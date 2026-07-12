@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <title>考题训练｜项目管理综合训练</title>
+  <link rel="stylesheet" href="styles/main.css"/>
+  <link rel="stylesheet" href="styles/question-training.css"/>
+<link rel="stylesheet" href="styles/global-shortcuts.css"/>
+<link rel="stylesheet" href="styles/subscription.css"/>
+<link rel="stylesheet" href="styles/user-center.css"/>
+</head>
+<body class="question-training-page">
+  <div class="question-training-app">
+    <header class="qt-topbar">
+      <div class="qt-brand">
+        <a class="qt-back-link" href="index.html" title="返回知识图谱首页">←</a>
+        <div>
+          <h1>考题训练</h1>
+          <p>独立训练页面：支持单题、当前题库与已发布综合试卷训练。</p>
+        </div>
+      </div>
+      <div class="qt-actions">
+        <a class="qt-nav-btn" href="question-bank.html" target="_blank" rel="noopener" data-permission="accessQuestionBank" data-permission-mode="hide">题库管理</a>
+        <a class="qt-nav-btn" href="user-management.html" target="_blank" rel="noopener" data-permission="accessUserManagement" data-permission-mode="hide">用户管理</a>
+        <a class="qt-nav-btn" href="system-settings.html" target="_blank" rel="noopener" data-permission="accessSystemSettings" data-permission-mode="hide">系统设置</a>
+        <a class="qt-nav-btn" href="knowledge-recall.html" target="_blank" rel="noopener" data-permission="useDeepRecall" data-permission-mode="hide">深度回忆</a>
+        <div class="auth-status" id="authStatus">访客只读</div>
+        <button class="auth-login-btn" id="authLoginBtn" type="button">登录</button>
+        <button class="auth-logout-btn" id="authLogoutBtn" type="button" style="display:none">退出</button>
+      </div>
+    </header>
+    <main class="question-page-shell show" id="questionModal" aria-label="考题训练独立页面">
+<div aria-labelledby="questionTitle" aria-modal="true" class="modal question-modal" role="dialog">
+<div class="question-head">
+<div>
+<h2 id="questionTitle">PMP 考题破案模式｜MVP 示例</h2>
+<div class="sub">像侦探一样点击题干线索，把线索连接到知识点，再用本题图谱推导答案。</div>
+<div aria-label="考题训练字体缩放" class="question-font-tools">
+<span class="font-tool-label">字体</span>
+<button data-q-font="small" id="qFontSmallBtn" title="缩小字体" type="button">A-</button>
+<button data-q-font="normal" id="qFontNormalBtn" title="默认字体" type="button">A</button>
+<button data-q-font="large" id="qFontLargeBtn" title="放大字体" type="button">A+</button>
+<button data-q-font="xlarge" id="qFontXLargeBtn" title="超大字体" type="button">A++</button>
+</div>
+</div>
+<button class="question-close" id="closeQuestionBtn" title="返回图谱首页">← 首页</button>
+</div>
+<div class="q-tabs" aria-label="破案模式内容切换" role="tablist">
+<button class="q-tab active" data-q-tab="question" id="qTabQuestion" role="tab" type="button" aria-selected="true" aria-controls="qPanelQuestion">题目</button>
+<button class="q-tab" data-q-tab="graph" id="qTabGraph" role="tab" type="button" aria-selected="false" aria-controls="qPanelGraph">推理图谱</button>
+<button class="q-tab" data-q-tab="notes" id="qTabNotes" role="tab" type="button" aria-selected="false" aria-controls="qPanelNotes">侦探笔记</button>
+</div>
+<div class="question-body q-case-body">
+<section class="q-panel q-tab-panel active" data-q-tab-panel="question" id="qPanelQuestion" role="tabpanel" aria-labelledby="qTabQuestion">
+<div class="q-question-layout">
+<div class="q-question-main">
+<div class="q-paper-bar" id="qPaperBar">
+  <label>综合试卷
+    <select id="qPaperSelect"><option value="">单题 / 当前题库训练</option></select>
+  </label>
+  <button type="button" id="qStartPaperBtn">开始试卷</button>
+  <button type="button" id="qExitPaperBtn">退出试卷</button>
+  <span id="qPaperProgress">未选择试卷</span>
+</div>
+<h3 id="qQuestionHeading">题目：敏捷迭代中期的新需求</h3>
+<div class="q-stem" id="qStem"></div>
+<div class="q-options" id="qOptions"></div>
+<div class="q-actions"><button id="qPrevQuestionBtn">上一题</button><button id="qNextQuestionBtn">下一题</button><button class="primary" id="qSubmitBtn">提交答案</button><button id="qResetBtn">重置本题</button><button id="qDeepRecallBtn" type="button">深度回忆</button></div>
+<div class="q-mini-note">提示：点击题干中你认为有价值的关键词，关键词只会高亮标记；完整线索解释请到“侦探笔记”查看。</div>
+</div>
+<aside class="q-evidence-dock" aria-label="简易证据栏">
+<div class="q-evidence-head"><span>证据栏</span><small>简略</small></div>
+<div class="q-chip-list" id="qClues"></div>
+<div class="q-score" id="qScore"></div>
+</aside>
+</div>
+</section>
+<section class="q-panel q-tab-panel" data-q-tab-panel="graph" id="qPanelGraph" role="tabpanel" aria-labelledby="qTabGraph" hidden>
+<div class="q-tab-section-head">
+<div><h3>推理图谱</h3><p>按“关键词 → 回忆知识点 → 提炼判断规则 → 锁定答案”的顺序逐步解锁本题推理链；排除干扰项合并在锁定答案行内完成。</p></div>
+<div class="q-actions"><button class="primary" id="qGraphBtn">生成本题图谱</button><button id="qAddToCanvasBtn">加入总图谱</button><button id="qFlashBtn">生成闪卡</button></div>
+</div>
+<div class="q-graph" id="qGraph"></div>
+</section>
+<section class="q-panel q-tab-panel" data-q-tab-panel="notes" id="qPanelNotes" role="tabpanel" aria-labelledby="qTabNotes" hidden>
+<div class="q-tab-section-head">
+<div><h3>侦探笔记</h3><p>这里集中展示完整线索解释、知识点连接、选项陷阱和复盘结论。</p></div>
+</div>
+<div class="q-detective-notes" id="qDetectiveNotes"></div>
+<div class="q-concepts" id="qConcepts"></div>
+<div class="q-review" id="qReview"></div>
+</section>
+</div>
+</div>
+</main>
+
+  </div>
+  <div class="status-chip" id="status"></div>
+  <div class="modal-backdrop auth-backdrop" id="authModal">
+<div aria-labelledby="authTitle" aria-modal="true" class="modal auth-modal" role="dialog">
+<div class="auth-head">
+<div>
+<h2 id="authTitle">登录后可编辑</h2>
+<p id="authReason">未登录时只能查看图谱，登录后可以新增、编辑、连线和保存自己的内容。</p>
+</div>
+<button class="auth-close" id="authCloseBtn" title="关闭登录窗口">×</button>
+</div>
+<div class="auth-body">
+<label>用户名
+        <input autocomplete="username" id="authUsername" placeholder="请输入用户名"/>
+</label>
+<label>密码
+        <input autocomplete="current-password" id="authPassword" placeholder="请输入密码" type="password"/>
+</label>
+<div class="auth-msg" id="authMsg"></div>
+<div class="auth-actions">
+<button class="primary" id="authDoLoginBtn">登录</button>
+<button id="authRegisterBtn">注册并登录</button>
+</div>
+<div class="auth-note">
+        当前为本地单文件多用户：账号和数据保存在本浏览器 localStorage 中。不同用户的数据互相隔离；如需跨设备/真正安全登录，需要后续接入服务器。
+      </div>
+</div>
+</div>
+</div>
+<script defer src="src/28-app-storage.js"></script>
+<script defer src="src/29-auth-core.js"></script>
+<script defer src="src/34-role-permissions.js"></script>
+<script defer src="src/37-subscription-plans.js"></script>
+<script defer src="src/37-subscription-orders.js"></script>
+<script defer src="src/37-subscription-redeem-codes.js"></script>
+<script defer src="src/37-subscription-core.js"></script>
+<script defer src="src/32-wechat-login.js"></script>
+<script defer src="src/33-user-center.js"></script>
+<script defer src="src/39-global-shortcuts.js"></script>
+<script defer src="src/50-question-data.js"></script>
+<script defer src="src/72-question-training-page.js"></script>
+<script defer src="src/60-question-bank.js"></script>
+<script defer src="src/70-question-trainer.js"></script>
+<script defer src="src/80-question-font-scale.js"></script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>系统设置｜知识图谱平台</title>
+  <link rel="stylesheet" href="styles/user-management.css"/>
+  <link rel="stylesheet" href="styles/system-settings.css"/>
+  <link rel="stylesheet" href="styles/global-shortcuts.css"/>
+  <link rel="stylesheet" href="styles/subscription.css"/>
+<link rel="stylesheet" href="styles/user-center.css"/>
+</head>
+<body>
+  <div class="ss-app" id="systemSettingsApp">
+    <header class="um-topbar ss-topbar">
+      <div class="um-brand">
+        <a class="um-back" href="index.html" title="返回知识图谱首页">←</a>
+        <div>
+          <p class="um-kicker">System Administration</p>
+          <h1>系统设置</h1>
+          <p>集中维护角色主题、登录配置、权限模板与系统操作日志，后续可扩展全局参数、公告、备份与审计。</p>
+        </div>
+      </div>
+      <div class="um-top-actions">
+        <div class="auth-status" id="authStatus">未登录 · 游客</div>
+        <a class="um-nav-btn" href="user-management.html">用户管理</a>
+        <a class="um-nav-btn" href="question-bank.html">题库管理</a>
+      </div>
+    </header>
+
+    <main class="ss-layout">
+      <aside class="ss-sidebar">
+        <button class="active" type="button" data-ss-tab="themes">角色主题</button>
+        <button type="button" data-ss-tab="wechat">微信登录</button>
+        <button type="button" data-ss-tab="permissions">权限模板</button>
+        <button type="button" data-ss-tab="subscriptions">订阅套餐</button>
+        <button type="button" data-ss-tab="logs">操作日志</button>
+      </aside>
+
+      <section class="ss-content">
+        <section class="ss-pane active" data-ss-panel="themes">
+          <div class="um-panel">
+            <div class="um-card-head small">
+              <div>
+                <h2>角色主题</h2>
+                <p>为不同角色设置登录后的主题色。首页、题库、训练、回忆和管理页面会自动应用。</p>
+              </div>
+            </div>
+            <div class="um-role-theme-panel ss-role-theme-panel" id="ssRoleThemePanel"></div>
+          </div>
+        </section>
+
+        <section class="ss-pane" data-ss-panel="wechat">
+          <div class="um-panel">
+            <div class="um-card-head small">
+              <div>
+                <h2>微信登录配置</h2>
+                <p>配置微信开放平台扫码登录。当前纯前端版本保留本地演示扫码能力，正式接入需要后端换取 openid/unionid。</p>
+              </div>
+            </div>
+            <div class="um-wechat-config" id="ssWechatConfigPanel"></div>
+          </div>
+        </section>
+
+        <section class="ss-pane" data-ss-panel="permissions">
+          <div class="um-panel">
+            <div class="um-card-head small">
+              <div>
+                <h2>角色权限模板</h2>
+                <p>当前版本为前端权限提示与拦截；正式网络版仍需后端二次校验。</p>
+              </div>
+            </div>
+            <div class="um-permission-matrix ss-permission-matrix" id="ssPermissionMatrix"></div>
+          </div>
+        </section>
+
+
+        <section class="ss-pane" data-ss-panel="subscriptions">
+          <div class="um-panel">
+            <div class="um-card-head small">
+              <div>
+                <h2>学员订阅套餐</h2>
+                <p>订阅权益只对学员角色生效；管理员和教师/教研自动绕过订阅限制，游客只保留公开示例体验。</p>
+              </div>
+            </div>
+            <div id="ssSubscriptionPanel"></div>
+          </div>
+        </section>
+
+        <section class="ss-pane" data-ss-panel="logs">
+          <div class="um-panel log-panel">
+            <div class="um-card-head small">
+              <div>
+                <h2>系统操作日志</h2>
+                <p>记录登录、注册、主题、微信配置、用户导入导出等后台操作。</p>
+              </div>
+              <button id="ssClearLogsBtn" type="button">清空</button>
+            </div>
+            <div class="um-log-list" id="ssLogList"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div class="um-toast" id="ssToast"></div>
+<script defer src="src/28-app-storage.js"></script>
+<script defer src="src/29-auth-core.js"></script>
+<script defer src="src/34-role-permissions.js"></script>
+<script defer src="src/37-subscription-plans.js"></script>
+<script defer src="src/37-subscription-orders.js"></script>
+<script defer src="src/37-subscription-redeem-codes.js"></script>
+<script defer src="src/37-subscription-core.js"></script>
+<script defer src="src/31-admin-utils.js"></script>
+<script defer src="src/32-wechat-login.js"></script>
+<script defer src="src/33-user-center.js"></script>
+<script defer src="src/39-global-shortcuts.js"></script>
+<script defer src="src/36-system-settings.js"></script>
+</body>
+</html>

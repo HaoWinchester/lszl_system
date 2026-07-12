@@ -1,0 +1,89 @@
+/* 系统设置独立页面 */
+.ss-app{
+  width:min(1480px,calc(100vw - 32px));
+  margin:0 auto;
+  padding:22px 0 34px;
+}
+.ss-topbar{
+  margin-bottom:16px;
+}
+.ss-layout{
+  display:grid;
+  grid-template-columns:240px minmax(0,1fr);
+  gap:16px;
+  align-items:start;
+}
+.ss-sidebar{
+  position:sticky;
+  top:16px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  border:1px solid rgba(148,163,184,.28);
+  border-radius:26px;
+  background:rgba(255,255,255,.88);
+  box-shadow:0 18px 50px rgba(15,23,42,.10);
+  backdrop-filter:blur(14px);
+  padding:14px;
+}
+.ss-sidebar button{
+  width:100%;
+  text-align:left;
+  border-radius:16px;
+}
+.ss-sidebar button.active{
+  color:#fff;
+  border-color:transparent;
+  background:linear-gradient(135deg,var(--role-primary,#2563eb),var(--role-accent,#7c3aed));
+}
+.ss-content{
+  min-width:0;
+}
+.ss-pane{
+  display:none;
+}
+.ss-pane.active{
+  display:block;
+}
+.ss-content .um-panel{
+  margin-bottom:16px;
+}
+.ss-role-theme-panel{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.ss-permission-matrix{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.ss-content .um-wechat-config{
+  max-width:860px;
+}
+@media(max-width:980px){
+  .ss-layout{
+    grid-template-columns:1fr;
+  }
+  .ss-sidebar{
+    position:static;
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+  }
+  .ss-sidebar button{
+    text-align:center;
+  }
+  .ss-role-theme-panel,
+  .ss-permission-matrix{
+    grid-template-columns:1fr;
+  }
+}
+@media(max-width:640px){
+  .ss-app{
+    width:min(100vw - 20px,760px);
+    padding-top:10px;
+  }
+  .ss-sidebar{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
