@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 项目结构（重构后）
+
+本仓库已重构为前后端分离：
+
+- `legacy/`：**原版纯前端代码**（HTML + 原生 JS + CSS，localStorage 存储），仅作参考和样式来源。独立运行：`cd legacy && python3 serve.py`（占 8000 端口）。
+- `backend/`：**新后端**，FastAPI + PostgreSQL + Alembic。启动：`cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000`。默认管理员 `admin / admin123`。数据存 PostgreSQL（本地 `/tmp` socket）。
+- `frontend/`：**新前端**，Vite + React + TypeScript，复用原版样式（`legacy/styles/*.css` 已复制到 `frontend/src/styles/`，各页面用原版 className）。启动：`cd frontend && pnpm dev`（端口 5173，proxy `/api` → 8000）。
+- `docs/`：架构与功能文档，含 `功能基线-重构参考.md`（重构基线 + SQL 建模依据）。
+
+> 下方「原版架构」部分描述的是 `legacy/` 的原始设计（全局脚本加载顺序、KGAuthCore 等），供理解数据模型和历史；新项目的 API、数据模型、认证见 `backend/app/`。
+
 ## 项目概述
 
 「通用知识点关系图谱工具」——纯前端、零构建、零框架的知识图谱编辑器，附带考题训练、题库管理、深度知识回忆、用户/角色/订阅管理等功能。所有数据存储在浏览器 `localStorage`，无后端、无数据库、无 npm 依赖。

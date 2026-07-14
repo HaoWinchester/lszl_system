@@ -1,0 +1,21 @@
+# Web 框架
+fastapi>=0.111,<0.112
+uvicorn[standard]>=0.30,<0.31
+
+# ORM + DB（async）
+sqlalchemy[asyncio]>=2.0.30,<2.1
+asyncpg>=0.29,<0.30
+
+# 迁移
+alembic>=1.13,<1.14
+
+# 配置 & 校验
+pydantic>=2.7,<3
+pydantic-settings>=2.3,<3
+
+# 表单/文件（阶段 2 登录表单预留）
+python-multipart>=0.0.9,<0.1
+
+# 认证（阶段 2 预留：session cookie + 密码 hash）
+itsdangerous>=2.2,<3
+bcrypt>=4.1,<5

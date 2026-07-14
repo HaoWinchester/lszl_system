@@ -1,0 +1,154 @@
+"""题库管理路由：题库 / 题目 / 试卷（组卷 + 发布）。按当前用户 owner 隔离。"""
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.auth import CurrentUser
+from app.db.session import get_db
+from app.services import question_service
+
+router = APIRouter(tags=["question-bank"])
+DB = Annotated[AsyncSession, Depends(get_db)]
+
+
+def _nf() -> HTTPException:
+    return HTTPException(status_code=404, detail="不存在或无权访问")
+
+
+# ---------- 题库 ----------
+@router.get("/banks")
+async def list_banks(db: DB, user: CurrentUser, subject: str | None = Query(None)):
+    return {"banks": await question_service.list_banks(db, user.username, subject)}
+
+
+@router.post("/banks")
+async def create_bank(body: dict, db: DB, user: CurrentUser):
+    b = await question_service.create_bank(db, user.username, body)
+    return {"bank": question_service.bank_to_dict(b)}
+
+
+@router.put("/banks/{bank_id}")
+async def update_bank(bank_id: str, body: dict, db: DB, user: CurrentUser):
+    b = await question_service.update_bank(db, user.username, bank_id, body)
+    if not b:
+        raise _nf()
+    return {"bank": question_service.bank_to_dict(b)}
+
+
+@router.delete("/banks/{bank_id}")
+async def delete_bank(bank_id: str, db: DB, user: CurrentUser):
+    if not await question_service.delete_bank(db, user.username, bank_id):
+        raise _nf()
+    return {"ok": True}
+
+
+# ---------- 题目 ----------
+@router.get("/banks/{bank_id}/questions")
+async def list_questions(
+    db: DB,
+    user: CurrentUser,
+    bank_id: str,
+    query: str | None = Query(None),
+    domain: str | None = Query(None),
+    difficulty: str | None = Query(None),
+    page: int = 1,
+    page_size: int = 20,
+):
+    items, total = await question_service.list_questions(
+        db, user.username, bank_id, query=query, domain=domain, difficulty=difficulty, page=page, page_size=page_size
+    )
+    return {"questions": items, "total": total, "page": page, "page_size": page_size}
+
+
+@router.post("/banks/{bank_id}/questions")
+async def create_question(bank_id: str, body: dict, db: DB, user: CurrentUser):
+    q = await question_service.create_question(db, user.username, bank_id, body)
+    if not q:
+        raise _nf()
+    return {"question": question_service.question_to_dict(q)}
+
+
+@router.get("/questions/{question_id}")
+async def get_question(question_id: str, db: DB, user: CurrentUser):
+    q = await question_service.get_question(db, user.username, question_id)
+    if not q:
+        raise _nf()
+    return {"question": question_service.question_to_dict(q)}
+
+
+@router.put("/questions/{question_id}")
+async def update_question(question_id: str, body: dict, db: DB, user: CurrentUser):
+    q = await question_service.update_question(db, user.username, question_id, body)
+    if not q:
+        raise _nf()
+    return {"question": question_service.question_to_dict(q)}
+
+
+@router.delete("/questions/{question_id}")
+async def delete_question(question_id: str, db: DB, user: CurrentUser):
+    if not await question_service.delete_question(db, user.username, question_id):
+        raise _nf()
+    return {"ok": True}
+
+
+# ---------- 试卷 ----------
+@router.get("/papers")
+async def list_papers(db: DB, user: CurrentUser, status: str | None = Query(None)):
+    return {"papers": await question_service.list_papers(db, user.username, status)}
+
+
+@router.post("/papers")
+async def create_paper(body: dict, db: DB, user: CurrentUser):
+    p = await question_service.create_paper(db, user.username, body)
+    return {"paper": question_service.paper_to_dict(p)}
+
+
+@router.get("/papers/{paper_id}")
+async def get_paper(paper_id: str, db: DB, user: CurrentUser):
+    p = await question_service.get_paper_with_questions(db, user.username, paper_id)
+    if not p:
+        raise _nf()
+    return {"paper": p}
+
+
+@router.put("/papers/{paper_id}")
+async def update_paper(paper_id: str, body: dict, db: DB, user: CurrentUser):
+    p = await question_service.update_paper(db, user.username, paper_id, body)
+    if not p:
+        raise _nf()
+    return {"paper": question_service.paper_to_dict(p)}
+
+
+@router.delete("/papers/{paper_id}")
+async def delete_paper(paper_id: str, db: DB, user: CurrentUser):
+    if not await question_service.delete_paper(db, user.username, paper_id):
+        raise _nf()
+    return {"ok": True}
+
+
+@router.post("/papers/{paper_id}/compose")
+async def compose_paper(paper_id: str, body: dict, db: DB, user: CurrentUser):
+    n = await question_service.compose_paper(
+        db, user.username, paper_id, body.get("bankIds") or [], body.get("quotas") or {}
+    )
+    if n < 0:
+        raise _nf()
+    return {"picked": n}
+
+
+@router.post("/papers/{paper_id}/publish")
+async def publish_paper(paper_id: str, db: DB, user: CurrentUser):
+    p = await question_service.set_published(db, user.username, paper_id, True)
+    if not p:
+        raise _nf()
+    return {"paper": question_service.paper_to_dict(p)}
+
+
+@router.post("/papers/{paper_id}/unpublish")
+async def unpublish_paper(paper_id: str, db: DB, user: CurrentUser):
+    p = await question_service.set_published(db, user.username, paper_id, False)
+    if not p:
+        raise _nf()
+    return {"paper": question_service.paper_to_dict(p)}

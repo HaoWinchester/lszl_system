@@ -1,0 +1,243 @@
+/*
+ * 用户中心：当前登录用户自助修改个人资料。
+ * 该组件跨页面使用，不依赖后台用户管理页。
+ */
+.user-center-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:2147483200;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  background:rgba(15,23,42,.45);
+  box-sizing:border-box;
+}
+.user-center-backdrop.show{
+  display:flex;
+}
+.user-center-backdrop .modal{
+  box-sizing:border-box;
+  box-shadow:0 26px 86px rgba(15,23,42,.30);
+}
+.user-center-backdrop button{
+  appearance:none;
+  border:0;
+  cursor:pointer;
+  font-family:inherit;
+  font-weight:900;
+  transition:.16s ease;
+}
+.user-center-backdrop button:hover{
+  transform:translateY(-1px);
+}
+.user-center-backdrop button.primary,
+.kg-user-center-actions .primary{
+  background:#2563eb;
+  color:#fff;
+}
+.auth-status{
+  cursor:pointer;
+  user-select:none;
+}
+.auth-status:hover,
+.auth-status:focus-visible{
+  transform:translateY(-1px);
+  box-shadow:0 8px 20px rgba(15,23,42,.10),0 0 0 1px rgba(37,99,235,.22);
+  outline:none;
+}
+.auth-status::after{
+  content:"";
+  width:0;
+  height:0;
+  margin-left:6px;
+  border-left:4px solid transparent;
+  border-right:4px solid transparent;
+  border-top:5px solid currentColor;
+  opacity:.55;
+}
+.kg-user-center-modal{
+  width:min(620px,calc(100vw - 28px));
+  max-height:calc(100vh - 34px);
+  padding:0;
+  overflow:hidden;
+  border-radius:26px;
+  background:linear-gradient(135deg,#ffffff 0%,#f8fbff 46%,#f5f3ff 100%);
+}
+.kg-user-center-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  padding:20px 22px 14px;
+  border-bottom:1px solid rgba(148,163,184,.18);
+  background:rgba(255,255,255,.90);
+  backdrop-filter:blur(12px);
+}
+.kg-user-center-title{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  min-width:0;
+}
+.kg-user-avatar{
+  width:46px;
+  height:46px;
+  border-radius:17px;
+  display:grid;
+  place-items:center;
+  color:#fff;
+  font-weight:1000;
+  font-size:18px;
+  background:linear-gradient(135deg,var(--role-primary,#2563eb),var(--role-accent,#22c55e));
+  box-shadow:0 12px 28px rgba(37,99,235,.18);
+  flex:0 0 auto;
+}
+.kg-user-center-head h2{
+  margin:0;
+  font-size:22px;
+  color:#0f172a;
+  line-height:1.16;
+}
+.kg-user-center-head p{
+  margin:5px 0 0;
+  color:#64748b;
+  font-size:13px;
+  line-height:1.5;
+}
+.kg-user-center-close{
+  width:34px;
+  height:34px;
+  min-width:34px;
+  padding:0;
+  border-radius:12px;
+  background:#f1f5f9;
+  color:#64748b;
+  box-shadow:none;
+}
+.kg-user-center-body{
+  padding:18px 22px 20px;
+  max-height:calc(100vh - 130px);
+  overflow:auto;
+}
+.kg-user-center-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:13px;
+}
+.kg-user-field{
+  display:block;
+  color:#334155;
+  font-size:13px;
+  font-weight:900;
+}
+.kg-user-field.full{
+  grid-column:1/-1;
+}
+.kg-user-field span{
+  display:block;
+  margin-bottom:6px;
+}
+.kg-user-field input,
+.kg-user-field textarea{
+  width:100%;
+  box-sizing:border-box;
+  border:1px solid rgba(148,163,184,.36);
+  border-radius:14px;
+  padding:11px 12px;
+  background:#fff;
+  color:#0f172a;
+  font:inherit;
+  font-weight:700;
+  outline:none;
+}
+.kg-user-field textarea{
+  min-height:86px;
+  resize:vertical;
+  line-height:1.55;
+}
+.kg-user-field input:focus,
+.kg-user-field textarea:focus{
+  border-color:var(--role-primary,#2563eb);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--role-primary,#2563eb) 14%,transparent);
+}
+.kg-user-field input[readonly]{
+  background:#f8fafc;
+  color:#64748b;
+}
+.kg-user-readonly-line{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  grid-column:1/-1;
+}
+.kg-user-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  border-radius:999px;
+  padding:6px 10px;
+  background:#eef2ff;
+  color:#3730a3;
+  font-size:12px;
+  font-weight:950;
+}
+.kg-user-password-box{
+  grid-column:1/-1;
+  margin-top:2px;
+  padding:13px;
+  border-radius:18px;
+  background:rgba(255,255,255,.72);
+  box-shadow:inset 0 0 0 1px rgba(148,163,184,.18);
+}
+.kg-user-password-box h3{
+  margin:0 0 9px;
+  color:#0f172a;
+  font-size:15px;
+}
+.kg-user-center-tip{
+  margin:12px 0 0;
+  padding:10px 11px;
+  border-radius:14px;
+  background:#fffbeb;
+  color:#92400e;
+  font-size:12px;
+  line-height:1.55;
+}
+.kg-user-center-msg{
+  min-height:20px;
+  margin:11px 0 0;
+  color:#dc2626;
+  font-size:13px;
+  line-height:1.45;
+  font-weight:850;
+}
+.kg-user-center-msg.ok{
+  color:#16a34a;
+}
+.kg-user-center-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  margin-top:14px;
+}
+.kg-user-center-actions button{
+  border-radius:14px;
+  padding:10px 15px;
+}
+.kg-user-center-actions .primary{
+  background:linear-gradient(135deg,var(--role-primary,#2563eb),var(--role-accent,#22c55e));
+  color:#fff;
+}
+@media(max-width:640px){
+  .kg-user-center-grid{
+    grid-template-columns:1fr;
+  }
+  .kg-user-center-head{
+    padding:18px 18px 12px;
+  }
+  .kg-user-center-body{
+    padding:16px 18px 18px;
+  }
+}

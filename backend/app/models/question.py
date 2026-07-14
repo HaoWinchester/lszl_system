@@ -1,0 +1,80 @@
+"""题库、题目、试卷模型。按 owner_id 隔离；认知标注（关键词/知识点/推理）作为题目 JSONB 字段。"""
+
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db.base import Base
+
+DRAFT = "draft"
+PUBLISHED = "published"
+
+
+class QuestionBank(Base):
+    __tablename__ = "question_banks"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.username"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    subject: Mapped[str] = mapped_column(String(32), default="PMP")
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    version: Mapped[str] = mapped_column(String(32), default="1.0")
+    visibility: Mapped[str] = mapped_column(String(32), default="private")  # private/public-demo
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class Question(Base):
+    __tablename__ = "questions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    bank_id: Mapped[str] = mapped_column(String(64), ForeignKey("question_banks.id"), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    type: Mapped[str] = mapped_column(String(32), default="single_choice")
+    subject: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    difficulty: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    domain: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    topic: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    tags: Mapped[list] = mapped_column(JSONB, default=list)
+    stem_parts: Mapped[list] = mapped_column(JSONB, default=list)  # [{text, clue?}]
+    options: Mapped[list] = mapped_column(JSONB, default=list)  # [{id, text, trap, correct}]
+    correct_answer: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    analysis: Mapped[str | None] = mapped_column(Text, nullable=True)
+    clues: Mapped[list] = mapped_column(JSONB, default=list)
+    concepts: Mapped[list] = mapped_column(JSONB, default=list)
+    reasoning_steps: Mapped[list] = mapped_column(JSONB, default=list)
+    status: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ExamPaper(Base):
+    __tablename__ = "exam_papers"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.username"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    subject: Mapped[str] = mapped_column(String(32), default="PMP")
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    total_count: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(16), default=DRAFT)  # draft/published
+    quotas: Mapped[dict] = mapped_column(JSONB, default=dict)  # {domain: count}
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class PaperQuestion(Base):
+    __tablename__ = "paper_questions"
+
+    paper_id: Mapped[str] = mapped_column(String(64), ForeignKey("exam_papers.id"), primary_key=True)
+    question_id: Mapped[str] = mapped_column(String(64), ForeignKey("questions.id"), primary_key=True)
+    order_index: Mapped[int] = mapped_column(Integer, default=0)

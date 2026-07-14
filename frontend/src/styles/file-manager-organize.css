@@ -1,0 +1,381 @@
+/* v8.4.5 标签菜单滚动优化与左侧文件夹树 */
+.fm-tag-nav{margin:8px 14px 12px;padding:12px;border:1px solid var(--fm-border);border-radius:14px;background:var(--fm-surface)}
+.fm-section-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.fm-section-row button{border:0;background:none;color:var(--fm-accent);cursor:pointer;font-size:12px}
+.fm-tag-filter-list{display:flex;flex-wrap:wrap;gap:6px;max-height:112px;overflow:auto}.fm-tag-filter-list button{border:1px solid var(--fm-border);background:var(--fm-faint);color:var(--fm-muted);border-radius:999px;padding:5px 9px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fm-tag-filter-list button.is-active{color:var(--fm-accent);border-color:color-mix(in srgb,var(--fm-accent) 40%,var(--fm-border));background:color-mix(in srgb,var(--fm-accent) 10%,transparent)}
+.fm-tag{border-left:3px solid var(--tag-color,#64748b)}
+.fm-organize-popover{position:fixed;z-index:1250;width:min(280px,calc(100vw - 20px));padding:10px;border:1px solid var(--fm-border);border-radius:14px;background:var(--fm-surface);box-shadow:0 18px 55px rgba(0,0,0,.26)}
+.fm-organize-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 4px 10px}.fm-organize-head>div{display:grid}.fm-organize-head small{color:var(--fm-muted)}.fm-organize-head button{border:0;background:none;color:var(--fm-muted);font-size:22px;cursor:pointer}
+#fmTagPickerList{display:grid;gap:3px;max-height:260px;overflow:auto}.fm-tag-choice{display:grid;grid-template-columns:14px 1fr;align-items:center;gap:9px;padding:9px;border:0;border-radius:9px;background:transparent;color:var(--fm-text);text-align:left;cursor:pointer}.fm-tag-choice:hover,.fm-tag-choice.is-active{background:var(--fm-faint)}.fm-tag-choice.is-active{box-shadow:inset 2px 0 0 var(--fm-accent)}.fm-tag-choice i{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--tag-color);background:var(--tag-color)}.fm-tag-choice.is-none i{background:transparent;border-color:var(--fm-muted)}.fm-organize-create{width:100%;display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:9px;border:0;border-top:1px solid var(--fm-border);border-radius:0;background:transparent;color:var(--fm-text);cursor:pointer}.fm-organize-create:hover{color:var(--fm-accent);background:var(--fm-faint)}.fm-organize-empty{color:var(--fm-muted);padding:10px;text-align:center}
+@media(max-width:760px){.fm-tag-nav{display:none}}
+.fm-card-tag-dot{position:absolute;right:14px;bottom:14px;z-index:5;width:16px;height:16px;padding:0;border-radius:50%;cursor:pointer;transition:opacity .15s ease,transform .15s ease,box-shadow .15s ease,background .15s ease}.fm-card-tag-dot.is-tagged{border:2px solid color-mix(in srgb,var(--tag-color) 82%,#fff);background:var(--tag-color);box-shadow:0 0 0 2px color-mix(in srgb,var(--tag-color) 18%,transparent)}.fm-card-tag-dot.is-empty{border:2px solid var(--fm-muted);background:transparent;opacity:0;pointer-events:none;transform:scale(.82)}.fm-file-card:hover .fm-card-tag-dot.is-empty,.fm-file-card.is-selected .fm-card-tag-dot.is-empty,.fm-file-card:focus-within .fm-card-tag-dot.is-empty{opacity:.72;pointer-events:auto;transform:scale(1)}.fm-card-tag-dot:hover,.fm-card-tag-dot:focus-visible{opacity:1!important;transform:scale(1.18)!important;outline:none;box-shadow:0 0 0 4px color-mix(in srgb,var(--tag-color,var(--fm-accent)) 20%,transparent)}.fm-tag-search{width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid var(--fm-border);border-radius:9px;background:var(--fm-faint);color:var(--fm-text);padding:9px 10px}.fm-tag-create-entry{position:relative}.fm-tag-create-submenu{position:absolute;left:calc(100% + 8px);bottom:0;z-index:2;width:238px;display:none;gap:9px;padding:11px;border:1px solid var(--fm-border);border-radius:12px;background:var(--fm-surface);box-shadow:0 16px 45px rgba(0,0,0,.26)}.fm-tag-create-entry:focus-within .fm-tag-create-submenu,.fm-tag-create-entry.is-open .fm-tag-create-submenu{display:grid}.fm-tag-create-entry.opens-left .fm-tag-create-submenu{left:auto;right:calc(100% + 8px)}.fm-tag-create-submenu label{display:grid;gap:5px;color:var(--fm-muted);font-size:11px}.fm-tag-create-submenu input,.fm-tag-create-submenu button{min-width:0;border:1px solid var(--fm-border);border-radius:8px;background:var(--fm-faint);color:var(--fm-text);padding:8px}.fm-tag-color-row{display:grid;grid-template-columns:44px 1fr;gap:7px}.fm-tag-color-row input[type=color]{padding:3px}.fm-tag-color-row button{cursor:pointer;color:var(--fm-accent);font-weight:800}
+.fm-tag-nav[hidden]{display:none}.fm-file-card .fm-file-stats{padding-right:28px}
+
+
+/* v8.4.3：标签菜单沿用文件右键菜单的视觉语言 */
+.fm-organize-popover{
+  width:min(280px,calc(100vw - 20px));
+  padding:6px;
+  border:1px solid var(--fm-border-strong);
+  border-radius:12px;
+  background:var(--fm-surface);
+  box-shadow:0 18px 50px rgba(0,0,0,.24);
+}
+.fm-organize-head{
+  min-height:35px;
+  padding:0 6px 5px 10px;
+}
+.fm-organize-head strong{
+  color:var(--fm-text);
+  font-size:11px;
+  font-weight:700;
+}
+.fm-organize-head button{
+  width:30px;
+  height:30px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border-radius:8px;
+  color:var(--fm-muted);
+  font-size:18px;
+  line-height:1;
+}
+.fm-organize-head button:hover,
+.fm-organize-head button:focus-visible{
+  background:var(--fm-surface-3);
+  color:var(--fm-text);
+  outline:none;
+}
+.fm-tag-search{
+  height:35px;
+  margin:0 0 5px;
+  padding:0 10px;
+  border:1px solid var(--fm-border);
+  border-radius:8px;
+  background:transparent;
+  color:var(--fm-text);
+  font-size:11px;
+  font-weight:700;
+}
+.fm-tag-search::placeholder{
+  color:var(--fm-muted);
+  font-weight:700;
+}
+.fm-tag-search:focus{
+  border-color:color-mix(in srgb,var(--fm-accent) 55%,var(--fm-border));
+  outline:2px solid color-mix(in srgb,var(--fm-accent) 18%,transparent);
+  outline-offset:-1px;
+}
+#fmTagPickerList{
+  display:grid;
+  gap:0;
+  max-height:260px;
+  overflow:auto;
+}
+.fm-tag-choice{
+  width:100%;
+  height:35px;
+  display:grid;
+  grid-template-columns:16px minmax(0,1fr);
+  align-items:center;
+  gap:9px;
+  padding:0 10px;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  color:var(--fm-text);
+  font-size:11px;
+  font-weight:700;
+  text-align:left;
+  cursor:pointer;
+}
+.fm-tag-choice:hover,
+.fm-tag-choice:focus-visible,
+.fm-tag-choice.is-active{
+  background:var(--fm-surface-3);
+  outline:none;
+}
+.fm-tag-choice.is-active{
+  box-shadow:none;
+  color:var(--fm-accent);
+}
+.fm-tag-choice i{
+  width:10px;
+  height:10px;
+  justify-self:center;
+}
+.fm-organize-create{
+  width:100%;
+  height:35px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:9px;
+  margin:5px 0 0;
+  padding:0 10px;
+  border:0;
+  border-top:1px solid var(--fm-border);
+  border-radius:0 0 8px 8px;
+  background:transparent;
+  color:var(--fm-text);
+  font-size:11px;
+  font-weight:700;
+  text-align:left;
+  cursor:pointer;
+}
+.fm-organize-create:hover,
+.fm-organize-create:focus-visible{
+  background:var(--fm-surface-3);
+  color:var(--fm-accent);
+  outline:none;
+}
+.fm-organize-empty{
+  min-height:35px;
+  display:grid;
+  place-items:center;
+  padding:0 10px;
+  color:var(--fm-muted);
+  font-size:11px;
+  font-weight:700;
+}
+.fm-tag-create-submenu{
+  width:238px;
+  gap:7px;
+  padding:6px;
+  border:1px solid var(--fm-border-strong);
+  border-radius:12px;
+  background:var(--fm-surface);
+  box-shadow:0 18px 50px rgba(0,0,0,.24);
+}
+.fm-tag-create-submenu label{
+  gap:5px;
+  color:var(--fm-muted);
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.08em;
+}
+.fm-tag-create-submenu input{
+  height:35px;
+  box-sizing:border-box;
+  padding:0 10px;
+  border:1px solid var(--fm-border);
+  border-radius:8px;
+  background:transparent;
+  color:var(--fm-text);
+  font-size:11px;
+  font-weight:700;
+}
+.fm-tag-color-row{
+  grid-template-columns:44px 35px;
+  justify-content:space-between;
+  gap:7px;
+}
+.fm-tag-color-row input[type=color]{
+  height:35px;
+  padding:3px;
+}
+.fm-tag-create-confirm{
+  width:35px;
+  min-width:35px!important;
+  height:35px;
+  padding:0!important;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--fm-border)!important;
+  border-radius:8px;
+  background:transparent!important;
+  color:var(--fm-accent)!important;
+  cursor:pointer;
+}
+.fm-tag-create-confirm:hover,
+.fm-tag-create-confirm:focus-visible{
+  background:var(--fm-surface-3)!important;
+  border-color:var(--fm-border-strong)!important;
+  outline:none;
+}
+.fm-tag-create-confirm svg{
+  width:16px;
+  height:16px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2.4;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+
+/* v8.4.4：标签项悬浮管理与原位轻量编辑 */
+.fm-tag-choice-row{
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  border-radius:8px;
+}
+.fm-tag-choice-row .fm-tag-choice{
+  grid-column:1 / -1;
+  grid-row:1;
+  padding-right:68px;
+}
+.fm-tag-choice-row.is-none .fm-tag-choice{
+  padding-right:10px;
+}
+.fm-tag-choice span{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.fm-tag-row-actions{
+  grid-column:2;
+  grid-row:1;
+  z-index:2;
+  display:flex;
+  align-items:center;
+  gap:2px;
+  padding-right:4px;
+  opacity:0;
+  pointer-events:none;
+  transform:translateX(3px);
+  transition:opacity .12s ease,transform .12s ease;
+}
+.fm-tag-choice-row:hover .fm-tag-row-actions,
+.fm-tag-choice-row:focus-within .fm-tag-row-actions{
+  opacity:1;
+  pointer-events:auto;
+  transform:none;
+}
+.fm-tag-row-actions button,
+.fm-tag-inline-save,
+.fm-tag-inline-cancel{
+  width:28px;
+  height:28px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border:0;
+  border-radius:7px;
+  background:transparent;
+  color:var(--fm-muted);
+  cursor:pointer;
+}
+.fm-tag-row-actions button:hover,
+.fm-tag-row-actions button:focus-visible,
+.fm-tag-inline-save:hover,
+.fm-tag-inline-save:focus-visible,
+.fm-tag-inline-cancel:hover,
+.fm-tag-inline-cancel:focus-visible{
+  background:var(--fm-surface-3);
+  color:var(--fm-text);
+  outline:none;
+}
+.fm-tag-row-actions button.is-danger:hover,
+.fm-tag-row-actions button.is-danger:focus-visible{
+  color:var(--fm-danger);
+}
+.fm-tag-row-actions svg,
+.fm-tag-inline-save svg,
+.fm-tag-inline-cancel svg{
+  width:15px;
+  height:15px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.9;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.fm-tag-choice-row.is-editing{
+  grid-template-columns:1fr;
+  padding-bottom:5px;
+  background:color-mix(in srgb,var(--fm-surface-3) 72%,transparent);
+}
+.fm-tag-choice-row.is-editing>.fm-tag-choice{
+  color:var(--fm-accent);
+  background:var(--fm-surface-3);
+}
+.fm-tag-choice-row.is-editing>.fm-tag-row-actions{
+  opacity:0;
+  pointer-events:none;
+}
+.fm-tag-inline-editor{
+  grid-column:1 / -1;
+  padding:5px 6px 1px;
+}
+.fm-tag-inline-fields{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 36px 28px 28px;
+  gap:5px;
+  align-items:center;
+}
+.fm-tag-inline-name,
+.fm-tag-inline-color{
+  height:32px;
+  box-sizing:border-box;
+  border:1px solid var(--fm-border);
+  border-radius:7px;
+  background:var(--fm-surface);
+  color:var(--fm-text);
+  font-size:11px;
+  font-weight:700;
+}
+.fm-tag-inline-name{
+  min-width:0;
+  padding:0 9px;
+}
+.fm-tag-inline-color{
+  width:36px;
+  padding:3px;
+}
+.fm-tag-inline-name:focus,
+.fm-tag-inline-color:focus{
+  border-color:color-mix(in srgb,var(--fm-accent) 55%,var(--fm-border));
+  outline:2px solid color-mix(in srgb,var(--fm-accent) 18%,transparent);
+  outline-offset:-1px;
+}
+.fm-tag-inline-save{
+  color:var(--fm-accent);
+}
+.fm-tag-inline-cancel{
+  color:var(--fm-muted);
+}
+@media(hover:none){
+  .fm-tag-row-actions{
+    opacity:1;
+    pointer-events:auto;
+    transform:none;
+  }
+}
+
+
+/* v8.4.6：标签列表仅纵向滚动，主菜单保留二级菜单外溢空间 */
+#fmTagPickerList,
+.fm-tag-choice-row,
+.fm-tag-inline-editor,
+.fm-tag-inline-fields{
+  max-width:100%;
+  overflow-x:hidden;
+}
+#fmTagPickerList{
+  overflow-y:auto;
+  scrollbar-width:thin;
+}
+.fm-tag-choice,
+.fm-tag-choice span,
+.fm-tag-inline-name{
+  min-width:0;
+}
+
+
+/* v8.4.7：连接主菜单与二级菜单的透明悬浮缓冲区 */
+.fm-tag-create-submenu::before{
+  content:"";
+  position:absolute;
+  top:0;
+  bottom:0;
+  left:-10px;
+  width:10px;
+}
+.fm-tag-create-entry.opens-left .fm-tag-create-submenu::before{
+  left:auto;
+  right:-10px;
+}

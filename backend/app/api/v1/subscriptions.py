@@ -1,0 +1,82 @@
+"""订阅路由：学员查看/兑换/申请；管理员开通/审批/卡密。"""
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.auth import CurrentUser, require_role
+from app.db.session import get_db
+from app.models.user import User
+from app.services import subscription_service, system_service
+
+router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
+DB = Annotated[AsyncSession, Depends(get_db)]
+AdminUser = Annotated[User, Depends(require_role("admin"))]
+
+
+@router.get("/me")
+async def my_subscription(db: DB, user: CurrentUser):
+    return {"subscription": subscription_service.sub_to_dict(await subscription_service.get_subscription(db, user.username))}
+
+
+@router.get("/plans")
+async def plans(db: DB, _: CurrentUser):
+    return {"plans": await system_service.get_subscription_plans(db)}
+
+
+@router.post("/redeem")
+async def redeem(body: dict, db: DB, user: CurrentUser):
+    try:
+        s = await subscription_service.redeem(db, user.username, body.get("code", ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"subscription": subscription_service.sub_to_dict(s)}
+
+
+@router.post("/orders")
+async def create_order(body: dict, db: DB, user: CurrentUser):
+    o = await subscription_service.request_order(db, user.username, body.get("planId", "free"))
+    return {"order": subscription_service.order_to_dict(o)}
+
+
+# ---------- 管理员 ----------
+@router.put("/admin/{username}")
+async def admin_set(username: str, body: dict, db: DB, _: AdminUser):
+    s = await subscription_service.admin_set(
+        db, username, body.get("planId", "free"), body.get("status"), body.get("note"), "admin"
+    )
+    return {"subscription": subscription_service.sub_to_dict(s)}
+
+
+@router.get("/orders")
+async def list_orders(db: DB, _: AdminUser, status: str | None = Query(None)):
+    return {"orders": [subscription_service.order_to_dict(o) for o in await subscription_service.list_orders(db, status)]}
+
+
+@router.post("/orders/{order_id}/approve")
+async def approve(order_id: str, db: DB, admin: AdminUser):
+    try:
+        o = await subscription_service.approve_order(db, order_id, admin.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"order": subscription_service.order_to_dict(o)}
+
+
+@router.post("/orders/{order_id}/cancel")
+async def cancel(order_id: str, db: DB, admin: AdminUser):
+    o = await subscription_service.cancel_order(db, order_id, admin.username)
+    return {"order": subscription_service.order_to_dict(o)}
+
+
+@router.get("/redeem-codes")
+async def list_codes(db: DB, _: AdminUser):
+    return {"codes": [subscription_service.code_to_dict(c) for c in await subscription_service.list_codes(db)]}
+
+
+@router.post("/redeem-codes/generate")
+async def generate_codes(body: dict, db: DB, admin: AdminUser):
+    codes = await subscription_service.generate_codes(
+        db, body.get("planId", "monthly"), int(body.get("count", 1)), admin.username
+    )
+    return {"codes": codes}
