@@ -75,6 +75,7 @@ export default function Users() {
   const [logs, setLogs] = useState<AdminLog[]>([])
   const [perms, setPerms] = useState<{ rows: { role: string; permissions: string[] }[] } | null>(null)
   const [rightTab, setRightTab] = useState<'actions' | 'permissions' | 'logs'>('actions')
+  const [listToolsOpen, setListToolsOpen] = useState(false)
   const [toast, setToast] = useState('')
 
   const notify = (m: string) => {
@@ -310,14 +311,23 @@ export default function Users() {
       </section>
 
       <main className="um-layout">
-        <aside className="um-left-card">
+        <aside className={`um-left-card${listToolsOpen ? ' tools-expanded' : ''}`}>
           <div className="um-card-head">
             <div>
               <h2>用户列表</h2>
               <p>共 {total} 个账号</p>
             </div>
           </div>
-          <div className="um-list-tools">
+          <button
+            className={`um-list-tools-summary${listToolsOpen ? ' active' : ''}`}
+            type="button"
+            aria-expanded={listToolsOpen}
+            onClick={() => setListToolsOpen((open) => !open)}
+          >
+            <span>筛选与批量操作</span>
+            <AppIcon name="chevronDown" size="compact" />
+          </button>
+          <div className={`um-list-tools${listToolsOpen ? ' is-open' : ''}`}>
             <label className="um-field compact">
               <span>搜索用户</span>
               <input type="search" placeholder="用户名 / 姓名 / 邮箱 / 科目" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1) }} />

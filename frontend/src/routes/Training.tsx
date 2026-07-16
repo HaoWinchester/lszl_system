@@ -58,10 +58,15 @@ export default function Training() {
             </div>
           </div>
           <div className="qt-actions">
-            <Link className="qt-nav-btn" to="/question-bank">题库管理</Link>
-            <Link className="qt-nav-btn" to="/users">用户管理</Link>
-            <Link className="qt-nav-btn" to="/settings">系统设置</Link>
-            <Link className="qt-nav-btn" to="/recall">深度回忆</Link>
+            <details className="qt-secondary-nav" open>
+              <summary>管理入口 <AppIcon name="chevronDown" size="compact" /></summary>
+              <nav className="qt-secondary-nav-links" aria-label="训练页管理入口">
+                <Link className="qt-nav-btn" to="/question-bank">题库管理</Link>
+                <Link className="qt-nav-btn" to="/users">用户管理</Link>
+                <Link className="qt-nav-btn" to="/settings">系统设置</Link>
+                <Link className="qt-nav-btn" to="/recall">深度回忆</Link>
+              </nav>
+            </details>
             <div className={`auth-status${me ? ' logged-in' : ''}`}>{me ? (me.display_name || me.username) : '访客'}</div>
             <button className="auth-login-btn" type="button" hidden>登录</button>
             <button className="auth-logout-btn" type="button" hidden>退出登录</button>

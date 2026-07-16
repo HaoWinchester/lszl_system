@@ -71,6 +71,10 @@ export default function QuestionBank() {
     })
     await reloadQuestions(); notify('已保存')
   }
+  const openAnnotation = (tab: AnnoTab) => {
+    if (!editing) { notify('请先选择一道题目'); return }
+    setAnnoTab(tab); setMainTab('base')
+  }
 
   const currentBank = banks.find((b) => b.id === bankId)
 
@@ -106,31 +110,22 @@ export default function QuestionBank() {
             <button className={mainTab === 'banks' ? 'active' : ''} type="button" onClick={() => setMainTab('banks')}>题库管理</button>
             <button className={mainTab === 'papers' ? 'active' : ''} type="button" onClick={() => setMainTab('papers')}>组卷与发布</button>
             <button className={mainTab === 'base' ? 'active' : ''} type="button" onClick={() => setMainTab('base')}>题目基本信息</button>
-            <button type="button" onClick={() => setAnnoTab('clues')}>关键词标记</button>
-            <button type="button" onClick={() => setAnnoTab('concepts')}>知识点绑定</button>
-            <button type="button" onClick={() => setAnnoTab('reasoning')}>推理逻辑</button>
-            <button type="button" onClick={() => notify('标注完成度见右侧面板')}>标注完成度</button>
+            <button className={mainTab === 'base' && annoTab === 'clues' ? 'active' : ''} type="button" onClick={() => openAnnotation('clues')}>关键词标记</button>
+            <button className={mainTab === 'base' && annoTab === 'concepts' ? 'active' : ''} type="button" onClick={() => openAnnotation('concepts')}>知识点绑定</button>
+            <button className={mainTab === 'base' && annoTab === 'reasoning' ? 'active' : ''} type="button" onClick={() => openAnnotation('reasoning')}>推理逻辑</button>
           </nav>
         </aside>
 
         <section className="qb-editor">
-          <div className="qb-status-card" id="qbStatusCard">
-            <div className="status-main">
-              <span className="big-dot" style={{ ['--dot' as string]: '#2563eb' }} />
-              <div>
-                <strong>{currentBank?.name || '未选择题库'}</strong>
-                <p>{currentBank ? `${currentBank.subject} · 当前 ${questions.length} 题` : '请选择题库开始管理题目'}{editing ? ` · 正在编辑：${editing.title.slice(0, 16)}` : ''}</p>
-              </div>
-            </div>
-            <div className="status-actions"><span>当前空间：{me?.username || '访客'} 的题库</span></div>
-          </div>
           <section className="qb-card qb-workspace-card" id="qbMainWorkspace">
             <div className="qb-workspace-head">
-              <div><h2>题库工作区</h2><p>题库管理、组卷发布和题目基础信息合并为一个主标签区域。</p></div>
-              <div className="qb-main-tabs" role="tablist">
-                <button className={mainTab === 'banks' ? 'active' : ''} role="tab" type="button" onClick={() => setMainTab('banks')}>题库管理</button>
-                <button className={mainTab === 'papers' ? 'active' : ''} role="tab" type="button" onClick={() => setMainTab('papers')}>组卷与发布</button>
-                <button className={mainTab === 'base' ? 'active' : ''} role="tab" type="button" onClick={() => setMainTab('base')}>题目基本信息</button>
+              <div>
+                <h2>题库工作区</h2>
+                <p>{currentBank ? `${currentBank.name} · ${currentBank.subject} · ${questions.length} 题` : '请选择题库开始管理题目'}{editing ? ` · 正在编辑：${editing.title.slice(0, 16)}` : ''}</p>
+              </div>
+              <div className="qb-workspace-context" aria-label="当前题库上下文">
+                <strong>{currentBank?.name || '未选择题库'}</strong>
+                <span>{me?.username || '访客'} 的题库空间</span>
               </div>
             </div>
 

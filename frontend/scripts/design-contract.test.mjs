@@ -252,3 +252,37 @@ test('mobile file manager exposes real read-only content above the fold', () => 
   assert.match(css, /@media\s*\(max-width:\s*800px\)\s*\{[\s\S]*?\.fm-app \.fm-sidebar\s*\{[^}]*height:\s*auto/)
   assert.match(css, /@media\s*\(max-width:\s*800px\)\s*\{[\s\S]*?\.fm-mobile-readonly-notice\s*\{[^}]*display:\s*grid/)
 })
+
+test('QuestionBank has one primary navigation and an inline workspace context', () => {
+  const route = readFrontend('src/routes/QuestionBank.tsx')
+
+  assert.equal((route.match(/className="qb-layout-nav"/g) || []).length, 1)
+  assert.doesNotMatch(route, /className="qb-main-tabs"/, 'the workspace must not repeat the sidebar primary navigation')
+  assert.doesNotMatch(route, /className="qb-status-card"/, 'bank status belongs in the workspace header')
+  assert.match(route, /className="qb-workspace-context"/)
+  assert.match(route, /const openAnnotation = \(tab: AnnoTab\)/)
+  assert.match(route, /setAnnoTab\(tab\); setMainTab\('base'\)/)
+  assert.doesNotMatch(route, /notify\('标注完成度见右侧面板'\)/, 'status is visible in the inspector and must not masquerade as navigation')
+})
+
+test('mobile admin and study routes put the active task before secondary navigation', () => {
+  const usersCss = readFrontend('src/styles/user-management.css')
+  const training = readFrontend('src/routes/Training.tsx')
+  const trainingCss = readFrontend('src/styles/question-training.css')
+  const recall = readFrontend('src/routes/Recall.tsx')
+  const recallCss = readFrontend('src/styles/knowledge-recall.css')
+
+  assert.match(usersCss, /@media\s*\(max-width:\s*820px\)[\s\S]*\.um-layout\s*\{[^}]*display:\s*contents/)
+  assert.match(usersCss, /@media\s*\(max-width:\s*820px\)[\s\S]*\.um-left-card\s*\{[^}]*order:\s*1/)
+  assert.match(usersCss, /@media\s*\(max-width:\s*820px\)[\s\S]*\.um-summary\s*\{[^}]*order:\s*2/)
+  const users = readFrontend('src/routes/Users.tsx')
+  assert.match(users, /const \[listToolsOpen, setListToolsOpen\] = useState\(false\)/)
+  assert.match(users, /className=\{`um-list-tools-summary\$\{listToolsOpen \? ' active' : ''\}`\}/)
+  assert.match(usersCss, /\.um-list-tools:not\(\.is-open\)\s*\{[^}]*display:\s*none/)
+  assert.match(training, /<details className="qt-secondary-nav" open>/, 'desktop management links must be present without an extra click')
+  assert.match(trainingCss, /\.qt-secondary-nav\[open\] \.qt-secondary-nav-links/)
+  assert.match(recall, /<details className="kr-secondary-tools" open>/, 'desktop canvas settings must be present without an extra click')
+  assert.match(recallCss, /\.kr-secondary-tools\[open\] \.kr-secondary-tools-content/)
+  assert.match(usersCss, /\/\* Compact desktop summary rail \*\/[\s\S]*\.um-summary\s*\{[^}]*display:\s*flex/)
+  assert.match(usersCss, /\/\* Compact desktop summary rail \*\/[\s\S]*\.um-stat\s*\{[^}]*border:\s*0/)
+})

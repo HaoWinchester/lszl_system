@@ -78,15 +78,20 @@ export default function Recall() {
         </div>
         <div className="kr-tools" aria-label="深度回忆画布工具">
           <div className="auth-status logged-in">{me ? (me.display_name || me.username) : '访客'}</div>
-          <label className="kr-theme-control"><span>主题</span>
-            <select value={theme} onChange={(e) => setTheme(e.target.value)} aria-label="切换主题">
-              {THEMES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-          </label>
           <button type="button" onClick={center}>回到题目</button>
           <button type="button" aria-label="缩小" onClick={() => setVp((v) => ({ ...v, scale: Math.max(0.45, v.scale / 1.2) }))}><AppIcon name="zoomOut" size="compact" /></button>
           <button type="button" aria-label="放大" onClick={() => setVp((v) => ({ ...v, scale: Math.min(1.75, v.scale * 1.2) }))}><AppIcon name="zoomIn" size="compact" /></button>
-          <button type="button" onClick={reset}>重置地图</button>
+          <details className="kr-secondary-tools" open>
+            <summary>更多 <AppIcon name="chevronDown" size="compact" /></summary>
+            <div className="kr-secondary-tools-content">
+              <label className="kr-theme-control"><span>主题</span>
+                <select value={theme} onChange={(e) => setTheme(e.target.value)} aria-label="切换主题">
+                  {THEMES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </label>
+              <button type="button" onClick={reset}>重置地图</button>
+            </div>
+          </details>
         </div>
       </header>
 

@@ -160,6 +160,10 @@ body[data-role-theme] button.primary,body[data-role-theme] .um-nav-btn.primary{b
   border-color:transparent;
 }
 .um-list-tools-summary{
+  display:none;
+  width:100%;
+  align-items:center;
+  justify-content:space-between;
   margin:-6px 0 10px;
   padding:8px 10px;
   border-radius:14px;
@@ -190,4 +194,62 @@ body[data-role-theme] button.primary,body[data-role-theme] .um-nav-btn.primary{b
   .um-left-card.tools-expanded .um-user-list{max-height:none}
   .um-head-actions{width:100%;justify-content:flex-start}
   .um-head-actions button{flex:1}
+}
+
+/* Compact desktop summary rail */
+.um-summary{
+  display:flex;
+  align-items:stretch;
+  gap:0;
+  padding:0 4px;
+  border:1px solid var(--kg-border);
+  border-radius:var(--kg-radius-panel);
+  background:var(--kg-surface);
+}
+.um-stat{
+  display:grid;
+  min-width:0;
+  flex:1;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:2px 12px;
+  padding:10px 14px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.um-stat + .um-stat{border-left:1px solid var(--kg-border)!important}
+.um-stat strong{margin:0;font-size:20px;line-height:1}
+.um-stat em{grid-column:1/-1;margin:0}
+
+/* On phones the user list is the task; summary and editing follow it. */
+@media (max-width: 820px) {
+  .um-app{
+    display:flex;
+    flex-direction:column;
+  }
+  .um-topbar{order:0}
+  .um-layout{display:contents}
+  .um-left-card{order:1}
+  .um-summary{
+    display:grid;
+    order:2;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+    margin:12px 0;
+  }
+  .um-editor-card{order:3}
+  .um-right-card{order:4}
+  .um-stat{padding:10px 12px!important}
+  .um-stat + .um-stat{border-left:0!important}
+  .um-stat strong{margin-top:3px;font-size:21px}
+  .um-stat em{display:none}
+  .um-list-tools-summary{display:flex}
+  .um-list-tools:not(.is-open){display:none}
+  .um-app button,
+  .um-app .um-nav-btn,
+  .um-user-check{
+    min-height:var(--kg-control-touch);
+  }
 }
