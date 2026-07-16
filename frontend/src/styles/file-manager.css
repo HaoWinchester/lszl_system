@@ -814,6 +814,42 @@ html[data-theme="light"] .fm-theme-sun{display:none}html[data-theme="dark"] .fm-
   pointer-events:none;
 }
 
+/* Shared AppIcon controls: one compact hit target and a stable visual center. */
+.fm-sidebar-collapse,
+.fm-folder-add-btn,
+.fm-segment button,
+.fm-icon-btn,
+.fm-file-menu-btn,
+.fm-select-mark{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  line-height:0;
+}
+.fm-segment button,
+.fm-icon-btn{
+  width:32px;
+  height:32px;
+}
+.fm-folder-add-btn{
+  width:32px;
+  height:32px;
+}
+.fm-sidebar-collapse .kg-icon,
+.fm-folder-add-btn .kg-icon,
+.fm-segment .kg-icon,
+.fm-icon-btn .kg-icon,
+.fm-file-menu-btn .kg-icon,
+.fm-select-mark .kg-icon{
+  flex:0 0 auto;
+}
+.fm-primary-action .kg-icon,
+.fm-nav-item .kg-icon,
+.fm-text-btn .kg-icon,
+.fm-account-menu .kg-icon{
+  flex:0 0 auto;
+}
+
 
 /* v8.4.10：当前目录子文件夹独立区域 */
 .fm-content-section-head{

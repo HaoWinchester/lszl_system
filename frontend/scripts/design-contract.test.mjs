@@ -72,7 +72,8 @@ test('shared AppIcon exposes the approved Lucide semantic icon contract', () => 
   for (const name of [
     'add', 'back', 'search', 'settings', 'refresh', 'grid', 'list', 'more',
     'delete', 'upload', 'download', 'folder', 'user', 'logout', 'close',
-    'zoomIn', 'zoomOut',
+    'zoomIn', 'zoomOut', 'check', 'chevronDown', 'collapse', 'expand',
+    'recent', 'favorite', 'folderAdd', 'sun', 'moon', 'home', 'userAdd', 'network',
   ]) {
     assert.match(component, new RegExp(`\\b${name}:`), `expected AppIcon mapping for ${name}`)
   }
@@ -103,4 +104,40 @@ test('AppIcon exposes accessible semantics and consumes shared size tokens', () 
     assert.match(css, new RegExp(`\\.kg-icon--${size}\\s*\\{[\\s\\S]*width:\\s*var\\(--kg-icon-${size}\\)`))
     assert.match(css, new RegExp(`\\.kg-icon--${size}\\s*\\{[\\s\\S]*height:\\s*var\\(--kg-icon-${size}\\)`))
   }
+})
+
+test('study workspaces use AppIcon controls and reserve SVG for recall relationship content', () => {
+  const questionBank = readFrontend('src/routes/QuestionBank.tsx')
+  const training = readFrontend('src/routes/Training.tsx')
+  const recall = readFrontend('src/routes/Recall.tsx')
+
+  for (const [name, source] of [
+    ['QuestionBank', questionBank],
+    ['Training', training],
+    ['Recall', recall],
+  ]) {
+    assert.match(source, /import \{ AppIcon \} from '\.\.\/components\/AppIcon'/, `${name} should consume AppIcon`)
+    assert.doesNotMatch(source, /from 'lucide-react'/, `${name} should not directly import Lucide icons`)
+  }
+
+  assert.doesNotMatch(questionBank, /<svg\b/, 'QuestionBank should not render inline SVG controls')
+  assert.doesNotMatch(training, /<svg\b/, 'Training should not render inline SVG controls')
+  assert.match(recall, /<svg className="kr-edges" id="krEdges" aria-hidden="true">/, 'Recall keeps its relationship-line SVG as content')
+  assert.equal((recall.match(/<svg\b/g) || []).length, 1, 'Recall should only retain the relationship-line SVG')
+})
+
+test('QuestionBank exposes accessible names for pure-icon delete controls', () => {
+  const questionBank = readFrontend('src/routes/QuestionBank.tsx')
+
+  assert.match(questionBank, /<button[^>]*aria-label="删除选项"[^>]*>[\s\S]{0,120}<AppIcon name="close"/, 'option deletion needs an accessible name')
+  assert.match(questionBank, /<button[^>]*aria-label="删除关键词"[^>]*>[\s\S]{0,120}<AppIcon name="close"/, 'keyword deletion needs an accessible name')
+})
+
+test('file manager uses AppIcon for controls while FileCover remains the only inline SVG artwork', () => {
+  const route = readFrontend('src/routes/Files.tsx')
+
+  assert.match(route, /import \{ AppIcon \} from '\.\.\/components\/AppIcon'/)
+  assert.doesNotMatch(route, /from 'lucide-react'/)
+  assert.equal((route.match(/<svg\b/g) || []).length, 1, 'FileCover should be the only inline SVG artwork')
+  assert.doesNotMatch(route, /<button[^>]*>[\s\S]{0,220}<svg\b/, 'action buttons must not contain hand-written SVGs')
 })

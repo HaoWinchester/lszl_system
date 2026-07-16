@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, Folder as FolderIcon, MoreHorizontal, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { filesApi, type FileMeta, type Folder } from '../api/files'
+import { AppIcon } from '../components/AppIcon'
 import { useAuth } from '../store/auth'
 
 type View = 'recent' | 'favorites' | 'all' | 'trash'
@@ -232,30 +232,30 @@ export default function Files() {
           <div className="fm-sidebar-brand-row">
             <Link className="fm-brand" to="/" aria-label="返回知识图谱编辑器">
               <span className="fm-brand-mark" aria-hidden="true">
-                <svg viewBox="0 0 48 48"><path d="M12 13 24 7l12 7v13l-12 7-12-7Z" /><circle cx="12" cy="13" r="4" /><circle cx="24" cy="7" r="4" /><circle cx="36" cy="14" r="4" /><circle cx="36" cy="27" r="4" /><circle cx="24" cy="34" r="4" /><circle cx="12" cy="27" r="4" /></svg>
+                <AppIcon name="network" size="prominent" />
               </span>
               <span className="fm-brand-text"><strong>知识图谱</strong><small>v8.4.22</small></span>
             </Link>
             <button className="fm-sidebar-collapse" type="button" aria-label="收起侧栏" title="收起侧栏" onClick={() => setSidebarCollapsed(true)}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+              <AppIcon name="collapse" />
             </button>
           </div>
 
           <div className="fm-sidebar-scroll" id="fmSidebarScroll">
             <div className="fm-primary-stack">
               <button className="fm-primary-action" id="fmNewFileBtn" type="button" onClick={create}>
-                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+                <AppIcon name="add" />
                 <span>新建图谱</span>
               </button>
             </div>
 
             <nav className="fm-nav fm-nav-primary" aria-label="文件分类">
               <button className={`fm-nav-item${view === 'recent' ? ' is-active' : ''}`} type="button" data-view="recent" onClick={() => setView('recent')}>
-                <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></svg>
+                <AppIcon name="recent" size="prominent" />
                 <span>最近打开</span><b>{stats?.activeCount ?? 0}</b>
               </button>
               <button className={`fm-nav-item${view === 'favorites' ? ' is-active' : ''}`} type="button" data-view="favorites" onClick={() => setView('favorites')}>
-                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z" /></svg>
+                <AppIcon name="favorite" size="prominent" />
                 <span>我的收藏</span><b>{stats?.activeCount ?? 0}</b>
               </button>
             </nav>
@@ -263,11 +263,11 @@ export default function Files() {
             <section className="fm-folder-nav" aria-labelledby="fmFolderNavTitle">
               <div className="fm-folder-nav-head">
                 <span className="fm-section-label" id="fmFolderNavTitle">文件夹</span>
-                <button className="fm-folder-add-btn" type="button" aria-label="新建文件夹" title="新建文件夹" onClick={createFolder}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
+                <button className="fm-folder-add-btn" type="button" aria-label="新建文件夹" title="新建文件夹" onClick={createFolder}><AppIcon name="folderAdd" /></button>
               </div>
               <div className="fm-folder-tree" role="tree" aria-label="文件夹目录">
                 {folders.map((f) => (
-                  <div key={f.id} className="fm-folder-tree-item" role="treeitem"><FolderIcon size={14} aria-hidden="true" /> {f.name}</div>
+                  <div key={f.id} className="fm-folder-tree-item" role="treeitem"><AppIcon name="folder" size="compact" /> {f.name}</div>
                 ))}
               </div>
             </section>
@@ -286,7 +286,7 @@ export default function Files() {
 
             <nav className="fm-nav fm-nav-bottom" aria-label="回收站">
               <button className={`fm-nav-item${view === 'trash' ? ' is-active' : ''}`} type="button" data-view="trash" onClick={() => setView('trash')}>
-                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" /><path d="M10 11v5M14 11v5" /></svg>
+                <AppIcon name="delete" size="prominent" />
                 <span>回收站</span><b>{stats?.trashedCount ?? 0}</b>
               </button>
             </nav>
@@ -302,24 +302,24 @@ export default function Files() {
         <main className="fm-main">
           <header className="fm-topbar">
             <div className="fm-heading">
-              {sidebarCollapsed && <button className="fm-sidebar-collapse" type="button" aria-label="展开侧栏" title="展开侧栏" style={{ marginRight: 8 }} onClick={() => setSidebarCollapsed(false)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></button>}
+              {sidebarCollapsed && <button className="fm-sidebar-collapse" type="button" aria-label="展开侧栏" title="展开侧栏" style={{ marginRight: 8 }} onClick={() => setSidebarCollapsed(false)}><AppIcon name="expand" /></button>}
               <h1>{isTrash ? '回收站' : '文件管理'}</h1>
               <p>{isTrash ? '已删除的文件，30 天内可恢复' : '管理你的知识图谱文件'}</p>
             </div>
             <div className="fm-top-actions">
               <label className="fm-search" htmlFor="fmSearchInput">
-                <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg>
+                <AppIcon name="search" />
                 <input id="fmSearchInput" type="search" autoComplete="off" placeholder="搜索文件名、描述或标签…" value={query} onChange={(e) => setQuery(e.target.value)} />
                 <kbd>Ctrl K</kbd>
               </label>
               <div className="fm-segment" role="group" aria-label="显示方式">
-                <button className={display === 'grid' ? 'is-active' : ''} type="button" title="网格视图" aria-label="网格视图" onClick={() => setDisplay('grid')}><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" /><rect x="14" y="4" width="6" height="6" /><rect x="4" y="14" width="6" height="6" /><rect x="14" y="14" width="6" height="6" /></svg></button>
-                <button className={display === 'list' ? 'is-active' : ''} type="button" title="列表视图" aria-label="列表视图" onClick={() => setDisplay('list')}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11" /><circle cx="5" cy="6" r="1" /><circle cx="5" cy="12" r="1" /><circle cx="5" cy="18" r="1" /></svg></button>
+                <button className={display === 'grid' ? 'is-active' : ''} type="button" title="网格视图" aria-label="网格视图" onClick={() => setDisplay('grid')}><AppIcon name="grid" /></button>
+                <button className={display === 'list' ? 'is-active' : ''} type="button" title="列表视图" aria-label="列表视图" onClick={() => setDisplay('list')}><AppIcon name="list" /></button>
               </div>
-              <button className="fm-icon-btn" type="button" title="刷新" aria-label="刷新" onClick={() => reload()}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M18.5 9A7 7 0 0 0 6 6.5L4 9m16 6-2 2.5A7 7 0 0 1 5.5 15" /></svg></button>
+              <button className="fm-icon-btn" type="button" title="刷新" aria-label="刷新" onClick={() => reload()}><AppIcon name="refresh" /></button>
               <button className="fm-icon-btn" type="button" title="切换浅色/深色主题" aria-label="切换浅色/深色主题" onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}>
-                <svg className="fm-theme-sun" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
-                <svg className="fm-theme-moon" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 15.5A8 8 0 0 1 8.5 4 8 8 0 1 0 20 15.5Z" /></svg>
+                <AppIcon name="sun" className="fm-theme-sun" />
+                <AppIcon name="moon" className="fm-theme-moon" />
               </button>
               <div className={`fm-account-shell${accountOpen ? ' is-open' : ''}`} id="fmAccountShell">
                 <button className="fm-avatar" type="button" aria-label="账号菜单" aria-haspopup="menu" aria-expanded={accountOpen} onClick={() => setAccountOpen((v) => !v)}>{(me?.display_name || me?.username || '访').slice(0, 1)}</button>
@@ -328,11 +328,11 @@ export default function Files() {
                     <span className="fm-account-avatar" aria-hidden="true">{(me?.display_name || me?.username || '访').slice(0, 1)}</span>
                     <div><strong>{me?.display_name || me?.username || '访客'}</strong><small>{me?.role || '返回编辑器可登录账号'}</small></div>
                   </div>
-                  <Link to="/" role="menuitem" onClick={() => setAccountOpen(false)}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h14M9 7l-5 5 5 5" /><path d="M14 5h6v14h-6" /></svg><span>返回编辑器</span></Link>
-                  <Link to="/settings" role="menuitem" onClick={() => setAccountOpen(false)}><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19 13.5v-3l-2-.8-.6-1.5.9-2-2.1-2.1-2 .9-1.5-.6L10.5 2h-3l-.8 2-1.5.6-2-.9L1.1 5.8l.9 2-.6 1.5-2 .8v3l2 .8.6 1.5-.9 2 2.1 2.1 2-.9 1.5.6.8 2h3l.8-2 1.5-.6 2 .9 2.1-2.1-.9-2 .6-1.5Z" transform="translate(2.5 0) scale(.8)" /></svg><span>系统设置</span></Link>
-                  {me?.role === 'admin' && <Link to="/users" role="menuitem" onClick={() => setAccountOpen(false)}><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3" /><path d="M3 19c.6-3.2 2.6-5 6-5s5.4 1.8 6 5M16 7h5M18.5 4.5v5" /></svg><span>用户管理</span></Link>}
+                  <Link to="/" role="menuitem" onClick={() => setAccountOpen(false)}><AppIcon name="home" size="compact" /><span>返回编辑器</span></Link>
+                  <Link to="/settings" role="menuitem" onClick={() => setAccountOpen(false)}><AppIcon name="settings" size="compact" /><span>系统设置</span></Link>
+                  {me?.role === 'admin' && <Link to="/users" role="menuitem" onClick={() => setAccountOpen(false)}><AppIcon name="userAdd" size="compact" /><span>用户管理</span></Link>}
                   <hr />
-                  <button type="button" role="menuitem" onClick={() => { setAccountOpen(false); logout(); navigate('/login') }}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 5H4v14h6M14 8l4 4-4 4M8 12h10" /></svg><span>退出登录</span></button>
+                  <button type="button" role="menuitem" onClick={() => { setAccountOpen(false); logout(); navigate('/login') }}><AppIcon name="logout" size="compact" /><span>退出登录</span></button>
                 </div>
               </div>
             </div>
@@ -351,7 +351,7 @@ export default function Files() {
                   <button className="fm-text-btn" id="fmSelectionModeBtn" type="button" onClick={() => { setSelectMode((v) => !v); setSelection(new Set()) }}>{selectMode ? '完成选择' : '选择'}</button>
                   <button className="fm-text-btn" id="fmDetailsBtn" type="button" title="显示文件详细信息（Alt + Enter）" aria-pressed={!!selected} onClick={() => selected ? null : notify('请先选择一个文件')}>详细信息</button>
                   <label className="fm-text-btn" id="fmImportBtn" style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5" /><path d="M5 19h14" /></svg>导入文件
+                    <AppIcon name="upload" size="compact" />导入文件
                     <input type="file" hidden accept=".json,application/json" onChange={(e) => { const f = e.target.files?.[0]; if (f) importJson(f); e.currentTarget.value = '' }} />
                   </label>
                   <select aria-label="排序方式" value={sort} onChange={(e) => setSort(e.target.value)}>
@@ -386,14 +386,14 @@ export default function Files() {
                           onClick={() => (selectMode ? toggleSelect(f.id) : setSelected(selected?.id === f.id ? null : f))}
                           onDoubleClick={() => open(f)}
                         >
-                          <button className="fm-select-mark" type="button" aria-label={`选择 ${f.name}`} style={{ opacity: selectMode || isSel ? 1 : undefined }} onClick={(e) => { e.stopPropagation(); if (selectMode) toggleSelect(f.id) }}><Check size={14} aria-hidden="true" /></button>
+                          <button className="fm-select-mark" type="button" aria-label={`选择 ${f.name}`} style={{ opacity: selectMode || isSel ? 1 : undefined }} onClick={(e) => { e.stopPropagation(); if (selectMode) toggleSelect(f.id) }}><AppIcon name="check" size="compact" /></button>
                           <div className="fm-file-cover-shell">
                             <div className="fm-file-cover" style={{ ['--cover-a' as string]: a, ['--cover-b' as string]: b, ['--cover-bg' as string]: COVER_PAIRS[idx % COVER_PAIRS.length][2] }}>
                               <FileCover id={f.id} nodes={f.nodeCount} links={f.linkCount} a={a} b={b} />
                             </div>
                           </div>
                           {isCur && <span className="fm-current-badge">当前打开</span>}
-                          <button className="fm-file-menu-btn" type="button" aria-label={`${f.name}的更多操作`} onClick={(e) => { e.stopPropagation(); setSelected(f) }}><MoreHorizontal size={16} aria-hidden="true" /></button>
+                          <button className="fm-file-menu-btn" type="button" aria-label={`${f.name}的更多操作`} onClick={(e) => { e.stopPropagation(); setSelected(f) }}><AppIcon name="more" size="compact" /></button>
                           <div className="fm-file-meta">
                             <div className="fm-file-title-cell">
                               <strong className="fm-file-name" title={f.name}>{f.name}</strong>
@@ -416,7 +416,7 @@ export default function Files() {
                   </div>
                   {files.length === 0 && (
                     <div className="fm-empty">
-                      <span className="fm-empty-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 7h7l2 2h9v10H3Z" /><path d="M8 14h8" /></svg></span>
+                      <span className="fm-empty-icon"><AppIcon name="folder" size="prominent" /></span>
                       <h2>{isTrash ? '回收站为空' : '还没有图谱文件'}</h2>
                       <p>{isTrash ? '删除的文件会出现在这里' : '创建一个新图谱，或导入已有学习包。'}</p>
                       {!isTrash && <button className="fm-primary-inline" type="button" onClick={create}>新建图谱</button>}
@@ -428,7 +428,7 @@ export default function Files() {
               {selected && !selectMode && (
                 <div className="fm-selection-summary">
                   <div><strong>{selected.name}</strong><span>{selected.nodeCount} 节点 · {selected.linkCount} 关系 · {(selected.byteSize / 1024).toFixed(2)} KB</span></div>
-                  <div><button type="button" onClick={() => setSelected(null)}>详细信息</button><button type="button" title="取消选择" aria-label="取消选择" onClick={() => setSelected(null)}><X size={16} aria-hidden="true" /></button></div>
+                  <div><button type="button" onClick={() => setSelected(null)}>详细信息</button><button type="button" title="取消选择" aria-label="取消选择" onClick={() => setSelected(null)}><AppIcon name="close" size="compact" /></button></div>
                 </div>
               )}
               <footer className="fm-browser-footer"><span>共 {files.length} 个文件</span><span>文件索引正常</span></footer>
@@ -440,10 +440,10 @@ export default function Files() {
         <div className="fm-drawer-backdrop" hidden={!selected} onClick={() => setSelected(null)} />
         <aside className="fm-details-drawer" aria-label="文件详情" aria-hidden={!selected}>
           <section className="fm-panel fm-file-info">
-            <div className="fm-panel-title"><h2>文件信息</h2><button className="fm-icon-btn fm-small" type="button" title="关闭详情" aria-label="关闭详情" onClick={() => setSelected(null)}><X size={16} aria-hidden="true" /></button></div>
+            <div className="fm-panel-title"><h2>文件信息</h2><button className="fm-icon-btn fm-small" type="button" title="关闭详情" aria-label="关闭详情" onClick={() => setSelected(null)}><AppIcon name="close" size="compact" /></button></div>
             {!selected ? (
               <div className="fm-info-empty">
-                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h6l2 2h8v11H4Z" /><path d="M9 13h6M12 10v6" /></svg>
+                <AppIcon name="folderAdd" size="prominent" />
                 <p>选择文件查看详细信息</p>
               </div>
             ) : (

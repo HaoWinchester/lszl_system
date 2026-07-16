@@ -354,3 +354,39 @@
     border-radius: 10px !important;
   }
 }
+
+/* The study routes are reading and decision surfaces, not gradient dashboards. */
+.qb-app .qb-top-actions .auth-status,
+.question-training-app .auth-status,
+.kr-app .auth-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--kg-border);
+  border-radius: var(--kg-radius-control);
+  background: var(--kg-surface-subtle);
+  color: var(--kg-muted);
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.qb-app .kg-icon,
+.question-training-app .kg-icon,
+.kr-app .kg-icon {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.qb-back .kg-icon,
+.qt-back-link .kg-icon,
+.kr-back .kg-icon {
+  margin: auto;
+}
+
+.question-close .kg-icon,
+.q-option-mark .kg-icon,
+.q-score .kg-icon {
+  margin: 0;
+}

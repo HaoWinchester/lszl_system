@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, X } from 'lucide-react'
 
 import { banksApi, papersApi, type Bank, type Paper, type Question } from '../api/questions'
+import { AppIcon } from '../components/AppIcon'
 import { useAuth } from '../store/auth'
 
 const SUBJECTS = ['PMP', 'CSPM', 'P2', 'ACP', 'NPDP', 'PgMP', 'PfMP']
@@ -78,7 +78,7 @@ export default function QuestionBank() {
     <div className="qb-app" id="qbApp">
       <header className="qb-topbar">
         <div className="qb-brand">
-          <Link className="qb-back" to="/" title="返回知识图谱"><ArrowLeft size={16} aria-hidden="true" /></Link>
+          <Link className="qb-back" to="/" title="返回知识图谱"><AppIcon name="back" size="compact" /></Link>
           <div>
             <p className="qb-kicker">Question Bank Administration</p>
             <h1>题库认知标注管理</h1>
@@ -182,7 +182,7 @@ export default function QuestionBank() {
                           <span>{q.domain || '未分类'} · {q.difficulty || ''}</span>
                         </div>
                       ))}
-                      {questions.length === 0 && <p className="qb-empty">{bankId ? '暂无题目' : <><ArrowLeft size={14} aria-hidden="true" /> 先选择题库</>}</p>}
+                      {questions.length === 0 && <p className="qb-empty">{bankId ? '暂无题目' : <><span className="qb-empty-icon"><AppIcon name="back" size="compact" /></span>先选择题库</>}</p>}
                     </div>
                   </section>
                 </div>
@@ -218,7 +218,7 @@ export default function QuestionBank() {
                         <input style={{ width: 36 }} value={o.id} onChange={(e) => setEditing({ ...editing, options: editing.options.map((x, idx) => idx === i ? { ...x, id: e.target.value } : x) })} />
                         <input placeholder="选项内容" value={o.text} onChange={(e) => setEditing({ ...editing, options: editing.options.map((x, idx) => idx === i ? { ...x, text: e.target.value } : x) })} />
                         <label style={{ fontSize: 12 }}><input type="checkbox" checked={!!o.correct} onChange={(e) => setEditing({ ...editing, options: editing.options.map((x, idx) => idx === i ? { ...x, correct: e.target.checked } : x), correctAnswer: e.target.checked ? o.id : editing.correctAnswer })} /> 正确</label>
-                        <button type="button" onClick={() => setEditing({ ...editing, options: editing.options.filter((_, idx) => idx !== i) })}><X size={14} aria-hidden="true" /></button>
+                          <button aria-label="删除选项" title="删除选项" type="button" onClick={() => setEditing({ ...editing, options: editing.options.filter((_, idx) => idx !== i) })}><AppIcon name="close" size="compact" /></button>
                       </div>
                     ))}
                   </div>
@@ -276,7 +276,7 @@ export default function QuestionBank() {
 
       <button className="qb-selection-mark" id="qbSelectionMark" type="button" hidden>标记关键词</button>
       <div className="qb-floating-keyword-panel" id="qbFloatingKeywordPanel" hidden>
-        <div className="floating-head"><strong>关键词标记操作台</strong><button aria-label="关闭" type="button"><X size={16} aria-hidden="true" /></button></div>
+        <div className="floating-head"><strong>关键词标记操作台</strong><button aria-label="关闭" type="button"><AppIcon name="close" size="compact" /></button></div>
         <label className="qb-field"><span>选中文本</span><input placeholder="选中的题干文本" /></label>
       </div>
 
@@ -294,7 +294,7 @@ function AnnotationPanel({ tab, editing, setEditing }: { tab: AnnoTab; editing: 
           {(editing.clues || []).map((c, i) => (
             <div key={i} className="qb-token">
               <span>{String(c.text ?? '')}</span>
-              <button type="button" onClick={() => setEditing({ ...editing, clues: (editing.clues || []).filter((_, idx) => idx !== i) })}><X size={14} aria-hidden="true" /></button>
+              <button aria-label="删除关键词" title="删除关键词" type="button" onClick={() => setEditing({ ...editing, clues: (editing.clues || []).filter((_, idx) => idx !== i) })}><AppIcon name="close" size="compact" /></button>
             </div>
           ))}
           {(editing.clues || []).length === 0 && <p className="qb-empty">暂无关键词</p>}
@@ -411,7 +411,7 @@ function PapersPanel({ papers, bankId, notify, reload }: { papers: Paper[]; bank
                 <Link className="qb-top-link" to="/training">去训练</Link>
               </div>
             </>
-          ) : <p className="qb-empty"><ArrowLeft size={14} aria-hidden="true" /> 选择试卷</p>}
+          ) : <p className="qb-empty"><span className="qb-empty-icon"><AppIcon name="back" size="compact" /></span>选择试卷</p>}
         </section>
       </div>
     </section>

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type WheelEvent, type MouseEvent as RMouseEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, ZoomIn, ZoomOut } from 'lucide-react'
 
 import type { Question } from '../api/questions'
+import { AppIcon } from '../components/AppIcon'
 import { trainingApi } from '../api/training'
 import { useAuth } from '../store/auth'
 
@@ -64,13 +64,13 @@ export default function Recall() {
   const center = () => setVp({ x: 0, y: 0, scale: 1 })
   const reset = () => { setNodes([]); setEdges([]); setActiveKeywords([]); persist([], [], []) }
 
-  if (denied) return <div className="kr-app"><div className="kr-topbar"><Link className="kr-back" to="/training"><ArrowLeft size={16} aria-hidden="true" /></Link> 题目不存在或无权访问</div></div>
+  if (denied) return <div className="kr-app"><div className="kr-topbar"><Link className="kr-back" to="/training"><AppIcon name="back" size="compact" /></Link> 题目不存在或无权访问</div></div>
 
   return (
     <div className="kr-app" id="krApp" data-theme={theme}>
       <header className="kr-topbar">
         <div className="kr-brand">
-          <Link className="kr-back" to="/training" title="返回训练"><ArrowLeft size={16} aria-hidden="true" /></Link>
+          <Link className="kr-back" to="/training" title="返回训练"><AppIcon name="back" size="compact" /></Link>
           <div>
             <h1>深度知识回忆</h1>
             <p>以题目为中心，点击关键词，像寻宝一样把知识点一层层回忆出来。</p>
@@ -84,8 +84,8 @@ export default function Recall() {
             </select>
           </label>
           <button type="button" onClick={center}>回到题目</button>
-          <button type="button" aria-label="缩小" onClick={() => setVp((v) => ({ ...v, scale: Math.max(0.45, v.scale / 1.2) }))}><ZoomOut size={16} aria-hidden="true" /></button>
-          <button type="button" aria-label="放大" onClick={() => setVp((v) => ({ ...v, scale: Math.min(1.75, v.scale * 1.2) }))}><ZoomIn size={16} aria-hidden="true" /></button>
+          <button type="button" aria-label="缩小" onClick={() => setVp((v) => ({ ...v, scale: Math.max(0.45, v.scale / 1.2) }))}><AppIcon name="zoomOut" size="compact" /></button>
+          <button type="button" aria-label="放大" onClick={() => setVp((v) => ({ ...v, scale: Math.min(1.75, v.scale * 1.2) }))}><AppIcon name="zoomIn" size="compact" /></button>
           <button type="button" onClick={reset}>重置地图</button>
         </div>
       </header>
