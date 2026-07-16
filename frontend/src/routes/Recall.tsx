@@ -96,7 +96,7 @@ export default function Recall() {
       </header>
 
       <main className="kr-viewport" id="krViewport" aria-label="深度知识回忆无限画布" onWheel={onWheel} onMouseDown={onDown}>
-        <div className="kr-world" id="krWorld" style={{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.scale})`, transformOrigin: 'center center' }}>
+        <div className="kr-world" id="krWorld" style={{ left: '50%', top: '50%', transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.scale})`, transformOrigin: 'center center' }}>
           <svg className="kr-edges" id="krEdges" aria-hidden="true">
             {edges.map((e, i) => {
               const a = e.from === 'root' ? { x: 0, y: 0 } : nodes.find((n) => n.id === e.from)
@@ -105,7 +105,7 @@ export default function Recall() {
               return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="currentColor" strokeWidth={1.5} strokeDasharray="4 4" opacity={0.5} />
             })}
           </svg>
-          <section className="kr-question-card" id="krQuestionCard" aria-label="中心题目卡片" style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)' }}>
+          <section className="kr-question-card" id="krQuestionCard" aria-label="中心题目卡片" style={{ position: 'absolute', left: 0, top: 0, transform: 'translate(-50%,-50%)' }}>
             {q ? (
               <>
                 <div className="kr-question-kicker">{q.domain || '中心题目'}</div>
@@ -125,7 +125,14 @@ export default function Recall() {
                   ))}
                 </div>
               </>
-            ) : <div className="kr-loading">加载题目…</div>}
+            ) : qid ? <div className="kr-loading">正在加载题目…</div> : (
+              <div className="kr-empty-state">
+                <span className="kr-empty-icon" aria-hidden="true"><AppIcon name="network" size="prominent" /></span>
+                <h2>从一道题目开始深度回忆</h2>
+                <p>先在考题训练中选择试卷和题目，再进入这里展开关键词与知识关系。</p>
+                <Link to="/training">前往考题训练</Link>
+              </div>
+            )}
           </section>
           <div className="kr-node-layer" id="krNodeLayer">
             {nodes.map((n) => (

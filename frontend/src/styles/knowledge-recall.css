@@ -453,3 +453,63 @@ body.kr-readonly .kr-readonly-control{
     width:var(--kg-control-touch);
   }
 }
+
+/* The empty canvas remains a workspace and clearly routes users to its source task. */
+.kr-app{
+  height:100vh;
+  min-height:0;
+}
+.kr-app[data-theme="platform"] .kr-empty-state{
+  display:grid;
+  justify-items:center;
+  padding:18px 24px;
+  color:var(--kg-muted);
+  text-align:center;
+}
+.kr-app[data-theme="platform"] .kr-empty-icon{
+  display:grid;
+  width:42px;
+  height:42px;
+  margin-bottom:14px;
+  place-items:center;
+  border:1px solid rgb(47 109 246 / 22%);
+  border-radius:var(--kg-radius-control);
+  background:var(--kg-primary-soft);
+  color:var(--kg-primary);
+}
+.kr-app[data-theme="platform"] .kr-empty-state h2{
+  margin:0;
+  color:var(--kg-text);
+  font-size:17px;
+  font-weight:700;
+}
+.kr-app[data-theme="platform"] .kr-empty-state p{
+  max-width:460px;
+  margin:8px 0 0;
+  color:var(--kg-muted);
+  font-size:13px;
+  line-height:1.65;
+}
+.kr-app[data-theme="platform"] .kr-empty-state a{
+  display:inline-flex;
+  min-height:34px;
+  align-items:center;
+  margin-top:16px;
+  padding:0 12px;
+  border:1px solid var(--kg-border);
+  border-radius:var(--kg-radius-control);
+  background:var(--kg-surface);
+  color:var(--kg-primary);
+  font-size:12px;
+  font-weight:650;
+  text-decoration:none;
+}
+.kr-app[data-theme="platform"] .kr-empty-state a:hover{
+  border-color:rgb(47 109 246 / 35%);
+  background:var(--kg-primary-soft);
+}
+.kr-app[data-theme="platform"] .kr-loading{
+  padding:24px;
+  color:var(--kg-muted);
+  text-align:center;
+}

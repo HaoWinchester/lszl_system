@@ -110,12 +110,19 @@ export default function Training() {
                     </div>
 
                     {!paper ? (
-                      <div className="q-empty">
-                        <h3 id="qQuestionHeading">请选择一套综合试卷开始训练</h3>
-                        <p style={{ color: '#64748b' }}>仅显示已发布试卷。如需新建，请到题库管理创建并发布。</p>
+                      <div className="q-empty q-guided-empty">
+                        <span className="q-empty-icon" aria-hidden="true"><AppIcon name="check" size="prominent" /></span>
+                        <h3 id="qQuestionHeading">{papers.length > 0 ? '选择一套已发布试卷' : '还没有可训练的试卷'}</h3>
+                        <p>{papers.length > 0 ? '从上方试卷列表选择内容，即可开始逐题作答。' : '先在题库中创建试卷并发布，发布后会自动出现在这里。'}</p>
+                        <div className="q-empty-actions"><Link to="/question-bank">前往题库管理</Link></div>
                       </div>
                     ) : !q ? (
-                      <p>该试卷暂无题目。</p>
+                      <div className="q-empty q-guided-empty">
+                        <span className="q-empty-icon" aria-hidden="true"><AppIcon name="check" size="prominent" /></span>
+                        <h3>这套试卷还没有题目</h3>
+                        <p>前往题库补充题目后，再回到这里开始训练。</p>
+                        <div className="q-empty-actions"><Link to="/question-bank">前往题库管理</Link></div>
+                      </div>
                     ) : (
                       <>
                         <h3 id="qQuestionHeading">题目：{q.title}</h3>

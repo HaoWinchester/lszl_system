@@ -98,7 +98,7 @@ export default function Settings() {
                   <p>为不同角色设置登录后的主题色。</p>
                 </div>
               </div>
-              <div className="um-role-theme-panel">
+              <div className="ss-role-theme-panel">
                 {ROLES.map(([role, label]) => (
                   <ThemeEditor key={role} role={role} label={label} theme={themes[role]} onSave={saveTheme} />
                 ))}
@@ -283,19 +283,40 @@ function ThemeEditor({
     if (theme) setT(theme)
   }, [theme])
   return (
-    <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
-      <strong style={{ minWidth: 80 }}>{label}</strong>
-      <label style={{ fontSize: 13 }}>
-        主色 <input type="color" value={t.primary_color} onChange={(e) => setT({ ...t, primary_color: e.target.value })} />
-      </label>
-      <label style={{ fontSize: 13 }}>
-        强调 <input type="color" value={t.accent_color} onChange={(e) => setT({ ...t, accent_color: e.target.value })} />
-      </label>
-      <label style={{ fontSize: 13 }}>
-        柔和 <input type="color" value={t.soft_color} onChange={(e) => setT({ ...t, soft_color: e.target.value })} />
-      </label>
-      <button type="button" onClick={() => onSave(role, t)}>保存</button>
-    </div>
+    <section className="um-role-theme">
+      <header className="um-role-theme-head">
+        <span className="ss-role-swatch" style={{ backgroundColor: t.primary_color }} aria-hidden="true" />
+        <strong>{label}</strong>
+        <code>{role}</code>
+      </header>
+      <div className="ss-theme-color-grid">
+        <label>
+          <span>主色</span>
+          <span className="ss-color-field">
+            <input aria-label={`${label}主色`} type="color" value={t.primary_color} onChange={(e) => setT({ ...t, primary_color: e.target.value })} />
+            <code>{t.primary_color.toUpperCase()}</code>
+          </span>
+        </label>
+        <label>
+          <span>强调色</span>
+          <span className="ss-color-field">
+            <input aria-label={`${label}强调色`} type="color" value={t.accent_color} onChange={(e) => setT({ ...t, accent_color: e.target.value })} />
+            <code>{t.accent_color.toUpperCase()}</code>
+          </span>
+        </label>
+        <label>
+          <span>柔和色</span>
+          <span className="ss-color-field">
+            <input aria-label={`${label}柔和色`} type="color" value={t.soft_color} onChange={(e) => setT({ ...t, soft_color: e.target.value })} />
+            <code>{t.soft_color.toUpperCase()}</code>
+          </span>
+        </label>
+      </div>
+      <footer className="um-role-theme-actions">
+        <span>应用于该角色登录后的工作区</span>
+        <button type="button" onClick={() => onSave(role, t)}>保存主题</button>
+      </footer>
+    </section>
   )
 }
 

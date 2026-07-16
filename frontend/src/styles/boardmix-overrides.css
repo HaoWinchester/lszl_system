@@ -438,12 +438,20 @@ body:has(.ss-app) {
 .kg-subscription-detail-modal {
   width: min(1040px, calc(100vw - 40px)) !important;
   max-height: min(780px, calc(100vh - 40px));
+  display: flex !important;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .kg-subscription-detail-body {
   padding: 20px !important;
+  min-height: 0;
   overflow: auto;
   background: var(--kg-canvas) !important;
+}
+
+.kg-subscription-detail-modal > .kg-user-center-head {
+  flex: 0 0 auto;
 }
 
 .kg-subscription-detail-grid {

@@ -90,3 +90,123 @@
 
 /* 系统设置使用导航+编辑区的运营台层级，不再采用悬浮玻璃卡片。 */
 .ss-sidebar{border-radius:12px;background:#fff;box-shadow:none;backdrop-filter:none;padding:8px}.ss-sidebar button{border-radius:8px;min-height:36px}.ss-sidebar button.active{background:#eff6ff;color:#2563eb;border-color:#bfdbfe}.ss-content .um-panel{border-radius:12px}
+
+/* Desktop role-theme editor: readable swatches, values and save ownership. */
+.ss-role-theme-panel{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.ss-app .um-role-theme{
+  display:grid;
+  gap:16px;
+  min-width:0;
+  padding:16px;
+  border:1px solid var(--kg-border);
+  border-radius:var(--kg-radius-panel);
+  background:var(--kg-surface);
+  box-shadow:none;
+}
+.ss-app .um-role-theme::before{display:none}
+.ss-app .um-role-theme-head{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin:0;
+}
+.ss-app .um-role-theme-head strong{
+  color:var(--kg-text);
+  font-size:14px;
+}
+.ss-app .um-role-theme-head code{
+  margin-left:auto;
+  color:var(--kg-muted);
+  font-size:11px;
+  font-weight:600;
+}
+.ss-role-swatch{
+  width:12px;
+  height:12px;
+  flex:0 0 auto;
+  border:2px solid var(--kg-surface);
+  border-radius:50%;
+  box-shadow:0 0 0 1px var(--kg-border-strong);
+}
+.ss-theme-color-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.ss-theme-color-grid label{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:6px;
+  min-width:0;
+  margin:0;
+  color:var(--kg-muted);
+  font-size:12px;
+  font-weight:650;
+}
+.ss-color-field{
+  display:grid;
+  grid-template-columns:42px minmax(0,1fr);
+  align-items:center;
+  min-width:0;
+  height:36px;
+  padding:3px 8px 3px 3px;
+  border:1px solid var(--kg-border);
+  border-radius:var(--kg-radius-control);
+  background:var(--kg-surface-subtle);
+}
+.ss-app .ss-color-field input[type="color"]{
+  width:34px;
+  height:28px;
+  min-width:0;
+  padding:2px;
+  border:0 !important;
+  border-radius:6px !important;
+  background:transparent !important;
+  cursor:pointer;
+}
+.ss-color-field code{
+  min-width:0;
+  overflow:hidden;
+  color:var(--kg-text);
+  font-size:11px;
+  font-weight:650;
+  text-overflow:ellipsis;
+}
+.ss-app .um-role-theme-actions{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:0;
+  padding-top:12px;
+  border-top:1px solid var(--kg-border);
+}
+.ss-app .um-role-theme-actions > span{
+  color:var(--kg-muted);
+  font-size:11px;
+}
+.ss-app .um-role-theme-actions button{
+  flex:0 0 auto;
+  min-height:32px;
+  padding:0 12px;
+  border:1px solid var(--kg-border);
+  background:var(--kg-surface);
+  color:var(--kg-text);
+  font-size:12px;
+  font-weight:650;
+}
+.ss-app .um-role-theme-actions button:hover{
+  border-color:rgb(47 109 246 / 35%);
+  background:var(--kg-primary-soft);
+  color:var(--kg-primary);
+}
+@media(max-width:1120px){
+  .ss-theme-color-grid{grid-template-columns:1fr}
+}
+@media(max-width:980px){
+  .ss-role-theme-panel{grid-template-columns:1fr}
+}

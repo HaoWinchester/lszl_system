@@ -286,3 +286,46 @@ test('mobile admin and study routes put the active task before secondary navigat
   assert.match(usersCss, /\/\* Compact desktop summary rail \*\/[\s\S]*\.um-summary\s*\{[^}]*display:\s*flex/)
   assert.match(usersCss, /\/\* Compact desktop summary rail \*\/[\s\S]*\.um-stat\s*\{[^}]*border:\s*0/)
 })
+
+test('settings presents role themes as readable desktop color workspaces', () => {
+  const route = readFrontend('src/routes/Settings.tsx')
+  const css = readFrontend('src/styles/system-settings.css')
+
+  assert.match(route, /className="ss-role-theme-panel"/)
+  assert.match(route, /className="um-role-theme"/)
+  assert.match(route, /className="ss-theme-color-grid"/)
+  assert.match(route, /aria-label=\{`\$\{label\}主色`\}/)
+  assert.match(route, /t\.primary_color\.toUpperCase\(\)/)
+  assert.match(css, /\.ss-role-theme-panel\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/)
+  assert.match(css, /\.ss-theme-color-grid label\s*\{[^}]*grid-template-columns:\s*1fr/)
+  assert.match(css, /\.ss-color-field\s*\{/)
+})
+
+test('training gives an actionable desktop empty state instead of a blank panel', () => {
+  const route = readFrontend('src/routes/Training.tsx')
+  const css = readFrontend('src/styles/question-training.css')
+
+  assert.match(route, /className="q-empty q-guided-empty"/)
+  assert.match(route, /<Link to="\/question-bank">前往题库管理<\/Link>/)
+  assert.match(css, /\.question-training-app \.q-guided-empty\s*\{/)
+  assert.match(css, /\.question-training-app \.q-empty-actions\s*\{/)
+})
+
+test('recall distinguishes no selected question from a loading request', () => {
+  const route = readFrontend('src/routes/Recall.tsx')
+  const css = readFrontend('src/styles/knowledge-recall.css')
+
+  assert.match(route, /qid \? <div className="kr-loading">正在加载题目…<\/div>/)
+  assert.match(route, /className="kr-empty-state"/)
+  assert.match(route, /<Link to="\/training">前往考题训练<\/Link>/)
+  assert.match(route, /className="kr-world"[\s\S]{0,180}left: '50%'[\s\S]{0,80}top: '50%'/)
+  assert.match(css, /\.kr-app\s*\{[^}]*height:\s*100vh/)
+  assert.match(css, /\.kr-app\[data-theme="platform"\] \.kr-empty-state\s*\{/)
+})
+
+test('member detail keeps its desktop header fixed while the body scrolls', () => {
+  const css = readFrontend('src/styles/boardmix-overrides.css')
+
+  assert.match(css, /\.kg-subscription-detail-modal\s*\{[\s\S]*display:\s*flex !important;[\s\S]*flex-direction:\s*column;[\s\S]*overflow:\s*hidden;/)
+  assert.match(css, /\.kg-subscription-detail-body\s*\{[\s\S]*min-height:\s*0;[\s\S]*overflow:\s*auto;/)
+})

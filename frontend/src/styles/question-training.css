@@ -100,3 +100,61 @@ body[data-role-theme] .qt-back-link,body[data-role-theme] .qt-nav-btn{border-col
     height:var(--kg-control-touch);
   }
 }
+
+/* Desktop empty states should explain the next task without inventing a dashboard. */
+.question-training-app .q-guided-empty{
+  display:grid;
+  justify-items:center;
+  width:min(520px,100%);
+  margin:64px auto 0;
+  padding:0 20px;
+  color:var(--kg-muted);
+  text-align:center;
+}
+.question-training-app .q-empty-icon{
+  display:grid;
+  width:40px;
+  height:40px;
+  margin-bottom:12px;
+  place-items:center;
+  border:1px solid rgb(47 109 246 / 22%);
+  border-radius:var(--kg-radius-control);
+  background:var(--kg-primary-soft);
+  color:var(--kg-primary);
+}
+.question-training-app .q-guided-empty h3{
+  margin:0;
+  color:var(--kg-text);
+  font-size:16px;
+  font-weight:700;
+}
+.question-training-app .q-guided-empty p{
+  max-width:420px;
+  margin:8px 0 0;
+  color:var(--kg-muted);
+  font-size:13px;
+  line-height:1.65;
+}
+.question-training-app .q-empty-actions{
+  display:flex;
+  justify-content:center;
+  gap:8px;
+  margin-top:16px;
+}
+.question-training-app .q-empty-actions a{
+  display:inline-flex;
+  min-height:34px;
+  align-items:center;
+  padding:0 12px;
+  border:1px solid var(--kg-border);
+  border-radius:var(--kg-radius-control);
+  background:var(--kg-surface);
+  color:var(--kg-primary);
+  font-size:12px;
+  font-weight:650;
+  text-decoration:none;
+}
+.question-training-app .q-empty-actions a:hover{
+  border-color:rgb(47 109 246 / 35%);
+  background:var(--kg-primary-soft);
+}
