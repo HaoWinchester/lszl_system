@@ -4,13 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-legacy.js",
     "dev": "vite",
+    "prebuild": "node scripts/copy-legacy.js",
     "build": "tsc -b && vite build",
+    "copy-legacy": "node scripts/copy-legacy.js",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
     "axios": "^1.18.1",
+    "lucide-react": "^1.24.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1",

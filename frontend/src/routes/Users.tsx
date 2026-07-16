@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 
 import { type AppUser } from '../api/auth'
 import { systemApi, type AdminLog } from '../api/system'
@@ -273,7 +274,7 @@ export default function Users() {
     <div className="um-app">
       <header className="um-topbar">
         <div className="um-brand">
-          <Link className="um-back" to="/" title="返回首页">←</Link>
+          <Link className="um-back" to="/" title="返回首页"><ArrowLeft size={16} aria-hidden="true" /></Link>
           <div>
             <p className="um-kicker">User Administration</p>
             <h1>用户管理</h1>
@@ -296,6 +297,13 @@ export default function Users() {
           <Link className="um-nav-btn" to="/settings">系统设置</Link>
         </div>
       </header>
+
+      <section className="um-summary" id="umSummary">
+        <article className="um-stat"><span>账号总数</span><strong>{total}</strong><em>服务端数据库</em></article>
+        <article className="um-stat"><span>正常用户</span><strong>{users.filter((u) => u.status === 'active').length}</strong><em>可登录使用</em></article>
+        <article className="um-stat"><span>已归档</span><strong>{users.filter((u) => u.status === 'archived').length}</strong><em>保留资料，不允许登录</em></article>
+        <article className="um-stat"><span>当前页</span><strong>{users.length}</strong><em>第 {page} / {totalPages} 页</em></article>
+      </section>
 
       <main className="um-layout">
         <aside className="um-left-card">
@@ -348,21 +356,21 @@ export default function Users() {
             {users.map((u) => (
               <div
                 key={u.username}
-                className={`um-user-item${editing?.username === u.username ? ' active' : ''}`}
+                className={`um-user-item compact${editing?.username === u.username ? ' active' : ''}`}
+                data-user={u.username}
+                role="button"
+                tabIndex={0}
+                title={`@${u.username} · ${ROLE_LABEL[u.role]} · ${u.subject || ''}`}
+                aria-label={`选择用户 ${u.username}，${ROLE_LABEL[u.role]}，${STATUS_LABEL[u.status]}`}
                 onClick={() => selectUser(u)}
-                style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #eef2f7' }}
               >
-                <input
-                  type="checkbox"
-                  checked={selected.has(u.username)}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={() => toggleSelect(u.username)}
-                  style={{ marginRight: 8 }}
-                />
-                <strong>{u.display_name || u.username}</strong>
-                <span style={{ color: '#64748b', marginLeft: 8 }}>({u.username})</span>
-                <span style={{ float: 'right', fontSize: 12 }}>
-                  <span className={`um-tag role-${u.role}`}>{ROLE_LABEL[u.role]}</span>{' '}
+                <label className="um-user-check" title="加入批量选择" onClick={(e) => e.stopPropagation()}>
+                  <input className="um-user-checkbox" type="checkbox" checked={selected.has(u.username)} onChange={() => toggleSelect(u.username)} />
+                  <span />
+                </label>
+                <span className="um-user-name"><strong>{u.display_name || u.username}</strong><em>@{u.username}</em></span>
+                <span className="um-user-tags">
+                  <span className={`um-tag role-${u.role}`}>{ROLE_LABEL[u.role]}</span>
                   <span className={`um-tag status-${u.status}`}>{STATUS_LABEL[u.status]}</span>
                 </span>
               </div>

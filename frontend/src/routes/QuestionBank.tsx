@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ArrowLeft, X } from 'lucide-react'
 
 import { banksApi, papersApi, type Bank, type Paper, type Question } from '../api/questions'
 import { useAuth } from '../store/auth'
@@ -77,7 +78,7 @@ export default function QuestionBank() {
     <div className="qb-app" id="qbApp">
       <header className="qb-topbar">
         <div className="qb-brand">
-          <Link className="qb-back" to="/" title="返回知识图谱">←</Link>
+          <Link className="qb-back" to="/" title="返回知识图谱"><ArrowLeft size={16} aria-hidden="true" /></Link>
           <div>
             <p className="qb-kicker">Question Bank Administration</p>
             <h1>题库认知标注管理</h1>
@@ -108,10 +109,21 @@ export default function QuestionBank() {
             <button type="button" onClick={() => setAnnoTab('clues')}>关键词标记</button>
             <button type="button" onClick={() => setAnnoTab('concepts')}>知识点绑定</button>
             <button type="button" onClick={() => setAnnoTab('reasoning')}>推理逻辑</button>
+            <button type="button" onClick={() => notify('标注完成度见右侧面板')}>标注完成度</button>
           </nav>
         </aside>
 
         <section className="qb-editor">
+          <div className="qb-status-card" id="qbStatusCard">
+            <div className="status-main">
+              <span className="big-dot" style={{ ['--dot' as string]: '#2563eb' }} />
+              <div>
+                <strong>{currentBank?.name || '未选择题库'}</strong>
+                <p>{currentBank ? `${currentBank.subject} · 当前 ${questions.length} 题` : '请选择题库开始管理题目'}{editing ? ` · 正在编辑：${editing.title.slice(0, 16)}` : ''}</p>
+              </div>
+            </div>
+            <div className="status-actions"><span>当前空间：{me?.username || '访客'} 的题库</span></div>
+          </div>
           <section className="qb-card qb-workspace-card" id="qbMainWorkspace">
             <div className="qb-workspace-head">
               <div><h2>题库工作区</h2><p>题库管理、组卷发布和题目基础信息合并为一个主标签区域。</p></div>
@@ -170,7 +182,7 @@ export default function QuestionBank() {
                           <span>{q.domain || '未分类'} · {q.difficulty || ''}</span>
                         </div>
                       ))}
-                      {questions.length === 0 && <p className="qb-empty">{bankId ? '暂无题目' : '← 先选择题库'}</p>}
+                      {questions.length === 0 && <p className="qb-empty">{bankId ? '暂无题目' : <><ArrowLeft size={14} aria-hidden="true" /> 先选择题库</>}</p>}
                     </div>
                   </section>
                 </div>
@@ -206,7 +218,7 @@ export default function QuestionBank() {
                         <input style={{ width: 36 }} value={o.id} onChange={(e) => setEditing({ ...editing, options: editing.options.map((x, idx) => idx === i ? { ...x, id: e.target.value } : x) })} />
                         <input placeholder="选项内容" value={o.text} onChange={(e) => setEditing({ ...editing, options: editing.options.map((x, idx) => idx === i ? { ...x, text: e.target.value } : x) })} />
                         <label style={{ fontSize: 12 }}><input type="checkbox" checked={!!o.correct} onChange={(e) => setEditing({ ...editing, options: editing.options.map((x, idx) => idx === i ? { ...x, correct: e.target.checked } : x), correctAnswer: e.target.checked ? o.id : editing.correctAnswer })} /> 正确</label>
-                        <button type="button" onClick={() => setEditing({ ...editing, options: editing.options.filter((_, idx) => idx !== i) })}>✕</button>
+                        <button type="button" onClick={() => setEditing({ ...editing, options: editing.options.filter((_, idx) => idx !== i) })}><X size={14} aria-hidden="true" /></button>
                       </div>
                     ))}
                   </div>
@@ -247,6 +259,11 @@ export default function QuestionBank() {
               <button className="primary" type="button" onClick={() => setMainTab('papers')}>进入组卷发布</button>
             </div>
             <hr />
+            <h2>科目快捷管理</h2>
+            <div className="qb-subject-quick">
+              {SUBJECTS.map((s) => <span key={s} className="qb-subject-chip">{s}</span>)}
+            </div>
+            <hr />
             <h2>字段关系提示</h2>
             <ul className="qb-tip-list">
               <li><strong>关键词</strong>：题干中的可点击线索。</li>
@@ -256,6 +273,12 @@ export default function QuestionBank() {
           </section>
         </aside>
       </main>
+
+      <button className="qb-selection-mark" id="qbSelectionMark" type="button" hidden>标记关键词</button>
+      <div className="qb-floating-keyword-panel" id="qbFloatingKeywordPanel" hidden>
+        <div className="floating-head"><strong>关键词标记操作台</strong><button aria-label="关闭" type="button"><X size={16} aria-hidden="true" /></button></div>
+        <label className="qb-field"><span>选中文本</span><input placeholder="选中的题干文本" /></label>
+      </div>
 
       <div className="qb-toast" role="status" aria-live="polite">{toast}</div>
     </div>
@@ -271,7 +294,7 @@ function AnnotationPanel({ tab, editing, setEditing }: { tab: AnnoTab; editing: 
           {(editing.clues || []).map((c, i) => (
             <div key={i} className="qb-token">
               <span>{String(c.text ?? '')}</span>
-              <button type="button" onClick={() => setEditing({ ...editing, clues: (editing.clues || []).filter((_, idx) => idx !== i) })}>×</button>
+              <button type="button" onClick={() => setEditing({ ...editing, clues: (editing.clues || []).filter((_, idx) => idx !== i) })}><X size={14} aria-hidden="true" /></button>
             </div>
           ))}
           {(editing.clues || []).length === 0 && <p className="qb-empty">暂无关键词</p>}
@@ -388,7 +411,7 @@ function PapersPanel({ papers, bankId, notify, reload }: { papers: Paper[]; bank
                 <Link className="qb-top-link" to="/training">去训练</Link>
               </div>
             </>
-          ) : <p className="qb-empty">← 选择试卷</p>}
+          ) : <p className="qb-empty"><ArrowLeft size={14} aria-hidden="true" /> 选择试卷</p>}
         </section>
       </div>
     </section>

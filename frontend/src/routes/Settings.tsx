@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ArrowLeft, Check } from 'lucide-react'
 
 import { systemApi, type AdminLog, type RoleTheme, type SubscriptionPlan } from '../api/system'
 import { useAuth } from '../store/auth'
@@ -66,7 +67,7 @@ export default function Settings() {
     <div className="ss-app">
       <header className="um-topbar ss-topbar">
         <div className="um-brand">
-          <Link className="um-back" to="/" title="返回首页">←</Link>
+          <Link className="um-back" to="/" title="返回首页"><ArrowLeft size={16} aria-hidden="true" /></Link>
           <div>
             <p className="um-kicker">System Administration</p>
             <h1>系统设置</h1>
@@ -82,101 +83,97 @@ export default function Settings() {
       <main className="ss-layout">
         <aside className="ss-sidebar">
           {TABS.map(([k, l]) => (
-            <button key={k} className={tab === k ? 'active' : ''} type="button" onClick={() => setTab(k)}>
+            <button key={k} className={tab === k ? 'active' : ''} type="button" data-ss-tab={k} onClick={() => setTab(k)}>
               {l}
             </button>
           ))}
         </aside>
 
         <section className="ss-content">
-          {tab === 'themes' && (
-            <section className="ss-pane active">
-              <div className="um-panel">
-                <div className="um-card-head small">
-                  <div>
-                    <h2>角色主题</h2>
-                    <p>为不同角色设置登录后的主题色。</p>
-                  </div>
-                </div>
-                <div className="um-role-theme-panel">
-                  {ROLES.map(([role, label]) => (
-                    <ThemeEditor key={role} role={role} label={label} theme={themes[role]} onSave={saveTheme} />
-                  ))}
+          <section className={tab === 'themes' ? 'ss-pane active' : 'ss-pane'}>
+            <div className="um-panel">
+              <div className="um-card-head small">
+                <div>
+                  <h2>角色主题</h2>
+                  <p>为不同角色设置登录后的主题色。</p>
                 </div>
               </div>
-            </section>
-          )}
+              <div className="um-role-theme-panel">
+                {ROLES.map(([role, label]) => (
+                  <ThemeEditor key={role} role={role} label={label} theme={themes[role]} onSave={saveTheme} />
+                ))}
+              </div>
+            </div>
+          </section>
 
-          {tab === 'wechat' && (
-            <section className="ss-pane active">
-              <div className="um-panel">
-                <div className="um-card-head small">
-                  <div>
-                    <h2>微信登录配置</h2>
-                    <p>正式接入需要后端 code 换取 openid/unionid。</p>
-                  </div>
-                </div>
-                <div className="um-wechat-config">
-                  <label className="um-field compact">
-                    <input
-                      type="checkbox"
-                      checked={!!wechat.enableDemo}
-                      onChange={(e) => setWechat({ ...wechat, enableDemo: e.target.checked })}
-                    />{' '}
-                    <span>启用本地演示扫码</span>
-                  </label>
-                  <label className="um-field compact">
-                    <input
-                      type="checkbox"
-                      checked={!!wechat.enableOfficial}
-                      onChange={(e) => setWechat({ ...wechat, enableOfficial: e.target.checked })}
-                    />{' '}
-                    <span>启用正式微信开放平台</span>
-                  </label>
-                  <label className="um-field compact">
-                    <input
-                      type="checkbox"
-                      checked={!!wechat.autoCreateUser}
-                      onChange={(e) => setWechat({ ...wechat, autoCreateUser: e.target.checked })}
-                    />{' '}
-                    <span>首次登录自动创建用户</span>
-                  </label>
-                  <label className="um-field">
-                    <span>AppID</span>
-                    <input value={(wechat.appId as string) || ''} onChange={(e) => setWechat({ ...wechat, appId: e.target.value })} />
-                  </label>
-                  <label className="um-field">
-                    <span>授权回调地址</span>
-                    <input value={(wechat.redirectUri as string) || ''} onChange={(e) => setWechat({ ...wechat, redirectUri: e.target.value })} />
-                  </label>
-                  <label className="um-field">
-                    <span>后端 code 换取接口</span>
-                    <input value={(wechat.backendExchangeUrl as string) || ''} onChange={(e) => setWechat({ ...wechat, backendExchangeUrl: e.target.value })} />
-                  </label>
-                  <label className="um-field">
-                    <span>scope</span>
-                    <input value={(wechat.scope as string) || ''} onChange={(e) => setWechat({ ...wechat, scope: e.target.value })} />
-                  </label>
-                  <label className="um-field">
-                    <span>默认角色</span>
-                    <select value={(wechat.defaultRole as string) || 'student'} onChange={(e) => setWechat({ ...wechat, defaultRole: e.target.value })}>
-                      {ROLES.map(([v, l]) => (
-                        <option key={v} value={v}>{l}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="um-field">
-                    <span>默认科目</span>
-                    <input value={(wechat.defaultSubject as string) || 'PMP'} onChange={(e) => setWechat({ ...wechat, defaultSubject: e.target.value })} />
-                  </label>
-                  <button className="primary" type="button" onClick={saveWechat}>保存微信配置</button>
+          <section className={tab === 'wechat' ? 'ss-pane active' : 'ss-pane'}>
+            <div className="um-panel">
+              <div className="um-card-head small">
+                <div>
+                  <h2>微信登录配置</h2>
+                  <p>正式接入需要后端 code 换取 openid/unionid。</p>
                 </div>
               </div>
-            </section>
-          )}
+              <div className="um-wechat-config">
+                <label className="um-field compact">
+                  <input
+                    type="checkbox"
+                    checked={!!wechat.enableDemo}
+                    onChange={(e) => setWechat({ ...wechat, enableDemo: e.target.checked })}
+                  />{' '}
+                  <span>启用本地演示扫码</span>
+                </label>
+                <label className="um-field compact">
+                  <input
+                    type="checkbox"
+                    checked={!!wechat.enableOfficial}
+                    onChange={(e) => setWechat({ ...wechat, enableOfficial: e.target.checked })}
+                  />{' '}
+                  <span>启用正式微信开放平台</span>
+                </label>
+                <label className="um-field compact">
+                  <input
+                    type="checkbox"
+                    checked={!!wechat.autoCreateUser}
+                    onChange={(e) => setWechat({ ...wechat, autoCreateUser: e.target.checked })}
+                  />{' '}
+                  <span>首次登录自动创建用户</span>
+                </label>
+                <label className="um-field">
+                  <span>AppID</span>
+                  <input value={(wechat.appId as string) || ''} onChange={(e) => setWechat({ ...wechat, appId: e.target.value })} />
+                </label>
+                <label className="um-field">
+                  <span>授权回调地址</span>
+                  <input value={(wechat.redirectUri as string) || ''} onChange={(e) => setWechat({ ...wechat, redirectUri: e.target.value })} />
+                </label>
+                <label className="um-field">
+                  <span>后端 code 换取接口</span>
+                  <input value={(wechat.backendExchangeUrl as string) || ''} onChange={(e) => setWechat({ ...wechat, backendExchangeUrl: e.target.value })} />
+                </label>
+                <label className="um-field">
+                  <span>scope</span>
+                  <input value={(wechat.scope as string) || ''} onChange={(e) => setWechat({ ...wechat, scope: e.target.value })} />
+                </label>
+                <label className="um-field">
+                  <span>默认角色</span>
+                  <select value={(wechat.defaultRole as string) || 'student'} onChange={(e) => setWechat({ ...wechat, defaultRole: e.target.value })}>
+                    {ROLES.map(([v, l]) => (
+                      <option key={v} value={v}>{l}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="um-field">
+                  <span>默认科目</span>
+                  <input value={(wechat.defaultSubject as string) || 'PMP'} onChange={(e) => setWechat({ ...wechat, defaultSubject: e.target.value })} />
+                </label>
+                <button className="primary" type="button" onClick={saveWechat}>保存微信配置</button>
+              </div>
+            </div>
+          </section>
 
-          {tab === 'permissions' && perms && (
-            <section className="ss-pane active">
+          <section className={tab === 'permissions' ? 'ss-pane active' : 'ss-pane'}>
+            {perms && (
               <div className="um-panel">
                 <div className="um-card-head small">
                   <div>
@@ -203,7 +200,7 @@ export default function Settings() {
                             const ok = perms.rows.find((row) => row.role === role)?.permissions.includes(pk)
                             return (
                               <td key={role} style={{ textAlign: 'center', color: ok ? '#16a34a' : '#cbd5e1' }}>
-                                {ok ? '✓' : '—'}
+                                {ok ? <Check size={14} aria-hidden="true" /> : '—'}
                               </td>
                             )
                           })}
@@ -213,56 +210,52 @@ export default function Settings() {
                   </table>
                 </div>
               </div>
-            </section>
-          )}
+            )}
+          </section>
 
-          {tab === 'subscriptions' && (
-            <section className="ss-pane active">
-              <div className="um-panel">
-                <div className="um-card-head small">
-                  <div>
-                    <h2>学员订阅套餐</h2>
-                    <p>订阅权益只对学员生效；管理员和教师自动绕过。</p>
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gap: 12 }}>
-                  {plans.map((p) => (
-                    <PlanEditor key={p.planId} plan={p} onSave={savePlan} />
-                  ))}
+          <section className={tab === 'subscriptions' ? 'ss-pane active' : 'ss-pane'}>
+            <div className="um-panel">
+              <div className="um-card-head small">
+                <div>
+                  <h2>学员订阅套餐</h2>
+                  <p>订阅权益只对学员生效；管理员和教师自动绕过。</p>
                 </div>
               </div>
-            </section>
-          )}
+              <div style={{ display: 'grid', gap: 12 }}>
+                {plans.map((p) => (
+                  <PlanEditor key={p.planId} plan={p} onSave={savePlan} />
+                ))}
+              </div>
+            </div>
+          </section>
 
-          {tab === 'logs' && (
-            <section className="ss-pane active">
-              <div className="um-panel log-panel">
-                <div className="um-card-head small">
-                  <div>
-                    <h2>系统操作日志</h2>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => systemApi.clearLogs().then(() => systemApi.logs(80).then(setLogs))}
-                  >
-                    清空
-                  </button>
+          <section className={tab === 'logs' ? 'ss-pane active' : 'ss-pane'}>
+            <div className="um-panel log-panel">
+              <div className="um-card-head small">
+                <div>
+                  <h2>系统操作日志</h2>
                 </div>
-                <div className="um-log-list">
-                  {logs.map((l) => (
-                    <div key={l.id} style={{ fontSize: 12, padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
-                      <div>
-                        {l.action} {l.target_username ? `→ ${l.target_username}` : ''}{' '}
-                        <span style={{ color: '#94a3b8' }}>@{l.actor}</span>
-                      </div>
-                      <div style={{ color: '#94a3b8' }}>{l.detail}</div>
+                <button
+                  type="button"
+                  onClick={() => systemApi.clearLogs().then(() => systemApi.logs(80).then(setLogs))}
+                >
+                  清空
+                </button>
+              </div>
+              <div className="um-log-list">
+                {logs.map((l) => (
+                  <div key={l.id} style={{ fontSize: 12, padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <div>
+                      {l.action} {l.target_username ? `→ ${l.target_username}` : ''}{' '}
+                      <span style={{ color: '#94a3b8' }}>@{l.actor}</span>
                     </div>
-                  ))}
-                  {logs.length === 0 && <p style={{ color: '#94a3b8' }}>暂无日志</p>}
-                </div>
+                    <div style={{ color: '#94a3b8' }}>{l.detail}</div>
+                  </div>
+                ))}
+                {logs.length === 0 && <p style={{ color: '#94a3b8' }}>暂无日志</p>}
               </div>
-            </section>
-          )}
+            </div>
+          </section>
         </section>
       </main>
 

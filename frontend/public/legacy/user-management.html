@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>用户管理｜本地多用户后台</title>
+  <link rel="stylesheet" href="styles/user-management.css"/>
+<link rel="stylesheet" href="styles/global-shortcuts.css"/>
+<link rel="stylesheet" href="styles/subscription.css"/>
+<link rel="stylesheet" href="styles/user-center.css"/>
+</head>
+<body>
+  <div class="um-app">
+    <header class="um-topbar">
+      <div class="um-brand">
+        <a class="um-back" href="index.html" title="返回知识图谱首页">←</a>
+        <div>
+          <p class="um-kicker">Local User Administration</p>
+          <h1>用户管理系统</h1>
+          <p>管理本浏览器中的账号资料、角色状态、归档记录和常规操作日志。后续接入服务器时可迁移为正式后台。</p>
+        </div>
+      </div>
+      <div class="um-top-actions">
+        <div class="auth-status" id="authStatus">未登录 · 游客</div>
+        <button id="umAddUserBtn" type="button" class="primary">+ 新用户</button>
+        <button id="umExportBtn" type="button">导出用户</button>
+        <button id="umImportBtn" type="button">导入用户</button>
+        <input id="umImportFile" type="file" hidden accept=".json,application/json"/>
+        <a class="um-nav-btn" href="question-bank.html" target="_blank" rel="noopener">题库管理</a>
+        <a class="um-nav-btn" href="system-settings.html" target="_blank" rel="noopener" data-permission="accessSystemSettings" data-permission-mode="hide">系统设置</a>
+      </div>
+    </header>
+
+    <section class="um-summary" id="umSummary"></section>
+
+    <main class="um-layout">
+      <aside class="um-left-card">
+        <div class="um-card-head">
+          <div>
+            <h2>用户列表</h2>
+            <p id="umScopeInfo">本地浏览器账号</p>
+          </div>
+          <div class="um-head-actions">
+            <button id="umListToolsToggle" type="button" class="um-list-tools-toggle" aria-expanded="false" aria-controls="umListTools">筛选/批量</button>
+            <button id="umRefreshBtn" type="button">刷新</button>
+          </div>
+        </div>
+        <div class="um-list-tools-summary" id="umListToolsSummary" hidden>筛选与批量操作已收起</div>
+        <div class="um-list-tools" id="umListTools" hidden>
+        <label class="um-field compact">
+          <span>搜索用户</span>
+          <input id="umSearchInput" type="search" placeholder="用户名 / 姓名 / 邮箱 / 科目"/>
+        </label>
+        <div class="um-filter-row">
+          <label class="um-field compact">
+            <span>角色</span>
+            <select id="umRoleFilter">
+              <option value="ALL">全部角色</option>
+              <option value="admin">管理员</option>
+              <option value="teacher">教师/教研</option>
+              <option value="student">学员</option>
+              <option value="viewer">游客</option>
+            </select>
+          </label>
+          <label class="um-field compact">
+            <span>状态</span>
+            <select id="umStatusFilter">
+              <option value="ALL">全部状态</option>
+              <option value="active">正常</option>
+              <option value="paused">暂停</option>
+              <option value="archived">已归档</option>
+            </select>
+          </label>
+        </div>
+
+        <section class="um-batch-toolbar" aria-label="用户批量操作">
+          <label class="um-select-all">
+            <input id="umSelectAllUsers" type="checkbox"/>
+            <span>全选当前页</span>
+          </label>
+          <strong id="umSelectedCount">已选 0 人</strong>
+          <div class="um-batch-grid">
+            <select id="umBatchRoleSelect" title="批量设置角色">
+              <option value="KEEP">角色不变</option>
+              <option value="admin">设为管理员</option>
+              <option value="teacher">设为教师/教研</option>
+              <option value="student">设为学员</option>
+              <option value="viewer">设为游客</option>
+            </select>
+            <select id="umBatchStatusSelect" title="批量设置状态">
+              <option value="KEEP">状态不变</option>
+              <option value="active">设为正常</option>
+              <option value="paused">设为暂停</option>
+              <option value="archived">设为已归档</option>
+            </select>
+            <select id="umBatchSubjectSelect" title="批量设置主要科目">
+              <option value="KEEP">科目不变</option>
+              <option value="PMP">PMP</option>
+              <option value="CSPM">CSPM</option>
+              <option value="P2">P2 / PRINCE2</option>
+              <option value="ACP">ACP</option>
+              <option value="NPDP">NPDP</option>
+              <option value="PgMP">PgMP</option>
+              <option value="PfMP">PfMP</option>
+              <option value="CUSTOM">自定义</option>
+            </select>
+          </div>
+          <div class="um-batch-actions">
+            <button id="umBatchApplyBtn" type="button">批量应用</button>
+            <button id="umBatchExportBtn" type="button">导出所选</button>
+            <button id="umBatchClearBtn" type="button">清除选择</button>
+            <button class="danger" id="umBatchDeleteBtn" type="button">删除所选</button>
+          </div>
+        </section>
+        </div>
+
+        <div class="um-user-list" id="umUserList"></div>
+        <div class="um-pagination" id="umPagination" aria-label="用户列表分页">
+          <div class="um-page-info" id="umPageInfo">第 1 / 1 页</div>
+          <div class="um-page-actions">
+            <button id="umPrevPageBtn" type="button">上一页</button>
+            <button id="umNextPageBtn" type="button">下一页</button>
+          </div>
+          <label class="um-page-size">
+            <span>每页</span>
+            <select id="umPageSizeSelect">
+              <option value="10">10</option>
+              <option value="20" selected>20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+        </div>
+      </aside>
+
+      <section class="um-editor-card">
+        <div class="um-card-head">
+          <div>
+            <h2 id="umEditorTitle">用户资料</h2>
+            <p id="umEditorSubtitle">选择左侧用户后可编辑资料、角色、状态和备注。</p>
+          </div>
+          <span class="um-save-state" id="umSaveState">未选择</span>
+        </div>
+
+        <form class="um-form" id="umUserForm">
+          <div class="um-grid two">
+            <label class="um-field">
+              <span>用户名</span>
+              <input id="umUsername" readonly placeholder="username"/>
+            </label>
+            <label class="um-field">
+              <span>显示名称</span>
+              <input id="umDisplayName" placeholder="例如：张三 / PMP 学员 001"/>
+            </label>
+            <label class="um-field">
+              <span>角色</span>
+              <select id="umRole">
+                <option value="admin">管理员</option>
+                <option value="teacher">教师/教研</option>
+                <option value="student">学员</option>
+                <option value="viewer">游客</option>
+              </select>
+            </label>
+            <label class="um-field">
+              <span>状态</span>
+              <select id="umStatus">
+                <option value="active">正常</option>
+                <option value="paused">暂停</option>
+                <option value="archived">已归档</option>
+              </select>
+            </label>
+            <label class="um-field">
+              <span>邮箱</span>
+              <input id="umEmail" type="email" placeholder="name@example.com"/>
+            </label>
+            <label class="um-field">
+              <span>手机 / 联系方式</span>
+              <input id="umPhone" placeholder="手机号、微信或内部编号"/>
+            </label>
+            <label class="um-field">
+              <span>主要科目</span>
+              <select id="umSubject">
+                <option value="PMP">PMP</option>
+                <option value="CSPM">CSPM</option>
+                <option value="P2">P2 / PRINCE2</option>
+                <option value="ACP">ACP</option>
+                <option value="NPDP">NPDP</option>
+                <option value="PgMP">PgMP</option>
+                <option value="PfMP">PfMP</option>
+                <option value="CUSTOM">自定义</option>
+              </select>
+            </label>
+            <label class="um-field">
+              <span>标签</span>
+              <input id="umTags" placeholder="例如：内测, PMP第1期, 重点跟进"/>
+            </label>
+          </div>
+          <label class="um-field">
+            <span>备注 / 存档说明</span>
+            <textarea id="umNote" rows="5" placeholder="记录用户来源、班级、学习情况、归档原因等常规信息"></textarea>
+          </label>
+          <div class="um-action-row">
+            <button class="primary" id="umSaveUserBtn" type="submit">保存用户资料</button>
+            <button id="umResetPasswordBtn" type="button">重置密码</button>
+            <button id="umArchiveUserBtn" type="button">归档用户</button>
+            <button id="umRestoreUserBtn" type="button">恢复用户</button>
+            <button class="danger" id="umDeleteUserBtn" type="button">删除账号</button>
+          </div>
+        </form>
+
+        <section class="um-subscription-card" id="umSubscriptionCard" aria-label="学员订阅管理"></section>
+        <section class="um-data-card" id="umDataCard"></section>
+      </section>
+
+      <aside class="um-right-card" id="umRightCard">
+        <div class="um-right-shell">
+          <div class="um-right-dock">
+            <div class="um-right-dock-title">
+              <h2>辅助面板</h2>
+              <p>操作、权限与日志集中在标签页中。系统配置已迁移到独立页面。</p>
+            </div>
+            <button id="umRightCollapseBtn" class="um-collapse-btn" type="button" aria-expanded="true">收起</button>
+          </div>
+
+          <nav class="um-right-tabbar" aria-label="右侧辅助面板标签">
+            <button class="active" type="button" data-right-tab="actions">操作</button>
+            <button type="button" data-right-tab="permissions">权限</button>
+            <button type="button" data-right-tab="logs">日志</button>
+          </nav>
+
+          <div class="um-right-tabs">
+            <section class="um-right-tab-pane active" data-right-panel="actions">
+              <section class="um-panel">
+                <div class="um-card-head small">
+                  <div>
+                    <h2>操作面板</h2>
+                    <p>针对当前用户或所选用户的常规后台操作。</p>
+                  </div>
+                </div>
+                <div class="um-mini-actions">
+                  <button id="umSetActiveBtn" type="button">设为正常</button>
+                  <button id="umSetPausedBtn" type="button">暂停使用</button>
+                  <button id="umDuplicateUserBtn" type="button">复制为新用户</button>
+                  <button id="umExportSelectedBtn" type="button">导出当前用户</button>
+                </div>
+              </section>
+
+              <section class="um-panel">
+                <div class="um-card-head small">
+                  <div>
+                    <h2>存档说明</h2>
+                    <p>归档不会删除数据，只会阻止该账号继续登录。</p>
+                  </div>
+                </div>
+                <ul class="um-help-list">
+                  <li>正常：可登录并继续使用本地空间。</li>
+                  <li>暂停：临时停用，管理员可随时恢复。</li>
+                  <li>已归档：保留账号资料和历史记录，登录会被拦截。</li>
+                  <li>删除账号：移除账号资料；是否清除学习数据需后续接服务器后细化。</li>
+                </ul>
+              </section>
+            </section>
+
+            <section class="um-right-tab-pane" data-right-panel="permissions">
+              <section class="um-panel">
+                <div class="um-card-head small">
+                  <div>
+                    <h2>角色权限模板</h2>
+                    <p>当前版本为前端权限提示与拦截；正式网络版仍需后端二次校验。</p>
+                  </div>
+                </div>
+                <div class="um-permission-matrix" id="umPermissionMatrix"></div>
+              </section>
+            </section>
+
+            <section class="um-right-tab-pane" data-right-panel="logs">
+              <section class="um-panel log-panel">
+                <div class="um-card-head small">
+                  <div>
+                    <h2>最近操作日志</h2>
+                    <p>记录登录、注册、归档、恢复、导入导出等动作。</p>
+                  </div>
+                  <button id="umClearLogsBtn" type="button">清空</button>
+                </div>
+                <div class="um-log-list" id="umLogList"></div>
+              </section>
+            </section>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <div class="um-toast" id="umToast"></div>
+<script defer src="src/28-app-storage.js"></script>
+<script defer src="src/29-auth-core.js"></script>
+<script defer src="src/34-role-permissions.js"></script>
+<script defer src="src/37-subscription-plans.js"></script>
+<script defer src="src/37-subscription-orders.js"></script>
+<script defer src="src/37-subscription-redeem-codes.js"></script>
+<script defer src="src/37-subscription-core.js"></script>
+<script defer src="src/33-user-center.js"></script>
+<script defer src="src/39-global-shortcuts.js"></script>
+<script defer src="src/35-user-management-service.js"></script>
+<script defer src="src/35-user-management.js"></script>
+</body>
+</html>

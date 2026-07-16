@@ -163,8 +163,21 @@
 .um-subscription-summary{
   display:flex;
   flex-wrap:wrap;
+  align-items:center;
   gap:8px;
-  margin-top:10px;
+  margin:6px 0 14px;
+}
+.kg-user-subscription-meta strong{
+  display:inline-flex;
+  align-items:center;
+  min-height:26px;
+  padding:0 11px;
+  border-radius:999px;
+  color:#fff;
+  background:linear-gradient(135deg,#2563eb,#4f46e5);
+  font-size:13px;
+  font-weight:1000;
+  letter-spacing:.2px;
 }
 .kg-user-subscription-meta span,
 .um-subscription-summary span{

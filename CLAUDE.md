@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | 目录 | 内容 | 运行 |
 |---|---|---|
-| `legacy/` | **原版纯前端**（HTML + 原生 JS + CSS，localStorage），仅作参考与样式来源 | `cd legacy && python3 serve.py`（占 8000） |
+| `legacy/` | **原版纯前端**（HTML + 原生 JS + CSS，localStorage）；**图谱编辑器 iframe 直接承载其引擎**（见前端架构），其余页面对照还原 | `cd legacy && python3 serve.py`（占 8000） |
 | `backend/` | **新后端**：FastAPI + PostgreSQL + Alembic | `cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000` |
 | `frontend/` | **新前端**：Vite + React + TypeScript | `cd frontend && pnpm dev`（5173，proxy `/api`→8000） |
 | `docs/` | 文档，`功能基线-重构参考.md` 是重构基线与 SQL 建模依据 | — |
@@ -51,6 +51,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **状态**（`store/auth.ts`）：zustand 存当前用户 + `init/login/logout/register`。
 - **样式**：`main.tsx` 统一 import 全部 `styles/*.css`；页面组件用原版 className（见上方硬约束）。
 - **类型检查**：`cd frontend && pnpm exec tsc -b`（严格模式，noUnusedLocals）。
+- **图谱编辑器（`/`）= iframe 承载 legacy 原版引擎**（非 React 重写）：`GraphEditor.tsx` 只是 iframe 外壳，加载 `/legacy/workbench.html`（原版 `index.html` 派生，由 `scripts/copy-legacy.js` 生成到 `public/legacy/`），通过 `scripts/legacy-assets/bridge.js` 把原版的 `KGGraphFileStore`/认证/导航桥接到后端 `filesApi` 与 React 路由。这样连线、平滑档位缩放、选中边环形样式面板、大图模式等全部原版功能与原版完全一致（postMessage 协议见 `src/iframe/graphBridge.ts`）。**铁律：不改 `legacy/` 源文件**——只在 `public/legacy/` 派生 + 加 bridge.js。改图谱行为优先改 `bridge.js` 或 `GraphEditor.tsx`，不要动 `legacy/src/`。
 
 ## 数据模型（PostgreSQL，Alembic 管理）
 
@@ -69,9 +70,10 @@ users / role_themes / system_settings(KV) / user_admin_logs / folders / graph_fi
 - 前端类型：`cd frontend && pnpm exec tsc -b`。
 - 浏览器对比 legacy：用 Playwright 同时截图 `frontend` 页面和 `legacy/*.html`，逐页比对（脚本见会话历史，或用 `mcp__4_5v_mcp__analyze_image` 确认布局）。
 
-## 已知简化项（功能层面，UI 布局已对齐 legacy）
+## 已知简化项（功能层面）
 
-艾宾浩斯闪卡、学习包 ZIP 导入导出、推理图谱自动生成、深度回忆完整寻宝地图交互——这些 legacy 高级功能在 frontend 是简化版，UI 框架已用原 className 对齐，功能待补全。
+- **图谱编辑器（`/`）已是原版完整功能**（iframe 承载 legacy 引擎，含艾宾浩斯闪卡、学习包 ZIP 导入导出、大图模式、搜索定位、撤销/复制粘贴等全部原版功能），不再简化。
+- 其余页面（文件管理 `/files`、题库、训练、回忆、用户管理、系统设置）仍为 React 重写，UI 用原 className 对齐，部分高级功能（推理图谱自动生成、深度回忆寻宝地图等）待补全。
 
 ## legacy 原版架构（仅参考，勿在新代码沿用）
 

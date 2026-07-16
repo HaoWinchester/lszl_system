@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 
 interface PlaceholderProps {
   title: string
@@ -16,7 +17,7 @@ export default function Placeholder({ title, stage, children }: PlaceholderProps
           <h1>{title}（占位 · 阶段 {stage}）</h1>
         </div>
         <Link to="/" style={{ marginLeft: 20 }}>
-          ← 返回首页
+          <ArrowLeft size={16} aria-hidden="true" /> 返回首页
         </Link>
       </div>
       <div className="stage" style={{ padding: 24, color: '#0f172a' }}>

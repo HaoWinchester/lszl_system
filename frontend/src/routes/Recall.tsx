@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type WheelEvent, type MouseEvent as RMouseEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, ZoomIn, ZoomOut } from 'lucide-react'
 
 import type { Question } from '../api/questions'
 import { trainingApi } from '../api/training'
+import { useAuth } from '../store/auth'
 
 const THEMES: [string, string][] = [
   ['platform', '统一默认'], ['parchment', '羊皮纸'], ['aurora', '极光绿'],
@@ -13,6 +15,7 @@ interface RNode { id: string; title: string; x: number; y: number }
 interface REdge { from: string; to: string }
 
 export default function Recall() {
+  const me = useAuth((s) => s.user)
   const [sp] = useSearchParams()
   const qid = sp.get('qid')
   const [theme, setTheme] = useState('platform')
@@ -61,27 +64,28 @@ export default function Recall() {
   const center = () => setVp({ x: 0, y: 0, scale: 1 })
   const reset = () => { setNodes([]); setEdges([]); setActiveKeywords([]); persist([], [], []) }
 
-  if (denied) return <div className="kr-app"><div className="kr-topbar"><Link className="kr-back" to="/training">←</Link> 题目不存在或无权访问</div></div>
+  if (denied) return <div className="kr-app"><div className="kr-topbar"><Link className="kr-back" to="/training"><ArrowLeft size={16} aria-hidden="true" /></Link> 题目不存在或无权访问</div></div>
 
   return (
     <div className="kr-app" id="krApp" data-theme={theme}>
       <header className="kr-topbar">
         <div className="kr-brand">
-          <Link className="kr-back" to="/training" title="返回训练">←</Link>
+          <Link className="kr-back" to="/training" title="返回训练"><ArrowLeft size={16} aria-hidden="true" /></Link>
           <div>
             <h1>深度知识回忆</h1>
             <p>以题目为中心，点击关键词，像寻宝一样把知识点一层层回忆出来。</p>
           </div>
         </div>
         <div className="kr-tools" aria-label="深度回忆画布工具">
+          <div className="auth-status logged-in">{me ? (me.display_name || me.username) : '访客'}</div>
           <label className="kr-theme-control"><span>主题</span>
             <select value={theme} onChange={(e) => setTheme(e.target.value)} aria-label="切换主题">
               {THEMES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </label>
           <button type="button" onClick={center}>回到题目</button>
-          <button type="button" onClick={() => setVp((v) => ({ ...v, scale: Math.max(0.45, v.scale / 1.2) }))}>－</button>
-          <button type="button" onClick={() => setVp((v) => ({ ...v, scale: Math.min(1.75, v.scale * 1.2) }))}>＋</button>
+          <button type="button" aria-label="缩小" onClick={() => setVp((v) => ({ ...v, scale: Math.max(0.45, v.scale / 1.2) }))}><ZoomOut size={16} aria-hidden="true" /></button>
+          <button type="button" aria-label="放大" onClick={() => setVp((v) => ({ ...v, scale: Math.min(1.75, v.scale * 1.2) }))}><ZoomIn size={16} aria-hidden="true" /></button>
           <button type="button" onClick={reset}>重置地图</button>
         </div>
       </header>
@@ -127,6 +131,7 @@ export default function Recall() {
             ))}
           </div>
         </div>
+        <div className="kr-guide" id="krGuide" hidden />
         <div className="kr-hint-pill" id="krHintPill">拖拽空白处移动画布 · 滚轮缩放 · 点击「回到题目」复位</div>
       </main>
     </div>

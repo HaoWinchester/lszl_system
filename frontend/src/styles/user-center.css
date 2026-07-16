@@ -106,6 +106,8 @@
   line-height:1.5;
 }
 .kg-user-center-close{
+  display:grid;
+  place-items:center;
   width:34px;
   height:34px;
   min-width:34px;
@@ -114,6 +116,8 @@
   background:#f1f5f9;
   color:#64748b;
   box-shadow:none;
+  line-height:1;
+  text-decoration:none;
 }
 .kg-user-center-body{
   padding:18px 22px 20px;

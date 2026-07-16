@@ -29,36 +29,26 @@ export default function Login() {
   }
 
   return (
-    <div className="app">
-      <div className="toolbar">
-        <div className="brand">
-          <h1>登录</h1>
-        </div>
-      </div>
-      <div className="stage" style={{ padding: 40, maxWidth: 360, margin: '48px auto' }}>
-        <form onSubmit={submit} className="um-form">
-          <label className="um-field">
-            <span>用户名</span>
-            <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
-          </label>
-          <label className="um-field">
-            <span>密码</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </label>
-          {err && <p style={{ color: '#dc2626', fontSize: 13 }}>{err}</p>}
-          <div className="um-action-row">
-            <button className="primary" type="submit" disabled={busy}>
-              {busy ? '登录中…' : '登录'}
-            </button>
+    <div className="modal-backdrop auth-backdrop show" style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="modal auth-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <div className="auth-head">
+          <div>
+            <h2 id="authTitle">登录后可编辑</h2>
+            <p>登录后可以新增、编辑、连线和保存自己的内容。</p>
           </div>
-          <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 12 }}>
-            默认管理员 admin / admin123
-          </p>
+        </div>
+        <form className="auth-body" onSubmit={submit}>
+          <label>用户名
+            <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" placeholder="请输入用户名" />
+          </label>
+          <label>密码
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="请输入密码" />
+          </label>
+          <div className="auth-msg">{err}</div>
+          <div className="auth-actions">
+            <button className="primary" type="submit" disabled={busy}>{busy ? '登录中…' : '登录'}</button>
+          </div>
+          <div className="auth-note">默认管理员 admin / admin123。账号和数据保存在服务端数据库；不同用户的数据互相隔离。</div>
         </form>
       </div>
     </div>

@@ -1,0 +1,34 @@
+
+/* 独立考题训练页面 */
+.question-training-page{min-height:100vh;background:linear-gradient(135deg,#f8fbff 0%,#eef2ff 52%,#f5f3ff 100%);overflow:auto;color:#111827}
+.question-training-app{min-height:100vh;display:flex;flex-direction:column}
+.qt-topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 18px;border-bottom:1px solid rgba(15,23,42,.08);background:rgba(255,255,255,.88);backdrop-filter:blur(16px);box-shadow:0 8px 24px rgba(15,23,42,.06)}
+.qt-brand{display:flex;align-items:center;gap:12px;min-width:0}
+.qt-brand h1{margin:0;font-size:22px;line-height:1.1}
+.qt-brand p{margin:4px 0 0;color:#64748b;font-size:13px}
+.qt-back-link,.qt-nav-btn{display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(15,23,42,.1);background:#fff;color:#334155;text-decoration:none;border-radius:999px;font-weight:850;box-shadow:0 6px 16px rgba(15,23,42,.08)}
+.qt-back-link{width:38px;height:38px;font-size:20px;flex:0 0 auto}
+.qt-nav-btn{min-height:36px;padding:0 14px}
+.qt-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.question-page-shell{flex:1;display:block;width:100%;padding:18px;box-sizing:border-box}
+.question-page-shell .question-modal{width:min(1240px,calc(100vw - 36px));min-height:calc(100vh - 118px);max-height:none;margin:0 auto;border-radius:26px;box-shadow:0 22px 60px rgba(15,23,42,.16);position:relative}
+.question-page-shell .question-close{width:auto;min-width:74px;padding:0 14px;font-size:14px;font-weight:850}
+.question-page-shell .question-body{max-height:none;min-height:calc(100vh - 248px)}
+.question-page-shell .q-graph{min-height:520px}
+.question-page-shell:not(.show){display:block}
+.question-training-page .status-chip{position:fixed;left:18px;bottom:18px}
+@media(max-width:850px){
+  .qt-topbar{align-items:flex-start;flex-direction:column}
+  .qt-actions{justify-content:flex-start}
+  .question-page-shell{padding:10px}
+  .question-page-shell .question-modal{width:100%;border-radius:22px}
+  .question-page-shell .question-body{min-height:auto}
+}
+
+
+/* 角色主题 */
+body[data-role-theme].question-training-page{background:linear-gradient(135deg,#f8fbff 0%,var(--role-soft,#eef2ff) 52%,#fff 100%)}
+body[data-role-theme] .qt-topbar{background:linear-gradient(135deg,rgba(255,255,255,.92),var(--role-soft,#f8fafc));border-bottom-color:color-mix(in srgb,var(--role-primary,#2563eb) 24%,transparent)}
+body[data-role-theme] .qt-back-link,body[data-role-theme] .qt-nav-btn{border-color:color-mix(in srgb,var(--role-primary,#2563eb) 28%,rgba(15,23,42,.1))}
+
+[data-permission][hidden],[data-permission-any][hidden],.permission-hidden{display:none!important;}
