@@ -9,6 +9,7 @@
     "prebuild": "node scripts/copy-legacy.js",
     "build": "tsc -b && vite build",
     "copy-legacy": "node scripts/copy-legacy.js",
+    "test:design": "node --test scripts/design-contract.test.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },

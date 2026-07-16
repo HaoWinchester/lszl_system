@@ -1,0 +1,18 @@
+:root {
+  --kg-canvas: #f6f7f9;
+  --kg-surface: #fff;
+  --kg-surface-subtle: #f1f4f8;
+  --kg-border: #e3e7ec;
+  --kg-text: #242a33;
+  --kg-muted: #737d89;
+  --kg-primary: #2f6df6;
+  --kg-shadow-float: 0 4px 8px rgb(28 39 53 / 10%);
+}
+
+html, body, .app { background: var(--kg-canvas); color: var(--kg-text); }
+.graph-file-tabbar, .canvas-toolbar, .floating-toolbox, .canvas-zoom-dock {
+  background: var(--kg-surface);
+  border-color: var(--kg-border);
+  box-shadow: var(--kg-shadow-float);
+}
+.world { background-color: var(--kg-canvas); }

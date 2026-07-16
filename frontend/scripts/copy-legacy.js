@@ -40,6 +40,7 @@ if (!existsSync(resolve(assetsDir, 'bridge.js'))) {
   process.exit(1)
 }
 cpSync(resolve(assetsDir, 'bridge.js'), resolve(outDir, 'bridge.js'))
+cpSync(resolve(assetsDir, 'boardmix-theme.css'), resolve(outDir, 'boardmix-theme.css'))
 
 // 5. 从 index.html 派生 workbench.html：在 23-graph-file-store.js 之后注入 bridge.js
 const indexHtml = readFileSync(resolve(legacyDir, 'index.html'), 'utf8')
@@ -52,6 +53,10 @@ const workbenchHtml = indexHtml.replace(
   marker,
   marker + '\n<script defer src="./bridge.js"></script><!-- kg-bridge（由 copy-legacy.js 注入，勿手改）-->',
 )
-writeFileSync(resolve(outDir, 'workbench.html'), workbenchHtml)
+const themedWorkbenchHtml = workbenchHtml.replace(
+  '</head>',
+  '<link rel="stylesheet" href="./boardmix-theme.css"><!-- kg-theme（由 copy-legacy.js 注入，勿手改）-->\n</head>',
+)
+writeFileSync(resolve(outDir, 'workbench.html'), themedWorkbenchHtml)
 
 console.log('[copy-legacy] 已生成 public/legacy/（含 workbench.html + bridge.js）')

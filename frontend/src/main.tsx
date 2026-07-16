@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 
+import './styles/design-system.css'
 // 统一加载现有 styles/*.css（复用原版样式，保证 UI 一致）
 import './styles/main.css'
 import './styles/global-shortcuts.css'
