@@ -87,3 +87,6 @@
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
 }
+
+/* 系统设置使用导航+编辑区的运营台层级，不再采用悬浮玻璃卡片。 */
+.ss-sidebar{border-radius:12px;background:#fff;box-shadow:none;backdrop-filter:none;padding:8px}.ss-sidebar button{border-radius:8px;min-height:36px}.ss-sidebar button.active{background:#eff6ff;color:#2563eb;border-color:#bfdbfe}.ss-content .um-panel{border-radius:12px}

@@ -77,6 +77,9 @@
   .subscription-plan-grid{grid-template-columns:1fr}
 }
 
+/* 会员页保持价格与权益信息的可读层级，取消营销式装饰。 */
+.kg-subscription-detail-body{background:#f6f7f9}.kg-subscription-detail-grid{gap:12px}.kg-subscription-purchase-card,.subscription-plan-card{border-radius:12px;background:#fff;box-shadow:none}.subscription-plan-card::before,.kg-subscription-purchase-card.current::after{display:none}.kg-subscription-purchase-card.current{border-color:#93c5fd;background:#fff}.kg-subscription-card-cta{display:inline-flex;align-items:center;justify-content:center;gap:7px;width:100%;min-height:38px;margin-top:14px;padding:0 12px;font:inherit;font-weight:700;cursor:pointer}.kg-subscription-card-cta .kg-icon{display:block;flex:0 0 auto}.kg-subscription-redeem-panel{border-radius:12px;background:#fff;box-shadow:none}.subscription-badge,[data-subscription-status]{background:#eff6ff;box-shadow:none}
+
 /* Step 7：订阅套餐模型校准后的展示样式 */
 .subscription-plan-grid{
   grid-template-columns:repeat(auto-fit,minmax(210px,1fr));

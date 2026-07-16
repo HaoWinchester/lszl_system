@@ -60,6 +60,13 @@
   line-height: 0;
 }
 
+.kg-button-with-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
 :where(button, a, input, textarea, select):focus-visible {
   outline: 2px solid var(--kg-primary);
   outline-offset: 2px;

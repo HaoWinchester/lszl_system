@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Check } from 'lucide-react'
 
 import { systemApi, type AdminLog, type RoleTheme, type SubscriptionPlan } from '../api/system'
+import { AppIcon } from '../components/AppIcon'
 import { useAuth } from '../store/auth'
 
 const ROLES: [string, string][] = [
@@ -67,7 +67,7 @@ export default function Settings() {
     <div className="ss-app">
       <header className="um-topbar ss-topbar">
         <div className="um-brand">
-          <Link className="um-back" to="/" title="返回首页"><ArrowLeft size={16} aria-hidden="true" /></Link>
+          <Link className="um-back kg-icon-button" to="/" aria-label="返回首页" title="返回首页"><AppIcon name="back" size="compact" /></Link>
           <div>
             <p className="um-kicker">System Administration</p>
             <h1>系统设置</h1>
@@ -198,9 +198,10 @@ export default function Settings() {
                           <td style={{ padding: '6px 8px' }}>{perms.keyLabels[pk]}</td>
                           {perms.roles.map((role) => {
                             const ok = perms.rows.find((row) => row.role === role)?.permissions.includes(pk)
+                            const roleLabel = ROLES.find(([value]) => value === role)?.[1] || role
                             return (
                               <td key={role} style={{ textAlign: 'center', color: ok ? '#16a34a' : '#cbd5e1' }}>
-                                {ok ? <Check size={14} aria-hidden="true" /> : '—'}
+                                {ok ? <AppIcon name="check" size="compact" label={`${roleLabel}已授予${perms.keyLabels[pk]}`} /> : '—'}
                               </td>
                             )
                           })}

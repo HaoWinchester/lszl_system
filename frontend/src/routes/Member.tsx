@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { X } from 'lucide-react'
 
 import { subsApi, type Subscription } from '../api/subscriptions'
 import type { SubscriptionPlan } from '../api/system'
+import { AppIcon } from '../components/AppIcon'
 import { useAuth } from '../store/auth'
 
 const PLAN_LABEL: Record<string, string> = {
@@ -59,7 +59,7 @@ export default function Member() {
               <p>查看各会员方案权益。点击方案提交订阅申请，管理员确认后开通；也可使用卡密直接兑换。</p>
             </div>
           </div>
-          <Link className="kg-user-center-close" to="/" aria-label="关闭" title="返回首页"><X size={18} aria-hidden="true" /></Link>
+          <Link className="kg-user-center-close kg-icon-button" to="/" aria-label="关闭" title="返回首页"><AppIcon name="close" size="default" /></Link>
         </div>
 
         <div className="kg-subscription-detail-body">
@@ -85,9 +85,6 @@ export default function Member() {
                   key={p.planId}
                   className={`subscription-plan-card kg-subscription-purchase-card${p.recommended ? ' recommended' : ''}${current ? ' current' : ''}`}
                   data-plan-id={p.planId}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${current ? '续费' : '选择'} ${p.name}`}
                 >
                   <div className="subscription-plan-head">
                     <h3>{p.name}</h3>
@@ -102,7 +99,15 @@ export default function Member() {
                     <ul className="kg-subscription-benefit-list">{benefits.map((b, i) => <li key={i}>{b}</li>)}</ul>
                   )}
                   {p.usageText && <div className="subscription-limit-note kg-subscription-usage-text">{p.usageText}</div>}
-                  <div className="kg-subscription-card-cta" onClick={() => requestPlan(p.planId)}>{current ? '续费当前方案' : '点击选择该方案'}</div>
+                  <button
+                    className="kg-subscription-card-cta um-action-with-icon"
+                    type="button"
+                    onClick={() => requestPlan(p.planId)}
+                    aria-label={`${current ? '续费' : '选择'} ${p.name}`}
+                    title={`${current ? '续费' : '选择'} ${p.name}`}
+                  >
+                    <AppIcon name="add" size="compact" />{current ? '续费当前方案' : '选择该方案'}
+                  </button>
                 </article>
               )
             })}

@@ -140,7 +140,7 @@ export default function QuestionBank() {
                   <section className="qb-management-section" role="tabpanel">
                     <div className="qb-sidebar-head">
                       <div><h2>题库</h2><p>{banks.length} 个题库</p></div>
-                      <button type="button" onClick={createBank}>+ 新题库</button>
+                      <button className="kg-button-with-icon" type="button" onClick={createBank}><AppIcon name="add" size="compact" />新题库</button>
                     </div>
                     <div className="qb-list" id="qbBankList">
                       {banks.map((b) => (
@@ -173,7 +173,7 @@ export default function QuestionBank() {
                   <section className="qb-management-section" role="tabpanel">
                     <div className="qb-sidebar-head questions">
                       <div><h2>题目</h2><p>{questions.length} 题</p></div>
-                      <button type="button" onClick={createQuestion}>+ 新题</button>
+                      <button className="kg-button-with-icon" type="button" onClick={createQuestion}><AppIcon name="add" size="compact" />新题</button>
                     </div>
                     <div className="qb-list question-list" id="qbQuestionList">
                       {questions.map((q) => (
@@ -375,7 +375,7 @@ function PapersPanel({ papers, bankId, notify, reload }: { papers: Paper[]; bank
       <div className="qb-card-title">
         <div><h2>组卷与发布</h2><p>按知识领域/主题配额从题库抽题，发布后训练页可选择。</p></div>
         <div className="qb-inline-actions">
-          <button type="button" onClick={create}>+ 新试卷</button>
+          <button className="kg-button-with-icon" type="button" onClick={create}><AppIcon name="add" size="compact" />新试卷</button>
           <button className="primary" type="button" onClick={compose}>按配额组卷</button>
         </div>
       </div>

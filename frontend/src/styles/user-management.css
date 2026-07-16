@@ -44,6 +44,9 @@ body[data-role-theme] button.primary,body[data-role-theme] .um-nav-btn.primary{b
 .um-pagination{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin-top:12px;padding:10px;border:1px solid #e2e8f0;border-radius:18px;background:linear-gradient(135deg,#f8fafc,#fff)}
 .um-page-info{color:#475569;font-size:12px;font-weight:900;line-height:1.4}
 .um-page-actions{display:flex;gap:8px;justify-content:flex-end}.um-page-actions button{padding:8px 10px;border-radius:12px;font-size:12px}.um-page-actions button:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* 管理运营台：页面级布局只负责信息密度，视觉令牌由全局工作台层统一。 */
+.um-top-actions .um-action-with-icon{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:34px}.um-top-actions .kg-icon{display:block;flex:0 0 auto}.um-right-shell{border-radius:12px;background:#fff;box-shadow:none;backdrop-filter:none}.um-right-tabbar{gap:4px}.um-right-tabbar button{border-radius:8px}.um-right-tabbar button.active{background:#eff6ff;border-color:#bfdbfe;color:#2563eb;box-shadow:none}.um-batch-toolbar,.um-pagination{border-radius:10px;background:#f8fafc;box-shadow:none}.um-user-item.selected{background:#eff6ff}.um-collapse-btn{background:#fff!important;color:#2563eb!important;border-color:#bfdbfe!important}
 .um-page-size{grid-column:1/-1;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;color:#64748b;font-size:12px;font-weight:900}.um-page-size select{width:100%;border:1px solid #cbd5e1;border-radius:12px;background:#fff;padding:8px 10px;font-weight:900;color:#0f172a}
 .um-user-order{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:9px;background:#f1f5f9;color:#475569;font-size:11px;font-weight:950;flex:0 0 auto;margin-top:2px}
 @media(max-width:820px){.um-pagination{grid-template-columns:1fr}.um-page-actions{justify-content:stretch}.um-page-actions button{flex:1}.um-page-size{grid-column:auto}}

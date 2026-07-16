@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+
+import { AppIcon } from './AppIcon'
 
 interface PlaceholderProps {
   title: string
@@ -16,8 +17,8 @@ export default function Placeholder({ title, stage, children }: PlaceholderProps
         <div className="brand">
           <h1>{title}（占位 · 阶段 {stage}）</h1>
         </div>
-        <Link to="/" style={{ marginLeft: 20 }}>
-          <ArrowLeft size={16} aria-hidden="true" /> 返回首页
+            <Link className="kg-button-with-icon" to="/" style={{ marginLeft: 20 }}>
+              <AppIcon name="back" size="compact" /> 返回首页
         </Link>
       </div>
       <div className="stage" style={{ padding: 24, color: '#0f172a' }}>

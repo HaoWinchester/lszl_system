@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
 
 import { type AppUser } from '../api/auth'
 import { systemApi, type AdminLog } from '../api/system'
 import { usersApi } from '../api/users'
+import { AppIcon } from '../components/AppIcon'
 import { useAuth } from '../store/auth'
 
 const ROLES: [string, string][] = [
@@ -274,7 +274,7 @@ export default function Users() {
     <div className="um-app">
       <header className="um-topbar">
         <div className="um-brand">
-          <Link className="um-back" to="/" title="返回首页"><ArrowLeft size={16} aria-hidden="true" /></Link>
+          <Link className="um-back kg-icon-button" to="/" aria-label="返回首页" title="返回首页"><AppIcon name="back" size="compact" /></Link>
           <div>
             <p className="um-kicker">User Administration</p>
             <h1>用户管理</h1>
@@ -283,10 +283,14 @@ export default function Users() {
         </div>
         <div className="um-top-actions">
           <div className="auth-status">{me ? `${me.display_name || me.username} · ${ROLE_LABEL[me.role]}` : '未登录'}</div>
-          <button type="button" className="primary" onClick={newUser}>+ 新用户</button>
-          <button type="button" onClick={exportAll}>导出用户</button>
-          <label className="um-nav-btn" style={{ cursor: 'pointer' }}>
-            导入用户
+          <button type="button" className="primary um-action-with-icon" onClick={newUser} title="新建用户">
+            <AppIcon name="add" size="compact" />新用户
+          </button>
+          <button type="button" className="um-action-with-icon" onClick={exportAll} title="导出用户">
+            <AppIcon name="download" size="compact" />导出用户
+          </button>
+          <label className="um-nav-btn um-action-with-icon" style={{ cursor: 'pointer' }} title="导入用户">
+            <AppIcon name="upload" size="compact" />导入用户
             <input
               type="file"
               hidden
@@ -294,7 +298,7 @@ export default function Users() {
               onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])}
             />
           </label>
-          <Link className="um-nav-btn" to="/settings">系统设置</Link>
+          <Link className="um-nav-btn um-action-with-icon" to="/settings" title="系统设置"><AppIcon name="settings" size="compact" />系统设置</Link>
         </div>
       </header>
 

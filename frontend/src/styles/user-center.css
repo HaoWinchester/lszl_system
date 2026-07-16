@@ -245,3 +245,6 @@
     padding:16px 18px 18px;
   }
 }
+
+/* 个人中心跟随运营台的白灰蓝基调，避免角色色扩散为页面装饰。 */
+.kg-user-center-modal{border:1px solid #dfe3e8;border-radius:12px;background:#fff}.kg-user-center-head{background:#fff;backdrop-filter:none}.kg-user-avatar{border-radius:10px;background:#2563eb;box-shadow:none}.kg-user-center-close{border-radius:8px}.kg-user-password-box{border-radius:10px;background:#f8fafc;box-shadow:none}.kg-user-center-actions button{border-radius:8px}.kg-user-center-actions .primary{background:#2563eb}

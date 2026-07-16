@@ -141,3 +141,84 @@ test('file manager uses AppIcon for controls while FileCover remains the only in
   assert.equal((route.match(/<svg\b/g) || []).length, 1, 'FileCover should be the only inline SVG artwork')
   assert.doesNotMatch(route, /<button[^>]*>[\s\S]{0,220}<svg\b/, 'action buttons must not contain hand-written SVGs')
 })
+
+test('admin and membership routes use AppIcon only where an operation has a clear icon meaning', () => {
+  const users = readFrontend('src/routes/Users.tsx')
+  const settings = readFrontend('src/routes/Settings.tsx')
+  const member = readFrontend('src/routes/Member.tsx')
+  const login = readFrontend('src/routes/Login.tsx')
+
+  for (const [name, source] of [
+    ['Users', users],
+    ['Settings', settings],
+    ['Member', member],
+  ]) {
+    assert.match(source, /import \{ AppIcon \} from '\.\.\/components\/AppIcon'/, `${name} should consume AppIcon`)
+    assert.doesNotMatch(source, /from 'lucide-react'/, `${name} should not directly import Lucide icons`)
+  }
+
+  assert.doesNotMatch(login, /from 'lucide-react'/, 'Login must not bypass the shared icon entry point')
+  assert.doesNotMatch(login, /components\/AppIcon/, 'Login has no icon-only operation and should avoid a decorative import')
+})
+
+test('workspace overrides keep the professional admin treatment free of gradients', () => {
+  const css = readFrontend('src/styles/boardmix-overrides.css')
+  assert.doesNotMatch(css, /linear-gradient/i, 'shared workspace overrides must not reintroduce decorative gradients')
+})
+
+test('admin and member surfaces share compact professional workspace geometry', () => {
+  const css = readFrontend('src/styles/boardmix-overrides.css')
+  for (const selector of ['.um-right-shell', '.ss-sidebar', '.kg-subscription-detail-body', '.kg-user-center-modal']) {
+    assert.match(css, new RegExp(selector.replaceAll('.', '\\.')), `expected ${selector} to receive the shared workspace treatment`)
+  }
+})
+
+test('admin route canvases explicitly replace the legacy gradient page background', () => {
+  const css = readFrontend('src/styles/boardmix-overrides.css')
+  assert.match(css, /body:has\(\.um-app\),\s*body:has\(\.ss-app\)\s*\{[\s\S]*background:\s*var\(--kg-canvas\) !important/)
+})
+
+test('member plan cards wrap into the modal instead of relying on a clipped horizontal rail', () => {
+  const css = readFrontend('src/styles/boardmix-overrides.css')
+  assert.match(css, /\.kg-subscription-detail-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(auto-fit, minmax\(210px, 1fr\)\) !important/)
+  assert.match(css, /\.kg-subscription-detail-grid\s*\{[\s\S]*overflow:\s*visible !important/)
+})
+
+test('member plan cards are content articles with one real CTA button', () => {
+  const member = readFrontend('src/routes/Member.tsx')
+  const css = readFrontend('src/styles/boardmix-overrides.css')
+
+  assert.match(member, /<article[\s\S]{0,360}className=\{`subscription-plan-card kg-subscription-purchase-card/)
+  assert.doesNotMatch(member, /<article[\s\S]{0,500}role="button"/, 'the plan article must not masquerade as a button')
+  assert.doesNotMatch(member, /<article[\s\S]{0,500}tabIndex=\{0\}/, 'the plan article must not enter the tab order without an action')
+  assert.match(member, /<button\s+className="kg-subscription-card-cta um-action-with-icon"/, 'the CTA remains the actionable control')
+  assert.match(css, /\.kg-subscription-card-cta\s*\{[\s\S]*pointer-events:\s*auto !important/, 'the shared override must restore CTA pointer interaction')
+})
+
+test('member plan articles do not retain the legacy clickable-card motion cue', () => {
+  const css = readFrontend('src/styles/boardmix-overrides.css')
+  assert.match(css, /\.kg-subscription-purchase-card\s*\{[\s\S]*cursor:\s*default !important/)
+  assert.match(css, /\.kg-subscription-purchase-card:hover\s*\{[\s\S]*transform:\s*none !important/)
+})
+
+test('AppIcon is the only direct Lucide entry point and create actions do not use plus glyphs', () => {
+  const sourceFiles = [
+    'src/components/Placeholder.tsx',
+    'src/routes/Files.tsx',
+    'src/routes/QuestionBank.tsx',
+    'src/routes/Training.tsx',
+    'src/routes/Recall.tsx',
+    'src/routes/Users.tsx',
+    'src/routes/Settings.tsx',
+    'src/routes/Member.tsx',
+    'src/routes/Login.tsx',
+  ]
+  for (const path of sourceFiles) {
+    assert.doesNotMatch(readFrontend(path), /from ['"]lucide-react['"]/, `${path} must consume AppIcon`)
+  }
+  assert.match(readFrontend('src/components/Placeholder.tsx'), /components\/AppIcon|\.\/AppIcon/)
+  const questionBank = readFrontend('src/routes/QuestionBank.tsx')
+  assert.doesNotMatch(questionBank, />\s*\+\s*(新题库|新题|新试卷)/)
+  assert.match(questionBank, /className="kg-button-with-icon"/)
+  assert.match(readFrontend('src/styles/design-system.css'), /\.kg-button-with-icon\s*\{[\s\S]*display:\s*inline-flex/)
+})
