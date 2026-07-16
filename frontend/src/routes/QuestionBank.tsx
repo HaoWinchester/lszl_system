@@ -109,7 +109,7 @@ export default function QuestionBank() {
           <nav className="qb-layout-nav" aria-label="页面布局导航">
             <button className={mainTab === 'banks' ? 'active' : ''} type="button" onClick={() => setMainTab('banks')}>题库管理</button>
             <button className={mainTab === 'papers' ? 'active' : ''} type="button" onClick={() => setMainTab('papers')}>组卷与发布</button>
-            <button className={mainTab === 'base' ? 'active' : ''} type="button" onClick={() => setMainTab('base')}>题目基本信息</button>
+            <button className={mainTab === 'base' ? 'section-active' : ''} type="button" onClick={() => setMainTab('base')}>题目基本信息</button>
             <button className={mainTab === 'base' && annoTab === 'clues' ? 'active' : ''} type="button" onClick={() => openAnnotation('clues')}>关键词标记</button>
             <button className={mainTab === 'base' && annoTab === 'concepts' ? 'active' : ''} type="button" onClick={() => openAnnotation('concepts')}>知识点绑定</button>
             <button className={mainTab === 'base' && annoTab === 'reasoning' ? 'active' : ''} type="button" onClick={() => openAnnotation('reasoning')}>推理逻辑</button>

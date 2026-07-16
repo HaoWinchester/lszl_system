@@ -457,6 +457,14 @@ body[data-role-theme] .qb-topbar{background:linear-gradient(135deg,rgba(255,255,
 @media(max-width:640px){.qb-bank-select{grid-template-columns:28px minmax(0,1fr)}.qb-bank-select .subject-dot{display:none}.qb-list-item.paper{grid-template-columns:1fr}.qb-paper-order,.qb-paper-state{justify-self:start}}
 
 /* One navigation source; the workspace header carries the active bank context. */
+.qb-app .qb-layout-nav button.section-active{
+  background:var(--kg-surface-subtle);
+  color:var(--kg-text);
+  font-weight:700;
+}
+.qb-app .qb-layout-nav button:nth-child(n+4){
+  padding-left:22px;
+}
 .qb-app .qb-workspace-context{
   display:flex;
   min-width:0;

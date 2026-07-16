@@ -262,6 +262,8 @@ test('QuestionBank has one primary navigation and an inline workspace context', 
   assert.match(route, /className="qb-workspace-context"/)
   assert.match(route, /const openAnnotation = \(tab: AnnoTab\)/)
   assert.match(route, /setAnnoTab\(tab\); setMainTab\('base'\)/)
+  assert.match(route, /mainTab === 'base' \? 'section-active' : ''/, 'the base section and its active annotation must not look like peers')
+  assert.match(readFrontend('src/styles/question-bank-admin.css'), /\.qb-app \.qb-layout-nav button\.section-active/)
   assert.doesNotMatch(route, /notify\('标注完成度见右侧面板'\)/, 'status is visible in the inspector and must not masquerade as navigation')
 })
 
