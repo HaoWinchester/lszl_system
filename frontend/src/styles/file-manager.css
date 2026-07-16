@@ -415,7 +415,7 @@ html[data-theme="light"] .fm-theme-sun{display:none}html[data-theme="dark"] .fm-
   left:12px;
   right:12px;
   top:12px;
-  display:grid;
+  display:none;
   grid-template-columns:auto minmax(0,1fr) 30px;
   align-items:center;
   gap:9px;
@@ -1394,4 +1394,51 @@ html[data-theme="light"] .fm-theme-sun{display:none}html[data-theme="dark"] .fm-
   left:14px;
   top:auto;
   bottom:14px;
+}
+
+/* Mobile file management is a real read-only workspace, not a 100vh brand splash. */
+@media (max-width: 800px) {
+  .fm-mobile-readonly-notice {
+    position:relative;
+    inset:auto;
+    display:grid;
+    margin:8px 10px;
+    box-shadow:none;
+  }
+  .fm-mobile-readonly-notice[hidden] {
+    display:none;
+  }
+  .fm-app .fm-sidebar {
+    height:auto;
+    min-height:0;
+    display:block;
+  }
+  .fm-sidebar-brand-row {
+    min-height:52px;
+  }
+  .fm-main {
+    min-height:calc(100vh - 52px);
+  }
+  .fm-topbar {
+    top:52px;
+  }
+  body.is-mobile-readonly .fm-select-mark {
+    display:none !important;
+  }
+  body.is-mobile-readonly #fmDetailsBtn {
+    display:none !important;
+  }
+  .fm-mobile-readonly-notice {
+    font-size:13px;
+  }
+  .fm-segment button,
+  .fm-icon-btn,
+  .fm-filter-tabs button,
+  .fm-toolbar-actions select,
+  .fm-text-btn,
+  .fm-danger-ghost,
+  .fm-mobile-readonly-notice button {
+    min-width:var(--kg-control-touch);
+    min-height:var(--kg-control-touch);
+  }
 }

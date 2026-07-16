@@ -222,3 +222,33 @@ test('AppIcon is the only direct Lucide entry point and create actions do not us
   assert.match(questionBank, /className="kg-button-with-icon"/)
   assert.match(readFrontend('src/styles/design-system.css'), /\.kg-button-with-icon\s*\{[\s\S]*display:\s*inline-flex/)
 })
+
+test('shared workspace tokens meet the approved contrast and touch contracts', () => {
+  const css = readFrontend('src/styles/design-system.css')
+
+  assert.match(css, /--kg-muted:\s*#626d78;/, 'muted body copy must clear AA contrast on both workspace surfaces')
+  assert.match(css, /--kg-control-touch:\s*44px;/, 'touch controls need one shared 44px interaction token')
+  assert.match(css, /@media\s*\(pointer:\s*coarse\)[\s\S]*\.kg-icon-button[\s\S]*min-width:\s*var\(--kg-control-touch\)/)
+  assert.match(css, /@media\s*\(pointer:\s*coarse\)[\s\S]*\.kg-icon-button[\s\S]*min-height:\s*var\(--kg-control-touch\)/)
+})
+
+test('cross-route workspace buttons do not use decorative lift motion', () => {
+  const css = readFrontend('src/styles/boardmix-overrides.css')
+
+  assert.doesNotMatch(css, /translateY\(-1px\)/, 'product controls should communicate state with color, not decorative lifting')
+})
+
+test('mobile file manager exposes real read-only content above the fold', () => {
+  const route = readFrontend('src/routes/Files.tsx')
+  const css = readFrontend('src/styles/file-manager.css')
+
+  assert.match(route, /const \[mobileReadonly, setMobileReadonly\] = useState\(false\)/)
+  assert.match(route, /matchMedia\('\(max-width: 800px\)'\)/)
+  assert.match(route, /classList\.toggle\('is-mobile-readonly', mobile\)/)
+  assert.match(route, /hidden=\{!mobileNoticeOpen\}/)
+  assert.match(route, /setMobileNoticeOpen\(false\)/)
+  assert.match(route, /mobileReadonly \? open\(f\)/, 'a tap must open a file in mobile read-only mode')
+  assert.match(css, /body\.is-mobile-readonly #fmDetailsBtn[\s\S]{0,160}display:\s*none\s*!important/, 'read-only mobile must not leave a textless details button')
+  assert.match(css, /@media\s*\(max-width:\s*800px\)\s*\{[\s\S]*?\.fm-app \.fm-sidebar\s*\{[^}]*height:\s*auto/)
+  assert.match(css, /@media\s*\(max-width:\s*800px\)\s*\{[\s\S]*?\.fm-mobile-readonly-notice\s*\{[^}]*display:\s*grid/)
+})

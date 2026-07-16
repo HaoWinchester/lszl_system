@@ -102,18 +102,7 @@
   border-radius: var(--kg-radius-control);
   transition: background-color var(--kg-duration-fast) var(--kg-ease-out),
     border-color var(--kg-duration-fast) var(--kg-ease-out),
-    color var(--kg-duration-fast) var(--kg-ease-out),
-    transform var(--kg-duration-fast) var(--kg-ease-out);
-}
-
-.auth-modal button:hover,
-.kg-subscription-detail-modal button:hover,
-.qb-app button:hover,
-.question-training-app button:hover,
-.kr-app button:hover,
-.um-app button:hover,
-.ss-app button:hover {
-  transform: translateY(-1px);
+    color var(--kg-duration-fast) var(--kg-ease-out);
 }
 
 .qb-app,

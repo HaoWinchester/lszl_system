@@ -112,6 +112,8 @@ export default function Files() {
   const [selectMode, setSelectMode] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [mobileReadonly, setMobileReadonly] = useState(false)
+  const [mobileNoticeOpen, setMobileNoticeOpen] = useState(true)
   const [toast, setToast] = useState('')
   const notify = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
 
@@ -132,6 +134,21 @@ export default function Files() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme
   }, [theme])
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 800px)')
+    const syncMobileMode = () => {
+      const mobile = media.matches
+      setMobileReadonly(mobile)
+      document.body.classList.toggle('is-mobile-readonly', mobile)
+    }
+    syncMobileMode()
+    media.addEventListener('change', syncMobileMode)
+    return () => {
+      media.removeEventListener('change', syncMobileMode)
+      document.body.classList.remove('is-mobile-readonly')
+    }
+  }, [])
 
   const open = async (f: FileMeta) => {
     if (view === 'trash') return
@@ -221,9 +238,10 @@ export default function Files() {
 
   return (
     <>
-      <div className="fm-mobile-readonly-notice" id="fmMobileReadonlyNotice" hidden role="status">
+      <div className="fm-mobile-readonly-notice" id="fmMobileReadonlyNotice" hidden={!mobileNoticeOpen} role="status">
         <strong>移动端仅支持查看</strong>
-        <span>文件管理与图谱编辑请使用电脑端。</span>
+        <span>可以浏览并打开图谱，管理和编辑请使用电脑端。</span>
+        <button type="button" aria-label="关闭移动端提示" title="关闭提示" onClick={() => setMobileNoticeOpen(false)}><AppIcon name="close" size="compact" /></button>
       </div>
 
       <div className="fm-app" id="fileManagerApp">
@@ -382,8 +400,8 @@ export default function Files() {
                           data-file-id={f.id}
                           tabIndex={0}
                           role="button"
-                          aria-label={`${f.name}，双击打开`}
-                          onClick={() => (selectMode ? toggleSelect(f.id) : setSelected(selected?.id === f.id ? null : f))}
+                          aria-label={`${f.name}，${mobileReadonly ? '点击打开' : '双击打开'}`}
+                          onClick={() => (mobileReadonly ? open(f) : selectMode ? toggleSelect(f.id) : setSelected(selected?.id === f.id ? null : f))}
                           onDoubleClick={() => open(f)}
                         >
                           <button className="fm-select-mark" type="button" aria-label={`选择 ${f.name}`} style={{ opacity: selectMode || isSel ? 1 : undefined }} onClick={(e) => { e.stopPropagation(); if (selectMode) toggleSelect(f.id) }}><AppIcon name="check" size="compact" /></button>
@@ -418,8 +436,8 @@ export default function Files() {
                     <div className="fm-empty">
                       <span className="fm-empty-icon"><AppIcon name="folder" size="prominent" /></span>
                       <h2>{isTrash ? '回收站为空' : '还没有图谱文件'}</h2>
-                      <p>{isTrash ? '删除的文件会出现在这里' : '创建一个新图谱，或导入已有学习包。'}</p>
-                      {!isTrash && <button className="fm-primary-inline" type="button" onClick={create}>新建图谱</button>}
+                      <p>{isTrash ? '删除的文件会出现在这里' : mobileReadonly ? '当前空间还没有图谱，请在电脑端创建或导入。' : '创建一个新图谱，或导入已有学习包。'}</p>
+                      {!isTrash && !mobileReadonly && <button className="fm-primary-inline" type="button" onClick={create}>新建图谱</button>}
                     </div>
                   )}
                 </section>

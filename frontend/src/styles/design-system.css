@@ -6,13 +6,15 @@
   --kg-border: #e3e7ec;
   --kg-border-strong: #ccd4dd;
   --kg-text: #242a33;
-  --kg-muted: #737d89;
+  --kg-muted: #626d78;
+  --kg-disabled: #9aa3ad;
   --kg-primary: #2f6df6;
   --kg-primary-strong: #2259d3;
   --kg-primary-soft: #edf3ff;
   --kg-success: #1fa978;
   --kg-warning: #c98725;
-  --kg-danger: #d55750;
+  --kg-danger: #b8423d;
+  --kg-control-touch: 44px;
   --kg-icon-compact: 16px;
   --kg-icon-default: 18px;
   --kg-icon-prominent: 20px;
@@ -65,6 +67,14 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
+}
+
+@media (pointer: coarse) {
+  .kg-icon-button,
+  .kg-button-with-icon {
+    min-width: var(--kg-control-touch);
+    min-height: var(--kg-control-touch);
+  }
 }
 
 :where(button, a, input, textarea, select):focus-visible {
