@@ -13,6 +13,9 @@
   --kg-success: #1fa978;
   --kg-warning: #c98725;
   --kg-danger: #d55750;
+  --kg-icon-compact: 16px;
+  --kg-icon-default: 18px;
+  --kg-icon-prominent: 20px;
   --kg-radius-control: 8px;
   --kg-radius-panel: 12px;
   --kg-shadow-float: 0 4px 8px rgb(28 39 53 / 10%);
@@ -29,6 +32,33 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 :where(button, a, input, textarea, select) { -webkit-tap-highlight-color: transparent; }
+
+.kg-icon {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.kg-icon--compact {
+  width: var(--kg-icon-compact);
+  height: var(--kg-icon-compact);
+}
+
+.kg-icon--default {
+  width: var(--kg-icon-default);
+  height: var(--kg-icon-default);
+}
+
+.kg-icon--prominent {
+  width: var(--kg-icon-prominent);
+  height: var(--kg-icon-prominent);
+}
+
+.kg-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
 
 :where(button, a, input, textarea, select):focus-visible {
   outline: 2px solid var(--kg-primary);

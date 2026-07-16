@@ -61,3 +61,46 @@ test('workspace overrides normalize the remaining tool, tab and admin-card outli
   assert.match(legacyTheme, /\.upgrade-member-btn/)
   assert.match(legacyTheme, /\.kg-global-shortcuts-link/)
 })
+
+test('shared AppIcon exposes the approved Lucide semantic icon contract', () => {
+  const iconPath = resolve(frontendDir, 'src/components/AppIcon.tsx')
+  assert.ok(existsSync(iconPath), 'expected the shared AppIcon component')
+
+  const component = readFrontend('src/components/AppIcon.tsx')
+  assert.match(component, /from 'lucide-react'/)
+  assert.match(component, /satisfies Record<string, LucideIcon>/)
+  for (const name of [
+    'add', 'back', 'search', 'settings', 'refresh', 'grid', 'list', 'more',
+    'delete', 'upload', 'download', 'folder', 'user', 'logout', 'close',
+    'zoomIn', 'zoomOut',
+  ]) {
+    assert.match(component, new RegExp(`\\b${name}:`), `expected AppIcon mapping for ${name}`)
+  }
+
+  const css = readFrontend('src/styles/design-system.css')
+  for (const token of ['--kg-icon-compact', '--kg-icon-default', '--kg-icon-prominent']) {
+    assert.match(css, new RegExp(token), `expected shared icon token ${token}`)
+  }
+  assert.match(css, /\.kg-icon\s*\{[\s\S]*display:\s*block/)
+  assert.match(css, /\.kg-icon-button\s*\{[\s\S]*display:\s*inline-flex/)
+  assert.match(css, /\.kg-icon-button\s*\{[\s\S]*align-items:\s*center/)
+  assert.match(css, /\.kg-icon-button\s*\{[\s\S]*justify-content:\s*center/)
+  assert.match(css, /\.kg-icon-button\s*\{[\s\S]*line-height:\s*0/)
+  assert.match(css, /\.kg-icon\s*\{[\s\S]*flex:\s*0 0 auto/)
+})
+
+test('AppIcon exposes accessible semantics and consumes shared size tokens', () => {
+  const component = readFrontend('src/components/AppIcon.tsx')
+  assert.match(component, /export type AppIconSize = 'compact' \| 'default' \| 'prominent'/)
+  assert.match(component, /size = 'default'/)
+  assert.match(component, /`kg-icon--\$\{size\}`/)
+  assert.match(component, /role=\{label \? 'img' : undefined\}/)
+  assert.match(component, /aria-hidden=\{label \? undefined : true\}/)
+  assert.doesNotMatch(component, /size=\{size\}/)
+
+  const css = readFrontend('src/styles/design-system.css')
+  for (const size of ['compact', 'default', 'prominent']) {
+    assert.match(css, new RegExp(`\\.kg-icon--${size}\\s*\\{[\\s\\S]*width:\\s*var\\(--kg-icon-${size}\\)`))
+    assert.match(css, new RegExp(`\\.kg-icon--${size}\\s*\\{[\\s\\S]*height:\\s*var\\(--kg-icon-${size}\\)`))
+  }
+})
