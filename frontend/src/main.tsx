@@ -19,6 +19,7 @@ import './styles/knowledge-recall.css'
 import './styles/graph-file-tabs.css'
 import './styles/graph-user-preferences.css'
 import './styles/home-file-library.css'
+import './styles/boardmix-overrides.css'
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
