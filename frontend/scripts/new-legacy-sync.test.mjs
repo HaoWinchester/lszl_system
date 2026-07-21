@@ -159,3 +159,14 @@ test('sync injects server storage before any upstream inline script', (t) => {
   const generated = readFileSync(resolve(item.output, 'learning-path.html'), 'utf8')
   assert.ok(generated.indexOf('server-state-bootstrap.js') < generated.indexOf("localStorage.getItem('kg_default_entry_mode_v1')"))
 })
+
+test('sync limits the training overlay stylesheet to the training page', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.doesNotMatch(readFileSync(resolve(item.output, 'learning-path.html'), 'utf8'), /direct-runtime-fixes\.css/)
+  assert.match(readFileSync(resolve(item.output, 'question-training.html'), 'utf8'), /direct-runtime-fixes\.css/)
+})

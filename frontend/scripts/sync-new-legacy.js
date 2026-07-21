@@ -247,7 +247,7 @@ function injectPage(html, page) {
     : /<head(?:\s[^>]*)?>/i.test(html)
       ? html.replace(/<head(?:\s[^>]*)?>/i, (head) => `${head}\n${injection}`)
       : `${injection}\n${html}`
-  if (!generated.includes('kg-runtime-fixes:generated')) {
+  if (page === 'question-training.html' && !generated.includes('kg-runtime-fixes:generated')) {
     const styleTag = '<link rel="stylesheet" href="./direct-runtime-fixes.css"><!-- kg-runtime-fixes:generated -->'
     generated = generated.includes('</head>')
       ? generated.replace('</head>', `${styleTag}\n</head>`)
