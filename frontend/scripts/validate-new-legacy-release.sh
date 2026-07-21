@@ -81,6 +81,8 @@ cd "$REPO_DIR"
 E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
 E2E_RELEASE_VERSION="$RELEASE_VERSION" \
   python3 frontend/e2e/new_legacy_smoke.py
+E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
+  python3 frontend/e2e/full_role_regression.py
 python3 frontend/e2e/direct_new_legacy_visual.py \
   --integrated "http://127.0.0.1:$INTEGRATED_PORT" \
   --raw "http://127.0.0.1:$RAW_PORT" \

@@ -124,3 +124,11 @@ test('rollback selects the previous successful release', () => {
   assert.equal(current.version, 'v8.6.0')
   assert.equal(current.previousVersion, 'v8.6.1')
 })
+
+test('release validation runs the full five-role regression against the candidate', () => {
+  const validator = readFileSync(resolve(scriptsDir, 'validate-new-legacy-release.sh'), 'utf8')
+
+  assert.ok(validator.includes(
+    'E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \\\n  python3 frontend/e2e/full_role_regression.py',
+  ))
+})
