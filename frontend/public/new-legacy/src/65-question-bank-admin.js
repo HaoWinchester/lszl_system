@@ -2518,6 +2518,7 @@
   }
   function previewDeepRecall(){
     if(!saveQuestionForm({silent:true})) return;
+    const bank = currentBank();
     const q = currentQuestion();
     if(!q) return;
     try{

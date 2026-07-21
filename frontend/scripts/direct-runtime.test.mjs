@@ -123,6 +123,14 @@ test('question validation adapter runs after the upstream question editor', () =
   assert.ok(page.indexOf('src/65-question-bank-admin.js') < page.indexOf('direct-question-adapter.js'))
 })
 
+test('generated question preview persists the selected bank and question for recall', () => {
+  const editor = readFileSync(resolve(frontendDir, 'public/new-legacy/src/65-question-bank-admin.js'), 'utf8')
+  const preview = editor.match(/function previewDeepRecall\(\)\{([\s\S]*?)window\.open\('knowledge-recall\.html/)
+  assert.ok(preview)
+  assert.match(preview[1], /const bank\s*=\s*currentBank\(\)/)
+  assert.match(preview[1], /sourceBankId:bank\?\.id/)
+})
+
 test('training runtime CSS keeps shortcuts above the guided action dock', () => {
   const cssPath = resolve(frontendDir, 'scripts/new-legacy-assets/direct-runtime-fixes.css')
   assert.ok(existsSync(cssPath), 'direct-runtime-fixes.css should exist')

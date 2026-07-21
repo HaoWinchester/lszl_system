@@ -236,6 +236,16 @@ function patchGraphInteractions(source) {
   return generated
 }
 
+function patchQuestionRecallPreview(source) {
+  if (!source.includes('function previewDeepRecall()')) return source
+  return replaceExactlyOnce(
+    source,
+    "  function previewDeepRecall(){\n    if(!saveQuestionForm({silent:true})) return;\n    const q = currentQuestion();",
+    "  function previewDeepRecall(){\n    if(!saveQuestionForm({silent:true})) return;\n    const bank = currentBank();\n    const q = currentQuestion();",
+    'new-legacy 深度回忆当前题传递',
+  )
+}
+
 function injectPage(html, page) {
   const injection = [
     '<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->',
@@ -366,6 +376,7 @@ function sync({ source, out }) {
     const target = resolve(out, 'src', path)
     let generated = patchArchitectureCopy(`src/${path}`, readFileSync(target, 'utf8'))
     if (path === '10-graph-editor.js') generated = patchGraphInteractions(generated)
+    if (path === '65-question-bank-admin.js') generated = patchQuestionRecallPreview(generated)
     if (path === '64-flow-orchestrator.js') generated = patchTrainingSessionReentrancy(generated)
     if (path === '27-graph-file-manager.js') generated = patchFileManagerNavigation(generated)
     writeFileSync(target, generated)
