@@ -12,6 +12,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal, engine
+from app.web.routes import router as web_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("app")
@@ -122,3 +123,4 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+app.include_router(web_router)

@@ -125,7 +125,7 @@ Expected: all tests PASS.
 Run: `./manage-new-legacy update ./new-legacy --skip-browser`  
 Expected: active manifest identifies `v8.6.0`; source and site hashes are recorded.
 
-- [ ] **Step 6: Commit the release subsystem**
+- [x] **Step 6: Commit the release subsystem**
 
 ```bash
 git add manage-new-legacy .gitignore frontend/scripts/manage-new-legacy.js frontend/scripts/new-legacy-release.test.mjs frontend/scripts/sync-new-legacy.js
@@ -143,7 +143,7 @@ git commit -m "feat: add new-legacy release manager"
 - Modify: `backend/app/main.py`
 - Modify: `backend/app/core/config.py`
 
-- [ ] **Step 1: Write failing direct-serving tests**
+- [x] **Step 1: Write failing direct-serving tests**
 
 ```python
 def test_root_serves_learning_path_without_iframe(client):
@@ -161,12 +161,12 @@ def test_asset_traversal_is_rejected(client):
     assert client.get("/src/../../backend/app/main.py").status_code == 404
 ```
 
-- [ ] **Step 2: Verify tests fail against the API-only app**
+- [x] **Step 2: Verify tests fail against the API-only app**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_web_runtime.py -q`  
 Expected: FAIL because `/` and the web resolver do not exist.
 
-- [ ] **Step 3: Implement an active release resolver and direct routes**
+- [x] **Step 3: Implement an active release resolver and direct routes**
 
 ```python
 ALIASES = {
@@ -190,7 +190,7 @@ def resolve_asset(root: Path, relative: str) -> Path:
 
 Register API routes first, then the web catch-all. Return original MIME types and no-cache HTML headers; hashed/static assets may use immutable cache headers. Preview resolution must be version-scoped and must never mutate the current pointer.
 
-- [ ] **Step 4: Run direct-serving and existing backend tests**
+- [x] **Step 4: Run direct-serving and existing backend tests**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_web_runtime.py tests/test_smoke.py -q`  
 Expected: PASS.
