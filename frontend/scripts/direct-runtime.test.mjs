@@ -94,6 +94,7 @@ test('file manager waits for server state before navigating', () => {
   assert.match(manager, /await flushServerStateBeforeNavigation\(\)/)
   assert.match(manager, /async function openFile/)
   assert.match(manager, /onSubmit:async value/)
+  assert.equal((manager.match(/location\.href='index\.html\?mode=free'/g) || []).length, 2)
 })
 
 test('generated graph editor discards new-node drafts and avoids exact overlap', () => {

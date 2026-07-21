@@ -182,7 +182,7 @@ function patchFileManagerNavigation(source) {
   generated = replaceExactlyOnce(
     generated,
     "    state.navigating=true;location.href='index.html';",
-    "    state.navigating=true;\n    try{await flushServerStateBeforeNavigation();location.href='index.html'}catch(err){state.navigating=false;toast(err&&err.message||'服务器保存失败，请稍后重试。','error')}",
+    "    state.navigating=true;\n    try{await flushServerStateBeforeNavigation();location.href='index.html?mode=free'}catch(err){state.navigating=false;toast(err&&err.message||'服务器保存失败，请稍后重试。','error')}",
     'new-legacy 文件打开跳转',
   )
   generated = replaceExactlyOnce(
@@ -194,7 +194,7 @@ function patchFileManagerNavigation(source) {
   generated = replaceExactlyOnce(
     generated,
     "      if(!file)throw new Error(store.getLastError&&store.getLastError()||'新建图谱失败。');\n      location.href='index.html';",
-    "      if(!file)throw new Error(store.getLastError&&store.getLastError()||'新建图谱失败。');\n      await flushServerStateBeforeNavigation();\n      location.href='index.html';",
+    "      if(!file)throw new Error(store.getLastError&&store.getLastError()||'新建图谱失败。');\n      await flushServerStateBeforeNavigation();\n      location.href='index.html?mode=free';",
     'new-legacy 创建文件跳转',
   )
   return generated

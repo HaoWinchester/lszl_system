@@ -688,7 +688,7 @@
     const file=store.openFile(id,{owner:currentOwner()});
     if(!file){toast(store.getLastError&&store.getLastError()||'图谱文件打开失败。','error');return}
     state.navigating=true;
-    try{await flushServerStateBeforeNavigation();location.href='index.html'}catch(err){state.navigating=false;toast(err&&err.message||'服务器保存失败，请稍后重试。','error')}
+    try{await flushServerStateBeforeNavigation();location.href='index.html?mode=free'}catch(err){state.navigating=false;toast(err&&err.message||'服务器保存失败，请稍后重试。','error')}
   }
   function openCreateModal(){
     if(!requireEdit('登录后才能新建图谱文件。'))return;
@@ -697,7 +697,7 @@
       const safe=uniqueName(value||name),file=store.createFile({name:safe,graphData:blankGraph(safe),source:'created',folderId:state.currentFolderId},{owner:currentOwner(),makeCurrent:true});
       if(!file)throw new Error(store.getLastError&&store.getLastError()||'新建图谱失败。');
       await flushServerStateBeforeNavigation();
-      location.href='index.html';
+      location.href='index.html?mode=free';
     }});
   }
   function beginInlineRename(file,card,{value=file&&file.name||'',selectAll=true,kind='file'}={}){
