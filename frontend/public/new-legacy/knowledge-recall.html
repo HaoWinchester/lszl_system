@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>深度知识回忆｜知识寻宝地图</title>
+  <link rel="stylesheet" href="styles/knowledge-recall.css" />
+<link rel="stylesheet" href="styles/global-shortcuts.css"/>
+<link rel="stylesheet" href="styles/subscription.css"/>
+<link rel="stylesheet" href="styles/user-center.css"/>
+<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
+<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->
+<script defer src="./new-legacy-navigation-bridge.js"></script><!-- kg-navigation:generated -->
+</head>
+<body>
+  <div class="kr-app" id="krApp">
+    <header class="kr-topbar">
+      <div class="kr-brand">
+        <button class="kr-back" id="krBackBtn" title="返回上一页" type="button">←</button>
+        <div>
+          <h1>深度知识回忆</h1>
+          <p>以题目为中心，点击关键词，像寻宝一样把知识点一层层回忆出来。</p>
+        </div>
+      </div>
+      <div class="kr-tools" aria-label="深度回忆画布工具">
+        <div class="auth-status" id="authStatus">访客只读</div>
+        <label class="kr-theme-control" for="krThemeSelect">
+          <span>主题</span>
+          <select id="krThemeSelect" aria-label="切换深度回忆主题">
+            <option value="platform">统一默认</option>
+            <option value="parchment">羊皮纸</option>
+            <option value="aurora">极光绿</option>
+            <option value="neon">暗夜霓虹</option>
+            <option value="sakura">樱花粉</option>
+            <option value="ocean">海盐蓝</option>
+            <option value="latte">奶油拿铁</option>
+          </select>
+        </label>
+        <button id="krCenterBtn" type="button">回到题目</button>
+        <button id="krZoomOutBtn" type="button">－</button>
+        <button id="krZoomInBtn" type="button">＋</button>
+        <button id="krResetBtn" type="button">重置地图</button>
+      </div>
+    </header>
+
+    <main class="kr-viewport" id="krViewport" aria-label="深度知识回忆无限画布">
+      <div class="kr-world" id="krWorld">
+        <svg class="kr-edges" id="krEdges" aria-hidden="true"></svg>
+        <section class="kr-question-card" id="krQuestionCard" aria-label="中心题目卡片"></section>
+        <div class="kr-node-layer" id="krNodeLayer"></div>
+      </div>
+      <div class="kr-guide" id="krGuide" hidden></div>
+      <div class="kr-hint-pill" id="krHintPill">拖拽空白处移动画布 · 滚轮缩放 · 双击回到题目</div>
+    </main>
+  </div>
+<script defer src="src/01-runtime-config.js"></script>
+  <script defer src="src/28-app-storage.js"></script>
+<script defer src="src/29-auth-core.js"></script>
+<script defer src="src/34-role-permissions.js"></script>
+<script defer src="src/37-subscription-plans.js"></script>
+<script defer src="src/37-subscription-orders.js"></script>
+<script defer src="src/37-subscription-redeem-codes.js"></script>
+<script defer src="src/37-subscription-core.js"></script>
+<script defer src="src/33-user-center.js"></script>
+<script defer src="src/39-global-shortcuts.js"></script>
+<script defer src="src/50-question-data.js"></script>
+<script defer src="src/85-knowledge-recall-data.js"></script>
+<script defer src="src/86-knowledge-recall.js"></script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.example/schemas/activity-schema-v1.json",
+  "title": "Activity Schema v1",
+  "type": "object",
+  "required": ["id", "type", "schemaVersion", "content", "answer", "explanation", "metadata"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 160},
+    "type": {
+      "type": "string",
+      "enum": [
+        "single_choice",
+        "keyword_recognition",
+        "matching",
+        "open_response",
+        "memory_match",
+        "deep_recall",
+        "multi_question_induction",
+        "knowledge_graph",
+        "part_challenge"
+      ]
+    },
+    "schemaVersion": {"const": 1},
+    "content": {"$ref": "#/$defs/localizedPayload"},
+    "answer": {"type": "object"},
+    "explanation": {"$ref": "#/$defs/localizedExplanation"},
+    "config": {"type": "object"},
+    "metadata": {
+      "type": "object",
+      "required": ["translationStatus"],
+      "properties": {
+        "runtimeType": {"type": "string"},
+        "adapter": {"type": "string"},
+        "source": {"type": "string"},
+        "repeatOf": {"type": "string"},
+        "translationStatus": {"enum": ["zh_only", "en_only", "bilingual"]}
+      },
+      "additionalProperties": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"type": {"const": "single_choice"}}},
+      "then": {
+        "properties": {
+          "answer": {
+            "type": "object",
+            "required": ["optionId"],
+            "properties": {"optionId": {"type": "string", "minLength": 1}}
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "keyword_recognition"}}},
+      "then": {
+        "properties": {
+          "answer": {
+            "type": "object",
+            "required": ["segmentIds", "requiredSelectionCount"],
+            "properties": {
+              "segmentIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+              "requiredSelectionCount": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"enum": ["matching", "memory_match"]}}},
+      "then": {
+        "properties": {
+          "answer": {
+            "type": "object",
+            "required": ["matches"],
+            "properties": {
+              "matches": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["leftId", "rightId"],
+                  "properties": {
+                    "leftId": {"type": "string"},
+                    "rightId": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "localizedPayload": {
+      "type": "object",
+      "required": ["zh", "en"],
+      "properties": {
+        "zh": {"type": ["object", "null"]},
+        "en": {"type": ["object", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "localizedExplanation": {
+      "type": "object",
+      "required": ["zh", "en"],
+      "properties": {
+        "zh": {"$ref": "#/$defs/explanationRecord"},
+        "en": {"anyOf": [{"$ref": "#/$defs/explanationRecord"}, {"type": "null"}]}
+      },
+      "additionalProperties": false
+    },
+    "explanationRecord": {
+      "type": "object",
+      "properties": {
+        "short": {"type": "string"},
+        "detailed": {"type": "string"},
+        "incorrect": {"type": "string"},
+        "general": {"type": "string"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

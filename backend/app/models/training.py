@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,6 +24,7 @@ class TrainingProgress(Base):
     submitted: Mapped[bool] = mapped_column(default=False)
     found_clues: Mapped[list] = mapped_column(JSONB, default=list)
     reasoning_state: Mapped[dict] = mapped_column(JSONB, default=dict)
+    session_data: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -42,3 +43,33 @@ class RecallProgress(Base):
     custom_nodes: Mapped[dict] = mapped_column(JSONB, default=dict)
     active_keywords: Mapped[list] = mapped_column(JSONB, default=list)
     saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class LearningEvent(Base):
+    """用户学习过程中产生的追加式领域事件。"""
+
+    __tablename__ = "learning_events"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.username"), nullable=False, index=True)
+    question_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("questions.id"), nullable=True, index=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    payload: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class CanvasWorkspace(Base):
+    """多题归纳画布；内容采用 new-legacy workspace schema。"""
+
+    __tablename__ = "canvas_workspaces"
+    __table_args__ = (UniqueConstraint("owner_id", "id", name="uq_canvas_workspace_owner_id"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.username"), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    schema_version: Mapped[int] = mapped_column(Integer, default=6)
+    payload: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), index=True
+    )

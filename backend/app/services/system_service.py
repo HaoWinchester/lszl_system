@@ -7,6 +7,7 @@ from app.core.permissions import (
     DEFAULT_PLANS,
     DEFAULT_THEMES,
     DEFAULT_WECHAT_CONFIG,
+    DEFAULT_WECHAT_PAY_CONFIG,
     PERMISSION_KEYS,
     PERMISSION_LABELS,
     ROLE_LABELS,
@@ -95,6 +96,24 @@ async def set_wechat_config(db: AsyncSession, patch: dict) -> dict:
         s.value = current
     else:
         db.add(SystemSetting(key="wechat_config", value=current))
+    await db.commit()
+    return current
+
+
+# ---------- 微信支付配置 ----------
+async def get_wechat_pay_config(db: AsyncSession) -> dict:
+    s = await _get_setting(db, "wechat_pay_config")
+    return {**DEFAULT_WECHAT_PAY_CONFIG, **(s.value if s else {})}
+
+
+async def set_wechat_pay_config(db: AsyncSession, patch: dict) -> dict:
+    current = await get_wechat_pay_config(db)
+    current.update({k: v for k, v in patch.items() if k in DEFAULT_WECHAT_PAY_CONFIG})
+    s = await _get_setting(db, "wechat_pay_config")
+    if s:
+        s.value = current
+    else:
+        db.add(SystemSetting(key="wechat_pay_config", value=current))
     await db.commit()
     return current
 

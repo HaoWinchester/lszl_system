@@ -1,14 +1,18 @@
-"""订阅路由：学员查看/兑换/申请；管理员开通/审批/卡密。"""
+"""订阅路由：学员查看/兑换/下单/微信支付回调；管理员开通/审批/卡密。"""
 
+import json
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser, require_role
+from app.core.security import uid
 from app.db.session import get_db
+from app.models.subscription import SubscriptionOrder
 from app.models.user import User
-from app.services import subscription_service, system_service
+from app.services import subscription_service, system_service, wechat_pay_service
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 DB = Annotated[AsyncSession, Depends(get_db)]
@@ -38,6 +42,60 @@ async def redeem(body: dict, db: DB, user: CurrentUser):
 async def create_order(body: dict, db: DB, user: CurrentUser):
     o = await subscription_service.request_order(db, user.username, body.get("planId", "free"))
     return {"order": subscription_service.order_to_dict(o)}
+
+
+@router.get("/orders/{order_id}/status")
+async def order_status(order_id: str, db: DB, user: CurrentUser):
+    """前端轮询订单支付状态。"""
+    o = await db.get(SubscriptionOrder, order_id)
+    if not o or o.username != user.username:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    return {
+        "orderId": o.id,
+        "payStatus": o.pay_status,
+        "status": o.status,
+        "subscription": subscription_service.sub_to_dict(
+            await subscription_service.get_subscription(db, user.username)
+        ),
+    }
+
+
+# ---------- 微信支付回调（公开，微信服务器调用；无登录态）----------
+@router.post("/wechat-pay/notify")
+async def wechat_pay_notify(request: Request, db: DB):
+    cfg = await system_service.get_wechat_pay_config(db)
+    body = (await request.body()).decode("utf-8")
+    timestamp = request.headers.get("Wechatpay-Timestamp", "")
+    nonce = request.headers.get("Wechatpay-Nonce", "")
+    signature = request.headers.get("Wechatpay-Signature", "")
+    if not wechat_pay_service.verify_signature(timestamp, nonce, body, signature, cfg):
+        return JSONResponse(status_code=400, content={"code": "FAIL", "message": "验签失败"})
+    try:
+        payload = json.loads(body)
+        plain = wechat_pay_service.decrypt_resource(payload.get("resource", {}), cfg["apiV3Key"])
+    except Exception:  # noqa: BLE001
+        return JSONResponse(status_code=400, content={"code": "FAIL", "message": "解密失败"})
+    if plain.get("trade_state") == "SUCCESS":
+        try:
+            await subscription_service.activate_paid_order(
+                db, plain.get("out_trade_no"), plain.get("transaction_id")
+            )
+        except ValueError:
+            return JSONResponse(status_code=400, content={"code": "FAIL", "message": "订单不存在"})
+    return {"code": "SUCCESS", "message": "OK"}
+
+
+@router.post("/wechat-pay/demo-notify")
+async def wechat_pay_demo_notify(body: dict, db: DB):
+    """演示模式：前端点"模拟支付成功"调此接口直接激活订单（不走微信）。"""
+    cfg = await system_service.get_wechat_pay_config(db)
+    if not cfg.get("enableDemo"):
+        raise HTTPException(status_code=403, detail="演示模式未开启")
+    try:
+        o = await subscription_service.activate_paid_order(db, body.get("orderId", ""), "demo_txn_" + uid(""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"code": "SUCCESS", "order": subscription_service.order_to_dict(o)}
 
 
 # ---------- 管理员 ----------

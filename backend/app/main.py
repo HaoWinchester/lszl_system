@@ -18,7 +18,7 @@ logger = logging.getLogger("app")
 
 
 async def _seed_admin() -> None:
-    """首次启动且无任何用户时，创建默认管理员 admin / admin123。"""
+    """幂等创建系统默认账号与教学演示账号。"""
     from sqlalchemy import func, select
 
     from app.models.user import User
@@ -42,6 +42,38 @@ async def _seed_admin() -> None:
             )
             logger.info("Seeded default admin: admin / admin123")
 
+        seed_users = (
+            ("佩奇007", "admin"),
+            ("老师", "teacher"),
+            ("学生", "student"),
+            ("乔治008", "viewer"),
+        )
+        for username, role in seed_users:
+            if await user_service.get_by_username(db, username):
+                continue
+            await user_service.create_user(
+                db,
+                UserCreate(
+                    username=username,
+                    password="111111",
+                    role=role,
+                    display_name=username,
+                    subject="PMP",
+                    source="seed",
+                ),
+                actor="system",
+            )
+            logger.info("Seeded role account: %s (%s)", username, role)
+
+
+async def _seed_guided_course() -> None:
+    """校验并幂等导入 new-legacy v8.6 引导学习课程。"""
+    from app.services import guided_learning_service
+
+    async with AsyncSessionLocal() as db:
+        course = await guided_learning_service.ensure_seeded(db)
+        logger.info("Seeded guided course: %s %s", course.id, course.version)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -52,6 +84,7 @@ async def lifespan(app: FastAPI):
         app.state.db_ok = True
         logger.info("DB connected: %s", settings.DATABASE_URL.split("@")[-1])
         await _seed_admin()
+        await _seed_guided_course()
     except Exception as e:  # noqa: BLE001
         app.state.db_ok = False
         app.state.db_err = str(e)

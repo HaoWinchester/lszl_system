@@ -1,0 +1,104 @@
+/*
+ * v8.4.27.1 学习路径连线层
+ * SVG 与卡片共享同一世界坐标，卡片拖动时只重算路径。
+ */
+.qt-canvas-edge-layer{
+  position:absolute;
+  inset:0;
+  z-index:0;
+  width:5200px;
+  height:1800px;
+  overflow:visible;
+  pointer-events:none;
+}
+.qt-canvas-edge{
+  opacity:1;
+  transition:opacity .18s ease;
+}
+.qt-canvas-edge-line,
+.qt-canvas-edge-glow{
+  fill:none;
+  vector-effect:non-scaling-stroke;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.qt-canvas-edge-line{
+  stroke:#aab4c4;
+  stroke-width:2.2;
+  opacity:.84;
+  transition:
+    stroke .18s ease,
+    stroke-width .18s ease,
+    opacity .18s ease;
+}
+.qt-canvas-edge-glow{
+  stroke:transparent;
+  stroke-width:12;
+  opacity:0;
+  transition:
+    stroke .18s ease,
+    opacity .18s ease;
+}
+.qt-canvas-edge.is-done .qt-canvas-edge-line{
+  stroke:#16a34a;
+  opacity:.78;
+}
+.qt-canvas-edge.is-current .qt-canvas-edge-line{
+  stroke:#6d5dfc;
+  stroke-width:3;
+  opacity:.96;
+  filter:drop-shadow(0 0 4px rgba(109,93,252,.3));
+}
+.qt-canvas-edge.is-active .qt-canvas-edge-line{
+  stroke:#6d5dfc;
+  stroke-width:4;
+  opacity:1;
+  filter:drop-shadow(0 0 6px rgba(109,93,252,.4));
+}
+.qt-canvas-edge.is-active .qt-canvas-edge-glow{
+  stroke:rgba(109,93,252,.18);
+  opacity:1;
+}
+.qt-canvas-edge.is-dimmed{
+  opacity:.09;
+}
+.qt-canvas-viewport[data-mode="explore"]:not(.has-path-selection) .qt-canvas-edge-line{
+  opacity:.58;
+}
+.qt-canvas-viewport[data-mode="explore"].has-path-selection .qt-canvas-edge.is-active{
+  opacity:1;
+}
+.qt-canvas-viewport[data-mode="explore"].has-path-selection .qt-canvas-edge.is-dimmed{
+  opacity:.07;
+}
+.qt-canvas-card{
+  z-index:2;
+}
+body[data-canvas-mobile="1"] .qt-canvas-edge-layer{
+  display:none;
+}
+
+.qt-canvas-edge-port{
+  vector-effect:non-scaling-stroke;
+  fill:#fff;
+  stroke:#aab4c4;
+  stroke-width:2;
+  opacity:.72;
+  transition:
+    r .18s ease,
+    stroke .18s ease,
+    opacity .18s ease;
+}
+.qt-canvas-edge.is-done .qt-canvas-edge-port{
+  stroke:#16a34a;
+}
+.qt-canvas-edge.is-current .qt-canvas-edge-port,
+.qt-canvas-edge.is-active .qt-canvas-edge-port{
+  stroke:#6d5dfc;
+  stroke-width:2.5;
+  opacity:1;
+}
+.qt-canvas-edge.is-active .qt-canvas-edge-port{
+  r:5.5;
+  filter:drop-shadow(0 0 4px rgba(109,93,252,.45));
+}

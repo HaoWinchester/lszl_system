@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import { filesApi, type FileMeta, type Folder } from '../api/files'
 import { AppIcon } from '../components/AppIcon'
+import { useNewLegacyStyles } from '../hooks/useNewLegacyStyles'
 import { useAuth } from '../store/auth'
 
 type View = 'recent' | 'favorites' | 'all' | 'trash'
 type Display = 'grid' | 'list'
+type ContentFilter = 'all' | 'created' | 'tagged'
 
 const SORTS: [string, string][] = [
   ['updated', '最近更新'],
@@ -94,12 +96,15 @@ const COVER_PAIRS: [string, string, string][] = [
 ]
 
 export default function Files() {
+  useNewLegacyStyles(['file-manager.css', 'file-manager-organize.css'], '文件管理｜知识图谱', 'fm-page')
   const me = useAuth((s) => s.user)
   const logout = useAuth((s) => s.logout)
   const navigate = useNavigate()
 
   const [view, setView] = useState<View>('recent')
   const [display, setDisplay] = useState<Display>('grid')
+  const [contentFilter, setContentFilter] = useState<ContentFilter>('all')
+  const [folderId, setFolderId] = useState<string | null>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [files, setFiles] = useState<FileMeta[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
@@ -120,14 +125,14 @@ export default function Files() {
   useEffect(() => { filesApi.current().then(setCurrentId).catch(() => {}) }, [])
 
   const reload = useCallback(async () => {
-    const params: Record<string, unknown> = { sort }
+    const params: Record<string, unknown> = { sort: view === 'recent' ? 'opened' : sort }
     if (query) params.query = query
     if (view === 'trash') params.status = 'trashed'
-    else params.folder_id = null
+    else params.folder_id = folderId
     const data = await filesApi.list(params)
     setFiles(data.files)
     filesApi.stats().then(setStats)
-  }, [view, query, sort])
+  }, [folderId, view, query, sort])
   useEffect(() => { reload() }, [reload])
   useEffect(() => { filesApi.folders().then(setFolders) }, [reload])
 
@@ -229,8 +234,44 @@ export default function Files() {
     } catch (e) { notify(e instanceof Error ? e.message : '导入失败') }
   }
 
+  const batchTag = async () => {
+    if (!selection.size) return
+    const tags = await filesApi.tags()
+    const name = window.prompt('标签名称（留空可移除标签）', tags[0]?.name || '收藏')
+    if (name === null) return
+    let tagId: string | null = null
+    if (name.trim()) {
+      const existing = tags.find((tag) => tag.name === name.trim())
+      tagId = existing?.id ?? (await filesApi.createTag(name.trim(), '#6d4aff')).id
+    }
+    await Promise.all([...selection].map((id) => filesApi.setFileTag(id, tagId)))
+    notify(`已更新 ${selection.size} 个文件的标签`)
+    await reload()
+  }
+  const batchMove = async () => {
+    if (!selection.size) return
+    const target = window.prompt(`移动到文件夹：${folders.map((folder) => folder.name).join(' / ')}（留空移到根目录）`, '')
+    if (target === null) return
+    const targetId = target.trim() ? folders.find((folder) => folder.name === target.trim())?.id : null
+    if (target.trim() && !targetId) return notify('没有找到该文件夹')
+    await Promise.all([...selection].map((id) => filesApi.move(id, targetId ?? null)))
+    notify(`已移动 ${selection.size} 个文件`)
+    setSelection(new Set())
+    await reload()
+  }
+
   const isTrash = view === 'trash'
-  const toggleSelect = (id: string) => setSelection((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const visibleFiles = files.filter((file) => {
+    if (view === 'favorites' && file.tag?.name !== '收藏') return false
+    if (contentFilter === 'tagged' && !file.tag) return false
+    return true
+  })
+  const toggleSelect = (id: string) => setSelection((current) => {
+    const next = new Set(current)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  })
 
   const activeBytes = stats?.activeBytes ?? 0
   const quota = 50 * 1024 * 1024
@@ -285,7 +326,7 @@ export default function Files() {
               </div>
               <div className="fm-folder-tree" role="tree" aria-label="文件夹目录">
                 {folders.map((f) => (
-                  <div key={f.id} className="fm-folder-tree-item" role="treeitem"><AppIcon name="folder" size="compact" /> {f.name}</div>
+                  <button key={f.id} className={`fm-folder-tree-item${folderId === f.id ? ' is-active' : ''}`} role="treeitem" type="button" onClick={() => { setFolderId(f.id); setView('all') }}><AppIcon name="folder" size="compact" /> {f.name}</button>
                 ))}
               </div>
             </section>
@@ -358,12 +399,12 @@ export default function Files() {
 
           <div className="fm-workspace">
             <section className="fm-browser" aria-label="图谱文件">
-              <div className="fm-breadcrumb-bar" id="fmBreadcrumbBar" aria-label="文件夹路径"><span className="fm-breadcrumb">{isTrash ? '回收站' : '全部文件'}</span></div>
+              <div className="fm-breadcrumb-bar" id="fmBreadcrumbBar" aria-label="文件夹路径"><button className="fm-breadcrumb" type="button" onClick={() => setFolderId(null)}>{isTrash ? '回收站' : '全部文件'}</button>{folderId && <span className="fm-breadcrumb"> / {folders.find((folder) => folder.id === folderId)?.name}</span>}</div>
               <div className="fm-browser-toolbar">
                 <div className="fm-filter-tabs" role="tablist" aria-label="文件筛选">
-                  <button className="is-active" type="button" data-filter="all" role="tab" onClick={() => notify('已显示全部')}>全部 <span>{stats?.activeCount ?? 0}</span></button>
-                  <button type="button" data-filter="created" role="tab" onClick={() => notify('已筛选我创建的')}>我创建的 <span>{stats?.activeCount ?? 0}</span></button>
-                  <button type="button" data-filter="tagged" role="tab" onClick={() => notify('已筛选有标签')}>有标签 <span>0</span></button>
+                  <button className={contentFilter === 'all' ? 'is-active' : ''} type="button" data-filter="all" role="tab" onClick={() => setContentFilter('all')}>全部 <span>{files.length}</span></button>
+                  <button className={contentFilter === 'created' ? 'is-active' : ''} type="button" data-filter="created" role="tab" onClick={() => setContentFilter('created')}>我创建的 <span>{files.filter((file) => file.ownerId === me?.username).length}</span></button>
+                  <button className={contentFilter === 'tagged' ? 'is-active' : ''} type="button" data-filter="tagged" role="tab" onClick={() => setContentFilter('tagged')}>有标签 <span>{files.filter((file) => file.tag).length}</span></button>
                 </div>
                 <div className="fm-toolbar-actions">
                   <button className="fm-text-btn" id="fmSelectionModeBtn" type="button" onClick={() => { setSelectMode((v) => !v); setSelection(new Set()) }}>{selectMode ? '完成选择' : '选择'}</button>
@@ -380,16 +421,16 @@ export default function Files() {
               </div>
 
               {selectMode && selection.size > 0 && (
-                <div className="fm-batch-bar"><strong>已选择 {selection.size} 项</strong><div><button type="button" onClick={() => notify('批量标签：请在文件详情中单独设置标签')}>标签</button><button type="button" onClick={() => notify('批量移动：可拖拽文件到左侧文件夹')}>移动</button><button type="button" onClick={batchExport}>导出</button><button className="is-danger" type="button" onClick={batchTrash}>移入回收站</button><button type="button" onClick={() => { setSelectMode(false); setSelection(new Set()) }}>取消</button></div></div>
+                <div className="fm-batch-bar"><strong>已选择 {selection.size} 项</strong><div><button type="button" onClick={() => void batchTag()}>标签</button><button type="button" onClick={() => void batchMove()}>移动</button><button type="button" onClick={batchExport}>导出</button><button className="is-danger" type="button" onClick={batchTrash}>移入回收站</button><button type="button" onClick={() => { setSelectMode(false); setSelection(new Set()) }}>取消</button></div></div>
               )}
 
               <div className="fm-content" tabIndex={-1}>
                 <section className="fm-file-section" aria-labelledby="fmFileSectionTitle">
                   <div className="fm-content-section-head">
-                    <h2 id="fmFileSectionTitle">{isTrash ? `回收站（${files.length}）` : `文件数（${files.length}）`}</h2>
+                    <h2 id="fmFileSectionTitle">{isTrash ? `回收站（${visibleFiles.length}）` : `文件数（${visibleFiles.length}）`}</h2>
                   </div>
                   <div className={`fm-file-grid${display === 'list' ? ' fm-list-view' : ''}`} aria-live="polite">
-                    {files.map((f, idx) => {
+                    {visibleFiles.map((f, idx) => {
                       const [a, b] = COVER_PAIRS[idx % COVER_PAIRS.length]
                       const isCur = f.id === currentId
                       const isSel = selection.has(f.id)
@@ -432,7 +473,7 @@ export default function Files() {
                       )
                     })}
                   </div>
-                  {files.length === 0 && (
+                  {visibleFiles.length === 0 && (
                     <div className="fm-empty">
                       <span className="fm-empty-icon"><AppIcon name="folder" size="prominent" /></span>
                       <h2>{isTrash ? '回收站为空' : '还没有图谱文件'}</h2>
@@ -449,7 +490,7 @@ export default function Files() {
                   <div><button type="button" onClick={() => setSelected(null)}>详细信息</button><button type="button" title="取消选择" aria-label="取消选择" onClick={() => setSelected(null)}><AppIcon name="close" size="compact" /></button></div>
                 </div>
               )}
-              <footer className="fm-browser-footer"><span>共 {files.length} 个文件</span><span>文件索引正常</span></footer>
+              <footer className="fm-browser-footer"><span>共 {visibleFiles.length} 个文件</span><span>文件索引正常</span></footer>
             </section>
           </div>
         </main>

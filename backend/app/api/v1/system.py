@@ -54,6 +54,17 @@ async def update_wechat_config(body: dict, db: DB, _: AdminUser):
     return {"config": await system_service.set_wechat_config(db, body)}
 
 
+# ---------- 微信支付配置 ----------
+@router.get("/wechat-pay-config")
+async def wechat_pay_config(db: DB, _: AdminUser):
+    return {"config": await system_service.get_wechat_pay_config(db)}
+
+
+@router.put("/wechat-pay-config")
+async def update_wechat_pay_config(body: dict, db: DB, _: AdminUser):
+    return {"config": await system_service.set_wechat_pay_config(db, body)}
+
+
 # ---------- 订阅套餐展示配置 ----------
 @router.get("/subscription-plans")
 async def subscription_plans(db: DB, _: CurrentUser):

@@ -1,0 +1,373 @@
+/*
+ * v8.4.27.4 画布交互与移动只读修复
+ * 1. 缩放档位与知识图谱统一
+ * 2. 进度节点视觉缩小
+ * 3. 左右悬浮工具固定在 OverlayLayer
+ * 4. 点阵背景跟随世界坐标平移和缩放
+ */
+
+/* 点阵背景使用画布提供的世界坐标变量 */
+.question-body.q-case-body.qt-canvas-viewport{
+  --qt-grid-size:24px;
+  --qt-grid-major-size:96px;
+  --qt-grid-x:0px;
+  --qt-grid-y:0px;
+  --qt-grid-major-x:0px;
+  --qt-grid-major-y:0px;
+}
+.qt-canvas-background{
+  background-color:#f8f9fd!important;
+  background-image:
+    radial-gradient(circle at 1px 1px,rgba(109,93,252,.23) 1.15px,transparent 1.35px),
+    radial-gradient(circle at 1px 1px,rgba(100,116,139,.12) .85px,transparent 1.05px),
+    linear-gradient(135deg,rgba(255,255,255,.74),rgba(246,247,252,.92))!important;
+  background-repeat:repeat,repeat,no-repeat!important;
+  background-size:
+    var(--qt-grid-major-size) var(--qt-grid-major-size),
+    var(--qt-grid-size) var(--qt-grid-size),
+    100% 100%!important;
+  background-position:
+    var(--qt-grid-major-x) var(--qt-grid-major-y),
+    var(--qt-grid-x) var(--qt-grid-y),
+    0 0!important;
+  will-change:background-position,background-size;
+}
+.qt-canvas-viewport[data-grid-lod="far"] .qt-canvas-background{
+  background-image:
+    radial-gradient(circle at 1px 1px,rgba(109,93,252,.22) 1.1px,transparent 1.3px),
+    radial-gradient(circle at 1px 1px,rgba(100,116,139,.08) .7px,transparent .95px),
+    linear-gradient(135deg,rgba(255,255,255,.74),rgba(246,247,252,.92))!important;
+}
+.qt-canvas-viewport[data-grid-lod="near"] .qt-canvas-background{
+  background-image:
+    radial-gradient(circle at 1px 1px,rgba(109,93,252,.2) 1.05px,transparent 1.3px),
+    radial-gradient(circle at 1px 1px,rgba(100,116,139,.14) .9px,transparent 1.1px),
+    linear-gradient(135deg,rgba(255,255,255,.74),rgba(246,247,252,.92))!important;
+}
+
+/* 左右悬浮工具不再依赖 flex 剩余空间，也不随浏览器缩放误触发隐藏 */
+.qt-canvas-toolbar{
+  position:absolute!important;
+  inset:0!important;
+  z-index:240!important;
+  display:block!important;
+  width:100%!important;
+  height:0!important;
+  min-height:0!important;
+  padding:0!important;
+  overflow:visible!important;
+  visibility:visible!important;
+  opacity:1!important;
+  transform:none!important;
+  pointer-events:none!important;
+}
+.qt-canvas-toolbar-group{
+  position:absolute!important;
+  top:10px!important;
+  left:10px!important;
+  z-index:242!important;
+  display:flex!important;
+  align-items:center!important;
+  width:max-content;
+  max-width:calc(100% - 150px);
+  visibility:visible!important;
+  opacity:1!important;
+  transform:none!important;
+  pointer-events:auto!important;
+}
+.qt-canvas-controls{
+  position:absolute!important;
+  top:10px!important;
+  right:10px!important;
+  left:auto!important;
+  z-index:242!important;
+  display:flex!important;
+  align-items:center!important;
+  width:max-content;
+  visibility:visible!important;
+  opacity:1!important;
+  transform:none!important;
+  pointer-events:auto!important;
+}
+.qt-canvas-minimap{
+  z-index:210!important;
+}
+.qt-canvas-viewport>.qt-question-drawer{
+  z-index:260!important;
+}
+.qt-canvas-viewport>.qt-question-drawer-backdrop{
+  z-index:250!important;
+}
+.qt-workspace-drop-indicator{
+  z-index:225!important;
+}
+
+/* 进度节点保留30px命中范围，但视觉圆点缩小约50% */
+.qt-workflow.qt-progress-milestone{
+  min-height:34px!important;
+  padding-top:2px!important;
+  padding-bottom:2px!important;
+}
+.qt-progress-rail{
+  left:calc(clamp(34px,8vw,132px) + 15px)!important;
+  right:calc(clamp(34px,8vw,132px) + 15px)!important;
+  height:2px!important;
+}
+.qt-workflow-step{
+  width:30px!important;
+  min-width:30px!important;
+  height:30px!important;
+  min-height:30px!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  transform:none!important;
+  animation:none!important;
+}
+.qt-workflow-number{
+  width:15px!important;
+  height:15px!important;
+  border:2px solid #fff!important;
+  background:#e8ecf3!important;
+  color:#7f8a9c!important;
+  font-size:7px!important;
+  line-height:1!important;
+  box-shadow:0 0 0 1px rgba(100,116,139,.15)!important;
+  transition:
+    transform .22s ease,
+    background .22s ease,
+    color .22s ease,
+    box-shadow .22s ease!important;
+}
+.qt-workflow-step.active{
+  background:transparent!important;
+  color:inherit!important;
+  box-shadow:none!important;
+  transform:none!important;
+  animation:none!important;
+}
+.qt-workflow-step.active .qt-workflow-number{
+  background:linear-gradient(135deg,#6d5dfc,#8b5cf6)!important;
+  color:#fff!important;
+  transform:scale(1.16);
+  box-shadow:
+    0 0 0 3px rgba(109,93,252,.10),
+    0 4px 10px rgba(109,93,252,.26)!important;
+  animation:qtMilestoneDotPulse 1.8s ease-in-out infinite;
+}
+.qt-workflow-step.done{
+  background:transparent!important;
+  color:inherit!important;
+  box-shadow:none!important;
+}
+.qt-workflow-step.done .qt-workflow-number{
+  width:15px!important;
+  height:15px!important;
+  background:linear-gradient(135deg,#16a34a,#22c55e)!important;
+  color:#fff!important;
+  font-size:7px!important;
+  box-shadow:0 3px 8px rgba(22,163,74,.22)!important;
+}
+.qt-workflow-step.done .qt-workflow-number::after{
+  content:none!important;
+}
+.qt-workflow-step.qt-step-complete-pop .qt-workflow-number{
+  animation:qtMilestoneDotComplete .48s cubic-bezier(.2,.85,.25,1);
+}
+@keyframes qtMilestoneDotPulse{
+  0%,100%{box-shadow:0 0 0 2px rgba(109,93,252,.08),0 3px 8px rgba(109,93,252,.22)}
+  50%{box-shadow:0 0 0 4px rgba(109,93,252,.035),0 4px 11px rgba(109,93,252,.3)}
+}
+@keyframes qtMilestoneDotComplete{
+  0%{transform:scale(1)}
+  45%{transform:scale(1.42)}
+  100%{transform:scale(1)}
+}
+
+/* 精细指针设备在窄窗口或浏览器放大时仍保留画布控件 */
+@media(pointer:fine){
+  .qt-canvas-controls,
+  body[data-canvas-mobile="1"] .qt-canvas-controls{
+    display:flex!important;
+  }
+}
+
+/* 只有真实触控小屏才收起右侧控件 */
+@media(max-width:760px) and (pointer:coarse){
+  .qt-canvas-toolbar{
+    top:0!important;
+    left:0!important;
+    right:0!important;
+  }
+  .qt-canvas-toolbar-group{
+    top:7px!important;
+    left:7px!important;
+    max-width:calc(100% - 14px);
+  }
+  .qt-canvas-controls{
+    display:none!important;
+  }
+  .qt-progress-rail{
+    left:39px!important;
+    right:39px!important;
+  }
+}
+
+/* 动画期间保持世界层和背景同步，不隐藏悬浮工具 */
+.qt-canvas-viewport.is-smooth-zooming .qt-canvas-world{
+  will-change:transform;
+}
+
+@media(prefers-reduced-motion:reduce){
+  .qt-workflow-step.active .qt-workflow-number,
+  .qt-workflow-step.qt-step-complete-pop .qt-workflow-number{
+    animation:none!important;
+  }
+}
+
+
+/* v8.4.27.4：稳定悬浮栏与移动端只读作答 */
+.qt-mobile-readonly-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  min-height:32px;
+  padding:0 9px;
+  border:1px solid rgba(37,99,235,.18);
+  border-radius:11px;
+  background:rgba(239,246,255,.94);
+  color:#1d4ed8;
+  font-size:9px;
+  font-weight:900;
+  box-shadow:0 7px 20px rgba(15,23,42,.08);
+  backdrop-filter:blur(12px);
+}
+.qt-mobile-readonly-badge[hidden]{
+  display:none!important;
+}
+
+/* 独立拖拽把手，避免从按钮文字开始拖动时浏览器取消原生拖放 */
+.qt-question-list-item{
+  grid-template-columns:20px minmax(0,1fr) auto!important;
+  align-items:stretch;
+}
+.qt-question-drag-handle{
+  display:grid;
+  place-items:center;
+  width:20px;
+  min-width:20px;
+  margin:7px 0 7px 6px;
+  border-radius:8px;
+  color:#94a3b8;
+  font-size:12px;
+  font-weight:1000;
+  letter-spacing:-3px;
+  cursor:grab;
+  user-select:none;
+  touch-action:none;
+}
+.qt-question-list-item:hover .qt-question-drag-handle{
+  background:#eef2ff;
+  color:#6d5dfc;
+}
+.qt-question-list-item.is-dragging .qt-question-drag-handle{
+  cursor:grabbing;
+  background:#ede9fe;
+  color:#5b4dd1;
+}
+
+/* 桌面窄视口或浏览器放大时，悬浮栏保持可见并自动紧凑化 */
+@media(max-width:980px) and (pointer:fine){
+  .qt-canvas-toolbar-group{
+    max-width:220px!important;
+    gap:3px!important;
+  }
+  .qt-question-dock-trigger>span:nth-child(2),
+  .qt-mode-switch button>span:last-child{
+    display:none;
+  }
+  .qt-canvas-help,
+  .qt-canvas-font-menu{
+    flex:0 0 auto;
+  }
+  .qt-canvas-controls{
+    gap:2px!important;
+    padding:2px!important;
+  }
+  .qt-canvas-controls button{
+    min-width:25px!important;
+    height:27px!important;
+    padding:0 5px!important;
+    font-size:9px!important;
+  }
+  .qt-canvas-controls .qt-canvas-zoom-label{
+    min-width:38px!important;
+  }
+}
+@media(max-width:700px) and (pointer:fine){
+  .qt-canvas-toolbar-group{
+    max-width:155px!important;
+  }
+  .qt-canvas-help,
+  .qt-canvas-font-menu{
+    display:none!important;
+  }
+  .qt-canvas-controls button{
+    min-width:23px!important;
+    padding:0 4px!important;
+  }
+}
+
+/* 真实移动小屏：只读、单卡、可切题和作答，不开放自由探索和编辑工具 */
+body[data-canvas-readonly="1"] .qt-mode-switch,
+body[data-canvas-readonly="1"] .qt-canvas-help,
+body[data-canvas-readonly="1"] .qt-canvas-font-menu,
+body[data-canvas-readonly="1"] .qt-path-selection-label,
+body[data-canvas-readonly="1"] .qt-canvas-controls,
+body[data-canvas-readonly="1"] .qt-canvas-minimap{
+  display:none!important;
+}
+body[data-canvas-readonly="1"] .qt-mobile-readonly-badge{
+  display:inline-flex!important;
+}
+body[data-canvas-readonly="1"] .qt-canvas-toolbar{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+body[data-canvas-readonly="1"] .qt-canvas-toolbar-group{
+  top:7px!important;
+  left:7px!important;
+  right:auto!important;
+  display:flex!important;
+  max-width:calc(100% - 14px)!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+body[data-canvas-readonly="1"] .qt-question-dock-trigger{
+  display:inline-flex!important;
+}
+body[data-canvas-readonly="1"] .qt-question-drag-handle,
+body[data-canvas-readonly="1"] .qt-question-add-workspace,
+body[data-canvas-readonly="1"] .qt-question-dock-tip,
+body[data-canvas-readonly="1"] .qt-workspace-drop-indicator{
+  display:none!important;
+}
+body[data-canvas-readonly="1"] .qt-question-list-item{
+  grid-template-columns:minmax(0,1fr)!important;
+  cursor:default;
+}
+body[data-canvas-readonly="1"] .qt-question-list-item.is-dragging{
+  opacity:1;
+}
+body[data-canvas-readonly="1"] .qt-canvas-card-header{
+  cursor:default!important;
+}
+body[data-canvas-readonly="1"] [data-card-drag-handle]{
+  touch-action:auto!important;
+  user-select:auto;
+}
+
+body[data-canvas-readonly="1"] .qt-canvas-world{
+  padding-top:54px!important;
+}

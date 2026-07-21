@@ -20,6 +20,14 @@ export interface AppUser {
   has_password: boolean
 }
 
+export interface WechatLoginConfig {
+  mode: 'official' | 'demo'
+  hasAppId: boolean
+  hasSecret: boolean
+  scope: string
+  enableDemo: boolean
+}
+
 export const authApi = {
   login: (username: string, password: string) =>
     apiClient.post<{ user: AppUser }>('/auth/login', { username, password }).then((r) => r.data.user),
@@ -27,4 +35,12 @@ export const authApi = {
     apiClient.post<{ user: AppUser }>('/auth/register', data).then((r) => r.data.user),
   logout: () => apiClient.post<{ ok: boolean }>('/auth/logout').then((r) => r.data),
   me: () => apiClient.get<{ user: AppUser }>('/auth/me').then((r) => r.data.user),
+  wechatConfig: () =>
+    apiClient.get<WechatLoginConfig>('/auth/wechat/config').then((r) => r.data),
+  wechatAuthUrl: () =>
+    apiClient.get<{ authUrl: string; state: string }>('/auth/wechat/auth-url').then((r) => r.data),
+  wechatLogin: (code: string, state: string) =>
+    apiClient.post<{ user: AppUser }>('/auth/wechat/login', { code, state }).then((r) => r.data.user),
+  wechatDemoLogin: () =>
+    apiClient.post<{ user: AppUser }>('/auth/wechat/demo-login').then((r) => r.data.user),
 }

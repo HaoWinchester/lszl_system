@@ -1,0 +1,48 @@
+{
+  "id": "activity-environment-001",
+  "type": "single_choice",
+  "schemaVersion": 1,
+  "content": {
+    "zh": {
+      "stem": "项目需求频繁变化，团队应采用哪种方式？",
+      "options": [
+        {"id": "A", "text": "严格按照原计划执行", "feedback": ""},
+        {"id": "B", "text": "采用迭代方式持续调整", "feedback": ""},
+        {"id": "C", "text": "暂停项目等待需求稳定", "feedback": ""},
+        {"id": "D", "text": "仅由项目经理决定", "feedback": ""}
+      ]
+    },
+    "en": {
+      "stem": "Project requirements change frequently. Which approach should the team use?",
+      "options": [
+        {"id": "A", "text": "Follow the original plan strictly", "feedback": ""},
+        {"id": "B", "text": "Use an iterative approach and adjust continuously", "feedback": ""},
+        {"id": "C", "text": "Pause the project until requirements stabilize", "feedback": ""},
+        {"id": "D", "text": "Let only the project manager decide", "feedback": ""}
+      ]
+    }
+  },
+  "answer": {"optionId": "B"},
+  "explanation": {
+    "zh": {
+      "short": "需求频繁变化时，应采用迭代和持续反馈。",
+      "detailed": "迭代方式允许团队根据反馈持续调整范围和优先级。",
+      "incorrect": "请重新关注题目中的需求变化频率。",
+      "general": "迭代和持续反馈更适合变化频繁的环境。"
+    },
+    "en": {
+      "short": "Frequent change calls for iteration and continuous feedback.",
+      "detailed": "An iterative approach lets the team adjust scope and priorities using feedback.",
+      "incorrect": "Focus again on how frequently the requirements change.",
+      "general": "Iteration and continuous feedback fit a rapidly changing environment."
+    }
+  },
+  "config": {},
+  "metadata": {
+    "adapter": "single_choice",
+    "runtimeType": "choice",
+    "source": "activity-schema-example",
+    "repeatOf": "",
+    "translationStatus": "bilingual"
+  }
+}

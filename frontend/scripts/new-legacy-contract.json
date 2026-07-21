@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "baselineVersion": "v8.6.0",
+  "requiredPages": [
+    "index.html",
+    "learning-path.html",
+    "guided-learning-node.html",
+    "guided-learning-placement-test.html",
+    "question-training.html",
+    "question-workspace.html",
+    "knowledge-recall.html"
+  ],
+  "requiredFiles": [
+    "src/01-runtime-config.js",
+    "src/23-graph-file-store.js",
+    "src/64-flow-orchestrator.js",
+    "src/86-activity-schema-v1.js",
+    "src/87-guided-learning-data.js",
+    "src/88-guided-learning-store.js",
+    "src/89-guided-learning-app.js",
+    "src/90-guided-learning-node-app.js",
+    "schemas/activity-schema-v1.json"
+  ],
+  "requiredGlobals": [
+    "KGActivitySchemaV1",
+    "KGGuidedLearningData",
+    "KGGuidedLearningStore",
+    "KGGraphFileStore"
+  ],
+  "allowedPersistentStorage": {
+    "localStorage": true,
+    "sessionStorage": true,
+    "indexedDB": false
+  }
+}

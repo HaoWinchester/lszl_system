@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <title>学习路径｜项目管理学习营</title>
+  <link rel="stylesheet" href="styles/main.css"/>
+  <link rel="stylesheet" href="styles/guided-learning-path.css"/>
+  <link rel="stylesheet" href="styles/subscription.css"/>
+  <link rel="stylesheet" href="styles/user-center.css"/>
+<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
+<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->
+<script defer src="./new-legacy-navigation-bridge.js"></script><!-- kg-navigation:generated -->
+</head>
+<body class="guided-learning-page">
+  <div class="gl-app">
+    <header class="gl-topbar">
+      <a class="gl-brand" href="learning-path.html" aria-label="学习路径首页">
+        <span class="gl-brand-mark">P</span>
+        <div><strong>项目管理学习营</strong><small>阶段式学习路径</small></div>
+      </a>
+      <nav class="gl-mode-nav" aria-label="学习模式切换">
+        <a class="active" href="learning-path.html">学习模式</a>
+        <a href="index.html?mode=free">自由模式</a>
+      </nav>
+      <div class="gl-account-actions">
+        <div class="auth-status" id="authStatus">访客学习</div>
+        <button class="auth-login-btn" id="authLoginBtn" type="button">登录</button>
+        <button class="auth-logout-btn" id="authLogoutBtn" type="button" style="display:none">退出</button>
+      </div>
+    </header>
+
+    <main class="gl-main">
+      <section class="gl-stage-controls" aria-label="当前学习阶段">
+        <button type="button" class="gl-stage-switch" id="glStageSwitch" aria-haspopup="dialog" aria-controls="glStagePicker" aria-expanded="false">
+          <span class="gl-stage-switch-copy">
+            <small id="glStageIndex">第 1 阶段 · 2 个部分</small>
+            <strong id="glStageTitle">基础认知</strong>
+            <span id="glStageDescription"></span>
+          </span>
+        </button>
+      </section>
+
+      <div class="gl-path-parts" id="glPathParts" aria-live="polite"></div>
+      <button type="button" class="gl-current-node-fab" id="glCurrentNodeBtn" title="回到当前位置" aria-label="回到当前位置"><span aria-hidden="true">↑</span><small>当前位置</small></button>
+
+      <details class="gl-path-settings">
+        <summary>学习设置</summary>
+        <div class="gl-path-settings-body">
+          <p>每个节点约 6 分钟。答错的题目会在本节点内再次出现；每个部分首节点还可选择参加跳级测试。</p>
+          <label><input type="checkbox" id="glDefaultMode" checked/><span>默认进入学习模式</span></label>
+          <button type="button" id="glResetBtn">重置示范进度</button>
+        </div>
+      </details>
+    </main>
+  </div>
+
+  <div class="gl-stage-picker-backdrop" id="glStagePicker" aria-hidden="true">
+    <section class="gl-stage-picker" role="dialog" aria-modal="true" aria-labelledby="glStagePickerTitle">
+      <header>
+        <div>
+          <small>课程阶段</small>
+          <h2 id="glStagePickerTitle">选择学习阶段</h2>
+        </div>
+        <button type="button" class="gl-stage-picker-close" id="glStagePickerClose" aria-label="关闭阶段列表">×</button>
+      </header>
+      <div class="gl-stage-list" id="glStageList"></div>
+    </section>
+  </div>
+
+
+  <div class="gl-placement-backdrop" id="glPlacementChoice" aria-hidden="true">
+    <section class="gl-placement-dialog" role="dialog" aria-modal="true" aria-labelledby="glPlacementTitle">
+      <button type="button" class="gl-placement-close" id="glPlacementClose" aria-label="关闭">×</button>
+      <small>部分首节点</small>
+      <h2 id="glPlacementTitle">选择学习方式</h2>
+      <h3 id="glPlacementPartTitle"></h3>
+      <p id="glPlacementPartDescription"></p>
+      <div class="gl-placement-requirements" id="glPlacementRequirements"></div>
+      <p class="gl-placement-history" id="glPlacementHistory" hidden></p>
+      <div class="gl-placement-actions">
+        <button type="button" class="ui-button ui-button--secondary" id="glPlacementNormalBtn">正常开始</button>
+        <button type="button" class="ui-button ui-button--primary" id="glPlacementTestBtn">参加跳级测试</button>
+      </div>
+      <p class="gl-placement-note">测试通过后，本部分节点将按正常完成状态显示，仍可随时返回练习。</p>
+    </section>
+  </div>
+
+  <div class="status-chip" id="status"></div>
+
+  <div class="modal-backdrop auth-backdrop" id="authModal" aria-hidden="true">
+    <div aria-labelledby="authTitle" aria-modal="true" class="modal auth-modal" role="dialog">
+      <div class="auth-head">
+        <div><h2 id="authTitle">登录并保存学习进度</h2><p id="authReason">访客也可以体验，登录后会按账号分别保存已完成节点。</p></div>
+        <button class="auth-close" id="authCloseBtn" title="关闭登录窗口">×</button>
+      </div>
+      <div class="auth-body">
+        <label>用户名<input autocomplete="username" id="authUsername" placeholder="请输入用户名"/></label>
+        <label>密码<input autocomplete="current-password" id="authPassword" placeholder="请输入密码" type="password"/></label>
+        <div class="auth-msg" id="authMsg"></div>
+        <div class="auth-actions"><button class="primary" id="authDoLoginBtn">登录</button><button id="authRegisterBtn">注册并登录</button></div>
+      </div>
+    </div>
+  </div>
+
+  <script defer src="src/01-runtime-config.js"></script>
+  <script defer src="src/28-app-storage.js"></script>
+  <script defer src="src/29-auth-core.js"></script>
+  <script defer src="src/30-standalone-auth-dialog.js"></script>
+  <script defer src="src/34-role-permissions.js"></script>
+  <script defer src="src/63-learning-event-repository.js"></script>
+  <script defer src="src/86-activity-schema-v1.js"></script>
+  <script defer src="src/87-guided-learning-data.js"></script>
+<script defer src="./guided-learning-data-bridge.js"></script><!-- kg-guided-data:generated -->
+  <script defer src="src/88-guided-learning-store.js"></script>
+  <script defer src="src/89-guided-learning-icon-registry.js"></script>
+  <script defer src="src/89-guided-learning-app.js"></script>
+</body>
+</html>

@@ -5,6 +5,7 @@ import { type AppUser } from '../api/auth'
 import { systemApi, type AdminLog } from '../api/system'
 import { usersApi } from '../api/users'
 import { AppIcon } from '../components/AppIcon'
+import { useNewLegacyStyles } from '../hooks/useNewLegacyStyles'
 import { useAuth } from '../store/auth'
 
 const ROLES: [string, string][] = [
@@ -59,6 +60,10 @@ function formFromUser(u: AppUser): EditForm {
 }
 
 export default function Users() {
+  useNewLegacyStyles(
+    ['user-management.css', 'global-shortcuts.css', 'subscription.css', 'user-center.css'],
+    '用户管理｜本地多用户后台',
+  )
   const me = useAuth((s) => s.user)
   const setUser = useAuth((s) => s.setUser)
 

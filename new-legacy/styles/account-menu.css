@@ -1,0 +1,202 @@
+/*
+ * C-1.2：右上角账号胶囊与下拉菜单。
+ * 保留胶囊入口，移除外置“使用说明 / 退出”按钮。
+ */
+.account-menu-shell{
+  position:relative;
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+}
+.account-menu-trigger{
+  appearance:none;
+  border:0;
+  cursor:pointer;
+  min-height:38px;
+  max-width:220px;
+  padding:0 11px;
+  color:var(--role-text,#334155);
+  text-align:left;
+  transition:box-shadow .16s ease,background .16s ease,transform .16s ease;
+}
+.account-menu-trigger:hover,
+.account-menu-trigger:focus-visible,
+.account-menu-shell.is-open .account-menu-trigger{
+  transform:none;
+  outline:none;
+  background:#fff;
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--role-primary,#2563eb) 24%,transparent),0 8px 22px rgba(15,23,42,.10);
+}
+.auth-status-label{
+  min-width:0;
+  max-width:150px;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+.account-menu-chevron{
+  flex:0 0 auto;
+  width:16px;
+  height:16px;
+  margin-left:2px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  opacity:.7;
+  transition:transform .16s ease;
+}
+.account-menu-shell.is-open .account-menu-chevron{transform:rotate(180deg)}
+.account-menu{
+  position:absolute;
+  top:calc(100% + 10px);
+  right:0;
+  z-index:160;
+  width:218px;
+  padding:8px;
+  border:1px solid rgba(148,163,184,.24);
+  border-radius:15px;
+  background:rgba(255,255,255,.98);
+  box-shadow:0 18px 50px rgba(15,23,42,.18),0 2px 8px rgba(15,23,42,.06);
+  backdrop-filter:blur(18px);
+  transform-origin:top right;
+  animation:accountMenuIn .14s ease-out;
+}
+.account-menu[hidden]{display:none!important}
+@keyframes accountMenuIn{
+  from{opacity:0;transform:translateY(-4px) scale(.98)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+.account-menu-item{
+  width:100%;
+  min-height:42px;
+  display:flex;
+  align-items:center;
+  gap:11px;
+  padding:0 11px;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:#334155;
+  box-shadow:none;
+  font-size:13px;
+  font-weight:800;
+  text-align:left;
+  cursor:pointer;
+}
+.account-menu-item:hover,
+.account-menu-item:focus-visible{
+  transform:none;
+  outline:none;
+  background:#f1f5f9;
+  color:#0f172a;
+  box-shadow:none;
+}
+.account-menu-item svg{
+  flex:0 0 auto;
+  width:19px;
+  height:19px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.account-menu-separator{
+  height:1px;
+  margin:7px 4px;
+  background:#e2e8f0;
+}
+.account-menu-session.is-logout{color:#dc2626}
+.account-menu-session.is-logout:hover,
+.account-menu-session.is-logout:focus-visible{background:#fef2f2;color:#b91c1c}
+.account-menu-session.is-login{color:var(--role-primary,#2563eb)}
+.account-hidden-trigger{display:none!important}
+
+@media(max-width:620px){
+  .account-menu-trigger{max-width:150px;padding:0 9px}
+  .auth-status-label{max-width:94px}
+  .account-menu{position:fixed;top:calc(var(--graph-tabbar-height,46px) + 66px);right:8px;width:min(250px,calc(100vw - 16px))}
+}
+
+/* C-1.4.4：账号菜单新增会员入口，并避免旧样式额外绘制第二个箭头。 */
+.account-menu-trigger::after{display:none!important}
+.account-menu-upgrade{display:none;color:#b45309}
+.account-menu-upgrade:hover,
+.account-menu-upgrade:focus-visible{background:#fff7ed;color:#c2410c}
+
+/*
+ * 移动端 / 触摸设备：账号入口固定吸附在屏幕上边缘。
+ * 视觉文字统一压缩为两个字：账号、用户、帮助、升级、登录/退出。
+ */
+@media (max-width:850px),(pointer:coarse),(hover:none){
+  .account-menu-shell{
+    position:relative;
+    display:inline-flex;
+    align-items:center;
+  }
+  .account-menu-trigger{
+    display:inline-flex!important;
+    width:58px;
+    min-width:58px;
+    max-width:58px;
+    min-height:30px;
+    height:30px;
+    justify-content:center;
+    gap:3px;
+    padding:0 7px;
+    border-radius:9px;
+    color:var(--role-text,#334155);
+    background:rgba(255,255,255,.96);
+    box-shadow:0 0 0 1px rgba(148,163,184,.25),0 3px 12px rgba(15,23,42,.10);
+  }
+  .account-menu-trigger::before{
+    content:"账号";
+    display:block;
+    font-size:12px;
+    font-weight:900;
+    line-height:1;
+    white-space:nowrap;
+  }
+  .account-menu-trigger .role-dot,
+  .account-menu-trigger .auth-status-label{display:none!important}
+  .account-menu-chevron{
+    width:13px;
+    height:13px;
+    margin-left:0;
+  }
+  .account-menu{
+    position:fixed;
+    top:calc(var(--graph-tabbar-height,38px) + 5px);
+    right:6px;
+    z-index:260;
+    width:126px;
+    max-height:calc(100dvh - var(--graph-tabbar-height,38px) - 12px);
+    padding:6px;
+    overflow-y:auto;
+    border-radius:13px;
+    transform-origin:top right;
+  }
+  .account-menu-upgrade{display:flex}
+  .account-menu-item{
+    min-height:40px;
+    justify-content:center;
+    gap:0;
+    padding:0 8px;
+    font-size:13px;
+    text-align:center;
+  }
+  .account-menu-item svg{display:none}
+  .account-menu-item span{
+    display:block;
+    font-size:0;
+    line-height:1;
+  }
+  .account-menu-item span::after{
+    content:attr(data-mobile-label);
+    font-size:13px;
+    font-weight:900;
+  }
+  .account-menu-separator{margin:5px 3px}
+}

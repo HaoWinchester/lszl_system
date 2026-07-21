@@ -6,7 +6,7 @@ import { useAuth } from '../store/auth'
 import { parseBridgeMessage, postToIframe, type BridgeUser, type IframeToParent } from '../iframe/graphBridge'
 import { pmpSampleGraph } from './pmpSample'
 
-const WORKBENCH = '/legacy/workbench.html'
+const WORKBENCH = '/new-legacy/workbench.html'
 
 type CurrentUser = { username: string; display_name?: string | null; role?: string | null; subject?: string | null }
 
@@ -33,8 +33,8 @@ export default function GraphEditor() {
 
   // iframe src 带 user query：bridge.js 同步读取，保证 legacy 30-auth-guards 加载时即识别为"已登录"
   const src = me
-    ? `${WORKBENCH}?u=${encodeURIComponent(me.username)}&d=${encodeURIComponent(me.display_name || me.username)}&r=${encodeURIComponent(me.role)}&s=${encodeURIComponent(me.subject || 'PMP')}`
-    : WORKBENCH
+    ? `${WORKBENCH}?mode=free&u=${encodeURIComponent(me.username)}&d=${encodeURIComponent(me.display_name || me.username)}&r=${encodeURIComponent(me.role)}&s=${encodeURIComponent(me.subject || 'PMP')}`
+    : `${WORKBENCH}?mode=free`
 
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
@@ -48,10 +48,22 @@ export default function GraphEditor() {
       switch (msg.type) {
         case 'kg:ready': {
           if (win) postToIframe(win, { type: 'kg:hello', user: toBridgeUser(me) })
-          await loadCurrentFile(win)
+          if (me) {
+            await loadCurrentFile(win)
+          } else if (win) {
+            postToIframe(win, {
+              type: 'kg:load',
+              meta: { id: 'guest-preview', name: 'PMP知识点关系图谱', ownerId: 'guest' },
+              graphData: pmpSampleGraph(),
+            })
+          }
           break
         }
         case 'kg:save': {
+          if (!me) {
+            if (win) postToIframe(win, { type: 'kg:save-result', requestId: msg.requestId || '', error: '登录后才能保存图谱' })
+            break
+          }
           try {
             const meta = await filesApi.save(msg.id, msg.graphData)
             if (win) postToIframe(win, { type: 'kg:save-result', requestId: msg.requestId || '', meta })
@@ -62,6 +74,7 @@ export default function GraphEditor() {
           break
         }
         case 'kg:rename': {
+          if (!me) break
           try {
             const meta = await filesApi.rename(msg.id, msg.name)
             if (win) postToIframe(win, { type: 'kg:meta-update', meta })
@@ -71,10 +84,12 @@ export default function GraphEditor() {
           break
         }
         case 'kg:switch-file': {
+          if (!me) break
           await openFileInto(win, msg.id)
           break
         }
         case 'kg:create-file': {
+          if (!me) break
           try {
             const created = await filesApi.create({ name: msg.name || '新图谱', graphData: pmpSampleGraph() })
             await filesApi.setCurrent(created.id)

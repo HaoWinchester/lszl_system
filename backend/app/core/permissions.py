@@ -85,9 +85,22 @@ DEFAULT_WECHAT_CONFIG = {
     "enableOfficial": False,
     "autoCreateUser": True,
     "appId": "",
+    "appSecret": "",
     "redirectUri": "",
     "backendExchangeUrl": "",
     "scope": "snsapi_login",
     "defaultRole": "student",
     "defaultSubject": "PMP",
+}
+
+DEFAULT_WECHAT_PAY_CONFIG = {
+    "enableDemo": True,
+    "mchId": "",
+    "apiV3Key": "",  # APIv3 密钥（32 位），解密回调用，敏感
+    "mchSerialNo": "",  # 商户 API 证书序列号
+    "mchPrivateKey": "",  # apiclient_key.pem 内容，最敏感
+    "wxPubKey": "",  # 微信支付公钥内容（验签）
+    "wxPubKeyId": "",  # 微信支付公钥 ID
+    "appId": "",  # 关联的 AppID（等网站应用）
+    "notifyUrl": "",  # https://你的域名/api/v1/subscriptions/wechat-pay/notify
 }

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport"/>
+<script>
+(function(){
+  try{
+    var params=new URLSearchParams(location.search);
+    if(params.get('mode')==='free')return;
+    if(params.get('mode')==='learning'){location.replace('learning-path.html');return;}
+    var mode=localStorage.getItem('kg_default_entry_mode_v1')||'learning';
+    if(mode!=='free')location.replace('learning-path.html');
+  }catch(error){}
+})();
+</script>
+<title>通用知识点关系图谱工具｜艾宾浩斯弹性滑动闪卡版（无电流优化）</title><link href="styles/main.css" rel="stylesheet"/>
+<link rel="stylesheet" href="styles/global-shortcuts.css"/>
+<link rel="stylesheet" href="styles/subscription.css"/>
+<link rel="stylesheet" href="styles/user-center.css"/>
+<link rel="stylesheet" href="styles/account-menu.css"/>
+<link rel="stylesheet" href="styles/home-file-library.css"/>
+<link rel="stylesheet" href="styles/graph-file-tabs.css"/>
+<link rel="stylesheet" href="styles/graph-user-preferences.css"/>
+
+</head>
+<body>
+<div class="app">
+<div class="graph-file-tabbar" id="graphFileTabbar" aria-label="图谱文件页签栏">
+<button class="graph-file-home" id="graphFileHomeBtn" type="button" title="打开文件管理" aria-label="打开文件管理">
+<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/></svg>
+</button>
+<div class="graph-file-tabs" id="graphFileTabs" role="tablist" aria-label="已打开的图谱文件"></div>
+<button class="graph-file-add" id="graphFileAddBtn" type="button" title="新建图谱文件" aria-label="新建图谱文件">＋</button>
+</div>
+<div class="stage" id="stage">
+<div class="canvas-toolbar-left" id="topToolbar" data-stage-ui="true">
+<button class="graph-save-state" id="graphSaveState" type="button" aria-label="立即保存。当前状态：已保存" title="立即保存（Ctrl+S / Command+S）">
+<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .8-7.9A6 6 0 0 0 6.4 8.5 4.8 4.8 0 0 0 7 18Z"/><path d="m9.5 13 1.7 1.7 3.5-3.7"/></svg>
+<span class="graph-save-state-text">已保存</span>
+</button>
+<div aria-label="图谱信息，双击可编辑" class="brand graph-meta-display" id="graphMetaDisplay" role="button" tabindex="0" title="双击编辑图谱信息">
+<h1 id="appTitle">知识点关系图谱</h1><span id="appSubtitle">通用知识图谱工具</span>
+</div>
+<button aria-expanded="false" aria-haspopup="menu" aria-label="打开图谱设置" class="graph-meta-preferences-btn" id="graphPrefsBtn" title="图谱设置" type="button">
+<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h10"></path><path d="M18 7h2"></path><circle cx="16" cy="7" r="2"></circle><path d="M4 17h2"></path><path d="M10 17h10"></path><circle cx="8" cy="17" r="2"></circle><path d="M4 12h4"></path><path d="M12 12h8"></path><circle cx="10" cy="12" r="2"></circle></svg>
+</button>
+<button aria-label="搜索定位卡牌" class="graph-meta-search-btn" id="graphSearchBtn" title="搜索定位" type="button">
+<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 21 21"></path></svg>
+</button>
+</div>
+<div class="canvas-toolbar-right" data-stage-ui="true">
+<a class="learning-mode-entry" href="learning-path.html" title="返回引导学习路径">学习路径</a>
+<button class="upgrade-member-btn" id="upgradeMemberBtn" type="button" data-open-subscription-detail>升级会员</button>
+<div class="account-menu-shell" id="accountMenuShell">
+<button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
+<span class="role-dot"></span><span class="auth-status-label">访客只读</span>
+<svg aria-hidden="true" class="account-menu-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>
+</button>
+<div class="account-menu" hidden id="accountMenu" role="menu" aria-label="账号菜单">
+<button class="account-menu-item" id="accountMenuUserCenterBtn" role="menuitem" type="button">
+<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+<span data-mobile-label="用户">用户中心</span>
+</button>
+<button class="account-menu-item" id="accountMenuHelpBtn" role="menuitem" type="button">
+<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.35 2.35 0 1 1 3.5 2.05c-.82.45-1.3.93-1.3 1.95"/><path d="M12 17h.01"/></svg>
+<span data-mobile-label="帮助">帮助中心</span>
+</button>
+<button class="account-menu-item account-menu-upgrade" id="accountMenuUpgradeBtn" role="menuitem" type="button">
+<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 9.6 8.1 4 9l4 3.9-.9 5.6L12 16l4.9 2.5-.9-5.6L20 9l-5.6-.9Z"/></svg>
+<span data-mobile-label="升级">升级会员</span>
+</button>
+<div class="account-menu-separator" role="separator"></div>
+<button class="account-menu-item account-menu-session" id="accountMenuSessionBtn" role="menuitem" type="button">
+<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></svg>
+<span data-mobile-label="登录">登录</span>
+</button>
+</div>
+</div>
+<button class="account-hidden-trigger" hidden id="authLoginBtn" type="button">登录</button>
+<button class="account-hidden-trigger" hidden id="authLogoutBtn" type="button">退出登录</button>
+<button class="account-hidden-trigger" hidden id="tutorialBtn" type="button">使用说明</button>
+</div>
+<aside aria-label="图谱操作工具" class="floating-toolbox" id="floatingToolbox" data-home-toolbar="registry"></aside>
+<div class="world" id="world">
+<svg class="edge-layer" id="edgeLayer" viewbox="-50000 -50000 100000 100000" xmlns="http://www.w3.org/2000/svg">
+<g id="edgeGroup"></g>
+</svg>
+<div class="cards-layer" id="cardsLayer"></div>
+</div>
+<div class="help-card" id="helpCard">
+<button id="hideHelpBtn">×</button>
+<strong>通用知识图谱操作</strong><br/>
+      新增知识点后，填写分类、难度、关键词、说明。点击知识点 A，再点击知识点 B，可建立关系线。点击线可编辑“前置、包含、关联、对比、易混淆、应用”等关系。手机端可长按知识点编辑，双指缩放画布。
+    </div>
+<aside class="detail-panel" id="detailPanel"></aside>
+<div class="status-chip" id="status"></div>
+<div class="canvas-zoom-dock" id="canvasZoomDock" data-stage-ui="true" role="group" aria-label="画布缩放控制">
+<button class="canvas-zoom-btn" id="zoomOutBtn" type="button" aria-label="缩小画布" title="缩小">−</button>
+<div class="canvas-zoom-percent-wrap">
+<div class="canvas-zoom-slider-popover" id="canvasZoomSliderPopover">
+<input id="canvasZoomSlider" type="range" min="1" max="400" step="1" value="100" aria-label="缩放比例滑轨"/>
+</div>
+<button class="canvas-zoom-percent" id="canvasZoomPercentBtn" type="button" aria-label="缩放比例，点击恢复 100%">100%</button>
+</div>
+<button class="canvas-zoom-btn" id="zoomInBtn" type="button" aria-label="放大画布" title="放大">＋</button>
+<span class="canvas-zoom-divider" aria-hidden="true"></span>
+<button class="canvas-zoom-btn canvas-fit-btn" id="canvasFitBtn" type="button" aria-label="居中显示当前图谱" title="居中">
+<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 4H4v4"></path><path d="M16 4h4v4"></path><path d="M4 16v4h4"></path><path d="M20 16v4h-4"></path><rect x="8" y="8" width="8" height="8" rx="2"></rect></svg>
+</button>
+<button class="canvas-zoom-btn canvas-fullscreen-btn" id="canvasFullscreenBtn" type="button" aria-label="全屏显示画布" title="全屏">
+<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 3H3v5"></path><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M16 21h5v-5"></path></svg>
+</button>
+</div>
+<div class="mobile-bar" id="mobileBar">
+<button class="primary" id="mAddBtn" data-permission="editGraph" data-permission-mode="hide">新节点</button>
+<button id="mEditBtn" data-permission="editGraph" data-permission-mode="hide">编辑</button>
+<button id="mLinkBtn" data-permission="editGraph" data-permission-mode="hide">连线</button>
+<button id="mFocusBtn">重点</button>
+<button id="mFlashcardBtn">闪卡</button>
+<button id="mSizeBtn" data-permission="editGraph" data-permission-mode="hide">大/小</button>
+<button id="mLineStyleBtn" data-permission="editGraph" data-permission-mode="hide">线型</button>
+<label class="mobile-color-control" data-permission="editGraph" data-permission-mode="hide">颜色 <input id="mLineColorPicker" type="color" value="#2563eb"/></label>
+<button id="mGraphBtn" data-permission="editGraph" data-permission-mode="hide">信息</button>
+<button id="mFitBtn">居中</button>
+<button class="small" id="mZoomOutBtn">－</button>
+<button class="small" id="mZoomInBtn">＋</button>
+</div>
+</div>
+</div>
+<div class="modal-backdrop" id="nodeModal">
+<div class="modal">
+<h2 id="nodeModalTitle">编辑知识点</h2>
+<div class="form-grid">
+<label>知识点名称</label><input id="nTitle" maxlength="40" placeholder="例如：关键路径法"/>
+<label>分类/章节</label><input id="nCategory" maxlength="50" placeholder="例如：进度管理"/>
+<label>节点颜色</label><input id="nColor" type="color"/>
+<label>卡牌尺寸</label><select id="nSize"><option value="">默认</option><option value="small">小</option><option value="big">大</option></select>
+<label>难度</label><select id="nLevel"><option>基础</option><option>中等</option><option>重点</option><option>难点</option><option>易错点</option></select>
+<label>关键词</label><input id="nKeywords" maxlength="80" placeholder="用逗号分隔，例如：浮动时间, 路径, 延期"/>
+<label>知识点说明</label><textarea id="nSummary" placeholder="给学员看的简明解释"></textarea>
+<label>学习提示</label><textarea id="nNotes" placeholder="可填写记忆方法、考试提示、例题方向等"></textarea>
+</div>
+<div class="modal-actions">
+<button class="danger left" id="deleteNodeBtn">删除知识点</button>
+<button id="cancelNodeBtn">取消</button>
+<button class="primary" id="saveNodeBtn">保存</button>
+</div>
+</div>
+</div>
+<div class="modal-backdrop" id="linkModal">
+<div class="modal">
+<h2>编辑关系线</h2>
+<div class="form-grid">
+<label>关系类型</label>
+<select id="linkType">
+<option>关联</option><option>前置</option><option>包含</option><option>属于</option><option>对比</option><option>易混淆</option><option>因果</option><option>应用</option><option>例题支撑</option>
+</select>
+<label>线型</label><select id="linkStyle"><option value="solid">实线</option><option value="dashed">虚线</option></select>
+<label>线色</label><input id="linkColor" type="color" value="#2563eb"/>
+<label>备注</label><textarea id="linkNote" placeholder="例如：关键路径法是进度压缩和进度控制的基础"></textarea>
+</div>
+<div class="modal-actions">
+<button class="danger left" id="deleteLinkBtn">删除关系线</button>
+<button id="cancelLinkBtn">取消</button>
+<button class="primary" id="saveLinkBtn">保存</button>
+</div>
+</div>
+</div>
+<div class="modal-backdrop" id="graphModal">
+<div class="modal graph-info-modal">
+<h2>图谱文件信息</h2>
+<div class="form-grid graph-info-grid">
+<label>标题</label><input id="gTitle" maxlength="40" placeholder="例如：PMP知识图谱"/>
+<label>创建时间</label><div class="graph-info-readonly" id="gCreatedAt">—</div>
+<label>最后更新</label><div class="graph-info-readonly" id="gUpdatedAt">—</div>
+<label>文件大小</label><div class="graph-info-readonly" id="gFileSize">—</div>
+<label>知识点数量</label><div class="graph-info-readonly" id="gNodeCount">—</div>
+<label>文件字数</label><div class="graph-info-readonly" id="gWordCount">—</div>
+</div>
+<div class="modal-actions">
+<button id="cancelGraphBtn">取消</button>
+<button class="primary" id="saveGraphBtn">保存标题</button>
+</div>
+</div>
+</div>
+<div class="modal-backdrop" id="templateModal">
+<div class="modal">
+<h2>选择模板</h2>
+<p>选择模板会替换当前图谱。需要保留当前内容时，请先导出学习包。</p>
+<div class="template-grid">
+<div class="template-card" data-template="blank"><h3>空白图谱</h3><div>从零开始，让学员自行添加知识点和关系。</div></div>
+<div class="template-card" data-template="pmp"><h3>PMP 示例</h3><div>内置项目管理常见知识点，可继续扩展成课程图谱。</div></div>
+<div class="template-card" data-template="p2"><h3>P2 / PRINCE2 示例</h3><div>内置原则、主题、流程等基础节点，适合做课程梳理。</div></div>
+<div class="template-card" data-template="acp"><h3>ACP 示例</h3><div>围绕敏捷心态、领导力、产品、交付等内容，适合敏捷课程学习。</div></div>
+<div class="template-card" data-template="cspm"><h3>CSPM 示例</h3><div>围绕项目管理能力评价、复杂项目、组织级能力和标准化实践。</div></div>
+<div class="template-card" data-template="npdp"><h3>NPDP 示例</h3><div>围绕产品创新战略、组合、流程、市场研究、团队文化等主题。</div></div>
+</div>
+<div class="modal-actions"><button id="cancelTemplateBtn">关闭</button></div>
+</div>
+</div>
+<div class="modal-backdrop auth-backdrop" id="authModal">
+<div aria-labelledby="authTitle" aria-modal="true" class="modal auth-modal" role="dialog">
+<div class="auth-head">
+<div>
+<h2 id="authTitle">登录后可编辑</h2>
+<p id="authReason">未登录时只能查看图谱，登录后可以新增、编辑、连线和保存自己的内容。</p>
+</div>
+<button class="auth-close" id="authCloseBtn" title="关闭登录窗口">×</button>
+</div>
+<div class="auth-body">
+<label>用户名
+        <input autocomplete="username" id="authUsername" placeholder="请输入用户名"/>
+</label>
+<label>密码
+        <input autocomplete="current-password" id="authPassword" placeholder="请输入密码" type="password"/>
+</label>
+<div class="auth-msg" id="authMsg"></div>
+<div class="auth-actions">
+<button class="primary" id="authDoLoginBtn">登录</button>
+<button id="authRegisterBtn">注册并登录</button>
+</div>
+<div class="auth-note">
+        当前为本地单文件多用户：账号和数据保存在本浏览器 localStorage 中。不同用户的数据互相隔离；如需跨设备/真正安全登录，需要后续接入服务器。
+      </div>
+</div>
+</div>
+</div>
+<div class="modal-backdrop question-bank-backdrop" id="questionBankModal">
+<div aria-labelledby="questionBankTitle" aria-modal="true" class="modal question-bank-modal" role="dialog">
+<div class="qb-head">
+<div>
+<h2 id="questionBankTitle">题库管理</h2>
+<p>管理考题破案模式使用的题库。第一版支持 JSON 题库导入、导出、下载模板、查看题目和设置当前训练题库。</p>
+</div>
+<button class="qb-close" id="closeQuestionBankBtn" title="关闭题库管理">×</button>
+</div>
+<div class="qb-toolbar">
+<button class="primary" id="qbImportBtn">导入 JSON 题库</button>
+<button id="qbExportBtn">导出当前题库</button>
+<button id="qbTemplateBtn">下载题库模板</button>
+<button id="qbSetCurrentBtn">设为当前训练题库</button>
+<input accept=".json,application/json" id="qbImportFile" style="display:none" type="file"/>
+</div>
+<div class="qb-body">
+<aside class="qb-panel qb-bank-panel">
+<h3>题库列表</h3>
+<div class="qb-list" id="qbBankList"></div>
+</aside>
+<aside class="qb-panel qb-question-panel">
+<h3>题目列表</h3>
+<div class="qb-list" id="qbQuestionList"></div>
+</aside>
+<section class="qb-panel qb-detail-panel">
+<h3>题目详情</h3>
+<div class="qb-detail" id="qbDetail"></div>
+</section>
+</div>
+</div>
+</div>
+
+<div class="modal-backdrop" id="tutorialModal">
+<div aria-labelledby="tutorialTitle" aria-modal="true" class="modal tutorial-modal" role="dialog">
+<div class="tutorial-header">
+<div>
+<h2 id="tutorialTitle">新手教程 / 使用说明</h2>
+<p>从创建知识点、建立关系线，到闪卡复习、批量入画布和框选整理，按下面步骤即可快速上手。</p>
+</div>
+<button class="tutorial-close" id="closeTutorialBtn" title="关闭使用说明">×</button>
+</div>
+<div class="tutorial-body">
+<section class="tutorial-section">
+<h3>一、快速开始</h3>
+<div class="tutorial-grid">
+<div class="tutorial-card"><strong><span class="tutorial-badge">1</span> 新增知识点</strong><p>点击左侧悬浮菜单中的“新增知识点”图标，填写名称、分类、难度、关键词和说明。保存后会在画布中央生成卡牌。</p></div>
+<div class="tutorial-card"><strong><span class="tutorial-badge">2</span> 移动画布与卡牌</strong><p>拖动画布空白处可以平移视图；拖动知识点卡牌可以调整位置；滚轮或双指可缩放。</p></div>
+<div class="tutorial-card"><strong><span class="tutorial-badge">3</span> 查看详情</strong><p>单击卡牌会显示详细信息；电脑端鼠标悬停也可以预览详情。详情窗口顶部按钮默认收起，点击箭头展开。</p></div>
+<div class="tutorial-card"><strong><span class="tutorial-badge">4</span> 建立关系线</strong><p>双击卡牌 A 设为连线起点，再单击卡牌 B，即可建立 A → B 的关系线。点击关系线可编辑类型、颜色和备注。</p></div>
+</div>
+</section>
+<section class="tutorial-section">
+<h3>二、批量整理与框选</h3>
+<div class="tutorial-grid">
+<div class="tutorial-card"><strong><span class="tutorial-badge">5</span> 鼠标框选卡片</strong><p>电脑端按住 <span class="tutorial-kbd">Shift</span>，在画布空白处拖拽，可以框选多个知识点卡片。</p></div>
+<div class="tutorial-card"><strong><span class="tutorial-badge">6</span> 整体移动选中卡片</strong><p>框选后，拖动任意一个已选中卡片，整组选中的知识点会一起移动，方便快速排版。</p></div>
+<div class="tutorial-card"><strong><span class="tutorial-badge">7</span> 调整卡牌大小</strong><p>双击卡牌进入连线起点状态后，卡牌右侧会显示 “- / o / +” 微型按钮，可切换小卡、默认卡、大卡。</p></div>
+<div class="tutorial-card"><strong><span class="tutorial-badge">8</span> 聚焦重点</strong><p>点击“重点聚焦”会突出重点、难点、易错点，帮助课堂讲解或复习时快速定位核心内容。</p></div>
+</div>
+</section>
+<section class="tutorial-section">
+<h3>三、记忆闪卡</h3>
+<div class="tutorial-grid">
+<div class="tutorial-card"><strong><span class="tutorial-badge">9</span> 打开闪卡</strong><p>点击左侧悬浮菜单中的“记忆闪卡”图标进入复习窗口。闪卡顶部工具默认收起，点击箭头可以展开更多功能。</p></div>
+<div class="tutorial-card"><strong><span class="tutorial-badge">10</span> 翻面与滑动</strong><p>点击闪卡可翻到反面；向左滑表示“记不清”，向右滑表示“记住了”，系统会记录复习结果。</p></div>
+<div class="tutorial-card"><strong><span class="tutorial-badge">11</span> 一键添加到画布</strong><p>在闪卡窗口点击“全部入画布”，可将当前筛选下尚未出现在画布中的闪卡批量添加为知识点。</p></div>
+<div class="tutorial-card"><strong><span class="tutorial-badge">12</span> 导入表格闪卡</strong><p>展开闪卡工具后点击“导入表格”，可导入 CSV / TSV 闪卡文件；“下载模板”可获得标准格式。</p></div>
+</div>
+</section>
+<section class="tutorial-section">
+<h3>四、数据安全与常用建议</h3>
+<div class="tutorial-grid">
+<div class="tutorial-card"><strong><span class="tutorial-badge">13</span> 导出备份</strong><p>定期点击左侧悬浮菜单中的“导出学习包”图标保存备份，避免浏览器缓存被清理后丢失数据。</p></div>
+<div class="tutorial-card"><strong><span class="tutorial-badge">14</span> 导入恢复</strong><p>点击“导入学习包”可以恢复之前导出的图谱数据，适合换电脑、换浏览器或课件分发。</p></div>
+<div class="tutorial-card"><strong><span class="tutorial-badge">15</span> 移动端操作</strong><p>手机和平板支持拖动画布、双指缩放、长按编辑知识点。详情窗口默认显示在屏幕上方，避免挡住底部手势。</p></div>
+<div class="tutorial-card"><strong><span class="tutorial-badge">16</span> 推荐流程</strong><p>先导入或新增知识点，再连线建立结构，最后用闪卡复习并把缺失闪卡批量加入画布。</p></div>
+</div>
+<div class="tutorial-note">
+          小提示：如果图谱节点很多，建议先用“框选 + 整体移动”整理分区；如果闪卡很多，先使用筛选按钮，再点击“全部入画布”，可以避免一次性添加过多无关卡片。
+        </div>
+</section>
+</div>
+<div class="tutorial-actions">
+<button id="tutorialCloseBottomBtn">关闭</button>
+<button class="primary" id="tutorialStartAddBtn">开始新增知识点</button>
+</div>
+</div>
+</div>
+<div class="modal-backdrop flashcard-backdrop" id="flashcardModal">
+<div class="modal flashcard-modal">
+<div class="flashcard-head">
+<div>
+<h2>知识记忆闪卡</h2>
+<div class="sub">每次只显示一张卡牌：点击卡牌翻面；左右滑动自动记录复习结果，并按艾宾浩斯节奏安排下次复习。</div>
+</div>
+<button class="flashcard-close" id="closeFlashcardBtn">×</button>
+</div>
+<div class="flashcard-tools">
+<button class="active-toggle" id="flashCurrentBtn">当前图谱</button>
+<button aria-expanded="false" aria-label="展开闪卡工具" class="flash-tools-toggle" id="flashToolsToggle" title="展开闪卡工具">⌄</button>
+<button id="flashLibraryBtn">示例闪卡库</button>
+<button id="flashImportedBtn">导入闪卡</button>
+<button id="flashDueBtn">到期复习</button>
+<button id="flashImportantBtn">只看重点</button>
+<button id="flashShuffleBtn">随机排序</button>
+<button id="flashImportBtn">导入表格</button>
+<button id="flashAddMissingBtn" title="将当前筛选下尚未出现在画布中的闪卡全部添加为知识点">全部入画布</button>
+<button id="flashTemplateBtn">下载模板</button>
+<button id="flashGuideBtn">导入格式</button>
+<input accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" id="flashImportFile" type="file"/>
+<span class="flashcard-tip" id="flashcardTip">可把闪卡一键添加为画布知识点。</span>
+</div>
+<label class="flash-speed-control">滑出速度
+      <input id="flashSwipeSpeed" max="5" min="1" step="1" type="range" value="2"/>
+<span id="flashSwipeSpeedLabel">较慢</span>
+</label>
+<div class="flash-import-guide" id="flashImportGuide">
+<strong>闪卡表格导入格式：</strong>请使用 UTF-8 编码的 CSV 或 TSV 文件，第一行必须是表头。推荐列如下：
+      <table>
+<thead><tr><th>科目</th><th>分类</th><th>知识点名称*</th><th>解释*</th><th>记忆口诀*</th><th>高亮词</th><th>难度</th><th>关键词</th><th>颜色</th><th>是否重点</th></tr></thead>
+<tbody><tr><td>PMP</td><td>进度管理</td><td>关键路径法</td><td>通过网络路径计算项目最短工期。</td><td>最长路径看工期，零浮动要警惕。</td><td>关键路径法,最短工期,最长路径,零浮动</td><td>重点</td><td>CPM,浮动时间</td><td>#ea580c</td><td>是</td></tr></tbody>
+</table>
+<div>必填项：<code>知识点名称</code>、<code>解释</code>、<code>记忆口诀</code>。可选项：科目、分类、高亮词、难度、关键词、颜色、是否重点。<code>高亮词</code> 用逗号、顿号、分号或竖线分隔；未填写时会自动尝试使用“关键词”列进行局部荧光标记。<code>是否重点=是</code> 会自动把难度设为“重点”。</div>
+</div>
+<div class="flashcard-progress" id="flashcardProgress"></div>
+<div class="flashcard-grid" id="flashcardGrid"></div>
+</div>
+</div>
+
+
+
+
+
+  <!-- Modularized application scripts. Keep this order. -->
+<script defer src="src/01-runtime-config.js"></script>
+  <script defer src="src/28-app-storage.js"></script>
+<script defer src="src/29-auth-core.js"></script>
+<script defer src="src/34-role-permissions.js"></script>
+<script defer src="src/37-subscription-plans.js"></script>
+<script defer src="src/37-subscription-orders.js"></script>
+<script defer src="src/37-subscription-redeem-codes.js"></script>
+<script defer src="src/37-subscription-core.js"></script>
+<script defer src="src/32-wechat-login.js"></script>
+<script defer src="src/33-user-center.js"></script>
+<script defer src="src/39-global-shortcuts.js"></script>
+<script defer src="src/00-config-state.js"></script>
+<script defer src="src/18-graph-user-preferences.js"></script>
+<script defer src="src/10-graph-editor.js"></script>
+<script defer src="src/19-home-toolbar-registry.js"></script>
+<script defer src="src/21-home-package-service.js"></script>
+<script defer src="src/26-graph-export-service.js"></script>
+<script defer src="src/22-home-file-library.js"></script>
+<script defer src="src/23-graph-file-store.js"></script>
+<script defer src="src/24-graph-file-autosave.js"></script>
+<script defer src="src/25-graph-file-tabs.js"></script>
+<script defer src="src/20-flashcards-toolbar.js"></script>
+<script defer src="src/30-auth-guards.js"></script>
+<script defer src="src/40-guided-tour.js"></script>
+<script defer src="src/41-account-menu.js"></script>
+<script defer src="src/50-question-data.js"></script>
+<script defer src="src/60-question-bank.js"></script>
+<script defer src="src/70-question-trainer.js"></script>
+<script defer src="src/80-question-font-scale.js"></script>
+<script defer src="src/90-bootstrap.js"></script>
+</body>
+</html>

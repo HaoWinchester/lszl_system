@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 
 import { systemApi, type AdminLog, type RoleTheme, type SubscriptionPlan } from '../api/system'
 import { AppIcon } from '../components/AppIcon'
+import { useNewLegacyStyles } from '../hooks/useNewLegacyStyles'
 import { useAuth } from '../store/auth'
 
 const ROLES: [string, string][] = [
@@ -11,20 +12,26 @@ const ROLES: [string, string][] = [
   ['student', '学员'],
   ['viewer', '游客'],
 ]
-type Tab = 'themes' | 'wechat' | 'permissions' | 'subscriptions' | 'logs'
+type Tab = 'themes' | 'wechat' | 'wechatpay' | 'permissions' | 'subscriptions' | 'logs'
 const TABS: [Tab, string][] = [
   ['themes', '角色主题'],
   ['wechat', '微信登录'],
+  ['wechatpay', '微信支付'],
   ['permissions', '权限模板'],
   ['subscriptions', '订阅套餐'],
   ['logs', '操作日志'],
 ]
 
 export default function Settings() {
+  useNewLegacyStyles(
+    ['user-management.css', 'system-settings.css', 'global-shortcuts.css', 'subscription.css', 'user-center.css'],
+    '系统设置｜知识图谱平台',
+  )
   const me = useAuth((s) => s.user)
   const [tab, setTab] = useState<Tab>('themes')
   const [themes, setThemes] = useState<Record<string, RoleTheme>>({})
   const [wechat, setWechat] = useState<Record<string, unknown>>({})
+  const [wechatPay, setWechatPay] = useState<Record<string, unknown>>({})
   const [perms, setPerms] = useState<{
     roles: string[]
     keys: string[]
@@ -42,6 +49,7 @@ export default function Settings() {
   useEffect(() => {
     systemApi.themes().then(setThemes)
     systemApi.wechatConfig().then(setWechat)
+    systemApi.wechatPayConfig().then(setWechatPay)
     systemApi.permissions().then(setPerms)
     systemApi.plans().then(setPlans)
     systemApi.logs(80).then(setLogs)
@@ -56,6 +64,11 @@ export default function Settings() {
     const cfg = await systemApi.updateWechatConfig(wechat)
     setWechat(cfg)
     notify('微信配置已保存')
+  }
+  const saveWechatPay = async () => {
+    const cfg = await systemApi.updateWechatPayConfig(wechatPay)
+    setWechatPay(cfg)
+    notify('微信支付配置已保存')
   }
   const savePlan = async (planId: string, patch: Record<string, unknown>) => {
     const p = await systemApi.updatePlan(planId, patch)
@@ -144,6 +157,10 @@ export default function Settings() {
                   <input value={(wechat.appId as string) || ''} onChange={(e) => setWechat({ ...wechat, appId: e.target.value })} />
                 </label>
                 <label className="um-field">
+                  <span>AppSecret（密钥，仅服务端使用）</span>
+                  <input type="password" value={(wechat.appSecret as string) || ''} onChange={(e) => setWechat({ ...wechat, appSecret: e.target.value })} placeholder="从微信开放平台网站应用获取" />
+                </label>
+                <label className="um-field">
                   <span>授权回调地址</span>
                   <input value={(wechat.redirectUri as string) || ''} onChange={(e) => setWechat({ ...wechat, redirectUri: e.target.value })} />
                 </label>
@@ -168,6 +185,60 @@ export default function Settings() {
                   <input value={(wechat.defaultSubject as string) || 'PMP'} onChange={(e) => setWechat({ ...wechat, defaultSubject: e.target.value })} />
                 </label>
                 <button className="primary" type="button" onClick={saveWechat}>保存微信配置</button>
+              </div>
+            </div>
+          </section>
+
+          <section className={tab === 'wechatpay' ? 'ss-pane active' : 'ss-pane'}>
+            <div className="um-panel">
+              <div className="um-card-head small">
+                <div>
+                  <h2>微信支付配置</h2>
+                  <p>Native 扫码支付。凭证从微信支付商户平台「API安全」获取；AppID 待网站应用关联。</p>
+                </div>
+              </div>
+              <div className="um-wechat-config">
+                <label className="um-field compact">
+                  <input
+                    type="checkbox"
+                    checked={!!wechatPay.enableDemo}
+                    onChange={(e) => setWechatPay({ ...wechatPay, enableDemo: e.target.checked })}
+                  />{' '}
+                  <span>启用演示模式（本地不调微信，模拟下单/支付）</span>
+                </label>
+                <label className="um-field">
+                  <span>商户号 mchId</span>
+                  <input value={(wechatPay.mchId as string) || ''} onChange={(e) => setWechatPay({ ...wechatPay, mchId: e.target.value })} />
+                </label>
+                <label className="um-field">
+                  <span>APIv3 密钥（32 位）</span>
+                  <input type="password" value={(wechatPay.apiV3Key as string) || ''} onChange={(e) => setWechatPay({ ...wechatPay, apiV3Key: e.target.value })} />
+                </label>
+                <label className="um-field">
+                  <span>商户证书序列号 mchSerialNo</span>
+                  <input value={(wechatPay.mchSerialNo as string) || ''} onChange={(e) => setWechatPay({ ...wechatPay, mchSerialNo: e.target.value })} />
+                </label>
+                <label className="um-field">
+                  <span>商户私钥（apiclient_key.pem 完整内容）</span>
+                  <textarea rows={4} value={(wechatPay.mchPrivateKey as string) || ''} onChange={(e) => setWechatPay({ ...wechatPay, mchPrivateKey: e.target.value })} placeholder="粘贴 apiclient_key.pem 的完整内容（含 BEGIN/END 行）" />
+                </label>
+                <label className="um-field">
+                  <span>微信支付公钥（完整内容）</span>
+                  <textarea rows={4} value={(wechatPay.wxPubKey as string) || ''} onChange={(e) => setWechatPay({ ...wechatPay, wxPubKey: e.target.value })} placeholder="粘贴微信支付公钥的完整内容（含 BEGIN/END 行）" />
+                </label>
+                <label className="um-field">
+                  <span>微信支付公钥 ID</span>
+                  <input value={(wechatPay.wxPubKeyId as string) || ''} onChange={(e) => setWechatPay({ ...wechatPay, wxPubKeyId: e.target.value })} />
+                </label>
+                <label className="um-field">
+                  <span>AppID（网站应用，待关联）</span>
+                  <input value={(wechatPay.appId as string) || ''} onChange={(e) => setWechatPay({ ...wechatPay, appId: e.target.value })} placeholder="开放平台网站应用 AppID" />
+                </label>
+                <label className="um-field">
+                  <span>支付回调地址 notifyUrl</span>
+                  <input value={(wechatPay.notifyUrl as string) || ''} onChange={(e) => setWechatPay({ ...wechatPay, notifyUrl: e.target.value })} placeholder="https://你的域名/api/v1/subscriptions/wechat-pay/notify" />
+                </label>
+                <button className="primary" type="button" onClick={saveWechatPay}>保存微信支付配置</button>
               </div>
             </div>
           </section>

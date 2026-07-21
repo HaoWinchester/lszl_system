@@ -1,0 +1,11 @@
+/* AnswerCard 独立作用域样式 */
+.answer-card-body{padding:0}
+.answer-card .qt-paper-context{margin-top:0}
+.answer-card #qQuestionHeading{margin-top:4px}
+.answer-card[data-card-mode="explore"] .answer-card-header{
+  background:linear-gradient(135deg,#eef6ff,#fff);
+}
+@media(max-width:720px){
+  .answer-card-body{padding:12px}
+  .learning-card-header{padding:11px 12px}
+}

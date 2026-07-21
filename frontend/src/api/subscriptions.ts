@@ -20,6 +20,17 @@ export interface Order {
   createdAt: string | null
   approvedAt: string | null
   approvedBy: string | null
+  payStatus: string | null
+  amount: number | null
+  codeUrl: string | null
+  payMethod: string | null
+  transactionId: string | null
+}
+export interface OrderStatus {
+  orderId: string
+  payStatus: string | null
+  status: string
+  subscription: Subscription
 }
 export interface RedeemCode {
   id: string
@@ -39,6 +50,12 @@ export const subsApi = {
     apiClient.post<{ subscription: Subscription }>('/subscriptions/redeem', { code }).then((r) => r.data.subscription),
   createOrder: (planId: string) =>
     apiClient.post<{ order: Order }>('/subscriptions/orders', { planId }).then((r) => r.data.order),
+  orderStatus: (id: string) =>
+    apiClient.get<OrderStatus>(`/subscriptions/orders/${id}/status`).then((r) => r.data),
+  demoNotify: (id: string) =>
+    apiClient
+      .post<{ code: string; order: Order }>('/subscriptions/wechat-pay/demo-notify', { orderId: id })
+      .then((r) => r.data),
   listOrders: () => apiClient.get<{ orders: Order[] }>('/subscriptions/orders').then((r) => r.data.orders),
   approveOrder: (id: string) =>
     apiClient.post<{ order: Order }>(`/subscriptions/orders/${id}/approve`).then((r) => r.data.order),

@@ -1,4 +1,4 @@
-"""订阅业务逻辑：当前订阅、卡密兑换、订单申请/审批、管理员开通、卡密生成。"""
+"""订阅业务逻辑：当前订阅、卡密兑换、订单申请/审批/支付、管理员开通、卡密生成。"""
 
 import secrets
 from datetime import timedelta
@@ -9,6 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.permissions import DEFAULT_PLANS
 from app.core.security import now_utc, uid
 from app.models.subscription import RedeemCode, Subscription, SubscriptionOrder
+from app.services import system_service, wechat_pay_service
+
+PLAN_AMOUNT_FEN = {
+    "monthly": 2900,
+    "quarterly": 7900,
+    "half_year": 13900,
+    "lifetime": 39900,
+}
 
 
 def _plan(plan_id: str) -> dict:
@@ -16,6 +24,10 @@ def _plan(plan_id: str) -> dict:
         if p["planId"] == plan_id:
             return p
     return DEFAULT_PLANS[0]
+
+
+def _plan_amount_fen(plan_id: str) -> int:
+    return PLAN_AMOUNT_FEN.get(plan_id, 0)
 
 
 def _expires(plan_id: str, started=None):
@@ -48,6 +60,11 @@ def order_to_dict(o: SubscriptionOrder) -> dict:
         "createdAt": o.created_at.isoformat() if o.created_at else None,
         "approvedAt": o.approved_at.isoformat() if o.approved_at else None,
         "approvedBy": o.approved_by,
+        "payStatus": o.pay_status,
+        "amount": o.amount,
+        "codeUrl": o.code_url,
+        "payMethod": o.pay_method,
+        "transactionId": o.transaction_id,
     }
 
 
@@ -118,11 +135,57 @@ async def redeem(db: AsyncSession, username: str, code: str) -> Subscription:
 
 
 async def request_order(db: AsyncSession, username: str, plan_id: str) -> SubscriptionOrder:
+    """创建订单并按支付配置生成微信扫码 code_url。"""
     p = _plan(plan_id)
+    amount_fen = _plan_amount_fen(plan_id)
     o = SubscriptionOrder(
-        id=uid("o_"), username=username, plan_id=plan_id, plan_name=p["name"], status="pending"
+        id=uid("o_"),
+        username=username,
+        plan_id=plan_id,
+        plan_name=p["name"],
+        status="pending",
+        pay_status="pending",
+        amount=amount_fen,
+        pay_method="wechat",
     )
     db.add(o)
+    await db.flush()  # 拿 o.id 作为 out_trade_no
+
+    pay_cfg = await system_service.get_wechat_pay_config(db)
+    if pay_cfg.get("enableDemo"):
+        o.code_url = wechat_pay_service.demo_code_url(o.id)
+    elif wechat_pay_service.is_ready(pay_cfg):
+        try:
+            o.code_url = await wechat_pay_service.create_native_order(
+                o.id, p["name"], amount_fen, pay_cfg
+            )
+        except Exception:  # noqa: BLE001
+            o.code_url = None  # 下单失败，前端提示重试
+    else:
+        o.code_url = None  # 未配置，退回管理员审批流程
+    await db.commit()
+    await db.refresh(o)
+    return o
+
+
+async def activate_paid_order(
+    db: AsyncSession, order_id: str, transaction_id: str | None
+) -> SubscriptionOrder:
+    """支付成功激活订阅（幂等：已 paid 直接返回）。"""
+    o = await db.get(SubscriptionOrder, order_id)
+    if not o:
+        raise ValueError("订单不存在")
+    if o.pay_status == "paid":
+        return o
+    o.pay_status = "paid"
+    o.transaction_id = transaction_id
+    o.paid_at = now_utc()
+    o.status = "approved"
+    s = await get_subscription(db, o.username)
+    _apply_plan(s, o.plan_id)
+    s.status = "active"
+    s.source = "wechat_pay"
+    s.order_id = o.id
     await db.commit()
     await db.refresh(o)
     return o

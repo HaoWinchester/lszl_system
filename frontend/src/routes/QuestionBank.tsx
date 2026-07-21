@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { banksApi, papersApi, type Bank, type Paper, type Question } from '../api/questions'
 import { AppIcon } from '../components/AppIcon'
+import { useNewLegacyStyles } from '../hooks/useNewLegacyStyles'
 import { useAuth } from '../store/auth'
 
 const SUBJECTS = ['PMP', 'CSPM', 'P2', 'ACP', 'NPDP', 'PgMP', 'PfMP']
@@ -18,7 +19,13 @@ type MainTab = 'banks' | 'papers' | 'base'
 type AnnoTab = 'clues' | 'concepts' | 'reasoning'
 
 export default function QuestionBank() {
+  useNewLegacyStyles(
+    ['question-bank-admin.css', 'global-shortcuts.css', 'subscription.css', 'user-center.css'],
+    '题库认知标注管理｜项目管理类科目',
+  )
   const me = useAuth((s) => s.user)
+  const navigate = useNavigate()
+  const importRef = useRef<HTMLInputElement>(null)
   const [mainTab, setMainTab] = useState<MainTab>('banks')
   const [annoTab, setAnnoTab] = useState<AnnoTab>('clues')
   const [banks, setBanks] = useState<Bank[]>([])
@@ -78,29 +85,95 @@ export default function QuestionBank() {
 
   const currentBank = banks.find((b) => b.id === bankId)
 
+  const downloadJson = (payload: unknown, filename: string) => {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(link.href)
+  }
+  const exportCurrent = () => {
+    if (!currentBank) return notify('请先选择题库')
+    downloadJson({ ...currentBank, questions }, `${currentBank.name}.json`)
+  }
+  const exportAll = async () => {
+    const payload = await Promise.all(banks.map(async (bank) => ({
+      ...bank,
+      questions: (await banksApi.listQuestions(bank.id, { page: 1, page_size: 100 })).questions,
+    })))
+    downloadJson({ version: 1, banks: payload }, '题库全量导出.json')
+  }
+  const downloadTemplate = () => downloadJson({
+    name: '示例题库',
+    subject: 'PMP',
+    description: '',
+    questions: [{
+      title: '题目题干',
+      type: 'single_choice',
+      options: [{ id: 'A', text: '选项 A', correct: true }, { id: 'B', text: '选项 B' }],
+      correctAnswer: 'A',
+      clues: [],
+      concepts: [],
+      reasoningSteps: [],
+    }],
+  }, '题库导入模板.json')
+  const importJson = async (file: File) => {
+    try {
+      const parsed = JSON.parse(await file.text()) as Record<string, unknown>
+      const rawBanks = Array.isArray(parsed) ? parsed : Array.isArray(parsed.banks) ? parsed.banks : [parsed]
+      let imported = 0
+      for (const raw of rawBanks) {
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue
+        const bank = raw as Record<string, unknown>
+        const created = await banksApi.create({
+          name: String(bank.name || bank.bankName || '导入题库'),
+          subject: String(bank.subject || 'PMP'),
+          description: String(bank.description || ''),
+        })
+        for (const question of Array.isArray(bank.questions) ? bank.questions : []) {
+          if (question && typeof question === 'object' && !Array.isArray(question)) {
+            await banksApi.createQuestion(created.id, question as Record<string, unknown>)
+          }
+        }
+        imported += 1
+      }
+      await reloadBanks()
+      notify(`已导入 ${imported} 个题库`)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : '导入失败')
+    } finally {
+      if (importRef.current) importRef.current.value = ''
+    }
+  }
+
   return (
     <div className="qb-app" id="qbApp">
       <header className="qb-topbar">
         <div className="qb-brand">
           <Link className="qb-back" to="/" title="返回知识图谱"><AppIcon name="back" size="compact" /></Link>
           <div>
-            <p className="qb-kicker">Question Bank Administration</p>
+            <p className="qb-kicker">Project Management Question Bank</p>
             <h1>题库认知标注管理</h1>
             <p>面向 PMP、CSPM、P2、ACP、NPDP 等项目管理类科目，统一维护题目、关键词、推理逻辑与知识点。</p>
           </div>
         </div>
         <div className="qb-top-actions">
           <div className="auth-status">{me ? `${me.display_name || me.username}` : '未登录'}</div>
-          <button type="button" onClick={() => notify('导入：请用下方题目编辑')}>导入 JSON</button>
-          <button type="button" onClick={() => notify('导出当前题库')}>导出当前题库</button>
-          <button type="button" onClick={() => notify('导出全部题库')}>导出全部题库</button>
+          <button type="button" onClick={() => importRef.current?.click()}>导入 JSON</button>
+          <button type="button" onClick={exportCurrent}>导出当前题库</button>
+          <button type="button" onClick={() => void exportAll()}>导出全部题库</button>
+          <button type="button" onClick={downloadTemplate}>下载模板</button>
+          <button className="primary" type="button" onClick={() => editing && navigate(`/training?bank=${editing.bankId}&question=${editing.id}`)} disabled={!editing}>设为当前训练题</button>
+          <button className="accent" type="button" onClick={() => editing && navigate(`/recall?qid=${editing.id}`)} disabled={!editing}>深度回忆预览</button>
           <Link className="qb-top-link" to="/users">用户管理</Link>
           <Link className="qb-top-link" to="/settings">系统设置</Link>
+          <input ref={importRef} accept=".json,application/json" hidden type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importJson(file) }} />
         </div>
       </header>
 
       <section className="qb-subject-strip" aria-label="科目快捷入口">
-        <div><strong>默认科目体系</strong><span>PMP / CSPM / P2 / ACP / NPDP，可继续扩展 PgMP、PfMP。</span></div>
+        <div><strong>默认科目体系</strong><span>后续可继续扩展 PgMP、PfMP、PMI-RMP、PMI-SP 等。</span></div>
         <div className="qb-subject-chips">{SUBJECTS.map((s) => <span key={s} className="qb-subject-chip">{s}</span>)}</div>
       </section>
 
@@ -113,19 +186,25 @@ export default function QuestionBank() {
             <button className={mainTab === 'base' && annoTab === 'clues' ? 'active' : ''} type="button" onClick={() => openAnnotation('clues')}>关键词标记</button>
             <button className={mainTab === 'base' && annoTab === 'concepts' ? 'active' : ''} type="button" onClick={() => openAnnotation('concepts')}>知识点绑定</button>
             <button className={mainTab === 'base' && annoTab === 'reasoning' ? 'active' : ''} type="button" onClick={() => openAnnotation('reasoning')}>推理逻辑</button>
+            <button type="button" onClick={() => notify('标注完成度见右侧面板')}>标注完成度</button>
           </nav>
         </aside>
 
         <section className="qb-editor">
+          <div className="qb-status-card" id="qbStatusCard">
+            <div className="status-main"><span className="big-dot" /><div><strong>{currentBank?.name || '请选择题库'}</strong><p>{editing ? `正在编辑：${editing.title}` : `${questions.length} 道题目`}</p></div></div>
+            <div className="status-actions">{me?.username || '访客'} 的题库空间</div>
+          </div>
           <section className="qb-card qb-workspace-card" id="qbMainWorkspace">
             <div className="qb-workspace-head">
               <div>
                 <h2>题库工作区</h2>
-                <p>{currentBank ? `${currentBank.name} · ${currentBank.subject} · ${questions.length} 题` : '请选择题库开始管理题目'}{editing ? ` · 正在编辑：${editing.title.slice(0, 16)}` : ''}</p>
+                <p>题库管理、组卷发布和题目基础信息合并为一个主标签区域，左侧仅保留纵向导航。</p>
               </div>
-              <div className="qb-workspace-context" aria-label="当前题库上下文">
-                <strong>{currentBank?.name || '未选择题库'}</strong>
-                <span>{me?.username || '访客'} 的题库空间</span>
+              <div className="qb-main-tabs" aria-label="题库工作区" role="tablist">
+                <button className={mainTab === 'banks' ? 'active' : ''} type="button" role="tab" onClick={() => setMainTab('banks')}>题库管理</button>
+                <button className={mainTab === 'papers' ? 'active' : ''} type="button" role="tab" onClick={() => setMainTab('papers')}>组卷与发布</button>
+                <button className={mainTab === 'base' ? 'active' : ''} type="button" role="tab" onClick={() => setMainTab('base')}>题目基本信息</button>
               </div>
             </div>
 

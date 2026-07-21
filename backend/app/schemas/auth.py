@@ -13,3 +13,8 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=4, max_length=128)
     display_name: str | None = None
     subject: str | None = "PMP"
+
+
+class WechatLoginRequest(BaseModel):
+    code: str = Field(min_length=1)
+    state: str = Field(min_length=1)

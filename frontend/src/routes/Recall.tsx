@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 
 import type { Question } from '../api/questions'
 import { AppIcon } from '../components/AppIcon'
+import { useNewLegacyStyles } from '../hooks/useNewLegacyStyles'
 import { trainingApi } from '../api/training'
 import { useAuth } from '../store/auth'
 
@@ -15,6 +16,10 @@ interface RNode { id: string; title: string; x: number; y: number }
 interface REdge { from: string; to: string }
 
 export default function Recall() {
+  useNewLegacyStyles(
+    ['knowledge-recall.css', 'global-shortcuts.css', 'subscription.css', 'user-center.css'],
+    '深度知识回忆｜知识寻宝地图',
+  )
   const me = useAuth((s) => s.user)
   const [sp] = useSearchParams()
   const qid = sp.get('qid')

@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import QRCode from 'qrcode'
 
-import { subsApi, type Subscription } from '../api/subscriptions'
+import { subsApi, type Order, type Subscription } from '../api/subscriptions'
 import type { SubscriptionPlan } from '../api/system'
 import { AppIcon } from '../components/AppIcon'
+import { useNewLegacyStyles } from '../hooks/useNewLegacyStyles'
 import { useAuth } from '../store/auth'
 
 const PLAN_LABEL: Record<string, string> = {
@@ -15,6 +17,7 @@ const PLAN_LABEL: Record<string, string> = {
 }
 
 export default function Member() {
+  useNewLegacyStyles(['main.css', 'subscription.css', 'user-center.css'], '会员中心｜项目管理学习营')
   const me = useAuth((s) => s.user)
   const [sub, setSub] = useState<Subscription | null>(null)
   const [plans, setPlans] = useState<SubscriptionPlan[]>([])
@@ -22,10 +25,36 @@ export default function Member() {
   const [toast, setToast] = useState('')
   const notify = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2400) }
 
+  const [payOrder, setPayOrder] = useState<Order | null>(null)
+  const [qrUrl, setQrUrl] = useState('')
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   useEffect(() => {
     subsApi.me().then(setSub)
     subsApi.plans().then(setPlans)
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [])
+
+  const stopPolling = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+  }
+
+  const startPolling = (orderId: string) => {
+    stopPolling()
+    pollRef.current = setInterval(async () => {
+      try {
+        const st = await subsApi.orderStatus(orderId)
+        if (st.payStatus === 'paid') {
+          stopPolling()
+          setSub(st.subscription)
+          setPayOrder(null)
+          notify('支付成功，会员已开通')
+        }
+      } catch {
+        /* 轮询失败忽略，继续 */
+      }
+    }, 2500)
+  }
 
   const redeem = async () => {
     if (!code.trim()) return
@@ -41,12 +70,35 @@ export default function Member() {
 
   const requestPlan = async (planId: string) => {
     try {
-      await subsApi.createOrder(planId)
-      notify('已提交订阅申请，等待管理员确认')
+      const order = await subsApi.createOrder(planId)
+      if (order.codeUrl) {
+        const url = await QRCode.toDataURL(order.codeUrl, { margin: 1, width: 240 })
+        setQrUrl(url)
+        setPayOrder(order)
+        startPolling(order.id)
+      } else {
+        notify('已提交订阅申请，等待管理员确认')
+      }
     } catch (e) {
       notify(e instanceof Error ? e.message : '申请失败')
     }
   }
+
+  const demoPay = async () => {
+    if (!payOrder) return
+    try {
+      await subsApi.demoNotify(payOrder.id)
+    } catch (e) {
+      notify(e instanceof Error ? e.message : '模拟支付失败')
+    }
+  }
+
+  const closePay = () => {
+    stopPolling()
+    setPayOrder(null)
+  }
+
+  const isDemoPay = !!payOrder?.codeUrl && payOrder.codeUrl.includes('demo=')
 
   return (
     <div className="modal-backdrop user-subscription-detail-backdrop show" style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -56,7 +108,7 @@ export default function Member() {
             <div className="kg-user-avatar">{(me?.display_name || me?.username || '会').slice(0, 1)}</div>
             <div>
               <h2 id="userSubscriptionDetailTitle">会员权益</h2>
-              <p>查看各会员方案权益。点击方案提交订阅申请，管理员确认后开通；也可使用卡密直接兑换。</p>
+              <p>查看各会员方案权益。点击方案生成微信支付二维码，扫码付款后自动开通；也可使用卡密直接兑换。</p>
             </div>
           </div>
           <Link className="kg-user-center-close kg-icon-button" to="/" aria-label="关闭" title="返回首页"><AppIcon name="close" size="default" /></Link>
@@ -123,6 +175,25 @@ export default function Member() {
           </div>
         </div>
       </div>
+
+      {payOrder && (
+        <div className="modal-backdrop show" style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15,23,42,0.55)', zIndex: 1000 }}>
+          <div className="modal kg-pay-qr-card" style={{ padding: 28, background: '#fff', borderRadius: 14, textAlign: 'center', width: 320, boxSizing: 'border-box' }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: 18 }}>微信扫码支付</h3>
+            <p style={{ color: '#475569', margin: '0 0 16px', fontSize: 14 }}>
+              {payOrder.planName} · ¥{((payOrder.amount || 0) / 100).toFixed(2)}
+            </p>
+            {qrUrl && <img src={qrUrl} alt="支付二维码" style={{ width: 240, height: 240, display: 'block', margin: '0 auto' }} />}
+            <p style={{ color: '#64748b', margin: '14px 0', fontSize: 13 }}>
+              {isDemoPay ? '演示模式：点下方按钮模拟支付成功' : '请用微信扫描二维码完成支付'}
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              {isDemoPay && <button type="button" className="primary" onClick={demoPay}>模拟支付成功</button>}
+              <button type="button" onClick={closePay}>取消</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

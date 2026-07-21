@@ -19,3 +19,9 @@ python-multipart>=0.0.9,<0.1
 # 认证（阶段 2 预留：session cookie + 密码 hash）
 itsdangerous>=2.2,<3
 bcrypt>=4.1,<5
+
+# HTTP 客户端（微信登录/支付调用微信接口）
+httpx>=0.27,<0.28
+
+# 微信支付 v3 回调解密（AES-256-GCM）
+cryptography>=42,<46

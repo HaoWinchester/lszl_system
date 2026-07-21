@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -27,7 +27,7 @@ class Subscription(Base):
 
 
 class SubscriptionOrder(Base):
-    """学员订阅申请单（管理员审批）。"""
+    """学员订阅订单（管理员审批 或 微信支付）。"""
 
     __tablename__ = "subscription_orders"
 
@@ -43,6 +43,14 @@ class SubscriptionOrder(Base):
     )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     approved_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # 微信支付相关（可空，兼容管理员审批流程的老订单）
+    prepay_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    code_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    transaction_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    pay_status: Mapped[str | None] = mapped_column(String(16), nullable=True)  # pending/paid/refunded
+    amount: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 分
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    pay_method: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
 
 class RedeemCode(Base):
