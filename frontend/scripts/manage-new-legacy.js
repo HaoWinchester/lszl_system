@@ -1,0 +1,199 @@
+import { createHash } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
+import {
+  closeSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
+import { dirname, relative, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const scriptsDir = dirname(fileURLToPath(import.meta.url))
+const frontendDir = resolve(scriptsDir, '..')
+const defaultRoot = resolve(frontendDir, 'new-legacy-releases')
+const syncScript = resolve(scriptsDir, 'sync-new-legacy.js')
+
+function parseArgs(argv) {
+  const positional = []
+  let root = defaultRoot
+  for (let index = 0; index < argv.length; index += 1) {
+    const value = argv[index]
+    if (value === '--root') {
+      if (!argv[index + 1]) throw new Error('--root 缺少目录参数')
+      root = resolve(argv[index + 1])
+      index += 1
+    } else if (value === '--skip-browser') {
+      // 浏览器验收由发布流水线调用；保留此参数方便本地首次导入。
+    } else {
+      positional.push(value)
+    }
+  }
+  return { command: positional[0] || 'status', argument: positional[1], root }
+}
+
+function walk(root, base = root) {
+  return readdirSync(root, { withFileTypes: true })
+    .flatMap((entry) => {
+      const path = resolve(root, entry.name)
+      return entry.isDirectory() ? walk(path, base) : [relative(base, path)]
+    })
+    .sort()
+}
+
+function sourceHash(source) {
+  const hash = createHash('sha256')
+  for (const path of walk(source)) {
+    hash.update(path)
+    hash.update('\0')
+    hash.update(readFileSync(resolve(source, path)))
+    hash.update('\0')
+  }
+  return hash.digest('hex')
+}
+
+function readJson(path) {
+  return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null
+}
+
+function atomicJson(path, value) {
+  const temporary = `${path}.${process.pid}.tmp`
+  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`)
+  renameSync(temporary, path)
+}
+
+function releaseManifest(root, version) {
+  return readJson(resolve(root, version, 'release.json'))
+}
+
+function currentManifest(root) {
+  return readJson(resolve(root, 'current.json'))
+}
+
+function pointerFor(release, previousVersion) {
+  return {
+    schemaVersion: 1,
+    version: release.version,
+    previousVersion,
+    site: `${release.version}/site`,
+    sourceHash: release.sourceHash,
+    promotedAt: new Date().toISOString(),
+  }
+}
+
+function promote(root, version) {
+  const release = releaseManifest(root, version)
+  if (!release) throw new Error(`找不到已构建版本：${version}`)
+  const current = currentManifest(root)
+  if (current?.version === version) return current
+  const pointer = pointerFor(release, current?.version ?? null)
+  atomicJson(resolve(root, 'current.json'), pointer)
+  return pointer
+}
+
+function withLock(root, operation) {
+  mkdirSync(root, { recursive: true })
+  const lockPath = resolve(root, '.update.lock')
+  let descriptor
+  try {
+    descriptor = openSync(lockPath, 'wx')
+  } catch {
+    throw new Error('已有 new-legacy 更新正在执行')
+  }
+  try {
+    return operation()
+  } finally {
+    closeSync(descriptor)
+    rmSync(lockPath, { force: true })
+  }
+}
+
+function inspect(source) {
+  const normalized = resolve(source || '')
+  if (!source || !existsSync(normalized) || !statSync(normalized).isDirectory()) {
+    throw new Error(`找不到 new-legacy 目录：${normalized}`)
+  }
+  const versionPath = resolve(normalized, 'VERSION')
+  if (!existsSync(versionPath)) throw new Error('new-legacy 缺少 VERSION')
+  const version = readFileSync(versionPath, 'utf8').trim()
+  if (!version) throw new Error('new-legacy/VERSION 不能为空')
+  return { source: normalized, version, sourceHash: sourceHash(normalized), files: walk(normalized).length }
+}
+
+function update(root, source) {
+  return withLock(root, () => {
+    const candidate = inspect(source)
+    const finalDir = resolve(root, candidate.version)
+    const existing = releaseManifest(root, candidate.version)
+    if (existing && existing.sourceHash !== candidate.sourceHash) {
+      throw new Error(`相同版本号 ${candidate.version} 的文件内容不同，拒绝覆盖`)
+    }
+    if (!existing) {
+      const staging = resolve(root, `.staging-${candidate.version}-${process.pid}`)
+      rmSync(staging, { recursive: true, force: true })
+      mkdirSync(staging, { recursive: true })
+      try {
+        const sourceOut = resolve(staging, 'source')
+        const siteOut = resolve(staging, 'site')
+        cpSync(candidate.source, sourceOut, { recursive: true })
+        const built = spawnSync(process.execPath, [syncScript, '--source', sourceOut, '--out', siteOut], {
+          cwd: frontendDir,
+          encoding: 'utf8',
+        })
+        if (built.status !== 0) throw new Error(built.stderr.trim() || 'new-legacy 构建失败')
+        const release = {
+          schemaVersion: 1,
+          version: candidate.version,
+          sourceHash: candidate.sourceHash,
+          sourceFiles: candidate.files,
+          adapterVersion: 3,
+          createdAt: new Date().toISOString(),
+        }
+        writeFileSync(resolve(staging, 'release.json'), `${JSON.stringify(release, null, 2)}\n`)
+        renameSync(staging, finalDir)
+      } catch (error) {
+        rmSync(staging, { recursive: true, force: true })
+        throw error
+      }
+    }
+    return promote(root, candidate.version)
+  })
+}
+
+function rollback(root) {
+  return withLock(root, () => {
+    const current = currentManifest(root)
+    if (!current?.previousVersion) throw new Error('没有可回滚的成功版本')
+    const previous = releaseManifest(root, current.previousVersion)
+    if (!previous) throw new Error(`回滚版本不存在：${current.previousVersion}`)
+    const pointer = pointerFor(previous, current.version)
+    atomicJson(resolve(root, 'current.json'), pointer)
+    return pointer
+  })
+}
+
+function main() {
+  const args = parseArgs(process.argv.slice(2))
+  let result
+  if (args.command === 'inspect') result = inspect(args.argument)
+  else if (args.command === 'update') result = update(args.root, args.argument)
+  else if (args.command === 'promote') result = withLock(args.root, () => promote(args.root, args.argument))
+  else if (args.command === 'rollback') result = rollback(args.root)
+  else if (args.command === 'status') result = currentManifest(args.root) || { status: 'empty' }
+  else throw new Error(`未知命令：${args.command}`)
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
+}
+
+try {
+  main()
+} catch (error) {
+  process.stderr.write(`[manage-new-legacy] ${error instanceof Error ? error.message : String(error)}\n`)
+  process.exitCode = 1
+}

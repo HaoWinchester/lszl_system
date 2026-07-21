@@ -38,19 +38,19 @@
 - Snapshot: `frontend/**`
 - Snapshot: `new-legacy/**`
 
-- [ ] **Step 1: Run the current mixed-runtime regression gate**
+- [x] **Step 1: Run the current mixed-runtime regression gate**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/ -q && cd ../frontend && node --test scripts/*.test.mjs && pnpm exec tsc -b`  
 Expected: all current backend, bridge, and TypeScript checks PASS.
 
-- [ ] **Step 2: Commit the current implementation checkpoint**
+- [x] **Step 2: Commit the current implementation checkpoint**
 
 ```bash
 git add backend frontend new-legacy
 git commit -m "chore: checkpoint new-legacy integration before direct cutover"
 ```
 
-- [ ] **Step 3: Create a recovery tag**
+- [x] **Step 3: Create a recovery tag**
 
 Run: `git tag pre-unified-new-legacy-runtime`  
 Expected: `git rev-parse pre-unified-new-legacy-runtime` equals `git rev-parse HEAD`.
@@ -64,7 +64,7 @@ Expected: `git rev-parse pre-unified-new-legacy-runtime` equals `git rev-parse H
 - Modify: `frontend/scripts/sync-new-legacy.js`
 - Modify: `.gitignore`
 
-- [ ] **Step 1: Write failing release-manager tests**
+- [x] **Step 1: Write failing release-manager tests**
 
 ```js
 test('update builds an isolated release and atomically selects it', () => {
@@ -88,12 +88,12 @@ test('rollback selects the previous successful release', () => {
 })
 ```
 
-- [ ] **Step 2: Run the tests and verify the missing command fails**
+- [x] **Step 2: Run the tests and verify the missing command fails**
 
 Run: `cd frontend && node --test scripts/new-legacy-release.test.mjs`  
 Expected: FAIL because `manage-new-legacy.js` does not exist.
 
-- [ ] **Step 3: Implement the release manager**
+- [x] **Step 3: Implement the release manager**
 
 ```js
 function atomicJson(path, value) {
@@ -115,12 +115,12 @@ function promote(registry, release) {
 
 The command must support `inspect`, `update`, `promote`, `rollback`, and `status`; acquire an exclusive lock before import; call the existing deterministic sync script into `<release>/site`; preserve immutable `<release>/source`; reject same-version/different-hash input; and only change `current.json` after build and contract tests succeed.
 
-- [ ] **Step 4: Run release tests**
+- [x] **Step 4: Run release tests**
 
 Run: `cd frontend && node --test scripts/new-legacy-release.test.mjs scripts/new-legacy-sync.test.mjs`  
 Expected: all tests PASS.
 
-- [ ] **Step 5: Import the current v8.6.0 bundle**
+- [x] **Step 5: Import the current v8.6.0 bundle**
 
 Run: `./manage-new-legacy update ./new-legacy --skip-browser`  
 Expected: active manifest identifies `v8.6.0`; source and site hashes are recorded.
