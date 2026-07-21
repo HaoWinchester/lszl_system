@@ -71,6 +71,9 @@ def test_runtime_state_accepts_scoped_multi_question_preferences() -> None:
         "kg_multi_question_paper_selection_v1",
     ):
         assert key_allowed(f"{base_key}__%E4%BD%A9%E5%A5%87007")
+    assert key_allowed(
+        "通用知识点关系图谱工具_多科目重点聚焦版_v2__user__%E4%BD%A9%E5%A5%87007"
+    )
 
 
 def test_runtime_state_rejects_unknown_storage_keys() -> None:

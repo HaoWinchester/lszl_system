@@ -88,6 +88,7 @@ PREFIXES = (
     "kg_canvas_workspace_catalog_v2__",
     "kg_canvas_workspace_v1__",
     "kg_deep_recall_progress_v1__",
+    "通用知识点关系图谱工具_多科目重点聚焦版_v2__user__",
 )
 
 
