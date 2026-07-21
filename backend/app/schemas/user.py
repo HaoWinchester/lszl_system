@@ -50,3 +50,20 @@ class BatchUpdate(BaseModel):
 
 class BatchDelete(BaseModel):
     usernames: list[str]
+
+
+class UserImportRecord(BaseModel):
+    username: str = Field(min_length=2, max_length=64)
+    role: str = "student"
+    status: str = "active"
+    display_name: str | None = Field(default=None, max_length=120)
+    email: str | None = Field(default=None, max_length=120)
+    phone: str | None = Field(default=None, max_length=40)
+    subject: str | None = Field(default="PMP", max_length=32)
+    tags: list[str] = Field(default_factory=list)
+    note: str | None = None
+
+
+class UserImport(BaseModel):
+    users: list[UserImportRecord]
+    initial_password: str = Field(min_length=4, max_length=128)

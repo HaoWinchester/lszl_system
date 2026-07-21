@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password, now_utc, uid, verify_password
 from app.models.user import ACTIVE, ADMIN, ARCHIVED, User, UserAdminLog
-from app.schemas.user import UserCreate, UserUpdate
+from app.schemas.user import UserCreate, UserImport, UserUpdate
 
 VALID_ROLES = {"admin", "teacher", "student", "viewer"}
 VALID_STATUSES = {"active", "paused", "archived"}
@@ -181,12 +181,13 @@ async def duplicate_user(
     if await get_by_username(db, new_username):
         raise ValueError("用户名已存在")
     src = await _require(db, src_username)
+    copied_display_name = f"{src.display_name or src.username} 副本"[:120]
     new = User(
         username=new_username,
         password_hash=hash_password(new_password),
         role=src.role,
         status=ACTIVE,
-        display_name=src.display_name,
+        display_name=copied_display_name,
         email=src.email,
         phone=src.phone,
         subject=src.subject,
@@ -288,29 +289,28 @@ async def build_export(db: AsyncSession, usernames: list[str] | None = None) -> 
     }
 
 
-async def import_users(db: AsyncSession, payload: dict, actor: str) -> tuple[int, int]:
-    imported = payload.get("users") or []
+async def import_users(db: AsyncSession, payload: UserImport, actor: str) -> tuple[int, int]:
     added = 0
     skipped = 0
-    for rec in imported:
-        un = rec.get("username")
+    for rec in payload.users:
+        un = rec.username
         if not un or await get_by_username(db, un):
             skipped += 1
             continue
-        role = rec.get("role") if rec.get("role") in VALID_ROLES else "student"
-        status = rec.get("status") if rec.get("status") in VALID_STATUSES else ACTIVE
+        role = rec.role if rec.role in VALID_ROLES else "student"
+        status = rec.status if rec.status in VALID_STATUSES else ACTIVE
         db.add(
             User(
                 username=un,
-                password_hash=hash_password(uid("pw")),  # 导入用户重置为随机密码
+                password_hash=hash_password(payload.initial_password),
                 role=role,
                 status=status,
-                display_name=rec.get("display_name"),
-                email=rec.get("email"),
-                phone=rec.get("phone"),
-                subject=rec.get("subject") or "PMP",
-                tags=rec.get("tags") or [],
-                note=rec.get("note"),
+                display_name=rec.display_name,
+                email=rec.email,
+                phone=rec.phone,
+                subject=rec.subject or "PMP",
+                tags=rec.tags or [],
+                note=rec.note,
                 source="import",
             )
         )

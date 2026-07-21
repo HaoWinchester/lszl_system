@@ -237,9 +237,9 @@
             <p>正式微信扫码登录需要微信开放平台网站应用 AppID、授权回调域名，以及后端接口用 <code>code</code> 换取 openid/unionid。</p>
             <div class="wechat-login-actions">
               <button type="button" class="wechat-official-btn" ${officialReady?'':'disabled'}>打开微信授权二维码页</button>
-              <button type="button" class="wechat-demo-btn" ${config.enableDemo?'':'disabled'}>本地演示扫码成功</button>
+              <button type="button" class="wechat-demo-btn" ${config.enableDemo?'':'disabled'}>模拟扫码成功</button>
             </div>
-            <small class="wechat-login-tip">本地演示会创建一个微信演示账号；正式上线时请关闭演示模式。</small>
+            <small class="wechat-login-tip">测试模式仅用于验证扫码界面；正式环境请关闭测试模式。</small>
           </div>
         </div>
       </div>`;

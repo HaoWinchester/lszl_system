@@ -111,3 +111,86 @@ test('generated graph editor keeps an existing relation on duplicate connect', (
   assert.match(branch[1], /已有关系线/)
   assert.doesNotMatch(branch[1], /state\.links\s*=|\.splice\(|\.filter\(/)
 })
+
+test('question validation adapter runs after the upstream question editor', () => {
+  const adapterPath = resolve(frontendDir, 'scripts/new-legacy-assets/direct-question-adapter.js')
+  assert.ok(existsSync(adapterPath), 'direct-question-adapter.js should exist')
+  const adapter = readFileSync(adapterPath, 'utf8')
+  assert.match(adapter, /questionStemInput/)
+  assert.match(adapter, /\.option-text/)
+  assert.match(adapter, /stopImmediatePropagation/)
+  const page = readFileSync(resolve(frontendDir, 'public/new-legacy/question-bank.html'), 'utf8')
+  assert.ok(page.indexOf('src/65-question-bank-admin.js') < page.indexOf('direct-question-adapter.js'))
+})
+
+test('training runtime CSS keeps shortcuts above the guided action dock', () => {
+  const cssPath = resolve(frontendDir, 'scripts/new-legacy-assets/direct-runtime-fixes.css')
+  assert.ok(existsSync(cssPath), 'direct-runtime-fixes.css should exist')
+  const css = readFileSync(cssPath, 'utf8')
+  assert.match(css, /question-training-page[\s\S]*kg-global-shortcuts/)
+  assert.match(css, /bottom:\s*88px\s*!important/)
+  const page = readFileSync(resolve(frontendDir, 'public/new-legacy/question-training.html'), 'utf8')
+  assert.match(page, /direct-runtime-fixes\.css/)
+})
+
+test('member deep link opens plans only for student accounts', () => {
+  const entry = readFileSync(resolve(frontendDir, 'scripts/new-legacy-assets/direct-entry.js'), 'utf8')
+  assert.match(entry, /authUser\?\.role/)
+  assert.match(entry, /role\s*===\s*['"]student['"]/)
+  assert.match(entry, /KGUserCenter\?\.open\?\.\(\)/)
+  assert.match(entry, /upgradeMemberBtn/)
+})
+
+test('admin import supplies an explicit initial password to the backend', () => {
+  const adapter = readFileSync(resolve(frontendDir, 'scripts/new-legacy-assets/direct-admin-adapter.js'), 'utf8')
+  assert.match(adapter, /prompt\(/)
+  assert.match(adapter, /initial_password/)
+  assert.match(adapter, /至少 4 位/)
+  assert.match(adapter, /导入账号的初始密码/)
+})
+
+test('system settings adapter uses normalized backend APIs before rendering', () => {
+  const adapterPath = resolve(frontendDir, 'scripts/new-legacy-assets/direct-system-adapter.js')
+  assert.ok(existsSync(adapterPath), 'direct-system-adapter.js should exist')
+  const adapter = readFileSync(adapterPath, 'utf8')
+  for (const endpoint of ['themes', 'wechat-config', 'wechat-pay-config', 'subscription-plans']) {
+    assert.match(adapter, new RegExp(`/api/v1/system/${endpoint}`))
+  }
+  assert.match(adapter, /method, path/)
+  assert.match(adapter, /saveTheme/)
+  assert.match(adapter, /saveConfig/)
+  assert.match(adapter, /setPlanSettings/)
+  const page = readFileSync(resolve(frontendDir, 'public/new-legacy/system-settings.html'), 'utf8')
+  assert.ok(page.indexOf('direct-system-adapter.js') < page.indexOf('src/36-system-settings.js'))
+})
+
+test('generated pages describe the server-backed architecture without stale local-demo copy', () => {
+  const generatedFiles = [
+    'index.html',
+    'question-training.html',
+    'system-settings.html',
+    'user-management.html',
+    'src/32-wechat-login.js',
+    'src/33-user-center.js',
+    'src/35-user-management.js',
+    'src/36-system-settings.js',
+  ]
+  const generated = generatedFiles
+    .map((path) => readFileSync(resolve(frontendDir, 'public/new-legacy', path), 'utf8'))
+    .join('\n')
+  const staleVisibleCopy = [
+    '账号和数据保存在本浏览器 localStorage',
+    '管理本浏览器中的账号资料',
+    '后续接服务器后细化',
+    '当前纯前端版本暂未接入支付',
+    '当前纯前端版本暂不接真实支付',
+    '仅保存在本浏览器',
+    '当前纯前端版支持“本地演示扫码登录”',
+    '当前纯前端版本保留本地演示扫码能力',
+    '当前版本为前端权限提示与拦截',
+    '正式收费时应由后端保存价格、订单和订阅状态',
+    '本浏览器 localStorage',
+  ]
+  for (const copy of staleVisibleCopy) assert.doesNotMatch(generated, new RegExp(copy))
+  assert.match(generated, /数据已同步至服务器/)
+})

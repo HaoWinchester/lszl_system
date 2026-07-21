@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="styles/global-shortcuts.css"/>
   <link rel="stylesheet" href="styles/subscription.css"/>
 <link rel="stylesheet" href="styles/user-center.css"/>
+<link rel="stylesheet" href="./direct-runtime-fixes.css"><!-- kg-runtime-fixes:generated -->
 </head>
 <body>
   <div class="ss-app" id="systemSettingsApp">
@@ -58,7 +59,7 @@
             <div class="um-card-head small">
               <div>
                 <h2>微信登录配置</h2>
-                <p>配置微信开放平台扫码登录。当前纯前端版本保留本地演示扫码能力，正式接入需要后端换取 openid/unionid。</p>
+                <p>配置微信开放平台扫码登录。账号认证与扫码配置由服务器统一管理。</p>
               </div>
             </div>
             <div class="um-wechat-config" id="ssWechatConfigPanel"></div>
@@ -70,7 +71,7 @@
             <div class="um-card-head small">
               <div>
                 <h2>角色权限模板</h2>
-                <p>当前版本为前端权限提示与拦截；正式网络版仍需后端二次校验。</p>
+                <p>页面与服务器共同执行权限校验，敏感操作会在后端再次验证。</p>
               </div>
             </div>
             <div class="um-permission-matrix ss-permission-matrix" id="ssPermissionMatrix"></div>
@@ -119,6 +120,7 @@
 <script defer src="src/32-wechat-login.js"></script>
 <script defer src="src/33-user-center.js"></script>
 <script defer src="src/39-global-shortcuts.js"></script>
+<script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->
 <script defer src="src/36-system-settings.js"></script>
 </body>
 </html>

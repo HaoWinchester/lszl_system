@@ -131,8 +131,12 @@ async def get_subscription_plans(db: AsyncSession) -> list[dict]:
 
 async def set_plan_setting(db: AsyncSession, plan_id: str, patch: dict) -> dict | None:
     s = await _get_setting(db, "subscription_plan_settings")
-    val = s.value if s else {}
-    val.setdefault(plan_id, {}).update(patch)
+    # JSON columns do not track nested in-place mutations reliably. Build fresh
+    # dicts so SQLAlchemy always emits the UPDATE and a new request sees it.
+    val = dict(s.value or {}) if s else {}
+    plan = dict(val.get(plan_id) or {})
+    plan.update(patch)
+    val[plan_id] = plan
     if s:
         s.value = val
     else:

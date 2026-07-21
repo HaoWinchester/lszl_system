@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { chmodSync, cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -55,6 +55,34 @@ test('same version with a different source hash fails without changing current',
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /相同版本号.*文件内容不同/)
   assert.equal(readFileSync(resolve(root, 'current.json'), 'utf8'), before)
+})
+
+test('same source version is atomically rebuilt when the adapter changes', () => {
+  const root = makeRoot()
+  const harness = resolve(root, 'harness', 'frontend')
+  const releases = resolve(root, 'releases')
+  mkdirSync(harness, { recursive: true })
+  cpSync(resolve(frontendDir, 'scripts'), resolve(harness, 'scripts'), { recursive: true })
+  const harnessCommand = resolve(harness, 'scripts', 'manage-new-legacy.js')
+  const runHarness = () => spawnSync(
+    process.execPath,
+    [harnessCommand, 'update', source, '--root', releases, '--skip-browser'],
+    { cwd: repoDir, encoding: 'utf8' },
+  )
+  assert.equal(runHarness().status, 0)
+  const before = readJson(resolve(releases, 'current.json'))
+  const adapterPath = resolve(harness, 'scripts', 'new-legacy-assets', 'direct-entry.js')
+  writeFileSync(adapterPath, `${readFileSync(adapterPath, 'utf8')}\n/* adapter-rebuild-probe */\n`)
+
+  const result = runHarness()
+
+  assert.equal(result.status, 0, result.stderr)
+  const after = readJson(resolve(releases, 'current.json'))
+  assert.equal(after.version, before.version)
+  assert.equal(after.sourceHash, before.sourceHash)
+  assert.notEqual(after.adapterHash, before.adapterHash)
+  assert.equal(readJson(resolve(releases, 'v8.6.0', 'release.json')).adapterHash, after.adapterHash)
+  assert.match(readFileSync(resolve(releases, 'v8.6.0', 'site', 'direct-entry.js'), 'utf8'), /adapter-rebuild-probe/)
 })
 
 test('failed automatic validation never changes the active release', () => {

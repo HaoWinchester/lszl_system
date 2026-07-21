@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="styles/global-shortcuts.css"/>
 <link rel="stylesheet" href="styles/subscription.css"/>
 <link rel="stylesheet" href="styles/user-center.css"/>
+<link rel="stylesheet" href="./direct-runtime-fixes.css"><!-- kg-runtime-fixes:generated -->
 </head>
 <body>
   <div class="um-app">
@@ -20,7 +21,7 @@
         <div>
           <p class="um-kicker">Local User Administration</p>
           <h1>用户管理系统</h1>
-          <p>管理本浏览器中的账号资料、角色状态、归档记录和常规操作日志。后续接入服务器时可迁移为正式后台。</p>
+          <p>管理服务器中的账号资料、角色状态、归档记录和常规操作日志。所有变更都会同步保存到后台。</p>
         </div>
       </div>
       <div class="um-top-actions">
@@ -259,7 +260,7 @@
                   <li>正常：可登录并继续使用本地空间。</li>
                   <li>暂停：临时停用，管理员可随时恢复。</li>
                   <li>已归档：保留账号资料和历史记录，登录会被拦截。</li>
-                  <li>删除账号：移除账号资料；是否清除学习数据需后续接服务器后细化。</li>
+                  <li>删除账号：移除账号资料；关联学习数据按服务器数据保留策略处理。</li>
                 </ul>
               </section>
             </section>
@@ -269,7 +270,7 @@
                 <div class="um-card-head small">
                   <div>
                     <h2>角色权限模板</h2>
-                    <p>当前版本为前端权限提示与拦截；正式网络版仍需后端二次校验。</p>
+                    <p>页面与服务器共同执行权限校验，敏感操作会在后端再次验证。</p>
                   </div>
                 </div>
                 <div class="um-permission-matrix" id="umPermissionMatrix"></div>

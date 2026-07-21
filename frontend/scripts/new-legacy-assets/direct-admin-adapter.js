@@ -178,13 +178,27 @@
   service.importUsers = function (users, payload, options = {}) {
     const validated = original.importUsers(users, payload, options)
     if (!validated?.ok) return validated
+    const initialPassword = global.prompt('请设置本次导入账号的初始密码（至少 4 位）。所有导入账号首次登录都使用此密码：', '')
+    if (initialPassword == null) {
+      return { ok: false, code: 'IMPORT_CANCELLED', message: '已取消导入。' }
+    }
+    if (String(initialPassword).length < 4) {
+      return { ok: false, code: 'INVALID_INITIAL_PASSWORD', message: '导入账号的初始密码至少 4 位。' }
+    }
     const incoming = payload?.users && typeof payload.users === 'object' ? payload.users : payload
     const records = Array.isArray(incoming)
       ? incoming
       : Object.entries(incoming || {}).map(([username, user]) => ({ username, ...userPayload(user) }))
-    const response = request('POST', '/api/v1/users/import', { users: records })
+    const response = request('POST', '/api/v1/users/import', {
+      users: records,
+      initial_password: String(initialPassword),
+    })
     return response.ok
-      ? refreshed(users, { count: Number(response.payload.added || 0), skipped: Number(response.payload.skipped || 0) })
+      ? refreshed(users, {
+          count: Number(response.payload.added || 0),
+          skipped: Number(response.payload.skipped || 0),
+          message: '导入成功；导入账号的初始密码为管理员本次设置的密码。',
+        })
       : response
   }
 })(window)

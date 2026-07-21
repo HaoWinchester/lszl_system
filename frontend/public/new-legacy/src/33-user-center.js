@@ -144,7 +144,7 @@
             <div class="kg-user-avatar">会</div>
             <div>
               <h2 id="userSubscriptionDetailTitle">会员权益</h2>
-              <p>查看各会员方案权益。当前纯前端版本暂未接入支付，购买按钮用于后续支付入口预留。</p>
+              <p>查看各会员方案权益。套餐开通方式由管理员在系统设置中统一配置。</p>
             </div>
           </div>
           <button class="kg-user-center-close" id="userSubscriptionDetailCloseBtn" type="button" aria-label="关闭">×</button>
@@ -217,7 +217,7 @@
             ${plan.originalPriceText?`<del>${escapeHTML(plan.originalPriceText)}</del>`:''}
             ${plan.discountText?`<em>${escapeHTML(plan.discountText)}</em>`:''}
           </div>
-          <p class="kg-subscription-order-desc">当前纯前端版本暂不接真实支付。确认后会生成一条“待确认”的订阅申请，由管理员在系统设置中确认开通。</p>
+          <p class="kg-subscription-order-desc">确认后会生成一条“待确认”的订阅申请，由管理员在系统设置中确认开通。</p>
           <div class="kg-subscription-order-meta">
             <span>申请账号：${escapeHTML(username||'未登录')}</span>
             <span>开通方式：管理员确认</span>
@@ -463,7 +463,7 @@
             <section class="kg-user-subscription-box" id="ucSubscriptionBox" aria-label="我的订阅"></section>
             <label class="kg-user-field full">
               <span>个人备注 / 学习说明</span>
-              <textarea id="ucNote" maxlength="500" placeholder="例如：所在班级、学习目标、备考进度等，仅保存在本浏览器。"></textarea>
+              <textarea id="ucNote" maxlength="500" placeholder="例如：所在班级、学习目标、备考进度等，保存后会同步到服务器。"></textarea>
             </label>
             <section class="kg-user-password-box">
               <h3>修改密码（可选）</h3>

@@ -15,6 +15,7 @@ from app.schemas.user import (
     ResetPassword,
     StatusUpdate,
     UserCreate,
+    UserImport,
     UserUpdate,
 )
 from app.services import user_service
@@ -57,7 +58,7 @@ async def export_users(db: DB, _: AdminUser, usernames: str | None = Query(None)
 
 
 @router.post("/import")
-async def import_users(payload: dict, db: DB, admin: AdminUser):
+async def import_users(payload: UserImport, db: DB, admin: AdminUser):
     added, skipped = await user_service.import_users(db, payload, actor=admin.username)
     return {"added": added, "skipped": skipped}
 

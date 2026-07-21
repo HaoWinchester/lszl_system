@@ -1,0 +1,9 @@
+/* 项目适配层只修复运行时遮挡，不改变 new-legacy 的组件结构与视觉令牌。 */
+@media (min-width: 901px) {
+  .question-training-page .kg-global-shortcuts {
+    top: auto !important;
+    right: 18px !important;
+    bottom: 88px !important;
+    left: auto !important;
+  }
+}

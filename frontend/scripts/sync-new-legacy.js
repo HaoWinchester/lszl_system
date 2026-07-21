@@ -46,6 +46,94 @@ function replaceExactlyOnce(source, before, after, label) {
   return source.replace(before, after)
 }
 
+function replaceVisibleCopy(source, before, after, label) {
+  if (!source.includes(before)) return source
+  return replaceExactlyOnce(source, before, after, label)
+}
+
+const architectureCopyRules = {
+  'index.html': [[
+    '当前为本地单文件多用户：账号和数据保存在本浏览器 localStorage 中。不同用户的数据互相隔离；如需跨设备/真正安全登录，需要后续接入服务器。',
+    '当前账号和学习数据已同步至服务器，并按用户隔离；重新登录或更换设备后可继续使用。',
+  ]],
+  'question-training.html': [[
+    '当前为本地单文件多用户：账号和数据保存在本浏览器 localStorage 中。不同用户的数据互相隔离；如需跨设备/真正安全登录，需要后续接入服务器。',
+    '当前账号和学习数据已同步至服务器，并按用户隔离；重新登录或更换设备后可继续使用。',
+  ]],
+  'user-management.html': [
+    [
+      '管理本浏览器中的账号资料、角色状态、归档记录和常规操作日志。后续接入服务器时可迁移为正式后台。',
+      '管理服务器中的账号资料、角色状态、归档记录和常规操作日志。所有变更都会同步保存到后台。',
+    ],
+    [
+      '删除账号：移除账号资料；是否清除学习数据需后续接服务器后细化。',
+      '删除账号：移除账号资料；关联学习数据按服务器数据保留策略处理。',
+    ],
+    [
+      '当前版本为前端权限提示与拦截；正式网络版仍需后端二次校验。',
+      '页面与服务器共同执行权限校验，敏感操作会在后端再次验证。',
+    ],
+  ],
+  'system-settings.html': [
+    [
+      '配置微信开放平台扫码登录。当前纯前端版本保留本地演示扫码能力，正式接入需要后端换取 openid/unionid。',
+      '配置微信开放平台扫码登录。账号认证与扫码配置由服务器统一管理。',
+    ],
+    [
+      '当前版本为前端权限提示与拦截；正式网络版仍需后端二次校验。',
+      '页面与服务器共同执行权限校验，敏感操作会在后端再次验证。',
+    ],
+  ],
+  'src/32-wechat-login.js': [
+    ['本地演示扫码成功', '模拟扫码成功'],
+    [
+      '本地演示会创建一个微信演示账号；正式上线时请关闭演示模式。',
+      '测试模式仅用于验证扫码界面；正式环境请关闭测试模式。',
+    ],
+  ],
+  'src/33-user-center.js': [
+    [
+      '查看各会员方案权益。当前纯前端版本暂未接入支付，购买按钮用于后续支付入口预留。',
+      '查看各会员方案权益。套餐开通方式由管理员在系统设置中统一配置。',
+    ],
+    [
+      '当前纯前端版本暂不接真实支付。确认后会生成一条“待确认”的订阅申请，由管理员在系统设置中确认开通。',
+      '确认后会生成一条“待确认”的订阅申请，由管理员在系统设置中确认开通。',
+    ],
+    [
+      '例如：所在班级、学习目标、备考进度等，仅保存在本浏览器。',
+      '例如：所在班级、学习目标、备考进度等，保存后会同步到服务器。',
+    ],
+  ],
+  'src/35-user-management.js': [[
+    '本浏览器 localStorage',
+    '服务器账号',
+  ]],
+  'src/36-system-settings.js': [
+    [
+      '当前纯前端版支持“本地演示扫码登录”；正式微信扫码登录需要微信开放平台 AppID、授权回调域名和后端换取 openid/unionid 的接口。',
+      '微信扫码配置由服务器统一保存；正式模式需要微信开放平台 AppID、授权回调域名和服务器换取 openid/unionid 的接口。',
+    ],
+    ['启用本地演示扫码', '启用扫码测试模式'],
+    [
+      '当前版本用于本地演示和管理员手动开通；价格只填写原价和折扣系数，现价会自动计算。正式收费时应由后端保存价格、订单和订阅状态。',
+      '套餐价格、订单和订阅状态统一保存到服务器；价格填写原价和折扣系数，现价会自动计算。',
+    ],
+  ],
+}
+
+function patchArchitectureCopy(path, source) {
+  return (architectureCopyRules[path] || []).reduce(
+    (generated, [before, after], index) => replaceVisibleCopy(
+      generated,
+      before,
+      after,
+      `new-legacy ${path} 架构文案补丁 ${index + 1}`,
+    ),
+    source,
+  )
+}
+
 function sourceFiles(source) {
   return Object.fromEntries(walk(source).map((path) => [path, hashFile(resolve(source, path))]))
 }
@@ -159,6 +247,12 @@ function injectPage(html, page) {
     : /<head(?:\s[^>]*)?>/i.test(html)
       ? html.replace(/<head(?:\s[^>]*)?>/i, (head) => `${head}\n${injection}`)
       : `${injection}\n${html}`
+  if (!generated.includes('kg-runtime-fixes:generated')) {
+    const styleTag = '<link rel="stylesheet" href="./direct-runtime-fixes.css"><!-- kg-runtime-fixes:generated -->'
+    generated = generated.includes('</head>')
+      ? generated.replace('</head>', `${styleTag}\n</head>`)
+      : `${styleTag}\n${generated}`
+  }
   if (page === 'user-management.html') {
     const serviceTag = '<script defer src="src/35-user-management-service.js"></script>'
     if (!generated.includes(serviceTag)) {
@@ -177,6 +271,26 @@ function injectPage(html, page) {
     generated = generated.replace(
       autosaveTag,
       `${autosaveTag}\n<script defer src="./direct-graph-adapter.js"></script><!-- kg-graph:generated -->`,
+    )
+  }
+  if (page === 'question-bank.html') {
+    const editorTag = '<script defer src="src/65-question-bank-admin.js"></script>'
+    if (!generated.includes(editorTag)) {
+      throw new Error('new-legacy 题库脚本顺序已变化，请复核题目校验适配器')
+    }
+    generated = generated.replace(
+      editorTag,
+      `${editorTag}\n<script defer src="./direct-question-adapter.js"></script><!-- kg-question:generated -->`,
+    )
+  }
+  if (page === 'system-settings.html') {
+    const settingsTag = '<script defer src="src/36-system-settings.js"></script>'
+    if (!generated.includes(settingsTag)) {
+      throw new Error('new-legacy 系统设置脚本顺序已变化，请复核归一化设置适配器')
+    }
+    generated = generated.replace(
+      settingsTag,
+      `<script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->\n${settingsTag}`,
     )
   }
   const authTag = page === 'index.html'
@@ -250,7 +364,7 @@ function sync({ source, out }) {
   for (const asset of walk(bridgeDir)) cpSync(resolve(bridgeDir, asset), resolve(out, asset))
   for (const path of walk(resolve(out, 'src')).filter((item) => item.endsWith('.js'))) {
     const target = resolve(out, 'src', path)
-    let generated = readFileSync(target, 'utf8')
+    let generated = patchArchitectureCopy(`src/${path}`, readFileSync(target, 'utf8'))
     if (path === '10-graph-editor.js') generated = patchGraphInteractions(generated)
     if (path === '64-flow-orchestrator.js') generated = patchTrainingSessionReentrancy(generated)
     if (path === '27-graph-file-manager.js') generated = patchFileManagerNavigation(generated)
@@ -259,7 +373,7 @@ function sync({ source, out }) {
 
   for (const page of walk(out).filter((path) => !path.includes('/') && path.endsWith('.html'))) {
     const path = resolve(out, page)
-    writeFileSync(path, injectPage(readFileSync(path, 'utf8'), page))
+    writeFileSync(path, injectPage(patchArchitectureCopy(page, readFileSync(path, 'utf8')), page))
   }
 
   const indexPath = resolve(out, 'index.html')

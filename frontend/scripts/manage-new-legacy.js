@@ -118,8 +118,15 @@ function promote(root, version) {
   const release = releaseManifest(root, version)
   if (!release) throw new Error(`找不到已构建版本：${version}`)
   const current = currentManifest(root)
-  if (current?.version === version) return current
-  const pointer = pointerFor(release, current?.version ?? null)
+  if (
+    current?.version === version
+    && current.sourceHash === release.sourceHash
+    && current.adapterHash === release.adapterHash
+  ) return current
+  const previousVersion = current?.version === version
+    ? current.previousVersion ?? null
+    : current?.version ?? null
+  const pointer = pointerFor(release, previousVersion)
   atomicJson(resolve(root, 'current.json'), pointer)
   return pointer
 }
@@ -183,6 +190,29 @@ function validateCandidate(root, version, skipValidation) {
   return report
 }
 
+function buildRelease(releaseDir, candidate) {
+  mkdirSync(releaseDir, { recursive: true })
+  const sourceOut = resolve(releaseDir, 'source')
+  const siteOut = resolve(releaseDir, 'site')
+  cpSync(candidate.source, sourceOut, { recursive: true })
+  const built = spawnSync(process.execPath, [syncScript, '--source', sourceOut, '--out', siteOut], {
+    cwd: frontendDir,
+    encoding: 'utf8',
+  })
+  if (built.status !== 0) throw new Error(built.stderr.trim() || 'new-legacy 构建失败')
+  const release = {
+    schemaVersion: 1,
+    version: candidate.version,
+    sourceHash: candidate.sourceHash,
+    sourceFiles: candidate.files,
+    adapterVersion: 4,
+    adapterHash: candidate.adapterHash,
+    createdAt: new Date().toISOString(),
+  }
+  writeFileSync(resolve(releaseDir, 'release.json'), `${JSON.stringify(release, null, 2)}\n`)
+  return release
+}
+
 function update(root, source, skipValidation = false) {
   return withLock(root, () => {
     const candidate = inspect(source)
@@ -196,28 +226,34 @@ function update(root, source, skipValidation = false) {
       rmSync(staging, { recursive: true, force: true })
       mkdirSync(staging, { recursive: true })
       try {
-        const sourceOut = resolve(staging, 'source')
-        const siteOut = resolve(staging, 'site')
-        cpSync(candidate.source, sourceOut, { recursive: true })
-        const built = spawnSync(process.execPath, [syncScript, '--source', sourceOut, '--out', siteOut], {
-          cwd: frontendDir,
-          encoding: 'utf8',
-        })
-        if (built.status !== 0) throw new Error(built.stderr.trim() || 'new-legacy 构建失败')
-        const release = {
-          schemaVersion: 1,
-          version: candidate.version,
-          sourceHash: candidate.sourceHash,
-          sourceFiles: candidate.files,
-          adapterVersion: 4,
-          adapterHash: candidate.adapterHash,
-          createdAt: new Date().toISOString(),
-        }
-        writeFileSync(resolve(staging, 'release.json'), `${JSON.stringify(release, null, 2)}\n`)
+        buildRelease(staging, candidate)
         renameSync(staging, finalDir)
       } catch (error) {
         rmSync(staging, { recursive: true, force: true })
         throw error
+      }
+    } else if (existing.adapterHash !== candidate.adapterHash) {
+      const stagingRoot = resolve(root, `.adapter-staging-${candidate.version}-${process.pid}`)
+      const stagingRelease = resolve(stagingRoot, candidate.version)
+      const backup = resolve(root, `.adapter-backup-${candidate.version}-${existing.adapterHash}`)
+      rmSync(stagingRoot, { recursive: true, force: true })
+      rmSync(backup, { recursive: true, force: true })
+      try {
+        buildRelease(stagingRelease, candidate)
+        validateCandidate(stagingRoot, candidate.version, skipValidation)
+        renameSync(finalDir, backup)
+        try {
+          renameSync(stagingRelease, finalDir)
+          const pointer = promote(root, candidate.version)
+          rmSync(backup, { recursive: true, force: true })
+          return pointer
+        } catch (error) {
+          rmSync(finalDir, { recursive: true, force: true })
+          renameSync(backup, finalDir)
+          throw error
+        }
+      } finally {
+        rmSync(stagingRoot, { recursive: true, force: true })
       }
     }
     validateCandidate(root, candidate.version, skipValidation)

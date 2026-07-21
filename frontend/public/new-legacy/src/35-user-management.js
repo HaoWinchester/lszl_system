@@ -181,7 +181,7 @@
     const admins=entries.filter(([,u])=>u.role==='admin').length;
     const totalQuestions=entries.reduce((sum,[name])=>sum+userDataStats(name).questions,0);
     $('umSummary').innerHTML=`
-      <article class="um-stat"><span>账号总数</span><strong>${entries.length}</strong><em>本浏览器 localStorage</em></article>
+      <article class="um-stat"><span>账号总数</span><strong>${entries.length}</strong><em>服务器账号</em></article>
       <article class="um-stat"><span>正常用户</span><strong>${active}</strong><em>可登录使用</em></article>
       <article class="um-stat"><span>已归档</span><strong>${archived}</strong><em>保留资料，不允许登录</em></article>
       <article class="um-stat"><span>题目总量</span><strong>${totalQuestions}</strong><em>统计各用户本地题库</em></article>`;

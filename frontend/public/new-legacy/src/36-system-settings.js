@@ -107,9 +107,9 @@
     const cfg=api.getConfig();
     const authUrl=(cfg.enableOfficial&&cfg.appId)?api.buildOfficialAuthUrl():'';
     panel.innerHTML=`<div class="um-wechat-config">
-      <p class="um-wechat-note">当前纯前端版支持“本地演示扫码登录”；正式微信扫码登录需要微信开放平台 AppID、授权回调域名和后端换取 openid/unionid 的接口。</p>
+      <p class="um-wechat-note">微信扫码配置由服务器统一保存；正式模式需要微信开放平台 AppID、授权回调域名和服务器换取 openid/unionid 的接口。</p>
       <div class="um-wechat-checks">
-        <label><input type="checkbox" id="wxEnableDemo" ${cfg.enableDemo?'checked':''}> 启用本地演示扫码</label>
+        <label><input type="checkbox" id="wxEnableDemo" ${cfg.enableDemo?'checked':''}> 启用扫码测试模式</label>
         <label><input type="checkbox" id="wxEnableOfficial" ${cfg.enableOfficial?'checked':''}> 启用正式微信开放平台模式</label>
         <label><input type="checkbox" id="wxAutoCreate" ${cfg.autoCreateUser?'checked':''}> 首次微信登录自动创建用户</label>
       </div>
@@ -354,7 +354,7 @@
     panel.innerHTML=`<div class="subscription-admin-toolbar">
       <div>
         <strong>订阅套餐配置</strong>
-        <p>当前版本用于本地演示和管理员手动开通；价格只填写原价和折扣系数，现价会自动计算。正式收费时应由后端保存价格、订单和订阅状态。</p>
+        <p>套餐价格、订单和订阅状态统一保存到服务器；价格填写原价和折扣系数，现价会自动计算。</p>
       </div>
       <button type="button" id="ssResetAllPlanSettingsBtn">恢复全部默认</button>
     </div>
