@@ -42,68 +42,6 @@ function sourceFiles(source) {
   return Object.fromEntries(walk(source).map((path) => [path, hashFile(resolve(source, path))]))
 }
 
-function rewriteStorageIdentifiers(source) {
-  let output = ''
-  let index = 0
-  const length = source.length
-  const isWord = (value) => /[A-Za-z0-9_$]/.test(value || '')
-  while (index < length) {
-    const char = source[index]
-    const next = source[index + 1]
-    if (char === "'" || char === '"' || char === '`') {
-      const quote = char
-      output += char
-      index += 1
-      while (index < length) {
-        const current = source[index]
-        output += current
-        index += 1
-        if (current === '\\' && index < length) {
-          output += source[index]
-          index += 1
-        } else if (current === quote) {
-          break
-        }
-      }
-      continue
-    }
-    if (char === '/' && next === '/') {
-      const end = source.indexOf('\n', index)
-      if (end < 0) return output + source.slice(index)
-      output += source.slice(index, end + 1)
-      index = end + 1
-      continue
-    }
-    if (char === '/' && next === '*') {
-      const end = source.indexOf('*/', index + 2)
-      if (end < 0) return output + source.slice(index)
-      output += source.slice(index, end + 2)
-      index = end + 2
-      continue
-    }
-    const qualified = ['window.localStorage', 'globalThis.localStorage'].find((token) => source.startsWith(token, index))
-    if (qualified) {
-      output += 'window.KGServerStateStorage'
-      index += qualified.length
-      continue
-    }
-    const token = 'localStorage'
-    if (source.startsWith(token, index) && !isWord(source[index - 1]) && !isWord(source[index + token.length])) {
-      output += 'window.KGServerStateStorage'
-      index += token.length
-      continue
-    }
-    output += char
-    index += 1
-  }
-  return output
-}
-
-function rewriteInlineScripts(html) {
-  return html.replace(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/gi, (match, attributes, body) =>
-    `<script${attributes}>${rewriteStorageIdentifiers(body)}</script>`)
-}
-
 function patchTrainingSessionReentrancy(source) {
   const declaration = "  let active=null;\n  let runtimeKey='';"
   if (!source.includes(declaration)) {
@@ -140,8 +78,8 @@ function injectPage(html, page) {
   ].join('\n')
   let generated = html.includes('kg-runtime:generated')
     ? html
-    : html.includes('</head>')
-      ? html.replace('</head>', `${injection}\n</head>`)
+    : /<head(?:\s[^>]*)?>/i.test(html)
+      ? html.replace(/<head(?:\s[^>]*)?>/i, (head) => `${head}\n${injection}`)
       : `${injection}\n${html}`
   if (page === 'user-management.html') {
     const serviceTag = '<script defer src="src/35-user-management-service.js"></script>'
@@ -224,14 +162,14 @@ function sync({ source, out }) {
   for (const asset of walk(bridgeDir)) cpSync(resolve(bridgeDir, asset), resolve(out, asset))
   for (const path of walk(resolve(out, 'src')).filter((item) => item.endsWith('.js'))) {
     const target = resolve(out, 'src', path)
-    let generated = rewriteStorageIdentifiers(readFileSync(target, 'utf8'))
+    let generated = readFileSync(target, 'utf8')
     if (path === '64-flow-orchestrator.js') generated = patchTrainingSessionReentrancy(generated)
     writeFileSync(target, generated)
   }
 
   for (const page of walk(out).filter((path) => !path.includes('/') && path.endsWith('.html'))) {
     const path = resolve(out, page)
-    writeFileSync(path, injectPage(rewriteInlineScripts(readFileSync(path, 'utf8')), page))
+    writeFileSync(path, injectPage(readFileSync(path, 'utf8'), page))
   }
 
   const indexPath = resolve(out, 'index.html')

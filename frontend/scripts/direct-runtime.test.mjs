@@ -26,6 +26,17 @@ test('direct storage exposes save state and pagehide recovery', () => {
   assert.match(source, /sendBeacon/)
 })
 
+test('direct storage replaces page localStorage and exposes an awaitable flush', () => {
+  assert.match(source, /Object\.defineProperty\(global,\s*['"]localStorage['"]/)
+  assert.match(source, /storage\.flush\s*=\s*flush/)
+  assert.match(source, /return\s+flushPromise/)
+})
+
+test('pagehide waits for upstream graph handlers before taking its beacon snapshot', () => {
+  assert.match(source, /queueMicrotask/)
+  assert.match(source, /sendLatestBeacon/)
+})
+
 test('a revision conflict reloads server state before retrying', () => {
   assert.match(source, /response\.status\s*===\s*409/)
   assert.match(source, /method:\s*['"]GET['"]/)

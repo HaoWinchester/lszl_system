@@ -33,6 +33,7 @@
   let timer = 0
   let inFlight = false
   let dirty = false
+  let flushPromise = null
   const pendingMutations = new Map()
   let lastMutation = { operation: 'bootstrap', key: '', value: null }
 
@@ -71,8 +72,7 @@
     }
   }
 
-  async function flush() {
-    if (!entry.authenticated || entry.readOnly || inFlight || !dirty) return
+  async function sendOnce() {
     const batch = new Map(pendingMutations)
     const outgoing = payload()
     let retryable = true
@@ -98,7 +98,7 @@
         revision = Number(serverState.revision || 0)
         dirty = pendingMutations.size > 0
         saveEvent('retrying', { page, namespace, revision })
-        return
+        return 'retry'
       }
       if (!response.ok) {
         const error = new Error(`保存失败 (${response.status})`)
@@ -112,14 +112,34 @@
       }
       dirty = pendingMutations.size > 0
       saveEvent('saved', { page, namespace, revision })
+      return 'saved'
     } catch (error) {
       retryable = error?.retryable !== false
       dirty = pendingMutations.size > 0
       saveEvent('error', { page, namespace, message: error instanceof Error ? error.message : '保存失败' })
+      throw error
     } finally {
       inFlight = false
-      if (dirty && retryable) timer = global.setTimeout(flush, 800)
+      if (dirty && retryable) timer = global.setTimeout(() => { flush().catch(() => {}) }, 800)
     }
+  }
+
+  async function flushLoop() {
+    while (dirty) {
+      const result = await sendOnce()
+      if (result !== 'retry' && !dirty) break
+    }
+    return true
+  }
+
+  function flush() {
+    if (!entry.authenticated || entry.readOnly || !dirty) return Promise.resolve(true)
+    if (!flushPromise) {
+      flushPromise = flushLoop().finally(() => {
+        flushPromise = null
+      })
+    }
+    return flushPromise
   }
 
   function emit(operation, key, value) {
@@ -129,7 +149,7 @@
     dirty = true
     if (!entry.authenticated || entry.readOnly) return
     global.clearTimeout(timer)
-    timer = global.setTimeout(flush, 120)
+    timer = global.setTimeout(() => { flush().catch(() => {}) }, 120)
   }
 
   const storage = {
@@ -158,11 +178,22 @@
     },
   }
   Object.defineProperty(storage, 'length', { enumerable: true, get: () => values.size })
+  storage.flush = flush
 
-  global.addEventListener('pagehide', () => {
+  Object.defineProperty(global, 'localStorage', {
+    configurable: true,
+    enumerable: true,
+    value: storage,
+  })
+
+  function sendLatestBeacon() {
     if (!entry.authenticated || entry.readOnly || !dirty || !global.navigator?.sendBeacon) return
     const blob = new Blob([JSON.stringify(payload())], { type: 'application/json' })
     global.navigator.sendBeacon('/api/v1/runtime/state', blob)
+  }
+
+  global.addEventListener('pagehide', () => {
+    global.queueMicrotask(sendLatestBeacon)
   })
 
   global.KGServerStateStorage = storage

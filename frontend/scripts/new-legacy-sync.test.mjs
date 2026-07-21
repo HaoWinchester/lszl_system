@@ -135,3 +135,27 @@ test('sync is reproducible for the same source tree', (t) => {
   assert.equal(runSync(item).status, 0)
   assert.equal(hashTree(item.output), first)
 })
+
+test('sync preserves upstream javascript instead of parsing localStorage identifiers', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  const source = `'use strict';\nlocalStorage.setItem('kg_default_entry_mode_v1', 'free');\nconst escaped = value => value.replace(/[&<>'"]/g, '');\nlocalStorage.setItem('kg_question_language_mode_v1', 'zh');\n`
+  write(resolve(item.upstream, 'src/65-question-bank-admin.js'), source)
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(readFileSync(resolve(item.output, 'src/65-question-bank-admin.js'), 'utf8'), source)
+})
+
+test('sync injects server storage before any upstream inline script', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'learning-path.html'), `<!doctype html><html><head><script>localStorage.getItem('kg_default_entry_mode_v1')</script></head><body><script defer src="src/01-runtime-config.js"></script></body></html>`)
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+  const generated = readFileSync(resolve(item.output, 'learning-path.html'), 'utf8')
+  assert.ok(generated.indexOf('server-state-bootstrap.js') < generated.indexOf("localStorage.getItem('kg_default_entry_mode_v1')"))
+})
