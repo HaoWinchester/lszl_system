@@ -90,6 +90,10 @@
       "kg_learning_sessions_v2__",
       "kg_learning_events_v1__",
       "kg_learning_rounds_v1__",
+      "kg_multi_question_analysis_sections_v1__",
+      "kg_multi_question_font_scale_v1__",
+      "kg_multi_question_highlight_color_v1__",
+      "kg_multi_question_paper_selection_v1__",
       "kg_canvas_workspace_catalog_v2__",
       "kg_canvas_workspace_v1__",
       "kg_deep_recall_progress_v1__"

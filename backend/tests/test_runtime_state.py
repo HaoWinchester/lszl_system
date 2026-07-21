@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.runtime_state_service import EXACT_KEYS, PREFIXES
+from app.services.runtime_state_service import EXACT_KEYS, PREFIXES, key_allowed
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -61,6 +61,16 @@ def test_frontend_compatibility_contract_matches_backend_storage_allowlist() -> 
 
     assert set(contract["exactKeys"]) == EXACT_KEYS
     assert tuple(contract["prefixes"]) == PREFIXES
+
+
+def test_runtime_state_accepts_scoped_multi_question_preferences() -> None:
+    for base_key in (
+        "kg_multi_question_analysis_sections_v1",
+        "kg_multi_question_font_scale_v1",
+        "kg_multi_question_highlight_color_v1",
+        "kg_multi_question_paper_selection_v1",
+    ):
+        assert key_allowed(f"{base_key}__%E4%BD%A9%E5%A5%87007")
 
 
 def test_runtime_state_rejects_unknown_storage_keys() -> None:
