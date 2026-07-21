@@ -110,6 +110,7 @@ test('generated graph editor keeps an existing relation on duplicate connect', (
   const branch = editor.match(/if\(relationExists\(source,id\)\)\{([\s\S]*?)\}else\{/)
   assert.ok(branch)
   assert.match(branch[1], /已有关系线/)
+  assert.match(branch[1], /state\.selectedLinkId\s*=\s*existing\?existing\.id:null/)
   assert.doesNotMatch(branch[1], /state\.links\s*=|\.splice\(|\.filter\(/)
 })
 

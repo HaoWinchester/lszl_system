@@ -233,6 +233,12 @@ function patchGraphInteractions(source) {
     "$('nodeModal').addEventListener('click',e=>{if(e.target===$('nodeModal'))closeNodeModal({discardNew:true})});\n['linkModal','graphModal','templateModal','flashcardModal'].forEach(id=>{$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).classList.remove('show')})});",
     'new-legacy 新节点遮罩取消',
   )
+  generated = replaceExactlyOnce(
+    generated,
+    "    if(relationExists(source,id)){\n      showStatus(`“${a?a.title:'起点'}”与“${b.title}”之间已有关系线。`);\n    }else{",
+    "    if(relationExists(source,id)){\n      const existing=linksForNodeId(source).find(link=>(link.from===source&&link.to===id)||(link.from===id&&link.to===source));\n      state.selectedLinkId=existing?existing.id:null;\n      showStatus(`“${a?a.title:'起点'}”与“${b.title}”之间已有关系线。`);\n    }else{",
+    'new-legacy 重复关系保持可见',
+  )
   return generated
 }
 

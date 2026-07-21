@@ -1980,6 +1980,8 @@ function handleNodeTap(id){
   if(state.linkSourceId&&state.linkSourceId!==id){
     const source=state.linkSourceId,a=nodeById(source),b=clicked;
     if(relationExists(source,id)){
+      const existing=linksForNodeId(source).find(link=>(link.from===source&&link.to===id)||(link.from===id&&link.to===source));
+      state.selectedLinkId=existing?existing.id:null;
       showStatus(`“${a?a.title:'起点'}”与“${b.title}”之间已有关系线。`);
     }else{
       const link=makeLink(source,id,'关联','',state.defaults.linkStyle,state.defaults.linkColor);
