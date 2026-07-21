@@ -2516,7 +2516,7 @@
       alert('设置失败：' + (e.message || e));
     }
   }
-  function previewDeepRecall(){
+  async function previewDeepRecall(){
     if(!saveQuestionForm({silent:true})) return;
     const bank = currentBank();
     const q = currentQuestion();
@@ -2527,6 +2527,12 @@
       payloadQuestion.sourceQuestionId=q.id || '';
       localStorage.setItem(DEEP_RECALL_KEY, JSON.stringify({question:payloadQuestion, savedAt:Date.now(), source:'question-bank-admin', sourceBankId:bank?.id || '', sourceQuestionId:q.id || ''}));
     }catch(e){}
+    try{
+      if(window.KGServerStateStorage&&typeof window.KGServerStateStorage.flush==='function')await window.KGServerStateStorage.flush();
+    }catch(error){
+      toast(error&&error.message||'服务器保存失败，请稍后重试。');
+      return;
+    }
     window.open('knowledge-recall.html?questionId=' + encodeURIComponent(q.id || 'current'), '_blank');
   }
   function exportCurrentBank(){

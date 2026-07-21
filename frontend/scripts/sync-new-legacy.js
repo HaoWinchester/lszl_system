@@ -244,12 +244,19 @@ function patchGraphInteractions(source) {
 
 function patchQuestionRecallPreview(source) {
   if (!source.includes('function previewDeepRecall()')) return source
-  return replaceExactlyOnce(
+  let generated = replaceExactlyOnce(
     source,
     "  function previewDeepRecall(){\n    if(!saveQuestionForm({silent:true})) return;\n    const q = currentQuestion();",
-    "  function previewDeepRecall(){\n    if(!saveQuestionForm({silent:true})) return;\n    const bank = currentBank();\n    const q = currentQuestion();",
+    "  async function previewDeepRecall(){\n    if(!saveQuestionForm({silent:true})) return;\n    const bank = currentBank();\n    const q = currentQuestion();",
     'new-legacy 深度回忆当前题传递',
   )
+  generated = replaceExactlyOnce(
+    generated,
+    "    }catch(e){}\n    window.open('knowledge-recall.html?questionId=' + encodeURIComponent(q.id || 'current'), '_blank');",
+    "    }catch(e){}\n    try{\n      if(window.KGServerStateStorage&&typeof window.KGServerStateStorage.flush==='function')await window.KGServerStateStorage.flush();\n    }catch(error){\n      toast(error&&error.message||'服务器保存失败，请稍后重试。');\n      return;\n    }\n    window.open('knowledge-recall.html?questionId=' + encodeURIComponent(q.id || 'current'), '_blank');",
+    'new-legacy 深度回忆打开前保存',
+  )
+  return generated
 }
 
 function injectPage(html, page) {

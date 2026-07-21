@@ -127,10 +127,12 @@ test('question validation adapter runs after the upstream question editor', () =
 
 test('generated question preview persists the selected bank and question for recall', () => {
   const editor = readFileSync(resolve(frontendDir, 'public/new-legacy/src/65-question-bank-admin.js'), 'utf8')
+  assert.match(editor, /async function previewDeepRecall\(\)/)
   const preview = editor.match(/function previewDeepRecall\(\)\{([\s\S]*?)window\.open\('knowledge-recall\.html/)
   assert.ok(preview)
   assert.match(preview[1], /const bank\s*=\s*currentBank\(\)/)
   assert.match(preview[1], /sourceBankId:bank\?\.id/)
+  assert.match(preview[1], /await window\.KGServerStateStorage\.flush\(\)/)
 })
 
 test('training runtime CSS keeps shortcuts above the guided action dock', () => {
