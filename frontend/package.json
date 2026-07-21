@@ -4,33 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "pnpm sync:new-legacy",
-    "dev": "vite",
-    "prebuild": "pnpm sync:new-legacy",
-    "build": "tsc -b && vite build",
-    "copy-legacy": "node scripts/copy-legacy.js",
+    "dev": "../scripts/dev.sh",
+    "build": "pnpm sync:new-legacy",
     "sync:new-legacy": "node scripts/sync-new-legacy.js && node scripts/export-guided-course.mjs",
-    "test:design": "node --test scripts/design-contract.test.mjs",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "test": "node --test scripts/*.test.mjs",
+    "test:design": "node --test scripts/design-contract.test.mjs"
   },
-  "dependencies": {
-    "axios": "^1.18.1",
-    "lucide-react": "^1.24.0",
-    "qrcode": "^1.5.4",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-router-dom": "^7.18.1",
-    "zustand": "^5.0.14"
-  },
-  "devDependencies": {
-    "@types/node": "^24.13.2",
-    "@types/qrcode": "^1.5.6",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.3",
-    "oxlint": "^1.71.0",
-    "typescript": "~6.0.2",
-    "vite": "^8.1.1"
-  }
+  "dependencies": {},
+  "devDependencies": {}
 }

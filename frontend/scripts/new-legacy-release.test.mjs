@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -17,7 +17,7 @@ function makeRoot() {
 }
 
 function run(root, ...args) {
-  return spawnSync(process.execPath, [command, ...args, '--root', root], {
+  return spawnSync(process.execPath, [command, ...args, '--root', root, '--skip-browser'], {
     cwd: repoDir,
     encoding: 'utf8',
   })
@@ -38,6 +38,8 @@ test('update builds an isolated release and atomically selects it', () => {
   assert.ok(existsSync(resolve(root, 'v8.6.0', 'source', 'learning-path.html')))
   assert.ok(existsSync(resolve(root, 'v8.6.0', 'site', 'learning-path.html')))
   assert.match(current.sourceHash, /^[a-f0-9]{64}$/)
+  assert.match(current.adapterHash, /^[a-f0-9]{64}$/)
+  assert.equal(readJson(resolve(root, 'v8.6.0', 'release.json')).adapterVersion, 4)
 })
 
 test('same version with a different source hash fails without changing current', () => {
@@ -53,6 +55,30 @@ test('same version with a different source hash fails without changing current',
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /相同版本号.*文件内容不同/)
   assert.equal(readFileSync(resolve(root, 'current.json'), 'utf8'), before)
+})
+
+test('failed automatic validation never changes the active release', () => {
+  const root = makeRoot()
+  assert.equal(run(root, 'update', source).status, 0)
+  const before = readFileSync(resolve(root, 'current.json'), 'utf8')
+  const next = resolve(root, 'validation-failure-source')
+  cpSync(source, next, { recursive: true })
+  writeFileSync(resolve(next, 'VERSION'), 'v8.6.1-validation-failure\n')
+  const validator = resolve(root, 'fail-validation.sh')
+  writeFileSync(validator, '#!/bin/sh\necho candidate rejected >&2\nexit 17\n')
+  chmodSync(validator, 0o755)
+
+  const result = spawnSync(process.execPath, [command, 'update', next, '--root', root], {
+    cwd: repoDir,
+    encoding: 'utf8',
+    env: { ...process.env, KG_RELEASE_VALIDATION_SCRIPT: validator },
+  })
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /自动验收失败.*正式版本未切换/s)
+  assert.equal(readFileSync(resolve(root, 'current.json'), 'utf8'), before)
+  const report = readJson(resolve(root, 'v8.6.1-validation-failure', 'validation.json'))
+  assert.equal(report.passed, false)
 })
 
 test('rollback selects the previous successful release', () => {

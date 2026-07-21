@@ -61,7 +61,12 @@ function fixture({ omit } = {}) {
   write(resolve(upstream, 'VERSION'), 'v8.6.0\n')
   for (const page of requiredPages) {
     if (page === omit) continue
-    write(resolve(upstream, page), '<!doctype html><html><head></head><body><script defer src="src/01-runtime-config.js"></script></body></html>')
+    const authScript = page === 'index.html'
+      ? '<script defer src="src/30-auth-guards.js"></script>'
+      : page === 'question-training.html'
+        ? '<script defer src="src/72-question-training-page.js"></script>'
+        : ''
+    write(resolve(upstream, page), `<!doctype html><html><head></head><body><script defer src="src/01-runtime-config.js"></script>${authScript}</body></html>`)
   }
   for (const path of requiredFiles) {
     if (path === omit) continue
@@ -81,7 +86,7 @@ function runSync(item) {
   })
 }
 
-test('sync copies v8.6.0 and injects project bridges without editing upstream', (t) => {
+test('sync copies v8.6.0 and injects the direct runtime without editing upstream', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))
   const before = hashTree(item.upstream)
@@ -91,7 +96,10 @@ test('sync copies v8.6.0 and injects project bridges without editing upstream', 
   assert.equal(result.status, 0, result.stderr)
   assert.equal(hashTree(item.upstream), before)
   assert.equal(JSON.parse(readFileSync(resolve(item.output, 'manifest.json'), 'utf8')).version, 'v8.6.0')
-  assert.match(readFileSync(resolve(item.output, 'learning-path.html'), 'utf8'), /new-legacy-navigation-bridge\.js/)
+  const page = readFileSync(resolve(item.output, 'learning-path.html'), 'utf8')
+  assert.match(page, /server-state-bootstrap\.js/)
+  assert.match(page, /direct-entry\.js/)
+  assert.doesNotMatch(page, /new-legacy-navigation-bridge\.js/)
   assert.match(readFileSync(resolve(item.output, 'src/64-flow-orchestrator.js'), 'utf8'), /publishingSessionChange/)
   assert.match(readFileSync(resolve(item.output, 'src/64-flow-orchestrator.js'), 'utf8'), /if\(!saved\)return clone\(current\)/)
 })
@@ -104,6 +112,18 @@ test('sync fails closed when a required page is missing', (t) => {
 
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /learning-path\.html/)
+})
+
+test('sync rejects an unregistered future business-storage key', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/23-graph-file-store.js'), "localStorage.setItem('kg_future_business_state_v1', '{}')\n")
+
+  const result = runSync(item)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /kg_future_business_state_v1/)
+  assert.match(result.stderr, /未登记/)
 })
 
 test('sync is reproducible for the same source tree', (t) => {

@@ -132,22 +132,42 @@ function patchTrainingSessionReentrancy(source) {
     .replace(persistAssignment, `    if(!saved)return clone(current);\n${persistAssignment}`)
 }
 
-function injectPage(html) {
+function injectPage(html, page) {
   const injection = [
     '<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->',
     '<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->',
-    '<script defer src="./new-legacy-navigation-bridge.js"></script><!-- kg-navigation:generated -->',
+    '<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->',
   ].join('\n')
-  if (html.includes('kg-runtime:generated')) return html
-  if (html.includes('</head>')) return html.replace('</head>', `${injection}\n</head>`)
-  return `${injection}\n${html}`
-}
-
-function injectGuidedLearningDataBridge(html) {
-  const marker = '<script defer src="src/87-guided-learning-data.js"></script>'
-  const bridge = '<script defer src="./guided-learning-data-bridge.js"></script><!-- kg-guided-data:generated -->'
-  if (html.includes('kg-guided-data:generated') || !html.includes(marker)) return html
-  return html.replace(marker, `${marker}\n${bridge}`)
+  let generated = html.includes('kg-runtime:generated')
+    ? html
+    : html.includes('</head>')
+      ? html.replace('</head>', `${injection}\n</head>`)
+      : `${injection}\n${html}`
+  if (page === 'user-management.html') {
+    const serviceTag = '<script defer src="src/35-user-management-service.js"></script>'
+    if (!generated.includes(serviceTag)) {
+      throw new Error('new-legacy 用户管理脚本顺序已变化，请复核直接后端适配器')
+    }
+    generated = generated.replace(
+      serviceTag,
+      `${serviceTag}\n<script defer src="./direct-admin-adapter.js"></script><!-- kg-admin:generated -->`,
+    )
+  }
+  const authTag = page === 'index.html'
+    ? '<script defer src="src/30-auth-guards.js"></script>'
+    : page === 'question-training.html'
+      ? '<script defer src="src/72-question-training-page.js"></script>'
+      : ''
+  if (authTag) {
+    if (!generated.includes(authTag)) {
+      throw new Error(`new-legacy ${page} 认证脚本顺序已变化，请复核直接后端适配器`)
+    }
+    generated = generated.replace(
+      authTag,
+      `${authTag}\n<script defer src="./direct-auth-adapter.js"></script><!-- kg-auth:generated -->`,
+    )
+  }
+  return generated
 }
 
 function diffFiles(previous = {}, next = {}) {
@@ -157,6 +177,25 @@ function diffFiles(previous = {}, next = {}) {
   return { added, changed, removed }
 }
 
+function validateStorageContract(source) {
+  const storage = contract.runtimeStorage || {}
+  const exact = new Set(storage.exactKeys || [])
+  const prefixes = storage.prefixes || []
+  const ignored = new Set(storage.ignoredLiterals || [])
+  const candidates = new Set()
+  const literalPattern = /(['"])(kg_[A-Za-z0-9_]+|pmp_question_font_size_v\d+|通用知识点关系图谱工具_[^'"\\\r\n]+)\1/g
+  for (const path of walk(source).filter((item) => item.endsWith('.js') || item.endsWith('.html'))) {
+    const contents = readFileSync(resolve(source, path), 'utf8')
+    for (const match of contents.matchAll(literalPattern)) candidates.add(match[2])
+  }
+  const unknown = Array.from(candidates)
+    .filter((key) => !ignored.has(key) && !exact.has(key) && !prefixes.some((prefix) => key.startsWith(prefix)))
+    .sort()
+  if (unknown.length) {
+    throw new Error(`new-legacy 出现未登记的业务存储键：${unknown.join(', ')}`)
+  }
+}
+
 function validate(source) {
   if (!existsSync(source) || !statSync(source).isDirectory()) throw new Error(`找不到 new-legacy 目录：${source}`)
   const required = ['VERSION', ...contract.requiredPages, ...contract.requiredFiles]
@@ -164,6 +203,7 @@ function validate(source) {
   if (missing.length) throw new Error(`new-legacy 缺少必需文件：${missing.join(', ')}`)
   const version = readFileSync(resolve(source, 'VERSION'), 'utf8').trim()
   if (!version) throw new Error('new-legacy/VERSION 不能为空')
+  validateStorageContract(source)
   return version
 }
 
@@ -182,9 +222,6 @@ function sync({ source, out }) {
 
   const bridgeDir = resolve(scriptsDir, 'new-legacy-assets')
   for (const asset of walk(bridgeDir)) cpSync(resolve(bridgeDir, asset), resolve(out, asset))
-  const graphBridge = resolve(scriptsDir, 'legacy-assets', 'bridge.js')
-  if (existsSync(graphBridge)) cpSync(graphBridge, resolve(out, 'graph-bridge.js'))
-
   for (const path of walk(resolve(out, 'src')).filter((item) => item.endsWith('.js'))) {
     const target = resolve(out, 'src', path)
     let generated = rewriteStorageIdentifiers(readFileSync(target, 'utf8'))
@@ -194,16 +231,11 @@ function sync({ source, out }) {
 
   for (const page of walk(out).filter((path) => !path.includes('/') && path.endsWith('.html'))) {
     const path = resolve(out, page)
-    writeFileSync(path, injectGuidedLearningDataBridge(injectPage(rewriteInlineScripts(readFileSync(path, 'utf8')))))
+    writeFileSync(path, injectPage(rewriteInlineScripts(readFileSync(path, 'utf8')), page))
   }
 
   const indexPath = resolve(out, 'index.html')
-  let workbench = readFileSync(indexPath, 'utf8')
-  const marker = '<script defer src="src/23-graph-file-store.js"></script>'
-  if (workbench.includes(marker) && existsSync(graphBridge)) {
-    workbench = workbench.replace(marker, `${marker}\n<script defer src="./graph-bridge.js"></script><!-- kg-graph:generated -->`)
-  }
-  writeFileSync(resolve(out, 'workbench.html'), workbench)
+  writeFileSync(resolve(out, 'workbench.html'), readFileSync(indexPath, 'utf8'))
 
   const manifest = {
     schemaVersion: 1,

@@ -18,12 +18,19 @@ import { fileURLToPath } from 'node:url'
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const frontendDir = resolve(scriptsDir, '..')
+const repoDir = resolve(frontendDir, '..')
 const defaultRoot = resolve(frontendDir, 'new-legacy-releases')
 const syncScript = resolve(scriptsDir, 'sync-new-legacy.js')
+const contractPath = resolve(scriptsDir, 'new-legacy-contract.json')
+const adapterRoot = resolve(scriptsDir, 'new-legacy-assets')
+const validationScript = process.env.KG_RELEASE_VALIDATION_SCRIPT
+  ? resolve(process.env.KG_RELEASE_VALIDATION_SCRIPT)
+  : resolve(scriptsDir, 'validate-new-legacy-release.sh')
 
 function parseArgs(argv) {
   const positional = []
   let root = defaultRoot
+  let skipValidation = false
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index]
     if (value === '--root') {
@@ -31,12 +38,13 @@ function parseArgs(argv) {
       root = resolve(argv[index + 1])
       index += 1
     } else if (value === '--skip-browser') {
-      // 浏览器验收由发布流水线调用；保留此参数方便本地首次导入。
+      // 只供首次引导和发布管理器自身的隔离测试使用。
+      skipValidation = true
     } else {
       positional.push(value)
     }
   }
-  return { command: positional[0] || 'status', argument: positional[1], root }
+  return { command: positional[0] || 'status', argument: positional[1], root, skipValidation }
 }
 
 function walk(root, base = root) {
@@ -54,6 +62,23 @@ function sourceHash(source) {
     hash.update(path)
     hash.update('\0')
     hash.update(readFileSync(resolve(source, path)))
+    hash.update('\0')
+  }
+  return hash.digest('hex')
+}
+
+function adapterHash() {
+  const hash = createHash('sha256')
+  for (const path of [syncScript, contractPath]) {
+    hash.update(relative(frontendDir, path))
+    hash.update('\0')
+    hash.update(readFileSync(path))
+    hash.update('\0')
+  }
+  for (const path of walk(adapterRoot)) {
+    hash.update(`new-legacy-assets/${path}`)
+    hash.update('\0')
+    hash.update(readFileSync(resolve(adapterRoot, path)))
     hash.update('\0')
   }
   return hash.digest('hex')
@@ -84,6 +109,7 @@ function pointerFor(release, previousVersion) {
     previousVersion,
     site: `${release.version}/site`,
     sourceHash: release.sourceHash,
+    adapterHash: release.adapterHash,
     promotedAt: new Date().toISOString(),
   }
 }
@@ -124,10 +150,40 @@ function inspect(source) {
   if (!existsSync(versionPath)) throw new Error('new-legacy 缺少 VERSION')
   const version = readFileSync(versionPath, 'utf8').trim()
   if (!version) throw new Error('new-legacy/VERSION 不能为空')
-  return { source: normalized, version, sourceHash: sourceHash(normalized), files: walk(normalized).length }
+  return {
+    source: normalized,
+    version,
+    sourceHash: sourceHash(normalized),
+    adapterHash: adapterHash(),
+    files: walk(normalized).length,
+  }
 }
 
-function update(root, source) {
+function validateCandidate(root, version, skipValidation) {
+  if (skipValidation) return { skipped: true }
+  const startedAt = new Date().toISOString()
+  const result = spawnSync(validationScript, [root, version], {
+    cwd: repoDir,
+    encoding: 'utf8',
+  })
+  const report = {
+    schemaVersion: 1,
+    version,
+    passed: result.status === 0,
+    startedAt,
+    completedAt: new Date().toISOString(),
+    stdout: String(result.stdout || '').slice(-40_000),
+    stderr: String(result.stderr || result.error?.message || '').slice(-40_000),
+  }
+  writeFileSync(resolve(root, version, 'validation.json'), `${JSON.stringify(report, null, 2)}\n`)
+  if (result.status !== 0) {
+    const detail = report.stderr.trim() || report.stdout.trim() || `退出码 ${result.status}`
+    throw new Error(`候选版本 ${version} 自动验收失败，正式版本未切换：\n${detail}`)
+  }
+  return report
+}
+
+function update(root, source, skipValidation = false) {
   return withLock(root, () => {
     const candidate = inspect(source)
     const finalDir = resolve(root, candidate.version)
@@ -153,7 +209,8 @@ function update(root, source) {
           version: candidate.version,
           sourceHash: candidate.sourceHash,
           sourceFiles: candidate.files,
-          adapterVersion: 3,
+          adapterVersion: 4,
+          adapterHash: candidate.adapterHash,
           createdAt: new Date().toISOString(),
         }
         writeFileSync(resolve(staging, 'release.json'), `${JSON.stringify(release, null, 2)}\n`)
@@ -163,6 +220,7 @@ function update(root, source) {
         throw error
       }
     }
+    validateCandidate(root, candidate.version, skipValidation)
     return promote(root, candidate.version)
   })
 }
@@ -183,7 +241,7 @@ function main() {
   const args = parseArgs(process.argv.slice(2))
   let result
   if (args.command === 'inspect') result = inspect(args.argument)
-  else if (args.command === 'update') result = update(args.root, args.argument)
+  else if (args.command === 'update') result = update(args.root, args.argument, args.skipValidation)
   else if (args.command === 'promote') result = withLock(args.root, () => promote(args.root, args.argument))
   else if (args.command === 'rollback') result = rollback(args.root)
   else if (args.command === 'status') result = currentManifest(args.root) || { status: 'empty' }
