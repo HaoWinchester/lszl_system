@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -74,4 +74,40 @@ test('graph and training login use remote authentication then reload account sta
   const entry = readFileSync(resolve(frontendDir, 'scripts/new-legacy-assets/direct-entry.js'), 'utf8')
   assert.match(entry, /kg-auth-session-change/)
   assert.match(entry, /location\.reload/)
+})
+
+test('graph autosave adapter runs after the upstream autosave module', () => {
+  const adapterPath = resolve(frontendDir, 'scripts/new-legacy-assets/direct-graph-adapter.js')
+  assert.ok(existsSync(adapterPath), 'direct-graph-adapter.js should exist')
+  const adapter = readFileSync(adapterPath, 'utf8')
+  assert.match(adapter, /KGGraphFileAutosave/)
+  assert.match(adapter, /saveNow/)
+  assert.match(adapter, /KGServerStateStorage/)
+  assert.match(adapter, /\.flush/)
+  const graphPage = readFileSync(resolve(frontendDir, 'public/new-legacy/index.html'), 'utf8')
+  assert.ok(graphPage.indexOf('src/24-graph-file-autosave.js') < graphPage.indexOf('direct-graph-adapter.js'))
+})
+
+test('file manager waits for server state before navigating', () => {
+  const manager = readFileSync(resolve(frontendDir, 'public/new-legacy/src/27-graph-file-manager.js'), 'utf8')
+  assert.match(manager, /await global\.KGServerStateStorage\.flush\(\)/)
+  assert.match(manager, /await flushServerStateBeforeNavigation\(\)/)
+  assert.match(manager, /async function openFile/)
+  assert.match(manager, /onSubmit:async value/)
+})
+
+test('generated graph editor discards new-node drafts and avoids exact overlap', () => {
+  const editor = readFileSync(resolve(frontendDir, 'public/new-legacy/src/10-graph-editor.js'), 'utf8')
+  assert.match(editor, /editingNodeIsNew/)
+  assert.match(editor, /discardNew:true/)
+  assert.match(editor, /findAvailableNodePosition/)
+  assert.match(editor, /graphNodeRectsOverlap/)
+})
+
+test('generated graph editor keeps an existing relation on duplicate connect', () => {
+  const editor = readFileSync(resolve(frontendDir, 'public/new-legacy/src/10-graph-editor.js'), 'utf8')
+  const branch = editor.match(/if\(relationExists\(source,id\)\)\{([\s\S]*?)\}else\{/)
+  assert.ok(branch)
+  assert.match(branch[1], /已有关系线/)
+  assert.doesNotMatch(branch[1], /state\.links\s*=|\.splice\(|\.filter\(/)
 })

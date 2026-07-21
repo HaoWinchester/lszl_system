@@ -11,11 +11,11 @@
     const Store = window.KGAppStorage || {};
     const readJSON = typeof ctx.readJSON === "function" ? ctx.readJSON : function(key,fallback){
       if(Store.readJSON) return Store.readJSON(key,fallback);
-      try{const raw=window.KGServerStateStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}
+      try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}
     };
     const writeJSON = typeof ctx.writeJSON === "function" ? ctx.writeJSON : function(key,value){
       if(Store.writeJSON) return Store.writeJSON(key,value);
-      try{window.KGServerStateStorage.setItem(key,JSON.stringify(value));return true}catch(e){return false}
+      try{localStorage.setItem(key,JSON.stringify(value));return true}catch(e){return false}
     };
     const refresh = function(){
       if(typeof ctx.decorateSubscriptionElements === "function") ctx.decorateSubscriptionElements();

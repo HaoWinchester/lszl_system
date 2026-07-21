@@ -19,7 +19,7 @@ function qbCurrentUsername(){
   try{
     if(typeof authCurrentUser!=='undefined'&&authCurrentUser?.username)return String(authCurrentUser.username);
   }catch(e){}
-  try{return String(window.KGServerStateStorage.getItem('kg_local_current_user_v1')||'')}catch(e){return ''}
+  try{return String(localStorage.getItem('kg_local_current_user_v1')||'')}catch(e){return ''}
 }
 function qbIsLoggedIn(){return !!qbCurrentUsername()}
 function qbScopeKey(){const username=qbCurrentUsername();return username?('user__'+encodeURIComponent(username)):'public'}
@@ -78,10 +78,10 @@ function qbLoadPapers(){
   qbEnsureScopeState();
   if(qBankState.papers)return qBankState.papers;
   let papers=[];
-  try{papers=JSON.parse(window.KGServerStateStorage.getItem(qbPapersKey())||'[]')}catch(e){papers=[]}
+  try{papers=JSON.parse(localStorage.getItem(qbPapersKey())||'[]')}catch(e){papers=[]}
   qBankState.papers=Array.isArray(papers)?papers.map(qbNormalizePaper):[];
   try{
-    const cur=JSON.parse(window.KGServerStateStorage.getItem(qbCurrentPaperKey())||'null');
+    const cur=JSON.parse(localStorage.getItem(qbCurrentPaperKey())||'null');
     if(cur&&qBankState.papers.some(p=>p.id===cur.paperId&&p.status==='published')){
       qBankState.currentPaperId=cur.paperId;
       qBankState.currentPaperIndex=Number(cur.index||0);
@@ -165,8 +165,8 @@ function qbEnsurePublishedPaperSelection(options={}){
 }
 function qbSaveCurrentPaper(){
   try{
-    if(qBankState.currentPaperId)window.KGServerStateStorage.setItem(qbCurrentPaperKey(),JSON.stringify({paperId:qBankState.currentPaperId,index:qBankState.currentPaperIndex||0,savedAt:Date.now()}));
-    else window.KGServerStateStorage.removeItem(qbCurrentPaperKey());
+    if(qBankState.currentPaperId)localStorage.setItem(qbCurrentPaperKey(),JSON.stringify({paperId:qBankState.currentPaperId,index:qBankState.currentPaperIndex||0,savedAt:Date.now()}));
+    else localStorage.removeItem(qbCurrentPaperKey());
   }catch(e){}
 }
 function qbPaperCurrentRef(){
@@ -210,10 +210,10 @@ function qbLoadBanks(){
   qbEnsureScopeState();
   if(qBankState.banks)return qBankState.banks;
   let banks=null;
-  try{banks=JSON.parse(window.KGServerStateStorage.getItem(qbBanksKey())||'null')}catch(e){}
+  try{banks=JSON.parse(localStorage.getItem(qbBanksKey())||'null')}catch(e){}
   if(!Array.isArray(banks)||!banks.length)banks=[qbDefaultBank()];
   qBankState.banks=banks.map(qbNormalizeBank);
-  try{const cur=JSON.parse(window.KGServerStateStorage.getItem(qbCurrentKey())||'null');if(cur){qBankState.currentBankId=cur.bankId;qBankState.currentQuestionIndex=Number(cur.index||0)}}catch(e){}
+  try{const cur=JSON.parse(localStorage.getItem(qbCurrentKey())||'null');if(cur){qBankState.currentBankId=cur.bankId;qBankState.currentQuestionIndex=Number(cur.index||0)}}catch(e){}
   qbLoadPapers();
   qbApplyPaperContext();
   if(!qBankState.currentBankId)qBankState.currentBankId=qBankState.banks[0].id;
@@ -225,8 +225,8 @@ function qbLoadBanks(){
   qbEnsureAllowedCurrentForRole();
   return qBankState.banks;
 }
-function qbSaveBanks(){if(!authRequire('登录后才能保存题库管理数据。'))return false;window.KGServerStateStorage.setItem(qbBanksKey(),JSON.stringify(qbLoadBanks()));return true}
-function qbSaveCurrent(){try{window.KGServerStateStorage.setItem(qbCurrentKey(),JSON.stringify({bankId:qBankState.currentBankId,index:qBankState.currentQuestionIndex}))}catch(e){}}
+function qbSaveBanks(){if(!authRequire('登录后才能保存题库管理数据。'))return false;localStorage.setItem(qbBanksKey(),JSON.stringify(qbLoadBanks()));return true}
+function qbSaveCurrent(){try{localStorage.setItem(qbCurrentKey(),JSON.stringify({bankId:qBankState.currentBankId,index:qBankState.currentQuestionIndex}))}catch(e){}}
 function qbCurrentBank(){return qbLoadBanks().find(b=>b.id===qBankState.currentBankId)||qbLoadBanks()[0]}
 function qbSelectedBank(){return qbLoadBanks().find(b=>b.id===qBankState.selectedBankId)||qbCurrentBank()}
 function qbCurrentQuestion(){const paperQuestion=qbApplyPaperContext();if(paperQuestion)return paperQuestion;const b=qbCurrentBank();return b&&b.questions&&b.questions[qBankState.currentQuestionIndex]?b.questions[qBankState.currentQuestionIndex]:qbDefaultBank().questions[0]}

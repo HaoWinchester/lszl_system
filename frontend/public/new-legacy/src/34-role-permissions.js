@@ -62,12 +62,12 @@
   function readJSON(key,fallback){
     if(Auth.readJSON)return Auth.readJSON(key,fallback);
     if(Store.readJSON)return Store.readJSON(key,fallback);
-    return (()=>{try{const raw=window.KGServerStateStorage.getItem(key);if(!raw)return fallback;const parsed=JSON.parse(raw);return parsed==null?fallback:parsed}catch(e){return fallback}})();
+    return (()=>{try{const raw=localStorage.getItem(key);if(!raw)return fallback;const parsed=JSON.parse(raw);return parsed==null?fallback:parsed}catch(e){return fallback}})();
   }
   function writeJSON(key,value){
     if(Auth.writeJSON)return Auth.writeJSON(key,value);
     if(Store.writeJSON)return Store.writeJSON(key,value);
-    window.KGServerStateStorage.setItem(key,JSON.stringify(value));
+    localStorage.setItem(key,JSON.stringify(value));
     return true;
   }
   function escapeHTML(value){

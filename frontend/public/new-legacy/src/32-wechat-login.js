@@ -32,13 +32,13 @@
     const core=authCore();
     if(core&&typeof core.readJSON==='function')return core.readJSON(key,fallback);
     if(Store.readJSON)return Store.readJSON(key,fallback);
-    try{const raw=window.KGServerStateStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}
+    try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}
   }
   function writeJSON(key,value){
     const core=authCore();
     if(core&&typeof core.writeJSON==='function')return core.writeJSON(key,value);
     if(Store.writeJSON)return Store.writeJSON(key,value);
-    window.KGServerStateStorage.setItem(key,JSON.stringify(value));
+    localStorage.setItem(key,JSON.stringify(value));
     return true;
   }
   function escapeHTML(value){
@@ -289,7 +289,7 @@
       const data=await res.json();
       if(!data || !data.openid)throw new Error('后端未返回 openid');
       if(Store.remove)Store.remove(WECHAT_PENDING_KEY);
-      else window.KGServerStateStorage.removeItem(WECHAT_PENDING_KEY);
+      else localStorage.removeItem(WECHAT_PENDING_KEY);
       completeLogin(data,'wechat-official');
       try{history.replaceState(null,document.title,location.pathname+location.hash)}catch(e){}
     }catch(err){

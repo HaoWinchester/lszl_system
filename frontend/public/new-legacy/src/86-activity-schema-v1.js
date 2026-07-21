@@ -29,11 +29,11 @@
   function cleanText(value){return text(value).trim()}
   function normalizeLanguageMode(mode){return LANGUAGE_MODES.includes(String(mode||''))?String(mode):'zh'}
   function getLanguageMode(){
-    try{return normalizeLanguageMode(global.window.KGServerStateStorage?.getItem(LANGUAGE_STORAGE_KEY)||'zh')}catch(error){return 'zh'}
+    try{return normalizeLanguageMode(global.localStorage?.getItem(LANGUAGE_STORAGE_KEY)||'zh')}catch(error){return 'zh'}
   }
   function setLanguageMode(mode){
     const value=normalizeLanguageMode(mode);
-    try{global.window.KGServerStateStorage?.setItem(LANGUAGE_STORAGE_KEY,value)}catch(error){}
+    try{global.localStorage?.setItem(LANGUAGE_STORAGE_KEY,value)}catch(error){}
     try{global.dispatchEvent?.(new CustomEvent('kg:question-language-mode',{detail:{mode:value}}))}catch(error){}
     return value;
   }

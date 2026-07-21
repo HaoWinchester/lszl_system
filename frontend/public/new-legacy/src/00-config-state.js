@@ -191,7 +191,7 @@ function normalizeState(){state=sanitizeState(state);return state}
 function readLegacyState(){
   try{
     const key=currentStoreKey(),store=window.KGAppStorage;
-    const data=store&&store.readJSON?store.readJSON(key,null):JSON.parse(window.KGServerStateStorage.getItem(key)||'null');
+    const data=store&&store.readJSON?store.readJSON(key,null):JSON.parse(localStorage.getItem(key)||'null');
     return data&&typeof data==='object'?sanitizeState(data):null;
   }catch(e){console.warn(e);return null}
 }
@@ -237,7 +237,7 @@ function persistCurrentGraphNow(options={}){
     const store=window.KGAppStorage,key=currentStoreKey();
     let legacySaved=true;
     if(store&&store.writeString)legacySaved=store.writeString(key,json)!==false;
-    else{window.KGServerStateStorage.setItem(key,json);legacySaved=true}
+    else{localStorage.setItem(key,json);legacySaved=true}
     if(!legacySaved)console.warn('[GraphSave] legacy mirror write failed:',key);
     lastSavedSnapshot=json;
     return true;

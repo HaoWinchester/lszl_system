@@ -51,7 +51,7 @@
     let raw=null;
     const possibleIds=[course?.id,'pmp-change-response-demo-v1'].filter(Boolean);
     for(const courseId of possibleIds){
-      try{raw=JSON.parse(window.KGServerStateStorage.getItem(key(courseId,userId,LEGACY_PREFIX))||'null')}catch(error){raw=null}
+      try{raw=JSON.parse(localStorage.getItem(key(courseId,userId,LEGACY_PREFIX))||'null')}catch(error){raw=null}
       if(raw)break;
     }
     if(!raw)return null;
@@ -128,18 +128,18 @@
   }
   function read(course,userId=currentUserId()){
     let raw=null;
-    try{raw=JSON.parse(window.KGServerStateStorage.getItem(key(course.id,userId))||'null')}catch(error){raw=null}
+    try{raw=JSON.parse(localStorage.getItem(key(course.id,userId))||'null')}catch(error){raw=null}
     if(!raw){
       raw=migrateLegacy(course,userId);
       if(raw){
-        try{window.KGServerStateStorage.setItem(key(course.id,userId),JSON.stringify(raw))}catch(error){}
+        try{localStorage.setItem(key(course.id,userId),JSON.stringify(raw))}catch(error){}
       }
     }
     return normalize(raw,course,userId);
   }
   function write(progress,course,userId=progress?.userId||currentUserId()){
     const normalized=normalize({...clone(progress),updatedAt:now()},course,userId);
-    try{window.KGServerStateStorage.setItem(key(course.id,userId),JSON.stringify(normalized))}catch(error){}
+    try{localStorage.setItem(key(course.id,userId),JSON.stringify(normalized))}catch(error){}
     try{global.dispatchEvent(new CustomEvent('kg:guided-learning-progress',{detail:{courseId:course.id,userId,progress:clone(normalized)}}))}catch(error){}
     return clone(normalized);
   }
@@ -265,8 +265,8 @@
       percent:nodes.length?Math.round(completed/nodes.length*100):0
     };
   }
-  function defaultMode(){try{return window.KGServerStateStorage.getItem(DEFAULT_MODE_KEY)==='free'?'free':'learning'}catch(error){return 'learning'}}
-  function setDefaultMode(mode){const value=mode==='free'?'free':'learning';try{window.KGServerStateStorage.setItem(DEFAULT_MODE_KEY,value)}catch(error){}return value}
+  function defaultMode(){try{return localStorage.getItem(DEFAULT_MODE_KEY)==='free'?'free':'learning'}catch(error){return 'learning'}}
+  function setDefaultMode(mode){const value=mode==='free'?'free':'learning';try{localStorage.setItem(DEFAULT_MODE_KEY,value)}catch(error){}return value}
 
   global.KGGuidedLearningStore=Object.freeze({
     PREFIX,

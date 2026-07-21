@@ -18,7 +18,7 @@
     return String(key || "");
   }
   function storage(){
-    try{return window.KGServerStateStorage || null}catch(e){return null}
+    try{return window.localStorage || null}catch(e){return null}
   }
   function cloneFallback(value){
     if(value == null) return value;

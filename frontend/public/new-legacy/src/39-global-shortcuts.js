@@ -53,7 +53,7 @@
   function readJSON(key, fallback){
     if(Store.readJSON) return Store.readJSON(key, fallback);
     try{
-      const raw = window.KGServerStateStorage.getItem(key);
+      const raw = localStorage.getItem(key);
       return raw ? JSON.parse(raw) : fallback;
     }catch(e){
       return fallback;
@@ -61,7 +61,7 @@
   }
   function writeJSON(key, value){
     if(Store.writeJSON){Store.writeJSON(key, value);return}
-    try{ window.KGServerStateStorage.setItem(key, JSON.stringify(value)); }catch(e){}
+    try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){}
   }
   function setStatus(message){
     const status = document.getElementById("status");

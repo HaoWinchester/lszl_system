@@ -20,7 +20,7 @@ function authNormalizeUserRecord(username,user){
 function authUsers(){
   if(AuthCore.users)return AuthCore.users();
   try{
-    const data=AppStorage.readJSON?AppStorage.readJSON(AUTH_USERS_KEY,{}):JSON.parse(window.KGServerStateStorage.getItem(AUTH_USERS_KEY)||'{}');
+    const data=AppStorage.readJSON?AppStorage.readJSON(AUTH_USERS_KEY,{}):JSON.parse(localStorage.getItem(AUTH_USERS_KEY)||'{}');
     if(!data||typeof data!=='object')return{};
     const users={};
     Object.keys(data).forEach(username=>{users[username]=authNormalizeUserRecord(username,data[username])});
@@ -30,15 +30,15 @@ function authUsers(){
 function authSaveUsers(users){
   if(AuthCore.saveUsers)return AuthCore.saveUsers(users||{});
   if(AppStorage.writeJSON)AppStorage.writeJSON(AUTH_USERS_KEY,users||{});
-  else window.KGServerStateStorage.setItem(AUTH_USERS_KEY,JSON.stringify(users||{}));
+  else localStorage.setItem(AUTH_USERS_KEY,JSON.stringify(users||{}));
 }
 function authLogAction(action,username='',detail=''){
   try{
     if(AuthCore.logAction)return AuthCore.logAction(action,username,detail);
-    const logs=AppStorage.readJSON?AppStorage.readJSON(USER_ADMIN_LOG_KEY,[]):JSON.parse(window.KGServerStateStorage.getItem(USER_ADMIN_LOG_KEY)||'[]');
+    const logs=AppStorage.readJSON?AppStorage.readJSON(USER_ADMIN_LOG_KEY,[]):JSON.parse(localStorage.getItem(USER_ADMIN_LOG_KEY)||'[]');
     logs.unshift({id:uid('log'),action:String(action||''),username:String(username||''),detail:String(detail||''),actor:(authCurrentUser&&authCurrentUser.username)||'local',at:Date.now()});
     if(AppStorage.writeJSON)AppStorage.writeJSON(USER_ADMIN_LOG_KEY,logs.slice(0,300));
-    else window.KGServerStateStorage.setItem(USER_ADMIN_LOG_KEY,JSON.stringify(logs.slice(0,300)));
+    else localStorage.setItem(USER_ADMIN_LOG_KEY,JSON.stringify(logs.slice(0,300)));
   }catch(e){}
 }
 function authUserKey(username){
@@ -55,13 +55,13 @@ function authLoadSession(){
       if(AuthCore.currentUsername&&AuthCore.currentUsername())AuthCore.clearSession&&AuthCore.clearSession();
       return null;
     }
-    const username=AppStorage.readString?AppStorage.readString(AUTH_SESSION_KEY,''):window.KGServerStateStorage.getItem(AUTH_SESSION_KEY);
+    const username=AppStorage.readString?AppStorage.readString(AUTH_SESSION_KEY,''):localStorage.getItem(AUTH_SESSION_KEY);
     if(!username)return null;
     const users=authUsers();
     const user=users[username];
     if(user&&user.status!=='archived'&&user.status!=='paused')return {username};
     if(AppStorage.remove)AppStorage.remove(AUTH_SESSION_KEY);
-    else window.KGServerStateStorage.removeItem(AUTH_SESSION_KEY);
+    else localStorage.removeItem(AUTH_SESSION_KEY);
     return null;
   }catch(e){return null}
 }

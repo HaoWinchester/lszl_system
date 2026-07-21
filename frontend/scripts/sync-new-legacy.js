@@ -38,6 +38,14 @@ function hashFile(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex')
 }
 
+function replaceExactlyOnce(source, before, after, label) {
+  const first = source.indexOf(before)
+  if (first < 0 || source.indexOf(before, first + before.length) >= 0) {
+    throw new Error(`${label} 结构已变化，请复核兼容补丁`)
+  }
+  return source.replace(before, after)
+}
+
 function sourceFiles(source) {
   return Object.fromEntries(walk(source).map((path) => [path, hashFile(resolve(source, path))]))
 }
@@ -70,6 +78,76 @@ function patchTrainingSessionReentrancy(source) {
     .replace(persistAssignment, `    if(!saved)return clone(current);\n${persistAssignment}`)
 }
 
+function patchFileManagerNavigation(source) {
+  let generated = replaceExactlyOnce(
+    source,
+    "  function selectFolder(id,options){selectItem('folder',id,options)}\n  function openFolder(id)",
+    "  function selectFolder(id,options){selectItem('folder',id,options)}\n  async function flushServerStateBeforeNavigation(){\n    if(global.KGServerStateStorage&&typeof global.KGServerStateStorage.flush==='function')await global.KGServerStateStorage.flush();\n  }\n  function openFolder(id)",
+    'new-legacy 文件管理保存屏障',
+  )
+  generated = replaceExactlyOnce(
+    generated,
+    '  function openFile(id){',
+    '  async function openFile(id){',
+    'new-legacy 文件打开异步入口',
+  )
+  generated = replaceExactlyOnce(
+    generated,
+    "    state.navigating=true;location.href='index.html';",
+    "    state.navigating=true;\n    try{await flushServerStateBeforeNavigation();location.href='index.html'}catch(err){state.navigating=false;toast(err&&err.message||'服务器保存失败，请稍后重试。','error')}",
+    'new-legacy 文件打开跳转',
+  )
+  generated = replaceExactlyOnce(
+    generated,
+    "submitLabel:'创建并打开',onSubmit:value=>{",
+    "submitLabel:'创建并打开',onSubmit:async value=>{",
+    'new-legacy 创建并打开异步入口',
+  )
+  generated = replaceExactlyOnce(
+    generated,
+    "      if(!file)throw new Error(store.getLastError&&store.getLastError()||'新建图谱失败。');\n      location.href='index.html';",
+    "      if(!file)throw new Error(store.getLastError&&store.getLastError()||'新建图谱失败。');\n      await flushServerStateBeforeNavigation();\n      location.href='index.html';",
+    'new-legacy 创建文件跳转',
+  )
+  return generated
+}
+
+function patchGraphInteractions(source) {
+  let generated = replaceExactlyOnce(
+    source,
+    "function createNodeAt(x,y){const sub=window.KGSubscription;if(sub&&typeof sub.requireUsageLimit==='function'&&!sub.requireUsageLimit('graphNodes',state.nodes.length,1,{label:'图谱卡牌'}))return null;clearRelatedGatherLayout({render:false,message:false});clearMultiSelection();const size=state.defaults.nodeSize||'',color=safeColor(state.defaults.nodeColor,DEFAULTS.nodeColor),d=dimsForSize(size),n=makeNode('新知识点',Math.round(x-d.w/2),Math.round(y-d.h/2),color,'','基础','','','',size);state.nodes.push(n);state.selectedNodeId=n.id;state.selectedLinkId=null;state.linkSourceId=null;render({persist:true});openNodeModal(n.id,true);return n}",
+    [
+      "function graphNodeRectsOverlap(x,y,w,h,node){const d=nodeDims(node),gap=12;return x<node.x+d.w+gap&&x+w+gap>node.x&&y<node.y+d.h+gap&&y+h+gap>node.y}",
+      "function findAvailableNodePosition(x,y,w,h){const origin={x:Math.round(x),y:Math.round(y)};for(let attempt=0;attempt<64;attempt++){const candidate={x:origin.x+(attempt%8)*36,y:origin.y+Math.floor(attempt/8)*36};if(!state.nodes.some(node=>graphNodeRectsOverlap(candidate.x,candidate.y,w,h,node)))return candidate}return{x:origin.x+36,y:origin.y+36}}",
+      "function createNodeAt(x,y){const sub=window.KGSubscription;if(sub&&typeof sub.requireUsageLimit==='function'&&!sub.requireUsageLimit('graphNodes',state.nodes.length,1,{label:'图谱卡牌'}))return null;clearRelatedGatherLayout({render:false,message:false});clearMultiSelection();const size=state.defaults.nodeSize||'',color=safeColor(state.defaults.nodeColor,DEFAULTS.nodeColor),d=dimsForSize(size),position=findAvailableNodePosition(x-d.w/2,y-d.h/2,d.w,d.h),n=makeNode('新知识点',position.x,position.y,color,'','基础','','','',size);state.nodes.push(n);state.selectedNodeId=n.id;state.selectedLinkId=null;state.linkSourceId=null;render({persist:true});openNodeModal(n.id,true);return n}",
+    ].join('\n'),
+    'new-legacy 新节点自动错位',
+  )
+  generated = replaceExactlyOnce(
+    generated,
+    [
+      'let editingNodeId=null,editingLinkId=null;',
+      "function openNodeModal(id,isNew=false){const n=nodeById(id);if(!n)return;editingNodeId=id;$('nodeModalTitle').textContent=isNew?'创建知识点':'编辑知识点';$('nTitle').value=n.title||'';$('nCategory').value=n.category||'';$('nColor').value=safeColor(n.color,'#64748b');$('nSize').value=n.size||'';$('nLevel').value=n.level||'基础';$('nKeywords').value=n.keywords||'';$('nSummary').value=n.summary||'';$('nNotes').value=n.notes||'';$('deleteNodeBtn').style.display=isNew?'none':'';$('nodeModal').classList.add('show');setTimeout(()=>$('nTitle').focus(),80)}",
+      "function closeNodeModal(){$('nodeModal').classList.remove('show')}",
+      "$('cancelNodeBtn').onclick=closeNodeModal;",
+    ].join('\n'),
+    [
+      'let editingNodeId=null,editingNodeIsNew=false,editingLinkId=null;',
+      "function openNodeModal(id,isNew=false){const n=nodeById(id);if(!n)return;editingNodeId=id;editingNodeIsNew=!!isNew;$('nodeModalTitle').textContent=isNew?'创建知识点':'编辑知识点';$('nTitle').value=n.title||'';$('nCategory').value=n.category||'';$('nColor').value=safeColor(n.color,'#64748b');$('nSize').value=n.size||'';$('nLevel').value=n.level||'基础';$('nKeywords').value=n.keywords||'';$('nSummary').value=n.summary||'';$('nNotes').value=n.notes||'';$('deleteNodeBtn').style.display=isNew?'none':'';$('nodeModal').classList.add('show');setTimeout(()=>$('nTitle').focus(),80)}",
+      "function closeNodeModal(options={}){const draftId=options.discardNew&&editingNodeIsNew?editingNodeId:null;$('nodeModal').classList.remove('show');editingNodeId=null;editingNodeIsNew=false;if(draftId){state.nodes=state.nodes.filter(node=>node.id!==draftId);state.links=state.links.filter(link=>link.from!==draftId&&link.to!==draftId);selectedNodeIds.delete(draftId);if(state.selectedNodeId===draftId)state.selectedNodeId=null;if(state.linkSourceId===draftId)state.linkSourceId=null;render({persist:true});showStatus('已取消创建知识点。')}}",
+      "$('cancelNodeBtn').onclick=()=>closeNodeModal({discardNew:true});",
+    ].join('\n'),
+    'new-legacy 取消新节点草稿',
+  )
+  generated = replaceExactlyOnce(
+    generated,
+    "['nodeModal','linkModal','graphModal','templateModal','flashcardModal'].forEach(id=>{$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).classList.remove('show')})});",
+    "$('nodeModal').addEventListener('click',e=>{if(e.target===$('nodeModal'))closeNodeModal({discardNew:true})});\n['linkModal','graphModal','templateModal','flashcardModal'].forEach(id=>{$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).classList.remove('show')})});",
+    'new-legacy 新节点遮罩取消',
+  )
+  return generated
+}
+
 function injectPage(html, page) {
   const injection = [
     '<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->',
@@ -89,6 +167,16 @@ function injectPage(html, page) {
     generated = generated.replace(
       serviceTag,
       `${serviceTag}\n<script defer src="./direct-admin-adapter.js"></script><!-- kg-admin:generated -->`,
+    )
+  }
+  if (page === 'index.html') {
+    const autosaveTag = '<script defer src="src/24-graph-file-autosave.js"></script>'
+    if (!generated.includes(autosaveTag)) {
+      throw new Error('new-legacy 图谱自动保存脚本顺序已变化，请复核直接图谱适配器')
+    }
+    generated = generated.replace(
+      autosaveTag,
+      `${autosaveTag}\n<script defer src="./direct-graph-adapter.js"></script><!-- kg-graph:generated -->`,
     )
   }
   const authTag = page === 'index.html'
@@ -163,7 +251,9 @@ function sync({ source, out }) {
   for (const path of walk(resolve(out, 'src')).filter((item) => item.endsWith('.js'))) {
     const target = resolve(out, 'src', path)
     let generated = readFileSync(target, 'utf8')
+    if (path === '10-graph-editor.js') generated = patchGraphInteractions(generated)
     if (path === '64-flow-orchestrator.js') generated = patchTrainingSessionReentrancy(generated)
+    if (path === '27-graph-file-manager.js') generated = patchFileManagerNavigation(generated)
     writeFileSync(target, generated)
   }
 

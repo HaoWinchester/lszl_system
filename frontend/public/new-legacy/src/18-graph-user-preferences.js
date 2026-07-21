@@ -85,7 +85,7 @@
     const store = window.KGAppStorage;
     if(store && typeof store.readJSON === "function") return store.readJSON(STORAGE_KEY, DEFAULT_PREFS);
     try{
-      const raw = window.KGServerStateStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY);
       return raw ? JSON.parse(raw) : clone(DEFAULT_PREFS);
     }catch(e){
       return clone(DEFAULT_PREFS);
@@ -107,7 +107,7 @@
     let ok = false;
     if(store && typeof store.writeJSON === "function") ok = store.writeJSON(STORAGE_KEY, clean) !== false;
     else{
-      try{window.KGServerStateStorage.setItem(STORAGE_KEY, JSON.stringify(clean));ok = true}catch(e){ok = false}
+      try{localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));ok = true}catch(e){ok = false}
     }
     prefs = clean;
     applyPrefs();

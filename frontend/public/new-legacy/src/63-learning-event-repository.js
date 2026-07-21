@@ -20,7 +20,7 @@
   function key(userId=currentUserId()){return EVENT_PREFIX+encodeURIComponent(String(userId||'guest'))}
   function read(userId=currentUserId()){
     try{
-      const value=JSON.parse(window.KGServerStateStorage.getItem(key(userId))||'[]');
+      const value=JSON.parse(localStorage.getItem(key(userId))||'[]');
       return Array.isArray(value)?value:[];
     }catch(e){console.warn('学习事件读取失败',e);return[]}
   }
@@ -38,7 +38,7 @@
     try{
       const events=read(userId);
       events.unshift(event);
-      window.KGServerStateStorage.setItem(key(userId),JSON.stringify(events.slice(0,MAX_EVENTS)));
+      localStorage.setItem(key(userId),JSON.stringify(events.slice(0,MAX_EVENTS)));
     }catch(e){console.warn('学习事件保存失败',e)}
     try{global.dispatchEvent(new CustomEvent('kg:learning-event',{detail:event}))}catch(e){}
     return clone(event);
@@ -55,10 +55,10 @@
     const userId=String(record.userId||currentUserId());
     try{
       const storageKey=LEGACY_ROUND_PREFIX+encodeURIComponent(userId);
-      const old=JSON.parse(window.KGServerStateStorage.getItem(storageKey)||'[]');
+      const old=JSON.parse(localStorage.getItem(storageKey)||'[]');
       const list=Array.isArray(old)?old:[];
       list.unshift(clone(record));
-      window.KGServerStateStorage.setItem(storageKey,JSON.stringify(list.slice(0,MAX_ROUNDS)));
+      localStorage.setItem(storageKey,JSON.stringify(list.slice(0,MAX_ROUNDS)));
     }catch(e){console.warn('学习轮次摘要保存失败',e)}
     append('SESSION_COMPLETED',record,{
       userId,

@@ -29,7 +29,7 @@
   }
   function readBucket(userId=currentUserId()){
     try{
-      const value=JSON.parse(window.KGServerStateStorage.getItem(key(userId))||'null');
+      const value=JSON.parse(localStorage.getItem(key(userId))||'null');
       if(value&&typeof value==='object'&&!Array.isArray(value)){
         value.sessions=value.sessions&&typeof value.sessions==='object'?value.sessions:{};
         return value;
@@ -45,7 +45,7 @@
     bucket.sessions=bucket.sessions&&typeof bucket.sessions==='object'?bucket.sessions:{};
     const entries=Object.entries(bucket.sessions).sort((a,b)=>Number(b[1]?.updatedAt||0)-Number(a[1]?.updatedAt||0));
     bucket.sessions=Object.fromEntries(entries.slice(0,MAX_SESSIONS_PER_USER));
-    window.KGServerStateStorage.setItem(key(bucket.userId),JSON.stringify(bucket));
+    localStorage.setItem(key(bucket.userId),JSON.stringify(bucket));
     return clone(bucket);
   }
   function createSession(context={},options={}){

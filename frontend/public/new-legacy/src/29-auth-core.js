@@ -22,7 +22,7 @@
   function readJSON(key, fallback){
     if(Store.readJSON) return Store.readJSON(key, fallback);
     try{
-      const raw = window.KGServerStateStorage.getItem(key);
+      const raw = localStorage.getItem(key);
       if(!raw) return fallback;
       const parsed = JSON.parse(raw);
       return parsed == null ? fallback : parsed;
@@ -33,7 +33,7 @@
   function writeJSON(key, value){
     if(Store.writeJSON) return Store.writeJSON(key, value);
     try{
-      window.KGServerStateStorage.setItem(key, JSON.stringify(value));
+      localStorage.setItem(key, JSON.stringify(value));
       return true;
     }catch(e){
       console.warn("[KGAuthCore] writeJSON failed", key, e);

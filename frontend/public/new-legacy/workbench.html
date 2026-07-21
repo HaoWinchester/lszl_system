@@ -2,6 +2,9 @@
 
 <html lang="zh-CN">
 <head>
+<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
+<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport"/>
 <script>
@@ -10,7 +13,7 @@
     var params=new URLSearchParams(location.search);
     if(params.get('mode')==='free')return;
     if(params.get('mode')==='learning'){location.replace('learning-path.html');return;}
-    var mode=window.KGServerStateStorage.getItem('kg_default_entry_mode_v1')||'learning';
+    var mode=localStorage.getItem('kg_default_entry_mode_v1')||'learning';
     if(mode!=='free')location.replace('learning-path.html');
   }catch(error){}
 })();
@@ -24,9 +27,6 @@
 <link rel="stylesheet" href="styles/graph-file-tabs.css"/>
 <link rel="stylesheet" href="styles/graph-user-preferences.css"/>
 
-<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
-<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->
-<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->
 </head>
 <body>
 <div class="app">
@@ -385,6 +385,7 @@
 <script defer src="src/22-home-file-library.js"></script>
 <script defer src="src/23-graph-file-store.js"></script>
 <script defer src="src/24-graph-file-autosave.js"></script>
+<script defer src="./direct-graph-adapter.js"></script><!-- kg-graph:generated -->
 <script defer src="src/25-graph-file-tabs.js"></script>
 <script defer src="src/20-flashcards-toolbar.js"></script>
 <script defer src="src/30-auth-guards.js"></script>

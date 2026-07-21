@@ -123,17 +123,17 @@
   function scrollStorageKey(stageId){return SCROLL_KEY_PREFIX+encodeURIComponent(currentUsername())+'__'+encodeURIComponent(state.course.id)+'__'+encodeURIComponent(stageId)}
   function readSavedScroll(stageId){
     try{
-      const raw=global.window.KGServerStateStorage?.getItem(scrollStorageKey(stageId));
+      const raw=global.localStorage?.getItem(scrollStorageKey(stageId));
       if(raw===null||raw==='')return null;
       const value=Number(raw);
       return Number.isFinite(value)&&value>=0?value:null;
     }catch(error){return null}
   }
   function writeSavedScroll(stageId,value){
-    try{global.window.KGServerStateStorage?.setItem(scrollStorageKey(stageId),String(Math.max(0,Math.round(Number(value)||0))))}catch(error){}
+    try{global.localStorage?.setItem(scrollStorageKey(stageId),String(Math.max(0,Math.round(Number(value)||0))))}catch(error){}
   }
   function clearSavedScroll(){
-    try{state.course.stages.forEach(stage=>global.window.KGServerStateStorage?.removeItem(scrollStorageKey(stage.id)))}catch(error){}
+    try{state.course.stages.forEach(stage=>global.localStorage?.removeItem(scrollStorageKey(stage.id)))}catch(error){}
   }
 
   function renderStageSwitch(){

@@ -170,7 +170,7 @@ function renderGuidedTour(){
 }
 function startGuidedTour(force=false){
   const store=window.KGAppStorage;
-  if(!force&&((store&&store.readString?store.readString(TOUR_STORAGE_KEY,''):window.KGServerStateStorage.getItem(TOUR_STORAGE_KEY))==='1'))return;
+  if(!force&&((store&&store.readString?store.readString(TOUR_STORAGE_KEY,''):localStorage.getItem(TOUR_STORAGE_KEY))==='1'))return;
   setGuidedTourPageState(true);
   guidedTourState={index:0,force};
   ensureGuidedTourLayer();
@@ -190,7 +190,7 @@ function finishGuidedTour(skipped=false){
   clearGuidedClone();
   setGuidedTourPageState(false);
   guidedTourState=null;
-  {const store=window.KGAppStorage;if(store&&store.writeString)store.writeString(TOUR_STORAGE_KEY,'1');else window.KGServerStateStorage.setItem(TOUR_STORAGE_KEY,'1');}
+  {const store=window.KGAppStorage;if(store&&store.writeString)store.writeString(TOUR_STORAGE_KEY,'1');else localStorage.setItem(TOUR_STORAGE_KEY,'1');}
   if(!skipped)showStatus('新手引导完成。你可以随时从右上角账号菜单进入“帮助中心”再次查看。');
 }
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&guidedTourState)finishGuidedTour(true)});

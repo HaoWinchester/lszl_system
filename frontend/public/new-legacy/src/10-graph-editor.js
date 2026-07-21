@@ -2008,7 +2008,9 @@ function activateLinkSource(id){
 }
 function selectLink(id,event=null){clearMultiSelection();clearHoverDetail(false);setSelectedEdgeQuickStyleAnchorFromEvent(event);state.selectedLinkId=id;state.selectedNodeId=null;state.linkSourceId=null;const l=linkById(id),a=nodeById(l&&l.from),b=nodeById(l&&l.to);showStatus(l&&a&&b?`已选择关系：${a.title} ↔ ${b.title}。可在线旁切换实线/虚线。`:'已选择关系线。可在线旁切换实线/虚线。');refreshSelectionUI()}
 function clearSelection(options={}){hoverDetailNodeId=null;clearTimeout(hoverDetailTimer);clearMultiSelection();state.selectedNodeId=null;state.selectedLinkId=null;state.linkSourceId=null;refreshSelectionUI(options)}
-function createNodeAt(x,y){const sub=window.KGSubscription;if(sub&&typeof sub.requireUsageLimit==='function'&&!sub.requireUsageLimit('graphNodes',state.nodes.length,1,{label:'图谱卡牌'}))return null;clearRelatedGatherLayout({render:false,message:false});clearMultiSelection();const size=state.defaults.nodeSize||'',color=safeColor(state.defaults.nodeColor,DEFAULTS.nodeColor),d=dimsForSize(size),n=makeNode('新知识点',Math.round(x-d.w/2),Math.round(y-d.h/2),color,'','基础','','','',size);state.nodes.push(n);state.selectedNodeId=n.id;state.selectedLinkId=null;state.linkSourceId=null;render({persist:true});openNodeModal(n.id,true);return n}
+function graphNodeRectsOverlap(x,y,w,h,node){const d=nodeDims(node),gap=12;return x<node.x+d.w+gap&&x+w+gap>node.x&&y<node.y+d.h+gap&&y+h+gap>node.y}
+function findAvailableNodePosition(x,y,w,h){const origin={x:Math.round(x),y:Math.round(y)};for(let attempt=0;attempt<64;attempt++){const candidate={x:origin.x+(attempt%8)*36,y:origin.y+Math.floor(attempt/8)*36};if(!state.nodes.some(node=>graphNodeRectsOverlap(candidate.x,candidate.y,w,h,node)))return candidate}return{x:origin.x+36,y:origin.y+36}}
+function createNodeAt(x,y){const sub=window.KGSubscription;if(sub&&typeof sub.requireUsageLimit==='function'&&!sub.requireUsageLimit('graphNodes',state.nodes.length,1,{label:'图谱卡牌'}))return null;clearRelatedGatherLayout({render:false,message:false});clearMultiSelection();const size=state.defaults.nodeSize||'',color=safeColor(state.defaults.nodeColor,DEFAULTS.nodeColor),d=dimsForSize(size),position=findAvailableNodePosition(x-d.w/2,y-d.h/2,d.w,d.h),n=makeNode('新知识点',position.x,position.y,color,'','基础','','','',size);state.nodes.push(n);state.selectedNodeId=n.id;state.selectedLinkId=null;state.linkSourceId=null;render({persist:true});openNodeModal(n.id,true);return n}
 
 let graphSearchPanel=null,graphSearchInputTimer=null,graphSearchIndexCache=null,graphSearchIndexStateRef=null,graphSearchIndexNodesRef=null,graphSearchIndexNodeLength=-1,graphSearchIndexVersion=0,graphSearchIndexBuiltVersion=-1;
 function invalidateGraphSearchIndex(){
@@ -2282,10 +2284,10 @@ stage.addEventListener('wheel',e=>{
     state.viewport.scale=ns;state.viewport.x=e.clientX-r.left-before.x*ns;state.viewport.y=e.clientY-r.top-before.y*ns;viewportDirty=true;applyTransform();scheduleViewportCommit();
   }
 },{passive:false});
-let editingNodeId=null,editingLinkId=null;
-function openNodeModal(id,isNew=false){const n=nodeById(id);if(!n)return;editingNodeId=id;$('nodeModalTitle').textContent=isNew?'创建知识点':'编辑知识点';$('nTitle').value=n.title||'';$('nCategory').value=n.category||'';$('nColor').value=safeColor(n.color,'#64748b');$('nSize').value=n.size||'';$('nLevel').value=n.level||'基础';$('nKeywords').value=n.keywords||'';$('nSummary').value=n.summary||'';$('nNotes').value=n.notes||'';$('deleteNodeBtn').style.display=isNew?'none':'';$('nodeModal').classList.add('show');setTimeout(()=>$('nTitle').focus(),80)}
-function closeNodeModal(){$('nodeModal').classList.remove('show')}
-$('cancelNodeBtn').onclick=closeNodeModal;
+let editingNodeId=null,editingNodeIsNew=false,editingLinkId=null;
+function openNodeModal(id,isNew=false){const n=nodeById(id);if(!n)return;editingNodeId=id;editingNodeIsNew=!!isNew;$('nodeModalTitle').textContent=isNew?'创建知识点':'编辑知识点';$('nTitle').value=n.title||'';$('nCategory').value=n.category||'';$('nColor').value=safeColor(n.color,'#64748b');$('nSize').value=n.size||'';$('nLevel').value=n.level||'基础';$('nKeywords').value=n.keywords||'';$('nSummary').value=n.summary||'';$('nNotes').value=n.notes||'';$('deleteNodeBtn').style.display=isNew?'none':'';$('nodeModal').classList.add('show');setTimeout(()=>$('nTitle').focus(),80)}
+function closeNodeModal(options={}){const draftId=options.discardNew&&editingNodeIsNew?editingNodeId:null;$('nodeModal').classList.remove('show');editingNodeId=null;editingNodeIsNew=false;if(draftId){state.nodes=state.nodes.filter(node=>node.id!==draftId);state.links=state.links.filter(link=>link.from!==draftId&&link.to!==draftId);selectedNodeIds.delete(draftId);if(state.selectedNodeId===draftId)state.selectedNodeId=null;if(state.linkSourceId===draftId)state.linkSourceId=null;render({persist:true});showStatus('已取消创建知识点。')}}
+$('cancelNodeBtn').onclick=()=>closeNodeModal({discardNew:true});
 $('saveNodeBtn').onclick=()=>{const n=nodeById(editingNodeId);if(!n)return;n.title=$('nTitle').value.trim()||'未命名知识点';n.category=$('nCategory').value.trim();n.color=safeColor($('nColor').value,'#64748b');n.size=NODE_SIZES.has($('nSize').value)?$('nSize').value:'';n.level=$('nLevel').value||'基础';n.keywords=$('nKeywords').value.trim();n.summary=$('nSummary').value.trim();n.notes=$('nNotes').value.trim();closeNodeModal();render({persist:true});showStatus('知识点已保存。')};
 $('deleteNodeBtn').onclick=()=>{if(editingNodeId)deleteNode(editingNodeId,true)};
 function deleteNode(id,fromModal=false){const n=nodeById(id);if(!n)return;if(confirm(`确定删除“${n.title}”及相关关系线吗？`)){pushGraphUndoSnapshot(`删除“${n.title}”`);if(relatedGatherLayout&&relatedGatherLayout.positions&&relatedGatherLayout.positions.has(n.id))clearRelatedGatherLayout({render:false,message:false});state.nodes=state.nodes.filter(i=>i.id!==n.id);selectedNodeIds.delete(n.id);state.links=state.links.filter(l=>l.from!==n.id&&l.to!==n.id);if(state.selectedNodeId===n.id)state.selectedNodeId=null;if(state.linkSourceId===n.id)state.linkSourceId=null;if(relatedScopeAnchorNodeId===n.id)relatedScopeAnchorNodeId=null;if(fromModal)closeNodeModal();render({persist:true});showStatus('知识点已删除。')}}
@@ -2473,6 +2475,7 @@ function bindGraphSearchButton(){
   });
 }
 bindGraphSearchButton();
-['nodeModal','linkModal','graphModal','templateModal','flashcardModal'].forEach(id=>{$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).classList.remove('show')})});
+$('nodeModal').addEventListener('click',e=>{if(e.target===$('nodeModal'))closeNodeModal({discardNew:true})});
+['linkModal','graphModal','templateModal','flashcardModal'].forEach(id=>{$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).classList.remove('show')})});
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&relatedCanvasModalEl){e.preventDefault();closeRelatedCanvasModal(true)}});

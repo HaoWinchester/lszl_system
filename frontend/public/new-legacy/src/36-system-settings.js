@@ -10,8 +10,8 @@
   const Store=window.KGAppStorage||{};
   const USER_LOG_KEY=A.USER_LOG_KEY||'kg_user_admin_logs_v1';
   const $=id=>document.getElementById(id);
-  const readJSON=A.readJSON||((key,fallback)=>Store.readJSON?Store.readJSON(key,fallback):(()=>{try{const raw=window.KGServerStateStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}})());
-  const writeJSON=A.writeJSON||((key,value)=>Store.writeJSON?Store.writeJSON(key,value):window.KGServerStateStorage.setItem(key,JSON.stringify(value)));
+  const readJSON=A.readJSON||((key,fallback)=>Store.readJSON?Store.readJSON(key,fallback):(()=>{try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}})());
+  const writeJSON=A.writeJSON||((key,value)=>Store.writeJSON?Store.writeJSON(key,value):localStorage.setItem(key,JSON.stringify(value)));
   const escapeHTML=A.escapeHTML||(value=>String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])));
   const fmtTime=A.fmtTime||(ts=>ts?new Date(Number(ts)).toLocaleString('zh-CN',{hour12:false}):'—');
   const roleLabel=A.roleLabel||(role=>({admin:'管理员',teacher:'教师/教研',student:'学员',viewer:'游客'}[role]||role||'学员'));

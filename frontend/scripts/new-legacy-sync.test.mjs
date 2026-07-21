@@ -62,7 +62,7 @@ function fixture({ omit } = {}) {
   for (const page of requiredPages) {
     if (page === omit) continue
     const authScript = page === 'index.html'
-      ? '<script defer src="src/30-auth-guards.js"></script>'
+      ? '<script defer src="src/24-graph-file-autosave.js"></script><script defer src="src/30-auth-guards.js"></script>'
       : page === 'question-training.html'
         ? '<script defer src="src/72-question-training-page.js"></script>'
         : ''

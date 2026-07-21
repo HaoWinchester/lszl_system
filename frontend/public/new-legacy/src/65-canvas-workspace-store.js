@@ -253,7 +253,7 @@
   }
   function rawRead(userId,workspaceId){
     try{
-      const raw=JSON.parse(window.KGServerStateStorage.getItem(storageKey(userId,workspaceId))||'null');
+      const raw=JSON.parse(localStorage.getItem(storageKey(userId,workspaceId))||'null');
       return raw?normalizeWorkspace(raw,{userId,workspaceId}):null;
     }catch(error){
       console.warn('跨题工作区读取失败',error);
@@ -262,12 +262,12 @@
   }
   function rawWrite(workspace){
     const normalized=normalizeWorkspace({...clone(workspace),updatedAt:now()});
-    window.KGServerStateStorage.setItem(storageKey(normalized.userId,normalized.id),JSON.stringify(normalized));
+    localStorage.setItem(storageKey(normalized.userId,normalized.id),JSON.stringify(normalized));
     return normalized;
   }
   function readCatalog(userId=currentUserId()){
     try{
-      const raw=JSON.parse(window.KGServerStateStorage.getItem(catalogKey(userId))||'null');
+      const raw=JSON.parse(localStorage.getItem(catalogKey(userId))||'null');
       return raw?normalizeCatalog(raw,userId):null;
     }catch(error){
       console.warn('工作区目录读取失败',error);
@@ -276,7 +276,7 @@
   }
   function writeCatalog(catalog){
     const normalized=normalizeCatalog({...clone(catalog),updatedAt:now()},catalog?.userId||currentUserId());
-    window.KGServerStateStorage.setItem(catalogKey(normalized.userId),JSON.stringify(normalized));
+    localStorage.setItem(catalogKey(normalized.userId),JSON.stringify(normalized));
     return normalized;
   }
   function ensureCatalog(options={}){
@@ -399,7 +399,7 @@
     let catalog=ensureCatalog({userId});
     workspaceId=String(workspaceId||catalog.activeWorkspaceId);
     if(!catalog.workspaces.some(item=>item.id===workspaceId))return null;
-    try{window.KGServerStateStorage.removeItem(storageKey(userId,workspaceId))}catch(e){}
+    try{localStorage.removeItem(storageKey(userId,workspaceId))}catch(e){}
     catalog.workspaces=catalog.workspaces.filter(item=>item.id!==workspaceId);
     if(!catalog.workspaces.length){
       const replacement=rawWrite(emptyWorkspace({

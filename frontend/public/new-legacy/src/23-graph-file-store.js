@@ -44,13 +44,13 @@
   function readJSON(key,fallback){
     const appStore=storage();
     if(appStore&&typeof appStore.readJSON==='function')return appStore.readJSON(key,fallback);
-    try{const raw=window.KGServerStateStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(err){console.warn('[KGGraphFileStore] read failed:',key,err);return fallback}
+    try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(err){console.warn('[KGGraphFileStore] read failed:',key,err);return fallback}
   }
   function writeJSON(key,value){
     const appStore=storage();
     try{
       if(appStore&&typeof appStore.writeJSON==='function')return appStore.writeJSON(key,value)===true;
-      window.KGServerStateStorage.setItem(key,JSON.stringify(value));return true;
+      localStorage.setItem(key,JSON.stringify(value));return true;
     }catch(err){console.warn('[KGGraphFileStore] write failed:',key,err);return false}
   }
   function removeKey(key){
@@ -58,7 +58,7 @@
     try{
       if(appStore&&typeof appStore.remove==='function')return appStore.remove(key)!==false;
       if(appStore&&typeof appStore.removeKey==='function')return appStore.removeKey(key)!==false;
-      window.KGServerStateStorage.removeItem(key);return true;
+      localStorage.removeItem(key);return true;
     }catch(err){return false}
   }
   function clone(value){
@@ -585,7 +585,7 @@
 
   function legacyKey(){try{if(typeof global.currentStoreKey==='function')return global.currentStoreKey()}catch(err){}return ''}
   function readLegacyGraph(key=legacyKey()){
-    if(!key)return null;try{const appStore=storage(),data=appStore&&typeof appStore.readJSON==='function'?appStore.readJSON(key,null):JSON.parse(window.KGServerStateStorage.getItem(key)||'null');return data&&typeof data==='object'?safeGraphData(data):null}catch(err){return null}
+    if(!key)return null;try{const appStore=storage(),data=appStore&&typeof appStore.readJSON==='function'?appStore.readJSON(key,null):JSON.parse(localStorage.getItem(key)||'null');return data&&typeof data==='object'?safeGraphData(data):null}catch(err){return null}
   }
   function migrateLegacyGraph(options={}){
     const owner=options.owner||currentOwner(),existing=listFiles({owner});if(existing.length)return getCurrentFile(owner)||existing[0];const graphData=options.graphData||readLegacyGraph(options.legacyKey);if(!graphData)return null;
