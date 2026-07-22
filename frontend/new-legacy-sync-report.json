@@ -1,27 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v8.6.6",
+  "fromVersion": "v8.6.8",
   "toVersion": "v8.6.8",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "index.html",
-      "learning-path.html",
-      "question-training.html",
-      "question-workspace.html",
-      "src/30-standalone-auth-dialog.js",
-      "src/34-role-permissions.js",
-      "src/41-account-menu.js",
-      "src/72-question-training-page.js",
-      "src/89-guided-learning-app.js",
-      "styles/account-menu.css",
-      "styles/guided-learning-path.css",
-      "styles/knowledge-recall.css",
-      "styles/main.css",
-      "styles/progress-workspace-dock.css",
-      "styles/question-workspace.css"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []

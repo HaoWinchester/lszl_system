@@ -264,6 +264,7 @@ function injectPage(html, page) {
     '<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->',
     '<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->',
     '<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->',
+    '<script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->',
   ].join('\n')
   let generated = html.includes('kg-runtime:generated')
     ? html
