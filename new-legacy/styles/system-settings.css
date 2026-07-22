@@ -68,7 +68,7 @@
   .ss-sidebar{
     position:static;
     display:grid;
-    grid-template-columns:repeat(5,minmax(0,1fr));
+    grid-template-columns:repeat(6,minmax(0,1fr));
   }
   .ss-sidebar button{
     text-align:center;
@@ -76,6 +76,13 @@
   .ss-role-theme-panel,
   .ss-permission-matrix{
     grid-template-columns:1fr;
+  }
+  .ss-analytics-summary{
+    grid-template-columns:1fr;
+  }
+  .ss-analytics-filters{
+    flex-direction:column;
+    align-items:stretch;
   }
 }
 @media(max-width:640px){
@@ -86,4 +93,125 @@
   .ss-sidebar{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
+}
+
+/* 用户功能偏好分析仪表板 */
+.ss-analytics-filters{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  align-items:flex-end;
+  margin-bottom:16px;
+}
+.ss-analytics-filters label{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  font-size:13px;
+  color:#475569;
+}
+.ss-analytics-filters input,
+.ss-analytics-filters select{
+  padding:6px 10px;
+  border:1px solid rgba(148,163,184,.4);
+  border-radius:10px;
+  background:#fff;
+}
+.ss-analytics-filters button{
+  padding:8px 18px;
+  border:none;
+  border-radius:10px;
+  background:linear-gradient(135deg,var(--role-primary,#2563eb),var(--role-accent,#7c3aed));
+  color:#fff;
+  cursor:pointer;
+}
+.ss-analytics-summary{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:18px;
+}
+.ss-analytics-summary>div{
+  display:flex;
+  flex-direction:column;
+  background:rgba(255,255,255,.8);
+  border:1px solid rgba(148,163,184,.24);
+  border-radius:16px;
+  padding:14px 16px;
+}
+.ss-analytics-summary strong{
+  font-size:24px;
+  color:var(--role-primary,#2563eb);
+}
+.ss-analytics-summary span{
+  font-size:13px;
+  color:#64748b;
+}
+.ss-analytics-table-wrap{
+  overflow-x:auto;
+  margin-bottom:18px;
+}
+.ss-analytics-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:14px;
+  min-width:680px;
+}
+.ss-analytics-table th,
+.ss-analytics-table td{
+  padding:10px 12px;
+  text-align:left;
+  border-bottom:1px solid rgba(148,163,184,.2);
+  white-space:nowrap;
+}
+.ss-analytics-table th{
+  color:#64748b;
+  font-weight:600;
+  background:rgba(248,250,252,.8);
+}
+.ss-analytics-bubble{
+  display:inline-block;
+  height:8px;
+  border-radius:4px;
+  background:linear-gradient(135deg,var(--role-primary,#2563eb),var(--role-accent,#7c3aed));
+  width:var(--w,0%);
+  min-width:8px;
+  max-width:120px;
+  margin-right:8px;
+  vertical-align:middle;
+}
+.ss-analytics-trends ul,
+.ss-analytics-insights ul{
+  list-style:none;
+  padding:0;
+  margin:0;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.ss-analytics-trends li{
+  display:flex;
+  gap:14px;
+  padding:6px 10px;
+  border-radius:10px;
+  background:rgba(248,250,252,.7);
+  font-size:13px;
+}
+.ss-analytics-trends h3,
+.ss-analytics-insights h3{
+  font-size:15px;
+  margin:0 0 10px;
+  color:#334155;
+}
+.ss-analytics-insights li{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  padding:8px 12px;
+  border-radius:12px;
+  background:rgba(248,250,252,.7);
+  font-size:13px;
+}
+.ss-analytics-insights strong{
+  color:var(--role-primary,#2563eb);
 }

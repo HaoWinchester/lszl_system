@@ -50,7 +50,6 @@ test('successful user actions emit only design-approved telemetry actions', () =
 })
 
 test('telemetry calls only fire after their successful persistence step', () => {
-  // 成果埋点必须出现在对应持久化/事件之后，而非之前或 catch 中
   const training = readSource('src/64-flow-orchestrator.js')
   assert.ok(training.indexOf('ANSWER_SUBMITTED') < training.indexOf("track('training','outcome'"), 'training 成果埋点应在提交事件之后')
   const recall = readSource('src/86-knowledge-recall.js')
@@ -59,4 +58,22 @@ test('telemetry calls only fire after their successful persistence step', () => 
   assert.ok(files.indexOf('await state.modalHandler(value)') < files.indexOf("track('files','outcome'"), 'files 成果埋点应在 modal handler 成功之后')
   const graph = readSource('direct-graph-adapter.js')
   assert.ok(graph.indexOf('storage.flush()') < graph.indexOf("track('graph','outcome'"), 'graph 成果埋点应在 flush 之后')
+})
+
+// ---------------------------------------------------------------- Task 6: 管理员仪表板
+
+test('system settings declares an analytics tab with stable content anchors', () => {
+  const html = readFileSync(resolve(repoDir, 'new-legacy/system-settings.html'), 'utf8')
+  for (const token of ['data-ss-tab="analytics"', 'data-ss-panel="analytics"', 'id="ssAnalyticsStart"', 'id="ssAnalyticsEnd"', 'id="ssAnalyticsRole"', 'id="ssAnalyticsContent"']) {
+    assert.match(html, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  }
+})
+
+test('dashboard only requests the aggregate endpoint and never renders user identifiers', () => {
+  const source = readFileSync(resolve(repoDir, 'new-legacy/src/36-system-settings.js'), 'utf8')
+  assert.match(source, /\/api\/v1\/system\/feature-analytics/)
+  const start = source.indexOf('function loadFeatureAnalytics')
+  assert.ok(start >= 0, '应实现 loadFeatureAnalytics')
+  const segment = source.slice(start, start + 6000)
+  assert.doesNotMatch(segment, /feature-events|ownerId|username|eventId/)
 })

@@ -404,6 +404,40 @@ def role_and_settings_regression(browser: Browser) -> None:
         page.close()
         context.close()
 
+    # P3-02：管理员可在系统设置查看“功能分析”聚合，仪表板不渲染任何用户标识；学生被权限拦截。
+    admin_context = context_for(browser, ACCOUNTS["admin"])
+    analytics_page = admin_context.new_page()
+    analytics_requested: list[str] = []
+    analytics_page.on("request", lambda request: analytics_requested.append(request.url))
+    try:
+        analytics_page.goto(f"{BASE}/settings", wait_until="networkidle")
+        analytics_page.locator('[data-ss-tab="analytics"]').click()
+        analytics_page.locator('[data-ss-panel="analytics"].active').wait_for(state="visible")
+        analytics_page.locator("#ssAnalyticsApply").click()
+        try:
+            analytics_page.wait_for_response(
+                lambda response: "/api/v1/system/feature-analytics" in response.url,
+                timeout=10_000,
+            )
+        except Exception:
+            pass
+        assert any("/api/v1/system/feature-analytics" in url for url in analytics_requested), analytics_requested
+        content_text = analytics_page.locator("#ssAnalyticsContent").inner_text().lower()
+        assert "username" not in content_text and "ownerid" not in content_text, content_text[:500]
+    finally:
+        analytics_page.close()
+        admin_context.close()
+
+    student_context = context_for(browser, ACCOUNTS["student_basic"])
+    student_page = student_context.new_page()
+    try:
+        student_page.goto(f"{BASE}/settings", wait_until="networkidle")
+        # 学生无系统设置权限，功能分析面板不会激活，也看不到其内容
+        assert student_page.locator('[data-ss-panel="analytics"].active').count() == 0
+    finally:
+        student_page.close()
+        student_context.close()
+
 
 def user_admin_regression(browser: Browser) -> None:
     # P1-08 / P2-05：复制显示名带“副本”；导入必须显式提供可登录初始密码。

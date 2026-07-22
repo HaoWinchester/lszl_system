@@ -39,6 +39,7 @@
         <button type="button" data-ss-tab="permissions">权限模板</button>
         <button type="button" data-ss-tab="subscriptions">订阅套餐</button>
         <button type="button" data-ss-tab="logs">操作日志</button>
+        <button type="button" data-ss-tab="analytics">功能分析</button>
       </aside>
 
       <section class="ss-content">
@@ -101,6 +102,19 @@
               <button id="ssClearLogsBtn" type="button">清空</button>
             </div>
             <div class="um-log-list" id="ssLogList"></div>
+          </div>
+        </section>
+
+        <section class="ss-pane" data-ss-panel="analytics">
+          <div class="um-panel">
+            <div class="um-card-head small"><div><h2>用户功能偏好</h2><p>比较常用程度与成果用户率，仅展示汇总数据。</p></div></div>
+            <div class="ss-analytics-filters">
+              <label>开始日期<input id="ssAnalyticsStart" type="date"></label>
+              <label>结束日期<input id="ssAnalyticsEnd" type="date"></label>
+              <label>角色<select id="ssAnalyticsRole"><option value="">全部角色</option><option value="teacher">教师/教研</option><option value="student">学员</option><option value="viewer">游客</option></select></label>
+              <button id="ssAnalyticsApply" type="button">查询</button>
+            </div>
+            <div id="ssAnalyticsContent" aria-live="polite"></div>
           </div>
         </section>
       </section>
