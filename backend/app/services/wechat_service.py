@@ -95,6 +95,52 @@ def profile_for_demo() -> dict:
     }
 
 
+def _wechat_payload(profile: dict, existing: dict | None, source: str) -> dict:
+    now = now_utc()
+    return {
+        "openid": str(profile.get("openid") or ""),
+        "unionid": str(profile.get("unionid") or ""),
+        "nickname": str(profile.get("nickname") or "微信用户"),
+        "avatar": str(profile.get("avatar") or ""),
+        "boundAt": (existing or {}).get("boundAt", _iso(now)),
+        "lastLoginAt": _iso(now),
+        "source": source,
+    }
+
+
+async def find_by_wechat_identity(
+    db: AsyncSession, openid: str, unionid: str = ""
+) -> User | None:
+    """按 openid 与可选 unionid 查询已绑定用户。"""
+    conditions = [User.wechat["openid"].astext == openid]
+    if unionid:
+        conditions.append(User.wechat["unionid"].astext == unionid)
+    return (await db.execute(select(User).where(or_(*conditions)))).scalar_one_or_none()
+
+
+async def bind_user(db: AsyncSession, user: User, profile: dict, source: str) -> User:
+    """将未被他人占用的微信身份绑定到当前用户；同用户重复绑定幂等。"""
+    openid = str(profile.get("openid") or "")
+    unionid = str(profile.get("unionid") or "")
+    if not openid:
+        raise ValueError("微信绑定失败：缺少 openid")
+    owner = await find_by_wechat_identity(db, openid, unionid)
+    if owner and owner.username != user.username:
+        raise ValueError("该微信已绑定其他账号，不能重复绑定")
+    user.wechat = _wechat_payload(profile, user.wechat, source)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+async def unbind_user(db: AsyncSession, user: User) -> User:
+    """仅移除微信登录标识，保留账号和所有业务数据。"""
+    user.wechat = None
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
 async def find_or_create_user(
     db: AsyncSession, profile: dict, cfg: dict, source: str
 ) -> User | None:
@@ -106,26 +152,18 @@ async def find_or_create_user(
     if not openid:
         raise ValueError("微信登录失败：缺少 openid")
 
-    conds = [User.wechat["openid"].astext == openid]
-    if unionid:
-        conds.append(User.wechat["unionid"].astext == unionid)
-    found = (await db.execute(select(User).where(or_(*conds)))).scalar_one_or_none()
+    found = await find_by_wechat_identity(db, openid, unionid)
 
     now = now_utc()
-    wechat_payload = {
-        "openid": openid,
-        "unionid": unionid,
-        "nickname": nickname,
-        "avatar": avatar,
-        "lastLoginAt": _iso(now),
-        "source": source,
-    }
+    wechat_payload = _wechat_payload(
+        {"openid": openid, "unionid": unionid, "nickname": nickname, "avatar": avatar},
+        found.wechat if found else None,
+        source,
+    )
 
     if found:
         if found.status != ACTIVE:
             raise PermissionError("该微信绑定账号已停用或归档")
-        existing = found.wechat or {}
-        wechat_payload["boundAt"] = existing.get("boundAt", _iso(now))
         found.wechat = wechat_payload
         found.display_name = found.display_name or nickname
         found.last_login_at = now
@@ -140,7 +178,6 @@ async def find_or_create_user(
     username = _wx_username(openid)
     while await user_service.get_by_username(db, username):
         username = _wx_username(openid + uid())  # 极小概率冲突，加随机重算
-    wechat_payload["boundAt"] = _iso(now)
     user = User(
         username=username,
         password_hash="",  # 微信用户无密码；to_dict 的 has_password=False
