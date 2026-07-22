@@ -14,6 +14,7 @@ from app.core.permissions import (
     ROLE_PERMISSIONS,
     ROLES,
 )
+from app.core.config import settings
 from app.models.system import RoleTheme, SystemSetting
 
 
@@ -83,21 +84,51 @@ async def set_theme(
 
 
 # ---------- 微信配置 ----------
+WECHAT_BROWSER_CONFIG_KEYS = (
+    "enableDemo",
+    "enableOfficial",
+    "autoCreateUser",
+    "appId",
+    "redirectUri",
+    "scope",
+    "defaultRole",
+    "defaultSubject",
+)
+
+
+def public_wechat_config(config: dict) -> dict:
+    """可传到管理页面或普通浏览器的非敏感微信配置。"""
+    return {key: config[key] for key in WECHAT_BROWSER_CONFIG_KEYS if key in config}
+
+
+def _environment_wechat_overrides() -> dict:
+    overrides = {
+        "appId": settings.WECHAT_APP_ID,
+        "appSecret": settings.WECHAT_APP_SECRET,
+        "redirectUri": settings.WECHAT_REDIRECT_URI,
+    }
+    if settings.WECHAT_ENABLE_OFFICIAL is not None:
+        overrides["enableOfficial"] = settings.WECHAT_ENABLE_OFFICIAL
+    if settings.WECHAT_ENABLE_DEMO is not None:
+        overrides["enableDemo"] = settings.WECHAT_ENABLE_DEMO
+    return {key: value for key, value in overrides.items() if value not in (None, "")}
+
+
 async def get_wechat_config(db: AsyncSession) -> dict:
     s = await _get_setting(db, "wechat_config")
-    return {**DEFAULT_WECHAT_CONFIG, **(s.value if s else {})}
+    return {**DEFAULT_WECHAT_CONFIG, **(s.value if s else {}), **_environment_wechat_overrides()}
 
 
 async def set_wechat_config(db: AsyncSession, patch: dict) -> dict:
     current = await get_wechat_config(db)
-    current.update({k: v for k, v in patch.items() if k in DEFAULT_WECHAT_CONFIG})
+    current.update(public_wechat_config(patch))
     s = await _get_setting(db, "wechat_config")
     if s:
         s.value = current
     else:
         db.add(SystemSetting(key="wechat_config", value=current))
     await db.commit()
-    return current
+    return public_wechat_config(current)
 
 
 # ---------- 微信支付配置 ----------

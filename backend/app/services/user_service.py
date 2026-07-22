@@ -15,6 +15,19 @@ VALID_STATUSES = {"active", "paused", "archived"}
 
 
 # ---------- 序列化 ----------
+def wechat_summary(wechat: dict | None) -> dict | None:
+    """返回前端需要的绑定状态，不泄露 openid 或 unionid。"""
+    if not wechat or not wechat.get("openid"):
+        return None
+    return {
+        "bound": True,
+        "nickname": str(wechat.get("nickname") or "微信用户"),
+        "avatar": str(wechat.get("avatar") or ""),
+        "boundAt": wechat.get("boundAt"),
+        "lastLoginAt": wechat.get("lastLoginAt"),
+    }
+
+
 def to_dict(user: User) -> dict:
     return {
         "username": user.username,
@@ -27,7 +40,7 @@ def to_dict(user: User) -> dict:
         "tags": user.tags or [],
         "note": user.note,
         "source": user.source,
-        "wechat": user.wechat,
+        "wechat": wechat_summary(user.wechat),
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "updated_at": user.updated_at.isoformat() if user.updated_at else None,
         "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,

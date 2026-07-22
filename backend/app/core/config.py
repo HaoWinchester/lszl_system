@@ -30,6 +30,13 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
 
+    # 微信网站应用凭证仅允许由后端运行环境提供，绝不下发到浏览器。
+    WECHAT_APP_ID: str = ""
+    WECHAT_APP_SECRET: str = ""
+    WECHAT_REDIRECT_URI: str = "https://lszl.aihuanpu.com/api/v1/auth/wechat/callback"
+    WECHAT_ENABLE_OFFICIAL: bool | None = None
+    WECHAT_ENABLE_DEMO: bool | None = None
+
     NEW_LEGACY_RELEASE_ROOT: str = str(PROJECT_ROOT / "frontend" / "new-legacy-releases")
     NEW_LEGACY_FALLBACK_SITE: str = str(PROJECT_ROOT / "frontend" / "public" / "new-legacy")
 

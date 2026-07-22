@@ -46,7 +46,7 @@ async def update_theme(role: str, body: dict, db: DB, _: AdminUser):
 # ---------- 微信配置 ----------
 @router.get("/wechat-config")
 async def wechat_config(db: DB, _: AdminUser):
-    return {"config": await system_service.get_wechat_config(db)}
+    return {"config": system_service.public_wechat_config(await system_service.get_wechat_config(db))}
 
 
 @router.put("/wechat-config")
