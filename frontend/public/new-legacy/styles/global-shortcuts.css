@@ -105,6 +105,27 @@
   stroke-linecap:round;
   stroke-linejoin:round;
 }
+.kg-global-shortcuts-controls{display:flex;align-items:center;gap:5px;flex:0 0 auto}
+.kg-global-shortcuts-collapse{
+  width:26px;
+  height:26px;
+  min-width:26px;
+  padding:0;
+  border:0;
+  border-radius:10px;
+  background:#f1f5f9;
+  color:#475569;
+  display:grid;
+  place-items:center;
+  box-shadow:none;
+  cursor:pointer;
+}
+.kg-global-shortcuts-collapse:hover{transform:none;background:#e2e8f0;box-shadow:none}
+.kg-global-shortcuts-collapse svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.kg-global-shortcuts.is-collapsed{width:48px!important;height:48px;min-height:48px;padding:6px;border-radius:16px}
+.kg-global-shortcuts.is-collapsed .kg-global-shortcuts-head{height:36px;padding:0;justify-content:center;cursor:default}
+.kg-global-shortcuts.is-collapsed .kg-global-shortcuts-title,.kg-global-shortcuts.is-collapsed .kg-global-shortcuts-toggle,.kg-global-shortcuts.is-collapsed .kg-global-shortcuts-body{display:none}
+.kg-global-shortcuts.is-collapsed .kg-global-shortcuts-collapse{width:36px;height:36px;min-width:36px;border-radius:11px;background:#eef2ff;color:#4f46e5}
 .kg-global-shortcuts.layout-vertical{
   width:168px;
 }

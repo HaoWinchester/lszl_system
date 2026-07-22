@@ -39,6 +39,14 @@ test('wechat scan mode hides password controls and offers a return action', () =
   assert.match(styles, /#authModal\.wechat-login-mode \.auth-actions/)
 })
 
+test('embedded official WeChat login stays comfortably within a short viewport', () => {
+  const styles = readSource('new-legacy/styles/main.css')
+
+  assert.match(styles, /\.wechat-login-qr\{height:320px;/)
+  assert.match(styles, /\.wechat-login-qr iframe\{transform:scale\(\.8\)/)
+  assert.match(styles, /\.wechat-login-back\{display:inline-flex;/)
+})
+
 test('user center offers server-backed WeChat binding and unbinding', () => {
   const source = readSource('new-legacy/src/33-user-center.js')
   const login = readSource('new-legacy/src/32-wechat-login.js')

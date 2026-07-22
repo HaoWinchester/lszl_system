@@ -2191,6 +2191,32 @@ body.qw-light-canvas.qw-viewport-motion *::before,
 body.qw-light-canvas.qw-viewport-motion *::after{
   transition:none!important;
 }
+
+/* 所有窄屏均使用同一顶栏收纳规则，避免因指针类型不同而把中文导航压成竖排。 */
+@media(max-width:780px){
+  .qw-topbar{grid-template-columns:minmax(0,1fr) auto;gap:8px;min-height:62px;padding:0 8px}
+  .qw-brand{min-width:0}
+  .qw-brand h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .qw-workspace-switcher{grid-column:1/-1;grid-row:2;justify-self:stretch;margin:0 -8px;padding:5px 8px;border-width:1px 0 0;border-radius:0}
+  .qw-workspace-switcher select{min-width:0;max-width:none;flex:1 1 auto}
+  .qw-top-actions{min-width:0;max-width:48vw;overflow-x:auto;overflow-y:hidden;justify-content:flex-start;gap:6px;flex-wrap:nowrap;scrollbar-width:none}
+  .qw-top-actions::-webkit-scrollbar{display:none}
+  .qw-top-actions>*{flex:0 0 auto;white-space:nowrap}
+  .qw-top-actions .qw-node-count,.qw-top-actions .qw-readonly-badge,.qw-top-actions .auth-status{display:none!important}
+  .qw-canvas-shell{margin-top:43px}
+}
+/* 中等宽度的桌面窗口仍需保留导航的完整词组，不能让 flex 项被压成逐字竖排。 */
+@media(min-width:781px) and (max-width:1100px){
+  .qw-topbar{grid-template-columns:minmax(180px,1fr) minmax(220px,auto) auto;gap:8px;min-height:62px;padding:0 10px}
+  .qw-workspace-switcher{justify-self:stretch}
+  .qw-workspace-switcher select{min-width:140px;max-width:220px}
+  .qw-top-actions{min-width:0;gap:6px;flex-wrap:nowrap}
+  .qw-top-actions>*{flex:0 0 auto;white-space:nowrap}
+  .qw-top-actions .qw-node-count,.qw-top-actions .qw-readonly-badge,.qw-top-actions .auth-status{display:none!important}
+}
+.qw-question-drawer>header>div{min-width:0;flex:1}
+.qw-question-drawer>header h2{overflow-wrap:anywhere}
+.qw-question-drawer>header button{flex:0 0 42px;width:42px;height:42px;padding:0;align-self:flex-start}
 body.qw-light-canvas .qw-question-card.has-overlap{
   border-color:#dc2626;
   box-shadow:0 0 0 2px rgba(220,38,38,.7)!important;

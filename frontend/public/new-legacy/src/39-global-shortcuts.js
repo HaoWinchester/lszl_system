@@ -17,7 +17,8 @@
     users: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
     settings: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.05.05a2.1 2.1 0 1 1-2.97 2.97l-.05-.05A1.8 1.8 0 0 0 14.8 19.6a1.8 1.8 0 0 0-1.8 1.4 2.1 2.1 0 0 1-4.1 0 1.8 1.8 0 0 0-1.8-1.4 1.8 1.8 0 0 0-1.98.36l-.05.05a2.1 2.1 0 1 1-2.97-2.97l.05-.05A1.8 1.8 0 0 0 2.6 15 1.8 1.8 0 0 0 1.2 13.2a2.1 2.1 0 0 1 0-4.1A1.8 1.8 0 0 0 2.6 7.3a1.8 1.8 0 0 0-.36-1.98l-.05-.05A2.1 2.1 0 1 1 5.16 2.3l.05.05A1.8 1.8 0 0 0 7.2 2.7 1.8 1.8 0 0 0 9 1.3a2.1 2.1 0 0 1 4.1 0 1.8 1.8 0 0 0 1.8 1.4 1.8 1.8 0 0 0 1.98-.36l.05-.05a2.1 2.1 0 1 1 2.97 2.97l-.05.05A1.8 1.8 0 0 0 19.4 7.3a1.8 1.8 0 0 0 1.4 1.8 2.1 2.1 0 0 1 0 4.1A1.8 1.8 0 0 0 19.4 15Z"/></svg>',
     grip: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 6h.01M16 6h.01M8 12h.01M16 12h.01M8 18h.01M16 18h.01"/></svg>',
-    toggle: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>'
+    toggle: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
+    launcher: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4h10M7 12h10M7 20h10"/><circle cx="4" cy="4" r=".8" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="4" cy="20" r=".8" fill="currentColor" stroke="none"/></svg>'
   };
 
   const ITEMS = [
@@ -46,6 +47,18 @@
   function currentPage(){
     const path = (location.pathname.split("/").pop() || "index.html").toLowerCase();
     return path || "index.html";
+  }
+  function isCompactViewport(){
+    return !!(window.matchMedia&&window.matchMedia('(max-width: 820px), (pointer: coarse)').matches);
+  }
+  function shouldStartCollapsed(){
+    return currentPage() !== "index.html" || isCompactViewport();
+  }
+  function resetToSafePosition(el){
+    el.style.left = "";
+    el.style.top = "";
+    el.style.right = "";
+    el.style.bottom = "";
   }
   function isCurrent(item){
     return currentPage() === item.href.toLowerCase();
@@ -78,6 +91,10 @@
     return Math.max(min, Math.min(max, value));
   }
   function applySavedPosition(el){
+    if(shouldStartCollapsed() || el.classList.contains("is-collapsed")){
+      resetToSafePosition(el);
+      return;
+    }
     const pos = readJSON(STORAGE_POS, null);
     if(!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return;
     const rect = el.getBoundingClientRect();
@@ -175,6 +192,18 @@
     const label = el.querySelector("[data-layout-label]");
     if(label) label.textContent = next === "horizontal" ? "水平排布" : "纵向排布";
   }
+  function setCollapsed(el, collapsed){
+    collapsed=!!collapsed;
+    el.classList.toggle("is-collapsed", collapsed);
+    const button=el.querySelector("#kgGlobalShortcutsCollapse");
+    if(button){
+      button.setAttribute("aria-expanded", String(!collapsed));
+      button.setAttribute("aria-label", collapsed ? "展开全局快捷入口" : "收起全局快捷入口");
+      button.title=collapsed ? "展开全局快捷" : "收起全局快捷";
+    }
+    if(collapsed)resetToSafePosition(el);
+    else applySavedPosition(el);
+  }
 
   function openItem(event, item){
     if(isCurrent(item)){
@@ -211,7 +240,10 @@
             <small data-layout-label>${layout === "horizontal" ? "水平排布" : "纵向排布"}</small>
           </div>
         </div>
-        <button class="kg-global-shortcuts-toggle" id="kgGlobalShortcutsToggle" type="button">${ICONS.toggle}</button>
+        <div class="kg-global-shortcuts-controls">
+          <button class="kg-global-shortcuts-toggle" id="kgGlobalShortcutsToggle" type="button">${ICONS.toggle}</button>
+          <button class="kg-global-shortcuts-collapse" id="kgGlobalShortcutsCollapse" type="button" aria-expanded="true">${ICONS.launcher}</button>
+        </div>
       </div>
       <nav class="kg-global-shortcuts-body" aria-label="快捷入口列表">
         ${visible.map(item => `
@@ -225,10 +257,12 @@
 
     document.body.appendChild(el);
     applyLayout(el, layout);
+    setCollapsed(el,shouldStartCollapsed());
     applySavedPosition(el);
 
     const handle = document.getElementById("kgGlobalShortcutsHandle");
     const toggle = document.getElementById("kgGlobalShortcutsToggle");
+    const collapse = document.getElementById("kgGlobalShortcutsCollapse");
     installDrag(el, handle);
     if(toggle){
       toggle.addEventListener("pointerdown", event => event.stopPropagation());
@@ -243,6 +277,14 @@
           applySavedPosition(el);
           savePosition(el);
         });
+      });
+    }
+    if(collapse){
+      collapse.addEventListener("pointerdown", event => event.stopPropagation());
+      collapse.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        setCollapsed(el,!el.classList.contains("is-collapsed"));
       });
     }
     el.querySelectorAll("[data-global-shortcut]").forEach(link => {

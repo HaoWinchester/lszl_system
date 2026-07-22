@@ -518,12 +518,14 @@
               <div class="kg-user-center-tip">不修改密码时请留空。微信演示账号或未设置密码的账号，可以直接设置新密码。</div>
             </section>
           </div>
+        </div>
+        <footer class="kg-user-center-footer">
           <div class="kg-user-center-msg" id="userCenterMsg"></div>
           <div class="kg-user-center-actions">
             <button id="userCenterCancelBtn" type="button">取消</button>
             <button class="primary" id="userCenterSaveBtn" type="button">保存个人资料</button>
           </div>
-        </div>
+        </footer>
       </div>
     `;
     document.body.appendChild(wrap);

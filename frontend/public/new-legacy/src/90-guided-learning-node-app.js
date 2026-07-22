@@ -392,6 +392,7 @@
     const shell=byId('glnActivity');
     shell.innerHTML=(isPartChallenge()?challengeContextHTML(activity):'')+plugin.render(activity,runtime);
     shell.dataset.activityId=activity.id;
+    shell.classList.toggle('gln-keyword-activity',activity.type==='keyword');
     const hideActionBar=Boolean(plugin.actionBarHidden?.(activity,runtime));
     setActionBarHidden(hideActionBar);
     if(hideActionBar)setFooterButtons([]);else setCheckButton(false);

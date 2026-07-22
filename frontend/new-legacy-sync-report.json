@@ -1,13 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v8.6.3",
-  "toVersion": "v8.6.4",
+  "fromVersion": "v8.6.6",
+  "toVersion": "v8.6.6",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "styles/main.css"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []

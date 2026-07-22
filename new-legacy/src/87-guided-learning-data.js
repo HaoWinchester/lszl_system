@@ -388,7 +388,7 @@
     environmentKeywords:addKeywordSet('env-keyword',[
       {
         segments:[
-          {text:'一个 '},{text:'敏捷团队',target:true},{text:' 正在进行 '},{text:'两周迭代',target:true},{text:'，客户提出新的高价值功能。'}
+          {text:'一个 '},{text:'敏捷团队',target:true},{text:' 正在进行 '},{text:'两周迭代，',target:true},{text:'客户提出新的高价值功能。'}
         ],
         explanation:'“敏捷团队”和“迭代”直接确定了敏捷方法环境。'
       },

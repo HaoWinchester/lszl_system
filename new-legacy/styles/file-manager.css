@@ -455,7 +455,28 @@ html[data-theme="light"] .fm-theme-sun{display:none}html[data-theme="dark"] .fm-
   color:var(--fm-text);
   outline:none;
 }
+.fm-mobile-readonly-actions{display:none}
 @media(max-width:800px){
+  .fm-mobile-readonly-notice{
+    top:50%;
+    right:auto;
+    left:50%;
+    width:min(360px,calc(100vw - 32px));
+    grid-template-columns:1fr;
+    justify-items:center;
+    gap:12px;
+    padding:24px 22px 20px;
+    transform:translate(-50%,-50%);
+    border-radius:20px;
+    text-align:center;
+    font-size:13px;
+  }
+  .fm-mobile-readonly-notice strong{font-size:17px}
+  .fm-mobile-readonly-notice span{overflow:visible;white-space:normal;line-height:1.6}
+  .fm-mobile-readonly-notice button{position:absolute;top:8px;right:8px}
+  .fm-mobile-readonly-actions{display:flex;gap:8px;width:100%;margin-top:2px}
+  .fm-mobile-readonly-actions a{flex:1;display:inline-flex;align-items:center;justify-content:center;min-height:38px;border:1px solid var(--fm-border-strong);border-radius:11px;background:var(--fm-surface-2);color:var(--fm-text);font-size:12px;font-weight:850;text-decoration:none}
+  .fm-mobile-readonly-actions a:first-child{border-color:var(--fm-accent);background:var(--fm-accent);color:#fff}
   body.is-mobile-readonly #fmNewFileBtn,
   body.is-mobile-readonly .fm-create-card,
   body.is-mobile-readonly #fmFolderNavAdd,
@@ -1359,4 +1380,3 @@ html[data-theme="light"] .fm-theme-sun{display:none}html[data-theme="dark"] .fm-
   top:auto;
   bottom:14px;
 }
-

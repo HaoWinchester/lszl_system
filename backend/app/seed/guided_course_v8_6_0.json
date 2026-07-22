@@ -1166,11 +1166,11 @@
             },
             {
               "id": "env-keyword-01-segment-04",
-              "text": "两周迭代"
+              "text": "两周迭代，"
             },
             {
               "id": "env-keyword-01-segment-05",
-              "text": "，客户提出新的高价值功能。"
+              "text": "客户提出新的高价值功能。"
             }
           ]
         }
@@ -5466,7 +5466,7 @@
     }
   ],
   "activitySchemaVersion": 1,
-  "contentHash": "sha256:9782b99e04fae9eeb2a73b80fc999e252c927245c254b536e7213765f368af32",
+  "contentHash": "sha256:1f4fdb15fa175b51e1351eb9b9b1c36b6afc294b9873d90c2549555ea2abb91c",
   "course": {
     "activitySchemaVersion": 1,
     "id": "pmp-change-response-demo-v3",
@@ -8941,5 +8941,5 @@
     ],
     "valid": true
   },
-  "version": "v8.6.4"
+  "version": "v8.6.6"
 }

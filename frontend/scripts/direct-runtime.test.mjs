@@ -76,6 +76,19 @@ test('graph and training login use remote authentication then reload account sta
   assert.match(entry, /location\.reload/)
 })
 
+test('graph account menu clears the remote session through the backend logout path', () => {
+  const guards = readFileSync(resolve(frontendDir, '..', 'new-legacy', 'src/30-auth-guards.js'), 'utf8')
+  const logout = guards.match(/async function authLogout\(\)\{([\s\S]*?)\n\}(?=\nfunction authAfterExternalLogin)/)
+  assert.ok(logout, 'graph auth guard should expose an async logout handler')
+  assert.match(logout[1], /AuthCore\.providerStatus\?\.\(\)\.remote/)
+  assert.match(logout[1], /await AuthCore\.logout\([\s\S]*?authCurrentUser=null;[\s\S]*?return true;/)
+
+  const training = readFileSync(resolve(frontendDir, '..', 'new-legacy', 'src/72-question-training-page.js'), 'utf8')
+  assert.match(training, /async function authLogout\(\)/)
+  assert.match(training, /AuthCore\.providerStatus\?\.\(\)\.remote[\s\S]*?await AuthCore\.logout\(/)
+  assert.match(training, /KGAuthRuntime=.*logout:authLogout/)
+})
+
 test('graph autosave adapter runs after the upstream autosave module', () => {
   const adapterPath = resolve(frontendDir, 'scripts/new-legacy-assets/direct-graph-adapter.js')
   assert.ok(existsSync(adapterPath), 'direct-graph-adapter.js should exist')

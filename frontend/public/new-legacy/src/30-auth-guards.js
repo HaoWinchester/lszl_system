@@ -174,9 +174,17 @@ function authRegister(username,password){
   showStatus(`已注册并登录：${username}`);
   return true;
 }
-function authLogout(){
+async function authLogout(){
   if(authIsLoggedIn()&&saveNow({silent:true})===false){showStatus('当前图谱保存失败，已取消退出。请先导出学习包备份或清理浏览器存储空间。');return false}
   const old=authCurrentUser&&authCurrentUser.username;
+  const remote=Boolean(AuthCore.providerStatus?.().remote);
+  if(remote&&typeof AuthCore.logout==='function'){
+    // 远程会话必须由认证核心清除：它会调用后端 /logout、移除 sessionStorage
+    // 中的会话缓存，并通知 direct-entry 重新载入访客态顶栏。
+    await AuthCore.logout({source:'图谱账号菜单退出'});
+    authCurrentUser=null;
+    return true;
+  }
   if(old)authLogAction('用户退出',old);
   authCurrentUser=null;
   if(AuthCore.clearSession)AuthCore.clearSession();
