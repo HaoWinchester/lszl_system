@@ -1,12 +1,11 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v8.6.1",
-  "toVersion": "v8.6.2",
+  "fromVersion": "v8.6.3",
+  "toVersion": "v8.6.4",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "src/32-wechat-login.js",
       "styles/main.css"
     ],
     "removed": []

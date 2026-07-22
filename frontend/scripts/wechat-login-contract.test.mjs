@@ -22,9 +22,21 @@ test('login modal embeds the official QR code below the login button', () => {
 
   assert.match(source, /class="wechat-login-entry" type="button">微信扫码登录<\/button><div class="wechat-login-panel" hidden><\/div>/)
   assert.match(source, /new window\.WxLogin\(\{[\s\S]*?self_redirect:false/)
-  assert.match(source, /entry\.onclick=\(\)=>\{panel\.hidden=!panel\.hidden;if\(!panel\.hidden\)renderPanel\(panel\)\}/)
+  assert.match(source, /entry\.onclick=\(\)=>\{setWechatLoginMode\(modal,true\);panel\.hidden=false;renderPanel\(panel\)\}/)
   assert.doesNotMatch(source, /模拟扫码成功/)
   assert.doesNotMatch(source, /wechat-pseudo-qr/)
+})
+
+test('wechat scan mode hides password controls and offers a return action', () => {
+  const source = readSource('new-legacy/src/32-wechat-login.js')
+  const styles = readSource('new-legacy/styles/main.css')
+
+  assert.match(source, /function setWechatLoginMode\(modal,enabled\)/)
+  assert.match(source, /modal\.classList\.toggle\('wechat-login-mode',!!enabled\)/)
+  assert.match(source, /setWechatLoginMode\(modal,true\)/)
+  assert.match(source, /使用账号密码登录/)
+  assert.match(source, /setWechatLoginMode\(modal,false\)/)
+  assert.match(styles, /#authModal\.wechat-login-mode \.auth-actions/)
 })
 
 test('user center offers server-backed WeChat binding and unbinding', () => {

@@ -115,14 +115,28 @@
     if(!appid||!redirectUri||!state)throw new Error('微信授权参数不完整，请重新生成二维码。');
     return {appid,redirectUri,scope,state};
   }
+  function setWechatLoginMode(modal,enabled){
+    if(!modal)return;
+    modal.classList.toggle('wechat-login-mode',!!enabled);
+    if(!enabled){
+      const panel=modal.querySelector('.wechat-login-panel');
+      if(panel){panel.hidden=true;panel.innerHTML=''}
+    }
+  }
+  function bindPasswordLoginReturn(container){
+    const back=container.querySelector('.wechat-login-back');
+    if(back)back.onclick=()=>setWechatLoginMode(container.closest('#authModal'),false);
+  }
   function renderPanelError(container,message){
-    container.innerHTML=`<div class="wechat-login-card"><div class="wechat-login-copy"><p>${escapeHTML(message)}</p><button type="button" class="wechat-login-retry">重新生成二维码</button></div></div>`;
+    container.innerHTML=`<div class="wechat-login-card"><div class="wechat-login-copy"><p>${escapeHTML(message)}</p><button type="button" class="wechat-login-retry">重新生成二维码</button><button type="button" class="wechat-login-back">使用账号密码登录</button></div></div>`;
     container.querySelector('.wechat-login-retry').onclick=()=>renderPanel(container);
+    bindPasswordLoginReturn(container);
   }
   async function renderPanel(container){
     if(!container)return;
     const qrId='wechatLoginQr_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
-    container.innerHTML=`<div class="wechat-login-card"><div class="wechat-login-copy"><strong>请使用微信扫码</strong><p>在手机上确认后，将自动登录当前页面。</p><div class="wechat-login-qr" id="${qrId}"><span>正在生成微信授权二维码…</span></div></div></div>`;
+    container.innerHTML=`<div class="wechat-login-card"><div class="wechat-login-copy"><strong>请使用微信扫码</strong><p>在手机上确认后，将自动登录当前页面。</p><div class="wechat-login-qr" id="${qrId}"><span>正在生成微信授权二维码…</span></div><button type="button" class="wechat-login-back">使用账号密码登录</button></div></div>`;
+    bindPasswordLoginReturn(container);
     try{
       const [payload]=await Promise.all([createOfficialAuthRequest('login'),loadWechatLoginSdk()]);
       if(!container.isConnected)return;
@@ -163,7 +177,8 @@
     actions.insertAdjacentElement('afterend',wrap);
     const entry=wrap.querySelector('.wechat-login-entry');
     const panel=wrap.querySelector('.wechat-login-panel');
-    entry.onclick=()=>{panel.hidden=!panel.hidden;if(!panel.hidden)renderPanel(panel)};
+    entry.onclick=()=>{setWechatLoginMode(modal,true);panel.hidden=false;renderPanel(panel)};
+    modal.querySelector('.auth-close')?.addEventListener('click',()=>setWechatLoginMode(modal,false));
   }
   function handleOfficialCallback(){
     const params=new URLSearchParams(location.search||'');

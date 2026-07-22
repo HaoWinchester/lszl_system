@@ -5466,7 +5466,7 @@
     }
   ],
   "activitySchemaVersion": 1,
-  "contentHash": "sha256:e574750cd7b337f8bfa956cfdc5a298116a5b6bad8ce3818a2188731c91ec72c",
+  "contentHash": "sha256:9782b99e04fae9eeb2a73b80fc999e252c927245c254b536e7213765f368af32",
   "course": {
     "activitySchemaVersion": 1,
     "id": "pmp-change-response-demo-v3",
@@ -8941,5 +8941,5 @@
     ],
     "valid": true
   },
-  "version": "v8.6.2"
+  "version": "v8.6.4"
 }
