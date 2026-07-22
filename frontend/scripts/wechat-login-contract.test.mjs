@@ -17,6 +17,16 @@ test('wechat login starts OAuth at the backend and never exchanges codes in the 
   assert.doesNotMatch(source, /completeLogin\s*\(/)
 })
 
+test('login modal embeds the official QR code below the login button', () => {
+  const source = readSource('new-legacy/src/32-wechat-login.js')
+
+  assert.match(source, /class="wechat-login-entry" type="button">微信扫码登录<\/button><div class="wechat-login-panel" hidden><\/div>/)
+  assert.match(source, /new window\.WxLogin\(\{[\s\S]*?self_redirect:false/)
+  assert.match(source, /entry\.onclick=\(\)=>\{panel\.hidden=!panel\.hidden;if\(!panel\.hidden\)renderPanel\(panel\)\}/)
+  assert.doesNotMatch(source, /模拟扫码成功/)
+  assert.doesNotMatch(source, /wechat-pseudo-qr/)
+})
+
 test('user center offers server-backed WeChat binding and unbinding', () => {
   const source = readSource('new-legacy/src/33-user-center.js')
   const login = readSource('new-legacy/src/32-wechat-login.js')

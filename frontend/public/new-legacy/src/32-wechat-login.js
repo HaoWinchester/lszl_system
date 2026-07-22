@@ -6,6 +6,7 @@
  */
 (function(){
   const WECHAT_CONFIG_KEY='kg_wechat_login_config_v1';
+  const WECHAT_LOGIN_SDK_URL='https://res.wx.qq.com/connect/zh_CN/htmledition/js/wxLogin.js';
   const Store=window.KGAppStorage||{};
 
   const DEFAULT_CONFIG={
@@ -71,14 +72,15 @@
     if(!response.ok)throw new Error(String(payload.detail||payload.message||`请求失败（${response.status}）`));
     return payload;
   }
-  async function getPublicConfig(){
-    return requestJson('/api/v1/auth/wechat/config');
+  async function createOfficialAuthRequest(intent='login',returnPath=currentReturnPath()){
+    const params=new URLSearchParams({intent:String(intent)==='bind'?'bind':'login',return_path:returnPath||'/'});
+    const payload=await requestJson('/api/v1/auth/wechat/auth-url?'+params.toString());
+    if(!payload.authUrl)throw new Error('服务器未返回微信授权地址。');
+    return payload;
   }
   async function startOfficialLogin(intent='login',returnPath=currentReturnPath()){
-    const params=new URLSearchParams({intent:String(intent)==='bind'?'bind':'login',return_path:returnPath||'/'});
     try{
-      const payload=await requestJson('/api/v1/auth/wechat/auth-url?'+params.toString());
-      if(!payload.authUrl)throw new Error('服务器未返回微信授权地址。');
+      const payload=await createOfficialAuthRequest(intent,returnPath);
       location.assign(payload.authUrl);
       return true;
     }catch(error){
@@ -86,14 +88,57 @@
       return false;
     }
   }
-  async function startDemoLogin(){
+  function loadWechatLoginSdk(){
+    if(typeof window.WxLogin==='function')return Promise.resolve();
+    return new Promise((resolve,reject)=>{
+      const existing=document.querySelector('script[data-wechat-login-sdk="true"]');
+      if(existing){
+        existing.addEventListener('load',resolve,{once:true});
+        existing.addEventListener('error',()=>reject(new Error('微信二维码组件加载失败。')),{once:true});
+        return;
+      }
+      const script=document.createElement('script');
+      script.src=WECHAT_LOGIN_SDK_URL;
+      script.async=true;
+      script.dataset.wechatLoginSdk='true';
+      script.onload=resolve;
+      script.onerror=()=>reject(new Error('微信二维码组件加载失败。'));
+      document.head.appendChild(script);
+    });
+  }
+  function getEmbeddedAuthParams(authUrl){
+    const params=new URL(authUrl).searchParams;
+    const appid=params.get('appid')||'';
+    const redirectUri=params.get('redirect_uri')||'';
+    const scope=params.get('scope')||'snsapi_login';
+    const state=params.get('state')||'';
+    if(!appid||!redirectUri||!state)throw new Error('微信授权参数不完整，请重新生成二维码。');
+    return {appid,redirectUri,scope,state};
+  }
+  function renderPanelError(container,message){
+    container.innerHTML=`<div class="wechat-login-card"><div class="wechat-login-copy"><p>${escapeHTML(message)}</p><button type="button" class="wechat-login-retry">重新生成二维码</button></div></div>`;
+    container.querySelector('.wechat-login-retry').onclick=()=>renderPanel(container);
+  }
+  async function renderPanel(container){
+    if(!container)return;
+    const qrId='wechatLoginQr_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+    container.innerHTML=`<div class="wechat-login-card"><div class="wechat-login-copy"><strong>请使用微信扫码</strong><p>在手机上确认后，将自动登录当前页面。</p><div class="wechat-login-qr" id="${qrId}"><span>正在生成微信授权二维码…</span></div></div></div>`;
     try{
-      await requestJson('/api/v1/auth/wechat/demo-login',{method:'POST'});
-      location.reload();
-      return true;
+      const [payload]=await Promise.all([createOfficialAuthRequest('login'),loadWechatLoginSdk()]);
+      if(!container.isConnected)return;
+      const auth=getEmbeddedAuthParams(payload.authUrl);
+      if(typeof window.WxLogin!=='function')throw new Error('微信二维码组件加载失败。');
+      new window.WxLogin({
+        self_redirect:false,
+        id:qrId,
+        appid:auth.appid,
+        scope:auth.scope,
+        redirect_uri:encodeURIComponent(auth.redirectUri),
+        state:encodeURIComponent(auth.state),
+        style:'black'
+      });
     }catch(error){
-      showToast(String(error&&error.message||'扫码测试登录失败，请稍后重试。'),false);
-      return false;
+      renderPanelError(container,String(error&&error.message||'微信授权暂不可用，请稍后重试。'));
     }
   }
   async function unbind(){
@@ -106,51 +151,6 @@
       return {ok:false,message:String(error&&error.message||'解除微信绑定失败。')};
     }
   }
-  function pseudoQR(seed){
-    seed=String(seed||'wechat');
-    let cells='';
-    for(let r=0;r<13;r++){
-      for(let c=0;c<13;c++){
-        const finder=(r<4&&c<4)||(r<4&&c>8)||(r>8&&c<4);
-        const inner=(r>0&&r<3&&c>0&&c<3)||(r>0&&r<3&&c>9&&c<12)||(r>9&&r<12&&c>0&&c<3);
-        let hash=0;const value=seed+'|'+r+'|'+c;
-        for(let i=0;i<value.length;i++)hash=(hash*31+value.charCodeAt(i))>>>0;
-        cells+=`<span class="${finder? 'on' : inner? '' : hash%3!==0?'on':''}"></span>`;
-      }
-    }
-    return `<div class="wechat-pseudo-qr" aria-hidden="true">${cells}</div>`;
-  }
-  function renderCard(container,config){
-    const officialReady=config.mode==='official';
-    const officialText=officialReady?'微信开放平台已配置，可使用微信扫码登录。':'正式微信登录尚未配置完成。';
-    container.innerHTML=`
-      <div class="wechat-login-card">
-        <div class="wechat-login-title"><span class="wechat-icon">微</span><div><strong>微信扫码登录</strong><small>${escapeHTML(officialText)}</small></div></div>
-        <div class="wechat-login-body">
-          ${pseudoQR(config.hasAppId?'wechat-official':'wechat-demo')}
-          <div class="wechat-login-copy">
-            <p>点击后将跳转至微信官方授权页。账号创建、绑定和登录状态均由服务器安全处理。</p>
-            <div class="wechat-login-actions">
-              <button type="button" class="wechat-official-btn" ${officialReady?'':'disabled'}>打开微信授权二维码页</button>
-              <button type="button" class="wechat-demo-btn" ${config.enableDemo?'':'disabled'}>模拟扫码成功</button>
-            </div>
-            <small class="wechat-login-tip">测试模式仅用于验证扫码界面；正式环境请关闭测试模式。</small>
-          </div>
-        </div>
-      </div>`;
-    const official=container.querySelector('.wechat-official-btn');
-    const demo=container.querySelector('.wechat-demo-btn');
-    if(official)official.onclick=()=>startOfficialLogin('login');
-    if(demo)demo.onclick=()=>startDemoLogin();
-  }
-  async function renderPanel(container){
-    if(!container)return;
-    container.innerHTML='<div class="wechat-login-card"><div class="wechat-login-copy"><p>正在读取微信登录配置…</p></div></div>';
-    try{renderCard(container,await getPublicConfig())}
-    catch(error){
-      container.innerHTML='<div class="wechat-login-card"><div class="wechat-login-copy"><p>暂时无法读取微信登录配置，请稍后重试。</p></div></div>';
-    }
-  }
   function ensureAuthPanel(){
     const modal=document.getElementById('authModal');
     if(!modal||modal.dataset.wechatLoginBound)return;
@@ -159,7 +159,7 @@
     modal.dataset.wechatLoginBound='1';
     const wrap=document.createElement('div');
     wrap.className='wechat-login-section';
-    wrap.innerHTML='<div class="wechat-divider"><span>或使用微信</span></div><button class="wechat-login-entry" type="button">微信扫码登录</button><div class="wechat-login-panel" hidden></div>';
+    wrap.innerHTML='<div class="wechat-divider"><span>或使用微信</span></div><p class="wechat-login-hint">点击后在下方打开微信授权二维码。首次登录将自动创建学生账号。</p><button class="wechat-login-entry" type="button">微信扫码登录</button><div class="wechat-login-panel" hidden></div>';
     actions.insertAdjacentElement('afterend',wrap);
     const entry=wrap.querySelector('.wechat-login-entry');
     const panel=wrap.querySelector('.wechat-login-panel');
@@ -187,7 +187,6 @@
     DEFAULT_CONFIG,
     getConfig,
     saveConfig,
-    getPublicConfig,
     startOfficialLogin,
     renderPanel,
     ensureAuthPanel,

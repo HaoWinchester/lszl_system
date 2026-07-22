@@ -114,8 +114,9 @@ test('rollback selects the previous successful release', () => {
   const root = makeRoot()
   assert.equal(run(root, 'update', source).status, 0)
   const next = resolve(root, 'next-source')
+  const nextVersion = `${sourceVersion}-rollback-test`
   cpSync(source, next, { recursive: true })
-  writeFileSync(resolve(next, 'VERSION'), 'v8.6.2\n')
+  writeFileSync(resolve(next, 'VERSION'), `${nextVersion}\n`)
   assert.equal(run(root, 'update', next).status, 0)
 
   const result = run(root, 'rollback')
@@ -123,7 +124,7 @@ test('rollback selects the previous successful release', () => {
   assert.equal(result.status, 0, result.stderr)
   const current = readJson(resolve(root, 'current.json'))
   assert.equal(current.version, sourceVersion)
-  assert.equal(current.previousVersion, 'v8.6.2')
+  assert.equal(current.previousVersion, nextVersion)
 })
 
 test('release validation runs the full five-role regression against the candidate', () => {
