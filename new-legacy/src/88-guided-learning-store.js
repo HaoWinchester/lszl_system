@@ -159,6 +159,9 @@
         metrics:clone(entry.metrics)
       },{userId:String(userId||currentUserId())});
     }catch(error){}
+    const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){};
+    track('learning_path','key_action','node_completed');
+    track('learning_path','outcome','node_completed');
     return write(progress,course,userId);
   }
   function nodesInScope(course,scopeType,scopeId){
@@ -208,6 +211,9 @@
         courseId:course.id,partId:key,...clone(attempt)
       },{userId:String(userId||currentUserId())});
     }catch(error){}
+    const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){};
+    track('learning_path','key_action','placement_completed');
+    track('learning_path','outcome','placement_completed');
     return write(progress,course,userId);
   }
   function completePartByPlacementTest(course,partId,result={},userId=currentUserId()){

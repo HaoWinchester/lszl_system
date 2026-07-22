@@ -117,7 +117,7 @@
   function progressKey(){return PROGRESS_PREFIX+encodeURIComponent(String(question.id||'current'))}
   function saveProgress(){
     if(isRecallReadonly())return;
-    try{const payload={nodes:state.nodes,edges:state.edges,customNodes:state.customNodes,activeKeywords:state.activeKeywords,savedAt:Date.now()};if(Store.writeJSON)Store.writeJSON(progressKey(),payload);else localStorage.setItem(progressKey(),JSON.stringify(payload))}catch(e){}
+    try{const payload={nodes:state.nodes,edges:state.edges,customNodes:state.customNodes,activeKeywords:state.activeKeywords,savedAt:Date.now()};if(Store.writeJSON)Store.writeJSON(progressKey(),payload);else localStorage.setItem(progressKey(),JSON.stringify(payload));const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){};track('recall','key_action','recall_saved');track('recall','outcome','recall_saved')}catch(e){}
   }
   function loadProgress(){
     try{

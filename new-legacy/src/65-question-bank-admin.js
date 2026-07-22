@@ -1955,6 +1955,7 @@
     bank.updatedAt = Date.now();
     bank.questions.forEach(q => { q.subject = q.subject || bank.subject; });
     saveBanks();
+    const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){};track('question_bank','key_action','bank_saved');track('question_bank','outcome','bank_saved');
     render();
   }
   function collectOptionsFromDom(){
@@ -2009,7 +2010,7 @@
     };
     bank.updatedAt = Date.now();
     saveBanks(state.banks, {silent:options.silent});
-    if(!options.silent) render();
+    if(!options.silent){const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){};track('question_bank','key_action','question_saved');track('question_bank','outcome','question_saved');render()}
     return true;
   }
 

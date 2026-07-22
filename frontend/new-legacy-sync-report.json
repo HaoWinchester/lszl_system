@@ -4,7 +4,13 @@
   "toVersion": "v8.6.8",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "src/27-graph-file-manager.js",
+      "src/64-flow-orchestrator.js",
+      "src/65-question-bank-admin.js",
+      "src/86-knowledge-recall.js",
+      "src/88-guided-learning-store.js"
+    ],
     "removed": []
   },
   "incompatible": []

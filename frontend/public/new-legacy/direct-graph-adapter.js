@@ -11,6 +11,9 @@
     autosave.saveNow({ force: true, silent: true, reason: 'server-debounce' })
     const storage = global.KGServerStateStorage
     if (storage && typeof storage.flush === 'function') await storage.flush()
+    const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){}
+    track('graph','key_action','graph_saved')
+    track('graph','outcome','graph_saved')
   }
 
   autosave.markDirty = function (reason) {

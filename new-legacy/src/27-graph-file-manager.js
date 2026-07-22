@@ -962,7 +962,7 @@
     const input=$('fmModalName'),field=$('fmNameField'),value=cleanName(input.value);
     if(!field.hidden&&!input.value.trim()){input.focus();toast('请输入文件名称。','error');return}
     setBusy(true);
-    try{await state.modalHandler(value);closeModal()}catch(err){toast(err.message||String(err),'error')}finally{setBusy(false)}
+    try{await state.modalHandler(value);const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){};track('files','key_action','library_saved');track('files','outcome','library_saved');closeModal()}catch(err){toast(err.message||String(err),'error')}finally{setBusy(false)}
   }
   function applyTheme(theme){
     theme=theme==='dark'?'dark':'light';document.documentElement.dataset.theme=theme;writeSetting(THEME_KEY,theme);$('fmThemeBtn').title=theme==='dark'?'切换到浅色主题':'切换到深色主题';
