@@ -77,3 +77,13 @@ test('dashboard only requests the aggregate endpoint and never renders user iden
   const segment = source.slice(start, start + 6000)
   assert.doesNotMatch(segment, /feature-events|ownerId|username|eventId/)
 })
+
+// ---------------------------------------------------------------- Task 7: 发布文档
+
+test('baseline document describes the feature analytics rollout', () => {
+  const doc = readFileSync(resolve(repoDir, 'docs/功能基线-重构参考.md'), 'utf8')
+  assert.match(doc, /feature_usage_events/)
+  assert.match(doc, /系统设置 → 功能分析/)
+  assert.match(doc, /发布后开始|不回填|发布后累计/)
+})
+

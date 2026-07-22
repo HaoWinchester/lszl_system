@@ -1,12 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v8.6.8",
+  "fromVersion": "v8.6.9",
   "toVersion": "v8.6.9",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
