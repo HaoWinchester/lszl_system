@@ -9,7 +9,7 @@ const upstreamRoot = resolve(import.meta.dirname, '../../new-legacy')
 
 test('exports the complete v8.6 course and canonical activity library', () => {
   const pkg = exportCourse(upstreamRoot)
-  assert.equal(pkg.version, 'v8.6.0')
+  assert.equal(pkg.version, readFileSync(resolve(upstreamRoot, 'VERSION'), 'utf8').trim())
   assert.equal(pkg.course.stages.length, 3)
   assert.equal(pkg.course.parts.length, 9)
   assert.equal(pkg.course.nodes.length, 108)

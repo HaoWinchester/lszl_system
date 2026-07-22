@@ -80,7 +80,10 @@
 
   function refreshed(fallback, extra = {}) {
     const result = listUsers(fallback)
-    return result.ok ? { ok: true, users: result.users, ...extra } : result
+    if (!result.ok) return result
+    const users = { ...result.users }
+    if (extra.user?.username) users[extra.user.username] = extra.user
+    return { ok: true, users: service.normalizeUsers(users), ...extra }
   }
 
   function userPayload(user = {}) {

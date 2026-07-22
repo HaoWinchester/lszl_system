@@ -116,7 +116,12 @@ def _environment_wechat_overrides() -> dict:
 
 async def get_wechat_config(db: AsyncSession) -> dict:
     s = await _get_setting(db, "wechat_config")
-    return {**DEFAULT_WECHAT_CONFIG, **(s.value if s else {}), **_environment_wechat_overrides()}
+    stored = dict(s.value or {}) if s else {}
+    # 登录凭证仅允许由部署环境提供。清理旧版本写入数据库的敏感字段，
+    # 避免管理端历史数据在迁移后仍能成为正式登录的凭证来源。
+    stored.pop("appSecret", None)
+    stored.pop("backendExchangeUrl", None)
+    return {**DEFAULT_WECHAT_CONFIG, **stored, **_environment_wechat_overrides()}
 
 
 async def set_wechat_config(db: AsyncSession, patch: dict) -> dict:

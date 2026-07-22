@@ -60,7 +60,6 @@ EXACT_KEYS = {
     "kg_subscription_plan_settings_v1",
     "kg_user_admin_logs_v1",
     "kg_wechat_login_config_v1",
-    "kg_wechat_login_pending_v1",
     "kg_local_users_v1",
     "kg_local_current_user_v1",
     "通用知识点关系图谱工具_多科目重点聚焦版_v2",

@@ -1,3 +1,8 @@
+## v8.6.1
+
+- 微信网站扫码登录改由服务器安全处理 OAuth 回调、账号创建和已有账号绑定；浏览器仅发起授权和展示结果。
+- AppSecret 仅允许配置在部署环境，不会保存到浏览器或管理页面。
+
 ## v8.6.0
 
 - 建立 Activity Schema v1：活动库使用稳定活动 ID、`schemaVersion: 1`、中英文内容槽位、独立答案结构、解释结构和元数据。
@@ -1272,4 +1277,3 @@ dev/unified-canvas-kernel-demo.html
 ```text
 docs/UNIFIED_CANVAS_KERNEL_V8429.md
 ```
-

@@ -105,9 +105,8 @@
     const api=window.KGWechatLogin;
     if(!api){panel.innerHTML='<div class="um-empty">微信登录模块未加载。</div>';return}
     const cfg=api.getConfig();
-    const authUrl=(cfg.enableOfficial&&cfg.appId)?api.buildOfficialAuthUrl():'';
     panel.innerHTML=`<div class="um-wechat-config">
-      <p class="um-wechat-note">微信扫码配置由服务器统一保存；正式模式需要微信开放平台 AppID、授权回调域名和服务器换取 openid/unionid 的接口。</p>
+      <p class="um-wechat-note">微信扫码配置由服务器统一保存。AppSecret 只可在部署环境中设置，不会显示或存入浏览器。</p>
       <div class="um-wechat-checks">
         <label><input type="checkbox" id="wxEnableDemo" ${cfg.enableDemo?'checked':''}> 启用扫码测试模式</label>
         <label><input type="checkbox" id="wxEnableOfficial" ${cfg.enableOfficial?'checked':''}> 启用正式微信开放平台模式</label>
@@ -115,14 +114,13 @@
       </div>
       <div class="um-wechat-grid">
         <label>微信开放平台 AppID<input id="wxAppId" value="${escapeHTML(cfg.appId)}" placeholder="wx1234567890abcdef"></label>
-        <label>授权回调地址 redirect_uri<input id="wxRedirectUri" value="${escapeHTML(cfg.redirectUri)}" placeholder="https://your-domain.com/index.html"></label>
-        <label>后端 code 换取用户接口<input id="wxBackendExchangeUrl" value="${escapeHTML(cfg.backendExchangeUrl)}" placeholder="https://your-api.com/auth/wechat/callback"></label>
+        <label>授权回调地址 redirect_uri<input id="wxRedirectUri" value="${escapeHTML(cfg.redirectUri)}" placeholder="https://lszl.aihuanpu.com/api/v1/auth/wechat/callback"></label>
         <label>微信授权 scope<select id="wxScope"><option value="snsapi_login" ${cfg.scope==='snsapi_login'?'selected':''}>snsapi_login（网站扫码）</option><option value="snsapi_userinfo" ${cfg.scope==='snsapi_userinfo'?'selected':''}>snsapi_userinfo（公众号网页授权）</option></select></label>
         <label>微信新用户默认角色<select id="wxDefaultRole"><option value="student" ${cfg.defaultRole==='student'?'selected':''}>学员</option><option value="viewer" ${cfg.defaultRole==='viewer'?'selected':''}>游客</option><option value="teacher" ${cfg.defaultRole==='teacher'?'selected':''}>教师/教研</option></select></label>
         <label>微信新用户默认科目<input id="wxDefaultSubject" value="${escapeHTML(cfg.defaultSubject||'PMP')}" placeholder="PMP"></label>
       </div>
-      <div class="um-wechat-actions"><button type="button" class="primary" id="wxSaveConfigBtn">保存微信配置</button><button type="button" id="wxPreviewAuthBtn" ${authUrl?'':'disabled'}>预览授权链接</button></div>
-      <div class="um-wechat-preview">${authUrl?escapeHTML(authUrl):'配置 AppID 并启用正式模式后，这里会显示微信授权地址预览。'}</div>
+      <div class="um-wechat-actions"><button type="button" class="primary" id="wxSaveConfigBtn">保存微信配置</button></div>
+      <div class="um-wechat-preview">正式登录由服务器创建授权链接并校验回调状态；浏览器不会接触 AppSecret 或微信用户标识。</div>
     </div>`;
   }
   function collectWechatConfig(){
@@ -133,7 +131,6 @@
       autoCreateUser:!!$('wxAutoCreate')?.checked,
       appId:$('wxAppId')?.value.trim()||'',
       redirectUri:$('wxRedirectUri')?.value.trim()||'',
-      backendExchangeUrl:$('wxBackendExchangeUrl')?.value.trim()||'',
       scope:$('wxScope')?.value||'snsapi_login',
       defaultRole:$('wxDefaultRole')?.value||'student',
       defaultSubject:$('wxDefaultSubject')?.value.trim()||'PMP'
@@ -146,15 +143,6 @@
     renderWechatConfig();
     toast('微信登录配置已保存');
   }
-  function previewWechatAuthUrl(){
-    const api=window.KGWechatLogin;if(!api)return;
-    const cfg=api.saveConfig(collectWechatConfig());
-    if(!cfg.appId){toast('请先填写 AppID');renderWechatConfig();return}
-    const url=api.buildOfficialAuthUrl();
-    prompt('微信授权地址预览，可复制给技术人员调试：',url);
-    renderWechatConfig();
-  }
-
   function renderPermissionMatrix(){
     const panel=$('ssPermissionMatrix');
     if(!panel)return;
@@ -492,11 +480,10 @@
         if(dot&&theme.primary)dot.style.background=theme.primary;
       });
     }
-    const wechatPanel=$('ssWechatConfigPanel');
-    if(wechatPanel)wechatPanel.addEventListener('click',event=>{
-      if(event.target.closest('#wxSaveConfigBtn'))saveWechatConfig();
-      if(event.target.closest('#wxPreviewAuthBtn'))previewWechatAuthUrl();
-    });
+        const wechatPanel=$('ssWechatConfigPanel');
+        if(wechatPanel)wechatPanel.addEventListener('click',event=>{
+          if(event.target.closest('#wxSaveConfigBtn'))saveWechatConfig();
+        });
     const subscriptionPanel=$('ssSubscriptionPanel');
     if(subscriptionPanel)subscriptionPanel.addEventListener('click',event=>{
       const resetAll=event.target.closest('#ssResetAllPlanSettingsBtn');

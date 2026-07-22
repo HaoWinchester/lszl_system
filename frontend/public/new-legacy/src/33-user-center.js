@@ -119,6 +119,39 @@
     const btn=$("ucSubscriptionRenewBtn");
     if(btn)btn.addEventListener("click",openSubscriptionDetailModal);
   }
+  function renderWechatBox(user){
+    const panel=$("ucWechatBox");
+    if(!panel)return;
+    const wechat=user&&user.wechat;
+    const bound=!!(wechat&&wechat.bound);
+    const nickname=String(wechat&&wechat.nickname||"微信用户");
+    panel.innerHTML=bound
+      ?`<div class="kg-user-subscription-main"><div><strong>微信已绑定</strong><span>已绑定微信账号：${escapeHTML(nickname)}。以后可直接使用微信扫码登录。</span></div><button type="button" class="kg-user-subscription-renew" id="ucWechatUnbindBtn">解除绑定</button></div>`
+      :`<div class="kg-user-subscription-main"><div><strong>尚未绑定微信</strong><span>绑定后可使用微信扫码登录当前账号。</span></div><button type="button" class="kg-user-subscription-renew" id="ucWechatBindBtn">绑定微信</button></div>`;
+    const bind=$("ucWechatBindBtn");
+    const unbind=$("ucWechatUnbindBtn");
+    if(bind)bind.addEventListener("click",()=>{
+      const api=window.KGWechatLogin;
+      if(!api||typeof api.startOfficialLogin!=="function"){msg("微信登录模块未加载，请刷新后重试。");return}
+      msg("正在跳转至微信授权页…",true);
+      api.startOfficialLogin('bind');
+    });
+    if(unbind)unbind.addEventListener("click",async()=>{
+      const api=window.KGWechatLogin;
+      if(!api||typeof api.unbind!=="function"){msg("微信登录模块未加载，请刷新后重试。");return}
+      if(!confirm("解除后将不能使用该微信扫码登录，确定解除绑定吗？"))return;
+      unbind.disabled=true;
+      const result=await api.unbind();
+      if(!result||!result.ok){
+        unbind.disabled=false;
+        msg(result&&result.message||"解除微信绑定失败。");
+        return;
+      }
+      fillForm();
+      msg("微信绑定已解除。",true);
+      showStatus("微信绑定已解除。");
+    });
+  }
   function planFeatureList(plan){
     const sub=subscriptionApi();
     if(sub&&typeof sub.planBenefitItems==="function")return sub.planBenefitItems(plan);
@@ -460,6 +493,7 @@
               <span class="kg-user-chip" id="ucRoleChip">角色：—</span>
               <span class="kg-user-chip" id="ucStatusChip">状态：—</span>
             </div>
+            <section class="kg-user-subscription-box" id="ucWechatBox" aria-label="微信登录"></section>
             <section class="kg-user-subscription-box" id="ucSubscriptionBox" aria-label="我的订阅"></section>
             <label class="kg-user-field full">
               <span>个人备注 / 学习说明</span>
@@ -524,6 +558,7 @@
     $("ucNote").value=user.note||"";
     $("ucRoleChip").textContent="角色："+roleLabel(user.role||"student");
     $("ucStatusChip").textContent="状态："+statusLabel(user.status||"active");
+    renderWechatBox(user);
     renderSubscriptionBox(user);
     $("ucCurrentPassword").value="";
     $("ucNewPassword").value="";
@@ -653,6 +688,7 @@
     window.addEventListener("kg-user-profile-updated",()=>setTimeout(()=>{bindEntry();bindSubscriptionEntrypoints()},0));
     window.addEventListener("kg-subscription-change",()=>{if($("userCenterModal")&&$("userCenterModal").classList.contains("show"))fillForm()});
     window.addEventListener("kg-subscription-plan-change",()=>{if($("userCenterModal")&&$("userCenterModal").classList.contains("show"))fillForm()});
+    window.addEventListener("kg-wechat-binding-change",()=>{if($("userCenterModal")&&$("userCenterModal").classList.contains("show"))fillForm()});
     window.addEventListener("storage",event=>{
       if(!event.key || event.key===AUTH_USERS_KEY || event.key===AUTH_SESSION_KEY){
         setTimeout(()=>{bindEntry();refreshAuthUI()},0);

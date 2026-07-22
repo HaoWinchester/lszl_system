@@ -3,25 +3,77 @@
 登录成功/失败/登出/微信登录均写审计日志。
 """
 
-from typing import Annotated
+from typing import Annotated, Literal
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser
 from app.db.session import get_db
-from app.schemas.auth import LoginRequest, RegisterRequest, WechatLoginRequest
+from app.schemas.auth import LoginRequest, RegisterRequest
 from app.schemas.user import UserCreate
+from app.models.user import ACTIVE
 from app.services import system_service, user_service, wechat_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 DB = Annotated[AsyncSession, Depends(get_db)]
+
+SAFE_WECHAT_RETURN_PATHS = {
+    "/",
+    "/graph",
+    "/training",
+    "/workspace",
+    "/learning/node",
+    "/learning/placement-test",
+    "/files",
+    "/question-bank",
+    "/recall",
+    "/users",
+    "/settings",
+    "/login",
+    "/member",
+    "/index.html",
+    "/workbench.html",
+    "/learning-path.html",
+    "/file-manager.html",
+    "/question-bank.html",
+    "/question-training.html",
+    "/question-workspace.html",
+    "/knowledge-recall.html",
+    "/user-management.html",
+    "/system-settings.html",
+    "/guided-learning-node.html",
+    "/guided-learning-placement-test.html",
+}
 
 
 def _client_info(request: Request) -> tuple[str | None, str | None]:
     ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent")
     return ip, ua
+
+
+def _safe_return_path(value: str | None) -> str:
+    parsed = urlsplit(str(value or "/"))
+    if (
+        not str(value or "/").startswith("/")
+        or str(value or "/").startswith("//")
+        or parsed.scheme
+        or parsed.netloc
+        or parsed.path not in SAFE_WECHAT_RETURN_PATHS
+    ):
+        return "/"
+    return urlunsplit(("", "", parsed.path, parsed.query, parsed.fragment))
+
+
+def _wechat_redirect(return_path: str, result: str) -> RedirectResponse:
+    parsed = urlsplit(_safe_return_path(return_path))
+    query = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True) if key != "wechat"]
+    query.append(("wechat", result))
+    location = urlunsplit(("", "", parsed.path, urlencode(query), parsed.fragment))
+    return RedirectResponse(url=location, status_code=303)
 
 
 @router.post("/register")
@@ -101,23 +153,38 @@ async def wechat_config(db: DB):
 
 
 @router.get("/wechat/auth-url")
-async def wechat_auth_url(request: Request, db: DB):
+async def wechat_auth_url(
+    request: Request,
+    db: DB,
+    intent: Literal["login", "bind"] = "login",
+    return_path: str = "/",
+):
     cfg = await system_service.get_wechat_config(db)
     if wechat_service.compute_mode(cfg) != "official":
         raise HTTPException(status_code=400, detail="未配置正式微信登录（缺 AppID/AppSecret 或未启用）")
+    username = str(request.session.get("username") or "")
+    if intent == "bind" and not username:
+        raise HTTPException(status_code=401, detail="请先登录后再绑定微信")
     url, state = wechat_service.build_auth_url(cfg)
-    request.session["wechat_state"] = state
+    request.session["wechat_oauth"] = {
+        "state": state,
+        "intent": intent,
+        "returnPath": _safe_return_path(return_path),
+        "username": username,
+    }
     return {"authUrl": url, "state": state}
 
 
-@router.post("/wechat/login")
-async def wechat_login(req: WechatLoginRequest, request: Request, db: DB):
+@router.get("/wechat/callback")
+async def wechat_callback(code: str, state: str, request: Request, db: DB):
+    pending = request.session.pop("wechat_oauth", None)
+    if not pending or pending.get("state") != state:
+        return _wechat_redirect("/", "state-invalid")
+
+    return_path = _safe_return_path(pending.get("returnPath"))
     cfg = await system_service.get_wechat_config(db)
-    expected = request.session.pop("wechat_state", None)
-    if not expected or expected != req.state:
-        raise HTTPException(status_code=400, detail="登录状态校验失败，请重新扫码")
     try:
-        token = await wechat_service.exchange_code(cfg, req.code)
+        token = await wechat_service.exchange_code(cfg, code)
         info = await wechat_service.fetch_userinfo(
             cfg, token.get("access_token", ""), token.get("openid", "")
         )
@@ -127,18 +194,38 @@ async def wechat_login(req: WechatLoginRequest, request: Request, db: DB):
             "nickname": info.get("nickname", ""),
             "avatar": info.get("avatar", ""),
         }
-        user = await wechat_service.find_or_create_user(db, profile, cfg, "wechat")
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=400, detail=f"微信登录失败：{e}")
-    if not user:
-        raise HTTPException(status_code=403, detail="该微信未绑定本系统账号，请联系管理员")
+        if pending.get("intent") == "bind":
+            username = str(pending.get("username") or "")
+            if not username or request.session.get("username") != username:
+                return _wechat_redirect(return_path, "bind-failed")
+            user = await user_service.get_by_username(db, username)
+            if not user or user.status != ACTIVE:
+                return _wechat_redirect(return_path, "bind-failed")
+            user = await wechat_service.bind_user(db, user, profile, "wechat-bind")
+            action, detail, result = "wechat_bind", "微信账号绑定成功", "bind-success"
+        else:
+            user = await wechat_service.find_or_create_user(db, profile, cfg, "wechat")
+            if not user:
+                return _wechat_redirect(return_path, "login-failed")
+            request.session["username"] = user.username
+            action, detail, result = "wechat_login", "微信扫码登录", "login-success"
+    except (PermissionError, ValueError):
+        return _wechat_redirect(return_path, "bind-failed" if pending.get("intent") == "bind" else "login-failed")
+    except Exception:  # noqa: BLE001
+        return _wechat_redirect(return_path, "provider-failed")
     ip, ua = _client_info(request)
-    await user_service.log_action(db, "wechat_login", user.username, user.username, "微信扫码登录", ip, ua)
+    await user_service.log_action(db, action, user.username, user.username, detail, ip, ua)
     await db.commit()
-    request.session["username"] = user.username
-    return {"user": user_service.to_dict(user)}
+    return _wechat_redirect(return_path, result)
+
+
+@router.delete("/wechat/binding")
+async def unbind_wechat(request: Request, user: CurrentUser, db: DB):
+    updated = await wechat_service.unbind_user(db, user)
+    ip, ua = _client_info(request)
+    await user_service.log_action(db, "wechat_unbind", updated.username, updated.username, "解除微信绑定", ip, ua)
+    await db.commit()
+    return {"user": user_service.to_dict(updated)}
 
 
 @router.post("/wechat/demo-login")

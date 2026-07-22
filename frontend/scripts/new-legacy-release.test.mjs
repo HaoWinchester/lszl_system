@@ -11,6 +11,7 @@ const frontendDir = resolve(scriptsDir, '..')
 const repoDir = resolve(frontendDir, '..')
 const command = resolve(scriptsDir, 'manage-new-legacy.js')
 const source = resolve(repoDir, 'new-legacy')
+const sourceVersion = readFileSync(resolve(source, 'VERSION'), 'utf8').trim()
 
 function makeRoot() {
   return mkdtempSync(resolve(tmpdir(), 'kg-new-legacy-releases-'))
@@ -33,13 +34,13 @@ test('update builds an isolated release and atomically selects it', () => {
 
   assert.equal(result.status, 0, result.stderr)
   const current = readJson(resolve(root, 'current.json'))
-  assert.equal(current.version, 'v8.6.0')
+  assert.equal(current.version, sourceVersion)
   assert.equal(current.previousVersion, null)
-  assert.ok(existsSync(resolve(root, 'v8.6.0', 'source', 'learning-path.html')))
-  assert.ok(existsSync(resolve(root, 'v8.6.0', 'site', 'learning-path.html')))
+  assert.ok(existsSync(resolve(root, sourceVersion, 'source', 'learning-path.html')))
+  assert.ok(existsSync(resolve(root, sourceVersion, 'site', 'learning-path.html')))
   assert.match(current.sourceHash, /^[a-f0-9]{64}$/)
   assert.match(current.adapterHash, /^[a-f0-9]{64}$/)
-  assert.equal(readJson(resolve(root, 'v8.6.0', 'release.json')).adapterVersion, 4)
+  assert.equal(readJson(resolve(root, sourceVersion, 'release.json')).adapterVersion, 4)
 })
 
 test('same version with a different source hash fails without changing current', () => {
@@ -81,8 +82,8 @@ test('same source version is atomically rebuilt when the adapter changes', () =>
   assert.equal(after.version, before.version)
   assert.equal(after.sourceHash, before.sourceHash)
   assert.notEqual(after.adapterHash, before.adapterHash)
-  assert.equal(readJson(resolve(releases, 'v8.6.0', 'release.json')).adapterHash, after.adapterHash)
-  assert.match(readFileSync(resolve(releases, 'v8.6.0', 'site', 'direct-entry.js'), 'utf8'), /adapter-rebuild-probe/)
+  assert.equal(readJson(resolve(releases, sourceVersion, 'release.json')).adapterHash, after.adapterHash)
+  assert.match(readFileSync(resolve(releases, sourceVersion, 'site', 'direct-entry.js'), 'utf8'), /adapter-rebuild-probe/)
 })
 
 test('failed automatic validation never changes the active release', () => {
@@ -114,15 +115,15 @@ test('rollback selects the previous successful release', () => {
   assert.equal(run(root, 'update', source).status, 0)
   const next = resolve(root, 'next-source')
   cpSync(source, next, { recursive: true })
-  writeFileSync(resolve(next, 'VERSION'), 'v8.6.1\n')
+  writeFileSync(resolve(next, 'VERSION'), 'v8.6.2\n')
   assert.equal(run(root, 'update', next).status, 0)
 
   const result = run(root, 'rollback')
 
   assert.equal(result.status, 0, result.stderr)
   const current = readJson(resolve(root, 'current.json'))
-  assert.equal(current.version, 'v8.6.0')
-  assert.equal(current.previousVersion, 'v8.6.1')
+  assert.equal(current.version, sourceVersion)
+  assert.equal(current.previousVersion, 'v8.6.2')
 })
 
 test('release validation runs the full five-role regression against the candidate', () => {

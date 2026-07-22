@@ -38,7 +38,7 @@ def test_public_default_course_contains_the_complete_v8_6_package() -> None:
     response = TestClient(app).get("/api/v1/guided-learning/courses/default")
     assert response.status_code == 200, response.text
     package = response.json()
-    assert package["version"] == "v8.6.0"
+    assert package["version"] == json.loads(SEED_PATH.read_text(encoding="utf-8"))["version"]
     assert len(package["course"]["stages"]) == 3
     assert len(package["course"]["parts"]) == 9
     assert len(package["course"]["nodes"]) == 108
