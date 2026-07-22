@@ -3,15 +3,17 @@
 GET 类登录即可（前端需读主题），写操作仅管理员。
 """
 
+from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser, require_role
 from app.db.session import get_db
 from app.models.user import User
-from app.services import system_service, user_service
+from app.schemas.analytics import FeatureAnalyticsQuery
+from app.services import analytics_service, system_service, user_service
 
 router = APIRouter(prefix="/system", tags=["system"])
 DB = Annotated[AsyncSession, Depends(get_db)]
@@ -88,3 +90,20 @@ async def logs(db: DB, _: AdminUser, limit: int = 100):
 async def clear_logs(db: DB, admin: AdminUser):
     await user_service.clear_logs(db, actor=admin.username)
     return {"ok": True}
+
+
+# ---------- 用户功能偏好分析 ----------
+@router.get("/feature-analytics")
+async def feature_analytics(
+    db: DB,
+    _: AdminUser,
+    start: date,
+    end: date,
+    role: str | None = None,
+):
+    """管理员查看各功能的常用度与成果用户率聚合（不含任何用户标识）。"""
+    try:
+        query = FeatureAnalyticsQuery(start=start, end=end, role=role)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return await analytics_service.aggregate_feature_analytics(db, query)
