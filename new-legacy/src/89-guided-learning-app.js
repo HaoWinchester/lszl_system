@@ -212,7 +212,7 @@
     const parts=selectedStageParts();
     const container=byId('glPathParts');if(!container)return;
     container.innerHTML='<section class="gl-stage-path-shell">'
-      +'<div class="gl-stage-path-tools"><span>左右滑动浏览本阶段完整路径</span><div><button type="button" data-gl-scroll="-1" aria-label="向左浏览">←</button><button type="button" data-gl-scroll="1" aria-label="向右浏览">→</button></div></div>'
+      +'<div class="gl-stage-path-tools"><span>左右滑动浏览本阶段完整路径</span><div><button type="button" data-gl-scroll="-1" aria-label="向左浏览"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14 5-6 7 6 7"/></svg></button><button type="button" data-gl-scroll="1" aria-label="向右浏览"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m10 5 6 7-6 7"/></svg></button></div></div>'
       +'<div class="gl-stage-path-scroll" id="glStagePathScroll" tabindex="0" aria-label="'+escapeHTML(stage.title)+'横向学习路径">'
       +'<div class="gl-stage-path-track">'+parts.map(partMarkup).join('')+'</div></div>'
       +'</section>';

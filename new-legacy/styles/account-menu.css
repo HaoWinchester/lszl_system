@@ -14,9 +14,10 @@
   cursor:pointer;
   min-height:38px;
   max-width:220px;
+  justify-content:center;
   padding:0 11px;
   color:var(--role-text,#334155);
-  text-align:left;
+  text-align:center;
   transition:box-shadow .16s ease,background .16s ease,transform .16s ease;
 }
 .account-menu-trigger:hover,
@@ -34,6 +35,7 @@
   white-space:nowrap;
   text-overflow:ellipsis;
 }
+.account-menu-mobile-label{display:none}
 .account-menu-chevron{
   flex:0 0 auto;
   width:16px;
@@ -151,14 +153,14 @@
     background:rgba(255,255,255,.96);
     box-shadow:0 0 0 1px rgba(148,163,184,.25),0 3px 12px rgba(15,23,42,.10);
   }
-  .account-menu-trigger::before{
-    content:"账号";
+  .account-menu-mobile-label{
     display:block;
     font-size:12px;
     font-weight:900;
     line-height:1;
     white-space:nowrap;
   }
+  .account-menu-trigger::before{display:none}
   .account-menu-trigger .role-dot,
   .account-menu-trigger .auth-status-label{display:none!important}
   .account-menu-chevron{

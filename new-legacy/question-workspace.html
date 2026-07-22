@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="styles/global-shortcuts.css"/>
   <link rel="stylesheet" href="styles/subscription.css"/>
   <link rel="stylesheet" href="styles/user-center.css"/>
+  <link rel="stylesheet" href="styles/account-menu.css"/>
 </head>
 <body class="question-workspace-page">
   <div class="qw-app">
@@ -38,9 +39,20 @@
         <span class="qw-readonly-badge" id="qwReadOnlyBadge" hidden>只读查看</span>
         <a class="qt-nav-btn" href="learning-path.html">学习路径</a>
         <a class="qt-nav-btn" href="question-training.html">单题深学</a>
-        <div class="auth-status" id="authStatus">访客只读</div>
-        <button class="auth-login-btn" id="authLoginBtn" type="button">登录</button>
-        <button class="auth-logout-btn" id="authLogoutBtn" type="button" style="display:none">退出</button>
+        <div class="account-menu-shell">
+          <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
+            <span class="role-dot"></span><span class="auth-status-label">访客只读</span><span aria-hidden="true" class="account-menu-mobile-label">账号</span>
+            <svg aria-hidden="true" class="account-menu-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>
+          </button>
+          <div class="account-menu" hidden id="accountMenu" role="menu" aria-label="账号菜单">
+            <button class="account-menu-item account-menu-session" data-account-menu-action="session" role="menuitem" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1 2 2h-5"/></svg>
+              <span data-mobile-label="登录">登录</span>
+            </button>
+          </div>
+        </div>
+        <button class="account-hidden-trigger" hidden id="authLoginBtn" type="button">登录</button>
+        <button class="account-hidden-trigger" hidden id="authLogoutBtn" type="button">退出登录</button>
       </div>
     </header>
 
@@ -292,6 +304,7 @@
   <script defer src="src/29-auth-core.js"></script>
   <script defer src="src/30-standalone-auth-dialog.js"></script>
   <script defer src="src/34-role-permissions.js"></script>
+  <script defer src="src/41-account-menu.js"></script>
   <script defer src="src/37-subscription-plans.js"></script>
   <script defer src="src/37-subscription-orders.js"></script>
   <script defer src="src/37-subscription-redeem-codes.js"></script>

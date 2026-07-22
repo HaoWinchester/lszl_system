@@ -50,3 +50,28 @@ test('status labels avoid duplicate role text and keyword punctuation stays atta
   assert.match(learningData, /\{text:'两周迭代，',target:true\}/)
   assert.match(learningStyles, /\.gln-activity\.gln-keyword-activity\{min-height:300px\}/)
 })
+
+test('standalone learning headers use one account menu instead of a detached logout button', () => {
+  for (const page of ['learning-path.html', 'question-training.html', 'question-workspace.html']) {
+    const markup = source(`new-legacy/${page}`)
+
+    assert.match(markup, /class="account-menu-shell(?:\s|\")/)
+    assert.match(markup, /data-account-menu-trigger="true"/)
+    assert.match(markup, /class="account-hidden-trigger" hidden id="authLogoutBtn"/)
+    assert.doesNotMatch(markup, /class="auth-logout-btn" id="authLogoutBtn"[^>]*style="display:none"/)
+  }
+})
+
+test('shared controls center their own content and document the only start-aligned exceptions', () => {
+  const main = source('new-legacy/styles/main.css')
+  const account = source('new-legacy/styles/account-menu.css')
+  const learning = source('new-legacy/styles/guided-learning-path.css')
+  const audit = source('frontend/e2e/ui_geometry_audit.py')
+
+  assert.match(main, /\.floating-subtool-btn\{[\s\S]*?justify-content:center;[\s\S]*?text-align:center;/)
+  assert.match(account, /\.account-menu-trigger\{[\s\S]*?justify-content:center;[\s\S]*?text-align:center;/)
+  assert.match(learning, /\.gl-stage-path-tools button\{display:grid;place-items:center/)
+  assert.doesNotMatch(learning, /writing-mode:vertical-rl/)
+  assert.match(audit, /\[data-geometry-align='start'\]/)
+  assert.match(audit, /\.qt-teacher-menu-panel \.qt-nav-btn/)
+})

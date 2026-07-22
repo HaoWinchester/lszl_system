@@ -1,18 +1,13 @@
 'use strict';
 
 /*
- * C-1.4.4：桌面端账号胶囊 + 移动端顶部吸附账号入口。
- * 移动端入口显示“账号”，菜单项使用两字短标签；桌面端保留完整名称。
+ * 账号入口统一为“账号胶囊 + 就近菜单”。
+ * 页面只需提供 .account-menu-shell、[data-account-menu-trigger] 和 role=menu；
+ * 登录/退出仍通过隐藏代理按钮转给各页面已有的认证实现，避免复制认证逻辑。
  */
 (function(){
   const $=id=>document.getElementById(id);
-  let shell=null;
-  let trigger=null;
-  let menu=null;
-  let userCenterBtn=null;
-  let helpBtn=null;
-  let upgradeBtn=null;
-  let sessionBtn=null;
+  const states=[];
 
   function isLoggedIn(){
     const runtime=window.KGAuthRuntime;
@@ -21,62 +16,70 @@
     if(auth&&typeof auth.currentUser==='function')return !!auth.currentUser();
     return false;
   }
-  function menuItems(){
-    if(!menu)return [];
-    return [...menu.querySelectorAll('[role="menuitem"]:not([disabled])')]
+  function menuItems(state){
+    if(!state?.menu)return [];
+    return [...state.menu.querySelectorAll('[role="menuitem"]:not([disabled])')]
       .filter(item=>!item.hidden&&getComputedStyle(item).display!=='none');
   }
-  function setOpen(open,{focusFirst=false}={}){
-    if(!shell||!trigger||!menu)return;
-    open=!!open;
-    shell.classList.toggle('is-open',open);
-    trigger.setAttribute('aria-expanded',String(open));
-    menu.hidden=!open;
-    if(open){
-      refresh();
-      if(focusFirst)requestAnimationFrame(()=>{
-        const first=menuItems()[0];
-        if(first)first.focus();
-      });
+  function stateFor(target){
+    if(target instanceof Element){
+      return states.find(state=>state.shell===target||state.shell.contains(target))||states[0]||null;
+    }
+    return states[0]||null;
+  }
+  function setOpen(state,open,{focusFirst=false}={}){
+    if(!state?.shell||!state.trigger||!state.menu)return;
+    const expanded=!!open;
+    state.shell.classList.toggle('is-open',expanded);
+    state.trigger.setAttribute('aria-expanded',String(expanded));
+    state.menu.hidden=!expanded;
+    if(expanded){
+      refresh(state);
+      if(focusFirst)requestAnimationFrame(()=>menuItems(state)[0]?.focus());
     }
   }
-  function open(options){setOpen(true,options)}
-  function close({restoreFocus=false}={}){
-    const wasOpen=!!(shell&&shell.classList.contains('is-open'));
-    setOpen(false);
-    if(restoreFocus&&wasOpen&&trigger)trigger.focus();
+  function open(target,options={}){setOpen(stateFor(target),true,options)}
+  function close(target,{restoreFocus=false}={}){
+    if(target===undefined){states.forEach(state=>close(state.shell,{restoreFocus:false}));return}
+    const state=stateFor(target);
+    const wasOpen=!!state?.shell.classList.contains('is-open');
+    setOpen(state,false);
+    if(restoreFocus&&wasOpen)state?.trigger.focus();
   }
-  function toggle(){
-    if(!shell)return;
-    setOpen(!shell.classList.contains('is-open'));
+  function toggle(target){
+    const state=stateFor(target);
+    if(state)setOpen(state,!state.shell.classList.contains('is-open'));
   }
-  function refresh(){
-    if(!sessionBtn)return;
-    const loggedIn=isLoggedIn();
-    sessionBtn.classList.toggle('is-logout',loggedIn);
-    sessionBtn.classList.toggle('is-login',!loggedIn);
-    const label=sessionBtn.querySelector('span');
-    if(label){
-      label.textContent=loggedIn?'退出登录':'登录';
-      label.dataset.mobileLabel=loggedIn?'退出':'登录';
-    }
-    sessionBtn.setAttribute('aria-label',loggedIn?'退出登录':'登录');
-    sessionBtn.title=loggedIn?'退出登录':'登录';
-    if(userCenterBtn)userCenterBtn.setAttribute('aria-label','用户中心');
-    if(helpBtn)helpBtn.setAttribute('aria-label','帮助中心');
-    if(upgradeBtn)upgradeBtn.setAttribute('aria-label','升级会员');
+  function refresh(target){
+    const only=target?stateFor(target):null;
+    (only?[only]:states).filter(Boolean).forEach(state=>{
+      if(!state.sessionBtn)return;
+      const loggedIn=isLoggedIn();
+      state.sessionBtn.classList.toggle('is-logout',loggedIn);
+      state.sessionBtn.classList.toggle('is-login',!loggedIn);
+      const label=state.sessionBtn.querySelector('span');
+      if(label){
+        label.textContent=loggedIn?'退出登录':'登录';
+        label.dataset.mobileLabel=loggedIn?'退出':'登录';
+      }
+      state.sessionBtn.setAttribute('aria-label',loggedIn?'退出登录':'登录');
+      state.sessionBtn.title=loggedIn?'退出登录':'登录';
+      state.userCenterBtn?.setAttribute('aria-label','用户中心');
+      state.helpBtn?.setAttribute('aria-label','帮助中心');
+      state.upgradeBtn?.setAttribute('aria-label','升级会员');
+    });
   }
-  function openUserCenter(){
-    close();
+  function closeForAction(state){close(state.shell)}
+  function openUserCenter(state){
+    closeForAction(state);
     if(window.KGUserCenter&&typeof window.KGUserCenter.open==='function'){
       window.KGUserCenter.open();
       return;
     }
-    const login=$('authLoginBtn');
-    if(login)login.click();
+    $('authLoginBtn')?.click();
   }
-  function openHelp(){
-    close();
+  function openHelp(state){
+    closeForAction(state);
     if(typeof window.startGuidedTour==='function'){
       window.startGuidedTour(true);
       return;
@@ -85,82 +88,84 @@
       window.openTutorial();
       return;
     }
-    const legacy=$('tutorialBtn');
-    if(legacy)legacy.click();
+    $('tutorialBtn')?.click();
   }
-  function openUpgrade(){
-    close();
+  function openUpgrade(state){
+    closeForAction(state);
     if(window.KGUserCenter&&typeof window.KGUserCenter.openSubscriptionDetail==='function'){
       window.KGUserCenter.openSubscriptionDetail();
       return;
     }
-    const legacy=$('upgradeMemberBtn');
-    if(legacy)legacy.click();
+    $('upgradeMemberBtn')?.click();
   }
-  function toggleSession(){
+  function toggleSession(state){
     const loggedIn=isLoggedIn();
-    close();
+    closeForAction(state);
+    const proxy=$(loggedIn?'authLogoutBtn':'authLoginBtn');
+    if(proxy){proxy.click();return}
     const runtime=window.KGAuthRuntime;
     if(loggedIn){
       if(runtime&&typeof runtime.logout==='function')runtime.logout();
       else if(typeof window.authLogout==='function')window.authLogout();
-      else{const logout=$('authLogoutBtn');if(logout)logout.click()}
       return;
     }
     if(runtime&&typeof runtime.openAuth==='function')runtime.openAuth('登录后可以新增、编辑、连线和保存自己的图谱。');
     else if(typeof window.authOpen==='function')window.authOpen('登录后可以新增、编辑、连线和保存自己的图谱。');
-    else{const login=$('authLoginBtn');if(login)login.click()}
   }
-  function onTriggerKeydown(event){
+  function onTriggerKeydown(state,event){
     if(event.key==='ArrowDown'){
       event.preventDefault();
-      open({focusFirst:true});
+      setOpen(state,true,{focusFirst:true});
     }else if(event.key==='Escape'){
       event.preventDefault();
-      close();
+      close(state.shell);
     }
   }
-  function onMenuKeydown(event){
-    const items=menuItems();
+  function onMenuKeydown(state,event){
+    const items=menuItems(state);
     const index=items.indexOf(document.activeElement);
     if(event.key==='Escape'){
       event.preventDefault();
-      close({restoreFocus:true});
+      close(state.shell,{restoreFocus:true});
       return;
     }
     if(event.key==='ArrowDown'||event.key==='ArrowUp'){
       event.preventDefault();
       const step=event.key==='ArrowDown'?1:-1;
       const next=index<0?0:(index+step+items.length)%items.length;
-      if(items[next])items[next].focus();
+      items[next]?.focus();
     }
   }
-  function init(){
-    shell=$('accountMenuShell');
-    trigger=$('authStatus');
-    menu=$('accountMenu');
-    userCenterBtn=$('accountMenuUserCenterBtn');
-    helpBtn=$('accountMenuHelpBtn');
-    upgradeBtn=$('accountMenuUpgradeBtn');
-    sessionBtn=$('accountMenuSessionBtn');
-    if(!shell||!trigger||!menu||!userCenterBtn||!helpBtn||!upgradeBtn||!sessionBtn)return;
-    if(shell.dataset.accountMenuBound==='1')return;
+  function initShell(shell){
+    const trigger=shell.querySelector('[data-account-menu-trigger="true"]');
+    const menu=shell.querySelector('[role="menu"]');
+    const sessionBtn=menu?.querySelector('[data-account-menu-action="session"],#accountMenuSessionBtn');
+    if(!trigger||!menu||!sessionBtn||shell.dataset.accountMenuBound==='1')return;
+    const state={
+      shell,trigger,menu,sessionBtn,
+      userCenterBtn:menu.querySelector('[data-account-menu-action="user-center"],#accountMenuUserCenterBtn'),
+      helpBtn:menu.querySelector('[data-account-menu-action="help"],#accountMenuHelpBtn'),
+      upgradeBtn:menu.querySelector('[data-account-menu-action="upgrade"],#accountMenuUpgradeBtn')
+    };
     shell.dataset.accountMenuBound='1';
-
+    states.push(state);
     trigger.addEventListener('click',event=>{
       event.preventDefault();
       event.stopPropagation();
-      toggle();
+      toggle(shell);
     });
-    trigger.addEventListener('keydown',onTriggerKeydown);
-    menu.addEventListener('keydown',onMenuKeydown);
-    userCenterBtn.addEventListener('click',openUserCenter);
-    helpBtn.addEventListener('click',openHelp);
-    upgradeBtn.addEventListener('click',openUpgrade);
-    sessionBtn.addEventListener('click',toggleSession);
-
+    trigger.addEventListener('keydown',event=>onTriggerKeydown(state,event));
+    menu.addEventListener('keydown',event=>onMenuKeydown(state,event));
+    state.userCenterBtn?.addEventListener('click',()=>openUserCenter(state));
+    state.helpBtn?.addEventListener('click',()=>openHelp(state));
+    state.upgradeBtn?.addEventListener('click',()=>openUpgrade(state));
+    sessionBtn.addEventListener('click',()=>toggleSession(state));
+    refresh(state);
+  }
+  function init(){
+    document.querySelectorAll('.account-menu-shell').forEach(initShell);
     document.addEventListener('click',event=>{
-      if(shell&&!shell.contains(event.target))close();
+      states.forEach(state=>{if(!state.shell.contains(event.target))close(state.shell)});
     });
     window.addEventListener('blur',()=>close());
     window.addEventListener('orientationchange',()=>close());
@@ -173,7 +178,6 @@
         setTimeout(refresh,0);
       }
     });
-    refresh();
   }
 
   window.KGAccountMenu={open,close,toggle,refresh};

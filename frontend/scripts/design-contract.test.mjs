@@ -7,6 +7,7 @@ const frontend = resolve(import.meta.dirname, '..')
 const repo = resolve(frontend, '..')
 const readFrontend = (path) => readFileSync(resolve(frontend, path), 'utf8')
 const readRepo = (path) => readFileSync(resolve(repo, path), 'utf8')
+const publicRelease = JSON.parse(readFrontend('public/new-legacy/manifest.json')).version
 
 test('generated pages use the exact upstream UI with only direct runtime adapters', () => {
   for (const page of [
@@ -24,7 +25,9 @@ test('generated pages use the exact upstream UI with only direct runtime adapter
     'workbench.html',
   ]) {
     const upstreamPage = page === 'workbench.html' ? 'index.html' : page
-    const upstream = readRepo(`new-legacy/${upstreamPage}`)
+    // 发布候选在自动验收时会先与线上当前版本并存；这里校验
+    // public 实际携带的版本，不能把未同步的候选源当成静态包的上游。
+    const upstream = readFrontend(`new-legacy-releases/${publicRelease}/source/${upstreamPage}`)
     const generated = readFrontend(`public/new-legacy/${page}`)
     assert.match(generated, /server-state-bootstrap\.js/)
     assert.match(generated, /direct-entry\.js/)

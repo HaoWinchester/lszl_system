@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
   <title>学习路径｜项目管理学习营</title>
   <link rel="stylesheet" href="styles/main.css"/>
+  <link rel="stylesheet" href="styles/account-menu.css"/>
   <link rel="stylesheet" href="styles/guided-learning-path.css"/>
   <link rel="stylesheet" href="styles/subscription.css"/>
   <link rel="stylesheet" href="styles/user-center.css"/>
@@ -21,15 +22,26 @@
         <a href="index.html?mode=free">自由模式</a>
       </nav>
       <div class="gl-account-actions">
-        <div class="auth-status" id="authStatus">访客学习</div>
-        <button class="auth-login-btn" id="authLoginBtn" type="button">登录</button>
-        <button class="auth-logout-btn" id="authLogoutBtn" type="button" style="display:none">退出</button>
+        <div class="account-menu-shell">
+          <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
+            <span class="role-dot"></span><span class="auth-status-label">访客学习</span><span aria-hidden="true" class="account-menu-mobile-label">账号</span>
+            <svg aria-hidden="true" class="account-menu-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>
+          </button>
+          <div class="account-menu" hidden id="accountMenu" role="menu" aria-label="账号菜单">
+            <button class="account-menu-item account-menu-session" data-account-menu-action="session" role="menuitem" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></svg>
+              <span data-mobile-label="登录">登录</span>
+            </button>
+          </div>
+        </div>
+        <button class="account-hidden-trigger" hidden id="authLoginBtn" type="button">登录</button>
+        <button class="account-hidden-trigger" hidden id="authLogoutBtn" type="button">退出登录</button>
       </div>
     </header>
 
     <main class="gl-main">
       <section class="gl-stage-controls" aria-label="当前学习阶段">
-        <button type="button" class="gl-stage-switch" id="glStageSwitch" aria-haspopup="dialog" aria-controls="glStagePicker" aria-expanded="false">
+        <button type="button" class="gl-stage-switch" data-geometry-align="start" id="glStageSwitch" aria-haspopup="dialog" aria-controls="glStagePicker" aria-expanded="false">
           <span class="gl-stage-switch-copy">
             <small id="glStageIndex">第 1 阶段 · 2 个部分</small>
             <strong id="glStageTitle">基础认知</strong>
@@ -105,6 +117,7 @@
   <script defer src="src/29-auth-core.js"></script>
   <script defer src="src/30-standalone-auth-dialog.js"></script>
   <script defer src="src/34-role-permissions.js"></script>
+  <script defer src="src/41-account-menu.js"></script>
   <script defer src="src/63-learning-event-repository.js"></script>
   <script defer src="src/86-activity-schema-v1.js"></script>
   <script defer src="src/87-guided-learning-data.js"></script>

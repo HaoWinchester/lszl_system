@@ -307,6 +307,7 @@ button,select{font:inherit}
 .kr-topbar .auth-status{
   display:inline-flex;
   align-items:center;
+  justify-content:center;
   gap:7px;
   min-height:34px;
   padding:0 12px;
@@ -318,6 +319,7 @@ button,select{font:inherit}
   background:rgba(248,250,252,.92);
   box-shadow:0 8px 20px rgba(15,23,42,.06),inset 0 0 0 1px rgba(255,255,255,.72);
   white-space:nowrap;
+  text-align:center;
 }
 .kr-topbar .auth-status .role-dot{
   width:9px;
