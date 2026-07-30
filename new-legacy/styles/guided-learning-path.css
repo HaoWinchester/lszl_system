@@ -207,3 +207,70 @@ button{cursor:pointer}
 @media(max-width:620px){
   .gl-placement-dialog{padding:26px 18px}.gl-placement-actions{grid-template-columns:1fr}.gl-placement-badge{right:-14px}
 }
+
+/* Knowledge Garden learning-path sample: CSS-only, preserves existing DOM and state. */
+body.guided-learning-page{
+  --gl-garden-cream:#fff8ec;
+  --gl-garden-paper:#fffdf8;
+  --gl-garden-ink:#293448;
+  --gl-garden-coral:#ff765f;
+  --gl-garden-sun:#f8c94d;
+  background:#fff8ec;
+  background-image:
+    radial-gradient(circle at 9% 12%,rgba(255,194,119,.22) 0 2px,transparent 2.5px),
+    radial-gradient(circle at 89% 24%,rgba(100,196,182,.16) 0 3px,transparent 3.5px),
+    linear-gradient(135deg,#fffaf0 0%,var(--gl-garden-cream) 50%,#f2fbf6 100%);
+  background-size:30px 30px,46px 46px,100% 100%;
+  color:var(--gl-garden-ink);
+}
+.gl-topbar{
+  min-height:76px;
+  padding:9px 28px;
+  border:0;
+  border-bottom:1px solid rgba(76,91,109,.10);
+  border-radius:0 0 24px 24px;
+  background:rgba(255,253,248,.88);
+  box-shadow:0 8px 28px rgba(94,76,43,.08);
+  backdrop-filter:blur(18px);
+}
+.gl-brand-mark{border-radius:15px;background:linear-gradient(145deg,#ff9274,var(--gl-garden-coral));box-shadow:0 5px 0 #d95745,0 10px 18px rgba(255,118,95,.2)}
+.gl-brand strong{font-size:16px;letter-spacing:.01em}
+.gl-brand small{color:#8a7b67}
+.gl-mode-nav{padding:5px;border-color:#f1dfbd;border-radius:16px;background:#fff4dc;box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
+.gl-mode-nav a{border-radius:12px;color:#8a7456}
+.gl-mode-nav a.active{background:#fffdf8;color:#d6614f;box-shadow:0 3px 0 #ecd7b3,0 7px 14px rgba(121,89,37,.08)}
+.gl-account-actions .auth-status{border-color:#f0dfbf;background:#fffdf8;color:#6d5e4d;box-shadow:0 3px 0 #ecd7b3}
+.gl-main{padding-top:30px}
+.gl-stage-controls{top:91px}
+.gl-stage-switch{
+  overflow:hidden;
+  border:1px solid color-mix(in srgb,var(--gl-part-main) 24%,#fff);
+  border-radius:25px;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--gl-part-main) 84%,#fff) 0%,var(--gl-part-main) 60%,color-mix(in srgb,var(--gl-part-main) 78%,#f8c94d) 100%);
+  box-shadow:0 var(--gl-stage-depth) 0 var(--gl-part-base),0 14px 26px color-mix(in srgb,var(--gl-part-main) 18%,transparent);
+}
+.gl-stage-switch::after{content:"";position:absolute;right:28px;top:15px;width:92px;height:92px;border:14px solid rgba(255,255,255,.13);border-radius:50%;pointer-events:none}
+.gl-stage-switch-copy{position:relative;z-index:1}
+.gl-stage-switch-copy strong{font-size:23px;letter-spacing:.02em}
+.gl-stage-path-scroll{
+  border-color:rgba(130,105,64,.09);
+  background:repeating-linear-gradient(90deg,transparent 0 18px,rgba(255,255,255,.32) 18px 20px),linear-gradient(180deg,rgba(255,253,248,.82),rgba(255,248,236,.46));
+  scrollbar-color:#edbd76 #fff4df;
+}
+.gl-stage-path-scroll::-webkit-scrollbar-track{background:#fff4df}
+.gl-stage-path-scroll::-webkit-scrollbar-thumb{border-color:#fff4df;background:#edbd76}
+.gl-part-divider-copy{border-color:color-mix(in srgb,var(--gl-part-main) 30%,transparent);background:var(--gl-garden-paper);box-shadow:0 4px 0 color-mix(in srgb,var(--gl-part-main) 18%,#fff)}
+.gl-node-base{background:#b9bcc2}
+.gl-node-face{border-color:#ece5d9;background:#d8dadd;box-shadow:0 5px 12px rgba(73,61,40,.08)}
+.gl-path-node.is-completed .gl-node-face{border-color:color-mix(in srgb,var(--gl-part-main) 20%,#fff);box-shadow:0 5px 0 var(--gl-part-base),0 11px 20px color-mix(in srgb,var(--gl-part-main) 20%,transparent)}
+.gl-path-node.is-available .gl-node-face{border-color:#fff2c7;background:linear-gradient(145deg,var(--gl-part-main),var(--gl-part-dark));box-shadow:0 5px 0 var(--gl-part-base),0 12px 25px color-mix(in srgb,var(--gl-part-main) 28%,transparent)}
+.gl-path-node.is-current .gl-node-button::before{border-color:var(--gl-garden-sun);box-shadow:0 0 0 7px rgba(248,201,77,.12)}
+.gl-node-copy{border-color:#f0dcc0;border-radius:15px;background:#fffdf8;box-shadow:0 6px 0 #efe2cf,0 13px 24px rgba(73,61,40,.11)}
+.gl-node-copy::before{border-color:#f0dcc0;background:#fffdf8}
+@media(prefers-reduced-motion:reduce){.gl-path-node.is-current .gl-node-button::before{animation:none}}
+@media(max-width:760px){
+  .gl-topbar{min-height:64px;padding:7px 14px;border-radius:0 0 18px 18px}
+  .gl-stage-controls{top:76px}
+  .gl-stage-switch::after{right:-12px;top:12px;width:74px;height:74px}
+  .gl-stage-switch-copy strong{font-size:19px}
+}

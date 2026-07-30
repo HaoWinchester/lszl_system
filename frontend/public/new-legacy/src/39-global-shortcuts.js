@@ -26,7 +26,7 @@
     {id:"training", label:"考题训练", href:"question-training.html", className:"training", permission:"useTraining", guestView:true, icon:ICONS.training},
     {id:"recall", label:"深度回忆", href:"knowledge-recall.html", className:"recall", permission:"useDeepRecall", guestView:true, icon:ICONS.recall},
     {id:"bank", label:"题库管理", href:"question-bank.html", className:"bank", permission:"accessQuestionBank", icon:ICONS.bank},
-    {id:"users", label:"用户管理", href:"user-management.html", className:"users", permission:"accessUserManagement", allowWhenNoAdmin:true, icon:ICONS.users},
+    {id:"users", label:"用户管理", href:"user-management.html", className:"users", permission:"accessUserManagement", icon:ICONS.users},
     {id:"settings", label:"系统设置", href:"system-settings.html", className:"settings", permission:"accessSystemSettings", icon:ICONS.settings}
   ];
 

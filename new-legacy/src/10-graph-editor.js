@@ -1907,7 +1907,7 @@ function renderDetails(){
   if(!n&&!l){detailPanel.classList.remove('show','hover-preview','detail-actions-expanded');detailPanel.innerHTML='';return}
   detailPanel.classList.remove('detail-actions-expanded');
   detailPanel.classList.toggle('hover-preview',!!isHoverPreview);
-  const tools=`<button class="detail-actions-toggle" id="detailActionsToggle" aria-expanded="false" title="展开操作">⌄</button><button class="close-detail" id="closeDetailBtn">×</button>`;
+  const tools=`<button class="detail-actions-toggle detail-panel-control" id="detailActionsToggle" aria-expanded="false" title="展开操作"><span class="detail-actions-chevron" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><path d="m4 6 4 4 4-4"/></svg></span></button><button class="close-detail detail-panel-control" id="closeDetailBtn" aria-label="关闭详情"><span class="detail-close-icon" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><path d="m4 4 8 8M12 4l-8 8"/></svg></span></button>`;
   if(l){const a=nodeById(l.from),b=nodeById(l.to),lineColor=safeColor(l.color,DEFAULTS.linkColor);detailPanel.innerHTML=`${tools}<div class="detail-top"><div class="detail-mini-icon" style="background:#2563eb">线</div><div><div class="detail-name">知识关系</div><div class="detail-title">${escapeHTML(a?a.title:'?')} ↔ ${escapeHTML(b?b.title:'?')}</div></div></div><div class="detail-grid"><div class="label">关系</div><div><span class="badge">${escapeHTML(l.type||'关联')}</span></div><div class="label">线型</div><div>${l.lineStyle==='dashed'?'虚线':'实线'} ｜ <span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:${lineColor};vertical-align:-2px;margin-right:4px"></span>${escapeHTML(lineColor)}</div><div class="label">备注</div><div>${escapeHTML(l.note||'暂无备注')}</div></div><div class="detail-actions"><button id="editLinkFromDetailBtn" class="primary">编辑关系</button><button id="deleteLinkFromDetailBtn" class="danger">删除线</button></div>`;detailPanel.classList.add('show');bindDetailBasics();$('editLinkFromDetailBtn').onclick=()=>openLinkModal(l.id);$('deleteLinkFromDetailBtn').onclick=()=>{if(confirm('确定删除这条知识关系吗？')){state.links=state.links.filter(i=>i.id!==l.id);clearSelection({persist:true});showStatus('关系线已删除。')}};return}
   const nodeColor=safeColor(n.color),nodeRelation=relatedScopeRelationForNode(n.id),anchor=nodeById(currentRelatedScopeAnchorId()),relationInfo=nodeRelation?`<div class="label">局部关系</div><div>${nodeRelation.relatedCount} 个相关知识点 ｜ ${nodeRelation.linkCount} 条关系${largeGraphRelatedFocusEnabled?` ｜ 只看相关中心：${escapeHTML(anchor?anchor.title:n.title)}`:''}</div>`:'';
   const scopeButtons=largeGraphRelatedFocusEnabled?`<button id="setScopeCenterBtn">以当前卡牌为中心</button><button id="fitScopeFromDetailBtn">适配相关</button>${isRelatedGatherActive()?'<button id="exitGatherLayoutBtn">退出聚拢</button>':''}`:'';
@@ -1921,8 +1921,8 @@ function bindDetailBasics(){
     e.stopPropagation();
     const expanded=!detailPanel.classList.contains('detail-actions-expanded');
     detailPanel.classList.toggle('detail-actions-expanded',expanded);
+    toggle.classList.toggle('is-expanded',expanded);
     toggle.setAttribute('aria-expanded',expanded?'true':'false');
-    toggle.textContent=expanded?'⌃':'⌄';
     toggle.title=expanded?'收起操作':'展开操作';
   };
 }

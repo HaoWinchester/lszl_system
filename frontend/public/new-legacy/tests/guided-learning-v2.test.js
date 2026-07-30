@@ -34,6 +34,12 @@ assert(/\.gl-stage-switch:hover\s*\{[^}]*box-shadow\s*:\s*0\s+var\(--gl-stage-de
 assert(!/\.gl-path-node\.is-current \.gl-node-button\s*\{[^}]*animation/i.test(pathCSS),'当前节点按钮本体不应再执行呼吸动画');
 assert(/\.gl-path-node\.is-current \.gl-node-button::before\s*\{[\s\S]*gl-current-node-ring-pulse/i.test(pathCSS),'当前节点应使用独立外围脉冲环');
 assert(/--gl-node-width:82px;--gl-node-face-height:68px/.test(pathCSS),'桌面节点应使用轻微横向椭圆比例');
+assert(/Knowledge Garden learning-path sample/.test(pathCSS),'学习路径应包含知识乐园局部样片样式层');
+assert(/body\.guided-learning-page\{[\s\S]*background:\s*#fff8ec/.test(pathCSS),'知识乐园应使用暖奶油页面背景');
+assert(/\.gl-topbar\{[\s\S]*border-radius:\s*0 0 24px 24px/.test(pathCSS),'顶栏应具备乐园风格的圆角层次');
+assert(/\.gl-stage-switch\{[\s\S]*background:\s*linear-gradient/.test(pathCSS),'阶段招牌应使用渐变表面');
+assert(/\.gl-stage-path-scroll\{[\s\S]*repeating-linear-gradient/.test(pathCSS),'路径轨道应具有低对比漫游纹理');
+assert(/@media\(prefers-reduced-motion:reduce\)\{[\s\S]*\.gl-path-node\.is-current \.gl-node-button::before\{animation:none/.test(pathCSS),'降低动态效果时应停用当前节点脉冲');
 assert(/button:hover\{transform:none/.test(mainCSS),'全局按钮悬浮不应再上移');
 assert(/\.ui-button\{[\s\S]*min-width:160px;[\s\S]*width:160px;height:48px/.test(mainCSS),'统一主操作按钮应为 160×48px');
 assert(/\.ui-button:active[^}]*transform:translateY\(4px\)[^}]*box-shadow:0 0 0/.test(mainCSS),'统一主操作按钮应具备 4px 下压反馈');
