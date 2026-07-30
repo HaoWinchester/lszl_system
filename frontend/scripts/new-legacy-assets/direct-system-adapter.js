@@ -28,6 +28,35 @@
     return payload
   }
 
+  async function requestJson(method, path, body) {
+    const response = await fetch(path, {
+      method,
+      credentials: 'include',
+      headers: body === undefined ? { Accept: 'application/json' } : {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+    let payload = {}
+    try { payload = await response.json() } catch (_) {}
+    if (!response.ok) throw new Error(errorMessage(payload, response.status))
+    return payload
+  }
+
+  global.KGWechatPay = {
+    async createNativeOrder(planId) {
+      return requestJson('POST', '/api/v1/subscriptions/orders', { planId })
+    },
+    async getNativeOrderStatus(orderId) {
+      return requestJson('GET', `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/status`)
+    },
+    syncSubscription,
+    nativeOrderQrCodeUrl(orderId) {
+      return `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/qrcode`
+    },
+  }
+
   function toLegacyTheme(theme = {}) {
     return {
       primary: theme.primary_color || theme.primary,
@@ -54,22 +83,69 @@
     )
   }
 
-  try {
-    const themes = request('GET', '/api/v1/system/themes').themes || {}
-    storage.setItem('kg_role_themes_v1', JSON.stringify(
-      Object.fromEntries(Object.entries(themes).map(([role, theme]) => [role, toLegacyTheme(theme)])),
-    ))
+  function isAuthenticated() {
+    return global.__KG_DIRECT_BOOTSTRAP__?.authenticated === true
+  }
 
-    const wechat = request('GET', '/api/v1/system/wechat-config').config || {}
-    storage.setItem('kg_wechat_login_config_v1', JSON.stringify(wechat))
+  function isAdmin() {
+    return global.__KG_DIRECT_BOOTSTRAP__?.authUser?.role === 'admin'
+  }
 
+  function preloadPlans() {
     const plans = request('GET', '/api/v1/system/subscription-plans').plans || []
     storage.setItem('kg_subscription_plan_settings_v1', JSON.stringify(planSettings(plans)))
+  }
 
-    const wechatPay = request('GET', '/api/v1/system/wechat-pay-config').config || {}
-    global.KGDirectSystemSettings = { wechatPayConfig: wechatPay }
-  } catch (error) {
-    console.error('[DirectSystemAdapter] normalized settings preload failed:', error)
+  function subscriptionTimestamp(value) {
+    const timestamp = Date.parse(value || '')
+    return Number.isFinite(timestamp) ? timestamp : 0
+  }
+
+  function syncSubscription(subscription) {
+    if (!subscription?.username || typeof subscriptionApi.setStudentSubscription !== 'function') return null
+    return subscriptionApi.setStudentSubscription(subscription.username, {
+      planId: subscription.planId,
+      status: subscription.status,
+      startedAt: subscriptionTimestamp(subscription.startedAt),
+      expiresAt: subscriptionTimestamp(subscription.expiresAt),
+      source: subscription.source,
+      note: subscription.note || '',
+    })
+  }
+
+  function preloadSubscription() {
+    const payload = request('GET', '/api/v1/subscriptions/me')
+    return syncSubscription(payload.subscription)
+  }
+
+  if (isAuthenticated()) {
+    try {
+      const themes = request('GET', '/api/v1/system/themes').themes || {}
+      storage.setItem('kg_role_themes_v1', JSON.stringify(
+        Object.fromEntries(Object.entries(themes).map(([role, theme]) => [role, toLegacyTheme(theme)])),
+      ))
+    } catch (error) {
+      console.error('[DirectSystemAdapter] role themes preload failed:', error)
+    }
+
+    try {
+      // 学员也需要读取套餐金额。
+      preloadPlans()
+      preloadSubscription()
+    } catch (error) {
+      console.error('[DirectSystemAdapter] subscription preload failed:', error)
+    }
+  }
+
+  if (isAdmin()) {
+    try {
+      const wechat = request('GET', '/api/v1/system/wechat-config').config || {}
+      storage.setItem('kg_wechat_login_config_v1', JSON.stringify(wechat))
+      const wechatPay = request('GET', '/api/v1/system/wechat-pay-config').config || {}
+      global.KGDirectSystemSettings = { wechatPayConfig: wechatPay }
+    } catch (error) {
+      console.error('[DirectSystemAdapter] admin settings preload failed:', error)
+    }
   }
 
   const originalSaveTheme = roleApi.saveTheme.bind(roleApi)

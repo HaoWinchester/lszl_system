@@ -25,3 +25,6 @@ httpx>=0.27,<0.28
 
 # 微信支付 v3 回调解密（AES-256-GCM）
 cryptography>=42,<46
+
+# 生成本站 Native 支付二维码 PNG（不向第三方二维码服务暴露 code_url）
+qrcode[pil]>=8.0,<9

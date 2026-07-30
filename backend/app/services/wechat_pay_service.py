@@ -5,11 +5,13 @@
 """
 
 import base64
+from io import BytesIO
 import json
 import secrets
 import time
 
 import httpx
+import qrcode
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -26,6 +28,8 @@ def is_ready(cfg: dict) -> bool:
             cfg.get("apiV3Key"),
             cfg.get("mchSerialNo"),
             cfg.get("mchPrivateKey"),
+            cfg.get("wxPubKey"),
+            cfg.get("wxPubKeyId"),
             cfg.get("appId"),
             cfg.get("notifyUrl"),
         ]
@@ -35,6 +39,14 @@ def is_ready(cfg: dict) -> bool:
 def demo_code_url(order_id: str) -> str:
     """演示模式假 code_url（无法扫码，仅走通前端二维码/轮询流程）。"""
     return f"weixin://wxpay/bizpayurl?demo=1&pr={order_id}"
+
+
+def native_qrcode_png(code_url: str) -> bytes:
+    """在服务端生成 Native code_url 的 PNG，避免将支付令牌发送给第三方服务。"""
+    image = qrcode.make(code_url)
+    output = BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
 
 
 def _load_private_key(pem: str):

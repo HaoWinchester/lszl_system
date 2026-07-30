@@ -1,5 +1,8 @@
 """系统设置：主题覆盖、微信配置、订阅套餐展示配置（DB KV 覆盖默认常量）。"""
 
+from collections.abc import Mapping
+from pathlib import Path
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -137,21 +140,107 @@ async def set_wechat_config(db: AsyncSession, patch: dict) -> dict:
 
 
 # ---------- 微信支付配置 ----------
+WECHAT_PAY_BROWSER_CONFIG_KEYS = (
+    "enableDemo",
+    "mchId",
+    "mchSerialNo",
+    "wxPubKeyId",
+    "appId",
+    "notifyUrl",
+)
+
+
+def wechat_pay_ready(config: dict) -> bool:
+    return all(
+        config.get(key)
+        for key in (
+            "mchId",
+            "apiV3Key",
+            "mchSerialNo",
+            "mchPrivateKey",
+            "wxPubKey",
+            "wxPubKeyId",
+            "appId",
+            "notifyUrl",
+        )
+    )
+
+
+def public_wechat_pay_config(config: dict) -> dict:
+    """返回管理端可见的支付配置，永不包含密钥或 PEM 内容。"""
+    result = {key: config[key] for key in WECHAT_PAY_BROWSER_CONFIG_KEYS if key in config}
+    result["ready"] = wechat_pay_ready(config)
+    return result
+
+
+def _parse_environment_bool(value: object) -> bool:
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _read_secret_file(path: str) -> str:
+    try:
+        return Path(path).read_text(encoding="utf-8").strip() if path else ""
+    except OSError:
+        return ""
+
+
+def wechat_pay_environment_overrides(environment: Mapping[str, object]) -> dict:
+    """将部署环境映射为运行时支付配置，PEM 仅从服务器文件读取。"""
+    result = {
+        "mchId": str(environment.get("WECHAT_PAY_MCH_ID") or ""),
+        "apiV3Key": str(environment.get("WECHAT_PAY_API_V3_KEY") or ""),
+        "mchSerialNo": str(environment.get("WECHAT_PAY_MCH_SERIAL_NO") or ""),
+        "mchPrivateKey": _read_secret_file(
+            str(environment.get("WECHAT_PAY_MCH_PRIVATE_KEY_FILE") or "")
+        ),
+        "wxPubKey": _read_secret_file(
+            str(environment.get("WECHAT_PAY_WX_PUBLIC_KEY_FILE") or "")
+        ),
+        "wxPubKeyId": str(environment.get("WECHAT_PAY_WX_PUBLIC_KEY_ID") or ""),
+        "appId": str(environment.get("WECHAT_PAY_APP_ID") or ""),
+        "notifyUrl": str(environment.get("WECHAT_PAY_NOTIFY_URL") or ""),
+    }
+    enable_demo = environment.get("WECHAT_PAY_ENABLE_DEMO")
+    if enable_demo not in (None, ""):
+        result["enableDemo"] = _parse_environment_bool(enable_demo)
+    return {key: value for key, value in result.items() if value not in (None, "")}
+
+
+def _environment_wechat_pay_overrides() -> dict:
+    return wechat_pay_environment_overrides(
+        {
+            "WECHAT_PAY_ENABLE_DEMO": settings.WECHAT_PAY_ENABLE_DEMO,
+            "WECHAT_PAY_MCH_ID": settings.WECHAT_PAY_MCH_ID,
+            "WECHAT_PAY_API_V3_KEY": settings.WECHAT_PAY_API_V3_KEY,
+            "WECHAT_PAY_MCH_SERIAL_NO": settings.WECHAT_PAY_MCH_SERIAL_NO,
+            "WECHAT_PAY_MCH_PRIVATE_KEY_FILE": settings.WECHAT_PAY_MCH_PRIVATE_KEY_FILE,
+            "WECHAT_PAY_WX_PUBLIC_KEY_FILE": settings.WECHAT_PAY_WX_PUBLIC_KEY_FILE,
+            "WECHAT_PAY_WX_PUBLIC_KEY_ID": settings.WECHAT_PAY_WX_PUBLIC_KEY_ID,
+            "WECHAT_PAY_APP_ID": settings.WECHAT_PAY_APP_ID,
+            "WECHAT_PAY_NOTIFY_URL": settings.WECHAT_PAY_NOTIFY_URL,
+        }
+    )
+
+
 async def get_wechat_pay_config(db: AsyncSession) -> dict:
     s = await _get_setting(db, "wechat_pay_config")
-    return {**DEFAULT_WECHAT_PAY_CONFIG, **(s.value if s else {})}
+    stored = dict(s.value or {}) if s else {}
+    # 历史版本可能把敏感凭证写进数据库；运行时绝不再读取它们。
+    stored = {key: stored[key] for key in WECHAT_PAY_BROWSER_CONFIG_KEYS if key in stored}
+    return {**DEFAULT_WECHAT_PAY_CONFIG, **stored, **_environment_wechat_pay_overrides()}
 
 
 async def set_wechat_pay_config(db: AsyncSession, patch: dict) -> dict:
     current = await get_wechat_pay_config(db)
-    current.update({k: v for k, v in patch.items() if k in DEFAULT_WECHAT_PAY_CONFIG})
+    current.update({key: patch[key] for key in WECHAT_PAY_BROWSER_CONFIG_KEYS if key in patch})
+    stored = {key: current[key] for key in WECHAT_PAY_BROWSER_CONFIG_KEYS if key in current}
     s = await _get_setting(db, "wechat_pay_config")
     if s:
-        s.value = current
+        s.value = stored
     else:
-        db.add(SystemSetting(key="wechat_pay_config", value=current))
+        db.add(SystemSetting(key="wechat_pay_config", value=stored))
     await db.commit()
-    return current
+    return public_wechat_pay_config(await get_wechat_pay_config(db))
 
 
 # ---------- 订阅套餐展示配置 ----------

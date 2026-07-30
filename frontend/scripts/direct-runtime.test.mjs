@@ -166,6 +166,12 @@ test('member deep link opens plans only for student accounts', () => {
   assert.match(entry, /upgradeMemberBtn/)
 })
 
+test('student navigation never exposes the user-management shortcut', () => {
+  const shortcuts = readFileSync(resolve(frontendDir, '../new-legacy/src/39-global-shortcuts.js'), 'utf8')
+
+  assert.doesNotMatch(shortcuts, /id:"users"[\s\S]*allowWhenNoAdmin:true/)
+})
+
 test('admin import supplies an explicit initial password to the backend', () => {
   const adapter = readFileSync(resolve(frontendDir, 'scripts/new-legacy-assets/direct-admin-adapter.js'), 'utf8')
   assert.match(adapter, /prompt\(/)
