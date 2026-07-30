@@ -1,0 +1,47 @@
+# 生产部署：lszl.aihuanpu.com
+# 用法：docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+# nginx（宿主）把 lszl.aihuanpu.com 全量反代到 127.0.0.1:18086（见 deploy/nginx-lszl.aihuanpu.com.conf）。
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-kg_graph}
+      POSTGRES_USER: ${POSTGRES_USER:-kg}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - kg_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kg} -d ${POSTGRES_DB:-kg_graph}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: lszl-kg-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENV: prod
+      SECRET_KEY: ${SECRET_KEY}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kg}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-kg_graph}
+      CORS_ORIGINS: '["https://lszl.aihuanpu.com"]'
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+      WECHAT_APP_SECRET: ${WECHAT_APP_SECRET:-}
+      WECHAT_REDIRECT_URI: ${WECHAT_REDIRECT_URI:-https://lszl.aihuanpu.com/api/v1/auth/wechat/callback}
+      WECHAT_ENABLE_OFFICIAL: ${WECHAT_ENABLE_OFFICIAL:-false}
+      WECHAT_ENABLE_DEMO: ${WECHAT_ENABLE_DEMO:-false}
+    env_file:
+      - /opt/lszl/secrets/wechatpay/payment.env
+    ports:
+      - "127.0.0.1:18086:8000"
+    volumes:
+      - /opt/lszl/secrets/wechatpay:/run/secrets/wechatpay:ro
+
+volumes:
+  kg_pg_data:
