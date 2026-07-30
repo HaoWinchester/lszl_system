@@ -37,6 +37,18 @@ class Settings(BaseSettings):
     WECHAT_ENABLE_OFFICIAL: bool | None = None
     WECHAT_ENABLE_DEMO: bool | None = None
 
+    # 微信 Native 支付凭证仅允许由部署环境和受限文件提供，禁止写入数据库。
+    WECHAT_PAY_ENABLE_DEMO: bool | None = None
+    WECHAT_PAY_MCH_ID: str = ""
+    WECHAT_PAY_API_V3_KEY: str = ""
+    WECHAT_PAY_MCH_SERIAL_NO: str = ""
+    WECHAT_PAY_MCH_PRIVATE_KEY_FILE: str = ""
+    WECHAT_PAY_WX_PUBLIC_KEY_FILE: str = ""
+    WECHAT_PAY_WX_PUBLIC_KEY_ID: str = ""
+    WECHAT_PAY_APP_ID: str = ""
+    WECHAT_PAY_NOTIFY_URL: str = ""
+    WECHAT_PAY_MONTHLY_AMOUNT_FEN: int = 2900
+
     NEW_LEGACY_RELEASE_ROOT: str = str(PROJECT_ROOT / "frontend" / "new-legacy-releases")
     NEW_LEGACY_FALLBACK_SITE: str = str(PROJECT_ROOT / "frontend" / "public" / "new-legacy")
 

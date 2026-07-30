@@ -59,7 +59,7 @@ async def update_wechat_config(body: dict, db: DB, _: AdminUser):
 # ---------- 微信支付配置 ----------
 @router.get("/wechat-pay-config")
 async def wechat_pay_config(db: DB, _: AdminUser):
-    return {"config": await system_service.get_wechat_pay_config(db)}
+    return {"config": system_service.public_wechat_pay_config(await system_service.get_wechat_pay_config(db))}
 
 
 @router.put("/wechat-pay-config")

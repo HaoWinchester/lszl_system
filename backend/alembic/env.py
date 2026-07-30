@@ -49,10 +49,11 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
+    # 与 app.db.session 同策略：仅在本机 socket 连接串时传 host=/tmp；生产 TCP 不传。
     connectable = create_async_engine(
         settings.DATABASE_URL,
         poolclass=pool.NullPool,
-        connect_args={"host": "/tmp"},
+        connect_args={"host": "/tmp"} if "host=" in settings.DATABASE_URL else {},
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
