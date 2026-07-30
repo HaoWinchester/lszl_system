@@ -420,6 +420,19 @@ function validate(source) {
   return version
 }
 
+function extractWechatLoginCss(source) {
+  // 提取 new-legacy main.css 的微信登录弹窗样式段（.wechat-login-section 起，到
+  // #authModal.wechat-login-mode 规则止），用于追加到 v9 site 的 main.css。
+  const lines = source.split('\n')
+  const start = lines.findIndex((line) => line.includes('.wechat-login-section'))
+  if (start < 0) return ''
+  let end = start
+  for (let index = start; index < lines.length; index += 1) {
+    if (lines[index].includes('#authModal.wechat-login-mode')) { end = index; break }
+  }
+  return lines.slice(start, end + 1).join('\n')
+}
+
 function sync({ source, out }) {
   const version = validate(source)
   const hashes = sourceFiles(source)
@@ -446,6 +459,15 @@ function sync({ source, out }) {
     if (path === '64-flow-orchestrator.js') generated = patchTrainingSessionReentrancy(generated)
     if (path === '27-graph-file-manager.js') generated = patchFileManagerNavigation(generated)
     writeFileSync(target, generated)
+  }
+
+  // 定制层：用户的"服务端 OAuth 微信登录"定制（new-legacy）覆盖 v9 上游纯前端版。
+  // 放在 patch 循环后——new-legacy 版已是服务端 OAuth 实现，无需 v8.6 的 architectureCopy 文案补丁。
+  cpSync(resolve(repoDir, 'new-legacy/src/32-wechat-login.js'), resolve(out, 'src/32-wechat-login.js'))
+  const wechatCss = extractWechatLoginCss(readFileSync(resolve(repoDir, 'new-legacy/styles/main.css'), 'utf8'))
+  if (wechatCss) {
+    const mainCssPath = resolve(out, 'styles/main.css')
+    writeFileSync(mainCssPath, `${readFileSync(mainCssPath, 'utf8')}\n/* kg:wechat-login-custom */\n${wechatCss}\n`)
   }
 
   for (const page of walk(out).filter((path) => !path.includes('/') && path.endsWith('.html'))) {
