@@ -279,6 +279,19 @@ function patchQuestionRecallPreview(source) {
   return generated
 }
 
+function patchAddQuestionTab(source) {
+  // v9 改了 render（qb-base-panel 只在 activeLayoutNav='base' 展开），但 addQuestion 仍设
+  // 'questions'（v8.6 遗留值）→ 新建题目后编辑表单 display:none 不显示。仅 v9 修；
+  // v8.6.29 的 render 兼容 'questions'，不动。
+  if (!source.includes('knowledge-recall.html?bankId=')) return source
+  return replaceExactlyOnce(
+    source,
+    "    state.activeSidebarTab = 'questions';\n    state.activeLayoutNav = 'questions';\n    bank.updatedAt = Date.now();\n    saveBanks();\n    render();\n  }",
+    "    state.activeSidebarTab = 'questions';\n    state.activeMainTab = 'base';\n    state.activeLayoutNav = 'base';\n    bank.updatedAt = Date.now();\n    saveBanks();\n    render();\n  }",
+    'new-legacy 新建题目激活编辑视图',
+  )
+}
+
 function versionPageStyles(html, version) {
   const query = `?v=${encodeURIComponent(version)}`
   return html.replace(
@@ -426,7 +439,10 @@ function sync({ source, out }) {
     const target = resolve(out, 'src', path)
     let generated = patchArchitectureCopy(`src/${path}`, readFileSync(target, 'utf8'))
     if (path === '10-graph-editor.js') generated = patchGraphInteractions(generated)
-    if (path === '65-question-bank-admin.js') generated = patchQuestionRecallPreview(generated)
+    if (path === '65-question-bank-admin.js') {
+      generated = patchQuestionRecallPreview(generated)
+      generated = patchAddQuestionTab(generated)
+    }
     if (path === '64-flow-orchestrator.js') generated = patchTrainingSessionReentrancy(generated)
     if (path === '27-graph-file-manager.js') generated = patchFileManagerNavigation(generated)
     writeFileSync(target, generated)
