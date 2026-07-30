@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser, require_role
@@ -60,6 +61,15 @@ async def order_status(order_id: str, db: DB, user: CurrentUser):
     }
 
 
+@router.get("/orders/{order_id}/qrcode")
+async def order_qrcode(order_id: str, db: DB, user: CurrentUser):
+    """仅订单本人可获取 Native 支付二维码。"""
+    o = await db.get(SubscriptionOrder, order_id)
+    if not o or o.username != user.username or not o.code_url:
+        raise HTTPException(status_code=404, detail="支付二维码不存在")
+    return Response(content=wechat_pay_service.native_qrcode_png(o.code_url), media_type="image/png")
+
+
 # ---------- 微信支付回调（公开，微信服务器调用；无登录态）----------
 @router.post("/wechat-pay/notify")
 async def wechat_pay_notify(request: Request, db: DB):
@@ -78,7 +88,11 @@ async def wechat_pay_notify(request: Request, db: DB):
     if plain.get("trade_state") == "SUCCESS":
         try:
             await subscription_service.activate_paid_order(
-                db, plain.get("out_trade_no"), plain.get("transaction_id")
+                db,
+                plain.get("out_trade_no"),
+                plain.get("transaction_id"),
+                (plain.get("amount") or {}).get("total"),
+                validate_amount=True,
             )
         except ValueError:
             return JSONResponse(status_code=400, content={"code": "FAIL", "message": "订单不存在"})

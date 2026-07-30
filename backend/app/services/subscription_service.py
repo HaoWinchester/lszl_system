@@ -6,6 +6,7 @@ from datetime import timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.permissions import DEFAULT_PLANS
 from app.core.security import now_utc, uid
 from app.models.subscription import RedeemCode, Subscription, SubscriptionOrder
@@ -17,6 +18,12 @@ PLAN_AMOUNT_FEN = {
     "half_year": 13900,
     "lifetime": 39900,
 }
+WECHAT_NATIVE_OUT_TRADE_NO_MAX_LENGTH = 32
+
+
+def native_out_trade_no() -> str:
+    """微信 Native out_trade_no 最长 32 字符，UUID hex 恰好满足且全为字母数字。"""
+    return uid()[:WECHAT_NATIVE_OUT_TRADE_NO_MAX_LENGTH]
 
 
 def _plan(plan_id: str) -> dict:
@@ -27,7 +34,19 @@ def _plan(plan_id: str) -> dict:
 
 
 def _plan_amount_fen(plan_id: str) -> int:
+    if plan_id == "monthly":
+        return settings.WECHAT_PAY_MONTHLY_AMOUNT_FEN
     return PLAN_AMOUNT_FEN.get(plan_id, 0)
+
+
+def payment_amount_matches(expected_amount_fen: int | None, received_amount_fen: object) -> bool:
+    """微信回调金额必须是整数分，且与本地订单金额完全一致。"""
+    return (
+        expected_amount_fen is not None
+        and isinstance(received_amount_fen, int)
+        and not isinstance(received_amount_fen, bool)
+        and expected_amount_fen == received_amount_fen
+    )
 
 
 def _expires(plan_id: str, started=None):
@@ -139,7 +158,7 @@ async def request_order(db: AsyncSession, username: str, plan_id: str) -> Subscr
     p = _plan(plan_id)
     amount_fen = _plan_amount_fen(plan_id)
     o = SubscriptionOrder(
-        id=uid("o_"),
+        id=native_out_trade_no(),
         username=username,
         plan_id=plan_id,
         plan_name=p["name"],
@@ -169,7 +188,11 @@ async def request_order(db: AsyncSession, username: str, plan_id: str) -> Subscr
 
 
 async def activate_paid_order(
-    db: AsyncSession, order_id: str, transaction_id: str | None
+    db: AsyncSession,
+    order_id: str,
+    transaction_id: str | None,
+    received_amount_fen: object = None,
+    validate_amount: bool = False,
 ) -> SubscriptionOrder:
     """支付成功激活订阅（幂等：已 paid 直接返回）。"""
     o = await db.get(SubscriptionOrder, order_id)
@@ -177,6 +200,8 @@ async def activate_paid_order(
         raise ValueError("订单不存在")
     if o.pay_status == "paid":
         return o
+    if validate_amount and not payment_amount_matches(o.amount, received_amount_fen):
+        raise ValueError("支付金额不匹配")
     o.pay_status = "paid"
     o.transaction_id = transaction_id
     o.paid_at = now_utc()
