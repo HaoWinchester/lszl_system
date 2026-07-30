@@ -29,6 +29,28 @@ test('mobile file manager offers clear exits and user-center keeps submit contro
   assert.match(centerStyles, /\.kg-user-center-footer/)
 })
 
+test('user center uses the supplied profile-dialog structure while retaining project fields', () => {
+  const center = source('new-legacy/src/33-user-center.js')
+  const centerStyles = source('new-legacy/styles/user-center.css')
+
+  for (const anchor of ['uc-dialog', 'uc-form-grid', 'uc-binding-card', 'uc-membership-card', 'uc-password-card', 'ucNoteCount']) {
+    assert.match(center, new RegExp(anchor))
+  }
+  assert.match(centerStyles, /\.kg-user-center-modal\.uc-dialog/)
+  assert.match(centerStyles, /\.uc-membership-card/)
+  assert.match(centerStyles, /width:min\(740px,calc\(100vw - 48px\)\)/)
+  assert.match(centerStyles, /\.uc-dialog \.uc-header h2\{font-size:26px\}/)
+  assert.match(center, /class="icon-button dialog-close"[^>]*><span class="modal-close-icon"/)
+  assert.match(center, /class="uc-close dialog-close"[^>]*><span class="modal-close-icon"/)
+  assert.match(centerStyles, /\.dialog-close \.modal-close-icon\{[^}]*background-image:url/)
+  assert.match(centerStyles, /\.uc-dialog \.uc-close\{\/\* display:grid; \*\//)
+  const membershipStyles = source('new-legacy/styles/membership-ui.css')
+  assert.match(membershipStyles, /\.membership-ui\{[^}]*width:min\(920px,calc\(100vw - 44px\)\)/)
+  assert.match(membershipStyles, /\.membership-ui \.plan-title\{[^}]*font-size:20px/)
+  assert.match(membershipStyles, /\.membership-ui \.modal-header\{[^}]*align-items:center/)
+  assert.match(membershipStyles, /\.membership-ui \.icon-button\{\/\* display:grid; \*\//)
+})
+
 test('narrow learning headers preserve readable, single-line navigation', () => {
   const training = source('new-legacy/styles/question-training.css')
   const workspace = source('new-legacy/styles/question-workspace.css')
@@ -74,4 +96,18 @@ test('shared controls center their own content and document the only start-align
   assert.doesNotMatch(learning, /writing-mode:vertical-rl/)
   assert.match(audit, /\[data-geometry-align='start'\]/)
   assert.match(audit, /\.qt-teacher-menu-panel \.qt-nav-btn/)
+})
+
+test('knowledge-detail action disclosure uses one centered chevron icon in both states', () => {
+  const editor = source('new-legacy/src/10-graph-editor.js')
+  const styles = source('new-legacy/styles/main.css')
+
+  assert.match(editor, /class="detail-actions-toggle detail-panel-control"[^>]*><span class="detail-actions-chevron"/)
+  assert.match(editor, /class="close-detail detail-panel-control"[^>]*><span class="detail-close-icon"/)
+  assert.match(editor, /toggle\.classList\.toggle\('is-expanded',expanded\)/)
+  assert.doesNotMatch(editor, /toggle\.textContent=expanded\?'⌃':'⌄'/)
+  assert.match(styles, /\.detail-panel-control\{[\s\S]*?display:grid;[\s\S]*?place-items:center;[\s\S]*?background:#f3f4f6;[\s\S]*?color:#64748b;/)
+  assert.match(styles, /\.detail-panel-control svg\{[\s\S]*?stroke-width:2\.4;/)
+  assert.match(styles, /\.detail-actions-chevron\{[\s\S]*?transform:rotate\(0deg\)/)
+  assert.match(styles, /\.detail-actions-toggle\.is-expanded \.detail-actions-chevron\{transform:rotate\(180deg\)/)
 })
