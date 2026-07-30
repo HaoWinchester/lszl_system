@@ -6,10 +6,11 @@ import re
 import json
 from urllib.parse import quote
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.runtime_state import RuntimeState
+from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.user import User
 from app.services import file_service, guided_learning_service, user_service
 from app.web.bootstrap import PAGE_NAMESPACES
@@ -128,6 +129,17 @@ PREFIXES = (
 )
 
 
+# v9 的"全局共享"键——published 类发布内容。前端把它们当全局读（无 scope 前缀），
+# 后端存独立 shared_runtime_states 表，所有用户读同一份，从而教师发布 → 学员可读（跨账号共享）。
+SHARED_KEYS = frozenset({
+    "kg_question_banks_published_v1",
+    "kg_exam_papers_published_v1",
+    "kg_course_config_releases_v1",
+    "kg_course_config_active_release_v1",
+    "kg_learning_tasks_v1",
+})
+
+
 class RuntimeStateValidationError(ValueError):
     pass
 
@@ -180,9 +192,14 @@ def validate_update(update: RuntimeStateUpdate) -> None:
 
 async def get_state(db: AsyncSession, owner: str) -> tuple[dict[str, str], int]:
     row = await db.get(RuntimeState, owner)
-    if row is None:
-        return {}, 0
-    return {str(key): str(value) for key, value in (row.storage or {}).items()}, row.revision
+    storage = {str(k): str(v) for k, v in (row.storage or {}).items()} if row else {}
+    revision = row.revision if row else 0
+    # 合并 v9 全局共享键（published 类）：所有用户读同一份，教师发布 → 学员可读。
+    result = await db.execute(select(SharedRuntimeState.key, SharedRuntimeState.value))
+    for key, value in result:
+        if key in SHARED_KEYS:
+            storage[key] = str(value)
+    return storage, revision
 
 
 def _json(value) -> str:
@@ -394,22 +411,41 @@ async def apply_update(
     elif update.operation == "removeItem":
         storage.pop(update.key, None)
 
-    total = sum(len(key.encode("utf-8")) + len(value.encode("utf-8")) for key, value in storage.items())
+    # 拆分：v9 全局共享键（published 类）→ 虚拟 SHARED_OWNER；其余 → 当前 owner。
+    own_part = {k: v for k, v in storage.items() if k not in SHARED_KEYS}
+    shared_part = {k: v for k, v in storage.items() if k in SHARED_KEYS}
+
+    total = sum(len(k.encode("utf-8")) + len(v.encode("utf-8")) for k, v in own_part.items())
     if total > MAX_TOTAL_BYTES:
         raise RuntimeStateValidationError("账号运行数据超过大小限制")
 
     if row is None:
         row = RuntimeState(
             owner_id=owner,
-            storage=storage,
+            storage=own_part,
             revision=1,
             last_request_id=update.requestId,
         )
         db.add(row)
     else:
-        row.storage = storage
+        row.storage = own_part
         row.revision += 1
         row.last_request_id = update.requestId
+
+    # 共享键写到独立 shared_runtime_states 表（每键一行）。前端 syncPublishedBanks 已
+    # read-modify-write 合并好，按键覆盖；removeItem 的共享键删行。
+    for key, value in shared_part.items():
+        shared_row = await db.get(SharedRuntimeState, key)
+        if shared_row is None:
+            db.add(SharedRuntimeState(key=key, value=value, updated_by=owner))
+        else:
+            shared_row.value = value
+            shared_row.updated_by = owner
+    if update.operation == "removeItem" and update.key in SHARED_KEYS:
+        shared_row = await db.get(SharedRuntimeState, update.key)
+        if shared_row is not None:
+            await db.delete(shared_row)
+
     await db.commit()
     await db.refresh(row)
-    return dict(row.storage or {}), row.revision
+    return await get_state(db, owner)

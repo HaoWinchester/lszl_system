@@ -5,6 +5,7 @@ from app.models.file import CurrentFile, FileContent, FileTag, Folder, GraphFile
 from app.models.guided_learning import GuidedActivity, GuidedCourse, GuidedCourseActivity, GuidedLearningProgress
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.runtime_state import RuntimeState
+from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.subscription import RedeemCode, Subscription, SubscriptionOrder
 from app.models.system import RoleTheme, SystemSetting
 from app.models.training import CanvasWorkspace, LearningEvent, RecallProgress, TrainingProgress
@@ -35,4 +36,5 @@ __all__ = [
     "GuidedCourseActivity",
     "GuidedLearningProgress",
     "RuntimeState",
+    "SharedRuntimeState",
 ]
