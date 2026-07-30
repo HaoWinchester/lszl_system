@@ -132,11 +132,26 @@ PREFIXES = (
 # v9 的"全局共享"键——published 类发布内容。前端把它们当全局读（无 scope 前缀），
 # 后端存独立 shared_runtime_states 表，所有用户读同一份，从而教师发布 → 学员可读（跨账号共享）。
 SHARED_KEYS = frozenset({
+    # 发布类（教师发布 → 学员读取）
     "kg_question_banks_published_v1",
     "kg_exam_papers_published_v1",
     "kg_course_config_releases_v1",
     "kg_course_config_active_release_v1",
     "kg_learning_tasks_v1",
+    # 全局教学内容（管理员/教师配一份，所有用户看；扫 updata-legacy 确认无 scope 拼接）
+    "kg_content_subjects_v1",
+    "kg_content_taxonomies_v1",
+    "kg_content_activity_overrides_v1",
+    "kg_content_organization_migration_v1",
+    "kg_activity_collections_v1",
+    "kg_activity_tags_v1",
+    "kg_question_tag_names_v1",
+    "kg_taxonomy_release_records_v1",
+    "kg_taxonomy_deletion_records_v1",
+    "kg_taxonomy_import_records_v1",
+    "kg_exam_paper_release_history_v1",
+    # 管理后台全局设置（低频写；审计/事务快照等高频写键暂不加入，避免并发竞态）
+    "kg_admin_settings_v1",
 })
 
 
