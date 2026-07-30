@@ -65,6 +65,36 @@ EXACT_KEYS = {
     "通用知识点关系图谱工具_多科目重点聚焦版_v2",
     "通用知识点关系图谱工具_悬浮菜单位置_v1",
     "通用知识点关系图谱工具_新手引导已看_v1",
+    "kg_activity_collections_v1",
+    "kg_activity_tags_v1",
+    "kg_admin_audit_log_v1",
+    "kg_admin_settings_v1",
+    "kg_admin_transaction_snapshots_v1",
+    "kg_assessment_papers_v1",
+    "kg_content_activity_overrides_v1",
+    "kg_content_organization_migration_v1",
+    "kg_content_subjects_v1",
+    "kg_content_taxonomies_v1",
+    "kg_course_admin_recent_v862_p2",
+    "kg_course_admin_workspace_v862_p1",
+    "kg_course_config_active_release_v1",
+    "kg_course_config_drafts_v1",
+    "kg_course_config_releases_v1",
+    "kg_deep_recall_legacy_owner_v1",
+    "kg_exam_paper_release_history_v1",
+    "kg_exam_papers_published_v1",
+    "kg_guided_practice_return_v1",
+    "kg_learning_tasks_v1",
+    "kg_paper_workspace_layout_v1",
+    "kg_question_banks_published_v1",
+    "kg_question_classification_collapsed_v1",
+    "kg_question_library_workspace_layout_v1",
+    "kg_question_tag_names_v1",
+    "kg_taxonomy_deletion_records_v1",
+    "kg_taxonomy_import_records_v1",
+    "kg_taxonomy_release_records_v1",
+    "kg_teacher_workbench_subject_v1",
+    "kg_wechat_login_pending_v1",
 }
 
 PREFIXES = (
@@ -88,6 +118,13 @@ PREFIXES = (
     "kg_canvas_workspace_v1__",
     "kg_deep_recall_progress_v1__",
     "通用知识点关系图谱工具_多科目重点聚焦版_v2__user__",
+    "kg_deep_recall_current_question_v2__",
+    "kg_deep_recall_explored_v2__",
+    "kg_deep_recall_progress_v2__",
+    "kg_exam_paper_categories_v1__",
+    "kg_guided_path_scroll_v3__",
+    "kg_multi_workspace_closed_tabs_v1__",
+    "kg_recall_association_library_v1__",
 )
 
 
@@ -117,7 +154,7 @@ def key_allowed(key: str) -> bool:
 
 
 def validate_update(update: RuntimeStateUpdate) -> None:
-    expected_namespace = PAGE_NAMESPACES.get(update.page)
+    expected_namespace = PAGE_NAMESPACES.get(update.page, "page")
     if expected_namespace != update.namespace:
         raise RuntimeStateValidationError("页面与数据域不匹配")
     if update.operation == "clear":

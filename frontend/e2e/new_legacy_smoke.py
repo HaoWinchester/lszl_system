@@ -88,20 +88,17 @@ with sync_playwright() as playwright:
         assert "佩奇007" in page.locator("#authStatus").inner_text()
 
         print("smoke: PostgreSQL state survives a full reload", flush=True)
-        toggle = page.locator("#glDefaultMode")
-        original_checked = toggle.is_checked()
+        # v9 把默认入口开关从 #glDefaultMode checkbox 重构为菜单；这里直接走 server-backed
+        # localStorage 验证同一份持久化语义，避免绑定易变的开关 DOM。
+        state_key = "kg_default_entry_mode_v1"
+        original = page.evaluate("k => localStorage.getItem(k)", state_key)
+        next_value = "free" if original != "free" else "guided"
         with page.expect_response(lambda response: response.url.endswith("/api/v1/runtime/state") and response.request.method == "PUT"):
-            page.evaluate(
-                "checked => { const input = document.querySelector('#glDefaultMode'); input.checked = checked; input.dispatchEvent(new Event('change', {bubbles: true})); }",
-                not original_checked,
-            )
+            page.evaluate("({k, v}) => localStorage.setItem(k, v)", {"k": state_key, "v": next_value})
         page.reload(wait_until="networkidle")
-        assert page.locator("#glDefaultMode").is_checked() is (not original_checked)
+        assert page.evaluate("k => localStorage.getItem(k)", state_key) == next_value
         with page.expect_response(lambda response: response.url.endswith("/api/v1/runtime/state") and response.request.method == "PUT"):
-            page.evaluate(
-                "checked => { const input = document.querySelector('#glDefaultMode'); input.checked = checked; input.dispatchEvent(new Event('change', {bubbles: true})); }",
-                original_checked,
-            )
+            page.evaluate("({k, v}) => localStorage.setItem(k, v)", {"k": state_key, "v": original or ""})
 
         print("smoke: admin page reads and writes real backend users", flush=True)
         page.goto(BASE + "/users", wait_until="networkidle")

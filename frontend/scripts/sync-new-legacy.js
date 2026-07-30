@@ -244,22 +244,50 @@ function patchGraphInteractions(source) {
 
 function patchQuestionRecallPreview(source) {
   if (!source.includes('function previewDeepRecall()')) return source
-  let generated = replaceExactlyOnce(
-    source,
-    "  function previewDeepRecall(){\n    if(!saveQuestionForm({silent:true})) return;\n    const q = currentQuestion();",
-    "  async function previewDeepRecall(){\n    if(!saveQuestionForm({silent:true})) return;\n    const bank = currentBank();\n    const q = currentQuestion();",
-    'new-legacy 深度回忆当前题传递',
-  )
-  generated = replaceExactlyOnce(
-    generated,
-    "    }catch(e){}\n    window.open('knowledge-recall.html?questionId=' + encodeURIComponent(q.id || 'current'), '_blank');",
-    "    }catch(e){}\n    try{\n      if(window.KGServerStateStorage&&typeof window.KGServerStateStorage.flush==='function')await window.KGServerStateStorage.flush();\n    }catch(error){\n      toast(error&&error.message||'服务器保存失败，请稍后重试。');\n      return;\n    }\n    window.open('knowledge-recall.html?questionId=' + encodeURIComponent(q.id || 'current'), '_blank');",
-    'new-legacy 深度回忆打开前保存',
-  )
+  // 兼容两个基线：
+  //  - v9：previewDeepRecall 已自带 `const bank = currentBank()`，window.open 带 `bankId=`。
+  //  - v8.6：用 `questionId=` 且无 bank 传递（需补 bank）。
+  // 两版都要在打开深度回忆页前先 flush 到服务器，避免 120ms 防抖让新窗口读不到刚写入的题。
+  const isV9 = source.includes('knowledge-recall.html?bankId=')
+  let generated = isV9
+    ? replaceExactlyOnce(
+      source,
+      '  function previewDeepRecall(){',
+      '  async function previewDeepRecall(){',
+      'new-legacy 深度回忆异步入口',
+    )
+    : replaceExactlyOnce(
+      source,
+      "  function previewDeepRecall(){\n    if(!saveQuestionForm({silent:true})) return;\n    const q = currentQuestion();",
+      "  async function previewDeepRecall(){\n    if(!saveQuestionForm({silent:true})) return;\n    const bank = currentBank();\n    const q = currentQuestion();",
+      'new-legacy 深度回忆当前题传递',
+    )
+  const openBefore = isV9
+    ? "    }catch(e){}\n    window.open('knowledge-recall.html?bankId=' + encodeURIComponent(bank.id||'') + '&questionId=' + encodeURIComponent(q.id || 'current'), '_blank');"
+    : "    }catch(e){}\n    window.open('knowledge-recall.html?questionId=' + encodeURIComponent(q.id || 'current'), '_blank');"
+  const openAfter = openBefore.replace('    }catch(e){}\n    ', [
+    '    }catch(e){}',
+    '    try{',
+    "      if(window.KGServerStateStorage&&typeof window.KGServerStateStorage.flush==='function')await window.KGServerStateStorage.flush();",
+    '    }catch(error){',
+    "      toast(error&&error.message||'服务器保存失败，请稍后重试。');",
+    '      return;',
+    '    }',
+    '    ',
+  ].join('\n'))
+  generated = replaceExactlyOnce(generated, openBefore, openAfter, 'new-legacy 深度回忆打开前保存')
   return generated
 }
 
-function injectPage(html, page) {
+function versionPageStyles(html, version) {
+  const query = `?v=${encodeURIComponent(version)}`
+  return html.replace(
+    /(\bhref=(['"]))((?!https?:|\/\/|data:|#)[^'"?#]+\.css)\2/gi,
+    (_, prefix, quote, asset) => `${prefix}${asset}${query}${quote}`,
+  )
+}
+
+function injectPage(html, page, version) {
   const injection = [
     '<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->',
     '<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->',
@@ -296,6 +324,14 @@ function injectPage(html, page) {
       autosaveTag,
       `${autosaveTag}\n<script defer src="./direct-graph-adapter.js"></script><!-- kg-graph:generated -->`,
     )
+    const wechatLoginTag = '<script defer src="src/32-wechat-login.js"></script>'
+    // 较早的发布包没有订阅模块；只在提供微信登录与订阅运行时的首页注入支付适配器。
+    if (generated.includes(wechatLoginTag)) {
+      generated = generated.replace(
+        wechatLoginTag,
+        `${wechatLoginTag}\n<script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->`,
+      )
+    }
   }
   if (page === 'question-bank.html') {
     const editorTag = '<script defer src="src/65-question-bank-admin.js"></script>'
@@ -331,7 +367,7 @@ function injectPage(html, page) {
       `${authTag}\n<script defer src="./direct-auth-adapter.js"></script><!-- kg-auth:generated -->`,
     )
   }
-  return generated
+  return versionPageStyles(generated, version)
 }
 
 function diffFiles(previous = {}, next = {}) {
@@ -398,7 +434,7 @@ function sync({ source, out }) {
 
   for (const page of walk(out).filter((path) => !path.includes('/') && path.endsWith('.html'))) {
     const path = resolve(out, page)
-    writeFileSync(path, injectPage(patchArchitectureCopy(page, readFileSync(path, 'utf8')), page))
+    writeFileSync(path, injectPage(patchArchitectureCopy(page, readFileSync(path, 'utf8')), page, version))
   }
 
   const indexPath = resolve(out, 'index.html')

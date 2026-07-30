@@ -118,6 +118,32 @@ async def member_alias(request: Request):
     return _redirect(request, "index.html", {"mode": "free", "member": "1"})
 
 
+# v9 新增的管理/教学页面稳定别名；权限由各页面自身与后端 API 二次校验。
+@router.get("/papers")
+async def papers_alias(request: Request):
+    return _redirect(request, "paper-management.html")
+
+
+@router.get("/courses")
+async def courses_alias(request: Request):
+    return _redirect(request, "course-admin.html")
+
+
+@router.get("/content")
+async def content_alias(request: Request):
+    return _redirect(request, "content-center.html")
+
+
+@router.get("/teacher")
+async def teacher_alias(request: Request):
+    return _redirect(request, "teacher-workbench.html")
+
+
+@router.get("/admin")
+async def admin_alias(request: Request):
+    return _redirect(request, "admin-console.html")
+
+
 @router.get("/__preview/{version}")
 @router.get("/__preview/{version}/")
 async def preview_root(version: str, request: Request, db: DB):

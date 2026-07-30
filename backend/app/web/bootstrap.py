@@ -20,6 +20,14 @@ PAGE_NAMESPACES = {
     "file-manager.html": "files",
     "user-management.html": "users",
     "system-settings.html": "system",
+    "paper-management.html": "papers",
+    "course-admin.html": "courses",
+    "content-center.html": "content",
+    "teacher-workbench.html": "teacher",
+    "admin-console.html": "admin",
+    "admin-operations.html": "operations",
+    "admin-settings.html": "admin",
+    "admin-subjects.html": "subjects",
 }
 
 

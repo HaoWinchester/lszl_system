@@ -29,7 +29,7 @@ def test_direct_page_serves_upstream_dom() -> None:
 
     assert response.status_code == 200
     assert 'class="question-training-page"' in response.text
-    assert 'id="qtOpenWorkspaceBtn"' in response.text
+    assert 'src="src/72-question-training-page.js"' in response.text
 
 
 def test_api_routes_keep_priority_over_static_runtime() -> None:
