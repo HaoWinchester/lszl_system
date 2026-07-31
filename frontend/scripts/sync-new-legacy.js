@@ -292,6 +292,207 @@ function patchAddQuestionTab(source) {
   )
 }
 
+// 定制层（1305e16 admin 功能偏好分析面板）：v9 上游无此面板，从 new-legacy 提取并注入。
+// 三段式 idempotent：new-legacy 已含则跳过（meta 测试 source=new-legacy 时直接 pass-through）。
+function patchSystemSettingsAnalyticsJs(generated) {
+  if (generated.includes('ANALYTICS_FEATURE_LABELS')) return generated
+  const nlPath = resolve(repoDir, 'new-legacy/src/36-system-settings.js')
+  if (!existsSync(nlPath)) return generated
+  const nlSource = readFileSync(nlPath, 'utf8')
+  const blockStart = nlSource.indexOf('  const ANALYTICS_FEATURE_LABELS')
+  const blockEnd = nlSource.indexOf('  function setTab', blockStart)
+  if (blockStart < 0 || blockEnd < 0) {
+    throw new Error('new-legacy 36-system-settings.js analytics 块结构已变化，请复核提取')
+  }
+  const block = nlSource.slice(blockStart, blockEnd).replace(/\n+$/, '')
+  let out = replaceExactlyOnce(
+    generated,
+    "    toast('日志已清空');\n  }\n\n  function setTab(tab){",
+    `    toast('日志已清空');\n  }\n\n${block}\n\n  function setTab(tab){`,
+    'new-legacy 系统设置 analytics 函数块',
+  )
+  out = replaceExactlyOnce(
+    out,
+    "    document.querySelectorAll('[data-ss-panel]').forEach(panel=>panel.classList.toggle('active',panel.dataset.ssPanel===next));\n  }",
+    "    document.querySelectorAll('[data-ss-panel]').forEach(panel=>panel.classList.toggle('active',panel.dataset.ssPanel===next));\n    if(next==='analytics'){initAnalyticsControls();if(!analyticsAutoLoaded){analyticsAutoLoaded=true;loadFeatureAnalytics();}}\n  }",
+    'new-legacy 系统设置 setTab analytics 分支',
+  )
+  out = replaceExactlyOnce(
+    out,
+    "    const clear=$('ssClearLogsBtn');\n    if(clear)clear.addEventListener('click',clearLogs);",
+    "    const clear=$('ssClearLogsBtn');\n    if(clear)clear.addEventListener('click',clearLogs);\n    const analyticsApply=$('ssAnalyticsApply');\n    if(analyticsApply)analyticsApply.addEventListener('click',loadFeatureAnalytics);",
+    'new-legacy 系统设置 bindEvents analytics 绑定',
+  )
+  out = replaceExactlyOnce(
+    out,
+    '    bindEvents();\n    render();',
+    '    bindEvents();\n    render();\n    initAnalyticsControls();',
+    'new-legacy 系统设置 init analytics 控件',
+  )
+  return out
+}
+
+function patchSystemSettingsAnalyticsHtml(generated) {
+  if (generated.includes('data-ss-tab="analytics"')) return generated
+  const analyticsTab = '        <button type="button" data-ss-tab="analytics">功能分析</button>'
+  const analyticsPanel = [
+    '',
+    '        <section class="ss-pane" data-ss-panel="analytics">',
+    '          <div class="um-panel">',
+    '            <div class="um-card-head small"><div><h2>用户功能偏好</h2><p>比较常用程度与成果用户率，仅展示汇总数据。</p></div></div>',
+    '            <div class="ss-analytics-filters">',
+    '              <label>开始日期<input id="ssAnalyticsStart" type="date"></label>',
+    '              <label>结束日期<input id="ssAnalyticsEnd" type="date"></label>',
+    '              <label>角色<select id="ssAnalyticsRole"><option value="">全部角色</option><option value="teacher">教师/教研</option><option value="student">学员</option><option value="viewer">游客</option></select></label>',
+    '              <button id="ssAnalyticsApply" type="button">查询</button>',
+    '            </div>',
+    '            <div id="ssAnalyticsContent" aria-live="polite"></div>',
+    '          </div>',
+    '        </section>',
+  ].join('\n')
+  let out = replaceExactlyOnce(
+    generated,
+    '        <button type="button" data-ss-tab="logs">操作日志</button>\n      </aside>',
+    `        <button type="button" data-ss-tab="logs">操作日志</button>\n${analyticsTab}\n      </aside>`,
+    'new-legacy 系统设置 analytics 标签按钮',
+  )
+  out = replaceExactlyOnce(
+    out,
+    '            <div class="um-log-list" id="ssLogList"></div>\n          </div>\n        </section>',
+    `            <div class="um-log-list" id="ssLogList"></div>\n          </div>\n        </section>\n${analyticsPanel}`,
+    'new-legacy 系统设置 analytics 面板',
+  )
+  return out
+}
+
+function patchSystemSettingsAnalyticsCss(generated) {
+  if (generated.includes('.ss-analytics-filters')) return generated
+  const nlPath = resolve(repoDir, 'new-legacy/styles/system-settings.css')
+  if (!existsSync(nlPath)) return generated
+  const nlSource = readFileSync(nlPath, 'utf8')
+  const blockStart = nlSource.indexOf('/* 用户功能偏好分析仪表板 */')
+  if (blockStart < 0) {
+    throw new Error('new-legacy system-settings.css analytics 块结构已变化，请复核提取')
+  }
+  const block = nlSource.slice(blockStart).replace(/\n+$/, '')
+  const out = replaceExactlyOnce(
+    generated,
+    'grid-template-columns:repeat(5,minmax(0,1fr));',
+    'grid-template-columns:repeat(6,minmax(0,1fr));',
+    'new-legacy system-settings.css 侧栏 6 列',
+  )
+  return `${out}\n/* kg:analytics-custom */\n${block}\n@media(max-width:768px){\n  .ss-analytics-summary{grid-template-columns:1fr;}\n  .ss-analytics-filters{flex-direction:column;align-items:stretch;}\n}\n`
+}
+
+// 定制层（cd38328 业务埋点）：在 v9 重构后的 5 个 src 文件成功操作点注入 KGFeatureAnalytics.track。
+// v9 改了 65（saveBanks 签名）与 86（saveProgress debounce）的保存函数，锚点用 v9 专属；
+// new-legacy 已含全部埋点，marker guard 跳过。graph 埋点在 bridge（direct-graph-adapter.js，已含）。
+const ANALYTICS_TRACK = 'const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){};'
+
+function injectTrack(source, marker, before, after, label) {
+  if (source.includes(marker)) return source
+  if (!source.includes(before)) return source
+  return replaceExactlyOnce(source, before, after, label)
+}
+
+function patchFeatureAnalytics(path, source) {
+  if (path === '27-graph-file-manager.js') {
+    return injectTrack(
+      source,
+      "track('files','outcome','library_saved')",
+      "try{await state.modalHandler(value);closeModal()}catch(err){toast(err.message||String(err),'error')}finally{setBusy(false)}",
+      `try{await state.modalHandler(value);${ANALYTICS_TRACK}track('files','key_action','library_saved');track('files','outcome','library_saved');closeModal()}catch(err){toast(err.message||String(err),'error')}finally{setBusy(false)}`,
+      'new-legacy 文件库保存埋点',
+    )
+  }
+  if (path === '64-flow-orchestrator.js') {
+    return injectTrack(
+      source,
+      "track('training','key_action','answer_submitted')",
+      `          isCorrect:saved.answer.isCorrect,
+          confidence:saved.confidence
+        },saved);`,
+      `          isCorrect:saved.answer.isCorrect,
+          confidence:saved.confidence
+        },saved);
+        ${ANALYTICS_TRACK}
+        track('training','key_action','answer_submitted');
+        track('training','outcome',saved.answer.isCorrect?'answer_correct':'answer_incorrect');`,
+      'new-legacy 训练答题埋点',
+    )
+  }
+  if (path === '65-question-bank-admin.js') {
+    let out = injectTrack(
+      source,
+      "track('question_bank','outcome','bank_saved')",
+      `    bank.questions.forEach(q => { q.subject = q.subject || bank.subject; });
+    saveBanks(state.banks,{silent:true});
+    render();`,
+      `    bank.questions.forEach(q => { q.subject = q.subject || bank.subject; });
+    saveBanks(state.banks,{silent:true});
+    ${ANALYTICS_TRACK}track('question_bank','key_action','bank_saved');track('question_bank','outcome','bank_saved');
+    render();`,
+      'new-legacy 题库保存埋点',
+    )
+    return injectTrack(
+      out,
+      "track('question_bank','outcome','question_saved')",
+      '    if(!options.silent) render();',
+      `    if(!options.silent){${ANALYTICS_TRACK}track('question_bank','key_action','question_saved');track('question_bank','outcome','question_saved');render()}`,
+      'new-legacy 题目保存埋点',
+    )
+  }
+  if (path === '86-knowledge-recall.js') {
+    return injectTrack(
+      source,
+      "track('recall','outcome','recall_saved')",
+      `  function saveProgress(){
+    if(isRecallReadonly())return;
+    if(progressSaveTimer)clearTimeout(progressSaveTimer);`,
+      `  function saveProgress(){
+    if(isRecallReadonly())return;
+    ${ANALYTICS_TRACK}track('recall','key_action','recall_saved');track('recall','outcome','recall_saved');
+    if(progressSaveTimer)clearTimeout(progressSaveTimer);`,
+      'new-legacy 回忆保存埋点',
+    )
+  }
+  if (path === '88-guided-learning-store.js') {
+    let out = injectTrack(
+      source,
+      "track('learning_path','outcome','node_completed')",
+      `        metrics:clone(entry.metrics)
+      },{userId:String(userId||currentUserId())});
+    }catch(error){}
+    return write(progress,course,userId);`,
+      `        metrics:clone(entry.metrics)
+      },{userId:String(userId||currentUserId())});
+    }catch(error){}
+    ${ANALYTICS_TRACK}
+    track('learning_path','key_action','node_completed');
+    track('learning_path','outcome','node_completed');
+    return write(progress,course,userId);`,
+      'new-legacy 学习路径节点埋点',
+    )
+    return injectTrack(
+      out,
+      "track('learning_path','outcome','placement_completed')",
+      `        courseId:course.id,partId:key,...clone(attempt)
+      },{userId:String(userId||currentUserId())});
+    }catch(error){}
+    return write(progress,course,userId);`,
+      `        courseId:course.id,partId:key,...clone(attempt)
+      },{userId:String(userId||currentUserId())});
+    }catch(error){}
+    ${ANALYTICS_TRACK}
+    track('learning_path','key_action','placement_completed');
+    track('learning_path','outcome','placement_completed');
+    return write(progress,course,userId);`,
+      'new-legacy 学习路径测试埋点',
+    )
+  }
+  return source
+}
+
 function versionPageStyles(html, version) {
   const query = `?v=${encodeURIComponent(version)}`
   return html.replace(
@@ -458,21 +659,36 @@ function sync({ source, out }) {
     }
     if (path === '64-flow-orchestrator.js') generated = patchTrainingSessionReentrancy(generated)
     if (path === '27-graph-file-manager.js') generated = patchFileManagerNavigation(generated)
+    if (path === '36-system-settings.js') generated = patchSystemSettingsAnalyticsJs(generated)
+    generated = patchFeatureAnalytics(path, generated)
     writeFileSync(target, generated)
   }
 
-  // 定制层：用户的"服务端 OAuth 微信登录"定制（new-legacy）覆盖 v9 上游纯前端版。
-  // 放在 patch 循环后——new-legacy 版已是服务端 OAuth 实现，无需 v8.6 的 architectureCopy 文案补丁。
-  cpSync(resolve(repoDir, 'new-legacy/src/32-wechat-login.js'), resolve(out, 'src/32-wechat-login.js'))
-  const wechatCss = extractWechatLoginCss(readFileSync(resolve(repoDir, 'new-legacy/styles/main.css'), 'utf8'))
-  if (wechatCss) {
-    const mainCssPath = resolve(out, 'styles/main.css')
-    writeFileSync(mainCssPath, `${readFileSync(mainCssPath, 'utf8')}\n/* kg:wechat-login-custom */\n${wechatCss}\n`)
+  // 定制层：用户在 new-legacy 上的"服务端化"定制，叠加到 sync 产物。
+  // 仅当（① 源是真实发布——含 styles/main.css；② 定制权威 new-legacy 可达）时应用。
+  // 测试桩 fixture 无 styles；release 元测试把 scripts 复制到 harness（repoDir 指向 harness，
+  // 无 new-legacy）——两者都跳过定制，避免 ENOENT。
+  const customSource = resolve(repoDir, 'new-legacy')
+  if (existsSync(resolve(source, 'styles/main.css')) && existsSync(customSource)) {
+    // Phase 1（fe546e2 微信登录服务端 OAuth）：new-legacy 版覆盖 v9 上游纯前端版。
+    cpSync(resolve(customSource, 'src/32-wechat-login.js'), resolve(out, 'src/32-wechat-login.js'))
+    const wechatCss = extractWechatLoginCss(readFileSync(resolve(customSource, 'styles/main.css'), 'utf8'))
+    if (wechatCss) {
+      const mainCssPath = resolve(out, 'styles/main.css')
+      writeFileSync(mainCssPath, `${readFileSync(mainCssPath, 'utf8')}\n/* kg:wechat-login-custom */\n${wechatCss}\n`)
+    }
+    // Phase 2.1（1305e16 admin 功能偏好分析面板）：注入侧栏 6 列 + 追加 analytics 样式块。
+    const ssAnalyticsCssPath = resolve(out, 'styles/system-settings.css')
+    if (existsSync(ssAnalyticsCssPath)) {
+      writeFileSync(ssAnalyticsCssPath, patchSystemSettingsAnalyticsCss(readFileSync(ssAnalyticsCssPath, 'utf8')))
+    }
   }
 
   for (const page of walk(out).filter((path) => !path.includes('/') && path.endsWith('.html'))) {
     const path = resolve(out, page)
-    writeFileSync(path, injectPage(patchArchitectureCopy(page, readFileSync(path, 'utf8')), page, version))
+    let pageHtml = patchArchitectureCopy(page, readFileSync(path, 'utf8'))
+    if (page === 'system-settings.html') pageHtml = patchSystemSettingsAnalyticsHtml(pageHtml)
+    writeFileSync(path, injectPage(pageHtml, page, version))
   }
 
   const indexPath = resolve(out, 'index.html')
