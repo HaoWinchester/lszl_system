@@ -384,6 +384,28 @@ function patchSystemSettingsAnalyticsCss(generated) {
   return `${out}\n/* kg:analytics-custom */\n${block}\n@media(max-width:768px){\n  .ss-analytics-summary{grid-template-columns:1fr;}\n  .ss-analytics-filters{flex-direction:column;align-items:stretch;}\n}\n`
 }
 
+// 定制层（fe45237 会员中心 UI）：membership-ui.css 紧跟 user-center.css 之后注入。
+// 仅在产物含 membership-ui.css（定制块已 cp）时对每页注入；idempotent。
+// v9 上游 user-center.css link 有两种自闭合写法（有空格 / 无空格），都要兼容。
+function patchMembershipUiLink(generated) {
+  if (generated.includes('styles/membership-ui.css')) return generated
+  const variants = [
+    '<link rel="stylesheet" href="styles/user-center.css"/>',
+    '<link rel="stylesheet" href="styles/user-center.css" />',
+  ]
+  for (const link of variants) {
+    if (generated.includes(link)) {
+      return replaceExactlyOnce(
+        generated,
+        link,
+        `${link}\n<link rel="stylesheet" href="styles/membership-ui.css"/>`,
+        'new-legacy membership-ui.css link 注入',
+      )
+    }
+  }
+  return generated
+}
+
 // 定制层（cd38328 业务埋点）：在 v9 重构后的 5 个 src 文件成功操作点注入 KGFeatureAnalytics.track。
 // v9 改了 65（saveBanks 签名）与 86（saveProgress debounce）的保存函数，锚点用 v9 专属；
 // new-legacy 已含全部埋点，marker guard 跳过。graph 埋点在 bridge（direct-graph-adapter.js，已含）。
@@ -682,12 +704,23 @@ function sync({ source, out }) {
     if (existsSync(ssAnalyticsCssPath)) {
       writeFileSync(ssAnalyticsCssPath, patchSystemSettingsAnalyticsCss(readFileSync(ssAnalyticsCssPath, 'utf8')))
     }
+    // Phase 3.1（fe45237 会员中心 UI）：membership-ui.css + icons 目录（v9 上游无）。
+    cpSync(resolve(customSource, 'styles/membership-ui.css'), resolve(out, 'styles/membership-ui.css'))
+    cpSync(resolve(customSource, 'assets/membership-ui'), resolve(out, 'assets/membership-ui'), { recursive: true })
+    // Phase 3.2（fe45237 + fe546e2 用户中心 / 会员中心 / 微信绑定）：整文件覆盖。
+    // 核查结论——v9 的 33-user-center.js 无专属功能（独有行全是旧 .kg-* 会员设计，已被
+    // new-legacy 的 .uc-* / .membership-ui 升级取代）；new-legacy 版自包含 KGWechatPay +
+    // renderWechatBox，依赖 KGWechatLogin(P1 已 cp)/KGSubscription/后端 wechat-pay 均就绪。
+    // user-center.css 同理：v9 仅 2 行旧值被 new-legacy 改进取代，整 cp 安全。故无需逐函数合并。
+    cpSync(resolve(customSource, 'src/33-user-center.js'), resolve(out, 'src/33-user-center.js'))
+    cpSync(resolve(customSource, 'styles/user-center.css'), resolve(out, 'styles/user-center.css'))
   }
 
   for (const page of walk(out).filter((path) => !path.includes('/') && path.endsWith('.html'))) {
     const path = resolve(out, page)
     let pageHtml = patchArchitectureCopy(page, readFileSync(path, 'utf8'))
     if (page === 'system-settings.html') pageHtml = patchSystemSettingsAnalyticsHtml(pageHtml)
+    if (existsSync(resolve(out, 'styles/membership-ui.css'))) pageHtml = patchMembershipUiLink(pageHtml)
     writeFileSync(path, injectPage(pageHtml, page, version))
   }
 
