@@ -6,7 +6,9 @@ from playwright.sync_api import sync_playwright
 
 
 CASES = [
-    ("learning", "/", "/learning-path.html", ".gl-app"),
+    # v9.0-p4.1.1：匿名访问 /learning-path.html 会被前端重定向到 practice-mode（做题模式），
+    # .gl-app 不再渲染，故匿名视觉回归改用 practice-mode（.practice-app）。index?mode=free 不受影响。
+    ("practice", "/practice-mode.html", "/practice-mode.html", ".practice-app"),
     ("free", "/index.html?mode=free", "/index.html?mode=free", ".app"),
 ]
 VIEWPORTS = {

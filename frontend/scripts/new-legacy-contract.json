@@ -104,7 +104,11 @@
       "kg_taxonomy_import_records_v1",
       "kg_taxonomy_release_records_v1",
       "kg_teacher_workbench_subject_v1",
-      "kg_wechat_login_pending_v1"
+      "kg_wechat_login_pending_v1",
+      "kg_announcements_v1",
+      "kg_question_training_filters_collapsed_v1",
+      "kg_question_training_workspace_layout_v1",
+      "kg_user_feedback_v1"
     ],
     "prefixes": [
       "kg_graph_file_content_v2__",
@@ -133,7 +137,11 @@
       "kg_exam_paper_categories_v1__",
       "kg_guided_path_scroll_v3__",
       "kg_multi_workspace_closed_tabs_v1__",
-      "kg_recall_association_library_v1__"
+      "kg_recall_association_library_v1__",
+      "kg_practice_history_v1__",
+      "kg_recall_association_management_v1__",
+      "kg_user_feedback_reply_reads_v1__",
+      "kg_user_message_reads_v1__"
     ],
     "ignoredLiterals": [
       "kg_graph_",

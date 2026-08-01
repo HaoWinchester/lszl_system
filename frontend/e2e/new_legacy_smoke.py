@@ -67,14 +67,12 @@ with sync_playwright() as playwright:
     page.on("response", record_response)
 
     try:
-        print("smoke: guest learning path and direct free-mode jump", flush=True)
+        print("smoke: guest entry renders without iframe", flush=True)
+        # v9.0-p4.1.1：后端稳定别名 "/" 把匿名访客落到 practice-mode（.practice-app），
+        # 不再经 learning-path（.gl-app）。学习节点详情流（line 142-146）依赖登录后
+        # learning-path 入口，p4.1.1 改版待专项重写，目前走 --skip-browser 发布。
         page.goto(BASE + "/", wait_until="networkidle")
-        page.locator(".gl-app").wait_for(state="visible")
-        assert page.locator(".gl-path-node").count() >= 12
-        assert page.locator("iframe").count() == 0
-        page.locator('a[href="index.html?mode=free"]').click()
-        page.wait_for_url("**/index.html?mode=free")
-        page.locator(".app").wait_for(state="visible")
+        page.locator(".practice-app").wait_for(state="visible")
         assert page.locator("iframe").count() == 0
 
         print("smoke: original login UI backed by FastAPI session", flush=True)

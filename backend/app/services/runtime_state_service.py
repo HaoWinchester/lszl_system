@@ -96,6 +96,11 @@ EXACT_KEYS = {
     "kg_taxonomy_release_records_v1",
     "kg_teacher_workbench_subject_v1",
     "kg_wechat_login_pending_v1",
+    # v9.0-p4.1.1 新增业务键（公告 / 训练 UI 偏好 / 用户反馈）
+    "kg_announcements_v1",
+    "kg_question_training_filters_collapsed_v1",
+    "kg_question_training_workspace_layout_v1",
+    "kg_user_feedback_v1",
 }
 
 PREFIXES = (
@@ -126,6 +131,11 @@ PREFIXES = (
     "kg_guided_path_scroll_v3__",
     "kg_multi_workspace_closed_tabs_v1__",
     "kg_recall_association_library_v1__",
+    # v9.0-p4.1.1 新增业务键（动态 id / subject 后缀）
+    "kg_practice_history_v1__",
+    "kg_recall_association_management_v1__",
+    "kg_user_feedback_reply_reads_v1__",
+    "kg_user_message_reads_v1__",
 )
 
 
