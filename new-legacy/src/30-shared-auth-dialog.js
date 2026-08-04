@@ -10,7 +10,8 @@
   const ownHandlers={};
   const state={
     mounted:false,
-    bound:false,
+    boundModal:null,
+    globalBound:false,
     busy:false,
     options:{
       defaultReason:'未登录时只能查看图谱，登录后可以新增、编辑、连线和保存自己的内容。',
@@ -207,10 +208,9 @@
     return !!username;
   }
   function bind(){
-    if(state.bound)return;
     const modal=byId('authModal');
-    if(!modal)return;
-    state.bound=true;
+    if(!modal||state.boundModal===modal)return;
+    state.boundModal=modal;
     byId('authCloseBtn')?.addEventListener('click',close);
     byId('authDoLoginBtn')?.addEventListener('click',login);
     byId('authRegisterBtn')?.addEventListener('click',register);
@@ -222,10 +222,14 @@
       });
     });
     modal.addEventListener('click',event=>{if(event.target===modal)close()});
-    document.addEventListener('keydown',event=>{
-      if(event.key==='Escape'&&modal.classList.contains('show')){event.preventDefault();close()}
-    });
-    global.addEventListener('kg-auth-session-change',renderStatus);
+    if(!state.globalBound){
+      state.globalBound=true;
+      document.addEventListener('keydown',event=>{
+        const currentModal=byId('authModal');
+        if(event.key==='Escape'&&currentModal?.classList.contains('show')){event.preventDefault();close()}
+      });
+      global.addEventListener('kg-auth-session-change',renderStatus);
+    }
   }
 
   const api={mount,configure,open,close,message,setBusy,login,register,logout,renderStatus,isLoggedIn,currentUsername,afterExternalLogin};

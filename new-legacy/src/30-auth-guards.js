@@ -264,6 +264,7 @@ function authInstallGuards(){
   if(window.KGSharedAuthDialog)window.KGSharedAuthDialog.configure({
     defaultReason:'未登录时只能查看图谱，登录后可以新增、编辑、连线和保存自己的内容。',
     source:'自由模式登录',
+    logout:window.KGAuthRuntime?.logout||authLogout,
     renderStatus:authRenderStatus
   });
   if(login)login.onclick=()=>authOpen('登录后可以新增、编辑、连线和保存自己的图谱。');

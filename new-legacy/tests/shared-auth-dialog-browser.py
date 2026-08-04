@@ -154,11 +154,27 @@ def exercise_dialog(page):
 
     page.evaluate("KGSharedAuthDialog.logout()")
     page.evaluate("KGSharedAuthDialog.open()")
+    page.locator('#authUsername').fill('admin')
+    page.locator('#authPassword').fill('admin123')
+    page.locator('#authPassword').press('Enter')
+    page.wait_for_function("!document.getElementById('authModal').classList.contains('show')")
+    assert page.evaluate('__authHarness.current().username') == 'admin'
+
+    page.evaluate("KGSharedAuthDialog.logout()")
+    page.evaluate("KGSharedAuthDialog.open()")
     page.locator('.wechat-login-entry').click()
     page.locator('[data-test-qr="true"]').wait_for()
     assert 'wechat-login-mode' in (page.locator('#authModal').get_attribute('class') or '')
     page.locator('.wechat-login-back').click()
     assert 'wechat-login-mode' not in (page.locator('#authModal').get_attribute('class') or '')
+
+    page.evaluate("""()=>{
+      document.getElementById('authDialogRoot').innerHTML='';
+      KGSharedAuthDialog.mount();
+      KGSharedAuthDialog.open();
+    }""")
+    page.locator('#authCloseBtn').click()
+    assert page.locator('#authModal').get_attribute('aria-hidden') == 'true'
 
 
 assert SHARED.exists(), 'src/30-shared-auth-dialog.js must exist before browser behavior can pass'

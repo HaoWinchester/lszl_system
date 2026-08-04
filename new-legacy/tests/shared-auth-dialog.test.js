@@ -24,6 +24,11 @@ assert.doesNotMatch(
   /openAuth\('登录后可以新增、编辑、连线和保存自己的图谱。'/,
   'the shared account menu must not inject a graph-only login reason',
 );
+assert.match(
+  read('src/30-auth-guards.js'),
+  /logout:window\.KGAuthRuntime\?\.logout/,
+  'the graph must configure shared logout with its save-before-logout runtime handler',
+);
 
 const sharedPath=path.join(root,'src/30-shared-auth-dialog.js');
 assert.ok(fs.existsSync(sharedPath),'the shared auth dialog controller must exist');
