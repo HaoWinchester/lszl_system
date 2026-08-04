@@ -517,10 +517,14 @@ function patchFeatureAnalytics(path, source) {
   return source
 }
 
-function versionPageStyles(html, version) {
+function versionPageAssets(html, version) {
   const query = `?v=${encodeURIComponent(version)}`
-  return html.replace(
+  const withStyles = html.replace(
     /(\bhref=(['"]))((?!https?:|\/\/|data:|#)[^'"?#]+\.css)\2/gi,
+    (_, prefix, quote, asset) => `${prefix}${asset}${query}${quote}`,
+  )
+  return withStyles.replace(
+    /(<script\b[^>]*\bsrc=(['"]))((?:\.\/)?src\/[^'"?#]+\.js)\2/gi,
     (_, prefix, quote, asset) => `${prefix}${asset}${query}${quote}`,
   )
 }
@@ -605,7 +609,7 @@ function injectPage(html, page, version) {
       `${authTag}\n<script defer src="./direct-auth-adapter.js"></script><!-- kg-auth:generated -->`,
     )
   }
-  return versionPageStyles(generated, version)
+  return versionPageAssets(generated, version)
 }
 
 function diffFiles(previous = {}, next = {}) {

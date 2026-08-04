@@ -41,6 +41,17 @@ test('update builds an isolated release and atomically selects it', () => {
   const page = readFileSync(resolve(root, sourceVersion, 'site', 'index.html'), 'utf8')
   assert.match(page, new RegExp(`styles/user-center\\.css\\?v=${sourceVersion}`))
   assert.match(page, /<script src="\.\/server-state-bootstrap\.js"><\/script>/)
+  const practicePage = readFileSync(resolve(root, sourceVersion, 'site', 'practice-mode.html'), 'utf8')
+  assert.match(
+    practicePage,
+    new RegExp(`src/41-account-menu\\.js\\?v=${sourceVersion}`),
+    'release pages must cache-bust local business scripts',
+  )
+  assert.match(
+    practicePage,
+    /<script src="\.\/server-state-bootstrap\.js"><\/script>/,
+    'the backend bootstrap injection marker must remain unversioned',
+  )
   assert.match(current.sourceHash, /^[a-f0-9]{64}$/)
   assert.match(current.adapterHash, /^[a-f0-9]{64}$/)
   assert.equal(readJson(resolve(root, sourceVersion, 'release.json')).adapterVersion, 4)
