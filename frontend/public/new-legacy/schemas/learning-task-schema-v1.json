@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kg.local/schemas/learning-task-schema-v1.json",
+  "title": "Learning Task Schema v1",
+  "type": "object",
+  "required": ["id", "schemaVersion", "title", "type", "subjectId", "sourceActivityIds", "config", "status", "version", "authorship"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "schemaVersion": {"const": 1},
+    "title": {"type": "string", "minLength": 1},
+    "type": {"enum": ["deep_recall", "single_deep_study", "multi_question_canvas"]},
+    "subjectId": {"type": "string", "minLength": 1},
+    "description": {"type": "string"},
+    "sourceActivityIds": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "sourcePaperId": {"type": "string"},
+    "config": {
+      "type": "object",
+      "required": ["keywordAnnotations", "legacyQuestionRefs", "workspaceId", "templateParserVersion"],
+      "properties": {
+        "keywordAnnotations": {"type": "array"},
+        "legacyQuestionRefs": {"type": "array"},
+        "workspaceId": {"type": "string"},
+        "templateParserVersion": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "status": {"enum": ["draft", "published", "archived"]},
+    "version": {"type": "integer", "minimum": 1},
+    "authorship": {"type": "object"}
+  },
+  "additionalProperties": true
+}

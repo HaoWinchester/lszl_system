@@ -4,6 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
   <title>考题训练｜项目管理综合训练</title>
+
   <link rel="stylesheet" href="styles/main.css"/>
   <link rel="stylesheet" href="styles/question-training.css"/>
   <link rel="stylesheet" href="styles/card-runtime.css"/>
@@ -18,44 +19,51 @@
 <link rel="stylesheet" href="styles/subscription.css"/>
 <link rel="stylesheet" href="styles/user-center.css"/>
 <link rel="stylesheet" href="styles/account-menu.css"/>
+<link rel="stylesheet" href="styles/learning-practice-shell.css"/>
+<link rel="stylesheet" href="styles/question-training-p2220.css"/>
+<link rel="stylesheet" href="styles/question-training-p2221.css"/>
+<script>
+try{
+  document.documentElement.classList.add('qt-canvas-initial-pending');
+  if(new URLSearchParams(location.search).has('questionId')){
+    document.documentElement.classList.add('qt-incoming-question-pending');
+  }
+}catch(e){}
+</script>
 </head>
 <body class="question-training-page">
   <div class="question-training-app">
-    <header class="qt-topbar">
-      <div class="qt-brand">
-        <a class="qt-back-link" href="learning-path.html" title="返回学习路径">←</a>
-        <div>
-          <h1>今日单题深学</h1>
-          <p>一道题 · 一张局部知识网 · 一个破题原则</p>
-        </div>
+    <header class="qt-topbar lp-topbar">
+      <div class="qt-brand lp-brand">
+        <a class="qt-back-link" data-practice-back href="question-workspace.html" title="返回多题归纳">←</a>
+        <div><h1>单题深学</h1><span class="lp-context">五步学习 · 当前题目</span></div>
       </div>
-      <div class="qt-actions">
-        <a class="qt-nav-btn" href="learning-path.html" title="返回引导学习路径">学习路径</a>
-        <div class="qt-session-metric" aria-label="本轮学习状态">
-          <span id="qtRoundLabel">本轮学习</span>
-          <strong id="qtElapsedTime">00:00</strong>
-        </div>
-        <a class="qt-nav-btn qt-workspace-entry" id="qtOpenWorkspaceBtn" href="question-workspace.html" title="打开多题归纳画布">多题归纳</a>
-        <nav class="qt-question-nav qt-question-nav-compact" aria-label="快捷切题">
-          <button type="button" id="qtPrevQuestionBtn" class="qt-question-nav-arrow" title="上一题" aria-label="上一题">‹</button>
-          <span id="qtQuestionPosition" class="qt-question-position-compact">题目 1 / 1</span>
-          <button type="button" id="qtNextQuestionBtn" class="qt-question-nav-arrow" title="下一题" aria-label="下一题">›</button>
-        </nav>
-        <details class="qt-teacher-menu" data-permission-any="accessQuestionBank,accessUserManagement,accessSystemSettings" data-permission-mode="hide">
-          <summary>教师工具</summary>
-          <div class="qt-teacher-menu-panel">
-            <a class="qt-nav-btn" href="question-bank.html" target="_blank" rel="noopener" data-permission="accessQuestionBank" data-permission-mode="hide">题库管理</a>
-            <a class="qt-nav-btn" href="user-management.html" target="_blank" rel="noopener" data-permission="accessUserManagement" data-permission-mode="hide">用户管理</a>
-            <a class="qt-nav-btn" href="system-settings.html" target="_blank" rel="noopener" data-permission="accessSystemSettings" data-permission-mode="hide">系统设置</a>
-          </div>
-        </details>
-        <div class="account-menu-shell">
+      <div class="qt-actions lp-top-actions">
+        <div class="qt-language-control lp-language-control"><div class="qt-language-switch lp-language-switch" role="group" aria-label="题目显示方式"><button type="button" data-question-language="zh" aria-pressed="true">中</button><button type="button" data-question-language="bilingual" aria-pressed="false">中英</button></div></div>
+        
+        
+        
+        
+        <div class="account-menu-shell" id="accountMenuShell" data-account-help-href="multi-question-help.html">
           <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
-            <span class="role-dot"></span><span class="auth-status-label">访客只读</span><span aria-hidden="true" class="account-menu-mobile-label">账号</span>
+            <span class="role-dot"></span><span class="auth-status-label">访客只读</span>
             <svg aria-hidden="true" class="account-menu-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>
           </button>
           <div class="account-menu" hidden id="accountMenu" role="menu" aria-label="账号菜单">
-            <button class="account-menu-item account-menu-session" data-account-menu-action="session" role="menuitem" type="button">
+            <button class="account-menu-item" id="accountMenuUserCenterBtn" role="menuitem" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+              <span data-mobile-label="用户">用户中心</span>
+            </button>
+            <button class="account-menu-item" id="accountMenuHelpBtn" role="menuitem" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.35 2.35 0 1 1 3.5 2.05c-.82.45-1.3.93-1.3 1.95"/><path d="M12 17h.01"/></svg>
+              <span data-mobile-label="帮助">帮助中心</span>
+            </button>
+            <button class="account-menu-item account-menu-upgrade" id="accountMenuUpgradeBtn" role="menuitem" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 9.6 8.1 4 9l4 3.9-.9 5.6L12 16l4.9 2.5-.9-5.6L20 9l-5.6-.9Z"/></svg>
+              <span data-mobile-label="升级">升级会员</span>
+            </button>
+            <div class="account-menu-separator" role="separator"></div>
+            <button class="account-menu-item account-menu-session" id="accountMenuSessionBtn" role="menuitem" type="button">
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></svg>
               <span data-mobile-label="登录">登录</span>
             </button>
@@ -63,44 +71,11 @@
         </div>
         <button class="account-hidden-trigger" hidden id="authLoginBtn" type="button">登录</button>
         <button class="account-hidden-trigger" hidden id="authLogoutBtn" type="button">退出登录</button>
+        <button class="account-hidden-trigger" hidden id="tutorialBtn" type="button">使用说明</button>
       </div>
     </header>
-    <main class="question-page-shell show" id="questionModal" aria-label="考题训练独立页面">
-<div aria-labelledby="questionTitle" aria-modal="true" class="modal question-modal" role="dialog">
-<div class="question-head qt-learning-head">
-  <div class="qt-learning-context">
-    <span class="qt-learning-kicker">PMP · 单题深学</span>
-    <h2 id="questionTitle">学习路径</h2>
-    <span class="sub" id="qtStepSummary">题目 → 知识 → 原则</span>
-  </div>
-  <button class="question-close" id="closeQuestionBtn" title="返回学习路径">← 路径</button>
-</div>
-<nav class="qt-workflow qt-progress-milestone" id="qtWorkflow" aria-label="单题深学进度" style="--qt-progress:0%">
-  <div class="qt-progress-rail" aria-hidden="true">
-    <span class="qt-progress-fill" id="qtWorkflowProgress"></span>
-  </div>
-  <button class="qt-workflow-step active" type="button" data-qt-step="1" aria-current="step" aria-label="第1步：独立作答">
-    <span class="qt-workflow-number">1</span>
-    <span class="qt-workflow-tooltip" role="tooltip"><strong>独立作答</strong><small>先凭自己的判断选择答案</small></span>
-  </button>
-  <button class="qt-workflow-step" type="button" data-qt-step="2" aria-label="第2步：识别关键词">
-    <span class="qt-workflow-number">2</span>
-    <span class="qt-workflow-tooltip" role="tooltip"><strong>识别关键词</strong><small>找出决定答案的题干线索</small></span>
-  </button>
-  <button class="qt-workflow-step" type="button" data-qt-step="3" aria-label="第3步：回忆知识网">
-    <span class="qt-workflow-number">3</span>
-    <span class="qt-workflow-tooltip" role="tooltip"><strong>回忆知识网</strong><small>连接关键词、知识点和判断规则</small></span>
-  </button>
-  <button class="qt-workflow-step" type="button" data-qt-step="4" aria-label="第4步：破译思路">
-    <span class="qt-workflow-number">4</span>
-    <span class="qt-workflow-tooltip" role="tooltip"><strong>破译思路</strong><small>理解证据、原则和选项陷阱</small></span>
-  </button>
-  <button class="qt-workflow-step" type="button" data-qt-step="5" aria-label="第5步：一句话复述">
-    <span class="qt-workflow-number">5</span>
-    <span class="qt-workflow-tooltip" role="tooltip"><strong>一句话复述</strong><small>把本题沉淀成可复用原则</small></span>
-  </button>
-</nav>
-
+    <main class="question-page-shell show qt-fullscreen-shell" id="questionModal" aria-label="单题深学页面">
+<div class="question-modal qt-fullscreen-learning-surface">
 <div class="q-tabs qt-legacy-tabs" aria-label="原破案模式内容切换" role="tablist" hidden>
   <button class="q-tab active" data-q-tab="question" id="qTabQuestion" role="tab" type="button" aria-selected="true">题目</button>
   <button class="q-tab" data-q-tab="graph" id="qTabGraph" role="tab" type="button" aria-selected="false">推理图谱</button>
@@ -108,94 +83,53 @@
 </div>
 
 <div class="qt-canvas-shell" id="qtCanvasShell">
-  <div class="qt-canvas-overlay qt-canvas-overlay-left" aria-label="单题深学工具">
-    <button type="button" id="qtQuestionListBtn" class="qt-question-dock-trigger" aria-haspopup="dialog" aria-controls="qtQuestionDrawer" title="打开已发布试卷题目">
-      <span aria-hidden="true">▤</span><span>试卷题目</span><strong id="qtCanvasQuestionCount">1</strong>
-    </button>
-    <a class="qt-question-dock-trigger qt-multi-canvas-trigger" id="qtMultiCanvasBtn" href="question-workspace.html" title="打开多题归纳画布">
-      <span aria-hidden="true">▱</span><span>多题画布</span>
-    </a>
-    <span class="qt-mobile-readonly-badge" id="qtMobileReadOnlyBadge" hidden>
-      <span aria-hidden="true">◉</span><span>只读作答</span>
-    </span>
-    <div class="qt-mode-switch" role="group" aria-label="学习模式">
-      <button type="button" id="qtGuidedModeBtn" class="active" aria-pressed="true" title="按步骤完成学习路径">
-        <span aria-hidden="true">◎</span><span>引导</span>
-      </button>
-      <button type="button" id="qtExploreModeBtn" aria-pressed="false" title="自由查看当前题目的五张学习卡">
-        <span aria-hidden="true">✣</span><span>探索</span>
-      </button>
+  <div class="qt-canvas-topline" aria-label="单题深学画布工具与学习进度">
+    <div class="qt-canvas-topline-left">
+      <div class="qt-question-library-nav" role="group" aria-label="题目切换与题目库">
+        <button type="button" id="qtPrevQuestionBtn" class="qt-question-nav-arrow qt-question-library-nav-arrow" title="上一题" aria-label="上一题">‹</button>
+        <button type="button" id="qtQuestionListBtn" class="qt-question-dock-trigger qt-question-library-center" aria-haspopup="dialog" aria-controls="qtQuestionDrawer" title="打开题目库"><span aria-hidden="true">▤</span><span>题目库</span><strong id="qtCanvasQuestionCount">1</strong></button>
+        <button type="button" id="qtNextQuestionBtn" class="qt-question-nav-arrow qt-question-library-nav-arrow" title="下一题" aria-label="下一题">›</button>
+        <span id="qtQuestionPosition" class="lp-visually-hidden">题目 1 / 1</span>
+      </div>
     </div>
-    <span class="qt-path-selection-label" id="qtPathSelectionLabel" hidden></span>
-    <details class="qt-canvas-help">
-      <summary title="画布使用说明" aria-label="画布使用说明">?</summary>
-      <div class="qt-canvas-popover">
-        <strong>单题深学画布</strong>
-        <p id="qtCanvasHint">系统会自动聚焦当前学习卡；后续卡片完成上一步后解锁。</p>
-        <p>本画布只包含当前题目的五步学习卡。多道题的整理、分组和归纳请进入“多题画布”。</p>
-      </div>
-    </details>
-    <details class="qt-canvas-font-menu">
-      <summary title="字体大小" aria-label="字体大小">Aa</summary>
-      <div aria-label="考题训练字体缩放" class="question-font-tools qt-floating-font-tools">
-        <span class="font-tool-label">字体</span>
-        <button data-q-font="small" id="qFontSmallBtn" title="缩小字体" type="button">A-</button>
-        <button data-q-font="normal" id="qFontNormalBtn" title="默认字体" type="button">A</button>
-        <button data-q-font="large" id="qFontLargeBtn" title="放大字体" type="button">A+</button>
-        <button data-q-font="xlarge" id="qFontXLargeBtn" title="超大字体" type="button">A++</button>
-      </div>
-    </details>
+    <nav class="qt-workflow qt-progress-milestone qt-progress-inline" id="qtWorkflow" aria-label="单题深学进度" style="--qt-progress:0%">
+      <div class="qt-progress-rail" aria-hidden="true"><span class="qt-progress-fill" id="qtWorkflowProgress"></span></div>
+      <button class="qt-workflow-step active" type="button" data-qt-step="1" aria-current="step" aria-label="第1步：独立作答"><span class="qt-workflow-number">1</span><span class="qt-workflow-tooltip" role="tooltip"><strong>独立作答</strong></span></button>
+      <button class="qt-workflow-step" type="button" data-qt-step="2" aria-label="第2步：识别关键词"><span class="qt-workflow-number">2</span><span class="qt-workflow-tooltip" role="tooltip"><strong>识别关键词</strong></span></button>
+      <button class="qt-workflow-step" type="button" data-qt-step="3" aria-label="第3步：回忆知识网"><span class="qt-workflow-number">3</span><span class="qt-workflow-tooltip" role="tooltip"><strong>回忆知识网</strong></span></button>
+      <button class="qt-workflow-step" type="button" data-qt-step="4" aria-label="第4步：破译思路"><span class="qt-workflow-number">4</span><span class="qt-workflow-tooltip" role="tooltip"><strong>破译思路</strong></span></button>
+      <button class="qt-workflow-step" type="button" data-qt-step="5" aria-label="第5步：一句话复述"><span class="qt-workflow-number">5</span><span class="qt-workflow-tooltip" role="tooltip"><strong>一句话复述</strong></span></button>
+    </nav>
+    <div class="qt-canvas-overlay qt-canvas-overlay-right qt-canvas-topline-right" role="group" aria-label="单题画布工具">
+      <button type="button" id="qtCanvasPointerModeBtn" class="qt-canvas-pointer-mode" title="选择/手型（V）" aria-label="选择/手型（V）"></button>
+      <button type="button" id="qtFontScaleBtn" class="qt-font-scale-cycle" title="切换字体大小" aria-label="切换字体大小">Aa</button>
+      <button type="button" id="qtQuestionResetBtn" class="qt-question-reset-btn" title="重置当前题目" aria-label="重置当前题目"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6v5h-5"></path><path d="M19 11a7 7 0 1 0 1 4"></path></svg></button>
+      <span class="qt-canvas-overlay-divider" aria-hidden="true"></span>
+      <button type="button" id="qtCanvasFocusBtn" title="返回当前步骤">当前卡</button>
+      <button type="button" id="qtCanvasResetBtn" title="恢复五步默认布局">重置</button>
+    </div>
   </div>
 
-  <div class="qt-canvas-overlay qt-canvas-overlay-right" role="group" aria-label="画布视图控制">
-    <button type="button" id="qtCanvasPointerModeBtn" class="qt-canvas-pointer-mode" title="选择/手型（V）" aria-label="选择/手型（V）"></button>
-    <span class="qt-canvas-overlay-divider" aria-hidden="true"></span>
-    <button type="button" id="qtCanvasZoomOutBtn" title="缩小画布" aria-label="缩小画布">−</button>
-    <button type="button" id="qtCanvasZoomLabel" class="qt-canvas-zoom-label" title="恢复100%">100%</button>
-    <button type="button" id="qtCanvasZoomInBtn" title="放大画布" aria-label="放大画布">＋</button>
-    <button type="button" id="qtCanvasFitBtn" title="显示五张学习卡">全览</button>
-    <button type="button" id="qtCanvasFocusBtn" title="返回当前步骤">当前卡</button>
-    <button type="button" id="qtCanvasResetBtn" title="恢复五步默认布局">重置</button>
+  <div class="lp-canvas-zoom-dock" id="qtCanvasZoomDock" role="group" aria-label="单题画布缩放控制">
+    <button class="lp-canvas-zoom-btn" id="qtCanvasZoomOutBtn" type="button" aria-label="缩小画布" title="缩小">−</button>
+    <div class="lp-canvas-zoom-percent-wrap"><div class="lp-canvas-zoom-slider-popover" id="qtCanvasZoomSliderPopover" aria-hidden="true"><input id="qtCanvasZoomSlider" type="range" min="1" max="400" step="1" value="100" aria-label="缩放比例"/></div><button class="lp-canvas-zoom-percent" id="qtCanvasZoomLabel" type="button" aria-label="当前缩放比例，点击调整">100%</button></div>
+    <button class="lp-canvas-zoom-btn" id="qtCanvasZoomInBtn" type="button" aria-label="放大画布" title="放大">＋</button><span class="lp-canvas-zoom-divider" aria-hidden="true"></span>
+    <button class="lp-canvas-zoom-btn lp-canvas-fit-btn" id="qtCanvasFitBtn" type="button" aria-label="全览五张学习卡" title="全览"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 4H4v4"></path><path d="M16 4h4v4"></path><path d="M4 16v4h4"></path><path d="M20 16v4h-4"></path><rect x="8" y="8" width="8" height="8" rx="2"></rect></svg></button>
   </div>
 
   <div class="qt-question-drawer-backdrop" id="qtQuestionDrawerBackdrop" hidden></div>
-  <aside class="qt-question-drawer" id="qtQuestionDrawer" role="dialog" aria-modal="false" aria-labelledby="qtQuestionDrawerTitle" aria-hidden="true">
-    <header class="qt-question-drawer-head">
-      <div>
-        <span class="qt-question-drawer-kicker">已发布试卷题目</span>
-        <h2 id="qtQuestionDrawerTitle">选择试卷题目</h2>
-        <p id="qtQuestionDrawerMeta">点击切题；可将题目加入指定的多题归纳画布。</p>
-      </div>
-      <button type="button" id="qtQuestionDrawerClose" class="qt-question-drawer-close" aria-label="关闭题目列表">×</button>
-    </header>
-    <div class="qt-question-drawer-tools">
-      <label class="qt-published-paper-picker" for="qtPublishedPaperSelect">
-        <span>已发布试卷</span>
-        <select id="qtPublishedPaperSelect" aria-label="选择已发布试卷"></select>
-        <small id="qtPublishedPaperStatus">前端仅显示已发布试卷中的有效题目。</small>
-      </label>
-      <label class="qt-question-search">
-        <span aria-hidden="true">⌕</span>
-        <input id="qtQuestionSearch" type="search" placeholder="搜索当前试卷中的题目、主题或标签" autocomplete="off"/>
-      </label>
-      <div class="qt-question-filters" role="group" aria-label="题目状态筛选">
+  <aside class="qt-question-drawer lp-question-library-compact" id="qtQuestionDrawer" aria-label="题目库" aria-hidden="true">
+    <div class="qt-question-drawer-tools lp-question-library-tools">
+      <div class="lp-question-paper-row"><select id="qtPublishedPaperSelect" class="lp-question-paper-select" aria-label="选择已发布试卷"></select><button id="qtQuestionDrawerClose" class="lp-question-library-close" type="button" aria-label="关闭题目库" title="关闭">×</button></div>
+      <div class="qt-question-search lp-question-search-row"><input id="qtQuestionSearch" type="search" placeholder="搜索题目" autocomplete="off"/><button id="qtQuestionSearchBtn" class="lp-question-text-action" type="button">搜索</button></div>
+      <div class="qt-question-filters lp-question-filter-links" role="group" aria-label="题目状态筛选">
         <button type="button" class="active" data-question-filter="all">全部</button>
         <button type="button" data-question-filter="unfinished">未完成</button>
         <button type="button" data-question-filter="completed">已完成</button>
       </div>
-      <div class="qt-workspace-target-row">
-        <label for="qtTargetWorkspaceSelect">加入多题画布</label>
-        <select id="qtTargetWorkspaceSelect" aria-label="目标多题画布"></select>
-        <button type="button" id="qtCreateWorkspaceBtn" title="新建多题画布">＋</button>
-      </div>
     </div>
-    <div class="qt-question-list" id="qtQuestionList" role="list"></div>
-    <div class="qt-question-dock-tip">单题画布不再接收其他题目。使用题目右侧按钮加入多题画布，再到多题画布进行拖拽、分组和归纳。</div>
-    <footer class="qt-question-drawer-footer">
-      <button type="button" id="qtDrawerPrevQuestion">上一题</button>
-      <span id="qtDrawerProgress">1 / 1</span>
-      <button type="button" id="qtDrawerNextQuestion">下一题</button>
-    </footer>
+    <div class="qt-question-list lp-question-library-list" id="qtQuestionList" role="list"></div>
+    <div hidden aria-hidden="true"><select id="qtTargetWorkspaceSelect"></select><button type="button" id="qtCreateWorkspaceBtn"></button><span id="qtDrawerProgress"></span></div>
   </aside>
 
   <div class="question-body q-case-body qt-canvas-viewport" id="qtCanvasViewport" tabindex="0" aria-label="单题深学画布">
@@ -223,6 +157,11 @@
       </header>
       <div class="qt-canvas-card-body">
         <div id="qtAnswerCardHost" class="learning-card-host" data-learning-card="answer-card" aria-label="独立作答学习卡"></div>
+        <div class="qt-question-switch-loader" id="qtQuestionSwitchLoader" hidden aria-live="polite" aria-label="正在切换题目">
+          <div class="qt-question-switch-loader-core" aria-hidden="true"><span></span><span></span><span></span></div>
+          <strong id="qtQuestionSwitchLoaderText">正在载入题目</strong>
+          <small>正在同步题目与学习状态…</small>
+        </div>
       </div>
     </section>
 
@@ -279,7 +218,6 @@
       <div class="qt-canvas-card-body">
         <div class="q-tab-section-head">
           <div><h3>关键词 → 知识点 → 判断规则</h3><p>点击关键词和知识节点，通过回忆问题走通本题最短知识路径。</p></div>
-          <div class="q-actions"><button class="primary" id="qGraphBtn">生成本题图谱</button><button id="qAddToCanvasBtn">加入总图谱</button><button id="qFlashBtn">生成闪卡</button></div>
         </div>
         <div class="q-graph" id="qGraph"></div>
       </div>
@@ -347,19 +285,18 @@
       </div>
     </section>
   </div>
-  <div class="qt-canvas-minimap" id="qtCanvasMinimap" aria-hidden="true">
-    <div class="qt-canvas-minimap-world" id="qtCanvasMinimapWorld"></div>
-    <div class="qt-canvas-minimap-view" id="qtCanvasMinimapView"></div>
+  <div class="qt-minimap-dock collapsed" id="qtMinimapDock">
+    <div class="qt-canvas-minimap" id="qtCanvasMinimap" aria-hidden="true">
+      <div class="qt-canvas-minimap-world" id="qtCanvasMinimapWorld"></div>
+      <div class="qt-canvas-minimap-view" id="qtCanvasMinimapView" title="拖动此框移动画布视野"></div>
+    </div>
+    <button type="button" class="qt-minimap-toggle" id="qtMinimapToggleBtn" aria-expanded="false" aria-controls="qtCanvasMinimap" title="打开缩略图" aria-label="打开缩略图"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6.5 8 4l8 3 5-2.5v13L16 20l-8-3-5 2.5z"></path><path d="M8 4v13M16 7v13"></path></svg></button>
   </div>
 </div>
 </div>
-<footer class="qt-guided-dock" aria-label="学习步骤操作">
-  <button type="button" class="qt-secondary-action" id="qtBackStepBtn">上一步</button>
-  <div class="qt-guided-dock-copy">
-    <strong id="qtDockTitle">先独立作答</strong>
-    <span id="qtDockHint">请选择答案和信心程度，不必先寻找关键词。</span>
-  </div>
-  <button type="button" class="qt-primary-action" id="qtNextStepBtn">锁定答案，找关键词</button>
+<footer class="qt-guided-dock qt-guided-dock-compact" aria-label="学习步骤操作">
+  <button type="button" class="qt-secondary-action qt-back-icon-action" id="qtBackStepBtn" title="上一步" aria-label="上一步"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"></path></svg></button>
+  <button type="button" class="qt-primary-action qt-continue-action" id="qtNextStepBtn">继续</button>
 </footer>
 </div>
 </main>
@@ -403,10 +340,15 @@
 <script defer src="src/37-subscription-core.js"></script>
 <script defer src="src/32-wechat-login.js"></script>
 <script defer src="src/33-user-center.js"></script>
+<script defer src="src/94-practice-navigation.js"></script>
+<script defer src="src/41-account-menu.js"></script>
 <script defer src="src/39-global-shortcuts.js"></script>
 <script defer src="src/50-question-data.js"></script>
+<script defer src="src/86-activity-schema-v1.js"></script>
+<script defer src="src/86-free-mode-language.js"></script>
+<script defer src="src/86-question-language-ui.js"></script>
 <script defer src="src/72-question-training-page.js"></script>
-<script defer src="src/41-account-menu.js"></script>
+<script defer src="src/59-published-paper-repository.js"></script>
 <script defer src="src/60-question-bank.js"></script>
 <script defer src="src/61-question-repository.js"></script>
 <script defer src="src/62-learning-session-store.js"></script>
@@ -428,5 +370,6 @@
 <script defer src="src/70-question-trainer.js"></script>
 <script defer src="src/80-question-font-scale.js"></script>
 <script defer src="src/73-guided-learning-canvas.js"></script>
+<script defer src="src/99-learning-practice-shell.js"></script>
 </body>
 </html>

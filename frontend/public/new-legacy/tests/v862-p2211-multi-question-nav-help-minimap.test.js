@@ -1,0 +1,15 @@
+'use strict';
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const root=path.resolve(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const qw=read('question-workspace.html'),qt=read('question-training.html'),js=read('src/77-multi-question-workspace.js');
+assert(!qw.includes('href="learning-path.html">学习路径</a>'));
+assert(!qw.includes('href="question-training.html">单题深学</a>'));
+assert(qw.includes('href="index.html?mode=free" title="返回知识图谱"'));
+assert(qt.includes('href="question-workspace.html" title="返回多题归纳"'));
+assert(qw.includes('id="qwBottomRightDock"')&&qw.includes('id="qwMinimapToggleBtn"'));
+assert(qw.includes('id="qwHelpBtn"')&&qw.includes('href="multi-question-help.html"'));
+assert(js.includes('function bindMinimapControls()'));
+assert(js.includes("view.addEventListener('pointermove'"));
+assert(js.includes("setViewport({x:-worldLeft*state.zoom,y:-worldTop*state.zoom"));
+assert(fs.existsSync(path.join(root,'multi-question-help.html')));
+console.log('v862-p2211-multi-question-nav-help-minimap-static-ok');

@@ -21,6 +21,22 @@
         session:'/api/auth/session'
       }),
       ...(existing.auth||{})
+    }),
+    engagement:Object.freeze({
+      mode:'local-demo',
+      baseUrl:'',
+      credentials:'include',
+      endpoints:Object.freeze({
+        submitFeedback:'/api/feedback',
+        myFeedback:'/api/feedback/mine',
+        adminFeedback:'/api/admin/feedback',
+        messages:'/api/messages',
+        adminMessages:'/api/admin/messages',
+        markMessageRead:'/api/messages/{id}/read',
+        markAllRead:'/api/messages/read-all',
+        markFeedbackRead:'/api/feedback/{id}/read'
+      }),
+      ...(existing.engagement||{})
     })
   });
 })(window);

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
+<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>知识树工作区｜科目与知识树</title>
+  <script>
+    (function(){
+      const params=new URLSearchParams(location.search),embedded=params.get('embed')==='knowledge';
+      if(embedded){document.documentElement.classList.add('kg-embedded');document.documentElement.dataset.embedMode='knowledge';return}
+      if(!params.has('standalone')&&/^(https?|file):$/.test(location.protocol)){
+        const target=new URL('admin-subjects.html',location.href);target.searchParams.set('tab','current');
+        ['subjectId','taxonomyId'].forEach(key=>{const value=params.get(key);if(value)target.searchParams.set(key,value)});
+        location.replace(target.href);
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="styles/teacher-workbench.css?v=v9.0-p4.1.9" />
+  <link rel="stylesheet" href="styles/content-center.css?v=v9.0-p4.1.9" />
+  <link rel="stylesheet" href="styles/workspace-panels.css?v=v9.0-p4.1.9" />
+  <link rel="stylesheet" href="styles/content-organization.css?v=v9.0-p4.1.9" />
+  <link rel="stylesheet" href="styles/workspace-placement.css?v=v9.0-p4.1.9" />
+</head>
+<body>
+  <div class="cc-app">
+    <header class="tw-topbar">
+      <a class="tw-brand" href="teacher-workbench.html"><span class="tw-brand-mark">KG</span><span class="tw-brand-copy"><strong>教师内容工作台</strong><small>V9.0-P2.1 · 从录入到发布</small></span></a>
+      <nav class="tw-tabs" aria-label="工作模块"><a href="teacher-workbench.html">工作台</a><a href="question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">题目管理</a><a class="active" href="admin-subjects.html">科目与知识树</a><a href="course-admin.html">配置中心</a></nav>
+      <div class="tw-user"><span class="tw-user-badge" id="ccAccount"></span><a href="index.html">返回学员端</a></div>
+    </header>
+    <section class="tw-workflow" aria-label="内容工作流程"><span class="tw-step done"><b>1</b>录入活动</span><i class="tw-arrow"></i><span class="tw-step active"><b>2</b>检查入库</span><i class="tw-arrow"></i><span class="tw-step"><b>3</b>配置内容</span><i class="tw-arrow"></i><span class="tw-step"><b>4</b>预览发布</span></section>
+    <section class="tw-guide"><div class="tw-guide-copy"><strong>当前步骤：检查内容并维护知识归属</strong><span>在这里管理活动、批量归类和维护知识树。题目确认后，再前往配置中心安排课程。</span></div><div class="tw-guide-actions"><a href="question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">返回题目管理</a><a class="primary" href="course-admin.html">前往配置中心 →</a></div></section>
+
+    <section class="tw-commandbar">
+      <div class="tw-command-title"><p>CONTENT CENTER</p><h1>内容中心</h1><span>统一活动库、可视化知识树、作者追踪与课程引用关系</span></div>
+      <div class="tw-command-actions cc-actions"><a href="#organization">标签与题集</a><a href="paper-management.html">组卷与测评</a><a href="question-bank.html" target="_blank" rel="noopener">旧题库高级编辑（兼容）</a><button type="button" id="ccImportBtn">导入活动包</button><input id="ccImportFile" type="file" accept=".json,application/json" hidden /><button type="button" id="ccExportBtn">导出当前结果</button></div>
+    </section>
+
+    <section class="cc-subjects" aria-label="科目切换">
+      <div><strong>当前科目</strong><span>切换科目后自动加载对应知识树和活动。</span></div>
+      <div id="ccSubjectChips" class="cc-subject-chips"></div>
+    </section>
+
+    <main class="cc-layout" data-workspace-group="content-center" data-workspace-responsive="stack-1280">
+      <section class="cc-tree-panel" id="knowledge" data-workspace-panel="knowledge-tree" data-workspace-title="知识树工作区" data-workspace-controls-target=".cc-panel-title">
+        <div class="cc-panel-title">
+          <div><h2>知识树工作区</h2><p id="ccTaxonomyMeta"></p></div>
+          <div class="cc-panel-actions"><a class="cc-panel-link" href="admin-subjects.html">科目与知识树</a><button type="button" id="ccUndoBtn" title="撤销最近一次知识树操作">↶ 撤销</button><button type="button" id="ccRedoBtn" title="重做">↷ 重做</button><button type="button" id="ccResetTaxonomyBtn" title="恢复内置知识树示例">重置</button></div>
+        </div>
+        <div class="cc-knowledge-toolbar">
+          <div class="cc-view-tabs" role="tablist" aria-label="知识树视图"><button type="button" class="active" data-tree-view="graph">图谱视图</button><button type="button" data-tree-view="list">目录视图</button></div>
+          <label class="cc-version-picker"><span>知识树版本</span><select id="ccTaxonomyVersion"></select></label>
+          <label class="cc-search"><span>搜索</span><input id="ccKnowledgeSearch" placeholder="名称、编号、英文或别名" /></label>
+          <label class="cc-question-count-toggle"><input id="ccShowQuestionCounts" type="checkbox" checked /><span>显示题量</span></label>
+          <label class="cc-question-coverage"><span>题量覆盖</span><select id="ccQuestionCoverageFilter"><option value="all">全部知识点</option><option value="zero">零题量</option><option value="low">题量不足</option></select></label>
+          <label class="cc-question-threshold"><span>不足阈值</span><input id="ccQuestionLowThreshold" type="number" min="1" max="999" value="5" /></label>
+          <div class="cc-zoom" id="ccZoomControls"><button type="button" data-zoom="out">−</button><span id="ccZoomLabel">100%</span><button type="button" data-zoom="in">＋</button><button type="button" data-zoom="reset">适应</button></div>
+          <button type="button" class="primary" id="ccAddRootBtn">＋ 一级知识点</button>
+        </div>
+        <div class="cc-taxonomy-mode" id="ccTaxonomyMode"></div>
+        <div class="cc-tree-summary" id="ccTreeSummary"></div>
+        <div class="cc-tree-workspace">
+          <div class="cc-tree-main">
+            <div class="cc-root-drop" id="ccRootDrop" data-drop-root>将节点拖到这里，可调整为一级知识点</div>
+            <div class="cc-graph-viewport" id="ccKnowledgeGraphViewport"><div class="cc-graph-scene" id="ccKnowledgeGraph"></div></div>
+            <div class="cc-tree" id="ccKnowledgeTree" hidden></div>
+          </div>
+          <aside class="cc-inspector" id="ccKnowledgeInspector">
+            <div class="cc-inspector-empty"><strong>选择一个知识点</strong><span>可以在右侧直接修改名称、编号、别名和状态。</span></div>
+          </aside>
+        </div>
+
+        <aside class="cc-question-count-drawer" id="ccQuestionCountDrawer" hidden aria-label="知识点题目明细">
+          <header><div><p>QUESTION COVERAGE</p><h3 id="ccQuestionDrawerTitle">知识点题目</h3><span id="ccQuestionDrawerSummary">—</span></div><button type="button" id="ccQuestionDrawerClose" aria-label="关闭">×</button></header>
+          <div class="cc-question-drawer-tabs"><button type="button" class="active" data-question-scope="direct">本节点题目</button><button type="button" data-question-scope="branch">含下级题目</button></div>
+          <label class="cc-question-drawer-search"><span>搜索</span><input id="ccQuestionDrawerSearch" placeholder="题干、题号或题库名称" /></label>
+          <div id="ccQuestionDrawerList" class="cc-question-drawer-list"></div>
+        </aside>
+      </section>
+
+      <section class="cc-library-panel" data-workspace-panel="activity-library" data-workspace-title="统一活动库" data-workspace-controls-target=".cc-library-head">
+        <div class="cc-library-head">
+          <div><p class="cc-kicker">ACTIVITY LIBRARY</p><h2>统一活动库</h2><span>内容中心负责检查和管理；配置中心只引用活动 ID，不复制活动正文。</span></div>
+          <div class="cc-head-stats" id="ccHeadStats"></div>
+        </div>
+        <div class="cc-toolbar">
+          <label class="cc-toolbar-search"><span>搜索</span><input id="ccActivitySearch" placeholder="活动 ID、题干、教师或知识点" /></label>
+          <label><span>活动范围</span><select id="ccAuthorScope"><option value="">全部活动</option><option value="me">我的活动</option></select></label>
+          <label><span>归类状态</span><select id="ccMappingFilter"><option value="">全部</option><option value="unmapped">待归类</option><option value="confirmed">已归类</option><option value="suggested">待确认</option></select></label>
+          <label><span>活动状态</span><select id="ccLifecycleFilter"><option value="">全部</option><option value="draft">草稿</option><option value="submitted">已提交</option><option value="approved">已入库</option><option value="archived">已归档</option></select></label>
+          <label><span>难度</span><select id="ccDifficultyFilter"><option value="">全部</option><option value="unset">未设置</option><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select></label>
+          <label><span>标签</span><select id="ccTagFilter"><option value="">全部标签</option></select></label>
+          <label><span>题集</span><select id="ccCollectionFilter"><option value="">全部题集</option></select></label>
+          <label class="cc-check"><input id="ccFavoriteOnly" type="checkbox" /><span>只看收藏</span></label>
+          <label class="cc-check"><input id="ccIncludeChildren" type="checkbox" checked /><span>包含下级知识点</span></label>
+          <button type="button" class="primary cc-toolbar-action" id="ccBatchMapBtn">批量设置知识点</button>
+        </div>
+        <div class="cc-selection-bar" id="ccSelectionBar" hidden><strong id="ccSelectionCount">已选 0 项</strong><button type="button" id="ccBatchMetaBtn">设置属性</button><button type="button" id="ccAddCollectionBtn">加入题集</button><button type="button" id="ccCreatePaperBtn">创建试卷</button><button type="button" id="ccBatchFavoriteBtn">收藏 / 取消收藏</button><button type="button" id="ccClearSelectionBtn">清空选择</button></div>
+        <div class="cc-table-wrap"><table class="cc-table"><thead><tr><th><input id="ccSelectAll" type="checkbox" aria-label="全选" /></th><th>活动</th><th>题型</th><th>知识点</th><th>创建教师</th><th>属性</th><th>状态</th><th>引用</th><th>操作</th></tr></thead><tbody id="ccActivityRows"></tbody></table><div class="cc-empty" id="ccEmpty" hidden>没有符合当前条件的活动。</div></div>
+      </section>
+
+      <section class="cc-organize-panel" id="organization" data-workspace-panel="activity-organization" data-workspace-span="full" data-workspace-title="标签与题集" data-workspace-controls-target=".cc-organize-head">
+        <div class="cc-organize-head"><div><p class="cc-kicker">ORGANIZE ACTIVITIES</p><h2>标签、题集与收藏</h2><span>活动只保存一份；标签、题集、试卷和课程都引用稳定 activityId。</span></div><div id="ccOrganizationSummary" class="cc-head-stats"></div></div>
+        <div class="cc-organize-grid">
+          <section><header><div><h3>标签</h3><p>用于高频、易错、版本和教学用途等多维分类。</p></div><button type="button" id="ccNewTagBtn">＋ 新标签</button></header><div id="ccTagList" class="cc-org-list"></div></section>
+          <section><header><div><h3>题集与收藏夹</h3><p>人工整理活动，不复制题目正文。</p></div><button type="button" id="ccNewCollectionBtn">＋ 新题集</button></header><div id="ccCollectionList" class="cc-org-list"></div></section>
+          <aside class="cc-org-help"><strong>推荐操作</strong><ol><li>先按知识点、题型和难度筛选活动。</li><li>批量添加标签或加入题集。</li><li>需要测评时，选中活动后“创建试卷”。</li></ol><a href="paper-management.html">前往配置中心组卷 →</a></aside>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog class="cc-dialog" id="ccMapDialog">
+    <form method="dialog" id="ccMapForm">
+      <header><div><p>KNOWLEDGE MAPPING</p><h2>设置知识点归属</h2></div><button value="cancel" aria-label="关闭">×</button></header>
+      <p id="ccMapTargetInfo"></p>
+      <div class="detail-grid"><label><span>科目</span><select id="ccMapSubject"></select></label><label><span>知识树</span><select id="ccMapTaxonomy"></select></label></div>
+      <label><span>搜索主知识点</span><input id="ccMapKnowledgeSearch" placeholder="输入名称、编号、英文或别名" /></label>
+      <input id="ccMapPrimary" type="hidden" />
+      <div class="cc-map-selected" id="ccMapSelected">尚未选择主知识点</div>
+      <div class="cc-map-results" id="ccMapKnowledgeResults"></div>
+      <label><span>相关知识点 ID</span><input id="ccMapRelated" placeholder="可选，多个 ID 使用逗号分隔" /><small>普通题目只需设置一个主知识点；相关知识点属于高级选项。</small></label>
+      <footer><button value="cancel">取消</button><button type="button" class="primary" id="ccConfirmMapBtn">确认归类</button></footer>
+    </form>
+  </dialog>
+
+  <dialog class="cc-dialog" id="ccMetaDialog"><form method="dialog"><header><div><p>ACTIVITY PROPERTIES</p><h2>批量设置活动属性</h2></div><button value="cancel">×</button></header><p id="ccMetaTargetInfo"></p><div class="detail-grid"><label><span>难度</span><select id="ccMetaDifficulty"><option value="">保持不变</option><option value="unset">未设置</option><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select></label><label><span>预计答题时间（秒）</span><input id="ccMetaTime" type="number" min="0" placeholder="保持不变" /></label><label><span>复核状态</span><select id="ccMetaReview"><option value="">保持不变</option><option value="unreviewed">待复核</option><option value="reviewed">已复核</option></select></label></div><fieldset class="cc-choice-field"><legend>使用场景</legend><label><input type="checkbox" value="practice" data-meta-purpose />练习</label><label><input type="checkbox" value="exam" data-meta-purpose />考试</label><label><input type="checkbox" value="learning_task" data-meta-purpose />学习任务</label></fieldset><fieldset class="cc-choice-field"><legend>标签操作</legend><label><span>方式</span><select id="ccMetaTagMode"><option value="add">添加所选标签</option><option value="remove">移除所选标签</option><option value="replace">替换为所选标签</option></select></label><div id="ccMetaTags" class="cc-choice-grid"></div></fieldset><footer><button value="cancel">取消</button><button type="button" class="primary" id="ccConfirmMetaBtn">保存属性</button></footer></form></dialog>
+
+  <dialog class="cc-dialog" id="ccCollectionDialog"><form method="dialog"><header><div><p>COLLECTION</p><h2>加入题集</h2></div><button value="cancel">×</button></header><p id="ccCollectionTargetInfo"></p><label><span>现有题集</span><select id="ccCollectionSelect"></select></label><div class="cc-inline-create"><span>或创建新题集</span><input id="ccCollectionNewTitle" placeholder="例如：需求管理重点题" /><input id="ccCollectionNewDescription" placeholder="题集说明（选填）" /></div><footer><button value="cancel">取消</button><button type="button" class="primary" id="ccConfirmCollectionBtn">确认加入</button></footer></form></dialog>
+
+  <dialog class="cc-dialog" id="ccTagDialog"><form method="dialog"><header><div><p>TAG</p><h2 id="ccTagDialogTitle">新建标签</h2></div><button value="cancel">×</button></header><input id="ccTagId" type="hidden" /><label><span>标签名称</span><input id="ccTagName" placeholder="例如：易错题" /></label><label><span>说明</span><input id="ccTagDescription" placeholder="标签适用范围" /></label><footer><button value="cancel">取消</button><button type="button" class="primary" id="ccSaveTagBtn">保存标签</button></footer></form></dialog>
+
+  <dialog class="cc-dialog detail" id="ccDetailDialog"><form method="dialog"><header><div><p>ACTIVITY DETAIL</p><h2 id="ccDetailTitle">活动详情</h2></div><button value="cancel" aria-label="关闭">×</button></header><div id="ccDetailBody"></div><footer><button value="cancel">关闭</button></footer></form></dialog>
+  <div class="cc-toast" id="ccToast" role="status" aria-live="polite"></div>
+  <script src="src/28-app-storage.js"></script><script src="src/29-auth-core.js"></script><script src="src/86-activity-schema-v1.js"></script><script src="src/87-guided-learning-data.js"></script><script src="src/91-learning-content-core.js"></script><script src="src/93-content-organization-core.js"></script><script src="src/admin/00-admin-core.js"></script><script src="src/admin/10-content-repository.js"></script><script src="src/admin/11-local-content-repository.js"></script><script src="src/admin/20-admin-permission-service.js"></script><script src="src/admin/21-admin-audit-service.js"></script><script src="src/admin/22-admin-transaction-service.js"></script><script src="src/admin/30-reference-index-service.js"></script><script src="src/admin/31-subject-service.js"></script><script src="src/admin/32-taxonomy-service.js"></script><script src="src/admin/33-activity-service.js"></script><script src="src/admin/34-course-service.js"></script><script src="src/admin/35-release-service.js"></script><script src="src/admin/40-admin-service-registry.js"></script><script src="src/admin/41-learning-content-compat.js"></script><script src="src/91-knowledge-tree-index.js"></script><script src="src/97-knowledge-question-stats.js"></script><script src="src/91-content-center-app.js"></script><script src="src/93-content-organization-app.js"></script><script src="src/92-workspace-panel-manager.js"></script><script src="src/99-embedded-workspace.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "release": "v9.0-p3.3.3.2",
+  "baseline": "v9.0-p3.3.3.1",
+  "scope": "batch paste separator stability, viewport-safe defaults and multi-question preview navigation",
+  "constraints": {
+    "batchSeparatorStable": true,
+    "multiQuestionPreviewNavigation": true,
+    "batchDefaultPanelViewportSafe": true,
+    "batchDefaultClassificationPreserved": true,
+    "perQuestionClassificationOverridePreserved": true,
+    "singlePrimaryKnowledgePoint": true,
+    "semanticKnowledgeGuessing": false,
+    "questionTypeLayoutChanged": false,
+    "paperQuestionIdsUnaffected": true,
+    "maxTaxonomyDepth": 9,
+    "p34QuestionBulkMoveImplemented": false,
+    "lightweightTagRenameIncluded": false
+  },
+  "changedFileSha256": {
+    "CHANGELOG.md": "b5a75b6317c80bc81e659ce163a4b32e6d0fa6e79fd84d31ae9489aa05719e8b",
+    "README.md": "36d7e3485bfe7840a2845ae70a951cb518ad843760dd61cd5b37498eafa05d3e",
+    "VERSION": "f4c73578bd24dd458ec87cd47c45579d9b475b76817697bfd95695e3e1690847",
+    "src/admin/00-admin-core.js": "640a929b2e5c9d42f39cbba74d2000599ad0e1b59aeb51d45a80a22efd942d83",
+    "src/97-teacher-question-workflow.js": "a7bb2fe44aafd3126480ff08292e874e68555542189c7085f9ce519af3fcb82b",
+    "src/98-teacher-workflow-p2-services.js": "12cfe63f0036132062b735f4a599ac862cfd7997c59563fc652cd5a38fac8ef5",
+    "styles/teacher-question-workflow.css": "c67642c25ccd084f8bfc85fbac81fd083c563b198bd2b44f1ebaa35c23194c62",
+    "tests/v90-p3331-batch-default-classification.test.js": "e0d0a0091427ea3f719b2c0e655b72229ef4c9e703b464966e28f4788a7b84e1",
+    "tests/v90-p3331-data-integrity.test.js": "76060891823a067068e913b4ba4d8883de04d555501fc7f4f86eb59e58bd73fa",
+    "V9.0_P3.3.3.2_BATCH_PASTE_NAVIGATION_FIX_REPORT.md": "edbf8bbc6290e847deaec6f128a8745929c0aecb5cfd471c1589d58a1b1fb1e7",
+    "V9.0_P3.3.3.2_QUICK_START.md": "6957cf63da96237aa09e0125c5ef82767fe3c5749636c396555c55d2807fd50f",
+    "tests/v90-p3332-batch-paste-navigation.test.js": "528e54703e17fa907b27c7b7332bff355b81d0067e9f55f76717fe0e89ce1d91",
+    "tests/v90-p3332-batch-paste-navigation-browser.py": "31aebd2152de834ee9bbd14f81de3b99211ed5c06eca3156ca036c259dc7d9e1",
+    "tests/v90-p3332-data-integrity.test.js": "9c742db7468b1a23d510f5cf5d01b299ea73680210769832daed3e94d519bd7e"
+  }
+}

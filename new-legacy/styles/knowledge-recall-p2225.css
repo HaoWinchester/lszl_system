@@ -1,0 +1,275 @@
+/* v8.6.2 P2.2.25 — deep recall pressed/selected states, hover scene palette and complete theme surfaces */
+
+/* Complete the palettes that previously inherited several platform-white surfaces. */
+.knowledge-recall-page .kr-app{
+  --kr-surface-glass:color-mix(in srgb,var(--kr-control-bg) 93%,transparent);
+  --kr-surface-solid:var(--kr-control-bg);
+  --kr-surface-muted:var(--kr-choice-bg);
+  --kr-surface-hover:var(--kr-control-hover);
+  --kr-surface-border:var(--kr-border);
+  --kr-strong-ink:var(--kr-card-ink);
+  --kr-selected-ring:color-mix(in srgb,var(--kr-primary) 76%,transparent);
+  --kr-selected-glow:color-mix(in srgb,var(--kr-primary) 24%,transparent);
+}
+.knowledge-recall-page .kr-app[data-theme="aurora"],
+.knowledge-recall-page .kr-viewport[data-theme="aurora"]{
+  --kr-ink:#123524;--kr-muted:#4b6b5b;--kr-gold:#84cc16;--kr-choice-bg:rgba(236,253,245,.88);
+  --kr-highlight-from:rgba(52,211,153,.28);--kr-highlight-to:rgba(167,243,208,.86);--kr-highlight-ring:rgba(16,185,129,.24);--kr-highlight-hover:rgba(16,185,129,.16);--kr-highlight-text:#064e3b;
+  --kr-node-base-a:#d1fae5;--kr-node-base-b:#34d399;--kr-node-base-c:#059669;--kr-node-base-d:#065f46;--kr-node-base-shadow:#047857;
+  --kr-node-root-a:#bef264;--kr-node-root-b:#65a30d;--kr-node-root-c:#4d7c0f;--kr-node-root-d:#365314;--kr-node-root-shadow:#4d7c0f;
+  --kr-node-alt-a:#99f6e4;--kr-node-alt-b:#14b8a6;--kr-node-alt-c:#0f766e;--kr-node-alt-d:#134e4a;--kr-node-alt-shadow:#0f766e;
+  --kr-node-cool-a:#bae6fd;--kr-node-cool-b:#38bdf8;--kr-node-cool-c:#0284c7;--kr-node-cool-d:#075985;--kr-node-cool-shadow:#0369a1;
+}
+.knowledge-recall-page .kr-app[data-theme="neon"],
+.knowledge-recall-page .kr-viewport[data-theme="neon"]{
+  --kr-gold:#22d3ee;--kr-highlight-from:rgba(34,211,238,.24);--kr-highlight-to:rgba(167,139,250,.55);--kr-highlight-ring:rgba(34,211,238,.32);--kr-highlight-hover:rgba(34,211,238,.15);--kr-highlight-text:#ecfeff;
+  --kr-node-base-a:#cffafe;--kr-node-base-b:#22d3ee;--kr-node-base-c:#0891b2;--kr-node-base-d:#164e63;--kr-node-base-shadow:#0e7490;
+  --kr-node-cool-a:#f5d0fe;--kr-node-cool-b:#d946ef;--kr-node-cool-c:#a21caf;--kr-node-cool-d:#701a75;--kr-node-cool-shadow:#86198f;
+}
+.knowledge-recall-page .kr-app[data-theme="sakura"],
+.knowledge-recall-page .kr-viewport[data-theme="sakura"]{
+  --kr-ink:#4a1d2d;--kr-muted:#8b5b6d;--kr-gold:#fb7185;--kr-choice-bg:rgba(255,247,249,.88);
+  --kr-highlight-from:rgba(244,114,182,.28);--kr-highlight-to:rgba(251,207,232,.88);--kr-highlight-ring:rgba(236,72,153,.24);--kr-highlight-hover:rgba(236,72,153,.15);--kr-highlight-text:#831843;
+  --kr-node-base-a:#fce7f3;--kr-node-base-b:#f472b6;--kr-node-base-c:#db2777;--kr-node-base-d:#9d174d;--kr-node-base-shadow:#be185d;
+  --kr-node-alt-a:#ddd6fe;--kr-node-alt-b:#a78bfa;--kr-node-alt-c:#7c3aed;--kr-node-alt-d:#4c1d95;--kr-node-alt-shadow:#6d28d9;
+  --kr-node-cool-a:#bae6fd;--kr-node-cool-b:#38bdf8;--kr-node-cool-c:#0284c7;--kr-node-cool-d:#075985;--kr-node-cool-shadow:#0369a1;
+}
+.knowledge-recall-page .kr-app[data-theme="ocean"],
+.knowledge-recall-page .kr-viewport[data-theme="ocean"]{
+  --kr-ink:#0f2942;--kr-muted:#527087;--kr-gold:#38bdf8;--kr-choice-bg:rgba(240,249,255,.88);
+  --kr-highlight-from:rgba(56,189,248,.28);--kr-highlight-to:rgba(186,230,253,.90);--kr-highlight-ring:rgba(14,165,233,.24);--kr-highlight-hover:rgba(14,165,233,.15);--kr-highlight-text:#0c4a6e;
+  --kr-node-base-a:#e0f2fe;--kr-node-base-b:#38bdf8;--kr-node-base-c:#0284c7;--kr-node-base-d:#075985;--kr-node-base-shadow:#0369a1;
+  --kr-node-alt-a:#ccfbf1;--kr-node-alt-b:#2dd4bf;--kr-node-alt-c:#0f766e;--kr-node-alt-d:#134e4a;--kr-node-alt-shadow:#0f766e;
+  --kr-node-cool-a:#dbeafe;--kr-node-cool-b:#60a5fa;--kr-node-cool-c:#2563eb;--kr-node-cool-d:#1e3a8a;--kr-node-cool-shadow:#1d4ed8;
+}
+.knowledge-recall-page .kr-app[data-theme="latte"],
+.knowledge-recall-page .kr-viewport[data-theme="latte"]{
+  --kr-ink:#3d2a1a;--kr-muted:#80654d;--kr-gold:#d97706;--kr-choice-bg:rgba(255,247,237,.88);
+  --kr-highlight-from:rgba(245,158,11,.27);--kr-highlight-to:rgba(254,215,170,.88);--kr-highlight-ring:rgba(180,83,9,.22);--kr-highlight-hover:rgba(180,83,9,.14);--kr-highlight-text:#5f3517;
+  --kr-node-base-a:#ffedd5;--kr-node-base-b:#fb923c;--kr-node-base-c:#c2410c;--kr-node-base-d:#7c2d12;--kr-node-base-shadow:#9a3412;
+  --kr-node-root-a:#fde68a;--kr-node-root-b:#f59e0b;--kr-node-root-c:#b45309;--kr-node-root-d:#78350f;--kr-node-root-shadow:#92400e;
+  --kr-node-alt-a:#d9f99d;--kr-node-alt-b:#84cc16;--kr-node-alt-c:#4d7c0f;--kr-node-alt-d:#365314;--kr-node-alt-shadow:#4d7c0f;
+  --kr-node-cool-a:#ddd6fe;--kr-node-cool-b:#a78bfa;--kr-node-cool-c:#7c3aed;--kr-node-cool-d:#4c1d95;--kr-node-cool-shadow:#6d28d9;
+}
+
+/* Every visible shell/canvas surface now follows the active scene variables. */
+.knowledge-recall-page .kr-app,
+.knowledge-recall-page .kr-viewport{color:var(--kr-ink)}
+.knowledge-recall-page .kr-topbar{border-color:var(--kr-border);background:var(--kr-topbar-bg)}
+.knowledge-recall-page .kr-topbar .account-menu-trigger{
+  border-color:var(--kr-border);background:var(--kr-control-bg);color:var(--kr-control-ink);
+}
+.knowledge-recall-page .kr-tools .account-menu-trigger:hover,
+.knowledge-recall-page .kr-tools .account-menu-trigger:focus-visible,
+.knowledge-recall-page .account-menu-shell.is-open .account-menu-trigger{background:var(--kr-control-hover)!important;color:var(--kr-control-ink)!important}
+
+.knowledge-recall-page .account-menu{
+  border-color:var(--kr-border);background:var(--kr-surface-glass);color:var(--kr-control-ink);
+  box-shadow:0 18px 50px color-mix(in srgb,var(--kr-ink) 22%,transparent),0 2px 8px color-mix(in srgb,var(--kr-ink) 8%,transparent);
+}
+.knowledge-recall-page .account-menu-item{color:var(--kr-control-ink)}
+.knowledge-recall-page .account-menu-item:hover,
+.knowledge-recall-page .account-menu-item:focus-visible{background:var(--kr-control-hover);color:var(--kr-control-ink)}
+.knowledge-recall-page .account-menu-separator{background:var(--kr-border)}
+.knowledge-recall-page .account-menu-session.is-logout:hover,
+.knowledge-recall-page .account-menu-session.is-logout:focus-visible{background:color-mix(in srgb,#dc2626 12%,var(--kr-control-bg));color:#ef4444}
+.knowledge-recall-page .kr-question-card{border-color:var(--kr-border);background:linear-gradient(145deg,var(--kr-card),var(--kr-card-2))}
+.knowledge-recall-page .kr-option{border-color:var(--kr-border);background:var(--kr-choice-bg);color:var(--kr-card-ink)}
+.knowledge-recall-page .kr-node-label{color:var(--kr-card-ink)}
+.knowledge-recall-page .kr-question-library-nav,
+.knowledge-recall-page .kr-reset-question-btn,
+.knowledge-recall-page #krCanvasZoomDock,
+.knowledge-recall-page .kr-session-stats-canvas{
+  border-color:var(--kr-border);background:var(--kr-surface-glass);color:var(--kr-control-ink);
+}
+.knowledge-recall-page .kr-question-nav-arrow,
+.knowledge-recall-page .kr-question-library-trigger,
+.knowledge-recall-page .kr-reset-question-btn,
+.knowledge-recall-page #krCanvasZoomDock .lp-canvas-zoom-btn{color:var(--kr-control-ink)}
+.knowledge-recall-page .kr-question-nav-arrow:hover,
+.knowledge-recall-page .kr-question-nav-arrow:focus-visible,
+.knowledge-recall-page .kr-question-library-trigger:hover,
+.knowledge-recall-page .kr-question-library-trigger:focus-visible,
+.knowledge-recall-page .kr-reset-question-btn:hover,
+.knowledge-recall-page .kr-reset-question-btn:focus-visible,
+.knowledge-recall-page #krCanvasZoomDock .lp-canvas-zoom-btn:hover,
+.knowledge-recall-page #krCanvasZoomDock .lp-canvas-zoom-btn:focus-visible{
+  border-color:var(--kr-border);background:var(--kr-control-hover);color:var(--kr-primary-dark);
+}
+.knowledge-recall-page #krCanvasZoomDock .lp-canvas-zoom-btn{background:var(--kr-control-bg)}
+.knowledge-recall-page #krCanvasZoomDock .lp-canvas-zoom-percent{background:var(--kr-choice-bg);color:var(--kr-control-ink)}
+.knowledge-recall-page #krCanvasZoomDock .lp-canvas-zoom-percent:hover,
+.knowledge-recall-page #krCanvasZoomDock .lp-canvas-zoom-percent:focus-visible{background:var(--kr-control-hover);color:var(--kr-primary-dark)}
+.knowledge-recall-page .kr-session-stats-canvas span{border-color:var(--kr-border);background:var(--kr-choice-bg);color:var(--kr-muted)}
+.knowledge-recall-page .kr-session-stats-canvas strong{color:var(--kr-primary-dark)}
+.knowledge-recall-page #krQuestionDrawer.lp-question-library-compact{
+  border-color:var(--kr-border)!important;background:var(--kr-card)!important;color:var(--kr-card-ink)!important;
+}
+.knowledge-recall-page .kr-drawer-tools{border-color:var(--kr-border);background:var(--kr-card)}
+.knowledge-recall-page .kr-drawer-search,
+.knowledge-recall-page .kr-bank-picker,
+.knowledge-recall-page .lp-question-paper-row,
+.knowledge-recall-page .lp-question-paper-select,
+.knowledge-recall-page .lp-question-library-close,
+.knowledge-recall-page .lp-question-text-action,
+.knowledge-recall-page .kr-question-filters button,
+.knowledge-recall-page .kr-question-item{
+  border-color:var(--kr-border)!important;background:var(--kr-control-bg)!important;color:var(--kr-card-ink)!important;
+}
+.knowledge-recall-page .kr-drawer-search input,
+.knowledge-recall-page .kr-bank-picker select,
+.knowledge-recall-page .lp-question-paper-select{color:var(--kr-card-ink)!important;background:transparent!important}
+.knowledge-recall-page .kr-question-item:hover{border-color:var(--kr-primary)!important;background:var(--kr-control-hover)!important}
+.knowledge-recall-page .kr-question-item.active{border-color:var(--kr-primary)!important;background:color-mix(in srgb,var(--kr-primary) 12%,var(--kr-control-bg))!important}
+.knowledge-recall-page .kr-question-index{background:var(--kr-choice-bg);color:var(--kr-muted)}
+.knowledge-recall-page .kr-question-copy strong{color:var(--kr-card-ink)}
+.knowledge-recall-page .kr-question-copy small{color:var(--kr-muted)}
+.knowledge-recall-page .kr-drawer-backdrop{background:color-mix(in srgb,var(--kr-ink) 30%,transparent)}
+
+/* Scene is an icon-only hover/focus palette; one click applies a scene immediately. */
+.knowledge-recall-page .kr-scene-menu{position:relative}
+.knowledge-recall-page .kr-scene-menu>summary{
+  width:36px;height:36px;min-width:36px;padding:0;border-color:var(--kr-border);border-radius:11px;
+  background:var(--kr-control-bg);color:var(--kr-control-ink);box-shadow:none;
+}
+.knowledge-recall-page .kr-scene-menu>summary svg{
+  width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;
+}
+.knowledge-recall-page .kr-scene-menu>summary:hover,
+.knowledge-recall-page .kr-scene-menu>summary:focus-visible,
+.knowledge-recall-page .kr-scene-menu[open]>summary{
+  border-color:var(--kr-primary);background:var(--kr-control-hover);color:var(--kr-primary-dark);outline:none;
+}
+.knowledge-recall-page .kr-scene-panel{
+  right:0;grid-template-columns:repeat(4,38px);gap:8px;width:auto!important;padding:10px;
+  border-color:var(--kr-border);background:var(--kr-surface-glass);box-shadow:0 18px 55px color-mix(in srgb,var(--kr-ink) 20%,transparent);
+  transform-origin:top right;animation:krScenePanelIn .14s ease both;
+}
+@keyframes krScenePanelIn{from{opacity:0;transform:translateY(-4px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+.knowledge-recall-page .kr-tools .kr-scene-option{
+  appearance:none;display:grid;place-items:center;width:38px;height:38px;min-height:38px;padding:0;border:1px solid var(--kr-border);
+  border-radius:11px;background:var(--kr-control-bg);color:inherit;box-shadow:none;transform:none;cursor:pointer;
+}
+.knowledge-recall-page .kr-tools .kr-scene-option:hover,
+.knowledge-recall-page .kr-tools .kr-scene-option:focus-visible{
+  border-color:var(--kr-primary);background:var(--kr-control-hover);box-shadow:0 0 0 3px color-mix(in srgb,var(--kr-primary) 12%,transparent);transform:none;outline:none;
+}
+.knowledge-recall-page .kr-tools .kr-scene-option.is-active{
+  border-color:var(--kr-primary);background:var(--kr-control-hover);box-shadow:0 0 0 2px color-mix(in srgb,var(--kr-primary) 24%,transparent);
+}
+.knowledge-recall-page .kr-scene-swatch{
+  position:relative;display:block;width:24px;height:24px;border:2px solid rgba(255,255,255,.78);border-radius:8px;
+  background:linear-gradient(135deg,var(--kr-scene-a),var(--kr-scene-b));box-shadow:0 2px 7px rgba(15,23,42,.16),inset 0 0 0 1px rgba(15,23,42,.08);
+}
+.knowledge-recall-page .kr-scene-swatch::after{
+  content:"";position:absolute;right:3px;bottom:3px;width:7px;height:7px;border-radius:50%;background:var(--kr-scene-c);box-shadow:0 0 0 1px rgba(15,23,42,.10);
+}
+.knowledge-recall-page [data-kr-theme="platform"]{--kr-scene-a:#eef4ff;--kr-scene-b:#6d5dfc;--kr-scene-c:#fff}
+.knowledge-recall-page [data-kr-theme="parchment"]{--kr-scene-a:#f8ead2;--kr-scene-b:#b7791f;--kr-scene-c:#fffaf0}
+.knowledge-recall-page [data-kr-theme="aurora"]{--kr-scene-a:#d9f99d;--kr-scene-b:#10b981;--kr-scene-c:#ecfdf5}
+.knowledge-recall-page [data-kr-theme="neon"]{--kr-scene-a:#111827;--kr-scene-b:#7c3aed;--kr-scene-c:#22d3ee}
+.knowledge-recall-page [data-kr-theme="sakura"]{--kr-scene-a:#ffe4e6;--kr-scene-b:#ec4899;--kr-scene-c:#fff7f9}
+.knowledge-recall-page [data-kr-theme="ocean"]{--kr-scene-a:#dbeafe;--kr-scene-b:#0ea5e9;--kr-scene-c:#cffafe}
+.knowledge-recall-page [data-kr-theme="latte"]{--kr-scene-a:#fef3c7;--kr-scene-b:#c08457;--kr-scene-c:#fffaf4}
+
+/* Hover stays visually still, while pointer-down/click feedback remains unmistakable. */
+.knowledge-recall-page .kr-node button{
+  transition:transform .10s ease,box-shadow .14s ease,filter .14s ease;
+}
+.knowledge-recall-page .kr-node button:hover{
+  transform:none;filter:none;box-shadow:0 10px 26px rgba(15,23,42,.14),0 0 0 1px rgba(15,23,42,.08);
+}
+.knowledge-recall-page .kr-node button:active,
+.knowledge-recall-page .kr-node button.is-pressed,
+.knowledge-recall-page .kr-node button:hover:active,
+.knowledge-recall-page .kr-node button:hover.is-pressed{
+  transform:translateY(2px) scale(.985);
+  box-shadow:0 6px 16px rgba(15,23,42,.16),0 0 0 1px rgba(15,23,42,.10);
+}
+.knowledge-recall-page .kr-node button:active::after,
+.knowledge-recall-page .kr-node button.is-pressed::after,
+.knowledge-recall-page .kr-node button:hover:active::after,
+.knowledge-recall-page .kr-node button:hover.is-pressed::after{
+  transform:translate(-50%,-46%) scale(.92);filter:none;
+  box-shadow:inset 0 7px 11px rgba(15,23,42,.18),0 4px 10px rgba(15,23,42,.10);
+}
+.knowledge-recall-page .kr-node button:active span,
+.knowledge-recall-page .kr-node button.is-pressed span,
+.knowledge-recall-page .kr-node button:hover:active span,
+.knowledge-recall-page .kr-node button:hover.is-pressed span{
+  transform:translate(-50%,-46%) scale(.92);filter:none;
+}
+
+/* Selection ring must survive hover and press; hover rules may never erase it. */
+.knowledge-recall-page .kr-node.is-active button,
+.knowledge-recall-page .kr-node.is-active button:hover,
+.knowledge-recall-page .kr-node.is-active button:focus-visible{
+  box-shadow:0 20px 44px var(--kr-selected-glow),0 0 0 3px var(--kr-selected-ring);
+}
+.knowledge-recall-page .kr-node.is-active button:active,
+.knowledge-recall-page .kr-node.is-active button.is-pressed,
+.knowledge-recall-page .kr-node.is-active button:hover:active,
+.knowledge-recall-page .kr-node.is-active button:hover.is-pressed{
+  box-shadow:0 8px 20px var(--kr-selected-glow),0 0 0 3px var(--kr-selected-ring);
+}
+
+@media(max-width:620px){
+  .knowledge-recall-page .kr-scene-menu{display:block}
+  .knowledge-recall-page .kr-scene-panel{
+    position:fixed;top:calc(var(--lp-shell-height,64px) + 6px);right:8px;left:auto;
+    grid-template-columns:repeat(4,38px);max-width:calc(100vw - 16px);transform-origin:top right;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .knowledge-recall-page .kr-scene-panel{animation:none}
+  .knowledge-recall-page .kr-node button{transition:none}
+}
+
+/* Shared learning shell previously forced a white header; bind it back to the scene palette. */
+.knowledge-recall-page .kr-app{
+  --kr-theme-control-ink:var(--kr-control-ink);
+  --kr-theme-muted:var(--kr-muted);
+  --lp-shell-bg:var(--kr-topbar-bg);
+  --lp-shell-ink:var(--kr-ink);
+  --lp-shell-border:var(--kr-border);
+}
+.knowledge-recall-page .kr-topbar.lp-topbar,
+.knowledge-recall-page .kr-topbar.lp-topbar *{
+  --kr-control-ink:var(--kr-theme-control-ink);
+  --kr-muted:var(--kr-theme-muted);
+}
+.knowledge-recall-page .kr-topbar.lp-topbar{
+  border-bottom-color:var(--kr-border)!important;background:var(--kr-topbar-bg)!important;color:var(--kr-ink)!important;
+}
+.knowledge-recall-page .kr-topbar.lp-topbar .kr-back{
+  border-color:var(--kr-border)!important;background:var(--kr-control-bg)!important;color:var(--kr-control-ink)!important;
+}
+.knowledge-recall-page .kr-topbar.lp-topbar .kr-language-switch button{color:var(--kr-muted)!important}
+.knowledge-recall-page .kr-topbar.lp-topbar .kr-language-switch button[aria-pressed="true"],
+.knowledge-recall-page .kr-topbar.lp-topbar .kr-language-switch button.is-active{
+  background:var(--kr-control-bg)!important;color:var(--kr-primary-dark)!important;
+}
+.knowledge-recall-page .kr-topbar.lp-topbar .auth-status{color:var(--kr-control-ink)!important}
+
+/* Knowledge-card shells and their depth bands also follow the active scene. */
+.knowledge-recall-page .kr-node button{background:var(--kr-control-bg)}
+.knowledge-recall-page .kr-node button::before{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--kr-node-base-b) 18%,var(--kr-card-2)),var(--kr-control-bg));
+}
+.knowledge-recall-page .kr-node.depth-0 button::before{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--kr-node-root-b) 18%,var(--kr-card-2)),var(--kr-control-bg));
+}
+.knowledge-recall-page .kr-node.depth-2 button::before,
+.knowledge-recall-page .kr-node.depth-5 button::before{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--kr-node-alt-b) 18%,var(--kr-card-2)),var(--kr-control-bg));
+}
+.knowledge-recall-page .kr-node.depth-3 button::before,
+.knowledge-recall-page .kr-node.depth-6 button::before{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--kr-node-cool-b) 18%,var(--kr-card-2)),var(--kr-control-bg));
+}
+
+/* Kept as a non-visible compatibility control for existing integrations and saved automation tests. */
+.knowledge-recall-page .kr-theme-compat-select{
+  position:absolute!important;right:0!important;bottom:0!important;width:1px!important;height:1px!important;
+  margin:0!important;padding:0!important;border:0!important;opacity:0!important;pointer-events:none!important;overflow:hidden!important;
+}

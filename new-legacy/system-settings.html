@@ -9,8 +9,20 @@
   <link rel="stylesheet" href="styles/global-shortcuts.css"/>
   <link rel="stylesheet" href="styles/subscription.css"/>
 <link rel="stylesheet" href="styles/user-center.css"/>
+<link rel="stylesheet" href="styles/admin-context-nav.css"/>
 </head>
-<body>
+<body data-admin-context="settings">
+<nav class="admin-context-nav" aria-label="管理后台一级导航">
+  <a data-admin-nav="overview" href="admin-console.html">总览</a>
+  <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
+  <a data-admin-nav="teacher" href="teacher-workbench.html">教师工作台</a>
+  <a data-admin-nav="courses" href="course-admin.html">课程与任务</a>
+  <a data-admin-nav="users" href="user-management.html">用户管理</a>
+    <a data-admin-nav="feedback" href="feedback-management.html">反馈管理</a>
+    <a data-admin-nav="messages" href="message-management.html">消息管理</a>
+  <a data-admin-nav="operations" href="admin-operations.html">操作记录</a>
+  <a data-admin-nav="settings" href="admin-settings.html">系统设置</a>
+</nav>
   <div class="ss-app" id="systemSettingsApp">
     <header class="um-topbar ss-topbar">
       <div class="um-brand">
@@ -23,8 +35,9 @@
       </div>
       <div class="um-top-actions">
         <div class="auth-status" id="authStatus">未登录 · 游客</div>
+        <a class="um-nav-btn" href="admin-settings.html">管理后台设置</a>
         <a class="um-nav-btn" href="user-management.html">用户管理</a>
-        <a class="um-nav-btn" href="question-bank.html">题库管理</a>
+        <a class="um-nav-btn" href="teacher-workbench.html">教师工作台</a>
       </div>
     </header>
 
@@ -35,7 +48,6 @@
         <button type="button" data-ss-tab="permissions">权限模板</button>
         <button type="button" data-ss-tab="subscriptions">订阅套餐</button>
         <button type="button" data-ss-tab="logs">操作日志</button>
-        <button type="button" data-ss-tab="analytics">功能分析</button>
       </aside>
 
       <section class="ss-content">
@@ -100,19 +112,6 @@
             <div class="um-log-list" id="ssLogList"></div>
           </div>
         </section>
-
-        <section class="ss-pane" data-ss-panel="analytics">
-          <div class="um-panel">
-            <div class="um-card-head small"><div><h2>用户功能偏好</h2><p>比较常用程度与成果用户率，仅展示汇总数据。</p></div></div>
-            <div class="ss-analytics-filters">
-              <label>开始日期<input id="ssAnalyticsStart" type="date"></label>
-              <label>结束日期<input id="ssAnalyticsEnd" type="date"></label>
-              <label>角色<select id="ssAnalyticsRole"><option value="">全部角色</option><option value="teacher">教师/教研</option><option value="student">学员</option><option value="viewer">游客</option></select></label>
-              <button id="ssAnalyticsApply" type="button">查询</button>
-            </div>
-            <div id="ssAnalyticsContent" aria-live="polite"></div>
-          </div>
-        </section>
       </section>
     </main>
   </div>
@@ -131,5 +130,6 @@
 <script defer src="src/33-user-center.js"></script>
 <script defer src="src/39-global-shortcuts.js"></script>
 <script defer src="src/36-system-settings.js"></script>
+<script src="src/admin/48-admin-context-nav.js"></script>
 </body>
 </html>

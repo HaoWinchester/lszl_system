@@ -1,0 +1,34 @@
+'use strict';
+const fs=require('fs'),vm=require('vm'),crypto=require('crypto'),path=require('path');
+const root=path.resolve(__dirname,'..');
+const manifest=JSON.parse(fs.readFileSync(path.join(root,'V8.6.2_DATA_INTEGRITY.json'),'utf8'));
+const storage=new Map();
+const context={console,Date,URLSearchParams,CustomEvent:function(type,init){this.type=type;this.detail=init?.detail},localStorage:{getItem:key=>storage.has(key)?storage.get(key):null,setItem:(key,value)=>storage.set(key,String(value)),removeItem:key=>storage.delete(key)},dispatchEvent(){},KGAuthCore:{currentUsername:()=> 'teacher-zhao',currentUser:()=>({username:'teacher-zhao',displayName:'赵老师',role:'teacher'})}};
+context.window=context;vm.createContext(context);
+for(const file of ['src/86-activity-schema-v1.js','src/87-guided-learning-data.js','src/91-learning-content-core.js','src/93-content-organization-core.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
+const core=context.KGLearningContent,org=context.KGContentOrganization;
+const hash=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const fileHash=file=>crypto.createHash('sha256').update(fs.readFileSync(path.join(root,file))).digest('hex');
+function assert(condition,message){if(!condition)throw new Error(message)}
+const activities=Object.keys(core.getActivityLibrary()).sort();
+const taxonomies=core.getTaxonomies();
+const knowledgeIds=taxonomies.flatMap(t=>t.nodes.map(n=>n.id)).sort();
+const courses=core.getCourseDrafts();
+const courseNodeIds=courses.flatMap(c=>c.nodes.map(n=>n.id)).sort();
+const tasks=org.getLearningTasks().map(x=>x.id).sort();
+const papers=org.getPapers().map(x=>x.id).sort();
+const actualCounts={activities:activities.length,taxonomies:taxonomies.length,knowledgeNodes:knowledgeIds.length,courses:courses.length,courseNodes:courseNodeIds.length,learningTasks:tasks.length,papers:papers.length};
+const actualHashes={activityIds:hash(activities),knowledgePointIds:hash(knowledgeIds),courseNodeIds:hash(courseNodeIds),learningTaskIds:hash(tasks),paperIds:hash(papers)};
+assert(/^v9\.0-(?:p3\.3\.(?:3(?:\.\d+)?|4|5)|p3\.4|p3\.5(?:\.[12345678])?|p4\.0(?:\.[123])?|p4\.1(?:\.1)?)$/.test(fs.readFileSync(path.join(root,'VERSION'),'utf8').trim()),'当前版本应保持在 V9.0-P3.3 兼容开发线');
+assert(JSON.stringify(actualCounts)===JSON.stringify(manifest.counts),'核心数据数量发生变化');
+assert(JSON.stringify(actualHashes)===JSON.stringify(manifest.idSetSha256),'稳定 ID 集合发生变化');
+const allowedV9Extensions=new Set(['src/91-learning-content-core.js','content-center.html','styles/content-center.css','src/91-content-center-app.js','src/93-assessment-config-app.js','src/91-teacher-workbench-app.js','src/97-teacher-question-workflow.js','src/39-global-shortcuts.js','src/34-role-permissions.js','src/35-user-management.js','src/60-question-bank.js','src/65-question-bank-admin.js','src/66-question-navigator.js','src/77-multi-question-workspace.js','src/admin/00-admin-core.js','src/admin/48-admin-context-nav.js','src/admin/49-admin-ui.js']);
+for(const [file,expected] of Object.entries(manifest.protectedFileSha256))if(!allowedV9Extensions.has(file))assert(fileHash(file)===expected,`${file} 发生了非预期变化`);
+// V8.6.2 的完整发布文件哈希只适用于当时发布包；后续 V9 以各自发布清单校验。
+const course=context.KGGuidedLearningData.getCourse();
+assert(course.parts.every(part=>Array.isArray(part.practiceEntries)&&part.practiceEntries.length===2),'每个学习部分应有两个自由练习入口');
+const workbench=fs.readFileSync(path.join(root,'teacher-workbench.html'),'utf8');
+assert((workbench.match(/data-workflow-card=/g)||[]).length===3,'教师工作台应保持三步主工作流');
+const pathApp=fs.readFileSync(path.join(root,'src/89-guided-learning-app.js'),'utf8');
+assert(pathApp.includes('gl-practice-image')&&!pathApp.includes('gl-practice-copy'),'自由练习入口应只渲染图片');
+console.log('v862-data-integrity-ok',actualCounts);

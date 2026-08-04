@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * GuidedLearningData v11
+ * GuidedLearningData v13
  * 固定课程编排：课程 → 阶段 → 部分 → 节点 → 活动。
  * 节点只保存活动 ID；路径页不加载活动正文，练习页按 nodeId 获取固定内容。
  */
@@ -388,7 +388,7 @@
     environmentKeywords:addKeywordSet('env-keyword',[
       {
         segments:[
-          {text:'一个 '},{text:'敏捷团队',target:true},{text:' 正在进行 '},{text:'两周迭代，',target:true},{text:'客户提出新的高价值功能。'}
+          {text:'一个 '},{text:'敏捷团队',target:true},{text:' 正在进行 '},{text:'两周迭代',target:true},{text:'，客户提出新的高价值功能。'}
         ],
         explanation:'“敏捷团队”和“迭代”直接确定了敏捷方法环境。'
       },
@@ -1122,6 +1122,13 @@
 
   const stages=stageBlueprints.map(({parts,...stage})=>stage);
   const parts=stageBlueprints.flatMap(stage=>stage.parts.map(part=>({...part,stageId:stage.id})));
+  const practiceEntryTemplates=Object.freeze([
+    Object.freeze({id:'deep-recall-playground',type:'deep_recall',title:'深度回忆寻宝',description:'进入完整版，自由点击关键词并探索知识联想网络。',target:'knowledge-recall.html',image:'assets/practice-deep-recall.gif',stillImage:'assets/practice-deep-recall.png',afterNodeOrder:3,targetNodeOrder:4,searchRadius:1}),
+    Object.freeze({id:'multi-question-playground',type:'multi_question_canvas',title:'多题归纳画布',description:'进入完整版，自由拖入多道原题、框选、分组和归纳。',target:'question-workspace.html',image:'assets/practice-multi-canvas.gif',stillImage:'assets/practice-multi-canvas.png',afterNodeOrder:8,targetNodeOrder:9,searchRadius:1})
+  ]);
+  parts.forEach(part=>{
+    part.practiceEntries=practiceEntryTemplates.map(template=>({...template,id:part.id+'-'+template.id}));
+  });
   const nodes=[];
   parts.forEach((part,partIndex)=>{
     nodeTemplates.forEach((template,nodeIndex)=>{
@@ -1231,10 +1238,11 @@
     title:'PMP 变更与敏捷响应',
     subtitle:'通过阶段、部分和短节点，建立可迁移的变更判断主线',
     subject:'PMP',
-    version:11,
+    version:13,
     schemaVersion:1,
     activitySchemaVersion:1,
-    questionLanguageModes:['zh','en','bilingual'],
+    questionLanguageModes:['zh','bilingual'],
+    assessmentLanguage:'zh',
     stages,
     parts,
     nodes,
@@ -1309,7 +1317,7 @@
   }
 
   global.KGGuidedLearningData=Object.freeze({
-    version:11,
+    version:13,
     activitySchemaVersion:1,
     getCourse,
     nodeById,
@@ -1328,6 +1336,9 @@
     setLanguageMode:mode=>activitySchema?.setLanguageMode?.(mode)||languageMode(mode),
     validateActivity:activity=>activitySchema?.validate?.(activity)||{valid:true,errors:[],warnings:[]},
     validateActivityLibrary:()=>clone(activityLibraryValidation),
-    exportActivityPackage:metadata=>activitySchema?.createPackage?.(activityLibrary,metadata)||null
+    exportActivityPackage:metadata=>activitySchema?.createPackage?.(activityLibrary,metadata)||null,
+    validateActivityPackage:payload=>activitySchema?.validatePackage?.(payload)||{valid:false,errors:['Activity Schema v1 未加载。']},
+    analyzeActivityPackage:payload=>activitySchema?.analyzePackageMerge?.(activityLibrary,payload)||{valid:false,errors:['Activity Schema v1 未加载。']},
+    mergeActivityPackage:(payload,options)=>activitySchema?.mergePackage?.(activityLibrary,payload,options)||{valid:false,errors:['Activity Schema v1 未加载。'],library:clone(activityLibrary)}
   });
 })(window);

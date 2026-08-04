@@ -1,0 +1,6 @@
+/* v8.6.2 P2.2.19 — resize affordance + selected-card deep-study fix */
+
+/* Keep the resize hit area and behavior unchanged; only double the visible line length. */
+.question-workspace-page .qw-card-width-resize::after{
+  height:80px!important;
+}

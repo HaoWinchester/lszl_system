@@ -66,9 +66,16 @@ function authLoadSession(){
   }catch(e){return null}
 }
 let authCurrentUser=authLoadSession();
-function authIsLoggedIn(){return !!(authCurrentUser&&authCurrentUser.username)}
+function authIsLoggedIn(){
+  // 远程模式下 authCurrentUser 闭包可能在登录 reload 后未同步，优先读权威源 KGAuthCore。
+  const core=window.KGAuthCore;
+  if(core&&typeof core.currentUser==='function'){try{if(core.currentUser())return true}catch(e){}}
+  return !!(authCurrentUser&&authCurrentUser.username)
+}
 function currentStoreKey(){
-  return authIsLoggedIn()?authUserKey(authCurrentUser.username):authPublicKey();
+  const core=window.KGAuthCore;
+  const username=(core&&typeof core.currentUsername==='function')?core.currentUsername():(authCurrentUser&&authCurrentUser.username||'');
+  return username?authUserKey(username):authPublicKey();
 }
 function authCleanUsername(v){
   return AuthCore.cleanUsername ? AuthCore.cleanUsername(v) : String(v||'').trim().replace(/\s+/g,'_').slice(0,32);
@@ -179,10 +186,11 @@ async function authLogout(){
   const old=authCurrentUser&&authCurrentUser.username;
   const remote=Boolean(AuthCore.providerStatus?.().remote);
   if(remote&&typeof AuthCore.logout==='function'){
-    // 远程会话必须由认证核心清除：它会调用后端 /logout、移除 sessionStorage
-    // 中的会话缓存，并通知 direct-entry 重新载入访客态顶栏。
+    // 远程会话必须由认证核心清除：调用后端 /logout、移除 sessionStorage 会话缓存。
     await AuthCore.logout({source:'图谱账号菜单退出'});
     authCurrentUser=null;
+    // 兜底：即便 direct-entry 未触发整页 reload，也立即把顶栏刷成访客态，避免残留用户名。
+    authRenderStatus();
     return true;
   }
   if(old)authLogAction('用户退出',old);
@@ -214,7 +222,7 @@ window.KGAuthRuntime={
   logout:authLogout,
   renderStatus:authRenderStatus,
   isLoggedIn:authIsLoggedIn,
-  currentUsername:()=>authCurrentUser&&authCurrentUser.username||''
+  currentUsername:()=>{const c=window.KGAuthCore;if(c&&c.currentUsername){try{return c.currentUsername()}catch(e){}}return authCurrentUser&&authCurrentUser.username||''}
 };
 function authRequire(reason,permission='editGraph'){
   if(!authIsLoggedIn()){

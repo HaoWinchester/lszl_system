@@ -1,0 +1,162 @@
+/* v8.6.2 P2.2.24 — deep recall return, reset, keyboard delete and concealment refinements */
+
+/* Restore the original top-left return entry; leaving the page is no longer duplicated in the account menu. */
+.knowledge-recall-page .kr-brand.lp-brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+.knowledge-recall-page .kr-brand .kr-back{
+  flex:0 0 auto;
+}
+
+/* Canvas-level reset control. */
+.knowledge-recall-page .kr-canvas-overlay-right{
+  position:absolute;
+  top:14px;
+  right:12px;
+  z-index:360;
+}
+.knowledge-recall-page .kr-reset-question-btn{
+  appearance:none;
+  display:grid;
+  place-items:center;
+  width:40px;
+  height:40px;
+  padding:0;
+  border:1px solid rgba(100,116,139,.18);
+  border-radius:12px;
+  background:rgba(255,255,255,.93);
+  color:#64748b;
+  box-shadow:0 7px 20px rgba(15,23,42,.09);
+  backdrop-filter:blur(14px);
+  cursor:pointer;
+  transition:background .14s ease,color .14s ease,border-color .14s ease,box-shadow .14s ease,transform .10s ease;
+}
+.knowledge-recall-page .kr-reset-question-btn svg{
+  width:19px;
+  height:19px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.knowledge-recall-page .kr-reset-question-btn:hover,
+.knowledge-recall-page .kr-reset-question-btn:focus-visible{
+  border-color:rgba(109,93,252,.28);
+  background:#f3f1ff;
+  color:#5b4dd1;
+  outline:none;
+  box-shadow:0 9px 24px rgba(15,23,42,.12),0 0 0 3px rgba(109,93,252,.10);
+}
+.knowledge-recall-page .kr-reset-question-btn:active{
+  transform:scale(.94);
+}
+.knowledge-recall-page .kr-reset-question-btn.kr-readonly-control{
+  opacity:.54;
+}
+
+/* Position/total is the only question number shown in the shell. */
+.knowledge-recall-page #krQuestionCount{
+  min-width:34px;
+  text-align:center;
+  font-variant-numeric:tabular-nums;
+}
+
+/* Hidden keywords must occupy exactly the same inline width as ordinary text. */
+.knowledge-recall-page .kr-keyword{
+  padding:0;
+  margin:0;
+  border-radius:3px;
+  letter-spacing:inherit;
+  word-spacing:inherit;
+  font:inherit;
+  vertical-align:baseline;
+}
+.knowledge-recall-page .kr-keyword.active{
+  box-shadow:0 0 0 2px var(--kr-highlight-ring);
+}
+
+/* Knowledge cards stay still on hover; only click/press feedback remains. */
+.knowledge-recall-page .kr-node button:hover{
+  filter:none;
+  transform:none;
+  box-shadow:0 10px 26px rgba(15,23,42,.14),0 0 0 1px rgba(15,23,42,.08);
+}
+.knowledge-recall-page .kr-node button:hover:after{
+  transform:translate(-50%,-50%);
+  filter:none;
+  box-shadow:inset 0 -8px 0 rgba(15,23,42,.08),0 8px 18px rgba(15,23,42,.12);
+}
+.knowledge-recall-page .kr-node button:hover span{
+  transform:translate(-50%,-50%);
+  filter:none;
+}
+
+/* Lightweight 360 ms destruction effect: two pseudo-elements, transform and opacity only. */
+.knowledge-recall-page .kr-node.is-destroying{
+  z-index:40;
+  pointer-events:none;
+}
+.knowledge-recall-page .kr-node.is-destroying button{
+  pointer-events:none;
+  animation:krCardDestroyCollapse .34s cubic-bezier(.34,.02,.3,1) both;
+}
+.knowledge-recall-page .kr-node.is-destroying .kr-node-label{
+  pointer-events:none;
+  animation:krCardDestroyLabel .34s cubic-bezier(.34,.02,.3,1) both;
+}
+.knowledge-recall-page .kr-node.is-destroying::before,
+.knowledge-recall-page .kr-node.is-destroying::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:35px;
+  width:17px;
+  height:17px;
+  z-index:20;
+  border-radius:50%;
+  background:rgba(100,116,139,.38);
+  pointer-events:none;
+  opacity:0;
+  will-change:transform,opacity;
+}
+.knowledge-recall-page .kr-node.is-destroying::before{
+  box-shadow:-22px 9px 0 -3px rgba(148,163,184,.34),19px 3px 0 -5px rgba(71,85,105,.30),3px -13px 0 -6px rgba(203,213,225,.52);
+  animation:krCardSmokeLeft .36s ease-out both;
+}
+.knowledge-recall-page .kr-node.is-destroying::after{
+  width:13px;
+  height:13px;
+  background:rgba(148,163,184,.34);
+  box-shadow:-13px 2px 0 -4px rgba(71,85,105,.27),18px 10px 0 -4px rgba(203,213,225,.46),4px -11px 0 -5px rgba(100,116,139,.28);
+  animation:krCardSmokeRight .36s .025s ease-out both;
+}
+@keyframes krCardDestroyCollapse{
+  0%{opacity:1;transform:scale(1)}
+  42%{opacity:.92;transform:scale(.93)}
+  100%{opacity:0;transform:scale(.42)}
+}
+@keyframes krCardDestroyLabel{
+  0%{opacity:1;transform:translateX(-50%) scale(1)}
+  42%{opacity:.88;transform:translateX(-50%) scale(.93)}
+  100%{opacity:0;transform:translateX(-50%) scale(.42)}
+}
+@keyframes krCardSmokeLeft{
+  0%{opacity:0;transform:translate(-50%,4px) scale(.45)}
+  22%{opacity:.84}
+  100%{opacity:0;transform:translate(calc(-50% - 16px),-48px) scale(1.48)}
+}
+@keyframes krCardSmokeRight{
+  0%{opacity:0;transform:translate(-50%,5px) scale(.4)}
+  18%{opacity:.72}
+  100%{opacity:0;transform:translate(calc(-50% + 18px),-43px) scale(1.35)}
+}
+@media(prefers-reduced-motion:reduce){
+  .knowledge-recall-page .kr-node.is-destroying button,
+  .knowledge-recall-page .kr-node.is-destroying .kr-node-label,
+  .knowledge-recall-page .kr-node.is-destroying::before,
+  .knowledge-recall-page .kr-node.is-destroying::after{animation:none!important}
+}

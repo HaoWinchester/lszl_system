@@ -8,21 +8,17 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="color-scheme" content="light dark"/>
-<title>文件管理｜知识图谱</title>
+<title>文件管理｜知识图谱与多题画布</title>
 <script>
 (function(){try{var saved=localStorage.getItem('kg_file_manager_theme_v1');var theme=saved||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=theme}catch(e){document.documentElement.dataset.theme='light'}})();
 </script>
-<link rel="stylesheet" href="styles/file-manager.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/file-manager-organize.css?v=v8.6.29"/>
+<link rel="stylesheet" href="styles/file-manager.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/file-manager-organize.css?v=v9.0-p4.1.9"/>
 </head>
 <body class="fm-page">
-<div class="fm-mobile-readonly-notice" id="fmMobileReadonlyNotice" hidden role="dialog" aria-label="移动端文件管理说明">
+<div class="fm-mobile-readonly-notice" id="fmMobileReadonlyNotice" hidden role="status">
   <strong>移动端仅支持查看</strong>
   <span>文件管理与图谱编辑请使用电脑端。</span>
-  <div class="fm-mobile-readonly-actions">
-    <a href="index.html?mode=free">返回首页</a>
-    <a href="learning-path.html">学习路径</a>
-  </div>
   <button id="fmMobileReadonlyClose" type="button" aria-label="关闭提示">×</button>
 </div>
 
@@ -94,7 +90,12 @@
   <main class="fm-main">
     <header class="fm-topbar">
       <div class="fm-heading">
-        <h1 id="fmPageTitle">文件管理</h1>
+        <div class="fm-heading-row"><h1 id="fmPageTitle">文件管理</h1>
+          <div class="fm-file-type-tabs" id="fmFileTypeTabs" role="tablist" aria-label="文件类型">
+            <button type="button" class="is-active" data-fm-file-type="graph" role="tab" aria-selected="true">知识图谱</button>
+            <button type="button" data-fm-file-type="workspace" role="tab" aria-selected="false">多题画布</button>
+          </div>
+        </div>
         <p id="fmPageSubtitle">管理你的知识图谱文件</p>
       </div>
       <div class="fm-top-actions">
@@ -130,7 +131,7 @@
     </header>
 
     <div class="fm-workspace">
-      <section class="fm-browser" aria-label="图谱文件">
+      <section class="fm-browser" id="fmGraphBrowser" aria-label="图谱文件">
         <div class="fm-breadcrumb-bar" id="fmBreadcrumbBar" aria-label="文件夹路径"></div>
         <div class="fm-browser-toolbar">
           <div class="fm-filter-tabs" role="tablist" aria-label="文件筛选">
@@ -198,6 +199,21 @@
         </div>
         <footer class="fm-browser-footer"><span id="fmResultCount">共 0 个文件</span><span id="fmIntegrityStatus">文件索引正常</span></footer>
       </section>
+
+      <section class="fm-workspace-library" id="fmWorkspaceLibrary" hidden aria-label="多题画布文件">
+        <div class="fm-workspace-library-toolbar">
+          <label class="fm-workspace-search"><span aria-hidden="true">⌕</span><input id="fmWorkspaceSearch" type="search" placeholder="搜索多题画布"/></label>
+          <button type="button" class="fm-primary-inline" id="fmWorkspaceCreateBtn">＋ 新建画布</button>
+        </div>
+        <div class="fm-workspace-library-summary"><strong id="fmWorkspaceCount">0 个画布</strong><span>双击打开 · 可重命名 / 复制 / 删除</span></div>
+        <div class="fm-file-grid fm-workspace-grid" id="fmWorkspaceGrid"></div>
+        <div class="fm-empty fm-workspace-empty" id="fmWorkspaceEmpty" hidden>
+          <div class="fm-empty-icon" aria-hidden="true">▣</div>
+          <h2>还没有多题画布</h2>
+          <p>创建一个多题画布，把相关题目放在同一空间中进行归纳。</p>
+          <button type="button" class="fm-primary-inline" id="fmWorkspaceEmptyCreate">新建画布</button>
+        </div>
+      </section>
     </div>
   </main>
 </div>
@@ -258,7 +274,10 @@
 <script defer src="src/34-role-permissions.js"></script>
 <script defer src="src/21-home-package-service.js"></script>
 <script defer src="src/23-graph-file-store.js"></script>
+<script defer src="src/62-learning-session-store.js"></script>
+<script defer src="src/65-canvas-workspace-store.js"></script>
 <script defer src="src/27-file-manager-organize.js"></script>
 <script defer src="src/27-graph-file-manager.js"></script>
+<script defer src="src/80-file-manager-workspace-library.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html lang="zh-CN">
+<html lang="zh-CN" data-release="v9.0-p4.1.1">
 <head>
 <script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
 <script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->
@@ -8,26 +8,16 @@
 <script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport"/>
-<script>
-(function(){
-  try{
-    var params=new URLSearchParams(location.search);
-    if(params.get('mode')==='free')return;
-    if(params.get('mode')==='learning'){location.replace('learning-path.html');return;}
-    var mode=localStorage.getItem('kg_default_entry_mode_v1')||'learning';
-    if(mode!=='free')location.replace('learning-path.html');
-  }catch(error){}
-})();
-</script>
-<title>通用知识点关系图谱工具｜艾宾浩斯弹性滑动闪卡版（无电流优化）</title><link href="styles/main.css?v=v8.6.29" rel="stylesheet"/>
-<link rel="stylesheet" href="styles/global-shortcuts.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/subscription.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/user-center.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/membership-ui.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/account-menu.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/home-file-library.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/graph-file-tabs.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/graph-user-preferences.css?v=v8.6.29"/>
+<title>通用知识点关系图谱工具｜艾宾浩斯弹性滑动闪卡版（无电流优化）</title><link href="styles/main.css?v=v9.0-p4.1.9" rel="stylesheet"/>
+<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/support-center.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/home-file-library.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/graph-file-tabs.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/graph-user-preferences.css?v=v9.0-p4.1.9"/>
 
 </head>
 <body>
@@ -56,11 +46,11 @@
 </button>
 </div>
 <div class="canvas-toolbar-right" data-stage-ui="true">
-<a class="learning-mode-entry" href="learning-path.html" title="返回引导学习路径">学习路径</a>
+<a class="learning-mode-entry" href="practice-mode.html" title="进入独立做题模式">做题模式</a>
 <button class="upgrade-member-btn" id="upgradeMemberBtn" type="button" data-open-subscription-detail>升级会员</button>
-<div class="account-menu-shell" id="accountMenuShell">
+<div class="account-menu-shell" id="accountMenuShell" data-account-help-href="help-center.html">
 <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
-<span class="role-dot"></span><span class="auth-status-label">访客只读</span><span aria-hidden="true" class="account-menu-mobile-label">账号</span>
+<span class="role-dot"></span><span class="auth-status-label">访客只读</span>
 <svg aria-hidden="true" class="account-menu-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>
 </button>
 <div class="account-menu" hidden id="accountMenu" role="menu" aria-label="账号菜单">
@@ -83,6 +73,14 @@
 </button>
 </div>
 </div>
+<div class="support-center-shell" id="supportCenterShell">
+<button class="support-center-trigger" id="supportCenterBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="supportCenterMenu" title="帮助、反馈与消息"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.35 2.35 0 1 1 3.5 2.05c-.82.45-1.3.93-1.3 1.95"/><path d="M12 17h.01"/></svg><span class="support-center-badge" id="supportCenterBadge" hidden>0</span></button>
+<div class="support-center-popover" id="supportCenterMenu" role="menu" hidden>
+<button type="button" role="menuitem" data-support-action="help"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5Z"/><path d="M4 5.5v16"/></svg><span>帮助中心</span></button>
+<button type="button" role="menuitem" data-support-action="feedback"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v12H8l-4 4Z"/><path d="M8 9h8M8 13h5"/></svg><span>需求反馈</span><b class="menu-badge" id="supportFeedbackMenuBadge" hidden>0</b></button>
+<button type="button" role="menuitem" data-support-action="messages"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7"/><path d="M10 19h4"/></svg><span>消息</span><b class="menu-badge" id="supportMessageMenuBadge" hidden>0</b></button>
+</div>
+</div>
 <button class="account-hidden-trigger" hidden id="authLoginBtn" type="button">登录</button>
 <button class="account-hidden-trigger" hidden id="authLogoutBtn" type="button">退出登录</button>
 <button class="account-hidden-trigger" hidden id="tutorialBtn" type="button">使用说明</button>
@@ -97,7 +95,7 @@
 <div class="help-card" id="helpCard">
 <button id="hideHelpBtn">×</button>
 <strong>通用知识图谱操作</strong><br/>
-      新增知识点后，填写分类、难度、关键词、说明。点击知识点 A，再点击知识点 B，可建立关系线。点击线可编辑“前置、包含、关联、对比、易混淆、应用”等关系。手机端可长按知识点编辑，双指缩放画布。
+      新增知识点后，填写分类、难度、关键词、说明。选中卡牌后会显示四个连接点：点击连接点可快速创建相邻卡牌，按住并拖到其他卡牌可建立无文字关系线；双击关系线可补充关系文字。手机端可长按知识点编辑，双指缩放画布。
     </div>
 <aside class="detail-panel" id="detailPanel"></aside>
 <div class="status-chip" id="status"></div>
@@ -160,7 +158,7 @@
 <div class="form-grid">
 <label>关系类型</label>
 <select id="linkType">
-<option>关联</option><option>前置</option><option>包含</option><option>属于</option><option>对比</option><option>易混淆</option><option>因果</option><option>应用</option><option>例题支撑</option>
+<option value="">无文字</option><option>关联</option><option>前置</option><option>包含</option><option>属于</option><option>对比</option><option>易混淆</option><option>因果</option><option>应用</option><option>例题支撑</option>
 </select>
 <label>线型</label><select id="linkStyle"><option value="solid">实线</option><option value="dashed">虚线</option></select>
 <label>线色</label><input id="linkColor" type="color" value="#2563eb"/>
@@ -236,8 +234,8 @@
 <div aria-labelledby="questionBankTitle" aria-modal="true" class="modal question-bank-modal" role="dialog">
 <div class="qb-head">
 <div>
-<h2 id="questionBankTitle">题库管理</h2>
-<p>管理考题破案模式使用的题库。第一版支持 JSON 题库导入、导出、下载模板、查看题目和设置当前训练题库。</p>
+<h2 id="questionBankTitle">内容中心 / 统一活动库</h2>
+<p>统一管理活动、科目知识树、教师作者与课程引用。旧题库编辑器仍保留为高级兼容入口。</p>
 </div>
 <button class="qb-close" id="closeQuestionBankBtn" title="关闭题库管理">×</button>
 </div>
@@ -381,6 +379,8 @@
 <script defer src="src/39-global-shortcuts.js"></script>
 <script defer src="src/00-config-state.js"></script>
 <script defer src="src/18-graph-user-preferences.js"></script>
+<script defer src="src/09-graph-connector-drag-controller.js"></script>
+<script defer src="src/canvas/84-canvas-edge-selection-geometry.js"></script>
 <script defer src="src/10-graph-editor.js"></script>
 <script defer src="src/19-home-toolbar-registry.js"></script>
 <script defer src="src/21-home-package-service.js"></script>
@@ -395,6 +395,9 @@
 <script defer src="./direct-auth-adapter.js"></script><!-- kg-auth:generated -->
 <script defer src="src/40-guided-tour.js"></script>
 <script defer src="src/41-account-menu.js"></script>
+<script defer src="src/101-engagement-repository.js"></script>
+<script defer src="src/102-help-content.js"></script>
+<script defer src="src/103-support-center.js"></script>
 <script defer src="src/50-question-data.js"></script>
 <script defer src="src/60-question-bank.js"></script>
 <script defer src="src/70-question-trainer.js"></script>

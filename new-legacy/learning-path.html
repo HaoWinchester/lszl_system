@@ -3,35 +3,53 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-  <title>学习路径｜项目管理学习营</title>
+  <title>学习路径｜项目管理学习营</title><script>
+(function(){
+  try{location.replace('practice-mode.html?from=learning-upgrade')}catch(error){location.href='practice-mode.html?from=learning-upgrade'}
+})();
+</script>
+
   <link rel="stylesheet" href="styles/main.css"/>
-  <link rel="stylesheet" href="styles/account-menu.css"/>
   <link rel="stylesheet" href="styles/guided-learning-path.css"/>
   <link rel="stylesheet" href="styles/subscription.css"/>
   <link rel="stylesheet" href="styles/user-center.css"/>
+  <link rel="stylesheet" href="styles/account-menu.css"/>
 </head>
 <body class="guided-learning-page">
   <div class="gl-app">
     <header class="gl-topbar">
-      <a class="gl-brand" href="learning-path.html" aria-label="学习路径首页">
-        <span class="gl-brand-mark">P</span>
-        <div><strong>项目管理学习营</strong><small>阶段式学习路径</small></div>
-      </a>
-      <nav class="gl-mode-nav" aria-label="学习模式切换">
-        <a class="active" href="learning-path.html">学习模式</a>
-        <a href="index.html?mode=free">自由模式</a>
-      </nav>
-      <div class="gl-account-actions">
-        <div class="account-menu-shell">
+      <div class="gl-topbar-left">
+        <div class="gl-subject-shell" id="glSubjectShell">
+          <button class="gl-subject-trigger" id="glSubjectBtn" type="button" aria-haspopup="menu" aria-expanded="false" title="切换科目：PMP 项目管理学习营">P</button>
+          <div class="gl-subject-menu" id="glSubjectMenu" hidden role="menu" aria-label="切换科目">
+            <button class="gl-subject-menu-item is-active" type="button" role="menuitem" data-gl-subject="pmp" title="PMP 项目管理学习营">PMP 项目管理</button>
+          </div>
+        </div>
+      </div>
+      <div class="gl-topbar-right">
+        <nav class="gl-mode-toggle-shell" aria-label="学习模式切换" title="切换学习模式">
+          <a class="gl-mode-choice is-active" href="learning-path.html" aria-current="page">学习</a>
+          <a class="gl-mode-choice" href="index.html?mode=free">自由</a>
+        </nav>
+        <div class="account-menu-shell" id="accountMenuShell" data-account-help-href="multi-question-help.html">
           <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
-            <span class="role-dot"></span><span class="auth-status-label">访客学习</span><span aria-hidden="true" class="account-menu-mobile-label">账号</span>
+            <span class="account-menu-status-dot" aria-hidden="true"></span><span class="account-menu-trigger-label">已登录：佩奇007</span>
             <svg aria-hidden="true" class="account-menu-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>
           </button>
           <div class="account-menu" hidden id="accountMenu" role="menu" aria-label="账号菜单">
-            <button class="account-menu-item account-menu-session" data-account-menu-action="session" role="menuitem" type="button">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></svg>
-              <span data-mobile-label="登录">登录</span>
-            </button>
+            <button class="account-menu-item" id="accountMenuUserCenterBtn" role="menuitem" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0"/></svg><span data-mobile-label="用户">用户中心</span></button>
+            <button class="account-menu-item" id="accountMenuHelpBtn" role="menuitem" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.5 2.5 0 1 1 3.8 2.1c-.9.5-1.5 1-1.5 2.2M12 17h.01"/></svg><span data-mobile-label="帮助">帮助中心</span></button>
+            <button class="account-menu-item account-menu-upgrade" hidden id="accountMenuUpgradeBtn" role="menuitem" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"/></svg><span data-mobile-label="升级">升级会员</span></button>
+            <div class="account-menu-separator" role="separator"></div>
+            <div class="account-menu-setting-row" id="glDefaultModeRow" tabindex="0">
+              <span class="account-menu-setting-label">默认进入学习模式</span>
+              <label class="account-menu-toggle" aria-label="默认进入学习模式">
+                <input id="glDefaultModeMenu" type="checkbox" checked />
+                <span class="account-menu-toggle-ui" aria-hidden="true"></span>
+              </label>
+            </div>
+            <div class="account-menu-separator" role="separator"></div>
+            <button class="account-menu-item account-menu-session" id="accountMenuSessionBtn" role="menuitem" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9"/></svg><span data-mobile-label="退出">退出登录</span></button>
           </div>
         </div>
         <button class="account-hidden-trigger" hidden id="authLoginBtn" type="button">登录</button>
@@ -41,7 +59,7 @@
 
     <main class="gl-main">
       <section class="gl-stage-controls" aria-label="当前学习阶段">
-        <button type="button" class="gl-stage-switch" data-geometry-align="start" id="glStageSwitch" aria-haspopup="dialog" aria-controls="glStagePicker" aria-expanded="false">
+        <button type="button" class="gl-stage-switch" id="glStageSwitch" aria-haspopup="dialog" aria-controls="glStagePicker" aria-expanded="false">
           <span class="gl-stage-switch-copy">
             <small id="glStageIndex">第 1 阶段 · 2 个部分</small>
             <strong id="glStageTitle">基础认知</strong>
@@ -53,14 +71,6 @@
       <div class="gl-path-parts" id="glPathParts" aria-live="polite"></div>
       <button type="button" class="gl-current-node-fab" id="glCurrentNodeBtn" title="回到当前位置" aria-label="回到当前位置"><span aria-hidden="true">↑</span><small>当前位置</small></button>
 
-      <details class="gl-path-settings">
-        <summary>学习设置</summary>
-        <div class="gl-path-settings-body">
-          <p>每个节点约 6 分钟。答错的题目会在本节点内再次出现；每个部分首节点还可选择参加跳级测试。</p>
-          <label><input type="checkbox" id="glDefaultMode" checked/><span>默认进入学习模式</span></label>
-          <button type="button" id="glResetBtn">重置示范进度</button>
-        </div>
-      </details>
     </main>
   </div>
 
@@ -117,12 +127,14 @@
   <script defer src="src/29-auth-core.js"></script>
   <script defer src="src/30-standalone-auth-dialog.js"></script>
   <script defer src="src/34-role-permissions.js"></script>
-  <script defer src="src/41-account-menu.js"></script>
   <script defer src="src/63-learning-event-repository.js"></script>
   <script defer src="src/86-activity-schema-v1.js"></script>
   <script defer src="src/87-guided-learning-data.js"></script>
+  <script defer src="src/94-practice-navigation.js"></script>
   <script defer src="src/88-guided-learning-store.js"></script>
   <script defer src="src/89-guided-learning-icon-registry.js"></script>
+  <script defer src="src/89-guided-learning-path-layout.js"></script>
+  <script defer src="src/41-account-menu.js"></script>
   <script defer src="src/89-guided-learning-app.js"></script>
 </body>
 </html>

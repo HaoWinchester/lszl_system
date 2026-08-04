@@ -8,16 +8,28 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>用户管理｜本地多用户后台</title>
-  <link rel="stylesheet" href="styles/user-management.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/global-shortcuts.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/subscription.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/user-center.css?v=v8.6.29"/>
+  <link rel="stylesheet" href="styles/user-management.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.9"/>
 </head>
-<body>
+<body class="admin-sticky-shell admin-user-management-shell" data-admin-context="users">
+<nav class="admin-context-nav" aria-label="管理后台一级导航">
+  <a data-admin-nav="overview" href="admin-console.html">总览</a>
+  <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
+  <a data-admin-nav="teacher" href="teacher-workbench.html">教师工作台</a>
+  <a data-admin-nav="courses" href="course-admin.html">课程与任务</a>
+  <a data-admin-nav="users" href="user-management.html">用户管理</a>
+    <a data-admin-nav="feedback" href="feedback-management.html">反馈管理</a>
+    <a data-admin-nav="messages" href="message-management.html">消息管理</a>
+  <a data-admin-nav="operations" href="admin-operations.html">操作记录</a>
+  <a data-admin-nav="settings" href="admin-settings.html">系统设置</a>
+</nav>
   <div class="um-app">
     <header class="um-topbar">
       <div class="um-brand">
-        <a class="um-back" href="index.html" title="返回知识图谱首页">←</a>
         <div>
           <p class="um-kicker">Local User Administration</p>
           <h1>用户管理系统</h1>
@@ -25,13 +37,10 @@
         </div>
       </div>
       <div class="um-top-actions">
-        <div class="auth-status" id="authStatus">未登录 · 游客</div>
         <button id="umAddUserBtn" type="button" class="primary">+ 新用户</button>
         <button id="umExportBtn" type="button">导出用户</button>
         <button id="umImportBtn" type="button">导入用户</button>
         <input id="umImportFile" type="file" hidden accept=".json,application/json"/>
-        <a class="um-nav-btn" href="question-bank.html" target="_blank" rel="noopener">题库管理</a>
-        <a class="um-nav-btn" href="system-settings.html" target="_blank" rel="noopener" data-permission="accessSystemSettings" data-permission-mode="hide">系统设置</a>
       </div>
     </header>
 
@@ -309,5 +318,6 @@
 <script defer src="src/35-user-management-service.js"></script>
 <script defer src="./direct-admin-adapter.js"></script><!-- kg-admin:generated -->
 <script defer src="src/35-user-management.js"></script>
+<script src="src/admin/48-admin-context-nav.js"></script>
 </body>
 </html>

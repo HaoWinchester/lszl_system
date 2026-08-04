@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.example/schemas/course-config-schema-v1.json",
+  "title": "Course Configuration Schema v1",
+  "type": "object",
+  "required": ["id", "name", "subjectId", "taxonomyId", "status", "version", "stages", "parts", "nodes"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "name": {"type": "string", "minLength": 1},
+    "subjectId": {"type": "string", "minLength": 1},
+    "taxonomyId": {"type": "string", "minLength": 1},
+    "status": {"enum": ["draft", "published", "archived"]},
+    "version": {"type": "integer", "minimum": 1},
+    "description": {"type": "string"},
+    "stages": {"type": "array", "items": {"type": "object", "required": ["id", "title", "order"], "properties": {"id": {"type": "string"}, "title": {"type": "string"}, "order": {"type": "number"}}, "additionalProperties": true}},
+    "parts": {"type": "array", "items": {"type": "object", "required": ["id", "stageId", "title", "order"], "properties": {"id": {"type": "string"}, "stageId": {"type": "string"}, "title": {"type": "string"}, "order": {"type": "number"}}, "additionalProperties": true}},
+    "nodes": {"type": "array", "items": {"type": "object", "required": ["id", "partId", "title", "order", "activityIds"], "properties": {"id": {"type": "string"}, "partId": {"type": "string"}, "title": {"type": "string"}, "order": {"type": "number"}, "activityIds": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}}, "additionalProperties": true}}
+  },
+  "additionalProperties": true
+}

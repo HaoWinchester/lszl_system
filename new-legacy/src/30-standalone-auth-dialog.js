@@ -61,9 +61,8 @@
       const provider=core()?.providerStatus?.();
       status.title=provider?.remote?'后端认证模式':'本地演示认证模式；正式部署请切换后端认证';
     }
-    // 账号菜单页面保留隐藏代理按钮供菜单复用既有认证流程；不得把它们重新显示为外置操作。
-    if(login)login.style.display=login.classList.contains('account-hidden-trigger')?'none':(user?'none':'inline-flex');
-    if(logout)logout.style.display=logout.classList.contains('account-hidden-trigger')?'none':(user?'inline-flex':'none');
+    if(login)login.style.display=user?'none':'inline-flex';
+    if(logout)logout.style.display=user?'inline-flex':'none';
     document.body?.classList.toggle('auth-readonly',!user);
     return !!user;
   }

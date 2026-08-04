@@ -15,6 +15,8 @@
   };
   const state={step:1,maxVisited:1,mode:'guided',confidence:'',startedAt:Date.now(),completed:false,runtimeKey:'',timer:null,referenceVisible:false,renderedMaxVisited:0,renderedCompleted:false};
   const flow=()=>window.KGFlowOrchestrator||null;
+  let recapTimer=null;
+  let pendingRecap=null;
   const questions=()=>window.KGQuestionRepository||null;
 
   function currentQuestionKey(){
@@ -188,8 +190,8 @@
     if(title)title.textContent=state.completed?'本轮已完成':meta.title;
     if(hint)hint.textContent=state.completed?'你已经完成一次“题目—知识网—破题原则”的完整闭环。':meta.hint;
     if(summary)summary.textContent=meta.summary;
-    if(next)next.textContent=state.completed?'再学一题':meta.next;
-    if(back)back.hidden=state.step===1||state.completed;
+    if(next){next.textContent='继续';next.setAttribute('aria-label',state.completed?'继续下一题':'继续下一步');}
+    if(back){back.hidden=false;back.disabled=state.step===1||state.completed;}
     if(questionHint){
       questionHint.textContent=state.step===1?'先独立选择答案。进入下一步后，题干关键词才可以点击。':'请点击题干中你认为真正决定答案的关键词；背景信息不一定都是有效线索。';
     }
@@ -286,6 +288,19 @@
     prepareStep(next);
     goStep(next);
   }
+  function persistRecapSnapshot(snapshot){
+    if(!snapshot)return null;
+    const orchestrator=flow();
+    if(orchestrator?.saveConclusionFor)return orchestrator.saveConclusionFor(snapshot.questionId,snapshot.userId,snapshot.value);
+    if(snapshot.runtimeKey===currentRuntimeKey())return orchestrator?.saveConclusion?.(snapshot.value);
+    return null;
+  }
+  function flushPendingConclusion(){
+    if(recapTimer){clearTimeout(recapTimer);recapTimer=null}
+    const snapshot=pendingRecap;pendingRecap=null;
+    return persistRecapSnapshot(snapshot);
+  }
+  window.KGGuidedLearningCanvas=Object.assign(window.KGGuidedLearningCanvas||{},{flushPendingConclusion});
   function bindEvents(){
     byId('qtNextStepBtn')?.addEventListener('click',nextAction);
     byId('qtBackStepBtn')?.addEventListener('click',()=>{if(state.step>1)goStep(state.step-1)});
@@ -302,11 +317,17 @@
       state.confidence=input.value;
       persistFlow();
     }));
-    let recapTimer=null;
-    byId('qtRecapInput')?.addEventListener('input',()=>{
+    byId('qtRecapInput')?.addEventListener('input',event=>{
       clearTimeout(recapTimer);
-      recapTimer=setTimeout(()=>flow()?.saveConclusion?.(String(byId('qtRecapInput')?.value||'')),300);
+      pendingRecap={
+        runtimeKey:currentRuntimeKey(),
+        questionId:currentQuestionKey(),
+        userId:currentUserKey(),
+        value:String(event.currentTarget?.value||'')
+      };
+      recapTimer=setTimeout(()=>{recapTimer=null;const snapshot=pendingRecap;pendingRecap=null;persistRecapSnapshot(snapshot)},300);
     });
+    window.addEventListener('beforeunload',flushPendingConclusion);
     window.addEventListener('kg:learning-session-reset',event=>{
       state.runtimeKey='';
       const session=event.detail?.session;
@@ -335,7 +356,6 @@
       }
       if(step<=state.maxVisited&&!state.completed)goStep(step,{persistViewport:false});
     });
-    state.timer=setInterval(()=>{const el=byId('qtElapsedTime');if(el)el.textContent=formatDuration(elapsedSeconds())},1000);
   }
   function wrapLegacyRender(){
     if(typeof renderQuestionTrainer!=='function'||renderQuestionTrainer.__qtGuidedWrapped)return;

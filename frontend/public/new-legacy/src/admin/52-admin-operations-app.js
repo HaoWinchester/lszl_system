@@ -1,0 +1,13 @@
+'use strict';
+(function(global){
+  const Services=global.KGAdminServices,UI=global.KGAdminUI;if(!Services||!UI)return;const {byId,escapeHtml,formatTime,toast}=UI;
+  function render(){
+    const audit=Services.audit.list().slice(0,100),releases=Services.taxonomies.releaseRecords().slice(0,100),deletions=Services.taxonomies.deletionRecords().slice(0,100),subjects=new Map(Services.subjects.list().map(item=>[item.id,item]));
+    byId('adminAuditCount').textContent=String(Services.audit.summary().total);byId('adminAuditSummary').textContent=`${Services.audit.summary().failed} 条失败记录`;byId('adminReleaseCount').textContent=String(releases.length);byId('adminDeletionCount').textContent=String(deletions.length);
+    const auditEl=byId('adminAuditList');if(!Services.permissions.can('viewAudit'))auditEl.innerHTML='<div class="admin-empty">当前角色无权查看审计详情。</div>';else auditEl.innerHTML=audit.length?audit.map(item=>`<article class="${item.status==='failed'?'failed':''}"><i></i><div><strong>${escapeHtml(item.summary||item.action)}</strong><span>${escapeHtml(item.actor?.name||'未知用户')} · ${escapeHtml(item.action)} · ${escapeHtml(item.entityType)} ${escapeHtml(item.entityId||'')}</span></div><time>${formatTime(item.at)}</time></article>`).join(''):'<div class="admin-empty">还没有审计记录。</div>';
+    const labels={publish:'发布为当前',activate:'切换当前版本',archive:'归档历史版本',restore:'恢复历史版本'};byId('adminReleaseList').innerHTML=releases.length?releases.map(item=>`<article><div><strong>${escapeHtml(labels[item.action]||item.action)} · ${escapeHtml(item.versionLabel)}</strong><span>${escapeHtml(subjects.get(item.subjectId)?.name?.zh||item.subjectId)} · ${escapeHtml(item.actor?.name||'未知用户')}</span>${item.notes?`<small>${escapeHtml(item.notes)}</small>`:''}</div><time>${formatTime(item.at)}</time></article>`).join(''):'<div class="admin-empty">还没有知识树生命周期记录。</div>';
+    byId('adminDeletionRows').innerHTML=deletions.length?deletions.map(item=>`<tr><td>${escapeHtml(subjects.get(item.subjectId)?.name?.zh||item.subjectId)}</td><td><strong>${escapeHtml(item.name?.zh||item.taxonomyId)}</strong><small>${escapeHtml(item.taxonomyId)}</small></td><td>${escapeHtml(item.versionLabel)}</td><td>${escapeHtml(Services.taxonomies.statusLabel(item.previousStatus))}</td><td>${Number(item.nodeCount)||0}</td><td>${escapeHtml(item.deletedBy?.name||'未知用户')}</td><td>${formatTime(item.deletedAt)}</td></tr>`).join(''):'<tr><td colspan="7">尚无安全删除记录。</td></tr>';
+  }
+  function init(){UI.init(Services);render();byId('adminRefreshOperations').addEventListener('click',()=>{render();toast('操作记录已刷新。')})}
+  document.readyState==='loading'?document.addEventListener('DOMContentLoaded',init):init();
+})(window);

@@ -1,0 +1,7 @@
+.admin-context-nav{display:flex;align-items:center;gap:3px;min-height:42px;padding:5px 14px;background:#17243a;overflow-x:auto;overflow-y:hidden;position:relative;z-index:70;box-shadow:0 4px 12px rgba(17,29,49,.12);scrollbar-width:thin;white-space:nowrap}.admin-context-nav a{display:inline-flex;align-items:center;justify-content:center;min-width:max-content;padding:7px 10px;border-radius:7px;color:#b9c4d5;text-decoration:none;font:500 11px/1.2 Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif}.admin-context-nav a:hover{background:rgba(255,255,255,.07);color:#fff}.admin-context-nav a.active{background:rgba(20,184,166,.18);color:#fff;box-shadow:inset 0 -2px 0 #2dd4bf}@media(max-width:700px){.admin-context-nav{padding-inline:8px}.admin-context-nav a{padding:7px 8px}}
+
+body.teacher-admin-shell>.admin-context-nav{position:sticky;top:0;z-index:80}body.teacher-admin-shell>.tw-topbar{top:42px}body.teacher-admin-shell>.ca-app .tw-topbar{top:42px}
+
+/* P3.3.5：管理后台长页面保留统一一级导航；后台业务头栏固定在一级导航下方。 */
+body.admin-sticky-shell>.admin-context-nav{position:sticky;top:0;z-index:110}
+body.admin-sticky-shell>.admin-topbar{position:sticky;top:42px;z-index:105}

@@ -708,10 +708,11 @@ $('flashImportFile').addEventListener('change',async e=>{const f=e.target.files[
 
 $('cancelTemplateBtn').onclick=()=>$('templateModal').classList.remove('show');
 document.querySelectorAll('.template-card').forEach(card=>card.addEventListener('click',()=>{const kind=card.dataset.template;if(confirm('使用模板会替换当前图谱。确定继续吗？')){state=templateState(kind);normalizeState();$('templateModal').classList.remove('show');fitView(true);showStatus('模板已载入。')}}));
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){for(const id of ['nodeModal','linkModal','graphModal','templateModal','flashcardModal']){if($(id).classList.contains('show')){$(id).classList.remove('show');return}}clearSelection();return}if(e.key!=='Delete'&&e.key!=='Backspace')return;if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))return;if(state.selectedLinkId){if(typeof pushGraphUndoSnapshot==='function')pushGraphUndoSnapshot('删除关系线');state.links=state.links.filter(l=>l.id!==state.selectedLinkId);state.selectedLinkId=null;render({persist:true});showStatus('已删除选中的关系线。')}else if(selectedNodeIds&&selectedNodeIds.size>1&&typeof deleteSelectedNodesBatch==='function'){deleteSelectedNodesBatch()}else if(state.selectedNodeId){deleteNode(state.selectedNodeId)}else if(selectedNodeIds&&selectedNodeIds.size&&typeof deleteSelectedNodesBatch==='function'){deleteSelectedNodesBatch()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){for(const id of ['nodeModal','linkModal','graphModal','templateModal','flashcardModal']){if($(id).classList.contains('show')){$(id).classList.remove('show');return}}clearSelection();return}if(e.key!=='Delete'&&e.key!=='Backspace')return;if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))return;const hasBatchLinks=typeof selectedLinkIds!=='undefined'&&selectedLinkIds&&selectedLinkIds.size;const hasBatchNodes=selectedNodeIds&&selectedNodeIds.size;if((hasBatchLinks||hasBatchNodes||state.selectedLinkId)&&typeof deleteGraphBatchSelection==='function'){deleteGraphBatchSelection()}else if(state.selectedNodeId){deleteNode(state.selectedNodeId)}});
 function graphMinZoom(){return typeof graphViewportMinScale==='function'?graphViewportMinScale():.01}
 function graphMaxZoom(){return typeof graphViewportMaxScale==='function'?graphViewportMaxScale():4}
 function setZoomAtStageCenter(scale,persist=true){
+  if(typeof hideGraphTransientMenus==='function')hideGraphTransientMenus();
   if(typeof cancelGraphSmoothZoom==='function')cancelGraphSmoothZoom();
   const r=stage.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,before=screenToWorld(cx,cy),ns=clamp(Number(scale)||1,graphMinZoom(),graphMaxZoom());
   state.viewport.scale=ns;
@@ -726,6 +727,7 @@ function setZoomAtStageCenter(scale,persist=true){
   }
 }
 function animateZoomAtStageCenter(scale,persist=true,options={}){
+  if(typeof hideGraphTransientMenus==='function')hideGraphTransientMenus();
   const r=stage.getBoundingClientRect();
   const cx=r.left+r.width/2,cy=r.top+r.height/2;
   const before=screenToWorld(cx,cy);
@@ -909,6 +911,7 @@ function fitBoundsToView(bounds,persist=false,options={}){
   animateViewportTo(viewportForBounds(bounds,args.options),args.persist,{duration:args.options.duration??360});
 }
 function fitView(persist=false){
+  if(typeof hideGraphTransientMenus==='function')hideGraphTransientMenus();
   if(!state.nodes.length){
     const r=stage.getBoundingClientRect();
     animateViewportTo({x:r.width/2,y:r.height/2,scale:1},persist,{duration:300});

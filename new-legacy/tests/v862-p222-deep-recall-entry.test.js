@@ -1,0 +1,11 @@
+'use strict';
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const root=path.resolve(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const recall=read('src/86-knowledge-recall.js');
+assert(recall.includes('.kr-canvas-overlay-left,.kr-question-library-trigger,button,a,input,select,textarea'),'Deep Recall viewport must not capture pointer events from question-library controls');
+const source=read('src/96-recall-question-source.js');
+assert(source.includes("mode:'deep_recall'"),'deep recall must request published papers enabled for deep recall');
+assert(source.includes('KGPublishedPaperRepository'),'deep recall must use the unified published paper repository');
+assert(!source.includes('PMP_QUESTION_MVP'),'deep recall must not fall back to the demo bank');
+assert(!source.includes('kg_question_banks_published_v1'),'deep recall must not mix public banks into published paper choices');
+console.log('v862-p222-deep-recall-entry-static-ok');

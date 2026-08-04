@@ -6,23 +6,57 @@
     "zh": {
       "stem": "项目需求频繁变化，团队应采用哪种方式？",
       "options": [
-        {"id": "A", "text": "严格按照原计划执行", "feedback": ""},
-        {"id": "B", "text": "采用迭代方式持续调整", "feedback": ""},
-        {"id": "C", "text": "暂停项目等待需求稳定", "feedback": ""},
-        {"id": "D", "text": "仅由项目经理决定", "feedback": ""}
+        {
+          "id": "A",
+          "text": "严格按照原计划执行",
+          "feedback": ""
+        },
+        {
+          "id": "B",
+          "text": "采用迭代方式持续调整",
+          "feedback": ""
+        },
+        {
+          "id": "C",
+          "text": "暂停项目等待需求稳定",
+          "feedback": ""
+        },
+        {
+          "id": "D",
+          "text": "仅由项目经理决定",
+          "feedback": ""
+        }
       ]
     },
     "en": {
       "stem": "Project requirements change frequently. Which approach should the team use?",
       "options": [
-        {"id": "A", "text": "Follow the original plan strictly", "feedback": ""},
-        {"id": "B", "text": "Use an iterative approach and adjust continuously", "feedback": ""},
-        {"id": "C", "text": "Pause the project until requirements stabilize", "feedback": ""},
-        {"id": "D", "text": "Let only the project manager decide", "feedback": ""}
+        {
+          "id": "A",
+          "text": "Follow the original plan strictly",
+          "feedback": ""
+        },
+        {
+          "id": "B",
+          "text": "Use an iterative approach and adjust continuously",
+          "feedback": ""
+        },
+        {
+          "id": "C",
+          "text": "Pause the project until requirements stabilize",
+          "feedback": ""
+        },
+        {
+          "id": "D",
+          "text": "Let only the project manager decide",
+          "feedback": ""
+        }
       ]
     }
   },
-  "answer": {"optionId": "B"},
+  "answer": {
+    "optionId": "B"
+  },
   "explanation": {
     "zh": {
       "short": "需求频繁变化时，应采用迭代和持续反馈。",
@@ -36,6 +70,9 @@
       "incorrect": "Focus again on how frequently the requirements change.",
       "general": "Iteration and continuous feedback fit a rapidly changing environment."
     }
+  },
+  "assessment": {
+    "language": "zh"
   },
   "config": {},
   "metadata": {

@@ -38,7 +38,7 @@ function bindQuestionTrainerSafe(){
   if(close){
     close.onclick=e=>{
       e.preventDefault();
-      if(document.body.classList.contains('question-training-page')){window.location.href='learning-path.html';return}
+      if(document.body.classList.contains('question-training-page')){window.location.href=window.KGPracticeNavigation?.returnUrl?.('question-workspace.html')||'question-workspace.html';return}
       const modal=$('questionModal');
       if(modal)modal.classList.remove('show');
     };

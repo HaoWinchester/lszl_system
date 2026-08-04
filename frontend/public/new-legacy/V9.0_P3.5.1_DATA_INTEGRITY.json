@@ -1,0 +1,89 @@
+{
+  "release": "v9.0-p3.5.1",
+  "baseline": "v9.0-p3.5",
+  "generatedAt": "2026-07-30T05:28:51.045346+00:00",
+  "baselinePackageSha256": "6545b5873a8b5df1553e1766801221bbac7b56c9ad2a23a6e454a9a40a9e88cf",
+  "scope": "试卷管理双栏工作区、横向排版、题目双击预览与精确编辑跳转",
+  "summary": {
+    "nodeTests": {
+      "passed": 84,
+      "failed": 0
+    },
+    "browserTests": {
+      "passed": 5,
+      "files": [
+        "tests/v90-p35-paper-management-browser.py",
+        "tests/v90-p34-question-ownership-safe-delete-browser.py",
+        "tests/v90-p311-admin-top-navigation-browser.py",
+        "tests/v90-p331-navigation-shell-fix-browser.py",
+        "tests/v90-p335-admin-sticky-account-tag-category-browser.py"
+      ]
+    },
+    "javascriptSyntaxChecked": 213,
+    "htmlFilesChecked": 20,
+    "duplicateHtmlIds": 0
+  },
+  "acceptance": {
+    "horizontalLabels": true,
+    "sideBySidePickerAndPreview": true,
+    "draggableSplitter": true,
+    "paneMaximizeAndCollapse": true,
+    "independentInternalScrolling": true,
+    "doubleClickQuestionPreview": true,
+    "exactQuestionEditDeepLink": true,
+    "paperQuestionIdsUnchanged": true,
+    "sourceQuestionsNotDeletedByPaperRemoval": true
+  },
+  "changedFiles": [
+    "CHANGELOG.md",
+    "README.md",
+    "VERSION",
+    "paper-management.html",
+    "src/65-question-bank-admin.js",
+    "src/admin/00-admin-core.js",
+    "styles/paper-management.css",
+    "tests/v862-data-integrity.test.js",
+    "tests/v862-p2238-legacy-freeze.test.js",
+    "tests/v90-p0-admin-foundation.test.js",
+    "tests/v90-p21-taxonomy-release.test.js",
+    "tests/v90-p22-taxonomy-lifecycle.test.js",
+    "tests/v90-p31-admin-ia.test.js",
+    "tests/v90-p31-data-integrity.test.js",
+    "tests/v90-p32-subject-management.test.js",
+    "tests/v90-p331-navigation-shell-fix.test.js",
+    "tests/v90-p333-question-classification.test.js",
+    "tests/v90-p3331-batch-default-classification.test.js",
+    "tests/v90-p334-lightweight-tag-management.test.js",
+    "tests/v90-p35-paper-management-browser.py",
+    "tests/v90-p35-paper-management.test.js"
+  ],
+  "addedFiles": [
+    "V9.0_P3.5.1_PAPER_MANAGEMENT_UI_OPTIMIZATION_REPORT.md",
+    "V9.0_P3.5.1_QUICK_START.md"
+  ],
+  "fileSha256": {
+    "CHANGELOG.md": "3c811db4f69c05562c9f7916cd2a97577aff85a1209b463ac648913f99947161",
+    "README.md": "205276d9a666e941a59f2cfcf4c29c4d3753458b07245d034ed5cdd5ccf9db64",
+    "VERSION": "ce186c63110ca4e9f41beb0d7b6a69d7341d4c4d1b632e121ee01eff17ba33c0",
+    "paper-management.html": "75495831f7d577ff64560d8f240ba86eaba92ff2530e863a63500f1de86d5a97",
+    "src/65-question-bank-admin.js": "6ed0defea26f6b82bb6e6235baf6b886784ba5632e725d21212f730fc1aa0b02",
+    "src/admin/00-admin-core.js": "886b917f7a7b5ad4dae14ece1aa1d04ee729fdd2647ddf30be1aec18e5b0196f",
+    "styles/paper-management.css": "57fee81b97061def270744b8b56aaeb51c36657fa02eb1aba2f1d789abc25ecc",
+    "tests/v862-data-integrity.test.js": "d20e663da65928256ba27fcb752a4aac8a4c7c13927472a37654977c9d840684",
+    "tests/v862-p2238-legacy-freeze.test.js": "e23f785276169d026e01883fb8a155c2854bf0ed4a5ce6c875d430bd0df03d17",
+    "tests/v90-p0-admin-foundation.test.js": "de1c154c8080b647babfdffaa0e989cc8a54281e6d91b2992dfc0c17209c8be5",
+    "tests/v90-p21-taxonomy-release.test.js": "e5ea57f8462c0fa668907d3ab9e25a23e3ca90c7e780248a8930a03c7b4bb83a",
+    "tests/v90-p22-taxonomy-lifecycle.test.js": "3caf59153e88eab205306aaaf0cd4c8a4bb371c0a6d3b0495a3579b63f229791",
+    "tests/v90-p31-admin-ia.test.js": "72e5813637be12fe6b0be7ae9bca2a3d6c38e3a5ffdf7127a6d9664cb31ed8f7",
+    "tests/v90-p31-data-integrity.test.js": "e8c085d34c3fdcbd524ecf7d4161f2e5ee51f52871bb4ba6e2e5a223dbae5a02",
+    "tests/v90-p32-subject-management.test.js": "3ecde934f6d2722e3bfcc5a828543fb37388a7ba4d164a648545f9a1f845558f",
+    "tests/v90-p331-navigation-shell-fix.test.js": "4ef17518302bdae6ac273d433924a894179e4b71f586d1013c5bd5463afda62d",
+    "tests/v90-p333-question-classification.test.js": "8251eef5d67fd66499e4c35886fe87c46cd7d2e87023309d114d19cdce51a9eb",
+    "tests/v90-p3331-batch-default-classification.test.js": "4b42332b02a90b797a709bd4a0d0ded93fd4757cf861543051533c743279fefd",
+    "tests/v90-p334-lightweight-tag-management.test.js": "bf5681670be821ca3593345956a55088f32e18dfd8461f7eb61f6b297d053379",
+    "tests/v90-p35-paper-management-browser.py": "9478dfe02669c18f1db36ce1fbc6533cec6145b368f0c24e60f3510b9981b168",
+    "tests/v90-p35-paper-management.test.js": "55e10c0e106a29a3637327617d9fd9a587a85db94a499c4d6616b33b28dde5da",
+    "V9.0_P3.5.1_PAPER_MANAGEMENT_UI_OPTIMIZATION_REPORT.md": "f20eb2cc645465f1f543026c43067d7e760d6d92781da5fa73d08a7839f8ec9c",
+    "V9.0_P3.5.1_QUICK_START.md": "40beeed65167137d332f0631b78116d8d173bcde9b11238ddaf92626da51af8f"
+  }
+}

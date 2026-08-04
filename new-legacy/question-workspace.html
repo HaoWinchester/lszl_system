@@ -3,8 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-  <title>多题归纳画布｜项目管理综合训练</title>
-  <link rel="stylesheet" href="styles/main.css"/>
+  <title>多题归纳画布｜项目管理综合训练</title><link rel="stylesheet" href="styles/main.css"/>
   <link rel="stylesheet" href="styles/question-training.css"/>
   <link rel="stylesheet" href="styles/infinite-learning-canvas.css"/>
   <link rel="stylesheet" href="styles/progress-workspace-dock.css"/>
@@ -14,120 +13,130 @@
   <link rel="stylesheet" href="styles/subscription.css"/>
   <link rel="stylesheet" href="styles/user-center.css"/>
   <link rel="stylesheet" href="styles/account-menu.css"/>
+  <link rel="stylesheet" href="styles/learning-practice-shell.css"/>
+  <link rel="stylesheet" href="styles/question-workspace-p2218.css"/>
+  <link rel="stylesheet" href="styles/question-workspace-p2219.css"/>
 </head>
 <body class="question-workspace-page">
   <div class="qw-app">
-    <header class="qw-topbar">
-      <div class="qw-brand">
-        <a class="qw-back" href="question-training.html" title="返回单题深学">←</a>
-        <div>
-          <span>多题归纳</span>
-          <h1 id="qwPageTitle">我的PMP解题规律</h1>
-        </div>
+    <header class="qw-topbar lp-topbar">
+      <div class="qw-brand lp-brand">
+        <a class="qw-back" data-practice-back href="index.html?mode=free" title="返回知识图谱">←</a>
+        <div><h1>多题归纳</h1></div>
       </div>
 
-      <div class="qw-workspace-switcher" aria-label="多题画布切换">
-        <label for="qwWorkspaceSelect">画布</label>
-        <select id="qwWorkspaceSelect"></select>
-        <button type="button" id="qwCreateWorkspaceBtn" title="新建画布">＋</button>
-        <button type="button" id="qwRenameWorkspaceBtn" title="重命名当前画布">改名</button>
-        <button type="button" id="qwDeleteWorkspaceBtn" title="删除当前画布">删除</button>
+      <div class="qw-workspace-tabbar" id="qwWorkspaceTabbar" aria-label="多题画布页签栏">
+        <a class="qw-workspace-home" id="qwWorkspaceListBtn" href="file-manager.html?type=workspace" title="进入文件管理" aria-label="进入文件管理，查看多题画布"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"></rect><path d="M8 9h8M8 13h8M8 17h5"></path></svg></a>
+        <div class="qw-workspace-tabs" id="qwWorkspaceTabs" role="tablist" aria-label="已打开的多题画布"></div>
+        <button class="qw-workspace-add" id="qwCreateWorkspaceBtn" type="button" title="新建画布" aria-label="新建画布">＋</button>
       </div>
 
-      <div class="qw-top-actions">
-        <span class="qw-node-count" id="qwNodeCount">0 题</span>
+      <div class="qw-top-actions lp-top-actions">
+        <span class="lp-visually-hidden" data-practice-only>自由练习，不计成绩</span>
         <span class="qw-readonly-badge" id="qwReadOnlyBadge" hidden>只读查看</span>
-        <a class="qt-nav-btn" href="learning-path.html">学习路径</a>
-        <a class="qt-nav-btn" href="question-training.html">单题深学</a>
-        <div class="account-menu-shell">
+        <div class="qw-language-control">
+          <div class="qw-language-switch" role="group" aria-label="题目显示方式">
+            <button type="button" data-question-language="zh" aria-pressed="true">中</button>
+            <button type="button" data-question-language="bilingual" aria-pressed="false">中英</button>
+          </div>
+          
+        </div>
+        
+        
+        <div class="account-menu-shell" id="accountMenuShell">
           <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
-            <span class="role-dot"></span><span class="auth-status-label">访客只读</span><span aria-hidden="true" class="account-menu-mobile-label">账号</span>
+            <span class="role-dot"></span><span class="auth-status-label">访客只读</span>
             <svg aria-hidden="true" class="account-menu-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>
           </button>
           <div class="account-menu" hidden id="accountMenu" role="menu" aria-label="账号菜单">
-            <button class="account-menu-item account-menu-session" data-account-menu-action="session" role="menuitem" type="button">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1 2 2h-5"/></svg>
+            <button class="account-menu-item" id="accountMenuUserCenterBtn" role="menuitem" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+              <span data-mobile-label="用户">用户中心</span>
+            </button>
+            <button class="account-menu-item" id="accountMenuHelpBtn" role="menuitem" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.35 2.35 0 1 1 3.5 2.05c-.82.45-1.3.93-1.3 1.95"/><path d="M12 17h.01"/></svg>
+              <span data-mobile-label="帮助">帮助中心</span>
+            </button>
+            <button class="account-menu-item account-menu-upgrade" id="accountMenuUpgradeBtn" role="menuitem" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 9.6 8.1 4 9l4 3.9-.9 5.6L12 16l4.9 2.5-.9-5.6L20 9l-5.6-.9Z"/></svg>
+              <span data-mobile-label="升级">升级会员</span>
+            </button>
+            <div class="account-menu-separator" role="separator"></div>
+            <button class="account-menu-item account-menu-session" id="accountMenuSessionBtn" role="menuitem" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></svg>
               <span data-mobile-label="登录">登录</span>
             </button>
           </div>
         </div>
         <button class="account-hidden-trigger" hidden id="authLoginBtn" type="button">登录</button>
         <button class="account-hidden-trigger" hidden id="authLogoutBtn" type="button">退出登录</button>
+        <button class="account-hidden-trigger" hidden id="tutorialBtn" type="button">使用说明</button>
       </div>
     </header>
 
     <main class="qw-canvas-shell" id="qwCanvasShell">
       <div class="qw-overlay qw-overlay-left">
         <button type="button" class="qw-tool-btn" id="qwQuestionDockBtn" aria-controls="qwQuestionDrawer">
-          <span aria-hidden="true">▤</span><span>试卷题目</span><strong id="qwQuestionCount">0</strong>
+          <span aria-hidden="true">▤</span><span>题目库</span><strong id="qwQuestionCount">0</strong>
         </button>
-        <span class="qw-workspace-chip" id="qwWorkspaceChip">我的PMP解题规律</span>
-        <button type="button" class="qw-help-btn" id="qwHelpBtn" title="使用说明">?</button>
+        <div class="qw-workspace-filebar" id="qwWorkspaceFilebar" aria-label="当前画布文件">
+          <button class="qw-workspace-save-state" id="qwWorkspaceSaveState" type="button" aria-label="立即保存。当前状态：已保存" title="已保存。点击立即保存（Ctrl+S / Command+S）">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .8-7.9A6 6 0 0 0 6.4 8.5 4.8 4.8 0 0 0 7 18Z"/><path d="m9.5 13 1.7 1.7 3.5-3.7"/></svg><span class="qw-workspace-save-state-text">已保存</span>
+          </button>
+          <span class="qw-workspace-chip" id="qwWorkspaceChip" role="button" tabindex="0" title="双击修改画布名称" aria-label="当前画布：我的PMP解题规律。双击修改名称">我的PMP解题规律</span>
+          <button class="qw-workspace-global-search-btn" id="qwWorkspaceGlobalSearchBtn" type="button" title="搜索当前画布" aria-label="搜索当前画布"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg></button>
+          <div class="qw-workspace-global-search-panel" id="qwWorkspaceGlobalSearchPanel" hidden>
+            <div class="qw-workspace-global-search-head">
+              <label><span aria-hidden="true">⌕</span><input id="qwWorkspaceGlobalSearchInput" type="search" autocomplete="off" placeholder="搜索题目、归纳卡、标签"/></label>
+              <button type="button" id="qwWorkspaceGlobalSearchClose" aria-label="关闭搜索">×</button>
+            </div>
+            <div class="qw-workspace-global-search-meta" id="qwWorkspaceGlobalSearchMeta">当前画布</div>
+            <div class="qw-workspace-global-search-results" id="qwWorkspaceGlobalSearchResults" role="listbox"></div>
+          </div>
+        </div>
+        
       </div>
 
-      <div class="qw-overlay qw-layout-toolbar" id="qwLayoutToolbar" aria-label="多题卡片排列与历史操作">
-        <button type="button" id="qwUndoBtn" title="撤销上一次布局操作（Ctrl/Command+Z）" disabled>↶</button>
-        <button type="button" id="qwRedoBtn" title="重做布局操作（Ctrl/Command+Shift+Z）" disabled>↷</button>
-        <span class="qw-overlay-divider" aria-hidden="true"></span>
-        <span class="qw-arrange-selection-count" id="qwArrangeSelectionCount" aria-live="polite">选择至少 2 张卡片</span>
-        <label class="qw-arrange-picker" for="qwArrangeSelect">
-          <span class="sr-only">选择排列操作，选择后立即执行</span>
-          <select id="qwArrangeSelect" aria-label="选择排列操作，选择后立即执行" disabled>
-            <option value="">选择排列方式（选择后立即执行）</option>
-            <optgroup label="对齐">
-              <option value="align-left">左对齐</option>
-              <option value="align-center">水平居中</option>
-              <option value="align-right">右对齐</option>
-              <option value="align-top">顶部对齐</option>
-              <option value="align-middle">垂直居中</option>
-              <option value="align-bottom">底部对齐</option>
-            </optgroup>
-            <optgroup label="等距分布（至少 3 张）">
-              <option value="distribute-x">横向等距</option>
-              <option value="distribute-y">纵向等距</option>
-            </optgroup>
-            <optgroup label="统一尺寸（以首选卡片为基准）">
-              <option value="same-width">统一宽度</option>
-              <option value="same-height">统一高度</option>
-              <option value="same-size">统一宽高</option>
-            </optgroup>
-          </select>
-        </label>
+      <div class="qw-overlay qw-layout-toolbar qw-layout-toolbar-global" id="qwLayoutToolbar" aria-label="画布历史与全局整理">
+        <button type="button" id="qwUndoBtn" title="撤销（Ctrl/Command+Z）" disabled>↶</button>
+        <button type="button" id="qwRedoBtn" title="重做（Ctrl/Command+Shift+Z）" disabled>↷</button>
         <span class="qw-overlay-divider" aria-hidden="true"></span>
         <button type="button" id="qwNewSynthesisBtn" class="qw-structure-primary" title="新增原则、套路、陷阱或笔记卡">＋归纳卡</button>
-        <button type="button" id="qwCreateGroupBtn" class="qw-legacy-group-action" title="将所选卡片建立为分组" disabled>分组</button>
-        <button type="button" id="qwConnectBtn" title="为两张所选卡片建立关系" disabled>连线</button>
         <label class="qw-smart-picker" for="qwSmartArrangeSelect">
           <span class="sr-only">一键智能整理</span>
           <select id="qwSmartArrangeSelect" aria-label="一键智能整理">
-            <option value="">智能整理</option>
-            <option value="grid">整齐网格</option>
-            <option value="topic">按主题分列</option>
-            <option value="status">按状态分列</option>
-            <option value="type">按卡片类型分列</option>
+            <option value="">智能整理</option><option value="grid">整齐网格</option><option value="topic">按主题分列</option><option value="status">按状态分列</option><option value="type">按卡片类型分列</option>
           </select>
         </label>
-        <button type="button" id="qwDiagnoseBtn" class="qw-diagnose-btn" title="检查重叠、越界与异常布局" aria-label="布局检查">检查<span id="qwIssueBadge" hidden>0</span></button>
+        <button type="button" id="qwDiagnoseBtn" class="qw-diagnose-btn" title="检查重叠、异常尺寸与分组布局" aria-label="布局检查">检查<span id="qwIssueBadge" hidden>0</span></button>
       </div>
 
-      <div class="qw-overlay qw-overlay-right" aria-label="多题画布视图控制">
+      <div class="qw-overlay qw-overlay-right" aria-label="多题画布工具">
         <button type="button" id="qwPointerModeBtn" class="qw-pointer-mode" title="选择/手型（V）" aria-label="选择/手型（V）"></button>
         <button type="button" id="qwFontScaleBtn" class="qw-font-scale" title="调整多题页面文字大小" aria-label="调整多题页面文字大小">Aa</button>
+        <button type="button" id="qwOpenSingleDeepBtn" class="qw-single-deep-btn" title="进入单题深学" aria-label="进入单题深学"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="2.2"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg></button>
         <span class="qw-overlay-divider" aria-hidden="true"></span>
-        <button type="button" id="qwZoomOutBtn" title="缩小">−</button>
-        <button type="button" id="qwZoomLabel" title="恢复100%">100%</button>
-        <button type="button" id="qwZoomInBtn" title="放大">＋</button>
-        <button type="button" id="qwFitBtn" title="显示全部题目卡">全览</button>
         <button type="button" id="qwResetViewBtn" title="恢复默认视图">重置视图</button>
       </div>
 
+      <div class="qw-canvas-summary-dock" id="qwCanvasSummaryDock" aria-label="当前多题画布统计">
+        <span class="qw-node-count" id="qwNodeCount">0 卡 · 0 题</span>
+      </div>
+
+      <div class="lp-canvas-zoom-dock" id="qwCanvasZoomDock" role="group" aria-label="多题画布缩放控制">
+        <button class="lp-canvas-zoom-btn" id="qwZoomOutBtn" type="button" aria-label="缩小画布" title="缩小">−</button>
+        <div class="lp-canvas-zoom-percent-wrap"><div class="lp-canvas-zoom-slider-popover" id="qwZoomSliderPopover" aria-hidden="true"><input id="qwZoomSlider" type="range" min="1" max="400" step="1" value="100" aria-label="缩放比例"/></div><button class="lp-canvas-zoom-percent" id="qwZoomLabel" type="button" aria-label="当前缩放比例，点击调整">100%</button></div>
+        <button class="lp-canvas-zoom-btn" id="qwZoomInBtn" type="button" aria-label="放大画布" title="放大">＋</button><span class="lp-canvas-zoom-divider" aria-hidden="true"></span>
+        <button class="lp-canvas-zoom-btn lp-canvas-fit-btn" id="qwFitBtn" type="button" aria-label="全览当前画布" title="全览"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 4H4v4"></path><path d="M16 4h4v4"></path><path d="M4 16v4h4"></path><path d="M20 16v4h-4"></path><rect x="8" y="8" width="8" height="8" rx="2"></rect></svg></button>
+      </div>
+
       <div class="qw-help-popover" id="qwHelpPopover" hidden>
-        <strong>多题归纳画布</strong>
+        <div class="qw-help-popover-head"><strong>多题归纳画布</strong><a class="qw-help-more" href="multi-question-help.html" title="打开完整版帮助" aria-label="打开完整版帮助">…</a></div>
         <p>从已发布试卷中拖入多道题，按相同原则、相同套路或对比陷阱进行空间整理。</p>
         <p>箭头模式可在空白处拖拽框选多张题目卡，拖动任一已选卡可整体移动；Ctrl/Command 点击卡片标题可增减选择。</p>
-        <p>选中两张以上卡片后，可排列、建立分组；点击分组容器可激活，激活后从容器空白区域整体拖动。恰好选择两张可建立“同类、对比、因果、例外、易混淆”等关系。</p>
+        <p>多选卡片后，使用卡片上方悬浮菜单进行对齐、分组、归纳、连线、颜色和删除。单选卡片会显示四个连接点，按住连接点拖到另一张卡片即可快速建立关系线。</p>
         <p>“＋归纳卡”可创建原则、套路、陷阱和笔记卡；“布局检查”只在操作结束后轻量检测重叠，不会实时推动其他卡片。</p>
-        <p>Ctrl/Command+Z 撤销布局或结构操作，Ctrl/Command+Shift+Z 重做；手型、空格或鼠标右键用于平移，Aa 可调整整页文字大小。</p>
+        <p>Delete / Backspace 可删除当前选中的卡片或关系线；Ctrl/Command+Z 撤销，Ctrl/Command+Shift+Z 重做；手型、空格或鼠标右键用于平移，Aa 可调整整页文字大小。</p>
         <p>本画布不会改变任何单题的五步学习进度。点击题目卡底部“解”可在卡片旁查看解析，并自行勾选答案、主线、知识点等展示内容。框选多张卡片后，使用选区上方的悬浮栏快速成组、归纳或改色。</p>
       </div>
 
@@ -136,18 +145,47 @@
         <span id="qwDropWorkspaceName">我的PMP解题规律</span>
       </div>
 
-      <div class="qw-selection-toolbar" id="qwSelectionToolbar" hidden role="toolbar" aria-label="所选卡片快捷操作">
-        <button type="button" data-qw-selection-action="group" title="将所选卡片成组" aria-label="成组">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="3"/><rect x="7" y="8" width="4" height="4" rx="1"/><rect x="13" y="8" width="4" height="4" rx="1"/></svg>
+      <div class="qw-selection-toolbar qw-selection-toolbar-pro" id="qwSelectionToolbar" hidden role="toolbar" aria-label="多选卡片快捷操作">
+        <span class="qw-selection-count" id="qwSelectionCount">多选（2）</span>
+        <div class="qw-selection-menu-wrap">
+          <button type="button" data-qw-selection-action="align-menu" title="元素对齐" aria-label="元素对齐">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14M8 8h8M8 12h5M8 16h9"/></svg>
+          </button>
+          <div class="qw-selection-popover qw-selection-align-menu" id="qwSelectionAlignMenu" hidden>
+            <strong>对齐</strong>
+            <div class="qw-align-grid">
+              <button type="button" data-qw-arrange="align-left" title="左对齐" aria-label="左对齐"><svg viewBox="0 0 24 24"><path d="M4 4v16"/><path d="M7 7h9M7 12h6M7 17h11"/></svg></button>
+              <button type="button" data-qw-arrange="align-center" title="水平居中对齐" aria-label="水平居中对齐"><svg viewBox="0 0 24 24"><path d="M12 4v16"/><path d="M7 7h10M8.5 12h7M6 17h12"/></svg></button>
+              <button type="button" data-qw-arrange="align-right" title="右对齐" aria-label="右对齐"><svg viewBox="0 0 24 24"><path d="M20 4v16"/><path d="M8 7h9M11 12h6M6 17h11"/></svg></button>
+              <button type="button" data-qw-arrange="distribute-x" title="水平等间距" aria-label="水平等间距"><svg viewBox="0 0 24 24"><path d="M4 6v12M9 8v8M15 8v8M20 6v12"/></svg></button>
+              <button type="button" data-qw-arrange="align-top" title="顶部对齐" aria-label="顶部对齐"><svg viewBox="0 0 24 24"><path d="M4 4h16"/><path d="M7 7v9M12 7v6M17 7v11"/></svg></button>
+              <button type="button" data-qw-arrange="align-middle" title="垂直居中对齐" aria-label="垂直居中对齐"><svg viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M7 7v10M12 8.5v7M17 6v12"/></svg></button>
+              <button type="button" data-qw-arrange="align-bottom" title="底部对齐" aria-label="底部对齐"><svg viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M7 8v9M12 11v6M17 6v11"/></svg></button>
+              <button type="button" data-qw-arrange="distribute-y" title="垂直等间距" aria-label="垂直等间距"><svg viewBox="0 0 24 24"><path d="M6 4h12M8 9h8M8 15h8M6 20h12"/></svg></button>
+            </div>
+          </div>
+        </div>
+        <button type="button" data-qw-selection-action="tidy" title="局部整理所选卡片" aria-label="局部整理所选卡片">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><rect x="14" y="14" width="6" height="6" rx="1"></rect></svg>
         </button>
+        <div class="qw-selection-menu-wrap">
+          <button type="button" data-qw-selection-action="group-menu" title="图元分组" aria-label="图元分组">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+          </button>
+          <div class="qw-selection-popover qw-selection-group-menu" id="qwSelectionGroupMenu" hidden></div>
+        </div>
         <button type="button" data-qw-selection-action="synthesize" title="根据所选题目生成归纳卡" aria-label="归纳">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z"/><path d="M5 15l.9 2.1L8 18l-2.1.9L5 21l-.9-2.1L2 18l2.1-.9L5 15z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z"/></svg>
+        </button>
+        <button type="button" data-qw-selection-action="connect" title="建立无文字关系线" aria-label="连线">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="17" r="2"/><circle cx="18" cy="7" r="2"/><path d="M8 16 16 8"/></svg>
         </button>
         <div class="qw-selection-color-wrap">
           <button type="button" data-qw-selection-action="color" title="设置卡片或分组颜色" aria-label="颜色">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3s6 6.4 6 11a6 6 0 0 1-12 0c0-4.6 6-11 6-11z"/></svg>
           </button>
           <div class="qw-selection-color-palette" id="qwSelectionColorPalette" hidden>
+            <button type="button" data-qw-selection-color="#ffffff" style="--qw-swatch:#ffffff" title="白色"></button>
             <button type="button" data-qw-selection-color="#ede9fe" style="--qw-swatch:#ede9fe" title="紫色"></button>
             <button type="button" data-qw-selection-color="#dbeafe" style="--qw-swatch:#dbeafe" title="蓝色"></button>
             <button type="button" data-qw-selection-color="#dcfce7" style="--qw-swatch:#dcfce7" title="绿色"></button>
@@ -157,37 +195,24 @@
             <button type="button" data-qw-selection-color="#e0f2fe" style="--qw-swatch:#e0f2fe" title="天蓝"></button>
           </div>
         </div>
+        <button type="button" class="danger" data-qw-selection-action="delete" title="删除所选卡片（Delete）" aria-label="删除所选卡片">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4h6v3M8 7l1 13h6l1-13"/></svg>
+        </button>
       </div>
 
       <div class="qw-drawer-backdrop" id="qwQuestionDrawerBackdrop" hidden></div>
-      <aside class="qw-question-drawer" id="qwQuestionDrawer" aria-hidden="true" aria-labelledby="qwQuestionDrawerTitle">
-        <header>
-          <div>
-            <span>已发布试卷题目</span>
-            <h2 id="qwQuestionDrawerTitle">拖入试卷题目进行归纳</h2>
-            <p id="qwQuestionDrawerMeta">题目只生成引用卡，不影响原题和学习记录。</p>
-          </div>
-          <button type="button" id="qwQuestionDrawerClose" aria-label="关闭">×</button>
-        </header>
-        <div class="qw-drawer-tools">
-          <label class="qw-paper-picker">
-            <span>已发布试卷</span>
-            <select id="qwPaperSelect" aria-label="选择已发布试卷"></select>
-          </label>
-          <label class="qw-question-search-field">
-            <span aria-hidden="true">⌕</span>
-            <input id="qwQuestionSearch" type="search" placeholder="搜索当前试卷中的题目、主题或标签"/>
-          </label>
-          <div role="group" aria-label="题目状态筛选">
+      <aside class="qw-question-drawer lp-question-library-compact" id="qwQuestionDrawer" aria-hidden="true" aria-label="题目库">
+        <div class="qw-drawer-tools lp-question-library-tools">
+          <div class="lp-question-paper-row"><select id="qwPaperSelect" class="lp-question-paper-select" aria-label="选择已发布试卷"></select><button id="qwQuestionDrawerClose" class="lp-question-library-close" type="button" aria-label="关闭题目库" title="关闭">×</button></div>
+          <div class="qw-question-search-field lp-question-search-row"><input id="qwQuestionSearch" type="search" placeholder="搜索题目"/><button id="qwQuestionSearchBtn" class="lp-question-text-action" type="button">搜索</button></div>
+          <div class="lp-question-filter-links" role="group" aria-label="题目状态筛选">
             <button type="button" class="active" data-qw-filter="all">全部</button>
             <button type="button" data-qw-filter="unfinished">未完成</button>
             <button type="button" data-qw-filter="completed">已完成</button>
           </div>
+          <div class="lp-question-library-meta" id="qwQuestionDrawerMeta" aria-live="polite"></div>
         </div>
-        <div class="qw-question-list" id="qwQuestionList" role="list"></div>
-        <footer>
-          <span>桌面端可拖动题目；也可点击右侧“＋”。</span>
-        </footer>
+        <div class="qw-question-list lp-question-library-list" id="qwQuestionList" role="list"></div>
       </aside>
 
       <section class="qw-viewport" id="qwCanvasViewport" tabindex="0" aria-label="多题归纳画布">
@@ -211,9 +236,15 @@
           <span>打开左上角“题目库”，拖入题目后按相同原则或解题套路进行整理。</span>
           <button type="button" id="qwEmptyAddBtn">打开题目库</button>
         </div>
-        <div class="qw-minimap" id="qwMinimap" aria-hidden="true">
-          <div class="qw-minimap-world" id="qwMinimapWorld"></div>
-          <div class="qw-minimap-view" id="qwMinimapView"></div>
+        <div class="qw-bottom-right-dock collapsed" id="qwBottomRightDock">
+          <div class="qw-minimap" id="qwMinimap" aria-hidden="true">
+            <div class="qw-minimap-world" id="qwMinimapWorld"></div>
+            <div class="qw-minimap-view" id="qwMinimapView" title="拖动此框移动画布视野"></div>
+          </div>
+          <div class="qw-bottom-right-toolbar" role="group" aria-label="帮助与缩略图">
+            <button type="button" class="qw-bottom-tool-btn qw-help-btn" id="qwHelpBtn" title="使用说明" aria-label="使用说明">?</button>
+            <button type="button" class="qw-bottom-tool-btn qw-minimap-toggle" id="qwMinimapToggleBtn" aria-expanded="false" aria-controls="qwMinimap" title="打开缩略图" aria-label="打开缩略图"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6.5 8 4l8 3 5-2.5v13L16 20l-8-3-5 2.5z"></path><path d="M8 4v13M16 7v13"></path></svg></button>
+          </div>
         </div>
       </section>
     </main>
@@ -229,7 +260,7 @@
       <label><span>标题</span><input id="qwSynthesisTitle" maxlength="80" placeholder="例如：先确认变更控制流程"/></label>
       <label class="full"><span>内容</span><textarea id="qwSynthesisContent" rows="7" maxlength="3000" placeholder="写下可复用的原则、步骤、陷阱或补充说明"></textarea></label>
       <label class="full"><span>标签</span><input id="qwSynthesisTags" maxlength="240" placeholder="多个标签用逗号分隔"/></label>
-      <label><span>颜色</span><select id="qwSynthesisColor"><option value="#ede9fe">紫色</option><option value="#dbeafe">蓝色</option><option value="#dcfce7">绿色</option><option value="#fef3c7">黄色</option><option value="#fee2e2">红色</option><option value="#fce7f3">粉色</option><option value="#e0f2fe">天蓝</option></select></label>
+      <label><span>颜色</span><select id="qwSynthesisColor"><option value="#ffffff">白色</option><option value="#ede9fe">紫色</option><option value="#dbeafe">蓝色</option><option value="#dcfce7">绿色</option><option value="#fef3c7">黄色</option><option value="#fee2e2">红色</option><option value="#fce7f3">粉色</option><option value="#e0f2fe">天蓝</option></select></label>
       <label><span>状态</span><select id="qwSynthesisStatus"><option value="draft">待验证</option><option value="verified">已验证</option><option value="mastered">已掌握</option></select></label>
     </div>
     <footer><button type="button" data-qw-modal-close>取消</button><button type="button" class="primary" id="qwSaveSynthesisBtn">保存归纳卡</button></footer>
@@ -239,7 +270,7 @@
     <header><div><small>主题容器</small><h2 id="qwGroupModalTitle">建立分组</h2></div><button type="button" data-qw-modal-close aria-label="关闭">×</button></header>
     <div class="qw-structure-form">
       <label class="full"><span>分组名称</span><input id="qwGroupTitle" maxlength="80" placeholder="例如：范围变更题型"/></label>
-      <label class="full"><span>分组颜色</span><select id="qwGroupColor"><option value="#ede9fe">紫色</option><option value="#dbeafe">蓝色</option><option value="#dcfce7">绿色</option><option value="#fef3c7">黄色</option><option value="#fee2e2">红色</option><option value="#fce7f3">粉色</option><option value="#e0f2fe">天蓝</option></select></label>
+      <label class="full"><span>分组颜色</span><select id="qwGroupColor"><option value="#ffffff">白色</option><option value="#ede9fe">紫色</option><option value="#dbeafe">蓝色</option><option value="#dcfce7">绿色</option><option value="#fef3c7">黄色</option><option value="#fee2e2">红色</option><option value="#fce7f3">粉色</option><option value="#e0f2fe">天蓝</option></select></label>
       <p class="qw-form-help" id="qwGroupSelectionSummary"></p>
     </div>
     <footer><button type="button" data-qw-modal-close>取消</button><button type="button" class="primary" id="qwSaveGroupBtn">保存分组</button></footer>
@@ -258,7 +289,7 @@
   <aside class="qw-diagnostics-panel" id="qwDiagnosticsPanel" hidden aria-labelledby="qwDiagnosticsTitle">
     <header><div><small>轻量布局诊断</small><h2 id="qwDiagnosticsTitle">布局检查</h2></div><button type="button" id="qwDiagnosticsClose" aria-label="关闭">×</button></header>
     <div class="qw-diagnostics-summary" id="qwDiagnosticsSummary"></div>
-    <div class="qw-diagnostics-actions"><button type="button" id="qwResolveOverlapBtn">一键解决重叠</button><button type="button" id="qwRepairBoundsBtn">修复越界</button><button type="button" id="qwRepairGroupsBtn">适配分组</button><button type="button" id="qwRunDiagnosisBtn">重新检查</button></div>
+    <div class="qw-diagnostics-actions"><button type="button" id="qwResolveOverlapBtn">一键解决重叠</button><button type="button" id="qwRepairGroupsBtn">适配分组</button><button type="button" id="qwRunDiagnosisBtn">重新检查</button></div>
     <div class="qw-diagnostics-list" id="qwDiagnosticsList"></div>
     <footer>仅在拖动、缩放、排列和内容变化结束后检查，不进行实时物理避让。</footer>
   </aside>
@@ -304,15 +335,19 @@
   <script defer src="src/29-auth-core.js"></script>
   <script defer src="src/30-standalone-auth-dialog.js"></script>
   <script defer src="src/34-role-permissions.js"></script>
-  <script defer src="src/41-account-menu.js"></script>
   <script defer src="src/37-subscription-plans.js"></script>
   <script defer src="src/37-subscription-orders.js"></script>
   <script defer src="src/37-subscription-redeem-codes.js"></script>
   <script defer src="src/37-subscription-core.js"></script>
   <script defer src="src/32-wechat-login.js"></script>
   <script defer src="src/33-user-center.js"></script>
+  <script defer src="src/41-account-menu.js"></script>
   <script defer src="src/39-global-shortcuts.js"></script>
   <script defer src="src/50-question-data.js"></script>
+  <script defer src="src/86-activity-schema-v1.js"></script>
+  <script defer src="src/86-free-mode-language.js"></script>
+  <script defer src="src/86-question-language-ui.js"></script>
+  <script defer src="src/59-published-paper-repository.js"></script>
   <script defer src="src/60-question-bank.js"></script>
   <script defer src="src/61-question-repository.js"></script>
   <script defer src="src/62-learning-session-store.js"></script>
@@ -320,9 +355,14 @@
   <script defer src="src/canvas/78-canvas-policy.js"></script>
   <script defer src="src/canvas/79-canvas-viewport-controller.js"></script>
   <script defer src="src/canvas/80-canvas-card-controller.js"></script>
+<script defer src="src/canvas/84-canvas-edge-selection-geometry.js"></script>
   <script defer src="src/canvas/82-canvas-selection-controller.js"></script>
   <script defer src="src/canvas/83-canvas-history-controller.js"></script>
   <script defer src="src/canvas/81-canvas-kernel.js"></script>
+  <script defer src="src/78-multi-question-workspace-tabs.js"></script>
+  <script defer src="src/79-multi-question-workspace-filebar.js"></script>
   <script defer src="src/77-multi-question-workspace.js"></script>
+<script defer src="src/94-practice-navigation.js"></script>
+<script defer src="src/99-learning-practice-shell.js"></script>
 </body>
 </html>

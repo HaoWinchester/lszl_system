@@ -1,0 +1,105 @@
+/* v8.6.2 P2.2.23 — deep recall shell, navigator, drawer and zoom parity */
+
+.knowledge-recall-page .kr-topbar.lp-topbar{
+  grid-template-columns:minmax(180px,auto) minmax(0,1fr) auto;
+}
+.knowledge-recall-page .kr-brand{padding-left:2px}
+.knowledge-recall-page .kr-topbar .account-menu-trigger{
+  min-height:36px;height:36px;max-width:250px;padding:0 11px;
+  border:1px solid rgba(248,113,113,.30);border-radius:999px;background:#fff;box-shadow:none;
+}
+.knowledge-recall-page .kr-topbar .account-menu{z-index:1400}
+.knowledge-recall-page .account-menu-exit{color:#dc2626}
+.knowledge-recall-page .account-menu-exit:hover,.knowledge-recall-page .account-menu-exit:focus-visible{background:#fef2f2;color:#b91c1c}
+
+.knowledge-recall-page .kr-canvas-overlay-left{top:14px;left:12px}
+.knowledge-recall-page .kr-question-library-nav{
+  display:flex;align-items:center;height:40px;min-height:40px;box-sizing:border-box;
+  border:1px solid rgba(100,116,139,.18);border-radius:12px;background:rgba(255,255,255,.93);
+  box-shadow:0 7px 20px rgba(15,23,42,.09);backdrop-filter:blur(14px);overflow:hidden;
+}
+.knowledge-recall-page .kr-question-nav-arrow{
+  appearance:none;display:grid;place-items:center;width:34px;min-width:34px;height:38px;min-height:38px;
+  padding:0;border:0;border-radius:0;background:transparent;color:#64748b;font-size:20px;font-weight:850;line-height:1;box-shadow:none;cursor:pointer;
+}
+.knowledge-recall-page .kr-question-nav-arrow:hover,.knowledge-recall-page .kr-question-nav-arrow:focus-visible{background:#f3f1ff;color:#5b4dd1;outline:none}
+.knowledge-recall-page .kr-question-nav-arrow:disabled{opacity:.32;cursor:default;background:transparent;color:#94a3b8}
+.knowledge-recall-page .kr-question-library-trigger{
+  height:38px;min-height:38px;padding:0 10px;border:0;border-left:1px solid rgba(100,116,139,.14);border-right:1px solid rgba(100,116,139,.14);
+  border-radius:0;background:transparent;color:#536074;font-size:13px;font-weight:850;box-shadow:none;backdrop-filter:none;
+}
+.knowledge-recall-page .kr-question-library-trigger:hover,.knowledge-recall-page .kr-question-library-trigger:focus-visible{background:#f3f1ff;color:#5b4dd1;outline:none}
+.knowledge-recall-page .kr-question-library-trigger strong{font-size:11px}
+
+/* Match the single-question library drawer exactly: below the shared header, attached to the left edge. */
+.knowledge-recall-page #krQuestionDrawer.lp-question-library-compact{
+  position:fixed!important;top:var(--lp-shell-height,64px)!important;bottom:0!important;left:0!important;right:auto!important;
+  width:min(360px,calc(100vw - 8px))!important;height:auto!important;max-height:none!important;
+  border:1px solid rgba(100,116,139,.18)!important;border-left:0!important;border-radius:0 12px 12px 0!important;
+  z-index:5000!important;box-sizing:border-box!important;
+}
+.knowledge-recall-page #krDrawerBackdrop{position:fixed!important;top:var(--lp-shell-height,64px)!important;right:0!important;bottom:0!important;left:0!important;height:auto!important;z-index:4990!important}
+
+/* The former instruction pill is replaced by live recall metrics at the bottom center. */
+.knowledge-recall-page .kr-session-stats-canvas{
+  position:absolute;left:50%;bottom:12px;z-index:360;transform:translateX(-50%);
+  display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:nowrap;
+  width:max-content;max-width:calc(100vw - 430px);min-height:40px;box-sizing:border-box;padding:5px 7px;
+  border:1px solid rgba(15,23,42,.08);border-radius:15px;background:rgba(255,255,255,.94);
+  box-shadow:0 12px 34px rgba(15,23,42,.14);backdrop-filter:blur(14px);pointer-events:auto;overflow-x:auto;
+}
+.knowledge-recall-page .kr-session-stats-canvas span{
+  display:inline-flex;align-items:center;gap:4px;min-height:28px;padding:0 8px;border:1px solid #e2e8f0;border-radius:999px;
+  background:#f8fafc;color:#64748b;font-size:11px;white-space:nowrap;
+}
+.knowledge-recall-page .kr-session-stats-canvas strong{color:#334155;font-size:12px}
+.knowledge-recall-page .kr-hint-pill{display:none!important}
+
+/* Percent is now a reset control. The slider remains synced for accessibility but is not opened by the label. */
+.knowledge-recall-page #krCanvasZoomDock .lp-canvas-zoom-slider-popover{display:none!important}
+.knowledge-recall-page #krZoomLabel{min-width:56px}
+
+@media(max-width:1180px){
+  .knowledge-recall-page .kr-session-stats-canvas{max-width:calc(100vw - 260px)}
+}
+@media(max-width:820px){
+  .knowledge-recall-page .kr-session-stats-canvas{left:50%;bottom:8px;max-width:calc(100vw - 188px);gap:4px;padding:4px 5px}
+  .knowledge-recall-page .kr-session-stats-canvas span{padding:0 6px;font-size:10px}
+  .knowledge-recall-page .kr-question-library-trigger>span:nth-child(2){display:none}
+}
+@media(max-width:620px){
+  .knowledge-recall-page .kr-topbar.lp-topbar{grid-template-columns:minmax(120px,1fr) auto;gap:8px;padding:0 8px}
+  .knowledge-recall-page .kr-topbar .lp-top-actions{grid-column:2}
+  .knowledge-recall-page .kr-topbar .kr-language-control{display:none}
+  .knowledge-recall-page .kr-topbar .account-menu-trigger{max-width:150px}
+  .knowledge-recall-page .lp-scene-menu{display:none}
+  .knowledge-recall-page .kr-session-stats-canvas{left:184px;right:8px;transform:none;max-width:none;justify-content:flex-start}
+}
+
+/* Keep the merged account/exit entry and bottom metrics available on compact screens. */
+@media(max-width:760px){
+  .knowledge-recall-page .lp-top-actions .account-menu-trigger{display:inline-flex!important}
+  .knowledge-recall-page .kr-session-stats.kr-session-stats-canvas{display:flex!important}
+  .knowledge-recall-page .account-menu{top:calc(var(--lp-shell-height,64px) + 6px);right:8px}
+}
+
+/* Prevent legacy recall toolbar button styles from turning account-menu rows into pills. */
+.knowledge-recall-page .kr-tools .account-menu-item{
+  width:100%!important;min-height:42px!important;height:auto!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:11px!important;
+  padding:0 11px!important;border:0!important;border-radius:10px!important;background:transparent!important;color:var(--kr-control-ink)!important;
+  box-shadow:none!important;font-size:13px!important;font-weight:800!important;text-align:left!important;transform:none!important;
+}
+.knowledge-recall-page .kr-tools .account-menu-item:hover,
+.knowledge-recall-page .kr-tools .account-menu-item:focus-visible{background:var(--kr-control-hover)!important;color:var(--kr-control-ink)!important;box-shadow:none!important;transform:none!important}
+.knowledge-recall-page .kr-tools .account-menu-item.account-menu-exit{color:#dc2626!important}
+.knowledge-recall-page .kr-tools .account-menu-item.account-menu-exit:hover,
+.knowledge-recall-page .kr-tools .account-menu-item.account-menu-exit:focus-visible{background:color-mix(in srgb,#dc2626 12%,var(--kr-control-bg))!important;color:#ef4444!important}
+.knowledge-recall-page .kr-tools .account-menu-item.account-menu-session.is-login{color:var(--role-primary,#2563eb)!important}
+.knowledge-recall-page .kr-tools .account-menu-item.account-menu-session.is-logout{color:#dc2626!important}
+.knowledge-recall-page .kr-tools .account-menu-trigger:hover,
+.knowledge-recall-page .kr-tools .account-menu-trigger:focus-visible,
+.knowledge-recall-page .account-menu-shell.is-open .account-menu-trigger{transform:none!important;background:var(--kr-control-hover)!important;color:var(--kr-control-ink)!important}
+.knowledge-recall-page .kr-tools .account-menu-upgrade{display:none!important}
+@media(max-width:850px),(pointer:coarse),(hover:none){
+  .knowledge-recall-page .kr-tools .account-menu-upgrade{display:flex!important}
+}

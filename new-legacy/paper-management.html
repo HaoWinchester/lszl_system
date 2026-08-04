@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>试卷管理｜V9.0-P3.5.8</title>
+  <link rel="stylesheet" href="styles/teacher-workbench.css" />
+  <link rel="stylesheet" href="styles/question-bank-admin.css" />
+  <link rel="stylesheet" href="styles/admin-context-nav.css" />
+  <link rel="stylesheet" href="styles/user-center.css" />
+  <link rel="stylesheet" href="styles/subscription.css" />
+  <link rel="stylesheet" href="styles/paper-management.css" />
+</head>
+<body class="teacher-admin-shell paper-management-page" data-admin-context="teacher" data-paper-management-page="true">
+<nav class="admin-context-nav" aria-label="管理后台一级导航">
+  <a data-admin-nav="overview" href="admin-console.html">总览</a>
+  <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
+  <a data-admin-nav="teacher" href="teacher-workbench.html">教师工作台</a>
+  <a data-admin-nav="courses" href="course-admin.html">课程与任务</a>
+  <a data-admin-nav="users" href="user-management.html">用户管理</a>
+    <a data-admin-nav="feedback" href="feedback-management.html">反馈管理</a>
+    <a data-admin-nav="messages" href="message-management.html">消息管理</a>
+  <a data-admin-nav="operations" href="admin-operations.html">操作记录</a>
+  <a data-admin-nav="settings" href="admin-settings.html">系统设置</a>
+</nav>
+<header class="tw-topbar pm-shell-topbar">
+  <a class="tw-brand" href="teacher-workbench.html"><span class="tw-brand-mark">KG</span><span class="tw-brand-copy"><strong>教师工作台</strong><small>V9.0-P3.5.8 · 从原题到试卷</small></span></a>
+  <nav class="tw-tabs" aria-label="教师主要工作"><a href="teacher-workbench.html">工作台</a><a href="question-bank.html?mode=simple&amp;step=questions">题目管理</a><a href="question-bank.html?mode=simple&amp;step=training">训练配置</a><a class="active" href="paper-management.html">试卷管理</a></nav>
+  <div class="tw-user"><a href="course-admin.html">课程与任务</a><a href="index.html">返回学员端</a></div>
+</header>
+<section class="tw-workflow pm-shell-workflow" aria-label="教师工作流程"><a class="tw-step done" href="question-bank.html?mode=simple&amp;step=questions"><b>1</b>管理题目</a><i class="tw-arrow"></i><a class="tw-step done" href="question-bank.html?mode=simple&amp;step=training"><b>2</b>配置训练</a><i class="tw-arrow"></i><a class="tw-step active" href="paper-management.html"><b>3</b>管理试卷</a></section>
+<main class="qb-app pm-app">
+  <header class="pm-page-head">
+    <div>
+      <p class="qb-kicker">PAPER MANAGEMENT</p>
+      <h1>试卷管理</h1>
+      <p>从正式题库手动选择题目组成试卷；发布版本可供学员在独立做题模式中选择。</p>
+    </div>
+    <div class="qb-inline-actions pm-primary-actions">
+      <button id="qbAddPaperBtn" type="button">＋ 新试卷</button>
+      <button id="qbSavePaperBtn" type="button">保存试卷</button>
+      <button id="qbBuildPaperBtn" type="button">按配额补充</button>
+      <button id="qbPublishPaperBtn" class="accent" type="button">发布试卷</button>
+      <button id="qbArchivePaperBtn" type="button">归档试卷</button>
+      <button id="qbDeletePaperBtn" class="danger" type="button">删除草稿</button>
+    </div>
+  </header>
+
+  <section class="qb-card qb-paper-card pm-paper-workspace">
+    <section class="pm-paper-list-section" aria-label="试卷目录">
+      <div class="qb-mini-head pm-paper-library-head">
+        <div><h2>试卷列表</h2><p>按分类、状态和关键词管理试卷；默认批量操作仅作用于当前页勾选项。</p></div>
+        <div class="qb-inline-actions"><button id="qbAddPaperCategoryBtn" type="button">＋ 新建分类</button><button id="qbExportPaperBtn" type="button">导出当前试卷</button></div>
+      </div>
+      <div class="pm-paper-library-layout">
+        <aside class="pm-paper-category-panel" aria-label="试卷分类">
+          <div class="pm-paper-category-title"><strong>分类目录</strong><small id="qbPaperCategorySummary">0 个分类</small></div>
+          <div class="pm-paper-category-list" id="qbPaperCategoryList"></div>
+        </aside>
+        <div class="pm-paper-catalog">
+          <div class="pm-paper-catalog-toolbar">
+            <label class="qb-field pm-paper-search"><span>搜索试卷</span><input id="qbPaperListSearch" type="search" placeholder="名称、科目、说明" /></label>
+            <label class="qb-field pm-paper-status-filter"><span>状态</span><select id="qbPaperStatusFilter"><option value="ALL">全部状态</option><option value="draft">草稿</option><option value="published">已发布</option><option value="archived">已归档</option></select></label>
+            <label class="pm-page-check"><input id="qbPaperListSelectPage" type="checkbox" /><span>选择当前页</span></label>
+          </div>
+          <div class="qb-bulk-toolbar pm-paper-list-bulk" id="qbPaperListBulkToolbar" hidden>
+            <strong id="qbPaperListSelectedCount">已选择 0 张试卷</strong>
+            <div class="qb-inline-actions">
+              <select id="qbPaperBulkCategorySelect" aria-label="批量移动到分类"></select>
+              <button id="qbPaperBulkMoveCategoryBtn" type="button">移动分类</button>
+              <button id="qbPaperBulkArchiveBtn" type="button">批量归档</button>
+              <button id="qbPaperBulkDeleteDraftBtn" class="danger" type="button">删除草稿</button>
+            </div>
+          </div>
+          <div class="qb-list paper-list pm-paper-list" id="qbPaperList"></div>
+          <div class="qb-question-pager pm-paper-list-pager" id="qbPaperListPager" hidden></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pm-editor-section">
+      <div class="qb-grid three pm-paper-fields">
+        <label class="qb-field"><span>试卷名称</span><input id="paperNameInput" placeholder="例如：PMP 综合模拟卷 01" /></label>
+        <label class="qb-field"><span>科目</span><select id="paperSubjectInput"></select></label>
+        <label class="qb-field"><span>目标题量</span><input id="paperTotalInput" min="1" max="300" type="number" value="180" /></label>
+        <label class="qb-field"><span>所属分类</span><select id="paperCategoryInput"></select></label>
+        <label class="qb-field wide"><span>发布说明 / 适用范围</span><textarea id="paperDescriptionInput" rows="2" placeholder="说明知识覆盖范围和适合的学习阶段。"></textarea></label>
+      </div>
+      <fieldset class="pm-mode-fieldset" hidden aria-hidden="true">
+        <legend>旧学习模式发布范围（暂时停用）</legend>
+        <label><input type="checkbox" data-paper-mode="deep_recall" checked /><span>深度回忆</span></label>
+        <label><input type="checkbox" data-paper-mode="multi_question_canvas" checked /><span>多题画布</span></label>
+        <label><input type="checkbox" data-paper-mode="single_deep_study" checked /><span>单题深学</span></label>
+        <small>发布时生成不可变版本；继续编辑草稿不会改变学员当前看到的版本。</small>
+      </fieldset>
+      <div class="qb-paper-meta" id="qbPaperMeta"></div>
+    </section>
+
+    <details class="qb-mini-section pm-quota-section">
+      <summary>按领域配额补充题目</summary>
+      <div class="qb-mini-head"><p>可在手动选题基础上补充题目；不会加入重复题目。</p><div class="qb-inline-actions"><button id="qbAutoQuotaBtn" type="button">自动分配</button><button id="qbClearQuotaBtn" type="button">清空配额</button></div></div>
+      <div class="qb-quota-list" id="qbPaperQuotaList"></div>
+    </details>
+
+    <section class="pm-question-workbench" id="pmQuestionWorkbench" aria-label="试卷选题工作区">
+      <section class="qb-mini-section pm-question-pane pm-question-picker" id="pmQuestionPickerPane" data-paper-pane="picker">
+        <div class="qb-mini-head pm-pane-head">
+          <div class="pm-pane-title"><h2>从题库选择题目</h2><p>默认只选择当前页；双击题目可快速预览。</p></div>
+          <div class="pm-pane-head-actions">
+            <div class="qb-inline-actions pm-picker-actions"><strong id="qbPaperCandidateSelectionCount">已选择 0 道题</strong><button id="qbAddSelectedToPaperBtn" class="primary" type="button">加入试卷</button></div>
+            <div class="pm-pane-controls" aria-label="题库选择区域控制">
+              <button class="pm-icon-btn" type="button" data-pane-action="maximize" data-pane-target="picker" title="放大题库选择区" aria-label="放大题库选择区">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5M3 8l6-6M21 8l-6-6M3 16l6 6M21 16l-6 6"/></svg>
+              </button>
+              <button class="pm-icon-btn" type="button" data-pane-action="collapse" data-pane-target="picker" title="收起题库选择区" aria-label="收起题库选择区">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="pm-pane-body">
+          <div class="pm-picker-filters">
+            <label class="qb-field"><span>搜索</span><input id="qbPaperCandidateSearch" type="search" placeholder="标题、题干、标签、知识点" /></label>
+            <label class="qb-field"><span>题库</span><select id="qbPaperCandidateBankFilter"><option value="ALL">全部题库</option></select></label>
+            <label class="pm-page-check"><input id="qbSelectPaperCandidatesPage" type="checkbox" /><span>选择当前页</span></label>
+          </div>
+          <div class="pm-candidate-list" id="qbPaperCandidateList"></div>
+          <div class="qb-question-pager" id="qbPaperCandidatePager" hidden></div>
+        </div>
+      </section>
+
+      <div class="pm-pane-splitter" id="pmPaneSplitter" role="separator" tabindex="0" aria-orientation="vertical" aria-label="拖动调整选题区与预览区宽度" aria-valuemin="28" aria-valuemax="72" aria-valuenow="50"><span></span></div>
+
+      <section class="qb-mini-section pm-question-pane pm-preview-section" id="pmPreviewPane" data-paper-pane="preview">
+        <div class="qb-mini-head pm-preview-head pm-pane-head">
+          <div class="pm-pane-title"><h2>试卷题目预览</h2><p>双击题目可预览；复选后可批量移除。</p></div>
+          <div class="pm-pane-head-actions">
+            <div class="pm-preview-summary"><label><input id="qbPaperPreviewSelectAll" type="checkbox" /><span>全选</span></label><strong id="qbPaperQuestionCount">0 题</strong></div>
+            <div class="pm-pane-controls" aria-label="试卷预览区域控制">
+              <button class="pm-icon-btn" type="button" data-pane-action="maximize" data-pane-target="preview" title="放大试卷预览区" aria-label="放大试卷预览区">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5M3 8l6-6M21 8l-6-6M3 16l6 6M21 16l-6 6"/></svg>
+              </button>
+              <button class="pm-icon-btn" type="button" data-pane-action="collapse" data-pane-target="preview" title="收起试卷预览区" aria-label="收起试卷预览区">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="pm-pane-body">
+          <div class="qb-bulk-toolbar pm-preview-bulk" id="qbPaperPreviewBulkToolbar" hidden>
+            <strong id="qbPaperPreviewSelectedCount">已选择 0 道题</strong>
+            <button id="qbPaperBulkRemoveBtn" class="danger" type="button">批量移除</button>
+          </div>
+          <div class="qb-paper-question-list pm-paper-preview" id="qbPaperQuestionList"></div>
+        </div>
+      </section>
+    </section>
+  </section>
+</main>
+<aside class="pm-question-preview-popover" id="qbQuestionPreviewPopover" role="dialog" aria-modal="false" aria-labelledby="qbQuestionPreviewTitle" hidden>
+  <span class="pm-question-preview-arrow" aria-hidden="true"></span>
+  <div class="pm-question-preview-shell">
+    <header class="pm-question-preview-head">
+      <div>
+        <p class="qb-kicker">QUESTION PREVIEW</p>
+        <h2 id="qbQuestionPreviewTitle">题目预览</h2>
+        <div class="pm-question-preview-meta" id="qbQuestionPreviewMeta"></div>
+      </div>
+      <div class="pm-question-preview-actions">
+        <button class="pm-icon-btn" id="qbQuestionPreviewEditBtn" type="button" title="编辑题目" aria-label="编辑题目">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Zm9.5-13.5 4 4M14.5 5.5l2-2a1.4 1.4 0 0 1 2 0l2 2a1.4 1.4 0 0 1 0 2l-2 2"/></svg>
+        </button>
+        <button class="pm-icon-btn" id="qbQuestionPreviewCloseBtn" type="button" title="关闭预览" aria-label="关闭预览">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5 5 19"/></svg>
+        </button>
+      </div>
+    </header>
+    <div class="pm-question-preview-content" id="qbQuestionPreviewContent"></div>
+  </div>
+</aside>
+<div class="qb-toast" id="qbToast" role="status" aria-live="polite"></div>
+<script defer src="src/01-runtime-config.js"></script>
+<script defer src="src/28-app-storage.js"></script>
+<script defer src="src/29-auth-core.js"></script>
+<script defer src="src/34-role-permissions.js"></script>
+<script defer src="src/37-subscription-plans.js"></script>
+<script defer src="src/37-subscription-orders.js"></script>
+<script defer src="src/37-subscription-redeem-codes.js"></script>
+<script defer src="src/37-subscription-core.js"></script>
+<script defer src="src/33-user-center.js"></script>
+<script defer src="src/50-question-data.js"></script>
+<script defer src="src/91-learning-content-core.js"></script>
+<script defer src="src/95-recall-association-library.js"></script>
+<script defer src="src/98-teacher-workflow-p2-services.js"></script>
+<script defer src="src/98-question-classification.js"></script>
+<script defer src="src/65-question-bank-admin.js"></script>
+<script defer src="src/admin/48-admin-context-nav.js"></script>
+</body>
+</html>

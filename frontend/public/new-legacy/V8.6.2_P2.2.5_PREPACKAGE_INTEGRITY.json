@@ -1,0 +1,37 @@
+{
+  "release": "v8.6.2-p2.2.5",
+  "baseline": "kg_graph_v8_6_2_teacher_workflow_p2_2_4_question_library_close_animation.zip",
+  "node_tests": "20/20 PASS",
+  "protected_content_data": {
+    "src/50-question-data.js": {
+      "unchanged": true,
+      "sha256": "5ac8ddd0ebe4474a72a9060ae102f37eb2fa97b30a6092555a3c38b0fcdd611f"
+    },
+    "src/86-activity-schema-v1.js": {
+      "unchanged": true,
+      "sha256": "2621b810158b332d3601ff9d17887c5584a12e1d2516911daa1e511401a35bc1"
+    },
+    "src/87-guided-learning-data.js": {
+      "unchanged": true,
+      "sha256": "4b4f7dc484631337645933c86cf358418c84609fd18e54770ab59fd0b3a92488"
+    },
+    "src/91-learning-content-core.js": {
+      "unchanged": true,
+      "sha256": "865f80bf156cbb60f63708a1bd88cef331b3f3d9450ca2d76c7c24cc5b18b93d"
+    },
+    "src/93-content-organization-core.js": {
+      "unchanged": true,
+      "sha256": "ca565a78076a8f4285f10d61c2c167b2d91ec0979f2a2ef1954632abedc7aeab"
+    },
+    "src/95-recall-association-library.js": {
+      "unchanged": true,
+      "sha256": "9a9dcc0932c2f11d6927d805b707c5516c9d75e040607f9069b863f0f8c1c0fb"
+    },
+    "src/80-question-font-scale.js": {
+      "unchanged": true,
+      "sha256": "3b7880fb9674407116a65217870bdcc7c81e90a5b0430337e298411573735bde"
+    }
+  },
+  "note": "Browser/UI verification is rerun in the user-visible release step.",
+  "result": "PREPACKAGE_PASS"
+}

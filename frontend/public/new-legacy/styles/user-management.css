@@ -189,12 +189,6 @@ body[data-role-theme] button.primary,body[data-role-theme] .um-nav-btn.primary{b
   .um-head-actions button{flex:1}
 }
 
-/* 中等桌面宽度：顶栏操作使用确定的三列网格，不让单个按钮孤立换行。 */
-@media(min-width:821px) and (max-width:1500px){
-  .um-topbar{align-items:flex-start}
-  .um-top-actions{display:grid;grid-template-columns:repeat(3,max-content);justify-content:end;gap:8px}
-  .um-top-actions>*{white-space:nowrap}
-  .um-left-card .um-card-head{display:grid;grid-template-columns:1fr;gap:10px}
-  .um-left-card .um-card-head p{white-space:nowrap}
-  .um-left-card .um-head-actions{justify-content:start}
-}
+/* P3.3.5：用户管理归入统一后台导航，移除重复返回与模块快捷按钮。 */
+.admin-user-management-shell .um-brand{gap:0;min-width:0}.admin-user-management-shell .um-brand>div{min-width:0}.admin-user-management-shell .um-top-actions{margin-left:auto}.admin-user-management-shell .um-topbar{align-items:center}
+@media(max-width:820px){.admin-user-management-shell .um-top-actions{margin-left:0;width:100%}.admin-user-management-shell .um-top-actions button{flex:1}}

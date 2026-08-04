@@ -1,0 +1,22 @@
+'use strict';
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const root=path.resolve(__dirname,'..');
+const read=file=>fs.readFileSync(path.join(root,file),'utf8');
+const html=read('knowledge-recall.html');
+const js=read('src/86-knowledge-recall.js');
+const baseCss=read('styles/knowledge-recall.css');
+const css=read('styles/knowledge-recall-p2225.css');
+
+assert(html.includes('styles/knowledge-recall-p2225.css'),'深度回忆页面应加载 P2.2.25 样式');
+assert(html.includes('id="krSceneMenu"')&&html.includes('aria-label="切换画布场景"'),'场景入口应升级为图标按钮');
+assert(!/<summary[^>]*>\s*场景\s*<\/summary>/.test(html),'场景入口不应继续显示文字');
+assert((html.match(/data-kr-theme=/g)||[]).length===7,'场景浮层应提供七种可点击主题');
+assert(js.includes("if(app)app.dataset.theme=next")&&js.includes('document.body.dataset.krTheme=next'),'主题应同时作用到应用外壳和画布');
+assert(js.includes("menu.addEventListener('pointerenter',openMenu)")&&js.includes("applyTheme(button.dataset.krTheme)"),'场景浮层应支持悬浮打开并点击即应用');
+assert(baseCss.includes(':is(.kr-app,.kr-viewport)[data-theme="parchment"]'),'主题变量应覆盖应用外壳与画布');
+assert(css.includes('.kr-node button:hover:active')&&css.includes('translateY(2px) scale(.985)'),'卡牌悬浮时仍应保留按下反馈');
+assert(css.includes('.kr-node.is-active button:hover')&&css.includes('var(--kr-selected-ring)'),'选中外边框应在悬浮时保持');
+assert(css.includes('.kr-question-library-nav')&&css.includes('var(--kr-surface-glass)'),'题目库等浮层背景应跟随主题');
+assert(css.includes('#krQuestionDrawer.lp-question-library-compact')&&css.includes('var(--kr-card)!important'),'题目库抽屉背景应跟随主题');
+assert(css.includes('.kr-scene-panel')&&css.includes('grid-template-columns:repeat(4,38px)'),'场景面板应为紧凑图标网格');
+console.log('v862-p2225-deep-recall-scene-card-state-static-ok');

@@ -1,0 +1,98 @@
+{
+  "release": "v9.0-p3.5.4",
+  "baseRelease": "v9.0-p3.5.3",
+  "generatedAt": "2026-07-30T10:12:15.298183+00:00",
+  "scope": [
+    "training bank selector",
+    "expanded independently scrollable question list",
+    "compact SVG question actions",
+    "resizable question and training panes",
+    "persisted training pane ratio",
+    "responsive stacked fallback"
+  ],
+  "summary": {
+    "nodeTestFiles": {
+      "passed": 86,
+      "total": 86
+    },
+    "browserTests": {
+      "passed": 6,
+      "total": 6
+    },
+    "javascriptSyntaxChecked": 215,
+    "htmlFilesChecked": 20,
+    "duplicateHtmlIds": 0
+  },
+  "storage": {
+    "trainingWorkspaceLayout": "kg_question_training_workspace_layout_v1",
+    "questionLibraryWorkspaceLayout": "kg_question_library_workspace_layout_v1",
+    "questionBanksPrefix": "kg_question_banks_v1__",
+    "publishedPapers": "kg_exam_papers_published_v1"
+  },
+  "safety": {
+    "questionIdsChanged": false,
+    "bankIdsChanged": false,
+    "questionDataChangedByLayout": false,
+    "paperReferencesChanged": false,
+    "publishedSnapshotsMutated": false,
+    "safeDeleteProtectionPreserved": true,
+    "permanentDeleteProtectionPreserved": true
+  },
+  "changedFiles": [
+    "CHANGELOG.md",
+    "V9.0_P3.5.4_QUICK_START.md",
+    "V9.0_P3.5.4_TRAINING_WORKSPACE_OPTIMIZATION_REPORT.md",
+    "VERSION",
+    "question-bank.html",
+    "src/65-question-bank-admin.js",
+    "src/97-teacher-question-workflow.js",
+    "src/admin/00-admin-core.js",
+    "styles/question-bank-admin.css",
+    "styles/teacher-question-workflow.css",
+    "tests/v862-data-integrity.test.js",
+    "tests/v862-p2238-legacy-freeze.test.js",
+    "tests/v90-p0-admin-foundation.test.js",
+    "tests/v90-p21-taxonomy-release.test.js",
+    "tests/v90-p22-taxonomy-lifecycle.test.js",
+    "tests/v90-p31-admin-ia.test.js",
+    "tests/v90-p31-data-integrity.test.js",
+    "tests/v90-p32-subject-management.test.js",
+    "tests/v90-p331-navigation-shell-fix.test.js",
+    "tests/v90-p333-question-classification.test.js",
+    "tests/v90-p3331-batch-default-classification.test.js",
+    "tests/v90-p334-lightweight-tag-management.test.js",
+    "tests/v90-p35-paper-management.test.js",
+    "tests/v90-p353-question-bank-workspace.test.js",
+    "tests/v90-p354-training-workspace-browser.py",
+    "tests/v90-p354-training-workspace.test.js"
+  ],
+  "removedFiles": [],
+  "changedFileSha256": {
+    "CHANGELOG.md": "cc96d46014996ce4665c543fa48096c349f984bcf461817668778ca13b288a96",
+    "V9.0_P3.5.4_QUICK_START.md": "2eed56b7bfd94e0bef567305cb9ae15cbf448a91dea96740ec0a0d7961526b9f",
+    "V9.0_P3.5.4_TRAINING_WORKSPACE_OPTIMIZATION_REPORT.md": "d6d260c3f553c85a98ae925f96e45d12cdd47a4342116b955efb30e18e508c87",
+    "VERSION": "b3e38938e9da6463b143c92994bed483687a25942b1cd2704ffebdba9e5ba8b9",
+    "question-bank.html": "7bf7e9aab8ba238b495a9bfc5080109d548363691d46fc00c9db06a4ebc08c16",
+    "src/65-question-bank-admin.js": "6b7c15f64c00fcf870bf7a3203f2f2d486c87e3f8ec8e5b48b760dff5e8e6c67",
+    "src/97-teacher-question-workflow.js": "27fddce1df7aadf3b0a8dee169d092d4ed65b9507028b4ef0ebc1f25cf83b46d",
+    "src/admin/00-admin-core.js": "af285e0204e49986a9922cb459dd9f64dad332849bd231713d0382ab4fd72a4c",
+    "styles/question-bank-admin.css": "59e4170f675ea07ea069c32234eb2ee8e20ab5ffa3bc9de87f5f1e313ca880f8",
+    "styles/teacher-question-workflow.css": "4eed546b1b98dd4553454884875bed10435d6070fdc09b65179a83aead44debf",
+    "tests/v862-data-integrity.test.js": "6b8e09f2d6811b1028f36d4031f99f92a7558a29a071b1b011a393f324d0aa95",
+    "tests/v862-p2238-legacy-freeze.test.js": "12101fbdd3a119142e15128e5368e433c95eac4663ab429c0d56db0fa4ad2ad3",
+    "tests/v90-p0-admin-foundation.test.js": "bfde78bcbfd6e5ad98de4ebbe34897b17c77bbcbf474a1c7b77751ed0ed7482f",
+    "tests/v90-p21-taxonomy-release.test.js": "7cf9825258275847b31005321c0f719f7c98b3fc19be4be38eb6d1ff8aaac08e",
+    "tests/v90-p22-taxonomy-lifecycle.test.js": "bfc5bcc1098058ff633fbd7558a2c4ed38f12d9a555cc7c16d38faf850a84240",
+    "tests/v90-p31-admin-ia.test.js": "854f711e23eea5780c41d4a3c25ba4e964b99b0a4ed78f45d4bfb6d301d88430",
+    "tests/v90-p31-data-integrity.test.js": "432f1fb48eeef5ac6844ce12d084e9983df2fb072a1d385d802f91bd5fe52f9d",
+    "tests/v90-p32-subject-management.test.js": "2765a3a5b20d9f7515e6acdcf3a83e73252a1f8d4e6b869a6a0f9ff9587b51a4",
+    "tests/v90-p331-navigation-shell-fix.test.js": "bc7d2a81bde5da293c7a742462f0a611c0d6fabfccdd99c6d66be03abe2b1283",
+    "tests/v90-p333-question-classification.test.js": "89d83fc62655d52119b114be136f3142910efa01d438e3581a429da76f872a9d",
+    "tests/v90-p3331-batch-default-classification.test.js": "836353d6dac53630b43083055df70378afddb38c6f92506564304dcc28518792",
+    "tests/v90-p334-lightweight-tag-management.test.js": "f522e90528dc9006af43e67155a0568b5f67ef4b400708b098ebc8717d01ad27",
+    "tests/v90-p35-paper-management.test.js": "f1e1579f0dc9a26d6a7dee2a4249bd499a0b592f7a59c80387f7c6dc8f5a1853",
+    "tests/v90-p353-question-bank-workspace.test.js": "4e6281a131cf3e4135d0768a2ccbec8187a5b26a4d983246955adda8be20481a",
+    "tests/v90-p354-training-workspace-browser.py": "23d2e933c366144cc904f73780839c433bc6ae7ce30a7a4445b94522f624d47a",
+    "tests/v90-p354-training-workspace.test.js": "781c9e528699ca4090d4d801b564a45505239271d102d4da0502fd9042eb6873"
+  }
+}

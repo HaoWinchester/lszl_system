@@ -1,0 +1,34 @@
+'use strict';
+const fs=require('fs');
+const path=require('path');
+const assert=require('assert/strict');
+const ROOT=path.resolve(__dirname,'..');
+const read=file=>fs.readFileSync(path.join(ROOT,file),'utf8');
+assert.equal(read('VERSION').trim(),'v9.0-p4.1.1');
+assert(read('src/admin/00-admin-core.js').includes("VERSION='9.0-p4.1.1'"));
+const page=read('paper-management.html');
+for(const id of ['qbPaperCategoryList','qbAddPaperCategoryBtn','qbPaperListSearch','qbPaperStatusFilter','qbPaperListSelectPage','qbPaperListBulkToolbar','qbPaperBulkMoveCategoryBtn','qbPaperBulkArchiveBtn','qbPaperBulkDeleteDraftBtn','paperCategoryInput','qbPaperList','pmQuestionWorkbench','pmPaneSplitter','qbPaperCandidateList','qbSelectPaperCandidatesPage','qbAddSelectedToPaperBtn','qbPaperQuestionList','qbPaperPreviewSelectAll','qbPaperBulkRemoveBtn','qbQuestionPreviewPopover','qbQuestionPreviewEditBtn']){
+  assert(page.includes(`id="${id}"`),`paper-management missing ${id}`);
+}
+assert(page.includes('data-paper-management-page="true"'));
+assert(page.includes('data-paper-mode="deep_recall"'));
+assert(page.includes('data-paper-mode="multi_question_canvas"'));
+assert(page.includes('data-paper-mode="single_deep_study"'));
+const qb=read('question-bank.html');
+assert(!qb.includes('id="qbPaperCard"'),'embedded paper panel must be removed');
+assert(qb.includes("location.href='paper-management.html'"));
+const course=read('course-admin.html');
+assert(course.includes("location.replace('paper-management.html')"));
+assert(!course.includes('data-config-panel="papers"'),'course page must not embed legacy paper management');
+assert(!course.includes('data-config-view="papers"'),'course page must not expose a paper tab');
+assert(page.includes('<a class="active" href="paper-management.html">试卷管理</a>'),'paper management must occupy teacher workflow tab 4');
+assert(page.includes('<b>3</b>管理试卷'),'paper management must be teacher workflow step 3');
+const admin=read('src/65-question-bank-admin.js');
+for(const token of ['PAPER_CATEGORY_PREFIX','loadPaperCategories','renderPaperCategoryList','toggleSelectPaperPage','moveSelectedPapersToCategory','archiveSelectedPapers','deleteSelectedPaperDrafts','qbQuestionPreviewPopover','bindPaperPreviewRow','positionPaperQuestionPreview','PUBLISHED_PAPERS_KEY','publishPaperRelease','questionSnapshots','removeSelectedPaperQuestions','toggleSelectPaperPreview','renderPaperCandidateList','addSelectedCandidatesToPaper','initPaperWorkspaceControls','openPaperQuestionPreview','applyQuestionEditorDeepLink'])assert(admin.includes(token),`admin script missing ${token}`);
+const learner=read('src/60-question-bank.js');
+assert(learner.includes("QUESTION_PUBLISHED_PAPERS_KEY='kg_exam_papers_published_v1'"));
+assert(learner.includes('questionSnapshots'));
+assert(read('src/66-question-navigator.js').includes("mode:'single_deep_study'"));
+assert(read('src/77-multi-question-workspace.js').includes("mode:'multi_question_canvas'"));
+assert(read('src/96-recall-question-source.js').includes("mode") || read('src/96-recall-question-source.js').includes("includes('deep_recall')"));
+console.log('v90-p35-paper-management-static-ok');

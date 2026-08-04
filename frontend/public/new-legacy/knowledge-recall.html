@@ -7,52 +7,137 @@
 <script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>深度知识回忆｜知识寻宝地图</title>
-  <link rel="stylesheet" href="styles/knowledge-recall.css?v=v8.6.29" />
-<link rel="stylesheet" href="styles/global-shortcuts.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/subscription.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/user-center.css?v=v8.6.29"/>
+  <title>深度知识回忆｜知识寻宝地图</title><link rel="stylesheet" href="styles/knowledge-recall.css?v=v9.0-p4.1.9" />
+<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/learning-practice-shell.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/knowledge-recall-p2223.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/knowledge-recall-p2224.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/knowledge-recall-p2225.css?v=v9.0-p4.1.9"/>
 </head>
-<body>
+<body class="knowledge-recall-page">
   <div class="kr-app" id="krApp">
-    <header class="kr-topbar">
-      <div class="kr-brand">
-        <button class="kr-back" id="krBackBtn" title="返回上一页" type="button">←</button>
-        <div>
-          <h1>深度知识回忆</h1>
-          <p>以题目为中心，点击关键词，像寻宝一样把知识点一层层回忆出来。</p>
-        </div>
+    <header class="kr-topbar lp-topbar">
+      <div class="kr-brand lp-brand">
+        <a class="kr-back" data-practice-back href="index.html" id="krBackBtn" title="返回图谱首页" aria-label="返回图谱首页">←</a>
+        <div><h1>深度回忆</h1></div>
       </div>
-      <div class="kr-tools" aria-label="深度回忆画布工具">
-        <div class="auth-status" id="authStatus">访客只读</div>
-        <label class="kr-theme-control" for="krThemeSelect">
-          <span>主题</span>
-          <select id="krThemeSelect" aria-label="切换深度回忆主题">
-            <option value="platform">统一默认</option>
-            <option value="parchment">羊皮纸</option>
-            <option value="aurora">极光绿</option>
-            <option value="neon">暗夜霓虹</option>
-            <option value="sakura">樱花粉</option>
-            <option value="ocean">海盐蓝</option>
-            <option value="latte">奶油拿铁</option>
-          </select>
-        </label>
-        <button id="krCenterBtn" type="button">回到题目</button>
-        <button id="krZoomOutBtn" type="button">－</button>
-        <button id="krZoomInBtn" type="button">＋</button>
-        <button id="krResetBtn" type="button">重置地图</button>
+      <div class="kr-tools lp-top-actions" aria-label="深度回忆页面工具">
+        <span class="lp-visually-hidden" data-practice-only>自由练习，不计成绩</span>
+        <div class="kr-language-control lp-language-control">
+          <div class="kr-language-switch lp-language-switch" role="group" aria-label="内容显示方式">
+            <button type="button" data-question-language="zh" aria-pressed="true">中</button>
+            <button type="button" data-question-language="bilingual" aria-pressed="false">中英</button>
+          </div>
+        </div>
+        <div class="account-menu-shell" id="accountMenuShell" data-account-help-href="multi-question-help.html">
+          <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
+            <span class="role-dot"></span><span class="auth-status-label">访客只读</span>
+            <svg aria-hidden="true" class="account-menu-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>
+          </button>
+          <div class="account-menu" hidden id="accountMenu" role="menu" aria-label="账号菜单">
+            <button class="account-menu-item" id="accountMenuUserCenterBtn" role="menuitem" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+              <span data-mobile-label="用户">用户中心</span>
+            </button>
+            <button class="account-menu-item" id="accountMenuHelpBtn" role="menuitem" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.35 2.35 0 1 1 3.5 2.05c-.82.45-1.3.93-1.3 1.95"/><path d="M12 17h.01"/></svg>
+              <span data-mobile-label="帮助">帮助中心</span>
+            </button>
+            <button class="account-menu-item account-menu-upgrade" id="accountMenuUpgradeBtn" role="menuitem" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 9.6 8.1 4 9l4 3.9-.9 5.6L12 16l4.9 2.5-.9-5.6L20 9l-5.6-.9Z"/></svg>
+              <span data-mobile-label="升级">升级会员</span>
+            </button>
+            <div class="account-menu-separator" role="separator"></div>
+            <button class="account-menu-item account-menu-session" id="accountMenuSessionBtn" role="menuitem" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 5H5v14h4"/><path d="m13 8 4 4-4 4"/><path d="M17 12H9"/></svg>
+              <span data-mobile-label="登录">登录</span>
+            </button>
+          </div>
+        </div>
+        <button class="account-hidden-trigger" hidden id="authLoginBtn" type="button">登录</button>
+        <button class="account-hidden-trigger" hidden id="authLogoutBtn" type="button">退出登录</button>
+        <button class="account-hidden-trigger" hidden id="tutorialBtn" type="button">使用说明</button>
+        <details class="lp-view-menu lp-scene-menu kr-scene-menu" id="krSceneMenu">
+          <summary aria-label="切换画布场景" title="切换画布场景">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18h1.2a1.8 1.8 0 0 0 0-3.6h-.7a1.65 1.65 0 0 1 0-3.3H15A6 6 0 0 0 15 3h-3Z"/><circle cx="7.6" cy="10" r="1"/><circle cx="9.5" cy="6.8" r="1"/><circle cx="13.2" cy="6.3" r="1"/></svg>
+          </summary>
+          <div class="lp-view-panel lp-scene-panel kr-scene-panel" role="menu" aria-label="选择画布场景">
+            <button class="kr-scene-option" type="button" role="menuitemradio" data-kr-theme="platform" aria-label="平台默认" title="平台默认"><span class="kr-scene-swatch" aria-hidden="true"></span></button>
+            <button class="kr-scene-option" type="button" role="menuitemradio" data-kr-theme="parchment" aria-label="羊皮纸" title="羊皮纸"><span class="kr-scene-swatch" aria-hidden="true"></span></button>
+            <button class="kr-scene-option" type="button" role="menuitemradio" data-kr-theme="aurora" aria-label="极光绿" title="极光绿"><span class="kr-scene-swatch" aria-hidden="true"></span></button>
+            <button class="kr-scene-option" type="button" role="menuitemradio" data-kr-theme="neon" aria-label="暗夜霓虹" title="暗夜霓虹"><span class="kr-scene-swatch" aria-hidden="true"></span></button>
+            <button class="kr-scene-option" type="button" role="menuitemradio" data-kr-theme="sakura" aria-label="樱花粉" title="樱花粉"><span class="kr-scene-swatch" aria-hidden="true"></span></button>
+            <button class="kr-scene-option" type="button" role="menuitemradio" data-kr-theme="ocean" aria-label="海盐蓝" title="海盐蓝"><span class="kr-scene-swatch" aria-hidden="true"></span></button>
+            <button class="kr-scene-option" type="button" role="menuitemradio" data-kr-theme="latte" aria-label="奶油拿铁" title="奶油拿铁"><span class="kr-scene-swatch" aria-hidden="true"></span></button>
+          </div>
+          <select id="krThemeSelect" class="kr-theme-compat-select" tabindex="-1" aria-hidden="true"><option value="platform">平台默认</option><option value="parchment">羊皮纸</option><option value="aurora">极光绿</option><option value="neon">暗夜霓虹</option><option value="sakura">樱花粉</option><option value="ocean">海盐蓝</option><option value="latte">奶油拿铁</option></select>
+        </details>
       </div>
     </header>
 
     <main class="kr-viewport" id="krViewport" aria-label="深度知识回忆无限画布">
+      <div class="kr-canvas-overlay-left">
+        <div class="kr-question-library-nav" role="group" aria-label="题目切换与题目库">
+          <button type="button" id="krPrevQuestionBtn" class="kr-question-nav-arrow" title="上一题" aria-label="上一题">‹</button>
+          <button id="krQuestionListBtn" class="kr-question-library-trigger" type="button" aria-haspopup="dialog" aria-controls="krQuestionDrawer" title="打开题目库"><span aria-hidden="true">▤</span><span>题目库</span><strong id="krQuestionCount">0/0</strong></button>
+          <button type="button" id="krNextQuestionBtn" class="kr-question-nav-arrow" title="下一题" aria-label="下一题">›</button>
+          <span id="krQuestionPosition" class="lp-visually-hidden">题目 1 / 1</span>
+        </div>
+      </div>
+      <div class="kr-canvas-overlay-right">
+        <button class="kr-reset-question-btn" id="krResetBtn" type="button" title="重置本题知识点" aria-label="重置本题知识点">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.34-5.66"/><path d="M4 4v6h6"/></svg>
+        </button>
+      </div>
       <div class="kr-world" id="krWorld">
         <svg class="kr-edges" id="krEdges" aria-hidden="true"></svg>
         <section class="kr-question-card" id="krQuestionCard" aria-label="中心题目卡片"></section>
         <div class="kr-node-layer" id="krNodeLayer"></div>
       </div>
       <div class="kr-guide" id="krGuide" hidden></div>
-      <div class="kr-hint-pill" id="krHintPill">拖拽空白处移动画布 · 滚轮缩放 · 双击回到题目</div>
+      <div class="lp-canvas-zoom-dock" id="krCanvasZoomDock" role="group" aria-label="深度回忆画布缩放控制">
+        <button class="lp-canvas-zoom-btn" id="krZoomOutBtn" type="button" aria-label="缩小画布" title="缩小">−</button>
+        <div class="lp-canvas-zoom-percent-wrap"><div class="lp-canvas-zoom-slider-popover" id="krZoomSliderPopover" aria-hidden="true"><input id="krZoomSlider" type="range" min="1" max="400" step="1" value="100" aria-label="缩放比例"/></div><button class="lp-canvas-zoom-percent" id="krZoomLabel" type="button" aria-label="当前缩放比例，点击恢复到 100%">100%</button></div>
+        <button class="lp-canvas-zoom-btn" id="krZoomInBtn" type="button" aria-label="放大画布" title="放大">＋</button><span class="lp-canvas-zoom-divider" aria-hidden="true"></span>
+        <button class="lp-canvas-zoom-btn lp-canvas-fit-btn" id="krCenterBtn" type="button" aria-label="回到中心题目" title="回到题目"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 4H4v4"></path><path d="M16 4h4v4"></path><path d="M4 16v4h4"></path><path d="M20 16v4h-4"></path><rect x="8" y="8" width="8" height="8" rx="2"></rect></svg></button>
+      </div>
+      <div class="kr-session-stats kr-session-stats-canvas" id="krSessionStats" aria-live="polite"></div>
     </main>
+    <div class="kr-drawer-backdrop" id="krDrawerBackdrop" hidden></div>
+    <aside class="kr-question-drawer lp-question-library-compact" id="krQuestionDrawer" aria-label="题目库" aria-hidden="true">
+      <div class="kr-drawer-tools lp-question-library-tools">
+        <div class="lp-question-paper-row"><select id="krBankSelect" class="lp-question-paper-select" aria-label="选择已发布试卷"></select><button id="krCloseQuestionDrawerBtn" class="lp-question-library-close" type="button" aria-label="关闭题目库" title="关闭">×</button></div>
+        <div class="kr-drawer-search lp-question-search-row"><input id="krQuestionSearch" type="search" placeholder="搜索题目" /><button id="krQuestionSearchBtn" class="lp-question-text-action" type="button">搜索</button></div>
+        <div class="kr-question-filters lp-question-filter-links" role="group" aria-label="题目探索状态筛选"><button type="button" class="active" data-kr-question-filter="all">全部</button><button type="button" data-kr-question-filter="unexplored">未探索</button><button type="button" data-kr-question-filter="explored">已探索</button></div>
+        <div class="lp-question-library-meta" id="krQuestionDrawerMeta" aria-live="polite"></div>
+      </div>
+      <div class="kr-question-list lp-question-library-list" id="krQuestionList"></div>
+    </aside>
+  </div>
+
+  <div class="modal-backdrop auth-backdrop" id="authModal">
+    <div aria-labelledby="authTitle" aria-modal="true" class="modal auth-modal" role="dialog">
+      <div class="auth-head">
+        <div>
+          <h2 id="authTitle">登录后可继续</h2>
+          <p id="authReason">登录后可以记录回忆进度、生成深度回忆地图。</p>
+        </div>
+        <button class="auth-close" id="authCloseBtn" title="关闭登录窗口">×</button>
+      </div>
+      <div class="auth-body">
+        <label>用户名<input autocomplete="username" id="authUsername" placeholder="请输入用户名"/></label>
+        <label>密码<input autocomplete="current-password" id="authPassword" placeholder="请输入密码" type="password"/></label>
+        <div class="auth-msg" id="authMsg"></div>
+        <div class="auth-actions">
+          <button class="primary" id="authDoLoginBtn">登录</button>
+          <button id="authRegisterBtn">注册</button>
+        </div>
+      </div>
+    </div>
   </div>
 <script defer src="src/01-runtime-config.js"></script>
   <script defer src="src/28-app-storage.js"></script>
@@ -63,9 +148,21 @@
 <script defer src="src/37-subscription-redeem-codes.js"></script>
 <script defer src="src/37-subscription-core.js"></script>
 <script defer src="src/33-user-center.js"></script>
+<script defer src="src/30-standalone-auth-dialog.js"></script>
+<script defer src="src/41-account-menu.js"></script>
 <script defer src="src/39-global-shortcuts.js"></script>
 <script defer src="src/50-question-data.js"></script>
+<script defer src="src/86-activity-schema-v1.js"></script>
+<script defer src="src/86-free-mode-language.js"></script>
+<script defer src="src/86-question-language-ui.js"></script>
 <script defer src="src/85-knowledge-recall-data.js"></script>
+<script defer src="src/94-practice-navigation.js"></script>
+<script defer src="src/95-recall-association-library.js"></script>
+<script defer src="src/97-recall-storage.js"></script>
+<script defer src="src/59-published-paper-repository.js"></script>
+<script defer src="src/96-recall-question-source.js"></script>
+<script defer src="src/98-recall-graph-model.js"></script>
 <script defer src="src/86-knowledge-recall.js"></script>
+<script defer src="src/99-learning-practice-shell.js"></script>
 </body>
 </html>

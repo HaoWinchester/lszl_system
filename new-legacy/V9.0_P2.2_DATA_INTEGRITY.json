@@ -1,0 +1,34 @@
+{
+  "release": "v9.0-p2.2",
+  "generatedAt": "2026-07-27T00:00:00Z",
+  "constraints": {
+    "knowledgeTreeMaxDepth": 9,
+    "oneCurrentTaxonomyPerSubject": true,
+    "multiplePublishedHistoryAllowed": true,
+    "currentTaxonomyDeleteBlocked": true,
+    "publishedArchiveBeforeDelete": true,
+    "directReferenceBlocksDelete": true,
+    "taxonomyDeleteAdminOnly": true,
+    "archivedTaxonomyRestorable": true,
+    "deleteCreatesSnapshotAndAudit": true
+  },
+  "releaseFileSha256": {
+    "VERSION": "9faadcb5eafdd54fc39cbe5cd029f908014c02793433ce588968aea2f4bc40e1",
+    "README.md": "ff95975fbced86dee1739cc94c36403ea87275e3b97af10b0a7a453fb50a60a4",
+    "CHANGELOG.md": "d53c7dbcbd64acea5646606fb56ed279da39258c4b873958ef333cc122c44ffe",
+    "admin-console.html": "c0d446438d50abeb28bd05563c27cd475ca78f897507ac7d17b860a530a53b61",
+    "styles/admin-console.css": "c5ac8ad0cd4bc503d48cdb419e14ce76d53e6488c6f0b21b92a0235088ed64ae",
+    "src/admin/00-admin-core.js": "0d713c1b964d5885db1288651944f205ad717e6cc42dac360ce5262c98830113",
+    "src/admin/11-local-content-repository.js": "7ceaf99eb267b0458660b6388a6b441006be63b55802671b4590c37a8104cc21",
+    "src/admin/20-admin-permission-service.js": "a90bb072bfddb7fa880dad32143fd0bd30251f604a8d1254a5cce603f0b41a1b",
+    "src/admin/30-reference-index-service.js": "13196d3fb41775de7d695e99a6a578f50d69bc0ab57a41cd8fdae0f4c60d5ac5",
+    "src/admin/32-taxonomy-service.js": "13af415260b0df6ee14eb257a46ecd3986ecf32d2de0aa02a8c7ca65e3c63c79",
+    "src/admin/40-admin-service-registry.js": "70e34358c98536ad0f61f3e175c3bc3c6d8930cb10975335f4fb91140f9cff5f",
+    "src/admin/50-admin-shell-app.js": "4e6d5a1f0ce1c8c8664fdc1f329a0b3f1be5be63f84dfa67b57ee55cf2d3e86f",
+    "V9.0_P2.2_KNOWLEDGE_TREE_LIFECYCLE_REPORT.md": "affbbfb4717d0ae300e374e7395d6ac445b6f56f946e5eab34bf1e4e7668f90a",
+    "V9.0_P2.2_QUICK_START.md": "7bc568babe136e7fbcd9e1063f3efbf232eae5079681eaac792999196184f19c",
+    "tests/v90-p22-taxonomy-lifecycle.test.js": "b1c77caa2b31c0b21d51aabe8912f15acb0559d4ace84d04840cc7a8342d279f",
+    "tests/v90-p22-taxonomy-lifecycle-browser.py": "6c259a12ed3b98cedb1f2b17fd63bc1c41ef987d781de1fe966c6b1c1c670c63",
+    "tests/v90-p22-data-integrity.test.js": "4bb686ccb0199678744fe24f5da2567be247ad2bd07644fc8c992a72bc0b0733"
+  }
+}

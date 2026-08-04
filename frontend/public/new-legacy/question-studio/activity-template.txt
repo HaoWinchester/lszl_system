@@ -1,0 +1,73 @@
+【题型】单项选择
+【ID】activity-choice-001
+【阶段】基础阶段
+【部分】项目环境
+【题干-中文】项目需求频繁变化，团队应采用哪种方式？
+【题干-English】Project requirements change frequently. Which approach should the team use?
+【A-中文】严格按照原计划执行
+【A-English】Follow the original plan strictly
+【B-中文】采用迭代方式持续调整
+【B-English】Use an iterative approach and adjust continuously
+【C-中文】暂停项目等待需求稳定
+【C-English】Pause the project until requirements stabilize
+【D-中文】仅由项目经理决定
+【D-English】Let only the project manager decide
+【答案】B
+【解析-中文】需求频繁变化时，应采用迭代和持续反馈。
+【解析-English】Use iteration and continuous feedback when requirements change frequently.
+
+===== 下一题 =====
+
+【题型】关键词识别
+【ID】activity-keyword-001
+【题干-中文】请选择体现敏捷思维的关键词。
+【题干-English】Select the keywords that reflect an agile mindset.
+【分段1-中文】持续反馈
+【分段1-English】Continuous feedback
+【分段2-中文】严格冻结计划
+【分段2-English】Freeze the plan strictly
+【分段3-中文】适应变化
+【分段3-English】Adapt to change
+【答案】segment-1,segment-3
+
+===== 下一题 =====
+
+【题型】开放表达
+【ID】activity-open-001
+【题干-中文】请说明为什么需求变化时适合采用迭代方式。
+【题干-English】Explain why an iterative approach is suitable when requirements change.
+【概念1-可接受表达】迭代,分步交付
+【概念1-提示】请提到迭代。
+【概念2-可接受表达】持续反馈,及时反馈
+【概念2-提示】请提到反馈。
+【参考答案-中文】迭代能够通过分步交付和持续反馈及时适应变化。
+【参考答案-English】Iteration supports adaptation through incremental delivery and continuous feedback.
+
+===== 下一题 =====
+
+【题型】排序
+【ID】activity-ordering-001
+【操作说明-中文】请按照正确顺序排列。
+【操作说明-English】Put the steps in the correct order.
+【排序项1-中文】识别项目环境
+【排序项1-English】Identify the project environment
+【排序项2-中文】选择适合的方法
+【排序项2-English】Choose an appropriate approach
+【排序项3-中文】持续检查并调整
+【排序项3-English】Inspect and adapt continuously
+【答案】item-1,item-2,item-3
+
+===== 下一题 =====
+
+【题型】连线配对
+【ID】activity-matching-001
+【操作说明-中文】请完成方法与适用环境的配对。
+【操作说明-English】Match each approach with its suitable environment.
+【配对1-左-中文】预测型
+【配对1-左-English】Predictive
+【配对1-右-中文】范围稳定、变化较少
+【配对1-右-English】Stable scope with limited change
+【配对2-左-中文】敏捷型
+【配对2-左-English】Agile
+【配对2-右-中文】需求变化频繁
+【配对2-右-English】Frequently changing requirements

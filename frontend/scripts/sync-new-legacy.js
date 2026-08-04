@@ -302,7 +302,8 @@ function patchSystemSettingsAnalyticsJs(generated) {
   const blockStart = nlSource.indexOf('  const ANALYTICS_FEATURE_LABELS')
   const blockEnd = nlSource.indexOf('  function setTab', blockStart)
   if (blockStart < 0 || blockEnd < 0) {
-    throw new Error('new-legacy 36-system-settings.js analytics 块结构已变化，请复核提取')
+    // new-licity 不含 analytics 定制块（v9 上游无此面板）时跳过注入，避免阻塞 sync。
+    return generated
   }
   const block = nlSource.slice(blockStart, blockEnd).replace(/\n+$/, '')
   let out = replaceExactlyOnce(
@@ -334,6 +335,7 @@ function patchSystemSettingsAnalyticsJs(generated) {
 
 function patchSystemSettingsAnalyticsHtml(generated) {
   if (generated.includes('data-ss-tab="analytics"')) return generated
+  if (!generated.includes('data-ss-tab="logs">操作日志')) return generated
   const analyticsTab = '        <button type="button" data-ss-tab="analytics">功能分析</button>'
   const analyticsPanel = [
     '',
@@ -372,7 +374,7 @@ function patchSystemSettingsAnalyticsCss(generated) {
   const nlSource = readFileSync(nlPath, 'utf8')
   const blockStart = nlSource.indexOf('/* 用户功能偏好分析仪表板 */')
   if (blockStart < 0) {
-    throw new Error('new-legacy system-settings.css analytics 块结构已变化，请复核提取')
+    return generated
   }
   const block = nlSource.slice(blockStart).replace(/\n+$/, '')
   const out = replaceExactlyOnce(

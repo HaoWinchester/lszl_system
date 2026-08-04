@@ -173,10 +173,12 @@ function smoothGraphZoomByLevelsAtClientPoint(direction,levels,clientX,clientY,o
   return smoothGraphZoomToScaleAtClientPoint(next,clientX,clientY,options);
 }
 function smoothGraphButtonZoomAtStageCenter(direction){
+  hideGraphTransientMenus();
   const r=stage.getBoundingClientRect();
   return smoothGraphZoomByLevelsAtClientPoint(direction,GRAPH_BUTTON_ZOOM_LEVELS,r.left+r.width/2,r.top+r.height/2,{duration:230,source:'button'});
 }
 function smoothGraphWheelZoomAtClientPoint(direction,clientX,clientY){
+  hideGraphTransientMenus();
   return smoothGraphZoomByLevelsAtClientPoint(direction,GRAPH_WHEEL_ZOOM_LEVELS,clientX,clientY,{duration:150,source:'wheel'});
 }
 window.cancelGraphSmoothZoom=cancelGraphSmoothZoom;
@@ -908,14 +910,14 @@ function normalModeEdgeLabelNodeIds(){
 }
 function shouldShowEdgeLabel(link,large,edgeIsLocal,labelText,labelCount,normalLabelNodeIds){
   if(!labelText)return false;
-  if(state.selectedLinkId===link.id)return true;
+  if(state.selectedLinkId===link.id||selectedLinkIds.has(String(link.id)))return true;
   if(large)return !!(edgeIsLocal&&labelCount<LARGE_GRAPH_SELECTED_LABEL_LIMIT);
   return !!(normalLabelNodeIds&&normalLabelNodeIds.size&&(normalLabelNodeIds.has(link.from)||normalLabelNodeIds.has(link.to)));
 }
 function shouldRenderLinkInCurrentMode(link,nodeMap,localIds,renderedCount){
   if(!link)return false;
   if(!isLargeGraphMode()){
-    if(state.selectedLinkId===link.id)return true;
+    if(state.selectedLinkId===link.id||selectedLinkIds.has(String(link.id)))return true;
     const localMatch=!!(localIds&&localIds.size&&(localIds.has(link.from)||localIds.has(link.to)));
     if(largeGraphRelatedFocusEnabled&&localIds&&localIds.size)return localMatch;
     const a=(nodeMap&&nodeMap.get(link.from))||nodeById(link.from),b=(nodeMap&&nodeMap.get(link.to))||nodeById(link.to);
@@ -926,7 +928,7 @@ function shouldRenderLinkInCurrentMode(link,nodeMap,localIds,renderedCount){
     }
     return true;
   }
-  if(state.selectedLinkId===link.id)return true;
+  if(state.selectedLinkId===link.id||selectedLinkIds.has(String(link.id)))return true;
   const a=(nodeMap&&nodeMap.get(link.from))||nodeById(link.from),b=(nodeMap&&nodeMap.get(link.to))||nodeById(link.to);
   if(!a||!b)return false;
   const localMatch=!!(localIds&&localIds.size&&(localIds.has(link.from)||localIds.has(link.to)));
@@ -952,11 +954,12 @@ function renderEdges(){
     const edgeIsLocal=!!(localIds&&localIds.size&&(localIds.has(link.from)||localIds.has(link.to)));
     renderedCount++;
     const g=document.createElementNS('http://www.w3.org/2000/svg','g'),hit=document.createElementNS('http://www.w3.org/2000/svg','path'),vis=document.createElementNS('http://www.w3.org/2000/svg','path');
+    if(selectedLinkIds.has(String(link.id)))g.classList.add('is-batch-selected');
     const lineColor=safeColor(link.color,DEFAULTS.linkColor),lineStyle=LINE_STYLES.has(link.lineStyle)?link.lineStyle:DEFAULTS.linkStyle,importantLink=!!state.focusMode&&isImportant(a)&&isImportant(b),normalRelationLayer=!large&&relationLayerEnabled()&&relationState&&relationState.anchors&&relationState.anchors.size?(relationState.anchors.has(link.from)||relationState.anchors.has(link.to)?'active':'muted'):'';
     g.setAttribute('data-link-id',link.id);
     if(large)g.setAttribute('data-large-edge-mode',edgeIsLocal?'local':'overview');
     if(normalRelationLayer)g.setAttribute('data-relation-layer',normalRelationLayer);
-    hit.setAttribute('class','edge-hit'+(state.selectedLinkId===link.id?' selected':'')+(normalRelationLayer==='active'?' edge-related-active':'')+(normalRelationLayer==='muted'?' edge-related-muted':''));
+    hit.setAttribute('class','edge-hit'+((state.selectedLinkId===link.id||selectedLinkIds.has(String(link.id)))?' selected':'')+(selectedLinkIds.has(String(link.id))?' batch-selected':'')+(normalRelationLayer==='active'?' edge-related-active':'')+(normalRelationLayer==='muted'?' edge-related-muted':''));
     const interactive=normalRelationLayer!=='muted';
     // v7.9.20：大图模式下已渲染的主干/骨架线也允许单击选中、双击就地编辑文字。
     if(interactive){
@@ -975,7 +978,7 @@ function renderEdges(){
       labelCount++;
       label=document.createElementNS('http://www.w3.org/2000/svg','text');
       label.setAttribute('text-anchor','middle');
-      label.setAttribute('class','edge-label'+(state.selectedLinkId===link.id?' edge-selected-label':'')+(importantLink?' focus-important-label':'')+(normalRelationLayer==='active'?' edge-related-active':'')+(normalRelationLayer==='muted'?' edge-related-muted':''));
+      label.setAttribute('class','edge-label'+((state.selectedLinkId===link.id||selectedLinkIds.has(String(link.id)))?' edge-selected-label':'')+(importantLink?' focus-important-label':'')+(normalRelationLayer==='active'?' edge-related-active':'')+(normalRelationLayer==='muted'?' edge-related-muted':''));
       label.textContent=truncate(labelText,12);
       g.appendChild(label);
     }
@@ -1032,6 +1035,7 @@ function requestLinkedEdgeGeometryRender(nodeIds){
 
 function clearMultiSelection(){
   selectedNodeIds.clear();
+  selectedLinkIds.clear();
 }
 function selectedNodeTitle(){
   if(!selectedNodeIds.size)return '';
@@ -1051,7 +1055,8 @@ function graphUndoSnapshot(){
     selectedNodeId:state.selectedNodeId||null,
     selectedLinkId:state.selectedLinkId||null,
     linkSourceId:state.linkSourceId||null,
-    selectedNodeIds:[...selectedNodeIds]
+    selectedNodeIds:[...selectedNodeIds],
+    selectedLinkIds:[...selectedLinkIds]
   };
 }
 function pushGraphUndoSnapshot(label='操作'){
@@ -1070,6 +1075,7 @@ function restoreGraphUndoSnapshot(){
   state.linkSourceId=nodeIds.has(item.snapshot.linkSourceId)?item.snapshot.linkSourceId:null;
   if(relatedScopeAnchorNodeId&&!nodeIds.has(relatedScopeAnchorNodeId))relatedScopeAnchorNodeId=null;
   selectedNodeIds=new Set((item.snapshot.selectedNodeIds||[]).filter(id=>nodeIds.has(id)));
+  selectedLinkIds=new Set((item.snapshot.selectedLinkIds||[]).filter(id=>linkIds.has(id)));
   render({persist:true});
   showStatus(`已撤回：${item.label}。`);
   return true;
@@ -1146,6 +1152,7 @@ function pasteGraphClipboardCards(){
     created.push(n.id);
   });
   selectedNodeIds=new Set(created);
+  selectedLinkIds.clear();
   state.selectedNodeId=created[0]||null;
   state.selectedLinkId=null;
   state.linkSourceId=null;
@@ -1157,6 +1164,7 @@ function toggleCardMultiSelection(id){
   const n=nodeById(id);if(!n)return;
   clearHoverDetail(false);
   state.selectedLinkId=null;
+  selectedLinkIds.clear();
   state.linkSourceId=null;
   if(state.selectedNodeId&&state.selectedNodeId!==id&&!selectedNodeIds.size)selectedNodeIds.add(state.selectedNodeId);
   if(state.selectedNodeId===id&&!selectedNodeIds.size)selectedNodeIds.add(id);
@@ -1170,7 +1178,9 @@ function screenRectForBox(a,b){
   return{left,top,width,height,right:left+width,bottom:top+height};
 }
 function worldRectFromScreenRect(rect){
-  const p1=screenToWorld(rect.left,rect.top),p2=screenToWorld(rect.right,rect.bottom);
+  const scale=Math.max(.0001,Number(state.viewport.scale)||1);
+  const p1={x:(Number(rect.left)-Number(state.viewport.x||0))/scale,y:(Number(rect.top)-Number(state.viewport.y||0))/scale};
+  const p2={x:(Number(rect.right)-Number(state.viewport.x||0))/scale,y:(Number(rect.bottom)-Number(state.viewport.y||0))/scale};
   return{left:Math.min(p1.x,p2.x),top:Math.min(p1.y,p2.y),right:Math.max(p1.x,p2.x),bottom:Math.max(p1.y,p2.y)};
 }
 function rectsOverlap(a,b){
@@ -1205,12 +1215,40 @@ function hideSelectionBox(){
 function idsInsideWorldRect(rect){
   return state.nodes.filter(n=>rectsOverlap(nodeWorldRect(n),rect)).map(n=>n.id);
 }
+function linkIdsInsideWorldRect(rect){
+  const geometry=window.KGCanvasEdgeSelectionGeometry;
+  if(!geometry?.collectPathIds)return [];
+  const entries=[];
+  edgeDomById.forEach((dom,id)=>{if(dom?.hit)entries.push({id,path:dom.hit})});
+  return geometry.collectPathIds(entries,rect,{sampleSpacing:42,minSamples:8,maxSamples:56});
+}
+function refreshEdgeSelectionClasses(){
+  edgeDomById.forEach((dom,id)=>{
+    const batch=selectedLinkIds.has(String(id));
+    const selected=batch||state.selectedLinkId===String(id);
+    dom.g?.classList.toggle('is-batch-selected',batch);
+    dom.hit?.classList.toggle('selected',selected);
+    dom.hit?.classList.toggle('batch-selected',batch);
+    dom.label?.classList.toggle('edge-selected-label',selected);
+  });
+  if(selectedLinkIds.size!==1||selectedNodeIds.size)hideSelectedEdgeQuickStylePanel();
+}
+function selectedLinkCount(){return [...selectedLinkIds].filter(id=>linkById(id)).length}
 function startBoxSelection(e){
   clearHoverDetail(false);
-  boxSelect={pointerId:e.pointerId,start:{x:e.clientX,y:e.clientY},last:{x:e.clientX,y:e.clientY},moved:false};
+  boxSelect={
+    pointerId:e.pointerId,
+    start:{x:e.clientX,y:e.clientY},
+    last:{x:e.clientX,y:e.clientY},
+    moved:false,
+    additive:!!(e.ctrlKey||e.metaKey||e.shiftKey),
+    baseNodeIds:new Set(selectedNodeIds),
+    baseLinkIds:new Set(selectedLinkIds)
+  };
   try{stage.setPointerCapture(e.pointerId)}catch{}
   const r=stage.getBoundingClientRect();
   updateSelectionBoxVisual({left:e.clientX-r.left,top:e.clientY-r.top,width:0,height:0,right:e.clientX-r.left,bottom:e.clientY-r.top});
+  hideSelectedEdgeQuickStylePanel();
   stage.classList.remove('panning');
   e.preventDefault();
   e.stopPropagation();
@@ -1222,35 +1260,49 @@ function moveBoxSelection(e){
   if(Math.hypot(e.clientX-boxSelect.start.x,e.clientY-boxSelect.start.y)>4)boxSelect.moved=true;
   const rect=screenRectForBox({x:boxSelect.start.x-r.left,y:boxSelect.start.y-r.top},{x:e.clientX-r.left,y:e.clientY-r.top});
   updateSelectionBoxVisual(rect);
-  const ids=idsInsideWorldRect(worldRectFromScreenRect(rect));
-  selectedNodeIds=new Set(ids);
-  state.selectedNodeId=ids[0]||null;
-  state.selectedLinkId=null;
+  const worldRect=worldRectFromScreenRect(rect);
+  const nodeHits=idsInsideWorldRect(worldRect),linkHits=linkIdsInsideWorldRect(worldRect);
+  const nextNodes=boxSelect.additive?new Set([...boxSelect.baseNodeIds,...nodeHits]):new Set(nodeHits);
+  const nextLinks=boxSelect.additive?new Set([...boxSelect.baseLinkIds,...linkHits]):new Set(linkHits);
+  selectedNodeIds=nextNodes;
+  selectedLinkIds=nextLinks;
+  state.selectedNodeId=nodeHits.at(-1)||nextNodes.values().next().value||null;
+  state.selectedLinkId=!nextNodes.size&&nextLinks.size===1?nextLinks.values().next().value:null;
   state.linkSourceId=null;
   refreshCardClasses();
+  refreshEdgeSelectionClasses();
   e.preventDefault();
   e.stopPropagation();
 }
 function finishBoxSelection(e,cancelled=false){
   if(!boxSelect||boxSelect.pointerId!==e.pointerId)return;
-  const count=selectedNodeIds.size,moved=!!boxSelect.moved;
+  const moved=!!boxSelect.moved,original=boxSelect;
   boxSelect=null;
   try{stage.releasePointerCapture(e.pointerId)}catch{}
   hideSelectionBox();
   if(cancelled){
-    clearMultiSelection();
+    selectedNodeIds=new Set(original.baseNodeIds);
+    selectedLinkIds=new Set(original.baseLinkIds);
+    state.selectedNodeId=selectedNodeIds.values().next().value||null;
+    state.selectedLinkId=!selectedNodeIds.size&&selectedLinkIds.size===1?selectedLinkIds.values().next().value:null;
     refreshSelectionUI();
     return;
   }
   if(!moved){
-    clearSelection();
-    showStatus('已关闭详情。');
-  }else if(count){
-    renderDetails();
-    showStatus(`已框选 ${count} 个知识点${count<=3?'：'+selectedNodeTitle():''}。拖动任一选中卡片可整体移动。`);
+    if(!original.additive)clearSelection();
+    showStatus(original.additive?'已保留当前选择。':'已关闭详情。');
   }else{
-    clearSelection();
-    showStatus('没有框选到知识点。');
+    const nodeCount=selectedNodeIds.size,linkCount=selectedLinkCount();
+    if(nodeCount||linkCount){
+      refreshSelectionUI();
+      const parts=[];
+      if(nodeCount)parts.push(nodeCount+' 个知识点');
+      if(linkCount)parts.push(linkCount+' 条关系线');
+      showStatus('已框选 '+parts.join('、')+'。按 Delete 可批量删除，Ctrl/Command+Z 可撤回。');
+    }else{
+      clearSelection();
+      showStatus('框选区域内没有知识点或关系线。');
+    }
   }
   e.preventDefault();
   e.stopPropagation();
@@ -1313,6 +1365,8 @@ function cardFromEvent(e){const card=e.target.closest&&e.target.closest('.knowle
 
 // v7.9.43：选中卡牌后显示四向快速生长点，悬浮预览，点击复制尺寸/颜色并自动连线创建新知识点。
 let nodeGrowthLayer=null,nodeGrowthPreviewDirection=null,nodeGrowthCreateLockUntil=0;
+let nodeGrowthPreviewTimer=null,nodeGrowthPreviewPendingDirection=null;
+const NODE_GROWTH_PREVIEW_DELAY=280;
 const NODE_GROWTH_DIRECTIONS={
   top:{label:'上方',dx:0,dy:-1},
   right:{label:'右侧',dx:1,dy:0},
@@ -1320,6 +1374,99 @@ const NODE_GROWTH_DIRECTIONS={
   left:{label:'左侧',dx:-1,dy:0}
 };
 const NODE_GROWTH_GAP=96;
+let nodeGrowthConnectController=null,nodeGrowthConnectDraftPath=null,nodeGrowthConnectTargetId=null,nodeGrowthConnectSourceId=null;
+function isNodeGrowthConnectDragActive(){return !!(nodeGrowthConnectController&&nodeGrowthConnectController.isActive&&nodeGrowthConnectController.isActive())}
+function ensureNodeGrowthConnectDraftPath(){
+  if(nodeGrowthConnectDraftPath&&nodeGrowthConnectDraftPath.isConnected)return nodeGrowthConnectDraftPath;
+  nodeGrowthConnectDraftPath=document.createElementNS('http://www.w3.org/2000/svg','path');
+  nodeGrowthConnectDraftPath.setAttribute('class','edge-connect-draft');
+  nodeGrowthConnectDraftPath.setAttribute('aria-hidden','true');
+  edgeGroup.appendChild(nodeGrowthConnectDraftPath);
+  return nodeGrowthConnectDraftPath;
+}
+function clearNodeGrowthConnectVisuals(){
+  if(nodeGrowthConnectDraftPath)nodeGrowthConnectDraftPath.remove();
+  nodeGrowthConnectDraftPath=null;
+  if(nodeGrowthConnectTargetId){const target=cardElementByNodeId(nodeGrowthConnectTargetId);if(target)target.classList.remove('is-connector-drag-target')}
+  if(nodeGrowthConnectSourceId){const source=cardElementByNodeId(nodeGrowthConnectSourceId);if(source)source.classList.remove('is-connector-drag-source')}
+  nodeGrowthConnectTargetId=null;
+  nodeGrowthConnectSourceId=null;
+  if(stage&&stage.classList)stage.classList.remove('graph-connector-dragging');
+}
+function setNodeGrowthConnectTarget(targetId){
+  if(nodeGrowthConnectTargetId===targetId)return;
+  if(nodeGrowthConnectTargetId){const old=cardElementByNodeId(nodeGrowthConnectTargetId);if(old)old.classList.remove('is-connector-drag-target')}
+  nodeGrowthConnectTargetId=targetId||null;
+  if(nodeGrowthConnectTargetId){const next=cardElementByNodeId(nodeGrowthConnectTargetId);if(next)next.classList.add('is-connector-drag-target')}
+}
+function nodeGrowthConnectTargetAt(event,active){
+  if(!event||!document.elementFromPoint)return null;
+  const hit=document.elementFromPoint(event.clientX,event.clientY);
+  const card=hit&&hit.closest&&hit.closest('.knowledge-card');
+  if(!card||!cardsLayer.contains(card))return null;
+  const targetId=card.dataset.nodeId||'';
+  return targetId&&targetId!==active.sourceId?targetId:null;
+}
+function updateNodeGrowthConnectDraft(result){
+  const source=nodeById(result&&result.sourceId);if(!source)return;
+  const start=nodeGrowthHandlePosition(source,result.direction);
+  const target=result.targetId&&nodeById(result.targetId);
+  const end=target?nodeCenter(target):screenToWorld(result.event.clientX,result.event.clientY);
+  const path=ensureNodeGrowthConnectDraftPath();
+  path.setAttribute('d',pathFor(start,end,state.defaults.linkPathStyle));
+  path.classList.toggle('has-target',!!target);
+  setNodeGrowthConnectTarget(target&&target.id);
+}
+function createConnectionFromGrowthHandle(sourceId,targetId){
+  const source=nodeById(sourceId),target=nodeById(targetId);if(!source||!target||source.id===target.id)return false;
+  if(isCanvasPanMode()||isRelatedGatherActive())return false;
+  if(relationExists(source.id,target.id)){
+    showStatus(`“${source.title}”与“${target.title}”之间已有关系线。`);
+    updateNodeGrowthHandles();
+    return false;
+  }
+  if(typeof pushGraphUndoSnapshot==='function')pushGraphUndoSnapshot('拖拽建立知识关系');
+  const link=makeLink(source.id,target.id,'','',state.defaults.linkStyle,state.defaults.linkColor,state.defaults.linkPathStyle);
+  state.links.push(link);
+  clearMultiSelection();
+  state.selectedNodeId=source.id;
+  state.selectedLinkId=null;
+  state.linkSourceId=null;
+  render({persist:true});
+  showStatus(`已建立无文字关系线：${source.title} → ${target.title}`);
+  return true;
+}
+function ensureNodeGrowthConnectController(){
+  if(nodeGrowthConnectController)return nodeGrowthConnectController;
+  const api=window.KGGraphConnectorDrag;
+  if(!api||typeof api.create!=='function')return null;
+  nodeGrowthConnectController=api.create({
+    threshold:6,
+    resolveTarget:nodeGrowthConnectTargetAt,
+    onStart:result=>{
+      nodeGrowthConnectSourceId=result.sourceId;
+      hideNodeGrowthPreview();
+      if(stage&&stage.classList)stage.classList.add('graph-connector-dragging');
+      const source=cardElementByNodeId(result.sourceId);if(source)source.classList.add('is-connector-drag-source');
+      updateNodeGrowthConnectDraft(result);
+    },
+    onMove:updateNodeGrowthConnectDraft,
+    onConnect:result=>{clearNodeGrowthConnectVisuals();createConnectionFromGrowthHandle(result.sourceId,result.targetId)},
+    onDropMiss:()=>{clearNodeGrowthConnectVisuals();updateNodeGrowthHandles();showStatus('未建立连线：请把连接点拖到另一张卡牌上。')},
+    onClick:result=>{clearNodeGrowthConnectVisuals();quickCreateNodeFromGrowthHandle(result.direction,result.sourceId)},
+    onCancel:()=>{clearNodeGrowthConnectVisuals();updateNodeGrowthHandles()}
+  });
+  return nodeGrowthConnectController;
+}
+function beginNodeGrowthConnectDrag(event,handle){
+  if(!event||!handle||event.button!==0)return false;
+  const sourceId=handle.dataset.nodeId||state.selectedNodeId,direction=handle.dataset.growthDir;
+  if(!sourceId||!NODE_GROWTH_DIRECTIONS[direction])return false;
+  cancelNodeGrowthPreviewDelay();
+  hideNodeGrowthPreview({render:false});
+  const controller=ensureNodeGrowthConnectController();
+  return !!(controller&&controller.begin(event,{sourceId,direction,handle}));
+}
 function ensureNodeGrowthLayer(){
   if(nodeGrowthLayer&&nodeGrowthLayer.isConnected)return nodeGrowthLayer;
   nodeGrowthLayer=document.createElement('div');
@@ -1329,7 +1476,28 @@ function ensureNodeGrowthLayer(){
   cardsLayer.appendChild(nodeGrowthLayer);
   return nodeGrowthLayer;
 }
+function removeNodeGrowthPreviewElements(){
+  if(!nodeGrowthLayer)return;
+  nodeGrowthLayer.querySelectorAll('.node-growth-preview-card,.node-growth-preview-svg').forEach(item=>item.remove());
+}
+function cancelNodeGrowthPreviewDelay(){
+  if(nodeGrowthPreviewTimer){clearTimeout(nodeGrowthPreviewTimer);nodeGrowthPreviewTimer=null}
+  nodeGrowthPreviewPendingDirection=null;
+}
+function scheduleNodeGrowthPreview(dir,handle){
+  if(!NODE_GROWTH_DIRECTIONS[dir]||isNodeGrowthConnectDragActive())return;
+  cancelNodeGrowthPreviewDelay();
+  nodeGrowthPreviewPendingDirection=dir;
+  nodeGrowthPreviewTimer=setTimeout(()=>{
+    nodeGrowthPreviewTimer=null;
+    const pending=nodeGrowthPreviewPendingDirection;
+    nodeGrowthPreviewPendingDirection=null;
+    if(pending!==dir||isNodeGrowthConnectDragActive()||!handle||!handle.isConnected)return;
+    showNodeGrowthPreview(dir);
+  },NODE_GROWTH_PREVIEW_DELAY);
+}
 function hideNodeGrowthHandles(){
+  cancelNodeGrowthPreviewDelay();
   nodeGrowthPreviewDirection=null;
   if(nodeGrowthLayer)nodeGrowthLayer.replaceChildren();
 }
@@ -1474,23 +1642,18 @@ function createNodeGrowthHandle(dir,n){
   btn.dataset.growthDir=dir;
   btn.dataset.nodeId=n.id;
   btn.dataset.stageUi='true';
-  btn.title=`在${meta.label}快速创建知识点`;
+  btn.title=`点击：在${meta.label}快速创建；拖拽：连接到其他卡牌`;
   btn.setAttribute('role','button');
   btn.setAttribute('tabindex','0');
   btn.setAttribute('aria-label',btn.title);
   btn.style.left=point.x+'px';
   btn.style.top=point.y+'px';
-  const create=e=>{
-    if(e){e.preventDefault();e.stopPropagation()}
-    quickCreateNodeFromGrowthHandle(btn.dataset.growthDir,btn.dataset.nodeId);
-  };
-  btn.addEventListener('pointerdown',create);
-  btn.addEventListener('mousedown',create);
-  btn.addEventListener('click',create);
-  btn.addEventListener('pointerenter',()=>showNodeGrowthPreview(btn.dataset.growthDir));
-  btn.addEventListener('pointerleave',()=>hideNodeGrowthPreview());
+  btn.addEventListener('pointerdown',event=>beginNodeGrowthConnectDrag(event,btn));
+  btn.addEventListener('click',event=>{event.preventDefault();event.stopPropagation()});
+  btn.addEventListener('pointerenter',()=>{if(!isNodeGrowthConnectDragActive())scheduleNodeGrowthPreview(btn.dataset.growthDir,btn)});
+  btn.addEventListener('pointerleave',()=>{cancelNodeGrowthPreviewDelay();if(!isNodeGrowthConnectDragActive())hideNodeGrowthPreview()});
   btn.addEventListener('keydown',e=>{
-    if(e.key==='Enter'||e.key===' '){create(e)}
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();quickCreateNodeFromGrowthHandle(btn.dataset.growthDir,btn.dataset.nodeId)}
   });
   return btn;
 }
@@ -1550,33 +1713,55 @@ function createNodeGrowthPreview(n,dir){
   return frag;
 }
 function updateNodeGrowthHandles(){
+  if(isNodeGrowthConnectDragActive())return;
   if(!canShowNodeGrowthHandles()){hideNodeGrowthHandles();return}
   const n=nodeById(state.selectedNodeId),layer=ensureNodeGrowthLayer();
   if(!n){hideNodeGrowthHandles();return}
-  const frag=document.createDocumentFragment();
-  ['top','right','bottom','left'].forEach(dir=>frag.appendChild(createNodeGrowthHandle(dir,n)));
-  if(nodeGrowthPreviewDirection&&NODE_GROWTH_DIRECTIONS[nodeGrowthPreviewDirection])frag.appendChild(createNodeGrowthPreview(n,nodeGrowthPreviewDirection));
-  layer.replaceChildren(frag);
+  const dirs=['top','right','bottom','left'];
+  const existing=[...layer.querySelectorAll('.node-growth-handle')];
+  const stable=layer.dataset.nodeId===String(n.id)&&existing.length===dirs.length;
+  if(!stable){
+    layer.replaceChildren();
+    layer.dataset.nodeId=String(n.id);
+    dirs.forEach(dir=>layer.appendChild(createNodeGrowthHandle(dir,n)));
+  }else{
+    existing.forEach(handle=>{
+      const dir=handle.dataset.growthDir;
+      const point=nodeGrowthHandlePosition(n,dir);
+      handle.dataset.nodeId=n.id;
+      handle.style.left=point.x+'px';
+      handle.style.top=point.y+'px';
+    });
+  }
+  removeNodeGrowthPreviewElements();
+  if(nodeGrowthPreviewDirection&&NODE_GROWTH_DIRECTIONS[nodeGrowthPreviewDirection]){
+    layer.appendChild(createNodeGrowthPreview(n,nodeGrowthPreviewDirection));
+  }
 }
 function showNodeGrowthPreview(dir){
-  if(!NODE_GROWTH_DIRECTIONS[dir])return;
+  if(!NODE_GROWTH_DIRECTIONS[dir]||isNodeGrowthConnectDragActive())return;
+  cancelNodeGrowthPreviewDelay();
   nodeGrowthPreviewDirection=dir;
   updateNodeGrowthHandles();
 }
-function hideNodeGrowthPreview(){
-  if(!nodeGrowthPreviewDirection)return;
+function hideNodeGrowthPreview(options={}){
+  cancelNodeGrowthPreviewDelay();
   nodeGrowthPreviewDirection=null;
-  updateNodeGrowthHandles();
+  removeNodeGrowthPreviewElements();
 }
 function shouldKeepNodeGrowthPreviewFromEvent(e){
   const target=e&&e.target;
   return !!(target&&target.closest&&target.closest('.node-growth-handle'));
 }
 document.addEventListener('pointermove',e=>{
-  if(nodeGrowthPreviewDirection&&!shouldKeepNodeGrowthPreviewFromEvent(e))hideNodeGrowthPreview();
+  if(isNodeGrowthConnectDragActive())return;
+  if(!shouldKeepNodeGrowthPreviewFromEvent(e)){
+    cancelNodeGrowthPreviewDelay();
+    if(nodeGrowthPreviewDirection)hideNodeGrowthPreview();
+  }
 },{passive:true});
-window.addEventListener('blur',hideNodeGrowthPreview);
-document.addEventListener('scroll',hideNodeGrowthPreview,true);
+window.addEventListener('blur',()=>{cancelNodeGrowthPreviewDelay();hideNodeGrowthPreview();if(nodeGrowthConnectController&&nodeGrowthConnectController.cancel)nodeGrowthConnectController.cancel()});
+document.addEventListener('scroll',()=>{cancelNodeGrowthPreviewDelay();hideNodeGrowthPreview()},true);
 function quickCreateNodeFromGrowthHandle(dir,sourceId=null){
   if(!NODE_GROWTH_DIRECTIONS[dir])return false;
   // sourceId 只用于定位原卡牌；新卡牌 ID 仍由 makeNode() 生成，绝不复用原卡牌 ID。
@@ -1592,7 +1777,7 @@ function quickCreateNodeFromGrowthHandle(dir,sourceId=null){
   if(typeof pushGraphUndoSnapshot==='function')pushGraphUndoSnapshot(`快速创建${NODE_GROWTH_DIRECTIONS[dir].label}知识点`);
   const pos=resolveNodeGrowthPosition(source,dir);
   const next=makeNode('未命名知识点',pos.x,pos.y,safeColor(source.color,DEFAULTS.nodeColor),'','基础','','','','',source.size||'');
-  const link=makeLink(source.id,next.id,'关联','',state.defaults.linkStyle,state.defaults.linkColor,state.defaults.linkPathStyle);
+  const link=makeLink(source.id,next.id,'','',state.defaults.linkStyle,state.defaults.linkColor,state.defaults.linkPathStyle);
   state.nodes.push(next);
   state.links.push(link);
   state.selectedNodeId=next.id;
@@ -1603,28 +1788,11 @@ function quickCreateNodeFromGrowthHandle(dir,sourceId=null){
   showStatus(`已在${NODE_GROWTH_DIRECTIONS[dir].label}创建“未命名知识点”，并自动建立关系线。`);
   return true;
 }
-cardsLayer.addEventListener('pointerdown',e=>{
-  const handle=e.target.closest&&e.target.closest('.node-growth-handle');
-  if(!handle)return;
-  // v7.9.45：创建动作绑定在小点自身，捕获阶段不再 stopPropagation，
-  // 避免事件到不了目标元素；这里仅保留委托兜底。
-},true);
-cardsLayer.addEventListener('pointerover',e=>{
-  const handle=e.target.closest&&e.target.closest('.node-growth-handle');
-  if(!handle||!cardsLayer.contains(handle))return;
-  showNodeGrowthPreview(handle.dataset.growthDir);
-});
-cardsLayer.addEventListener('pointerout',e=>{
-  const handle=e.target.closest&&e.target.closest('.node-growth-handle');
-  if(!handle)return;
-  hideNodeGrowthPreview();
-});
 cardsLayer.addEventListener('click',e=>{
   const handle=e.target.closest&&e.target.closest('.node-growth-handle');
   if(!handle)return;
   e.preventDefault();
   e.stopPropagation();
-  quickCreateNodeFromGrowthHandle(handle.dataset.growthDir,handle.dataset.nodeId);
 },true);
 
 
@@ -1907,8 +2075,8 @@ function renderDetails(){
   if(!n&&!l){detailPanel.classList.remove('show','hover-preview','detail-actions-expanded');detailPanel.innerHTML='';return}
   detailPanel.classList.remove('detail-actions-expanded');
   detailPanel.classList.toggle('hover-preview',!!isHoverPreview);
-  const tools=`<button class="detail-actions-toggle detail-panel-control" id="detailActionsToggle" aria-expanded="false" title="展开操作"><span class="detail-actions-chevron" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><path d="m4 6 4 4 4-4"/></svg></span></button><button class="close-detail detail-panel-control" id="closeDetailBtn" aria-label="关闭详情"><span class="detail-close-icon" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><path d="m4 4 8 8M12 4l-8 8"/></svg></span></button>`;
-  if(l){const a=nodeById(l.from),b=nodeById(l.to),lineColor=safeColor(l.color,DEFAULTS.linkColor);detailPanel.innerHTML=`${tools}<div class="detail-top"><div class="detail-mini-icon" style="background:#2563eb">线</div><div><div class="detail-name">知识关系</div><div class="detail-title">${escapeHTML(a?a.title:'?')} ↔ ${escapeHTML(b?b.title:'?')}</div></div></div><div class="detail-grid"><div class="label">关系</div><div><span class="badge">${escapeHTML(l.type||'关联')}</span></div><div class="label">线型</div><div>${l.lineStyle==='dashed'?'虚线':'实线'} ｜ <span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:${lineColor};vertical-align:-2px;margin-right:4px"></span>${escapeHTML(lineColor)}</div><div class="label">备注</div><div>${escapeHTML(l.note||'暂无备注')}</div></div><div class="detail-actions"><button id="editLinkFromDetailBtn" class="primary">编辑关系</button><button id="deleteLinkFromDetailBtn" class="danger">删除线</button></div>`;detailPanel.classList.add('show');bindDetailBasics();$('editLinkFromDetailBtn').onclick=()=>openLinkModal(l.id);$('deleteLinkFromDetailBtn').onclick=()=>{if(confirm('确定删除这条知识关系吗？')){state.links=state.links.filter(i=>i.id!==l.id);clearSelection({persist:true});showStatus('关系线已删除。')}};return}
+  const tools=`<button class="detail-actions-toggle" id="detailActionsToggle" aria-expanded="false" title="展开操作">⌄</button><button class="close-detail" id="closeDetailBtn">×</button>`;
+  if(l){const a=nodeById(l.from),b=nodeById(l.to),lineColor=safeColor(l.color,DEFAULTS.linkColor);detailPanel.innerHTML=`${tools}<div class="detail-top"><div class="detail-mini-icon" style="background:#2563eb">线</div><div><div class="detail-name">知识关系</div><div class="detail-title">${escapeHTML(a?a.title:'?')} ↔ ${escapeHTML(b?b.title:'?')}</div></div></div><div class="detail-grid"><div class="label">关系</div><div><span class="badge">${escapeHTML(l.type||'无文字关系')}</span></div><div class="label">线型</div><div>${l.lineStyle==='dashed'?'虚线':'实线'} ｜ <span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:${lineColor};vertical-align:-2px;margin-right:4px"></span>${escapeHTML(lineColor)}</div><div class="label">备注</div><div>${escapeHTML(l.note||'暂无备注')}</div></div><div class="detail-actions"><button id="editLinkFromDetailBtn" class="primary">编辑关系</button><button id="deleteLinkFromDetailBtn" class="danger">删除线</button></div>`;detailPanel.classList.add('show');bindDetailBasics();$('editLinkFromDetailBtn').onclick=()=>openLinkModal(l.id);$('deleteLinkFromDetailBtn').onclick=()=>{if(confirm('确定删除这条知识关系吗？')){state.links=state.links.filter(i=>i.id!==l.id);clearSelection({persist:true});showStatus('关系线已删除。')}};return}
   const nodeColor=safeColor(n.color),nodeRelation=relatedScopeRelationForNode(n.id),anchor=nodeById(currentRelatedScopeAnchorId()),relationInfo=nodeRelation?`<div class="label">局部关系</div><div>${nodeRelation.relatedCount} 个相关知识点 ｜ ${nodeRelation.linkCount} 条关系${largeGraphRelatedFocusEnabled?` ｜ 只看相关中心：${escapeHTML(anchor?anchor.title:n.title)}`:''}</div>`:'';
   const scopeButtons=largeGraphRelatedFocusEnabled?`<button id="setScopeCenterBtn">以当前卡牌为中心</button><button id="fitScopeFromDetailBtn">适配相关</button>${isRelatedGatherActive()?'<button id="exitGatherLayoutBtn">退出聚拢</button>':''}`:'';
   detailPanel.innerHTML=`${tools}<div class="detail-top"><div class="detail-mini-icon" style="background:${nodeColor}">${escapeHTML((n.title||'?').slice(0,1))}</div><div><div class="detail-name">${escapeHTML(n.title||'未命名知识点')}</div><div class="detail-title">${escapeHTML(n.category||'未填写分类')} ${n.level?`｜${escapeHTML(n.level)}`:''}</div></div></div><div class="detail-grid">${relationInfo}<div class="label">关键词</div><div>${escapeHTML(n.keywords||'—')}</div><div class="label">说明</div><div>${escapeHTML(n.summary||'—')}</div><div class="label">学习提示</div><div>${escapeHTML(n.notes||'—')}</div></div><div class="detail-actions"><button id="editFromDetailBtn" class="primary">编辑知识点</button>${scopeButtons}<button id="toggleSourceBtn">${state.linkSourceId===n.id?'取消起点':'设为连线起点'}</button><button id="deleteNodeFromDetailBtn" class="danger">删除知识点</button></div>`;
@@ -1921,8 +2089,8 @@ function bindDetailBasics(){
     e.stopPropagation();
     const expanded=!detailPanel.classList.contains('detail-actions-expanded');
     detailPanel.classList.toggle('detail-actions-expanded',expanded);
-    toggle.classList.toggle('is-expanded',expanded);
     toggle.setAttribute('aria-expanded',expanded?'true':'false');
+    toggle.textContent=expanded?'⌃':'⌄';
     toggle.title=expanded?'收起操作':'展开操作';
   };
 }
@@ -1982,7 +2150,7 @@ function handleNodeTap(id){
     if(relationExists(source,id)){
       showStatus(`“${a?a.title:'起点'}”与“${b.title}”之间已有关系线。`);
     }else{
-      const link=makeLink(source,id,'关联','',state.defaults.linkStyle,state.defaults.linkColor);
+      const link=makeLink(source,id,'','',state.defaults.linkStyle,state.defaults.linkColor,state.defaults.linkPathStyle);
       state.links.push(link);state.selectedLinkId=link.id;changed=true;
       showStatus(`已建立关系：${a?a.title:'起点'} → ${b.title}`);
     }
@@ -2128,6 +2296,13 @@ function focusGraphNodeFromSearch(id){
 const GRAPH_POINTER_ARROW_ICON='<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 3l13 8-6 1.2 3.7 6.2-2.8 1.6-3.6-6.1L5 18V3z"/></svg>';
 const GRAPH_POINTER_HAND_ICON='<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11"/><path d="M11 11V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M14 11V7.5a1.5 1.5 0 0 1 3 0V13"/><path d="M8 12l-1.1-1.1a1.6 1.6 0 0 0-2.3 2.2l4.2 5.1A5.5 5.5 0 0 0 13 20h1a5 5 0 0 0 5-5v-3.5a1.5 1.5 0 0 0-3 0V13"/></svg>';
 let graphPointerMode='edit',temporaryPanMode=false,temporaryPanReason='',rightPanPointerId=null;
+function hideGraphTransientMenus(){
+  try{window.KGHomeToolbarRegistry?.hideTransientMenus?.()}catch(error){}
+  if(cardQuickActionsEl)cardQuickActionsEl.classList.remove('show');
+  if(typeof hideSelectedEdgeQuickStylePanel==='function')hideSelectedEdgeQuickStylePanel();
+  const zoomPopover=$('canvasZoomDock');if(zoomPopover)zoomPopover.classList.remove('slider-open');
+}
+window.hideGraphTransientMenus=hideGraphTransientMenus;
 function isCanvasPanMode(){return graphPointerMode==='pan'||temporaryPanMode}
 function isPermanentPanMode(){return graphPointerMode==='pan'}
 function updateGraphPointerModeUI(){
@@ -2201,6 +2376,7 @@ stage.addEventListener('pointerdown',e=>{
   const touchPan=e.pointerType==='touch';
   const rightPan=e.button===2;
   const panRequested=touchPan||rightPan||isCanvasPanMode();
+  if(panRequested)hideGraphTransientMenus();
   if(!panRequested){
     if(e.button!==0)return;
     if(isUI(e.target))return;
@@ -2243,6 +2419,7 @@ function selectAllGraphNodesFromShortcut(){
   state.selectedLinkId=null;
   state.linkSourceId=null;
   selectedNodeIds=new Set(ids);
+  selectedLinkIds.clear();
   state.selectedNodeId=ids[0]||null;
   refreshSelectionUI();
   showStatus(`已全选 ${ids.length} 个知识点。按 Delete 可批量删除。`);
@@ -2272,6 +2449,7 @@ function handleGraphClipboardShortcut(e){
 document.addEventListener('keydown',handleGraphClipboardShortcut);
 stage.addEventListener('wheel',e=>{
   if(isTextEditingTarget(e.target))return;
+  hideGraphTransientMenus();
   e.preventDefault();
   markStageInteracting();
   const direction=e.deltaY<0?1:-1;
@@ -2289,33 +2467,42 @@ $('cancelNodeBtn').onclick=closeNodeModal;
 $('saveNodeBtn').onclick=()=>{const n=nodeById(editingNodeId);if(!n)return;n.title=$('nTitle').value.trim()||'未命名知识点';n.category=$('nCategory').value.trim();n.color=safeColor($('nColor').value,'#64748b');n.size=NODE_SIZES.has($('nSize').value)?$('nSize').value:'';n.level=$('nLevel').value||'基础';n.keywords=$('nKeywords').value.trim();n.summary=$('nSummary').value.trim();n.notes=$('nNotes').value.trim();closeNodeModal();render({persist:true});showStatus('知识点已保存。')};
 $('deleteNodeBtn').onclick=()=>{if(editingNodeId)deleteNode(editingNodeId,true)};
 function deleteNode(id,fromModal=false){const n=nodeById(id);if(!n)return;if(confirm(`确定删除“${n.title}”及相关关系线吗？`)){pushGraphUndoSnapshot(`删除“${n.title}”`);if(relatedGatherLayout&&relatedGatherLayout.positions&&relatedGatherLayout.positions.has(n.id))clearRelatedGatherLayout({render:false,message:false});state.nodes=state.nodes.filter(i=>i.id!==n.id);selectedNodeIds.delete(n.id);state.links=state.links.filter(l=>l.from!==n.id&&l.to!==n.id);if(state.selectedNodeId===n.id)state.selectedNodeId=null;if(state.linkSourceId===n.id)state.linkSourceId=null;if(relatedScopeAnchorNodeId===n.id)relatedScopeAnchorNodeId=null;if(fromModal)closeNodeModal();render({persist:true});showStatus('知识点已删除。')}}
-function deleteSelectedNodesBatch(){
-  const ids=[...selectedNodeIds].filter(id=>nodeById(id));
-  if(!ids.length)return false;
-  if(ids.length===1){deleteNode(ids[0]);return true}
-  if(typeof authRequire==='function'&&!authRequire('登录后才能删除框选知识点。'))return true;
-  const sample=ids.map(id=>nodeById(id)).filter(Boolean).slice(0,3).map(n=>n.title).join('、');
-  const suffix=ids.length>3?' 等':'';
-  if(!confirm(`确定删除框选的 ${ids.length} 个知识点及相关关系线吗？${sample?'\n'+sample+suffix:''}`))return true;
-  pushGraphUndoSnapshot(`删除 ${ids.length} 个框选知识点`);
-  const idSet=new Set(ids);
-  if(relatedGatherLayout&&relatedGatherLayout.positions&&ids.some(id=>relatedGatherLayout.positions.has(id)))clearRelatedGatherLayout({render:false,message:false});
-  state.nodes=state.nodes.filter(n=>!idSet.has(n.id));
-  state.links=state.links.filter(l=>!idSet.has(l.from)&&!idSet.has(l.to));
-  if(idSet.has(state.selectedNodeId))state.selectedNodeId=null;
-  if(idSet.has(state.linkSourceId))state.linkSourceId=null;
-  if(idSet.has(relatedScopeAnchorNodeId))relatedScopeAnchorNodeId=null;
-  state.selectedNodeId=null;
-  state.selectedLinkId=null;
-  clearMultiSelection();
+function deleteGraphBatchSelection(){
+  const nodeIds=new Set([...selectedNodeIds].filter(id=>nodeById(id)));
+  if(state.selectedNodeId&&nodeById(state.selectedNodeId))nodeIds.add(state.selectedNodeId);
+  const linkIds=new Set([...selectedLinkIds].filter(id=>linkById(id)));
+  if(state.selectedLinkId&&linkById(state.selectedLinkId))linkIds.add(state.selectedLinkId);
+  if(!nodeIds.size&&!linkIds.size)return false;
+  if(nodeIds.size&&typeof authRequire==='function'&&!authRequire('登录后才能删除框选内容。'))return true;
+  if(nodeIds.size){
+    const sample=[...nodeIds].map(id=>nodeById(id)).filter(Boolean).slice(0,3).map(n=>n.title).join('、');
+    const relationText=linkIds.size?'，以及选中的 '+linkIds.size+' 条关系线':'';
+    if(!confirm(`确定删除 ${nodeIds.size} 个知识点${relationText}及其相关关系线吗？${sample?'\n'+sample+(nodeIds.size>3?' 等':''):''}`))return true;
+  }
+  const label=nodeIds.size?`删除 ${nodeIds.size} 个知识点和 ${linkIds.size} 条关系线`:`删除 ${linkIds.size} 条关系线`;
+  pushGraphUndoSnapshot(label);
+  if(relatedGatherLayout&&relatedGatherLayout.positions&&[...nodeIds].some(id=>relatedGatherLayout.positions.has(id)))clearRelatedGatherLayout({render:false,message:false});
+  state.nodes=state.nodes.filter(n=>!nodeIds.has(n.id));
+  state.links=state.links.filter(link=>!linkIds.has(link.id)&&!nodeIds.has(link.from)&&!nodeIds.has(link.to));
+  if(nodeIds.has(state.selectedNodeId))state.selectedNodeId=null;
+  if(linkIds.has(state.selectedLinkId)||!linkById(state.selectedLinkId))state.selectedLinkId=null;
+  if(nodeIds.has(state.linkSourceId))state.linkSourceId=null;
+  if(nodeIds.has(relatedScopeAnchorNodeId))relatedScopeAnchorNodeId=null;
+  selectedNodeIds.clear();
+  selectedLinkIds.clear();
+  hideSelectedEdgeQuickStylePanel();
+  hideEdgeInlineLabelEditor();
   render({persist:true});
-  showStatus(`已删除 ${ids.length} 个框选知识点及相关关系线。`);
+  if(nodeIds.size)showStatus(`已删除 ${nodeIds.size} 个知识点及相关关系线${linkIds.size?'，其中包含 '+linkIds.size+' 条框选关系':''}。可按 Ctrl/Command+Z 撤回。`);
+  else showStatus(`已删除 ${linkIds.size} 条框选关系线。可按 Ctrl/Command+Z 撤回。`);
   return true;
 }
-function openLinkModal(id){const l=linkById(id);if(!l)return;editingLinkId=id;state.selectedLinkId=id;state.selectedNodeId=null;state.linkSourceId=null;$('linkType').value=l.type||'关联';$('linkStyle').value=l.lineStyle||DEFAULTS.linkStyle;$('linkColor').value=safeColor(l.color,DEFAULTS.linkColor);$('linkNote').value=l.note||'';$('linkModal').classList.add('show');setTimeout(()=>$('linkNote').focus(),80);renderEdges()}
+function deleteSelectedNodesBatch(){return deleteGraphBatchSelection()}
+function deleteSelectedLinksBatch(){return deleteGraphBatchSelection()}
+function openLinkModal(id){const l=linkById(id);if(!l)return;editingLinkId=id;state.selectedLinkId=id;state.selectedNodeId=null;state.linkSourceId=null;$('linkType').value=l.type||'';$('linkStyle').value=l.lineStyle||DEFAULTS.linkStyle;$('linkColor').value=safeColor(l.color,DEFAULTS.linkColor);$('linkNote').value=l.note||'';$('linkModal').classList.add('show');setTimeout(()=>$('linkNote').focus(),80);renderEdges()}
 function closeLinkModal(){$('linkModal').classList.remove('show')}
 $('cancelLinkBtn').onclick=closeLinkModal;
-$('saveLinkBtn').onclick=()=>{const l=linkById(editingLinkId);if(l){l.type=$('linkType').value||'关联';l.lineStyle=LINE_STYLES.has($('linkStyle').value)?$('linkStyle').value:DEFAULTS.linkStyle;l.color=safeColor($('linkColor').value,DEFAULTS.linkColor);l.note=$('linkNote').value.trim()}closeLinkModal();render({persist:true});showStatus('关系线已保存。')};
+$('saveLinkBtn').onclick=()=>{const l=linkById(editingLinkId);if(l){l.type=$('linkType').value||'';l.lineStyle=LINE_STYLES.has($('linkStyle').value)?$('linkStyle').value:DEFAULTS.linkStyle;l.color=safeColor($('linkColor').value,DEFAULTS.linkColor);l.note=$('linkNote').value.trim()}closeLinkModal();render({persist:true});showStatus('关系线已保存。')};
 $('deleteLinkBtn').onclick=()=>{if(editingLinkId){state.links=state.links.filter(l=>l.id!==editingLinkId);state.selectedLinkId=null}closeLinkModal();render({persist:true});showStatus('关系线已删除。')};
 function currentGraphTitle(){
   const fileStore=window.KGGraphFileStore,currentFile=fileStore&&fileStore.getCurrentFileMeta?fileStore.getCurrentFileMeta():(fileStore&&fileStore.getCurrentFile?fileStore.getCurrentFile():null);

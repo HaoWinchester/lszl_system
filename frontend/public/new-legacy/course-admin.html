@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
+<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>课程与任务｜V9.0-P3.5.8</title>
+  <link rel="stylesheet" href="styles/teacher-workbench.css?v=v9.0-p4.1.9" />
+  <link rel="stylesheet" href="styles/course-admin.css?v=v9.0-p4.1.9" />
+  <link rel="stylesheet" href="styles/workspace-panels.css?v=v9.0-p4.1.9" />
+  <link rel="stylesheet" href="styles/config-organization.css?v=v9.0-p4.1.9" />
+  <link rel="stylesheet" href="styles/teacher-course-workflow.css?v=v9.0-p4.1.9" />
+<link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.9"/>
+<script>if(new URLSearchParams(location.search).get('view')==='papers')location.replace('paper-management.html');</script>
+</head>
+<body class="teacher-admin-shell" data-admin-context="courses">
+<nav class="admin-context-nav" aria-label="管理后台一级导航">
+  <a data-admin-nav="overview" href="admin-console.html">总览</a>
+  <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
+  <a data-admin-nav="teacher" href="teacher-workbench.html">教师工作台</a>
+  <a data-admin-nav="courses" href="course-admin.html">课程与任务</a>
+  <a data-admin-nav="users" href="user-management.html">用户管理</a>
+    <a data-admin-nav="feedback" href="feedback-management.html">反馈管理</a>
+    <a data-admin-nav="messages" href="message-management.html">消息管理</a>
+  <a data-admin-nav="operations" href="admin-operations.html">操作记录</a>
+  <a data-admin-nav="settings" href="admin-settings.html">系统设置</a>
+</nav>
+  <div class="ca-app">
+    <section class="tw-commandbar">
+      <div class="tw-command-title"><p>COURSES &amp; TASKS</p><h1>课程与任务</h1><span>独立维护课程结构、学习任务与发布内容；不属于教师工作台三步流程。</span></div>
+      <div class="tw-command-actions ca-actions"><button id="caNewCourseBtn" type="button">新建课程</button><button id="caSaveBtn" type="button">保存草稿</button><button id="caExportBtn" class="ca-advanced-action" type="button">导出课程</button><button id="caPublishBtn" type="button" class="primary">预览并发布</button></div>
+    </section>
+
+    <section class="ca-simple-guide" id="caSimpleGuide" aria-label="课程设置步骤">
+      <div class="ca-simple-guide-copy"><strong>按 5 步完成课程</strong><span>从左到右操作即可；学习任务可通过上方页签独立管理。</span></div>
+      <nav><button type="button" data-ca-step-target="caCourseBasics"><b>1</b>课程信息</button><button type="button" data-ca-step-target="caStructure"><b>2</b>学习顺序</button><button type="button" data-ca-step-target="caLibrary"><b>3</b>选择内容</button><button type="button" data-ca-step-target="preview"><b>4</b>检查预览</button><button type="button" data-ca-step-action="publish"><b>5</b>发布</button></nav>
+      <a id="caAdvancedModeLink" href="course-admin.html?mode=advanced">高级工具</a>
+    </section>
+
+    <nav class="ca-config-tabs" aria-label="配置类型"><button type="button" class="active" data-config-view="courses">课程配置</button><button type="button" data-config-view="tasks">学习任务</button></nav>
+
+    <div id="caCourseView" data-config-panel="courses">
+    <section class="ca-coursebar" id="caCourseBasics">
+      <label><span>课程</span><select id="caCourseSelect"></select></label>
+      <label><span>课程名称</span><input id="caCourseName" /></label>
+      <label><span>科目</span><select id="caSubject"></select></label>
+      <label class="ca-advanced-field"><span>知识树</span><select id="caTaxonomy"></select></label>
+      <label class="wide"><span>说明</span><input id="caDescription" placeholder="课程适用范围和学习目标" /></label>
+      <button type="button" class="danger ca-advanced-action" id="caDeleteCourseBtn">删除草稿</button>
+    </section>
+
+    <main class="ca-layout" id="caStructure" data-workspace-group="course-builder">
+      <aside class="ca-structure" data-workspace-panel="course-structure" data-workspace-title="课程结构" data-workspace-controls-target=".ca-panel-head">
+        <div class="ca-panel-head"><div><h2>学习顺序</h2><p>一次只查看一个阶段，快速定位章节与学习步骤。</p></div><div class="ca-structure-head-actions"><button type="button" id="caRecentBtn">最近编辑</button><button type="button" id="caBatchToolsBtn">批量工具</button><button type="button" id="caAddStageBtn">＋ 阶段</button></div></div>
+        <div class="ca-structure-tools" aria-label="课程结构定位工具">
+          <label class="ca-stage-selector"><span>当前阶段</span><select id="caStageSelector"></select><small id="caStagePosition">0 / 0</small></label>
+          <label class="ca-structure-search"><span>快速查找</span><input id="caStructureSearch" type="search" placeholder="搜索阶段、章节或学习步骤" autocomplete="off" /></label>
+          <label class="ca-structure-filter"><span>显示范围</span><select id="caStructureFilter"><option value="all">当前阶段全部</option><option value="incomplete">仅待配置</option><option value="issues">仅有问题</option></select></label>
+          <div class="ca-structure-actions">
+            <button type="button" id="caPrevPartBtn" title="上一章节">← 上一章</button>
+            <button type="button" id="caNextPartBtn" title="下一章节">下一章 →</button>
+            <button type="button" id="caJumpIncompleteBtn">待配置</button>
+            <button type="button" id="caJumpIssueBtn">有问题</button>
+          </div>
+          <div id="caStructureSearchResults" class="ca-structure-search-results" hidden></div>
+        </div>
+        <div id="caStructureTree" class="ca-tree"></div>
+      </aside>
+
+      <section class="ca-node-editor" data-workspace-panel="node-editor" data-workspace-title="节点编辑" data-workspace-controls-target=".ca-panel-head">
+        <div class="ca-panel-head"><div><h2 id="caEditorTitle">请选择学习步骤</h2><p id="caEditorPath">从左侧学习顺序中选择一项进行设置。</p></div><div class="ca-node-actions"><button id="caAddPartBtn" type="button">＋ 章节</button><button id="caAddNodeBtn" type="button">＋ 学习步骤</button><button id="caDeleteItemBtn" type="button" class="danger">删除当前项</button></div></div>
+        <div id="caNodeFields" class="ca-node-fields"><div class="ca-empty">选择阶段、部分或节点后显示编辑区域。</div></div>
+
+        <section class="ca-node-activities" id="caNodeActivities" hidden>
+          <div class="ca-section-head"><div><h3>节点活动</h3><p>拖动或使用上下按钮调整顺序。</p></div><span id="caNodeActivityCount">0 个活动</span></div>
+          <div id="caAssignedActivities" class="ca-assigned"></div>
+        </section>
+      </section>
+
+      <aside class="ca-library" id="caLibrary" data-workspace-panel="activity-picker" data-workspace-title="活动选择" data-workspace-controls-target=".ca-panel-head">
+        <div class="ca-panel-head"><div><h2>选择题目与训练</h2><p>把需要的内容加入当前学习步骤。</p></div><a class="ca-advanced-link" href="question-bank.html" target="_blank">打开题目管理</a></div>
+        <label><span>搜索内容</span><input id="caActivitySearch" placeholder="题干、标题或题型" /></label>
+        <label><span>知识点</span><select id="caKnowledgeFilter"><option value="">全部知识点</option></select></label>
+        <label class="ca-check ca-advanced-field"><input id="caOnlyMapped" type="checkbox" checked /><span>只显示已完成知识归类的内容</span></label>
+        <div id="caActivityPicker" class="ca-picker"></div>
+      </aside>
+    </main>
+
+    <section class="ca-preview" id="preview" data-workspace-panel="course-preview" data-workspace-title="课程预览与发布" data-workspace-controls-target=".ca-section-head">
+      <div class="ca-section-head"><div><p>Current Chapter Preview</p><h2>当前章节预览与发布检查</h2><span>只预览当前位置，避免大型课程在页面底部持续展开。</span></div><div class="ca-preview-head-actions"><div id="caValidationSummary"></div><button type="button" id="caValidationBtn">课程检查</button><button type="button" id="caOpenChapterPreviewBtn">独立预览当前章节</button></div></div>
+      <div class="ca-preview-grid"><div><h3>当前章节</h3><div id="caPreviewTree"></div></div><div><h3>知识覆盖摘要</h3><div id="caCoverage"></div></div><div><h3>最近发布版本</h3><div id="caReleases"></div></div></div>
+    </section>
+    </div>
+
+    <section id="caTaskView" class="config-module" data-config-panel="tasks" hidden>
+      <aside class="config-list-panel" data-workspace-panel="learning-task-list" data-workspace-title="学习任务列表" data-workspace-controls-target=".config-panel-head"><div class="config-panel-head"><div><p>LEARNING TASKS</p><h2>学习任务</h2><span>深度回忆、单题深学和多题画布不是普通试卷。</span></div><div><button type="button" id="caMigrateTasksBtn">同步旧列表</button><button type="button" id="caNewTaskBtn" class="primary">＋ 新任务</button></div></div><div class="config-filter-row"><label><span>类型</span><select id="caTaskTypeFilter"><option value="">全部</option><option value="deep_recall">深度回忆</option><option value="single_deep_study">单题深学</option><option value="multi_question_canvas">多题画布</option></select></label><label><span>状态</span><select id="caTaskStatusFilter"><option value="">全部</option><option value="draft">草稿</option><option value="published">已发布</option><option value="archived">已归档</option></select></label></div><div id="caTaskList" class="config-record-list"></div></aside>
+      <section class="config-editor-panel" data-workspace-panel="learning-task-editor" data-workspace-title="学习任务编辑" data-workspace-controls-target=".config-panel-head"><div class="config-panel-head"><div><p>EDIT TASK</p><h2 id="caTaskEditorTitle">请选择学习任务</h2><span>学习任务引用活动 ID；关键词模板编辑器将在 v8.6.2 接入。</span></div><div class="config-editor-actions"><button type="button" id="caDeleteTaskBtn" class="danger">删除</button><button type="button" id="caArchiveTaskBtn">归档</button><button type="button" id="caPublishTaskBtn">发布</button><button type="button" id="caSaveTaskBtn" class="primary">保存草稿</button></div></div><div id="caTaskEditor" class="config-editor-empty">从左侧选择任务，或新建一个学习任务。</div></section>
+      <aside class="config-picker-panel" data-workspace-panel="learning-task-picker" data-workspace-title="任务活动选择" data-workspace-controls-target=".config-panel-head"><div class="config-panel-head"><div><h2>选择活动</h2><span>从统一活动库加入当前学习任务。</span></div><a href="question-bank.html">打开题目管理</a></div><label><span>搜索</span><input id="caTaskActivitySearch" placeholder="题干、ID、知识点" /></label><div id="caTaskActivityPicker" class="config-picker-list"></div></aside>
+    </section>
+  </div>
+
+
+  <dialog id="caBatchToolsDialog" class="ca-dialog ca-p2-dialog">
+    <form method="dialog">
+      <header><div><p>Efficiency Tools</p><h2>批量与规则化工具</h2><span>只新增结构或生成新的稳定 ID，不修改现有课程项 ID。</span></div><button value="cancel" aria-label="关闭">×</button></header>
+      <div class="ca-p2-tool-body">
+        <section class="ca-p2-tool-section"><div><h3>批量套用学习模板</h3><p>向一个或多个章节追加缺少的学习步骤；已有同名同类型步骤不会重复创建。</p></div><div class="ca-p2-form-grid"><label><span>应用范围</span><select id="caTemplateScope"><option value="current_part">当前章节</option><option value="current_stage">当前阶段全部章节</option><option value="all_empty_parts">全课程空章节</option></select></label><label><span>学习模板</span><select id="caTemplateSelect"></select></label></div><div id="caTemplateDescription" class="ca-p2-note"></div><button type="button" class="primary" id="caApplyTemplateBtn">套用模板</button></section>
+        <section class="ca-p2-tool-section"><div><h3>批量复制阶段或章节</h3><p>复制项会生成新 ID；可选择是否继续引用原有题目与训练内容。</p></div><div class="ca-p2-form-grid"><label><span>复制对象</span><select id="caCopyKind"><option value="part">当前章节</option><option value="stage">当前阶段</option></select></label><label><span>复制份数</span><input id="caCopyCount" type="number" min="1" max="20" value="1" /></label><label id="caCopyTargetWrap"><span>章节复制到</span><select id="caCopyTargetStage"></select></label><label class="ca-p2-check"><input id="caCopyActivities" type="checkbox" checked /><span>保留题目与训练内容引用</span></label></div><button type="button" class="primary" id="caCopyStructureBtn">开始复制</button></section>
+        <section class="ca-p2-tool-section ca-p2-outline"><div><h3>按大纲批量建立课程结构</h3><p>使用“# 阶段、## 章节、- 学习步骤 | 类型”格式，一次生成多个阶段、章节和步骤。</p></div><textarea id="caOutlineInput" rows="12" placeholder="# 阶段一：基础知识
+## 识别方法环境
+- 题干观察 | standard
+- 关键词识别 | deep_recall
+- 知识图谱 | knowledge_graph
+
+## 环境判断
+- 原题作答 | standard
+- 多题归纳 | multi_question"></textarea><div class="ca-p2-outline-actions"><button type="button" id="caParseOutlineBtn">解析预览</button><button type="button" class="primary" id="caApplyOutlineBtn" disabled>生成课程结构</button></div><div id="caOutlineReport" class="ca-p2-note">等待输入课程大纲。</div></section>
+      </div>
+      <footer><button value="cancel">关闭</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="caRecentDialog" class="ca-dialog ca-p2-list-dialog">
+    <form method="dialog"><header><div><p>Recent Edits</p><h2>最近编辑</h2><span>记录保存在当前浏览器，只用于快速返回工作位置。</span></div><button value="cancel" aria-label="关闭">×</button></header><div id="caRecentList" class="ca-p2-list"></div><footer><button type="button" id="caClearRecentBtn">清空记录</button><button value="cancel" class="primary">关闭</button></footer></form>
+  </dialog>
+
+  <dialog id="caValidationDialog" class="ca-dialog ca-p2-list-dialog">
+    <form method="dialog"><header><div><p>Course Validation</p><h2>课程结构检查</h2><span id="caValidationDialogSummary"></span></div><button value="cancel" aria-label="关闭">×</button></header><div class="ca-validation-filters"><button type="button" class="active" data-validation-filter="all">全部</button><button type="button" data-validation-filter="issue">错误</button><button type="button" data-validation-filter="incomplete">待配置</button></div><div id="caValidationList" class="ca-p2-list"></div><footer><button value="cancel" class="primary">返回课程设置</button></footer></form>
+  </dialog>
+
+  <dialog id="caChapterPreviewDialog" class="ca-dialog ca-chapter-preview-dialog">
+    <form method="dialog">
+      <header><div><p>Chapter Preview</p><h2 id="caChapterPreviewTitle">当前章节预览</h2><span id="caChapterPreviewPath"></span></div><button value="cancel" aria-label="关闭">×</button></header>
+      <div id="caChapterPreviewBody" class="ca-chapter-preview-body"></div>
+      <footer><button type="button" id="caPreviewPrevPartBtn">← 上一章节</button><button type="button" id="caPreviewNextPartBtn">下一章节 →</button><button value="cancel" class="primary">返回课程设置</button></footer>
+    </form>
+  </dialog>
+  <dialog id="caPublishDialog" class="ca-dialog"><form method="dialog"><header><div><p>Publish Course</p><h2>发布课程版本</h2></div><button value="cancel">×</button></header><label><span>发布说明</span><textarea id="caPublishNotes" rows="4" placeholder="例如：完成知识树映射和第一版课程结构。"></textarea></label><div id="caPublishWarnings"></div><footer><button value="cancel">取消</button><button type="button" class="primary" id="caConfirmPublishBtn">确认发布</button></footer></form></dialog>
+  <div class="ca-toast" id="caToast" role="status" aria-live="polite"></div>
+  <script src="src/28-app-storage.js"></script>
+  <script src="src/29-auth-core.js"></script>
+  <script src="src/86-activity-schema-v1.js"></script>
+  <script src="src/87-guided-learning-data.js"></script>
+  <script src="src/91-learning-content-core.js"></script>
+  <script src="src/65-canvas-workspace-store.js"></script>
+  <script src="src/93-content-organization-core.js"></script>
+  <script src="src/admin/00-admin-core.js"></script><script src="src/admin/10-content-repository.js"></script><script src="src/admin/11-local-content-repository.js"></script><script src="src/admin/20-admin-permission-service.js"></script><script src="src/admin/21-admin-audit-service.js"></script><script src="src/admin/22-admin-transaction-service.js"></script><script src="src/admin/30-reference-index-service.js"></script><script src="src/admin/31-subject-service.js"></script><script src="src/admin/32-taxonomy-service.js"></script><script src="src/admin/33-activity-service.js"></script><script src="src/admin/34-course-service.js"></script><script src="src/admin/35-release-service.js"></script><script src="src/admin/40-admin-service-registry.js"></script><script src="src/admin/41-learning-content-compat.js"></script>
+  <script src="src/98-teacher-workflow-p2-services.js"></script>
+  <script src="src/91-course-admin-app.js"></script>
+  <script src="src/93-assessment-config-app.js"></script>
+  <script src="src/92-workspace-panel-manager.js"></script>
+  <script src="src/97-teacher-course-workflow.js"></script>
+<script src="src/admin/48-admin-context-nav.js"></script>
+</body>
+</html>

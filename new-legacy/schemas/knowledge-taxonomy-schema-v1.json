@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.example/schemas/knowledge-taxonomy-schema-v1.json",
+  "title": "Knowledge Taxonomy Schema v1",
+  "type": "object",
+  "required": [
+    "id",
+    "subjectId",
+    "name",
+    "version",
+    "maxDepth",
+    "status",
+    "nodes"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subjectId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "object",
+      "required": [
+        "zh",
+        "en"
+      ],
+      "properties": {
+        "zh": {
+          "type": "string",
+          "minLength": 1
+        },
+        "en": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maxDepth": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "published",
+        "deprecated",
+        "archived"
+      ]
+    },
+    "isDefault": {
+      "type": "boolean"
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "createdBy": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "updatedAt": {
+      "type": "string"
+    },
+    "updatedBy": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "maintenanceRevision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "lastMaintainedAt": {
+      "type": "string"
+    },
+    "lastMaintainedBy": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "taxonomyId",
+          "parentId",
+          "level",
+          "title",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "taxonomyId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9
+          },
+          "title": {
+            "type": "object",
+            "required": [
+              "zh",
+              "en"
+            ],
+            "properties": {
+              "zh": {
+                "type": "string",
+                "minLength": 1
+              },
+              "en": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "code": {
+            "type": "string"
+          },
+          "aliases": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "enum": [
+              "active",
+              "deprecated",
+              "archived"
+            ]
+          },
+          "replacedByNodeIds": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "description": {
+            "type": "object",
+            "properties": {
+              "zh": {
+                "type": "string"
+              },
+              "en": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "deactivatedAt": {
+            "type": "string"
+          },
+          "deactivatedBy": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "reactivatedAt": {
+            "type": "string"
+          },
+          "reactivatedBy": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

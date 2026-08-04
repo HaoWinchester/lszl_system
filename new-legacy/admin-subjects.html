@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>科目与知识树｜V9.0-P3.5.7</title>
+  <link rel="stylesheet" href="styles/admin-console.css" />
+  <link rel="stylesheet" href="styles/admin-context-nav.css" />
+  <link rel="stylesheet" href="styles/user-center.css" />
+  <link rel="stylesheet" href="styles/workspace-placement.css" />
+</head>
+<body class="admin-sticky-shell" data-admin-page="subjects">
+  <nav class="admin-context-nav" aria-label="管理后台一级导航">
+    <a data-admin-nav="overview" href="admin-console.html">总览</a>
+    <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
+    <a data-admin-nav="teacher" href="teacher-workbench.html">教师工作台</a>
+    <a data-admin-nav="courses" href="course-admin.html">课程与任务</a>
+    <a data-admin-nav="users" href="user-management.html">用户管理</a>
+    <a data-admin-nav="feedback" href="feedback-management.html">反馈管理</a>
+    <a data-admin-nav="messages" href="message-management.html">消息管理</a>
+    <a data-admin-nav="operations" href="admin-operations.html">操作记录</a>
+    <a data-admin-nav="settings" href="admin-settings.html">系统设置</a>
+  </nav>
+  <header class="admin-topbar">
+    <a class="admin-brand" href="admin-console.html"><span>P</span><div><strong>项目管理学习者</strong><small>V9.0-P3.5.7 管理后台</small></div></a>
+    <div class="admin-account admin-account-menu" id="adminAccountMenu">
+      <button type="button" class="admin-account-trigger" id="adminAccountTrigger" aria-haspopup="menu" aria-expanded="false"><span class="admin-account-dot" aria-hidden="true"></span><span id="adminAccount">读取账号中</span><b aria-hidden="true">⌄</b></button>
+      <div class="admin-account-popover" id="adminAccountPopover" role="menu" hidden>
+        <button type="button" role="menuitem" id="adminAccountUserCenterBtn"><span class="admin-account-icon" aria-hidden="true">♙</span><span>用户中心</span></button>
+        <button type="button" role="menuitem" id="adminAccountHelpBtn"><span class="admin-account-icon" aria-hidden="true">?</span><span>帮助中心</span></button>
+        <div class="admin-account-divider" aria-hidden="true"></div>
+        <button type="button" role="menuitem" class="danger" id="adminAccountLogoutBtn"><span class="admin-account-icon" aria-hidden="true">↪</span><span>退出登录</span></button>
+      </div>
+    </div>
+  </header>
+  <div class="admin-app-shell">
+<main class="admin-main">
+      <section class="admin-page-head">
+        <div><p>SUBJECTS & KNOWLEDGE TREE</p><h1>科目与知识树</h1><span>左侧选择科目，右侧维护当前知识树、科目级联想库和历史版本。</span></div>
+        <div class="admin-head-actions"><a class="admin-button" href="admin-subjects.html?tab=history">导入与历史版本</a></div>
+      </section>
+
+      <section class="admin-subject-workspace">
+        <aside class="admin-subject-rail">
+          <div class="admin-rail-head"><div><p>SUBJECTS</p><h2>科目列表</h2></div><div class="admin-rail-tools"><span id="adminSubjectTotal" title="启用数 / 总数">—</span><button id="adminAddSubjectBtn" type="button" class="primary">新增科目</button></div></div>
+          <div id="adminSubjectList" class="admin-subject-list"></div>
+          <p class="admin-rail-foot">科目停用不会影响已有知识树、题目、试卷、课程和历史记录；仅完全空白的科目可以永久删除。</p>
+        </aside>
+
+        <section class="admin-subject-detail">
+          <header class="admin-subject-detail-head">
+            <div><p id="adminSelectedSubjectCode">SUBJECT</p><h2 id="adminSelectedSubjectName">请选择科目</h2><span id="adminSelectedSubjectDescription">—</span></div>
+            <div class="admin-subject-head-actions"><span id="adminSelectedSubjectStatus" class="admin-status published">启用</span><div class="admin-subject-manage-actions"><button id="adminMoveSubjectUp" type="button" title="上移科目">上移</button><button id="adminMoveSubjectDown" type="button" title="下移科目">下移</button><button id="adminEditSubjectBtn" type="button">编辑科目</button><button id="adminToggleSubjectBtn" type="button" class="warning">停用科目</button><button id="adminDeleteSubjectBtn" type="button" class="danger">删除</button></div></div>
+          </header>
+          <nav class="admin-subtabs" aria-label="科目与知识树二级导航">
+            <button type="button" data-subject-tab="current" class="active">当前知识树</button>
+            <button type="button" data-subject-tab="association">科目级联想库</button>
+            <button type="button" data-subject-tab="history">历史版本</button>
+          </nav>
+
+          <section class="admin-subtab-panel active" data-subject-panel="current">
+            <div class="admin-subject-usage" aria-label="科目内容使用情况">
+              <article><span>知识树版本</span><strong id="adminUsageTaxonomyCount">0</strong></article>
+              <article><span>题目</span><strong id="adminUsageQuestionCount">0</strong></article>
+              <article><span>试卷</span><strong id="adminUsagePaperCount">0</strong></article>
+              <article><span>课程与任务</span><strong id="adminUsageOtherCount">0</strong></article>
+              <p id="adminSubjectDeletionHint"></p>
+            </div>
+            <div class="admin-current-tree-card">
+              <div class="admin-current-tree-title"><div><p>CURRENT KNOWLEDGE TREE</p><h3 id="adminCurrentTreeName">尚无当前知识树</h3><span id="adminCurrentTreeMeta">请选择左侧科目。</span></div><span id="adminCurrentTreeVersion" class="admin-version-pill">—</span></div>
+              <div class="admin-current-tree-metrics">
+                <article><span>知识点</span><strong id="adminCurrentNodeCount">0</strong></article>
+                <article><span>最大层级</span><strong id="adminCurrentMaxDepth">0</strong></article>
+                <article><span>已分类题目</span><strong id="adminMappedQuestionCount">0</strong></article>
+              </div>
+              <div class="admin-operating-rules">
+                <strong>日常运营规则</strong>
+                <span>新增、改名、移动、排序、分配题目和停用节点属于当前知识树维护，不应要求复制版本。</span>
+                <small>当前知识树可直接维护；重大导入与整体重构仍通过历史版本完成。</small>
+              </div>
+              <div class="admin-card-actions"><button id="adminRefreshCurrentTree" type="button">刷新科目数据</button></div>
+            </div>
+            <section class="admin-embedded-workspace" aria-labelledby="adminTreeWorkspaceTitle">
+              <header class="embedded-workspace-head"><div><p>KNOWLEDGE TREE WORKSPACE</p><h2 id="adminTreeWorkspaceTitle">当前知识树工作区</h2><span id="adminTreeWorkspaceHint">在本页直接新增、编辑、移动、排序、停用或恢复知识点。</span></div><div class="embedded-workspace-actions"><button id="adminReloadCurrentTreeFrame" type="button">重新加载工作区</button></div></header>
+              <div id="adminCurrentTreeEmpty" class="admin-embedded-empty"><strong>尚无可打开的知识树</strong><span>请先在“历史版本”中导入知识树或设置当前版本。</span></div>
+              <iframe id="adminCurrentTreeFrame" class="embedded-workspace-frame" data-embed-frame title="当前知识树工作区" hidden></iframe>
+            </section>
+          </section>
+
+          <section class="admin-subtab-panel" data-subject-panel="association" id="adminRecallPanel">
+            <header class="admin-section-head admin-recall-section-head">
+              <div><h3>科目级联想库</h3><span>按科目维护关键词、别名、知识联想和知识树关联。编辑先保存为草稿，发布后学习端才会读取。</span></div>
+              <div class="admin-recall-head-actions"><button type="button" id="adminRecallNewBtn">＋ 新建关键词</button><button type="button" id="adminRecallImportBtn">导入 TXT / JSON</button><input id="adminRecallImportFile" type="file" accept=".txt,.json,text/plain,application/json" hidden><button type="button" id="adminRecallExportBtn">导出备份</button><button type="button" id="adminRecallSaveDraftBtn">保存草稿</button><button type="button" class="primary" id="adminRecallPublishBtn">发布启用</button></div>
+            </header>
+            <div class="admin-recall-status-row">
+              <div id="adminRecallStatus" class="admin-recall-status published"><strong>正在读取联想库</strong><span>请稍候</span></div>
+              <div class="admin-recall-metrics"><article><span>当前科目</span><strong id="adminRecallSubjectLabel">—</strong></article><article><span>草稿节点</span><strong id="adminRecallNodeCount">0</strong></article><article><span>草稿关系</span><strong id="adminRecallEdgeCount">0</strong></article><article><span>未关联知识点</span><strong id="adminRecallUnlinkedCount">0</strong></article><article><span>正式版本</span><strong id="adminRecallPublishedVersion">未发布</strong></article></div>
+            </div>
+            <nav class="admin-recall-tabs" aria-label="联想库视图"><button type="button" class="active" data-recall-view="list">内容列表</button><button type="button" data-recall-view="graph">关系图谱</button><button type="button" data-recall-view="imports">导入记录</button></nav>
+
+            <section class="admin-recall-view active" data-recall-view-panel="list">
+              <div class="admin-recall-toolbar"><label class="search"><span>搜索</span><input id="adminRecallSearch" placeholder="关键词、别名或关联知识点"></label><label><span>状态</span><select id="adminRecallStatusFilter"><option value="all">全部</option><option value="active">启用</option><option value="disabled">停用</option></select></label><label><span>知识树关联</span><select id="adminRecallLinkFilter"><option value="all">全部</option><option value="linked">已关联</option><option value="unlinked">未关联 / 已失效</option></select></label><span id="adminRecallListSummary">—</span></div>
+              <div id="adminRecallBatchBar" class="admin-recall-batch" hidden><strong id="adminRecallBatchCount">已选择 0 个节点</strong><select id="adminRecallBatchKnowledge"></select><button type="button" id="adminRecallBatchLink">批量关联</button><button type="button" id="adminRecallBatchEnable">启用</button><button type="button" id="adminRecallBatchDisable">停用</button><button type="button" class="danger" id="adminRecallBatchDelete">删除</button></div>
+              <div class="admin-recall-list-layout">
+                <div class="admin-recall-table-box"><div class="admin-table-wrap"><table><thead><tr><th><input id="adminRecallSelectAll" type="checkbox" aria-label="全选当前页"></th><th>关键词 / 概念</th><th>别名</th><th>关联知识点</th><th>联想数</th><th>状态</th><th>操作</th></tr></thead><tbody id="adminRecallRows"></tbody></table></div><div class="admin-recall-pager"><button type="button" id="adminRecallPrevPage">上一页</button><button type="button" id="adminRecallNextPage">下一页</button></div></div>
+                <aside class="admin-recall-editor"><div id="adminRecallEditorEmpty" class="admin-empty">从左侧选择一个关键词查看和编辑内容。</div><div id="adminRecallEditorForm" hidden><header><div><small>稳定节点 ID</small><code id="adminRecallEditorId">—</code></div></header><label><span>关键词 / 概念名称</span><input id="adminRecallEditorTitle"></label><label><span>别名</span><input id="adminRecallEditorAliases" placeholder="多个别名用逗号分隔"></label><label><span>关联知识点</span><select id="adminRecallTaxonomyNode"></select></label><label><span>提示语</span><textarea id="adminRecallEditorPrompt" rows="2"></textarea></label><label><span>说明 / 提示</span><textarea id="adminRecallEditorHint" rows="3"></textarea></label><label><span>联想目标</span><textarea id="adminRecallEditorTargets" rows="8" placeholder="每行一个目标关键词"></textarea><small>保存时会自动建立或更新从当前关键词出发的关系。</small></label><label><span>状态</span><select id="adminRecallEditorStatus"><option value="active">启用</option><option value="disabled">停用</option></select></label><div class="admin-recall-editor-actions"><button type="button" class="danger" id="adminRecallEditorDelete">删除节点</button><button type="button" class="primary" id="adminRecallEditorSave">保存到草稿</button></div></div></aside>
+              </div>
+            </section>
+
+            <section class="admin-recall-view" data-recall-view-panel="graph"><div class="admin-recall-graph-toolbar"><label><span>搜索并聚焦</span><input id="adminRecallGraphSearch" placeholder="输入关键词或别名"></label><span id="adminRecallGraphLimit"></span></div><div id="adminRecallGraph" class="admin-recall-graph"></div><p class="admin-note">点击图谱节点可切换到内容列表进行编辑。图谱用于理解整体关系，日常维护以内容列表为主。</p></section>
+
+            <section class="admin-recall-view" data-recall-view-panel="imports"><div class="admin-recall-import-grid"><section><header><h4>导入检查</h4><span>文件先解析和对比，再加入编辑草稿；不会直接影响正式版本。</span></header><label><span>应用方式</span><select id="adminRecallImportMode"><option value="merge">合并到当前草稿（推荐）</option><option value="replace">替换当前草稿</option></select></label><div id="adminRecallImportPreview" class="admin-recall-import-preview"></div><button type="button" class="primary" id="adminRecallApplyImportBtn" disabled>确认加入草稿</button></section><section><header><h4>导入记录</h4><span>记录文件、操作者、数量与应用方式。</span></header><div id="adminRecallImportHistory" class="admin-recall-history"></div></section><section><header><h4>正式发布记录</h4><span>每次发布形成可追溯的正式版本快照。</span></header><div id="adminRecallReleaseHistory" class="admin-recall-history"></div></section></div></section>
+          </section>
+
+          <section class="admin-subtab-panel" data-subject-panel="history">
+            <header class="admin-section-head"><div><h3>历史版本</h3><span>导入新树、整体替换、回退、归档和安全删除集中在这里。</span></div><button type="button" id="adminRefreshTaxonomyBtn">刷新版本</button></header>
+            <label class="admin-file-action"><span>重大调整导入</span><input id="adminTaxonomyFile" type="file" accept=".json,application/json" /><button type="button" class="primary" id="adminImportTaxonomyBtn">导入为新草稿</button></label>
+            <p class="admin-note">无旧树时导入为 v1.0；已有知识树时自动创建下一个整数版本。日常小修改不从这里建立版本。</p>
+            <div class="admin-table-wrap admin-taxonomy-table"><table><thead><tr><th>知识树</th><th>版本</th><th>状态</th><th>当前</th><th>节点</th><th>操作</th></tr></thead><tbody id="adminTaxonomyRows"></tbody></table></div>
+          </section>
+        </section>
+      </section>
+    </main>
+  </div>
+  <dialog id="adminSubjectDialog" class="admin-dialog" aria-labelledby="adminSubjectDialogTitle">
+    <form id="adminSubjectForm" method="dialog">
+      <header><div><p>SUBJECT MANAGEMENT</p><h2 id="adminSubjectDialogTitle">新增科目</h2></div><button id="adminSubjectDialogClose" type="button" class="icon" aria-label="关闭">×</button></header>
+      <div class="admin-form-grid">
+        <label><span>科目编号 <b>*</b></span><input id="adminSubjectCode" name="code" maxlength="32" autocomplete="off" required /><small id="adminSubjectCodeHint">使用 1—32 位大写字母、数字、点、下划线或连字符。</small></label>
+        <label><span>中文名称 <b>*</b></span><input id="adminSubjectNameZh" name="nameZh" maxlength="80" required /></label>
+        <label><span>英文名称</span><input id="adminSubjectNameEn" name="nameEn" maxlength="120" /></label>
+        <label class="wide"><span>科目说明</span><textarea id="adminSubjectDescriptionZh" name="descriptionZh" rows="4" maxlength="500" placeholder="说明该科目的适用范围和内容边界"></textarea></label>
+      </div>
+      <footer><button id="adminSubjectDialogCancel" type="button">取消</button><button id="adminSubjectDialogSubmit" type="submit" class="primary">创建科目</button></footer>
+    </form>
+  </dialog>
+  <div id="adminToast" class="admin-toast" role="status" aria-live="polite"></div>
+  <script src="src/28-app-storage.js"></script><script src="src/29-auth-core.js"></script><script src="src/33-user-center.js"></script><script src="src/86-activity-schema-v1.js"></script><script src="src/87-guided-learning-data.js"></script><script src="src/91-learning-content-core.js"></script><script src="src/93-content-organization-core.js"></script>
+  <script src="src/admin/00-admin-core.js"></script><script src="src/admin/10-content-repository.js"></script><script src="src/admin/11-local-content-repository.js"></script><script src="src/admin/20-admin-permission-service.js"></script><script src="src/admin/21-admin-audit-service.js"></script><script src="src/admin/22-admin-transaction-service.js"></script><script src="src/admin/30-reference-index-service.js"></script><script src="src/admin/31-subject-service.js"></script><script src="src/admin/32-taxonomy-service.js"></script><script src="src/admin/33-activity-service.js"></script><script src="src/admin/34-course-service.js"></script><script src="src/admin/35-release-service.js"></script><script src="src/admin/40-admin-service-registry.js"></script><script src="src/admin/41-learning-content-compat.js"></script><script src="src/admin/49-admin-ui.js"></script><script src="src/95-recall-association-library.js"></script><script src="src/admin/51-admin-subjects-app.js"></script><script src="src/admin/53-recall-association-management.js"></script><script src="src/99-workspace-placement.js"></script>
+</body>
+</html>

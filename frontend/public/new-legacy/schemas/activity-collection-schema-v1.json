@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kg.local/schemas/activity-collection-schema-v1.json",
+  "title": "Activity Collection Schema v1",
+  "type": "object",
+  "required": ["id", "schemaVersion", "title", "subjectId", "type", "visibility", "status", "activityIds", "authorship"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "schemaVersion": {"const": 1},
+    "title": {"type": "string", "minLength": 1},
+    "subjectId": {"type": "string"},
+    "description": {"type": "string"},
+    "type": {"enum": ["collection", "favorites"]},
+    "visibility": {"enum": ["private", "shared"]},
+    "status": {"enum": ["active", "archived"]},
+    "activityIds": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "authorship": {"type": "object"}
+  },
+  "additionalProperties": true
+}

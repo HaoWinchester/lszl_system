@@ -1,0 +1,90 @@
+{
+  "release": "v9.0-p3.5.2",
+  "generatedAt": "2026-07-30T07:14:29.973450+00:00",
+  "baseRelease": "v9.0-p3.5.1",
+  "scope": [
+    "anchored non-modal question preview",
+    "paper category management",
+    "paper search and status filtering",
+    "18-item pagination",
+    "current-page paper batch operations",
+    "protected batch archive and draft deletion"
+  ],
+  "summary": {
+    "nodeTests": {
+      "passed": 84,
+      "total": 84
+    },
+    "browserTests": {
+      "passed": 5,
+      "total": 5
+    },
+    "javascriptSyntaxChecked": 213,
+    "htmlFilesChecked": 20,
+    "duplicateHtmlIds": 0
+  },
+  "storage": {
+    "paperCategoriesPrefix": "kg_exam_paper_categories_v1__",
+    "paperDraftPrefix": "kg_exam_papers_v1__",
+    "publishedPaperCatalog": "kg_exam_papers_published_v1"
+  },
+  "safety": {
+    "paperBatchSelectionScope": "current page",
+    "paperBatchDelete": "draft only; published and archived items are skipped",
+    "categoryDelete": "moves papers to uncategorized",
+    "questionRecordsDeletedByPaperOperations": false,
+    "questionIdsChanged": false,
+    "publishedSnapshotsMutatedByDraftEditing": false
+  },
+  "changedFiles": [
+    "CHANGELOG.md",
+    "README.md",
+    "V9.0_P3.5.2_PAPER_CATALOG_FLOATING_PREVIEW_REPORT.md",
+    "V9.0_P3.5.2_QUICK_START.md",
+    "VERSION",
+    "paper-management.html",
+    "src/65-question-bank-admin.js",
+    "src/admin/00-admin-core.js",
+    "styles/paper-management.css",
+    "tests/v862-data-integrity.test.js",
+    "tests/v862-p2238-legacy-freeze.test.js",
+    "tests/v90-p0-admin-foundation.test.js",
+    "tests/v90-p21-taxonomy-release.test.js",
+    "tests/v90-p22-taxonomy-lifecycle.test.js",
+    "tests/v90-p31-admin-ia.test.js",
+    "tests/v90-p31-data-integrity.test.js",
+    "tests/v90-p32-subject-management.test.js",
+    "tests/v90-p331-navigation-shell-fix.test.js",
+    "tests/v90-p333-question-classification.test.js",
+    "tests/v90-p3331-batch-default-classification.test.js",
+    "tests/v90-p334-lightweight-tag-management.test.js",
+    "tests/v90-p35-paper-management-browser.py",
+    "tests/v90-p35-paper-management.test.js"
+  ],
+  "removedFiles": [],
+  "changedFileSha256": {
+    "CHANGELOG.md": "9bff006bdd34e266f78ef156c2babca829b65ecd4102f9141bf5dac6fe1e3a0c",
+    "README.md": "9ce5ee765b7e89e89df67ffb0c52a1375f2aa866f791d8c9cea9baad562ba401",
+    "V9.0_P3.5.2_PAPER_CATALOG_FLOATING_PREVIEW_REPORT.md": "26938340788e593b86bd085c6604e77bad9f87b78c35dccac95c1a89a60e8438",
+    "V9.0_P3.5.2_QUICK_START.md": "8f2ecccb6f581f8104b30a9844699eb29dee627b8d9399debd736e9356087c16",
+    "VERSION": "6d39443e7b385df2998fa3570a97d85efeb5614850e9d123d05ffac960caf343",
+    "paper-management.html": "b4c6ef8fbfd7c07a069797ba1209bd1edca84e5eb9a204ee33d5941956e11454",
+    "src/65-question-bank-admin.js": "0ac929b46a4be5c620b611392f4af7ac12ebbc6e311dc108a5f87066c2404b33",
+    "src/admin/00-admin-core.js": "7956f0c144ba1ac65d5738a75fe58c359f636c392190657549290d22716b22a9",
+    "styles/paper-management.css": "cef8d7738e513a03f2fdaface4fc34b35a07b4e66e6dbf9916ae9d7475be0a2f",
+    "tests/v862-data-integrity.test.js": "f636c80c3ecf7649012e2c2ff0bcd0a547bbe88632badb8ee12f7a8b6bcaf2cf",
+    "tests/v862-p2238-legacy-freeze.test.js": "334174f8af305cce31d798bc01ccf0fab8ddf96d0d87609ebaa5e85034b0962f",
+    "tests/v90-p0-admin-foundation.test.js": "3e1a3500be240ce143ef404c6eb1a2274f08d8d803cba63c61fb287e48db48ea",
+    "tests/v90-p21-taxonomy-release.test.js": "5d6ada17b3e8752dc25157b8adf583ee776ef0442178b82cd6013e33a7d58578",
+    "tests/v90-p22-taxonomy-lifecycle.test.js": "f0ad05da6feec860a22f02bd84b2d297308506204a328f1615571ab8e959d18b",
+    "tests/v90-p31-admin-ia.test.js": "ac4ed7f0538393cb97e6548f735888e54672806f4a89ebba8370170c34fd14eb",
+    "tests/v90-p31-data-integrity.test.js": "7041a5a0c4147546ac00259d32fb0b6e26e058913429d32f8f38c97c045c6162",
+    "tests/v90-p32-subject-management.test.js": "f65e81a415889d1c0a19b7504ec3b9613f25f6ae553e071f02aff883523b2a7c",
+    "tests/v90-p331-navigation-shell-fix.test.js": "93e904f87bf0e67875a0a8e16a4f45bf8f2ad5a9b4b1eaa0b3787d2cf0e12a59",
+    "tests/v90-p333-question-classification.test.js": "d1f35d5feb1845cf910a702db45acaeab63801a7242e4c61fc2f8e835ee4c791",
+    "tests/v90-p3331-batch-default-classification.test.js": "5f60a68c61786fe6c6f266cfcc703a697c66742688f5dec295fdbb1b8a66a491",
+    "tests/v90-p334-lightweight-tag-management.test.js": "f6400ee12a152d732b9d58e09a6fc6311c9eaf7ff6a1843a33dde21615879932",
+    "tests/v90-p35-paper-management-browser.py": "5d261c15ea4e6fd811d8b2c68200979087892da012d27eed89639275b66d3569",
+    "tests/v90-p35-paper-management.test.js": "157d0c6747a3f8c097f20f3f15cedd324a67a4fc8d799bfefbbdfb9983e47917"
+  }
+}

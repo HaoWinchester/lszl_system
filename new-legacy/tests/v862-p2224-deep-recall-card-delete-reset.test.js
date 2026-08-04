@@ -1,0 +1,23 @@
+'use strict';
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const root=path.resolve(__dirname,'..');
+const read=file=>fs.readFileSync(path.join(root,file),'utf8');
+const html=read('knowledge-recall.html');
+const js=read('src/86-knowledge-recall.js');
+const css=read('styles/knowledge-recall-p2224.css');
+
+assert(html.includes('id="krBackBtn"')&&html.includes('data-practice-back'),'深度回忆应恢复原左上角返回按钮');
+assert(!html.includes('id="krTopContext"'),'页面标题后不应继续显示题号');
+assert(!html.includes('id="accountMenuExitBtn"'),'账号菜单不应重复提供页面返回入口');
+assert(html.includes('id="krResetBtn"')&&html.indexOf('kr-canvas-overlay-right')>html.indexOf('kr-canvas-overlay-left'),'画布右上角应有重置本题按钮');
+assert(html.includes('<strong id="krQuestionCount">0/0</strong>'),'题目库按钮应预留当前位置/总数');
+assert(js.includes("$('krResetBtn').onclick=resetProgress"),'重置按钮必须绑定清空本题知识点');
+assert(js.includes("nodeLayer.addEventListener('dblclick'")&&js.includes("event.key!=='Delete'"),'知识卡应通过事件委托支持双击和 Delete 键删除');
+assert(!js.includes("event.key!=='Delete'&&event.key!=='Backspace'"),'本轮删除快捷键不应扩大到 Backspace');
+assert(js.includes("wrap.classList.add('is-destroying')")&&js.includes('setTimeout(()=>finalizeNodeDeletion(id,token),360)'),'删除前应播放短时销毁动画，并避免跨题定时器污染');
+assert(js.includes('state.transform.scale=1;centerOn(0,0,true)'),'点击缩放百分比应同时恢复 100% 并回到题目');
+assert(js.includes("count.textContent=context.total?`${position}/${context.total}`:'0/0'"),'题目库按钮应显示 1/20 格式');
+assert(/\.kr-keyword\s*\{[\s\S]*?padding:0;[\s\S]*?margin:0;/.test(css),'关键词包裹不应改变文字间距');
+assert(css.includes('.kr-node button:hover')&&css.includes('transform:none'),'知识卡悬浮时不应发生位移动画');
+assert(css.includes('@keyframes krCardSmokeLeft')&&css.includes('@keyframes krCardSmokeRight'),'知识卡销毁应包含轻量冒烟效果');
+console.log('v862-p2224-deep-recall-card-delete-reset-static-ok');

@@ -1,0 +1,11 @@
+"use strict";
+const fs=require('fs'),path=require('path'),assert=require('assert'),root=path.resolve(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const pages=['knowledge-recall.html','question-workspace.html','question-training.html'].map(read);
+pages.forEach(html=>{assert(html.includes('lp-question-library-compact'));assert(html.includes('lp-question-paper-select'));assert(html.includes('lp-question-search-row'));assert(html.includes('lp-question-filter-links'));});
+assert(!pages[0].includes('kr-drawer-head'));assert(!pages[1].includes('qwQuestionDrawerTitle'));assert(!pages[2].includes('qt-question-drawer-head'));
+assert(!pages[2].includes('qt-workspace-target-row'));assert(!pages[2].includes('qt-question-dock-tip'));assert(!pages[2].includes('qt-question-drawer-footer'));
+const css=read('styles/learning-practice-shell.css');assert(css.includes('v8.6.2 P2.2.3 — unified lightweight question-library panel'));assert(css.includes('background:transparent!important;backdrop-filter:none!important'));assert(css.includes('.lp-question-filter-links button.active'));assert(css.includes('height:min(68vh,560px)'));
+const kr=read('src/86-knowledge-recall.js'),qw=read('src/77-multi-question-workspace.js'),qt=read('src/66-question-navigator.js');
+assert(kr.includes('krQuestionSearchBtn'));assert(qw.includes('qwQuestionSearchBtn'));assert(qt.includes('qtQuestionSearchBtn'));
+assert(!kr.includes("setTimeout(()=>$('krQuestionSearch')?.focus()"));assert(!qw.includes("setTimeout(()=>byId('qwQuestionSearch')?.focus()"));assert(!qt.includes("setTimeout(()=>byId('qtQuestionSearch')?.focus()"));
+console.log('v862-p223-lightweight-question-library-static-ok');

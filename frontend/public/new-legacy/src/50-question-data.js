@@ -47,6 +47,31 @@ let PMP_QUESTION_MVP={
     ruleConceptId:'product-owner',
     answerId:'C',
     ruleText:'看到“高价值功能”，先想到产品待办列表；产品待办列表由产品负责人管理，所以下一步应找产品负责人评估价值与优先级。'
+  },
+  translations:{
+    en:{
+      title:'A new requirement during an agile iteration',
+      stemParts:[
+        {text:'An '},{text:'agile team',clue:'agile-team'},
+        {text:' is working in a '},{text:'two-week iteration',clue:'two-week-iteration'},
+        {text:'. '},{text:'Halfway through the iteration',clue:'mid-iteration'},
+        {text:', the '},{text:'customer requests a new high-value feature',clue:'new-high-value-feature'},
+        {text:' and asks the team to '},{text:'add it immediately to the current iteration',clue:'add-now'},
+        {text:'. The team explains that doing so may mean '},{text:'the committed work cannot be completed',clue:'commitment-risk'},
+        {text:'. What should the project manager do?'}
+      ],
+      options:[
+        {id:'A',text:'Ask the team to work overtime and complete both the new feature and the planned work.'},
+        {id:'B',text:'Reject the request because no change can be accepted after an iteration begins.'},
+        {id:'C',text:'Discuss the feature value and priority with the product owner and consider adding it to the product backlog.'},
+        {id:'D',text:'Immediately submit a change request and convene the change control board for approval.'}
+      ],
+      analysis:'Protect the current iteration goal while managing the new request through the product backlog and product owner. English is provided for display only; assessment remains in Chinese.',
+      keyPath:{
+        label:'High-value feature → Product backlog → Product owner → Answer C',
+        ruleText:'A high-value feature should be evaluated and prioritized through the product backlog by the product owner instead of being inserted directly into the current iteration.'
+      }
+    }
   }
 };
 let qMvpState={found:new Set(),selected:null,submitted:false,graph:false,reasoning:{recallDone:{},ruleDone:{},trapDone:{},answerUnlocked:false,lockedAnswer:''}};

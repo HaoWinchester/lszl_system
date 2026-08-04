@@ -1,0 +1,92 @@
+{
+  "release": "v9.0-p3.5.3",
+  "baseRelease": "v9.0-p3.5.2",
+  "generatedAt": "2026-07-30T09:13:07.413541+00:00",
+  "scope": [
+    "resizable question-bank and question-list panes",
+    "pane maximize and collapse controls",
+    "persisted pane ratio",
+    "anchored non-modal question preview",
+    "single-click preview switching",
+    "same-question double-click close",
+    "in-page exact question editing"
+  ],
+  "summary": {
+    "nodeTests": {
+      "passed": 85,
+      "total": 85
+    },
+    "browserTests": {
+      "passed": 6,
+      "total": 6
+    },
+    "javascriptSyntaxChecked": 214,
+    "htmlFilesChecked": 20,
+    "duplicateHtmlIds": 0
+  },
+  "storage": {
+    "questionLibraryWorkspaceLayout": "kg_question_library_workspace_layout_v1",
+    "questionBanksPrefix": "kg_question_banks_v1__",
+    "publishedBanks": "kg_question_banks_published_v1",
+    "publishedPapers": "kg_exam_papers_published_v1"
+  },
+  "safety": {
+    "questionIdsChanged": false,
+    "questionRecordsDeletedByPreview": false,
+    "paperReferencesChangedByLayout": false,
+    "publishedSnapshotsMutated": false,
+    "safeDeleteProtectionPreserved": true,
+    "permanentDeleteProtectionPreserved": true
+  },
+  "changedFiles": [
+    "CHANGELOG.md",
+    "V9.0_P3.5.3_QUESTION_BANK_WORKSPACE_PREVIEW_REPORT.md",
+    "V9.0_P3.5.3_QUICK_START.md",
+    "VERSION",
+    "question-bank.html",
+    "src/65-question-bank-admin.js",
+    "src/admin/00-admin-core.js",
+    "styles/question-bank-admin.css",
+    "tests/v862-data-integrity.test.js",
+    "tests/v862-p2238-legacy-freeze.test.js",
+    "tests/v90-p0-admin-foundation.test.js",
+    "tests/v90-p21-taxonomy-release.test.js",
+    "tests/v90-p22-taxonomy-lifecycle.test.js",
+    "tests/v90-p31-admin-ia.test.js",
+    "tests/v90-p31-data-integrity.test.js",
+    "tests/v90-p32-subject-management.test.js",
+    "tests/v90-p331-navigation-shell-fix.test.js",
+    "tests/v90-p333-question-classification.test.js",
+    "tests/v90-p3331-batch-default-classification.test.js",
+    "tests/v90-p334-lightweight-tag-management.test.js",
+    "tests/v90-p35-paper-management.test.js",
+    "tests/v90-p353-question-bank-workspace-browser.py",
+    "tests/v90-p353-question-bank-workspace.test.js"
+  ],
+  "removedFiles": [],
+  "changedFileSha256": {
+    "CHANGELOG.md": "092eee80390918d7bac29a6568bf235430957503a801fcf8187523f32ff1b7b0",
+    "V9.0_P3.5.3_QUESTION_BANK_WORKSPACE_PREVIEW_REPORT.md": "6f2486f477ee3f00036cc37c04c47ea160ff3d5adff61e55e4cd0abb9430091d",
+    "V9.0_P3.5.3_QUICK_START.md": "a57d3b25e884cacc1071161631bb50d28e485ec4e71472efb207ed44032f5773",
+    "VERSION": "5016436e65915554768972aef81af9ea7d7c5e44ff5bedbc5c2bc82d1f67e0cd",
+    "question-bank.html": "89dc23054561ba32cba815dade8a0d9804d18eb6c3b1f99c3f6711be235d0851",
+    "src/65-question-bank-admin.js": "cd14a9482f3c66038ab893564e06e8cc715f24f833adba6b54e28b0f19f9285d",
+    "src/admin/00-admin-core.js": "da3f0225b3ff1651415845c0deb74e080dfd45faf1e6fa744c5a127949ae5b85",
+    "styles/question-bank-admin.css": "26d533e43cc2bfcc96641b5de7cf48615903b31d0e130fa69cc8e62a07c5385d",
+    "tests/v862-data-integrity.test.js": "cd07e1b95c02670fd0568618dc323c015711842ce45447a438ba98fbf45b9545",
+    "tests/v862-p2238-legacy-freeze.test.js": "bb046268060f1b5c69748d2d143b242043d4e5a686d473f1cdf46591430232c7",
+    "tests/v90-p0-admin-foundation.test.js": "ce68492659db53cb5b543786c459aff913269a73538d24728b7e439f18926dc4",
+    "tests/v90-p21-taxonomy-release.test.js": "188a7df5bff08f5a74e2767a98575e5a4d5a49a28431080e8b971f7471620fa7",
+    "tests/v90-p22-taxonomy-lifecycle.test.js": "5dba1cdd63bf8b717f8ea78881b29d5ab65942cdbab6aa7172b97e2dd225345b",
+    "tests/v90-p31-admin-ia.test.js": "bf26103be06f27b74a6c64e31d2fbac2874784f3e8eaac01bba4fb8f3d5563f0",
+    "tests/v90-p31-data-integrity.test.js": "f5b4f1f17ff192e53001c468458221e4e01e05df6613f31ba98c888ea7053238",
+    "tests/v90-p32-subject-management.test.js": "ac7d7614240e778591a7c43a8cb757e0dc1b682233d5d1be7494ad5eb0fe203c",
+    "tests/v90-p331-navigation-shell-fix.test.js": "2223bea9b1f0fa898927bf4820a343b379ad6241ae557de169e439e63d718c3f",
+    "tests/v90-p333-question-classification.test.js": "911b3500183d8c0f0fd5bb653695faa6510446a990c98762aa9f919f2671f14c",
+    "tests/v90-p3331-batch-default-classification.test.js": "594ad9cdf1dfbe2d2b72b601e31d0baf9f929600c47ad30c37d28efd5e61c014",
+    "tests/v90-p334-lightweight-tag-management.test.js": "58f8d9431811a815d63cf57f0f9f4453f3cbd2bba0c13f41657b74df6763056c",
+    "tests/v90-p35-paper-management.test.js": "994025b58e7d05a7ce4e569d5484349e79a320082b935a4826cb979407c62cd8",
+    "tests/v90-p353-question-bank-workspace-browser.py": "f05fd57ab6931caa27f635c17eb8d16dbc93c2c61ab9c4f6ed19b3b1654e3dce",
+    "tests/v90-p353-question-bank-workspace.test.js": "c6fc11bfa4b85a7c04f1cd138b8abc84e3d70f3101f1a7204afb2dae941a1f3a"
+  }
+}

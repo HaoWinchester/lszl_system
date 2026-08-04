@@ -1,0 +1,108 @@
+/* v8.6.2 P2.2.18 — multi-question viewport/search/drawer/local tidy refinements */
+
+/* Global search is viewport-clamped by JS; fixed positioning prevents clipping by the filebar/canvas. */
+.question-workspace-page #qwWorkspaceGlobalSearchPanel{
+  position:fixed!important;
+  right:auto!important;
+  bottom:auto!important;
+  width:min(390px,calc(100vw - 20px))!important;
+  max-width:calc(100vw - 20px)!important;
+  max-height:calc(100dvh - 20px)!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+}
+.question-workspace-page #qwWorkspaceGlobalSearchResults{
+  max-height:min(330px,calc(100dvh - 132px))!important;
+  overflow:auto!important;
+  overscroll-behavior:contain!important;
+}
+
+/* Multi-question question library matches the single-deep drawer dimensions exactly. */
+.question-workspace-page #qwQuestionDrawer.lp-question-library-compact{
+  position:fixed!important;
+  top:var(--lp-shell-height,64px)!important;
+  right:auto!important;
+  bottom:0!important;
+  left:0!important;
+  z-index:5000!important;
+  width:min(360px,calc(100vw - 8px))!important;
+  box-sizing:border-box!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  border-radius:0 12px 12px 0!important;
+  transform:translateX(calc(-100% - 8px))!important;
+  visibility:hidden!important;
+  transition:transform .18s ease,visibility 0s linear .18s!important;
+}
+.question-workspace-page #qwQuestionDrawer.lp-question-library-compact.open{
+  transform:translateX(0)!important;
+  visibility:visible!important;
+  transition:transform .18s ease,visibility 0s!important;
+}
+.question-workspace-page #qwQuestionDrawerBackdrop{
+  position:fixed!important;
+  top:var(--lp-shell-height,64px)!important;
+  right:0!important;
+  bottom:0!important;
+  left:0!important;
+  z-index:4990!important;
+  width:auto!important;
+  height:auto!important;
+  background:transparent!important;
+  backdrop-filter:none!important;
+}
+
+/* Sniper/target entry into single-question deep study. */
+.question-workspace-page #qwOpenSingleDeepBtn{
+  display:grid!important;
+  place-items:center!important;
+  width:34px!important;
+  min-width:34px!important;
+  height:34px!important;
+  min-height:34px!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:9px!important;
+  background:transparent!important;
+  color:#536074!important;
+  box-shadow:none!important;
+  cursor:pointer!important;
+}
+.question-workspace-page #qwOpenSingleDeepBtn:hover,
+.question-workspace-page #qwOpenSingleDeepBtn:focus-visible{
+  background:#eef2ff!important;
+  color:#4f46e5!important;
+  outline:none!important;
+}
+.question-workspace-page #qwOpenSingleDeepBtn svg{
+  width:19px!important;
+  height:19px!important;
+  fill:none!important;
+  stroke:currentColor!important;
+  stroke-width:1.9!important;
+  stroke-linecap:round!important;
+  stroke-linejoin:round!important;
+}
+
+/* Local tidy is a direct action in the multi-select floating toolbar. */
+.question-workspace-page [data-qw-selection-action="tidy"] svg{
+  width:18px!important;
+  height:18px!important;
+}
+
+@media(max-width:760px),(pointer:coarse){
+  .question-workspace-page #qwQuestionDrawer.lp-question-library-compact{
+    top:var(--lp-shell-height,64px)!important;
+    right:auto!important;
+    bottom:0!important;
+    left:0!important;
+    width:min(360px,calc(100vw - 8px))!important;
+    height:auto!important;
+    border-radius:0 12px 12px 0!important;
+    transform:translateX(calc(-100% - 8px))!important;
+  }
+  .question-workspace-page #qwQuestionDrawer.lp-question-library-compact.open{
+    transform:translateX(0)!important;
+  }
+}

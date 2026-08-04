@@ -21,6 +21,9 @@
           }
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "cardOrder": [
           "po-backlog:left",
@@ -85,6 +88,9 @@
       "answer": {
         "optionId": "B"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -137,6 +143,9 @@
     {
       "answer": {
         "optionId": "B"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -191,6 +200,9 @@
       "answer": {
         "optionId": "A"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -243,6 +255,9 @@
     {
       "answer": {
         "optionId": "B"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -297,6 +312,9 @@
       "answer": {
         "optionId": "A"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -349,6 +367,9 @@
     {
       "answer": {
         "optionId": "B"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -403,6 +424,9 @@
       "answer": {
         "optionId": "B"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -455,6 +479,9 @@
     {
       "answer": {
         "optionId": "C"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -509,6 +536,9 @@
       "answer": {
         "optionId": "C"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -562,6 +592,9 @@
       "answer": {
         "optionId": "B"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -614,6 +647,9 @@
     {
       "answer": {
         "adapter": "legacy_runtime"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -821,6 +857,9 @@
       "answer": {
         "optionId": "A"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -873,6 +912,9 @@
     {
       "answer": {
         "optionId": "A"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -927,6 +969,9 @@
       "answer": {
         "optionId": "B"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -979,6 +1024,9 @@
     {
       "answer": {
         "optionId": "C"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -1033,6 +1081,9 @@
       "answer": {
         "optionId": "A"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -1085,6 +1136,9 @@
     {
       "answer": {
         "optionId": "C"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -1143,6 +1197,9 @@
           "env-keyword-01-segment-04"
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "hintAfterWrong": 1
       },
@@ -1166,11 +1223,11 @@
             },
             {
               "id": "env-keyword-01-segment-04",
-              "text": "两周迭代，"
+              "text": "两周迭代"
             },
             {
               "id": "env-keyword-01-segment-05",
-              "text": "客户提出新的高价值功能。"
+              "text": "，客户提出新的高价值功能。"
             }
           ]
         }
@@ -1202,6 +1259,9 @@
           "env-keyword-02-segment-02",
           "env-keyword-02-segment-04"
         ]
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {
         "hintAfterWrong": 1
@@ -1263,6 +1323,9 @@
           "env-keyword-03-segment-04"
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "hintAfterWrong": 1
       },
@@ -1322,6 +1385,9 @@
           "env-keyword-04-segment-02",
           "env-keyword-04-segment-04"
         ]
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {
         "hintAfterWrong": 1
@@ -1383,6 +1449,9 @@
           "env-keyword-05-segment-04"
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "hintAfterWrong": 1
       },
@@ -1439,6 +1508,9 @@
       "answer": {
         "optionId": "C"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -1491,6 +1563,9 @@
     {
       "answer": {
         "optionId": "C"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -1545,6 +1620,9 @@
       "answer": {
         "optionId": "A"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -1597,6 +1675,9 @@
     {
       "answer": {
         "optionId": "A"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -1651,6 +1732,9 @@
       "answer": {
         "optionId": "B"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -1703,6 +1787,9 @@
     {
       "answer": {
         "optionId": "C"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -1757,6 +1844,9 @@
       "answer": {
         "optionId": "B"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -1809,6 +1899,9 @@
     {
       "answer": {
         "optionId": "A"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -1863,6 +1956,9 @@
       "answer": {
         "optionId": "A"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -1915,6 +2011,9 @@
     {
       "answer": {
         "optionId": "A"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -1969,6 +2068,9 @@
       "answer": {
         "optionId": "A"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -2021,6 +2123,9 @@
     {
       "answer": {
         "optionId": "A"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -2096,6 +2201,9 @@
           }
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "cardOrder": [
           "assess:left",
@@ -2166,6 +2274,9 @@
     {
       "answer": {
         "adapter": "legacy_runtime"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -2452,6 +2563,9 @@
       "answer": {
         "adapter": "legacy_runtime"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -2657,6 +2771,9 @@
       "answer": {
         "optionId": "B"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -2709,6 +2826,9 @@
     {
       "answer": {
         "optionId": "B"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -2763,6 +2883,9 @@
       "answer": {
         "optionId": "B"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -2815,6 +2938,9 @@
     {
       "answer": {
         "optionId": "C"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -2869,6 +2995,9 @@
       "answer": {
         "optionId": "B"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -2921,7 +3050,6 @@
     {
       "answer": {
         "acceptedConcepts": {
-          "en": [],
           "zh": [
             {
               "acceptedExpressions": [
@@ -2960,6 +3088,9 @@
         "maxLength": 300,
         "minLength": 1
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -2992,7 +3123,6 @@
     {
       "answer": {
         "acceptedConcepts": {
-          "en": [],
           "zh": [
             {
               "acceptedExpressions": [
@@ -3029,6 +3159,9 @@
         "maxLength": 140,
         "minLength": 30
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -3061,7 +3194,6 @@
     {
       "answer": {
         "acceptedConcepts": {
-          "en": [],
           "zh": [
             {
               "acceptedExpressions": [
@@ -3097,6 +3229,9 @@
         "maxLength": 140,
         "minLength": 30
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -3129,7 +3264,6 @@
     {
       "answer": {
         "acceptedConcepts": {
-          "en": [],
           "zh": [
             {
               "acceptedExpressions": [
@@ -3167,6 +3301,9 @@
         "maxLength": 140,
         "minLength": 30
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -3199,7 +3336,6 @@
     {
       "answer": {
         "acceptedConcepts": {
-          "en": [],
           "zh": [
             {
               "acceptedExpressions": [
@@ -3236,6 +3372,9 @@
         "maxLength": 140,
         "minLength": 30
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -3268,7 +3407,6 @@
     {
       "answer": {
         "acceptedConcepts": {
-          "en": [],
           "zh": [
             {
               "acceptedExpressions": [
@@ -3306,6 +3444,9 @@
         "evaluationMode": "show_reference",
         "maxLength": 300,
         "minLength": 1
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -3352,6 +3493,9 @@
             "rightId": "constraint"
           }
         ]
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {
         "rightOrder": [
@@ -3420,6 +3564,9 @@
           }
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "rightOrder": [
           "baseline",
@@ -3486,6 +3633,9 @@
             "rightId": "authority"
           }
         ]
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {
         "rightOrder": [
@@ -3554,6 +3704,9 @@
           }
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "rightOrder": [
           "act",
@@ -3620,6 +3773,9 @@
             "rightId": "hybrid"
           }
         ]
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {
         "rightOrder": [
@@ -3688,6 +3844,9 @@
           }
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "rightOrder": [
           "hybrid",
@@ -3754,6 +3913,9 @@
             "rightId": "baseline"
           }
         ]
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {
         "rightOrder": [
@@ -3822,6 +3984,9 @@
           }
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "rightOrder": [
           "governance",
@@ -3888,6 +4053,9 @@
             "rightId": "assess"
           }
         ]
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {
         "rightOrder": [
@@ -3956,6 +4124,9 @@
           }
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "rightOrder": [
           "third",
@@ -4022,6 +4193,9 @@
             "rightId": "stakeholder"
           }
         ]
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {
         "rightOrder": [
@@ -4090,6 +4264,9 @@
           }
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "rightOrder": [
           "sponsor",
@@ -4156,6 +4333,9 @@
             "rightId": "dev"
           }
         ]
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {
         "rightOrder": [
@@ -4224,6 +4404,9 @@
           }
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "rightOrder": [
           "po3",
@@ -4291,6 +4474,9 @@
           }
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "rightOrder": [
           "board",
@@ -4344,7 +4530,6 @@
     {
       "answer": {
         "acceptedConcepts": {
-          "en": [],
           "zh": [
             {
               "acceptedExpressions": [
@@ -4379,6 +4564,9 @@
         "maxLength": 140,
         "minLength": 30
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -4411,7 +4599,6 @@
     {
       "answer": {
         "acceptedConcepts": {
-          "en": [],
           "zh": [
             {
               "acceptedExpressions": [
@@ -4446,6 +4633,9 @@
         "maxLength": 140,
         "minLength": 30
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -4478,7 +4668,6 @@
     {
       "answer": {
         "acceptedConcepts": {
-          "en": [],
           "zh": [
             {
               "acceptedExpressions": [
@@ -4513,6 +4702,9 @@
         "maxLength": 140,
         "minLength": 30
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -4545,7 +4737,6 @@
     {
       "answer": {
         "acceptedConcepts": {
-          "en": [],
           "zh": [
             {
               "acceptedExpressions": [
@@ -4580,6 +4771,9 @@
         "maxLength": 140,
         "minLength": 30
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -4612,7 +4806,6 @@
     {
       "answer": {
         "acceptedConcepts": {
-          "en": [],
           "zh": [
             {
               "acceptedExpressions": [
@@ -4646,6 +4839,9 @@
         "evaluationMode": "concept_match",
         "maxLength": 140,
         "minLength": 30
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -4684,6 +4880,9 @@
           "structure-keyword-01-segment-04",
           "structure-keyword-01-segment-06"
         ]
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {
         "hintAfterWrong": 1
@@ -4756,6 +4955,9 @@
           "structure-keyword-01-fixed-06-segment-06"
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "hintAfterWrong": 1
       },
@@ -4826,6 +5028,9 @@
           "structure-keyword-02-segment-04",
           "structure-keyword-02-segment-06"
         ]
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {
         "hintAfterWrong": 1
@@ -4898,6 +5103,9 @@
           "structure-keyword-02-fixed-07-segment-06"
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "hintAfterWrong": 1
       },
@@ -4968,6 +5176,9 @@
           "structure-keyword-03-segment-04"
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "hintAfterWrong": 1
       },
@@ -5029,6 +5240,9 @@
           "structure-keyword-04-segment-02",
           "structure-keyword-04-segment-04"
         ]
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {
         "hintAfterWrong": 1
@@ -5092,6 +5306,9 @@
           "structure-keyword-05-segment-04"
         ]
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {
         "hintAfterWrong": 1
       },
@@ -5150,6 +5367,9 @@
       "answer": {
         "optionId": "A"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -5202,6 +5422,9 @@
     {
       "answer": {
         "optionId": "A"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -5256,6 +5479,9 @@
       "answer": {
         "optionId": "A"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -5308,6 +5534,9 @@
     {
       "answer": {
         "optionId": "A"
+      },
+      "assessment": {
+        "language": "zh"
       },
       "config": {},
       "content": {
@@ -5362,6 +5591,9 @@
       "answer": {
         "optionId": "A"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -5415,6 +5647,9 @@
       "answer": {
         "optionId": "A"
       },
+      "assessment": {
+        "language": "zh"
+      },
       "config": {},
       "content": {
         "en": null,
@@ -5466,9 +5701,10 @@
     }
   ],
   "activitySchemaVersion": 1,
-  "contentHash": "sha256:3eaff575c883ce16788e27615d23590f24273205a3106afc906c45a70afb23a6",
+  "contentHash": "sha256:7fb7fa8faefe1d38434362a48cdef1490b69bbc6da53811deb2ab5a00f39729a",
   "course": {
     "activitySchemaVersion": 1,
+    "assessmentLanguage": "zh",
     "id": "pmp-change-response-demo-v3",
     "nodes": [
       {
@@ -7772,6 +8008,32 @@
         "id": "environment",
         "objective": "从角色、工件和节奏线索判断敏捷、预测型或混合环境。",
         "order": 1,
+        "practiceEntries": [
+          {
+            "afterNodeOrder": 3,
+            "description": "进入完整版，自由点击关键词并探索知识联想网络。",
+            "id": "environment-deep-recall-playground",
+            "image": "assets/practice-deep-recall.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-deep-recall.png",
+            "target": "knowledge-recall.html",
+            "targetNodeOrder": 4,
+            "title": "深度回忆寻宝",
+            "type": "deep_recall"
+          },
+          {
+            "afterNodeOrder": 8,
+            "description": "进入完整版，自由拖入多道原题、框选、分组和归纳。",
+            "id": "environment-multi-question-playground",
+            "image": "assets/practice-multi-canvas.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-multi-canvas.png",
+            "target": "question-workspace.html",
+            "targetNodeOrder": 9,
+            "title": "多题归纳画布",
+            "type": "multi_question_canvas"
+          }
+        ],
         "stageId": "foundation",
         "title": "识别方法环境"
       },
@@ -7779,6 +8041,32 @@
         "id": "roles-process",
         "objective": "明确角色职责和变更处理的第一步。",
         "order": 2,
+        "practiceEntries": [
+          {
+            "afterNodeOrder": 3,
+            "description": "进入完整版，自由点击关键词并探索知识联想网络。",
+            "id": "roles-process-deep-recall-playground",
+            "image": "assets/practice-deep-recall.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-deep-recall.png",
+            "target": "knowledge-recall.html",
+            "targetNodeOrder": 4,
+            "title": "深度回忆寻宝",
+            "type": "deep_recall"
+          },
+          {
+            "afterNodeOrder": 8,
+            "description": "进入完整版，自由拖入多道原题、框选、分组和归纳。",
+            "id": "roles-process-multi-question-playground",
+            "image": "assets/practice-multi-canvas.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-multi-canvas.png",
+            "target": "question-workspace.html",
+            "targetNodeOrder": 9,
+            "title": "多题归纳画布",
+            "type": "multi_question_canvas"
+          }
+        ],
         "stageId": "foundation",
         "title": "理解角色与顺序"
       },
@@ -7786,6 +8074,32 @@
         "id": "foundation-practice",
         "objective": "通过重复练习巩固环境、角色和处理顺序。",
         "order": 3,
+        "practiceEntries": [
+          {
+            "afterNodeOrder": 3,
+            "description": "进入完整版，自由点击关键词并探索知识联想网络。",
+            "id": "foundation-practice-deep-recall-playground",
+            "image": "assets/practice-deep-recall.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-deep-recall.png",
+            "target": "knowledge-recall.html",
+            "targetNodeOrder": 4,
+            "title": "深度回忆寻宝",
+            "type": "deep_recall"
+          },
+          {
+            "afterNodeOrder": 8,
+            "description": "进入完整版，自由拖入多道原题、框选、分组和归纳。",
+            "id": "foundation-practice-multi-question-playground",
+            "image": "assets/practice-multi-canvas.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-multi-canvas.png",
+            "target": "question-workspace.html",
+            "targetNodeOrder": 9,
+            "title": "多题归纳画布",
+            "type": "multi_question_canvas"
+          }
+        ],
         "stageId": "foundation",
         "title": "基础情境巩固"
       },
@@ -7793,6 +8107,32 @@
         "id": "question-analysis",
         "objective": "识别题目中的方法环境、角色和关键约束。",
         "order": 1,
+        "practiceEntries": [
+          {
+            "afterNodeOrder": 3,
+            "description": "进入完整版，自由点击关键词并探索知识联想网络。",
+            "id": "question-analysis-deep-recall-playground",
+            "image": "assets/practice-deep-recall.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-deep-recall.png",
+            "target": "knowledge-recall.html",
+            "targetNodeOrder": 4,
+            "title": "深度回忆寻宝",
+            "type": "deep_recall"
+          },
+          {
+            "afterNodeOrder": 8,
+            "description": "进入完整版，自由拖入多道原题、框选、分组和归纳。",
+            "id": "question-analysis-multi-question-playground",
+            "image": "assets/practice-multi-canvas.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-multi-canvas.png",
+            "target": "question-workspace.html",
+            "targetNodeOrder": 9,
+            "title": "多题归纳画布",
+            "type": "multi_question_canvas"
+          }
+        ],
         "stageId": "reasoning",
         "title": "拆解题干与约束"
       },
@@ -7800,6 +8140,32 @@
         "id": "agile-application",
         "objective": "排除自动接受、自动拒绝和命令控制类错误选项。",
         "order": 2,
+        "practiceEntries": [
+          {
+            "afterNodeOrder": 3,
+            "description": "进入完整版，自由点击关键词并探索知识联想网络。",
+            "id": "agile-application-deep-recall-playground",
+            "image": "assets/practice-deep-recall.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-deep-recall.png",
+            "target": "knowledge-recall.html",
+            "targetNodeOrder": 4,
+            "title": "深度回忆寻宝",
+            "type": "deep_recall"
+          },
+          {
+            "afterNodeOrder": 8,
+            "description": "进入完整版，自由拖入多道原题、框选、分组和归纳。",
+            "id": "agile-application-multi-question-playground",
+            "image": "assets/practice-multi-canvas.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-multi-canvas.png",
+            "target": "question-workspace.html",
+            "targetNodeOrder": 9,
+            "title": "多题归纳画布",
+            "type": "multi_question_canvas"
+          }
+        ],
         "stageId": "reasoning",
         "title": "排除选项陷阱"
       },
@@ -7807,6 +8173,32 @@
         "id": "reasoning-practice",
         "objective": "在完整情境中运用价值、容量与角色判断。",
         "order": 3,
+        "practiceEntries": [
+          {
+            "afterNodeOrder": 3,
+            "description": "进入完整版，自由点击关键词并探索知识联想网络。",
+            "id": "reasoning-practice-deep-recall-playground",
+            "image": "assets/practice-deep-recall.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-deep-recall.png",
+            "target": "knowledge-recall.html",
+            "targetNodeOrder": 4,
+            "title": "深度回忆寻宝",
+            "type": "deep_recall"
+          },
+          {
+            "afterNodeOrder": 8,
+            "description": "进入完整版，自由拖入多道原题、框选、分组和归纳。",
+            "id": "reasoning-practice-multi-question-playground",
+            "image": "assets/practice-multi-canvas.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-multi-canvas.png",
+            "target": "question-workspace.html",
+            "targetNodeOrder": 9,
+            "title": "多题归纳画布",
+            "type": "multi_question_canvas"
+          }
+        ],
         "stageId": "reasoning",
         "title": "情境应用练习"
       },
@@ -7814,6 +8206,32 @@
         "id": "hybrid-governance",
         "objective": "同时处理敏捷价值排序和正式基准约束。",
         "order": 1,
+        "practiceEntries": [
+          {
+            "afterNodeOrder": 3,
+            "description": "进入完整版，自由点击关键词并探索知识联想网络。",
+            "id": "hybrid-governance-deep-recall-playground",
+            "image": "assets/practice-deep-recall.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-deep-recall.png",
+            "target": "knowledge-recall.html",
+            "targetNodeOrder": 4,
+            "title": "深度回忆寻宝",
+            "type": "deep_recall"
+          },
+          {
+            "afterNodeOrder": 8,
+            "description": "进入完整版，自由拖入多道原题、框选、分组和归纳。",
+            "id": "hybrid-governance-multi-question-playground",
+            "image": "assets/practice-multi-canvas.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-multi-canvas.png",
+            "target": "question-workspace.html",
+            "targetNodeOrder": 9,
+            "title": "多题归纳画布",
+            "type": "multi_question_canvas"
+          }
+        ],
         "stageId": "transfer",
         "title": "识别混合治理边界"
       },
@@ -7821,6 +8239,32 @@
         "id": "integrated-rule",
         "objective": "把环境、角色、约束和流程连接成可迁移规则。",
         "order": 2,
+        "practiceEntries": [
+          {
+            "afterNodeOrder": 3,
+            "description": "进入完整版，自由点击关键词并探索知识联想网络。",
+            "id": "integrated-rule-deep-recall-playground",
+            "image": "assets/practice-deep-recall.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-deep-recall.png",
+            "target": "knowledge-recall.html",
+            "targetNodeOrder": 4,
+            "title": "深度回忆寻宝",
+            "type": "deep_recall"
+          },
+          {
+            "afterNodeOrder": 8,
+            "description": "进入完整版，自由拖入多道原题、框选、分组和归纳。",
+            "id": "integrated-rule-multi-question-playground",
+            "image": "assets/practice-multi-canvas.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-multi-canvas.png",
+            "target": "question-workspace.html",
+            "targetNodeOrder": 9,
+            "title": "多题归纳画布",
+            "type": "multi_question_canvas"
+          }
+        ],
         "stageId": "transfer",
         "title": "形成综合判断主线"
       },
@@ -7828,6 +8272,32 @@
         "id": "transfer-practice",
         "objective": "通过综合练习和挑战检验跨情境迁移能力。",
         "order": 3,
+        "practiceEntries": [
+          {
+            "afterNodeOrder": 3,
+            "description": "进入完整版，自由点击关键词并探索知识联想网络。",
+            "id": "transfer-practice-deep-recall-playground",
+            "image": "assets/practice-deep-recall.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-deep-recall.png",
+            "target": "knowledge-recall.html",
+            "targetNodeOrder": 4,
+            "title": "深度回忆寻宝",
+            "type": "deep_recall"
+          },
+          {
+            "afterNodeOrder": 8,
+            "description": "进入完整版，自由拖入多道原题、框选、分组和归纳。",
+            "id": "transfer-practice-multi-question-playground",
+            "image": "assets/practice-multi-canvas.gif",
+            "searchRadius": 1,
+            "stillImage": "assets/practice-multi-canvas.png",
+            "target": "question-workspace.html",
+            "targetNodeOrder": 9,
+            "title": "多题归纳画布",
+            "type": "multi_question_canvas"
+          }
+        ],
         "stageId": "transfer",
         "title": "迁移与阶段挑战"
       }
@@ -8241,7 +8711,6 @@
     },
     "questionLanguageModes": [
       "zh",
-      "en",
       "bilingual"
     ],
     "schemaVersion": 1,
@@ -8274,7 +8743,7 @@
     "subject": "PMP",
     "subtitle": "通过阶段、部分和短节点，建立可迁移的变更判断主线",
     "title": "PMP 变更与敏捷响应",
-    "version": 11
+    "version": 13
   },
   "packageSchemaVersion": 1,
   "validation": {
@@ -8941,5 +9410,5 @@
     ],
     "valid": true
   },
-  "version": "v8.6.29"
+  "version": "v9.0-p4.1.9"
 }

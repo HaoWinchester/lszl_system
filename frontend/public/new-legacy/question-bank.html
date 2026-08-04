@@ -8,21 +8,45 @@
 <script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
-<title>题库认知标注管理｜项目管理类科目</title>
-<link href="styles/question-bank-admin.css?v=v8.6.29" rel="stylesheet"/>
-<link rel="stylesheet" href="styles/global-shortcuts.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/subscription.css?v=v8.6.29"/>
-<link rel="stylesheet" href="styles/user-center.css?v=v8.6.29"/>
+<title>教师原题工作台｜项目管理类科目</title>
+<link href="styles/teacher-workbench.css?v=v9.0-p4.1.9" rel="stylesheet"/>
+<link href="styles/question-bank-admin.css?v=v9.0-p4.1.9" rel="stylesheet"/>
+<link href="styles/teacher-question-workflow.css?v=v9.0-p4.1.9" rel="stylesheet"/>
+<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/workspace-placement.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/question-classification.css?v=v9.0-p4.1.9"/>
 </head>
-<body>
+<body class="teacher-admin-shell" data-admin-context="teacher">
+<nav class="admin-context-nav" aria-label="管理后台一级导航">
+  <a data-admin-nav="overview" href="admin-console.html">总览</a>
+  <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
+  <a data-admin-nav="teacher" href="teacher-workbench.html">教师工作台</a>
+  <a data-admin-nav="courses" href="course-admin.html">课程与任务</a>
+  <a data-admin-nav="users" href="user-management.html">用户管理</a>
+    <a data-admin-nav="feedback" href="feedback-management.html">反馈管理</a>
+    <a data-admin-nav="messages" href="message-management.html">消息管理</a>
+  <a data-admin-nav="operations" href="admin-operations.html">操作记录</a>
+  <a data-admin-nav="settings" href="admin-settings.html">系统设置</a>
+</nav>
+<header class="tw-topbar tq-shell-topbar" id="tqWorkflow">
+  <a class="tw-brand" href="teacher-workbench.html"><span class="tw-brand-mark">KG</span><span class="tw-brand-copy"><strong>教师工作台</strong><small>V9.0-P3.5.8 · 从原题到试卷</small></span></a>
+  <nav class="tw-tabs" aria-label="教师主要工作"><a href="teacher-workbench.html">工作台</a><a data-tq-step="questions" href="question-bank.html?mode=simple&amp;step=questions">题目管理</a><a data-tq-step="training" href="question-bank.html?mode=simple&amp;step=training">训练配置</a><a href="paper-management.html">试卷管理</a></nav>
+  <div class="tw-user"><a id="tqAdvancedLink" href="question-bank.html?mode=advanced">高级工具</a><a href="index.html">返回学员端</a></div>
+</header>
+<section class="tw-workflow tq-shell-workflow" aria-label="教师工作流程"><a class="tw-step" data-tq-step-flow="questions" href="question-bank.html?mode=simple&amp;step=questions"><b>1</b>管理题目</a><i class="tw-arrow"></i><a class="tw-step" data-tq-step-flow="training" href="question-bank.html?mode=simple&amp;step=training"><b>2</b>配置训练</a><i class="tw-arrow"></i><a class="tw-step" href="paper-management.html"><b>3</b>管理试卷</a></section>
+<section class="business-workspace-panel active" id="questionLibraryWorkspace" data-question-workspace-panel="library" role="tabpanel">
 <div class="qb-app" id="qbApp">
 <header class="qb-topbar">
 <div class="qb-brand">
 <a class="qb-back" href="index.html" title="返回知识图谱">←</a>
 <div>
 <p class="qb-kicker">Project Management Question Bank</p>
-<h1>题库认知标注管理</h1>
-<p>面向 PMP、CSPM、P2、ACP、NPDP 等项目管理类科目，统一维护题目、关键词、推理逻辑与知识点。</p>
+<h1>教师原题工作台</h1>
+<p>面向 PMP 等项目管理类科目，快速维护完整原题、可点击关键词和共享知识联想网络。</p>
 </div>
 </div>
 <div class="qb-top-actions">
@@ -33,6 +57,7 @@
 <button id="qbTemplateBtn" type="button">下载模板</button>
 <button class="primary" id="qbSetCurrentBtn" type="button">设为当前训练题</button>
 <button class="accent" id="qbPreviewRecallBtn" type="button">深度回忆预览</button>
+<a class="qb-top-link" href="admin-console.html">管理后台</a>
 <a class="qb-top-link" href="user-management.html" target="_blank" rel="noopener" data-permission="accessUserManagement" data-permission-mode="hide">用户管理</a>
 <a class="qb-top-link" href="system-settings.html" target="_blank" rel="noopener" data-permission="accessSystemSettings" data-permission-mode="hide">系统设置</a>
 <input accept=".json,application/json" hidden="" id="qbImportFile" type="file"/>
@@ -49,10 +74,11 @@
 <aside class="qb-sidebar">
 <nav aria-label="页面布局导航" class="qb-layout-nav">
 <button class="active" data-layout-nav="banks" type="button">题库管理</button>
-<button data-layout-nav="papers" type="button">组卷与发布</button>
+<button type="button" onclick="location.href='paper-management.html'">试卷管理 ↗</button>
 <button data-layout-nav="base" type="button">题目基本信息</button>
-<button data-layout-nav="clues" type="button">关键词标记</button>
-<button data-layout-nav="concepts" type="button">知识点绑定</button>
+<button data-layout-nav="recall" type="button">快速回忆配置</button>
+<button data-layout-nav="clues" type="button">高级关键词</button>
+<button data-layout-nav="concepts" type="button">训练知识关联</button>
 <button data-layout-nav="reasoning" type="button">推理逻辑</button>
 <button data-layout-nav="completion" type="button">标注完成度</button>
 </nav>
@@ -62,16 +88,18 @@
 <div class="qb-workspace-head">
 <div>
 <h2>题库工作区</h2>
-<p>题库管理、组卷发布和题目基础信息合并为一个主标签区域，左侧仅保留纵向导航。</p>
+<p>题库管理和题目基础信息保留在本页；试卷管理已拆分为独立工作区。</p>
 </div>
 <div aria-label="题库工作区" class="qb-main-tabs" role="tablist">
 <button aria-controls="qbMainBanksPanel" aria-selected="true" class="active" data-main-tab="banks" role="tab" type="button">题库管理</button>
-<button aria-controls="qbPaperCard" aria-selected="false" data-main-tab="papers" role="tab" type="button">组卷与发布</button>
+
 <button aria-controls="qbQuestionBaseCard" aria-selected="false" data-main-tab="base" role="tab" type="button">题目基本信息</button>
 </div>
 </div>
 <section class="qb-workspace-panel active" data-main-tab-panel="banks" id="qbMainBanksPanel" role="tabpanel">
-<div class="qb-management-grid"><section aria-labelledby="qbBankTabBtn" class="qb-tab-panel active qb-management-section" id="qbBankTabPanel" role="tabpanel">
+<div class="qb-management-grid" id="qbLibraryWorkbench" data-mode="split">
+<section aria-labelledby="qbBankTabBtn" class="qb-tab-panel active qb-management-section qb-library-pane" data-library-pane="banks" id="qbBankTabPanel" role="tabpanel">
+<div class="qb-management-pane-head">
 <div class="qb-sidebar-head">
 <div>
 <h2>题库</h2>
@@ -79,6 +107,12 @@
 </div>
 <button id="qbAddBankBtn" type="button">+ 新题库</button>
 </div>
+<div class="qb-management-pane-controls" aria-label="题库区域显示控制">
+<button type="button" data-library-pane-action="maximize" data-library-pane-target="banks"></button>
+<button type="button" data-library-pane-action="collapse" data-library-pane-target="banks"></button>
+</div>
+</div>
+<div class="qb-management-pane-body" id="qbBankPaneBody">
 <label class="qb-field compact">
 <span>按科目筛选</span>
 <select id="qbSubjectFilter"></select>
@@ -114,12 +148,24 @@
 <input id="bankVersion" placeholder="1.0"/>
 </label>
 <label class="qb-field">
+<span>学员可见性</span>
+<select id="bankVisibility">
+<option value="private">仅教师自己</option>
+<option value="published">发布给学员</option>
+</select>
+<small>发布后，学员可在完整版深度回忆的“题集 / 题目”列表中读取；原题 ID 不变。</small>
+</label>
+<label class="qb-field">
 <span>题库说明</span>
 <textarea id="bankDescription" placeholder="说明该题库的覆盖范围、适用人群和训练目标" rows="3"></textarea>
 </label>
 </div>
 </section>
-</section><section aria-labelledby="qbQuestionTabBtn" class="qb-tab-panel qb-management-section" id="qbQuestionTabPanel" role="tabpanel">
+</div>
+</section>
+<div class="qb-management-splitter" id="qbLibrarySplitter" role="separator" tabindex="0" aria-orientation="vertical" aria-label="拖动调整题库区与题目区宽度" aria-valuemin="25" aria-valuemax="75" aria-valuenow="42"><span></span></div>
+<section aria-labelledby="qbQuestionTabBtn" class="qb-tab-panel qb-management-section qb-library-pane" data-library-pane="questions" id="qbQuestionTabPanel" role="tabpanel">
+<div class="qb-management-pane-head">
 <div class="qb-sidebar-head questions">
 <div>
 <h2>题目</h2>
@@ -127,10 +173,28 @@
 </div>
 <button id="qbAddQuestionBtn" type="button">+ 新题</button>
 </div>
+<div class="qb-management-pane-controls" aria-label="题目区域显示控制">
+<button type="button" data-library-pane-action="maximize" data-library-pane-target="questions"></button>
+<button type="button" data-library-pane-action="collapse" data-library-pane-target="questions"></button>
+</div>
+</div>
+<div class="qb-management-pane-body" id="qbQuestionPaneBody">
 <div class="qb-question-tools">
-<label class="qb-field">
+<label class="qb-field qb-training-bank-selector" id="qbTrainingBankField">
+<span>选择题库</span>
+<select id="qbTrainingBankSelect" aria-label="选择训练配置题库"><option value="">尚无题库</option></select>
+</label>
+<label class="qb-field qb-question-search-field">
 <span>搜索题目</span>
 <input id="qbQuestionSearch" placeholder="按标题、题干、标签、知识领域搜索"/>
+</label>
+<label class="qb-field">
+<span>题目状态</span>
+<select id="qbQuestionLifecycleFilter">
+<option value="active">正常题目</option>
+<option value="unclassified">待分类</option>
+<option value="deleted">已删除题目</option>
+</select>
 </label>
 <label class="qb-field">
 <span>按类归集</span>
@@ -142,72 +206,97 @@
 </select>
 </label>
 </div>
+<div class="qb-page-selection" id="qbPageSelection" hidden>
+<label><input id="qbSelectPageQuestions" type="checkbox"/><span>选择当前页题目</span></label>
+<small>默认只选择当前页面，翻页或切换筛选会清空选择。</small>
+</div>
+<div class="qb-bulk-toolbar" id="qbBulkToolbar" hidden>
+<div><strong id="qbBulkSelectionCount">已选择 0 道题</strong><small id="qbBulkSelectionHint">仅当前页</small></div>
+<div class="qb-bulk-actions" id="qbBulkActiveActions">
+<button type="button" id="qbBulkKnowledgeBtn">修改知识点</button>
+<button type="button" id="qbBulkUnclassifiedBtn">移入待分类</button>
+<button type="button" id="qbBulkTagsBtn">设置标签</button>
+<button type="button" class="danger" id="qbBulkDeleteBtn">删除</button>
+</div>
+<div class="qb-bulk-actions" id="qbBulkDeletedActions" hidden>
+<button type="button" id="qbBulkRestoreBtn">恢复题目</button>
+<button type="button" class="danger" id="qbBulkPermanentDeleteBtn">永久删除</button>
+</div>
+</div>
 <div class="qb-list question-list grouped" id="qbQuestionList"></div>
 <div class="qb-question-pager" id="qbQuestionPager" hidden></div>
+</div>
 </section></div>
 </section>
-<section class="qb-workspace-panel qb-paper-card" data-main-tab-panel="papers" hidden="" id="qbPaperCard">
-<div class="qb-card-title">
-<div>
-<h2>组卷与发布</h2>
-<p>按科目、知识领域/主题配额从多个题库抽题，生成综合训练试卷；发布后首页“考题训练”可直接选择。</p>
-</div>
-<div class="qb-inline-actions">
-<button id="qbAddPaperBtn" type="button">+ 新试卷</button>
-<button id="qbSavePaperBtn" type="button">保存试卷</button>
-<button class="primary" id="qbBuildPaperBtn" type="button">按配额组卷</button>
-<button class="accent" id="qbPublishPaperBtn" type="button">发布试卷</button>
-<button class="danger" id="qbDeletePaperBtn" type="button">删除试卷</button>
-</div>
-</div>
-<div class="qb-paper-layout">
-<aside class="qb-paper-list-panel">
-<div class="qb-mini-head">
-<h3>试卷列表</h3>
-<button id="qbExportPaperBtn" type="button">导出试卷</button>
-</div>
-<div class="qb-list paper-list" id="qbPaperList"></div>
-</aside>
-<section class="qb-paper-editor-panel">
-<div class="qb-grid three">
-<label class="qb-field">
-<span>试卷名称</span>
-<input id="paperNameInput" placeholder="例如：PMP 综合模拟卷 01"/>
-</label>
-<label class="qb-field">
-<span>科目</span>
-<select id="paperSubjectInput"></select>
-</label>
-<label class="qb-field">
-<span>目标题量</span>
-<input id="paperTotalInput" max="300" min="1" type="number" value="180"/>
-</label>
-<label class="qb-field wide">
-<span>发布说明 / 适用范围</span>
-<textarea id="paperDescriptionInput" placeholder="说明这套卷覆盖哪些知识领域、适合什么阶段训练。" rows="2"></textarea>
-</label>
-</div>
-<div class="qb-paper-meta" id="qbPaperMeta"></div>
-<div class="qb-mini-section">
-<div class="qb-mini-head">
-<h3>领域配额</h3>
-<div class="qb-inline-actions">
-<button id="qbAutoQuotaBtn" type="button">按目标题量自动分配</button>
-<button id="qbClearQuotaBtn" type="button">清空配额</button>
-</div>
-</div>
-<div class="qb-quota-list" id="qbPaperQuotaList"></div>
-</div>
-<div class="qb-mini-section">
-<div class="qb-mini-head">
-<h3>试卷题目预览</h3>
-<span id="qbPaperQuestionCount">0 题</span>
-</div>
-<div class="qb-paper-question-list" id="qbPaperQuestionList"></div>
-</div>
+<section class="qb-workspace-panel qb-base-panel" data-main-tab-panel="base" hidden="" id="qbQuestionBaseCard">
+<section class="tq-quick-entry" id="tqQuickEntry" aria-label="快捷录入题目">
+  <div class="tq-entry-toolbar">
+    <div class="tq-entry-tabs" role="tablist" aria-label="题目录入方式">
+      <button type="button" class="active" data-tq-entry-mode="paste" role="tab" aria-selected="true">快捷粘贴</button>
+      <button type="button" data-tq-entry-mode="manual" role="tab" aria-selected="false">手动填写</button>
+    </div>
+    <div class="tq-paste-toolbar-controls" aria-label="快捷粘贴工具">
+      <div class="tq-template-actions" aria-label="录题模板工具">
+        <span class="tq-toolbar-label">模板</span>
+        <select id="tqTemplateSelect" aria-label="选择录题模板">
+          <option value="bilingual">标准双语单题模板</option>
+          <option value="example">双语单题示例</option>
+          <option value="batch">双语批量录题模板</option>
+          <option value="chinese">仅中文模板</option>
+        </select>
+        <button type="button" id="tqDownloadTemplateBtn" title="下载当前模板">下载</button>
+        <button type="button" id="tqCopyTemplateBtn" title="复制当前模板">复制</button>
+        <button type="button" id="tqShowTemplateExampleBtn">查看示例</button>
+      </div>
+      <div class="tq-paste-mode" role="group" aria-label="粘贴数量">
+        <button type="button" class="active" data-tq-paste-mode="single" aria-pressed="true">单题粘贴</button>
+        <button type="button" data-tq-paste-mode="batch" aria-pressed="false">批量粘贴多题</button>
+        <span id="tqPasteModeHint">适合逐题校对并立即进入结构化编辑。</span>
+      </div>
+    </div>
+  </div>
+  <div class="tq-paste-panel" id="tqPastePanel">
+    <details class="tq-template-example" id="tqTemplateExample" hidden>
+      <summary>双语模板填写示例</summary>
+      <pre id="tqTemplateExampleText"></pre>
+    </details>
+    <div class="tq-paste-grid">
+      <label class="qb-field tq-paste-source"><span id="tqPasteLabel">粘贴完整单选题</span><textarea id="tqPasteInput" rows="13" placeholder="推荐粘贴标准双语模板：
+
+【科目】PMP
+【知识点】PMP/敏捷方法
+【标签】阶段测试、核心题
+
+【题干-中文】……
+【题干-English】……
+【A-中文】……
+【A-English】……
+【答案】B
+【解析-中文】……
+【解析-English】……
+【关键词】关键相关方 | key stakeholder"></textarea><small id="tqPasteHelp">支持标准双语模板、仅中文模板和原有 A/B/C/D 普通文本。解析前不会写入题库。</small></label>
+      <section class="tq-parse-preview" aria-live="polite">
+        <div class="tq-parse-head"><div><strong>解析预览</strong><span id="tqParseSummary">等待粘贴题目</span></div><button type="button" id="tqParseBtn">解析</button></div>
+        <div class="tq-parse-result" id="tqParseResult"><div class="tq-parse-empty">粘贴后点击“解析”，系统会识别题干、选项、答案和解析。</div></div>
+        <div class="tq-batch-options" id="tqBatchOptions" hidden>
+          <section class="tq-batch-defaults" aria-label="本批次默认分类">
+            <div class="tq-batch-defaults-head"><div><strong>本批次默认分类</strong><span>单题模板已填写的知识点或标签优先；未填写时继承这里的默认值。</span></div><div><button type="button" id="tqBatchDefaultsClearBtn">清除默认</button><button type="button" class="primary" id="tqBatchDefaultEditBtn">设置默认分类</button></div></div>
+            <div class="tq-batch-default-grid">
+              <div><span>科目</span><strong id="tqBatchDefaultSubject">当前题库</strong></div>
+              <div><span>默认知识点</span><strong id="tqBatchDefaultKnowledgeLabel">未设置（模板优先）</strong></div>
+              <div><span>默认标签</span><strong id="tqBatchDefaultTagsLabel">未设置（模板优先）</strong></div>
+            </div>
+          </section>
+          <div class="tq-batch-import-options">
+            <label><input id="tqImportValidOnly" type="checkbox" /><span>存在错误时，仅导入解析通过的题目</span></label>
+            <label><input id="tqSkipDuplicates" type="checkbox" checked /><span>跳过题干完全相同的重复题</span></label>
+          </div>
+        </div>
+        <div class="tq-parse-actions"><button type="button" id="tqClearPasteBtn">清空</button><button type="button" class="primary" id="tqApplyParsedBtn" disabled>确认并进入编辑</button></div>
+      </section>
+    </div>
+  </div>
 </section>
-</div>
-</section><section class="qb-workspace-panel qb-base-panel" data-main-tab-panel="base" hidden="" id="qbQuestionBaseCard">
 <div class="qb-card-title">
 <div>
 <h2>题目基础信息</h2>
@@ -219,10 +308,43 @@
 <button class="primary" id="qbSaveQuestionBtn" type="button">保存题目</button>
 </div>
 </div>
+<section class="qb-classification-bar" id="qbClassificationBar" aria-label="题目分类信息">
+  <div class="qb-classification-heading">
+    <div><strong>分类信息</strong><span>科目由当前题库决定；主要知识点单选，普通标签可多选。</span></div>
+    <button type="button" id="qbClassificationCollapseBtn" aria-expanded="true" aria-controls="qbClassificationFields">收起</button>
+  </div>
+  <div class="qb-classification-fields" id="qbClassificationFields">
+    <label class="qb-classification-field subject">
+      <span>所属科目</span>
+      <select id="questionSubjectInput" disabled aria-label="所属科目"></select>
+      <small>随当前题库，不单独改变题库科目。</small>
+    </label>
+    <div class="qb-classification-field knowledge">
+      <span>主要知识点</span>
+      <button type="button" class="qb-classification-value" id="qbKnowledgePickerBtn"><span id="qbKnowledgePathLabel">待分类</span><b>选择</b></button>
+      <div class="qb-classification-subline"><span id="qbKnowledgeStatus" class="qb-classification-status unmapped">待分类</span><button type="button" id="qbSetUnclassifiedBtn">设为待分类</button></div>
+    </div>
+    <div class="qb-classification-field tags">
+      <span>普通标签</span>
+      <button type="button" class="qb-classification-value" id="qbTagPickerBtn"><span id="qbTagSummary">未选择标签</span><b>选择</b></button>
+      <div class="qb-selected-chips" id="qbSelectedTagChips" aria-live="polite"></div>
+    </div>
+  </div>
+</section>
+<div class="tq-question-meta" aria-live="polite">
+  <span>教师题号 <strong id="questionTeacherNumber">保存后自动生成</strong></span>
+  <span>语言状态 <strong id="questionTranslationStatus">仅中文</strong></span>
+  <small>内部稳定 ID 由系统维护，修改题目或加入课程时不会改变。</small>
+</div>
+<div class="tq-editor-language-tabs" role="tablist" aria-label="题目语言校对方式">
+  <button type="button" class="active" data-tq-editor-language="zh" aria-pressed="true">中文</button>
+  <button type="button" data-tq-editor-language="en" aria-pressed="false">English</button>
+  <button type="button" data-tq-editor-language="bilingual" aria-pressed="false">中英对照</button>
+</div>
 <div class="qb-grid three">
 <label class="qb-field">
-<span>题目标题</span>
-<input id="questionTitleInput" placeholder="例如：敏捷迭代中期的新需求"/>
+<span>题目标题（可选）</span>
+<input id="questionTitleInput" placeholder="系统会根据题干自动生成，也可手动修改"/>
 </label>
 <label class="qb-field">
 <span>题型</span>
@@ -233,6 +355,9 @@
 <option value="case_analysis">案例分析题</option>
 </select>
 </label>
+<details class="tq-more-info wide">
+<summary>更多信息（可选）</summary>
+<div class="qb-grid four tq-more-info-grid">
 <label class="qb-field">
 <span>难度</span>
 <select id="questionDifficultyInput">
@@ -249,31 +374,45 @@
 <input id="questionDomainInput" placeholder="例如：敏捷、治理、产品管理"/>
 </label>
 <label class="qb-field">
-<span>章节 / 主题</span>
-<input id="questionTopicInput" placeholder="例如：变更管理、干系人、商业论证"/>
+<span>题目简称 / 主题</span>
+<input id="questionTopicInput" placeholder="可用于后台搜索，不决定课程位置"/>
 </label>
-<label class="qb-field">
-<span>标签</span>
-<input id="questionTagsInput" placeholder="用逗号分隔：敏捷,优先级,PO"/>
+<label class="qb-field qb-legacy-tags-field" hidden>
+<span>标签（由顶部分类信息维护）</span>
+<input id="questionTagsInput" type="hidden"/>
 </label>
-<label class="qb-field wide">
-<span>题干</span>
-<textarea id="questionStemInput" placeholder="输入完整题干。选中文本后可一键标记为关键词。" rows="5"></textarea>
+</div>
+</details>
+<label class="qb-field wide tq-zh-content">
+<span>中文题干</span>
+<textarea id="questionStemInput" placeholder="输入完整中文题干。选中文本后可一键标记为关键词。" rows="5"></textarea>
 </label>
-<label class="qb-field wide">
-<span>解析 / 复盘说明</span>
+<label class="qb-field wide tq-zh-content">
+<span>中文解析 / 复盘说明</span>
 <textarea id="questionAnalysisInput" placeholder="解释为什么正确答案成立，以及错误选项错在哪里。" rows="3"></textarea>
 </label>
 </div>
-<div class="qb-mini-section">
+<div class="qb-mini-section tq-zh-content">
 <div class="qb-mini-head">
-<h3>选项</h3>
+<h3>中文选项</h3>
 <button id="qbAddOptionBtn" type="button">+ 选项</button>
 </div>
 <div class="qb-options" id="qbOptionsEditor"></div>
 </div>
+<section class="tq-en-content" aria-label="English question content">
+  <div class="qb-grid two">
+    <label class="qb-field wide"><span>English title (optional)</span><input id="questionTitleEnInput" placeholder="Optional English title"/></label>
+    <label class="qb-field wide"><span>English question stem</span><textarea id="questionStemEnInput" rows="5" placeholder="Enter the English question stem"></textarea></label>
+    <label class="qb-field wide"><span>English explanation</span><textarea id="questionAnalysisEnInput" rows="3" placeholder="Enter the English explanation"></textarea></label>
+  </div>
+  <div class="qb-mini-section">
+    <div class="qb-mini-head"><h3>English options</h3><span>Correct answer uses the same A–D selection as the Chinese options.</span></div>
+    <div class="qb-options tq-options-en" id="qbOptionsEditorEn"></div>
+  </div>
+</section>
 </section></section>
 
+<div class="tq-training-workspace-splitter" id="tqTrainingWorkspaceSplitter" role="separator" tabindex="0" aria-orientation="vertical" aria-label="拖动调整题目区域与训练配置区域宽度" aria-valuemin="28" aria-valuemax="68" aria-valuenow="40"><span></span></div>
 
 <section class="qb-card qb-annotation-card" id="qbAnnotationCard">
 <div class="qb-card-title">
@@ -282,12 +421,50 @@
 <p>关键词、知识点和推理逻辑改为标签栏，录入时不需要在长页面中上下寻找。</p>
 </div>
 <div aria-label="认知标注类型" class="qb-annotation-tabs" role="tablist">
-<button aria-controls="qbClueAnnotationPanel" aria-selected="true" class="active" data-annotation-tab="clues" role="tab" type="button">关键词标记</button>
-<button aria-controls="qbConceptAnnotationPanel" aria-selected="false" data-annotation-tab="concepts" role="tab" type="button">知识点绑定</button>
-<button aria-controls="qbReasoningAnnotationPanel" aria-selected="false" data-annotation-tab="reasoning" role="tab" type="button">推理逻辑</button>
+<button aria-controls="qbRecallAnnotationPanel" aria-selected="true" class="active" data-annotation-tab="recall" role="tab" type="button">快速回忆配置</button>
+<button aria-controls="qbClueAnnotationPanel" aria-selected="false" data-annotation-tab="clues" role="tab" type="button">高级关键词</button>
+<button aria-controls="qbConceptAnnotationPanel" aria-selected="false" data-annotation-tab="concepts" role="tab" type="button">训练知识概念</button>
+<button aria-controls="qbReasoningAnnotationPanel" aria-selected="false" data-annotation-tab="reasoning" role="tab" type="button">高级推理</button>
 </div>
 </div>
-<section class="qb-annotation-panel active" data-annotation-panel="clues" id="qbClueAnnotationPanel" role="tabpanel">
+<section class="qb-annotation-panel active qb-recall-config-panel" data-annotation-panel="recall" id="qbRecallAnnotationPanel" role="tabpanel">
+<div class="qb-panel-head">
+<div>
+<h3>快速回忆配置</h3>
+<p>教师只需输入关键词与知识联想入口，系统自动在题干和选项中定位；不需要使用 <code>[[关键词]]</code>。</p>
+</div>
+<div class="qb-inline-actions">
+<button class="primary" id="qbSyncRecallConfigBtn" type="button">同步关键词与入口</button>
+<button class="accent" id="qbRecallPreviewBtn" type="button">预览完整版深度回忆</button>
+</div>
+</div>
+<div class="qb-recall-quick-grid">
+<label class="qb-field wide">
+<span>可点击关键词</span>
+<textarea id="qbRecallKeywordsInput" rows="5" placeholder="一行一个或用逗号分隔，例如：
+关键干系人
+项目章程
+开工大会"></textarea>
+<small>系统会在题干和 A/B/C/D 选项中自动查找并高亮。未找到的词会在下方提示，不会写入错误位置。</small>
+</label>
+<label class="qb-field wide">
+<span>关键词 → 知识联想入口</span>
+<textarea id="qbRecallBindingsInput" rows="5" placeholder="关键干系人 -> 关键干系人
+项目章程 -> 项目章程"></textarea>
+<small>每行格式：关键词 -&gt; 联想入口。箭头后填写知识点名称或联想库节点 ID；留空时使用关键词本身。</small>
+</label>
+</div>
+<p class="qb-recall-status-help">下方卡片用于检查关键词命中位置、当前联想入口和联想库状态；点击“编辑入口”可直接修改。</p>
+<div class="qb-recall-status" id="qbRecallConfigStatus"></div>
+<div class="qb-recall-library-relocated" id="qbRecallLibraryRelocatedNotice">
+  <div>
+    <strong>科目级知识联想库已移至知识树页面</strong>
+    <span>当前区域只维护本题的可点击关键词与知识联想入口；共享知识网络请在知识树页面集中管理。</span>
+  </div>
+  <a href="admin-subjects.html" target="_blank" rel="noopener">打开知识树管理</a>
+</div>
+</section>
+<section class="qb-annotation-panel" data-annotation-panel="clues" hidden="" id="qbClueAnnotationPanel" role="tabpanel">
 <div class="qb-panel-head">
 <div>
 <h3>关键词标记</h3>
@@ -353,8 +530,8 @@
 <section class="qb-annotation-panel" data-annotation-panel="concepts" hidden="" id="qbConceptAnnotationPanel" role="tabpanel">
 <div class="qb-panel-head">
 <div>
-<h3>知识点绑定</h3>
-<p>知识点会支撑题目图谱、错题归因、后续智能推荐和知识图谱关联。</p>
+<h3>训练知识关联（高级）</h3>
+<p>这里维护训练和回忆所需的概念网络，不等同于顶部“主要知识点”分类。</p>
 </div>
 <div class="qb-inline-actions">
 <button class="ghost" hidden="" id="qbCancelConceptEditBtn" type="button">取消编辑</button>
@@ -494,6 +671,162 @@
 </div>
 <div aria-live="polite" class="qb-toast" id="qbToast" role="status"></div>
 </div>
+</section>
+
+<aside class="qb-library-question-preview-popover" id="qbLibraryQuestionPreviewPopover" role="dialog" aria-modal="false" aria-labelledby="qbLibraryQuestionPreviewTitle" hidden>
+  <span class="qb-library-question-preview-arrow" aria-hidden="true"></span>
+  <div class="qb-library-question-preview-shell">
+    <header class="qb-library-question-preview-head">
+      <div>
+        <p>QUESTION PREVIEW</p>
+        <h2 id="qbLibraryQuestionPreviewTitle">题目预览</h2>
+        <div class="qb-library-question-preview-meta" id="qbLibraryQuestionPreviewMeta"></div>
+      </div>
+      <div class="qb-library-question-preview-actions">
+        <button type="button" id="qbLibraryQuestionPreviewEditBtn" title="编辑题目" aria-label="编辑题目">✎</button>
+        <button type="button" id="qbLibraryQuestionPreviewCloseBtn" title="关闭预览" aria-label="关闭预览">×</button>
+      </div>
+    </header>
+    <div class="qb-library-question-preview-content" id="qbLibraryQuestionPreviewContent"></div>
+  </div>
+</aside>
+
+<dialog class="tq-batch-classification-dialog" id="tqBatchClassificationDialog">
+  <form method="dialog">
+    <header class="tq-batch-classification-head">
+      <div><p>BATCH CLASSIFICATION</p><h2 id="tqBatchClassificationTitle">本批次默认分类</h2><span id="tqBatchClassificationContext">未填写单题分类字段时自动继承。</span></div>
+      <button value="cancel" aria-label="关闭">×</button>
+    </header>
+    <div class="tq-batch-classification-context"><span>所属科目</span><strong id="tqBatchClassificationSubject">当前题库</strong></div>
+    <div class="tq-batch-class-tabs" role="tablist" aria-label="批量分类编辑">
+      <button type="button" class="active" data-tq-batch-class-tab="knowledge" role="tab" aria-selected="true">主要知识点</button>
+      <button type="button" data-tq-batch-class-tab="tags" role="tab" aria-selected="false">普通标签</button>
+    </div>
+    <section class="tq-batch-class-pane" id="tqBatchKnowledgePane">
+      <label class="tq-batch-search"><span>搜索知识点</span><input id="tqBatchKnowledgeSearch" placeholder="输入名称、编号、别名或完整路径" autocomplete="off"/></label>
+      <div class="tq-batch-search-results" id="tqBatchKnowledgeSearchResults" hidden></div>
+      <div class="tq-batch-knowledge-columns" id="tqBatchKnowledgeColumns" aria-label="批量知识点层级选择"></div>
+      <div class="tq-batch-current-selection"><span>当前选择</span><strong id="tqBatchKnowledgeSelection">待分类</strong><button type="button" id="tqBatchKnowledgeUnmappedBtn">设为待分类</button></div>
+    </section>
+    <section class="tq-batch-class-pane" id="tqBatchTagsPane" hidden>
+      <div class="tq-batch-tag-columns">
+        <div class="tq-batch-tag-column"><strong>标签分类</strong><div id="tqBatchTagGroupList"></div></div>
+        <div class="tq-batch-tag-column"><strong>二级分类</strong><div id="tqBatchTagCategoryList"></div></div>
+        <div class="tq-batch-tag-column options"><strong>可选标签</strong><div id="tqBatchTagOptionList"></div></div>
+      </div>
+      <label class="tq-batch-custom-tag"><span>自定义标签</span><input id="tqBatchCustomTagInput" placeholder="输入后按回车添加" autocomplete="off"/></label>
+      <div class="tq-batch-tag-chips" id="tqBatchTagChips"><small>未选择默认标签</small></div>
+    </section>
+    <footer><button type="button" id="tqBatchClassificationResetBtn">清除本批默认</button><span></span><button value="cancel">取消</button><button type="button" class="primary" id="tqBatchClassificationApplyBtn">应用</button></footer>
+  </form>
+</dialog>
+
+<dialog class="qb-classification-dialog qb-knowledge-picker-dialog" id="qbKnowledgePickerDialog">
+  <form method="dialog">
+    <header class="qb-dialog-head">
+      <div><p>KNOWLEDGE PICKER</p><h2>选择主要知识点</h2><span>按层级逐列展开，主要知识点只能选择一个。</span></div>
+      <button value="cancel" aria-label="关闭">×</button>
+    </header>
+    <div class="qb-dialog-context">
+      <label><span>科目</span><strong id="qbKnowledgeSubjectLabel">—</strong></label>
+      <label><span>当前知识树</span><strong id="qbKnowledgeTaxonomyLabel">—</strong></label>
+    </div>
+    <label class="qb-picker-search"><span>搜索知识点</span><input id="qbKnowledgeSearchInput" placeholder="输入名称、编号、别名或完整路径" autocomplete="off"/></label>
+    <div class="qb-knowledge-breadcrumb" id="qbKnowledgeBreadcrumb"></div>
+    <div class="qb-knowledge-columns" id="qbKnowledgeColumns" aria-label="知识点层级选择"></div>
+    <div class="qb-knowledge-search-results" id="qbKnowledgeSearchResults" hidden></div>
+    <div class="qb-dialog-selection"><span>当前选择</span><strong id="qbKnowledgeDraftSelection">尚未选择知识点</strong><small id="qbKnowledgeSelectionHint">可以选择有下级节点的知识点，但建议尽量选择最具体的节点。</small></div>
+    <footer><button type="button" id="qbKnowledgeUnmappedBtn">设为待分类</button><span></span><button value="cancel">取消</button><button type="button" class="primary" id="qbKnowledgeConfirmBtn">确认选择</button></footer>
+  </form>
+</dialog>
+<dialog class="qb-classification-dialog qb-tag-picker-dialog" id="qbTagPickerDialog">
+  <form method="dialog">
+    <header class="qb-dialog-head">
+      <div><p>TAG PICKER</p><h2>选择普通标签</h2><span>标签可多选，并与主要知识点保持独立。</span></div>
+      <button value="cancel" aria-label="关闭">×</button>
+    </header>
+    <div class="qb-tag-columns" aria-label="标签层级选择">
+      <div class="qb-tag-column"><strong>标签分类</strong><div id="qbTagGroupList"></div></div>
+      <div class="qb-tag-column"><strong>二级分类</strong><div id="qbTagCategoryList"></div></div>
+      <div class="qb-tag-column options"><strong>可选标签</strong><div id="qbTagOptionList"></div></div>
+    </div>
+    <label class="qb-custom-tag"><span>自定义标签</span><input id="qbCustomTagInput" placeholder="输入后按回车添加" autocomplete="off"/></label>
+    <div class="qb-dialog-selection"><span>已选择</span><div class="qb-selected-chips" id="qbTagDraftChips"></div></div>
+    <footer><div class="qb-tag-footer-tools"><button type="button" id="qbTagClearBtn">清空标签</button><button type="button" class="qb-text-button" id="qbTagManageBtn">管理标签</button></div><span></span><button value="cancel">取消</button><button type="button" class="primary" id="qbTagConfirmBtn">应用标签</button></footer>
+  </form>
+</dialog>
+<dialog class="qb-classification-dialog qb-tag-manager-dialog" id="qbTagManagerDialog">
+  <form method="dialog">
+    <header class="qb-dialog-head">
+      <div><p>TAG MANAGEMENT</p><h2>管理标签</h2><span>双击标签分类、二级分类或标签名称即可修改；Enter 或点击其他位置保存，Esc 取消。</span></div>
+      <button value="cancel" aria-label="关闭">×</button>
+    </header>
+    <div class="qb-tag-manager-list" id="qbTagManagerList"></div>
+    <div class="qb-tag-manager-message" id="qbTagManagerMessage" aria-live="polite"></div>
+    <footer><span></span><button value="cancel">关闭</button></footer>
+  </form>
+</dialog>
+
+<dialog class="qb-classification-dialog qb-bulk-knowledge-dialog" id="qbBulkKnowledgeDialog">
+  <form method="dialog">
+    <header class="qb-dialog-head">
+      <div><p>BULK KNOWLEDGE MOVE</p><h2>批量修改主要知识点</h2><span id="qbBulkKnowledgeContext">仅修改分类，不复制题目，也不改变题目 ID。</span></div>
+      <button value="cancel" aria-label="关闭">×</button>
+    </header>
+    <div class="qb-dialog-context">
+      <label><span>科目</span><strong id="qbBulkKnowledgeSubjectLabel">—</strong></label>
+      <label><span>当前知识树</span><strong id="qbBulkKnowledgeTaxonomyLabel">—</strong></label>
+    </div>
+    <label class="qb-picker-search"><span>搜索知识点</span><input id="qbBulkKnowledgeSearchInput" placeholder="输入名称、编号、别名或完整路径" autocomplete="off"/></label>
+    <div class="qb-knowledge-breadcrumb" id="qbBulkKnowledgeBreadcrumb"></div>
+    <div class="qb-knowledge-columns" id="qbBulkKnowledgeColumns" aria-label="批量知识点层级选择"></div>
+    <div class="qb-knowledge-search-results" id="qbBulkKnowledgeSearchResults" hidden></div>
+    <div class="qb-dialog-selection"><span>移动到</span><strong id="qbBulkKnowledgeDraftSelection">尚未选择知识点</strong><small>只能选择当前科目、当前知识树中未停用的知识点。</small></div>
+    <footer><button type="button" id="qbBulkKnowledgeUnmappedBtn">移入待分类</button><span></span><button value="cancel">取消</button><button type="button" class="primary" id="qbBulkKnowledgeConfirmBtn">确认移动</button></footer>
+  </form>
+</dialog>
+
+<dialog class="qb-classification-dialog qb-bulk-tag-dialog" id="qbBulkTagDialog">
+  <form method="dialog">
+    <header class="qb-dialog-head">
+      <div><p>BULK TAGS</p><h2>批量设置普通标签</h2><span>选择增加或移除；主要知识点不会改变。</span></div>
+      <button value="cancel" aria-label="关闭">×</button>
+    </header>
+    <div class="qb-bulk-tag-mode" role="radiogroup" aria-label="标签操作方式">
+      <label><input type="radio" name="qbBulkTagMode" value="add" checked/>增加标签</label>
+      <label><input type="radio" name="qbBulkTagMode" value="remove"/>移除标签</label>
+    </div>
+    <div class="qb-bulk-tag-options" id="qbBulkTagOptions"></div>
+    <label class="qb-custom-tag"><span>自定义标签</span><input id="qbBulkCustomTagInput" placeholder="输入后按回车加入本次操作" autocomplete="off"/></label>
+    <div class="qb-dialog-selection"><span>本次选择</span><div class="qb-selected-chips" id="qbBulkTagDraftChips"></div></div>
+    <footer><button type="button" id="qbBulkTagClearBtn">清空选择</button><span></span><button value="cancel">取消</button><button type="button" class="primary" id="qbBulkTagConfirmBtn">应用标签</button></footer>
+  </form>
+</dialog>
+
+<dialog class="qb-classification-dialog qb-delete-dialog" id="qbSafeDeleteDialog">
+  <form method="dialog">
+    <header class="qb-dialog-head">
+      <div><p>SAFE DELETE</p><h2 id="qbSafeDeleteTitle">删除题目</h2><span>题目数据和原题 ID 会保留，之后可以恢复。</span></div>
+      <button value="cancel" aria-label="关闭">×</button>
+    </header>
+    <div class="qb-delete-summary" id="qbSafeDeleteSummary"></div>
+    <p class="qb-delete-note">删除后，题目将从正常题库、新组卷、新课程选题和默认筛选中隐藏。已有试卷、课程、答题记录、成绩和统计不会受到影响。</p>
+    <footer><span></span><button value="cancel">取消</button><button type="button" class="danger" id="qbSafeDeleteConfirmBtn">确认删除</button></footer>
+  </form>
+</dialog>
+
+<dialog class="qb-classification-dialog qb-delete-dialog" id="qbPermanentDeleteDialog">
+  <form method="dialog">
+    <header class="qb-dialog-head">
+      <div><p>PERMANENT DELETE</p><h2>永久删除题目</h2><span>仅无任何业务引用的已删除题目可以永久删除。</span></div>
+      <button value="cancel" aria-label="关闭">×</button>
+    </header>
+    <div class="qb-delete-summary" id="qbPermanentDeleteSummary"></div>
+    <label class="qb-permanent-confirm"><input id="qbPermanentDeleteAcknowledge" type="checkbox"/><span>我已了解永久删除不可恢复，并确认只删除检查通过的题目。</span></label>
+    <footer><span></span><button value="cancel">取消</button><button type="button" class="danger" id="qbPermanentDeleteConfirmBtn" disabled>永久删除</button></footer>
+  </form>
+</dialog>
+
 <script defer src="src/01-runtime-config.js"></script>
   <script defer src="src/28-app-storage.js"></script>
 <script defer src="src/29-auth-core.js"></script>
@@ -505,7 +838,15 @@
 <script defer src="src/33-user-center.js"></script>
 <script defer src="src/39-global-shortcuts.js"></script>
 <script defer src="src/50-question-data.js"></script>
+<script defer src="src/91-learning-content-core.js"></script>
+<script defer src="src/95-recall-association-library.js"></script>
+<script defer src="question-studio/question-studio-parser.js"></script>
+<script defer src="src/98-teacher-workflow-p2-services.js"></script>
 <script defer src="src/65-question-bank-admin.js"></script>
 <script defer src="./direct-question-adapter.js"></script><!-- kg-question:generated -->
+<script defer src="src/98-question-classification.js"></script>
+<script defer src="src/97-teacher-question-workflow.js"></script>
+<script src="src/admin/48-admin-context-nav.js"></script>
+<script src="src/99-workspace-placement.js"></script>
 </body>
 </html>

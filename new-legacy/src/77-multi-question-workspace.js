@@ -21,7 +21,7 @@
   const ANALYSIS_SECTION_LABELS=Object.freeze({analysis:'题目解析',answer:'正确答案',path:'判断主线',concepts:'知识点',clues:'关键词',traps:'选项提示'});
   const ANALYSIS_SECTION_DEFAULTS=['analysis','answer','path'];
   const MAX_ANALYSIS_PANELS=2;
-  const CARD_COLORS=['#ede9fe','#dbeafe','#dcfce7','#fef3c7','#fee2e2','#fce7f3','#e0f2fe'];
+  const CARD_COLORS=['#ffffff','#ede9fe','#dbeafe','#dcfce7','#fef3c7','#fee2e2','#fce7f3','#e0f2fe'];
   const FULL_CARD_MIN_HEIGHT=300;
   const FULL_CARD_MAX_HEIGHT=12000;
   const COMPACT_CARD_HEIGHT=240;
@@ -76,6 +76,10 @@
     edgeElements:new Map(),
     edgeAdjacency:new Map(),
     activeEdgeId:'',
+    selectedEdgeIds:new Set(),
+    edgeBoxSelection:null,
+    edgeConnectDrag:null,
+    edgeDraftPath:null,
     edgeQuickMenu:null,
     edgeInlineEditor:null,
     edgeMenuAnchorWorld:null,
@@ -84,6 +88,7 @@
     viewportMotionTimer:null,
     minimapDirty:true,
     minimapModel:null,
+    minimapDrag:null,
     inlineEdit:null,
     questions:[],
     papers:[],
@@ -93,6 +98,7 @@
     questionLoadError:'',
     selection:null,
     selectedNodeIds:new Set(),
+    singleDeepPendingNodeId:'',
     highlightColor:'#fde68a',
     fontScale:'large',
     pointerMode:'edit',
@@ -125,6 +131,19 @@
   function notify(message){
     if(typeof showStatus==='function')showStatus(message);
     else console.info(message);
+  }
+  function languageMode(){return global.KGFreeModeLanguage?.mode?.()||'zh'}
+  function questionDisplayView(question={}){
+    return global.KGFreeModeLanguage?.questionView?.(question,languageMode())||{
+      mode:'zh',title:{zh:String(question.title||''),en:'',hasEnglish:false},
+      stem:{zh:questionStem(question,''),en:'',hasEnglish:false},
+      options:(Array.isArray(question.options)?question.options:[]).map((item,index)=>({id:String(item?.id||String.fromCharCode(65+index)),display:{zh:String(item?.text||''),en:'',hasEnglish:false},original:item})),
+      explanation:{zh:String(question.analysis||question.explanation||''),en:'',hasEnglish:false},
+      path:{zh:String(question.keyPath?.ruleText||question.keyPath?.label||''),en:'',hasEnglish:false},hasEnglish:false
+    };
+  }
+  function englishLine(display,className='qw-bilingual-en'){
+    return languageMode()==='bilingual'&&display?.hasEnglish?'<span class="'+escapeHTML(className)+'">'+escapeHTML(display.en)+'</span>':'';
   }
   function isMobile(){
     return global.KGCanvasViewportController?.isCoarseSmallScreen?.(1100)??false;
@@ -175,6 +194,7 @@
       persistDelay:380,
       onViewportApply(next){
         state.panX=next.x;
+        if(state.initialized&&state.workspaceId&&!state.mobile)global.KGMultiQuestionWorkspaceFilebar?.markDirty?.();
         state.panY=next.y;
         state.zoom=next.zoom;
         updateZoomLabel();
@@ -184,12 +204,17 @@
       onViewportPersist(next){
         if(state.mobile||!state.workspaceId)return;
         state.suppressStoreEvent=true;
+        global.KGMultiQuestionWorkspaceFilebar?.markSaving?.();
         try{
-          store()?.updateViewport?.({
+          const saved=store()?.updateViewport?.({
             x:next.x,
             y:next.y,
             zoom:next.zoom
           },workspaceOptions());
+          if(saved){state.workspace=saved;global.KGMultiQuestionWorkspaceFilebar?.markSaved?.()}
+          else global.KGMultiQuestionWorkspaceFilebar?.markError?.('视图保存失败');
+        }catch(error){
+          global.KGMultiQuestionWorkspaceFilebar?.markError?.(error);
         }finally{
           state.suppressStoreEvent=false;
         }
@@ -198,6 +223,7 @@
         if(!record?.node||state.readonly)return;
         let result=null;
         state.suppressStoreEvent=true;
+        global.KGMultiQuestionWorkspaceFilebar?.markSaving?.();
         try{
           result=store()?.updateNodeLayout?.(record.node.id,{
             x:record.node.x,
@@ -209,7 +235,8 @@
           state.suppressStoreEvent=false;
         }
         if(result?.node)syncRecordNode(record,result.node);
-        if(result?.workspace)state.workspace=result.workspace;
+        if(result?.workspace){state.workspace=result.workspace;global.KGMultiQuestionWorkspaceFilebar?.markSaved?.()}
+        else global.KGMultiQuestionWorkspaceFilebar?.markError?.('布局保存失败');
         updateEdgesForNodeIds([record.id]);
         state.minimapDirty=true;
         renderMinimap();
@@ -297,24 +324,9 @@
   function loadPublishedPapers(){
     let catalog=[];
     try{
-      if(typeof qbPublishedPaperCatalog==='function')catalog=qbPublishedPaperCatalog({respectRole:true})||[];
-      else{
-        const papers=typeof qbPublishedPapers==='function'?qbPublishedPapers():(typeof qbLoadPapers==='function'?qbLoadPapers().filter(paper=>paper?.status==='published'):[]);
-        const banks=loadBanks();
-        const bankMap=new Map(banks.map(bank=>[String(bank.id||bank.bankId||''),bank]));
-        const roleApi=global.KGRolePermissions;
-        catalog=(papers||[]).map(paper=>{
-          let missingCount=0,blockedCount=0;
-          const items=(paper.questions||[]).map((ref,paperIndex)=>{
-            const bank=bankMap.get(String(ref.bankId||''));
-            const question=bank?.questions?.find(item=>String(item.id)===String(ref.questionId));
-            if(!bank||!question){missingCount+=1;return null}
-            if(roleApi&&typeof roleApi.canOperateQuestion==='function'&&!roleApi.canOperateQuestion(question,bank.id)){blockedCount+=1;return null}
-            return {paper,paperIndex,index:paperIndex,bank,question,ref};
-          }).filter(Boolean);
-          return {paper,items,configuredCount:(paper.questions||[]).length,targetCount:Number(paper.totalCount||paper.questions?.length||0),availableCount:items.length,missingCount,blockedCount};
-        });
-      }
+      const repository=global.KGPublishedPaperRepository;
+      if(repository)catalog=repository.listPublishedPapers({respectRole:true,mode:'multi_question_canvas'})||[];
+      else if(typeof qbPublishedPaperCatalog==='function')catalog=qbPublishedPaperCatalog({respectRole:true,mode:'multi_question_canvas'})||[];
     }catch(error){
       state.questionLoadError=String(error?.message||error||'发布试卷读取失败');
       console.error('多题画布发布试卷读取失败',error);
@@ -414,7 +426,7 @@
       return;
     }
     select.disabled=false;
-    select.innerHTML=state.paperCatalog.map(entry=>'<option value="'+escapeHTML(entry.paper.id)+'">'+escapeHTML(entry.paper.name)+'（已组 '+Number(entry.configuredCount||0)+'/'+Number(entry.targetCount||0)+' 题）</option>').join('');
+    select.innerHTML=state.paperCatalog.map(entry=>'<option value="'+escapeHTML(entry.paper.id)+'">'+escapeHTML(entry.paper.name)+' · v'+Number(entry.paper.version||0)+'（可用 '+Number(entry.availableCount||0)+'/'+Number(entry.configuredCount||0)+' 题）</option>').join('');
     select.value=state.paperId;
   }
   function buildQuestionList(){
@@ -442,7 +454,7 @@
         paper,
         paperIndex,
         bank:{...bank,id:String(bank.id||bank.bankId||''),name:String(bank.name||bank.bankName||'未命名题库')},
-        question:{...question,id:questionId,sourceBankId:String(bank.id||''),sourceQuestionId:questionId,sourcePaperId:String(paper.id||'')},
+        question:{...question,id:questionId,sourceBankId:String(bank.id||''),sourceQuestionId:questionId,sourcePaperId:String(paper.id||''),sourceReleaseId:String(paper.releaseId||question.sourceReleaseId||'')},
         index:(bank.questions||[]).indexOf(question)
       });
     });
@@ -498,9 +510,11 @@
     })||false;
   }
   function updateZoomLabel(){
-    const label=byId('qwZoomLabel');
-    if(label)label.textContent=Math.round(state.zoom*100)+'%';
+    const value=Math.round(state.zoom*100),label=byId('qwZoomLabel'),slider=byId('qwZoomSlider');
+    if(label)label.textContent=value+'%';
+    if(slider&&document.activeElement!==slider)slider.value=String(Math.max(1,Math.min(400,value)));
   }
+  function showZoomSlider(show=true){const dock=byId('qwCanvasZoomDock'),popover=byId('qwZoomSliderPopover');if(!dock||!popover)return;dock.classList.toggle('slider-open',!!show);popover.setAttribute('aria-hidden',show?'false':'true')}
   function viewportTarget(scale,clientX,clientY){
     return state.kernel?.viewport?.targetForScale?.(scale,clientX,clientY)||{
       x:state.panX,y:state.panY,zoom:state.zoom
@@ -635,21 +649,27 @@
       +'<h4>'+escapeHTML(title)+'</h4><div class="qw-analysis-section-body">'+body+'</div></section>';
   }
   function questionAnalysisMarkup(question={},node={}){
+    const view=questionDisplayView(question);
     const options=Array.isArray(question.options)?question.options:[];
     const answerId=correctAnswerId(question)||String(node.correctAnswer||'');
     const correct=options.find(item=>String(item?.id||'')===answerId)||options.find(item=>item?.correct)||null;
-    const explicit=String(question.analysis||question.explanation||question.rationale||question.solution||'').trim();
-    const pathText=String(question.keyPath?.ruleText||question.keyPath?.label||'').trim();
+    const displayCorrect=view.options.find(item=>String(item.id)===String(answerId))||null;
+    const explicit=String(view.explanation?.zh||question.analysis||question.explanation||question.rationale||question.solution||'').trim();
+    const pathText=String(view.path?.zh||question.keyPath?.ruleText||question.keyPath?.label||'').trim();
     const concepts=(Array.isArray(question.concepts)?question.concepts:[]).slice(0,6);
     const clues=(Array.isArray(question.clues)?question.clues:[]).filter(item=>String(item?.explain||'').trim()).slice(0,6);
     const traps=options.filter(item=>String(item?.trap||'').trim()).slice(0,8);
     const sections=[];
-    if(analysisSectionEnabled('analysis')&&explicit)sections.push(analysisSectionMarkup('analysis','题目解析','<p>'+escapeHTML(explicit)+'</p>'));
-    if(analysisSectionEnabled('answer')&&(answerId||correct))sections.push(analysisSectionMarkup('answer','正确答案','<p><strong>'+escapeHTML(answerId||correct?.id||'')+'</strong>'+(correct?.text?' · '+escapeHTML(correct.text):'')+'</p>','qw-analysis-answer'));
-    if(analysisSectionEnabled('path')&&pathText)sections.push(analysisSectionMarkup('path','判断主线','<p>'+escapeHTML(pathText)+'</p>'));
-    if(analysisSectionEnabled('concepts')&&concepts.length)sections.push(analysisSectionMarkup('concepts','知识点','<ul>'+concepts.map(item=>'<li><strong>'+escapeHTML(item.title||'知识点')+'</strong>'+(item.rule||item.summary?'：'+escapeHTML(item.rule||item.summary):'')+'</li>').join('')+'</ul>'));
-    if(analysisSectionEnabled('clues')&&clues.length)sections.push(analysisSectionMarkup('clues','关键词讲解','<ul>'+clues.map(item=>'<li><strong>'+escapeHTML(item.text||'线索')+'</strong>：'+escapeHTML(item.explain||'')+'</li>').join('')+'</ul>'));
-    if(analysisSectionEnabled('traps')&&traps.length)sections.push(analysisSectionMarkup('traps','选项提示','<ul>'+traps.map(item=>'<li><strong>'+escapeHTML(item.id||'')+'</strong>：'+escapeHTML(item.trap||'')+'</li>').join('')+'</ul>'));
+    if(analysisSectionEnabled('analysis')&&explicit)sections.push(analysisSectionMarkup('analysis','题目解析','<p>'+escapeHTML(explicit)+englishLine(view.explanation)+'</p>'));
+    if(analysisSectionEnabled('answer')&&(answerId||correct)){
+      const zhText=displayCorrect?.display?.zh||correct?.text||'';
+      const enText=displayCorrect?.display?.en||'';
+      sections.push(analysisSectionMarkup('answer','正确答案','<p><strong>'+escapeHTML(answerId||correct?.id||'')+'</strong>'+(zhText?' · '+escapeHTML(zhText):'')+(enText&&languageMode()==='bilingual'?'<span class="qw-bilingual-en">'+escapeHTML(enText)+'</span>':'')+'</p>','qw-analysis-answer'));
+    }
+    if(analysisSectionEnabled('path')&&pathText)sections.push(analysisSectionMarkup('path','判断主线','<p>'+escapeHTML(pathText)+englishLine(view.path)+'</p>'));
+    if(analysisSectionEnabled('concepts')&&concepts.length)sections.push(analysisSectionMarkup('concepts','知识点','<ul>'+concepts.map(item=>'<li><strong>'+escapeHTML(item.title||'知识点')+'</strong>'+(item.rule||item.summary?'：'+escapeHTML(item.rule||item.summary):'')+(languageMode()==='bilingual'&&String(item.titleEn||item.ruleEn||item.summaryEn||'').trim()?'<span class="qw-bilingual-en">'+escapeHTML([item.titleEn,item.ruleEn||item.summaryEn].filter(Boolean).join(': '))+'</span>':'')+'</li>').join('')+'</ul>'));
+    if(analysisSectionEnabled('clues')&&clues.length)sections.push(analysisSectionMarkup('clues','关键词讲解','<ul>'+clues.map(item=>'<li><strong>'+escapeHTML(item.text||'线索')+'</strong>：'+escapeHTML(item.explain||'')+(languageMode()==='bilingual'&&String(item.textEn||item.explainEn||'').trim()?'<span class="qw-bilingual-en">'+escapeHTML([item.textEn,item.explainEn].filter(Boolean).join(': '))+'</span>':'')+'</li>').join('')+'</ul>'));
+    if(analysisSectionEnabled('traps')&&traps.length)sections.push(analysisSectionMarkup('traps','选项提示','<ul>'+traps.map(item=>'<li><strong>'+escapeHTML(item.id||'')+'</strong>：'+escapeHTML(item.trap||'')+(languageMode()==='bilingual'&&String(item.trapEn||'').trim()?'<span class="qw-bilingual-en">'+escapeHTML(item.trapEn)+'</span>':'')+'</li>').join('')+'</ul>'));
     if(!sections.length)sections.push('<section class="qw-analysis-empty"><h4>暂无可展示内容</h4><p>可在“显示内容”中勾选其他项目；若仍为空，请先在题库中补充解析、知识点或选项提示。</p></section>');
     return sections.join('');
   }
@@ -677,8 +697,9 @@
   }
   function questionNodeMarkup(node){
     const question=resolvedQuestionForNode(node)||{};
-    const stem=questionStem(question,node.stemSummary||'打开题目查看完整题干。');
-    const options=Array.isArray(question.options)?question.options:[];
+    const view=questionDisplayView(question);
+    const stem=view.stem?.zh||questionStem(question,node.stemSummary||'打开题目查看完整题干。');
+    const options=Array.isArray(view.options)?view.options:[];
     const displayMode=node.displayMode==='compact'?'compact':'full';
     const activeAnswer=String(state.answerSelections.get(String(node.id))||'');
     const correctId=correctAnswerId(question)||String(node.correctAnswer||'');
@@ -687,12 +708,13 @@
       const region='option:'+key;
       const active=activeAnswer===key&&key===correctId;
       return '<li class="qw-card-option"><button type="button" class="qw-card-option-key'+(active?' is-correct-active':'')+'" data-qw-option-key="'+escapeHTML(key)+'" title="选择 '+escapeHTML(key)+'" aria-pressed="'+(active?'true':'false')+'">'+escapeHTML(key)+'</button>'
-        +'<span class="qw-highlight-region" data-highlight-region="'+escapeHTML(region)+'">'+highlightedMarkup(option?.text||'',node,region)+'</span></li>';
+        +'<span class="qw-highlight-region" data-highlight-region="'+escapeHTML(region)+'">'+highlightedMarkup(option?.display?.zh||'',node,region)+englishLine(option?.display)+'</span></li>';
     }).join('')+'</ol>':'<p class="qw-card-question-stem">当前题目没有可用选项。</p>');
     const analysisOpen=analysisPanelOpen(node.id);
+    const titleZh=view.title?.zh||node.title||'未命名题目';
     return '<header class="qw-card-header" data-card-drag-handle>'
       +'<div class="qw-card-heading"><span class="qw-card-icon">题</span><div>'
-      +'<small>QUESTION REFERENCE</small><h3>'+escapeHTML(node.title)+'</h3></div></div>'
+      +'<small>QUESTION REFERENCE</small><h3>'+escapeHTML(titleZh)+englishLine(view.title,'qw-card-title-en')+'</h3></div></div>'
       +'<div class="qw-card-header-actions">'
       +cardModeToggleMarkup(displayMode)+'</div>'
       +'</header>'
@@ -700,7 +722,7 @@
       +'<div class="qw-card-meta"><span>'+escapeHTML(node.topic||'未分类')+'</span>'
       +(node.difficulty?'<span>'+escapeHTML(node.difficulty)+'</span>':'')+'</div>'
       +'<div class="qw-card-content">'
-      +'<p class="qw-card-question-stem"><span class="qw-highlight-region" data-highlight-region="stem">'+highlightedMarkup(stem,node,'stem')+'</span></p>'
+      +'<p class="qw-card-question-stem"><span class="qw-highlight-region" data-highlight-region="stem">'+highlightedMarkup(stem,node,'stem')+englishLine(view.stem)+'</span></p>'
       +optionsMarkup+'</div>'
       +'<div class="qw-card-actions qw-card-learning-actions">'
       +cardIconButtonMarkup('analysis','显示或关闭本题解析',CARD_ACTION_ICONS.analysis,{active:analysisOpen,pressed:analysisOpen})
@@ -726,6 +748,160 @@
       +'<div class="qw-card-actions">'+cardIconButtonMarkup('remove','移除归纳卡',CARD_ACTION_ICONS.remove,{className:'danger'})+'</div>'
       +'</div>'+cardWidthResizeMarkup();
   }
+  function connectorHandlesMarkup(){
+    return '<button type="button" class="qw-card-connector is-top" data-qw-connector="top" aria-label="从上方连接点建立关系" title="拖动建立关系"></button>'
+      +'<button type="button" class="qw-card-connector is-right" data-qw-connector="right" aria-label="从右侧连接点建立关系" title="拖动建立关系"></button>'
+      +'<button type="button" class="qw-card-connector is-bottom" data-qw-connector="bottom" aria-label="从下方连接点建立关系" title="拖动建立关系"></button>'
+      +'<button type="button" class="qw-card-connector is-left" data-qw-connector="left" aria-label="从左侧连接点建立关系" title="拖动建立关系"></button>';
+  }
+  function connectorAnchor(record,side='right'){
+    const rect=liveCardLayout(record),cx=Number(rect.x)+Number(rect.width)/2,cy=Number(rect.y)+Number(rect.height)/2;
+    if(side==='top')return {x:cx,y:Number(rect.y)};
+    if(side==='bottom')return {x:cx,y:Number(rect.y)+Number(rect.height)};
+    if(side==='left')return {x:Number(rect.x),y:cy};
+    return {x:Number(rect.x)+Number(rect.width),y:cy};
+  }
+  function draftEdgePath(start,end,side='right'){
+    const dx=Math.max(54,Math.abs(Number(end.x)-Number(start.x))*.45),dy=Math.max(54,Math.abs(Number(end.y)-Number(start.y))*.45);
+    if(side==='top'||side==='bottom'){
+      const sign=side==='top'?-1:1;
+      return `M ${start.x} ${start.y} C ${start.x} ${start.y+sign*dy}, ${end.x} ${end.y-sign*dy*.35}, ${end.x} ${end.y}`;
+    }
+    const sign=side==='left'?-1:1;
+    return `M ${start.x} ${start.y} C ${start.x+sign*dx} ${start.y}, ${end.x-sign*dx*.35} ${end.y}, ${end.x} ${end.y}`;
+  }
+  function clearConnectorTarget(){
+    state.cards.forEach(record=>record.element?.classList.remove('is-edge-connect-target','is-edge-connect-source'));
+  }
+  function ensureDraftEdgePath(){
+    if(state.edgeDraftPath?.isConnected)return state.edgeDraftPath;
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('class','qw-edge-draft');
+    state.edgeRoot?.appendChild(path);
+    state.edgeDraftPath=path;
+    return path;
+  }
+  function createQuickEdge(sourceId,targetId){
+    sourceId=String(sourceId||'');targetId=String(targetId||'');
+    if(!canEdit()||!sourceId||!targetId||sourceId===targetId)return false;
+    const before=workspaceSnapshot();
+    state.suppressStoreEvent=true;
+    let result=null;
+    try{
+      result=store()?.addEdge?.({source:sourceId,target:targetId,type:'same',label:'',lineStyle:'solid',pathStyle:'curve'},workspaceOptions());
+    }finally{state.suppressStoreEvent=false}
+    if(!result?.created){
+      if(result?.reason==='already-exists')notify('这两张卡片已经存在同类关系线。');
+      return false;
+    }
+    state.workspace=result.workspace||workspaceSnapshot();
+    const after=workspaceSnapshot();
+    pushWorkspaceHistory('建立无文字关系',before,after);
+    renderEdges();
+    state.activeEdgeId=String(result.edge.id);
+    notify('已建立关系线。默认不显示文字；点击连线后可自行添加文字。');
+    return true;
+  }
+  function beginConnectorDrag(event){
+    if(event.button!==0||!canEdit()||state.mobile)return false;
+    const handle=event.target.closest?.('[data-qw-connector]'),card=handle?.closest?.('[data-node-id]');
+    const record=state.cards.get(String(card?.dataset.nodeId||''));
+    if(!handle||!record)return false;
+    event.preventDefault();event.stopPropagation();
+    setCardSelection([record.id],{reason:'connector-source'});
+    clearConnectorTarget();record.element.classList.add('is-edge-connect-source');
+    const side=String(handle.dataset.qwConnector||'right'),start=connectorAnchor(record,side),draft=ensureDraftEdgePath();
+    state.edgeConnectDrag={pointerId:event.pointerId,sourceId:String(record.id),side,start,targetId:''};
+    draft.setAttribute('d',draftEdgePath(start,start,side));draft.hidden=false;
+    try{handle.setPointerCapture?.(event.pointerId)}catch(e){}
+    return true;
+  }
+  function moveConnectorDrag(event){
+    const drag=state.edgeConnectDrag;if(!drag||drag.pointerId!==event.pointerId)return false;
+    const point=clientToWorld(event.clientX,event.clientY);
+    state.edgeDraftPath?.setAttribute('d',draftEdgePath(drag.start,point,drag.side));
+    const element=document.elementFromPoint(event.clientX,event.clientY);
+    const card=element?.closest?.('[data-node-id]');
+    const targetId=String(card?.dataset.nodeId||'');
+    clearConnectorTarget();
+    state.cards.get(drag.sourceId)?.element?.classList.add('is-edge-connect-source');
+    drag.targetId=targetId&&targetId!==drag.sourceId?targetId:'';
+    if(drag.targetId)state.cards.get(drag.targetId)?.element?.classList.add('is-edge-connect-target');
+    event.preventDefault();event.stopPropagation();
+    return true;
+  }
+  function endConnectorDrag(event){
+    const drag=state.edgeConnectDrag;if(!drag||drag.pointerId!==event.pointerId)return false;
+    state.edgeConnectDrag=null;
+    if(state.edgeDraftPath){state.edgeDraftPath.remove();state.edgeDraftPath=null}
+    clearConnectorTarget();
+    if(drag.targetId)createQuickEdge(drag.sourceId,drag.targetId);
+    event.preventDefault();event.stopPropagation();
+    return true;
+  }
+
+  function hideSelectionSubmenus(except=''){
+    ['qwSelectionAlignMenu','qwSelectionGroupMenu','qwSelectionColorPalette'].forEach(id=>{
+      if(id===except)return;
+      const el=byId(id);if(el)el.hidden=true;
+    });
+  }
+  function renderSelectionGroupMenu(){
+    const menu=byId('qwSelectionGroupMenu');if(!menu)return false;
+    const groups=state.workspace?.groups||[];
+    menu.innerHTML='<strong>分组</strong>'
+      +(groups.length?groups.map(group=>`<button type="button" data-qw-existing-group="${escapeHTML(group.id)}"><span>☷</span>${escapeHTML(group.title||'未命名分组')}</button>`).join(''):'<span class="qw-selection-menu-empty">暂无现有分组</span>')
+      +'<button type="button" class="create" data-qw-create-group="1"><span>＋</span>新建分组</button>';
+    return true;
+  }
+  function assignSelectionToGroup(groupId){
+    if(!canEdit())return false;
+    const ids=[...state.selectedNodeIds].filter(id=>state.cards.has(String(id)));
+    if(!ids.length)return false;
+    const before=workspaceSnapshot(),draft=clone(before);
+    const target=(draft.groups||[]).find(group=>String(group.id)===String(groupId));
+    if(!target)return false;
+    (draft.groups||[]).forEach(group=>{group.nodeIds=(group.nodeIds||[]).filter(id=>!ids.includes(String(id)))});
+    target.nodeIds=[...new Set([...(target.nodeIds||[]).map(String),...ids.map(String)])];
+    const bounds=groupBoundsFromNodeIds(target.nodeIds);
+    Object.assign(target,bounds,{updatedAt:Date.now()});
+    draft.groups=(draft.groups||[]).filter(group=>(group.nodeIds||[]).length);
+    state.suppressStoreEvent=true;
+    try{state.workspace=store()?.write?.(draft,{reason:'selection-assigned-to-group'})||draft}finally{state.suppressStoreEvent=false}
+    const after=workspaceSnapshot();pushWorkspaceHistory('调整分组',before,after);
+    renderCards();setCardSelection(ids,{reason:'group-retain'});setActiveGroup(groupId,{force:true});
+    notify('所选卡片已加入“'+String(target.title||'分组')+'”。可按 Ctrl/Command+Z 撤销。');
+    return true;
+  }
+  function deleteWorkspaceBatchSelection(){
+    if(!canEdit())return false;
+    const cardIds=new Set([...state.selectedNodeIds].filter(id=>state.cards.has(String(id))).map(String));
+    const edgeIds=new Set([...selectedEdgeIds()].filter(id=>edgeById(id)).map(String));
+    if(state.activeEdgeId&&edgeById(state.activeEdgeId))edgeIds.add(String(state.activeEdgeId));
+    if(!cardIds.size&&!edgeIds.size)return false;
+    cardIds.forEach(id=>{if(analysisPanelOpen(id))closeAnalysisPanel(id);state.answerSelections.delete(String(id))});
+    hideEdgeQuickMenu();hideEdgeInlineEditor();
+    const before=workspaceSnapshot(),draft=clone(before);
+    cardIds.forEach(id=>{delete draft.nodes?.[id]});
+    draft.edges=(draft.edges||[]).filter(edge=>!edgeIds.has(String(edge.id))&&!cardIds.has(String(edge.source))&&!cardIds.has(String(edge.target)));
+    draft.groups=(draft.groups||[]).map(group=>({...group,nodeIds:(group.nodeIds||[]).filter(id=>!cardIds.has(String(id)))})).filter(group=>group.nodeIds.length);
+    state.suppressStoreEvent=true;
+    try{state.workspace=store()?.write?.(draft,{reason:'batch-selection-deleted'})||draft}finally{state.suppressStoreEvent=false}
+    const after=workspaceSnapshot();
+    const label=cardIds.size&&edgeIds.size?'批量删除卡片和关系线':cardIds.size?(cardIds.size>1?'删除所选卡片':'删除卡片'):'批量删除关系线';
+    pushWorkspaceHistory(label,before,after);
+    clearCardSelection();clearEdgeSelection({render:false});setActiveGroup('');
+    renderCards();
+    const parts=[];
+    if(cardIds.size)parts.push(cardIds.size+' 张卡片');
+    if(edgeIds.size)parts.push(edgeIds.size+' 条框选关系线');
+    notify('已删除 '+parts.join('、')+(cardIds.size?'及卡片相关关系':'')+'。可按 Ctrl/Command+Z 撤销。');
+    return true;
+  }
+  function deleteSelectedCards(){return deleteWorkspaceBatchSelection()}
+  function deleteSelectedEdgesBatch(){return deleteWorkspaceBatchSelection()}
+
+
   function nodeMarkup(node){
     return node.nodeType==='synthesis-card'?synthesisNodeMarkup(node):questionNodeMarkup(node);
   }
@@ -943,6 +1119,7 @@
     state.cards.forEach(record=>{
       const active=selected.has(String(record.id));
       record.element?.classList.toggle('is-selected',active);
+      record.element?.classList.toggle('show-connectors',active&&selected.size===1&&!state.readonly&&!state.mobile);
       record.element?.setAttribute('aria-selected',active?'true':'false');
     });
     state.viewport?.classList.toggle('has-card-selection',selected.size>0);
@@ -951,8 +1128,10 @@
     return selected.size;
   }
   function setCardSelection(ids=[],options={}){
+    if(options.preserveEdges!==true)clearEdgeSelection({render:false});
     const controller=state.kernel?.selection;
     const count=controller?controller.set(ids,{reason:options.reason||'workspace-set'}):0;
+    refreshEdgeSelectionClasses();
     if(options.announce){
       if(count)notify('已选择 '+count+' 张卡片；拖动任一已选卡可整体移动。');
       else notify('已取消卡片选择。');
@@ -966,38 +1145,64 @@
     return count;
   }
   function toggleCardSelection(nodeId){
+    clearEdgeSelection({render:false});
     const count=state.kernel?.selection?.toggle(String(nodeId||''),{reason:'workspace-toggle'})||0;
+    refreshEdgeSelectionClasses();
     notify(count?'已选择 '+count+' 张卡片；Ctrl/Command 点击可继续增减选择。':'已取消卡片选择。');
     return count;
   }
   function selectedRecords(){
     return [...state.selectedNodeIds].map(id=>state.cards.get(String(id))).filter(record=>record?.element&&!record.element.classList.contains('is-group-collapsed'));
   }
+  function suppressSelectionToolbarForMotion(kind='drag'){
+    state.selectionToolbarSuppressed=true;
+    document.body?.classList.add('qw-selection-toolbar-motion');
+    document.body?.setAttribute?.('data-qw-motion-kind',String(kind||'drag'));
+    if(state.selectionToolbarRaf){
+      global.cancelAnimationFrame?.(state.selectionToolbarRaf);
+      state.selectionToolbarRaf=0;
+    }
+    const toolbar=byId('qwSelectionToolbar');
+    if(toolbar)toolbar.hidden=true;
+    hideSelectionSubmenus();
+  }
+  function restoreSelectionToolbarAfterMotion({delay=0}={}){
+    const restore=()=>{
+      state.selectionToolbarSuppressed=false;
+      document.body?.classList.remove('qw-selection-toolbar-motion');
+      document.body?.removeAttribute?.('data-qw-motion-kind');
+      scheduleSelectionToolbarPosition();
+    };
+    if(delay>0)return global.setTimeout(restore,delay);
+    restore();return 0;
+  }
   function beginViewportMotion(kind='zoom'){
     hideEdgeQuickMenu();hideEdgeInlineEditor();
     document.body?.classList.add('qw-viewport-motion');
-    if(kind==='zoom'){
-      state.selectionToolbarSuppressed=true;
-      const toolbar=byId('qwSelectionToolbar');if(toolbar)toolbar.hidden=true;
-    }
+    if(kind==='zoom')suppressSelectionToolbarForMotion('zoom');
     clearTimeout(state.viewportMotionTimer);
     state.viewportMotionTimer=global.setTimeout(()=>{
       state.viewportMotionTimer=null;
-      state.selectionToolbarSuppressed=false;
       document.body?.classList.remove('qw-viewport-motion');
-      scheduleSelectionToolbarPosition();
+      if(kind==='zoom')restoreSelectionToolbarAfterMotion();
     },190);
   }
   function scheduleSelectionToolbarPosition(){
+    if(state.selectionToolbarSuppressed){
+      if(state.selectionToolbarRaf)global.cancelAnimationFrame?.(state.selectionToolbarRaf);
+      state.selectionToolbarRaf=0;
+      return false;
+    }
     if(state.selectionToolbarRaf)global.cancelAnimationFrame?.(state.selectionToolbarRaf);
     const schedule=global.requestAnimationFrame||((callback)=>global.setTimeout(callback,0));
     state.selectionToolbarRaf=schedule(()=>{state.selectionToolbarRaf=0;updateSelectionToolbar()});
+    return true;
   }
   function updateSelectionToolbar(){
     const toolbar=byId('qwSelectionToolbar');
     if(!toolbar)return false;
     const records=selectedRecords();
-    const visible=!state.selectionToolbarSuppressed&&!state.readonly&&!state.mobile&&records.length>=1&&state.pointerMode!=='pan';
+    const visible=!state.selectionToolbarSuppressed&&!state.readonly&&!state.mobile&&records.length>=2&&state.pointerMode!=='pan';
     toolbar.hidden=!visible;
     if(!visible){
       const palette=byId('qwSelectionColorPalette');
@@ -1021,7 +1226,10 @@
     toolbar.style.left=x+'px';
     toolbar.style.top=y+'px';
     toolbar.dataset.selectionCount=String(records.length);
-    toolbar.querySelectorAll('[data-qw-selection-action="group"],[data-qw-selection-action="synthesize"]').forEach(button=>button.disabled=records.length<2);
+    const countLabel=byId('qwSelectionCount');if(countLabel)countLabel.textContent='多选（'+records.length+'）';
+    toolbar.querySelectorAll('[data-qw-selection-action="synthesize"]').forEach(button=>button.disabled=records.length<2);
+    toolbar.querySelectorAll('[data-qw-selection-action="connect"]').forEach(button=>button.disabled=records.length!==2);
+    renderSelectionGroupMenu();
     return true;
   }
   function selectionWorldBounds(records=selectedRecords()){
@@ -1408,6 +1616,40 @@
     notify('已完成'+ARRANGE_LABELS[type]+'。可按 Ctrl/Command+Z 撤销。');
     return true;
   }
+  function tidySelectedCards(){
+    if(!canEdit())return false;
+    const records=selectedRecords().slice().sort((a,b)=>Number(a.node?.y||0)-Number(b.node?.y||0)||Number(a.node?.x||0)-Number(b.node?.x||0));
+    if(records.length<2){notify('请先框选至少 2 张卡片。');return false}
+    const before=cardLayoutSnapshot(records);
+    const left=Math.min(...records.map(record=>Number(record.node?.x||0)));
+    const top=Math.min(...records.map(record=>Number(record.node?.y||0)));
+    const columns=Math.max(1,Math.min(4,Math.ceil(Math.sqrt(records.length))));
+    const gapX=36,gapY=36;
+    let cursorY=top;
+    for(let start=0;start<records.length;start+=columns){
+      const row=records.slice(start,start+columns);
+      let cursorX=left;
+      const rowHeight=Math.max(...row.map(record=>Number(record.node?.height||FULL_CARD_MIN_HEIGHT)));
+      row.forEach(record=>{
+        record.node.x=cursorX;
+        record.node.y=cursorY;
+        applyCard(record);
+        cursorX+=Number(record.node?.width||MULTI_CARD_MIN_WIDTH)+gapX;
+      });
+      cursorY+=rowHeight+gapY;
+    }
+    const proposed=cardLayoutSnapshot(records);
+    if(layoutsEqual(before,proposed)){notify('所选卡片已经比较整齐。');return true}
+    const persisted=persistLayoutSnapshot(proposed,'local-tidy-selection');
+    pushLayoutHistory('局部整理',before,persisted);
+    renderStructure();
+    renderMinimap();
+    scheduleLayoutDiagnosis();
+    setCardSelection(records.map(record=>record.id),{reason:'local-tidy-retain'});
+    notify('已局部整理所选 '+records.length+' 张卡片。可按 Ctrl/Command+Z 撤销。');
+    return true;
+  }
+
   function handleArrangeSelection(event){
     const select=event?.currentTarget||byId('qwArrangeSelect');
     const type=String(select?.value||'');
@@ -1737,6 +1979,42 @@
     return ({contrast:'#db2777',cause:'#2563eb',exception:'#dc2626',confused:'#d97706',support:'#059669'}[String(edge.type||'')]||'#7c8799');
   }
   function edgeById(edgeId){return (state.workspace?.edges||[]).find(edge=>String(edge.id)===String(edgeId||''))||null}
+  function selectedEdgeIds(){
+    [...state.selectedEdgeIds].forEach(id=>{if(!edgeById(id))state.selectedEdgeIds.delete(id)});
+    return state.selectedEdgeIds;
+  }
+  function clearEdgeSelection(options={}){
+    state.selectedEdgeIds.clear();
+    if(options.keepActive!==true)state.activeEdgeId='';
+    if(options.render!==false)refreshEdgeSelectionClasses();
+    return 0;
+  }
+  function refreshEdgeSelectionClasses(){
+    const selected=selectedEdgeIds();
+    state.edgeElements.forEach((dom,id)=>{
+      const batch=selected.has(String(id));
+      const active=batch||String(state.activeEdgeId||'')===String(id);
+      dom.group.classList.toggle('is-active',active);
+      dom.group.classList.toggle('is-batch-selected',batch);
+      dom.hit?.classList.toggle('is-selected',active);
+    });
+    return selected.size;
+  }
+  function currentSelectionBoxWorldRect(){
+    const box=byId('qwSelectionBox');
+    if(!box||box.hidden)return null;
+    const left=Number.parseFloat(box.style.left)||0,top=Number.parseFloat(box.style.top)||0;
+    const width=Number.parseFloat(box.style.width)||0,height=Number.parseFloat(box.style.height)||0;
+    const zoom=Math.max(.0001,Number(state.zoom)||1);
+    return {left:(left-state.panX)/zoom,top:(top-state.panY)/zoom,right:(left+width-state.panX)/zoom,bottom:(top+height-state.panY)/zoom};
+  }
+  function edgeIdsInsideWorldRect(rect){
+    const geometry=global.KGCanvasEdgeSelectionGeometry;
+    if(!rect||!geometry?.collectPathIds)return [];
+    const entries=[];
+    state.edgeElements.forEach((dom,id)=>{if(dom?.hit&&!dom.group.hidden)entries.push({id,path:dom.hit})});
+    return geometry.collectPathIds(entries,rect,{sampleSpacing:42,minSamples:8,maxSamples:56});
+  }
   function liveCardLayout(record){
     const node=record?.node||record?.layout||{};
     const element=record?.element||null;
@@ -1765,7 +2043,10 @@
     dom.group.style.setProperty('--qw-edge-color',edgeColor(edge));
     dom.group.dataset.lineStyle=String(edge.lineStyle||'solid');
     dom.group.dataset.pathStyle=String(edge.pathStyle||'curve');
-    dom.group.classList.toggle('is-active',String(state.activeEdgeId||'')===String(edge.id));
+    const batchSelected=state.selectedEdgeIds.has(String(edge.id));
+    dom.group.classList.toggle('is-active',batchSelected||String(state.activeEdgeId||'')===String(edge.id));
+    dom.group.classList.toggle('is-batch-selected',batchSelected);
+    dom.hit?.classList.toggle('is-selected',batchSelected||String(state.activeEdgeId||'')===String(edge.id));
     const label=String(edge.label??'').trim();
     if(dom.labelGroup){
       dom.labelGroup.hidden=!label;
@@ -1868,12 +2149,15 @@
   function showEdgeQuickMenu(edgeId,event=null){
     if(!canEdit())return false;
     const edge=edgeById(edgeId);if(!edge)return false;
+    clearCardSelection();
+    state.selectedEdgeIds.clear();
+    state.selectedEdgeIds.add(String(edge.id));
     const previousEdgeId=String(state.activeEdgeId||'');
     state.activeEdgeId=String(edge.id);
     const worldRect=state.viewport?.getBoundingClientRect?.();
     if(event&&worldRect)state.edgeMenuAnchorWorld={x:(event.clientX-worldRect.left-state.panX)/state.zoom,y:(event.clientY-worldRect.top-state.panY)/state.zoom};
     else if(previousEdgeId!==String(edge.id))state.edgeMenuAnchorWorld=null;
-    state.edgeElements.forEach((dom,id)=>dom.group.classList.toggle('is-active',id===state.activeEdgeId));
+    refreshEdgeSelectionClasses();
     const menu=ensureEdgeQuickMenu();menu.hidden=false;
     menu.querySelectorAll('[data-qw-edge-line]').forEach(button=>button.classList.toggle('active',button.dataset.qwEdgeLine===String(edge.lineStyle||'solid')));
     menu.querySelectorAll('[data-qw-edge-path]').forEach(button=>button.classList.toggle('active',button.dataset.qwEdgePath===String(edge.pathStyle||'curve')));
@@ -1882,7 +2166,7 @@
   }
   function hideEdgeQuickMenu(clear=true){
     if(state.edgeQuickMenu)state.edgeQuickMenu.hidden=true;
-    if(clear){state.activeEdgeId='';state.edgeMenuAnchorWorld=null;state.edgeElements.forEach(dom=>dom.group.classList.remove('is-active'))}
+    if(clear){state.activeEdgeId='';state.edgeMenuAnchorWorld=null;refreshEdgeSelectionClasses()}
   }
   function ensureEdgeInlineEditor(){
     if(state.edgeInlineEditor?.isConnected)return state.edgeInlineEditor;
@@ -1916,14 +2200,38 @@
     if(!result?.edge)return false;state.workspace=result.workspace||store()?.ensure?.(workspaceOptions())||state.workspace;
     const after=workspaceSnapshot();pushWorkspaceHistory(label||'修改关系',before,after);renderEdges();showEdgeQuickMenu(edgeId);notify((label||'关系已更新')+'。');return true;
   }
-  function deleteEdgeById(edgeId){
+  function deleteEdgeById(edgeId,options={}){
     if(!canEdit())return false;
-    let approved=true;try{approved=global.confirm?.('删除这条关系线？')!==false}catch(e){}if(!approved)return false;
+    let approved=true;
+    if(options.confirm!==false){try{approved=global.confirm?.('删除这条关系线？')!==false}catch(e){}}
+    if(!approved)return false;
     const before=workspaceSnapshot();state.suppressStoreEvent=true;try{store()?.removeEdge?.(edgeId,workspaceOptions())}finally{state.suppressStoreEvent=false}
-    state.workspace=store()?.ensure?.(workspaceOptions())||state.workspace;const after=workspaceSnapshot();pushWorkspaceHistory('删除关系',before,after);hideEdgeQuickMenu();hideEdgeInlineEditor();renderEdges();notify('已删除关系。');return true;
+    state.workspace=store()?.ensure?.(workspaceOptions())||state.workspace;state.selectedEdgeIds.delete(String(edgeId));const after=workspaceSnapshot();pushWorkspaceHistory('删除关系',before,after);hideEdgeQuickMenu();hideEdgeInlineEditor();renderEdges();notify('已删除关系。');return true;
   }
   function renderStructure(){renderGroups();renderEdges()}
-  function recordRect(record){return {x:Number(record.node.x||0),y:Number(record.node.y||0),width:Number(record.node.width||0),height:Number(record.node.height||0)}}
+  function recordRect(record){
+    const live=liveCardLayout(record);
+    return {x:Number(live.x||0),y:Number(live.y||0),width:Number(live.width||0),height:Number(live.height||0)};
+  }
+  function diagnosisWorldBounds(){
+    const world=state.world||byId('qwCanvasWorld');
+    return {
+      left:0,
+      top:0,
+      right:Math.max(WORLD_WIDTH,Number(world?.clientWidth||world?.offsetWidth||0)),
+      bottom:Math.max(WORLD_HEIGHT,Number(world?.clientHeight||world?.offsetHeight||0))
+    };
+  }
+  function isMeaningfullyOutsideWorld(rect,bounds=diagnosisWorldBounds()){
+    const overflow={
+      left:Math.max(0,bounds.left-Number(rect.x)),
+      top:Math.max(0,bounds.top-Number(rect.y)),
+      right:Math.max(0,Number(rect.x)+Number(rect.width)-bounds.right),
+      bottom:Math.max(0,Number(rect.y)+Number(rect.height)-bounds.bottom)
+    };
+    const tolerance=Math.max(28,Math.min(64,Math.min(Number(rect.width||0),Number(rect.height||0))*.08));
+    return Math.max(overflow.left,overflow.top,overflow.right,overflow.bottom)>tolerance;
+  }
   function runLayoutDiagnosis(options={}){
     if(state.diagnosisTimer){clearTimeout(state.diagnosisTimer);state.diagnosisTimer=null}
     const visible=[...state.cards.values()].filter(record=>!record.element?.classList.contains('is-group-collapsed'));
@@ -1950,7 +2258,6 @@
     const outOfBounds=[],oversized=[];
     visible.forEach(record=>{
       const rect=recordRect(record);
-      if(rect.x<0||rect.y<0||rect.x+rect.width>WORLD_WIDTH||rect.y+rect.height>WORLD_HEIGHT){outOfBounds.push({nodeId:String(record.id),rect});record.element?.classList.add('has-layout-warning')}
       if(rect.width>1200||rect.height>4200){oversized.push({nodeId:String(record.id),rect});record.element?.classList.add('has-layout-warning')}
     });
     const groupOverflow=[];
@@ -1978,20 +2285,18 @@
   function renderDiagnosticsPanel(){
     const issues=state.layoutIssues||runLayoutDiagnosis();
     const summary=byId('qwDiagnosticsSummary'),list=byId('qwDiagnosticsList');
-    if(summary)summary.textContent=issues.total?'发现 '+issues.total+' 项布局问题：'+issues.overlaps.length+' 处重叠、'+issues.outOfBounds.length+' 张越界、'+issues.oversized.length+' 张异常大卡、'+issues.groupOverflow.length+' 项分组溢出。':'当前未发现重叠、越界或异常尺寸。';
+    if(summary)summary.textContent=issues.total?'发现 '+issues.total+' 项布局问题：'+issues.overlaps.length+' 处重叠、'+issues.oversized.length+' 张异常大卡、'+issues.groupOverflow.length+' 项分组溢出。':'当前未发现重叠、异常尺寸或分组问题。';
     if(!list)return;
     const items=[];
     issues.overlaps.forEach(item=>items.push(diagnosticItem('卡片重叠',nodeTitle(item.a)+' 与 '+nodeTitle(item.b),item.a)));
-    issues.outOfBounds.forEach(item=>items.push(diagnosticItem('卡片超出画布',nodeTitle(item.nodeId),item.nodeId)));
     issues.oversized.forEach(item=>items.push(diagnosticItem('卡片尺寸异常',nodeTitle(item.nodeId)+' · '+Math.round(item.rect.width)+'×'+Math.round(item.rect.height),item.nodeId)));
     issues.groupOverflow.forEach(item=>{
       const group=(state.workspace?.groups||[]).find(group=>String(group.id)===item.groupId);
       items.push(diagnosticItem('卡片超出分组',nodeTitle(item.nodeId)+' 超出“'+String(group?.title||'分组')+'”',item.nodeId));
     });
     list.innerHTML=items.join('')||'<div class="qw-diagnostics-empty">布局状态良好</div>';
-    const overlapBtn=byId('qwResolveOverlapBtn'),boundsBtn=byId('qwRepairBoundsBtn'),groupsBtn=byId('qwRepairGroupsBtn');
+    const overlapBtn=byId('qwResolveOverlapBtn'),groupsBtn=byId('qwRepairGroupsBtn');
     if(overlapBtn)overlapBtn.disabled=!issues.overlaps.length;
-    if(boundsBtn)boundsBtn.disabled=!issues.outOfBounds.length;
     if(groupsBtn)groupsBtn.disabled=!issues.groupOverflow.length;
   }
   function openDiagnosticsPanel(){
@@ -2154,7 +2459,7 @@
       element.tabIndex=0;
       if(node.color)element.style.setProperty('--qw-card-color',String(node.color));
       if(synthesis||node.color)element.classList.add('has-custom-color');
-      element.innerHTML=nodeMarkup(node);
+      element.innerHTML=nodeMarkup(node)+connectorHandlesMarkup();
       element.style.zIndex=String(index+2);
       state.nodeLayer.appendChild(element);
       state.kernel.registerCard({
@@ -2204,15 +2509,20 @@
     return true;
   }
 
-  function renderWorkspaceSelector(){
+  function renderWorkspaceSelector(options={}){
     const workspaces=store()?.listWorkspaces?.()||[];
-    const select=byId('qwWorkspaceSelect');
-    if(select){
-      select.innerHTML=workspaces.map(item=>
-        '<option value="'+escapeHTML(item.id)+'">'+escapeHTML(item.title)+' · '+Number(item.nodeCount||0)+'题</option>'
-      ).join('');
-      select.value=state.workspaceId;
-    }
+    global.KGMultiQuestionWorkspaceTabs?.render?.({
+      workspaces,
+      activeWorkspaceId:state.workspaceId,
+      ownerKey:store()?.currentUserId?.()||'guest',
+      onOpen:id=>loadWorkspace(id),
+      onCreate:createWorkspace,
+      onRename:id=>renameWorkspace(id),
+      onDelete:id=>deleteWorkspace(id),
+      onReorder:ids=>store()?.reorderWorkspaces?.(ids),
+      onNotify:notify,
+      scrollActive:options.scrollActive!==false
+    });
     return workspaces;
   }
   function loadWorkspace(workspaceId,options={}){
@@ -2240,10 +2550,7 @@
       zoom:state.zoom,
       mobile:state.mobile
     });
-    const title=byId('qwPageTitle');
-    if(title)title.textContent=workspace.title;
-    const chip=byId('qwWorkspaceChip');
-    if(chip)chip.textContent=workspace.title;
+    global.KGMultiQuestionWorkspaceFilebar?.render?.(workspace);
     const dropName=byId('qwDropWorkspaceName');
     if(dropName)dropName.textContent=workspace.title;
     renderWorkspaceSelector();
@@ -2251,6 +2558,7 @@
     applyViewport();
     replaceUrl(workspace.id,options.focusNodeId||'');
     if(options.focusNodeId)setTimeout(()=>focusNode(options.focusNodeId),0);
+    global.KGMultiQuestionWorkspaceFilebar?.markSaved?.();
     return true;
   }
   function createWorkspace(){
@@ -2262,29 +2570,60 @@
       title=String(entered||title).trim()||title;
     }catch(e){}
     const workspace=store()?.createWorkspace?.(title,{activate:true});
-    if(workspace)loadWorkspace(workspace.id);
+    if(workspace){
+      global.KGMultiQuestionWorkspaceTabs?.reopen?.(workspace.id);
+      loadWorkspace(workspace.id);
+    }
     return workspace;
   }
-  function renameWorkspace(){
+  function renameWorkspaceTo(workspaceId,title){
     if(!canEdit())return null;
-    let title=state.workspace?.title||'';
+    workspaceId=String(workspaceId||state.workspaceId||'');
+    title=String(title||'').trim();
+    if(!workspaceId||!title)return null;
+    const workspace=store()?.renameWorkspace?.(workspaceId,title);
+    if(workspace){
+      if(workspaceId===state.workspaceId){
+        state.workspace=workspace;
+        global.KGMultiQuestionWorkspaceFilebar?.render?.(workspace);
+      }
+      renderWorkspaceSelector({scrollActive:false});
+    }
+    return workspace;
+  }
+  function renameWorkspace(workspaceId=state.workspaceId){
+    if(!canEdit())return null;
+    workspaceId=String(workspaceId||state.workspaceId||'');
+    const summary=(store()?.listWorkspaces?.()||[]).find(item=>String(item.id)===workspaceId);
+    let title=summary?.title||(workspaceId===state.workspaceId?state.workspace?.title:'')||'';
     try{
       const entered=global.prompt?.('请输入新的画布名称',title);
       if(entered===null)return null;
       title=String(entered||'').trim();
     }catch(e){}
-    if(!title)return null;
-    const workspace=store()?.renameWorkspace?.(state.workspaceId,title);
-    if(workspace)loadWorkspace(workspace.id);
-    return workspace;
+    return renameWorkspaceTo(workspaceId,title);
   }
-  function deleteWorkspace(){
+  function manualSaveWorkspace(){
+    if(!state.workspaceId)return false;
+    const latest=store()?.ensure?.(workspaceOptions())||state.workspace;
+    if(!latest)return false;
+    const saved=store()?.write?.(latest,{reason:'manual-save'});
+    if(saved){state.workspace=saved;return saved}
+    return false;
+  }
+
+  function deleteWorkspace(workspaceId=state.workspaceId){
     if(!canEdit())return null;
+    workspaceId=String(workspaceId||state.workspaceId||'');
     let approved=true;
     try{approved=global.confirm?.('删除当前多题画布？其中的题目引用和布局会被删除，原题和学习记录不受影响。')!==false}catch(e){}
     if(!approved)return null;
-    const result=store()?.deleteWorkspace?.(state.workspaceId);
-    if(result?.activeWorkspace)loadWorkspace(result.activeWorkspace.id);
+    const result=store()?.deleteWorkspace?.(workspaceId);
+    if(result){
+      global.KGMultiQuestionWorkspaceTabs?.forget?.(workspaceId);
+      if(result.activeWorkspace)loadWorkspace(result.activeWorkspace.id);
+      else renderWorkspaceSelector();
+    }
     return result;
   }
 
@@ -2294,8 +2633,10 @@
     if(state.filter==='unfinished'&&status.key==='completed')return false;
     const query=state.query.trim().toLowerCase();
     if(!query)return true;
+    const view=questionDisplayView(item.question||{});
     return [
-      item.question.title,
+      item.question.title,view.title?.en,view.stem?.zh,view.stem?.en,
+      ...view.options.flatMap(option=>[option.display?.zh,option.display?.en]),
       item.question.topic,
       item.question.domain,
       item.question.difficulty,
@@ -2319,8 +2660,8 @@
         ?'读取发布试卷时发生错误：'+state.questionLoadError
         :(state.papers.length
           ?'当前发布试卷没有前端可用题目。'+(Number(stats?.missingCount||0)?'失效引用 '+Number(stats.missingCount)+' 题。':'')+(Number(stats?.blockedCount||0)?'当前角色不可见 '+Number(stats.blockedCount)+' 题。':'')
-          :'暂无已发布试卷。请先在题库管理页完成组卷并发布；未发布时前端保持空白。');
-      list.innerHTML='<div class="qw-question-load-error"><strong>'+(state.papers.length?'试卷题目不可用':'暂无已发布试卷')+'</strong><span>'+escapeHTML(reason)+'</span><button type="button" data-qw-retry-questions>重新读取发布试卷</button></div>';
+          :'暂无已发布试卷。请先在教师工作台的试卷管理中完成组卷并发布；未发布时前端保持空白。');
+      list.innerHTML='<div class="qw-question-load-error"><strong>'+(state.papers.length?'暂无可用题目':'暂无已发布试卷')+'</strong></div>';
       return;
     }
     list.innerHTML=filtered.length?filtered.map((item,visibleIndex)=>{
@@ -2330,12 +2671,14 @@
       const stableQuestionId=String(question.id||question.sourceQuestionId||'');
       const stableBankId=String(item.bank?.id||question.sourceBankId||'');
       const stablePaperId=String(item.paper?.id||question.sourcePaperId||state.paperId||'');
-      return '<div class="qw-question-item '+(existing?'in-workspace':'')+'" data-question-index="'+state.questions.indexOf(item)+'" data-question-id="'+escapeHTML(stableQuestionId)+'" data-bank-id="'+escapeHTML(stableBankId)+'" data-paper-id="'+escapeHTML(stablePaperId)+'" draggable="'+(!state.readonly)+'">'
+      const stableReleaseId=String(item.paper?.releaseId||question.sourceReleaseId||'');
+      const view=questionDisplayView(question);
+      return '<div class="qw-question-item '+(existing?'in-workspace':'')+'" data-question-index="'+state.questions.indexOf(item)+'" data-question-id="'+escapeHTML(stableQuestionId)+'" data-bank-id="'+escapeHTML(stableBankId)+'" data-paper-id="'+escapeHTML(stablePaperId)+'" data-release-id="'+escapeHTML(stableReleaseId)+'" draggable="'+(!state.readonly)+'">'
         +'<span class="qw-question-drag" data-drag-handle draggable="'+(!state.readonly)+'">⋮⋮</span>'
-        +'<div class="qw-question-copy"><span>'+String(visibleIndex+1)+'</span><div><strong>'+escapeHTML(question.title||'未命名题目')+'</strong>'
+        +'<div class="qw-question-copy"><span>'+String(visibleIndex+1)+'</span><div><strong>'+escapeHTML(view.title?.zh||question.title||'未命名题目')+englishLine(view.title,'qw-question-title-en')+'</strong>'
         +'<small>'+escapeHTML([question.topic||question.domain||'未分类',question.difficulty||''].filter(Boolean).join(' · '))+'</small></div>'
         +'<em class="'+status.key+'">'+escapeHTML(status.label)+'</em></div>'
-        +'<button type="button" class="qw-question-add '+(existing?'added':'')+'" data-add-index="'+state.questions.indexOf(item)+'" data-question-id="'+escapeHTML(stableQuestionId)+'" data-bank-id="'+escapeHTML(stableBankId)+'" data-paper-id="'+escapeHTML(stablePaperId)+'"'
+        +'<button type="button" class="qw-question-add '+(existing?'added':'')+'" data-add-index="'+state.questions.indexOf(item)+'" data-question-id="'+escapeHTML(stableQuestionId)+'" data-bank-id="'+escapeHTML(stableBankId)+'" data-paper-id="'+escapeHTML(stablePaperId)+'" data-release-id="'+escapeHTML(stableReleaseId)+'"'
         +' title="'+(existing?'定位已有题目卡':'加入当前画布')+'">'+(existing?'◎':'+')+'</button>'
         +'</div>';
     }).join(''):'<div class="qt-question-list-empty">没有符合当前搜索或筛选条件的题目。</div>';
@@ -2346,13 +2689,15 @@
     const questionId=String(element?.dataset?.questionId||'');
     const bankId=String(element?.dataset?.bankId||'');
     const paperId=String(element?.dataset?.paperId||'');
+    const releaseId=String(element?.dataset?.releaseId||'');
     const indexed=Number.isInteger(index)?state.questions[index]:null;
     const matches=item=>{
       if(!item?.question)return false;
       const qid=String(item.question.id||item.question.sourceQuestionId||'');
       const bid=String(item.bank?.id||item.question.sourceBankId||'');
       const pid=String(item.paper?.id||item.question.sourcePaperId||'');
-      return (!questionId||qid===questionId)&&(!bankId||bid===bankId)&&(!paperId||pid===paperId);
+      const rid=String(item.paper?.releaseId||item.question.sourceReleaseId||'');
+      return (!questionId||qid===questionId)&&(!bankId||bid===bankId)&&(!paperId||pid===paperId)&&(!releaseId||rid===releaseId);
     };
     return indexed&&matches(indexed)?indexed:state.questions.find(matches)||null;
   }
@@ -2381,7 +2726,7 @@
     let result=null;
     try{
       result=store()?.addQuestionReference?.(
-        {...item.question,sourcePaperId:String(item.paper?.id||item.question.sourcePaperId||state.paperId||'')},
+        {...item.question,sourcePaperId:String(item.paper?.id||item.question.sourcePaperId||state.paperId||''),sourceReleaseId:String(item.paper?.releaseId||item.question.sourceReleaseId||'')},
         String(item.bank?.id||item.question.sourceBankId||''),
         position||defaultNodePosition(),
         workspaceOptions()
@@ -2402,7 +2747,7 @@
     byId('qwQuestionDrawer')?.setAttribute('aria-hidden','false');
     const backdrop=byId('qwQuestionDrawerBackdrop');
     if(backdrop)backdrop.hidden=false;
-    setTimeout(()=>byId('qwQuestionSearch')?.focus(),60);
+
   }
   function closeQuestionDrawer(){
     byId('qwQuestionDrawer')?.classList.remove('open');
@@ -2678,7 +3023,8 @@
       index,
       questionId:String(item.question.id||item.question.sourceQuestionId||''),
       bankId:String(item.bank?.id||item.question.sourceBankId||''),
-      paperId:String(item.paper?.id||item.question.sourcePaperId||state.paperId||'')
+      paperId:String(item.paper?.id||item.question.sourcePaperId||state.paperId||''),
+      releaseId:String(item.paper?.releaseId||item.question.sourceReleaseId||'')
     };
     const raw=JSON.stringify(state.dragPayload);
     event.dataTransfer.effectAllowed='copy';
@@ -2848,6 +3194,7 @@
       groupOrigin:{x:Number(group.x),y:Number(group.y)},startX:event.clientX,startY:event.clientY,moved:false,beforeWorkspace:workspaceSnapshot()
     };
     element.classList.add('is-dragging');
+    suppressSelectionToolbarForMotion('group-container-drag');
     state.viewport.setPointerCapture?.(event.pointerId);
     event.preventDefault();
     return true;
@@ -2861,7 +3208,7 @@
     });
     gesture.element.style.left=(gesture.groupOrigin.x+dx)+'px';
     gesture.element.style.top=(gesture.groupOrigin.y+dy)+'px';
-    updateEdgesForNodeIds(gesture.records.map(record=>record.id));state.minimapDirty=true;renderMinimap({nodes:false});positionAnalysisPanels();scheduleSelectionToolbarPosition();
+    updateEdgesForNodeIds(gesture.records.map(record=>record.id));state.minimapDirty=true;renderMinimap({nodes:false});positionAnalysisPanels();
     return true;
   }
   function endGroupContainerDrag(event,gesture,cancelled=false){
@@ -2869,7 +3216,8 @@
     try{state.viewport.releasePointerCapture?.(event.pointerId)}catch(e){}
     if(cancelled||!gesture.moved){
       if(cancelled)restoreWorkspaceSnapshot(gesture.beforeWorkspace,'group-drag-cancel');
-      else{positionAnalysisPanels();scheduleSelectionToolbarPosition()}
+      else positionAnalysisPanels();
+      restoreSelectionToolbarAfterMotion();
       return false;
     }
     const dx=(event.clientX-gesture.startX)/Math.max(.0001,state.zoom),dy=(event.clientY-gesture.startY)/Math.max(.0001,state.zoom);
@@ -2883,12 +3231,15 @@
     try{state.workspace=store()?.write?.(draft,{reason:'group-container-moved'})||draft}finally{state.suppressStoreEvent=false}
     const after=workspaceSnapshot();
     pushWorkspaceHistory('整体移动分组',gesture.beforeWorkspace,after);
-    renderCards();notify('已整体移动分组。可按 Ctrl/Command+Z 撤销。');
+    renderCards();restoreSelectionToolbarAfterMotion();notify('已整体移动分组。可按 Ctrl/Command+Z 撤销。');
     return true;
   }
   function beginGroupCardDrag(event,records){
     const started=state.kernel?.selection?.beginGroupDrag?.(event,records,{activeClass:'is-group-dragging'});
-    if(started)state.gesture={type:'group-card',pointerId:event.pointerId};
+    if(started){
+      suppressSelectionToolbarForMotion('group-card-drag');
+      state.gesture={type:'group-card',pointerId:event.pointerId};
+    }
     return !!started;
   }
   function beginCardDrag(event){
@@ -2911,7 +3262,10 @@
       activeClass:'is-dragging',
       shouldStart:currentEvent=>!currentEvent.target.closest?.('button,a,input,textarea,select,[contenteditable="true"]')
     });
-    if(started)state.gesture={type:'card',pointerId:event.pointerId,record,before};
+    if(started){
+      suppressSelectionToolbarForMotion('card-drag');
+      state.gesture={type:'card',pointerId:event.pointerId,record,before};
+    }
     return started;
   }
   function beginBoxSelection(event){
@@ -2919,17 +3273,43 @@
     const started=state.kernel?.selection?.beginBox?.(event,{
       shouldStart:currentEvent=>!currentEvent.target.closest?.('.qw-question-card,.qw-group-container,.qw-question-drawer,.qw-overlay,.qw-highlight-menu,.qw-diagnostics-panel,.qw-analysis-panel,[data-edge-id],.qw-edge-quick-menu,.qw-edge-inline-editor,button,a,input,textarea,select')
     });
-    if(started)state.gesture={type:'box',pointerId:event.pointerId};
+    if(started){
+      state.edgeBoxSelection={
+        additive:!!(event.ctrlKey||event.metaKey||event.shiftKey),
+        baseIds:new Set(state.selectedEdgeIds)
+      };
+      hideEdgeQuickMenu();
+      hideEdgeInlineEditor();
+      state.gesture={type:'box',pointerId:event.pointerId};
+    }
     return !!started;
   }
   function moveBoxSelection(event){
-    return state.kernel?.selection?.moveBox?.(event)||false;
+    const moved=state.kernel?.selection?.moveBox?.(event)||false;
+    if(!moved||!state.edgeBoxSelection)return moved;
+    const rect=currentSelectionBoxWorldRect();
+    const hits=edgeIdsInsideWorldRect(rect);
+    state.selectedEdgeIds=state.edgeBoxSelection.additive?new Set([...state.edgeBoxSelection.baseIds,...hits]):new Set(hits);
+    state.activeEdgeId=!state.selectedNodeIds.size&&state.selectedEdgeIds.size===1?state.selectedEdgeIds.values().next().value:'';
+    refreshEdgeSelectionClasses();
+    return moved;
   }
   function finishBoxSelection(event,cancelled=false){
+    const edgeBox=state.edgeBoxSelection;
     const result=state.kernel?.selection?.endBox?.(event,{cancelled});
     if(!result)return false;
-    const count=result.ids?.length||0;
-    if(!cancelled&&result.moved)notify(count?'已框选 '+count+' 张卡片；可整体移动、对齐或统一尺寸。':'框选区域内没有题目卡。');
+    if(cancelled&&edgeBox)state.selectedEdgeIds=new Set(edgeBox.baseIds);
+    else if(!result.moved&&edgeBox&&!edgeBox.additive)state.selectedEdgeIds.clear();
+    state.edgeBoxSelection=null;
+    state.activeEdgeId=!state.selectedNodeIds.size&&state.selectedEdgeIds.size===1?state.selectedEdgeIds.values().next().value:'';
+    refreshEdgeSelectionClasses();
+    const cardCount=result.ids?.length||0,edgeCount=selectedEdgeIds().size;
+    if(!cancelled&&result.moved){
+      const parts=[];
+      if(cardCount)parts.push(cardCount+' 张卡片');
+      if(edgeCount)parts.push(edgeCount+' 条关系线');
+      notify(parts.length?'已框选 '+parts.join('、')+'；按 Delete 可批量删除，Ctrl/Command+Z 可撤回。':'框选区域内没有卡片或关系线。');
+    }
     return true;
   }
   function beginPan(event){
@@ -2943,6 +3323,7 @@
     });
     if(started){
       beginViewportMotion('pan');
+      suppressSelectionToolbarForMotion('pan');
       if(rightPan){state.rightPanPointerId=event.pointerId;setTemporaryPanMode(true,'right')}
       state.gesture={type:'pan',pointerId:event.pointerId};
     }
@@ -2969,12 +3350,12 @@
       return;
     }
     if(gesture.type==='group-card'){
-      const result=moveGroupCardDrag(event);if(result)updateEdgesForNodeIds([...state.selectedNodeIds]);scheduleSelectionToolbarPosition();
+      const result=moveGroupCardDrag(event);if(result)updateEdgesForNodeIds([...state.selectedNodeIds]);
       return;
     }
     if(gesture.type==='card'){
       state.kernel.cards.moveDrag(event);
-      updateEdgesForNodeIds([gesture.record.id]);scheduleSelectionToolbarPosition();
+      updateEdgesForNodeIds([gesture.record.id]);
     }
   }
   function pointerUp(event){
@@ -2997,11 +3378,13 @@
     if(gesture.type==='pan'){
       state.kernel.viewport.endPan(event,{activeClass:'is-panning',persist:true});
       if(event.pointerId===state.rightPanPointerId){state.rightPanPointerId=null;setTemporaryPanMode(false,'right')}
+      restoreSelectionToolbarAfterMotion();
       return;
     }
     if(gesture.type==='group-card'){
       const result=endGroupCardDrag(event,cancelled);
       if(!cancelled&&result?.moved&&!syncDraggedMembership(result.records.map(record=>record.id))){renderStructure();scheduleLayoutDiagnosis()}
+      restoreSelectionToolbarAfterMotion();
       return;
     }
     if(gesture.type==='card'){
@@ -3017,7 +3400,7 @@
         pushLayoutHistory('移动题目卡',gesture.before,after);
         if(!syncDraggedMembership([gesture.record.id])){renderStructure();scheduleLayoutDiagnosis()}
       }
-      updateEdgesForNodeIds([gesture.record.id]);state.minimapDirty=true;renderMinimap();positionAnalysisPanels();scheduleSelectionToolbarPosition();
+      updateEdgesForNodeIds([gesture.record.id]);state.minimapDirty=true;renderMinimap();positionAnalysisPanels();restoreSelectionToolbarAfterMotion();
     }
   }
 
@@ -3040,7 +3423,8 @@
     const worldEl=byId('qwMinimapWorld');
     const viewEl=byId('qwMinimapView');
     const minimap=byId('qwMinimap');
-    if(!worldEl||!viewEl||!minimap||state.mobile)return;
+    const dock=byId('qwBottomRightDock');
+    if(!worldEl||!viewEl||!minimap||state.mobile||dock?.classList.contains('collapsed'))return;
     const rebuild=options.nodes!==false||state.minimapDirty||!state.minimapModel;
     if(rebuild){
       const bounds=cardBounds()||{left:0,top:0,width:8000,height:5000,right:8000,bottom:5000};
@@ -3064,12 +3448,136 @@
     viewEl.style.height=Math.max(6,rect.height/state.zoom*model.scale)+'px';
   }
 
+
+  function bindMinimapControls(){
+    const dock=byId('qwBottomRightDock'),minimap=byId('qwMinimap'),view=byId('qwMinimapView'),toggle=byId('qwMinimapToggleBtn');
+    if(!dock||!minimap||!view||!toggle)return;
+    toggle.addEventListener('click',()=>{
+      const open=dock.classList.contains('collapsed');
+      dock.classList.toggle('collapsed',!open);
+      toggle.setAttribute('aria-expanded',open?'true':'false');
+      toggle.setAttribute('aria-label',open?'收起缩略图':'打开缩略图');
+      toggle.title=open?'收起缩略图':'打开缩略图';
+      minimap.setAttribute('aria-hidden',open?'false':'true');
+      if(open){state.minimapDirty=true;requestAnimationFrame(()=>renderMinimap({nodes:true}))}
+    });
+    view.addEventListener('pointerdown',event=>{
+      if(event.button!==0||state.mobile||!state.minimapModel)return;
+      const rect=view.getBoundingClientRect();
+      state.minimapDrag={pointerId:event.pointerId,offsetX:event.clientX-rect.left,offsetY:event.clientY-rect.top};
+      view.classList.add('dragging');view.setPointerCapture?.(event.pointerId);
+      event.preventDefault();event.stopPropagation();
+    });
+    view.addEventListener('pointermove',event=>{
+      const drag=state.minimapDrag,model=state.minimapModel;
+      if(!drag||drag.pointerId!==event.pointerId||!model||state.mobile)return;
+      const root=minimap.getBoundingClientRect(),vr=view.getBoundingClientRect();
+      const maxLeft=Math.max(8,root.width-vr.width-8),maxTop=Math.max(8,root.height-vr.height-8);
+      const left=clamp(event.clientX-root.left-drag.offsetX,8,maxLeft);
+      const top=clamp(event.clientY-root.top-drag.offsetY,8,maxTop);
+      const worldLeft=(left-8)/model.scale+model.left;
+      const worldTop=(top-8)/model.scale+model.top;
+      setViewport({x:-worldLeft*state.zoom,y:-worldTop*state.zoom,zoom:state.zoom},{persist:false,source:'workspace-minimap-drag'});
+      event.preventDefault();event.stopPropagation();
+    });
+    const finish=event=>{
+      const drag=state.minimapDrag;if(!drag||drag.pointerId!==event.pointerId)return;
+      state.minimapDrag=null;view.classList.remove('dragging');
+      try{view.releasePointerCapture?.(event.pointerId)}catch(_){}
+      scheduleViewportSave();event.preventDefault();event.stopPropagation();
+    };
+    view.addEventListener('pointerup',finish);view.addEventListener('pointercancel',finish);
+  }
+
+  function preferredQuestionNodeForSingleDeep(preferredNodeId=''){
+    const nodes=state.workspace?.nodes||{};
+    const direct=String(preferredNodeId||'')?nodes[String(preferredNodeId||'')]:null;
+    if(direct?.nodeType==='question-reference')return direct;
+    if(direct?.nodeType==='synthesis-card'){
+      for(const sourceId of direct.sourceNodeIds||[]){
+        const source=nodes[String(sourceId)];
+        if(source?.nodeType==='question-reference')return source;
+      }
+    }
+
+    // Read selection from the authoritative selection ID set rather than DOM-backed
+    // selectedRecords(). This keeps the target stable when the toolbar receives focus
+    // or a selected card is temporarily hidden by grouping/render refresh.
+    const selectedIds=[...state.selectedNodeIds].map(String);
+    for(const id of selectedIds){
+      const node=nodes[id];
+      if(node?.nodeType==='question-reference')return node;
+    }
+    for(const id of selectedIds){
+      const node=nodes[id];
+      if(node?.nodeType!=='synthesis-card')continue;
+      for(const sourceId of node.sourceNodeIds||[]){
+        const source=nodes[String(sourceId)];
+        if(source?.nodeType==='question-reference')return source;
+      }
+    }
+    return Object.values(nodes).find(item=>item.nodeType==='question-reference')||null;
+  }
+  function prepareSingleDeepQuestion(node){
+    if(!node?.questionId)return false;
+    try{
+      if(node.paperId&&typeof qbOpenPaperQuestion==='function'){
+        const opened=qbOpenPaperQuestion(node.paperId,node.questionId,node.bankId||'');
+        if(opened)return true;
+      }
+    }catch(e){}
+    try{
+      if(typeof qbLoadBanks==='function'&&typeof qbSetCurrent==='function'){
+        const bank=(qbLoadBanks()||[]).find(item=>String(item.id)===String(node.bankId||''));
+        const index=(bank?.questions||[]).findIndex(question=>String(question.id)===String(node.questionId));
+        if(bank&&index>=0){qbSetCurrent(bank.id,index);return true}
+      }
+    }catch(e){}
+    return false;
+  }
+  function captureSingleDeepTarget(){
+    const node=preferredQuestionNodeForSingleDeep();
+    state.singleDeepPendingNodeId=String(node?.id||'');
+    return node;
+  }
+  function openSingleDeepStudy(){
+    const pendingId=String(state.singleDeepPendingNodeId||'');
+    const node=preferredQuestionNodeForSingleDeep(pendingId);
+    state.singleDeepPendingNodeId='';
+    if(node)prepareSingleDeepQuestion(node);
+    try{
+      const url=new URL('question-training.html',global.location.href);
+      if(node?.questionId)url.searchParams.set('questionId',String(node.questionId));
+      if(node?.bankId)url.searchParams.set('bankId',String(node.bankId));
+      if(node?.paperId)url.searchParams.set('paperId',String(node.paperId));
+      if(node?.releaseId)url.searchParams.set('releaseId',String(node.releaseId));
+      url.searchParams.set('source','multi-question');
+      url.searchParams.set('return','question-workspace.html?workspace='+encodeURIComponent(String(state.workspaceId||'')));
+      global.location.href=url.pathname.split('/').pop()+url.search;
+      return true;
+    }catch(e){
+      global.location.href='question-training.html';
+      return true;
+    }
+  }
+
   function bind(){
-    byId('qwWorkspaceSelect')?.addEventListener('change',event=>loadWorkspace(event.target.value));
-    byId('qwCreateWorkspaceBtn')?.addEventListener('click',createWorkspace);
-    byId('qwRenameWorkspaceBtn')?.addEventListener('click',renameWorkspace);
-    byId('qwDeleteWorkspaceBtn')?.addEventListener('click',deleteWorkspace);
+    bindMinimapControls();
+    const tutorialTrigger=byId('tutorialBtn');
+    if(tutorialTrigger){
+      tutorialTrigger.dataset.accountMenuBoundHelp='1';
+      tutorialTrigger.addEventListener('click',()=>byId('qwHelpBtn')?.click());
+    }
+    global.KGMultiQuestionWorkspaceFilebar?.configure?.({
+      getWorkspace:()=>state.workspace,
+      canEdit:()=>canEdit(),
+      onRename:title=>renameWorkspaceTo(state.workspaceId,title),
+      onSave:manualSaveWorkspace,
+      onNotify:notify
+    });
     byId('qwQuestionDockBtn')?.addEventListener('click',openQuestionDrawer);
+    byId('qwOpenSingleDeepBtn')?.addEventListener('pointerdown',captureSingleDeepTarget);
+    byId('qwOpenSingleDeepBtn')?.addEventListener('click',openSingleDeepStudy);
     byId('qwEmptyAddBtn')?.addEventListener('click',openQuestionDrawer);
     byId('qwQuestionDrawerClose')?.addEventListener('click',closeQuestionDrawer);
     byId('qwQuestionDrawerBackdrop')?.addEventListener('click',closeQuestionDrawer);
@@ -3080,11 +3588,26 @@
       const action=event.target.closest?.('[data-qw-selection-action]')?.dataset.qwSelectionAction;
       if(!action)return;
       event.stopPropagation();
-      if(action==='group')quickCreateGroup();
-      if(action==='synthesize')quickCreateSynthesis();
+      if(action==='tidy'){hideSelectionSubmenus();tidySelectedCards();return}
+      if(action==='synthesize'){hideSelectionSubmenus();quickCreateSynthesis();return}
+      if(action==='connect'){
+        hideSelectionSubmenus();
+        const pair=selectedPair();if(pair)createQuickEdge(pair[0],pair[1]);else notify('请选择恰好两张卡片建立关系。');
+        return;
+      }
+      if(action==='delete'){hideSelectionSubmenus();deleteSelectedCards();return}
       if(action==='color'){
-        const palette=byId('qwSelectionColorPalette');
-        if(palette)palette.hidden=!palette.hidden;
+        const palette=byId('qwSelectionColorPalette');if(!palette)return;
+        const next=palette.hidden;hideSelectionSubmenus('qwSelectionColorPalette');palette.hidden=!next;return;
+      }
+      if(action==='align-menu'){
+        const menu=byId('qwSelectionAlignMenu');if(!menu)return;
+        const next=menu.hidden;hideSelectionSubmenus('qwSelectionAlignMenu');menu.hidden=!next;return;
+      }
+      if(action==='group-menu'){
+        const menu=byId('qwSelectionGroupMenu');if(!menu)return;
+        renderSelectionGroupMenu();
+        const next=menu.hidden;hideSelectionSubmenus('qwSelectionGroupMenu');menu.hidden=!next;return;
       }
     });
     byId('qwSelectionColorPalette')?.addEventListener('click',event=>{
@@ -3093,6 +3616,18 @@
       event.stopPropagation();
       applySelectionColor(color);
       event.currentTarget.hidden=true;
+    });
+    byId('qwSelectionAlignMenu')?.addEventListener('click',event=>{
+      const type=event.target.closest?.('[data-qw-arrange]')?.dataset.qwArrange;
+      if(!type)return;
+      event.stopPropagation();applySelectedArrangement(type);event.currentTarget.hidden=true;
+    });
+    byId('qwSelectionGroupMenu')?.addEventListener('click',event=>{
+      const existing=event.target.closest?.('[data-qw-existing-group]')?.dataset.qwExistingGroup;
+      const create=event.target.closest?.('[data-qw-create-group]');
+      if(!existing&&!create)return;
+      event.stopPropagation();event.currentTarget.hidden=true;
+      if(existing)assignSelectionToGroup(existing);else quickCreateGroup();
     });
     byId('qwSmartArrangeSelect')?.addEventListener('change',event=>{const mode=String(event.target.value||'');if(mode)smartArrange(mode);event.target.value=''});
     byId('qwDiagnoseBtn')?.addEventListener('click',openDiagnosticsPanel);
@@ -3159,10 +3694,8 @@
       buildQuestionList();
       renderQuestionDock();
     });
-    byId('qwQuestionSearch')?.addEventListener('input',event=>{
-      state.query=String(event.target.value||'');
-      renderQuestionDock();
-    });
+    byId('qwQuestionSearch')?.addEventListener('input',event=>{state.query=String(event.target.value||'');renderQuestionDock()});
+    byId('qwQuestionSearchBtn')?.addEventListener('click',()=>{state.query=String(byId('qwQuestionSearch')?.value||'');renderQuestionDock()});
     document.querySelectorAll('[data-qw-filter]').forEach(button=>{
       button.addEventListener('click',()=>{
         state.filter=String(button.dataset.qwFilter||'all');
@@ -3185,6 +3718,10 @@
     });
     byId('qwQuestionList')?.addEventListener('dragstart',questionDragStart);
     byId('qwQuestionList')?.addEventListener('dragend',questionDragEnd);
+    state.nodeLayer.addEventListener('pointerdown',event=>{if(event.target.closest?.('[data-qw-connector]'))beginConnectorDrag(event)});
+    state.nodeLayer.addEventListener('pointermove',event=>{if(state.edgeConnectDrag)moveConnectorDrag(event)});
+    state.nodeLayer.addEventListener('pointerup',event=>{if(state.edgeConnectDrag)endConnectorDrag(event)});
+    state.nodeLayer.addEventListener('pointercancel',event=>{if(state.edgeConnectDrag)endConnectorDrag(event)});
     state.nodeLayer.addEventListener('click',event=>{
       const mark=event.target.closest?.('[data-highlight-id]');
       if(mark){
@@ -3192,6 +3729,7 @@
         showExistingHighlightMenu(mark);
         return;
       }
+      if(event.target.closest?.('[data-qw-connector]'))return;
       const card=event.target.closest?.('[data-node-id]');
       if(!card)return;
       const record=state.cards.get(String(card.dataset.nodeId||''));
@@ -3287,14 +3825,11 @@
         {duration:230,persist:true,source:'workspace-button'}
       );
     });
-    byId('qwZoomLabel')?.addEventListener('click',()=>{
-      beginViewportMotion('zoom');
-      const rect=state.viewport.getBoundingClientRect();
-      state.kernel.viewport.zoomAt(
-        1,rect.left+rect.width/2,rect.top+rect.height/2,
-        {duration:230,persist:true,source:'workspace-reset'}
-      );
-    });
+    byId('qwZoomLabel')?.addEventListener('click',()=>showZoomSlider(!byId('qwCanvasZoomDock')?.classList.contains('slider-open')));
+    byId('qwZoomSlider')?.addEventListener('input',event=>{beginViewportMotion('zoom');const rect=state.viewport.getBoundingClientRect(),scale=Number(event.target.value)/100;showZoomSlider(true);state.kernel.viewport.zoomAt(scale,rect.left+rect.width/2,rect.top+rect.height/2,{duration:0,persist:true,source:'workspace-slider'});});
+    byId('qwZoomSlider')?.addEventListener('pointerdown',event=>event.stopPropagation());
+    document.addEventListener('pointerdown',event=>{const dock=byId('qwCanvasZoomDock');if(dock?.classList.contains('slider-open')&&!dock.contains(event.target))showZoomSlider(false)},true);
+    document.addEventListener('keydown',event=>{if(event.key==='Escape')showZoomSlider(false)});
     byId('qwPointerModeBtn')?.addEventListener('click',togglePointerMode);
     byId('qwFontScaleBtn')?.addEventListener('click',cycleFontScale);
     byId('qwUndoBtn')?.addEventListener('click',undoLayout);
@@ -3328,11 +3863,20 @@
         event.preventDefault();
         return;
       }
+      if(!editing&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&(event.key==='Delete'||event.key==='Backspace')){
+        if(state.selectedNodeIds.size||selectedEdgeIds().size||state.activeEdgeId){event.preventDefault();deleteWorkspaceBatchSelection();return}
+      }
       if(event.key==='Escape'){
-        hideHighlightMenu();
+        hideHighlightMenu();hideSelectionSubmenus();
+        if(state.edgeConnectDrag){
+          state.edgeConnectDrag=null;
+          if(state.edgeDraftPath){state.edgeDraftPath.remove();state.edgeDraftPath=null}
+          clearConnectorTarget();
+        }
         state.kernel?.selection?.cancel?.();
         if(state.gesture?.type==='box'||state.gesture?.type==='group-card'||state.gesture?.type==='container-group')state.gesture=null;
         clearCardSelection();
+        clearEdgeSelection();
         setActiveGroup('');
         closeQuestionDrawer();
         closeStructureModals();
@@ -3380,6 +3924,12 @@
       buildQuestionList();
       if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
     });
+    global.addEventListener('kg:question-language-mode',()=>{
+      if(!state.initialized)return;
+      renderCards();
+      renderQuestionDock();
+      refreshAnalysisPanelContents();
+    });
     global.addEventListener('storage',event=>{
       const key=String(event.key||'');
       if(!key.includes('question')&&!key.includes('exam_papers'))return;
@@ -3391,7 +3941,11 @@
       if(state.suppressStoreEvent)return;
       const workspaceId=String(event.detail?.workspaceId||'');
       const reason=String(event.detail?.reason||'');
-      renderWorkspaceSelector();
+      renderWorkspaceSelector({scrollActive:reason!=='workspace-order-changed'});
+      if(workspaceId===state.workspaceId){
+        if(event.detail?.workspace)global.KGMultiQuestionWorkspaceFilebar?.render?.(event.detail.workspace);
+        global.KGMultiQuestionWorkspaceFilebar?.markSaved?.();
+      }
       if(workspaceId===state.workspaceId&&['question-node-added','synthesis-node-added','node-removed','node-updated','nodes-layout-updated','workspace-renamed','question-progress-refreshed','edge-added','edge-updated','edge-removed','group-created','group-updated','group-removed'].includes(reason)){
         state.workspace=store()?.ensure?.(workspaceOptions())||state.workspace;
         renderCards();
@@ -3434,6 +3988,11 @@
   global.KGMultiQuestionWorkspace=Object.freeze({
     init,
     loadWorkspace,
+    createWorkspace,
+    renameWorkspace,
+    deleteWorkspace,
+    manualSaveWorkspace,
+    renderWorkspaceSelector,
     renderCards,
     renderQuestionDock,
     addQuestionItem,
@@ -3447,11 +4006,20 @@
     createSynthesisCard:openSynthesisModal,
     createGroup:quickCreateGroup,
     quickCreateSynthesis,
-    connectSelected:openEdgeModal,
+    createQuickEdge,
+    assignSelectionToGroup,
+    deleteSelectedCards,
+    connectSelected:()=>{const pair=selectedPair();return pair?createQuickEdge(pair[0],pair[1]):false},
     toggleAnalysis:toggleAnalysisPanel,
     applySelectionColor,
     diagnoseLayout:runLayoutDiagnosis,
+    diagnosisWorldBounds,
+    isMeaningfullyOutsideWorld,
     smartArrange,
+    tidySelectedCards,
+    preferredQuestionNodeForSingleDeep,
+    captureSingleDeepTarget,
+    openSingleDeepStudy,
     undoLayout,
     redoLayout,
     getState:()=>({
@@ -3472,6 +4040,7 @@
       activeGroupId:state.activeGroupId,
       quickAnswerNodeIds:[...state.answerSelections.keys()],
       selectedNodeIds:[...state.selectedNodeIds],
+      selectedEdgeIds:[...selectedEdgeIds()],
       groupCount:(state.workspace?.groups||[]).length,
       edgeCount:(state.workspace?.edges||[]).length,
       layoutIssues:clone(state.layoutIssues),

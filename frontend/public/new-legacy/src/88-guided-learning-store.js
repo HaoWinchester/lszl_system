@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * GuidedLearningStore v6
+ * GuidedLearningStore v7
  * 节点只保存统一的完成状态；部分跳级测试成绩单独保存在 placementTests 中。
  */
 (function(global){
@@ -112,16 +112,23 @@
   }
   function recomputeUnlocks(progress,course){
     const nodes=orderedNodes(course);
-    let firstIncompleteFound=false;
+    let canUnlock=true;
+    const available=[];
     for(const node of nodes){
       const entry=progress.nodes[node.id]||(progress.nodes[node.id]=emptyNode(1));
-      if(entry.status==='completed')continue;
-      entry.status=firstIncompleteFound?'locked':'available';
+      if(entry.status==='completed'){
+        canUnlock=true;
+        continue;
+      }
+      entry.status=canUnlock?'available':'locked';
       entry.completedAt=null;
       entry.metrics=null;
-      firstIncompleteFound=true;
+      if(entry.status==='available')available.push(node);
+      canUnlock=false;
     }
-    const current=nodes.find(node=>progress.nodes[node.id]?.status==='available')||nodes[nodes.length-1]||null;
+    // 历史数据可能存在非连续完成记录。较早缺口仍允许补学，但当前位置必须
+    // 指向课程顺序中最靠后的可学习节点，避免脉冲环退回旧节点。
+    const current=available.at(-1)||nodes[nodes.length-1]||null;
     progress.currentNodeId=String(current?.id||'');
     progress.updatedAt=Number(progress.updatedAt||now());
     return progress;

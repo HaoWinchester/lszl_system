@@ -25,12 +25,6 @@
     function template(){
       return '<article class="learning-card answer-card" data-answer-card>'
         +'<div class="answer-card-body">'
-          +'<div class="q-paper-bar qt-paper-context" id="qPaperBar">'
-            +'<label>学习内容<select id="qPaperSelect"><option value="">单题 / 当前题库训练</option></select></label>'
-            +'<button type="button" id="qStartPaperBtn">开始试卷</button>'
-            +'<button type="button" id="qExitPaperBtn">退出试卷</button>'
-            +'<span id="qPaperProgress">当前单题</span>'
-          +'</div>'
           +'<h3 id="qQuestionHeading">题目</h3>'
           +'<div class="q-stem" id="qStem"></div>'
           +'<div class="q-options" id="qOptions"></div>'
@@ -52,6 +46,12 @@
     function question(){
       return context.question()||{};
     }
+    function displayView(q){
+      return global.KGFreeModeLanguage?.questionView?.(q,global.KGFreeModeLanguage?.mode?.()||'zh')||null;
+    }
+    function englishLine(pair){
+      return global.KGFreeModeLanguage?.mode?.()==='bilingual'&&pair?.hasEnglish?'<span class="answer-card-bilingual-en">'+escapeHTML(pair.en)+'</span>':'';
+    }
     function session(){
       return context.session()||{};
     }
@@ -65,16 +65,19 @@
       const el=host?.querySelector('#qStem');
       if(!el)return;
       const found=state?.found instanceof Set?state.found:new Set(session().activation?.selectedKeywordIds||[]);
-      el.innerHTML=(q.stemParts||[]).map(part=>{
+      const view=displayView(q);
+      const zh=(q.stemParts||[]).map(part=>{
         if(!part.clue)return escapeHTML(part.text);
         return '<span class="q-clue'+(found.has(String(part.clue))?' found':'')+'" title="关键词将在第2张卡中选择">'+escapeHTML(part.text)+'</span>';
       }).join('');
+      el.innerHTML=zh+englishLine(view?.stem);
     }
     function renderOptions(q,state){
       const el=host?.querySelector('#qOptions');
       if(!el)return;
       const selected=optionId(state?.selected||session().answer?.selectedOptionId);
       const submitted=!!(state?.submitted||session().answer?.submitted);
+      const view=displayView(q),displayById=new Map((view?.options||[]).map(item=>[String(item.id),item.display]));
       el.innerHTML=(q.options||[]).map(option=>{
         const id=optionId(option.id);
         let cls='q-option';
@@ -83,8 +86,9 @@
           if(option.correct||id===optionId(q.correctAnswer))cls+=' correct';
           else if(selected===id)cls+=' wrong';
         }
+        const pair=displayById.get(id);
         return '<button type="button" class="'+cls+'" data-option-id="'+escapeHTML(id)+'" aria-pressed="'+(selected===id?'true':'false')+'">'
-          +'<strong>'+escapeHTML(id)+'.</strong> '+escapeHTML(option.text)
+          +'<strong>'+escapeHTML(id)+'.</strong> '+escapeHTML(pair?.zh||option.text)+englishLine(pair)
           +'</button>';
       }).join('');
     }
@@ -116,7 +120,7 @@
       const currentSession=session();
       const state=legacyState();
       const heading=host.querySelector('#qQuestionHeading');
-      if(heading)heading.textContent='题目：'+String(q.title||'未命名题目');
+      if(heading){const view=displayView(q);heading.innerHTML='题目：'+escapeHTML(view?.title?.zh||q.title||'未命名题目')+englishLine(view?.title);}
       renderStem(q,state);
       renderOptions(q,state);
       renderConfidence(currentSession);

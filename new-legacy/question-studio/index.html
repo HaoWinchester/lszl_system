@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>旧学习活动设计器（兼容）｜题目管理</title>
+  <script>
+    (function(){
+      const params=new URLSearchParams(location.search),embedded=params.get('embed')==='entry';
+      if(embedded){document.documentElement.classList.add('kg-embedded');document.documentElement.dataset.embedMode='entry';return}
+      if(!params.has('standalone')&&/^(https?|file):$/.test(location.protocol))location.replace('../question-bank.html?mode=simple&step=questions&view=content&entry=paste');
+    })();
+  </script>
+  <link rel="stylesheet" href="teacher-workbench.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="../styles/workspace-panels.css" />
+  <link rel="stylesheet" href="../styles/workspace-placement.css" />
+</head>
+<body>
+  <div class="qs-app">
+    <header class="tw-topbar">
+      <a class="tw-brand" href="../teacher-workbench.html"><span class="tw-brand-mark">KG</span><span class="tw-brand-copy"><strong>教师内容工作台</strong><small>v8.6.1.2.1 · 从录入到发布</small></span></a>
+      <nav class="tw-tabs" aria-label="工作模块"><a href="../teacher-workbench.html">工作台</a><a class="active" href="../question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">题目管理</a><a href="../admin-subjects.html">科目与知识树</a><a href="../course-admin.html">配置中心</a></nav>
+      <div class="tw-user"><span class="tw-user-badge" id="qsShellAccount">本地教师</span><a href="../index.html">返回学员端</a></div>
+    </header>
+    <section class="tw-workflow" aria-label="内容工作流程"><span class="tw-step active"><b>1</b>录入活动</span><i class="tw-arrow"></i><span class="tw-step"><b>2</b>检查入库</span><i class="tw-arrow"></i><span class="tw-step"><b>3</b>配置内容</span><i class="tw-arrow"></i><span class="tw-step"><b>4</b>预览发布</span></section>
+    <section class="tw-guide"><div class="tw-guide-copy"><strong>当前步骤：录入并检查题目</strong><span>粘贴题目、修正结构、选择主知识点并预览。完成后提交到题库，不需要在这里配置课程。</span></div><div class="tw-guide-actions"><a href="../teacher-workbench.html">返回工作台</a><a class="primary" href="../question-bank.html">返回题目管理 →</a></div></section>
+
+    <section class="tw-commandbar qs-header">
+      <div class="tw-command-title"><p>QUESTION STUDIO v0.2.1.2</p><h1>旧学习活动设计器（兼容）</h1><span>普通考试题请统一在题目管理中录入；此页面仅保留旧活动包兼容能力。</span></div>
+      <div class="tw-command-actions qs-header-actions">
+        <button type="button" id="qsNewBtn">新建</button><button type="button" id="qsSampleBtn">载入示例</button><button type="button" id="qsImportBtn">导入 JSON</button><input type="file" id="qsImportFile" accept="application/json,.json" hidden /><button type="button" id="qsSaveDraftBtn">保存草稿</button><button type="button" id="qsBackupBtn">创建备份</button><button type="button" id="qsExportCurrentBtn">导出当前活动</button><button type="button" id="qsSubmitLibraryBtn">提交到题库</button><button type="button" class="primary" id="qsExportBtn">导出标准活动包</button>
+      </div>
+    </section>
+
+    <section class="qs-project-bar" aria-label="本批设置">
+      <label>本批科目<select id="qsBatchSubject"></select></label>
+      <label class="knowledge-picker">本批默认知识点<button type="button" class="qs-knowledge-button" id="qsBatchKnowledgeBtn"><span id="qsBatchKnowledgeLabel">请选择默认主知识点</span><b>选择</b></button><select id="qsBatchKnowledge" hidden></select></label>
+      <button type="button" id="qsApplyKnowledgeBtn">应用到全部活动</button>
+      <label>活动包 ID<input id="qsPackageId" value="question-studio-package" /></label><label>版本<input id="qsPackageVersion" type="number" min="1" step="1" value="1" /></label><label>作者<input id="qsAuthor" placeholder="可选" /></label>
+      <label class="backup-picker">历史备份<select id="qsBackupSelect"><option value="">暂无备份</option></select></label><button type="button" id="qsRestoreBackupBtn">恢复所选备份</button><span class="qs-mode-state" id="qsModeState"></span><span class="qs-save-state" id="qsSaveState" aria-live="polite">尚未保存</span>
+    </section>
+
+    <main class="qs-layout" data-workspace-group="question-studio">
+      <section class="qs-panel qs-source-panel" aria-labelledby="qsSourceTitle" data-workspace-panel="source-text" data-workspace-title="批量文本" data-workspace-controls-target=":scope > header"><header><div><span>01</span><h2 id="qsSourceTitle">批量文本</h2></div><button type="button" id="qsParseBtn" class="primary">解析文本</button></header><textarea id="qsRawText" spellcheck="false" placeholder="粘贴一道或多道题。多道题使用 ===== 下一题 ===== 分隔。"></textarea><div class="qs-source-help"><strong>支持规范模板与宽松标签识别</strong><span>题型：单项选择、关键词识别、开放表达、排序、连线配对。</span></div><div class="qs-activity-list-head"><strong>已解析活动</strong><button type="button" id="qsAddActivityBtn">＋ 手工新增</button></div><div class="qs-activity-list" id="qsActivityList"></div></section>
+      <section class="qs-panel qs-editor-panel" aria-labelledby="qsEditorTitle" data-workspace-panel="structured-editor" data-workspace-title="结构化修改" data-workspace-controls-target=":scope > header"><header><div><span>02</span><h2 id="qsEditorTitle">结构化修改</h2></div><div class="qs-question-nav" aria-label="试题定位"><button type="button" id="qsPrevActivityBtn" title="上一题">←</button><label><span>试题定位</span><select id="qsQuestionLocator" aria-label="选择要编辑的试题"><option value="">暂无试题</option></select></label><button type="button" id="qsNextActivityBtn" title="下一题">→</button><span class="qs-current-index" id="qsCurrentIndex">0 / 0</span></div></header><div class="qs-editor" id="qsEditor"><div class="qs-empty">请先解析文本或新增活动。</div></div></section>
+      <section class="qs-panel qs-preview-panel" aria-labelledby="qsPreviewTitle" data-workspace-panel="activity-preview" data-workspace-title="运行预览" data-workspace-controls-target=":scope > header"><header><div><span>03</span><h2 id="qsPreviewTitle">运行预览</h2></div><div class="qs-language-switch" role="group" aria-label="预览显示方式"><button type="button" class="active" data-preview-language="zh">中文</button><button type="button" data-preview-language="bilingual">中英对照</button></div></header><p class="qs-language-note" id="qsLanguageNote" hidden>英文仅供对照，请使用中文作答。</p><div class="qs-preview" id="qsPreview"><div class="qs-empty">选择活动后显示预览。</div></div></section>
+    </main>
+    <section class="qs-diagnostics" aria-labelledby="qsDiagnosticsTitle" data-workspace-panel="diagnostics" data-workspace-title="校验结果" data-workspace-controls-target=":scope > header"><header><div><span>04</span><h2 id="qsDiagnosticsTitle">校验结果</h2></div><div id="qsValidationSummary">0 个错误 · 0 个警告</div></header><div class="qs-diagnostic-list" id="qsDiagnostics"><p class="ok">等待活动数据。</p></div></section>
+  </div>
+
+  <dialog class="qs-knowledge-dialog" id="qsKnowledgeDialog">
+    <form method="dialog">
+      <header><div><p>KNOWLEDGE FINDER</p><h2>选择主知识点</h2></div><button value="cancel" aria-label="关闭">×</button></header>
+      <div class="qs-knowledge-context"><label><span>科目</span><select id="qsPickerSubject"></select></label><label><span>知识树</span><select id="qsPickerTaxonomy"></select></label></div>
+      <label class="qs-picker-search"><span>快速搜索</span><input id="qsPickerSearch" placeholder="名称、英文、编号、别名或完整路径" /></label>
+      <div class="qs-picker-tabs" role="tablist"><button type="button" class="active" data-picker-tab="browse">分级浏览</button><button type="button" data-picker-tab="recent">最近使用</button><button type="button" data-picker-tab="favorite">常用收藏</button></div>
+      <div class="qs-picker-breadcrumb" id="qsPickerBreadcrumb"></div>
+      <div class="qs-picker-results" id="qsPickerResults"></div>
+      <div class="qs-picker-selected" id="qsPickerSelected">尚未选择知识点</div>
+      <footer><button value="cancel">取消</button><button type="button" id="qsPickerFavoriteBtn">☆ 收藏当前</button><button type="button" class="primary" id="qsPickerConfirmBtn">确认选择</button></footer>
+    </form>
+  </dialog>
+
+  <div class="qs-toast" id="qsToast" role="status" aria-live="polite"></div>
+  <script src="activity-schema-v1.js"></script><script src="knowledge-taxonomy-v1.js"></script><script src="server-config.js"></script><script src="question-studio-sync.js"></script><script src="question-studio-parser.js"></script><script src="question-studio.js"></script><script src="../src/92-workspace-panel-manager.js"></script><script src="../src/99-embedded-workspace.js"></script>
+</body>
+</html>

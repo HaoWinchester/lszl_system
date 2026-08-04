@@ -105,8 +105,9 @@
     const api=window.KGWechatLogin;
     if(!api){panel.innerHTML='<div class="um-empty">微信登录模块未加载。</div>';return}
     const cfg=api.getConfig();
+    const authUrl=(cfg.enableOfficial&&cfg.appId)?api.buildOfficialAuthUrl():'';
     panel.innerHTML=`<div class="um-wechat-config">
-      <p class="um-wechat-note">微信扫码配置由服务器统一保存。AppSecret 只可在部署环境中设置，不会显示或存入浏览器。</p>
+      <p class="um-wechat-note">微信扫码配置由服务器统一保存；正式模式需要微信开放平台 AppID、授权回调域名和服务器换取 openid/unionid 的接口。</p>
       <div class="um-wechat-checks">
         <label><input type="checkbox" id="wxEnableDemo" ${cfg.enableDemo?'checked':''}> 启用扫码测试模式</label>
         <label><input type="checkbox" id="wxEnableOfficial" ${cfg.enableOfficial?'checked':''}> 启用正式微信开放平台模式</label>
@@ -114,13 +115,14 @@
       </div>
       <div class="um-wechat-grid">
         <label>微信开放平台 AppID<input id="wxAppId" value="${escapeHTML(cfg.appId)}" placeholder="wx1234567890abcdef"></label>
-        <label>授权回调地址 redirect_uri<input id="wxRedirectUri" value="${escapeHTML(cfg.redirectUri)}" placeholder="https://lszl.aihuanpu.com/api/v1/auth/wechat/callback"></label>
+        <label>授权回调地址 redirect_uri<input id="wxRedirectUri" value="${escapeHTML(cfg.redirectUri)}" placeholder="https://your-domain.com/index.html"></label>
+        <label>后端 code 换取用户接口<input id="wxBackendExchangeUrl" value="${escapeHTML(cfg.backendExchangeUrl)}" placeholder="https://your-api.com/auth/wechat/callback"></label>
         <label>微信授权 scope<select id="wxScope"><option value="snsapi_login" ${cfg.scope==='snsapi_login'?'selected':''}>snsapi_login（网站扫码）</option><option value="snsapi_userinfo" ${cfg.scope==='snsapi_userinfo'?'selected':''}>snsapi_userinfo（公众号网页授权）</option></select></label>
         <label>微信新用户默认角色<select id="wxDefaultRole"><option value="student" ${cfg.defaultRole==='student'?'selected':''}>学员</option><option value="viewer" ${cfg.defaultRole==='viewer'?'selected':''}>游客</option><option value="teacher" ${cfg.defaultRole==='teacher'?'selected':''}>教师/教研</option></select></label>
         <label>微信新用户默认科目<input id="wxDefaultSubject" value="${escapeHTML(cfg.defaultSubject||'PMP')}" placeholder="PMP"></label>
       </div>
-      <div class="um-wechat-actions"><button type="button" class="primary" id="wxSaveConfigBtn">保存微信配置</button></div>
-      <div class="um-wechat-preview">正式登录由服务器创建授权链接并校验回调状态；浏览器不会接触 AppSecret 或微信用户标识。</div>
+      <div class="um-wechat-actions"><button type="button" class="primary" id="wxSaveConfigBtn">保存微信配置</button><button type="button" id="wxPreviewAuthBtn" ${authUrl?'':'disabled'}>预览授权链接</button></div>
+      <div class="um-wechat-preview">${authUrl?escapeHTML(authUrl):'配置 AppID 并启用正式模式后，这里会显示微信授权地址预览。'}</div>
     </div>`;
   }
   function collectWechatConfig(){
@@ -131,6 +133,7 @@
       autoCreateUser:!!$('wxAutoCreate')?.checked,
       appId:$('wxAppId')?.value.trim()||'',
       redirectUri:$('wxRedirectUri')?.value.trim()||'',
+      backendExchangeUrl:$('wxBackendExchangeUrl')?.value.trim()||'',
       scope:$('wxScope')?.value||'snsapi_login',
       defaultRole:$('wxDefaultRole')?.value||'student',
       defaultSubject:$('wxDefaultSubject')?.value.trim()||'PMP'
@@ -143,6 +146,15 @@
     renderWechatConfig();
     toast('微信登录配置已保存');
   }
+  function previewWechatAuthUrl(){
+    const api=window.KGWechatLogin;if(!api)return;
+    const cfg=api.saveConfig(collectWechatConfig());
+    if(!cfg.appId){toast('请先填写 AppID');renderWechatConfig();return}
+    const url=api.buildOfficialAuthUrl();
+    prompt('微信授权地址预览，可复制给技术人员调试：',url);
+    renderWechatConfig();
+  }
+
   function renderPermissionMatrix(){
     const panel=$('ssPermissionMatrix');
     if(!panel)return;
@@ -452,78 +464,10 @@
     toast('日志已清空');
   }
 
-  const ANALYTICS_FEATURE_LABELS={graph:'图谱编辑',files:'文件管理',question_bank:'题库',training:'训练',recall:'回忆',learning_path:'学习路径'};
-  const ANALYTICS_OUTCOME_NOTES={graph:'保存图谱',files:'保存文件库',question_bank:'保存题库 / 题目',training:'提交答题',recall:'保存回忆',learning_path:'完成节点 / 测试'};
-  let analyticsAutoLoaded=false;
-  function fmtAnalyticsDate(daysAgo){
-    const d=new Date();
-    d.setDate(d.getDate()-daysAgo);
-    const mm=String(d.getMonth()+1).padStart(2,'0');
-    const dd=String(d.getDate()).padStart(2,'0');
-    return d.getFullYear()+'-'+mm+'-'+dd;
-  }
-  function initAnalyticsControls(){
-    const start=$('ssAnalyticsStart'),end=$('ssAnalyticsEnd');
-    if(start&&!start.value)start.value=fmtAnalyticsDate(29);
-    if(end&&!end.value)end.value=fmtAnalyticsDate(0);
-  }
-  async function loadFeatureAnalytics(){
-    const content=$('ssAnalyticsContent');
-    if(!content)return;
-    const start=$('ssAnalyticsStart'),end=$('ssAnalyticsEnd'),role=$('ssAnalyticsRole');
-    const startValue=(start&&start.value)||'',endValue=(end&&end.value)||'';
-    if(!startValue||!endValue){content.innerHTML='<div class="um-empty">请选择开始与结束日期。</div>';return}
-    if(startValue>endValue){content.innerHTML='<div class="um-empty">开始日期不能晚于结束日期。</div>';return}
-    content.innerHTML='<div class="um-empty">正在加载汇总数据…</div>';
-    let data;
-    try{
-      const params=new URLSearchParams({start:startValue,end:endValue});
-      if(role&&role.value)params.set('role',role.value);
-      const response=await fetch('/api/v1/system/feature-analytics?'+params.toString(),{credentials:'include'});
-      if(!response.ok)throw new Error('加载失败 ('+response.status+')');
-      data=await response.json();
-    }catch(error){
-      content.innerHTML='<div class="um-empty">汇总数据加载失败，请稍后重试。</div>';
-      return;
-    }
-    renderFeatureAnalytics(content,data);
-  }
-  function renderFeatureAnalytics(content,data){
-    const sampleSize=Number(data&&data.sampleSize||0);
-    if(sampleSize===0){content.innerHTML='<div class="um-empty">所选区间暂无功能使用记录，发布后开始累计。</div>';return}
-    const features=Array.isArray(data.features)?data.features:[];
-    const totalActive=features.reduce((sum,f)=>sum+Number(f&&f.activeUsers||0),0);
-    const totalKey=features.reduce((sum,f)=>sum+Number(f&&f.keyActions||0),0);
-    const summary=[
-      {label:'功能记录数',value:String(sampleSize)},
-      {label:'活跃用户合计',value:String(totalActive)},
-      {label:'关键操作次数',value:String(totalKey)},
-    ];
-    const maxActive=Math.max(1,...features.map(f=>Number(f&&f.activeUsers||0)));
-    const rows=features.map(f=>{
-      const active=Number(f&&f.activeUsers||0);
-      const rate=Number(f&&f.outcomeUserRate||0);
-      const pct=Math.round(rate*100);
-      const width=Math.round(active/maxActive*100);
-      const quality=(f&&f.quality&&f.quality.value!==null&&f.quality.value!==undefined)?Math.round(Number(f.quality.value)*100)+'%':'—';
-      return '<tr><td>'+escapeHTML(ANALYTICS_FEATURE_LABELS[f.featureKey]||f.featureKey)+'</td>'
-        +'<td>'+active+'</td><td>'+Number(f&&f.keyActions||0)+'</td><td>'+Number(f&&f.engagedSeconds||0)+'</td>'
-        +'<td><span class="ss-analytics-bubble" style="--w:'+width+'%"></span><span>'+pct+'%</span></td>'
-        +'<td>'+quality+'</td><td>'+escapeHTML(ANALYTICS_OUTCOME_NOTES[f.featureKey]||'')+'</td></tr>';
-    }).join('');
-    const trends=(Array.isArray(data.trends)&&data.trends.length)?data.trends.map(t=>'<li><span>'+escapeHTML(t.date||'')+'</span><span>事件 '+Number(t.events||0)+'</span><span>活跃 '+Number(t.activeUsers||0)+'</span></li>').join(''):'<li class="um-empty">暂无每日趋势。</li>';
-    const insights=(Array.isArray(data.insights)&&data.insights.length)?data.insights.map(i=>'<li><strong>'+escapeHTML(i.title||'')+'</strong><span>'+escapeHTML(i.detail||'')+'</span></li>').join(''):'<li class="um-empty">暂无洞察。</li>';
-    content.innerHTML='<div class="ss-analytics-summary">'+summary.map(s=>'<div><strong>'+escapeHTML(s.value)+'</strong><span>'+escapeHTML(s.label)+'</span></div>').join('')+'</div>'
-      +'<div class="ss-analytics-table-wrap"><table class="ss-analytics-table"><thead><tr><th>功能</th><th>活跃用户</th><th>关键操作</th><th>停留秒数</th><th>成果用户率</th><th>质量</th><th>成果定义</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
-      +'<div class="ss-analytics-trends"><h3>每日趋势</h3><ul>'+trends+'</ul></div>'
-      +'<div class="ss-analytics-insights"><h3>洞察</h3><ul>'+insights+'</ul></div>';
-  }
-
   function setTab(tab){
     const next=tab||'themes';
     document.querySelectorAll('[data-ss-tab]').forEach(btn=>btn.classList.toggle('active',btn.dataset.ssTab===next));
     document.querySelectorAll('[data-ss-panel]').forEach(panel=>panel.classList.toggle('active',panel.dataset.ssPanel===next));
-    if(next==='analytics'){initAnalyticsControls();if(!analyticsAutoLoaded){analyticsAutoLoaded=true;loadFeatureAnalytics();}}
   }
   function bindEvents(){
     document.querySelectorAll('[data-ss-tab]').forEach(btn=>btn.addEventListener('click',()=>setTab(btn.dataset.ssTab)));
@@ -548,10 +492,11 @@
         if(dot&&theme.primary)dot.style.background=theme.primary;
       });
     }
-        const wechatPanel=$('ssWechatConfigPanel');
-        if(wechatPanel)wechatPanel.addEventListener('click',event=>{
-          if(event.target.closest('#wxSaveConfigBtn'))saveWechatConfig();
-        });
+    const wechatPanel=$('ssWechatConfigPanel');
+    if(wechatPanel)wechatPanel.addEventListener('click',event=>{
+      if(event.target.closest('#wxSaveConfigBtn'))saveWechatConfig();
+      if(event.target.closest('#wxPreviewAuthBtn'))previewWechatAuthUrl();
+    });
     const subscriptionPanel=$('ssSubscriptionPanel');
     if(subscriptionPanel)subscriptionPanel.addEventListener('click',event=>{
       const resetAll=event.target.closest('#ssResetAllPlanSettingsBtn');
@@ -572,8 +517,6 @@
     });
     const clear=$('ssClearLogsBtn');
     if(clear)clear.addEventListener('click',clearLogs);
-    const analyticsApply=$('ssAnalyticsApply');
-    if(analyticsApply)analyticsApply.addEventListener('click',loadFeatureAnalytics);
   }
   function render(){
     renderRoleThemes();
@@ -587,7 +530,6 @@
     if(!ensureAccess())return;
     bindEvents();
     render();
-    initAnalyticsControls();
     window.addEventListener('kg-subscription-plan-change',()=>renderSubscriptionPlans());
     window.addEventListener('kg-subscription-order-change',()=>renderSubscriptionPlans());
     window.addEventListener('kg-subscription-redeem-code-change',()=>renderSubscriptionPlans());

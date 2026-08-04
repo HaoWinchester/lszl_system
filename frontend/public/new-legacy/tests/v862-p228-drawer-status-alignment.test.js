@@ -1,0 +1,10 @@
+'use strict';
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const root=path.resolve(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const css=read('styles/learning-practice-shell.css'),js=read('src/99-learning-practice-shell.js');
+assert(css.includes('v8.6.2 P2.2.8 — single question drawer/status baseline correction'));
+assert(css.includes('top:var(--qt-topbar-bottom,var(--lp-shell-height,64px))!important'));
+assert(css.includes('bottom:var(--qt-bottom-tool-gap,12px)!important'));
+assert(js.includes('function syncSingleQuestionChrome()'));
+assert(js.includes("'--qt-topbar-bottom'")&&js.includes("'--qt-bottom-tool-gap'"));
+console.log('v862-p228-drawer-status-alignment-static-ok');

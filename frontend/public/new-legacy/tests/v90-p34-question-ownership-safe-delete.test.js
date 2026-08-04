@@ -1,0 +1,43 @@
+'use strict';
+const fs=require('fs');
+const path=require('path');
+const assert=require('assert/strict');
+const ROOT=path.resolve(__dirname,'..');
+const read=file=>fs.readFileSync(path.join(ROOT,file),'utf8');
+const qhtml=read('question-bank.html');
+const admin=read('src/65-question-bank-admin.js');
+const classification=read('src/98-question-classification.js');
+const normal=read('src/60-question-bank.js');
+const recall=read('src/96-recall-question-source.js');
+const teacher=read('src/91-teacher-workbench-app.js');
+const css=read('styles/question-bank-admin.css');
+for(const id of ['qbQuestionLifecycleFilter','qbSelectPageQuestions','qbBulkToolbar','qbBulkKnowledgeDialog','qbBulkTagDialog','qbSafeDeleteDialog','qbPermanentDeleteDialog'])assert(qhtml.includes(`id="${id}"`),`${id} missing`);
+assert(qhtml.includes('已有试卷、课程、答题记录、成绩和统计不会受到影响'));
+assert(qhtml.includes('我已了解永久删除不可恢复'));
+assert(admin.includes("const QUESTION_PAGE_SIZE = 20"));
+assert(admin.includes("status:'deleted'"));
+assert(admin.includes("question.safe_delete.bulk"));
+assert(admin.includes("question.permanent_delete"));
+assert(admin.includes("question.restore.bulk"));
+assert(admin.includes("question.knowledge.bulk_update"));
+assert(admin.includes("question.tags.bulk_set"));
+assert(admin.includes("business_reference_protected"));
+assert(admin.includes("options.includeDeleted===true||!isQuestionDeleted(question)"));
+assert(admin.includes("paperCandidates(bank).filter")||admin.includes("function paperCandidates"));
+assert(admin.includes(".filter(question => !isQuestionDeleted(question))")||admin.includes("!isQuestionDeleted(question)"));
+assert(classification.includes("['deprecated','disabled','inactive','archived']"));
+assert(normal.includes('qbIsQuestionDeleted'));
+assert(recall.includes('KGPublishedPaperRepository'));
+assert(!recall.includes('kg_question_banks_published_v1'));
+assert(read('src/59-published-paper-repository.js').includes('questionSnapshots'));
+assert(read('src/59-published-paper-repository.js').includes('if(!snapshot||!question){missingCount+=1;return}')); 
+assert(teacher.includes("lifecycle?.status!=='deleted'"));
+assert(css.includes('.qb-bulk-toolbar'));
+assert(css.includes('.qb-question-row-actions'));
+// Bulk operations may mutate metadata/tags/lifecycle, but must never assign a new question id.
+for(const fn of ['bulkMoveKnowledge','applyBulkTags','confirmSafeDelete','restoreQuestionIds']){
+  const match=admin.match(new RegExp(`function ${fn}\\([^)]*\\)\\{([\\s\\S]*?)\\n  \\}`));
+  assert(match,`${fn} missing`);
+  assert(!/question\.id\s*=/.test(match[1]),`${fn} changes question ID`);
+}
+console.log('v90-p34-question-ownership-safe-delete-ok');

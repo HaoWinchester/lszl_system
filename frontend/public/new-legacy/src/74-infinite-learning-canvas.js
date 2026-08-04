@@ -47,7 +47,12 @@
     pointerMode:'edit',
     temporaryPanMode:false,
     temporaryPanReasons:new Set(),
-    rightPanPointerId:null
+    rightPanPointerId:null,
+    minimapMetrics:null,
+    minimapDrag:null,
+    entryFocusTimer:null,
+    entryFocusToken:0,
+    entryFocusPending:false
   };
 
   const byId=id=>document.getElementById(id);
@@ -311,7 +316,7 @@
     renderEdges();
     renderMinimap();
   }
-  function restoreFromSession(currentSession=session()){
+  function restoreFromSession(currentSession=session(),options={}){
     if(!currentSession)return;
     clearTimeout(state.saveTimer);
     state.saveTimer=null;
@@ -323,7 +328,7 @@
     state.completed=currentSession.status==='completed';
 
     const viewport=currentSession.canvas?.viewport||{};
-    if(!state.mobile){
+    if(options.restoreViewport!==false&&!state.mobile){
       state.panX=Number.isFinite(Number(viewport.x))?Number(viewport.x):state.panX;
       state.panY=Number.isFinite(Number(viewport.y))?Number(viewport.y):state.panY;
       state.zoom=clamp(Number(viewport.zoom||state.zoom),ZOOM_MIN,ZOOM_MAX);
@@ -334,7 +339,7 @@
       Object.assign(record.layout,normalizeLayout(savedCards[record.id],record.element));
     });
     applyAllCardLayouts();
-    applyViewportTransform();
+    if(options.restoreViewport!==false)applyViewportTransform();
     syncModeUI();
     syncFlowState({step:state.step,maxVisited:state.maxVisited,mode:state.mode,completed:state.completed},{focus:false});
   }
@@ -347,8 +352,13 @@
     })||false;
   }
   function updateZoomLabel(){
-    const label=byId('qtCanvasZoomLabel');
-    if(label)label.textContent=Math.round(state.zoom*100)+'%';
+    const value=Math.round(state.zoom*100),label=byId('qtCanvasZoomLabel'),slider=byId('qtCanvasZoomSlider');
+    if(label)label.textContent=value+'%';
+    if(slider&&document.activeElement!==slider)slider.value=String(Math.max(1,Math.min(400,value)));
+  }
+  function showCanvasZoomSlider(show=true){
+    const dock=byId('qtCanvasZoomDock'),popover=byId('qtCanvasZoomSliderPopover');if(!dock||!popover)return;
+    dock.classList.toggle('slider-open',!!show);popover.setAttribute('aria-hidden',show?'false':'true');
   }
   function scheduleViewportSave(){
     return state.kernel?.viewport?.schedulePersist?.()||false;
@@ -399,11 +409,13 @@
       persist:options.persist,
       source:'focus'
     });
-    record.element.animate?.([
-      {boxShadow:'0 18px 50px rgba(31,41,65,.13)'},
-      {boxShadow:'0 0 0 6px rgba(109,93,252,.18),0 28px 80px rgba(31,41,65,.18)'},
-      {boxShadow:''}
-    ],{duration:520,easing:'ease-out'});
+    if(options.highlight!==false){
+      record.element.animate?.([
+        {boxShadow:'0 18px 50px rgba(31,41,65,.13)'},
+        {boxShadow:'0 0 0 6px rgba(109,93,252,.18),0 28px 80px rgba(31,41,65,.18)'},
+        {boxShadow:''}
+      ],{duration:520,easing:'ease-out'});
+    }
     return focused;
   }
 
@@ -413,6 +425,46 @@
   function focusStep(step,options={}){
     step=clamp(Number(step||state.step),1,5);
     return focusCard(cardIdForStep(step),options);
+  }
+  function cancelEntryFocus(){
+    state.entryFocusToken+=1;
+    state.entryFocusPending=false;
+    if(state.entryFocusTimer){
+      clearTimeout(state.entryFocusTimer);
+      state.entryFocusTimer=null;
+    }
+    document.body?.classList.remove('qt-canvas-entry-focusing');
+  }
+  function scheduleFirstCardEntryFocus(reason='entry',options={}){
+    const token=++state.entryFocusToken;
+    state.entryFocusPending=true;
+    if(state.entryFocusTimer)clearTimeout(state.entryFocusTimer);
+    cancelSmoothZoom();
+    state.kernel?.viewport?.cancelPersist?.();
+    document.body?.classList.add('qt-canvas-entry-focusing');
+    const delay=Math.max(0,Number(options.delay??24));
+    state.entryFocusTimer=setTimeout(()=>{
+      state.entryFocusTimer=null;
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        if(token!==state.entryFocusToken||!state.initialized)return;
+        applyAllCardLayouts();
+        clearPathSelection();
+        focusStep(1,{instant:true,persist:false,highlight:false,zoom:options.zoom});
+        renderEdges();
+        renderMinimap();
+        state.entryFocusPending=false;
+        document.documentElement?.classList?.remove?.('qt-canvas-initial-pending');
+        document.body?.classList.remove('qt-canvas-entry-focusing');
+        document.body?.classList.add('qt-canvas-entry-settled');
+        setTimeout(()=>document.body?.classList.remove('qt-canvas-entry-settled'),220);
+        try{
+          global.dispatchEvent(new CustomEvent('kg:single-question-entry-focused',{
+            detail:{reason,step:1,cardId:cardIdForStep(1)}
+          }));
+        }catch(e){}
+      }));
+    },delay);
+    return true;
   }
   function clientToWorld(clientX,clientY){
     return state.kernel?.viewport?.clientToWorld?.(clientX,clientY)||{x:0,y:0};
@@ -457,7 +509,7 @@
     setTimeout(()=>focusStep(state.step,{persist:true}),0);
   }
   function statusForStep(step){
-    if(state.completed)return step===5?'current':'done';
+    if(state.completed)return 'done';
     if(step===state.step)return 'current';
     if(step<state.step)return 'done';
     if(state.mode==='explore')return 'available';
@@ -767,6 +819,7 @@
     );
     const offsetX=padding-bounds.left*scale;
     const offsetY=padding-bounds.top*scale;
+    state.minimapMetrics={bounds,scale,offsetX,offsetY,rootWidth,rootHeight};
     world.innerHTML=[...state.cards.values()].map(record=>{
       const l=record.layout;
       return '<span class="qt-canvas-minimap-card '+(record.step===state.step?'current':'')+'" style="left:'+(offsetX+l.x*scale)+'px;top:'+(offsetY+l.y*scale)+'px;width:'+Math.max(3,l.width*scale)+'px;height:'+Math.max(3,l.height*scale)+'px"></span>';
@@ -782,6 +835,46 @@
     view.style.width=Math.max(5,worldWidth*scale)+'px';
     view.style.height=Math.max(5,worldHeight*scale)+'px';
   }
+
+  function bindMinimap(){
+    const dock=byId('qtMinimapDock'),root=byId('qtCanvasMinimap'),view=byId('qtCanvasMinimapView'),toggle=byId('qtMinimapToggleBtn');
+    if(!dock||!root||!view||!toggle)return;
+    toggle.addEventListener('click',()=>{
+      const open=dock.classList.contains('collapsed');
+      dock.classList.toggle('collapsed',!open);
+      toggle.setAttribute('aria-expanded',open?'true':'false');
+      toggle.setAttribute('aria-label',open?'收起缩略图':'打开缩略图');
+      toggle.title=open?'收起缩略图':'打开缩略图';
+      root.setAttribute('aria-hidden',open?'false':'true');
+      if(open)requestAnimationFrame(renderMinimap);
+    });
+    view.addEventListener('pointerdown',event=>{
+      if(event.button!==0||state.mobile)return;
+      const metrics=state.minimapMetrics;if(!metrics)return;
+      const viewRect=view.getBoundingClientRect();
+      state.minimapDrag={pointerId:event.pointerId,offsetX:event.clientX-viewRect.left,offsetY:event.clientY-viewRect.top};
+      view.classList.add('dragging');view.setPointerCapture?.(event.pointerId);
+      event.preventDefault();event.stopPropagation();
+    });
+    view.addEventListener('pointermove',event=>{
+      const drag=state.minimapDrag,metrics=state.minimapMetrics;
+      if(!drag||drag.pointerId!==event.pointerId||!metrics||state.mobile)return;
+      const rootRect=root.getBoundingClientRect(),viewRect=view.getBoundingClientRect();
+      const maxLeft=Math.max(0,rootRect.width-viewRect.width),maxTop=Math.max(0,rootRect.height-viewRect.height);
+      const left=clamp(event.clientX-rootRect.left-drag.offsetX,0,maxLeft),top=clamp(event.clientY-rootRect.top-drag.offsetY,0,maxTop);
+      const worldLeft=(left-metrics.offsetX)/metrics.scale,worldTop=(top-metrics.offsetY)/metrics.scale;
+      setViewport({x:-worldLeft*state.zoom,y:-worldTop*state.zoom,zoom:state.zoom},{persist:false,source:'minimap-drag'});
+      event.preventDefault();event.stopPropagation();
+    });
+    const finish=event=>{
+      const drag=state.minimapDrag;if(!drag||drag.pointerId!==event.pointerId)return;
+      state.minimapDrag=null;view.classList.remove('dragging');
+      try{view.releasePointerCapture?.(event.pointerId)}catch(_){}
+      scheduleViewportSave();event.preventDefault();event.stopPropagation();
+    };
+    view.addEventListener('pointerup',finish);view.addEventListener('pointercancel',finish);
+  }
+
   function bindToolbar(){
     byId('qtCanvasPointerModeBtn')?.addEventListener('click',togglePointerMode);
     byId('qtGuidedModeBtn')?.addEventListener('click',()=>setMode('guided'));
@@ -810,17 +903,21 @@
     });
     byId('qtCanvasZoomLabel')?.addEventListener('click',()=>{
       const rect=state.viewport.getBoundingClientRect();
-      smoothZoomAt(1,rect.left+rect.width/2,rect.top+rect.height/2,{
-        duration:230,
-        persist:true,
-        source:'reset'
-      });
+      smoothZoomAt(1,rect.left+rect.width/2,rect.top+rect.height/2,{duration:230,persist:true,source:'percent-reset'});
+      showCanvasZoomSlider(true);
     });
+    byId('qtCanvasZoomSlider')?.addEventListener('input',event=>{const rect=state.viewport.getBoundingClientRect(),scale=Number(event.target.value)/100;showCanvasZoomSlider(true);smoothZoomAt(scale,rect.left+rect.width/2,rect.top+rect.height/2,{duration:0,persist:true,source:'slider'});});
+    byId('qtCanvasZoomSlider')?.addEventListener('pointerdown',event=>event.stopPropagation());
+    document.addEventListener('pointerdown',event=>{const dock=byId('qtCanvasZoomDock');if(dock?.classList.contains('slider-open')&&!dock.contains(event.target))showCanvasZoomSlider(false)},true);
+    document.addEventListener('keydown',event=>{if(event.key==='Escape')showCanvasZoomSlider(false)});
     byId('qtCanvasFitBtn')?.addEventListener('click',()=>fitAll());
     byId('qtCanvasFocusBtn')?.addEventListener('click',()=>focusStep(state.step));
+    byId('qtQuestionResetBtn')?.addEventListener('click',()=>{
+      if(typeof resetQuestionTrainer==='function')resetQuestionTrainer();
+    });
     byId('qtCanvasResetBtn')?.addEventListener('click',resetLayout);
   }
-  function applyResponsiveMode(force=false){
+  function applyResponsiveMode(force=false,options={}){
     const nextMobile=isMobile();
     if(!force&&nextMobile===state.mobile&&state.initialized)return;
     state.gesture=null;
@@ -844,7 +941,7 @@
       global.KGCardRuntime?.setMode?.('guided');
     }
     syncFlowState({mode:state.mode},{focus:false});
-    setTimeout(()=>focusStep(state.step,{instant:true,persist:false}),0);
+    if(options.focus!==false)setTimeout(()=>focusStep(state.step,{instant:true,persist:false}),0);
   }
   function bindEvents(){
     state.viewport.addEventListener('pointerdown',beginPan);
@@ -888,7 +985,7 @@
       const eventType=String(event.detail?.eventType||'');
       const viewport=current.canvas?.viewport;
       const cards=current.canvas?.cards;
-      if(eventType==='CANVAS_VIEWPORT_UPDATED'&&viewport&&!state.gesture&&!state.mobile){
+      if(eventType==='CANVAS_VIEWPORT_UPDATED'&&viewport&&!state.gesture&&!state.mobile&&!state.entryFocusPending&&!document.body.classList.contains('qt-question-switching')){
         state.panX=Number.isFinite(Number(viewport.x))?Number(viewport.x):state.panX;
         state.panY=Number.isFinite(Number(viewport.y))?Number(viewport.y):state.panY;
         state.zoom=clamp(Number(viewport.zoom||state.zoom),ZOOM_MIN,ZOOM_MAX);
@@ -906,21 +1003,21 @@
         completed:current.status==='completed'
       },{focus:false});
       renderKeywordCard();
-      if(eventType==='CANVAS_VIEWPORT_UPDATED')applyViewportTransform();
+      if(eventType==='CANVAS_VIEWPORT_UPDATED'&&!state.entryFocusPending&&!document.body.classList.contains('qt-question-switching'))applyViewportTransform();
     });
     global.addEventListener('kg:learning-session-changed',event=>{
-      restoreFromSession(event.detail?.session);
+      restoreFromSession(event.detail?.session,{restoreViewport:false});
       renderKeywordCard();
-      if(state.mode==='guided')setTimeout(()=>focusStep(state.step,{instant:true,persist:false}),0);
+      scheduleFirstCardEntryFocus('learning-session-changed');
     });
     global.addEventListener('kg:learning-session-reset',event=>{
-      restoreFromSession(event.detail?.session);
+      restoreFromSession(event.detail?.session,{restoreViewport:false});
       renderKeywordCard();
-      setTimeout(()=>focusStep(1,{instant:true,persist:false}),0);
+      scheduleFirstCardEntryFocus('learning-session-reset');
     });
     global.addEventListener('kg:question-changed',()=>{
       renderKeywordCard();
-      if(state.mode==='guided')setTimeout(()=>focusStep(state.step,{instant:true,persist:false}),0);
+      scheduleFirstCardEntryFocus('question-changed');
     });
   }
   function init(){
@@ -933,16 +1030,16 @@
     state.initialized=true;
     registerCards();
     initEdgeLayer();
-    applyResponsiveMode(true);
+    applyResponsiveMode(true,{focus:false});
     updatePointerModeUI();
-    restoreFromSession();
+    restoreFromSession(undefined,{restoreViewport:false});
     renderKeywordCard();
     bindToolbar();
+    bindMinimap();
     bindEvents();
     requestAnimationFrame(()=>{
       applyAllCardLayouts();
-      if(state.mode==='guided')focusStep(state.step,{instant:true,persist:false});
-      else applyViewportTransform();
+      scheduleFirstCardEntryFocus('initial-entry',{delay:0});
       renderMinimap();
       try{
         global.dispatchEvent(new CustomEvent('kg:canvas-ready',{
@@ -955,6 +1052,8 @@
   const api=Object.freeze({
     init,
     focusStep,
+    scheduleFirstCardEntryFocus,
+    cancelEntryFocus,
     fitAll,
     resetLayout,
     setMode,

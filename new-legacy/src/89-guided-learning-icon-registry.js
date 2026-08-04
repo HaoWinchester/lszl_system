@@ -49,6 +49,9 @@
   register('choice',{
     body:'<circle cx="5" cy="7" r="1.7" fill="currentColor"/><circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="5" cy="17" r="1.7" fill="currentColor"/><path d="M9 7h10M9 12h10M9 17h7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'
   });
+  register('ordering',{
+    body:'<path d="M7 5h12M7 12h12M7 19h12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><path d="m3.5 4 1.5 1.5L3.5 7M3.5 11 5 12.5 3.5 14M3.5 18 5 19.5 3.5 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'
+  });
   register('matching',{
     body:'<path d="M9.2 14.8 7.6 16.4a3.4 3.4 0 1 1-4.8-4.8l3.1-3.1a3.4 3.4 0 0 1 4.8 0" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="m14.8 9.2 1.6-1.6a3.4 3.4 0 1 1 4.8 4.8l-3.1 3.1a3.4 3.4 0 0 1-4.8 0" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="m8.6 15.4 6.8-6.8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'
   });

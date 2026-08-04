@@ -299,7 +299,8 @@
     groups: HOME_TOOL_GROUPS,
     render: renderToolbar,
     bindHandlers,
-    registerActions
+    registerActions,
+    hideTransientMenus:()=>closeFloatingSubmenus()
   };
 
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", renderToolbar);

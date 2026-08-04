@@ -13,7 +13,7 @@ const isCoarse=matchMedia('(pointer: coarse)').matches;
 function uid(p){const c=globalThis.crypto;return p+(c&&c.randomUUID?c.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36))}
 function baseState(){return{meta:{title:'知识点关系图谱',subject:'通用课程',audience:'学员自学 / 课堂共创',description:'用于梳理不同学科、课程或考试的知识点关系。'},viewport:{x:260,y:170,scale:1},defaults:{...DEFAULTS},focusMode:false,selectedNodeId:null,selectedLinkId:null,linkSourceId:null,nodes:[],links:[],importedFlashcards:[],flashReviews:{}}}
 function makeNode(title,x,y,color,category='',level='基础',keywords='',summary='',notes='',size=''){return{id:uid('n'),title,x,y,color,category,level,keywords,summary,notes,size}}
-function makeLink(from,to,type='关联',note='',lineStyle=DEFAULTS.linkStyle,color=DEFAULTS.linkColor,pathStyle=DEFAULTS.linkPathStyle){return{id:uid('l'),from,to,type,note,lineStyle,color,pathStyle}}
+function makeLink(from,to,type='',note='',lineStyle=DEFAULTS.linkStyle,color=DEFAULTS.linkColor,pathStyle=DEFAULTS.linkPathStyle){return{id:uid('l'),from,to,type,note,lineStyle,color,pathStyle}}
 function templateState(kind='pmp'){
   const s=baseState();
   if(kind==='acp'){
@@ -136,7 +136,7 @@ function templateState(kind='pmp'){
 }
 let state=templateState('pmp');
 let saveTimer=null,lastSavedSnapshot='',hoverDetailNodeId=null,hoverDetailTimer=null,detailDrag=null,detailPanelDragged=false;
-let selectedNodeIds=new Set(),boxSelect=null;
+let selectedNodeIds=new Set(),selectedLinkIds=new Set(),boxSelect=null;
 function safeString(v,fallback='',max=3000){const s=String(v??fallback).trim();return s.length>max?s.slice(0,max):s}
 function safeNumber(v,fallback=0,min=-50000,max=50000){const n=Number(v);return Number.isFinite(n)?clamp(n,min,max):fallback}
 function safeColor(v,fallback='#64748b'){const s=String(v||'').trim();return SAFE_HEX_COLOR.test(s)?s:fallback}
@@ -177,7 +177,7 @@ function sanitizeState(data={}){
     if(!l||typeof l!=='object')return null;
     const from=safeString(l.from,'',120),to=safeString(l.to,'',120);if(!nodeIds.has(from)||!nodeIds.has(to)||from===to)return null;
     let id=safeString(l.id,'',120)||uid('l');if(linkIds.has(id))id=uid('l');linkIds.add(id);
-    return{id,from,to,type:safeString(l.type||'关联','关联',60),note:safeString(l.note||'','',1200),lineStyle:LINE_STYLES.has(l.lineStyle)?l.lineStyle:DEFAULTS.linkStyle,pathStyle:LINE_PATH_STYLES.has(l.pathStyle)?l.pathStyle:DEFAULTS.linkPathStyle,color:safeColor(l.color,DEFAULTS.linkColor)};
+    return{id,from,to,type:safeString(l.type??'','',60),note:safeString(l.note||'','',1200),lineStyle:LINE_STYLES.has(l.lineStyle)?l.lineStyle:DEFAULTS.linkStyle,pathStyle:LINE_PATH_STYLES.has(l.pathStyle)?l.pathStyle:DEFAULTS.linkPathStyle,color:safeColor(l.color,DEFAULTS.linkColor)};
   }).filter(Boolean);
   const selectedNode=safeString(input.selectedNodeId,'',120),selectedLink=safeString(input.selectedLinkId,'',120),linkSource=safeString(input.linkSourceId,'',120);
   s.selectedNodeId=nodeIds.has(selectedNode)?selectedNode:null;

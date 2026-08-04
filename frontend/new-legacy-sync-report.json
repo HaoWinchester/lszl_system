@@ -1,12 +1,11 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v8.6.28",
-  "toVersion": "v8.6.29",
+  "fromVersion": "v9.0-p4.1.8",
+  "toVersion": "v9.0-p4.1.9",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "src/10-graph-editor.js",
       "styles/main.css"
     ],
     "removed": []

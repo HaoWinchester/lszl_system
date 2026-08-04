@@ -1,0 +1,12 @@
+'use strict';
+const fs=require('fs'),path=require('path'),assert=require('assert'),root=path.resolve(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const h=read('question-training.html');
+assert(!h.includes('id="qtOpenWorkspaceBtn"'));assert(!h.includes('class="qt-session-metric"'));assert(!h.includes('class="qt-teacher-menu"'));
+assert(!h.includes('qt-learning-head'));assert(h.includes('qt-fullscreen-learning-surface'));assert(h.includes('qt-canvas-topline'));
+assert(!h.includes('id="qtMultiCanvasBtn"'));assert(!h.includes('id="qtGuidedModeBtn"'));assert(!h.includes('id="qtExploreModeBtn"'));assert(!h.includes('qt-canvas-help'));
+assert(h.includes('id="qtFontScaleBtn"'));assert(!h.includes('qt-canvas-font-menu'));
+const a=read('src/cards/answer-card.js');['qPaperBar','qPaperSelect','qStartPaperBtn','qExitPaperBtn','qPaperProgress'].forEach(x=>assert(!a.includes(x)));
+const n=read('src/66-question-navigator.js');assert(!n.includes('data-add-question-index'));assert(!n.includes('qt-question-add-workspace'));assert(!n.includes('qt-question-workspace-mark'));
+const f=read('src/80-question-font-scale.js');assert(f.includes("QUESTION_FONT_CYCLE_LEVELS=['normal','large','xlarge']"));assert(f.includes("closest('#qtFontScaleBtn')"));
+assert(!read('src/73-guided-learning-canvas.js').includes("setInterval(()=>{const el=byId('qtElapsedTime')"));
+console.log('v862-p226-single-deep-cleanup-static-ok');

@@ -1,0 +1,69 @@
+/* v8.6.2 P2.2.21 — account capsule + stable Step 1 entry view */
+
+/* The single-question page now uses the same account capsule as Knowledge Graph / Multi-question. */
+.question-training-page .qt-topbar .account-menu-shell{
+  flex:0 0 auto;
+}
+.question-training-page .qt-topbar .account-menu-trigger{
+  min-height:36px;
+  height:36px;
+  max-width:250px;
+  padding:0 11px;
+  border:1px solid rgba(248,113,113,.30);
+  border-radius:999px;
+  background:#fff;
+  box-shadow:none;
+}
+.question-training-page .qt-topbar .account-menu{
+  z-index:1200;
+}
+.question-training-page .qt-topbar>.qt-actions>.auth-login-btn,
+.question-training-page .qt-topbar>.qt-actions>.auth-logout-btn{
+  display:none!important;
+}
+
+/* During the coalesced entry focus, suppress transform animation and interaction.
+   The final Step 1 viewport is applied once, then controls return immediately. */
+.question-training-page.qt-canvas-entry-focusing #qtCanvasWorld{
+  transition:none!important;
+}
+.question-training-page.qt-canvas-entry-focusing #qtCanvasViewport{
+  pointer-events:none;
+}
+.question-training-page.qt-canvas-entry-focusing .qt-canvas-minimap-viewport{
+  transition:none!important;
+}
+
+@media(max-width:760px){
+  .question-training-page .qt-topbar .account-menu-trigger{
+    max-width:170px;
+  }
+}
+
+
+/* First page paint is held until the final Step 1 transform is ready. */
+html.qt-canvas-initial-pending .question-training-page #qtCanvasWorld{
+  opacity:0!important;
+  transition:none!important;
+}
+.question-training-page #qtCanvasWorld{
+  transition:opacity .16s ease;
+}
+.question-training-page.qt-canvas-entry-focusing #qtCanvasWorld{
+  opacity:.18;
+  transition:opacity .10s ease!important;
+}
+.question-training-page.qt-canvas-entry-settled #qtCanvasWorld{
+  animation:qt-canvas-step1-reveal .20s ease-out;
+}
+@keyframes qt-canvas-step1-reveal{
+  from{opacity:.18}
+  to{opacity:1}
+}
+@media(prefers-reduced-motion:reduce){
+  .question-training-page #qtCanvasWorld,
+  .question-training-page.qt-canvas-entry-settled #qtCanvasWorld{
+    transition:none!important;
+    animation:none!important;
+  }
+}

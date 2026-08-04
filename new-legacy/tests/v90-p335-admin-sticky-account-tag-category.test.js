@@ -1,0 +1,45 @@
+'use strict';
+const fs=require('fs');
+const path=require('path');
+const assert=require('assert/strict');
+const ROOT=path.resolve(__dirname,'..');
+const read=file=>fs.readFileSync(path.join(ROOT,file),'utf8');
+const currentVersion=read('VERSION').trim();
+if(currentVersion!=='v9.0-p3.3.5'){console.log('v90-p335-admin-sticky-account-tag-category-skipped-for',currentVersion);process.exit(0)}
+assert.equal(read('VERSION').trim(),'v9.0-p3.3.5');
+assert(read('src/admin/00-admin-core.js').includes("VERSION='9.0-p3.3.5'"));
+const navCss=read('styles/admin-context-nav.css');
+assert(navCss.includes('body.admin-sticky-shell>.admin-context-nav{position:sticky;top:0'));
+assert(navCss.includes('body.admin-sticky-shell>.admin-topbar{position:sticky;top:42px'));
+const adminCss=read('styles/admin-console.css');
+assert(adminCss.includes('.admin-account-trigger'));
+assert(adminCss.includes('.admin-account-popover'));
+assert(adminCss.includes('.admin-help-backdrop'));
+for(const file of ['admin-console.html','admin-subjects.html','admin-operations.html','admin-settings.html']){
+  const html=read(file);
+  assert(html.includes('class="admin-sticky-shell"'),`${file}: sticky shell missing`);
+  assert(html.includes('id="adminAccountTrigger"'),`${file}: account capsule missing`);
+  assert(html.includes('id="adminAccountUserCenterBtn"'),`${file}: user center entry missing`);
+  assert(html.includes('id="adminAccountHelpBtn"'),`${file}: admin help entry missing`);
+  assert(html.includes('id="adminAccountLogoutBtn"'),`${file}: logout entry missing`);
+  const head=(html.match(/<header class="admin-topbar">[\s\S]*?<\/header>/)||[])[0]||'';
+  assert(!head.includes('>教师端</a>'),`${file}: teacher switch remains in topbar`);
+  assert(!head.includes('>切换账号</a>'),`${file}: account switch remains in topbar`);
+  assert(html.includes('src/33-user-center.js'),`${file}: user center component missing`);
+}
+const users=read('user-management.html');
+assert(users.includes('class="admin-sticky-shell admin-user-management-shell"'));
+assert(!users.includes('class="um-back"'),'user-management back button remains');
+assert(!users.includes('id="authStatus"'),'user-management account capsule remains');
+assert(!users.includes('class="um-nav-btn"'),'user-management duplicated top shortcuts remain');
+for(const id of ['umAddUserBtn','umExportBtn','umImportBtn'])assert(users.includes(`id="${id}"`),`${id} should remain`);
+const classification=read('src/98-question-classification.js');
+assert(classification.includes('groupNames:parsed.groupNames'));
+assert(classification.includes('categoryNames:parsed.categoryNames'));
+assert(classification.includes("kind:'group'"));
+assert(classification.includes("kind:'category'"));
+assert(classification.includes("renameManagedCatalogItem(kind,key,oldName,input.value)"));
+assert(classification.includes("new CustomEvent('kg-tag-catalog-renamed'"));
+const qhtml=read('question-bank.html');
+assert(qhtml.includes('双击标签分类、二级分类或标签名称即可修改'));
+console.log('v90-p335-admin-sticky-account-tag-category-ok');

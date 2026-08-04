@@ -1,0 +1,38 @@
+{
+  "release": "v9.0-p3.3.3.3",
+  "baseline": "v9.0-p3.3.3.2",
+  "scope": "full batch question preview parity with single preview and full-width question workspace",
+  "constraints": {
+    "batchPreviewMatchesSingle": true,
+    "fullQuestionDetailsInBatchPreview": true,
+    "fullWidthQuestionWorkspace": true,
+    "multiQuestionPreviewNavigation": true,
+    "batchSeparatorStable": true,
+    "batchDefaultPanelViewportSafe": true,
+    "batchDefaultClassificationPreserved": true,
+    "perQuestionClassificationOverridePreserved": true,
+    "singlePrimaryKnowledgePoint": true,
+    "semanticKnowledgeGuessing": false,
+    "questionTypeLayoutChanged": false,
+    "paperQuestionIdsUnaffected": true,
+    "maxTaxonomyDepth": 9,
+    "p34QuestionBulkMoveImplemented": false,
+    "lightweightTagRenameIncluded": false
+  },
+  "changedFileSha256": {
+    "CHANGELOG.md": "4a53d413c50ffa06629a718705a9f4d2c91c65cdc2eea256017280f553ffa67d",
+    "README.md": "f788831b5a10787428dcd7ce7b33b5e77d0125113380bc7d5c568ea4c0122276",
+    "VERSION": "65c369621dd2676eccfcd2db1b0d2784c21b595987fd2c20e5dc8abf6a516219",
+    "src/admin/00-admin-core.js": "f9e2d5221e92e906dfbf3fca9d5957339b994d9ce4a967654e460156e58e1c52",
+    "src/97-teacher-question-workflow.js": "c87da3041689e3f9c63a8e5a7d846d31fd9a59b0a90dc69316a212dbd0f0e4f9",
+    "styles/teacher-question-workflow.css": "84349c14957428108facb6940abb5a737056c29c91abece471320ce1072293d2",
+    "tests/v90-p3331-batch-default-classification.test.js": "14debb4b7a1ab5b8d7882bdb3c24ad9dbeaaaf4c39f6d7724ad47c27e8a85da7",
+    "tests/v90-p3331-batch-default-classification-browser.py": "63f1659a7e0e581773cee76b3db9b80256ddddbbd3fc9704c682d5221df2e381",
+    "tests/v90-p3332-data-integrity.test.js": "5a00842065f84bebaee6ccdf170732a9ce6553e98fba9b5cf2026d5ed8f8419b",
+    "V9.0_P3.3.3.3_FULL_BATCH_PREVIEW_LAYOUT_REPORT.md": "99e9833aef04267dbf5a2bfa4d7d7dc0b53fc38c2817d9ec885d8ada251ec886",
+    "V9.0_P3.3.3.3_QUICK_START.md": "d97c5a00543643104d9305b51d8ef055fb8dbf9df4949275493c2c2160eef4c7",
+    "tests/v90-p3333-full-batch-preview-layout.test.js": "80124d4410b2f94ccf581b13476f64ae8c791f7867669e74a417d625796a1c1b",
+    "tests/v90-p3333-full-batch-preview-layout-browser.py": "6fbdaff12bda8bcc72a5c8da5877a98a858a79eaa9b5065db5f53ecf0f024ad2",
+    "tests/v90-p3333-data-integrity.test.js": "9b66beaad36d4d31b1ddf77428ae3c10b35c88a2d603b2804da587b3f5c063c9"
+  }
+}

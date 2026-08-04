@@ -31,7 +31,7 @@ function authPasswordHash(username,password,salt){return AuthCore.passwordHash?A
 function authMsg(text,ok=false){const el=$('authMsg');if(!el)return;el.textContent=text||'';el.classList.toggle('ok',!!ok)}
 function authOpen(reason='该操作需要登录后才能使用。'){const m=$('authModal');const r=$('authReason');if(r)r.textContent=reason;if(m)m.classList.add('show');authMsg('');setTimeout(()=>$('authUsername')?.focus(),60)}
 function authClose(){$('authModal')?.classList.remove('show')}
-function authRenderStatus(){const status=$('authStatus'),login=$('authLoginBtn'),logout=$('authLogoutBtn');const roleApi=window.KGRolePermissions;if(roleApi){roleApi.applyTheme();if(status)roleApi.renderStatus(status);roleApi.decoratePermissionElements()}else if(authIsLoggedIn()){if(status)status.textContent='已登录：'+authCurrentUser.username}else{if(status)status.textContent='未登录 · 游客'}if(login)login.style.display=login.classList.contains('account-hidden-trigger')?'none':(authIsLoggedIn()?'none':'inline-flex');if(logout)logout.style.display=logout.classList.contains('account-hidden-trigger')?'none':(authIsLoggedIn()?'inline-flex':'none')}
+function authRenderStatus(){const status=$('authStatus'),login=$('authLoginBtn'),logout=$('authLogoutBtn');const roleApi=window.KGRolePermissions;if(roleApi){roleApi.applyTheme();if(status)roleApi.renderStatus(status);roleApi.decoratePermissionElements()}else if(authIsLoggedIn()){if(status)status.textContent='已登录：'+authCurrentUser.username}else{if(status)status.textContent='未登录 · 游客'}if(login)login.style.display=authIsLoggedIn()?'none':'inline-flex';if(logout)logout.style.display=authIsLoggedIn()?'inline-flex':'none'}
 function authLoadCurrentSpace(){authRenderStatus();if(typeof qBankState==='object'){qBankState.banks=null;qBankState.papers=null;qBankState.scope=null}}
 function authLogin(username,password){
   username=authCleanUsername(username);password=String(password||'');
@@ -43,7 +43,7 @@ function authLogin(username,password){
   if(user.status==='paused'){authMsg('该账号已暂停，请联系管理员恢复后再登录。');return false}
   user.lastLoginAt=Date.now();user.lastActiveAt=Date.now();user.updatedAt=Date.now();users[username]=user;authSaveUsers(users);
   authCurrentUser={username};if(AuthCore.setCurrentUsername)AuthCore.setCurrentUsername(username);else localStorage.setItem(AUTH_SESSION_KEY,username);authLogAction('用户登录',username);authClose();authLoadCurrentSpace();
-  if(typeof qbLoadBanks==='function'){qbLoadBanks();qbApplyCurrentQuestion&&qbApplyCurrentQuestion(false);renderQuestionTrainer&&renderQuestionTrainer();renderPaperControls&&renderPaperControls()}
+  if(typeof qbLoadBanks==='function'){qbLoadBanks();ensureSingleDeepPublishedSelection();renderQuestionTrainer&&renderQuestionTrainer();renderPaperControls&&renderPaperControls()}
   showStatus('已登录：'+username);return true
 }
 function authRegister(username,password){
@@ -52,19 +52,13 @@ function authRegister(username,password){
   const users=authUsers();if(users[username]){authMsg('该用户名已存在，请直接登录。');return false}
   const salt=authMakeSalt();users[username]=authNormalizeUserRecord(username,{username,salt,hash:authPasswordHash(username,password,salt),createdAt:Date.now(),updatedAt:Date.now(),lastLoginAt:Date.now(),lastActiveAt:Date.now(),status:'active',role:'student',displayName:username,subject:'PMP',source:'self-register'});
   authSaveUsers(users);authCurrentUser={username};if(AuthCore.setCurrentUsername)AuthCore.setCurrentUsername(username);else localStorage.setItem(AUTH_SESSION_KEY,username);authLogAction('用户注册',username,'训练页注册并登录');authClose();authLoadCurrentSpace();
-  if(typeof qbLoadBanks==='function'){qbLoadBanks();qbApplyCurrentQuestion&&qbApplyCurrentQuestion(false);renderQuestionTrainer&&renderQuestionTrainer();renderPaperControls&&renderPaperControls()}
+  if(typeof qbLoadBanks==='function'){qbLoadBanks();ensureSingleDeepPublishedSelection();renderQuestionTrainer&&renderQuestionTrainer();renderPaperControls&&renderPaperControls()}
   showStatus('已注册并登录：'+username);return true
 }
-async function authLogout(){
-  const old=authCurrentUser&&authCurrentUser.username;
-  if(AuthCore.providerStatus?.().remote&&typeof AuthCore.logout==='function'){
-    await AuthCore.logout({source:'考题训练退出'});
-    authCurrentUser=null;
-    return true;
-  }
-  if(old)authLogAction('用户退出',old);authCurrentUser=null;if(AuthCore.clearSession)AuthCore.clearSession();else localStorage.removeItem(AUTH_SESSION_KEY);authLoadCurrentSpace();
-  if(typeof qbLoadBanks==='function'){qbLoadBanks();qbApplyCurrentQuestion&&qbApplyCurrentQuestion(false);renderQuestionTrainer&&renderQuestionTrainer();renderPaperControls&&renderPaperControls()}
-  showStatus(old?'已退出：'+old+'。当前为只读浏览模式。':'当前为只读浏览模式。');return true
+function authLogout(){
+  const old=authCurrentUser&&authCurrentUser.username;if(old)authLogAction('用户退出',old);authCurrentUser=null;if(AuthCore.clearSession)AuthCore.clearSession();else localStorage.removeItem(AUTH_SESSION_KEY);authLoadCurrentSpace();
+  if(typeof qbLoadBanks==='function'){qbLoadBanks();ensureSingleDeepPublishedSelection();renderQuestionTrainer&&renderQuestionTrainer();renderPaperControls&&renderPaperControls()}
+  showStatus(old?'已退出：'+old+'。当前为只读浏览模式。':'当前为只读浏览模式。')
 }
 function authAfterExternalLogin(username,message='第三方登录成功'){
   username=authCleanUsername(username);
@@ -75,12 +69,44 @@ function authAfterExternalLogin(username,message='第三方登录成功'){
   authLogAction(message.includes('微信')?'微信扫码登录':'第三方登录',username,message);
   authClose();
   authLoadCurrentSpace();
-  if(typeof qbLoadBanks==='function'){qbLoadBanks();qbApplyCurrentQuestion&&qbApplyCurrentQuestion(false);renderQuestionTrainer&&renderQuestionTrainer();renderPaperControls&&renderPaperControls()}
+  if(typeof qbLoadBanks==='function'){qbLoadBanks();ensureSingleDeepPublishedSelection();renderQuestionTrainer&&renderQuestionTrainer();renderPaperControls&&renderPaperControls()}
   showStatus(message+'：'+username);
   return true;
 }
-window.KGAuthRuntime={afterExternalLogin:authAfterExternalLogin,closeAuth:authClose,logout:authLogout,renderStatus:authRenderStatus,isLoggedIn:authIsLoggedIn,currentUsername:()=>authCurrentUser&&authCurrentUser.username||''};
+window.KGAuthRuntime={afterExternalLogin:authAfterExternalLogin,closeAuth:authClose,renderStatus:authRenderStatus,isLoggedIn:authIsLoggedIn,currentUsername:()=>authCurrentUser&&authCurrentUser.username||''};
 function authRequire(reason,permission='useTraining'){if(!authIsLoggedIn()){authOpen(reason||'该操作需要登录后才能使用。');return false}const roleApi=window.KGRolePermissions;if(roleApi&&permission&&!roleApi.can(permission)){showStatus('当前角色（'+roleApi.currentRoleLabel()+'）没有考题训练操作权限。');return false}return true}
+
+function applyNoPublishedQuestion(){
+  try{
+    if(typeof qBankState==='object'){
+      qBankState.currentPaperId=null;
+      qBankState.currentPaperIndex=0;
+      if(typeof qbSaveCurrentPaper==='function')qbSaveCurrentPaper();
+    }
+    PMP_QUESTION_MVP={id:'unavailable',title:'暂无可用题目',stemParts:[{text:'当前没有可用于单题深学的已发布试卷。'}],options:[],clues:[],concepts:[],tags:[],sourceBankId:'',sourceQuestionId:'unavailable',sourcePaperId:'',sourceReleaseId:''};
+    document.body.classList.add('qt-no-published-paper');
+    return false;
+  }catch(error){return false}
+}
+function singleDeepCatalog(){
+  try{
+    const repository=window.KGPublishedPaperRepository;
+    if(repository)return repository.listPublishedPapers({mode:'single_deep_study',respectRole:true})||[];
+    if(typeof qbPublishedPaperCatalog==='function')return qbPublishedPaperCatalog({mode:'single_deep_study',respectRole:true})||[];
+  }catch(error){console.error('单题深学读取已发布试卷失败',error)}
+  return [];
+}
+function ensureSingleDeepPublishedSelection(){
+  const catalog=singleDeepCatalog();
+  const current=typeof qbCurrentPaper==='function'?qbCurrentPaper():null;
+  let entry=catalog.find(item=>String(item.paper?.id||'')===String(current?.id||'')&&item.availableCount>0)||catalog.find(item=>item.availableCount>0)||null;
+  if(!entry)return applyNoPublishedQuestion();
+  const currentIndex=Number(typeof qBankState==='object'?qBankState.currentPaperIndex:0)||0;
+  const selectedItem=(entry.items||[]).find(item=>Number(item.paperIndex)===currentIndex)||entry.items?.[0];
+  if(typeof qbSelectPublishedPaper==='function')qbSelectPublishedPaper(entry.paper.id,selectedItem?.paperIndex||0,{applyQuestion:true});
+  document.body.classList.remove('qt-no-published-paper');
+  return true;
+}
 
 function initQuestionTrainingAuth(){
   const login=$('authLoginBtn'),logout=$('authLogoutBtn'),close=$('authCloseBtn'),doLogin=$('authDoLoginBtn'),register=$('authRegisterBtn'),modal=$('authModal');
@@ -97,23 +123,28 @@ function initQuestionTrainingAuth(){
 function applyQuestionTrainingRoute(){
   let params=null;
   try{params=new URLSearchParams(window.location.search||'')}catch(e){return false}
-  const paperId=String(params.get('paper')||'');
-  const questionId=String(params.get('question')||'');
-  const bankId=String(params.get('bank')||'');
-  if(!paperId||!questionId)return false;
+  const paperId=String(params.get('paperId')||params.get('paper')||'');
+  const releaseId=String(params.get('releaseId')||'');
+  const questionId=String(params.get('questionId')||params.get('question')||'');
+  const bankId=String(params.get('bankId')||params.get('bank')||'');
+  if(!questionId)return false;
   try{
-    if(typeof qbOpenPaperQuestion==='function'){
-      const opened=!!qbOpenPaperQuestion(paperId,questionId,bankId);
-      if(opened){
-        try{sessionStorage.setItem('kg_question_training_route_v1',JSON.stringify({paperId,questionId,bankId,workspaceId:String(params.get('workspace')||''),source:String(params.get('source')||''),at:Date.now()}))}catch(e){}
-      }
-      return opened;
-    }
+    const repository=window.KGPublishedPaperRepository;
+    const entry=repository?.resolvePublishedPaper?.(releaseId||paperId,{mode:'single_deep_study',respectRole:true})||singleDeepCatalog().find(item=>String(item.paper?.id||'')===paperId)||null;
+    const item=entry?.items?.find(row=>
+      String(row.question?.id||row.ref?.questionId||'')===questionId&&
+      (!bankId||String(row.bank?.id||row.ref?.bankId||'')===bankId)
+    );
+    if(!entry||!item){showStatus('这道题不在当前可用的已发布试卷中。');return false}
+    if(typeof qbSelectPublishedPaper==='function')qbSelectPublishedPaper(entry.paper.id,item.paperIndex,{applyQuestion:true});
+    document.body.classList.remove('qt-no-published-paper');
+    try{sessionStorage.setItem('kg_question_training_route_v1',JSON.stringify({paperId:entry.paper.id,releaseId:entry.paper.releaseId,questionId,bankId:String(item.bank?.id||bankId),workspaceId:String(params.get('workspace')||''),source:String(params.get('source')||''),at:Date.now()}))}catch(e){}
+    return true;
   }catch(error){
     console.error('训练页路由恢复失败',error);
-    showStatus('未能恢复多题画布中的题目，请重新选择试卷。');
+    showStatus('未能恢复多题画布中的题目，请重新选择已发布试卷。');
+    return false;
   }
-  return false;
 }
 
 function installQuestionTrainingReadonlyGuard(){
@@ -138,7 +169,7 @@ function initQuestionTrainingPage(){
   try{
     if(typeof qbLoadBanks==='function')qbLoadBanks();
     const routed=applyQuestionTrainingRoute();
-    if(!routed&&typeof qbApplyCurrentQuestion==='function')qbApplyCurrentQuestion(false);
+    if(!routed)ensureSingleDeepPublishedSelection();
     if(typeof bindQuestionCaseTabs==='function')bindQuestionCaseTabs();
     if(typeof bindQuestionTrainer==='function')bindQuestionTrainer();
     if(typeof bindQuestionTrainerSafe==='function')bindQuestionTrainerSafe();

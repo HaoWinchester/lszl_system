@@ -78,7 +78,7 @@ button.active-toggle{background:#0f172a;color:#fff;box-shadow:0 8px 22px rgba(15
 .edge-layer{position:absolute;left:-50000px;top:-50000px;width:100000px;height:100000px;overflow:visible;z-index:1;pointer-events:none}
 .cards-layer{position:absolute;left:0;top:0;z-index:2}
 .edge-visible{fill:none;stroke:var(--edge-color,var(--line));stroke-width:4;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 3px 3px rgba(37,99,235,.18));pointer-events:none}
-.edge-hit{fill:none;stroke:rgba(37,99,235,.001);stroke-width:28;stroke-linecap:round;stroke-linejoin:round;cursor:pointer;pointer-events:stroke}
+.edge-hit{fill:none;stroke:rgba(37,99,235,.001);stroke-width:28;stroke-linecap:round;stroke-linejoin:round;cursor:pointer;pointer-events:stroke;vector-effect:non-scaling-stroke}
 .edge-hit:hover+.edge-visible,.edge-hit.selected+.edge-visible{stroke-width:7;filter:drop-shadow(0 0 6px rgba(37,99,235,.45)) drop-shadow(0 3px 3px rgba(37,99,235,.18))}
 .edge-label{font-size:14px;paint-order:stroke;stroke:#fff;stroke-width:5px;stroke-linejoin:round;fill:#1e3a8a;pointer-events:none;font-weight:800}
 .knowledge-card{position:absolute;width:var(--card-w);height:var(--card-h);border-radius:20px;background:#fff;box-shadow:0 10px 26px rgba(15,23,42,.12),0 0 0 1px rgba(15,23,42,.08);overflow:hidden;cursor:grab;user-select:none;transition:box-shadow .14s ease,transform .14s ease;touch-action:none;container-type:inline-size}
@@ -102,7 +102,7 @@ button.active-toggle{background:#0f172a;color:#fff;box-shadow:0 8px 22px rgba(15
 .status-chip.show{opacity:1;transform:translateY(0)}
 .detail-panel{position:absolute;right:18px;top:78px;width:min(396px,calc(100vw - 36px));background:rgba(255,255,255,.94);border:1px solid rgba(15,23,42,.08);box-shadow:var(--shadow);backdrop-filter:blur(16px);border-radius:22px;z-index:25;padding:18px;display:none;pointer-events:auto}
 .detail-panel.show{display:block;animation:panelIn .18s ease both}@keyframes panelIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
-.detail-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px}.detail-mini-icon{width:52px;height:52px;border-radius:17px;flex:0 0 auto;display:grid;place-items:center;font-weight:1000;color:#fff}.detail-name{font-size:21px;font-weight:950;line-height:1.15;margin-top:1px}.detail-title{font-size:13px;color:#4b5563;margin-top:5px;line-height:1.4}.close-detail{position:absolute;right:12px;top:12px}
+.detail-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px}.detail-mini-icon{width:52px;height:52px;border-radius:17px;flex:0 0 auto;display:grid;place-items:center;font-weight:1000;color:#fff}.detail-name{font-size:21px;font-weight:950;line-height:1.15;margin-top:1px}.detail-title{font-size:13px;color:#4b5563;margin-top:5px;line-height:1.4}.close-detail{position:absolute;right:12px;top:12px;width:30px;height:30px;border-radius:10px;padding:0;box-shadow:none;background:#f3f4f6;color:#64748b}
 .detail-grid{display:grid;grid-template-columns:82px 1fr;gap:8px 10px;font-size:14px;line-height:1.55;border-top:1px solid rgba(15,23,42,.08);padding-top:13px}.detail-grid .label{color:#64748b;text-align:right}.detail-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}.detail-actions button{flex:1 1 120px}
 .badge{display:inline-flex;align-items:center;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:12px;font-weight:800;padding:2px 8px;margin-right:4px}
 .modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.44);display:none;align-items:center;justify-content:center;z-index:60;padding:20px;touch-action:none}.modal-backdrop.show{display:flex}.modal{width:min(590px,100%);max-height:calc(100vh - 42px);overflow:auto;background:#fff;border-radius:24px;box-shadow:0 30px 90px rgba(0,0,0,.30);padding:22px;border:1px solid rgba(255,255,255,.7)}.modal h2{margin:0 0 14px;font-size:20px}.modal p{margin:0 0 14px;color:#64748b;line-height:1.55;font-size:14px}.form-grid{display:grid;grid-template-columns:96px 1fr;gap:10px 12px;align-items:center}.form-grid label{font-size:14px;color:#475569;text-align:right}.form-grid input,.form-grid textarea,.form-grid select{width:100%;border:1px solid #cfd6e4;border-radius:12px;padding:10px 12px;background:#fff;color:#111827;outline:none;user-select:text;touch-action:auto}.form-grid textarea{min-height:78px;resize:vertical;line-height:1.45}.modal-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}.modal-actions .left{margin-right:auto}
@@ -414,39 +414,21 @@ input[type=file]{display:none}
 }
 
 
-/* 知识点详情面板：右上角操作与关闭按钮共用一套几何与颜色。 */
-.detail-panel-control{
-  display:grid;
-  width:30px;
-  height:30px;
-  place-items:center;
-  border:0;
-  border-radius:10px;
-  padding:0;
-  box-shadow:none;
-  background:#f3f4f6;
-  color:#64748b;
-  cursor:pointer;
-  line-height:1;
-}
-.detail-panel-control:hover{background:#e9edf2;color:#334155}
+/* 知识点详情面板：操作按钮默认折叠 */
 .detail-actions-toggle{
   position:absolute;
   right:48px;
   top:12px;
+  width:30px;
+  height:30px;
+  border-radius:10px;
+  padding:0;
+  box-shadow:none;
+  background:#eef2ff;
+  color:#334155;
+  font-weight:950;
+  line-height:1;
 }
-.detail-actions-chevron,.detail-close-icon{
-  display:grid;
-  width:16px;
-  height:16px;
-  place-items:center;
-}
-.detail-actions-chevron{
-  transform:rotate(0deg);
-  transition:transform .16s ease;
-}
-.detail-panel-control svg{display:block;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
-.detail-actions-toggle.is-expanded .detail-actions-chevron{transform:rotate(180deg)}
 .detail-panel .detail-actions{
   display:none!important;
 }
@@ -1101,7 +1083,6 @@ input[type=file]{display:none}
 .auth-status{
   display:inline-flex;
   align-items:center;
-  justify-content:center;
   min-height:30px;
   padding:0 10px;
   border-radius:999px;
@@ -1118,19 +1099,11 @@ input[type=file]{display:none}
   box-shadow:0 0 0 1px rgba(34,197,94,.22);
 }
 .auth-login-btn{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  line-height:1;
   background:#0f172a;
   color:#fff;
   font-weight:850;
 }
 .auth-logout-btn{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  line-height:1;
   background:#f1f5f9;
   color:#475569;
 }
@@ -2162,11 +2135,23 @@ body[data-role-theme] .floating-tool-btn.primary,body[data-role-theme] button.pr
 [data-permission][hidden],[data-permission-any][hidden],.permission-hidden{display:none!important;}
 
 /* 微信扫码登录 */
-.wechat-login-section{margin-top:14px;border-top:1px dashed #cbd5e1;padding-top:14px}.wechat-login-hint{margin:0 0 10px;color:#64748b;font-size:13px;line-height:1.6}
+.wechat-login-section{margin-top:14px;border-top:1px dashed #cbd5e1;padding-top:14px}
 .wechat-divider{display:flex;align-items:center;gap:10px;margin-bottom:12px;color:#94a3b8;font-size:12px;font-weight:900}.wechat-divider:before,.wechat-divider:after{content:"";height:1px;background:#e2e8f0;flex:1}.wechat-divider span{white-space:nowrap}
 .wechat-login-entry{width:100%;border:0;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border-radius:14px;padding:11px 14px;font-weight:900;box-shadow:0 12px 26px rgba(22,163,74,.22);cursor:pointer}.wechat-login-entry:hover{transform:translateY(-1px);box-shadow:0 16px 32px rgba(22,163,74,.28)}
-.wechat-login-panel{margin-top:12px}.wechat-login-card{border:1px solid #bbf7d0;border-radius:18px;background:linear-gradient(135deg,#f0fdf4,#fff);padding:14px;box-shadow:0 12px 28px rgba(22,163,74,.09)}.wechat-login-copy{text-align:center}.wechat-login-copy strong{display:block;color:#14532d;font-size:17px}.wechat-login-copy p{margin:6px 0 12px;color:#64748b;font-size:13px;line-height:1.6}.wechat-login-qr{height:320px;min-height:0;display:flex;justify-content:center;align-items:flex-start;overflow:hidden}.wechat-login-qr>span{margin:auto;color:#64748b;font-size:13px}.wechat-login-qr iframe{transform:scale(.8);transform-origin:top center}.wechat-login-retry{border:1px solid #86efac;border-radius:12px;background:#16a34a;color:#fff;padding:9px 14px;font-weight:900;cursor:pointer}
-.wechat-login-back{display:inline-flex;align-items:center;justify-content:center;min-height:36px;margin:10px auto 0;padding:0 14px;border:1px solid #bbf7d0;border-radius:10px;background:#fff;color:#166534;font-size:13px;font-weight:900;box-shadow:none;cursor:pointer}.wechat-login-back:hover{background:#f0fdf4;color:#14532d;box-shadow:0 0 0 2px rgba(34,197,94,.12)}#authModal.wechat-login-mode .auth-body>label,#authModal.wechat-login-mode .auth-msg,#authModal.wechat-login-mode .auth-actions,#authModal.wechat-login-mode .auth-note{display:none}#authModal.wechat-login-mode .wechat-login-section{margin-top:0;padding-top:0;border-top:0}#authModal.wechat-login-mode .wechat-divider,#authModal.wechat-login-mode .wechat-login-hint,#authModal.wechat-login-mode .wechat-login-entry{display:none}
+.wechat-login-panel{margin-top:12px}.wechat-login-card{border:1px solid #bbf7d0;border-radius:18px;background:linear-gradient(135deg,#f0fdf4,#fff);padding:14px;box-shadow:0 12px 28px rgba(22,163,74,.09)}
+.wechat-login-title{display:flex;align-items:center;gap:10px;margin-bottom:12px}.wechat-icon{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;background:#22c55e;color:#fff;font-weight:1000;box-shadow:0 8px 18px rgba(34,197,94,.24)}.wechat-login-title strong{display:block;color:#14532d}.wechat-login-title small{display:block;margin-top:2px;color:#64748b;font-size:12px;line-height:1.4}
+.wechat-login-hint{margin:0 0 10px;color:#64748b;font-size:13px;line-height:1.6}
+#authModal.wechat-login-mode .auth-body>label,#authModal.wechat-login-mode .auth-msg,#authModal.wechat-login-mode .auth-actions,#authModal.wechat-login-mode .auth-note{display:none}
+#authModal.wechat-login-mode .wechat-login-section{margin-top:0;padding-top:0;border-top:0}
+#authModal.wechat-login-mode .wechat-divider,#authModal.wechat-login-mode .wechat-login-hint,#authModal.wechat-login-mode .wechat-login-entry{display:none}
+.wechat-login-copy{text-align:center}
+.wechat-login-copy strong{display:block;margin-bottom:6px;color:#14532d;font-size:15px;font-weight:900}
+.wechat-login-copy p{margin:0 0 12px;color:#64748b;font-size:13px;line-height:1.5}
+.wechat-login-qr{display:flex;justify-content:center;align-items:flex-start;overflow:hidden}
+.wechat-login-qr iframe{width:300px;height:400px;border:0;max-width:100%}
+.wechat-login-back{display:inline-flex;align-items:center;justify-content:center;min-height:36px;margin:14px auto 0;padding:0 14px;border:1px solid #bbf7d0;border-radius:10px;background:#fff;color:#166434;font-size:13px;font-weight:900;box-shadow:none;cursor:pointer}.wechat-login-back:hover{background:#f0fdf4;color:#14532d;box-shadow:0 0 0 2px rgba(34,197,94,.12)}
+.wechat-login-body{display:grid;grid-template-columns:120px minmax(0,1fr);gap:14px;align-items:center}.wechat-pseudo-qr{width:116px;height:116px;border:8px solid #fff;border-radius:16px;display:grid;grid-template-columns:repeat(13,1fr);grid-template-rows:repeat(13,1fr);gap:2px;background:#fff;box-shadow:0 10px 24px rgba(15,23,42,.14)}.wechat-pseudo-qr span{border-radius:2px;background:#dcfce7}.wechat-pseudo-qr span.on{background:#166534}.wechat-login-copy p{margin:0 0 10px;color:#475569;font-size:12px;line-height:1.6}.wechat-login-copy code{background:#dcfce7;color:#166534;border-radius:6px;padding:1px 4px}.wechat-login-actions{display:flex;gap:8px;flex-wrap:wrap}.wechat-login-actions button{border:1px solid #86efac;border-radius:12px;background:#fff;color:#166534;padding:9px 11px;font-weight:900;cursor:pointer}.wechat-login-actions button:first-child{background:#16a34a;color:#fff;border-color:#16a34a}.wechat-login-actions button:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.4)}.wechat-login-tip{display:block;margin-top:9px;color:#64748b;line-height:1.45}
+@media(max-width:560px){.wechat-login-body{grid-template-columns:1fr}.wechat-pseudo-qr{margin:0 auto}}
 
 
 /* 大图谱性能模式：节点/关系线数量过大时，优先保证打开、缩放、拖拽和查看节点。 */
@@ -3109,7 +3094,6 @@ body.related-canvas-open{overflow:hidden;}
   height:34px;
   display:flex;
   align-items:center;
-  justify-content:center;
   gap:8px;
   padding:0 9px;
   border-radius:11px;
@@ -3118,7 +3102,7 @@ body.related-canvas-open{overflow:hidden;}
   box-shadow:0 0 0 1px rgba(15,23,42,.06);
   font-size:12px;
   font-weight:850;
-  text-align:center;
+  text-align:left;
   white-space:nowrap;
 }
 .floating-subtool-btn svg{
@@ -3162,6 +3146,21 @@ body.related-canvas-open{overflow:hidden;}
 /* v8.4.30.16-light-alpha · 学习模式入口 */
 .learning-mode-entry{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:0 12px;border:1px solid rgba(109,93,252,.22);border-radius:10px;background:#fff;color:#5b4dd1;font-size:12px;font-weight:850;text-decoration:none}
 .learning-mode-entry:hover{background:#f5f3ff}
+
+/* 桌面端统一图谱顶栏右上角三个入口（学习路径 / 升级会员 / 账号菜单）的几何尺寸，
+   使三者等高、等内边距、等圆角；移动端仍沿用账号胶囊的紧凑样式。 */
+@media (min-width:851px){
+  .stage>.canvas-toolbar-right .learning-mode-entry,
+  .stage>.canvas-toolbar-right .upgrade-member-btn,
+  .stage>.canvas-toolbar-right .account-menu-trigger{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:36px;
+    padding:0 14px;
+    border-radius:10px;
+  }
+}
 
 
 /* v8.5.4.3 · 统一按钮普通态底座保护
@@ -3218,5 +3217,110 @@ body[data-role-theme] a.ui-button[aria-disabled="true"]{
   box-shadow:0 4px 0 var(--ui-button-depth)
 }
 
-/* 微信 Native 支付二维码 */
-.kg-native-pay-qr{display:block;width:220px;height:220px;margin:16px auto;border:1px solid #d7dce8;border-radius:14px;background:#fff;padding:10px}
+/* v8.6.2 P2.2.28 — hover affordance and drag-to-connect graph handles. */
+@media (hover:hover) and (pointer:fine){
+  .stage .knowledge-card:hover:not(.dragging):not(.group-dragging){
+    outline:2px solid #ef4444;
+    outline-offset:1px;
+  }
+}
+.stage .knowledge-card.is-connector-drag-source{
+  outline:2px solid #2563eb;
+  outline-offset:2px;
+}
+.stage .knowledge-card.is-connector-drag-target{
+  outline:3px solid #10b981!important;
+  outline-offset:3px!important;
+}
+.edge-connect-draft{
+  fill:none;
+  stroke:#ef4444;
+  stroke-width:3;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  stroke-dasharray:8 6;
+  vector-effect:non-scaling-stroke;
+  pointer-events:none;
+  opacity:.9;
+}
+.edge-connect-draft.has-target{
+  stroke:#10b981;
+  stroke-dasharray:none;
+}
+.stage.graph-connector-dragging .node-growth-handle{
+  cursor:crosshair;
+}
+.stage.graph-connector-dragging .knowledge-card{
+  cursor:crosshair;
+}
+
+/* P2.2.34 · knowledge graph toolbar and connector hover stability */
+.floating-toolbox .floating-tool-btn,
+.floating-toolbox .floating-menu-trigger,
+.floating-toolbox #focusBtn.floating-tool-btn,
+.floating-toolbox #flashcardBtn.floating-tool-btn,
+.floating-toolbox #questionTrainBtn.floating-tool-btn,
+.floating-toolbox #addBtn.floating-tool-btn{
+  background:#fff!important;
+  color:#334155!important;
+  box-shadow:0 1px 0 rgba(15,23,42,.08),0 0 0 1px rgba(15,23,42,.08)!important;
+}
+.floating-toolbox .floating-tool-btn:hover,
+.floating-toolbox .floating-menu-trigger:hover{
+  background:#f8fafc!important;
+  color:#0f172a!important;
+  transform:none;
+  box-shadow:0 5px 14px rgba(15,23,42,.10),0 0 0 1px rgba(15,23,42,.10)!important;
+}
+.node-growth-handle::before{
+  transition:background-color .12s ease,box-shadow .12s ease!important;
+  transform:translate(-50%,-50%)!important;
+}
+.node-growth-handle:hover::before,
+.node-growth-handle:focus-visible::before{
+  width:4px;
+  height:4px;
+  transform:translate(-50%,-50%)!important;
+  background:#2563eb;
+  box-shadow:0 4px 12px rgba(37,99,235,.30),0 0 0 4px rgba(59,130,246,.14);
+}
+
+/* P2.2.35 · left graph toolbar: inactive white, active deep gray. */
+.floating-toolbox .floating-tool-btn.active-toggle,
+.floating-toolbox .floating-tool-btn.is-active,
+.floating-toolbox .floating-tool-btn[aria-pressed="true"],
+.floating-toolbox .floating-menu-trigger.active-toggle,
+.floating-toolbox .floating-menu-trigger[aria-pressed="true"],
+.floating-toolbox .floating-tool-menu-shell.menu-open > .floating-menu-trigger{
+  background:#111827!important;
+  color:#fff!important;
+  box-shadow:0 7px 16px rgba(15,23,42,.24),0 0 0 1px rgba(15,23,42,.82)!important;
+}
+.floating-toolbox .floating-tool-btn.active-toggle:hover,
+.floating-toolbox .floating-tool-btn.is-active:hover,
+.floating-toolbox .floating-tool-btn[aria-pressed="true"]:hover,
+.floating-toolbox .floating-menu-trigger.active-toggle:hover,
+.floating-toolbox .floating-menu-trigger[aria-pressed="true"]:hover,
+.floating-toolbox .floating-tool-menu-shell.menu-open > .floating-menu-trigger:hover{
+  background:#111827!important;
+  color:#fff!important;
+  transform:none!important;
+  box-shadow:0 7px 16px rgba(15,23,42,.24),0 0 0 1px rgba(15,23,42,.82)!important;
+}
+/* Keep P2.2.34 ID-specific inactive overrides from winning when those tools are active. */
+.floating-toolbox #focusBtn.floating-tool-btn.active-toggle,
+.floating-toolbox #flashcardBtn.floating-tool-btn.active-toggle,
+.floating-toolbox #questionTrainBtn.floating-tool-btn.active-toggle,
+.floating-toolbox #addBtn.floating-tool-btn.active-toggle{
+  background:#111827!important;
+  color:#fff!important;
+  box-shadow:0 7px 16px rgba(15,23,42,.24),0 0 0 1px rgba(15,23,42,.82)!important;
+}
+
+/* P2.2.37 · 框选关系线的批量选中反馈 */
+.edge-hit.batch-selected + .edge-visible,
+g.is-batch-selected .edge-visible{
+  stroke-width:7;
+  opacity:1;
+  filter:drop-shadow(0 0 6px rgba(37,99,235,.45)) drop-shadow(0 3px 3px rgba(37,99,235,.18));
+}

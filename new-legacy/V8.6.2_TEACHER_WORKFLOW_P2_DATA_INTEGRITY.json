@@ -1,0 +1,61 @@
+{
+  "release": "v8.6.2",
+  "baseline": "v8.6.2 teacher-workflow-p1",
+  "scope": "teacher-workflow-p2-efficiency-tools",
+  "counts": {
+    "activities": 82,
+    "taxonomies": 5,
+    "knowledgeNodes": 16,
+    "courses": 1,
+    "courseNodes": 108,
+    "learningTasks": 0,
+    "papers": 0
+  },
+  "idSetSha256": {
+    "activityIds": "d647dbbb4e999067cce8e239d2f067c6b1fdfe90cc2ddd23e942ea7a52493212",
+    "knowledgePointIds": "c6eadebaa073a2b95c7a9f2c0b8b4b41806bee20bfaff5b8db4733f46f0e30d9",
+    "courseNodeIds": "b78bc1829c0868228563e06b6e904c2de30740cbb1d2817ef40b85e6615154b5",
+    "learningTaskIds": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "paperIds": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "protectedFileSha256": {
+    "src/62-learning-session-store.js": "6163074d45977ca1463cf0d7207672b010099be85b851a6161352e52b9e8b952",
+    "src/88-guided-learning-store.js": "37234d4cfaebfc9fcef0ec4cfd82914f4332dd2848be3affb926985840521980",
+    "src/91-learning-content-core.js": "865f80bf156cbb60f63708a1bd88cef331b3f3d9450ca2d76c7c24cc5b18b93d",
+    "src/93-content-organization-core.js": "ca565a78076a8f4285f10d61c2c167b2d91ec0979f2a2ef1954632abedc7aeab",
+    "src/93-assessment-config-app.js": "c3f12f86b0d84c62f67f0ae4a849ff0d674094b9986c4d570d01b17620ab1093",
+    "question-studio/activity-schema-v1.js": "2621b810158b332d3601ff9d17887c5584a12e1d2516911daa1e511401a35bc1",
+    "src/86-activity-schema-v1.js": "2621b810158b332d3601ff9d17887c5584a12e1d2516911daa1e511401a35bc1",
+    "content-center.html": "1ec3829e5602a82fd9f42164233f917e63ac9a7f3b5b0c1b4936b8122f5e13fd",
+    "styles/content-center.css": "106ac5df300b90abbbcd6da5b3626877e17209b2e44429eb4505462f52345af7",
+    "src/91-content-center-app.js": "65e4a517f5ef97bcf87edcdabb4dbc7596ccc17abba04070ebcafd2a356d3510",
+    "src/92-workspace-panel-manager.js": "7b192a32e05644ee61602e28062b515cc8555e5a5bda2d0d20e62d6c0919cc28"
+  },
+  "constraints": {
+    "existingActivityIdsChanged": false,
+    "existingKnowledgePointIdsChanged": false,
+    "existingCourseNodeIdsChanged": false,
+    "learningProgressChanged": false,
+    "courseGradesAffected": false,
+    "knowledgeTaxonomyImportExport": false,
+    "subjectCreateDeleteImplemented": false,
+    "batchQuestionPaste": true,
+    "batchQuestionValidationPreview": true,
+    "batchQuestionDuplicateSkip": true,
+    "batchLearningTemplates": true,
+    "batchStructureCopy": true,
+    "copiedStructureUsesNewIds": true,
+    "ruleBasedCourseGeneration": true,
+    "recentEditNavigation": true,
+    "courseValidationPanel": true,
+    "existingCourseItemsOverwrittenByBatchTools": false,
+    "courseTreeRendersCurrentStageOnly": true,
+    "courseStructureGlobalSearch": true,
+    "courseIncompleteAndIssueJump": true,
+    "courseWorkspacePositionRestore": true,
+    "independentCurrentChapterPreview": true,
+    "stressCourseStages": 24,
+    "stressCourseParts": 288,
+    "stressCourseNodes": 2880
+  }
+}

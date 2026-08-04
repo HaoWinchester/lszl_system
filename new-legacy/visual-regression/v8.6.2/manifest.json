@@ -1,0 +1,69 @@
+{
+  "release": "v8.6.2",
+  "page": "learning-path.html",
+  "cases": [
+    {
+      "viewport": "1366x768",
+      "zoom": 100,
+      "practiceEntries": 6,
+      "overlaps": 0,
+      "pageOverflow": 0
+    },
+    {
+      "viewport": "1366x768",
+      "zoom": 125,
+      "practiceEntries": 6,
+      "overlaps": 0,
+      "pageOverflow": 0
+    },
+    {
+      "viewport": "1366x768",
+      "zoom": 150,
+      "practiceEntries": 6,
+      "overlaps": 0,
+      "pageOverflow": 0
+    },
+    {
+      "viewport": "1440x900",
+      "zoom": 100,
+      "practiceEntries": 6,
+      "overlaps": 0,
+      "pageOverflow": 0
+    },
+    {
+      "viewport": "1440x900",
+      "zoom": 125,
+      "practiceEntries": 6,
+      "overlaps": 0,
+      "pageOverflow": 0
+    },
+    {
+      "viewport": "1440x900",
+      "zoom": 150,
+      "practiceEntries": 6,
+      "overlaps": 0,
+      "pageOverflow": 0
+    },
+    {
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "practiceEntries": 6,
+      "overlaps": 0,
+      "pageOverflow": 0
+    },
+    {
+      "viewport": "1920x1080",
+      "zoom": 125,
+      "practiceEntries": 6,
+      "overlaps": 0,
+      "pageOverflow": 0
+    },
+    {
+      "viewport": "1920x1080",
+      "zoom": 150,
+      "practiceEntries": 6,
+      "overlaps": 0,
+      "pageOverflow": 0
+    }
+  ]
+}

@@ -24,7 +24,7 @@
 
   const PERMISSION_LABELS={
     editGraph:'编辑个人知识图谱',
-    accessQuestionBank:'进入题库管理',
+    accessQuestionBank:'进入教师工作台',
     manageQuestionBank:'新建/编辑/删除题库',
     editQuestions:'编辑题目与认知标注',
     importData:'导入题库/数据',
@@ -203,15 +203,12 @@
       }
       const role=u.role;
       const theme=getTheme(role);
-      const label=String(u.displayName||u.username||'用户');
-      const showRoleBadge=roleLabel(role)!==label;
-      el.innerHTML=`<span class="role-dot" style="background:${escapeHTML(theme.primary)}"></span><span>已登录：${escapeHTML(label)}</span>${showRoleBadge?`<span class="role-badge">${escapeHTML(roleLabel(role))}</span>`:''}`;
+      el.innerHTML=`<span class="role-dot" style="background:${escapeHTML(theme.primary)}"></span><span>已登录：${escapeHTML(u.displayName||u.username)}</span><span class="role-badge">${escapeHTML(roleLabel(role))}</span>`;
       return;
     }
-    const mobileLabel='<span aria-hidden="true" class="account-menu-mobile-label">账号</span>';
     const chevron='<svg aria-hidden="true" class="account-menu-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>';
     if(!u){
-      el.innerHTML=`<span class="role-dot"></span><span class="auth-status-label">访客只读</span>${mobileLabel}${chevron}`;
+      el.innerHTML=`<span class="role-dot"></span><span class="auth-status-label">访客只读</span>${chevron}`;
       el.setAttribute('aria-label','访客只读，打开账号菜单');
       el.title='打开账号菜单';
       return;
@@ -219,7 +216,7 @@
     const role=u.role;
     const theme=getTheme(role);
     const label=String(u.displayName||u.username||'用户');
-    el.innerHTML=`<span class="role-dot" style="background:${escapeHTML(theme.primary)}"></span><span class="auth-status-label">${escapeHTML(label)}</span>${mobileLabel}${chevron}`;
+    el.innerHTML=`<span class="role-dot" style="background:${escapeHTML(theme.primary)}"></span><span class="auth-status-label">${escapeHTML(label)}</span>${chevron}`;
     el.setAttribute('aria-label',`${label}，打开账号菜单`);
     el.title='打开账号菜单';
   }

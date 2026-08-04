@@ -1,0 +1,143 @@
+{
+  "release": "v9.0-p4.0.1",
+  "baseRelease": "v9.0-p4.0",
+  "generatedAt": "2026-07-31T05:16:46.809163+00:00",
+  "scope": [
+    "add a lightweight practice/free mode switch beside the account menu",
+    "remove nonessential fixed-version explanatory copy from the practice lobby",
+    "make challenge and scholar streak feedback persistent until the streak is interrupted",
+    "remove the scholar topbar streak counter and reuse the common streak popup",
+    "add an alarm icon before the scholar timer progress rail",
+    "add a red edge-to-center breathing vignette when scholar time reaches 20 seconds or less"
+  ],
+  "summary": {
+    "nodeTestFiles": {
+      "passed": 94,
+      "total": 94
+    },
+    "browserTests": {
+      "passed": 10,
+      "total": 10
+    },
+    "javascriptSyntaxChecked": 227,
+    "htmlFilesChecked": 21,
+    "duplicateHtmlIds": 0,
+    "visualScreensChecked": 2
+  },
+  "ui": {
+    "modeSwitch": true,
+    "modeSwitchOptions": [
+      "practice",
+      "free"
+    ],
+    "lobbyExplanatoryCopyRemoved": true,
+    "persistentStreakPopup": true,
+    "streakPopupStartsAt": 3,
+    "streakBreakConditions": [
+      "wrong_answer",
+      "timeout",
+      "practice_end"
+    ],
+    "scholarTopbarStreakCounterRemoved": true,
+    "scholarAlarmIcon": true,
+    "scholarDangerVignetteThresholdSeconds": 20,
+    "dangerVignetteReducedMotionSupported": true
+  },
+  "practiceRulesPreserved": {
+    "questionCounts": [
+      10,
+      20,
+      60,
+      180
+    ],
+    "baseExperience": 10,
+    "initialHealth": 3,
+    "scholarInitialSeconds": 80,
+    "correctTimeRewardSeconds": 20,
+    "wrongTimePenaltySeconds": 20,
+    "checkpointInterval": 5,
+    "pauseAllowed": false
+  },
+  "safety": {
+    "questionIdsChanged": false,
+    "bankIdsChanged": false,
+    "questionContentChanged": false,
+    "questionClassificationChanged": false,
+    "paperReferencesChanged": false,
+    "publishedPaperSnapshotsChanged": false,
+    "teacherDraftsReadByPractice": false,
+    "practiceHistorySchemaChanged": false,
+    "legacyLearningDataRemoved": false,
+    "safeDeleteProtectionPreserved": true,
+    "browserStorageMigrationRequired": false
+  },
+  "changedFiles": [
+    "CHANGELOG.md",
+    "README.md",
+    "V9.0_P4.0.1_PRACTICE_MODE_FEEDBACK_OPTIMIZATION_REPORT.md",
+    "V9.0_P4.0.1_QUICK_START.md",
+    "VERSION",
+    "practice-mode.html",
+    "src/100-practice-mode.js",
+    "src/admin/00-admin-core.js",
+    "styles/practice-mode.css",
+    "tests/v862-data-integrity.test.js",
+    "tests/v862-p2238-legacy-freeze.test.js",
+    "tests/v90-p0-admin-foundation.test.js",
+    "tests/v90-p21-taxonomy-release.test.js",
+    "tests/v90-p22-taxonomy-lifecycle.test.js",
+    "tests/v90-p31-admin-ia.test.js",
+    "tests/v90-p31-data-integrity.test.js",
+    "tests/v90-p32-subject-management.test.js",
+    "tests/v90-p331-navigation-shell-fix.test.js",
+    "tests/v90-p333-question-classification.test.js",
+    "tests/v90-p3331-batch-default-classification.test.js",
+    "tests/v90-p334-lightweight-tag-management.test.js",
+    "tests/v90-p35-paper-management.test.js",
+    "tests/v90-p353-question-bank-workspace.test.js",
+    "tests/v90-p354-training-workspace.test.js",
+    "tests/v90-p355-training-subject-preview-recall-library.test.js",
+    "tests/v90-p356-training-compact-filters-preview.test.js",
+    "tests/v90-p357-recall-library-question-stats.test.js",
+    "tests/v90-p358-teacher-workbench-navigation.test.js",
+    "tests/v90-p40-data-integrity.test.js",
+    "tests/v90-p40-practice-mode-browser.py",
+    "tests/v90-p40-practice-mode.test.js",
+    "tests/v90-p401-data-integrity.test.js"
+  ],
+  "removedFiles": [],
+  "changedFileSha256": {
+    "CHANGELOG.md": "054835ea8a04cd41632ffae72ae592e2ec3494b11c0ef5d8f76815c324fe8f9a",
+    "README.md": "c1d66e015f2afe6c334398b31e707ffe98b1e05d4206e5daae65260749445b5c",
+    "V9.0_P4.0.1_PRACTICE_MODE_FEEDBACK_OPTIMIZATION_REPORT.md": "94e8d69becf8e01d7208b35b84b1391ef5e678215ec58ae4edf136dea161a5d9",
+    "V9.0_P4.0.1_QUICK_START.md": "6b8baf6e880a54925ef069d2dae35504eb96c186466384976e5514c386e98110",
+    "VERSION": "ddde1e3183421c004aaf7fe28bfff2df878e56205450c62d3e16e0e641322382",
+    "practice-mode.html": "881012b39ca1db8f68f8de4d7d28cf2a168c78859289a6e0b85705caa5f9bb96",
+    "src/100-practice-mode.js": "7180c6fe6c9ebb13e9aae445a816d7e77eb9a7d12537ce3124bed8b095db34ea",
+    "src/admin/00-admin-core.js": "d4578045ab18fb88b1993a29b0c98a8c64c794e9a2c0939744106e45732d3b0e",
+    "styles/practice-mode.css": "ae50cad07dd81ef8695e3765c4743fcf95ed7c7c4ff405e778f6cc05d9153d7c",
+    "tests/v862-data-integrity.test.js": "0e11c057c0721de4e326c7c5743f0ff995caa1a5541368a3be08b0ad24d87482",
+    "tests/v862-p2238-legacy-freeze.test.js": "fa01c90dce32699fba41602da268eb2e8c43e817e5d9bb9341b52844edb18e73",
+    "tests/v90-p0-admin-foundation.test.js": "cdfce486d35542fc083f5c831bd82dad9d8f4b5f6c01dca26229268b27cc6bae",
+    "tests/v90-p21-taxonomy-release.test.js": "98c82cf4f1016b46b2ff40e68c67f7626fbc866932ce218dc4f974a2a7514fd8",
+    "tests/v90-p22-taxonomy-lifecycle.test.js": "5e8427408b425c041dfa5c6c10b9da2df601eeec57bd8c1ab341c0e82b409c77",
+    "tests/v90-p31-admin-ia.test.js": "3427492b6b61e268a5dee951966472fd8b7f6012c04020ba524b947f09998cd3",
+    "tests/v90-p31-data-integrity.test.js": "edcdf5257b436bc5c04e2f084b964fd196260913025c6f23a30c171993abfe3c",
+    "tests/v90-p32-subject-management.test.js": "82168b24bbbc67435c422bb90233ed0fd7c484bed62383d57c0ff81777865c5b",
+    "tests/v90-p331-navigation-shell-fix.test.js": "6c39d16ec79fb1243d9c2db8ce34b772cceb1b40e08ac7465eac35b1157ecb58",
+    "tests/v90-p333-question-classification.test.js": "f9d165998a31295c20991687dee67887e22f0ca1ae528a0eaec9610df0219885",
+    "tests/v90-p3331-batch-default-classification.test.js": "9f9b5d907140ed06c20ca975331a15c524bf734e35dc4f1aabf6002da129a205",
+    "tests/v90-p334-lightweight-tag-management.test.js": "890bebcba5de30092ed76fa8d5fb3dd70225fd8d1c3721171720cfa87c6dbcb7",
+    "tests/v90-p35-paper-management.test.js": "72be8bf130ba75ee997dd4d2f9d2c12d8681acfc7a72243f3efad76221413262",
+    "tests/v90-p353-question-bank-workspace.test.js": "dcf3a12584fcbfac978d7998de935aa3b0a4ff3ef5b6228f3b943be86c0ce9cd",
+    "tests/v90-p354-training-workspace.test.js": "7efb61348b01ac29db6b05e0e28c0c5706ed4a861cdd8d77c74a1a0cf98ca63a",
+    "tests/v90-p355-training-subject-preview-recall-library.test.js": "1da3265f1faedb2abe995665abf92ebb23fe22b9a76967ab0e4b1f478b1a15d6",
+    "tests/v90-p356-training-compact-filters-preview.test.js": "17cf9b4132e1f6646bc832c26e353586eecdb6802958702ba14029efceedc70e",
+    "tests/v90-p357-recall-library-question-stats.test.js": "8ab5ace75e4c5d24fdef0f2db0b2c59d5e1cd47689e847db56a38f62c3c953d5",
+    "tests/v90-p358-teacher-workbench-navigation.test.js": "61121711cbac958f984665feeba2e340019380eb3dc82e0e7eae93048eb0b254",
+    "tests/v90-p40-data-integrity.test.js": "10af0af6e98648ef74de6027de60e90b479c222abe7d1a8c2fe110521c3fe956",
+    "tests/v90-p40-practice-mode-browser.py": "de3415204ae8f602cef75694c0d1a5632eca4c962bc9b6c22f1e9e5a54952d8c",
+    "tests/v90-p40-practice-mode.test.js": "7688ce2e42d7f774524ab714560b639615c2fae24b86267ceb877212a4b6bd3a",
+    "tests/v90-p401-data-integrity.test.js": "9218d7d49d65c0dc98fdddc6bd87d608c34c546009b7e5a0f9b9cd0cb6d39665"
+  }
+}

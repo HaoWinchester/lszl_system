@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>管理后台总览｜V9.0-P3.5</title>
+  <link rel="stylesheet" href="styles/admin-console.css" />
+  <link rel="stylesheet" href="styles/admin-context-nav.css" />
+  <link rel="stylesheet" href="styles/user-center.css" />
+</head>
+<body class="admin-sticky-shell" data-admin-page="overview">
+  <nav class="admin-context-nav" aria-label="管理后台一级导航">
+    <a data-admin-nav="overview" href="admin-console.html">总览</a>
+    <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
+    <a data-admin-nav="teacher" href="teacher-workbench.html">教师工作台</a>
+    <a data-admin-nav="courses" href="course-admin.html">课程与任务</a>
+    <a data-admin-nav="users" href="user-management.html">用户管理</a>
+    <a data-admin-nav="feedback" href="feedback-management.html">反馈管理</a>
+    <a data-admin-nav="messages" href="message-management.html">消息管理</a>
+    <a data-admin-nav="operations" href="admin-operations.html">操作记录</a>
+    <a data-admin-nav="settings" href="admin-settings.html">系统设置</a>
+  </nav>
+  <header class="admin-topbar">
+    <a class="admin-brand" href="admin-console.html"><span>P</span><div><strong>项目管理学习者</strong><small>V9.0-P3.5 管理后台</small></div></a>
+    <div class="admin-account admin-account-menu" id="adminAccountMenu">
+      <button type="button" class="admin-account-trigger" id="adminAccountTrigger" aria-haspopup="menu" aria-expanded="false"><span class="admin-account-dot" aria-hidden="true"></span><span id="adminAccount">读取账号中</span><b aria-hidden="true">⌄</b></button>
+      <div class="admin-account-popover" id="adminAccountPopover" role="menu" hidden>
+        <button type="button" role="menuitem" id="adminAccountUserCenterBtn"><span class="admin-account-icon" aria-hidden="true">♙</span><span>用户中心</span></button>
+        <button type="button" role="menuitem" id="adminAccountHelpBtn"><span class="admin-account-icon" aria-hidden="true">?</span><span>帮助中心</span></button>
+        <div class="admin-account-divider" aria-hidden="true"></div>
+        <button type="button" role="menuitem" class="danger" id="adminAccountLogoutBtn"><span class="admin-account-icon" aria-hidden="true">↪</span><span>退出登录</span></button>
+      </div>
+    </div>
+  </header>
+  <div class="admin-app-shell">
+<main class="admin-main">
+      <section class="admin-page-head admin-overview-head">
+        <div><p>ADMIN OVERVIEW · V9.0-P3.5</p><h1>管理后台</h1><span>按业务任务进入科目、题库、试卷、课程和用户管理。版本生命周期与技术诊断已移出首页。</span></div>
+        <div class="admin-head-actions"><a class="admin-button primary" href="admin-subjects.html">管理科目与知识树</a><a class="admin-button" href="teacher-workbench.html">进入教师工作台</a></div>
+      </section>
+
+      <section class="admin-kpi-grid" aria-label="业务概览">
+        <article><span>启用科目</span><strong id="adminSubjectCount">—</strong><small id="adminSubjectDetail">等待读取</small></article>
+        <article><span>当前知识树</span><strong id="adminCurrentTaxonomyCount">—</strong><small id="adminTaxonomyDetail">等待读取</small></article>
+        <article><span>题库题目</span><strong id="adminQuestionCount">—</strong><small id="adminQuestionDetail">等待读取</small></article>
+        <article><span>试卷与任务</span><strong id="adminAssessmentCount">—</strong><small id="adminAssessmentDetail">等待读取</small></article>
+      </section>
+
+      <section class="admin-panel">
+        <header><div><p>COMMON WORK</p><h2>常用工作</h2><span>从业务目标出发，不需要先理解仓库、事务或版本状态。</span></div></header>
+        <div class="admin-module-grid">
+          <a href="admin-subjects.html"><i>01</i><strong>维护科目与知识树</strong><span>查看当前知识树、待分类题目与历史版本。</span></a>
+          <a href="question-bank.html"><i>02</i><strong>整理题库</strong><span>搜索、筛选、编辑题目和普通标签。</span></a>
+          <a href="paper-management.html"><i>03</i><strong>管理试卷</strong><span>按确定的题目 ID 组卷，不受知识点后续移动影响。</span></a>
+          <a href="course-admin.html?view=tasks"><i>04</i><strong>配置课程与任务</strong><span>维护学习任务、课程结构与发布内容。</span></a>
+          <a href="feedback-management.html"><i>05</i><strong>处理用户反馈</strong><span>查看问题、建议和管理员回复进度。</span></a>
+          <a href="message-management.html"><i>06</i><strong>发布站内消息</strong><span>按用户范围发布通知并查看已读情况。</span></a>
+        </div>
+      </section>
+
+      <section class="admin-two-column">
+        <section class="admin-panel">
+          <header><div><p>ATTENTION</p><h2>需要关注</h2><span>聚合日常运营中需要继续处理的项目。</span></div></header>
+          <div id="adminAttentionList" class="admin-attention-list"></div>
+        </section>
+        <section class="admin-panel">
+          <header><div><p>RECENT ACTIVITY</p><h2>最近操作</h2><span>这里只显示摘要，完整记录请进入“操作记录”。</span></div><a class="admin-text-link" href="admin-operations.html">查看全部</a></header>
+          <div id="adminRecentAudit" class="admin-audit-list compact"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+  <div id="adminToast" class="admin-toast" role="status" aria-live="polite"></div>
+  <script src="src/28-app-storage.js"></script><script src="src/29-auth-core.js"></script><script src="src/33-user-center.js"></script><script src="src/86-activity-schema-v1.js"></script><script src="src/87-guided-learning-data.js"></script><script src="src/91-learning-content-core.js"></script><script src="src/93-content-organization-core.js"></script>
+  <script src="src/admin/00-admin-core.js"></script><script src="src/admin/10-content-repository.js"></script><script src="src/admin/11-local-content-repository.js"></script><script src="src/admin/20-admin-permission-service.js"></script><script src="src/admin/21-admin-audit-service.js"></script><script src="src/admin/22-admin-transaction-service.js"></script><script src="src/admin/30-reference-index-service.js"></script><script src="src/admin/31-subject-service.js"></script><script src="src/admin/32-taxonomy-service.js"></script><script src="src/admin/33-activity-service.js"></script><script src="src/admin/34-course-service.js"></script><script src="src/admin/35-release-service.js"></script><script src="src/admin/40-admin-service-registry.js"></script><script src="src/admin/41-learning-content-compat.js"></script><script src="src/admin/49-admin-ui.js"></script><script src="src/admin/50-admin-shell-app.js"></script>
+</body>
+</html>

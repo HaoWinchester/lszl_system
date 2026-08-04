@@ -1,0 +1,68 @@
+{
+  "release": "v8.6.1.2.1",
+  "matrix": [
+    {
+      "screen": "1366x768",
+      "zoom": 100,
+      "cssViewport": 1366,
+      "columns": "653px 653px",
+      "pixelDiffRatio": 0.0
+    },
+    {
+      "screen": "1366x768",
+      "zoom": 125,
+      "cssViewport": 1093,
+      "columns": "1049px",
+      "pixelDiffRatio": 0.0
+    },
+    {
+      "screen": "1366x768",
+      "zoom": 150,
+      "cssViewport": 911,
+      "columns": "887px",
+      "pixelDiffRatio": 0.0
+    },
+    {
+      "screen": "1440x900",
+      "zoom": 100,
+      "cssViewport": 1440,
+      "columns": "690px 690px",
+      "pixelDiffRatio": 0.0
+    },
+    {
+      "screen": "1440x900",
+      "zoom": 125,
+      "cssViewport": 1152,
+      "columns": "1108px",
+      "pixelDiffRatio": 0.0
+    },
+    {
+      "screen": "1440x900",
+      "zoom": 150,
+      "cssViewport": 960,
+      "columns": "936px",
+      "pixelDiffRatio": 0.0
+    },
+    {
+      "screen": "1920x1080",
+      "zoom": 100,
+      "cssViewport": 1920,
+      "columns": "930px 930px",
+      "pixelDiffRatio": 0.0
+    },
+    {
+      "screen": "1920x1080",
+      "zoom": 125,
+      "cssViewport": 1536,
+      "columns": "738px 738px",
+      "pixelDiffRatio": 0.0
+    },
+    {
+      "screen": "1920x1080",
+      "zoom": 150,
+      "cssViewport": 1280,
+      "columns": "610px 610px",
+      "pixelDiffRatio": 0.0
+    }
+  ]
+}

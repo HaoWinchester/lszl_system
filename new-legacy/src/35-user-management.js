@@ -612,7 +612,7 @@
   if(window.KGRolePermissions){
     window.KGRolePermissions.applyTheme();
     if(!window.KGRolePermissions.canEnterUserManagement()){
-      window.KGRolePermissions.renderPermissionDenied(document.querySelector('.um-app') || document.body, '用户管理仅限管理员访问。教师/教研可进入题库管理与组卷发布；学员请进入考题训练。');
+      window.KGRolePermissions.renderPermissionDenied(document.querySelector('.um-app') || document.body, '用户管理仅限管理员访问。教师/教研可进入教师工作台完成题目、训练与组卷；学员请进入考题训练。');
       return;
     }
   }

@@ -1,0 +1,70 @@
+{
+  "release": "v8.6.2",
+  "phase": "P2.1",
+  "baseline": "v8.6.2 teacher-workflow-p2",
+  "scope": "bilingual-quick-question-entry",
+  "generatedAt": "2026-07-24T03:49:16+00:00",
+  "counts": {
+    "activities": 82,
+    "taxonomies": 5,
+    "knowledgeNodes": 16,
+    "courses": 1,
+    "courseNodes": 108,
+    "learningTasks": 0,
+    "papers": 0
+  },
+  "idSetSha256": {
+    "activityIds": "d647dbbb4e999067cce8e239d2f067c6b1fdfe90cc2ddd23e942ea7a52493212",
+    "knowledgePointIds": "c6eadebaa073a2b95c7a9f2c0b8b4b41806bee20bfaff5b8db4733f46f0e30d9",
+    "courseNodeIds": "b78bc1829c0868228563e06b6e904c2de30740cbb1d2817ef40b85e6615154b5",
+    "learningTaskIds": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "paperIds": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "protectedFileSha256": {
+    "src/62-learning-session-store.js": "6163074d45977ca1463cf0d7207672b010099be85b851a6161352e52b9e8b952",
+    "src/88-guided-learning-store.js": "37234d4cfaebfc9fcef0ec4cfd82914f4332dd2848be3affb926985840521980",
+    "src/91-learning-content-core.js": "865f80bf156cbb60f63708a1bd88cef331b3f3d9450ca2d76c7c24cc5b18b93d",
+    "src/93-content-organization-core.js": "ca565a78076a8f4285f10d61c2c167b2d91ec0979f2a2ef1954632abedc7aeab",
+    "src/93-assessment-config-app.js": "c3f12f86b0d84c62f67f0ae4a849ff0d674094b9986c4d570d01b17620ab1093",
+    "question-studio/activity-schema-v1.js": "2621b810158b332d3601ff9d17887c5584a12e1d2516911daa1e511401a35bc1",
+    "src/86-activity-schema-v1.js": "2621b810158b332d3601ff9d17887c5584a12e1d2516911daa1e511401a35bc1",
+    "content-center.html": "1ec3829e5602a82fd9f42164233f917e63ac9a7f3b5b0c1b4936b8122f5e13fd",
+    "styles/content-center.css": "106ac5df300b90abbbcd6da5b3626877e17209b2e44429eb4505462f52345af7",
+    "src/91-content-center-app.js": "65e4a517f5ef97bcf87edcdabb4dbc7596ccc17abba04070ebcafd2a356d3510",
+    "src/92-workspace-panel-manager.js": "7b192a32e05644ee61602e28062b515cc8555e5a5bda2d0d20e62d6c0919cc28"
+  },
+  "baselineChangedFileSha256": {
+    "question-bank.html": "62413688628d0b81f978a5bdf0ebeb3f500ded6186f0a31819acfbcf604d13ee",
+    "src/65-question-bank-admin.js": "aa9eafd0027cba816c26b0f3f9f5b3309f761042c1bf8d0a2037ee235938719c",
+    "src/97-teacher-question-workflow.js": "ccd4b1602cf22c3e7dc6ac6dca9c0c9309cc1edd20b940c89490f71bf2155d6a",
+    "src/98-teacher-workflow-p2-services.js": "0ed9b0292429f5be1b9ff392a41fcfd0dcfc880e89ea0b8ae6bdb0850ec21671",
+    "styles/teacher-question-workflow.css": "e9f308d52eb7955dfee02d22971b4d518050c53e663d087db73bb7bf6930e28c",
+    "README.md": "5ea9fc53e1d21f6dfe26a6c345b14ad2086acf3db621bc6ba1fb3e2d35e29306",
+    "CHANGELOG.md": "cd430cd0d7ccfa8655ee97723d1d999e7686c1a8a638c3f0f0b9a36241f658bb"
+  },
+  "releaseChangedFileSha256": {
+    "question-bank.html": "f8724bac49d8c29171b9c070e61a00f0a2dcde81ef89d42535faa11d135bf2f9",
+    "src/65-question-bank-admin.js": "4b9f7f559677ec072ee531fddc232fb83dfe9ed93f94e90763ca05da8905fb21",
+    "src/97-teacher-question-workflow.js": "389077f624e29e994acafb9149b011553f29e9e8798bad6fd6e3d0c20f980ee6",
+    "src/98-teacher-workflow-p2-services.js": "40979fba869e0a9328a685271852049ac2ca0df0b40bda49c7887da94363b51d",
+    "styles/teacher-question-workflow.css": "21dce97cb0e797257691e51b24869ec5a23bebfb50f6d0db3b4c26ee56412f64",
+    "README.md": "4acb0583ffeb4f75b1f1285e608ffa11d1d3eabf5677ba8a6bdb5ff29bf8142c",
+    "CHANGELOG.md": "0eea2e21ff5370e03094f8f1677f49cfb7eb2c316997c965ee5ae8949a8249bc",
+    "tests/v862-p21-bilingual-entry.test.js": "496489e7d954bae8b3ef3f21c9e335d45e6184e149a5e3499a9cf78e3de6d4e1",
+    "tests/v862-p21-bilingual-entry-browser.py": "44d6411b027e8ef8edc37d3205ca0226e314a60d845b22590f2634fb21a8ebeb",
+    "V8.6.2_TEACHER_WORKFLOW_P2.1_REPORT.md": "f35fca1133d64acaa2fde6be9cc1e6271b0c0c9d9a3f4f7fed9b89fee8928723"
+  },
+  "constraints": {
+    "existingActivityIdsChanged": false,
+    "existingKnowledgePointIdsChanged": false,
+    "existingCourseNodeIdsChanged": false,
+    "learningProgressChanged": false,
+    "courseGradesAffected": false,
+    "unlockRulesChanged": false,
+    "legacyChinesePlainTextEntryRetained": true,
+    "bilingualQuestionTemplateCount": 4,
+    "teacherVisibleQuestionNumber": true,
+    "englishTranslationOptional": true,
+    "p22LearningPageChangesIncluded": false
+  }
+}

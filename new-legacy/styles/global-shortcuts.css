@@ -1,6 +1,6 @@
 /*
  * 全局快捷悬浮栏。
- * 在首页、考题训练、深度回忆、题库管理、用户管理等独立页面统一显示。
+ * 在首页、多题归纳、深度回忆、教师工作台、用户管理等独立页面统一显示。
  * 入口可按角色权限自动显示，支持拖拽到任意位置，并可在纵向/横向排布间切换。
  */
 .kg-global-shortcuts{
@@ -105,27 +105,6 @@
   stroke-linecap:round;
   stroke-linejoin:round;
 }
-.kg-global-shortcuts-controls{display:flex;align-items:center;gap:5px;flex:0 0 auto}
-.kg-global-shortcuts-collapse{
-  width:26px;
-  height:26px;
-  min-width:26px;
-  padding:0;
-  border:0;
-  border-radius:10px;
-  background:#f1f5f9;
-  color:#475569;
-  display:grid;
-  place-items:center;
-  box-shadow:none;
-  cursor:pointer;
-}
-.kg-global-shortcuts-collapse:hover{transform:none;background:#e2e8f0;box-shadow:none}
-.kg-global-shortcuts-collapse svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
-.kg-global-shortcuts.is-collapsed{width:48px!important;height:48px;min-height:48px;padding:6px;border-radius:16px}
-.kg-global-shortcuts.is-collapsed .kg-global-shortcuts-head{height:36px;padding:0;justify-content:center;cursor:default}
-.kg-global-shortcuts.is-collapsed .kg-global-shortcuts-title,.kg-global-shortcuts.is-collapsed .kg-global-shortcuts-toggle,.kg-global-shortcuts.is-collapsed .kg-global-shortcuts-body{display:none}
-.kg-global-shortcuts.is-collapsed .kg-global-shortcuts-collapse{width:36px;height:36px;min-width:36px;border-radius:11px;background:#eef2ff;color:#4f46e5}
 .kg-global-shortcuts.layout-vertical{
   width:168px;
 }
@@ -326,4 +305,162 @@
   position:relative;
   z-index:1;
   touch-action:manipulation;
+}
+
+
+/* v8.6.2 P2.2.10 — compact icon-only global shortcut bar */
+.kg-global-shortcuts{
+  width:54px!important;
+  padding:6px!important;
+  box-sizing:border-box!important;
+  border-radius:16px!important;
+}
+.kg-global-shortcuts-head{
+  justify-content:center!important;
+  gap:2px!important;
+  padding:0 0 5px!important;
+}
+.kg-global-shortcuts-title{gap:0!important}
+.kg-global-shortcuts-title>div,
+.kg-global-shortcuts-title strong,
+.kg-global-shortcuts-title small{display:none!important}
+.kg-global-shortcuts-grip,
+.kg-global-shortcuts-toggle{
+  width:19px!important;
+  min-width:19px!important;
+  height:19px!important;
+  border-radius:7px!important;
+}
+.kg-global-shortcuts-grip svg,
+.kg-global-shortcuts-toggle svg{
+  width:13px!important;
+  height:13px!important;
+}
+.kg-global-shortcuts.layout-vertical{width:54px!important}
+.kg-global-shortcuts-body{gap:5px!important}
+.kg-global-shortcuts-link{
+  width:38px!important;
+  min-width:38px!important;
+  max-width:38px!important;
+  min-height:38px!important;
+  height:38px!important;
+  justify-content:center!important;
+  gap:0!important;
+  padding:0!important;
+  border-radius:11px!important;
+}
+.kg-global-shortcuts-link svg{width:18px!important;height:18px!important}
+.kg-global-shortcuts-link span{display:none!important}
+.kg-global-shortcuts.layout-horizontal{
+  width:auto!important;
+  max-width:calc(100vw - 24px)!important;
+  gap:5px!important;
+  padding:6px!important;
+  border-radius:16px!important;
+}
+.kg-global-shortcuts.layout-horizontal .kg-global-shortcuts-head{
+  width:auto!important;
+  min-width:40px!important;
+  padding:0 5px 0 0!important;
+  gap:2px!important;
+}
+.kg-global-shortcuts.layout-horizontal .kg-global-shortcuts-body{gap:5px!important}
+.kg-global-shortcuts.layout-horizontal .kg-global-shortcuts-link{
+  width:38px!important;
+  min-width:38px!important;
+  max-width:38px!important;
+  min-height:38px!important;
+  height:38px!important;
+  padding:0!important;
+}
+.kg-global-shortcuts-link.workspace{
+  background:linear-gradient(135deg,#7c3aed,#6366f1);
+  color:#fff;
+  box-shadow:0 8px 18px rgba(124,58,237,.20);
+}
+.kg-global-shortcuts-link.current.workspace{
+  outline:3px solid rgba(255,255,255,.72);
+  outline-offset:-5px;
+}
+@media(max-width:720px),(pointer:coarse){
+  .kg-global-shortcuts{
+    right:10px;
+    bottom:82px;
+    width:48px!important;
+    padding:5px!important;
+    border-radius:15px!important;
+  }
+  .kg-global-shortcuts.layout-vertical{width:48px!important}
+  .kg-global-shortcuts-link,
+  .kg-global-shortcuts.layout-horizontal .kg-global-shortcuts-link{
+    width:36px!important;
+    min-width:36px!important;
+    max-width:36px!important;
+    height:36px!important;
+    min-height:36px!important;
+    border-radius:10px!important;
+  }
+  .kg-global-shortcuts-link svg{width:17px!important;height:17px!important}
+}
+@media(max-width:420px){
+  .kg-global-shortcuts.layout-vertical{width:48px!important}
+  .kg-global-shortcuts-body{grid-template-columns:1fr!important}
+}
+
+/* P2.2.34 · inactive shortcuts use white surfaces; only current shortcut is color-filled. */
+.kg-global-shortcuts-link.training,
+.kg-global-shortcuts-link.recall,
+.kg-global-shortcuts-link.bank,
+.kg-global-shortcuts-link.users,
+.kg-global-shortcuts-link.settings,
+.kg-global-shortcuts-link.workspace{
+  background:#fff;
+  box-shadow:0 1px 0 rgba(15,23,42,.08),0 0 0 1px rgba(15,23,42,.08);
+}
+.kg-global-shortcuts-link.training{color:#6d28d9}
+.kg-global-shortcuts-link.recall{color:#be185d}
+.kg-global-shortcuts-link.bank{color:#0e7490}
+.kg-global-shortcuts-link.users{color:#9a3412}
+.kg-global-shortcuts-link.settings{color:#334155}
+.kg-global-shortcuts-link.workspace{color:#4f46e5}
+.kg-global-shortcuts-link.current.training{
+  background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;box-shadow:0 8px 18px rgba(124,58,237,.20)
+}
+.kg-global-shortcuts-link.current.recall{
+  background:linear-gradient(135deg,#db2777,#f97316);color:#fff;box-shadow:0 8px 18px rgba(219,39,119,.20)
+}
+.kg-global-shortcuts-link.current.bank{
+  background:linear-gradient(135deg,#0891b2,#0e7490);color:#fff;box-shadow:0 8px 18px rgba(8,145,178,.22)
+}
+.kg-global-shortcuts-link.current.users{
+  background:linear-gradient(135deg,#7c3aed,#f59e0b);color:#fff;box-shadow:0 8px 18px rgba(124,58,237,.20)
+}
+.kg-global-shortcuts-link.current.settings{
+  background:linear-gradient(135deg,#0f172a,#475569);color:#fff;box-shadow:0 8px 18px rgba(15,23,42,.20)
+}
+.kg-global-shortcuts-link.current.workspace{
+  background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;box-shadow:0 8px 18px rgba(124,58,237,.20)
+}
+
+/* P2.2.35 · global shortcuts: black icons by default, color fill only when current. */
+.kg-global-shortcuts-link.training,
+.kg-global-shortcuts-link.recall,
+.kg-global-shortcuts-link.bank,
+.kg-global-shortcuts-link.users,
+.kg-global-shortcuts-link.settings,
+.kg-global-shortcuts-link.workspace{
+  color:#111827;
+}
+.kg-global-shortcuts-link:not(.current):hover,
+.kg-global-shortcuts-link:not(.current):focus-visible{
+  color:#111827;
+  background:#f8fafc;
+}
+.kg-global-shortcuts-link.current.training,
+.kg-global-shortcuts-link.current.recall,
+.kg-global-shortcuts-link.current.bank,
+.kg-global-shortcuts-link.current.users,
+.kg-global-shortcuts-link.current.settings,
+.kg-global-shortcuts-link.current.workspace{
+  color:#fff;
 }

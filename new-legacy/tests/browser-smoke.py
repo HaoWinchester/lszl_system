@@ -44,6 +44,7 @@ def test_path(browser):
     install_storage(page);add_core(page)
     page.evaluate("()=>{const course=KGGuidedLearningData.getCourse();KGGuidedLearningStore.completeNode(course,course.nodes[0].id,{},'browser-test')}")
     page.add_script_tag(content=script('src/89-guided-learning-icon-registry.js'))
+    page.add_script_tag(content=script('src/89-guided-learning-path-layout.js'))
     page.add_script_tag(content=script('src/89-guided-learning-app.js'))
     page.evaluate('KGGuidedLearningApp.init()')
     page.wait_for_timeout(80)
@@ -65,9 +66,9 @@ def test_path(browser):
     assert page.locator('.gl-stage-option').count()==3
     assert page.locator('.gl-part').count()==3
     assert page.locator('.gl-part-divider').count()==3
-    assert page.locator('.gl-path-curve').count()==0
-    assert '--gl-path-y:0px' in page.locator('.gl-path-node').first.get_attribute('style')
-    assert page.locator('.gl-part-divider-copy').first.evaluate("el=>getComputedStyle(el).writingMode").startswith('vertical')
+    assert page.locator('.gl-part-path-curve').count()==3
+    assert '--gl-path-top:122px' in page.locator('.gl-path-node').first.get_attribute('style')
+    assert page.locator('.gl-part-divider-copy').first.evaluate("el=>getComputedStyle(el).writingMode")=='horizontal-tb'
     assert page.locator('.gl-part-divider-copy small').count()==0
     assert page.locator('[data-gl-node]').count()==36
     assert page.locator('.gl-path-node.is-completed').count()==1
@@ -121,8 +122,8 @@ def test_path(browser):
     page.mouse.down();page.wait_for_timeout(40)
     assert page.locator('.is-available .gl-node-face').evaluate("el=>getComputedStyle(el).transform")!='none'
     page.mouse.move(1,1);page.mouse.up()
-    dimensions=page.evaluate("()=>{const el=document.querySelector('.gl-stage-path-scroll');return {client:el.clientWidth,scroll:el.scrollWidth,left:el.scrollLeft}}")
-    assert dimensions['scroll']>dimensions['client']
+    dimensions=page.evaluate("()=>{const el=document.querySelector('.gl-stage-path-scroll');return {client:el.clientHeight,scroll:el.scrollHeight,top:el.scrollTop,width:el.scrollWidth,clientWidth:el.clientWidth}}")
+    assert dimensions['scroll']>dimensions['client'] and dimensions['width']<=dimensions['clientWidth']+1
     first_theme=page.locator('#glStageSwitch').evaluate("el=>getComputedStyle(el).getPropertyValue('--gl-part-main').trim()")
     page.evaluate("""()=>KGGuidedLearningApp.setActivePart('roles-process',{force:true})""")
     page.wait_for_timeout(30)
@@ -132,6 +133,42 @@ def test_path(browser):
     page.locator('#glStageSwitch').dispatch_event('click');assert page.locator('#glStagePicker.is-open').count()==1
     page.locator('[data-gl-stage="reasoning"]').dispatch_event('click')
     assert page.locator('#glStageTitle').text_content()=='拆解题干与约束'
+    page.close()
+
+    # 旧进度出现非连续完成节点时，较早缺口可补学，但脉冲环必须位于最靠后的学习前沿。
+    page=browser.new_page(viewport={'width':1200,'height':900})
+    page.set_content(path_html())
+    page.add_style_tag(content=script('styles/main.css'))
+    page.add_style_tag(content=script('styles/guided-learning-path.css'))
+    page.add_style_tag(content='*{transition:none!important}')
+    install_storage(page);add_core(page)
+    gap_ids=page.evaluate("""()=>{const course=KGGuidedLearningData.getCourse();const key=KGGuidedLearningStore.PREFIX+encodeURIComponent('browser-test')+'__'+encodeURIComponent(course.id);localStorage.setItem(key,JSON.stringify({schemaVersion:4,userId:'browser-test',courseId:course.id,nodes:{[course.nodes[1].id]:{status:'completed',completedAt:22222,metrics:null}}}));return {oldGap:course.nodes[0].id,frontier:course.nodes[2].id}}""")
+    page.add_script_tag(content=script('src/89-guided-learning-icon-registry.js'))
+    page.add_script_tag(content=script('src/89-guided-learning-path-layout.js'))
+    page.add_script_tag(content=script('src/89-guided-learning-app.js'))
+    page.evaluate('KGGuidedLearningApp.init()')
+    page.wait_for_timeout(80)
+    assert page.locator('.gl-path-node.is-available').count()==2
+    assert page.locator('.gl-path-node.is-current').count()==1
+    assert page.locator('.gl-path-node.is-current [data-gl-node]').get_attribute('data-gl-node')==gap_ids['frontier']
+    assert 'is-current' not in page.locator(f'[data-node-wrap="{gap_ids["oldGap"]}"]').get_attribute('class').split()
+    page.close()
+
+    # 全课程完成后不再存在 available 节点，最后一个已完成节点也不得继续显示当前位置脉冲环。
+    page=browser.new_page(viewport={'width':1200,'height':900})
+    page.set_content(path_html())
+    page.add_style_tag(content=script('styles/main.css'))
+    page.add_style_tag(content=script('styles/guided-learning-path.css'))
+    page.add_style_tag(content='*{transition:none!important}')
+    install_storage(page);add_core(page)
+    page.evaluate("""()=>{const course=KGGuidedLearningData.getCourse();for(const node of course.nodes)KGGuidedLearningStore.completeNode(course,node.id,{},'browser-test')}""")
+    page.add_script_tag(content=script('src/89-guided-learning-icon-registry.js'))
+    page.add_script_tag(content=script('src/89-guided-learning-path-layout.js'))
+    page.add_script_tag(content=script('src/89-guided-learning-app.js'))
+    page.evaluate('KGGuidedLearningApp.init()')
+    page.wait_for_timeout(80)
+    assert page.locator('.gl-path-node.is-available').count()==0
+    assert page.locator('.gl-path-node.is-current').count()==0
     page.close()
 
 
@@ -154,6 +191,7 @@ def test_desktop_entry_matrix(browser):
         install_storage(page);add_core(page)
         page.evaluate("()=>{const course=KGGuidedLearningData.getCourse();KGGuidedLearningStore.completeNode(course,course.nodes[0].id,{},'browser-test')}")
         page.add_script_tag(content=script('src/89-guided-learning-icon-registry.js'))
+        page.add_script_tag(content=script('src/89-guided-learning-path-layout.js'))
         page.add_script_tag(content=script('src/89-guided-learning-app.js'))
         page.evaluate('KGGuidedLearningApp.init()')
         page.evaluate('zoom=>{document.documentElement.style.zoom=String(zoom)}',zoom)
@@ -186,6 +224,7 @@ def test_admin_access(browser):
     page.add_style_tag(content='*{transition:none!important}')
     install_storage(page,'admin');add_core(page)
     page.add_script_tag(content=script('src/89-guided-learning-icon-registry.js'))
+    page.add_script_tag(content=script('src/89-guided-learning-path-layout.js'))
     page.add_script_tag(content=script('src/89-guided-learning-app.js'))
     page.evaluate('KGGuidedLearningApp.init()')
     page.wait_for_timeout(80)
@@ -211,12 +250,13 @@ def test_path_position_memory(browser):
     install_storage(page);add_core(page)
     page.evaluate("index=>{const course=KGGuidedLearningData.getCourse();for(let i=0;i<index;i+=1)KGGuidedLearningStore.completeNode(course,course.nodes[i].id,{},'browser-test')}",15)
     page.add_script_tag(content=script('src/89-guided-learning-icon-registry.js'))
+    page.add_script_tag(content=script('src/89-guided-learning-path-layout.js'))
     page.add_script_tag(content=script('src/89-guided-learning-app.js'));page.evaluate('KGGuidedLearningApp.init()');page.wait_for_timeout(80)
-    first_position=page.evaluate("document.querySelector('.gl-stage-path-scroll').scrollLeft")
-    assert first_position>900
-    page.evaluate("()=>{const el=document.querySelector('.gl-stage-path-scroll');el.style.scrollBehavior='auto';el.scrollLeft=260;el.dispatchEvent(new Event('scroll'))}")
+    first_position=page.evaluate("document.querySelector('.gl-stage-path-scroll').scrollTop")
+    assert first_position>1200
+    page.evaluate("()=>{const el=document.querySelector('.gl-stage-path-scroll');el.style.scrollBehavior='auto';el.scrollTop=260;el.dispatchEvent(new Event('scroll'))}")
     page.wait_for_timeout(140);page.evaluate('KGGuidedLearningApp.renderAll()');page.wait_for_timeout(80)
-    restored=page.evaluate("document.querySelector('.gl-stage-path-scroll').scrollLeft")
+    restored=page.evaluate("document.querySelector('.gl-stage-path-scroll').scrollTop")
     assert abs(restored-260)<8
     page.close()
 
@@ -237,6 +277,7 @@ def new_placement_page(browser,part_id,unlock_index=0,role='student'):
     page.add_style_tag(content=script('styles/guided-learning-placement-test.css'))
     page.add_style_tag(content='*{transition:none!important}')
     install_storage(page,role);add_core(page)
+    page.add_script_tag(content=script('src/86-question-language-ui.js'))
     if unlock_index:
         page.evaluate("index=>{const course=KGGuidedLearningData.getCourse();for(let i=0;i<index;i+=1)KGGuidedLearningStore.completeNode(course,course.nodes[i].id,{},'browser-test')}",unlock_index)
     page.add_script_tag(content=script('src/89-guided-learning-placement-test.js'))
@@ -279,6 +320,12 @@ def test_placement_test(browser):
     part_id='environment'
     page=new_placement_page(browser,part_id)
     assert page.locator('#gptTaskCount').text_content()=='12 项'
+    assert page.locator('[data-question-language]').count()==2
+    assert page.locator('[data-question-language="en"]').count()==0
+    assert page.locator('[data-question-language-note]').is_hidden()
+    page.evaluate("()=>{localStorage.setItem(KGActivitySchemaV1.LANGUAGE_STORAGE_KEY,'en');KGQuestionLanguageUI.sync()}")
+    assert page.evaluate("()=>KGQuestionLanguageUI.getMode()")=='bilingual'
+    assert page.locator('[data-question-language-note]').is_visible()
     assert '至少 10 项正确' in page.locator('#gptPassRule').text_content()
 
     start=page.locator('#gptStartBtn')
@@ -315,7 +362,7 @@ def test_placement_test(browser):
     after_action=action.evaluate("el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,label:el.textContent}}")
     assert before_action['label']=='提交答案' and after_action['label']=='下一项'
     assert all(abs(after_action[key]-before_action[key])<0.1 for key in ['x','y','width','height'])
-    page.locator('#gptExitBtn').dispatch_event('click')
+    assert page.locator('#gptExitBtn').is_visible()
 
     page.close()
     page=new_placement_page(browser,part_id)
@@ -359,6 +406,7 @@ def new_node_page(browser,node_id,unlock_index=0,role='student'):
     page.add_style_tag(content=script('styles/guided-learning-node.css'))
     page.add_style_tag(content='*{transition:none!important}')
     install_storage(page,role);add_core(page)
+    page.add_script_tag(content=script('src/86-question-language-ui.js'))
     if unlock_index:
         page.evaluate("index=>{const course=KGGuidedLearningData.getCourse();for(let i=0;i<index;i+=1)KGGuidedLearningStore.completeNode(course,course.nodes[i].id,{},'browser-test')}",unlock_index)
     page.add_script_tag(content=script('src/89-guided-learning-activity-registry.js'))
@@ -821,6 +869,43 @@ def test_multi_induction(browser):
     page.close()
 
 
+def test_standard_ordering(browser):
+    page=browser.new_page(viewport={'width':1100,'height':820})
+    errors=[]
+    page.on('pageerror',lambda error:errors.append(str(error)))
+    page.set_content(node_html())
+    page.add_style_tag(content=script('styles/main.css'))
+    page.add_style_tag(content=script('styles/guided-learning-node.css'))
+    page.add_style_tag(content='*{transition:none!important}')
+    install_storage(page);add_core(page)
+    page.add_script_tag(content=script('src/86-question-language-ui.js'))
+    page.evaluate("""()=>{
+      const activity={
+        id:'ordering-browser-01',type:'ordering',instruction:'请按顺序排列。',
+        items:[{id:'step-1',text:'第一步'},{id:'step-2',text:'第二步'},{id:'step-3',text:'第三步'}],
+        correctOrder:['step-1','step-2','step-3'],displayOrder:['step-3','step-1','step-2'],
+        shortExplanation:'顺序正确。',incorrectFeedback:'请重新判断。',detailedExplanation:'第一步、第二步、第三步。',
+        assessmentLanguage:'zh',answerLanguage:'zh'
+      };
+      const course={id:'ordering-browser-course',title:'排序测试',schemaVersion:1,activitySchemaVersion:1,assessmentLanguage:'zh',questionLanguageModes:['zh','bilingual'],stages:[{id:'s1',title:'阶段',order:1}],parts:[{id:'p1',stageId:'s1',title:'部分',order:1}],nodes:[{id:'ordering-node',partId:'p1',title:'排序节点',order:1,nodeType:'ordering',runMode:'standard',activityIds:['ordering-browser-01']}],activities:{},placementTests:{}};
+      window.KGGuidedLearningData={getCourse:()=>JSON.parse(JSON.stringify(course)),contentForNode:()=>({mode:'standard',languageMode:'zh',nodeId:'ordering-node',activityType:'ordering',activities:[JSON.parse(JSON.stringify(activity))],stages:[]}),activitiesForNode:()=>[JSON.parse(JSON.stringify(activity))]};
+    }""")
+    page.add_script_tag(content=script('src/89-guided-learning-activity-registry.js'))
+    page.add_script_tag(content=script('src/90-guided-learning-node-app.js'))
+    page.evaluate("()=>KGGuidedLearningNodeApp.init('ordering-node')")
+    page.wait_for_timeout(50)
+    assert not errors,errors
+    assert page.locator('[data-ordering-item]').count()==3
+    assert page.evaluate("()=>Array.from(document.querySelectorAll('[data-ordering-item]')).map(el=>el.dataset.orderingItem).join(',')")=='step-3,step-1,step-2'
+    page.locator('[data-ordering-id="step-3"][data-ordering-move="down"]').dispatch_event('click')
+    page.locator('[data-ordering-id="step-3"][data-ordering-move="down"]').dispatch_event('click')
+    assert page.evaluate("()=>Array.from(document.querySelectorAll('[data-ordering-item]')).map(el=>el.dataset.orderingItem).join(',')")=='step-1,step-2,step-3'
+    page.locator('[data-footer-action="check"]').dispatch_event('click')
+    assert page.locator('#glnFeedback[data-kind="success"]').count()==1
+    assert page.locator('[data-footer-action="continue"]').count()==1
+    page.close()
+
+
 BROWSER_ARGS=[
     '--no-sandbox','--disable-dev-shm-usage',
     '--in-process-gpu','--disable-gpu-sandbox','--use-gl=swiftshader',
@@ -843,6 +928,7 @@ CASE_LIST=[
     ('test_keyword',test_keyword),
     ('test_choice',test_choice_completion_metrics),
     ('test_matching',test_matching),
+    ('test_standard_ordering',test_standard_ordering),
     ('test_mixed_process',test_mixed_process_node),
     ('test_structure_hint',test_structure_retry_hint),
     ('test_part_challenge',test_part_challenge),
@@ -856,30 +942,19 @@ CASE_MAP=dict(CASE_LIST)
 if __name__=='__main__':
     mode=os.environ.get('KG_BROWSER_TEST_MODE','smoke')
     only=os.environ.get('KG_BROWSER_CASE','').strip()
+    if mode=='smoke' and not only:only='test_path'
 
     with sync_playwright() as p:
         if mode=='matrix':
             print('test_desktop_entry_matrix',flush=True)
             browser=p.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=BROWSER_ARGS)
-            test_desktop_entry_matrix(browser)
+            try:test_desktop_entry_matrix(browser)
+            finally:browser.close()
             print('browser-matrix-ok',flush=True)
-            os._exit(0)
+            raise SystemExit(0)
 
-        browser=p.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=BROWSER_ARGS)
-        if only:
-            test=CASE_MAP.get(only)
-            if not test:raise SystemExit('Unknown browser case: '+only)
-            print(only,flush=True)
-            test(browser)
-        else:
-            critical=[
-                ('test_path',test_path),
-                ('test_placement_test',test_placement_test),
-                ('test_part_challenge',test_part_challenge)
-            ]
-            for name,test in critical:
-                print(name,flush=True)
-                test(browser)
+        test=CASE_MAP.get(only)
+        if not test:raise SystemExit('Unknown browser case: '+only)
+        run_browser_case(p,only,test)
         print('browser-smoke-ok',flush=True)
-        # Avoid intermittent Chromium shutdown hangs in restricted containers.
-        os._exit(0)
+        raise SystemExit(0)

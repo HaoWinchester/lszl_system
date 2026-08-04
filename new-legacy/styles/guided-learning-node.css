@@ -31,7 +31,6 @@ button{touch-action:manipulation}
 .gln-main{width:min(800px,calc(100% - 36px));margin:0 auto;padding:28px 0 calc(var(--gln-footer-height) + 52px)}
 .gln-main.is-wide{width:min(1200px,calc(100% - 44px))}
 .gln-activity{min-height:410px;padding:34px;border:1px solid var(--gln-border);border-radius:24px;background:var(--gln-card)}
-.gln-activity.gln-keyword-activity{min-height:300px}
 .gln-question-head{margin-bottom:24px}
 .gln-question-head span{display:block;margin-bottom:8px;color:var(--gln-primary);font-size:11px;font-weight:900;letter-spacing:.08em}
 .gln-question-head h2{margin:0;font-size:22px;line-height:1.62}
@@ -110,7 +109,7 @@ button{touch-action:manipulation}
 @media(max-width:720px){
   :root{--gln-footer-height:168px}
   .gln-topbar{padding:14px 14px}.gln-topbar-row{grid-template-columns:40px minmax(0,1fr) 48px;gap:9px}.gln-topbar h1{font-size:16px}.gln-exit{width:38px;height:38px}
-  .gln-main,.gln-main.is-wide{width:100%;padding:20px 12px calc(var(--gln-footer-height) + 42px)}.gln-activity{min-height:390px;padding:22px 16px;border-radius:18px}.gln-activity.gln-keyword-activity{min-height:280px}.gln-question-head h2{font-size:19px}
+  .gln-main,.gln-main.is-wide{width:100%;padding:20px 12px calc(var(--gln-footer-height) + 42px)}.gln-activity{min-height:390px;padding:22px 16px;border-radius:18px}.gln-question-head h2{font-size:19px}
   .gln-keyword-passage{padding:18px;font-size:17px}.gln-match-board{gap:18px}.gln-match-column button{min-height:66px;padding:9px;font-size:12px}.gln-match-board svg{display:none}
   .gln-action-inner,.gln-main.is-wide~.gln-action-bar .gln-action-inner{grid-template-columns:1fr;width:100%;min-height:145px;padding:14px 12px;gap:12px}.gln-feedback[hidden]{display:none}.gln-footer-actions{grid-template-columns:1fr 1fr;justify-content:stretch;width:100%}.gln-footer-actions:not(.has-secondary){grid-template-columns:1fr}.gln-footer-actions:not(.has-secondary) .gln-footer-slot--secondary{display:none}.gln-footer-slot{width:100%;min-width:0}.gln-footer-actions .ui-button{width:100%;min-width:0}.gln-primary-action{width:100%}
 }
@@ -340,3 +339,11 @@ body.guided-node-page .gln-footer-actions .ui-button[aria-disabled="true"]{
   .gln-language-switch{grid-column:1/-1;justify-self:center}
   .question-language-switch button{padding:0 10px}
 }
+
+/* v8.6.0.1 · 双语内容按中英文分行显示 */
+.gln-question-head h2,
+.gln-choice-list button strong,
+.gln-keyword-passage button,
+.gln-match-column button,
+.gln-memory-front{white-space:pre-line}
+.question-language-note{margin:5px 0 0;text-align:right;color:#70798b;font-size:11px;font-weight:750}

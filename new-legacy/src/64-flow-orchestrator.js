@@ -167,9 +167,6 @@
           isCorrect:saved.answer.isCorrect,
           confidence:saved.confidence
         },saved);
-        const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){};
-        track('training','key_action','answer_submitted');
-        track('training','outcome',saved.answer.isCorrect?'answer_correct':'answer_incorrect');
       }
     }
     return saved;
@@ -200,6 +197,26 @@
       draft.conclusion.learnerSummary=String(summary||'').trim();
       return draft;
     },'CONCLUSION_UPDATED',{length:String(summary||'').trim().length});
+  }
+  function saveConclusionFor(questionId,targetUserId,summary){
+    const id=String(questionId||'');
+    const uid=String(targetUserId||userId());
+    if(!id||!sessions?.update)return null;
+    const text=String(summary||'').trim();
+    const saved=sessions.update(id,draft=>{
+      draft.conclusion=draft.conclusion&&typeof draft.conclusion==='object'?draft.conclusion:{};
+      draft.conclusion.learnerSummary=text;
+      draft.updatedAt=Date.now();
+      return draft;
+    },uid);
+    if(saved){
+      event('CONCLUSION_UPDATED',{length:text.length},saved);
+      if(active&&String(active.questionId)===id&&String(active.userId||userId())===uid){
+        active=clone(saved);runtimeKey=makeRuntimeKey(saved);
+      }
+      try{global.dispatchEvent(new CustomEvent('kg:learning-session-updated',{detail:{session:clone(saved),eventType:'CONCLUSION_UPDATED'}}))}catch(e){}
+    }
+    return clone(saved);
   }
   function completeCurrent(options={}){
     const recap=String(options.recap??active?.conclusion?.learnerSummary??'').trim();
@@ -349,6 +366,7 @@
     captureLegacyState,
     restoreLegacyState,
     saveConclusion,
+    saveConclusionFor,
     completeCurrent,
     resetCurrentSession,
     setMode,

@@ -1,0 +1,13 @@
+'use strict';
+const fs=require('fs'),path=require('path'),assert=require('assert/strict');
+const ROOT=path.resolve(__dirname,'..');
+const read=file=>fs.readFileSync(path.join(ROOT,file),'utf8');
+const workflow=read('src/97-teacher-question-workflow.js');
+const css=read('styles/teacher-question-workflow.css');
+assert(workflow.includes('function previewDetailMarkup(result)'), '单题与批量预览应复用完整详情模板');
+assert(workflow.includes('tq-batch-full-preview'), '批量预览应渲染完整详情区');
+for(const label of ['<b>语言</b>','<b>题干</b>','<b>选项</b>','<b>正确答案</b>','<b>解析</b>','<b>分类</b>']) assert(workflow.includes(label),`预览缺少字段 ${label}`);
+assert(css.includes('body.qb-simple-mode .qb-layout{max-width:none;width:100%'), '简化题目工作区不应继续受 1440px 最大宽度限制');
+assert(css.includes('body.qb-simple-mode .tq-paste-grid{grid-template-columns:minmax(0,1fr) minmax(440px,1fr)}'), '宽屏下粘贴区与完整预览应充分利用可用宽度');
+assert(css.includes('.tq-batch-result{max-height:none;overflow:visible'), '批量完整预览不应再被摘要卡片自身裁切');
+console.log('v90-p3333-full-batch-preview-layout-ok');

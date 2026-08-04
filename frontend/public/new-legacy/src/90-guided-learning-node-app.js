@@ -24,6 +24,8 @@
     current:null,
     selectedChoice:'',
     selectedKeywords:new Set(),
+    orderingOrder:[],
+    orderingDragId:'',
     matchAssignments:new Map(),
     matchLeft:'',
     textAnswer:'',
@@ -120,6 +122,8 @@
     clearMemoryTimer();
     state.selectedChoice='';
     state.selectedKeywords=new Set();
+    state.orderingOrder=[];
+    state.orderingDragId='';
     state.matchAssignments=new Map();
     state.matchLeft='';
     state.textAnswer='';
@@ -286,6 +290,36 @@
       +'<div class="gln-keyword-passage">'+(activity.segments||[]).map((segment,index)=>'<button type="button" class="ui-option-control" data-keyword="'+index+'" aria-pressed="false">'+escapeHTML(segment.text)+'</button>').join('')+'</div>'
       +renderKeywordHintPanel(activity);
   }
+  function orderingItems(activity){return Array.isArray(activity?.items)?activity.items:[]}
+  function initialOrderingOrder(activity){
+    const items=orderingItems(activity);
+    const ids=items.map(item=>String(item.id));
+    const configured=Array.isArray(activity?.displayOrder)?activity.displayOrder.map(String):[];
+    return configured.length===ids.length&&configured.every(id=>ids.includes(id))?configured:[...ids].reverse();
+  }
+  function prepareOrdering(activity){state.orderingOrder=initialOrderingOrder(activity);state.orderingDragId=''}
+  function renderOrdering(activity){
+    const byItemId=new Map(orderingItems(activity).map(item=>[String(item.id),item]));
+    return '<div class="gln-question-head"><span>'+activityLabel(activity.type)+'</span><h2>'+escapeHTML(activity.instruction||'请按照正确顺序排列。')+'</h2></div>'
+      +'<div class="gln-order-list" id="glnOrderingList">'+state.orderingOrder.map((id,index)=>{
+        const item=byItemId.get(String(id))||{id,text:''};
+        return '<div class="gln-order-card" draggable="true" data-ordering-item="'+escapeHTML(item.id)+'"><span class="gln-order-handle" aria-hidden="true">⋮⋮</span><strong>'+escapeHTML(item.text)+'</strong><span class="gln-order-actions"><button type="button" class="ui-option-control" data-ordering-move="up" data-ordering-id="'+escapeHTML(item.id)+'" aria-label="上移"'+(index===0?' disabled':'')+'>↑</button><button type="button" class="ui-option-control" data-ordering-move="down" data-ordering-id="'+escapeHTML(item.id)+'" aria-label="下移"'+(index===state.orderingOrder.length-1?' disabled':'')+'>↓</button></span></div>';
+      }).join('')+'</div>';
+  }
+  function rerenderOrdering(){mountCurrentActivity(false);setCheckButton(state.orderingOrder.length>1)}
+  function moveOrdering(id,direction){
+    const index=state.orderingOrder.indexOf(String(id));
+    const target=index+(direction==='up'?-1:1);
+    if(index<0||target<0||target>=state.orderingOrder.length)return;
+    [state.orderingOrder[index],state.orderingOrder[target]]=[state.orderingOrder[target],state.orderingOrder[index]];
+    rerenderOrdering();
+  }
+  function submitOrdering(){
+    const expected=(state.current.correctOrder||orderingItems(state.current).map(item=>String(item.id))).map(String);
+    const correct=state.orderingOrder.length===expected.length&&state.orderingOrder.every((id,index)=>String(id)===String(expected[index]));
+    if(correct)markCorrect(state.current.shortExplanation);
+    else markWrong('当前顺序还不正确，请重新检查各步骤之间的先后关系。'+(state.current.incorrectFeedback?' '+state.current.incorrectFeedback:''));
+  }
   function matchingRightPairs(activity){
     const pairs=activity.pairs||[];
     const byPairId=new Map(pairs.map(pair=>[String(pair.id),pair]));
@@ -392,7 +426,6 @@
     const shell=byId('glnActivity');
     shell.innerHTML=(isPartChallenge()?challengeContextHTML(activity):'')+plugin.render(activity,runtime);
     shell.dataset.activityId=activity.id;
-    shell.classList.toggle('gln-keyword-activity',activity.type==='keyword');
     const hideActionBar=Boolean(plugin.actionBarHidden?.(activity,runtime));
     setActionBarHidden(hideActionBar);
     if(hideActionBar)setFooterButtons([]);else setCheckButton(false);
@@ -738,6 +771,47 @@
         const keyword=event.target.closest?.('[data-keyword]');
         if(!keyword)return false;
         updateKeywordSelection(keyword);
+        return true;
+      }
+    });
+    target.register('ordering',{
+      label:'排序任务',
+      prepare:prepareOrdering,
+      render:renderOrdering,
+      submit(){submitOrdering()},
+      handleClick(event){
+        if(state.awaitingAdvance)return false;
+        const move=event.target.closest?.('[data-ordering-move]');
+        if(!move)return false;
+        moveOrdering(move.dataset.orderingId,move.dataset.orderingMove);
+        return true;
+      },
+      handleDragStart(event){
+        const card=event.target.closest?.('[data-ordering-item]');
+        if(!card||state.awaitingAdvance)return false;
+        state.orderingDragId=String(card.dataset.orderingItem||'');
+        card.classList.add('is-dragging');
+        try{event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',state.orderingDragId)}catch(error){}
+        return true;
+      },
+      handleDragOver(event){
+        if(!state.orderingDragId)return false;
+        if(event.target.closest?.('[data-ordering-item]'))event.preventDefault();
+        return true;
+      },
+      handleDrop(event){
+        const target=event.target.closest?.('[data-ordering-item]');
+        if(!target||!state.orderingDragId)return false;
+        event.preventDefault();
+        const from=state.orderingOrder.indexOf(state.orderingDragId);
+        const to=state.orderingOrder.indexOf(String(target.dataset.orderingItem||''));
+        if(from>=0&&to>=0&&from!==to){const moved=state.orderingOrder.splice(from,1)[0];state.orderingOrder.splice(to,0,moved);rerenderOrdering()}
+        state.orderingDragId='';
+        return true;
+      },
+      handleDragEnd(){
+        state.orderingDragId='';
+        byId('glnActivity')?.querySelectorAll('.gln-order-card.is-dragging').forEach(card=>card.classList.remove('is-dragging'));
         return true;
       }
     });

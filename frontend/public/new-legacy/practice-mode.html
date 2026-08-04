@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
+<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <meta name="color-scheme" content="light"/>
+  <title>做题模式｜项目管理学习营</title>
+  <link rel="stylesheet" href="styles/main.css?v=v9.0-p4.1.9"/>
+  <link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.9"/>
+<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.9"/>
+  <link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.9"/>
+  <link rel="stylesheet" href="styles/practice-mode.css?v=v9.0-p4.1.9"/>
+</head>
+<body class="practice-mode-page">
+  <div class="practice-app">
+    <header class="practice-header">
+      <a class="practice-brand" href="practice-mode.html" aria-label="返回做题模式大厅">
+        <span class="practice-brand-mark" aria-hidden="true">P</span>
+        <span><strong>做题模式</strong><small>轻量练习</small></span>
+      </a>
+      <div class="practice-header-actions">
+        <nav class="practice-mode-switch" aria-label="模式切换" title="切换做题或自由模式">
+          <a class="is-active" href="practice-mode.html" aria-current="page">做题</a>
+          <a href="index.html">自由</a>
+        </nav>
+        <div class="account-menu-shell" id="accountMenuShell" data-account-help-href="multi-question-help.html">
+        <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
+          <span class="account-menu-status-dot" aria-hidden="true"></span><span class="account-menu-trigger-label">访客</span>
+          <svg aria-hidden="true" class="account-menu-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>
+        </button>
+        <div class="account-menu" hidden id="accountMenu" role="menu" aria-label="账号菜单">
+          <button class="account-menu-item" id="accountMenuUserCenterBtn" role="menuitem" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0"/></svg><span>用户中心</span></button>
+          <button class="account-menu-item" id="accountMenuHelpBtn" role="menuitem" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.5 2.5 0 1 1 3.8 2.1c-.9.5-1.5 1-1.5 2.2M12 17h.01"/></svg><span>帮助中心</span></button>
+          <div class="account-menu-separator" role="separator"></div>
+          <button class="account-menu-item account-menu-session" id="accountMenuSessionBtn" role="menuitem" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9"/></svg><span>登录</span></button>
+        </div>
+      </div>
+      </div>
+      <button class="account-hidden-trigger" hidden id="authLoginBtn" type="button">登录</button>
+      <button class="account-hidden-trigger" hidden id="authLogoutBtn" type="button">退出登录</button>
+    </header>
+
+    <main class="practice-main">
+      <section class="practice-lobby" id="practiceLobby" aria-labelledby="practiceLobbyTitle">
+        <header class="practice-lobby-head">
+          <span>READY</span>
+          <h1 id="practiceLobbyTitle">选择一套试卷，开始练习</h1>
+        </header>
+
+        <section class="practice-setup-card" aria-label="练习设置">
+          <label class="practice-field">
+            <span>选择试卷</span>
+            <select id="practicePaperSelect" aria-describedby="practicePaperMeta"></select>
+            <small id="practicePaperMeta">正在读取已发布试卷…</small>
+          </label>
+
+          <fieldset class="practice-choice-group">
+            <legend>题目数量</legend>
+            <div class="practice-count-options" id="practiceCountOptions">
+              <label><input type="radio" name="practiceCount" value="10" checked/><span>10</span></label>
+              <label><input type="radio" name="practiceCount" value="20"/><span>20</span></label>
+              <label><input type="radio" name="practiceCount" value="60"/><span>60</span></label>
+              <label><input type="radio" name="practiceCount" value="180"/><span>180</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="practice-choice-group">
+            <legend>答题顺序</legend>
+            <div class="practice-order-options">
+              <label><input type="radio" name="practiceOrder" value="paper" checked/><span>试卷顺序</span></label>
+              <label><input type="radio" name="practiceOrder" value="random"/><span>随机顺序</span></label>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="practice-mode-grid" aria-label="选择练习模式">
+          <article class="practice-mode-card challenge">
+            <span class="practice-mode-icon" aria-hidden="true">◆</span>
+            <div><small>CHALLENGE</small><h2>挑战模式</h2><p>用三点血量持续闯关。连续答对可获得额外经验，并恢复血量。</p></div>
+            <button type="button" class="practice-start-btn" data-practice-start="challenge">开始挑战</button>
+          </article>
+          <article class="practice-mode-card scholar">
+            <span class="practice-mode-icon" aria-hidden="true">⚡</span>
+            <div><small>SCHOLAR</small><h2>学霸模式</h2><p>共享 80 秒倒计时。答对加时间，答错扣时间并损失血量。</p></div>
+            <button type="button" class="practice-start-btn" data-practice-start="scholar">进入学霸模式</button>
+          </article>
+        </section>
+
+        <section class="practice-history" id="practiceHistorySection" aria-labelledby="practiceHistoryTitle" hidden>
+          <div class="practice-section-head"><h2 id="practiceHistoryTitle">最近练习</h2><button type="button" id="practiceClearHistoryBtn">清空记录</button></div>
+          <div id="practiceHistoryList" class="practice-history-list"></div>
+        </section>
+
+        <div class="practice-empty" id="practiceEmpty" hidden>
+          <strong>暂时没有可练习的已发布试卷</strong>
+          <p>请先让教师在“教师工作台 → 试卷管理”中完成选题并发布。</p>
+        </div>
+      </section>
+
+      <section class="practice-game" id="practiceGame" hidden aria-live="polite">
+        <header class="practice-game-topbar">
+          <button type="button" class="practice-exit-btn" id="practiceExitBtn" aria-label="退出本次练习" title="退出">×</button>
+          <div class="practice-progress-shell" id="practiceProgressShell" role="progressbar" aria-label="做题进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="practiceProgressBar"></span></div>
+          <div class="practice-health" id="practiceHealth" aria-label="剩余血量"></div>
+          <div class="practice-scholar-stat practice-timer" id="practiceTimer" hidden><strong>80</strong><span>秒</span></div>
+        </header>
+        <div class="practice-time-row" id="practiceTimeRow" hidden aria-hidden="true">
+          <svg class="practice-time-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="7"/><path d="M12 10v3.4l2.2 1.4M8.5 3.8 6 6.3M15.5 3.8 18 6.3M9 2h6"/></svg>
+          <div class="practice-time-rail" id="practiceTimeRail"><span id="practiceTimeBar"></span></div>
+        </div>
+        <div class="practice-streak-pop" id="practiceStreakPop" hidden role="status"></div>
+        <div class="practice-feedback" id="practiceFeedback" hidden role="status"></div>
+
+        <article class="practice-question-card" id="practiceQuestionCard">
+          <div class="practice-question-stem" id="practiceQuestionStem"></div>
+          <div class="practice-options" id="practiceOptions"></div>
+        </article>
+      </section>
+
+      <section class="practice-checkpoint" id="practiceCheckpoint" hidden aria-labelledby="practiceCheckpointTitle">
+        <span>CHECKPOINT</span>
+        <h1 id="practiceCheckpointTitle">继续保持</h1>
+        <div class="practice-checkpoint-stats">
+          <div><span>连胜</span><strong id="practiceCheckpointStreak">0</strong></div>
+          <div><span>经验值</span><strong id="practiceCheckpointExperience">0</strong></div>
+          <div><span>耗时</span><strong id="practiceCheckpointDuration">00:00</strong></div>
+        </div>
+        <button type="button" class="practice-primary-btn" id="practiceCheckpointContinue">继续</button>
+      </section>
+
+      <section class="practice-result" id="practiceResult" hidden aria-labelledby="practiceResultTitle">
+        <span>COMPLETE</span>
+        <h1 id="practiceResultTitle">练习结束</h1>
+        <div class="practice-result-stats">
+          <div><span>正确率</span><strong id="practiceResultAccuracy">0%</strong></div>
+          <div><span>总耗时</span><strong id="practiceResultDuration">00:00</strong></div>
+          <div><span>经验值</span><strong id="practiceResultExperience">0</strong></div>
+        </div>
+        <div class="practice-result-actions">
+          <button type="button" class="practice-primary-btn" id="practiceAgainBtn">再练一次</button>
+          <button type="button" class="practice-secondary-btn" id="practiceLobbyBtn">返回大厅</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="practice-danger-vignette" id="practiceDangerVignette" aria-hidden="true"></div>
+
+  <div class="practice-exit-backdrop" id="practiceExitConfirm" hidden aria-hidden="true">
+    <section class="practice-exit-dialog" role="dialog" aria-modal="true" aria-labelledby="practiceExitTitle">
+      <h2 id="practiceExitTitle">退出本次练习？</h2>
+      <p>退出后本次练习立即结束，当前进度不能继续。</p>
+      <div><button type="button" class="practice-secondary-btn" id="practiceExitCancel">继续做题</button><button type="button" class="practice-danger-btn" id="practiceExitConfirmBtn">退出练习</button></div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop auth-backdrop" id="authModal" aria-hidden="true">
+    <div aria-labelledby="authTitle" aria-modal="true" class="modal auth-modal" role="dialog">
+      <div class="auth-head"><div><h2 id="authTitle">登录并保存练习记录</h2><p id="authReason">登录后，练习记录会按账号分别保存。</p></div><button class="auth-close" id="authCloseBtn" title="关闭登录窗口">×</button></div>
+      <div class="auth-body">
+        <label>用户名<input autocomplete="username" id="authUsername" placeholder="请输入用户名"/></label>
+        <label>密码<input autocomplete="current-password" id="authPassword" placeholder="请输入密码" type="password"/></label>
+        <div class="auth-msg" id="authMsg"></div>
+        <div class="auth-actions"><button class="primary" id="authDoLoginBtn">登录</button><button id="authRegisterBtn">注册并登录</button></div>
+      </div>
+    </div>
+  </div>
+
+  <script defer src="src/01-runtime-config.js"></script>
+  <script defer src="src/28-app-storage.js"></script>
+  <script defer src="src/29-auth-core.js"></script>
+  <script defer src="src/30-standalone-auth-dialog.js"></script>
+  <script defer src="src/33-user-center.js"></script>
+  <script defer src="src/41-account-menu.js"></script>
+  <script defer src="src/100-practice-mode.js"></script>
+</body>
+</html>

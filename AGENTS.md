@@ -78,3 +78,23 @@ users / role_themes / system_settings(KV) / user_admin_logs / folders / graph_fi
 ## legacy 原版架构（仅参考，勿在新代码沿用）
 
 `legacy/` 是非 ES Module 的纯前端：`<script defer>` 按序加载 + 全局变量通信（`KGAuthCore`/`KGRolePermissions`/`KGSubscription`/`KGGraphFileStore` 挂 window），数据存 localStorage（key 见 `docs/功能基线-重构参考.md` 的迁移映射表）。新项目不要沿用这套全局变量模式，用 backend API + React 组件化。读 legacy 只为：① 还原 UI（className/DOM）；② 理解数据模型与业务规则。
+
+## 发布与验证纪律（事故教训，强制执行）
+
+后端实际 serve 的是 **active release**（`frontend/new-legacy-releases/<version>/site`，由 `current.json` 指定），**不是** sync 产物（`frontend/public/new-legacy/`），**也不是**源（`new-legacy/`）。三者内容可能脱节。以下纪律是用两次生产事故换来的，必须遵守：
+
+### 1. 发布前硬校验，防内容回退
+- 发布前**必须**核对：`find <待发布 site> -type f | wc -l` 与当前 active release site 文件数对齐；抽查关键页面（如 v9 的 `admin-console.html`）存在。
+- **版本号"最新" ≠ 内容最新**：版本号只是标识，内容取决于 source。源（`new-legacy/`）可能比 active release 旧。
+- 文件数对不上**绝对不发**。改源后正式发布走 `node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser`（内部 sync + 重建 site + promote），不要手 cp 覆盖 release site。
+
+### 2. 跨页面 bug 必须遍历验证，防漏页
+- 改认证/登录/权限/导航等跨页面逻辑，**必须遍历所有相关页**验证：用 agent-browser 循环每页（`hasAuthModal` / `authOpen` / 点登录 / 点退出），不能只在顺手测过的页面通过就宣布完成。
+- **"登录后跳转一致" ≠ "登录功能一致"**：先确认每页"能不能登录/退出"，再谈跳转。
+
+### 3. 信息不全用命令拿证据，不要用假设填充
+- 看到版本号/路径就脑补"两套体系"，是事故之源。任何"应该是…"的判断，先跑一条命令（`ls` / `find` / `grep` / `curl`）拿证据再动手。
+
+### 事故案例（别再犯）
+- **发布回退**：曾基于旧源（new-legacy v8.6.29，146 文件）发布 v9.0-p4.1.2，把生产 v9 内容（597 文件、含 admin-console 等新页面）回退掉。根因：没核对源 vs active release 文件数，凭"版本号体系"假设行事。
+- **漏页**：曾修 `isLoggedIn` 后只在 training/workspace/index 验证退出，漏掉 `knowledge-recall.html` 有账号菜单但缺 `authModal` DOM + `standalone-auth-dialog.js`（点登录无反应）。根因：没遍历所有做题页测登录/退出，把"跳转一致"当成了"功能一致"。

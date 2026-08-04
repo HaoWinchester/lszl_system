@@ -1,14 +1,15 @@
 'use strict';
 
 /*
- * GuidedLearningPathApp v10
- * 横向阶段路径、部分循环配色、当前部分联动标题、SVG 活动图标与立体按压节点。
+ * GuidedLearningPathApp v12
+ * 纵向 S 曲线阶段路径、辅助练习锚点吸附、当前部分联动标题与立体按压节点。
  */
 (function(global){
   const byId=id=>document.getElementById(id);
   const data=()=>global.KGGuidedLearningData;
   const store=()=>global.KGGuidedLearningStore;
   const icons=()=>global.KGGuidedLearningIconRegistry;
+  const pathLayoutEngine=()=>global.KGGuidedLearningPathLayout;
   const state={
     course:null,
     progress:null,
@@ -16,6 +17,9 @@
     currentStageId:'',
     activePartId:'',
     pickerOpen:false,
+    subjectMenuOpen:false,
+    requestedPartId:'',
+    practiceReturn:false,
     placementPartId:'',
     placementNormalHref:'',
     drag:null,
@@ -23,8 +27,7 @@
     bound:false
   };
 
-  const curveOffsets=[0,-54,-96,-118,-96,-54,0,54,96,118,96,54];
-  const SCROLL_KEY_PREFIX='kg_guided_path_scroll_v2__';
+  const SCROLL_KEY_PREFIX='kg_guided_path_scroll_v3__';
   const PART_THEMES=Object.freeze([
     Object.freeze({key:'magenta',main:'#cf2080',dark:'#a71665',base:'#7d104b',soft:'#fbe4f1',foreground:'#ffffff',currentForeground:'#ffffff'}),
     Object.freeze({key:'red',main:'#ef5054',dark:'#c9383d',base:'#9f252a',soft:'#fde7e8',foreground:'#ffffff',currentForeground:'#ffffff'}),
@@ -42,7 +45,13 @@
   function setText(id,value){const element=byId(id);if(element)element.textContent=String(value??'')}
   function partForNode(node){return state.course.parts.find(part=>part.id===node?.partId)||null}
   function stageForNode(node){const part=partForNode(node);return state.course.stages.find(stage=>stage.id===part?.stageId)||null}
-  function currentNode(){return state.course.nodes.find(node=>state.progress.nodes[node.id]?.status==='available')||state.course.nodes.at(-1)||null}
+  function currentNode(){
+    const explicitId=String(state.progress?.currentNodeId||'');
+    const explicit=state.course.nodes.find(node=>String(node.id)===explicitId);
+    if(explicit&&state.progress.nodes[explicit.id]?.status==='available')return explicit;
+    const available=state.course.nodes.filter(node=>state.progress.nodes[node.id]?.status==='available');
+    return available.at(-1)||state.course.nodes.at(-1)||null;
+  }
   function isAdminUser(){
     try{
       const user=global.KGAuthCore?.currentUser?.();
@@ -105,8 +114,13 @@
   function resolveStages(){
     const node=currentNode();
     state.currentStageId=stageForNode(node)?.id||state.course.stages[0]?.id||'';
-    const requested=new URLSearchParams(global.location.search).get('stage');
+    const params=new URLSearchParams(global.location.search);
+    const requested=params.get('stage');
     state.selectedStageId=state.course.stages.some(stage=>stage.id===requested)?requested:(state.selectedStageId||state.currentStageId);
+    const requestedPart=params.get('part');
+    state.requestedPartId=state.course.parts.some(part=>part.id===requestedPart&&part.stageId===state.selectedStageId)?requestedPart:'';
+    state.practiceReturn=params.get('practiceReturn')==='1';
+    state.activePartId=state.requestedPartId||state.activePartId;
     ensureActivePart();
   }
   function loadProgress(){state.progress=store().read(state.course);resolveStages()}
@@ -149,6 +163,7 @@
     applyTheme(switchButton,theme);
     switchButton?.setAttribute('aria-label','选择学习阶段。当前为'+indexText+'，'+(part?.title||stage.title));
     const toggle=byId('glDefaultMode');if(toggle)toggle.checked=store().defaultMode()==='learning';
+    const menuToggle=byId('glDefaultModeMenu');if(menuToggle)menuToggle.checked=store().defaultMode()==='learning';
   }
 
   function renderStageList(){
@@ -172,21 +187,29 @@
     if(rendered)return rendered;
     return '<svg class="gl-node-svg" data-icon-key="fallback" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="7" fill="currentColor"/></svg>';
   }
-  function nodeMarkup(node,index,total){
+  function pathLayout(nodes,entries){
+    return pathLayoutEngine()?.createPartLayout?.(nodes,entries,{top:122,gap:154,bottom:132,amplitudePercent:20,searchRadius:1})||{
+      height:Math.max(420,122+Math.max(0,nodes.length-1)*154+132),
+      viewBox:'0 0 1000 2000',curvePath:'',
+      nodePositions:nodes.map((node,index)=>({node,index,order:Number(node.order)||index+1,leftPercent:50,top:122+index*154})),
+      entryPositions:[]
+    };
+  }
+
+  function nodeMarkup(node,index,total,layout){
     const entry=state.progress.nodes[node.id]||{status:'locked'};
     const rawStatus=String(entry.status||'locked');
     const status=['available','completed','recompleted'].includes(rawStatus)?rawStatus:'locked';
     const adminOpen=isAdminUser()&&status==='locked';
     const statusClass=adminOpen?'admin-open':status;
     const available=status==='available';
-    const isCurrent=String(currentNode()?.id||'')===String(node.id);
+    const isCurrent=available&&String(state.progress.currentNodeId||currentNode()?.id||'')===String(node.id);
     const completed=status==='completed'||status==='recompleted';
     const accessible=adminOpen||status!=='locked';
     const placementOffer=placementOfferAvailable(node,entry);
     const label=status==='recompleted'?'再次完成':completed?'已完成':adminOpen?'管理员测试':available?'开始学习':'未解锁';
-    const offset=curveOffsets[index%curveOffsets.length];
-    const left=total<=1?50:5+(index*(90/(total-1)));
-    const inlineStyle='--gl-path-y:'+offset+'px;--gl-path-left:'+left.toFixed(3)+'%';
+    const position=layout?.nodePositions?.[index]||{leftPercent:50,top:122+index*154};
+    const inlineStyle='--gl-path-top:'+Math.round(position.top)+'px;--gl-path-left:'+Number(position.leftPercent||50).toFixed(3)+'%';
     const nodeTitle=String(node.title||'未命名节点');
     return '<div class="gl-path-node is-'+statusClass+(isCurrent?' is-current':'')+'" style="'+inlineStyle+'" data-node-wrap="'+escapeHTML(node.id)+'">'
       +'<a class="gl-node-button" '+(accessible?'href="'+nodeHref(node.id)+'"':'aria-disabled="true" tabindex="-1"')+(placementOffer?' data-gl-placement-part="'+escapeHTML(node.partId)+'"':'')+' data-gl-node="'+escapeHTML(node.id)+'" title="'+escapeHTML(nodeTitle)+'" aria-label="'+escapeHTML(nodeTitle+'，'+label)+'">'
@@ -196,15 +219,40 @@
       +'</div>';
   }
 
+  function practiceEntryHref(entry,part){
+    const navigation=global.KGPracticeNavigation;
+    const context={stageId:part.stageId,partId:part.id,entryId:entry.id};
+    return navigation?.buildPracticeHref?.(entry.target,context)||String(entry.target||'#');
+  }
+  function practiceEntryMarkup(entry,part,nodes,layout,index){
+    const position=layout?.entryPositions?.[index]||{top:122,side:'right',anchorOrder:1,targetOrder:1};
+    const side=position.side==='left'?'left':'right';
+    const style='--gl-practice-top:'+Math.round(position.top)+'px';
+    return '<a class="gl-practice-entry is-'+escapeHTML(entry.type||'practice')+' is-'+side+'-lane" style="'+style+'" href="'+escapeHTML(practiceEntryHref(entry,part))+'" data-gl-practice-entry="'+escapeHTML(entry.id)+'" data-gl-practice-part="'+escapeHTML(part.id)+'" data-gl-practice-anchor="'+escapeHTML(position.anchorOrder)+'" aria-label="'+escapeHTML(entry.title+'，自由练习，不计成绩')+'" title="'+escapeHTML(entry.title||'自由练习')+'">'
+      +'<img class="gl-practice-image" src="'+escapeHTML(entry.image||'')+'" data-still-src="'+escapeHTML(entry.stillImage||entry.image||'')+'" alt="" />'
+      +'</a>';
+  }
+
   function partMarkup(part){
     const nodes=state.course.nodes.filter(node=>node.partId===part.id).sort((a,b)=>a.order-b.order);
     const dividerTitle='第 '+part.order+' 部分 · '+part.title+(part.objective?'：'+part.objective:'');
     const theme=themeForPart(part);
-    return '<section class="gl-part'+(part.id===state.activePartId?' is-active':'')+'" style="'+themeStyle(theme)+'" data-part="'+escapeHTML(part.id)+'" data-part-order="'+part.order+'">'
+    const layout=pathLayout(nodes,part.practiceEntries||[]);
+    const pathStyle='--gl-part-path-height:'+Math.round(layout.height)+'px';
+    const curve=layout.curvePath?'<svg class="gl-part-path-curve" viewBox="'+escapeHTML(layout.viewBox)+'" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="'+escapeHTML(layout.curvePath)+'"></path></svg>':'';
+    return '<section class="gl-part'+(part.id===state.activePartId?' is-active':'')+'" style="'+themeStyle(theme)+';'+pathStyle+'" data-part="'+escapeHTML(part.id)+'" data-part-order="'+part.order+'">'
       +'<aside class="gl-part-divider" title="'+escapeHTML(dividerTitle)+'" aria-label="'+escapeHTML(dividerTitle)+'">'
       +'<span class="gl-part-divider-copy"><strong>第 '+part.order+' 部分</strong><span>'+escapeHTML(part.title)+'</span></span></aside>'
-      +'<div class="gl-part-path"><div class="gl-part-path-track">'+nodes.map((node,index)=>nodeMarkup(node,index,nodes.length)).join('')+'</div></div>'
+      +'<div class="gl-part-path"><div class="gl-part-path-track">'+curve+nodes.map((node,index)=>nodeMarkup(node,index,nodes.length,layout)).join('')+(part.practiceEntries||[]).map((entry,index)=>practiceEntryMarkup(entry,part,nodes,layout,index)).join('')+'</div></div>'
       +'</section>';
+  }
+
+  function renderSubjectButton(){
+    const button=byId('glSubjectBtn');
+    if(button){
+      button.textContent=String(state.course?.subject||'P').slice(0,1);
+      button.title=(state.course?.subject||'科目')+'：'+(state.course?.title||'学习路径');
+    }
   }
 
   function renderPath(){
@@ -212,10 +260,11 @@
     const parts=selectedStageParts();
     const container=byId('glPathParts');if(!container)return;
     container.innerHTML='<section class="gl-stage-path-shell">'
-      +'<div class="gl-stage-path-tools"><span>左右滑动浏览本阶段完整路径</span><div><button type="button" data-gl-scroll="-1" aria-label="向左浏览"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14 5-6 7 6 7"/></svg></button><button type="button" data-gl-scroll="1" aria-label="向右浏览"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m10 5 6 7-6 7"/></svg></button></div></div>'
-      +'<div class="gl-stage-path-scroll" id="glStagePathScroll" tabindex="0" aria-label="'+escapeHTML(stage.title)+'横向学习路径">'
+      +'<div class="gl-stage-path-tools"><div><button type="button" data-gl-scroll="-1" aria-label="向上浏览" title="向上浏览">↑</button><button type="button" data-gl-scroll="1" aria-label="向下浏览" title="向下浏览">↓</button></div></div>'
+      +'<div class="gl-stage-path-scroll" id="glStagePathScroll" tabindex="0" aria-label="'+escapeHTML(stage.title)+'纵向 S 曲线学习路径">'
       +'<div class="gl-stage-path-track">'+parts.map(partMarkup).join('')+'</div></div>'
       +'</section>';
+    container.querySelectorAll('[data-gl-scroll]').forEach(button=>button.addEventListener('click',()=>scrollStage(Number(button.dataset.glScroll||0))));
     bindStageScroller();
     requestAnimationFrame(restoreStagePosition);
   }
@@ -228,17 +277,17 @@
     const scroller=stageScroller();
     if(!wrap||!scroller)return;
     const wrapRect=wrap.getBoundingClientRect(),scrollRect=scroller.getBoundingClientRect();
-    const relativeLeft=scroller.scrollLeft+(wrapRect.left-scrollRect.left);
-    const target=Math.max(0,Math.min(scroller.scrollWidth-scroller.clientWidth,relativeLeft-scroller.clientWidth*.46+wrap.clientWidth/2));
+    const relativeTop=scroller.scrollTop+(wrapRect.top-scrollRect.top);
+    const target=Math.max(0,Math.min(scroller.scrollHeight-scroller.clientHeight,relativeTop-scroller.clientHeight*.46+wrap.clientHeight/2));
     if(behavior==='auto'){
       const previousBehavior=scroller.style.scrollBehavior;
       scroller.style.scrollBehavior='auto';
-      scroller.scrollLeft=target;
+      scroller.scrollTop=target;
       global.requestAnimationFrame(()=>{scroller.style.scrollBehavior=previousBehavior});
     }else if(scroller.scrollTo){
-      scroller.scrollTo({left:target,behavior});
+      scroller.scrollTo({top:target,behavior});
     }else{
-      scroller.scrollLeft=target;
+      scroller.scrollTop=target;
     }
   }
   function setActivePart(partId,{force=false}={}){
@@ -253,10 +302,12 @@
   function syncActivePartFromScroll(force=false){
     const scroller=stageScroller();if(!scroller)return;
     const parts=[...scroller.querySelectorAll('.gl-part')];if(!parts.length)return;
-    const activationPoint=scroller.scrollLeft+scroller.clientWidth*.42;
+    const activationPoint=scroller.scrollTop+88;
     let candidate=parts[0];
     for(const element of parts){
-      if(element.offsetLeft<=activationPoint+12)candidate=element;
+      const divider=element.querySelector('.gl-part-divider');
+      const threshold=(divider?.offsetTop||0)+element.offsetTop;
+      if(threshold<=activationPoint)candidate=element;
       else break;
     }
     setActivePart(candidate.dataset.part,{force});
@@ -264,57 +315,73 @@
   function restoreStagePosition(){
     const scroller=stageScroller();if(!scroller)return;
     const saved=readSavedScroll(state.selectedStageId);
-    if(saved!==null){
-      const previousBehavior=scroller.style.scrollBehavior;
-      scroller.style.scrollBehavior='auto';
-      scroller.scrollLeft=Math.min(saved,Math.max(0,scroller.scrollWidth-scroller.clientWidth));
-      global.requestAnimationFrame(()=>{scroller.style.scrollBehavior=previousBehavior});
+    const previousBehavior=scroller.style.scrollBehavior;
+    scroller.style.scrollBehavior='auto';
+    if(state.practiceReturn&&saved!==null){
+      scroller.scrollTop=Math.min(saved,Math.max(0,scroller.scrollHeight-scroller.clientHeight));
+    }else if(state.requestedPartId){
+      const requested=scroller.querySelector('[data-part=+cssEscape(state.requestedPartId)+]');
+      scroller.scrollTop=Math.max(0,(requested?.offsetTop||0)-26);
+    }else if(saved!==null){
+      scroller.scrollTop=Math.min(saved,Math.max(0,scroller.scrollHeight-scroller.clientHeight));
     }else if(state.selectedStageId===state.currentStageId){
-      scrollCurrentNodeIntoView('auto');
+      scroller.scrollTop=0;
+      global.requestAnimationFrame(()=>scrollCurrentNodeIntoView('auto'));
     }else{
-      scroller.scrollLeft=0;
+      scroller.scrollTop=0;
     }
+    global.requestAnimationFrame(()=>{scroller.style.scrollBehavior=previousBehavior});
     syncActivePartFromScroll(true);
     updateCurrentLocator();
     updateScrollControls();
   }
+  function flushStagePosition(){
+    const pending=flushStagePosition.pending;
+    if(!pending)return;
+    clearTimeout(state.scrollSaveTimer);
+    state.scrollSaveTimer=0;
+    writeSavedScroll(pending.stageId,pending.value);
+    flushStagePosition.pending=null;
+  }
   function saveStagePosition(){
     const scroller=stageScroller();if(!scroller)return;
+    const pending={stageId:state.selectedStageId,value:scroller.scrollTop};
+    flushStagePosition.pending=pending;
     clearTimeout(state.scrollSaveTimer);
-    state.scrollSaveTimer=setTimeout(()=>writeSavedScroll(state.selectedStageId,scroller.scrollLeft),80);
+    state.scrollSaveTimer=setTimeout(()=>{
+      writeSavedScroll(pending.stageId,pending.value);
+      if(flushStagePosition.pending===pending)flushStagePosition.pending=null;
+    },80);
   }
   function scrollStage(direction){
     const scroller=stageScroller();if(!scroller)return;
-    scroller.scrollBy?.({left:direction*Math.max(520,scroller.clientWidth*.78),behavior:'smooth'});
+    const delta=direction*Math.max(420,scroller.clientHeight*.78);
+    const target=Math.max(0,Math.min(scroller.scrollHeight-scroller.clientHeight,scroller.scrollTop+delta));
+    scroller.scrollTop=target;
   }
   function updateScrollControls(){
     const scroller=stageScroller();if(!scroller)return;
-    const max=Math.max(0,scroller.scrollWidth-scroller.clientWidth);
+    const max=Math.max(0,scroller.scrollHeight-scroller.clientHeight);
     document.querySelectorAll('[data-gl-scroll]').forEach(button=>{
       const direction=Number(button.dataset.glScroll||0);
-      button.disabled=direction<0?scroller.scrollLeft<=2:scroller.scrollLeft>=max-2;
+      button.disabled=direction<0?scroller.scrollTop<=2:scroller.scrollTop>=max-2;
     });
   }
   function bindStageScroller(){
     const scroller=stageScroller();if(!scroller)return;
     scroller.addEventListener('scroll',()=>{saveStagePosition();scheduleViewportUpdate()},{passive:true});
-    scroller.addEventListener('wheel',event=>{
-      if(Math.abs(event.deltaY)<=Math.abs(event.deltaX))return;
-      event.preventDefault();
-      scroller.scrollLeft+=event.deltaY;
-    },{passive:false});
     scroller.addEventListener('pointerdown',event=>{
-      if(event.pointerType==='mouse'&&event.button!==0)return;
+      if(event.pointerType!=='mouse'||event.button!==0)return;
       if(event.target.closest?.('a,button'))return;
-      state.drag={pointerId:event.pointerId,startX:event.clientX,startLeft:scroller.scrollLeft,moved:false};
+      state.drag={pointerId:event.pointerId,startY:event.clientY,startTop:scroller.scrollTop,moved:false};
       scroller.setPointerCapture?.(event.pointerId);
       scroller.classList.add('is-dragging');
     });
     scroller.addEventListener('pointermove',event=>{
       if(!state.drag||state.drag.pointerId!==event.pointerId)return;
-      const delta=event.clientX-state.drag.startX;
+      const delta=event.clientY-state.drag.startY;
       if(Math.abs(delta)>4)state.drag.moved=true;
-      scroller.scrollLeft=state.drag.startLeft-delta;
+      scroller.scrollTop=state.drag.startTop-delta;
     });
     const endDrag=event=>{
       if(!state.drag||state.drag.pointerId!==event.pointerId)return;
@@ -335,8 +402,8 @@
     const scroller=stageScroller();
     if(!wrap||!scroller){icon.textContent='↩';return}
     const rect=wrap.getBoundingClientRect(),viewport=scroller.getBoundingClientRect();
-    if(rect.right<viewport.left+24)icon.textContent='←';
-    else if(rect.left>viewport.right-24)icon.textContent='→';
+    if(rect.bottom<viewport.top+24)icon.textContent='↑';
+    else if(rect.top>viewport.bottom-24)icon.textContent='↓';
     else icon.textContent='◎';
   }
   function scheduleViewportUpdate(){
@@ -390,12 +457,17 @@
     state.placementPartId='';
     state.placementNormalHref='';
   }
-  function setSelectedStage(stageId){
+  function setSelectedStage(stageId,options={}){
     if(!state.course.stages.some(stage=>stage.id===stageId))return;
+    flushStagePosition();
     state.selectedStageId=stageId;
-    state.activePartId='';
+    state.activePartId=String(options.partId||'');
+    state.requestedPartId=state.activePartId;
     ensureActivePart();
-    const url=new URL(global.location.href);url.searchParams.set('stage',stageId);global.history.replaceState({},'',url);
+    const url=new URL(global.location.href);url.searchParams.set('stage',stageId);
+    const resolvedPart=state.activePartId||'';
+    if(resolvedPart)url.searchParams.set('part',resolvedPart);else url.searchParams.delete('part');
+    global.history.replaceState({},'',url);
     closeStagePicker();renderAll();
   }
   function bind(){
@@ -408,8 +480,16 @@
       const button=event.target.closest?.('[data-gl-stage]');if(button)setSelectedStage(button.dataset.glStage);
     });
     byId('glPathParts')?.addEventListener('click',event=>{
-      const button=event.target.closest?.('[data-gl-scroll]');
-      if(button){scrollStage(Number(button.dataset.glScroll||0));return}
+      const practice=event.target.closest?.('[data-gl-practice-entry]');
+      if(practice){
+        event.preventDefault();
+        const scroller=stageScroller();
+        if(scroller)writeSavedScroll(state.selectedStageId,scroller.scrollTop);
+        const part=state.course.parts.find(item=>item.id===practice.dataset.glPracticePart)||activePart();
+        global.KGPracticeNavigation?.saveContext?.({source:'guided-learning',stageId:part?.stageId||state.selectedStageId,partId:part?.id||state.activePartId,entryId:practice.dataset.glPracticeEntry,returnUrl:'learning-path.html?stage='+encodeURIComponent(part?.stageId||state.selectedStageId)+'&part='+encodeURIComponent(part?.id||state.activePartId)+'&practiceReturn=1',scrollTop:scroller?.scrollTop||0});
+        global.location.href=practice.getAttribute('href');
+        return;
+      }
       const placement=event.target.closest?.('[data-gl-placement-part]');
       if(placement&&!isAdminUser()){
         event.preventDefault();
@@ -426,7 +506,13 @@
       else if(state.pickerOpen)closeStagePicker();
     });
     byId('glCurrentNodeBtn')?.addEventListener('click',()=>{
-      if(state.selectedStageId!==state.currentStageId){state.selectedStageId=state.currentStageId;state.activePartId='';ensureActivePart();renderAll();return}
+      if(state.selectedStageId!==state.currentStageId){
+        const node=currentNode();
+        const part=partForNode(node);
+        setSelectedStage(state.currentStageId,{partId:part?.id||''});
+        global.requestAnimationFrame(()=>scrollCurrentNodeIntoView('smooth'));
+        return;
+      }
       scrollCurrentNodeIntoView('smooth');
     });
     byId('glResetBtn')?.addEventListener('click',()=>{
@@ -438,14 +524,60 @@
       store().setDefaultMode(event.target.checked?'learning':'free');
       toast(event.target.checked?'以后默认进入学习模式。':'以后默认进入自由模式。');
     });
+    byId('glDefaultModeMenu')?.addEventListener('change',event=>{
+      store().setDefaultMode(event.target.checked?'learning':'free');
+      renderStageSwitch();
+      toast(event.target.checked?'以后默认进入学习模式。':'以后默认进入自由模式。');
+    });
+    byId('glDefaultModeRow')?.addEventListener('click',event=>{
+      if(event.target.closest?.('.account-menu-toggle'))return;
+      const input=byId('glDefaultModeMenu');
+      if(!input)return;
+      input.checked=!input.checked;
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+    byId('glDefaultModeRow')?.addEventListener('keydown',event=>{
+      if(event.key!=='Enter'&&event.key!==' ')return;
+      event.preventDefault();
+      const input=byId('glDefaultModeMenu');
+      if(!input)return;
+      input.checked=!input.checked;
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+
+    const subjectButton=byId('glSubjectBtn');
+    const subjectMenu=byId('glSubjectMenu');
+    subjectButton?.addEventListener('click',()=>{
+      const open=subjectMenu?.hidden!==false;
+      if(subjectMenu)subjectMenu.hidden=!open?true:false;
+      state.subjectMenuOpen=open;
+      subjectButton.setAttribute('aria-expanded',open?'true':'false');
+    });
+    document.addEventListener('click',event=>{
+      if(!event.target.closest?.('#glSubjectShell')){
+        if(subjectMenu)subjectMenu.hidden=true;
+        subjectButton?.setAttribute('aria-expanded','false');
+      }
+    });
+    subjectMenu?.addEventListener('click',event=>{
+      const item=event.target.closest?.('[data-gl-subject]');
+      if(!item)return;
+      subjectMenu.hidden=true;
+      subjectButton?.setAttribute('aria-expanded','false');
+      toast('当前版本仅提供 PMP 项目管理科目。');
+    });
     global.addEventListener('resize',scheduleViewportUpdate);
-    global.addEventListener('kg-auth-session-change',()=>{closePlacementChoice();loadProgress();renderAll()});
+    global.addEventListener('pagehide',flushStagePosition);
+    global.addEventListener('kg-auth-session-change',()=>{flushStagePosition();closePlacementChoice();loadProgress();renderAll()});
     global.addEventListener('kg:guided-learning-progress',()=>{loadProgress();renderAll()});
   }
-  function renderAll(){ensureActivePart();renderStageSwitch();renderStageList();renderPath()}
+  function renderAll(){ensureActivePart();renderSubjectButton();renderStageSwitch();renderStageList();renderPath()}
   function init(){
     state.course=data()?.getCourse?.();if(!state.course)return;
     loadProgress();bind();renderAll();
+    if(global.matchMedia?.('(prefers-reduced-motion: reduce)').matches){
+      document.querySelectorAll('.gl-practice-entry img[data-still-src]').forEach(image=>{if(image.dataset.stillSrc)image.src=image.dataset.stillSrc});
+    }
   }
 
   global.KGGuidedLearningPathThemes=Object.freeze({palette:PART_THEMES,themeForPart});

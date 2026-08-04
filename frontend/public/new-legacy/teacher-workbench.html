@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
+<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>教师工作台｜V9.0-P3.5.8</title>
+  <link rel="stylesheet" href="styles/teacher-workbench.css?v=v9.0-p4.1.9" />
+  <link rel="stylesheet" href="styles/workbench-home.css?v=v9.0-p4.1.9" />
+  <link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.9" />
+</head>
+<body class="teacher-admin-shell" data-admin-context="teacher">
+  <nav class="admin-context-nav" aria-label="管理后台一级导航">
+    <a data-admin-nav="overview" href="admin-console.html">总览</a>
+    <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
+    <a data-admin-nav="teacher" href="teacher-workbench.html">教师工作台</a>
+    <a data-admin-nav="courses" href="course-admin.html">课程与任务</a>
+    <a data-admin-nav="users" href="user-management.html">用户管理</a>
+    <a data-admin-nav="feedback" href="feedback-management.html">反馈管理</a>
+    <a data-admin-nav="messages" href="message-management.html">消息管理</a>
+    <a data-admin-nav="operations" href="admin-operations.html">操作记录</a>
+    <a data-admin-nav="settings" href="admin-settings.html">系统设置</a>
+  </nav>
+  <header class="tw-topbar">
+    <a class="tw-brand" href="teacher-workbench.html">
+      <span class="tw-brand-mark">KG</span>
+      <span class="tw-brand-copy"><strong>教师工作台</strong><small>V9.0-P3.5.8 · 从原题到试卷</small></span>
+    </a>
+    <nav class="tw-tabs" aria-label="教师主要工作">
+      <a class="active" href="teacher-workbench.html">工作台</a>
+      <a href="question-bank.html?mode=simple&step=questions">题目管理</a>
+      <a href="question-bank.html?mode=simple&step=training">训练配置</a>
+      <a href="paper-management.html">试卷管理</a>
+    </nav>
+    <div class="tw-user"><span class="tw-user-badge" id="wbAccount">本地教师</span><a href="index.html">返回学员端</a></div>
+  </header>
+
+  <section class="tw-workflow" aria-label="教师工作流程">
+    <a class="tw-step active" href="question-bank.html?mode=simple&step=questions"><b>1</b>管理题目</a>
+    <i class="tw-arrow"></i>
+    <a class="tw-step" href="question-bank.html?mode=simple&step=training"><b>2</b>配置训练</a>
+    <i class="tw-arrow"></i>
+    <a class="tw-step" href="paper-management.html"><b>3</b>管理试卷</a>
+  </section>
+
+  <main class="wb-main">
+    <section class="wb-hero">
+      <div class="wb-hero-copy">
+        <p>TEACHER WORKFLOW</p>
+        <h1>今天准备从哪一步开始？</h1>
+        <span>教师只需要维护完整原题、训练方式和试卷发布。题目引用、发布版本与底层结构由系统继续维护。</span>
+        <div class="wb-path" aria-label="三步教师工作流">
+          <a href="question-bank.html?mode=simple&step=questions" data-workflow-card="questions">
+            <b>1</b><strong>管理题目</strong>
+            <span>快速录入或维护完整单选原题、选项、答案和解析。</span>
+            <em id="wbQuestionCardState">查看题目</em>
+          </a>
+          <a href="question-bank.html?mode=simple&step=training" data-workflow-card="training">
+            <b>2</b><strong>配置训练</strong>
+            <span>设置关键词、知识联想入口和可用的学习方式。</span>
+            <em id="wbTrainingCardState">继续配置</em>
+          </a>
+          <a href="paper-management.html" data-workflow-card="papers">
+            <b>3</b><strong>管理试卷</strong>
+            <span>从正式题库选题组卷，检查顺序并发布到独立做题模式。</span>
+            <em id="wbPaperCardState">打开试卷管理</em>
+          </a>
+        </div>
+      </div>
+      <aside class="wb-next" aria-labelledby="wbNextTitle">
+        <span class="wb-next-kicker">建议下一步</span>
+        <h2 id="wbNextTitle">检查当前内容</h2>
+        <p id="wbNextDescription">系统正在读取当前浏览器中的题目、训练配置与试卷状态。</p>
+        <a class="wb-next-action" id="wbNextAction" href="question-bank.html?mode=simple&step=questions">开始</a>
+        <small>建议仅供参考，不会自动修改或发布任何内容。</small>
+      </aside>
+    </section>
+
+    <section class="wb-section">
+      <div class="wb-section-head"><div><h2>当前工作概览</h2><p>只显示教师最需要关注的四项信息。</p></div></div>
+      <div class="wb-metrics">
+        <article class="wb-metric"><span>完整原题</span><strong id="wbQuestionCount">0</strong><a href="question-bank.html?mode=simple&step=questions">管理题目</a></article>
+        <article class="wb-metric"><span>待配置训练</span><strong id="wbTrainingPendingCount">0</strong><a href="question-bank.html?mode=simple&step=training">配置关键词与联想</a></article>
+        <article class="wb-metric"><span>试卷草稿</span><strong id="wbPaperDraftCount">0</strong><a href="paper-management.html">继续组卷</a></article>
+        <article class="wb-metric"><span>已发布试卷</span><strong id="wbPublishedPaperCount">0</strong><a href="paper-management.html">查看发布情况</a></article>
+      </div>
+    </section>
+
+    <section class="wb-section wb-help-section">
+      <div class="wb-section-head"><div><h2>新教师只需要记住</h2><p>一份原题，多种学习方式，试卷负责组织并发布学习题集。</p></div></div>
+      <div class="wb-tips">
+        <article class="wb-tip"><span>题目</span><h3>原题只维护一份</h3><p>题干、选项、答案和解析都在题目管理中维护，其他页面只引用这道题。</p></article>
+        <article class="wb-tip"><span>训练</span><h3>从原题派生学习体验</h3><p>关键词回忆、知识联想和多题归纳使用同一题目，不要求重复录入。</p></article>
+        <article class="wb-tip"><span>试卷</span><h3>选题组卷后统一发布</h3><p>试卷只引用题库原题，发布后可供学员在独立做题模式中使用。</p></article>
+      </div>
+    </section>
+
+    <details class="wb-advanced">
+      <summary>高级工具与兼容入口</summary>
+      <p>以下入口用于维护知识结构、课程与任务等独立业务。教师日常录题、训练配置和组卷均在上方三步完成。</p>
+      <div class="wb-advanced-links">
+        <a href="question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">新建考试题目</a>
+        <a href="admin-subjects.html">科目与知识树</a>
+        <a href="question-bank.html?mode=advanced">题库高级编辑</a>
+        <a href="course-admin.html?view=courses">课程管理</a>
+        <a href="course-admin.html?view=tasks">学习任务</a>
+        <a href="admin-console.html">管理后台总览</a>
+      </div>
+    </details>
+  </main>
+
+  <script src="src/28-app-storage.js"></script>
+  <script src="src/29-auth-core.js"></script>
+  <script src="src/86-activity-schema-v1.js"></script>
+  <script src="src/87-guided-learning-data.js"></script>
+  <script src="src/91-learning-content-core.js"></script>
+  <script src="src/93-content-organization-core.js"></script>
+  <script src="src/admin/00-admin-core.js"></script><script src="src/admin/10-content-repository.js"></script><script src="src/admin/11-local-content-repository.js"></script><script src="src/admin/20-admin-permission-service.js"></script><script src="src/admin/21-admin-audit-service.js"></script><script src="src/admin/22-admin-transaction-service.js"></script><script src="src/admin/30-reference-index-service.js"></script><script src="src/admin/31-subject-service.js"></script><script src="src/admin/32-taxonomy-service.js"></script><script src="src/admin/33-activity-service.js"></script><script src="src/admin/34-course-service.js"></script><script src="src/admin/35-release-service.js"></script><script src="src/admin/40-admin-service-registry.js"></script><script src="src/admin/41-learning-content-compat.js"></script>
+  <script src="src/admin/48-admin-context-nav.js"></script>
+  <script src="src/91-teacher-workbench-app.js"></script>
+</body>
+</html>

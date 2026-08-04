@@ -1,0 +1,56 @@
+'use strict';
+const fs=require('fs');
+const path=require('path');
+const assert=require('assert');
+const ROOT=path.resolve(__dirname,'..');
+const read=p=>fs.readFileSync(path.join(ROOT,p),'utf8');
+assert(/^v9\.0-(?:p3\.3\.(?:3(?:\.\d+)?|4|5)|p3\.4|p3\.5(?:\.[12345678])?|p4\.0(?:\.[123])?|p4\.1(?:\.1)?)$/.test(read('VERSION').trim()));
+const overview=read('admin-console.html');
+const subjects=read('admin-subjects.html');
+const operations=read('admin-operations.html');
+const settings=read('admin-settings.html');
+
+const adminPages=['admin-console.html','admin-subjects.html','admin-operations.html','admin-settings.html','teacher-workbench.html','question-bank.html','paper-management.html','course-admin.html','user-management.html','feedback-management.html','message-management.html','system-settings.html'];
+const expectedNav=['overview','subjects','teacher','courses','users','feedback','messages','operations','settings'];
+adminPages.forEach(file=>{
+  const html=read(file);
+  assert(html.includes('styles/admin-context-nav.css'),`${file} missing shared top-nav stylesheet`);
+  assert(html.includes('<nav class="admin-context-nav"'),`${file} missing top navigation`);
+  assert.equal((html.match(/data-admin-nav=/g)||[]).length,9,`${file} must have exactly seven primary links`);
+  expectedNav.forEach(key=>assert(html.includes(`data-admin-nav="${key}"`),`${file} missing ${key} navigation`));
+});
+['admin-console.html','admin-subjects.html','admin-operations.html','admin-settings.html'].forEach(file=>{
+  const html=read(file);
+  assert(!html.includes('<aside class="admin-sidebar">'),`${file} must not render a desktop primary sidebar`);
+  assert(html.indexOf('admin-context-nav')<html.indexOf('admin-topbar'),`${file} navigation must remain at the top`);
+});
+
+['总览','科目与知识树','教师工作台','课程与任务','用户管理','反馈管理','消息管理','操作记录','系统设置'].forEach(label=>assert(overview.includes(label),`missing nav: ${label}`));
+assert(overview.includes('<h1>管理后台</h1>'));
+assert(!overview.includes('知识树版本与发布'),'version workflow must not remain the overview title');
+assert(!overview.includes('adminRepositoryMode'),'technical repository state must move off overview');
+assert(subjects.includes('adminSubjectList'));
+assert(subjects.includes('data-subject-tab="current"'));
+assert(subjects.includes('data-subject-tab="association"'));
+assert(!subjects.includes('data-subject-tab="unmapped"'));
+assert(subjects.includes('id="adminRecallPanel"'));
+assert(subjects.includes('data-subject-tab="history"'));
+assert(subjects.includes('adminTaxonomyRows'),'history tab must retain lifecycle controls');
+assert(subjects.includes('重大调整导入'));
+assert(operations.includes('adminAuditList'));
+assert(operations.includes('adminDeletionRows'));
+assert(settings.includes('adminRepositoryMode'));
+assert(settings.includes('adminSnapshotBtn'));
+assert(settings.includes('adminReferenceCount'));
+assert(read('content-center.html').includes('admin-subjects.html">科目与知识树'));
+assert(read('question-bank.html').includes('styles/admin-context-nav.css'));
+assert(read('question-bank.html').includes('data-admin-context="teacher"'));
+assert(read('paper-management.html').includes('data-admin-context="teacher"'));
+assert(read('teacher-workbench.html').includes('data-admin-context="teacher"'));
+assert(read('course-admin.html').includes('data-admin-context="courses"'));
+assert(read('user-management.html').includes('data-admin-context="users"'));
+assert(read('system-settings.html').includes('data-admin-context="settings"'));
+assert(/VERSION='9\.0-(?:p3\.3\.(?:3(?:\.\d+)?|4|5)|p3\.4|p3\.5(?:\.[12345678])?|p4\.0(?:\.[123])?|p4\.1(?:\.1)?)'/.test(read('src/admin/00-admin-core.js')));
+assert(read('src/admin/50-admin-shell-app.js').includes('renderAttention'));
+assert(read('src/admin/51-admin-subjects-app.js').includes('renderTaxonomies'));
+console.log('v90-p31-admin-ia-ok');

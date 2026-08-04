@@ -7,7 +7,7 @@
  */
 (function(global){
   const byId=id=>document.getElementById(id);
-  const state={open:false,query:'',filter:'all',items:[],currentIndex:0,bound:false,workspaceNodes:[],selectedWorkspaceId:'',paperCatalog:[]};
+  const state={open:false,query:'',filter:'all',items:[],currentIndex:0,bound:false,workspaceNodes:[],selectedWorkspaceId:'',paperCatalog:[],incomingTargetApplied:false,questionTransitionTimer:null,questionTransitionHideTimer:null,questionTransitionToken:0};
 
   function escapeHTML(value){
     return String(value??'').replace(/[&<>"']/g,char=>({
@@ -37,7 +37,7 @@
   }
   function publishedCatalog(){
     try{
-      if(typeof qbPublishedPaperCatalog==='function')return qbPublishedPaperCatalog({respectRole:true})||[];
+      if(typeof qbPublishedPaperCatalog==='function')return qbPublishedPaperCatalog({respectRole:true,mode:'single_deep_study'})||[];
     }catch(e){console.warn('读取已发布试卷失败',e)}
     let papers=[];
     try{papers=typeof qbPublishedPapers==='function'?qbPublishedPapers():[]}catch(e){papers=[]}
@@ -115,7 +115,7 @@
     const paper=entry?.paper||{};
     const configured=Number(entry?.configuredCount||0);
     const target=Number(entry?.targetCount||paper.totalCount||configured||0);
-    return String(paper.name||'未命名试卷')+'（已组 '+configured+'/'+target+' 题）';
+    return String(paper.name||'未命名试卷')+' · v'+Number(paper.version||0)+'（可用 '+Number(entry?.availableCount||0)+'/'+configured+' 题）';
   }
   function renderPaperSelector(context){
     const select=byId('qtPublishedPaperSelect');
@@ -143,7 +143,10 @@
   function selectPublishedPaper(paperId){
     const catalog=publishedCatalog();
     const entry=catalog.find(item=>String(item.paper?.id)===String(paperId||''));
-    if(!entry)return false;
+    if(!entry||!canSwitch())return false;
+    beginQuestionTransition('正在切换试卷');
+    global.KGGuidedLearningCanvas?.flushPendingConclusion?.();
+    captureCurrent();
     if(typeof qbSelectPublishedPaper==='function')qbSelectPublishedPaper(entry.paper.id,entry.items[0]?.paperIndex||0,{applyQuestion:true});
     else if(typeof qBankState!=='undefined'){
       qBankState.currentPaperId=entry.paper.id;
@@ -160,6 +163,8 @@
     setTimeout(()=>{
       global.KGFlowOrchestrator?.switchQuestion?.({restartCompleted:false});
       render();
+      close();
+      finishQuestionTransition();
     },0);
     return true;
   }
@@ -266,7 +271,7 @@
       return {created:false,node:existing,reason:'already-exists'};
     }
     const result=store.addQuestionReference?.(
-      {...item.question,sourcePaperId:String(item.paper?.id||item.question.sourcePaperId||'')},
+      {...item.question,sourcePaperId:String(item.paper?.id||item.question.sourcePaperId||''),sourceReleaseId:String(item.paper?.releaseId||item.question.sourceReleaseId||'')},
       bankIdForItem(item),
       workspacePosition(),
       {workspaceId}
@@ -285,17 +290,26 @@
     const context=listContext();
     return context.items[Math.max(0,Math.min(Number(index)||0,Math.max(0,context.items.length-1)))]||null;
   }
-  function findQuestion(questionId,bankId=''){
+  function findQuestion(questionId,bankId='',paperId='',releaseId=''){
     questionId=String(questionId||'');
     bankId=String(bankId||'');
+    paperId=String(paperId||'');
+    releaseId=String(releaseId||'');
     const context=listContext();
+    const contextPaperId=String(context.paper?.id||'');
+    const contextReleaseId=String(context.paper?.releaseId||'');
     const currentPosition=context.items.findIndex(item=>{
       const id=String(item.question?.id||item.question?.sourceQuestionId||'');
       const itemBankId=bankIdForItem(item);
-      return id===questionId&&(!bankId||!itemBankId||itemBankId===bankId);
+      return id===questionId
+        &&(!bankId||!itemBankId||itemBankId===bankId)
+        &&(!paperId||!contextPaperId||contextPaperId===paperId)
+        &&(!releaseId||!contextReleaseId||contextReleaseId===releaseId);
     });
     if(currentPosition>=0)return {...context.items[currentPosition],position:currentPosition,inCurrentContext:true,contextType:context.type};
     for(const entry of publishedCatalog()){
+      if(paperId&&String(entry.paper?.id||'')!==paperId)continue;
+      if(releaseId&&String(entry.paper?.releaseId||'')!==releaseId)continue;
       const match=(entry.items||[]).find(item=>{
         const id=String(item.question?.id||item.question?.sourceQuestionId||'');
         const itemBankId=bankIdForItem(item);
@@ -354,7 +368,7 @@
     const filtered=context.items.map((item,position)=>({item,position})).filter(row=>matches(row.item));
     if(!filtered.length){
       const message=!context.paper
-        ?'暂无已发布试卷。请先在题库管理中完成组卷并发布。'
+        ?'暂无已发布试卷。请先在教师工作台的试卷管理中完成组卷并发布。'
         :(!context.items.length?'这套试卷没有前端可用题目，请检查失效引用或角色权限。':'没有符合当前搜索或筛选条件的题目。');
       list.innerHTML='<div class="qt-question-list-empty">'+escapeHTML(message)+'</div>';
       return;
@@ -365,33 +379,15 @@
       const id=String(q.id||q.sourceQuestionId||'');
       const current=id===currentId||position===context.currentIndex;
       const subtitle=[q.topic||q.domain||'未分类',q.difficulty||''].filter(Boolean).join(' · ');
-      const workspaceNode=workspaceNodeFor(item);
-      const workspaceTitle=String(workspaceSummary?.title||'多题画布');
-      return '<div role="listitem" class="qt-question-list-item '+(current?'current ':'')+(workspaceNode?'in-workspace':'')+'" aria-current="'+(current?'true':'false')+'">'
+      return '<div role="listitem" class="qt-question-list-item '+(current?'current':'')+'" aria-current="'+(current?'true':'false')+'">'
         +'<button type="button" class="qt-question-open" data-question-index="'+position+'">'
           +'<span class="qt-question-number">'+(position+1)+'</span>'
-          +'<span class="qt-question-item-copy"><strong>'+escapeHTML(q.title||'未命名题目')+'</strong><small>'+escapeHTML(subtitle)+'</small>'
-            +(workspaceNode?'<span class="qt-question-workspace-mark">已加入 '+escapeHTML(workspaceTitle)+'</span>':'')
-          +'</span>'
+          +'<span class="qt-question-item-copy"><strong>'+escapeHTML(q.title||'未命名题目')+'</strong><small>'+escapeHTML(subtitle)+'</small></span>'
           +'<span class="qt-question-status '+status.key+'">'+escapeHTML(status.label)+'</span>'
-        +'</button>'
-        +'<button type="button" class="qt-question-add-workspace '+(workspaceNode?'added':'')+'" data-add-question-index="'+position+'"'
-          +' title="'+(workspaceNode?'在多题画布中定位':'加入 '+escapeHTML(workspaceTitle))+'"'
-          +' aria-label="'+(workspaceNode?'在多题画布中定位':'加入 '+escapeHTML(workspaceTitle))+'">'
-          +(workspaceNode?'↗':'+')
         +'</button>'
       +'</div>';
     }).join('');
-    list.querySelectorAll('.qt-question-open[data-question-index]').forEach(button=>{
-      button.addEventListener('click',()=>switchTo(Number(button.dataset.questionIndex)));
-    });
-    list.querySelectorAll('[data-add-question-index]').forEach(button=>{
-      button.addEventListener('click',event=>{
-        event.stopPropagation();
-        const item=getItem(Number(button.dataset.addQuestionIndex));
-        addItemToWorkspace(item);
-      });
-    });
+    list.querySelectorAll('.qt-question-open[data-question-index]').forEach(button=>{button.addEventListener('click',()=>switchTo(Number(button.dataset.questionIndex)));});
     requestAnimationFrame(()=>{
       list.querySelector('.qt-question-list-item.current')?.scrollIntoView({block:'center'});
     });
@@ -400,6 +396,42 @@
   function captureCurrent(){
     try{global.KGFlowOrchestrator?.captureLegacyState?.({force:true})}catch(e){}
   }
+  function cancelQuestionTransitionTimers(){
+    if(state.questionTransitionTimer){global.clearTimeout?.(state.questionTransitionTimer);state.questionTransitionTimer=null}
+    if(state.questionTransitionHideTimer){global.clearTimeout?.(state.questionTransitionHideTimer);state.questionTransitionHideTimer=null}
+  }
+  function beginQuestionTransition(message='正在载入题目'){
+    if(!isTrainingPage())return false;
+    cancelQuestionTransitionTimers();
+    state.questionTransitionToken+=1;
+    const loader=byId('qtQuestionSwitchLoader'),text=byId('qtQuestionSwitchLoaderText');
+    if(text)text.textContent=String(message||'正在载入题目');
+    if(loader)loader.hidden=false;
+    document.documentElement?.classList?.remove?.('qt-incoming-question-pending');
+    document.body.classList.remove('qt-question-switch-entering');
+    document.body.classList.add('qt-question-switching');
+    return true;
+  }
+  function finishQuestionTransition(){
+    if(!isTrainingPage())return false;
+    cancelQuestionTransitionTimers();
+    const token=state.questionTransitionToken;
+    state.questionTransitionTimer=global.setTimeout?.(()=>{
+      state.questionTransitionTimer=null;
+      if(token!==state.questionTransitionToken)return;
+      document.documentElement?.classList?.remove?.('qt-incoming-question-pending');
+      document.body.classList.remove('qt-question-switching');
+      document.body.classList.add('qt-question-switch-entering');
+      state.questionTransitionHideTimer=global.setTimeout?.(()=>{
+        state.questionTransitionHideTimer=null;
+        if(token!==state.questionTransitionToken)return;
+        const loader=byId('qtQuestionSwitchLoader');if(loader)loader.hidden=true;
+        document.body.classList.remove('qt-question-switch-entering');
+      },260);
+    },80);
+    return true;
+  }
+
   function canSwitch(){
     try{
       const loggedIn=typeof authIsLoggedIn==='function'?authIsLoggedIn():!!global.KGAuthCore?.currentUsername?.();
@@ -432,33 +464,39 @@
   function switchTo(index){
     const context=listContext();
     index=Math.max(0,Math.min(Number(index)||0,Math.max(0,context.items.length-1)));
-    if(!context.items.length)return false;
+    if(!context.items.length){finishQuestionTransition();return false}
     if(index===context.currentIndex){
+      finishQuestionTransition();
       close();
       return true;
     }
-    if(!canSwitch())return false;
+    if(!canSwitch()){finishQuestionTransition();return false}
+    beginQuestionTransition('正在切换到第 '+(index+1)+' 题');
+    global.KGGuidedLearningCanvas?.flushPendingConclusion?.();
     captureCurrent();
     const success=switchPaperQuestion(index,context);
-    if(!success)return false;
+    if(!success){finishQuestionTransition();return false}
     global.KGQuestionRepository?.notify?.('navigator-switch');
     setTimeout(()=>{
       global.KGFlowOrchestrator?.switchQuestion?.({restartCompleted:false});
       render();
       close();
+      finishQuestionTransition();
       if(typeof showStatus==='function')showStatus('已切换到第 '+(index+1)+' 题。');
     },0);
     return true;
   }
-  function switchToQuestion(questionId,bankId=''){
-    const item=findQuestion(questionId,bankId);
-    if(!item)return false;
+  function switchToQuestion(questionId,bankId='',paperId='',releaseId=''){
+    const item=findQuestion(questionId,bankId,paperId,releaseId);
+    if(!item){finishQuestionTransition();return false}
     if(item.inCurrentContext!==false)return switchTo(item.position);
-    if(!canSwitch())return false;
+    if(!canSwitch()){finishQuestionTransition();return false}
+    beginQuestionTransition('正在载入选中的题目');
+    global.KGGuidedLearningCanvas?.flushPendingConclusion?.();
     captureCurrent();
     if(typeof qbSelectPublishedPaper==='function')qbSelectPublishedPaper(item.paper?.id,item.paperIndex,{applyQuestion:true});
     else{
-      if(typeof qBankState==='undefined'||!item.paper)return false;
+      if(typeof qBankState==='undefined'||!item.paper){finishQuestionTransition();return false}
       qBankState.currentPaperId=item.paper.id;
       qBankState.currentPaperIndex=Number(item.paperIndex||0);
       if(typeof qbSaveCurrentPaper==='function')qbSaveCurrentPaper();
@@ -471,9 +509,31 @@
       global.KGFlowOrchestrator?.switchQuestion?.({restartCompleted:false});
       render();
       close();
+      finishQuestionTransition();
     },0);
     return true;
   }
+  function applyIncomingQuestionTarget(){
+    if(state.incomingTargetApplied||!isTrainingPage())return false;
+    let params;
+    try{params=new URLSearchParams(global.location?.search||'')}catch(e){return false}
+    const questionId=String(params.get('questionId')||'');
+    if(!questionId)return false;
+    const bankId=String(params.get('bankId')||'');
+    const paperId=String(params.get('paperId')||'');
+    const releaseId=String(params.get('releaseId')||'');
+    const success=switchToQuestion(questionId,bankId,paperId,releaseId);
+    if(!success){finishQuestionTransition();return false}
+    state.incomingTargetApplied=true;
+    try{
+      params.delete('questionId');params.delete('bankId');params.delete('paperId');params.delete('releaseId');
+      const query=params.toString();
+      const next=(global.location?.pathname?.split('/').pop()||'question-training.html')+(query?'?'+query:'')+(global.location?.hash||'');
+      global.history?.replaceState?.(null,'',next);
+    }catch(e){}
+    return true;
+  }
+
   function move(delta){
     const context=listContext();
     if(!context.items.length)return;
@@ -489,7 +549,7 @@
     drawer?.setAttribute('aria-hidden','false');
     if(backdrop)backdrop.hidden=false;
     document.body.classList.add('qt-question-dock-open');
-    setTimeout(()=>byId('qtQuestionSearch')?.focus(),80);
+
   }
   function close(){
     state.open=false;
@@ -498,7 +558,7 @@
     drawer?.setAttribute('aria-hidden','true');
     if(backdrop)backdrop.hidden=true;
     document.body.classList.remove('qt-question-dock-open');
-    byId('qtQuestionListBtn')?.focus();
+
   }
   function wrapLegacyRender(){
     if(typeof renderQuestionTrainer!=='function'||renderQuestionTrainer.__qtNavigatorWrapped)return;
@@ -530,10 +590,8 @@
       render();
     });
     byId('qtCreateWorkspaceBtn')?.addEventListener('click',createWorkspaceFromDrawer);
-    byId('qtQuestionSearch')?.addEventListener('input',event=>{
-      state.query=String(event.target.value||'');
-      render();
-    });
+    byId('qtQuestionSearch')?.addEventListener('input',event=>{state.query=String(event.target.value||'');render()});
+    byId('qtQuestionSearchBtn')?.addEventListener('click',()=>{state.query=String(byId('qtQuestionSearch')?.value||'');render()});
     document.querySelectorAll('[data-question-filter]').forEach(button=>{
       button.addEventListener('click',()=>{
         state.filter=String(button.dataset.questionFilter||'all');
@@ -570,6 +628,7 @@
     });
     global.addEventListener('resize',()=>{if(state.open)render()});
     render();
+    setTimeout(applyIncomingQuestionTarget,0);
   }
 
   global.KGQuestionNavigator=Object.freeze({
@@ -579,6 +638,9 @@
     move,
     switchTo,
     switchToQuestion,
+    beginQuestionTransition,
+    finishQuestionTransition,
+    applyIncomingQuestionTarget,
     getContext:listContext,
     getItem,
     findQuestion,

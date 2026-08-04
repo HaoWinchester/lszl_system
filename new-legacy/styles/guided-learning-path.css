@@ -56,31 +56,34 @@ button{cursor:pointer}
 .gl-current-node-fab span{font-size:24px;font-weight:950;line-height:1}.gl-current-node-fab small{font-size:9px;font-weight:850}
 .gl-current-node-fab:hover{border-color:#a8dece;background:#f7fffc}
 
-/* PC 主路径：阶段是一条连续横向轨道；部分标题经过视口激活线时同步顶部主题。 */
+/* 主路径：各部分沿纵向 S 曲线连续排列；辅助练习入口吸附到转折节点对侧，不占正式节点槽位。 */
 .gl-path-parts{width:100%;min-width:0;padding-top:3px}
 .gl-stage-path-shell{position:relative;width:100%}
-.gl-stage-path-tools{display:flex;align-items:center;justify-content:space-between;width:min(1180px,calc(100% - 56px));margin:0 auto 8px;color:#8b94a1;font-size:11px;font-weight:750}
+.gl-stage-path-tools{display:flex;align-items:center;justify-content:space-between;width:min(960px,calc(100% - 56px));margin:0 auto 8px;color:#8b94a1;font-size:11px;font-weight:750}
 .gl-stage-path-tools>div{display:flex;gap:7px}
 .gl-stage-path-tools button{display:grid;place-items:center;width:34px;height:30px;border:1px solid #dfe3e7;border-radius:9px;background:#fff;color:#5d6878;font-size:17px;font-weight:900}
-.gl-stage-path-tools button svg{display:block;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .gl-stage-path-tools button:hover:not(:disabled){border-color:#a7dfcf;color:var(--gl-primary-dark);background:#f7fffc}
 .gl-stage-path-tools button:disabled{cursor:default;opacity:.34}
-.gl-stage-path-scroll{position:relative;width:100%;height:520px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;scroll-behavior:smooth;scrollbar-width:auto;scrollbar-color:#cfd5da #f0f2f4;cursor:grab;touch-action:pan-x;background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(251,252,253,.3));border-top:1px solid #edf0f2;border-bottom:1px solid #edf0f2}
+.gl-stage-path-scroll{position:relative;width:100%;height:min(720px,calc(100vh - 216px));min-height:520px;overflow-x:hidden;overflow-y:auto;overscroll-behavior-block:contain;scroll-behavior:smooth;scrollbar-width:auto;scrollbar-color:#cfd5da #f0f2f4;cursor:grab;touch-action:pan-y;background:linear-gradient(90deg,rgba(251,252,253,.2),rgba(255,255,255,.88) 50%,rgba(251,252,253,.2));border-top:1px solid #edf0f2;border-bottom:1px solid #edf0f2}
 .gl-stage-path-scroll:focus-visible{outline:3px solid rgba(8,201,149,.22);outline-offset:-3px}
 .gl-stage-path-scroll.is-dragging{cursor:grabbing;scroll-behavior:auto;user-select:none}
-.gl-stage-path-scroll::-webkit-scrollbar{height:12px}
+.gl-stage-path-scroll::-webkit-scrollbar{width:12px}
 .gl-stage-path-scroll::-webkit-scrollbar-track{background:#f0f2f4}
 .gl-stage-path-scroll::-webkit-scrollbar-thumb{border:3px solid #f0f2f4;border-radius:999px;background:#cbd1d7}
-.gl-stage-path-track{display:flex;width:max-content;min-width:100%;height:100%;padding:0 max(52px,calc((100vw - 1180px)/2))}
-.gl-part{position:relative;flex:0 0 1860px;height:100%;min-width:0;scroll-snap-align:start}
-.gl-part-divider{position:absolute;top:18px;left:112px;z-index:6;display:flex;align-items:center;max-width:390px;background:transparent}
-.gl-part-divider::before{content:"";position:absolute;left:-15px;top:50%;width:8px;height:2px;background:var(--gl-part-main);opacity:.56}
-.gl-part-divider-copy{position:relative;display:flex;align-items:center;gap:8px;min-width:0;padding:7px 11px;border:1px solid color-mix(in srgb,var(--gl-part-main) 24%,transparent);border-radius:999px;background:var(--gl-bg);color:var(--gl-part-dark);letter-spacing:.02em;white-space:nowrap}
-.gl-part-divider-copy strong{flex:0 0 auto;color:var(--gl-part-dark);font-size:12px;font-weight:900}
+.gl-stage-path-track{display:block;width:min(960px,100%);min-height:100%;margin:0 auto;padding:0 28px 84px}
+.gl-part{position:relative;width:100%;min-height:calc(var(--gl-part-path-height,1900px) + 86px);padding-top:76px;border-bottom:1px solid color-mix(in srgb,var(--gl-part-main) 14%,transparent);scroll-margin-top:72px}
+.gl-part:last-child{border-bottom:0}
+.gl-part-divider{position:absolute;left:50%;top:18px;z-index:6;display:flex;align-items:center;justify-content:center;width:min(680px,calc(100% - 32px));height:44px;transform:translateX(-50%);background:transparent}
+.gl-part-divider::before{content:"";position:absolute;left:0;right:0;top:50%;height:2px;background:var(--gl-part-main);opacity:.18;transition:opacity .2s ease}
+.gl-part.is-active .gl-part-divider::before{opacity:.5}
+.gl-part-divider-copy{position:relative;display:flex;align-items:center;gap:9px;max-width:calc(100% - 30px);padding:8px 14px;border:1px solid color-mix(in srgb,var(--gl-part-main) 24%,#fff);border-radius:999px;background:var(--gl-bg);color:var(--gl-part-dark);box-shadow:0 5px 16px rgba(35,48,67,.06);white-space:nowrap}
+.gl-part-divider-copy strong{color:var(--gl-part-dark);font-size:11px;font-weight:900}
 .gl-part-divider-copy>span{overflow:hidden;font-size:13px;font-weight:850;text-overflow:ellipsis}
-.gl-part-path{position:absolute;inset:0 0 0 96px;width:1764px;height:100%;overflow:visible}
+.gl-part-path{position:relative;width:min(860px,100%);height:var(--gl-part-path-height,1900px);margin:0 auto;overflow:visible}
 .gl-part-path-track{position:relative;width:100%;height:100%}
-.gl-path-node{position:absolute;left:var(--gl-path-left,50%);top:50%;z-index:2;display:grid;place-items:center;width:112px;transform:translate(-50%,-50%) translateY(var(--gl-path-y,0))}
+.gl-part-path-curve{position:absolute;inset:0;z-index:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.gl-part-path-curve path{fill:none;stroke:var(--gl-part-main);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;opacity:.13;vector-effect:non-scaling-stroke}
+.gl-path-node{position:absolute;left:var(--gl-path-left,50%);top:var(--gl-path-top,122px);z-index:2;display:grid;place-items:center;width:112px;transform:translate(-50%,-50%)}
 .gl-node-button{
   --gl-node-width:82px;--gl-node-face-height:68px;--gl-node-depth:9px;--gl-node-ring-gap:8px;
   position:relative;z-index:2;display:block;width:var(--gl-node-width);height:calc(var(--gl-node-face-height) + var(--gl-node-depth));border:0;background:transparent;color:#fff;text-decoration:none;outline:0;overflow:visible
@@ -155,11 +158,13 @@ button{cursor:pointer}
   .gl-current-node-fab{right:14px;bottom:18px;width:48px;height:48px;border-radius:14px}
   .gl-current-node-fab span{font-size:22px}.gl-current-node-fab small{display:none}
   .gl-stage-path-tools{width:calc(100% - 28px)}.gl-stage-path-tools>span{font-size:10px}
-  .gl-stage-path-scroll{height:470px}
-  .gl-stage-path-track{padding:0 22px}
-  .gl-part{flex-basis:1650px}
-  .gl-part-divider{top:14px;left:94px;max-width:300px}.gl-part-divider-copy{padding:6px 9px}.gl-part-divider-copy>span{max-width:190px}
-  .gl-part-path{left:82px;width:1568px}
+  .gl-stage-path-scroll{height:calc(100vh - 236px);min-height:480px}
+  .gl-stage-path-track{padding:0 8px 70px}
+  .gl-part{padding-top:70px}
+  .gl-part-divider{top:16px;width:calc(100% - 24px)}
+  .gl-part-divider-copy{max-width:calc(100% - 18px);padding:7px 11px}
+  .gl-part-divider-copy strong{font-size:10px}.gl-part-divider-copy>span{font-size:12px}
+  .gl-part-path{width:100%}
   .gl-node-button{--gl-node-width:72px;--gl-node-face-height:60px;--gl-node-depth:8px;--gl-node-ring-gap:7px}
   .gl-node-face{border-width:6px}
   .gl-node-icon{width:31px;height:31px}
@@ -208,69 +213,137 @@ button{cursor:pointer}
   .gl-placement-dialog{padding:26px 18px}.gl-placement-actions{grid-template-columns:1fr}.gl-placement-badge{right:-14px}
 }
 
-/* Knowledge Garden learning-path sample: CSS-only, preserves existing DOM and state. */
-body.guided-learning-page{
-  --gl-garden-cream:#fff8ec;
-  --gl-garden-paper:#fffdf8;
-  --gl-garden-ink:#293448;
-  --gl-garden-coral:#ff765f;
-  --gl-garden-sun:#f8c94d;
-  background:#fff8ec;
-  background-image:
-    radial-gradient(circle at 9% 12%,rgba(255,194,119,.22) 0 2px,transparent 2.5px),
-    radial-gradient(circle at 89% 24%,rgba(100,196,182,.16) 0 3px,transparent 3.5px),
-    linear-gradient(135deg,#fffaf0 0%,var(--gl-garden-cream) 50%,#f2fbf6 100%);
-  background-size:30px 30px,46px 46px,100% 100%;
-  color:var(--gl-garden-ink);
+/* v8.6.2 · 学习路径中的完整版自由练习入口：吸附在候选转折节点对侧，不占主流程位置。 */
+.gl-practice-entry{
+  position:absolute;top:var(--gl-practice-top,122px);z-index:3;display:block;width:124px;height:124px;
+  transform:translate(-50%,-50%);color:inherit;text-decoration:none;
+  border:0;border-radius:0;background:transparent;box-shadow:none;transition:transform .16s ease,filter .16s ease
 }
-.gl-topbar{
-  min-height:76px;
-  padding:9px 28px;
-  border:0;
-  border-bottom:1px solid rgba(76,91,109,.10);
-  border-radius:0 0 24px 24px;
-  background:rgba(255,253,248,.88);
-  box-shadow:0 8px 28px rgba(94,76,43,.08);
-  backdrop-filter:blur(18px);
-}
-.gl-brand-mark{border-radius:15px;background:linear-gradient(145deg,#ff9274,var(--gl-garden-coral));box-shadow:0 5px 0 #d95745,0 10px 18px rgba(255,118,95,.2)}
-.gl-brand strong{font-size:16px;letter-spacing:.01em}
-.gl-brand small{color:#8a7b67}
-.gl-mode-nav{padding:5px;border-color:#f1dfbd;border-radius:16px;background:#fff4dc;box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
-.gl-mode-nav a{border-radius:12px;color:#8a7456}
-.gl-mode-nav a.active{background:#fffdf8;color:#d6614f;box-shadow:0 3px 0 #ecd7b3,0 7px 14px rgba(121,89,37,.08)}
-.gl-account-actions .auth-status{border-color:#f0dfbf;background:#fffdf8;color:#6d5e4d;box-shadow:0 3px 0 #ecd7b3}
-.gl-main{padding-top:30px}
-.gl-stage-controls{top:91px}
-.gl-stage-switch{
-  overflow:hidden;
-  border:1px solid color-mix(in srgb,var(--gl-part-main) 24%,#fff);
-  border-radius:25px;
-  background:linear-gradient(135deg,color-mix(in srgb,var(--gl-part-main) 84%,#fff) 0%,var(--gl-part-main) 60%,color-mix(in srgb,var(--gl-part-main) 78%,#f8c94d) 100%);
-  box-shadow:0 var(--gl-stage-depth) 0 var(--gl-part-base),0 14px 26px color-mix(in srgb,var(--gl-part-main) 18%,transparent);
-}
-.gl-stage-switch::after{content:"";position:absolute;right:28px;top:15px;width:92px;height:92px;border:14px solid rgba(255,255,255,.13);border-radius:50%;pointer-events:none}
-.gl-stage-switch-copy{position:relative;z-index:1}
-.gl-stage-switch-copy strong{font-size:23px;letter-spacing:.02em}
-.gl-stage-path-scroll{
-  border-color:rgba(130,105,64,.09);
-  background:repeating-linear-gradient(90deg,transparent 0 18px,rgba(255,255,255,.32) 18px 20px),linear-gradient(180deg,rgba(255,253,248,.82),rgba(255,248,236,.46));
-  scrollbar-color:#edbd76 #fff4df;
-}
-.gl-stage-path-scroll::-webkit-scrollbar-track{background:#fff4df}
-.gl-stage-path-scroll::-webkit-scrollbar-thumb{border-color:#fff4df;background:#edbd76}
-.gl-part-divider-copy{border-color:color-mix(in srgb,var(--gl-part-main) 30%,transparent);background:var(--gl-garden-paper);box-shadow:0 4px 0 color-mix(in srgb,var(--gl-part-main) 18%,#fff)}
-.gl-node-base{background:#b9bcc2}
-.gl-node-face{border-color:#ece5d9;background:#d8dadd;box-shadow:0 5px 12px rgba(73,61,40,.08)}
-.gl-path-node.is-completed .gl-node-face{border-color:color-mix(in srgb,var(--gl-part-main) 20%,#fff);box-shadow:0 5px 0 var(--gl-part-base),0 11px 20px color-mix(in srgb,var(--gl-part-main) 20%,transparent)}
-.gl-path-node.is-available .gl-node-face{border-color:#fff2c7;background:linear-gradient(145deg,var(--gl-part-main),var(--gl-part-dark));box-shadow:0 5px 0 var(--gl-part-base),0 12px 25px color-mix(in srgb,var(--gl-part-main) 28%,transparent)}
-.gl-path-node.is-current .gl-node-button::before{border-color:var(--gl-garden-sun);box-shadow:0 0 0 7px rgba(248,201,77,.12)}
-.gl-node-copy{border-color:#f0dcc0;border-radius:15px;background:#fffdf8;box-shadow:0 6px 0 #efe2cf,0 13px 24px rgba(73,61,40,.11)}
-.gl-node-copy::before{border-color:#f0dcc0;background:#fffdf8}
-@media(prefers-reduced-motion:reduce){.gl-path-node.is-current .gl-node-button::before{animation:none}}
+.gl-practice-entry.is-left-lane{left:14%}
+.gl-practice-entry.is-right-lane{left:86%}
+.gl-practice-entry:hover{transform:translate(-50%,calc(-50% - 5px)) scale(1.045);filter:drop-shadow(0 12px 16px rgba(32,44,61,.18))}
+.gl-practice-entry:focus-visible{outline:4px solid var(--gl-part-main);outline-offset:5px;border-radius:22px}
+.gl-practice-image{display:block;width:100%;height:100%;object-fit:contain}
 @media(max-width:760px){
-  .gl-topbar{min-height:64px;padding:7px 14px;border-radius:0 0 18px 18px}
-  .gl-stage-controls{top:76px}
-  .gl-stage-switch::after{right:-12px;top:12px;width:74px;height:74px}
-  .gl-stage-switch-copy strong{font-size:19px}
+  .gl-practice-entry{width:92px;height:92px}
+  .gl-practice-entry.is-left-lane{left:16%}
+  .gl-practice-entry.is-right-lane{left:84%}
 }
+@media(max-width:420px){
+  .gl-practice-entry{width:84px;height:84px}
+  .gl-practice-entry.is-left-lane{left:17%}
+  .gl-practice-entry.is-right-lane{left:83%}
+}
+@media(prefers-reduced-motion:reduce){.gl-practice-entry:hover{transform:translate(-50%,-50%);filter:none}}
+
+
+/* P2.2.31 · learning path shell compaction */
+.gl-topbar{grid-template-columns:auto 1fr;gap:14px;padding:10px 18px;min-height:58px}
+.gl-topbar-left,.gl-topbar-right{display:flex;align-items:center;gap:12px}
+.gl-topbar-right{justify-content:flex-end}
+.gl-brand{display:none}
+.gl-subject-shell{position:relative}
+.gl-subject-trigger{display:grid;place-items:center;width:38px;height:38px;border:1px solid var(--gl-border);border-radius:12px;background:#fff;color:var(--gl-primary-dark);font-weight:950;box-shadow:0 3px 10px rgba(33,46,63,.06)}
+.gl-subject-menu{position:absolute;left:0;top:46px;min-width:160px;padding:8px;border:1px solid var(--gl-border);border-radius:14px;background:#fff;box-shadow:0 16px 36px rgba(30,40,55,.14)}
+.gl-subject-menu-item{display:block;width:100%;padding:10px 12px;border:0;border-radius:10px;background:#fff;text-align:left;color:#42506a;font-weight:800}
+.gl-subject-menu-item.is-active,.gl-subject-menu-item:hover{background:#f1fbf8;color:var(--gl-primary-dark)}
+.gl-mode-nav--icons{margin-left:auto;gap:6px;padding:0;border:none;background:transparent}
+.gl-mode-nav--icons a{display:grid;place-items:center;min-width:38px;width:38px;height:38px;padding:0;border:1px solid var(--gl-border);border-radius:12px;background:#fff;font-size:18px;box-shadow:0 3px 10px rgba(33,46,63,.06)}
+.gl-mode-nav--icons a.active{box-shadow:0 3px 10px rgba(33,46,63,.06);border-color:#bfe7da}
+.gl-account-actions{display:none}
+.gl-main{padding:10px 0 58px}
+.gl-stage-controls{top:68px;margin:0 auto 8px;width:min(1120px,calc(100% - 32px))}
+.gl-stage-switch{min-height:82px;padding:14px 18px;border-radius:16px}
+.gl-stage-switch-copy>span{display:none}
+.gl-stage-path-shell{position:relative;width:min(1120px,calc(100% - 32px));margin:0 auto}
+.gl-stage-path-tools{position:absolute;top:10px;right:14px;z-index:10;width:auto;margin:0;background:transparent}
+.gl-stage-path-tools>span{display:none}
+.gl-stage-path-tools>div{gap:6px}
+.gl-stage-path-tools button{width:32px;height:32px;background:rgba(255,255,255,.92);box-shadow:0 4px 12px rgba(33,46,63,.08)}
+.gl-stage-path-scroll{height:min(820px,calc(100dvh - 160px));min-height:0;border-top:0;background:transparent}
+.gl-stage-path-track{padding:0 8px 40px}
+.gl-part{padding-top:56px}
+.gl-part-divider{top:2px;height:36px}
+.gl-part-divider-copy{padding:6px 12px}
+.gl-path-settings{display:none}
+.gl-practice-entry{background:transparent;box-shadow:none;transition:filter .14s ease,opacity .14s ease}
+.gl-practice-entry:hover{transform:translate(-50%,-50%);filter:drop-shadow(0 8px 10px rgba(32,44,61,.10)) brightness(1.03)}
+.gl-practice-entry::after{content:"";position:absolute;inset:8px;border-radius:22px;border:2px dashed rgba(167,99,222,.18);opacity:0;transition:opacity .14s ease}
+.gl-practice-entry:hover::after,.gl-practice-entry:focus-visible::after{opacity:1}
+.gl-current-node-fab{width:56px;height:56px;border-radius:16px}
+@media(max-width:760px){
+  .gl-topbar{padding:8px 12px;gap:10px}
+  .gl-topbar-right{gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .gl-stage-controls{top:10px;width:calc(100% - 20px)}
+  .gl-stage-path-shell{width:calc(100% - 20px)}
+  .gl-stage-path-scroll{height:calc(100dvh - 134px)}
+  .gl-stage-path-tools{top:8px;right:8px}
+}
+
+/* P2.2.32 · visual follow-up adjustments */
+.gl-app{min-height:100dvh;display:flex;flex-direction:column}
+.gl-topbar{padding:8px 16px;min-height:52px}
+.gl-subject-trigger{background:var(--gl-primary);border-color:var(--gl-primary);color:#fff;box-shadow:0 4px 12px rgba(8,201,149,.22)}
+.gl-subject-trigger:hover,.gl-subject-trigger:focus-visible{background:var(--gl-primary-dark);border-color:var(--gl-primary-dark);color:#fff}
+.gl-mode-switch{display:flex;gap:4px;padding:4px;border:1px solid var(--gl-border);border-radius:14px;background:#f5f7f8;box-shadow:inset 0 1px 0 rgba(255,255,255,.95)}
+.gl-mode-switch a{min-width:84px;height:34px;padding:0 14px;border-radius:10px;display:grid;place-items:center;background:transparent;color:#68748a;font-size:13px;font-weight:900;box-shadow:none}
+.gl-mode-switch a.active{background:#fff;color:var(--gl-primary-dark);box-shadow:0 2px 8px rgba(31,41,65,.08)}
+.gl-main{flex:1;display:flex;flex-direction:column;min-height:0;padding:8px 0 0}
+.gl-stage-controls{top:60px;margin:0 auto 4px;width:min(1120px,calc(100% - 24px))}
+.gl-stage-switch{min-height:74px;padding:12px 16px}
+.gl-path-parts{flex:1;display:flex;min-height:0}
+.gl-stage-path-shell{flex:1;display:flex;flex-direction:column;min-height:0;width:min(1120px,calc(100% - 24px))}
+.gl-stage-path-tools{top:8px;right:10px}
+.gl-stage-path-scroll{flex:1;height:auto;min-height:0;max-height:none;border-bottom:0;border-radius:0}
+.gl-stage-path-track{min-height:100%;padding:0 6px 12px}
+.gl-part{padding-top:52px}
+.gl-part:last-child{padding-bottom:8px}
+.gl-current-node-fab{bottom:16px}
+@media(max-width:760px){
+  .gl-subject-trigger{width:36px;height:36px;border-radius:11px}
+  .gl-mode-switch a{min-width:72px;height:32px;font-size:12px}
+  .gl-main{padding-top:6px}
+  .gl-stage-controls{width:calc(100% - 16px)}
+  .gl-stage-path-shell{width:calc(100% - 16px)}
+  .gl-stage-path-scroll{height:auto}
+}
+
+/* P2.2.33 · interaction recovery and definitive scroll sizing */
+html,body{height:100%;overflow:hidden}
+body.guided-learning-page{height:100dvh;overflow:hidden}
+.gl-app{height:100dvh;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.gl-topbar{flex:0 0 auto}
+.gl-main{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:8px 0 0}
+.gl-stage-controls{position:relative;top:auto;flex:0 0 auto}
+.gl-path-parts{flex:1 1 auto;min-height:0;overflow:hidden;display:flex}
+.gl-stage-path-shell{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.gl-stage-path-scroll{flex:1 1 auto!important;height:0!important;min-height:0!important;max-height:none!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain}
+.gl-stage-path-track{min-height:max-content}
+
+.gl-mode-toggle-shell{display:flex;align-items:center;gap:8px;padding:4px 8px;border:1px solid var(--gl-border);border-radius:999px;background:#f6f8f9;color:#778294;font-size:11px;font-weight:900;white-space:nowrap}
+.gl-mode-label{transition:color .16s ease}
+.gl-mode-label.is-active{color:var(--gl-primary-dark)}
+.gl-mode-toggle{position:relative;display:inline-flex;align-items:center;cursor:pointer}
+.gl-mode-toggle input{position:absolute;opacity:0;pointer-events:none}
+.gl-mode-toggle-track{position:relative;display:block;width:46px;height:26px;border-radius:999px;background:#d4dae1;box-shadow:inset 0 1px 2px rgba(15,23,42,.1);transition:background .16s ease}
+.gl-mode-toggle-thumb{position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(15,23,42,.18);transition:transform .16s ease}
+.gl-mode-toggle input:checked + .gl-mode-toggle-track{background:var(--gl-primary)}
+.gl-mode-toggle input:checked + .gl-mode-toggle-track .gl-mode-toggle-thumb{transform:translateX(20px)}
+.gl-mode-toggle input:focus-visible + .gl-mode-toggle-track{outline:3px solid rgba(8,201,149,.22);outline-offset:2px}
+
+@media(max-width:760px){
+  .gl-topbar-right{flex-wrap:nowrap}
+  .gl-mode-toggle-shell{gap:5px;padding:3px 6px}
+  .gl-mode-label{font-size:10px}
+  .gl-mode-toggle-track{width:40px;height:24px}
+  .gl-mode-toggle-thumb{width:18px;height:18px}
+  .gl-mode-toggle input:checked + .gl-mode-toggle-track .gl-mode-toggle-thumb{transform:translateX(16px)}
+  .gl-stage-path-scroll{height:0!important}
+}
+
+/* P2.2.33 · native-link mode switch */
+.gl-mode-toggle-shell{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:3px;min-width:146px;padding:4px;border:1px solid var(--gl-border);border-radius:999px;background:#f3f5f7}
+.gl-mode-choice{position:relative;z-index:1;display:grid;place-items:center;height:30px;padding:0 13px;border-radius:999px;color:#778294;font-size:11px;font-weight:900;text-decoration:none;transition:background .16s ease,color .16s ease,box-shadow .16s ease}
+.gl-mode-choice.is-active{background:#fff;color:var(--gl-primary-dark);box-shadow:0 2px 8px rgba(31,41,65,.10)}
+.gl-mode-choice:hover{color:var(--gl-primary-dark)}
+@media(max-width:760px){.gl-mode-toggle-shell{min-width:126px}.gl-mode-choice{height:28px;padding:0 10px;font-size:10px}}

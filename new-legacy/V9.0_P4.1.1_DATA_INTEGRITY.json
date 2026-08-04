@@ -1,0 +1,188 @@
+{
+  "release": "v9.0-p4.1.1",
+  "baseRelease": "v9.0-p4.1",
+  "generatedAt": "2026-07-31T11:20:27.752210+00:00",
+  "scope": [
+    "fix visual centering for the home support trigger and engagement dialog close buttons",
+    "add per-account unread notifications for administrator feedback replies",
+    "combine unread feedback replies and site messages in the home support badge while preserving source-specific badges",
+    "extend the local-demo repository and remote REST contract for feedback reply read state",
+    "assess modularization risk and recommend incremental extraction instead of a pre-deployment big-bang rewrite"
+  ],
+  "summary": {
+    "nodeTestFiles": {
+      "passed": 102,
+      "total": 102
+    },
+    "browserTests": {
+      "passed": 8,
+      "total": 8
+    },
+    "javascriptSyntaxChecked": 242,
+    "htmlFilesChecked": 24,
+    "duplicateHtmlIds": 0,
+    "missingLocalScriptOrStyleReferences": 0
+  },
+  "bugAudit": {
+    "blockingProductBugsFound": 0,
+    "userVisibleIssuesFixed": 3,
+    "staleRegressionExpectationFixed": 1,
+    "questionOrPaperDataMutated": false
+  },
+  "uiAlignment": {
+    "supportButtonCentered": true,
+    "dialogCloseUsesSvg": true,
+    "fontBaselineIndependent": true,
+    "browserCenterTolerancePx": 0.6
+  },
+  "feedbackReplyNotifications": {
+    "homeTotalBadge": true,
+    "totalBadgeIncludesReplies": true,
+    "feedbackMenuBadge": true,
+    "myFeedbackTabBadge": true,
+    "feedbackCardUnreadMarker": true,
+    "perAccountReadState": true,
+    "markReadOnVisibleMyFeedback": true,
+    "statusOnlyUpdateCreatesUnread": false,
+    "readStoragePrefix": "kg_user_feedback_reply_reads_v1__"
+  },
+  "messages": {
+    "existingUnreadBehaviorPreserved": true,
+    "messageMenuBadgeIndependent": true,
+    "markOneRead": true,
+    "markAllRead": true
+  },
+  "deployment": {
+    "defaultMode": "local-demo",
+    "localStorageKeysAdded": [
+      "kg_user_feedback_reply_reads_v1__<account>"
+    ],
+    "remoteAdapterReady": true,
+    "apiContract": "SERVER_ENGAGEMENT_API_V1.md",
+    "markFeedbackReadEndpoint": "POST /api/feedback/:id/read",
+    "backendImplemented": false,
+    "serverAuthenticationRequired": true,
+    "serverOwnershipCheckRequired": true
+  },
+  "modularization": {
+    "sourceJavascriptFiles": 134,
+    "sourceJavascriptLines": 42397,
+    "largestFiles": [
+      {
+        "file": "src/77-multi-question-workspace.js",
+        "lines": 4058
+      },
+      {
+        "file": "src/65-question-bank-admin.js",
+        "lines": 3732
+      },
+      {
+        "file": "src/10-graph-editor.js",
+        "lines": 2665
+      }
+    ],
+    "bigBangRewriteRecommended": false,
+    "incrementalRefactorRecommended": true,
+    "recommendedOrder": [
+      "shared UI primitives",
+      "common page shell",
+      "domain repositories and state services",
+      "large controller decomposition"
+    ]
+  },
+  "safety": {
+    "questionIdsChanged": false,
+    "questionBankIdsChanged": false,
+    "questionContentChanged": false,
+    "publishedPaperSchemaChanged": false,
+    "publishedPaperSnapshotsChanged": false,
+    "practiceModeRulesChanged": false,
+    "safeDeleteRulesChanged": false,
+    "browserStorageMigrationRequired": false
+  },
+  "changedFiles": [
+    "CHANGELOG.md",
+    "README.md",
+    "SERVER_ENGAGEMENT_API_V1.md",
+    "V9.0_P4.1.1_QUICK_START.md",
+    "V9.0_P4.1.1_SUPPORT_ALIGNMENT_FEEDBACK_REPLY_BADGES_REPORT.md",
+    "VERSION",
+    "feedback-management.html",
+    "help-center.html",
+    "index.html",
+    "message-management.html",
+    "src/01-runtime-config.js",
+    "src/101-engagement-repository.js",
+    "src/103-support-center.js",
+    "src/admin/00-admin-core.js",
+    "styles/support-center.css",
+    "tests/v862-data-integrity.test.js",
+    "tests/v862-p2238-legacy-freeze.test.js",
+    "tests/v90-p0-admin-foundation.test.js",
+    "tests/v90-p0-admin-shell-browser.py",
+    "tests/v90-p21-taxonomy-release.test.js",
+    "tests/v90-p22-taxonomy-lifecycle.test.js",
+    "tests/v90-p31-admin-ia.test.js",
+    "tests/v90-p31-data-integrity.test.js",
+    "tests/v90-p32-subject-management.test.js",
+    "tests/v90-p331-navigation-shell-fix.test.js",
+    "tests/v90-p333-question-classification.test.js",
+    "tests/v90-p3331-batch-default-classification.test.js",
+    "tests/v90-p334-lightweight-tag-management.test.js",
+    "tests/v90-p35-paper-management.test.js",
+    "tests/v90-p353-question-bank-workspace.test.js",
+    "tests/v90-p354-training-workspace.test.js",
+    "tests/v90-p355-training-subject-preview-recall-library.test.js",
+    "tests/v90-p356-training-compact-filters-preview.test.js",
+    "tests/v90-p357-recall-library-question-stats.test.js",
+    "tests/v90-p358-teacher-workbench-navigation.test.js",
+    "tests/v90-p402-navigation-role-danger.test.js",
+    "tests/v90-p403-published-paper-learning-pages.test.js",
+    "tests/v90-p41-engagement-center-browser.py",
+    "tests/v90-p41-engagement-center.test.js",
+    "tests/v90-p411-data-integrity.test.js"
+  ],
+  "removedFiles": [],
+  "changedFileSha256": {
+    "CHANGELOG.md": "7084b5a83d04252788a27818f2a8975269e2d90e1e1d51ceabb58333347467f5",
+    "README.md": "a4fa1cd999d38aa51c4f1c0d3fe0641fa1523a15e36763a0ce40c7bef199abd6",
+    "SERVER_ENGAGEMENT_API_V1.md": "ac2acfd4b670306874a729ec22b582cdd05345721cba36f9dfb56a3b166578e1",
+    "V9.0_P4.1.1_QUICK_START.md": "63b61680b15f24f3748f121f207b564311d9498209bedccc2160b0ef3bf803f1",
+    "V9.0_P4.1.1_SUPPORT_ALIGNMENT_FEEDBACK_REPLY_BADGES_REPORT.md": "597c124834aa1f3bca08f3ceb167d4cfe2c1964d8c10a7e8974cc0db3bb92f77",
+    "VERSION": "80ca23b43ea21b209cbfc2877b958aa37f992f7e5b9fc7dc4b806a1c81a42d22",
+    "feedback-management.html": "b04248b171335f2ee49381ed0dfb75b4bdd347956bf14e43242b60f8ac0bcb38",
+    "help-center.html": "b1934e44aa7853270243b540e39f2257b81ef86b9455e35c765f7ecc48420c1c",
+    "index.html": "43c063824ef4b0003a7ffb8b4828fe8d899f10bf40916b277393b4eac0baf3bf",
+    "message-management.html": "579c4a684dc7e4b06b320cb682deb8b1348ca755c20f394eae13b4288e85a9c9",
+    "src/01-runtime-config.js": "e06eda6fd661a8234a501d9547439770687b064320a64d5b8d4a6f44e7950b75",
+    "src/101-engagement-repository.js": "c34dab19e7d0620e07857178adc39b21f9330c85b670a207b553e62f879704cf",
+    "src/103-support-center.js": "80fab861f20b54e7a1850f7d06c02e08b53e4fad0e990198d04f70c599872c73",
+    "src/admin/00-admin-core.js": "2b22b7c9313d3240a8d73f019a9c0b9428b19e3051b39859784c4ebbfe13f2be",
+    "styles/support-center.css": "bd7d7ff068621f940693f2b243dcde2bea8c5939e45afa4e75e849e0c43702ef",
+    "tests/v862-data-integrity.test.js": "7b105dbab419043cce38cd0be771528d745485378ebe45e7d9f61b2107a594b3",
+    "tests/v862-p2238-legacy-freeze.test.js": "05bc207e2b15b97c25e56798ff5406fe509e34079223f8ac0300b68bc677c9e3",
+    "tests/v90-p0-admin-foundation.test.js": "c28b0f3d07f4e1ca8abb13d3637c653d22d3a307447d5d10a29493b5b84f77e9",
+    "tests/v90-p0-admin-shell-browser.py": "468d1cbf9712080a9f885f92871d5bc20cf7473e8f9b56c5d9a90e1eb3a01cdb",
+    "tests/v90-p21-taxonomy-release.test.js": "ee876d52c4b75c4c80368dc13a8b9b0b4e2a6af00f654ce4665cdebb89f7b54c",
+    "tests/v90-p22-taxonomy-lifecycle.test.js": "8ff9dde6185de089bf356c7ae9b878d7a8d30dc1f69142b3fe1f02ee96d6973a",
+    "tests/v90-p31-admin-ia.test.js": "138e445491b11e9bd2cd69ae7314e5bd6ea46a49aea223c9a0aa71962494c3f2",
+    "tests/v90-p31-data-integrity.test.js": "6e1134e6c2a4f0f2ca62fdac763eb1b324ef729ecf40a4a5d159a54607ccba03",
+    "tests/v90-p32-subject-management.test.js": "f4e76e107223ca9edd10472a5a547189bc0be6fb3294545c040837654a17855b",
+    "tests/v90-p331-navigation-shell-fix.test.js": "4f9c392ad88e862d12f512c0f5d9aaafea6d35b45b95a39a7c30a07dae2e7511",
+    "tests/v90-p333-question-classification.test.js": "13f8859670518badb173f3a177337aad3a8b8040e94b9c41448fb42509029021",
+    "tests/v90-p3331-batch-default-classification.test.js": "8a362504f0369153900c26a48f02283607505ab75348ad38e98ec6c4e8d71ec1",
+    "tests/v90-p334-lightweight-tag-management.test.js": "40d484055c4537f770a3c89a7d90bcaa84c2f7d8cb640dbc9d5607e7fa5c29c4",
+    "tests/v90-p35-paper-management.test.js": "da0890172d5fcebd8d5167619cbb10795e4ab1d5f803fc33440780327bd7c168",
+    "tests/v90-p353-question-bank-workspace.test.js": "59bc6a1de25a7a380ef5cfbe985ad62c0235a848a942b7fc0a82f99169e1f9ef",
+    "tests/v90-p354-training-workspace.test.js": "9302eaca62db3a166dc0f29ada2679d139e8d5e8a07a63dee1eb3d18cf9b58b0",
+    "tests/v90-p355-training-subject-preview-recall-library.test.js": "a89228fc5ab488dddbc745aa7dddea2a24b829f1549d3d14a0d9dd9af0b5cc46",
+    "tests/v90-p356-training-compact-filters-preview.test.js": "a4f4fdfc3deab58e7721370b490507e7d9210b366b995df8206ce6bc06eadbe6",
+    "tests/v90-p357-recall-library-question-stats.test.js": "11180412a0bb5b6f613444b6292f1c972eceb56965108234ccd42921f823ff7a",
+    "tests/v90-p358-teacher-workbench-navigation.test.js": "cf3b9886187972cc5552d3af05c442e4200d6b2abd8aad47efeffd903c2288d6",
+    "tests/v90-p402-navigation-role-danger.test.js": "e97c8a1e37b5120b44091cf5111442fa2cd87d848a62344a61ef1ab9e5fe9052",
+    "tests/v90-p403-published-paper-learning-pages.test.js": "e621b1727735625e47b31faa3c515dcba28503d91314ed7f938cb99992eb3279",
+    "tests/v90-p41-engagement-center-browser.py": "2890922050b0cdfc2b1e5d50accc0d2170390958abc36ef6442f8adfeaef7f9c",
+    "tests/v90-p41-engagement-center.test.js": "01211bd171bbe3542dc3f73663d70d12c9247e44209c6e98746aaa8d9c64f3af",
+    "tests/v90-p411-data-integrity.test.js": "5e5c1641e05d71482b89e7f98999a08d44c66cad3706e49ef04e314ee444fff9"
+  }
+}

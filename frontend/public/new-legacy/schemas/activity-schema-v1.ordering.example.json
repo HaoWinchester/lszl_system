@@ -1,0 +1,85 @@
+{
+  "id": "activity-ordering-001",
+  "type": "ordering",
+  "schemaVersion": 1,
+  "content": {
+    "zh": {
+      "instruction": "请按照正确的分析顺序排列。",
+      "items": [
+        {
+          "id": "step-1",
+          "text": "识别项目环境"
+        },
+        {
+          "id": "step-2",
+          "text": "判断角色职责"
+        },
+        {
+          "id": "step-3",
+          "text": "选择下一步行动"
+        }
+      ],
+      "hints": [
+        "先判断题目属于哪种项目环境。"
+      ]
+    },
+    "en": {
+      "instruction": "Arrange the analysis steps in the correct order.",
+      "items": [
+        {
+          "id": "step-1",
+          "text": "Identify the project environment"
+        },
+        {
+          "id": "step-2",
+          "text": "Determine role responsibilities"
+        },
+        {
+          "id": "step-3",
+          "text": "Choose the next action"
+        }
+      ],
+      "hints": [
+        "Start by identifying the project environment."
+      ]
+    }
+  },
+  "answer": {
+    "itemIds": [
+      "step-1",
+      "step-2",
+      "step-3"
+    ]
+  },
+  "explanation": {
+    "zh": {
+      "short": "顺序正确。",
+      "detailed": "先识别环境，再判断职责，最后选择行动。",
+      "incorrect": "请从环境判断开始。",
+      "general": "分析应遵循环境、职责、行动的顺序。"
+    },
+    "en": {
+      "short": "The order is correct.",
+      "detailed": "Identify the environment, determine responsibilities, then choose the action.",
+      "incorrect": "Start with the environment.",
+      "general": "Use the environment, responsibility, action sequence."
+    }
+  },
+  "assessment": {
+    "language": "zh"
+  },
+  "config": {
+    "displayOrder": [
+      "step-3",
+      "step-1",
+      "step-2"
+    ]
+  },
+  "metadata": {
+    "adapter": "ordering",
+    "runtimeType": "ordering",
+    "source": "activity-schema-example",
+    "repeatOf": "",
+    "translationStatus": "bilingual"
+  }
+}
