@@ -111,8 +111,17 @@
     document.body.dataset.practiceView=name;
     if(name!=='game')setDangerVignette(false);
   }
+  function renderHeartIcon(){
+    try{
+      if(typeof global.KGLearningIcons?.render==='function'){
+        const icon=global.KGLearningIcons.render('heart',{size:18});
+        if(typeof icon==='string'&&icon)return icon;
+      }
+    }catch(error){}
+    return '♥';
+  }
   function renderHealth(){
-    dom.health.innerHTML=Array.from({length:MAX_HEALTH},(_,index)=>'<span class="practice-heart '+(index<state.health?'active':'')+'" aria-hidden="true">♥</span>').join('');
+    dom.health.innerHTML=Array.from({length:MAX_HEALTH},(_,index)=>'<span class="practice-heart '+(index<state.health?'active':'')+'" aria-hidden="true">'+renderHeartIcon()+'</span>').join('');
     dom.health.setAttribute('aria-label','剩余血量 '+state.health+' / '+MAX_HEALTH);
   }
   function renderProgress(){
@@ -298,6 +307,6 @@
 
   const api=Object.freeze({init,startPractice,answerById:id=>answer(id,dom.options.querySelector('[data-option-id="'+CSS.escape(text(id))+'"]')),finishPractice,showLobby,loadReleases,snapshot,constants:Object.freeze({COUNTS:[...COUNTS],MAX_HEALTH,SCHOLAR_MAX_SECONDS,CHECKPOINT_INTERVAL})});
   global.KGPracticeMode=api;
-  if(typeof module!=='undefined'&&module.exports)module.exports={streakBonus,formatDuration,resolveRelease,constants:api.constants};
+  if(typeof module!=='undefined'&&module.exports)module.exports={streakBonus,formatDuration,resolveRelease,renderHeartIcon,constants:api.constants};
   if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',init,{once:true});
 })(typeof window!=='undefined'?window:globalThis);

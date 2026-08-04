@@ -59,6 +59,7 @@ body.practice-mode-page[data-practice-view="game"] .practice-main{padding-top:cl
 .practice-game-topbar{grid-template-columns:40px minmax(120px,1fr) auto auto}
 .practice-time-row{display:grid;grid-template-columns:20px minmax(0,1fr);align-items:center;gap:8px;margin:0 0 18px 52px;color:var(--practice-success)}
 .practice-time-icon{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;transition:color .2s ease}
+.practice-time-icon .kg-icon{width:100%;height:100%}
 .practice-time-rail{height:4px;margin:0;border-radius:999px;background:#e4e8ef;overflow:hidden}
 .practice-time-row.is-tense{color:var(--practice-warning)}
 .practice-time-row.is-danger{color:var(--practice-danger)}

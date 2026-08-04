@@ -9,8 +9,9 @@
   <link rel="stylesheet" href="styles/user-center.css"/>
   <link rel="stylesheet" href="styles/account-menu.css"/>
   <link rel="stylesheet" href="styles/practice-mode.css"/>
+  <link rel="stylesheet" href="styles/learning-skin.css"/>
 </head>
-<body class="practice-mode-page">
+<body class="practice-mode-page" data-learning-skin="focus-vega">
   <div class="practice-app">
     <header class="practice-header">
       <a class="practice-brand" href="practice-mode.html" aria-label="返回做题模式大厅">
@@ -25,13 +26,13 @@
         <div class="account-menu-shell" id="accountMenuShell" data-account-help-href="multi-question-help.html">
         <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
           <span class="account-menu-status-dot" aria-hidden="true"></span><span class="account-menu-trigger-label">访客</span>
-          <svg aria-hidden="true" class="account-menu-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>
+          <span class="account-menu-chevron" data-kg-icon="chevron-down" data-kg-icon-size="16" aria-hidden="true"></span>
         </button>
         <div class="account-menu" hidden id="accountMenu" role="menu" aria-label="账号菜单">
-          <button class="account-menu-item" id="accountMenuUserCenterBtn" role="menuitem" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0"/></svg><span>用户中心</span></button>
-          <button class="account-menu-item" id="accountMenuHelpBtn" role="menuitem" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.5 2.5 0 1 1 3.8 2.1c-.9.5-1.5 1-1.5 2.2M12 17h.01"/></svg><span>帮助中心</span></button>
+          <button class="account-menu-item" id="accountMenuUserCenterBtn" role="menuitem" type="button"><span data-kg-icon="circle-user-round" data-kg-icon-size="16" aria-hidden="true"></span><span class="account-menu-item-label">用户中心</span></button>
+          <button class="account-menu-item" id="accountMenuHelpBtn" role="menuitem" type="button"><span data-kg-icon="circle-help" data-kg-icon-size="16" aria-hidden="true"></span><span class="account-menu-item-label">帮助中心</span></button>
           <div class="account-menu-separator" role="separator"></div>
-          <button class="account-menu-item account-menu-session" id="accountMenuSessionBtn" role="menuitem" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9"/></svg><span>登录</span></button>
+          <button class="account-menu-item account-menu-session" id="accountMenuSessionBtn" role="menuitem" type="button"><span data-account-session-icon data-kg-icon="log-in" data-kg-icon-size="16" aria-hidden="true"></span><span class="account-menu-item-label">登录</span></button>
         </div>
       </div>
       </div>
@@ -74,12 +75,12 @@
 
         <section class="practice-mode-grid" aria-label="选择练习模式">
           <article class="practice-mode-card challenge">
-            <span class="practice-mode-icon" aria-hidden="true">◆</span>
+            <span class="practice-mode-icon" data-kg-icon="diamond" data-kg-icon-size="20" aria-hidden="true"></span>
             <div><small>CHALLENGE</small><h2>挑战模式</h2><p>用三点血量持续闯关。连续答对可获得额外经验，并恢复血量。</p></div>
             <button type="button" class="practice-start-btn" data-practice-start="challenge">开始挑战</button>
           </article>
           <article class="practice-mode-card scholar">
-            <span class="practice-mode-icon" aria-hidden="true">⚡</span>
+            <span class="practice-mode-icon" data-kg-icon="zap" data-kg-icon-size="20" aria-hidden="true"></span>
             <div><small>SCHOLAR</small><h2>学霸模式</h2><p>共享 80 秒倒计时。答对加时间，答错扣时间并损失血量。</p></div>
             <button type="button" class="practice-start-btn" data-practice-start="scholar">进入学霸模式</button>
           </article>
@@ -98,13 +99,13 @@
 
       <section class="practice-game" id="practiceGame" hidden aria-live="polite">
         <header class="practice-game-topbar">
-          <button type="button" class="practice-exit-btn" id="practiceExitBtn" aria-label="退出本次练习" title="退出">×</button>
+          <button type="button" class="practice-exit-btn" id="practiceExitBtn" aria-label="退出本次练习" title="退出"><span data-kg-icon="x" data-kg-icon-size="18" aria-hidden="true"></span></button>
           <div class="practice-progress-shell" id="practiceProgressShell" role="progressbar" aria-label="做题进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="practiceProgressBar"></span></div>
           <div class="practice-health" id="practiceHealth" aria-label="剩余血量"></div>
           <div class="practice-scholar-stat practice-timer" id="practiceTimer" hidden><strong>80</strong><span>秒</span></div>
         </header>
         <div class="practice-time-row" id="practiceTimeRow" hidden aria-hidden="true">
-          <svg class="practice-time-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="7"/><path d="M12 10v3.4l2.2 1.4M8.5 3.8 6 6.3M15.5 3.8 18 6.3M9 2h6"/></svg>
+          <span class="practice-time-icon" data-kg-icon="timer" data-kg-icon-size="18" aria-hidden="true"></span>
           <div class="practice-time-rail" id="practiceTimeRail"><span id="practiceTimeBar"></span></div>
         </div>
         <div class="practice-streak-pop" id="practiceStreakPop" hidden role="status"></div>
@@ -155,7 +156,7 @@
 
   <div class="modal-backdrop auth-backdrop" id="authModal" aria-hidden="true">
     <div aria-labelledby="authTitle" aria-modal="true" class="modal auth-modal" role="dialog">
-      <div class="auth-head"><div><h2 id="authTitle">登录并保存练习记录</h2><p id="authReason">登录后，练习记录会按账号分别保存。</p></div><button class="auth-close" id="authCloseBtn" title="关闭登录窗口">×</button></div>
+      <div class="auth-head"><div><h2 id="authTitle">登录并保存练习记录</h2><p id="authReason">登录后，练习记录会按账号分别保存。</p></div><button class="auth-close" id="authCloseBtn" title="关闭登录窗口" type="button" aria-label="关闭登录窗口"><span data-kg-icon="x" data-kg-icon-size="18" aria-hidden="true"></span></button></div>
       <div class="auth-body">
         <label>用户名<input autocomplete="username" id="authUsername" placeholder="请输入用户名"/></label>
         <label>密码<input autocomplete="current-password" id="authPassword" placeholder="请输入密码" type="password"/></label>
@@ -170,6 +171,7 @@
   <script defer src="src/29-auth-core.js"></script>
   <script defer src="src/30-standalone-auth-dialog.js"></script>
   <script defer src="src/33-user-center.js"></script>
+  <script defer src="src/107-learning-ui-icons.js"></script>
   <script defer src="src/41-account-menu.js"></script>
   <script defer src="src/100-practice-mode.js"></script>
 </body>
