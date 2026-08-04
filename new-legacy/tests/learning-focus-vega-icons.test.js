@@ -95,7 +95,7 @@ const sessionBtn={...control(),
 };
 const elements={
   accountMenuShell:control(),authStatus:control(),accountMenu:control(),
-  accountMenuUserCenterBtn:control(),accountMenuHelpBtn:control(),accountMenuUpgradeBtn:control(),accountMenuSessionBtn:sessionBtn,
+  accountMenuUserCenterBtn:control(),accountMenuHelpBtn:control(),accountMenuSessionBtn:sessionBtn,
 };
 const accountDocument={
   readyState:'loading',
@@ -109,7 +109,7 @@ const accountWindow={
 };
 const accountSource=fs.readFileSync(path.join(root,'src/41-account-menu.js'),'utf8');
 vm.runInNewContext(accountSource,{window:accountWindow,document:accountDocument,console,getComputedStyle:()=>({display:'block'}),requestAnimationFrame:fn=>fn()},{filename:'41-account-menu.js'});
-ready();
+assert.doesNotThrow(()=>ready(),'account menu should initialize without the optional upgrade item');
 assert.equal(sessionLabel.textContent,'登录');
 assert.match(sessionIcon.innerHTML,/lucide-learning\.svg#log-in/);
 loggedIn=true;

@@ -181,7 +181,7 @@
     menu.addEventListener('keydown',onMenuKeydown);
     userCenterBtn.addEventListener('click',openUserCenter);
     helpBtn.addEventListener('click',openHelp);
-    upgradeBtn.addEventListener('click',openUpgrade);
+    if(upgradeBtn)upgradeBtn.addEventListener('click',openUpgrade);
     if(exitBtn)exitBtn.addEventListener('click',exitPage);
     sessionBtn.addEventListener('click',toggleSession);
 
