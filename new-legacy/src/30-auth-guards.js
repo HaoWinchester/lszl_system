@@ -87,20 +87,26 @@ function authPasswordHash(username,password,salt){
   return AuthCore.passwordHash ? AuthCore.passwordHash(username,password,salt) : authHash(String(salt)+'|'+String(username).toLowerCase()+'|'+String(password));
 }
 function authMsg(text,ok=false){
+  if(window.KGSharedAuthDialog)return window.KGSharedAuthDialog.message(text,ok);
   const el=$('authMsg');if(!el)return;
   el.textContent=text||'';
   el.classList.toggle('ok',!!ok);
 }
-function authOpen(reason='该操作需要登录后才能编辑。'){
+function authOpen(reason='未登录时只能查看图谱，登录后可以新增、编辑、连线和保存自己的内容。'){
+  if(window.KGSharedAuthDialog)return window.KGSharedAuthDialog.open(reason);
   const modal=$('authModal');
-  if(!modal)return;
+  if(!modal)return false;
   $('authReason').textContent=reason||'未登录时只能查看，登录后可以编辑自己的内容。';
   authMsg('');
   modal.classList.add('show');
+  modal.setAttribute('aria-hidden','false');
   setTimeout(()=>{$('authUsername')&&$('authUsername').focus()},80);
+  return true;
 }
 function authClose(){
-  const modal=$('authModal');if(modal)modal.classList.remove('show');
+  if(window.KGSharedAuthDialog)return window.KGSharedAuthDialog.close();
+  const modal=$('authModal');if(!modal)return false;
+  modal.classList.remove('show');modal.setAttribute('aria-hidden','true');return true;
 }
 function authRenderStatus(){
   const status=$('authStatus'),login=$('authLoginBtn'),logout=$('authLogoutBtn');
@@ -254,14 +260,14 @@ const AUTH_EDIT_SELECTOR=[
 ].join(',');
 const AUTH_EDIT_CHANGE_SELECTOR='#lineColorPicker,#importFile,#flashFile,#nTitle,#nCategory,#nColor,#nSize,#nLevel,#nKeywords,#nSummary,#nNotes,#linkType,#linkStyle,#linkColor,#linkNote,#gTitle,#gSubject,#gAudience,#gDescription';
 function authInstallGuards(){
-  const login=$('authLoginBtn'),logout=$('authLogoutBtn'),close=$('authCloseBtn'),doLogin=$('authDoLoginBtn'),register=$('authRegisterBtn'),modal=$('authModal');
+  const login=$('authLoginBtn'),logout=$('authLogoutBtn');
+  if(window.KGSharedAuthDialog)window.KGSharedAuthDialog.configure({
+    defaultReason:'未登录时只能查看图谱，登录后可以新增、编辑、连线和保存自己的内容。',
+    source:'自由模式登录',
+    renderStatus:authRenderStatus
+  });
   if(login)login.onclick=()=>authOpen('登录后可以新增、编辑、连线和保存自己的图谱。');
   if(logout)logout.onclick=authLogout;
-  if(close)close.onclick=authClose;
-  if(doLogin)doLogin.onclick=()=>authLogin($('authUsername').value,$('authPassword').value);
-  if(register)register.onclick=()=>authRegister($('authUsername').value,$('authPassword').value);
-  ['authUsername','authPassword'].forEach(id=>{const el=$(id);if(el&&!el.dataset.authEnterBound){el.dataset.authEnterBound='1';el.addEventListener('keydown',e=>{if(e.key==='Enter')authLogin($('authUsername').value,$('authPassword').value)})}});
-  if(modal&&!modal.dataset.authClickBound){modal.dataset.authClickBound='1';modal.addEventListener('click',e=>{if(e.target===modal)authClose()})}
 
   document.addEventListener('click',e=>{
     if(authIsLoggedIn() && (!window.KGRolePermissions || window.KGRolePermissions.can('editGraph')))return;
