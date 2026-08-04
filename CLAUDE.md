@@ -17,6 +17,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## ⚠️ 硬约束：UI 必须和 legacy 原版一模一样
 
+### 用户批准的学习端局部例外（2026-08-04）
+
+`practice-mode.html`、`question-training.html`、`question-workspace.html`、`knowledge-recall.html` 的非画板区域允许使用 Focus / Vega 兼容皮肤和本地 Lucide SVG；页面排版、业务行为及 `.qt-canvas-shell`、`.qw-canvas-shell`、`.kr-viewport` 全部后代仍必须保持不变。实施依据见 `docs/superpowers/specs/2026-08-04-learning-focus-vega-ui-skin-design.md`。
+
 **这是用户明确且反复强调的要求。** 每个页面都要和 `legacy/` 里对应的原版 HTML **视觉一模一样**：
 
 - **复用原版 CSS**：`legacy/styles/*.css` 已复制到 `frontend/src/styles/`，`main.tsx` 统一 import。
