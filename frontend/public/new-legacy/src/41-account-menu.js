@@ -56,7 +56,14 @@
     const loggedIn=isLoggedIn();
     sessionBtn.classList.toggle('is-logout',loggedIn);
     sessionBtn.classList.toggle('is-login',!loggedIn);
-    const label=sessionBtn.querySelector('span');
+    const label=sessionBtn.querySelector('.account-menu-item-label,[data-account-session-label]')
+      || [...sessionBtn.querySelectorAll('span')].find(item=>!item.matches('[data-kg-icon],[data-account-session-icon]'));
+    const sessionIcon=sessionBtn.querySelector('[data-account-session-icon]');
+    if(sessionIcon&&window.KGLearningIcons){
+      sessionIcon.dataset.kgIcon=loggedIn?'log-out':'log-in';
+      delete sessionIcon.dataset.kgIconHydrated;
+      window.KGLearningIcons.hydrate(sessionIcon);
+    }
     if(label){
       label.textContent=loggedIn?'退出登录':'登录';
       label.dataset.mobileLabel=loggedIn?'退出':'登录';
@@ -174,7 +181,7 @@
     menu.addEventListener('keydown',onMenuKeydown);
     userCenterBtn.addEventListener('click',openUserCenter);
     helpBtn.addEventListener('click',openHelp);
-    upgradeBtn.addEventListener('click',openUpgrade);
+    if(upgradeBtn)upgradeBtn.addEventListener('click',openUpgrade);
     if(exitBtn)exitBtn.addEventListener('click',exitPage);
     sessionBtn.addEventListener('click',toggleSession);
 

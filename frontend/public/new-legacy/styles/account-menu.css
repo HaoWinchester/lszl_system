@@ -47,6 +47,7 @@
   opacity:.7;
   transition:transform .16s ease;
 }
+.account-menu-chevron .kg-icon{width:100%;height:100%}
 .account-menu-shell.is-open .account-menu-chevron{transform:rotate(180deg)}
 .account-menu{
   position:absolute;

@@ -11,7 +11,10 @@ def body_html(file):
     return match.group(1),re.sub(r'<script[\s\S]*?</script>','',match.group(2),flags=re.I)
 
 with sync_playwright() as p:
-    browser=p.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=ARGS)
+    launch_options={'headless':True,'args':ARGS}
+    if Path('/usr/bin/chromium').exists():
+      launch_options['executable_path']='/usr/bin/chromium'
+    browser=p.chromium.launch(**launch_options)
     page=browser.new_page(viewport={'width':1280,'height':900});page.set_default_timeout(10000)
     errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
     attrs,body=body_html('practice-mode.html')
@@ -24,11 +27,14 @@ with sync_playwright() as p:
       localStorage.setItem('kg_exam_papers_published_v1',JSON.stringify([{id:'release-1',paperId:'paper-1',version:3,name:'PMP 发布练习卷',subject:'PMP',status:'published',publishedAt:Date.now(),questions,questionSnapshots}]));
       window.confirm=()=>true;
     }""")
-    for file in ['styles/main.css','styles/account-menu.css','styles/user-center.css','styles/practice-mode.css']:
+    for file in ['styles/main.css','styles/account-menu.css','styles/user-center.css','styles/practice-mode.css','styles/learning-skin.css']:
       page.add_style_tag(content=(ROOT/file).read_text(encoding='utf-8'))
+    page.add_script_tag(content=(ROOT/'src/107-learning-ui-icons.js').read_text(encoding='utf-8'))
     page.add_script_tag(content=(ROOT/'src/100-practice-mode.js').read_text(encoding='utf-8'))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))");page.wait_for_timeout(120)
 
+    assert page.locator('[data-kg-icon] svg.kg-icon').count() >= 8
+    assert page.locator('[data-kg-icon]:empty').count() == 0
     assert page.locator('#practicePaperSelect option').count()==1
     assert '可练习 20 题' in page.locator('#practicePaperMeta').inner_text()
     assert not page.locator('[name="practiceCount"][value="10"]').is_disabled()
