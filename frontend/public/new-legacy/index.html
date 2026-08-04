@@ -8,16 +8,16 @@
 <script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport"/>
-<title>通用知识点关系图谱工具｜艾宾浩斯弹性滑动闪卡版（无电流优化）</title><link href="styles/main.css?v=v9.0-p4.1.10" rel="stylesheet"/>
-<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.10"/>
-<link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.10"/>
-<link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.10"/>
-<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.10"/>
-<link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.10"/>
-<link rel="stylesheet" href="styles/support-center.css?v=v9.0-p4.1.10"/>
-<link rel="stylesheet" href="styles/home-file-library.css?v=v9.0-p4.1.10"/>
-<link rel="stylesheet" href="styles/graph-file-tabs.css?v=v9.0-p4.1.10"/>
-<link rel="stylesheet" href="styles/graph-user-preferences.css?v=v9.0-p4.1.10"/>
+<title>通用知识点关系图谱工具｜艾宾浩斯弹性滑动闪卡版（无电流优化）</title><link href="styles/main.css?v=v9.0-p4.1.12" rel="stylesheet"/>
+<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.12"/>
+<link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.12"/>
+<link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.12"/>
+<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.12"/>
+<link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.12"/>
+<link rel="stylesheet" href="styles/support-center.css?v=v9.0-p4.1.12"/>
+<link rel="stylesheet" href="styles/home-file-library.css?v=v9.0-p4.1.12"/>
+<link rel="stylesheet" href="styles/graph-file-tabs.css?v=v9.0-p4.1.12"/>
+<link rel="stylesheet" href="styles/graph-user-preferences.css?v=v9.0-p4.1.12"/>
 
 </head>
 <body>
@@ -203,33 +203,7 @@
 <div class="modal-actions"><button id="cancelTemplateBtn">关闭</button></div>
 </div>
 </div>
-<div class="modal-backdrop auth-backdrop" id="authModal">
-<div aria-labelledby="authTitle" aria-modal="true" class="modal auth-modal" role="dialog">
-<div class="auth-head">
-<div>
-<h2 id="authTitle">登录后可编辑</h2>
-<p id="authReason">未登录时只能查看图谱，登录后可以新增、编辑、连线和保存自己的内容。</p>
-</div>
-<button class="auth-close" id="authCloseBtn" title="关闭登录窗口">×</button>
-</div>
-<div class="auth-body">
-<label>用户名
-        <input autocomplete="username" id="authUsername" placeholder="请输入用户名"/>
-</label>
-<label>密码
-        <input autocomplete="current-password" id="authPassword" placeholder="请输入密码" type="password"/>
-</label>
-<div class="auth-msg" id="authMsg"></div>
-<div class="auth-actions">
-<button class="primary" id="authDoLoginBtn">登录</button>
-<button id="authRegisterBtn">注册并登录</button>
-</div>
-<div class="auth-note">
-        当前账号和学习数据已同步至服务器，并按用户隔离；重新登录或更换设备后可继续使用。
-      </div>
-</div>
-</div>
-</div>
+<div id="authDialogRoot"></div>
 <div class="modal-backdrop question-bank-backdrop" id="questionBankModal">
 <div aria-labelledby="questionBankTitle" aria-modal="true" class="modal question-bank-modal" role="dialog">
 <div class="qb-head">
@@ -365,43 +339,44 @@
 
 
   <!-- Modularized application scripts. Keep this order. -->
-<script defer src="src/01-runtime-config.js"></script>
-  <script defer src="src/28-app-storage.js"></script>
-<script defer src="src/29-auth-core.js"></script>
-<script defer src="src/34-role-permissions.js"></script>
-<script defer src="src/37-subscription-plans.js"></script>
-<script defer src="src/37-subscription-orders.js"></script>
-<script defer src="src/37-subscription-redeem-codes.js"></script>
-<script defer src="src/37-subscription-core.js"></script>
-<script defer src="src/32-wechat-login.js"></script>
+<script defer src="src/01-runtime-config.js?v=v9.0-p4.1.12"></script>
+  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/29-auth-core.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/30-shared-auth-dialog.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/34-role-permissions.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/37-subscription-plans.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/37-subscription-orders.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/37-subscription-redeem-codes.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/37-subscription-core.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/32-wechat-login.js?v=v9.0-p4.1.12"></script>
 <script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->
-<script defer src="src/33-user-center.js"></script>
-<script defer src="src/39-global-shortcuts.js"></script>
-<script defer src="src/00-config-state.js"></script>
-<script defer src="src/18-graph-user-preferences.js"></script>
-<script defer src="src/09-graph-connector-drag-controller.js"></script>
-<script defer src="src/canvas/84-canvas-edge-selection-geometry.js"></script>
-<script defer src="src/10-graph-editor.js"></script>
-<script defer src="src/19-home-toolbar-registry.js"></script>
-<script defer src="src/21-home-package-service.js"></script>
-<script defer src="src/26-graph-export-service.js"></script>
-<script defer src="src/22-home-file-library.js"></script>
-<script defer src="src/23-graph-file-store.js"></script>
-<script defer src="src/24-graph-file-autosave.js"></script>
+<script defer src="src/33-user-center.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/39-global-shortcuts.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/00-config-state.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/18-graph-user-preferences.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/09-graph-connector-drag-controller.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/canvas/84-canvas-edge-selection-geometry.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/10-graph-editor.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/19-home-toolbar-registry.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/21-home-package-service.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/26-graph-export-service.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/22-home-file-library.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/23-graph-file-store.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/24-graph-file-autosave.js?v=v9.0-p4.1.12"></script>
 <script defer src="./direct-graph-adapter.js"></script><!-- kg-graph:generated -->
-<script defer src="src/25-graph-file-tabs.js"></script>
-<script defer src="src/20-flashcards-toolbar.js"></script>
-<script defer src="src/30-auth-guards.js"></script>
+<script defer src="src/25-graph-file-tabs.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/20-flashcards-toolbar.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/30-auth-guards.js?v=v9.0-p4.1.12"></script>
 <script defer src="./direct-auth-adapter.js"></script><!-- kg-auth:generated -->
-<script defer src="src/40-guided-tour.js"></script>
-<script defer src="src/41-account-menu.js"></script>
-<script defer src="src/101-engagement-repository.js"></script>
-<script defer src="src/102-help-content.js"></script>
-<script defer src="src/103-support-center.js"></script>
-<script defer src="src/50-question-data.js"></script>
-<script defer src="src/60-question-bank.js"></script>
-<script defer src="src/70-question-trainer.js"></script>
-<script defer src="src/80-question-font-scale.js"></script>
-<script defer src="src/90-bootstrap.js"></script>
+<script defer src="src/40-guided-tour.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/41-account-menu.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/101-engagement-repository.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/102-help-content.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/103-support-center.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/50-question-data.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/60-question-bank.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/70-question-trainer.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/80-question-font-scale.js?v=v9.0-p4.1.12"></script>
+<script defer src="src/90-bootstrap.js?v=v9.0-p4.1.12"></script>
 </body>
 </html>

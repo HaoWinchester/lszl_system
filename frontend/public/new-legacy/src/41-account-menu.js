@@ -131,8 +131,8 @@
       else{const logout=$('authLogoutBtn');if(logout)logout.click()}
       return;
     }
-    if(runtime&&typeof runtime.openAuth==='function')runtime.openAuth('登录后可以新增、编辑、连线和保存自己的图谱。');
-    else if(typeof window.authOpen==='function')window.authOpen('登录后可以新增、编辑、连线和保存自己的图谱。');
+    if(runtime&&typeof runtime.openAuth==='function')runtime.openAuth();
+    else if(typeof window.authOpen==='function')window.authOpen();
     else{const login=$('authLoginBtn');if(login)login.click()}
   }
   function onTriggerKeydown(event){

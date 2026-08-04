@@ -1,11 +1,20 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.9",
-  "toVersion": "v9.0-p4.1.10",
+  "fromVersion": "v9.0-p4.1.10",
+  "toVersion": "v9.0-p4.1.12",
   "changes": {
-    "added": [],
+    "added": [
+      "src/30-shared-auth-dialog.js",
+      "tests/shared-auth-dialog-browser.py",
+      "tests/shared-auth-dialog.test.js"
+    ],
     "changed": [
-      "VERSION"
+      "VERSION",
+      "index.html",
+      "practice-mode.html",
+      "src/30-auth-guards.js",
+      "src/41-account-menu.js",
+      "styles/learning-skin.css"
     ],
     "removed": []
   },
