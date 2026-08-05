@@ -154,7 +154,9 @@ function assertScopedPcCss(source){
       assert.equal(depth,0,`unbalanced CSS block ${prelude}`);
       const body=block.slice(open+1,close-1);
       if(prelude.startsWith('@')){
-        assert.match(prelude,/^@media\s*\(min-width\s*:\s*901px\)$/);
+        const media=prelude.match(/^@media\s*\(min-width\s*:\s*(\d+)px\)$/);
+        assert.ok(media,`unsupported responsive rule: ${prelude}`);
+        assert.ok(Number(media[1])>=901,`mobile rule is outside the approved PC scope: ${prelude}`);
         walk(body,true);
       }else{
         assert.equal(insidePcMedia,true,`selector outside PC scope: ${prelude}`);
