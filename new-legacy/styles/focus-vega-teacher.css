@@ -1,0 +1,13 @@
+@media (min-width:901px){
+  body[data-ui-skin="focus-vega"]{
+    --teacher-background:#fafafa;
+    --teacher-foreground:#18181b;
+    --teacher-card:#fff;
+    --teacher-primary:#6d5dfc;
+    --teacher-primary-soft:#f1efff;
+    --teacher-muted:#71717a;
+    --teacher-border:#e4e4e7;
+    --teacher-control-radius:8px;
+    --teacher-panel-radius:10px;
+  }
+}
