@@ -141,3 +141,98 @@ body[data-admin-skin="focus-vega"] .ss-content>[data-ss-panel="logs"] .um-log-it
   body[data-admin-skin="focus-vega"] .ss-layout{grid-template-columns:200px minmax(0,1fr)}
   body[data-admin-skin="focus-vega"] .ss-topbar .um-top-actions{max-width:330px}
 }
+
+/* Settings typography is scoped to safe navigation and non-payment panes. */
+body[data-admin-skin="focus-vega"] .ss-topbar .um-brand{
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"] .ss-topbar .um-kicker{
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-bold);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"] .ss-topbar .um-brand h1{
+  font-size:var(--ui-text-page-title);
+  font-weight:var(--ui-weight-bold);
+  line-height:var(--ui-leading-heading);
+}
+body[data-admin-skin="focus-vega"] .ss-topbar .um-brand p:last-child{
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"] :where(
+  .ss-topbar .um-nav-btn,
+  .ss-sidebar [data-ss-tab="themes"],
+  .ss-sidebar [data-ss-tab="permissions"],
+  .ss-sidebar [data-ss-tab="analytics"],
+  .ss-sidebar [data-ss-tab="logs"]
+){
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"] .ss-content>.ss-pane:is([data-ss-panel="themes"],[data-ss-panel="permissions"],[data-ss-panel="analytics"],[data-ss-panel="logs"]){
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"] .ss-content>.ss-pane:is([data-ss-panel="themes"],[data-ss-panel="permissions"],[data-ss-panel="analytics"],[data-ss-panel="logs"]) :where(button,a,input,select,textarea){
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"] .ss-content>.ss-pane:is([data-ss-panel="themes"],[data-ss-panel="permissions"],[data-ss-panel="analytics"],[data-ss-panel="logs"]) .um-card-head h2{
+  font-size:var(--ui-text-card-title);
+  font-weight:var(--ui-weight-semibold);
+  line-height:var(--ui-leading-heading);
+}
+body[data-admin-skin="focus-vega"] .ss-content>.ss-pane:is([data-ss-panel="themes"],[data-ss-panel="permissions"],[data-ss-panel="analytics"],[data-ss-panel="logs"]) .um-card-head p{
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"] .ss-content>.ss-pane:is([data-ss-panel="themes"],[data-ss-panel="permissions"],[data-ss-panel="analytics"],[data-ss-panel="logs"]) :where(strong,b,h2,h3,h4,th){font-weight:var(--ui-weight-semibold)}
+body[data-admin-skin="focus-vega"] .ss-content>.ss-pane:is([data-ss-panel="themes"],[data-ss-panel="permissions"],[data-ss-panel="analytics"],[data-ss-panel="logs"]) :where(span,small,em,time,li,label,th,td,p){
+  font-size:var(--ui-text-control);
+}
+body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-topbar .um-nav-btn,
+body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-sidebar [data-ss-tab="themes"],
+body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-sidebar [data-ss-tab="permissions"],
+body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-sidebar [data-ss-tab="analytics"],
+body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-sidebar [data-ss-tab="logs"]{
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-content>.ss-pane:is([data-ss-panel="themes"],[data-ss-panel="permissions"],[data-ss-panel="analytics"],[data-ss-panel="logs"]) .um-card-head h2{
+  font-size:var(--ui-text-card-title);
+  font-weight:var(--ui-weight-semibold);
+  line-height:var(--ui-leading-heading);
+}
+body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-content>.ss-pane:is([data-ss-panel="themes"],[data-ss-panel="permissions"],[data-ss-panel="analytics"],[data-ss-panel="logs"]) .um-card-head p{
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-content>.ss-pane:is([data-ss-panel="themes"],[data-ss-panel="permissions"],[data-ss-panel="analytics"],[data-ss-panel="logs"]) :where(button,a,input,select,textarea){
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-content>.ss-pane:is([data-ss-panel="themes"],[data-ss-panel="permissions"],[data-ss-panel="analytics"],[data-ss-panel="logs"]) :where(span,small,em,time,li,label,td,p){font-weight:var(--ui-weight-regular)}
+body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-content>.ss-pane:is([data-ss-panel="themes"],[data-ss-panel="permissions"],[data-ss-panel="analytics"],[data-ss-panel="logs"]) :where(strong,b,h2,h3,h4,th){font-weight:var(--ui-weight-semibold)}
+body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-content>.ss-pane:is([data-ss-panel="themes"],[data-ss-panel="permissions"],[data-ss-panel="analytics"],[data-ss-panel="logs"]) .um-panel :where(button,a,input,select,textarea){
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}

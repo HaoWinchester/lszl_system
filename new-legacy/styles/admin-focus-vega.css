@@ -173,3 +173,21 @@ body[data-admin-skin="focus-vega"] ::selection{background:rgba(109,93,252,.18);c
   body[data-admin-skin="focus-vega"] *::before,
   body[data-admin-skin="focus-vega"] *::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
 }
+
+/* Shared typography entry points stay on administration chrome, not body. */
+body[data-admin-skin="focus-vega"] :where(.admin-context-nav,.admin-brand){
+  font-family:var(--ui-font-sans);
+}
+body[data-admin-skin="focus-vega"] .admin-context-nav a{
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"] .admin-brand strong{
+  font-weight:var(--ui-weight-semibold);
+}
+body[data-admin-skin="focus-vega"] .admin-brand small{
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-regular);
+}

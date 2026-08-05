@@ -50,6 +50,10 @@ button{cursor:pointer}
 body.practice-mode-page:not([data-practice-view="lobby"]) .practice-header{display:none}
 body.practice-mode-page[data-practice-view="game"] .practice-main{padding-top:clamp(24px,5vh,54px)}
 
+/* Token fallbacks keep the source stylesheet legible outside the skin adapter. */
+.practice-main{font-size:var(--ui-text-body,1rem);line-height:var(--ui-leading-body,1.65)}
+.practice-main :where(button,input,select,textarea){font-size:var(--ui-text-control,.875rem);line-height:var(--ui-leading-control,1.35)}
+
 /* V9.0-P4.0.2 · 渐进危险视野、原学习入口恢复与角色快捷栏收紧 */
 .practice-header-actions{display:flex;align-items:center;gap:10px;min-width:0}
 .practice-mode-switch{display:flex;align-items:center;gap:3px;padding:3px;border:1px solid var(--practice-border);border-radius:13px;background:#f3f5f8;box-shadow:inset 0 1px 0 rgba(255,255,255,.92)}

@@ -265,3 +265,157 @@ body[data-admin-skin="focus-vega"] .admin-dialog{
   body[data-admin-skin="focus-vega"] .admin-subject-workspace{grid-template-columns:220px minmax(0,1fr)}
   body[data-admin-skin="focus-vega"] .engagement-admin-grid{grid-template-columns:minmax(300px,38%) minmax(0,1fr)}
 }
+
+/* Semantic typography for general administration pages. */
+body[data-admin-skin="focus-vega"] :where(.admin-main,.engagement-admin-main,.admin-dialog){
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-body);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"] :where(.admin-main,.engagement-admin-main,.admin-dialog) :where(p,span,small,em,time,li,dt,dd,label,th,td){
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+}
+body[data-admin-skin="focus-vega"] :where(.admin-main,.engagement-admin-main,.admin-dialog) :where(button,a,input,select,textarea){
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"] :where(.admin-main,.engagement-admin-main,.admin-dialog) :where(strong,b,h1,h2,h3,h4){
+  font-weight:var(--ui-weight-semibold);
+}
+body[data-admin-skin="focus-vega"] .admin-page-head>div:first-child>p,
+body[data-admin-skin="focus-vega"] .admin-panel>header>div:first-child>p,
+body[data-admin-skin="focus-vega"] .admin-rail-head>div:first-child>p,
+body[data-admin-skin="focus-vega"] .admin-current-tree-title>div:first-child>p,
+body[data-admin-skin="focus-vega"] .embedded-workspace-head>div:first-child>p{
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-bold);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"] .admin-page-head h1{
+  font-size:var(--ui-text-page-title);
+  font-weight:var(--ui-weight-bold);
+  line-height:var(--ui-leading-heading);
+}
+body[data-admin-skin="focus-vega"] .admin-page-head>div:first-child>span{
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"] :where(.admin-panel>header h2,.engagement-admin-card>header h2,.admin-rail-head h2,.admin-subject-detail-head h2,.admin-current-tree-title h3,.embedded-workspace-head h2){
+  font-size:var(--ui-text-card-title);
+  font-weight:var(--ui-weight-semibold);
+  line-height:var(--ui-leading-heading);
+}
+body[data-admin-skin="focus-vega"] .engagement-admin-card>header p{
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"] :where(.admin-kpi-grid,.engagement-admin-summary,.admin-subject-usage,.admin-current-tree-metrics) article>span{
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-medium);
+}
+body[data-admin-skin="focus-vega"] :where(.admin-kpi-grid,.engagement-admin-summary,.admin-subject-usage,.admin-current-tree-metrics) article>strong{
+  font-size:var(--ui-text-kpi);
+  font-weight:var(--ui-weight-bold);
+  line-height:var(--ui-leading-heading);
+  font-variant-numeric:tabular-nums;
+}
+body[data-admin-skin="focus-vega"] :where(.admin-head-actions,.admin-card-actions,.admin-section-head,.embedded-workspace-actions) :where(button,.admin-button),
+body[data-admin-skin="focus-vega"] .admin-main>.admin-page-head .admin-button,
+body[data-admin-skin="focus-vega"] .engagement-admin-main>.admin-page-head button{
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"] :where(.admin-panel>header h2,.engagement-admin-card>header h2){
+  font-size:var(--ui-text-card-title);
+  font-weight:var(--ui-weight-semibold);
+}
+body[data-admin-skin="focus-vega"] :where(.admin-kpi-grid,.engagement-admin-summary) article>span{
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-medium);
+}
+body[data-admin-skin="focus-vega"] :where(.admin-kpi-grid,.engagement-admin-summary) article>strong{
+  font-size:var(--ui-text-kpi);
+  font-weight:var(--ui-weight-bold);
+}
+body[data-admin-skin="focus-vega"] :where(.admin-panel>header span,.admin-section-head span,.admin-module-grid span,.admin-settings-links span){
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"] .admin-module-grid i{
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-bold);
+}
+body[data-admin-skin="focus-vega"] .admin-module-grid strong{font-weight:var(--ui-weight-semibold)}
+body[data-admin-skin="focus-vega"] .engagement-admin-row :where(strong,time,p,footer,span,b){
+  min-width:0;
+  font-size:var(--ui-text-control);
+}
+body[data-admin-skin="focus-vega"] .engagement-admin-row strong,
+body[data-admin-skin="focus-vega"] .engagement-admin-row b{font-weight:var(--ui-weight-semibold)}
+body[data-admin-skin="focus-vega"] .engagement-admin-row :where(time,p,footer,span){font-weight:var(--ui-weight-regular)}
+body[data-admin-skin="focus-vega"] .engagement-admin-row p{
+  white-space:normal;
+  overflow:visible;
+  overflow-wrap:anywhere;
+  text-overflow:clip;
+}
+body[data-admin-skin="focus-vega"] .engagement-admin-row footer{flex-wrap:wrap}
+body[data-admin-skin="focus-vega"] .engagement-admin-row time{flex:0 0 auto}
+
+/* The legacy stylesheet has intentionally dense, high-specificity type rules. */
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-head-actions button,
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-head-actions .admin-button,
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-card-actions button,
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-section-head button,
+body[data-admin-skin="focus-vega"][data-admin-page] .embedded-workspace-actions button,
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-subtabs button{
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-panel h2,
+body[data-admin-skin="focus-vega"][data-admin-page] .engagement-admin-card>header h2{
+  font-size:var(--ui-text-card-title);
+  font-weight:var(--ui-weight-semibold);
+  line-height:var(--ui-leading-heading);
+}
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-kpi-grid span,
+body[data-admin-skin="focus-vega"][data-admin-page] .engagement-admin-summary span{
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-medium);
+}
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-kpi-grid strong,
+body[data-admin-skin="focus-vega"][data-admin-page] .engagement-admin-summary strong{
+  font-size:var(--ui-text-kpi);
+  font-weight:var(--ui-weight-bold);
+  line-height:var(--ui-leading-heading);
+}
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-panel header span,
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-section-head span,
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-module-grid span,
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-settings-links span{
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"][data-admin-page] :where(.admin-chip,.admin-status,.admin-current-dot,.admin-current-label),
+body[data-admin-skin="focus-vega"][data-admin-page] :where(#adminSelectedSubjectStatus,#adminCurrentTreeMeta){
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-medium);
+}
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-operating-rules :where(strong,span,small),
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-subtabs b{
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-regular);
+}
+body[data-admin-skin="focus-vega"][data-admin-page] .admin-operating-rules strong{font-weight:var(--ui-weight-semibold)}
