@@ -10,4 +10,13 @@
     --teacher-control-radius:8px;
     --teacher-panel-radius:10px;
   }
+  body[data-ui-skin="focus-vega"] [data-ui-icon]{
+    display:inline-flex;
+    flex:0 0 auto;
+    align-items:center;
+    justify-content:center;
+    line-height:0;
+    vertical-align:-.125em;
+  }
+  body[data-ui-skin="focus-vega"] [data-ui-icon]>.focus-vega-ui-icon{display:block}
 }

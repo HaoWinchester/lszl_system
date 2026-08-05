@@ -4,6 +4,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
+const crypto=require('node:crypto');
 
 const root=path.resolve(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
@@ -14,12 +15,20 @@ const pages=[
   'course-admin.html',
   'content-center.html',
 ];
+const iconAdapter='src/109-focus-vega-ui-icons.js';
 const anchors={
   'teacher-workbench.html':['tw-topbar','tw-workflow','tw-tabs'],
   'question-bank.html':['qb-app','qb-layout','qb-editor','qb-inspector'],
-  'paper-management.html':['qb-app','paper-list'],
+  'paper-management.html':['qb-app','paper-list','pm-paper-library-layout','pm-question-workbench'],
   'course-admin.html':['ca-app','ca-layout','ca-tree','ca-node-editor'],
   'content-center.html':['cc-app','cc-layout','cc-tree-panel','cc-inspector'],
+};
+const inlineScriptHashes={
+  'teacher-workbench.html':[],
+  'question-bank.html':[],
+  'paper-management.html':[],
+  'course-admin.html':['619250ef4a795ae71c1a2af4a6cae38104fea03f1b12c439d7edd3094c2f821c'],
+  'content-center.html':['93b597957350ba2c1f1241464267c56cffbd31d1d3ac9b71a19411f4992ec682'],
 };
 const existingScripts={
   'teacher-workbench.html':[
@@ -98,6 +107,11 @@ function scriptSrcs(html){
     .map(match=>match[1]);
 }
 
+function inlineScriptDigests(html){
+  return [...html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)]
+    .map(match=>crypto.createHash('sha256').update(match[1]).digest('hex'));
+}
+
 function classTokenCount(html,className){
   return [...html.matchAll(/\bclass=["']([^"']+)["']/gi)]
     .filter(match=>match[1].split(/\s+/).includes(className)).length;
@@ -170,7 +184,14 @@ test('five teacher pages opt into the shared typography and final family adapter
 test('teacher opt-in preserves exact business script order and native layout anchors',()=>{
   for(const file of pages){
     const html=read(file);
-    assert.deepEqual(scriptSrcs(html),existingScripts[file],`${file}: business scripts changed`);
+    assert.deepEqual(
+      scriptSrcs(html).filter(source=>source!==iconAdapter),
+      existingScripts[file],
+      `${file}: business scripts changed`,
+    );
+    assert.equal(scriptSrcs(html).filter(source=>source===iconAdapter).length,1,`${file}: icon adapter count`);
+    assert.equal(scriptSrcs(html).at(-1),iconAdapter,`${file}: icon adapter must load last`);
+    assert.deepEqual(inlineScriptDigests(html),inlineScriptHashes[file],`${file}: inline behavior changed`);
     for(const anchor of anchors[file]){
       assert.equal(classTokenCount(html,anchor),1,`${file}: expected one native .${anchor}`);
     }
@@ -185,9 +206,35 @@ test('teacher adapter is local, PC-only, scoped, and avoids frozen surfaces',()=
   assert.doesNotMatch(css,/:root\b|https?:\/\/|@import/);
   assert.doesNotMatch(
     css,
-    /#authModal|\.auth-(?:backdrop|modal)|\.account-menu|\.subscription-|\.membership-|\.payment-|\.wechat(?:-pay)?-/,
+    /#authModal|#authStatus|\.auth-(?:backdrop|modal)|\.account-menu|\.tw-user|#wbAccount|#ccAccount|#userCenterModal|\.user-center|\.uc-|#userSubscriptionDetailModal|\.kg-subscription-|\.subscription-|\.membership-|\.payment-|\.wechat(?:-pay)?-/,
   );
   assertScopedPcCss(css);
+});
+
+test('teacher product icons use one local allowlisted sprite with a safe fallback',()=>{
+  const sourcePath=path.join(root,iconAdapter);
+  const spritePath=path.join(root,'assets/icons/lucide-product.svg');
+  assert.equal(fs.existsSync(sourcePath),true,`missing ${iconAdapter}`);
+  assert.equal(fs.existsSync(spritePath),true,'missing assets/icons/lucide-product.svg');
+  const source=fs.readFileSync(sourcePath,'utf8');
+  const sprite=fs.readFileSync(spritePath,'utf8');
+  assert.match(source,/global\.KGFocusVegaIcons=Object\.freeze/);
+  assert.match(source,/unknown:\s*['"]circle-help['"]/);
+  assert.match(source,/\[data-ui-icon\]:not\(\[data-ui-icon-ready\]\)/);
+  assert.match(source,/closest\(protectedSelector\)/);
+  assert.match(source,/aria-hidden/);
+  assert.match(source,/\[class\^=["']wechat-["']\]/);
+  assert.doesNotMatch(source,/fetch\(|https?:\/\//);
+  assert.match(read('styles/focus-vega-teacher.css'),/\[data-ui-icon\]/);
+  assert.match(sprite,/<svg\b[^>]*fill=["']none["'][^>]*stroke=["']currentColor["'][^>]*stroke-width=["']2["']/);
+  for(const name of [
+    'arrow-left','arrow-right','book-open','check','chevron-down','circle-help',
+    'download','edit-3','filter','folder-tree','minus','plus','search','settings',
+    'trash-2','upload','x',
+  ])assert.match(sprite,new RegExp(`<symbol\\s+id=["']${name}["']`),name);
+  for(const file of pages){
+    assert.match(read(file),/data-ui-icon=["'][^"']+["']/,`${file}: declarative icon slot`);
+  }
 });
 
 console.log('focus-vega-teacher-contract-ok');
