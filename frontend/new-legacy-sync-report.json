@@ -3,27 +3,11 @@
   "fromVersion": "v9.0-p4.1.18",
   "toVersion": "v9.0-p4.1.18",
   "changes": {
-    "added": [
-      "assets/icons/lucide-admin.svg",
-      "src/108-admin-ui-icons.js",
-      "styles/admin-focus-vega-common.css",
-      "styles/admin-focus-vega-settings.css",
-      "styles/admin-focus-vega-users.css",
-      "styles/admin-focus-vega.css",
-      "tests/admin-focus-vega-pc-browser.py",
-      "tests/admin-focus-vega-skin-contract.test.js"
-    ],
-    "changed": [
-      "admin-console.html",
-      "admin-operations.html",
-      "admin-settings.html",
-      "admin-subjects.html",
-      "feedback-management.html",
-      "message-management.html",
-      "system-settings.html",
-      "user-management.html"
-    ],
-    "removed": []
+    "added": [],
+    "changed": [],
+    "removed": [
+      "tests/__pycache__/focus-vega-typography-pc-browser.cpython-311.pyc"
+    ]
   },
   "incompatible": []
 }

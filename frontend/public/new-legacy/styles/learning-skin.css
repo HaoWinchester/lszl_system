@@ -46,3 +46,56 @@ body[data-learning-skin="focus-vega"] .kg-icon{display:block;flex:0 0 auto;fill:
 @media(prefers-reduced-motion:reduce){
   body[data-learning-skin="focus-vega"] *,body[data-learning-skin="focus-vega"] *::before,body[data-learning-skin="focus-vega"] *::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
 }
+
+/* Learning typography uses explicit non-authentication application roots. */
+body.practice-mode-page[data-learning-skin="focus-vega"] :where(.practice-brand,.practice-mode-switch,.practice-main){
+  font-family:var(--ui-font-sans);
+  font-weight:var(--ui-weight-regular);
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-mode-switch a,
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-main :where(button,input,select,textarea){
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] :where(.practice-lobby-head>span,.practice-brand small,.practice-field>span,.practice-field small,.practice-choice-group legend,.practice-mode-card small){
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-bold);
+  line-height:var(--ui-leading-control);
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-lobby-head h1{
+  font-size:var(--ui-text-page-title);
+  font-weight:var(--ui-weight-bold);
+  line-height:var(--ui-leading-heading);
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-field select{
+  font-size:var(--ui-text-body);
+  font-weight:var(--ui-weight-regular);
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-choice-group label>span,
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-mode-switch a{
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-semibold);
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-mode-card h2{
+  font-size:var(--ui-text-card-title);
+  font-weight:var(--ui-weight-semibold);
+  line-height:var(--ui-leading-heading);
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-mode-card p{
+  font-size:var(--ui-text-body);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-section-head h2{
+  font-size:var(--ui-text-section-title);
+  font-weight:var(--ui-weight-semibold);
+  line-height:var(--ui-leading-heading);
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] :where(.practice-start-btn,.practice-section-head button){
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-semibold);
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-history-row :where(strong,span,em){font-weight:var(--ui-weight-medium)}
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-history-row :where(span,em){font-size:var(--ui-text-meta)}

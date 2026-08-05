@@ -1,0 +1,23 @@
+:where(
+  body[data-ui-skin="focus-vega"],
+  body[data-admin-skin="focus-vega"],
+  body[data-learning-skin="focus-vega"]
+){
+  --ui-font-sans:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --ui-text-meta:.75rem;
+  --ui-text-control:.875rem;
+  --ui-text-body:1rem;
+  --ui-text-card-title:1.125rem;
+  --ui-text-section-title:1.25rem;
+  --ui-text-shell-title:1.5rem;
+  --ui-text-page-title:1.75rem;
+  --ui-text-kpi:1.5rem;
+  --ui-text-kpi-lg:1.75rem;
+  --ui-weight-regular:400;
+  --ui-weight-medium:500;
+  --ui-weight-semibold:600;
+  --ui-weight-bold:700;
+  --ui-leading-control:1.35;
+  --ui-leading-heading:1.24;
+  --ui-leading-body:1.65;
+}

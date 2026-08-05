@@ -187,3 +187,150 @@ body[data-admin-skin="focus-vega"] .um-empty{border-color:#d4d4d8;border-radius:
   body[data-admin-skin="focus-vega"] .um-right-card{grid-column:4}
   body[data-admin-skin="focus-vega"] .um-right-shell{max-height:calc(100vh - 58px)}
 }
+
+/* User-management typography excludes the subscription card by construction. */
+body[data-admin-skin="focus-vega"] :where(.um-topbar,.um-summary,.um-left-card,.um-right-card,.um-editor-card>.um-card-head,.um-editor-card>.um-form,.um-editor-card>.um-data-card){
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"] :where(.um-topbar,.um-left-card,.um-right-card,.um-editor-card>.um-card-head,.um-editor-card>.um-form,.um-editor-card>.um-data-card) :where(button,a,input,select,textarea){
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"] .um-top-actions button,
+body[data-admin-skin="focus-vega"] :where(.um-left-card,.um-right-card,.um-editor-card>.um-form) button{
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"] .um-kicker{
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-bold);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"] .um-topbar .um-brand h1{
+  font-size:var(--ui-text-page-title);
+  font-weight:var(--ui-weight-bold);
+  line-height:var(--ui-leading-heading);
+}
+body[data-admin-skin="focus-vega"] .um-topbar .um-brand p:last-child{
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"] :where(.um-left-card,.um-right-card,.um-editor-card>.um-card-head,.um-editor-card>.um-data-card) :where(.um-card-head h2,.um-right-dock-title h2){
+  font-size:var(--ui-text-card-title);
+  font-weight:var(--ui-weight-semibold);
+  line-height:var(--ui-leading-heading);
+}
+body[data-admin-skin="focus-vega"] :where(.um-left-card,.um-right-card,.um-editor-card>.um-card-head,.um-editor-card>.um-data-card) :where(.um-card-head p,.um-right-dock-title p,.um-help-list li){
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"] .um-summary .um-stat>span{
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-medium);
+}
+body[data-admin-skin="focus-vega"] .um-summary .um-stat>strong{
+  font-size:var(--ui-text-kpi);
+  font-weight:var(--ui-weight-bold);
+  line-height:var(--ui-leading-heading);
+  font-variant-numeric:tabular-nums;
+}
+body[data-admin-skin="focus-vega"] .um-summary .um-stat>em{
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-medium);
+}
+body[data-admin-skin="focus-vega"] .um-left-card :where(.um-user-title strong,.um-batch-toolbar strong,.um-user-order),
+body[data-admin-skin="focus-vega"] .um-right-card :where(strong,b,h2,h3),
+body[data-admin-skin="focus-vega"] .um-editor-card>.um-card-head :where(strong,b,h2,h3),
+body[data-admin-skin="focus-vega"] .um-editor-card>.um-data-card :where(strong,b,h2,h3){
+  font-weight:var(--ui-weight-semibold);
+}
+body[data-admin-skin="focus-vega"] .um-left-card :where(.um-pill,.um-user-compact-meta span,.um-page-info,.um-page-size),
+body[data-admin-skin="focus-vega"] .um-right-card :where(.um-save-state,.um-log-item span){
+  min-width:0;
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-medium);
+}
+body[data-admin-skin="focus-vega"] .um-user-item.compact .um-user-main,
+body[data-admin-skin="focus-vega"] .um-user-item.compact .um-user-title,
+body[data-admin-skin="focus-vega"] .um-user-item.compact .um-user-compact-meta{min-width:0}
+body[data-admin-skin="focus-vega"] .um-user-item.compact .um-user-title strong{
+  white-space:normal;
+  overflow:visible;
+  overflow-wrap:anywhere;
+  text-overflow:clip;
+}
+body[data-admin-skin="focus-vega"] .um-user-item.compact .um-user-compact-meta{
+  display:flex;
+  flex-wrap:wrap;
+  row-gap:2px;
+}
+body[data-admin-skin="focus-vega"] .um-user-item.compact .um-user-compact-meta span{
+  max-width:100%;
+  white-space:normal;
+  overflow:visible;
+  overflow-wrap:anywhere;
+  text-overflow:clip;
+}
+body[data-admin-skin="focus-vega"].admin-user-management-shell .um-kicker{
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-bold);
+}
+body[data-admin-skin="focus-vega"].admin-user-management-shell .um-brand p:last-child,
+body[data-admin-skin="focus-vega"].admin-user-management-shell :where(.um-card-head p,.um-right-dock-title p,.um-help-list li){
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"].admin-user-management-shell :where(.um-top-actions,.um-head-actions,.um-page-actions,.um-batch-actions,.um-action-row,.um-mini-actions,.um-right-tabbar) button{
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"].admin-user-management-shell .um-user-item.compact .um-user-title .um-pill,
+body[data-admin-skin="focus-vega"].admin-user-management-shell .um-user-item.compact .um-user-order{
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-semibold);
+}
+body[data-admin-skin="focus-vega"].admin-user-management-shell .um-kicker{
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-bold);
+}
+body[data-admin-skin="focus-vega"].admin-user-management-shell .um-brand p:last-child,
+body[data-admin-skin="focus-vega"].admin-user-management-shell .um-card-head p,
+body[data-admin-skin="focus-vega"].admin-user-management-shell .um-right-dock-title p,
+body[data-admin-skin="focus-vega"].admin-user-management-shell .um-help-list li{
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-regular);
+  line-height:var(--ui-leading-body);
+}
+body[data-admin-skin="focus-vega"].admin-user-management-shell .um-card-head h2,
+body[data-admin-skin="focus-vega"].admin-user-management-shell .um-right-dock-title h2{
+  font-size:var(--ui-text-card-title);
+  font-weight:var(--ui-weight-semibold);
+  line-height:var(--ui-leading-heading);
+}
+body[data-admin-skin="focus-vega"].admin-user-management-shell :where(.um-collapse-btn,.um-page-actions button),
+body[data-admin-skin="focus-vega"].admin-user-management-shell .um-page-size select{
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}
+body[data-admin-skin="focus-vega"].admin-user-management-shell .um-user-item.compact .um-user-title strong{font-weight:var(--ui-weight-semibold)}
+body[data-admin-skin="focus-vega"].admin-user-management-shell :where(.um-page-info,.um-page-size){font-weight:var(--ui-weight-medium)}
+body[data-admin-skin="focus-vega"].admin-user-management-shell #umRightCollapseBtn{
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-control);
+}
