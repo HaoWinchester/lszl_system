@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import test from 'node:test'
 
@@ -8,6 +8,22 @@ const repo = resolve(frontend, '..')
 const readFrontend = (path) => readFileSync(resolve(frontend, path), 'utf8')
 const readRepo = (path) => readFileSync(resolve(repo, path), 'utf8')
 const publicRelease = JSON.parse(readFrontend('public/new-legacy/manifest.json')).version
+const frozenSource = resolve(frontend, 'new-legacy-releases', publicRelease, 'source')
+const candidateSource = existsSync(frozenSource) ? frozenSource : resolve(repo, 'new-legacy')
+
+test('production pages do not describe account data as a local demo or local question bank', () => {
+  const targets = [
+    'new-legacy/help-center.html',
+    'new-legacy/message-management.html',
+    'new-legacy/multi-question-help.html',
+    'new-legacy/src/65-question-bank-admin.js',
+    'new-legacy/src/97-teacher-question-workflow.js',
+    'new-legacy/src/102-help-content.js',
+  ].map(readRepo).join('\n')
+  for (const phrase of ['本地演示模式', '本地演示环境中的已读数量', '已保存到本地题库', '后续会继续补充完整图示']) {
+    assert.doesNotMatch(targets, new RegExp(phrase))
+  }
+})
 
 test('generated pages use the exact upstream UI with only direct runtime adapters', () => {
   for (const page of [
@@ -27,7 +43,7 @@ test('generated pages use the exact upstream UI with only direct runtime adapter
     const upstreamPage = page === 'workbench.html' ? 'index.html' : page
     // 发布候选在自动验收时会先与线上当前版本并存；这里校验
     // public 实际携带的版本，不能把未同步的候选源当成静态包的上游。
-    const upstream = readFrontend(`new-legacy-releases/${publicRelease}/source/${upstreamPage}`)
+    const upstream = readFileSync(resolve(candidateSource, upstreamPage), 'utf8')
     const generated = readFrontend(`public/new-legacy/${page}`)
     assert.match(generated, /server-state-bootstrap\.js/)
     assert.match(generated, /direct-entry\.js/)

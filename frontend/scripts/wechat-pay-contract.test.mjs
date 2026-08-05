@@ -57,11 +57,12 @@ test('member purchase keeps the supplied membership-center visual structure arou
   assert.match(membershipStyles, /\.membership-ui\.is-payment-view\{[^}]*overflow:hidden/)
 })
 
-test('member plans generate the Native QR directly and stay in one horizontal scroll row', () => {
+test('member plans confirm before generating the Native QR and stay in one horizontal scroll row', () => {
   const userCenter = readFileSync(resolve(repoDir, 'new-legacy/src/33-user-center.js'), 'utf8')
   const membershipStyles = readFileSync(resolve(repoDir, 'new-legacy/styles/membership-ui.css'), 'utf8')
 
-  assert.match(userCenter, /async function handlePlanPick\(card\)[\s\S]*?await pay\.createNativeOrder\(plan\.id\)[\s\S]*?renderNativePayment\(plan,result\.order\)/)
+  assert.match(userCenter, /async function handlePlanPick\(card\)[\s\S]*?renderPlanConfirm\(plan\)/)
+  assert.match(userCenter, /id="subscriptionSubmitOrderBtn"[\s\S]*?await pay\.createNativeOrder\(plan\.id\)[\s\S]*?renderNativePayment\(plan,result\.order\)/)
   assert.match(membershipStyles, /\.membership-ui\s+\.plans-grid\{display:flex/)
   assert.match(membershipStyles, /overflow-x:auto/)
   assert.match(membershipStyles, /\.membership-ui\s+\.plan-card\{[^}]*flex:0 0/)

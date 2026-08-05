@@ -117,8 +117,8 @@
         {text:'一个 '},
         {text:'敏捷团队',target:true},
         {text:' 正在进行 '},
-        {text:'两周迭代',target:true},
-        {text:'。迭代中期，客户提出一个 '},
+        {text:'两周迭代，',target:true},
+        {text:'迭代中期，客户提出一个 '},
         {text:'高价值新功能',target:true},
         {text:'，希望团队立即加入当前迭代。'}
       ],

@@ -105,3 +105,33 @@ def test_user_export_never_contains_password_material() -> None:
     assert "password" not in serialized
     assert "hash" not in serialized
     assert "salt" not in serialized
+
+
+def test_batch_user_actions_support_targets_longer_than_audit_username_column() -> None:
+    token = uuid4().hex[:8]
+    usernames = [f"batch-audit-{token}-{index}-long-target" for index in range(3)]
+    with TestClient(app, raise_server_exceptions=False) as client:
+        login_admin(client)
+        try:
+            for username in usernames:
+                created = client.post(
+                    "/api/v1/users",
+                    json={"username": username, "password": "111111", "role": "student"},
+                )
+                assert created.status_code == 200, created.text
+
+            archived = client.patch(
+                "/api/v1/users/batch",
+                json={"usernames": usernames, "status": "archived"},
+            )
+            assert archived.status_code == 200, archived.text
+            assert archived.json()["updated_count"] == len(usernames)
+
+            deleted = client.request(
+                "DELETE", "/api/v1/users/batch", json={"usernames": usernames}
+            )
+            assert deleted.status_code == 200, deleted.text
+            assert deleted.json()["deleted_count"] == len(usernames)
+        finally:
+            for username in usernames:
+                client.delete(f"/api/v1/users/{username}")

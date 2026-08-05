@@ -16,7 +16,8 @@
   max-width:220px;
   padding:0 11px;
   color:var(--role-text,#334155);
-  text-align:left;
+  justify-content:center;
+  text-align:center;
   transition:box-shadow .16s ease,background .16s ease,transform .16s ease;
 }
 .account-menu-trigger:hover,

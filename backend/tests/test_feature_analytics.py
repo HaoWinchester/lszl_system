@@ -185,6 +185,10 @@ def test_feature_analytics_is_admin_only_and_validates_dates() -> None:
         == 422
     )
     assert (
+        admin.get("/api/v1/system/feature-analytics?start=2025-01-01&end=2026-01-03").status_code
+        == 422
+    )
+    assert (
         admin.get(
             "/api/v1/system/feature-analytics?start=2026-07-01&end=2026-07-31&role=admin"
         ).status_code

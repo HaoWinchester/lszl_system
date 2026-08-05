@@ -55,10 +55,14 @@ function authRegister(username,password){
   if(typeof qbLoadBanks==='function'){qbLoadBanks();ensureSingleDeepPublishedSelection();renderQuestionTrainer&&renderQuestionTrainer();renderPaperControls&&renderPaperControls()}
   showStatus('已注册并登录：'+username);return true
 }
-function authLogout(){
-  const old=authCurrentUser&&authCurrentUser.username;if(old)authLogAction('用户退出',old);authCurrentUser=null;if(AuthCore.clearSession)AuthCore.clearSession();else localStorage.removeItem(AUTH_SESSION_KEY);authLoadCurrentSpace();
+async function authLogout(){
+  const old=authCurrentUser&&authCurrentUser.username,remote=Boolean(AuthCore.providerStatus?.().remote);
+  if(remote&&typeof AuthCore.logout==='function'){
+    await AuthCore.logout({source:'单题深学账号菜单退出'});authCurrentUser=null;authRenderStatus();return true
+  }
+  if(old)authLogAction('用户退出',old);authCurrentUser=null;if(AuthCore.clearSession)AuthCore.clearSession();else localStorage.removeItem(AUTH_SESSION_KEY);authLoadCurrentSpace();
   if(typeof qbLoadBanks==='function'){qbLoadBanks();ensureSingleDeepPublishedSelection();renderQuestionTrainer&&renderQuestionTrainer();renderPaperControls&&renderPaperControls()}
-  showStatus(old?'已退出：'+old+'。当前为只读浏览模式。':'当前为只读浏览模式。')
+  showStatus(old?'已退出：'+old+'。当前为只读浏览模式。':'当前为只读浏览模式。');return true
 }
 function authAfterExternalLogin(username,message='第三方登录成功'){
   username=authCleanUsername(username);
@@ -73,7 +77,7 @@ function authAfterExternalLogin(username,message='第三方登录成功'){
   showStatus(message+'：'+username);
   return true;
 }
-window.KGAuthRuntime={afterExternalLogin:authAfterExternalLogin,closeAuth:authClose,renderStatus:authRenderStatus,isLoggedIn:authIsLoggedIn,currentUsername:()=>authCurrentUser&&authCurrentUser.username||''};
+window.KGAuthRuntime={afterExternalLogin:authAfterExternalLogin,closeAuth:authClose,logout:authLogout,renderStatus:authRenderStatus,isLoggedIn:authIsLoggedIn,currentUsername:()=>authCurrentUser&&authCurrentUser.username||''};
 function authRequire(reason,permission='useTraining'){if(!authIsLoggedIn()){authOpen(reason||'该操作需要登录后才能使用。');return false}const roleApi=window.KGRolePermissions;if(roleApi&&permission&&!roleApi.can(permission)){showStatus('当前角色（'+roleApi.currentRoleLabel()+'）没有考题训练操作权限。');return false}return true}
 
 function applyNoPublishedQuestion(){

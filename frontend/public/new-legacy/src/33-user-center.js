@@ -308,7 +308,7 @@
           <article class="payment-card payment-card--qr"><div class="payment-card-head"><div class="payment-tag"><span class="icon i-wechat"></span>微信扫码支付</div><h3 class="payment-title">${escapeHTML(plan&&plan.name||order.planName||'会员方案')}</h3><p class="payment-help">请使用微信扫描二维码并完成付款，支付结果将自动刷新。</p></div><div class="qr-frame"><img class="kg-native-pay-qr" src="${escapeHTML(pay.nativeOrderQrCodeUrl(order.id))}" alt="微信支付二维码" /></div><div class="wechat-hint"><div class="wechat-hint-icon"><span class="icon i-wechat"></span></div><div><strong>微信扫一扫</strong><span>支付成功后自动开通会员权益</span></div></div></article>
           <article class="payment-card payment-summary"><div class="summary-top"><div><p class="summary-label">应付金额</p><div class="summary-amount">${escapeHTML(amount)}</div></div><span class="pill pill-solid"><span class="icon i-clock"></span>待支付</span></div><div class="summary-divider"></div><dl class="summary-list"><div class="summary-row"><dt class="summary-key"><span class="icon i-receipt"></span>订单编号</dt><dd class="summary-value">${escapeHTML(order.id)}</dd></div><div class="summary-row"><dt class="summary-key"><span class="icon i-money"></span>支付金额</dt><dd class="summary-value green">${escapeHTML(amount)}</dd></div><div class="summary-row"><dt class="summary-key"><span class="icon i-clock"></span>订单状态</dt><dd class="summary-value" id="nativePayStatus">等待扫码付款</dd></div></dl><div class="summary-note"><span class="icon i-info"></span>支付成功后页面将自动更新状态</div></article>
         </section>
-        <div class="payment-actions"><button type="button" class="btn btn-secondary" id="nativePayRefreshBtn"><span class="icon i-refresh"></span>查询支付状态</button><button type="button" class="btn btn-primary" id="nativePayCloseBtn">稍后支付</button></div>
+        <div class="payment-actions"><button type="button" class="btn btn-secondary" id="nativePayRefreshBtn"><span class="icon i-refresh"></span>查询支付状态</button><button type="button" class="btn btn-secondary" id="nativePayCancelOrderBtn">取消订单</button><button type="button" class="btn btn-primary" id="nativePayCloseBtn">稍后支付</button></div>
         <div class="footnote"><span class="icon i-shield-check"></span>支付过程由微信安全保障，请放心使用</div>`;
       const status=$("nativePayStatus");
       const refresh=async()=>{
@@ -331,6 +331,24 @@
         }
       };
       $("nativePayRefreshBtn")?.addEventListener("click",refresh);
+      const cancelOrderBtn=$("nativePayCancelOrderBtn");
+      let cancelArmed=false,cancelArmTimer=0;
+      cancelOrderBtn?.addEventListener("click",async()=>{
+        if(!cancelArmed){
+          cancelArmed=true;cancelOrderBtn.textContent="再次点击确认取消";
+          if(status)status.textContent="订单尚未取消";
+          clearTimeout(cancelArmTimer);cancelArmTimer=setTimeout(()=>{cancelArmed=false;cancelOrderBtn.textContent="取消订单"},4000);
+          return;
+        }
+        cancelOrderBtn.disabled=true;cancelOrderBtn.textContent="正在取消…";
+        try{
+          await pay.cancelNativeOrder(order.id);clearNativePayPolling();clearTimeout(cancelArmTimer);
+          showStatus("待支付订单已取消。",true);renderSubscriptionDetailPlans();
+        }catch(error){
+          cancelArmed=false;cancelOrderBtn.disabled=false;cancelOrderBtn.textContent="取消订单";
+          if(status)status.textContent=String(error&&error.message||"订单取消失败，请重试");
+        }
+      });
       $("nativePayCloseBtn")?.addEventListener("click",closeSubscriptionDetailModal);
       nativePayPollTimer=setInterval(refresh,3000);
       refresh();
@@ -365,26 +383,7 @@
         showStatus("免费学员无需购买，可直接使用免费权益。");
         return;
       }
-      const pay=window.KGWechatPay;
-      if(!pay||typeof pay.createNativeOrder!=="function"){
-        showStatus("支付服务不可用，请刷新页面后重试。");
-        return;
-      }
-      const initialMarkup=card.innerHTML;
-      card.disabled=true;
-      card.textContent="正在生成二维码…";
-      try{
-        const result=await pay.createNativeOrder(plan.id);
-        if(!result||!result.order||!result.order.codeUrl){
-          throw new Error("支付二维码生成失败，请重试。");
-        }
-        renderNativePayment(plan,result.order);
-        showStatus("支付二维码已生成，请使用微信扫码。",true);
-      }catch(error){
-        card.disabled=false;
-        card.innerHTML=initialMarkup;
-        showStatus(String(error&&error.message||"支付二维码生成失败，请重试。"));
-      }
+      renderPlanConfirm(plan);
     }
     body.querySelectorAll('[data-buy-plan]').forEach(card=>card.addEventListener('click',()=>handlePlanPick(card)));
     const redeemBtn=$("subscriptionRedeemCodeBtn");
@@ -588,7 +587,7 @@
     const modal=$("userCenterModal");
     if(modal)modal.classList.remove("show");
   }
-  function saveProfile(){
+  async function saveProfile(){
     const rec=currentRecord();
     if(!rec){msg("请先登录。");return}
     const {username,user}=rec;
@@ -637,7 +636,14 @@
       note,
       updatedAt:Date.now()
     };
-    saveUser(username,patch);
+    const core=authCore();
+    const saveBtn=$("userCenterSaveBtn");if(saveBtn)saveBtn.disabled=true;
+    try{
+      if(core?.providerStatus?.().remote&&typeof core.updateProfile==="function"){
+        const result=await core.updateProfile({...patch,currentPassword,newPassword});
+        if(!result?.ok){msg(result?.message||"个人资料保存失败，请稍后重试。");return}
+      }else saveUser(username,patch);
+    }finally{if(saveBtn)saveBtn.disabled=false}
     logAction("用户自助更新资料",username,newPassword?"更新资料并修改密码":"更新资料");
     refreshAuthUI();
     fillForm();

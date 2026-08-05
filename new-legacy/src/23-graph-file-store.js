@@ -186,9 +186,11 @@
     const createdAt=Number(file.createdAt)||now,updatedAt=Number(file.updatedAt)||now;
     const hasLastOpenedAt=Object.prototype.hasOwnProperty.call(file,'lastOpenedAt');
     const lastOpenedAt=hasLastOpenedAt?Math.max(0,Number(file.lastOpenedAt)||0):updatedAt;
+    const tags=normalizeTags(file.tags&&file.tags.length?file.tags:(file.favorite===true?['收藏']:[]));
+    const favoriteExplicit=file.favoriteExplicit===true||(file.favorite===true&&tags.includes('收藏'));
     return{
       schemaVersion:SCHEMA_VERSION,id,owner,
-      name:cleanText(file.name,'我的知识图谱',100),description:cleanText(file.description,'',500),tags:normalizeTags(file.tags&&file.tags.length?file.tags:(file.favorite===true?['收藏']:[])),favorite:normalizeTags(file.tags&&file.tags.length?file.tags:(file.favorite===true?['收藏']:[])).length>0,folderId:cleanText(file.folderId,'',120)||null,restoreFolderId:cleanText(file.restoreFolderId,'',120)||null,
+      name:cleanText(file.name,'我的知识图谱',100),description:cleanText(file.description,'',500),tags,favorite:favoriteExplicit&&file.favorite===true,favoriteExplicit,folderId:cleanText(file.folderId,'',120)||null,restoreFolderId:cleanText(file.restoreFolderId,'',120)||null,
       createdAt,updatedAt,lastOpenedAt,
       order:Number.isFinite(Number(file.order))?Number(file.order):null,status:file.status==='trashed'?'trashed':'active',deletedAt:file.status==='trashed'?(Number(file.deletedAt)||now):null,
       nodeCount:Math.max(0,Number(file.nodeCount)||0),linkCount:Math.max(0,Number(file.linkCount)||0),byteSize:Math.max(0,Number(file.byteSize)||0),
@@ -455,13 +457,12 @@
     if(!writeIndex(index))return null;clearError();const ordered=listFiles({owner});if(options.emit!==false)emit('reorder',null,{owner,orderedIds:finalIds});return ordered;
   }
   function setFileTags(id,tags,options={}){
-    const normalized=normalizeTags(tags);const entry=patchIndexFile(id,{tags:normalized,favorite:normalized.length>0,updatedAt:Date.now()},options);if(!entry){emitError('要设置标签的图谱文件不存在。');return null}const file=hydrate(entry);clearError();if(options.emit!==false)emit('tags',file,{owner:entry.owner});return file;
+    const normalized=normalizeTags(tags);const entry=patchIndexFile(id,{tags:normalized,updatedAt:Date.now()},options);if(!entry){emitError('要设置标签的图谱文件不存在。');return null}const file=hydrate(entry);clearError();if(options.emit!==false)emit('tags',file,{owner:entry.owner});return file;
   }
   function getFileTags(id,options={}){const file=listFiles({owner:options.owner||currentOwner(),includeTrash:true}).find(item=>item.id===id);return file?clone(file.tags):[]}
   function setFileFavorite(id,favorite,options={}){
     const current=listFiles({owner:options.owner||currentOwner(),includeTrash:true}).find(item=>item.id===id);if(!current){emitError('要收藏的图谱文件不存在。');return null}
-    const nextTags=favorite===true?(current.tags.length?current.tags:['收藏']):[];
-    const entry=patchIndexFile(id,{tags:normalizeTags(nextTags),favorite:nextTags.length>0,updatedAt:Date.now()},options);if(!entry)return null;
+    const entry=patchIndexFile(id,{favorite:favorite===true,favoriteExplicit:true,updatedAt:Date.now()},options);if(!entry)return null;
     clearError();if(options.emit!==false)emit('favorite-file',entry,{owner:entry.owner,favorite:entry.favorite});return clone(entry);
   }
   function readTagMap(){return objectMap(readJSON(TAGS_KEY,{}))}
@@ -514,8 +515,9 @@
     return true;
   }
   function listFolders(options={}){
-    const owner=options.owner||currentOwner(),includeTrash=options.includeTrash===true,status=options.status;
-    return clone(readFolders().filter(folder=>folder.owner===owner&&(includeTrash||(status?folder.status===status:folder.status==='active'))).sort((a,b)=>(Number(a.order)||0)-(Number(b.order)||0)||(Number(a.createdAt)||0)-(Number(b.createdAt)||0)));
+    const owner=options.owner||currentOwner(),includeTrash=options.includeTrash===true,status=options.status;let folders=readFolders().filter(folder=>folder.owner===owner);
+    if(status)folders=folders.filter(folder=>folder.status===status);else if(!includeTrash)folders=folders.filter(folder=>folder.status==='active');
+    return clone(folders.sort((a,b)=>(Number(a.order)||0)-(Number(b.order)||0)||(Number(a.createdAt)||0)-(Number(b.createdAt)||0)));
   }
   function getFolder(id,options={}){
     const owner=options.owner||currentOwner();return clone(readFolders().find(folder=>folder.owner===owner&&folder.id===id&&(options.includeTrash||folder.status==='active'))||null);

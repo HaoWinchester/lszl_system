@@ -11,6 +11,7 @@
     autosave.saveNow({ force: true, silent: true, reason: 'server-debounce' })
     const storage = global.KGServerStateStorage
     if (storage && typeof storage.flush === 'function') await storage.flush()
+    autosave.reportSaved?.('server-saved')
     const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){}
     track('graph','key_action','graph_saved')
     track('graph','outcome','graph_saved')
@@ -21,6 +22,7 @@
     global.clearTimeout(timer)
     timer = global.setTimeout(() => {
       persistToServer().catch((error) => {
+        autosave.reportError?.(error, 'server-error')
         console.warn('[DirectGraphAdapter] graph persistence failed:', error)
       })
     }, 400)

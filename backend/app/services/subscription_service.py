@@ -119,6 +119,20 @@ async def get_subscription(db: AsyncSession, username: str) -> Subscription:
     return s
 
 
+async def _subscription_for_update(db: AsyncSession, username: str) -> Subscription:
+    result = await db.execute(
+        select(Subscription).where(Subscription.username == username).with_for_update()
+    )
+    subscription = result.scalar_one_or_none()
+    if subscription is None:
+        subscription = Subscription(
+            username=username, plan_id="free", status="active", source="default"
+        )
+        db.add(subscription)
+        await db.flush()
+    return subscription
+
+
 async def admin_set(
     db: AsyncSession, username: str, plan_id: str, status: str | None, note: str | None, actor: str
 ) -> Subscription:
@@ -195,22 +209,29 @@ async def activate_paid_order(
     validate_amount: bool = False,
 ) -> SubscriptionOrder:
     """支付成功激活订阅（幂等：已 paid 直接返回）。"""
-    o = await db.get(SubscriptionOrder, order_id)
+    result = await db.execute(
+        select(SubscriptionOrder)
+        .where(SubscriptionOrder.id == order_id)
+        .with_for_update()
+    )
+    o = result.scalar_one_or_none()
     if not o:
         raise ValueError("订单不存在")
     if o.pay_status == "paid":
         return o
     if validate_amount and not payment_amount_matches(o.amount, received_amount_fen):
         raise ValueError("支付金额不匹配")
+    already_activated = o.status == "approved"
     o.pay_status = "paid"
     o.transaction_id = transaction_id
     o.paid_at = now_utc()
     o.status = "approved"
-    s = await get_subscription(db, o.username)
-    _apply_plan(s, o.plan_id)
-    s.status = "active"
-    s.source = "wechat_pay"
-    s.order_id = o.id
+    s = await _subscription_for_update(db, o.username)
+    if not already_activated:
+        _apply_plan(s, o.plan_id)
+        s.status = "active"
+        s.source = "wechat_pay"
+        s.order_id = o.id
     await db.commit()
     await db.refresh(o)
     return o
@@ -225,13 +246,18 @@ async def list_orders(db: AsyncSession, status: str | None = None) -> list[Subsc
 
 
 async def approve_order(db: AsyncSession, order_id: str, actor: str) -> SubscriptionOrder:
-    o = await db.get(SubscriptionOrder, order_id)
-    if not o or o.status != "pending":
+    result = await db.execute(
+        select(SubscriptionOrder)
+        .where(SubscriptionOrder.id == order_id)
+        .with_for_update()
+    )
+    o = result.scalar_one_or_none()
+    if not o or o.status != "pending" or o.pay_status == "paid":
         raise ValueError("订单不存在或已处理")
     o.status = "approved"
     o.approved_at = now_utc()
     o.approved_by = actor
-    s = await get_subscription(db, o.username)
+    s = await _subscription_for_update(db, o.username)
     _apply_plan(s, o.plan_id)
     s.status = "active"
     s.source = "order"
@@ -242,13 +268,37 @@ async def approve_order(db: AsyncSession, order_id: str, actor: str) -> Subscrip
 
 
 async def cancel_order(db: AsyncSession, order_id: str, actor: str) -> SubscriptionOrder:
-    o = await db.get(SubscriptionOrder, order_id)
-    if not o:
-        raise ValueError("订单不存在")
+    result = await db.execute(
+        select(SubscriptionOrder)
+        .where(SubscriptionOrder.id == order_id)
+        .with_for_update()
+    )
+    o = result.scalar_one_or_none()
+    if not o or o.status != "pending" or o.pay_status not in {None, "pending"}:
+        raise ValueError("订单不存在或已处理")
     o.status = "cancelled"
     await db.commit()
     await db.refresh(o)
     return o
+
+
+async def cancel_own_order(
+    db: AsyncSession, order_id: str, username: str
+) -> SubscriptionOrder:
+    result = await db.execute(
+        select(SubscriptionOrder)
+        .where(SubscriptionOrder.id == order_id)
+        .with_for_update()
+    )
+    order = result.scalar_one_or_none()
+    if not order or order.username != username:
+        raise LookupError("订单不存在")
+    if order.status != "pending" or order.pay_status not in {None, "pending"}:
+        raise ValueError("订单不存在或已处理")
+    order.status = "cancelled"
+    await db.commit()
+    await db.refresh(order)
+    return order
 
 
 async def generate_codes(db: AsyncSession, plan_id: str, count: int, actor: str) -> list[str]:

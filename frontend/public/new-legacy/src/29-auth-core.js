@@ -91,14 +91,14 @@
       username,
       salt: String(user.salt || makeSalt()),
       hash: String(user.hash || ""),
-      createdAt: Number(user.createdAt || now),
-      updatedAt: Number(user.updatedAt || user.createdAt || now),
-      lastLoginAt: Number(user.lastLoginAt || 0),
-      lastActiveAt: Number(user.lastActiveAt || user.lastLoginAt || 0),
-      archivedAt: Number(user.archivedAt || 0),
+      createdAt: Number(user.createdAt || Date.parse(user.created_at||'') || now),
+      updatedAt: Number(user.updatedAt || Date.parse(user.updated_at||'') || user.createdAt || now),
+      lastLoginAt: Number(user.lastLoginAt || Date.parse(user.last_login_at||'') || 0),
+      lastActiveAt: Number(user.lastActiveAt || Date.parse(user.last_active_at||'') || user.lastLoginAt || 0),
+      archivedAt: Number(user.archivedAt || Date.parse(user.archived_at||'') || 0),
       status: normalizeStatus(user.status || "active"),
       role: normalizeRole(user.role || "student"),
-      displayName: String(user.displayName || username || ""),
+      displayName: String(user.displayName || user.display_name || username || ""),
       email: String(user.email || ""),
       phone: String(user.phone || ""),
       subject: String(user.subject || "PMP"),
@@ -134,7 +134,8 @@
         login: String(raw.endpoints?.login || "/api/auth/login"),
         register: String(raw.endpoints?.register || "/api/auth/register"),
         logout: String(raw.endpoints?.logout || "/api/auth/logout"),
-        session: String(raw.endpoints?.session || "/api/auth/session")
+        session: String(raw.endpoints?.session || "/api/auth/session"),
+        profile: String(raw.endpoints?.profile || raw.endpoints?.session || "/api/auth/session")
       },
       credentials: String(raw.credentials || "include"),
       allowLocalRegistration: raw.allowLocalRegistration !== false
@@ -176,7 +177,7 @@
     });
     let payload={};
     try{payload=await response.json()}catch(e){}
-    if(!response.ok)throw new Error(String(payload.message||payload.error||("认证服务请求失败（"+response.status+"）")));
+    if(!response.ok)throw new Error(String(payload.detail||payload.message||payload.error||("认证服务请求失败（"+response.status+"）")));
     return payload;
   }
   function currentUsername(){
@@ -345,6 +346,27 @@
       return {ok:true,user,provider:"remote"};
     }catch(error){writeRemoteSession(null);return {ok:false,user:null,provider:"remote",message:String(error?.message||error)}}
   }
+  async function updateProfile(patch={}){
+    const username=currentUsername();if(!username)return {ok:false,message:"请先登录。"};
+    if(providerConfig().mode!=="remote")return {ok:true,user:upsertUser(username,patch),message:"个人资料已保存。"};
+    try{
+      const payload=await remoteRequest(providerConfig().endpoints.profile,{method:"PUT",body:{
+        display_name:patch.displayName,
+        email:patch.email,
+        phone:patch.phone,
+        subject:patch.subject,
+        tags:patch.tags,
+        note:patch.note,
+        current_password:patch.currentPassword||undefined,
+        new_password:patch.newPassword||undefined
+      }});
+      const raw=payload.user||{};const user=normalizeUser(raw.username||username,{...raw,source:"remote"});
+      writeRemoteSession({user,token:readRemoteSession()?.token||"",issuedAt:Date.now()});
+      window.dispatchEvent(new CustomEvent("kg-user-profile-updated",{detail:{username:user.username,user}}));
+      window.dispatchEvent(new CustomEvent("kg-auth-session-change",{detail:{username:user.username,provider:"remote"}}));
+      return {ok:true,user,message:String(payload.message||"个人资料已保存。")} ;
+    }catch(error){return {ok:false,message:String(error?.message||error||"个人资料保存失败。")}}
+  }
   function providerStatus(){
     const config=providerConfig();
     const sameOriginSecure=!config.baseUrl&&String(globalThis.location?.protocol||'')==='https:';
@@ -396,6 +418,7 @@
     register,
     logout,
     refreshSession,
+    updateProfile,
     fmtTime
   };
 })();

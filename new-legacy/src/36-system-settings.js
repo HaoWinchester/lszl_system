@@ -105,24 +105,23 @@
     const api=window.KGWechatLogin;
     if(!api){panel.innerHTML='<div class="um-empty">微信登录模块未加载。</div>';return}
     const cfg=api.getConfig();
-    const authUrl=(cfg.enableOfficial&&cfg.appId)?api.buildOfficialAuthUrl():'';
+    const canPreview=!!(cfg.enableOfficial&&cfg.appId);
     panel.innerHTML=`<div class="um-wechat-config">
-      <p class="um-wechat-note">当前纯前端版支持“本地演示扫码登录”；正式微信扫码登录需要微信开放平台 AppID、授权回调域名和后端换取 openid/unionid 的接口。</p>
+      <p class="um-wechat-note">正式微信扫码登录由服务器生成一次性授权状态并完成回调校验；配置变更后可请求一条临时授权地址用于联调。</p>
       <div class="um-wechat-checks">
-        <label><input type="checkbox" id="wxEnableDemo" ${cfg.enableDemo?'checked':''}> 启用本地演示扫码</label>
+        <label><input type="checkbox" id="wxEnableDemo" ${cfg.enableDemo?'checked':''}> 启用扫码演练模式</label>
         <label><input type="checkbox" id="wxEnableOfficial" ${cfg.enableOfficial?'checked':''}> 启用正式微信开放平台模式</label>
         <label><input type="checkbox" id="wxAutoCreate" ${cfg.autoCreateUser?'checked':''}> 首次微信登录自动创建用户</label>
       </div>
       <div class="um-wechat-grid">
         <label>微信开放平台 AppID<input id="wxAppId" value="${escapeHTML(cfg.appId)}" placeholder="wx1234567890abcdef"></label>
         <label>授权回调地址 redirect_uri<input id="wxRedirectUri" value="${escapeHTML(cfg.redirectUri)}" placeholder="https://your-domain.com/index.html"></label>
-        <label>后端 code 换取用户接口<input id="wxBackendExchangeUrl" value="${escapeHTML(cfg.backendExchangeUrl)}" placeholder="https://your-api.com/auth/wechat/callback"></label>
         <label>微信授权 scope<select id="wxScope"><option value="snsapi_login" ${cfg.scope==='snsapi_login'?'selected':''}>snsapi_login（网站扫码）</option><option value="snsapi_userinfo" ${cfg.scope==='snsapi_userinfo'?'selected':''}>snsapi_userinfo（公众号网页授权）</option></select></label>
         <label>微信新用户默认角色<select id="wxDefaultRole"><option value="student" ${cfg.defaultRole==='student'?'selected':''}>学员</option><option value="viewer" ${cfg.defaultRole==='viewer'?'selected':''}>游客</option><option value="teacher" ${cfg.defaultRole==='teacher'?'selected':''}>教师/教研</option></select></label>
         <label>微信新用户默认科目<input id="wxDefaultSubject" value="${escapeHTML(cfg.defaultSubject||'PMP')}" placeholder="PMP"></label>
       </div>
-      <div class="um-wechat-actions"><button type="button" class="primary" id="wxSaveConfigBtn">保存微信配置</button><button type="button" id="wxPreviewAuthBtn" ${authUrl?'':'disabled'}>预览授权链接</button></div>
-      <div class="um-wechat-preview">${authUrl?escapeHTML(authUrl):'配置 AppID 并启用正式模式后，这里会显示微信授权地址预览。'}</div>
+      <div class="um-wechat-actions"><button type="button" class="primary" id="wxSaveConfigBtn">保存微信配置</button><button type="button" id="wxPreviewAuthBtn" ${canPreview?'':'disabled'}>预览授权链接</button></div>
+      <div class="um-wechat-preview">${canPreview?'点击“预览授权链接”后，由服务器生成一次性授权地址。':'配置 AppID 并启用正式模式后，可向服务器请求授权地址预览。'}</div>
     </div>`;
   }
   function collectWechatConfig(){
@@ -133,7 +132,6 @@
       autoCreateUser:!!$('wxAutoCreate')?.checked,
       appId:$('wxAppId')?.value.trim()||'',
       redirectUri:$('wxRedirectUri')?.value.trim()||'',
-      backendExchangeUrl:$('wxBackendExchangeUrl')?.value.trim()||'',
       scope:$('wxScope')?.value||'snsapi_login',
       defaultRole:$('wxDefaultRole')?.value||'student',
       defaultSubject:$('wxDefaultSubject')?.value.trim()||'PMP'
@@ -142,17 +140,20 @@
   function saveWechatConfig(){
     const api=window.KGWechatLogin;if(!api)return;
     const cfg=api.saveConfig(collectWechatConfig());
-    logAction('保存微信登录配置','SYSTEM',cfg.enableOfficial?'正式微信模式已启用':'保存本地演示微信配置');
+    logAction('保存微信登录配置','SYSTEM',cfg.enableOfficial?'正式微信模式已启用':'保存扫码演练配置');
     renderWechatConfig();
     toast('微信登录配置已保存');
   }
-  function previewWechatAuthUrl(){
+  async function previewWechatAuthUrl(){
     const api=window.KGWechatLogin;if(!api)return;
     const cfg=api.saveConfig(collectWechatConfig());
     if(!cfg.appId){toast('请先填写 AppID');renderWechatConfig();return}
-    const url=api.buildOfficialAuthUrl();
-    prompt('微信授权地址预览，可复制给技术人员调试：',url);
-    renderWechatConfig();
+    try{
+      const result=await api.createOfficialAuthRequest('login',location.pathname+location.search+location.hash);
+      prompt('微信授权地址预览，可复制给技术人员调试：',result.authUrl);
+    }catch(error){
+      toast(error?.message||'授权地址生成失败，请检查服务端微信配置。');
+    }finally{renderWechatConfig()}
   }
 
   function renderPermissionMatrix(){
@@ -354,7 +355,7 @@
     panel.innerHTML=`<div class="subscription-admin-toolbar">
       <div>
         <strong>订阅套餐配置</strong>
-        <p>当前版本用于本地演示和管理员手动开通；价格只填写原价和折扣系数，现价会自动计算。正式收费时应由后端保存价格、订单和订阅状态。</p>
+        <p>订单、订阅和价格配置由服务器保存；扫码演练仅用于支付联调，正式收费需配置微信支付商户参数。</p>
       </div>
       <button type="button" id="ssResetAllPlanSettingsBtn">恢复全部默认</button>
     </div>
@@ -464,10 +465,43 @@
     toast('日志已清空');
   }
 
+  const ANALYTICS_FEATURE_LABELS={graph:'图谱编辑',files:'文件管理',question_bank:'题库',training:'训练',recall:'回忆',learning_path:'学习路径'};
+  function analyticsDate(daysAgo=0){
+    const date=new Date();date.setDate(date.getDate()-daysAgo);
+    return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
+  }
+  function renderFeatureAnalytics(data){
+    const content=$('ssAnalyticsContent');if(!content)return;
+    const features=Array.isArray(data?.features)?data.features:[];
+    const insights=Array.isArray(data?.insights)?data.insights:[];
+    const trends=Array.isArray(data?.trends)?data.trends:[];
+    const percent=value=>`${Math.round(Number(value||0)*100)}%`;
+    const featureRows=features.map(item=>`<tr><th>${escapeHTML(ANALYTICS_FEATURE_LABELS[item.featureKey]||item.featureKey||'未知功能')}</th><td>${Number(item.activeUsers||0)}</td><td>${Number(item.keyActions||0)}</td><td>${Math.round(Number(item.engagedSeconds||0)/60)} 分钟</td><td>${percent(item.outcomeUserRate)}</td><td>${item.quality?.value==null?'—':percent(item.quality.value)}</td></tr>`).join('');
+    const trendRows=trends.map(item=>`<li><span>${escapeHTML(item.date||'—')}</span><strong>${Number(item.events||0)} 次事件 · ${Number(item.activeUsers||0)} 位活跃用户</strong></li>`).join('');
+    const insightRows=insights.map(item=>`<article><strong>${escapeHTML(item.title||'分析结论')}</strong><p>${escapeHTML(item.detail||'')}</p></article>`).join('');
+    content.innerHTML=`<div class="ss-analytics-summary"><strong>${Number(data?.sampleSize||0)}</strong><span>条有效事件</span></div><div class="ss-analytics-table-wrap"><table><thead><tr><th>功能</th><th>活跃用户</th><th>关键操作</th><th>有效停留</th><th>成果用户率</th><th>质量指标</th></tr></thead><tbody>${featureRows||'<tr><td colspan="6">暂无数据</td></tr>'}</tbody></table></div><div class="ss-analytics-lower"><section><h3>每日趋势</h3><ul>${trendRows||'<li>当前区间暂无趋势数据</li>'}</ul></section><section><h3>确定性洞察</h3><div class="ss-analytics-insights">${insightRows||'<p>样本积累后将显示洞察。</p>'}</div></section></div>`;
+  }
+  async function loadFeatureAnalytics(){
+    const content=$('ssAnalyticsContent');if(!content)return;
+    const start=$('ssAnalyticsStart')?.value||analyticsDate(29);
+    const end=$('ssAnalyticsEnd')?.value||analyticsDate();
+    const role=$('ssAnalyticsRole')?.value||'';
+    if(start>end){content.innerHTML='<div class="um-empty">开始日期不能晚于结束日期。</div>';return}
+    content.innerHTML='<div class="um-empty">正在加载汇总数据…</div>';
+    const query=new URLSearchParams({start,end});if(role)query.set('role',role);
+    try{
+      const response=await fetch(`/api/v1/system/feature-analytics?${query}`,{credentials:'include'});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data?.detail||`加载失败（${response.status}）`);
+      renderFeatureAnalytics(data);
+    }catch(error){content.innerHTML=`<div class="um-empty">${escapeHTML(error?.message||'功能分析加载失败，请稍后重试。')}</div>`}
+  }
+
   function setTab(tab){
     const next=tab||'themes';
     document.querySelectorAll('[data-ss-tab]').forEach(btn=>btn.classList.toggle('active',btn.dataset.ssTab===next));
     document.querySelectorAll('[data-ss-panel]').forEach(panel=>panel.classList.toggle('active',panel.dataset.ssPanel===next));
+    if(next==='analytics')loadFeatureAnalytics();
   }
   function bindEvents(){
     document.querySelectorAll('[data-ss-tab]').forEach(btn=>btn.addEventListener('click',()=>setTab(btn.dataset.ssTab)));
@@ -517,6 +551,8 @@
     });
     const clear=$('ssClearLogsBtn');
     if(clear)clear.addEventListener('click',clearLogs);
+    const analyticsRefresh=$('ssAnalyticsRefresh');
+    if(analyticsRefresh)analyticsRefresh.addEventListener('click',loadFeatureAnalytics);
   }
   function render(){
     renderRoleThemes();
@@ -524,6 +560,8 @@
     renderPermissionMatrix();
     renderSubscriptionPlans();
     renderLogs();
+    const analyticsStart=$('ssAnalyticsStart');if(analyticsStart&&!analyticsStart.value)analyticsStart.value=analyticsDate(29);
+    const analyticsEnd=$('ssAnalyticsEnd');if(analyticsEnd&&!analyticsEnd.value)analyticsEnd.value=analyticsDate();
   }
 
   document.addEventListener('DOMContentLoaded',()=>{

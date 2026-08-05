@@ -51,6 +51,9 @@
     async getNativeOrderStatus(orderId) {
       return requestJson('GET', `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/status`)
     },
+    async cancelNativeOrder(orderId) {
+      return requestJson('POST', `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/self-cancel`)
+    },
     syncSubscription,
     nativeOrderQrCodeUrl(orderId) {
       return `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/qrcode`

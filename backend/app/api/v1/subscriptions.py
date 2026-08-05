@@ -70,6 +70,17 @@ async def order_qrcode(order_id: str, db: DB, user: CurrentUser):
     return Response(content=wechat_pay_service.native_qrcode_png(o.code_url), media_type="image/png")
 
 
+@router.post("/orders/{order_id}/self-cancel")
+async def self_cancel(order_id: str, db: DB, user: CurrentUser):
+    try:
+        order = await subscription_service.cancel_own_order(db, order_id, user.username)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return {"order": subscription_service.order_to_dict(order)}
+
+
 # ---------- 微信支付回调（公开，微信服务器调用；无登录态）----------
 @router.post("/wechat-pay/notify")
 async def wechat_pay_notify(request: Request, db: DB):
@@ -137,7 +148,10 @@ async def approve(order_id: str, db: DB, admin: AdminUser):
 
 @router.post("/orders/{order_id}/cancel")
 async def cancel(order_id: str, db: DB, admin: AdminUser):
-    o = await subscription_service.cancel_order(db, order_id, admin.username)
+    try:
+        o = await subscription_service.cancel_order(db, order_id, admin.username)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     return {"order": subscription_service.order_to_dict(o)}
 
 

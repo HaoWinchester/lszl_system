@@ -79,7 +79,7 @@
   function bind(){
     document.querySelectorAll('[data-fm-file-type]').forEach(button=>button.addEventListener('click',()=>updateMode(button.dataset.fmFileType)));
     $('fmWorkspaceSearch')?.addEventListener('input',event=>{state.query=String(event.target.value||'');render()});
-    $('fmWorkspaceCreateBtn')?.addEventListener('click',create);$('fmWorkspaceEmptyCreate')?.addEventListener('click',create);
+    document.addEventListener('click',event=>{const button=event.target.closest?.('#fmWorkspaceCreateBtn,#fmWorkspaceEmptyCreate');if(!button)return;event.preventDefault();event.stopImmediatePropagation();create()},true);
     $('fmWorkspaceGrid')?.addEventListener('dblclick',event=>{if(event.target.closest('button'))return;const card=event.target.closest('[data-workspace-id]');if(card)open(card.dataset.workspaceId)});
     $('fmWorkspaceGrid')?.addEventListener('keydown',event=>{const card=event.target.closest('[data-workspace-id]');if(card&&(event.key==='Enter'||event.key===' ')){event.preventDefault();open(card.dataset.workspaceId)}});
     $('fmWorkspaceGrid')?.addEventListener('click',event=>{

@@ -1728,7 +1728,7 @@
     const node=nodeId?state.workspace?.nodes?.[String(nodeId)]:null;
     if(nodeId&&!node)return false;
     state.editingSynthesisNodeId=String(nodeId||'');
-    state.pendingSynthesisPosition=position||viewportCenterWorld();
+    state.pendingSynthesisPosition=position||findOpenCardPosition(viewportCenterWorld(),{width:420,height:280});
     byId('qwSynthesisModalTitle').textContent=node?'编辑归纳卡':'新增归纳卡';
     byId('qwSynthesisType').value=String(node?.synthesisType||'principle');
     byId('qwSynthesisTitle').value=String(node?.title||'');
@@ -2603,12 +2603,12 @@
     }catch(e){}
     return renameWorkspaceTo(workspaceId,title);
   }
-  function manualSaveWorkspace(){
+  async function manualSaveWorkspace(){
     if(!state.workspaceId)return false;
     const latest=store()?.ensure?.(workspaceOptions())||state.workspace;
     if(!latest)return false;
     const saved=store()?.write?.(latest,{reason:'manual-save'});
-    if(saved){state.workspace=saved;return saved}
+    if(saved){state.workspace=saved;await global.KGServerStateStorage?.flush?.();return saved}
     return false;
   }
 

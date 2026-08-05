@@ -3,8 +3,7 @@
 /*
  * 用户帮助、需求反馈与站内消息统一仓库。
  *
- * 默认使用 local-demo 适配器，便于静态部署和离线回归。正式服务器部署可在
- * KG_APP_CONFIG.engagement 中切换为 remote，并实现相同 REST 接口。
+ * 浏览器页面通过 KG_APP_CONFIG.engagement 连接认证后的服务端 REST 接口。
  */
 (function(global){
   const FEEDBACK_KEY='kg_user_feedback_v1';
@@ -42,11 +41,17 @@
         adminMessages:text(raw.endpoints?.adminMessages||'/api/admin/messages'),
         markMessageRead:text(raw.endpoints?.markMessageRead||'/api/messages/{id}/read'),
         markAllRead:text(raw.endpoints?.markAllRead||'/api/messages/read-all'),
-        markFeedbackRead:text(raw.endpoints?.markFeedbackRead||'/api/feedback/{id}/read')
+        markFeedbackRead:text(raw.endpoints?.markFeedbackRead||'/api/feedback/{id}/read'),
+        unreadSummary:text(raw.endpoints?.unreadSummary||'/api/engagement/unread-summary')
       }
     };
   }
   function endpoint(path){const cfg=config();if(/^https?:\/\//i.test(path))return path;return cfg.baseUrl+(path.startsWith('/')?path:'/'+path)}
+  function pagedEndpoint(path,options={}){
+    const limit=Math.max(1,Math.min(200,Math.floor(number(options.limit,200))));
+    const offset=Math.max(0,Math.floor(number(options.offset,0)));
+    return path+(path.includes('?')?'&':'?')+'limit='+limit+'&offset='+offset;
+  }
   async function remoteRequest(path,options={}){
     const cfg=config();
     const response=await fetch(endpoint(path),{
@@ -55,8 +60,20 @@
       body:options.body===undefined?undefined:JSON.stringify(options.body)
     });
     let payload=null;try{payload=await response.json()}catch(error){}
-    if(!response.ok)throw new Error(text(payload?.message||payload?.error||('服务请求失败（'+response.status+'）')));
+    if(!response.ok)throw new Error(text(payload?.detail||payload?.message||payload?.error||('服务请求失败（'+response.status+'）')));
     return payload;
+  }
+  async function remoteAllPages(path){
+    const rows=[];let offset=0;
+    while(rows.length<1000){
+      const payload=await remoteRequest(pagedEndpoint(path,{limit:200,offset}));
+      const page=Array.isArray(payload)?payload:(payload?.items||[]);
+      rows.push(...page);
+      if(Array.isArray(payload)||!payload?.pagination?.hasMore||!page.length)break;
+      const next=number(payload.pagination.offset,offset)+number(payload.pagination.limit,page.length);
+      if(next<=offset)break;offset=next;
+    }
+    return rows.slice(0,1000);
   }
   function normalizeFeedback(item,index=0){
     item=item&&typeof item==='object'?item:{};
@@ -125,10 +142,9 @@
     if(config().mode==='remote')return normalizeFeedback(await remoteRequest(config().endpoints.submitFeedback,{method:'POST',body:next}));
     const rows=localFeedback();rows.unshift(next);if(!saveLocalFeedback(rows.slice(0,1000)))throw new Error('反馈保存失败。');return clone(next);
   }
-  async function listMyFeedback(){
+  async function listMyFeedback(options={}){
     if(config().mode==='remote'){
-      const payload=await remoteRequest(config().endpoints.myFeedback);
-      return (Array.isArray(payload)?payload:payload?.items||[]).map(normalizeFeedback);
+      return (await remoteAllPages(config().endpoints.myFeedback)).map(normalizeFeedback);
     }
     const userId=currentUserId(),reads=localFeedbackReads(userId);
     return localFeedback().filter(item=>item.submittedBy.username===userId).sort((a,b)=>b.createdAt-a.createdAt).map(item=>clone(withFeedbackReadState(item,reads)));
@@ -146,7 +162,7 @@
   }
   async function listFeedback(options={}){
     let rows;
-    if(config().mode==='remote'){const payload=await remoteRequest(config().endpoints.adminFeedback);rows=(Array.isArray(payload)?payload:payload?.items||[]).map(normalizeFeedback)}
+    if(config().mode==='remote')rows=(await remoteAllPages(config().endpoints.adminFeedback)).map(normalizeFeedback)
     else rows=localFeedback();
     const status=text(options.status),query=text(options.query).toLowerCase(),type=text(options.type);
     if(status&&status!=='ALL')rows=rows.filter(item=>item.status===status);if(type&&type!=='ALL')rows=rows.filter(item=>item.type===type);
@@ -170,7 +186,7 @@
 
   async function listAnnouncements(options={}){
     let rows;
-    if(config().mode==='remote'){const payload=await remoteRequest(config().endpoints.adminMessages);rows=(Array.isArray(payload)?payload:payload?.items||[]).map(normalizeAnnouncement)}
+    if(config().mode==='remote')rows=(await remoteAllPages(config().endpoints.adminMessages)).map(normalizeAnnouncement)
     else rows=localAnnouncements();
     const status=text(options.status),query=text(options.query).toLowerCase();
     if(status&&status!=='ALL')rows=rows.filter(item=>item.status===status);
@@ -204,13 +220,18 @@
     const rows=localAnnouncements(),target=rows.find(item=>item.id===id);if(!target)return false;if(target.status==='published')throw new Error('已发布消息请先撤回，不能直接删除。');
     saveLocalAnnouncements(rows.filter(item=>item.id!==id));return true;
   }
-  async function listUserMessages(){
-    if(config().mode==='remote'){const payload=await remoteRequest(config().endpoints.messages);return (Array.isArray(payload)?payload:payload?.items||[]).map(item=>({...normalizeAnnouncement(item),read:!!item.read,readAt:number(item.readAt,0)}))}
+  async function listUserMessages(options={}){
+    if(config().mode==='remote')return (await remoteAllPages(config().endpoints.messages)).map(item=>({...normalizeAnnouncement(item),read:!!item.read,readAt:number(item.readAt,0)}))
     const user=currentUser(),reads=localReads(user.username);
     return localAnnouncements().filter(item=>isVisibleMessage(item,{user})).sort((a,b)=>(b.publishAt||b.publishedAt||b.createdAt)-(a.publishAt||a.publishedAt||a.createdAt)).map(item=>({...clone(item),read:!!reads[item.id],readAt:number(reads[item.id],0)}));
   }
   async function unreadCount(){return (await listUserMessages()).filter(item=>!item.read).length}
   async function unreadSummary(){
+    if(config().mode==='remote'){
+      const summary=await remoteRequest(config().endpoints.unreadSummary);
+      const messages=Math.max(0,number(summary?.messages,0)),feedbackReplies=Math.max(0,number(summary?.feedbackReplies,0));
+      return {messages,feedbackReplies,total:messages+feedbackReplies};
+    }
     const [messages,feedbackReplies]=await Promise.all([unreadCount(),unreadFeedbackReplyCount()]);
     return {messages,feedbackReplies,total:messages+feedbackReplies};
   }

@@ -54,11 +54,12 @@ test('user center uses the supplied profile-dialog structure while retaining pro
 test('narrow learning headers preserve readable, single-line navigation', () => {
   const training = source('new-legacy/styles/question-training.css')
   const workspace = source('new-legacy/styles/question-workspace.css')
+  const shell = source('new-legacy/styles/learning-practice-shell.css')
 
   assert.match(training, /\.qt-brand h1\{white-space:nowrap/)
-  assert.match(training, /\.qt-actions \.qt-workspace-entry,\.qt-actions \.qt-question-nav,\.qt-actions \.auth-status\{display:none!important\}/)
-  assert.match(workspace, /@media\(max-width:780px\)\{[\s\S]*?\.qw-top-actions\{min-width:0;max-width:48vw;overflow-x:auto/)
-  assert.match(workspace, /@media\(min-width:781px\) and \(max-width:1100px\)\{[\s\S]*?\.qw-top-actions>\*\{flex:0 0 auto;white-space:nowrap\}/)
+  assert.match(shell, /@media\(max-width:760px\)\{[\s\S]*?grid-template-columns:1fr auto/)
+  assert.match(shell, /\.lp-top-actions \.account-menu-trigger\{display:inline-flex!important\}/)
+  assert.match(workspace, /\.question-workspace-page \.qw-top-actions \.account-menu-trigger\{/)
   assert.match(workspace, /\.qw-question-drawer>header>div\{min-width:0;flex:1\}/)
   assert.match(workspace, /\.qw-question-drawer>header button\{flex:0 0 42px;/)
 })

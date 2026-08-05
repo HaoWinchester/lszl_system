@@ -41,6 +41,8 @@ test('update builds an isolated release and atomically selects it', () => {
   const page = readFileSync(resolve(root, sourceVersion, 'site', 'index.html'), 'utf8')
   assert.match(page, new RegExp(`styles/user-center\\.css\\?v=${sourceVersion}`))
   assert.match(page, /<script src="\.\/server-state-bootstrap\.js"><\/script>/)
+  assert.match(page, new RegExp(`direct-entry\\.js\\?v=${sourceVersion}`))
+  assert.match(page, new RegExp(`runtime-config\\.override\\.js\\?v=${sourceVersion}`))
   const practicePage = readFileSync(resolve(root, sourceVersion, 'site', 'practice-mode.html'), 'utf8')
   assert.match(
     practicePage,
@@ -51,6 +53,12 @@ test('update builds an isolated release and atomically selects it', () => {
     practicePage,
     /<script src="\.\/server-state-bootstrap\.js"><\/script>/,
     'the backend bootstrap injection marker must remain unversioned',
+  )
+  const questionBankPage = readFileSync(resolve(root, sourceVersion, 'site', 'question-bank.html'), 'utf8')
+  assert.match(
+    questionBankPage,
+    new RegExp(`question-studio/question-studio-parser\\.js\\?v=${sourceVersion}`),
+    'all local scripts must be versioned so warm navigation can reuse immutable assets',
   )
   assert.match(current.sourceHash, /^[a-f0-9]{64}$/)
   assert.match(current.adapterHash, /^[a-f0-9]{64}$/)

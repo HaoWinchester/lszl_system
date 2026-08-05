@@ -181,10 +181,10 @@
     const admins=entries.filter(([,u])=>u.role==='admin').length;
     const totalQuestions=entries.reduce((sum,[name])=>sum+userDataStats(name).questions,0);
     $('umSummary').innerHTML=`
-      <article class="um-stat"><span>账号总数</span><strong>${entries.length}</strong><em>服务器账号</em></article>
+      <article class="um-stat"><span>账号总数</span><strong>${entries.length}</strong><em>服务器账号库</em></article>
       <article class="um-stat"><span>正常用户</span><strong>${active}</strong><em>可登录使用</em></article>
       <article class="um-stat"><span>已归档</span><strong>${archived}</strong><em>保留资料，不允许登录</em></article>
-      <article class="um-stat"><span>题目总量</span><strong>${totalQuestions}</strong><em>统计各用户本地题库</em></article>`;
+      <article class="um-stat"><span>题目总量</span><strong>${totalQuestions}</strong><em>统计各账号题库</em></article>`;
     $('umScopeInfo').textContent=`${entries.length} 个账号 · ${admins} 个管理员角色`;
   }
   function renderUserList(){
@@ -234,7 +234,7 @@
       ['umUsername','umDisplayName','umEmail','umPhone','umTags','umNote'].forEach(id=>$(id).value='');
       $('umRole').value='student';$('umStatus').value='active';$('umSubject').value='PMP';
       const subCard=$('umSubscriptionCard');if(subCard){subCard.innerHTML='';subCard.hidden=true}
-      $('umDataCard').innerHTML='<div class="um-empty">选择用户后可查看该用户本地题库、试卷和图谱数据概览。</div>';
+      $('umDataCard').innerHTML='<div class="um-empty">选择用户后可查看该用户题库、试卷和图谱数据概览。</div>';
       return;
     }
     $('umEditorTitle').textContent=u.displayName||username;
@@ -243,7 +243,7 @@
     $('umUsername').value=username;$('umDisplayName').value=u.displayName||username;$('umRole').value=u.role||'student';$('umStatus').value=u.status||'active';$('umEmail').value=u.email||'';$('umPhone').value=u.phone||'';$('umSubject').value=u.subject||'PMP';$('umTags').value=(u.tags||[]).join(', ');$('umNote').value=u.note||'';
     renderSubscriptionCard(username,u);
     const stats=userDataStats(username);
-    $('umDataCard').innerHTML=`<div class="um-card-head small"><div><h2>用户数据概览</h2><p>仅统计当前浏览器保存的数据，接入服务器后可扩展为全量学习档案。</p></div></div>
+    $('umDataCard').innerHTML=`<div class="um-card-head small"><div><h2>用户数据概览</h2><p>统计当前账号在服务器保存的题库、试卷与图谱数据。</p></div></div>
       <div class="um-data-grid">
         <div class="um-data-item"><span>图谱节点</span><strong>${stats.graphNodes}</strong></div>
         <div class="um-data-item"><span>关系线</span><strong>${stats.graphLinks}</strong></div>
@@ -410,7 +410,8 @@
   }
   function resetPassword(){
     const username=state.selected;if(!username)return;
-    const password=prompt(`请输入 ${username} 的新密码（至少 4 个字符）：`)||'';
+    const password=prompt(`请输入 ${username} 的新密码（至少 4 个字符）：`);
+    if(password===null)return;
     const result=UserService.resetPassword(state.users,username,password);
     applyServiceResult(result,{
       selected:username,

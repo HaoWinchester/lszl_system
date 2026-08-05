@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser
@@ -23,9 +23,52 @@ from app.web.releases import (
 )
 from app.web.schemas import RuntimeStateUpdate
 from app.services import runtime_state_service
+from app.services import user_service
 
 router = APIRouter(include_in_schema=False)
 DB = Annotated[AsyncSession, Depends(get_db)]
+
+ADMIN_ONLY_PAGES = frozenset({
+    "admin-operations.html",
+    "admin-settings.html",
+    "feedback-management.html",
+    "message-management.html",
+    "system-settings.html",
+    "user-management.html",
+})
+TEACHING_PAGES = frozenset({
+    "admin-console.html",
+    "admin-subjects.html",
+    "content-center.html",
+    "course-admin.html",
+    "paper-management.html",
+    "question-bank.html",
+    "teacher-workbench.html",
+})
+
+
+async def _page_access_denied(request: Request, db: AsyncSession, page: str) -> bool:
+    allowed_roles: set[str] | None = None
+    if page in ADMIN_ONLY_PAGES:
+        allowed_roles = {"admin"}
+    elif page in TEACHING_PAGES:
+        allowed_roles = {"admin", "teacher"}
+    if allowed_roles is None:
+        return False
+    username = request.session.get("username")
+    user = await user_service.get_by_username(db, str(username)) if username else None
+    return not user or user.status != "active" or user.role not in allowed_roles
+
+
+def _forbidden_page() -> HTMLResponse:
+    return HTMLResponse(
+        """<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>无权访问</title>
+<style>body{margin:0;display:grid;min-height:100vh;place-items:center;background:#f5f7fa;font-family:system-ui,-apple-system,'PingFang SC',sans-serif;color:#24324a}.card{width:min(520px,calc(100vw - 40px));box-sizing:border-box;padding:36px;border:1px solid #dfe5ec;border-radius:18px;background:#fff;box-shadow:0 18px 50px rgba(30,50,80,.08);text-align:center}h1{margin:0 0 12px;font-size:26px}p{margin:0 0 24px;color:#667085;line-height:1.7}a{display:inline-flex;min-height:42px;align-items:center;padding:0 20px;border-radius:10px;background:#0f766e;color:#fff;text-decoration:none;font-weight:700}</style></head>
+<body><main class="card"><h1>无权访问</h1><p>当前账号没有访问此页面的权限，请返回学习首页或联系管理员。</p><a href="/practice-mode.html">返回学习首页</a></main></body></html>""",
+        status_code=403,
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 def _release_or_503() -> WebRelease:
@@ -40,6 +83,15 @@ def _asset_or_404(release: WebRelease, path: str):
         return resolve_asset(release, path)
     except ReleaseNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+def _static_headers(request: Request, release: WebRelease) -> dict[str, str]:
+    cache_control = (
+        "public, max-age=31536000, immutable"
+        if request.query_params.get("v") == release.version
+        else "no-cache"
+    )
+    return {"Cache-Control": cache_control, "X-Content-Type-Options": "nosniff"}
 
 
 def _redirect(request: Request, page: str, defaults: dict[str, str] | None = None) -> RedirectResponse:
@@ -165,11 +217,13 @@ async def preview_asset(version: str, asset_path: str, request: Request, db: DB)
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     path = _asset_or_404(release, asset_path)
     if path.suffix.lower() == ".html":
+        if await _page_access_denied(request, db, path.name):
+            return _forbidden_page()
         bootstrap = await build_bootstrap(
             request, db, page=path.name, release_version=release.version, read_only=True
         )
         return html_response(path, bootstrap)
-    return FileResponse(path, headers={"X-Content-Type-Options": "nosniff"})
+    return FileResponse(path, headers=_static_headers(request, release))
 
 
 @router.put("/api/v1/runtime/state")
@@ -177,11 +231,15 @@ async def preview_asset(version: str, asset_path: str, request: Request, db: DB)
 async def save_runtime_state(update: RuntimeStateUpdate, user: CurrentUser, db: DB):
     """Persist one validated mutation in the user's PostgreSQL runtime state."""
     try:
-        _, revision = await runtime_state_service.apply_update(db, user.username, update)
+        _, revision = await runtime_state_service.apply_update(
+            db, user.username, user.role, update
+        )
     except runtime_state_service.RuntimeStateConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except runtime_state_service.RuntimeStateValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except runtime_state_service.RuntimeStatePermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     return {
         "ok": True,
         "username": user.username,
@@ -202,8 +260,10 @@ async def active_asset(asset_path: str, request: Request, db: DB) -> Response:
     release = _release_or_503()
     path = _asset_or_404(release, asset_path)
     if path.suffix.lower() == ".html":
+        if await _page_access_denied(request, db, path.name):
+            return _forbidden_page()
         bootstrap = await build_bootstrap(
             request, db, page=path.name, release_version=release.version
         )
         return html_response(path, bootstrap)
-    return FileResponse(path, headers={"X-Content-Type-Options": "nosniff"})
+    return FileResponse(path, headers=_static_headers(request, release))

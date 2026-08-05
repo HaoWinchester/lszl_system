@@ -243,7 +243,7 @@ function persistCurrentGraphNow(options={}){
     return true;
   }catch(e){
     console.warn(e);
-    if(!options.silent)showStatus('保存失败：浏览器本地存储空间可能已满，请先导出学习包备份。');
+    if(!options.silent)showStatus('保存失败：账号存储空间可能已满，请先导出学习包备份。');
     return false;
   }
 }

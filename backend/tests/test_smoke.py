@@ -14,6 +14,30 @@ def test_health():
     assert r.json()["db"] == "ok"
 
 
+def test_health_returns_503_when_database_is_unavailable(monkeypatch):
+    import importlib
+
+    health_module = importlib.import_module("app.api.v1.health")
+
+    class BrokenSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_):
+            return None
+
+        async def execute(self, *_):
+            raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(health_module, "AsyncSessionLocal", lambda: BrokenSession())
+    with TestClient(app) as isolated_client:
+        response = isolated_client.get("/api/v1/health")
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "degraded"
+    assert response.json()["db"].startswith("error:")
+
+
 def test_auth_flow():
     r = client.post("/api/v1/auth/login", json={"username": "admin", "password": "admin123"})
     assert r.status_code == 200

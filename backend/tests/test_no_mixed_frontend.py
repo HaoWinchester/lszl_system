@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 
@@ -26,7 +27,8 @@ def test_generated_runtime_contains_no_frame_navigation_bridge() -> None:
         html = page.read_text(encoding="utf-8")
         assert "new-legacy-navigation-bridge" not in html
         assert "graph-bridge" not in html
-        assert "<iframe" not in html
+        for frame in re.findall(r"<iframe\b[^>]*>", html, flags=re.IGNORECASE):
+            assert "data-embed-frame" in frame, f"unexpected iframe host in {page.name}: {frame}"
 
 
 def test_direct_runtime_source_has_no_parent_message_protocol() -> None:

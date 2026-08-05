@@ -500,7 +500,7 @@ function isLargeGraphPreferenceEnabled(){
   return !prefs||prefs.largeGraphMode!==false;
 }
 function isGraphOverLargeThreshold(){return state.nodes.length>=LARGE_GRAPH_NODE_THRESHOLD||state.links.length>=LARGE_GRAPH_LINK_THRESHOLD}
-function isLargeGraphMode(){return isLargeGraphPreferenceEnabled()}
+function isLargeGraphMode(){return isLargeGraphPreferenceEnabled()&&isGraphOverLargeThreshold()}
 function shouldShowLargeGraphOverview(){return !!(isLargeGraphMode()&&largeGraphOverviewEnabled)}
 function normalizeRelatedScopeAnchor(){
   if(relatedScopeAnchorNodeId&&!nodeById(relatedScopeAnchorNodeId))relatedScopeAnchorNodeId=null;
@@ -868,6 +868,7 @@ function commitEdgeInlineLabelEditor(){
   pushGraphUndoSnapshot('修改关系文字');
   link.type=nextText;
   render({persist:true});
+  if(typeof saveNow==='function')saveNow({force:true,silent:true,reason:'relation-label'});
   showStatus(nextText?`已更新关系文字：${nextText}`:'已清空关系文字。');
   return true;
 }
@@ -912,7 +913,7 @@ function shouldShowEdgeLabel(link,large,edgeIsLocal,labelText,labelCount,normalL
   if(!labelText)return false;
   if(state.selectedLinkId===link.id||selectedLinkIds.has(String(link.id)))return true;
   if(large)return !!(edgeIsLocal&&labelCount<LARGE_GRAPH_SELECTED_LABEL_LIMIT);
-  return !!(normalLabelNodeIds&&normalLabelNodeIds.size&&(normalLabelNodeIds.has(link.from)||normalLabelNodeIds.has(link.to)));
+  return true;
 }
 function shouldRenderLinkInCurrentMode(link,nodeMap,localIds,renderedCount){
   if(!link)return false;
@@ -1044,7 +1045,9 @@ function selectedNodeTitle(){
 }
 
 const GRAPH_UNDO_LIMIT=20;
-let graphUndoStack=[],graphClipboardNodes=null,lastGraphPointerWorldPosition=null;
+let graphUndoStack=[],graphRedoStack=[],graphClipboardNodes=null,lastGraphPointerWorldPosition=null;
+function resetGraphHistory(){graphUndoStack=[];graphRedoStack=[]}
+window.resetGraphHistory=resetGraphHistory;
 function cloneGraphValue(value){
   try{return JSON.parse(JSON.stringify(value))}catch(e){return value}
 }
@@ -1059,13 +1062,12 @@ function graphUndoSnapshot(){
     selectedLinkIds:[...selectedLinkIds]
   };
 }
-function pushGraphUndoSnapshot(label='操作'){
-  graphUndoStack.push({label,snapshot:graphUndoSnapshot(),createdAt:Date.now()});
+function pushGraphUndoSnapshot(label='操作',snapshot=graphUndoSnapshot()){
+  graphUndoStack.push({label,snapshot:cloneGraphValue(snapshot),createdAt:Date.now()});
   if(graphUndoStack.length>GRAPH_UNDO_LIMIT)graphUndoStack.splice(0,graphUndoStack.length-GRAPH_UNDO_LIMIT);
+  graphRedoStack=[];
 }
-function restoreGraphUndoSnapshot(){
-  const item=graphUndoStack.pop();
-  if(!item){showStatus('暂无可撤回的操作。');return true}
+function applyGraphHistorySnapshot(item,prefix){
   clearRelatedGatherLayout({render:false,message:false});
   state.nodes=cloneGraphValue(item.snapshot.nodes||[]);
   state.links=cloneGraphValue(item.snapshot.links||[]);
@@ -1077,8 +1079,22 @@ function restoreGraphUndoSnapshot(){
   selectedNodeIds=new Set((item.snapshot.selectedNodeIds||[]).filter(id=>nodeIds.has(id)));
   selectedLinkIds=new Set((item.snapshot.selectedLinkIds||[]).filter(id=>linkIds.has(id)));
   render({persist:true});
-  showStatus(`已撤回：${item.label}。`);
+  showStatus(`${prefix}：${item.label}。`);
   return true;
+}
+function restoreGraphUndoSnapshot(){
+  const item=graphUndoStack.pop();
+  if(!item){showStatus('暂无可撤回的操作。');return true}
+  graphRedoStack.push({label:item.label,snapshot:graphUndoSnapshot(),createdAt:Date.now()});
+  if(graphRedoStack.length>GRAPH_UNDO_LIMIT)graphRedoStack.splice(0,graphRedoStack.length-GRAPH_UNDO_LIMIT);
+  return applyGraphHistorySnapshot(item,'已撤回');
+}
+function restoreGraphRedoSnapshot(){
+  const item=graphRedoStack.pop();
+  if(!item){showStatus('暂无可重做的操作。');return true}
+  graphUndoStack.push({label:item.label,snapshot:graphUndoSnapshot(),createdAt:Date.now()});
+  if(graphUndoStack.length>GRAPH_UNDO_LIMIT)graphUndoStack.splice(0,graphUndoStack.length-GRAPH_UNDO_LIMIT);
+  return applyGraphHistorySnapshot(item,'已重做');
 }
 function selectedNodeIdsForClipboard(){
   const rawIds=selectedNodeIds&&selectedNodeIds.size?[...selectedNodeIds]:(state.selectedNodeId?[state.selectedNodeId]:[]);
@@ -1801,7 +1817,10 @@ cardsLayer.addEventListener('click',e=>{
   const btn=e.target.closest&&e.target.closest('.node-size-btn');if(!btn)return;
   e.stopPropagation();e.preventDefault();
   const card=btn.closest('.knowledge-card'),n=card&&nodeById(card.dataset.nodeId);if(!n)return;
-  n.size=NODE_SIZES.has(btn.dataset.size)?btn.dataset.size:'';
+  const nextSize=NODE_SIZES.has(btn.dataset.size)?btn.dataset.size:'';
+  if(nextSize===String(n.size||''))return;
+  pushGraphUndoSnapshot('调整卡牌尺寸');
+  n.size=nextSize;
   state.defaults.nodeSize=n.size||'';
   showStatus(n.size==='small'?`“${n.title}”已设为小卡。`:n.size==='big'?`“${n.title}”已设为大卡。`:`“${n.title}”已恢复默认尺寸。`);
   render({persist:true});
@@ -1811,13 +1830,14 @@ cardsLayer.addEventListener('pointerdown',e=>{
   if(e.target.closest&&e.target.closest('.node-size-btn')){e.stopPropagation();return}
   const card=cardFromEvent(e);if(!card||e.button!==0)return;
   const id=card.dataset.nodeId,n=nodeById(id);if(!n)return;
+  const undoSnapshot=graphUndoSnapshot();
   hideNodeGrowthHandles();
   e.stopPropagation();e.preventDefault();
   const toggleMulti=e.ctrlKey||e.metaKey;
   const groupIds=toggleMulti?[id]:(selectedNodeIds.has(id)&&selectedNodeIds.size>1?[...selectedNodeIds]:[id]);
   if(groupIds.length===1&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey)clearMultiSelection();
   const startPositions=Object.fromEntries(groupIds.map(gid=>{const gn=nodeById(gid);return[gid,{x:gn.x,y:gn.y}]}));
-  cardDrag={id,ids:groupIds,card,pointerId:e.pointerId,moved:false,longOpened:false,toggleMulti,startClient:{x:e.clientX,y:e.clientY},startPos:{x:n.x,y:n.y},startPositions,longTimer:null};
+  cardDrag={id,ids:groupIds,card,pointerId:e.pointerId,moved:false,longOpened:false,toggleMulti,startClient:{x:e.clientX,y:e.clientY},startPos:{x:n.x,y:n.y},startPositions,undoSnapshot,longTimer:null};
   cardDrag.ids.forEach(gid=>{const el=cardElementByNodeId(gid);if(el)el.classList.add(groupIds.length>1?'group-dragging':'dragging')});
   card.setPointerCapture(e.pointerId);
   cardDrag.longTimer=setTimeout(()=>{
@@ -1865,6 +1885,7 @@ function finishCardPointer(e,cancelled=false){
   if(cancelled||drag.longOpened){renderDeferredEdges();return}
   if(drag.gatherDragBlocked){handleNodeTap(drag.id);return}
   if(!drag.moved){if(drag.toggleMulti){toggleCardMultiSelection(drag.id);return}handleNodeTap(drag.id);return}
+  pushGraphUndoSnapshot((drag.ids||[]).length>1?`移动 ${drag.ids.length} 个知识点`:'移动知识点',drag.undoSnapshot);
   state.selectedNodeId=drag.id;state.selectedLinkId=null;state.linkSourceId=null;
   if((drag.ids||[]).length>1){
     selectedNodeIds=new Set(drag.ids);
@@ -2075,8 +2096,8 @@ function renderDetails(){
   if(!n&&!l){detailPanel.classList.remove('show','hover-preview','detail-actions-expanded');detailPanel.innerHTML='';return}
   detailPanel.classList.remove('detail-actions-expanded');
   detailPanel.classList.toggle('hover-preview',!!isHoverPreview);
-  const tools=`<button class="detail-actions-toggle" id="detailActionsToggle" aria-expanded="false" title="展开操作">⌄</button><button class="close-detail" id="closeDetailBtn">×</button>`;
-  if(l){const a=nodeById(l.from),b=nodeById(l.to),lineColor=safeColor(l.color,DEFAULTS.linkColor);detailPanel.innerHTML=`${tools}<div class="detail-top"><div class="detail-mini-icon" style="background:#2563eb">线</div><div><div class="detail-name">知识关系</div><div class="detail-title">${escapeHTML(a?a.title:'?')} ↔ ${escapeHTML(b?b.title:'?')}</div></div></div><div class="detail-grid"><div class="label">关系</div><div><span class="badge">${escapeHTML(l.type||'无文字关系')}</span></div><div class="label">线型</div><div>${l.lineStyle==='dashed'?'虚线':'实线'} ｜ <span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:${lineColor};vertical-align:-2px;margin-right:4px"></span>${escapeHTML(lineColor)}</div><div class="label">备注</div><div>${escapeHTML(l.note||'暂无备注')}</div></div><div class="detail-actions"><button id="editLinkFromDetailBtn" class="primary">编辑关系</button><button id="deleteLinkFromDetailBtn" class="danger">删除线</button></div>`;detailPanel.classList.add('show');bindDetailBasics();$('editLinkFromDetailBtn').onclick=()=>openLinkModal(l.id);$('deleteLinkFromDetailBtn').onclick=()=>{if(confirm('确定删除这条知识关系吗？')){state.links=state.links.filter(i=>i.id!==l.id);clearSelection({persist:true});showStatus('关系线已删除。')}};return}
+  const tools=`<button class="detail-actions-toggle detail-panel-control" id="detailActionsToggle" aria-expanded="false" title="展开操作"><span class="detail-actions-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></span></button><button class="close-detail detail-panel-control" id="closeDetailBtn" aria-label="关闭详情"><span class="detail-close-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></svg></span></button>`;
+  if(l){const a=nodeById(l.from),b=nodeById(l.to),lineColor=safeColor(l.color,DEFAULTS.linkColor);detailPanel.innerHTML=`${tools}<div class="detail-top"><div class="detail-mini-icon" style="background:#2563eb">线</div><div><div class="detail-name">知识关系</div><div class="detail-title">${escapeHTML(a?a.title:'?')} ↔ ${escapeHTML(b?b.title:'?')}</div></div></div><div class="detail-grid"><div class="label">关系</div><div><span class="badge">${escapeHTML(l.type||'无文字关系')}</span></div><div class="label">线型</div><div>${l.lineStyle==='dashed'?'虚线':'实线'} ｜ <span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:${lineColor};vertical-align:-2px;margin-right:4px"></span>${escapeHTML(lineColor)}</div><div class="label">备注</div><div>${escapeHTML(l.note||'暂无备注')}</div></div><div class="detail-actions"><button id="editLinkFromDetailBtn" class="primary">编辑关系</button><button id="deleteLinkFromDetailBtn" class="danger">删除线</button></div>`;detailPanel.classList.add('show');bindDetailBasics();$('editLinkFromDetailBtn').onclick=()=>openLinkModal(l.id);$('deleteLinkFromDetailBtn').onclick=()=>{if(confirm('确定删除这条知识关系吗？')){pushGraphUndoSnapshot('删除关系');state.links=state.links.filter(i=>i.id!==l.id);clearSelection({persist:true});showStatus('关系线已删除。')}};return}
   const nodeColor=safeColor(n.color),nodeRelation=relatedScopeRelationForNode(n.id),anchor=nodeById(currentRelatedScopeAnchorId()),relationInfo=nodeRelation?`<div class="label">局部关系</div><div>${nodeRelation.relatedCount} 个相关知识点 ｜ ${nodeRelation.linkCount} 条关系${largeGraphRelatedFocusEnabled?` ｜ 只看相关中心：${escapeHTML(anchor?anchor.title:n.title)}`:''}</div>`:'';
   const scopeButtons=largeGraphRelatedFocusEnabled?`<button id="setScopeCenterBtn">以当前卡牌为中心</button><button id="fitScopeFromDetailBtn">适配相关</button>${isRelatedGatherActive()?'<button id="exitGatherLayoutBtn">退出聚拢</button>':''}`:'';
   detailPanel.innerHTML=`${tools}<div class="detail-top"><div class="detail-mini-icon" style="background:${nodeColor}">${escapeHTML((n.title||'?').slice(0,1))}</div><div><div class="detail-name">${escapeHTML(n.title||'未命名知识点')}</div><div class="detail-title">${escapeHTML(n.category||'未填写分类')} ${n.level?`｜${escapeHTML(n.level)}`:''}</div></div></div><div class="detail-grid">${relationInfo}<div class="label">关键词</div><div>${escapeHTML(n.keywords||'—')}</div><div class="label">说明</div><div>${escapeHTML(n.summary||'—')}</div><div class="label">学习提示</div><div>${escapeHTML(n.notes||'—')}</div></div><div class="detail-actions"><button id="editFromDetailBtn" class="primary">编辑知识点</button>${scopeButtons}<button id="toggleSourceBtn">${state.linkSourceId===n.id?'取消起点':'设为连线起点'}</button><button id="deleteNodeFromDetailBtn" class="danger">删除知识点</button></div>`;
@@ -2089,8 +2110,8 @@ function bindDetailBasics(){
     e.stopPropagation();
     const expanded=!detailPanel.classList.contains('detail-actions-expanded');
     detailPanel.classList.toggle('detail-actions-expanded',expanded);
+    toggle.classList.toggle('is-expanded',expanded);
     toggle.setAttribute('aria-expanded',expanded?'true':'false');
-    toggle.textContent=expanded?'⌃':'⌄';
     toggle.title=expanded?'收起操作':'展开操作';
   };
 }
@@ -2264,7 +2285,13 @@ function renderGraphSearchResults(query){
   }
   const results=graphSearchResults(q);
   meta.textContent=results.length?`找到 ${results.length}${results.length>=80?'+' : ''} 个结果。点击结果自动定位。`:'没有找到匹配卡牌。';
-  if(!results.length){box.innerHTML='<div class="graph-search-empty">换一个关键词试试，例如分类、标题或关键词。</div>';return}
+  if(!results.length){
+    if(state.selectedNodeId||state.selectedLinkId||selectedNodeIds.size||selectedLinkIds.size){
+      clearSelection();
+      refreshSelectionUI();
+    }
+    box.innerHTML='<div class="graph-search-empty">换一个关键词试试，例如分类、标题或关键词。</div>';return
+  }
   box.innerHTML=results.map(({node:n})=>`<button type="button" class="graph-search-result" data-node-id="${escapeHTML(n.id)}"><span class="graph-search-result-title">${escapeHTML(n.title||'未命名知识点')}</span><span class="graph-search-result-sub">${escapeHTML([n.category,n.level].filter(Boolean).join(' ｜ ')||'未填写分类')}</span><span class="graph-search-result-keywords">${escapeHTML(n.keywords||n.summary||'')}</span></button>`).join('');
   box.querySelectorAll('.graph-search-result').forEach(btn=>btn.onclick=()=>focusGraphNodeFromSearch(btn.dataset.nodeId));
 }
@@ -2444,6 +2471,10 @@ function handleGraphClipboardShortcut(e){
   }
   if(key==='z'&&!e.shiftKey){
     if(restoreGraphUndoSnapshot()){e.preventDefault();e.stopPropagation()}
+    return;
+  }
+  if(key==='y'||(key==='z'&&e.shiftKey)){
+    if(restoreGraphRedoSnapshot()){e.preventDefault();e.stopPropagation()}
   }
 }
 document.addEventListener('keydown',handleGraphClipboardShortcut);
@@ -2464,7 +2495,7 @@ let editingNodeId=null,editingLinkId=null;
 function openNodeModal(id,isNew=false){const n=nodeById(id);if(!n)return;editingNodeId=id;$('nodeModalTitle').textContent=isNew?'创建知识点':'编辑知识点';$('nTitle').value=n.title||'';$('nCategory').value=n.category||'';$('nColor').value=safeColor(n.color,'#64748b');$('nSize').value=n.size||'';$('nLevel').value=n.level||'基础';$('nKeywords').value=n.keywords||'';$('nSummary').value=n.summary||'';$('nNotes').value=n.notes||'';$('deleteNodeBtn').style.display=isNew?'none':'';$('nodeModal').classList.add('show');setTimeout(()=>$('nTitle').focus(),80)}
 function closeNodeModal(){$('nodeModal').classList.remove('show')}
 $('cancelNodeBtn').onclick=closeNodeModal;
-$('saveNodeBtn').onclick=()=>{const n=nodeById(editingNodeId);if(!n)return;n.title=$('nTitle').value.trim()||'未命名知识点';n.category=$('nCategory').value.trim();n.color=safeColor($('nColor').value,'#64748b');n.size=NODE_SIZES.has($('nSize').value)?$('nSize').value:'';n.level=$('nLevel').value||'基础';n.keywords=$('nKeywords').value.trim();n.summary=$('nSummary').value.trim();n.notes=$('nNotes').value.trim();closeNodeModal();render({persist:true});showStatus('知识点已保存。')};
+$('saveNodeBtn').onclick=()=>{const n=nodeById(editingNodeId);if(!n)return;const next={title:$('nTitle').value.trim()||'未命名知识点',category:$('nCategory').value.trim(),color:safeColor($('nColor').value,'#64748b'),size:NODE_SIZES.has($('nSize').value)?$('nSize').value:'',level:$('nLevel').value||'基础',keywords:$('nKeywords').value.trim(),summary:$('nSummary').value.trim(),notes:$('nNotes').value.trim()};const changed=Object.keys(next).some(key=>String(n[key]??'')!==String(next[key]??''));if(changed&&$('deleteNodeBtn').style.display!=='none')pushGraphUndoSnapshot('编辑知识点');Object.assign(n,next);closeNodeModal();render({persist:true});showStatus('知识点已保存。')};
 $('deleteNodeBtn').onclick=()=>{if(editingNodeId)deleteNode(editingNodeId,true)};
 function deleteNode(id,fromModal=false){const n=nodeById(id);if(!n)return;if(confirm(`确定删除“${n.title}”及相关关系线吗？`)){pushGraphUndoSnapshot(`删除“${n.title}”`);if(relatedGatherLayout&&relatedGatherLayout.positions&&relatedGatherLayout.positions.has(n.id))clearRelatedGatherLayout({render:false,message:false});state.nodes=state.nodes.filter(i=>i.id!==n.id);selectedNodeIds.delete(n.id);state.links=state.links.filter(l=>l.from!==n.id&&l.to!==n.id);if(state.selectedNodeId===n.id)state.selectedNodeId=null;if(state.linkSourceId===n.id)state.linkSourceId=null;if(relatedScopeAnchorNodeId===n.id)relatedScopeAnchorNodeId=null;if(fromModal)closeNodeModal();render({persist:true});showStatus('知识点已删除。')}}
 function deleteGraphBatchSelection(){
@@ -2502,8 +2533,8 @@ function deleteSelectedLinksBatch(){return deleteGraphBatchSelection()}
 function openLinkModal(id){const l=linkById(id);if(!l)return;editingLinkId=id;state.selectedLinkId=id;state.selectedNodeId=null;state.linkSourceId=null;$('linkType').value=l.type||'';$('linkStyle').value=l.lineStyle||DEFAULTS.linkStyle;$('linkColor').value=safeColor(l.color,DEFAULTS.linkColor);$('linkNote').value=l.note||'';$('linkModal').classList.add('show');setTimeout(()=>$('linkNote').focus(),80);renderEdges()}
 function closeLinkModal(){$('linkModal').classList.remove('show')}
 $('cancelLinkBtn').onclick=closeLinkModal;
-$('saveLinkBtn').onclick=()=>{const l=linkById(editingLinkId);if(l){l.type=$('linkType').value||'';l.lineStyle=LINE_STYLES.has($('linkStyle').value)?$('linkStyle').value:DEFAULTS.linkStyle;l.color=safeColor($('linkColor').value,DEFAULTS.linkColor);l.note=$('linkNote').value.trim()}closeLinkModal();render({persist:true});showStatus('关系线已保存。')};
-$('deleteLinkBtn').onclick=()=>{if(editingLinkId){state.links=state.links.filter(l=>l.id!==editingLinkId);state.selectedLinkId=null}closeLinkModal();render({persist:true});showStatus('关系线已删除。')};
+$('saveLinkBtn').onclick=()=>{const l=linkById(editingLinkId);if(l){const next={type:$('linkType').value||'',lineStyle:LINE_STYLES.has($('linkStyle').value)?$('linkStyle').value:DEFAULTS.linkStyle,color:safeColor($('linkColor').value,DEFAULTS.linkColor),note:$('linkNote').value.trim()};if(Object.keys(next).some(key=>String(l[key]??'')!==String(next[key]??'')))pushGraphUndoSnapshot('编辑知识关系');Object.assign(l,next)}closeLinkModal();render({persist:true});showStatus('关系线已保存。')};
+$('deleteLinkBtn').onclick=()=>{if(editingLinkId){pushGraphUndoSnapshot('删除知识关系');state.links=state.links.filter(l=>l.id!==editingLinkId);state.selectedLinkId=null}closeLinkModal();render({persist:true});showStatus('关系线已删除。')};
 function currentGraphTitle(){
   const fileStore=window.KGGraphFileStore,currentFile=fileStore&&fileStore.getCurrentFileMeta?fileStore.getCurrentFileMeta():(fileStore&&fileStore.getCurrentFile?fileStore.getCurrentFile():null);
   return currentFile&&currentFile.name||state.meta.title||'知识点关系图谱';
@@ -2567,11 +2598,11 @@ function saveGraphTitle(nextTitle,options={}){
   state.meta.title=nextTitle;
   if(currentFile&&typeof persistCurrentGraphNow==='function'){
     const saved=persistCurrentGraphNow({force:true,name:nextTitle,emit:true});
-    if(!saved){state.meta.title=oldTitle||currentFile.name||'知识点关系图谱';showStatus('图谱标题保存失败：浏览器本地存储空间可能已满。');return false}
+    if(!saved){state.meta.title=oldTitle||currentFile.name||'知识点关系图谱';showStatus('图谱标题保存失败：账号存储空间可能已满。');return false}
     if(window.KGGraphFileAutosave&&window.KGGraphFileAutosave.clearDirty)window.KGGraphFileAutosave.clearDirty('title-saved');
   }else if(currentFile&&fileStore&&fileStore.renameFile){
     const renamed=fileStore.renameFile(currentFile.id,nextTitle,{emit:true});
-    if(!renamed){state.meta.title=oldTitle||'知识点关系图谱';showStatus('文件名称保存失败：浏览器本地存储空间可能已满。');return false}
+    if(!renamed){state.meta.title=oldTitle||'知识点关系图谱';showStatus('文件名称保存失败：账号存储空间可能已满。');return false}
   }else{
     render({persist:true});
   }
@@ -2660,6 +2691,25 @@ function bindGraphSearchButton(){
   });
 }
 bindGraphSearchButton();
+let mobileGraphViewportTimer=0;
+function graphHasVisibleNode(){
+  const r=stage.getBoundingClientRect(),scale=Math.max(graphViewportMinScale(),Number(state.viewport.scale)||1),vx=Number(state.viewport.x)||0,vy=Number(state.viewport.y)||0;
+  return state.nodes.some(node=>{const p=visualPositionForNode(node),d=nodeDims(node),left=vx+p.x*scale,top=vy+p.y*scale,right=left+d.w*scale,bottom=top+d.h*scale;return right>8&&bottom>8&&left<r.width-8&&top<r.height-8});
+}
+function recoverMobileGraphViewport(){
+  const r=stage.getBoundingClientRect();
+  if(r.width>650||r.width<1||r.height<1||!state.nodes.length||graphHasVisibleNode())return false;
+  const bounds=boundsForNodes(state.nodes);if(!bounds)return false;
+  fitBoundsToView(bounds,{margin:36,minScale:.05,maxScale:.85});
+  return true;
+}
+function scheduleMobileGraphViewportRecovery(){
+  clearTimeout(mobileGraphViewportTimer);
+  mobileGraphViewportTimer=setTimeout(()=>recoverMobileGraphViewport(),80);
+}
+window.addEventListener('resize',scheduleMobileGraphViewportRecovery,{passive:true});
+window.visualViewport?.addEventListener('resize',scheduleMobileGraphViewportRecovery,{passive:true});
+requestAnimationFrame(()=>requestAnimationFrame(()=>recoverMobileGraphViewport()));
 ['nodeModal','linkModal','graphModal','templateModal','flashcardModal'].forEach(id=>{$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).classList.remove('show')})});
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&relatedCanvasModalEl){e.preventDefault();closeRelatedCanvasModal(true)}});

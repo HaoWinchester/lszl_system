@@ -8,9 +8,8 @@ const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const frontendDir = resolve(scriptsDir, '..')
 const repoDir = resolve(frontendDir, '..')
 const assetsDir = resolve(scriptsDir, 'new-legacy-assets')
-const sourceDir = resolve(repoDir, 'new-legacy')
 const generatedDir = resolve(frontendDir, 'public', 'new-legacy')
-const readSource = (path) => readFileSync(path.endsWith('.js') && path.startsWith('direct-') ? resolve(assetsDir, path) : resolve(sourceDir, path), 'utf8')
+const readSource = (path) => readFileSync(path.endsWith('.js') && path.startsWith('direct-') ? resolve(assetsDir, path) : resolve(generatedDir, path), 'utf8')
 
 // ---------------------------------------------------------------- Task 4: 上报器注入与隐私
 
@@ -86,4 +85,3 @@ test('baseline document describes the feature analytics rollout', () => {
   assert.match(doc, /系统设置 → 功能分析/)
   assert.match(doc, /发布后开始|不回填|发布后累计/)
 })
-

@@ -172,7 +172,7 @@
           isCorrect:saved.answer.isCorrect,
           confidence:saved.confidence
         },saved);
-        const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){};
+        const track=(globalThis.KGFeatureAnalytics&&globalThis.KGFeatureAnalytics.track)||function(){};
         track('training','key_action','answer_submitted');
         track('training','outcome',saved.answer.isCorrect?'answer_correct':'answer_incorrect');
       }

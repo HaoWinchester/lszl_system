@@ -27,7 +27,7 @@
 - Consumes: `.um-summary`, `.um-layout`, `.um-left-card`, `.um-editor-card`, `.um-right-card`, `.um-top-actions`, and the existing `data-admin-icon` markup.
 - Produces: browser assertions for exact wide-PC column boundaries and vertically centered top action-button icon/text pairs.
 
-- [ ] **Step 1: Write the failing geometry regression**
+- [x] **Step 1: Write the failing geometry regression**
 
 Add four synthetic `.um-stat` elements when mounting `user-management.html`, then assert at widths of at least `1181px`:
 
@@ -42,7 +42,7 @@ assert_close(right['right'], stats[3]['right'])
 
 For `#umAddUserBtn`, `#umExportBtn`, and `#umImportBtn`, require `display: inline-flex`, `align-items: center`, a positive icon-to-label gap, and at most `1px` difference between icon and label vertical centers.
 
-- [ ] **Step 2: Run the focused browser test and verify RED**
+- [x] **Step 2: Run the focused browser test and verify RED**
 
 Run:
 
@@ -52,7 +52,7 @@ python3 new-legacy/tests/admin-focus-vega-pc-browser.py
 
 Expected: FAIL on `user-management.html` because the current workspace uses independent `300px / 1fr / 330px` tracks and the action buttons render as block boxes with baseline-aligned inline children.
 
-- [ ] **Step 3: Apply the minimum scoped CSS correction**
+- [x] **Step 3: Apply the minimum scoped CSS correction**
 
 Use a shared gap variable, flex-center the header buttons, and replace only the wide-PC grid rule:
 
@@ -78,7 +78,7 @@ body[data-admin-skin="focus-vega"] .um-top-actions button{
 
 Also normalize the icon slot to a `16px` square with zero line-height so the SVG has no baseline contribution.
 
-- [ ] **Step 4: Run targeted and existing contracts and verify GREEN**
+- [x] **Step 4: Run targeted and existing contracts and verify GREEN**
 
 Run:
 
@@ -89,6 +89,6 @@ python3 new-legacy/tests/admin-focus-vega-pc-browser.py
 
 Expected: the static contract passes and all `24/24` page/viewport browser checks pass.
 
-- [ ] **Step 5: Rebuild the isolated local preview and inspect live geometry**
+- [x] **Step 5: Rebuild the isolated local preview and inspect live geometry**
 
 Create a new temporary release root through `manage-new-legacy.js update ... --skip-browser`, restart the local backend preview on `127.0.0.1:8011`, log in as the local administrator, and measure the live `user-management.html` card and button bounding boxes. Do not promote or publish the candidate.

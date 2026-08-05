@@ -335,7 +335,7 @@
     if(state.view==='files'&&!state.query&&!state.showAllFiles)files=files.filter(file=>(file.folderId||null)===(state.currentFolderId||null));
     if(state.view==='trash'&&!state.query&&!state.showAllFiles)files=files.filter(file=>(file.folderId||null)===(state.currentFolderId||null));
     if(state.view==='recent')files=files.filter(file=>Number(file.lastOpenedAt)>0);
-    if(state.view==='favorites')files=files.filter(file=>Array.isArray(file.tags)&&file.tags.length>0);
+    if(state.view==='favorites')files=files.filter(file=>file.favorite===true);
     if(state.filter==='created')files=files.filter(file=>!['import','imported','package-import'].includes(String(file.source||'')));
     if(state.filter==='tagged')files=files.filter(file=>Array.isArray(file.tags)&&file.tags.length);
     if(state.tagFilter)files=files.filter(file=>Array.isArray(file.tags)&&file.tags.includes(state.tagFilter));
@@ -365,7 +365,7 @@
     if(state.currentFolderId){const pool=state.view==='trash'?state.trashFolders:state.folders;if(!pool.some(folder=>folder.id===state.currentFolderId)){state.currentFolderId=null;state.showAllFiles=true;}}
     pruneSelection();
     if(state.view==='favorites'){
-      const favoriteKeys=new Set(state.activeFiles.filter(item=>item.tags&&item.tags.length).map(item=>itemKey('file',item.id)));
+      const favoriteKeys=new Set(state.activeFiles.filter(item=>item.favorite===true).map(item=>itemKey('file',item.id)));
       state.selectedItems=new Set([...state.selectedItems].filter(key=>favoriteKeys.has(key)));
       if(state.selectedId&&!favoriteKeys.has(itemKey(state.selectedType,state.selectedId))){state.selectedId='';state.selectedType='file'}
     }
@@ -429,9 +429,9 @@
   }
   function renderCounts(){
     $('fmRecentCount').textContent=Math.min(24,state.activeFiles.filter(file=>file.lastOpenedAt).length);
-    $('fmFavoriteCount').textContent=state.activeFiles.filter(file=>file.tags&&file.tags.length).length;
+    $('fmFavoriteCount').textContent=state.activeFiles.filter(file=>file.favorite===true).length;
     $('fmTrashCount').textContent=state.trashFiles.length+state.trashFolders.length;
-    const base=state.view==='trash'?state.trashFiles:state.view==='recent'?state.activeFiles.filter(file=>file.lastOpenedAt).slice(0,24):state.view==='favorites'?state.activeFiles.filter(file=>file.tags&&file.tags.length):state.activeFiles;
+    const base=state.view==='trash'?state.trashFiles:state.view==='recent'?state.activeFiles.filter(file=>file.lastOpenedAt).slice(0,24):state.view==='favorites'?state.activeFiles.filter(file=>file.favorite===true):state.activeFiles;
     $('fmAllCount').textContent=base.length;
     $('fmCreatedCount').textContent=base.filter(file=>!['import','imported','package-import'].includes(String(file.source||''))).length;
     $('fmTaggedCount').textContent=base.filter(file=>file.tags&&file.tags.length).length;
@@ -473,6 +473,9 @@
     const grid=$('fmFileGrid'),empty=$('fmEmptyState'),files=filteredFiles(),currentId=store.getCurrentFileId(currentOwner()),folderSection=$('fmChildFolderSection'),folderGrid=$('fmChildFolderGrid'),fileSection=$('fmFileSection'),listHeader=$('fmListHeader');
     const showFolders=(state.view==='files'||state.view==='trash')&&!state.query&&!state.tagFilter,trash=state.view==='trash';
     const folders=showFolders?folderChildren(state.currentFolderId,{trash}).sort((a,b)=>new Intl.Collator('zh-CN',{numeric:true,sensitivity:'base'}).compare(a.name,b.name)):[];
+    const visibleFiles=new Set(files.map(file=>itemKey('file',file.id))),visibleFolders=new Set(folders.map(folder=>itemKey('folder',folder.id)));
+    state.selectedItems=new Set([...state.selectedItems].filter(key=>visibleFiles.has(key)||visibleFolders.has(key)));
+    if(state.selectedId&&!((state.selectedType==='file'?visibleFiles:visibleFolders).has(itemKey(state.selectedType,state.selectedId)))){state.selectedId='';state.selectedType='file'}
     if(folderSection&&folderGrid){
       folderSection.hidden=!showFolders;
       folderGrid.replaceChildren();
@@ -500,7 +503,7 @@
       const query=state.query.trim();
       if(query){$('fmEmptyTitle').textContent='没有找到匹配文件';$('fmEmptyText').textContent='尝试更换关键词或清除筛选条件。';$('fmEmptyAction').textContent='清除搜索';$('fmEmptyAction').dataset.emptyAction='clear'}
       else if(state.view==='trash'){$('fmEmptyTitle').textContent='回收站为空';$('fmEmptyText').textContent='删除的文件会暂存在这里，默认保留 30 天。';$('fmEmptyAction').textContent='返回全部文件';$('fmEmptyAction').dataset.emptyAction='files'}
-      else if(state.view==='favorites'){$('fmEmptyTitle').textContent='还没有收藏文件';$('fmEmptyText').textContent='给图谱文件添加标签后，它会自动出现在我的收藏中。';$('fmEmptyAction').textContent='返回全部文件';$('fmEmptyAction').dataset.emptyAction='files'}
+      else if(state.view==='favorites'){$('fmEmptyTitle').textContent='还没有收藏文件';$('fmEmptyText').textContent='从文件的更多操作中选择“加入收藏”。';$('fmEmptyAction').textContent='返回全部文件';$('fmEmptyAction').dataset.emptyAction='files'}
       else{$('fmEmptyTitle').textContent=state.view==='recent'?'还没有最近打开的文件':'还没有图谱文件';$('fmEmptyText').textContent='创建一个新图谱，或导入已有学习包。';$('fmEmptyAction').textContent='新建图谱';$('fmEmptyAction').dataset.emptyAction='create'}
     }
     $('fmResultCount').textContent=`共 ${folders.length} 个文件夹，${files.length} 个图谱文件${state.selectedItems.size?` · 已选择 ${state.selectedItems.size} 项`:''}`;
@@ -542,7 +545,7 @@
     const actions=$('fmInfoActions');actions.replaceChildren();
     if(isFolder){if(folder.status==='trashed')actions.append(actionButton('恢复','folder-restore','is-primary'),actionButton('永久删除','folder-permanent','is-danger'));else actions.append(actionButton('打开','folder-open','is-primary'),actionButton('重命名','folder-rename'),actionButton('移动到','folder-move'),actionButton('移入回收站','folder-trash','is-danger'))}
     else if(file.status==='trashed')actions.append(actionButton('恢复','restore','is-primary'),actionButton('永久删除','permanent','is-danger'));
-    else actions.append(actionButton('打开','open','is-primary'),actionButton(file.tags&&file.tags.length?'更换标签':'添加标签','tags'),actionButton('重命名','rename'),actionButton('移动到','move'),actionButton('复制','duplicate'),actionButton('导出','export'),actionButton('移入回收站','trash','is-danger'));
+    else actions.append(actionButton('打开','open','is-primary'),actionButton(file.favorite?'取消收藏':'加入收藏','favorite'),actionButton(file.tags&&file.tags.length?'更换标签':'添加标签','tags'),actionButton('重命名','rename'),actionButton('移动到','move'),actionButton('复制','duplicate'),actionButton('导出','export'),actionButton('移入回收站','trash','is-danger'));
   }
   function renderIntegrity(){
     const el=$('fmIntegrityStatus');if(!el)return;
@@ -727,7 +730,7 @@
     const renamed=isFolder?store.renameFolder(session.id,nextName,{owner:currentOwner(),includeTrash:session.file.status==='trashed',emit:false}):store.renameFile(session.id,nextName,{owner:currentOwner(),includeTrash:session.file.status==='trashed',emit:false});
     if(!renamed){toast(store.getLastError&&store.getLastError()||'重命名失败。','error');return false}
     const local=(isFolder?[...state.folders,...state.trashFolders]:[...state.activeFiles,...state.trashFiles]).find(item=>item.id===session.id);if(local)Object.assign(local,renamed,{graphData:undefined,learningState:undefined});
-    name.textContent=nextName;name.title=nextName;if(card)card.setAttribute('aria-label',`${nextName}，双击打开`);
+    name.textContent=nextName;name.title=nextName;if(card){card.setAttribute('aria-label',`${nextName}，双击打开`);card.querySelector('[data-menu-file]')?.setAttribute('aria-label',`${nextName}的更多操作`);card.querySelector('[data-select-id]')?.setAttribute('aria-label',`选择 ${nextName}`)}
     if(state.selectedId===session.id){$('fmInfoName').textContent=nextName;$('fmInfoUpdated').textContent=formatDate(renamed.updatedAt)}
     toast(nextName!==raw?`文件已重命名为“${nextName}”。`:'文件已重命名。');return true;
   }
@@ -877,7 +880,7 @@
       ['restore','恢复',ICONS.restore,''],['separator'],['permanent','永久删除',ICONS.delete,'is-danger']
     ];
     return[
-      ['open','打开',ICONS.open,''],['tags',file.tags&&file.tags.length?'更换标签':'添加标签',ICONS.tag,''],['rename','重命名',ICONS.rename,''],['details','查看详情',ICONS.info,''],['move','移动到',ICONS.move,''],['duplicate','创建副本',ICONS.duplicate,''],['export','导出学习包',ICONS.export,''],['separator'],['trash','移入回收站',ICONS.trash,'is-danger']
+      ['open','打开',ICONS.open,''],['favorite',file.favorite?'取消收藏':'加入收藏',ICONS.favorite,''],['tags',file.tags&&file.tags.length?'更换标签':'添加标签',ICONS.tag,''],['rename','重命名',ICONS.rename,''],['details','查看详情',ICONS.info,''],['move','移动到',ICONS.move,''],['duplicate','创建副本',ICONS.duplicate,''],['export','导出学习包',ICONS.export,''],['separator'],['trash','移入回收站',ICONS.trash,'is-danger']
     ];
   }
   function buildMoveSubmenu(item,type,anchor){
@@ -931,6 +934,7 @@
     else if(action==='tags'){const organizer=global.KGFileManagerOrganize;if(organizer)organizer.openTagPicker(state.selectedItems.has(itemKey(actionKind,id))?selectedPayload():[{kind:actionKind,id}],$('fmDetailsBtn'));}
     else if(action.startsWith('quick-move:')){const target=action.slice(11)||null;const kind=actionKind;moveItems(state.selectedItems.has(itemKey(kind,id))?selectedPayload():[{kind,id}],target);}
     else if(action==='open')openFile(id);
+    else if(action==='favorite'){const file=state.activeFiles.find(item=>item.id===id),saved=file&&store.setFileFavorite?.(id,!file.favorite,{owner:currentOwner()});if(saved)refreshData({toast:saved.favorite?'已加入我的收藏。':'已取消收藏。'});else toast(store.getLastError&&store.getLastError()||'收藏状态更新失败。','error')}
     else if(action==='rename')renameFile(id);
     else if(action==='move')openMoveDialog('file',id);
     else if(action==='folder-open')openFolder(id);
@@ -982,12 +986,12 @@
     const user=currentUser(),label=user&&(user.displayName||user.username)||'访客',role=user?ROLE_LABELS[user.role]||user.role||'用户':'未登录';
     const initial=label.trim().charAt(0)||'访';$('fmOwnerLabel').textContent=user?`${label}的文件空间`:'访客空间';$('fmAvatar').textContent=initial;$('fmAccountAvatar').textContent=initial;$('fmAvatar').title=`${label} · ${role}`;$('fmAvatar').setAttribute('aria-label',`账号菜单：${label}`);
     $('fmAccountName').textContent=label;$('fmAccountMeta').textContent=user?`${role}${user.username&&user.username!==label?' · '+user.username:''}`:'返回编辑器可登录账号';
-    $('fmUserManagementLink').hidden=!(user&&user.role==='admin');$('fmAccountSessionBtn').textContent=user?'退出登录':'返回编辑器登录';$('fmAccountSessionBtn').classList.toggle('is-danger',!!user);
+    $('fmUserCenterBtn').hidden=!user;$('fmSystemSettingsLink').hidden=!(user&&user.role==='admin');$('fmUserManagementLink').hidden=!(user&&user.role==='admin');$('fmAccountSessionBtn').textContent=user?'退出登录':'返回编辑器登录';$('fmAccountSessionBtn').classList.toggle('is-danger',!!user);
   }
-  function accountSessionAction(){
+  async function accountSessionAction(){
     const user=currentUser();setAccountMenu(false);
     if(!user){location.href='index.html';return}
-    try{if(auth&&typeof auth.clearSession==='function')auth.clearSession();else localStorage.removeItem('kg_local_current_user_v1');toast('已退出当前账号。')}catch(err){toast('退出登录失败。','error')}
+    try{if(auth&&typeof auth.logout==='function')await auth.logout({source:'文件管理账号菜单'});else if(auth&&typeof auth.clearSession==='function')auth.clearSession();else localStorage.removeItem('kg_local_current_user_v1');location.href='index.html'}catch(err){toast(err&&err.message||'退出登录失败。','error')}
   }
   function clearFolderDragState(){
     state.dragPayload=null;
@@ -1068,6 +1072,7 @@
     if(global.matchMedia){const mobileQuery=global.matchMedia('(max-width: 800px)');const onMobileChange=()=>syncMobileReadonly();if(mobileQuery.addEventListener)mobileQuery.addEventListener('change',onMobileChange);else if(mobileQuery.addListener)mobileQuery.addListener(onMobileChange)}
     $('fmAvatar').addEventListener('click',event=>{event.stopPropagation();setAccountMenu($('fmAccountMenu').hidden)});
     $('fmAvatar').addEventListener('keydown',event=>{if(event.key==='ArrowDown'){event.preventDefault();setAccountMenu(true,{focusFirst:true})}});
+    $('fmUserCenterBtn')?.addEventListener('click',()=>{setAccountMenu(false);const center=global.KGUserCenter;if(center&&typeof center.open==='function')center.open();else location.href='index.html'});
     $('fmAccountSessionBtn').addEventListener('click',accountSessionAction);
     $('fmImportBtn').addEventListener('click',()=>{if(requireEdit('登录后才能导入图谱文件。'))$('fmFileInput').click()});$('fmFileInput').addEventListener('change',event=>importFiles(event.target.files));
     $('fmEmptyTrashBtn').addEventListener('click',emptyTrash);$('fmCloseSelectionBtn').addEventListener('click',()=>{state.selectedId='';state.selectedType='file';syncSelectionUI()});$('fmDetailsBtn').addEventListener('click',toggleDetails);$('fmSummaryDetailsBtn').addEventListener('click',()=>setDetailsOpen(true));$('fmCloseDetailsBtn').addEventListener('click',()=>setDetailsOpen(false));$('fmDrawerBackdrop').addEventListener('click',()=>setDetailsOpen(false));

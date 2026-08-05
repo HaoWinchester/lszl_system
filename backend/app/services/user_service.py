@@ -3,11 +3,14 @@
 含唯一有效管理员保护、暂停/归档登录拦截。所有写操作记录到 user_admin_logs。
 """
 
+import re
+
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password, now_utc, uid, verify_password
 from app.models.user import ACTIVE, ADMIN, ARCHIVED, User, UserAdminLog
+from app.schemas.auth import SelfProfileUpdate
 from app.schemas.user import UserCreate, UserImport, UserUpdate
 
 VALID_ROLES = {"admin", "teacher", "student", "viewer"}
@@ -166,6 +169,29 @@ async def update_user(db: AsyncSession, username: str, data: UserUpdate, actor: 
     return user
 
 
+async def update_self_profile(
+    db: AsyncSession,
+    user: User,
+    data: SelfProfileUpdate,
+) -> User:
+    if data.email and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", data.email):
+        raise ValueError("邮箱格式不正确")
+    if data.new_password:
+        if not data.current_password or not verify_password(data.current_password, user.password_hash):
+            raise ValueError("当前密码不正确")
+        user.password_hash = hash_password(data.new_password)
+    for field in ("display_name", "email", "phone", "subject", "note"):
+        value = getattr(data, field)
+        if value is not None:
+            setattr(user, field, value.strip())
+    if data.tags is not None:
+        user.tags = list(dict.fromkeys(tag.strip() for tag in data.tags if tag.strip()))[:40]
+    await log_action(db, "update_self_profile", user.username, user.username, "用户自助更新资料")
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
 async def set_status(db: AsyncSession, username: str, status: str, actor: str) -> User:
     user = await _require(db, username)
     if status not in VALID_STATUSES:
@@ -215,6 +241,15 @@ async def duplicate_user(
     return new
 
 
+def batch_log_fields(usernames: list[str], summary: str) -> tuple[str | None, str]:
+    """Keep batch audit targets within the single-username database column."""
+    if len(usernames) == 1:
+        return usernames[0], summary
+    preview = ", ".join(usernames[:20])
+    suffix = f" 等 {len(usernames)} 个账号" if len(usernames) > 20 else ""
+    return None, f"{summary}；目标：{preview}{suffix}"
+
+
 async def delete_users(db: AsyncSession, usernames: list[str], actor: str) -> int:
     if not usernames:
         return 0
@@ -228,7 +263,8 @@ async def delete_users(db: AsyncSession, usernames: list[str], actor: str) -> in
     users = (await db.execute(select(User).where(User.username.in_(usernames)))).scalars().all()
     for u in users:
         await db.delete(u)
-    await log_action(db, "delete_users", ",".join(usernames), actor, f"删除 {len(users)} 个用户")
+    target, detail = batch_log_fields(usernames, f"删除 {len(users)} 个用户")
+    await log_action(db, "delete_users", target, actor, detail)
     await db.commit()
     return len(users)
 
@@ -247,7 +283,8 @@ async def batch_update(db: AsyncSession, data, actor: str) -> int:
         if data.subject and data.subject != "KEEP":
             u.subject = data.subject
         n += 1
-    await log_action(db, "batch_update", ",".join(data.usernames), actor, f"批量更新 {n} 个用户")
+    target, detail = batch_log_fields(data.usernames, f"批量更新 {n} 个用户")
+    await log_action(db, "batch_update", target, actor, detail)
     await db.commit()
     return n
 

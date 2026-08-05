@@ -3,6 +3,7 @@ import json
 import re
 
 from app.main import app
+from app.web.releases import active_release
 
 
 def test_root_serves_learning_path_without_iframe() -> None:
@@ -38,6 +39,18 @@ def test_api_routes_keep_priority_over_static_runtime() -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_versioned_static_assets_are_immutable_and_cacheable() -> None:
+    version = active_release().version
+    with TestClient(app) as client:
+        versioned = client.get(f"/styles/main.css?v={version}")
+        unversioned = client.get("/server-state-bootstrap.js")
+
+    assert versioned.status_code == 200
+    assert versioned.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert unversioned.status_code == 200
+    assert unversioned.headers["cache-control"] == "no-cache"
 
 
 def _bootstrap(response_text: str) -> dict:

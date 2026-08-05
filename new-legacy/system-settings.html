@@ -10,8 +10,10 @@
   <link rel="stylesheet" href="styles/subscription.css"/>
 <link rel="stylesheet" href="styles/user-center.css"/>
 <link rel="stylesheet" href="styles/admin-context-nav.css"/>
+<link rel="stylesheet" href="styles/admin-focus-vega.css"/>
+<link rel="stylesheet" href="styles/admin-focus-vega-settings.css"/>
 </head>
-<body data-admin-context="settings">
+<body data-admin-context="settings" data-admin-skin="focus-vega">
 <nav class="admin-context-nav" aria-label="管理后台一级导航">
   <a data-admin-nav="overview" href="admin-console.html">总览</a>
   <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
@@ -26,7 +28,7 @@
   <div class="ss-app" id="systemSettingsApp">
     <header class="um-topbar ss-topbar">
       <div class="um-brand">
-        <a class="um-back" href="index.html" title="返回知识图谱首页">←</a>
+        <a class="um-back" href="index.html" title="返回知识图谱首页"><span data-admin-icon="arrow-left" data-admin-icon-size="18" aria-hidden="true"></span><span class="ss-back-label">←</span></a>
         <div>
           <p class="um-kicker">System Administration</p>
           <h1>系统设置</h1>
@@ -47,6 +49,7 @@
         <button type="button" data-ss-tab="wechat">微信登录</button>
         <button type="button" data-ss-tab="permissions">权限模板</button>
         <button type="button" data-ss-tab="subscriptions">订阅套餐</button>
+        <button type="button" data-ss-tab="analytics">功能分析</button>
         <button type="button" data-ss-tab="logs">操作日志</button>
       </aside>
 
@@ -68,7 +71,7 @@
             <div class="um-card-head small">
               <div>
                 <h2>微信登录配置</h2>
-                <p>配置微信开放平台扫码登录。当前纯前端版本保留本地演示扫码能力，正式接入需要后端换取 openid/unionid。</p>
+                <p>配置微信开放平台扫码登录；授权回调、身份绑定和登录状态均由服务器校验与保存。</p>
               </div>
             </div>
             <div class="um-wechat-config" id="ssWechatConfigPanel"></div>
@@ -97,6 +100,24 @@
               </div>
             </div>
             <div id="ssSubscriptionPanel"></div>
+          </div>
+        </section>
+
+        <section class="ss-pane" data-ss-panel="analytics">
+          <div class="um-panel ss-analytics-panel">
+            <div class="um-card-head small">
+              <div>
+                <h2>功能分析</h2>
+                <p>按日期和角色查看去标识化的功能使用与成果汇总；数据从发布后开始累计，不展示个人记录。</p>
+              </div>
+            </div>
+            <div class="ss-analytics-filters">
+              <label>开始日期<input id="ssAnalyticsStart" type="date"></label>
+              <label>结束日期<input id="ssAnalyticsEnd" type="date"></label>
+              <label>角色<select id="ssAnalyticsRole"><option value="">全部角色</option><option value="teacher">教师/教研</option><option value="student">学员</option><option value="viewer">游客</option></select></label>
+              <button id="ssAnalyticsRefresh" type="button">刷新分析</button>
+            </div>
+            <div class="ss-analytics-content" id="ssAnalyticsContent" aria-live="polite"></div>
           </div>
         </section>
 
@@ -131,5 +152,6 @@
 <script defer src="src/39-global-shortcuts.js"></script>
 <script defer src="src/36-system-settings.js"></script>
 <script src="src/admin/48-admin-context-nav.js"></script>
+<script defer src="src/108-admin-ui-icons.js"></script>
 </body>
 </html>

@@ -139,6 +139,7 @@
       "kg_multi_workspace_closed_tabs_v1__",
       "kg_recall_association_library_v1__",
       "kg_practice_history_v1__",
+      "kg_practice_active_attempt_v1__",
       "kg_recall_association_management_v1__",
       "kg_user_feedback_reply_reads_v1__",
       "kg_user_message_reads_v1__"

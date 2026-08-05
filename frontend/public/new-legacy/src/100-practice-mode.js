@@ -9,6 +9,7 @@
   const PUBLISHED_BANKS_KEY='kg_question_banks_published_v1';
   const USER_KEY='kg_local_current_user_v1';
   const HISTORY_PREFIX='kg_practice_history_v1__';
+  const ACTIVE_ATTEMPT_PREFIX='kg_practice_active_attempt_v1__';
   const COUNTS=[10,20,60,180];
   const MAX_HEALTH=3;
   const SCHOLAR_MAX_SECONDS=80;
@@ -35,6 +36,21 @@
     try{return text(global.KGAuthCore?.currentUsername?.()||global.localStorage?.getItem(USER_KEY)||'guest')}catch(error){return 'guest'}
   }
   function historyKey(){return HISTORY_PREFIX+'user__'+encodeURIComponent(currentUser())}
+  function activeAttemptKey(){return ACTIVE_ATTEMPT_PREFIX+'user__'+encodeURIComponent(currentUser())}
+  function clearActiveAttempt(){try{global.sessionStorage?.removeItem(activeAttemptKey())}catch(error){}}
+  function persistActiveAttempt(indexOverride=null){
+    if(!state.active)return;
+    const release=selectedRelease();
+    const attempt={savedAt:Date.now(),paperId:state.selectedPaperId,releaseId:text(release?.releaseId),paperVersion:Number(release?.version||0),selectedCount:state.selectedCount,order:state.order,mode:state.mode,questions:state.questions,index:indexOverride==null?state.index:indexOverride,health:state.health,streak:state.streak,experience:state.experience,correct:state.correct,answered:state.answered,startedAt:state.startedAt,deadline:state.deadline,lastSettings:state.lastSettings};
+    try{global.sessionStorage?.setItem(activeAttemptKey(),JSON.stringify(attempt))}catch(error){}
+  }
+  function loadActiveAttempt(){
+    try{
+      const attempt=safeJson(global.sessionStorage?.getItem(activeAttemptKey()),null);
+      if(!attempt||Date.now()-Number(attempt.savedAt||0)>12*60*60*1000||!Array.isArray(attempt.questions)||!attempt.questions.length){clearActiveAttempt();return null}
+      return attempt;
+    }catch(error){return null}
+  }
   function formatDuration(ms){
     const total=Math.max(0,Math.floor(Number(ms||0)/1000)),minutes=Math.floor(total/60),seconds=total%60;
     return String(minutes).padStart(2,'0')+':'+String(seconds).padStart(2,'0');
@@ -188,6 +204,7 @@
   function advanceAfterAnswer(){
     state.index+=1;
     if(state.index>=state.questions.length||state.health<=0){finishPractice();return}
+    persistActiveAttempt();
     if(state.mode==='challenge'&&state.index%CHECKPOINT_INTERVAL===0){showCheckpoint();return}
     renderQuestion();
   }
@@ -200,9 +217,11 @@
       state.correct+=1;state.streak+=1;const bonus=streakBonus(state.streak);state.experience+=10+bonus;
       let healed=false;
       if(state.mode==='challenge'&&state.streak%5===0&&state.health<MAX_HEALTH){state.health+=1;healed=true}
-      if(state.mode==='scholar')setScholarSeconds(Math.min(SCHOLAR_MAX_SECONDS,remainingSeconds()+20));
+      const beforeSeconds=state.mode==='scholar'?remainingSeconds():0;
+      if(state.mode==='scholar')setScholarSeconds(Math.min(SCHOLAR_MAX_SECONDS,beforeSeconds+20));
+      const gainedSeconds=state.mode==='scholar'?Math.max(0,remainingSeconds()-beforeSeconds):0;
       if(state.streak>=3)showStreakPop('连胜 ×'+state.streak+(bonus?' · +'+bonus+' 经验':'')+(healed?' · +1 ♥':''));
-      showFeedback('正确'+(state.mode==='scholar'?' · +20 秒':'')+' · +'+(10+bonus)+' 经验','success');
+      showFeedback('正确'+(state.mode==='scholar'?(gainedSeconds?' · +'+gainedSeconds+' 秒':' · 时间已满'):'')+' · +'+(10+bonus)+' 经验','success');
     }else{
       state.streak=0;hideStreakPop();state.health=Math.max(0,state.health-1);
       if(state.mode==='scholar'){
@@ -211,6 +230,7 @@
       }else showFeedback('失误 · -1 ♥','danger');
     }
     renderHealth();
+    persistActiveAttempt(state.index+1);
     state.feedbackTimer=global.setTimeout(advanceAfterAnswer,FEEDBACK_DELAY);return correct;
   }
   function handleTimeout(){
@@ -218,24 +238,26 @@
     state.locked=true;lockOptions();state.answered+=1;state.streak=0;hideStreakPop();state.health=Math.max(0,state.health-1);dom.questionCard.classList.add('is-timeout');
     showFeedback('超时 · -1 ♥','danger');renderHealth();
     if(state.health>0)setScholarSeconds(40);
+    persistActiveAttempt(state.index+1);
     state.feedbackTimer=global.setTimeout(advanceAfterAnswer,FEEDBACK_DELAY);
   }
   function timerTick(){renderTimer();handleTimeout()}
   function startTimer(){
     if(state.mode!=='scholar')return;setScholarSeconds(SCHOLAR_MAX_SECONDS);state.timerId=global.setInterval(timerTick,120);
   }
+  function resumeTimer(){if(state.mode==='scholar'&&!state.timerId)state.timerId=global.setInterval(timerTick,120)}
   function showCheckpoint(){
     state.locked=true;setView('checkpoint');dom.checkpointStreak.textContent=String(state.streak);dom.checkpointExperience.textContent=String(state.experience);dom.checkpointDuration.textContent=formatDuration(elapsed());
   }
-  function continueCheckpoint(){if(!state.active)return;setView('game');renderQuestion()}
+  function continueCheckpoint(){if(!state.active)return;setView('game');renderQuestion();persistActiveAttempt()}
   function finishPractice(){
     if(!state.active)return;
     state.active=false;state.completed=true;state.endedAt=Date.now();clearTimers();hideStreakPop();setDangerVignette(false);renderProgress();
-    saveRecord('completed');dom.resultAccuracy.textContent=accuracy()+'%';dom.resultDuration.textContent=formatDuration(elapsed());dom.resultExperience.textContent=String(state.experience);setView('result');renderHistory();
+    saveRecord('completed');clearActiveAttempt();dom.resultAccuracy.textContent=accuracy()+'%';dom.resultDuration.textContent=formatDuration(elapsed());dom.resultExperience.textContent=String(state.experience);setView('result');renderHistory();
   }
   function abandonPractice(){
     if(!state.active)return;
-    state.active=false;state.endedAt=Date.now();clearTimers();hideStreakPop();setDangerVignette(false);if(!state.abandonedRecorded){saveRecord('abandoned');state.abandonedRecorded=true}closeExitConfirm();showLobby();
+    state.active=false;state.endedAt=Date.now();clearTimers();hideStreakPop();setDangerVignette(false);if(!state.abandonedRecorded){saveRecord('abandoned');state.abandonedRecorded=true}clearActiveAttempt();closeExitConfirm();showLobby();
   }
   function startPractice(mode){
     const release=selectedRelease(),count=Number(state.selectedCount);
@@ -246,7 +268,7 @@
     state.index=0;state.health=MAX_HEALTH;state.streak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
     state.lastSettings={paperId:release.id,count,order:state.order,mode:state.mode};
     dom.timer.hidden=state.mode!=='scholar';dom.timeRow.hidden=state.mode!=='scholar';
-    setView('game');renderQuestion();if(state.mode==='scholar')startTimer();return true;
+    setView('game');renderQuestion();if(state.mode==='scholar')startTimer();persistActiveAttempt();return true;
   }
   function startAgain(){
     const settings=state.lastSettings;if(!settings){showLobby();return}
@@ -256,6 +278,18 @@
   }
   function openExitConfirm(){if(!state.active)return;dom.exitConfirm.hidden=false;dom.exitConfirm.setAttribute('aria-hidden','false')}
   function closeExitConfirm(){dom.exitConfirm.hidden=true;dom.exitConfirm.setAttribute('aria-hidden','true')}
+  function restoreActiveAttempt(){
+    const attempt=loadActiveAttempt();if(!attempt)return false;
+    const release=state.releases.find(row=>row.id===text(attempt.paperId));
+    if(!release||text(release.releaseId)!==text(attempt.releaseId)||Number(release.version)!==Number(attempt.paperVersion)){clearActiveAttempt();return false}
+    state.selectedPaperId=text(attempt.paperId);state.selectedCount=Number(attempt.selectedCount)||attempt.questions.length;state.order=text(attempt.order)||'paper';state.mode=attempt.mode==='scholar'?'scholar':'challenge';state.questions=clone(attempt.questions);
+    state.index=Math.max(0,Number(attempt.index)||0);state.health=Math.max(0,Number(attempt.health));state.streak=Math.max(0,Number(attempt.streak)||0);state.experience=Math.max(0,Number(attempt.experience)||0);state.correct=Math.max(0,Number(attempt.correct)||0);state.answered=Math.max(0,Number(attempt.answered)||0);state.startedAt=Number(attempt.startedAt)||Date.now();state.deadline=Number(attempt.deadline)||0;state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;state.lastSettings=attempt.lastSettings||{paperId:state.selectedPaperId,count:state.selectedCount,order:state.order,mode:state.mode};
+    dom.timer.hidden=state.mode!=='scholar';dom.timeRow.hidden=state.mode!=='scholar';
+    if(state.index>=state.questions.length||state.health<=0){finishPractice();return true}
+    if(state.mode==='challenge'&&state.index>0&&state.index%CHECKPOINT_INTERVAL===0)showCheckpoint();else{setView('game');renderQuestion()}
+    if(state.mode==='scholar'){if(!state.deadline)state.deadline=Date.now()+SCHOLAR_MAX_SECONDS*1000;resumeTimer()}
+    return true;
+  }
   function renderHistory(){
     const history=read(historyKey(),[]),completed=(Array.isArray(history)?history:[]).filter(item=>item?.status==='completed').slice(0,6);
     dom.historySection.hidden=!completed.length;
@@ -264,6 +298,7 @@
   function clearHistory(){if(global.confirm&&!global.confirm('清空当前账号的练习记录？'))return;write(historyKey(),[]);renderHistory()}
   function syncCountOptions(){
     const release=selectedRelease(),available=release?.questions.length||0;let firstEnabled=0,currentEnabled=false;
+    const minimum=dom.countInputs[0];if(minimum){minimum.value=String(available>0&&available<COUNTS[0]?available:COUNTS[0]);const label=minimum.closest('label')?.querySelector('span');if(label)label.textContent=available>0&&available<COUNTS[0]?'全部 '+available:String(COUNTS[0])}
     dom.countInputs.forEach(input=>{const count=Number(input.value),enabled=available>=count;input.disabled=!enabled;if(enabled&&!firstEnabled)firstEnabled=count;if(enabled&&count===state.selectedCount)currentEnabled=true});
     if(!currentEnabled)state.selectedCount=firstEnabled||10;
     dom.countInputs.forEach(input=>input.checked=Number(input.value)===state.selectedCount);
@@ -292,7 +327,7 @@
     document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!dom.exitConfirm.hidden)closeExitConfirm()});
     global.addEventListener('storage',event=>{if(event.key===PUBLISHED_PAPERS_KEY&&!state.active)syncLobby();if(event.key===USER_KEY&&!state.active)renderHistory()});
     global.addEventListener('kg-auth-session-change',()=>{if(!state.active)renderHistory()});
-    global.addEventListener('pagehide',()=>{if(state.active&&!state.abandonedRecorded){state.endedAt=Date.now();saveRecord('abandoned');state.abandonedRecorded=true}});
+    global.addEventListener('pagehide',()=>{const answering=document.body.dataset.practiceView==='game'&&state.locked;persistActiveAttempt(answering?state.index+1:state.index)});
   }
   function cacheDom(){
     Object.assign(dom,{
@@ -303,7 +338,7 @@
     });
   }
   function snapshot(){return {mode:state.mode,index:state.index,health:state.health,streak:state.streak,experience:state.experience,correct:state.correct,answered:state.answered,remainingSeconds:state.mode==='scholar'?remainingSeconds():null,active:state.active,view:document.body.dataset.practiceView||'',questionCount:state.questions.length}}
-  function init(){cacheDom();bind();syncLobby();setView('lobby')}
+  function init(){cacheDom();bind();syncLobby();if(!restoreActiveAttempt())setView('lobby')}
 
   const api=Object.freeze({init,startPractice,answerById:id=>answer(id,dom.options.querySelector('[data-option-id="'+CSS.escape(text(id))+'"]')),finishPractice,showLobby,loadReleases,snapshot,constants:Object.freeze({COUNTS:[...COUNTS],MAX_HEALTH,SCHOLAR_MAX_SECONDS,CHECKPOINT_INTERVAL})});
   global.KGPracticeMode=api;

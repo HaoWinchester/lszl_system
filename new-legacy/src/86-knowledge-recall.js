@@ -15,7 +15,7 @@
   let rootMap=buildRootMap(question);
   let keywordMatchers=buildKeywordMatchers(rootMap);
   let state={nodes:[],edges:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
-  let isDragging=false,dragStart=null,worldStart=null,customOpen=false;
+  let isDragging=false,dragStart=null,worldStart=null,customOpen=false,lastViewportSize=null;
   let progressSaveTimer=0,questionSessionToken=0,cardClickTimer=0,searchTimer=0;
   const destroyingNodeIds=new Set();
   let questionBrowser={bankId:'',filter:'all'};
@@ -563,8 +563,22 @@
     const customBtn=$('krCustomBtn'),customForm=$('krCustomForm'),customInput=$('krCustomInput'),customSave=$('krCustomSaveBtn'),centerBtn=$('krCenterNodeBtn'),moreBtn=$('krMoreChoicesBtn');
     if(moreBtn)moreBtn.onclick=()=>{state.choiceOffsets[node.dataId]=Number(d.nextOffset)||0;saveProgress();openNodeGuide(instanceId,liveAnchor,{countOpen:false})};
     if(customBtn)customBtn.onclick=()=>{customOpen=!customOpen;customForm.hidden=!customOpen;if(customOpen)setTimeout(()=>customInput&&customInput.focus(),20)};
-    if(customSave)customSave.onclick=()=>{const title=(customInput.value||'').trim();if(title)createCustomChild(node,title)};
-    if(customInput)customInput.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const title=(customInput.value||'').trim();if(title)createCustomChild(node,title)}};
+    const submitCustom=()=>{
+      const title=(customInput?.value||'').trim();
+      if(!title){
+        customInput?.setCustomValidity('请输入要添加的知识点');
+        customInput?.reportValidity();
+        customInput?.focus();
+        return;
+      }
+      customInput?.setCustomValidity('');
+      createCustomChild(node,title);
+    };
+    if(customSave)customSave.onclick=submitCustom;
+    if(customInput){
+      customInput.oninput=()=>customInput.setCustomValidity('');
+      customInput.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();submitCustom()}};
+    }
     if(centerBtn)centerBtn.onclick=()=>centerOn(node.x,node.y,true);
     requestAnimationFrame(()=>placeGuide(liveAnchor));
   }
@@ -736,7 +750,21 @@
     viewport.addEventListener('pointercancel',()=>{isDragging=false;viewport.classList.remove('dragging')});
     viewport.addEventListener('wheel',e=>{if(e.target.closest('.kr-canvas-overlay-left,.kr-question-library-trigger,button,a,input,select,textarea'))return;e.preventDefault();zoomByLevel(e.deltaY<0?1:-1,WHEEL_ZOOM_LEVELS,e.clientX,e.clientY,false)},{passive:false});
     viewport.addEventListener('dblclick',e=>{if(e.target.closest('.kr-node,.kr-question-card,.kr-guide,.kr-canvas-overlay-left,.kr-question-library-trigger,button,a,input,select,textarea'))return;centerOn(0,0,true)});
-    window.addEventListener('resize',()=>{applyTransform(false);if(!state.nodes.length)centerOn(0,0,false);if(!guide.hidden&&guide.dataset.dragged==='1'){const pos=clampGuidePosition(parseFloat(guide.style.left)||0,parseFloat(guide.style.top)||0);guide.style.left=Math.round(pos.left)+'px';guide.style.top=Math.round(pos.top)+'px';}});
+    const rect=viewport.getBoundingClientRect();lastViewportSize={width:rect.width,height:rect.height};
+    window.addEventListener('resize',()=>{
+      const next=viewport.getBoundingClientRect();
+      if(lastViewportSize){
+        state.transform.x+=(next.width-lastViewportSize.width)/2;
+        state.transform.y+=(next.height-lastViewportSize.height)/2;
+      }
+      lastViewportSize={width:next.width,height:next.height};
+      applyTransform(false);
+      if(!state.nodes.length)centerOn(0,0,false);
+      if(!guide.hidden&&guide.dataset.dragged==='1'){
+        const pos=clampGuidePosition(parseFloat(guide.style.left)||0,parseFloat(guide.style.top)||0);
+        guide.style.left=Math.round(pos.left)+'px';guide.style.top=Math.round(pos.top)+'px';
+      }
+    });
   }
   function renderStats(){
     const el=$('krSessionStats');if(!el)return;

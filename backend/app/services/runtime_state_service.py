@@ -14,7 +14,7 @@ from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.user import User
 from app.services import file_service, guided_learning_service, user_service
 from app.web.bootstrap import PAGE_NAMESPACES
-from app.web.schemas import RuntimeStateUpdate
+from app.web.schemas import RuntimeMutation, RuntimeStateUpdate
 
 MAX_VALUE_BYTES = 8 * 1024 * 1024
 MAX_TOTAL_BYTES = 48 * 1024 * 1024
@@ -133,6 +133,7 @@ PREFIXES = (
     "kg_recall_association_library_v1__",
     # v9.0-p4.1.1 新增业务键（动态 id / subject 后缀）
     "kg_practice_history_v1__",
+    "kg_practice_active_attempt_v1__",
     "kg_recall_association_management_v1__",
     "kg_user_feedback_reply_reads_v1__",
     "kg_user_message_reads_v1__",
@@ -164,12 +165,26 @@ SHARED_KEYS = frozenset({
     "kg_admin_settings_v1",
 })
 
+TEACHING_SHARED_KEYS = SHARED_KEYS - {"kg_admin_settings_v1"}
+PUBLISHER_COLLECTION_KEYS = frozenset({
+    "kg_question_banks_published_v1",
+    "kg_exam_papers_published_v1",
+    "kg_course_config_releases_v1",
+    "kg_learning_tasks_v1",
+    "kg_activity_collections_v1",
+})
+SERVER_OWNED_KEYS = frozenset({"kg_announcements_v1", "kg_user_feedback_v1"})
+
 
 class RuntimeStateValidationError(ValueError):
     pass
 
 
 class RuntimeStateConflictError(ValueError):
+    pass
+
+
+class RuntimeStatePermissionError(ValueError):
     pass
 
 
@@ -205,6 +220,13 @@ def validate_update(update: RuntimeStateUpdate) -> None:
             raise RuntimeStateValidationError(f"存储键未登记：{key}")
         if len(value.encode("utf-8")) > MAX_VALUE_BYTES:
             raise RuntimeStateValidationError(f"存储项超过大小限制：{key}")
+    for mutation in update.mutations:
+        if not key_allowed(mutation.key):
+            raise RuntimeStateValidationError(f"存储键未登记：{mutation.key}")
+        if mutation.operation == "setItem" and mutation.value is None:
+            raise RuntimeStateValidationError(f"setItem 缺少 value：{mutation.key}")
+        if mutation.value is not None and len(mutation.value.encode("utf-8")) > MAX_VALUE_BYTES:
+            raise RuntimeStateValidationError(f"存储项超过大小限制：{mutation.key}")
     total = sum(
         len(key.encode("utf-8")) + len(value.encode("utf-8"))
         for key, value in update.storage.items()
@@ -215,15 +237,119 @@ def validate_update(update: RuntimeStateUpdate) -> None:
         raise RuntimeStateValidationError("请求 ID 格式不正确")
 
 
+def shared_key_writable(key: str, role: str) -> bool:
+    if key == "kg_admin_settings_v1":
+        return role == "admin"
+    return key in TEACHING_SHARED_KEYS and role in {"admin", "teacher"}
+
+
+def shared_key_readable(key: str, role: str) -> bool:
+    return key != "kg_admin_settings_v1" or role == "admin"
+
+
+def server_owned_key(key: str) -> bool:
+    return key in SERVER_OWNED_KEYS
+
+
+def private_runtime_storage(raw: object) -> dict[str, str]:
+    values = raw if isinstance(raw, dict) else {}
+    return {
+        str(key): str(value)
+        for key, value in values.items()
+        if str(key) not in SHARED_KEYS and str(key) not in SERVER_OWNED_KEYS
+    }
+
+
+def update_mutations(update: RuntimeStateUpdate) -> list[RuntimeMutation]:
+    if update.mutations:
+        return list(update.mutations)
+    if update.operation in {"setItem", "removeItem"} and update.key:
+        return [RuntimeMutation(operation=update.operation, key=update.key, value=update.value)]
+    return []
+
+
+def explicit_shared_mutations(update: RuntimeStateUpdate) -> list[RuntimeMutation]:
+    return [mutation for mutation in update_mutations(update) if mutation.key in SHARED_KEYS]
+
+
+def _publisher_id(item: object, key: str) -> str:
+    if not isinstance(item, dict):
+        return ""
+    if key == "kg_learning_tasks_v1":
+        authorship = item.get("authorship")
+        if isinstance(authorship, dict):
+            return str(authorship.get("createdByUserId") or "")
+        return ""
+    if key == "kg_activity_collections_v1":
+        authorship = item.get("authorship")
+        if isinstance(authorship, dict):
+            return str(authorship.get("createdByUserId") or "")
+        return ""
+    publisher = item.get("publishedBy")
+    if isinstance(publisher, dict):
+        return str(publisher.get("id") or publisher.get("username") or "")
+    return str(publisher or "")
+
+
+def visible_shared_value(key: str, value: str, owner: str) -> str:
+    """Remove account-private records before a shared collection reaches a browser."""
+    if key != "kg_activity_collections_v1":
+        return value
+    try:
+        rows = json.loads(value or "[]")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return "[]"
+    if not isinstance(rows, list):
+        return "[]"
+    visible = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("visibility") or "private") == "shared" or _publisher_id(row, key) == owner:
+            visible.append(row)
+    return _json(visible)
+
+
+def merge_shared_value(key: str, existing: str, incoming: str, owner: str) -> str:
+    """Keep other publishers' rows when one publisher replaces its own catalog."""
+    if key not in PUBLISHER_COLLECTION_KEYS:
+        return incoming
+    try:
+        old_rows = json.loads(existing or "[]")
+        new_rows = json.loads(incoming or "[]")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return incoming
+    if not isinstance(old_rows, list) or not isinstance(new_rows, list):
+        return incoming
+    retained = [row for row in old_rows if _publisher_id(row, key) != owner]
+    owned = [row for row in new_rows if _publisher_id(row, key) == owner]
+    return _json([*retained, *owned])
+
+
+def remove_publisher_rows(key: str, existing: str, owner: str) -> str:
+    """Remove only the caller's rows from a multi-publisher shared catalog."""
+    if key not in PUBLISHER_COLLECTION_KEYS:
+        return ""
+    try:
+        rows = json.loads(existing or "[]")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return "[]"
+    if not isinstance(rows, list):
+        return "[]"
+    return _json([row for row in rows if _publisher_id(row, key) != owner])
+
+
 async def get_state(db: AsyncSession, owner: str) -> tuple[dict[str, str], int]:
     row = await db.get(RuntimeState, owner)
-    storage = {str(k): str(v) for k, v in (row.storage or {}).items()} if row else {}
+    user = await db.get(User, owner)
+    role = user.role if user else "viewer"
+    storage = private_runtime_storage(row.storage if row else {})
     revision = row.revision if row else 0
     # 合并 v9 全局共享键（published 类）：所有用户读同一份，教师发布 → 学员可读。
     result = await db.execute(select(SharedRuntimeState.key, SharedRuntimeState.value))
     for key, value in result:
-        if key in SHARED_KEYS:
-            storage[key] = str(value)
+        if key in SHARED_KEYS and shared_key_readable(key, role):
+            storage[key] = visible_shared_value(key, str(value), owner)
     return storage, revision
 
 
@@ -397,7 +523,7 @@ async def ensure_domain_seed(
         changed = await _seed_guided(db, user.username, storage) or changed
     if not changed:
         await db.commit()
-        return storage, revision
+        return await get_state(db, user.username)
 
     if row is None:
         row = RuntimeState(owner_id=user.username, storage=storage, revision=1)
@@ -407,15 +533,27 @@ async def ensure_domain_seed(
         row.revision += 1
     await db.commit()
     await db.refresh(row)
-    return dict(row.storage or {}), row.revision
+    return await get_state(db, user.username)
 
 
 async def apply_update(
     db: AsyncSession,
     owner: str,
+    role: str,
     update: RuntimeStateUpdate,
 ) -> tuple[dict[str, str], int]:
     validate_update(update)
+    protected_mutations = [
+        mutation.key for mutation in update_mutations(update) if server_owned_key(mutation.key)
+    ]
+    if protected_mutations:
+        raise RuntimeStatePermissionError(
+            f"该数据只能通过专用接口修改：{protected_mutations[0]}"
+        )
+    shared_mutations = explicit_shared_mutations(update)
+    forbidden = [mutation.key for mutation in shared_mutations if not shared_key_writable(mutation.key, role)]
+    if forbidden:
+        raise RuntimeStatePermissionError(f"当前角色无权限修改共享内容：{forbidden[0]}")
     await _lock_owner(db, owner)
     row = await db.get(RuntimeState, owner)
     if row is not None and row.last_request_id == update.requestId:
@@ -437,8 +575,13 @@ async def apply_update(
         storage.pop(update.key, None)
 
     # 拆分：v9 全局共享键（published 类）→ 虚拟 SHARED_OWNER；其余 → 当前 owner。
-    own_part = {k: v for k, v in storage.items() if k not in SHARED_KEYS}
-    shared_part = {k: v for k, v in storage.items() if k in SHARED_KEYS}
+    own_part = {
+        k: v for k, v in storage.items()
+        if k not in SHARED_KEYS and k not in SERVER_OWNED_KEYS
+    }
+    for key in SERVER_OWNED_KEYS:
+        if key in current_storage:
+            own_part[key] = current_storage[key]
 
     total = sum(len(k.encode("utf-8")) + len(v.encode("utf-8")) for k, v in own_part.items())
     if total > MAX_TOTAL_BYTES:
@@ -457,19 +600,29 @@ async def apply_update(
         row.revision += 1
         row.last_request_id = update.requestId
 
-    # 共享键写到独立 shared_runtime_states 表（每键一行）。前端 syncPublishedBanks 已
-    # read-modify-write 合并好，按键覆盖；removeItem 的共享键删行。
-    for key, value in shared_part.items():
+    # 共享区只接受本批次显式 mutation，避免完整账号快照把其他发布者的新内容覆盖掉。
+    for mutation in shared_mutations:
+        key = mutation.key
+        await _lock_owner(db, f"shared:{key}")
         shared_row = await db.get(SharedRuntimeState, key)
+        if mutation.operation == "removeItem":
+            if shared_row is not None:
+                if key in PUBLISHER_COLLECTION_KEYS:
+                    shared_row.value = remove_publisher_rows(key, shared_row.value, owner)
+                    shared_row.updated_by = owner
+                else:
+                    await db.delete(shared_row)
+            continue
+        value = str(mutation.value or "")
         if shared_row is None:
-            db.add(SharedRuntimeState(key=key, value=value, updated_by=owner))
+            db.add(SharedRuntimeState(
+                key=key,
+                value=merge_shared_value(key, "[]", value, owner),
+                updated_by=owner,
+            ))
         else:
-            shared_row.value = value
+            shared_row.value = merge_shared_value(key, shared_row.value, value, owner)
             shared_row.updated_by = owner
-    if update.operation == "removeItem" and update.key in SHARED_KEYS:
-        shared_row = await db.get(SharedRuntimeState, update.key)
-        if shared_row is not None:
-            await db.delete(shared_row)
 
     await db.commit()
     await db.refresh(row)

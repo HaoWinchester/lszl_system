@@ -46,7 +46,7 @@
             <button class="primary" id="authDoLoginBtn" type="button">登录</button>
             <button id="authRegisterBtn" type="button">注册并登录</button>
           </div>
-          <div class="auth-note">当前为本地单文件多用户：账号和数据保存在本浏览器 localStorage 中。不同用户的数据互相隔离；如需跨设备/真正安全登录，需要后续接入服务器。</div>
+          <div class="auth-note">账号身份与业务数据由服务器按用户隔离保存；请勿与他人共享密码。</div>
         </div>
       </div>
     </div>`;

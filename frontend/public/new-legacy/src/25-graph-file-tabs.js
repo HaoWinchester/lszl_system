@@ -129,6 +129,7 @@
   }
   function applyFile(file){
     if(!file||!file.graphData)return false;
+    global.resetGraphHistory?.();
     try{
       state=typeof global.sanitizeState==='function'?global.sanitizeState(file.graphData):file.graphData;
     }catch(err){console.warn('[KGGraphFileTabs] invalid graph file:',err);return false}

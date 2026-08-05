@@ -2,7 +2,9 @@
 (function(global){
   const $=id=>document.getElementById(id);
   const Repository=()=>global.KGEngagementRepository;
-  let shell,trigger,popover,badge,feedbackMenuBadge,messageMenuBadge,refreshTimer=0,toastTimer=0;
+  let shell,trigger,popover,badge,feedbackMenuBadge,messageMenuBadge,refreshTimer=0,toastTimer=0,dialogReturnFocus=null;
+  const FOCUSABLE='button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  const MAX_ATTACHMENT_BYTES=160*1024;
   function escapeHtml(value){return String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]))}
   function fmtTime(value){try{return new Date(Number(value||0)).toLocaleString('zh-CN',{hour12:false})}catch(error){return '—'}}
   function safeHref(value){const href=String(value||'').trim();if(!href)return '';if(/^(https?:\/\/|\/?[\w.-]+(?:\/[^\s]*)?|[\w.-]+\.html(?:[?#][^\s]*)?)$/i.test(href))return href;return ''}
@@ -13,7 +15,7 @@
   function ensureShell(){
     shell=$('supportCenterShell');
     if(shell)return shell;
-    const toolbar=document.querySelector('.canvas-toolbar-right');if(!toolbar)return null;
+    const toolbar=document.querySelector('.canvas-toolbar-right,.lp-top-actions,.practice-header-actions,.fm-top-actions');if(!toolbar)return null;
     shell=document.createElement('div');shell.id='supportCenterShell';shell.className='support-center-shell';
     shell.innerHTML=`<button class="support-center-trigger" id="supportCenterBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="supportCenterMenu" title="帮助、反馈与消息"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.35 2.35 0 1 1 3.5 2.05c-.82.45-1.3.93-1.3 1.95"/><path d="M12 17h.01"/></svg><span class="support-center-badge" id="supportCenterBadge" hidden>0</span></button><div class="support-center-popover" id="supportCenterMenu" role="menu" hidden><button type="button" role="menuitem" data-support-action="help"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5Z"/><path d="M4 5.5v16"/></svg><span>帮助中心</span></button><button type="button" role="menuitem" data-support-action="feedback"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v12H8l-4 4Z"/><path d="M8 9h8M8 13h5"/></svg><span>需求反馈</span><b class="menu-badge" id="supportFeedbackMenuBadge" hidden>0</b></button><button type="button" role="menuitem" data-support-action="messages"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7"/><path d="M10 19h4"/></svg><span>消息</span><b class="menu-badge" id="supportMessageMenuBadge" hidden>0</b></button></div>`;
     const account=document.getElementById('accountMenuShell');if(account&&account.parentNode===toolbar)account.insertAdjacentElement('afterend',shell);else toolbar.appendChild(shell);
@@ -25,11 +27,20 @@
     backdrop.innerHTML=`<section class="engagement-dialog" role="dialog" aria-modal="true" aria-labelledby="engagementDialogTitle"><header><div><h2 id="engagementDialogTitle">需求反馈</h2><p id="engagementDialogSubtitle"></p></div><button class="engagement-close" id="engagementDialogClose" type="button" aria-label="关闭" title="关闭"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header><div class="engagement-body" id="engagementDialogBody"></div></section>`;
     document.body.appendChild(backdrop);$('engagementDialogClose').addEventListener('click',closeDialog);backdrop.addEventListener('click',event=>{if(event.target===backdrop)closeDialog()});return backdrop;
   }
-  function closeDialog(){const dialog=$('engagementDialogBackdrop');if(dialog)dialog.hidden=true}
-  function openDialog(title,subtitle=''){const dialog=ensureDialog();$('engagementDialogTitle').textContent=title;$('engagementDialogSubtitle').textContent=subtitle;$('engagementDialogBody').innerHTML='';dialog.hidden=false;return $('engagementDialogBody')}
+  function visibleFocusable(root){return [...root.querySelectorAll(FOCUSABLE)].filter(item=>!item.hidden&&item.getClientRects().length>0)}
+  function trapDialogFocus(event){
+    const backdrop=$('engagementDialogBackdrop');if(event.key!=='Tab'||!backdrop||backdrop.hidden)return;
+    const items=visibleFocusable(backdrop);if(!items.length){event.preventDefault();return}
+    const first=items[0],last=items[items.length-1];
+    if(!backdrop.contains(document.activeElement)){event.preventDefault();(event.shiftKey?last:first).focus()}
+    else if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}
+    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
+  }
+  function closeDialog(){const dialog=$('engagementDialogBackdrop');if(!dialog||dialog.hidden)return;dialog.hidden=true;document.body.classList.remove('engagement-dialog-open');const target=dialogReturnFocus;dialogReturnFocus=null;requestAnimationFrame(()=>target?.focus?.())}
+  function openDialog(title,subtitle=''){const dialog=ensureDialog();dialogReturnFocus=trigger||document.activeElement;$('engagementDialogTitle').textContent=title;$('engagementDialogSubtitle').textContent=subtitle;$('engagementDialogBody').innerHTML='';dialog.hidden=false;document.body.classList.add('engagement-dialog-open');requestAnimationFrame(()=>$('engagementDialogClose')?.focus());return $('engagementDialogBody')}
   function statusLabel(status){return ({pending:'待处理',in_progress:'处理中',resolved:'已解决',closed:'已关闭'}[status]||status||'待处理')}
   async function filePayload(file){
-    if(!file)return null;if(file.size>2*1024*1024)throw new Error('截图不能超过 2MB。');
+    if(!file)return null;if(file.size>MAX_ATTACHMENT_BYTES)throw new Error('截图不能超过 160KB。');
     const allowed=/^image\/(png|jpeg|webp|gif)$/i.test(file.type||'');if(!allowed)throw new Error('截图仅支持 PNG、JPG、WebP 或 GIF。');
     const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('截图读取失败。'));reader.readAsDataURL(file)});
     return {name:file.name,type:file.type,size:file.size,dataUrl};
@@ -41,12 +52,14 @@
   }
   function renderNewFeedback(body){
     const content=body.querySelector('#feedbackTabContent');if(!content)return;
-    content.innerHTML=`<form class="engagement-form" id="feedbackForm"><div class="engagement-form-row"><label>反馈类型<select id="feedbackType"><option value="suggestion">功能建议</option><option value="bug">问题反馈</option><option value="content">内容问题</option><option value="other">其他</option></select></label><label>联系方式（选填）<input id="feedbackContact" maxlength="120" placeholder="邮箱或手机号"/></label></div><label>标题<input id="feedbackTitle" maxlength="100" required placeholder="请简要说明问题或建议"/></label><label>详细描述<textarea id="feedbackDetail" maxlength="4000" required placeholder="请描述发生了什么、期望结果以及复现步骤"></textarea></label><label>截图（选填，最大 2MB）<input id="feedbackAttachment" type="file" accept="image/png,image/jpeg,image/webp,image/gif"/></label><div class="engagement-note">将自动记录当前页面、账号角色和应用版本，不会自动提交图谱或题目内容。</div><button class="engagement-primary" type="submit">提交反馈</button></form>`;
+    content.innerHTML=`<form class="engagement-form" id="feedbackForm" novalidate><div class="engagement-form-row"><label>反馈类型<select id="feedbackType"><option value="suggestion">功能建议</option><option value="bug">问题反馈</option><option value="content">内容问题</option><option value="other">其他</option></select></label><label>联系方式（选填）<input id="feedbackContact" maxlength="120" placeholder="邮箱或手机号"/></label></div><label>标题<input id="feedbackTitle" maxlength="100" aria-describedby="feedbackFormError" placeholder="请简要说明问题或建议"/></label><label>详细描述<textarea id="feedbackDetail" maxlength="4000" aria-describedby="feedbackFormError" placeholder="请描述发生了什么、期望结果以及复现步骤"></textarea></label><label>截图（选填，最大 160KB）<input id="feedbackAttachment" type="file" accept="image/png,image/jpeg,image/webp,image/gif"/></label><div class="engagement-form-error" id="feedbackFormError" role="alert" hidden></div><div class="engagement-note">将自动记录当前页面、账号角色和应用版本，不会自动提交图谱或题目内容。</div><button class="engagement-primary" type="submit">提交反馈</button></form>`;
     $('feedbackForm').addEventListener('submit',async event=>{
-      event.preventDefault();const button=event.submitter||$('feedbackForm').querySelector('[type="submit"]');button.disabled=true;
+      event.preventDefault();const title=$('feedbackTitle').value.trim(),detail=$('feedbackDetail').value.trim(),errorBox=$('feedbackFormError');
+      if(!title||!detail){errorBox.textContent='请填写反馈标题和详细描述。';errorBox.hidden=false;(title?$('feedbackDetail'):$('feedbackTitle')).focus();return}
+      errorBox.hidden=true;const button=event.submitter||$('feedbackForm').querySelector('[type="submit"]');button.disabled=true;
       try{
         const attachment=await filePayload($('feedbackAttachment').files?.[0]);
-        await Repository().submitFeedback({type:$('feedbackType').value,title:$('feedbackTitle').value,detail:$('feedbackDetail').value,contact:$('feedbackContact').value,page:location.pathname.split('/').pop()||'index.html',appVersion:document.documentElement.dataset.release||'v9.0-p4.1.1',attachment});
+        await Repository().submitFeedback({type:$('feedbackType').value,title,detail,contact:$('feedbackContact').value,page:location.pathname.split('/').pop()||'index.html',appVersion:global.__KG_DIRECT_BOOTSTRAP__?.releaseVersion||document.documentElement.dataset.release||'',attachment});
         toast('反馈已提交，谢谢你的建议！');$('feedbackForm').reset();
       }catch(error){toast(error.message||'反馈提交失败。',true)}finally{button.disabled=false}
     });
@@ -71,7 +84,7 @@
       $('messageMarkAllBtn')?.addEventListener('click',async()=>{await Repository().markAllMessagesRead();body.querySelectorAll('.message-card').forEach(card=>card.classList.remove('unread'));body.querySelectorAll('[data-message-read]').forEach(button=>button.remove());$('messageMarkAllBtn').disabled=true;refreshUnread()});
     }catch(error){body.innerHTML=`<div class="engagement-empty">${escapeHtml(error.message||'消息读取失败。')}</div>`}
   }
-  function openHelp(){closePopover();location.href='help-center.html'}
+  function openHelp(){closePopover();const returnTo=(location.pathname.split('/').pop()||'index.html')+location.search+location.hash;location.href='help-center.html?returnTo='+encodeURIComponent(returnTo)}
   function applyBadge(element,count){if(!element)return;const safe=Math.max(0,Number(count||0));element.textContent=safe>99?'99+':String(safe);element.hidden=safe<=0}
   async function refreshUnread(){
     if(!Repository()||!badge)return;
@@ -83,6 +96,7 @@
     }catch(error){applyBadge(badge,0);applyBadge(messageMenuBadge,0);applyBadge(feedbackMenuBadge,0);applyBadge($('feedbackTabBadge'),0)}
   }
   function onKeydown(event){
+    trapDialogFocus(event);
     if(event.key==='Escape'){const dialog=$('engagementDialogBackdrop');if(dialog&&!dialog.hidden)closeDialog();else closePopover({focus:true});return}
     if(!popover||popover.hidden)return;const items=[...popover.querySelectorAll('[role="menuitem"]')];const index=items.indexOf(document.activeElement);if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const step=event.key==='ArrowDown'?1:-1;items[(Math.max(index,0)+step+items.length)%items.length]?.focus()}
   }

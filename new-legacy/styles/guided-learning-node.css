@@ -31,6 +31,7 @@ button{touch-action:manipulation}
 .gln-main{width:min(800px,calc(100% - 36px));margin:0 auto;padding:28px 0 calc(var(--gln-footer-height) + 52px)}
 .gln-main.is-wide{width:min(1200px,calc(100% - 44px))}
 .gln-activity{min-height:410px;padding:34px;border:1px solid var(--gln-border);border-radius:24px;background:var(--gln-card)}
+.gln-activity.gln-keyword-activity{min-height:300px}
 .gln-question-head{margin-bottom:24px}
 .gln-question-head span{display:block;margin-bottom:8px;color:var(--gln-primary);font-size:11px;font-weight:900;letter-spacing:.08em}
 .gln-question-head h2{margin:0;font-size:22px;line-height:1.62}

@@ -411,7 +411,7 @@ function patchMembershipUiLink(generated) {
 // 定制层（cd38328 业务埋点）：在 v9 重构后的 5 个 src 文件成功操作点注入 KGFeatureAnalytics.track。
 // v9 改了 65（saveBanks 签名）与 86（saveProgress debounce）的保存函数，锚点用 v9 专属；
 // new-legacy 已含全部埋点，marker guard 跳过。graph 埋点在 bridge（direct-graph-adapter.js，已含）。
-const ANALYTICS_TRACK = 'const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){};'
+const ANALYTICS_TRACK = 'const track=(globalThis.KGFeatureAnalytics&&globalThis.KGFeatureAnalytics.track)||function(){};'
 
 function injectTrack(source, marker, before, after, label) {
   if (source.includes(marker)) return source
@@ -524,9 +524,18 @@ function versionPageAssets(html, version) {
     (_, prefix, quote, asset) => `${prefix}${asset}${query}${quote}`,
   )
   return withStyles.replace(
-    /(<script\b[^>]*\bsrc=(['"]))((?:\.\/)?src\/[^'"?#]+\.js)\2/gi,
-    (_, prefix, quote, asset) => `${prefix}${asset}${query}${quote}`,
+    /(<script\b[^>]*\bsrc=(['"]))((?!https?:|\/\/|data:)[^'"?#]+\.js)\2/gi,
+    (_, prefix, quote, asset) => asset.replace(/^\.\//, '') === 'server-state-bootstrap.js'
+      ? `${prefix}${asset}${quote}`
+      : `${prefix}${asset}${query}${quote}`,
   )
+}
+
+function versionPageRelease(html, version) {
+  if (/\bdata-release=(['"])[^'"]*\1/i.test(html)) {
+    return html.replace(/\bdata-release=(['"])[^'"]*\1/i, `data-release="${version}"`)
+  }
+  return html.replace(/<html\b/i, `<html data-release="${version}"`)
 }
 
 function injectPage(html, page, version) {
@@ -609,7 +618,7 @@ function injectPage(html, page, version) {
       `${authTag}\n<script defer src="./direct-auth-adapter.js"></script><!-- kg-auth:generated -->`,
     )
   }
-  return versionPageAssets(generated, version)
+  return versionPageAssets(versionPageRelease(generated, version), version)
 }
 
 function diffFiles(previous = {}, next = {}) {

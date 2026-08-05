@@ -10,6 +10,8 @@
 </script>
 <link rel="stylesheet" href="styles/file-manager.css"/>
 <link rel="stylesheet" href="styles/file-manager-organize.css"/>
+<link rel="stylesheet" href="styles/user-center.css"/>
+<link rel="stylesheet" href="styles/support-center.css"/>
 </head>
 <body class="fm-page">
 <div class="fm-mobile-readonly-notice" id="fmMobileReadonlyNotice" hidden role="status">
@@ -25,12 +27,16 @@
         <span class="fm-brand-mark" aria-hidden="true">
           <svg viewBox="0 0 48 48"><path d="M12 13 24 7l12 7v13l-12 7-12-7Z"/><circle cx="12" cy="13" r="4"/><circle cx="24" cy="7" r="4"/><circle cx="36" cy="14" r="4"/><circle cx="36" cy="27" r="4"/><circle cx="24" cy="34" r="4"/><circle cx="12" cy="27" r="4"/></svg>
         </span>
-        <span class="fm-brand-text"><strong>知识图谱</strong><small>v8.4.22</small></span>
+        <span class="fm-brand-text"><strong>知识图谱</strong><small>云端文件</small></span>
       </a>
       <button class="fm-sidebar-collapse" id="fmSidebarCollapseBtn" type="button" aria-label="收起侧栏" title="收起侧栏">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
       </button>
     </div>
+    <nav class="fm-mobile-readonly-actions" aria-label="移动端快捷返回">
+      <a href="index.html?mode=free">返回首页</a>
+      <a href="learning-path.html">学习路径</a>
+    </nav>
 
     <div class="fm-sidebar-scroll" id="fmSidebarScroll">
       <div class="fm-primary-stack"><button class="fm-primary-action" id="fmNewFileBtn" type="button">
@@ -59,7 +65,7 @@
 
       <section class="fm-storage-card" aria-labelledby="fmStorageTitle">
         <div class="fm-section-label" id="fmStorageTitle">存储空间</div>
-        <div class="fm-storage-head"><strong id="fmStorageUsed">0 B</strong><span id="fmStorageQuota">浏览器本地存储</span></div>
+        <div class="fm-storage-head"><strong id="fmStorageUsed">0 B</strong><span id="fmStorageQuota">账号云端存储</span></div>
         <div class="fm-progress" aria-hidden="true"><i id="fmStorageBar"></i></div>
         <p id="fmStorageRatio">正在统计…</p>
         <dl>
@@ -117,7 +123,8 @@
               <div><strong id="fmAccountName">访客</strong><small id="fmAccountMeta">返回编辑器可登录账号</small></div>
             </div>
             <a href="index.html" role="menuitem"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h14M9 7l-5 5 5 5"/><path d="M14 5h6v14h-6"/></svg><span>返回编辑器</span></a>
-            <a href="system-settings.html" role="menuitem"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.8-.6-1.5.9-2-2.1-2.1-2 .9-1.5-.6L10.5 2h-3l-.8 2-1.5.6-2-.9L1.1 5.8l.9 2-.6 1.5-2 .8v3l2 .8.6 1.5-.9 2 2.1 2.1 2-.9 1.5.6.8 2h3l.8-2 1.5-.6 2 .9 2.1-2.1-.9-2 .6-1.5Z" transform="translate(2.5 0) scale(.8)"/></svg><span>系统设置</span></a>
+            <button id="fmUserCenterBtn" type="button" role="menuitem" hidden><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>用户中心</span></button>
+            <a href="system-settings.html" id="fmSystemSettingsLink" role="menuitem" hidden><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.8-.6-1.5.9-2-2.1-2.1-2 .9-1.5-.6L10.5 2h-3l-.8 2-1.5.6-2-.9L1.1 5.8l.9 2-.6 1.5-.9 2 2.1 2.1 2-.9 1.5.6.8 2h3l.8-2 1.5-.6 2 .9 2.1-2.1-.9-2 .6-1.5Z" transform="translate(2.5 0) scale(.8)"/></svg><span>系统设置</span></a>
             <a href="user-management.html" id="fmUserManagementLink" role="menuitem" hidden><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 19c.6-3.2 2.6-5 6-5s5.4 1.8 6 5M16 7h5M18.5 4.5v5"/></svg><span>用户管理</span></a>
             <hr/>
             <button id="fmAccountSessionBtn" type="button" role="menuitem"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 5H4v14h6M14 8l4 4-4 4M8 12h10"/></svg><span>返回编辑器登录</span></button>
@@ -268,6 +275,9 @@
   <script defer src="src/28-app-storage.js"></script>
 <script defer src="src/29-auth-core.js"></script>
 <script defer src="src/34-role-permissions.js"></script>
+<script defer src="src/33-user-center.js"></script>
+<script defer src="src/101-engagement-repository.js"></script>
+<script defer src="src/103-support-center.js"></script>
 <script defer src="src/21-home-package-service.js"></script>
 <script defer src="src/23-graph-file-store.js"></script>
 <script defer src="src/62-learning-session-store.js"></script>

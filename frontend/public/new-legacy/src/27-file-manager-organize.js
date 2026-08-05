@@ -38,7 +38,7 @@
     const selected=selectedFiles();if(!selected.length)return false;let ok=true;
     selected.forEach(item=>{if(!store.setFileTags(item.id,name?[name]:[],{owner:owner(),emit:false}))ok=false});
     if(!ok){notify(store.getLastError&&store.getLastError()||'标签更新失败。','error');return false}
-    notify(name?`已标记为“${name}”，并加入我的收藏。`:'已取消标签，并退出我的收藏。');
+    notify(name?`已标记为“${name}”。`:'已取消标签。');
     closePicker();refresh();return true;
   }
 
@@ -112,7 +112,7 @@
   }
   function removeTag(id){
     const tag=tags().find(item=>item.id===id);if(!tag)return;
-    if(!confirm(`删除标签“${tag.name}”？相关文件将取消该标签并退出我的收藏。`))return;
+    if(!confirm(`删除标签“${tag.name}”？相关文件将取消该标签。`))return;
     if(!store.deleteTag(id,{owner:owner()})){notify(store.getLastError&&store.getLastError()||'删除标签失败。','error');return}
     if(editingTagId===id)editingTagId='';
     notify('标签已删除。');refresh();renderPicker(searchTerm());

@@ -138,11 +138,22 @@
 .engagement-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 700;
+  z-index: 2147483646;
   background: rgba(15, 23, 42, .28);
   display: grid;
   place-items: center;
   padding: 18px;
+}
+
+.engagement-dialog-open .kg-global-shortcuts {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.engagement-form-error {
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .engagement-backdrop[hidden] {

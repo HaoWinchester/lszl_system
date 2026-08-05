@@ -291,7 +291,7 @@
     const result=parsedQuestion;if(!result||result.errors.length)return;const api=window.KGQuestionBankAdminAPI;if(!api)return;
     const question=parsedToQuestion(result),current=api.getCurrentQuestion?.();
     const placeholder=current&&!current.status?.contentReady&&(/未命名|新题/.test(current.title||'')||String((current.stemParts||[]).map(item=>item.text||'').join('')).includes('请在这里输入题干'));
-    const saved=placeholder?api.updateCurrentQuestion?.(question):api.bulkAddQuestions?.([question],{skipDuplicates:true});
+    const saved=placeholder?api.updateCurrentQuestion?.(question):api.bulkAddQuestions?.([question],{skipDuplicates:byId('tqSkipDuplicates')?.checked!==false});
     if(saved?.duplicates?.length){byId('tqParseSummary').textContent='发现题干完全重复，未新建题目。';return}
     setEntryMode('manual');setEditorLanguage(result.language==='bilingual'?'bilingual':'zh');setTimeout(()=>{click('[data-main-tab="base"]');byId('questionStemInput')?.scrollIntoView({behavior:'smooth',block:'center'})},0);
   }

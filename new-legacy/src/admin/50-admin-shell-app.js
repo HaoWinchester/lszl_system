@@ -2,6 +2,12 @@
 (function(global){
   const Services=global.KGAdminServices,UI=global.KGAdminUI;if(!Services||!UI)return;
   const {byId,escapeHtml,formatTime}=UI;
+  function ensureAccess(){
+    if(Services.permissions.can('viewAdminConsole'))return true;
+    const nav=document.querySelector('.admin-context-nav');if(nav)nav.hidden=true;
+    const shell=document.querySelector('.admin-app-shell');if(shell)shell.innerHTML='<main class="admin-main"><section class="admin-panel admin-empty"><h1>无权访问管理后台</h1><p>当前账号没有管理后台权限，请返回学习首页或联系管理员。</p><a class="admin-button primary" href="index.html">返回首页</a></section></main>';
+    return false;
+  }
   function renderMetrics(){
     const subjects=Services.subjects.list();
     const activeSubjects=subjects.filter(item=>!Services.subjects.isInactive(item));
@@ -39,6 +45,6 @@
     const rows=Services.audit.list().slice(0,6);
     el.innerHTML=rows.length?rows.map(item=>`<article class="${item.status==='failed'?'failed':''}"><i></i><div><strong>${escapeHtml(item.summary||item.action)}</strong><span>${escapeHtml(item.actor?.name||'未知用户')} · ${escapeHtml(item.entityType)}</span></div><time>${formatTime(item.at)}</time></article>`).join(''):'<div class="admin-empty">还没有操作记录。</div>';
   }
-  function init(){UI.init(Services);renderMetrics();renderAttention();renderAudit()}
+  function init(){UI.init(Services);if(!ensureAccess())return;renderMetrics();renderAttention();renderAudit()}
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',init):init();
 })(window);

@@ -7,12 +7,7 @@
   <script>
     (function(){
       const params=new URLSearchParams(location.search),embedded=params.get('embed')==='knowledge';
-      if(embedded){document.documentElement.classList.add('kg-embedded');document.documentElement.dataset.embedMode='knowledge';return}
-      if(!params.has('standalone')&&/^(https?|file):$/.test(location.protocol)){
-        const target=new URL('admin-subjects.html',location.href);target.searchParams.set('tab','current');
-        ['subjectId','taxonomyId'].forEach(key=>{const value=params.get(key);if(value)target.searchParams.set(key,value)});
-        location.replace(target.href);
-      }
+      if(embedded){document.documentElement.classList.add('kg-embedded');document.documentElement.dataset.embedMode='knowledge'}
     })();
   </script>
   <link rel="stylesheet" href="styles/teacher-workbench.css" />
@@ -24,8 +19,8 @@
 <body>
   <div class="cc-app">
     <header class="tw-topbar">
-      <a class="tw-brand" href="teacher-workbench.html"><span class="tw-brand-mark">KG</span><span class="tw-brand-copy"><strong>教师内容工作台</strong><small>V9.0-P2.1 · 从录入到发布</small></span></a>
-      <nav class="tw-tabs" aria-label="工作模块"><a href="teacher-workbench.html">工作台</a><a href="question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">题目管理</a><a class="active" href="admin-subjects.html">科目与知识树</a><a href="course-admin.html">配置中心</a></nav>
+      <a class="tw-brand" href="teacher-workbench.html"><span class="tw-brand-mark">KG</span><span class="tw-brand-copy"><strong>教师内容工作台</strong><small>内容生产与发布</small></span></a>
+      <nav class="tw-tabs" aria-label="工作模块"><a href="teacher-workbench.html">工作台</a><a href="question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">题目管理</a><a class="active" href="content-center.html">内容中心</a><a href="course-admin.html">配置中心</a></nav>
       <div class="tw-user"><span class="tw-user-badge" id="ccAccount"></span><a href="index.html">返回学员端</a></div>
     </header>
     <section class="tw-workflow" aria-label="内容工作流程"><span class="tw-step done"><b>1</b>录入活动</span><i class="tw-arrow"></i><span class="tw-step active"><b>2</b>检查入库</span><i class="tw-arrow"></i><span class="tw-step"><b>3</b>配置内容</span><i class="tw-arrow"></i><span class="tw-step"><b>4</b>预览发布</span></section>

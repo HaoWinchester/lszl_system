@@ -85,20 +85,9 @@
   }
   function openHelp(){
     close();
-    const explicit=String(shell?.dataset.accountHelpHref||helpBtn?.dataset.accountHelpHref||'').trim();
-    if(explicit&&window.location){window.location.href=explicit;return}
-    if(typeof window.startGuidedTour==='function'){
-      window.startGuidedTour(true);
-      return;
-    }
-    if(typeof window.openTutorial==='function'){
-      window.openTutorial();
-      return;
-    }
-    const legacy=$('tutorialBtn');
-    if(legacy&&legacy.dataset.accountMenuBoundHelp==='1'){legacy.click();return}
-    const href=String(shell?.dataset.accountHelpHref||helpBtn?.dataset.accountHelpHref||'multi-question-help.html').trim();
-    if(href&&window.location){window.location.href=href;return}
+    if(!window.location)return;
+    const returnTo=(window.location.pathname.split('/').pop()||'index.html')+window.location.search+window.location.hash;
+    window.location.href='help-center.html?returnTo='+encodeURIComponent(returnTo);
   }
   function exitPage(){
     close();

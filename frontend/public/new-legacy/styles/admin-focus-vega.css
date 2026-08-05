@@ -1,0 +1,175 @@
+/* Focus / Vega admin skin. Intentionally opt-in and visual-only. */
+body[data-admin-skin="focus-vega"]{
+  --admin-background:#fafafa;
+  --admin-foreground:#18181b;
+  --admin-card:#fff;
+  --admin-card-foreground:#18181b;
+  --admin-primary:#6d5dfc;
+  --admin-primary-foreground:#fff;
+  --admin-secondary:#f4f4f5;
+  --admin-secondary-foreground:#27272a;
+  --admin-muted:#f4f4f5;
+  --admin-muted-foreground:#71717a;
+  --admin-accent:#f1efff;
+  --admin-accent-foreground:#4c3fd1;
+  --admin-border:#e4e4e7;
+  --admin-input:#d4d4d8;
+  --admin-ring:#6d5dfc;
+  --admin-success:#15803d;
+  --admin-warning:#b45309;
+  --admin-destructive:#dc2626;
+  --admin-radius-control:8px;
+  --admin-radius-panel:10px;
+  --admin-shadow-xs:0 1px 2px rgba(24,24,27,.04);
+  --admin-shadow-sm:0 1px 3px rgba(24,24,27,.06),0 1px 2px rgba(24,24,27,.04);
+  margin:0;
+  background:#fafafa;
+  color:#18181b;
+  font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:14px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+body[data-admin-skin="focus-vega"] *{box-sizing:border-box}
+body[data-admin-skin="focus-vega"] .admin-ui-icon{display:block;flex:0 0 auto;pointer-events:none}
+body[data-admin-skin="focus-vega"] [data-admin-icon]{display:inline-grid;place-items:center;flex:0 0 auto}
+body[data-admin-skin="focus-vega"] .admin-context-nav{
+  min-height:42px;
+  height:42px;
+  padding:0 clamp(18px,2.5vw,36px);
+  gap:4px;
+  background:rgba(255,255,255,.96);
+  border-bottom:1px solid var(--admin-border);
+  box-shadow:none;
+  backdrop-filter:blur(12px);
+}
+body[data-admin-skin="focus-vega"] .admin-context-nav a{
+  min-height:30px;
+  padding:6px 10px;
+  border-radius:var(--admin-radius-control);
+  color:#52525b;
+  font-size:12px;
+  font-weight:600;
+  letter-spacing:0;
+  transition:background-color .15s ease,color .15s ease;
+}
+body[data-admin-skin="focus-vega"] .admin-context-nav a:hover{
+  background:var(--admin-secondary);
+  color:var(--admin-foreground);
+}
+body[data-admin-skin="focus-vega"] .admin-context-nav a.active,
+body[data-admin-skin="focus-vega"] .admin-context-nav a[aria-current="page"]{
+  background:var(--admin-accent);
+  color:var(--admin-accent-foreground);
+  box-shadow:none;
+}
+body[data-admin-skin="focus-vega"] .admin-topbar,
+body[data-admin-skin="focus-vega"] .um-topbar,
+body[data-admin-skin="focus-vega"] .ss-topbar{
+  border-color:var(--admin-border);
+  background:rgba(255,255,255,.96);
+  color:var(--admin-foreground);
+  box-shadow:var(--admin-shadow-xs);
+  backdrop-filter:blur(12px);
+}
+body[data-admin-skin="focus-vega"] .admin-brand>span,
+body[data-admin-skin="focus-vega"] .um-brand-mark{
+  border-radius:var(--admin-radius-control);
+  background:var(--admin-primary);
+  color:var(--admin-primary-foreground);
+  box-shadow:none;
+}
+body[data-admin-skin="focus-vega"] .admin-brand strong,
+body[data-admin-skin="focus-vega"] .um-brand strong{color:var(--admin-foreground);font-weight:650}
+body[data-admin-skin="focus-vega"] .admin-brand small,
+body[data-admin-skin="focus-vega"] .um-brand span{color:var(--admin-muted-foreground)}
+body[data-admin-skin="focus-vega"] .admin-page-head,
+body[data-admin-skin="focus-vega"] .admin-panel,
+body[data-admin-skin="focus-vega"] .engagement-admin-card,
+body[data-admin-skin="focus-vega"] .um-topbar,
+body[data-admin-skin="focus-vega"] .ss-topbar{
+  border:1px solid var(--admin-border);
+  border-radius:var(--admin-radius-panel);
+  background:var(--admin-card);
+  color:var(--admin-card-foreground);
+  box-shadow:var(--admin-shadow-xs);
+}
+body[data-admin-skin="focus-vega"] .admin-page-head p,
+body[data-admin-skin="focus-vega"] .admin-panel header p,
+body[data-admin-skin="focus-vega"] .admin-rail-head p,
+body[data-admin-skin="focus-vega"] .admin-current-tree-title p{
+  color:var(--admin-primary);
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.12em;
+}
+body[data-admin-skin="focus-vega"] .admin-page-head h1,
+body[data-admin-skin="focus-vega"] .um-topbar h1,
+body[data-admin-skin="focus-vega"] .ss-topbar h1{
+  color:var(--admin-foreground);
+  font-weight:680;
+  letter-spacing:-.025em;
+}
+body[data-admin-skin="focus-vega"] .admin-page-head>div>span,
+body[data-admin-skin="focus-vega"] .admin-panel header span,
+body[data-admin-skin="focus-vega"] .admin-section-head span{color:var(--admin-muted-foreground)}
+body[data-admin-skin="focus-vega"] .admin-button,
+body[data-admin-skin="focus-vega"] .admin-head-actions button,
+body[data-admin-skin="focus-vega"] .admin-card-actions button,
+body[data-admin-skin="focus-vega"] .admin-section-head button,
+body[data-admin-skin="focus-vega"] .embedded-workspace-actions button{
+  min-height:36px;
+  padding:8px 12px;
+  gap:7px;
+  border:1px solid var(--admin-border);
+  border-radius:var(--admin-radius-control);
+  background:var(--admin-card);
+  color:var(--admin-secondary-foreground);
+  box-shadow:var(--admin-shadow-xs);
+  font-size:13px;
+  font-weight:550;
+  line-height:1;
+  text-decoration:none;
+}
+body[data-admin-skin="focus-vega"] .admin-button:hover,
+body[data-admin-skin="focus-vega"] .admin-head-actions button:hover:not(:disabled),
+body[data-admin-skin="focus-vega"] .admin-card-actions button:hover:not(:disabled),
+body[data-admin-skin="focus-vega"] .admin-section-head button:hover:not(:disabled),
+body[data-admin-skin="focus-vega"] .embedded-workspace-actions button:hover:not(:disabled){
+  border-color:#d4d4d8;
+  background:var(--admin-secondary);
+  box-shadow:var(--admin-shadow-xs);
+}
+body[data-admin-skin="focus-vega"] .admin-button.primary,
+body[data-admin-skin="focus-vega"] .admin-head-actions button.primary,
+body[data-admin-skin="focus-vega"] .admin-card-actions button.primary,
+body[data-admin-skin="focus-vega"] .admin-section-head button.primary{
+  border-color:var(--admin-primary);
+  background:var(--admin-primary);
+  color:var(--admin-primary-foreground);
+}
+body[data-admin-skin="focus-vega"] .admin-button:focus-visible,
+body[data-admin-skin="focus-vega"] .admin-head-actions button:focus-visible,
+body[data-admin-skin="focus-vega"] .admin-card-actions button:focus-visible,
+body[data-admin-skin="focus-vega"] .admin-section-head button:focus-visible,
+body[data-admin-skin="focus-vega"] .admin-context-nav a:focus-visible{
+  outline:2px solid var(--admin-ring);
+  outline-offset:2px;
+}
+body[data-admin-skin="focus-vega"] .admin-chip,
+body[data-admin-skin="focus-vega"] .admin-status{
+  border-radius:999px;
+  background:var(--admin-secondary);
+  color:#52525b;
+  box-shadow:none;
+}
+body[data-admin-skin="focus-vega"] .admin-status.published,
+body[data-admin-skin="focus-vega"] .admin-chip{background:var(--admin-accent);color:var(--admin-accent-foreground)!important}
+body[data-admin-skin="focus-vega"] .admin-status.draft{background:#fff7ed;color:var(--admin-warning)}
+body[data-admin-skin="focus-vega"] .admin-status.archived{background:var(--admin-secondary);color:var(--admin-muted-foreground)}
+body[data-admin-skin="focus-vega"] ::selection{background:rgba(109,93,252,.18);color:var(--admin-foreground)}
+@media (prefers-reduced-motion:reduce){
+  body[data-admin-skin="focus-vega"] *,
+  body[data-admin-skin="focus-vega"] *::before,
+  body[data-admin-skin="focus-vega"] *::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+}

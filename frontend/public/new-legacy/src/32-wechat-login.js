@@ -202,6 +202,7 @@
     DEFAULT_CONFIG,
     getConfig,
     saveConfig,
+    createOfficialAuthRequest,
     startOfficialLogin,
     renderPanel,
     ensureAuthPanel,

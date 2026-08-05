@@ -151,7 +151,7 @@
     const c=course();if(!c)return;
     $('caCourseName').value=c.name;$('caDescription').value=c.description||'';
     $('caSubject').innerHTML=subjects().map(subject=>`<option value="${escapeHTML(subject.id)}" ${subject.id===c.subjectId?'selected':''}>${escapeHTML(subject.name.zh)}</option>`).join('');
-    renderTaxonomySelect();$('caAccount').textContent=`${Core.currentUser().name} · 本地草稿模式`;
+    renderTaxonomySelect();const account=$('caAccount');if(account)account.textContent=`${Core.currentUser().name} · 在线草稿模式`;
     if($('caActivitySearch'))$('caActivitySearch').value=state.activityQuery;
     if($('caOnlyMapped'))$('caOnlyMapped').checked=state.onlyMapped;
   }

@@ -34,6 +34,9 @@ with sync_playwright() as playwright:
         page.locator("#userSubscriptionDetailModal.show .membership-ui .plans-grid").wait_for(state="visible")
         assert page.locator(".membership-ui .plan-card").count() >= 3
         assert page.locator(".membership-ui .redeem").is_visible()
+        purchase_chevron = page.locator(".membership-ui [data-buy-plan] .i-chevron-right").first
+        assert purchase_chevron.is_visible()
+        assert purchase_chevron.evaluate("element => getComputedStyle(element).filter") == "brightness(0) invert(1)"
         header_alignment = page.locator(".membership-ui .modal-header").evaluate("""header => {
             const brand = header.querySelector('.brand').getBoundingClientRect()
             const close = header.querySelector('.icon-button').getBoundingClientRect()

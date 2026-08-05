@@ -676,10 +676,10 @@
               },
               {
                 "target": true,
-                "text": "两周迭代"
+                "text": "两周迭代，"
               },
               {
-                "text": "。迭代中期，客户提出一个 "
+                "text": "迭代中期，客户提出一个 "
               },
               {
                 "target": true,
@@ -5701,7 +5701,7 @@
     }
   ],
   "activitySchemaVersion": 1,
-  "contentHash": "sha256:054d7c6d4219cca61fcab845c5c390575a9c01803a9e0fb5698f1d382a5bc237",
+  "contentHash": "sha256:c6cc922fe21f732944267ddca8c28f6143c91bdcaf45582484d9897ca1eb7c85",
   "course": {
     "activitySchemaVersion": 1,
     "assessmentLanguage": "zh",
@@ -9410,5 +9410,5 @@
     ],
     "valid": true
   },
-  "version": "v9.0-p4.1.12"
+  "version": "v9.0-p4.1.18"
 }

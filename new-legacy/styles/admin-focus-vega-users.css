@@ -1,0 +1,189 @@
+/* User-management adapter. Existing column order and workflows stay intact. */
+body[data-admin-skin="focus-vega"] .um-app{
+  --um-grid-gap:10px;
+  width:min(1440px,calc(100vw - 48px));
+  margin:0 auto;
+  padding:24px 0 56px;
+}
+body[data-admin-skin="focus-vega"] .um-topbar{
+  min-height:128px;
+  margin-bottom:14px;
+  padding:22px 24px;
+  gap:22px;
+}
+body[data-admin-skin="focus-vega"] .um-kicker{margin:0 0 6px;color:var(--admin-primary);font-size:10px;font-weight:700;letter-spacing:.12em}
+body[data-admin-skin="focus-vega"] .um-brand h1{margin:0;font-size:28px;line-height:1.2;color:var(--admin-foreground);font-weight:680;letter-spacing:-.025em}
+body[data-admin-skin="focus-vega"] .um-brand p:last-child{margin:6px 0 0;max-width:700px;color:var(--admin-muted-foreground);font-size:13px;line-height:1.6}
+body[data-admin-skin="focus-vega"] .um-top-actions{gap:8px}
+body[data-admin-skin="focus-vega"] .um-top-actions button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+}
+body[data-admin-skin="focus-vega"] .um-top-actions button>[data-admin-icon]{
+  width:16px;
+  height:16px;
+  line-height:0;
+}
+body[data-admin-skin="focus-vega"] .um-app button,
+body[data-admin-skin="focus-vega"] .um-app .um-nav-btn{
+  min-height:36px;
+  padding:8px 12px;
+  border:1px solid var(--admin-border);
+  border-radius:var(--admin-radius-control);
+  background:var(--admin-card);
+  color:var(--admin-secondary-foreground);
+  box-shadow:var(--admin-shadow-xs);
+  font-size:13px;
+  font-weight:550;
+  line-height:1.1;
+  transition:background-color .15s ease,border-color .15s ease,color .15s ease;
+}
+body[data-admin-skin="focus-vega"] .um-app button:hover,
+body[data-admin-skin="focus-vega"] .um-app .um-nav-btn:hover{
+  transform:none;
+  border-color:#d4d4d8;
+  background:var(--admin-secondary);
+  box-shadow:var(--admin-shadow-xs);
+}
+body[data-admin-skin="focus-vega"] .um-app button.primary,
+body[data-admin-skin="focus-vega"] .um-app .um-nav-btn.primary{
+  border-color:var(--admin-primary);
+  background:var(--admin-primary);
+  color:var(--admin-primary-foreground);
+}
+body[data-admin-skin="focus-vega"] .um-app button.danger{border-color:#fecaca;background:#fff;color:var(--admin-destructive)}
+body[data-admin-skin="focus-vega"] .um-app button:focus-visible,
+body[data-admin-skin="focus-vega"] .um-app .um-nav-btn:focus-visible{outline:2px solid var(--admin-ring);outline-offset:2px}
+body[data-admin-skin="focus-vega"] .um-summary{min-height:82px;gap:var(--um-grid-gap);margin-bottom:14px}
+body[data-admin-skin="focus-vega"] .um-stat{
+  padding:15px 16px;
+  border:1px solid var(--admin-border);
+  border-radius:var(--admin-radius-panel);
+  background:var(--admin-card);
+  box-shadow:var(--admin-shadow-xs);
+}
+body[data-admin-skin="focus-vega"] .um-stat span,
+body[data-admin-skin="focus-vega"] .um-stat em{color:var(--admin-muted-foreground);font-weight:550}
+body[data-admin-skin="focus-vega"] .um-stat strong{margin-top:4px;color:var(--admin-foreground);font-size:25px;font-weight:680;letter-spacing:-.02em}
+body[data-admin-skin="focus-vega"] .um-layout{grid-template-columns:280px minmax(0,1fr);gap:14px;align-items:start}
+body[data-admin-skin="focus-vega"] .um-left-card,
+body[data-admin-skin="focus-vega"] .um-editor-card,
+body[data-admin-skin="focus-vega"] .um-right-shell,
+body[data-admin-skin="focus-vega"] .um-panel{
+  border:1px solid var(--admin-border);
+  border-radius:var(--admin-radius-panel);
+  background:var(--admin-card);
+  box-shadow:var(--admin-shadow-xs);
+  backdrop-filter:none;
+}
+body[data-admin-skin="focus-vega"] .um-left-card,
+body[data-admin-skin="focus-vega"] .um-editor-card{padding:16px}
+body[data-admin-skin="focus-vega"] .um-right-card{display:block;grid-column:1/-1;padding:0;border:0;background:transparent;box-shadow:none}
+body[data-admin-skin="focus-vega"] .um-right-shell{padding:14px;top:58px}
+body[data-admin-skin="focus-vega"] .um-panel{padding:15px}
+body[data-admin-skin="focus-vega"] .um-card-head{gap:12px;margin-bottom:13px}
+body[data-admin-skin="focus-vega"] .um-card-head h2,
+body[data-admin-skin="focus-vega"] .um-right-dock-title h2{margin:0;color:var(--admin-foreground);font-size:17px;font-weight:650}
+body[data-admin-skin="focus-vega"] .um-card-head p,
+body[data-admin-skin="focus-vega"] .um-right-dock-title p{color:var(--admin-muted-foreground);font-size:12px}
+body[data-admin-skin="focus-vega"] .um-field{gap:6px;margin-bottom:11px}
+body[data-admin-skin="focus-vega"] .um-field span{color:#52525b;font-size:12px;font-weight:600}
+body[data-admin-skin="focus-vega"] .um-field input,
+body[data-admin-skin="focus-vega"] .um-field select,
+body[data-admin-skin="focus-vega"] .um-field textarea,
+body[data-admin-skin="focus-vega"] .um-batch-grid select,
+body[data-admin-skin="focus-vega"] .um-page-size select{
+  min-height:38px;
+  padding:8px 10px;
+  border:1px solid var(--admin-input);
+  border-radius:var(--admin-radius-control);
+  background:var(--admin-card);
+  color:var(--admin-foreground);
+  box-shadow:var(--admin-shadow-xs);
+  font-weight:500;
+}
+body[data-admin-skin="focus-vega"] .um-field input:focus,
+body[data-admin-skin="focus-vega"] .um-field select:focus,
+body[data-admin-skin="focus-vega"] .um-field textarea:focus,
+body[data-admin-skin="focus-vega"] .um-batch-grid select:focus,
+body[data-admin-skin="focus-vega"] .um-page-size select:focus{
+  border-color:var(--admin-ring);
+  outline:0;
+  box-shadow:0 0 0 3px rgba(109,93,252,.14);
+}
+body[data-admin-skin="focus-vega"] .um-list-tools,
+body[data-admin-skin="focus-vega"] .um-batch-toolbar,
+body[data-admin-skin="focus-vega"] .um-list-tools-summary,
+body[data-admin-skin="focus-vega"] .um-pagination{
+  border:1px solid var(--admin-border);
+  border-radius:var(--admin-radius-panel);
+  background:#fafafa;
+  box-shadow:none;
+}
+body[data-admin-skin="focus-vega"] .um-list-tools{padding:10px}
+body[data-admin-skin="focus-vega"] .um-batch-toolbar{padding:11px}
+body[data-admin-skin="focus-vega"] .um-list-tools-toggle{border-color:#d8d4ff;background:var(--admin-accent);color:var(--admin-accent-foreground)}
+body[data-admin-skin="focus-vega"] .um-list-tools-toggle.active{border-color:var(--admin-primary);background:var(--admin-primary);color:var(--admin-primary-foreground)}
+body[data-admin-skin="focus-vega"] .um-select-all{color:#52525b;font-weight:600}
+body[data-admin-skin="focus-vega"] .um-select-all input{accent-color:var(--admin-primary)}
+body[data-admin-skin="focus-vega"] .um-batch-toolbar strong{color:var(--admin-foreground);font-weight:650}
+body[data-admin-skin="focus-vega"] .um-user-list{gap:6px;padding-right:3px}
+body[data-admin-skin="focus-vega"] .um-user-item,
+body[data-admin-skin="focus-vega"] .um-user-item.compact{
+  border:1px solid var(--admin-border);
+  border-radius:var(--admin-radius-control);
+  background:var(--admin-card);
+  box-shadow:none;
+}
+body[data-admin-skin="focus-vega"] .um-user-item:hover,
+body[data-admin-skin="focus-vega"] .um-user-item.compact:hover{border-color:#c7c2fb;background:#fcfbff;box-shadow:none}
+body[data-admin-skin="focus-vega"] .um-user-item.active,
+body[data-admin-skin="focus-vega"] .um-user-item.selected{border-color:#bdb6ff;background:var(--admin-accent)}
+body[data-admin-skin="focus-vega"] .um-pill{border-radius:999px;background:var(--admin-secondary);color:#52525b;box-shadow:none}
+body[data-admin-skin="focus-vega"] .um-user-item.compact .um-user-title strong{color:var(--admin-foreground);font-weight:650}
+body[data-admin-skin="focus-vega"] .um-user-compact-meta,
+body[data-admin-skin="focus-vega"] .um-page-info,
+body[data-admin-skin="focus-vega"] .um-page-size{color:var(--admin-muted-foreground);font-weight:550}
+body[data-admin-skin="focus-vega"] .um-user-order{border-radius:6px;background:var(--admin-secondary);color:#52525b;font-weight:650}
+body[data-admin-skin="focus-vega"] .um-user-check{border-color:var(--admin-border);border-radius:6px;background:#fafafa}
+body[data-admin-skin="focus-vega"] .um-user-check input:checked+span{border-color:var(--admin-primary);background:var(--admin-primary)}
+body[data-admin-skin="focus-vega"] .um-save-state{background:var(--admin-secondary);color:#52525b;font-weight:600}
+body[data-admin-skin="focus-vega"] .um-save-state.saved{background:#f0fdf4;color:var(--admin-success)}
+body[data-admin-skin="focus-vega"] .um-save-state.warn{background:#fff7ed;color:var(--admin-warning)}
+body[data-admin-skin="focus-vega"] .um-data-card,
+body[data-admin-skin="focus-vega"] .um-data-item,
+body[data-admin-skin="focus-vega"] .um-log-item,
+body[data-admin-skin="focus-vega"] .um-permission-row{
+  border-color:var(--admin-border);
+  border-radius:var(--admin-radius-control);
+  background:#fafafa;
+  box-shadow:none;
+}
+body[data-admin-skin="focus-vega"] .um-data-item{background:var(--admin-card)}
+body[data-admin-skin="focus-vega"] .um-right-tabbar{gap:6px;margin-bottom:12px}
+body[data-admin-skin="focus-vega"] .um-right-tabbar button{border-radius:var(--admin-radius-control);background:#fafafa;box-shadow:none;font-size:12px}
+body[data-admin-skin="focus-vega"] .um-right-tabbar button.active{border-color:#d8d4ff;background:var(--admin-accent);color:var(--admin-accent-foreground);box-shadow:none}
+body[data-admin-skin="focus-vega"] .um-right-tab-pane .um-panel{background:var(--admin-card);box-shadow:none}
+body[data-admin-skin="focus-vega"] .um-collapse-btn{border-radius:var(--admin-radius-control)}
+body[data-admin-skin="focus-vega"] .um-pagination{padding:9px}
+body[data-admin-skin="focus-vega"] .um-empty{border-color:#d4d4d8;border-radius:var(--admin-radius-control);background:#fafafa;color:var(--admin-muted-foreground)}
+@media (min-width:901px) and (max-width:1180px){
+  body[data-admin-skin="focus-vega"] .um-app{width:min(1440px,calc(100vw - 32px));padding-top:18px}
+  body[data-admin-skin="focus-vega"] .um-topbar{padding:20px}
+  body[data-admin-skin="focus-vega"] .um-layout{grid-template-columns:270px minmax(0,1fr)}
+  body[data-admin-skin="focus-vega"] .um-right-card{grid-column:1/-1}
+  body[data-admin-skin="focus-vega"] .um-right-shell{max-height:none}
+}
+@media (min-width:901px) and (min-width:1181px){
+  body[data-admin-skin="focus-vega"] .um-summary,
+  body[data-admin-skin="focus-vega"] .um-layout{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:var(--um-grid-gap);
+  }
+  body[data-admin-skin="focus-vega"] .um-left-card{grid-column:1}
+  body[data-admin-skin="focus-vega"] .um-editor-card{grid-column:2/4}
+  body[data-admin-skin="focus-vega"] .um-right-card{grid-column:4}
+  body[data-admin-skin="focus-vega"] .um-right-shell{max-height:calc(100vh - 58px)}
+}

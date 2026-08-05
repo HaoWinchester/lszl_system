@@ -134,10 +134,10 @@
     chip.focus();placeCaretAtEnd(chip);
     return chip;
   }
-  function manualSave(){
+  async function manualSave(){
     if(status.saving)return false;markSaving();
     try{
-      const saved=options.onSave?.();
+      const saved=await options.onSave?.();
       if(!saved){markError('保存失败');options.onNotify?.('当前画布保存失败。');return false}
       render(saved===true?workspace():saved);markSaved();options.onNotify?.('当前画布已保存。');return true;
     }catch(error){markError(error);options.onNotify?.('当前画布保存失败。');return false}

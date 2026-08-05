@@ -17,6 +17,12 @@
   function clearDirty(reason='saved'){
     dirty=false;lastError='';lastSavedAt=Date.now();emit(reason);return true;
   }
+  function reportError(error,reason='server-error'){
+    dirty=true;saving=false;lastError=String(error&&error.message||error||'保存失败');emit(reason);return false;
+  }
+  function reportSaved(reason='server-saved'){
+    dirty=false;saving=false;lastError='';lastSavedAt=Date.now();emit(reason);return true;
+  }
   function isDirty(){return dirty}
   function saveNow(options={}){
     if(saving)return true;
@@ -48,5 +54,5 @@
   function status(){return{dirty,saving,lastSavedAt,lastError,intervalMs:INTERVAL_MS}}
 
   bindBeforeUnload();
-  global.KGGraphFileAutosave={INTERVAL_MS,start,stop,markDirty,clearDirty,isDirty,saveNow,saveBeforeSwitch,bindBeforeUnload,status};
+  global.KGGraphFileAutosave={INTERVAL_MS,start,stop,markDirty,clearDirty,reportError,reportSaved,isDirty,saveNow,saveBeforeSwitch,bindBeforeUnload,status};
 })(window);

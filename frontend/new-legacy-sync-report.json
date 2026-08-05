@@ -1,20 +1,27 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.10",
-  "toVersion": "v9.0-p4.1.12",
+  "fromVersion": "v9.0-p4.1.18",
+  "toVersion": "v9.0-p4.1.18",
   "changes": {
     "added": [
-      "src/30-shared-auth-dialog.js",
-      "tests/shared-auth-dialog-browser.py",
-      "tests/shared-auth-dialog.test.js"
+      "assets/icons/lucide-admin.svg",
+      "src/108-admin-ui-icons.js",
+      "styles/admin-focus-vega-common.css",
+      "styles/admin-focus-vega-settings.css",
+      "styles/admin-focus-vega-users.css",
+      "styles/admin-focus-vega.css",
+      "tests/admin-focus-vega-pc-browser.py",
+      "tests/admin-focus-vega-skin-contract.test.js"
     ],
     "changed": [
-      "VERSION",
-      "index.html",
-      "practice-mode.html",
-      "src/30-auth-guards.js",
-      "src/41-account-menu.js",
-      "styles/learning-skin.css"
+      "admin-console.html",
+      "admin-operations.html",
+      "admin-settings.html",
+      "admin-subjects.html",
+      "feedback-management.html",
+      "message-management.html",
+      "system-settings.html",
+      "user-management.html"
     ],
     "removed": []
   },

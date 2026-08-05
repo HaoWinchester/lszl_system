@@ -203,7 +203,9 @@
       }
       const role=u.role;
       const theme=getTheme(role);
-      el.innerHTML=`<span class="role-dot" style="background:${escapeHTML(theme.primary)}"></span><span>已登录：${escapeHTML(u.displayName||u.username)}</span><span class="role-badge">${escapeHTML(roleLabel(role))}</span>`;
+      const label=String(u.displayName||u.username||'用户');
+      const showRoleBadge=roleLabel(role)!==label;
+      el.innerHTML=`<span class="role-dot" style="background:${escapeHTML(theme.primary)}"></span><span>已登录：${escapeHTML(label)}</span>${showRoleBadge?`<span class="role-badge">${escapeHTML(roleLabel(role))}</span>`:''}`;
       return;
     }
     const chevron='<svg aria-hidden="true" class="account-menu-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>';

@@ -94,6 +94,8 @@ class FeatureAnalyticsQuery(BaseModel):
     def _enforce_query_contract(self) -> Self:
         if self.start > self.end:
             raise ValueError("开始日期不能晚于结束日期")
+        if (self.end - self.start).days > 365:
+            raise ValueError("查询日期范围不能超过 366 天")
         if self.role is not None and self.role not in ALLOWED_ANALYTICS_ROLES:
             raise ValueError("角色过滤仅支持 teacher / student / viewer")
         return self

@@ -223,5 +223,5 @@ test('generated pages describe the server-backed architecture without stale loca
     '本浏览器 localStorage',
   ]
   for (const copy of staleVisibleCopy) assert.doesNotMatch(generated, new RegExp(copy))
-  assert.match(generated, /数据已同步至服务器/)
+  assert.match(generated, /服务器按用户隔离保存|保存到服务器/)
 })

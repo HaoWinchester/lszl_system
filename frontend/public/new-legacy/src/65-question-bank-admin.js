@@ -300,7 +300,7 @@
   function scopeLabel(){
     const scope = sessionScope();
     if(scope === 'public') return '当前空间：公共/未登录本地数据';
-    return '当前空间：' + decodeURIComponent(scope.replace(/^user__/, '')) + ' 的本地题库';
+    return '当前空间：' + decodeURIComponent(scope.replace(/^user__/, '')) + ' 的账号题库';
   }
 
   function emptyQuestion(subject='PMP'){
@@ -1017,7 +1017,7 @@
       localStorage.setItem(banksKey(), JSON.stringify(state.banks));
       syncPublishedBanks();
       state.dirty = false;
-      if(!options.silent) toast('已保存到本地题库。');
+      if(!options.silent) toast('已保存到账号题库。');
     }catch(e){
       alert('保存失败：' + (e.message || e));
     }
@@ -2817,8 +2817,11 @@
     const bank = currentBank();
     if(!bank) return;
     const selectedSubject = $('bankSubject').value;
-    bank.subject = selectedSubject === 'CUSTOM' ? ($('bankCustomSubject').value.trim() || '自定义科目') : selectedSubject;
-    bank.name = $('bankName').value.trim() || bank.subject + ' 题库';
+    const customSubject=$('bankCustomSubject').value.trim(),bankName=$('bankName').value.trim();
+    if(selectedSubject==='CUSTOM'&&!customSubject){$('bankCustomSubject').focus();toast('自定义科目不能为空。');return}
+    if(!bankName){$('bankName').focus();toast('题库名称不能为空。');return}
+    bank.subject = selectedSubject === 'CUSTOM' ? customSubject : selectedSubject;
+    bank.name = bankName;
     bank.version = $('bankVersion').value.trim() || '1.0';
     const nextVisibility=$('bankVisibility')?.value==='published'?'published':'private';
     bank.visibility=nextVisibility;
@@ -2827,7 +2830,7 @@
     bank.updatedAt = Date.now();
     bank.questions.forEach(q => { q.subject = q.subject || bank.subject; });
     saveBanks(state.banks,{silent:true});
-    const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){};track('question_bank','key_action','bank_saved');track('question_bank','outcome','bank_saved');
+    const track=(globalThis.KGFeatureAnalytics&&globalThis.KGFeatureAnalytics.track)||function(){};track('question_bank','key_action','bank_saved');track('question_bank','outcome','bank_saved');
     render();
     toast(nextVisibility==='published'?'题库已保存并发布给学员。':'题库已保存，仅教师自己可见。');
   }
@@ -2896,7 +2899,7 @@
     };
     bank.updatedAt = Date.now();
     saveBanks(state.banks, {silent:options.silent});
-    if(!options.silent){const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){};track('question_bank','key_action','question_saved');track('question_bank','outcome','question_saved');render()}
+    if(!options.silent){const track=(globalThis.KGFeatureAnalytics&&globalThis.KGFeatureAnalytics.track)||function(){};track('question_bank','key_action','question_saved');track('question_bank','outcome','question_saved');render()}
     return true;
   }
 

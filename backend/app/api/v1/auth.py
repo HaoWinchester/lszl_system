@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser
 from app.db.session import get_db
-from app.schemas.auth import LoginRequest, RegisterRequest
+from app.schemas.auth import LoginRequest, RegisterRequest, SelfProfileUpdate
 from app.schemas.user import UserCreate
 from app.models.user import ACTIVE
 from app.services import system_service, user_service, wechat_service
@@ -136,6 +136,15 @@ async def logout(request: Request, db: DB):
 @router.get("/me")
 async def me(user: CurrentUser):
     return {"user": user_service.to_dict(user)}
+
+
+@router.put("/me")
+async def update_me(req: SelfProfileUpdate, user: CurrentUser, db: DB):
+    try:
+        updated = await user_service.update_self_profile(db, user, req)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"user": user_service.to_dict(updated)}
 
 
 # ---------- 微信扫码登录 ----------
