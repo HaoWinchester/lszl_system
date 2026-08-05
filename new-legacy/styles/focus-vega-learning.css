@@ -1,0 +1,4 @@
+/* Focus / Vega learning-family adapter. PC-only rules are added below. */
+@media (min-width:901px){
+  body[data-ui-skin="focus-vega"] .focus-vega-learning-contract-anchor{display:contents}
+}
