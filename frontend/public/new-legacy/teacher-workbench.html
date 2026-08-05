@@ -11,8 +11,10 @@
   <link rel="stylesheet" href="styles/teacher-workbench.css?v=v9.0-p4.1.18" />
   <link rel="stylesheet" href="styles/workbench-home.css?v=v9.0-p4.1.18" />
   <link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.18" />
+  <link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.18" />
+  <link rel="stylesheet" href="styles/focus-vega-teacher.css?v=v9.0-p4.1.18" />
 </head>
-<body class="teacher-admin-shell" data-admin-context="teacher">
+<body class="teacher-admin-shell" data-admin-context="teacher" data-ui-skin="focus-vega">
   <nav class="admin-context-nav" aria-label="管理后台一级导航">
     <a data-admin-nav="overview" href="admin-console.html">总览</a>
     <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
@@ -99,7 +101,7 @@
     </section>
 
     <details class="wb-advanced">
-      <summary>高级工具与兼容入口</summary>
+      <summary><span data-ui-icon="settings" data-ui-icon-size="16" aria-hidden="true"></span>高级工具与兼容入口</summary>
       <p>以下入口用于维护知识结构、课程与任务等独立业务。教师日常录题、训练配置和组卷均在上方三步完成。</p>
       <div class="wb-advanced-links">
         <a href="question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">新建考试题目</a>
@@ -121,5 +123,6 @@
   <script src="src/admin/00-admin-core.js?v=v9.0-p4.1.18"></script><script src="src/admin/10-content-repository.js?v=v9.0-p4.1.18"></script><script src="src/admin/11-local-content-repository.js?v=v9.0-p4.1.18"></script><script src="src/admin/20-admin-permission-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/21-admin-audit-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/22-admin-transaction-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/30-reference-index-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/31-subject-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/32-taxonomy-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/33-activity-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/34-course-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/35-release-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/40-admin-service-registry.js?v=v9.0-p4.1.18"></script><script src="src/admin/41-learning-content-compat.js?v=v9.0-p4.1.18"></script>
   <script src="src/admin/48-admin-context-nav.js?v=v9.0-p4.1.18"></script>
   <script src="src/91-teacher-workbench-app.js?v=v9.0-p4.1.18"></script>
+  <script src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.18"></script>
 </body>
 </html>

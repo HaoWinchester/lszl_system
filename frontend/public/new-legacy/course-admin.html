@@ -14,9 +14,11 @@
   <link rel="stylesheet" href="styles/config-organization.css?v=v9.0-p4.1.18" />
   <link rel="stylesheet" href="styles/teacher-course-workflow.css?v=v9.0-p4.1.18" />
 <link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.18"/>
+<link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.18"/>
+<link rel="stylesheet" href="styles/focus-vega-teacher.css?v=v9.0-p4.1.18"/>
 <script>if(new URLSearchParams(location.search).get('view')==='papers')location.replace('paper-management.html');</script>
 </head>
-<body class="teacher-admin-shell" data-admin-context="courses">
+<body class="teacher-admin-shell" data-admin-context="courses" data-ui-skin="focus-vega">
 <nav class="admin-context-nav" aria-label="管理后台一级导航">
   <a data-admin-nav="overview" href="admin-console.html">总览</a>
   <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
@@ -54,14 +56,14 @@
 
     <main class="ca-layout" id="caStructure" data-workspace-group="course-builder">
       <aside class="ca-structure" data-workspace-panel="course-structure" data-workspace-title="课程结构" data-workspace-controls-target=".ca-panel-head">
-        <div class="ca-panel-head"><div><h2>学习顺序</h2><p>一次只查看一个阶段，快速定位章节与学习步骤。</p></div><div class="ca-structure-head-actions"><button type="button" id="caRecentBtn">最近编辑</button><button type="button" id="caBatchToolsBtn">批量工具</button><button type="button" id="caAddStageBtn">＋ 阶段</button></div></div>
+        <div class="ca-panel-head"><div><h2>学习顺序</h2><p>一次只查看一个阶段，快速定位章节与学习步骤。</p></div><div class="ca-structure-head-actions"><button type="button" id="caRecentBtn">最近编辑</button><button type="button" id="caBatchToolsBtn">批量工具</button><button type="button" id="caAddStageBtn"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>阶段</button></div></div>
         <div class="ca-structure-tools" aria-label="课程结构定位工具">
           <label class="ca-stage-selector"><span>当前阶段</span><select id="caStageSelector"></select><small id="caStagePosition">0 / 0</small></label>
           <label class="ca-structure-search"><span>快速查找</span><input id="caStructureSearch" type="search" placeholder="搜索阶段、章节或学习步骤" autocomplete="off" /></label>
           <label class="ca-structure-filter"><span>显示范围</span><select id="caStructureFilter"><option value="all">当前阶段全部</option><option value="incomplete">仅待配置</option><option value="issues">仅有问题</option></select></label>
           <div class="ca-structure-actions">
-            <button type="button" id="caPrevPartBtn" title="上一章节">← 上一章</button>
-            <button type="button" id="caNextPartBtn" title="下一章节">下一章 →</button>
+            <button type="button" id="caPrevPartBtn" title="上一章节"><span data-ui-icon="arrow-left" data-ui-icon-size="16" aria-hidden="true"></span>上一章</button>
+            <button type="button" id="caNextPartBtn" title="下一章节">下一章<span data-ui-icon="arrow-right" data-ui-icon-size="16" aria-hidden="true"></span></button>
             <button type="button" id="caJumpIncompleteBtn">待配置</button>
             <button type="button" id="caJumpIssueBtn">有问题</button>
           </div>
@@ -71,7 +73,7 @@
       </aside>
 
       <section class="ca-node-editor" data-workspace-panel="node-editor" data-workspace-title="节点编辑" data-workspace-controls-target=".ca-panel-head">
-        <div class="ca-panel-head"><div><h2 id="caEditorTitle">请选择学习步骤</h2><p id="caEditorPath">从左侧学习顺序中选择一项进行设置。</p></div><div class="ca-node-actions"><button id="caAddPartBtn" type="button">＋ 章节</button><button id="caAddNodeBtn" type="button">＋ 学习步骤</button><button id="caDeleteItemBtn" type="button" class="danger">删除当前项</button></div></div>
+        <div class="ca-panel-head"><div><h2 id="caEditorTitle">请选择学习步骤</h2><p id="caEditorPath">从左侧学习顺序中选择一项进行设置。</p></div><div class="ca-node-actions"><button id="caAddPartBtn" type="button"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>章节</button><button id="caAddNodeBtn" type="button"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>学习步骤</button><button id="caDeleteItemBtn" type="button" class="danger"><span data-ui-icon="trash-2" data-ui-icon-size="16" aria-hidden="true"></span>删除当前项</button></div></div>
         <div id="caNodeFields" class="ca-node-fields"><div class="ca-empty">选择阶段、部分或节点后显示编辑区域。</div></div>
 
         <section class="ca-node-activities" id="caNodeActivities" hidden>
@@ -96,7 +98,7 @@
     </div>
 
     <section id="caTaskView" class="config-module" data-config-panel="tasks" hidden>
-      <aside class="config-list-panel" data-workspace-panel="learning-task-list" data-workspace-title="学习任务列表" data-workspace-controls-target=".config-panel-head"><div class="config-panel-head"><div><p>LEARNING TASKS</p><h2>学习任务</h2><span>深度回忆、单题深学和多题画布不是普通试卷。</span></div><div><button type="button" id="caMigrateTasksBtn">同步旧列表</button><button type="button" id="caNewTaskBtn" class="primary">＋ 新任务</button></div></div><div class="config-filter-row"><label><span>类型</span><select id="caTaskTypeFilter"><option value="">全部</option><option value="deep_recall">深度回忆</option><option value="single_deep_study">单题深学</option><option value="multi_question_canvas">多题画布</option></select></label><label><span>状态</span><select id="caTaskStatusFilter"><option value="">全部</option><option value="draft">草稿</option><option value="published">已发布</option><option value="archived">已归档</option></select></label></div><div id="caTaskList" class="config-record-list"></div></aside>
+      <aside class="config-list-panel" data-workspace-panel="learning-task-list" data-workspace-title="学习任务列表" data-workspace-controls-target=".config-panel-head"><div class="config-panel-head"><div><p>LEARNING TASKS</p><h2>学习任务</h2><span>深度回忆、单题深学和多题画布不是普通试卷。</span></div><div><button type="button" id="caMigrateTasksBtn">同步旧列表</button><button type="button" id="caNewTaskBtn" class="primary"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新任务</button></div></div><div class="config-filter-row"><label><span>类型</span><select id="caTaskTypeFilter"><option value="">全部</option><option value="deep_recall">深度回忆</option><option value="single_deep_study">单题深学</option><option value="multi_question_canvas">多题画布</option></select></label><label><span>状态</span><select id="caTaskStatusFilter"><option value="">全部</option><option value="draft">草稿</option><option value="published">已发布</option><option value="archived">已归档</option></select></label></div><div id="caTaskList" class="config-record-list"></div></aside>
       <section class="config-editor-panel" data-workspace-panel="learning-task-editor" data-workspace-title="学习任务编辑" data-workspace-controls-target=".config-panel-head"><div class="config-panel-head"><div><p>EDIT TASK</p><h2 id="caTaskEditorTitle">请选择学习任务</h2><span>学习任务引用活动 ID；关键词模板编辑器将在 v8.6.2 接入。</span></div><div class="config-editor-actions"><button type="button" id="caDeleteTaskBtn" class="danger">删除</button><button type="button" id="caArchiveTaskBtn">归档</button><button type="button" id="caPublishTaskBtn">发布</button><button type="button" id="caSaveTaskBtn" class="primary">保存草稿</button></div></div><div id="caTaskEditor" class="config-editor-empty">从左侧选择任务，或新建一个学习任务。</div></section>
       <aside class="config-picker-panel" data-workspace-panel="learning-task-picker" data-workspace-title="任务活动选择" data-workspace-controls-target=".config-panel-head"><div class="config-panel-head"><div><h2>选择活动</h2><span>从统一活动库加入当前学习任务。</span></div><a href="question-bank.html">打开题目管理</a></div><label><span>搜索</span><input id="caTaskActivitySearch" placeholder="题干、ID、知识点" /></label><div id="caTaskActivityPicker" class="config-picker-list"></div></aside>
     </section>
@@ -154,5 +156,6 @@
   <script src="src/92-workspace-panel-manager.js?v=v9.0-p4.1.18"></script>
   <script src="src/97-teacher-course-workflow.js?v=v9.0-p4.1.18"></script>
 <script src="src/admin/48-admin-context-nav.js?v=v9.0-p4.1.18"></script>
+<script src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.18"></script>
 </body>
 </html>

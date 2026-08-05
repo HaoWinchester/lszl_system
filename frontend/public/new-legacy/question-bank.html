@@ -19,8 +19,10 @@
 <link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.18"/>
 <link rel="stylesheet" href="styles/workspace-placement.css?v=v9.0-p4.1.18"/>
 <link rel="stylesheet" href="styles/question-classification.css?v=v9.0-p4.1.18"/>
+<link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.18"/>
+<link rel="stylesheet" href="styles/focus-vega-teacher.css?v=v9.0-p4.1.18"/>
 </head>
-<body class="teacher-admin-shell" data-admin-context="teacher">
+<body class="teacher-admin-shell" data-admin-context="teacher" data-ui-skin="focus-vega">
 <nav class="admin-context-nav" aria-label="管理后台一级导航">
   <a data-admin-nav="overview" href="admin-console.html">总览</a>
   <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
@@ -42,7 +44,7 @@
 <div class="qb-app" id="qbApp">
 <header class="qb-topbar">
 <div class="qb-brand">
-<a class="qb-back" href="index.html" title="返回知识图谱">←</a>
+<a class="qb-back" href="index.html" title="返回知识图谱"><span data-ui-icon="arrow-left" data-ui-icon-size="18" aria-hidden="true"></span></a>
 <div>
 <p class="qb-kicker">Project Management Question Bank</p>
 <h1>教师原题工作台</h1>
@@ -105,7 +107,7 @@
 <h2>题库</h2>
 <p id="qbScopeInfo">本地浏览器数据</p>
 </div>
-<button id="qbAddBankBtn" type="button">+ 新题库</button>
+<button id="qbAddBankBtn" type="button"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新题库</button>
 </div>
 <div class="qb-management-pane-controls" aria-label="题库区域显示控制">
 <button type="button" data-library-pane-action="maximize" data-library-pane-target="banks"></button>
@@ -171,7 +173,7 @@
 <h2>题目</h2>
 <p id="qbQuestionCount">0 题</p>
 </div>
-<button id="qbAddQuestionBtn" type="button">+ 新题</button>
+<button id="qbAddQuestionBtn" type="button"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新题</button>
 </div>
 <div class="qb-management-pane-controls" aria-label="题目区域显示控制">
 <button type="button" data-library-pane-action="maximize" data-library-pane-target="questions"></button>
@@ -395,7 +397,7 @@
 <div class="qb-mini-section tq-zh-content">
 <div class="qb-mini-head">
 <h3>中文选项</h3>
-<button id="qbAddOptionBtn" type="button">+ 选项</button>
+<button id="qbAddOptionBtn" type="button"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>选项</button>
 </div>
 <div class="qb-options" id="qbOptionsEditor"></div>
 </div>
@@ -628,7 +630,7 @@
 <div class="qb-floating-keyword-panel" hidden="" id="qbFloatingKeywordPanel">
 <div class="floating-head">
 <strong>关键词标记操作台</strong>
-<button aria-label="关闭" id="floatingKeywordCloseBtn" type="button">×</button>
+<button aria-label="关闭" id="floatingKeywordCloseBtn" type="button"><span data-ui-icon="x" data-ui-icon-size="16" aria-hidden="true"></span></button>
 </div>
 <label class="qb-field">
 <span>选中文本</span>
@@ -683,8 +685,8 @@
         <div class="qb-library-question-preview-meta" id="qbLibraryQuestionPreviewMeta"></div>
       </div>
       <div class="qb-library-question-preview-actions">
-        <button type="button" id="qbLibraryQuestionPreviewEditBtn" title="编辑题目" aria-label="编辑题目">✎</button>
-        <button type="button" id="qbLibraryQuestionPreviewCloseBtn" title="关闭预览" aria-label="关闭预览">×</button>
+        <button type="button" id="qbLibraryQuestionPreviewEditBtn" title="编辑题目" aria-label="编辑题目"><span data-ui-icon="edit-3" data-ui-icon-size="16" aria-hidden="true"></span></button>
+        <button type="button" id="qbLibraryQuestionPreviewCloseBtn" title="关闭预览" aria-label="关闭预览"><span data-ui-icon="x" data-ui-icon-size="16" aria-hidden="true"></span></button>
       </div>
     </header>
     <div class="qb-library-question-preview-content" id="qbLibraryQuestionPreviewContent"></div>
@@ -848,5 +850,6 @@
 <script defer src="src/97-teacher-question-workflow.js?v=v9.0-p4.1.18"></script>
 <script src="src/admin/48-admin-context-nav.js?v=v9.0-p4.1.18"></script>
 <script src="src/99-workspace-placement.js?v=v9.0-p4.1.18"></script>
+<script src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.18"></script>
 </body>
 </html>

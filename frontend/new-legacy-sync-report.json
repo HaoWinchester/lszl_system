@@ -3,11 +3,21 @@
   "fromVersion": "v9.0-p4.1.18",
   "toVersion": "v9.0-p4.1.18",
   "changes": {
-    "added": [],
-    "changed": [],
-    "removed": [
-      "tests/__pycache__/focus-vega-typography-pc-browser.cpython-311.pyc"
-    ]
+    "added": [
+      "assets/icons/lucide-product.svg",
+      "src/109-focus-vega-ui-icons.js",
+      "styles/focus-vega-teacher.css",
+      "tests/focus-vega-teacher-contract.test.js",
+      "tests/focus-vega-teacher-pc-browser.py"
+    ],
+    "changed": [
+      "content-center.html",
+      "course-admin.html",
+      "paper-management.html",
+      "question-bank.html",
+      "teacher-workbench.html"
+    ],
+    "removed": []
   },
   "incompatible": []
 }

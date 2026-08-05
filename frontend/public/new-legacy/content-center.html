@@ -19,8 +19,10 @@
   <link rel="stylesheet" href="styles/workspace-panels.css?v=v9.0-p4.1.18" />
   <link rel="stylesheet" href="styles/content-organization.css?v=v9.0-p4.1.18" />
   <link rel="stylesheet" href="styles/workspace-placement.css?v=v9.0-p4.1.18" />
+  <link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.18" />
+  <link rel="stylesheet" href="styles/focus-vega-teacher.css?v=v9.0-p4.1.18" />
 </head>
-<body>
+<body data-ui-skin="focus-vega">
   <div class="cc-app">
     <header class="tw-topbar">
       <a class="tw-brand" href="teacher-workbench.html"><span class="tw-brand-mark">KG</span><span class="tw-brand-copy"><strong>教师内容工作台</strong><small>内容生产与发布</small></span></a>
@@ -28,7 +30,7 @@
       <div class="tw-user"><span class="tw-user-badge" id="ccAccount"></span><a href="index.html">返回学员端</a></div>
     </header>
     <section class="tw-workflow" aria-label="内容工作流程"><span class="tw-step done"><b>1</b>录入活动</span><i class="tw-arrow"></i><span class="tw-step active"><b>2</b>检查入库</span><i class="tw-arrow"></i><span class="tw-step"><b>3</b>配置内容</span><i class="tw-arrow"></i><span class="tw-step"><b>4</b>预览发布</span></section>
-    <section class="tw-guide"><div class="tw-guide-copy"><strong>当前步骤：检查内容并维护知识归属</strong><span>在这里管理活动、批量归类和维护知识树。题目确认后，再前往配置中心安排课程。</span></div><div class="tw-guide-actions"><a href="question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">返回题目管理</a><a class="primary" href="course-admin.html">前往配置中心 →</a></div></section>
+    <section class="tw-guide"><div class="tw-guide-copy"><strong>当前步骤：检查内容并维护知识归属</strong><span>在这里管理活动、批量归类和维护知识树。题目确认后，再前往配置中心安排课程。</span></div><div class="tw-guide-actions"><a href="question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">返回题目管理</a><a class="primary" href="course-admin.html">前往配置中心<span data-ui-icon="arrow-right" data-ui-icon-size="16" aria-hidden="true"></span></a></div></section>
 
     <section class="tw-commandbar">
       <div class="tw-command-title"><p>CONTENT CENTER</p><h1>内容中心</h1><span>统一活动库、可视化知识树、作者追踪与课程引用关系</span></div>
@@ -53,8 +55,8 @@
           <label class="cc-question-count-toggle"><input id="ccShowQuestionCounts" type="checkbox" checked /><span>显示题量</span></label>
           <label class="cc-question-coverage"><span>题量覆盖</span><select id="ccQuestionCoverageFilter"><option value="all">全部知识点</option><option value="zero">零题量</option><option value="low">题量不足</option></select></label>
           <label class="cc-question-threshold"><span>不足阈值</span><input id="ccQuestionLowThreshold" type="number" min="1" max="999" value="5" /></label>
-          <div class="cc-zoom" id="ccZoomControls"><button type="button" data-zoom="out">−</button><span id="ccZoomLabel">100%</span><button type="button" data-zoom="in">＋</button><button type="button" data-zoom="reset">适应</button></div>
-          <button type="button" class="primary" id="ccAddRootBtn">＋ 一级知识点</button>
+          <div class="cc-zoom" id="ccZoomControls"><button type="button" data-zoom="out" aria-label="缩小"><span data-ui-icon="minus" data-ui-icon-size="16" aria-hidden="true"></span></button><span id="ccZoomLabel">100%</span><button type="button" data-zoom="in" aria-label="放大"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span></button><button type="button" data-zoom="reset">适应</button></div>
+          <button type="button" class="primary" id="ccAddRootBtn"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>一级知识点</button>
         </div>
         <div class="cc-taxonomy-mode" id="ccTaxonomyMode"></div>
         <div class="cc-tree-summary" id="ccTreeSummary"></div>
@@ -70,7 +72,7 @@
         </div>
 
         <aside class="cc-question-count-drawer" id="ccQuestionCountDrawer" hidden aria-label="知识点题目明细">
-          <header><div><p>QUESTION COVERAGE</p><h3 id="ccQuestionDrawerTitle">知识点题目</h3><span id="ccQuestionDrawerSummary">—</span></div><button type="button" id="ccQuestionDrawerClose" aria-label="关闭">×</button></header>
+          <header><div><p>QUESTION COVERAGE</p><h3 id="ccQuestionDrawerTitle">知识点题目</h3><span id="ccQuestionDrawerSummary">—</span></div><button type="button" id="ccQuestionDrawerClose" aria-label="关闭"><span data-ui-icon="x" data-ui-icon-size="16" aria-hidden="true"></span></button></header>
           <div class="cc-question-drawer-tabs"><button type="button" class="active" data-question-scope="direct">本节点题目</button><button type="button" data-question-scope="branch">含下级题目</button></div>
           <label class="cc-question-drawer-search"><span>搜索</span><input id="ccQuestionDrawerSearch" placeholder="题干、题号或题库名称" /></label>
           <div id="ccQuestionDrawerList" class="cc-question-drawer-list"></div>
@@ -101,9 +103,9 @@
       <section class="cc-organize-panel" id="organization" data-workspace-panel="activity-organization" data-workspace-span="full" data-workspace-title="标签与题集" data-workspace-controls-target=".cc-organize-head">
         <div class="cc-organize-head"><div><p class="cc-kicker">ORGANIZE ACTIVITIES</p><h2>标签、题集与收藏</h2><span>活动只保存一份；标签、题集、试卷和课程都引用稳定 activityId。</span></div><div id="ccOrganizationSummary" class="cc-head-stats"></div></div>
         <div class="cc-organize-grid">
-          <section><header><div><h3>标签</h3><p>用于高频、易错、版本和教学用途等多维分类。</p></div><button type="button" id="ccNewTagBtn">＋ 新标签</button></header><div id="ccTagList" class="cc-org-list"></div></section>
-          <section><header><div><h3>题集与收藏夹</h3><p>人工整理活动，不复制题目正文。</p></div><button type="button" id="ccNewCollectionBtn">＋ 新题集</button></header><div id="ccCollectionList" class="cc-org-list"></div></section>
-          <aside class="cc-org-help"><strong>推荐操作</strong><ol><li>先按知识点、题型和难度筛选活动。</li><li>批量添加标签或加入题集。</li><li>需要测评时，选中活动后“创建试卷”。</li></ol><a href="paper-management.html">前往配置中心组卷 →</a></aside>
+          <section><header><div><h3>标签</h3><p>用于高频、易错、版本和教学用途等多维分类。</p></div><button type="button" id="ccNewTagBtn"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新标签</button></header><div id="ccTagList" class="cc-org-list"></div></section>
+          <section><header><div><h3>题集与收藏夹</h3><p>人工整理活动，不复制题目正文。</p></div><button type="button" id="ccNewCollectionBtn"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新题集</button></header><div id="ccCollectionList" class="cc-org-list"></div></section>
+          <aside class="cc-org-help"><strong>推荐操作</strong><ol><li>先按知识点、题型和难度筛选活动。</li><li>批量添加标签或加入题集。</li><li>需要测评时，选中活动后“创建试卷”。</li></ol><a href="paper-management.html">前往配置中心组卷<span data-ui-icon="arrow-right" data-ui-icon-size="16" aria-hidden="true"></span></a></aside>
         </div>
       </section>
     </main>
@@ -131,6 +133,6 @@
 
   <dialog class="cc-dialog detail" id="ccDetailDialog"><form method="dialog"><header><div><p>ACTIVITY DETAIL</p><h2 id="ccDetailTitle">活动详情</h2></div><button value="cancel" aria-label="关闭">×</button></header><div id="ccDetailBody"></div><footer><button value="cancel">关闭</button></footer></form></dialog>
   <div class="cc-toast" id="ccToast" role="status" aria-live="polite"></div>
-  <script src="src/28-app-storage.js?v=v9.0-p4.1.18"></script><script src="src/29-auth-core.js?v=v9.0-p4.1.18"></script><script src="src/86-activity-schema-v1.js?v=v9.0-p4.1.18"></script><script src="src/87-guided-learning-data.js?v=v9.0-p4.1.18"></script><script src="src/91-learning-content-core.js?v=v9.0-p4.1.18"></script><script src="src/93-content-organization-core.js?v=v9.0-p4.1.18"></script><script src="src/admin/00-admin-core.js?v=v9.0-p4.1.18"></script><script src="src/admin/10-content-repository.js?v=v9.0-p4.1.18"></script><script src="src/admin/11-local-content-repository.js?v=v9.0-p4.1.18"></script><script src="src/admin/20-admin-permission-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/21-admin-audit-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/22-admin-transaction-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/30-reference-index-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/31-subject-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/32-taxonomy-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/33-activity-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/34-course-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/35-release-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/40-admin-service-registry.js?v=v9.0-p4.1.18"></script><script src="src/admin/41-learning-content-compat.js?v=v9.0-p4.1.18"></script><script src="src/91-knowledge-tree-index.js?v=v9.0-p4.1.18"></script><script src="src/97-knowledge-question-stats.js?v=v9.0-p4.1.18"></script><script src="src/91-content-center-app.js?v=v9.0-p4.1.18"></script><script src="src/93-content-organization-app.js?v=v9.0-p4.1.18"></script><script src="src/92-workspace-panel-manager.js?v=v9.0-p4.1.18"></script><script src="src/99-embedded-workspace.js?v=v9.0-p4.1.18"></script>
+  <script src="src/28-app-storage.js?v=v9.0-p4.1.18"></script><script src="src/29-auth-core.js?v=v9.0-p4.1.18"></script><script src="src/86-activity-schema-v1.js?v=v9.0-p4.1.18"></script><script src="src/87-guided-learning-data.js?v=v9.0-p4.1.18"></script><script src="src/91-learning-content-core.js?v=v9.0-p4.1.18"></script><script src="src/93-content-organization-core.js?v=v9.0-p4.1.18"></script><script src="src/admin/00-admin-core.js?v=v9.0-p4.1.18"></script><script src="src/admin/10-content-repository.js?v=v9.0-p4.1.18"></script><script src="src/admin/11-local-content-repository.js?v=v9.0-p4.1.18"></script><script src="src/admin/20-admin-permission-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/21-admin-audit-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/22-admin-transaction-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/30-reference-index-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/31-subject-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/32-taxonomy-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/33-activity-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/34-course-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/35-release-service.js?v=v9.0-p4.1.18"></script><script src="src/admin/40-admin-service-registry.js?v=v9.0-p4.1.18"></script><script src="src/admin/41-learning-content-compat.js?v=v9.0-p4.1.18"></script><script src="src/91-knowledge-tree-index.js?v=v9.0-p4.1.18"></script><script src="src/97-knowledge-question-stats.js?v=v9.0-p4.1.18"></script><script src="src/91-content-center-app.js?v=v9.0-p4.1.18"></script><script src="src/93-content-organization-app.js?v=v9.0-p4.1.18"></script><script src="src/92-workspace-panel-manager.js?v=v9.0-p4.1.18"></script><script src="src/99-embedded-workspace.js?v=v9.0-p4.1.18"></script><script src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.18"></script>
 </body>
 </html>
