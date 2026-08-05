@@ -1,4 +1,484 @@
-/* Focus / Vega learning-family adapter. PC-only rules are added below. */
+/* Focus / Vega learning-family adapter. Approved PC scope only. */
 @media (min-width:901px){
-  body[data-ui-skin="focus-vega"] .focus-vega-learning-contract-anchor{display:contents}
+  body[data-ui-skin="focus-vega"].guided-learning-page,
+  body[data-ui-skin="focus-vega"].guided-node-page,
+  body[data-ui-skin="focus-vega"].guided-placement-page{
+    background:#fafafa;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-main,
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-stage-picker-backdrop,
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-placement-backdrop,
+  body[data-ui-skin="focus-vega"].guided-learning-page .status-chip{
+    --gl-primary:#6d5dfc;
+    --gl-primary-dark:#5b4ae8;
+    --gl-primary-soft:#f0edff;
+    --gl-complete:#6d5dfc;
+    --gl-part-main:#6d5dfc;
+    --gl-part-dark:#5b4ae8;
+    --gl-part-base:#4637c8;
+    --gl-part-soft:#f0edff;
+    font-family:var(--ui-font-sans);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-topbar{
+    border-color:#e4e4e7;
+    background:rgba(255,255,255,.98);
+    backdrop-filter:none;
+    box-shadow:none;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-subject-shell,
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-mode-toggle-shell{
+    font-family:var(--ui-font-sans);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-subject-trigger{
+    width:40px;
+    height:40px;
+    border-color:#6d5dfc;
+    border-radius:8px;
+    background:#6d5dfc;
+    box-shadow:none;
+    color:#fff;
+    font-size:var(--ui-text-control);
+    font-weight:var(--ui-weight-semibold);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-subject-trigger:hover,
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-subject-trigger:focus-visible{
+    border-color:#5b4ae8;
+    background:#5b4ae8;
+    box-shadow:none;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-subject-menu{
+    border-color:#e4e4e7;
+    border-radius:10px;
+    box-shadow:0 10px 30px rgba(24,24,27,.1);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-subject-menu-item{
+    min-height:36px;
+    border-radius:8px;
+    color:#3f3f46;
+    font-size:var(--ui-text-control);
+    font-weight:var(--ui-weight-medium);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-subject-menu-item.is-active,
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-subject-menu-item:hover{
+    background:#f0edff;
+    color:#5b4ae8;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-mode-toggle-shell{
+    min-width:160px;
+    padding:3px;
+    border-color:#e4e4e7;
+    border-radius:9px;
+    background:#f4f4f5;
+    box-shadow:none;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-mode-choice{
+    min-height:36px;
+    height:36px;
+    border-radius:7px;
+    color:#71717a;
+    font-size:var(--ui-text-control);
+    font-weight:var(--ui-weight-medium);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-mode-choice.is-active{
+    background:#fff;
+    color:#5b4ae8;
+    box-shadow:0 1px 2px rgba(24,24,27,.06);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-stage-switch{
+    min-height:74px;
+    border:1px solid #6d5dfc;
+    border-radius:10px;
+    background:#6d5dfc;
+    box-shadow:none;
+    color:#fff;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-stage-switch:hover{
+    border-color:#5b4ae8;
+    background:#5b4ae8;
+    box-shadow:none;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-stage-switch:active{
+    transform:none;
+    box-shadow:none;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-stage-switch:focus-visible,
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-mode-choice:focus-visible,
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-stage-path-tools button:focus-visible,
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-current-node-fab:focus-visible{
+    outline:2px solid #6d5dfc;
+    outline-offset:2px;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-main :where(p,span,small,em,time){
+    font-size:var(--ui-text-meta)!important;
+    font-weight:var(--ui-weight-regular)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-main :where(button,a,label,input,select,textarea){
+    font-family:var(--ui-font-sans);
+    font-size:var(--ui-text-control)!important;
+    font-weight:var(--ui-weight-medium)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-main :where(strong,b,h2,h3,h4),
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-stage-picker-backdrop :where(strong,b,h2,h3,h4),
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-placement-backdrop :where(strong,b,h2,h3,h4){
+    font-weight:var(--ui-weight-semibold)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-stage-switch-copy strong{
+    font-size:var(--ui-text-card-title)!important;
+    font-weight:var(--ui-weight-semibold)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-stage-switch-copy small,
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-part-divider-copy strong,
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-node-copy strong{
+    font-size:var(--ui-text-meta)!important;
+    font-weight:var(--ui-weight-semibold)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-part-divider-copy>span{
+    font-size:var(--ui-text-control)!important;
+    font-weight:var(--ui-weight-medium)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-stage-path-tools button{
+    width:36px;
+    height:36px;
+    border-color:#e4e4e7;
+    border-radius:8px;
+    background:#fff;
+    box-shadow:none;
+    color:#52525b;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-part-divider-copy,
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-node-copy{
+    border-color:#e4e4e7;
+    border-radius:8px;
+    background:#fff;
+    box-shadow:0 1px 2px rgba(24,24,27,.05);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-current-node-fab{
+    border-color:#e4e4e7;
+    border-radius:10px;
+    background:#fff;
+    box-shadow:0 4px 16px rgba(24,24,27,.09);
+    color:#5b4ae8;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-current-node-fab small{
+    font-size:var(--ui-text-meta)!important;
+    font-weight:var(--ui-weight-medium)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-stage-picker,
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-placement-dialog{
+    border-color:#e4e4e7;
+    border-radius:10px;
+    box-shadow:0 16px 48px rgba(24,24,27,.15);
+    font-family:var(--ui-font-sans);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-stage-picker-backdrop :where(p,span,small),
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-placement-backdrop :where(p,span,small){
+    font-size:var(--ui-text-meta)!important;
+    font-weight:var(--ui-weight-regular)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-stage-picker-backdrop :where(button,a),
+  body[data-ui-skin="focus-vega"].guided-learning-page .gl-placement-backdrop :where(button,a){
+    min-height:36px;
+    font-size:var(--ui-text-control)!important;
+    font-weight:var(--ui-weight-medium)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page,
+  body[data-ui-skin="focus-vega"].guided-placement-page{
+    color:#18181b;
+    font-family:var(--ui-font-sans);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page{
+    --gln-bg:#fafafa;
+    --gln-card:#fff;
+    --gln-ink:#18181b;
+    --gln-muted:#71717a;
+    --gln-border:#e4e4e7;
+    --gln-primary:#6d5dfc;
+    --gln-primary-dark:#5b4ae8;
+    --gln-primary-soft:#f0edff;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page :where(.gln-topbar,.gln-main,.gln-action-bar) :where(p,span,small,em,time){
+    font-size:var(--ui-text-meta)!important;
+    font-weight:var(--ui-weight-regular)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page :where(.gln-topbar,.gln-main,.gln-action-bar) :where(button,a,input,select,textarea,label){
+    font-family:var(--ui-font-sans);
+    font-size:var(--ui-text-control)!important;
+    font-weight:var(--ui-weight-medium)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page :where(.gln-topbar,.gln-main,.gln-action-bar) :where(strong,b,h1,h2,h3,h4){
+    font-weight:var(--ui-weight-semibold)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .gln-topbar{
+    border-color:#e4e4e7;
+    background:rgba(255,255,255,.98);
+    backdrop-filter:none;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .gln-topbar h1{
+    font-size:var(--ui-text-card-title)!important;
+    font-weight:var(--ui-weight-semibold)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .gln-exit{
+    border-color:#e4e4e7;
+    border-radius:8px;
+    background:#fff;
+    color:#52525b;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .question-language-switch{
+    padding:3px;
+    border-color:#e4e4e7;
+    border-radius:8px;
+    background:#f4f4f5;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .question-language-switch button{
+    min-height:36px;
+    height:36px;
+    border-radius:6px;
+    color:#71717a;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .question-language-switch button.is-active,
+  body[data-ui-skin="focus-vega"].guided-node-page .question-language-switch button[aria-pressed="true"]{
+    background:#fff;
+    color:#5b4ae8;
+    box-shadow:0 1px 2px rgba(24,24,27,.06);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .gln-activity{
+    border-color:#e4e4e7;
+    border-radius:10px;
+    box-shadow:0 1px 2px rgba(24,24,27,.04);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .gln-question-head span{
+    color:#6d5dfc;
+    font-weight:var(--ui-weight-semibold)!important;
+    letter-spacing:.04em;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .gln-question-head h2{
+    font-size:var(--ui-text-section-title)!important;
+    font-weight:var(--ui-weight-semibold)!important;
+    line-height:1.6;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .gln-question-head p{
+    color:#71717a;
+    font-size:var(--ui-text-control)!important;
+    line-height:var(--ui-leading-body);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .gln-choice-list button{
+    border-color:#e4e4e7;
+    border-radius:8px;
+    background:#fff;
+    box-shadow:none;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .gln-choice-list button:hover{
+    border-color:#c4b5fd;
+    background:#faf9ff;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .gln-choice-list button>span{
+    border-radius:8px;
+    background:#f4f4f5;
+    color:#52525b;
+    font-weight:var(--ui-weight-semibold)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .gln-choice-list button strong{
+    font-size:var(--ui-text-control)!important;
+    font-weight:var(--ui-weight-medium)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .gln-action-bar{
+    border-color:#e4e4e7;
+    background:rgba(255,255,255,.98);
+    box-shadow:0 -1px 3px rgba(24,24,27,.04);
+    backdrop-filter:none;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page .gln-primary-action{
+    min-height:40px;
+    border-color:#6d5dfc;
+    border-radius:8px;
+    background:#6d5dfc;
+    box-shadow:none;
+    color:#fff;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-node-page :where(.gln-exit,.question-language-switch button,.gln-choice-list button,.gln-primary-action):focus-visible{
+    outline:2px solid #6d5dfc;
+    outline-offset:2px;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page{
+    --glp-primary:#6d5dfc;
+    --glp-primary-dark:#5b4ae8;
+    --glp-primary-soft:#f0edff;
+    --glp-ink:#18181b;
+    --glp-muted:#71717a;
+    --glp-border:#e4e4e7;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page :where(.glp-topbar,.glp-main,.glp-action-bar) :where(p,span,small,em,time){
+    font-size:var(--ui-text-meta)!important;
+    font-weight:var(--ui-weight-regular)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page :where(.glp-topbar,.glp-main,.glp-action-bar) :where(button,a,input,select,textarea,label){
+    font-family:var(--ui-font-sans);
+    font-size:var(--ui-text-control)!important;
+    font-weight:var(--ui-weight-medium)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page :where(.glp-topbar,.glp-main,.glp-action-bar) :where(strong,b,h1,h2,h3,h4){
+    font-weight:var(--ui-weight-semibold)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .glp-topbar{
+    border-color:#e4e4e7;
+    background:rgba(255,255,255,.98);
+    backdrop-filter:none;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .glp-exit{
+    border:1px solid #e4e4e7;
+    border-radius:8px;
+    background:#fff;
+    color:#52525b;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .glp-heading span{
+    color:#6d5dfc;
+    font-weight:var(--ui-weight-semibold)!important;
+    letter-spacing:.04em;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .glp-heading h1{
+    font-size:var(--ui-text-card-title)!important;
+    font-weight:var(--ui-weight-semibold)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .glp-score-rule{
+    border-radius:8px;
+    background:#f0edff;
+    color:#5b4ae8;
+    font-size:var(--ui-text-meta)!important;
+    font-weight:var(--ui-weight-semibold)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .question-language-switch{
+    padding:3px;
+    border-color:#e4e4e7;
+    border-radius:8px;
+    background:#f4f4f5;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .question-language-switch button{
+    min-height:36px;
+    height:36px;
+    border-radius:6px;
+    color:#71717a;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .question-language-switch button.is-active,
+  body[data-ui-skin="focus-vega"].guided-placement-page .question-language-switch button[aria-pressed="true"]{
+    background:#fff;
+    color:#5b4ae8;
+    box-shadow:0 1px 2px rgba(24,24,27,.06);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .glp-activity{
+    border-color:#e4e4e7;
+    border-radius:10px;
+    box-shadow:0 1px 2px rgba(24,24,27,.04);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .glp-intro-eyebrow,
+  body[data-ui-skin="focus-vega"].guided-placement-page .glp-question-head>span{
+    color:#6d5dfc;
+    font-weight:var(--ui-weight-semibold)!important;
+    letter-spacing:.04em;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .glp-intro h2{
+    font-size:var(--ui-text-page-title)!important;
+    font-weight:var(--ui-weight-bold)!important;
+    line-height:var(--ui-leading-heading);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .glp-intro>p{
+    color:#71717a;
+    font-size:var(--ui-text-body)!important;
+    line-height:var(--ui-leading-body);
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .glp-intro-facts>div{
+    border-color:#e4e4e7;
+    border-radius:8px;
+    background:#fafafa;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .glp-intro-facts span{
+    color:#71717a;
+    font-weight:var(--ui-weight-regular)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .glp-intro-facts strong{
+    font-size:var(--ui-text-card-title)!important;
+    font-weight:var(--ui-weight-semibold)!important;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page .glp-primary-action{
+    min-height:40px;
+    border-color:#6d5dfc;
+    border-radius:8px;
+    background:#6d5dfc;
+    box-shadow:none;
+    color:#fff;
+  }
+
+  body[data-ui-skin="focus-vega"].guided-placement-page :where(.glp-exit,.question-language-switch button,.glp-primary-action):focus-visible{
+    outline:2px solid #6d5dfc;
+    outline-offset:2px;
+  }
 }
