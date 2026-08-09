@@ -293,6 +293,7 @@ function patchAddQuestionTab(source) {
   // 'questions'（v8.6 遗留值）→ 新建题目后编辑表单 display:none 不显示。仅 v9 修；
   // v8.6.29 的 render 兼容 'questions'，不动。
   if (!source.includes('knowledge-recall.html?bankId=')) return source
+  if (source.includes('Catalog.saveQuestion(')) return source
   return replaceExactlyOnce(
     source,
     "    state.activeSidebarTab = 'questions';\n    state.activeLayoutNav = 'questions';\n    bank.updatedAt = Date.now();\n    saveBanks();\n    render();\n  }",

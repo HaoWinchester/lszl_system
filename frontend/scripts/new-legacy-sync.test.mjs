@@ -226,6 +226,32 @@ test('sync adds the server flush when recall preview is already async', (t) => {
   assert.ok(flush < open)
 })
 
+test('sync accepts the server-catalog add-question flow without applying the legacy tab patch', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  const source = `(function(){
+  async function previewDeepRecall(){
+    try{
+      if(window.KGServerStateStorage&&typeof window.KGServerStateStorage.flush==='function')await window.KGServerStateStorage.flush();
+    }catch(error){return}
+    window.open('knowledge-recall.html?bankId=' + encodeURIComponent(bank.id||'') + '&questionId=' + encodeURIComponent(q.id || 'current'), '_blank');
+  }
+  async function addQuestion(){
+    const created=await Catalog.saveQuestion(q,{bankId:bank.id});
+    state.activeLayoutNav='questions';
+    toast('已创建题目并进入服务器题库。');
+    return created;
+  }
+})();
+`
+  write(resolve(item.upstream, 'src/65-question-bank-admin.js'), source)
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(readFileSync(resolve(item.output, 'src/65-question-bank-admin.js'), 'utf8'), source)
+})
+
 test('sync injects server storage before any upstream inline script', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))
