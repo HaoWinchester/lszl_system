@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,6 +22,13 @@ class QuestionBank(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     version: Mapped[str] = mapped_column(String(32), default="1.0")
     visibility: Mapped[str] = mapped_column(String(32), default="private")  # private/public-demo
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_by: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("users.username", ondelete="SET NULL"), nullable=True
+    )
+    updated_by: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("users.username", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -30,6 +37,10 @@ class QuestionBank(Base):
 
 class Question(Base):
     __tablename__ = "questions"
+    __table_args__ = (
+        CheckConstraint("scope IN ('public', 'internal')", name="ck_questions_scope"),
+        Index("ix_questions_bank_scope_lifecycle", "bank_id", "scope"),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     bank_id: Mapped[str] = mapped_column(String(64), ForeignKey("question_banks.id"), nullable=False, index=True)
@@ -39,6 +50,18 @@ class Question(Base):
     difficulty: Mapped[str | None] = mapped_column(String(32), nullable=True)
     domain: Mapped[str | None] = mapped_column(String(100), nullable=True)
     topic: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    teacher_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    scope: Mapped[str] = mapped_column(String(16), nullable=False, default="internal")
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    creator_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    creator_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_by: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("users.username", ondelete="SET NULL"), nullable=True
+    )
+    updated_by: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("users.username", ondelete="SET NULL"), nullable=True
+    )
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     tags: Mapped[list] = mapped_column(JSONB, default=list)
     stem_parts: Mapped[list] = mapped_column(JSONB, default=list)  # [{text, clue?}]
     options: Mapped[list] = mapped_column(JSONB, default=list)  # [{id, text, trap, correct}]
@@ -48,6 +71,10 @@ class Question(Base):
     concepts: Mapped[list] = mapped_column(JSONB, default=list)
     reasoning_steps: Mapped[list] = mapped_column(JSONB, default=list)
     status: Mapped[dict] = mapped_column(JSONB, default=dict)
+    translations: Mapped[dict] = mapped_column(JSONB, default=dict)
+    content_metadata: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    key_path: Mapped[dict] = mapped_column(JSONB, default=dict)
+    lifecycle: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

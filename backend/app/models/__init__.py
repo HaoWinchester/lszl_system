@@ -1,6 +1,15 @@
 """ORM 模型汇总。新增模型在此 import，供 Alembic autogenerate 检测。"""
 
 from app.models.analytics import FeatureUsageEvent
+from app.models.content_prep import (
+    Principle,
+    QuestionAuditLog,
+    QuestionBankCollaborator,
+    QuestionEditLock,
+    QuestionTagConfig,
+    QuestionUploadBatch,
+    SynthesisPreset,
+)
 from app.models.file import CurrentFile, FileContent, FileTag, Folder, GraphFile, Tag
 from app.models.guided_learning import GuidedActivity, GuidedCourse, GuidedCourseActivity, GuidedLearningProgress
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
@@ -24,7 +33,14 @@ __all__ = [
     "FileTag",
     "CurrentFile",
     "QuestionBank",
+    "QuestionBankCollaborator",
     "Question",
+    "Principle",
+    "SynthesisPreset",
+    "QuestionTagConfig",
+    "QuestionEditLock",
+    "QuestionUploadBatch",
+    "QuestionAuditLog",
     "ExamPaper",
     "PaperQuestion",
     "TrainingProgress",
