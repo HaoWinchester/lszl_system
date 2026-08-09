@@ -21,6 +21,7 @@ PAGE_NAMESPACES = {
     "user-management.html": "users",
     "system-settings.html": "system",
     "paper-management.html": "papers",
+    "content-prep.html": "content-prep",
     "course-admin.html": "courses",
     "content-center.html": "content",
     "teacher-workbench.html": "teacher",

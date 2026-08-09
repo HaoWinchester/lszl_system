@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.web.routes import TEACHING_PAGES
 
 
 def _login(client: TestClient, username: str, password: str = "111111") -> None:
@@ -47,3 +48,7 @@ def test_admin_can_download_privileged_page_html() -> None:
         response = client.get("/admin-console.html")
     assert response.status_code == 200
     assert "管理后台" in response.text
+
+
+def test_content_prep_html_is_registered_as_a_teaching_page() -> None:
+    assert "content-prep.html" in TEACHING_PAGES

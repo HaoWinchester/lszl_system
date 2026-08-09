@@ -14,8 +14,12 @@ def inject_bootstrap(html: str, payload: dict) -> str:
         .replace("\u2029", "\\u2029")
     )
     direct = f"<script>window.__KG_DIRECT_BOOTSTRAP__={encoded};</script><!-- kg-direct-bootstrap -->"
-    marker = '<script src="./server-state-bootstrap.js"></script>'
-    if marker not in html:
+    markers = (
+        '<script src="./server-state-bootstrap.js"></script>',
+        '<script src="/server-state-bootstrap.js"></script>',
+    )
+    marker = next((candidate for candidate in markers if candidate in html), None)
+    if marker is None:
         raise RuntimeError("generated page is missing server-state-bootstrap.js")
     return html.replace(marker, f"{direct}\n{marker}", 1)
 

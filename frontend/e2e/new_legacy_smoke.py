@@ -132,6 +132,7 @@ with sync_playwright() as playwright:
             ("/recall", ".kr-app"),
             ("/users", ".um-app"),
             ("/settings", ".ss-app"),
+            ("/content-prep", "#prepApp"),
             ("/learning/placement-test", ".glp-main"),
         ]
         for route, selector in routes:
@@ -148,10 +149,22 @@ with sync_playwright() as playwright:
         assert page.locator("iframe").count() == 0
 
         print("smoke: non-admin receives the original permission-denied surface", flush=True)
+        teacher_context = browser.new_context(viewport={"width": 1280, "height": 800})
+        try:
+            login_api(teacher_context, "老师")
+            teacher_page = teacher_context.new_page()
+            teacher_page.goto(BASE + "/content-prep", wait_until="domcontentloaded")
+            teacher_page.locator("#prepApp").wait_for(state="visible")
+        finally:
+            teacher_context.close()
+
         student_context = browser.new_context(viewport={"width": 1280, "height": 800})
         try:
             login_api(student_context, "学生")
             student_page = student_context.new_page()
+            student_page.goto(BASE + "/content-prep", wait_until="domcontentloaded")
+            assert student_page.locator("#prepApp").count() == 0
+            assert "无权访问" in student_page.locator("body").inner_text()
             student_page.goto(BASE + "/users", wait_until="domcontentloaded")
             student_page.locator(".role-permission-denied").wait_for(state="visible")
             assert "仅限管理员" in student_page.locator("body").inner_text()

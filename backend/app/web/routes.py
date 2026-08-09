@@ -11,8 +11,9 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Resp
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser
+from app.core.permissions import can
 from app.db.session import get_db
-from app.web.bootstrap import build_bootstrap
+from app.web.bootstrap import build_bootstrap, optional_user
 from app.web.html import html_response
 from app.web.releases import (
     ReleaseNotFoundError,
@@ -40,11 +41,17 @@ TEACHING_PAGES = frozenset({
     "admin-console.html",
     "admin-subjects.html",
     "content-center.html",
+    "content-prep.html",
     "course-admin.html",
     "paper-management.html",
     "question-bank.html",
     "teacher-workbench.html",
 })
+CONTENT_PREP_PERMISSIONS = (
+    "accessQuestionBank",
+    "importData",
+    "editQuestions",
+)
 
 
 async def _page_access_denied(request: Request, db: AsyncSession, page: str) -> bool:
@@ -184,6 +191,27 @@ async def courses_alias(request: Request):
 @router.get("/content")
 async def content_alias(request: Request):
     return _redirect(request, "content-center.html")
+
+
+@router.get("/content-prep")
+async def content_prep_page(request: Request, db: DB):
+    actor = await optional_user(request, db)
+    if actor is None:
+        query = urlencode({"next": "/content-prep"})
+        return RedirectResponse(f"/login?{query}", status_code=307)
+    if not all(can(actor.role, permission) for permission in CONTENT_PREP_PERMISSIONS):
+        return _forbidden_page()
+    release = _release_or_503()
+    bootstrap = await build_bootstrap(
+        request,
+        db,
+        page="content-prep.html",
+        release_version=release.version,
+    )
+    return html_response(
+        _asset_or_404(release, "content-prep-studio/dist/content-prep.html"),
+        bootstrap,
+    )
 
 
 @router.get("/teacher")
