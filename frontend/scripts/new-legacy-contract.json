@@ -19,7 +19,21 @@
     "src/88-guided-learning-store.js",
     "src/89-guided-learning-app.js",
     "src/90-guided-learning-node-app.js",
-    "schemas/activity-schema-v1.json"
+    "schemas/activity-schema-v1.json",
+    "content-prep-studio/README.md",
+    "content-prep-studio/build.py",
+    "content-prep-studio/src/index.template.html",
+    "content-prep-studio/src/css/app.css",
+    "content-prep-studio/src/js/00-core-bootstrap.js",
+    "content-prep-studio/src/js/10-state-domain.js",
+    "content-prep-studio/src/js/20-page-runtime.js",
+    "content-prep-studio/src/js/30-service-layer.js",
+    "content-prep-studio/src/js/40-events-bootstrap.js",
+    "content-prep-studio/src/tag-slot-schema.json",
+    "content-prep-studio/tests/test_build.py",
+    "content-prep-studio/tests/test_services.py",
+    "content-prep-studio/tests/test_tag_migration.js",
+    "content-prep-studio/dist/content-prep.html"
   ],
   "requiredGlobals": [
     "KGActivitySchemaV1",
@@ -172,6 +186,6 @@
   "allowedPersistentStorage": {
     "localStorage": false,
     "sessionStorage": true,
-    "indexedDB": false
+    "indexedDB": true
   }
 }

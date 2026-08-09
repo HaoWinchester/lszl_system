@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "strategy": "semantic-v1",
+  "formalExportStrategy": "legacy-numeric-slots",
+  "slots": {
+    "usage/stage/0": "usage/stage/basic",
+    "usage/stage/1": "usage/stage/phase-test",
+    "usage/stage/2": "usage/stage/mock-exam",
+    "usage/stage/3": "usage/stage/sprint-review",
+    "usage/stage/4": "usage/stage/preview",
+    "usage/stage/5": "usage/stage/intensive",
+    "usage/stage/6": "usage/stage/mistake-review",
+    "usage/scene/0": "usage/scene/after-class",
+    "usage/scene/1": "usage/scene/classroom-discussion",
+    "usage/scene/2": "usage/scene/homework",
+    "usage/scene/3": "usage/scene/special-training",
+    "quality/feature/0": "quality/feature/error-prone",
+    "quality/feature/1": "quality/feature/high-frequency",
+    "quality/feature/2": "quality/feature/core",
+    "quality/feature/3": "quality/feature/comprehensive",
+    "quality/review/0": "quality/review/pending-review",
+    "quality/review/1": "quality/review/reviewed",
+    "quality/review/2": "quality/review/needs-update",
+    "source/origin/0": "source/origin/real-exam",
+    "source/origin/1": "source/origin/self-authored",
+    "source/origin/2": "source/origin/adapted",
+    "source/origin/3": "source/origin/textbook-example",
+    "source/scope/0": "source/scope/public",
+    "source/scope/1": "source/scope/internal"
+  }
+}

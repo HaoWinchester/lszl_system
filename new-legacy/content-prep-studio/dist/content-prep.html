@@ -1,0 +1,2420 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PMP Content Prep Studio</title>
+<script src="/server-state-bootstrap.js"></script>
+<style>
+:root{
+  --bg:#f5f7fb;--panel:#fff;--line:#dbe2ea;--text:#182230;--muted:#64748b;
+  --brand:#2457d6;--brand2:#173da2;--good:#16835a;--warn:#b26700;--bad:#b42318;
+  --normal:#eaf2ff;--normal-border:#7ea6ff;--core:#fff1db;--core-border:#e69922;
+  --shadow:0 8px 24px rgba(15,23,42,.08);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+header{height:64px;background:#10213f;color:#fff;display:flex;align-items:center;gap:20px;padding:0 22px;position:sticky;top:0;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+.brand{font-size:19px;font-weight:800;letter-spacing:.2px}.version{font-size:12px;color:#b8c7e6}
+.header-meta{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;background:rgba(255,255,255,.12);font-size:12px}
+nav{display:flex;background:#fff;border-bottom:1px solid var(--line);padding:0 18px;position:sticky;top:64px;z-index:19}
+nav button{border:0;background:transparent;padding:14px 18px;border-bottom:3px solid transparent;color:#42526a;font-weight:700}
+nav button.active{color:var(--brand);border-bottom-color:var(--brand)}
+main{padding:16px}
+.tab{display:none}.tab.active{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.card-hd{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);font-weight:800}
+.card-bd{padding:14px}
+.grid3{display:grid;grid-template-columns:270px minmax(460px,1fr) 390px;gap:14px;align-items:start}
+.grid2{display:grid;grid-template-columns:360px minmax(520px,1fr);gap:14px;align-items:start}
+@media(max-width:1180px){.grid3{grid-template-columns:240px 1fr}.grid3>.right{grid-column:1/-1}.grid2{grid-template-columns:1fr}}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{border:1px solid #cbd5e1;background:#fff;color:#263449;border-radius:8px;padding:7px 11px;font-weight:650}
+.btn:hover{background:#f6f8fb}.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}.btn.primary:hover{background:var(--brand2)}
+.btn.danger{color:var(--bad);border-color:#efb5b0}.btn.good{color:var(--good);border-color:#9fd8c4}
+.btn.small{padding:4px 8px;font-size:12px}
+.q-list,.node-list{max-height:calc(100vh - 220px);overflow:auto}
+.list-item{padding:9px 10px;border-bottom:1px solid #edf1f5;cursor:pointer}
+.list-item:hover{background:#f7faff}.list-item.active{background:#edf4ff;border-left:3px solid var(--brand)}
+.list-title{font-weight:700}.list-meta{font-size:12px;color:var(--muted);margin-top:2px}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:#94a3b8}
+.status-dot.ok{background:var(--good)}.status-dot.warn{background:#e6a22d}.status-dot.bad{background:var(--bad)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}.span2{grid-column:1/-1}
+label{display:block;font-weight:700;margin-bottom:5px;color:#344054}
+input[type=text],input[type=number],textarea,select{width:100%;border:1px solid #cfd8e3;border-radius:8px;padding:8px 9px;background:#fff;color:var(--text);outline:none}
+input:focus,textarea:focus,select:focus{border-color:#7298ef;box-shadow:0 0 0 3px rgba(36,87,214,.09)}
+textarea{min-height:78px;resize:vertical}
+.textarea-sm{min-height:54px}
+.section{margin-top:14px;border-top:1px solid #e8edf3;padding-top:14px}.section:first-child{margin-top:0;border-top:0;padding-top:0}
+.section-title{font-weight:900;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.option-row{display:grid;grid-template-columns:36px 1fr 44px;gap:8px;align-items:start;margin-bottom:8px}
+.option-letter{height:38px;border-radius:8px;background:#eef2f7;display:flex;align-items:center;justify-content:center;font-weight:900}
+.kw-actions{display:flex;gap:8px;background:#f8fafc;border:1px dashed #cbd5e1;padding:9px;border-radius:9px;align-items:center;flex-wrap:wrap}
+.kw-hint{color:var(--muted);font-size:12px}
+.kw-list{display:flex;flex-direction:column;gap:8px}
+.kw-card{border:1px solid var(--line);border-radius:9px;padding:9px;background:#fff}
+.kw-card.normal{border-left:4px solid var(--normal-border);background:linear-gradient(90deg,var(--normal),#fff 28%)}
+.kw-card.core{border-left:4px solid var(--core-border);background:linear-gradient(90deg,var(--core),#fff 32%)}
+.kw-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.kw-word{font-size:15px;font-weight:900}
+.pill{font-size:11px;padding:2px 7px;border-radius:999px;border:1px solid #ccd5e0;background:#fff}
+.pill.normal{background:var(--normal);border-color:var(--normal-border);color:#174ea6}.pill.core{background:var(--core);border-color:var(--core-border);color:#8a4e00}
+.kw-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}.kw-grid .span2{grid-column:1/-1}
+.muted{color:var(--muted)}.tiny{font-size:11px}.smalltxt{font-size:12px}
+.issue{padding:9px 10px;border-radius:8px;margin-bottom:7px;border:1px solid #e1e7ef;background:#fff}
+.issue.error{border-color:#efaaa4;background:#fff7f6}.issue.warn{border-color:#f1c77c;background:#fffaf0}.issue.ok{border-color:#a7d9c7;background:#f4fcf8}
+.issue strong{display:block;margin-bottom:3px}
+.metric-grid{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px}.metric{padding:12px;border:1px solid var(--line);border-radius:10px;background:#fff}.metric b{font-size:22px;display:block}
+.preview{border:1px solid var(--line);border-radius:10px;background:#fbfcfe;padding:12px;white-space:pre-wrap;word-break:break-word;max-height:420px;overflow:auto}
+.preview mark.normal{background:#dceaff;border-bottom:2px solid #5c8df3}.preview mark.core{background:#ffe0a6;border-bottom:2px solid #d78008;font-weight:800}
+.node-editor{display:grid;grid-template-columns:1fr 1fr;gap:10px}.node-editor .span2{grid-column:1/-1}
+.edge-row{display:grid;grid-template-columns:1fr 110px 56px 36px;gap:6px;margin:6px 0;align-items:center}
+.filebox{border:2px dashed #cbd5e1;border-radius:12px;padding:18px;background:#fff;text-align:center}
+.filebox input{max-width:100%}
+.data-summary{display:grid;grid-template-columns:repeat(3,minmax(200px,1fr));gap:12px;margin-top:14px}
+.data-card{padding:14px;border-radius:12px;border:1px solid var(--line);background:#fff}.data-card h3{margin:0 0 8px}.data-card b{font-size:26px}
+.check-table{width:100%;border-collapse:collapse;background:#fff}.check-table th,.check-table td{padding:8px;border-bottom:1px solid #e8edf3;text-align:left;vertical-align:top}.check-table th{background:#f8fafc;position:sticky;top:0}
+.export-grid{display:grid;grid-template-columns:repeat(2,minmax(320px,1fr));gap:14px}.export-card{padding:16px}.export-card h3{margin-top:0}
+.help{background:#eef4ff;border:1px solid #c7d9ff;padding:10px;border-radius:9px;color:#264878}
+.no-data{padding:24px;text-align:center;color:var(--muted)}
+hr{border:0;border-top:1px solid var(--line)}
+code{background:#f1f5f9;padding:1px 4px;border-radius:4px}
+.hidden{display:none!important}
+.toast{position:fixed;right:20px;bottom:20px;background:#182230;color:#fff;padding:10px 14px;border-radius:9px;box-shadow:var(--shadow);z-index:50;opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none}
+.toast.show{opacity:1;transform:none}
+
+/* v0.2.0: AI-first workflow, interactive keyword preview, lightweight recall preview */
+.help-btn{width:26px;height:26px;border-radius:50%;border:1px solid #aebbd0;background:#fff;color:#254b9d;font-weight:900;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.workflow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;border:1px solid #c7d9ff;background:#f7faff;border-radius:10px}
+.workflow .step{font-weight:750}.workflow .arrow{color:#8391a7}
+.import-assistant{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:14px}
+.import-assistant textarea{min-height:190px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.preview-core{border:1px solid #bdc9d9;border-radius:12px;background:#fff;padding:14px;min-height:180px;line-height:1.9;user-select:text}
+.preview-core .stem-view{font-size:15px;font-weight:700;margin-bottom:12px}
+.preview-core .option-view{padding:7px 9px;margin:5px 0;border:1px solid #e4e9ef;border-radius:8px;background:#fbfcfe}
+.preview-core .option-view.correct{border-color:#a6d6c5;background:#f5fcf8}
+.preview-core mark{cursor:pointer;border-radius:4px;padding:1px 2px}
+.preview-core mark.normal{background:#dceaff;border-bottom:2px solid #5c8df3}
+.preview-core mark.core{background:#ffe0a6;border-bottom:2px solid #d78008;font-weight:850}
+.preview-tip{font-size:12px;color:var(--muted);margin:0 0 8px}
+.keyword-float{position:fixed;z-index:80;width:min(420px,calc(100vw - 24px));border:1px solid #aebbd0;border-radius:12px;background:#fff;box-shadow:0 14px 40px rgba(15,23,42,.22);padding:11px;display:none}
+.keyword-float.show{display:block}.keyword-float .float-title{font-weight:900;margin-bottom:7px;display:flex;gap:8px;align-items:center}.keyword-float .float-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.keyword-float .float-grid .span2{grid-column:1/-1}
+.modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:90;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-backdrop.show{display:flex}.modal-panel{width:min(900px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:14px;border:1px solid #c8d2df;padding:18px}
+.modal-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}.modal-head h2{margin:0;font-size:20px}.modal-head .spacer{flex:1}
+.modal-panel details{border-top:1px solid #e7ebf0;padding:10px 0}.modal-panel summary{cursor:pointer;font-weight:800}
+.recall-preview{border:1px solid #cbd6e4;border-radius:11px;background:#f9fbfe;padding:12px;margin-bottom:14px}
+.recall-preview-title{font-size:16px;font-weight:900}.chip-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.chip-btn{border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:4px 8px;font-size:12px;cursor:pointer}.chip-btn:hover{border-color:#7298ef;background:#f2f6ff}
+.recall-links{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}.recall-links h4{margin:0 0 5px;font-size:12px;color:#526075}
+.synonym-note{font-size:12px;color:#53657a;background:#f6f8fb;border:1px solid #e0e6ee;border-radius:8px;padding:8px;margin-top:8px}
+.fold-editor{margin-top:14px}.fold-editor summary{cursor:pointer;font-weight:900;padding:8px 0}
+@media(max-width:760px){.recall-links{grid-template-columns:1fr}.keyword-float .float-grid{grid-template-columns:1fr}.keyword-float .float-grid .span2{grid-column:auto}}
+
+
+/* v0.3.0 */
+.grid-manage{display:grid;grid-template-columns:300px minmax(520px,1fr);gap:14px;align-items:start}
+@media(max-width:980px){.grid-manage{grid-template-columns:1fr}}
+.bundle-box{border:2px solid #8da9e8;background:#f7faff}
+.relation-map{border:1px solid #cfd8e3;border-radius:12px;background:#fbfcfe;padding:14px;margin-bottom:14px}
+.relation-breadcrumb{text-align:center;color:#46566c;font-size:13px;margin-bottom:14px;word-break:break-word}
+.relation-top{display:grid;grid-template-columns:1fr 80px 1.05fr 80px 1fr;align-items:center;gap:8px}
+.relation-title{text-align:center;font-size:15px;font-weight:900;margin-bottom:8px}
+.relation-col{min-width:0}.relation-node{width:100%;min-height:116px;border:2px solid #20242b;background:#fff;border-radius:3px;padding:10px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:5px;cursor:pointer}
+.relation-node:hover{border-color:#426bd6;background:#f7faff}.relation-node.current{background:#5b5b5b;color:#fff;border-color:#161616;font-weight:900}.relation-node.current small{color:#eee}
+.relation-node.mini{min-height:48px;border-width:1px;margin:5px 0;padding:7px}.relation-arrow{height:3px;background:#181a1e;position:relative}.relation-arrow:after{content:"";position:absolute;right:-1px;top:-6px;border-left:12px solid #181a1e;border-top:7px solid transparent;border-bottom:7px solid transparent}
+.relation-bottom{margin-top:18px}.relation-bottom-box{border:2px solid #20242b;min-height:82px;padding:10px;background:#fff;display:flex;gap:7px;flex-wrap:wrap;align-items:center;justify-content:center}
+.demo-layout{display:grid;grid-template-columns:250px minmax(520px,1fr) 360px;gap:14px;align-items:start}@media(max-width:1180px){.demo-layout{grid-template-columns:220px 1fr}.demo-layout>.demo-side{grid-column:1/-1}}
+.demo-question{background:#fff;border:1px solid #ccd6e2;border-radius:12px;padding:18px}.demo-tags{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.demo-tag{font-size:12px;padding:4px 9px;border-radius:999px;border:1px solid #92aef1;background:#eef4ff;color:#244b9d;font-weight:750}.demo-tag.unbound{border-color:#c9ced7;background:#f1f2f4;color:#8a9099}
+.demo-stem{font-size:16px;font-weight:750;line-height:2;margin-bottom:14px}.demo-option{border:1px solid #d7dee8;border-radius:9px;padding:10px;margin:8px 0;cursor:pointer;line-height:1.7}.demo-option:hover{background:#f8faff;border-color:#9bb5ed}.demo-option.active{border-color:#557ede;background:#eef4ff}
+.demo-keyword{border-radius:3px;cursor:pointer;transition:.12s;background:transparent}.demo-keyword:hover{background:#ffe4a8;box-shadow:0 0 0 2px #ffe4a8}.demo-keyword.core:hover{background:#ffd290;box-shadow:0 0 0 2px #ffd290}
+.demo-recall-panel,.demo-card-panel{border:1px solid #d5dde8;border-radius:10px;background:#fbfcfe;padding:12px}.demo-recall-panel h3,.demo-card-panel h3{margin:0 0 8px;font-size:15px}
+.recall-layer{display:flex;gap:6px;flex-wrap:wrap;padding:7px 0;border-top:1px dashed #d9e0e8}.recall-layer:first-of-type{border-top:0}.recall-layer b{min-width:54px;color:#556579}
+.principle-card{border:1px solid #cbd6e4;border-radius:10px;background:#fff;padding:11px;margin:8px 0}.principle-card strong{display:block;margin-bottom:4px}.principle-card .status{font-size:11px;color:#68768a}
+.manager-list{max-height:560px;overflow:auto}.manager-row{padding:9px;border-bottom:1px solid #edf0f4;cursor:pointer}.manager-row:hover{background:#f7faff}.manager-row.active{background:#edf4ff;border-left:3px solid var(--brand)}
+.tag-group-card{border:1px solid #d9e0e9;border-radius:10px;margin-bottom:12px;background:#fff}.tag-group-head{padding:9px 11px;background:#f7f9fc;border-bottom:1px solid #e1e6ed;font-weight:900}.tag-category{padding:10px}.tag-category-title{font-weight:800;margin-bottom:7px}
+.tag-slot{display:grid;grid-template-columns:160px 1fr 1.2fr;gap:8px;align-items:center;margin:6px 0}.option-principles{border:1px solid #e0e6ed;border-radius:9px;padding:8px;margin:7px 0}.principle-checks{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px}.principle-checks label{font-weight:500;margin:0;border:1px solid #d3dce7;border-radius:999px;padding:4px 8px;background:#fff}
+@media(max-width:760px){.tag-slot{grid-template-columns:1fr}.relation-top{grid-template-columns:1fr}.relation-arrow{width:3px;height:34px;margin:auto}.relation-arrow:after{right:-6px;top:auto;bottom:-1px;border-left:7px solid transparent;border-right:7px solid transparent;border-top:12px solid #181a1e;border-bottom:0}}
+
+
+/* v0.3.1 */
+.demo-lang-switch{display:flex;gap:5px;margin-left:auto}
+.demo-lang-switch button{border:1px solid #c8d2df;background:#fff;border-radius:7px;padding:5px 9px;font-size:12px;font-weight:750;color:#46566c}
+.demo-lang-switch button.active{background:var(--brand);border-color:var(--brand);color:#fff}
+.demo-question-list{max-height:640px;overflow:auto}
+.demo-answer{border-color:#91cfb8!important;background:#eefaf4!important;box-shadow:inset 3px 0 0 #16835a}
+.demo-answer .answer-badge{display:inline-flex;margin-left:8px;font-size:11px;padding:2px 7px;border-radius:999px;background:#dff4e9;color:#116744;font-weight:850}
+.demo-bilingual-block{border-top:1px dashed #d8e0ea;margin-top:8px;padding-top:7px;color:#4f5d70}
+.demo-bilingual-block:first-child{border-top:0;margin-top:0;padding-top:0}
+.demo-side .demo-card-panel{margin-top:0!important;margin-bottom:12px}
+.relation-selection{margin-top:10px;border:1px solid #cfd8e3;border-radius:9px;padding:9px;background:#fff}
+.relation-selection-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.relation-node.selected{border-color:#426bd6;background:#eef4ff}
+
+
+/* v0.3.2 */
+.save-panel{border:1px solid #a9c0ef;background:#f7faff;border-radius:12px;padding:13px;margin-top:14px}
+.save-status{font-size:12px;color:#53657a}.save-status.good{color:#137651}.save-status.warn{color:#a15b00}.save-status.bad{color:#b42318}
+.header-save-btn{border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:#fff;border-radius:8px;padding:6px 10px;font-weight:800}.header-save-btn:hover{background:rgba(255,255,255,.2)}
+.full-paste-example{margin-top:10px;border:1px solid #d9e1eb;border-radius:9px;background:#fbfcfe;padding:9px}.full-paste-example summary{cursor:pointer;font-weight:850}.full-paste-example pre{white-space:pre-wrap;word-break:break-word;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#fff;border:1px solid #e2e7ee;border-radius:7px;padding:10px;max-height:430px;overflow:auto}
+.tag-alias-help{font-size:11px;color:#65758a;margin-top:2px}.tag-alias-status{font-size:11px;color:#137651}
+
+/* v0.3.3: global question identity + creator/device/batch provenance */
+.identity-panel{border:1px solid #c5d4ef;border-radius:12px;background:#f8faff;padding:13px;margin-top:14px}
+.identity-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.identity-grid .span2{grid-column:1/-1}
+.identity-id{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:#fff}
+.identity-note{font-size:12px;color:#56667b;margin-top:7px;line-height:1.6}
+.system-id-note{border-left:4px solid #4d76d7;background:#f4f7ff;padding:9px 11px;border-radius:7px;margin-top:10px;font-size:12px;color:#45566f}
+@media(max-width:760px){.identity-grid{grid-template-columns:1fr}.identity-grid .span2{grid-column:auto}}
+
+/* v0.3.4: forced creator selection */
+.creator-gate{position:fixed;inset:0;z-index:200;background:linear-gradient(135deg,#eef4ff 0%,#f8fbff 42%,#fff7f0 100%);display:flex;align-items:center;justify-content:center;padding:28px}
+.creator-gate.hidden{display:none}
+.creator-gate-panel{width:min(1120px,96vw);background:rgba(255,255,255,.96);border:1px solid #c9d5e6;border-radius:22px;box-shadow:0 24px 80px rgba(36,52,78,.22);padding:28px}
+.creator-gate-head{text-align:center;margin-bottom:24px}
+.creator-gate-head h1{margin:0;font-size:30px;letter-spacing:.02em;color:#1e2b3f}
+.creator-gate-head p{margin:9px auto 0;max-width:760px;color:#5b6b7f;font-size:14px;line-height:1.7}
+.creator-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.creator-card{appearance:none;border:0;border-radius:18px;min-height:170px;padding:22px 18px;text-align:left;cursor:pointer;position:relative;overflow:hidden;box-shadow:0 10px 28px rgba(33,44,61,.13);transition:transform .15s ease,box-shadow .15s ease,filter .15s ease;color:#142031}
+.creator-card:hover{transform:translateY(-3px) scale(1.01);box-shadow:0 16px 34px rgba(33,44,61,.2);filter:saturate(1.06)}
+.creator-card:active{transform:translateY(0) scale(.99)}
+.creator-avatar{width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;background:rgba(255,255,255,.78);border:2px solid rgba(255,255,255,.72);box-shadow:0 6px 20px rgba(0,0,0,.08)}
+.creator-name{font-size:27px;font-weight:950;margin-top:16px;letter-spacing:.04em}
+.creator-id{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin-top:5px;opacity:.72}
+.creator-card::after{content:"";position:absolute;width:120px;height:120px;border-radius:50%;right:-28px;top:-36px;background:rgba(255,255,255,.27)}
+.creator-card.peiqi{background:linear-gradient(135deg,#ffd3e1,#ffb6cf)}
+.creator-card.momo{background:linear-gradient(135deg,#d6e7ff,#acd0ff)}
+.creator-card.mengmeng{background:linear-gradient(135deg,#d8f5df,#afe8bd)}
+.creator-card.qiaozhi{background:linear-gradient(135deg,#fff0c7,#ffdb7a)}
+.creator-card.tiancai{background:linear-gradient(135deg,#e4d7ff,#c9b0ff)}
+.creator-card.nvdi{background:linear-gradient(135deg,#ffd7c9,#ffb396)}
+.creator-gate-foot{margin-top:20px;text-align:center;color:#7a8798;font-size:12px}
+.creator-switch-btn{border:1px solid rgba(255,255,255,.42);background:rgba(255,255,255,.12);color:#fff;border-radius:8px;padding:6px 10px;font-weight:800}
+.creator-switch-btn:hover{background:rgba(255,255,255,.2)}
+.creator-fixed-panel{border:1px solid #c5d4ef;border-radius:12px;background:#f8faff;padding:13px;margin-top:14px}
+.creator-fixed-current{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.creator-fixed-badge{font-size:20px;font-weight:900;padding:8px 14px;border-radius:12px;background:#fff;border:1px solid #d5deeb}
+@media(max-width:820px){.creator-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.creator-grid{grid-template-columns:1fr}.creator-card{min-height:132px}.creator-gate-panel{padding:18px}.creator-gate-head h1{font-size:24px}}
+
+
+/* v0.3.5: theme switcher, help center, export audit */
+:root{--header:#10213f;--nav:#fff;--nav-text:#42526a;--soft:#eef4ff;--soft2:#f7faff}
+body[data-theme="sakura"]{
+  --bg:#fff7fa;--panel:#fff;--line:#ecd9e3;--text:#352431;--muted:#81677a;
+  --brand:#c94d82;--brand2:#9b3562;--good:#32845f;--warn:#a76500;--bad:#b52c3c;
+  --normal:#fff0f6;--normal-border:#e498b9;--core:#fff4dd;--core-border:#e4a348;
+  --header:#6e2948;--nav:#fffafd;--nav-text:#654457;--soft:#fff0f6;--soft2:#fff8fb
+}
+body[data-theme="mint"]{
+  --bg:#f3fbf7;--panel:#fff;--line:#d4e7dd;--text:#20352d;--muted:#627b70;
+  --brand:#238764;--brand2:#176448;--good:#16835a;--warn:#aa6800;--bad:#b42318;
+  --normal:#eaf9f2;--normal-border:#77c6a6;--core:#fff3db;--core-border:#dfa43a;
+  --header:#194f40;--nav:#fbfffd;--nav-text:#3f6457;--soft:#eaf9f2;--soft2:#f7fcf9
+}
+body[data-theme="sunshine"]{
+  --bg:#fff9ef;--panel:#fff;--line:#eadcc6;--text:#382c1d;--muted:#826f57;
+  --brand:#cf741d;--brand2:#9b5211;--good:#34805a;--warn:#b16800;--bad:#b52f20;
+  --normal:#fff3df;--normal-border:#e5b469;--core:#fff0c8;--core-border:#d58b1b;
+  --header:#633915;--nav:#fffdf8;--nav-text:#6b5031;--soft:#fff3df;--soft2:#fffbf4
+}
+body[data-theme="grape"]{
+  --bg:#f8f5ff;--panel:#fff;--line:#ddd7ed;--text:#2f2941;--muted:#716a85;
+  --brand:#7350c7;--brand2:#54379c;--good:#33805d;--warn:#a86a00;--bad:#b22d41;
+  --normal:#f1edff;--normal-border:#aa96e3;--core:#fff1dc;--core-border:#dc9c35;
+  --header:#38275f;--nav:#fcfaff;--nav-text:#5d5274;--soft:#f1edff;--soft2:#faf8ff
+}
+body[data-theme="ocean"]{
+  --bg:#f2fafc;--panel:#fff;--line:#d2e4e9;--text:#20343a;--muted:#60777e;
+  --brand:#167d91;--brand2:#0f5d6d;--good:#2f8062;--warn:#a56a00;--bad:#b72c2c;
+  --normal:#e8f7fa;--normal-border:#70bfd0;--core:#fff1dc;--core-border:#d99a38;
+  --header:#154853;--nav:#fbfeff;--nav-text:#3c6570;--soft:#e8f7fa;--soft2:#f7fcfd
+}
+header{background:var(--header)!important}
+nav{background:var(--nav)!important}
+nav button{color:var(--nav-text)!important}
+nav button.active{color:var(--brand)!important}
+.theme-control{display:inline-flex;align-items:center;gap:6px}
+.theme-control select{width:auto;min-width:110px;border:1px solid rgba(255,255,255,.38);background:rgba(255,255,255,.13);color:#fff;border-radius:8px;padding:5px 8px;font-weight:750}
+.theme-control select option{color:#222;background:#fff}
+.help-center-btn{border:1px solid rgba(255,255,255,.42);background:rgba(255,255,255,.12);color:#fff;border-radius:8px;padding:6px 10px;font-weight:850}
+.help-center-btn:hover{background:rgba(255,255,255,.2)}
+.help-center-panel{width:min(1180px,98vw)!important;max-height:92vh!important;padding:0!important;overflow:hidden!important}
+.help-center-head{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+.help-center-body{display:grid;grid-template-columns:230px minmax(0,1fr);height:min(760px,78vh)}
+.help-center-nav{border-right:1px solid var(--line);background:var(--soft2);padding:12px;overflow:auto}
+.help-center-nav button{display:block;width:100%;border:0;background:transparent;text-align:left;padding:10px 11px;border-radius:8px;color:var(--text);font-weight:750;margin-bottom:4px;cursor:pointer}
+.help-center-nav button:hover{background:var(--soft)}
+.help-center-nav button.active{background:var(--brand);color:#fff}
+.help-center-content{padding:18px 22px;overflow:auto;background:var(--panel)}
+.help-topic{display:none}.help-topic.active{display:block}
+.help-topic h2{margin:0 0 8px;font-size:23px}.help-topic h3{margin:20px 0 7px;font-size:16px}
+.help-topic p,.help-topic li{line-height:1.75}
+.help-example{border:1px solid var(--line);background:var(--soft2);border-radius:10px;padding:11px 13px;margin:9px 0}
+.help-example code{font-size:12px}.help-topic pre{white-space:pre-wrap;word-break:break-word;background:#182230;color:#eef4ff;padding:12px;border-radius:9px;overflow:auto;font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.audit-card{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:14px;margin-top:14px}
+.audit-list{max-height:340px;overflow:auto;margin-top:9px}
+.audit-row{display:grid;grid-template-columns:170px 120px minmax(180px,1fr) 120px;gap:9px;padding:8px 4px;border-bottom:1px solid var(--line);align-items:center;font-size:12px}
+.audit-row:last-child{border-bottom:0}.audit-hash{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.audit-empty{color:var(--muted);padding:12px 0}
+@media(max-width:760px){
+  .help-center-body{grid-template-columns:1fr;height:82vh}.help-center-nav{display:flex;gap:5px;border-right:0;border-bottom:1px solid var(--line);overflow:auto}.help-center-nav button{min-width:160px}
+  .audit-row{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header>
+  <div><div class="brand">PMP Content Prep Studio</div><div class="version">v0.4.0 · 架构重构版 · 语义标签ID→Service层→Workspace v4 · Keyword System v2</div></div>
+  <div class="header-meta">
+    <span class="badge" id="hdrTree">知识树 0</span>
+    <span class="badge" id="hdrRecall">联想库 0</span>
+    <span class="badge" id="hdrQuestions">题目 0</span>
+    <span class="badge" id="hdrCreator">制作人：未选择</span>
+    <div class="theme-control"><span>主题</span><select id="themeSelect" aria-label="工作主题">
+      <option value="default">清爽蓝</option>
+      <option value="sakura">樱花粉</option>
+      <option value="mint">薄荷绿</option>
+      <option value="sunshine">暖阳橙</option>
+      <option value="grape">葡萄紫</option>
+      <option value="ocean">海盐青</option>
+    </select></div>
+    <button class="help-center-btn" id="btnHelpCenter" type="button">帮助中心</button>
+    <button class="creator-switch-btn" id="btnSwitchCreator" type="button">切换制作人</button>
+    <button class="header-save-btn" id="btnQuickSaveWorkspace" type="button">保存工作区</button>
+    <span class="badge" id="hdrSaveStatus">尚未保存</span>
+    <span class="badge">独立本地保存 · 不写正式程序存储</span>
+  </div>
+</header>
+
+<nav id="tabs">
+  <button data-tab="base" class="active">① 基础数据与导入</button>
+  <button data-tab="management">② 原则归纳卡 / 标签</button>
+  <button data-tab="questions">③ 题目录入与检查</button>
+  <button data-tab="association">④ 联想词编辑</button>
+  <button data-tab="demo">⑤ 题目演示校验</button>
+  <button data-tab="validate">⑥ 校验中心</button>
+  <button data-tab="export">⑦ 导出中心</button>
+</nav>
+
+<main>
+<section class="tab active" id="tab-base">
+  <div class="card">
+    <div class="card-hd">
+      <span>① 基础数据与导入</span>
+      <button class="help-btn" id="btnHelp" title="新手使用说明">?</button>
+    </div>
+    <div class="card-bd">
+      <div class="workflow">
+        <span class="step">外部 AI / Word 基础题</span><span class="arrow">→</span>
+        <span class="step">导入基础文件</span><span class="arrow">→</span>
+        <span class="step">人工可视化校核</span><span class="arrow">→</span>
+        <span class="step">校验</span><span class="arrow">→</span>
+        <span class="step">导出成品 JSON</span>
+      </div>
+      <div class="help" style="margin-top:10px">
+        推荐工作方式：先让外部 AI 把 Word 中的“题干、选项、正确答案、解析”转换为本工具模板 JSON，再导入人工校核。
+        如果暂时不想转换 JSON，也可以把 Word 文字直接复制到下面的“Word/AI 文本粘贴助手”。
+      </div>
+
+
+      <div class="creator-fixed-panel">
+        <div class="section-title"><span>当前制作人</span><span class="muted tiny">强制选择 · 当前页面会话有效</span></div>
+        <div class="creator-fixed-current">
+          <div class="creator-fixed-badge" id="creatorFixedName">尚未选择</div>
+          <div>
+            <div class="muted smalltxt">Creator ID：<code id="creatorFixedId">—</code></div>
+            <div class="muted smalltxt">Device ID：<code id="deviceFixedId">正在初始化…</code></div>
+          </div>
+          <button class="btn" id="btnSwitchCreatorBase" type="button">切换制作人</button>
+        </div>
+        <div class="system-id-note">
+          本版固定 6 个制作人：波塞冬、狗娃、阿浩、杰瑞、天才、女帝。每人使用永久固定 Creator ID；
+          当前制作人必须在进入程序前选择。关闭页面后下次重新选择，避免共用电脑误记作者。
+          Device ID 仍由当前浏览器/设备独立保存。
+        </div>
+      </div>
+      <div class="data-summary">
+        <div class="filebox bundle-box">
+          <h3>完整内容准备包 JSON（推荐）</h3>
+          <input type="file" id="fileContentBundle" accept=".json,application/json">
+          <p class="muted smalltxt">一次导入：题库 + 原则 + 归纳卡 + 标签配置；也可携带知识树/联想库。</p>
+        </div>
+        <div class="filebox">
+          <h3>知识树 JSON</h3>
+          <input type="file" id="fileTree" accept=".json,application/json">
+          <p class="muted smalltxt">支持知识树 package：<code>taxonomy.nodes</code></p>
+        </div>
+        <div class="filebox">
+          <h3>科目级联想库 JSON</h3>
+          <input type="file" id="fileRecall" accept=".json,application/json">
+          <p class="muted smalltxt">同义词/不同翻译请放在同一节点的 <code>aliases</code>。</p>
+        </div>
+        <div class="filebox">
+          <h3>基础题库 JSON</h3>
+          <input type="file" id="fileQuestionBank" accept=".json,application/json">
+          <p class="muted smalltxt">支持 <code>questions[]</code>；也兼容 <code>banks[0]</code></p>
+        </div>
+      </div>
+
+      <div class="toolbar" style="margin-top:12px">
+        <button class="btn primary" id="btnDownloadCompleteBundle">下载“完整内容包”模板</button>
+        <button class="btn primary" id="btnDownloadCompleteAiPrompt">下载完整 AI 制作提示词</button>
+        <button class="btn" id="btnDownloadQuestionTemplate">下载题库 JSON 模板</button>
+        <button class="btn" id="btnDownloadAiPrompt">下载“Word→JSON”AI 提示词</button>
+        <button class="btn" id="btnOpenHelp">查看导入说明</button>
+      </div>
+
+      <div class="import-assistant">
+        <div class="section-title"><span>Word / AI 文本粘贴助手</span><span class="muted tiny">适合只有题干、选项、答案、解析的基础资料</span></div>
+        <p class="smalltxt muted">
+          从 Word 复制后粘贴。建议格式：<code>【题目1】</code>、<code>题干：</code>、<code>A.</code>～<code>D.</code>、<code>答案：</code>、<code>解析：</code>。
+          可一次粘贴多题。
+        </p>
+        <textarea id="rawQuestionPaste" placeholder="【题目1】
+标题：已发送不等于已沟通
+难度：基础
+领域：PMP 沟通绩效域 / 利益相关方与沟通管理
+主题：项目沟通管理的概念
+阶段：基础练习
+标签：基础练习、核心题、自编题、内部使用
+题干：项目经理……
+A. 选项A
+A陷阱：……
+B. 选项B
+B陷阱：……
+C. 选项C
+D. 选项D
+答案：B
+解析：完整中文解析……
+English Title：Sent Does Not Mean Understood
+English Stem：The project manager...
+A_EN：...
+B_EN：...
+C_EN：...
+D_EN：...
+English Analysis：Complete English analysis...
+A反馈EN：...
+B反馈EN：...
+C反馈EN：...
+D反馈EN：...
+主知识点ID：kp-...
+普通关键词：项目经理=>recall-...；通知=>recall-...
+核心关键词：首先=>recall-...|decision-cue|题目要求识别优先行动；有效沟通=>recall-...|answer-anchor|决定答案判断
+原则IDs：principle-1、principle-2
+A原则：principle-1
+B原则：principle-2"></textarea>
+        <div class="toolbar" style="margin-top:8px">
+          <select id="pasteImportMode" style="width:auto"><option value="append">追加到当前题库</option><option value="replace">替换当前题库</option></select>
+          <button class="btn primary" id="btnParsePastedQuestions">解析并导入</button>
+          <span class="muted smalltxt" id="pasteParseResult"></span>
+        </div>
+        <details class="full-paste-example">
+          <summary>查看“完整版 Word / AI 文本粘贴格式”说明</summary>
+          <p class="smalltxt muted">可解析题目基础信息、标签、Trap、双语、英文逐选项反馈、主知识点 ID、普通/核心关键词、原则 IDs 和 A/B/C/D 原则映射。原则库/归纳卡定义本身仍建议使用“完整内容准备包 JSON”。</p>
+          <pre>【题目1】
+标题：已发送不等于已沟通
+难度：基础
+领域：PMP 沟通绩效域 / 利益相关方与沟通管理
+主题：项目沟通管理的概念
+阶段：基础练习
+标签：基础练习、核心题、自编题、内部使用
+
+题干：项目经理按计划向团队发送重要变更通知，但成员仍按旧方案工作。项目经理首先应该认识到什么？
+A. 只要邮件发送成功，沟通责任就已经完成
+A陷阱：把发送等同于有效沟通
+B. 有效沟通不仅是发送信息，还要确认信息被接收和理解
+B陷阱：
+C. 应立即处罚没有阅读邮件的成员
+C陷阱：过早升级
+D. 以后所有信息都应由发起人亲自传达
+D陷阱：角色责任错置
+
+答案：B
+解析：沟通的效果不以“已经发送”为终点，而应确认接收、理解并产生预期行动。
+
+English Title：Sent Does Not Mean Understood
+English Stem：The project manager sent an important change notice...
+A_EN：Once the email is sent, communication is complete.
+B_EN：Effective communication requires confirmation of receipt and understanding.
+C_EN：Discipline the team members immediately.
+D_EN：Ask the sponsor to deliver all future messages.
+English Analysis：Communication effectiveness requires receipt, understanding, and intended action.
+A反馈EN：Incorrect: sending alone does not prove effectiveness.
+B反馈EN：Correct: confirmation closes the communication loop.
+C反馈EN：Incorrect: this is premature escalation.
+D反馈EN：Incorrect: this shifts responsibility to the wrong role.
+
+主知识点ID：kp-pmp-people-1-1-4
+普通关键词：项目经理=>recall-tax-kp-pmp-people-2-2-1-k01；通知=>recall-tax-kp-pmp-people-1-1-4
+核心关键词：首先=>recall-keyword-pmp-action-order|decision-cue|题目要求识别优先行动；有效沟通=>recall-tax-kp-pmp-people-1-1-4|answer-anchor|决定本题对沟通有效性的判断
+原则IDs：principle-effective-communication、principle-no-premature-escalation
+A原则：principle-effective-communication
+B原则：principle-effective-communication
+C原则：principle-no-premature-escalation
+D原则：principle-role-accountability</pre>
+        </details>
+      </div>
+
+      <div class="data-summary">
+        <div class="filebox"><h3>原则库 JSON（可选）</h3><input type="file" id="filePrinciples" accept=".json,application/json"><p class="muted smalltxt">兼容主程序 principle repository。</p></div>
+        <div class="filebox"><h3>归纳卡 JSON（可选）</h3><input type="file" id="filePresets" accept=".json,application/json"><p class="muted smalltxt">兼容主程序 synthesis preset repository。</p></div>
+        <div class="filebox"><h3>标签配置 JSON（可选）</h3><input type="file" id="fileTagConfig" accept=".json,application/json"><p class="muted smalltxt">兼容主程序标签名称/别名配置。</p></div>
+      </div>
+      <div class="data-summary">
+        <div class="data-card"><h3>知识树</h3><b id="baseTreeCount">0</b><div class="muted" id="baseTreeName">未加载</div></div>
+        <div class="data-card"><h3>联想库</h3><b id="baseRecallCount">0</b><div class="muted" id="baseRecallInfo">未加载</div></div>
+        <div class="data-card"><h3>题库</h3><b id="baseQuestionCount">0</b><div class="muted" id="baseQuestionName">未加载</div></div>
+        <div class="data-card"><h3>原则 / 归纳卡</h3><b id="basePrincipleCount">0</b><div class="muted" id="basePresetInfo">归纳卡 0</div></div>
+        <div class="data-card"><h3>标签配置</h3><b id="baseTagCount">0</b><div class="muted">主程序预设槽位</div></div>
+      </div>
+      <div class="save-panel">
+        <div class="section-title"><span>本地工作区保存</span><span class="save-status" id="localSaveStatus">尚未保存</span></div>
+        <div class="help">
+          适合几百题分多次处理。保存内容包括题库、知识树、联想库、原则、归纳卡、标签配置和当前编辑位置。
+          数据写入本工具独立 IndexedDB：<code>pmp_content_prep_studio_v1</code>，不会使用正式程序的 <code>kg_*</code> 存储。
+          重要项目仍建议定期“导出工作区草稿”，用于跨浏览器/跨目录备份。
+        </div>
+        <div class="toolbar" style="margin-top:9px">
+          <button class="btn primary" id="btnSaveWorkspaceLocal">保存到本机</button>
+          <button class="btn" id="btnRestoreWorkspaceLocal">恢复上次保存</button>
+          <button class="btn danger" id="btnDeleteWorkspaceLocal">删除本机保存</button>
+          <label style="display:inline-flex;align-items:center;gap:6px;margin:0"><input type="checkbox" id="chkAutoSaveWorkspace"> 每 60 秒自动保存有变更的工作区</label>
+        </div>
+      </div>
+      <div class="section toolbar">
+        <button class="btn" id="btnNewWorkspace">清空工作区</button>
+        <button class="btn" id="btnImportWorkspace">导入 Prep Studio 草稿</button>
+        <input type="file" id="fileWorkspace" class="hidden" accept=".json,application/json">
+      </div>
+    </div>
+  </div>
+</section>
+<section class="tab" id="tab-management">
+  <div class="grid-manage">
+    <div class="card"><div class="card-hd"><span>② 原则列表</span><button class="help-btn" data-page-help="management" title="本页帮助">?</button></div><div class="card-bd toolbar"><button class="btn small primary" id="btnNewPrinciple">+ 新原则</button></div><div class="manager-list" id="principleList"></div></div>
+    <div class="card"><div class="card-hd">原则与系统预设归纳卡</div><div class="card-bd" id="principleEditor"><div class="no-data">请选择或新建原则。</div></div></div>
+  </div>
+  <div class="card" style="margin-top:14px"><div class="card-hd"><span>轻量标签管理</span><span class="muted tiny">对齐主程序用途 / 质量 / 来源标签槽位</span></div><div class="card-bd"><div class="help">管理预设标签名称和兼容别名。自由文本标签仍可保留；在题目演示校验中，不能绑定预设槽位的标签会显示为灰色。</div><div id="tagManager" style="margin-top:12px"></div></div></div>
+</section>
+<section class="tab" id="tab-questions">
+  <div class="grid3">
+    <div class="card">
+      <div class="card-hd"><span>题目列表</span><span class="muted tiny" id="qCount"></span></div>
+      <div class="card-bd toolbar">
+        <button class="btn small primary" id="btnNewQuestion">+ 新建</button>
+        <button class="btn small" id="btnDuplicateQuestion">复制</button>
+        <button class="btn small danger" id="btnDeleteQuestion">删除草稿</button>
+      </div>
+      <div class="q-list" id="questionList"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><span>③ 题目预览与编辑</span><button class="help-btn" data-page-help="questions" title="本页帮助">?</button><span class="muted tiny" id="currentQuestionId"></span></div>
+      <div class="card-bd">
+        <div class="preview-tip">
+          主要操作区：点击已标记关键词可直接修改；框选其他词/术语后会弹出关键词编辑浮层。核心关键词为橙色，普通关键词为蓝色。
+        </div>
+        <div class="preview-core" id="questionPreview"></div>
+        <details class="fold-editor" open>
+          <summary>详细表单编辑（保留传统编辑方式）</summary>
+          <div id="questionEditor">
+            <div class="no-data">请在“基础数据与导入”加载题库，或新建题目。</div>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="card">
+        <div class="card-hd">关键词、联想与检查</div>
+        <div class="card-bd">
+          <div class="help">
+            预览区是主要关键词编辑方式；这里继续保留完整列表编辑作为校核工具。<br>
+            <b>普通关键词</b>：知识回忆；<b>核心关键词</b>：知识回忆 + 本题解题关键。
+          </div>
+          <div class="kw-actions" style="margin-top:10px">
+            <button class="btn small" id="btnAddNormalKeyword">+ 普通关键词</button>
+            <button class="btn small primary" id="btnAddCoreKeyword">★ 核心关键词</button>
+            <span class="kw-hint" id="selectionHint">也可在下方表单文本框选词</span>
+          </div>
+          <div class="section">
+            <div class="section-title">本题快速检查</div>
+            <div id="questionIssues"></div>
+          </div>
+          <div class="section">
+            <div class="section-title"><span>关键词明细</span><span class="muted tiny" id="kwSummary"></span></div>
+            <div class="kw-list" id="keywordList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="tab" id="tab-association">
+  <div class="grid2">
+    <div class="card">
+      <div class="card-hd">④ 联想词编辑</div>
+      <div class="card-bd">
+        <div class="toolbar">
+          <input type="text" id="recallSearch" placeholder="搜索名称 / Alias / ID">
+          <button class="btn small primary" id="btnNewRecall">+ 节点</button>
+        </div>
+        <div class="smalltxt muted" style="margin-top:7px" id="aliasConflictSummary"></div>
+        <div class="synonym-note"><b>同义词/不同翻译：</b>只建一个规范节点。例：规范词“相关方”；Aliases 填“利益相关方、干系人、Stakeholder、Stakeholders”。不要为这些译名分别建节点。</div>
+      </div>
+      <div class="node-list" id="recallNodeList"></div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><span>联想词编辑 · 关系预览</span><button class="help-btn" data-page-help="association" title="本页帮助">?</button><span class="muted tiny" id="currentRecallId"></span></div>
+      <div class="card-bd" id="recallEditor">
+        <div class="no-data">请在“基础数据”导入科目级联想库，或新建联想节点。</div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="tab" id="tab-demo">
+  <div class="demo-layout">
+    <div class="card">
+      <div class="card-hd"><span>⑤ 题目列表</span><button class="help-btn" data-page-help="demo" title="本页帮助">?</button><span class="muted tiny" id="demoQuestionCount"></span></div>
+      <div class="demo-question-list" id="demoQuestionList"></div>
+    </div>
+    <div class="card">
+      <div class="card-hd">
+        <span>完整题目演示</span>
+        <div class="demo-lang-switch">
+          <button type="button" data-demo-lang="zh" class="active">中</button>
+          <button type="button" data-demo-lang="en">EN</button>
+          <button type="button" data-demo-lang="bi">双语</button>
+        </div>
+      </div>
+      <div class="card-bd">
+        <div class="help" style="margin-bottom:10px">关键词默认不高亮，鼠标悬浮时临时高亮；点击关键词只在右侧检查最多 4 层联想通路。正确答案在演示区直接高亮。</div>
+        <div id="demoQuestion"></div>
+      </div>
+    </div>
+    <div class="demo-side">
+      <div class="demo-card-panel">
+        <h3>原则归纳卡</h3>
+        <div id="demoPrincipleResult" class="muted">点击 A/B/C/D 选项查看对应原则归纳卡。</div>
+      </div>
+      <div class="demo-recall-panel">
+        <h3>关键词联想通路</h3>
+        <div id="demoRecallResult" class="muted">点击题目中的关键词进行检查。</div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="tab" id="tab-validate">
+  <div class="card">
+    <div class="card-hd"><span>⑥ 整体校验中心</span><button class="help-btn" data-page-help="validate" title="本页帮助">?</button><button class="btn small primary" id="btnRunValidation">重新校验</button></div>
+    <div class="card-bd">
+      <div class="metric-grid" id="validationMetrics"></div>
+      <div class="section">
+        <div class="section-title">问题清单</div>
+        <div style="max-height:570px;overflow:auto">
+          <table class="check-table">
+            <thead><tr><th style="width:85px">级别</th><th style="width:170px">对象</th><th>问题</th><th>建议</th></tr></thead>
+            <tbody id="validationRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="tab" id="tab-export">
+  <div class="export-grid">
+    <div class="card export-card"><div style="display:flex;align-items:center;gap:8px"><h3 style="margin-right:auto">完整内容成品包</h3><button class="help-btn" data-page-help="export" title="本页帮助">?</button></div><p>题库 + 原则库 + 归纳卡 + 标签配置，作为未来服务器内容导入的推荐格式。</p><button class="btn primary" id="btnExportCompleteBundle">导出完整成品包 JSON</button></div>
+    <div class="card export-card">
+      <h3>题库 JSON</h3>
+      <p>输出可供正式题目管理/未来服务器端口接收的 Question Bank JSON。知识点仅保存稳定 <code>primaryNodeId</code>，不写死 taxonomy 版本。</p>
+      <button class="btn primary" id="btnExportQuestions">导出题库 JSON</button>
+    </div>
+    <div class="card export-card">
+      <h3>科目级联想库 JSON</h3>
+      <p>输出 <code>schemaVersion: 1</code>、<code>nodes</code>、<code>edges</code>，可导回正式系统。</p>
+      <button class="btn primary" id="btnExportRecall">导出联想库 JSON</button>
+    </div>
+    <div class="card export-card">
+      <h3>校验报告</h3>
+      <p>导出题目、知识点、普通/核心关键词、联想入口、Alias 冲突等完整检查结果。</p>
+      <button class="btn" id="btnExportValidation">导出校验报告 JSON</button>
+    </div>
+    <div class="card export-card">
+      <h3>Prep Studio 草稿</h3>
+      <p>保存当前全部工作数据，方便下次继续编辑。该草稿不是正式服务器导入格式。</p>
+      <button class="btn" id="btnExportWorkspace">导出工作区草稿</button>
+    </div>
+  <div class="card export-card"><h3>原则 / 归纳卡 / 标签配置</h3><p>分别输出与当前主程序 repository/storage 结构对齐的 JSON。</p><div class="toolbar"><button class="btn" id="btnExportPrinciples">原则库</button><button class="btn" id="btnExportPresets">归纳卡</button><button class="btn" id="btnExportTagConfig">标签配置</button></div></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="card-hd">Keyword System v2 导出规则</div>
+    <div class="card-bd">
+      <div class="help">
+        每个关键词会输出 <code>keywordLevel: normal|core</code>、<code>isCore</code>、
+        <code>solutionRole</code>、<code>coreReason</code>。同时在
+        <code>metadata.keywordSystemV2</code> 保存兼容镜像。<br>
+        原因：当前正式程序 P4.3.44.2 / 后续服务器接口 的 <code>normalizeClue()</code> 尚不会保留这些新字段；
+        镜像可以保证导入当前版本后，未来升级“做题大厅核心关键词显示”时仍有可迁移的数据。
+      </div>
+    </div>
+  </div>
+
+  <div class="audit-card">
+    <div class="card-hd" style="padding:0 0 8px">
+      <span>导出审计记录</span>
+      <span class="muted tiny" id="auditCount">0 条</span>
+      <span class="spacer"></span>
+      <button class="btn" id="btnExportAuditTrail">导出审计日志 JSON</button>
+      <button class="btn danger" id="btnClearAuditTrail">清空本机审计记录</button>
+    </div>
+    <div class="help">
+      每次正式导出都会记录制作人、设备、时间、导出类型、文件名、题目数量、校验摘要和导出 payload 的 SHA-256。
+      这里只记录审计元数据，不复制整份题目内容。
+    </div>
+    <div class="audit-list" id="auditList"></div>
+  </div>
+
+</section>
+</main>
+
+
+<div class="keyword-float" id="keywordFloat" aria-live="polite"></div>
+
+
+<div class="modal-backdrop" id="helpModal">
+  <div class="modal-panel help-center-panel">
+    <div class="help-center-head">
+      <h2 style="margin:0">PMP Content Prep Studio · 帮助中心</h2>
+      <span class="spacer"></span>
+      <span class="muted smalltxt" id="helpCurrentHint"></span>
+      <button class="btn" id="btnCloseHelp">关闭</button>
+    </div>
+    <div class="help-center-body">
+      <div class="help-center-nav">
+        <button data-help-topic="base">① 基础数据与导入</button>
+        <button data-help-topic="management">② 原则归纳卡 / 标签</button>
+        <button data-help-topic="questions">③ 题目录入与检查</button>
+        <button data-help-topic="association">④ 联想词编辑</button>
+        <button data-help-topic="demo">⑤ 题目演示校验</button>
+        <button data-help-topic="validate">⑥ 校验中心</button>
+        <button data-help-topic="export">⑦ 导出与审计</button>
+        <button data-help-topic="global">全局：身份 / 保存 / 主题</button>
+      </div>
+      <div class="help-center-content">
+        <article class="help-topic" data-help-content="base">
+          <h2>① 基础数据与导入</h2>
+          <p>这里负责把外部 AI / Word 内容、知识树、联想库、原则、归纳卡和标签配置装入当前工作区。建议先选择制作人，再导入基础数据。</p>
+          <h3>推荐顺序</h3>
+          <ol><li>确认当前制作人。</li><li>导入知识树和科目级联想库。</li><li>优先导入“完整内容准备包 JSON”，或使用 Word / AI 文本粘贴助手。</li><li>题量大时开启本机保存或自动保存。</li></ol>
+          <div class="help-example"><b>示例：</b>一次导入 50 道沟通题后，程序会自动给 50 道题生成 Question UUID，并给整批题记录同一个 Batch ID。</div>
+          <h3>Word / AI 完整文本示例</h3>
+          <pre>【题目1】
+标题：已发送不等于已沟通
+难度：基础
+标签：基础练习、核心题、自编题
+题干：项目经理……
+A. ...
+B. ...
+C. ...
+D. ...
+答案：B
+解析：……
+主知识点ID：kp-...
+普通关键词：项目经理=>recall-...
+核心关键词：首先=>recall-...|decision-cue|判断优先行动
+B原则：principle-effective-communication</pre>
+          <p><b>注意：</b>不要让外部 AI 生成题目 ID、Creator ID、Device ID、Batch ID 或 Content Hash。</p>
+        </article>
+
+        <article class="help-topic" data-help-content="management">
+          <h2>② 原则归纳卡 / 标签</h2>
+          <p>原则用于解释“为什么这个选项应该/不应该这样做”；归纳卡是原则的可阅读教学卡片。标签用于训练阶段、题目特征、来源等分类。</p>
+          <h3>原则示例</h3>
+          <div class="help-example"><b>原则：</b>确认沟通是否真正有效<br><b>归纳卡：</b>信息已经发送，不代表沟通完成。应确认接收、理解并能够据此行动。</div>
+          <h3>训练阶段标签</h3>
+          <div class="help-example">第一个二级标签“训练阶段”现在固定 7 个槽位：<b>基础练习、阶段测试、模拟考试、冲刺复习、预习练习、强化训练、错题复盘</b>。前 4 个保留旧版槽位不变，新增加的 3 个放在后面，避免历史配置错位。后期仍可在标签管理中改名和配置 Alias。</div>
+          <h3>标签 Alias 示例</h3>
+          <div class="help-example">规范标签：<b>基础练习</b><br>兼容别名：<code>入门题, 基础题</code><br>旧资料出现“基础题”时可归一到“基础练习”。</div>
+          <p>修改标签名不会自动把旧名称偷偷加入 Alias；Alias 只按当前槽位明确保存。</p>
+        </article>
+
+        <article class="help-topic" data-help-content="questions">
+          <h2>③ 题目录入与检查</h2>
+          <p>这是主要人工校核区。中部题目预览用于快速标关键词；完整表单位于下方，用于细改双语、解析、知识点和原则映射。</p>
+          <h3>关键词操作</h3>
+          <ul><li>框选未标记词：弹出新增关键词编辑框。</li><li>点击已有关键词：修改普通/核心、联想入口、Solution Role、Core Reason。</li><li>点击其他区域：关键词编辑浮窗自动关闭。</li></ul>
+          <div class="help-example"><b>普通关键词：</b>“项目经理”“相关方”——用于知识回忆。<br><b>核心关键词：</b>“首先”——可标为 <code>decision-cue</code>，说明它决定解题顺序。</div>
+          <h3>快速检查</h3>
+          <p>右侧“本题快速检查”会优先提示缺失字段、核心关键词数量、联想入口、知识点等问题，再查看关键词明细。</p>
+        </article>
+
+        <article class="help-topic" data-help-content="association">
+          <h2>④ 联想词编辑</h2>
+          <p>这里维护“看到一个词，应该联想到哪个知识入口，以及还能继续想到什么”的关系网络。</p>
+          <h3>同义词原则</h3>
+          <div class="help-example">规范节点：<b>相关方</b><br>Aliases：<code>利益相关方, 干系人, Stakeholder</code><br>不要为了不同译名建立多个等义节点。</div>
+          <h3>关系图怎么点</h3>
+          <p>上位/下位知识点普通点击只做<b>预览选择</b>，不会修改绑定。只有明确点击“将当前联想词绑定到此知识点”才会改变 <code>metadata.taxonomyNodeId</code>。</p>
+          <p>底部“被哪些节点联想”可点击直接跳到对应联想节点继续编辑。</p>
+        </article>
+
+        <article class="help-topic" data-help-content="demo">
+          <h2>⑤ 题目演示校验</h2>
+          <p>以未来做题大厅的视角检查完整题目，而不是看数据表。</p>
+          <ul><li>左侧按题目列表切换。</li><li>右上角切换：中 / EN / 双语。</li><li>正确答案直接高亮。</li><li>关键词默认不高亮，鼠标悬浮临时高亮。</li><li>点击关键词：右侧显示最多 4 层联想通路。</li><li>点击 A/B/C/D：顶部原则归纳卡显示该选项对应原则。</li></ul>
+          <div class="help-example"><b>检查目标：</b>点击“有效沟通”后，应能看到有效的 Recall 入口和后续通路；点击错误选项 C，应能看到例如“避免过早升级”的原则归纳卡。</div>
+        </article>
+
+        <article class="help-topic" data-help-content="validate">
+          <h2>⑥ 校验中心</h2>
+          <p>这是全工作区的结构完整性检查。建议正式导出前运行一次，并尽量清除所有 Error。</p>
+          <h3>主要检查</h3>
+          <ul><li>题干、选项、正确答案、解析完整性。</li><li>双语内容提醒。</li><li>知识点稳定 Node ID。</li><li>普通/核心关键词及 Core Reason。</li><li>Recall 节点、Alias 冲突、关系端点。</li><li>原则 / 归纳卡 / 标签绑定。</li><li>Question ID 重复。</li><li>不同 Question ID 但 Content Hash 相同的疑似重复题。</li></ul>
+          <div class="help-example"><b>Error：</b>核心关键词指向不存在的 Recall ID。<br><b>Warning：</b>两个不同 UUID 的题目有相同 SHA-256 Content Hash，需要确认是否重复题。</div>
+        </article>
+
+        <article class="help-topic" data-help-content="export">
+          <h2>⑦ 导出与审计</h2>
+          <p>这里输出题库、完整内容包、联想库、原则、归纳卡、标签配置、校验报告和工作区草稿。</p>
+          <h3>v0.3.5 导出审计</h3>
+          <p>每次正式导出会写入一条设备级审计事件，记录：</p>
+          <ul><li>Audit ID</li><li>导出时间</li><li>制作人 Creator ID / 姓名</li><li>Device ID</li><li>导出类型与文件名</li><li>题目数量</li><li>最近 Batch ID</li><li>校验 Error / Warning 数</li><li>导出 payload 的 SHA-256 指纹</li><li>Prep Studio 版本</li></ul>
+          <div class="help-example"><b>用途：</b>未来管理员收到一个 JSON 后，可以把文件重新计算 SHA-256，与 Audit Trail 中的 payloadHash 对比，确认是否就是某位制作人在某个时间导出的那一版。</div>
+          <p>“导出审计日志”本身不会再写一条新的审计事件，避免递归记录。</p>
+        </article>
+
+        <article class="help-topic" data-help-content="global">
+          <h2>全局功能：制作人、保存、主题</h2>
+          <h3>强制制作人</h3>
+          <p>每次打开页面必须从波塞冬、狗娃、阿浩、杰瑞、天才、女帝中选择一人。关闭页面后不会记住当前人物，避免共用电脑误记作者。</p>
+          <h3>数据兼容与重构说明</h3>
+          <p>v0.4.0 是架构重构版：内部标签槽位改用稳定语义 ID，Workspace 升级到 v4；导出到正式主程序时仍自动转换为原数字槽位格式。旧版工作区打开时自动迁移，不需要人工改 JSON。</p>
+          <h3>本机保存</h3>
+          <p>工作区通过独立 IndexedDB 保存；适合几百题分多次处理。重要项目仍建议定期导出工作区草稿 JSON。</p>
+          <h3>开心主题</h3>
+          <p>顶部可切换清爽蓝、樱花粉、薄荷绿、暖阳橙、葡萄紫、海盐青。主题只影响界面颜色，不改变任何题目或导出数据；主题选择会保存在当前浏览器设备中。</p>
+        </article>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div class="creator-gate" id="creatorGate" role="dialog" aria-modal="true" aria-labelledby="creatorGateTitle">
+  <div class="creator-gate-panel">
+    <div class="creator-gate-head">
+      <h1 id="creatorGateTitle">请选择当前制作人</h1>
+      <p>必须选择一位制作人才能进入 PMP Content Prep Studio。选择只在当前页面会话中保持；下次重新打开页面会再次要求选择。</p>
+    </div>
+    <div class="creator-grid">
+      <button class="creator-card peiqi" data-creator-key="peiqi"><span class="creator-avatar">波</span><div class="creator-name">波塞冬</div><div class="creator-id">creator_001</div></button>
+      <button class="creator-card momo" data-creator-key="momo"><span class="creator-avatar">狗</span><div class="creator-name">狗娃</div><div class="creator-id">creator_002</div></button>
+      <button class="creator-card mengmeng" data-creator-key="mengmeng"><span class="creator-avatar">浩</span><div class="creator-name">阿浩</div><div class="creator-id">creator_003</div></button>
+      <button class="creator-card qiaozhi" data-creator-key="qiaozhi"><span class="creator-avatar">杰</span><div class="creator-name">杰瑞</div><div class="creator-id">creator_004</div></button>
+      <button class="creator-card tiancai" data-creator-key="tiancai"><span class="creator-avatar">天</span><div class="creator-name">天才</div><div class="creator-id">creator_005</div></button>
+      <button class="creator-card nvdi" data-creator-key="nvdi"><span class="creator-avatar">女</span><div class="creator-name">女帝</div><div class="creator-id">creator_006</div></button>
+    </div>
+    <div class="creator-gate-foot">Creator ID 用于来源追踪；Question ID 仍由 UUID v4 独立生成，因此不同制作人、不同电脑之间不会依赖人工编号。</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const VERSION='0.4.0';
+const KEYWORD_SCHEMA='Question Keyword System v2';
+const BASE_TAG_GROUPS=[
+  {id:'usage',label:'用途标签',categories:[{id:'stage',label:'训练阶段',options:['基础练习','阶段测试','模拟考试','冲刺复习','预习练习','强化训练','错题复盘']},{id:'scene',label:'使用场景',options:['课后练习','课堂讨论','作业题','专项训练']}]},
+  {id:'quality',label:'质量标签',categories:[{id:'feature',label:'题目特征',options:['易错题','高频题','核心题','综合题']},{id:'review',label:'内容状态',options:['待复核','已复核','需更新']}]},
+  {id:'source',label:'来源标签',categories:[{id:'origin',label:'来源类型',options:['真题','自编题','改编题','教材例题']},{id:'scope',label:'使用范围',options:['可公开','内部使用']}]}];
+
+/* v0.4.0 internal tag identity.
+   Formal/main-program exports still use legacy numeric slots. */
+const TAG_SLOT_SEMANTIC_MAP=Object.freeze({
+  'usage/stage/0':'usage/stage/basic',
+  'usage/stage/1':'usage/stage/phase-test',
+  'usage/stage/2':'usage/stage/mock-exam',
+  'usage/stage/3':'usage/stage/sprint-review',
+  'usage/stage/4':'usage/stage/preview',
+  'usage/stage/5':'usage/stage/intensive',
+  'usage/stage/6':'usage/stage/mistake-review',
+  'usage/scene/0':'usage/scene/after-class',
+  'usage/scene/1':'usage/scene/classroom-discussion',
+  'usage/scene/2':'usage/scene/homework',
+  'usage/scene/3':'usage/scene/special-training',
+  'quality/feature/0':'quality/feature/error-prone',
+  'quality/feature/1':'quality/feature/high-frequency',
+  'quality/feature/2':'quality/feature/core',
+  'quality/feature/3':'quality/feature/comprehensive',
+  'quality/review/0':'quality/review/pending-review',
+  'quality/review/1':'quality/review/reviewed',
+  'quality/review/2':'quality/review/needs-update',
+  'source/origin/0':'source/origin/real-exam',
+  'source/origin/1':'source/origin/self-authored',
+  'source/origin/2':'source/origin/adapted',
+  'source/origin/3':'source/origin/textbook-example',
+  'source/scope/0':'source/scope/public',
+  'source/scope/1':'source/scope/internal'
+});
+const TAG_SLOT_LEGACY_MAP=Object.freeze(Object.fromEntries(Object.entries(TAG_SLOT_SEMANTIC_MAP).map(([legacy,semantic])=>[semantic,legacy])));
+function legacyTagSlotKey(g,c,i){return `${g.id}/${c.id}/${i}`}
+function semanticTagSlot(slot){slot=String(slot||'');return TAG_SLOT_SEMANTIC_MAP[slot]||slot}
+function formalTagSlot(slot){slot=String(slot||'');return TAG_SLOT_LEGACY_MAP[slot]||slot}
+function tagSlotKey(g,c,i){return semanticTagSlot(legacyTagSlotKey(g,c,i))}
+function tagCategoryKey(g,c){return `${g.id}/${c.id}`}
+function tagGroupKey(g){return g.id}
+const COMPLETE_CONTENT_BUNDLE_TEMPLATE={"prepContentBundleVersion":1,"format":"pmp-content-prep-complete-bundle-v1","questionBank":{"name":"PMP 完整内容模板题库","subject":"PMP","description":"完整字段示例：双语、知识点、关键词、推理、标签、原则与选项归纳卡映射。","version":"1.0","visibility":"private","questions":[{"title":"已发送不等于已沟通","type":"single_choice","subject":"PMP","difficulty":"基础","domain":"PMP 沟通绩效域 / 利益相关方与沟通管理","topic":"项目沟通管理的概念","tags":["基础练习","核心题","自编题","内部使用"],"stage":"基础练习","stemParts":[{"text":"项目经理按计划向团队发送了一份重要变更通知，但第二天发现多名成员仍按旧方案工作。项目经理首先应该认识到什么？"}],"options":[{"id":"A","text":"只要邮件发送成功，沟通责任就已经完成","trap":"把发送等同于有效沟通","correct":false},{"id":"B","text":"有效沟通不仅是发送信息，还要确认信息被接收和理解","trap":"","correct":true},{"id":"C","text":"应立即处罚没有阅读邮件的成员","trap":"过早升级 / 命令控制","correct":false},{"id":"D","text":"以后所有信息都应由发起人亲自传达","trap":"角色责任错置","correct":false}],"correctAnswer":"B","analysis":"沟通的效果不以“已经发送”为终点，而以信息是否被正确接收、理解并产生预期行动来判断。项目经理应建立反馈或确认机制，而不是把发送动作等同于沟通完成。","translations":{"en":{"title":"Sent Does Not Mean Understood","stemParts":[{"text":"The project manager sent an important change notice to the team as planned, but several members were still working from the old approach the next day. What should the project manager recognize first?"}],"options":[{"id":"A","text":"Once the email is successfully sent, the communication responsibility is complete"},{"id":"B","text":"Effective communication requires more than sending information; receipt and understanding should be confirmed"},{"id":"C","text":"Members who did not read the email should be disciplined immediately"},{"id":"D","text":"All future information should be delivered personally by the sponsor"}],"analysis":"Communication effectiveness is measured by whether the message is received, understood, and translated into the intended action, not merely by transmission.","optionFeedback":{"A":"Incorrect: sending alone does not prove communication effectiveness.","B":"Correct: effective communication requires receipt and understanding.","C":"Incorrect: this is premature escalation.","D":"Incorrect: this shifts communication responsibility to the wrong role."},"keyPath":{"label":"Communication effectiveness → confirmation → B","ruleText":"Communication is effective when the message is received, understood, and acted upon."},"explanationStatus":"complete"}},"clues":[{"id":"kw-001","text":"项目经理","textEn":"project manager","keywordLevel":"normal","isCore":false,"type":"recall-keyword","clueRole":"true","sourceType":"stem","sourceOptionId":"","recallNodeId":"recall-tax-kp-pmp-people-2-2-1-k01","recallEntryLabel":"项目经理","solutionRole":"context","coreReason":"","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"stem","optionId":"","count":2}],"explain":"关键词“项目经理”连接到联想入口“项目经理”。","sourceMode":"prep-studio-keyword-v2"},{"id":"kw-002","text":"首先","textEn":"first","keywordLevel":"core","isCore":true,"type":"core-keyword","clueRole":"true","sourceType":"stem","sourceOptionId":"","recallNodeId":"recall-keyword-pmp-action-order","recallEntryLabel":"PMP 情景题动作顺序","solutionRole":"decision-cue","coreReason":"题目要求识别优先判断，而不是最终处置。","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"stem","optionId":"","count":1}],"explain":"关键词“首先”连接到联想入口“PMP 情景题动作顺序”。","sourceMode":"prep-studio-keyword-v2"},{"id":"kw-003","text":"有效沟通","textEn":"effective communication","keywordLevel":"core","isCore":true,"type":"core-keyword","clueRole":"true","sourceType":"option","sourceOptionId":"B","recallNodeId":"recall-tax-kp-pmp-people-1-1-4","recallEntryLabel":"项目沟通管理的概念","solutionRole":"answer-anchor","coreReason":"该词直接区分“发送信息”与“真正完成沟通”。","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"option","optionId":"B","count":1}],"explain":"关键词“有效沟通”连接到联想入口“项目沟通管理的概念”。","sourceMode":"prep-studio-keyword-v2"}],"concepts":[{"id":"kp-pmp-people-1-1-4","title":"项目沟通管理的概念","category":"PMP 沟通绩效域","level":"基础","keywords":"沟通,有效沟通,反馈,理解","summary":"PMP > 人 > 利益相关方与沟通管理 > 项目沟通管理的概念","notes":"映射稳定知识节点 ID。","rule":"有效沟通需要接收、理解和反馈闭环。"}],"reasoningSteps":[{"id":"rs-1","title":"识别核心线索","content":"首先 + 有效沟通，说明题目在问优先判断与沟通有效性。","relatedKeywords":["首先","有效沟通"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]},{"id":"rs-2","title":"匹配知识点","content":"信息发送不等于被正确理解，应检查反馈闭环。","relatedKeywords":["沟通","理解"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]},{"id":"rs-3","title":"比较选项","content":"B 直接体现有效沟通的接收与理解确认。","relatedKeywords":["有效沟通"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]}],"keyPath":{"label":"沟通有效性 → 反馈确认 → B","clueIds":["kw-002","kw-003"],"conceptIds":["kp-pmp-people-1-1-4"],"primaryConceptId":"kp-pmp-people-1-1-4","ruleConceptId":"kp-pmp-people-1-1-4","answerId":"B","ruleText":"有效沟通不以发送为完成标准，应确认接收、理解和行动。"},"metadata":{"subjectId":"subject-pmp","translationStatus":"bilingual","knowledge":{"primaryNodeId":"kp-pmp-people-1-1-4","relatedNodeIds":[],"mappingStatus":"confirmed","mappingSource":"prep-studio","pathSnapshot":["PMP","人","利益相关方与沟通管理","项目沟通管理的概念"]},"principleIds":["principle-effective-communication","principle-no-premature-escalation","principle-role-accountability"],"optionPrincipleMap":{"A":["principle-effective-communication"],"B":["principle-effective-communication"],"C":["principle-no-premature-escalation"],"D":["principle-role-accountability"]},"tagPaths":[{"groupId":"usage","group":"用途标签","categoryId":"stage","category":"训练阶段","label":"基础练习"},{"groupId":"quality","group":"质量标签","categoryId":"feature","category":"题目特征","label":"核心题"},{"groupId":"source","group":"来源标签","categoryId":"origin","category":"来源类型","label":"自编题"},{"groupId":"source","group":"来源标签","categoryId":"scope","category":"使用范围","label":"内部使用"}],"keywordSystemV2":{"schemaVersion":2,"name":"Question Keyword System v2","keywords":[{"clueId":"kw-001","text":"项目经理","textEn":"project manager","keywordLevel":"normal","isCore":false,"solutionRole":"context","coreReason":"","recallNodeId":"recall-tax-kp-pmp-people-2-2-1-k01","recallEntryLabel":"项目经理"},{"clueId":"kw-002","text":"首先","textEn":"first","keywordLevel":"core","isCore":true,"solutionRole":"decision-cue","coreReason":"题目要求识别优先判断，而不是最终处置。","recallNodeId":"recall-keyword-pmp-action-order","recallEntryLabel":"PMP 情景题动作顺序"},{"clueId":"kw-003","text":"有效沟通","textEn":"effective communication","keywordLevel":"core","isCore":true,"solutionRole":"answer-anchor","coreReason":"该词直接区分“发送信息”与“真正完成沟通”。","recallNodeId":"recall-tax-kp-pmp-people-1-1-4","recallEntryLabel":"项目沟通管理的概念"}]},"englishOptionFeedback":{"A":"Incorrect: sending alone does not prove communication effectiveness.","B":"Correct: effective communication requires receipt and understanding.","C":"Incorrect: this is premature escalation.","D":"Incorrect: this shifts communication responsibility to the wrong role."},"contentPreparation":{"source":"external-ai-or-manual","reviewStatus":"ready-for-human-check","prepStudioTargetVersion":"0.4.0"}},"status":{"contentReady":true,"keywordsReady":true,"knowledgeReady":true,"reasoningReady":true,"published":false},"lifecycle":{"status":"active","deletedAt":""},"teacherNumber":"","explanation":"沟通的效果不以“已经发送”为终点，而以信息是否被正确接收、理解并产生预期行动来判断。项目经理应建立反馈或确认机制，而不是把发送动作等同于沟通完成。"}]},"principles":{"schemaVersion":1,"items":[{"id":"principle-effective-communication","name":"确认沟通是否真正有效","status":"active","confusablePrincipleIds":[]},{"id":"principle-no-premature-escalation","name":"先分析并处理，再考虑升级","status":"active","confusablePrincipleIds":[]},{"id":"principle-role-accountability","name":"按正确角色承担沟通责任","status":"active","confusablePrincipleIds":[]}]},"synthesisPresets":{"schemaVersion":1,"items":[{"id":"preset-effective-communication","principleId":"principle-effective-communication","title":"原则：有效沟通需要反馈闭环","content":"信息已经发送，不代表沟通完成。应确认接收方收到、理解并能够据此行动。","status":"active","version":1},{"id":"preset-no-premature-escalation","principleId":"principle-no-premature-escalation","title":"原则：避免过早升级","content":"遇到沟通偏差时先澄清、确认和解决根因；除非情境要求，否则不要直接处罚或升级。","status":"active","version":1},{"id":"preset-role-accountability","principleId":"principle-role-accountability","title":"原则：角色责任不应被错误转移","content":"项目经理应根据沟通管理计划和角色职责管理沟通，而不是把所有信息传递责任转移给发起人。","status":"active","version":1}]},"tagConfig":{"names":{},"groupNames":{},"categoryNames":{},"aliases":{}}};
+const COMPLETE_AI_PROMPT=`你是一名 PMP 内容生产与结构化校核助手。请根据我提供的 Word/文本基础题目，输出 PMP Content Prep Studio v0.3.5 的“完整内容准备包 JSON”。
+
+目标：尽量在外部 AI 阶段完成题干、选项、答案、解析、双语、知识点、普通/核心关键词、推理步骤、标签、原则、归纳卡和选项→原则映射，使进入 Prep Studio 后主要进行人工校核。
+
+规则：
+1. 顶层 prepContentBundleVersion=1，包含 questionBank、principles、synthesisPresets、tagConfig。
+2. 来源已明确的题干/选项/答案/解析必须忠实保留，不得静默改题。
+3. 知识点只能使用我提供知识树中真实存在的稳定 node ID；无法确定时留空。
+4. 联想词只能使用我提供联想库中真实存在且唯一匹配的 recallNodeId；无法确定时留空。
+5. 关键词必须是词/稳定专业术语，不能是半句话。
+6. 普通关键词 keywordLevel=normal；核心关键词 keywordLevel=core，并填写 solutionRole 和 coreReason；每题建议 2～5 个。
+7. 标签优先使用主程序预设标签。
+8. metadata.principleIds 保存题目原则；metadata.optionPrincipleMap 保存 A/B/C/D 对应原则。
+9. principles 与 synthesisPresets 按模板结构输出；用于解释选项的原则尽量有 active 归纳卡。
+10. 不写死 taxonomyId/taxonomyVersion。
+11. 不要生成题目 id、questionId、contentHash、metadata.origin、creatorId、deviceId 或 batchId；这些全部由 Prep Studio 生成。
+12. 输出纯 JSON，不要 Markdown 代码围栏，不要额外解释。
+
+完整模板：${JSON.stringify(COMPLETE_CONTENT_BUNDLE_TEMPLATE,null,2)}`;
+
+
+const QUESTION_TEMPLATE={
+  name:"PMP 基础题库模板",
+  subject:"PMP",
+  description:"外部 AI 只负责内容；题库 ID、题目全局 ID、制作人/设备/批次信息和 Content Hash 由 Prep Studio 自动生成。",
+  version:"1.0",
+  visibility:"private",
+  questions:[{
+    title:"示例题目",
+    difficulty:"中等",
+    domain:"",
+    topic:"",
+    tags:[],
+    stage:"",
+    stemParts:[{text:"项目经理……应该首先做什么？"}],
+    options:[
+      {id:"A",text:"选项 A",correct:false},
+      {id:"B",text:"选项 B",correct:true},
+      {id:"C",text:"选项 C",correct:false},
+      {id:"D",text:"选项 D",correct:false}
+    ],
+    correctAnswer:"B",
+    analysis:"中文解析。",
+    translations:{en:{title:"",stemParts:[{text:""}],options:[{id:"A",text:""},{id:"B",text:""},{id:"C",text:""},{id:"D",text:""}],analysis:""}},
+    clues:[],
+    reasoningSteps:[],
+    metadata:{knowledge:{primaryNodeId:"",relatedNodeIds:[],mappingStatus:"unmapped",pathSnapshot:[]}},
+    lifecycle:{status:"active",deletedAt:""}
+  }]
+};
+const WORD_TO_JSON_AI_PROMPT=`你是一名 PMP 题库结构化编辑助手。
+请把我提供的 Word/文本题目转换成“PMP Content Prep Studio”可导入的 Question Bank JSON。
+
+硬性要求：
+1. 顶层必须是一个对象，包含 name、subject、questions；不要生成题库 id 或题目 id。
+2. 每道题保留原始题干、A/B/C/D、正确答案、解析；不得擅自补写原资料没有的事实。
+3. correctAnswer 使用 A/B/C/D。
+4. 中文题干放 stemParts:[{text:"..."}]。
+5. 中文解析同时放 analysis。
+6. 如果原资料没有英文，不要编造英文；translations.en 对应字段可留空。
+7. 如果原资料没有知识点，不要猜；metadata.knowledge.primaryNodeId 留空。
+8. 如果原资料没有关键词，不要猜；clues 留空，后续在 Prep Studio 人工标记。
+9. 不写死 taxonomyId / taxonomyVersion。
+10. 不要生成题目 id、questionId、contentHash、creatorId、deviceId、batchId 或 metadata.origin；这些由 Prep Studio 自动生成。
+11. 输出纯 JSON，不要 Markdown 代码围栏，不要解释。
+
+参考模板：
+${JSON.stringify(QUESTION_TEMPLATE,null,2)}
+`;
+
+const state={
+  knowledgeTree:null,
+  recallLibrary:{schemaVersion:1,nodes:[],edges:[],updatedAt:''},
+  questionBank:{id:generateSystemId('bank'),name:'PMP 内容准备题库',subject:'PMP',description:'',version:'1.0',visibility:'private',createdAt:Date.now(),updatedAt:Date.now(),questions:[]},
+  principles:{schemaVersion:1,items:[],updatedAt:Date.now()},
+  synthesisPresets:{schemaVersion:1,items:[],updatedAt:Date.now()},
+  tagConfig:{schemaVersion:2,slotIdStrategy:'semantic-v1',names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}},
+  currentQuestionId:'',
+  currentRecallId:'',
+  currentPrincipleId:'',
+  demoQuestionId:'',
+  demoLang:'zh',
+  recallPreviewCandidateId:'',
+  lastSelection:null,
+  validation:null
+};
+const FIXED_CREATORS={
+  peiqi:{creatorId:'creator_001',name:'波塞冬'},
+  momo:{creatorId:'creator_002',name:'狗娃'},
+  mengmeng:{creatorId:'creator_003',name:'阿浩'},
+  qiaozhi:{creatorId:'creator_004',name:'杰瑞'},
+  tiancai:{creatorId:'creator_005',name:'天才'},
+  nvdi:{creatorId:'creator_006',name:'女帝'}
+};
+const prepRuntime={
+  dirty:false,autoSave:false,lastSavedAt:'',saveInFlight:false,
+  creatorProfile:null,deviceProfile:null,lastBatchId:'',
+  theme:'default',auditTrail:[],
+  issuedQuestionIds:new Set()
+};
+const PREP_DB_NAME='pmp_content_prep_studio_v1';
+const PREP_DB_VERSION=1;
+const PREP_DB_STORE='workspaces';
+const PREP_DB_KEY='latest';
+const UI_SETTINGS_KEY='ui-settings';
+const AUDIT_TRAIL_KEY='audit-trail';
+const THEMES=new Set(['default','sakura','mint','sunshine','grape','ocean']);
+
+function updateWorkspaceSaveStatus(message='',kind=''){
+  const header=document.getElementById('hdrSaveStatus'),local=document.getElementById('localSaveStatus');
+  let text=message;
+  if(!text){
+    if(prepRuntime.saveInFlight)text='正在保存…';
+    else if(prepRuntime.dirty)text=prepRuntime.lastSavedAt?`有未保存变更 · 上次 ${prepRuntime.lastSavedAt}`:'有未保存变更';
+    else text=prepRuntime.lastSavedAt?`已保存 ${prepRuntime.lastSavedAt}`:'尚未保存';
+  }
+  if(header)header.textContent=text;
+  if(local){local.textContent=text;local.className='save-status '+(kind||(prepRuntime.dirty?'warn':prepRuntime.lastSavedAt?'good':''))}
+}
+function markWorkspaceDirty(){prepRuntime.dirty=true;updateWorkspaceSaveStatus()}
+function formatLocalSaveTime(value){const d=value?new Date(value):new Date();return Number.isNaN(d.getTime())?'':d.toLocaleString()}
+function openPrepDb(){
+  return new Promise((resolve,reject)=>{
+    if(!('indexedDB' in window)){reject(new Error('当前浏览器不支持 IndexedDB'));return}
+    let req;try{req=indexedDB.open(PREP_DB_NAME,PREP_DB_VERSION)}catch(err){reject(err);return}
+    req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(PREP_DB_STORE))db.createObjectStore(PREP_DB_STORE,{keyPath:'id'})};
+    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error('无法打开本地工作区数据库'));
+  });
+}
+async function prepDbPut(record){
+  const db=await openPrepDb();return new Promise((resolve,reject)=>{const tx=db.transaction(PREP_DB_STORE,'readwrite');tx.objectStore(PREP_DB_STORE).put(record);tx.oncomplete=()=>{db.close();resolve(true)};tx.onerror=()=>{const err=tx.error;db.close();reject(err||new Error('本地保存失败'))};tx.onabort=tx.onerror});
+}
+async function prepDbGet(key=PREP_DB_KEY){
+  const db=await openPrepDb();return new Promise((resolve,reject)=>{const tx=db.transaction(PREP_DB_STORE,'readonly'),req=tx.objectStore(PREP_DB_STORE).get(key);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error||new Error('读取本地数据失败'));tx.oncomplete=()=>db.close()});
+}
+async function prepDbDelete(key=PREP_DB_KEY){
+  const db=await openPrepDb();return new Promise((resolve,reject)=>{const tx=db.transaction(PREP_DB_STORE,'readwrite');tx.objectStore(PREP_DB_STORE).delete(key);tx.oncomplete=()=>{db.close();resolve(true)};tx.onerror=()=>{const err=tx.error;db.close();reject(err||new Error('删除本地数据失败'))}});
+}
+
+function applyTheme(theme,{persist=false}={}){
+  theme=THEMES.has(theme)?theme:'default';prepRuntime.theme=theme;
+  if(theme==='default')document.body.removeAttribute('data-theme');else document.body.setAttribute('data-theme',theme);
+  const sel=document.getElementById('themeSelect');if(sel)sel.value=theme;
+  if(persist)prepDbPut({id:UI_SETTINGS_KEY,theme,updatedAt:nowIso()}).catch(()=>{});
+}
+async function initThemeSettings(){
+  try{const row=await prepDbGet(UI_SETTINGS_KEY);applyTheme(row?.theme||'default')}
+  catch(_err){applyTheme('default')}
+}
+
+async function saveWorkspaceLocal({silent=false}={}){
+  if(prepRuntime.saveInFlight)return;
+  prepRuntime.saveInFlight=true;updateWorkspaceSaveStatus();
+  try{
+    const savedAt=nowIso(),workspace=workspacePayload();await prepDbPut({id:PREP_DB_KEY,savedAt,workspace});
+    prepRuntime.lastSavedAt=formatLocalSaveTime(savedAt);prepRuntime.dirty=false;updateWorkspaceSaveStatus('', 'good');
+    if(!silent)toast('工作区已保存到本机');
+  }catch(err){
+    updateWorkspaceSaveStatus('保存失败，请导出工作区草稿','bad');
+    if(!silent)alert('本地保存失败：'+(err?.message||err)+'\n\n建议立即使用“导出工作区草稿”。某些浏览器的 file:// 环境可能限制 IndexedDB。');
+  }finally{prepRuntime.saveInFlight=false;updateWorkspaceSaveStatus()}
+}
+async function restoreWorkspaceLocal(){
+  try{
+    const row=await prepDbGet();if(!row?.workspace){alert('没有找到本机保存的工作区。');return}
+    if(!confirm(`恢复本机工作区？\n保存时间：${formatLocalSaveTime(row.savedAt)}\n\n当前未导出的修改会被替换。`))return;
+    applyWorkspacePayload(row.workspace);prepRuntime.lastSavedAt=formatLocalSaveTime(row.savedAt);prepRuntime.dirty=false;updateWorkspaceSaveStatus('', 'good');toast('已恢复本机工作区');
+  }catch(err){alert('恢复本机工作区失败：'+(err?.message||err))}
+}
+async function deleteWorkspaceLocal(){
+  if(!confirm('删除本工具在当前浏览器中的本机工作区保存？不会删除已经导出的 JSON 文件。'))return;
+  try{await prepDbDelete();prepRuntime.lastSavedAt='';updateWorkspaceSaveStatus('本机保存已删除','');toast('本机保存已删除')}catch(err){alert('删除本机保存失败：'+(err?.message||err))}
+}
+async function detectLocalWorkspace(){
+  try{const row=await prepDbGet();if(row?.savedAt){prepRuntime.lastSavedAt=formatLocalSaveTime(row.savedAt);updateWorkspaceSaveStatus()}}catch(_err){updateWorkspaceSaveStatus('本地保存不可用 · 可导出草稿','warn')}
+}
+setInterval(()=>{if(prepRuntime.autoSave&&prepRuntime.dirty)saveWorkspaceLocal({silent:true})},60000);
+window.addEventListener('beforeunload',e=>{if(!prepRuntime.dirty)return;e.preventDefault();e.returnValue=''});
+
+
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function clone(v){return JSON.parse(JSON.stringify(v))}
+function uid(prefix='id'){return prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8)}
+function nowIso(){return new Date().toISOString()}
+
+function randomUuidV4(){
+  if(globalThis.crypto?.randomUUID)return globalThis.crypto.randomUUID();
+  const a=new Uint8Array(16);
+  if(globalThis.crypto?.getRandomValues)globalThis.crypto.getRandomValues(a);
+  else for(let i=0;i<a.length;i++)a[i]=Math.floor(Math.random()*256);
+  a[6]=(a[6]&0x0f)|0x40;a[8]=(a[8]&0x3f)|0x80;
+  const h=[...a].map(x=>x.toString(16).padStart(2,'0')).join('');
+  return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+}
+function generateSystemId(prefix){return `${prefix}_${randomUuidV4()}`}
+function registerQuestionId(id){id=String(id||'').trim();if(id)prepRuntime.issuedQuestionIds.add(id);return id}
+function generateQuestionId(){
+  let id;do{id=generateSystemId('q')}while(prepRuntime.issuedQuestionIds.has(id)||state.questionBank.questions.some(q=>q.id===id));
+  return registerQuestionId(id);
+}
+function generateBatchId(){const id=generateSystemId('batch');prepRuntime.lastBatchId=id;return id}
+
+const SHA256_K=[
+  0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+  0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+  0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+  0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+  0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+  0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+  0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+  0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+];
+function rotr32(x,n){return (x>>>n)|(x<<(32-n))}
+function sha256Hex(input){
+  const data=new TextEncoder().encode(String(input??'')),bitLen=data.length*8;
+  const pad=(64-((data.length+1+8)%64))%64,total=data.length+1+pad+8,bytes=new Uint8Array(total);
+  bytes.set(data);bytes[data.length]=0x80;
+  const view=new DataView(bytes.buffer);
+  view.setUint32(total-8,Math.floor(bitLen/4294967296),false);view.setUint32(total-4,bitLen>>>0,false);
+  let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a,h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;
+  const w=new Uint32Array(64);
+  for(let off=0;off<total;off+=64){
+    for(let i=0;i<16;i++)w[i]=view.getUint32(off+i*4,false);
+    for(let i=16;i<64;i++){
+      const s0=(rotr32(w[i-15],7)^rotr32(w[i-15],18)^(w[i-15]>>>3))>>>0;
+      const s1=(rotr32(w[i-2],17)^rotr32(w[i-2],19)^(w[i-2]>>>10))>>>0;
+      w[i]=(w[i-16]+s0+w[i-7]+s1)>>>0;
+    }
+    let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;
+    for(let i=0;i<64;i++){
+      const S1=(rotr32(e,6)^rotr32(e,11)^rotr32(e,25))>>>0,ch=((e&f)^((~e)&g))>>>0;
+      const t1=(h+S1+ch+SHA256_K[i]+w[i])>>>0;
+      const S0=(rotr32(a,2)^rotr32(a,13)^rotr32(a,22))>>>0,maj=((a&b)^(a&c)^(b&c))>>>0;
+      const t2=(S0+maj)>>>0;
+      h=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0;
+    }
+    h0=(h0+a)>>>0;h1=(h1+b)>>>0;h2=(h2+c)>>>0;h3=(h3+d)>>>0;
+    h4=(h4+e)>>>0;h5=(h5+f)>>>0;h6=(h6+g)>>>0;h7=(h7+h)>>>0;
+  }
+  return [h0,h1,h2,h3,h4,h5,h6,h7].map(x=>x.toString(16).padStart(8,'0')).join('');
+}
+function normalizedContentText(v){return String(v||'').trim().replace(/\s+/g,' ')}
+function canonicalQuestionContent(q){
+  return JSON.stringify({
+    stem:normalizedContentText(questionStem(q)),
+    options:(q.options||[]).slice(0,4).map(o=>({id:String(o.id||''),text:normalizedContentText(o.text)})),
+    correctAnswer:String(q.correctAnswer||'')
+  });
+}
+function computeQuestionContentHash(q){return 'sha256:'+sha256Hex(canonicalQuestionContent(q))}
+function currentIdentitySnapshot(){
+  const c=prepRuntime.creatorProfile||{},d=prepRuntime.deviceProfile||{};
+  return {creatorId:c.creatorId||'',creatorName:c.name||'',deviceId:d.deviceId||''};
+}
+
+function auditValidationSnapshot(){
+  const v=state.validation||null;
+  return v?.metrics?{errors:Number(v.metrics.errors||0),warnings:Number(v.metrics.warnings||0)}:{errors:null,warnings:null};
+}
+function auditTrailPayload(){
+  return {
+    schemaVersion:1,
+    format:'pmp-content-prep-export-audit-v1',
+    exportedAt:nowIso(),
+    exportedBy:{...currentIdentitySnapshot()},
+    deviceId:prepRuntime.deviceProfile?.deviceId||'',
+    application:{name:'PMP Content Prep Studio',version:VERSION,architecture:'service-layer-v1'},
+    eventCount:prepRuntime.auditTrail.length,
+    events:clone(prepRuntime.auditTrail)
+  };
+}
+function buildAuditEvent({exportType,fileName,payload,details={}}){
+  const identity=currentIdentitySnapshot(),json=JSON.stringify(payload);
+  return {
+    auditId:generateSystemId('audit'),
+    eventType:'export',
+    exportType:String(exportType||'unknown'),
+    exportedAt:nowIso(),
+    creatorId:identity.creatorId||'',
+    creatorName:identity.creatorName||'',
+    deviceId:identity.deviceId||'',
+    batchId:prepRuntime.lastBatchId||'',
+    applicationVersion:VERSION,
+    fileName:String(fileName||''),
+    payloadHash:'sha256:'+sha256Hex(json),
+    payloadBytes:new TextEncoder().encode(json).length,
+    questionBankId:state.questionBank?.id||'',
+    questionBankName:state.questionBank?.name||'',
+    questionCount:state.questionBank?.questions?.length||0,
+    validation:auditValidationSnapshot(),
+    details:clone(details||{})
+  };
+}
+async function persistAuditTrail(){
+  const max=2000;if(prepRuntime.auditTrail.length>max)prepRuntime.auditTrail=prepRuntime.auditTrail.slice(-max);
+  try{await prepDbPut({id:AUDIT_TRAIL_KEY,updatedAt:nowIso(),events:prepRuntime.auditTrail})}catch(_err){}
+}
+async function loadAuditTrail(){
+  try{const row=await prepDbGet(AUDIT_TRAIL_KEY);prepRuntime.auditTrail=Array.isArray(row?.events)?row.events:[]}
+  catch(_err){prepRuntime.auditTrail=[]}
+  renderAuditTrail();
+}
+function recordAuditEvent(options){
+  const event=buildAuditEvent(options);prepRuntime.auditTrail.push(event);persistAuditTrail();renderAuditTrail();return event;
+}
+function renderAuditTrail(){
+  const box=document.getElementById('auditList'),count=document.getElementById('auditCount');
+  if(count)count.textContent=`${prepRuntime.auditTrail.length} 条`;
+  if(!box)return;
+  const rows=prepRuntime.auditTrail.slice(-50).reverse();
+  if(!rows.length){box.innerHTML='<div class="audit-empty">尚无导出审计记录。完成一次题库/内容包/联想库等正式导出后会自动出现。</div>';return}
+  box.innerHTML=rows.map(e=>`<div class="audit-row">
+    <div><b>${esc(new Date(e.exportedAt).toLocaleString())}</b><div class="muted tiny">${esc(e.creatorName||e.creatorId||'未选择')}</div></div>
+    <div>${esc(e.exportType)}<div class="muted tiny">${esc(e.applicationVersion)}</div></div>
+    <div title="${esc(e.fileName)}">${esc(e.fileName)}<div class="audit-hash" title="${esc(e.payloadHash)}">${esc(e.payloadHash)}</div></div>
+    <div>${Number(e.questionCount||0)} 题<div class="muted tiny">${e.validation?.errors??'—'}E / ${e.validation?.warnings??'—'}W</div></div>
+  </div>`).join('');
+}
+async function clearAuditTrail(){
+  if(!confirm('清空当前浏览器设备上的全部导出审计记录？已经导出的审计日志文件不会受影响。'))return;
+  prepRuntime.auditTrail=[];try{await prepDbDelete(AUDIT_TRAIL_KEY)}catch(_err){}renderAuditTrail();toast('本机导出审计记录已清空');
+}
+
+function stampQuestionOrigin(q,{batchId='',source='manual',forceOrigin=false,parentQuestionId=''}={}){
+  q.metadata=q.metadata||{};const now=nowIso(),identity=currentIdentitySnapshot(),batch=batchId||generateBatchId();
+  if(forceOrigin||!q.metadata.origin){
+    q.metadata.origin={...identity,batchId:batch,source,createdAt:now};
+    if(parentQuestionId)q.metadata.origin.parentQuestionId=parentQuestionId;
+  }
+  q.metadata.lastImport={...identity,batchId:batch,source,importedAt:now};
+  q.metadata.idSystem={schemaVersion:1,strategy:'uuid-v4',generatedBy:`PMP Content Prep Studio v${VERSION}`};
+  q.contentHash=computeQuestionContentHash(q);
+  registerQuestionId(q.id);
+  return q;
+}
+function stampImportedQuestions(questions,source){
+  const batchId=generateBatchId();
+  (questions||[]).forEach(q=>stampQuestionOrigin(q,{batchId,source,forceOrigin:!q.metadata?.origin}));
+  return batchId;
+}
+
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),1800)}
+function cleanList(v){if(Array.isArray(v))return v.map(x=>String(x).trim()).filter(Boolean);return String(v||'').split(/[\n,，、;；|]/).map(x=>x.trim()).filter(Boolean)}
+function unique(a){return [...new Set(a.filter(Boolean))]}
+function countOccurrences(text,term){if(!term)return 0;let n=0,i=0;while((i=String(text).indexOf(term,i))>=0){n++;i+=Math.max(1,term.length)}return n}
+function downloadText(text,name,type='text/plain;charset=utf-8'){const blob=new Blob([String(text??'')],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500)}
+function downloadJson(obj,name,options={}){
+  const json=JSON.stringify(obj,null,2),blob=new Blob([json],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
+  if(options.auditType)recordAuditEvent({exportType:options.auditType,fileName:name,payload:obj,details:options.details||{}});
+}
+function readJsonFile(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>{try{resolve(JSON.parse(String(r.result||'').replace(/^\ufeff/,'')))}catch(e){reject(e)}};r.onerror=()=>reject(r.error);r.readAsText(file,'utf-8')})}
+
+const DEVICE_PROFILE_KEY='device-profile';
+
+function blankDeviceProfile(){
+  return {deviceId:generateSystemId('device'),createdAt:nowIso(),updatedAt:nowIso()};
+}
+function renderFixedCreator(){
+  const c=prepRuntime.creatorProfile||{},d=prepRuntime.deviceProfile||{};
+  const hdr=document.getElementById('hdrCreator');if(hdr)hdr.textContent='制作人：'+(c.name||'未选择');
+  const name=document.getElementById('creatorFixedName');if(name)name.textContent=c.name||'尚未选择';
+  const cid=document.getElementById('creatorFixedId');if(cid)cid.textContent=c.creatorId||'—';
+  const did=document.getElementById('deviceFixedId');if(did)did.textContent=d.deviceId||'正在初始化…';
+}
+function showCreatorGate(){document.getElementById('creatorGate')?.classList.remove('hidden')}
+function hideCreatorGate(){document.getElementById('creatorGate')?.classList.add('hidden')}
+function selectFixedCreator(key){
+  const creator=FIXED_CREATORS[key];if(!creator)return;
+  prepRuntime.creatorProfile={creatorId:creator.creatorId,name:creator.name,selectedAt:nowIso()};
+  renderFixedCreator();hideCreatorGate();toast(`当前制作人：${creator.name}`);
+}
+async function initDeviceProfile(){
+  try{
+    const row=await prepDbGet(DEVICE_PROFILE_KEY);
+    prepRuntime.deviceProfile=row?.profile||blankDeviceProfile();
+    if(!row)await prepDbPut({id:DEVICE_PROFILE_KEY,profile:prepRuntime.deviceProfile});
+  }catch(_err){prepRuntime.deviceProfile=prepRuntime.deviceProfile||blankDeviceProfile()}
+  renderFixedCreator();
+}
+function requireCreatorSelection(){
+  prepRuntime.creatorProfile=null;renderFixedCreator();showCreatorGate();
+}
+function parseKeywordPasteSpecs(value,level){
+  const out=[];String(value||'').split(/[；;]/).map(x=>x.trim()).filter(Boolean).forEach(part=>{
+    const pieces=part.split('=>'),term=String(pieces[0]||'').trim();if(!term)return;const details=String(pieces.slice(1).join('=>')||'').split('|').map(x=>x.trim()),recallNodeId=details[0]||'',role=level==='core'?(details[1]||'concept-anchor'):'context',reason=level==='core'?(details.slice(2).join('|')||''):'',rn=recallNodeId?recallIndex().byId.get(recallNodeId):null;
+    out.push({id:uid('kw'),text:term,textEn:'',keywordLevel:level,isCore:level==='core',type:level==='core'?'core-keyword':'recall-keyword',clueRole:'true',sourceType:'stem',sourceOptionId:'',recallNodeId,recallEntryLabel:rn?.title||'',solutionRole:role,coreReason:reason,conceptIds:[],explain:'',sourceMode:'word-paste-keyword-v2',matchLocations:[]});
+  });return out;
+}
+function parsePastedQuestionText(raw){
+  raw=String(raw||'').replace(/\r\n?/g,'\n').trim();if(!raw)return [];
+  let blocks=raw.split(/\n(?=\s*(?:【\s*题目\s*\d+\s*】|题目\s*\d+\s*[:：.]|Q(?:uestion)?\s*\d+\s*[:：.]))/i).map(x=>x.trim()).filter(Boolean);
+  if(blocks.length===1){const markerCount=(raw.match(/(?:^|\n)\s*【\s*题目\s*\d+\s*】/g)||[]).length;if(markerCount>1)blocks=raw.split(/(?=(?:^|\n)\s*【\s*题目\s*\d+\s*】)/g).map(x=>x.trim()).filter(Boolean)}
+  const out=[];
+  blocks.forEach((block,bi)=>{
+    const lines=block.split('\n').map(x=>x.trim()).filter(Boolean);
+    let title='',difficulty='中等',domain='',topic='',stage='',tags=[],stem=[],analysis=[],answer='',mode='stem',enTitle='',enStem=[],enAnalysis=[],primaryNodeId='',normalKw='',coreKw='',principleIds=[];
+    const opts={A:'',B:'',C:'',D:''},traps={A:'',B:'',C:'',D:''},enOpts={A:'',B:'',C:'',D:''},enFeedback={A:'',B:'',C:'',D:''},optionPrinciples={A:[],B:[],C:[],D:[]};
+    for(const line of lines){
+      if(/^【\s*题目\s*\d+\s*】$/.test(line)||/^题目\s*\d+\s*[:：.]?$/.test(line)||/^Q(?:uestion)?\s*\d+\s*[:：.]?$/i.test(line))continue;
+      let mm=line.match(/^(?:ID|题目ID)\s*[:：]\s*(.*)$/i);if(mm){continue}
+      mm=line.match(/^标题\s*[:：]\s*(.*)$/);if(mm){title=mm[1].trim();continue}
+      mm=line.match(/^难度\s*[:：]\s*(.*)$/);if(mm){difficulty=mm[1].trim()||'中等';continue}
+      mm=line.match(/^(?:领域|Domain)\s*[:：]\s*(.*)$/i);if(mm){domain=mm[1].trim();continue}
+      mm=line.match(/^(?:主题|Topic)\s*[:：]\s*(.*)$/i);if(mm){topic=mm[1].trim();continue}
+      mm=line.match(/^(?:阶段|Stage)\s*[:：]\s*(.*)$/i);if(mm){stage=mm[1].trim();continue}
+      mm=line.match(/^标签\s*[:：]\s*(.*)$/);if(mm){tags=cleanList(mm[1]);continue}
+      mm=line.match(/^题干\s*[:：]\s*(.*)$/);if(mm){mode='stem';if(mm[1])stem.push(mm[1]);continue}
+      mm=line.match(/^([A-DＡ-Ｄ])\s*[\.．、:：\)）]\s*(.*)$/i);if(mm){const letter={'Ａ':'A','Ｂ':'B','Ｃ':'C','Ｄ':'D'}[mm[1]]||mm[1].toUpperCase();opts[letter]=mm[2].trim();mode='option';continue}
+      mm=line.match(/^([A-D])\s*(?:陷阱|Trap)\s*[:：]\s*(.*)$/i);if(mm){traps[mm[1].toUpperCase()]=mm[2].trim();continue}
+      mm=line.match(/^(?:正确答案|参考答案|答案|Answer)\s*[:：]\s*([A-DＡ-Ｄ])/i);if(mm){answer=({'Ａ':'A','Ｂ':'B','Ｃ':'C','Ｄ':'D'}[mm[1]]||mm[1].toUpperCase());mode='answer';continue}
+      mm=line.match(/^(?:题目解析|解析)\s*[:：]\s*(.*)$/);if(mm){mode='analysis';if(mm[1])analysis.push(mm[1]);continue}
+      mm=line.match(/^(?:English Title|英文标题)\s*[:：]\s*(.*)$/i);if(mm){enTitle=mm[1].trim();mode='en-title';continue}
+      mm=line.match(/^(?:English Stem|英文题干)\s*[:：]\s*(.*)$/i);if(mm){mode='en-stem';if(mm[1])enStem.push(mm[1]);continue}
+      mm=line.match(/^([A-D])(?:_EN|\s+EN)\s*[:：]\s*(.*)$/i);if(mm){enOpts[mm[1].toUpperCase()]=mm[2].trim();mode='en-option';continue}
+      mm=line.match(/^(?:English Analysis|英文解析|Analysis EN)\s*[:：]\s*(.*)$/i);if(mm){mode='en-analysis';if(mm[1])enAnalysis.push(mm[1]);continue}
+      mm=line.match(/^([A-D])(?:反馈EN|反馈\s*EN|Feedback\s*EN)\s*[:：]\s*(.*)$/i);if(mm){enFeedback[mm[1].toUpperCase()]=mm[2].trim();continue}
+      mm=line.match(/^(?:主知识点ID|PrimaryNodeId|Primary Node ID)\s*[:：]\s*(.*)$/i);if(mm){primaryNodeId=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^普通关键词\s*[:：]\s*(.*)$/);if(mm){normalKw=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^核心关键词\s*[:：]\s*(.*)$/);if(mm){coreKw=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^(?:原则IDs|原则ID|PrincipleIds)\s*[:：]\s*(.*)$/i);if(mm){principleIds=cleanList(mm[1]);mode='meta';continue}
+      mm=line.match(/^([A-D])原则\s*[:：]\s*(.*)$/);if(mm){optionPrinciples[mm[1].toUpperCase()]=cleanList(mm[2]);mode='meta';continue}
+      if(mode==='analysis')analysis.push(line);else if(mode==='en-stem')enStem.push(line);else if(mode==='en-analysis')enAnalysis.push(line);else if(mode==='stem')stem.push(line);
+    }
+    if(stem.length||Object.values(opts).some(Boolean)){
+      const clues=[...parseKeywordPasteSpecs(normalKw,'normal'),...parseKeywordPasteSpecs(coreKw,'core')];
+      const nq=normalizeQuestion({title:title||`导入题目 ${bi+1}`,difficulty,domain,topic,tags,stage,stemParts:[{text:stem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:opts[letter],trap:traps[letter]})),correctAnswer:answer||'A',analysis:analysis.join('\n'),translations:{en:{title:enTitle,stemParts:[{text:enStem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:enOpts[letter]})),analysis:enAnalysis.join('\n'),optionFeedback:enFeedback}},clues,metadata:{knowledge:{primaryNodeId,relatedNodeIds:[],mappingStatus:primaryNodeId?'confirmed':'unmapped',pathSnapshot:[]},principleIds,optionPrincipleMap:optionPrinciples}},bi,state.questionBank.subject||'PMP');
+      if(primaryNodeId&&state.knowledgeTree?.map.has(primaryNodeId))nq.metadata.knowledge.pathSnapshot=state.knowledgeTree.pathFor(primaryNodeId);
+      nq.clues.forEach(c=>c.conceptIds=primaryNodeId?[primaryNodeId]:[]);recomputeKeywordLocations(nq);syncQuestionPrinciples(nq);nq.tags=unique((nq.tags||[]).map(canonicalTagName));nq.metadata.tagPaths=nq.tags.map(tagPathFor).filter(Boolean);out.push(nq);
+    }
+  });return out;
+}
+
+function normalizeTree(payload){
+  const tax=payload?.taxonomy?.nodes?payload.taxonomy:(payload?.nodes?payload:null);
+  if(!tax||!Array.isArray(tax.nodes))throw new Error('未找到 taxonomy.nodes。');
+  const nodes=tax.nodes.map(n=>({...n,id:String(n.id||''),parentId:n.parentId==null?null:String(n.parentId)})).filter(n=>n.id);
+  const map=new Map(nodes.map(n=>[n.id,n]));
+  const title=n=>typeof n.title==='object'?(n.title.zh||n.title.en||''):String(n.title||'');
+  const pathFor=id=>{const out=[];let cur=map.get(id),seen=new Set();while(cur&&!seen.has(cur.id)){seen.add(cur.id);out.push(title(cur));cur=cur.parentId?map.get(cur.parentId):null}return out.reverse()};
+  return {id:String(tax.id||''),subjectId:String(tax.subjectId||'subject-pmp'),name:typeof tax.name==='object'?(tax.name.zh||tax.name.en||''):(tax.name||''),version:Number(tax.version||1),nodes,map,title,pathFor};
+}
+function normalizeRecall(payload){
+  if(!payload||typeof payload!=='object')throw new Error('联想库必须是 JSON 对象。');
+  const nodes=(Array.isArray(payload.nodes)?payload.nodes:[]).map((n,i)=>({
+    id:String(n.id||uid('recall')),
+    title:String(n.title||'未命名节点'),
+    titleEn:String(n.titleEn||''),
+    aliases:unique(cleanList(n.aliases)),
+    prompt:String(n.prompt||''),
+    promptEn:String(n.promptEn||''),
+    hint:String(n.hint||''),
+    hintEn:String(n.hintEn||''),
+    priority:Number(n.priority||0),
+    metadata:n.metadata&&typeof n.metadata==='object'?clone(n.metadata):{}
+  }));
+  const ids=new Set(nodes.map(n=>n.id));
+  const edges=(Array.isArray(payload.edges)?payload.edges:[]).map(e=>({
+    id:String(e.id||uid('edge')),from:String(e.from||''),to:String(e.to||''),priority:Number(e.priority||0),label:String(e.label||'关联'),
+    metadata:e.metadata&&typeof e.metadata==='object'?clone(e.metadata):{}
+  })).filter(e=>ids.has(e.from)&&ids.has(e.to)&&e.from!==e.to);
+  return {schemaVersion:1,nodes,edges,updatedAt:String(payload.updatedAt||nowIso())};
+}
+function normalizePrinciples(payload){
+  const raw=Array.isArray(payload)?payload:(Array.isArray(payload?.items)?payload.items:[]);
+  return {schemaVersion:1,items:raw.map((item,i)=>{const name=String(item?.name||item?.title||'未命名原则').trim()||'未命名原则';return {id:String(item?.id||('principle-'+i+'-'+Date.now().toString(36))),name,status:String(item?.status||'active')==='inactive'?'inactive':'active',confusablePrincipleIds:unique((item?.confusablePrincipleIds||[]).map(String)),createdAt:Number(item?.createdAt||Date.now()),updatedAt:Number(item?.updatedAt||Date.now())}}),updatedAt:Number(payload?.updatedAt||Date.now())};
+}
+function normalizePresets(payload){
+  const raw=Array.isArray(payload)?payload:(Array.isArray(payload?.items)?payload.items:[]);
+  return {schemaVersion:1,items:raw.map((item,i)=>({id:String(item?.id||('preset-'+i+'-'+Date.now().toString(36))),principleId:String(item?.principleId||''),title:String(item?.title||'').trim(),content:String(item?.content||item?.description||'').trim(),status:['draft','active','inactive'].includes(String(item?.status||''))?String(item.status):'draft',version:Math.max(1,Number(item?.version||1)),createdAt:Number(item?.createdAt||Date.now()),updatedAt:Number(item?.updatedAt||Date.now())})),updatedAt:Number(payload?.updatedAt||Date.now())};
+}
+function baseTagSlotEntries(config={}){
+  const out=[];BASE_TAG_GROUPS.forEach(g=>g.categories.forEach(c=>c.options.forEach((baseLabel,i)=>{
+    const legacySlot=legacyTagSlotKey(g,c,i),slot=semanticTagSlot(legacySlot),label=String(config.names?.[slot]||config.names?.[legacySlot]||baseLabel);
+    out.push({slot,legacySlot,baseLabel,label,groupId:g.id,categoryId:c.id});
+  })));return out;
+}
+function resolveAliasMapValue(value,map){
+  let current=String(value||'').trim(),seen=new Set();while(map[current]&&!seen.has(current)){seen.add(current);current=String(map[current]||current).trim()||current}return current;
+}
+function syncFlatTagAliases(config=state.tagConfig){
+  config=config||{};const flat={...(config.looseAliases||{})},slotLabels=new Map(baseTagSlotEntries(config).map(x=>[x.slot,x.label]));
+  Object.entries(config.slotAliases||{}).forEach(([slot,items])=>{const target=slotLabels.get(slot);if(!target)return;unique(cleanList(items)).forEach(alias=>{if(alias&&alias!==target)flat[alias]=target})});
+  config.aliases=flat;return config;
+}
+function normalizeTagConfig(payload){
+  payload=payload&&typeof payload==='object'?payload:{};
+  const names={};Object.entries(payload.names&&typeof payload.names==='object'?payload.names:{}).forEach(([slot,value])=>names[semanticTagSlot(slot)]=value);
+  const slotAliases={};Object.entries(payload.slotAliases&&typeof payload.slotAliases==='object'?payload.slotAliases:{}).forEach(([slot,items])=>slotAliases[semanticTagSlot(slot)]=unique(cleanList(items)));
+  const config={
+    schemaVersion:2,slotIdStrategy:'semantic-v1',
+    names,
+    groupNames:payload.groupNames&&typeof payload.groupNames==='object'?{...payload.groupNames}:{},
+    categoryNames:payload.categoryNames&&typeof payload.categoryNames==='object'?{...payload.categoryNames}:{},
+    aliases:payload.aliases&&typeof payload.aliases==='object'?{...payload.aliases}:{},
+    slotAliases,
+    looseAliases:payload.looseAliases&&typeof payload.looseAliases==='object'?{...payload.looseAliases}:{}
+  };
+  const slots=baseTagSlotEntries(config),slotByLabel=new Map(slots.map(x=>[x.label,x.slot])),represented=new Set(Object.values(config.slotAliases).flatMap(cleanList));
+  Object.entries(config.aliases).forEach(([from,to])=>{
+    if(represented.has(from))return;
+    const resolved=resolveAliasMapValue(to,config.aliases),slot=slotByLabel.get(resolved)||slotByLabel.get(String(to||'').trim());
+    if(slot)config.slotAliases[slot]=unique([...(config.slotAliases[slot]||[]),from]);
+    else if(!(from in config.looseAliases))config.looseAliases[from]=to;
+  });
+  Object.keys(config.slotAliases).forEach(slot=>config.slotAliases[semanticTagSlot(slot)]=unique(cleanList(config.slotAliases[slot])));
+  return syncFlatTagAliases(config);
+}
+function effectiveTagGroups(){
+  const c=state.tagConfig||{},groups=clone(BASE_TAG_GROUPS);
+  groups.forEach(g=>{g.label=String(c.groupNames?.[tagGroupKey(g)]||g.label);g.categories.forEach(cat=>{
+    cat.label=String(c.categoryNames?.[tagCategoryKey(g,cat)]||cat.label);
+    cat.options=cat.options.map((name,i)=>String(c.names?.[tagSlotKey(g,cat,i)]||name));
+  })});return groups;
+}
+function tagCatalogEntries(){const out=[];effectiveTagGroups().forEach(g=>g.categories.forEach(c=>c.options.forEach((label,i)=>{
+  const legacySlot=legacyTagSlotKey(g,c,i),slot=semanticTagSlot(legacySlot);
+  out.push({groupId:g.id,group:g.label,categoryId:c.id,category:c.label,label,slot,legacySlot});
+})));return out}
+function canonicalTagName(value){let current=String(value||'').trim(),seen=new Set(),aliases=state.tagConfig?.aliases||{};while(aliases[current]&&!seen.has(current)){seen.add(current);current=String(aliases[current]||current).trim()||current}return current}
+function tagPathFor(label){const canonical=canonicalTagName(label);return tagCatalogEntries().find(x=>x.label===canonical)||null}
+function principleById(id){return state.principles.items.find(x=>x.id===String(id))||null}
+function presetByPrincipleId(id){return state.synthesisPresets.items.find(x=>x.principleId===String(id))||null}
+function normalizeOptionPrincipleMap(value){const out={};if(value&&typeof value==='object')Object.entries(value).forEach(([key,ids])=>out[String(key)]=unique((Array.isArray(ids)?ids:cleanList(ids)).map(String)));return out}
+function syncQuestionPrinciples(q){q.metadata=q.metadata||{};q.metadata.optionPrincipleMap=normalizeOptionPrincipleMap(q.metadata.optionPrincipleMap);q.metadata.principleIds=unique([...(q.metadata.principleIds||[]),...Object.values(q.metadata.optionPrincipleMap).flat()].map(String).filter(Boolean))}
+function refreshQuestionTagPaths(){state.questionBank.questions.forEach(q=>{q.tags=unique((q.tags||[]).map(canonicalTagName));q.metadata=q.metadata||{};q.metadata.tagPaths=q.tags.map(tagPathFor).filter(Boolean)})}
+
+function normalizeOption(o,i,correct){
+  const id=String(o?.id||String.fromCharCode(65+i));
+  return {id,text:String(o?.text||''),trap:String(o?.trap||''),correct:id===String(correct||'')||!!o?.correct};
+}
+function questionStem(q){return Array.isArray(q?.stemParts)?q.stemParts.map(p=>String(p?.text||'')).join(''):String(q?.stem||'')}
+function englishStem(q){return Array.isArray(q?.translations?.en?.stemParts)?q.translations.en.stemParts.map(p=>String(p?.text||'')).join(''):String(q?.stemEn||'')}
+
+function normalizeKeywordLevel(clue,q){
+  const mirror=q?.metadata?.keywordSystemV2?.keywords?.find(x=>String(x.clueId||x.id)===String(clue.id||''));
+  const level=String(clue.keywordLevel||mirror?.keywordLevel||'normal');
+  return level==='core'?'core':'normal';
+}
+function normalizeQuestion(q,i=0,subject='PMP'){
+  q=q&&typeof q==='object'?clone(q):{};
+  const options=(Array.isArray(q.options)?q.options:[]).map((o,idx)=>normalizeOption(o,idx,q.correctAnswer));
+  while(options.length<4)options.push(normalizeOption({id:String.fromCharCode(65+options.length),text:''},options.length,q.correctAnswer));
+  const correct=String(q.correctAnswer||options.find(o=>o.correct)?.id||'A');
+  options.forEach(o=>o.correct=o.id===correct);
+  const clues=(Array.isArray(q.clues)?q.clues:[]).map((c,idx)=>{
+    const level=normalizeKeywordLevel(c,q);
+    const mirror=q?.metadata?.keywordSystemV2?.keywords?.find(x=>String(x.clueId||x.id)===String(c.id||''));
+    return {
+      ...c,
+      id:String(c.id||uid('kw')),
+      text:String(c.text||c.keyword||'').trim(),
+      textEn:String(c.textEn||''),
+      keywordLevel:level,
+      isCore:level==='core',
+      solutionRole:String(c.solutionRole||mirror?.solutionRole||(level==='core'?'concept-anchor':'context')),
+      coreReason:String(c.coreReason||mirror?.coreReason||''),
+      sourceType:String(c.sourceType||'stem'),
+      sourceOptionId:String(c.sourceOptionId||''),
+      recallNodeId:String(c.recallNodeId||''),
+      recallEntryLabel:String(c.recallEntryLabel||''),
+      matchLocations:Array.isArray(c.matchLocations)?clone(c.matchLocations):[]
+    };
+  }).filter(c=>c.text);
+  const knowledge=q?.metadata?.knowledge&&typeof q.metadata.knowledge==='object'?clone(q.metadata.knowledge):{};
+  delete knowledge.taxonomyId; delete knowledge.taxonomyVersion;
+  const systemQuestionId=registerQuestionId(String(q.id||generateQuestionId()));
+  return {
+    ...q,
+    id:systemQuestionId,
+    title:String(q.title||'未命名题目'),
+    type:String(q.type||'single_choice'),
+    subject:String(q.subject||subject||'PMP'),
+    difficulty:String(q.difficulty||'中等'),
+    domain:String(q.domain||''),
+    topic:String(q.topic||''),
+    tags:cleanList(q.tags),
+    stage:String(q.stage||''),
+    stemParts:[{text:questionStem(q)}],
+    options,
+    correctAnswer:correct,
+    analysis:String(q.analysis||q.explanation||''),
+    explanation:String(q.explanation||q.analysis||''),
+    translations:{
+      ...(q.translations&&typeof q.translations==='object'?q.translations:{}),
+      en:{
+        ...(q.translations?.en&&typeof q.translations.en==='object'?q.translations.en:{}),
+        title:String(q.translations?.en?.title||q.titleEn||''),
+        stemParts:[{text:englishStem(q)}],
+        options:(Array.isArray(q.translations?.en?.options)?q.translations.en.options:[]).map((o,idx)=>({id:String(o?.id||String.fromCharCode(65+idx)),text:String(o?.text||'')})),
+        analysis:String(q.translations?.en?.analysis||q.analysisEn||'')
+      }
+    },
+    clues,
+    reasoningSteps:Array.isArray(q.reasoningSteps)?clone(q.reasoningSteps):[],
+    metadata:{...(q.metadata&&typeof q.metadata==='object'?q.metadata:{}),principleIds:unique([...(Array.isArray(q.principleIds)?q.principleIds:[]),...(Array.isArray(q.metadata?.principleIds)?q.metadata.principleIds:[])].map(String)),optionPrincipleMap:normalizeOptionPrincipleMap(q.metadata?.optionPrincipleMap),tagPaths:Array.isArray(q.metadata?.tagPaths)?clone(q.metadata.tagPaths):[],knowledge},
+    lifecycle:q.lifecycle&&typeof q.lifecycle==='object'?clone(q.lifecycle):{status:'active',deletedAt:''},
+    status:q.status&&typeof q.status==='object'?clone(q.status):{contentReady:false,keywordsReady:false,knowledgeReady:false,reasoningReady:false,published:false}
+  };
+}
+function normalizeBank(payload){
+  let b=payload;
+  if(Array.isArray(payload?.banks)&&payload.banks.length)b=payload.banks[0];
+  if(Array.isArray(payload))b={name:'导入题库',subject:'PMP',questions:payload};
+  if(!b||!Array.isArray(b.questions))throw new Error('题库缺少 questions 数组。');
+  const subject=String(b.subject||'PMP');
+  return {
+    id:String(b.id||b.bankId||generateSystemId('bank')),name:String(b.name||b.bankName||'PMP 题库'),subject,description:String(b.description||''),
+    version:String(b.version||'1.0'),visibility:String(b.visibility||'private'),createdAt:Number(b.createdAt||Date.now()),updatedAt:Number(b.updatedAt||Date.now()),
+    questions:b.questions.map((q,i)=>{const nq=QuestionService.normalize(q,i,subject);syncQuestionPrinciples(nq);nq.tags=unique((nq.tags||[]).map(canonicalTagName));nq.metadata.tagPaths=nq.tags.map(tagPathFor).filter(Boolean);return nq})
+  };
+}
+function normalizeContentBundle(payload){
+  if(!payload||typeof payload!=='object')throw new Error('完整内容包必须是 JSON 对象。');
+  const qb=payload.questionBank||payload.bank||(Array.isArray(payload.questions)?payload:null);if(!qb)throw new Error('完整内容包缺少 questionBank。');
+  return {prepContentBundleVersion:Number(payload.prepContentBundleVersion||1),questionBank:normalizeBank(qb),principles:normalizePrinciples(payload.principles||{}),synthesisPresets:normalizePresets(payload.synthesisPresets||payload.presets||{}),tagConfig:normalizeTagConfig(payload.tagConfig||{}),recallLibrary:payload.recallLibrary?normalizeRecall(payload.recallLibrary):null,knowledgeTree:payload.knowledgeTree?normalizeTree(payload.knowledgeTree):null};
+}
+function importContentBundle(payload){
+  const b=ImportService.completeBundle(payload);state.tagConfig=b.tagConfig;state.principles=b.principles;state.synthesisPresets=b.synthesisPresets;state.questionBank=b.questionBank;if(b.recallLibrary)state.recallLibrary=b.recallLibrary;if(b.knowledgeTree)state.knowledgeTree=b.knowledgeTree;
+  stampImportedQuestions(state.questionBank.questions,'complete-content-bundle');
+  refreshQuestionTagPaths();state.questionBank.questions.forEach(syncQuestionPrinciples);state.currentQuestionId=state.questionBank.questions[0]?.id||'';state.demoQuestionId=state.currentQuestionId;state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';state.currentPrincipleId=state.principles.items[0]?.id||'';refreshAll();
+}
+function completeBundlePayload(){return {prepContentBundleVersion:1,format:'pmp-content-prep-complete-bundle-v1',generatedBy:`PMP Content Prep Studio v${VERSION}`,generatedAt:nowIso(),exportManifest:{creator:{...currentIdentitySnapshot()},lastBatchId:prepRuntime.lastBatchId||'',applicationVersion:VERSION},questionBank:exportableBank(),principles:clone(state.principles),synthesisPresets:clone(state.synthesisPresets),tagConfig:exportTagConfig(),recallLibraryReference:{schemaVersion:state.recallLibrary.schemaVersion,nodeCount:state.recallLibrary.nodes.length,edgeCount:state.recallLibrary.edges.length},knowledgeTreeReference:state.knowledgeTree?{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:state.knowledgeTree.name,version:state.knowledgeTree.version,nodeCount:state.knowledgeTree.nodes.length}:null}}
+
+function recallIndex(){
+  const byId=new Map(),terms=new Map();
+  state.recallLibrary.nodes.forEach(n=>{
+    byId.set(n.id,n);
+    [n.title,n.titleEn,...(n.aliases||[])].map(x=>String(x||'').trim()).filter(Boolean).forEach(term=>{
+      if(!terms.has(term))terms.set(term,[]);
+      const rows=terms.get(term);
+      if(!rows.some(item=>item.id===n.id))rows.push(n);
+    });
+  });
+  return {byId,terms};
+}
+function resolveRecall(term){
+  const idx=recallIndex(),list=idx.terms.get(String(term||'').trim())||[];
+  return {matches:list,unique:list.length===1?list[0]:null};
+}
+function recallSuggestions(term){
+  term=String(term||'').trim();if(!term)return [];
+  const scored=[];
+  state.recallLibrary.nodes.forEach(n=>{
+    const hay=[n.title,n.titleEn,...(n.aliases||[])].join(' ');
+    let score=0;
+    if(hay.includes(term))score+=3;
+    if(term.includes(n.title)&&n.title.length>=2)score+=2;
+    if(score)scored.push({n,score});
+  });
+  return scored.sort((a,b)=>b.score-a.score||b.n.priority-a.n.priority).slice(0,5).map(x=>x.n);
+}
+function currentQuestion(){return state.questionBank.questions.find(q=>q.id===state.currentQuestionId)||null}
+function currentRecall(){return state.recallLibrary.nodes.find(n=>n.id===state.currentRecallId)||null}
+
+function refreshHeader(){
+  document.getElementById('hdrTree').textContent='知识树 '+(state.knowledgeTree?.nodes.length||0);
+  document.getElementById('hdrRecall').textContent='联想库 '+state.recallLibrary.nodes.length;
+  document.getElementById('hdrQuestions').textContent='题目 '+state.questionBank.questions.length;
+  const creator=prepRuntime.creatorProfile?.name||'未选择';const hdrCreator=document.getElementById('hdrCreator');if(hdrCreator)hdrCreator.textContent='制作人：'+creator;
+  document.getElementById('baseTreeCount').textContent=state.knowledgeTree?.nodes.length||0;
+  document.getElementById('baseTreeName').textContent=state.knowledgeTree?.name||'未加载';
+  document.getElementById('baseRecallCount').textContent=state.recallLibrary.nodes.length;
+  document.getElementById('baseRecallInfo').textContent=state.recallLibrary.nodes.length?`${state.recallLibrary.edges.length} 条关系`:'未加载';
+  document.getElementById('baseQuestionCount').textContent=state.questionBank.questions.length;
+  document.getElementById('baseQuestionName').textContent=state.questionBank.name||'未加载';
+  if(document.getElementById('basePrincipleCount'))document.getElementById('basePrincipleCount').textContent=state.principles.items.length;
+  if(document.getElementById('basePresetInfo'))document.getElementById('basePresetInfo').textContent=`归纳卡 ${state.synthesisPresets.items.length}`;
+  if(document.getElementById('baseTagCount'))document.getElementById('baseTagCount').textContent=tagCatalogEntries().length;
+}
+function setTab(name){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.id==='tab-'+name));
+  if(name==='validate')runValidation();
+  if(name==='association')renderRecallList();
+  if(name==='management'){renderPrincipleList();renderPrincipleEditor();renderTagManager()}
+  if(name==='demo')renderDemoValidation();
+  if(name==='export')renderAuditTrail();
+}
+
+function newQuestion(){
+  const q=QuestionService.create({
+    title:'新题目',subject:state.questionBank.subject||'PMP',
+    options:[{id:'A',text:''},{id:'B',text:''},{id:'C',text:''},{id:'D',text:''}],correctAnswer:'A',
+    translations:{en:{title:'',stemParts:[{text:''}],options:[{id:'A',text:''},{id:'B',text:''},{id:'C',text:''},{id:'D',text:''}],analysis:''}},
+    metadata:{knowledge:{primaryNodeId:'',relatedNodeIds:[],mappingStatus:'unmapped',pathSnapshot:[]}}
+  },state.questionBank.subject);
+  stampQuestionOrigin(q,{batchId:generateBatchId(),source:'manual-new',forceOrigin:true});
+  state.questionBank.questions.push(q);state.currentQuestionId=q.id;state.questionBank.updatedAt=Date.now();renderQuestions();toast('已新建题目 · 全局 ID 已生成');
+}
+function duplicateQuestion(){
+  const q=currentQuestion();if(!q)return;
+  const copy=QuestionService.duplicatePayload(q);copy.title=q.title+'（副本）';
+  state.questionBank.questions.push(copy);state.currentQuestionId=copy.id;renderQuestions();toast('已复制 · 新全局 ID 已生成');
+}
+function deleteQuestion(){
+  const q=currentQuestion();if(!q)return;if(!confirm('删除当前本地草稿题目？不会影响正式程序。'))return;
+  state.questionBank.questions=state.questionBank.questions.filter(x=>x.id!==q.id);
+  state.currentQuestionId=state.questionBank.questions[0]?.id||'';renderQuestions();
+}
+function questionCompleteness(q){
+  const issues=validateQuestion(q,false);const err=issues.some(x=>x.level==='error'),warn=issues.some(x=>x.level==='warn');
+  return err?'bad':warn?'warn':'ok';
+}
+function renderQuestionListOnly(){
+  refreshHeader();
+  const list=document.getElementById('questionList');if(!list)return;list.innerHTML='';
+  document.getElementById('qCount').textContent=state.questionBank.questions.length+' 题';
+  state.questionBank.questions.forEach((q,i)=>{
+    const d=document.createElement('div');d.className='list-item'+(q.id===state.currentQuestionId?' active':'');
+    const st=questionCompleteness(q);
+    d.innerHTML=`<div class="list-title"><span class="status-dot ${st}"></span>${i+1}. ${esc(q.title)}</div><div class="list-meta">${esc(q.id)} · ${esc(q.difficulty||'')}</div>`;
+    d.onclick=()=>{state.currentQuestionId=q.id;renderQuestions()};list.appendChild(d);
+  });
+}
+function renderQuestions(){
+  if(!state.currentQuestionId&&state.questionBank.questions[0])state.currentQuestionId=state.questionBank.questions[0].id;
+  renderQuestionListOnly();
+  renderQuestionEditor();
+}
+function treeOptions(selected){
+  if(!state.knowledgeTree)return '<option value="">未加载知识树</option>';
+  return '<option value="">— 未关联 —</option>'+state.knowledgeTree.nodes.map(n=>{
+    const label=state.knowledgeTree.pathFor(n.id).join(' > ');
+    return `<option value="${esc(n.id)}"${n.id===selected?' selected':''}>${esc(label)} [${esc(n.id)}]</option>`;
+  }).join('');
+}
+function principleCheckMarkup(selected=[],namePrefix='p'){
+  const set=new Set((selected||[]).map(String));if(!state.principles.items.length)return '<span class="muted smalltxt">尚未导入/创建原则。</span>';
+  return `<div class="principle-checks">${state.principles.items.filter(p=>p.status!=='inactive').map(p=>`<label><input type="checkbox" data-principle-check="${esc(namePrefix)}" value="${esc(p.id)}"${set.has(p.id)?' checked':''}> ${esc(p.name)}</label>`).join('')}</div>`;
+}
+function renderQuestionPrincipleBindings(){
+  const q=currentQuestion(),box=document.getElementById('questionPrincipleBindingPanel');if(!q||!box)return;syncQuestionPrinciples(q);const map=q.metadata.optionPrincipleMap||{};
+  box.innerHTML=`<div class="help">题目级原则保存到 <code>metadata.principleIds</code>；A/B/C/D 选项级映射保存到 <code>metadata.optionPrincipleMap</code>，用于“题目演示校验”和未来做题大厅。</div>
+  <div style="margin-top:9px"><label>题目级原则</label>${principleCheckMarkup(q.metadata.principleIds,'question')}</div>
+  <div style="margin-top:10px">${q.options.slice(0,4).map(o=>`<div class="option-principles"><b>选项 ${esc(o.id)}</b>${principleCheckMarkup(map[o.id]||[],'opt-'+o.id)}</div>`).join('')}</div>`;
+  box.querySelectorAll('[data-principle-check="question"]').forEach(el=>el.addEventListener('change',()=>{q.metadata.principleIds=[...box.querySelectorAll('[data-principle-check="question"]:checked')].map(x=>x.value);syncQuestionPrinciples(q);renderCurrentIssues()}));
+  q.options.slice(0,4).forEach(o=>box.querySelectorAll(`[data-principle-check="opt-${o.id}"]`).forEach(el=>el.addEventListener('change',()=>{q.metadata.optionPrincipleMap=q.metadata.optionPrincipleMap||{};q.metadata.optionPrincipleMap[o.id]=[...box.querySelectorAll(`[data-principle-check="opt-${o.id}"]:checked`)].map(x=>x.value);syncQuestionPrinciples(q);renderCurrentIssues()})));
+}
+function renderQuestionEditor(){
+  const q=currentQuestion(),ed=document.getElementById('questionEditor');
+  document.getElementById('currentQuestionId').textContent=q?.id||'';
+  if(!q){ed.innerHTML='<div class="no-data">请新建题目，或导入已有题库。</div>';renderKeywords();return}
+  const en=q.translations?.en||{};
+  while(en.options.length<4)en.options.push({id:String.fromCharCode(65+en.options.length),text:''});
+  ed.innerHTML=`
+  <div class="form-grid">
+    <div><label>题目 ID</label><input type="text" data-qfield="id" value="${esc(q.id)}"></div>
+    <div><label>标题</label><input type="text" data-qfield="title" value="${esc(q.title)}"></div>
+    <div><label>难度</label><select data-qfield="difficulty">${['基础','中等','困难'].map(x=>`<option${q.difficulty===x?' selected':''}>${x}</option>`).join('')}</select></div>
+    <div><label>阶段</label><input type="text" data-qfield="stage" value="${esc(q.stage||'')}"></div>
+    <div><label>领域 / Domain</label><input type="text" data-qfield="domain" value="${esc(q.domain||'')}"></div>
+    <div><label>主题 / Topic</label><input type="text" data-qfield="topic" value="${esc(q.topic||'')}"></div>
+    <div class="span2"><label>标签（逗号分隔）</label><input type="text" data-qfield="tags" value="${esc((q.tags||[]).join(', '))}"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">中文题干</div>
+    <textarea id="stemZh" data-source="stem">${esc(questionStem(q))}</textarea>
+  </div>
+  <div class="section">
+    <div class="section-title">中文选项</div>
+    ${q.options.slice(0,4).map(o=>`<div class="option-row"><div class="option-letter">${o.id}</div><textarea class="textarea-sm" data-option="${o.id}" data-source="option">${esc(o.text)}</textarea><label class="tiny" style="margin-top:9px"><input type="radio" name="correctOption" value="${o.id}" ${q.correctAnswer===o.id?'checked':''}> 正确</label></div>`).join('')}
+  </div>
+  <div class="section">
+    <div class="section-title">中文解析</div>
+    <textarea id="analysisZh">${esc(q.analysis||'')}</textarea>
+  </div>
+  <div class="section">
+    <div class="section-title">原则 / 归纳卡关联</div>
+    <div id="questionPrincipleBindingPanel"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">知识点</div>
+    <label>主知识点（只保存稳定 Node ID）</label>
+    <select id="primaryNode">${treeOptions(q.metadata?.knowledge?.primaryNodeId||'')}</select>
+  </div>
+  <div class="section">
+    <div class="section-title">English</div>
+    <div class="form-grid">
+      <div class="span2"><label>English Title</label><input id="titleEn" type="text" value="${esc(en.title||'')}"></div>
+      <div class="span2"><label>English Stem</label><textarea id="stemEn">${esc(englishStem(q))}</textarea></div>
+      ${en.options.slice(0,4).map(o=>`<div class="span2"><label>${o.id}</label><input type="text" data-enoption="${o.id}" value="${esc(o.text)}"></div>`).join('')}
+      <div class="span2"><label>English Analysis</label><textarea id="analysisEn">${esc(en.analysis||'')}</textarea></div>
+    </div>
+  </div>`;
+  bindQuestionEditor();
+  renderQuestionPrincipleBindings();renderKeywords();renderPreview();renderCurrentIssues();
+}
+function bindQuestionEditor(){
+  const q=currentQuestion();if(!q)return;
+  document.querySelectorAll('[data-qfield]').forEach(el=>el.addEventListener('input',()=>{
+    const f=el.dataset.qfield,v=el.value,oldId=q.id;
+    if(f==='tags'){q.tags=unique(cleanList(v).map(canonicalTagName));q.metadata.tagPaths=q.tags.map(tagPathFor).filter(Boolean)}else q[f]=v;
+    if(f==='id'){
+      state.currentQuestionId=v;
+      document.getElementById('currentQuestionId').textContent=v;
+    }
+    state.questionBank.updatedAt=Date.now();
+    if(f==='title'||f==='id')renderQuestionListOnly();
+    renderCurrentIssues();
+  }));
+  const stem=document.getElementById('stemZh');stem.addEventListener('input',()=>{q.stemParts=[{text:stem.value}];recomputeKeywordLocations(q);renderKeywords();renderPreview();renderCurrentIssues()});bindSelection(stem,'stem','');
+  document.querySelectorAll('[data-option]').forEach(el=>{
+    el.addEventListener('input',()=>{const o=q.options.find(x=>x.id===el.dataset.option);if(o)o.text=el.value;recomputeKeywordLocations(q);renderKeywords();renderPreview();renderCurrentIssues()});
+    bindSelection(el,'option',el.dataset.option);
+  });
+  document.querySelectorAll('input[name=correctOption]').forEach(el=>el.addEventListener('change',()=>{q.correctAnswer=el.value;q.options.forEach(o=>o.correct=o.id===el.value);renderCurrentIssues()}));
+  document.getElementById('analysisZh').addEventListener('input',e=>{q.analysis=e.target.value;q.explanation=e.target.value;renderCurrentIssues()});
+  document.getElementById('primaryNode').addEventListener('change',e=>{setPrimaryKnowledge(q,e.target.value);renderKeywords();renderCurrentIssues()});
+  document.getElementById('titleEn').addEventListener('input',e=>q.translations.en.title=e.target.value);
+  document.getElementById('stemEn').addEventListener('input',e=>q.translations.en.stemParts=[{text:e.target.value}]);
+  document.querySelectorAll('[data-enoption]').forEach(el=>el.addEventListener('input',()=>{let o=q.translations.en.options.find(x=>x.id===el.dataset.enoption);if(!o){o={id:el.dataset.enoption,text:''};q.translations.en.options.push(o)}o.text=el.value}));
+  document.getElementById('analysisEn').addEventListener('input',e=>q.translations.en.analysis=e.target.value);
+}
+function setPrimaryKnowledge(q,nodeId){
+  const knowledge=q.metadata.knowledge=q.metadata.knowledge||{};
+  knowledge.primaryNodeId=nodeId||'';
+  knowledge.relatedNodeIds=Array.isArray(knowledge.relatedNodeIds)?knowledge.relatedNodeIds:[];
+  knowledge.mappingStatus=nodeId?'confirmed':'unmapped';
+  knowledge.pathSnapshot=nodeId&&state.knowledgeTree?state.knowledgeTree.pathFor(nodeId):[];
+  delete knowledge.taxonomyId;delete knowledge.taxonomyVersion;
+  q.clues.forEach(c=>c.conceptIds=nodeId?[nodeId]:[]);
+}
+function bindSelection(el,sourceType,optionId){
+  const capture=()=>{
+    const a=el.selectionStart,b=el.selectionEnd;
+    if(a!=null&&b!=null&&b>a){
+      state.lastSelection={sourceType,optionId,text:el.value.slice(a,b).trim(),start:a,end:b};
+      document.getElementById('selectionHint').textContent=state.lastSelection.text?`已选：“${state.lastSelection.text}”`:'先选中一个词/术语';
+    }
+  };
+  ['select','mouseup','keyup'].forEach(ev=>el.addEventListener(ev,capture));
+}
+function keywordLooksLikeWord(term){
+  term=String(term||'').trim();
+  if(!term)return {ok:false,msg:'关键词为空'};
+  if(/[，。！？；：\n\r]/.test(term))return {ok:false,msg:'关键词包含句子标点'};
+  if(/\s{2,}/.test(term))return {ok:false,msg:'关键词包含异常空格'};
+  if(term.length>14)return {ok:false,msg:'关键词过长，疑似半句话'};
+  return {ok:true,msg:''};
+}
+function addKeyword(level){
+  const q=currentQuestion(),sel=state.lastSelection;if(!q)return;
+  if(!sel?.text){toast('请先在题干或选项中选中一个词/术语');return}
+  const check=keywordLooksLikeWord(sel.text);if(!check.ok&&!confirm(check.msg+'。仍要添加吗？'))return;
+  if(q.clues.some(c=>c.text===sel.text&&c.sourceType===sel.sourceType&&String(c.sourceOptionId||'')===String(sel.optionId||''))){toast('该位置已存在此关键词');return}
+  const resolved=resolveRecall(sel.text);
+  const primary=q.metadata?.knowledge?.primaryNodeId||'';
+  q.clues.push({
+    id:uid('kw'),text:sel.text,textEn:'',type:level==='core'?'core-keyword':'recall-keyword',clueRole:'true',
+    keywordLevel:level,isCore:level==='core',solutionRole:level==='core'?'concept-anchor':'context',coreReason:'',
+    sourceType:sel.sourceType,sourceOptionId:sel.optionId||'',conceptIds:primary?[primary]:[],
+    explain:'',recallNodeId:resolved.unique?.id||'',recallEntryLabel:resolved.unique?.title||'',sourceMode:'prep-studio-keyword-v2',matchLocations:[]
+  });
+  recomputeKeywordLocations(q);state.lastSelection=null;document.getElementById('selectionHint').textContent='先在题干或选项中选中一个词/术语';
+  renderKeywords();renderPreview();renderCurrentIssues();
+}
+function recomputeKeywordLocations(q){
+  const stem=questionStem(q);
+  q.clues.forEach(c=>{
+    const locs=[],sc=countOccurrences(stem,c.text);if(sc)locs.push({field:'stem',optionId:'',count:sc});
+    q.options.forEach(o=>{const n=countOccurrences(o.text,c.text);if(n)locs.push({field:'option',optionId:o.id,count:n})});
+    c.matchLocations=locs;
+    const first=locs[0];if(first){c.sourceType=first.field;c.sourceOptionId=first.optionId||''}
+  });
+}
+function recallNodeOptions(selected){
+  return '<option value="">— 未关联 —</option>'+state.recallLibrary.nodes.slice().sort((a,b)=>a.title.localeCompare(b.title,'zh-CN')).map(n=>`<option value="${esc(n.id)}"${n.id===selected?' selected':''}>${esc(n.title)}${n.titleEn?' / '+esc(n.titleEn):''}</option>`).join('');
+}
+function renderKeywords(){
+  const q=currentQuestion(),box=document.getElementById('keywordList');if(!box)return;
+  if(!q){box.innerHTML='<div class="no-data">暂无题目</div>';document.getElementById('kwSummary').textContent='';return}
+  const normal=q.clues.filter(c=>c.keywordLevel!=='core').length,core=q.clues.filter(c=>c.keywordLevel==='core').length;
+  document.getElementById('kwSummary').textContent=`普通 ${normal} · 核心 ${core}`;
+  if(!q.clues.length){box.innerHTML='<div class="no-data">尚未标记关键词</div>';return}
+  box.innerHTML=q.clues.map((c,i)=>{
+    const level=c.keywordLevel==='core'?'core':'normal',resolved=c.recallNodeId&&recallIndex().byId.get(c.recallNodeId);
+    const location=(c.matchLocations||[]).map(x=>x.field==='stem'?'题干':`选项 ${x.optionId}`).join(' / ')||'未命中';
+    return `<div class="kw-card ${level}" data-kw="${esc(c.id)}">
+      <div class="kw-head">
+        <span class="kw-word">${esc(c.text)}</span>
+        <span class="pill ${level}">${level==='core'?'核心关键词':'普通关键词'}</span>
+        <span class="pill">${esc(location)}</span>
+        <span style="margin-left:auto"></span>
+        <button class="btn small danger" data-remove-kw="${esc(c.id)}">删除</button>
+      </div>
+      <div class="kw-grid">
+        <div><label>英文</label><input type="text" data-kwfield="textEn" data-kwid="${esc(c.id)}" value="${esc(c.textEn||'')}"></div>
+        <div><label>级别</label><select data-kwfield="keywordLevel" data-kwid="${esc(c.id)}"><option value="normal"${level==='normal'?' selected':''}>普通关键词</option><option value="core"${level==='core'?' selected':''}>核心关键词</option></select></div>
+        <div class="span2"><label>联想入口 ${resolved?'✓':'⚠'}</label><select data-kwfield="recallNodeId" data-kwid="${esc(c.id)}">${recallNodeOptions(c.recallNodeId)}</select></div>
+        ${level==='core'?`<div><label>解题作用</label><select data-kwfield="solutionRole" data-kwid="${esc(c.id)}">
+          ${[['decision-cue','Decision Cue / 决策提示'],['concept-anchor','Concept Anchor / 知识锚点'],['condition-anchor','Condition Anchor / 情境条件'],['answer-anchor','Answer Anchor / 答案判断']].map(([v,t])=>`<option value="${v}"${c.solutionRole===v?' selected':''}>${t}</option>`).join('')}
+        </select></div><div><label>核心理由</label><input type="text" data-kwfield="coreReason" data-kwid="${esc(c.id)}" value="${esc(c.coreReason||'')}" placeholder="为什么这个词影响本题推理？"></div>`:''}
+        <div class="span2 tiny muted">${resolved?`→ ${esc(resolved.title)}`:`未找到稳定联想入口。${esc(suggestionText(c.text))}`}</div>
+      </div>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('[data-remove-kw]').forEach(b=>b.onclick=()=>{q.clues=q.clues.filter(c=>c.id!==b.dataset.removeKw);renderKeywords();renderPreview();renderCurrentIssues()});
+  box.querySelectorAll('[data-kwfield]').forEach(el=>el.addEventListener('change',()=>updateKeywordField(el)));
+  box.querySelectorAll('input[data-kwfield]').forEach(el=>el.addEventListener('input',()=>updateKeywordField(el,false)));
+}
+function updateKeywordField(el,rerender=true){
+  const q=currentQuestion(),c=q?.clues.find(x=>x.id===el.dataset.kwid);if(!c)return;
+  const f=el.dataset.kwfield,v=el.value;
+  if(f==='keywordLevel'){
+    c.keywordLevel=v==='core'?'core':'normal';c.isCore=c.keywordLevel==='core';c.type=c.isCore?'core-keyword':'recall-keyword';
+    if(c.isCore&&!c.solutionRole)c.solutionRole='concept-anchor';if(!c.isCore){c.solutionRole='context';c.coreReason=''}
+  }else if(f==='recallNodeId'){
+    c.recallNodeId=v;const n=recallIndex().byId.get(v);c.recallEntryLabel=n?.title||'';
+  }else c[f]=v;
+  if(rerender){renderKeywords();renderPreview();renderCurrentIssues()}
+}
+function suggestionText(term){
+  const s=recallSuggestions(term);return s.length?' 建议检查：'+s.map(x=>x.title).join('、')+'；或把该词加入正确节点 Alias。':' 建议：创建新的语义联想入口，或把该词增加为现有节点 Alias。'
+}
+function markText(text,clues,field,optionId=''){
+  const spans=[];
+  clues.forEach(c=>{
+    const applies=(c.matchLocations||[]).some(x=>x.field===field&&(field!=='option'||String(x.optionId)===String(optionId)));
+    if(!applies)return;
+    let i=0;while((i=text.indexOf(c.text,i))>=0){spans.push({a:i,b:i+c.text.length,c});i+=Math.max(1,c.text.length)}
+  });
+  spans.sort((x,y)=>x.a-y.a||(y.b-y.a)-(x.b-x.a));
+  const picked=[];spans.forEach(s=>{if(!picked.some(p=>!(s.b<=p.a||s.a>=p.b)))picked.push(s)});
+  picked.sort((a,b)=>a.a-b.a);let cur=0,out='';
+  picked.forEach(s=>{out+=esc(text.slice(cur,s.a));out+=`<mark class="${s.c.keywordLevel==='core'?'core':'normal'}" data-kwid="${esc(s.c.id)}" title="${esc(s.c.recallEntryLabel||'未关联')}">${esc(text.slice(s.a,s.b))}</mark>`;cur=s.b});
+  return out+esc(text.slice(cur));
+}
+function renderPreview(){
+  const q=currentQuestion(),p=document.getElementById('questionPreview');if(!p)return;
+  if(!q){p.innerHTML='<div class="no-data">请导入或新建题目。</div>';return}
+  let html=`<div class="stem-view" data-preview-source="stem" data-preview-option="">${markText(questionStem(q),q.clues,'stem')}</div>`;
+  q.options.forEach(o=>{
+    html+=`<div class="option-view${q.correctAnswer===o.id?' correct':''}" data-preview-source="option" data-preview-option="${esc(o.id)}"><b>${esc(o.id)}.</b> ${markText(o.text,q.clues,'option',o.id)} ${q.correctAnswer===o.id?'<span class="pill">正确答案</span>':''}</div>`;
+  });
+  p.innerHTML=html;
+  bindInteractivePreview();
+}
+
+function hideKeywordFloat(){const box=document.getElementById('keywordFloat');if(box)box.classList.remove('show')}
+document.addEventListener('pointerdown',e=>{const edit=document.getElementById('keywordFloat');if(edit?.classList.contains('show')&&!edit.contains(e.target)&&!e.target.closest('mark[data-kwid]'))hideKeywordFloat()});
+function positionKeywordFloat(x,y){
+  const box=document.getElementById('keywordFloat');if(!box)return;
+  const w=420,h=340,left=Math.max(8,Math.min(window.innerWidth-w-8,x+8)),top=Math.max(8,Math.min(window.innerHeight-h-8,y+8));
+  box.style.left=left+'px';box.style.top=top+'px';box.classList.add('show');
+}
+function keywordMatchesSource(c,sourceType,optionId){
+  return (c.matchLocations||[]).some(x=>x.field===sourceType&&(sourceType!=='option'||String(x.optionId)===String(optionId||'')));
+}
+function showKeywordFloatEditor({clue=null,text='',sourceType='stem',optionId='',x=100,y=100}){
+  const q=currentQuestion(),box=document.getElementById('keywordFloat');if(!q||!box)return;
+  const existing=clue||q.clues.find(c=>c.text===text&&keywordMatchesSource(c,sourceType,optionId))||null;
+  const resolved=existing?.recallNodeId?recallIndex().byId.get(existing.recallNodeId):resolveRecall(text).unique;
+  const level=existing?.keywordLevel==='core'?'core':'normal';
+  const role=existing?.solutionRole||(level==='core'?'concept-anchor':'context');
+  box.innerHTML=`<div class="float-title"><span>${existing?'编辑关键词':'新增关键词'}：</span><span class="kw-word">${esc(existing?.text||text)}</span><span class="spacer"></span><button class="btn small" id="floatClose">×</button></div>
+  <div class="float-grid">
+    <div><label>级别</label><select id="floatLevel"><option value="normal"${level==='normal'?' selected':''}>普通关键词</option><option value="core"${level==='core'?' selected':''}>核心关键词</option></select></div>
+    <div><label>English</label><input id="floatTextEn" type="text" value="${esc(existing?.textEn||'')}"></div>
+    <div class="span2"><label>联想入口</label><select id="floatRecall">${recallNodeOptions(existing?.recallNodeId||resolved?.id||'')}</select></div>
+    <div id="floatCoreRoleWrap"${level==='core'?'':' class="hidden"'}><label>解题作用</label><select id="floatRole">
+      ${[['decision-cue','Decision Cue / 决策提示'],['concept-anchor','Concept Anchor / 知识锚点'],['condition-anchor','Condition Anchor / 情境条件'],['answer-anchor','Answer Anchor / 答案判断']].map(([v,t])=>`<option value="${v}"${role===v?' selected':''}>${t}</option>`).join('')}
+    </select></div>
+    <div id="floatCoreReasonWrap"${level==='core'?'':' class="hidden"'}><label>核心理由</label><input id="floatReason" type="text" value="${esc(existing?.coreReason||'')}" placeholder="为什么这个词影响解题？"></div>
+  </div>
+  <div class="toolbar" style="margin-top:9px"><button class="btn primary" id="floatSave">保存</button>${existing?'<button class="btn danger" id="floatDelete">删除关键词</button>':''}<span class="muted tiny">${resolved?'自动命中：'+esc(resolved.title):esc(suggestionText(text))}</span></div>`;
+  positionKeywordFloat(x,y);
+  document.getElementById('floatClose').onclick=hideKeywordFloat;
+  document.getElementById('floatLevel').onchange=e=>{
+    const core=e.target.value==='core';
+    document.getElementById('floatCoreRoleWrap').classList.toggle('hidden',!core);
+    document.getElementById('floatCoreReasonWrap').classList.toggle('hidden',!core);
+  };
+  document.getElementById('floatSave').onclick=()=>{
+    const selectedLevel=document.getElementById('floatLevel').value==='core'?'core':'normal';
+    let c=existing;
+    if(!c){
+      const check=keywordLooksLikeWord(text);if(!check.ok&&!confirm(check.msg+'。仍要添加吗？'))return;
+      c={id:uid('kw'),text:String(text).trim(),textEn:'',type:'recall-keyword',clueRole:'true',keywordLevel:'normal',isCore:false,solutionRole:'context',coreReason:'',
+        sourceType,sourceOptionId:optionId||'',conceptIds:[],explain:'',recallNodeId:'',recallEntryLabel:'',sourceMode:'prep-studio-keyword-v2',matchLocations:[]};
+      q.clues.push(c);
+    }
+    c.textEn=document.getElementById('floatTextEn').value;
+    c.keywordLevel=selectedLevel;c.isCore=selectedLevel==='core';c.type=c.isCore?'core-keyword':'recall-keyword';
+    c.solutionRole=c.isCore?document.getElementById('floatRole').value:'context';
+    c.coreReason=c.isCore?document.getElementById('floatReason').value:'';
+    c.recallNodeId=document.getElementById('floatRecall').value;
+    const rn=recallIndex().byId.get(c.recallNodeId);c.recallEntryLabel=rn?.title||'';
+    c.sourceType=sourceType||c.sourceType;c.sourceOptionId=optionId||c.sourceOptionId||'';
+    const primary=q.metadata?.knowledge?.primaryNodeId||'';c.conceptIds=primary?[primary]:[];
+    recomputeKeywordLocations(q);hideKeywordFloat();renderKeywords();renderPreview();renderCurrentIssues();
+  };
+  if(existing)document.getElementById('floatDelete').onclick=()=>{q.clues=q.clues.filter(c=>c.id!==existing.id);hideKeywordFloat();renderKeywords();renderPreview();renderCurrentIssues()};
+}
+function bindInteractivePreview(){
+  const p=document.getElementById('questionPreview');if(!p)return;
+  p.querySelectorAll('mark[data-kwid]').forEach(el=>el.addEventListener('click',e=>{
+    e.preventDefault();e.stopPropagation();const q=currentQuestion(),c=q?.clues.find(x=>x.id===el.dataset.kwid);if(c)showKeywordFloatEditor({clue:c,text:c.text,sourceType:c.sourceType,optionId:c.sourceOptionId,x:e.clientX,y:e.clientY});
+  }));
+  p.addEventListener('mouseup',e=>{
+    if(e.target.closest('mark[data-kwid]'))return;
+    const source=e.target.closest('[data-preview-source]');if(!source)return;
+    const sel=window.getSelection();const text=String(sel?.toString()||'').trim();if(!text)return;
+    state.lastSelection={sourceType:source.dataset.previewSource,optionId:source.dataset.previewOption||'',text};
+    showKeywordFloatEditor({text,sourceType:source.dataset.previewSource,optionId:source.dataset.previewOption||'',x:e.clientX,y:e.clientY});
+  });
+}
+
+function buildMarkedParts(text,clues){
+  const spans=[];
+  clues.filter(c=>(c.matchLocations||[]).some(x=>x.field==='stem')).forEach(c=>{
+    let i=0;while((i=text.indexOf(c.text,i))>=0){spans.push({a:i,b:i+c.text.length,id:c.id});i+=Math.max(1,c.text.length)}
+  });
+  spans.sort((x,y)=>x.a-y.a||(y.b-y.a)-(x.b-x.a));const picked=[];spans.forEach(s=>{if(!picked.some(p=>!(s.b<=p.a||s.a>=p.b)))picked.push(s)});
+  picked.sort((a,b)=>a.a-b.a);const parts=[];let cur=0;picked.forEach(s=>{if(s.a>cur)parts.push({text:text.slice(cur,s.a)});parts.push({text:text.slice(s.a,s.b),clue:s.id});cur=s.b});if(cur<text.length)parts.push({text:text.slice(cur)});return parts.length?parts:[{text}];
+}
+
+function validateKeyword(q,c){
+  const issues=[],word=keywordLooksLikeWord(c.text);
+  if(!word.ok)issues.push({level:'warn',message:`关键词“${c.text}”：${word.msg}`,suggest:'缩短为词或稳定专业术语。'});
+  if(!(c.matchLocations||[]).length)issues.push({level:'error',message:`关键词“${c.text}”已不在题干/选项中`,suggest:'重新标记或删除该关键词。'});
+  if(!c.recallNodeId||!recallIndex().byId.has(c.recallNodeId))issues.push({level:c.keywordLevel==='core'?'error':'warn',message:`关键词“${c.text}”没有有效联想入口`,suggest:suggestionText(c.text)});
+  if(c.keywordLevel==='core'){
+    if(!c.solutionRole||c.solutionRole==='context')issues.push({level:'error',message:`核心关键词“${c.text}”缺少解题作用`,suggest:'选择 Decision Cue / Concept Anchor / Condition Anchor / Answer Anchor。'});
+    if(!String(c.coreReason||'').trim())issues.push({level:'error',message:`核心关键词“${c.text}”缺少核心理由`,suggest:'说明这个词为什么影响本题推理或答案选择。'});
+  }
+  return issues;
+}
+function validateQuestion(q,deep=true){
+  const issues=[],id=q.id||'未命名';
+  const push=(level,message,suggest='')=>issues.push({level,object:id,message,suggest});
+  if(!String(q.title||'').trim())push('error','缺少题目标题','填写 title。');
+  if(!String(questionStem(q)||'').trim())push('error','缺少中文题干','填写题干。');
+  if(!Array.isArray(q.options)||q.options.length<4||q.options.slice(0,4).some(o=>!String(o.text||'').trim()))push('error','A/B/C/D 选项不完整','补齐四个选项。');
+  if(!q.options.some(o=>o.id===q.correctAnswer))push('error','正确答案无效','从 A/B/C/D 选择正确答案。');
+  if(!String(q.analysis||'').trim())push('error','缺少中文解析','填写 analysis。');
+  const en=q.translations?.en||{};
+  if(!String(englishStem(q)||'').trim())push('warn','缺少英文题干','若要双语题库，请补齐 English Stem。');
+  if((en.options||[]).length<4||(en.options||[]).slice(0,4).some(o=>!String(o.text||'').trim()))push('warn','英文选项不完整','补齐英文 A/B/C/D。');
+  if(!String(en.analysis||'').trim())push('warn','缺少英文解析','补齐 English Analysis。');
+  const primary=q.metadata?.knowledge?.primaryNodeId||'';
+  if(!primary)push('error','未关联主知识点','从知识树选择 primaryNodeId。');
+  else if(state.knowledgeTree&&!state.knowledgeTree.map.has(primary))push('error',`主知识点 ${primary} 不在已加载知识树中`,'重新选择当前知识树节点。');
+  const normal=q.clues.filter(c=>c.keywordLevel!=='core').length,core=q.clues.filter(c=>c.keywordLevel==='core').length;
+  if(!q.clues.length)push('error','没有关键词','至少标记普通关键词和核心关键词。');
+  if(core===0)push('error','没有核心关键词','核心关键词用于未来做题大厅的解题提示。');
+  if(core>6)push('warn',`核心关键词 ${core} 个，可能过多`,'建议保留 2～5 个真正影响解题的词。');
+  if(core===1)push('warn','只有 1 个核心关键词','通常建议 2～5 个。');
+  if(normal===0)push('warn','没有普通关键词','建议补充知识回忆类词汇。');
+  if(deep)q.clues.forEach(c=>validateKeyword(q,c).forEach(x=>push(x.level,x.message,x.suggest)));
+  return issues;
+}
+function renderCurrentIssues(){
+  const q=currentQuestion(),box=document.getElementById('questionIssues');if(!box)return;
+  if(!q){box.innerHTML='';return}
+  const issues=validateQuestion(q,true);
+  if(!issues.length){box.innerHTML='<div class="issue ok"><strong>✓ 当前题通过</strong>结构、知识点、关键词和核心关键词规则均通过。</div>';return}
+  box.innerHTML=issues.slice(0,12).map(x=>`<div class="issue ${x.level}"><strong>${x.level==='error'?'错误':'提醒'}：${esc(x.message)}</strong><span class="smalltxt">${esc(x.suggest||'')}</span></div>`).join('');
+}
+
+function newPrinciple(){
+  const item={id:'principle-'+Date.now().toString(36),name:'新原则',status:'active',confusablePrincipleIds:[],createdAt:Date.now(),updatedAt:Date.now()};
+  state.principles.items.push(item);state.currentPrincipleId=item.id;renderPrincipleList();renderPrincipleEditor();renderQuestions();
+}
+function renderPrincipleList(){
+  const box=document.getElementById('principleList');if(!box)return;if(!state.currentPrincipleId&&state.principles.items[0])state.currentPrincipleId=state.principles.items[0].id;
+  box.innerHTML=state.principles.items.length?state.principles.items.map(p=>`<div class="manager-row${p.id===state.currentPrincipleId?' active':''}" data-principle-id="${esc(p.id)}"><b>${esc(p.name)}</b><div class="muted tiny">${esc(p.id)} · ${esc(p.status)}</div></div>`).join(''):'<div class="no-data">暂无原则</div>';
+  box.querySelectorAll('[data-principle-id]').forEach(el=>el.onclick=()=>{state.currentPrincipleId=el.dataset.principleId;renderPrincipleList();renderPrincipleEditor()});
+}
+function renderPrincipleEditor(){
+  const box=document.getElementById('principleEditor');if(!box)return;const p=principleById(state.currentPrincipleId);if(!p){box.innerHTML='<div class="no-data">请选择或新建原则。</div>';return}let preset=presetByPrincipleId(p.id);
+  box.innerHTML=`<div class="form-grid"><div><label>原则 ID</label><input type="text" value="${esc(p.id)}" disabled></div><div><label>状态</label><select id="pmPrincipleStatus"><option value="active"${p.status==='active'?' selected':''}>active</option><option value="inactive"${p.status==='inactive'?' selected':''}>inactive</option></select></div><div class="span2"><label>原则名称</label><input id="pmPrincipleName" type="text" value="${esc(p.name)}"></div><div class="span2"><label>易混淆原则 IDs</label><input id="pmConfusable" type="text" value="${esc((p.confusablePrincipleIds||[]).join(', '))}"></div></div>
+  <div class="section"><div class="section-title">系统预设归纳卡</div><div class="form-grid"><div class="span2"><label>标题</label><input id="pmPresetTitle" type="text" value="${esc(preset?.title||('原则：'+p.name))}"></div><div class="span2"><label>内容</label><textarea id="pmPresetContent">${esc(preset?.content||'')}</textarea></div><div><label>状态</label><select id="pmPresetStatus"><option value="draft"${preset?.status==='draft'||!preset?' selected':''}>draft</option><option value="active"${preset?.status==='active'?' selected':''}>active</option><option value="inactive"${preset?.status==='inactive'?' selected':''}>inactive</option></select></div><div><label>版本</label><input id="pmPresetVersion" type="number" min="1" value="${preset?.version||1}"></div></div></div>
+  <div class="section toolbar"><button class="btn primary" id="pmSave">保存原则与归纳卡</button><button class="btn danger" id="pmDelete">删除原则</button></div>`;
+  document.getElementById('pmSave').onclick=()=>{p.name=document.getElementById('pmPrincipleName').value.trim()||'未命名原则';p.status=document.getElementById('pmPrincipleStatus').value;p.confusablePrincipleIds=unique(cleanList(document.getElementById('pmConfusable').value));p.updatedAt=Date.now();const title=document.getElementById('pmPresetTitle').value.trim(),content=document.getElementById('pmPresetContent').value.trim(),status=document.getElementById('pmPresetStatus').value,version=Math.max(1,Number(document.getElementById('pmPresetVersion').value||1));preset=preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()};Object.assign(preset,{principleId:p.id,title,content,status,version,updatedAt:Date.now()});const idx=state.synthesisPresets.items.findIndex(x=>x.id===preset.id);if(idx>=0)state.synthesisPresets.items[idx]=preset;else state.synthesisPresets.items.push(preset);renderPrincipleList();renderPrincipleEditor();renderQuestions();toast('原则与归纳卡已保存')};
+  document.getElementById('pmDelete').onclick=()=>{if(!confirm('删除该原则及其归纳卡？题目中的旧原则 ID 会在校验中心提示。'))return;state.principles.items=state.principles.items.filter(x=>x.id!==p.id);state.synthesisPresets.items=state.synthesisPresets.items.filter(x=>x.principleId!==p.id);state.currentPrincipleId=state.principles.items[0]?.id||'';renderPrincipleList();renderPrincipleEditor();renderQuestions()};
+}
+function tagAliasesForSlot(slot){return unique(cleanList(state.tagConfig?.slotAliases?.[slot]||[]))}
+function exportTagConfig(){
+  syncFlatTagAliases(state.tagConfig);
+  const names={};Object.entries(state.tagConfig.names||{}).forEach(([slot,value])=>names[formalTagSlot(slot)]=value);
+  return {names,groupNames:{...(state.tagConfig.groupNames||{})},categoryNames:{...(state.tagConfig.categoryNames||{})},aliases:{...(state.tagConfig.aliases||{})}};
+}
+function renderTagManager(){
+  const box=document.getElementById('tagManager');if(!box)return;
+  box.innerHTML=effectiveTagGroups().map(g=>`<div class="tag-group-card"><div class="tag-group-head"><label>一级分类</label><input type="text" data-tag-group="${esc(g.id)}" value="${esc(g.label)}"></div>${g.categories.map(c=>`<div class="tag-category"><div class="tag-category-title"><label>二级分类</label><input type="text" data-tag-category="${esc(g.id+'/'+c.id)}" value="${esc(c.label)}"></div>${c.options.map((name,oi)=>{const slot=tagSlotKey(g,c,oi),aliases=tagAliasesForSlot(slot);return `<div class="tag-slot"><span class="muted tiny">${esc(slot)}</span><div><input type="text" data-tag-name="${esc(slot)}" value="${esc(name)}"><div class="tag-alias-help">修改标签名不会自动把旧名称加入 Alias。</div></div><div><input type="text" data-tag-aliases="${esc(slot)}" value="${esc(aliases.join(', '))}" placeholder="兼容别名，逗号分隔"><div class="tag-alias-status" data-tag-alias-status="${esc(slot)}">${aliases.length?`已保存 ${aliases.length} 个别名`:'无别名'}</div></div></div>`}).join('')}</div>`).join('')}</div>`).join('');
+  box.querySelectorAll('[data-tag-group]').forEach(el=>el.addEventListener('change',()=>{state.tagConfig.groupNames[el.dataset.tagGroup]=el.value.trim();refreshQuestionTagPaths();renderTagManager()}));
+  box.querySelectorAll('[data-tag-category]').forEach(el=>el.addEventListener('change',()=>{state.tagConfig.categoryNames[el.dataset.tagCategory]=el.value.trim();refreshQuestionTagPaths();renderTagManager()}));
+  box.querySelectorAll('[data-tag-name]').forEach(el=>el.addEventListener('change',()=>{
+    const slot=el.dataset.tagName,next=el.value.trim(),oldLabel=tagCatalogEntries().find(x=>x.slot===slot)?.label||'';
+    if(!next){renderTagManager();return}
+    state.tagConfig.names[slot]=next;
+    if(oldLabel&&oldLabel!==next)state.questionBank.questions.forEach(q=>q.tags=unique((q.tags||[]).map(t=>t===oldLabel?next:t)));
+    syncFlatTagAliases(state.tagConfig);refreshQuestionTagPaths();renderTagManager();renderQuestions()
+  }));
+  box.querySelectorAll('[data-tag-aliases]').forEach(el=>el.addEventListener('change',()=>{const slot=el.dataset.tagAliases,current=tagCatalogEntries().find(x=>x.slot===slot)?.label||'';state.tagConfig.slotAliases=state.tagConfig.slotAliases||{};state.tagConfig.slotAliases[slot]=unique(cleanList(el.value)).filter(a=>a&&a!==current);syncFlatTagAliases(state.tagConfig);refreshQuestionTagPaths();const status=box.querySelector(`[data-tag-alias-status="${CSS.escape(slot)}"]`);if(status)status.textContent=state.tagConfig.slotAliases[slot].length?`已保存 ${state.tagConfig.slotAliases[slot].length} 个别名`:'无别名';el.value=state.tagConfig.slotAliases[slot].join(', ')}));
+}
+
+function newRecallNode(){
+  const n={id:uid('recall'),title:'新联想节点',titleEn:'',aliases:[],prompt:'',promptEn:'',hint:'',hintEn:'',priority:0,metadata:{taxonomyNodeId:'',status:'active',source:'prep-studio'}};
+  state.recallLibrary.nodes.push(n);state.currentRecallId=n.id;renderRecallList();renderRecallEditor();toast('已新建联想节点');
+}
+function aliasConflicts(){
+  const map=new Map();
+  state.recallLibrary.nodes.forEach(n=>[n.title,...(n.aliases||[])].filter(Boolean).forEach(t=>{
+    if(!map.has(t))map.set(t,[]);
+    const rows=map.get(t);
+    if(!rows.some(item=>item.id===n.id))rows.push(n);
+  }));
+  return [...map.entries()].filter(([,a])=>a.length>1).map(([term,nodes])=>({term,nodes}));
+}
+function renderRecallList(){
+  const search=String(document.getElementById('recallSearch')?.value||'').trim().toLowerCase();
+  const list=document.getElementById('recallNodeList');if(!list)return;
+  const rows=state.recallLibrary.nodes.filter(n=>!search||[n.id,n.title,n.titleEn,...(n.aliases||[])].join(' ').toLowerCase().includes(search)).sort((a,b)=>b.priority-a.priority||a.title.localeCompare(b.title,'zh-CN'));
+  list.innerHTML=rows.length?rows.map(n=>`<div class="list-item${n.id===state.currentRecallId?' active':''}" data-recall="${esc(n.id)}"><div class="list-title">${esc(n.title)}</div><div class="list-meta">${esc(n.id)} · Alias ${(n.aliases||[]).length} · Priority ${n.priority}</div></div>`).join(''):'<div class="no-data">没有匹配节点</div>';
+  list.querySelectorAll('[data-recall]').forEach(el=>el.onclick=()=>{state.currentRecallId=el.dataset.recall;state.recallPreviewCandidateId='';renderRecallList();renderRecallEditor()});
+  const conflicts=aliasConflicts();document.getElementById('aliasConflictSummary').textContent=conflicts.length?`⚠ ${conflicts.length} 个名称/Alias 冲突`:'✓ 无名称/Alias 冲突';
+}
+
+function recallPreviewHtml(n){
+  const taxId=n.metadata?.taxonomyNodeId||'',tax=taxId&&state.knowledgeTree?.map.get(taxId),parent=tax?.parentId?state.knowledgeTree?.map.get(tax.parentId):null;
+  const children=tax?state.knowledgeTree.nodes.filter(x=>x.parentId===tax.id).slice(0,7):[],incoming=state.recallLibrary.edges.filter(e=>e.to===n.id),byId=recallIndex().byId;
+  const path=tax?state.knowledgeTree.pathFor(tax.id).join(' > '):'未关联知识点',aliases=unique([n.title,...(n.aliases||[])]).slice(0,7);
+  const selectedId=state.recallPreviewCandidateId||'';
+  const taxNode=(node,extra='')=>node?`<button class="relation-node ${extra}${selectedId===node.id?' selected':''}" data-tax-preview-id="${esc(node.id)}"><b>${esc(state.knowledgeTree.title(node))}</b><small>${esc(node.id)}</small></button>`:`<div class="relation-node mini muted">无</div>`;
+  const childHtml=children.length?children.map(c=>taxNode(c,'mini')).join(''):'<div class="relation-node mini muted">暂无下位知识点</div>';
+  const incomingHtml=incoming.length?incoming.map(e=>{const x=byId.get(e.from);return x?`<button class="chip-btn" data-preview-recall-id="${esc(x.id)}">${esc(x.title)}${e.label?' · '+esc(e.label):''}</button>`:''}).join(''):'<span class="muted">暂无反向联想</span>';
+  const selected=selectedId&&state.knowledgeTree?.map.get(selectedId);
+  return `<div class="relation-map"><div class="relation-breadcrumb">${esc(path)}</div><div class="relation-top">
+    <div class="relation-col"><div class="relation-title">上位概念</div>${taxNode(parent)}</div><div class="relation-arrow"></div>
+    <div class="relation-col"><div class="relation-title">当前联想词</div><div class="relation-node current"><b>${esc(n.title)}</b>${aliases.map(x=>`<small>${esc(x)}</small>`).join('')}</div></div><div class="relation-arrow"></div>
+    <div class="relation-col"><div class="relation-title">下位知识点</div>${childHtml}</div></div>
+    <div class="relation-bottom"><div class="relation-title" style="text-align:left">被哪些节点联想</div><div class="relation-bottom-box">${incomingHtml}</div></div>
+    ${selected?`<div class="relation-selection"><b>当前仅预览：</b>${esc(state.knowledgeTree.title(selected))}<div class="muted tiny">${esc(state.knowledgeTree.pathFor(selected.id).join(' > '))}</div><div class="relation-selection-actions"><button class="btn primary small" id="btnBindRecallCandidate">将“${esc(n.title)}”绑定到此知识点</button><button class="btn small" id="btnCancelRecallCandidate">取消选择</button></div></div>`:''}
+    <div class="synonym-note">上位/下位知识点现在采用<b>“点击预览、明确按钮才改绑”</b>。普通点击不会修改数据；只有点击“绑定到此知识点”才会改变当前联想词的 <code>metadata.taxonomyNodeId</code>。</div></div>`;
+}
+function bindRecallPreview(n){
+  document.querySelectorAll('[data-preview-recall-id]').forEach(b=>b.onclick=()=>{state.currentRecallId=b.dataset.previewRecallId;state.recallPreviewCandidateId='';renderRecallList();renderRecallEditor()});
+  document.querySelectorAll('[data-tax-preview-id]').forEach(b=>b.onclick=()=>{state.recallPreviewCandidateId=b.dataset.taxPreviewId;renderRecallEditor()});
+  const bind=document.getElementById('btnBindRecallCandidate');if(bind)bind.onclick=()=>{const id=state.recallPreviewCandidateId,node=state.knowledgeTree?.map.get(id);if(!node)return;n.metadata=n.metadata||{};n.metadata.taxonomyNodeId=id;state.recallPreviewCandidateId='';renderRecallEditor();renderRecallList();toast(`已绑定到：${state.knowledgeTree.title(node)}`)};
+  const cancel=document.getElementById('btnCancelRecallCandidate');if(cancel)cancel.onclick=()=>{state.recallPreviewCandidateId='';renderRecallEditor()};
+}
+
+function renderRecallEditor(){
+  const n=currentRecall(),ed=document.getElementById('recallEditor');document.getElementById('currentRecallId').textContent=n?.id||'';
+  if(!n){ed.innerHTML='<div class="no-data">请选择或新建联想节点。</div>';return}
+  const outgoing=state.recallLibrary.edges.filter(e=>e.from===n.id);
+  ed.innerHTML=`
+  ${recallPreviewHtml(n)}
+  <div class="node-editor">
+    <div><label>ID</label><input type="text" value="${esc(n.id)}" disabled></div>
+    <div><label>Priority</label><input type="number" data-rfield="priority" value="${n.priority||0}"></div>
+    <div><label>中文名称</label><input type="text" data-rfield="title" value="${esc(n.title)}"></div>
+    <div><label>English</label><input type="text" data-rfield="titleEn" value="${esc(n.titleEn||'')}"></div>
+    <div class="span2"><label>Aliases / 同义词 / 旧译名（每行一个或逗号分隔）</label>
+    <div class="synonym-note">示例：规范词“相关方”；Aliases：利益相关方、干系人、Stakeholder、Stakeholders。所有译名应指向同一个联想节点。</div><textarea data-rfield="aliases">${esc((n.aliases||[]).join('\n'))}</textarea></div>
+    <div class="span2"><label>关联知识点 Node ID</label><select id="recallTaxonomyNode">${treeOptions(n.metadata?.taxonomyNodeId||'')}</select></div>
+    <div><label>Prompt</label><textarea data-rfield="prompt">${esc(n.prompt||'')}</textarea></div>
+    <div><label>Prompt EN</label><textarea data-rfield="promptEn">${esc(n.promptEn||'')}</textarea></div>
+    <div><label>Hint</label><textarea data-rfield="hint">${esc(n.hint||'')}</textarea></div>
+    <div><label>Hint EN</label><textarea data-rfield="hintEn">${esc(n.hintEn||'')}</textarea></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><span>从本节点出发的关系</span><button class="btn small" id="btnAddEdge">+ 关系</button></div>
+    <div id="edgeList">${outgoing.length?outgoing.map(e=>edgeRowHtml(e)).join(''):'<div class="muted smalltxt">暂无关系</div>'}</div>
+  </div>
+  <div class="section toolbar"><button class="btn danger" id="btnDeleteRecall">删除联想节点</button></div>`;
+  bindRecallPreview(n);
+  ed.querySelectorAll('[data-rfield]').forEach(el=>{
+    el.addEventListener('input',()=>{
+      const f=el.dataset.rfield;if(f==='aliases')n.aliases=unique(cleanList(el.value));else if(f==='priority')n.priority=Number(el.value||0);else n[f]=el.value;
+      state.recallLibrary.updatedAt=nowIso();renderRecallList();
+    });
+    el.addEventListener('change',()=>renderRecallEditor());
+  });
+  document.getElementById('recallTaxonomyNode').onchange=e=>{n.metadata=n.metadata||{};n.metadata.taxonomyNodeId=e.target.value};
+  document.getElementById('btnAddEdge').onclick=()=>{state.recallLibrary.edges.push({id:uid('edge'),from:n.id,to:state.recallLibrary.nodes.find(x=>x.id!==n.id)?.id||'',priority:0,label:'关联',metadata:{source:'prep-studio'}});renderRecallEditor()};
+  ed.querySelectorAll('[data-edgefield]').forEach(el=>el.addEventListener('change',()=>updateEdge(el)));
+  ed.querySelectorAll('[data-remove-edge]').forEach(el=>el.onclick=()=>{state.recallLibrary.edges=state.recallLibrary.edges.filter(e=>e.id!==el.dataset.removeEdge);renderRecallEditor()});
+  document.getElementById('btnDeleteRecall').onclick=()=>{if(!confirm('删除该联想节点及其全部关系？'))return;state.recallLibrary.nodes=state.recallLibrary.nodes.filter(x=>x.id!==n.id);state.recallLibrary.edges=state.recallLibrary.edges.filter(e=>e.from!==n.id&&e.to!==n.id);state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';renderRecallList();renderRecallEditor();renderKeywords()};
+}
+function edgeRowHtml(e){
+  const opts=state.recallLibrary.nodes.filter(n=>n.id!==e.from).map(n=>`<option value="${esc(n.id)}"${n.id===e.to?' selected':''}>${esc(n.title)}</option>`).join('');
+  return `<div class="edge-row"><select data-edgefield="to" data-edgeid="${esc(e.id)}">${opts}</select><input type="text" data-edgefield="label" data-edgeid="${esc(e.id)}" value="${esc(e.label||'关联')}"><input type="number" data-edgefield="priority" data-edgeid="${esc(e.id)}" value="${e.priority||0}"><button class="btn small danger" data-remove-edge="${esc(e.id)}">×</button></div>`;
+}
+function updateEdge(el){
+  const e=state.recallLibrary.edges.find(x=>x.id===el.dataset.edgeid);if(!e)return;e[el.dataset.edgefield]=el.dataset.edgefield==='priority'?Number(el.value||0):el.value;
+}
+
+function exportableQuestion(q){
+  const out=clone(q),primary=out.metadata?.knowledge?.primaryNodeId||'';
+  registerQuestionId(out.id);out.contentHash=computeQuestionContentHash(out);
+  recomputeKeywordLocations(out);
+  out.stemParts=buildMarkedParts(questionStem(out),out.clues);
+  out.metadata=out.metadata||{};out.metadata.knowledge=out.metadata.knowledge||{};
+  delete out.metadata.knowledge.taxonomyId;delete out.metadata.knowledge.taxonomyVersion;
+  out.metadata.knowledge.primaryNodeId=primary;
+  out.metadata.knowledge.mappingStatus=primary?'confirmed':'unmapped';
+  if(primary&&state.knowledgeTree)out.metadata.knowledge.pathSnapshot=state.knowledgeTree.pathFor(primary);
+  syncQuestionPrinciples(out);out.tags=unique((out.tags||[]).map(canonicalTagName));out.metadata.tagPaths=out.tags.map(tagPathFor).filter(Boolean);
+  out.metadata.translationStatus=(englishStem(out)&&out.translations?.en?.analysis)?'bilingual':'zh_only';
+  out.metadata.keywordSystemV2={
+    schemaVersion:2,
+    name:KEYWORD_SCHEMA,
+    keywords:out.clues.map(c=>({
+      clueId:c.id,text:c.text,textEn:c.textEn||'',keywordLevel:c.keywordLevel||'normal',isCore:c.keywordLevel==='core',
+      solutionRole:c.keywordLevel==='core'?(c.solutionRole||'concept-anchor'):'context',
+      coreReason:c.keywordLevel==='core'?(c.coreReason||''):'',
+      recallNodeId:c.recallNodeId||'',recallEntryLabel:c.recallEntryLabel||''
+    }))
+  };
+  out.clues=out.clues.map(c=>({
+    ...c,
+    keywordLevel:c.keywordLevel||'normal',isCore:c.keywordLevel==='core',
+    type:c.keywordLevel==='core'?'core-keyword':'recall-keyword',
+    solutionRole:c.keywordLevel==='core'?(c.solutionRole||'concept-anchor'):'context',
+    coreReason:c.keywordLevel==='core'?(c.coreReason||''):'',
+    sourceMode:'prep-studio-keyword-v2',
+    conceptIds:primary?[primary]:[]
+  }));
+  const coreIds=out.clues.filter(c=>c.keywordLevel==='core').map(c=>c.id);
+  out.keyPath=out.keyPath&&typeof out.keyPath==='object'?out.keyPath:{};
+  out.keyPath.clueIds=coreIds;
+  out.keyPath.conceptIds=primary?[primary]:[];
+  out.keyPath.primaryConceptId=primary;
+  out.keyPath.ruleConceptId=primary;
+  out.keyPath.answerId=out.correctAnswer;
+  out.analysis=String(out.analysis||out.explanation||'');out.explanation=out.analysis;
+  out.status=out.status||{};
+  out.status.contentReady=!!(questionStem(out)&&out.options.every(o=>o.text)&&out.analysis);
+  out.status.keywordsReady=!!(out.clues.length&&out.clues.every(c=>c.recallNodeId));
+  out.status.knowledgeReady=!!primary;
+  out.status.reasoningReady=!!(out.reasoningSteps||[]).length;
+  return out;
+}
+function exportableBank(){
+  const b=clone(state.questionBank);b.updatedAt=Date.now();b.questions=state.questionBank.questions.map(QuestionService.prepareForExport);
+  b.programCompatibility={...(b.programCompatibility||{}),prepStudioVersion:VERSION,architecture:'service-layer-v1',keywordSystem:'Question Keyword System v2',knowledgeBindingStrategy:'current-default-taxonomy-by-subject'};
+  return b;
+}
+function demoKeywordMarkedText(text,q,field,optionId=''){
+  const spans=[];q.clues.forEach(c=>{const applies=(c.matchLocations||[]).some(x=>x.field===field&&(field!=='option'||String(x.optionId)===String(optionId)));if(!applies)return;let i=0;while((i=text.indexOf(c.text,i))>=0){spans.push({a:i,b:i+c.text.length,c});i+=Math.max(1,c.text.length)}});
+  spans.sort((a,b)=>a.a-b.a||((b.b-b.a)-(a.b-a.a)));const picked=[];spans.forEach(s=>{if(!picked.some(p=>!(s.b<=p.a||s.a>=p.b)))picked.push(s)});picked.sort((a,b)=>a.a-b.a);let out='',cur=0;picked.forEach(s=>{out+=esc(text.slice(cur,s.a));out+=`<span class="demo-keyword ${s.c.keywordLevel==='core'?'core':''}" data-demo-clue="${esc(s.c.id)}">${esc(text.slice(s.a,s.b))}</span>`;cur=s.b});return out+esc(text.slice(cur));
+}
+function recallLayers(startId,maxDepth=4){
+  const byId=recallIndex().byId;if(!byId.has(startId))return [];const layers=[[byId.get(startId)]],seen=new Set([startId]);let frontier=[startId];
+  for(let d=1;d<maxDepth;d++){const next=[];state.recallLibrary.edges.forEach(e=>{if(frontier.includes(e.from)&&!seen.has(e.to)&&byId.has(e.to)){seen.add(e.to);next.push(e.to)}});if(!next.length)break;layers.push(next.map(id=>byId.get(id)));frontier=next}return layers;
+}
+function renderDemoRecall(clue){
+  const box=document.getElementById('demoRecallResult');if(!box)return;
+  if(!clue?.recallNodeId){box.innerHTML=`<div class="issue error"><strong>${esc(clue?.text||'关键词')} 无有效 recallNodeId</strong></div>`;return}
+  const layers=recallLayers(clue.recallNodeId,4);if(!layers.length){box.innerHTML=`<div class="issue error"><strong>联想入口不存在：${esc(clue.recallNodeId)}</strong></div>`;return}
+  const knowledge=layers[0][0]?.metadata?.taxonomyNodeId||'',path=knowledge&&state.knowledgeTree?.map.has(knowledge)?state.knowledgeTree.pathFor(knowledge).join(' > '):'未绑定知识树节点';
+  box.innerHTML=`<div><b>关键词：</b>${esc(clue.text)} ${clue.keywordLevel==='core'?'<span class="pill core">核心</span>':'<span class="pill normal">普通</span>'}</div><div class="muted tiny" style="margin:5px 0">${esc(path)}</div>`+
+    layers.map((layer,i)=>`<div class="recall-layer"><b>${i===0?'入口':`第${i}层`}</b><span>${layer.map(n=>`<button class="chip-btn" data-demo-recall-jump="${esc(n.id)}">${esc(n.title)}</button>`).join(' ')}</span></div>`).join('');
+  box.querySelectorAll('[data-demo-recall-jump]').forEach(b=>b.onclick=()=>{state.currentRecallId=b.dataset.demoRecallJump;state.recallPreviewCandidateId='';setTab('association');renderRecallList();renderRecallEditor()});
+}
+function renderDemoPrinciples(q,optionId){
+  const box=document.getElementById('demoPrincipleResult');if(!box)return;const mapped=q.metadata?.optionPrincipleMap?.[optionId]||[],ids=mapped.length?mapped:(q.metadata?.principleIds||[]);
+  const rows=ids.map(id=>{const p=principleById(id);return p?{p,preset:presetByPrincipleId(id)}:null}).filter(Boolean);
+  if(!rows.length){box.innerHTML='<div class="issue warn"><strong>该选项未绑定原则归纳卡</strong><span>请在题目录入区配置。</span></div>';return}
+  box.innerHTML=`<div class="muted smalltxt">选项 ${esc(optionId)}：</div>`+rows.map(({p,preset})=>`<div class="principle-card"><strong>${esc(p.name)}</strong><div class="status">${esc(preset?.status||'未配置归纳卡')}</div><div>${esc(preset?.title||'')}</div><div style="margin-top:4px">${esc(preset?.content||'暂无归纳卡内容')}</div></div>`).join('');
+}
+function demoKeywordMarkedTextEn(text,q,field,optionId=''){
+  text=String(text||'');const spans=[];
+  q.clues.forEach(c=>{
+    const term=String(c.textEn||'').trim();if(!term)return;
+    const applies=(c.matchLocations||[]).some(x=>x.field===field&&(field!=='option'||String(x.optionId)===String(optionId)));if(!applies)return;
+    let i=0;const lowerText=text.toLowerCase(),lowerTerm=term.toLowerCase();
+    while((i=lowerText.indexOf(lowerTerm,i))>=0){spans.push({a:i,b:i+term.length,c});i+=Math.max(1,term.length)}
+  });
+  spans.sort((a,b)=>a.a-b.a||((b.b-b.a)-(a.b-a.a)));const picked=[];spans.forEach(x=>{if(!picked.some(y=>!(x.b<=y.a||x.a>=y.b)))picked.push(x)});picked.sort((a,b)=>a.a-b.a);
+  let out='',cur=0;picked.forEach(x=>{out+=esc(text.slice(cur,x.a));out+=`<span class="demo-keyword ${x.c.keywordLevel==='core'?'core':''}" data-demo-clue="${esc(x.c.id)}">${esc(text.slice(x.a,x.b))}</span>`;cur=x.b});return out+esc(text.slice(cur));
+}
+
+function demoEnglishOption(q,id){return q.translations?.en?.options?.find(x=>x.id===id)?.text||''}
+function demoQuestionTitle(q){return state.demoLang==='en'?(q.translations?.en?.title||q.title):q.title}
+function demoStemHtml(q){
+  const zh=demoKeywordMarkedText(questionStem(q),q,'stem'),rawEn=englishStem(q)||'（暂无英文题干）',en=demoKeywordMarkedTextEn(rawEn,q,'stem');
+  if(state.demoLang==='en')return en;
+  if(state.demoLang==='bi')return `<div>${zh}</div><div class="demo-bilingual-block">${en}</div>`;
+  return zh;
+}
+function demoOptionHtml(q,o){
+  const zh=demoKeywordMarkedText(o.text,q,'option',o.id),rawEn=demoEnglishOption(q,o.id)||'（暂无英文选项）',en=demoKeywordMarkedTextEn(rawEn,q,'option',o.id);
+  if(state.demoLang==='en')return en;
+  if(state.demoLang==='bi')return `<div>${zh}</div><div class="demo-bilingual-block">${en}</div>`;
+  return zh;
+}
+function renderDemoQuestionList(){
+  const box=document.getElementById('demoQuestionList');if(!box)return;
+  if(!state.demoQuestionId)state.demoQuestionId=state.currentQuestionId||state.questionBank.questions[0]?.id||'';
+  document.getElementById('demoQuestionCount').textContent=`${state.questionBank.questions.length} 题`;
+  box.innerHTML=state.questionBank.questions.length?state.questionBank.questions.map((q,i)=>{
+    const st=questionCompleteness(q);
+    return `<div class="list-item${q.id===state.demoQuestionId?' active':''}" data-demo-question-id="${esc(q.id)}"><div class="list-title"><span class="status-dot ${st}"></span>${i+1}. ${esc(q.title)}</div><div class="list-meta">${esc(q.id)} · ${esc(q.difficulty||'')}</div></div>`;
+  }).join(''):'<div class="no-data">暂无题目</div>';
+  box.querySelectorAll('[data-demo-question-id]').forEach(el=>el.onclick=()=>{state.demoQuestionId=el.dataset.demoQuestionId;renderDemoValidation()});
+}
+function renderDemoValidation(){
+  const host=document.getElementById('demoQuestion');if(!host)return;renderDemoQuestionList();
+  const q=state.questionBank.questions.find(x=>x.id===state.demoQuestionId);if(!q){host.innerHTML='<div class="no-data">暂无题目</div>';return}
+  recomputeKeywordLocations(q);
+  document.querySelectorAll('[data-demo-lang]').forEach(b=>{b.classList.toggle('active',b.dataset.demoLang===state.demoLang);b.onclick=()=>{state.demoLang=b.dataset.demoLang;renderDemoValidation()}});
+  const tags=(q.tags||[]).map(t=>`<span class="demo-tag${tagPathFor(t)?'':' unbound'}" title="${tagPathFor(t)?'已绑定标签槽位':'未绑定预设标签槽位'}">${esc(t)}</span>`).join('');
+  host.innerHTML=`<div class="demo-question"><div class="demo-tags">${tags||'<span class="demo-tag unbound">无标签</span>'}</div>
+    <div style="font-weight:900;margin-bottom:8px">${esc(demoQuestionTitle(q))}</div>
+    <div class="demo-stem">${demoStemHtml(q)}</div>
+    ${q.options.map(o=>`<div class="demo-option${q.correctAnswer===o.id?' demo-answer':''}" data-demo-option="${esc(o.id)}"><b>${esc(o.id)}.</b> ${demoOptionHtml(q,o)}${q.correctAnswer===o.id?'<span class="answer-badge">正确答案</span>':''}</div>`).join('')}
+    <details style="margin-top:12px"><summary>查看解析</summary><div style="padding:8px 2px">${
+      state.demoLang==='en'?esc(q.translations?.en?.analysis||'暂无英文解析'):
+      state.demoLang==='bi'?`<div>${esc(q.analysis||'暂无解析')}</div><div class="demo-bilingual-block">${esc(q.translations?.en?.analysis||'暂无英文解析')}</div>`:
+      esc(q.analysis||'暂无解析')
+    }</div></details></div>`;
+  host.querySelectorAll('[data-demo-clue]').forEach(el=>el.onclick=e=>{e.stopPropagation();renderDemoRecall(q.clues.find(x=>x.id===el.dataset.demoClue))});
+  host.querySelectorAll('[data-demo-option]').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-demo-clue]'))return;host.querySelectorAll('[data-demo-option]').forEach(x=>x.classList.remove('active'));el.classList.add('active');renderDemoPrinciples(q,el.dataset.demoOption)});
+  document.getElementById('demoRecallResult').textContent='点击题目中的关键词进行检查。';
+  document.getElementById('demoPrincipleResult').textContent='点击 A/B/C/D 选项查看对应原则归纳卡。';
+}
+
+function runValidation(){
+  const issues=[];
+  if(!prepRuntime.creatorProfile?.name)issues.push({level:'error',object:'制作人身份',message:'当前页面尚未选择制作人',suggest:'返回制作人入口，必须选择 6 人之一后才能继续。'});
+  const contentHashOwners=new Map();;
+  const qids=new Set();
+  state.questionBank.questions.forEach(q=>{
+    if(qids.has(q.id))issues.push({level:'error',object:q.id,message:'题目 ID 重复',suggest:'该文件可能来自旧版本或被手工修改；新题 ID 应全部由 Prep Studio 自动生成。'});qids.add(q.id);
+    const ch=computeQuestionContentHash(q);q.contentHash=ch;
+    if(contentHashOwners.has(ch))issues.push({level:'warn',object:q.id,message:`疑似重复题内容：与 ${contentHashOwners.get(ch)} 的 Content Hash 相同`,suggest:'确认是否为重复题；服务器未来可用 contentHash 做二次去重。'});
+    else contentHashOwners.set(ch,q.id);
+    validateQuestion(q,true).forEach(x=>issues.push(x));
+  });
+  state.questionBank.questions.forEach(q=>{(q.metadata?.principleIds||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`原则 ID 不存在：${id}`,suggest:'在原则管理中创建或重新绑定。'})});Object.entries(q.metadata?.optionPrincipleMap||{}).forEach(([opt,ids])=>(ids||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`选项 ${opt} 的原则 ID 不存在：${id}`,suggest:'重新绑定选项原则。'})}));(q.tags||[]).forEach(tag=>{if(!tagPathFor(tag))issues.push({level:'warn',object:q.id,message:`标签“${tag}”未绑定主程序预设标签槽位`,suggest:'保留为自由标签，或在标签管理中映射/改名。'})})});
+  state.principles.items.forEach(p=>{const preset=presetByPrincipleId(p.id);if(!preset||!preset.content)issues.push({level:'warn',object:p.id,message:`原则“${p.name}”缺少归纳卡内容`,suggest:'补充 synthesis preset。'})});
+  const conflicts=aliasConflicts();conflicts.forEach(c=>issues.push({level:'error',object:'联想库',message:`名称/Alias 冲突：“${c.term}” → ${c.nodes.map(n=>n.title).join(' / ')}`,suggest:'保留唯一入口，或把 Alias 改成更具体的词。'}));
+  const recallIds=new Set(state.recallLibrary.nodes.map(n=>n.id));
+  state.recallLibrary.edges.forEach(e=>{if(!recallIds.has(e.from)||!recallIds.has(e.to))issues.push({level:'error',object:'联想库',message:`关系 ${e.id} 端点不存在`,suggest:'删除或修正关系。'})});
+  const coreCount=state.questionBank.questions.reduce((n,q)=>n+q.clues.filter(c=>c.keywordLevel==='core').length,0);
+  const normalCount=state.questionBank.questions.reduce((n,q)=>n+q.clues.filter(c=>c.keywordLevel!=='core').length,0);
+  state.validation={at:nowIso(),issues,metrics:{questions:state.questionBank.questions.length,errors:issues.filter(x=>x.level==='error').length,warnings:issues.filter(x=>x.level==='warn').length,normalKeywords:normalCount,coreKeywords:coreCount,recallNodes:state.recallLibrary.nodes.length,recallEdges:state.recallLibrary.edges.length,principles:state.principles.items.length,presets:state.synthesisPresets.items.length,aliasConflicts:conflicts.length}};
+  renderValidation();return state.validation;
+}
+function renderValidation(){
+  const v=state.validation||runValidation(),m=v.metrics;
+  document.getElementById('validationMetrics').innerHTML=[
+    ['题目',m.questions],['错误',m.errors],['提醒',m.warnings],['普通关键词',m.normalKeywords],
+    ['核心关键词',m.coreKeywords],['联想节点',m.recallNodes],['原则',m.principles],['归纳卡',m.presets],['Alias 冲突',m.aliasConflicts]
+  ].map(([k,n])=>`<div class="metric"><span class="muted">${k}</span><b>${n}</b></div>`).join('');
+  document.getElementById('validationRows').innerHTML=v.issues.length?v.issues.map(x=>`<tr><td>${x.level==='error'?'❌ 错误':'⚠ 提醒'}</td><td>${esc(x.object||'')}</td><td>${esc(x.message)}</td><td>${esc(x.suggest||'')}</td></tr>`).join(''):'<tr><td colspan="4">✓ 未发现问题</td></tr>';
+}
+function workspacePayload(){return {
+  prepStudioWorkspaceVersion:4,prepStudioVersion:VERSION,savedAt:nowIso(),
+  schema:{tagSlots:'semantic-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA},
+  knowledgeTree:state.knowledgeTree?{taxonomy:{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:{zh:state.knowledgeTree.name},version:state.knowledgeTree.version,nodes:state.knowledgeTree.nodes}}:null,
+  recallLibrary:state.recallLibrary,questionBank:state.questionBank,principles:state.principles,synthesisPresets:state.synthesisPresets,tagConfig:state.tagConfig,
+  identitySnapshot:{deviceProfile:clone(prepRuntime.deviceProfile||{})},
+  system:{issuedQuestionIds:[...prepRuntime.issuedQuestionIds]},
+  ui:{currentQuestionId:state.currentQuestionId,currentRecallId:state.currentRecallId,currentPrincipleId:state.currentPrincipleId,demoQuestionId:state.demoQuestionId,demoLang:state.demoLang}
+}}
+function migrateWorkspacePayload(input){
+  if(!input||!input.prepStudioWorkspaceVersion)throw new Error('不是 Prep Studio 工作区草稿');
+  const w=clone(input),from=Number(w.prepStudioWorkspaceVersion||1);
+  if(from<4){
+    w.tagConfig=normalizeTagConfig(w.tagConfig||{});
+    w.prepStudioWorkspaceVersion=4;
+    w.schema={...(w.schema||{}),tagSlots:'semantic-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA};
+    w.migratedFromVersion=from;
+    w.migratedAt=nowIso();
+  }
+  return w;
+}
+function applyWorkspacePayload(input){
+  const w=migrateWorkspacePayload(input);
+  state.knowledgeTree=w.knowledgeTree?normalizeTree(w.knowledgeTree):null;
+  state.recallLibrary=normalizeRecall(w.recallLibrary||{});
+  state.tagConfig=normalizeTagConfig(w.tagConfig||{});
+  state.principles=normalizePrinciples(w.principles||{});
+  state.synthesisPresets=normalizePresets(w.synthesisPresets||{});
+  state.questionBank=normalizeBank(w.questionBank||{questions:[]});
+  (w.system?.issuedQuestionIds||[]).forEach(registerQuestionId);
+  state.questionBank.questions.forEach(q=>registerQuestionId(q.id));
+  const ui=w.ui||{};
+  state.currentQuestionId=state.questionBank.questions.some(q=>q.id===ui.currentQuestionId)?ui.currentQuestionId:(state.questionBank.questions[0]?.id||'');
+  state.currentRecallId=state.recallLibrary.nodes.some(n=>n.id===ui.currentRecallId)?ui.currentRecallId:(state.recallLibrary.nodes[0]?.id||'');
+  state.currentPrincipleId=state.principles.items.some(p=>p.id===ui.currentPrincipleId)?ui.currentPrincipleId:(state.principles.items[0]?.id||'');
+  state.demoQuestionId=state.questionBank.questions.some(q=>q.id===ui.demoQuestionId)?ui.demoQuestionId:state.currentQuestionId;
+  state.demoLang=['zh','en','bi'].includes(ui.demoLang)?ui.demoLang:'zh';
+  state.recallPreviewCandidateId='';refreshQuestionTagPaths();refreshAll();
+}
+
+function refreshAll(){refreshHeader();renderQuestions();renderRecallList();renderRecallEditor();renderPrincipleList();renderPrincipleEditor();renderTagManager();if(document.getElementById('tab-demo')?.classList.contains('active'))renderDemoValidation()}
+document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b)setTab(b.dataset.tab)});
+document.getElementById('btnNewQuestion').onclick=newQuestion;
+document.getElementById('btnDuplicateQuestion').onclick=duplicateQuestion;
+document.getElementById('btnDeleteQuestion').onclick=deleteQuestion;
+document.getElementById('btnAddNormalKeyword').onclick=()=>addKeyword('normal');
+document.getElementById('btnAddCoreKeyword').onclick=()=>addKeyword('core');
+document.getElementById('btnNewRecall').onclick=newRecallNode;
+document.getElementById('btnNewPrinciple').onclick=newPrinciple;
+document.getElementById('recallSearch').addEventListener('input',()=>renderRecallList());
+document.getElementById('btnRunValidation').onclick=runValidation;
+document.querySelectorAll('[data-creator-key]').forEach(btn=>btn.addEventListener('click',()=>selectFixedCreator(btn.dataset.creatorKey)));
+document.getElementById('btnSwitchCreator').onclick=requireCreatorSelection;
+document.getElementById('btnSwitchCreatorBase').onclick=requireCreatorSelection;
+document.getElementById('themeSelect').addEventListener('change',e=>applyTheme(e.target.value,{persist:true}));
+document.getElementById('btnQuickSaveWorkspace').onclick=()=>saveWorkspaceLocal();
+document.getElementById('btnSaveWorkspaceLocal').onclick=()=>saveWorkspaceLocal();
+document.getElementById('btnRestoreWorkspaceLocal').onclick=restoreWorkspaceLocal;
+document.getElementById('btnDeleteWorkspaceLocal').onclick=deleteWorkspaceLocal;
+document.getElementById('chkAutoSaveWorkspace').addEventListener('change',e=>{prepRuntime.autoSave=!!e.target.checked;updateWorkspaceSaveStatus(e.target.checked?'自动保存已开启（60 秒）':'自动保存已关闭',e.target.checked?'good':'')});
+
+
+
+
+document.addEventListener('input',()=>markWorkspaceDirty(),true);
+document.addEventListener('change',e=>{if(!['chkAutoSaveWorkspace','themeSelect'].includes(e.target.id))markWorkspaceDirty()},true);
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  const mutationIds=new Set(['btnNewQuestion','btnDuplicateQuestion','btnDeleteQuestion','btnAddNormalKeyword','btnAddCoreKeyword','btnNewRecall','btnNewPrinciple','btnParsePastedQuestions','pmSave','pmDelete','floatSave','floatDelete','btnAddEdge','btnDeleteRecall','btnBindRecallCandidate']);
+  if(mutationIds.has(b.id)||b.dataset.removeKw||b.dataset.removeEdge)markWorkspaceDirty();
+},true);
+function currentTabName(){return document.querySelector('nav button.active')?.dataset.tab||'base'}
+function setHelpTopic(topic){
+  const valid=new Set(['base','management','questions','association','demo','validate','export','global']);topic=valid.has(topic)?topic:'global';
+  document.querySelectorAll('[data-help-topic]').forEach(b=>b.classList.toggle('active',b.dataset.helpTopic===topic));
+  document.querySelectorAll('[data-help-content]').forEach(x=>x.classList.toggle('active',x.dataset.helpContent===topic));
+  const label=document.querySelector(`[data-help-topic="${topic}"]`)?.textContent?.trim()||'';const hint=document.getElementById('helpCurrentHint');if(hint)hint.textContent=label;
+}
+function openHelp(topic=currentTabName()){setHelpTopic(topic);document.getElementById('helpModal').classList.add('show')}
+function closeHelp(){document.getElementById('helpModal').classList.remove('show')}
+
+/* ==========================================================
+   v0.4.0 Service Layer
+   UI handlers should call these facades for cross-domain work.
+   They intentionally wrap the proven v0.3.x functions instead
+   of rewriting page behavior in this architecture-only release.
+   ========================================================== */
+const TagService=Object.freeze({
+  normalizeConfig:normalizeTagConfig,
+  exportFormalConfig:exportTagConfig,
+  semanticSlot:semanticTagSlot,
+  formalSlot:formalTagSlot,
+  catalog:tagCatalogEntries,
+  canonicalName:canonicalTagName,
+  pathFor:tagPathFor,
+  refreshQuestionPaths:refreshQuestionTagPaths
+});
+const QuestionService=Object.freeze({
+  create:(payload={},subject=state.questionBank.subject||'PMP')=>normalizeQuestion(payload,state.questionBank.questions.length,subject),
+  normalize:normalizeQuestion,
+  normalizeBank,
+  duplicatePayload:(question)=>{
+    const copy=clone(question),parentQuestionId=copy.id;copy.id=generateQuestionId();delete copy.contentHash;
+    copy.metadata=copy.metadata||{};delete copy.metadata.origin;delete copy.metadata.lastImport;
+    stampQuestionOrigin(copy,{batchId:generateBatchId(),source:'duplicate',forceOrigin:true,parentQuestionId});
+    return copy;
+  },
+  contentHash:computeQuestionContentHash,
+  validate:validateQuestion,
+  prepareForExport:exportableQuestion,
+  exportBank:exportableBank
+});
+const StorageService=Object.freeze({
+  put:prepDbPut,
+  get:prepDbGet,
+  remove:prepDbDelete,
+  saveWorkspace:saveWorkspaceLocal,
+  restoreWorkspace:restoreWorkspaceLocal,
+  deleteWorkspace:deleteWorkspaceLocal
+});
+const WorkspaceService=Object.freeze({
+  currentPayload:workspacePayload,
+  migrate:migrateWorkspacePayload,
+  apply:applyWorkspacePayload
+});
+const ImportService=Object.freeze({
+  questionBank:(payload)=>normalizeBank(payload),
+  completeBundle:(payload)=>normalizeContentBundle(payload),
+  tagConfig:(payload)=>normalizeTagConfig(payload),
+  recall:(payload)=>normalizeRecall(payload),
+  principles:(payload)=>normalizePrinciples(payload),
+  presets:(payload)=>normalizePresets(payload)
+});
+const ExportService=Object.freeze({
+  json:downloadJson,
+  completeBundle:completeBundlePayload,
+  questionBank:exportableBank,
+  tagConfig:exportTagConfig,
+  auditTrail:auditTrailPayload
+});
+const ValidationService=Object.freeze({
+  question:validateQuestion,
+  workspace:runValidation
+});
+const AppServices=Object.freeze({TagService,QuestionService,StorageService,WorkspaceService,ImportService,ExportService,ValidationService});
+window.PMPPrepServices=AppServices;
+
+document.getElementById('btnHelp').onclick=()=>openHelp('base');
+document.getElementById('btnOpenHelp').onclick=openHelp;
+document.getElementById('btnHelpCenter').onclick=()=>openHelp(currentTabName());
+document.querySelectorAll('[data-help-topic]').forEach(b=>b.onclick=()=>setHelpTopic(b.dataset.helpTopic));
+document.querySelectorAll('[data-page-help]').forEach(b=>b.onclick=()=>openHelp(b.dataset.pageHelp));
+document.getElementById('btnCloseHelp').onclick=closeHelp;
+document.getElementById('helpModal').addEventListener('click',e=>{if(e.target.id==='helpModal')closeHelp()});
+document.getElementById('btnDownloadCompleteBundle').onclick=()=>downloadJson(COMPLETE_CONTENT_BUNDLE_TEMPLATE,'PMP_Content_Prep_完整内容包模板_v1.json');
+document.getElementById('btnDownloadCompleteAiPrompt').onclick=()=>downloadText(COMPLETE_AI_PROMPT,'PMP_Content_Prep_完整AI制作提示词.txt');
+document.getElementById('btnDownloadQuestionTemplate').onclick=()=>downloadJson(QUESTION_TEMPLATE,'PMP_Content_Prep_题库导入模板_v3_自动ID.json');
+document.getElementById('btnDownloadAiPrompt').onclick=()=>downloadText(WORD_TO_JSON_AI_PROMPT,'Word题目转PrepStudio_JSON_AI提示词.txt');
+document.getElementById('btnParsePastedQuestions').onclick=()=>{
+  const raw=document.getElementById('rawQuestionPaste').value;
+  const qs=parsePastedQuestionText(raw);
+  if(!qs.length){document.getElementById('pasteParseResult').textContent='未识别到题目，请点击 ? 查看推荐格式。';return}
+  const batchId=stampImportedQuestions(qs,'word-ai-paste');
+  if(document.getElementById('pasteImportMode').value==='replace')state.questionBank.questions=qs;else state.questionBank.questions.push(...qs);
+  state.questionBank.updatedAt=Date.now();state.currentQuestionId=qs[0].id;renderQuestions();refreshHeader();
+  document.getElementById('pasteParseResult').textContent=`已导入 ${qs.length} 题；Batch：${batchId.slice(0,24)}…；题目 ID 已由程序生成。`;
+  markWorkspaceDirty();toast(`已解析 ${qs.length} 题`);
+};
+
+document.getElementById('fileContentBundle').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{importContentBundle(await readJsonFile(f));markWorkspaceDirty();toast('完整内容包已加载')}catch(err){alert('完整内容包导入失败：'+err.message)}e.target.value=''});
+document.getElementById('filePrinciples').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.principles=normalizePrinciples(await readJsonFile(f));state.currentPrincipleId=state.principles.items[0]?.id||'';refreshAll();markWorkspaceDirty();toast('原则库已加载')}catch(err){alert('原则库导入失败：'+err.message)}e.target.value=''});
+document.getElementById('filePresets').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.synthesisPresets=normalizePresets(await readJsonFile(f));refreshAll();markWorkspaceDirty();toast('归纳卡已加载')}catch(err){alert('归纳卡导入失败：'+err.message)}e.target.value=''});
+document.getElementById('fileTagConfig').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.tagConfig=ImportService.tagConfig(await readJsonFile(f));refreshQuestionTagPaths();refreshAll();markWorkspaceDirty();toast('标签配置已加载')}catch(err){alert('标签配置导入失败：'+err.message)}e.target.value=''});
+document.getElementById('fileTree').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.knowledgeTree=normalizeTree(await readJsonFile(f));state.questionBank.questions.forEach(q=>{const id=q.metadata?.knowledge?.primaryNodeId;if(id&&state.knowledgeTree.map.has(id))q.metadata.knowledge.pathSnapshot=state.knowledgeTree.pathFor(id)});refreshHeader();renderQuestionEditor();renderRecallEditor();markWorkspaceDirty();toast('知识树已加载')}catch(err){alert('知识树导入失败：'+err.message)}e.target.value=''});
+document.getElementById('fileRecall').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.recallLibrary=normalizeRecall(await readJsonFile(f));state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';refreshHeader();renderRecallList();renderRecallEditor();renderKeywords();markWorkspaceDirty();toast('联想库已加载')}catch(err){alert('联想库导入失败：'+err.message)}e.target.value=''});
+document.getElementById('fileQuestionBank').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.questionBank=ImportService.questionBank(await readJsonFile(f));stampImportedQuestions(state.questionBank.questions,'question-bank-json');state.currentQuestionId=state.questionBank.questions[0]?.id||'';refreshHeader();renderQuestions();markWorkspaceDirty();toast('题库已加载 · 已记录导入批次')}catch(err){alert('题库导入失败：'+err.message)}e.target.value=''});
+
+document.getElementById('btnNewWorkspace').onclick=()=>{if(!confirm('清空当前 Prep Studio 工作区？请先导出需要保留的草稿。'))return;state.knowledgeTree=null;state.recallLibrary={schemaVersion:1,nodes:[],edges:[],updatedAt:''};state.questionBank={id:generateSystemId('bank'),name:'PMP 内容准备题库',subject:'PMP',description:'',version:'1.0',visibility:'private',createdAt:Date.now(),updatedAt:Date.now(),questions:[]};state.principles={schemaVersion:1,items:[],updatedAt:Date.now()};state.synthesisPresets={schemaVersion:1,items:[],updatedAt:Date.now()};state.tagConfig={names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}};state.currentQuestionId='';state.currentRecallId='';state.currentPrincipleId='';state.demoQuestionId='';state.demoLang='zh';state.recallPreviewCandidateId='';refreshAll();setTab('base');markWorkspaceDirty();toast('已清空')};
+document.getElementById('btnImportWorkspace').onclick=()=>document.getElementById('fileWorkspace').click();
+document.getElementById('fileWorkspace').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const w=await readJsonFile(f);if(!w.prepStudioWorkspaceVersion)throw new Error('不是 Prep Studio 草稿');applyWorkspacePayload(w);markWorkspaceDirty();toast('草稿已恢复')}catch(err){alert('草稿导入失败：'+err.message)}e.target.value=''});
+
+document.getElementById('btnExportCompleteBundle').onclick=()=>{const v=runValidation();if(v.metrics.errors&&!confirm(`当前有 ${v.metrics.errors} 个错误。仍要导出完整成品包吗？`))return;const payload=completeBundlePayload();downloadJson(payload,'PMP_Content_Complete_Bundle.json',{auditType:'complete-bundle',details:{validation:{errors:v.metrics.errors,warnings:v.metrics.warnings}}})};
+document.getElementById('btnExportPrinciples').onclick=()=>downloadJson(state.principles,'kg_principle_repository_v1.json',{auditType:'principles'});
+document.getElementById('btnExportPresets').onclick=()=>downloadJson(state.synthesisPresets,'kg_synthesis_preset_repository_v1.json',{auditType:'synthesis-presets'});
+document.getElementById('btnExportTagConfig').onclick=()=>ExportService.json(ExportService.tagConfig(),'kg_question_tag_names_v1.json',{auditType:'tag-config'});
+document.getElementById('btnExportQuestions').onclick=()=>{const v=runValidation();if(v.metrics.errors&&!confirm(`当前有 ${v.metrics.errors} 个错误。仍要导出题库吗？`))return;const payload=exportableBank(),name=safeName(state.questionBank.name||'PMP题库')+'_PrepStudio.json';downloadJson(payload,name,{auditType:'question-bank',details:{validation:{errors:v.metrics.errors,warnings:v.metrics.warnings}}})};
+document.getElementById('btnExportRecall').onclick=()=>{const lib=clone(state.recallLibrary);lib.schemaVersion=1;lib.updatedAt=nowIso();downloadJson(lib,'PMP_科目级联想库_PrepStudio.json',{auditType:'recall-library',details:{nodes:lib.nodes.length,edges:lib.edges.length}})};
+document.getElementById('btnExportValidation').onclick=()=>{const payload=runValidation();downloadJson(payload,'PMP_Content_Prep_Studio_校验报告.json',{auditType:'validation-report',details:{errors:payload.metrics.errors,warnings:payload.metrics.warnings}})};
+document.getElementById('btnExportWorkspace').onclick=()=>ExportService.json(WorkspaceService.currentPayload(),'PMP_Content_Prep_Studio_工作区草稿.json',{auditType:'workspace-draft'});
+document.getElementById('btnExportAuditTrail').onclick=()=>downloadJson(auditTrailPayload(),'PMP_Content_Prep_Studio_导出审计日志.json');
+document.getElementById('btnClearAuditTrail').onclick=clearAuditTrail;
+function safeName(s){return String(s||'file').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_')}
+
+refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initThemeSettings();loadAuditTrail();requireCreatorSelection();
+</script>
+</body>
+</html>

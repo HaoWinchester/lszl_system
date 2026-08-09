@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -27,6 +28,67 @@ function run(root, ...args) {
 function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8'))
 }
+
+function hashTree(root) {
+  const hash = createHash('sha256')
+  const visit = (directory) => {
+    for (const name of readdirSync(directory).sort()) {
+      const path = resolve(directory, name)
+      const relative = path.slice(root.length + 1)
+      hash.update(relative)
+      if (statSync(path).isDirectory()) visit(path)
+      else hash.update(readFileSync(path))
+    }
+  }
+  visit(root)
+  return hash.digest('hex')
+}
+
+test('content prep studio ships reproducible modular source and backend bootstrap marker', () => {
+  const contract = readJson(resolve(scriptsDir, 'new-legacy-contract.json'))
+  const required = [
+    'content-prep-studio/README.md',
+    'content-prep-studio/build.py',
+    'content-prep-studio/src/index.template.html',
+    'content-prep-studio/src/css/app.css',
+    'content-prep-studio/src/js/00-core-bootstrap.js',
+    'content-prep-studio/src/js/10-state-domain.js',
+    'content-prep-studio/src/js/20-page-runtime.js',
+    'content-prep-studio/src/js/30-service-layer.js',
+    'content-prep-studio/src/js/40-events-bootstrap.js',
+    'content-prep-studio/src/tag-slot-schema.json',
+    'content-prep-studio/tests/test_build.py',
+    'content-prep-studio/tests/test_services.py',
+    'content-prep-studio/tests/test_tag_migration.js',
+    'content-prep-studio/dist/content-prep.html',
+  ]
+  for (const path of required) {
+    assert.ok(contract.requiredFiles.includes(path), `${path} must be release-required`)
+    assert.ok(existsSync(resolve(source, path)), `${path} must exist in source`)
+  }
+
+  const built = readFileSync(resolve(source, 'content-prep-studio/dist/content-prep.html'), 'utf8')
+  assert.match(built, /window\.PMPPrepServices/)
+  for (let index = 1; index <= 6; index += 1) {
+    assert.match(built, new RegExp(`creator_00${index}`))
+  }
+  assert.match(built, /indexedDB\.open/)
+  assert.match(built, /<script src="\/server-state-bootstrap\.js"><\/script>/)
+
+  const enterinformation = resolve(repoDir, 'enterinformation')
+  const before = hashTree(enterinformation)
+  const result = spawnSync('python3', [resolve(source, 'content-prep-studio/build.py')], {
+    cwd: repoDir,
+    encoding: 'utf8',
+  })
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(hashTree(enterinformation), before, 'build must not modify enterinformation')
+  assert.equal(
+    readFileSync(resolve(source, 'content-prep-studio/dist/content-prep.html'), 'utf8'),
+    built,
+    'repeated builds must be byte-identical',
+  )
+})
 
 test('update builds an isolated release and atomically selects it', () => {
   const root = makeRoot()

@@ -606,31 +606,31 @@ git commit -m "feat: make question catalog server authoritative"
 - Output: `new-legacy/content-prep-studio/dist/content-prep.html`
 - Page marker: `<script src="/server-state-bootstrap.js"></script>` must appear in built output for backend bootstrap injection and direct nested-page loading
 
-- [ ] **Step 1: 从 source zip 原样提取模块化基线到正式目录**
+- [x] **Step 1: 从 source zip 原样提取模块化基线到正式目录**
 
 只复制 `PMP_Content_Prep_Studio_v0.4.0_source.zip` 中的模块化源码、测试和 README；把默认 dist 文件名改为 `content-prep.html`。不要复制根目录单 HTML 作为新的维护源。
 
-- [ ] **Step 2: 写 release 合同失败测试**
+- [x] **Step 2: 写 release 合同失败测试**
 
 合同必须要求 `content-prep-studio/dist/content-prep.html`、模块化源和测试存在；built output 包含 `PMPPrepServices`、六位 creator ID、IndexedDB 工作区和 bootstrap marker；构建不能修改 `enterinformation/`。
 
-- [ ] **Step 3: 运行 RED/基线测试**
+- [x] **Step 3: 运行 RED/基线测试**
 
 Run: `python3 new-legacy/content-prep-studio/tests/test_services.py && python3 new-legacy/content-prep-studio/tests/test_build.py && node new-legacy/content-prep-studio/tests/test_tag_migration.js && cd frontend && node --test scripts/new-legacy-release.test.mjs`
 
 Expected: Prep 原测试 PASS；release 合同先因 required file/marker 未登记而 FAIL。
 
-- [ ] **Step 4: 在模板中加入后端 bootstrap marker 并更新 build**
+- [x] **Step 4: 在模板中加入后端 bootstrap marker 并更新 build**
 
 使用根绝对资源 `/server-state-bootstrap.js`，避免直接访问 nested HTML 时解析到不存在的 `content-prep-studio/dist/server-state-bootstrap.js`。Task 17 同步扩展后端 bootstrap 注入器识别根绝对 marker。页面其余 CSS/JS 仍自包含；IndexedDB 不改为 Runtime State。
 
-- [ ] **Step 5: 运行 GREEN 和可重复构建**
+- [x] **Step 5: 运行 GREEN 和可重复构建**
 
 Run: `python3 new-legacy/content-prep-studio/build.py && python3 new-legacy/content-prep-studio/tests/test_build.py && cd frontend && node --test scripts/new-legacy-release.test.mjs`
 
 Expected: PASS，连续构建的 dist 字节一致。
 
-- [ ] **Step 6: 提交本任务**
+- [x] **Step 6: 提交本任务**
 
 ```bash
 git add new-legacy/content-prep-studio frontend/scripts/new-legacy-contract.json frontend/scripts/new-legacy-release.test.mjs
