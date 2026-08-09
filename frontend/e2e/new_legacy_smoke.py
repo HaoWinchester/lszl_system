@@ -75,6 +75,20 @@ with sync_playwright() as playwright:
 
         print("smoke: original login UI backed by FastAPI session", flush=True)
         page.goto(BASE + "/login", wait_until="networkidle")
+        assert "/practice-mode.html?auth=login" in page.url
+        page.locator(".practice-app").wait_for(state="visible")
+        page.wait_for_function("""() => {
+          const empty = document.getElementById('practiceEmpty')
+          const hasPaper = document.querySelectorAll('#practicePaperLibrary [data-paper-id]').length > 0
+          return (empty && !empty.hidden) || hasPaper
+        }""")
+        if page.locator("#practiceEmpty").is_visible():
+            assert "暂时没有可练习的已发布试卷" in page.locator("#practiceEmpty").inner_text()
+        page.locator("#authModal.show").wait_for(state="visible")
+        page.locator("#authCloseBtn").click()
+        page.locator("#authModal").wait_for(state="hidden")
+        page.locator("#authStatus").click()
+        page.locator("#accountMenuSessionBtn").click()
         page.locator("#authModal.show").wait_for(state="visible")
         page.locator("#authUsername").fill("佩奇007")
         page.locator("#authPassword").fill("111111")

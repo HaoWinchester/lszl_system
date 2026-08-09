@@ -169,7 +169,12 @@ async def settings_alias(request: Request):
 
 @router.get("/login")
 async def login_alias(request: Request):
-    return _redirect(request, "learning-path.html", {"auth": "login"})
+    params = {"auth": "login"}
+    params.update({key: value for key, value in request.query_params.items() if key != "auth"})
+    return RedirectResponse(
+        f"/practice-mode.html?{urlencode(params)}",
+        status_code=307,
+    )
 
 
 @router.get("/member")

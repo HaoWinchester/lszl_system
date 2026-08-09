@@ -24,6 +24,30 @@ def test_graph_alias_preserves_free_mode() -> None:
     assert response.headers["location"] == "/index.html?mode=free"
 
 
+def test_login_alias_opens_the_practice_page_login_surface() -> None:
+    with TestClient(app) as client:
+        response = client.get("/login", follow_redirects=False)
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/practice-mode.html?auth=login"
+
+
+def test_login_alias_preserves_return_context() -> None:
+    with TestClient(app) as client:
+        response = client.get("/login?next=%2Fcontent-prep", follow_redirects=False)
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/practice-mode.html?auth=login&next=%2Fcontent-prep"
+
+
+def test_login_alias_cannot_be_overridden_by_incoming_auth_mode() -> None:
+    with TestClient(app) as client:
+        response = client.get("/login?auth=register&next=%2Fcontent-prep", follow_redirects=False)
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/practice-mode.html?auth=login&next=%2Fcontent-prep"
+
+
 def test_direct_page_serves_upstream_dom() -> None:
     with TestClient(app) as client:
         response = client.get("/question-training.html")
