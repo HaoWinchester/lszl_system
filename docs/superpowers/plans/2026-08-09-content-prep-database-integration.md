@@ -357,17 +357,17 @@ git commit -m "feat: create prep banks and validate references"
 - Produces: `acquire_lock`, `heartbeat_lock`, `release_lock`, `assert_lock_and_revision`
 - Lease: 300 seconds; client heartbeat: 30 seconds
 
-- [ ] **Step 1: 写锁行为失败测试**
+- [x] **Step 1: 写锁行为失败测试**
 
 覆盖首次获取、同账号同 client 幂等重取、其他账号 409、同题库不同题同时成功、过期接管、错误 token、心跳续期、主动释放、非 admin 强制释放 403、admin 强制释放、旧 token 保存 409、revision 不一致 409。Prep 请求必须提交 allowlist creatorId；现有教师编辑器可沿用题目已有 creatorId，历史题为空时允许 null，但 actor 审计不能缺失。
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_edit_locks.py -q`
 
 Expected: FAIL。
 
-- [ ] **Step 3: 实现原子获取和令牌摘要**
+- [x] **Step 3: 实现原子获取和令牌摘要**
 
 使用 `select(QuestionEditLock).where(...).with_for_update()` 和数据库事务串行化同一 `question_id`。生成 256-bit 随机 token，只存 `sha256(token)`；返回明文一次。锁响应固定包含：
 
@@ -380,17 +380,17 @@ Expected: FAIL。
 }
 ```
 
-- [ ] **Step 4: 实现心跳、释放和 revision 断言**
+- [x] **Step 4: 实现心跳、释放和 revision 断言**
 
 过期判断只使用服务器 UTC；强制解锁写 `question_audit_logs`；普通释放要求 token、actor 和 clientInstanceId 都匹配。任何锁冲突返回稳定 `LOCKED_BY_OTHER` 或 `LOCK_TOKEN_INVALID` 错误码。
 
-- [ ] **Step 5: 运行并发 GREEN 测试**
+- [x] **Step 5: 运行并发 GREEN 测试**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_edit_locks.py -q`
 
 Expected: PASS。
 
-- [ ] **Step 6: 提交本任务**
+- [x] **Step 6: 提交本任务**
 
 ```bash
 git add backend/app/services/question_lock_service.py backend/app/api/v1/content_prep.py backend/tests/test_question_edit_locks.py

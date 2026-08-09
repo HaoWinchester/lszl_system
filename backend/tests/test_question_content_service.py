@@ -245,8 +245,14 @@ def test_response_dtos_emit_stable_camel_case_contracts() -> None:
         {
             "questionId": "question-001",
             "lockToken": "plain-token-returned-once",
+            "lockedBy": "teacher",
+            "creatorId": "creator_001",
+            "creatorName": "波塞冬",
+            "clientInstanceId": "browser-001",
+            "acquiredAt": "2026-08-09T00:00:00Z",
             "expiresAt": "2026-08-09T00:05:00Z",
-            "holderUsername": "teacher",
+            "heartbeatIntervalSeconds": 30,
+            "leaseSeconds": 300,
         }
     ).model_dump(by_alias=True, mode="json")
     error = CatalogError.model_validate(
@@ -266,7 +272,10 @@ def test_response_dtos_emit_stable_camel_case_contracts() -> None:
     ).model_dump(by_alias=True)
 
     assert result["questions"][0]["contentHash"] == "a" * 64
-    assert lock["holderUsername"] == "teacher"
+    assert lock["lockedBy"] == "teacher"
+    assert lock["creatorName"] == "波塞冬"
+    assert lock["heartbeatIntervalSeconds"] == 30
+    assert lock["leaseSeconds"] == 300
     assert error == {
         "code": "QUESTION_VALIDATION_FAILED",
         "message": "题目内容校验失败",

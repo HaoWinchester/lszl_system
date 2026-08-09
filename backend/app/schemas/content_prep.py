@@ -54,8 +54,14 @@ class LockGrant(BaseModel):
 
     question_id: str = Field(alias="questionId", min_length=1, max_length=64)
     lock_token: str = Field(alias="lockToken", min_length=1, max_length=256)
+    locked_by: str = Field(alias="lockedBy", min_length=1, max_length=64)
+    creator_id: str | None = Field(default=None, alias="creatorId", max_length=64)
+    creator_name: str | None = Field(default=None, alias="creatorName", max_length=120)
+    client_instance_id: str = Field(alias="clientInstanceId", min_length=1, max_length=128)
+    acquired_at: datetime = Field(alias="acquiredAt")
     expires_at: datetime = Field(alias="expiresAt")
-    holder_username: str = Field(alias="holderUsername", min_length=1, max_length=64)
+    heartbeat_interval_seconds: int = Field(alias="heartbeatIntervalSeconds", ge=1)
+    lease_seconds: int = Field(alias="leaseSeconds", ge=1)
 
 
 class CatalogIssue(BaseModel):
