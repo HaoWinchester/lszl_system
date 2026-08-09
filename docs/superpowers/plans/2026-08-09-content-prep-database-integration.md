@@ -242,7 +242,7 @@ git commit -m "feat: define canonical question payloads"
 - Produces: `GET /api/v1/question-catalog/learning/questions?subject=&bank_id=&paper_id=&page=&page_size=`
 - Produces: `question_catalog_service.question_to_payload(question) -> dict`
 
-- [ ] **Step 1: 写目录 API 失败测试**
+- [x] **Step 1: 写目录 API 失败测试**
 
 覆盖 owner、edit collaborator、view collaborator、admin、student、viewer；分页总数；完整字段往返；私有题库优先；公开题库内 public/internal 混合；deleted lifecycle 排除。
 
@@ -253,13 +253,13 @@ def test_learning_query_applies_both_visibility_rules(client, seeded_catalog):
     assert ids == {seeded_catalog.published_public_active_id}
 ```
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_catalog.py -q`
 
 Expected: FAIL，因为目录路由不存在。
 
-- [ ] **Step 3: 实现服务端过滤和序列化**
+- [x] **Step 3: 实现服务端过滤和序列化**
 
 `mode=writable` 只返回 owner、edit collaborator 或 admin；`mode=managed` 也包含 view collaborator。学习查询使用数据库 WHERE 条件：
 
@@ -275,17 +275,17 @@ or_(
 
 兼容缺失 lifecycle 的历史行时以 active 处理；明确 deleted 必须排除。`paper_id` 查询通过 `PaperQuestion`/`ExamPaper` join，并继续验证试卷 status 和调用方访问策略。`bootstrap` 一次返回页面初始化所需的 banks/questions，并提供 `catalogRevision`（最大 bank/question revision 与更新时间的稳定摘要），但不得写浏览器持久化。
 
-- [ ] **Step 4: 实现路由与 OpenAPI DTO**
+- [x] **Step 4: 实现路由与 OpenAPI DTO**
 
 管理接口要求 `accessQuestionBank`；学习接口使用 `optional_current_user`，只返回公开过滤结果，保留当前匿名预览/登录后学习入口；登录用户的试卷和订阅策略继续在公开过滤结果之上裁剪。所有输出使用 camelCase。
 
-- [ ] **Step 5: 运行 GREEN 和 SQL 查询回归**
+- [x] **Step 5: 运行 GREEN 和 SQL 查询回归**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_catalog.py tests/test_smoke.py -q`
 
 Expected: PASS。
 
-- [ ] **Step 6: 提交本任务**
+- [x] **Step 6: 提交本任务**
 
 ```bash
 git add backend/app/services/question_catalog_service.py backend/app/api/v1/question_catalog.py backend/app/api/v1/router.py backend/tests/test_question_catalog.py

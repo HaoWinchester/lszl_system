@@ -34,3 +34,59 @@ class QuestionPayload(BaseModel):
     lifecycle: dict[str, Any] = Field(default_factory=dict)
     teacher_number: str | None = Field(default=None, alias="teacherNumber", max_length=128)
     explanation: Any = None
+
+
+class CatalogQuestionPayload(QuestionPayload):
+    bank_id: str = Field(alias="bankId", min_length=1, max_length=64)
+    content_hash: str | None = Field(default=None, alias="contentHash", max_length=64)
+    creator_id: str | None = Field(default=None, alias="creatorId", max_length=64)
+    creator_name: str | None = Field(default=None, alias="creatorName", max_length=120)
+    revision: int = Field(ge=1)
+    created_by: str | None = Field(default=None, alias="createdBy", max_length=64)
+    updated_by: str | None = Field(default=None, alias="updatedBy", max_length=64)
+    created_at: str | None = Field(default=None, alias="createdAt")
+    updated_at: str | None = Field(default=None, alias="updatedAt")
+
+
+class CatalogBankPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    id: str
+    owner_id: str = Field(alias="ownerId")
+    name: str
+    subject: str
+    description: str | None = None
+    version: str
+    visibility: str
+    revision: int = Field(ge=1)
+    question_count: int = Field(alias="questionCount", ge=0)
+    access_mode: str = Field(alias="accessMode")
+    created_by: str | None = Field(default=None, alias="createdBy")
+    updated_by: str | None = Field(default=None, alias="updatedBy")
+    created_at: str | None = Field(default=None, alias="createdAt")
+    updated_at: str | None = Field(default=None, alias="updatedAt")
+
+
+class CatalogBankListResponse(BaseModel):
+    banks: list[CatalogBankPayload]
+
+
+class CatalogQuestionListResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    questions: list[CatalogQuestionPayload]
+    total: int = Field(ge=0)
+    page: int = Field(ge=1)
+    page_size: int = Field(alias="pageSize", ge=1)
+
+
+class CatalogQuestionResponse(BaseModel):
+    question: CatalogQuestionPayload
+
+
+class CatalogBootstrapResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    banks: list[CatalogBankPayload]
+    questions: list[CatalogQuestionPayload]
+    catalog_revision: str = Field(alias="catalogRevision", min_length=64, max_length=64)
