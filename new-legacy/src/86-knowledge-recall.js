@@ -11,7 +11,7 @@
   const DATA=window.KNOWLEDGE_RECALL_MAP||{roots:{},nodes:{}};
   const Store=window.KGAppStorage||{};
   const fallbackQuestion={id:'unavailable',title:'暂无可用题目',stemParts:[{text:'当前没有可用于深度回忆的已发布试卷。'}],options:[],clues:[],concepts:[],tags:[],sourceCollectionId:'',sourceBankId:'',sourceQuestionId:'unavailable',sourcePaperId:'',sourceReleaseId:''};
-  let question=loadQuestion();
+  let question=cloneValue(fallbackQuestion);
   let rootMap=buildRootMap(question);
   let keywordMatchers=buildKeywordMatchers(rootMap);
   let state={nodes:[],edges:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
@@ -876,11 +876,20 @@
       }
     });
   }
-  function init(){
+  async function init(){
     if(typeof GraphModel.normalizeGraph!=='function'||typeof GraphModel.removeNode!=='function'||typeof GraphModel.canConnect!=='function'){
       notifyRecallLimit('深度回忆图模型加载失败，请刷新页面后重试。');
       return;
     }
+    try{
+      await window.KGQuestionCatalogAdapter.ready;
+      question=loadQuestion();
+    }catch(error){
+      question=cloneValue({...fallbackQuestion,stemParts:[{text:'题目目录暂不可用，请稍后刷新重试。'}]});
+      notifyRecallLimit('题目目录暂不可用，请稍后刷新重试。');
+    }
+    rootMap=buildRootMap(question);
+    keywordMatchers=buildKeywordMatchers(rootMap);
     if(!enforceRecallPermission())return;
     applyRandomHighlight();bindThemeSelect();bindCanvas();bindQuestionInteractions();bindNodeInteractions();bindTools();bindQuestionDrawer();bindLanguageMode();loadProgress();renderAll();
     setTimeout(()=>centerOn(0,0,false),30);

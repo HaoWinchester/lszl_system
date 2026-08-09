@@ -7,6 +7,7 @@
  */
 (function(global){
   const listeners=new Set();
+  const catalog=global.KGQuestionCatalogAdapter;
 
   function clone(value){
     if(value===undefined)return undefined;
@@ -22,13 +23,20 @@
 
   function sourceQuestion(){
     try{
-      if(typeof qbCurrentQuestion==='function')return qbCurrentQuestion();
+      if(typeof qbCurrentQuestion==='function'){
+        const current=qbCurrentQuestion();
+        if(current)return current;
+      }
     }catch(e){}
-    return appliedQuestion();
+    const snapshot=typeof catalog?.snapshot==='function'?catalog.snapshot():{questions:[]};
+    const rows=Array.isArray(snapshot?.questions)?snapshot.questions:[];
+    let selectedId='';
+    try{if(typeof qBankState!=='undefined')selectedId=String(qBankState.selectedQuestionId||qBankState.currentQuestionId||'')}catch(e){}
+    return rows.find(question=>String(question.id)===selectedId&&String(question.scope||'')==='public'&&question?.lifecycle?.status!=='deleted')||rows.find(question=>String(question.scope||'')==='public'&&question?.lifecycle?.status!=='deleted')||null;
   }
 
   function current(){
-    return clone(appliedQuestion()||sourceQuestion()||null);
+    return clone(sourceQuestion()||null);
   }
 
   function currentBank(){
@@ -39,7 +47,7 @@
   }
 
   function currentId(){
-    const q=appliedQuestion()||sourceQuestion()||{};
+    const q=sourceQuestion()||{};
     return String(q.sourceQuestionId||q.id||q.title||'current');
   }
 
@@ -53,7 +61,7 @@
   }
 
   function currentRevision(){
-    const q=appliedQuestion()||sourceQuestion()||{};
+    const q=sourceQuestion()||{};
     return String(q.revision||q.version||q.updatedAt||'1');
   }
 
@@ -98,6 +106,7 @@
   }
 
   global.KGQuestionRepository=Object.freeze({
+    ready:Promise.resolve(catalog?.ready),
     current,
     currentId,
     currentBank,

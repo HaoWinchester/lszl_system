@@ -167,10 +167,11 @@ function installQuestionTrainingReadonlyGuard(){
   },true)
 }
 
-function initQuestionTrainingPage(){
+async function initQuestionTrainingPage(){
   initQuestionTrainingAuth();
   installQuestionTrainingReadonlyGuard();
   try{
+    await window.KGQuestionCatalogAdapter.ready;
     if(typeof qbLoadBanks==='function')qbLoadBanks();
     const routed=applyQuestionTrainingRoute();
     if(!routed)ensureSingleDeepPublishedSelection();
@@ -183,8 +184,8 @@ function initQuestionTrainingPage(){
     if(typeof qSetCaseTab==='function')qSetCaseTab(typeof qActiveCaseTab!=='undefined'?qActiveCaseTab:'question')
   }catch(err){
     console.error(err);
-    showStatus('考题训练初始化异常，请检查文件完整性。')
+    showStatus('题目目录暂不可用，请稍后刷新重试。')
   }
 }
 document.addEventListener('DOMContentLoaded',initQuestionTrainingPage);
-window.addEventListener('load',()=>setTimeout(initQuestionTrainingPage,0));
+window.addEventListener('load',()=>setTimeout(()=>{void initQuestionTrainingPage()},0));

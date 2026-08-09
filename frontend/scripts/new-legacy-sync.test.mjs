@@ -28,6 +28,20 @@ const requiredFiles = [
   'src/89-guided-learning-app.js',
   'src/90-guided-learning-node-app.js',
   'schemas/activity-schema-v1.json',
+  'content-prep-studio/README.md',
+  'content-prep-studio/build.py',
+  'content-prep-studio/src/index.template.html',
+  'content-prep-studio/src/css/app.css',
+  'content-prep-studio/src/js/00-core-bootstrap.js',
+  'content-prep-studio/src/js/10-state-domain.js',
+  'content-prep-studio/src/js/20-page-runtime.js',
+  'content-prep-studio/src/js/30-service-layer.js',
+  'content-prep-studio/src/js/40-events-bootstrap.js',
+  'content-prep-studio/src/tag-slot-schema.json',
+  'content-prep-studio/tests/test_build.py',
+  'content-prep-studio/tests/test_services.py',
+  'content-prep-studio/tests/test_tag_migration.js',
+  'content-prep-studio/dist/content-prep.html',
 ]
 
 function write(path, content) {
@@ -62,10 +76,12 @@ function fixture({ omit } = {}) {
   for (const page of requiredPages) {
     if (page === omit) continue
     const authScript = page === 'index.html'
-      ? '<script defer src="src/24-graph-file-autosave.js"></script><script defer src="src/30-auth-guards.js"></script>'
+      ? '<script defer src="src/24-graph-file-autosave.js"></script><script defer src="src/30-auth-guards.js"></script><script defer src="src/60-question-bank.js"></script>'
       : page === 'question-training.html'
-        ? '<script defer src="src/72-question-training-page.js"></script>'
-        : ''
+        ? '<script defer src="src/59-published-paper-repository.js"></script><script defer src="src/72-question-training-page.js"></script>'
+        : ['question-workspace.html', 'knowledge-recall.html'].includes(page)
+          ? '<script defer src="src/59-published-paper-repository.js"></script>'
+          : ''
     write(resolve(upstream, page), `<!doctype html><html><head></head><body><script defer src="src/01-runtime-config.js"></script>${authScript}</body></html>`)
   }
   for (const path of requiredFiles) {

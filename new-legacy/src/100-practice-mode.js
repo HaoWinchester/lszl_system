@@ -22,7 +22,7 @@
     releases:[],selectedPaperId:'',selectedCount:10,order:'paper',mode:'',questions:[],index:0,
     health:MAX_HEALTH,streak:0,experience:0,correct:0,answered:0,startedAt:0,endedAt:0,
     locked:false,active:false,completed:false,lastSettings:null,timerId:0,deadline:0,
-    feedbackTimer:0,popTimer:0,abandonedRecorded:false
+    feedbackTimer:0,popTimer:0,abandonedRecorded:false,catalogAvailable:false
   };
 
   function clone(value){try{return JSON.parse(JSON.stringify(value))}catch(error){return value}}
@@ -310,6 +310,12 @@
     dom.paperMeta.textContent=release.subject+' · 已发布 v'+release.version+' · 可练习 '+release.questions.length+' 题';
   }
   function syncLobby(){
+    if(!state.catalogAvailable){
+      state.releases=[];state.selectedPaperId='';
+      if(dom.empty){dom.empty.hidden=false;const title=dom.empty.querySelector('strong'),detail=dom.empty.querySelector('p');if(title)title.textContent='题目目录暂不可用';if(detail)detail.textContent='请稍后刷新页面重试。'}
+      if(dom.setupCard)dom.setupCard.hidden=true;if(dom.modeGrid)dom.modeGrid.hidden=true;
+      renderHistory();return;
+    }
     const releases=loadReleases();
     if(!releases.some(row=>row.id===state.selectedPaperId))state.selectedPaperId=releases[0]?.id||'';
     dom.paperSelect.innerHTML=releases.length?releases.map(row=>'<option value="'+escapeHTML(row.id)+'">'+escapeHTML(row.name)+' · '+row.questions.length+' 题</option>').join(''):'<option value="">暂无已发布试卷</option>';
@@ -338,7 +344,11 @@
     });
   }
   function snapshot(){return {mode:state.mode,index:state.index,health:state.health,streak:state.streak,experience:state.experience,correct:state.correct,answered:state.answered,remainingSeconds:state.mode==='scholar'?remainingSeconds():null,active:state.active,view:document.body.dataset.practiceView||'',questionCount:state.questions.length}}
-  function init(){cacheDom();bind();syncLobby();if(!restoreActiveAttempt())setView('lobby')}
+  async function init(){
+    cacheDom();bind();
+    try{await global.KGQuestionCatalogAdapter.ready;state.catalogAvailable=true}catch(error){state.catalogAvailable=false;console.error(error)}
+    syncLobby();if(state.catalogAvailable&&restoreActiveAttempt())return;setView('lobby');
+  }
 
   const api=Object.freeze({init,startPractice,answerById:id=>answer(id,dom.options.querySelector('[data-option-id="'+CSS.escape(text(id))+'"]')),finishPractice,showLobby,loadReleases,snapshot,constants:Object.freeze({COUNTS:[...COUNTS],MAX_HEALTH,SCHOLAR_MAX_SECONDS,CHECKPOINT_INTERVAL})});
   global.KGPracticeMode=api;

@@ -48,6 +48,7 @@
 
   const state={
     initialized:false,
+    initializing:false,
     viewport:null,
     world:null,
     nodeLayer:null,
@@ -3953,8 +3954,10 @@
     });
   }
 
-  function init(){
-    if(state.initialized||!document.body.classList.contains('question-workspace-page'))return;
+  async function init(){
+    if(state.initialized||state.initializing||!document.body.classList.contains('question-workspace-page'))return;
+    state.initializing=true;
+    try{await global.KGQuestionCatalogAdapter.ready}catch(error){state.initializing=false;document.body.dataset.questionCatalogUnavailable='true';notify('题目目录暂不可用，请稍后刷新重试。');return}
     state.viewport=byId('qwCanvasViewport');
     state.world=byId('qwCanvasWorld');
     state.nodeLayer=byId('qwNodeLayer');
@@ -3962,11 +3965,12 @@
     state.edgeLayer=byId('qwEdgeLayer');
     state.edgeRoot=byId('qwEdges');
     state.analysisLayer=byId('qwAnalysisLayer');
-    if(!state.viewport||!state.world||!state.nodeLayer)return;
+    if(!state.viewport||!state.world||!state.nodeLayer){state.initializing=false;return}
     state.mobile=isMobile();
     state.readonly=state.mobile||!loggedIn();
     createKernel();
     state.initialized=true;
+    state.initializing=false;
     document.body.classList.add('qw-light-canvas');
     state.minimapDirty=true;
     updateReadonly();
@@ -4049,8 +4053,8 @@
   });
 
   document.addEventListener('DOMContentLoaded',init);
-  global.addEventListener('load',()=>setTimeout(()=>{
-    init();
+  global.addEventListener('load',()=>setTimeout(async()=>{
+    await init();
     if(!state.initialized)return;
     buildQuestionList();
     if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();

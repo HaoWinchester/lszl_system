@@ -6,12 +6,13 @@
  */
 
 /* 题库管理 MVP 核心 */
+const QB_CATALOG=window.KGQuestionCatalogAdapter;
+function qbReadJSON(key,fallback=null){try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}catch(e){return fallback}}
 const QUESTION_BANKS_STORAGE_PREFIX='kg_question_banks_v1__';
 const QUESTION_CURRENT_STORAGE_PREFIX='kg_question_current_v1__';
 const QUESTION_PAPERS_STORAGE_PREFIX='kg_exam_papers_v1__';
 const QUESTION_CURRENT_PAPER_STORAGE_PREFIX='kg_exam_current_v1__';
 const QUESTION_PUBLISHED_PAPERS_KEY='kg_exam_papers_published_v1';
-const QUESTION_PUBLISHED_BANKS_KEY='kg_question_banks_published_v1';
 let qBankState={banks:null,papers:null,scope:null,selectedBankId:null,selectedQuestionId:null,currentBankId:null,currentQuestionIndex:0,currentPaperId:null,currentPaperIndex:0};
 function qbCurrentUsername(){
   try{
@@ -84,7 +85,7 @@ function qbNormalizePaper(paper,i=0){
   };
 }
 function qbInvalidateCaches(){qBankState.banks=null;qBankState.papers=null}
-try{window.addEventListener('storage',event=>{if([QUESTION_PUBLISHED_PAPERS_KEY,QUESTION_PUBLISHED_BANKS_KEY,qbPapersKey(),qbBanksKey()].includes(String(event.key||'')))qbInvalidateCaches()});window.addEventListener('kg:published-papers-changed',qbInvalidateCaches)}catch(e){}
+try{window.addEventListener('storage',event=>{if([QUESTION_PUBLISHED_PAPERS_KEY,qbPapersKey()].includes(String(event.key||'')))qbInvalidateCaches()});window.addEventListener('kg:published-papers-changed',qbInvalidateCaches);window.addEventListener('kg:question-catalog-changed',qbInvalidateCaches)}catch(e){}
 function qbLoadPapers(){
   qbEnsureScopeState();
   if(qBankState.papers)return qBankState.papers;
@@ -223,29 +224,37 @@ function qbValidateBank(bank){
   (bank.questions||[]).forEach((q,i)=>{if(!q.title)errors.push(`第 ${i+1} 题缺少 title。`);if(!Array.isArray(q.options)||q.options.length<2)errors.push(`第 ${i+1} 题选项不足。`);const hasCorrect=(q.options||[]).some(o=>o.correct)||q.correctAnswer;if(!hasCorrect)errors.push(`第 ${i+1} 题缺少正确答案。`);});
   return errors;
 }
+function qbLoadLegacyBanksForMigrationPreview(){
+  if(typeof document==='undefined'||document.body?.dataset?.questionCatalogMigrationPreview!=='true')return [];
+  const rows=qbReadJSON(qbBanksKey(),[]);
+  return Array.isArray(rows)?rows.map(qbNormalizeBank):[];
+}
+function qbCatalogQuestionAllowed(question){return String(question?.scope||'')==='public'&&!qbIsQuestionDeleted(question)}
+function qbCatalogBankAllowed(bank){return String(bank?.visibility||'')==='published'&&String(bank?.accessMode||'')!=='private'}
 function qbLoadBanks(){
   qbEnsureScopeState();if(qBankState.banks)return qBankState.banks;
-  let own=[],publishedBanks=[],publishedPapers=[];
-  try{own=JSON.parse(localStorage.getItem(qbBanksKey())||'[]')}catch(e){own=[]}
-  try{publishedBanks=JSON.parse(localStorage.getItem(QUESTION_PUBLISHED_BANKS_KEY)||'[]')}catch(e){publishedBanks=[]}
-  try{publishedPapers=JSON.parse(localStorage.getItem(QUESTION_PUBLISHED_PAPERS_KEY)||'[]')}catch(e){publishedPapers=[]}
-  const rows=[],ids=new Set();
-  const add=bank=>{const normalized=qbNormalizeBank(bank);if(!normalized.id||ids.has(normalized.id))return;ids.add(normalized.id);rows.push(normalized)};
-  (Array.isArray(own)?own:[]).forEach(add);(Array.isArray(publishedBanks)?publishedBanks:[]).forEach(add);
-  (Array.isArray(publishedPapers)?publishedPapers:[]).forEach(release=>{const grouped=new Map();(release.questionSnapshots||[]).forEach(item=>{if(!item?.question)return;const bankId=String(item.bankId||'');if(!bankId)return;if(!grouped.has(bankId))grouped.set(bankId,{id:bankId,name:String(item.bankName||release.name||'发布试卷题库'),subject:String(item.bankSubject||release.subject||'PMP'),visibility:'published-paper',questions:[]});grouped.get(bankId).questions.push(item.question)});grouped.forEach(add)});
-  if(!rows.length)add(qbDefaultBank());qBankState.banks=rows;
+  const snapshot=QB_CATALOG.snapshot();
+  const allowedQuestions=(Array.isArray(snapshot?.questions)?snapshot.questions:[]).filter(qbCatalogQuestionAllowed);
+  const questionsByBank=new Map();
+  allowedQuestions.forEach(question=>{const bankId=String(question?.bankId||'');if(!bankId)return;if(!questionsByBank.has(bankId))questionsByBank.set(bankId,[]);questionsByBank.get(bankId).push(question)});
+  qBankState.banks=(Array.isArray(snapshot?.banks)?snapshot.banks:[]).filter(qbCatalogBankAllowed).map(bank=>qbNormalizeBank({...bank,questions:questionsByBank.get(String(bank.id))||[]})).filter(bank=>bank.questions.length);
   try{const cur=JSON.parse(localStorage.getItem(qbCurrentKey())||'null');if(cur){qBankState.currentBankId=cur.bankId;qBankState.currentQuestionIndex=Number(cur.index||0)}}catch(e){}
-  qbLoadPapers();qbApplyPaperContext();if(!qBankState.currentBankId)qBankState.currentBankId=qBankState.banks[0].id;const bank=qbCurrentBank()||qBankState.banks[0];qBankState.currentBankId=bank.id;const pointed=bank.questions?.[Math.max(0,Math.min(qBankState.currentQuestionIndex,(bank.questions||[]).length-1))];const fallback=qbActiveQuestions(bank)[0]||null;const selected=!qBankState.currentPaperId&&qbIsQuestionDeleted(pointed)?fallback:pointed||fallback;qBankState.currentQuestionIndex=selected?Math.max(0,bank.questions.findIndex(item=>item.id===selected.id)):0;qBankState.selectedBankId=qBankState.selectedBankId||qBankState.currentBankId;qBankState.selectedQuestionId=qBankState.selectedQuestionId||selected?.id||fallback?.id||null;qbEnsureAllowedCurrentForRole();return qBankState.banks;
+  qbLoadPapers();qbApplyPaperContext();
+  const firstBank=qBankState.banks[0]||null;
+  if(!firstBank){qBankState.currentBankId=null;qBankState.selectedBankId=null;qBankState.selectedQuestionId=null;qBankState.currentQuestionIndex=0;return qBankState.banks}
+  if(!qBankState.banks.some(bank=>bank.id===qBankState.currentBankId))qBankState.currentBankId=firstBank.id;
+  const bank=qbCurrentBank()||firstBank;qBankState.currentBankId=bank.id;const pointed=bank.questions?.[Math.max(0,Math.min(qBankState.currentQuestionIndex,(bank.questions||[]).length-1))];const fallback=qbActiveQuestions(bank)[0]||null;const selected=!qBankState.currentPaperId&&qbIsQuestionDeleted(pointed)?fallback:pointed||fallback;qBankState.currentQuestionIndex=selected?Math.max(0,bank.questions.findIndex(item=>item.id===selected.id)):0;qBankState.selectedBankId=qBankState.selectedBankId&&qBankState.banks.some(item=>item.id===qBankState.selectedBankId)?qBankState.selectedBankId:qBankState.currentBankId;qBankState.selectedQuestionId=qBankState.selectedQuestionId||selected?.id||fallback?.id||null;qbEnsureAllowedCurrentForRole();return qBankState.banks;
 }
-function qbSaveBanks(){if(!authRequire('登录后才能保存题库管理数据。'))return false;localStorage.setItem(qbBanksKey(),JSON.stringify(qbLoadBanks()));return true}
+function qbSaveBanks(){void qbBanksKey();showStatus('正式题库由服务器统一管理，请在题库管理页完成修改。');return false}
 function qbSaveCurrent(){try{localStorage.setItem(qbCurrentKey(),JSON.stringify({bankId:qBankState.currentBankId,index:qBankState.currentQuestionIndex}))}catch(e){}}
-function qbCurrentBank(){return qbLoadBanks().find(b=>b.id===qBankState.currentBankId)||qbLoadBanks()[0]}
+function qbCurrentBank(){const banks=qbLoadBanks();return banks.find(b=>b.id===qBankState.currentBankId)||banks[0]||null}
 function qbSelectedBank(){return qbLoadBanks().find(b=>b.id===qBankState.selectedBankId)||qbCurrentBank()}
-function qbCurrentQuestion(){const paperQuestion=qbApplyPaperContext();if(paperQuestion)return paperQuestion;const b=qbCurrentBank();const pointed=b?.questions?.[qBankState.currentQuestionIndex];if(pointed&&!qbIsQuestionDeleted(pointed))return pointed;const fallback=qbActiveQuestions(b)[0]||qbDefaultBank().questions[0];if(b&&fallback){qBankState.currentQuestionIndex=Math.max(0,b.questions.findIndex(item=>item.id===fallback.id))}return fallback}
+function qbCurrentQuestion(){const paperQuestion=qbApplyPaperContext();if(paperQuestion)return paperQuestion;const b=qbCurrentBank();const pointed=b?.questions?.[qBankState.currentQuestionIndex];if(pointed&&!qbIsQuestionDeleted(pointed))return pointed;const fallback=qbActiveQuestions(b)[0]||null;if(b&&fallback){qBankState.currentQuestionIndex=Math.max(0,b.questions.findIndex(item=>item.id===fallback.id))}return fallback}
 function qbSelectedQuestion(){const b=qbSelectedBank(),selected=b&&(b.questions||[]).find(q=>q.id===qBankState.selectedQuestionId);return selected&&!qbIsQuestionDeleted(selected)?selected:qbActiveQuestions(b)[0]||null}
 function qbApplyCurrentQuestion(reset=true){
   const sourceQuestion=qbCurrentQuestion();
   const sourceBank=qbCurrentBank();
+  if(!sourceQuestion){PMP_QUESTION_MVP=null;if(reset)qMvpState=qNewMvpState();return null}
   const cloned=qbNormalizeQuestion(qbClone(sourceQuestion));
   cloned.sourceBankId=String(sourceBank?.id||qBankState.currentBankId||cloned.sourceBankId||'');
   cloned.sourceQuestionId=String(sourceQuestion?.id||cloned.id||'');
@@ -282,7 +291,7 @@ function qbFindDemoBankQuestion(){
 function qbEnsureAllowedCurrentForRole(){
   const roleApi=window.KGRolePermissions;
   if(!roleApi||typeof roleApi.canOperateQuestion!=='function')return;
-  const bank=qBankState.banks.find(b=>b.id===qBankState.currentBankId)||qBankState.banks[0];
+  const bank=(qBankState.banks||[]).find(b=>b.id===qBankState.currentBankId)||(qBankState.banks||[])[0];
   const question=bank?.questions?.[qBankState.currentQuestionIndex];
   if(!question||(!qbIsQuestionDeleted(question)&&roleApi.canOperateQuestion(question,bank.id)))return;
   const demo=qbFindDemoBankQuestion();

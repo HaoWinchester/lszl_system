@@ -4,6 +4,8 @@
 (function(global){
   const LEGACY_CURRENT_KEY='kg_deep_recall_current_question_v1';
   const AUTH_SESSION_KEY='kg_local_current_user_v1';
+  const catalogReady=Promise.resolve(global.KGQuestionCatalogAdapter?.ready);
+  let catalogLoaded=false;
   let cache={signature:'',list:[]};
 
   function clone(value){try{return JSON.parse(JSON.stringify(value))}catch(error){return value}}
@@ -51,12 +53,7 @@
       })
     })).filter(item=>item.id&&item.questions.length);
   }
-  function list(){
-    const raw=signature();
-    if(cache.signature===raw)return cache.list;
-    cache={signature:raw,list:buildList()};
-    return cache.list;
-  }
+  function list(){if(!catalogLoaded)return [];const raw=signature();if(cache.signature===raw)return cache.list;cache={signature:raw,list:buildList()};return cache.list}
   function banks(){return list()}
   function invalidate(){cache={signature:'',list:[]}}
   function resolveCollection(identifier){
@@ -117,6 +114,8 @@
     }catch(error){return {valid:false,errors:['切换题目失败：'+error.message]}}
   }
 
+  catalogReady.then(()=>{catalogLoaded=true;invalidate()},()=>{catalogLoaded=false;invalidate()});
+
   try{
     global.addEventListener?.('kg:published-papers-changed',invalidate);
     global.addEventListener?.('kg-app-storage-change',event=>{
@@ -124,7 +123,7 @@
     });
   }catch(error){}
 
-  const api=Object.freeze({banks,list,find,findPublished,findAny,activate,invalidate,emptyQuestion});
+  const api=Object.freeze({ready:catalogReady,banks,list,find,findPublished,findAny,activate,invalidate,emptyQuestion});
   global.KGRecallQuestionSource=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
