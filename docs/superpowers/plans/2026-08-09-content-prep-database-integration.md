@@ -503,31 +503,31 @@ git commit -m "refactor: route question crud through catalog"
 - CLI: `backend/scripts/migrate_runtime_questions.py [--apply] [--report PATH]`
 - Sources: current relational rows, `RuntimeState.storage['kg_question_banks_v1__*']`, `SharedRuntimeState['kg_question_banks_published_v1']`
 
-- [ ] **Step 1: 写 dry-run、冲突和重跑失败测试**
+- [x] **Step 1: 写 dry-run、冲突和重跑失败测试**
 
 覆盖同 ID/同 hash 合并；同 ID/不同 hash 阻止 apply；私有 owner 保留；共享 published bank 保留发布状态；历史非 UUID ID 保留；重复执行不增加行；空/损坏 JSON 进入 issues 而不是跳过。
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_runtime_migration.py -q`
 
 Expected: FAIL。
 
-- [ ] **Step 3: 实现只读快照和报告**
+- [x] **Step 3: 实现只读快照和报告**
 
 报告必须包含：`snapshotHash`、三类来源数量、bank/question 总数、public/internal 数、deduplicated 数、conflicts、invalidRecords、nullContentHashes、执行时间。默认不写数据库；只有 `--apply` 且 conflicts 为空时执行。
 
-- [ ] **Step 4: 实现 apply 和 hash 补齐**
+- [x] **Step 4: 实现 apply 和 hash 补齐**
 
 迁移使用稳定 bank/question ID；关系表已有行先规范化并补 content hash；共享题库无明确 owner 时使用原 `publishedBy`，缺失时记为冲突，不能默认为当前运行账号。整个 apply 单事务，原 Runtime State 不删除。
 
-- [ ] **Step 5: 运行 GREEN 与本地 dry-run**
+- [x] **Step 5: 运行 GREEN 与本地 dry-run**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_runtime_migration.py -q && .venv/bin/python scripts/migrate_runtime_questions.py --report /tmp/content-prep-migration-dry-run.json`
 
 Expected: 测试 PASS；CLI 不修改数据并生成 JSON 报告。若本地真实数据有 conflicts，只报告，不执行修复。
 
-- [ ] **Step 6: 提交本任务**
+- [x] **Step 6: 提交本任务**
 
 ```bash
 git add backend/app/services/question_migration_service.py backend/scripts/migrate_runtime_questions.py backend/tests/test_question_runtime_migration.py
