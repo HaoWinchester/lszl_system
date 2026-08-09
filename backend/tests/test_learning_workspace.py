@@ -24,11 +24,16 @@ def _create_student(username: str) -> None:
     assert response.status_code == 200, response.text
 
 
-def _create_question(client: TestClient) -> str:
-    bank = client.post("/api/v1/banks", json={"name": _name("学习题库"), "subject": "PMP"})
+def _create_published_question() -> str:
+    admin = TestClient(app)
+    _login(admin, "admin", "admin123")
+    bank = admin.post(
+        "/api/v1/banks",
+        json={"name": _name("学习题库"), "subject": "PMP", "visibility": "published"},
+    )
     assert bank.status_code == 200, bank.text
     bank_id = bank.json()["bank"]["id"]
-    question = client.post(
+    question = admin.post(
         f"/api/v1/banks/{bank_id}/questions",
         json={
             "title": "学习会话测试题",
@@ -37,7 +42,10 @@ def _create_question(client: TestClient) -> str:
         },
     )
     assert question.status_code == 200, question.text
-    return question.json()["question"]["id"]
+    question_id = question.json()["question"]["id"]
+    published = admin.put(f"/api/v1/questions/{question_id}", json={"scope": "public"})
+    assert published.status_code == 200, published.text
+    return question_id
 
 
 def test_training_session_and_events_round_trip() -> None:
@@ -45,7 +53,7 @@ def test_training_session_and_events_round_trip() -> None:
     _create_student(username)
     client = TestClient(app)
     _login(client, username)
-    question_id = _create_question(client)
+    question_id = _create_published_question()
     session = {
         "schemaVersion": 2,
         "currentStep": 3,

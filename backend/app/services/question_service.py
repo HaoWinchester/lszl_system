@@ -3,10 +3,11 @@
 import random
 
 from fastapi import HTTPException
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
+from app.models.content_prep import QuestionUploadBatch
 from app.models.question import DRAFT, ExamPaper, PaperQuestion, PUBLISHED, Question, QuestionBank
 from app.models.user import User
 from app.services import (
@@ -124,6 +125,9 @@ async def delete_bank(db: AsyncSession, owner: User | str, bank_id: str) -> bool
     except HTTPException:
         return False
     qs = (await db.execute(select(Question).where(Question.bank_id == bank_id))).scalars().all()
+    await db.execute(
+        delete(QuestionUploadBatch).where(QuestionUploadBatch.bank_id == bank_id)
+    )
     for q in qs:
         await db.delete(q)
     await db.delete(b)

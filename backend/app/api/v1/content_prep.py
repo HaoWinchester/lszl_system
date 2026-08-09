@@ -175,7 +175,12 @@ async def save_question(
         tagConfig=request.tag_config,
     )
     try:
-        result = await content_prep_service.upload_bundle(db, actor, batch_request)
+        result = await content_prep_service.upload_bundle(
+            db,
+            actor,
+            batch_request,
+            require_existing_locks=True,
+        )
     except content_prep_service.ContentPrepOperationError as error:
         _raise_upload_error(error)
     return {

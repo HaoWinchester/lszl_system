@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import uid
 from app.models.training import CanvasWorkspace, LearningEvent, TrainingProgress
-from app.services import question_service
+from app.services import question_catalog_service, question_service
 
 SESSION_SCHEMA_VERSIONS = {1, 2}
 WORKSPACE_SCHEMA_VERSIONS = set(range(1, 7))
@@ -19,7 +19,9 @@ def _iso(value) -> str | None:
 
 
 async def _owned_question(db: AsyncSession, owner: str, question_id: str) -> bool:
-    return await question_service.get_question(db, owner, question_id) is not None
+    if await question_service.get_question(db, owner, question_id) is not None:
+        return True
+    return await question_catalog_service.is_learning_question_visible(db, question_id)
 
 
 async def _progress(db: AsyncSession, owner: str, question_id: str) -> TrainingProgress | None:

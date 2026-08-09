@@ -24,6 +24,25 @@ def _login(client: TestClient, username: str, password: str = PASSWORD) -> None:
     assert response.status_code == 200
 
 
+def test_catalog_serializer_normalizes_legacy_string_collections() -> None:
+    question = Question(
+        id="legacy-string-question",
+        bank_id="legacy-string-bank",
+        title="旧格式题目",
+        stem_parts=["旧格式题干"],
+        clues=["旧格式线索"],
+        concepts=["可持续步调"],
+        reasoning_steps=["先判断原则"],
+    )
+
+    payload = question_to_payload(question)
+
+    assert payload["stemParts"] == [{"text": "旧格式题干"}]
+    assert payload["clues"] == [{"text": "旧格式线索"}]
+    assert payload["concepts"] == [{"title": "可持续步调"}]
+    assert payload["reasoningSteps"] == [{"content": "先判断原则"}]
+
+
 def test_catalog_access_pagination_round_trip_and_learning_visibility() -> None:
     suffix = uuid4().hex[:10]
     usernames = {

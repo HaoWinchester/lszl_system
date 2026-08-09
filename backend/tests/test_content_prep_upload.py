@@ -140,6 +140,95 @@ def request_payload(
     )
 
 
+def test_deleting_bank_removes_upload_batches_and_preserves_audit_history() -> None:
+    suffix = uuid4().hex[:10]
+    bank_id = f"delete-upload-bank-{suffix}"
+    question_id = str(uuid4())
+    batch_id = f"delete-upload-batch-{suffix}"
+    audit_id = f"delete-upload-audit-{suffix}"
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                QuestionBank(
+                    id=bank_id,
+                    owner_id="admin",
+                    name="可删除上传题库",
+                    subject="PMP",
+                )
+            )
+            await db.flush()
+            db.add(
+                Question(
+                    id=question_id,
+                    bank_id=bank_id,
+                    title="待删除题目",
+                    subject="PMP",
+                )
+            )
+            db.add(
+                QuestionUploadBatch(
+                    id=batch_id,
+                    idempotency_key=f"delete-{suffix}",
+                    bank_id=bank_id,
+                    actor_username="admin",
+                    actor_role="admin",
+                    creator_id="creator_001",
+                    creator_name="波塞冬",
+                    client_instance_id="delete-test",
+                    manifest_hash="a" * 64,
+                    input_count=1,
+                    status="committed",
+                )
+            )
+            db.add(
+                QuestionAuditLog(
+                    id=audit_id,
+                    entity_type="question",
+                    entity_id=question_id,
+                    action="question_created",
+                    actor_username="admin",
+                    actor_role="admin",
+                    creator_id="creator_001",
+                    creator_name="波塞冬",
+                    bank_id=bank_id,
+                    question_id=question_id,
+                    batch_id=batch_id,
+                )
+            )
+            await db.commit()
+
+    async def verify_and_cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            assert await db.get(QuestionBank, bank_id) is None
+            assert await db.get(QuestionUploadBatch, batch_id) is None
+            assert await db.get(QuestionAuditLog, audit_id) is not None
+            await db.execute(delete(QuestionAuditLog).where(QuestionAuditLog.id == audit_id))
+            await db.commit()
+
+    async def cleanup_after_failure() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(QuestionAuditLog).where(QuestionAuditLog.id == audit_id))
+            await db.execute(delete(QuestionUploadBatch).where(QuestionUploadBatch.id == batch_id))
+            await db.execute(delete(Question).where(Question.id == question_id))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "admin123"},
+            ).status_code == 200
+            deleted = client.delete(f"/api/v1/banks/{bank_id}")
+            assert deleted.status_code == 200, deleted.text
+        asyncio.run(verify_and_cleanup())
+    except Exception:
+        asyncio.run(cleanup_after_failure())
+        raise
+
+
 def test_transactional_upload_create_skip_update_idempotency_and_single_save() -> None:
     suffix = uuid4().hex[:10]
     username = f"prep-upload-{suffix}"
@@ -406,5 +495,41 @@ def test_transactional_upload_create_skip_update_idempotency_and_single_save() -
             )
             assert batch.status_code == 200
             assert batch.json()["batch"]["status"] == "committed"
+
+            stale_grant = asyncio.run(lock_for_single_save())
+            client.post("/api/v1/auth/logout")
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "admin123"},
+            ).status_code == 200
+            forced = client.delete(
+                f"/api/v1/content-prep/locks/{new_question_id}/force"
+            )
+            assert forced.status_code == 200
+            client.post("/api/v1/auth/logout")
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": username, "password": PASSWORD},
+            ).status_code == 200
+            stale = client.put(
+                f"/api/v1/content-prep/questions/{new_question_id}",
+                json={
+                    "idempotencyKey": f"single-stale-{suffix}",
+                    "clientInstanceId": "upload-browser",
+                    "creatorId": "creator_001",
+                    "baseRevision": 3,
+                    "lockToken": stale_grant["lockToken"],
+                    "question": single_changed,
+                    "principles": request_payload(
+                        key="unused-stale",
+                        bank_id=target_bank_id,
+                        question=single_changed,
+                    ).principles,
+                    "synthesisPresets": {},
+                    "tagConfig": {},
+                },
+            )
+            assert stale.status_code == 409, stale.text
+            assert stale.json()["detail"]["code"] == "LOCK_TOKEN_INVALID"
     finally:
         asyncio.run(cleanup())

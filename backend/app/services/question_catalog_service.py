@@ -21,6 +21,16 @@ def _iso(value) -> str | None:
     return value.isoformat() if value else None
 
 
+def _legacy_object_list(values, *, text_key: str) -> list[dict]:
+    normalized: list[dict] = []
+    for value in values or []:
+        if isinstance(value, dict):
+            normalized.append(value)
+        elif value is not None and str(value).strip():
+            normalized.append({text_key: str(value)})
+    return normalized
+
+
 def question_to_payload(question: Question) -> dict:
     """Serialize every canonical question field using the browser contract aliases."""
 
@@ -40,16 +50,16 @@ def question_to_payload(question: Question) -> dict:
         "creatorName": question.creator_name,
         "revision": question.revision,
         "tags": question.tags or [],
-        "stemParts": question.stem_parts or [],
+        "stemParts": _legacy_object_list(question.stem_parts, text_key="text"),
         "options": question.options or [],
         "correctAnswer": question.correct_answer,
         "analysis": question.analysis,
         "translations": question.translations or {},
         "metadata": question.content_metadata or {},
         "keyPath": question.key_path or {},
-        "clues": question.clues or [],
-        "concepts": question.concepts or [],
-        "reasoningSteps": question.reasoning_steps or [],
+        "clues": _legacy_object_list(question.clues, text_key="text"),
+        "concepts": _legacy_object_list(question.concepts, text_key="title"),
+        "reasoningSteps": _legacy_object_list(question.reasoning_steps, text_key="content"),
         "status": question.status or {},
         "lifecycle": question.lifecycle or {},
         "createdBy": question.created_by,
@@ -192,6 +202,16 @@ def _learning_visibility_clause():
             Question.lifecycle["status"].astext == "active",
         ),
     )
+
+
+async def is_learning_question_visible(db: AsyncSession, question_id: str) -> bool:
+    query = (
+        select(Question.id)
+        .join(QuestionBank, QuestionBank.id == Question.bank_id)
+        .where(Question.id == question_id, *_learning_visibility_clause())
+        .limit(1)
+    )
+    return (await db.execute(query)).scalar_one_or_none() is not None
 
 
 async def list_learning_questions(

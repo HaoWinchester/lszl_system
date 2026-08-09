@@ -906,6 +906,8 @@ async def _execute_upload(
     actor: _ActorContext,
     request: ContentPrepBatchRequest,
     manifest_hash: str,
+    *,
+    require_existing_locks: bool,
 ) -> ContentPrepBatchResult:
     from app.services import question_lock_service
 
@@ -963,7 +965,9 @@ async def _execute_upload(
         )
 
     for prepared_question in prepared:
-        if prepared_question.status != "updated":
+        if prepared_question.existing is None or (
+            prepared_question.status != "updated" and not require_existing_locks
+        ):
             continue
         item = request.questions[prepared_question.item_index]
         try:
@@ -1047,7 +1051,10 @@ async def _execute_upload(
             revision = question.revision
             action = "question_skipped"
             skipped_count += 1
-            await _remove_own_skipped_lock(db, actor, request, question_id)
+            if prepared_question.lock is not None:
+                await db.delete(prepared_question.lock)
+            else:
+                await _remove_own_skipped_lock(db, actor, request, question_id)
 
         _add_question_audit(
             db,
@@ -1276,6 +1283,8 @@ async def upload_bundle(
     db: AsyncSession,
     actor: User,
     request: ContentPrepBatchRequest,
+    *,
+    require_existing_locks: bool = False,
 ) -> ContentPrepBatchResult:
     actor_context = _actor_context(actor)
     manifest_hash = _manifest_hash(request)
@@ -1283,7 +1292,13 @@ async def upload_bundle(
         await db.rollback()
     try:
         async with db.begin():
-            return await _execute_upload(db, actor_context, request, manifest_hash)
+            return await _execute_upload(
+                db,
+                actor_context,
+                request,
+                manifest_hash,
+                require_existing_locks=require_existing_locks,
+            )
     except ContentPrepInputError as error:
         raise ContentPrepOperationError(
             error.code,
