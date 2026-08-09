@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -55,11 +55,16 @@ test('content prep studio ships reproducible modular source and backend bootstra
     'content-prep-studio/src/js/10-state-domain.js',
     'content-prep-studio/src/js/20-page-runtime.js',
     'content-prep-studio/src/js/30-service-layer.js',
+    'content-prep-studio/src/js/35-server-catalog-service.js',
     'content-prep-studio/src/js/40-events-bootstrap.js',
+    'content-prep-studio/src/js/45-server-events.js',
     'content-prep-studio/src/tag-slot-schema.json',
     'content-prep-studio/tests/test_build.py',
     'content-prep-studio/tests/test_services.py',
     'content-prep-studio/tests/test_tag_migration.js',
+    'content-prep-studio/tests/test_server_catalog.js',
+    'content-prep-studio/tests/test_edit_lock_client.js',
+    'content-prep-studio/tests/test_server_ui_contract.py',
     'content-prep-studio/dist/content-prep.html',
   ]
   for (const path of required) {
@@ -192,6 +197,48 @@ test('failed automatic validation never changes the active release', () => {
   assert.equal(readFileSync(resolve(root, 'current.json'), 'utf8'), before)
   const report = readJson(resolve(root, 'v8.6.1-validation-failure', 'validation.json'))
   assert.equal(report.passed, false)
+  assert.ok(Array.isArray(report.command))
+  assert.match(report.error, /candidate rejected/)
+})
+
+test('candidate with fewer site files is rejected before promotion', () => {
+  const root = makeRoot()
+  assert.equal(run(root, 'update', source).status, 0)
+  const before = readFileSync(resolve(root, 'current.json'), 'utf8')
+  const next = resolve(root, 'smaller-source')
+  const nextVersion = `${sourceVersion}-smaller-site`
+  cpSync(source, next, { recursive: true })
+  writeFileSync(resolve(next, 'VERSION'), `${nextVersion}\n`)
+  rmSync(resolve(next, 'README.md'))
+
+  const result = run(root, 'update', next)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /候选 site 文件数.*当前 active site/)
+  assert.equal(readFileSync(resolve(root, 'current.json'), 'utf8'), before)
+  const report = readJson(resolve(root, nextVersion, 'validation.json'))
+  assert.equal(report.passed, false)
+  assert.match(report.error, /候选 site 文件数/)
+})
+
+test('candidate missing a critical content page is rejected before promotion', () => {
+  const root = makeRoot()
+  assert.equal(run(root, 'update', source).status, 0)
+  const before = readFileSync(resolve(root, 'current.json'), 'utf8')
+  const next = resolve(root, 'missing-critical-source')
+  const nextVersion = `${sourceVersion}-missing-critical`
+  cpSync(source, next, { recursive: true })
+  writeFileSync(resolve(next, 'VERSION'), `${nextVersion}\n`)
+  rmSync(resolve(next, 'admin-console.html'))
+
+  const result = run(root, 'update', next)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /候选 site 缺少关键文件.*admin-console\.html/s)
+  assert.equal(readFileSync(resolve(root, 'current.json'), 'utf8'), before)
+  const report = readJson(resolve(root, nextVersion, 'validation.json'))
+  assert.equal(report.passed, false)
+  assert.match(report.error, /admin-console\.html/)
 })
 
 test('rollback selects the previous successful release', () => {
@@ -216,5 +263,8 @@ test('release validation runs smoke and visual regression against the candidate'
 
   // full_role_regression.py 绑定 v8.6 全字段 UI，v9 重构（简化模式 + 试卷独立页）后待重写，暂移出验收。
   assert.ok(validator.includes('frontend/e2e/new_legacy_smoke.py'))
+  assert.ok(validator.includes('content-prep-studio/tests/test_server_catalog.js'))
+  assert.ok(validator.includes('frontend/e2e/content_prep_question_bank.py'))
+  assert.ok(validator.includes('frontend/e2e/content_prep_concurrency.py'))
   assert.ok(validator.includes('frontend/e2e/direct_new_legacy_visual.py'))
 })

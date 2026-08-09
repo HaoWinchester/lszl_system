@@ -36,11 +36,16 @@ const requiredFiles = [
   'content-prep-studio/src/js/10-state-domain.js',
   'content-prep-studio/src/js/20-page-runtime.js',
   'content-prep-studio/src/js/30-service-layer.js',
+  'content-prep-studio/src/js/35-server-catalog-service.js',
   'content-prep-studio/src/js/40-events-bootstrap.js',
+  'content-prep-studio/src/js/45-server-events.js',
   'content-prep-studio/src/tag-slot-schema.json',
   'content-prep-studio/tests/test_build.py',
   'content-prep-studio/tests/test_services.py',
   'content-prep-studio/tests/test_tag_migration.js',
+  'content-prep-studio/tests/test_server_catalog.js',
+  'content-prep-studio/tests/test_edit_lock_client.js',
+  'content-prep-studio/tests/test_server_ui_contract.py',
   'content-prep-studio/dist/content-prep.html',
 ]
 

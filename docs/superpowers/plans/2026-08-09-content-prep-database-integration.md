@@ -800,35 +800,35 @@ git commit -m "feat: add in-memory question catalog adapter"
 - Existing-question edit acquires the same server lock and saves with `lockToken + baseRevision`
 - Existing DOM/class names and current Focus/Vega teacher skin remain unchanged
 
-- [ ] **Step 1: 写教师页失败测试**
+- [x] **Step 1: 写教师页失败测试**
 
 断言 `init()`/`initPaperManagementPage()` await catalog ready；新增/编辑题库和题目调用 adapter；选中已有题进入编辑前获取锁并开始 30 秒心跳；保存带 token/revision；切题/关闭释放；被锁时只读；原 `banksKey()` 只用于 migration fallback read；`saveBanks()` 不写正式题库 runtime key；现有 DOM 和样式链接未变化。
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `node new-legacy/tests/content-prep-question-bank-integration.test.js`
 
 Expected: FAIL。
 
-- [ ] **Step 3: 重构初始化和显式写操作**
+- [x] **Step 3: 重构初始化和显式写操作**
 
 把 `init` 改为 async，并在渲染前 await adapter。将保存题库、保存题目、发布可见性、删除/恢复等调用映射到专用目录/现有兼容 API；已有题保存调用 content-prep 单题端点并传锁 token/revision，沿用题目已有 creatorId（迁移历史题可为空，actor 仍完整审计）。API 成功后 reload 内存快照，失败时恢复编辑前 state 并显示后端错误。不要改变题库页面 DOM 骨架和 CSS class。
 
-- [ ] **Step 4: 保留试卷发布快照边界**
+- [x] **Step 4: 保留试卷发布快照边界**
 
 试卷发布仍可生成不可变 `questionSnapshots` 作为 release artifact，但候选题和当前可编辑题从 catalog API 获取。快照不是可编辑正式题目主数据，不回写题库。
 
-- [ ] **Step 5: 编写 Prep → 题库 E2E**
+- [x] **Step 5: 编写 Prep → 题库 E2E**
 
 用 admin 登录，在 `/content-prep` 创建私有题库、上传一题，随后打开 `/question-bank?bankId=...&questionId=...`，断言无需 JSON 导入即可看到同一 ID、标题、制作人和 revision。
 
-- [ ] **Step 6: 运行 GREEN**
+- [x] **Step 6: 运行 GREEN**
 
 Run: `node new-legacy/tests/content-prep-question-bank-integration.test.js`
 
 Expected: PASS。浏览器测试在 Task 18 候选 release 中运行。
 
-- [ ] **Step 7: 提交本任务**
+- [x] **Step 7: 提交本任务**
 
 ```bash
 git add new-legacy/question-bank.html new-legacy/paper-management.html new-legacy/src/65-question-bank-admin.js new-legacy/tests/content-prep-question-bank-integration.test.js frontend/scripts/new-legacy-assets/direct-question-adapter.js frontend/e2e/content_prep_question_bank.py
@@ -853,31 +853,31 @@ git commit -m "feat: read teacher questions from catalog"
 - Learning visibility remains server filtered; client role checks are defense-in-depth only
 - Existing published paper snapshots remain immutable release inputs
 
-- [ ] **Step 1: 写学习页失败测试**
+- [x] **Step 1: 写学习页失败测试**
 
 测试 public+active 可见；internal、private、deleted 不进入 banks/repository；目录未 ready 时不渲染错误示例题；API 失败显示不可用状态；发布试卷快照仍按 release ID 固定；页面不写正式目录键。
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `node new-legacy/tests/question-catalog-learning-integration.test.js`
 
 Expected: FAIL。
 
-- [ ] **Step 3: 切换 `60-question-bank.js` 数据源**
+- [x] **Step 3: 切换 `60-question-bank.js` 数据源**
 
 保留 `qbNormalizeBank/qbNormalizeQuestion` 和当前全局函数契约；`qbLoadBanks()` 从适配器内存快照构建 banks。只有显式 migration preview 模式可读取旧 runtime bank keys，正式页面默认禁用。
 
-- [ ] **Step 4: 为所有入口增加 ready barrier**
+- [x] **Step 4: 为所有入口增加 ready barrier**
 
 逐页修改 `DOMContentLoaded` initializer，使训练、工作区、回忆和 practice library 在目录加载完成后再建立当前题目/试卷上下文。不得用 setTimeout 猜测网络完成。
 
-- [ ] **Step 5: 运行 GREEN 和现有学习回归**
+- [x] **Step 5: 运行 GREEN 和现有学习回归**
 
 Run: `node new-legacy/tests/question-catalog-learning-integration.test.js && cd frontend && pnpm test`
 
 Expected: PASS。
 
-- [ ] **Step 6: 提交本任务**
+- [x] **Step 6: 提交本任务**
 
 ```bash
 git add new-legacy/src/60-question-bank.js new-legacy/src/61-question-repository.js new-legacy/src/72-question-training-page.js new-legacy/src/77-multi-question-workspace.js new-legacy/src/86-knowledge-recall.js new-legacy/src/96-recall-question-source.js new-legacy/src/100-practice-mode.js new-legacy/tests/question-catalog-learning-integration.test.js
@@ -899,31 +899,31 @@ git commit -m "feat: read learning questions from catalog"
 - Active asset: `content-prep-studio/dist/content-prep.html`
 - Namespace: `PAGE_NAMESPACES['content-prep.html'] = 'content-prep'`
 
-- [ ] **Step 1: 写路由失败测试**
+- [x] **Step 1: 写路由失败测试**
 
 匿名访问重定向到 `/login` 并保留 `next=/content-prep`；student/viewer 返回项目 403；teacher/admin 返回 200；响应包含 bootstrap actor、active release version 和 Prep 根节点；`inject_bootstrap()` 支持根绝对 `/server-state-bootstrap.js` marker；直接访问 nested HTML 和 preview 也不能绕过权限。
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_content_prep_route.py tests/test_web_page_access.py -q`
 
 Expected: FAIL。
 
-- [ ] **Step 3: 实现稳定路由**
+- [x] **Step 3: 实现稳定路由**
 
 先扩展 `inject_bootstrap()` 同时识别现有 `./server-state-bootstrap.js` 和 Prep 的 `/server-state-bootstrap.js`，任一 marker 缺失仍 fail closed。`/content-prep` 先解析 session；未登录 redirect；登录后用三个 permission keys 全量校验；通过后调用 `html_response(_asset_or_404(release, 'content-prep-studio/dist/content-prep.html'), bootstrap)`。把 `content-prep.html` 加入 teaching page protection，防 catch-all/preview 绕过。
 
-- [ ] **Step 4: 扩展稳定别名 smoke**
+- [x] **Step 4: 扩展稳定别名 smoke**
 
 在现有 routes loop 中加入 `('/content-prep', '#prepApp')`，并分别用 teacher、student context 验证允许/拒绝。
 
-- [ ] **Step 5: 运行 GREEN**
+- [x] **Step 5: 运行 GREEN**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_content_prep_route.py tests/test_web_page_access.py -q`
 
 Expected: PASS。
 
-- [ ] **Step 6: 提交本任务**
+- [x] **Step 6: 提交本任务**
 
 ```bash
 git add backend/app/web/bootstrap.py backend/app/web/html.py backend/app/web/routes.py backend/tests/test_web_page_access.py backend/tests/test_content_prep_route.py frontend/e2e/new_legacy_smoke.py
@@ -946,19 +946,19 @@ git commit -m "feat: serve protected content prep route"
 - Concurrency: two browser contexts, same question conflict, different questions allowed
 - Release command: `node frontend/scripts/manage-new-legacy.js update new-legacy`
 
-- [ ] **Step 1: 完成权限和数据 E2E**
+- [x] **Step 1: 完成权限和数据 E2E**
 
 测试 admin/teacher 页面访问、student/viewer/guest 拒绝；六位制作人选择；已有题库选择；新题库创建；上传后 teacher 页面立即可见；published+public 学习可见，internal/private 不可见；JSON 导入导出和 IndexedDB reload 继续工作。
 
-- [ ] **Step 2: 完成并发/离线 E2E**
+- [x] **Step 2: 完成并发/离线 E2E**
 
 两个登录 context 同开一题：第一个获得锁，第二个只读；两人打开同题库不同题均可编辑；管理员 force unlock 后旧 token 保存 409；断网编辑保留 IndexedDB，恢复网络后重获锁或复制新题；重复网络请求不重复新增。
 
-- [ ] **Step 3: 把新测试加入发布门禁**
+- [x] **Step 3: 把新测试加入发布门禁**
 
 `validate-new-legacy-release.sh` 在启动 integrated server 前运行 Prep 的 Python/Node 单测；启动后运行 `content_prep_question_bank.py` 和 `content_prep_concurrency.py`。发布管理器在 promote 前比较 candidate site 与当前 active site 文件数，candidate 较少或缺少 `admin-console.html`、`question-bank.html`、`content-prep-studio/dist/content-prep.html` 时 fail closed。失败时保留 active release 不变并在 validation.json 写明命令和错误。
 
-- [ ] **Step 4: 运行完整自动测试**
+- [x] **Step 4: 运行完整自动测试**
 
 Run:
 
@@ -984,6 +984,8 @@ cd backend
 ```
 
 Expected: `conflicts == []`、`invalidRecords == []`。只有报告无冲突并已保存数据库备份/Runtime State 快照后，运行：
+
+2026-08-09 实际 dry-run 已确认 `invalidRecords == []`，但发现 10 个 `BANK_OWNER_CONFLICT`：多个 owner 使用相同内置题库 ID 且内容不同。依照本步骤的 fail-closed 规则，尚未执行 apply、未开启全局 cutover、未切换 active release，等待明确冲突处置策略。
 
 ```bash
 .venv/bin/python scripts/migrate_runtime_questions.py --apply --report /tmp/content-prep-migration-after.json
@@ -1021,7 +1023,7 @@ node frontend/scripts/manage-new-legacy.js update new-legacy
 
 确认 candidate site 文件数不低于发布前 active；检查 `/content-prep`、`/question-bank`、`/training`、`/workspace`、`/recall`；读取 `frontend/new-legacy-releases/current.json` 确认只有自动验收通过后才指向新版本。
 
-- [ ] **Step 8: 提交测试和门禁**
+- [x] **Step 8: 提交测试和门禁**
 
 ```bash
 git add frontend/e2e/content_prep_concurrency.py frontend/e2e/content_prep_question_bank.py frontend/scripts/validate-new-legacy-release.sh frontend/scripts/manage-new-legacy.js frontend/scripts/new-legacy-release.test.mjs frontend/scripts/new-legacy-contract.json new-legacy/VERSION

@@ -68,11 +68,9 @@ with sync_playwright() as playwright:
 
     try:
         print("smoke: guest entry renders without iframe", flush=True)
-        # v9.0-p4.1.1：后端稳定别名 "/" 把匿名访客落到 practice-mode（.practice-app），
-        # 不再经 learning-path（.gl-app）。学习节点详情流（line 142-146）依赖登录后
-        # learning-path 入口，p4.1.1 改版待专项重写，目前走 --skip-browser 发布。
+        # FastAPI 的稳定首页别名直接服务 learning-path.html。
         page.goto(BASE + "/", wait_until="networkidle")
-        page.locator(".practice-app").wait_for(state="visible")
+        page.locator(".gl-app").wait_for(state="visible")
         assert page.locator("iframe").count() == 0
 
         print("smoke: original login UI backed by FastAPI session", flush=True)
@@ -165,9 +163,9 @@ with sync_playwright() as playwright:
             student_page.goto(BASE + "/content-prep", wait_until="domcontentloaded")
             assert student_page.locator("#prepApp").count() == 0
             assert "无权访问" in student_page.locator("body").inner_text()
-            student_page.goto(BASE + "/users", wait_until="domcontentloaded")
-            student_page.locator(".role-permission-denied").wait_for(state="visible")
-            assert "仅限管理员" in student_page.locator("body").inner_text()
+            denied = student_page.goto(BASE + "/users", wait_until="domcontentloaded")
+            assert denied and denied.status == 403
+            assert "无权访问" in student_page.locator("body").inner_text()
             assert student_page.locator("iframe").count() == 0
         finally:
             student_context.close()

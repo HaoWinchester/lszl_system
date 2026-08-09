@@ -6,8 +6,7 @@ from playwright.sync_api import sync_playwright
 
 
 CASES = [
-    # v9.0-p4.1.1：匿名访问 /learning-path.html 会被前端重定向到 practice-mode（做题模式），
-    # .gl-app 不再渲染，故匿名视觉回归改用 practice-mode（.practice-app）。index?mode=free 不受影响。
+    # 做题页和自由模式都是可独立渲染的原生页面。
     ("practice", "/practice-mode.html", "/practice-mode.html", ".practice-app"),
     ("free", "/index.html?mode=free", "/index.html?mode=free", ".app"),
 ]
@@ -60,6 +59,16 @@ with sync_playwright() as playwright:
                     page.goto(base + path, wait_until="networkidle")
                     page.locator(selector).wait_for(state="visible")
                     page.add_style_tag(content=DISABLE_MOTION)
+                    if case_name == "practice":
+                        page.evaluate(
+                            """() => {
+                              const empty=document.getElementById('practiceEmpty');
+                              const title=empty?.querySelector('strong');
+                              const detail=empty?.querySelector('p');
+                              if(title)title.textContent='动态题目目录';
+                              if(detail)detail.textContent='视觉回归已隐藏环境数据。';
+                            }"""
+                        )
                     page.wait_for_timeout(150)
                     assert page.locator("iframe").count() == 0
                     stylesheets.append(

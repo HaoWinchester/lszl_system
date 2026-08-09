@@ -26,6 +26,11 @@ const adapterRoot = resolve(scriptsDir, 'new-legacy-assets')
 const validationScript = process.env.KG_RELEASE_VALIDATION_SCRIPT
   ? resolve(process.env.KG_RELEASE_VALIDATION_SCRIPT)
   : resolve(scriptsDir, 'validate-new-legacy-release.sh')
+const criticalSiteFiles = [
+  'admin-console.html',
+  'question-bank.html',
+  'content-prep-studio/dist/content-prep.html',
+]
 
 function parseArgs(argv) {
   const positional = []
@@ -166,23 +171,89 @@ function inspect(source) {
   }
 }
 
-function validateCandidate(root, version, skipValidation) {
-  if (skipValidation) return { skipped: true }
+function candidateSiteGate(activeRoot, candidateRoot, version) {
+  const candidateSite = resolve(candidateRoot, version, 'site')
+  if (!existsSync(candidateSite) || !statSync(candidateSite).isDirectory()) {
+    throw new Error('候选 site 目录不存在')
+  }
+  const missing = criticalSiteFiles.filter((path) => !existsSync(resolve(candidateSite, path)))
+  if (missing.length) throw new Error(`候选 site 缺少关键文件：${missing.join(', ')}`)
+  const candidateFiles = walk(candidateSite).length
+  const current = currentManifest(activeRoot)
+  let activeFiles = 0
+  if (current?.site) {
+    const activeSite = resolve(activeRoot, current.site)
+    if (!existsSync(activeSite) || !statSync(activeSite).isDirectory()) {
+      throw new Error(`当前 active site 不可用：${current.site}`)
+    }
+    activeFiles = walk(activeSite).length
+    if (candidateFiles < activeFiles) {
+      throw new Error(`候选 site 文件数 ${candidateFiles} 少于当前 active site ${activeFiles}`)
+    }
+  }
+  return { candidateFiles, activeFiles, requiredFiles: criticalSiteFiles }
+}
+
+function writeValidationReport(root, version, report) {
+  writeFileSync(resolve(root, version, 'validation.json'), `${JSON.stringify(report, null, 2)}\n`)
+  return report
+}
+
+function validateCandidate(activeRoot, candidateRoot, version, skipValidation) {
   const startedAt = new Date().toISOString()
-  const result = spawnSync(validationScript, [root, version], {
+  let gate
+  try {
+    gate = candidateSiteGate(activeRoot, candidateRoot, version)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    writeValidationReport(candidateRoot, version, {
+      schemaVersion: 1,
+      version,
+      passed: false,
+      startedAt,
+      completedAt: new Date().toISOString(),
+      command: ['candidate-site-gate'],
+      error: message,
+      stdout: '',
+      stderr: message,
+    })
+    throw new Error(`候选版本 ${version} 自动验收失败，正式版本未切换：\n${message}`)
+  }
+  if (skipValidation) {
+    return writeValidationReport(candidateRoot, version, {
+      schemaVersion: 1,
+      version,
+      passed: true,
+      skipped: true,
+      startedAt,
+      completedAt: new Date().toISOString(),
+      command: ['candidate-site-gate'],
+      gate,
+      error: '',
+      stdout: '',
+      stderr: '',
+    })
+  }
+  const result = spawnSync(validationScript, [candidateRoot, version], {
     cwd: repoDir,
     encoding: 'utf8',
   })
+  const error = result.status === 0
+    ? ''
+    : String(result.stderr || result.error?.message || result.stdout || `退出码 ${result.status}`).trim()
   const report = {
     schemaVersion: 1,
     version,
     passed: result.status === 0,
     startedAt,
     completedAt: new Date().toISOString(),
+    command: [validationScript, candidateRoot, version],
+    gate,
+    error,
     stdout: String(result.stdout || '').slice(-40_000),
     stderr: String(result.stderr || result.error?.message || '').slice(-40_000),
   }
-  writeFileSync(resolve(root, version, 'validation.json'), `${JSON.stringify(report, null, 2)}\n`)
+  writeValidationReport(candidateRoot, version, report)
   if (result.status !== 0) {
     const detail = report.stderr.trim() || report.stdout.trim() || `退出码 ${result.status}`
     throw new Error(`候选版本 ${version} 自动验收失败，正式版本未切换：\n${detail}`)
@@ -240,7 +311,7 @@ function update(root, source, skipValidation = false) {
       rmSync(backup, { recursive: true, force: true })
       try {
         buildRelease(stagingRelease, candidate)
-        validateCandidate(stagingRoot, candidate.version, skipValidation)
+        validateCandidate(root, stagingRoot, candidate.version, skipValidation)
         renameSync(finalDir, backup)
         try {
           renameSync(stagingRelease, finalDir)
@@ -256,7 +327,7 @@ function update(root, source, skipValidation = false) {
         rmSync(stagingRoot, { recursive: true, force: true })
       }
     }
-    validateCandidate(root, candidate.version, skipValidation)
+    validateCandidate(root, root, candidate.version, skipValidation)
     return promote(root, candidate.version)
   })
 }

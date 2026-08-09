@@ -38,6 +38,14 @@ cd "$REPO_DIR/backend"
 cd "$REPO_DIR/frontend"
 pnpm test
 
+cd "$REPO_DIR"
+python3 new-legacy/content-prep-studio/tests/test_services.py
+python3 new-legacy/content-prep-studio/tests/test_build.py
+python3 new-legacy/content-prep-studio/tests/test_server_ui_contract.py
+node new-legacy/content-prep-studio/tests/test_tag_migration.js
+node new-legacy/content-prep-studio/tests/test_server_catalog.js
+node new-legacy/content-prep-studio/tests/test_edit_lock_client.js
+
 mkdir -p "$VALIDATION_ROOT/releases/$RELEASE_VERSION"
 cp -R "$RELEASE_ROOT/$RELEASE_VERSION/." "$VALIDATION_ROOT/releases/$RELEASE_VERSION/"
 python3 - "$VALIDATION_ROOT/releases/current.json" "$RELEASE_VERSION" <<'PY'
@@ -61,6 +69,7 @@ PY
 INTEGRATED_PORT="$(free_port)"
 cd "$REPO_DIR/backend"
 NEW_LEGACY_RELEASE_ROOT="$VALIDATION_ROOT/releases" \
+QUESTION_CATALOG_CUTOVER_ENABLED=true \
   .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port "$INTEGRATED_PORT" \
   >"$INTEGRATED_LOG" 2>&1 &
 INTEGRATED_PID=$!
@@ -81,6 +90,10 @@ cd "$REPO_DIR"
 E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
 E2E_RELEASE_VERSION="$RELEASE_VERSION" \
   python3 frontend/e2e/new_legacy_smoke.py
+E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
+  python3 frontend/e2e/content_prep_question_bank.py
+E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
+  python3 frontend/e2e/content_prep_concurrency.py
 # v9 重构了题库（简化模式，高级字段折叠）与试卷管理（拆为独立页 paper-management.html），
 # full_role_regression.py 绑定的是 v8.6 全字段 UI 流程，已过时——其失败不代表 v9 功能损坏，
 # 而是 v9 有意改了布局。该 e2e 待后续按 v9 布局专项重写，暂移出自动验收。
