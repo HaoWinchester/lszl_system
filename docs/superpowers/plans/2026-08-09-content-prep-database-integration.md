@@ -995,7 +995,7 @@ apply 报告 `/tmp/content-prep-migration-after.json` 为 `applied == true`、�
 
 随后在目标部署配置中设置 `QUESTION_CATALOG_CUTOVER_ENABLED=true`，重新运行 Runtime State 拒写测试和教师/学习 E2E；出现冲突时停止，不猜测覆盖哪一版，也不启用 cutover。
 
-- [ ] **Step 6: 构建候选 release 并核对文件数**
+- [x] **Step 6: 构建候选 release 并核对文件数**
 
 先读取 active pointer 和源文件数作为人工证据：
 
@@ -1021,9 +1021,11 @@ node frontend/scripts/manage-new-legacy.js update new-legacy
 
 不得用 `--skip-browser` 完成本功能的最终发布。
 
-- [ ] **Step 7: 预览验收再确认 active pointer**
+- [x] **Step 7: 预览验收再确认 active pointer**
 
 确认 candidate site 文件数不低于发布前 active；检查 `/content-prep`、`/question-bank`、`/training`、`/workspace`、`/recall`；读取 `frontend/new-legacy-releases/current.json` 确认只有自动验收通过后才指向新版本。
+
+2026-08-09 正式发布 `v9.0-p4.1.20`：候选 site 795 个文件，发布前 active `v9.0-p4.1.19` 为 640 个文件；三个关键文件均存在。`validation.json` 为 `passed == true`、`skipped == false`，后端 170 项、前端 111 项、Prep 单测、权限/题库/并发 E2E、practice 初始视图及四组视觉对比全部通过，视觉差异均为 0.000%。active pointer 已由发布管理器原子切换到 `v9.0-p4.1.20`。
 
 - [x] **Step 8: 提交测试和门禁**
 

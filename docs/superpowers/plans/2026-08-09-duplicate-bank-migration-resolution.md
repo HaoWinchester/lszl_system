@@ -187,11 +187,11 @@ Expected: `applied == true`、`conflicts == []`、`invalidRecords == []`。
 - Consumes: `node frontend/scripts/manage-new-legacy.js update new-legacy`
 - Produces: 通过全量验证的新 active release
 
-- [ ] **Step 1: 在 cutover 模式重跑拒写与端到端测试**
+- [x] **Step 1: 在 cutover 模式重跑拒写与端到端测试**
 
 使用临时集成服务设置 `QUESTION_CATALOG_CUTOVER_ENABLED=true`，运行 Runtime State 正式题库拒写测试、教师题库 E2E、学习端 E2E 和 Content Prep 并发 E2E。Expected: 全部 PASS。
 
-- [ ] **Step 2: 选择未使用的新版本号并核对发布输入**
+- [x] **Step 2: 选择未使用的新版本号并核对发布输入**
 
 读取 `frontend/new-legacy-releases/current.json` 和 `new-legacy/VERSION`，生成高于两者且未存在的补丁版本号。核对当前 active site 文件数、source 文件数及以下关键文件：
 
@@ -201,7 +201,7 @@ new-legacy/question-bank.html
 new-legacy/content-prep-studio/dist/content-prep.html
 ```
 
-- [ ] **Step 3: 使用正式发布管理器构建、验证并切换**
+- [x] **Step 3: 使用正式发布管理器构建、验证并切换**
 
 更新 `new-legacy/VERSION` 后运行：
 
@@ -211,11 +211,11 @@ node frontend/scripts/manage-new-legacy.js update new-legacy
 
 不得使用 `--skip-browser`。Expected: 候选 site 文件数不低于发布前 active，完整验证脚本退出码 0，`current.json` 自动指向新版本。
 
-- [ ] **Step 4: 发布后核验**
+- [x] **Step 4: 发布后核验**
 
 读取 active pointer 和 validation.json，验证 `/content-prep`、`/question-bank`、`/training`、`/workspace`、`/recall`；确认匿名、student/viewer、teacher/admin 权限矩阵保持正确，上传题目立即出现在教师目录，只有 published+public 进入学习端。
 
-- [ ] **Step 5: 更新主计划并提交发布记录**
+- [x] **Step 5: 更新主计划并提交发布记录**
 
 把主计划 Task 18 Steps 6–7 改为完成，精确提交 `new-legacy/VERSION` 与计划文档：
 
