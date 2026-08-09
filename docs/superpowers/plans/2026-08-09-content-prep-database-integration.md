@@ -753,31 +753,31 @@ git commit -m "feat: enforce prep question edit locks"
 - Emits: `kg:question-catalog-ready`, `kg:question-catalog-changed`
 - Invariant: no formal catalog payload is written to localStorage/Runtime State
 
-- [ ] **Step 1: 写适配器失败测试**
+- [x] **Step 1: 写适配器失败测试**
 
 测试 managed/learning 页面选择正确 bootstrap mode；请求带 cookie；缓存仅为 module-scoped object；reload 替换快照；401 触发登录提示事件；409 保留旧快照；锁方法正确传 token/client instance；源码不存在题库 key 的 `setItem`。
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `cd frontend && node --test scripts/question-catalog-adapter.test.mjs scripts/direct-runtime.test.mjs`
 
 Expected: FAIL。
 
-- [ ] **Step 3: 实现异步启动屏障**
+- [x] **Step 3: 实现异步启动屏障**
 
 适配器在 defer 执行时立即请求 `/api/v1/question-catalog/bootstrap`，根据 `document.body.dataset.questionCatalogMode` 选择 managed/learning；页面初始化代码必须显式 await `ready`，不得使用同步 XHR。
 
-- [ ] **Step 4: 注入相关页面**
+- [x] **Step 4: 注入相关页面**
 
 在 `question-bank.html`、`paper-management.html`、`question-training.html`、`question-workspace.html`、`knowledge-recall.html`、`practice-mode.html` 和首页需要题目函数的页面中，把适配器注入在 `59-published-paper-repository.js`/`60-question-bank.js`/`65-question-bank-admin.js` 之前。sync 脚本对每页使用精确 marker，脚本顺序变化时 fail closed。
 
-- [ ] **Step 5: 运行 GREEN**
+- [x] **Step 5: 运行 GREEN**
 
 Run: `cd frontend && node --test scripts/question-catalog-adapter.test.mjs scripts/direct-runtime.test.mjs`
 
 Expected: PASS。
 
-- [ ] **Step 6: 提交本任务**
+- [x] **Step 6: 提交本任务**
 
 ```bash
 git add frontend/scripts/new-legacy-assets/question-catalog-adapter.js frontend/scripts/sync-new-legacy.js frontend/scripts/question-catalog-adapter.test.mjs frontend/scripts/direct-runtime.test.mjs

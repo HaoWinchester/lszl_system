@@ -558,6 +558,31 @@ function injectPage(html, page, version) {
     : /<head(?:\s[^>]*)?>/i.test(html)
       ? html.replace(/<head(?:\s[^>]*)?>/i, (head) => `${head}\n${injection}`)
       : `${injection}\n${html}`
+  const questionCatalogPages = {
+    'question-bank.html': { mode: 'managed', marker: '<script defer src="src/65-question-bank-admin.js"></script>' },
+    'paper-management.html': { mode: 'managed', marker: '<script defer src="src/65-question-bank-admin.js"></script>' },
+    'question-training.html': { mode: 'learning', marker: '<script defer src="src/59-published-paper-repository.js"></script>' },
+    'question-workspace.html': { mode: 'learning', marker: '<script defer src="src/59-published-paper-repository.js"></script>' },
+    'knowledge-recall.html': { mode: 'learning', marker: '<script defer src="src/59-published-paper-repository.js"></script>' },
+    'practice-mode.html': { mode: 'learning', marker: '<script defer src="src/59-published-paper-repository.js"></script>' },
+    'index.html': { mode: 'learning', marker: '<script defer src="src/60-question-bank.js"></script>' },
+  }
+  const catalogPage = questionCatalogPages[page]
+  if (catalogPage && !generated.includes('kg-question-catalog:generated')) {
+    if (!generated.includes(catalogPage.marker)) {
+      throw new Error(`new-legacy ${page} 题目目录脚本顺序已变化，请复核目录适配器`)
+    }
+    generated = generated.replace(
+      /<body\b([^>]*)>/i,
+      (body, attributes) => /\bdata-question-catalog-mode=/i.test(attributes)
+        ? body
+        : `<body${attributes} data-question-catalog-mode="${catalogPage.mode}">`,
+    )
+    generated = generated.replace(
+      catalogPage.marker,
+      `<script defer src="./question-catalog-adapter.js"></script><!-- kg-question-catalog:generated -->\n${catalogPage.marker}`,
+    )
+  }
   if (page === 'question-training.html' && !generated.includes('kg-runtime-fixes:generated')) {
     const styleTag = '<link rel="stylesheet" href="./direct-runtime-fixes.css"><!-- kg-runtime-fixes:generated -->'
     generated = generated.includes('</head>')

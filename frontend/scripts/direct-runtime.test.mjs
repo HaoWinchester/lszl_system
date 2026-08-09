@@ -29,10 +29,9 @@ test('question catalog runtime keys are legacy-read-only after cutover', () => {
   assert.match(syncSource, /只读旧键禁止新增写调用/)
 
   const adapterPath = resolve(scriptsDir, 'new-legacy-assets', 'question-catalog-adapter.js')
-  if (existsSync(adapterPath)) {
-    const adapter = readFileSync(adapterPath, 'utf8')
-    assert.doesNotMatch(adapter, /localStorage\s*\.\s*(?:setItem|removeItem)\s*\(/)
-  }
+  assert.ok(existsSync(adapterPath), 'question catalog adapter must exist after cutover')
+  const adapter = readFileSync(adapterPath, 'utf8')
+  assert.doesNotMatch(adapter, /localStorage\s*\.\s*(?:setItem|removeItem)\s*\(/)
 })
 
 test('direct bootstrap consumes the FastAPI-injected payload', () => {
