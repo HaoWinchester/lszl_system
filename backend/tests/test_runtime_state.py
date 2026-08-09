@@ -44,7 +44,7 @@ def update_payload(*, key: str, value: str, revision: int = 0) -> dict:
 def test_runtime_state_is_saved_in_postgres_and_preloaded_after_refresh() -> None:
     with TestClient(app) as client:
         login(client, "学生")
-        initial = bootstrap(client.get("/learning-path.html").text)
+        initial = bootstrap(client.get("/guided-learning-node.html?node=awareness-keywords").text)
         response = client.put(
             "/api/v1/runtime/state",
             json=update_payload(
@@ -54,7 +54,7 @@ def test_runtime_state_is_saved_in_postgres_and_preloaded_after_refresh() -> Non
             ),
         )
         assert response.status_code == 200, response.text
-        refreshed = bootstrap(client.get("/learning-path.html").text)
+        refreshed = bootstrap(client.get("/guided-learning-node.html?node=awareness-keywords").text)
 
     assert refreshed["storage"]["kg_default_entry_mode_v1"] == "free"
     assert refreshed["revision"] == response.json()["revision"]
@@ -110,7 +110,7 @@ def test_runtime_state_rejects_page_namespace_mismatch() -> None:
 def test_runtime_state_rejects_a_stale_revision_without_overwriting() -> None:
     with TestClient(app) as client:
         login(client, "学生")
-        current = bootstrap(client.get("/learning-path.html").text)
+        current = bootstrap(client.get("/guided-learning-node.html?node=awareness-keywords").text)
         first = client.put(
             "/api/v1/runtime/state",
             json=update_payload(
@@ -164,7 +164,7 @@ def test_runtime_state_persists_all_coalesced_snapshot_changes() -> None:
 def test_runtime_state_is_isolated_between_accounts() -> None:
     with TestClient(app) as student, TestClient(app) as teacher:
         login(student, "学生")
-        state = bootstrap(student.get("/learning-path.html").text)
+        state = bootstrap(student.get("/guided-learning-node.html?node=awareness-keywords").text)
         assert student.put(
             "/api/v1/runtime/state",
             json=update_payload(
@@ -175,7 +175,7 @@ def test_runtime_state_is_isolated_between_accounts() -> None:
         ).status_code == 200
 
         login(teacher, "老师")
-        teacher_state = bootstrap(teacher.get("/learning-path.html").text)
+        teacher_state = bootstrap(teacher.get("/guided-learning-node.html?node=awareness-keywords").text)
 
     assert teacher_state["storage"].get("kg_question_language_mode_v1") != "bilingual"
 
@@ -183,7 +183,7 @@ def test_runtime_state_is_isolated_between_accounts() -> None:
 def test_every_upstream_page_declares_the_expected_namespace() -> None:
     expected = {
         "index.html": "files",
-        "learning-path.html": "guided-learning",
+        "practice-mode.html": "page",
         "guided-learning-node.html": "guided-learning",
         "guided-learning-placement-test.html": "guided-learning",
         "question-training.html": "training",
@@ -240,7 +240,7 @@ def test_graph_page_imports_existing_backend_files_once() -> None:
 def test_guided_page_imports_server_progress_and_course_metadata() -> None:
     with TestClient(app) as client:
         login(client, "学生")
-        payload = bootstrap(client.get("/learning-path.html").text)
+        payload = bootstrap(client.get("/guided-learning-node.html?node=awareness-keywords").text)
 
     progress_keys = [key for key in payload["storage"] if key.startswith("kg_guided_learning_progress_v2__")]
     assert len(progress_keys) == 1

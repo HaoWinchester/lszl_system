@@ -67,10 +67,14 @@ with sync_playwright() as playwright:
     page.on("response", record_response)
 
     try:
-        print("smoke: guest entry renders without iframe", flush=True)
-        # FastAPI 的稳定首页别名直接服务 learning-path.html。
-        page.goto(BASE + "/", wait_until="networkidle")
-        page.locator(".gl-app").wait_for(state="visible")
+        print("smoke: guest learning entry lands on practice mode", flush=True)
+        page.goto(BASE + "/learning-path.html", wait_until="networkidle")
+        assert page.url == BASE + "/practice-mode.html"
+        page.locator(".practice-app").wait_for(state="visible")
+        page.locator("#practiceEmpty").wait_for(state="visible")
+        assert "暂时没有可练习的已发布试卷" in page.locator("#practiceEmpty").inner_text()
+        assert page.locator(".gl-app").count() == 0
+        assert not page.locator("#authModal").is_visible()
         assert page.locator("iframe").count() == 0
 
         print("smoke: original login UI backed by FastAPI session", flush=True)
@@ -153,10 +157,7 @@ with sync_playwright() as playwright:
             assert page.locator("iframe").count() == 0, route
             assert page.evaluate("window.__KG_DIRECT_BOOTSTRAP__?.releaseVersion") == EXPECTED_RELEASE
 
-        page.goto(BASE + "/", wait_until="networkidle")
-        node_id = page.locator(".gl-node-button").first.get_attribute("data-gl-node")
-        assert node_id
-        page.goto(BASE + "/learning/node?node=" + quote(node_id), wait_until="networkidle")
+        page.goto(BASE + "/learning/node?node=awareness-keywords", wait_until="networkidle")
         page.locator(".gln-main").wait_for(state="visible")
         assert page.locator("iframe").count() == 0
 

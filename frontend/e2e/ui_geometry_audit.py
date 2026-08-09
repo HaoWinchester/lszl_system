@@ -16,7 +16,7 @@ from playwright.sync_api import Browser, Page, sync_playwright
 
 PAGES = [
     ("index", "/index.html?mode=free", ".app"),
-    ("learning-path", "/learning-path.html", ".gl-app"),
+    ("practice-entry", "/learning-path.html", ".practice-app"),
     ("question-training", "/question-training.html", ".question-training-app"),
     ("question-workspace", "/question-workspace.html", ".qw-app"),
     ("file-manager", "/file-manager.html", ".fm-app"),

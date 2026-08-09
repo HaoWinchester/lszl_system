@@ -6,14 +6,23 @@ from app.main import app
 from app.web.releases import active_release
 
 
-def test_root_serves_learning_path_without_iframe() -> None:
+def test_root_redirects_to_practice_mode_without_query_context() -> None:
     with TestClient(app) as client:
-        response = client.get("/")
+        response = client.get("/?auth=login&stage=foundation", follow_redirects=False)
 
-    assert response.status_code == 200
-    assert 'class="guided-learning-page"' in response.text
-    assert "<iframe" not in response.text
-    assert "react" not in response.text.lower()
+    assert response.status_code == 307
+    assert response.headers["location"] == "/practice-mode.html"
+
+
+def test_learning_path_redirects_to_practice_mode_without_query_context() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/learning-path.html?auth=login&part=environment",
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/practice-mode.html"
 
 
 def test_graph_alias_preserves_free_mode() -> None:
@@ -87,7 +96,7 @@ def test_html_injects_authenticated_user_before_state_bootstrap() -> None:
     with TestClient(app) as client:
         login = client.post("/api/v1/auth/login", json={"username": "佩奇007", "password": "111111"})
         assert login.status_code == 200
-        response = client.get("/learning-path.html")
+        response = client.get("/practice-mode.html")
 
     marker = "window.__KG_DIRECT_BOOTSTRAP__="
     assert marker in response.text
@@ -99,7 +108,7 @@ def test_html_injects_authenticated_user_before_state_bootstrap() -> None:
 
 def test_guest_html_injects_anonymous_bootstrap() -> None:
     with TestClient(app) as client:
-        payload = _bootstrap(client.get("/learning-path.html").text)
+        payload = _bootstrap(client.get("/practice-mode.html").text)
 
     assert payload["authUser"] is None
     assert payload["authenticated"] is False

@@ -109,12 +109,13 @@ def _redirect(request: Request, page: str, defaults: dict[str, str] | None = Non
 
 
 @router.get("/")
-async def learning_path_page(request: Request, db: DB):
-    release = _release_or_503()
-    bootstrap = await build_bootstrap(
-        request, db, page="learning-path.html", release_version=release.version
-    )
-    return html_response(_asset_or_404(release, "learning-path.html"), bootstrap)
+async def practice_entry_page():
+    return RedirectResponse("/practice-mode.html", status_code=307)
+
+
+@router.get("/learning-path.html")
+async def learning_path_alias():
+    return RedirectResponse("/practice-mode.html", status_code=307)
 
 
 @router.get("/graph")
