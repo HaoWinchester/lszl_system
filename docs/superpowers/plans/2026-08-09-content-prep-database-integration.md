@@ -463,27 +463,27 @@ git commit -m "feat: upload prep bundles transactionally"
 - Preserves: existing `/api/v1/banks`, `/api/v1/banks/{id}/questions`, `/api/v1/questions/{id}`, `/api/v1/papers`
 - Delegates: bank/question authorization, serialization, scope normalization and hash generation to new services
 
-- [ ] **Step 1: 写兼容失败测试**
+- [x] **Step 1: 写兼容失败测试**
 
 旧端点必须保持现有 envelope 和状态码；旧 `POST /banks/{id}/questions` 可由服务器生成 `q_...` ID，但也要填 `scope=internal`、revision、hash、actor；旧 update 必须递增 revision，且不能丢失新增 JSONB 字段。
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_api_compatibility.py tests/test_smoke.py -q`
 
 Expected: 新字段和访问策略断言 FAIL，原 smoke 继续反映现有兼容基线。
 
-- [ ] **Step 3: 重构为兼容包装器**
+- [x] **Step 3: 重构为兼容包装器**
 
 保留公开函数名，内部调用 `question_catalog_service`、`question_access_service` 和 `question_content_service`。旧 CRUD 可以保留一次请求一次 commit，但不得被 Task 7 的批处理事务调用。
 
-- [ ] **Step 4: 运行 GREEN**
+- [x] **Step 4: 运行 GREEN**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_api_compatibility.py tests/test_smoke.py -q`
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交本任务**
+- [x] **Step 5: 提交本任务**
 
 ```bash
 git add backend/app/services/question_service.py backend/app/api/v1/questions.py backend/tests/test_smoke.py backend/tests/test_question_api_compatibility.py

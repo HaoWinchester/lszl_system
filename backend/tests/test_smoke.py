@@ -85,10 +85,14 @@ def test_file_crud():
 def test_question_bank_and_paper():
     client.post("/api/v1/auth/login", json={"username": "admin", "password": "admin123"})
     b = client.post("/api/v1/banks", json={"name": "pytest题库", "subject": "PMP"}).json()["bank"]["id"]
-    q = client.post(
+    question = client.post(
         f"/api/v1/banks/{b}/questions",
         json={"title": "pytest题目", "domain": "范围", "options": [{"id": "A", "text": "x", "correct": True}], "correctAnswer": "A"},
-    ).json()["question"]["id"]
+    ).json()["question"]
+    q = question["id"]
+    assert question["scope"] == "internal"
+    assert question["revision"] == 1
+    assert len(question["contentHash"]) == 64
     assert len(client.get(f"/api/v1/banks/{b}/questions").json()["questions"]) == 1
     p = client.post("/api/v1/papers", json={"name": "pytest卷"}).json()["paper"]["id"]
     comp = client.post(f"/api/v1/papers/{p}/compose", json={"bankIds": [b], "quotas": {"范围": 1}})

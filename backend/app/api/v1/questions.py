@@ -5,12 +5,25 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import CurrentUser
+from app.core.auth import CurrentUser, require_permissions
 from app.db.session import get_db
+from app.models.user import User
 from app.services import question_service
 
 router = APIRouter(tags=["question-bank"])
 DB = Annotated[AsyncSession, Depends(get_db)]
+QuestionBankReader = Annotated[
+    User,
+    Depends(require_permissions("accessQuestionBank")),
+]
+QuestionBankManager = Annotated[
+    User,
+    Depends(require_permissions("accessQuestionBank", "manageQuestionBank")),
+]
+QuestionEditor = Annotated[
+    User,
+    Depends(require_permissions("accessQuestionBank", "editQuestions")),
+]
 
 
 def _nf() -> HTTPException:
@@ -19,27 +32,27 @@ def _nf() -> HTTPException:
 
 # ---------- 题库 ----------
 @router.get("/banks")
-async def list_banks(db: DB, user: CurrentUser, subject: str | None = Query(None)):
-    return {"banks": await question_service.list_banks(db, user.username, subject)}
+async def list_banks(db: DB, user: QuestionBankReader, subject: str | None = Query(None)):
+    return {"banks": await question_service.list_banks(db, user, subject)}
 
 
 @router.post("/banks")
-async def create_bank(body: dict, db: DB, user: CurrentUser):
-    b = await question_service.create_bank(db, user.username, body)
+async def create_bank(body: dict, db: DB, user: QuestionBankManager):
+    b = await question_service.create_bank(db, user, body)
     return {"bank": question_service.bank_to_dict(b)}
 
 
 @router.put("/banks/{bank_id}")
-async def update_bank(bank_id: str, body: dict, db: DB, user: CurrentUser):
-    b = await question_service.update_bank(db, user.username, bank_id, body)
+async def update_bank(bank_id: str, body: dict, db: DB, user: QuestionBankManager):
+    b = await question_service.update_bank(db, user, bank_id, body)
     if not b:
         raise _nf()
     return {"bank": question_service.bank_to_dict(b)}
 
 
 @router.delete("/banks/{bank_id}")
-async def delete_bank(bank_id: str, db: DB, user: CurrentUser):
-    if not await question_service.delete_bank(db, user.username, bank_id):
+async def delete_bank(bank_id: str, db: DB, user: QuestionBankManager):
+    if not await question_service.delete_bank(db, user, bank_id):
         raise _nf()
     return {"ok": True}
 
@@ -48,7 +61,7 @@ async def delete_bank(bank_id: str, db: DB, user: CurrentUser):
 @router.get("/banks/{bank_id}/questions")
 async def list_questions(
     db: DB,
-    user: CurrentUser,
+    user: QuestionBankReader,
     bank_id: str,
     query: str | None = Query(None),
     domain: str | None = Query(None),
@@ -57,38 +70,38 @@ async def list_questions(
     page_size: int = 20,
 ):
     items, total = await question_service.list_questions(
-        db, user.username, bank_id, query=query, domain=domain, difficulty=difficulty, page=page, page_size=page_size
+        db, user, bank_id, query=query, domain=domain, difficulty=difficulty, page=page, page_size=page_size
     )
     return {"questions": items, "total": total, "page": page, "page_size": page_size}
 
 
 @router.post("/banks/{bank_id}/questions")
-async def create_question(bank_id: str, body: dict, db: DB, user: CurrentUser):
-    q = await question_service.create_question(db, user.username, bank_id, body)
+async def create_question(bank_id: str, body: dict, db: DB, user: QuestionEditor):
+    q = await question_service.create_question(db, user, bank_id, body)
     if not q:
         raise _nf()
     return {"question": question_service.question_to_dict(q)}
 
 
 @router.get("/questions/{question_id}")
-async def get_question(question_id: str, db: DB, user: CurrentUser):
-    q = await question_service.get_question(db, user.username, question_id)
+async def get_question(question_id: str, db: DB, user: QuestionBankReader):
+    q = await question_service.get_question(db, user, question_id)
     if not q:
         raise _nf()
     return {"question": question_service.question_to_dict(q)}
 
 
 @router.put("/questions/{question_id}")
-async def update_question(question_id: str, body: dict, db: DB, user: CurrentUser):
-    q = await question_service.update_question(db, user.username, question_id, body)
+async def update_question(question_id: str, body: dict, db: DB, user: QuestionEditor):
+    q = await question_service.update_question(db, user, question_id, body)
     if not q:
         raise _nf()
     return {"question": question_service.question_to_dict(q)}
 
 
 @router.delete("/questions/{question_id}")
-async def delete_question(question_id: str, db: DB, user: CurrentUser):
-    if not await question_service.delete_question(db, user.username, question_id):
+async def delete_question(question_id: str, db: DB, user: QuestionEditor):
+    if not await question_service.delete_question(db, user, question_id):
         raise _nf()
     return {"ok": True}
 

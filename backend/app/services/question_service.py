@@ -2,49 +2,40 @@
 
 import random
 
+from fastapi import HTTPException
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
 from app.models.question import DRAFT, ExamPaper, PaperQuestion, PUBLISHED, Question, QuestionBank
+from app.models.user import User
+from app.services import (
+    question_access_service,
+    question_catalog_service,
+    question_content_service,
+)
 
 
 def bank_to_dict(b: QuestionBank, question_count: int = 0) -> dict:
     return {
         "id": b.id,
+        "ownerId": b.owner_id,
         "name": b.name,
         "subject": b.subject,
         "description": b.description,
         "version": b.version,
         "visibility": b.visibility,
+        "revision": b.revision,
         "questionCount": question_count,
+        "createdBy": b.created_by,
+        "updatedBy": b.updated_by,
         "createdAt": b.created_at.isoformat() if b.created_at else None,
         "updatedAt": b.updated_at.isoformat() if b.updated_at else None,
     }
 
 
 def question_to_dict(q: Question) -> dict:
-    return {
-        "id": q.id,
-        "bankId": q.bank_id,
-        "title": q.title,
-        "type": q.type,
-        "subject": q.subject,
-        "difficulty": q.difficulty,
-        "domain": q.domain,
-        "topic": q.topic,
-        "tags": q.tags or [],
-        "stemParts": q.stem_parts or [],
-        "options": q.options or [],
-        "correctAnswer": q.correct_answer,
-        "analysis": q.analysis,
-        "clues": q.clues or [],
-        "concepts": q.concepts or [],
-        "reasoningSteps": q.reasoning_steps or [],
-        "status": q.status or {},
-        "createdAt": q.created_at.isoformat() if q.created_at else None,
-        "updatedAt": q.updated_at.isoformat() if q.updated_at else None,
-    }
+    return question_catalog_service.question_to_payload(q)
 
 
 def paper_to_dict(p: ExamPaper, question_count: int = 0) -> dict:
@@ -64,27 +55,41 @@ def paper_to_dict(p: ExamPaper, question_count: int = 0) -> dict:
 
 
 # ---------- 题库 ----------
-async def list_banks(db: AsyncSession, owner: str, subject: str | None = None) -> list[dict]:
-    q = select(QuestionBank).where(QuestionBank.owner_id == owner)
-    if subject:
-        q = q.where(QuestionBank.subject == subject)
-    banks = (await db.execute(q.order_by(QuestionBank.created_at))).scalars().all()
-    result = []
-    for b in banks:
-        cnt = int(
-            (await db.execute(select(func.count()).select_from(Question).where(Question.bank_id == b.id))).scalar() or 0
-        )
-        result.append(bank_to_dict(b, cnt))
-    return result
+async def _resolve_actor(db: AsyncSession, actor: User | str) -> User | None:
+    if isinstance(actor, User):
+        return actor
+    return await db.get(User, actor)
 
 
-async def create_bank(db: AsyncSession, owner: str, data: dict) -> QuestionBank:
+async def list_banks(db: AsyncSession, owner: User | str, subject: str | None = None) -> list[dict]:
+    actor = await _resolve_actor(db, owner)
+    if actor is None:
+        return []
+    return await question_catalog_service.list_catalog_banks(
+        db,
+        actor,
+        mode="managed",
+        subject=subject,
+    )
+
+
+async def create_bank(db: AsyncSession, owner: User | str, data: dict) -> QuestionBank:
+    actor = await _resolve_actor(db, owner)
+    if actor is None:
+        raise ValueError("用户不存在")
+    visibility = str(data.get("visibility") or "private")
+    if visibility not in {"private", "published"}:
+        visibility = "private"
     b = QuestionBank(
         id=uid("b_"),
-        owner_id=owner,
+        owner_id=actor.username,
         name=data.get("name", "新题库"),
         subject=data.get("subject", "PMP"),
         description=data.get("description"),
+        visibility=visibility,
+        revision=1,
+        created_by=actor.username,
+        updated_by=actor.username,
     )
     db.add(b)
     await db.commit()
@@ -92,21 +97,31 @@ async def create_bank(db: AsyncSession, owner: str, data: dict) -> QuestionBank:
     return b
 
 
-async def update_bank(db: AsyncSession, owner: str, bank_id: str, patch: dict) -> QuestionBank | None:
-    b = await db.get(QuestionBank, bank_id)
-    if not b or b.owner_id != owner:
+async def update_bank(db: AsyncSession, owner: User | str, bank_id: str, patch: dict) -> QuestionBank | None:
+    actor = await _resolve_actor(db, owner)
+    if actor is None:
+        return None
+    try:
+        b = await question_access_service.require_bank_access(db, actor, bank_id, edit=True)
+    except HTTPException:
         return None
     for k in ("name", "subject", "description", "version", "visibility"):
         if k in patch:
             setattr(b, k, patch[k])
+    b.revision += 1
+    b.updated_by = actor.username
     await db.commit()
     await db.refresh(b)
     return b
 
 
-async def delete_bank(db: AsyncSession, owner: str, bank_id: str) -> bool:
-    b = await db.get(QuestionBank, bank_id)
-    if not b or b.owner_id != owner:
+async def delete_bank(db: AsyncSession, owner: User | str, bank_id: str) -> bool:
+    actor = await _resolve_actor(db, owner)
+    if actor is None:
+        return False
+    try:
+        b = await question_access_service.require_bank_access(db, actor, bank_id, edit=True)
+    except HTTPException:
         return False
     qs = (await db.execute(select(Question).where(Question.bank_id == bank_id))).scalars().all()
     for q in qs:
@@ -119,7 +134,7 @@ async def delete_bank(db: AsyncSession, owner: str, bank_id: str) -> bool:
 # ---------- 题目 ----------
 async def list_questions(
     db: AsyncSession,
-    owner: str,
+    owner: User | str,
     bank_id: str,
     *,
     query: str | None = None,
@@ -128,8 +143,12 @@ async def list_questions(
     page: int = 1,
     page_size: int = 20,
 ):
-    b = await db.get(QuestionBank, bank_id)
-    if not b or b.owner_id != owner:
+    actor = await _resolve_actor(db, owner)
+    if actor is None:
+        return [], 0
+    try:
+        await question_access_service.require_bank_access(db, actor, bank_id, edit=False)
+    except HTTPException:
         return [], 0
     q = select(Question).where(Question.bank_id == bank_id)
     if query:
@@ -145,28 +164,49 @@ async def list_questions(
     return [question_to_dict(r) for r in rows], total
 
 
-async def create_question(db: AsyncSession, owner: str, bank_id: str, data: dict) -> Question | None:
-    b = await db.get(QuestionBank, bank_id)
-    if not b or b.owner_id != owner:
+async def create_question(db: AsyncSession, owner: User | str, bank_id: str, data: dict) -> Question | None:
+    actor = await _resolve_actor(db, owner)
+    if actor is None:
         return None
+    try:
+        b = await question_access_service.require_bank_access(db, actor, bank_id, edit=True)
+    except HTTPException:
+        return None
+    question_id = uid("q_")
+    normalized = question_content_service.normalize_question_payload(
+        {**data, "id": question_id, "title": data.get("title", "新题目")},
+        subject=b.subject,
+    )
+    normalized["scope"] = "internal"
+    content_hash = question_content_service.canonical_question_hash(normalized)
     q = Question(
-        id=uid("q_"),
+        id=question_id,
         bank_id=bank_id,
-        title=data.get("title", "新题目"),
-        type=data.get("type", "single_choice"),
-        subject=data.get("subject", b.subject),
-        difficulty=data.get("difficulty"),
-        domain=data.get("domain"),
-        topic=data.get("topic"),
-        tags=data.get("tags") or [],
-        stem_parts=data.get("stemParts") or [],
-        options=data.get("options") or [],
-        correct_answer=data.get("correctAnswer"),
-        analysis=data.get("analysis"),
-        clues=data.get("clues") or [],
-        concepts=data.get("concepts") or [],
-        reasoning_steps=data.get("reasoningSteps") or [],
-        status=data.get("status") or {},
+        title=normalized["title"],
+        type=normalized["type"],
+        subject=normalized["subject"],
+        difficulty=normalized.get("difficulty"),
+        domain=normalized.get("domain"),
+        topic=normalized.get("topic"),
+        teacher_number=normalized.get("teacherNumber"),
+        scope="internal",
+        content_hash=content_hash,
+        created_by=actor.username,
+        updated_by=actor.username,
+        revision=1,
+        tags=normalized["tags"],
+        stem_parts=normalized["stemParts"],
+        options=normalized["options"],
+        correct_answer=str(normalized.get("correctAnswer") or "") or None,
+        analysis=normalized.get("analysis"),
+        clues=normalized["clues"],
+        concepts=normalized["concepts"],
+        reasoning_steps=normalized["reasoningSteps"],
+        status=normalized["status"],
+        translations=normalized["translations"],
+        content_metadata=normalized["metadata"],
+        key_path=normalized["keyPath"],
+        lifecycle=normalized["lifecycle"],
     )
     db.add(q)
     await db.commit()
@@ -174,37 +214,76 @@ async def create_question(db: AsyncSession, owner: str, bank_id: str, data: dict
     return q
 
 
-async def get_question(db: AsyncSession, owner: str, question_id: str) -> Question | None:
+async def get_question(db: AsyncSession, owner: User | str, question_id: str) -> Question | None:
+    actor = await _resolve_actor(db, owner)
+    if actor is None:
+        return None
     q = await db.get(Question, question_id)
     if not q:
         return None
-    b = await db.get(QuestionBank, q.bank_id)
-    if not b or b.owner_id != owner:
+    try:
+        await question_access_service.require_bank_access(db, actor, q.bank_id, edit=False)
+    except HTTPException:
         return None
     return q
 
 
-async def update_question(db: AsyncSession, owner: str, question_id: str, patch: dict) -> Question | None:
-    q = await get_question(db, owner, question_id)
-    if not q:
+async def update_question(db: AsyncSession, owner: User | str, question_id: str, patch: dict) -> Question | None:
+    actor = await _resolve_actor(db, owner)
+    if actor is None:
         return None
-    field_map = {
-        "title": "title", "type": "type", "difficulty": "difficulty", "domain": "domain", "topic": "topic",
-        "tags": "tags", "stemParts": "stem_parts", "options": "options", "correctAnswer": "correct_answer",
-        "analysis": "analysis", "clues": "clues", "concepts": "concepts", "reasoningSteps": "reasoning_steps",
-        "status": "status",
-    }
-    for k_in, k_col in field_map.items():
-        if k_in in patch:
-            setattr(q, k_col, patch[k_in])
+    q = await db.get(Question, question_id)
+    if q is None:
+        return None
+    try:
+        await question_access_service.require_bank_access(db, actor, q.bank_id, edit=True)
+    except HTTPException:
+        return None
+    current = question_catalog_service.question_to_payload(q)
+    merged = {**current, **patch, "id": q.id}
+    normalized = question_content_service.normalize_question_payload(
+        merged,
+        subject=q.subject or "PMP",
+    )
+    q.title = normalized["title"]
+    q.type = normalized["type"]
+    q.subject = normalized["subject"]
+    q.difficulty = normalized.get("difficulty")
+    q.domain = normalized.get("domain")
+    q.topic = normalized.get("topic")
+    q.teacher_number = normalized.get("teacherNumber")
+    q.scope = normalized["scope"]
+    q.tags = normalized["tags"]
+    q.stem_parts = normalized["stemParts"]
+    q.options = normalized["options"]
+    q.correct_answer = str(normalized.get("correctAnswer") or "") or None
+    q.analysis = normalized.get("analysis")
+    q.clues = normalized["clues"]
+    q.concepts = normalized["concepts"]
+    q.reasoning_steps = normalized["reasoningSteps"]
+    q.status = normalized["status"]
+    q.translations = normalized["translations"]
+    q.content_metadata = normalized["metadata"]
+    q.key_path = normalized["keyPath"]
+    q.lifecycle = normalized["lifecycle"]
+    q.content_hash = question_content_service.canonical_question_hash(normalized)
+    q.revision += 1
+    q.updated_by = actor.username
     await db.commit()
     await db.refresh(q)
     return q
 
 
-async def delete_question(db: AsyncSession, owner: str, question_id: str) -> bool:
-    q = await get_question(db, owner, question_id)
-    if not q:
+async def delete_question(db: AsyncSession, owner: User | str, question_id: str) -> bool:
+    actor = await _resolve_actor(db, owner)
+    if actor is None:
+        return False
+    q = await db.get(Question, question_id)
+    if q is None:
+        return False
+    try:
+        await question_access_service.require_bank_access(db, actor, q.bank_id, edit=True)
+    except HTTPException:
         return False
     links = (await db.execute(select(PaperQuestion).where(PaperQuestion.question_id == question_id))).scalars().all()
     for l in links:
