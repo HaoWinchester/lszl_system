@@ -26,6 +26,18 @@ from app.services.question_content_service import (
 
 PRIVATE_BANK_PREFIX = "kg_question_banks_v1__"
 PUBLISHED_BANK_KEY = "kg_question_banks_published_v1"
+SOURCE_PRIORITY = {"relational": 0, "runtimeState": 1, "sharedPublished": 2}
+
+
+class BankMigrationMapping(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    owner_id: str = Field(alias="ownerId")
+    old_bank_id: str = Field(alias="oldBankId")
+    new_bank_id: str = Field(alias="newBankId")
+    old_name: str = Field(alias="oldName")
+    new_name: str = Field(alias="newName")
+    ordinal: int
 
 
 class MigrationReport(BaseModel):
@@ -40,6 +52,10 @@ class MigrationReport(BaseModel):
     deduplicated: int = Field(alias="deduplicatedCount")
     conflicts: list[dict[str, Any]]
     invalid_records: list[dict[str, Any]] = Field(alias="invalidRecords")
+    bank_mappings: list[BankMigrationMapping] = Field(
+        default_factory=list,
+        alias="bankMappings",
+    )
     null_content_hashes: int = Field(alias="nullContentHashes")
     applied: bool = False
     started_at: str = Field(alias="startedAt")
@@ -72,6 +88,21 @@ class _QuestionCandidate:
 
 
 @dataclass
+class _LogicalBank:
+    owner_id: str
+    old_bank_id: str
+    name: str
+    preferred_source: str
+    has_relational: bool
+
+
+@dataclass
+class _BankMappingPlan:
+    by_identity: dict[tuple[str, str], BankMigrationMapping]
+    report: list[BankMigrationMapping]
+
+
+@dataclass
 class _Snapshot:
     report: MigrationReport
     banks: dict[str, _BankCandidate]
@@ -88,6 +119,164 @@ def _decode_json(raw: Any) -> Any:
 
 def _filtered(bank_id: str, bank_ids: set[str] | None) -> bool:
     return bank_ids is None or bank_id in bank_ids
+
+
+def _bank_name(raw_bank: dict[str, Any]) -> str:
+    return str(raw_bank.get("name") or raw_bank.get("bankName") or "未命名题库").strip()[:200]
+
+
+def _candidate_id_status(
+    candidate_id: str,
+    *,
+    owner_id: str,
+    expected_name: str,
+    logical_by_id: dict[str, list[_LogicalBank]],
+    assigned_ids: set[str],
+) -> tuple[bool, tuple[str, str] | None]:
+    existing = logical_by_id.get(candidate_id, [])
+    if not existing and candidate_id not in assigned_ids:
+        return True, None
+    if len(existing) == 1:
+        logical = existing[0]
+        if (
+            logical.has_relational
+            and logical.owner_id == owner_id
+            and logical.name == expected_name
+        ):
+            return True, (logical.owner_id, logical.old_bank_id)
+    return False, None
+
+
+def _mapped_bank_id(
+    old_id: str,
+    owner_id: str,
+    ordinal: int,
+    expected_name: str,
+    logical_by_id: dict[str, list[_LogicalBank]],
+    assigned_ids: set[str],
+) -> tuple[str, tuple[str, str] | None]:
+    direct = f"{old_id}-{ordinal}"
+    if len(direct) <= 64:
+        available, absorbed = _candidate_id_status(
+            direct,
+            owner_id=owner_id,
+            expected_name=expected_name,
+            logical_by_id=logical_by_id,
+            assigned_ids=assigned_ids,
+        )
+        if available:
+            return direct, absorbed
+
+    digest = hashlib.sha256(
+        f"{old_id}\0{owner_id}\0{ordinal}".encode("utf-8")
+    ).hexdigest()
+    for hash_length in range(8, 53, 4):
+        suffix = f"-{ordinal}-{digest[:hash_length]}"
+        candidate = f"{old_id[: 64 - len(suffix)]}{suffix}"
+        available, absorbed = _candidate_id_status(
+            candidate,
+            owner_id=owner_id,
+            expected_name=expected_name,
+            logical_by_id=logical_by_id,
+            assigned_ids=assigned_ids,
+        )
+        if available:
+            return candidate, absorbed
+    raise ValueError(f"无法为题库 {old_id} 分配唯一迁移 ID")
+
+
+def _plan_bank_mappings(
+    records: list[tuple[str, str | None, dict[str, Any]]],
+    user_ids: set[str],
+) -> _BankMappingPlan:
+    logical_records: dict[tuple[str, str], list[tuple[str, dict[str, Any]]]] = {}
+    for source, owner_id, raw_bank in records:
+        old_bank_id = str(raw_bank.get("id") or raw_bank.get("bankId") or "").strip()
+        if (
+            not old_bank_id
+            or len(old_bank_id) > 64
+            or not owner_id
+            or owner_id not in user_ids
+        ):
+            continue
+        logical_records.setdefault((owner_id, old_bank_id), []).append((source, raw_bank))
+
+    logical: dict[tuple[str, str], _LogicalBank] = {}
+    for identity, variants in logical_records.items():
+        preferred_source, preferred_bank = min(
+            variants,
+            key=lambda item: SOURCE_PRIORITY.get(item[0], 99),
+        )
+        logical[identity] = _LogicalBank(
+            owner_id=identity[0],
+            old_bank_id=identity[1],
+            name=_bank_name(preferred_bank),
+            preferred_source=preferred_source,
+            has_relational=any(source == "relational" for source, _ in variants),
+        )
+
+    logical_by_id: dict[str, list[_LogicalBank]] = {}
+    for item in logical.values():
+        logical_by_id.setdefault(item.old_bank_id, []).append(item)
+
+    by_identity: dict[tuple[str, str], BankMigrationMapping] = {}
+    report: list[BankMigrationMapping] = []
+    assigned_ids: set[str] = set()
+    absorbed_identities: set[tuple[str, str]] = set()
+
+    for old_bank_id in sorted(logical_by_id):
+        group = [
+            item
+            for item in logical_by_id[old_bank_id]
+            if (item.owner_id, item.old_bank_id) not in absorbed_identities
+        ]
+        if len({item.owner_id for item in group}) <= 1:
+            continue
+        group.sort(
+            key=lambda item: (
+                0 if item.has_relational else 1,
+                item.owner_id,
+                SOURCE_PRIORITY.get(item.preferred_source, 99),
+                item.old_bank_id,
+            )
+        )
+        seen_names: set[str] = set()
+        for ordinal, item in enumerate(group, start=1):
+            normalized_name = item.name.strip()
+            new_name = (
+                f"{normalized_name}（{ordinal}）"
+                if normalized_name in seen_names
+                else normalized_name
+            )
+            seen_names.add(normalized_name)
+            absorbed: tuple[str, str] | None = None
+            if ordinal == 1:
+                new_bank_id = old_bank_id
+            else:
+                new_bank_id, absorbed = _mapped_bank_id(
+                    old_bank_id,
+                    item.owner_id,
+                    ordinal,
+                    new_name,
+                    logical_by_id,
+                    assigned_ids,
+                )
+            mapping = BankMigrationMapping(
+                ownerId=item.owner_id,
+                oldBankId=old_bank_id,
+                newBankId=new_bank_id,
+                oldName=item.name,
+                newName=new_name,
+                ordinal=ordinal,
+            )
+            identity = (item.owner_id, item.old_bank_id)
+            by_identity[identity] = mapping
+            if absorbed is not None and absorbed != identity:
+                by_identity[absorbed] = mapping
+                absorbed_identities.add(absorbed)
+            assigned_ids.add(new_bank_id)
+            report.append(mapping)
+    return _BankMappingPlan(by_identity=by_identity, report=report)
 
 
 def _has_internal_marker(payload: dict[str, Any]) -> bool:
@@ -341,28 +530,29 @@ async def _build_snapshot(
         if isinstance(question, dict) and not _has_internal_marker(question)
     }
     user_ids = set((await db.execute(select(User.username))).scalars().all())
+    bank_mapping_plan = _plan_bank_mappings(records, user_ids)
     banks: dict[str, _BankCandidate] = {}
     questions: dict[str, _QuestionCandidate] = {}
     conflicts: list[dict[str, Any]] = []
     deduplicated = 0
 
     for source, owner_id, raw_bank in records:
-        bank_id = str(raw_bank.get("id") or raw_bank.get("bankId") or "").strip()
-        if not bank_id or len(bank_id) > 64:
+        old_bank_id = str(raw_bank.get("id") or raw_bank.get("bankId") or "").strip()
+        if not old_bank_id or len(old_bank_id) > 64:
             _invalid(
                 invalid_records,
                 source=source,
                 code="BANK_ID_INVALID",
                 message="题库 ID 为空或超过 64 字符",
                 owner_id=owner_id,
-                record_id=bank_id or None,
+                record_id=old_bank_id or None,
             )
             continue
         if source == "sharedPublished" and not owner_id:
             conflicts.append(
                 {
                     "code": "PUBLISHED_OWNER_MISSING",
-                    "bankId": bank_id,
+                    "bankId": old_bank_id,
                     "message": "共享题库缺少 publishedBy，不能推断 owner",
                 }
             )
@@ -371,21 +561,24 @@ async def _build_snapshot(
             conflicts.append(
                 {
                     "code": "OWNER_NOT_FOUND",
-                    "bankId": bank_id,
+                    "bankId": old_bank_id,
                     "ownerId": owner_id,
                     "message": "题库 owner 不存在",
                 }
             )
             continue
+        mapping = bank_mapping_plan.by_identity.get((owner_id, old_bank_id))
+        bank_id = mapping.new_bank_id if mapping is not None else old_bank_id
+        bank_name = mapping.new_name if mapping is not None else _bank_name(raw_bank)
         visibility = (
             "published"
-            if bank_id in published_bank_ids or source == "sharedPublished"
+            if old_bank_id in published_bank_ids or source == "sharedPublished"
             else "private"
         )
         candidate = _BankCandidate(
             id=bank_id,
             owner_id=owner_id,
-            name=str(raw_bank.get("name") or raw_bank.get("bankName") or "未命名题库")[:200],
+            name=bank_name,
             subject=str(raw_bank.get("subject") or "PMP")[:32],
             description=(
                 str(raw_bank.get("description")) if raw_bank.get("description") else None
@@ -517,6 +710,7 @@ async def _build_snapshot(
         deduplicated=deduplicated,
         conflicts=conflicts,
         invalidRecords=invalid_records,
+        bankMappings=bank_mapping_plan.report,
         nullContentHashes=null_content_hashes,
         applied=False,
         startedAt=started_at,
@@ -586,6 +780,12 @@ async def _apply_snapshot(db: AsyncSession, snapshot: _Snapshot) -> None:
             )
             db.add(bank)
         else:
+            if bank.owner_id != candidate.owner_id:
+                raise ValueError(f"题库 {candidate.id} 的 owner 与迁移映射不一致")
+            bank.name = candidate.name
+            bank.subject = candidate.subject
+            bank.description = candidate.description
+            bank.version = candidate.version
             bank.visibility = candidate.visibility
             bank.revision = max(bank.revision, candidate.revision)
             bank.updated_by = bank.updated_by or candidate.owner_id

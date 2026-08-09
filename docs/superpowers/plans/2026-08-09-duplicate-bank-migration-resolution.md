@@ -31,7 +31,7 @@
 - Consumes: `migrate_runtime_questions(db, apply: bool, owner_ids=None, bank_ids=None) -> MigrationReport`
 - Produces: 关于 `MigrationReport.bank_mappings`、题库名称/ID、题目 `bank_id` 和重复执行的回归约束
 
-- [ ] **Step 1: 新增三 owner 同 ID、同名称的迁移测试**
+- [x] **Step 1: 新增三 owner 同 ID、同名称的迁移测试**
 
 测试创建三个用户；关系表已有 `shared-bank` 属于第一个用户，另两个用户的 Runtime State 各保存同 ID、同名称、不同题目 ID。断言 dry-run：
 
@@ -51,15 +51,15 @@ assert [item.new_name for item in report.bank_mappings] == [
 
 apply 后断言三个题库均存在、owner 正确，三个题目的 `bank_id` 分别指向映射 ID。再次 dry-run/apply，断言映射不变、题库数和题目数不增长。
 
-- [ ] **Step 2: 新增不同名称与 ID 回退测试**
+- [x] **Step 2: 新增不同名称与 ID 回退测试**
 
 同一原 ID 的两个 owner 使用不同名称，断言第二个只改 ID、不改名称。另预占 `shared-bank-2`，断言映射使用不超过 64 字符且包含序号与确定性哈希的备用 ID；两次 dry-run 结果完全相同。
 
-- [ ] **Step 3: 新增普通同名题库不重映射测试**
+- [x] **Step 3: 新增普通同名题库不重映射测试**
 
 两个 owner 的题库名称相同但原 ID 不同，断言名称和 ID 均保持不变，避免把现有 `pytest题库` 等普通同名数据纳入本次冲突修复。
 
-- [ ] **Step 4: 运行 RED 测试**
+- [x] **Step 4: 运行 RED 测试**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_runtime_migration.py -q`
 
@@ -77,7 +77,7 @@ Expected: FAIL，原因是 `MigrationReport` 尚无 `bankMappings`，现有逻�
 - Produces: `_plan_bank_mappings(records, user_ids) -> _BankMappingPlan`
 - Produces: `_mapped_bank_id(old_id, owner_id, ordinal, occupied_ids) -> str`
 
-- [ ] **Step 1: 增加映射 DTO 和内部结构**
+- [x] **Step 1: 增加映射 DTO 和内部结构**
 
 新增：
 
@@ -97,7 +97,7 @@ class MigrationReport(BaseModel):
 
 内部 plan 保存 `(owner_id, old_bank_id)` 到映射的查找表、需要吸收的已迁移关系表目标，以及报告顺序。
 
-- [ ] **Step 2: 实现稳定 ID 分配**
+- [x] **Step 2: 实现稳定 ID 分配**
 
 优先尝试 `f"{old_id}-{ordinal}"`。若超过 64 字符或已被其他逻辑题库占用，计算：
 
@@ -109,29 +109,29 @@ candidate = f"{old_id[:64 - len(suffix)]}{suffix}"
 
 若短哈希候选仍被占用，按 12、16、20 位哈希扩展后重试；不得覆盖不同 owner 的已有题库。
 
-- [ ] **Step 3: 实现跨 owner 冲突组规划**
+- [x] **Step 3: 实现跨 owner 冲突组规划**
 
 先把记录按 `(owner_id, old_bank_id)` 归并，名称优先级为 `relational > runtimeState > sharedPublished`。只对同一 `old_bank_id` 出现多个 owner 的组排序；关系表记录优先，其余按 `(owner_id, source, old_bank_id)`。第一项 ordinal 为 1，保留 ID；后续分配新 ID。同名比较用 `name.strip()`，同名项生成 `f"{base_name}（{ordinal}）"`。
 
-- [ ] **Step 4: 识别已迁移目标保证幂等**
+- [x] **Step 4: 识别已迁移目标保证幂等**
 
 若关系表已存在预期的 `new_bank_id`，且 owner、预期名称均匹配，则把该关系表记录吸收到原 `(owner, old_bank_id)` 映射，不把它视为新逻辑题库；若 ID 已存在但 owner 或名称不匹配，则走哈希备用 ID。这样保留 Runtime State 快照的同时，apply 后再次扫描仍产生相同映射。
 
-- [ ] **Step 5: 在快照构建中应用映射**
+- [x] **Step 5: 在快照构建中应用映射**
 
 构造 `_BankCandidate` 时使用 `mapping.new_bank_id/new_name`，构造 `_QuestionCandidate` 时使用相同 `new_bank_id`。删除同名 owner 冲突产生 `BANK_OWNER_CONFLICT` 的旧分支，但保留 `OWNER_NOT_FOUND`、`PUBLISHED_OWNER_MISSING`、题目内容冲突及所有结构校验。
 
-- [ ] **Step 6: 完善 apply 的元数据更新**
+- [x] **Step 6: 完善 apply 的元数据更新**
 
 新建题库使用映射后的名称和 ID；已存在且 owner 相同的目标题库同步 `name/subject/description/version/visibility/revision`，owner 不匹配则在快照阶段阻止 apply。题目继续通过 `_assign_migrated_question()` 更新 `bank_id`，不改变题目 ID。
 
-- [ ] **Step 7: 运行 GREEN 与全后端回归**
+- [x] **Step 7: 运行 GREEN 与全后端回归**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_runtime_migration.py -q && .venv/bin/python -m pytest tests/ -q`
 
 Expected: 全部 PASS。
 
-- [ ] **Step 8: 提交迁移实现**
+- [x] **Step 8: 提交迁移实现**
 
 ```bash
 git add backend/app/services/question_migration_service.py backend/tests/test_question_runtime_migration.py
