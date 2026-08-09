@@ -9,15 +9,25 @@ from urllib.parse import quote
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.subscription import Subscription
 from app.models.user import User
-from app.services import file_service, guided_learning_service, user_service
+from app.services import file_service, guided_learning_service, subscription_service, user_service
 from app.web.bootstrap import PAGE_NAMESPACES
 from app.web.schemas import RuntimeMutation, RuntimeStateUpdate
 
 MAX_VALUE_BYTES = 8 * 1024 * 1024
 MAX_TOTAL_BYTES = 48 * 1024 * 1024
+
+DEPRECATED_QUESTION_EXACT_KEYS = frozenset({
+    "kg_question_banks_published_v1",
+    "kg_principle_repository_v1",
+    "kg_synthesis_preset_repository_v1",
+    "kg_question_tag_names_v1",
+})
+DEPRECATED_QUESTION_PREFIXES = ("kg_question_banks_v1__",)
 
 EXACT_KEYS = {
     "kg_default_entry_mode_v1",
@@ -25,6 +35,10 @@ EXACT_KEYS = {
     "kg_global_shortcuts_layout_v1",
     "kg_global_shortcuts_position_v1",
     "kg_graph_user_preferences_v1",
+    "kg_canvas_view_preferences_v1",
+    "kg_graph_recent_colors_v1",
+    "kg_home_interaction_mode_v1",
+    "kg_home_professional_flow_v1",
     "kg_graph_closed_tabs_v1",
     "kg_graph_current_file_v1",
     "kg_graph_current_file_v2",
@@ -87,10 +101,8 @@ EXACT_KEYS = {
     "kg_guided_practice_return_v1",
     "kg_learning_tasks_v1",
     "kg_paper_workspace_layout_v1",
-    "kg_question_banks_published_v1",
     "kg_question_classification_collapsed_v1",
     "kg_question_library_workspace_layout_v1",
-    "kg_question_tag_names_v1",
     "kg_taxonomy_deletion_records_v1",
     "kg_taxonomy_import_records_v1",
     "kg_taxonomy_release_records_v1",
@@ -109,11 +121,11 @@ PREFIXES = (
     "kg_guided_learning_progress_v2__",
     "kg_guided_path_scroll_v2__",
     "kg_question_bank_demo_suppressed_v1__",
-    "kg_question_banks_v1__",
     "kg_question_current_v1__",
     "kg_exam_papers_v1__",
     "kg_exam_current_v1__",
     "kg_learning_sessions_v2__",
+    "kg_learning_active_context_v1__",
     "kg_learning_events_v1__",
     "kg_learning_rounds_v1__",
     "kg_multi_question_analysis_sections_v1__",
@@ -134,6 +146,9 @@ PREFIXES = (
     # v9.0-p4.1.1 新增业务键（动态 id / subject 后缀）
     "kg_practice_history_v1__",
     "kg_practice_active_attempt_v1__",
+    "kg_practice_attempts_v1__",
+    "kg_multi_question_release_selection_v1__",
+    "kg_ui_resizable_region_v1__",
     "kg_recall_association_management_v1__",
     "kg_user_feedback_reply_reads_v1__",
     "kg_user_message_reads_v1__",
@@ -161,6 +176,8 @@ SHARED_KEYS = frozenset({
     "kg_taxonomy_deletion_records_v1",
     "kg_taxonomy_import_records_v1",
     "kg_exam_paper_release_history_v1",
+    "kg_principle_repository_v1",
+    "kg_synthesis_preset_repository_v1",
     # 管理后台全局设置（低频写；审计/事务快照等高频写键暂不加入，避免并发竞态）
     "kg_admin_settings_v1",
 })
@@ -202,7 +219,18 @@ async def _lock_owner(db: AsyncSession, owner: str) -> None:
 
 
 def key_allowed(key: str) -> bool:
-    return key in EXACT_KEYS or any(key.startswith(prefix) for prefix in PREFIXES)
+    return (
+        key in EXACT_KEYS
+        or key in DEPRECATED_QUESTION_EXACT_KEYS
+        or any(key.startswith(prefix) for prefix in PREFIXES)
+        or any(key.startswith(prefix) for prefix in DEPRECATED_QUESTION_PREFIXES)
+    )
+
+
+def deprecated_question_key(key: str) -> bool:
+    return key in DEPRECATED_QUESTION_EXACT_KEYS or any(
+        key.startswith(prefix) for prefix in DEPRECATED_QUESTION_PREFIXES
+    )
 
 
 def validate_update(update: RuntimeStateUpdate) -> None:
@@ -291,8 +319,50 @@ def _publisher_id(item: object, key: str) -> str:
     return str(publisher or "")
 
 
-def visible_shared_value(key: str, value: str, owner: str) -> str:
+def visible_published_papers(value: str, *, can_access_member: bool) -> str:
+    """Keep VIP catalog metadata visible while withholding paid question payloads."""
+    try:
+        rows = json.loads(value or "[]")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return "[]"
+    if not isinstance(rows, list):
+        return "[]"
+    visible = []
+    for raw in rows:
+        if not isinstance(raw, dict):
+            continue
+        row = dict(raw)
+        policy = row.get("accessPolicy") if isinstance(row.get("accessPolicy"), dict) else {}
+        access_level = str(
+            policy.get("accessLevel") or row.get("accessLevel") or "free"
+        ).lower()
+        is_member = access_level in {"member", "vip", "paid", "premium"}
+        row["accessPolicy"] = {"accessLevel": "member" if is_member else "free"}
+        if is_member and not can_access_member:
+            questions = row.get("questions") if isinstance(row.get("questions"), list) else []
+            configured_count = int(row.get("configuredCount") or len(questions))
+            row["configuredCount"] = configured_count
+            row["totalCount"] = int(row.get("totalCount") or configured_count)
+            row["questions"] = []
+            row["questionSnapshots"] = []
+            row["contentRestricted"] = True
+        visible.append(row)
+    return _json(visible)
+
+
+def visible_shared_value(
+    key: str,
+    value: str,
+    owner: str,
+    *,
+    can_access_member: bool = False,
+) -> str:
     """Remove account-private records before a shared collection reaches a browser."""
+    if key in {
+        "kg_exam_papers_published_v1",
+        "kg_exam_paper_release_history_v1",
+    }:
+        return visible_published_papers(value, can_access_member=can_access_member)
     if key != "kg_activity_collections_v1":
         return value
     try:
@@ -343,13 +413,20 @@ async def get_state(db: AsyncSession, owner: str) -> tuple[dict[str, str], int]:
     row = await db.get(RuntimeState, owner)
     user = await db.get(User, owner)
     role = user.role if user else "viewer"
+    subscription = await db.get(Subscription, owner)
+    entitlements = subscription_service.entitlements_for(role, subscription)
     storage = private_runtime_storage(row.storage if row else {})
     revision = row.revision if row else 0
     # 合并 v9 全局共享键（published 类）：所有用户读同一份，教师发布 → 学员可读。
     result = await db.execute(select(SharedRuntimeState.key, SharedRuntimeState.value))
     for key, value in result:
         if key in SHARED_KEYS and shared_key_readable(key, role):
-            storage[key] = visible_shared_value(key, str(value), owner)
+            storage[key] = visible_shared_value(
+                key,
+                str(value),
+                owner,
+                can_access_member=entitlements["allExamPapers"],
+            )
     return storage, revision
 
 
@@ -543,8 +620,15 @@ async def apply_update(
     update: RuntimeStateUpdate,
 ) -> tuple[dict[str, str], int]:
     validate_update(update)
+    mutations = update_mutations(update)
+    if settings.QUESTION_CATALOG_CUTOVER_ENABLED:
+        deprecated_mutations = [
+            mutation.key for mutation in mutations if deprecated_question_key(mutation.key)
+        ]
+        if deprecated_mutations:
+            raise RuntimeStatePermissionError("正式题库已迁移，请使用题目目录接口")
     protected_mutations = [
-        mutation.key for mutation in update_mutations(update) if server_owned_key(mutation.key)
+        mutation.key for mutation in mutations if server_owned_key(mutation.key)
     ]
     if protected_mutations:
         raise RuntimeStatePermissionError(
@@ -573,6 +657,19 @@ async def apply_update(
         storage[update.key] = update.value
     elif update.operation == "removeItem":
         storage.pop(update.key, None)
+
+    if settings.QUESTION_CATALOG_CUTOVER_ENABLED:
+        # Full browser snapshots can still contain the pre-cutover catalog. Ignore
+        # those stale values while retaining the original server copy for audit,
+        # migration verification, and rollback.
+        storage = {
+            key: value for key, value in storage.items() if not deprecated_question_key(key)
+        }
+        storage.update({
+            key: value
+            for key, value in current_storage.items()
+            if deprecated_question_key(key)
+        })
 
     # 拆分：v9 全局共享键（published 类）→ 虚拟 SHARED_OWNER；其余 → 当前 owner。
     own_part = {

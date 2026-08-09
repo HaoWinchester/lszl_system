@@ -8,6 +8,33 @@ const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const frontendDir = resolve(scriptsDir, '..')
 const source = readFileSync(resolve(scriptsDir, 'new-legacy-assets', 'server-state-bootstrap.js'), 'utf8')
 
+test('question catalog runtime keys are legacy-read-only after cutover', () => {
+  const contract = JSON.parse(readFileSync(resolve(scriptsDir, 'new-legacy-contract.json'), 'utf8'))
+  const runtime = contract.runtimeStorage
+  const readOnly = runtime.legacyReadOnlyKeys
+  for (const key of [
+    'kg_question_banks_published_v1',
+    'kg_principle_repository_v1',
+    'kg_synthesis_preset_repository_v1',
+    'kg_question_tag_names_v1',
+  ]) {
+    assert.ok(readOnly.exactKeys.includes(key))
+    assert.ok(!runtime.exactKeys.includes(key))
+  }
+  assert.ok(readOnly.prefixes.includes('kg_question_banks_v1__'))
+  assert.ok(!runtime.prefixes.includes('kg_question_banks_v1__'))
+
+  const syncSource = readFileSync(resolve(scriptsDir, 'sync-new-legacy.js'), 'utf8')
+  assert.match(syncSource, /legacyReadOnlyKeys/)
+  assert.match(syncSource, /只读旧键禁止新增写调用/)
+
+  const adapterPath = resolve(scriptsDir, 'new-legacy-assets', 'question-catalog-adapter.js')
+  if (existsSync(adapterPath)) {
+    const adapter = readFileSync(adapterPath, 'utf8')
+    assert.doesNotMatch(adapter, /localStorage\s*\.\s*(?:setItem|removeItem)\s*\(/)
+  }
+})
+
 test('direct bootstrap consumes the FastAPI-injected payload', () => {
   assert.match(source, /__KG_DIRECT_BOOTSTRAP__/)
   assert.doesNotMatch(source, /__KG_NEW_LEGACY_BOOTSTRAP__/)
@@ -141,7 +168,7 @@ test('question validation adapter runs after the upstream question editor', () =
 test('generated question preview persists the selected bank and question for recall', () => {
   const editor = readFileSync(resolve(frontendDir, 'public/new-legacy/src/65-question-bank-admin.js'), 'utf8')
   assert.match(editor, /async function previewDeepRecall\(\)/)
-  const preview = editor.match(/function previewDeepRecall\(\)\{([\s\S]*?)window\.open\('knowledge-recall\.html/)
+  const preview = editor.match(/function previewDeepRecall\(\)\{([\s\S]*?)window\.open\((?:url|'knowledge-recall\.html)/)
   assert.ok(preview)
   assert.match(preview[1], /const bank\s*=\s*currentBank\(\)/)
   assert.match(preview[1], /sourceBankId:bank\?\.id/)

@@ -550,31 +550,31 @@ git commit -m "feat: migrate runtime question catalogs"
 - Adds: `QUESTION_CATALOG_CUTOVER_ENABLED` deployment setting, false during adapter rollout and true only after Task 18 migration verification
 - Error: `RuntimeStatePermissionError('正式题库已迁移，请使用题目目录接口')`
 
-- [ ] **Step 1: 写拒绝写入失败测试**
+- [x] **Step 1: 写拒绝写入失败测试**
 
 精确拒绝 `kg_question_banks_published_v1`、`kg_principle_repository_v1`、`kg_synthesis_preset_repository_v1`、`kg_question_tag_names_v1` 及所有 `kg_question_banks_v1__*` mutation；继续允许训练进度、当前题目指针、布局和字体偏好。
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_runtime_shared_policy.py tests/test_runtime_state.py -q`
 
 Expected: FAIL，因为正式题库键仍可写。
 
-- [ ] **Step 3: 实现 cutover 写保护**
+- [x] **Step 3: 实现 cutover 写保护**
 
 在 `apply_update()` 权限判断前检查显式 mutations。实现阶段通过 `QUESTION_CATALOG_CUTOVER_ENABLED` 保护：本任务先实现并测试开启后的拒绝行为，Tasks 14–16 完成前部署配置保持 false；Task 18 迁移校验通过后设置 true，最终系统不存在双写。读取旧键暂时保留给回滚和迁移验证；`private_runtime_storage()` 不把旧题库作为目录 API 的输入。原则、归纳卡和标签配置改由专用 API 写入后，也禁止原共享键更新。
 
-- [ ] **Step 4: 更新前端存储合同**
+- [x] **Step 4: 更新前端存储合同**
 
 从可写 runtime 合同中移除正式题库键/前缀，但在 `legacyReadOnlyKeys` 中登记；同步扫描器允许这些字面量只读出现，却拒绝新增写调用。合同测试应断言 catalog adapter 不调用 `localStorage.setItem()` 写这些键。
 
-- [ ] **Step 5: 运行 GREEN**
+- [x] **Step 5: 运行 GREEN**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_runtime_shared_policy.py tests/test_runtime_state.py -q && cd ../frontend && node --test scripts/direct-runtime.test.mjs`
 
 Expected: PASS。
 
-- [ ] **Step 6: 提交本任务**
+- [x] **Step 6: 提交本任务**
 
 ```bash
 git add backend/app/services/runtime_state_service.py backend/tests/test_runtime_shared_policy.py backend/tests/test_runtime_state.py frontend/scripts/new-legacy-contract.json frontend/scripts/sync-new-legacy.js frontend/scripts/direct-runtime.test.mjs

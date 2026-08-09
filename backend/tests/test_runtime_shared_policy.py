@@ -1,5 +1,9 @@
+import asyncio
 import json
 
+import pytest
+
+from app.core.config import settings
 from app.services import runtime_state_service as service
 from app.web.schemas import RuntimeMutation, RuntimeStateUpdate
 
@@ -144,3 +148,44 @@ def test_private_activity_collections_are_only_visible_to_their_owner() -> None:
 
     assert [row["id"] for row in student_rows] == ["teacher-shared"]
     assert [row["id"] for row in owner_rows] == ["admin-private", "teacher-shared"]
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "kg_question_banks_published_v1",
+        "kg_principle_repository_v1",
+        "kg_synthesis_preset_repository_v1",
+        "kg_question_tag_names_v1",
+        "kg_question_banks_v1__user__teacher-a",
+    ],
+)
+def test_catalog_cutover_rejects_deprecated_question_writes_before_role_checks(
+    monkeypatch: pytest.MonkeyPatch,
+    key: str,
+) -> None:
+    monkeypatch.setattr(settings, "QUESTION_CATALOG_CUTOVER_ENABLED", True)
+    payload = update(
+        storage={key: "[]"},
+        mutations=[RuntimeMutation(operation="setItem", key=key, value="[]")],
+    )
+
+    with pytest.raises(
+        service.RuntimeStatePermissionError,
+        match="正式题库已迁移，请使用题目目录接口",
+    ):
+        asyncio.run(service.apply_update(None, "teacher-a", "student", payload))
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "kg_question_current_v1__user__teacher-a",
+        "kg_question_training_route_v1",
+        "kg_question_library_workspace_layout_v1",
+        "pmp_question_font_size_v2",
+    ],
+)
+def test_catalog_cutover_keeps_learning_progress_and_preferences_writable(key: str) -> None:
+    assert service.key_allowed(key)
+    assert not service.deprecated_question_key(key)

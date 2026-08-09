@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     ENV: str = "dev"
     APP_NAME: str = "KG Graph API"
     API_V1_PREFIX: str = "/api/v1"
+    QUESTION_CATALOG_CUTOVER_ENABLED: bool = False
 
     # itsdangerous 签名密钥（生产必改）
     SECRET_KEY: str = "change-me-in-prod"

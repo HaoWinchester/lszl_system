@@ -201,6 +201,13 @@ function patchFileManagerNavigation(source) {
 }
 
 function patchGraphInteractions(source) {
+  const migratedMarkers = [
+    'function findAvailableNodePosition(',
+    'editingNodeIsNew=false',
+    'closeNodeModal({discardNew:true})',
+    'const existing=linksForNodeId(source).find(',
+  ]
+  if (migratedMarkers.every((marker) => source.includes(marker))) return source
   let generated = replaceExactlyOnce(
     source,
     "function createNodeAt(x,y){const sub=window.KGSubscription;if(sub&&typeof sub.requireUsageLimit==='function'&&!sub.requireUsageLimit('graphNodes',state.nodes.length,1,{label:'图谱卡牌'}))return null;clearRelatedGatherLayout({render:false,message:false});clearMultiSelection();const size=state.defaults.nodeSize||'',color=safeColor(state.defaults.nodeColor,DEFAULTS.nodeColor),d=dimsForSize(size),n=makeNode('新知识点',Math.round(x-d.w/2),Math.round(y-d.h/2),color,'','基础','','','',size);state.nodes.push(n);state.selectedNodeId=n.id;state.selectedLinkId=null;state.linkSourceId=null;render({persist:true});openNodeModal(n.id,true);return n}",
@@ -243,6 +250,7 @@ function patchGraphInteractions(source) {
 }
 
 function patchQuestionRecallPreview(source) {
+  if (source.includes('async function previewDeepRecall()') && source.includes("KGServerStateStorage&&typeof window.KGServerStateStorage.flush==='function'")) return source
   if (!source.includes('function previewDeepRecall()')) return source
   // 兼容两个基线：
   //  - v9：previewDeepRecall 已自带 `const bank = currentBank()`，window.open 带 `bankId=`。
@@ -632,18 +640,38 @@ function validateStorageContract(source) {
   const storage = contract.runtimeStorage || {}
   const exact = new Set(storage.exactKeys || [])
   const prefixes = storage.prefixes || []
+  const legacyReadOnly = storage.legacyReadOnlyKeys || {}
+  const readOnlyExact = new Set(legacyReadOnly.exactKeys || [])
+  const readOnlyPrefixes = legacyReadOnly.prefixes || []
   const ignored = new Set(storage.ignoredLiterals || [])
   const candidates = new Set()
+  const readOnlyWrites = new Set()
   const literalPattern = /(['"])(kg_[A-Za-z0-9_]+|pmp_question_font_size_v\d+|通用知识点关系图谱工具_[^'"\\\r\n]+)\1/g
+  const writePattern = /(?:localStorage|sessionStorage)\s*(?:\?\.|\.)\s*(?:setItem|removeItem)\s*\(\s*(['"])(kg_[A-Za-z0-9_]+)\1/g
   for (const path of walk(source).filter((item) => item.endsWith('.js') || item.endsWith('.html'))) {
     const contents = readFileSync(resolve(source, path), 'utf8')
     for (const match of contents.matchAll(literalPattern)) candidates.add(match[2])
+    for (const match of contents.matchAll(writePattern)) {
+      const key = match[2]
+      if (readOnlyExact.has(key) || readOnlyPrefixes.some((prefix) => key.startsWith(prefix))) {
+        readOnlyWrites.add(`${path}:${key}`)
+      }
+    }
   }
   const unknown = Array.from(candidates)
-    .filter((key) => !ignored.has(key) && !exact.has(key) && !prefixes.some((prefix) => key.startsWith(prefix)))
+    .filter((key) => (
+      !ignored.has(key)
+      && !exact.has(key)
+      && !readOnlyExact.has(key)
+      && !prefixes.some((prefix) => key.startsWith(prefix))
+      && !readOnlyPrefixes.some((prefix) => key.startsWith(prefix))
+    ))
     .sort()
   if (unknown.length) {
     throw new Error(`new-legacy 出现未登记的业务存储键：${unknown.join(', ')}`)
+  }
+  if (readOnlyWrites.size) {
+    throw new Error(`new-legacy 只读旧键禁止新增写调用：${Array.from(readOnlyWrites).sort().join(', ')}`)
   }
 }
 

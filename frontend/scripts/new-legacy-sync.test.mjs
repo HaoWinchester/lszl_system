@@ -127,6 +127,28 @@ test('sync rejects an unregistered future business-storage key', (t) => {
   assert.match(result.stderr, /未登记/)
 })
 
+test('sync permits deprecated question keys for reads but rejects new direct writes', (t) => {
+  const readable = fixture()
+  const writable = fixture()
+  t.after(() => rmSync(readable.root, { recursive: true, force: true }))
+  t.after(() => rmSync(writable.root, { recursive: true, force: true }))
+  write(
+    resolve(readable.upstream, 'src/23-graph-file-store.js'),
+    "localStorage.getItem('kg_question_banks_published_v1')\n",
+  )
+  write(
+    resolve(writable.upstream, 'src/23-graph-file-store.js'),
+    "localStorage.setItem('kg_question_banks_published_v1', '[]')\n",
+  )
+
+  const readResult = runSync(readable)
+  const writeResult = runSync(writable)
+
+  assert.equal(readResult.status, 0, readResult.stderr)
+  assert.notEqual(writeResult.status, 0)
+  assert.match(writeResult.stderr, /只读旧键禁止新增写调用/)
+})
+
 test('sync is reproducible for the same source tree', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))

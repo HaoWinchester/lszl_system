@@ -5,7 +5,13 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.runtime_state_service import EXACT_KEYS, PREFIXES, key_allowed
+from app.services.runtime_state_service import (
+    DEPRECATED_QUESTION_EXACT_KEYS,
+    DEPRECATED_QUESTION_PREFIXES,
+    EXACT_KEYS,
+    PREFIXES,
+    key_allowed,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -61,6 +67,8 @@ def test_frontend_compatibility_contract_matches_backend_storage_allowlist() -> 
 
     assert set(contract["exactKeys"]) == EXACT_KEYS
     assert tuple(contract["prefixes"]) == PREFIXES
+    assert set(contract["legacyReadOnlyKeys"]["exactKeys"]) == DEPRECATED_QUESTION_EXACT_KEYS
+    assert tuple(contract["legacyReadOnlyKeys"]["prefixes"]) == DEPRECATED_QUESTION_PREFIXES
 
 
 def test_runtime_state_accepts_scoped_multi_question_preferences() -> None:

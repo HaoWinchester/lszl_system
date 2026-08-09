@@ -34,6 +34,10 @@
       "kg_global_shortcuts_layout_v1",
       "kg_global_shortcuts_position_v1",
       "kg_graph_user_preferences_v1",
+      "kg_canvas_view_preferences_v1",
+      "kg_graph_recent_colors_v1",
+      "kg_home_interaction_mode_v1",
+      "kg_home_professional_flow_v1",
       "kg_graph_closed_tabs_v1",
       "kg_graph_current_file_v1",
       "kg_graph_current_file_v2",
@@ -96,10 +100,8 @@
       "kg_guided_practice_return_v1",
       "kg_learning_tasks_v1",
       "kg_paper_workspace_layout_v1",
-      "kg_question_banks_published_v1",
-      "kg_question_classification_collapsed_v1",
-      "kg_question_library_workspace_layout_v1",
-      "kg_question_tag_names_v1",
+    "kg_question_classification_collapsed_v1",
+    "kg_question_library_workspace_layout_v1",
       "kg_taxonomy_deletion_records_v1",
       "kg_taxonomy_import_records_v1",
       "kg_taxonomy_release_records_v1",
@@ -116,11 +118,11 @@
       "kg_guided_learning_progress_v2__",
       "kg_guided_path_scroll_v2__",
       "kg_question_bank_demo_suppressed_v1__",
-      "kg_question_banks_v1__",
-      "kg_question_current_v1__",
+    "kg_question_current_v1__",
       "kg_exam_papers_v1__",
       "kg_exam_current_v1__",
       "kg_learning_sessions_v2__",
+      "kg_learning_active_context_v1__",
       "kg_learning_events_v1__",
       "kg_learning_rounds_v1__",
       "kg_multi_question_analysis_sections_v1__",
@@ -140,14 +142,31 @@
       "kg_recall_association_library_v1__",
       "kg_practice_history_v1__",
       "kg_practice_active_attempt_v1__",
+      "kg_practice_attempts_v1__",
+      "kg_multi_question_release_selection_v1__",
+      "kg_ui_resizable_region_v1__",
       "kg_recall_association_management_v1__",
       "kg_user_feedback_reply_reads_v1__",
       "kg_user_message_reads_v1__"
     ],
-    "ignoredLiterals": [
+  "legacyReadOnlyKeys": {
+    "exactKeys": [
+      "kg_question_banks_published_v1",
+      "kg_principle_repository_v1",
+      "kg_synthesis_preset_repository_v1",
+      "kg_question_tag_names_v1"
+    ],
+    "prefixes": [
+      "kg_question_banks_v1__"
+    ]
+  },
+  "ignoredLiterals": [
       "kg_graph_",
       "kg_local_",
-      "kg_remote_auth_session_v1"
+      "kg_remote_auth_session_v1",
+      "kg_learning_route_context_v1__",
+      "kg_multi_question_release_selection_v1",
+      "kg_training_workspace_layout_v1"
     ]
   },
   "allowedPersistentStorage": {
