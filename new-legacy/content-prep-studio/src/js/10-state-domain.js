@@ -29,6 +29,7 @@ const prepRuntime={
   serverActor:prepBootstrap.authenticated?(prepBootstrap.authUser||{username:prepBootstrap.username}):null,
   serverBankId:'',serverBankRevision:null,clientInstanceId:generateSystemId('prep_client'),
   lastIdempotencyKey:'',lastUploadFingerprint:'',serverBanks:[],
+  editLeaseState:{questionId:'',mode:'local-new',connection:'online',canSave:true,readOnly:false,lockToken:'',message:''},
   theme:'default',auditTrail:[],
   issuedQuestionIds:new Set()
 };

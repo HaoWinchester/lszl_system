@@ -707,31 +707,31 @@ git commit -m "feat: connect prep studio to question api"
 - Events: `prep:lock-acquired`, `prep:lock-lost`, `prep:sync-committed`
 - UI modes: `local-new`, `server-editable`, `server-readonly`, `offline-unsynced`, `conflict-copy-required`
 
-- [ ] **Step 1: 写计时器、只读和冲突失败测试**
+- [x] **Step 1: 写计时器、只读和冲突失败测试**
 
 使用 fake timers/fetch 测试：打开服务器题前先获锁；30 秒心跳；切题/关闭/取消释放；其他人锁定时只读；5 分钟租约由服务器响应决定；409 后旧页面不再调用保存；断网修改保存在 IndexedDB；恢复后重新确认锁。
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `node new-legacy/content-prep-studio/tests/test_edit_lock_client.js`
 
 Expected: FAIL。
 
-- [ ] **Step 3: 实现锁生命周期**
+- [x] **Step 3: 实现锁生命周期**
 
 只有通过 catalog 拉取的已有题需要锁；本地未上传新题不需要锁。心跳失败一次显示不稳定状态，连续失败或服务器 409/403 进入只读/冲突状态。`beforeunload` 使用 `sendBeacon` 不可靠且 DELETE 带 token 困难，因此只做 best-effort `fetch(...,{keepalive:true})`；正确性由租约保证。
 
-- [ ] **Step 4: 实现“复制为新题”恢复路径**
+- [x] **Step 4: 实现“复制为新题”恢复路径**
 
 锁丢失后的本地变更不能覆盖原题。用户可调用现有 `QuestionService.duplicatePayload()` 生成新 UUID，清除 server revision/hash/lock 元数据，保留内容和 parentQuestionId 来源，然后作为新题上传。
 
-- [ ] **Step 5: 运行 GREEN 与构建回归**
+- [x] **Step 5: 运行 GREEN 与构建回归**
 
 Run: `node new-legacy/content-prep-studio/tests/test_edit_lock_client.js && python3 new-legacy/content-prep-studio/tests/test_build.py`
 
 Expected: PASS。
 
-- [ ] **Step 6: 提交本任务**
+- [x] **Step 6: 提交本任务**
 
 ```bash
 git add new-legacy/content-prep-studio

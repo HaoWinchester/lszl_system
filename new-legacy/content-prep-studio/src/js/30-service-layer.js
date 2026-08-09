@@ -20,6 +20,7 @@ const QuestionService=Object.freeze({
   normalizeBank,
   duplicatePayload:(question)=>{
     const copy=clone(question),parentQuestionId=copy.id;copy.id=generateQuestionId();delete copy.contentHash;
+    delete copy.serverRevision;delete copy.serverContentHash;delete copy.lastSyncedAt;delete copy.lockToken;delete copy.lock;
     copy.metadata=copy.metadata||{};delete copy.metadata.origin;delete copy.metadata.lastImport;
     stampQuestionOrigin(copy,{batchId:generateBatchId(),source:'duplicate',forceOrigin:true,parentQuestionId});
     return copy;

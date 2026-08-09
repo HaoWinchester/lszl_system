@@ -179,6 +179,10 @@ code{background:#f1f5f9;padding:1px 4px;border-radius:4px}
 .server-status{font-size:12px;color:var(--muted)}.server-status.good{color:var(--good)}.server-status.warn{color:var(--warn)}.server-status.bad{color:var(--bad)}
 .server-catalog-help{font-size:12px;color:var(--muted);margin-top:9px}.server-catalog-issues{font-size:12px;color:var(--bad);margin-top:7px;line-height:1.6}
 @media(max-width:760px){.server-identity-grid{grid-template-columns:1fr}.server-actions{align-items:stretch}.server-actions input{width:100%}}
+.question-lock-banner{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--line);background:var(--soft2);border-radius:9px;padding:8px 10px;margin-bottom:10px;font-size:12px}
+.question-lock-banner #questionLockMessage{margin-right:auto}.question-lock-banner.good{border-color:#93d2b2;background:#effbf5}.question-lock-banner.warn{border-color:#e7bd6e;background:#fff8e8}.question-lock-banner.bad{border-color:#e09aa3;background:#fff1f3}
+#btnReconfirmQuestionLock,#btnCopyConflictQuestion{display:none}.question-lock-banner.offline-unsynced #btnReconfirmQuestionLock{display:inline-flex}.question-lock-banner.conflict-copy-required #btnCopyConflictQuestion{display:inline-flex}
+#tab-questions.question-edit-readonly #questionPreview,#tab-questions.question-edit-readonly #keywordList{pointer-events:none;opacity:.72}
 
 /* v0.3.4: forced creator selection */
 .creator-gate{position:fixed;inset:0;z-index:200;background:linear-gradient(135deg,#eef4ff 0%,#f8fbff 42%,#fff7f0 100%);display:flex;align-items:center;justify-content:center;padding:28px}
@@ -541,6 +545,11 @@ D原则：principle-role-accountability</pre>
     <div class="card">
       <div class="card-hd"><span>③ 题目预览与编辑</span><button class="help-btn" data-page-help="questions" title="本页帮助">?</button><span class="muted tiny" id="currentQuestionId"></span></div>
       <div class="card-bd">
+        <div class="question-lock-banner" id="questionLockBanner">
+          <span id="questionLockMessage">本地新题无需编辑锁</span>
+          <button class="btn small" id="btnReconfirmQuestionLock" type="button">重新确认编辑权</button>
+          <button class="btn small primary" id="btnCopyConflictQuestion" type="button">复制为新题</button>
+        </div>
         <div class="preview-tip">
           主要操作区：点击已标记关键词可直接修改；框选其他词/术语后会弹出关键词编辑浮层。核心关键词为橙色，普通关键词为蓝色。
         </div>
@@ -996,6 +1005,7 @@ const prepRuntime={
   serverActor:prepBootstrap.authenticated?(prepBootstrap.authUser||{username:prepBootstrap.username}):null,
   serverBankId:'',serverBankRevision:null,clientInstanceId:generateSystemId('prep_client'),
   lastIdempotencyKey:'',lastUploadFingerprint:'',serverBanks:[],
+  editLeaseState:{questionId:'',mode:'local-new',connection:'online',canSave:true,readOnly:false,lockToken:'',message:''},
   theme:'default',auditTrail:[],
   issuedQuestionIds:new Set()
 };
@@ -1582,7 +1592,33 @@ function setTab(name){
   if(name==='export')renderAuditTrail();
 }
 
-function newQuestion(){
+function currentQuestionLeaseState(){
+  const q=currentQuestion(),lease=prepRuntime.editLeaseState||{};
+  if(!q?.serverRevision)return {mode:'local-new',readOnly:false,canSave:true,message:'本地新题无需编辑锁'};
+  if(lease.questionId!==q.id)return {mode:'server-readonly',readOnly:true,canSave:false,message:'正在确认服务器编辑权…'};
+  return lease;
+}
+function renderQuestionLockState(){
+  const lease=currentQuestionLeaseState(),banner=document.getElementById('questionLockBanner');if(!banner)return;
+  const messages={
+    'local-new':'本地新题无需编辑锁',
+    'server-editable':`已锁定当前题目 · ${lease.leaseSeconds||300} 秒租约`,
+    'server-readonly':lease.message||'该题正由其他人编辑，当前为只读',
+    'offline-unsynced':lease.message||'连接中断，本地修改仍会保存在工作区',
+    'conflict-copy-required':lease.message||'编辑锁或版本已失效，请复制为新题'
+  };
+  banner.className=`question-lock-banner ${lease.mode||'server-readonly'} ${lease.readOnly?'bad':lease.connection==='unstable'||lease.connection==='offline'?'warn':'good'}`;
+  document.getElementById('questionLockMessage').textContent=messages[lease.mode]||lease.message||'正在确认编辑状态';
+  const readOnly=!!lease.readOnly,tab=document.getElementById('tab-questions');tab?.classList.toggle('question-edit-readonly',readOnly);
+  document.querySelectorAll('#questionEditor input,#questionEditor textarea,#questionEditor select,#keywordList input,#keywordList textarea,#keywordList select,#keywordList button').forEach(control=>control.disabled=readOnly);
+  for(const id of ['btnDeleteQuestion','btnAddNormalKeyword','btnAddCoreKeyword']){const control=document.getElementById(id);if(control)control.disabled=readOnly}
+}
+async function switchQuestionForEdit(question){
+  if(window.PMPPrepQuestionLocks)await window.PMPPrepQuestionLocks.switchTo(question);
+}
+
+async function newQuestion(){
+  await switchQuestionForEdit(null);
   const q=QuestionService.create({
     title:'新题目',subject:state.questionBank.subject||'PMP',
     options:[{id:'A',text:''},{id:'B',text:''},{id:'C',text:''},{id:'D',text:''}],correctAnswer:'A',
@@ -1592,13 +1628,15 @@ function newQuestion(){
   stampQuestionOrigin(q,{batchId:generateBatchId(),source:'manual-new',forceOrigin:true});
   state.questionBank.questions.push(q);state.currentQuestionId=q.id;state.questionBank.updatedAt=Date.now();renderQuestions();toast('已新建题目 · 全局 ID 已生成');
 }
-function duplicateQuestion(){
+async function duplicateQuestion(){
   const q=currentQuestion();if(!q)return;
+  await switchQuestionForEdit(null);
   const copy=QuestionService.duplicatePayload(q);copy.title=q.title+'（副本）';
   state.questionBank.questions.push(copy);state.currentQuestionId=copy.id;renderQuestions();toast('已复制 · 新全局 ID 已生成');
 }
-function deleteQuestion(){
+async function deleteQuestion(){
   const q=currentQuestion();if(!q)return;if(!confirm('删除当前本地草稿题目？不会影响正式程序。'))return;
+  await switchQuestionForEdit(null);
   state.questionBank.questions=state.questionBank.questions.filter(x=>x.id!==q.id);
   state.currentQuestionId=state.questionBank.questions[0]?.id||'';renderQuestions();
 }
@@ -1614,7 +1652,7 @@ function renderQuestionListOnly(){
     const d=document.createElement('div');d.className='list-item'+(q.id===state.currentQuestionId?' active':'');
     const st=questionCompleteness(q);
     d.innerHTML=`<div class="list-title"><span class="status-dot ${st}"></span>${i+1}. ${esc(q.title)}</div><div class="list-meta">${esc(q.id)} · ${esc(q.difficulty||'')}</div>`;
-    d.onclick=()=>{state.currentQuestionId=q.id;renderQuestions()};list.appendChild(d);
+    d.onclick=async()=>{if(q.id===state.currentQuestionId)return;await switchQuestionForEdit(q);state.currentQuestionId=q.id;renderQuestions()};list.appendChild(d);
   });
 }
 function renderQuestions(){
@@ -1688,7 +1726,7 @@ function renderQuestionEditor(){
     </div>
   </div>`;
   bindQuestionEditor();
-  renderQuestionPrincipleBindings();renderKeywords();renderPreview();renderCurrentIssues();
+  renderQuestionPrincipleBindings();renderKeywords();renderPreview();renderCurrentIssues();renderQuestionLockState();
 }
 function bindQuestionEditor(){
   const q=currentQuestion();if(!q)return;
@@ -2377,6 +2415,7 @@ const QuestionService=Object.freeze({
   normalizeBank,
   duplicatePayload:(question)=>{
     const copy=clone(question),parentQuestionId=copy.id;copy.id=generateQuestionId();delete copy.contentHash;
+    delete copy.serverRevision;delete copy.serverContentHash;delete copy.lastSyncedAt;delete copy.lockToken;delete copy.lock;
     copy.metadata=copy.metadata||{};delete copy.metadata.origin;delete copy.metadata.lastImport;
     stampQuestionOrigin(copy,{batchId:generateBatchId(),source:'duplicate',forceOrigin:true,parentQuestionId});
     return copy;
@@ -2495,6 +2534,12 @@ window.PMPPrepServices=AppServices;
     workspace.lastIdempotencyKey=key;workspace.lastUploadFingerprint=fingerprint;
     return key;
   }
+  async function withStableIdempotencyKey(workspace,fingerprint,operation){
+    return operation(idempotencyKey(workspace,fingerprint));
+  }
+  function emit(type,detail){
+    try{global.dispatchEvent(new CustomEvent(type,{detail}))}catch(_error){}
+  }
   function migrateWorkspaceMetadata(input){
     const workspace=cloneJson(input),server=workspace.server&&typeof workspace.server==='object'?workspace.server:{};
     workspace.server={
@@ -2527,12 +2572,108 @@ window.PMPPrepServices=AppServices;
       question.serverContentHash=String(item.contentHash||'');
       question.lastSyncedAt=syncedAt;
     }
+    emit('prep:sync-committed',{result});
     return true;
+  }
+
+  async function acquireLock(questionId,{clientInstanceId,creatorId}={}){
+    return request(`/content-prep/locks/${encodeURIComponent(questionId)}`,{
+      method:'POST',body:JSON.stringify({clientInstanceId,creatorId})
+    });
+  }
+  async function heartbeatLock(questionId,{clientInstanceId,lockToken}={}){
+    return request(`/content-prep/locks/${encodeURIComponent(questionId)}/heartbeat`,{
+      method:'PUT',body:JSON.stringify({clientInstanceId,lockToken})
+    });
+  }
+  async function releaseLock(questionId,{clientInstanceId,lockToken,keepalive=false}={}){
+    return request(`/content-prep/locks/${encodeURIComponent(questionId)}`,{
+      method:'DELETE',body:JSON.stringify({clientInstanceId,lockToken}),keepalive
+    });
+  }
+  function createEditLeaseController({clientInstanceId,creatorId,onState=()=>{}}={}){
+    let timer=0,heartbeatFailures=0;
+    let currentQuestion=null;
+    let state={
+      questionId:'',mode:'local-new',connection:'online',canSave:true,readOnly:false,
+      lockToken:'',leaseSeconds:0,heartbeatIntervalSeconds:0,expiresAt:'',message:''
+    };
+    const snapshot=()=>({...state});
+    function publish(patch,event=''){
+      state={...state,...patch};onState(snapshot());if(event)emit(event,snapshot());return snapshot();
+    }
+    function stopHeartbeat(){if(timer){global.clearInterval(timer);timer=0}}
+    async function releaseCurrent({keepalive=false}={}){
+      stopHeartbeat();
+      if(!state.questionId||!state.lockToken)return;
+      try{await releaseLock(state.questionId,{clientInstanceId,lockToken:state.lockToken,keepalive})}catch(_error){}
+      state.lockToken='';
+    }
+    async function beat(){
+      if(!state.questionId||!state.lockToken||state.mode!=='server-editable')return snapshot();
+      try{
+        const grant=await heartbeatLock(state.questionId,{clientInstanceId,lockToken:state.lockToken});
+        heartbeatFailures=0;
+        return publish({connection:'online',expiresAt:grant.expiresAt||state.expiresAt,message:''});
+      }catch(error){
+        heartbeatFailures+=1;
+        if(error.status===409){stopHeartbeat();return publish({mode:'conflict-copy-required',connection:'online',canSave:false,readOnly:true,message:error.message},'prep:lock-lost')}
+        if(error.status===403){stopHeartbeat();return publish({mode:'server-readonly',connection:'online',canSave:false,readOnly:true,message:error.message},'prep:lock-lost')}
+        if(heartbeatFailures>=2){stopHeartbeat();return publish({mode:'offline-unsynced',connection:'offline',canSave:false,readOnly:false,message:'连接中断，本地修改将继续保存在工作区；恢复后需重新确认编辑锁。'},'prep:lock-lost')}
+        return publish({connection:'unstable',message:'服务器连接不稳定，正在保留当前编辑锁。'});
+      }
+    }
+    function beginHeartbeat(grant){
+      stopHeartbeat();
+      const seconds=Math.max(1,Number(grant.heartbeatIntervalSeconds||30));
+      timer=global.setInterval(beat,seconds*1000);
+    }
+    async function acquire(question){
+      currentQuestion=question;
+      if(!question?.serverRevision){
+        return publish({questionId:String(question?.id||''),mode:'local-new',connection:'online',canSave:true,readOnly:false,lockToken:'',leaseSeconds:0,heartbeatIntervalSeconds:0,expiresAt:'',message:''});
+      }
+      publish({questionId:String(question.id),mode:'server-readonly',connection:'online',canSave:false,readOnly:true,lockToken:'',message:'正在申请编辑锁…'});
+      try{
+        const grant=await acquireLock(question.id,{clientInstanceId,creatorId});heartbeatFailures=0;
+        question.lockToken=grant.lockToken;
+        const next=publish({
+          mode:'server-editable',connection:'online',canSave:true,readOnly:false,
+          lockToken:grant.lockToken,leaseSeconds:Number(grant.leaseSeconds||0),
+          heartbeatIntervalSeconds:Number(grant.heartbeatIntervalSeconds||30),
+          expiresAt:String(grant.expiresAt||''),message:''
+        },'prep:lock-acquired');
+        beginHeartbeat(grant);return next;
+      }catch(error){
+        const offline=error.code==='NETWORK_ERROR';
+        return publish({
+          mode:offline?'offline-unsynced':'server-readonly',connection:offline?'offline':'online',
+          canSave:false,readOnly:!offline,lockToken:'',message:error.message
+        },'prep:lock-lost');
+      }
+    }
+    return Object.freeze({
+      snapshot,
+      async open(question){await releaseCurrent();return acquire(question)},
+      async close(options={}){await releaseCurrent(options);currentQuestion=null;return publish({questionId:'',mode:'local-new',connection:'online',canSave:true,readOnly:false,lockToken:'',message:''})},
+      async reconfirm(){stopHeartbeat();return acquire(currentQuestion)},
+      heartbeat:beat,
+      handleSaveError(error){
+        if(error?.status===409){stopHeartbeat();return publish({mode:'conflict-copy-required',canSave:false,readOnly:true,message:error.message||'服务器版本冲突'},'prep:lock-lost')}
+        if(error?.status===403){stopHeartbeat();return publish({mode:'server-readonly',canSave:false,readOnly:true,message:error.message||'当前账号无权继续编辑'},'prep:lock-lost')}
+        return snapshot();
+      }
+    });
   }
 
   const ServerCatalogService=Object.freeze({
     Error:ServerCatalogError,
     migrateWorkspaceMetadata,
+    withStableIdempotencyKey,
+    acquireLock,
+    heartbeatLock,
+    releaseLock,
+    createEditLeaseController,
     async listWritableBanks(subject=''){
       const query=new URLSearchParams({mode:'writable'});if(subject)query.set('subject',subject);
       return (await request(`/question-catalog/banks?${query}`)).banks||[];
@@ -2547,8 +2688,8 @@ window.PMPPrepServices=AppServices;
       if(!creatorId)throw new ServerCatalogError('CREATOR_REQUIRED','请先选择制作人。');
       const sourceQuestions=bundle?.questionBank?.questions||[];
       const fingerprint=uploadFingerprint(bundle,workspace,creatorId);
-      const key=idempotencyKey(workspace,fingerprint);
-      const payload={
+      return withStableIdempotencyKey(workspace,fingerprint,async key=>{
+        const payload={
         idempotencyKey:key,
         clientInstanceId:workspace.clientInstanceId,
         targetBankId:workspace.serverBankId,
@@ -2563,15 +2704,16 @@ window.PMPPrepServices=AppServices;
         principles:cloneJson(bundle?.principles||{}),
         synthesisPresets:cloneJson(bundle?.synthesisPresets||{}),
         tagConfig:cloneJson(bundle?.tagConfig||{})
-      };
-      const posted=await request('/content-prep/batches',{method:'POST',body:JSON.stringify(payload)});
-      const batch=await this.getBatch(posted.batchId);
-      const result={...posted,status:String(batch?.status||''),batch};
-      if(result.status!=='committed'){
-        throw new ServerCatalogError('UPLOAD_NOT_COMMITTED','服务器尚未确认提交，本地草稿已保留。',{detail:batch});
-      }
-      syncMetadata(workspace,questions||sourceQuestions,result);
-      return result;
+        };
+        const posted=await request('/content-prep/batches',{method:'POST',body:JSON.stringify(payload)});
+        const batch=await ServerCatalogService.getBatch(posted.batchId);
+        const result={...posted,status:String(batch?.status||''),batch};
+        if(result.status!=='committed'){
+          throw new ServerCatalogError('UPLOAD_NOT_COMMITTED','服务器尚未确认提交，本地草稿已保留。',{detail:batch});
+        }
+        syncMetadata(workspace,questions||sourceQuestions,result);
+        return result;
+      });
     }
   });
   global.PMPPrepServerCatalogService=ServerCatalogService;
@@ -2641,6 +2783,39 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
   const syncButton=document.getElementById('btnSyncToCatalog');
   const questionInput=document.getElementById('serverQuestionIdInput');
   const issuesBox=document.getElementById('serverCatalogIssues');
+  const reconfirmButton=document.getElementById('btnReconfirmQuestionLock');
+  const copyConflictButton=document.getElementById('btnCopyConflictQuestion');
+  let lockController=null,lockCreatorId='';
+
+  function onLeaseState(lease){
+    prepRuntime.editLeaseState=lease;renderQuestionLockState();refreshButtons();
+    if(['offline-unsynced','server-readonly','conflict-copy-required'].includes(lease.mode)){
+      saveWorkspaceLocal({silent:true});
+    }
+  }
+  async function ensureLockController(){
+    const creatorId=prepRuntime.creatorProfile?.creatorId||'';
+    if(lockController&&lockCreatorId===creatorId)return lockController;
+    if(lockController)await lockController.close();
+    lockCreatorId=creatorId;
+    lockController=Catalog.createEditLeaseController({
+      clientInstanceId:prepRuntime.clientInstanceId,creatorId,onState:onLeaseState
+    });
+    return lockController;
+  }
+  const QuestionLocks={
+    async switchTo(question){
+      if(!actor&&question?.serverRevision){
+        return onLeaseState({questionId:question.id,mode:'server-readonly',connection:'online',canSave:false,readOnly:true,lockToken:'',message:'请先登录后再编辑服务器题目'});
+      }
+      const controller=await ensureLockController();return controller.open(question);
+    },
+    async close(options={}){if(!lockController)return;return lockController.close(options)},
+    async reconfirm(){if(!lockController)return;return lockController.reconfirm()},
+    handleSaveError(error){return lockController?.handleSaveError(error)},
+    snapshot(){return lockController?.snapshot()||prepRuntime.editLeaseState}
+  };
+  window.PMPPrepQuestionLocks=QuestionLocks;
 
   function setStatus(message,kind=''){
     status.textContent=message;status.className=`server-status ${kind}`;
@@ -2652,9 +2827,11 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
   function serverEnabled(){return !!(actor&&prepRuntime.creatorProfile&&prepRuntime.serverBankId)}
   function refreshButtons(){
     const authenticated=!!actor;
+    const question=currentQuestion(),lease=prepRuntime.editLeaseState||{};
+    const canSyncQuestion=!question?.serverRevision||lease.questionId===question.id&&lease.canSave;
     createButton.disabled=!authenticated||!prepRuntime.creatorProfile;
-    loadButton.disabled=!authenticated||!questionInput.value.trim();
-    syncButton.disabled=!serverEnabled()||!state.questionBank.questions.length;
+    loadButton.disabled=!authenticated||!prepRuntime.creatorProfile||!questionInput.value.trim();
+    syncButton.disabled=!serverEnabled()||!state.questionBank.questions.length||!canSyncQuestion;
   }
   function renderActor(){
     actorName.textContent=actor?(actor.display_name||actor.displayName||actor.username):'未登录';
@@ -2702,6 +2879,7 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
       const remote=await Catalog.loadQuestion(id),question=QuestionService.normalize({
         ...remote,serverRevision:remote.revision,serverContentHash:remote.contentHash,lastSyncedAt:nowIso()
       },state.questionBank.questions.length,remote.subject||state.questionBank.subject);
+      await QuestionLocks.switchTo(question);
       const index=state.questionBank.questions.findIndex(item=>item.id===question.id);
       if(index>=0)state.questionBank.questions[index]=question;else state.questionBank.questions.push(question);
       prepRuntime.serverBankId=remote.bankId||prepRuntime.serverBankId;
@@ -2719,15 +2897,45 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
       prepRuntime.lastBatchId=result.batchId;markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
       setStatus(`已进入题库 · 批次 ${result.batchId}`,'good');toast('上传成功，已进入题库');
     }catch(error){
+      QuestionLocks.handleSaveError(error);
       setStatus(error.message||'同步失败，本地草稿已保留','bad');setIssues(error);
       await saveWorkspaceLocal({silent:true});
     }finally{refreshButtons()}
   });
 
   document.querySelectorAll('[data-creator-key]').forEach(button=>button.addEventListener('click',()=>{
-    setTimeout(()=>{renderActor();refreshButtons()},0);
+    QuestionLocks.close().finally(()=>{
+      lockController=null;lockCreatorId='';
+      setTimeout(async()=>{
+        renderActor();refreshButtons();
+        if(currentQuestion()?.serverRevision)await QuestionLocks.switchTo(currentQuestion());
+      },0);
+    });
   }));
+  const newWorkspaceButton=document.getElementById('btnNewWorkspace'),clearWorkspace=newWorkspaceButton.onclick;
+  newWorkspaceButton.onclick=async event=>{
+    const lockedQuestionId=QuestionLocks.snapshot().questionId;
+    clearWorkspace.call(newWorkspaceButton,event);
+    if(lockedQuestionId&&!state.questionBank.questions.some(question=>question.id===lockedQuestionId))await QuestionLocks.close();
+  };
+  reconfirmButton.addEventListener('click',async()=>{
+    reconfirmButton.disabled=true;
+    try{await QuestionLocks.reconfirm()}finally{reconfirmButton.disabled=false;renderQuestionLockState()}
+  });
+  copyConflictButton.addEventListener('click',async()=>{
+    await duplicateQuestion();markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
+    setStatus('冲突内容已复制为本地新题，可作为新题上传','good');
+  });
+  window.addEventListener('beforeunload',()=>{
+    const lease=QuestionLocks.snapshot();
+    if(lease.questionId&&lease.lockToken){
+      Catalog.releaseLock(lease.questionId,{
+        clientInstanceId:prepRuntime.clientInstanceId,lockToken:lease.lockToken,keepalive:true
+      }).catch(()=>{});
+    }
+  });
   renderActor();refreshButtons();refreshBanks();
+  const initial=currentQuestion();if(initial?.serverRevision)QuestionLocks.switchTo(initial).then(()=>renderQuestionLockState());
 })();
 </script>
 </body>

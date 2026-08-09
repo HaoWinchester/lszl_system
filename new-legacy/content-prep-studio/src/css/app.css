@@ -171,6 +171,10 @@ code{background:#f1f5f9;padding:1px 4px;border-radius:4px}
 .server-status{font-size:12px;color:var(--muted)}.server-status.good{color:var(--good)}.server-status.warn{color:var(--warn)}.server-status.bad{color:var(--bad)}
 .server-catalog-help{font-size:12px;color:var(--muted);margin-top:9px}.server-catalog-issues{font-size:12px;color:var(--bad);margin-top:7px;line-height:1.6}
 @media(max-width:760px){.server-identity-grid{grid-template-columns:1fr}.server-actions{align-items:stretch}.server-actions input{width:100%}}
+.question-lock-banner{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--line);background:var(--soft2);border-radius:9px;padding:8px 10px;margin-bottom:10px;font-size:12px}
+.question-lock-banner #questionLockMessage{margin-right:auto}.question-lock-banner.good{border-color:#93d2b2;background:#effbf5}.question-lock-banner.warn{border-color:#e7bd6e;background:#fff8e8}.question-lock-banner.bad{border-color:#e09aa3;background:#fff1f3}
+#btnReconfirmQuestionLock,#btnCopyConflictQuestion{display:none}.question-lock-banner.offline-unsynced #btnReconfirmQuestionLock{display:inline-flex}.question-lock-banner.conflict-copy-required #btnCopyConflictQuestion{display:inline-flex}
+#tab-questions.question-edit-readonly #questionPreview,#tab-questions.question-edit-readonly #keywordList{pointer-events:none;opacity:.72}
 
 /* v0.3.4: forced creator selection */
 .creator-gate{position:fixed;inset:0;z-index:200;background:linear-gradient(135deg,#eef4ff 0%,#f8fbff 42%,#fff7f0 100%);display:flex;align-items:center;justify-content:center;padding:28px}

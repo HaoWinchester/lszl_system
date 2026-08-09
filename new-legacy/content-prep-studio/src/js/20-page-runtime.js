@@ -23,7 +23,33 @@ function setTab(name){
   if(name==='export')renderAuditTrail();
 }
 
-function newQuestion(){
+function currentQuestionLeaseState(){
+  const q=currentQuestion(),lease=prepRuntime.editLeaseState||{};
+  if(!q?.serverRevision)return {mode:'local-new',readOnly:false,canSave:true,message:'本地新题无需编辑锁'};
+  if(lease.questionId!==q.id)return {mode:'server-readonly',readOnly:true,canSave:false,message:'正在确认服务器编辑权…'};
+  return lease;
+}
+function renderQuestionLockState(){
+  const lease=currentQuestionLeaseState(),banner=document.getElementById('questionLockBanner');if(!banner)return;
+  const messages={
+    'local-new':'本地新题无需编辑锁',
+    'server-editable':`已锁定当前题目 · ${lease.leaseSeconds||300} 秒租约`,
+    'server-readonly':lease.message||'该题正由其他人编辑，当前为只读',
+    'offline-unsynced':lease.message||'连接中断，本地修改仍会保存在工作区',
+    'conflict-copy-required':lease.message||'编辑锁或版本已失效，请复制为新题'
+  };
+  banner.className=`question-lock-banner ${lease.mode||'server-readonly'} ${lease.readOnly?'bad':lease.connection==='unstable'||lease.connection==='offline'?'warn':'good'}`;
+  document.getElementById('questionLockMessage').textContent=messages[lease.mode]||lease.message||'正在确认编辑状态';
+  const readOnly=!!lease.readOnly,tab=document.getElementById('tab-questions');tab?.classList.toggle('question-edit-readonly',readOnly);
+  document.querySelectorAll('#questionEditor input,#questionEditor textarea,#questionEditor select,#keywordList input,#keywordList textarea,#keywordList select,#keywordList button').forEach(control=>control.disabled=readOnly);
+  for(const id of ['btnDeleteQuestion','btnAddNormalKeyword','btnAddCoreKeyword']){const control=document.getElementById(id);if(control)control.disabled=readOnly}
+}
+async function switchQuestionForEdit(question){
+  if(window.PMPPrepQuestionLocks)await window.PMPPrepQuestionLocks.switchTo(question);
+}
+
+async function newQuestion(){
+  await switchQuestionForEdit(null);
   const q=QuestionService.create({
     title:'新题目',subject:state.questionBank.subject||'PMP',
     options:[{id:'A',text:''},{id:'B',text:''},{id:'C',text:''},{id:'D',text:''}],correctAnswer:'A',
@@ -33,13 +59,15 @@ function newQuestion(){
   stampQuestionOrigin(q,{batchId:generateBatchId(),source:'manual-new',forceOrigin:true});
   state.questionBank.questions.push(q);state.currentQuestionId=q.id;state.questionBank.updatedAt=Date.now();renderQuestions();toast('已新建题目 · 全局 ID 已生成');
 }
-function duplicateQuestion(){
+async function duplicateQuestion(){
   const q=currentQuestion();if(!q)return;
+  await switchQuestionForEdit(null);
   const copy=QuestionService.duplicatePayload(q);copy.title=q.title+'（副本）';
   state.questionBank.questions.push(copy);state.currentQuestionId=copy.id;renderQuestions();toast('已复制 · 新全局 ID 已生成');
 }
-function deleteQuestion(){
+async function deleteQuestion(){
   const q=currentQuestion();if(!q)return;if(!confirm('删除当前本地草稿题目？不会影响正式程序。'))return;
+  await switchQuestionForEdit(null);
   state.questionBank.questions=state.questionBank.questions.filter(x=>x.id!==q.id);
   state.currentQuestionId=state.questionBank.questions[0]?.id||'';renderQuestions();
 }
@@ -55,7 +83,7 @@ function renderQuestionListOnly(){
     const d=document.createElement('div');d.className='list-item'+(q.id===state.currentQuestionId?' active':'');
     const st=questionCompleteness(q);
     d.innerHTML=`<div class="list-title"><span class="status-dot ${st}"></span>${i+1}. ${esc(q.title)}</div><div class="list-meta">${esc(q.id)} · ${esc(q.difficulty||'')}</div>`;
-    d.onclick=()=>{state.currentQuestionId=q.id;renderQuestions()};list.appendChild(d);
+    d.onclick=async()=>{if(q.id===state.currentQuestionId)return;await switchQuestionForEdit(q);state.currentQuestionId=q.id;renderQuestions()};list.appendChild(d);
   });
 }
 function renderQuestions(){
@@ -129,7 +157,7 @@ function renderQuestionEditor(){
     </div>
   </div>`;
   bindQuestionEditor();
-  renderQuestionPrincipleBindings();renderKeywords();renderPreview();renderCurrentIssues();
+  renderQuestionPrincipleBindings();renderKeywords();renderPreview();renderCurrentIssues();renderQuestionLockState();
 }
 function bindQuestionEditor(){
   const q=currentQuestion();if(!q)return;
