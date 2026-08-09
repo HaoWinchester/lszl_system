@@ -177,7 +177,7 @@ git commit -m "feat: enforce content prep permissions"
 - Produces: `canonical_question_hash(payload: dict) -> str`
 - Produces: Pydantic DTOs `QuestionPayload`, `QuestionSyncItem`, `ContentPrepBatchRequest`, `ContentPrepBatchResult`, `LockGrant`, `CatalogError`
 
-- [ ] **Step 1: 写字段往返、范围映射和哈希失败测试**
+- [x] **Step 1: 写字段往返、范围映射和哈希失败测试**
 
 测试完整 v0.4.0 题目可保留 `translations`、`metadata.knowledge`、`metadata.principleIds`、`metadata.optionPrincipleMap`、`metadata.tagPaths`、`keyPath`、`lifecycle` 及所有现有 JSONB 字段；测试“可公开”映射 public、“内部使用”映射 internal、两者同时出现时 internal、缺失时 internal。
 
@@ -190,13 +190,13 @@ def test_hash_ignores_server_fields_but_changes_with_content():
     assert canonical_question_hash(a) != canonical_question_hash(b)
 ```
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_content_service.py -q`
 
 Expected: FAIL，因为 DTO 和规范化函数不存在。
 
-- [ ] **Step 3: 实现 DTO 与稳定错误结构**
+- [x] **Step 3: 实现 DTO 与稳定错误结构**
 
 `ContentPrepBatchRequest` 使用 aliases：`idempotencyKey`、`clientInstanceId`、`targetBankId`、`creatorId`、`prepVersion`、`workspaceVersion`、`synthesisPresets`、`tagConfig`。`QuestionSyncItem` 包含 `question`、`baseRevision`、`lockToken`。错误统一为：
 
@@ -209,17 +209,17 @@ Expected: FAIL，因为 DTO 和规范化函数不存在。
 }
 ```
 
-- [ ] **Step 4: 实现规范化和哈希**
+- [x] **Step 4: 实现规范化和哈希**
 
 哈希输入必须删除 `contentHash`、`revision`、`serverRevision`、`serverContentHash`、`lastSyncedAt`、锁字段和服务器时间；递归按键排序，用紧凑 UTF-8 JSON 计算 SHA-256。客户端提交的 `creatorName`、`contentHash` 和 actor 字段一律忽略。
 
-- [ ] **Step 5: 运行 GREEN**
+- [x] **Step 5: 运行 GREEN**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_content_service.py -q`
 
 Expected: PASS。
 
-- [ ] **Step 6: 提交本任务**
+- [x] **Step 6: 提交本任务**
 
 ```bash
 git add backend/app/schemas/question_catalog.py backend/app/schemas/content_prep.py backend/app/services/question_content_service.py backend/tests/test_question_content_service.py
