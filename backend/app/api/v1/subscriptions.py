@@ -41,7 +41,12 @@ async def redeem(body: dict, db: DB, user: CurrentUser):
 
 @router.post("/orders")
 async def create_order(body: dict, db: DB, user: CurrentUser):
-    o = await subscription_service.request_order(db, user.username, body.get("planId", "free"))
+    try:
+        o = await subscription_service.request_order(
+            db, user.username, body.get("planId", "free")
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     return {"order": subscription_service.order_to_dict(o)}
 
 
@@ -126,9 +131,17 @@ async def wechat_pay_demo_notify(body: dict, db: DB):
 # ---------- 管理员 ----------
 @router.put("/admin/{username}")
 async def admin_set(username: str, body: dict, db: DB, _: AdminUser):
-    s = await subscription_service.admin_set(
-        db, username, body.get("planId", "free"), body.get("status"), body.get("note"), "admin"
-    )
+    try:
+        s = await subscription_service.admin_set(
+            db,
+            username,
+            body.get("planId", "free"),
+            body.get("status"),
+            body.get("note"),
+            "admin",
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     return {"subscription": subscription_service.sub_to_dict(s)}
 
 
@@ -162,7 +175,13 @@ async def list_codes(db: DB, _: AdminUser):
 
 @router.post("/redeem-codes/generate")
 async def generate_codes(body: dict, db: DB, admin: AdminUser):
-    codes = await subscription_service.generate_codes(
-        db, body.get("planId", "monthly"), int(body.get("count", 1)), admin.username
-    )
+    try:
+        codes = await subscription_service.generate_codes(
+            db,
+            body.get("planId", "monthly"),
+            int(body.get("count", 1)),
+            admin.username,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     return {"codes": codes}

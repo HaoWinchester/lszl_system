@@ -18,6 +18,9 @@ PLAN_AMOUNT_FEN = {
     "half_year": 13900,
     "lifetime": 39900,
 }
+FINITE_PAID_PLAN_IDS = frozenset({"monthly", "quarterly", "half_year"})
+PAID_PLAN_IDS = FINITE_PAID_PLAN_IDS | {"lifetime"}
+VALID_PLAN_IDS = PAID_PLAN_IDS | {"free"}
 WECHAT_NATIVE_OUT_TRADE_NO_MAX_LENGTH = 32
 
 
@@ -26,11 +29,21 @@ def native_out_trade_no() -> str:
     return uid()[:WECHAT_NATIVE_OUT_TRADE_NO_MAX_LENGTH]
 
 
+def validate_plan_id(plan_id: str, *, allow_free: bool = True) -> str:
+    """Normalize a supported plan ID or reject it before any write occurs."""
+    normalized = str(plan_id or "").strip().lower()
+    allowed = VALID_PLAN_IDS if allow_free else PAID_PLAN_IDS
+    if normalized not in allowed:
+        raise ValueError("套餐不存在")
+    return normalized
+
+
 def _plan(plan_id: str) -> dict:
+    normalized = validate_plan_id(plan_id)
     for p in DEFAULT_PLANS:
-        if p["planId"] == plan_id:
+        if p["planId"] == normalized:
             return p
-    return DEFAULT_PLANS[0]
+    raise ValueError("套餐不存在")
 
 
 def _plan_amount_fen(plan_id: str) -> int:
@@ -48,11 +61,19 @@ def entitlements_for(role: str, subscription: Subscription | None) -> dict[str, 
         return {"allExamPapers": False}
     if str(subscription.status or "").lower() != "active":
         return {"allExamPapers": False}
-    if str(subscription.plan_id or "free").lower() == "free":
+    plan_id = str(subscription.plan_id or "free").strip().lower()
+    if plan_id not in PAID_PLAN_IDS:
         return {"allExamPapers": False}
-    if subscription.expires_at is not None and subscription.expires_at <= now_utc():
+    expires_at = subscription.expires_at
+    if expires_at is None:
+        return {"allExamPapers": plan_id == "lifetime"}
+    try:
+        is_future = expires_at > now_utc()
+    except TypeError:
         return {"allExamPapers": False}
-    return {"allExamPapers": True}
+    if plan_id in FINITE_PAID_PLAN_IDS and not is_future:
+        return {"allExamPapers": False}
+    return {"allExamPapers": is_future}
 
 
 def payment_amount_matches(expected_amount_fen: int | None, received_amount_fen: object) -> bool:
@@ -116,6 +137,7 @@ def code_to_dict(c: RedeemCode) -> dict:
 
 
 def _apply_plan(sub: Subscription, plan_id: str) -> None:
+    plan_id = validate_plan_id(plan_id)
     sub.plan_id = plan_id
     if plan_id in ("free", "lifetime"):
         sub.expires_at = None
@@ -152,6 +174,7 @@ async def _subscription_for_update(db: AsyncSession, username: str) -> Subscript
 async def admin_set(
     db: AsyncSession, username: str, plan_id: str, status: str | None, note: str | None, actor: str
 ) -> Subscription:
+    plan_id = validate_plan_id(plan_id)
     s = await get_subscription(db, username)
     _apply_plan(s, plan_id)
     if status:
@@ -185,6 +208,7 @@ async def redeem(db: AsyncSession, username: str, code: str) -> Subscription:
 
 async def request_order(db: AsyncSession, username: str, plan_id: str) -> SubscriptionOrder:
     """创建订单并按支付配置生成微信扫码 code_url。"""
+    plan_id = validate_plan_id(plan_id, allow_free=False)
     p = _plan(plan_id)
     amount_fen = _plan_amount_fen(plan_id)
     o = SubscriptionOrder(
@@ -318,6 +342,7 @@ async def cancel_own_order(
 
 
 async def generate_codes(db: AsyncSession, plan_id: str, count: int, actor: str) -> list[str]:
+    plan_id = validate_plan_id(plan_id, allow_free=False)
     p = _plan(plan_id)
     codes: list[str] = []
     for _ in range(max(1, min(count, 500))):
