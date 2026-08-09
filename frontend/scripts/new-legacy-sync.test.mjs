@@ -252,6 +252,71 @@ test('sync accepts the server-catalog add-question flow without applying the leg
   assert.equal(readFileSync(resolve(item.output, 'src/65-question-bank-admin.js'), 'utf8'), source)
 })
 
+test('sync does not mistake an unrelated flush for a recall-preview flush', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/65-question-bank-admin.js'), `(function(){
+  async   function previewDeepRecall () {
+    const bank = currentBank();
+    const q = currentQuestion();
+    try{
+      JSON.stringify(q);
+    }catch(e){}
+    window.open('knowledge-recall.html?bankId=' + encodeURIComponent(bank.id||'') + '&questionId=' + encodeURIComponent(q.id || 'current'), '_blank');
+  }
+  async function unrelatedSave(){
+    if(window.KGServerStateStorage&&typeof window.KGServerStateStorage.flush==='function')await window.KGServerStateStorage.flush();
+  }
+  function addQuestion(){
+    state.activeSidebarTab = 'questions';
+    state.activeLayoutNav = 'questions';
+    bank.updatedAt = Date.now();
+    saveBanks();
+    render();
+  }
+})();
+`)
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+  const generated = readFileSync(resolve(item.output, 'src/65-question-bank-admin.js'), 'utf8')
+  const preview = generated.indexOf('function previewDeepRecall')
+  const open = generated.indexOf("window.open('knowledge-recall.html?bankId='", preview)
+  const flush = generated.lastIndexOf('await window.KGServerStateStorage.flush()', open)
+  assert.ok(flush > preview)
+  assert.ok(flush < open)
+})
+
+test('sync does not mistake an unrelated catalog save for the catalog add-question flow', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/65-question-bank-admin.js'), `(function(){
+  async function previewDeepRecall(){
+    try{
+      if(window.KGServerStateStorage&&typeof window.KGServerStateStorage.flush==='function')await window.KGServerStateStorage.flush();
+    }catch(error){return}
+    window.open('knowledge-recall.html?bankId=' + encodeURIComponent(bank.id||'') + '&questionId=' + encodeURIComponent(q.id || 'current'), '_blank');
+  }
+  function helper(){return Catalog.saveQuestion(draft)}
+  function addQuestion(){
+    state.activeSidebarTab = 'questions';
+    state.activeLayoutNav = 'questions';
+    bank.updatedAt = Date.now();
+    saveBanks();
+    render();
+  }
+})();
+`)
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+  const generated = readFileSync(resolve(item.output, 'src/65-question-bank-admin.js'), 'utf8')
+  assert.match(generated, /state\.activeMainTab = 'base';/)
+  assert.match(generated, /state\.activeLayoutNav = 'base';/)
+})
+
 test('sync injects server storage before any upstream inline script', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))

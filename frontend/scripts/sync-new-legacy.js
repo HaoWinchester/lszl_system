@@ -51,6 +51,22 @@ function replaceVisibleCopy(source, before, after, label) {
   return replaceExactlyOnce(source, before, after, label)
 }
 
+function namedFunctionRegion(source, name) {
+  const signature = new RegExp(
+    `(^|\\n)([ \\t]*)(?:async[ \\t]+)?function[ \\t]+${name}[ \\t]*\\(`,
+  )
+  const match = signature.exec(source)
+  if (!match) return null
+  const start = match.index + match[1].length
+  const indent = match[2]
+  const remaining = source.slice(start + match[0].length - match[1].length)
+  const nextFunction = new RegExp(`\\n${indent}(?:async[ \\t]+)?function[ \\t]+[$A-Z_a-z]`).exec(remaining)
+  const end = nextFunction
+    ? start + match[0].length - match[1].length + nextFunction.index
+    : source.length
+  return { start, end, text: source.slice(start, end) }
+}
+
 const architectureCopyRules = {
   'index.html': [[
     '当前为本地单文件多用户：账号和数据保存在本浏览器 localStorage 中。不同用户的数据互相隔离；如需跨设备/真正安全登录，需要后续接入服务器。',
@@ -250,14 +266,15 @@ function patchGraphInteractions(source) {
 }
 
 function patchQuestionRecallPreview(source) {
-  if (source.includes('async function previewDeepRecall()') && source.includes("KGServerStateStorage&&typeof window.KGServerStateStorage.flush==='function'")) return source
-  if (!source.includes('function previewDeepRecall()')) return source
+  const preview = namedFunctionRegion(source, 'previewDeepRecall')
+  if (!preview) return source
+  if (preview.text.includes("KGServerStateStorage&&typeof window.KGServerStateStorage.flush==='function'")) return source
   // 兼容两个基线：
   //  - v9：previewDeepRecall 已自带 `const bank = currentBank()`，window.open 带 `bankId=`。
   //  - v8.6：用 `questionId=` 且无 bank 传递（需补 bank）。
   // 两版都要在打开深度回忆页前先 flush 到服务器，避免 120ms 防抖让新窗口读不到刚写入的题。
-  const isV9 = source.includes('knowledge-recall.html?bankId=')
-  const isAsync = source.includes('  async function previewDeepRecall(){')
+  const isV9 = preview.text.includes('knowledge-recall.html?bankId=')
+  const isAsync = /(?:^|\n)[ \t]*async[ \t]+function[ \t]+previewDeepRecall[ \t]*\(/.test(preview.text)
   let generated = isV9
     ? isAsync ? source : replaceExactlyOnce(
       source,
@@ -293,7 +310,8 @@ function patchAddQuestionTab(source) {
   // 'questions'（v8.6 遗留值）→ 新建题目后编辑表单 display:none 不显示。仅 v9 修；
   // v8.6.29 的 render 兼容 'questions'，不动。
   if (!source.includes('knowledge-recall.html?bankId=')) return source
-  if (source.includes('Catalog.saveQuestion(')) return source
+  const addQuestion = namedFunctionRegion(source, 'addQuestion')
+  if (addQuestion?.text.includes('Catalog.saveQuestion(')) return source
   return replaceExactlyOnce(
     source,
     "    state.activeSidebarTab = 'questions';\n    state.activeLayoutNav = 'questions';\n    bank.updatedAt = Date.now();\n    saveBanks();\n    render();\n  }",
