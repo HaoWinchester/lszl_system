@@ -41,7 +41,7 @@
 - Creates: `QuestionBankCollaborator`, `Principle`, `SynthesisPreset`, `QuestionTagConfig`, `QuestionEditLock`, `QuestionUploadBatch`, `QuestionAuditLog`
 - Migration parent: `down_revision = "3545e387bfac"`
 
-- [ ] **Step 1: 写模型契约失败测试**
+- [x] **Step 1: 写模型契约失败测试**
 
 ```python
 def test_content_prep_tables_are_registered():
@@ -58,13 +58,13 @@ def test_question_has_server_sync_columns():
             "translations", "metadata", "key_path", "lifecycle"} <= columns
 ```
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_content_prep_models.py -q`
 
 Expected: FAIL，因为新表和字段尚未注册。
 
-- [ ] **Step 3: 实现 SQLAlchemy 模型**
+- [x] **Step 3: 实现 SQLAlchemy 模型**
 
 使用以下数据库约束：
 
@@ -80,7 +80,7 @@ question_tag_configs: partial UNIQUE index WHERE active IS TRUE
 
 历史行的 `content_hash` 在 schema migration 中允许为空，Task 9 的内容迁移会计算并补齐；所有新建/更新服务必须写入非空 SHA-256。`created_by`、`updated_by` 对历史数据允许为空，新写入必须设置。
 
-- [ ] **Step 4: 编写可逆 Alembic migration**
+- [x] **Step 4: 编写可逆 Alembic migration**
 
 迁移中创建索引：
 
@@ -93,13 +93,13 @@ ix_question_audit_logs_entity_created on (entity_type, entity_id, created_at)
 
 `downgrade()` 先删除外键表和索引，再删除新增列；不删除原有题库、题目和试卷数据。
 
-- [ ] **Step 5: 运行模型与 migration 检查**
+- [x] **Step 5: 运行模型与 migration 检查**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_content_prep_models.py -q && .venv/bin/alembic heads`
 
 Expected: PASS，且唯一 head 为 `a91c4d7e2f60`。
 
-- [ ] **Step 6: 提交本任务**
+- [x] **Step 6: 提交本任务**
 
 ```bash
 git add backend/app/models/question.py backend/app/models/content_prep.py backend/app/models/__init__.py backend/alembic/versions/a91c4d7e2f60_content_prep_catalog.py backend/tests/test_content_prep_models.py
@@ -120,17 +120,17 @@ git commit -m "feat: add content prep catalog schema"
 - Produces: `question_access_service.can_edit_bank(db, user, bank) -> bool`
 - Produces: `question_access_service.require_bank_access(db, user, bank_id, *, edit: bool) -> QuestionBank`
 
-- [ ] **Step 1: 写权限失败测试**
+- [x] **Step 1: 写权限失败测试**
 
 覆盖：admin 可写所有题库；teacher 可写自己的题库；teacher 有 `edit` collaborator 时可写；只有 `view` 时不可写；student/viewer 拒绝；缺少三个能力中任一项时依赖返回 403。
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_content_prep_permissions.py -q`
 
 Expected: FAIL，因为能力依赖和协作者服务不存在。
 
-- [ ] **Step 3: 实现能力依赖**
+- [x] **Step 3: 实现能力依赖**
 
 ```python
 def require_permissions(*permission_names: str) -> Callable:
@@ -146,17 +146,17 @@ def require_permissions(*permission_names: str) -> Callable:
     return dependency
 ```
 
-- [ ] **Step 4: 实现题库访问策略**
+- [x] **Step 4: 实现题库访问策略**
 
 管理员绕过 owner；owner 拥有 view/edit；协作者按 `view`/`edit`；其他账号只能在学习查询中看到 `published` 题库，不获得管理权限。所有查询按 `bank_id` 精确锁定，不能先返回对象再由前端过滤。
 
-- [ ] **Step 5: 运行 GREEN 和认证回归**
+- [x] **Step 5: 运行 GREEN 和认证回归**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_content_prep_permissions.py tests/test_smoke.py -q`
 
 Expected: PASS。
 
-- [ ] **Step 6: 提交本任务**
+- [x] **Step 6: 提交本任务**
 
 ```bash
 git add backend/app/core/auth.py backend/app/services/question_access_service.py backend/tests/test_content_prep_permissions.py

@@ -10,6 +10,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
+from app.core.permissions import can
 from app.models.user import ACTIVE, User
 from app.services import user_service
 
@@ -28,12 +29,44 @@ async def get_current_user(
     return user
 
 
+async def optional_current_user(request: Request, db: AsyncSession) -> User | None:
+    """Resolve an active session when present without requiring authentication."""
+
+    username = request.session.get("username")
+    if not username:
+        return None
+    user = await user_service.get_by_username(db, str(username))
+    if not user or user.status != ACTIVE:
+        request.session.clear()
+        return None
+    return user
+
+
 def require_role(*roles: str) -> Callable:
     """角色鉴权依赖工厂：require_role('admin') 或 require_role('admin','teacher')。"""
 
     async def _dependency(user: Annotated[User, Depends(get_current_user)]) -> User:
         if roles and user.role not in roles:
             raise HTTPException(status_code=403, detail="当前角色无权限执行此操作")
+        return user
+
+    return _dependency
+
+
+def require_permissions(*permission_names: str) -> Callable:
+    """Require every named capability from the server-side role matrix."""
+
+    async def _dependency(user: Annotated[User, Depends(get_current_user)]) -> User:
+        missing = [name for name in permission_names if not can(user.role, name)]
+        if missing:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "当前账号缺少所需权限",
+                    "permissions": missing,
+                },
+            )
         return user
 
     return _dependency
