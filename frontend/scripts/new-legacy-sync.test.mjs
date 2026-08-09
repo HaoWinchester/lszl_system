@@ -192,6 +192,40 @@ test('sync preserves upstream javascript instead of parsing localStorage identif
   assert.equal(readFileSync(resolve(item.output, 'src/65-question-bank-admin.js'), 'utf8'), source)
 })
 
+test('sync adds the server flush when recall preview is already async', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/65-question-bank-admin.js'), `(function(){
+  async function previewDeepRecall(){
+    if(!await saveQuestionForm({silent:true})) return;
+    const bank = currentBank();
+    const q = currentQuestion();
+    if(!bank || !q) return;
+    try{
+      JSON.stringify({question:q});
+    }catch(e){}
+    window.open('knowledge-recall.html?bankId=' + encodeURIComponent(bank.id||'') + '&questionId=' + encodeURIComponent(q.id || 'current'), '_blank');
+  }
+  function addQuestion(){
+    state.activeSidebarTab = 'questions';
+    state.activeLayoutNav = 'questions';
+    bank.updatedAt = Date.now();
+    saveBanks();
+    render();
+  }
+})();
+`)
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+  const generated = readFileSync(resolve(item.output, 'src/65-question-bank-admin.js'), 'utf8')
+  const flush = generated.indexOf('await window.KGServerStateStorage.flush()')
+  const open = generated.indexOf("window.open('knowledge-recall.html?bankId='")
+  assert.ok(flush >= 0)
+  assert.ok(flush < open)
+})
+
 test('sync injects server storage before any upstream inline script', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))

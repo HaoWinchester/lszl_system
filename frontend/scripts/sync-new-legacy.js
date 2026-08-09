@@ -257,8 +257,9 @@ function patchQuestionRecallPreview(source) {
   //  - v8.6：用 `questionId=` 且无 bank 传递（需补 bank）。
   // 两版都要在打开深度回忆页前先 flush 到服务器，避免 120ms 防抖让新窗口读不到刚写入的题。
   const isV9 = source.includes('knowledge-recall.html?bankId=')
+  const isAsync = source.includes('  async function previewDeepRecall(){')
   let generated = isV9
-    ? replaceExactlyOnce(
+    ? isAsync ? source : replaceExactlyOnce(
       source,
       '  function previewDeepRecall(){',
       '  async function previewDeepRecall(){',
