@@ -412,39 +412,39 @@ git commit -m "feat: add per-question edit leases"
 - Produces: `upload_bundle(db, actor, request) -> ContentPrepBatchResult`
 - Produces: `record_failed_batch(db, actor, request, error) -> None`
 
-- [ ] **Step 1: 写新增/更新/跳过和幂等失败测试**
+- [x] **Step 1: 写新增/更新/跳过和幂等失败测试**
 
 测试：新 UUID created；同 ID/同服务器 hash skipped；同 ID/变化内容且锁+revision 正确 updated；同 ID 位于另一题库返回 `QUESTION_BANK_MOVE_FORBIDDEN`；重复 actor+idempotencyKey+同 manifest 返回原结果；相同键不同 manifest 返回 `IDEMPOTENCY_PAYLOAD_CONFLICT`。
 
-- [ ] **Step 2: 写事务回滚失败测试**
+- [x] **Step 2: 写事务回滚失败测试**
 
 构造两题批次，第一题合法、第二题引用不存在；断言题目、原则、归纳卡、标签配置、成功审计都未写入，原编辑锁仍存在，且独立短事务只留下 `rolled_back` 批次摘要。
 
-- [ ] **Step 3: 运行 RED 测试**
+- [x] **Step 3: 运行 RED 测试**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_content_prep_upload.py tests/test_content_prep_transactions.py -q`
 
 Expected: FAIL。
 
-- [ ] **Step 4: 实现事务用例**
+- [x] **Step 4: 实现事务用例**
 
 在一个 `async with db.begin()` 中按以下顺序执行：权限和幂等检查 → 对 `actor_username + idempotency_key` 获取 PostgreSQL transaction advisory lock → `SELECT ... FOR UPDATE` 题库 → 规范化并 hash 题目 → 分类 created/updated/skipped → 只对 updated 校验锁和 base revision → 校验并 upsert principle/preset/tag config → 写题目 → 审计 → 删除 updated/skipped 题目的本客户端锁 → 批次 committed。新题不需要锁，hash 未变化的 skipped 题不要求先获得锁。所有内部 helper 只 `flush()`，不得 `commit()`。
 
-- [ ] **Step 5: 实现失败批次记录和响应**
+- [x] **Step 5: 实现失败批次记录和响应**
 
 主事务异常后先 rollback，再用新事务按 actor/idempotency key 写 `rolled_back`、manifest hash 和 issues 摘要。客户端网络重试同一已提交键返回原结果；已失败键返回原失败摘要，用户修改内容后必须生成新键。
 
-- [ ] **Step 6: 验证制作人和 actor 审计**
+- [x] **Step 6: 验证制作人和 actor 审计**
 
 服务器只按 `CREATORS[creatorId]` 写 creatorName；`actor_username/actor_role` 来自 Session。测试客户端伪造 `creatorName`、`actorUsername` 和 `contentHash` 均不能污染数据库。
 
-- [ ] **Step 7: 运行 GREEN 与完整字段回归**
+- [x] **Step 7: 运行 GREEN 与完整字段回归**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_content_prep_upload.py tests/test_content_prep_transactions.py tests/test_question_content_service.py -q`
 
 Expected: PASS。
 
-- [ ] **Step 8: 提交本任务**
+- [x] **Step 8: 提交本任务**
 
 ```bash
 git add backend/app/services/content_prep_service.py backend/app/api/v1/content_prep.py backend/tests/test_content_prep_upload.py backend/tests/test_content_prep_transactions.py

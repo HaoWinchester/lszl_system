@@ -2,11 +2,41 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+from copy import deepcopy
+from dataclasses import dataclass
+from typing import Any
+from uuid import UUID
+
+from fastapi import HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import uid
-from app.models.question import QuestionBank
+from app.core.security import now_utc, uid
+from app.models.content_prep import (
+    Principle,
+    QuestionAuditLog,
+    QuestionBankCollaborator,
+    QuestionEditLock,
+    QuestionTagConfig,
+    QuestionUploadBatch,
+    SynthesisPreset,
+)
+from app.models.question import Question, QuestionBank
 from app.models.user import User
+from app.schemas.content_prep import (
+    CatalogError,
+    CatalogIssue,
+    ContentPrepBatchRequest,
+    ContentPrepBatchResult,
+    ContentPrepQuestionResult,
+)
+from app.services import content_reference_service
+from app.services.question_content_service import (
+    canonical_question_hash,
+    normalize_question_payload,
+)
 
 
 CREATORS = {
@@ -24,6 +54,69 @@ class ContentPrepInputError(ValueError):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+class ContentPrepOperationError(RuntimeError):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        issues: list[CatalogIssue] | None = None,
+        status_code: int = 422,
+        batch_id: str | None = None,
+        record_failure: bool = True,
+    ):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.issues = issues or []
+        self.status_code = status_code
+        self.batch_id = batch_id
+        self.record_failure = record_failure
+
+    def error_payload(self) -> dict:
+        return CatalogError(
+            code=self.code,
+            message=self.message,
+            batchId=self.batch_id,
+            issues=self.issues,
+        ).model_dump(by_alias=True)
+
+
+@dataclass(frozen=True)
+class _ActorContext:
+    username: str
+    role: str
+    subject: str | None
+
+
+@dataclass
+class _PreparedQuestion:
+    item_index: int
+    normalized: dict[str, Any]
+    content_hash: str
+    existing: Question | None
+    status: str
+    lock: QuestionEditLock | None = None
+
+
+BASE_TAG_OPTIONS: dict[tuple[str, str], set[str]] = {
+    ("usage", "stage"): {
+        "基础练习",
+        "阶段测试",
+        "模拟考试",
+        "冲刺复习",
+        "预习练习",
+        "强化训练",
+        "错题复盘",
+    },
+    ("usage", "scene"): {"课后练习", "课堂讨论", "作业题", "专项训练"},
+    ("quality", "feature"): {"易错题", "高频题", "核心题", "综合题"},
+    ("quality", "review"): {"待复核", "已复核", "需更新"},
+    ("source", "origin"): {"真题", "自编题", "改编题", "教材例题"},
+    ("source", "scope"): {"可公开", "内部使用"},
+}
 
 
 def resolve_creator(creator_id: object) -> tuple[str, str]:
@@ -80,4 +173,1033 @@ def created_bank_payload(bank: QuestionBank) -> dict:
         "updatedBy": bank.updated_by,
         "createdAt": bank.created_at.isoformat() if bank.created_at else None,
         "updatedAt": bank.updated_at.isoformat() if bank.updated_at else None,
+    }
+
+
+def _actor_context(actor: User | _ActorContext) -> _ActorContext:
+    if isinstance(actor, _ActorContext):
+        return actor
+    cached = actor.__dict__.get("_content_prep_actor_context")
+    if isinstance(cached, _ActorContext):
+        return cached
+    context = _ActorContext(
+        username=str(actor.username),
+        role=str(actor.role),
+        subject=(str(actor.subject) if actor.subject else None),
+    )
+    actor.__dict__["_content_prep_actor_context"] = context
+    return context
+
+
+def _manifest_hash(request: ContentPrepBatchRequest) -> str:
+    manifest = {
+        "clientInstanceId": request.client_instance_id,
+        "targetBankId": request.target_bank_id,
+        "creatorId": request.creator_id,
+        "prepVersion": request.prep_version,
+        "workspaceVersion": request.workspace_version,
+        "questions": [
+            {
+                "id": item.question.id,
+                "baseRevision": item.base_revision,
+                "contentHash": canonical_question_hash(
+                    item.question.model_dump(by_alias=True)
+                ),
+            }
+            for item in request.questions
+        ],
+        "principles": request.principles,
+        "synthesisPresets": request.synthesis_presets,
+        "tagConfig": request.tag_config,
+    }
+    canonical = json.dumps(
+        manifest,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _advisory_key(actor_username: str, idempotency_key: str) -> int:
+    digest = hashlib.sha256(
+        f"{actor_username}\0{idempotency_key}".encode("utf-8")
+    ).digest()
+    return int.from_bytes(digest[:8], byteorder="big", signed=True)
+
+
+async def _lock_idempotency_key(
+    db: AsyncSession,
+    actor_username: str,
+    idempotency_key: str,
+) -> None:
+    await db.execute(
+        select(func.pg_advisory_xact_lock(_advisory_key(actor_username, idempotency_key)))
+    )
+
+
+async def _lock_configuration_inputs(
+    db: AsyncSession,
+    request: ContentPrepBatchRequest,
+) -> None:
+    keys = {
+        f"content-prep:principle:{item.get('id')}"
+        for item in _incoming_items(request.principles)
+        if item.get("id")
+    }
+    keys.update(
+        f"content-prep:preset:{item.get('id')}"
+        for item in _incoming_items(request.synthesis_presets)
+        if item.get("id")
+    )
+    if request.tag_config:
+        keys.add("content-prep:active-tag-config")
+    for key in sorted(keys):
+        digest = hashlib.sha256(key.encode("utf-8")).digest()
+        advisory_key = int.from_bytes(digest[:8], byteorder="big", signed=True)
+        await db.execute(select(func.pg_advisory_xact_lock(advisory_key)))
+
+
+async def _existing_batch_for_update(
+    db: AsyncSession,
+    actor_username: str,
+    idempotency_key: str,
+) -> QuestionUploadBatch | None:
+    result = await db.execute(
+        select(QuestionUploadBatch)
+        .where(
+            QuestionUploadBatch.actor_username == actor_username,
+            QuestionUploadBatch.idempotency_key == idempotency_key,
+        )
+        .with_for_update()
+    )
+    return result.scalar_one_or_none()
+
+
+def _error_from_failed_batch(batch: QuestionUploadBatch) -> ContentPrepOperationError:
+    summary = batch.error_summary or {}
+    issues = [CatalogIssue.model_validate(issue) for issue in summary.get("issues") or []]
+    return ContentPrepOperationError(
+        str(summary.get("code") or "BATCH_PREVIOUSLY_FAILED"),
+        str(summary.get("message") or "该上传批次此前已失败"),
+        issues=issues,
+        status_code=int(summary.get("statusCode") or 422),
+        batch_id=batch.id,
+        record_failure=False,
+    )
+
+
+async def _locked_writable_bank(
+    db: AsyncSession,
+    actor: _ActorContext,
+    bank_id: str,
+) -> QuestionBank:
+    result = await db.execute(
+        select(QuestionBank).where(QuestionBank.id == bank_id).with_for_update()
+    )
+    bank = result.scalar_one_or_none()
+    if bank is None:
+        raise ContentPrepOperationError(
+            "BANK_NOT_FOUND",
+            "目标题库不存在",
+            status_code=404,
+            record_failure=False,
+        )
+    allowed = actor.role == "admin" or bank.owner_id == actor.username
+    if not allowed:
+        permission = (
+            await db.execute(
+                select(QuestionBankCollaborator.permission).where(
+                    QuestionBankCollaborator.bank_id == bank_id,
+                    QuestionBankCollaborator.username == actor.username,
+                )
+            )
+        ).scalar_one_or_none()
+        allowed = permission == "edit"
+    if not allowed:
+        raise ContentPrepOperationError(
+            "BANK_ACCESS_DENIED",
+            "当前账号无权编辑该题库",
+            status_code=403,
+            record_failure=False,
+        )
+    return bank
+
+
+def _question_issue(
+    question_id: str,
+    field: str,
+    code: str,
+    message: str,
+) -> CatalogIssue:
+    return CatalogIssue(
+        questionId=question_id,
+        field=field,
+        code=code,
+        message=message,
+    )
+
+
+def _validate_question_content(
+    normalized: dict[str, Any],
+    *,
+    is_new: bool,
+) -> list[CatalogIssue]:
+    question_id = str(normalized.get("id") or "")
+    issues: list[CatalogIssue] = []
+    if is_new:
+        try:
+            UUID(question_id)
+        except (TypeError, ValueError, AttributeError):
+            issues.append(
+                _question_issue(
+                    question_id,
+                    "id",
+                    "QUESTION_ID_INVALID",
+                    "新题 ID 必须是 UUID",
+                )
+            )
+    if not str(normalized.get("title") or "").strip():
+        issues.append(
+            _question_issue(
+                question_id,
+                "title",
+                "QUESTION_TITLE_REQUIRED",
+                "题目标题不能为空",
+            )
+        )
+    options = normalized.get("options") or []
+    option_ids = {
+        str(option.get("id"))
+        for option in options
+        if isinstance(option, dict) and option.get("id")
+    }
+    if not options:
+        issues.append(
+            _question_issue(
+                question_id,
+                "options",
+                "OPTIONS_REQUIRED",
+                "题目必须包含选项",
+            )
+        )
+    correct_answer = normalized.get("correctAnswer")
+    if not correct_answer or str(correct_answer) not in option_ids:
+        issues.append(
+            _question_issue(
+                question_id,
+                "options",
+                "CORRECT_ANSWER_MISSING",
+                "必须设置且只能引用现有选项的正确答案",
+            )
+        )
+    return issues
+
+
+def _incoming_items(container: dict[str, Any]) -> list[dict[str, Any]]:
+    items = container.get("items") if isinstance(container, dict) else None
+    return [item for item in (items or []) if isinstance(item, dict)]
+
+
+async def _validate_principle_and_preset_inputs(
+    db: AsyncSession,
+    request: ContentPrepBatchRequest,
+) -> tuple[set[str], list[CatalogIssue]]:
+    principle_items = _incoming_items(request.principles)
+    incoming_ids = {
+        str(item.get("id") or "").strip()
+        for item in principle_items
+        if str(item.get("id") or "").strip()
+    }
+    issues: list[CatalogIssue] = []
+    for index, item in enumerate(principle_items):
+        principle_id = str(item.get("id") or "").strip()
+        if not principle_id:
+            issues.append(
+                CatalogIssue(
+                    field=f"principles.items[{index}].id",
+                    code="PRINCIPLE_ID_REQUIRED",
+                    message="原则 ID 不能为空",
+                )
+            )
+        if not str(item.get("name") or "").strip():
+            issues.append(
+                CatalogIssue(
+                    field=f"principles.items[{index}].name",
+                    code="PRINCIPLE_NAME_REQUIRED",
+                    message="原则名称不能为空",
+                )
+            )
+
+    referenced_ids: set[str] = set()
+    for item in principle_items:
+        referenced_ids.update(
+            str(value)
+            for value in (item.get("confusablePrincipleIds") or [])
+            if value
+        )
+    preset_items = _incoming_items(request.synthesis_presets)
+    referenced_ids.update(
+        str(item.get("principleId"))
+        for item in preset_items
+        if item.get("principleId")
+    )
+    existing_ids = set()
+    if referenced_ids:
+        existing_ids = set(
+            (
+                await db.execute(
+                    select(Principle.id).where(Principle.id.in_(referenced_ids))
+                )
+            ).scalars().all()
+        )
+    allowed = incoming_ids | existing_ids
+    for index, item in enumerate(preset_items):
+        principle_id = str(item.get("principleId") or "").strip()
+        if not str(item.get("id") or "").strip():
+            issues.append(
+                CatalogIssue(
+                    field=f"synthesisPresets.items[{index}].id",
+                    code="PRESET_ID_REQUIRED",
+                    message="归纳卡 ID 不能为空",
+                )
+            )
+        if principle_id not in allowed:
+            issues.append(
+                CatalogIssue(
+                    field=f"synthesisPresets.items[{index}].principleId",
+                    code="REFERENCE_NOT_FOUND",
+                    message=f"归纳卡引用的原则不存在：{principle_id}",
+                )
+            )
+    return incoming_ids, issues
+
+
+async def _effective_tag_config(
+    db: AsyncSession,
+    incoming: dict[str, Any],
+) -> dict[str, Any]:
+    has_incoming_values = any(
+        bool(incoming.get(key))
+        for key in (
+            "names",
+            "groupNames",
+            "categoryNames",
+            "aliases",
+            "slotSchema",
+            "slotAliases",
+            "looseAliases",
+        )
+    )
+    if has_incoming_values:
+        return incoming
+    active = (
+        await db.execute(
+            select(QuestionTagConfig).where(QuestionTagConfig.active.is_(True))
+        )
+    ).scalar_one_or_none()
+    if active is None:
+        return incoming
+    return {
+        "names": active.names or {},
+        "groupNames": active.group_names or {},
+        "categoryNames": active.category_names or {},
+        "aliases": active.aliases or {},
+        "slotSchema": active.slot_schema or {},
+        "schemaVersion": active.schema_version,
+    }
+
+
+def _validate_tag_paths(
+    normalized: dict[str, Any],
+    config: dict[str, Any],
+) -> list[CatalogIssue]:
+    metadata = normalized.get("metadata") if isinstance(normalized.get("metadata"), dict) else {}
+    tag_paths = metadata.get("tagPaths") or []
+    question_id = str(normalized.get("id") or "")
+    names = config.get("names") if isinstance(config.get("names"), dict) else {}
+    aliases = config.get("aliases") if isinstance(config.get("aliases"), dict) else {}
+    issues: list[CatalogIssue] = []
+    for index, path in enumerate(tag_paths):
+        if not isinstance(path, dict):
+            issues.append(
+                _question_issue(
+                    question_id,
+                    f"metadata.tagPaths[{index}]",
+                    "TAG_PATH_INVALID",
+                    "标签路径必须是对象",
+                )
+            )
+            continue
+        group_id = str(path.get("groupId") or "")
+        category_id = str(path.get("categoryId") or "")
+        label = str(path.get("label") or "").strip()
+        slot = (group_id, category_id)
+        if slot not in BASE_TAG_OPTIONS:
+            issues.append(
+                _question_issue(
+                    question_id,
+                    f"metadata.tagPaths[{index}]",
+                    "TAG_PATH_UNKNOWN",
+                    f"未知标签路径：{group_id}/{category_id}",
+                )
+            )
+            continue
+        configured_labels = {
+            str(value)
+            for key, value in names.items()
+            if str(key).startswith(f"{group_id}/{category_id}/") and value
+        }
+        allowed_labels = BASE_TAG_OPTIONS[slot] | configured_labels
+        canonical_label = str(aliases.get(label) or label)
+        if not label or canonical_label not in allowed_labels:
+            issues.append(
+                _question_issue(
+                    question_id,
+                    f"metadata.tagPaths[{index}].label",
+                    "TAG_LABEL_UNKNOWN",
+                    f"标签不属于当前配置：{label}",
+                )
+            )
+    return issues
+
+
+async def _upsert_principles(
+    db: AsyncSession,
+    actor: _ActorContext,
+    container: dict[str, Any],
+) -> None:
+    for item in _incoming_items(container):
+        principle_id = str(item.get("id"))
+        existing = await db.get(Principle, principle_id)
+        values = {
+            "name": str(item.get("name") or "").strip(),
+            "status": (
+                "inactive"
+                if str(item.get("status") or "active").lower() == "inactive"
+                else "active"
+            ),
+            "confusable_principle_ids": [
+                str(value) for value in (item.get("confusablePrincipleIds") or [])
+            ],
+        }
+        if existing is None:
+            db.add(
+                Principle(
+                    id=principle_id,
+                    **values,
+                    revision=1,
+                    created_by=actor.username,
+                    updated_by=actor.username,
+                )
+            )
+        else:
+            changed = any(getattr(existing, key) != value for key, value in values.items())
+            if changed:
+                for key, value in values.items():
+                    setattr(existing, key, value)
+                existing.revision += 1
+                existing.updated_by = actor.username
+
+
+async def _upsert_presets(
+    db: AsyncSession,
+    actor: _ActorContext,
+    container: dict[str, Any],
+) -> None:
+    for item in _incoming_items(container):
+        preset_id = str(item.get("id"))
+        existing = await db.get(SynthesisPreset, preset_id)
+        values = {
+            "principle_id": str(item.get("principleId") or ""),
+            "title": str(item.get("title") or "").strip(),
+            "content": str(item.get("content") or item.get("description") or "").strip(),
+            "status": str(item.get("status") or "draft"),
+            "business_version": max(1, int(item.get("version") or 1)),
+        }
+        if existing is None:
+            db.add(
+                SynthesisPreset(
+                    id=preset_id,
+                    **values,
+                    revision=1,
+                    created_by=actor.username,
+                    updated_by=actor.username,
+                )
+            )
+        else:
+            changed = any(getattr(existing, key) != value for key, value in values.items())
+            if changed:
+                for key, value in values.items():
+                    setattr(existing, key, value)
+                existing.revision += 1
+                existing.updated_by = actor.username
+
+
+def _tag_config_values(config: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema_version": max(1, int(config.get("schemaVersion") or 1)),
+        "names": config.get("names") if isinstance(config.get("names"), dict) else {},
+        "group_names": (
+            config.get("groupNames") if isinstance(config.get("groupNames"), dict) else {}
+        ),
+        "category_names": (
+            config.get("categoryNames")
+            if isinstance(config.get("categoryNames"), dict)
+            else {}
+        ),
+        "aliases": config.get("aliases") if isinstance(config.get("aliases"), dict) else {},
+        "slot_schema": {
+            key: config[key]
+            for key in ("slotSchema", "slotAliases", "looseAliases", "slotIdStrategy")
+            if key in config
+        },
+    }
+
+
+async def _upsert_tag_config(
+    db: AsyncSession,
+    actor: _ActorContext,
+    config: dict[str, Any],
+) -> None:
+    if not config:
+        return
+    values = _tag_config_values(config)
+    active = (
+        await db.execute(
+            select(QuestionTagConfig)
+            .where(QuestionTagConfig.active.is_(True))
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    comparable_keys = (
+        "schema_version",
+        "names",
+        "group_names",
+        "category_names",
+        "aliases",
+        "slot_schema",
+    )
+    if active is not None and all(
+        getattr(active, key) == values[key] for key in comparable_keys
+    ):
+        return
+    if active is not None:
+        active.active = False
+    await db.flush()
+    db.add(
+        QuestionTagConfig(
+            id=uid("qtc_"),
+            **values,
+            active=True,
+            revision=1,
+            created_by=actor.username,
+            updated_by=actor.username,
+        )
+    )
+
+
+def _assign_question_fields(
+    question: Question,
+    normalized: dict[str, Any],
+    *,
+    content_hash: str,
+    creator_id: str,
+    creator_name: str,
+    actor_username: str,
+    actor_role: str,
+    is_new: bool,
+) -> None:
+    question.title = str(normalized.get("title") or "").strip()
+    question.type = str(normalized.get("type") or "single_choice")[:32]
+    question.subject = str(normalized.get("subject") or "PMP")[:32]
+    question.difficulty = (
+        str(normalized["difficulty"])[:32] if normalized.get("difficulty") else None
+    )
+    question.domain = str(normalized["domain"])[:100] if normalized.get("domain") else None
+    question.topic = str(normalized["topic"])[:100] if normalized.get("topic") else None
+    question.teacher_number = (
+        str(normalized["teacherNumber"])[:64]
+        if normalized.get("teacherNumber")
+        else None
+    )
+    question.scope = str(normalized.get("scope") or "internal")
+    question.content_hash = content_hash
+    question.creator_id = creator_id
+    question.creator_name = creator_name
+    question.updated_by = actor_username
+    if is_new:
+        question.created_by = actor_username
+    question.tags = normalized.get("tags") or []
+    question.stem_parts = normalized.get("stemParts") or []
+    question.options = normalized.get("options") or []
+    question.correct_answer = str(normalized.get("correctAnswer") or "")[:20] or None
+    analysis = normalized.get("analysis")
+    question.analysis = str(analysis) if analysis is not None else None
+    question.translations = normalized.get("translations") or {}
+    metadata = deepcopy(normalized.get("metadata") or {})
+    origin = metadata.get("origin") if isinstance(metadata.get("origin"), dict) else {}
+    metadata["origin"] = {
+        **origin,
+        "creatorId": creator_id,
+        "creatorName": creator_name,
+        "actorUsername": actor_username,
+        "actorRole": actor_role,
+    }
+    question.content_metadata = metadata
+    question.key_path = normalized.get("keyPath") or {}
+    question.clues = normalized.get("clues") or []
+    question.concepts = normalized.get("concepts") or []
+    question.reasoning_steps = normalized.get("reasoningSteps") or []
+    question.status = normalized.get("status") or {}
+    question.lifecycle = normalized.get("lifecycle") or {"status": "active"}
+
+
+def _add_question_audit(
+    db: AsyncSession,
+    *,
+    action: str,
+    actor: _ActorContext,
+    creator_id: str,
+    creator_name: str,
+    bank_id: str,
+    question_id: str,
+    batch_id: str,
+    before_hash: str | None,
+    after_hash: str,
+    before_revision: int | None,
+    after_revision: int,
+) -> None:
+    db.add(
+        QuestionAuditLog(
+            id=uid("qal_"),
+            entity_type="question",
+            entity_id=question_id,
+            action=action,
+            actor_username=actor.username,
+            actor_role=actor.role,
+            creator_id=creator_id,
+            creator_name=creator_name,
+            bank_id=bank_id,
+            question_id=question_id,
+            batch_id=batch_id,
+            before_hash=before_hash,
+            after_hash=after_hash,
+            before_revision=before_revision,
+            after_revision=after_revision,
+            outcome="success",
+            detail={},
+        )
+    )
+
+
+async def _prepare_questions(
+    db: AsyncSession,
+    actor: _ActorContext,
+    bank: QuestionBank,
+    request: ContentPrepBatchRequest,
+) -> tuple[list[_PreparedQuestion], list[CatalogIssue]]:
+    ids = [item.question.id for item in request.questions]
+    duplicate_ids = {question_id for question_id in ids if ids.count(question_id) > 1}
+    if duplicate_ids:
+        raise ContentPrepOperationError(
+            "QUESTION_VALIDATION_FAILED",
+            "题目内容校验失败",
+            issues=[
+                _question_issue(
+                    question_id,
+                    "id",
+                    "DUPLICATE_QUESTION_ID",
+                    "同一批次不能包含重复题目 ID",
+                )
+                for question_id in sorted(duplicate_ids)
+            ],
+        )
+
+    existing_rows = (
+        await db.execute(
+            select(Question).where(Question.id.in_(ids)).with_for_update()
+        )
+    ).scalars().all()
+    existing_by_id = {question.id: question for question in existing_rows}
+    prepared: list[_PreparedQuestion] = []
+    issues: list[CatalogIssue] = []
+    effective_tag_config = await _effective_tag_config(db, request.tag_config)
+
+    for index, item in enumerate(request.questions):
+        raw = item.question.model_dump(by_alias=True)
+        normalized = normalize_question_payload(raw, subject=bank.subject)
+        question_id = normalized["id"]
+        existing = existing_by_id.get(question_id)
+        if existing is not None and existing.bank_id != bank.id:
+            raise ContentPrepOperationError(
+                "QUESTION_BANK_MOVE_FORBIDDEN",
+                "同一题目 ID 不能移动到其他题库",
+                status_code=409,
+            )
+        content_hash = canonical_question_hash(normalized)
+        status = (
+            "created"
+            if existing is None
+            else "skipped"
+            if existing.content_hash == content_hash
+            else "updated"
+        )
+        issues.extend(_validate_question_content(normalized, is_new=existing is None))
+        issues.extend(_validate_tag_paths(normalized, effective_tag_config))
+        prepared.append(
+            _PreparedQuestion(
+                item_index=index,
+                normalized=normalized,
+                content_hash=content_hash,
+                existing=existing,
+                status=status,
+            )
+        )
+
+    incoming_principle_ids, input_issues = await _validate_principle_and_preset_inputs(
+        db,
+        request,
+    )
+    issues.extend(input_issues)
+    for prepared_question in prepared:
+        issues.extend(
+            await content_reference_service.validate_question_references(
+                db,
+                actor.username,
+                bank.subject,
+                prepared_question.normalized,
+                incoming_principle_ids=incoming_principle_ids,
+            )
+        )
+    return prepared, issues
+
+
+async def _remove_own_skipped_lock(
+    db: AsyncSession,
+    actor: _ActorContext,
+    request: ContentPrepBatchRequest,
+    question_id: str,
+) -> None:
+    lock = (
+        await db.execute(
+            select(QuestionEditLock)
+            .where(QuestionEditLock.question_id == question_id)
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if (
+        lock is not None
+        and lock.locked_by == actor.username
+        and lock.client_instance_id == request.client_instance_id
+    ):
+        await db.delete(lock)
+
+
+async def _execute_upload(
+    db: AsyncSession,
+    actor: _ActorContext,
+    request: ContentPrepBatchRequest,
+    manifest_hash: str,
+) -> ContentPrepBatchResult:
+    from app.services import question_lock_service
+
+    await _lock_idempotency_key(db, actor.username, request.idempotency_key)
+    existing_batch = await _existing_batch_for_update(
+        db,
+        actor.username,
+        request.idempotency_key,
+    )
+    if existing_batch is not None:
+        if existing_batch.manifest_hash != manifest_hash:
+            raise ContentPrepOperationError(
+                "IDEMPOTENCY_PAYLOAD_CONFLICT",
+                "相同幂等键不能用于不同上传内容",
+                status_code=409,
+                batch_id=existing_batch.id,
+                record_failure=False,
+            )
+        if existing_batch.status == "committed":
+            replayed = dict(existing_batch.result or {})
+            replayed["replayed"] = True
+            return ContentPrepBatchResult.model_validate(replayed)
+        if existing_batch.status == "rolled_back":
+            raise _error_from_failed_batch(existing_batch)
+
+    creator_id, creator_name = resolve_creator(request.creator_id)
+    bank = await _locked_writable_bank(db, actor, request.target_bank_id)
+    await _lock_configuration_inputs(db, request)
+    batch_id = uid("qub_")
+    batch = QuestionUploadBatch(
+        id=batch_id,
+        idempotency_key=request.idempotency_key,
+        bank_id=bank.id,
+        actor_username=actor.username,
+        actor_role=actor.role,
+        creator_id=creator_id,
+        creator_name=creator_name,
+        client_instance_id=request.client_instance_id,
+        prep_version=request.prep_version,
+        workspace_version=request.workspace_version,
+        manifest_hash=manifest_hash,
+        input_count=len(request.questions),
+        status="pending",
+    )
+    db.add(batch)
+    await db.flush()
+
+    prepared, issues = await _prepare_questions(db, actor, bank, request)
+    if issues:
+        raise ContentPrepOperationError(
+            "QUESTION_VALIDATION_FAILED",
+            "题目内容校验失败",
+            issues=issues,
+            batch_id=batch_id,
+        )
+
+    for prepared_question in prepared:
+        if prepared_question.status != "updated":
+            continue
+        item = request.questions[prepared_question.item_index]
+        try:
+            prepared_question.lock = await question_lock_service.assert_lock_and_revision(
+                db,
+                prepared_question.existing,
+                actor,
+                client_instance_id=request.client_instance_id,
+                lock_token=str(item.lock_token or ""),
+                base_revision=item.base_revision,
+            )
+        except question_lock_service.QuestionLockError as error:
+            raise ContentPrepOperationError(
+                error.code,
+                error.message,
+                status_code=error.status_code,
+                batch_id=batch_id,
+            ) from error
+
+    await _upsert_principles(db, actor, request.principles)
+    await db.flush()
+    await _upsert_presets(db, actor, request.synthesis_presets)
+    await _upsert_tag_config(db, actor, request.tag_config)
+
+    question_results: list[ContentPrepQuestionResult] = []
+    created_count = 0
+    updated_count = 0
+    skipped_count = 0
+    for prepared_question in prepared:
+        normalized = prepared_question.normalized
+        question_id = normalized["id"]
+        if prepared_question.status == "created":
+            question = Question(
+                id=question_id,
+                bank_id=bank.id,
+                title=str(normalized.get("title") or ""),
+                revision=1,
+            )
+            _assign_question_fields(
+                question,
+                normalized,
+                content_hash=prepared_question.content_hash,
+                creator_id=creator_id,
+                creator_name=creator_name,
+                actor_username=actor.username,
+                actor_role=actor.role,
+                is_new=True,
+            )
+            db.add(question)
+            revision = 1
+            before_hash = None
+            before_revision = None
+            action = "question_created"
+            created_count += 1
+        elif prepared_question.status == "updated":
+            question = prepared_question.existing
+            assert question is not None
+            before_hash = question.content_hash
+            before_revision = question.revision
+            question.revision += 1
+            _assign_question_fields(
+                question,
+                normalized,
+                content_hash=prepared_question.content_hash,
+                creator_id=creator_id,
+                creator_name=creator_name,
+                actor_username=actor.username,
+                actor_role=actor.role,
+                is_new=False,
+            )
+            revision = question.revision
+            action = "question_updated"
+            updated_count += 1
+            if prepared_question.lock is not None:
+                await db.delete(prepared_question.lock)
+        else:
+            question = prepared_question.existing
+            assert question is not None
+            before_hash = question.content_hash
+            before_revision = question.revision
+            revision = question.revision
+            action = "question_skipped"
+            skipped_count += 1
+            await _remove_own_skipped_lock(db, actor, request, question_id)
+
+        _add_question_audit(
+            db,
+            action=action,
+            actor=actor,
+            creator_id=creator_id,
+            creator_name=creator_name,
+            bank_id=bank.id,
+            question_id=question_id,
+            batch_id=batch_id,
+            before_hash=before_hash,
+            after_hash=prepared_question.content_hash,
+            before_revision=before_revision,
+            after_revision=revision,
+        )
+        question_results.append(
+            ContentPrepQuestionResult(
+                questionId=question_id,
+                status=prepared_question.status,
+                revision=revision,
+                contentHash=prepared_question.content_hash,
+            )
+        )
+
+    if created_count or updated_count:
+        bank.revision += 1
+        bank.updated_by = actor.username
+    result = ContentPrepBatchResult(
+        batchId=batch_id,
+        bankId=bank.id,
+        bankRevision=bank.revision,
+        replayed=False,
+        questions=question_results,
+    )
+    batch.created_count = created_count
+    batch.updated_count = updated_count
+    batch.skipped_count = skipped_count
+    batch.status = "committed"
+    batch.result = result.model_dump(by_alias=True)
+    batch.error_summary = {}
+    batch.committed_at = now_utc()
+    await db.flush()
+    return result
+
+
+async def record_failed_batch(
+    db: AsyncSession,
+    actor: User | _ActorContext,
+    request: ContentPrepBatchRequest,
+    error: ContentPrepOperationError,
+) -> None:
+    actor_context = actor if isinstance(actor, _ActorContext) else _actor_context(actor)
+    try:
+        creator_id, creator_name = resolve_creator(request.creator_id)
+    except ContentPrepInputError:
+        return
+    manifest_hash = _manifest_hash(request)
+    if db.in_transaction():
+        await db.rollback()
+    async with db.begin():
+        await _lock_idempotency_key(
+            db,
+            actor_context.username,
+            request.idempotency_key,
+        )
+        existing = await _existing_batch_for_update(
+            db,
+            actor_context.username,
+            request.idempotency_key,
+        )
+        if existing is not None:
+            return
+        bank = await db.get(QuestionBank, request.target_bank_id)
+        if bank is None:
+            return
+        batch_id = error.batch_id or uid("qub_")
+        error.batch_id = batch_id
+        summary = error.error_payload()
+        summary["statusCode"] = error.status_code
+        db.add(
+            QuestionUploadBatch(
+                id=batch_id,
+                idempotency_key=request.idempotency_key,
+                bank_id=request.target_bank_id,
+                actor_username=actor_context.username,
+                actor_role=actor_context.role,
+                creator_id=creator_id,
+                creator_name=creator_name,
+                client_instance_id=request.client_instance_id,
+                prep_version=request.prep_version,
+                workspace_version=request.workspace_version,
+                manifest_hash=manifest_hash,
+                input_count=len(request.questions),
+                status="rolled_back",
+                result={},
+                error_summary=summary,
+            )
+        )
+
+
+async def upload_bundle(
+    db: AsyncSession,
+    actor: User,
+    request: ContentPrepBatchRequest,
+) -> ContentPrepBatchResult:
+    actor_context = _actor_context(actor)
+    manifest_hash = _manifest_hash(request)
+    if db.in_transaction():
+        await db.rollback()
+    try:
+        async with db.begin():
+            return await _execute_upload(db, actor_context, request, manifest_hash)
+    except ContentPrepInputError as error:
+        raise ContentPrepOperationError(
+            error.code,
+            error.message,
+            status_code=422,
+            record_failure=False,
+        ) from error
+    except ContentPrepOperationError as error:
+        if error.record_failure:
+            await record_failed_batch(db, actor_context, request, error)
+        raise
+    except Exception as unexpected:
+        error = ContentPrepOperationError(
+            "BATCH_TRANSACTION_FAILED",
+            "上传事务执行失败",
+            status_code=500,
+        )
+        await record_failed_batch(db, actor_context, request, error)
+        raise error from unexpected
+
+
+async def get_batch(
+    db: AsyncSession,
+    actor: User,
+    batch_id: str,
+) -> dict[str, Any]:
+    batch = await db.get(QuestionUploadBatch, batch_id)
+    if batch is None or (
+        actor.role != "admin" and batch.actor_username != actor.username
+    ):
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "BATCH_NOT_FOUND", "message": "上传批次不存在"},
+        )
+    return {
+        "id": batch.id,
+        "idempotencyKey": batch.idempotency_key,
+        "bankId": batch.bank_id,
+        "actorUsername": batch.actor_username,
+        "actorRole": batch.actor_role,
+        "creatorId": batch.creator_id,
+        "creatorName": batch.creator_name,
+        "status": batch.status,
+        "result": batch.result or {},
+        "errorSummary": batch.error_summary or {},
+        "createdAt": batch.created_at.isoformat() if batch.created_at else None,
+        "committedAt": batch.committed_at.isoformat() if batch.committed_at else None,
     }

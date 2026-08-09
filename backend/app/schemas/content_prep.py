@@ -19,13 +19,29 @@ class QuestionSyncItem(BaseModel):
 class ContentPrepBatchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=128)
+    idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=120)
     client_instance_id: str = Field(alias="clientInstanceId", min_length=1, max_length=128)
     target_bank_id: str = Field(alias="targetBankId", min_length=1, max_length=64)
     creator_id: str = Field(alias="creatorId", min_length=1, max_length=64)
     prep_version: str = Field(alias="prepVersion", min_length=1, max_length=32)
     workspace_version: str = Field(alias="workspaceVersion", min_length=1, max_length=32)
     questions: list[QuestionSyncItem] = Field(min_length=1)
+    principles: dict[str, Any] = Field(default_factory=dict)
+    synthesis_presets: dict[str, Any] = Field(default_factory=dict, alias="synthesisPresets")
+    tag_config: dict[str, Any] = Field(default_factory=dict, alias="tagConfig")
+
+
+class ContentPrepQuestionSaveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=120)
+    client_instance_id: str = Field(alias="clientInstanceId", min_length=1, max_length=128)
+    creator_id: str = Field(alias="creatorId", min_length=1, max_length=64)
+    prep_version: str = Field(default="0.4.0", alias="prepVersion", max_length=32)
+    workspace_version: str = Field(default="1", alias="workspaceVersion", max_length=32)
+    question: QuestionPayload
+    base_revision: int = Field(alias="baseRevision", ge=1)
+    lock_token: str = Field(alias="lockToken", min_length=1, max_length=128)
     principles: dict[str, Any] = Field(default_factory=dict)
     synthesis_presets: dict[str, Any] = Field(default_factory=dict, alias="synthesisPresets")
     tag_config: dict[str, Any] = Field(default_factory=dict, alias="tagConfig")
@@ -45,6 +61,7 @@ class ContentPrepBatchResult(BaseModel):
 
     batch_id: str = Field(alias="batchId", min_length=1, max_length=64)
     bank_id: str = Field(alias="bankId", min_length=1, max_length=64)
+    bank_revision: int | None = Field(default=None, alias="bankRevision", ge=1)
     replayed: bool = False
     questions: list[ContentPrepQuestionResult]
 
