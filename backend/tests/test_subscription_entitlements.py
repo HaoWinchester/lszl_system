@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete
+from sqlalchemy import delete, func, select
 
 from app.core.security import now_utc
 from app.db.session import AsyncSessionLocal
@@ -73,6 +73,28 @@ def test_subscription_write_endpoints_reject_unknown_plan_ids() -> None:
             await db.execute(delete(RedeemCode).where(RedeemCode.plan_id == invalid_plan))
             await db.commit()
 
+    async def write_state() -> tuple[int, tuple[str, str] | None, int]:
+        async with AsyncSessionLocal() as db:
+            order_count = await db.scalar(
+                select(func.count())
+                .select_from(SubscriptionOrder)
+                .where(SubscriptionOrder.username == username)
+            )
+            subscription = await db.scalar(
+                select(Subscription).where(Subscription.username == username)
+            )
+            code_count = await db.scalar(
+                select(func.count())
+                .select_from(RedeemCode)
+                .where(RedeemCode.plan_id == invalid_plan)
+            )
+            subscription_state = (
+                (subscription.plan_id, subscription.status)
+                if subscription is not None
+                else None
+            )
+            return int(order_count or 0), subscription_state, int(code_count or 0)
+
     with TestClient(app) as admin, TestClient(app) as student:
         assert admin.post(
             "/api/v1/auth/login",
@@ -84,6 +106,7 @@ def test_subscription_write_endpoints_reject_unknown_plan_ids() -> None:
         )
         assert created.status_code == 200, created.text
         try:
+            before = asyncio.run(write_state())
             assert student.post(
                 "/api/v1/auth/login",
                 json={"username": username, "password": "test1234"},
@@ -103,6 +126,7 @@ def test_subscription_write_endpoints_reject_unknown_plan_ids() -> None:
             assert order.status_code == 400
             assert manual.status_code == 400
             assert codes.status_code == 400
+            assert asyncio.run(write_state()) == before
         finally:
             asyncio.run(cleanup())
             admin.request(

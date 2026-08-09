@@ -51,19 +51,104 @@ function replaceVisibleCopy(source, before, after, label) {
   return replaceExactlyOnce(source, before, after, label)
 }
 
+function skipQuotedLiteral(source, start, quote) {
+  for (let index = start + 1; index < source.length; index += 1) {
+    if (source[index] === '\\') {
+      index += 1
+    } else if (source[index] === quote) {
+      return index + 1
+    }
+  }
+  return source.length
+}
+
+function skipLineComment(source, start) {
+  const newline = source.indexOf('\n', start + 2)
+  return newline < 0 ? source.length : newline
+}
+
+function skipBlockComment(source, start) {
+  const close = source.indexOf('*/', start + 2)
+  return close < 0 ? source.length : close + 2
+}
+
+function matchingDelimiterIndex(source, openIndex, open, close) {
+  let depth = 1
+  for (let index = openIndex + 1; index < source.length; index += 1) {
+    const character = source[index]
+    const next = source[index + 1]
+    if (character === "'" || character === '"') {
+      index = skipQuotedLiteral(source, index, character) - 1
+      continue
+    }
+    if (character === '`') {
+      index = skipTemplateLiteral(source, index) - 1
+      continue
+    }
+    if (character === '/' && next === '/') {
+      index = skipLineComment(source, index) - 1
+      continue
+    }
+    if (character === '/' && next === '*') {
+      index = skipBlockComment(source, index) - 1
+      continue
+    }
+    if (character === open) depth += 1
+    if (character === close) {
+      depth -= 1
+      if (depth === 0) return index
+    }
+  }
+  return -1
+}
+
+function skipTemplateLiteral(source, start) {
+  for (let index = start + 1; index < source.length; index += 1) {
+    if (source[index] === '\\') {
+      index += 1
+    } else if (source[index] === '`') {
+      return index + 1
+    } else if (source[index] === '$' && source[index + 1] === '{') {
+      const close = matchingDelimiterIndex(source, index + 1, '{', '}')
+      if (close < 0) return source.length
+      index = close
+    }
+  }
+  return source.length
+}
+
+function nextCodeIndex(source, start) {
+  let index = start
+  while (index < source.length) {
+    if (/\s/.test(source[index])) {
+      index += 1
+    } else if (source[index] === '/' && source[index + 1] === '/') {
+      index = skipLineComment(source, index)
+    } else if (source[index] === '/' && source[index + 1] === '*') {
+      index = skipBlockComment(source, index)
+    } else {
+      return index
+    }
+  }
+  return index
+}
+
 function namedFunctionRegion(source, name) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const signature = new RegExp(
-    `(^|\\n)([ \\t]*)(?:async[ \\t]+)?function[ \\t]+${name}[ \\t]*\\(`,
+    `(^|\\n)([ \\t]*)(?:async[ \\t]+)?function[ \\t]+${escapedName}[ \\t]*\\(`,
   )
   const match = signature.exec(source)
   if (!match) return null
   const start = match.index + match[1].length
-  const indent = match[2]
-  const remaining = source.slice(start + match[0].length - match[1].length)
-  const nextFunction = new RegExp(`\\n${indent}(?:async[ \\t]+)?function[ \\t]+[$A-Z_a-z]`).exec(remaining)
-  const end = nextFunction
-    ? start + match[0].length - match[1].length + nextFunction.index
-    : source.length
+  const openParenthesis = match.index + match[0].length - 1
+  const closeParenthesis = matchingDelimiterIndex(source, openParenthesis, '(', ')')
+  if (closeParenthesis < 0) return null
+  const openBrace = nextCodeIndex(source, closeParenthesis + 1)
+  if (source[openBrace] !== '{') return null
+  const closeBrace = matchingDelimiterIndex(source, openBrace, '{', '}')
+  if (closeBrace < 0) return null
+  const end = closeBrace + 1
   return { start, end, text: source.slice(start, end) }
 }
 
