@@ -163,6 +163,15 @@ code{background:#f1f5f9;padding:1px 4px;border-radius:4px}
 .system-id-note{border-left:4px solid #4d76d7;background:#f4f7ff;padding:9px 11px;border-radius:7px;margin-top:10px;font-size:12px;color:#45566f}
 @media(max-width:760px){.identity-grid{grid-template-columns:1fr}.identity-grid .span2{grid-column:auto}}
 
+/* Server question catalog */
+.server-catalog-panel{border:1px solid #b8c9e8;border-radius:12px;background:linear-gradient(135deg,#f4f8ff,#fff);padding:14px;margin-top:14px}
+.server-identity-grid{display:grid;grid-template-columns:minmax(140px,.7fr) minmax(140px,.7fr) minmax(240px,1.6fr);gap:12px;align-items:end}
+.server-identity-grid>div,.server-identity-grid label{display:flex;flex-direction:column;gap:5px;margin:0}
+.server-identity-grid strong{font-size:14px}.server-actions{margin-top:12px}.server-actions input{width:min(300px,100%)}
+.server-status{font-size:12px;color:var(--muted)}.server-status.good{color:var(--good)}.server-status.warn{color:var(--warn)}.server-status.bad{color:var(--bad)}
+.server-catalog-help{font-size:12px;color:var(--muted);margin-top:9px}.server-catalog-issues{font-size:12px;color:var(--bad);margin-top:7px;line-height:1.6}
+@media(max-width:760px){.server-identity-grid{grid-template-columns:1fr}.server-actions{align-items:stretch}.server-actions input{width:100%}}
+
 /* v0.3.4: forced creator selection */
 .creator-gate{position:fixed;inset:0;z-index:200;background:linear-gradient(135deg,#eef4ff 0%,#f8fbff 42%,#fff7f0 100%);display:flex;align-items:center;justify-content:center;padding:28px}
 .creator-gate.hidden{display:none}

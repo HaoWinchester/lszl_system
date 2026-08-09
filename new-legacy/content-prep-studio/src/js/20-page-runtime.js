@@ -699,6 +699,11 @@ function workspacePayload(){return {
   schema:{tagSlots:'semantic-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA},
   knowledgeTree:state.knowledgeTree?{taxonomy:{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:{zh:state.knowledgeTree.name},version:state.knowledgeTree.version,nodes:state.knowledgeTree.nodes}}:null,
   recallLibrary:state.recallLibrary,questionBank:state.questionBank,principles:state.principles,synthesisPresets:state.synthesisPresets,tagConfig:state.tagConfig,
+  server:{
+    serverBankId:prepRuntime.serverBankId||'',serverBankRevision:prepRuntime.serverBankRevision??null,
+    clientInstanceId:prepRuntime.clientInstanceId,lastIdempotencyKey:prepRuntime.lastIdempotencyKey||'',
+    lastBatchId:prepRuntime.lastBatchId||'',lastUploadFingerprint:prepRuntime.lastUploadFingerprint||''
+  },
   identitySnapshot:{deviceProfile:clone(prepRuntime.deviceProfile||{})},
   system:{issuedQuestionIds:[...prepRuntime.issuedQuestionIds]},
   ui:{currentQuestionId:state.currentQuestionId,currentRecallId:state.currentRecallId,currentPrincipleId:state.currentPrincipleId,demoQuestionId:state.demoQuestionId,demoLang:state.demoLang}
@@ -713,10 +718,26 @@ function migrateWorkspacePayload(input){
     w.migratedFromVersion=from;
     w.migratedAt=nowIso();
   }
+  const server=w.server&&typeof w.server==='object'?w.server:{};
+  w.server={
+    serverBankId:String(server.serverBankId||''),
+    serverBankRevision:Number(server.serverBankRevision)||null,
+    clientInstanceId:String(server.clientInstanceId||generateSystemId('prep_client')),
+    lastIdempotencyKey:String(server.lastIdempotencyKey||''),
+    lastBatchId:String(server.lastBatchId||''),
+    lastUploadFingerprint:String(server.lastUploadFingerprint||'')
+  };
+  if(w.questionBank&&Array.isArray(w.questionBank.questions))w.questionBank.questions=w.questionBank.questions.map(question=>({
+    ...question,serverRevision:Number(question.serverRevision)||null,
+    serverContentHash:String(question.serverContentHash||''),lastSyncedAt:String(question.lastSyncedAt||'')
+  }));
   return w;
 }
 function applyWorkspacePayload(input){
   const w=migrateWorkspacePayload(input);
+  prepRuntime.serverBankId=w.server.serverBankId;prepRuntime.serverBankRevision=w.server.serverBankRevision;
+  prepRuntime.clientInstanceId=w.server.clientInstanceId;prepRuntime.lastIdempotencyKey=w.server.lastIdempotencyKey;
+  prepRuntime.lastBatchId=w.server.lastBatchId;prepRuntime.lastUploadFingerprint=w.server.lastUploadFingerprint;
   state.knowledgeTree=w.knowledgeTree?normalizeTree(w.knowledgeTree):null;
   state.recallLibrary=normalizeRecall(w.recallLibrary||{});
   state.tagConfig=normalizeTagConfig(w.tagConfig||{});

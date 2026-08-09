@@ -80,6 +80,22 @@
           Device ID 仍由当前浏览器/设备独立保存。
         </div>
       </div>
+      <div class="server-catalog-panel">
+        <div class="section-title"><span>服务器题库</span><span><span class="muted tiny">服务器状态：</span><span class="server-status" id="serverCatalogStatus">等待连接</span></span></div>
+        <div class="server-identity-grid">
+          <div><span class="muted tiny">登录账号</span><strong id="serverActorName">未登录</strong></div>
+          <div><span class="muted tiny">制作人</span><strong id="serverCreatorName">请先选择</strong></div>
+          <label><span class="muted tiny">目标题库</span><select id="serverBankSelect"><option value="">请选择题库</option></select></label>
+        </div>
+        <div class="toolbar server-actions">
+          <button class="btn" id="btnCreateServerBank" type="button">新建题库</button>
+          <input id="serverQuestionIdInput" type="text" placeholder="服务器 Question ID">
+          <button class="btn" id="btnLoadServerQuestion" type="button">从服务器载入</button>
+          <button class="btn primary" id="btnSyncToCatalog" type="button">同步到题库</button>
+        </div>
+        <div class="server-catalog-help">上传成功后立即进入正式题库；失败时本地 IndexedDB 草稿不会被删除。</div>
+        <div class="server-catalog-issues" id="serverCatalogIssues" aria-live="polite"></div>
+      </div>
       <div class="data-summary">
         <div class="filebox bundle-box">
           <h3>完整内容准备包 JSON（推荐）</h3>

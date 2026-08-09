@@ -61,5 +61,8 @@ const ValidationService=Object.freeze({
   question:validateQuestion,
   workspace:runValidation
 });
-const AppServices=Object.freeze({TagService,QuestionService,StorageService,WorkspaceService,ImportService,ExportService,ValidationService});
+const AppServices=Object.freeze({
+  TagService,QuestionService,StorageService,WorkspaceService,ImportService,ExportService,ValidationService,
+  get ServerCatalogService(){return window.PMPPrepServerCatalogService||null}
+});
 window.PMPPrepServices=AppServices;

@@ -22,9 +22,13 @@ const FIXED_CREATORS={
   tiancai:{creatorId:'creator_005',name:'天才'},
   nvdi:{creatorId:'creator_006',name:'女帝'}
 };
+const prepBootstrap=window.__KG_DIRECT_BOOTSTRAP__||{};
 const prepRuntime={
   dirty:false,autoSave:false,lastSavedAt:'',saveInFlight:false,
   creatorProfile:null,deviceProfile:null,lastBatchId:'',
+  serverActor:prepBootstrap.authenticated?(prepBootstrap.authUser||{username:prepBootstrap.username}):null,
+  serverBankId:'',serverBankRevision:null,clientInstanceId:generateSystemId('prep_client'),
+  lastIdempotencyKey:'',lastUploadFingerprint:'',serverBanks:[],
   theme:'default',auditTrail:[],
   issuedQuestionIds:new Set()
 };
@@ -526,6 +530,9 @@ function normalizeQuestion(q,i=0,subject='PMP'){
     metadata:{...(q.metadata&&typeof q.metadata==='object'?q.metadata:{}),principleIds:unique([...(Array.isArray(q.principleIds)?q.principleIds:[]),...(Array.isArray(q.metadata?.principleIds)?q.metadata.principleIds:[])].map(String)),optionPrincipleMap:normalizeOptionPrincipleMap(q.metadata?.optionPrincipleMap),tagPaths:Array.isArray(q.metadata?.tagPaths)?clone(q.metadata.tagPaths):[],knowledge},
     lifecycle:q.lifecycle&&typeof q.lifecycle==='object'?clone(q.lifecycle):{status:'active',deletedAt:''},
     status:q.status&&typeof q.status==='object'?clone(q.status):{contentReady:false,keywordsReady:false,knowledgeReady:false,reasoningReady:false,published:false}
+    ,serverRevision:Number(q.serverRevision)||null
+    ,serverContentHash:String(q.serverContentHash||'')
+    ,lastSyncedAt:String(q.lastSyncedAt||'')
   };
 }
 function normalizeBank(payload){

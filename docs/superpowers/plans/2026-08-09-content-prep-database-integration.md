@@ -656,29 +656,29 @@ git commit -m "feat: add content prep studio source"
 - Workspace metadata: `serverBankId`, `serverBankRevision`, `clientInstanceId`, `lastIdempotencyKey`, `lastBatchId`
 - Per-question metadata: `serverRevision`, `serverContentHash`, `lastSyncedAt`
 
-- [ ] **Step 1: 写客户端映射和 UI 失败测试**
+- [x] **Step 1: 写客户端映射和 UI 失败测试**
 
 测试相对 API URL、`credentials:'include'`、401/403/409/422 错误映射、相同网络重试复用 idempotency key、成功后才更新同步元数据。UI 合同要求页面显示登录账号、制作人、服务器状态、目标题库选择、新建题库、从服务器载入和“同步到题库”按钮。
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `node new-legacy/content-prep-studio/tests/test_server_catalog.js && python3 new-legacy/content-prep-studio/tests/test_server_ui_contract.py`
 
 Expected: FAIL。
 
-- [ ] **Step 3: 扩展工作区迁移**
+- [x] **Step 3: 扩展工作区迁移**
 
 `WorkspaceService.migrate()` 为旧 IndexedDB payload 补服务器元数据但不改变题目内容。`clientInstanceId` 首次生成后永久保存在当前本地工作区；切换制作人不能改变它。
 
-- [ ] **Step 4: 实现 API client 和服务器面板**
+- [x] **Step 4: 实现 API client 和服务器面板**
 
 页面从 `window.__KG_DIRECT_BOOTSTRAP__` 显示真实 actor；未知/未登录状态禁止服务器按钮但不删除本地草稿。上传 payload 由 `ExportService.completeBundle()` 生成，再附加 target bank、base revisions、lock tokens 和 workspace 元数据。
 
-- [ ] **Step 5: 实现成功/失败状态规则**
+- [x] **Step 5: 实现成功/失败状态规则**
 
 只有 HTTP 2xx 且响应 `status == 'committed'` 才显示“已进入题库”并写 `serverRevision/serverContentHash/lastSyncedAt`。任何失败保留 IndexedDB，显示稳定错误和 issues，不清空编辑内容。
 
-- [ ] **Step 6: 更新 JS_ORDER 并运行 GREEN**
+- [x] **Step 6: 更新 JS_ORDER 并运行 GREEN**
 
 `JS_ORDER` 固定为 `00,10,20,30,35,40,45`，保证服务在事件绑定前可用。
 
@@ -686,7 +686,7 @@ Run: `node new-legacy/content-prep-studio/tests/test_server_catalog.js && python
 
 Expected: PASS。
 
-- [ ] **Step 7: 提交本任务**
+- [x] **Step 7: 提交本任务**
 
 ```bash
 git add new-legacy/content-prep-studio
