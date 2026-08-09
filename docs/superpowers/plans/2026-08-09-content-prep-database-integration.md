@@ -307,17 +307,17 @@ git commit -m "feat: add unified question catalog api"
 - Produces: `content_prep_service.create_bank(db, actor, body) -> QuestionBank`
 - Constant: `CREATORS = {'creator_001':'波塞冬', ..., 'creator_006':'女帝'}`
 
-- [ ] **Step 1: 写创建题库、制作人和引用校验失败测试**
+- [x] **Step 1: 写创建题库、制作人和引用校验失败测试**
 
 测试未知 creatorId 返回 422；teacher 创建题库成为 owner；admin 创建时仍记录 actor；`metadata.knowledge.primaryNodeId`、`relatedNodeIds`、clue `recallNodeId` 不存在时返回定位字段的 issue；上传内容中同时 upsert 的 principle ID 可被引用。
 
-- [ ] **Step 2: 运行 RED 测试**
+- [x] **Step 2: 运行 RED 测试**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_content_prep_banks_and_refs.py -q`
 
 Expected: FAIL。
 
-- [ ] **Step 3: 实现题库创建**
+- [x] **Step 3: 实现题库创建**
 
 服务器生成 `b_<uuid hex>` 题库 ID，规范 visibility 为 `private|published`，写入 `created_by/updated_by/revision=1`。响应：
 
@@ -325,17 +325,17 @@ Expected: FAIL。
 {"bank":{"id":"b_...","name":"...","subject":"PMP","visibility":"private","revision":1}}
 ```
 
-- [ ] **Step 4: 实现现有正式内容引用读取**
+- [x] **Step 4: 实现现有正式内容引用读取**
 
 知识树从 `SharedRuntimeState.key == 'kg_content_taxonomies_v1'` 读取当前发布项；科目联想库从当前发布者的 `RuntimeState.storage['kg_recall_association_library_v1__subject__<SUBJECT>']` 读取。校验服务只读现有数据，不更新知识树或联想库；结构损坏时返回 `REFERENCE_CATALOG_UNAVAILABLE`，不能静默放过伪造引用。
 
-- [ ] **Step 5: 运行 GREEN**
+- [x] **Step 5: 运行 GREEN**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_content_prep_banks_and_refs.py -q`
 
 Expected: PASS。
 
-- [ ] **Step 6: 提交本任务**
+- [x] **Step 6: 提交本任务**
 
 ```bash
 git add backend/app/services/content_reference_service.py backend/app/services/content_prep_service.py backend/app/api/v1/content_prep.py backend/app/api/v1/router.py backend/tests/test_content_prep_banks_and_refs.py

@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     analytics,
     auth,
+    content_prep,
     engagement,
     files,
     guided_learning,
@@ -26,6 +27,7 @@ api_router.include_router(system.router)
 api_router.include_router(files.router)
 api_router.include_router(questions.router)
 api_router.include_router(question_catalog.router)
+api_router.include_router(content_prep.router)
 api_router.include_router(training.router)
 api_router.include_router(learning.router)
 api_router.include_router(guided_learning.router)
