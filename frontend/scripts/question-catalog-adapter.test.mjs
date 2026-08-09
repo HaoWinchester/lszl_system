@@ -121,6 +121,7 @@ test('save methods use the canonical bank routes and reload the snapshot', async
     fetchImpl: async (url, options = {}) => {
       calls.push({ url, options })
       if (url.includes('/bootstrap')) return response(200, { banks: [{ id: 'bank-1' }], questions: [], catalogRevision: 'd'.repeat(64) })
+      if (options.method === 'DELETE') return response(200, { ok: true })
       if (url === '/api/v1/banks') return response(200, { bank: { id: 'bank-2' } })
       if (url === '/api/v1/banks/bank-1') return response(200, { bank: { id: 'bank-1' } })
       if (url === '/api/v1/banks/bank-1/questions') return response(200, { question: { id: 'q-new' } })
@@ -134,10 +135,14 @@ test('save methods use the canonical bank routes and reload the snapshot', async
   await adapter.saveQuestion({ id: 'q-existing', title: 'existing', revision: 2 }, {
     baseRevision: 2, lockToken: 'lock', creatorId: 'creator_001', idempotencyKey: 'save-existing',
   })
+  await adapter.deleteQuestion('q-existing')
+  await adapter.deleteBank('bank-1')
   assert.ok(calls.some(call => call.url === '/api/v1/banks' && call.options.method === 'POST'))
   assert.ok(calls.some(call => call.url === '/api/v1/banks/bank-1' && call.options.method === 'PUT'))
   assert.ok(calls.some(call => call.url === '/api/v1/banks/bank-1/questions' && call.options.method === 'POST'))
   assert.ok(calls.some(call => call.url === '/api/v1/content-prep/questions/q-existing' && call.options.method === 'PUT'))
+  assert.ok(calls.some(call => call.url === '/api/v1/questions/q-existing' && call.options.method === 'DELETE'))
+  assert.ok(calls.some(call => call.url === '/api/v1/banks/bank-1' && call.options.method === 'DELETE'))
 })
 
 test('sync injects the adapter before each page question repository and marks its mode', () => {

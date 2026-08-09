@@ -2,6 +2,8 @@
 
 (function(){
   const $ = id => document.getElementById(id);
+  const Catalog = window.KGQuestionCatalogAdapter;
+  const CatalogEditor = window.KGQuestionCatalogEditController;
   const STORAGE_PREFIX = 'kg_question_banks_v1__';
   const CURRENT_PREFIX = 'kg_question_current_v1__';
   const PAPER_PREFIX = 'kg_exam_papers_v1__';
@@ -244,31 +246,6 @@
   }
   function currentUsername(){
     try{return String(window.KGAuthCore?.currentUsername?.() || localStorage.getItem(AUTH_SESSION_KEY) || 'local-teacher')}catch(e){return 'local-teacher'}
-  }
-  function readPublishedBanks(){
-    try{
-      const parsed=JSON.parse(localStorage.getItem(PUBLISHED_BANKS_KEY)||'[]');
-      return Array.isArray(parsed)?parsed.map(normalizeBank):[];
-    }catch(e){return []}
-  }
-  function syncPublishedBanks(){
-    const owner=currentUsername();
-    const retained=readPublishedBanks().filter(bank=>String(bank.publishedBy||'')!==owner);
-    const now=Date.now();
-    const published=state.banks.filter(bank=>bank.visibility==='published').map(bank=>normalizeBank({
-      ...clone(bank),
-      visibility:'published',
-      publishedBy:owner,
-      publishedAt:Number(bank.publishedAt)||now,
-      updatedAt:Number(bank.updatedAt)||now
-    }));
-    try{
-      localStorage.setItem(PUBLISHED_BANKS_KEY,JSON.stringify([...retained,...published]));
-      return true;
-    }catch(e){
-      console.warn('同步学员题库失败',e);
-      return false;
-    }
   }
   function currentKey(){
     return CURRENT_PREFIX + sessionScope();
@@ -567,12 +544,18 @@
     const subject = String(bank.subject || 'PMP');
     const questions=ensureTeacherNumbers(Array.isArray(bank.questions) ? bank.questions.map((q,i) => normalizeQuestion({...q, subject:q.subject || subject}, i)) : [],subject);
     return {
+      ...bank,
       id:String(bank.id || bank.bankId || ('bank-' + Date.now().toString(36) + '-' + index)),
       name:String(bank.name || bank.bankName || subject + ' 题库'),
       subject,
       description:String(bank.description || ''),
       version:String(bank.version || '1.0'),
       visibility:String(bank.visibility || 'private'),
+      revision:Math.max(0,Number(bank.revision || 0)),
+      ownerId:String(bank.ownerId || ''),
+      accessMode:String(bank.accessMode || ''),
+      createdBy:String(bank.createdBy || ''),
+      updatedBy:String(bank.updatedBy || ''),
       publishedBy:String(bank.publishedBy || ''),
       publishedAt:Number(bank.publishedAt || 0),
       createdAt:Number(bank.createdAt || Date.now()),
@@ -881,10 +864,10 @@
     }
     refreshRecallNodeSelector();
   }
-  function syncRecallConfig(){
+  async function syncRecallConfig(){
     const keywordValue=String($('qbRecallKeywordsInput')?.value||'');
     const bindingValue=String($('qbRecallBindingsInput')?.value||'');
-    if(!saveQuestionForm({silent:true}))return;
+    if(!await saveQuestionForm({silent:true}))return;
     const q=currentQuestion(),bank=currentBank();if(!q||!bank)return;
     const keywords=keywordValue.split(/[\r\n,，、;；|]+/).map(item=>item.trim()).filter(Boolean).filter((item,index,list)=>list.indexOf(item)===index);
     const bindings=parseRecallBindings(bindingValue);
@@ -995,32 +978,35 @@
     return {banks:next, changed};
   }
 
-  function loadBanks(){
+  function loadLegacyBanksForMigrationPreview(){
     try{
-      const raw = localStorage.getItem(banksKey());
-      const parsed = JSON.parse(raw || 'null');
-      if(Array.isArray(parsed) && parsed.length){
-        const ensured = ensureEmbeddedPmpExample(parsed);
-        if(ensured.changed) saveBanks(ensured.banks, {silent:true});
-        return ensureGlobalTeacherNumbers(ensured.banks);
-      }
-    }catch(e){
-      console.warn(e);
+      const raw=localStorage.getItem(banksKey());
+      const parsed=JSON.parse(raw||'null');
+      return Array.isArray(parsed)?ensureGlobalTeacherNumbers(parsed.map(normalizeBank)):[];
+    }catch(error){console.warn(error);return []}
+  }
+  function loadBanks(){
+    if(Catalog){
+      const snapshot=Catalog.snapshot(),questions=Array.isArray(snapshot.questions)?snapshot.questions:[];
+      return ensureGlobalTeacherNumbers((snapshot.banks||[]).map((bank,index)=>normalizeBank({...bank,questions:questions.filter(question=>String(question.bankId)===String(bank.id))},index)));
     }
-    const seeded = ensureEmbeddedPmpExample(starterBanks()).banks;
-    saveBanks(seeded, {silent:true});
-    return ensureGlobalTeacherNumbers(seeded);
+    if(document.body?.dataset?.questionCatalogMigrationPreview==='true')return loadLegacyBanksForMigrationPreview();
+    console.warn('题目目录适配器未加载，正式题库不会读取 Runtime State 回退数据。');
+    return [];
   }
   function saveBanks(nextBanks=state.banks, options={}){
-    state.banks = ensureGlobalTeacherNumbers((nextBanks || []).map(normalizeBank));
-    try{
-      localStorage.setItem(banksKey(), JSON.stringify(state.banks));
-      syncPublishedBanks();
-      state.dirty = false;
-      if(!options.silent) toast('已保存到账号题库。');
-    }catch(e){
-      alert('保存失败：' + (e.message || e));
-    }
+    state.banks=ensureGlobalTeacherNumbers((nextBanks||[]).map(normalizeBank));
+    state.dirty=true;
+    if(!options.silent)toast('已更新当前编辑草稿，请使用对应保存按钮提交到题库。');
+    return true;
+  }
+  function reloadBanksFromCatalog(selectedBankId=state.selectedBankId,selectedQuestionId=state.selectedQuestionId){
+    state.banks=loadBanks();
+    state.selectedBankId=state.banks.some(bank=>bank.id===selectedBankId)?selectedBankId:(state.banks[0]?.id||'');
+    const bank=state.banks.find(item=>item.id===state.selectedBankId);
+    state.selectedQuestionId=bank?.questions.some(question=>question.id===selectedQuestionId)?selectedQuestionId:(bank?.questions.find(question=>!isQuestionDeleted(question))?.id||'');
+    state.dirty=false;
+    return bank||null;
   }
   function currentBank(){
     const selected=state.banks.find(b=>b.id===state.selectedBankId);
@@ -1041,7 +1027,7 @@
       ? state.banks
       : state.banks.filter(b => b.subject === state.subjectFilter);
   }
-  function selectBank(bankId){
+  async function selectBank(bankId){
     closeLibraryQuestionPreview();
     const bank = state.banks.find(b => b.id === bankId);
     if(!bank) return;
@@ -1058,11 +1044,14 @@
     state.collapsedQuestionGroups = {};
     state.questionPage = 1;
     clearQuestionSelection();
+    if(CatalogEditor)await CatalogEditor.open(currentQuestion());
     render();
+    CatalogEditor?.applyReadonlyState(CatalogEditor.status().readonly);
   }
-  function selectQuestion(questionId){
+  async function selectQuestion(questionId){
     const bank = currentBank();
     if(!bank) return;
+    const before=clone(bank);
     const question = bank.questions.find(q => q.id === questionId);
     if(!question||!questionMatchesLifecycle(question)) return;
     state.selectedQuestionId = question.id;
@@ -1070,7 +1059,9 @@
     state.conceptPage = 1;
     state.editingClueId = '';
     state.editingConceptId = '';
+    if(CatalogEditor)await CatalogEditor.open(question);
     render();
+    CatalogEditor?.applyReadonlyState(CatalogEditor.status().readonly);
   }
 
   function applyQuestionEditorDeepLink(){
@@ -1084,7 +1075,7 @@
     return true;
   }
 
-  function init(){
+  async function init(){
     if(document.body?.dataset?.paperManagementPage === 'true') return initPaperManagementPage();
     if(window.KGRolePermissions){
       window.KGRolePermissions.applyTheme();
@@ -1094,6 +1085,8 @@
         return;
       }
     }
+    if(!Catalog){alert('题目目录服务未加载，请刷新页面后重试。');return}
+    try{await Catalog.ready}catch(error){alert('题目目录加载失败：'+(error.message||error));return}
     initStaticControls();
     initLibraryWorkspaceControls();
     state.banks = loadBanks();
@@ -1103,10 +1096,12 @@
     state.selectedQuestionId = state.banks[0]?.questions.find(question=>!isQuestionDeleted(question))?.id || '';
     if(isTrainingConfigurationStep()&&state.banks[0]?.subject)state.subjectFilter=state.banks[0].subject;
     applyQuestionEditorDeepLink();
+    if(CatalogEditor)await CatalogEditor.open(currentQuestion());
     render();
+    CatalogEditor?.applyReadonlyState(CatalogEditor.status().readonly);
   }
 
-  function initPaperManagementPage(){
+  async function initPaperManagementPage(){
     if(window.KGRolePermissions){
       window.KGRolePermissions.applyTheme();
       window.KGRolePermissions.decoratePermissionElements();
@@ -1115,6 +1110,8 @@
         return;
       }
     }
+    if(!Catalog){alert('题目目录服务未加载，请刷新页面后重试。');return}
+    try{await Catalog.ready}catch(error){alert('题目目录加载失败：'+(error.message||error));return}
     state.banks=loadBanks();state.papers=loadPapers();state.paperCategories=loadPaperCategories();state.selectedPaperId=state.papers[0]?.id||'';
     const on=(id,event,handler)=>$(id)?.addEventListener(event,handler);
     on('qbAddPaperBtn','click',addPaper);on('qbSavePaperBtn','click',savePaperForm);on('qbBuildPaperBtn','click',buildCurrentPaper);on('qbPublishPaperBtn','click',togglePublishPaper);on('qbArchivePaperBtn','click',archiveCurrentPaper);on('qbDeletePaperBtn','click',deleteCurrentPaper);on('qbExportPaperBtn','click',exportCurrentPaper);on('qbAutoQuotaBtn','click',autoDistributeQuota);on('qbClearQuotaBtn','click',clearPaperQuota);
@@ -2813,7 +2810,7 @@
     const isCustom = $('bankSubject').value === 'CUSTOM';
     $('customSubjectWrap').hidden = !isCustom;
   }
-  function saveBankForm(){
+  async function saveBankForm(){
     const bank = currentBank();
     if(!bank) return;
     const selectedSubject = $('bankSubject').value;
@@ -2829,9 +2826,11 @@
     bank.description = $('bankDescription').value.trim();
     bank.updatedAt = Date.now();
     bank.questions.forEach(q => { q.subject = q.subject || bank.subject; });
-    saveBanks(state.banks,{silent:true});
-    render();
-    toast(nextVisibility==='published'?'题库已保存并发布给学员。':'题库已保存，仅教师自己可见。');
+    try{
+      await Catalog.saveBank({id:bank.id,name:bank.name,subject:bank.subject,description:bank.description,version:bank.version,visibility:bank.visibility,revision:bank.revision});
+      reloadBanksFromCatalog(bank.id,state.selectedQuestionId);render();CatalogEditor?.applyReadonlyState(CatalogEditor.status().readonly);
+      toast(nextVisibility==='published'?'题库已保存并发布给学员。':'题库已保存，仅教师自己可见。');return true;
+    }catch(error){Object.assign(bank,before);render();alert('题库保存失败：'+(error.message||error));return false}
   }
   function collectOptionsFromDom(){
     const rows = Array.from(document.querySelectorAll('#qbOptionsEditor .qb-option-row'));
@@ -2861,45 +2860,48 @@
       recallQuestion:row.querySelector('.rs-question').value.trim()
     }));
   }
-  function saveQuestionForm(options={}){
+  async function saveQuestionForm(options={}){
     const bank = currentBank();
     const q = currentQuestion();
     if(!bank || !q) return false;
-    q.title = $('questionTitleInput').value.trim() || (String($('questionStemInput').value||'').replace(/\s+/g,' ').slice(0,36) || '未命名题目');
-    q.teacherNumber=q.teacherNumber||nextTeacherNumber(bank.subject);
-    q.type = $('questionTypeInput').value || 'single_choice';
-    q.subject = bank.subject;
-    q.difficulty = $('questionDifficultyInput').value;
-    q.domain = $('questionDomainInput').value.trim();
-    q.topic = $('questionTopicInput').value.trim();
-    q.tags = cleanList($('questionTagsInput').value);
-    q.analysis = $('questionAnalysisInput').value.trim();
-    q.options = collectOptionsFromDom().map((o,i) => normalizeOption(o,i,''));
-    const correct = document.querySelector('input[name="correctOption"]:checked')?.value || q.options.find(o => o.correct)?.id || q.options[0]?.id || '';
-    q.correctAnswer = correct;
-    q.options.forEach(o => { o.correct = o.id === correct; });
+    const draft=clone(q),previousBanks=clone(state.banks);
+    draft.title = $('questionTitleInput').value.trim() || (String($('questionStemInput').value||'').replace(/\s+/g,' ').slice(0,36) || '未命名题目');
+    draft.teacherNumber=draft.teacherNumber||nextTeacherNumber(bank.subject);
+    draft.type = $('questionTypeInput').value || 'single_choice';
+    draft.subject = bank.subject;
+    draft.difficulty = $('questionDifficultyInput').value;
+    draft.domain = $('questionDomainInput').value.trim();
+    draft.topic = $('questionTopicInput').value.trim();
+    draft.tags = cleanList($('questionTagsInput').value);
+    draft.analysis = $('questionAnalysisInput').value.trim();
+    draft.options = collectOptionsFromDom().map((o,i) => normalizeOption(o,i,''));
+    const correct = document.querySelector('input[name="correctOption"]:checked')?.value || draft.options.find(o => o.correct)?.id || draft.options[0]?.id || '';
+    draft.correctAnswer = correct;
+    draft.options.forEach(o => { o.correct = o.id === correct; });
     const rawStem = $('questionStemInput').value;
-    q.stemParts = rebuildStemParts(rawStem, stemClues(q.clues));
-    q.reasoningSteps = collectReasoningFromDom().map(normalizeReasoningStep);
+    draft.stemParts = rebuildStemParts(rawStem, stemClues(draft.clues));
+    draft.reasoningSteps = collectReasoningFromDom().map(normalizeReasoningStep);
     const enTitle=$('questionTitleEnInput')?.value.trim()||'';
     const enStem=$('questionStemEnInput')?.value||'';
     const enAnalysis=$('questionAnalysisEnInput')?.value.trim()||'';
     const enOptions=collectEnglishOptionsFromDom();
     const hasEnglish=Boolean(enTitle||enStem.trim()||enAnalysis||enOptions.some(option=>option.text));
-    if(hasEnglish)q.translations={...(q.translations||{}),en:{title:enTitle,stemParts:[{text:enStem}],options:enOptions,analysis:enAnalysis}};
-    else if(q.translations?.en){q.translations={...(q.translations||{})};delete q.translations.en}
-    q.metadata={...(q.metadata||{}),translationStatus:hasEnglish?'bilingual':'zh_only'};
-    q.status = {
-      contentReady:!!(rawStem.trim() && q.options.length >= 2 && q.correctAnswer),
-      keywordsReady:q.clues.length > 0,
-      knowledgeReady:!!q.metadata?.knowledge?.primaryNodeId || q.concepts.length > 0,
-      reasoningReady:q.reasoningSteps.length > 0,
-      published:q.status && q.status.published || false
+    if(hasEnglish)draft.translations={...(draft.translations||{}),en:{title:enTitle,stemParts:[{text:enStem}],options:enOptions,analysis:enAnalysis}};
+    else if(draft.translations?.en){draft.translations={...(draft.translations||{})};delete draft.translations.en}
+    draft.metadata={...(draft.metadata||{}),translationStatus:hasEnglish?'bilingual':'zh_only'};
+    draft.status = {
+      contentReady:!!(rawStem.trim() && draft.options.length >= 2 && draft.correctAnswer),
+      keywordsReady:draft.clues.length > 0,
+      knowledgeReady:!!draft.metadata?.knowledge?.primaryNodeId || draft.concepts.length > 0,
+      reasoningReady:draft.reasoningSteps.length > 0,
+      published:draft.status && draft.status.published || false
     };
-    bank.updatedAt = Date.now();
-    saveBanks(state.banks, {silent:options.silent});
-    if(!options.silent) render();
-    return true;
+    try{
+      const saved=await CatalogEditor.save({...draft,id:q.id,bankId:bank.id,revision:q.revision,creatorId:q.creatorId},{bankId:bank.id,baseRevision:q.revision,creatorId:q.creatorId});
+      reloadBanksFromCatalog(bank.id,saved?.id||q.id);
+      if(!options.silent){render();CatalogEditor.applyReadonlyState(CatalogEditor.status().readonly);toast('题目已保存到服务器题库。')}
+      return true;
+    }catch(error){state.banks=previousBanks.map(normalizeBank);if(!options.silent)render();alert('题目保存失败：'+(error.message||error));return false}
   }
 
   function activeTaxonomyForCurrentBank(){
@@ -3009,15 +3011,19 @@
     if($('qbSafeDeleteSummary'))$('qbSafeDeleteSummary').innerHTML=`<strong>${valid.length===1?'安全删除后仍可恢复':`即将删除 ${valid.length} 道题`}</strong><div class="row"><span>已有试卷引用</span><b>${summary.paperQuestions} 道</b></div><div class="row"><span>已有课程或任务引用</span><b>${summary.courseQuestions} 道</b></div><div class="row"><span>存在答题、成绩或统计记录</span><b>${summary.answerQuestions} 道</b></div>`;
     const dialog=$('qbSafeDeleteDialog');dialog?.showModal?dialog.showModal():dialog?.setAttribute('open','');
   }
-  function confirmSafeDelete(){
+  async function persistCatalogQuestionChanges(questions,selectedBankId,selectedQuestionId){
+    for(const question of questions){const lockState=await CatalogEditor.open(question);if(lockState.readonly)throw new Error('题目正在由其他人编辑');await CatalogEditor.save(question,{bankId:question.bankId||selectedBankId,baseRevision:question.revision,creatorId:question.creatorId})}
+    reloadBanksFromCatalog(selectedBankId,selectedQuestionId);if(currentQuestion())await CatalogEditor.open(currentQuestion());else await CatalogEditor.release();
+  }
+  async function confirmSafeDelete(){
     const bank=currentBank(),ids=state.pendingSafeDeleteIds.slice(),batchId=safeId('batch-delete'),now=new Date().toISOString(),actor=currentActor();let changed=0;
     ids.forEach(id=>{const question=bank?.questions.find(item=>item.id===id);if(!question||isQuestionDeleted(question))return;if(isDemoQuestion(question)||isDemoBank(bank))suppressDemoExample();const before=clone(question.lifecycle||normalizeQuestionLifecycle(question));const after={status:'deleted',deletedAt:now,deletedBy:actor,deletedBatchId:batchId,restoredAt:'',restoredBy:null};question.lifecycle=after;recordQuestionAudit(ids.length>1?'question.safe_delete.bulk':'question.safe_delete',question,before,after,batchId,`安全删除题目：${question.title}`,'success',{references:referenceSummaryForQuestion(question,bank)});changed+=1});
-    if(bank&&changed)bank.updatedAt=Date.now();saveBanks(state.banks,{silent:true});state.pendingSafeDeleteIds=[];clearQuestionSelection();state.selectedQuestionId=bank?.questions.find(question=>questionMatchesLifecycle(question))?.id||'';$('qbSafeDeleteDialog')?.close();render();toast(`已安全删除 ${changed} 道题，可在“已删除题目”中恢复。`);
+    if(bank&&changed)bank.updatedAt=Date.now();try{await persistCatalogQuestionChanges(bank.questions.filter(question=>ids.includes(question.id)),bank.id,state.selectedQuestionId)}catch(error){alert('删除保存失败：'+(error.message||error));return}state.pendingSafeDeleteIds=[];clearQuestionSelection();state.selectedQuestionId=currentBank()?.questions.find(question=>questionMatchesLifecycle(question))?.id||'';$('qbSafeDeleteDialog')?.close();render();toast(`已安全删除 ${changed} 道题，可在“已删除题目”中恢复。`);
   }
-  function restoreQuestionIds(ids){
+  async function restoreQuestionIds(ids){
     const bank=currentBank(),batchId=safeId('batch-restore'),actor=currentActor(),now=new Date().toISOString();let changed=0;
     [...new Set(ids.map(String))].forEach(id=>{const question=bank?.questions.find(item=>item.id===id);if(!question||!isQuestionDeleted(question))return;const before=clone(question.lifecycle),after={...normalizeQuestionLifecycle(question),status:'active',deletedAt:'',deletedBy:null,deletedBatchId:'',restoredAt:now,restoredBy:actor};question.lifecycle=after;recordQuestionAudit(ids.length>1?'question.restore.bulk':'question.restore',question,before,after,batchId,`恢复题目：${question.title}`);changed+=1});
-    if(bank&&changed)bank.updatedAt=Date.now();saveBanks(state.banks,{silent:true});clearQuestionSelection();state.selectedQuestionId=bank?.questions.find(question=>questionMatchesLifecycle(question))?.id||'';render();toast(`已恢复 ${changed} 道题。`);
+    if(bank&&changed)bank.updatedAt=Date.now();try{await persistCatalogQuestionChanges(bank.questions.filter(question=>ids.includes(question.id)),bank.id,state.selectedQuestionId)}catch(error){alert('恢复保存失败：'+(error.message||error));return}clearQuestionSelection();state.selectedQuestionId=currentBank()?.questions.find(question=>questionMatchesLifecycle(question))?.id||'';render();toast(`已恢复 ${changed} 道题。`);
   }
   function openPermanentDeleteDialog(ids){
     const bank=currentBank(),valid=[...new Set(ids.map(String))].filter(id=>{const question=bank?.questions.find(item=>item.id===id);return question&&isQuestionDeleted(question)});if(!valid.length)return toast('请先选择已删除题目。');
@@ -3026,13 +3032,13 @@
     if($('qbPermanentDeleteAcknowledge'))$('qbPermanentDeleteAcknowledge').checked=false;if($('qbPermanentDeleteConfirmBtn'))$('qbPermanentDeleteConfirmBtn').disabled=true;
     const dialog=$('qbPermanentDeleteDialog');dialog?.showModal?dialog.showModal():dialog?.setAttribute('open','');
   }
-  function confirmPermanentDelete(){
-    const bank=currentBank(),ids=state.pendingPermanentDeleteIds.slice(),batchId=safeId('batch-permanent-delete');let deleted=0,protectedCount=0;
-    ids.forEach(id=>{const index=bank?.questions.findIndex(item=>item.id===id)??-1;if(index<0)return;const question=bank.questions[index];if(!isQuestionDeleted(question))return;const refs=referenceSummaryForQuestion(question,bank);if(refs.protected){recordQuestionAudit('question.permanent_delete',question,question.lifecycle,null,batchId,`永久删除受保护：${question.title}`,'failed',{references:refs,reason:'business_reference_protected'});protectedCount+=1;return}recordQuestionAudit('question.permanent_delete',question,question.lifecycle,null,batchId,`永久删除题目：${question.title}`,'success',{references:refs});bank.questions.splice(index,1);deleted+=1});
-    if(bank&&deleted)bank.updatedAt=Date.now();saveBanks(state.banks,{silent:true});state.pendingPermanentDeleteIds=[];clearQuestionSelection();state.selectedQuestionId=bank?.questions.find(question=>questionMatchesLifecycle(question))?.id||'';$('qbPermanentDeleteDialog')?.close();render();toast(`已永久删除 ${deleted} 道题${protectedCount?`，${protectedCount} 道受引用保护未删除`:''}。`);
+  async function confirmPermanentDelete(){
+    const bank=currentBank(),ids=state.pendingPermanentDeleteIds.slice(),batchId=safeId('batch-permanent-delete'),deletedIds=[];let deleted=0,protectedCount=0;
+    ids.forEach(id=>{const index=bank?.questions.findIndex(item=>item.id===id)??-1;if(index<0)return;const question=bank.questions[index];if(!isQuestionDeleted(question))return;const refs=referenceSummaryForQuestion(question,bank);if(refs.protected){recordQuestionAudit('question.permanent_delete',question,question.lifecycle,null,batchId,`永久删除受保护：${question.title}`,'failed',{references:refs,reason:'business_reference_protected'});protectedCount+=1;return}recordQuestionAudit('question.permanent_delete',question,question.lifecycle,null,batchId,`永久删除题目：${question.title}`,'success',{references:refs});bank.questions.splice(index,1);deleted+=1;deletedIds.push(question.id)});
+    try{for(const id of deletedIds){const question=Catalog.question(id);if(!question)continue;const lockState=await CatalogEditor.open(question);if(lockState.readonly)throw new Error('题目正在由其他人编辑');await Catalog.deleteQuestion(id);await CatalogEditor.release({forgetOnly:true})}}catch(error){reloadBanksFromCatalog(bank.id,'');render();alert('永久删除失败：'+(error.message||error));return}reloadBanksFromCatalog(bank.id,'');state.pendingPermanentDeleteIds=[];clearQuestionSelection();state.selectedQuestionId=currentBank()?.questions.find(question=>questionMatchesLifecycle(question))?.id||'';$('qbPermanentDeleteDialog')?.close();render();toast(`已永久删除 ${deleted} 道题${protectedCount?`，${protectedCount} 道受业务引用保护未删除`:''}。`);
   }
 
-  function addBank(subject='PMP'){
+  async function addBank(subject='PMP'){
     const subjectId = subject === 'ALL' ? 'PMP' : subject;
     const meta = subjectMeta(subjectId);
     const bank = normalizeBank({
@@ -3044,51 +3050,24 @@
       visibility:'private',
       questions:[]
     });
-    state.banks.push(bank);
-    state.selectedBankId = bank.id;
-    state.selectedQuestionId = '';
-    state.cluePage = 1;
-    state.conceptPage = 1;
-    state.questionPage = 1;
-    state.subjectFilter = subjectId;
-    state.bankPage = Math.max(1, Math.ceil(filteredBanks().length / BANK_PAGE_SIZE));
-    state.activeSidebarTab = 'banks';
-    state.activeLayoutNav = 'banks';
-    const filter = $('qbSubjectFilter');
-    if(filter) filter.value = subjectId;
-    saveBanks();
-    render();
+    try{
+      const created=await Catalog.saveBank(bank);reloadBanksFromCatalog(created?.id||'','');
+      state.cluePage=1;state.conceptPage=1;state.questionPage=1;state.subjectFilter=subjectId;state.activeSidebarTab='banks';state.activeLayoutNav='banks';
+      const filter=$('qbSubjectFilter');if(filter)filter.value=subjectId;render();toast('已创建题库。');return created;
+    }catch(error){alert('题库创建失败：'+(error.message||error));return null}
   }
-  function addQuestion(){
-    const bank = currentBank();
-    if(!bank) return addBank('PMP');
-    const q = emptyQuestion(bank.subject);
-    q.lifecycle=normalizeQuestionLifecycle({});
-    q.teacherNumber=nextTeacherNumber(bank.subject);
-    bank.questions.push(q);
-    state.selectedQuestionId = q.id;
-    state.cluePage = 1;
-    state.conceptPage = 1;
-    state.questionPage = Math.max(1, Math.ceil(bank.questions.length / QUESTION_PAGE_SIZE));
-    state.activeSidebarTab = 'questions';
-    state.activeLayoutNav = 'questions';
-    bank.updatedAt = Date.now();
-    saveBanks();
-    render();
+  async function addQuestion(){
+    const bank=currentBank();if(!bank){await addBank('PMP');return}
+    const q=emptyQuestion(bank.subject);q.lifecycle=normalizeQuestionLifecycle({});q.teacherNumber=nextTeacherNumber(bank.subject);
+    try{const created=await Catalog.saveQuestion(q,{bankId:bank.id});reloadBanksFromCatalog(bank.id,created?.id||'');state.activeSidebarTab='questions';state.activeLayoutNav='questions';if(CatalogEditor)await CatalogEditor.open(currentQuestion());render();CatalogEditor?.applyReadonlyState(CatalogEditor.status().readonly);toast('已创建题目并进入服务器题库。');return created}
+    catch(error){alert('题目创建失败：'+(error.message||error));return null}
   }
-  function cloneQuestion(){
-    const bank = currentBank();
-    const q = currentQuestion();
-    if(!bank || !q) return;
-    const copied = normalizeQuestion({...clone(q), id:safeId('q'), teacherNumber:nextTeacherNumber(bank.subject), title:q.title + '（副本）', lifecycle:{status:'active'}});
-    bank.questions.push(copied);
-    state.selectedQuestionId = copied.id;
-    state.cluePage = 1;
-    state.conceptPage = 1;
-    state.questionPage = Math.max(1, Math.ceil(bank.questions.length / QUESTION_PAGE_SIZE));
-    bank.updatedAt = Date.now();
-    saveBanks();
-    render();
+  async function cloneQuestion(){
+    const bank=currentBank(),q=currentQuestion();if(!bank||!q)return;
+    const copied=normalizeQuestion({...clone(q),id:safeId('q'),teacherNumber:nextTeacherNumber(bank.subject),title:q.title+'（副本）',lifecycle:{status:'active'}});
+    delete copied.revision;delete copied.contentHash;delete copied.createdAt;delete copied.updatedAt;
+    try{const created=await Catalog.saveQuestion(copied,{bankId:bank.id});reloadBanksFromCatalog(bank.id,created?.id||'');if(CatalogEditor)await CatalogEditor.open(currentQuestion());render();CatalogEditor?.applyReadonlyState(CatalogEditor.status().readonly);toast('已复制为服务器题库中的新题。');return created}
+    catch(error){alert('复制题目失败：'+(error.message||error));return null}
   }
   function deleteQuestion(){
     const q=currentQuestion();if(!q)return;openSafeDeleteDialog([q.id]);
@@ -3099,12 +3078,12 @@
   function isDemoQuestion(question){
     return !!question && String(question.id || '') === DEMO_QUESTION_ID;
   }
-  function deleteCurrentBank(){
+  async function deleteCurrentBank(){
     const bank = currentBank();
     if(!bank) return;
-    deleteBankById(bank.id);
+    await deleteBankById(bank.id);
   }
-  function deleteBankById(bankId){
+  async function deleteBankById(bankId){
     const bank = state.banks.find(b => b.id === bankId);
     if(!bank) return;
     const referenced=(bank.questions||[]).map(question=>({question,refs:questionReferenceSummary(question,bank)})).filter(row=>row.refs.protected);
@@ -3128,6 +3107,7 @@
 
 此操作不可恢复。`;
     if(!confirm(message)) return;
+    try{await Catalog.deleteBank(bank.id)}catch(error){alert('题库删除失败：'+(error.message||error));return false}
     if(isDemoBank(bank) || (bank.questions || []).some(isDemoQuestion)) suppressDemoExample();
     const filteredBefore = filteredBanks();
     const filteredIndex = filteredBefore.findIndex(b => b.id === bank.id);
@@ -3149,9 +3129,9 @@
     toast('已删除题库。');
   }
 
-  function addOption(){
+  async function addOption(){
     if(!currentQuestion()) return;
-    if(!saveQuestionForm({silent:true})) return;
+    if(!await saveQuestionForm({silent:true})) return;
     const q = currentQuestion();
     if(!q) return;
     q.options = Array.isArray(q.options) ? q.options : [];
@@ -3237,8 +3217,8 @@
     fillClueFormFromSelection(selection);
     toast('已带入选中文本，可补充类型和解释后保存。');
   }
-  function editClue(clueId){
-    if(!saveQuestionForm({silent:true})) return;
+  async function editClue(clueId){
+    if(!await saveQuestionForm({silent:true})) return;
     const q = currentQuestion();
     const clue = q && q.clues.find(c => c.id === clueId);
     if(!clue) return;
@@ -3259,9 +3239,9 @@
     $('clueTextInput').scrollIntoView({behavior:'smooth', block:'center'});
     toast('正在编辑关键词。');
   }
-  function addClue(){
+  async function addClue(){
     if(!currentQuestion()) return;
-    if(!saveQuestionForm({silent:true})) return;
+    if(!await saveQuestionForm({silent:true})) return;
     const q = currentQuestion();
     if(!q) return;
     const text = $('clueTextInput').value.trim();
@@ -3314,8 +3294,8 @@
     $('qbAddConceptBtn').textContent = '添加知识点';
     $('qbCancelConceptEditBtn').hidden = true;
   }
-  function editConcept(conceptId){
-    if(!saveQuestionForm({silent:true})) return;
+  async function editConcept(conceptId){
+    if(!await saveQuestionForm({silent:true})) return;
     const q = currentQuestion();
     const concept = q && q.concepts.find(c => c.id === conceptId);
     if(!concept) return;
@@ -3336,9 +3316,9 @@
     $('conceptTitleInput').scrollIntoView({behavior:'smooth', block:'center'});
     toast('正在编辑知识点。');
   }
-  function addConcept(){
+  async function addConcept(){
     if(!currentQuestion()) return;
-    if(!saveQuestionForm({silent:true})) return;
+    if(!await saveQuestionForm({silent:true})) return;
     const q = currentQuestion();
     if(!q) return;
     const title = $('conceptTitleInput').value.trim();
@@ -3382,10 +3362,10 @@
     toast(isEditing ? '已保存知识点修改。' : '已添加知识点。');
   }
 
-  function addReasoningStep(){
+  async function addReasoningStep(){
     setAnnotationTab('reasoning');
     if(!currentQuestion()) return;
-    if(!saveQuestionForm({silent:true})) return;
+    if(!await saveQuestionForm({silent:true})) return;
     const q = currentQuestion();
     if(!q) return;
     q.reasoningSteps = Array.isArray(q.reasoningSteps) ? q.reasoningSteps : [];
@@ -3489,13 +3469,13 @@
     const panel = $('qbFloatingKeywordPanel');
     if(panel) panel.hidden = true;
   }
-  function saveFloatingKeyword(){
+  async function saveFloatingKeyword(){
     const selection = state.pendingKeywordSelection;
     if(!selection){
       toast('没有可保存的选中文本。');
       return;
     }
-    if(!saveQuestionForm({silent:true})) return;
+    if(!await saveQuestionForm({silent:true})) return;
     const q = currentQuestion();
     if(!q) return;
     const text = $('floatingClueTextInput').value.trim();
@@ -3530,8 +3510,8 @@
     toast('已保存选中文本为关键词。');
   }
 
-  function setCurrentTrainingQuestion(){
-    if(!saveQuestionForm({silent:true})) return;
+  async function setCurrentTrainingQuestion(){
+    if(!await saveQuestionForm({silent:true})) return;
     const bank = currentBank();
     const q = currentQuestion();
     if(!bank || !q) return;
@@ -3544,8 +3524,8 @@
       alert('设置失败：' + (e.message || e));
     }
   }
-  function previewDeepRecall(){
-    if(!saveQuestionForm({silent:true})) return;
+  async function previewDeepRecall(){
+    if(!await saveQuestionForm({silent:true})) return;
     const bank = currentBank();
     const q = currentQuestion();
     if(!bank || !q) return;
@@ -3558,20 +3538,20 @@
     }catch(e){}
     window.open('knowledge-recall.html?bankId=' + encodeURIComponent(bank.id||'') + '&questionId=' + encodeURIComponent(q.id || 'current'), '_blank');
   }
-  function exportCurrentBank(){
-    saveQuestionForm({silent:true});
+  async function exportCurrentBank(){
+    await saveQuestionForm({silent:true});
     const bank = currentBank();
     if(!bank) return;
     downloadJson((bank.name || '题库') + '.json', bank);
   }
-  function exportBankById(bankId){
-    saveQuestionForm({silent:true});
+  async function exportBankById(bankId){
+    await saveQuestionForm({silent:true});
     const bank = state.banks.find(b => b.id === bankId);
     if(!bank) return;
     downloadJson((bank.name || '题库') + '.json', bank);
   }
-  function exportAllBanks(){
-    saveQuestionForm({silent:true});
+  async function exportAllBanks(){
+    await saveQuestionForm({silent:true});
     const payload = {
       id:'all-project-management-question-banks',
       name:'全部项目管理类题库',
@@ -3731,5 +3711,6 @@
     referenceSummaryForQuestion:(questionId,bankId='')=>{const bank=state.banks.find(item=>item.id===String(bankId||''))||currentBank();const question=bank?.questions.find(item=>item.id===String(questionId||''));return clone(referenceSummaryForQuestion(question,bank))}
   });
 
+  window.addEventListener('beforeunload',()=>{if(CatalogEditor)CatalogEditor.release({keepalive:true})});
   document.addEventListener('DOMContentLoaded', init);
 })();

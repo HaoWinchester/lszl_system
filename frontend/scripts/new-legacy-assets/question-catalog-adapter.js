@@ -86,6 +86,12 @@
     return clone(payload.bank || null)
   }
 
+  async function deleteBank(bankId) {
+    const payload = await request(`/banks/${encodeURIComponent(bankId)}`, { method: 'DELETE' })
+    await reload()
+    return Boolean(payload.ok)
+  }
+
   async function saveQuestion(input, options = {}) {
     const questionId = String(input?.id || '')
     const existing = Number(options.baseRevision || input?.revision || 0) > 0
@@ -116,6 +122,12 @@
     }
     await reload()
     return clone(payload.question || null)
+  }
+
+  async function deleteQuestion(questionId) {
+    const payload = await request(`/questions/${encodeURIComponent(questionId)}`, { method: 'DELETE' })
+    await reload()
+    return Boolean(payload.ok)
   }
 
   function acquireQuestionLock(questionId, options = {}) {
@@ -150,6 +162,7 @@
   }
 
   const ready = reload()
+  ready.catch(() => {})
   global.KGQuestionCatalogAdapter = Object.freeze({
     ready,
     mode,
@@ -160,7 +173,9 @@
     question,
     reload,
     saveBank,
+    deleteBank,
     saveQuestion,
+    deleteQuestion,
     acquireQuestionLock,
     heartbeatQuestionLock,
     releaseQuestionLock,

@@ -580,7 +580,7 @@ function injectPage(html, page, version) {
     )
     generated = generated.replace(
       catalogPage.marker,
-      `<script defer src="./question-catalog-adapter.js"></script><!-- kg-question-catalog:generated -->\n${catalogPage.marker}`,
+      `<script defer src="./question-catalog-adapter.js"></script><!-- kg-question-catalog:generated -->\n${page === 'question-bank.html' ? '<script defer src="./direct-question-adapter.js"></script><!-- kg-question-editor:generated -->\n' : ''}${catalogPage.marker}`,
     )
   }
   if (page === 'question-training.html' && !generated.includes('kg-runtime-fixes:generated')) {
@@ -622,10 +622,9 @@ function injectPage(html, page, version) {
     if (!generated.includes(editorTag)) {
       throw new Error('new-legacy 题库脚本顺序已变化，请复核题目校验适配器')
     }
-    generated = generated.replace(
-      editorTag,
-      `${editorTag}\n<script defer src="./direct-question-adapter.js"></script><!-- kg-question:generated -->`,
-    )
+    if (!generated.includes('kg-question-editor:generated')) {
+      throw new Error('new-legacy 题目编辑锁适配器未在管理脚本前加载')
+    }
   }
   if (page === 'system-settings.html') {
     const settingsTag = '<script defer src="src/36-system-settings.js"></script>'

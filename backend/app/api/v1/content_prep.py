@@ -146,11 +146,21 @@ async def save_question(
             status_code=404,
             detail={"code": "QUESTION_NOT_FOUND", "message": "题目不存在"},
         )
+    if request.creator_id is None and question.creator_id is None:
+        try:
+            return await content_prep_service.save_legacy_question_without_creator(
+                db,
+                actor,
+                request,
+            )
+        except content_prep_service.ContentPrepOperationError as error:
+            _raise_upload_error(error)
+    creator_id = request.creator_id or question.creator_id
     batch_request = ContentPrepBatchRequest(
         idempotencyKey=request.idempotency_key,
         clientInstanceId=request.client_instance_id,
         targetBankId=question.bank_id,
-        creatorId=request.creator_id,
+        creatorId=creator_id,
         prepVersion=request.prep_version,
         workspaceVersion=request.workspace_version,
         questions=[

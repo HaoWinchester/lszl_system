@@ -36,7 +36,7 @@ class ContentPrepQuestionSaveRequest(BaseModel):
 
     idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=120)
     client_instance_id: str = Field(alias="clientInstanceId", min_length=1, max_length=128)
-    creator_id: str = Field(alias="creatorId", min_length=1, max_length=64)
+    creator_id: str | None = Field(default=None, alias="creatorId", min_length=1, max_length=64)
     prep_version: str = Field(default="0.4.0", alias="prepVersion", max_length=32)
     workspace_version: str = Field(default="1", alias="workspaceVersion", max_length=32)
     question: QuestionPayload

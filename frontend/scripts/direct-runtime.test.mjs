@@ -153,15 +153,15 @@ test('generated graph editor keeps an existing relation on duplicate connect', (
   assert.doesNotMatch(branch[1], /state\.links\s*=|\.splice\(|\.filter\(/)
 })
 
-test('question validation adapter runs after the upstream question editor', () => {
+test('question edit adapter is injected before the upstream question editor initializer', () => {
   const adapterPath = resolve(frontendDir, 'scripts/new-legacy-assets/direct-question-adapter.js')
   assert.ok(existsSync(adapterPath), 'direct-question-adapter.js should exist')
   const adapter = readFileSync(adapterPath, 'utf8')
   assert.match(adapter, /questionStemInput/)
   assert.match(adapter, /\.option-text/)
   assert.match(adapter, /stopImmediatePropagation/)
-  const page = readFileSync(resolve(frontendDir, 'public/new-legacy/question-bank.html'), 'utf8')
-  assert.ok(page.indexOf('src/65-question-bank-admin.js') < page.indexOf('direct-question-adapter.js'))
+  const sync = readFileSync(resolve(frontendDir, 'scripts/sync-new-legacy.js'), 'utf8')
+  assert.match(sync, /direct-question-adapter\.js[^]*kg-question-editor:generated[^]*catalogPage\.marker/)
 })
 
 test('generated question preview persists the selected bank and question for recall', () => {

@@ -30,9 +30,14 @@ from app.schemas.content_prep import (
     CatalogIssue,
     ContentPrepBatchRequest,
     ContentPrepBatchResult,
+    ContentPrepQuestionSaveRequest,
     ContentPrepQuestionResult,
 )
-from app.services import content_reference_service
+from app.services import (
+    content_reference_service,
+    question_access_service,
+    question_catalog_service,
+)
 from app.services.question_content_service import (
     canonical_question_hash,
     normalize_question_payload,
@@ -704,8 +709,8 @@ def _assign_question_fields(
     normalized: dict[str, Any],
     *,
     content_hash: str,
-    creator_id: str,
-    creator_name: str,
+    creator_id: str | None,
+    creator_name: str | None,
     actor_username: str,
     actor_role: str,
     is_new: bool,
@@ -760,8 +765,8 @@ def _add_question_audit(
     *,
     action: str,
     actor: _ActorContext,
-    creator_id: str,
-    creator_name: str,
+    creator_id: str | None,
+    creator_name: str | None,
     bank_id: str,
     question_id: str,
     batch_id: str,
@@ -1086,6 +1091,130 @@ async def _execute_upload(
     batch.committed_at = now_utc()
     await db.flush()
     return result
+
+
+async def save_legacy_question_without_creator(
+    db: AsyncSession,
+    actor: User,
+    request: ContentPrepQuestionSaveRequest,
+) -> dict[str, Any]:
+    """Save a locked historical question while preserving its null attribution.
+
+    Batch uploads still require an allowlisted creator. This narrow path exists
+    only for a pre-migration question whose creator was never recorded.
+    """
+
+    from app.services import question_lock_service
+
+    actor_context = _actor_context(actor)
+    if db.in_transaction():
+        await db.rollback()
+    async with db.begin():
+        actor_row = await db.get(User, actor_context.username)
+        if actor_row is None:
+            raise ContentPrepOperationError(
+                "ACTOR_NOT_FOUND",
+                "当前登录账号不存在",
+                status_code=401,
+                record_failure=False,
+            )
+        question = (
+            await db.execute(
+                select(Question)
+                .where(Question.id == request.question.id)
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        if question is None:
+            raise ContentPrepOperationError(
+                "QUESTION_NOT_FOUND",
+                "题目不存在",
+                status_code=404,
+                record_failure=False,
+            )
+        await question_access_service.require_bank_access(
+            db,
+            actor_row,
+            question.bank_id,
+            edit=True,
+        )
+        try:
+            lock = await question_lock_service.assert_lock_and_revision(
+                db,
+                question,
+                actor_row,
+                client_instance_id=request.client_instance_id,
+                lock_token=request.lock_token,
+                base_revision=request.base_revision,
+            )
+        except question_lock_service.QuestionLockError as error:
+            raise ContentPrepOperationError(
+                error.code,
+                error.message,
+                status_code=error.status_code,
+                record_failure=False,
+            ) from error
+
+        if request.creator_id or question.creator_id:
+            raise ContentPrepOperationError(
+                "CREATOR_REQUIRED_FOR_BATCH_PATH",
+                "已有制作人的题目必须使用标准制作人保存路径",
+                status_code=409,
+                record_failure=False,
+            )
+
+        normalized = normalize_question_payload(
+            request.question.model_dump(by_alias=True),
+            subject=question.subject or "PMP",
+        )
+        content_hash = canonical_question_hash(normalized)
+        before_hash = question.content_hash
+        before_revision = question.revision
+        question.revision += 1
+        _assign_question_fields(
+            question,
+            normalized,
+            content_hash=content_hash,
+            creator_id=None,
+            creator_name=None,
+            actor_username=actor_context.username,
+            actor_role=actor_context.role,
+            is_new=False,
+        )
+        batch_id = uid("qsave_")
+        _add_question_audit(
+            db,
+            action="question_updated",
+            actor=actor_context,
+            creator_id=None,
+            creator_name=None,
+            bank_id=question.bank_id,
+            question_id=question.id,
+            batch_id=batch_id,
+            before_hash=before_hash,
+            after_hash=content_hash,
+            before_revision=before_revision,
+            after_revision=question.revision,
+        )
+        bank = (
+            await db.execute(
+                select(QuestionBank)
+                .where(QuestionBank.id == question.bank_id)
+                .with_for_update()
+            )
+        ).scalar_one()
+        bank.revision += 1
+        bank.updated_by = actor_context.username
+        await db.delete(lock)
+        await db.flush()
+        await db.refresh(question)
+        await db.refresh(bank)
+        return {
+            "batchId": batch_id,
+            "bankId": bank.id,
+            "bankRevision": bank.revision,
+            "question": question_catalog_service.question_to_payload(question),
+        }
 
 
 async def record_failed_batch(
