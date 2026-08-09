@@ -150,29 +150,29 @@ git commit -m "fix: resolve duplicate bank migration identities"
 - Consumes: `backend/scripts/migrate_runtime_questions.py`
 - Produces: 零冲突真实迁移报告、可恢复 PostgreSQL 备份和已补齐的题目 content hash
 
-- [ ] **Step 1: 执行新的真实 dry-run**
+- [x] **Step 1: 执行新的真实 dry-run**
 
 Run: `cd backend && .venv/bin/python scripts/migrate_runtime_questions.py --report /tmp/content-prep-migration-before.json`
 
 Expected: `conflicts == []`、`invalidRecords == []`；报告包含五组 `admin / 佩奇007 / 老师` 的稳定映射，PMP 映射为 `bank-pmp-demo`、`bank-pmp-demo-2`、`bank-pmp-demo-3`。
 
-- [ ] **Step 2: 保存完整数据库备份**
+- [x] **Step 2: 保存完整数据库备份**
 
 Run: `pg_dump -h /tmp -d kg_graph_dev -Fc -f /tmp/kg_graph_dev-before-content-prep.dump`
 
 随后运行 `pg_restore -l /tmp/kg_graph_dev-before-content-prep.dump >/dev/null`，Expected: 退出码 0。备份包含 Runtime State 原始快照，不另行改写源键。
 
-- [ ] **Step 3: 执行 apply**
+- [x] **Step 3: 执行 apply**
 
 Run: `cd backend && .venv/bin/python scripts/migrate_runtime_questions.py --apply --report /tmp/content-prep-migration-after.json`
 
 Expected: `applied == true`、`conflicts == []`、`invalidRecords == []`。
 
-- [ ] **Step 4: 重复 dry-run 验证幂等和数据完整性**
+- [x] **Step 4: 重复 dry-run 验证幂等和数据完整性**
 
 再次 dry-run，核对 `bankMappings` 不变、正式题库与题目数量不增长、全部正式题目 `content_hash` 非空。用 SQL 抽查三个 PMP 题库 owner、名称、题目数分别为 `admin/2`、`佩奇007/27`、`老师/19`。
 
-- [ ] **Step 5: 标记主计划迁移步骤完成**
+- [x] **Step 5: 标记主计划迁移步骤完成**
 
 在主计划 Task 18 Step 5 记录备份路径、报告路径、映射数量和验证结果，并把复选框改为完成。若任何预期不满足，停止，不设置 cutover、不发布。
 

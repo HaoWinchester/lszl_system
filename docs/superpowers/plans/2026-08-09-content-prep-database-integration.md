@@ -974,7 +974,7 @@ node new-legacy/content-prep-studio/tests/test_edit_lock_client.js
 
 Expected: 全部 PASS。
 
-- [ ] **Step 5: 对真实数据先 dry-run 再 apply**
+- [x] **Step 5: 对真实数据先 dry-run 再 apply**
 
 Run:
 
@@ -985,13 +985,15 @@ cd backend
 
 Expected: `conflicts == []`、`invalidRecords == []`。只有报告无冲突并已保存数据库备份/Runtime State 快照后，运行：
 
-2026-08-09 实际 dry-run 已确认 `invalidRecords == []`，但发现 10 个 `BANK_OWNER_CONFLICT`：多个 owner 使用相同内置题库 ID 且内容不同。依照本步骤的 fail-closed 规则，尚未执行 apply、未开启全局 cutover、未切换 active release，等待明确冲突处置策略。
+2026-08-09 已按用户确认的序号规则解决 10 个 `BANK_OWNER_CONFLICT`：5 个内置题库各生成 `admin / 佩奇007 / 老师` 三条稳定映射，共 15 条。迁移前报告为 `/tmp/content-prep-migration-before.json`；完整 PostgreSQL 备份为 `/tmp/kg_graph_dev-before-content-prep.dump`（831 KB），`pg_restore -l` 校验通过。
 
 ```bash
 .venv/bin/python scripts/migrate_runtime_questions.py --apply --report /tmp/content-prep-migration-after.json
 ```
 
-再次 dry-run，期望 `pendingWrites == 0`、所有正式 questions 的 `contentHash` 非空。随后在目标部署配置中设置 `QUESTION_CATALOG_CUTOVER_ENABLED=true`，重新运行 Runtime State 拒写测试和教师/学习 E2E；出现冲突时停止，不猜测覆盖哪一版，也不启用 cutover。
+apply 报告 `/tmp/content-prep-migration-after.json` 为 `applied == true`、零冲突、零无效记录。重复验证报告 `/tmp/content-prep-migration-verify.json` 为 237 个题库、285 道题、15 条映射、`nullContentHashes == 0`；数据库内 285 道题的存储 hash 与重新计算 hash 全部一致。PMP 三库为 `admin/2`、`佩奇007/27`、`老师/19`，名称和 ID 分别保留原值、增加 `（2）/-2`、增加 `（3）/-3`。Runtime State 原数据未回写或删除。
+
+随后在目标部署配置中设置 `QUESTION_CATALOG_CUTOVER_ENABLED=true`，重新运行 Runtime State 拒写测试和教师/学习 E2E；出现冲突时停止，不猜测覆盖哪一版，也不启用 cutover。
 
 - [ ] **Step 6: 构建候选 release 并核对文件数**
 

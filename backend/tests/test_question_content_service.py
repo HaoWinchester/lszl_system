@@ -203,6 +203,16 @@ def test_hash_changes_when_any_meaningful_content_changes() -> None:
     assert canonical_question_hash(original) != canonical_question_hash(changed)
 
 
+def test_hash_treats_blank_optional_text_as_database_null() -> None:
+    browser_payload = complete_question()
+    database_payload = complete_question()
+    for field in ("difficulty", "domain", "topic", "stage", "teacherNumber"):
+        browser_payload[field] = ""
+        database_payload[field] = None
+
+    assert canonical_question_hash(browser_payload) == canonical_question_hash(database_payload)
+
+
 def test_batch_schema_accepts_frontend_aliases_and_rejects_actor_spoofing() -> None:
     raw = {
         "idempotencyKey": "upload-001",

@@ -71,6 +71,12 @@ def normalize_scope(payload: dict[str, Any]) -> Literal["public", "internal"]:
     return "internal"
 
 
+def _optional_text(value: Any) -> Any:
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    return deepcopy(value)
+
+
 def normalize_question_payload(payload: dict[str, Any], *, subject: str) -> dict[str, Any]:
     """Normalize known fields without discarding Content Prep extension data."""
 
@@ -79,6 +85,8 @@ def normalize_question_payload(payload: dict[str, Any], *, subject: str) -> dict
     normalized["title"] = str(payload.get("title") or "").strip()
     normalized["type"] = str(payload.get("type") or "single_choice").strip()
     normalized["subject"] = str(payload.get("subject") or subject).strip()
+    for field in ("difficulty", "domain", "topic", "stage"):
+        normalized[field] = _optional_text(payload.get(field))
     normalized["tags"] = deepcopy(payload.get("tags") or [])
     normalized["stemParts"] = deepcopy(payload.get("stemParts") or [])
     normalized["options"] = deepcopy(payload.get("options") or [])
@@ -103,7 +111,7 @@ def normalize_question_payload(payload: dict[str, Any], *, subject: str) -> dict
     normalized["metadata"] = deepcopy(payload.get("metadata") or {})
     normalized["status"] = deepcopy(payload.get("status") or {})
     normalized["lifecycle"] = deepcopy(payload.get("lifecycle") or {"status": "active"})
-    normalized["teacherNumber"] = payload.get("teacherNumber")
+    normalized["teacherNumber"] = _optional_text(payload.get("teacherNumber"))
     normalized["explanation"] = deepcopy(payload.get("explanation"))
     normalized["scope"] = normalize_scope(payload)
     return normalized
