@@ -39,6 +39,22 @@ def _plan_amount_fen(plan_id: str) -> int:
     return PLAN_AMOUNT_FEN.get(plan_id, 0)
 
 
+def entitlements_for(role: str, subscription: Subscription | None) -> dict[str, bool]:
+    """Return server-authoritative subscription capabilities for one account."""
+    normalized_role = str(role or "viewer").lower()
+    if normalized_role in {"admin", "teacher"}:
+        return {"allExamPapers": True}
+    if normalized_role != "student" or subscription is None:
+        return {"allExamPapers": False}
+    if str(subscription.status or "").lower() != "active":
+        return {"allExamPapers": False}
+    if str(subscription.plan_id or "free").lower() == "free":
+        return {"allExamPapers": False}
+    if subscription.expires_at is not None and subscription.expires_at <= now_utc():
+        return {"allExamPapers": False}
+    return {"allExamPapers": True}
+
+
 def payment_amount_matches(expected_amount_fen: int | None, received_amount_fen: object) -> bool:
     """微信回调金额必须是整数分，且与本地订单金额完全一致。"""
     return (
