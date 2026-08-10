@@ -2,8 +2,14 @@
 const fs=require('fs'),path=require('path'),assert=require('assert/strict');
 const root=path.resolve(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
+const modePolicyPath=path.join(root,'src/59c-active-learning-mode-policy.js');
+delete require.cache[require.resolve(modePolicyPath)];
+const modes=require(modePolicyPath);
 
-assert.equal(read('VERSION').trim(),'v9.0-p4.1.1');
+assert.deepEqual(modes.listActive().map(item=>item.id),['practice_mode','deep_recall','multi_question_canvas']);
+assert.deepEqual(modes.resolveHistorical('single-deep'),{
+  id:'single_deep_study',label:'单题深学（已停用）',retired:true,fallbackId:'practice_mode'
+});
 const training=read('question-training.html');
 const workspace=read('question-workspace.html');
 const recall=read('knowledge-recall.html');
