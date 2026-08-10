@@ -98,6 +98,8 @@ def _access_mode(user: User, bank: QuestionBank, collaborator_permission: str | 
         return "admin"
     if bank.owner_id == user.username:
         return "owner"
+    if user.role == "teacher":
+        return "teacher"
     return collaborator_permission or "none"
 
 
@@ -122,7 +124,7 @@ async def list_catalog_banks(
             & (QuestionBankCollaborator.username == user.username),
         )
     )
-    if user.role != "admin":
+    if user.role not in question_access_service.TEACHING_MANAGER_ROLES:
         allowed_permissions = ["edit"] if mode == "writable" else ["view", "edit"]
         query = query.where(
             or_(

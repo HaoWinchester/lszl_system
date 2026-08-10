@@ -9,6 +9,9 @@ from app.models.question import QuestionBank
 from app.models.user import User
 
 
+TEACHING_MANAGER_ROLES = frozenset({"admin", "teacher"})
+
+
 async def _collaborator_permission(
     db: AsyncSession,
     username: str,
@@ -24,13 +27,13 @@ async def _collaborator_permission(
 
 
 async def can_view_bank(db: AsyncSession, user: User, bank: QuestionBank) -> bool:
-    if user.role == "admin" or bank.owner_id == user.username:
+    if user.role in TEACHING_MANAGER_ROLES or bank.owner_id == user.username:
         return True
     return await _collaborator_permission(db, user.username, bank.id) in {"view", "edit"}
 
 
 async def can_edit_bank(db: AsyncSession, user: User, bank: QuestionBank) -> bool:
-    if user.role == "admin" or bank.owner_id == user.username:
+    if user.role in TEACHING_MANAGER_ROLES or bank.owner_id == user.username:
         return True
     return await _collaborator_permission(db, user.username, bank.id) == "edit"
 

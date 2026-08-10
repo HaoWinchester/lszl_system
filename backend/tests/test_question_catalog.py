@@ -2,12 +2,12 @@ import asyncio
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
 from app.main import app
-from app.models.content_prep import QuestionBankCollaborator
+from app.models.content_prep import QuestionAuditLog, QuestionBankCollaborator
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.user import User
 from app.services.question_catalog_service import question_to_payload
@@ -41,6 +41,454 @@ def test_catalog_serializer_normalizes_legacy_string_collections() -> None:
     assert payload["clues"] == [{"text": "旧格式线索"}]
     assert payload["concepts"] == [{"title": "可持续步调"}]
     assert payload["reasoningSteps"] == [{"content": "先判断原则"}]
+
+
+def test_teacher_can_manage_another_teachers_bank() -> None:
+    """Catch a regression that restores owner-only filtering for teaching managers."""
+
+    suffix = uuid4().hex[:10]
+    owner_name = f"catalog-shared-owner-{suffix}"
+    peer_name = f"catalog-shared-peer-{suffix}"
+    student_name = f"catalog-shared-student-{suffix}"
+    bank_id = f"catalog-shared-bank-{suffix}"
+    question_id = f"catalog-shared-question-{suffix}"
+
+    async def seed() -> None:
+        password_hash = hash_password(PASSWORD)
+        async with AsyncSessionLocal() as db:
+            db.add_all(
+                [
+                    User(
+                        username=owner_name,
+                        password_hash=password_hash,
+                        role="teacher",
+                        status="active",
+                    ),
+                    User(
+                        username=peer_name,
+                        password_hash=password_hash,
+                        role="teacher",
+                        status="active",
+                    ),
+                    User(
+                        username=student_name,
+                        password_hash=password_hash,
+                        role="student",
+                        status="active",
+                    ),
+                ]
+            )
+            await db.flush()
+            db.add(
+                QuestionBank(
+                    id=bank_id,
+                    owner_id=owner_name,
+                    name="跨教师共享题库",
+                    subject="PMP",
+                    visibility="private",
+                )
+            )
+            await db.flush()
+            db.add(
+                Question(
+                    id=question_id,
+                    bank_id=bank_id,
+                    title="共享池原题",
+                    subject="PMP",
+                    scope="internal",
+                )
+            )
+            await db.commit()
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(Question).where(Question.bank_id == bank_id))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.execute(
+                delete(User).where(
+                    User.username.in_([owner_name, peer_name, student_name])
+                )
+            )
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as client:
+            _login(client, peer_name)
+            managed = client.get("/api/v1/question-catalog/banks?mode=managed")
+            writable = client.get("/api/v1/question-catalog/banks?mode=writable")
+
+            assert managed.status_code == 200
+            assert writable.status_code == 200
+            managed_bank = next(
+                bank for bank in managed.json()["banks"] if bank["id"] == bank_id
+            )
+            writable_bank = next(
+                bank for bank in writable.json()["banks"] if bank["id"] == bank_id
+            )
+            assert managed_bank["accessMode"] == "teacher"
+            assert writable_bank["accessMode"] == "teacher"
+
+            page = client.get(
+                f"/api/v1/question-catalog/banks/{bank_id}/questions",
+                params={"page": 1, "page_size": 20},
+            )
+            assert page.status_code == 200
+            assert [row["id"] for row in page.json()["questions"]] == [question_id]
+
+            created = client.post(
+                f"/api/v1/banks/{bank_id}/questions",
+                json={"title": "由另一位教师创建"},
+            )
+            assert created.status_code == 200
+            assert created.json()["question"]["createdBy"] == peer_name
+
+            client.post("/api/v1/auth/logout")
+            _login(client, student_name)
+            assert (
+                client.get("/api/v1/question-catalog/banks?mode=managed").status_code
+                == 403
+            )
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_teacher_can_update_and_delete_another_teachers_bank_content() -> None:
+    """Catch regressions where shared listing works but cross-teacher writes do not."""
+
+    suffix = uuid4().hex[:10]
+    owner_name = f"catalog-write-owner-{suffix}"
+    peer_name = f"catalog-write-peer-{suffix}"
+    student_name = f"catalog-write-student-{suffix}"
+    viewer_name = f"catalog-write-viewer-{suffix}"
+    created_bank_ids: set[str] = set()
+    created_question_ids: set[str] = set()
+
+    async def seed_users() -> None:
+        password_hash = hash_password(PASSWORD)
+        async with AsyncSessionLocal() as db:
+            db.add_all(
+                [
+                    User(
+                        username=owner_name,
+                        password_hash=password_hash,
+                        role="teacher",
+                        status="active",
+                    ),
+                    User(
+                        username=peer_name,
+                        password_hash=password_hash,
+                        role="teacher",
+                        status="active",
+                    ),
+                    User(
+                        username=student_name,
+                        password_hash=password_hash,
+                        role="student",
+                        status="active",
+                    ),
+                    User(
+                        username=viewer_name,
+                        password_hash=password_hash,
+                        role="viewer",
+                        status="active",
+                    ),
+                ]
+            )
+            await db.commit()
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            test_usernames = [owner_name, peer_name, student_name, viewer_name]
+            owned_bank_ids = set(
+                (
+                    await db.execute(
+                        select(QuestionBank.id).where(
+                            QuestionBank.owner_id.in_(test_usernames)
+                        )
+                    )
+                ).scalars()
+            )
+            cleanup_bank_ids = created_bank_ids | owned_bank_ids
+            if cleanup_bank_ids:
+                await db.execute(
+                    delete(QuestionAuditLog).where(
+                        QuestionAuditLog.bank_id.in_(cleanup_bank_ids)
+                    )
+                )
+                await db.execute(
+                    delete(Question).where(Question.bank_id.in_(cleanup_bank_ids))
+                )
+                await db.execute(
+                    delete(QuestionBank).where(QuestionBank.id.in_(cleanup_bank_ids))
+                )
+            if created_question_ids:
+                await db.execute(
+                    delete(QuestionAuditLog).where(
+                        QuestionAuditLog.question_id.in_(created_question_ids)
+                    )
+                )
+            await db.execute(
+                delete(User).where(
+                    User.username.in_(test_usernames)
+                )
+            )
+            await db.commit()
+
+    asyncio.run(seed_users())
+    try:
+        with TestClient(app) as client:
+            _login(client, owner_name)
+            mutable_bank = client.post(
+                "/api/v1/banks",
+                json={"name": "待协作编辑题库", "subject": "PMP"},
+            )
+            assert mutable_bank.status_code == 200
+            mutable_bank_id = mutable_bank.json()["bank"]["id"]
+            created_bank_ids.add(mutable_bank_id)
+
+            removable_bank = client.post(
+                "/api/v1/banks",
+                json={"name": "待协作删除题库", "subject": "PMP"},
+            )
+            assert removable_bank.status_code == 200
+            removable_bank_id = removable_bank.json()["bank"]["id"]
+            created_bank_ids.add(removable_bank_id)
+
+            mutable_question = client.post(
+                f"/api/v1/banks/{mutable_bank_id}/questions",
+                json={"title": "待协作编辑题目"},
+            )
+            assert mutable_question.status_code == 200
+            mutable_question_id = mutable_question.json()["question"]["id"]
+            created_question_ids.add(mutable_question_id)
+
+            removable_question = client.post(
+                f"/api/v1/banks/{mutable_bank_id}/questions",
+                json={"title": "待协作删除题目"},
+            )
+            assert removable_question.status_code == 200
+            removable_question_id = removable_question.json()["question"]["id"]
+            created_question_ids.add(removable_question_id)
+
+            client.post("/api/v1/auth/logout")
+            _login(client, peer_name)
+            updated_bank = client.put(
+                f"/api/v1/banks/{mutable_bank_id}",
+                json={"name": "由另一位教师更新"},
+            )
+            assert updated_bank.status_code == 200
+            updated_bank_payload = updated_bank.json()["bank"]
+            assert {
+                "name": updated_bank_payload["name"],
+                "ownerId": updated_bank_payload["ownerId"],
+                "createdBy": updated_bank_payload["createdBy"],
+                "updatedBy": updated_bank_payload["updatedBy"],
+            } == {
+                "name": "由另一位教师更新",
+                "ownerId": owner_name,
+                "createdBy": owner_name,
+                "updatedBy": peer_name,
+            }
+
+            updated_question = client.put(
+                f"/api/v1/questions/{mutable_question_id}",
+                json={"title": "由另一位教师更新的题目"},
+            )
+            assert updated_question.status_code == 200
+            updated_question_payload = updated_question.json()["question"]
+            assert {
+                "title": updated_question_payload["title"],
+                "createdBy": updated_question_payload["createdBy"],
+                "updatedBy": updated_question_payload["updatedBy"],
+            } == {
+                "title": "由另一位教师更新的题目",
+                "createdBy": owner_name,
+                "updatedBy": peer_name,
+            }
+
+            deleted_question = client.delete(
+                f"/api/v1/questions/{removable_question_id}"
+            )
+            assert deleted_question.status_code == 200
+            assert client.get(
+                f"/api/v1/questions/{removable_question_id}"
+            ).status_code == 404
+
+            deleted_bank = client.delete(f"/api/v1/banks/{removable_bank_id}")
+            assert deleted_bank.status_code == 200
+            managed_ids = {
+                bank["id"]
+                for bank in client.get(
+                    "/api/v1/question-catalog/banks?mode=managed"
+                ).json()["banks"]
+            }
+            assert removable_bank_id not in managed_ids
+            assert mutable_bank_id in managed_ids
+
+            for restricted_username in (student_name, viewer_name):
+                client.post("/api/v1/auth/logout")
+                _login(client, restricted_username)
+                assert client.post(
+                    "/api/v1/banks",
+                    json={"name": "禁止创建", "subject": "PMP"},
+                ).status_code == 403
+                assert client.put(
+                    f"/api/v1/banks/{mutable_bank_id}",
+                    json={"name": "禁止更新"},
+                ).status_code == 403
+                assert client.delete(
+                    f"/api/v1/questions/{mutable_question_id}"
+                ).status_code == 403
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_admin_can_update_and_delete_teacher_owned_bank_content() -> None:
+    """Catch regressions that leave admin access read-only across teacher ownership."""
+
+    suffix = uuid4().hex[:10]
+    owner_name = f"catalog-admin-owner-{suffix}"
+    created_bank_ids: set[str] = set()
+    created_question_ids: set[str] = set()
+
+    async def seed_owner() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                User(
+                    username=owner_name,
+                    password_hash=hash_password(PASSWORD),
+                    role="teacher",
+                    status="active",
+                )
+            )
+            await db.commit()
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            owned_bank_ids = set(
+                (
+                    await db.execute(
+                        select(QuestionBank.id).where(
+                            QuestionBank.owner_id == owner_name
+                        )
+                    )
+                ).scalars()
+            )
+            cleanup_bank_ids = created_bank_ids | owned_bank_ids
+            if cleanup_bank_ids:
+                await db.execute(
+                    delete(QuestionAuditLog).where(
+                        QuestionAuditLog.bank_id.in_(cleanup_bank_ids)
+                    )
+                )
+                await db.execute(
+                    delete(Question).where(Question.bank_id.in_(cleanup_bank_ids))
+                )
+                await db.execute(
+                    delete(QuestionBank).where(QuestionBank.id.in_(cleanup_bank_ids))
+                )
+            if created_question_ids:
+                await db.execute(
+                    delete(QuestionAuditLog).where(
+                        QuestionAuditLog.question_id.in_(created_question_ids)
+                    )
+                )
+            await db.execute(delete(User).where(User.username == owner_name))
+            await db.commit()
+
+    asyncio.run(seed_owner())
+    try:
+        with TestClient(app) as client:
+            _login(client, owner_name)
+            mutable_bank = client.post(
+                "/api/v1/banks",
+                json={"name": "管理员待编辑题库", "subject": "PMP"},
+            )
+            assert mutable_bank.status_code == 200
+            mutable_bank_id = mutable_bank.json()["bank"]["id"]
+            created_bank_ids.add(mutable_bank_id)
+
+            removable_bank = client.post(
+                "/api/v1/banks",
+                json={"name": "管理员待删除题库", "subject": "PMP"},
+            )
+            assert removable_bank.status_code == 200
+            removable_bank_id = removable_bank.json()["bank"]["id"]
+            created_bank_ids.add(removable_bank_id)
+
+            mutable_question = client.post(
+                f"/api/v1/banks/{mutable_bank_id}/questions",
+                json={"title": "管理员待编辑题目"},
+            )
+            assert mutable_question.status_code == 200
+            mutable_question_id = mutable_question.json()["question"]["id"]
+            created_question_ids.add(mutable_question_id)
+
+            removable_question = client.post(
+                f"/api/v1/banks/{mutable_bank_id}/questions",
+                json={"title": "管理员待删除题目"},
+            )
+            assert removable_question.status_code == 200
+            removable_question_id = removable_question.json()["question"]["id"]
+            created_question_ids.add(removable_question_id)
+
+            client.post("/api/v1/auth/logout")
+            _login(client, "admin", "admin123")
+            updated_bank = client.put(
+                f"/api/v1/banks/{mutable_bank_id}",
+                json={"name": "由管理员更新"},
+            )
+            assert updated_bank.status_code == 200
+            updated_bank_payload = updated_bank.json()["bank"]
+            assert {
+                "name": updated_bank_payload["name"],
+                "ownerId": updated_bank_payload["ownerId"],
+                "createdBy": updated_bank_payload["createdBy"],
+                "updatedBy": updated_bank_payload["updatedBy"],
+            } == {
+                "name": "由管理员更新",
+                "ownerId": owner_name,
+                "createdBy": owner_name,
+                "updatedBy": "admin",
+            }
+
+            updated_question = client.put(
+                f"/api/v1/questions/{mutable_question_id}",
+                json={"title": "由管理员更新的题目"},
+            )
+            assert updated_question.status_code == 200
+            updated_question_payload = updated_question.json()["question"]
+            assert {
+                "title": updated_question_payload["title"],
+                "createdBy": updated_question_payload["createdBy"],
+                "updatedBy": updated_question_payload["updatedBy"],
+            } == {
+                "title": "由管理员更新的题目",
+                "createdBy": owner_name,
+                "updatedBy": "admin",
+            }
+
+            assert client.delete(
+                f"/api/v1/questions/{removable_question_id}"
+            ).status_code == 200
+            assert client.get(
+                f"/api/v1/questions/{removable_question_id}"
+            ).status_code == 404
+
+            assert client.delete(
+                f"/api/v1/banks/{removable_bank_id}"
+            ).status_code == 200
+            writable_ids = {
+                bank["id"]
+                for bank in client.get(
+                    "/api/v1/question-catalog/banks?mode=writable"
+                ).json()["banks"]
+            }
+            assert removable_bank_id not in writable_ids
+            assert mutable_bank_id in writable_ids
+    finally:
+        asyncio.run(cleanup())
 
 
 def test_catalog_access_pagination_round_trip_and_learning_visibility() -> None:
@@ -306,7 +754,7 @@ def test_catalog_access_pagination_round_trip_and_learning_visibility() -> None:
                 ).json()["banks"]
             }
             assert bank_ids["private"] in managed_ids
-            assert bank_ids["private"] not in writable_ids
+            assert bank_ids["private"] in writable_ids
             assert client.get(
                 f"/api/v1/question-catalog/questions/{question_ids['complete']}"
             ).status_code == 200
