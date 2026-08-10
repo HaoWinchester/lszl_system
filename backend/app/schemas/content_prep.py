@@ -62,6 +62,7 @@ class ContentPrepBatchResult(BaseModel):
     batch_id: str = Field(alias="batchId", min_length=1, max_length=64)
     bank_id: str = Field(alias="bankId", min_length=1, max_length=64)
     bank_revision: int | None = Field(default=None, alias="bankRevision", ge=1)
+    content_revision: int = Field(default=0, alias="contentRevision", ge=0)
     replayed: bool = False
     questions: list[ContentPrepQuestionResult]
 

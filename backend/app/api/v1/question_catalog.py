@@ -16,12 +16,18 @@ from app.schemas.question_catalog import (
     CatalogBootstrapResponse,
     CatalogQuestionListResponse,
     CatalogQuestionResponse,
+    TeachingContentRevisionResponse,
 )
-from app.services import question_catalog_service
+from app.services import question_catalog_service, teaching_content_revision_service
 
 router = APIRouter(prefix="/question-catalog", tags=["question-catalog"])
 DB = Annotated[AsyncSession, Depends(get_db)]
 CatalogManager = Annotated[User, Depends(require_permissions("accessQuestionBank"))]
+
+
+@router.get("/revision", response_model=TeachingContentRevisionResponse)
+async def teaching_content_revision(db: DB, user: CatalogManager):
+    return await teaching_content_revision_service.current(db)
 
 
 @router.get("/banks", response_model=CatalogBankListResponse)
@@ -148,8 +154,10 @@ async def bootstrap(
             page=1,
             page_size=200,
         )
+    content_revision = await teaching_content_revision_service.current(db)
     return {
         "banks": banks,
         "questions": questions,
         "catalogRevision": question_catalog_service.catalog_revision(banks, questions),
+        "contentRevision": content_revision["revision"],
     }

@@ -84,9 +84,27 @@ class CatalogQuestionResponse(BaseModel):
     question: CatalogQuestionPayload
 
 
+class TeachingContentChangePayload(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    entity_type: str = Field(alias="entityType", min_length=1)
+    entity_id: str = Field(alias="entityId", min_length=1)
+    action: str = Field(min_length=1)
+
+
+class TeachingContentRevisionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    revision: int = Field(ge=0)
+    changes: list[TeachingContentChangePayload] = Field(max_length=100)
+    updated_at: str | None = Field(alias="updatedAt")
+    updated_by: str | None = Field(alias="updatedBy")
+
+
 class CatalogBootstrapResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     banks: list[CatalogBankPayload]
     questions: list[CatalogQuestionPayload]
     catalog_revision: str = Field(alias="catalogRevision", min_length=64, max_length=64)
+    content_revision: int = Field(alias="contentRevision", ge=0)

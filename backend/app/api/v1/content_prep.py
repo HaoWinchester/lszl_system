@@ -17,7 +17,11 @@ from app.schemas.content_prep import (
     ContentPrepQuestionSaveRequest,
     LockGrant,
 )
-from app.services import content_prep_service, question_lock_service
+from app.services import (
+    content_prep_service,
+    question_lock_service,
+    teaching_content_revision_service,
+)
 
 router = APIRouter(prefix="/content-prep", tags=["content-prep"])
 DB = Annotated[AsyncSession, Depends(get_db)]
@@ -148,11 +152,16 @@ async def save_question(
         )
     if request.creator_id is None and question.creator_id is None:
         try:
-            return await content_prep_service.save_legacy_question_without_creator(
+            result = await content_prep_service.save_legacy_question_without_creator(
                 db,
                 actor,
                 request,
             )
+            content_revision = await teaching_content_revision_service.current(db)
+            return {
+                **result,
+                "contentRevision": content_revision["revision"],
+            }
         except content_prep_service.ContentPrepOperationError as error:
             _raise_upload_error(error)
     creator_id = request.creator_id or question.creator_id
@@ -183,9 +192,11 @@ async def save_question(
         )
     except content_prep_service.ContentPrepOperationError as error:
         _raise_upload_error(error)
+    content_revision = await teaching_content_revision_service.current(db)
     return {
         "batchId": result.batch_id,
         "bankId": result.bank_id,
         "bankRevision": result.bank_revision,
+        "contentRevision": content_revision["revision"],
         "question": result.questions[0].model_dump(by_alias=True),
     }
