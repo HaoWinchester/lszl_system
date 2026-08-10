@@ -1,11 +1,11 @@
-"""题库管理路由：题库 / 题目 / 试卷（组卷 + 发布）。按当前用户 owner 隔离。"""
+"""题库管理路由：题库 / 题目 / 试卷（组卷 + 发布）。"""
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import CurrentUser, require_permissions
+from app.core.auth import require_permissions
 from app.db.session import get_db
 from app.models.user import User
 from app.services import question_service
@@ -23,6 +23,14 @@ QuestionBankManager = Annotated[
 QuestionEditor = Annotated[
     User,
     Depends(require_permissions("accessQuestionBank", "editQuestions")),
+]
+PaperManager = Annotated[
+    User,
+    Depends(require_permissions("managePapers")),
+]
+PaperPublisher = Annotated[
+    User,
+    Depends(require_permissions("managePapers", "publishPapers")),
 ]
 
 
@@ -108,43 +116,61 @@ async def delete_question(question_id: str, db: DB, user: QuestionEditor):
 
 # ---------- 试卷 ----------
 @router.get("/papers")
-async def list_papers(db: DB, user: CurrentUser, status: str | None = Query(None)):
-    return {"papers": await question_service.list_papers(db, user.username, status)}
+async def list_papers(db: DB, user: PaperManager, status: str | None = Query(None)):
+    return {"papers": await question_service.list_papers(db, user, status)}
 
 
 @router.post("/papers")
-async def create_paper(body: dict, db: DB, user: CurrentUser):
-    p = await question_service.create_paper(db, user.username, body)
+async def create_paper(body: dict, db: DB, user: PaperManager):
+    p = await question_service.create_paper(db, user, body)
     return {"paper": question_service.paper_to_dict(p)}
 
 
 @router.get("/papers/{paper_id}")
-async def get_paper(paper_id: str, db: DB, user: CurrentUser):
-    p = await question_service.get_paper_with_questions(db, user.username, paper_id)
+async def get_paper(paper_id: str, db: DB, user: PaperManager):
+    p = await question_service.get_paper_with_questions(db, user, paper_id)
     if not p:
         raise _nf()
     return {"paper": p}
 
 
 @router.put("/papers/{paper_id}")
-async def update_paper(paper_id: str, body: dict, db: DB, user: CurrentUser):
-    p = await question_service.update_paper(db, user.username, paper_id, body)
+async def update_paper(paper_id: str, body: dict, db: DB, user: PaperManager):
+    p = await question_service.update_paper(db, user, paper_id, body)
     if not p:
         raise _nf()
     return {"paper": question_service.paper_to_dict(p)}
 
 
 @router.delete("/papers/{paper_id}")
-async def delete_paper(paper_id: str, db: DB, user: CurrentUser):
-    if not await question_service.delete_paper(db, user.username, paper_id):
+async def delete_paper(
+    paper_id: str,
+    db: DB,
+    user: PaperManager,
+    revision: str | None = Query(None),
+    reason: str | None = Query(None),
+):
+    deletion = await question_service.delete_paper(
+        db,
+        user,
+        paper_id,
+        revision,
+        reason,
+    )
+    if not deletion:
         raise _nf()
-    return {"ok": True}
+    return {"ok": True, "deletion": deletion}
 
 
 @router.post("/papers/{paper_id}/compose")
-async def compose_paper(paper_id: str, body: dict, db: DB, user: CurrentUser):
+async def compose_paper(paper_id: str, body: dict, db: DB, user: PaperManager):
     n = await question_service.compose_paper(
-        db, user.username, paper_id, body.get("bankIds") or [], body.get("quotas") or {}
+        db,
+        user,
+        paper_id,
+        body.get("bankIds") or [],
+        body.get("quotas") or {},
+        body.get("revision"),
     )
     if n < 0:
         raise _nf()
@@ -152,16 +178,26 @@ async def compose_paper(paper_id: str, body: dict, db: DB, user: CurrentUser):
 
 
 @router.post("/papers/{paper_id}/publish")
-async def publish_paper(paper_id: str, db: DB, user: CurrentUser):
-    p = await question_service.set_published(db, user.username, paper_id, True)
+async def publish_paper(
+    paper_id: str,
+    db: DB,
+    user: PaperPublisher,
+    revision: str | None = Query(None),
+):
+    p = await question_service.set_published(db, user, paper_id, True, revision)
     if not p:
         raise _nf()
     return {"paper": question_service.paper_to_dict(p)}
 
 
 @router.post("/papers/{paper_id}/unpublish")
-async def unpublish_paper(paper_id: str, db: DB, user: CurrentUser):
-    p = await question_service.set_published(db, user.username, paper_id, False)
+async def unpublish_paper(
+    paper_id: str,
+    db: DB,
+    user: PaperPublisher,
+    revision: str | None = Query(None),
+):
+    p = await question_service.set_published(db, user, paper_id, False, revision)
     if not p:
         raise _nf()
     return {"paper": question_service.paper_to_dict(p)}

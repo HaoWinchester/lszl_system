@@ -86,6 +86,31 @@ class ExamPaper(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     owner_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.username"), nullable=False, index=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_by: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("users.username", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    updated_by: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("users.username", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    deleted_by: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("users.username", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
+    deletion_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     subject: Mapped[str] = mapped_column(String(32), default="PMP")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

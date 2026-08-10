@@ -94,7 +94,18 @@ def test_question_bank_and_paper():
     assert question["revision"] == 1
     assert len(question["contentHash"]) == 64
     assert len(client.get(f"/api/v1/banks/{b}/questions").json()["questions"]) == 1
-    p = client.post("/api/v1/papers", json={"name": "pytest卷"}).json()["paper"]["id"]
-    comp = client.post(f"/api/v1/papers/{p}/compose", json={"bankIds": [b], "quotas": {"范围": 1}})
+    paper = client.post("/api/v1/papers", json={"name": "pytest卷"}).json()["paper"]
+    p = paper["id"]
+    comp = client.post(
+        f"/api/v1/papers/{p}/compose",
+        json={
+            "bankIds": [b],
+            "quotas": {"范围": 1},
+            "revision": paper["revision"],
+        },
+    )
     assert comp.json()["picked"] == 1
-    assert client.post(f"/api/v1/papers/{p}/publish").json()["paper"]["status"] == "published"
+    composed_paper = client.get(f"/api/v1/papers/{p}").json()["paper"]
+    assert client.post(
+        f"/api/v1/papers/{p}/publish?revision={composed_paper['revision']}"
+    ).json()["paper"]["status"] == "published"
