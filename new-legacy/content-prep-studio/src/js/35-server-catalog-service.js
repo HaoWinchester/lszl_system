@@ -75,6 +75,11 @@
   function emit(type,detail){
     try{global.dispatchEvent(new CustomEvent(type,{detail}))}catch(_error){}
   }
+  function publishContentRevision(payload,detail={}){
+    const revision=Number(payload?.contentRevision);
+    if(!Number.isSafeInteger(revision)||revision<0)return false;
+    return global.KGTeachingContentSync?.publish?.({revision,source:'content-prep',...detail})||false;
+  }
   function migrateWorkspaceMetadata(input){
     const workspace=cloneJson(input),server=workspace.server&&typeof workspace.server==='object'?workspace.server:{};
     workspace.server={
@@ -108,6 +113,7 @@
       question.lastSyncedAt=syncedAt;
     }
     emit('prep:sync-committed',{result});
+    publishContentRevision(result,{entityType:'content-prep-batch',entityId:String(result.batchId||'')});
     return true;
   }
 
@@ -213,7 +219,12 @@
       const query=new URLSearchParams({mode:'writable'});if(subject)query.set('subject',subject);
       return (await request(`/question-catalog/banks?${query}`)).banks||[];
     },
-    async createBank(input){return (await request('/content-prep/banks',{method:'POST',body:JSON.stringify(input)})).bank},
+    async loadCatalog(){return request('/question-catalog/bootstrap?mode=managed')},
+    async createBank(input){
+      const result=await request('/content-prep/banks',{method:'POST',body:JSON.stringify(input)});
+      publishContentRevision(result,{entityType:'bank',entityId:String(result?.bank?.id||'')});
+      return result.bank;
+    },
     async loadQuestion(questionId){return (await request(`/question-catalog/questions/${encodeURIComponent(questionId)}`)).question},
     async getBatch(batchId){return (await request(`/content-prep/batches/${encodeURIComponent(batchId)}`)).batch},
     syncMetadata,
@@ -241,11 +252,7 @@
         tagConfig:cloneJson(bundle?.tagConfig||{})
         };
         const posted=await request('/content-prep/batches',{method:'POST',body:JSON.stringify(payload)});
-        const batch=await ServerCatalogService.getBatch(posted.batchId);
-        const result={...posted,status:String(batch?.status||''),batch};
-        if(result.status!=='committed'){
-          throw new ServerCatalogError('UPLOAD_NOT_COMMITTED','服务器尚未确认提交，本地草稿已保留。',{detail:batch});
-        }
+        const result={...posted,status:'committed',batch:null};
         syncMetadata(workspace,questions||sourceQuestions,result);
         return result;
       });

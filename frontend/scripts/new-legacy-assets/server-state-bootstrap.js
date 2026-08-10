@@ -5,6 +5,9 @@
   const page = entry.page || global.location.pathname.split('/').pop() || 'learning-path.html'
   const namespace = entry.namespace || 'page'
   let revision = Number(entry.revision || 0)
+  let contentRevision = Number.isSafeInteger(Number(entry.contentRevision))
+    ? Number(entry.contentRevision)
+    : 0
 
   try {
     const authUser = entry.authUser
@@ -34,6 +37,11 @@
   let inFlight = false
   let dirty = false
   let flushPromise = null
+  let remoteReloadTarget = 0
+  let remoteReloadPromise = null
+  let remoteRetryTimer = 0
+  let remoteRetryDelay = 250
+  let remoteRetryStopped = false
   const pendingMutations = new Map()
   let lastMutation = { operation: 'bootstrap', key: '', value: null }
 
@@ -65,6 +73,7 @@
       mutations,
       requestId: requestId(),
       revision,
+      contentRevision,
     }
   }
 
@@ -99,25 +108,72 @@
     })
     if (!latest.ok) throw new Error(`重新加载保存版本失败 (${latest.status})`)
     const serverState = await latest.json()
-    revision = Number(serverState.revision || 0)
+    const nextRevision = Number(serverState.revision || 0)
+    const nextContentRevision = Number(serverState.contentRevision)
+    if (nextRevision < revision
+      || (Number.isSafeInteger(nextContentRevision) && nextContentRevision < contentRevision)) {
+      return null
+    }
+    revision = nextRevision
+    contentRevision = Number.isSafeInteger(nextContentRevision)
+      ? nextContentRevision
+      : contentRevision
     return new Map(
       Object.entries(serverState.storage || {}).map(([key, value]) => [String(key), String(value)]),
     )
   }
 
-  async function reloadServerState() {
+  function staleSnapshotError() {
+    const error = new Error('服务器状态快照仍在同步，请稍后重试')
+    error.retryable = false
+    return error
+  }
+
+  function teardownError() {
+    const error = new Error('页面已关闭，停止后续保存请求')
+    error.retryable = false
+    return error
+  }
+
+  async function reloadServerState({ announce = false } = {}) {
     const serverValues = await fetchServerSnapshot()
+    if (!serverValues) throw staleSnapshotError()
     values.clear()
     for (const [key, value] of serverValues) values.set(key, value)
     applyPendingMutations()
     dirty = pendingMutations.size > 0
+    if (announce) {
+      try {
+        global.dispatchEvent(new CustomEvent('kg:server-state-reloaded', {
+          detail: { revision, contentRevision },
+        }))
+      } catch (error) {}
+    }
+  }
+
+  function acceptReturnedRevisions(result, { publish = false } = {}) {
+    revision = Number(result.revision ?? revision)
+    const nextContentRevision = Number(result.contentRevision)
+    if (!Number.isSafeInteger(nextContentRevision) || nextContentRevision < 0) return
+    const advanced = nextContentRevision > contentRevision
+    contentRevision = Math.max(contentRevision, nextContentRevision)
+    if (publish && advanced) {
+      global.KGTeachingContentSync?.publish?.({
+        revision: contentRevision,
+        source: 'runtime-state',
+        page,
+        namespace,
+      })
+    }
   }
 
   async function submitIsolatedBatch(batch) {
     let serverValues = await fetchServerSnapshot()
+    if (!serverValues) throw staleSnapshotError()
     const rejected = []
 
-    async function submitPart(part) {
+    async function submitPart(part, conflictAttempt = 0) {
+      if (remoteRetryStopped) throw teardownError()
       const candidate = new Map(serverValues)
       for (const mutation of part.values()) applyMutation(candidate, mutation)
       const response = await fetch('/api/v1/runtime/state', {
@@ -126,9 +182,16 @@
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(payload(part, snapshot(candidate))),
       })
+      if (remoteRetryStopped && !response.ok) throw teardownError()
       if (response.status === 409) {
+        if (conflictAttempt >= 1) {
+          const error = new Error('教学内容持续变化，请确认最新版本后重试')
+          error.retryable = false
+          throw error
+        }
         serverValues = await fetchServerSnapshot()
-        return submitPart(part)
+        if (!serverValues) throw staleSnapshotError()
+        return submitPart(part, conflictAttempt + 1)
       }
       if (response.status === 403 || response.status === 422) {
         if (part.size === 1) {
@@ -147,13 +210,13 @@
         throw error
       }
       const result = await response.json()
-      revision = Number(result.revision ?? revision)
+      acceptReturnedRevisions(result, { publish: true })
       serverValues = candidate
       discardBatch(part)
     }
 
     await submitPart(batch)
-    serverValues = await fetchServerSnapshot()
+    if (!remoteRetryStopped) serverValues = await fetchServerSnapshot() || serverValues
     values.clear()
     for (const [key, value] of serverValues) values.set(key, value)
     applyPendingMutations()
@@ -161,7 +224,7 @@
     return rejected
   }
 
-  async function sendOnce() {
+  async function sendOnce(conflictAttempt = 0) {
     const batch = new Map(pendingMutations)
     const outgoing = payload(batch)
     let retryable = true
@@ -174,7 +237,14 @@
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(outgoing),
       })
+      if (remoteRetryStopped && !response.ok) return 'stopped'
       if (response.status === 409) {
+        retryable = false
+        if (conflictAttempt >= 1) {
+          const error = new Error('教学内容持续变化，请确认最新版本后重试')
+          error.retryable = false
+          throw error
+        }
         await reloadServerState()
         saveEvent('retrying', { page, namespace, revision })
         return 'retry'
@@ -195,34 +265,49 @@
         throw error
       }
       const result = await response.json()
-      revision = Number(result.revision ?? revision)
+      acceptReturnedRevisions(result, { publish: true })
       discardBatch(batch)
       dirty = pendingMutations.size > 0
       saveEvent('saved', { page, namespace, revision })
       return 'saved'
     } catch (error) {
-      retryable = error?.retryable !== false
+      retryable = retryable && error?.retryable !== false
       dirty = pendingMutations.size > 0
       saveEvent('error', { page, namespace, message: error instanceof Error ? error.message : '保存失败' })
       throw error
     } finally {
       inFlight = false
-      if (dirty && retryable) timer = global.setTimeout(() => { flush().catch(() => {}) }, 800)
+      if (dirty && retryable && !remoteRetryStopped) {
+        timer = global.setTimeout(() => { flush().catch(() => {}) }, 800)
+      }
     }
   }
 
   async function flushLoop() {
-    while (dirty) {
-      const result = await sendOnce()
+    let conflictAttempt = 0
+    while (dirty && !remoteRetryStopped) {
+      const result = await sendOnce(conflictAttempt)
+      if (result === 'stopped' || remoteRetryStopped) break
+      if (result === 'retry') {
+        conflictAttempt += 1
+        continue
+      }
+      conflictAttempt = 0
       if (result !== 'retry' && !dirty) break
     }
     return true
   }
 
   function flush() {
-    if (!entry.authenticated || entry.readOnly || !dirty) return Promise.resolve(true)
+    if (remoteRetryStopped || !entry.authenticated || entry.readOnly || !dirty) return Promise.resolve(true)
+    global.clearTimeout(timer)
+    timer = 0
     if (!flushPromise) {
-      flushPromise = flushLoop().finally(() => {
+      const precedingRemoteReload = remoteReloadPromise
+      flushPromise = (async () => {
+        if (precedingRemoteReload) await precedingRemoteReload
+        return flushLoop()
+      })().finally(() => {
         flushPromise = null
       })
     }
@@ -234,7 +319,8 @@
     pendingMutations.delete(lastMutation.key)
     pendingMutations.set(lastMutation.key, lastMutation)
     dirty = true
-    if (!entry.authenticated || entry.readOnly) return
+    if (remoteRetryStopped || !entry.authenticated || entry.readOnly) return
+    if (flushPromise || inFlight) return
     global.clearTimeout(timer)
     timer = global.setTimeout(() => { flush().catch(() => {}) }, 120)
   }
@@ -280,8 +366,75 @@
   }
 
   global.addEventListener('pagehide', () => {
+    remoteRetryStopped = true
+    global.clearTimeout(timer)
+    timer = 0
+    global.clearTimeout(remoteRetryTimer)
     global.queueMicrotask(sendLatestBeacon)
   })
+
+  const teachingSync = global.KGTeachingContentSync
+  const teachingManager = entry.authenticated
+    && ['admin', 'teacher'].includes(String(entry.authUser?.role || ''))
+  if (teachingSync && teachingManager) {
+    function scheduleRemoteRetry() {
+      if (remoteRetryStopped || remoteRetryTimer) return
+      const delay = remoteRetryDelay
+      remoteRetryDelay = Math.min(remoteRetryDelay * 2, 10000)
+      remoteRetryTimer = global.setTimeout(() => {
+        remoteRetryTimer = 0
+        reloadRemoteRevision({ revision: remoteReloadTarget, source: 'retry' })
+      }, delay)
+    }
+    function reloadRemoteRevision(detail) {
+      if (remoteRetryStopped) return
+      const remoteRevision = Number(detail?.revision)
+      if (!Number.isSafeInteger(remoteRevision) || remoteRevision <= contentRevision) return
+      global.clearTimeout(remoteRetryTimer)
+      remoteRetryTimer = 0
+      remoteReloadTarget = Math.max(remoteReloadTarget, remoteRevision)
+      if (!remoteReloadPromise) {
+        const precedingFlush = flushPromise
+        remoteReloadPromise = (async () => {
+          if (precedingFlush) await precedingFlush.catch(() => {})
+          let failures = 0
+          while (!remoteRetryStopped && remoteReloadTarget > contentRevision) {
+            const previousRevision = contentRevision
+            try {
+              await reloadServerState({ announce: true })
+              if (remoteRetryStopped) return
+              failures = 0
+            } catch (error) {
+              failures += 1
+              if (failures > 2) throw error
+              await new Promise(resolve => global.setTimeout(resolve, failures * 80))
+              continue
+            }
+            if (contentRevision <= previousRevision) break
+          }
+          if (remoteReloadTarget <= contentRevision) remoteRetryDelay = 250
+          else scheduleRemoteRetry()
+        })().catch(() => {
+          scheduleRemoteRetry()
+        }).finally(() => {
+          remoteReloadPromise = null
+        })
+      }
+      return remoteReloadPromise
+    }
+    teachingSync.subscribe(reloadRemoteRevision)
+    teachingSync.startPolling({
+      intervalMs: 10000,
+      async getRevision() {
+        const response = await global.fetch('/api/v1/question-catalog/revision', {
+          method: 'GET',
+          credentials: 'include',
+        })
+        if (!response.ok) throw new Error(`教学内容版本请求失败 (${response.status})`)
+        return response.json()
+      },
+    })
+  }
 
   global.KGServerStateStorage = storage
   global.KGServerStateBootstrap = Object.freeze({ ...entry, page, namespace })

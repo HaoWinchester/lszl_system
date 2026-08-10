@@ -54,13 +54,21 @@ def _raise_upload_error(error: content_prep_service.ContentPrepOperationError) -
 @router.post("/banks")
 async def create_bank(body: dict, db: DB, actor: PrepEditor):
     try:
-        bank = await content_prep_service.create_bank(db, actor, body)
+        bank, content_revision = await content_prep_service.create_bank(
+            db,
+            actor,
+            body,
+            include_content_revision=True,
+        )
     except content_prep_service.ContentPrepInputError as error:
         raise HTTPException(
             status_code=422,
             detail={"code": error.code, "message": error.message},
         ) from error
-    return {"bank": content_prep_service.created_bank_payload(bank)}
+    return {
+        "bank": content_prep_service.created_bank_payload(bank),
+        "contentRevision": content_revision,
+    }
 
 
 @router.post("/locks/{question_id}", response_model=LockGrant)

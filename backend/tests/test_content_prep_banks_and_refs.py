@@ -215,6 +215,9 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
                 json={"username": teacher_username, "password": PASSWORD},
             )
             assert login.status_code == 200
+            before_create_revision = client.get(
+                "/api/v1/question-catalog/revision"
+            ).json()["revision"]
             unknown = client.post(
                 "/api/v1/content-prep/banks",
                 json={"name": "未知制作人题库", "subject": "PMP", "creatorId": "forged"},
@@ -234,6 +237,10 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
             assert created.status_code == 200
             assert created.json()["bank"]["id"].startswith("b_")
             assert created.json()["bank"]["revision"] == 1
+            assert created.json()["contentRevision"] == before_create_revision + 1
+            assert created.json()["contentRevision"] == client.get(
+                "/api/v1/question-catalog/revision"
+            ).json()["revision"]
             created_bank_ids.add(created.json()["bank"]["id"])
 
             client.post("/api/v1/auth/logout")

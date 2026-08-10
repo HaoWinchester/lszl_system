@@ -138,7 +138,9 @@ async def create_bank(
     db: AsyncSession,
     actor: User,
     body: dict,
-) -> QuestionBank:
+    *,
+    include_content_revision: bool = False,
+) -> QuestionBank | tuple[QuestionBank, int]:
     await teaching_content_revision_service.acquire_lock(db)
     resolve_creator(body.get("creatorId"))
     visibility = str(body.get("visibility") or "private").strip().lower()
@@ -163,13 +165,15 @@ async def create_bank(
         updated_by=actor.username,
     )
     db.add(bank)
-    await teaching_content_revision_service.bump(
+    revision_state = await teaching_content_revision_service.bump(
         db,
         actor.username,
         [{"entityType": "bank", "entityId": bank.id, "action": "created"}],
     )
     await db.commit()
     await db.refresh(bank)
+    if include_content_revision:
+        return bank, int(revision_state["revision"])
     return bank
 
 

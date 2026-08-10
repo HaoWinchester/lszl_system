@@ -653,6 +653,7 @@ function versionPageRelease(html, version) {
 
 function injectPage(html, page, version) {
   const injection = [
+    '<script src="./teaching-content-sync.js"></script><!-- kg-teaching-content-sync:generated -->',
     '<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->',
     '<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->',
     '<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->',

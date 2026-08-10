@@ -134,6 +134,12 @@
     editingConceptId: '',
     pendingKeywordSelection: null,
     dirty: false,
+    serverCatalogNewerRevision: 0,
+    serverCatalogLocalDraft: null,
+    serverCatalogConflictReason: '',
+    catalogPendingClueTouched: false,
+    catalogPendingConceptTouched: false,
+    catalogPendingFloatingClueTouched: false,
     recallLibraryPreview:null,
     recallNodeEditId:'',
     recallNodeDraftChoices:[],
@@ -156,6 +162,19 @@
     libraryPreviewAnchor:null,
     libraryPreviewClickTimer:0
   };
+  let catalogUiReady=false;
+  const CATALOG_EDITOR_FIELD_IDS=new Set([
+    'bankSubject','bankCustomSubject','bankName','bankVersion','bankVisibility','bankDescription',
+    'questionTitleInput','questionTitleEnInput','questionTypeInput','questionDifficultyInput',
+    'questionDomainInput','questionTopicInput','questionTagsInput','questionPrincipleIdsInput',
+    'questionStemInput','questionStemEnInput','questionAnalysisInput','questionAnalysisEnInput',
+    'qbRecallKeywordsInput','qbRecallBindingsInput','qbRecallLibraryText','qbRecallNodeTitle','qbRecallNodeTitleEn',
+    'qbRecallNodePrompt','qbRecallNodePromptEn','qbRecallNodeHint','qbRecallNodeHintEn','qbRecallCandidateInput',
+    'clueTextInput','clueTypeInput','clueRoleInput','clueSourceInput','clueOptionIdInput','clueConceptIdsInput','clueExplainInput',
+    'conceptIdInput','conceptTitleInput','conceptCategoryInput','conceptLevelInput','conceptKeywordsInput','conceptColorInput',
+    'conceptSummaryInput','conceptNotesInput','conceptRuleInput','floatingClueTextInput','floatingClueTypeInput',
+    'floatingClueRoleInput','floatingClueConceptIdsInput','floatingClueExplainInput'
+  ]);
 
   function escapeHTML(value){
     return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -1006,7 +1025,119 @@
     const bank=state.banks.find(item=>item.id===state.selectedBankId);
     state.selectedQuestionId=bank?.questions.some(question=>question.id===selectedQuestionId)?selectedQuestionId:(bank?.questions.find(question=>!isQuestionDeleted(question))?.id||'');
     state.dirty=false;
+    state.serverCatalogNewerRevision=0;
+    state.serverCatalogLocalDraft=null;
+    state.serverCatalogConflictReason='';
+    state.catalogPendingClueTouched=false;
+    state.catalogPendingConceptTouched=false;
+    state.catalogPendingFloatingClueTouched=false;
     return bank||null;
+  }
+  function isCatalogEditorField(target){
+    if(!target)return false;
+    if(CATALOG_EDITOR_FIELD_IDS.has(String(target.id||'')))return true;
+    return !!target.closest?.('#qbOptionsEditor,#qbOptionsEditorEn,#qbClueList,#qbConceptList,#qbReasoningList,#qbRecallConfigPanel');
+  }
+  function markCatalogEditorDirty(event){
+    if(!isCatalogEditorField(event?.target))return;
+    state.dirty=true;
+    const targetId=String(event?.target?.id||'');
+    if(/^clue[A-Z]/.test(targetId))state.catalogPendingClueTouched=true;
+    if(/^floatingClue/.test(targetId))state.catalogPendingFloatingClueTouched=true;
+    if(/^concept[A-Z]/.test(targetId))state.catalogPendingConceptTouched=true;
+    const local=state.serverCatalogLocalDraft;
+    if(local?.question&&local.bank){
+      local.pendingSubforms.clueTouched=state.catalogPendingClueTouched;
+      local.pendingSubforms.conceptTouched=state.catalogPendingConceptTouched;
+      local.pendingSubforms.floatingClueTouched=state.catalogPendingFloatingClueTouched;
+      const collected=collectQuestionDraftFromDom(local.question,local.bank,{includePendingSubforms:true,pendingSubforms:local.pendingSubforms});
+      if(collected?.draft)local.question=collected.draft;
+    }
+  }
+  function captureServerCatalogLocalDraft(){
+    if(state.serverCatalogLocalDraft)return state.serverCatalogLocalDraft;
+    const bank=currentBank(),question=currentQuestion();
+    const local={
+      bankId:String(bank?.id||state.selectedBankId||''),questionId:String(question?.id||state.selectedQuestionId||''),
+      activeSidebarTab:state.activeSidebarTab,bank:bank?clone(bank):null,question:question?clone(question):null,
+      pendingSubforms:{clueTouched:state.catalogPendingClueTouched,conceptTouched:state.catalogPendingConceptTouched,floatingClueTouched:state.catalogPendingFloatingClueTouched}
+    };
+    state.serverCatalogLocalDraft=local;
+    const collected=question&&bank?collectQuestionDraftFromDom(question,bank,{includePendingSubforms:true,pendingSubforms:local.pendingSubforms}):null;
+    if(collected?.draft)local.question=collected.draft;
+    return local;
+  }
+  function markServerCatalogDraftConflict(reason){
+    state.serverCatalogConflictReason=String(reason||'服务器中的原编辑对象已变化，不能自动合并。');
+    renderServerCatalogNewerNotice();
+    toast(`${state.serverCatalogConflictReason} 请复制草稿为新题或导出后处理。`);
+    try{window.dispatchEvent(new CustomEvent('kg:question-editor-conflict-copy-required',{detail:{reason:state.serverCatalogConflictReason,draft:clone(state.serverCatalogLocalDraft)}}))}catch(error){}
+    return false;
+  }
+  function copyServerCatalogLocalDraft(){
+    const local=state.serverCatalogLocalDraft,targetBank=state.banks.find(bank=>bank.id===local?.bankId)||currentBank();
+    if(!local?.question||!targetBank)return markServerCatalogDraftConflict('原题库已删除，当前页面无法放置草稿副本。');
+    const copy=clone(local.question);copy.id=safeId('q');copy.title=`${copy.title||'未命名题目'}（冲突副本）`;
+    delete copy.revision;delete copy.contentHash;delete copy.createdAt;delete copy.updatedAt;
+    targetBank.questions.push(normalizeQuestion(copy,targetBank.questions.length));
+    state.selectedBankId=targetBank.id;state.selectedQuestionId=copy.id;state.serverCatalogConflictReason='';state.serverCatalogNewerRevision=0;state.serverCatalogLocalDraft=null;state.catalogPendingClueTouched=false;state.catalogPendingConceptTouched=false;state.catalogPendingFloatingClueTouched=false;
+    saveBanks(state.banks,{silent:true});render();toast('已将未提交内容复制为本地新题，请检查后保存到服务器。');return true;
+  }
+  function refreshReadOnlyCatalogViews(){
+    const selectedBankId=state.selectedBankId,selectedQuestionId=state.selectedQuestionId;
+    state.banks=loadBanks();
+    state.selectedBankId=state.banks.some(bank=>bank.id===selectedBankId)?selectedBankId:(state.banks[0]?.id||'');
+    const bank=state.banks.find(item=>item.id===state.selectedBankId);
+    state.selectedQuestionId=bank?.questions.some(question=>question.id===selectedQuestionId)?selectedQuestionId:(bank?.questions.find(question=>!isQuestionDeleted(question))?.id||'');
+    const local=state.serverCatalogLocalDraft,originalBank=state.banks.find(item=>item.id===local?.bankId);
+    if(local&&!originalBank)state.serverCatalogConflictReason='服务器中的原题库已删除，不能自动合并。';
+    else if(local&&local.activeSidebarTab!=='banks'&&!originalBank?.questions.some(question=>question.id===local.questionId))state.serverCatalogConflictReason='服务器中的原题目已删除或移动，不能自动合并。';
+    renderBankList();renderTrainingBankSelect();renderSubjectChipState();renderQuestionList();renderStatusCard();renderCompletion();renderServerCatalogNewerNotice();
+  }
+  async function applyServerCatalogRefresh(options={}){
+    const mode=String(options.mode||'reload');
+    if(mode==='merge'){
+      const local=state.serverCatalogLocalDraft;
+      if(!local)return false;
+      if(local.pendingSubforms?.incompleteReason){toast(local.pendingSubforms.incompleteReason);return false}
+      const remoteBank=state.banks.find(bank=>bank.id===local.bankId);
+      if(!remoteBank)return markServerCatalogDraftConflict('服务器中的原题库已删除，不能自动合并。');
+      state.selectedBankId=remoteBank.id;
+      let merged;
+      if(local.activeSidebarTab==='banks')merged=await saveBankForm({allowServerMerge:true});
+      else{
+        const questionIndex=remoteBank.questions.findIndex(question=>question.id===local.questionId);
+        if(questionIndex<0)return markServerCatalogDraftConflict('服务器中的原题目已删除或移动，不能自动合并。');
+        const remoteQuestion=remoteBank.questions[questionIndex],localQuestion=clone(local.question);
+        remoteBank.questions[questionIndex]=normalizeQuestion({...localQuestion,revision:remoteQuestion.revision,contentHash:remoteQuestion.contentHash,creatorId:remoteQuestion.creatorId},questionIndex);
+        state.selectedQuestionId=local.questionId;
+        merged=await saveQuestionForm({allowServerMerge:true});
+      }
+      if(merged)toast('已将当前表单合并到服务器新版本。');
+      return !!merged;
+    }
+    const bankId=state.serverCatalogLocalDraft?.bankId||state.selectedBankId,questionId=state.serverCatalogLocalDraft?.questionId||state.selectedQuestionId;
+    reloadBanksFromCatalog(bankId,questionId);
+    if(CatalogEditor)await CatalogEditor.open(currentQuestion());
+    render();CatalogEditor?.applyReadonlyState(CatalogEditor.status().readonly);toast('已重新载入服务器版本。');
+    try{window.dispatchEvent(new CustomEvent('kg:question-editor-server-applied',{detail:{mode:'reload'}}))}catch(error){}
+    return true;
+  }
+  async function handleQuestionCatalogChanged(event){
+    if(!catalogUiReady||event?.detail?.source!=='remote')return;
+    const revision=Number(event.detail?.snapshot?.contentRevision||0);
+    if(document.body?.dataset?.paperManagementPage==='true'){state.banks=loadBanks();renderPaperManager();return}
+    if(!state.dirty){
+      const bankId=state.selectedBankId,questionId=state.selectedQuestionId;
+      reloadBanksFromCatalog(bankId,questionId);
+      if(CatalogEditor)await CatalogEditor.open(currentQuestion());
+      render();CatalogEditor?.applyReadonlyState(CatalogEditor.status().readonly);return;
+    }
+    captureServerCatalogLocalDraft();
+    state.serverCatalogNewerRevision=Math.max(state.serverCatalogNewerRevision,Number.isSafeInteger(revision)?revision:0);
+    refreshReadOnlyCatalogViews();state.dirty=true;renderBankList();renderQuestionList();renderServerCatalogNewerNotice();
+    toast('服务器有新版本，当前表单未覆盖；请选择重新载入/合并。');
+    try{window.dispatchEvent(new CustomEvent('kg:question-editor-server-newer',{detail:{revision:state.serverCatalogNewerRevision,requiresExplicitReload:true}}))}catch(error){}
   }
   function currentBank(){
     const selected=state.banks.find(b=>b.id===state.selectedBankId);
@@ -1099,6 +1230,7 @@
     if(CatalogEditor)await CatalogEditor.open(currentQuestion());
     render();
     CatalogEditor?.applyReadonlyState(CatalogEditor.status().readonly);
+    catalogUiReady=true;
   }
 
   async function initPaperManagementPage(){
@@ -1127,6 +1259,7 @@
     window.addEventListener('resize',positionPaperQuestionPreview,{passive:true});document.addEventListener('scroll',positionPaperQuestionPreview,true);
     initPaperWorkspaceControls();
     renderPaperManager();
+    catalogUiReady=true;
   }
 
   function initStaticControls(){
@@ -2213,6 +2346,19 @@
         <span>${escapeHTML(scopeLabel())}</span>
       </div>
     `;
+    renderServerCatalogNewerNotice();
+  }
+  function renderServerCatalogNewerNotice(){
+    const panel=$('qbStatusCard');
+    if(!panel)return;
+    const existing=$('qbServerCatalogNewerNotice');
+    if(!state.serverCatalogNewerRevision){existing?.remove();return}
+    const notice=existing||document.createElement('div');
+    notice.id='qbServerCatalogNewerNotice';notice.className='status-actions';
+    const message=state.serverCatalogConflictReason||'服务器有新版本 · 当前表单未覆盖，请显式重新载入/合并';
+    notice.innerHTML=`<span>${escapeHTML(message)}</span><button type="button" data-server-catalog-action="reload">重新载入</button>${state.serverCatalogConflictReason?'<button type="button" data-server-catalog-action="copy">复制草稿为新题</button>':'<button type="button" data-server-catalog-action="merge">合并当前表单</button>'}`;
+    if(!existing)panel.appendChild(notice);
+    notice.querySelectorAll('[data-server-catalog-action]').forEach(button=>button.addEventListener('click',()=>button.dataset.serverCatalogAction==='copy'?copyServerCatalogLocalDraft():applyServerCatalogRefresh({mode:button.dataset.serverCatalogAction})));
   }
   function completionInfo(q){
     const content = !!(q && stemText(q).trim() && (q.options || []).length >= 2 && q.correctAnswer);
@@ -2810,9 +2956,10 @@
     const isCustom = $('bankSubject').value === 'CUSTOM';
     $('customSubjectWrap').hidden = !isCustom;
   }
-  async function saveBankForm(){
+  async function saveBankForm(options={}){
     const bank = currentBank();
     if(!bank) return;
+    if(state.serverCatalogNewerRevision&&!options.allowServerMerge){toast('服务器有新版本，请先选择重新载入或合并。');return false}
     const selectedSubject = $('bankSubject').value;
     const customSubject=$('bankCustomSubject').value.trim(),bankName=$('bankName').value.trim();
     if(selectedSubject==='CUSTOM'&&!customSubject){$('bankCustomSubject').focus();toast('自定义科目不能为空。');return}
@@ -2849,10 +2996,10 @@
     return Array.from(document.querySelectorAll('#qbOptionsEditorEn .tq-option-en-row')).map((row,index)=>({id:String(row.dataset.enOptionId||String.fromCharCode(65+index)),text:row.querySelector('.option-text-en')?.value.trim()||''}));
   }
 
-  function collectReasoningFromDom(){
+  function collectReasoningFromDom(question=currentQuestion()){
     const rows = Array.from(document.querySelectorAll('#qbReasoningList [data-reasoning-index]'));
     return rows.map((row, index) => ({
-      id:currentQuestion().reasoningSteps[index]?.id || safeId('rs'),
+      id:question?.reasoningSteps?.[index]?.id || safeId('rs'),
       title:row.querySelector('.rs-title').value.trim() || '推理步骤 ' + (index + 1),
       content:row.querySelector('.rs-content').value.trim(),
       relatedKeywords:cleanList(row.querySelector('.rs-keywords').value),
@@ -2860,35 +3007,71 @@
       recallQuestion:row.querySelector('.rs-question').value.trim()
     }));
   }
+  function applyPendingCognitiveSubforms(draft,pendingSubforms={}){
+    const clueText=String($('clueTextInput')?.value||'').trim();
+    const clueHasPartial=Boolean(pendingSubforms.clueTouched||clueText||String($('clueConceptIdsInput')?.value||'').trim()||String($('clueExplainInput')?.value||'').trim());
+    const floatingClueText=String($('floatingClueTextInput')?.value||'').trim();
+    const floatingClueHasPartial=Boolean(pendingSubforms.floatingClueTouched||floatingClueText||String($('floatingClueConceptIdsInput')?.value||'').trim()||String($('floatingClueExplainInput')?.value||'').trim());
+    const conceptTitle=String($('conceptTitleInput')?.value||'').trim();
+    const conceptHasPartial=Boolean(pendingSubforms.conceptTouched||conceptTitle||['conceptIdInput','conceptCategoryInput','conceptKeywordsInput','conceptSummaryInput','conceptNotesInput','conceptRuleInput'].some(id=>String($(id)?.value||'').trim()));
+    pendingSubforms.incompleteReason=!clueText&&clueHasPartial?'关键词子表单尚未填写关键词，不能合并。':(!floatingClueText&&floatingClueHasPartial?'悬浮关键词子表单尚未填写关键词，不能合并。':(!conceptTitle&&conceptHasPartial?'知识点子表单尚未填写名称，不能合并。':''));
+    if(clueText){
+      draft.clues=Array.isArray(draft.clues)?draft.clues:[];
+      const sourceType=$('clueSourceInput')?.value==='option'?'option':'stem';
+      const pendingClueId=state.editingClueId||pendingSubforms.clueId||(pendingSubforms.clueId=safeId('clue-pending'));
+      const clue=normalizeClue({id:pendingClueId,text:clueText,type:$('clueTypeInput')?.value||'core',clueRole:$('clueRoleInput')?.value||'true',sourceType,sourceOptionId:sourceType==='option'?String($('clueOptionIdInput')?.value||''):'',conceptIds:cleanList($('clueConceptIdsInput')?.value),explain:String($('clueExplainInput')?.value||'').trim()},draft.clues.length);
+      const index=draft.clues.findIndex(item=>item.id===pendingClueId);if(index>=0)draft.clues[index]=clue;else draft.clues.push(clue);
+    }
+    if(floatingClueText){
+      draft.clues=Array.isArray(draft.clues)?draft.clues:[];
+      const pendingFloatingId=pendingSubforms.floatingClueId||(pendingSubforms.floatingClueId=safeId('clue-floating-pending')),selection=state.pendingKeywordSelection||{};
+      const clue=normalizeClue({id:pendingFloatingId,text:floatingClueText,type:$('floatingClueTypeInput')?.value||'core',clueRole:$('floatingClueRoleInput')?.value||'true',sourceType:selection.sourceType==='option'?'option':'stem',sourceOptionId:selection.sourceType==='option'?String(selection.sourceOptionId||''):'',conceptIds:cleanList($('floatingClueConceptIdsInput')?.value),explain:String($('floatingClueExplainInput')?.value||'').trim()},draft.clues.length);
+      const index=draft.clues.findIndex(item=>item.id===pendingFloatingId);if(index>=0)draft.clues[index]=clue;else draft.clues.push(clue);
+    }
+    if(conceptTitle){
+      draft.concepts=Array.isArray(draft.concepts)?draft.concepts:[];
+      const pendingConceptId=state.editingConceptId||pendingSubforms.conceptId||(pendingSubforms.conceptId=safeId('concept-pending'));
+      const requestedConceptId=String($('conceptIdInput')?.value||'').trim()||pendingConceptId;
+      const concept=normalizeConcept({id:requestedConceptId,title:conceptTitle,category:String($('conceptCategoryInput')?.value||'').trim(),level:$('conceptLevelInput')?.value||'基础',keywords:String($('conceptKeywordsInput')?.value||'').trim(),color:$('conceptColorInput')?.value||'#7c3aed',summary:String($('conceptSummaryInput')?.value||'').trim(),notes:String($('conceptNotesInput')?.value||'').trim(),rule:String($('conceptRuleInput')?.value||'').trim()},draft.concepts.length);
+      let index=draft.concepts.findIndex(item=>item.id===requestedConceptId);if(index<0&&pendingSubforms.conceptAppliedId)index=draft.concepts.findIndex(item=>item.id===pendingSubforms.conceptAppliedId);
+      if(index>=0)draft.concepts[index]=concept;else draft.concepts.push(concept);pendingSubforms.conceptAppliedId=requestedConceptId;
+    }
+    const recallKeywords=String($('qbRecallKeywordsInput')?.value||'').split(/[\r\n,，、;；|]+/).map(value=>value.trim()).filter(Boolean);
+    const recallBindings=parseRecallBindings(String($('qbRecallBindingsInput')?.value||''));
+    if(recallKeywords.length){
+      draft.clues=Array.isArray(draft.clues)?draft.clues:[];
+      const existing=new Map(draft.clues.map(clue=>[String(clue.text),clue])),advanced=draft.clues.filter(clue=>clue.sourceMode!=='quick'&&!recallKeywords.includes(clue.text));
+      const quick=recallKeywords.map((keyword,index)=>normalizeClue({...existing.get(keyword),id:existing.get(keyword)?.id||slugify(keyword)||safeId('clue'),text:keyword,type:existing.get(keyword)?.type||'core',clueRole:existing.get(keyword)?.clueRole||'true',recallNodeId:String(recallBindings.get(keyword)||existing.get(keyword)?.recallNodeId||keyword),sourceMode:'quick'},index));
+      draft.clues=[...advanced,...quick];
+    }
+    draft.stemParts=rebuildStemParts(stemText(draft),stemClues(draft.clues));return draft;
+  }
+  function collectQuestionDraftFromDom(q=currentQuestion(),bank=currentBank(),options={}){
+    if(!bank||!q)return null;
+    const draft=clone(q);
+    draft.title=$('questionTitleInput').value.trim()||(String($('questionStemInput').value||'').replace(/\s+/g,' ').slice(0,36)||'未命名题目');
+    draft.teacherNumber=draft.teacherNumber||nextTeacherNumber(bank.subject);draft.type=$('questionTypeInput').value||'single_choice';draft.subject=bank.subject;draft.difficulty=$('questionDifficultyInput').value;
+    draft.domain=$('questionDomainInput').value.trim();draft.topic=$('questionTopicInput').value.trim();draft.tags=cleanList($('questionTagsInput').value);draft.analysis=$('questionAnalysisInput').value.trim();
+    draft.options=collectOptionsFromDom().map((o,i)=>normalizeOption(o,i,''));
+    const correct=document.querySelector('input[name="correctOption"]:checked')?.value||draft.options.find(o=>o.correct)?.id||draft.options[0]?.id||'';
+    draft.correctAnswer=correct;draft.options.forEach(o=>{o.correct=o.id===correct});
+    const rawStem=$('questionStemInput').value;draft.stemParts=rebuildStemParts(rawStem,stemClues(draft.clues));
+    const reasoningSteps=collectReasoningFromDom(q).map(normalizeReasoningStep);draft.reasoningSteps=reasoningSteps;
+    const enTitle=$('questionTitleEnInput')?.value.trim()||'',enStem=$('questionStemEnInput')?.value||'',enAnalysis=$('questionAnalysisEnInput')?.value.trim()||'',enOptions=collectEnglishOptionsFromDom();
+    const hasEnglish=Boolean(enTitle||enStem.trim()||enAnalysis||enOptions.some(option=>option.text));
+    if(hasEnglish)draft.translations={...(draft.translations||{}),en:{title:enTitle,stemParts:[{text:enStem}],options:enOptions,analysis:enAnalysis}};
+    else if(draft.translations?.en){draft.translations={...(draft.translations||{})};delete draft.translations.en}
+    draft.metadata={...(draft.metadata||{}),principleIds:[...new Set(String($('questionPrincipleIdsInput')?.value||'').split(',').map(value=>value.trim()).filter(Boolean))],translationStatus:hasEnglish?'bilingual':'zh_only'};
+    if(options.includePendingSubforms)applyPendingCognitiveSubforms(draft,options.pendingSubforms||{});
+    return {draft,rawStem,reasoningSteps};
+  }
   async function saveQuestionForm(options={}){
     const bank = currentBank();
     const q = currentQuestion();
     if(!bank || !q) return false;
-    const draft=clone(q),previousBanks=clone(state.banks);
-    draft.title = $('questionTitleInput').value.trim() || (String($('questionStemInput').value||'').replace(/\s+/g,' ').slice(0,36) || '未命名题目');
-    draft.teacherNumber=draft.teacherNumber||nextTeacherNumber(bank.subject);
-    draft.type = $('questionTypeInput').value || 'single_choice';
-    draft.subject = bank.subject;
-    draft.difficulty = $('questionDifficultyInput').value;
-    draft.domain = $('questionDomainInput').value.trim();
-    draft.topic = $('questionTopicInput').value.trim();
-    draft.tags = cleanList($('questionTagsInput').value);
-    draft.analysis = $('questionAnalysisInput').value.trim();
-    draft.options = collectOptionsFromDom().map((o,i) => normalizeOption(o,i,''));
-    const correct = document.querySelector('input[name="correctOption"]:checked')?.value || draft.options.find(o => o.correct)?.id || draft.options[0]?.id || '';
-    draft.correctAnswer = correct;
-    draft.options.forEach(o => { o.correct = o.id === correct; });
-    const rawStem = $('questionStemInput').value;
-    draft.stemParts = rebuildStemParts(rawStem, stemClues(draft.clues));
-    draft.reasoningSteps = collectReasoningFromDom().map(normalizeReasoningStep);
-    const enTitle=$('questionTitleEnInput')?.value.trim()||'';
-    const enStem=$('questionStemEnInput')?.value||'';
-    const enAnalysis=$('questionAnalysisEnInput')?.value.trim()||'';
-    const enOptions=collectEnglishOptionsFromDom();
-    const hasEnglish=Boolean(enTitle||enStem.trim()||enAnalysis||enOptions.some(option=>option.text));
-    if(hasEnglish)draft.translations={...(draft.translations||{}),en:{title:enTitle,stemParts:[{text:enStem}],options:enOptions,analysis:enAnalysis}};
-    else if(draft.translations?.en){draft.translations={...(draft.translations||{})};delete draft.translations.en}
-    draft.metadata={...(draft.metadata||{}),translationStatus:hasEnglish?'bilingual':'zh_only'};
+    if(state.serverCatalogNewerRevision&&!options.allowServerMerge){if(!options.silent)toast('服务器有新版本，请先选择重新载入或合并。');return false}
+    const collected=collectQuestionDraftFromDom(q,bank);if(!collected)return false;
+    const {draft,rawStem}=collected,previousBanks=clone(state.banks);
     draft.status = {
       contentReady:!!(rawStem.trim() && draft.options.length >= 2 && draft.correctAnswer),
       keywordsReady:draft.clues.length > 0,
@@ -3198,6 +3381,12 @@
   }
   function resetClueForm(){
     state.editingClueId = '';
+    state.catalogPendingClueTouched=false;
+    if(state.serverCatalogLocalDraft?.pendingSubforms){
+      delete state.serverCatalogLocalDraft.pendingSubforms.clueId;
+      state.serverCatalogLocalDraft.pendingSubforms.clueTouched=false;
+      state.serverCatalogLocalDraft.pendingSubforms.incompleteReason='';
+    }
     $('clueTextInput').value = '';
     $('clueTypeInput').value = 'core';
     $('clueRoleInput').value = 'true';
@@ -3288,6 +3477,13 @@
   }
   function resetConceptForm(){
     state.editingConceptId = '';
+    state.catalogPendingConceptTouched=false;
+    if(state.serverCatalogLocalDraft?.pendingSubforms){
+      delete state.serverCatalogLocalDraft.pendingSubforms.conceptId;
+      delete state.serverCatalogLocalDraft.pendingSubforms.conceptAppliedId;
+      state.serverCatalogLocalDraft.pendingSubforms.conceptTouched=false;
+      state.serverCatalogLocalDraft.pendingSubforms.incompleteReason='';
+    }
     ['conceptIdInput','conceptTitleInput','conceptCategoryInput','conceptKeywordsInput','conceptSummaryInput','conceptNotesInput','conceptRuleInput'].forEach(id => $(id).value = '');
     $('conceptLevelInput').value = '基础';
     $('conceptColorInput').value = '#7c3aed';
@@ -3468,6 +3664,12 @@
   function hideFloatingKeywordPanel(){
     const panel = $('qbFloatingKeywordPanel');
     if(panel) panel.hidden = true;
+    state.catalogPendingFloatingClueTouched=false;
+    if(state.serverCatalogLocalDraft?.pendingSubforms){
+      delete state.serverCatalogLocalDraft.pendingSubforms.floatingClueId;
+      state.serverCatalogLocalDraft.pendingSubforms.floatingClueTouched=false;
+      state.serverCatalogLocalDraft.pendingSubforms.incompleteReason='';
+    }
   }
   async function saveFloatingKeyword(){
     const selection = state.pendingKeywordSelection;
@@ -3708,9 +3910,17 @@
     bulkAddQuestions,
     recordQuestionAudit:(action,before,after,options={})=>{const question=currentQuestion();if(!question)return null;return recordQuestionAudit(action,question,before,after,options.batchId||safeId('batch-single'),options.summary||`题目分类变更：${question.title}`,options.status||'success',options.metadata||{})},
     isQuestionDeleted:question=>isQuestionDeleted(question),
-    referenceSummaryForQuestion:(questionId,bankId='')=>{const bank=state.banks.find(item=>item.id===String(bankId||''))||currentBank();const question=bank?.questions.find(item=>item.id===String(questionId||''));return clone(referenceSummaryForQuestion(question,bank))}
+    referenceSummaryForQuestion:(questionId,bankId='')=>{const bank=state.banks.find(item=>item.id===String(bankId||''))||currentBank();const question=bank?.questions.find(item=>item.id===String(questionId||''));return clone(referenceSummaryForQuestion(question,bank))},
+    getServerCatalogRefreshState:()=>({dirty:state.dirty,revision:state.serverCatalogNewerRevision,conflictReason:state.serverCatalogConflictReason,requiresExplicitReload:state.serverCatalogNewerRevision>0}),
+    exportServerCatalogLocalDraft:()=>clone(state.serverCatalogLocalDraft),
+    copyServerCatalogLocalDraft,
+    applyServerCatalogRefresh
   });
 
+  document.addEventListener('input',markCatalogEditorDirty,true);
+  document.addEventListener('change',markCatalogEditorDirty,true);
+  window.addEventListener('kg:question-catalog-changed',handleQuestionCatalogChanged);
+  window.addEventListener('pagehide',()=>window.removeEventListener?.('kg:question-catalog-changed',handleQuestionCatalogChanged));
   window.addEventListener('beforeunload',()=>{if(CatalogEditor)CatalogEditor.release({keepalive:true})});
   document.addEventListener('DOMContentLoaded', init);
 })();
