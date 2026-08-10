@@ -55,13 +55,14 @@ async def build_bootstrap(
     auth_user = user_service.to_dict(user) if user else None
     storage: dict[str, str] = {}
     revision = 0
+    content_revision = 0
     if user:
         from app.services import runtime_state_service
 
-        storage, revision = await runtime_state_service.get_state(
+        storage, revision, content_revision = await runtime_state_service.get_state(
             db, user.username, user.role
         )
-        storage, revision = await runtime_state_service.ensure_domain_seed(
+        storage, revision, content_revision = await runtime_state_service.ensure_domain_seed(
             db, user, page, storage, revision
         )
     return {
@@ -73,6 +74,7 @@ async def build_bootstrap(
         "username": user.username if user else None,
         "authUser": auth_user,
         "revision": revision,
+        "contentRevision": content_revision,
         "readOnly": read_only,
         "storage": storage,
     }

@@ -15,6 +15,7 @@ from app.services import (
     question_access_service,
     question_catalog_service,
     question_content_service,
+    teaching_content_revision_service,
 )
 
 
@@ -89,6 +90,7 @@ async def create_bank(db: AsyncSession, owner: User | str, data: dict) -> Questi
     actor = await _resolve_actor(db, owner)
     if actor is None:
         raise ValueError("用户不存在")
+    await teaching_content_revision_service.acquire_lock(db)
     visibility = str(data.get("visibility") or "private")
     if visibility not in {"private", "published"}:
         visibility = "private"
@@ -104,6 +106,11 @@ async def create_bank(db: AsyncSession, owner: User | str, data: dict) -> Questi
         updated_by=actor.username,
     )
     db.add(b)
+    await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        [{"entityType": "bank", "entityId": b.id, "action": "created"}],
+    )
     await db.commit()
     await db.refresh(b)
     return b
@@ -113,6 +120,7 @@ async def update_bank(db: AsyncSession, owner: User | str, bank_id: str, patch: 
     actor = await _resolve_actor(db, owner)
     if actor is None:
         return None
+    await teaching_content_revision_service.acquire_lock(db)
     try:
         b = await question_access_service.require_bank_access(db, actor, bank_id, edit=True)
     except HTTPException:
@@ -122,6 +130,11 @@ async def update_bank(db: AsyncSession, owner: User | str, bank_id: str, patch: 
             setattr(b, k, patch[k])
     b.revision += 1
     b.updated_by = actor.username
+    await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        [{"entityType": "bank", "entityId": b.id, "action": "updated"}],
+    )
     await db.commit()
     await db.refresh(b)
     return b
@@ -131,17 +144,33 @@ async def delete_bank(db: AsyncSession, owner: User | str, bank_id: str) -> bool
     actor = await _resolve_actor(db, owner)
     if actor is None:
         return False
+    await teaching_content_revision_service.acquire_lock(db)
     try:
         b = await question_access_service.require_bank_access(db, actor, bank_id, edit=True)
     except HTTPException:
         return False
-    qs = (await db.execute(select(Question).where(Question.bank_id == bank_id))).scalars().all()
+    qs = (
+        await db.execute(
+            select(Question).where(Question.bank_id == bank_id).order_by(Question.id)
+        )
+    ).scalars().all()
     await db.execute(
         delete(QuestionUploadBatch).where(QuestionUploadBatch.bank_id == bank_id)
     )
     for q in qs:
         await db.delete(q)
     await db.delete(b)
+    await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        [
+            *[
+                {"entityType": "question", "entityId": q.id, "action": "deleted"}
+                for q in qs
+            ],
+            {"entityType": "bank", "entityId": b.id, "action": "deleted"},
+        ],
+    )
     await db.commit()
     return True
 
@@ -183,6 +212,7 @@ async def create_question(db: AsyncSession, owner: User | str, bank_id: str, dat
     actor = await _resolve_actor(db, owner)
     if actor is None:
         return None
+    await teaching_content_revision_service.acquire_lock(db)
     try:
         b = await question_access_service.require_bank_access(db, actor, bank_id, edit=True)
     except HTTPException:
@@ -224,6 +254,11 @@ async def create_question(db: AsyncSession, owner: User | str, bank_id: str, dat
         lifecycle=normalized["lifecycle"],
     )
     db.add(q)
+    await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        [{"entityType": "question", "entityId": q.id, "action": "created"}],
+    )
     await db.commit()
     await db.refresh(q)
     return q
@@ -247,6 +282,7 @@ async def update_question(db: AsyncSession, owner: User | str, question_id: str,
     actor = await _resolve_actor(db, owner)
     if actor is None:
         return None
+    await teaching_content_revision_service.acquire_lock(db)
     q = await db.get(Question, question_id)
     if q is None:
         return None
@@ -284,6 +320,11 @@ async def update_question(db: AsyncSession, owner: User | str, question_id: str,
     q.content_hash = question_content_service.canonical_question_hash(normalized)
     q.revision += 1
     q.updated_by = actor.username
+    await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        [{"entityType": "question", "entityId": q.id, "action": "updated"}],
+    )
     await db.commit()
     await db.refresh(q)
     return q
@@ -293,6 +334,7 @@ async def delete_question(db: AsyncSession, owner: User | str, question_id: str)
     actor = await _resolve_actor(db, owner)
     if actor is None:
         return False
+    await teaching_content_revision_service.acquire_lock(db)
     q = await db.get(Question, question_id)
     if q is None:
         return False
@@ -304,6 +346,11 @@ async def delete_question(db: AsyncSession, owner: User | str, question_id: str)
     for l in links:
         await db.delete(l)
     await db.delete(q)
+    await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        [{"entityType": "question", "entityId": q.id, "action": "deleted"}],
+    )
     await db.commit()
     return True
 
@@ -399,6 +446,7 @@ async def list_papers(db: AsyncSession, actor: User, status: str | None = None) 
 
 
 async def create_paper(db: AsyncSession, actor: User, data: dict) -> ExamPaper:
+    await teaching_content_revision_service.acquire_lock(db)
     p = ExamPaper(
         id=uid("p_"),
         owner_id=actor.username,
@@ -412,12 +460,18 @@ async def create_paper(db: AsyncSession, actor: User, data: dict) -> ExamPaper:
         quotas=data.get("quotas") or {},
     )
     db.add(p)
+    await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        [{"entityType": "paper", "entityId": p.id, "action": "created"}],
+    )
     await db.commit()
     await db.refresh(p)
     return p
 
 
 async def update_paper(db: AsyncSession, actor: User, paper_id: str, patch: dict) -> ExamPaper | None:
+    await teaching_content_revision_service.acquire_lock(db)
     values = {
         k: patch[k]
         for k in ("name", "subject", "description", "quotas")
@@ -432,6 +486,11 @@ async def update_paper(db: AsyncSession, actor: User, paper_id: str, patch: dict
     )
     if updated_id is None:
         return None
+    await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        [{"entityType": "paper", "entityId": updated_id, "action": "updated"}],
+    )
     await db.commit()
     p = await db.get(ExamPaper, updated_id)
     if p is None:
@@ -447,6 +506,7 @@ async def delete_paper(
     expected_revision: object,
     deletion_reason: str | None = None,
 ) -> dict | None:
+    await teaching_content_revision_service.acquire_lock(db)
     revision = _require_paper_revision(expected_revision)
     current = (
         await db.execute(
@@ -480,6 +540,11 @@ async def delete_paper(
     )
     if updated_id is None:
         return None
+    await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        [{"entityType": "paper", "entityId": updated_id, "action": "deleted"}],
+    )
     await db.commit()
     return {
         "paperId": updated_id,
@@ -501,6 +566,7 @@ async def compose_paper(
     expected_revision: object,
 ) -> int:
     """按领域配额从管理员和教师共同维护的题库随机抽题。"""
+    await teaching_content_revision_service.acquire_lock(db)
     revision = _require_paper_revision(expected_revision)
     q = select(Question).join(QuestionBank, QuestionBank.id == Question.bank_id)
     if bank_ids:
@@ -526,6 +592,11 @@ async def compose_paper(
     await db.flush()
     for i, question in enumerate(picked):
         db.add(PaperQuestion(paper_id=paper_id, question_id=question.id, order_index=i))
+    await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        [{"entityType": "paper", "entityId": paper_id, "action": "composed"}],
+    )
     await db.commit()
     return len(picked)
 
@@ -537,6 +608,7 @@ async def set_published(
     published: bool,
     expected_revision: object,
 ) -> ExamPaper | None:
+    await teaching_content_revision_service.acquire_lock(db)
     updated_id = await _cas_paper_mutation(
         db,
         actor,
@@ -549,6 +621,17 @@ async def set_published(
     )
     if updated_id is None:
         return None
+    await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        [
+            {
+                "entityType": "paper",
+                "entityId": updated_id,
+                "action": "published" if published else "unpublished",
+            }
+        ],
+    )
     await db.commit()
     p = await db.get(ExamPaper, updated_id)
     if p is None:

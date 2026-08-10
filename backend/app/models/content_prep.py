@@ -152,6 +152,10 @@ class QuestionUploadBatch(Base):
             "status IN ('pending', 'committed', 'rolled_back')",
             name="ck_question_upload_batch_status",
         ),
+        CheckConstraint(
+            "(creator_id IS NULL) = (creator_name IS NULL)",
+            name="ck_question_upload_batch_creator_pair",
+        ),
         Index("ix_question_upload_batches_actor_created", "actor_username", "created_at"),
     )
 
@@ -162,8 +166,8 @@ class QuestionUploadBatch(Base):
     )
     actor_username: Mapped[str] = mapped_column(String(64), nullable=False)
     actor_role: Mapped[str] = mapped_column(String(32), nullable=False)
-    creator_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    creator_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    creator_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    creator_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     client_instance_id: Mapped[str] = mapped_column(String(128), nullable=False)
     prep_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
     workspace_version: Mapped[str | None] = mapped_column(String(32), nullable=True)

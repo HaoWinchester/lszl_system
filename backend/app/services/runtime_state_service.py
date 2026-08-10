@@ -15,7 +15,14 @@ from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.subscription import Subscription
 from app.models.user import User
-from app.services import file_service, guided_learning_service, subscription_service, user_service
+from app.services import (
+    file_service,
+    guided_learning_service,
+    subscription_service,
+    teaching_content_projection_service,
+    teaching_content_revision_service,
+    user_service,
+)
 from app.web.bootstrap import PAGE_NAMESPACES
 from app.web.schemas import RuntimeMutation, RuntimeStateUpdate
 
@@ -220,7 +227,14 @@ class RuntimeStateValidationError(ValueError):
 
 
 class RuntimeStateConflictError(ValueError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        current_content_revision: int | None = None,
+    ):
+        super().__init__(message)
+        self.current_content_revision = current_content_revision
 
 
 class RuntimeStatePermissionError(ValueError):
@@ -265,6 +279,14 @@ def validate_update(update: RuntimeStateUpdate) -> None:
         raise RuntimeStateValidationError(f"存储键未登记：{update.key}")
     if update.value is not None and len(update.value.encode("utf-8")) > MAX_VALUE_BYTES:
         raise RuntimeStateValidationError("单项数据超过大小限制")
+    if update.key in teaching_content_projection_service.PROJECTION_KEYS:
+        try:
+            teaching_content_projection_service.validate_projection_value(
+                update.key,
+                str(update.value or '{"schemaVersion":1,"items":[]}'),
+            )
+        except (TypeError, ValueError) as exc:
+            raise RuntimeStateValidationError(str(exc)) from exc
     for key, value in update.storage.items():
         if not key_allowed(key):
             raise RuntimeStateValidationError(f"存储键未登记：{key}")
@@ -277,6 +299,17 @@ def validate_update(update: RuntimeStateUpdate) -> None:
             raise RuntimeStateValidationError(f"setItem 缺少 value：{mutation.key}")
         if mutation.value is not None and len(mutation.value.encode("utf-8")) > MAX_VALUE_BYTES:
             raise RuntimeStateValidationError(f"存储项超过大小限制：{mutation.key}")
+        if mutation.key in teaching_content_projection_service.PROJECTION_KEYS:
+            try:
+                teaching_content_projection_service.validate_projection_value(
+                    mutation.key,
+                    str(
+                        mutation.value
+                        or '{"schemaVersion":1,"items":[]}'
+                    ),
+                )
+            except (TypeError, ValueError) as exc:
+                raise RuntimeStateValidationError(str(exc)) from exc
     total = sum(
         len(key.encode("utf-8")) + len(value.encode("utf-8"))
         for key, value in update.storage.items()
@@ -379,6 +412,14 @@ def explicit_shared_mutations(update: RuntimeStateUpdate) -> list[RuntimeMutatio
         mutation
         for mutation in update_mutations(update)
         if mutation.key in SHARED_KEYS or _is_teacher_shared_key(mutation.key)
+    ]
+
+
+def teaching_shared_mutations(update: RuntimeStateUpdate) -> list[RuntimeMutation]:
+    return [
+        mutation
+        for mutation in explicit_shared_mutations(update)
+        if mutation.key in TEACHING_SHARED_KEYS or _is_teacher_shared_key(mutation.key)
     ]
 
 
@@ -675,13 +716,24 @@ def merge_teacher_shared_payload(
     return _json(merged_metadata), [*node_conflicts, *edge_conflicts]
 
 
-async def _promote_legacy_teacher_state(db: AsyncSession) -> None:
+def _same_json_value(left: str, right: str) -> bool:
+    try:
+        return json.loads(left) == json.loads(right)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return left == right
+
+
+async def _promote_legacy_teacher_state(db: AsyncSession) -> int | None:
     """Promote pre-shared manager drafts once without deleting rollback copies."""
     if await db.get(SharedRuntimeState, TEACHER_SHARED_PROMOTION_MARKER_KEY):
-        return
+        return None
+    await teaching_content_revision_service.acquire_lock(db)
+    revision_before = int(
+        (await teaching_content_revision_service.current(db))["revision"]
+    )
     await _lock_owner(db, f"promotion:{TEACHER_SHARED_PROMOTION_MARKER_KEY}")
     if await db.get(SharedRuntimeState, TEACHER_SHARED_PROMOTION_MARKER_KEY):
-        return
+        return None
 
     result = await db.execute(
         select(RuntimeState, User.role)
@@ -706,6 +758,7 @@ async def _promote_legacy_teacher_state(db: AsyncSession) -> None:
 
     all_conflicts: list[dict] = []
     promoted_keys: list[str] = []
+    changes: list[dict[str, str]] = []
     for key in sorted(contributions):
         shared_row = await db.get(SharedRuntimeState, key)
         merged, conflicts = merge_teacher_shared_payload(
@@ -719,8 +772,15 @@ async def _promote_legacy_teacher_state(db: AsyncSession) -> None:
                 value=merged,
                 updated_by="runtime-promotion",
             ))
-        else:
+            changes.append(
+                {"entityType": "runtimeShared", "entityId": key, "action": "migrated"}
+            )
+        elif not _same_json_value(shared_row.value, merged):
             shared_row.value = merged
+            shared_row.updated_by = "runtime-promotion"
+            changes.append(
+                {"entityType": "runtimeShared", "entityId": key, "action": "migrated"}
+            )
         promoted_keys.append(key)
         all_conflicts.extend(conflicts)
 
@@ -743,16 +803,21 @@ async def _promote_legacy_teacher_state(db: AsyncSession) -> None:
         value=_json(marker),
         updated_by="runtime-promotion",
     ))
+    if changes:
+        await teaching_content_revision_service.bump(
+            db,
+            "runtime-promotion",
+            changes,
+        )
     await db.commit()
+    return revision_before if changes else None
 
 
-async def get_state(
+async def _read_state_snapshot_locked(
     db: AsyncSession,
     owner: str,
     role: str,
-) -> tuple[dict[str, str], int]:
-    if role in TEACHING_MANAGER_ROLES:
-        await _promote_legacy_teacher_state(db)
+) -> tuple[dict[str, str], int, int]:
     row = await db.get(RuntimeState, owner)
     subscription = await db.get(Subscription, owner)
     entitlements = subscription_service.entitlements_for(role, subscription)
@@ -773,7 +838,23 @@ async def get_state(
         canonical = canonical_teacher_shared_key(str(key), role, owner)
         if canonical == key and shared_key_readable(str(key), role):
             storage[aliases.get(str(key), str(key))] = str(value)
-    return storage, revision
+    content_revision = int(
+        (await teaching_content_revision_service.current(db))["revision"]
+    )
+    return storage, revision, content_revision
+
+
+async def get_state(
+    db: AsyncSession,
+    owner: str,
+    role: str,
+) -> tuple[dict[str, str], int, int]:
+    if role in TEACHING_MANAGER_ROLES:
+        await _promote_legacy_teacher_state(db)
+    await teaching_content_revision_service.acquire_read_lock(db)
+    snapshot = await _read_state_snapshot_locked(db, owner, role)
+    await db.commit()
+    return snapshot
 
 
 def _json(value) -> str:
@@ -923,7 +1004,7 @@ async def ensure_domain_seed(
     page: str,
     storage: dict[str, str],
     revision: int,
-) -> tuple[dict[str, str], int]:
+) -> tuple[dict[str, str], int, int]:
     await _lock_owner(db, user.username)
     row = await db.get(RuntimeState, user.username)
     if row is None:
@@ -964,12 +1045,15 @@ async def apply_update(
     owner: str,
     role: str,
     update: RuntimeStateUpdate,
-) -> tuple[dict[str, str], int]:
+) -> tuple[dict[str, str], int, int]:
     validate_update(update)
     mutations = update_mutations(update)
     if settings.QUESTION_CATALOG_CUTOVER_ENABLED:
         deprecated_mutations = [
-            mutation.key for mutation in mutations if deprecated_question_key(mutation.key)
+            mutation.key
+            for mutation in mutations
+            if deprecated_question_key(mutation.key)
+            and mutation.key not in teaching_content_projection_service.PROJECTION_KEYS
         ]
         if deprecated_mutations:
             raise RuntimeStatePermissionError("正式题库已迁移，请使用题目目录接口")
@@ -981,6 +1065,7 @@ async def apply_update(
             f"该数据只能通过专用接口修改：{protected_mutations[0]}"
         )
     shared_mutations = explicit_shared_mutations(update)
+    teaching_mutations = teaching_shared_mutations(update)
     forbidden = [
         mutation.key
         for mutation in shared_mutations
@@ -988,13 +1073,31 @@ async def apply_update(
     ]
     if forbidden:
         raise RuntimeStatePermissionError(f"当前角色无权限修改共享内容：{forbidden[0]}")
+    promotion_base_revision: int | None = None
     if shared_mutations and role in TEACHING_MANAGER_ROLES:
-        await _promote_legacy_teacher_state(db)
+        promotion_base_revision = await _promote_legacy_teacher_state(db)
     await _lock_owner(db, owner)
     row = await db.get(RuntimeState, owner)
     if row is not None and row.last_request_id == update.requestId:
         await db.commit()
         return await get_state(db, owner, role)
+    if teaching_mutations:
+        await teaching_content_revision_service.acquire_lock(db)
+        current_content_revision = int(
+            (await teaching_content_revision_service.current(db))["revision"]
+        )
+        if (
+            update.contentRevision != current_content_revision
+            and not (
+                promotion_base_revision is not None
+                and update.contentRevision == promotion_base_revision
+                and current_content_revision == promotion_base_revision + 1
+            )
+        ):
+            raise RuntimeStateConflictError(
+                "教学内容已更新，请重新加载后重试",
+                current_content_revision=current_content_revision,
+            )
     current_revision = row.revision if row else 0
     if update.revision != current_revision:
         raise RuntimeStateConflictError("数据已更新，请重新加载后重试")
@@ -1058,9 +1161,39 @@ async def apply_update(
         row.last_request_id = update.requestId
 
     # 共享区只接受本批次显式 mutation，避免完整账号快照把其他发布者的新内容覆盖掉。
+    content_changes: list[dict[str, str]] = []
+    projection_mutations = [
+        mutation
+        for mutation in teaching_mutations
+        if mutation.key in teaching_content_projection_service.PROJECTION_KEYS
+    ]
+    projection_mutations.sort(
+        key=lambda mutation: (
+            mutation.key != teaching_content_projection_service.PRINCIPLE_KEY,
+            mutation.key,
+        )
+    )
+    for mutation in projection_mutations:
+        try:
+            content_changes.extend(
+                await teaching_content_projection_service.apply_principle_projection(
+                    db,
+                    owner,
+                    mutation.key,
+                    str(mutation.value or '{"schemaVersion":1,"items":[]}'),
+                )
+            )
+        except (TypeError, ValueError) as exc:
+            raise RuntimeStateValidationError(str(exc)) from exc
+    if projection_mutations:
+        await teaching_content_projection_service.write_principle_projection(db, owner)
+
     for mutation in shared_mutations:
         key = canonical_teacher_shared_key(mutation.key, role, owner) or mutation.key
-        await _lock_owner(db, f"shared:{key}")
+        if key in teaching_content_projection_service.PROJECTION_KEYS:
+            continue
+        if mutation not in teaching_mutations:
+            await _lock_owner(db, f"shared:{key}")
         shared_row = await db.get(SharedRuntimeState, key)
         if mutation.operation == "removeItem":
             if shared_row is not None:
@@ -1069,6 +1202,10 @@ async def apply_update(
                     shared_row.updated_by = owner
                 else:
                     await db.delete(shared_row)
+            if mutation in teaching_mutations:
+                content_changes.append(
+                    {"entityType": "runtimeShared", "entityId": key, "action": "deleted"}
+                )
             continue
         value = str(mutation.value or "")
         if shared_row is None:
@@ -1080,7 +1217,29 @@ async def apply_update(
         else:
             shared_row.value = merge_shared_value(key, shared_row.value, value, owner)
             shared_row.updated_by = owner
+        if mutation in teaching_mutations:
+            content_changes.append(
+                {"entityType": "runtimeShared", "entityId": key, "action": "updated"}
+            )
 
+    if teaching_mutations:
+        bumped = await teaching_content_revision_service.bump(
+            db,
+            owner,
+            content_changes,
+        )
+        response_content_revision = int(bumped["revision"])
+    else:
+        await teaching_content_revision_service.acquire_read_lock(db)
+        current_content_revision = int(
+            (await teaching_content_revision_service.current(db))["revision"]
+        )
+        response_content_revision = (
+            int(update.contentRevision)
+            if update.contentRevision is not None
+            else current_content_revision
+        )
+
+    snapshot = await _read_state_snapshot_locked(db, owner, role)
     await db.commit()
-    await db.refresh(row)
-    return await get_state(db, owner, role)
+    return snapshot[0], snapshot[1], response_content_revision

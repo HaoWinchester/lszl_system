@@ -23,6 +23,7 @@ from app.services.question_content_service import (
     canonical_question_hash,
     normalize_question_payload,
 )
+from app.services import teaching_content_revision_service
 
 PRIVATE_BANK_PREFIX = "kg_question_banks_v1__"
 PUBLISHED_BANK_KEY = "kg_question_banks_published_v1"
@@ -762,7 +763,58 @@ def _assign_migrated_question(
     question.lifecycle = payload.get("lifecycle") or {"status": "active"}
 
 
-async def _apply_snapshot(db: AsyncSession, snapshot: _Snapshot) -> None:
+def _bank_mutation_state(bank: QuestionBank) -> tuple[Any, ...]:
+    return (
+        bank.owner_id,
+        bank.name,
+        bank.subject,
+        bank.description,
+        bank.version,
+        bank.visibility,
+        bank.revision,
+        bank.created_by,
+        bank.updated_by,
+    )
+
+
+def _question_mutation_state(question: Question) -> tuple[Any, ...]:
+    return (
+        question.bank_id,
+        question.title,
+        question.type,
+        question.subject,
+        question.difficulty,
+        question.domain,
+        question.topic,
+        question.teacher_number,
+        question.scope,
+        question.content_hash,
+        question.creator_id,
+        question.creator_name,
+        question.created_by,
+        question.updated_by,
+        question.revision,
+        question.tags,
+        question.stem_parts,
+        question.options,
+        question.correct_answer,
+        question.analysis,
+        question.translations,
+        question.content_metadata,
+        question.key_path,
+        question.clues,
+        question.concepts,
+        question.reasoning_steps,
+        question.status,
+        question.lifecycle,
+    )
+
+
+async def _apply_snapshot(
+    db: AsyncSession,
+    snapshot: _Snapshot,
+) -> list[dict[str, str]]:
+    changes: list[dict[str, str]] = []
     for candidate in sorted(snapshot.banks.values(), key=lambda bank: bank.id):
         bank = await db.get(QuestionBank, candidate.id)
         if bank is None:
@@ -779,9 +831,13 @@ async def _apply_snapshot(db: AsyncSession, snapshot: _Snapshot) -> None:
                 updated_by=candidate.owner_id,
             )
             db.add(bank)
+            changes.append(
+                {"entityType": "questionBank", "entityId": candidate.id, "action": "created"}
+            )
         else:
             if bank.owner_id != candidate.owner_id:
                 raise ValueError(f"题库 {candidate.id} 的 owner 与迁移映射不一致")
+            previous = _bank_mutation_state(bank)
             bank.name = candidate.name
             bank.subject = candidate.subject
             bank.description = candidate.description
@@ -790,6 +846,10 @@ async def _apply_snapshot(db: AsyncSession, snapshot: _Snapshot) -> None:
             bank.revision = max(bank.revision, candidate.revision)
             bank.updated_by = bank.updated_by or candidate.owner_id
             bank.created_by = bank.created_by or candidate.owner_id
+            if _bank_mutation_state(bank) != previous:
+                changes.append(
+                    {"entityType": "questionBank", "entityId": candidate.id, "action": "updated"}
+                )
     await db.flush()
     for candidate in sorted(snapshot.questions.values(), key=lambda question: question.id):
         question = await db.get(Question, candidate.id)
@@ -802,8 +862,18 @@ async def _apply_snapshot(db: AsyncSession, snapshot: _Snapshot) -> None:
                 revision=candidate.revision,
             )
             db.add(question)
+        previous = None if is_new else _question_mutation_state(question)
         _assign_migrated_question(question, candidate, is_new=is_new)
+        if is_new or _question_mutation_state(question) != previous:
+            changes.append(
+                {
+                    "entityType": "question",
+                    "entityId": candidate.id,
+                    "action": "created" if is_new else "updated",
+                }
+            )
     await db.flush()
+    return changes
 
 
 async def scan_runtime_question_sources(
@@ -824,13 +894,28 @@ async def migrate_runtime_questions(
     owner_ids: set[str] | None = None,
     bank_ids: set[str] | None = None,
 ) -> MigrationReport:
-    snapshot = await _build_snapshot(db, owner_ids=owner_ids, bank_ids=bank_ids)
-    if not apply or snapshot.report.conflicts or snapshot.report.invalid_records:
-        return snapshot.report
+    if not apply:
+        return (
+            await _build_snapshot(db, owner_ids=owner_ids, bank_ids=bank_ids)
+        ).report
     if db.in_transaction():
         await db.rollback()
     async with db.begin():
-        await _apply_snapshot(db, snapshot)
-    snapshot.report.applied = True
-    snapshot.report.completed_at = _utc_iso()
+        await teaching_content_revision_service.acquire_lock(db)
+        snapshot = await _build_snapshot(
+            db,
+            owner_ids=owner_ids,
+            bank_ids=bank_ids,
+        )
+        if snapshot.report.conflicts or snapshot.report.invalid_records:
+            return snapshot.report
+        changes = await _apply_snapshot(db, snapshot)
+        if changes:
+            await teaching_content_revision_service.bump(
+                db,
+                "question-runtime-migration",
+                changes,
+            )
+        snapshot.report.applied = True
+        snapshot.report.completed_at = _utc_iso()
     return snapshot.report

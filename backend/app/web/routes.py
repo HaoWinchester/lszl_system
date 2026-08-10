@@ -265,11 +265,18 @@ async def preview_asset(version: str, asset_path: str, request: Request, db: DB)
 async def save_runtime_state(update: RuntimeStateUpdate, user: CurrentUser, db: DB):
     """Persist one validated mutation in the user's PostgreSQL runtime state."""
     try:
-        _, revision = await runtime_state_service.apply_update(
+        _, revision, content_revision = await runtime_state_service.apply_update(
             db, user.username, user.role, update
         )
     except runtime_state_service.RuntimeStateConflictError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        detail: str | dict = str(exc)
+        if exc.current_content_revision is not None:
+            detail = {
+                "code": "CONTENT_REVISION_CONFLICT",
+                "message": str(exc),
+                "currentContentRevision": exc.current_content_revision,
+            }
+        raise HTTPException(status_code=409, detail=detail) from exc
     except runtime_state_service.RuntimeStateValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except runtime_state_service.RuntimeStatePermissionError as exc:
@@ -279,16 +286,21 @@ async def save_runtime_state(update: RuntimeStateUpdate, user: CurrentUser, db: 
         "username": user.username,
         "namespace": update.namespace,
         "revision": revision,
+        "contentRevision": content_revision,
         "requestId": update.requestId,
     }
 
 
 @router.get("/api/v1/runtime/state")
 async def read_runtime_state(user: CurrentUser, db: DB):
-    storage, revision = await runtime_state_service.get_state(
+    storage, revision, content_revision = await runtime_state_service.get_state(
         db, user.username, user.role
     )
-    return {"storage": storage, "revision": revision}
+    return {
+        "storage": storage,
+        "revision": revision,
+        "contentRevision": content_revision,
+    }
 
 
 @router.get("/{asset_path:path}")

@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictInt
 
 
 class RuntimeMutation(BaseModel):
@@ -22,3 +22,4 @@ class RuntimeStateUpdate(BaseModel):
     mutations: list[RuntimeMutation] = Field(default_factory=list, max_length=500)
     requestId: str = Field(min_length=1, max_length=120)
     revision: int = Field(default=0, ge=0)
+    contentRevision: StrictInt | None = Field(default=None, ge=0)

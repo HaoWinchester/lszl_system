@@ -14,6 +14,8 @@ from app.services.question_migration_service import (
     migrate_runtime_questions,
     scan_runtime_question_sources,
 )
+from app.services import teaching_content_revision_service
+from app.services import question_service
 
 
 PUBLISHED_KEY = "kg_question_banks_published_v1"
@@ -56,6 +58,7 @@ def test_runtime_question_migration_dry_run_apply_and_rerun_are_safe() -> None:
         published_question_id,
     }
     previous_published: dict | None = None
+    revision_before_apply = 0
 
     async def seed() -> None:
         nonlocal previous_published
@@ -167,7 +170,11 @@ def test_runtime_question_migration_dry_run_apply_and_rerun_are_safe() -> None:
             await db.commit()
 
     async def scenario() -> None:
+        nonlocal revision_before_apply
         async with AsyncSessionLocal() as db:
+            revision_before_apply = int(
+                (await teaching_content_revision_service.current(db))["revision"]
+            )
             dry = await scan_runtime_question_sources(
                 db,
                 owner_ids={owner},
@@ -189,6 +196,16 @@ def test_runtime_question_migration_dry_run_apply_and_rerun_are_safe() -> None:
             assert dry.applied is False
             assert await db.get(QuestionBank, private_bank_id) is None
             assert await db.get(QuestionBank, published_bank_id) is None
+            dry_apply = await migrate_runtime_questions(
+                db,
+                apply=False,
+                owner_ids={owner},
+                bank_ids=bank_ids,
+            )
+            assert dry_apply.applied is False
+            assert int(
+                (await teaching_content_revision_service.current(db))["revision"]
+            ) == revision_before_apply
 
         async with AsyncSessionLocal() as db:
             applied = await migrate_runtime_questions(
@@ -199,6 +216,19 @@ def test_runtime_question_migration_dry_run_apply_and_rerun_are_safe() -> None:
             )
             assert applied.applied is True
             assert applied.conflicts == []
+            revision = await teaching_content_revision_service.current(db)
+            assert revision["revision"] == revision_before_apply + 1
+            assert {
+                (change["entityType"], change["entityId"], change["action"])
+                for change in revision["changes"]
+            } == {
+                ("questionBank", relational_bank_id, "updated"),
+                ("questionBank", private_bank_id, "created"),
+                ("questionBank", published_bank_id, "created"),
+                ("question", relational_question_id, "updated"),
+                ("question", private_question_id, "created"),
+                ("question", published_question_id, "created"),
+            }
 
         async with AsyncSessionLocal() as db:
             relational = await db.get(Question, relational_question_id)
@@ -241,6 +271,9 @@ def test_runtime_question_migration_dry_run_apply_and_rerun_are_safe() -> None:
                 bank_ids=bank_ids,
             )
             assert rerun.applied is True
+            assert int(
+                (await teaching_content_revision_service.current(db))["revision"]
+            ) == revision_before_apply + 1
 
         async with AsyncSessionLocal() as db:
             after_counts = (
@@ -385,6 +418,9 @@ def test_migration_reports_conflicts_missing_publishers_and_broken_json() -> Non
 
     async def scenario() -> None:
         async with AsyncSessionLocal() as db:
+            revision_before = int(
+                (await teaching_content_revision_service.current(db))["revision"]
+            )
             report = await migrate_runtime_questions(
                 db,
                 apply=True,
@@ -398,6 +434,9 @@ def test_migration_reports_conflicts_missing_publishers_and_broken_json() -> Non
             existing = await db.get(Question, conflict_question_id)
             assert existing is not None and existing.title == "关系表版本"
             assert await db.get(QuestionBank, missing_owner_bank_id) is None
+            assert int(
+                (await teaching_content_revision_service.current(db))["revision"]
+            ) == revision_before
 
     async def cleanup() -> None:
         async with AsyncSessionLocal() as db:
@@ -414,6 +453,146 @@ def test_migration_reports_conflicts_missing_publishers_and_broken_json() -> Non
                 published.updated_by = previous_published["updated_by"]
             await db.execute(delete(User).where(User.username == owner))
             await db.commit()
+
+    asyncio.run(seed())
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_apply_migration_builds_snapshot_only_after_the_global_lock(
+    monkeypatch,
+) -> None:
+    suffix = uuid4().hex[:10]
+    owner = f"migration-lock-{suffix}"
+    bank_id = f"migration-lock-bank-{suffix}"
+    question_id = f"migration-lock-question-{suffix}"
+    raw = legacy_question(question_id, "迁移旧标题")
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                User(
+                    username=owner,
+                    password_hash=hash_password("migration-pass"),
+                    role="teacher",
+                    status="active",
+                )
+            )
+            await db.flush()
+            db.add(
+                QuestionBank(
+                    id=bank_id,
+                    owner_id=owner,
+                    name="迁移锁顺序题库",
+                    subject="PMP",
+                    visibility="private",
+                )
+            )
+            await db.flush()
+            db.add(
+                Question(
+                    id=question_id,
+                    bank_id=bank_id,
+                    title=raw["title"],
+                    type="single_choice",
+                    subject="PMP",
+                    scope="internal",
+                    content_hash=None,
+                    revision=1,
+                    tags=raw["tags"],
+                    stem_parts=raw["stemParts"],
+                    options=raw["options"],
+                    correct_answer="B",
+                    analysis=raw["analysis"],
+                    translations=raw["translations"],
+                    content_metadata={},
+                    key_path=raw["keyPath"],
+                    lifecycle=raw["lifecycle"],
+                )
+            )
+            db.add(
+                RuntimeState(
+                    owner_id=owner,
+                    storage={
+                        f"kg_question_banks_v1__user__{owner}": json.dumps(
+                            [
+                                {
+                                    "id": bank_id,
+                                    "name": "迁移锁顺序题库",
+                                    "subject": "PMP",
+                                    "questions": [raw],
+                                }
+                            ],
+                            ensure_ascii=False,
+                        )
+                    },
+                    revision=1,
+                )
+            )
+            await db.commit()
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(Question).where(Question.id == question_id))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.execute(delete(RuntimeState).where(RuntimeState.owner_id == owner))
+            await db.execute(delete(User).where(User.username == owner))
+            await db.commit()
+
+    async def scenario() -> None:
+        migration_at_lock = asyncio.Event()
+        competitor_done = asyncio.Event()
+        original_acquire = teaching_content_revision_service.acquire_lock
+
+        async def gated_acquire(db) -> None:
+            if db.info.get("migration_lock_probe"):
+                migration_at_lock.set()
+                await asyncio.wait_for(competitor_done.wait(), timeout=10)
+            await original_acquire(db)
+
+        monkeypatch.setattr(
+            teaching_content_revision_service,
+            "acquire_lock",
+            gated_acquire,
+        )
+
+        async def migrate() -> object:
+            async with AsyncSessionLocal() as db:
+                db.info["migration_lock_probe"] = True
+                return await migrate_runtime_questions(
+                    db,
+                    apply=True,
+                    owner_ids={owner},
+                    bank_ids={bank_id},
+                )
+
+        async def relational_update() -> None:
+            await asyncio.wait_for(migration_at_lock.wait(), timeout=10)
+            async with AsyncSessionLocal() as db:
+                actor = await db.get(User, owner)
+                assert actor is not None
+                updated = await question_service.update_question(
+                    db,
+                    actor,
+                    question_id,
+                    {"title": "并发关系表新标题"},
+                )
+                assert updated is not None
+            competitor_done.set()
+
+        report, _ = await asyncio.gather(migrate(), relational_update())
+        async with AsyncSessionLocal() as db:
+            question = await db.get(Question, question_id)
+            assert question is not None
+            assert question.title == "并发关系表新标题"
+            assert question.revision == 2
+        assert report.applied is False
+        assert any(
+            item["code"] == "QUESTION_CONTENT_CONFLICT"
+            for item in report.conflicts
+        )
 
     asyncio.run(seed())
     try:

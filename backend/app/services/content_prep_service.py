@@ -37,6 +37,8 @@ from app.services import (
     content_reference_service,
     question_access_service,
     question_catalog_service,
+    teaching_content_projection_service,
+    teaching_content_revision_service,
 )
 from app.services.question_content_service import (
     canonical_question_hash,
@@ -137,6 +139,7 @@ async def create_bank(
     actor: User,
     body: dict,
 ) -> QuestionBank:
+    await teaching_content_revision_service.acquire_lock(db)
     resolve_creator(body.get("creatorId"))
     visibility = str(body.get("visibility") or "private").strip().lower()
     if visibility not in {"private", "published"}:
@@ -160,6 +163,11 @@ async def create_bank(
         updated_by=actor.username,
     )
     db.add(bank)
+    await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        [{"entityType": "bank", "entityId": bank.id, "action": "created"}],
+    )
     await db.commit()
     await db.refresh(bank)
     return bank
@@ -226,6 +234,69 @@ def _manifest_hash(request: ContentPrepBatchRequest) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _legacy_save_manifest_hash(
+    request: ContentPrepQuestionSaveRequest,
+    bank_id: str,
+) -> str:
+    manifest = {
+        "clientInstanceId": request.client_instance_id,
+        "targetBankId": bank_id,
+        "creatorId": None,
+        "prepVersion": request.prep_version,
+        "workspaceVersion": request.workspace_version,
+        "questions": [
+            {
+                "id": request.question.id,
+                "baseRevision": request.base_revision,
+                "contentHash": canonical_question_hash(
+                    request.question.model_dump(by_alias=True)
+                ),
+            }
+        ],
+        "principles": request.principles,
+        "synthesisPresets": request.synthesis_presets,
+        "tagConfig": request.tag_config,
+    }
+    canonical = json.dumps(
+        manifest,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _single_save_manifest_hash(
+    request: ContentPrepQuestionSaveRequest,
+    batch: QuestionUploadBatch,
+) -> str:
+    if batch.creator_id is None:
+        if request.creator_id is not None:
+            return ""
+        return _legacy_save_manifest_hash(request, batch.bank_id)
+    if request.creator_id is not None and request.creator_id != batch.creator_id:
+        return ""
+    batch_request = ContentPrepBatchRequest(
+        idempotencyKey=request.idempotency_key,
+        clientInstanceId=request.client_instance_id,
+        targetBankId=batch.bank_id,
+        creatorId=batch.creator_id,
+        prepVersion=request.prep_version,
+        workspaceVersion=request.workspace_version,
+        questions=[
+            {
+                "question": request.question,
+                "baseRevision": request.base_revision,
+                "lockToken": request.lock_token,
+            }
+        ],
+        principles=request.principles,
+        synthesisPresets=request.synthesis_presets,
+        tagConfig=request.tag_config,
+    )
+    return _manifest_hash(batch_request)
+
+
 def _advisory_key(actor_username: str, idempotency_key: str) -> int:
     digest = hashlib.sha256(
         f"{actor_username}\0{idempotency_key}".encode("utf-8")
@@ -247,22 +318,15 @@ async def _lock_configuration_inputs(
     db: AsyncSession,
     request: ContentPrepBatchRequest,
 ) -> None:
-    keys = {
-        f"content-prep:principle:{item.get('id')}"
-        for item in _incoming_items(request.principles)
-        if item.get("id")
-    }
-    keys.update(
-        f"content-prep:preset:{item.get('id')}"
-        for item in _incoming_items(request.synthesis_presets)
-        if item.get("id")
-    )
-    if request.tag_config:
-        keys.add("content-prep:active-tag-config")
-    for key in sorted(keys):
-        digest = hashlib.sha256(key.encode("utf-8")).digest()
-        advisory_key = int.from_bytes(digest[:8], byteorder="big", signed=True)
-        await db.execute(select(func.pg_advisory_xact_lock(advisory_key)))
+    # The teaching-content revision lock is already held before this helper.
+    # Only the independent singleton tag-config row needs its historical lock;
+    # principle/preset per-ID advisory locks would add N round-trips without
+    # increasing serialization.
+    if not request.tag_config:
+        return
+    digest = hashlib.sha256(b"content-prep:active-tag-config").digest()
+    advisory_key = int.from_bytes(digest[:8], byteorder="big", signed=True)
+    await db.execute(select(func.pg_advisory_xact_lock(advisory_key)))
 
 
 async def _existing_batch_for_update(
@@ -573,10 +637,23 @@ async def _upsert_principles(
     db: AsyncSession,
     actor: _ActorContext,
     container: dict[str, Any],
-) -> None:
-    for item in _incoming_items(container):
-        principle_id = str(item.get("id"))
-        existing = await db.get(Principle, principle_id)
+) -> list[dict[str, str]]:
+    changes: list[dict[str, str]] = []
+    items = _incoming_items(container)
+    ids = [str(item.get("id") or "").strip() for item in items]
+    existing_by_id = {
+        row.id: row
+        for row in (
+            await db.execute(
+                select(Principle)
+                .where(Principle.id.in_(ids))
+                .with_for_update()
+            )
+        ).scalars().all()
+    } if ids else {}
+    for item in items:
+        principle_id = str(item.get("id") or "").strip()
+        existing = existing_by_id.get(principle_id)
         values = {
             "name": str(item.get("name") or "").strip(),
             "status": (
@@ -585,7 +662,9 @@ async def _upsert_principles(
                 else "active"
             ),
             "confusable_principle_ids": [
-                str(value) for value in (item.get("confusablePrincipleIds") or [])
+                str(value).strip()
+                for value in (item.get("confusablePrincipleIds") or [])
+                if str(value).strip()
             ],
         }
         if existing is None:
@@ -598,6 +677,9 @@ async def _upsert_principles(
                     updated_by=actor.username,
                 )
             )
+            changes.append(
+                {"entityType": "principle", "entityId": principle_id, "action": "created"}
+            )
         else:
             changed = any(getattr(existing, key) != value for key, value in values.items())
             if changed:
@@ -605,18 +687,35 @@ async def _upsert_principles(
                     setattr(existing, key, value)
                 existing.revision += 1
                 existing.updated_by = actor.username
+                changes.append(
+                    {"entityType": "principle", "entityId": principle_id, "action": "updated"}
+                )
+    return changes
 
 
 async def _upsert_presets(
     db: AsyncSession,
     actor: _ActorContext,
     container: dict[str, Any],
-) -> None:
-    for item in _incoming_items(container):
-        preset_id = str(item.get("id"))
-        existing = await db.get(SynthesisPreset, preset_id)
+) -> list[dict[str, str]]:
+    changes: list[dict[str, str]] = []
+    items = _incoming_items(container)
+    ids = [str(item.get("id") or "").strip() for item in items]
+    existing_by_id = {
+        row.id: row
+        for row in (
+            await db.execute(
+                select(SynthesisPreset)
+                .where(SynthesisPreset.id.in_(ids))
+                .with_for_update()
+            )
+        ).scalars().all()
+    } if ids else {}
+    for item in items:
+        preset_id = str(item.get("id") or "").strip()
+        existing = existing_by_id.get(preset_id)
         values = {
-            "principle_id": str(item.get("principleId") or ""),
+            "principle_id": str(item.get("principleId") or "").strip(),
             "title": str(item.get("title") or "").strip(),
             "content": str(item.get("content") or item.get("description") or "").strip(),
             "status": str(item.get("status") or "draft"),
@@ -632,6 +731,13 @@ async def _upsert_presets(
                     updated_by=actor.username,
                 )
             )
+            changes.append(
+                {
+                    "entityType": "synthesisPreset",
+                    "entityId": preset_id,
+                    "action": "created",
+                }
+            )
         else:
             changed = any(getattr(existing, key) != value for key, value in values.items())
             if changed:
@@ -639,6 +745,14 @@ async def _upsert_presets(
                     setattr(existing, key, value)
                 existing.revision += 1
                 existing.updated_by = actor.username
+                changes.append(
+                    {
+                        "entityType": "synthesisPreset",
+                        "entityId": preset_id,
+                        "action": "updated",
+                    }
+                )
+    return changes
 
 
 def _tag_config_values(config: dict[str, Any]) -> dict[str, Any]:
@@ -911,6 +1025,7 @@ async def _execute_upload(
 ) -> ContentPrepBatchResult:
     from app.services import question_lock_service
 
+    await teaching_content_revision_service.acquire_lock(db)
     await _lock_idempotency_key(db, actor.username, request.idempotency_key)
     existing_batch = await _existing_batch_for_update(
         db,
@@ -928,6 +1043,10 @@ async def _execute_upload(
             )
         if existing_batch.status == "committed":
             replayed = dict(existing_batch.result or {})
+            if "contentRevision" not in replayed:
+                replayed["contentRevision"] = int(
+                    (await teaching_content_revision_service.current(db))["revision"]
+                )
             replayed["replayed"] = True
             return ContentPrepBatchResult.model_validate(replayed)
         if existing_batch.status == "rolled_back":
@@ -987,10 +1106,19 @@ async def _execute_upload(
                 batch_id=batch_id,
             ) from error
 
-    await _upsert_principles(db, actor, request.principles)
+    content_changes = await _upsert_principles(db, actor, request.principles)
     await db.flush()
-    await _upsert_presets(db, actor, request.synthesis_presets)
+    content_changes.extend(
+        await _upsert_presets(db, actor, request.synthesis_presets)
+    )
     await _upsert_tag_config(db, actor, request.tag_config)
+    if content_changes or not await (
+        teaching_content_projection_service.projection_rows_present(db)
+    ):
+        await teaching_content_projection_service.write_principle_projection(
+            db,
+            actor.username,
+        )
 
     question_results: list[ContentPrepQuestionResult] = []
     created_count = 0
@@ -1022,6 +1150,9 @@ async def _execute_upload(
             before_revision = None
             action = "question_created"
             created_count += 1
+            content_changes.append(
+                {"entityType": "question", "entityId": question_id, "action": "created"}
+            )
         elif prepared_question.status == "updated":
             question = prepared_question.existing
             assert question is not None
@@ -1041,6 +1172,9 @@ async def _execute_upload(
             revision = question.revision
             action = "question_updated"
             updated_count += 1
+            content_changes.append(
+                {"entityType": "question", "entityId": question_id, "action": "updated"}
+            )
             if prepared_question.lock is not None:
                 await db.delete(prepared_question.lock)
         else:
@@ -1082,10 +1216,19 @@ async def _execute_upload(
     if created_count or updated_count:
         bank.revision += 1
         bank.updated_by = actor.username
+        content_changes.append(
+            {"entityType": "bank", "entityId": bank.id, "action": "updated"}
+        )
+    content_revision = await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        content_changes,
+    )
     result = ContentPrepBatchResult(
         batchId=batch_id,
         bankId=bank.id,
         bankRevision=bank.revision,
+        contentRevision=content_revision["revision"],
         replayed=False,
         questions=question_results,
     )
@@ -1117,6 +1260,34 @@ async def save_legacy_question_without_creator(
     if db.in_transaction():
         await db.rollback()
     async with db.begin():
+        await teaching_content_revision_service.acquire_lock(db)
+        await _lock_idempotency_key(
+            db,
+            actor_context.username,
+            request.idempotency_key,
+        )
+        existing_batch = await _existing_batch_for_update(
+            db,
+            actor_context.username,
+            request.idempotency_key,
+        )
+        if existing_batch is not None:
+            manifest_hash = _legacy_save_manifest_hash(
+                request,
+                existing_batch.bank_id,
+            )
+            if existing_batch.manifest_hash != manifest_hash:
+                raise ContentPrepOperationError(
+                    "IDEMPOTENCY_PAYLOAD_CONFLICT",
+                    "相同幂等键不能用于不同上传内容",
+                    status_code=409,
+                    batch_id=existing_batch.id,
+                    record_failure=False,
+                )
+            if existing_batch.status == "committed":
+                return dict(existing_batch.result or {})
+            if existing_batch.status == "rolled_back":
+                raise _error_from_failed_batch(existing_batch)
         actor_row = await db.get(User, actor_context.username)
         if actor_row is None:
             raise ContentPrepOperationError(
@@ -1139,6 +1310,7 @@ async def save_legacy_question_without_creator(
                 status_code=404,
                 record_failure=False,
             )
+        manifest_hash = _legacy_save_manifest_hash(request, question.bank_id)
         await question_access_service.require_bank_access(
             db,
             actor_row,
@@ -1213,14 +1385,106 @@ async def save_legacy_question_without_creator(
         bank.revision += 1
         bank.updated_by = actor_context.username
         await db.delete(lock)
+        content_revision = await teaching_content_revision_service.bump(
+            db,
+            actor_context.username,
+            [
+                {
+                    "entityType": "question",
+                    "entityId": question.id,
+                    "action": "updated",
+                },
+                {"entityType": "bank", "entityId": bank.id, "action": "updated"},
+            ],
+        )
         await db.flush()
         await db.refresh(question)
         await db.refresh(bank)
-        return {
+        result = {
             "batchId": batch_id,
             "bankId": bank.id,
             "bankRevision": bank.revision,
+            "contentRevision": content_revision["revision"],
             "question": question_catalog_service.question_to_payload(question),
+        }
+        db.add(
+            QuestionUploadBatch(
+                id=batch_id,
+                idempotency_key=request.idempotency_key,
+                bank_id=bank.id,
+                actor_username=actor_context.username,
+                actor_role=actor_context.role,
+                creator_id=None,
+                creator_name=None,
+                client_instance_id=request.client_instance_id,
+                prep_version=request.prep_version,
+                workspace_version=request.workspace_version,
+                manifest_hash=manifest_hash,
+                input_count=1,
+                created_count=0,
+                updated_count=1,
+                skipped_count=0,
+                status="committed",
+                result=result,
+                error_summary={},
+                committed_at=now_utc(),
+            )
+        )
+        await db.flush()
+        return result
+
+
+async def replay_single_question_save(
+    db: AsyncSession,
+    actor: User,
+    request: ContentPrepQuestionSaveRequest,
+) -> dict[str, Any] | None:
+    """Replay a committed single-save before consulting mutable question state."""
+
+    actor_context = _actor_context(actor)
+    if db.in_transaction():
+        await db.rollback()
+    async with db.begin():
+        await teaching_content_revision_service.acquire_lock(db)
+        await _lock_idempotency_key(
+            db,
+            actor_context.username,
+            request.idempotency_key,
+        )
+        batch = await _existing_batch_for_update(
+            db,
+            actor_context.username,
+            request.idempotency_key,
+        )
+        if batch is None:
+            return None
+        if batch.manifest_hash != _single_save_manifest_hash(request, batch):
+            raise ContentPrepOperationError(
+                "IDEMPOTENCY_PAYLOAD_CONFLICT",
+                "相同幂等键不能用于不同上传内容",
+                status_code=409,
+                batch_id=batch.id,
+                record_failure=False,
+            )
+        if batch.status == "rolled_back":
+            raise _error_from_failed_batch(batch)
+        if batch.status != "committed":
+            raise ContentPrepOperationError(
+                "BATCH_IN_PROGRESS",
+                "该幂等请求正在处理中",
+                status_code=409,
+                batch_id=batch.id,
+                record_failure=False,
+            )
+        if batch.creator_id is None:
+            return dict(batch.result or {})
+        result = ContentPrepBatchResult.model_validate(batch.result or {})
+        return {
+            "batchId": result.batch_id,
+            "bankId": result.bank_id,
+            "bankRevision": result.bank_revision,
+            "contentRevision": result.content_revision,
+            "question": result.questions[0].model_dump(by_alias=True),
         }
 
 
@@ -1239,6 +1503,7 @@ async def record_failed_batch(
     if db.in_transaction():
         await db.rollback()
     async with db.begin():
+        await teaching_content_revision_service.acquire_lock(db)
         await _lock_idempotency_key(
             db,
             actor_context.username,

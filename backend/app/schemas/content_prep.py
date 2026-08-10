@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.question_catalog import QuestionPayload
+from app.services import teaching_content_projection_service
 
 
 class QuestionSyncItem(BaseModel):
@@ -30,6 +31,22 @@ class ContentPrepBatchRequest(BaseModel):
     synthesis_presets: dict[str, Any] = Field(default_factory=dict, alias="synthesisPresets")
     tag_config: dict[str, Any] = Field(default_factory=dict, alias="tagConfig")
 
+    @field_validator("principles")
+    @classmethod
+    def validate_principles(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return teaching_content_projection_service.validate_projection_container(
+            teaching_content_projection_service.PRINCIPLE_KEY,
+            value,
+        )
+
+    @field_validator("synthesis_presets")
+    @classmethod
+    def validate_synthesis_presets(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return teaching_content_projection_service.validate_projection_container(
+            teaching_content_projection_service.PRESET_KEY,
+            value,
+        )
+
 
 class ContentPrepQuestionSaveRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -45,6 +62,22 @@ class ContentPrepQuestionSaveRequest(BaseModel):
     principles: dict[str, Any] = Field(default_factory=dict)
     synthesis_presets: dict[str, Any] = Field(default_factory=dict, alias="synthesisPresets")
     tag_config: dict[str, Any] = Field(default_factory=dict, alias="tagConfig")
+
+    @field_validator("principles")
+    @classmethod
+    def validate_principles(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return teaching_content_projection_service.validate_projection_container(
+            teaching_content_projection_service.PRINCIPLE_KEY,
+            value,
+        )
+
+    @field_validator("synthesis_presets")
+    @classmethod
+    def validate_synthesis_presets(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return teaching_content_projection_service.validate_projection_container(
+            teaching_content_projection_service.PRESET_KEY,
+            value,
+        )
 
 
 class ContentPrepQuestionResult(BaseModel):

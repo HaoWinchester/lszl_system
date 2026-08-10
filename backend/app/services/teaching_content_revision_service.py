@@ -82,15 +82,30 @@ async def current(db: AsyncSession) -> dict[str, Any]:
     return _parse_payload(row.value) if row is not None else _empty_payload()
 
 
+async def acquire_lock(db: AsyncSession) -> None:
+    """Serialize teaching-content transactions before they touch domain rows."""
+
+    await db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+        {"key": REVISION_KEY},
+    )
+
+
+async def acquire_read_lock(db: AsyncSession) -> None:
+    """Hold a shared snapshot lock while allowing other readers to overlap."""
+
+    await db.execute(
+        text("SELECT pg_advisory_xact_lock_shared(hashtextextended(:key, 0))"),
+        {"key": REVISION_KEY},
+    )
+
+
 async def bump(
     db: AsyncSession,
     actor_username: str,
     changes: list[dict[str, str]],
 ) -> dict[str, Any]:
-    await db.execute(
-        text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
-        {"key": REVISION_KEY},
-    )
+    await acquire_lock(db)
     row = (
         await db.execute(
             select(SharedRuntimeState)

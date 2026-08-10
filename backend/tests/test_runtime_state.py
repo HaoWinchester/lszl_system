@@ -45,6 +45,9 @@ def test_runtime_state_is_saved_in_postgres_and_preloaded_after_refresh() -> Non
     with TestClient(app) as client:
         login(client, "学生")
         initial = bootstrap(client.get("/guided-learning-node.html?node=awareness-keywords").text)
+        content_before = client.get("/api/v1/runtime/state").json()[
+            "contentRevision"
+        ]
         response = client.put(
             "/api/v1/runtime/state",
             json=update_payload(
@@ -54,10 +57,16 @@ def test_runtime_state_is_saved_in_postgres_and_preloaded_after_refresh() -> Non
             ),
         )
         assert response.status_code == 200, response.text
+        assert response.json()["contentRevision"] == initial["contentRevision"]
+        content_after = client.get("/api/v1/runtime/state").json()[
+            "contentRevision"
+        ]
         refreshed = bootstrap(client.get("/guided-learning-node.html?node=awareness-keywords").text)
 
     assert refreshed["storage"]["kg_default_entry_mode_v1"] == "free"
     assert refreshed["revision"] == response.json()["revision"]
+    assert refreshed["contentRevision"] == initial["contentRevision"]
+    assert content_after == content_before
 
 
 def test_frontend_compatibility_contract_matches_backend_storage_allowlist() -> None:

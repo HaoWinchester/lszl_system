@@ -3,6 +3,9 @@ import json
 import re
 
 from app.main import app
+from app.db.session import AsyncSessionLocal
+from app.services import runtime_state_service
+from app.services import teaching_content_revision_service as revision_service
 from app.web.releases import active_release
 
 
@@ -97,6 +100,7 @@ def test_html_injects_authenticated_user_before_state_bootstrap() -> None:
         login = client.post("/api/v1/auth/login", json={"username": "佩奇007", "password": "111111"})
         assert login.status_code == 200
         response = client.get("/practice-mode.html")
+        revision = client.get("/api/v1/question-catalog/revision")
 
     marker = "window.__KG_DIRECT_BOOTSTRAP__="
     assert marker in response.text
@@ -104,6 +108,57 @@ def test_html_injects_authenticated_user_before_state_bootstrap() -> None:
     payload = _bootstrap(response.text)
     assert payload["authUser"]["username"] == "佩奇007"
     assert payload["authUser"]["role"] == "admin"
+    assert revision.status_code == 200
+    assert payload["contentRevision"] == revision.json()["revision"]
+
+
+def test_html_bootstrap_does_not_pair_old_state_with_a_later_content_token(
+    monkeypatch,
+) -> None:
+    original_ensure = runtime_state_service.ensure_domain_seed
+    captured: dict[str, int] = {}
+
+    async def competing_bump() -> None:
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                await revision_service.bump(
+                    db,
+                    "bootstrap-competitor",
+                    [
+                        {
+                            "entityType": "runtimeShared",
+                            "entityId": "bootstrap-competitor",
+                            "action": "updated",
+                        }
+                    ],
+                )
+
+    async def writer_after_snapshot(*args, **kwargs):
+        result = await original_ensure(*args, **kwargs)
+        if not captured:
+            if len(result) == 3:
+                captured["contentRevision"] = int(result[2])
+            else:
+                async with AsyncSessionLocal() as db:
+                    captured["contentRevision"] = int(
+                        (await revision_service.current(db))["revision"]
+                    )
+            await competing_bump()
+        return result
+
+    monkeypatch.setattr(
+        runtime_state_service,
+        "ensure_domain_seed",
+        writer_after_snapshot,
+    )
+    with TestClient(app) as client:
+        assert client.post(
+            "/api/v1/auth/login",
+            json={"username": "admin", "password": "admin123"},
+        ).status_code == 200
+        payload = _bootstrap(client.get("/practice-mode.html").text)
+
+    assert payload["contentRevision"] == captured["contentRevision"]
 
 
 def test_guest_html_injects_anonymous_bootstrap() -> None:

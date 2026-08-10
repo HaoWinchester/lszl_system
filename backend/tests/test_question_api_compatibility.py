@@ -13,7 +13,7 @@ from app.main import app
 from app.models.content_prep import QuestionBankCollaborator
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.user import User
-from app.services import question_service
+from app.services import question_service, teaching_content_revision_service
 
 
 PASSWORD = "legacy-question-pass"
@@ -771,26 +771,26 @@ def test_concurrent_compose_and_publish_share_one_atomic_revision(monkeypatch) -
             await db.commit()
 
     async def run_race() -> dict:
-        original_execute = AsyncSession.execute
+        original_acquire_lock = teaching_content_revision_service.acquire_lock
         arrival_lock = asyncio.Lock()
         both_arrived = asyncio.Event()
         arrivals = 0
 
-        async def gated_execute(self, statement, *args, **kwargs):
+        async def gated_acquire_lock(db: AsyncSession) -> None:
             nonlocal arrivals
-            table = getattr(statement, "table", None)
-            if (
-                getattr(statement, "is_update", False)
-                and getattr(table, "name", None) == "exam_papers"
-            ):
+            if arrivals < 2:
                 async with arrival_lock:
                     arrivals += 1
                     if arrivals == 2:
                         both_arrived.set()
                 await asyncio.wait_for(both_arrived.wait(), timeout=5)
-            return await original_execute(self, statement, *args, **kwargs)
+            await original_acquire_lock(db)
 
-        monkeypatch.setattr(AsyncSession, "execute", gated_execute)
+        monkeypatch.setattr(
+            teaching_content_revision_service,
+            "acquire_lock",
+            gated_acquire_lock,
+        )
 
         async with AsyncSessionLocal() as compose_db, AsyncSessionLocal() as publish_db:
             compose_actor = await compose_db.get(User, teacher_b)

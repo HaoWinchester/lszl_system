@@ -1,6 +1,8 @@
 import asyncio
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from threading import Barrier
 from urllib.parse import quote
 from uuid import uuid4
 
@@ -14,7 +16,9 @@ from app.main import app
 from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.subscription import Subscription
+from app.models.user import User
 from app.services import runtime_state_service as service
+from app.services import teaching_content_revision_service as revision_service
 from app.web.schemas import RuntimeMutation, RuntimeStateUpdate
 
 
@@ -164,8 +168,6 @@ def test_private_activity_collections_are_only_visible_to_their_owner() -> None:
     "key",
     [
         "kg_question_banks_published_v1",
-        "kg_principle_repository_v1",
-        "kg_synthesis_preset_repository_v1",
         "kg_question_tag_names_v1",
         "kg_question_banks_v1__user__teacher-a",
     ],
@@ -309,6 +311,11 @@ def _runtime_storage(client: TestClient) -> dict[str, str]:
     return response.json()["storage"]
 
 
+async def _content_revision() -> int:
+    async with AsyncSessionLocal() as db:
+        return int((await revision_service.current(db))["revision"])
+
+
 def _write_runtime(client: TestClient, key: str, value: str, request_id: str):
     state = client.get("/api/v1/runtime/state")
     assert state.status_code == 200, state.text
@@ -325,6 +332,7 @@ def _write_runtime(client: TestClient, key: str, value: str, request_id: str):
             "mutations": [{"operation": "setItem", "key": key, "value": value}],
             "requestId": request_id,
             "revision": state.json()["revision"],
+            "contentRevision": state.json()["contentRevision"],
         },
     )
 
@@ -338,6 +346,8 @@ def _direct_runtime_mutation(
     request_id: str,
     value: str | None = None,
 ):
+    content_revision = client.get("/api/v1/question-catalog/revision")
+    assert content_revision.status_code == 200, content_revision.text
     mutation = {"operation": operation, "key": key}
     if value is not None:
         mutation["value"] = value
@@ -354,6 +364,7 @@ def _direct_runtime_mutation(
             "mutations": [mutation],
             "requestId": request_id,
             "revision": revision,
+            "contentRevision": content_revision.json()["revision"],
         },
     )
 
@@ -684,7 +695,25 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
         }
         asyncio.run(_seed_legacy_runtime_states(storages))
 
-        first = _runtime_storage(clients["teacher_b"])
+        before_promotion_revision = asyncio.run(_content_revision())
+        arrival = Barrier(2)
+
+        def first_read(account: str):
+            arrival.wait(timeout=10)
+            return clients[account].get("/api/v1/runtime/state")
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first_responses = list(
+                pool.map(first_read, ("teacher_b", "admin_a"))
+            )
+        assert all(response.status_code == 200 for response in first_responses)
+        assert {
+            response.json()["contentRevision"] for response in first_responses
+        } == {before_promotion_revision + 1}
+        first_response = first_responses[0]
+        first = first_response.json()["storage"]
+        assert first_response.json()["contentRevision"] == before_promotion_revision + 1
+        assert asyncio.run(_content_revision()) == before_promotion_revision + 1
         for account in ("admin_a", "teacher_b", "teacher_c"):
             storage = first if account == "teacher_b" else _runtime_storage(clients[account])
             courses = {row["id"]: row for row in json.loads(
@@ -741,6 +770,7 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
         before_repeat = dict(promoted)
         assert _runtime_storage(clients["admin_a"])
         assert asyncio.run(_read_shared_values(canonical_keys)) == before_repeat
+        assert asyncio.run(_content_revision()) == before_promotion_revision + 1
 
         unrelated = _write_runtime(
             clients["admin_a"],
@@ -827,6 +857,7 @@ def test_first_direct_manager_mutation_promotes_before_set_or_remove(
             )
         }))
 
+        before_promotion_revision = asyncio.run(_content_revision())
         response = _direct_runtime_mutation(
             client,
             operation=operation,
@@ -836,6 +867,8 @@ def test_first_direct_manager_mutation_promotes_before_set_or_remove(
             request_id=f"pytest-direct-promotion-{operation}-{token}",
         )
         assert response.status_code == 200, response.text
+        assert response.json()["contentRevision"] == before_promotion_revision + 2
+        assert asyncio.run(_content_revision()) == before_promotion_revision + 2
         storage = _runtime_storage(client)
         if replacement is None:
             assert key not in storage
@@ -865,6 +898,185 @@ def test_first_direct_manager_mutation_promotes_before_set_or_remove(
             provisioner.close()
         if cleanup_errors:
             raise cleanup_errors[0]
+
+
+def test_promotion_cas_exemption_rejects_a_competitor_in_the_commit_window(
+    monkeypatch,
+) -> None:
+    token = uuid4().hex[:10]
+    username = f"promotion_window_{token}"
+    key = "kg_course_config_drafts_v1"
+    marker_key = "kg_teacher_shared_runtime_promotion_v1"
+    snapshot = asyncio.run(_snapshot_teacher_promotion_rows())
+    asyncio.run(_delete_shared_rows(set(snapshot) | {marker_key, key}))
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                User(
+                    username=username,
+                    password_hash="unused",
+                    role="teacher",
+                    status="active",
+                )
+            )
+            await db.flush()
+            db.add(
+                RuntimeState(
+                    owner_id=username,
+                    storage={key: json.dumps([{"id": "legacy"}])},
+                    revision=7,
+                )
+            )
+            await db.commit()
+
+    async def cleanup() -> None:
+        await _restore_teacher_promotion_rows(snapshot)
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(RuntimeState).where(RuntimeState.owner_id == username))
+            await db.execute(delete(User).where(User.username == username))
+            await db.commit()
+
+    async def scenario() -> None:
+        base_revision = await _content_revision()
+        reached_put_lock = asyncio.Event()
+        release_put_lock = asyncio.Event()
+        original_acquire = revision_service.acquire_lock
+        main_acquire_calls = 0
+
+        async def gated_acquire(db) -> None:
+            nonlocal main_acquire_calls
+            if db.info.get("promotion_window_main"):
+                main_acquire_calls += 1
+                if main_acquire_calls == 3:
+                    reached_put_lock.set()
+                    await asyncio.wait_for(release_put_lock.wait(), timeout=10)
+            await original_acquire(db)
+
+        monkeypatch.setattr(revision_service, "acquire_lock", gated_acquire)
+
+        async def competing_write() -> None:
+            await asyncio.wait_for(reached_put_lock.wait(), timeout=10)
+            async with AsyncSessionLocal() as db:
+                async with db.begin():
+                    await revision_service.acquire_lock(db)
+                    row = await db.get(SharedRuntimeState, key)
+                    assert row is not None
+                    row.value = json.dumps([{"id": "competitor"}])
+                    row.updated_by = "promotion-competitor"
+                    await revision_service.bump(
+                        db,
+                        "promotion-competitor",
+                        [
+                            {
+                                "entityType": "runtimeShared",
+                                "entityId": key,
+                                "action": "updated",
+                            }
+                        ],
+                    )
+            release_put_lock.set()
+
+        async def stale_put() -> service.RuntimeStateConflictError:
+            async with AsyncSessionLocal() as db:
+                db.info["promotion_window_main"] = True
+                request = RuntimeStateUpdate(
+                    page="question-bank.html",
+                    namespace="questions",
+                    operation="setItem",
+                    key=key,
+                    value=json.dumps([{"id": "stale-request"}]),
+                    storage={},
+                    snapshotMode="merge",
+                    mutations=[
+                        RuntimeMutation(
+                            operation="setItem",
+                            key=key,
+                            value=json.dumps([{"id": "stale-request"}]),
+                        )
+                    ],
+                    requestId=f"promotion-window-{token}",
+                    revision=7,
+                    contentRevision=base_revision,
+                )
+                with pytest.raises(service.RuntimeStateConflictError) as conflict:
+                    await service.apply_update(db, username, "teacher", request)
+                return conflict.value
+
+        conflict, _ = await asyncio.gather(stale_put(), competing_write())
+        assert conflict.current_content_revision == base_revision + 2
+        async with AsyncSessionLocal() as db:
+            row = await db.get(SharedRuntimeState, key)
+            assert row is not None
+            assert json.loads(row.value) == [{"id": "competitor"}]
+            assert int((await revision_service.current(db))["revision"]) == base_revision + 2
+
+    asyncio.run(seed())
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_promotion_with_identical_shared_content_does_not_bump_revision() -> None:
+    """Catches marker-only promotion creating a false teaching-content revision."""
+
+    token = uuid4().hex[:10]
+    username = f"promotion_noop_{token}"
+    key = "kg_course_config_drafts_v1"
+    marker_key = "kg_teacher_shared_runtime_promotion_v1"
+    snapshot = asyncio.run(_snapshot_teacher_promotion_rows())
+    value = json.dumps([{"id": f"same-{token}"}])
+    other_states: dict[str, dict[str, str]] = {}
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            rows = (
+                await db.execute(
+                    select(RuntimeState)
+                    .join(User, User.username == RuntimeState.owner_id)
+                    .where(User.role.in_(("admin", "teacher")))
+                )
+            ).scalars().all()
+            for row in rows:
+                other_states[row.owner_id] = dict(row.storage or {})
+                row.storage = {}
+            db.add(User(username=username, password_hash="unused", role="teacher", status="active"))
+            await db.flush()
+            db.add(RuntimeState(owner_id=username, storage={key: value}, revision=1))
+            existing = await db.get(SharedRuntimeState, key)
+            if existing is None:
+                db.add(SharedRuntimeState(key=key, value=value, updated_by=username))
+            else:
+                existing.value = value
+            marker = await db.get(SharedRuntimeState, marker_key)
+            if marker is not None:
+                await db.delete(marker)
+            await db.commit()
+
+    async def scenario() -> None:
+        before = await _content_revision()
+        async with AsyncSessionLocal() as db:
+            storage, _, _ = await service.get_state(db, username, "teacher")
+            assert json.loads(storage[key]) == json.loads(value)
+        assert await _content_revision() == before
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(RuntimeState).where(RuntimeState.owner_id == username))
+            await db.execute(delete(User).where(User.username == username))
+            for owner_id, storage in other_states.items():
+                row = await db.get(RuntimeState, owner_id)
+                if row is not None:
+                    row.storage = storage
+            await db.commit()
+        await _restore_teacher_promotion_rows(snapshot)
+
+    asyncio.run(seed())
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(cleanup())
 
 
 def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers() -> None:
