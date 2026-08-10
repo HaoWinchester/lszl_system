@@ -1,26 +1,34 @@
-"""Read-only classification and report phase for shared-question cleanup.
+"""Content-addressed reporting and guarded apply for shared-question cleanup.
 
-This module intentionally contains no apply, delete, or commit logic.  The
-report is a content-addressed inventory for human review before any destructive
-phase is authorized.
+Report construction is read-only.  The separate apply entrypoint requires an
+approved closed manifest, verified backup receipt, locked snapshot recheck,
+transactional repairs, and an append-only audit before it commits.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from collections import Counter
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from enum import Enum
 import hashlib
+import hmac
 import json
+from pathlib import Path
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.content_prep import QuestionAuditLog, QuestionUploadBatch
-from app.models.question import Question
+from app.models.content_prep import (
+    QuestionAuditLog,
+    QuestionEditLock,
+    QuestionUploadBatch,
+)
+from app.models.question import Question, QuestionBank, QuestionCleanupAudit
+from app.models.training import LearningEvent, RecallProgress, TrainingProgress
 from app.schemas.question_cleanup import (
     QuestionCleanupDecision,
     QuestionCleanupReport,
@@ -28,7 +36,9 @@ from app.schemas.question_cleanup import (
     QuestionCleanupSummary,
 )
 from app.services.question_cleanup_reference_service import (
+    QuestionCleanupReferenceRepairError,
     inventory_question_references,
+    repair_current_question_references,
 )
 from app.services import teaching_content_revision_service
 
@@ -397,6 +407,479 @@ class QuestionCleanupReviewDecisionError(ValueError):
     """The human-review file does not exactly resolve one report's review set."""
 
 
+class QuestionCleanupApplyError(ValueError):
+    """The approved cleanup cannot be safely applied to the current snapshot."""
+
+
+@dataclass
+class QuestionCleanupBackupReceipt:
+    """Verified backup evidence supplied by the separately gated caller."""
+
+    path: str
+    sha256: str
+    confirmation: str
+
+
+@dataclass(frozen=True)
+class QuestionCleanupApplyResult:
+    """Committed cleanup identity and the counts needed by later verification."""
+
+    audit_id: str
+    manifest_hash: str
+    snapshot_hash: str
+    deleted_question_ids: list[str]
+    repaired_reference_count: int
+    preserved_reference_count: int
+    teaching_revision: int
+    repair_summary: dict[str, object]
+    completed_at: datetime
+
+
+def _validate_apply_report(report: QuestionCleanupReport) -> None:
+    if calculate_manifest_hash(report) != report.manifest_hash:
+        raise QuestionCleanupApplyError(
+            "report manifest hash does not match its current content"
+        )
+    if report.summary.review_count or report.review:
+        raise QuestionCleanupApplyError(
+            "cleanup report still contains unresolved review rows"
+        )
+    all_rows = [*report.keep, *report.delete, *report.review]
+    duplicate_ids = sorted(
+        question_id
+        for question_id, count in Counter(
+            item.question_id for item in all_rows
+        ).items()
+        if count > 1
+    )
+    if duplicate_ids:
+        raise QuestionCleanupApplyError(
+            f"cleanup report contains duplicate question IDs: {duplicate_ids}"
+        )
+    if any(item.decision != "keep_formal_import" for item in report.keep):
+        raise QuestionCleanupApplyError("cleanup keep section has an invalid decision")
+    if any(
+        item.decision not in {"delete_explicit_test", "delete_non_imported"}
+        for item in report.delete
+    ):
+        raise QuestionCleanupApplyError("cleanup delete section has an invalid decision")
+    repair_reference_count = sum(
+        row.repair_action == "remove_question_and_recalculate"
+        for row in report.references
+    )
+    preserved_reference_count = sum(
+        row.repair_action == "preserve_historical_snapshot"
+        for row in report.references
+    )
+    expected_counts = {
+        "total": len(all_rows),
+        "keep": len(report.keep),
+        "delete": len(report.delete),
+        "review": len(report.review),
+        "references": len(report.references),
+        "repairReferences": repair_reference_count,
+        "preservedReferences": preserved_reference_count,
+    }
+    actual_counts = {
+        "total": report.summary.total_count,
+        "keep": report.summary.keep_count,
+        "delete": report.summary.delete_count,
+        "review": report.summary.review_count,
+        "references": report.summary.reference_count,
+        "repairReferences": report.summary.repair_reference_count,
+        "preservedReferences": report.summary.preserved_reference_count,
+    }
+    if actual_counts != expected_counts:
+        raise QuestionCleanupApplyError("cleanup report summary counts are inconsistent")
+
+
+def _validate_backup_receipt(
+    report: QuestionCleanupReport,
+    receipt: QuestionCleanupBackupReceipt,
+) -> Path:
+    candidate = Path(str(receipt.path or "")).expanduser()
+    if not candidate.is_file():
+        raise QuestionCleanupApplyError("verified backup path does not exist")
+    actual_hash = hashlib.sha256(candidate.read_bytes()).hexdigest()
+    if not hmac.compare_digest(actual_hash, str(receipt.sha256 or "")):
+        raise QuestionCleanupApplyError("backup SHA-256 does not match its bytes")
+    expected_confirmation = f"DELETE-QUESTION-POOL:{report.manifest_hash[:12]}"
+    if not hmac.compare_digest(
+        expected_confirmation,
+        str(receipt.confirmation or ""),
+    ):
+        raise QuestionCleanupApplyError("typed confirmation token does not match")
+    return candidate.resolve()
+
+
+def _canonical_reference_rows(report: QuestionCleanupReport) -> list[dict[str, Any]]:
+    rows = [
+        row.model_dump(mode="json", by_alias=True)
+        for row in report.references
+    ]
+    return sorted(rows, key=_canonical_json)
+
+
+def _validate_approved_report_against_current(
+    approved: QuestionCleanupReport,
+    current: QuestionCleanupReport,
+) -> None:
+    if _canonical_reference_rows(approved) != _canonical_reference_rows(current):
+        raise QuestionCleanupApplyError(
+            "approved cleanup references do not match the locked report"
+        )
+
+    approved_rows = {
+        row.question_id: row
+        for row in [*approved.keep, *approved.delete, *approved.review]
+    }
+    current_rows = {
+        row.question_id: row
+        for row in [*current.keep, *current.delete, *current.review]
+    }
+    if set(approved_rows) != set(current_rows):
+        raise QuestionCleanupApplyError(
+            "approved cleanup question set is not closed over the locked report"
+        )
+
+    current_review_ids = {row.question_id for row in current.review}
+    for question_id in sorted(current_rows):
+        automatic = current_rows[question_id]
+        approved_row = approved_rows[question_id]
+        if question_id not in current_review_ids:
+            if approved_row != automatic:
+                raise QuestionCleanupApplyError(
+                    "approved cleanup classification differs from locked automatic evidence"
+                )
+            continue
+
+        if approved_row.decision not in {
+            "keep_formal_import",
+            "delete_non_imported",
+        }:
+            raise QuestionCleanupApplyError(
+                "approved cleanup review classification is invalid"
+            )
+        if (
+            approved_row.source_fingerprint != automatic.source_fingerprint
+            or approved_row.affected_reference_ids
+            != automatic.affected_reference_ids
+        ):
+            raise QuestionCleanupApplyError(
+                "approved cleanup review evidence differs from locked report"
+            )
+        automatic_codes = set(automatic.evidence_codes)
+        approved_codes = set(approved_row.evidence_codes)
+        human_codes = {
+            code for code in approved_codes if code.startswith("human-review:")
+        }
+        if (
+            automatic_codes - approved_codes
+            or approved_codes - automatic_codes != human_codes
+            or len(human_codes) != 1
+            or next(iter(human_codes)) == "human-review:"
+        ):
+            raise QuestionCleanupApplyError(
+                "approved cleanup review evidence is not one explicit human decision"
+            )
+
+
+async def apply_cleanup(
+    db: AsyncSession,
+    report: QuestionCleanupReport,
+    actor: str,
+    backup_receipt: QuestionCleanupBackupReceipt,
+) -> QuestionCleanupApplyResult:
+    """Apply one approved manifest atomically and append its immutable audit."""
+
+    _validate_apply_report(report)
+    backup_path = _validate_backup_receipt(report, backup_receipt)
+    actor_username = str(actor or "").strip()
+    if not actor_username:
+        raise QuestionCleanupApplyError("cleanup actor is required")
+
+    started_at = datetime.now(timezone.utc)
+    deleted_question_ids = sorted(
+        {str(item.question_id) for item in report.delete}
+    )
+    deleted_question_id_set = set(deleted_question_ids)
+    try:
+        await teaching_content_revision_service.acquire_cleanup_lock(db)
+        prior_audit = (
+            await db.execute(
+                select(QuestionCleanupAudit.id).where(
+                    QuestionCleanupAudit.manifest_hash == report.manifest_hash
+                )
+            )
+        ).scalar_one_or_none()
+        if prior_audit is not None:
+            raise QuestionCleanupApplyError(
+                "this cleanup manifest was already applied successfully"
+            )
+
+        current_report = await build_report(db)
+        if not hmac.compare_digest(
+            current_report.snapshot_hash,
+            report.snapshot_hash,
+        ):
+            raise QuestionCleanupApplyError(
+                "database snapshot changed after cleanup approval"
+            )
+        _validate_approved_report_against_current(report, current_report)
+
+        target_questions = list(
+            (
+                await db.execute(
+                    select(Question)
+                    .where(Question.id.in_(deleted_question_ids))
+                    .order_by(Question.id)
+                    .with_for_update()
+                )
+            )
+            .scalars()
+            .all()
+        )
+        locked_question_ids = {str(row.id) for row in target_questions}
+        if locked_question_ids != deleted_question_id_set:
+            raise QuestionCleanupApplyError(
+                "cleanup target question rows changed after snapshot verification"
+            )
+
+        await db.execute(
+            select(QuestionEditLock)
+            .where(QuestionEditLock.question_id.in_(deleted_question_ids))
+            .with_for_update()
+        )
+        await db.execute(
+            select(QuestionAuditLog)
+            .where(
+                or_(
+                    QuestionAuditLog.question_id.in_(deleted_question_ids),
+                    (
+                        (QuestionAuditLog.entity_type == "question")
+                        & QuestionAuditLog.entity_id.in_(deleted_question_ids)
+                    ),
+                )
+            )
+            .with_for_update()
+        )
+        for model in (TrainingProgress, RecallProgress, LearningEvent):
+            await db.execute(
+                select(model)
+                .where(model.question_id.in_(deleted_question_ids))
+                .with_for_update()
+            )
+
+        question_domains = {
+            str(question_id): domain
+            for question_id, domain in (
+                await db.execute(select(Question.id, Question.domain))
+            ).all()
+        }
+        repair_summary = await repair_current_question_references(
+            db,
+            deleted_question_id_set,
+            actor_username=actor_username,
+            question_domains=question_domains,
+        )
+
+        repaired_references = sorted(
+            (
+                reference
+                for reference in report.references
+                if reference.question_id in deleted_question_id_set
+                and reference.repair_action
+                == "remove_question_and_recalculate"
+            ),
+            key=lambda row: row.reference_id,
+        )
+        preserved_references = sorted(
+            (
+                reference
+                for reference in report.references
+                if reference.question_id in deleted_question_id_set
+                and reference.repair_action == "preserve_historical_snapshot"
+            ),
+            key=lambda row: row.reference_id,
+        )
+        repair_summary = {
+            **repair_summary,
+            "repairedReferenceIds": [
+                row.reference_id for row in repaired_references
+            ],
+            "publishedHistoricalReferences": [
+                row.model_dump(mode="json", by_alias=True)
+                for row in preserved_references
+            ],
+        }
+
+        await db.execute(
+            delete(TrainingProgress).where(
+                TrainingProgress.question_id.in_(deleted_question_ids)
+            )
+        )
+        await db.execute(
+            delete(RecallProgress).where(
+                RecallProgress.question_id.in_(deleted_question_ids)
+            )
+        )
+        await db.execute(
+            delete(LearningEvent).where(
+                LearningEvent.question_id.in_(deleted_question_ids)
+            )
+        )
+        await db.execute(
+            delete(QuestionEditLock).where(
+                QuestionEditLock.question_id.in_(deleted_question_ids)
+            )
+        )
+        await db.execute(
+            delete(QuestionAuditLog).where(
+                or_(
+                    QuestionAuditLog.question_id.in_(deleted_question_ids),
+                    (
+                        (QuestionAuditLog.entity_type == "question")
+                        & QuestionAuditLog.entity_id.in_(deleted_question_ids)
+                    ),
+                )
+            )
+        )
+
+        bank_id_by_question = {
+            str(question.id): str(question.bank_id)
+            for question in target_questions
+        }
+        for question in target_questions:
+            await db.delete(question)
+        await db.flush()
+
+        preserved_question_ids = {
+            row.question_id for row in preserved_references
+        }
+        published_dependency_bank_ids = {
+            bank_id_by_question[question_id]
+            for question_id in preserved_question_ids
+            if question_id in bank_id_by_question
+        }
+        published_dependency_bank_ids.update(
+            str(bank_id)
+            for bank_id in repair_summary.get("publishedBankIds", [])
+            if str(bank_id) in set(bank_id_by_question.values())
+        )
+        candidate_bank_ids = sorted(set(bank_id_by_question.values()))
+        deleted_bank_ids: list[str] = []
+        deleted_upload_batch_ids: list[str] = []
+        retained_empty_bank_ids: list[str] = []
+        if candidate_bank_ids:
+            banks = list(
+                (
+                    await db.execute(
+                        select(QuestionBank)
+                        .where(QuestionBank.id.in_(candidate_bank_ids))
+                        .order_by(QuestionBank.id)
+                        .with_for_update()
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for bank in banks:
+                remaining_count = int(
+                    (
+                        await db.execute(
+                            select(func.count())
+                            .select_from(Question)
+                            .where(Question.bank_id == bank.id)
+                        )
+                    ).scalar_one()
+                )
+                if remaining_count:
+                    continue
+                if bank.id in published_dependency_bank_ids:
+                    retained_empty_bank_ids.append(str(bank.id))
+                    continue
+                batches = list(
+                    (
+                        await db.execute(
+                            select(QuestionUploadBatch)
+                            .where(QuestionUploadBatch.bank_id == bank.id)
+                            .order_by(QuestionUploadBatch.id)
+                            .with_for_update()
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                batch_ids = [str(batch.id) for batch in batches]
+                if batch_ids:
+                    await db.execute(
+                        select(QuestionAuditLog)
+                        .where(QuestionAuditLog.batch_id.in_(batch_ids))
+                        .with_for_update()
+                    )
+                    await db.execute(
+                        delete(QuestionAuditLog).where(
+                            QuestionAuditLog.batch_id.in_(batch_ids)
+                        )
+                    )
+                    for batch in batches:
+                        deleted_upload_batch_ids.append(str(batch.id))
+                        await db.delete(batch)
+                deleted_bank_ids.append(str(bank.id))
+                await db.delete(bank)
+        repair_summary["deletedBankIds"] = sorted(deleted_bank_ids)
+        repair_summary["deletedUploadBatchIds"] = sorted(
+            deleted_upload_batch_ids
+        )
+        repair_summary["retainedEmptyBankIds"] = sorted(retained_empty_bank_ids)
+
+        revision = await teaching_content_revision_service.bump_cleanup(
+            db,
+            actor_username,
+            report.manifest_hash,
+        )
+        completed_at = datetime.now(timezone.utc)
+        audit = QuestionCleanupAudit(
+            id=f"qca_{hashlib.sha256((report.manifest_hash + completed_at.isoformat()).encode()).hexdigest()[:32]}",
+            manifest_hash=report.manifest_hash,
+            snapshot_hash=report.snapshot_hash,
+            actor_username=actor_username,
+            backup_path=str(backup_path),
+            backup_sha256=backup_receipt.sha256,
+            total_count=report.summary.total_count,
+            retained_count=report.summary.keep_count,
+            deleted_count=len(deleted_question_ids),
+            repaired_reference_count=len(repaired_references),
+            preserved_reference_count=len(preserved_references),
+            deleted_question_ids=deleted_question_ids,
+            repair_summary=repair_summary,
+            teaching_revision=int(revision["revision"]),
+            started_at=started_at,
+            completed_at=completed_at,
+        )
+        db.add(audit)
+        await db.flush()
+        await db.commit()
+        await db.refresh(audit)
+        return QuestionCleanupApplyResult(
+            audit_id=audit.id,
+            manifest_hash=audit.manifest_hash,
+            snapshot_hash=audit.snapshot_hash,
+            deleted_question_ids=list(audit.deleted_question_ids),
+            repaired_reference_count=audit.repaired_reference_count,
+            preserved_reference_count=audit.preserved_reference_count,
+            teaching_revision=audit.teaching_revision,
+            repair_summary=dict(audit.repair_summary),
+            completed_at=audit.completed_at,
+        )
+    except QuestionCleanupReferenceRepairError as exc:
+        await db.rollback()
+        raise QuestionCleanupApplyError(str(exc)) from exc
+    except BaseException:
+        await db.rollback()
+        raise
+
+
 def apply_review_decisions(
     report: QuestionCleanupReport,
     decisions: QuestionCleanupReviewDecisionFile | Mapping[str, Any],
@@ -642,9 +1125,13 @@ async def build_report(db: AsyncSession) -> QuestionCleanupReport:
 __all__ = [
     "CLEANUP_POLICY_VERSION",
     "QuestionCleanupReviewDecisionError",
+    "QuestionCleanupApplyError",
+    "QuestionCleanupBackupReceipt",
+    "QuestionCleanupApplyResult",
     "SEEDED_TEST_BATCH_IDS",
     "VERIFIED_IMPORT_ACTIONS",
     "apply_review_decisions",
+    "apply_cleanup",
     "build_report",
     "calculate_manifest_hash",
     "classify_question",

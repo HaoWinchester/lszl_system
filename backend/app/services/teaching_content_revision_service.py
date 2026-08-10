@@ -13,6 +13,7 @@ from app.models.shared_runtime_state import SharedRuntimeState
 
 
 REVISION_KEY = "kg_teaching_content_revision_v1"
+CLEANUP_LOCK_KEY = "question-pool-cleanup-v1"
 MAX_CHANGES = 100
 
 
@@ -100,6 +101,21 @@ async def acquire_read_lock(db: AsyncSession) -> None:
     )
 
 
+async def acquire_cleanup_lock(db: AsyncSession) -> None:
+    """Serialize cleanup after the global teaching-content writer lock.
+
+    Every supported teaching writer takes ``REVISION_KEY`` first.  Keeping
+    that shared lock order prevents writers from entering between cleanup's
+    snapshot recheck and its destructive mutations.
+    """
+
+    await acquire_lock(db)
+    await db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+        {"key": CLEANUP_LOCK_KEY},
+    )
+
+
 async def bump(
     db: AsyncSession,
     actor_username: str,
@@ -134,3 +150,23 @@ async def bump(
         row.updated_by = actor_username
     await db.flush()
     return payload
+
+
+async def bump_cleanup(
+    db: AsyncSession,
+    actor_username: str,
+    manifest_hash: str,
+) -> dict[str, Any]:
+    """Publish exactly one shared-content change for a committed cleanup."""
+
+    return await bump(
+        db,
+        actor_username,
+        [
+            {
+                "entityType": "question_pool",
+                "entityId": manifest_hash,
+                "action": "cleanup",
+            }
+        ],
+    )

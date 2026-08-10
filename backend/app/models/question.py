@@ -130,3 +130,55 @@ class PaperQuestion(Base):
     paper_id: Mapped[str] = mapped_column(String(64), ForeignKey("exam_papers.id"), primary_key=True)
     question_id: Mapped[str] = mapped_column(String(64), ForeignKey("questions.id"), primary_key=True)
     order_index: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class QuestionCleanupAudit(Base):
+    """Append-only evidence for one successfully committed pool cleanup."""
+
+    __tablename__ = "question_cleanup_audits"
+    __table_args__ = (
+        Index(
+            "ix_question_cleanup_audits_manifest_hash",
+            "manifest_hash",
+            unique=True,
+        ),
+        Index(
+            "ix_question_cleanup_audits_completed_at",
+            "completed_at",
+        ),
+        Index(
+            "ix_question_cleanup_audits_actor_username",
+            "actor_username",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    manifest_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    actor_username: Mapped[str] = mapped_column(String(64), nullable=False)
+    backup_path: Mapped[str] = mapped_column(Text, nullable=False)
+    backup_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    total_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    retained_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    deleted_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    repaired_reference_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    preserved_reference_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    deleted_question_ids: Mapped[list] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+    )
+    repair_summary: Mapped[dict] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=dict,
+    )
+    teaching_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    completed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )

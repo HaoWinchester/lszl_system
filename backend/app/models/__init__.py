@@ -12,7 +12,13 @@ from app.models.content_prep import (
 )
 from app.models.file import CurrentFile, FileContent, FileTag, Folder, GraphFile, Tag
 from app.models.guided_learning import GuidedActivity, GuidedCourse, GuidedCourseActivity, GuidedLearningProgress
-from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
+from app.models.question import (
+    ExamPaper,
+    PaperQuestion,
+    Question,
+    QuestionBank,
+    QuestionCleanupAudit,
+)
 from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.subscription import RedeemCode, Subscription, SubscriptionOrder
@@ -43,6 +49,7 @@ __all__ = [
     "QuestionAuditLog",
     "ExamPaper",
     "PaperQuestion",
+    "QuestionCleanupAudit",
     "TrainingProgress",
     "RecallProgress",
     "LearningEvent",

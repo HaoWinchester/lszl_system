@@ -1,12 +1,13 @@
-"""Read-only inventory of references to the relational question catalog.
+"""Inventory and transaction-local repair of question catalog references.
 
-The cleanup report must distinguish mutable current containers from immutable
-published snapshots.  This module only reads and classifies references; repair
-operations belong to a later, separately authorized cleanup phase.
+Reporting distinguishes mutable current containers from immutable published
+snapshots.  Apply locks the same rows, repairs only current references, and
+preserves published payload bytes and historical dependency evidence.
 """
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Iterator, Mapping
 import hashlib
 import json
@@ -61,6 +62,10 @@ _QUESTION_COLLECTION_FIELDS = frozenset(
         "questionSnapshots",
     }
 )
+
+
+class QuestionCleanupReferenceRepairError(ValueError):
+    """A locked managed payload is unsafe to inspect or repair."""
 
 
 def _canonical_json(value: object) -> str:
@@ -380,10 +385,370 @@ async def inventory_question_references(
     return sorted_references, snapshot
 
 
+def _repair_json_value(
+    value: object,
+    deleted_question_ids: set[str],
+    *,
+    collection_item: bool = False,
+) -> tuple[object, int, bool]:
+    """Remove live question references without interpreting unrelated IDs."""
+
+    if isinstance(value, Mapping):
+        if collection_item:
+            direct_ids = {
+                _clean_question_id(value.get(field))
+                for field in _DIRECT_QUESTION_FIELDS
+            }
+            direct_ids.discard("")
+            if not direct_ids:
+                candidate = _clean_question_id(value.get("id"))
+                if candidate:
+                    direct_ids.add(candidate)
+            if direct_ids & deleted_question_ids:
+                return {}, 1, True
+
+        repaired = dict(value)
+        removed = 0
+        for field in _DIRECT_QUESTION_FIELDS:
+            question_id = _clean_question_id(repaired.get(field))
+            if question_id in deleted_question_ids:
+                repaired.pop(field, None)
+                removed += 1
+        for field in _QUESTION_ARRAY_FIELDS:
+            rows = repaired.get(field)
+            if not isinstance(rows, list):
+                continue
+            kept_rows = [
+                row
+                for row in rows
+                if _clean_question_id(row) not in deleted_question_ids
+            ]
+            removed += len(rows) - len(kept_rows)
+            repaired[field] = kept_rows
+
+        for key, child in list(repaired.items()):
+            if key in _DIRECT_QUESTION_FIELDS or key in _QUESTION_ARRAY_FIELDS:
+                continue
+            if isinstance(child, list):
+                child_is_question_collection = key in _QUESTION_COLLECTION_FIELDS
+                repaired_rows: list[object] = []
+                for item in child:
+                    repaired_item, child_removed, remove_item = _repair_json_value(
+                        item,
+                        deleted_question_ids,
+                        collection_item=child_is_question_collection,
+                    )
+                    removed += child_removed
+                    if not remove_item:
+                        repaired_rows.append(repaired_item)
+                repaired[key] = repaired_rows
+            elif isinstance(child, Mapping):
+                repaired_child, child_removed, _ = _repair_json_value(
+                    child,
+                    deleted_question_ids,
+                )
+                removed += child_removed
+                repaired[key] = repaired_child
+        return repaired, removed, False
+
+    if isinstance(value, list):
+        repaired_rows = []
+        removed = 0
+        for item in value:
+            repaired_item, child_removed, remove_item = _repair_json_value(
+                item,
+                deleted_question_ids,
+            )
+            removed += child_removed
+            if not remove_item:
+                repaired_rows.append(repaired_item)
+        return repaired_rows, removed, False
+    return value, 0, False
+
+
+def _walk_bank_ids(value: object) -> Iterator[str]:
+    if isinstance(value, Mapping):
+        bank_id = _clean_question_id(value.get("bankId"))
+        if bank_id:
+            yield bank_id
+        for child in value.values():
+            yield from _walk_bank_ids(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _walk_bank_ids(child)
+
+
+def _raw_top_level_array_items(value: str) -> list[str] | None:
+    """Return exact JSON bytes for top-level array elements when parseable."""
+
+    decoder = json.JSONDecoder()
+    length = len(value)
+    index = 0
+    while index < length and value[index].isspace():
+        index += 1
+    if index >= length or value[index] != "[":
+        return None
+    index += 1
+    items: list[str] = []
+    while True:
+        while index < length and value[index].isspace():
+            index += 1
+        if index < length and value[index] == "]":
+            index += 1
+            break
+        start = index
+        try:
+            _, end = decoder.raw_decode(value, index)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+        items.append(value[start:end])
+        index = end
+        while index < length and value[index].isspace():
+            index += 1
+        if index < length and value[index] == ",":
+            index += 1
+            continue
+        if index < length and value[index] == "]":
+            index += 1
+            break
+        return None
+    if value[index:].strip():
+        return None
+    return items
+
+
+def _recalculate_runtime_papers(
+    payload: object,
+    question_domains: Mapping[str, str | None],
+) -> object:
+    rows = payload if isinstance(payload, list) else [payload]
+    for paper in rows:
+        if not isinstance(paper, dict):
+            continue
+        questions = paper.get("questions")
+        if not isinstance(questions, list):
+            continue
+        question_ids: list[str] = []
+        for question in questions:
+            if not isinstance(question, Mapping):
+                continue
+            question_id = next(
+                (
+                    _clean_question_id(question.get(field))
+                    for field in _DIRECT_QUESTION_FIELDS
+                    if _clean_question_id(question.get(field))
+                ),
+                "",
+            )
+            if question_id:
+                question_ids.append(question_id)
+        total = len(questions)
+        if "totalCount" in paper:
+            paper["totalCount"] = total
+        if "questionCount" in paper:
+            paper["questionCount"] = total
+        if isinstance(paper.get("quotas"), Mapping):
+            quotas = Counter(
+                str(question_domains.get(question_id) or "").strip()
+                for question_id in question_ids
+            )
+            quotas.pop("", None)
+            paper["quotas"] = dict(sorted(quotas.items()))
+    return payload
+
+
+async def _lock_runtime_rows(db: AsyncSession) -> list[SharedRuntimeState]:
+    query = (
+        select(SharedRuntimeState)
+        .where(
+            or_(
+                SharedRuntimeState.key.in_(REPORT_RUNTIME_EXACT_KEYS),
+                SharedRuntimeState.key.startswith(RECALL_ASSOCIATION_PREFIX),
+            )
+        )
+        .order_by(SharedRuntimeState.key)
+        .with_for_update()
+    )
+    return list((await db.execute(query)).scalars().all())
+
+
+async def repair_current_question_references(
+    db: AsyncSession,
+    deleted_question_ids: set[str],
+    *,
+    actor_username: str,
+    question_domains: Mapping[str, str | None],
+) -> dict[str, object]:
+    """Lock and repair relational/current-runtime references in this transaction."""
+
+    if not deleted_question_ids:
+        return {
+            "relationalPaperIds": [],
+            "runtimeKeys": [],
+            "removedRuntimeReferences": 0,
+        }
+
+    targeted_links = list(
+        (
+            await db.execute(
+                select(PaperQuestion)
+                .where(PaperQuestion.question_id.in_(deleted_question_ids))
+                .order_by(PaperQuestion.paper_id, PaperQuestion.order_index)
+                .with_for_update()
+            )
+        )
+        .scalars()
+        .all()
+    )
+    paper_ids = sorted({str(link.paper_id) for link in targeted_links})
+    papers: dict[str, ExamPaper] = {}
+    all_links_by_paper: dict[str, list[PaperQuestion]] = {}
+    if paper_ids:
+        paper_rows = list(
+            (
+                await db.execute(
+                    select(ExamPaper)
+                    .where(ExamPaper.id.in_(paper_ids))
+                    .order_by(ExamPaper.id)
+                    .with_for_update()
+                )
+            )
+            .scalars()
+            .all()
+        )
+        papers = {str(row.id): row for row in paper_rows}
+        all_links = list(
+            (
+                await db.execute(
+                    select(PaperQuestion)
+                    .where(PaperQuestion.paper_id.in_(paper_ids))
+                    .order_by(
+                        PaperQuestion.paper_id,
+                        PaperQuestion.order_index,
+                        PaperQuestion.question_id,
+                    )
+                    .with_for_update()
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for link in all_links:
+            all_links_by_paper.setdefault(str(link.paper_id), []).append(link)
+
+    for link in targeted_links:
+        await db.delete(link)
+    for paper_id in paper_ids:
+        remaining = [
+            link
+            for link in all_links_by_paper.get(paper_id, [])
+            if str(link.question_id) not in deleted_question_ids
+        ]
+        for index, link in enumerate(remaining):
+            link.order_index = index
+        paper = papers.get(paper_id)
+        if paper is None:
+            continue
+        quotas = Counter(
+            str(question_domains.get(str(link.question_id)) or "").strip()
+            for link in remaining
+        )
+        quotas.pop("", None)
+        paper.total_count = len(remaining)
+        paper.quotas = dict(sorted(quotas.items()))
+        paper.revision = int(paper.revision) + 1
+        paper.updated_by = actor_username
+
+    changed_runtime_keys: list[str] = []
+    removed_runtime_references = 0
+    published_bank_ids: set[str] = set()
+    for row in await _lock_runtime_rows(db):
+        key = str(row.key)
+        try:
+            payload = json.loads(row.value)
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise QuestionCleanupReferenceRepairError(
+                f"malformed managed runtime JSON prevents cleanup: {key}"
+            ) from exc
+        if key in PUBLISHED_RUNTIME_KEY_TYPES:
+            published_bank_ids.update(_walk_bank_ids(payload))
+            continue
+
+        serialized_override: str | None = None
+        if key == "kg_learning_tasks_v1" and isinstance(payload, list):
+            repaired_tasks: list[object] = []
+            serialized_tasks: list[str] = []
+            raw_tasks = _raw_top_level_array_items(row.value)
+            removed = 0
+            for index, task in enumerate(payload):
+                if _container_repair_action(
+                    key,
+                    task,
+                    "remove_question_and_recalculate",
+                ) == "preserve_historical_snapshot":
+                    repaired_tasks.append(task)
+                    published_bank_ids.update(_walk_bank_ids(task))
+                    if raw_tasks is not None and len(raw_tasks) == len(payload):
+                        serialized_tasks.append(raw_tasks[index])
+                    else:
+                        serialized_tasks.append(
+                            json.dumps(
+                                task,
+                                ensure_ascii=False,
+                                separators=(",", ":"),
+                            )
+                        )
+                    continue
+                repaired_task, task_removed, _ = _repair_json_value(
+                    task,
+                    deleted_question_ids,
+                )
+                repaired_tasks.append(repaired_task)
+                serialized_tasks.append(
+                    json.dumps(
+                        repaired_task,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                )
+                removed += task_removed
+            repaired_payload: object = repaired_tasks
+            serialized_override = f"[{','.join(serialized_tasks)}]"
+        else:
+            repaired_payload, removed, _ = _repair_json_value(
+                payload,
+                deleted_question_ids,
+            )
+        if key == "kg_exam_papers_v1__teacher_shared":
+            repaired_payload = _recalculate_runtime_papers(
+                repaired_payload,
+                question_domains,
+            )
+        if removed <= 0:
+            continue
+        row.value = serialized_override or json.dumps(
+            repaired_payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        row.updated_by = actor_username
+        changed_runtime_keys.append(key)
+        removed_runtime_references += removed
+
+    return {
+        "relationalPaperIds": paper_ids,
+        "runtimeKeys": sorted(changed_runtime_keys),
+        "removedRuntimeReferences": removed_runtime_references,
+        "publishedBankIds": sorted(published_bank_ids),
+    }
+
+
 __all__ = [
     "CURRENT_RUNTIME_KEY_TYPES",
     "PUBLISHED_RUNTIME_KEY_TYPES",
     "RECALL_ASSOCIATION_PREFIX",
     "REPORT_RUNTIME_EXACT_KEYS",
+    "QuestionCleanupReferenceRepairError",
     "inventory_question_references",
+    "repair_current_question_references",
 ]

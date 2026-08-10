@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import subprocess
@@ -10,25 +11,44 @@ from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.exc import IntegrityError
 
 from app.db.session import AsyncSessionLocal
-from app.models.content_prep import QuestionAuditLog, QuestionUploadBatch
-from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
+from app.models.content_prep import (
+    QuestionAuditLog,
+    QuestionEditLock,
+    QuestionUploadBatch,
+)
+from app.models.question import (
+    ExamPaper,
+    PaperQuestion,
+    Question,
+    QuestionBank,
+    QuestionCleanupAudit,
+)
 from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.training import LearningEvent, RecallProgress, TrainingProgress
 from app.schemas.question_cleanup import (
     QuestionCleanupDecision,
     QuestionCleanupReport,
     QuestionCleanupReviewDecisionFile,
 )
 from app.services.question_cleanup_service import (
+    QuestionCleanupApplyError,
+    QuestionCleanupBackupReceipt,
     SEEDED_TEST_BATCH_IDS,
+    apply_cleanup,
     apply_review_decisions,
     build_report,
     calculate_manifest_hash,
     classify_question,
 )
-from app.services import teaching_content_revision_service
+from app.services import (
+    question_cleanup_service,
+    question_service,
+    teaching_content_revision_service,
+)
 from scripts import question_pool_maintenance
 
 
@@ -1435,3 +1455,1359 @@ def test_report_cli_writes_only_report_and_exits_two_when_review_is_required(tmp
         assert asyncio.run(database_counts()) == before_counts
     finally:
         asyncio.run(cleanup())
+
+
+def test_cleanup_audit_rows_are_unique_by_manifest_and_database_append_only():
+    """Catch duplicate success records or later UPDATE/DELETE of cleanup history."""
+
+    suffix = uuid4().hex[:12]
+    audit_id = f"cleanup-audit-immutable-{suffix}"
+    manifest_hash = (suffix * 6)[:64].ljust(64, "a")
+    now = datetime.now(timezone.utc)
+
+    def audit_row(row_id: str) -> QuestionCleanupAudit:
+        return QuestionCleanupAudit(
+            id=row_id,
+            manifest_hash=manifest_hash,
+            snapshot_hash="b" * 64,
+            actor_username="admin",
+            backup_path=f"/tmp/{suffix}.dump",
+            backup_sha256="c" * 64,
+            total_count=3,
+            retained_count=1,
+            deleted_count=2,
+            repaired_reference_count=4,
+            preserved_reference_count=1,
+            deleted_question_ids=["q-delete-a", "q-delete-b"],
+            repair_summary={"runtimeKeys": ["kg_course_config_drafts_v1"]},
+            teaching_revision=7,
+            started_at=now,
+            completed_at=now,
+        )
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(audit_row(audit_id))
+            await db.commit()
+
+        async with AsyncSessionLocal() as duplicate_db:
+            duplicate_db.add(audit_row(f"{audit_id}-duplicate"))
+            with pytest.raises(IntegrityError):
+                await duplicate_db.commit()
+            await duplicate_db.rollback()
+
+        async with AsyncSessionLocal() as update_db:
+            with pytest.raises(Exception, match="append-only"):
+                await update_db.execute(
+                    update(QuestionCleanupAudit)
+                    .where(QuestionCleanupAudit.id == audit_id)
+                    .values(actor_username="teacher-a")
+                )
+                await update_db.commit()
+            await update_db.rollback()
+
+        async with AsyncSessionLocal() as delete_db:
+            with pytest.raises(Exception, match="append-only"):
+                await delete_db.execute(
+                    delete(QuestionCleanupAudit).where(
+                        QuestionCleanupAudit.id == audit_id
+                    )
+                )
+                await delete_db.commit()
+            await delete_db.rollback()
+
+        async with AsyncSessionLocal() as verify_db:
+            stored = await verify_db.get(QuestionCleanupAudit, audit_id)
+            assert stored is not None
+            assert stored.actor_username == "admin"
+            assert stored.deleted_question_ids == ["q-delete-a", "q-delete-b"]
+
+    asyncio.run(scenario())
+
+
+def _resolve_all_test_review_rows(
+    report: QuestionCleanupReport,
+) -> QuestionCleanupReport:
+    if not report.review:
+        return report
+    return apply_review_decisions(
+        report,
+        {
+            "manifestHash": report.manifest_hash,
+            "decisions": [
+                {
+                    "questionId": row.question_id,
+                    "decision": "keep_formal_import",
+                    "reason": "pytest 隔离：保留既有非本夹具数据",
+                }
+                for row in report.review
+            ],
+        },
+    )
+
+
+async def _create_cleanup_guard_fixture(
+    *,
+    origin: str | None,
+    resolve_review: bool = True,
+):
+    suffix = uuid4().hex[:12]
+    bank_id = f"cleanup-guard-bank-{suffix}"
+    question_id = f"cleanup-guard-question-{suffix}"
+    async with AsyncSessionLocal() as db:
+        db.add(
+            QuestionBank(
+                id=bank_id,
+                owner_id="admin",
+                name="清理事务保护测试题库",
+                subject="PMP",
+            )
+        )
+        await db.flush()
+        db.add(
+            Question(
+                id=question_id,
+                bank_id=bank_id,
+                title="待清理题目",
+                domain="守卫领域",
+                content_metadata=(
+                    {"origin": origin} if origin is not None else {}
+                ),
+            )
+        )
+        await db.commit()
+    async with AsyncSessionLocal() as report_db:
+        report = await build_report(report_db)
+    if resolve_review:
+        report = _resolve_all_test_review_rows(report)
+    return bank_id, question_id, report
+
+
+async def _remove_cleanup_guard_fixture(bank_id: str, question_id: str) -> None:
+    async with AsyncSessionLocal() as db:
+        await db.execute(delete(Question).where(Question.id == question_id))
+        await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+        await db.commit()
+
+
+def _backup_receipt(path: Path, manifest_hash: str) -> QuestionCleanupBackupReceipt:
+    import hashlib
+
+    return QuestionCleanupBackupReceipt(
+        path=str(path),
+        sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+        confirmation=f"DELETE-QUESTION-POOL:{manifest_hash[:12]}",
+    )
+
+
+def test_apply_rejects_a_manifest_with_unresolved_review_rows(tmp_path):
+    """Catch destructive apply proceeding while any provenance is ambiguous."""
+
+    backup_path = tmp_path / "verified.dump"
+    backup_path.write_bytes(b"disposable pytest backup")
+
+    async def scenario() -> None:
+        bank_id, question_id, report = await _create_cleanup_guard_fixture(
+            origin=None,
+            resolve_review=False,
+        )
+        try:
+            assert report.summary.review_count >= 1
+            async with AsyncSessionLocal() as db:
+                with pytest.raises(QuestionCleanupApplyError, match="review"):
+                    await apply_cleanup(
+                        db,
+                        report,
+                        actor="admin",
+                        backup_receipt=_backup_receipt(
+                            backup_path,
+                            report.manifest_hash,
+                        ),
+                    )
+            async with AsyncSessionLocal() as verify_db:
+                assert await verify_db.get(Question, question_id) is not None
+                audit_count = (
+                    await verify_db.execute(
+                        select(func.count())
+                        .select_from(QuestionCleanupAudit)
+                        .where(
+                            QuestionCleanupAudit.manifest_hash
+                            == report.manifest_hash
+                        )
+                    )
+                ).scalar_one()
+                assert audit_count == 0
+        finally:
+            await _remove_cleanup_guard_fixture(bank_id, question_id)
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    "receipt_mutation, expected_message",
+    [
+        ("missing", "backup"),
+        ("hash", "SHA-256"),
+        ("confirmation", "confirmation"),
+    ],
+)
+def test_apply_rejects_invalid_backup_or_confirmation_guards(
+    tmp_path,
+    receipt_mutation,
+    expected_message,
+):
+    """Catch bypass of any independent backup-receipt or typed-token guard."""
+
+    backup_path = tmp_path / "verified.dump"
+    backup_path.write_bytes(b"disposable pytest backup")
+
+    async def scenario() -> None:
+        bank_id, question_id, report = await _create_cleanup_guard_fixture(
+            origin="manual"
+        )
+        try:
+            receipt = _backup_receipt(backup_path, report.manifest_hash)
+            if receipt_mutation == "missing":
+                receipt.path = str(tmp_path / "absent.dump")
+            elif receipt_mutation == "hash":
+                receipt.sha256 = "f" * 64
+            else:
+                receipt.confirmation = "DELETE-QUESTION-POOL:wrong-token"
+
+            async with AsyncSessionLocal() as db:
+                with pytest.raises(
+                    QuestionCleanupApplyError,
+                    match=expected_message,
+                ):
+                    await apply_cleanup(
+                        db,
+                        report,
+                        actor="admin",
+                        backup_receipt=receipt,
+                    )
+            async with AsyncSessionLocal() as verify_db:
+                assert await verify_db.get(Question, question_id) is not None
+        finally:
+            await _remove_cleanup_guard_fixture(bank_id, question_id)
+
+    asyncio.run(scenario())
+
+
+def test_apply_rechecks_the_locked_snapshot_before_deletion(tmp_path):
+    """Catch apply trusting an approved report after live content has changed."""
+
+    backup_path = tmp_path / "verified.dump"
+    backup_path.write_bytes(b"disposable pytest backup")
+
+    async def scenario() -> None:
+        bank_id, question_id, report = await _create_cleanup_guard_fixture(
+            origin="manual"
+        )
+        try:
+            async with AsyncSessionLocal() as writer_db:
+                question = await writer_db.get(Question, question_id)
+                assert question is not None
+                question.title = "审批报告生成后发生变化"
+                question.revision += 1
+                await writer_db.commit()
+
+            async with AsyncSessionLocal() as apply_db:
+                with pytest.raises(QuestionCleanupApplyError, match="snapshot"):
+                    await apply_cleanup(
+                        apply_db,
+                        report,
+                        actor="admin",
+                        backup_receipt=_backup_receipt(
+                            backup_path,
+                            report.manifest_hash,
+                        ),
+                    )
+
+            async with AsyncSessionLocal() as verify_db:
+                question = await verify_db.get(Question, question_id)
+                assert question is not None
+                assert question.title == "审批报告生成后发生变化"
+        finally:
+            await _remove_cleanup_guard_fixture(bank_id, question_id)
+
+    asyncio.run(scenario())
+
+
+def test_apply_fails_closed_on_malformed_managed_runtime_json(tmp_path):
+    """Catch deletion leaving an unreadable current draft or unknown history link."""
+
+    backup_path = tmp_path / "verified.dump"
+    backup_path.write_bytes(b"disposable pytest backup")
+
+    async def scenario() -> None:
+        bank_id, question_id, _ = await _create_cleanup_guard_fixture(
+            origin="manual"
+        )
+        runtime_key = (
+            "kg_recall_association_library_v1__subject__malformed-"
+            f"{uuid4().hex[:10]}"
+        )
+        malformed_value = f'{{"questionId":"{question_id}"'
+        try:
+            async with AsyncSessionLocal() as setup_db:
+                setup_db.add(
+                    SharedRuntimeState(
+                        key=runtime_key,
+                        value=malformed_value,
+                        updated_by="admin",
+                    )
+                )
+                await setup_db.commit()
+            async with AsyncSessionLocal() as report_db:
+                report = _resolve_all_test_review_rows(
+                    await build_report(report_db)
+                )
+            async with AsyncSessionLocal() as revision_db:
+                revision_before = int(
+                    (
+                        await teaching_content_revision_service.current(
+                            revision_db
+                        )
+                    )["revision"]
+                )
+
+            async with AsyncSessionLocal() as apply_db:
+                with pytest.raises(QuestionCleanupApplyError, match="malformed"):
+                    await apply_cleanup(
+                        apply_db,
+                        report,
+                        actor="admin",
+                        backup_receipt=_backup_receipt(
+                            backup_path,
+                            report.manifest_hash,
+                        ),
+                    )
+                assert not apply_db.in_transaction()
+
+            async with AsyncSessionLocal() as verify_db:
+                assert await verify_db.get(Question, question_id) is not None
+                runtime = await verify_db.get(SharedRuntimeState, runtime_key)
+                assert runtime is not None
+                assert runtime.value == malformed_value
+                revision = await teaching_content_revision_service.current(verify_db)
+                assert revision["revision"] == revision_before
+                audit_count = (
+                    await verify_db.execute(
+                        select(func.count())
+                        .select_from(QuestionCleanupAudit)
+                        .where(
+                            QuestionCleanupAudit.manifest_hash
+                            == report.manifest_hash
+                        )
+                    )
+                ).scalar_one()
+                assert audit_count == 0
+        finally:
+            async with AsyncSessionLocal() as cleanup_db:
+                await cleanup_db.execute(
+                    delete(SharedRuntimeState).where(
+                        SharedRuntimeState.key == runtime_key
+                    )
+                )
+                await cleanup_db.commit()
+            await _remove_cleanup_guard_fixture(bank_id, question_id)
+
+    asyncio.run(scenario())
+
+
+def test_apply_rejects_a_self_hashed_manifest_with_duplicate_target_ids(tmp_path):
+    """Catch a maliciously rehashed report deleting a non-closed target set."""
+
+    backup_path = tmp_path / "verified.dump"
+    backup_path.write_bytes(b"disposable pytest backup")
+
+    async def scenario() -> None:
+        bank_id, question_id, report = await _create_cleanup_guard_fixture(
+            origin="manual"
+        )
+        try:
+            forged = report.model_copy(deep=True)
+            forged.delete.append(forged.delete[0].model_copy(deep=True))
+            forged.summary.delete_count += 1
+            forged.summary.total_count += 1
+            forged.manifest_hash = calculate_manifest_hash(forged)
+            async with AsyncSessionLocal() as db:
+                with pytest.raises(QuestionCleanupApplyError, match="duplicate"):
+                    await apply_cleanup(
+                        db,
+                        forged,
+                        actor="admin",
+                        backup_receipt=_backup_receipt(
+                            backup_path,
+                            forged.manifest_hash,
+                        ),
+                    )
+            async with AsyncSessionLocal() as verify_db:
+                assert await verify_db.get(Question, question_id) is not None
+        finally:
+            await _remove_cleanup_guard_fixture(bank_id, question_id)
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    ("forgery", "expected_message"),
+    [
+        ("keep_to_delete", "classification"),
+        ("omit_keep", "closed"),
+        ("omit_reference", "references"),
+    ],
+)
+def test_apply_rejects_self_hashed_classification_or_reference_forgery(
+    tmp_path,
+    forgery,
+    expected_message,
+):
+    """Catch a rehashed manifest overriding the locked automatic report."""
+
+    backup_path = tmp_path / "verified.dump"
+    backup_path.write_bytes(b"restorable disposable pytest backup")
+
+    async def scenario() -> None:
+        fixture = await _create_cleanup_apply_fixture()
+        report = fixture["report"]
+        assert isinstance(report, QuestionCleanupReport)
+        forged = report.model_copy(deep=True)
+        try:
+            if forgery == "keep_to_delete":
+                formal = next(
+                    row
+                    for row in forged.keep
+                    if row.question_id == fixture["keep_id"]
+                )
+                forged.keep.remove(formal)
+                formal.decision = "delete_non_imported"
+                forged.delete.append(formal)
+                forged.delete.sort(key=lambda row: row.question_id)
+                forged.summary.keep_count -= 1
+                forged.summary.delete_count += 1
+            elif forgery == "omit_keep":
+                forged.keep = [
+                    row
+                    for row in forged.keep
+                    if row.question_id != fixture["keep_id"]
+                ]
+                forged.summary.keep_count -= 1
+                forged.summary.total_count -= 1
+            else:
+                omitted = forged.references.pop()
+                forged.summary.reference_count -= 1
+                if omitted.repair_action == "remove_question_and_recalculate":
+                    forged.summary.repair_reference_count -= 1
+                else:
+                    forged.summary.preserved_reference_count -= 1
+            forged.manifest_hash = calculate_manifest_hash(forged)
+
+            async with AsyncSessionLocal() as apply_db:
+                with pytest.raises(
+                    QuestionCleanupApplyError,
+                    match=expected_message,
+                ):
+                    await apply_cleanup(
+                        apply_db,
+                        forged,
+                        actor="admin",
+                        backup_receipt=_backup_receipt(
+                            backup_path,
+                            forged.manifest_hash,
+                        ),
+                    )
+            async with AsyncSessionLocal() as verify_db:
+                assert await verify_db.get(
+                    Question,
+                    fixture["keep_id"],
+                ) is not None
+        finally:
+            await _remove_cleanup_apply_fixture(fixture)
+
+    asyncio.run(scenario())
+
+
+async def _create_cleanup_apply_fixture() -> dict[str, object]:
+    suffix = uuid4().hex[:10]
+    main_bank_id = f"cleanup-main-{suffix}"
+    empty_bank_id = f"cleanup-empty-{suffix}"
+    historical_bank_id = f"cleanup-history-{suffix}"
+    bank_only_history_id = f"cleanup-bank-only-{suffix}"
+    keep_id = f"cleanup-keep-{suffix}"
+    delete_id = f"cleanup-delete-{suffix}"
+    empty_delete_id = f"cleanup-empty-q-{suffix}"
+    historical_delete_id = f"cleanup-history-q-{suffix}"
+    bank_only_delete_id = f"cleanup-bank-only-q-{suffix}"
+    batch_id = f"cleanup-batch-{suffix}"
+    test_batch_id = f"cleanup-test-batch-{suffix}"
+    paper_id = f"cleanup-paper-{suffix}"
+    audit_ids = [
+        f"cleanup-log-keep-{suffix}",
+        f"cleanup-log-delete-{suffix}",
+        f"cleanup-log-test-batch-{suffix}",
+    ]
+    runtime_keys = [
+        "kg_exam_papers_v1__teacher_shared",
+        "kg_course_config_drafts_v1",
+        "kg_learning_tasks_v1",
+        "kg_principle_repository_v1",
+        "kg_assessment_papers_v1",
+        "kg_exam_papers_published_v1",
+        "kg_course_config_releases_v1",
+        f"kg_recall_association_library_v1__subject__apply-{suffix}",
+    ]
+    now = datetime.now(timezone.utc)
+    published_task = {
+        "id": f"published-task-{suffix}",
+        "status": "published",
+        "config": {"questionIds": [delete_id]},
+    }
+    archived_published_task = {
+        "id": f"archived-published-task-{suffix}",
+        "status": "archived",
+        "publishedAt": "2026-08-01T08:00:00Z",
+        "config": {"questionIds": [delete_id]},
+    }
+    runtime_payloads: dict[str, object] = {
+        "kg_exam_papers_v1__teacher_shared": [
+            {
+                "id": f"runtime-paper-{suffix}",
+                "questions": [
+                    {"questionId": keep_id, "domain": "保留领域"},
+                    {"questionId": delete_id, "domain": "淘汰领域"},
+                ],
+                "totalCount": 2,
+                "questionCount": 2,
+                "quotas": {"保留领域": 1, "淘汰领域": 1},
+            }
+        ],
+        "kg_course_config_drafts_v1": [
+            {
+                "id": f"draft-course-{suffix}",
+                "nodes": [
+                    {
+                        "id": f"draft-node-{suffix}",
+                        "questionIds": [keep_id, delete_id],
+                    }
+                ],
+            }
+        ],
+        "kg_learning_tasks_v1": [
+            {
+                "id": f"draft-task-{suffix}",
+                "status": "draft",
+                "config": {"questionIds": [keep_id, delete_id]},
+            },
+            published_task,
+            archived_published_task,
+            {
+                "id": f"archived-draft-task-{suffix}",
+                "status": "archived",
+                "publishedAt": "",
+                "config": {"questionIds": [keep_id, delete_id]},
+            },
+        ],
+        "kg_principle_repository_v1": {
+            "schemaVersion": 1,
+            "items": [
+                {
+                    "id": f"principle-{suffix}",
+                    "metadata": {"questionId": delete_id},
+                }
+            ],
+        },
+        "kg_assessment_papers_v1": [
+            {
+                "id": f"assessment-{suffix}",
+                "items": [{"metadata": {"questionId": delete_id}}],
+            }
+        ],
+        "kg_exam_papers_published_v1": [
+            {
+                "releaseId": f"published-release-{suffix}",
+                "paperId": f"published-paper-{suffix}",
+                "questions": [
+                    {"bankId": main_bank_id, "questionId": delete_id},
+                    {
+                        "bankId": historical_bank_id,
+                        "questionId": historical_delete_id,
+                    },
+                ],
+                "detachedBankSnapshot": {
+                    "bankId": bank_only_history_id,
+                    "title": "仅保留题库标识的冻结快照",
+                },
+            }
+        ],
+        "kg_course_config_releases_v1": [
+            {
+                "id": f"course-release-{suffix}",
+                "course": {"questionIds": [delete_id]},
+            }
+        ],
+        runtime_keys[-1]: {
+            "schemaVersion": 1,
+            "nodes": [
+                {
+                    "id": f"association-node-{suffix}",
+                    "metadata": {"questionIds": [keep_id, delete_id]},
+                }
+            ],
+            "edges": [],
+        },
+    }
+    published_task_raw = json.dumps(
+        published_task,
+        ensure_ascii=False,
+        separators=(", ", ": "),
+    )
+    archived_published_task_raw = json.dumps(
+        archived_published_task,
+        ensure_ascii=False,
+        indent=3,
+    )
+    learning_task_rows = runtime_payloads["kg_learning_tasks_v1"]
+    runtime_values = {
+        key: (
+            json.dumps(value, ensure_ascii=False, indent=2)
+            if key == "kg_exam_papers_published_v1"
+            else "["
+            + ",".join(
+                [
+                    json.dumps(
+                        learning_task_rows[0],
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
+                    published_task_raw,
+                    archived_published_task_raw,
+                    json.dumps(
+                        learning_task_rows[3],
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
+                ]
+            )
+            + "]"
+            if key == "kg_learning_tasks_v1"
+            else json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        )
+        for key, value in runtime_payloads.items()
+    }
+
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            delete(SharedRuntimeState).where(
+                SharedRuntimeState.key.in_(runtime_keys)
+            )
+        )
+        db.add_all(
+            [
+                QuestionBank(
+                    id=main_bank_id,
+                    owner_id="admin",
+                    name="保留正式导入题库",
+                    subject="PMP",
+                ),
+                QuestionBank(
+                    id=bank_only_history_id,
+                    owner_id="admin",
+                    name="仅题库标识历史依赖",
+                    subject="PMP",
+                ),
+                QuestionBank(
+                    id=empty_bank_id,
+                    owner_id="admin",
+                    name="清理后空题库",
+                    subject="PMP",
+                ),
+                QuestionBank(
+                    id=historical_bank_id,
+                    owner_id="admin",
+                    name="历史快照依赖题库",
+                    subject="PMP",
+                ),
+            ]
+        )
+        await db.flush()
+        db.add_all(
+            [QuestionUploadBatch(
+                id=batch_id,
+                idempotency_key=f"cleanup-apply-{suffix}",
+                bank_id=main_bank_id,
+                actor_username="admin",
+                actor_role="admin",
+                client_instance_id=f"cleanup-client-{suffix}",
+                manifest_hash="d" * 64,
+                status="committed",
+            ),
+            QuestionUploadBatch(
+                id=test_batch_id,
+                idempotency_key=f"cleanup-test-apply-{suffix}",
+                bank_id=empty_bank_id,
+                actor_username="admin",
+                actor_role="admin",
+                client_instance_id=f"cleanup-test-client-{suffix}",
+                manifest_hash="f" * 64,
+                status="committed",
+            )]
+        )
+        db.add_all(
+            [
+                Question(
+                    id=keep_id,
+                    bank_id=main_bank_id,
+                    title="正式导入保留题",
+                    domain="保留领域",
+                    content_metadata={"origin": "content_prep"},
+                ),
+                Question(
+                    id=delete_id,
+                    bank_id=main_bank_id,
+                    title="手工临时题",
+                    domain="淘汰领域",
+                    content_metadata={"origin": "manual"},
+                ),
+                Question(
+                    id=bank_only_delete_id,
+                    bank_id=bank_only_history_id,
+                    title="仅题库标识历史依赖临时题",
+                    domain="历史领域",
+                    content_metadata={"origin": "manual"},
+                ),
+                Question(
+                    id=empty_delete_id,
+                    bank_id=empty_bank_id,
+                    title="空题库临时题",
+                    domain="空题库领域",
+                    content_metadata={"origin": "manual"},
+                ),
+                Question(
+                    id=historical_delete_id,
+                    bank_id=historical_bank_id,
+                    title="历史快照临时题",
+                    domain="历史领域",
+                    content_metadata={"origin": "manual"},
+                ),
+            ]
+        )
+        await db.flush()
+        db.add_all(
+            [
+                QuestionAuditLog(
+                    id=audit_ids[0],
+                    entity_type="question",
+                    entity_id=keep_id,
+                    question_id=keep_id,
+                    bank_id=main_bank_id,
+                    batch_id=batch_id,
+                    action="question_created",
+                    actor_username="admin",
+                    actor_role="admin",
+                    outcome="success",
+                    detail={},
+                ),
+                QuestionAuditLog(
+                    id=audit_ids[2],
+                    entity_type="question",
+                    entity_id=empty_delete_id,
+                    question_id=empty_delete_id,
+                    bank_id=empty_bank_id,
+                    batch_id=test_batch_id,
+                    action="question_created",
+                    actor_username="admin",
+                    actor_role="admin",
+                    outcome="success",
+                    detail={"testFixture": True},
+                ),
+                QuestionAuditLog(
+                    id=audit_ids[1],
+                    entity_type="question",
+                    entity_id=delete_id,
+                    question_id=delete_id,
+                    bank_id=main_bank_id,
+                    action="manual_edit",
+                    actor_username="admin",
+                    actor_role="admin",
+                    outcome="success",
+                    detail={},
+                ),
+            ]
+        )
+        db.add(
+            QuestionEditLock(
+                question_id=delete_id,
+                locked_by="admin",
+                client_instance_id=f"cleanup-lock-{suffix}",
+                token_hash="e" * 64,
+                acquired_at=now,
+                heartbeat_at=now,
+                expires_at=now,
+            )
+        )
+        db.add_all(
+            [
+                TrainingProgress(
+                    id=f"cleanup-training-{suffix}",
+                    owner_id="admin",
+                    question_id=delete_id,
+                    bank_id=main_bank_id,
+                ),
+                RecallProgress(
+                    owner_id="admin",
+                    question_id=delete_id,
+                ),
+                LearningEvent(
+                    id=f"cleanup-event-{suffix}",
+                    owner_id="admin",
+                    question_id=delete_id,
+                    event_type="answer",
+                    payload={},
+                ),
+            ]
+        )
+        db.add(
+            ExamPaper(
+                id=paper_id,
+                owner_id="admin",
+                name="待修复关系型试卷",
+                total_count=2,
+                quotas={"保留领域": 1, "淘汰领域": 1},
+                revision=5,
+            )
+        )
+        await db.flush()
+        db.add_all(
+            [
+                PaperQuestion(
+                    paper_id=paper_id,
+                    question_id=keep_id,
+                    order_index=0,
+                ),
+                PaperQuestion(
+                    paper_id=paper_id,
+                    question_id=delete_id,
+                    order_index=1,
+                ),
+            ]
+        )
+        db.add_all(
+            [
+                SharedRuntimeState(
+                    key=key,
+                    value=runtime_values[key],
+                    schema_version=1,
+                    updated_by="admin",
+                )
+                for key in runtime_keys
+            ]
+        )
+        await db.commit()
+
+    async with AsyncSessionLocal() as revision_db:
+        revision_before = int(
+            (await teaching_content_revision_service.current(revision_db))["revision"]
+        )
+    async with AsyncSessionLocal() as report_db:
+        report = await build_report(report_db)
+    report = _resolve_all_test_review_rows(report)
+    assert report.summary.review_count == 0
+    return {
+        "suffix": suffix,
+        "main_bank_id": main_bank_id,
+        "empty_bank_id": empty_bank_id,
+        "historical_bank_id": historical_bank_id,
+        "bank_only_history_id": bank_only_history_id,
+        "keep_id": keep_id,
+        "delete_id": delete_id,
+        "empty_delete_id": empty_delete_id,
+        "historical_delete_id": historical_delete_id,
+        "bank_only_delete_id": bank_only_delete_id,
+        "batch_id": batch_id,
+        "test_batch_id": test_batch_id,
+        "paper_id": paper_id,
+        "audit_ids": audit_ids,
+        "runtime_keys": runtime_keys,
+        "runtime_values": runtime_values,
+        "published_task": published_task,
+        "archived_published_task": archived_published_task,
+        "published_task_raw": published_task_raw,
+        "archived_published_task_raw": archived_published_task_raw,
+        "revision_before": revision_before,
+        "report": report,
+    }
+
+
+async def _remove_cleanup_apply_fixture(fixture: dict[str, object]) -> None:
+    question_ids = [
+        str(fixture[key])
+        for key in (
+            "keep_id",
+            "delete_id",
+            "empty_delete_id",
+            "historical_delete_id",
+            "bank_only_delete_id",
+        )
+    ]
+    bank_ids = [
+        str(fixture[key])
+        for key in (
+            "main_bank_id",
+            "empty_bank_id",
+            "historical_bank_id",
+            "bank_only_history_id",
+        )
+    ]
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            delete(TrainingProgress).where(
+                TrainingProgress.question_id.in_(question_ids)
+            )
+        )
+        await db.execute(
+            delete(RecallProgress).where(RecallProgress.question_id.in_(question_ids))
+        )
+        await db.execute(
+            delete(LearningEvent).where(LearningEvent.question_id.in_(question_ids))
+        )
+        await db.execute(
+            delete(QuestionEditLock).where(
+                QuestionEditLock.question_id.in_(question_ids)
+            )
+        )
+        await db.execute(
+            delete(QuestionAuditLog).where(
+                QuestionAuditLog.id.in_(fixture["audit_ids"])
+            )
+        )
+        await db.execute(
+            delete(PaperQuestion).where(
+                PaperQuestion.paper_id == fixture["paper_id"]
+            )
+        )
+        await db.execute(
+            delete(ExamPaper).where(ExamPaper.id == fixture["paper_id"])
+        )
+        await db.execute(delete(Question).where(Question.id.in_(question_ids)))
+        await db.execute(
+            delete(QuestionUploadBatch).where(
+                QuestionUploadBatch.id.in_(
+                    [fixture["batch_id"], fixture["test_batch_id"]]
+                )
+            )
+        )
+        await db.execute(
+            delete(QuestionBank).where(QuestionBank.id.in_(bank_ids))
+        )
+        await db.execute(
+            delete(SharedRuntimeState).where(
+                SharedRuntimeState.key.in_(fixture["runtime_keys"])
+            )
+        )
+        await db.commit()
+
+
+def test_apply_repairs_current_references_preserves_history_and_audits_once(tmp_path):
+    """Catch partial cleanup, historical rewrites, or multiple revision bumps."""
+
+    backup_path = tmp_path / "verified.dump"
+    backup_path.write_bytes(b"restorable disposable pytest backup")
+
+    async def scenario() -> None:
+        fixture = await _create_cleanup_apply_fixture()
+        report = fixture["report"]
+        assert isinstance(report, QuestionCleanupReport)
+        try:
+            async with AsyncSessionLocal() as apply_db:
+                result = await apply_cleanup(
+                    apply_db,
+                    report,
+                    actor="admin",
+                    backup_receipt=_backup_receipt(
+                        backup_path,
+                        report.manifest_hash,
+                    ),
+                )
+
+            expected_deleted = sorted(
+                [
+                    str(fixture["delete_id"]),
+                    str(fixture["empty_delete_id"]),
+                    str(fixture["historical_delete_id"]),
+                    str(fixture["bank_only_delete_id"]),
+                ]
+            )
+            assert result.deleted_question_ids == expected_deleted
+            assert result.teaching_revision == int(fixture["revision_before"]) + 1
+
+            async with AsyncSessionLocal() as verify_db:
+                assert await verify_db.get(Question, fixture["keep_id"]) is not None
+                for question_id in expected_deleted:
+                    assert await verify_db.get(Question, question_id) is None
+
+                paper = await verify_db.get(ExamPaper, fixture["paper_id"])
+                assert paper is not None
+                assert paper.total_count == 1
+                assert paper.quotas == {"保留领域": 1}
+                assert paper.revision == 6
+                links = (
+                    await verify_db.execute(
+                        select(PaperQuestion)
+                        .where(PaperQuestion.paper_id == fixture["paper_id"])
+                        .order_by(PaperQuestion.order_index)
+                    )
+                ).scalars().all()
+                assert [link.question_id for link in links] == [fixture["keep_id"]]
+                assert links[0].order_index == 0
+
+                current_paper_row = await verify_db.get(
+                    SharedRuntimeState,
+                    "kg_exam_papers_v1__teacher_shared",
+                )
+                current_paper = json.loads(current_paper_row.value)[0]
+                assert [
+                    row["questionId"] for row in current_paper["questions"]
+                ] == [fixture["keep_id"]]
+                assert current_paper["totalCount"] == 1
+                assert current_paper["questionCount"] == 1
+                assert current_paper["quotas"] == {"保留领域": 1}
+
+                course_row = await verify_db.get(
+                    SharedRuntimeState,
+                    "kg_course_config_drafts_v1",
+                )
+                assert json.loads(course_row.value)[0]["nodes"][0][
+                    "questionIds"
+                ] == [fixture["keep_id"]]
+
+                tasks_row = await verify_db.get(
+                    SharedRuntimeState,
+                    "kg_learning_tasks_v1",
+                )
+                tasks = {
+                    row["id"]: row for row in json.loads(tasks_row.value)
+                }
+                assert tasks[f"draft-task-{fixture['suffix']}"]["config"][
+                    "questionIds"
+                ] == [fixture["keep_id"]]
+                assert tasks[f"archived-draft-task-{fixture['suffix']}"][
+                    "config"
+                ]["questionIds"] == [fixture["keep_id"]]
+                assert tasks[f"published-task-{fixture['suffix']}"] == fixture[
+                    "published_task"
+                ]
+                assert tasks[
+                    f"archived-published-task-{fixture['suffix']}"
+                ] == fixture["archived_published_task"]
+                assert fixture["published_task_raw"] in tasks_row.value
+                assert fixture["archived_published_task_raw"] in tasks_row.value
+
+                published_row = await verify_db.get(
+                    SharedRuntimeState,
+                    "kg_exam_papers_published_v1",
+                )
+                assert published_row.value == fixture["runtime_values"][
+                    "kg_exam_papers_published_v1"
+                ]
+                published_course_row = await verify_db.get(
+                    SharedRuntimeState,
+                    "kg_course_config_releases_v1",
+                )
+                assert published_course_row.value == fixture["runtime_values"][
+                    "kg_course_config_releases_v1"
+                ]
+
+                assert await verify_db.get(
+                    QuestionBank,
+                    fixture["empty_bank_id"],
+                ) is None
+                assert await verify_db.get(
+                    QuestionUploadBatch,
+                    fixture["test_batch_id"],
+                ) is None
+                assert await verify_db.get(
+                    QuestionBank,
+                    fixture["historical_bank_id"],
+                ) is not None
+                assert await verify_db.get(
+                    QuestionBank,
+                    fixture["bank_only_history_id"],
+                ) is not None
+                assert await verify_db.get(
+                    QuestionEditLock,
+                    fixture["delete_id"],
+                ) is None
+                for model in (TrainingProgress, RecallProgress, LearningEvent):
+                    dependent_count = (
+                        await verify_db.execute(
+                            select(func.count())
+                            .select_from(model)
+                            .where(model.question_id == fixture["delete_id"])
+                        )
+                    ).scalar_one()
+                    assert dependent_count == 0
+                deleted_audit_count = (
+                    await verify_db.execute(
+                        select(func.count())
+                        .select_from(QuestionAuditLog)
+                        .where(
+                            QuestionAuditLog.question_id
+                            == fixture["delete_id"]
+                        )
+                    )
+                ).scalar_one()
+                assert deleted_audit_count == 0
+
+                revision = await teaching_content_revision_service.current(verify_db)
+                assert revision["revision"] == int(fixture["revision_before"]) + 1
+                assert revision["changes"] == [
+                    {
+                        "entityType": "question_pool",
+                        "entityId": report.manifest_hash,
+                        "action": "cleanup",
+                    }
+                ]
+                audit = await verify_db.get(QuestionCleanupAudit, result.audit_id)
+                assert audit is not None
+                assert audit.manifest_hash == report.manifest_hash
+                assert audit.deleted_question_ids == expected_deleted
+                assert audit.teaching_revision == revision["revision"]
+                assert audit.repair_summary[
+                    "publishedHistoricalReferences"
+                ]
+
+            async with AsyncSessionLocal() as second_db:
+                with pytest.raises(QuestionCleanupApplyError, match="already"):
+                    await apply_cleanup(
+                        second_db,
+                        report,
+                        actor="admin",
+                        backup_receipt=_backup_receipt(
+                            backup_path,
+                            report.manifest_hash,
+                        ),
+                    )
+        finally:
+            await _remove_cleanup_apply_fixture(fixture)
+
+    asyncio.run(scenario())
+
+
+def test_apply_rolls_back_repairs_deletes_audit_and_revision_on_failure(
+    tmp_path,
+    monkeypatch,
+):
+    """Catch a repair exception leaving any partial destructive state committed."""
+
+    backup_path = tmp_path / "verified.dump"
+    backup_path.write_bytes(b"restorable disposable pytest backup")
+
+    async def scenario() -> None:
+        fixture = await _create_cleanup_apply_fixture()
+        report = fixture["report"]
+        assert isinstance(report, QuestionCleanupReport)
+        real_repair = question_cleanup_service.repair_current_question_references
+
+        async def fail_after_real_repair(*args, **kwargs):
+            await real_repair(*args, **kwargs)
+            raise RuntimeError("injected repair failure")
+
+        monkeypatch.setattr(
+            question_cleanup_service,
+            "repair_current_question_references",
+            fail_after_real_repair,
+        )
+        try:
+            async with AsyncSessionLocal() as apply_db:
+                with pytest.raises(RuntimeError, match="injected repair failure"):
+                    await apply_cleanup(
+                        apply_db,
+                        report,
+                        actor="admin",
+                        backup_receipt=_backup_receipt(
+                            backup_path,
+                            report.manifest_hash,
+                        ),
+                    )
+                assert not apply_db.in_transaction()
+
+            async with AsyncSessionLocal() as verify_db:
+                for field in (
+                    "keep_id",
+                    "delete_id",
+                    "empty_delete_id",
+                    "historical_delete_id",
+                    "bank_only_delete_id",
+                ):
+                    assert await verify_db.get(Question, fixture[field]) is not None
+                for key, original in fixture["runtime_values"].items():
+                    row = await verify_db.get(SharedRuntimeState, key)
+                    assert row is not None
+                    assert row.value == original
+                paper = await verify_db.get(ExamPaper, fixture["paper_id"])
+                assert paper is not None
+                assert paper.total_count == 2
+                assert paper.quotas == {"保留领域": 1, "淘汰领域": 1}
+                assert paper.revision == 5
+                revision = await teaching_content_revision_service.current(verify_db)
+                assert revision["revision"] == fixture["revision_before"]
+                audit_count = (
+                    await verify_db.execute(
+                        select(func.count())
+                        .select_from(QuestionCleanupAudit)
+                        .where(
+                            QuestionCleanupAudit.manifest_hash
+                            == report.manifest_hash
+                        )
+                    )
+                ).scalar_one()
+                assert audit_count == 0
+        finally:
+            monkeypatch.setattr(
+                question_cleanup_service,
+                "repair_current_question_references",
+                real_repair,
+            )
+            await _remove_cleanup_apply_fixture(fixture)
+
+    asyncio.run(scenario())
+
+
+def test_apply_global_lock_blocks_official_writer_between_recheck_and_commit(
+    tmp_path,
+    monkeypatch,
+):
+    """Catch lock-order regressions that admit a Plan1 writer mid-cleanup."""
+
+    backup_path = tmp_path / "verified.dump"
+    backup_path.write_bytes(b"restorable disposable pytest backup")
+
+    async def scenario() -> None:
+        fixture = await _create_cleanup_apply_fixture()
+        report = fixture["report"]
+        assert isinstance(report, QuestionCleanupReport)
+        repair_entered = asyncio.Event()
+        release_repair = asyncio.Event()
+        real_repair = question_cleanup_service.repair_current_question_references
+        created_question_id: str | None = None
+
+        async def pause_before_repair(*args, **kwargs):
+            repair_entered.set()
+            await release_repair.wait()
+            return await real_repair(*args, **kwargs)
+
+        monkeypatch.setattr(
+            question_cleanup_service,
+            "repair_current_question_references",
+            pause_before_repair,
+        )
+        try:
+            async def cleanup_task():
+                async with AsyncSessionLocal() as apply_db:
+                    return await apply_cleanup(
+                        apply_db,
+                        report,
+                        actor="admin",
+                        backup_receipt=_backup_receipt(
+                            backup_path,
+                            report.manifest_hash,
+                        ),
+                    )
+
+            async def official_writer():
+                async with AsyncSessionLocal() as writer_db:
+                    return await question_service.create_question(
+                        writer_db,
+                        "admin",
+                        str(fixture["main_bank_id"]),
+                        {
+                            "title": "清理锁释放后写入",
+                            "domain": "保留领域",
+                            "metadata": {"origin": "manual"},
+                        },
+                    )
+
+            apply_task = asyncio.create_task(cleanup_task())
+            await asyncio.wait_for(repair_entered.wait(), timeout=5)
+            writer_task = asyncio.create_task(official_writer())
+            await asyncio.sleep(0.1)
+            assert not writer_task.done(), (
+                "official teaching writer must wait for cleanup's global lock"
+            )
+            release_repair.set()
+            await apply_task
+            created = await asyncio.wait_for(writer_task, timeout=5)
+            assert created is not None
+            created_question_id = str(created.id)
+        finally:
+            release_repair.set()
+            monkeypatch.setattr(
+                question_cleanup_service,
+                "repair_current_question_references",
+                real_repair,
+            )
+            if created_question_id is not None:
+                async with AsyncSessionLocal() as cleanup_db:
+                    await cleanup_db.execute(
+                        delete(Question).where(Question.id == created_question_id)
+                    )
+                    await cleanup_db.commit()
+            await _remove_cleanup_apply_fixture(fixture)
+
+    asyncio.run(scenario())
+
+
+def test_cleanup_lock_contract_uses_the_plan1_global_writer_lock():
+    """Catch cleanup's advisory lock diverging from every official writer."""
+
+    async def scenario() -> None:
+        bank_id, question_id, _ = await _create_cleanup_guard_fixture(
+            origin="manual"
+        )
+        created_question_id: str | None = None
+        writer_task = None
+        try:
+            async with AsyncSessionLocal() as cleanup_db:
+                await teaching_content_revision_service.acquire_cleanup_lock(
+                    cleanup_db
+                )
+
+                async def official_writer():
+                    async with AsyncSessionLocal() as writer_db:
+                        return await question_service.create_question(
+                            writer_db,
+                            "admin",
+                            bank_id,
+                            {
+                                "title": "全局锁契约写入",
+                                "metadata": {"origin": "manual"},
+                            },
+                        )
+
+                writer_task = asyncio.create_task(official_writer())
+                await asyncio.sleep(0.1)
+                assert not writer_task.done(), (
+                    "cleanup lock must include the shared teaching writer lock"
+                )
+                await cleanup_db.rollback()
+                created = await asyncio.wait_for(writer_task, timeout=5)
+                assert created is not None
+                created_question_id = str(created.id)
+        finally:
+            if (
+                created_question_id is None
+                and writer_task is not None
+            ):
+                created = await asyncio.wait_for(writer_task, timeout=5)
+                if created is not None:
+                    created_question_id = str(created.id)
+            if created_question_id is not None:
+                async with AsyncSessionLocal() as cleanup_db:
+                    await cleanup_db.execute(
+                        delete(Question).where(Question.id == created_question_id)
+                    )
+                    await cleanup_db.commit()
+            await _remove_cleanup_guard_fixture(bank_id, question_id)
+
+    asyncio.run(scenario())
