@@ -12,6 +12,7 @@
   const PUBLISHED_BANKS_KEY = 'kg_question_banks_published_v1';
   const PUBLISHED_PAPERS_KEY = 'kg_exam_papers_published_v1';
   const PAPER_RELEASE_HISTORY_KEY = 'kg_exam_paper_release_history_v1';
+  const PRINCIPLE_REPOSITORY_KEY = 'kg_principle_repository_v1';
   const AUTH_SESSION_KEY = 'kg_local_current_user_v1';
   const DEEP_RECALL_KEY = 'kg_deep_recall_current_question_v1';
   const DEMO_SUPPRESSED_PREFIX = 'kg_question_bank_demo_suppressed_v1__';
@@ -26,6 +27,8 @@
   const COGNITIVE_PAGE_SIZE = 10;
   const PAPER_CANDIDATE_PAGE_SIZE = 20;
   const PAPER_LIST_PAGE_SIZE = 18;
+  const PaperQuotaService=window.KGPaperQuotaService||{};
+  const PrincipleRepository=window.KGPrincipleRepository||{};
 
   const SUBJECTS = [
     {
@@ -156,6 +159,7 @@
     paperPreviewAnchor:null,
     paperPreviewSource:'',
     paperPreviewClickTimer:0,
+    paperQuotaFeedback:null,
     libraryWorkspaceMode:'split',
     libraryPaneRatio:0.42,
     libraryPreviewRef:null,
@@ -583,17 +587,49 @@
     };
   }
 
+  function normalizePaperQuotaMap(value){
+    if(!value||typeof value!=='object'||Array.isArray(value))return {};
+    const normalized={};
+    Object.entries(value).forEach(([rawId,rawQuota])=>{
+      const id=String(rawId||'').trim(),quota=Number(rawQuota);
+      if(id&&Number.isInteger(quota)&&quota>=0)normalized[id]=quota;
+    });
+    return normalized;
+  }
+
+  function parsePaperQuotaEntries(entries=[]){
+    const quotas={},errors=[];
+    (Array.isArray(entries)?entries:[]).forEach(entry=>{
+      const id=String(entry?.id||'').trim(),label=String(entry?.label||id||'当前项目').trim(),raw=String(entry?.value??'').trim();
+      if(!id||!raw)return;
+      const quota=Number(raw);
+      if(!Number.isInteger(quota)||quota<0){errors.push(`${label}的配额必须是非负整数。`);return}
+      if(quota>0)quotas[id]=quota;
+    });
+    return {quotas,errors};
+  }
+
   function normalizePaper(paper, index=0){
     paper = paper && typeof paper === 'object' ? paper : {};
     const subject = String(paper.subject || 'PMP');
     const rawQuestions = Array.isArray(paper.questions) ? paper.questions : (Array.isArray(paper.questionRefs) ? paper.questionRefs : []);
+    const seenQuestionRefs=new Set();
     const questions = rawQuestions.map((item, i) => ({
       bankId:String(item.bankId || item.sourceBankId || ''),
       questionId:String(item.questionId || item.id || ''),
       order:Number(item.order || i + 1),
       score:Number(item.score || 1)
-    })).filter(item => item.bankId && item.questionId).sort((a,b) => a.order - b.order);
-    const quotas = paper.quotas && typeof paper.quotas === 'object' ? paper.quotas : {};
+    })).filter(item => item.bankId && item.questionId).sort((a,b) => a.order - b.order).filter(item=>{
+      const key=paperRefKey(item);if(seenQuestionRefs.has(key))return false;seenQuestionRefs.add(key);return true;
+    }).map((item,questionIndex)=>({...item,order:questionIndex+1}));
+    const legacyDomainQuotas=paper.domainTargets&&typeof paper.domainTargets==='object'&&!Array.isArray(paper.domainTargets)
+      ?paper.domainTargets
+      :(paper.quotas&&typeof paper.quotas==='object'&&!Array.isArray(paper.quotas)?paper.quotas:{});
+    const domainQuotas=normalizePaperQuotaMap(paper.domainQuotas&&typeof paper.domainQuotas==='object'&&!Array.isArray(paper.domainQuotas)?paper.domainQuotas:legacyDomainQuotas);
+    const principleQuotas=normalizePaperQuotaMap(paper.principleQuotas);
+    const questionIds=new Set(questions.map(item=>item.questionId));
+    const rawManualIds=Array.isArray(paper.manualQuestionIds)?paper.manualQuestionIds:questions.map(item=>item.questionId);
+    const manualQuestionIds=[...new Set(rawManualIds.map(value=>String(value||'').trim()).filter(id=>id&&questionIds.has(id)))];
     return {
       id:String(paper.id || ('paper-' + Date.now().toString(36) + '-' + index)),
       name:String(paper.name || subject + ' 综合训练试卷'),
@@ -601,6 +637,8 @@
       description:String(paper.description || ''),
       totalCount:Number(paper.totalCount || paper.targetCount || 180),
       status:String(paper.status || 'draft'),
+      createdBy:String(paper.createdBy||''),
+      updatedBy:String(paper.updatedBy||''),
       createdAt:Number(paper.createdAt || Date.now()),
       updatedAt:Number(paper.updatedAt || Date.now()),
       publishedAt:paper.publishedAt ? Number(paper.publishedAt) : 0,
@@ -610,7 +648,11 @@
       purpose:String(paper.purpose || 'learning'),
       categoryId:String(paper.categoryId || ''),
       archivedAt:Number(paper.archivedAt || 0),
-      quotas:Object.fromEntries(Object.entries(quotas).map(([k,v]) => [String(k), Math.max(0, Number(v || 0))])),
+      supplementMode:paper.supplementMode==='principle'?'principle':'domain',
+      domainQuotas,
+      principleQuotas,
+      manualQuestionIds,
+      quotas:{...domainQuotas},
       questions
     };
   }
@@ -720,6 +762,27 @@
     });
     return rows;
   }
+  function paperQuotaCandidate(row){
+    const bankId=String(row?.bank?.id||row?.bankId||''),question=row?.question||row||{},questionId=String(question.id||row?.questionId||'');
+    return {
+      id:paperRefKey({bankId,questionId}),
+      domainId:String(row?.domain||questionDomainKey(question)),
+      principleIds:[...new Set([...(Array.isArray(question.principleIds)?question.principleIds:[]),...(Array.isArray(question.metadata?.principleIds)?question.metadata.principleIds:[])].map(String).filter(Boolean))],
+      eligible:!!(bankId&&questionId&&!isQuestionDeleted(question)),
+      archived:isQuestionDeleted(question)
+    };
+  }
+  function supplementPaperDraft(value,candidateRows=paperCandidates(value?.subject),random=Math.random){
+    if(typeof PaperQuotaService.supplement!=='function')throw new Error('试卷配额服务未加载，请刷新页面后重试。');
+    const paper=normalizePaper(value),mode=paper.supplementMode==='principle'?'principle':'domain';
+    const rows=Array.isArray(candidateRows)?candidateRows:[],candidateById=new Map();
+    const candidates=rows.map(row=>{const candidate=paperQuotaCandidate(row);candidateById.set(candidate.id,row);return candidate});
+    const response=PaperQuotaService.supplement({paperQuestionIds:(paper.questions||[]).map(paperRefKey),candidates,mode,quotas:mode==='principle'?paper.principleQuotas:paper.domainQuotas,random});
+    const existing=(paper.questions||[]).map(ref=>({...ref}));
+    const additions=response.addedQuestionIds.map(id=>{const row=candidateById.get(id),bankId=String(row?.bank?.id||row?.bankId||''),questionId=String(row?.question?.id||row?.questionId||'');return {bankId,questionId,order:existing.length+1,score:1}}).filter(ref=>ref.bankId&&ref.questionId);
+    const next=normalizePaper({...paper,questions:[...existing,...additions],updatedAt:Date.now()});
+    return {paper:next,shortages:response.shortages,assignments:response.assignments,addedQuestionIds:response.addedQuestionIds,unassignedExistingIds:response.unassignedExistingIds};
+  }
   function paperDomainStats(subject){
     const stats = new Map();
     paperCandidates(subject).forEach(row => {
@@ -730,6 +793,18 @@
       if(row.completion >= 50) item.complete += 1;
     });
     return Array.from(stats.values()).sort((a,b) => a.domain.localeCompare(b.domain, 'zh-Hans-CN'));
+  }
+  function paperPrincipleStats(subject,candidateRows=paperCandidates(subject)){
+    const runtimeItems=PrincipleRepository.list?.({includeInactive:true});
+    let payload={};try{payload=JSON.parse(localStorage.getItem(PRINCIPLE_REPOSITORY_KEY)||'{}')||{}}catch(error){}
+    const storedItems=Array.isArray(runtimeItems)&&runtimeItems.length?runtimeItems:(Array.isArray(payload?.items)?payload.items:[]);
+    const records=new Map();
+    storedItems.forEach(item=>{const id=String(item?.id||'').trim();if(id)records.set(id,{id,name:String(item?.name||id),status:item?.status==='inactive'?'inactive':'active'})});
+    (Array.isArray(candidateRows)?candidateRows:[]).forEach(row=>{if(subject&&row?.bank?.subject&&String(row.bank.subject)!==String(subject))return;const candidate=paperQuotaCandidate(row);if(!candidate.eligible)return;candidate.principleIds.forEach(id=>{if(!records.has(id))records.set(id,{id,name:id,status:'active'})})});
+    const active=[...records.values()].filter(item=>item.status!=='inactive');
+    const linked=new Map(active.map(item=>[String(item.id),new Set()]));
+    (Array.isArray(candidateRows)?candidateRows:[]).forEach(row=>{if(subject&&row?.bank?.subject&&String(row.bank.subject)!==String(subject))return;const candidate=paperQuotaCandidate(row);if(!candidate.eligible)return;candidate.principleIds.forEach(id=>linked.get(id)?.add(candidate.id))});
+    return active.map(item=>({id:String(item.id),name:String(item.name||item.id),count:linked.get(String(item.id))?.size||0}));
   }
   function setCurrentPaper(paper){
     try{
@@ -1250,6 +1325,7 @@
     on('qbAddPaperCategoryBtn','click',addPaperCategory);on('qbPaperListSearch','input',event=>applyPaperCatalogFilter({search:String(event.currentTarget.value||'')}));on('qbPaperStatusFilter','change',event=>applyPaperCatalogFilter({status:String(event.currentTarget.value||'ALL')}));on('qbPaperListSelectPage','change',toggleSelectPaperPage);on('qbPaperBulkMoveCategoryBtn','click',moveSelectedPapersToCategory);on('qbPaperBulkArchiveBtn','click',archiveSelectedPapers);on('qbPaperBulkDeleteDraftBtn','click',deleteSelectedPaperDrafts);
     on('paperSubjectInput','change',()=>{savePaperForm({silent:true,skipRender:true});state.paperCandidatePage=1;state.selectedPaperCandidateKeys=new Set();renderPaperManager()});
     on('paperCategoryInput','change',()=>savePaperForm({silent:true}));
+    document.querySelectorAll('[data-paper-supplement-mode]').forEach(input=>input.addEventListener('change',handlePaperSupplementModeChange));
     on('qbPaperCandidateSearch','input',event=>{state.paperCandidateSearch=String(event.currentTarget.value||'').trim();state.paperCandidatePage=1;state.selectedPaperCandidateKeys=new Set();renderPaperCandidateList()});
     on('qbPaperCandidateBankFilter','change',event=>{state.paperCandidateBankId=String(event.currentTarget.value||'ALL');state.paperCandidatePage=1;state.selectedPaperCandidateKeys=new Set();renderPaperCandidateList()});
     on('qbSelectPaperCandidatesPage','change',toggleSelectPaperCandidatePage);on('qbAddSelectedToPaperBtn','click',addSelectedCandidatesToPaper);
@@ -1407,6 +1483,7 @@
     $('qbAutoQuotaBtn')?.addEventListener('click', autoDistributeQuota);
     $('qbClearQuotaBtn')?.addEventListener('click', clearPaperQuota);
     $('paperSubjectInput')?.addEventListener('change', () => { savePaperForm({silent:true, skipRender:true}); renderPaperManager(); });
+    document.querySelectorAll('[data-paper-supplement-mode]').forEach(input=>input.addEventListener('change',handlePaperSupplementModeChange));
     $('qbTemplateBtn').addEventListener('click', downloadTemplate);
     $('qbSetCurrentBtn').addEventListener('click', setCurrentTrainingQuestion);
     $('qbPreviewRecallBtn').addEventListener('click', previewDeepRecall);
@@ -2703,6 +2780,20 @@
 
 只删除试卷配置，不会删除题库原题。`))return;const ids=new Set(deletable.map(paper=>paper.id));state.papers=state.papers.filter(paper=>!ids.has(paper.id));state.selectedPaperIds=new Set();savePapers(state.papers,{silent:true});ensureSelectedPaperVisible();renderPaperManager();toast(`已删除 ${deletable.length} 张草稿${protectedCount?`，跳过 ${protectedCount} 张受保护试卷`:''}。`)
   }
+  function paperQuotaBucketLabel(mode,bucketId){
+    if(mode!=='principle')return bucketId;const runtime=PrincipleRepository.get?.(bucketId);if(runtime?.name)return runtime.name;
+    let payload={};try{payload=JSON.parse(localStorage.getItem(PRINCIPLE_REPOSITORY_KEY)||'{}')||{}}catch(error){}
+    const stored=Array.isArray(payload?.items)?payload.items.find(item=>String(item?.id||'')===String(bucketId)):null;return stored?.name||bucketId;
+  }
+  function syncPaperSupplementModeControls(paper=currentPaper()){
+    const mode=paper?.supplementMode==='principle'?'principle':'domain';document.querySelectorAll('[data-paper-supplement-mode]').forEach(input=>{input.checked=String(input.value||'domain')===mode});
+    const domainWrap=$('qbPaperDomainQuotaList'),principleWrap=$('qbPaperPrincipleQuotaList');if(domainWrap)domainWrap.hidden=mode!=='domain';if(principleWrap)principleWrap.hidden=mode!=='principle';return mode;
+  }
+  function handlePaperSupplementModeChange(){const paper=currentPaper();if(!paper){syncPaperSupplementModeControls(null);return false}if(savePaperForm({silent:true}))return true;syncPaperSupplementModeControls(paper);return false}
+  function paperQuotaFeedbackMarkup(paper){
+    const feedback=state.paperQuotaFeedback;if(!paper||!feedback||feedback.paperId!==paper.id||!feedback.shortages?.length)return '';
+    return feedback.shortages.map(item=>`<span class="qb-badge warn">${feedback.mode==='principle'?'原则':'领域'}“${escapeHTML(paperQuotaBucketLabel(feedback.mode,item.bucketId))}”短缺 ${Number(item.missing||0)} 题（目标 ${Number(item.requested||0)}，已满足 ${Number(item.existing||0)+Number(item.added||0)}）</span>`).join('');
+  }
   function fillPaperForm(){
     const paper = currentPaper();
     const subjectSelect = $('paperSubjectInput');
@@ -2715,6 +2806,7 @@
     const categorySelect=$('paperCategoryInput');if(categorySelect){categorySelect.innerHTML='<option value="">未分类</option>'+state.paperCategories.map(item=>`<option value="${escapeHTML(item.id)}">${escapeHTML(item.name)}</option>`).join('');categorySelect.value=paper?.categoryId||''}
     if($('paperDescriptionInput')) $('paperDescriptionInput').value = paper ? paper.description || '' : '';
     document.querySelectorAll('[data-paper-mode]').forEach(input=>{input.checked=!!paper&&(paper.enabledModes||[]).includes(String(input.dataset.paperMode||''))});
+    syncPaperSupplementModeControls(paper);
     const meta = $('qbPaperMeta');
     if(meta){
       if(!paper){
@@ -2729,6 +2821,7 @@
           <span class="qb-badge ${integrity.missingCount ? 'warn' : ''}">前端可用 ${integrity.validCount} 题</span>
           ${integrity.missingCount ? `<span class="qb-badge warn">失效引用 ${integrity.missingCount} 题</span>` : ''}
           ${integrity.duplicateCount ? `<span class="qb-badge warn">重复引用 ${integrity.duplicateCount} 题</span>` : ''}
+          ${paperQuotaFeedbackMarkup(paper)}
           ${paper.publishedAt ? `<span class="qb-badge">发布时间 ${new Date(paper.publishedAt).toLocaleString()}</span>` : ''}
         `;
       }
@@ -2738,6 +2831,7 @@
   }
   function readPaperFormInto(paper){
     if(!paper) return null;
+    const quotaDraft=collectPaperQuotaFromDom();if(quotaDraft.errors.length){toast(quotaDraft.errors[0]);return null}
     paper.name = $('paperNameInput')?.value.trim() || paper.name || '未命名试卷';
     paper.subject = $('paperSubjectInput')?.value || paper.subject || 'PMP';
     paper.totalCount = Math.max(1, Number($('paperTotalInput')?.value || paper.totalCount || 180));
@@ -2745,7 +2839,9 @@
     paper.description = $('paperDescriptionInput')?.value.trim() || '';
     paper.enabledModes=Array.from(document.querySelectorAll('[data-paper-mode]:checked')).map(input=>String(input.dataset.paperMode||'')).filter(Boolean);
     if(!paper.enabledModes.length)paper.enabledModes=['deep_recall','multi_question_canvas','single_deep_study'];
-    paper.quotas = collectPaperQuotaFromDom();
+    paper.supplementMode=document.querySelector('[data-paper-supplement-mode]:checked')?.value==='principle'?'principle':'domain';
+    paper.domainQuotas=quotaDraft.domainQuotas;paper.principleQuotas=quotaDraft.principleQuotas;
+    const actor=currentActor();paper.createdBy=paper.createdBy||String(actor.id||'');paper.updatedBy=String(actor.id||'');
     paper.updatedAt = Date.now();
     return paper;
   }
@@ -2756,8 +2852,9 @@
       state.papers.push(paper);
       state.selectedPaperId = paper.id;
     }
-    readPaperFormInto(paper);
+    if(!readPaperFormInto(paper))return false;
     savePapers(state.papers, {silent:options.silent});
+    state.paperQuotaFeedback=null;
     if(!options.skipRender) renderPaperManager();
     return true;
   }
@@ -2771,7 +2868,10 @@
       totalCount:180,
       categoryId:state.paperCategoryFilter!=='ALL'&&state.paperCategoryFilter!=='UNCATEGORIZED'?state.paperCategoryFilter:'',
       status:'draft',
-      quotas:{},
+      supplementMode:'domain',
+      domainQuotas:{},
+      principleQuotas:{},
+      manualQuestionIds:[],
       questions:[]
     });
   }
@@ -2786,34 +2886,27 @@
     renderPaperManager();
   }
   function collectPaperQuotaFromDom(){
-    const rows = Array.from(document.querySelectorAll('#qbPaperQuotaList [data-domain]'));
-    const quotas = {};
-    rows.forEach(row => {
-      const domain = row.dataset.domain || '';
-      const value = Math.max(0, Number(row.querySelector('input')?.value || 0));
-      if(domain && value > 0) quotas[domain] = value;
-    });
-    return quotas;
+    const read=(selector,datasetField)=>parsePaperQuotaEntries(Array.from(document.querySelectorAll(selector)).map(row=>({id:row.dataset?.[datasetField]||'',label:row.querySelector('strong')?.textContent||'',value:row.querySelector('input')?.value||''})));
+    const domain=read('#qbPaperDomainQuotaList [data-domain]','domain'),principle=read('#qbPaperPrincipleQuotaList [data-principle-id]','principleId');
+    return {domainQuotas:domain.quotas,principleQuotas:principle.quotas,errors:[...domain.errors,...principle.errors]};
   }
   function renderPaperQuotaList(){
-    const wrap = $('qbPaperQuotaList');
-    if(!wrap) return;
+    const wrap=$('qbPaperQuotaList'),domainWrap=$('qbPaperDomainQuotaList'),principleWrap=$('qbPaperPrincipleQuotaList');if(!wrap||!domainWrap||!principleWrap)return;
     const paper = currentPaper();
     const subject = $('paperSubjectInput')?.value || paper?.subject || 'PMP';
-    const stats = paperDomainStats(subject);
-    const quotas = paper ? paper.quotas || {} : {};
-    if(!stats.length){
-      wrap.innerHTML = '<div class="qb-empty">该科目暂无题目。请先在对应科目题库中录入或导入题目。</div>';
-      return;
-    }
-    wrap.innerHTML = stats.map(item => `
+    const mode=paper?.supplementMode==='principle'?'principle':'domain',domainStats=paperDomainStats(subject),principleStats=paperPrincipleStats(subject),domainQuotas=paper?.domainQuotas||{},principleQuotas=paper?.principleQuotas||{};
+    domainWrap.hidden=mode!=='domain';principleWrap.hidden=mode!=='principle';
+    domainWrap.innerHTML=!domainStats.length?'<div class="qb-empty">该科目暂无题目。请先在对应科目题库中录入或导入题目。</div>':domainStats.map(item => `
       <div class="qb-quota-row" data-domain="${escapeHTML(item.domain)}">
         <div>
           <strong>${escapeHTML(item.domain)}</strong>
           <small>可用 ${item.count} 题 · 标注≥50% ${item.complete} 题</small>
         </div>
-        <input type="number" min="0" max="${item.count}" value="${escapeHTML(quotas[item.domain] || 0)}" />
+        <input type="number" min="0" step="1" max="${item.count}" aria-label="${escapeHTML(item.domain)}领域配额" value="${escapeHTML(domainQuotas[item.domain] || 0)}" />
       </div>
+    `).join('');
+    principleWrap.innerHTML=!principleStats.length?'<div class="qb-empty">暂无启用的原则。请先在训练配置中维护原则。</div>':principleStats.map(item=>`
+      <div class="qb-quota-row" data-principle-id="${escapeHTML(item.id)}"><div><strong>${escapeHTML(item.name)}</strong><small>可用 ${item.count} 题 · 原则 ID ${escapeHTML(item.id)}</small></div><input type="number" min="0" step="1" aria-label="${escapeHTML(item.name)}原则配额" value="${escapeHTML(principleQuotas[item.id]||0)}" /></div>
     `).join('');
   }
   function renderPaperQuestionList(){
@@ -2838,7 +2931,7 @@
     list.querySelectorAll('[data-paper-move]').forEach(btn=>btn.addEventListener('click',()=>movePaperQuestion(Number(btn.dataset.paperMove),Number(btn.dataset.direction))));
   }
   function toggleSelectPaperPreview(event){const paper=currentPaper(),checked=!!event.currentTarget.checked;if(!paper)return;state.selectedPaperQuestionKeys=checked?new Set((paper.questions||[]).map(paperRefKey)):new Set();renderPaperQuestionList()}
-  function removeSelectedPaperQuestions(){const paper=currentPaper(),keys=state.selectedPaperQuestionKeys;if(!paper||!keys.size)return;const count=keys.size;if(state.paperPreviewRef&&keys.has(paperPreviewKey()))closePaperQuestionPreview();if(!confirm(`确定从试卷中移除选中的 ${count} 道题吗？\n\n只移除试卷引用，不会删除题库原题。`))return;paper.questions=(paper.questions||[]).filter(ref=>!keys.has(paperRefKey(ref)));paper.questions.forEach((ref,index)=>{ref.order=index+1});paper.updatedAt=Date.now();state.selectedPaperQuestionKeys=new Set();savePapers(state.papers,{silent:true});renderPaperManager();toast(`已从试卷移除 ${count} 道题。`)}
+  function removeSelectedPaperQuestions(){const paper=currentPaper(),keys=state.selectedPaperQuestionKeys;if(!paper||!keys.size)return;const count=keys.size;if(state.paperPreviewRef&&keys.has(paperPreviewKey()))closePaperQuestionPreview();if(!confirm(`确定从试卷中移除选中的 ${count} 道题吗？\n\n只移除试卷引用，不会删除题库原题。`))return;paper.questions=(paper.questions||[]).filter(ref=>!keys.has(paperRefKey(ref)));const remainingIds=new Set(paper.questions.map(ref=>String(ref.questionId||'')));paper.manualQuestionIds=(paper.manualQuestionIds||[]).filter(id=>remainingIds.has(String(id)));paper.questions.forEach((ref,index)=>{ref.order=index+1});paper.updatedAt=Date.now();state.paperQuotaFeedback=null;state.selectedPaperQuestionKeys=new Set();savePapers(state.papers,{silent:true});renderPaperManager();toast(`已从试卷移除 ${count} 道题。`)}
   function movePaperQuestion(index,direction){const paper=currentPaper(),target=index+direction;if(!paper||index<0||target<0||target>=paper.questions.length)return;[paper.questions[index],paper.questions[target]]=[paper.questions[target],paper.questions[index]];paper.questions.forEach((ref,i)=>{ref.order=i+1});paper.updatedAt=Date.now();savePapers(state.papers,{silent:true});renderPaperQuestionList()}
 
   function renderPaperCandidateList(){
@@ -2857,13 +2950,14 @@
     const pager=$('qbPaperCandidatePager');if(pager){pager.hidden=pages<=1;pager.innerHTML=pages<=1?'':`<button type="button" data-paper-page="${state.paperCandidatePage-1}" ${state.paperCandidatePage<=1?'disabled':''}>上一页</button><span>${state.paperCandidatePage} / ${pages} · ${rows.length} 题</span><button type="button" data-paper-page="${state.paperCandidatePage+1}" ${state.paperCandidatePage>=pages?'disabled':''}>下一页</button>`;pager.querySelectorAll('[data-paper-page]').forEach(btn=>btn.addEventListener('click',()=>{state.paperCandidatePage=Number(btn.dataset.paperPage||1);state.selectedPaperCandidateKeys=new Set();renderPaperCandidateList()}))}
   }
   function toggleSelectPaperCandidatePage(event){const checked=!!event.currentTarget.checked;state.selectedPaperCandidateKeys=checked?new Set(state.currentPaperCandidateKeys.filter(key=>{const paper=currentPaper();return !(paper?.questions||[]).some(ref=>paperRefKey(ref)===key)})):new Set();renderPaperCandidateList()}
-  function addSelectedCandidatesToPaper(){const paper=currentPaper();if(!paper)return toast('请先新建试卷。');const selected=state.selectedPaperCandidateKeys;if(!selected.size)return toast('请先选择当前页题目。');const existing=new Set((paper.questions||[]).map(paperRefKey));let added=0;selected.forEach(key=>{if(existing.has(key))return;const [bankId,questionId]=key.split('::');if(!bankId||!questionId)return;paper.questions.push({bankId,questionId,order:paper.questions.length+1,score:1});existing.add(key);added+=1});paper.totalCount=Math.max(Number(paper.totalCount||0),paper.questions.length);paper.updatedAt=Date.now();state.selectedPaperCandidateKeys=new Set();savePapers(state.papers,{silent:true});renderPaperManager();toast(`已加入 ${added} 道题。`)}
+  function addSelectedCandidatesToPaper(){const paper=currentPaper();if(!paper)return toast('请先新建试卷。');const selected=state.selectedPaperCandidateKeys;if(!selected.size)return toast('请先选择当前页题目。');const existing=new Set((paper.questions||[]).map(paperRefKey)),addedIds=[];selected.forEach(key=>{if(existing.has(key))return;const [bankId,questionId]=key.split('::');if(!bankId||!questionId)return;paper.questions.push({bankId,questionId,order:paper.questions.length+1,score:1});existing.add(key);addedIds.push(questionId)});paper.manualQuestionIds=[...new Set([...(paper.manualQuestionIds||[]),...addedIds])];paper.totalCount=Math.max(Number(paper.totalCount||0),paper.questions.length);paper.updatedAt=Date.now();state.paperQuotaFeedback=null;state.selectedPaperCandidateKeys=new Set();savePapers(state.papers,{silent:true});renderPaperManager();toast(`已加入 ${addedIds.length} 道题。`)}
 
   function autoDistributeQuota(){
     let paper = currentPaper();
     if(!paper){ addPaper(); paper = currentPaper(); }
-    readPaperFormInto(paper);
-    const stats = paperDomainStats(paper.subject).filter(item => item.count > 0);
+    if(!readPaperFormInto(paper))return;
+    const mode=paper.supplementMode==='principle'?'principle':'domain';
+    const stats=(mode==='principle'?paperPrincipleStats(paper.subject).map(item=>({bucketId:item.id,count:item.count})):paperDomainStats(paper.subject).map(item=>({bucketId:item.domain,count:item.count}))).filter(item => item.count > 0);
     if(!stats.length) return toast('该科目暂无可组卷题目。');
     const total = Math.min(paper.totalCount || 180, stats.reduce((sum,item) => sum + item.count, 0));
     let remain = total;
@@ -2873,49 +2967,35 @@
       let value = index === stats.length - 1 ? remain : Math.round(total * item.count / Math.max(1, leftCount + stats.slice(0,index).reduce((sum,x)=>sum+x.count,0)));
       value = Math.min(item.count, Math.max(0, value));
       if(value > remain) value = remain;
-      quotas[item.domain] = value;
+      quotas[item.bucketId] = value;
       remain -= value;
     });
     let i = 0;
     while(remain > 0 && stats.length){
       const item = stats[i % stats.length];
-      if((quotas[item.domain] || 0) < item.count){ quotas[item.domain] += 1; remain -= 1; }
+      if((quotas[item.bucketId] || 0) < item.count){ quotas[item.bucketId] += 1; remain -= 1; }
       i += 1;
       if(i > stats.length * 400) break;
     }
-    paper.quotas = quotas;
+    if(mode==='principle')paper.principleQuotas=quotas;else paper.domainQuotas=quotas;state.paperQuotaFeedback=null;
     savePapers(state.papers, {silent:true});
     renderPaperManager();
-    toast('已按当前可用题量自动分配配额。');
+    toast(`已按当前可用题量自动分配${mode==='principle'?'原则':'领域'}配额。`);
   }
   function clearPaperQuota(){
     const paper = currentPaper();
     if(!paper) return;
-    paper.quotas = {};
+    if(paper.supplementMode==='principle')paper.principleQuotas={};else paper.domainQuotas={};state.paperQuotaFeedback=null;
     savePapers(state.papers, {silent:true});
     renderPaperManager();
   }
-  function shuffleRows(rows){
-    const next = rows.slice();
-    for(let i=next.length-1;i>0;i--){
-      const j = Math.floor(Math.random() * (i + 1));
-      [next[i], next[j]] = [next[j], next[i]];
-    }
-    return next;
-  }
   function buildCurrentPaper(){
-    let paper=currentPaper();if(!paper){addPaper();paper=currentPaper()}
-    readPaperFormInto(paper);const quotas=paper.quotas||{},candidates=paperCandidates(paper.subject);
-    const selected=(paper.questions||[]).filter(ref=>{const found=paperQuestionLookup(ref);return !!(found.bank&&found.question)}).map((ref,index)=>({...ref,order:index+1}));
-    const used=new Set(selected.map(paperRefKey));
-    const existingByDomain=new Map();selected.forEach(ref=>{const found=paperQuestionLookup(ref);const domain=found.question?questionDomainKey(found.question):'';if(domain)existingByDomain.set(domain,(existingByDomain.get(domain)||0)+1)});
-    Object.entries(quotas).forEach(([domain,quota])=>{let need=Math.max(0,Number(quota||0)-(existingByDomain.get(domain)||0));if(!need)return;for(const row of shuffleRows(candidates.filter(item=>item.domain===domain))){if(need<=0)break;const key=paperRefKey({bankId:row.bank.id,questionId:row.question.id});if(used.has(key))continue;used.add(key);selected.push({bankId:row.bank.id,questionId:row.question.id,order:selected.length+1,score:1});need-=1}});
-    const target=Math.max(selected.length,Math.max(1,Number(paper.totalCount||180)));if(selected.length<target){for(const row of shuffleRows(candidates)){if(selected.length>=target)break;const key=paperRefKey({bankId:row.bank.id,questionId:row.question.id});if(used.has(key))continue;used.add(key);selected.push({bankId:row.bank.id,questionId:row.question.id,order:selected.length+1,score:1})}}
-    paper.questions=selected.map((ref,index)=>({...ref,order:index+1}));paper.updatedAt=Date.now();savePapers(state.papers,{silent:true});renderPaperManager();const shortage=selected.length<target?`，当前题量不足目标 ${target}，实际 ${selected.length} 题`:'';toast(`已按配额补充题目${shortage}。`)
+    let paper=currentPaper();if(!paper){addPaper();paper=currentPaper()}if(!readPaperFormInto(paper))return false;
+    try{const result=supplementPaperDraft(paper,paperCandidates(paper.subject),Math.random);Object.assign(paper,result.paper);state.paperQuotaFeedback={paperId:paper.id,mode:paper.supplementMode,shortages:result.shortages};savePapers(state.papers,{silent:true});renderPaperManager();const added=result.addedQuestionIds.length,missing=result.shortages.reduce((sum,item)=>sum+Number(item.missing||0),0);toast(missing?`已补充 ${added} 道题，仍短缺 ${missing} 道；可保存当前试卷后继续调整。`:`已按${paper.supplementMode==='principle'?'原则':'领域'}配额补充 ${added} 道题。`);return result}catch(error){toast(`配额补题失败：${error.message||error}`);return false}
   }
   function togglePublishPaper(){
     if(window.KGRolePermissions&&!window.KGRolePermissions.can('publishPapers'))return toast('当前角色无试卷发布权限。');
-    const paper=currentPaper();if(!paper)return toast('请先新建试卷。');readPaperFormInto(paper);
+    const paper=currentPaper();if(!paper)return toast('请先新建试卷。');if(!readPaperFormInto(paper))return;
     if(!(paper.questions||[]).length)return toast('请先从题库选择题目后再发布。');
     const integrity=paperIntegrity(paper);if(integrity.missingCount)return toast(`试卷中有 ${integrity.missingCount} 道题目引用已失效，请先移除。`);if(integrity.duplicateCount)return toast(`试卷中有 ${integrity.duplicateCount} 个重复题目引用，请先处理。`);
     if(!(paper.enabledModes||[]).length)return toast('请保留默认发布范围。');
@@ -2927,6 +3007,8 @@
     if(!paper) return;
     const removed=paper.questions[index];
     paper.questions.splice(index, 1);
+    if(removed)paper.manualQuestionIds=(paper.manualQuestionIds||[]).filter(id=>String(id)!==String(removed.questionId||''));
+    state.paperQuotaFeedback=null;
     if(removed){state.selectedPaperQuestionKeys.delete(paperRefKey(removed));if(paperPreviewKey()===paperRefKey(removed))closePaperQuestionPreview()}
     paper.questions.forEach((ref, i) => { ref.order = i + 1; });
     paper.updatedAt = Date.now();
@@ -3902,6 +3984,12 @@
     return {valid:true,updatedQuestions};
   }
   globalThis.KGQuestionBankAdminAPI=Object.freeze({
+    normalizePaperDraft:paper=>clone(normalizePaper(paper)),
+    parsePaperQuotaEntries:entries=>clone(parsePaperQuotaEntries(entries)),
+    supplementPaperDraft:(paper,candidates,random)=>clone(supplementPaperDraft(paper,candidates,random)),
+    listPaperPrincipleQuotaRows:(subject,candidates)=>clone(paperPrincipleStats(subject,candidates)),
+    syncPaperSupplementModeControls:paper=>syncPaperSupplementModeControls(paper),
+    handlePaperSupplementModeChange:()=>handlePaperSupplementModeChange(),
     getCurrentBank:()=>clone(currentBank()),
     getCurrentQuestion:()=>clone(currentQuestion()),
     getAllQuestions:(options={})=>clone(state.banks.flatMap(bank=>(bank.questions||[]).filter(question=>options.includeDeleted===true||!isQuestionDeleted(question)).map(question=>({bankId:bank.id,bankName:bank.name,...question})))),

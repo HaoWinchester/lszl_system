@@ -690,6 +690,19 @@ function injectPage(html, page, version) {
       `<script defer src="./question-catalog-adapter.js"></script><!-- kg-question-catalog:generated -->\n${page === 'question-bank.html' ? '<script defer src="./direct-question-adapter.js"></script><!-- kg-question-editor:generated -->\n' : ''}${catalogPage.marker}`,
     )
   }
+  if (page === 'paper-management.html') {
+    const adminTag = '<script defer src="src/65-question-bank-admin.js"></script>'
+    if (!generated.includes(adminTag)) {
+      throw new Error('new-legacy 试卷管理脚本顺序已变化，请复核配额服务')
+    }
+    const quotaTag = '<script defer src="src/teacher/paper-management/paper-quota-service.js"></script>'
+    const removeDependencyTag = (source, tag) => source
+      .split(`${tag}\r\n`).join('')
+      .split(`${tag}\n`).join('')
+      .split(tag).join('')
+    generated = removeDependencyTag(generated, quotaTag)
+    generated = generated.replace(adminTag, `${quotaTag}\n${adminTag}`)
+  }
   if (page === 'question-training.html' && !generated.includes('kg-runtime-fixes:generated')) {
     const styleTag = '<link rel="stylesheet" href="./direct-runtime-fixes.css"><!-- kg-runtime-fixes:generated -->'
     generated = generated.includes('</head>')

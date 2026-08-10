@@ -99,9 +99,21 @@
     </section>
 
     <details class="qb-mini-section pm-quota-section">
-      <summary>按领域配额补充题目</summary>
-      <div class="qb-mini-head"><p>可在手动选题基础上补充题目；不会加入重复题目。</p><div class="qb-inline-actions"><button id="qbAutoQuotaBtn" type="button">自动分配</button><button id="qbClearQuotaBtn" type="button">清空配额</button></div></div>
-      <div class="qb-quota-list" id="qbPaperQuotaList"></div>
+      <summary>按配额补充题目</summary>
+      <div class="qb-mini-head">
+        <div>
+          <p>可在手动选题基础上选择一种补题方式；不会加入重复题目。</p>
+          <div class="qb-inline-actions" role="radiogroup" aria-label="补题方式">
+            <label class="pm-page-check"><input type="radio" name="paperSupplementMode" value="domain" data-paper-supplement-mode checked /><span>按领域配额</span></label>
+            <label class="pm-page-check"><input type="radio" name="paperSupplementMode" value="principle" data-paper-supplement-mode /><span>按原则配额</span></label>
+          </div>
+        </div>
+        <div class="qb-inline-actions"><button id="qbAutoQuotaBtn" type="button">自动分配</button><button id="qbClearQuotaBtn" type="button">清空配额</button></div>
+      </div>
+      <div class="qb-quota-list" id="qbPaperQuotaList">
+        <div id="qbPaperDomainQuotaList" data-paper-quota-panel="domain"></div>
+        <div id="qbPaperPrincipleQuotaList" data-paper-quota-panel="principle" hidden></div>
+      </div>
     </details>
 
     <section class="pm-question-workbench" id="pmQuestionWorkbench" aria-label="试卷选题工作区">
@@ -195,6 +207,7 @@
 <script defer src="src/95-recall-association-library.js"></script>
 <script defer src="src/98-teacher-workflow-p2-services.js"></script>
 <script defer src="src/98-question-classification.js"></script>
+<script defer src="src/teacher/paper-management/paper-quota-service.js"></script>
 <script defer src="src/65-question-bank-admin.js"></script>
 <script defer src="src/admin/48-admin-context-nav.js"></script>
 <script src="src/109-focus-vega-ui-icons.js"></script>
