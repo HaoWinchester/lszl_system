@@ -58,7 +58,9 @@ async def build_bootstrap(
     if user:
         from app.services import runtime_state_service
 
-        storage, revision = await runtime_state_service.get_state(db, user.username)
+        storage, revision = await runtime_state_service.get_state(
+            db, user.username, user.role
+        )
         storage, revision = await runtime_state_service.ensure_domain_seed(
             db, user, page, storage, revision
         )

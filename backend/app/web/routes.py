@@ -285,7 +285,9 @@ async def save_runtime_state(update: RuntimeStateUpdate, user: CurrentUser, db: 
 
 @router.get("/api/v1/runtime/state")
 async def read_runtime_state(user: CurrentUser, db: DB):
-    storage, revision = await runtime_state_service.get_state(db, user.username)
+    storage, revision = await runtime_state_service.get_state(
+        db, user.username, user.role
+    )
     return {"storage": storage, "revision": revision}
 
 

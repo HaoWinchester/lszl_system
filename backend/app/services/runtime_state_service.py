@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import json
+from datetime import datetime, timezone
 from urllib.parse import quote
 
 from sqlalchemy import select, text
@@ -182,6 +183,27 @@ SHARED_KEYS = frozenset({
     "kg_admin_settings_v1",
 })
 
+TEACHING_MANAGER_ROLES = frozenset({"admin", "teacher"})
+TEACHER_SHARED_EXACT_KEYS = frozenset({
+    "kg_course_config_drafts_v1",
+    "kg_assessment_papers_v1",
+})
+TEACHER_SHARED_SCOPED_PREFIXES = {
+    "kg_exam_papers_v1__user__": "kg_exam_papers_v1__teacher_shared",
+    "kg_exam_paper_categories_v1__user__": "kg_exam_paper_categories_v1__teacher_shared",
+}
+TEACHER_SHARED_RESTRICTED_PREFIXES = (
+    "kg_exam_papers_v1__",
+    "kg_exam_paper_categories_v1__",
+)
+RECALL_ASSOCIATION_PREFIX = "kg_recall_association_library_v1__"
+TEACHER_SHARED_GLOBAL_PREFIXES = (
+    f"{RECALL_ASSOCIATION_PREFIX}subject__",
+)
+TEACHER_SHARED_SCOPED_CANONICAL_KEYS = frozenset(
+    TEACHER_SHARED_SCOPED_PREFIXES.values()
+)
+TEACHER_SHARED_PROMOTION_MARKER_KEY = "kg_teacher_shared_runtime_promotion_v1"
 TEACHING_SHARED_KEYS = SHARED_KEYS - {"kg_admin_settings_v1"}
 PUBLISHER_COLLECTION_KEYS = frozenset({
     "kg_question_banks_published_v1",
@@ -265,13 +287,67 @@ def validate_update(update: RuntimeStateUpdate) -> None:
         raise RuntimeStateValidationError("请求 ID 格式不正确")
 
 
-def shared_key_writable(key: str, role: str) -> bool:
+def _is_teacher_shared_key(key: str) -> bool:
+    return (
+        key in TEACHER_SHARED_EXACT_KEYS
+        or key in TEACHER_SHARED_SCOPED_CANONICAL_KEYS
+        or any(key.startswith(prefix) for prefix in TEACHER_SHARED_RESTRICTED_PREFIXES)
+        or any(key.startswith(prefix) for prefix in TEACHER_SHARED_GLOBAL_PREFIXES)
+        or key.startswith(f"{RECALL_ASSOCIATION_PREFIX}user__")
+    )
+
+
+def canonical_teacher_shared_key(
+    key: str,
+    role: str,
+    owner: str | None = None,
+) -> str | None:
+    """Resolve one manager-facing draft key to its shared database key."""
+    if role not in TEACHING_MANAGER_ROLES:
+        return None
+    if key in TEACHER_SHARED_EXACT_KEYS or key in TEACHER_SHARED_SCOPED_CANONICAL_KEYS:
+        return key
+    for prefix in TEACHER_SHARED_GLOBAL_PREFIXES:
+        if key.startswith(prefix) and key != prefix:
+            return key
+    if owner is None:
+        return None
+    encoded_owner = quote(owner, safe="")
+    for prefix, canonical in TEACHER_SHARED_SCOPED_PREFIXES.items():
+        if key == f"{prefix}{encoded_owner}":
+            return canonical
+    legacy_association_prefix = (
+        f"{RECALL_ASSOCIATION_PREFIX}user__{encoded_owner}__"
+    )
+    if key.startswith(legacy_association_prefix):
+        encoded_subject = key[len(legacy_association_prefix):]
+        if encoded_subject:
+            return f"{RECALL_ASSOCIATION_PREFIX}subject__{encoded_subject}"
+    return None
+
+
+def teacher_shared_aliases(owner: str, role: str) -> dict[str, str]:
+    """Expose canonical scoped rows under the legacy key expected by this account."""
+    if role not in TEACHING_MANAGER_ROLES:
+        return {}
+    encoded_owner = quote(owner, safe="")
+    return {
+        canonical: f"{prefix}{encoded_owner}"
+        for prefix, canonical in TEACHER_SHARED_SCOPED_PREFIXES.items()
+    }
+
+
+def shared_key_writable(key: str, role: str, owner: str | None = None) -> bool:
     if key == "kg_admin_settings_v1":
         return role == "admin"
+    if _is_teacher_shared_key(key):
+        return canonical_teacher_shared_key(key, role, owner) is not None
     return key in TEACHING_SHARED_KEYS and role in {"admin", "teacher"}
 
 
 def shared_key_readable(key: str, role: str) -> bool:
+    if _is_teacher_shared_key(key):
+        return role in TEACHING_MANAGER_ROLES
     return key != "kg_admin_settings_v1" or role == "admin"
 
 
@@ -284,7 +360,9 @@ def private_runtime_storage(raw: object) -> dict[str, str]:
     return {
         str(key): str(value)
         for key, value in values.items()
-        if str(key) not in SHARED_KEYS and str(key) not in SERVER_OWNED_KEYS
+        if str(key) not in SHARED_KEYS
+        and str(key) not in SERVER_OWNED_KEYS
+        and not _is_teacher_shared_key(str(key))
     }
 
 
@@ -297,7 +375,11 @@ def update_mutations(update: RuntimeStateUpdate) -> list[RuntimeMutation]:
 
 
 def explicit_shared_mutations(update: RuntimeStateUpdate) -> list[RuntimeMutation]:
-    return [mutation for mutation in update_mutations(update) if mutation.key in SHARED_KEYS]
+    return [
+        mutation
+        for mutation in update_mutations(update)
+        if mutation.key in SHARED_KEYS or _is_teacher_shared_key(mutation.key)
+    ]
 
 
 def _publisher_id(item: object, key: str) -> str:
@@ -409,15 +491,275 @@ def remove_publisher_rows(key: str, existing: str, owner: str) -> str:
     return _json([row for row in rows if _publisher_id(row, key) != owner])
 
 
-async def get_state(db: AsyncSession, owner: str) -> tuple[dict[str, str], int]:
+def _source_timestamp(value: datetime | None) -> datetime:
+    if value is None:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+def _merge_id_rows(
+    key: str,
+    payloads: list[tuple[str, list]],
+) -> tuple[list, list[dict]]:
+    merged: dict[str, object] = {}
+    owners: dict[str, str] = {}
+    conflicts: list[dict] = []
+    anonymous = 0
+    for owner, rows in payloads:
+        for row in rows:
+            if not isinstance(row, dict) or not str(row.get("id") or ""):
+                merged[f"__anonymous__:{anonymous}"] = row
+                anonymous += 1
+                continue
+            entity_id = str(row["id"])
+            previous = merged.get(entity_id)
+            if previous is not None and previous != row:
+                conflicts.append({
+                    "key": key,
+                    "entityId": entity_id,
+                    "loserOwner": owners[entity_id],
+                    "winnerOwner": owner,
+                })
+            merged[entity_id] = row
+            owners[entity_id] = owner
+    return list(merged.values()), conflicts
+
+
+def _base36(value: int) -> str:
+    alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+    if value == 0:
+        return "0"
+    digits = []
+    while value:
+        value, remainder = divmod(value, 36)
+        digits.append(alphabet[remainder])
+    return "".join(reversed(digits))
+
+
+def _association_hash(value: str) -> str:
+    hashed = 2166136261
+    for character in str(value or ""):
+        hashed ^= ord(character)
+        hashed = (hashed * 16777619) & 0xFFFFFFFF
+    return _base36(hashed)
+
+
+def _association_node_id(title: str) -> str:
+    cleaned = str(title or "").strip()
+    if cleaned.startswith("recall-"):
+        return cleaned
+    slug = re.sub(r"[^a-z0-9]+", "-", cleaned.lower()).strip("-")[:40]
+    return f"recall-{slug or f'n-{_association_hash(cleaned)}'}"
+
+
+def _association_targets(value: object) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [
+        item.strip()
+        for item in re.split(r"[,，、;；|]", str(value or ""))
+        if item.strip()
+    ]
+
+
+def _normalize_association_payload(payload: dict) -> dict:
+    structured = any(
+        field in payload for field in {"nodes", "edges", "schemaVersion"}
+    )
+    if structured:
+        normalized = dict(payload)
+        normalized["nodes"] = (
+            list(payload.get("nodes", []))
+            if isinstance(payload.get("nodes", []), list)
+            else []
+        )
+        normalized["edges"] = (
+            list(payload.get("edges", []))
+            if isinstance(payload.get("edges", []), list)
+            else []
+        )
+        return normalized
+
+    nodes: dict[str, dict] = {}
+    edges: list[dict] = []
+    edge_index = 0
+    for raw_source, raw_targets in payload.items():
+        source = str(raw_source or "").strip()
+        if not source:
+            continue
+        source_id = _association_node_id(source)
+        nodes.setdefault(source_id, {"id": source_id, "title": source})
+        for target in _association_targets(raw_targets):
+            target_id = _association_node_id(target)
+            nodes.setdefault(target_id, {"id": target_id, "title": target})
+            edges.append({
+                "id": f"edge-{_association_hash(f'{source}>{target}#{edge_index}')}",
+                "from": source_id,
+                "to": target_id,
+            })
+            edge_index += 1
+    return {"schemaVersion": 1, "nodes": list(nodes.values()), "edges": edges}
+
+
+def merge_teacher_shared_payload(
+    key: str,
+    sources: list[tuple[str, datetime, str]],
+    *,
+    existing_shared: str | None = None,
+) -> tuple[str, list[dict]]:
+    """Deterministically merge confirmed legacy draft JSON shapes."""
+    ordered = sorted(
+        sources,
+        key=lambda source: (_source_timestamp(source[1]), source[0]),
+    )
+    raw_payloads = [(owner, raw) for owner, _, raw in ordered]
+    if existing_shared is not None:
+        raw_payloads.append(("shared", existing_shared))
+
+    decoded: list[tuple[str, object]] = []
+    for owner, raw in raw_payloads:
+        try:
+            decoded.append((owner, json.loads(raw)))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            decoded.append((owner, None))
+
+    is_association = any(
+        key.startswith(prefix) for prefix in TEACHER_SHARED_GLOBAL_PREFIXES
+    )
+    expected = dict if is_association else list
+    if any(not isinstance(payload, expected) for _, payload in decoded):
+        winner_owner, winner_raw = raw_payloads[-1] if raw_payloads else ("shared", "[]")
+        conflicts = [
+            {
+                "key": key,
+                "entityId": "__payload__",
+                "loserOwner": owner,
+                "winnerOwner": winner_owner,
+            }
+            for owner, raw in raw_payloads[:-1]
+            if raw != winner_raw
+        ]
+        return winner_raw, conflicts
+
+    if is_association:
+        decoded = [
+            (owner, _normalize_association_payload(payload))
+            for owner, payload in decoded
+            if isinstance(payload, dict)
+        ]
+
+    if not is_association:
+        rows, conflicts = _merge_id_rows(
+            key,
+            [(owner, payload) for owner, payload in decoded if isinstance(payload, list)],
+        )
+        return _json(rows), conflicts
+
+    merged_metadata: dict = {}
+    node_payloads: list[tuple[str, list]] = []
+    edge_payloads: list[tuple[str, list]] = []
+    for owner, payload in decoded:
+        if not isinstance(payload, dict):
+            continue
+        merged_metadata.update({
+            field: value
+            for field, value in payload.items()
+            if field not in {"nodes", "edges"}
+        })
+        node_payloads.append((owner, payload.get("nodes", [])))
+        edge_payloads.append((owner, payload.get("edges", [])))
+    nodes, node_conflicts = _merge_id_rows(key, node_payloads)
+    edges, edge_conflicts = _merge_id_rows(key, edge_payloads)
+    merged_metadata["nodes"] = nodes
+    merged_metadata["edges"] = edges
+    return _json(merged_metadata), [*node_conflicts, *edge_conflicts]
+
+
+async def _promote_legacy_teacher_state(db: AsyncSession) -> None:
+    """Promote pre-shared manager drafts once without deleting rollback copies."""
+    if await db.get(SharedRuntimeState, TEACHER_SHARED_PROMOTION_MARKER_KEY):
+        return
+    await _lock_owner(db, f"promotion:{TEACHER_SHARED_PROMOTION_MARKER_KEY}")
+    if await db.get(SharedRuntimeState, TEACHER_SHARED_PROMOTION_MARKER_KEY):
+        return
+
+    result = await db.execute(
+        select(RuntimeState, User.role)
+        .join(User, User.username == RuntimeState.owner_id)
+        .where(User.role.in_(TEACHING_MANAGER_ROLES))
+    )
+    contributions: dict[str, list[tuple[str, datetime, str]]] = {}
+    source_owners: set[str] = set()
+    for row, role in result:
+        for legacy_key, raw_value in dict(row.storage or {}).items():
+            canonical = canonical_teacher_shared_key(
+                str(legacy_key), str(role), row.owner_id
+            )
+            if canonical is None:
+                continue
+            contributions.setdefault(canonical, []).append((
+                row.owner_id,
+                row.updated_at,
+                str(raw_value),
+            ))
+            source_owners.add(row.owner_id)
+
+    all_conflicts: list[dict] = []
+    promoted_keys: list[str] = []
+    for key in sorted(contributions):
+        shared_row = await db.get(SharedRuntimeState, key)
+        merged, conflicts = merge_teacher_shared_payload(
+            key,
+            contributions[key],
+            existing_shared=shared_row.value if shared_row else None,
+        )
+        if shared_row is None:
+            db.add(SharedRuntimeState(
+                key=key,
+                value=merged,
+                updated_by="runtime-promotion",
+            ))
+        else:
+            shared_row.value = merged
+        promoted_keys.append(key)
+        all_conflicts.extend(conflicts)
+
+    all_conflicts.sort(key=lambda row: (
+        str(row.get("key") or ""),
+        str(row.get("entityId") or ""),
+        str(row.get("winnerOwner") or ""),
+        str(row.get("loserOwner") or ""),
+    ))
+    marker = {
+        "schemaVersion": 1,
+        "status": "complete",
+        "sourceOwners": sorted(source_owners),
+        "promotedKeys": promoted_keys,
+        "conflicts": all_conflicts,
+        "completedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    db.add(SharedRuntimeState(
+        key=TEACHER_SHARED_PROMOTION_MARKER_KEY,
+        value=_json(marker),
+        updated_by="runtime-promotion",
+    ))
+    await db.commit()
+
+
+async def get_state(
+    db: AsyncSession,
+    owner: str,
+    role: str,
+) -> tuple[dict[str, str], int]:
+    if role in TEACHING_MANAGER_ROLES:
+        await _promote_legacy_teacher_state(db)
     row = await db.get(RuntimeState, owner)
-    user = await db.get(User, owner)
-    role = user.role if user else "viewer"
     subscription = await db.get(Subscription, owner)
     entitlements = subscription_service.entitlements_for(role, subscription)
     storage = private_runtime_storage(row.storage if row else {})
     revision = row.revision if row else 0
     # 合并 v9 全局共享键（published 类）：所有用户读同一份，教师发布 → 学员可读。
+    aliases = teacher_shared_aliases(owner, role)
     result = await db.execute(select(SharedRuntimeState.key, SharedRuntimeState.value))
     for key, value in result:
         if key in SHARED_KEYS and shared_key_readable(key, role):
@@ -427,6 +769,10 @@ async def get_state(db: AsyncSession, owner: str) -> tuple[dict[str, str], int]:
                 owner,
                 can_access_member=entitlements["allExamPapers"],
             )
+            continue
+        canonical = canonical_teacher_shared_key(str(key), role, owner)
+        if canonical == key and shared_key_readable(str(key), role):
+            storage[aliases.get(str(key), str(key))] = str(value)
     return storage, revision
 
 
@@ -600,7 +946,7 @@ async def ensure_domain_seed(
         changed = await _seed_guided(db, user.username, storage) or changed
     if not changed:
         await db.commit()
-        return await get_state(db, user.username)
+        return await get_state(db, user.username, user.role)
 
     if row is None:
         row = RuntimeState(owner_id=user.username, storage=storage, revision=1)
@@ -610,7 +956,7 @@ async def ensure_domain_seed(
         row.revision += 1
     await db.commit()
     await db.refresh(row)
-    return await get_state(db, user.username)
+    return await get_state(db, user.username, user.role)
 
 
 async def apply_update(
@@ -635,13 +981,20 @@ async def apply_update(
             f"该数据只能通过专用接口修改：{protected_mutations[0]}"
         )
     shared_mutations = explicit_shared_mutations(update)
-    forbidden = [mutation.key for mutation in shared_mutations if not shared_key_writable(mutation.key, role)]
+    forbidden = [
+        mutation.key
+        for mutation in shared_mutations
+        if not shared_key_writable(mutation.key, role, owner)
+    ]
     if forbidden:
         raise RuntimeStatePermissionError(f"当前角色无权限修改共享内容：{forbidden[0]}")
+    if shared_mutations and role in TEACHING_MANAGER_ROLES:
+        await _promote_legacy_teacher_state(db)
     await _lock_owner(db, owner)
     row = await db.get(RuntimeState, owner)
     if row is not None and row.last_request_id == update.requestId:
-        return dict(row.storage or {}), row.revision
+        await db.commit()
+        return await get_state(db, owner, role)
     current_revision = row.revision if row else 0
     if update.revision != current_revision:
         raise RuntimeStateConflictError("数据已更新，请重新加载后重试")
@@ -674,8 +1027,15 @@ async def apply_update(
     # 拆分：v9 全局共享键（published 类）→ 虚拟 SHARED_OWNER；其余 → 当前 owner。
     own_part = {
         k: v for k, v in storage.items()
-        if k not in SHARED_KEYS and k not in SERVER_OWNED_KEYS
+        if k not in SHARED_KEYS
+        and k not in SERVER_OWNED_KEYS
+        and not _is_teacher_shared_key(k)
     }
+    own_part.update({
+        key: value
+        for key, value in current_storage.items()
+        if _is_teacher_shared_key(key)
+    })
     for key in SERVER_OWNED_KEYS:
         if key in current_storage:
             own_part[key] = current_storage[key]
@@ -699,7 +1059,7 @@ async def apply_update(
 
     # 共享区只接受本批次显式 mutation，避免完整账号快照把其他发布者的新内容覆盖掉。
     for mutation in shared_mutations:
-        key = mutation.key
+        key = canonical_teacher_shared_key(mutation.key, role, owner) or mutation.key
         await _lock_owner(db, f"shared:{key}")
         shared_row = await db.get(SharedRuntimeState, key)
         if mutation.operation == "removeItem":
@@ -723,4 +1083,4 @@ async def apply_update(
 
     await db.commit()
     await db.refresh(row)
-    return await get_state(db, owner)
+    return await get_state(db, owner, role)
