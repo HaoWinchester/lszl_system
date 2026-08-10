@@ -16,13 +16,20 @@ from app.db.session import AsyncSessionLocal
 from app.models.content_prep import QuestionAuditLog, QuestionUploadBatch
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
-from app.schemas.question_cleanup import QuestionCleanupDecision
+from app.schemas.question_cleanup import (
+    QuestionCleanupDecision,
+    QuestionCleanupReport,
+    QuestionCleanupReviewDecisionFile,
+)
 from app.services.question_cleanup_service import (
     SEEDED_TEST_BATCH_IDS,
+    apply_review_decisions,
     build_report,
+    calculate_manifest_hash,
     classify_question,
 )
 from app.services import teaching_content_revision_service
+from scripts import question_pool_maintenance
 
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "question_cleanup"
@@ -258,6 +265,217 @@ def test_decision_contract_sorts_reference_ids_and_rejects_missing_required_fiel
         payload.pop(missing)
         with pytest.raises(ValidationError):
             QuestionCleanupDecision.model_validate(payload)
+
+
+def _review_decision_report() -> QuestionCleanupReport:
+    def decision(
+        question_id: str,
+        value: str,
+        evidence_codes: list[str],
+        fingerprint: str,
+    ) -> dict[str, object]:
+        return {
+            "questionId": question_id,
+            "decision": value,
+            "evidenceCodes": evidence_codes,
+            "sourceFingerprint": fingerprint,
+            "affectedReferenceIds": [f"ref:{question_id}"],
+        }
+
+    return QuestionCleanupReport.model_validate(
+        {
+            "policyVersion": "question-cleanup-v1",
+            "generatedAt": "2026-08-10T12:00:00Z",
+            "summary": {
+                "totalCount": 4,
+                "keepCount": 1,
+                "deleteCount": 1,
+                "reviewCount": 2,
+                "referenceCount": 7,
+                "repairReferenceCount": 5,
+                "preservedReferenceCount": 2,
+            },
+            "keep": [
+                decision(
+                    "q-formal",
+                    "keep_formal_import",
+                    ["verified_import:committed_batch"],
+                    "1" * 64,
+                )
+            ],
+            "delete": [
+                decision(
+                    "q-automated-test",
+                    "delete_explicit_test",
+                    ["explicit_test:metadata_fixture"],
+                    "2" * 64,
+                )
+            ],
+            "review": [
+                decision(
+                    "q-review-b",
+                    "review",
+                    ["source:ambiguous", "trace:legacy-row"],
+                    "4" * 64,
+                ),
+                decision(
+                    "q-review-a",
+                    "review",
+                    ["source:ambiguous"],
+                    "3" * 64,
+                ),
+            ],
+            "references": [],
+            "snapshotHash": "a" * 64,
+            "manifestHash": "7313229abfa6c9cceb2b1f1a4f25d0032ff7629f7e734acb85a3091fc0e166b6",
+        }
+    )
+
+
+def test_review_decisions_resolve_the_exact_closed_set_and_rehash_report():
+    """Catch partial resolution or loss of machine evidence during human review."""
+
+    report = _review_decision_report()
+    decisions = QuestionCleanupReviewDecisionFile.model_validate_json(
+        (FIXTURE_ROOT / "review-decisions.json").read_text(encoding="utf-8")
+    )
+
+    resolved = apply_review_decisions(report, decisions)
+
+    assert resolved.summary.model_dump(by_alias=True) == {
+        "totalCount": 4,
+        "keepCount": 2,
+        "deleteCount": 2,
+        "reviewCount": 0,
+        "referenceCount": 7,
+        "repairReferenceCount": 5,
+        "preservedReferenceCount": 2,
+    }
+    assert [item.question_id for item in resolved.keep] == [
+        "q-formal",
+        "q-review-a",
+    ]
+    assert [item.question_id for item in resolved.delete] == [
+        "q-automated-test",
+        "q-review-b",
+    ]
+    resolved_by_id = {
+        item.question_id: item for item in [*resolved.keep, *resolved.delete]
+    }
+    assert resolved_by_id["q-review-a"].evidence_codes == [
+        "human-review:已核对为正式导入",
+        "source:ambiguous",
+    ]
+    assert resolved_by_id["q-review-b"].evidence_codes == [
+        "human-review:已核对为非导入题",
+        "source:ambiguous",
+        "trace:legacy-row",
+    ]
+    assert resolved_by_id["q-review-a"].source_fingerprint == "3" * 64
+    assert resolved_by_id["q-review-b"].affected_reference_ids == [
+        "ref:q-review-b"
+    ]
+    assert resolved.manifest_hash != report.manifest_hash
+    assert resolved.manifest_hash == calculate_manifest_hash(resolved)
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (
+            lambda payload: payload.update(manifestHash="c" * 64),
+            "manifest",
+        ),
+        (
+            lambda payload: payload["decisions"].pop(),
+            "missing",
+        ),
+        (
+            lambda payload: payload["decisions"].append(
+                dict(payload["decisions"][0])
+            ),
+            "duplicate",
+        ),
+        (
+            lambda payload: payload["decisions"].append(
+                {
+                    "questionId": "q-not-in-review",
+                    "decision": "delete_non_imported",
+                    "reason": "额外题目",
+                }
+            ),
+            "extra",
+        ),
+        (
+            lambda payload: payload["decisions"][0].update(reason="   "),
+            "reason",
+        ),
+        (
+            lambda payload: payload["decisions"][0].update(
+                decision="delete_explicit_test"
+            ),
+            "decision",
+        ),
+    ],
+)
+def test_review_decisions_reject_stale_or_non_closed_set_input(mutate, message):
+    """Catch stale, incomplete, duplicated, extra, or unsafe manual decisions."""
+
+    payload = json.loads(
+        (FIXTURE_ROOT / "review-decisions.json").read_text(encoding="utf-8")
+    )
+    mutate(payload)
+
+    with pytest.raises((ValueError, ValidationError), match=message):
+        apply_review_decisions(_review_decision_report(), payload)
+
+
+def test_review_decision_unicode_colons_keep_evidence_and_hash_deterministic():
+    """Catch delimiter-like Unicode reasons destabilizing evidence or hashes."""
+
+    payload = json.loads(
+        (FIXTURE_ROOT / "review-decisions.json").read_text(encoding="utf-8")
+    )
+    for item in payload["decisions"]:
+        item["reason"] = "  人工复核：外部来源:批次甲/✅  "
+
+    forward = apply_review_decisions(_review_decision_report(), payload)
+    payload["decisions"].reverse()
+    reversed_order = apply_review_decisions(_review_decision_report(), payload)
+
+    expected_code = "human-review:人工复核：外部来源:批次甲/✅"
+    assert forward == reversed_order
+    assert forward.manifest_hash == reversed_order.manifest_hash
+    assert all(
+        expected_code in item.evidence_codes
+        for item in [*forward.keep, *forward.delete]
+        if item.question_id.startswith("q-review-")
+    )
+
+
+def test_review_decisions_reject_a_report_changed_after_its_manifest_was_set():
+    """Catch decisions being applied to mutable report content under an old hash."""
+
+    report = _review_decision_report()
+    report.keep.clear()
+    decisions = json.loads(
+        (FIXTURE_ROOT / "review-decisions.json").read_text(encoding="utf-8")
+    )
+
+    with pytest.raises(ValueError, match="report manifest"):
+        apply_review_decisions(report, decisions)
+
+
+def test_review_decisions_revalidate_a_mutated_schema_instance():
+    """Catch post-validation mutation bypassing the human decision allowlist."""
+
+    decisions = QuestionCleanupReviewDecisionFile.model_validate_json(
+        (FIXTURE_ROOT / "review-decisions.json").read_text(encoding="utf-8")
+    )
+    decisions.decisions[0].decision = "delete_explicit_test"  # type: ignore[assignment]
+
+    with pytest.raises(ValueError, match="decision"):
+        apply_review_decisions(_review_decision_report(), decisions)
 
 
 def test_report_hashes_are_stable_across_insertion_order_and_change_on_question_edit():
@@ -683,6 +901,202 @@ def test_report_hashes_are_stable_across_insertion_order_and_change_on_question_
                 await db.commit()
 
     asyncio.run(scenario())
+
+
+def test_decisions_template_cli_builds_complete_blanket_policy_file_without_db(
+    tmp_path,
+):
+    """Catch operators having to hand-edit a large review set or missing an ID."""
+
+    report_path = tmp_path / "source-report.json"
+    decisions_path = tmp_path / "review-decisions.json"
+    original_bytes = (
+        json.dumps(
+            _review_decision_report().model_dump(mode="json", by_alias=True),
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n"
+    ).encode("utf-8")
+    report_path.write_bytes(original_bytes)
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "scripts/question_pool_maintenance.py",
+            "decisions-template",
+            "--report",
+            str(report_path),
+            "--output",
+            str(decisions_path),
+            "--reason",
+            "已确认仅保留可验证正式导入",
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 2
+    assert not decisions_path.exists()
+
+    wrong_confirmation = subprocess.run(
+        [
+            sys.executable,
+            "scripts/question_pool_maintenance.py",
+            "decisions-template",
+            "--report",
+            str(report_path),
+            "--output",
+            str(decisions_path),
+            "--reason",
+            "已确认仅保留可验证正式导入",
+            "--confirm",
+            "DELETE-NON-IMPORTED-REVIEW:000000000000",
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert wrong_confirmation.returncode != 0
+    assert "delete_non_imported" in wrong_confirmation.stderr
+    assert not decisions_path.exists()
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "scripts/question_pool_maintenance.py",
+            "decisions-template",
+            "--report",
+            str(report_path),
+            "--output",
+            str(decisions_path),
+            "--reason",
+            "已确认仅保留可验证正式导入",
+            "--confirm",
+            "DELETE-NON-IMPORTED-REVIEW:7313229abfa6",
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert report_path.read_bytes() == original_bytes
+    payload = json.loads(decisions_path.read_text(encoding="utf-8"))
+    assert payload == {
+        "manifestHash": "7313229abfa6c9cceb2b1f1a4f25d0032ff7629f7e734acb85a3091fc0e166b6",
+        "decisions": [
+            {
+                "questionId": "q-review-a",
+                "decision": "delete_non_imported",
+                "reason": "已确认仅保留可验证正式导入",
+            },
+            {
+                "questionId": "q-review-b",
+                "decision": "delete_non_imported",
+                "reason": "已确认仅保留可验证正式导入",
+            },
+        ],
+    }
+    assert "database" not in completed.stderr.casefold()
+
+
+@pytest.mark.parametrize("use_hard_link", [False, True])
+def test_report_decisions_rejects_output_alias_before_database_access(
+    tmp_path,
+    monkeypatch,
+    use_hard_link,
+):
+    """Catch a resolved report overwriting its decision file or hard-link alias."""
+
+    decisions_path = tmp_path / "review-decisions.json"
+    decisions_path.write_text(
+        (FIXTURE_ROOT / "review-decisions.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    output = decisions_path
+    if use_hard_link:
+        output = tmp_path / "resolved-report.json"
+        output.hardlink_to(decisions_path)
+
+    def fail_if_database_is_initialized():
+        raise AssertionError("database must not be initialized")
+
+    monkeypatch.setattr(
+        question_pool_maintenance,
+        "AsyncSessionLocal",
+        fail_if_database_is_initialized,
+    )
+
+    with pytest.raises(ValueError, match="output.*decision"):
+        question_pool_maintenance.main(
+            [
+                "report",
+                "--decisions",
+                str(decisions_path),
+                "--output",
+                str(output),
+            ]
+        )
+
+
+def test_report_decisions_cli_resolves_a_controlled_report_without_database(
+    tmp_path,
+    monkeypatch,
+):
+    """Catch --decisions being ignored while avoiding the live dev report."""
+
+    decisions_path = FIXTURE_ROOT / "review-decisions.json"
+    output = tmp_path / "resolved-report.json"
+
+    class _NoDatabaseSession:
+        async def __aenter__(self):
+            return object()
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return False
+
+    async def controlled_report(_db):
+        return _review_decision_report()
+
+    monkeypatch.setattr(
+        question_pool_maintenance,
+        "AsyncSessionLocal",
+        _NoDatabaseSession,
+    )
+    monkeypatch.setattr(
+        question_pool_maintenance,
+        "build_report",
+        controlled_report,
+    )
+
+    exit_code = question_pool_maintenance.main(
+        [
+            "report",
+            "--decisions",
+            str(decisions_path),
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["summary"] == {
+        "totalCount": 4,
+        "keepCount": 2,
+        "deleteCount": 2,
+        "reviewCount": 0,
+        "referenceCount": 7,
+        "repairReferenceCount": 5,
+        "preservedReferenceCount": 2,
+    }
+    assert payload["snapshotHash"] == "a" * 64
+    assert payload["manifestHash"] != _review_decision_report().manifest_hash
 
 
 def test_report_requires_import_action_and_committed_batch_to_be_the_same_trace():

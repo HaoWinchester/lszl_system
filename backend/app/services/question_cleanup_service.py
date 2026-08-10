@@ -8,6 +8,7 @@ phase is authorized.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from collections import Counter
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from enum import Enum
@@ -23,6 +24,7 @@ from app.models.question import Question
 from app.schemas.question_cleanup import (
     QuestionCleanupDecision,
     QuestionCleanupReport,
+    QuestionCleanupReviewDecisionFile,
     QuestionCleanupSummary,
 )
 from app.services.question_cleanup_reference_service import (
@@ -391,6 +393,122 @@ def calculate_manifest_hash(report: QuestionCleanupReport) -> str:
     return _sha256(_manifest_payload(report))
 
 
+class QuestionCleanupReviewDecisionError(ValueError):
+    """The human-review file does not exactly resolve one report's review set."""
+
+
+def apply_review_decisions(
+    report: QuestionCleanupReport,
+    decisions: QuestionCleanupReviewDecisionFile | Mapping[str, Any],
+) -> QuestionCleanupReport:
+    """Resolve every ambiguous row exactly once without mutating stored data."""
+
+    if calculate_manifest_hash(report) != report.manifest_hash:
+        raise QuestionCleanupReviewDecisionError(
+            "report manifest hash does not match its current content"
+        )
+
+    try:
+        decision_payload = (
+            decisions.model_dump(mode="json", by_alias=True)
+            if isinstance(decisions, QuestionCleanupReviewDecisionFile)
+            else decisions
+        )
+        decisions = QuestionCleanupReviewDecisionFile.model_validate(
+            decision_payload
+        )
+    except Exception as exc:
+        raise QuestionCleanupReviewDecisionError(
+            f"invalid review decisions: {exc}"
+        ) from exc
+
+    if decisions.manifest_hash != report.manifest_hash:
+        raise QuestionCleanupReviewDecisionError(
+            "manifest hash does not match the reviewed report"
+        )
+
+    review_ids = [item.question_id for item in report.review]
+    duplicate_review_ids = sorted(
+        question_id
+        for question_id, count in Counter(review_ids).items()
+        if count > 1
+    )
+    if duplicate_review_ids:
+        raise QuestionCleanupReviewDecisionError(
+            f"report contains duplicate review IDs: {duplicate_review_ids}"
+        )
+
+    decision_ids = [item.question_id for item in decisions.decisions]
+    duplicate_ids = sorted(
+        question_id
+        for question_id, count in Counter(decision_ids).items()
+        if count > 1
+    )
+    if duplicate_ids:
+        raise QuestionCleanupReviewDecisionError(
+            f"duplicate decision IDs: {duplicate_ids}"
+        )
+
+    review_set = set(review_ids)
+    decision_set = set(decision_ids)
+    missing_ids = sorted(review_set - decision_set)
+    if missing_ids:
+        raise QuestionCleanupReviewDecisionError(
+            f"missing decisions for review IDs: {missing_ids}"
+        )
+    extra_ids = sorted(decision_set - review_set)
+    if extra_ids:
+        raise QuestionCleanupReviewDecisionError(
+            f"extra decisions outside review set: {extra_ids}"
+        )
+
+    decisions_by_id = {item.question_id: item for item in decisions.decisions}
+    resolved_keep: list[QuestionCleanupDecision] = []
+    resolved_delete: list[QuestionCleanupDecision] = []
+    for original in report.review:
+        human = decisions_by_id[original.question_id]
+        resolved = QuestionCleanupDecision.model_validate(
+            {
+                **original.model_dump(mode="json", by_alias=True),
+                "decision": human.decision,
+                "evidenceCodes": [
+                    *original.evidence_codes,
+                    f"human-review:{human.reason}",
+                ],
+            }
+        )
+        if resolved.decision == "keep_formal_import":
+            resolved_keep.append(resolved)
+        else:
+            resolved_delete.append(resolved)
+
+    keep = sorted([*report.keep, *resolved_keep], key=lambda item: item.question_id)
+    delete_rows = sorted(
+        [*report.delete, *resolved_delete], key=lambda item: item.question_id
+    )
+    summary = QuestionCleanupSummary(
+        totalCount=len(keep) + len(delete_rows),
+        keepCount=len(keep),
+        deleteCount=len(delete_rows),
+        reviewCount=0,
+        referenceCount=report.summary.reference_count,
+        repairReferenceCount=report.summary.repair_reference_count,
+        preservedReferenceCount=report.summary.preserved_reference_count,
+    )
+    resolved_report = report.model_copy(
+        deep=True,
+        update={
+            "summary": summary,
+            "keep": keep,
+            "delete": delete_rows,
+            "review": [],
+            "manifest_hash": "0" * 64,
+        },
+    )
+    resolved_report.manifest_hash = calculate_manifest_hash(resolved_report)
+    return resolved_report
+
+
 async def build_report(db: AsyncSession) -> QuestionCleanupReport:
     """Build a deterministic cleanup report without mutating business data."""
 
@@ -523,8 +641,10 @@ async def build_report(db: AsyncSession) -> QuestionCleanupReport:
 
 __all__ = [
     "CLEANUP_POLICY_VERSION",
+    "QuestionCleanupReviewDecisionError",
     "SEEDED_TEST_BATCH_IDS",
     "VERIFIED_IMPORT_ACTIONS",
+    "apply_review_decisions",
     "build_report",
     "calculate_manifest_hash",
     "classify_question",

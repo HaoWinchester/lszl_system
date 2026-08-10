@@ -1,0 +1,15 @@
+{
+  "manifestHash": "7313229abfa6c9cceb2b1f1a4f25d0032ff7629f7e734acb85a3091fc0e166b6",
+  "decisions": [
+    {
+      "questionId": "q-review-a",
+      "decision": "keep_formal_import",
+      "reason": "已核对为正式导入"
+    },
+    {
+      "questionId": "q-review-b",
+      "decision": "delete_non_imported",
+      "reason": "已核对为非导入题"
+    }
+  ]
+}

@@ -24,6 +24,10 @@ ReferenceId = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=256),
 ]
+ReviewReason = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=187),
+]
 
 
 class QuestionCleanupDecision(BaseModel):
@@ -105,3 +109,28 @@ class QuestionCleanupReport(BaseModel):
     references: list[QuestionCleanupReference] = Field(default_factory=list)
     snapshot_hash: Sha256Hex = Field(alias="snapshotHash")
     manifest_hash: Sha256Hex = Field(alias="manifestHash")
+
+
+QuestionCleanupHumanDecisionValue = Literal[
+    "keep_formal_import",
+    "delete_non_imported",
+]
+
+
+class QuestionCleanupReviewDecision(BaseModel):
+    """One explicit human decision for an automatically ambiguous question."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    question_id: str = Field(alias="questionId", min_length=1, max_length=64)
+    decision: QuestionCleanupHumanDecisionValue
+    reason: ReviewReason
+
+
+class QuestionCleanupReviewDecisionFile(BaseModel):
+    """Content-addressed closed-set decisions for one cleanup report."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    manifest_hash: Sha256Hex = Field(alias="manifestHash")
+    decisions: list[QuestionCleanupReviewDecision]
