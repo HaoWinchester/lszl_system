@@ -69,7 +69,7 @@ def test_optional_current_user_resolves_an_active_session() -> None:
     asyncio.run(scenario())
 
 
-def test_question_bank_access_enforces_owner_collaborator_and_admin_matrix() -> None:
+def test_question_bank_access_is_shared_by_all_managers_and_denied_to_learners() -> None:
     async def scenario() -> None:
         from app.services import question_access_service
 
@@ -77,15 +77,17 @@ def test_question_bank_access_enforces_owner_collaborator_and_admin_matrix() -> 
         usernames = {
             "owner": f"access-owner-{suffix}",
             "editor": f"access-editor-{suffix}",
-            "viewer": f"access-viewer-{suffix}",
-            "outsider": f"access-outside-{suffix}",
+            "legacy_viewer": f"access-viewer-{suffix}",
+            "other_teacher": f"access-other-{suffix}",
+            "student": f"access-student-{suffix}",
+            "viewer": f"access-guest-{suffix}",
         }
         bank_id = f"access-bank-{suffix}"
         users = {
             name: User(
                 username=username,
                 password_hash="unused",
-                role="teacher",
+                role=name if name in {"student", "viewer"} else "teacher",
                 status="active",
             )
             for name, username in usernames.items()
@@ -114,7 +116,7 @@ def test_question_bank_access_enforces_owner_collaborator_and_admin_matrix() -> 
                     QuestionBankCollaborator(
                         id=f"collab-view-{suffix}",
                         bank_id=bank_id,
-                        username=usernames["viewer"],
+                        username=usernames["legacy_viewer"],
                         permission="view",
                         granted_by=usernames["owner"],
                     ),
@@ -126,8 +128,10 @@ def test_question_bank_access_enforces_owner_collaborator_and_admin_matrix() -> 
                 expected = {
                     "owner": (True, True),
                     "editor": (True, True),
-                    "viewer": (True, False),
-                    "outsider": (False, False),
+                    "legacy_viewer": (True, True),
+                    "other_teacher": (True, True),
+                    "student": (False, False),
+                    "viewer": (False, False),
                 }
                 for name, (can_view, can_edit) in expected.items():
                     assert await question_access_service.can_view_bank(db, users[name], bank) is can_view
@@ -146,7 +150,7 @@ def test_question_bank_access_enforces_owner_collaborator_and_admin_matrix() -> 
                 with pytest.raises(HTTPException) as forbidden:
                     await question_access_service.require_bank_access(
                         db,
-                        users["outsider"],
+                        users["viewer"],
                         bank_id,
                         edit=False,
                     )

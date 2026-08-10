@@ -665,6 +665,7 @@ function injectPage(html, page, version) {
       ? html.replace(/<head(?:\s[^>]*)?>/i, (head) => `${head}\n${injection}`)
       : `${injection}\n${html}`
   const questionCatalogPages = {
+    'teacher-workbench.html': { mode: 'managed', marker: '<script src="src/91-teacher-workbench-app.js"></script>' },
     'question-bank.html': { mode: 'managed', marker: '<script defer src="src/65-question-bank-admin.js"></script>' },
     'paper-management.html': { mode: 'managed', marker: '<script defer src="src/65-question-bank-admin.js"></script>' },
     'question-training.html': { mode: 'learning', marker: '<script defer src="src/59-published-paper-repository.js"></script>' },
