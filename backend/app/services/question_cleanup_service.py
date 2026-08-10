@@ -16,7 +16,9 @@ from enum import Enum
 import hashlib
 import hmac
 import json
+import os
 from pathlib import Path
+import stat
 from typing import Any
 
 from sqlalchemy import delete, func, or_, select
@@ -418,6 +420,8 @@ class QuestionCleanupBackupReceipt:
     path: str
     sha256: str
     confirmation: str
+    device: int | None = None
+    inode: int | None = None
 
 
 @dataclass(frozen=True)
@@ -498,9 +502,84 @@ def _validate_backup_receipt(
     receipt: QuestionCleanupBackupReceipt,
 ) -> Path:
     candidate = Path(str(receipt.path or "")).expanduser()
-    if not candidate.is_file():
-        raise QuestionCleanupApplyError("verified backup path does not exist")
-    actual_hash = hashlib.sha256(candidate.read_bytes()).hexdigest()
+    try:
+        path_stat = candidate.lstat()
+    except OSError as exc:
+        raise QuestionCleanupApplyError(
+            "verified backup path does not exist"
+        ) from exc
+    if stat.S_ISLNK(path_stat.st_mode):
+        raise QuestionCleanupApplyError(
+            "verified backup path must not be a symbolic link"
+        )
+    if not stat.S_ISREG(path_stat.st_mode):
+        raise QuestionCleanupApplyError(
+            "verified backup must be a regular file"
+        )
+    try:
+        resolved = candidate.resolve(strict=True)
+    except OSError as exc:
+        raise QuestionCleanupApplyError(
+            "verified backup path changed during validation"
+        ) from exc
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(candidate, flags)
+    except OSError as exc:
+        try:
+            changed_to_symlink = stat.S_ISLNK(candidate.lstat().st_mode)
+        except OSError:
+            changed_to_symlink = False
+        if changed_to_symlink:
+            raise QuestionCleanupApplyError(
+                "verified backup path changed to a symbolic link"
+            ) from exc
+        raise QuestionCleanupApplyError(
+            "verified backup must open as a regular file"
+        ) from exc
+    try:
+        file_stat = os.fstat(descriptor)
+        if not stat.S_ISREG(file_stat.st_mode):
+            raise QuestionCleanupApplyError(
+                "verified backup must be a regular file"
+            )
+        if (
+            receipt.device is not None
+            and receipt.inode is not None
+            and (
+                int(receipt.device) != int(file_stat.st_dev)
+                or int(receipt.inode) != int(file_stat.st_ino)
+            )
+        ):
+            raise QuestionCleanupApplyError(
+                "verified backup file identity changed after CLI validation"
+            )
+        digest = hashlib.sha256()
+        while chunk := os.read(descriptor, 1024 * 1024):
+            digest.update(chunk)
+        actual_hash = digest.hexdigest()
+
+        try:
+            final_path_stat = candidate.lstat()
+        except OSError as exc:
+            raise QuestionCleanupApplyError(
+                "verified backup path changed during validation"
+            ) from exc
+        if stat.S_ISLNK(final_path_stat.st_mode):
+            raise QuestionCleanupApplyError(
+                "verified backup path changed to a symbolic link"
+            )
+        if (
+            int(final_path_stat.st_dev) != int(file_stat.st_dev)
+            or int(final_path_stat.st_ino) != int(file_stat.st_ino)
+        ):
+            raise QuestionCleanupApplyError(
+                "verified backup path identity changed during validation"
+            )
+    finally:
+        os.close(descriptor)
     if not hmac.compare_digest(actual_hash, str(receipt.sha256 or "")):
         raise QuestionCleanupApplyError("backup SHA-256 does not match its bytes")
     expected_confirmation = f"DELETE-QUESTION-POOL:{report.manifest_hash[:12]}"
@@ -509,7 +588,7 @@ def _validate_backup_receipt(
         str(receipt.confirmation or ""),
     ):
         raise QuestionCleanupApplyError("typed confirmation token does not match")
-    return candidate.resolve()
+    return resolved
 
 
 def _canonical_reference_rows(report: QuestionCleanupReport) -> list[dict[str, Any]]:

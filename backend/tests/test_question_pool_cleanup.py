@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+import hashlib
 import json
+import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -2756,6 +2759,611 @@ def test_apply_global_lock_blocks_official_writer_between_recheck_and_commit(
             await _remove_cleanup_apply_fixture(fixture)
 
     asyncio.run(scenario())
+
+
+def _write_cleanup_cli_report(path: Path, report: QuestionCleanupReport) -> None:
+    path.write_text(
+        json.dumps(
+            report.model_dump(mode="json", by_alias=True),
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _run_cleanup_cli(*args: object) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            sys.executable,
+            "scripts/question_pool_maintenance.py",
+            *(str(arg) for arg in args),
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "omitted_option",
+    ["--report", "--backup", "--backup-sha256", "--confirm", "--output"],
+)
+def test_cleanup_apply_cli_requires_every_independent_guard_option(
+    tmp_path,
+    omitted_option,
+):
+    """Catch parser changes that make any destructive apply guard optional."""
+
+    values = {
+        "--report": tmp_path / "approved-report.json",
+        "--backup": tmp_path / "external-backup.dump",
+        "--backup-sha256": "a" * 64,
+        "--confirm": "DELETE-QUESTION-POOL:123456789abc",
+        "--output": tmp_path / "apply-result.json",
+    }
+    command: list[object] = ["apply"]
+    for option, value in values.items():
+        if option != omitted_option:
+            command.extend([option, value])
+
+    completed = _run_cleanup_cli(*command)
+
+    assert completed.returncode == 2
+    assert omitted_option in completed.stderr
+    assert not values["--output"].exists()
+
+
+@pytest.mark.parametrize(
+    ("backup_variant", "expected_error"),
+    [
+        ("relative", "absolute"),
+        ("symlink", "symbolic link"),
+        ("repository", "outside the repository"),
+        ("wrong_hash", "SHA-256"),
+    ],
+)
+def test_cleanup_apply_cli_rejects_unverified_or_non_external_backup_receipts(
+    tmp_path,
+    backup_variant,
+    expected_error,
+):
+    """Catch apply accepting a path that is not an exact external backup receipt."""
+
+    report = _resolve_all_test_review_rows(_review_decision_report())
+    report.summary.reference_count = 0
+    report.summary.repair_reference_count = 0
+    report.summary.preserved_reference_count = 0
+    report.manifest_hash = calculate_manifest_hash(report)
+    report_path = tmp_path / "approved-report.json"
+    output = tmp_path / "apply-result.json"
+    _write_cleanup_cli_report(report_path, report)
+    external_backup = tmp_path / "verified.dump"
+    external_backup.write_bytes(b"disposable pytest backup receipt")
+    backup_path = external_backup
+    backup_hash = hashlib.sha256(external_backup.read_bytes()).hexdigest()
+
+    if backup_variant == "relative":
+        backup_path = Path(
+            os.path.relpath(
+                external_backup,
+                Path(__file__).resolve().parents[1],
+            )
+        )
+    elif backup_variant == "symlink":
+        backup_path = tmp_path / "backup-link.dump"
+        backup_path.symlink_to(external_backup)
+    elif backup_variant == "repository":
+        backup_path = Path(__file__).resolve().parents[1] / "requirements.txt"
+        backup_hash = hashlib.sha256(backup_path.read_bytes()).hexdigest()
+    else:
+        backup_hash = "f" * 64
+
+    completed = _run_cleanup_cli(
+        "apply",
+        "--report",
+        report_path,
+        "--backup",
+        backup_path,
+        "--backup-sha256",
+        backup_hash,
+        "--confirm",
+        f"DELETE-QUESTION-POOL:{report.manifest_hash[:12]}",
+        "--output",
+        output,
+    )
+
+    assert completed.returncode != 0
+    assert expected_error in completed.stderr
+    assert not output.exists()
+
+
+@pytest.mark.parametrize(
+    ("replacement_kind", "expected_error"),
+    [
+        ("new_inode", "identity"),
+        ("symlink_same_inode", "symbolic link"),
+        ("late_symlink_same_inode", "symbolic link"),
+    ],
+)
+def test_cleanup_apply_cli_binds_backup_inode_across_service_validation(
+    tmp_path,
+    monkeypatch,
+    replacement_kind,
+    expected_error,
+):
+    """Catch same-byte backup replacement between CLI hashing and service apply."""
+
+    report = _resolve_all_test_review_rows(_review_decision_report())
+    report.summary.reference_count = 0
+    report.summary.repair_reference_count = 0
+    report.summary.preserved_reference_count = 0
+    report.manifest_hash = calculate_manifest_hash(report)
+    report_path = tmp_path / "approved-report.json"
+    output = tmp_path / "apply-result.json"
+    backup_path = tmp_path / "verified.dump"
+    backup_bytes = b"disposable inode-bound pytest backup"
+    backup_path.write_bytes(backup_bytes)
+    backup_hash = hashlib.sha256(backup_bytes).hexdigest()
+    _write_cleanup_cli_report(report_path, report)
+    real_apply = question_pool_maintenance.apply_cleanup
+
+    if replacement_kind == "late_symlink_same_inode":
+        real_resolve = Path.resolve
+        backup_resolve_calls = 0
+
+        def replace_during_service_resolve(path, *args, **kwargs):
+            nonlocal backup_resolve_calls
+            if str(path) == str(backup_path):
+                backup_resolve_calls += 1
+                if backup_resolve_calls == 3:
+                    replacement = tmp_path / "replacement.dump"
+                    os.replace(backup_path, replacement)
+                    backup_path.symlink_to(replacement)
+            return real_resolve(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "resolve", replace_during_service_resolve)
+
+    async def replace_backup_before_service_validation(*args, **kwargs):
+        replacement = tmp_path / "replacement.dump"
+        if replacement_kind == "new_inode":
+            replacement.write_bytes(backup_bytes)
+            os.replace(replacement, backup_path)
+        elif replacement_kind == "symlink_same_inode":
+            os.replace(backup_path, replacement)
+            backup_path.symlink_to(replacement)
+        return await real_apply(*args, **kwargs)
+
+    monkeypatch.setattr(
+        question_pool_maintenance,
+        "apply_cleanup",
+        replace_backup_before_service_validation,
+    )
+
+    with pytest.raises(Exception, match=expected_error):
+        question_pool_maintenance.main(
+            [
+                "apply",
+                "--report",
+                str(report_path),
+                "--backup",
+                str(backup_path),
+                "--backup-sha256",
+                backup_hash,
+                "--confirm",
+                f"DELETE-QUESTION-POOL:{report.manifest_hash[:12]}",
+                "--output",
+                str(output),
+            ]
+        )
+    assert not output.exists()
+
+
+def test_cleanup_apply_result_atomic_writer_never_chmods_named_path(
+    tmp_path,
+    monkeypatch,
+):
+    """Catch a post-rename path chmod race; mode must come from the temp fd."""
+
+    output = tmp_path / "apply-result.json"
+
+    def reject_named_path_chmod(*args, **kwargs):
+        raise AssertionError("named-path chmod is unsafe after atomic rename")
+
+    monkeypatch.setattr(question_pool_maintenance.os, "chmod", reject_named_path_chmod)
+
+    question_pool_maintenance._write_json_secure_atomic(
+        output,
+        {"verified": True},
+    )
+
+    assert json.loads(output.read_text(encoding="utf-8")) == {"verified": True}
+    assert stat.S_IMODE(output.stat().st_mode) == 0o600
+
+    real_fsync = question_pool_maintenance.os.fsync
+
+    def fail_directory_fsync(descriptor):
+        if stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            raise OSError("injected directory fsync failure")
+        return real_fsync(descriptor)
+
+    monkeypatch.setattr(
+        question_pool_maintenance.os,
+        "fsync",
+        fail_directory_fsync,
+    )
+    with pytest.raises(OSError, match="directory fsync"):
+        question_pool_maintenance._write_json_secure_atomic(
+            output,
+            {"verified": "committed-before-dir-fsync"},
+        )
+    assert json.loads(output.read_text(encoding="utf-8")) == {
+        "verified": "committed-before-dir-fsync"
+    }
+    assert stat.S_IMODE(output.stat().st_mode) == 0o600
+
+
+def test_cleanup_apply_and_verify_cli_secure_receipt_and_detect_all_drift(
+    tmp_path,
+    monkeypatch,
+):
+    """Catch insecure result writes or verification missing any post-apply invariant."""
+
+    fixture = asyncio.run(_create_cleanup_apply_fixture())
+    bound_keep_id = f"cleanup-bound-keep-{fixture['suffix']}"
+    bound_keep_audit_id = f"cleanup-bound-log-{fixture['suffix']}"
+    replacement_id = f"cleanup-replacement-keep-{fixture['suffix']}"
+    replacement_audit_id = f"cleanup-replacement-log-{fixture['suffix']}"
+
+    async def add_unreferenced_formal_import() -> QuestionCleanupReport:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                Question(
+                    id=bound_keep_id,
+                    bank_id=fixture["main_bank_id"],
+                    title="无引用正式导入题",
+                    domain="保留领域",
+                    content_metadata={"origin": "content_prep"},
+                )
+            )
+            await db.flush()
+            db.add(
+                QuestionAuditLog(
+                    id=bound_keep_audit_id,
+                    entity_type="question",
+                    entity_id=bound_keep_id,
+                    question_id=bound_keep_id,
+                    bank_id=fixture["main_bank_id"],
+                    batch_id=fixture["batch_id"],
+                    action="question_created",
+                    actor_username="admin",
+                    actor_role="admin",
+                    outcome="success",
+                    detail={},
+                )
+            )
+            await db.commit()
+        async with AsyncSessionLocal() as report_db:
+            return _resolve_all_test_review_rows(await build_report(report_db))
+
+    report = asyncio.run(add_unreferenced_formal_import())
+    assert isinstance(report, QuestionCleanupReport)
+    report_path = tmp_path / "approved-report.json"
+    output = tmp_path / "nested" / "apply-result.json"
+    backup_path = tmp_path / "verified-external.dump"
+    backup_path.write_bytes(b"restorable disposable pytest-only backup")
+    backup_hash = hashlib.sha256(backup_path.read_bytes()).hexdigest()
+    _write_cleanup_cli_report(report_path, report)
+    dangling_key = (
+        "kg_recall_association_library_v1__subject__verify-dangling-"
+        f"{fixture['suffix']}"
+    )
+    test_bank_id = f"cleanup-verify-test-bank-{fixture['suffix']}"
+    test_question_id = f"__test__cleanup-verify-{fixture['suffix']}"
+    original_revision_value: str | None = None
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text('{"stale":true}\n', encoding="utf-8")
+
+    try:
+        apply_arguments = [
+            "apply",
+            "--report",
+            str(report_path),
+            "--backup",
+            str(backup_path),
+            "--backup-sha256",
+            backup_hash,
+            "--confirm",
+            f"DELETE-QUESTION-POOL:{report.manifest_hash[:12]}",
+            "--output",
+            str(output),
+        ]
+        real_atomic_writer = question_pool_maintenance._write_json_secure_atomic
+
+        def fail_result_write_after_commit(path, payload):
+            raise OSError("injected apply-result fsync failure")
+
+        monkeypatch.setattr(
+            question_pool_maintenance,
+            "_write_json_secure_atomic",
+            fail_result_write_after_commit,
+        )
+        with pytest.raises(OSError, match="injected apply-result"):
+            question_pool_maintenance.main(apply_arguments)
+        monkeypatch.setattr(
+            question_pool_maintenance,
+            "_write_json_secure_atomic",
+            real_atomic_writer,
+        )
+        assert json.loads(output.read_text(encoding="utf-8")) == {"stale": True}
+
+        async def assert_commit_survived_result_write_failure() -> None:
+            async with AsyncSessionLocal() as db:
+                audit = (
+                    await db.execute(
+                        select(QuestionCleanupAudit).where(
+                            QuestionCleanupAudit.manifest_hash
+                            == report.manifest_hash
+                        )
+                    )
+                ).scalar_one_or_none()
+                assert audit is not None
+                assert await db.get(Question, fixture["delete_id"]) is None
+
+        asyncio.run(assert_commit_survived_result_write_failure())
+        applied = _run_cleanup_cli(
+            *apply_arguments,
+        )
+
+        assert applied.returncode == 0, applied.stderr
+        assert '"recovered": true' in applied.stdout
+        assert output.is_file()
+        assert stat.S_IMODE(output.stat().st_mode) == 0o600
+        assert sorted(path.name for path in output.parent.iterdir()) == [output.name]
+        result = json.loads(output.read_text(encoding="utf-8"))
+        assert result["formatVersion"] == "question-cleanup-apply-result-v1"
+        assert result["manifestHash"] == report.manifest_hash
+        assert result["snapshotHash"] == report.snapshot_hash
+        assert result["backup"] == {
+            "path": str(backup_path.resolve()),
+            "sha256": backup_hash,
+        }
+        assert result["deletedQuestionIds"] == sorted(
+            [
+                fixture["delete_id"],
+                fixture["empty_delete_id"],
+                fixture["historical_delete_id"],
+                fixture["bank_only_delete_id"],
+            ]
+        )
+        assert {row["questionId"] for row in result["retainedQuestions"]} == {
+            row.question_id for row in report.keep
+        }
+
+        verified = _run_cleanup_cli("verify", "--apply-result", output)
+        assert verified.returncode == 0, verified.stderr
+        assert '"verified": true' in verified.stdout
+
+        idempotent_retry = _run_cleanup_cli(*apply_arguments)
+        assert idempotent_retry.returncode == 0, idempotent_retry.stderr
+        assert '"recovered": true' in idempotent_retry.stdout
+
+        tampered_result = tmp_path / "tampered-audit-result.json"
+        tampered = dict(result)
+        tampered["auditId"] = "missing-cleanup-audit"
+        tampered_result.write_text(json.dumps(tampered), encoding="utf-8")
+        audit_mismatch = _run_cleanup_cli(
+            "verify",
+            "--apply-result",
+            tampered_result,
+        )
+        assert audit_mismatch.returncode != 0
+        assert "audit" in audit_mismatch.stderr.lower()
+
+        async def insert_dangling_reference() -> None:
+            async with AsyncSessionLocal() as db:
+                db.add(
+                    SharedRuntimeState(
+                        key=dangling_key,
+                        value=json.dumps(
+                            {
+                                "nodes": [
+                                    {
+                                        "id": "restored-live-reference",
+                                        "questionId": fixture["delete_id"],
+                                    }
+                                ]
+                            },
+                            separators=(",", ":"),
+                        ),
+                        updated_by="admin",
+                    )
+                )
+                await db.commit()
+
+        asyncio.run(insert_dangling_reference())
+        dangling = _run_cleanup_cli("verify", "--apply-result", output)
+        assert dangling.returncode != 0
+        assert "live reference" in dangling.stderr.lower()
+
+        async def remove_dangling_and_restore_test_row() -> None:
+            async with AsyncSessionLocal() as db:
+                await db.execute(
+                    delete(SharedRuntimeState).where(
+                        SharedRuntimeState.key == dangling_key
+                    )
+                )
+                db.add(
+                    QuestionBank(
+                        id=test_bank_id,
+                        owner_id="admin",
+                        name="恢复测试题守卫",
+                        subject="PMP",
+                    )
+                )
+                await db.flush()
+                db.add(
+                    Question(
+                        id=test_question_id,
+                        bank_id=test_bank_id,
+                        title="__test__清理后恢复测试题",
+                        content_metadata={"fixture": True},
+                    )
+                )
+                await db.commit()
+
+        asyncio.run(remove_dangling_and_restore_test_row())
+        restored_test = _run_cleanup_cli("verify", "--apply-result", output)
+        assert restored_test.returncode != 0
+        assert "delete set" in restored_test.stderr.lower()
+
+        async def remove_test_and_bump_revision() -> str:
+            async with AsyncSessionLocal() as db:
+                await db.execute(
+                    delete(Question).where(Question.id == test_question_id)
+                )
+                await db.execute(
+                    delete(QuestionBank).where(QuestionBank.id == test_bank_id)
+                )
+                revision_row = await db.get(
+                    SharedRuntimeState,
+                    teaching_content_revision_service.REVISION_KEY,
+                )
+                assert revision_row is not None
+                original_value = revision_row.value
+                payload = json.loads(original_value)
+                payload["revision"] += 1
+                revision_row.value = json.dumps(payload, separators=(",", ":"))
+                await db.commit()
+                return original_value
+
+        original_revision_value = asyncio.run(remove_test_and_bump_revision())
+        revision_mismatch = _run_cleanup_cli("verify", "--apply-result", output)
+        assert revision_mismatch.returncode != 0
+        assert "revision" in revision_mismatch.stderr.lower()
+
+        async def restore_revision_and_remove_retained_import() -> None:
+            async with AsyncSessionLocal() as db:
+                revision_row = await db.get(
+                    SharedRuntimeState,
+                    teaching_content_revision_service.REVISION_KEY,
+                )
+                assert revision_row is not None
+                revision_row.value = original_revision_value
+                await db.execute(
+                    delete(QuestionAuditLog).where(
+                        QuestionAuditLog.question_id == bound_keep_id
+                    )
+                )
+                await db.execute(
+                    delete(Question).where(Question.id == bound_keep_id)
+                )
+                await db.commit()
+
+        asyncio.run(restore_revision_and_remove_retained_import())
+        missing_retained = _run_cleanup_cli("verify", "--apply-result", output)
+        assert missing_retained.returncode != 0
+        assert "retained" in missing_retained.stderr.lower()
+
+        async def insert_coordinated_replacement() -> str:
+            async with AsyncSessionLocal() as db:
+                db.add(
+                    Question(
+                        id=replacement_id,
+                        bank_id=fixture["main_bank_id"],
+                        title="替换后的另一正式导入题",
+                        domain="保留领域",
+                        content_metadata={"origin": "content_prep"},
+                    )
+                )
+                await db.flush()
+                db.add(
+                    QuestionAuditLog(
+                        id=replacement_audit_id,
+                        entity_type="question",
+                        entity_id=replacement_id,
+                        question_id=replacement_id,
+                        bank_id=fixture["main_bank_id"],
+                        batch_id=fixture["batch_id"],
+                        action="question_created",
+                        actor_username="admin",
+                        actor_role="admin",
+                        outcome="success",
+                        detail={},
+                    )
+                )
+                await db.commit()
+            async with AsyncSessionLocal() as report_db:
+                current = await build_report(report_db)
+            replacement = next(
+                row for row in current.keep if row.question_id == replacement_id
+            )
+            return replacement.source_fingerprint
+
+        replacement_fingerprint = asyncio.run(insert_coordinated_replacement())
+        coordinated_payload = json.loads(output.read_text(encoding="utf-8"))
+        coordinated_payload["retainedQuestions"] = [
+            (
+                {
+                    "questionId": replacement_id,
+                    "sourceFingerprint": replacement_fingerprint,
+                }
+                if row["questionId"] == bound_keep_id
+                else row
+            )
+            for row in coordinated_payload["retainedQuestions"]
+        ]
+        coordinated_result = tmp_path / "coordinated-tamper-result.json"
+        coordinated_result.write_text(
+            json.dumps(coordinated_payload),
+            encoding="utf-8",
+        )
+        coordinated = _run_cleanup_cli(
+            "verify",
+            "--apply-result",
+            coordinated_result,
+        )
+        assert coordinated.returncode != 0
+        assert "manifest" in coordinated.stderr.lower()
+    finally:
+        async def cleanup_verification_drift() -> None:
+            async with AsyncSessionLocal() as db:
+                await db.execute(
+                    delete(SharedRuntimeState).where(
+                        SharedRuntimeState.key == dangling_key
+                    )
+                )
+                await db.execute(
+                    delete(Question).where(Question.id == test_question_id)
+                )
+                await db.execute(
+                    delete(QuestionAuditLog).where(
+                        QuestionAuditLog.id.in_(
+                            [bound_keep_audit_id, replacement_audit_id]
+                        )
+                    )
+                )
+                await db.execute(
+                    delete(Question).where(
+                        Question.id.in_([bound_keep_id, replacement_id])
+                    )
+                )
+                await db.execute(
+                    delete(QuestionBank).where(QuestionBank.id == test_bank_id)
+                )
+                if original_revision_value is not None:
+                    revision_row = await db.get(
+                        SharedRuntimeState,
+                        teaching_content_revision_service.REVISION_KEY,
+                    )
+                    if revision_row is not None:
+                        revision_row.value = original_revision_value
+                await db.commit()
+
+        asyncio.run(cleanup_verification_drift())
+        asyncio.run(_remove_cleanup_apply_fixture(fixture))
 
 
 def test_cleanup_lock_contract_uses_the_plan1_global_writer_lock():
