@@ -1,8 +1,8 @@
-"""Provenance classifier for the shared question-pool cleanup workflow.
+"""Read-only classification and report phase for shared-question cleanup.
 
-This module intentionally contains no report, apply, delete, or commit logic.
-Task 1 is a pure classifier so it can be exercised without touching business
-data or a production database.
+This module intentionally contains no apply, delete, or commit logic.  The
+report is a content-addressed inventory for human review before any destructive
+phase is authorized.
 """
 
 from __future__ import annotations
@@ -15,7 +15,20 @@ import hashlib
 import json
 from typing import Any
 
-from app.schemas.question_cleanup import QuestionCleanupDecision
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.content_prep import QuestionAuditLog, QuestionUploadBatch
+from app.models.question import Question
+from app.schemas.question_cleanup import (
+    QuestionCleanupDecision,
+    QuestionCleanupReport,
+    QuestionCleanupSummary,
+)
+from app.services.question_cleanup_reference_service import (
+    inventory_question_references,
+)
+from app.services import teaching_content_revision_service
 
 
 CLEANUP_POLICY_VERSION = "question-cleanup-v1"
@@ -304,9 +317,215 @@ def classify_question(
     )
 
 
+def _canonical_json(value: object) -> str:
+    return json.dumps(
+        _canonical_value(value),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _sha256(value: object) -> str:
+    return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def _live_question_fingerprint(
+    question: Question,
+    source_fingerprint: str,
+) -> str:
+    """Hash all mutable business fields, excluding server timestamps."""
+
+    excluded = {"created_at", "updated_at"}
+    values = {
+        column.name: getattr(question, column.key)
+        for column in Question.__table__.columns
+        if column.key not in excluded
+    }
+    return _sha256(
+        {
+            "policyVersion": CLEANUP_POLICY_VERSION,
+            "question": values,
+            "sourceFingerprint": source_fingerprint,
+        }
+    )
+
+
+def _audit_question_id(audit: QuestionAuditLog, live_ids: set[str]) -> str | None:
+    if audit.question_id and audit.question_id in live_ids:
+        return str(audit.question_id)
+    if audit.entity_type == "question" and audit.entity_id in live_ids:
+        return str(audit.entity_id)
+    return None
+
+
+def _batch_for_question(
+    audits: Sequence[QuestionAuditLog],
+    batches: Mapping[str, QuestionUploadBatch],
+) -> QuestionUploadBatch | None:
+    candidates: dict[str, QuestionUploadBatch] = {}
+    for audit in audits:
+        batch_id = str(audit.batch_id) if audit.batch_id is not None else ""
+        batch = batches.get(batch_id)
+        if (
+            batch is not None
+            and audit.action in VERIFIED_IMPORT_ACTIONS
+            and _normalized_token(batch.status) == "committed"
+        ):
+            candidates[batch_id] = batch
+    if not candidates:
+        return None
+    return sorted(candidates.values(), key=lambda row: str(row.id))[0]
+
+
+def _manifest_payload(report: QuestionCleanupReport) -> dict[str, Any]:
+    payload = report.model_dump(mode="json", by_alias=True)
+    payload.pop("generatedAt", None)
+    payload.pop("manifestHash", None)
+    return payload
+
+
+def calculate_manifest_hash(report: QuestionCleanupReport) -> str:
+    """Hash canonical report content while excluding time and the hash itself."""
+
+    return _sha256(_manifest_payload(report))
+
+
+async def build_report(db: AsyncSession) -> QuestionCleanupReport:
+    """Build a deterministic cleanup report without mutating business data."""
+
+    await teaching_content_revision_service.acquire_read_lock(db)
+    questions = (
+        await db.execute(select(Question).order_by(Question.id))
+    ).scalars().all()
+    live_ids = {str(question.id) for question in questions}
+
+    audits_by_question: dict[str, list[QuestionAuditLog]] = {
+        question_id: [] for question_id in live_ids
+    }
+    audit_rows: list[QuestionAuditLog] = []
+    if live_ids:
+        audit_rows = (
+            await db.execute(
+                select(QuestionAuditLog)
+                .where(
+                    or_(
+                        QuestionAuditLog.question_id.in_(live_ids),
+                        (
+                            (QuestionAuditLog.entity_type == "question")
+                            & QuestionAuditLog.entity_id.in_(live_ids)
+                        ),
+                    )
+                )
+                .order_by(QuestionAuditLog.id)
+            )
+        ).scalars().all()
+        for audit in audit_rows:
+            question_id = _audit_question_id(audit, live_ids)
+            if question_id is not None:
+                audits_by_question[question_id].append(audit)
+
+    batch_ids = sorted(
+        {
+            str(audit.batch_id)
+            for audit in audit_rows
+            if audit.batch_id is not None
+        }
+    )
+    batches: dict[str, QuestionUploadBatch] = {}
+    if batch_ids:
+        batch_rows = (
+            await db.execute(
+                select(QuestionUploadBatch)
+                .where(QuestionUploadBatch.id.in_(batch_ids))
+                .order_by(QuestionUploadBatch.id)
+            )
+        ).scalars().all()
+        batches = {str(row.id): row for row in batch_rows}
+
+    references, reference_snapshot = await inventory_question_references(db)
+    reference_ids_by_question: dict[str, list[str]] = {}
+    for reference in references:
+        reference_ids_by_question.setdefault(reference.question_id, []).append(
+            reference.reference_id
+        )
+
+    decisions: list[QuestionCleanupDecision] = []
+    question_snapshot: list[dict[str, str]] = []
+    for question in questions:
+        question_id = str(question.id)
+        audits = audits_by_question.get(question_id, [])
+        batch = _batch_for_question(audits, batches)
+        decision = classify_question(question, audits, batch).model_copy(
+            update={
+                "affected_reference_ids": sorted(
+                    set(reference_ids_by_question.get(question_id, []))
+                )
+            }
+        )
+        decisions.append(decision)
+        question_snapshot.append(
+            {
+                "questionId": question_id,
+                "fingerprint": _live_question_fingerprint(
+                    question,
+                    decision.source_fingerprint,
+                ),
+            }
+        )
+
+    decisions.sort(key=lambda item: item.question_id)
+    keep = [item for item in decisions if item.decision == "keep_formal_import"]
+    delete_rows = [
+        item
+        for item in decisions
+        if item.decision in {"delete_explicit_test", "delete_non_imported"}
+    ]
+    review = [item for item in decisions if item.decision == "review"]
+    repair_reference_count = sum(
+        item.repair_action == "remove_question_and_recalculate"
+        for item in references
+    )
+    preserved_reference_count = sum(
+        item.repair_action == "preserve_historical_snapshot"
+        for item in references
+    )
+
+    snapshot_hash = _sha256(
+        {
+            "policyVersion": CLEANUP_POLICY_VERSION,
+            "questions": question_snapshot,
+            "references": reference_snapshot,
+        }
+    )
+    report = QuestionCleanupReport(
+        policyVersion=CLEANUP_POLICY_VERSION,
+        generatedAt=datetime.now(timezone.utc),
+        summary=QuestionCleanupSummary(
+            totalCount=len(decisions),
+            keepCount=len(keep),
+            deleteCount=len(delete_rows),
+            reviewCount=len(review),
+            referenceCount=len(references),
+            repairReferenceCount=repair_reference_count,
+            preservedReferenceCount=preserved_reference_count,
+        ),
+        keep=keep,
+        delete=delete_rows,
+        review=review,
+        references=references,
+        snapshotHash=snapshot_hash,
+        manifestHash="0" * 64,
+    )
+    report.manifest_hash = calculate_manifest_hash(report)
+    return report
+
+
 __all__ = [
     "CLEANUP_POLICY_VERSION",
     "SEEDED_TEST_BATCH_IDS",
     "VERIFIED_IMPORT_ACTIONS",
+    "build_report",
+    "calculate_manifest_hash",
     "classify_question",
 ]
