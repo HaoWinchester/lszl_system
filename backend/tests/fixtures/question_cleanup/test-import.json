@@ -1,0 +1,63 @@
+{
+  "seededBatchIds": [
+    "seeded-e2e-question-batch-v1",
+    "seeded-pytest-question-batch-v1",
+    "seeded-test-question-batch-v1"
+  ],
+  "cases": [
+    {
+      "name": "environment-test",
+      "question": {"metadata": {"origin": "content_prep", "environment": "test"}},
+      "audits": [{"action": "question_created", "batch_id": "batch-formal", "detail": {}}],
+      "batch": {"id": "batch-formal", "status": "committed"}
+    },
+    {
+      "name": "environment-e2e-normalized",
+      "question": {"metadata": {"origin": "content_prep", "environment": " E2E "}},
+      "audits": [{"action": "question_created", "batch_id": "batch-formal", "detail": {}}],
+      "batch": {"id": "batch-formal", "status": "committed"}
+    },
+    {
+      "name": "environment-pytest",
+      "question": {"metadata": {"origin": "content_prep", "environment": "pytest"}},
+      "audits": [{"action": "question_created", "batch_id": "batch-formal", "detail": {}}],
+      "batch": {"id": "batch-formal", "status": "committed"}
+    },
+    {
+      "name": "fixture-boolean",
+      "question": {"metadata": {"origin": "content_prep", "fixture": true}},
+      "audits": [{"action": "question_created", "batch_id": "batch-formal", "detail": {}}],
+      "batch": {"id": "batch-formal", "status": "committed"}
+    },
+    {
+      "name": "title-test-prefix",
+      "question": {"title": "__test__upload", "metadata": {"origin": "content_prep"}},
+      "audits": [{"action": "question_created", "batch_id": "batch-formal", "detail": {}}],
+      "batch": {"id": "batch-formal", "status": "committed"}
+    },
+    {
+      "name": "title-e2e-prefix",
+      "question": {"title": "__e2e__upload", "metadata": {"origin": "content_prep"}},
+      "audits": [{"action": "question_created", "batch_id": "batch-formal", "detail": {}}],
+      "batch": {"id": "batch-formal", "status": "committed"}
+    },
+    {
+      "name": "external-id-pytest-prefix",
+      "question": {"externalId": "pytest-upload-9", "metadata": {"origin": "content_prep"}},
+      "audits": [{"action": "question_created", "batch_id": "batch-formal", "detail": {}}],
+      "batch": {"id": "batch-formal", "status": "committed"}
+    },
+    {
+      "name": "seeded-batch-id",
+      "question": {"metadata": {"origin": "content_prep"}},
+      "audits": [{"action": "question_created", "batch_id": "seeded-e2e-question-batch-v1", "detail": {}}],
+      "batch": {"id": "seeded-e2e-question-batch-v1", "status": "committed"}
+    },
+    {
+      "name": "audit-test-fixture",
+      "question": {"metadata": {"origin": "content_prep"}},
+      "audits": [{"action": "question_created", "batch_id": "batch-formal", "detail": {"testFixture": true}}],
+      "batch": {"id": "batch-formal", "status": "committed"}
+    }
+  ]
+}

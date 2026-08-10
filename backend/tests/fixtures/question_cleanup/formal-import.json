@@ -1,0 +1,37 @@
+{
+  "cases": [
+    {
+      "name": "committed-content-prep-create",
+      "question": {
+        "title": "正式导入题目",
+        "metadata": {"origin": "content_prep"}
+      },
+      "audits": [
+        {"action": "question_created", "batch_id": "batch-formal-create", "detail": {}}
+      ],
+      "batch": {"id": "batch-formal-create", "status": "committed"}
+    },
+    {
+      "name": "committed-content-prep-update",
+      "question": {
+        "title": "正式导入更新题目",
+        "metadata": {"origin": "content_prep"}
+      },
+      "audits": [
+        {"action": "question_updated", "batch_id": "batch-formal-update", "detail": {}}
+      ],
+      "batch": {"id": "batch-formal-update", "status": "committed"}
+    },
+    {
+      "name": "verified-legacy-import",
+      "question": {
+        "title": "正式旧题",
+        "metadata": {"origin": "legacy_import"}
+      },
+      "audits": [
+        {"action": "legacy_import_verified", "batch_id": null, "detail": {}}
+      ],
+      "batch": null
+    }
+  ]
+}
