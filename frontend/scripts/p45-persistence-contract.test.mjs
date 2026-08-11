@@ -4,6 +4,18 @@ import { resolve } from 'node:path'
 import test from 'node:test'
 
 const p45Path = new URL('./p45-persistence-contract.json', import.meta.url)
+const migrationMatrixPath = new URL('../../docs/p45-migration-matrix.md', import.meta.url)
+
+function parseMarkdownTable(markdown) {
+  const lines = markdown.split('\n').filter((line) => /^\|.*\|\s*$/.test(line))
+  assert.ok(lines.length >= 3, 'expected a Markdown table with a header and at least one row')
+
+  const parseCells = (line) => line.split('|').slice(1, -1).map((cell) => cell.trim())
+  const headers = parseCells(lines[0])
+  return lines.slice(2).map((line) => Object.fromEntries(
+    parseCells(line).map((cell, index) => [headers[index], cell])
+  ))
+}
 
 function findSourceDirectory() {
   return [
@@ -69,4 +81,43 @@ test('P4.5 limits session persistence to navigation and preview token prefixes',
     'kg_teacher_preview_',
     'kg_learning_route_context_',
   ])
+})
+
+test('P4.5 migration matrix assigns database ownership and API routes to every migrated feature group', () => {
+  const rows = parseMarkdownTable(readFileSync(migrationMatrixPath, 'utf8'))
+  const requiredGroups = [
+    '图谱画布',
+    '题库与训练',
+    '做题与验证',
+    '深度回忆',
+    '学习诊断与推荐',
+    'Prep Studio',
+  ]
+
+  for (const group of requiredGroups) {
+    const row = rows.find((candidate) => candidate['功能组'] === group)
+    assert.ok(row, `expected migration matrix row for ${group}`)
+    assert.notEqual(row['排除？'], 'excluded', `${group} must be a migrated group`)
+    assert.ok(row['PostgreSQL 归属'], `${group} requires a PostgreSQL owner`)
+    assert.ok(row.API, `${group} requires an API route`)
+  }
+})
+
+test('P4.5 migration matrix records homepage exclusions without a source-copy task', () => {
+  const rows = parseMarkdownTable(readFileSync(migrationMatrixPath, 'utf8'))
+  const excludedFeatures = [
+    '四个学习入口',
+    '新手引导',
+    '简易/专业知识点编辑切换',
+    '帮助入口改版',
+  ]
+
+  for (const feature of excludedFeatures) {
+    const row = rows.find((candidate) => candidate['功能组'] === feature)
+    assert.ok(row, `expected exclusion row for ${feature}`)
+    assert.equal(row['排除？'], 'excluded', `${feature} must be excluded`)
+    assert.equal(row['来源模块'], '无（不得从 updata-legacy/ 复制）', `${feature} must not have a source-copy task`)
+    assert.equal(row['PostgreSQL 归属'], '—', `${feature} must not be assigned a database owner`)
+    assert.equal(row.API, '—', `${feature} must not be assigned an API route`)
+  }
 })
