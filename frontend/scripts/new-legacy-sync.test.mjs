@@ -193,6 +193,37 @@ test('sync permits IndexedDB in an offline-export-only migrated module', (t) => 
   assert.equal(result.status, 0, result.stderr)
 })
 
+test('sync does not permit a truthy non-boolean offline-export-only flag', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/p45-fixture.js'), "indexedDB.open('business-workspace')\n")
+  write(resolve(item.upstream, 'p45-migration-manifest.json'), JSON.stringify({
+    migratedBusinessModules: {
+      'src/p45-fixture.js': { offlineExportOnly: 'false' },
+    },
+  }))
+
+  const result = runSync(item)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /IndexedDB business persistence is forbidden in migrated module: src\/p45-fixture\.js/)
+})
+
+test('sync permits ordinary collection writes in a migrated module without IndexedDB', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/p45-fixture.js'), "const values = new Set(); values.add('value')\n")
+  write(resolve(item.upstream, 'p45-migration-manifest.json'), JSON.stringify({
+    migratedBusinessModules: {
+      'src/p45-fixture.js': {},
+    },
+  }))
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+})
+
 test('sync permits P4.5 session-only navigation and preview tokens', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))

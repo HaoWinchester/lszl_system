@@ -833,6 +833,11 @@ function p45MigratedBusinessModules(source) {
   return new Map(Object.entries(manifest.migratedBusinessModules || {}))
 }
 
+function hasIndexedDbBusinessPersistence(source) {
+  if (/\bindexedDB\s*\.\s*open\s*\(/.test(source)) return true
+  return /\.\s*transaction\s*\([^)]*\)\s*\.\s*objectStore\s*\([^)]*\)\s*\.\s*(?:add|put|delete|clear)\s*\(/.test(source)
+}
+
 function validateStorageContract(source) {
   const storage = contract.runtimeStorage || {}
   const p45Runtime = p45PersistenceContract.runtime || {}
@@ -884,9 +889,9 @@ function validateStorageContract(source) {
   }
 
   for (const [path, options] of p45MigratedBusinessModules(source)) {
-    if (options?.offlineExportOnly) continue
+    if (options?.offlineExportOnly === true) continue
     const contents = readFileSync(resolve(source, path), 'utf8')
-    if (/\bindexedDB\s*\.\s*open\s*\(|\.\s*(?:add|put|delete|clear)\s*\(/.test(contents)) {
+    if (hasIndexedDbBusinessPersistence(contents)) {
       throw new Error(`IndexedDB business persistence is forbidden in migrated module: ${path}`)
     }
   }
