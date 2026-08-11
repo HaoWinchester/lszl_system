@@ -53,7 +53,11 @@
     if(!el)return;
     el.classList.toggle('is-collapsed',!!collapsed);
     const toggle=el.querySelector('#kgGlobalShortcutsToggle');
-    if(toggle)toggle.setAttribute('aria-label',collapsed?'展开全局快捷入口':'切换快捷入口排布');
+    if(toggle){
+      const label=collapsed?'展开全局快捷入口':'切换快捷入口排布';
+      toggle.setAttribute('aria-label',label);
+      toggle.dataset.tooltip=label;
+    }
   }
   function isCurrent(item){
     return currentPage() === item.href.toLowerCase();
@@ -87,18 +91,26 @@
   }
   function applySavedPosition(el){
     const pos = readJSON(STORAGE_POS, null);
-    if(!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return;
-    const rect = el.getBoundingClientRect();
-    const width = rect.width || 168;
-    const height = rect.height || 220;
-    const maxX = Math.max(8, window.innerWidth - width - 8);
-    const maxY = Math.max(8, window.innerHeight - height - 8);
-    const x = clamp(pos.x, 8, maxX);
-    const y = clamp(pos.y, 8, maxY);
-    el.style.left = x + "px";
-    el.style.top = y + "px";
-    el.style.right = "auto";
-    el.style.bottom = "auto";
+    if(pos && typeof pos.x === "number" && typeof pos.y === "number"){
+      const rect = el.getBoundingClientRect();
+      const width = rect.width || 168;
+      const height = rect.height || 220;
+      const maxX = Math.max(8, window.innerWidth - width - 8);
+      const maxY = Math.max(8, window.innerHeight - height - 8);
+      const x = clamp(pos.x, 8, maxX);
+      const y = clamp(pos.y, 8, maxY);
+      el.style.left = x + "px";
+      el.style.top = y + "px";
+      el.style.right = "auto";
+      el.style.bottom = "auto";
+    }
+    refreshTooltipSides(el);
+  }
+  function refreshTooltipSides(el){
+    if(!el)return;
+    const rect=el.getBoundingClientRect();
+    const side=rect.left+rect.width/2>window.innerWidth/2?'left':'right';
+    el.querySelectorAll('[data-tooltip]').forEach(target=>{target.dataset.tooltipSide=side});
   }
   function savePosition(el){
     const rect = el.getBoundingClientRect();
@@ -127,6 +139,7 @@
       el.style.top = y + "px";
       el.style.right = "auto";
       el.style.bottom = "auto";
+      refreshTooltipSides(el);
       event.preventDefault();
     };
     const up = () => {
@@ -177,8 +190,9 @@
     el.classList.toggle("layout-vertical", next !== "horizontal");
     const toggle = el.querySelector("#kgGlobalShortcutsToggle");
     if(toggle){
-      toggle.setAttribute("aria-label", next === "horizontal" ? "当前水平排布，点击切换为纵向排布" : "当前纵向排布，点击切换为水平排布");
-      toggle.setAttribute("title", next === "horizontal" ? "水平排布，点击切换为纵向" : "纵向排布，点击切换为水平");
+      const label=next === "horizontal" ? "当前水平排布，点击切换为纵向排布" : "当前纵向排布，点击切换为水平排布";
+      toggle.setAttribute("aria-label", label);
+      toggle.dataset.tooltip=label;
     }
     const label = el.querySelector("[data-layout-label]");
     if(label) label.textContent = next === "horizontal" ? "水平排布" : "纵向排布";
@@ -211,9 +225,9 @@
     const layout = readLayout();
 
     el.innerHTML = `
-      <div class="kg-global-shortcuts-head" id="kgGlobalShortcutsHandle" title="按住拖拽快捷栏">
+      <div class="kg-global-shortcuts-head" id="kgGlobalShortcutsHandle">
         <div class="kg-global-shortcuts-title">
-          <span class="kg-global-shortcuts-grip">${ICONS.grip}</span>
+          <span class="kg-global-shortcuts-grip" data-tooltip="按住拖拽快捷栏">${ICONS.grip}</span>
           <div>
             <strong>全局快捷</strong>
             <small data-layout-label>${layout === "horizontal" ? "水平排布" : "纵向排布"}</small>
@@ -223,7 +237,7 @@
       </div>
       <nav class="kg-global-shortcuts-body" aria-label="快捷入口列表">
         ${visible.map(item => `
-          <a class="kg-global-shortcuts-link ${item.className || ""} ${isCurrent(item) ? "current" : ""}" href="${item.href}" data-global-shortcut="${item.id}" title="${item.label}">
+          <a class="kg-global-shortcuts-link ${item.className || ""} ${isCurrent(item) ? "current" : ""}" href="${item.href}" data-global-shortcut="${item.id}" data-tooltip="${escapeHTML(item.label)}" aria-label="${escapeHTML(item.label)}">
             ${item.icon}
             <span>${item.label}</span>
           </a>
