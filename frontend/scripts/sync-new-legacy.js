@@ -826,27 +826,50 @@ function diffFiles(previous = {}, next = {}) {
   return { added, changed, removed }
 }
 
-function p45MigratedBusinessModules(source) {
+function p45MigrationManifest(source) {
   const manifestPath = resolve(source, 'p45-migration-manifest.json')
-  if (!existsSync(manifestPath)) return new Map()
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-  return new Map(Object.entries(manifest.migratedBusinessModules || {}))
+  if (!existsSync(manifestPath)) throw new Error('P4.5 migration manifest is required')
+  let manifest
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  } catch {
+    throw new Error('P4.5 migration manifest is invalid')
+  }
+  if (
+    !manifest
+    || typeof manifest !== 'object'
+    || Array.isArray(manifest)
+    || !manifest.migratedBusinessModules
+    || typeof manifest.migratedBusinessModules !== 'object'
+    || Array.isArray(manifest.migratedBusinessModules)
+    || !Array.isArray(manifest.legacyUnmigratedIndexedDbModules)
+    || manifest.legacyUnmigratedIndexedDbModules.some((path) => typeof path !== 'string')
+  ) {
+    throw new Error('P4.5 migration manifest is invalid')
+  }
+  return {
+    migratedBusinessModules: new Map(Object.entries(manifest.migratedBusinessModules)),
+    legacyUnmigratedIndexedDbModules: new Set(manifest.legacyUnmigratedIndexedDbModules),
+  }
 }
 
 function hasIndexedDbBusinessPersistence(source) {
-  if (/\bindexedDB\s*\.\s*open\s*\(/.test(source)) return true
-  if (/\.\s*transaction\s*\([^)]*\)\s*\.\s*objectStore\s*\([^)]*\)\s*\.\s*(?:add|put|delete|clear)\s*\(/.test(source)) return true
+  const propertyAccess = String.raw`(?:\?\.|\.)`
+  if (new RegExp(String.raw`\bindexedDB\s*${propertyAccess}\s*open\s*\(`).test(source)) return true
+  if (new RegExp(String.raw`${propertyAccess}\s*transaction\s*\([^)]*\)\s*${propertyAccess}\s*objectStore\s*\([^)]*\)\s*${propertyAccess}\s*(?:add|put|delete|clear)\s*\(`).test(source)) return true
 
   const transactions = new Set()
-  for (const match of source.matchAll(/\b(?:(?:const|let|var)\s+)?([A-Za-z_$][\w$]*)\s*=\s*[A-Za-z_$][\w$]*\s*\.\s*transaction\s*\(/g)) {
+  const transactionPattern = new RegExp(String.raw`\b(?:(?:const|let|var)\s+)?([A-Za-z_$][\w$]*)\s*=\s*[A-Za-z_$][\w$]*\s*${propertyAccess}\s*transaction\s*\(`, 'g')
+  for (const match of source.matchAll(transactionPattern)) {
     transactions.add(match[1])
   }
   const objectStores = new Set()
-  for (const match of source.matchAll(/\b(?:(?:const|let|var)\s+)?([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*\.\s*objectStore\s*\(/g)) {
+  const objectStorePattern = new RegExp(String.raw`\b(?:(?:const|let|var)\s+)?([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*${propertyAccess}\s*objectStore\s*\(`, 'g')
+  for (const match of source.matchAll(objectStorePattern)) {
     if (transactions.has(match[2])) objectStores.add(match[1])
   }
   if (!objectStores.size) return false
-  return new RegExp(`\\b(?:${Array.from(objectStores).join('|')})\\s*\\.\\s*(?:add|put|delete|clear)\\s*\\(`).test(source)
+  return new RegExp(String.raw`\b(?:${Array.from(objectStores).join('|')})\s*${propertyAccess}\s*(?:add|put|delete|clear)\s*\(`).test(source)
 }
 
 function validateStorageContract(source) {
@@ -899,12 +922,13 @@ function validateStorageContract(source) {
     throw new Error(`new-legacy 只读旧键禁止新增写调用：${Array.from(readOnlyWrites).sort().join(', ')}`)
   }
 
-  for (const [path, options] of p45MigratedBusinessModules(source)) {
-    if (options?.offlineExportOnly === true) continue
+  const p45Migration = p45MigrationManifest(source)
+  for (const path of walk(source).filter((item) => item.endsWith('.js') || item.endsWith('.html'))) {
     const contents = readFileSync(resolve(source, path), 'utf8')
-    if (hasIndexedDbBusinessPersistence(contents)) {
-      throw new Error(`IndexedDB business persistence is forbidden in migrated module: ${path}`)
-    }
+    if (!hasIndexedDbBusinessPersistence(contents)) continue
+    if (p45Migration.legacyUnmigratedIndexedDbModules.has(path)) continue
+    if (p45Migration.migratedBusinessModules.get(path)?.offlineExportOnly === true) continue
+    throw new Error(`IndexedDB business persistence is forbidden in migrated module: ${path}`)
   }
 }
 
