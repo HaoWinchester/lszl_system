@@ -10,7 +10,7 @@ import sys
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, insert, select
 
 from app.db.session import AsyncSessionLocal
 from app.models.content_prep import (
@@ -36,6 +36,67 @@ from app.services.teaching_content_reset_service import (
 
 MUTABLE_RUNTIME_KEY = "kg_course_config_drafts_v1"
 IMMUTABLE_RUNTIME_KEY = "kg_exam_papers_published_v1"
+
+RESET_STATE_MODELS = (
+    QuestionBank,
+    Question,
+    ExamPaper,
+    Principle,
+    SynthesisPreset,
+    QuestionBankCollaborator,
+    QuestionUploadBatch,
+    QuestionEditLock,
+    TrainingProgress,
+    RecallProgress,
+    LearningEvent,
+    PaperQuestion,
+    QuestionAuditLog,
+    SharedRuntimeState,
+)
+
+RESET_DELETE_ORDER = (
+    PaperQuestion,
+    LearningEvent,
+    TrainingProgress,
+    RecallProgress,
+    QuestionEditLock,
+    QuestionUploadBatch,
+    QuestionBankCollaborator,
+    QuestionAuditLog,
+    Question,
+    QuestionBank,
+    SynthesisPreset,
+    Principle,
+    ExamPaper,
+    SharedRuntimeState,
+)
+
+
+async def _snapshot_reset_state() -> dict[type, list[dict[str, object]]]:
+    async with AsyncSessionLocal() as db:
+        return {
+            model: [
+                dict(row)
+                for row in (
+                    await db.execute(select(model.__table__))
+                ).mappings().all()
+            ]
+            for model in RESET_STATE_MODELS
+        }
+
+
+async def _restore_reset_state(
+    snapshot: dict[type, list[dict[str, object]]],
+) -> None:
+    async with AsyncSessionLocal() as db:
+        for model in RESET_DELETE_ORDER:
+            await db.execute(delete(model))
+        await db.flush()
+        for model in RESET_STATE_MODELS:
+            rows = snapshot[model]
+            if rows:
+                await db.execute(insert(model.__table__), rows)
+        await db.commit()
 
 
 async def _count(db, model) -> int:
@@ -323,14 +384,16 @@ async def _seed_reset_fixture() -> dict[str, object]:
 
 
 def test_reset_current_content_deletes_current_rows_and_preserves_history_and_audit():
+    snapshot = asyncio.run(_snapshot_reset_state())
+
     async def scenario() -> None:
         fixture = await _seed_reset_fixture()
         async with AsyncSessionLocal() as db:
             preview = await preview_reset(db)
-            assert preview["counts"]["questionBanks"] == 2
-            assert preview["counts"]["questions"] == 3
-            assert preview["counts"]["principles"] == 1
-            assert preview["counts"]["synthesisPresets"] == 1
+            assert preview["counts"]["questionBanks"] == len(snapshot[QuestionBank]) + 2
+            assert preview["counts"]["questions"] == len(snapshot[Question]) + 3
+            assert preview["counts"]["principles"] == len(snapshot[Principle]) + 1
+            assert preview["counts"]["synthesisPresets"] == len(snapshot[SynthesisPreset]) + 1
             await db.rollback()
 
             result = await reset_current_content(
@@ -339,10 +402,10 @@ def test_reset_current_content_deletes_current_rows_and_preserves_history_and_au
                 expected_snapshot_hash=str(preview["snapshotHash"]),
             )
             assert result["deleted"] == {
-                "questionBanks": 2,
-                "questions": 3,
-                "principles": 1,
-                "synthesisPresets": 1,
+                "questionBanks": len(snapshot[QuestionBank]) + 2,
+                "questions": len(snapshot[Question]) + 3,
+                "principles": len(snapshot[Principle]) + 1,
+                "synthesisPresets": len(snapshot[SynthesisPreset]) + 1,
             }
 
         async with AsyncSessionLocal() as verify_db:
@@ -392,10 +455,15 @@ def test_reset_current_content_deletes_current_rows_and_preserves_history_and_au
             after_revision = await teaching_content_revision_service.current(verify_db)
             assert after_revision["revision"] == fixture["beforeRevision"] + 1
 
-    asyncio.run(scenario())
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(_restore_reset_state(snapshot))
 
 
 def test_reset_current_content_rejects_stale_snapshot_before_any_mutation():
+    snapshot = asyncio.run(_snapshot_reset_state())
+
     async def scenario() -> None:
         fixture = await _seed_reset_fixture()
         async with AsyncSessionLocal() as db:
@@ -413,26 +481,24 @@ def test_reset_current_content_rejects_stale_snapshot_before_any_mutation():
                 raise AssertionError("stale reset snapshot must be rejected")
 
         async with AsyncSessionLocal() as verify_db:
-            assert await _count(verify_db, QuestionBank) == 2
-            assert await _count(verify_db, Question) == 3
-            assert await _count(verify_db, Principle) == 1
-            assert await _count(verify_db, SynthesisPreset) == 1
+            assert await _count(verify_db, QuestionBank) == len(snapshot[QuestionBank]) + 2
+            assert await _count(verify_db, Question) == len(snapshot[Question]) + 3
+            assert await _count(verify_db, Principle) == len(snapshot[Principle]) + 1
+            assert await _count(verify_db, SynthesisPreset) == len(snapshot[SynthesisPreset]) + 1
             immutable_row = await verify_db.get(SharedRuntimeState, IMMUTABLE_RUNTIME_KEY)
             assert immutable_row is not None
             assert immutable_row.value == fixture["immutableValue"]
             assert await _count(verify_db, QuestionAuditLog) == fixture["beforeAuditCount"]
-            cleanup_preview = await preview_reset(verify_db)
-            await verify_db.rollback()
-            await reset_current_content(
-                verify_db,
-                actor_username="admin",
-                expected_snapshot_hash=str(cleanup_preview["snapshotHash"]),
-            )
 
-    asyncio.run(scenario())
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(_restore_reset_state(snapshot))
 
 
 def test_reset_current_content_rolls_back_all_rows_when_projection_write_fails(monkeypatch):
+    snapshot = asyncio.run(_snapshot_reset_state())
+
     async def scenario() -> None:
         fixture = await _seed_reset_fixture()
         original_write = teaching_content_reset_service.write_principle_projection
@@ -461,17 +527,17 @@ def test_reset_current_content_rolls_back_all_rows_when_projection_write_fails(m
                 raise AssertionError("injected failure must abort reset")
 
         async with AsyncSessionLocal() as verify_db:
-            assert await _count(verify_db, QuestionBank) == 2
-            assert await _count(verify_db, Question) == 3
-            assert await _count(verify_db, QuestionBankCollaborator) == 1
-            assert await _count(verify_db, QuestionUploadBatch) == 1
-            assert await _count(verify_db, QuestionEditLock) == 1
-            assert await _count(verify_db, TrainingProgress) == 1
-            assert await _count(verify_db, RecallProgress) == 1
-            assert await _count(verify_db, LearningEvent) == 1
-            assert await _count(verify_db, Principle) == 1
-            assert await _count(verify_db, SynthesisPreset) == 1
-            assert await _count(verify_db, PaperQuestion) == 2
+            assert await _count(verify_db, QuestionBank) == len(snapshot[QuestionBank]) + 2
+            assert await _count(verify_db, Question) == len(snapshot[Question]) + 3
+            assert await _count(verify_db, QuestionBankCollaborator) == len(snapshot[QuestionBankCollaborator]) + 1
+            assert await _count(verify_db, QuestionUploadBatch) == len(snapshot[QuestionUploadBatch]) + 1
+            assert await _count(verify_db, QuestionEditLock) == len(snapshot[QuestionEditLock]) + 1
+            assert await _count(verify_db, TrainingProgress) == len(snapshot[TrainingProgress]) + 1
+            assert await _count(verify_db, RecallProgress) == len(snapshot[RecallProgress]) + 1
+            assert await _count(verify_db, LearningEvent) == len(snapshot[LearningEvent]) + 1
+            assert await _count(verify_db, Principle) == len(snapshot[Principle]) + 1
+            assert await _count(verify_db, SynthesisPreset) == len(snapshot[SynthesisPreset]) + 1
+            assert await _count(verify_db, PaperQuestion) == len(snapshot[PaperQuestion]) + 2
             mutable_row = await verify_db.get(SharedRuntimeState, MUTABLE_RUNTIME_KEY)
             immutable_row = await verify_db.get(SharedRuntimeState, IMMUTABLE_RUNTIME_KEY)
             assert mutable_row is not None
@@ -485,87 +551,87 @@ def test_reset_current_content_rolls_back_all_rows_when_projection_write_fails(m
             "write_principle_projection",
             original_write,
         )
-        async with AsyncSessionLocal() as cleanup_db:
-            cleanup_preview = await preview_reset(cleanup_db)
-            await cleanup_db.rollback()
-            await reset_current_content(
-                cleanup_db,
-                actor_username="admin",
-                expected_snapshot_hash=str(cleanup_preview["snapshotHash"]),
-            )
 
-    asyncio.run(scenario())
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(_restore_reset_state(snapshot))
 
 
 def test_reset_cli_previews_rejects_teacher_and_applies_for_admin():
-    fixture = asyncio.run(_seed_reset_fixture())
-    backend_root = Path(__file__).resolve().parents[1]
-    script = backend_root / "scripts" / "reset_teaching_content.py"
+    snapshot = asyncio.run(_snapshot_reset_state())
 
-    preview_process = subprocess.run(
-        [sys.executable, str(script), "preview"],
-        cwd=backend_root,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert preview_process.returncode == 0, preview_process.stderr
-    preview = json.loads(preview_process.stdout)
-    assert preview["counts"]["questionBanks"] == 2
-    assert preview["counts"]["questions"] == 3
+    try:
+        fixture = asyncio.run(_seed_reset_fixture())
+        backend_root = Path(__file__).resolve().parents[1]
+        script = backend_root / "scripts" / "reset_teaching_content.py"
 
-    teacher_process = subprocess.run(
-        [
-            sys.executable,
-            str(script),
-            "apply",
-            "--actor",
-            "老师",
-            "--snapshot-hash",
-            preview["snapshotHash"],
-            "--confirm",
-            preview["confirmToken"],
-        ],
-        cwd=backend_root,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert teacher_process.returncode != 0
-    assert "管理员" in teacher_process.stderr
+        preview_process = subprocess.run(
+            [sys.executable, str(script), "preview"],
+            cwd=backend_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert preview_process.returncode == 0, preview_process.stderr
+        preview = json.loads(preview_process.stdout)
+        assert preview["counts"]["questionBanks"] == len(snapshot[QuestionBank]) + 2
+        assert preview["counts"]["questions"] == len(snapshot[Question]) + 3
 
-    async def verify_teacher_rejection() -> None:
-        async with AsyncSessionLocal() as db:
-            assert await _count(db, QuestionBank) == 2
-            assert await _count(db, Question) == 3
-            immutable_row = await db.get(SharedRuntimeState, IMMUTABLE_RUNTIME_KEY)
-            assert immutable_row is not None
-            assert immutable_row.value == fixture["immutableValue"]
+        teacher_process = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "apply",
+                "--actor",
+                "老师",
+                "--snapshot-hash",
+                preview["snapshotHash"],
+                "--confirm",
+                preview["confirmToken"],
+            ],
+            cwd=backend_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert teacher_process.returncode != 0
+        assert "管理员" in teacher_process.stderr
 
-    asyncio.run(verify_teacher_rejection())
+        async def verify_teacher_rejection() -> None:
+            async with AsyncSessionLocal() as db:
+                assert await _count(db, QuestionBank) == len(snapshot[QuestionBank]) + 2
+                assert await _count(db, Question) == len(snapshot[Question]) + 3
+                immutable_row = await db.get(SharedRuntimeState, IMMUTABLE_RUNTIME_KEY)
+                assert immutable_row is not None
+                assert immutable_row.value == fixture["immutableValue"]
 
-    admin_process = subprocess.run(
-        [
-            sys.executable,
-            str(script),
-            "apply",
-            "--actor",
-            "admin",
-            "--snapshot-hash",
-            preview["snapshotHash"],
-            "--confirm",
-            preview["confirmToken"],
-        ],
-        cwd=backend_root,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert admin_process.returncode == 0, admin_process.stderr
-    result = json.loads(admin_process.stdout)
-    assert result["deleted"] == {
-        "questionBanks": 2,
-        "questions": 3,
-        "principles": 1,
-        "synthesisPresets": 1,
-    }
+        asyncio.run(verify_teacher_rejection())
+
+        admin_process = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "apply",
+                "--actor",
+                "admin",
+                "--snapshot-hash",
+                preview["snapshotHash"],
+                "--confirm",
+                preview["confirmToken"],
+            ],
+            cwd=backend_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert admin_process.returncode == 0, admin_process.stderr
+        result = json.loads(admin_process.stdout)
+        assert result["deleted"] == {
+            "questionBanks": len(snapshot[QuestionBank]) + 2,
+            "questions": len(snapshot[Question]) + 3,
+            "principles": len(snapshot[Principle]) + 1,
+            "synthesisPresets": len(snapshot[SynthesisPreset]) + 1,
+        }
+    finally:
+        asyncio.run(_restore_reset_state(snapshot))

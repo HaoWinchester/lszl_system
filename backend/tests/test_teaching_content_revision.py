@@ -422,6 +422,17 @@ def test_principle_archive_rejects_bound_questions_then_archives_the_pair() -> N
                 "code": "PRINCIPLE_IN_USE",
                 "referencedIds": [principle_id],
                 "referenceCounts": {principle_id: 1},
+                "referenceQuestions": {
+                    principle_id: [
+                        {
+                            "questionId": question_id,
+                            "questionTitle": "引用原则的题目",
+                            "teacherNumber": None,
+                            "bankId": bank_id,
+                            "bankName": "原则归档测试题库",
+                        }
+                    ]
+                },
             }
             blocked_delete = client.post(
                 "/api/v1/content-prep/principles/delete",
