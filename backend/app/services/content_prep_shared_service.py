@@ -23,7 +23,6 @@ from app.services import (
 
 
 TAXONOMY_KEY = "kg_content_taxonomies_v1"
-TAG_KEY = "kg_question_tag_names_v1"
 ACTIVITY_KEY = "kg_content_activity_overrides_v1"
 RECALL_PREFIX = "kg_recall_association_library_v1__subject__"
 MAX_SHARED_BYTES = 2 * 1024 * 1024
@@ -234,12 +233,6 @@ async def apply_auxiliary_assets(
                 {"entityType": "recallLibrary", "entityId": subject_id, "action": "upserted"}
             )
 
-    if tag_config and await _write_row(
-        db, TAG_KEY, tag_config, actor_username, "标签配置"
-    ):
-        changes.append(
-            {"entityType": "tagConfig", "entityId": "active", "action": "upserted"}
-        )
     return changes
 
 

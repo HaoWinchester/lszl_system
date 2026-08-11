@@ -113,6 +113,13 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
                 },
             )
             assert saved.status_code == 200, saved.text
+
+            async def tag_projection() -> str | None:
+                async with AsyncSessionLocal() as db:
+                    row = await db.get(SharedRuntimeState, TAG_KEY)
+                    return None if row is None else row.value
+
+            assert asyncio.run(tag_projection()) is None
             shared = second.get("/api/v1/content-prep/shared-content", params={"subjectId": "PMP"})
             assert shared.status_code == 200, shared.text
             assert shared.json()["knowledgeTree"]["taxonomy"]["id"] == f"tax-{suffix}"
@@ -196,7 +203,13 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
             storage = runtime.json()["storage"]
             assert json.loads(storage[TAXONOMY_KEY])[-1]["id"] == f"empty-tax-{suffix}"
             assert json.loads(storage[RECALL_KEY])["nodes"][0]["title"] == "零题目联想"
-            assert json.loads(storage[TAG_KEY])["names"]["stage"] == "零题目阶段"
+            assert TAG_KEY not in storage
+            shared_after_batch = second.get(
+                "/api/v1/content-prep/shared-content",
+                params={"subjectId": "PMP"},
+            )
+            assert shared_after_batch.status_code == 200, shared_after_batch.text
+            assert shared_after_batch.json()["tagConfig"]["names"]["stage"] == "零题目阶段"
             activities = json.loads(storage[ACTIVITY_KEY])
             assert activities[activity_id]["title"] == "共享活动"
             assert activities[activity_id]["metadata"]["authorship"]["createdByUserId"] == teacher_b
