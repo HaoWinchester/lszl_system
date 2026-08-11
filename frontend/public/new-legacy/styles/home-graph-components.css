@@ -709,7 +709,7 @@
 
 
 /* V9.0-P4.2.13 · delayed hints, integrated mode banner and lightweight edge labels */
-/* Homepage main toolbar and node toolbar hints appear only after a stable 260ms hover. */
+/* Homepage toolbar hints start promptly; node editing hints keep their longer dwell time. */
 .floating-tool-btn[data-tooltip]::after,
 .node-toolbar-btn[data-tooltip]::after,
 .node-toolbar-btn[data-tooltip]::before,
@@ -719,7 +719,9 @@
 }
 .floating-tool-btn[data-tooltip]:hover::after,
 .floating-tool-btn[data-tooltip]:focus-visible::after,
-.floating-color-tool[data-tooltip]:focus-within::after,
+.floating-color-tool[data-tooltip]:focus-within::after{
+  transition-delay:60ms;
+}
 .node-toolbar-btn[data-tooltip]:hover::after,
 .node-toolbar-btn[data-tooltip]:focus-visible::after,
 .node-toolbar-btn[data-tooltip]:hover::before,

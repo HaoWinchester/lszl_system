@@ -1,23 +1,19 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.30",
-  "toVersion": "v9.0-p4.1.31",
+  "fromVersion": "v9.0-p4.1.31",
+  "toVersion": "v9.0-p4.1.34",
   "changes": {
     "added": [
-      "tests/multi-question-correct-flash.test.js",
-      "tests/question-import-persistence.test.js"
+      "tests/home-toolbar-tooltip-speed.test.js",
+      "tests/multi-question-synthesis-fallback.test.js",
+      "tests/question-bank-test-record-cleanup.test.js"
     ],
     "changed": [
       "VERSION",
       "question-bank.html",
       "src/65-question-bank-admin.js",
-      "src/principles/principle-repository.js",
-      "src/principles/synthesis-preset-repository.js",
-      "src/teacher/training-config/principle-preset-controller.js",
-      "styles/question-workspace.css",
-      "styles/teacher-question-workflow.css",
-      "tests/content-prep-question-bank-integration.test.js",
-      "tests/v90-p4313-teacher-principle-config-browser.py"
+      "src/77-multi-question-workspace.js",
+      "styles/home-graph-components.css"
     ],
     "removed": []
   },
