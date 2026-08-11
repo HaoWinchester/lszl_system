@@ -3,13 +3,31 @@
 ;(function (global) {
   const bootstrapUsername = String(global.__KG_DIRECT_BOOTSTRAP__?.username || '')
   let reloadingForSession = false
+  let pendingChooserFor = ''
+  let pendingChooser = Promise.resolve({ shown: false })
+
+  function showLearningEntryChooser() {
+    if (!global.KGLearningEntryChooser || typeof global.KGLearningEntryChooser.init !== 'function') {
+      return Promise.resolve({ shown: false })
+    }
+    return Promise.resolve(global.KGLearningEntryChooser.init()).catch(() => ({ shown: false }))
+  }
+
+  global.addEventListener('kg:auth-session-changed', (event) => {
+    pendingChooserFor = String(event?.detail?.username || '')
+    pendingChooser = showLearningEntryChooser()
+  })
 
   global.addEventListener('kg-auth-session-change', (event) => {
     if (event?.detail?.provider !== 'remote') return
     const nextUsername = String(event?.detail?.username || '')
-    if (reloadingForSession || nextUsername === bootstrapUsername) return
-    reloadingForSession = true
-    global.location.reload()
+    const chooserForThisSession = pendingChooserFor === nextUsername ? pendingChooser : Promise.resolve({ shown: false })
+    pendingChooserFor = ''
+    chooserForThisSession.then((result) => {
+      if (result?.shown || reloadingForSession || nextUsername === bootstrapUsername) return
+      reloadingForSession = true
+      global.location.reload()
+    })
   })
 
   function currentRole() {
@@ -33,6 +51,7 @@
       else global.KGUserCenter?.open?.()
     }
     decorateMemberEntry()
+    showLearningEntryChooser()
   }
 
   if (document.readyState === 'loading') {

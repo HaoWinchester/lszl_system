@@ -110,6 +110,13 @@ test('update builds an isolated release and atomically selects it', () => {
   assert.match(page, /<script src="\.\/server-state-bootstrap\.js"><\/script>/)
   assert.match(page, new RegExp(`direct-entry\\.js\\?v=${sourceVersion}`))
   assert.match(page, new RegExp(`runtime-config\\.override\\.js\\?v=${sourceVersion}`))
+  const chooserTags = page.match(/<script defer src="src\/31-learning-entry-chooser\.js\?v=[^"]+"><\/script>/g) || []
+  assert.equal(chooserTags.length, 1, 'release index must contain exactly one learning-entry chooser script')
+  assert.ok(
+    page.indexOf('src/29-auth-core.js') < page.indexOf('src/31-learning-entry-chooser.js')
+      && page.indexOf('src/31-learning-entry-chooser.js') < page.indexOf('src/10-graph-editor.js'),
+    'release chooser must run after auth core and before graph initialization',
+  )
   const practicePage = readFileSync(resolve(root, sourceVersion, 'site', 'practice-mode.html'), 'utf8')
   assert.match(
     practicePage,
@@ -121,6 +128,10 @@ test('update builds an isolated release and atomically selects it', () => {
     /<script src="\.\/server-state-bootstrap\.js"><\/script>/,
     'the backend bootstrap injection marker must remain unversioned',
   )
+  const retiredSingleDeep = readFileSync(resolve(root, sourceVersion, 'site', 'question-training.html'), 'utf8')
+  assert.match(retiredSingleDeep, /location\.replace\(target\.toString\(\)\)/, 'the retired single-deep page must stay a redirect shell')
+  assert.doesNotMatch(retiredSingleDeep, /<script\b[^>]*\bsrc=(['"])(?:\.\/)?src\//i, 'a redirect shell must contain zero src application scripts')
+  assert.doesNotMatch(retiredSingleDeep, /question-catalog-adapter|direct-runtime-fixes|direct-auth-adapter/, 'a redirect shell must not receive retired runtime adapters')
   const questionBankPage = readFileSync(resolve(root, sourceVersion, 'site', 'question-bank.html'), 'utf8')
   assert.match(
     questionBankPage,

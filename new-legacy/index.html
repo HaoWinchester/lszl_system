@@ -199,6 +199,19 @@
 </div>
 </div>
 <div id="authDialogRoot"></div>
+<div class="modal-backdrop learning-entry-chooser-backdrop" id="learningEntryChooserRoot" hidden>
+<section aria-labelledby="learningEntryChooserTitle" aria-modal="true" class="modal learning-entry-chooser-modal" role="dialog">
+<h2 id="learningEntryChooserTitle">选择学习方式</h2>
+<p class="learning-entry-chooser-intro">请选择本次学习的进入方式</p>
+<div class="learning-entry-chooser-grid">
+<button class="learning-entry-choice" data-description="进入知识图谱" data-destination="index.html" data-learning-entry-choice="知识图谱" type="button"><strong class="learning-entry-choice-title">知识图谱</strong><span class="learning-entry-choice-description">进入知识图谱</span></button>
+<button class="learning-entry-choice" data-description="深度回忆" data-destination="knowledge-recall.html" data-learning-entry-choice="知识回忆" type="button"><strong class="learning-entry-choice-title">知识回忆</strong><span class="learning-entry-choice-description">深度回忆</span></button>
+<button class="learning-entry-choice" data-description="归纳" data-destination="question-workspace.html" data-learning-entry-choice="知识归纳" type="button"><strong class="learning-entry-choice-title">知识归纳</strong><span class="learning-entry-choice-description">归纳</span></button>
+<button class="learning-entry-choice" data-description="刷题" data-destination="practice-mode.html" data-learning-entry-choice="知识巩固" type="button"><strong class="learning-entry-choice-title">知识巩固</strong><span class="learning-entry-choice-description">刷题</span></button>
+</div>
+<p aria-live="polite" class="learning-entry-chooser-error" id="learningEntryChooserError"></p>
+</section>
+</div>
 <div class="modal-backdrop question-bank-backdrop" id="questionBankModal">
 <div aria-labelledby="questionBankTitle" aria-modal="true" class="modal question-bank-modal" role="dialog">
 <div class="qb-head">
@@ -336,6 +349,7 @@
 <script defer src="src/01-runtime-config.js"></script>
   <script defer src="src/28-app-storage.js"></script>
 <script defer src="src/29-auth-core.js"></script>
+<script defer src="src/31-learning-entry-chooser.js"></script>
 <script defer src="src/30-shared-auth-dialog.js"></script>
 <script defer src="src/34-role-permissions.js"></script>
 <script defer src="src/37-subscription-plans.js"></script>

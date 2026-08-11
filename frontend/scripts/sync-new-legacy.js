@@ -7,6 +7,8 @@ const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const frontendDir = resolve(scriptsDir, '..')
 const repoDir = resolve(frontendDir, '..')
 const contract = JSON.parse(readFileSync(resolve(scriptsDir, 'new-legacy-contract.json'), 'utf8'))
+const learningEntryChooserAssets = ['src/31-learning-entry-chooser.js']
+const learningEntryChooserStorageKeys = ['kg_learning_entry_chooser_claim_v1', 'kg_learning_entry_chooser_consumed_v1']
 
 function parseArgs(argv) {
   const args = { source: resolve(repoDir, 'new-legacy'), out: resolve(frontendDir, 'public', 'new-legacy') }
@@ -672,6 +674,9 @@ function injectPage(html, page, version) {
   const removeLocalScriptTags = (source, asset) => source
     .replace(new RegExp(`^[ \\t]*${localScriptPattern(asset)}[ \\t]*(?:\\r?\\n)?`, 'gim'), '')
     .replace(new RegExp(localScriptPattern(asset), 'gi'), '')
+  const retiredSingleDeepRedirectShell = page === 'question-training.html'
+    && /location\.replace\(target\.toString\(\)\)/.test(generated)
+    && /id="practiceRedirectFallback"/.test(generated)
   const learningModeConsumers = {
     'paper-management.html': 'src/65-question-bank-admin.js',
     'question-workspace.html': 'src/77-multi-question-workspace.js',
@@ -691,7 +696,6 @@ function injectPage(html, page, version) {
     'teacher-workbench.html': { mode: 'managed', marker: '<script src="src/91-teacher-workbench-app.js"></script>' },
     'question-bank.html': { mode: 'managed', marker: '<script defer src="src/65-question-bank-admin.js"></script>' },
     'paper-management.html': { mode: 'managed', marker: '<script defer src="src/65-question-bank-admin.js"></script>' },
-    'question-training.html': { mode: 'learning', marker: '<script defer src="src/59-published-paper-repository.js"></script>' },
     'question-workspace.html': { mode: 'learning', marker: '<script defer src="src/59-published-paper-repository.js"></script>' },
     'knowledge-recall.html': { mode: 'learning', marker: '<script defer src="src/59-published-paper-repository.js"></script>' },
     'practice-mode.html': { mode: 'learning', marker: generated.includes('<script defer src="src/59-published-paper-repository.js"></script>') ? '<script defer src="src/59-published-paper-repository.js"></script>' : '<script defer src="src/100-practice-mode.js"></script>' },
@@ -723,7 +727,7 @@ function injectPage(html, page, version) {
     generated = removeLocalScriptTags(generated, quotaAsset)
     generated = generated.replace(adminTag, `${quotaTag}\n${adminTag}`)
   }
-  if (page === 'question-training.html' && !generated.includes('kg-runtime-fixes:generated')) {
+  if (page === 'question-training.html' && !retiredSingleDeepRedirectShell && !generated.includes('kg-runtime-fixes:generated')) {
     const styleTag = '<link rel="stylesheet" href="./direct-runtime-fixes.css"><!-- kg-runtime-fixes:generated -->'
     generated = generated.includes('</head>')
       ? generated.replace('</head>', `${styleTag}\n</head>`)
@@ -778,7 +782,7 @@ function injectPage(html, page, version) {
   }
   const authTag = page === 'index.html'
     ? '<script defer src="src/30-auth-guards.js"></script>'
-    : page === 'question-training.html'
+    : page === 'question-training.html' && !retiredSingleDeepRedirectShell
       ? '<script defer src="src/72-question-training-page.js"></script>'
       : ''
   if (authTag) {
@@ -823,7 +827,7 @@ function diffFiles(previous = {}, next = {}) {
 
 function validateStorageContract(source) {
   const storage = contract.runtimeStorage || {}
-  const exact = new Set(storage.exactKeys || [])
+  const exact = new Set([...(storage.exactKeys || []), ...learningEntryChooserStorageKeys])
   const prefixes = storage.prefixes || []
   const legacyReadOnly = storage.legacyReadOnlyKeys || {}
   const readOnlyExact = new Set(legacyReadOnly.exactKeys || [])
@@ -862,7 +866,7 @@ function validateStorageContract(source) {
 
 function validate(source) {
   if (!existsSync(source) || !statSync(source).isDirectory()) throw new Error(`找不到 new-legacy 目录：${source}`)
-  const required = ['VERSION', ...contract.requiredPages, ...contract.requiredFiles]
+  const required = ['VERSION', ...contract.requiredPages, ...contract.requiredFiles, ...learningEntryChooserAssets]
   const missing = required.filter((path) => !existsSync(resolve(source, path)))
   if (missing.length) throw new Error(`new-legacy 缺少必需文件：${missing.join(', ')}`)
   const version = readFileSync(resolve(source, 'VERSION'), 'utf8').trim()
