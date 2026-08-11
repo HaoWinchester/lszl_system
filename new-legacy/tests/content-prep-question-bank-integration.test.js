@@ -205,6 +205,7 @@ function loadManagedAdmin() {
   const elements = new Map();
   const documentListeners = new Map();
   const windowListeners = new Map();
+  const alerts = [];
   let catalogSnapshot = {
     banks: [{ id: 'bank-1', name: '本地显示题库', subject: 'PMP', questions: [] }],
     questions: [{
@@ -247,6 +248,24 @@ function loadManagedAdmin() {
   const Catalog = {
     ready: Promise.resolve(), snapshot: () => JSON.parse(JSON.stringify(catalogSnapshot)),
     saveBank: async value => value, saveQuestion: async value => value, deleteBank: async () => true, deleteQuestion: async () => true,
+    async importBanks({ banks }) {
+      const source = banks[0];
+      catalogSnapshot = {
+        banks: [{ id: 'b-imported', name: source.name, subject: source.subject, revision: 1 }],
+        questions: [{
+          id: 'q-imported', bankId: 'b-imported', title: source.questions[0].title, revision: 1,
+          stemParts: source.questions[0].stemParts, options: source.questions[0].options,
+          correctAnswer: source.questions[0].correctAnswer,
+        }],
+        contentRevision: 2,
+      };
+      return {
+        banks: [{ ...catalogSnapshot.banks[0], questions: catalogSnapshot.questions }],
+        sourceBankIdMap: { [source.id]: 'b-imported' },
+        sourceQuestionIdMap: { [`${source.id}::${source.questions[0].id}`]: 'q-imported' },
+        contentRevision: 2,
+      };
+    },
   };
   const savedQuestions = [];
   const CatalogEditor = { open: async () => true, save: async (value, options) => { savedQuestions.push({ value, options }); return value; }, release() {}, applyReadonlyState() {}, status: () => ({ readonly: false }) };
@@ -263,7 +282,7 @@ function loadManagedAdmin() {
   const context = vm.createContext({
     window, document, CustomEvent, URLSearchParams, URL, Blob, Map, Set, Date, JSON, Math, Number, Object, Array,
     location, navigator: {}, crypto: { randomUUID: () => 'id-test' },
-    requestAnimationFrame() {}, cancelAnimationFrame() {}, setTimeout, clearTimeout, alert() {}, confirm: () => true, prompt: () => null,
+    requestAnimationFrame() {}, cancelAnimationFrame() {}, setTimeout, clearTimeout, alert(message) { alerts.push(String(message)); }, confirm: () => true, prompt: () => null,
     console, CSS: { escape: value => String(value) },
   });
   vm.runInContext(admin, context, { filename: '65-question-bank-admin.js' });
@@ -272,7 +291,7 @@ function loadManagedAdmin() {
     input(target) { for (const listener of documentListeners.get('input') || []) listener({ target }); },
     change(target) { for (const listener of documentListeners.get('change') || []) listener({ target }); },
     remote(snapshot) { catalogSnapshot = snapshot; window.dispatchEvent(new CustomEvent('kg:question-catalog-changed', { detail: { source: 'remote', snapshot } })); },
-    element, api: context.KGQuestionBankAdminAPI, savedQuestions, location,
+    element, api: context.KGQuestionBankAdminAPI, savedQuestions, location, Catalog, alerts,
   };
 }
 
@@ -328,6 +347,30 @@ async function testManagedAdminDirtyEditorPreservesFields() {
   await managed.api.applyServerCatalogRefresh({ mode: 'reload' });
   assert.equal(stem.value, '服务器题干', 'explicit reload must replace the form with the retained server version');
   assert.equal(managed.api.getServerCatalogRefreshState().dirty, false);
+}
+
+async function testManagedAdminJsonImportPersistsBeforeAnyQuestionSave() {
+  const managed = loadManagedAdmin();
+  await managed.init();
+  const sourceBank = {
+    id: 'source-bank-import', name: '导入后持久化题库', subject: 'PMP',
+    questions: [{
+      id: 'source-question-import', title: '导入后持久化题目',
+      stemParts: [{ text: '导入题干' }], options: [{ id: 'A', text: '正确' }, { id: 'B', text: '错误' }], correctAnswer: 'A',
+    }],
+  };
+  const success = await managed.api.importQuestionBanks({ banks: [sourceBank] });
+  assert.equal(success.ok, true);
+  assert.equal(managed.api.getCurrentBank().id, 'b-imported');
+  assert.equal(managed.api.getCurrentQuestion().id, 'q-imported');
+  assert.equal(managed.api.getCurrentQuestion().revision, 1);
+
+  const before = JSON.stringify(managed.api.getAllQuestions());
+  managed.Catalog.importBanks = async () => { throw new Error('模拟网络中断'); };
+  const failed = await managed.api.importQuestionBanks({ banks: [sourceBank] });
+  assert.equal(failed.ok, false);
+  assert.equal(JSON.stringify(managed.api.getAllQuestions()), before, 'failed imports must retain the visible managed catalog');
+  assert.match(managed.alerts.at(-1), /导入未提交/);
 }
 
 async function testManagedAdminMergePreservesNestedDraft() {
@@ -596,6 +639,7 @@ async function testPrepPagehideStopsInFlightRetryLoop() {
 
 testPrepPublishesOnlyCommittedServerChanges()
   .then(testManagedAdminDirtyEditorPreservesFields)
+  .then(testManagedAdminJsonImportPersistsBeforeAnyQuestionSave)
   .then(testManagedAdminMergePreservesNestedDraft)
   .then(testManagedAdminDeletionRequiresConflictCopy)
   .then(testManagedAdminBlocksIncompleteNestedMerge)
