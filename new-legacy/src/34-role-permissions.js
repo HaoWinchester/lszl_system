@@ -31,7 +31,7 @@
     exportData:'导出题库/数据',
     managePapers:'组卷与维护试卷',
     publishPapers:'发布/取消发布试卷',
-    useTraining:'参加考题训练',
+    useTraining:'参加刷题与归纳训练',
     useDeepRecall:'使用深度回忆',
     accessUserManagement:'进入用户管理',
     accessSystemSettings:'进入系统设置',
@@ -269,7 +269,7 @@
         <p>${escapeHTML(message||'当前角色无权访问该页面。请使用管理员账号登录，或联系管理员调整角色。')}</p>
         <div class="role-denied-actions">
           <a href="index.html">返回首页</a>
-          <a href="question-training.html">进入考题训练</a>
+          <a href="practice-mode.html">进入刷题</a>
         </div>
       </div>
     </section>`;

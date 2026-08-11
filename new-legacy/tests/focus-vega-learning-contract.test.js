@@ -29,8 +29,8 @@ const scriptDigests={
   'guided-learning-node.html':'c8285eb6e1999a606b6661d9b0058299f3a927843819ead460375e75e775b28b',
   'guided-learning-placement-test.html':'19cd280e236d9ae06f72e76996b0ea79988a9f362bd80d0d5f2477820b653e02',
   'question-training.html':'14509ed5355a0f2ddf61e9d43632e35194600bfc39336fe6c3e89ffc226d5e03',
-  'question-workspace.html':'ef9884224ff2a2bfad02d8206f72f5b2fe0400ce0ea458e829bff94c39612c25',
-  'knowledge-recall.html':'f86d3fcc09edaa1c2b25867d84ae65b113395796e82694b75e9075d4a4625d9d',
+  'question-workspace.html':'59730a15e1db71959a6e11ca5b01e806f599ffebcd2456e575877c3a081d8be7',
+  'knowledge-recall.html':'df4fa429fe713adfc7595f570ce42eab9714fb50bd1bb9cf31bca1185b002be7',
 };
 const inlineScriptDigests={
   'learning-path.html':[],

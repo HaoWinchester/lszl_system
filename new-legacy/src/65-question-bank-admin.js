@@ -644,7 +644,7 @@
       publishedAt:paper.publishedAt ? Number(paper.publishedAt) : 0,
       publishedVersion:Math.max(0, Number(paper.publishedVersion || paper.releaseVersion || 0)),
       publishedReleaseId:String(paper.publishedReleaseId || ''),
-      enabledModes:[...new Set((Array.isArray(paper.enabledModes) ? paper.enabledModes : ['deep_recall','multi_question_canvas','single_deep_study']).map(String).filter(mode => ['deep_recall','multi_question_canvas','single_deep_study'].includes(mode)))],
+      enabledModes:(window.KGPaperLearningModes?.normalizePaper?.(paper)||['practice_mode','deep_recall','multi_question_canvas']),
       purpose:String(paper.purpose || 'learning'),
       categoryId:String(paper.categoryId || ''),
       archivedAt:Number(paper.archivedAt || 0),
@@ -1287,7 +1287,7 @@
       window.KGRolePermissions.applyTheme();
       window.KGRolePermissions.decoratePermissionElements();
       if(!window.KGRolePermissions.can('accessQuestionBank')){
-        window.KGRolePermissions.renderPermissionDenied(document.querySelector('.qb-app') || document.body, '教师工作台仅限管理员、教师/教研角色访问。学员请进入考题训练，或联系管理员调整角色。');
+        window.KGRolePermissions.renderPermissionDenied(document.querySelector('.qb-app') || document.body, '教师工作台仅限管理员、教师/教研角色访问。学员请进入刷题，或联系管理员调整角色。');
         return;
       }
     }
@@ -1485,7 +1485,6 @@
     $('paperSubjectInput')?.addEventListener('change', () => { savePaperForm({silent:true, skipRender:true}); renderPaperManager(); });
     document.querySelectorAll('[data-paper-supplement-mode]').forEach(input=>input.addEventListener('change',handlePaperSupplementModeChange));
     $('qbTemplateBtn').addEventListener('click', downloadTemplate);
-    $('qbSetCurrentBtn').addEventListener('click', setCurrentTrainingQuestion);
     $('qbPreviewRecallBtn').addEventListener('click', previewDeepRecall);
     $('qbRecallPreviewBtn')?.addEventListener('click', previewDeepRecall);
     $('qbSyncRecallConfigBtn')?.addEventListener('click', syncRecallConfig);
@@ -2838,7 +2837,7 @@
     paper.categoryId = $('paperCategoryInput')?.value || '';
     paper.description = $('paperDescriptionInput')?.value.trim() || '';
     paper.enabledModes=Array.from(document.querySelectorAll('[data-paper-mode]:checked')).map(input=>String(input.dataset.paperMode||'')).filter(Boolean);
-    if(!paper.enabledModes.length)paper.enabledModes=['deep_recall','multi_question_canvas','single_deep_study'];
+    if(!paper.enabledModes.length)paper.enabledModes=['practice_mode','deep_recall','multi_question_canvas'];
     paper.supplementMode=document.querySelector('[data-paper-supplement-mode]:checked')?.value==='principle'?'principle':'domain';
     paper.domainQuotas=quotaDraft.domainQuotas;paper.principleQuotas=quotaDraft.principleQuotas;
     const actor=currentActor();paper.createdBy=paper.createdBy||String(actor.id||'');paper.updatedBy=String(actor.id||'');
@@ -3794,20 +3793,6 @@
     toast('已保存选中文本为关键词。');
   }
 
-  async function setCurrentTrainingQuestion(){
-    if(!await saveQuestionForm({silent:true})) return;
-    const bank = currentBank();
-    const q = currentQuestion();
-    if(!bank || !q) return;
-    if(isQuestionDeleted(q))return toast('已删除题目不能设为新的训练题。');
-    const index = bank.questions.findIndex(item => item.id === q.id);
-    try{
-      localStorage.setItem(currentKey(), JSON.stringify({bankId:bank.id, index:Math.max(0,index)}));
-      toast('已设为当前训练题。回到首页打开“考题训练”即可使用。');
-    }catch(e){
-      alert('设置失败：' + (e.message || e));
-    }
-  }
   async function previewDeepRecall(){
     if(!await saveQuestionForm({silent:true})) return;
     const bank = currentBank();

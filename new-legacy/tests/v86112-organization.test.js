@@ -5,7 +5,7 @@ const storage=new Map();
 const context={console,Date,URLSearchParams,CustomEvent:function(type,init){this.type=type;this.detail=init?.detail},localStorage:{getItem:key=>storage.has(key)?storage.get(key):null,setItem:(key,value)=>storage.set(key,String(value)),removeItem:key=>storage.delete(key)},dispatchEvent(){},KGAuthCore:{currentUsername:()=> 'teacher-zhao',currentUser:()=>({username:'teacher-zhao',displayName:'赵老师',role:'teacher'})}};
 context.window=context;
 vm.createContext(context);
-for(const file of ['src/86-activity-schema-v1.js','src/87-guided-learning-data.js','src/91-learning-content-core.js','src/93-content-organization-core.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});
+for(const file of ['src/86-activity-schema-v1.js','src/87-guided-learning-data.js','src/91-learning-content-core.js','src/59c-active-learning-mode-policy.js','src/93-content-organization-core.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});
 const core=context.KGLearningContent,org=context.KGContentOrganization;
 function assert(condition,message){if(!condition)throw new Error(message)}
 const activityIds=Object.keys(core.getActivityLibrary()).slice(0,3);
@@ -30,5 +30,6 @@ assert(refs.some(item=>item.kind==='paper'),'引用关系应包含试卷');
 assert(refs.some(item=>item.kind==='learning_task'),'引用关系应包含学习任务');
 storage.set('kg_exam_papers_v1__user__teacher-zhao',JSON.stringify([{id:'legacy-paper-1',name:'旧发布试卷',subject:'PMP',status:'published',publishedAt:Date.now(),questions:[{bankId:'bank-a',questionId:'q-a'}]}]));
 const migrated=org.migrateLegacyLearningSources({force:true});
-assert(migrated.created===2,'旧发布试卷应迁移为深度回忆与单题深学任务');
+assert(migrated.created===1,'旧发布试卷只应迁移为当前可用的深度回忆任务');
+assert(org.getLearningTasks().every(item=>!item.retired),'迁移不应新建已停用模式任务');
 console.log('v86112-organization-ok',{tags:org.getTags().length,collections:org.getCollections().length,papers:org.getPapers().length,tasks:org.getLearningTasks().length,references:refs.length});

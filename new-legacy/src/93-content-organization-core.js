@@ -10,13 +10,20 @@
   const TASK_KEY='kg_learning_tasks_v1';
   const MIGRATION_KEY='kg_content_organization_migration_v1';
   const SCHEMA_VERSION=1;
-  const TASK_TYPES=['deep_recall','single_deep_study','multi_question_canvas'];
+  const ModePolicy=global.KGPaperLearningModes;
+  const TASK_TYPES=Object.freeze((ModePolicy?.listActive?.()||[
+    {id:'practice_mode'},{id:'deep_recall'},{id:'multi_question_canvas'}
+  ]).map(mode=>mode.id));
+  const RETIRED_TASK_ERROR='单题深学已停用，请选择刷题、深度回忆或归纳';
+  const RETIRED_TASK_TYPES=Object.freeze(['single_deep_study','single_deep','single-deep']);
+  const RETIRED_TASK=Object.freeze({id:'single_deep_study',label:'单题深学（已停用）',retired:true,fallbackId:'practice_mode'});
   const PAPER_STATUSES=['draft','published','archived'];
   const ACTIVITY_DIFFICULTIES=['unset','easy','medium','hard'];
   const ACTIVITY_PURPOSES=['practice','exam','learning_task'];
 
   const clone=value=>Core.clone(value);
   const clean=value=>String(value??'').trim();
+  const resolveHistoricalTaskType=value=>ModePolicy?.resolveHistorical?.(clean(value))||(RETIRED_TASK_TYPES.includes(clean(value))?RETIRED_TASK:null);
   const unique=values=>[...new Set((values||[]).map(value=>clean(value)).filter(Boolean))];
   const nowIso=()=>new Date().toISOString();
   const safeId=prefix=>Core.safeId(prefix);
@@ -144,8 +151,12 @@
   function archivePaper(paperId){const paper=getPapers().find(item=>item.id===clean(paperId));if(!paper)return {valid:false,errors:['试卷不存在。']};paper.status='archived';paper.archivedAt=nowIso();return savePaper(paper)}
 
   function normalizeTask(task,index=0){
-    const source=task&&typeof task==='object'?task:{};const type=TASK_TYPES.includes(source.type)?source.type:'deep_recall';
-    return {id:clean(source.id)||safeId('learning-task'),schemaVersion:SCHEMA_VERSION,title:clean(source.title)||`学习任务 ${index+1}`,type,subjectId:clean(source.subjectId)||'subject-pmp',description:clean(source.description),sourceActivityIds:unique(source.sourceActivityIds),sourcePaperId:clean(source.sourcePaperId),config:{keywordAnnotations:Array.isArray(source.config?.keywordAnnotations)?clone(source.config.keywordAnnotations):[],legacyQuestionRefs:Array.isArray(source.config?.legacyQuestionRefs)?clone(source.config.legacyQuestionRefs):[],workspaceId:clean(source.config?.workspaceId),templateParserVersion:clean(source.config?.templateParserVersion)||'reserved-v1'},status:PAPER_STATUSES.includes(source.status)?source.status:'draft',version:Math.max(1,Number(source.version)||1),publishedAt:clean(source.publishedAt),archivedAt:clean(source.archivedAt),authorship:authorRecord(source.authorship),legacySource:source.legacySource?clone(source.legacySource):null};
+    const source=task&&typeof task==='object'?task:{};
+    const rawType=clean(source.type);
+    const historical=resolveHistoricalTaskType(rawType);
+    const activeType=ModePolicy?.ACTIVE_MODE_ALIASES?.[rawType.toLowerCase()]||rawType;
+    const type=historical?.id||(TASK_TYPES.includes(activeType)?activeType:'deep_recall');
+    return {id:clean(source.id)||safeId('learning-task'),schemaVersion:SCHEMA_VERSION,title:clean(source.title)||`学习任务 ${index+1}`,type,typeLabel:historical?.label||ModePolicy?.label?.(type)||type,retired:!!historical,fallbackId:historical?.fallbackId||'',subjectId:clean(source.subjectId)||'subject-pmp',description:clean(source.description),sourceActivityIds:unique(source.sourceActivityIds),sourcePaperId:clean(source.sourcePaperId),config:{keywordAnnotations:Array.isArray(source.config?.keywordAnnotations)?clone(source.config.keywordAnnotations):[],legacyQuestionRefs:Array.isArray(source.config?.legacyQuestionRefs)?clone(source.config.legacyQuestionRefs):[],workspaceId:clean(source.config?.workspaceId),templateParserVersion:clean(source.config?.templateParserVersion)||'reserved-v1'},status:PAPER_STATUSES.includes(source.status)?source.status:'draft',version:Math.max(1,Number(source.version)||1),publishedAt:clean(source.publishedAt),archivedAt:clean(source.archivedAt),authorship:authorRecord(source.authorship),legacySource:source.legacySource?clone(source.legacySource):null};
   }
   function getLearningTasks(filters={}){
     let list=(read(TASK_KEY,[])||[]).map(normalizeTask);
@@ -156,13 +167,14 @@
   }
   function validateTask(task){
     const record=normalizeTask(task);const errors=[];const warnings=[];const library=Core.getActivityLibrary();
+    if(resolveHistoricalTaskType(task?.type))errors.push(RETIRED_TASK_ERROR);
     if(!record.title)errors.push('学习任务名称不能为空。');if(!Core.subjectById(record.subjectId))errors.push('学习任务科目不存在。');
     record.sourceActivityIds.forEach(id=>{if(!library[id])errors.push(`活动不存在：${id}`);else if(library[id].metadata?.subjectId!==record.subjectId)warnings.push(`活动 ${id} 与任务科目不一致。`)});
     if(!record.sourceActivityIds.length&&!record.config.legacyQuestionRefs.length&&!record.config.workspaceId)warnings.push('学习任务尚未关联活动、旧题目或画布。');
     return {valid:errors.length===0,errors:[...new Set(errors)],warnings:[...new Set(warnings)],task:record};
   }
   function saveLearningTask(task){const validation=validateTask(task);if(!validation.valid)return validation;const list=getLearningTasks();let record=touch(validation.task);const index=list.findIndex(item=>item.id===record.id);if(index>=0)list[index]=record;else list.push(record);write(TASK_KEY,list);return {...validation,valid:true,task:clone(record)}}
-  function deleteLearningTask(taskId){write(TASK_KEY,getLearningTasks().filter(item=>item.id!==clean(taskId)));return {valid:true,deletedId:clean(taskId)}}
+  function deleteLearningTask(taskId){const id=clean(taskId);const tasks=getLearningTasks();const task=tasks.find(item=>item.id===id);if(!task)return {valid:false,errors:['学习任务不存在。']};if(task.retired)return {valid:false,errors:[RETIRED_TASK_ERROR],task};write(TASK_KEY,tasks.filter(item=>item.id!==id));return {valid:true,deletedId:id}}
   function publishLearningTask(taskId){const task=getLearningTasks().find(item=>item.id===clean(taskId));if(!task)return {valid:false,errors:['学习任务不存在。']};const validation=validateTask(task);if(!validation.valid)return validation;const hasSource=task.sourceActivityIds.length||task.config.legacyQuestionRefs.length||task.config.workspaceId;if(!hasSource)return {valid:false,errors:['学习任务至少需要关联一个活动、旧题目或多题画布。']};task.version=task.publishedAt?task.version+1:Math.max(1,task.version);task.status='published';task.publishedAt=nowIso();return saveLearningTask(task)}
   function archiveLearningTask(taskId){const task=getLearningTasks().find(item=>item.id===clean(taskId));if(!task)return {valid:false,errors:['学习任务不存在。']};task.status='archived';task.archivedAt=nowIso();return saveLearningTask(task)}
 
@@ -178,9 +190,9 @@
     const marker=read(MIGRATION_KEY,{legacyTasks:false});if(marker.legacyTasks&&!options.force)return {valid:true,created:0,skipped:true};
     const tasks=getLearningTasks();const keys=new Set(tasks.map(item=>item.legacySource?.key).filter(Boolean));let created=0;
     readLegacyPapers().filter(paper=>paper.status==='published'||options.includeDrafts).forEach(paper=>{
-      ['deep_recall','single_deep_study'].forEach(type=>{
+      ['deep_recall'].forEach(type=>{
         const key=`legacy-paper:${paper.id}:${type}`;if(keys.has(key))return;
-        tasks.push(normalizeTask({title:`${paper.name||'旧试卷'} · ${type==='deep_recall'?'深度回忆':'单题深学'}`,type,subjectId:Core.subjectById(String(paper.subject||'').toUpperCase())?.id||'subject-pmp',description:'由旧题库试卷列表迁移，保留原题目引用。',config:{legacyQuestionRefs:clone(paper.questions||[])},status:paper.status==='published'?'published':'draft',publishedAt:paper.publishedAt?new Date(paper.publishedAt).toISOString():'',legacySource:{key,paperId:paper.id,kind:'legacy-paper'}},tasks.length));keys.add(key);created+=1;
+        tasks.push(normalizeTask({title:`${paper.name||'旧试卷'} · 深度回忆`,type,subjectId:Core.subjectById(String(paper.subject||'').toUpperCase())?.id||'subject-pmp',description:'由旧题库试卷列表迁移，保留原题目引用。',config:{legacyQuestionRefs:clone(paper.questions||[])},status:paper.status==='published'?'published':'draft',publishedAt:paper.publishedAt?new Date(paper.publishedAt).toISOString():'',legacySource:{key,paperId:paper.id,kind:'legacy-paper'}},tasks.length));keys.add(key);created+=1;
       });
     });
     readCanvasWorkspaces().filter(workspace=>Number(workspace.nodeCount||0)>0).forEach(workspace=>{
@@ -202,7 +214,7 @@
   function summary(){return {tags:getTags().length,collections:getCollections().filter(item=>item.type==='collection').length,favorites:favoriteActivityIds().size,papers:getPapers().length,publishedPapers:getPapers({status:'published'}).length,tasks:getLearningTasks().length,publishedTasks:getLearningTasks({status:'published'}).length}}
 
   global.KGContentOrganization=Object.freeze({
-    SCHEMA_VERSION,storageKeys:Object.freeze({TAG_KEY,COLLECTION_KEY,PAPER_KEY,TASK_KEY,MIGRATION_KEY}),TASK_TYPES,ACTIVITY_DIFFICULTIES,ACTIVITY_PURPOSES,
+    SCHEMA_VERSION,storageKeys:Object.freeze({TAG_KEY,COLLECTION_KEY,PAPER_KEY,TASK_KEY,MIGRATION_KEY}),TASK_TYPES,RETIRED_TASK_ERROR,ACTIVITY_DIFFICULTIES,ACTIVITY_PURPOSES,
     getTags,saveTag,deleteTag,getCollections,saveCollection,deleteCollection,addActivitiesToCollection,removeActivitiesFromCollection,toggleFavorite,favoriteActivityIds,
     activityOrganization,updateActivityOrganization,getPapers,savePaper,deletePaper,publishPaper,archivePaper,validatePaper,getLearningTasks,saveLearningTask,deleteLearningTask,publishLearningTask,archiveLearningTask,validateTask,migrateLegacyLearningSources,activityReferences,collectionUsage,summary,normalizePaper,normalizeTask
   });

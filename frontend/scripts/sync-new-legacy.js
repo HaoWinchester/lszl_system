@@ -664,6 +664,29 @@ function injectPage(html, page, version) {
     : /<head(?:\s[^>]*)?>/i.test(html)
       ? html.replace(/<head(?:\s[^>]*)?>/i, (head) => `${head}\n${injection}`)
       : `${injection}\n${html}`
+  const localScriptPattern = (asset) => {
+    const escaped = asset.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return `<script\\b[^>]*\\bsrc=(['"])(?:\\.\\/)?${escaped}(?:\\?[^'"]*)?\\1[^>]*><\\/script>`
+  }
+  const findLocalScriptTag = (source, asset) => source.match(new RegExp(localScriptPattern(asset), 'i'))?.[0] || ''
+  const removeLocalScriptTags = (source, asset) => source
+    .replace(new RegExp(`^[ \\t]*${localScriptPattern(asset)}[ \\t]*(?:\\r?\\n)?`, 'gim'), '')
+    .replace(new RegExp(localScriptPattern(asset), 'gi'), '')
+  const learningModeConsumers = {
+    'paper-management.html': 'src/65-question-bank-admin.js',
+    'question-workspace.html': 'src/77-multi-question-workspace.js',
+    'course-admin.html': 'src/93-content-organization-core.js',
+    'knowledge-recall.html': 'src/96-recall-question-source.js',
+    'practice-mode.html': 'src/100-practice-mode.js',
+    'question-bank.html': 'src/65-question-bank-admin.js',
+    'admin-console.html': 'src/93-content-organization-core.js',
+    'admin-operations.html': 'src/93-content-organization-core.js',
+    'admin-settings.html': 'src/93-content-organization-core.js',
+    'admin-subjects.html': 'src/93-content-organization-core.js',
+    'content-center.html': 'src/93-content-organization-core.js',
+    'teacher-workbench.html': 'src/93-content-organization-core.js',
+  }
+  const learningModeConsumer = learningModeConsumers[page]
   const questionCatalogPages = {
     'teacher-workbench.html': { mode: 'managed', marker: '<script src="src/91-teacher-workbench-app.js"></script>' },
     'question-bank.html': { mode: 'managed', marker: '<script defer src="src/65-question-bank-admin.js"></script>' },
@@ -671,7 +694,7 @@ function injectPage(html, page, version) {
     'question-training.html': { mode: 'learning', marker: '<script defer src="src/59-published-paper-repository.js"></script>' },
     'question-workspace.html': { mode: 'learning', marker: '<script defer src="src/59-published-paper-repository.js"></script>' },
     'knowledge-recall.html': { mode: 'learning', marker: '<script defer src="src/59-published-paper-repository.js"></script>' },
-    'practice-mode.html': { mode: 'learning', marker: '<script defer src="src/59-published-paper-repository.js"></script>' },
+    'practice-mode.html': { mode: 'learning', marker: generated.includes('<script defer src="src/59-published-paper-repository.js"></script>') ? '<script defer src="src/59-published-paper-repository.js"></script>' : '<script defer src="src/100-practice-mode.js"></script>' },
     'index.html': { mode: 'learning', marker: '<script defer src="src/60-question-bank.js"></script>' },
   }
   const catalogPage = questionCatalogPages[page]
@@ -691,16 +714,13 @@ function injectPage(html, page, version) {
     )
   }
   if (page === 'paper-management.html') {
-    const adminTag = '<script defer src="src/65-question-bank-admin.js"></script>'
-    if (!generated.includes(adminTag)) {
+    const adminTag = findLocalScriptTag(generated, 'src/65-question-bank-admin.js')
+    if (!adminTag) {
       throw new Error('new-legacy 试卷管理脚本顺序已变化，请复核配额服务')
     }
-    const quotaTag = '<script defer src="src/teacher/paper-management/paper-quota-service.js"></script>'
-    const removeDependencyTag = (source, tag) => source
-      .split(`${tag}\r\n`).join('')
-      .split(`${tag}\n`).join('')
-      .split(tag).join('')
-    generated = removeDependencyTag(generated, quotaTag)
+    const quotaAsset = 'src/teacher/paper-management/paper-quota-service.js'
+    const quotaTag = `<script defer src="${quotaAsset}"></script>`
+    generated = removeLocalScriptTags(generated, quotaAsset)
     generated = generated.replace(adminTag, `${quotaTag}\n${adminTag}`)
   }
   if (page === 'question-training.html' && !generated.includes('kg-runtime-fixes:generated')) {
@@ -738,8 +758,8 @@ function injectPage(html, page, version) {
     }
   }
   if (page === 'question-bank.html') {
-    const editorTag = '<script defer src="src/65-question-bank-admin.js"></script>'
-    if (!generated.includes(editorTag)) {
+    const editorTag = findLocalScriptTag(generated, 'src/65-question-bank-admin.js')
+    if (!editorTag) {
       throw new Error('new-legacy 题库脚本顺序已变化，请复核题目校验适配器')
     }
     if (!generated.includes('kg-question-editor:generated')) {
@@ -769,6 +789,27 @@ function injectPage(html, page, version) {
       authTag,
       `${authTag}\n<script defer src="./direct-auth-adapter.js"></script><!-- kg-auth:generated -->`,
     )
+  }
+  if (learningModeConsumer) {
+    generated = generated.replace(
+      /^[ \t]*<script\b[^>]*\bsrc=(['"])(?:\.\/)?src\/59(?:a-paper-learning-modes|c-active-learning-mode-policy)\.js(?:\?[^'"]*)?\1[^>]*><\/script>[ \t]*(?:<!--\s*kg-learning-mode-policy:generated\s*-->[ \t]*)?(?:\r?\n)?/gim,
+      '',
+    )
+    generated = generated.replace(
+      /<script\b[^>]*\bsrc=(['"])(?:\.\/)?src\/59(?:a-paper-learning-modes|c-active-learning-mode-policy)\.js(?:\?[^'"]*)?\1[^>]*><\/script>[ \t]*(?:<!--\s*kg-learning-mode-policy:generated\s*-->[ \t]*)?/gi,
+      '',
+    )
+    const consumerTag = findLocalScriptTag(generated, learningModeConsumer)
+    const consumerIndex = generated.indexOf(consumerTag)
+    if (!consumerTag || consumerIndex < 0) {
+      throw new Error(`new-legacy ${page} 学习模式脚本顺序已变化，请复核已停用模式边界`)
+    }
+    const lineStart = generated.lastIndexOf('\n', consumerIndex - 1) + 1
+    const prefix = generated.slice(lineStart, consumerIndex)
+    const indent = /^[ \t]*$/.test(prefix) ? prefix : ''
+    const separator = prefix && !indent ? '\n' : ''
+    const policyTag = '<script src="src/59c-active-learning-mode-policy.js"></script><!-- kg-learning-mode-policy:generated -->'
+    generated = `${generated.slice(0, consumerIndex)}${separator}${policyTag}\n${indent}${generated.slice(consumerIndex)}`
   }
   return versionPageAssets(versionPageRelease(generated, version), version)
 }

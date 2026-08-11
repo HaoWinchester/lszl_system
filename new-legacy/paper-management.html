@@ -89,10 +89,10 @@
         <label class="qb-field wide"><span>发布说明 / 适用范围</span><textarea id="paperDescriptionInput" rows="2" placeholder="说明知识覆盖范围和适合的学习阶段。"></textarea></label>
       </div>
       <fieldset class="pm-mode-fieldset" hidden aria-hidden="true">
-        <legend>旧学习模式发布范围（暂时停用）</legend>
+        <legend>学习模式发布范围</legend>
+        <label><input type="checkbox" data-paper-mode="practice_mode" checked /><span>刷题</span></label>
         <label><input type="checkbox" data-paper-mode="deep_recall" checked /><span>深度回忆</span></label>
-        <label><input type="checkbox" data-paper-mode="multi_question_canvas" checked /><span>多题画布</span></label>
-        <label><input type="checkbox" data-paper-mode="single_deep_study" checked /><span>单题深学</span></label>
+        <label><input type="checkbox" data-paper-mode="multi_question_canvas" checked /><span>归纳</span></label>
         <small>发布时生成不可变版本；继续编辑草稿不会改变学员当前看到的版本。</small>
       </fieldset>
       <div class="qb-paper-meta" id="qbPaperMeta"></div>
@@ -208,6 +208,7 @@
 <script defer src="src/98-teacher-workflow-p2-services.js"></script>
 <script defer src="src/98-question-classification.js"></script>
 <script defer src="src/teacher/paper-management/paper-quota-service.js"></script>
+<script defer src="src/59c-active-learning-mode-policy.js"></script>
 <script defer src="src/65-question-bank-admin.js"></script>
 <script defer src="src/admin/48-admin-context-nav.js"></script>
 <script src="src/109-focus-vega-ui-icons.js"></script>

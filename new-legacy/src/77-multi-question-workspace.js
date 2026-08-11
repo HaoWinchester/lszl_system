@@ -99,7 +99,6 @@
     questionLoadError:'',
     selection:null,
     selectedNodeIds:new Set(),
-    singleDeepPendingNodeId:'',
     highlightColor:'#fde68a',
     fontScale:'large',
     pointerMode:'edit',
@@ -3490,78 +3489,6 @@
     view.addEventListener('pointerup',finish);view.addEventListener('pointercancel',finish);
   }
 
-  function preferredQuestionNodeForSingleDeep(preferredNodeId=''){
-    const nodes=state.workspace?.nodes||{};
-    const direct=String(preferredNodeId||'')?nodes[String(preferredNodeId||'')]:null;
-    if(direct?.nodeType==='question-reference')return direct;
-    if(direct?.nodeType==='synthesis-card'){
-      for(const sourceId of direct.sourceNodeIds||[]){
-        const source=nodes[String(sourceId)];
-        if(source?.nodeType==='question-reference')return source;
-      }
-    }
-
-    // Read selection from the authoritative selection ID set rather than DOM-backed
-    // selectedRecords(). This keeps the target stable when the toolbar receives focus
-    // or a selected card is temporarily hidden by grouping/render refresh.
-    const selectedIds=[...state.selectedNodeIds].map(String);
-    for(const id of selectedIds){
-      const node=nodes[id];
-      if(node?.nodeType==='question-reference')return node;
-    }
-    for(const id of selectedIds){
-      const node=nodes[id];
-      if(node?.nodeType!=='synthesis-card')continue;
-      for(const sourceId of node.sourceNodeIds||[]){
-        const source=nodes[String(sourceId)];
-        if(source?.nodeType==='question-reference')return source;
-      }
-    }
-    return Object.values(nodes).find(item=>item.nodeType==='question-reference')||null;
-  }
-  function prepareSingleDeepQuestion(node){
-    if(!node?.questionId)return false;
-    try{
-      if(node.paperId&&typeof qbOpenPaperQuestion==='function'){
-        const opened=qbOpenPaperQuestion(node.paperId,node.questionId,node.bankId||'');
-        if(opened)return true;
-      }
-    }catch(e){}
-    try{
-      if(typeof qbLoadBanks==='function'&&typeof qbSetCurrent==='function'){
-        const bank=(qbLoadBanks()||[]).find(item=>String(item.id)===String(node.bankId||''));
-        const index=(bank?.questions||[]).findIndex(question=>String(question.id)===String(node.questionId));
-        if(bank&&index>=0){qbSetCurrent(bank.id,index);return true}
-      }
-    }catch(e){}
-    return false;
-  }
-  function captureSingleDeepTarget(){
-    const node=preferredQuestionNodeForSingleDeep();
-    state.singleDeepPendingNodeId=String(node?.id||'');
-    return node;
-  }
-  function openSingleDeepStudy(){
-    const pendingId=String(state.singleDeepPendingNodeId||'');
-    const node=preferredQuestionNodeForSingleDeep(pendingId);
-    state.singleDeepPendingNodeId='';
-    if(node)prepareSingleDeepQuestion(node);
-    try{
-      const url=new URL('question-training.html',global.location.href);
-      if(node?.questionId)url.searchParams.set('questionId',String(node.questionId));
-      if(node?.bankId)url.searchParams.set('bankId',String(node.bankId));
-      if(node?.paperId)url.searchParams.set('paperId',String(node.paperId));
-      if(node?.releaseId)url.searchParams.set('releaseId',String(node.releaseId));
-      url.searchParams.set('source','multi-question');
-      url.searchParams.set('return','question-workspace.html?workspace='+encodeURIComponent(String(state.workspaceId||'')));
-      global.location.href=url.pathname.split('/').pop()+url.search;
-      return true;
-    }catch(e){
-      global.location.href='question-training.html';
-      return true;
-    }
-  }
-
   function bind(){
     bindMinimapControls();
     const tutorialTrigger=byId('tutorialBtn');
@@ -3577,8 +3504,6 @@
       onNotify:notify
     });
     byId('qwQuestionDockBtn')?.addEventListener('click',openQuestionDrawer);
-    byId('qwOpenSingleDeepBtn')?.addEventListener('pointerdown',captureSingleDeepTarget);
-    byId('qwOpenSingleDeepBtn')?.addEventListener('click',openSingleDeepStudy);
     byId('qwEmptyAddBtn')?.addEventListener('click',openQuestionDrawer);
     byId('qwQuestionDrawerClose')?.addEventListener('click',closeQuestionDrawer);
     byId('qwQuestionDrawerBackdrop')?.addEventListener('click',closeQuestionDrawer);
@@ -4021,9 +3946,6 @@
     isMeaningfullyOutsideWorld,
     smartArrange,
     tidySelectedCards,
-    preferredQuestionNodeForSingleDeep,
-    captureSingleDeepTarget,
-    openSingleDeepStudy,
     undoLayout,
     redoLayout,
     getState:()=>({

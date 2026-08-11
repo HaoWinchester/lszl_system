@@ -91,7 +91,7 @@
   }
   function exitPage(){
     close();
-    const fallback=String(shell?.dataset.accountExitHref||exitBtn?.dataset.accountExitHref||'question-training.html').trim()||'question-training.html';
+    const fallback=String(shell?.dataset.accountExitHref||exitBtn?.dataset.accountExitHref||'index.html').trim()||'index.html';
     if(window.KGPracticeNavigation&&typeof window.KGPracticeNavigation.goBack==='function'){
       window.KGPracticeNavigation.goBack(fallback);
       return;

@@ -123,7 +123,7 @@ function exactDeclarations(rules,selector,atRulePattern=null){
 
 const frozen=[
   ['question-training.html','class="qt-canvas-shell"','div','3dc3850b0ee841ffe7a984e212e0f46a191e46baa15e69b44d5cc2766198580f'],
-  ['question-workspace.html','class="qw-canvas-shell"','main','ec7d0d07b46c874c1e1a9fab37de3a2c5a438556f8ddc4b610d8c6ee12dbbf9e'],
+  ['question-workspace.html','class="qw-canvas-shell"','main','e464b230a105342b1ab7b62c542a4764dc6e60074f5d9eb24c11dc7fe50f19df'],
   ['knowledge-recall.html','class="kr-viewport"','main','bb4d9370d470798895b2d6f72ebda388933b15b31685610b659cb73e431cc7a8'],
 ];
 

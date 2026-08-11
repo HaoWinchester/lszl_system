@@ -79,7 +79,7 @@ function qbNormalizePaper(paper,i=0){
     status:String(paper.status||'draft'),
     publishedAt:Number(paper.publishedAt||0),
     updatedAt:Number(paper.updatedAt||paper.publishedAt||Date.now()),
-    enabledModes:Array.isArray(paper.enabledModes)?paper.enabledModes.map(String):['deep_recall','multi_question_canvas','single_deep_study'],
+    enabledModes:(window.KGPaperLearningModes?.normalizePaper?.(paper)||['practice_mode','deep_recall','multi_question_canvas']),
     questionSnapshots:Array.isArray(paper.questionSnapshots)?paper.questionSnapshots.map(qbClone):[],
     questions:questions.map((ref,idx)=>({bankId:String(ref.bankId||ref.sourceBankId||''),questionId:String(ref.questionId||ref.id||''),order:Number(ref.order||idx+1),score:Number(ref.score||1)})).filter(ref=>ref.bankId&&ref.questionId).sort((a,b)=>a.order-b.order)
   };
@@ -362,12 +362,11 @@ function qbDownloadJson(filename,obj){const blob=new Blob([JSON.stringify(obj,nu
 function qbExportSelectedBank(){const b=qbSelectedBank();if(!b){showStatus('请先选择题库。');return}qbDownloadJson((b.name||'题库')+'.json',b)}
 function qbDownloadTemplate(){qbDownloadJson('PMP考题破案题库模板.json',qbDefaultBank())}
 function bindQuestionBankManager(){
-  const open=$('questionBankBtn'),close=$('closeQuestionBankBtn'),modal=$('questionBankModal'),importBtn=$('qbImportBtn'),file=$('qbImportFile'),exportBtn=$('qbExportBtn'),templateBtn=$('qbTemplateBtn'),setBtn=$('qbSetCurrentBtn');
+  const open=$('questionBankBtn'),close=$('closeQuestionBankBtn'),modal=$('questionBankModal'),importBtn=$('qbImportBtn'),file=$('qbImportFile'),exportBtn=$('qbExportBtn'),templateBtn=$('qbTemplateBtn');
   if(open)open.onclick=e=>{e.preventDefault();e.stopPropagation();const roleApi=window.KGRolePermissions;if(roleApi&&!authIsLoggedIn()){authOpen('请先以管理员或教师/教研账号登录后进入教师内容工作台。');return}if(roleApi&&authIsLoggedIn()&&!roleApi.can('accessQuestionBank')){showStatus('当前角色无内容工作台权限。');return}window.open('teacher-workbench.html','_blank')};if(close)close.onclick=closeQuestionBankManager;if(modal&&!modal.dataset.qbBound){modal.dataset.qbBound='1';modal.addEventListener('click',e=>{if(e.target===modal)closeQuestionBankManager()})}
   if(importBtn)importBtn.onclick=()=>{if(!authRequire('登录后才能导入题库。'))return;file&&file.click()};
   if(file)file.onchange=()=>{qbImportJsonFile(file.files&&file.files[0]);file.value=''};
   if(exportBtn)exportBtn.onclick=qbExportSelectedBank;if(templateBtn)templateBtn.onclick=qbDownloadTemplate;
-  if(setBtn)setBtn.onclick=()=>{const b=qbSelectedBank(),q=qbSelectedQuestion();if(!b||!q)return;const idx=b.questions.findIndex(x=>x.id===q.id);qbSetCurrent(b.id,Math.max(0,idx))};
   const prev=$('qPrevQuestionBtn'),next=$('qNextQuestionBtn');if(prev)prev.onclick=()=>qbNext(-1);if(next)next.onclick=()=>qbNext(1);
   const startPaper=$('qStartPaperBtn'),exitPaper=$('qExitPaperBtn'),paperSelect=$('qPaperSelect');
   if(startPaper)startPaper.onclick=()=>{const id=paperSelect&&paperSelect.value;if(id)qbStartPaper(id);else qbExitPaper()};
@@ -753,7 +752,7 @@ function bindQuestionCaseTabs(){
   qSetCaseTab(qActiveCaseTab);
 }
 function openQuestionTrainer(){
-  if(!document.body.classList.contains('question-training-page')){window.open('question-training.html','_blank');return}
+  if(!document.body.classList.contains('question-training-page')){window.open('practice-mode.html','_blank');return}
   if(typeof qbLoadBanks==='function')qbLoadBanks();if(typeof qbLoadPapers==='function'){qBankState.papers=null;qbLoadPapers();}if(typeof qbApplyCurrentQuestion==='function')qbApplyCurrentQuestion(false);
   const m=$('questionModal');
   if(!m)return;
@@ -1114,8 +1113,7 @@ function qOpenDeepRecallPage(){
 
 function bindQuestionTrainer(){
   bindQuestionCaseTabs();
-  const open=$('questionTrainBtn'),close=$('closeQuestionBtn'),modal=$('questionModal');
-  if(open)open.onclick=e=>{e.preventDefault();e.stopPropagation();window.open('question-training.html','_blank')};
+  const close=$('closeQuestionBtn'),modal=$('questionModal');
   if(close)close.onclick=closeQuestionTrainer;
   if(modal&&!modal.dataset.questionClickBound){
     modal.dataset.questionClickBound='1';

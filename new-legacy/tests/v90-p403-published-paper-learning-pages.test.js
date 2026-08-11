@@ -19,19 +19,20 @@ assert(recall.includes('href="index.html" id="krBackBtn"'));
 assert(recall.includes('aria-label="选择已发布试卷"'));
 
 const source=read('src/96-recall-question-source.js');
-assert(source.includes("mode:'deep_recall'"));
-assert(source.includes('只读取不可变发布版本'));
+assert(/(?:const\s+MODE\s*=|mode\s*:)\s*['"]deep_recall['"]/.test(source));
+assert(source.includes('KGPublishedPaperRepository'));
 assert(!source.includes('kg_question_banks_v1__'));
 assert(!source.includes('kg_question_banks_published_v1'));
 assert(!source.includes('demoBank'));
 
 const multi=read('src/77-multi-question-workspace.js');
-assert(multi.includes("repository.listPublishedPapers({respectRole:true,mode:'multi_question_canvas'})"));
-assert(multi.includes("url.searchParams.set('releaseId'"));
+assert(/(?:repository\.listPublishedPapers|resolver\.listPapers)\(\{respectRole:true,mode:'multi_question_canvas'\}\)/.test(multi));
+assert(!multi.includes('question-training.html'));
+assert(!multi.includes('qwOpenSingleDeepBtn'));
 const single=read('src/72-question-training-page.js');
 assert(single.includes("mode:'single_deep_study'"));
 assert(single.includes('ensureSingleDeepPublishedSelection'));
-assert(single.includes("params.get('releaseId')"));
+assert(single.includes("params.get('releaseId')")||single.includes("KGLearningRouteContext?.parse?.({mode:'single_deep_study'"));
 const navigator=read('src/66-question-navigator.js');
 assert(navigator.includes("params.get('releaseId')"));
 assert(navigator.includes("sourceReleaseId:String(item.paper?.releaseId"));

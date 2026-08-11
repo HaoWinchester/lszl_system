@@ -643,14 +643,6 @@ window.KGHomeToolbarActions={
   toggleLargeGraphOverview:()=>toggleLargeGraphOverviewRelations(),
   toggleLargeGraphRelated:()=>toggleLargeGraphRelatedFocus(),
   openGraphSearch:()=>openGraphSearchPanel(),
-  openQuestionTraining:event=>{
-    if(event){
-      event.preventDefault();
-      event.stopPropagation();
-    }
-    if(typeof forceOpenQuestionTrainer==='function') forceOpenQuestionTrainer();
-    else window.open('question-training.html','_blank');
-  },
   setSmallCards:()=>applyNodeSize('small'),
   setDefaultCards:()=>applyNodeSize(''),
   setBigCards:()=>applyNodeSize('big'),

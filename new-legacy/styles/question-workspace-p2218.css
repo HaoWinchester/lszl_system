@@ -17,7 +17,7 @@
   overscroll-behavior:contain!important;
 }
 
-/* Multi-question question library matches the single-deep drawer dimensions exactly. */
+/* Keep the multi-question library drawer compact and viewport-bound. */
 .question-workspace-page #qwQuestionDrawer.lp-question-library-compact{
   position:fixed!important;
   top:var(--lp-shell-height,64px)!important;
@@ -51,38 +51,6 @@
   height:auto!important;
   background:transparent!important;
   backdrop-filter:none!important;
-}
-
-/* Sniper/target entry into single-question deep study. */
-.question-workspace-page #qwOpenSingleDeepBtn{
-  display:grid!important;
-  place-items:center!important;
-  width:34px!important;
-  min-width:34px!important;
-  height:34px!important;
-  min-height:34px!important;
-  padding:0!important;
-  border:0!important;
-  border-radius:9px!important;
-  background:transparent!important;
-  color:#536074!important;
-  box-shadow:none!important;
-  cursor:pointer!important;
-}
-.question-workspace-page #qwOpenSingleDeepBtn:hover,
-.question-workspace-page #qwOpenSingleDeepBtn:focus-visible{
-  background:#eef2ff!important;
-  color:#4f46e5!important;
-  outline:none!important;
-}
-.question-workspace-page #qwOpenSingleDeepBtn svg{
-  width:19px!important;
-  height:19px!important;
-  fill:none!important;
-  stroke:currentColor!important;
-  stroke-width:1.9!important;
-  stroke-linecap:round!important;
-  stroke-linejoin:round!important;
 }
 
 /* Local tidy is a direct action in the multi-select floating toolbar. */

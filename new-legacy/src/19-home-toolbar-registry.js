@@ -46,8 +46,7 @@
         {id:"addBtn", label:"新增知识点", tooltip:"新增知识点", icon:"add", shortcut:"N", className:"primary", permission:"editGraph", action:"addNode", shortTip:"新增"},
         {id:"templateBtn", label:"模板", ariaLabel:"选择模板", tooltip:"模板", icon:"template", shortcut:"T", permission:"editGraph", action:"openTemplate", shortTip:"模板"},
         {id:"focusBtn", label:"重点聚焦", tooltip:"重点聚焦", icon:"focus", shortcut:"F", className:"focus-menu-btn", action:"toggleFocus", shortTip:"聚焦"},
-        {id:"flashcardBtn", label:"记忆闪卡", tooltip:"记忆闪卡", icon:"flashcard", shortcut:"K", className:"flash-menu-btn", permission:"editGraph", action:"openFlashcards", shortTip:"闪卡"},
-        {id:"questionTrainBtn", label:"考题训练", tooltip:"考题训练", title:"考题训练（独立页面）", icon:"question", shortcut:"Q", className:"question-menu-btn", permission:"useTraining", action:"openQuestionTraining", shortTip:"训练"}
+        {id:"flashcardBtn", label:"记忆闪卡", tooltip:"记忆闪卡", icon:"flashcard", shortcut:"K", className:"flash-menu-btn", permission:"editGraph", action:"openFlashcards", shortTip:"闪卡"}
       ]
     },
     {

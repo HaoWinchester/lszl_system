@@ -215,7 +215,7 @@
     };
 
     const FEATURE_LABELS = {
-      basicTraining:"基础考题训练",
+      basicTraining:"基础刷题",
       basicRecall:"基础深度回忆",
       personalGraph:"个人知识图谱",
       demoOnly:"公开示例体验",
