@@ -359,9 +359,48 @@ git add new-legacy/p45-migration-manifest.json frontend/scripts/sync-new-legacy.
 git commit -m "fix: fail closed for P4.5 IndexedDB persistence"
 ```
 
+## Task 6: Remove the self-declared offline IndexedDB exception
+
+**Files:**
+
+- Modify: `new-legacy/p45-migration-manifest.json`
+- Modify: `frontend/scripts/sync-new-legacy.js`
+- Modify: `frontend/scripts/new-legacy-sync.test.mjs`
+
+**Interfaces:**
+
+- `legacyUnmigratedIndexedDbModules` remains the sole, finite IndexedDB debt list, containing exactly the two existing Prep Studio paths until Batch 7 replaces them with database-backed workspaces.
+- Removes `offlineExportOnly` as an IndexedDB exception: export flows must use server data plus in-memory/streamed file creation and cannot cache business payloads in IndexedDB.
+- Every non-debt JavaScript/HTML module containing IndexedDB persistence fails the sync, regardless of a self-declared manifest option.
+
+- [x] **Step 1: Reverse the former exception test (RED)**
+
+Replace the test that permits `offlineExportOnly: true` with a regression test proving the same flag cannot permit `indexedDB.open()` or optional/bracket IndexedDB writes. Keep the two historical Prep Studio debt paths as the only passing compatibility case.
+
+- [x] **Step 2: Run RED**
+
+Run: `cd frontend && node --test scripts/new-legacy-sync.test.mjs`
+
+Expected: the legacy offline-export allowance test fails because the old implementation still skips its scan.
+
+- [x] **Step 3: Delete the bypass rather than attempting to infer export intent**
+
+Remove `offlineExportOnly` and the now-unused `migratedBusinessModules` map from the production manifest contract and synchronization guard. Permit only the finite `legacyUnmigratedIndexedDbModules` schema key; reject any unknown manifest key rather than silently accepting a future caller-controlled bypass. Continue validating the finite debt list exactly and fail closed for every other IndexedDB-bearing module.
+
+- [x] **Step 4: Run GREEN and real-source regression**
+
+Run the focused Node suite and sync the actual source to an `mktemp -d` output using the supported `--source ../new-legacy --out <temp>/site` syntax. Confirm only the two recorded legacy Prep Studio paths are exempt and no release/public output changed.
+
+- [x] **Step 5: Commit and re-review**
+
+```bash
+git add new-legacy/p45-migration-manifest.json frontend/scripts/sync-new-legacy.js frontend/scripts/new-legacy-sync.test.mjs
+git commit -m "fix: require database persistence for all P4.5 modules"
+```
+
 ## Plan Self-Review
 
 - Coverage: protects all later P4.2–P4.5 migrations with a server-backed persistence contract, explicit feature ownership, exclusions and release checks.
 - Scope: this plan intentionally implements only Batch 1; Batches 2–7 are independent implementation plans because they each introduce separate data models and user workflows.
-- Consistency: every runtime key is declared in the frontend contract and validated by backend tests; relational domains are prohibited from the compatibility store.
+- Consistency: every runtime key is declared in the frontend contract and validated by backend tests; relational domains are prohibited from the compatibility store, and no new browser IndexedDB exception can be self-declared.
 - No placeholders: each task names its files, expected test command, required behavior and commit boundary.
