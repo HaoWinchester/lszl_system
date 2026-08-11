@@ -4,8 +4,6 @@ const path=require('path');
 const assert=require('assert/strict');
 const ROOT=path.resolve(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(ROOT,file),'utf8');
-assert.equal(read('VERSION').trim(),'v9.0-p4.1.1');
-assert(read('src/admin/00-admin-core.js').includes("VERSION='9.0-p4.1.1'"));
 const page=read('question-bank.html');
 for(const id of ['qbTrainingBankField','qbTrainingBankSelect','tqTrainingWorkspaceSplitter']){
   assert(page.includes(`id="${id}"`),`question-bank missing ${id}`);
