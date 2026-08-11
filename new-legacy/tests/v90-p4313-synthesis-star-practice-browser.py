@@ -13,7 +13,7 @@ def page_parts(file):
     return match.group(1),re.sub(r'<script[\s\S]*?</script>','',match.group(2),flags=re.I),re.findall(r'<script[^>]+src="([^"]+)"',source,re.I),re.findall(r'<link[^>]+href="([^"]+\.css)"',source,re.I)
 
 def question(id,difficulty,principle):
-    return {'id':id,'title':'练习题 '+id,'teacherNumber':'P4313-'+id,'type':'single_choice','subject':'PMP','difficulty':difficulty,'metadata':{'principleIds':[principle]},'stemParts':[{'text':'题目 '+id+'：请选择正确行动。'}],'options':[{'id':'A','text':'正确行动','correct':True},{'id':'B','text':'错误行动'}],'correctAnswer':'A','answer':'A','analysis':'解析 '+id}
+    return {'id':id,'title':'练习题 '+id,'teacherNumber':'P4313-'+id,'type':'single_choice','subject':'PMP','difficulty':difficulty,'metadata':{'stemPrincipleIds':[],'optionPrincipleMap':{'A':[principle]},'principleIds':[principle]},'stemParts':[{'text':'题目 '+id+'：请选择正确行动。'}],'options':[{'id':'A','text':'正确行动','correct':True},{'id':'B','text':'错误行动'}],'correctAnswer':'A','answer':'A','analysis':'解析 '+id}
 
 def questions():
     result=[question('source-1','easy',MAIN),question('source-2','easy',MAIN)]
@@ -33,6 +33,7 @@ def install_storage(page,items):
       const snapshots=items.map(question=>({bankId:'p4313-bank',bankName:'P4.3.13 题库',bankSubject:'PMP',questionId:question.id,question}));
       const release={id:'p4313-release',releaseId:'p4313-release',paperId:'p4313-paper',version:1,name:'P4.3.13 发布卷',title:'P4.3.13 发布卷',subject:'PMP',status:'published',publishedAt:1,enabledModes:['multi_question_canvas'],totalCount:items.length,questions:items.map((q,index)=>({bankId:'p4313-bank',questionId:q.id,order:index+1})),questionSnapshots:snapshots};
       localStorage.setItem('kg_exam_papers_published_v1',JSON.stringify([release]));localStorage.setItem('kg_question_banks_v1__user__'+username,JSON.stringify([{id:'p4313-bank',name:'P4.3.13 题库',subject:'PMP',questions:items}]));
+      window.KGQuestionCatalogAdapter={ready:Promise.resolve()};
       window.alert=()=>{};window.confirm=()=>true;window.open=()=>null;
     }""",{'items':items,'main':MAIN,'other':OTHER})
 
@@ -57,6 +58,7 @@ def main():
     page.on('pageerror',lambda e:errors.append(str(e)))
     page.on('console',lambda m:errors.append(m.text) if m.type=='error' and 'lucide-product.svg' not in m.text else None)
     load(page,items)
+    assert page.evaluate("""()=>({state:KGMultiQuestionWorkspace?.getState?.(),workspace:KGCanvasWorkspaceStore?.getActiveWorkspace?.()})""")['workspace'],errors
     page.evaluate("""items=>{KGMultiQuestionWorkspace.setViewport({x:0,y:0,zoom:1});[0,1].forEach((index)=>KGMultiQuestionWorkspace.addQuestionItem({question:items[index],bank:{id:'p4313-bank'},paper:{id:'p4313-paper',releaseId:'p4313-release'}},{x:240+index*500,y:120,width:400,height:340}));}""",items)
     page.wait_for_timeout(350)
     ids=page.evaluate("""()=>{const w=KGCanvasWorkspaceStore.getActiveWorkspace();return Object.values(w.nodes).filter(n=>['source-1','source-2'].includes(n.questionId)).map(n=>n.id)}""")
@@ -91,6 +93,12 @@ def main():
     own=sum(MAIN in by_id[node['questionId']]['metadata']['principleIds'] for node in batch);other=sum(OTHER in by_id[node['questionId']]['metadata']['principleIds'] for node in batch)
     assert own==2 and other==1,(own,other,batch)
     assert all(by_id[node['questionId']]['difficulty'] in ['medium','hard'] for node in batch)
+    unbound={**question('unbound','easy',MAIN),'metadata':{'principleIds':[MAIN]}}
+    page.evaluate("""item=>{KGMultiQuestionWorkspace.addQuestionItem({question:item,bank:{id:'p4313-bank'},paper:{id:'p4313-paper',releaseId:'p4313-release'}},{x:180,y:620,width:400,height:340})}""",unbound);page.wait_for_timeout(250)
+    source_and_unbound=page.evaluate("""()=>{const w=KGCanvasWorkspaceStore.getActiveWorkspace();return Object.values(w.nodes).filter(n=>['source-1','unbound'].includes(n.questionId)).map(n=>n.id)}""")
+    page.evaluate("""ids=>{KGMultiQuestionWorkspace.selectNodes(ids);KGMultiQuestionWorkspace.quickCreateSynthesis()}""",source_and_unbound);page.wait_for_timeout(250)
+    workspace=page.evaluate('KGCanvasWorkspaceStore.getActiveWorkspace()')
+    assert len([node for node in workspace['nodes'].values() if node.get('nodeType')=='synthesis-card'])==1
     card=page.locator(f'[data-node-id="{synth["id"]}"]')
     card.locator('[data-qw-action="copy-synthesis"]').click(force=True);page.wait_for_timeout(350)
     workspace=page.evaluate('KGCanvasWorkspaceStore.getActiveWorkspace()')

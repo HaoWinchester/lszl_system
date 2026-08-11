@@ -9,6 +9,7 @@
   const Difficulty=global.KGDifficultyService||global.KGTeacherDomains?.DifficultyService||{};
   const Principles=global.KGPrincipleRepository||{};
   const Presets=global.KGSynthesisPresetRepository||{};
+  const PrincipleBinding=global.KGQuestionPrincipleBinding||{};
   const PracticeSelector=global.KGPracticeSelectionService||{};
   const PracticeAttempts=global.KGPracticeAttemptRepository||{};
   const BUTTON_LEVELS=viewportLibrary.BUTTON_ZOOM_LEVELS||[.01,.02,.03,.05,.10,.15,.20,.33,.50,.75,1,1.25,1.50,2,2.50,3,4];
@@ -1873,20 +1874,28 @@
   }
   function synthesisDraftFromSelection(records=selectedRecords()){
     const questions=records.filter(record=>record.node?.nodeType==='question-reference');
-    const principleId=mostFrequent(questions.map(principleIdForRecord).filter(Boolean));
-    const fallbackLabel=mostFrequent(questions.map(principleLabelForRecord).filter(Boolean))||'原则：待提炼';
-    const principleName=principleDisplayName(principleId,fallbackLabel);
+    const resolved=PrincipleBinding.selectionPrinciple?.(questions.map(record=>resolvedQuestionForNode(record?.node||{})||{}));
+    if(!resolved?.ok){
+      const reason=String(resolved?.reason||'missing');
+      const detail=reason==='multiple'?'正确选项绑定了多条原则，请保留一条后再归纳。':reason==='mismatch'?'所选题目的正确选项绑定的原则不一致，请按原则重新分组。':`正确选项 ${resolved?.correctOptionId||''} 尚未绑定原则，请先回到题目内容完成绑定。`;
+      return {valid:false,error:detail};
+    }
+    const principleId=String(resolved.principleId||'');
+    const principle=Principles.get?.(principleId)||null;
+    const principleName=principleDisplayName(principleId,principle?.name||'');
     const principleTag='原则：'+principleName;
-    const preset=principleId?(Presets.getByPrincipleId?.(principleId,{activeOnly:true})||null):null;
+    const preset=Presets.getByPrincipleId?.(principleId,{activeOnly:true})||null;
+    if(!preset)return {valid:false,error:`原则“${principleName}”尚未配置已启用的系统归纳卡。`};
     return {
+      valid:true,
       synthesisType:'principle',
-      cardType:preset?'system':'user',
+      cardType:'system',
       principleId,
-      sourcePresetId:String(preset?.id||''),
-      presetVersion:Number(preset?.version||0),
-      title:String(preset?.title||principleTag),
+      sourcePresetId:String(preset.id||''),
+      presetVersion:Number(preset.version||0),
+      title:principleTag,
       principleTag,
-      content:String(preset?.content||''),
+      content:String(preset.content||''),
       tags:[principleTag],
       color:'#ede9fe',
       status:'draft',
@@ -2116,6 +2125,7 @@
     const questions=records.filter(record=>record.node?.nodeType==='question-reference');
     if(questions.length<2){notify('请先框选至少 2 张题目卡再生成归纳。');return false}
     const payload=synthesisDraftFromSelection(records);
+    if(!payload.valid){notify(payload.error||'无法按正确选项原则生成归纳卡。');return false}
     const bounds=selectionWorldBounds(records);
     const cardWidth=430,cardHeight=220,gap=64;
     const preferredBelow=bounds.bottom+gap;

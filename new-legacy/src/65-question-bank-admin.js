@@ -31,6 +31,7 @@
   const PaperModePolicy=window.KGPaperLearningModes||{};
   const PaperQuotaService=window.KGPaperQuotaService||{};
   const PrincipleRepository=window.KGPrincipleRepository||{};
+  const PrincipleBinding=window.KGQuestionPrincipleBinding||{};
   const PAPER_MODE_IDS=PaperModePolicy.IDS||Object.freeze(['practice_mode','deep_recall','multi_question_canvas']);
   const PAPER_MODE_LABELS=PaperModePolicy.LABELS||Object.freeze({practice_mode:'刷题',deep_recall:'深度回忆',multi_question_canvas:'归纳'});
   const PAPER_MODE_CONFIG_VERSION=Number(PaperModePolicy.CONFIG_VERSION||2);
@@ -224,7 +225,7 @@
   const CATALOG_EDITOR_FIELD_IDS=new Set([
     'bankSubject','bankCustomSubject','bankName','bankVersion','bankVisibility','bankDescription',
     'questionTitleInput','questionTitleEnInput','questionTypeInput','questionDifficultyInput',
-    'questionDomainInput','questionTopicInput','questionTagsInput','questionPrincipleIdsInput',
+    'questionDomainInput','questionTopicInput','questionTagsInput','questionPrincipleIdsInput','questionStemPrincipleIdsInput','questionOptionPrincipleMapInput',
     'questionStemInput','questionStemEnInput','questionAnalysisInput','questionAnalysisEnInput',
     'qbRecallKeywordsInput','qbRecallBindingsInput','qbRecallLibraryText','qbRecallNodeTitle','qbRecallNodeTitleEn',
     'qbRecallNodePrompt','qbRecallNodePromptEn','qbRecallNodeHint','qbRecallNodeHintEn','qbRecallCandidateInput',
@@ -505,7 +506,11 @@
       text,
       textEn:String(clue.textEn || clue.englishText || clue.translation?.en?.text || ''),
       type:String(clue.type || 'core'),
+      keywordLevel:String(clue.keywordLevel || (clue.isCore ? 'core' : '') || clue.type || 'core'),
+      isCore:clue.isCore===true || String(clue.keywordLevel || clue.type || '') === 'core',
       clueRole:String(clue.clueRole || clue.role || 'true'),
+      solutionRole:String(clue.solutionRole || clue.clueRole || clue.role || 'true'),
+      coreReason:String(clue.coreReason || clue.reason || ''),
       sourceType:String(clue.sourceType || (sourceOptionId ? 'option' : 'stem')),
       sourceOptionId,
       conceptIds:Array.isArray(clue.conceptIds) ? clue.conceptIds.map(String) : cleanList(clue.conceptIds),
@@ -595,6 +600,8 @@
     const detectedCorrect = options.find(o => o.correct);
     const correctAnswer = String(question.correctAnswer || detectedCorrect?.id || options[0]?.id || '');
     options.forEach(o => { o.correct = o.id === correctAnswer || o.correct && !correctAnswer; });
+    const metadataSource={...(question.metadata&&typeof question.metadata==='object'?question.metadata:{}),principleIds:[...new Set([...(Array.isArray(question.principleIds)?question.principleIds:[]),...(Array.isArray(question.metadata?.principleIds)?question.metadata.principleIds:[])].map(String).filter(Boolean))]};
+    const principleBindings=PrincipleBinding.normalize?.(metadataSource,options.map(option=>option.id))||{stemPrincipleIds:metadataSource.principleIds||[],optionPrincipleMap:metadataSource.optionPrincipleMap||{},principleIds:metadataSource.principleIds||[]};
     return {
       ...question,
       id:String(question.id || ('q-' + Date.now().toString(36) + '-' + index)),
@@ -612,7 +619,7 @@
       correctAnswer,
       analysis:String(question.analysis || ''),
       translations:normalizeTranslations(question),
-      metadata:{...(question.metadata&&typeof question.metadata==='object'?question.metadata:{}),principleIds:[...new Set([...(Array.isArray(question.principleIds)?question.principleIds:[]),...(Array.isArray(question.metadata?.principleIds)?question.metadata.principleIds:[])].map(String).filter(Boolean))],tagPaths:Array.isArray(question.metadata?.tagPaths)?question.metadata.tagPaths.map(item=>item&&typeof item==='object'?{...item,label:canonicalTagName(item.label)}:item):[],translationStatus:String(question.metadata?.translationStatus || (normalizeTranslations(question).en?'bilingual':'zh_only')),knowledge:normalizeQuestionKnowledge(question,String(question.subject||'')),classificationHistory:Array.isArray(question.metadata?.classificationHistory)?question.metadata.classificationHistory.slice(-50):[]},
+      metadata:{...metadataSource,...principleBindings,tagPaths:Array.isArray(question.metadata?.tagPaths)?question.metadata.tagPaths.map(item=>item&&typeof item==='object'?{...item,label:canonicalTagName(item.label)}:item):[],translationStatus:String(question.metadata?.translationStatus || (normalizeTranslations(question).en?'bilingual':'zh_only')),knowledge:normalizeQuestionKnowledge(question,String(question.subject||'')),classificationHistory:Array.isArray(question.metadata?.classificationHistory)?question.metadata.classificationHistory.slice(-50):[]},
       clues:Array.isArray(question.clues) ? question.clues.map(normalizeClue).filter(c => c.text || c.textEn) : [],
       concepts:Array.isArray(question.concepts) ? question.concepts.map(normalizeConcept).filter(c => c.title) : [],
       reasoningSteps:Array.isArray(question.reasoningSteps) ? question.reasoningSteps.map(normalizeReasoningStep) : [],
@@ -2233,6 +2240,30 @@
     $('bankCustomSubject').value = bank && !SUBJECTS.some(s => s.id === bank.subject) ? bank.subject : '';
     toggleCustomSubject();
   }
+  function parseOptionPrincipleMap(value){
+    try{
+      const parsed=JSON.parse(String(value||'{}'));
+      return parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:{};
+    }catch(error){return {}}
+  }
+  function questionPrincipleBindingsFromDom(optionIds=[]){
+    const stem=String($('questionStemPrincipleIdsInput')?.value||'').split(',').map(value=>value.trim()).filter(Boolean);
+    const optionPrincipleMap=parseOptionPrincipleMap($('questionOptionPrincipleMapInput')?.value);
+    return PrincipleBinding.normalize?.({stemPrincipleIds:stem,optionPrincipleMap},optionIds)||{stemPrincipleIds:stem,optionPrincipleMap,principleIds:[...new Set([...stem,...Object.values(optionPrincipleMap).flat()])]};
+  }
+  function writeQuestionPrincipleBindings(bindings={},optionIds=[]){
+    const normalized=PrincipleBinding.normalize?.(bindings,optionIds)||bindings;
+    if($('questionStemPrincipleIdsInput'))$('questionStemPrincipleIdsInput').value=(normalized.stemPrincipleIds||[]).join(',');
+    if($('questionOptionPrincipleMapInput'))$('questionOptionPrincipleMapInput').value=JSON.stringify(normalized.optionPrincipleMap||{});
+    if($('questionPrincipleIdsInput'))$('questionPrincipleIdsInput').value=(normalized.principleIds||[]).join(',');
+    return normalized;
+  }
+  function optionPrincipleCheckboxes(option,bindings={}){
+    const selected=new Set(bindings.optionPrincipleMap?.[option.id]||[]);
+    const principles=PrincipleRepository.list?.()||[];
+    if(!principles.length)return '<span class="qb-option-principle-empty">暂无可绑定原则，请先在训练配置中创建。</span>';
+    return principles.map(item=>`<label><input type="checkbox" data-option-principle-id="${escapeHTML(option.id)}" value="${escapeHTML(item.id)}" ${selected.has(item.id)?'checked':''}/><span>${escapeHTML(item.name)}</span></label>`).join('');
+  }
   function fillQuestionForm(){
     const q = currentQuestion();
     const disabled = !q;
@@ -2251,6 +2282,8 @@
       $('questionTopicInput').value = '';
       $('questionTagsInput').value = '';
       if($('questionPrincipleIdsInput'))$('questionPrincipleIdsInput').value='';
+      if($('questionStemPrincipleIdsInput'))$('questionStemPrincipleIdsInput').value='';
+      if($('questionOptionPrincipleMapInput'))$('questionOptionPrincipleMapInput').value='{}';
       $('questionStemInput').value = '';
       if($('questionStemEnInput'))$('questionStemEnInput').value='';
       $('questionAnalysisInput').value = '';
@@ -2274,7 +2307,8 @@
     if($('questionTranslationStatus'))$('questionTranslationStatus').textContent=q.metadata?.translationStatus==='bilingual'?'中英双语':(q.metadata?.translationStatus==='en_only'?'仅英文':'仅中文');
     $('questionTypeInput').value = q.type || 'single_choice';
     $('questionDifficultyInput').value = difficultyValue(q.difficulty);
-    if($('questionPrincipleIdsInput'))$('questionPrincipleIdsInput').value=(q.metadata?.principleIds||q.principleIds||[]).join(',');
+    const principleBindings=PrincipleBinding.normalize?.(q.metadata||{},(q.options||[]).map(option=>option.id))||{stemPrincipleIds:q.metadata?.principleIds||q.principleIds||[],optionPrincipleMap:q.metadata?.optionPrincipleMap||{},principleIds:q.metadata?.principleIds||q.principleIds||[]};
+    writeQuestionPrincipleBindings(principleBindings,(q.options||[]).map(option=>option.id));
     $('questionDomainInput').value = q.domain || '';
     $('questionTopicInput').value = q.topic || '';
     $('questionTagsInput').value = (q.tags || []).join(',');
@@ -2295,6 +2329,7 @@
     const q = currentQuestion();
     const wrap = $('qbOptionsEditor');
     if(!q || !wrap) return;
+    const bindings=PrincipleBinding.normalize?.(q.metadata||{},(q.options||[]).map(option=>option.id))||q.metadata||{};
     wrap.innerHTML = (q.options || []).map((o, i) => `
       <div class="qb-option-row" data-index="${i}" data-option-id="${escapeHTML(o.id)}">
         <label class="radio">
@@ -2305,6 +2340,7 @@
         <input class="option-text keyword-source" value="${escapeHTML(o.text)}" placeholder="选项内容（可选中文本标记关键词）" />
         <input class="option-trap" value="${escapeHTML(o.trap || '')}" placeholder="错误原因 / 干扰项说明" />
         <button type="button" class="danger option-remove">删除</button>
+        <div class="qb-option-principle-bindings"><strong>选项原则</strong><span>正确选项须且只能绑定一条原则，才能参与多题归纳。</span><div class="qb-option-principle-checks">${optionPrincipleCheckboxes(o,bindings)}</div></div>
       </div>
     `).join('');
     wrap.querySelectorAll('.option-remove').forEach(btn => {
@@ -2316,6 +2352,15 @@
         saveBanks(state.banks, {silent:true});
         render();
         toast('已删除选项。');
+      });
+    });
+    wrap.querySelectorAll('[data-option-principle-id]').forEach(input=>{
+      input.addEventListener('change',()=>{
+        const optionIds=Array.from(wrap.querySelectorAll('.qb-option-row')).map(row=>String(row.dataset.optionId||''));
+        const optionPrincipleMap=parseOptionPrincipleMap($('questionOptionPrincipleMapInput')?.value);
+        const optionId=String(input.dataset.optionPrincipleId||'');
+        optionPrincipleMap[optionId]=Array.from(wrap.querySelectorAll('[data-option-principle-id]:checked')).filter(item=>String(item.dataset.optionPrincipleId||'')===optionId).map(item=>String(item.value||''));
+        writeQuestionPrincipleBindings({stemPrincipleIds:String($('questionStemPrincipleIdsInput')?.value||'').split(',').map(value=>value.trim()).filter(Boolean),optionPrincipleMap},optionIds);
       });
     });
   }
@@ -3317,6 +3362,21 @@
       };
     }).filter(o => o.id || o.text);
   }
+  function collectQuestionPrincipleBindings(options=[]){
+    const optionPrincipleMap=parseOptionPrincipleMap($('questionOptionPrincipleMapInput')?.value);
+    document.querySelectorAll('#qbOptionsEditor .qb-option-row').forEach((row,index)=>{
+      const priorId=String(row.dataset.optionId||'');
+      const optionId=String(options[index]?.id||priorId).trim();
+      if(!optionId)return;
+      const selected=Array.from(row.querySelectorAll('[data-option-principle-id]:checked')).map(input=>String(input.value||''));
+      optionPrincipleMap[optionId]=selected;
+      if(optionId!==priorId)delete optionPrincipleMap[priorId];
+    });
+    return PrincipleBinding.normalize?.({
+      stemPrincipleIds:String($('questionStemPrincipleIdsInput')?.value||'').split(',').map(value=>value.trim()).filter(Boolean),
+      optionPrincipleMap
+    },options.map(option=>option.id))||questionPrincipleBindingsFromDom(options.map(option=>option.id));
+  }
   function collectEnglishOptionsFromDom(){
     return Array.from(document.querySelectorAll('#qbOptionsEditorEn .tq-option-en-row')).map((row,index)=>({id:String(row.dataset.enOptionId||String.fromCharCode(65+index)),text:row.querySelector('.option-text-en')?.value.trim()||''}));
   }
@@ -3418,7 +3478,9 @@
     const hasEnglish=Boolean(enTitle||enStem.trim()||enAnalysis||enOptions.some(option=>option.text));
     if(hasEnglish)draft.translations={...(draft.translations||{}),en:{title:enTitle,stemParts:[{text:enStem}],options:enOptions,analysis:enAnalysis}};
     else if(draft.translations?.en){draft.translations={...(draft.translations||{})};delete draft.translations.en}
-    draft.metadata={...(draft.metadata||{}),principleIds:[...new Set(String($('questionPrincipleIdsInput')?.value||'').split(',').map(value=>value.trim()).filter(Boolean))],translationStatus:hasEnglish?'bilingual':'zh_only'};
+    const principleBindings=collectQuestionPrincipleBindings(draft.options);
+    writeQuestionPrincipleBindings(principleBindings,draft.options.map(option=>option.id));
+    draft.metadata={...(draft.metadata||{}),...principleBindings,translationStatus:hasEnglish?'bilingual':'zh_only'};
     if(options.includePendingSubforms)applyPendingCognitiveSubforms(draft,options.pendingSubforms||{});
     return {draft,rawStem,reasoningSteps};
   }
@@ -4327,7 +4389,11 @@
     const questions=selectedQuestions();if(!questions.length)return {valid:false,error:'请先选择当前页题目。',updated:0};const beforeBanks=clone(state.banks);
     questions.forEach(question=>{
       if(Object.prototype.hasOwnProperty.call(patch,'difficulty'))question.difficulty=difficultyValue(patch.difficulty);
-      if(Object.prototype.hasOwnProperty.call(patch,'principleIds'))question.metadata={...(question.metadata||{}),principleIds:[...new Set((patch.principleIds||[]).map(String).filter(Boolean))]};
+      if(Object.prototype.hasOwnProperty.call(patch,'principleIds')){
+        const optionIds=(question.options||[]).map(option=>option.id);
+        const bindings=PrincipleBinding.normalize?.({...question.metadata,stemPrincipleIds:[...new Set((patch.principleIds||[]).map(String).filter(Boolean))]},optionIds)||{...(question.metadata||{}),stemPrincipleIds:[...new Set((patch.principleIds||[]).map(String).filter(Boolean))],principleIds:[...new Set((patch.principleIds||[]).map(String).filter(Boolean))]};
+        question.metadata={...(question.metadata||{}),...bindings};
+      }
     });
     const bank=currentBank();if(bank)bank.updatedAt=Date.now();
     persistCatalogQuestionChanges(questions,bank?.id||state.selectedBankId,state.selectedQuestionId).then(()=>render()).catch(error=>{state.banks=beforeBanks.map(normalizeBank);render();alert('批量保存失败：'+(error.message||error))});

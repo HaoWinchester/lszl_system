@@ -325,10 +325,12 @@
       <div class="qb-classification-subline"><span id="qbKnowledgeStatus" class="qb-classification-status unmapped">待分类</span><button type="button" id="qbSetUnclassifiedBtn">设为待分类</button></div>
     </div>
     <div class="qb-classification-field principles">
-      <span>做题原则</span>
-      <button type="button" class="qb-classification-value" id="qbPrinciplePickerBtn"><span id="qbPrincipleSummary">未关联原则</span><b>选择</b></button>
+      <span>题干 / 通用原则</span>
+      <button type="button" class="qb-classification-value" id="qbPrinciplePickerBtn"><span id="qbPrincipleSummary">未关联题干原则</span><b>选择</b></button>
       <div class="qb-selected-chips" id="qbSelectedPrincipleChips" aria-live="polite"></div>
       <input id="questionPrincipleIdsInput" type="hidden"/>
+      <input id="questionStemPrincipleIdsInput" type="hidden"/>
+      <input id="questionOptionPrincipleMapInput" type="hidden"/>
     </div>
     <div class="qb-classification-field tags">
       <span>普通标签</span>
@@ -855,7 +857,7 @@
   </form>
 </dialog>
 
-<dialog class="qb-classification-dialog tq-principle-picker-dialog" id="qbPrinciplePickerDialog"><form method="dialog"><header class="qb-dialog-head"><div><p>PRINCIPLE</p><h2>关联做题原则</h2><span>可多选；原则的详细配置位于“训练配置”。</span></div><button value="cancel" aria-label="关闭">×</button></header><div class="tq-principle-picker-options" id="qbPrinciplePickerOptions"></div><footer><button type="button" id="qbPrinciplePickerManageBtn">管理原则</button><span></span><button value="cancel">取消</button><button type="button" class="primary" id="qbPrinciplePickerConfirmBtn">应用</button></footer></form></dialog>
+<dialog class="qb-classification-dialog tq-principle-picker-dialog" id="qbPrinciplePickerDialog"><form method="dialog"><header class="qb-dialog-head"><div><p>PRINCIPLE</p><h2>关联题干 / 通用原则</h2><span>选项原则在各选项下单独绑定；正确选项的唯一原则将用于多题归纳。</span></div><button value="cancel" aria-label="关闭">×</button></header><div class="tq-principle-picker-options" id="qbPrinciplePickerOptions"></div><footer><button type="button" id="qbPrinciplePickerManageBtn">管理原则</button><span></span><button value="cancel">取消</button><button type="button" class="primary" id="qbPrinciplePickerConfirmBtn">应用</button></footer></form></dialog>
 <dialog class="qb-classification-dialog compact" id="qbBulkDifficultyDialog"><form method="dialog"><header class="qb-dialog-head"><div><p>DIFFICULTY</p><h2>批量设置难度</h2><span>统一使用三星制。</span></div><button value="cancel" aria-label="关闭">×</button></header><div class="tq-bulk-star-options"><button type="button" data-bulk-difficulty="easy">★<small>简单</small></button><button type="button" data-bulk-difficulty="medium">★★<small>中等</small></button><button type="button" data-bulk-difficulty="hard">★★★<small>困难</small></button></div><footer><span></span><button value="cancel">取消</button></footer></form></dialog>
 <dialog class="qb-classification-dialog" id="qbBulkPrincipleDialog"><form method="dialog"><header class="qb-dialog-head"><div><p>PRINCIPLE</p><h2>批量关联原则</h2><span>所选原则将替换当前原则关联。</span></div><button value="cancel" aria-label="关闭">×</button></header><div class="tq-principle-picker-options" id="qbBulkPrincipleOptions"></div><footer><span></span><button value="cancel">取消</button><button type="button" class="primary" id="qbBulkPrincipleConfirmBtn">应用</button></footer></form></dialog>
 
@@ -877,6 +879,7 @@
 <script defer src="src/teacher/shared/difficulty-service.js"></script>
 <script defer src="src/principles/principle-repository.js"></script>
 <script defer src="src/principles/synthesis-preset-repository.js"></script>
+<script defer src="src/principles/question-principle-binding.js"></script>
 <script defer src="src/practice/practice-selection-service.js"></script>
 <script defer src="src/teacher/question-bank/batch-operation-service.js"></script>
 <script defer src="src/teacher/question-bank/safe-delete-service.js"></script>

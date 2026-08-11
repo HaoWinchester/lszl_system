@@ -6,6 +6,7 @@
   const Difficulty=global.KGDifficultyService||global.KGTeacherDomains?.DifficultyService||{};
   const Principles=global.KGPrincipleRepository;
   const Presets=global.KGSynthesisPresetRepository;
+  const PrincipleBinding=global.KGQuestionPrincipleBinding||{};
   let pickerDraft=new Set(),bulkDraft=new Set(),selectedPrincipleIds=new Set(),activePrincipleId='',draftPrincipleId='';
 
   function api(){return global.KGQuestionBankAdminAPI||{}}
@@ -31,11 +32,25 @@
     Principles?.ensureFromLabels?.(names);
     return questions;
   }
-  function currentPrincipleIds(){return unique(String(byId('questionPrincipleIdsInput')?.value||'').split(',').map(value=>value.trim()))}
-  function setCurrentPrincipleIds(ids=[]){const next=unique(ids);if(byId('questionPrincipleIdsInput'))byId('questionPrincipleIdsInput').value=next.join(',');renderCurrentPrinciples()}
+  function currentQuestionOptionIds(){return (api().getCurrentQuestion?.()?.options||[]).map(option=>String(option?.id||'').trim()).filter(Boolean)}
+  function currentOptionPrincipleMap(){try{const value=JSON.parse(String(byId('questionOptionPrincipleMapInput')?.value||'{}'));return value&&typeof value==='object'&&!Array.isArray(value)?value:{}}catch(error){return {}}}
+  function currentPrincipleBindings(){
+    const stem=String(byId('questionStemPrincipleIdsInput')?.value||'').split(',').map(value=>value.trim()).filter(Boolean);
+    const optionIds=currentQuestionOptionIds();
+    return PrincipleBinding.normalize?.({stemPrincipleIds:stem,optionPrincipleMap:currentOptionPrincipleMap()},optionIds)||{stemPrincipleIds:unique(stem),optionPrincipleMap:currentOptionPrincipleMap(),principleIds:unique(stem)};
+  }
+  function currentPrincipleIds(){return currentPrincipleBindings().stemPrincipleIds||[]}
+  function setCurrentPrincipleIds(ids=[]){
+    const bindings=currentPrincipleBindings();
+    const next=PrincipleBinding.normalize?.({...bindings,stemPrincipleIds:unique(ids)},currentQuestionOptionIds())||{...bindings,stemPrincipleIds:unique(ids),principleIds:unique(ids)};
+    if(byId('questionStemPrincipleIdsInput'))byId('questionStemPrincipleIdsInput').value=(next.stemPrincipleIds||[]).join(',');
+    if(byId('questionOptionPrincipleMapInput'))byId('questionOptionPrincipleMapInput').value=JSON.stringify(next.optionPrincipleMap||{});
+    if(byId('questionPrincipleIdsInput'))byId('questionPrincipleIdsInput').value=(next.principleIds||[]).join(',');
+    renderCurrentPrinciples();
+  }
   function renderCurrentPrinciples(){
     const ids=currentPrincipleIds(),items=ids.map(id=>Principles?.get?.(id)).filter(Boolean),summary=byId('qbPrincipleSummary'),chips=byId('qbSelectedPrincipleChips');
-    if(summary)summary.textContent=items.length?items.map(item=>item.name).join('、'):'未关联原则';
+    if(summary)summary.textContent=items.length?items.map(item=>item.name).join('、'):'未关联题干 / 通用原则';
     if(chips)chips.innerHTML=items.length?items.map(item=>`<span class="qb-selected-chip">${escapeHTML(item.name)}<button type="button" data-remove-principle="${escapeHTML(item.id)}" aria-label="移除 ${escapeHTML(item.name)}">×</button></span>`).join(''):'';
   }
   function renderStarRating(){
@@ -139,7 +154,7 @@
     byId('tqArchiveSelectedPrinciplesBtn')?.addEventListener('click',()=>{archiveSelectedPrinciples()});
     byId('tqNewPrincipleBtn')?.addEventListener('click',newPrinciple);byId('tqSavePrincipleBtn')?.addEventListener('click',savePrinciple);
     byId('tqPrincipleName')?.addEventListener('input',()=>{if(byId('tqPresetTitle'))byId('tqPresetTitle').value='原则：'+String(byId('tqPrincipleName').value||'').trim()});
-    document.addEventListener('kg-question-form-filled',event=>{const question=event.detail?.question||{};let ids=unique(question.metadata?.principleIds||question.principleIds||[]);if(!ids.length){const created=legacyPrincipleNames(question).map(name=>Principles?.findByName?.(name)||Principles?.upsert?.({name})).filter(Boolean);ids=created.map(item=>item.id)}setCurrentPrincipleIds(ids);if(byId('questionDifficultyInput'))byId('questionDifficultyInput').value=Difficulty.normalize?.(question.difficulty)||'';renderStarRating();renderPrincipleList()});
+    document.addEventListener('kg-question-form-filled',event=>{const question=event.detail?.question||{};const normalized=PrincipleBinding.normalize?.(question.metadata||{},(question.options||[]).map(option=>option.id))||{};let ids=unique(normalized.stemPrincipleIds||question.metadata?.stemPrincipleIds||question.metadata?.principleIds||question.principleIds||[]);if(!ids.length){const created=legacyPrincipleNames(question).map(name=>Principles?.findByName?.(name)||Principles?.upsert?.({name})).filter(Boolean);ids=created.map(item=>item.id)}setCurrentPrincipleIds(ids);if(byId('questionDifficultyInput'))byId('questionDifficultyInput').value=Difficulty.normalize?.(question.difficulty)||'';renderStarRating();renderPrincipleList()});
     global.addEventListener('kg:principles-changed',()=>{renderCurrentPrinciples();renderPrincipleList()});
     renderStarRating();renderCurrentPrinciples();renderPrincipleList();
     const requested=new URLSearchParams(location.search).get('section');if(requested==='principles')setTimeout(()=>document.querySelector('[data-annotation-tab="principles"]')?.click(),80);

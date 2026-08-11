@@ -6,7 +6,7 @@ from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 ARGS=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']
 CSS=['styles/teacher-workbench.css','styles/question-bank-admin.css','styles/teacher-question-workflow.css','styles/admin-context-nav.css','styles/workspace-placement.css','styles/question-classification.css']
-JS=['src/01-runtime-config.js','src/28-app-storage.js','src/29-auth-core.js','src/34-role-permissions.js','src/50-question-data.js','src/91-learning-content-core.js','src/95-recall-association-library.js','question-studio/question-studio-parser.js','src/98-teacher-workflow-p2-services.js','src/teacher/shared/domain-core.js','src/teacher/shared/difficulty-service.js','src/principles/principle-repository.js','src/principles/synthesis-preset-repository.js','src/practice/practice-selection-service.js','src/teacher/question-bank/batch-operation-service.js','src/teacher/question-bank/safe-delete-service.js','src/teacher/paper-management/paper-category-service.js','src/teacher/paper-management/paper-audit-service.js','src/teacher/paper-management/paper-release-service.js','src/teacher/paper-management/paper-question-picker.js','src/teacher/training-config/training-config-service.js','src/teacher/training-config/workspace-layout.js','src/65-question-bank-admin.js','src/98-question-classification.js','src/97-teacher-question-workflow.js','src/99-workspace-placement.js','src/teacher/training-config/principle-preset-controller.js']
+JS=['src/01-runtime-config.js','src/28-app-storage.js','src/29-auth-core.js','src/34-role-permissions.js','src/50-question-data.js','src/91-learning-content-core.js','src/95-recall-association-library.js','question-studio/question-studio-parser.js','src/98-teacher-workflow-p2-services.js','src/teacher/shared/domain-core.js','src/teacher/shared/difficulty-service.js','src/principles/principle-repository.js','src/principles/synthesis-preset-repository.js','src/principles/question-principle-binding.js','src/practice/practice-selection-service.js','src/teacher/question-bank/batch-operation-service.js','src/teacher/question-bank/safe-delete-service.js','src/teacher/paper-management/paper-category-service.js','src/teacher/paper-management/paper-audit-service.js','src/teacher/paper-management/paper-release-service.js','src/teacher/paper-management/paper-question-picker.js','src/teacher/training-config/training-config-service.js','src/teacher/training-config/workspace-layout.js','src/65-question-bank-admin.js','src/98-question-classification.js','src/97-teacher-question-workflow.js','src/99-workspace-placement.js','src/teacher/training-config/principle-preset-controller.js']
 
 def body_html(step):
     text=(ROOT/'question-bank.html').read_text(encoding='utf-8')
@@ -27,8 +27,16 @@ def seed(page):
       const user='p4313-teacher',scope='user__'+encodeURIComponent(user);
       localStorage.setItem('kg_local_current_user_v1',user);localStorage.setItem('kg_local_users_v1',JSON.stringify({[user]:{username:user,displayName:'P4.3.13 教师',role:'admin',status:'active',subject:'PMP',salt:'x',hash:'x'}}));
       localStorage.setItem('kg_question_bank_demo_suppressed_v1__'+scope,'1');
+      localStorage.setItem('kg_principle_repository_v1',JSON.stringify({items:[
+        {id:'principle-stem',name:'先看题干',status:'active'},
+        {id:'principle-correct',name:'正确项原则',status:'active'},
+        {id:'principle-trap',name:'干扰项原则',status:'active'}
+      ]}));
       const q=(id,difficulty,tags)=>({id,teacherNumber:'P4313-'+id,title:'题目 '+id,type:'single_choice',subject:'PMP',difficulty,tags,stemParts:[{text:'题干 '+id}],options:[{id:'A',text:'正确',correct:true},{id:'B',text:'错误'}],correctAnswer:'A',analysis:'解析',metadata:{knowledge:{primaryNodeId:null}},status:{contentReady:true}});
-      localStorage.setItem('kg_question_banks_v1__'+scope,JSON.stringify([{id:'bank-p4313',name:'P4.3.13 题库',subject:'PMP',visibility:'private',questions:[q('q1','基础',['原则：先分析后行动']),q('q2','重点',[]),q('q3','中等',[])]}]));
+      let catalog={banks:[{id:'bank-p4313',name:'P4.3.13 题库',subject:'PMP',visibility:'private',revision:1}],questions:[q('q1','基础',['原则：先分析后行动']),q('q2','重点',[]),q('q3','中等',[])].map(question=>({...question,bankId:'bank-p4313',revision:1}))};
+      const clone=value=>JSON.parse(JSON.stringify(value));
+      window.KGQuestionCatalogAdapter={ready:Promise.resolve(catalog),snapshot:()=>clone(catalog),saveBank:async bank=>bank,saveQuestion:async question=>question,deleteBank:async()=>true,deleteQuestion:async()=>true};
+      window.KGQuestionCatalogEditController={open:async()=>({readonly:false}),save:async(question,{bankId}={})=>{const saved={...clone(question),bankId:bankId||question.bankId||'bank-p4313',revision:Number(question.revision||0)+1};const index=catalog.questions.findIndex(item=>item.id===saved.id);if(index>=0)catalog.questions[index]=saved;else catalog.questions.push(saved);return clone(saved)},release:async()=>true,applyReadonlyState:()=>{},status:()=>({readonly:false})};
       window.__principleRequests=[];
       window.__principleStorageFlushes=0;window.KGServerStateStorage={flush:async()=>{window.__principleStorageFlushes+=1}};
       window.fetch=async(url,options={})=>{
@@ -99,6 +107,22 @@ def main():
     # Legacy principle-tagged question is counted without a destructive migration.
     row=page.locator('#tqPrincipleList [data-principle-id="principle-先分析后行动"]')
     if row.count(): assert '题目 1' in row.inner_text()
+    assert not errors,errors
+    page.close();browser.close()
+    browser=p.chromium.launch(**launch_options)
+    page,errors=load(browser,'questions')
+    page.locator('[data-main-tab="base"]').click()
+    assert page.locator('#qbOptionsEditor [data-option-principle-id="A"][value="principle-correct"]').count()==1
+    page.locator('#qbOptionsEditor [data-option-principle-id="A"][value="principle-correct"]').check()
+    page.locator('#qbOptionsEditor [data-option-principle-id="B"][value="principle-trap"]').check()
+    page.locator('#qbPrinciplePickerBtn').click()
+    page.locator('#qbPrinciplePickerOptions input[value="principle-stem"]').check()
+    page.locator('#qbPrinciplePickerConfirmBtn').click()
+    page.locator('#qbSaveQuestionBtn').click();page.wait_for_timeout(300)
+    bindings=page.evaluate("""()=>KGQuestionBankAdminAPI.getCurrentQuestion().metadata""")
+    assert bindings['stemPrincipleIds']==['principle-stem'],bindings
+    assert bindings['optionPrincipleMap']=={'A':['principle-correct'],'B':['principle-trap']},bindings
+    assert bindings['principleIds']==['principle-stem','principle-correct','principle-trap'],bindings
     assert not errors,errors
     page.close();browser.close()
   print('v90-p4313-teacher-browser-pass principle-config')
