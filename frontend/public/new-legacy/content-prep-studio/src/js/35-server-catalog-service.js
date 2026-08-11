@@ -60,7 +60,8 @@
       questions:(bundle?.questionBank?.questions||[]).map(question=>({
         id:question.id,contentHash:question.contentHash||'',serverRevision:question.serverRevision??null
       })),
-      principles:bundle?.principles||{},synthesisPresets:bundle?.synthesisPresets||{},tagConfig:bundle?.tagConfig||{}
+      principles:bundle?.principles||{},synthesisPresets:bundle?.synthesisPresets||{},tagConfig:bundle?.tagConfig||{},
+      knowledgeTree:bundle?.knowledgeTree||null,recallLibrary:bundle?.recallLibrary||null
     });
   }
   function idempotencyKey(workspace,fingerprint){
@@ -220,6 +221,34 @@
       return (await request(`/question-catalog/banks?${query}`)).banks||[];
     },
     async loadCatalog(){return request('/question-catalog/bootstrap?mode=managed')},
+    async loadSharedContent(subjectId='PMP'){
+      return request(`/content-prep/shared-content?subjectId=${encodeURIComponent(String(subjectId||'PMP'))}`);
+    },
+    async saveSharedContent(bundle,{subjectId='PMP',contentRevision=0}={}){
+      const result=await request('/content-prep/shared-content',{
+        method:'PUT',body:JSON.stringify({
+          subjectId:String(subjectId||'PMP'),contentRevision:Number(contentRevision),
+          knowledgeTree:cloneJson(bundle?.knowledgeTree||null),recallLibrary:cloneJson(bundle?.recallLibrary||null),
+          principles:cloneJson(bundle?.principles||{}),synthesisPresets:cloneJson(bundle?.synthesisPresets||{}),
+          tagConfig:cloneJson(bundle?.tagConfig||{})
+        })
+      });
+      publishContentRevision(result,{entityType:'contentPrepWorkspace',entityId:String(subjectId||'PMP')});return result;
+    },
+    async savePrinciple(principle,preset,{contentRevision=0,isNew=false}={}){
+      const id=String(principle?.id||'');
+      const result=await request(isNew?'/content-prep/principles':`/content-prep/principles/${encodeURIComponent(id)}`,{
+        method:isNew?'POST':'PUT',body:JSON.stringify({contentRevision:Number(contentRevision),principle:cloneJson(principle),preset:cloneJson(preset)})
+      });
+      publishContentRevision(result,{entityType:'principle',entityId:id});return result;
+    },
+    async deletePrinciple(principleId,{contentRevision=0}={}){
+      const id=String(principleId||'');
+      const result=await request(`/content-prep/principles/${encodeURIComponent(id)}`,{
+        method:'DELETE',body:JSON.stringify({contentRevision:Number(contentRevision)})
+      });
+      publishContentRevision(result,{entityType:'principle',entityId:id});return result;
+    },
     async createBank(input){
       const result=await request('/content-prep/banks',{method:'POST',body:JSON.stringify(input)});
       publishContentRevision(result,{entityType:'bank',entityId:String(result?.bank?.id||'')});
@@ -249,7 +278,10 @@
         })),
         principles:cloneJson(bundle?.principles||{}),
         synthesisPresets:cloneJson(bundle?.synthesisPresets||{}),
-        tagConfig:cloneJson(bundle?.tagConfig||{})
+        tagConfig:cloneJson(bundle?.tagConfig||{}),
+        subjectId:String(bundle?.knowledgeTree?.taxonomy?.subjectId||bundle?.knowledgeTree?.subjectId||bundle?.questionBank?.subject||'PMP'),
+        knowledgeTree:cloneJson(bundle?.knowledgeTree||null),
+        recallLibrary:cloneJson(bundle?.recallLibrary||null)
         };
         const posted=await request('/content-prep/batches',{method:'POST',body:JSON.stringify(payload)});
         const result={...posted,status:'committed',batch:null};

@@ -28,9 +28,9 @@
     </select></div>
     <button class="help-center-btn" id="btnHelpCenter" type="button">帮助中心</button>
     <button class="creator-switch-btn" id="btnSwitchCreator" type="button">切换制作人</button>
-    <button class="header-save-btn" id="btnQuickSaveWorkspace" type="button">保存工作区</button>
+    <button class="header-save-btn" id="btnQuickSaveWorkspace" type="button">保存到服务器</button>
     <span class="badge" id="hdrSaveStatus">尚未保存</span>
-    <span class="badge">独立本地保存 · 不写正式程序存储</span>
+    <span class="badge">服务端共享 · 本机仅作故障恢复副本</span>
   </div>
 </header>
 
@@ -231,16 +231,16 @@ D原则：principle-role-accountability</pre>
         <div class="data-card"><h3>标签配置</h3><b id="baseTagCount">0</b><div class="muted">主程序预设槽位</div></div>
       </div>
       <div class="save-panel">
-        <div class="section-title"><span>本地工作区保存</span><span class="save-status" id="localSaveStatus">尚未保存</span></div>
+        <div class="section-title"><span>服务端共享工作区</span><span class="save-status" id="localSaveStatus">尚未保存</span></div>
         <div class="help">
-          适合几百题分多次处理。保存内容包括题库、知识树、联想库、原则、归纳卡、标签配置和当前编辑位置。
-          数据写入本工具独立 IndexedDB：<code>pmp_content_prep_studio_v1</code>，不会使用正式程序的 <code>kg_*</code> 存储。
-          重要项目仍建议定期“导出工作区草稿”，用于跨浏览器/跨目录备份。
+          点击保存会把题库、知识树、联想库、原则、归纳卡和标签配置一起提交到服务器，管理员与所有教师共享，主程序无需手工导入即可读取。
+          IndexedDB <code>pmp_content_prep_studio_v1</code> 仅保留故障恢复副本，不再作为正式数据源。
+          重要项目仍建议定期“导出工作区草稿”作为额外备份。
         </div>
         <div class="toolbar" style="margin-top:9px">
-          <button class="btn primary" id="btnSaveWorkspaceLocal">保存到本机</button>
-          <button class="btn" id="btnRestoreWorkspaceLocal">恢复上次保存</button>
-          <button class="btn danger" id="btnDeleteWorkspaceLocal">删除本机保存</button>
+          <button class="btn primary" id="btnSaveWorkspaceLocal">保存到服务器</button>
+          <button class="btn" id="btnRestoreWorkspaceLocal">恢复本机副本</button>
+          <button class="btn danger" id="btnDeleteWorkspaceLocal">删除本机副本</button>
           <label style="display:inline-flex;align-items:center;gap:6px;margin:0"><input type="checkbox" id="chkAutoSaveWorkspace"> 每 60 秒自动保存有变更的工作区</label>
         </div>
       </div>

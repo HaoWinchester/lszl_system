@@ -141,11 +141,53 @@ async function testRejectedBatchNeverMutatesSyncMetadata(){
   assert.equal(question.lastSyncedAt,'old-time');
 }
 
+async function testCompleteSyncCarriesEverySharedAsset(){
+  let body=null;
+  const service=loadService(async(url,options={})=>{
+    assert.equal(url,'/api/v1/content-prep/batches');body=JSON.parse(options.body);
+    return response(200,{batchId:'batch-assets',bankId:'bank-1',bankRevision:2,contentRevision:9,questions:[]});
+  });
+  const workspace={serverBankId:'bank-1',serverBankRevision:1,clientInstanceId:'client-1',lastIdempotencyKey:'',lastBatchId:''};
+  await service.uploadBundle({
+    questionBank:{subject:'PMP',questions:[]},
+    knowledgeTree:{taxonomy:{id:'taxonomy-1',subjectId:'subject-pmp',nodes:[]}},
+    recallLibrary:{schemaVersion:1,nodes:[{id:'recall-1'}],edges:[]},
+    principles:{},synthesisPresets:{},tagConfig:{names:{stage:'阶段'}},
+  },{workspace,creatorId:'creator_001',questions:[]});
+  assert.equal(body.subjectId,'subject-pmp');
+  assert.equal(body.knowledgeTree.taxonomy.id,'taxonomy-1');
+  assert.equal(body.recallLibrary.nodes[0].id,'recall-1');
+  assert.equal(body.tagConfig.names.stage,'阶段');
+  assert.deepEqual(body.questions,[]);
+}
+
+async function testSharedContentAndPrincipleCrudUseServerApis(){
+  const calls=[];
+  const service=loadService(async(url,options={})=>{
+    calls.push({url,method:options.method||'GET',body:options.body?JSON.parse(options.body):null});
+    return response(200,{contentRevision:calls.length,principles:{items:[]},synthesisPresets:{items:[]}});
+  });
+  await service.loadSharedContent('subject-pmp');
+  await service.saveSharedContent({knowledgeTree:null,recallLibrary:{nodes:[],edges:[]},principles:{},synthesisPresets:{},tagConfig:{}},{subjectId:'subject-pmp',contentRevision:1});
+  await service.savePrinciple({id:'p-1'},{id:'sp-1',principleId:'p-1'},{contentRevision:2});
+  await service.deletePrinciple('p-1',{contentRevision:3});
+  assert.deepEqual(calls.map(call=>[call.method,call.url]),[
+    ['GET','/api/v1/content-prep/shared-content?subjectId=subject-pmp'],
+    ['PUT','/api/v1/content-prep/shared-content'],
+    ['PUT','/api/v1/content-prep/principles/p-1'],
+    ['DELETE','/api/v1/content-prep/principles/p-1'],
+  ]);
+  assert.equal(calls[1].body.contentRevision,1);
+  assert.equal(calls[2].body.principle.id,'p-1');
+}
+
 Promise.resolve()
   .then(testRelativeUrlsAndCredentials)
   .then(testStableErrorMapping)
   .then(testWorkspaceMetadataMigrationIsStableAndContentSafe)
   .then(testNetworkRetryReusesIdempotencyKeyAndCommitsMetadataLast)
   .then(testRejectedBatchNeverMutatesSyncMetadata)
+  .then(testCompleteSyncCarriesEverySharedAsset)
+  .then(testSharedContentAndPrincipleCrudUseServerApis)
   .then(()=>console.log('server catalog contracts: passed'))
   .catch(error=>{console.error(error);process.exitCode=1});

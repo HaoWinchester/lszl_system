@@ -445,8 +445,23 @@ function renderPrincipleEditor(){
   box.innerHTML=`<div class="form-grid"><div><label>原则 ID</label><input type="text" value="${esc(p.id)}" disabled></div><div><label>状态</label><select id="pmPrincipleStatus"><option value="active"${p.status==='active'?' selected':''}>active</option><option value="inactive"${p.status==='inactive'?' selected':''}>inactive</option></select></div><div class="span2"><label>原则名称</label><input id="pmPrincipleName" type="text" value="${esc(p.name)}"></div><div class="span2"><label>易混淆原则 IDs</label><input id="pmConfusable" type="text" value="${esc((p.confusablePrincipleIds||[]).join(', '))}"></div></div>
   <div class="section"><div class="section-title">系统预设归纳卡</div><div class="form-grid"><div class="span2"><label>标题（与原则名称自动一致）</label><input id="pmPresetTitle" type="text" readonly value="${esc('原则：'+p.name)}"></div><div class="span2"><label>内容</label><textarea id="pmPresetContent">${esc(preset?.content||'')}</textarea></div><div><label>状态</label><select id="pmPresetStatus"><option value="draft"${preset?.status==='draft'||!preset?' selected':''}>draft</option><option value="active"${preset?.status==='active'?' selected':''}>active</option><option value="inactive"${preset?.status==='inactive'?' selected':''}>inactive</option></select></div><div><label>版本</label><input id="pmPresetVersion" type="number" min="1" value="${preset?.version||1}"></div></div></div>
   <div class="section toolbar"><button class="btn primary" id="pmSave">保存原则与归纳卡</button><button class="btn danger" id="pmDelete">删除原则</button></div>`;
-  document.getElementById('pmSave').onclick=()=>{p.name=document.getElementById('pmPrincipleName').value.trim()||'未命名原则';p.status=document.getElementById('pmPrincipleStatus').value;p.confusablePrincipleIds=unique(cleanList(document.getElementById('pmConfusable').value));p.updatedAt=Date.now();const title='原则：'+p.name,content=document.getElementById('pmPresetContent').value.trim(),status=document.getElementById('pmPresetStatus').value,version=Math.max(1,Number(document.getElementById('pmPresetVersion').value||1));preset=preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()};Object.assign(preset,{principleId:p.id,title,content,status,version,updatedAt:Date.now()});const idx=state.synthesisPresets.items.findIndex(x=>x.id===preset.id);if(idx>=0)state.synthesisPresets.items[idx]=preset;else state.synthesisPresets.items.push(preset);renderPrincipleList();renderPrincipleEditor();renderQuestions();toast('原则与归纳卡已保存')};
-  document.getElementById('pmDelete').onclick=()=>{if(!confirm('删除该原则及其归纳卡？题目中的旧原则 ID 会在校验中心提示。'))return;state.principles.items=state.principles.items.filter(x=>x.id!==p.id);state.synthesisPresets.items=state.synthesisPresets.items.filter(x=>x.principleId!==p.id);state.currentPrincipleId=state.principles.items[0]?.id||'';renderPrincipleList();renderPrincipleEditor();renderQuestions()};
+  document.getElementById('pmSave').onclick=async()=>{
+    const controller=window.PMPPrepServerPrinciples;if(!controller){alert('服务器原则接口尚未就绪，请登录后重试。');return}
+    const button=document.getElementById('pmSave');button.disabled=true;
+    const principle={...p,name:document.getElementById('pmPrincipleName').value.trim()||'未命名原则',status:document.getElementById('pmPrincipleStatus').value,confusablePrincipleIds:unique(cleanList(document.getElementById('pmConfusable').value)),updatedAt:Date.now()};
+    const nextPreset={...(preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()}),principleId:p.id,title:'原则：'+principle.name,content:document.getElementById('pmPresetContent').value.trim(),status:document.getElementById('pmPresetStatus').value,version:Math.max(1,Number(document.getElementById('pmPresetVersion').value||1)),updatedAt:Date.now()};
+    try{await controller.save(principle,nextPreset);toast('原则与归纳卡已保存到服务器')}
+    catch(error){alert('服务器保存失败：'+(error?.message||error))}
+    finally{button.disabled=false}
+  };
+  document.getElementById('pmDelete').onclick=async()=>{
+    if(!confirm('从共享服务器删除该原则及其归纳卡？题目中的旧原则 ID 会在校验中心提示。'))return;
+    const controller=window.PMPPrepServerPrinciples;if(!controller){alert('服务器原则接口尚未就绪，请登录后重试。');return}
+    const button=document.getElementById('pmDelete');button.disabled=true;
+    try{await controller.remove(p.id);toast('原则与归纳卡已从服务器删除')}
+    catch(error){alert('服务器删除失败：'+(error?.message||error))}
+    finally{button.disabled=false}
+  };
 }
 function tagAliasesForSlot(slot){return unique(cleanList(state.tagConfig?.slotAliases?.[slot]||[]))}
 function exportTagConfig(){

@@ -59,7 +59,7 @@
     const canSyncQuestion=!question?.serverRevision||lease.questionId===question.id&&lease.canSave;
     createButton.disabled=!authenticated||!prepRuntime.creatorProfile;
     loadButton.disabled=!authenticated||!prepRuntime.creatorProfile||!questionInput.value.trim();
-    syncButton.disabled=!serverEnabled()||!state.questionBank.questions.length||!canSyncQuestion;
+    syncButton.disabled=!serverEnabled()||!canSyncQuestion;
   }
   function renderActor(){
     actorName.textContent=actor?(actor.display_name||actor.displayName||actor.username):'未登录';
@@ -84,6 +84,75 @@
       prepRuntime.serverBanks=[];renderBanks([]);return [];
     }
   }
+  function normalizeSharedContent(payload){
+    const tree=payload?.knowledgeTree;
+    return {
+      knowledgeTree:tree?(typeof normalizeTree==='function'?normalizeTree(tree):tree.taxonomy||tree):null,
+      recallLibrary:typeof normalizeRecall==='function'?normalizeRecall(payload?.recallLibrary||{}):(payload?.recallLibrary||{schemaVersion:1,nodes:[],edges:[]}),
+      principles:typeof normalizePrinciples==='function'?normalizePrinciples(payload?.principles||{}):(payload?.principles||{schemaVersion:1,items:[]}),
+      synthesisPresets:typeof normalizePresets==='function'?normalizePresets(payload?.synthesisPresets||{}):(payload?.synthesisPresets||{schemaVersion:1,items:[]}),
+      tagConfig:typeof normalizeTagConfig==='function'?normalizeTagConfig(payload?.tagConfig||{}):(payload?.tagConfig||{schemaVersion:2,names:{}}),
+      contentRevision:Number(payload?.contentRevision||0)
+    };
+  }
+  function applySharedContent(payload,{refresh=true}={}){
+    const shared=normalizeSharedContent(payload);
+    if(shared.knowledgeTree)state.knowledgeTree=shared.knowledgeTree;
+    state.recallLibrary=shared.recallLibrary;
+    state.principles=shared.principles;
+    state.synthesisPresets=shared.synthesisPresets;
+    state.tagConfig=shared.tagConfig;
+    prepRuntime.serverContentRevision=Math.max(Number(prepRuntime.serverContentRevision||0),shared.contentRevision);
+    state.currentPrincipleId=state.principles.items.some(item=>item.id===state.currentPrincipleId)
+      ?state.currentPrincipleId:(state.principles.items[0]?.id||'');
+    if(refresh)refreshAll();
+    return shared;
+  }
+  async function refreshSharedContent(){
+    if(!actor)return null;
+    const subjectId=state.knowledgeTree?.subjectId||state.questionBank.subject||'PMP';
+    const payload=await Catalog.loadSharedContent(subjectId);
+    if(!prepRuntime.dirty)applySharedContent(payload);
+    return payload;
+  }
+  const ServerPrinciples=Object.freeze({
+    async save(principle,preset){
+      if(!actor)throw new Error('请先登录后再保存原则。');
+      const payload=await Catalog.savePrinciple(principle,preset,{contentRevision:Number(prepRuntime.serverContentRevision||0)});
+      applySharedContent(payload);markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
+      return payload;
+    },
+    async remove(principleId){
+      if(!actor)throw new Error('请先登录后再删除原则。');
+      const payload=await Catalog.deletePrinciple(principleId,{contentRevision:Number(prepRuntime.serverContentRevision||0)});
+      applySharedContent(payload);markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
+      return payload;
+    }
+  });
+  window.PMPPrepServerPrinciples=ServerPrinciples;
+
+  async function syncWorkspaceToServer({source='sync'}={}){
+    if(!serverEnabled())throw new Error('请先登录、选择制作人和服务器题库。');
+    syncButton.disabled=true;setStatus(source==='save'?'正在保存到服务器…':'正在同步到题库…');setIssues(null);
+    try{
+      const result=await Catalog.uploadBundle(ExportService.completeBundle(),{
+        workspace:prepRuntime,creatorId:prepRuntime.creatorProfile.creatorId,
+        questions:state.questionBank.questions,prepVersion:VERSION,workspaceVersion:'4'
+      });
+      prepRuntime.lastBatchId=result.batchId;
+      prepRuntime.serverContentRevision=Math.max(Number(prepRuntime.serverContentRevision||0),Number(result.contentRevision||0));
+      markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
+      setStatus(`已保存到服务器 · 批次 ${result.batchId}`,'good');toast('保存成功，主程序已同步');
+      return result;
+    }catch(error){
+      QuestionLocks.handleSaveError(error);
+      setStatus(error.message||'服务器保存失败，本机恢复副本已保留','bad');setIssues(error);
+      await saveWorkspaceLocal({silent:true});markWorkspaceDirty();throw error;
+    }finally{refreshButtons()}
+  }
+  window.PMPPrepSyncWorkspace=syncWorkspaceToServer;
+  document.getElementById('btnQuickSaveWorkspace').onclick=()=>syncWorkspaceToServer({source:'save'}).catch(()=>{});
+  document.getElementById('btnSaveWorkspaceLocal').onclick=()=>syncWorkspaceToServer({source:'save'}).catch(()=>{});
   function readServerProjection(key,normalizer){
     try{
       const raw=window.localStorage?.getItem?.(key);if(!raw)return null;
@@ -278,21 +347,7 @@
       setStatus('题目已从服务器载入','good');
     }catch(error){setStatus(error.message,'bad');setIssues(error)}finally{refreshButtons()}
   });
-  syncButton.addEventListener('click',async()=>{
-    syncButton.disabled=true;setStatus('正在同步到题库…');setIssues(null);
-    try{
-      const result=await Catalog.uploadBundle(ExportService.completeBundle(),{
-        workspace:prepRuntime,creatorId:prepRuntime.creatorProfile.creatorId,
-        questions:state.questionBank.questions,prepVersion:VERSION,workspaceVersion:'4'
-      });
-      prepRuntime.lastBatchId=result.batchId;markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
-      setStatus(`已进入题库 · 批次 ${result.batchId}`,'good');toast('上传成功，已进入题库');
-    }catch(error){
-      QuestionLocks.handleSaveError(error);
-      setStatus(error.message||'同步失败，本地草稿已保留','bad');setIssues(error);
-      await saveWorkspaceLocal({silent:true});
-    }finally{refreshButtons()}
-  });
+  syncButton.addEventListener('click',()=>syncWorkspaceToServer({source:'sync'}).catch(()=>{}));
 
   document.querySelectorAll('[data-creator-key]').forEach(button=>button.addEventListener('click',()=>{
     QuestionLocks.close().finally(()=>{
@@ -327,5 +382,6 @@
   });
   window.addEventListener('pagehide',()=>{remoteRetryStopped=true;clearTimeout(remoteRetryTimer);unsubscribeTeachingSync?.();window.removeEventListener?.('kg:server-state-reloaded',handleServerStateReload)});
   renderActor();refreshButtons();refreshBanks();
+  refreshSharedContent().catch(error=>{setStatus(error.message||'共享内容读取失败','bad');setIssues(error)});
   const initial=currentQuestion();if(initial?.serverRevision)QuestionLocks.switchTo(initial).then(()=>renderQuestionLockState());
 })();

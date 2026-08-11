@@ -26,6 +26,9 @@ const syncScript = fs.readFileSync(
 const prepCatalogService = read('content-prep-studio/src/js/35-server-catalog-service.js');
 const prepServerEvents = read('content-prep-studio/src/js/45-server-events.js');
 assert.match(prepCatalogService, /async loadCatalog\(/, 'Content Prep needs a managed catalog snapshot for remote read-only refreshes');
+assert.match(prepServerEvents, /PMPPrepServerPrinciples/, 'Content Prep principle editor must use a server CRUD controller');
+assert.match(prepServerEvents, /btnQuickSaveWorkspace[^]*syncWorkspaceToServer/, 'the header save button must commit to the server');
+assert.match(prepServerEvents, /btnSaveWorkspaceLocal[^]*syncWorkspaceToServer/, 'the workspace save button must commit to the server');
 
 for (const [name, html, shellClass] of [
   ['question-bank.html', questionPage, 'teacher-admin-shell'],
@@ -102,6 +105,7 @@ function loadPrepEvents({ listWritableBanks, loadCatalog } = {}) {
   let syncListener = null;
   let bankRefreshes = 0;
   let catalogRefreshes = 0;
+  const serverWrites = [];
   function element(id) {
     if (elements.has(id)) return elements.get(id);
     const handlers = new Map();
@@ -136,6 +140,9 @@ function loadPrepEvents({ listWritableBanks, loadCatalog } = {}) {
   };
   const state = {
     questionBank: { subject: 'PMP', name: '本地题库', questions: [question] },
+    knowledgeTree: { id: 'tax-local', subjectId: 'subject-pmp', nodes: [] },
+    recallLibrary: { schemaVersion: 1, nodes: [], edges: [] },
+    tagConfig: { schemaVersion: 2, names: {} },
     principles: { schemaVersion: 1, items: [{ id: 'principle-local', name: '本地原则', status: 'active', confusablePrincipleIds: [] }] },
     synthesisPresets: { schemaVersion: 1, items: [{ id: 'preset-local', principleId: 'principle-local', title: '本地归纳卡', content: '本地归纳内容', status: 'draft', version: 1 }] },
     currentQuestionId: question.id,
@@ -158,6 +165,10 @@ function loadPrepEvents({ listWritableBanks, loadCatalog } = {}) {
             contentRevision: 5,
           };
     },
+    async loadSharedContent() { return { contentRevision: 1, knowledgeTree: null, recallLibrary: state.recallLibrary, principles: state.principles, synthesisPresets: state.synthesisPresets, tagConfig: state.tagConfig }; },
+    async savePrinciple(principle,preset,options) { serverWrites.push({ type: 'principle-save', principle, preset, options }); return { contentRevision: 2, principles: { schemaVersion: 1, items: [principle] }, synthesisPresets: { schemaVersion: 1, items: [preset] }, recallLibrary:state.recallLibrary,tagConfig:state.tagConfig }; },
+    async deletePrinciple(id,options) { serverWrites.push({ type: 'principle-delete', id, options }); return { contentRevision: 3, principles: { schemaVersion: 1, items: [] }, synthesisPresets: { schemaVersion: 1, items: [] }, recallLibrary:state.recallLibrary,tagConfig:state.tagConfig }; },
+    async uploadBundle(bundle,options) { serverWrites.push({ type: 'workspace-save', bundle, options }); return { batchId: 'batch-save', bankId: 'bank-1', bankRevision: 2, contentRevision: 4, questions: [] }; },
     createEditLeaseController() { return { open: async () => ({}), close: async () => {}, reconfirm: async () => ({}), handleSaveError() {}, snapshot: () => ({}) }; },
     releaseLock: async () => true,
   };
@@ -180,7 +191,7 @@ function loadPrepEvents({ listWritableBanks, loadCatalog } = {}) {
     esc: value => String(value), markWorkspaceDirty() {}, prompt: () => null, QuestionService: { normalize: value => value },
     normalizePrinciples: value => value, normalizePresets: value => value,
     renderQuestionListOnly() {}, renderPrincipleList() {}, refreshHeader() {}, refreshAll() {},
-    nowIso: () => '2026-08-10T00:00:00Z', refreshAll() {}, ExportService: { completeBundle: () => ({}) },
+    nowIso: () => '2026-08-10T00:00:00Z', refreshAll() {}, ExportService: { completeBundle: () => ({questionBank:state.questionBank,knowledgeTree:{taxonomy:state.knowledgeTree},recallLibrary:state.recallLibrary,principles:state.principles,synthesisPresets:state.synthesisPresets,tagConfig:state.tagConfig}) },
     VERSION: '0.4.0', toast() {}, duplicateQuestion: async () => {}, CustomEvent, setTimeout, clearTimeout, console,
   });
   vm.runInContext(prepServerEvents, context);
@@ -198,6 +209,8 @@ function loadPrepEvents({ listWritableBanks, loadCatalog } = {}) {
     catalogRefreshes: () => catalogRefreshes,
     remote: detail => syncListener?.(detail),
     pagehide: () => windowListeners.get('pagehide')?.(),
+    serverWrites,
+    serverPrinciples: () => window.PMPPrepServerPrinciples,
   };
 }
 
@@ -325,6 +338,25 @@ async function testPrepPublishesOnlyCommittedServerChanges() {
 
   const offline = loadPrepService(async () => response(200, { bank: { id: 'offline-bank' }, contentRevision: 4 }), { withSync: false });
   assert.equal((await offline.service.createBank({ name: '离线兼容' })).id, 'offline-bank', 'offline Content Prep must continue when the sync global is absent');
+}
+
+async function testPrepPrincipleCrudAndWorkspaceSaveAreServerBacked() {
+  const prep = loadPrepEvents();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const principle = { id: 'principle-local', name: '服务器原则', status: 'active', confusablePrincipleIds: [] };
+  const preset = { id: 'preset-local', principleId: principle.id, title: '原则：服务器原则', content: '服务器内容', status: 'active', version: 1 };
+  await prep.serverPrinciples().save(principle,preset);
+  assert.equal(prep.serverWrites[0].type,'principle-save');
+  assert.equal(prep.state.principles.items[0].name,'服务器原则');
+  assert.equal(prep.prepRuntime.serverContentRevision,2);
+  await prep.serverPrinciples().remove(principle.id);
+  assert.equal(prep.serverWrites[1].type,'principle-delete');
+  assert.deepEqual(prep.state.principles.items,[]);
+  await prep.element('btnQuickSaveWorkspace').onclick();
+  assert.equal(prep.serverWrites[2].type,'workspace-save');
+  assert.equal(prep.serverWrites[2].bundle.knowledgeTree.taxonomy.id,'tax-local');
+  assert.ok(Object.hasOwn(prep.serverWrites[2].bundle,'recallLibrary'));
+  assert.equal(prep.prepRuntime.serverContentRevision,4);
 }
 
 async function testManagedAdminDirtyEditorPreservesFields() {
@@ -638,6 +670,7 @@ async function testPrepPagehideStopsInFlightRetryLoop() {
 }
 
 testPrepPublishesOnlyCommittedServerChanges()
+  .then(testPrepPrincipleCrudAndWorkspaceSaveAreServerBacked)
   .then(testManagedAdminDirtyEditorPreservesFields)
   .then(testManagedAdminJsonImportPersistsBeforeAnyQuestionSave)
   .then(testManagedAdminMergePreservesNestedDraft)

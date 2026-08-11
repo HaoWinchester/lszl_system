@@ -1,17 +1,27 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.34",
-  "toVersion": "v9.0-p4.1.35",
+  "fromVersion": "v9.0-p4.1.35",
+  "toVersion": "v9.0-p4.1.37",
   "changes": {
     "added": [
-      "tests/__pycache__/global-shortcut-tooltip-speed-browser.cpython-311.pyc",
-      "tests/global-shortcut-tooltip-speed-browser.py",
-      "tests/global-shortcut-tooltip-speed.test.js"
+      "tests/question-studio-server-sync.test.js"
     ],
     "changed": [
       "VERSION",
+      "content-prep-studio/dist/content-prep.html",
+      "content-prep-studio/src/index.template.html",
+      "content-prep-studio/src/js/10-state-domain.js",
+      "content-prep-studio/src/js/20-page-runtime.js",
+      "content-prep-studio/src/js/35-server-catalog-service.js",
+      "content-prep-studio/src/js/45-server-events.js",
+      "content-prep-studio/tests/test_server_catalog.js",
+      "question-studio/index.html",
+      "question-studio/question-studio-sync.js",
+      "question-studio/question-studio.js",
+      "question-studio/server-config.js",
       "src/39-global-shortcuts.js",
-      "styles/global-shortcuts.css"
+      "tests/content-prep-question-bank-integration.test.js",
+      "tests/global-shortcut-tooltip-speed-browser.py"
     ],
     "removed": []
   },
