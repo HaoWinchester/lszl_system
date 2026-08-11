@@ -854,22 +854,26 @@ function p45MigrationManifest(source) {
 }
 
 function hasIndexedDbBusinessPersistence(source) {
-  const propertyAccess = String.raw`(?:\?\.|\.)`
-  if (new RegExp(String.raw`\bindexedDB\s*${propertyAccess}\s*open\s*\(`).test(source)) return true
-  if (new RegExp(String.raw`${propertyAccess}\s*transaction\s*\([^)]*\)\s*${propertyAccess}\s*objectStore\s*\([^)]*\)\s*${propertyAccess}\s*(?:add|put|delete|clear)\s*\(`).test(source)) return true
+  const propertyAccess = (names) => String.raw`(?:\?\.\s*(?:${names})\b|\.\s*(?:${names})\b|\?\.\s*\[\s*['"](?:${names})['"]\s*\]|\[\s*['"](?:${names})['"]\s*\])`
+  const open = propertyAccess('open')
+  const transaction = propertyAccess('transaction')
+  const objectStore = propertyAccess('objectStore')
+  const mutation = propertyAccess('add|put|delete|clear')
+  if (new RegExp(String.raw`\bindexedDB\s*${open}\s*\(`).test(source)) return true
+  if (new RegExp(String.raw`${transaction}\s*\([^)]*\)\s*${objectStore}\s*\([^)]*\)\s*${mutation}\s*\(`).test(source)) return true
 
   const transactions = new Set()
-  const transactionPattern = new RegExp(String.raw`\b(?:(?:const|let|var)\s+)?([A-Za-z_$][\w$]*)\s*=\s*[A-Za-z_$][\w$]*\s*${propertyAccess}\s*transaction\s*\(`, 'g')
+  const transactionPattern = new RegExp(String.raw`\b(?:(?:const|let|var)\s+)?([A-Za-z_$][\w$]*)\s*=\s*[A-Za-z_$][\w$]*\s*${transaction}\s*\(`, 'g')
   for (const match of source.matchAll(transactionPattern)) {
     transactions.add(match[1])
   }
   const objectStores = new Set()
-  const objectStorePattern = new RegExp(String.raw`\b(?:(?:const|let|var)\s+)?([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*${propertyAccess}\s*objectStore\s*\(`, 'g')
+  const objectStorePattern = new RegExp(String.raw`\b(?:(?:const|let|var)\s+)?([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*${objectStore}\s*\(`, 'g')
   for (const match of source.matchAll(objectStorePattern)) {
     if (transactions.has(match[2])) objectStores.add(match[1])
   }
   if (!objectStores.size) return false
-  return new RegExp(String.raw`\b(?:${Array.from(objectStores).join('|')})\s*${propertyAccess}\s*(?:add|put|delete|clear)\s*\(`).test(source)
+  return new RegExp(String.raw`\b(?:${Array.from(objectStores).join('|')})\s*${mutation}\s*\(`).test(source)
 }
 
 function validateStorageContract(source) {

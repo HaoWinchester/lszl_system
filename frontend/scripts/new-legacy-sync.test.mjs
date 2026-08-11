@@ -302,6 +302,22 @@ test('sync rejects optional IndexedDB transaction and object-store writes in an 
   assert.match(result.stderr, /IndexedDB business persistence is forbidden in migrated module: src\/p45-fixture\.js/)
 })
 
+test('sync rejects optional bracket IndexedDB persistence in an unlisted module', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/p45-fixture.js'), [
+    "const db = indexedDB?.['open']('business-workspace')",
+    "const tx = db?.['transaction']('workspace', 'readwrite')",
+    "const store = tx?.['objectStore']('workspace')",
+    "store?.['put']({ id: 1 })",
+  ].join('\n'))
+
+  const result = runSync(item)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /IndexedDB business persistence is forbidden in migrated module: src\/p45-fixture\.js/)
+})
+
 test('sync rejects split IndexedDB writes assigned after declaration in a migrated module', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))
