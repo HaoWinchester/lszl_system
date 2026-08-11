@@ -10,6 +10,10 @@ const contract = JSON.parse(readFileSync(resolve(scriptsDir, 'new-legacy-contrac
 const p45PersistenceContract = JSON.parse(readFileSync(resolve(scriptsDir, 'p45-persistence-contract.json'), 'utf8'))
 const learningEntryChooserAssets = ['src/31-learning-entry-chooser.js']
 const learningEntryChooserStorageKeys = ['kg_learning_entry_chooser_claim_v1', 'kg_learning_entry_chooser_consumed_v1']
+const legacyUnmigratedIndexedDbModules = Object.freeze([
+  'content-prep-studio/src/js/10-state-domain.js',
+  'content-prep-studio/dist/content-prep.html',
+])
 
 function parseArgs(argv) {
   const args = { source: resolve(repoDir, 'new-legacy'), out: resolve(frontendDir, 'public', 'new-legacy') }
@@ -835,19 +839,24 @@ function p45MigrationManifest(source) {
   } catch {
     throw new Error('P4.5 migration manifest is invalid')
   }
+  const declaredDebtModules = manifest?.legacyUnmigratedIndexedDbModules
+  const expectedDebtModules = new Set(legacyUnmigratedIndexedDbModules)
   if (
     !manifest
     || typeof manifest !== 'object'
     || Array.isArray(manifest)
     || Object.keys(manifest).length !== 1
     || Object.keys(manifest)[0] !== 'legacyUnmigratedIndexedDbModules'
-    || !Array.isArray(manifest.legacyUnmigratedIndexedDbModules)
-    || manifest.legacyUnmigratedIndexedDbModules.some((path) => typeof path !== 'string')
+    || !Array.isArray(declaredDebtModules)
+    || declaredDebtModules.some((path) => typeof path !== 'string')
+    || declaredDebtModules.length !== expectedDebtModules.size
+    || new Set(declaredDebtModules).size !== declaredDebtModules.length
+    || declaredDebtModules.some((path) => !expectedDebtModules.has(path))
   ) {
     throw new Error('P4.5 migration manifest is invalid')
   }
   return {
-    legacyUnmigratedIndexedDbModules: new Set(manifest.legacyUnmigratedIndexedDbModules),
+    legacyUnmigratedIndexedDbModules: expectedDebtModules,
   }
 }
 

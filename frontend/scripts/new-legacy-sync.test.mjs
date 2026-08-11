@@ -104,7 +104,10 @@ function fixture({ omit, omitP45MigrationManifest = false } = {}) {
   }
   if (!omitP45MigrationManifest) {
     write(resolve(upstream, 'p45-migration-manifest.json'), JSON.stringify({
-      legacyUnmigratedIndexedDbModules: [],
+      legacyUnmigratedIndexedDbModules: [
+        'content-prep-studio/src/js/10-state-domain.js',
+        'content-prep-studio/dist/content-prep.html',
+      ],
     }))
   }
   return { root, upstream, output }
@@ -195,6 +198,54 @@ test('sync rejects IndexedDB persistence in every non-debt P4.5 module', (t) => 
 
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /IndexedDB business persistence is forbidden in migrated module: src\/p45-fixture\.js/)
+})
+
+test('sync rejects a manifest that self-declares an extra IndexedDB debt module before scanning source', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'p45-migration-manifest.json'), JSON.stringify({
+    legacyUnmigratedIndexedDbModules: [
+      'content-prep-studio/src/js/10-state-domain.js',
+      'content-prep-studio/dist/content-prep.html',
+      'src/p45-fixture.js',
+    ],
+  }))
+  write(resolve(item.upstream, 'src/p45-fixture.js'), "indexedDB.open('business-workspace')\n")
+
+  const result = runSync(item)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /P4\.5 migration manifest is invalid/)
+  assert.doesNotMatch(result.stderr, /IndexedDB business persistence is forbidden/)
+})
+
+test('sync rejects missing, duplicate, and additional P4.5 IndexedDB debt entries before scanning source', (t) => {
+  const manifests = [
+    ['content-prep-studio/src/js/10-state-domain.js'],
+    [
+      'content-prep-studio/src/js/10-state-domain.js',
+      'content-prep-studio/dist/content-prep.html',
+      'content-prep-studio/dist/content-prep.html',
+    ],
+    [
+      'content-prep-studio/src/js/10-state-domain.js',
+      'content-prep-studio/dist/content-prep.html',
+      'src/another-fixture.js',
+    ],
+  ]
+
+  for (const legacyUnmigratedIndexedDbModules of manifests) {
+    const item = fixture()
+    t.after(() => rmSync(item.root, { recursive: true, force: true }))
+    write(resolve(item.upstream, 'p45-migration-manifest.json'), JSON.stringify({ legacyUnmigratedIndexedDbModules }))
+    write(resolve(item.upstream, 'src/p45-fixture.js'), "indexedDB.open('business-workspace')\n")
+
+    const result = runSync(item)
+
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /P4\.5 migration manifest is invalid/)
+    assert.doesNotMatch(result.stderr, /IndexedDB business persistence is forbidden/)
+  }
 })
 
 test('sync rejects optional IndexedDB open in an unlisted module', (t) => {
