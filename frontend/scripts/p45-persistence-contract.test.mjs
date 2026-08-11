@@ -62,3 +62,11 @@ test('P4.5 runtime manifest is accepted by the frontend build contract', () => {
   for (const key of p45.runtime.exactKeys) assert.ok(contract.runtimeStorage.exactKeys.includes(key), key)
   for (const prefix of p45.runtime.prefixes) assert.ok(contract.runtimeStorage.prefixes.includes(prefix), prefix)
 })
+
+test('P4.5 limits session persistence to navigation and preview token prefixes', () => {
+  const p45 = readJson(p45Path)
+  assert.deepEqual(p45.sessionOnlyPrefixes, [
+    'kg_teacher_preview_',
+    'kg_learning_route_context_',
+  ])
+})

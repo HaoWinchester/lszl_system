@@ -148,7 +148,59 @@ test('sync rejects an unregistered future business-storage key', (t) => {
 
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /kg_future_business_state_v1/)
-  assert.match(result.stderr, /未登记/)
+  assert.match(result.stderr, /P4\.5 persistent state is not registered/)
+})
+
+test('sync reports the P4.5 contract diagnostic for an unregistered persistent key', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/p45-fixture.js'), "localStorage.setItem('kg_p45_unregistered_payload_v1', '{}')\n")
+
+  const result = runSync(item)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /P4\.5 persistent state is not registered: kg_p45_unregistered_payload_v1/)
+})
+
+test('sync rejects IndexedDB persistence in a migrated P4.5 business module', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/p45-fixture.js'), "indexedDB.open('business-workspace')\n")
+  write(resolve(item.upstream, 'p45-migration-manifest.json'), JSON.stringify({
+    migratedBusinessModules: {
+      'src/p45-fixture.js': {},
+    },
+  }))
+
+  const result = runSync(item)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /IndexedDB business persistence is forbidden in migrated module: src\/p45-fixture\.js/)
+})
+
+test('sync permits IndexedDB in an offline-export-only migrated module', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/p45-fixture.js'), "indexedDB.open('export-cache')\n")
+  write(resolve(item.upstream, 'p45-migration-manifest.json'), JSON.stringify({
+    migratedBusinessModules: {
+      'src/p45-fixture.js': { offlineExportOnly: true },
+    },
+  }))
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+})
+
+test('sync permits P4.5 session-only navigation and preview tokens', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/p45-fixture.js'), "sessionStorage.setItem('kg_teacher_preview_123', 'token')\n")
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
 })
 
 test('sync permits deprecated question keys for reads but rejects new direct writes', (t) => {

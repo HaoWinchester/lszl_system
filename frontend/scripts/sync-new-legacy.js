@@ -7,6 +7,7 @@ const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const frontendDir = resolve(scriptsDir, '..')
 const repoDir = resolve(frontendDir, '..')
 const contract = JSON.parse(readFileSync(resolve(scriptsDir, 'new-legacy-contract.json'), 'utf8'))
+const p45PersistenceContract = JSON.parse(readFileSync(resolve(scriptsDir, 'p45-persistence-contract.json'), 'utf8'))
 const learningEntryChooserAssets = ['src/31-learning-entry-chooser.js']
 const learningEntryChooserStorageKeys = ['kg_learning_entry_chooser_claim_v1', 'kg_learning_entry_chooser_consumed_v1']
 
@@ -825,21 +826,39 @@ function diffFiles(previous = {}, next = {}) {
   return { added, changed, removed }
 }
 
+function p45MigratedBusinessModules(source) {
+  const manifestPath = resolve(source, 'p45-migration-manifest.json')
+  if (!existsSync(manifestPath)) return new Map()
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  return new Map(Object.entries(manifest.migratedBusinessModules || {}))
+}
+
 function validateStorageContract(source) {
   const storage = contract.runtimeStorage || {}
-  const exact = new Set([...(storage.exactKeys || []), ...learningEntryChooserStorageKeys])
-  const prefixes = storage.prefixes || []
+  const p45Runtime = p45PersistenceContract.runtime || {}
+  const exact = new Set([
+    ...(storage.exactKeys || []),
+    ...(p45Runtime.exactKeys || []),
+    ...learningEntryChooserStorageKeys,
+  ])
+  const prefixes = [...(storage.prefixes || []), ...(p45Runtime.prefixes || [])]
+  const sessionOnlyPrefixes = p45PersistenceContract.sessionOnlyPrefixes || []
   const legacyReadOnly = storage.legacyReadOnlyKeys || {}
   const readOnlyExact = new Set(legacyReadOnly.exactKeys || [])
   const readOnlyPrefixes = legacyReadOnly.prefixes || []
   const ignored = new Set(storage.ignoredLiterals || [])
   const candidates = new Set()
+  const sessionOnlyKeys = new Set()
   const readOnlyWrites = new Set()
   const literalPattern = /(['"])(kg_[A-Za-z0-9_]+|pmp_question_font_size_v\d+|通用知识点关系图谱工具_[^'"\\\r\n]+)\1/g
   const writePattern = /(?:localStorage|sessionStorage)\s*(?:\?\.|\.)\s*(?:setItem|removeItem)\s*\(\s*(['"])(kg_[A-Za-z0-9_]+)\1/g
+  const sessionTokenPattern = /sessionStorage\s*(?:\?\.|\.)\s*(?:getItem|setItem|removeItem)\s*\(\s*(['"])(kg_[A-Za-z0-9_]+)\1/g
   for (const path of walk(source).filter((item) => item.endsWith('.js') || item.endsWith('.html'))) {
     const contents = readFileSync(resolve(source, path), 'utf8')
     for (const match of contents.matchAll(literalPattern)) candidates.add(match[2])
+    for (const match of contents.matchAll(sessionTokenPattern)) {
+      if (sessionOnlyPrefixes.some((prefix) => match[2].startsWith(prefix))) sessionOnlyKeys.add(match[2])
+    }
     for (const match of contents.matchAll(writePattern)) {
       const key = match[2]
       if (readOnlyExact.has(key) || readOnlyPrefixes.some((prefix) => key.startsWith(prefix))) {
@@ -854,13 +873,22 @@ function validateStorageContract(source) {
       && !readOnlyExact.has(key)
       && !prefixes.some((prefix) => key.startsWith(prefix))
       && !readOnlyPrefixes.some((prefix) => key.startsWith(prefix))
+      && !sessionOnlyKeys.has(key)
     ))
     .sort()
   if (unknown.length) {
-    throw new Error(`new-legacy 出现未登记的业务存储键：${unknown.join(', ')}`)
+    throw new Error(`P4.5 persistent state is not registered: ${unknown.join(', ')}`)
   }
   if (readOnlyWrites.size) {
     throw new Error(`new-legacy 只读旧键禁止新增写调用：${Array.from(readOnlyWrites).sort().join(', ')}`)
+  }
+
+  for (const [path, options] of p45MigratedBusinessModules(source)) {
+    if (options?.offlineExportOnly) continue
+    const contents = readFileSync(resolve(source, path), 'utf8')
+    if (/\bindexedDB\s*\.\s*open\s*\(|\.\s*(?:add|put|delete|clear)\s*\(/.test(contents)) {
+      throw new Error(`IndexedDB business persistence is forbidden in migrated module: ${path}`)
+    }
   }
 }
 
