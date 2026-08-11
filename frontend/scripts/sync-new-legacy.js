@@ -838,11 +838,11 @@ function hasIndexedDbBusinessPersistence(source) {
   if (/\.\s*transaction\s*\([^)]*\)\s*\.\s*objectStore\s*\([^)]*\)\s*\.\s*(?:add|put|delete|clear)\s*\(/.test(source)) return true
 
   const transactions = new Set()
-  for (const match of source.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*[A-Za-z_$][\w$]*\s*\.\s*transaction\s*\(/g)) {
+  for (const match of source.matchAll(/\b(?:(?:const|let|var)\s+)?([A-Za-z_$][\w$]*)\s*=\s*[A-Za-z_$][\w$]*\s*\.\s*transaction\s*\(/g)) {
     transactions.add(match[1])
   }
   const objectStores = new Set()
-  for (const match of source.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*\.\s*objectStore\s*\(/g)) {
+  for (const match of source.matchAll(/\b(?:(?:const|let|var)\s+)?([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*\.\s*objectStore\s*\(/g)) {
     if (transactions.has(match[2])) objectStores.add(match[1])
   }
   if (!objectStores.size) return false
