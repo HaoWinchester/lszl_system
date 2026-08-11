@@ -146,7 +146,7 @@ def test_failed_bundle_rolls_back_all_business_writes_but_records_failure() -> N
                 await upload_bundle(db, actor, request)
             assert failure.value.code == "QUESTION_VALIDATION_FAILED"
             assert any(
-                issue.field == "metadata.principleIds[0]"
+                issue.field == "metadata.stemPrincipleIds[0]"
                 and issue.question_id == new_id
                 for issue in failure.value.issues
             )

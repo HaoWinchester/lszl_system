@@ -150,7 +150,12 @@ def test_legacy_question_endpoints_delegate_access_and_preserve_new_fields() -> 
             assert question["contentHash"] != "forged"
             assert question["createdBy"] == usernames["owner"]
             assert question["translations"] == {"en": {"analysis": "Original"}}
-            assert question["metadata"] == {"knowledge": {"mappingStatus": "unmapped"}}
+            assert question["metadata"] == {
+                "knowledge": {"mappingStatus": "unmapped"},
+                "stemPrincipleIds": [],
+                "optionPrincipleMap": {},
+                "principleIds": [],
+            }
             assert question["keyPath"] == {"answerId": "B"}
             original_hash = question["contentHash"]
 
@@ -172,7 +177,12 @@ def test_legacy_question_endpoints_delegate_access_and_preserve_new_fields() -> 
             assert updated_question["contentHash"] != original_hash
             assert updated_question["updatedBy"] == usernames["editor"]
             assert updated_question["translations"] == {"en": {"analysis": "Original"}}
-            assert updated_question["metadata"] == {"knowledge": {"mappingStatus": "unmapped"}}
+            assert updated_question["metadata"] == {
+                "knowledge": {"mappingStatus": "unmapped"},
+                "stemPrincipleIds": [],
+                "optionPrincipleMap": {},
+                "principleIds": [],
+            }
             assert updated_question["keyPath"] == {"answerId": "B"}
 
             client.post("/api/v1/auth/logout")
