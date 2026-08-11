@@ -3,6 +3,7 @@ frontend/new-legacy-releases/
 
 # 工具缓存 / 生成物 / 源材料（不跟踪，文件保留）
 .superpowers/
+.worktrees/
 UI/
 **/__pycache__/
 docs/superpowers/plans/
