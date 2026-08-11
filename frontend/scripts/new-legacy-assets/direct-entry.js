@@ -2,9 +2,8 @@
 
 ;(function (global) {
   const bootstrapUsername = String(global.__KG_DIRECT_BOOTSTRAP__?.username || '')
+  const bootstrapAuthenticated = global.__KG_DIRECT_BOOTSTRAP__?.authenticated === true
   let reloadingForSession = false
-  let pendingChooserFor = ''
-  let pendingChooser = Promise.resolve({ shown: false })
 
   function showLearningEntryChooser() {
     if (!global.KGLearningEntryChooser || typeof global.KGLearningEntryChooser.init !== 'function') {
@@ -13,21 +12,21 @@
     return Promise.resolve(global.KGLearningEntryChooser.init()).catch(() => ({ shown: false }))
   }
 
+  function matchesBootstrap(username) {
+    return bootstrapAuthenticated && !!username && username === bootstrapUsername
+  }
+
   global.addEventListener('kg:auth-session-changed', (event) => {
-    pendingChooserFor = String(event?.detail?.username || '')
-    pendingChooser = showLearningEntryChooser()
+    const nextUsername = String(event?.detail?.username || '')
+    if (event?.detail?.authenticated && matchesBootstrap(nextUsername)) showLearningEntryChooser()
   })
 
   global.addEventListener('kg-auth-session-change', (event) => {
     if (event?.detail?.provider !== 'remote') return
     const nextUsername = String(event?.detail?.username || '')
-    const chooserForThisSession = pendingChooserFor === nextUsername ? pendingChooser : Promise.resolve({ shown: false })
-    pendingChooserFor = ''
-    chooserForThisSession.then((result) => {
-      if (result?.shown || reloadingForSession || nextUsername === bootstrapUsername) return
-      reloadingForSession = true
-      global.location.reload()
-    })
+    if (reloadingForSession || matchesBootstrap(nextUsername)) return
+    reloadingForSession = true
+    global.location.reload()
   })
 
   function currentRole() {

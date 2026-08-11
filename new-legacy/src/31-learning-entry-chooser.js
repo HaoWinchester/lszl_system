@@ -211,6 +211,13 @@
     if (!storage) return { shown: false };
     const loginSessionId = authenticatedSession(await currentServerSession(config.auth || global.KGAuthCore));
     if (!loginSessionId) return { shown: false };
+    if (typeof storage.claimLearningEntry === "function") {
+      let claimResult = false;
+      try { claimResult = await storage.claimLearningEntry(); } catch (_error) { claimResult = false; }
+      const shown = claimResult === true || claimResult?.claimed === true;
+      if (shown) showDialog(config);
+      return { shown };
+    }
     const digest = await sha256(loginSessionId);
     if (!digest || consumed(storage, digest)) return { shown: false };
     const locks = global.navigator && global.navigator.locks;

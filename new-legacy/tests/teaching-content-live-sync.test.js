@@ -347,6 +347,29 @@ async function run() {
   assert.equal(refreshFailureGets, 0, 'refresh must not GET after its preceding flush fails');
   refreshFailureRuntime.pagehide();
 
+  const atomicClaimCalls = [];
+  const atomicMarker = '{"schemaVersion":1,"consumedDigest":"atomic-digest","consumedAt":1786425000000}';
+  const atomicClaimRuntime = loadServerState({
+    fetchImpl: async (url, options = {}) => {
+      atomicClaimCalls.push({ url, options });
+      if (url === '/api/v1/runtime/learning-entry-claim') {
+        return response(200, { claimed: false, key: 'kg_learning_entry_chooser_consumed_v1', value: atomicMarker, revision: 6 });
+      }
+      return response(200, { ok: true, revision: 7, contentRevision: 7 });
+    },
+  });
+  assert.equal(typeof atomicClaimRuntime.storage.claimLearningEntry, 'function');
+  const atomicClaim = await atomicClaimRuntime.storage.claimLearningEntry();
+  assert.equal(atomicClaim.claimed, false);
+  assert.equal(atomicClaimCalls[0].url, '/api/v1/runtime/learning-entry-claim');
+  assert.equal(atomicClaimCalls[0].options.method, 'POST');
+  assert.equal(atomicClaimCalls[0].options.credentials, 'include');
+  assert.equal(atomicClaimRuntime.storage.getItem('kg_learning_entry_chooser_consumed_v1'), atomicMarker);
+  atomicClaimRuntime.storage.setItem('after-atomic-claim', 'saved');
+  await atomicClaimRuntime.storage.flush();
+  const afterAtomicPayload = JSON.parse(atomicClaimCalls.find(call => call.options.method === 'PUT').options.body);
+  assert.equal(afterAtomicPayload.revision, 6, 'atomic claim revision must become the next Runtime State write base');
+
   runtime.storage.setItem('pending-local-key', 'local draft');
   await runtime.remote({ revision: 9, source: 'remote' });
   assert.equal(runtime.storage.getItem('pending-local-key'), 'local draft', 'remote snapshots must reapply pending local mutations');

@@ -9,6 +9,7 @@ const { test } = require('node:test');
 
 const ROOT = path.resolve(__dirname, '..');
 const assetPath = path.join(ROOT, 'src', '31-learning-entry-chooser.js');
+const directEntryPath = path.resolve(ROOT, '..', 'frontend', 'scripts', 'new-legacy-assets', 'direct-entry.js');
 const CONSUMED_KEY = 'kg_learning_entry_chooser_consumed_v1';
 
 class SharedStorage {
@@ -67,7 +68,7 @@ function session(id = 'server-session-a') {
   return { authenticated: true, loginSessionId: id, user: { username: 'learner' } };
 }
 
-function createTab({ shared, authSession = session(), locksImpl = locks(), BroadcastChannelImpl = FakeBroadcastChannel, storageFlush, storageRefresh } = {}) {
+function createTab({ shared, authSession = session(), locksImpl = locks(), BroadcastChannelImpl = FakeBroadcastChannel, storageClaim, storageFlush, storageRefresh } = {}) {
   const listeners = new Map();
   const window = {
     crypto: webcrypto,
@@ -91,6 +92,7 @@ function createTab({ shared, authSession = session(), locksImpl = locks(), Broad
     clearTimeout,
     queueMicrotask,
   };
+  if (storageClaim) window.localStorage.claimLearningEntry = storageClaim;
   if (storageFlush) window.localStorage.flush = storageFlush;
   if (storageRefresh) window.localStorage.refresh = storageRefresh;
   shared.attach(window);
@@ -135,6 +137,65 @@ test('lock-backed VM tabs race to one winning claim', async () => {
   const [first, second] = await Promise.all([a.init(), b.init()]);
   assert.equal(Number(first.shown) + Number(second.shown), 1);
   assert.equal((await a.init()).shown, false);
+});
+
+test('atomic server claims allow exactly one independent-map tab without Web Locks', async () => {
+  const claimedSessions = new Set();
+  let lockRequests = 0;
+  const forbiddenLocks = { request() { lockRequests += 1; throw new Error('Web Locks must not run'); } };
+  function atomicTab() {
+    return createTab({
+      shared: new SharedStorage(),
+      locksImpl: forbiddenLocks,
+      storageClaim: async () => {
+        const claimed = !claimedSessions.has('server-session-a');
+        claimedSessions.add('server-session-a');
+        return { claimed, key: CONSUMED_KEY, value: 'server-marker', revision: claimedSessions.size };
+      },
+    });
+  }
+  const [first, second] = await Promise.all([atomicTab().init(), atomicTab().init()]);
+  assert.equal(Number(first.shown) + Number(second.shown), 1);
+  assert.equal(lockRequests, 0);
+});
+
+test('atomic server claims allow different login sessions to win independently', async () => {
+  const claimedSessions = new Set();
+  let claimCalls = 0;
+  let lockRequests = 0;
+  function atomicTab(loginSessionId) {
+    return createTab({
+      shared: new SharedStorage(),
+      authSession: session(loginSessionId),
+      locksImpl: { request() { lockRequests += 1; throw new Error('Web Locks must not run'); } },
+      storageClaim: async () => {
+        claimCalls += 1;
+        const claimed = !claimedSessions.has(loginSessionId);
+        claimedSessions.add(loginSessionId);
+        return { claimed, key: CONSUMED_KEY, value: `marker-${loginSessionId}`, revision: claimedSessions.size };
+      },
+    });
+  }
+  assert.equal((await atomicTab('login-a').init()).shown, true);
+  assert.equal((await atomicTab('login-b').init()).shown, true);
+  assert.equal(claimCalls, 2);
+  assert.equal(lockRequests, 0);
+});
+
+test('a false atomic server claim never displays the chooser', async () => {
+  const tab = createTab({
+    shared: new SharedStorage(),
+    storageClaim: async () => false,
+  });
+  assert.equal((await tab.init()).shown, false);
+});
+
+test('a rejected atomic server claim never displays the chooser', async () => {
+  const tab = createTab({
+    shared: new SharedStorage(),
+    storageClaim: async () => { throw new Error('claim unavailable'); },
+  });
+  assert.equal((await tab.init()).shown, false);
 });
 
 test('lock-backed tabs with independent runtime maps refresh from one backend before claiming', async () => {
@@ -459,4 +520,57 @@ test('source markup and execution order keep the chooser after auth core and bef
   const chooser = html.indexOf('src/31-learning-entry-chooser.js');
   const graph = html.indexOf('src/10-graph-editor.js');
   assert.ok(auth >= 0 && chooser > auth && graph > chooser, 'chooser must execute after auth core and before graph initialization');
+});
+
+function directEntryVm(bootstrap) {
+  const listeners = new Map();
+  const actions = [];
+  const document = { readyState: 'loading', getElementById() { return null; } };
+  const window = {
+    __KG_DIRECT_BOOTSTRAP__: bootstrap,
+    document,
+    location: { search: '', reload() { actions.push('reload'); } },
+    KGLearningEntryChooser: { async init() { actions.push('show'); return { shown: true }; } },
+    addEventListener(type, listener) {
+      const entries = listeners.get(type) || [];
+      entries.push(listener);
+      listeners.set(type, entries);
+    },
+    setTimeout,
+  };
+  const context = vm.createContext({ window, document, URLSearchParams, Promise, setTimeout, console });
+  vm.runInContext(fs.readFileSync(directEntryPath, 'utf8'), context, { filename: directEntryPath });
+  return {
+    actions,
+    async dispatch(type, detail = {}) {
+      for (const listener of listeners.get(type) || []) listener({ type, detail });
+      await Promise.resolve();
+      await Promise.resolve();
+    },
+  };
+}
+
+test('guest index login reloads before authenticated DOMContentLoaded shows the chooser', async () => {
+  const guest = directEntryVm({ authenticated: false, username: '', authUser: null });
+  await guest.dispatch('kg:auth-session-changed', { authenticated: true, username: 'learner', loginSessionId: 'login-a' });
+  await guest.dispatch('kg-auth-session-change', { username: 'learner', provider: 'remote' });
+  assert.deepEqual(guest.actions, ['reload']);
+
+  const authenticated = directEntryVm({ authenticated: true, username: 'learner', authUser: { username: 'learner', role: 'student' } });
+  await authenticated.dispatch('DOMContentLoaded');
+  assert.deepEqual(authenticated.actions, ['show']);
+});
+
+test('a login for a different bootstrap user reloads without pre-showing the chooser', async () => {
+  const page = directEntryVm({ authenticated: true, username: 'teacher', authUser: { username: 'teacher', role: 'teacher' } });
+  await page.dispatch('kg:auth-session-changed', { authenticated: true, username: 'learner', loginSessionId: 'login-a' });
+  await page.dispatch('kg-auth-session-change', { username: 'learner', provider: 'remote' });
+  assert.deepEqual(page.actions, ['reload']);
+});
+
+test('same-user authenticated session rotation may show without reloading', async () => {
+  const page = directEntryVm({ authenticated: true, username: 'learner', authUser: { username: 'learner', role: 'student' } });
+  await page.dispatch('kg:auth-session-changed', { authenticated: true, username: 'learner', loginSessionId: 'login-b' });
+  await page.dispatch('kg-auth-session-change', { username: 'learner', provider: 'remote' });
+  assert.deepEqual(page.actions, ['show']);
 });

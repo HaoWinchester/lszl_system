@@ -322,6 +322,23 @@
     return true
   }
 
+  async function claimLearningEntry() {
+    const response = await fetch('/api/v1/runtime/learning-entry-claim', {
+      method: 'POST',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error(`学习入口状态保存失败 (${response.status})`)
+    const result = await response.json()
+    const key = typeof result.key === 'string' ? result.key : ''
+    if (!key) throw new Error('学习入口状态响应无效')
+    const value = result.value == null ? null : String(result.value)
+    if (value == null) values.delete(key)
+    else values.set(key, value)
+    const nextRevision = Number(result.revision)
+    if (Number.isSafeInteger(nextRevision) && nextRevision >= 0) revision = nextRevision
+    return { claimed: result.claimed === true, key, value, revision }
+  }
+
   function emit(operation, key, value) {
     lastMutation = { operation, key: String(key || ''), value: value == null ? null : String(value) }
     pendingMutations.delete(lastMutation.key)
@@ -359,6 +376,7 @@
     },
   }
   Object.defineProperty(storage, 'length', { enumerable: true, get: () => values.size })
+  storage.claimLearningEntry = claimLearningEntry
   storage.flush = flush
   storage.refresh = refresh
 
