@@ -9,7 +9,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_prep import Principle, SynthesisPreset
-from app.models.question import Question
+from app.models.question import Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.services import teaching_content_revision_service
 
@@ -26,9 +26,17 @@ MAX_BUSINESS_VERSION = 2_147_483_647
 
 
 class PrincipleArchiveConflict(RuntimeError):
-    def __init__(self, reference_counts: dict[str, int]):
+    def __init__(self, reference_questions: dict[str, list[dict[str, Any]]]):
         super().__init__("原则仍被题目引用")
-        self.reference_counts = reference_counts
+        self.reference_questions = {
+            principle_id: list(reference_questions[principle_id])
+            for principle_id in sorted(reference_questions)
+            if reference_questions[principle_id]
+        }
+        self.reference_counts = {
+            principle_id: len(rows)
+            for principle_id, rows in self.reference_questions.items()
+        }
 
 
 def validate_principle_card_bundle(payload: object) -> dict[str, dict[str, Any]]:
@@ -140,6 +148,64 @@ def _question_principle_ids(metadata: object) -> set[str]:
         for value in option_map.values():
             ids.update(_normalized_ids(value))
     return ids
+
+
+async def principle_reference_questions(
+    db: AsyncSession,
+    principle_ids: object,
+) -> dict[str, list[dict[str, str | None]]]:
+    values = (
+        list(principle_ids)
+        if isinstance(principle_ids, (set, frozenset, tuple))
+        else principle_ids
+    )
+    selected_ids = set(_normalized_ids(values))
+    if not selected_ids:
+        return {}
+    grouped: dict[str, list[dict[str, str | None]]] = {
+        principle_id: [] for principle_id in selected_ids
+    }
+    rows = (
+        await db.execute(
+            select(
+                Question.id,
+                Question.title,
+                Question.teacher_number,
+                Question.content_metadata,
+                QuestionBank.id,
+                QuestionBank.name,
+            ).join(QuestionBank, QuestionBank.id == Question.bank_id)
+        )
+    ).all()
+    for (
+        question_id,
+        question_title,
+        teacher_number,
+        metadata,
+        bank_id,
+        bank_name,
+    ) in rows:
+        reference = {
+            "questionId": str(question_id),
+            "questionTitle": str(question_title or "未命名题目"),
+            "teacherNumber": str(teacher_number) if teacher_number else None,
+            "bankId": str(bank_id),
+            "bankName": str(bank_name or "未命名题库"),
+        }
+        for principle_id in _question_principle_ids(metadata) & selected_ids:
+            grouped[principle_id].append(reference)
+    return {
+        principle_id: sorted(
+            grouped[principle_id],
+            key=lambda row: (
+                str(row["bankName"]),
+                str(row["questionTitle"]),
+                str(row["questionId"]),
+            ),
+        )
+        for principle_id in sorted(grouped)
+        if grouped[principle_id]
+    }
 
 
 async def _write_row(
@@ -534,19 +600,7 @@ async def archive_principles(
     if missing_ids:
         raise ValueError(f"原则不存在：{missing_ids[0]}")
 
-    reference_counts = {principle_id: 0 for principle_id in ids}
-    question_rows = (
-        await db.execute(select(Question.id, Question.content_metadata))
-    ).all()
-    selected_ids = set(ids)
-    for _, metadata in question_rows:
-        for principle_id in _question_principle_ids(metadata) & selected_ids:
-            reference_counts[principle_id] += 1
-    referenced = {
-        principle_id: count
-        for principle_id, count in reference_counts.items()
-        if count
-    }
+    referenced = await principle_reference_questions(db, ids)
     if referenced:
         raise PrincipleArchiveConflict(referenced)
 
@@ -622,18 +676,7 @@ async def delete_principles(
         raise ValueError(f"原则不存在：{missing_ids[0]}")
 
     selected_ids = set(ids)
-    reference_counts = {principle_id: 0 for principle_id in ids}
-    question_rows = (
-        await db.execute(select(Question.id, Question.content_metadata))
-    ).all()
-    for _, metadata in question_rows:
-        for principle_id in _question_principle_ids(metadata) & selected_ids:
-            reference_counts[principle_id] += 1
-    referenced = {
-        principle_id: count
-        for principle_id, count in reference_counts.items()
-        if count
-    }
+    referenced = await principle_reference_questions(db, ids)
     if referenced:
         raise PrincipleArchiveConflict(referenced)
 
@@ -720,18 +763,7 @@ async def import_principle_card_bundle(
     removed_ids = set(existing_by_principle_id) - incoming_principle_ids
 
     if removed_ids:
-        reference_counts = {principle_id: 0 for principle_id in removed_ids}
-        question_rows = (
-            await db.execute(select(Question.id, Question.content_metadata))
-        ).all()
-        for _, metadata in question_rows:
-            for principle_id in _question_principle_ids(metadata) & removed_ids:
-                reference_counts[principle_id] += 1
-        referenced = {
-            principle_id: count
-            for principle_id, count in reference_counts.items()
-            if count
-        }
+        referenced = await principle_reference_questions(db, removed_ids)
         if referenced:
             raise PrincipleArchiveConflict(referenced)
 

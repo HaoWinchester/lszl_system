@@ -43,6 +43,24 @@ PrepEditor = Annotated[
 AdminUser = Annotated[User, Depends(require_role("admin"))]
 
 
+def _principle_conflict_detail(
+    error: teaching_content_projection_service.PrincipleArchiveConflict,
+) -> dict:
+    reference_questions = {
+        principle_id: error.reference_questions[principle_id]
+        for principle_id in sorted(error.reference_questions)
+    }
+    return {
+        "code": "PRINCIPLE_IN_USE",
+        "referencedIds": list(reference_questions),
+        "referenceCounts": {
+            principle_id: len(rows)
+            for principle_id, rows in reference_questions.items()
+        },
+        "referenceQuestions": reference_questions,
+    }
+
+
 def _raise_lock_error(error: question_lock_service.QuestionLockError) -> None:
     raise HTTPException(
         status_code=error.status_code,
@@ -68,14 +86,11 @@ def _raise_shared_error(error: Exception) -> None:
             },
         ) from error
     if isinstance(error, teaching_content_projection_service.PrincipleArchiveConflict):
-        reference_counts = dict(sorted(error.reference_counts.items()))
         raise HTTPException(
             status_code=409,
             detail={
-                "code": "PRINCIPLE_IN_USE",
                 "message": str(error),
-                "referencedIds": list(reference_counts),
-                "referenceCounts": reference_counts,
+                **_principle_conflict_detail(error),
             },
         ) from error
     raise HTTPException(
@@ -216,14 +231,9 @@ async def archive_principles(body: dict, db: DB, actor: PrepEditor):
             body.get("ids"),
         )
     except teaching_content_projection_service.PrincipleArchiveConflict as error:
-        reference_counts = dict(sorted(error.reference_counts.items()))
         raise HTTPException(
             status_code=409,
-            detail={
-                "code": "PRINCIPLE_IN_USE",
-                "referencedIds": list(reference_counts),
-                "referenceCounts": reference_counts,
-            },
+            detail=_principle_conflict_detail(error),
         ) from error
     except ValueError as error:
         raise HTTPException(
@@ -241,14 +251,9 @@ async def delete_principles(body: dict, db: DB, actor: PrepEditor):
             body.get("ids"),
         )
     except teaching_content_projection_service.PrincipleArchiveConflict as error:
-        reference_counts = dict(sorted(error.reference_counts.items()))
         raise HTTPException(
             status_code=409,
-            detail={
-                "code": "PRINCIPLE_IN_USE",
-                "referencedIds": list(reference_counts),
-                "referenceCounts": reference_counts,
-            },
+            detail=_principle_conflict_detail(error),
         ) from error
     except ValueError as error:
         raise HTTPException(
@@ -266,14 +271,9 @@ async def import_principle_card_bundle(body: dict, db: DB, actor: PrepEditor):
             body,
         )
     except teaching_content_projection_service.PrincipleArchiveConflict as error:
-        reference_counts = dict(sorted(error.reference_counts.items()))
         raise HTTPException(
             status_code=409,
-            detail={
-                "code": "PRINCIPLE_IN_USE",
-                "referencedIds": list(reference_counts),
-                "referenceCounts": reference_counts,
-            },
+            detail=_principle_conflict_detail(error),
         ) from error
     except ValueError as error:
         raise HTTPException(
