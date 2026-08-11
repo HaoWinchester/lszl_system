@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
@@ -305,6 +306,194 @@ def test_revision_endpoint_filters_non_object_changes_from_a_damaged_row() -> No
         ]
     finally:
         asyncio.run(_restore_revision_row(snapshot))
+
+
+def test_principle_archive_rejects_bound_questions_then_archives_the_pair() -> None:
+    """Catch a batch archive leaving a question bound to an inactive principle."""
+
+    suffix = uuid4().hex[:10]
+    username = f"teacher-archive-{suffix}"
+    principle_id = f"principle-archive-{suffix}"
+    preset_id = f"preset-archive-{suffix}"
+    bank_id = f"bank-archive-{suffix}"
+    question_id = f"question-archive-{suffix}"
+    state = {"archived": False}
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                User(
+                    username=username,
+                    password_hash=hash_password(PASSWORD),
+                    role="teacher",
+                    status="active",
+                    subject="PMP",
+                )
+            )
+            await db.flush()
+            db.add(
+                QuestionBank(
+                    id=bank_id,
+                    owner_id=username,
+                    name="原则归档测试题库",
+                    subject="PMP",
+                )
+            )
+            db.add(
+                Principle(
+                    id=principle_id,
+                    name="被绑定的原则",
+                    status="active",
+                    created_by=username,
+                    updated_by=username,
+                )
+            )
+            await db.flush()
+            db.add(
+                SynthesisPreset(
+                    id=preset_id,
+                    principle_id=principle_id,
+                    title="原则：被绑定的原则",
+                    content="归纳内容",
+                    status="active",
+                    created_by=username,
+                    updated_by=username,
+                )
+            )
+            db.add(
+                Question(
+                    id=question_id,
+                    bank_id=bank_id,
+                    title="引用原则的题目",
+                    content_metadata={
+                        "stemPrincipleIds": [principle_id],
+                        "optionPrincipleMap": {"B": [principle_id]},
+                        "principleIds": [principle_id],
+                    },
+                )
+            )
+            await db.commit()
+
+    async def remove_question() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(Question).where(Question.id == question_id))
+            await db.commit()
+
+    async def assert_preset_draft() -> None:
+        async with AsyncSessionLocal() as db:
+            preset = await db.get(SynthesisPreset, preset_id)
+            assert preset is not None and preset.status == "draft"
+
+    async def verify_and_cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            principle = await db.get(Principle, principle_id)
+            preset = await db.get(SynthesisPreset, preset_id)
+            if state["archived"]:
+                assert principle is not None and principle.status == "inactive"
+                assert preset is not None and preset.status == "inactive"
+            await db.execute(delete(Question).where(Question.id == question_id))
+            await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id == preset_id))
+            await db.execute(delete(Principle).where(Principle.id == principle_id))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.execute(delete(User).where(User.username == username))
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": username, "password": PASSWORD},
+            ).status_code == 200
+            drafted = client.post(
+                "/api/v1/content-prep/principles/status",
+                json={"ids": [principle_id], "presetStatus": "draft"},
+            )
+            assert drafted.status_code == 200
+            assert drafted.json()["updatedPresetIds"] == [preset_id]
+            asyncio.run(assert_preset_draft())
+            blocked = client.post(
+                "/api/v1/content-prep/principles/archive",
+                json={"ids": [principle_id]},
+            )
+            assert blocked.status_code == 409
+            assert blocked.json()["detail"] == {
+                "code": "PRINCIPLE_IN_USE",
+                "referencedIds": [principle_id],
+                "referenceCounts": {principle_id: 1},
+            }
+            asyncio.run(remove_question())
+            archived = client.post(
+                "/api/v1/content-prep/principles/archive",
+                json={"ids": [principle_id]},
+            )
+            assert archived.status_code == 200
+            assert archived.json()["archivedIds"] == [principle_id]
+            state["archived"] = True
+    finally:
+        asyncio.run(verify_and_cleanup())
+
+
+def test_synthesis_preset_enforces_one_card_per_principle() -> None:
+    """Catch two system cards being persisted for one principle."""
+
+    suffix = uuid4().hex[:10]
+    username = f"teacher-preset-unique-{suffix}"
+    principle_id = f"principle-preset-unique-{suffix}"
+    preset_ids = [f"preset-primary-{suffix}", f"preset-duplicate-{suffix}"]
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                User(
+                    username=username,
+                    password_hash=hash_password(PASSWORD),
+                    role="teacher",
+                    status="active",
+                )
+            )
+            await db.flush()
+            db.add(
+                Principle(
+                    id=principle_id,
+                    name="唯一归纳卡原则",
+                    created_by=username,
+                    updated_by=username,
+                )
+            )
+            await db.flush()
+            db.add(
+                SynthesisPreset(
+                    id=preset_ids[0],
+                    principle_id=principle_id,
+                    title="原则：唯一归纳卡原则",
+                    content="第一张卡",
+                    created_by=username,
+                    updated_by=username,
+                )
+            )
+            await db.commit()
+            db.add(
+                SynthesisPreset(
+                    id=preset_ids[1],
+                    principle_id=principle_id,
+                    title="原则：唯一归纳卡原则",
+                    content="第二张卡",
+                    created_by=username,
+                    updated_by=username,
+                )
+            )
+            with pytest.raises(IntegrityError):
+                await db.commit()
+            await db.rollback()
+            await db.execute(
+                delete(SynthesisPreset).where(SynthesisPreset.id.in_(preset_ids))
+            )
+            await db.execute(delete(Principle).where(Principle.id == principle_id))
+            await db.execute(delete(User).where(User.username == username))
+            await db.commit()
+
+    asyncio.run(scenario())
 
 
 def test_revision_endpoint_and_managed_bootstrap_are_role_safe() -> None:

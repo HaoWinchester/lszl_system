@@ -9,7 +9,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_prep import Principle, SynthesisPreset
+from app.models.question import Question
 from app.models.shared_runtime_state import SharedRuntimeState
+from app.services import teaching_content_revision_service
 
 
 PRINCIPLE_KEY = "kg_principle_repository_v1"
@@ -21,6 +23,12 @@ MAX_ID_LENGTH = 128
 MAX_PRINCIPLE_NAME_LENGTH = 300
 MAX_PRESET_TITLE_LENGTH = 500
 MAX_BUSINESS_VERSION = 2_147_483_647
+
+
+class PrincipleArchiveConflict(RuntimeError):
+    def __init__(self, reference_counts: dict[str, int]):
+        super().__init__("原则仍被题目引用")
+        self.reference_counts = reference_counts
 
 
 def _milliseconds(value: object) -> int:
@@ -57,6 +65,30 @@ def _payload(items: list[dict[str, Any]]) -> dict[str, Any]:
         "items": items,
         "updatedAt": max((int(item["updatedAt"]) for item in items), default=0),
     }
+
+
+def _normalized_ids(values: object) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    return list(
+        dict.fromkeys(
+            str(value).strip()
+            for value in values
+            if str(value or "").strip()
+        )
+    )
+
+
+def _question_principle_ids(metadata: object) -> set[str]:
+    if not isinstance(metadata, dict):
+        return set()
+    ids = set(_normalized_ids(metadata.get("stemPrincipleIds")))
+    ids.update(_normalized_ids(metadata.get("principleIds")))
+    option_map = metadata.get("optionPrincipleMap")
+    if isinstance(option_map, dict):
+        for value in option_map.values():
+            ids.update(_normalized_ids(value))
+    return ids
 
 
 async def _write_row(
@@ -408,3 +440,185 @@ async def apply_principle_projection(
         raise ValueError(f"不是原则投影键：{key}")
     await db.flush()
     return changes
+
+
+async def archive_principles(
+    db: AsyncSession,
+    actor_username: str,
+    principle_ids: object,
+) -> dict[str, Any]:
+    """Archive unreferenced principles and their paired synthesis presets atomically."""
+
+    ids = _normalized_ids(principle_ids)
+    if not ids:
+        raise ValueError("至少选择一条原则")
+
+    await teaching_content_revision_service.acquire_lock(db)
+    principles = (
+        await db.execute(
+            select(Principle)
+            .where(Principle.id.in_(ids))
+            .with_for_update()
+        )
+    ).scalars().all()
+    found_ids = {principle.id for principle in principles}
+    missing_ids = [principle_id for principle_id in ids if principle_id not in found_ids]
+    if missing_ids:
+        raise ValueError(f"原则不存在：{missing_ids[0]}")
+
+    reference_counts = {principle_id: 0 for principle_id in ids}
+    question_rows = (
+        await db.execute(select(Question.id, Question.content_metadata))
+    ).all()
+    selected_ids = set(ids)
+    for _, metadata in question_rows:
+        for principle_id in _question_principle_ids(metadata) & selected_ids:
+            reference_counts[principle_id] += 1
+    referenced = {
+        principle_id: count
+        for principle_id, count in reference_counts.items()
+        if count
+    }
+    if referenced:
+        raise PrincipleArchiveConflict(referenced)
+
+    changes: list[dict[str, str]] = []
+    for principle in principles:
+        if principle.status != "inactive":
+            principle.status = "inactive"
+            principle.revision += 1
+            principle.updated_by = actor_username
+            changes.append(
+                {
+                    "entityType": "principle",
+                    "entityId": principle.id,
+                    "action": "archived",
+                }
+            )
+
+    presets = (
+        await db.execute(
+            select(SynthesisPreset)
+            .where(SynthesisPreset.principle_id.in_(ids))
+            .with_for_update()
+        )
+    ).scalars().all()
+    for preset in presets:
+        if preset.status != "inactive":
+            preset.status = "inactive"
+            preset.revision += 1
+            preset.updated_by = actor_username
+            changes.append(
+                {
+                    "entityType": "synthesisPreset",
+                    "entityId": preset.id,
+                    "action": "archived",
+                }
+            )
+
+    await write_principle_projection(db, actor_username)
+    revision = await teaching_content_revision_service.bump(
+        db,
+        actor_username,
+        changes,
+    )
+    await db.commit()
+    return {
+        "archivedIds": ids,
+        "contentRevision": int(revision["revision"]),
+    }
+
+
+async def update_principle_statuses(
+    db: AsyncSession,
+    actor_username: str,
+    principle_ids: object,
+    *,
+    principle_status: object = None,
+    preset_status: object = None,
+) -> dict[str, Any]:
+    """Update selected principle and/or paired-preset statuses atomically."""
+
+    ids = _normalized_ids(principle_ids)
+    if not ids:
+        raise ValueError("至少选择一条原则")
+    normalized_principle_status = (
+        str(principle_status).strip() if principle_status is not None else None
+    )
+    normalized_preset_status = (
+        str(preset_status).strip() if preset_status is not None else None
+    )
+    if normalized_principle_status not in {None, "active", "inactive"}:
+        raise ValueError("原则状态必须是 active 或 inactive")
+    if normalized_preset_status not in {None, "draft", "active", "inactive"}:
+        raise ValueError("归纳卡状态必须是 draft、active 或 inactive")
+    if normalized_principle_status is None and normalized_preset_status is None:
+        raise ValueError("至少提供一种状态修改")
+
+    await teaching_content_revision_service.acquire_lock(db)
+    principles = (
+        await db.execute(
+            select(Principle)
+            .where(Principle.id.in_(ids))
+            .with_for_update()
+        )
+    ).scalars().all()
+    found_ids = {principle.id for principle in principles}
+    missing_ids = [principle_id for principle_id in ids if principle_id not in found_ids]
+    if missing_ids:
+        raise ValueError(f"原则不存在：{missing_ids[0]}")
+
+    changes: list[dict[str, str]] = []
+    updated_principle_ids: list[str] = []
+    if normalized_principle_status is not None:
+        by_id = {principle.id: principle for principle in principles}
+        for principle_id in ids:
+            principle = by_id[principle_id]
+            if principle.status != normalized_principle_status:
+                principle.status = normalized_principle_status
+                principle.revision += 1
+                principle.updated_by = actor_username
+                changes.append(
+                    {
+                        "entityType": "principle",
+                        "entityId": principle.id,
+                        "action": "status_updated",
+                    }
+                )
+                updated_principle_ids.append(principle.id)
+
+    updated_preset_ids: list[str] = []
+    if normalized_preset_status is not None:
+        presets = (
+            await db.execute(
+                select(SynthesisPreset)
+                .where(SynthesisPreset.principle_id.in_(ids))
+                .with_for_update()
+            )
+        ).scalars().all()
+        for preset in presets:
+            if preset.status != normalized_preset_status:
+                preset.status = normalized_preset_status
+                preset.revision += 1
+                preset.updated_by = actor_username
+                changes.append(
+                    {
+                        "entityType": "synthesisPreset",
+                        "entityId": preset.id,
+                        "action": "status_updated",
+                    }
+                )
+                updated_preset_ids.append(preset.id)
+
+    await write_principle_projection(db, actor_username)
+    revision = await teaching_content_revision_service.bump(
+        db,
+        actor_username,
+        changes,
+    )
+    await db.commit()
+    return {
+        "updatedPrincipleIds": updated_principle_ids,
+        "updatedPresetIds": updated_preset_ids,
+        "contentRevision": int(revision["revision"]),
+    }

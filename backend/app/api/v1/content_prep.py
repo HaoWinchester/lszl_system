@@ -20,6 +20,7 @@ from app.schemas.content_prep import (
 from app.services import (
     content_prep_service,
     question_lock_service,
+    teaching_content_projection_service,
 )
 
 router = APIRouter(prefix="/content-prep", tags=["content-prep"])
@@ -49,6 +50,48 @@ def _raise_upload_error(error: content_prep_service.ContentPrepOperationError) -
         status_code=error.status_code,
         detail=error.error_payload(),
     ) from error
+
+
+@router.post("/principles/archive")
+async def archive_principles(body: dict, db: DB, actor: PrepEditor):
+    try:
+        return await teaching_content_projection_service.archive_principles(
+            db,
+            actor.username,
+            body.get("ids"),
+        )
+    except teaching_content_projection_service.PrincipleArchiveConflict as error:
+        reference_counts = dict(sorted(error.reference_counts.items()))
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "PRINCIPLE_IN_USE",
+                "referencedIds": list(reference_counts),
+                "referenceCounts": reference_counts,
+            },
+        ) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_PRINCIPLE_ARCHIVE", "message": str(error)},
+        ) from error
+
+
+@router.post("/principles/status")
+async def update_principle_statuses(body: dict, db: DB, actor: PrepEditor):
+    try:
+        return await teaching_content_projection_service.update_principle_statuses(
+            db,
+            actor.username,
+            body.get("ids"),
+            principle_status=body.get("principleStatus"),
+            preset_status=body.get("presetStatus"),
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_PRINCIPLE_STATUS", "message": str(error)},
+        ) from error
 
 
 @router.post("/banks")

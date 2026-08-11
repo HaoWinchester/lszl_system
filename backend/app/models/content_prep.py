@@ -68,10 +68,16 @@ class Principle(Base):
 
 class SynthesisPreset(Base):
     __tablename__ = "synthesis_presets"
+    __table_args__ = (
+        UniqueConstraint(
+            "principle_id",
+            name="uq_synthesis_presets_principle_id",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
     principle_id: Mapped[str] = mapped_column(
-        String(128), ForeignKey("principles.id", ondelete="RESTRICT"), nullable=False, index=True
+        String(128), ForeignKey("principles.id", ondelete="RESTRICT"), nullable=False
     )
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
