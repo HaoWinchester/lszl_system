@@ -20,11 +20,13 @@ from app.schemas.content_prep import (
     ContentPrepQuestionSaveRequest,
     ContentPrepSharedContentRequest,
     LockGrant,
+    SubjectFacetSchemaWriteRequest,
 )
 from app.services import (
     content_prep_shared_service,
     content_prep_service,
     question_lock_service,
+    subject_facet_service,
     teaching_content_projection_service,
 )
 
@@ -99,6 +101,27 @@ def _raise_shared_error(error: Exception) -> None:
     ) from error
 
 
+def _raise_subject_facet_error(error: Exception) -> None:
+    if isinstance(error, subject_facet_service.SubjectFacetRevisionConflict):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "CONTENT_REVISION_CONFLICT",
+                "message": str(error),
+                "currentContentRevision": error.current_revision,
+            },
+        ) from error
+    if isinstance(error, subject_facet_service.SubjectFacetValidationError):
+        raise HTTPException(
+            status_code=422,
+            detail={"code": error.code, "message": str(error)},
+        ) from error
+    raise HTTPException(
+        status_code=422,
+        detail={"code": "INVALID_SUBJECT_FACET_SCHEMA", "message": str(error)},
+    ) from error
+
+
 @router.get("/shared-content")
 async def get_shared_content(subjectId: str, db: DB, actor: PrepEditor):
     try:
@@ -131,6 +154,32 @@ async def save_shared_content(
         teaching_content_projection_service.PrincipleArchiveConflict,
     ) as error:
         _raise_shared_error(error)
+
+
+@router.get("/subject-facets")
+async def list_subject_facet_schemas(db: DB, actor: PrepEditor):
+    return await subject_facet_service.list_schemas(db)
+
+
+@router.put("/subject-facets")
+async def upsert_subject_facet_schema(
+    request: SubjectFacetSchemaWriteRequest,
+    db: DB,
+    actor: PrepEditor,
+):
+    try:
+        return await subject_facet_service.upsert_schema(
+            db,
+            actor,
+            content_revision=request.content_revision,
+            schema=request.facet_schema,
+        )
+    except (
+        ValueError,
+        subject_facet_service.SubjectFacetRevisionConflict,
+        subject_facet_service.SubjectFacetValidationError,
+    ) as error:
+        _raise_subject_facet_error(error)
 
 
 @router.get("/principles")

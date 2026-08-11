@@ -95,6 +95,15 @@ class ContentPrepSharedContentRequest(BaseModel):
     tag_config: dict[str, Any] = Field(default_factory=dict, alias="tagConfig")
 
 
+class SubjectFacetSchemaWriteRequest(BaseModel):
+    """One canonical subject-facet schema write under the shared content lock."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    content_revision: StrictInt = Field(alias="contentRevision", ge=0)
+    facet_schema: dict[str, Any] = Field(alias="schema")
+
+
 class ContentPrepPrincipleWriteRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
