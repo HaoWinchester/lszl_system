@@ -1713,6 +1713,12 @@ body[data-qw-readonly="1"] .qw-selection-toolbar{display:none!important}
   0%,100%{border-color:rgba(100,116,139,.18);background:#f1f5f9;color:#64748b}
   20%,72%{border-color:#dc2626;background:#ef4444;color:#fff}
 }
+.qw-card-option-key.is-correct-flash{animation:qw-option-correct-flash .56s ease}
+@keyframes qw-option-correct-flash{
+  0%,100%{border-color:rgba(100,116,139,.18);background:#f1f5f9;color:#64748b}
+  24%,74%{border-color:#16a34a;background:#22c55e;color:#fff}
+}
+@media(prefers-reduced-motion:reduce){.qw-card-option-key.is-correct-flash{animation:none;background:#dcfce7;color:#166534;border-color:#16a34a}}
 
 .qw-analysis-panel{
   --qw-analysis-pointer-y:58px;
