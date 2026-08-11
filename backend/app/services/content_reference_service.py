@@ -84,6 +84,11 @@ def _active_node_ids(nodes: list[Any]) -> set[str]:
 
 def _principle_references(metadata: dict) -> list[tuple[str, str]]:
     references: list[tuple[str, str]] = []
+    for index, principle_id in enumerate(metadata.get("stemPrincipleIds") or []):
+        if principle_id:
+            references.append(
+                (f"metadata.stemPrincipleIds[{index}]", str(principle_id))
+            )
     for index, principle_id in enumerate(metadata.get("principleIds") or []):
         if principle_id:
             references.append((f"metadata.principleIds[{index}]", str(principle_id)))

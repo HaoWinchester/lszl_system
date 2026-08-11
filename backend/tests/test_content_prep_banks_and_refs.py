@@ -126,6 +126,7 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
                     "primaryNodeId": "kp-missing-primary",
                     "relatedNodeIds": ["kp-related", "kp-missing-related"],
                 },
+                "stemPrincipleIds": ["principle-missing-stem"],
                 "principleIds": [principle_id, "principle-incoming", "principle-missing"],
                 "optionPrincipleMap": {
                     "A": [principle_id],
@@ -143,6 +144,7 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
             "relatedNodeIds": ["kp-related"],
         }
         valid_payload["metadata"]["principleIds"] = [principle_id, "principle-incoming"]
+        valid_payload["metadata"]["stemPrincipleIds"] = [principle_id]
         valid_payload["clues"] = [{"id": "clue-2", "recallNodeId": "recall-known"}]
 
         async with AsyncSessionLocal() as db:
@@ -158,6 +160,7 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
                 "metadata.knowledge.primaryNodeId",
                 "metadata.knowledge.relatedNodeIds[1]",
                 "clues[0].recallNodeId",
+                "metadata.stemPrincipleIds[0]",
                 "metadata.principleIds[2]",
             }
             assert {issue.code for issue in issues} == {"REFERENCE_NOT_FOUND"}

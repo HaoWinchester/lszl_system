@@ -13,6 +13,7 @@ from app.schemas.question_catalog import QuestionPayload
 from app.services.content_prep_service import _validate_question_content
 from app.services.question_content_service import (
     canonical_question_hash,
+    normalize_question_metadata,
     normalize_question_payload,
     normalize_scope,
 )
@@ -146,7 +147,13 @@ def test_question_normalization_preserves_the_complete_prep_contract() -> None:
     assert normalized["id"] == raw["id"]
     assert normalized["scope"] == "internal"
     assert normalized["translations"] == raw["translations"]
-    assert normalized["metadata"] == raw["metadata"]
+    assert normalized["metadata"]["stemPrincipleIds"] == [
+        "principle-effective-communication"
+    ]
+    assert normalized["metadata"]["optionPrincipleMap"] == raw["metadata"][
+        "optionPrincipleMap"
+    ]
+    assert normalized["metadata"]["principleIds"] == raw["metadata"]["principleIds"]
     assert normalized["keyPath"] == raw["keyPath"]
     assert normalized["clues"] == raw["clues"]
     assert normalized["concepts"] == raw["concepts"]
@@ -154,6 +161,43 @@ def test_question_normalization_preserves_the_complete_prep_contract() -> None:
     assert normalized["lifecycle"] == raw["lifecycle"]
     assert normalized["stage"] == "基础练习"
     assert normalized["explanation"] == raw["explanation"]
+
+
+def test_question_metadata_separates_stem_bindings_and_derives_search_union() -> None:
+    metadata = normalize_question_metadata(
+        {
+            "stemPrincipleIds": ["principle-stem", "principle-stem", ""],
+            "principleIds": ["stale-index-value"],
+            "optionPrincipleMap": {
+                "A": ["principle-trap", "principle-trap"],
+                "B": ["principle-answer"],
+                "Z": ["must-be-ignored"],
+            },
+        },
+        option_ids={"A", "B"},
+    )
+
+    assert metadata["stemPrincipleIds"] == ["principle-stem"]
+    assert metadata["optionPrincipleMap"] == {
+        "A": ["principle-trap"],
+        "B": ["principle-answer"],
+    }
+    assert metadata["principleIds"] == [
+        "principle-stem",
+        "principle-trap",
+        "principle-answer",
+    ]
+
+
+def test_question_metadata_promotes_legacy_principles_to_stem_bindings() -> None:
+    metadata = normalize_question_metadata(
+        {"principleIds": ["principle-legacy", "principle-legacy"]},
+        option_ids={"A", "B"},
+    )
+
+    assert metadata["stemPrincipleIds"] == ["principle-legacy"]
+    assert metadata["optionPrincipleMap"] == {}
+    assert metadata["principleIds"] == ["principle-legacy"]
 
 
 def test_question_payload_round_trips_aliases_and_extension_fields() -> None:
