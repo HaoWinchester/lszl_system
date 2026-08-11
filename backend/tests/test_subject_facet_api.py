@@ -195,6 +195,14 @@ def test_subject_facet_schemas_are_editor_only_versioned_and_server_persistent()
             assert persisted.json()["contentRevision"] == created_payload["contentRevision"]
             assert persisted.json()["schemas"] == [created_payload["schema"]]
 
+            shared = second.get(
+                "/api/v1/content-prep/shared-content",
+                params={"subjectId": f"subject-{suffix}"},
+            )
+            assert shared.status_code == 200, shared.text
+            assert shared.json()["contentRevision"] == created_payload["contentRevision"]
+            assert shared.json()["subjectFacetSchemas"] == [created_payload["schema"]]
+
             stale = second.put(
                 "/api/v1/content-prep/subject-facets",
                 json={"contentRevision": initial_revision, "schema": _schema(suffix)},

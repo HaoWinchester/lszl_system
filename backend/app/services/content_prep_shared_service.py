@@ -16,6 +16,7 @@ from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.user import User
 from app.services import (
     content_prep_service,
+    subject_facet_service,
     teaching_content_projection_service,
     teaching_content_revision_service,
 )
@@ -175,6 +176,13 @@ async def read_shared_content(db: AsyncSession, subject_id: str) -> dict[str, An
         {"schemaVersion": 1, "nodes": [], "edges": [], "updatedAt": ""},
         "联想库",
     )
+    facet_snapshot = await subject_facet_service.list_schemas(db)
+    subject_facet_schemas = [
+        schema
+        for schema in facet_snapshot["schemas"]
+        if _subject_id(schema.get("subjectId")) == subject_id
+        or any(_subject_id(code) == subject_id for code in schema.get("subjectCodes", []))
+    ]
     revision = int((await teaching_content_revision_service.current(db))["revision"])
     return {
         "subjectId": subject_id,
@@ -183,6 +191,7 @@ async def read_shared_content(db: AsyncSession, subject_id: str) -> dict[str, An
         "principles": bundle["principles"],
         "synthesisPresets": bundle["synthesisPresets"],
         "tagConfig": _tag_payload(await _active_tag_config(db)),
+        "subjectFacetSchemas": subject_facet_schemas,
         "contentRevision": revision,
     }
 

@@ -163,6 +163,15 @@ test('P4.5 migration matrix assigns database ownership and API routes to every m
   }
 })
 
+test('P4.5 question catalog matrix keeps tags and subject facets in concrete database tables', () => {
+  const rows = parseMarkdownTable(readFileSync(migrationMatrixPath, 'utf8'))
+  const row = rows.find((candidate) => candidate['功能组'] === '题库与训练')
+  assert.ok(row, 'expected the question catalog migration matrix row')
+  for (const owner of ['question_tag_configs', 'subject_facet_schemas']) {
+    assert.match(row['PostgreSQL 归属'], new RegExp(`\\b${owner}\\b`), owner)
+  }
+})
+
 test('P4.5 migration matrix rejects blank and placeholder persistence assignments for every migrated row', () => {
   const rows = parseMarkdownTable(readFileSync(migrationMatrixPath, 'utf8'))
 
