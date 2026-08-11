@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
+import json
 import re
 from playwright.sync_api import sync_playwright
 
@@ -38,11 +39,12 @@ def seed(page):
       window.KGQuestionCatalogAdapter={ready:Promise.resolve(catalog),snapshot:()=>clone(catalog),saveBank:async bank=>bank,saveQuestion:async question=>question,deleteBank:async()=>true,deleteQuestion:async()=>true};
       window.KGQuestionCatalogEditController={open:async()=>({readonly:false}),save:async(question,{bankId}={})=>{const saved={...clone(question),bankId:bankId||question.bankId||'bank-p4313',revision:Number(question.revision||0)+1};const index=catalog.questions.findIndex(item=>item.id===saved.id);if(index>=0)catalog.questions[index]=saved;else catalog.questions.push(saved);return clone(saved)},release:async()=>true,applyReadonlyState:()=>{},status:()=>({readonly:false})};
       window.__principleRequests=[];
-      window.__principleStorageFlushes=0;window.KGServerStateStorage={flush:async()=>{window.__principleStorageFlushes+=1}};
+      window.__principleStorageFlushes=0;window.KGServerStateStorage={flush:async()=>{window.__principleStorageFlushes+=1},refresh:async()=>true};
       window.fetch=async(url,options={})=>{
         const body=JSON.parse(options.body||'{}');window.__principleRequests.push({url:String(url),body});
         const principleStore=JSON.parse(localStorage.getItem('kg_principle_repository_v1')||'{"items":[]}');
         const presetStore=JSON.parse(localStorage.getItem('kg_synthesis_preset_repository_v1')||'{"items":[]}');
+        const bundle=()=>({principles:principleStore,synthesisPresets:presetStore});
         if(String(url).endsWith('/principles/status')){
           presetStore.items.forEach(item=>{if(body.ids.includes(item.principleId))item.status=body.presetStatus||item.status});
           localStorage.setItem('kg_synthesis_preset_repository_v1',JSON.stringify(presetStore));
@@ -53,6 +55,17 @@ def seed(page):
           presetStore.items.forEach(item=>{if(body.ids.includes(item.principleId))item.status='inactive'});
           localStorage.setItem('kg_principle_repository_v1',JSON.stringify(principleStore));localStorage.setItem('kg_synthesis_preset_repository_v1',JSON.stringify(presetStore));
           return {ok:true,status:200,json:async()=>({archivedIds:body.ids})};
+        }
+        if(String(url).endsWith('/principles/delete')){
+          principleStore.items=principleStore.items.filter(item=>!body.ids.includes(item.id));
+          presetStore.items=presetStore.items.filter(item=>!body.ids.includes(item.principleId));
+          localStorage.setItem('kg_principle_repository_v1',JSON.stringify(principleStore));localStorage.setItem('kg_synthesis_preset_repository_v1',JSON.stringify(presetStore));
+          return {ok:true,status:200,json:async()=>({deletedIds:body.ids,...bundle()})};
+        }
+        if(String(url).endsWith('/principles/import')){
+          localStorage.setItem('kg_principle_repository_v1',JSON.stringify(body.principles));localStorage.setItem('kg_synthesis_preset_repository_v1',JSON.stringify(body.synthesisPresets));
+          principleStore.items=body.principles.items;presetStore.items=body.synthesisPresets.items;
+          return {ok:true,status:200,json:async()=>bundle()};
         }
         return {ok:true,status:200,json:async()=>({})};
       };
@@ -78,6 +91,21 @@ def main():
     assert principle_tab.is_visible();principle_tab.click();page.wait_for_timeout(150)
     page.locator('#qbPrincipleAnnotationPanel').evaluate("""panel=>{panel.hidden=false;panel.classList.add('active')}""")
     assert page.locator('#qbPrincipleAnnotationPanel').is_visible()
+    assert page.locator('#tqExportPrincipleCardBundleBtn').is_visible()
+    assert page.locator('#tqImportPrincipleCardBundleBtn').is_visible()
+    assert page.locator('#tqImportPrincipleCardBundleFile').count()==1
+    assert page.locator('#tqDeleteSelectedPrinciplesBtn').is_visible()
+    # Double-click a principle card to inspect its linked questions, then preview one.
+    page.locator('[data-principle-id="principle-先分析后行动"]').dblclick();page.wait_for_timeout(120)
+    assert page.locator('#tqPrincipleQuestionListDialog[open]').is_visible()
+    linked=page.locator('[data-principle-question-id="q1"]')
+    assert linked.count()==1 and '题目 q1' in linked.inner_text()
+    linked.dblclick();page.wait_for_timeout(120)
+    assert page.locator('#tqPrincipleQuestionPreviewDialog[open]').is_visible()
+    assert '题目 q1' in page.locator('#tqPrincipleQuestionPreviewTitle').inner_text()
+    assert page.locator('#tqPrincipleQuestionPreviewEditLink').get_attribute('href')=='question-bank.html?mode=simple&step=questions&bankId=bank-p4313&questionId=q1'
+    page.locator('#tqPrincipleQuestionPreviewCloseBtn').click()
+    page.locator('#tqPrincipleQuestionListCloseBtn').click()
     page.locator('#tqNewPrincipleBtn').click();page.locator('#tqPrincipleName').fill('识别约束')
     page.locator('#tqPresetContent').fill('先识别限制条件，再比较可行动方案。');page.locator('#tqPresetStatus').select_option('active')
     page.locator('#tqSavePrincipleBtn').click();page.wait_for_timeout(250)
@@ -101,9 +129,28 @@ def main():
     assert request['url'].endswith('/principles/status') and request['body']=={'ids':[principle_id],'presetStatus':'draft'},request
     assert page.evaluate("""()=>window.__principleStorageFlushes""")==1
     page.locator(f'input[data-principle-select="{principle_id}"]').check()
-    page.locator('#tqArchiveSelectedPrinciplesBtn').click();page.wait_for_timeout(150)
-    archived=page.evaluate("""id=>({p:KGPrincipleRepository.get(id),preset:KGSynthesisPresetRepository.getByPrincipleId(id)})""",principle_id)
-    assert archived['p']['status']=='inactive' and archived['preset']['status']=='inactive',archived
+    page.locator('#tqDeleteSelectedPrinciplesBtn').click();page.wait_for_timeout(150)
+    deleted=page.evaluate("""id=>({p:KGPrincipleRepository.get(id),preset:KGSynthesisPresetRepository.getByPrincipleId(id)})""",principle_id)
+    assert deleted['p'] is None and deleted['preset'] is None,deleted
+    request=page.evaluate("""()=>window.__principleRequests.at(-1)""")
+    assert request['url'].endswith('/principles/delete') and request['body']=={'ids':[principle_id]},request
+    with page.expect_download() as download_info:
+      page.locator('#tqExportPrincipleCardBundleBtn').click()
+    assert download_info.value.suggested_filename=='kg_principle_card_bundle_v1.json'
+    imported={
+      'principleCardBundleVersion':1,
+      'format':'kg-principle-card-bundle-v1',
+      'principles':{'schemaVersion':1,'items':[{'id':'principle-imported','name':'导入原则','status':'active','confusablePrincipleIds':[]}]},
+      'synthesisPresets':{'schemaVersion':1,'items':[{'id':'preset-imported','principleId':'principle-imported','title':'任意旧标题','content':'导入归纳卡','status':'active','version':1}]}
+    }
+    page.locator('#tqImportPrincipleCardBundleFile').set_input_files({
+      'name':'principle-cards.json',
+      'mimeType':'application/json',
+      'buffer':json.dumps(imported).encode('utf-8')
+    });page.wait_for_timeout(180)
+    imported_pair=page.evaluate("""()=>({p:KGPrincipleRepository.get('principle-imported'),preset:KGSynthesisPresetRepository.getByPrincipleId('principle-imported')})""")
+    assert imported_pair['p'] and imported_pair['preset'],imported_pair
+    assert imported_pair['preset']['title']=='原则：导入原则',imported_pair
     # Legacy principle-tagged question is counted without a destructive migration.
     row=page.locator('#tqPrincipleList [data-principle-id="principle-先分析后行动"]')
     if row.count(): assert '题目 1' in row.inner_text()

@@ -35,6 +35,11 @@
   }
   function ensureFromLabels(labels=[]){const created=[];[...new Set(labels.map(value=>String(value||'').trim().replace(/^原则\s*[:：-]?\s*/,'')).filter(Boolean))].forEach(name=>{if(!findByName(name))created.push(upsert({name}))});return created}
   function setStatus(id,status='active'){const item=get(id);if(!item)return null;return upsert({...item,status:status==='inactive'?'inactive':'active'})}
+  function replaceAll(payload={}){
+    const items=model(payload).items,ids=new Set(items.map(item=>item.id));
+    if(ids.size!==items.length)throw new Error('原则 ID 不能重复。');
+    save(items);emit('replaced',null);return clone(items);
+  }
   function subscribe(listener){if(typeof listener!=='function')return()=>{};listeners.add(listener);return()=>listeners.delete(listener)}
-  global.KGPrincipleRepository=Object.freeze({KEY,list,get,findByName,upsert,ensureFromLabels,setStatus,subscribe});
+  global.KGPrincipleRepository=Object.freeze({KEY,list,get,findByName,upsert,ensureFromLabels,setStatus,replaceAll,subscribe});
 })(globalThis);

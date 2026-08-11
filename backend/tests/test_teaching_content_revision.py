@@ -26,6 +26,7 @@ from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.user import User
 from app.schemas.content_prep import ContentPrepBatchResult, ContentPrepBatchRequest
 from app.services import teaching_content_revision_service as revision_service
+from app.services import teaching_content_projection_service
 from app.services import question_service
 from app.services.content_prep_service import (
     ContentPrepOperationError,
@@ -422,6 +423,12 @@ def test_principle_archive_rejects_bound_questions_then_archives_the_pair() -> N
                 "referencedIds": [principle_id],
                 "referenceCounts": {principle_id: 1},
             }
+            blocked_delete = client.post(
+                "/api/v1/content-prep/principles/delete",
+                json={"ids": [principle_id]},
+            )
+            assert blocked_delete.status_code == 409
+            assert blocked_delete.json()["detail"] == blocked.json()["detail"]
             asyncio.run(remove_question())
             archived = client.post(
                 "/api/v1/content-prep/principles/archive",
@@ -432,6 +439,233 @@ def test_principle_archive_rejects_bound_questions_then_archives_the_pair() -> N
             state["archived"] = True
     finally:
         asyncio.run(verify_and_cleanup())
+
+
+def test_principle_delete_removes_an_unreferenced_principle_and_its_card() -> None:
+    """A configured-but-unused pair must disappear, not merely become hidden."""
+
+    suffix = uuid4().hex[:10]
+    username = f"teacher-delete-{suffix}"
+    principle_id = f"principle-delete-{suffix}"
+    preset_id = f"preset-delete-{suffix}"
+    shared_keys = {
+        revision_service.REVISION_KEY,
+        PRINCIPLE_PROJECTION_KEY,
+        PRESET_PROJECTION_KEY,
+    }
+
+    async def seed() -> dict[str, dict]:
+        shared_snapshot = await _snapshot_shared_rows(shared_keys)
+        async with AsyncSessionLocal() as db:
+            db.add(
+                User(
+                    username=username,
+                    password_hash=hash_password(PASSWORD),
+                    role="teacher",
+                    status="active",
+                    subject="PMP",
+                )
+            )
+            await db.flush()
+            db.add(
+                Principle(
+                    id=principle_id,
+                    name="可删除原则",
+                    status="active",
+                    created_by=username,
+                    updated_by=username,
+                )
+            )
+            await db.flush()
+            db.add(
+                SynthesisPreset(
+                    id=preset_id,
+                    principle_id=principle_id,
+                    title="原则：可删除原则",
+                    content="尚未绑定到任何题目。",
+                    status="active",
+                    created_by=username,
+                    updated_by=username,
+                )
+            )
+            await teaching_content_projection_service.write_principle_projection(
+                db, username
+            )
+            await db.commit()
+        return shared_snapshot
+
+    async def verify_deleted() -> None:
+        async with AsyncSessionLocal() as db:
+            assert await db.get(Principle, principle_id) is None
+            assert await db.get(SynthesisPreset, preset_id) is None
+            principles = json.loads(
+                (await db.get(SharedRuntimeState, PRINCIPLE_PROJECTION_KEY)).value
+            )
+            presets = json.loads(
+                (await db.get(SharedRuntimeState, PRESET_PROJECTION_KEY)).value
+            )
+            assert principle_id not in {item["id"] for item in principles["items"]}
+            assert preset_id not in {item["id"] for item in presets["items"]}
+
+    async def cleanup(shared_snapshot: dict[str, dict]) -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id == preset_id))
+            await db.execute(delete(Principle).where(Principle.id == principle_id))
+            await db.execute(delete(User).where(User.username == username))
+            await db.commit()
+        await _restore_shared_rows(shared_keys, shared_snapshot)
+
+    snapshot = asyncio.run(seed())
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": username, "password": PASSWORD},
+            ).status_code == 200
+            response = client.post(
+                "/api/v1/content-prep/principles/delete",
+                json={"ids": [principle_id]},
+            )
+        assert response.status_code == 200, response.text
+        assert response.json()["deletedIds"] == [principle_id]
+        asyncio.run(verify_deleted())
+    finally:
+        asyncio.run(cleanup(snapshot))
+
+
+def test_principle_bundle_import_replaces_unused_pairs_as_one_canonical_bundle() -> None:
+    """Import must replace both sides together and normalize the card heading."""
+
+    suffix = uuid4().hex[:10]
+    username = f"teacher-bundle-{suffix}"
+    old_principle_id = f"principle-old-{suffix}"
+    old_preset_id = f"preset-old-{suffix}"
+    new_principle_id = f"principle-new-{suffix}"
+    new_preset_id = f"preset-new-{suffix}"
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                User(
+                    username=username,
+                    password_hash=hash_password(PASSWORD),
+                    role="teacher",
+                    status="active",
+                )
+            )
+            await db.flush()
+            db.add(
+                Principle(
+                    id=old_principle_id,
+                    name="旧原则",
+                    status="active",
+                    created_by=username,
+                    updated_by=username,
+                )
+            )
+            await db.flush()
+            db.add(
+                SynthesisPreset(
+                    id=old_preset_id,
+                    principle_id=old_principle_id,
+                    title="原则：旧原则",
+                    content="旧归纳卡",
+                    status="active",
+                    created_by=username,
+                    updated_by=username,
+                )
+            )
+            await db.commit()
+
+    async def verify() -> None:
+        async with AsyncSessionLocal() as db:
+            assert await db.get(Principle, old_principle_id) is None
+            assert await db.get(SynthesisPreset, old_preset_id) is None
+            principle = await db.get(Principle, new_principle_id)
+            preset = await db.get(SynthesisPreset, new_preset_id)
+            assert principle is not None and principle.name == "导入原则"
+            assert preset is not None and preset.principle_id == new_principle_id
+            assert preset.title == "原则：导入原则"
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id == old_preset_id))
+            await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id == new_preset_id))
+            await db.execute(
+                delete(Principle).where(
+                    Principle.id.in_([old_principle_id, new_principle_id])
+                )
+            )
+            await db.execute(delete(User).where(User.username == username))
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        payload = {
+            "principleCardBundleVersion": 1,
+            "format": "kg-principle-card-bundle-v1",
+            "principles": {
+                "schemaVersion": 1,
+                "items": [
+                    {
+                        "id": new_principle_id,
+                        "name": "导入原则",
+                        "status": "active",
+                        "confusablePrincipleIds": [],
+                    }
+                ],
+            },
+            "synthesisPresets": {
+                "schemaVersion": 1,
+                "items": [
+                    {
+                        "id": new_preset_id,
+                        "principleId": new_principle_id,
+                        "title": "应由原则名称覆盖",
+                        "content": "导入归纳卡",
+                        "status": "active",
+                        "version": 1,
+                    }
+                ],
+            },
+        }
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": username, "password": PASSWORD},
+            ).status_code == 200
+            response = client.post("/api/v1/content-prep/principles/import", json=payload)
+        assert response.status_code == 200, response.text
+        assert response.json()["importedPrincipleCount"] == 1
+        projected_preset = response.json()["synthesisPresets"]["items"][0]
+        assert {
+            key: value
+            for key, value in projected_preset.items()
+            if key not in {"createdAt", "updatedAt"}
+        } == {
+            "id": new_preset_id,
+            "principleId": new_principle_id,
+            "title": "原则：导入原则",
+            "content": "导入归纳卡",
+            "status": "active",
+            "version": 1,
+        }
+        asyncio.run(verify())
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_principle_bundle_validation_rejects_missing_card_collection() -> None:
+    """A malformed upload must fail with a client error, never a KeyError/500."""
+
+    with pytest.raises(ValueError, match="归纳卡必须包含 items 数组"):
+        teaching_content_projection_service.validate_principle_card_bundle(
+            {
+                "principleCardBundleVersion": 1,
+                "format": "kg-principle-card-bundle-v1",
+                "principles": {"schemaVersion": 1, "items": []},
+            }
+        )
 
 
 def test_synthesis_preset_enforces_one_card_per_principle() -> None:

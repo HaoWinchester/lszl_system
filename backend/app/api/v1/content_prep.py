@@ -77,6 +77,56 @@ async def archive_principles(body: dict, db: DB, actor: PrepEditor):
         ) from error
 
 
+@router.post("/principles/delete")
+async def delete_principles(body: dict, db: DB, actor: PrepEditor):
+    try:
+        return await teaching_content_projection_service.delete_principles(
+            db,
+            actor.username,
+            body.get("ids"),
+        )
+    except teaching_content_projection_service.PrincipleArchiveConflict as error:
+        reference_counts = dict(sorted(error.reference_counts.items()))
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "PRINCIPLE_IN_USE",
+                "referencedIds": list(reference_counts),
+                "referenceCounts": reference_counts,
+            },
+        ) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_PRINCIPLE_DELETE", "message": str(error)},
+        ) from error
+
+
+@router.post("/principles/import")
+async def import_principle_card_bundle(body: dict, db: DB, actor: PrepEditor):
+    try:
+        return await teaching_content_projection_service.import_principle_card_bundle(
+            db,
+            actor.username,
+            body,
+        )
+    except teaching_content_projection_service.PrincipleArchiveConflict as error:
+        reference_counts = dict(sorted(error.reference_counts.items()))
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "PRINCIPLE_IN_USE",
+                "referencedIds": list(reference_counts),
+                "referenceCounts": reference_counts,
+            },
+        ) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_PRINCIPLE_BUNDLE", "message": str(error)},
+        ) from error
+
+
 @router.post("/principles/status")
 async def update_principle_statuses(body: dict, db: DB, actor: PrepEditor):
     try:

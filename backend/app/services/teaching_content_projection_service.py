@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_prep import Principle, SynthesisPreset
@@ -29,6 +29,57 @@ class PrincipleArchiveConflict(RuntimeError):
     def __init__(self, reference_counts: dict[str, int]):
         super().__init__("原则仍被题目引用")
         self.reference_counts = reference_counts
+
+
+def validate_principle_card_bundle(payload: object) -> dict[str, dict[str, Any]]:
+    """Validate the portable one-principle-to-one-card configuration contract."""
+
+    if not isinstance(payload, dict):
+        raise ValueError("原则与归纳卡组合必须是 JSON 对象")
+    bundle_version = payload.get("principleCardBundleVersion", 1)
+    if type(bundle_version) is not int or bundle_version != 1:
+        raise ValueError("原则与归纳卡组合版本必须是 1")
+    bundle_format = payload.get("format")
+    if bundle_format not in {None, "", "kg-principle-card-bundle-v1"}:
+        raise ValueError("不是支持的原则与归纳卡组合文件")
+    raw_principles = payload.get("principles") or payload.get("principleRepository")
+    raw_presets = (
+        payload.get("synthesisPresets")
+        or payload.get("presets")
+        or payload.get("synthesisPresetRepository")
+    )
+    if not isinstance(raw_principles, dict):
+        raise ValueError("原则必须包含 items 数组")
+    if not isinstance(raw_presets, dict):
+        raise ValueError("归纳卡必须包含 items 数组")
+    principles = validate_projection_container(PRINCIPLE_KEY, raw_principles)
+    presets = validate_projection_container(PRESET_KEY, raw_presets)
+    principle_names = {
+        str(item["id"]): str(item["name"])
+        for item in principles["items"]
+    }
+    seen_principle_ids: set[str] = set()
+    normalized_presets: list[dict[str, Any]] = []
+    for preset in presets["items"]:
+        principle_id = str(preset["principleId"])
+        if principle_id not in principle_names:
+            raise ValueError(f"归纳卡引用了不存在的原则：{principle_id}")
+        if principle_id in seen_principle_ids:
+            raise ValueError(f"原则 {principle_id} 存在重复归纳卡")
+        seen_principle_ids.add(principle_id)
+        normalized_presets.append(
+            {
+                **preset,
+                "title": f"原则：{principle_names[principle_id]}",
+            }
+        )
+    for principle_id in principle_names:
+        if principle_id not in seen_principle_ids:
+            raise ValueError(f"原则 {principle_id} 缺少对应归纳卡")
+    return {
+        "principles": {**principles, "items": list(principles["items"])},
+        "synthesisPresets": {**presets, "items": normalized_presets},
+    }
 
 
 def _milliseconds(value: object) -> int:
@@ -138,6 +189,23 @@ async def write_principle_projection(
         actor_username,
     )
     await db.flush()
+
+
+async def principle_card_bundle(db: AsyncSession) -> dict[str, Any]:
+    """Read the canonical pair in the same envelope used by both UIs."""
+
+    principles = (
+        await db.execute(select(Principle).order_by(Principle.id))
+    ).scalars().all()
+    presets = (
+        await db.execute(select(SynthesisPreset).order_by(SynthesisPreset.id))
+    ).scalars().all()
+    return {
+        "principleCardBundleVersion": 1,
+        "format": "kg-principle-card-bundle-v1",
+        "principles": _payload([_principle_item(row) for row in principles]),
+        "synthesisPresets": _payload([_preset_item(row) for row in presets]),
+    }
 
 
 async def projection_rows_present(db: AsyncSession) -> bool:
@@ -526,6 +594,285 @@ async def archive_principles(
     return {
         "archivedIds": ids,
         "contentRevision": int(revision["revision"]),
+    }
+
+
+async def delete_principles(
+    db: AsyncSession,
+    actor_username: str,
+    principle_ids: object,
+) -> dict[str, Any]:
+    """Hard-delete unused principle/card pairs and refresh the browser projection."""
+
+    ids = _normalized_ids(principle_ids)
+    if not ids:
+        raise ValueError("至少选择一条原则")
+
+    await teaching_content_revision_service.acquire_lock(db)
+    principles = (
+        await db.execute(
+            select(Principle)
+            .where(Principle.id.in_(ids))
+            .with_for_update()
+        )
+    ).scalars().all()
+    found_ids = {principle.id for principle in principles}
+    missing_ids = [principle_id for principle_id in ids if principle_id not in found_ids]
+    if missing_ids:
+        raise ValueError(f"原则不存在：{missing_ids[0]}")
+
+    selected_ids = set(ids)
+    reference_counts = {principle_id: 0 for principle_id in ids}
+    question_rows = (
+        await db.execute(select(Question.id, Question.content_metadata))
+    ).all()
+    for _, metadata in question_rows:
+        for principle_id in _question_principle_ids(metadata) & selected_ids:
+            reference_counts[principle_id] += 1
+    referenced = {
+        principle_id: count
+        for principle_id, count in reference_counts.items()
+        if count
+    }
+    if referenced:
+        raise PrincipleArchiveConflict(referenced)
+
+    all_principles = (
+        await db.execute(select(Principle).with_for_update())
+    ).scalars().all()
+    changes: list[dict[str, str]] = []
+    for principle in all_principles:
+        if principle.id in selected_ids:
+            continue
+        filtered = [
+            value
+            for value in (principle.confusable_principle_ids or [])
+            if value not in selected_ids
+        ]
+        if filtered != list(principle.confusable_principle_ids or []):
+            principle.confusable_principle_ids = filtered
+            principle.revision += 1
+            principle.updated_by = actor_username
+            changes.append(
+                {
+                    "entityType": "principle",
+                    "entityId": principle.id,
+                    "action": "updated",
+                }
+            )
+
+    presets = (
+        await db.execute(
+            select(SynthesisPreset)
+            .where(SynthesisPreset.principle_id.in_(ids))
+            .with_for_update()
+        )
+    ).scalars().all()
+    for preset in presets:
+        changes.append(
+            {
+                "entityType": "synthesisPreset",
+                "entityId": preset.id,
+                "action": "deleted",
+            }
+        )
+    for principle in principles:
+        changes.append(
+            {
+                "entityType": "principle",
+                "entityId": principle.id,
+                "action": "deleted",
+            }
+        )
+    # The models deliberately do not declare an ORM relationship. Issue the
+    # dependent delete first so PostgreSQL's RESTRICT foreign key is honored.
+    await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id.in_([item.id for item in presets])))
+    await db.execute(delete(Principle).where(Principle.id.in_(ids)))
+
+    await write_principle_projection(db, actor_username)
+    bundle = await principle_card_bundle(db)
+    revision = await teaching_content_revision_service.bump(db, actor_username, changes)
+    await db.commit()
+    return {
+        "deletedIds": ids,
+        "contentRevision": int(revision["revision"]),
+        **bundle,
+    }
+
+
+async def import_principle_card_bundle(
+    db: AsyncSession,
+    actor_username: str,
+    payload: object,
+) -> dict[str, Any]:
+    """Replace the global principle/card configuration as one safe transaction."""
+
+    bundle = validate_principle_card_bundle(payload)
+    incoming_principles = list(bundle["principles"]["items"])
+    incoming_presets = list(bundle["synthesisPresets"]["items"])
+    incoming_principle_ids = {str(item["id"]) for item in incoming_principles}
+
+    await teaching_content_revision_service.acquire_lock(db)
+    existing_principles = (
+        await db.execute(select(Principle).with_for_update())
+    ).scalars().all()
+    existing_by_principle_id = {row.id: row for row in existing_principles}
+    removed_ids = set(existing_by_principle_id) - incoming_principle_ids
+
+    if removed_ids:
+        reference_counts = {principle_id: 0 for principle_id in removed_ids}
+        question_rows = (
+            await db.execute(select(Question.id, Question.content_metadata))
+        ).all()
+        for _, metadata in question_rows:
+            for principle_id in _question_principle_ids(metadata) & removed_ids:
+                reference_counts[principle_id] += 1
+        referenced = {
+            principle_id: count
+            for principle_id, count in reference_counts.items()
+            if count
+        }
+        if referenced:
+            raise PrincipleArchiveConflict(referenced)
+
+    existing_presets = (
+        await db.execute(select(SynthesisPreset).with_for_update())
+    ).scalars().all()
+    existing_preset_by_id = {row.id: row for row in existing_presets}
+    existing_preset_by_principle_id = {
+        row.principle_id: row for row in existing_presets
+    }
+    changes: list[dict[str, str]] = []
+
+    for item in incoming_principles:
+        principle_id = str(item["id"])
+        values = {
+            "name": str(item["name"]),
+            "status": str(item["status"]),
+            "confusable_principle_ids": list(item["confusablePrincipleIds"]),
+        }
+        row = existing_by_principle_id.get(principle_id)
+        if row is None:
+            db.add(
+                Principle(
+                    id=principle_id,
+                    **values,
+                    revision=1,
+                    created_by=actor_username,
+                    updated_by=actor_username,
+                )
+            )
+            changes.append(
+                {
+                    "entityType": "principle",
+                    "entityId": principle_id,
+                    "action": "created",
+                }
+            )
+        elif any(getattr(row, key) != value for key, value in values.items()):
+            for key, value in values.items():
+                setattr(row, key, value)
+            row.revision += 1
+            row.updated_by = actor_username
+            changes.append(
+                {
+                    "entityType": "principle",
+                    "entityId": principle_id,
+                    "action": "updated",
+                }
+            )
+
+    # Make newly added parents visible to the child foreign keys before cards.
+    await db.flush()
+    retained_preset_ids: set[str] = set()
+    for item in incoming_presets:
+        incoming_id = str(item["id"])
+        principle_id = str(item["principleId"])
+        direct_match = existing_preset_by_id.get(incoming_id)
+        if direct_match is not None and direct_match.principle_id != principle_id:
+            raise ValueError(f"归纳卡 ID 已绑定不同原则：{incoming_id}")
+        row = direct_match or existing_preset_by_principle_id.get(principle_id)
+        values = {
+            "principle_id": principle_id,
+            "title": str(item["title"]),
+            "content": str(item["content"]),
+            "status": str(item["status"]),
+            "business_version": int(item["version"]),
+        }
+        if row is None:
+            db.add(
+                SynthesisPreset(
+                    id=incoming_id,
+                    **values,
+                    revision=1,
+                    created_by=actor_username,
+                    updated_by=actor_username,
+                )
+            )
+            retained_preset_ids.add(incoming_id)
+            changes.append(
+                {
+                    "entityType": "synthesisPreset",
+                    "entityId": incoming_id,
+                    "action": "created",
+                }
+            )
+        else:
+            retained_preset_ids.add(row.id)
+            if any(getattr(row, key) != value for key, value in values.items()):
+                for key, value in values.items():
+                    setattr(row, key, value)
+                row.revision += 1
+                row.updated_by = actor_username
+                changes.append(
+                    {
+                        "entityType": "synthesisPreset",
+                        "entityId": row.id,
+                        "action": "updated",
+                    }
+                )
+
+    preset_ids_to_delete: list[str] = []
+    for preset in existing_presets:
+        if preset.id not in retained_preset_ids:
+            changes.append(
+                {
+                    "entityType": "synthesisPreset",
+                    "entityId": preset.id,
+                    "action": "deleted",
+                }
+            )
+            preset_ids_to_delete.append(preset.id)
+    principle_ids_to_delete: list[str] = []
+    for principle in existing_principles:
+        if principle.id not in incoming_principle_ids:
+            changes.append(
+                {
+                    "entityType": "principle",
+                    "entityId": principle.id,
+                    "action": "deleted",
+                }
+            )
+            principle_ids_to_delete.append(principle.id)
+
+    if preset_ids_to_delete:
+        await db.execute(
+            delete(SynthesisPreset).where(SynthesisPreset.id.in_(preset_ids_to_delete))
+        )
+    if principle_ids_to_delete:
+        await db.execute(
+            delete(Principle).where(Principle.id.in_(principle_ids_to_delete))
+        )
+
+    await write_principle_projection(db, actor_username)
+    canonical_bundle = await principle_card_bundle(db)
+    revision = await teaching_content_revision_service.bump(db, actor_username, changes)
+    await db.commit()
+    return {
+        "importedPrincipleCount": len(incoming_principles),
+        "importedPresetCount": len(incoming_presets),
+        "contentRevision": int(revision["revision"]),
+        **canonical_bundle,
     }
 
 

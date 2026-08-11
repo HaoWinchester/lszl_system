@@ -434,3 +434,14 @@ Run `./deploy/update.sh` only after the user asks to deploy. Verify the deployme
 ## Execution Handoff
 
 Plan complete and saved to `docs/superpowers/plans/2026-08-11-question-import-persistence-and-answer-feedback.md`. The plan will be executed inline in this isolated worktree, task by task with failing tests before implementation and checkpoints between the backend, adapter/UI and release stages.
+
+### Task 6: Complete principle/card configuration controls and linked-question inspection
+
+**Files:**
+- Modify: `backend/app/api/v1/content_prep.py`, `backend/app/services/teaching_content_projection_service.py`
+- Modify: `new-legacy/question-bank.html`, `new-legacy/src/teacher/training-config/principle-preset-controller.js`, `new-legacy/src/principles/*-repository.js`, `new-legacy/styles/teacher-question-workflow.css`
+- Test: `backend/tests/test_teaching_content_revision.py`, `new-legacy/tests/v90-p4313-teacher-principle-config-browser.py`
+
+- [x] Add a failing API test for hard deletion of an unused principle/card pair; implement the protected delete endpoint and canonical projection refresh.
+- [x] Add a failing browser test for export/import controls, card double-click, question preview and editor deep link; implement the toolbar and two dialogs.
+- [x] Run the focused API and browser regressions, including protection against deleting a principle still used by a question.
