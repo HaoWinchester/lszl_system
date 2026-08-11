@@ -1,27 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.35",
-  "toVersion": "v9.0-p4.1.37",
+  "fromVersion": "v9.0-p4.1.37",
+  "toVersion": "v9.0-p4.1.38",
   "changes": {
-    "added": [
-      "tests/question-studio-server-sync.test.js"
-    ],
+    "added": [],
     "changed": [
       "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "content-prep-studio/src/index.template.html",
-      "content-prep-studio/src/js/10-state-domain.js",
-      "content-prep-studio/src/js/20-page-runtime.js",
-      "content-prep-studio/src/js/35-server-catalog-service.js",
-      "content-prep-studio/src/js/45-server-events.js",
-      "content-prep-studio/tests/test_server_catalog.js",
-      "question-studio/index.html",
-      "question-studio/question-studio-sync.js",
-      "question-studio/question-studio.js",
-      "question-studio/server-config.js",
-      "src/39-global-shortcuts.js",
-      "tests/content-prep-question-bank-integration.test.js",
-      "tests/global-shortcut-tooltip-speed-browser.py"
+      "src/77-multi-question-workspace.js",
+      "tests/multi-question-synthesis-fallback.test.js"
     ],
     "removed": []
   },
