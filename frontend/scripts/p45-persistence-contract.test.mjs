@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const p45Path = new URL('./p45-persistence-contract.json', import.meta.url)
 const migrationMatrixPath = new URL('../../docs/p45-migration-matrix.md', import.meta.url)
-const backendRoot = resolve(process.cwd(), '../backend')
+const backendRoot = fileURLToPath(new URL('../../backend/', import.meta.url))
+const legacySourceCandidates = [
+  fileURLToPath(new URL('../../updata-legacy/', import.meta.url)),
+  fileURLToPath(new URL('../../../../updata-legacy/', import.meta.url)),
+]
 const plannedP45PostgresTables = new Set([
   'practice_mistakes',
   'practice_verifications',
@@ -37,10 +42,7 @@ function parseMarkdownTable(markdown) {
 }
 
 function findSourceDirectory() {
-  return [
-    resolve(process.cwd(), '../updata-legacy'),
-    resolve(process.cwd(), '../../../updata-legacy')
-  ].find(existsSync)
+  return legacySourceCandidates.find(existsSync)
 }
 
 function readJson(path) {
@@ -113,12 +115,7 @@ test('P4.5 persistence manifest assigns every state domain', () => {
 })
 
 test('P4.5 source audit locates the repository update source', () => {
-  const normalCheckoutSource = resolve(process.cwd(), '../updata-legacy')
-  const linkedWorktreeSource = resolve(process.cwd(), '../../../updata-legacy')
-  assert.equal(
-    findSourceDirectory(),
-    existsSync(normalCheckoutSource) ? normalCheckoutSource : linkedWorktreeSource
-  )
+  assert.equal(findSourceDirectory(), legacySourceCandidates.find(existsSync))
 })
 
 test('P4.5 runtime manifest is accepted by the frontend build contract', () => {
