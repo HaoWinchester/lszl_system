@@ -931,7 +931,6 @@ function validateStorageContract(source) {
     const contents = readFileSync(resolve(source, path), 'utf8')
     if (!hasIndexedDbBusinessPersistence(contents)) continue
     if (p45Migration.legacyUnmigratedIndexedDbModules.has(path)) continue
-    if (p45Migration.migratedBusinessModules.get(path)?.offlineExportOnly === true) continue
     throw new Error(`IndexedDB business persistence is forbidden in migrated module: ${path}`)
   }
 }
