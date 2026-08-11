@@ -98,8 +98,15 @@ test('P4.5 migration matrix assigns database ownership and API routes to every m
     const row = rows.find((candidate) => candidate['功能组'] === group)
     assert.ok(row, `expected migration matrix row for ${group}`)
     assert.notEqual(row['排除？'], 'excluded', `${group} must be a migrated group`)
-    assert.ok(row['PostgreSQL 归属'], `${group} requires a PostgreSQL owner`)
-    assert.ok(row.API, `${group} requires an API route`)
+  }
+})
+
+test('P4.5 migration matrix rejects blank and placeholder persistence assignments for every migrated row', () => {
+  const rows = parseMarkdownTable(readFileSync(migrationMatrixPath, 'utf8'))
+
+  for (const row of rows.filter((candidate) => candidate['排除？'] !== 'excluded')) {
+    assert.ok(row['PostgreSQL 归属'] && row['PostgreSQL 归属'] !== '—', `${row['功能组']} requires a PostgreSQL owner`)
+    assert.ok(row.API && row.API !== '—', `${row['功能组']} requires an API route`)
   }
 })
 
