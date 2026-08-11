@@ -132,10 +132,8 @@ async def reset_current_content(
             question_domains=question_domains,
         )
 
+        await db.execute(delete(LearningEvent))
         if question_ids:
-            await db.execute(
-                delete(LearningEvent).where(LearningEvent.question_id.in_(question_ids))
-            )
             await db.execute(
                 delete(TrainingProgress).where(
                     TrainingProgress.question_id.in_(question_ids)

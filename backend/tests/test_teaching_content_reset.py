@@ -247,6 +247,13 @@ async def _seed_reset_fixture() -> dict[str, object]:
                     event_type="answer",
                     payload={},
                 ),
+                LearningEvent(
+                    id=f"reset-event-null-{suffix}",
+                    owner_id="学生",
+                    question_id=None,
+                    event_type="session_opened",
+                    payload={"sourceQuestionId": question_ids[0]},
+                ),
                 Principle(
                     id=principle_id,
                     name="重置原则",
@@ -534,7 +541,7 @@ def test_reset_current_content_rolls_back_all_rows_when_projection_write_fails(m
             assert await _count(verify_db, QuestionEditLock) == len(snapshot[QuestionEditLock]) + 1
             assert await _count(verify_db, TrainingProgress) == len(snapshot[TrainingProgress]) + 1
             assert await _count(verify_db, RecallProgress) == len(snapshot[RecallProgress]) + 1
-            assert await _count(verify_db, LearningEvent) == len(snapshot[LearningEvent]) + 1
+            assert await _count(verify_db, LearningEvent) == len(snapshot[LearningEvent]) + 2
             assert await _count(verify_db, Principle) == len(snapshot[Principle]) + 1
             assert await _count(verify_db, SynthesisPreset) == len(snapshot[SynthesisPreset]) + 1
             assert await _count(verify_db, PaperQuestion) == len(snapshot[PaperQuestion]) + 2
