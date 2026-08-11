@@ -5,6 +5,35 @@ import test from 'node:test'
 
 const p45Path = new URL('./p45-persistence-contract.json', import.meta.url)
 const migrationMatrixPath = new URL('../../docs/p45-migration-matrix.md', import.meta.url)
+const p45PostgresTableRegistry = new Set([
+  'graph_files',
+  'file_contents',
+  'question_banks',
+  'questions',
+  'principles',
+  'synthesis_presets',
+  'learning_events',
+  'practice_mistakes',
+  'practice_verifications',
+  'recall_progress',
+  'shared_runtime_states',
+  'recall_association_libraries',
+  'learning_evidence',
+  'learning_diagnoses',
+  'learning_decisions',
+  'learning_content_versions',
+  'content_eligibility_policies',
+  'recommendation_candidates',
+  'recommendation_rankings',
+  'recommendation_selections',
+  'recommendation_records',
+  'learner_content_events',
+  'content_effect_attributions',
+  'question_upload_batches',
+  'question_audit_logs',
+  'prep_workspaces',
+])
+const placeholderOrWildcard = /—|\bTBD\b|\bfuture\b|后续|\*/iu
 
 function parseMarkdownTable(markdown) {
   const lines = markdown.split('\n').filter((line) => /^\|.*\|\s*$/.test(line))
@@ -105,8 +134,19 @@ test('P4.5 migration matrix rejects blank and placeholder persistence assignment
   const rows = parseMarkdownTable(readFileSync(migrationMatrixPath, 'utf8'))
 
   for (const row of rows.filter((candidate) => candidate['排除？'] !== 'excluded')) {
-    assert.ok(row['PostgreSQL 归属'] && row['PostgreSQL 归属'] !== '—', `${row['功能组']} requires a PostgreSQL owner`)
-    assert.ok(row.API && row.API !== '—', `${row['功能组']} requires an API route`)
+    const owners = row['PostgreSQL 归属'].match(/[a-z][a-z0-9_]*/g) ?? []
+    assert.equal(placeholderOrWildcard.test(row['PostgreSQL 归属']), false, `${row['功能组']} has a placeholder PostgreSQL owner`)
+    assert.ok(owners.length, `${row['功能组']} requires a PostgreSQL owner`)
+    for (const owner of owners) {
+      assert.ok(p45PostgresTableRegistry.has(owner), `${row['功能组']} has an unregistered PostgreSQL owner: ${owner}`)
+    }
+
+    const apiRoutes = row.API.split(/[、,，；;]/).map((route) => route.trim().replaceAll('`', '')).filter(Boolean)
+    assert.equal(placeholderOrWildcard.test(row.API), false, `${row['功能组']} has a placeholder API route`)
+    assert.ok(apiRoutes.length, `${row['功能组']} requires an API route`)
+    for (const route of apiRoutes) {
+      assert.match(route, /^\/api\/v1\/[a-z0-9-]+$/, `${row['功能组']} has an invalid API route`)
+    }
   }
 })
 
