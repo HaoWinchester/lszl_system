@@ -226,6 +226,22 @@ test('sync rejects obsolete migration and offline-export manifest fields before 
   }
 })
 
+test('sync rejects an obsolete manifest field before source storage violations', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'p45-migration-manifest.json'), JSON.stringify({
+    legacyUnmigratedIndexedDbModules: [],
+    offlineExportOnly: true,
+  }))
+  write(resolve(item.upstream, 'src/p45-fixture.js'), "localStorage.setItem('kg_p45_unregistered_payload_v1', '{}')\n")
+
+  const result = runSync(item)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /P4\.5 migration manifest is invalid/)
+  assert.doesNotMatch(result.stderr, /P4\.5 persistent state is not registered/)
+})
+
 test('sync permits ordinary collection writes without IndexedDB', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))

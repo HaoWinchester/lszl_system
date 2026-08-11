@@ -875,6 +875,7 @@ function hasIndexedDbBusinessPersistence(source) {
 }
 
 function validateStorageContract(source) {
+  const p45Migration = p45MigrationManifest(source)
   const storage = contract.runtimeStorage || {}
   const p45Runtime = p45PersistenceContract.runtime || {}
   const exact = new Set([
@@ -924,7 +925,6 @@ function validateStorageContract(source) {
     throw new Error(`new-legacy 只读旧键禁止新增写调用：${Array.from(readOnlyWrites).sort().join(', ')}`)
   }
 
-  const p45Migration = p45MigrationManifest(source)
   for (const path of walk(source).filter((item) => item.endsWith('.js') || item.endsWith('.html'))) {
     const contents = readFileSync(resolve(source, path), 'utf8')
     if (!hasIndexedDbBusinessPersistence(contents)) continue
