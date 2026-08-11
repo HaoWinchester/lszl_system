@@ -312,6 +312,53 @@ git add docs/p45-migration-matrix.md frontend/scripts/p45-persistence-contract.t
 git commit -m "docs: map P4.5 features to database migrations"
 ```
 
+## Task 5: Fail closed for every IndexedDB-bearing module
+
+**Files:**
+
+- Create: `new-legacy/p45-migration-manifest.json`
+- Modify: `frontend/scripts/sync-new-legacy.js`
+- Modify: `frontend/scripts/new-legacy-sync.test.mjs`
+
+**Interfaces:**
+
+- Requires a source-root `p45-migration-manifest.json` with `migratedBusinessModules` and the finite, audited `legacyUnmigratedIndexedDbModules` debt list.
+- Produces build failure `P4.5 migration manifest is required` when the manifest is absent.
+- Scans every JavaScript/HTML module in the selected `new-legacy/` source for IndexedDB persistence, rather than only opt-in manifest entries.
+- Allows IndexedDB only for the audited pre-P4.5 debt paths or a module explicitly marked `offlineExportOnly: true`; no unlisted module may bypass the check.
+
+- [x] **Step 1: Write RED regression fixtures**
+
+Make the test fixture create the required empty manifest by default. Add fixtures proving that a missing manifest fails, an unlisted module containing `indexedDB?.open()` fails, and modules using both dot and bracket optional chaining (`db?.transaction()` / `store?.put()` and `db?.['transaction']()` / `store?.['put']()`) fail. Preserve the strict-boolean export-only exception test.
+
+- [x] **Step 2: Run RED**
+
+Run: `cd frontend && node --test scripts/new-legacy-sync.test.mjs`
+
+Expected: the new fixtures fail because the current implementation treats a missing manifest as an empty allowlist and does not recognize optional chaining.
+
+- [x] **Step 3: Implement the fail-closed manifest and scan**
+
+Require and parse the source manifest. Add only the two existing Prep Studio IndexedDB files to `legacyUnmigratedIndexedDbModules`; they are explicitly transitional technical debt for Batch 7 and are not `offlineExportOnly`. Reject an unlisted IndexedDB-bearing module even when it is absent from `migratedBusinessModules`. Extend all IndexedDB-open, transaction, object-store and write recognition to accept JavaScript optional chaining in both dot and bracket-property form while retaining false-positive protection for ordinary collection methods.
+
+- [x] **Step 4: Run GREEN and real-source regression**
+
+Run:
+
+```bash
+cd frontend && node --test scripts/new-legacy-sync.test.mjs scripts/p45-persistence-contract.test.mjs
+node scripts/sync-new-legacy.js ../new-legacy --out "$(mktemp -d)/site"
+```
+
+The actual source may pass only through the two explicitly named pre-migration Prep Studio debt paths; it must not add a release output.
+
+- [x] **Step 5: Commit and re-review**
+
+```bash
+git add new-legacy/p45-migration-manifest.json frontend/scripts/sync-new-legacy.js frontend/scripts/new-legacy-sync.test.mjs
+git commit -m "fix: fail closed for P4.5 IndexedDB persistence"
+```
+
 ## Plan Self-Review
 
 - Coverage: protects all later P4.2–P4.5 migrations with a server-backed persistence contract, explicit feature ownership, exclusions and release checks.
