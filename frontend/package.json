@@ -8,7 +8,8 @@
     "build": "pnpm sync:new-legacy",
     "sync:new-legacy": "node scripts/sync-new-legacy.js && node scripts/export-guided-course.mjs",
     "test": "node --test scripts/*.test.mjs",
-    "test:design": "node --test scripts/design-contract.test.mjs"
+    "test:design": "node --test scripts/design-contract.test.mjs",
+    "test:p45-persistence": "node --test scripts/p45-persistence-contract.test.mjs"
   },
   "dependencies": {},
   "devDependencies": {}

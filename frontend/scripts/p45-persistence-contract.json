@@ -1,0 +1,32 @@
+{
+  "sourceVersion": "v9.0-p4.5.28",
+  "runtime": {
+    "exactKeys": [
+      "kg_canvas_view_preferences_v1",
+      "kg_home_interaction_mode_v1",
+      "kg_graph_recent_colors_v1"
+    ],
+    "prefixes": [
+      "kg_practice_mistakes_v1__user__",
+      "kg_recall_association_management_v1__subject__",
+      "kg_recall_association_library_v1__subject__",
+      "kg_canvas_workspace_v1__",
+      "kg_canvas_workspace_catalog_v2__",
+      "kg_deep_recall_progress_v2__"
+    ]
+  },
+  "shared": {
+    "exactKeys": [],
+    "prefixes": ["kg_recall_association_library_v1__subject__"]
+  },
+  "domainApi": {
+    "contentPrep": ["question-banks", "questions", "principles", "synthesis-presets", "tag-config", "prep-workspace"],
+    "learning": ["diagnosis", "recommendation", "content-consumption", "effect-attribution"],
+    "questionCatalog": ["question-family", "keyword-system-v2", "subject-facets", "semantic-tags", "import-policy"],
+    "training": ["attempts", "mistakes", "verification", "workspace", "recall-progress"]
+  },
+  "sessionOnlyPrefixes": ["kg_teacher_preview_", "kg_learning_route_context_"],
+  "excludedHomeFeatures": [
+    "learning-entry", "new-user-onboarding", "simple-professional-node-editor", "help-entry-refresh"
+  ]
+}
