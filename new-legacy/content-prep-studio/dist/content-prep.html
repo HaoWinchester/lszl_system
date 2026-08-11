@@ -299,9 +299,9 @@ nav button.active{color:var(--brand)!important}
     </select></div>
     <button class="help-center-btn" id="btnHelpCenter" type="button">帮助中心</button>
     <button class="creator-switch-btn" id="btnSwitchCreator" type="button">切换制作人</button>
-    <button class="header-save-btn" id="btnQuickSaveWorkspace" type="button">保存工作区</button>
+    <button class="header-save-btn" id="btnQuickSaveWorkspace" type="button">保存到服务器</button>
     <span class="badge" id="hdrSaveStatus">尚未保存</span>
-    <span class="badge">独立本地保存 · 不写正式程序存储</span>
+    <span class="badge">服务端共享 · 本机仅作故障恢复副本</span>
   </div>
 </header>
 
@@ -502,16 +502,16 @@ D原则：principle-role-accountability</pre>
         <div class="data-card"><h3>标签配置</h3><b id="baseTagCount">0</b><div class="muted">主程序预设槽位</div></div>
       </div>
       <div class="save-panel">
-        <div class="section-title"><span>本地工作区保存</span><span class="save-status" id="localSaveStatus">尚未保存</span></div>
+        <div class="section-title"><span>服务端共享工作区</span><span class="save-status" id="localSaveStatus">尚未保存</span></div>
         <div class="help">
-          适合几百题分多次处理。保存内容包括题库、知识树、联想库、原则、归纳卡、标签配置和当前编辑位置。
-          数据写入本工具独立 IndexedDB：<code>pmp_content_prep_studio_v1</code>，不会使用正式程序的 <code>kg_*</code> 存储。
-          重要项目仍建议定期“导出工作区草稿”，用于跨浏览器/跨目录备份。
+          点击保存会把题库、知识树、联想库、原则、归纳卡和标签配置一起提交到服务器，管理员与所有教师共享，主程序无需手工导入即可读取。
+          IndexedDB <code>pmp_content_prep_studio_v1</code> 仅保留故障恢复副本，不再作为正式数据源。
+          重要项目仍建议定期“导出工作区草稿”作为额外备份。
         </div>
         <div class="toolbar" style="margin-top:9px">
-          <button class="btn primary" id="btnSaveWorkspaceLocal">保存到本机</button>
-          <button class="btn" id="btnRestoreWorkspaceLocal">恢复上次保存</button>
-          <button class="btn danger" id="btnDeleteWorkspaceLocal">删除本机保存</button>
+          <button class="btn primary" id="btnSaveWorkspaceLocal">保存到服务器</button>
+          <button class="btn" id="btnRestoreWorkspaceLocal">恢复本机副本</button>
+          <button class="btn danger" id="btnDeleteWorkspaceLocal">删除本机副本</button>
           <label style="display:inline-flex;align-items:center;gap:6px;margin:0"><input type="checkbox" id="chkAutoSaveWorkspace"> 每 60 秒自动保存有变更的工作区</label>
         </div>
       </div>
@@ -1002,6 +1002,7 @@ const prepRuntime={
   dirty:false,autoSave:false,lastSavedAt:'',saveInFlight:false,
   creatorProfile:null,deviceProfile:null,lastBatchId:'',
   serverActor:prepBootstrap.authenticated?(prepBootstrap.authUser||{username:prepBootstrap.username}):null,
+  serverContentRevision:Number(prepBootstrap.contentRevision||0),
   serverBankId:'',serverBankRevision:null,clientInstanceId:generateSystemId('prep_client'),
   lastIdempotencyKey:'',lastUploadFingerprint:'',serverBanks:[],
   editLeaseState:{questionId:'',mode:'local-new',connection:'online',canSave:true,readOnly:false,lockToken:'',message:''},
@@ -1563,7 +1564,7 @@ function importContentBundle(payload){
   stampImportedQuestions(state.questionBank.questions,'complete-content-bundle');
   refreshQuestionTagPaths();state.questionBank.questions.forEach(syncQuestionPrinciples);state.currentQuestionId=state.questionBank.questions[0]?.id||'';state.demoQuestionId=state.currentQuestionId;state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';state.currentPrincipleId=state.principles.items[0]?.id||'';refreshAll();
 }
-function completeBundlePayload(){const pair=normalizePrincipleCardBundle({principles:state.principles,synthesisPresets:state.synthesisPresets});return {prepContentBundleVersion:1,format:'pmp-content-prep-complete-bundle-v1',generatedBy:`PMP Content Prep Studio v${VERSION}`,generatedAt:nowIso(),exportManifest:{creator:{...currentIdentitySnapshot()},lastBatchId:prepRuntime.lastBatchId||'',applicationVersion:VERSION},questionBank:exportableBank(),principles:pair.principles,synthesisPresets:pair.synthesisPresets,tagConfig:exportTagConfig(),recallLibraryReference:{schemaVersion:state.recallLibrary.schemaVersion,nodeCount:state.recallLibrary.nodes.length,edgeCount:state.recallLibrary.edges.length},knowledgeTreeReference:state.knowledgeTree?{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:state.knowledgeTree.name,version:state.knowledgeTree.version,nodeCount:state.knowledgeTree.nodes.length}:null}}
+function completeBundlePayload(){const pair=normalizePrincipleCardBundle({principles:state.principles,synthesisPresets:state.synthesisPresets});return {prepContentBundleVersion:1,format:'pmp-content-prep-complete-bundle-v1',generatedBy:`PMP Content Prep Studio v${VERSION}`,generatedAt:nowIso(),exportManifest:{creator:{...currentIdentitySnapshot()},lastBatchId:prepRuntime.lastBatchId||'',applicationVersion:VERSION},questionBank:exportableBank(),principles:pair.principles,synthesisPresets:pair.synthesisPresets,tagConfig:exportTagConfig(),recallLibrary:clone(state.recallLibrary),knowledgeTree:state.knowledgeTree?{taxonomy:{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:{zh:state.knowledgeTree.name},version:state.knowledgeTree.version,status:state.knowledgeTree.status||'draft',nodes:clone(state.knowledgeTree.nodes)}}:null,recallLibraryReference:{schemaVersion:state.recallLibrary.schemaVersion,nodeCount:state.recallLibrary.nodes.length,edgeCount:state.recallLibrary.edges.length},knowledgeTreeReference:state.knowledgeTree?{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:state.knowledgeTree.name,version:state.knowledgeTree.version,nodeCount:state.knowledgeTree.nodes.length}:null}}
 
 function recallIndex(){
   const byId=new Map(),terms=new Map();
@@ -2043,8 +2044,23 @@ function renderPrincipleEditor(){
   box.innerHTML=`<div class="form-grid"><div><label>原则 ID</label><input type="text" value="${esc(p.id)}" disabled></div><div><label>状态</label><select id="pmPrincipleStatus"><option value="active"${p.status==='active'?' selected':''}>active</option><option value="inactive"${p.status==='inactive'?' selected':''}>inactive</option></select></div><div class="span2"><label>原则名称</label><input id="pmPrincipleName" type="text" value="${esc(p.name)}"></div><div class="span2"><label>易混淆原则 IDs</label><input id="pmConfusable" type="text" value="${esc((p.confusablePrincipleIds||[]).join(', '))}"></div></div>
   <div class="section"><div class="section-title">系统预设归纳卡</div><div class="form-grid"><div class="span2"><label>标题（与原则名称自动一致）</label><input id="pmPresetTitle" type="text" readonly value="${esc('原则：'+p.name)}"></div><div class="span2"><label>内容</label><textarea id="pmPresetContent">${esc(preset?.content||'')}</textarea></div><div><label>状态</label><select id="pmPresetStatus"><option value="draft"${preset?.status==='draft'||!preset?' selected':''}>draft</option><option value="active"${preset?.status==='active'?' selected':''}>active</option><option value="inactive"${preset?.status==='inactive'?' selected':''}>inactive</option></select></div><div><label>版本</label><input id="pmPresetVersion" type="number" min="1" value="${preset?.version||1}"></div></div></div>
   <div class="section toolbar"><button class="btn primary" id="pmSave">保存原则与归纳卡</button><button class="btn danger" id="pmDelete">删除原则</button></div>`;
-  document.getElementById('pmSave').onclick=()=>{p.name=document.getElementById('pmPrincipleName').value.trim()||'未命名原则';p.status=document.getElementById('pmPrincipleStatus').value;p.confusablePrincipleIds=unique(cleanList(document.getElementById('pmConfusable').value));p.updatedAt=Date.now();const title='原则：'+p.name,content=document.getElementById('pmPresetContent').value.trim(),status=document.getElementById('pmPresetStatus').value,version=Math.max(1,Number(document.getElementById('pmPresetVersion').value||1));preset=preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()};Object.assign(preset,{principleId:p.id,title,content,status,version,updatedAt:Date.now()});const idx=state.synthesisPresets.items.findIndex(x=>x.id===preset.id);if(idx>=0)state.synthesisPresets.items[idx]=preset;else state.synthesisPresets.items.push(preset);renderPrincipleList();renderPrincipleEditor();renderQuestions();toast('原则与归纳卡已保存')};
-  document.getElementById('pmDelete').onclick=()=>{if(!confirm('删除该原则及其归纳卡？题目中的旧原则 ID 会在校验中心提示。'))return;state.principles.items=state.principles.items.filter(x=>x.id!==p.id);state.synthesisPresets.items=state.synthesisPresets.items.filter(x=>x.principleId!==p.id);state.currentPrincipleId=state.principles.items[0]?.id||'';renderPrincipleList();renderPrincipleEditor();renderQuestions()};
+  document.getElementById('pmSave').onclick=async()=>{
+    const controller=window.PMPPrepServerPrinciples;if(!controller){alert('服务器原则接口尚未就绪，请登录后重试。');return}
+    const button=document.getElementById('pmSave');button.disabled=true;
+    const principle={...p,name:document.getElementById('pmPrincipleName').value.trim()||'未命名原则',status:document.getElementById('pmPrincipleStatus').value,confusablePrincipleIds:unique(cleanList(document.getElementById('pmConfusable').value)),updatedAt:Date.now()};
+    const nextPreset={...(preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()}),principleId:p.id,title:'原则：'+principle.name,content:document.getElementById('pmPresetContent').value.trim(),status:document.getElementById('pmPresetStatus').value,version:Math.max(1,Number(document.getElementById('pmPresetVersion').value||1)),updatedAt:Date.now()};
+    try{await controller.save(principle,nextPreset);toast('原则与归纳卡已保存到服务器')}
+    catch(error){alert('服务器保存失败：'+(error?.message||error))}
+    finally{button.disabled=false}
+  };
+  document.getElementById('pmDelete').onclick=async()=>{
+    if(!confirm('从共享服务器删除该原则及其归纳卡？题目中的旧原则 ID 会在校验中心提示。'))return;
+    const controller=window.PMPPrepServerPrinciples;if(!controller){alert('服务器原则接口尚未就绪，请登录后重试。');return}
+    const button=document.getElementById('pmDelete');button.disabled=true;
+    try{await controller.remove(p.id);toast('原则与归纳卡已从服务器删除')}
+    catch(error){alert('服务器删除失败：'+(error?.message||error))}
+    finally{button.disabled=false}
+  };
 }
 function tagAliasesForSlot(slot){return unique(cleanList(state.tagConfig?.slotAliases?.[slot]||[]))}
 function exportTagConfig(){
@@ -2554,7 +2570,8 @@ window.PMPPrepServices=AppServices;
       questions:(bundle?.questionBank?.questions||[]).map(question=>({
         id:question.id,contentHash:question.contentHash||'',serverRevision:question.serverRevision??null
       })),
-      principles:bundle?.principles||{},synthesisPresets:bundle?.synthesisPresets||{},tagConfig:bundle?.tagConfig||{}
+      principles:bundle?.principles||{},synthesisPresets:bundle?.synthesisPresets||{},tagConfig:bundle?.tagConfig||{},
+      knowledgeTree:bundle?.knowledgeTree||null,recallLibrary:bundle?.recallLibrary||null
     });
   }
   function idempotencyKey(workspace,fingerprint){
@@ -2714,6 +2731,34 @@ window.PMPPrepServices=AppServices;
       return (await request(`/question-catalog/banks?${query}`)).banks||[];
     },
     async loadCatalog(){return request('/question-catalog/bootstrap?mode=managed')},
+    async loadSharedContent(subjectId='PMP'){
+      return request(`/content-prep/shared-content?subjectId=${encodeURIComponent(String(subjectId||'PMP'))}`);
+    },
+    async saveSharedContent(bundle,{subjectId='PMP',contentRevision=0}={}){
+      const result=await request('/content-prep/shared-content',{
+        method:'PUT',body:JSON.stringify({
+          subjectId:String(subjectId||'PMP'),contentRevision:Number(contentRevision),
+          knowledgeTree:cloneJson(bundle?.knowledgeTree||null),recallLibrary:cloneJson(bundle?.recallLibrary||null),
+          principles:cloneJson(bundle?.principles||{}),synthesisPresets:cloneJson(bundle?.synthesisPresets||{}),
+          tagConfig:cloneJson(bundle?.tagConfig||{})
+        })
+      });
+      publishContentRevision(result,{entityType:'contentPrepWorkspace',entityId:String(subjectId||'PMP')});return result;
+    },
+    async savePrinciple(principle,preset,{contentRevision=0,isNew=false}={}){
+      const id=String(principle?.id||'');
+      const result=await request(isNew?'/content-prep/principles':`/content-prep/principles/${encodeURIComponent(id)}`,{
+        method:isNew?'POST':'PUT',body:JSON.stringify({contentRevision:Number(contentRevision),principle:cloneJson(principle),preset:cloneJson(preset)})
+      });
+      publishContentRevision(result,{entityType:'principle',entityId:id});return result;
+    },
+    async deletePrinciple(principleId,{contentRevision=0}={}){
+      const id=String(principleId||'');
+      const result=await request(`/content-prep/principles/${encodeURIComponent(id)}`,{
+        method:'DELETE',body:JSON.stringify({contentRevision:Number(contentRevision)})
+      });
+      publishContentRevision(result,{entityType:'principle',entityId:id});return result;
+    },
     async createBank(input){
       const result=await request('/content-prep/banks',{method:'POST',body:JSON.stringify(input)});
       publishContentRevision(result,{entityType:'bank',entityId:String(result?.bank?.id||'')});
@@ -2743,7 +2788,10 @@ window.PMPPrepServices=AppServices;
         })),
         principles:cloneJson(bundle?.principles||{}),
         synthesisPresets:cloneJson(bundle?.synthesisPresets||{}),
-        tagConfig:cloneJson(bundle?.tagConfig||{})
+        tagConfig:cloneJson(bundle?.tagConfig||{}),
+        subjectId:String(bundle?.knowledgeTree?.taxonomy?.subjectId||bundle?.knowledgeTree?.subjectId||bundle?.questionBank?.subject||'PMP'),
+        knowledgeTree:cloneJson(bundle?.knowledgeTree||null),
+        recallLibrary:cloneJson(bundle?.recallLibrary||null)
         };
         const posted=await request('/content-prep/batches',{method:'POST',body:JSON.stringify(payload)});
         const result={...posted,status:'committed',batch:null};
@@ -2865,7 +2913,7 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
     const canSyncQuestion=!question?.serverRevision||lease.questionId===question.id&&lease.canSave;
     createButton.disabled=!authenticated||!prepRuntime.creatorProfile;
     loadButton.disabled=!authenticated||!prepRuntime.creatorProfile||!questionInput.value.trim();
-    syncButton.disabled=!serverEnabled()||!state.questionBank.questions.length||!canSyncQuestion;
+    syncButton.disabled=!serverEnabled()||!canSyncQuestion;
   }
   function renderActor(){
     actorName.textContent=actor?(actor.display_name||actor.displayName||actor.username):'未登录';
@@ -2890,6 +2938,75 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
       prepRuntime.serverBanks=[];renderBanks([]);return [];
     }
   }
+  function normalizeSharedContent(payload){
+    const tree=payload?.knowledgeTree;
+    return {
+      knowledgeTree:tree?(typeof normalizeTree==='function'?normalizeTree(tree):tree.taxonomy||tree):null,
+      recallLibrary:typeof normalizeRecall==='function'?normalizeRecall(payload?.recallLibrary||{}):(payload?.recallLibrary||{schemaVersion:1,nodes:[],edges:[]}),
+      principles:typeof normalizePrinciples==='function'?normalizePrinciples(payload?.principles||{}):(payload?.principles||{schemaVersion:1,items:[]}),
+      synthesisPresets:typeof normalizePresets==='function'?normalizePresets(payload?.synthesisPresets||{}):(payload?.synthesisPresets||{schemaVersion:1,items:[]}),
+      tagConfig:typeof normalizeTagConfig==='function'?normalizeTagConfig(payload?.tagConfig||{}):(payload?.tagConfig||{schemaVersion:2,names:{}}),
+      contentRevision:Number(payload?.contentRevision||0)
+    };
+  }
+  function applySharedContent(payload,{refresh=true}={}){
+    const shared=normalizeSharedContent(payload);
+    if(shared.knowledgeTree)state.knowledgeTree=shared.knowledgeTree;
+    state.recallLibrary=shared.recallLibrary;
+    state.principles=shared.principles;
+    state.synthesisPresets=shared.synthesisPresets;
+    state.tagConfig=shared.tagConfig;
+    prepRuntime.serverContentRevision=Math.max(Number(prepRuntime.serverContentRevision||0),shared.contentRevision);
+    state.currentPrincipleId=state.principles.items.some(item=>item.id===state.currentPrincipleId)
+      ?state.currentPrincipleId:(state.principles.items[0]?.id||'');
+    if(refresh)refreshAll();
+    return shared;
+  }
+  async function refreshSharedContent(){
+    if(!actor)return null;
+    const subjectId=state.knowledgeTree?.subjectId||state.questionBank.subject||'PMP';
+    const payload=await Catalog.loadSharedContent(subjectId);
+    if(!prepRuntime.dirty)applySharedContent(payload);
+    return payload;
+  }
+  const ServerPrinciples=Object.freeze({
+    async save(principle,preset){
+      if(!actor)throw new Error('请先登录后再保存原则。');
+      const payload=await Catalog.savePrinciple(principle,preset,{contentRevision:Number(prepRuntime.serverContentRevision||0)});
+      applySharedContent(payload);markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
+      return payload;
+    },
+    async remove(principleId){
+      if(!actor)throw new Error('请先登录后再删除原则。');
+      const payload=await Catalog.deletePrinciple(principleId,{contentRevision:Number(prepRuntime.serverContentRevision||0)});
+      applySharedContent(payload);markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
+      return payload;
+    }
+  });
+  window.PMPPrepServerPrinciples=ServerPrinciples;
+
+  async function syncWorkspaceToServer({source='sync'}={}){
+    if(!serverEnabled())throw new Error('请先登录、选择制作人和服务器题库。');
+    syncButton.disabled=true;setStatus(source==='save'?'正在保存到服务器…':'正在同步到题库…');setIssues(null);
+    try{
+      const result=await Catalog.uploadBundle(ExportService.completeBundle(),{
+        workspace:prepRuntime,creatorId:prepRuntime.creatorProfile.creatorId,
+        questions:state.questionBank.questions,prepVersion:VERSION,workspaceVersion:'4'
+      });
+      prepRuntime.lastBatchId=result.batchId;
+      prepRuntime.serverContentRevision=Math.max(Number(prepRuntime.serverContentRevision||0),Number(result.contentRevision||0));
+      markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
+      setStatus(`已保存到服务器 · 批次 ${result.batchId}`,'good');toast('保存成功，主程序已同步');
+      return result;
+    }catch(error){
+      QuestionLocks.handleSaveError(error);
+      setStatus(error.message||'服务器保存失败，本机恢复副本已保留','bad');setIssues(error);
+      await saveWorkspaceLocal({silent:true});markWorkspaceDirty();throw error;
+    }finally{refreshButtons()}
+  }
+  window.PMPPrepSyncWorkspace=syncWorkspaceToServer;
+  document.getElementById('btnQuickSaveWorkspace').onclick=()=>syncWorkspaceToServer({source:'save'}).catch(()=>{});
+  document.getElementById('btnSaveWorkspaceLocal').onclick=()=>syncWorkspaceToServer({source:'save'}).catch(()=>{});
   function readServerProjection(key,normalizer){
     try{
       const raw=window.localStorage?.getItem?.(key);if(!raw)return null;
@@ -3084,21 +3201,7 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
       setStatus('题目已从服务器载入','good');
     }catch(error){setStatus(error.message,'bad');setIssues(error)}finally{refreshButtons()}
   });
-  syncButton.addEventListener('click',async()=>{
-    syncButton.disabled=true;setStatus('正在同步到题库…');setIssues(null);
-    try{
-      const result=await Catalog.uploadBundle(ExportService.completeBundle(),{
-        workspace:prepRuntime,creatorId:prepRuntime.creatorProfile.creatorId,
-        questions:state.questionBank.questions,prepVersion:VERSION,workspaceVersion:'4'
-      });
-      prepRuntime.lastBatchId=result.batchId;markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
-      setStatus(`已进入题库 · 批次 ${result.batchId}`,'good');toast('上传成功，已进入题库');
-    }catch(error){
-      QuestionLocks.handleSaveError(error);
-      setStatus(error.message||'同步失败，本地草稿已保留','bad');setIssues(error);
-      await saveWorkspaceLocal({silent:true});
-    }finally{refreshButtons()}
-  });
+  syncButton.addEventListener('click',()=>syncWorkspaceToServer({source:'sync'}).catch(()=>{}));
 
   document.querySelectorAll('[data-creator-key]').forEach(button=>button.addEventListener('click',()=>{
     QuestionLocks.close().finally(()=>{
@@ -3133,6 +3236,7 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
   });
   window.addEventListener('pagehide',()=>{remoteRetryStopped=true;clearTimeout(remoteRetryTimer);unsubscribeTeachingSync?.();window.removeEventListener?.('kg:server-state-reloaded',handleServerStateReload)});
   renderActor();refreshButtons();refreshBanks();
+  refreshSharedContent().catch(error=>{setStatus(error.message||'共享内容读取失败','bad');setIssues(error)});
   const initial=currentQuestion();if(initial?.serverRevision)QuestionLocks.switchTo(initial).then(()=>renderQuestionLockState());
 })();
 </script>

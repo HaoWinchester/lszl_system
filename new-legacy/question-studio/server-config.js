@@ -10,7 +10,7 @@
   const existing=global.KG_SERVER_CONFIG||{};
   global.KG_SERVER_CONFIG=Object.freeze({
     ...existing,
-    activityImportEndpoint:String(existing.activityImportEndpoint||''),
+    activityImportEndpoint:String(existing.activityImportEndpoint||'/api/v1/content-prep/activities/import'),
     credentials:'include'
   });
 })(window);

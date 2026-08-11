@@ -29,7 +29,6 @@ with sync_playwright() as playwright:
     page = browser.new_page(viewport={"width": 1440, "height": 900})
     page.set_content("<!doctype html><html><body></body></html>")
     page.add_style_tag(content=(ROOT / "styles" / "global-shortcuts.css").read_text(encoding="utf-8"))
-    page.add_script_tag(content="window.escapeHTML = value => String(value ?? '').replace(/[&<>\"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','\\\"':'&quot;',\"'\":'&#39;'}[char]));")
     page.add_script_tag(content=(ROOT / "src" / "39-global-shortcuts.js").read_text(encoding="utf-8"))
     page.wait_for_selector("#kgGlobalShortcuts", state="attached", timeout=2_000)
     page.evaluate("document.getElementById('kgGlobalShortcuts').classList.remove('is-collapsed')")

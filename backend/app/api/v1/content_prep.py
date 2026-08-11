@@ -12,12 +12,17 @@ from app.db.session import get_db
 from app.models.question import Question
 from app.models.user import User
 from app.schemas.content_prep import (
+    ContentPrepActivityImportRequest,
     ContentPrepBatchRequest,
     ContentPrepBatchResult,
+    ContentPrepDeleteRequest,
+    ContentPrepPrincipleWriteRequest,
     ContentPrepQuestionSaveRequest,
+    ContentPrepSharedContentRequest,
     LockGrant,
 )
 from app.services import (
+    content_prep_shared_service,
     content_prep_service,
     question_lock_service,
     teaching_content_projection_service,
@@ -50,6 +55,156 @@ def _raise_upload_error(error: content_prep_service.ContentPrepOperationError) -
         status_code=error.status_code,
         detail=error.error_payload(),
     ) from error
+
+
+def _raise_shared_error(error: Exception) -> None:
+    if isinstance(error, content_prep_shared_service.ContentRevisionConflict):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "CONTENT_REVISION_CONFLICT",
+                "message": str(error),
+                "currentContentRevision": error.current_revision,
+            },
+        ) from error
+    if isinstance(error, teaching_content_projection_service.PrincipleArchiveConflict):
+        reference_counts = dict(sorted(error.reference_counts.items()))
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "PRINCIPLE_IN_USE",
+                "message": str(error),
+                "referencedIds": list(reference_counts),
+                "referenceCounts": reference_counts,
+            },
+        ) from error
+    raise HTTPException(
+        status_code=422,
+        detail={"code": "INVALID_SHARED_CONTENT", "message": str(error)},
+    ) from error
+
+
+@router.get("/shared-content")
+async def get_shared_content(subjectId: str, db: DB, actor: PrepEditor):
+    try:
+        return await content_prep_shared_service.read_shared_content(db, subjectId)
+    except ValueError as error:
+        _raise_shared_error(error)
+
+
+@router.put("/shared-content")
+async def save_shared_content(
+    request: ContentPrepSharedContentRequest,
+    db: DB,
+    actor: PrepEditor,
+):
+    try:
+        return await content_prep_shared_service.save_shared_content(
+            db,
+            actor,
+            subject_id=request.subject_id,
+            content_revision=request.content_revision,
+            knowledge_tree=request.knowledge_tree,
+            recall_library=request.recall_library,
+            principles=request.principles,
+            synthesis_presets=request.synthesis_presets,
+            tag_config=request.tag_config,
+        )
+    except (
+        ValueError,
+        content_prep_shared_service.ContentRevisionConflict,
+        teaching_content_projection_service.PrincipleArchiveConflict,
+    ) as error:
+        _raise_shared_error(error)
+
+
+@router.get("/principles")
+async def list_principles(db: DB, actor: PrepEditor):
+    return await content_prep_shared_service.read_principles(db)
+
+
+@router.post("/principles")
+async def create_principle(
+    request: ContentPrepPrincipleWriteRequest,
+    db: DB,
+    actor: PrepEditor,
+):
+    principle_id = str(request.principle.get("id") or "").strip()
+    if not principle_id:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_PRINCIPLE", "message": "原则 ID 不能为空"},
+        )
+    try:
+        return await content_prep_shared_service.upsert_principle(
+            db,
+            actor,
+            principle_id=principle_id,
+            content_revision=request.content_revision,
+            principle=request.principle,
+            preset=request.preset,
+        )
+    except (ValueError, content_prep_shared_service.ContentRevisionConflict) as error:
+        _raise_shared_error(error)
+
+
+@router.put("/principles/{principle_id}")
+async def update_principle(
+    principle_id: str,
+    request: ContentPrepPrincipleWriteRequest,
+    db: DB,
+    actor: PrepEditor,
+):
+    try:
+        return await content_prep_shared_service.upsert_principle(
+            db,
+            actor,
+            principle_id=principle_id,
+            content_revision=request.content_revision,
+            principle=request.principle,
+            preset=request.preset,
+        )
+    except (ValueError, content_prep_shared_service.ContentRevisionConflict) as error:
+        _raise_shared_error(error)
+
+
+@router.delete("/principles/{principle_id}")
+async def remove_principle(
+    principle_id: str,
+    request: ContentPrepDeleteRequest,
+    db: DB,
+    actor: PrepEditor,
+):
+    try:
+        return await content_prep_shared_service.delete_principle(
+            db,
+            actor,
+            principle_id=principle_id,
+            content_revision=request.content_revision,
+        )
+    except (
+        ValueError,
+        content_prep_shared_service.ContentRevisionConflict,
+        teaching_content_projection_service.PrincipleArchiveConflict,
+    ) as error:
+        _raise_shared_error(error)
+
+
+@router.post("/activities/import")
+async def import_activities(
+    request: ContentPrepActivityImportRequest,
+    db: DB,
+    actor: PrepEditor,
+):
+    try:
+        return await content_prep_shared_service.import_activities(
+            db,
+            actor,
+            content_revision=request.content_revision,
+            activities=request.activities,
+        )
+    except (ValueError, content_prep_shared_service.ContentRevisionConflict) as error:
+        _raise_shared_error(error)
 
 
 @router.post("/principles/archive")

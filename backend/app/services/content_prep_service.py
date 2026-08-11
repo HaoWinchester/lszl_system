@@ -229,6 +229,14 @@ def _manifest_hash(request: ContentPrepBatchRequest) -> str:
         "synthesisPresets": request.synthesis_presets,
         "tagConfig": request.tag_config,
     }
+    if request.knowledge_tree is not None or request.recall_library is not None:
+        manifest.update(
+            {
+                "subjectId": request.subject_id,
+                "knowledgeTree": request.knowledge_tree,
+                "recallLibrary": request.recall_library,
+            }
+        )
     canonical = json.dumps(
         manifest,
         ensure_ascii=False,
@@ -804,9 +812,9 @@ async def _upsert_tag_config(
     db: AsyncSession,
     actor: _ActorContext,
     config: dict[str, Any],
-) -> None:
+) -> bool:
     if not config:
-        return
+        return False
     values = _tag_config_values(config)
     active = (
         await db.execute(
@@ -826,7 +834,7 @@ async def _upsert_tag_config(
     if active is not None and all(
         getattr(active, key) == values[key] for key in comparable_keys
     ):
-        return
+        return False
     if active is not None:
         active.active = False
     await db.flush()
@@ -840,6 +848,7 @@ async def _upsert_tag_config(
             updated_by=actor.username,
         )
     )
+    return True
 
 
 def _assign_question_fields(
@@ -1135,7 +1144,25 @@ async def _execute_upload(
     content_changes.extend(
         await _upsert_presets(db, actor, request.synthesis_presets)
     )
-    await _upsert_tag_config(db, actor, request.tag_config)
+    tag_changed = await _upsert_tag_config(db, actor, request.tag_config)
+    from app.services import content_prep_shared_service
+
+    content_changes.extend(
+        await content_prep_shared_service.apply_auxiliary_assets(
+            db,
+            actor_username=actor.username,
+            subject_id=request.subject_id,
+            knowledge_tree=request.knowledge_tree,
+            recall_library=request.recall_library,
+            tag_config=request.tag_config,
+        )
+    )
+    if tag_changed and not any(
+        change.get("entityType") == "tagConfig" for change in content_changes
+    ):
+        content_changes.append(
+            {"entityType": "tagConfig", "entityId": "active", "action": "upserted"}
+        )
     if content_changes or not await (
         teaching_content_projection_service.projection_rows_present(db)
     ):

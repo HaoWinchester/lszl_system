@@ -93,10 +93,11 @@ test('graph and training login use remote authentication then reload account sta
   assert.match(adapter, /core\.login/)
   assert.match(adapter, /core\.register/)
   assert.match(adapter, /core\.logout/)
-  for (const pageName of ['index.html', 'question-training.html']) {
-    const page = readFileSync(resolve(frontendDir, `public/new-legacy/${pageName}`), 'utf8')
-    assert.match(page, /direct-auth-adapter\.js/)
-  }
+  const graphPage = readFileSync(resolve(frontendDir, 'public/new-legacy/index.html'), 'utf8')
+  assert.match(graphPage, /direct-auth-adapter\.js/)
+  const retiredTrainingPage = readFileSync(resolve(frontendDir, 'public/new-legacy/question-training.html'), 'utf8')
+  assert.match(retiredTrainingPage, /location\.replace\(target\.toString\(\)\)/)
+  assert.doesNotMatch(retiredTrainingPage, /direct-auth-adapter\.js/)
   const entry = readFileSync(resolve(frontendDir, 'scripts/new-legacy-assets/direct-entry.js'), 'utf8')
   assert.match(entry, /kg-auth-session-change/)
   assert.match(entry, /location\.reload/)
@@ -174,14 +175,15 @@ test('generated question preview persists the selected bank and question for rec
   assert.match(preview[1], /await window\.KGServerStateStorage\.flush\(\)/)
 })
 
-test('training runtime CSS keeps shortcuts above the guided action dock', () => {
+test('retired training shell does not load the former training runtime', () => {
   const cssPath = resolve(frontendDir, 'scripts/new-legacy-assets/direct-runtime-fixes.css')
   assert.ok(existsSync(cssPath), 'direct-runtime-fixes.css should exist')
   const css = readFileSync(cssPath, 'utf8')
   assert.match(css, /question-training-page[\s\S]*kg-global-shortcuts/)
   assert.match(css, /bottom:\s*88px\s*!important/)
   const page = readFileSync(resolve(frontendDir, 'public/new-legacy/question-training.html'), 'utf8')
-  assert.match(page, /direct-runtime-fixes\.css/)
+  assert.match(page, /location\.replace\(target\.toString\(\)\)/)
+  assert.doesNotMatch(page, /direct-runtime-fixes\.css/)
 })
 
 test('member deep link opens plans only for student accounts', () => {
@@ -249,5 +251,5 @@ test('generated pages describe the server-backed architecture without stale loca
     '本浏览器 localStorage',
   ]
   for (const copy of staleVisibleCopy) assert.doesNotMatch(generated, new RegExp(copy))
-  assert.match(generated, /服务器按用户隔离保存|保存到服务器/)
+  assert.match(generated, /服务器(?:校验与保存|保存)|同步保存到后台|保存到服务器/)
 })

@@ -30,6 +30,15 @@
   ];
 
   const qs = (sel, root=document) => root.querySelector(sel);
+  function escapeHTML(value){
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&':'&amp;',
+      '<':'&lt;',
+      '>':'&gt;',
+      '"':'&quot;',
+      "'":'&#39;'
+    }[char]));
+  }
 
   function roleApi(){
     return window.KGRolePermissions || null;

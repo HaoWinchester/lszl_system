@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
 
 from app.schemas.question_catalog import QuestionPayload
 from app.services import teaching_content_projection_service
@@ -26,7 +26,10 @@ class ContentPrepBatchRequest(BaseModel):
     creator_id: str = Field(alias="creatorId", min_length=1, max_length=64)
     prep_version: str = Field(alias="prepVersion", min_length=1, max_length=32)
     workspace_version: str = Field(alias="workspaceVersion", min_length=1, max_length=32)
-    questions: list[QuestionSyncItem] = Field(min_length=1)
+    questions: list[QuestionSyncItem] = Field(default_factory=list)
+    subject_id: str = Field(default="PMP", alias="subjectId", min_length=1, max_length=128)
+    knowledge_tree: dict[str, Any] | None = Field(default=None, alias="knowledgeTree")
+    recall_library: dict[str, Any] | None = Field(default=None, alias="recallLibrary")
     principles: dict[str, Any] = Field(default_factory=dict)
     synthesis_presets: dict[str, Any] = Field(default_factory=dict, alias="synthesisPresets")
     tag_config: dict[str, Any] = Field(default_factory=dict, alias="tagConfig")
@@ -78,6 +81,39 @@ class ContentPrepQuestionSaveRequest(BaseModel):
             teaching_content_projection_service.PRESET_KEY,
             value,
         )
+
+
+class ContentPrepSharedContentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    subject_id: str = Field(alias="subjectId", min_length=1, max_length=128)
+    content_revision: StrictInt = Field(alias="contentRevision", ge=0)
+    knowledge_tree: dict[str, Any] | None = Field(default=None, alias="knowledgeTree")
+    recall_library: dict[str, Any] | None = Field(default=None, alias="recallLibrary")
+    principles: dict[str, Any] = Field(default_factory=dict)
+    synthesis_presets: dict[str, Any] = Field(default_factory=dict, alias="synthesisPresets")
+    tag_config: dict[str, Any] = Field(default_factory=dict, alias="tagConfig")
+
+
+class ContentPrepPrincipleWriteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    content_revision: StrictInt = Field(alias="contentRevision", ge=0)
+    principle: dict[str, Any]
+    preset: dict[str, Any]
+
+
+class ContentPrepDeleteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    content_revision: StrictInt = Field(alias="contentRevision", ge=0)
+
+
+class ContentPrepActivityImportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    content_revision: StrictInt = Field(alias="contentRevision", ge=0)
+    activities: list[dict[str, Any]] = Field(min_length=1, max_length=5000)
 
 
 class ContentPrepQuestionResult(BaseModel):

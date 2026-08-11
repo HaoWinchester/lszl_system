@@ -388,7 +388,19 @@
     handleEditorInput(event)
   }
   function applyBatchKnowledge(){if(!state.activities.length)return toast('当前没有活动。');if(!state.batchKnowledgeNodeId)return toast('请先选择本批默认知识点。');state.activities.forEach(activity=>applyKnowledge(activity,state.batchSubjectId,state.batchKnowledgeNodeId,state.batchTaxonomyId));renderAll();scheduleSave();toast(`已将知识点应用到 ${state.activities.length} 个活动。`)}
-  async function submitLibrary(){const validation=libraryValidation();if(!state.activities.length)return toast('没有可提交的活动。');if(!validation.valid)return toast('仍有错误，请先完成知识点归属并查看校验结果。');try{const result=await Sync.submit(state.activities);const summary=result.summary||{};toast(`已提交活动库：新增 ${summary.created||0}，更新 ${summary.updated||0}，未变 ${summary.unchanged||0}。`);createBackup()}catch(error){toast('提交失败：'+error.message)}}
+  async function submitLibrary(){
+    const validation=libraryValidation();
+    if(!state.activities.length){state.dirty=true;$('qsSaveState').textContent='服务器未保存';toast('没有可提交的活动。');return false}
+    if(!validation.valid){state.dirty=true;$('qsSaveState').textContent='服务器未保存 · 请先修正校验错误';toast('仍有错误，请先完成知识点归属并查看校验结果。');return false}
+    try{
+      const result=await Sync.submit(state.activities),summary=result.summary||{};
+      state.dirty=false;$('qsSaveState').textContent='已保存到服务器 '+new Date().toLocaleTimeString();
+      toast(`已提交活动库：新增 ${summary.created||0}，更新 ${summary.updated||0}，未变 ${summary.unchanged||0}。`);createBackup();return true
+    }catch(error){
+      state.dirty=true;$('qsSaveState').textContent='服务器未保存 · 本机草稿已保留';toast('提交失败：'+error.message);return false
+    }
+  }
+  async function saveAndSubmit(){saveDraft(false);await submitLibrary()}
   function bind(){
     $('qsParseBtn').addEventListener('click',parseRaw);$('qsSampleBtn').addEventListener('click',()=>{$('qsRawText').value=Parser.SAMPLE;toast('示例模板已载入，点击“解析文本”。')});
     $('qsNewBtn').addEventListener('click',()=>{if((state.activities.length||clean($('qsRawText').value))&&!confirm('新建会清空当前内容，是否继续？'))return;state.activities=[];state.currentIndex=-1;state.parserIssues=[];state.previewState.clear();$('qsRawText').value='';renderAll();scheduleSave()});
@@ -407,7 +419,7 @@
     $('qsPickerBreadcrumb').addEventListener('click',event=>{const button=event.target.closest('[data-picker-parent]');if(!button)return;state.picker.parentId=button.dataset.pickerParent||null;state.picker.query='';$('qsPickerSearch').value='';renderKnowledgePicker()});
     $('qsPickerResults').addEventListener('click',event=>{const star=event.target.closest('[data-picker-star]');if(star){toggleFavorite(star.dataset.pickerStar);return}const open=event.target.closest('[data-picker-open]');if(open){state.picker.parentId=open.dataset.pickerOpen;state.picker.query='';$('qsPickerSearch').value='';renderKnowledgePicker();return}const select=event.target.closest('[data-picker-node]');if(select){state.picker.selectedNodeId=select.dataset.pickerNode;renderKnowledgePicker()}});
     $('qsPickerFavoriteBtn').addEventListener('click',()=>toggleFavorite());$('qsPickerConfirmBtn').addEventListener('click',confirmKnowledgePicker);
-    $('qsSaveDraftBtn').addEventListener('click',()=>saveDraft(true));$('qsBackupBtn').addEventListener('click',createBackup);$('qsRestoreBackupBtn').addEventListener('click',restoreBackup);$('qsExportBtn').addEventListener('click',exportPackage);$('qsExportCurrentBtn').addEventListener('click',exportCurrent);$('qsSubmitLibraryBtn').addEventListener('click',submitLibrary);
+    $('qsSaveDraftBtn').addEventListener('click',saveAndSubmit);$('qsBackupBtn').addEventListener('click',createBackup);$('qsRestoreBackupBtn').addEventListener('click',restoreBackup);$('qsExportBtn').addEventListener('click',exportPackage);$('qsExportCurrentBtn').addEventListener('click',exportCurrent);$('qsSubmitLibraryBtn').addEventListener('click',submitLibrary);
     $('qsImportBtn').addEventListener('click',()=>$('qsImportFile').click());$('qsImportFile').addEventListener('change',event=>importFile(event.target.files?.[0]));
     ['qsPackageId','qsPackageVersion','qsAuthor','qsRawText'].forEach(id=>$(id).addEventListener('input',scheduleSave));
     window.addEventListener('beforeunload',()=>{if(state.dirty)saveDraft(false)});
