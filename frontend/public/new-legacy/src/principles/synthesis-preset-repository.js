@@ -13,5 +13,11 @@
   function get(id){return clone(read().items.find(item=>item.id===String(id))||null)}
   function getByPrincipleId(principleId,{activeOnly=false}={}){const items=read().items.filter(item=>item.principleId===String(principleId));return clone(items.find(item=>!activeOnly||item.status==='active')||null)}
   function upsert(payload={}){const data=read(),existing=payload.id?data.items.find(item=>item.id===String(payload.id)):data.items.find(item=>item.principleId===String(payload.principleId));const next=normalize({...existing,...payload,id:existing?.id||payload.id||('preset-'+now().toString(36)),version:existing&&((existing.title!==payload.title)||(existing.content!==payload.content))?Number(existing.version||1)+1:Number(existing?.version||1)});const index=data.items.findIndex(item=>item.id===next.id);if(index>=0)data.items[index]=next;else data.items.push(next);save(data.items);try{global.dispatchEvent(new CustomEvent('kg:synthesis-presets-changed',{detail:{item:clone(next)}}))}catch(error){}return clone(next)}
-  global.KGSynthesisPresetRepository=Object.freeze({KEY,list,get,getByPrincipleId,upsert});
+  function replaceAll(payload={}){
+    const items=readProjection(payload),ids=new Set(),principleIds=new Set();
+    items.forEach(item=>{if(ids.has(item.id))throw new Error('归纳卡 ID 不能重复。');if(principleIds.has(item.principleId))throw new Error(`原则 ${item.principleId} 存在重复归纳卡。`);ids.add(item.id);principleIds.add(item.principleId)});
+    save(items);try{global.dispatchEvent(new CustomEvent('kg:synthesis-presets-changed',{detail:{reason:'replaced',items:clone(items)}}))}catch(error){}return clone(items);
+  }
+  function readProjection(payload={}){return (Array.isArray(payload?.items)?payload.items:[]).map(normalize)}
+  global.KGSynthesisPresetRepository=Object.freeze({KEY,list,get,getByPrincipleId,upsert,replaceAll});
 })(globalThis);

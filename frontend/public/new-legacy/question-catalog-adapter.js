@@ -118,6 +118,20 @@
     return clone(payload.bank || null)
   }
 
+  async function importBanks(input) {
+    const payload = await request('/banks/import', {
+      method: 'POST',
+      body: JSON.stringify({ banks: Array.isArray(input?.banks) ? input.banks : [] }),
+    })
+    publishCommit(payload, {
+      entityType: 'question-import',
+      entityId: payload.banks?.at(-1)?.id || '',
+      action: 'created',
+    })
+    await refreshAfterCommit(payload)
+    return clone(payload)
+  }
+
   async function deleteBank(bankId) {
     const payload = await request(`/banks/${encodeURIComponent(bankId)}`, { method: 'DELETE' })
     publishCommit(payload, { entityType: 'bank', entityId: bankId, action: 'deleted' })
@@ -262,6 +276,7 @@
     question,
     reload,
     saveBank,
+    importBanks,
     deleteBank,
     saveQuestion,
     deleteQuestion,

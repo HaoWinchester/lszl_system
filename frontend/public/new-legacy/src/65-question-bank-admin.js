@@ -4290,41 +4290,73 @@
     });
     downloadJson('项目管理类题库认知标注模板.json', template);
   }
-  function importJson(file){
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try{
-        const raw = String(reader.result || '').replace(/^\ufeff/,'');
-        const data = JSON.parse(raw);
-        const incoming = Array.isArray(data) ? data.map(normalizeBank) : (Array.isArray(data.banks) ? data.banks.map(normalizeBank) : [normalizeBank(data)]);
-        incoming.forEach(bank => {
-          if(state.banks.some(b => b.id === bank.id)) bank.id = bank.id + '-' + Date.now().toString(36);
-          state.banks.push(bank);
-        });
-        if(Array.isArray(data.papers)){
-          data.papers.map(normalizePaper).forEach(paper => {
-            if(state.papers.some(p => p.id === paper.id)) paper.id = paper.id + '-' + Date.now().toString(36);
-            state.papers.push(paper);
-          });
-          savePapers(state.papers, {silent:true});
-        }
-        const last = incoming[incoming.length - 1];
-        state.selectedBankId = last.id;
-        state.selectedQuestionId = last.questions[0]?.id || '';
-        state.cluePage = 1;
-        state.conceptPage = 1;
-        state.questionPage = 1;
-        saveBanks();
-        render();
-        toast(`已导入 ${incoming.length} 个题库${Array.isArray(data.papers) ? '，并导入 ' + data.papers.length + ' 套试卷' : ''}。`);
-      }catch(e){
-        alert('导入失败：' + (e.message || e));
-      }finally{
-        $('qbImportFile').value = '';
-      }
+  function importBanksFromPayload(data){
+    const rawBanks=Array.isArray(data)?data:(Array.isArray(data?.banks)?data.banks:[data]);
+    return rawBanks.filter(bank=>bank&&typeof bank==='object').map(normalizeBank);
+  }
+  function remapImportedPaperRefs(papers,maps={}){
+    const bankMap=maps.sourceBankIdMap&&typeof maps.sourceBankIdMap==='object'?maps.sourceBankIdMap:{};
+    const questionMap=maps.sourceQuestionIdMap&&typeof maps.sourceQuestionIdMap==='object'?maps.sourceQuestionIdMap:{};
+    return (Array.isArray(papers)?papers:[]).map(rawPaper=>{
+      const paper=normalizePaper(rawPaper);
+      paper.questions=(paper.questions||[]).map(ref=>{
+        const sourceBankId=String(ref.bankId||''),sourceQuestionId=String(ref.questionId||'');
+        return {...ref,bankId:bankMap[sourceBankId]||sourceBankId,questionId:questionMap[`${sourceBankId}::${sourceQuestionId}`]||sourceQuestionId};
+      });
+      return paper;
+    });
+  }
+  function questionImportStateSnapshot(){
+    return {
+      banks:clone(state.banks),papers:clone(state.papers),selectedBankId:state.selectedBankId,selectedQuestionId:state.selectedQuestionId,
+      selectedPaperId:state.selectedPaperId,cluePage:state.cluePage,conceptPage:state.conceptPage,questionPage:state.questionPage,
+      dirty:state.dirty,serverCatalogNewerRevision:state.serverCatalogNewerRevision,serverCatalogLocalDraft:clone(state.serverCatalogLocalDraft),serverCatalogConflictReason:state.serverCatalogConflictReason
     };
-    reader.readAsText(file, 'utf-8');
+  }
+  function restoreQuestionImportState(snapshot){
+    state.banks=(snapshot.banks||[]).map(normalizeBank);state.papers=(snapshot.papers||[]).map(normalizePaper);
+    state.selectedBankId=snapshot.selectedBankId||'';state.selectedQuestionId=snapshot.selectedQuestionId||'';state.selectedPaperId=snapshot.selectedPaperId||'';
+    state.cluePage=snapshot.cluePage||1;state.conceptPage=snapshot.conceptPage||1;state.questionPage=snapshot.questionPage||1;
+    state.dirty=!!snapshot.dirty;state.serverCatalogNewerRevision=Number(snapshot.serverCatalogNewerRevision||0);state.serverCatalogLocalDraft=clone(snapshot.serverCatalogLocalDraft);state.serverCatalogConflictReason=snapshot.serverCatalogConflictReason||'';
+  }
+  async function importQuestionBanks(data){
+    const incoming=importBanksFromPayload(data);
+    if(!incoming.length){alert('导入未提交：未找到可导入的题库。');return {ok:false,error:'未找到可导入的题库。'};}
+    if(!Catalog?.importBanks){alert('导入未提交：题目目录服务未加载。');return {ok:false,error:'题目目录服务未加载。'};}
+    const snapshot=questionImportStateSnapshot();
+    try{
+      const result=await Catalog.importBanks({banks:incoming});
+      const savedBanks=Array.isArray(result?.banks)?result.banks:[];
+      const last=savedBanks[savedBanks.length-1];
+      if(!last?.id)throw new Error('服务器未返回已保存题库。');
+      const savedQuestionId=String(last.questions?.[0]?.id||'');
+      reloadBanksFromCatalog(String(last.id),savedQuestionId);
+      const importedPapers=remapImportedPaperRefs(data?.papers,{sourceBankIdMap:result.sourceBankIdMap,sourceQuestionIdMap:result.sourceQuestionIdMap});
+      if(importedPapers.length){
+        importedPapers.forEach(paper=>{if(state.papers.some(item=>item.id===paper.id))paper.id=paper.id+'-'+Date.now().toString(36);state.papers.push(paper)});
+        savePapers(state.papers,{silent:true});
+      }
+      state.cluePage=1;state.conceptPage=1;state.questionPage=1;state.dirty=false;render();
+      toast(`已导入并保存 ${savedBanks.length} 个题库${importedPapers.length?'，并导入 '+importedPapers.length+' 套试卷':''}。`);
+      return {ok:true,bankId:state.selectedBankId,questionId:state.selectedQuestionId,importedBankCount:savedBanks.length,importedPaperCount:importedPapers.length};
+    }catch(error){
+      restoreQuestionImportState(snapshot);render();
+      const message=String(error?.message||error||'未知错误');alert('导入未提交：'+message);
+      return {ok:false,error:message};
+    }
+  }
+  function importJson(file){
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=async()=>{
+      try{
+        const raw=String(reader.result||'').replace(/^\ufeff/,'');
+        await importQuestionBanks(JSON.parse(raw));
+      }catch(error){
+        alert('导入未提交：'+(error?.message||error));
+      }finally{$('qbImportFile').value=''};
+    };
+    reader.readAsText(file,'utf-8');
   }
   function downloadJson(filename, obj){
     const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json;charset=utf-8'});
@@ -4447,6 +4479,7 @@
     getCurrentBank:()=>clone(currentBank()),
     getCurrentQuestion:()=>clone(currentQuestion()),
     getSelectedQuestions:()=>clone(selectedQuestions()),
+    importQuestionBanks,
     bulkPatchSelectedQuestions,
     getAllQuestions:(options={})=>clone(state.banks.flatMap(bank=>(bank.questions||[]).filter(question=>options.includeDeleted===true||!isQuestionDeleted(question)).map(question=>({bankId:bank.id,bankName:bank.name,...question})))),
     updateCurrentQuestion,
