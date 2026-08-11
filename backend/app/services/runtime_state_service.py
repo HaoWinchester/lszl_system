@@ -161,6 +161,11 @@ PREFIXES = (
     "kg_guided_path_scroll_v3__",
     "kg_multi_workspace_closed_tabs_v1__",
     "kg_recall_association_library_v1__",
+    # P4.5 browser compatibility contract. Practice and management remain
+    # owner-scoped runtime state; the subject-scoped library is teacher-shared.
+    "kg_practice_mistakes_v1__user__",
+    "kg_recall_association_management_v1__subject__",
+    "kg_recall_association_library_v1__subject__",
     # v9.0-p4.1.1 新增业务键（动态 id / subject 后缀）
     "kg_practice_history_v1__",
     "kg_practice_active_attempt_v1__",
