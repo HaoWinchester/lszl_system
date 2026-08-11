@@ -9,6 +9,7 @@ from app.db.session import AsyncSessionLocal
 from app.main import app
 from app.models.content_prep import QuestionAuditLog, QuestionBankCollaborator
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
+from app.models.training import LearningEvent, RecallProgress, TrainingProgress
 from app.models.user import User
 from app.services.question_catalog_service import question_to_payload
 
@@ -22,6 +23,196 @@ def _login(client: TestClient, username: str, password: str = PASSWORD) -> None:
         json={"username": username, "password": password},
     )
     assert response.status_code == 200
+
+
+def test_bank_scoped_test_record_cleanup_only_removes_selected_bank_records() -> None:
+    suffix = uuid4().hex[:10]
+    teacher_name = f"catalog-clear-teacher-{suffix}"
+    learner_name = f"catalog-clear-learner-{suffix}"
+    bank_a_id = f"catalog-clear-bank-a-{suffix}"
+    bank_b_id = f"catalog-clear-bank-b-{suffix}"
+    question_a_id = f"catalog-clear-question-a-{suffix}"
+    question_b_id = f"catalog-clear-question-b-{suffix}"
+    paper_id = f"catalog-clear-paper-{suffix}"
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            password_hash = hash_password(PASSWORD)
+            db.add_all(
+                [
+                    User(
+                        username=teacher_name,
+                        password_hash=password_hash,
+                        role="teacher",
+                        status="active",
+                    ),
+                    User(
+                        username=learner_name,
+                        password_hash=password_hash,
+                        role="student",
+                        status="active",
+                    ),
+                ]
+            )
+            await db.flush()
+            db.add_all(
+                [
+                    QuestionBank(
+                        id=bank_a_id,
+                        owner_id=teacher_name,
+                        name="待清理测试题库",
+                        subject="PMP",
+                    ),
+                    QuestionBank(
+                        id=bank_b_id,
+                        owner_id=teacher_name,
+                        name="保留题库",
+                        subject="PMP",
+                    ),
+                ]
+            )
+            await db.flush()
+            db.add_all(
+                [
+                    Question(
+                        id=question_a_id,
+                        bank_id=bank_a_id,
+                        title="测试题 A",
+                        scope="internal",
+                    ),
+                    Question(
+                        id=question_b_id,
+                        bank_id=bank_b_id,
+                        title="测试题 B",
+                        scope="internal",
+                    ),
+                ]
+            )
+            await db.flush()
+            db.add(
+                ExamPaper(
+                    id=paper_id,
+                    owner_id=teacher_name,
+                    name="已发布测试试卷",
+                    subject="PMP",
+                    status="published",
+                    total_count=1,
+                )
+            )
+            await db.flush()
+            db.add(PaperQuestion(paper_id=paper_id, question_id=question_a_id))
+            db.add_all(
+                [
+                    TrainingProgress(
+                        id=f"tp-clear-a-{suffix}",
+                        owner_id=learner_name,
+                        question_id=question_a_id,
+                        bank_id=bank_a_id,
+                    ),
+                    TrainingProgress(
+                        id=f"tp-clear-b-{suffix}",
+                        owner_id=learner_name,
+                        question_id=question_b_id,
+                        bank_id=bank_b_id,
+                    ),
+                    RecallProgress(
+                        owner_id=learner_name,
+                        question_id=question_a_id,
+                    ),
+                    RecallProgress(
+                        owner_id=teacher_name,
+                        question_id=question_b_id,
+                    ),
+                    LearningEvent(
+                        id=f"le-clear-a-{suffix}",
+                        owner_id=learner_name,
+                        question_id=question_a_id,
+                        event_type="answer_submitted",
+                    ),
+                    LearningEvent(
+                        id=f"le-clear-b-{suffix}",
+                        owner_id=learner_name,
+                        question_id=question_b_id,
+                        event_type="answer_submitted",
+                    ),
+                ]
+            )
+            await db.commit()
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            question_ids = [question_a_id, question_b_id]
+            await db.execute(delete(PaperQuestion).where(PaperQuestion.paper_id == paper_id))
+            await db.execute(delete(ExamPaper).where(ExamPaper.id == paper_id))
+            await db.execute(
+                delete(TrainingProgress).where(
+                    TrainingProgress.question_id.in_(question_ids)
+                )
+            )
+            await db.execute(
+                delete(RecallProgress).where(
+                    RecallProgress.question_id.in_(question_ids)
+                )
+            )
+            await db.execute(
+                delete(LearningEvent).where(
+                    LearningEvent.question_id.in_(question_ids)
+                )
+            )
+            await db.execute(delete(Question).where(Question.id.in_(question_ids)))
+            await db.execute(
+                delete(QuestionBank).where(QuestionBank.id.in_([bank_a_id, bank_b_id]))
+            )
+            await db.execute(
+                delete(User).where(User.username.in_([teacher_name, learner_name]))
+            )
+            await db.commit()
+
+    async def remaining_question_ids(
+        model: type[TrainingProgress | RecallProgress | LearningEvent],
+    ) -> set[str]:
+        async with AsyncSessionLocal() as db:
+            rows = await db.execute(select(model.question_id))
+            return {str(question_id) for question_id in rows.scalars().all()}
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as client:
+            _login(client, teacher_name)
+            response = client.post(
+                f"/api/v1/banks/{bank_a_id}/test-learning-records/clear"
+            )
+
+            deleted = client.delete(f"/api/v1/banks/{bank_a_id}")
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "questionCount": 1,
+            "cleared": {
+                "trainingProgress": 1,
+                "recallProgress": 1,
+                "learningEvents": 1,
+            },
+        }
+        assert deleted.status_code == 200
+        for model in (TrainingProgress, RecallProgress, LearningEvent):
+            assert asyncio.run(remaining_question_ids(model)) == {question_b_id}
+
+        async def paper_has_no_deleted_bank_questions() -> bool:
+            async with AsyncSessionLocal() as db:
+                links = await db.execute(
+                    select(PaperQuestion).where(PaperQuestion.paper_id == paper_id)
+                )
+                paper = await db.get(ExamPaper, paper_id)
+                return (
+                    not links.scalars().all()
+                    and paper is not None
+                    and paper.total_count == 0
+                )
+
+        assert asyncio.run(paper_has_no_deleted_bank_questions())
+    finally:
+        asyncio.run(cleanup())
 
 
 def test_catalog_serializer_normalizes_legacy_string_collections() -> None:

@@ -160,6 +160,7 @@
     banks: [],
     selectedBankId: '',
     selectedQuestionId: '',
+    clearedTestRecordBankIds:new Set(),
     papers: [],
     paperCategories: [],
     selectedPaperId: '',
@@ -1623,6 +1624,7 @@
     $('qbSafeDeleteConfirmBtn')?.addEventListener('click',confirmSafeDelete);
     $('qbPermanentDeleteAcknowledge')?.addEventListener('change',event=>{const button=$('qbPermanentDeleteConfirmBtn');if(button)button.disabled=!event.currentTarget.checked});
     $('qbPermanentDeleteConfirmBtn')?.addEventListener('click',confirmPermanentDelete);
+    $('qbClearBankTestRecordsBtn')?.addEventListener('click',()=>{void clearCurrentBankTestRecords()});
     $('qbDeleteBankBtn')?.addEventListener('click', deleteCurrentBank);
     $('qbAddOptionBtn').addEventListener('click', addOption);
     $('qbAddSelectedKeywordBtn').addEventListener('click', addSelectedKeyword);
@@ -3776,10 +3778,30 @@
     if(!bank) return;
     await deleteBankById(bank.id);
   }
+  async function clearCurrentBankTestRecords(){
+    const bank=currentBank();
+    if(!bank)return;
+    const confirmed=confirm(`确定清除题库“${bank.name}”的测试答题记录吗？\n\n只会清除本题库题目的训练进度、深度回忆和答题事件，其他题库不会受影响。`);
+    if(!confirmed)return;
+    try{
+      await window.KGServerStateStorage?.flush?.();
+      const response=await fetch(`/api/v1/banks/${encodeURIComponent(bank.id)}/test-learning-records/clear`,{method:'POST',credentials:'include'});
+      let payload={};try{payload=await response.json()}catch(error){}
+      if(!response.ok)throw new Error(payload?.detail?.message||payload?.detail||'清除测试答题记录失败。');
+      const cleared=payload?.cleared||{};
+      const total=Number(cleared.trainingProgress||0)+Number(cleared.recallProgress||0)+Number(cleared.learningEvents||0);
+      state.clearedTestRecordBankIds.add(bank.id);
+      toast(`已清除 ${total} 条测试答题记录（训练 ${Number(cleared.trainingProgress||0)}、回忆 ${Number(cleared.recallProgress||0)}、事件 ${Number(cleared.learningEvents||0)}）。`);
+    }catch(error){alert('清除测试答题记录失败：'+(error.message||error));}
+  }
   async function deleteBankById(bankId){
     const bank = state.banks.find(b => b.id === bankId);
     if(!bank) return;
-    const referenced=(bank.questions||[]).map(question=>({question,refs:referenceSummaryForQuestion(question,bank)})).filter(row=>row.refs.protected);
+    const referenced=(bank.questions||[]).map(question=>({question,refs:referenceSummaryForQuestion(question,bank)})).filter(row=>row.refs.protected&&(
+      !state.clearedTestRecordBankIds.has(bank.id)
+      ||row.refs.courseTaskRefs>0
+      ||row.refs.otherRefs>0
+    ));
     if(referenced.length){
       const paperCount=referenced.filter(row=>row.refs.paperRefs>0).length;
       const courseCount=referenced.filter(row=>row.refs.courseTaskRefs>0).length;
@@ -3794,13 +3816,17 @@
 请保留题库，或先在题目层使用安全删除。`);
       return;
     }
+    const testRecordCleanupNote=state.clearedTestRecordBankIds.has(bank.id)
+      ? '\n已清除测试答题记录；删除时会移除当前试卷关联，已发布历史快照保留。'
+      : '';
     const message = `确定永久删除题库“${bank.name}”吗？
 
-将物理删除该题库下 ${bank.questions.length} 道无业务引用题目。${bank.visibility==='published'?'该题库也会从学员的自由练习列表中撤下。':'此操作只影响当前教师题库。'}
+将物理删除该题库下 ${bank.questions.length} 道无业务引用题目。${bank.visibility==='published'?'该题库也会从学员的自由练习列表中撤下。':'此操作只影响当前教师题库。'}${testRecordCleanupNote}
 
 此操作不可恢复。`;
     if(!confirm(message)) return;
     try{await Catalog.deleteBank(bank.id)}catch(error){alert('题库删除失败：'+(error.message||error));return false}
+    state.clearedTestRecordBankIds.delete(bank.id);
     if(isDemoBank(bank) || (bank.questions || []).some(isDemoQuestion)) suppressDemoExample();
     const filteredBefore = filteredBanks();
     const filteredIndex = filteredBefore.findIndex(b => b.id === bank.id);

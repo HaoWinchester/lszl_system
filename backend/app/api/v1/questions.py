@@ -75,6 +75,18 @@ async def delete_bank(bank_id: str, db: DB, user: QuestionBankManager):
     return {"ok": True}
 
 
+@router.post("/banks/{bank_id}/test-learning-records/clear")
+async def clear_bank_test_learning_records(
+    bank_id: str,
+    db: DB,
+    user: QuestionBankManager,
+):
+    result = await question_service.clear_bank_test_learning_records(db, user, bank_id)
+    if result is None:
+        raise _nf()
+    return result
+
+
 # ---------- 题目 ----------
 @router.get("/banks/{bank_id}/questions")
 async def list_questions(

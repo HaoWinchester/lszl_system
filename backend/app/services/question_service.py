@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import now_utc, uid
 from app.models.content_prep import QuestionUploadBatch
 from app.models.question import DRAFT, ExamPaper, PaperQuestion, PUBLISHED, Question, QuestionBank
+from app.models.training import LearningEvent, RecallProgress, TrainingProgress
 from app.models.user import User
 from app.schemas.question_catalog import QuestionBankImportRequest
 from app.services import (
@@ -17,6 +18,9 @@ from app.services import (
     question_catalog_service,
     question_content_service,
     teaching_content_revision_service,
+)
+from app.services.question_cleanup_reference_service import (
+    repair_current_question_references,
 )
 
 
@@ -321,6 +325,19 @@ async def delete_bank(db: AsyncSession, owner: User | str, bank_id: str) -> bool
             select(Question).where(Question.bank_id == bank_id).order_by(Question.id)
         )
     ).scalars().all()
+    question_ids = [question.id for question in qs]
+    question_domains = {
+        str(question_id): domain
+        for question_id, domain in (
+            await db.execute(select(Question.id, Question.domain))
+        ).all()
+    }
+    repair_summary = await repair_current_question_references(
+        db,
+        set(question_ids),
+        actor_username=actor.username,
+        question_domains=question_domains,
+    )
     await db.execute(
         delete(QuestionUploadBatch).where(QuestionUploadBatch.bank_id == bank_id)
     )
@@ -335,11 +352,66 @@ async def delete_bank(db: AsyncSession, owner: User | str, bank_id: str) -> bool
                 {"entityType": "question", "entityId": q.id, "action": "deleted"}
                 for q in qs
             ],
+            *[
+                {"entityType": "paper", "entityId": paper_id, "action": "updated"}
+                for paper_id in repair_summary["relationalPaperIds"]
+            ],
             {"entityType": "bank", "entityId": b.id, "action": "deleted"},
         ],
     )
     await db.commit()
     return True
+
+
+async def clear_bank_test_learning_records(
+    db: AsyncSession,
+    owner: User | str,
+    bank_id: str,
+) -> dict[str, object] | None:
+    """Remove every learner record belonging to one editable test question bank."""
+
+    actor = await _resolve_actor(db, owner)
+    if actor is None:
+        return None
+    await teaching_content_revision_service.acquire_lock(db)
+    try:
+        bank = await question_access_service.require_bank_access(
+            db,
+            actor,
+            bank_id,
+            edit=True,
+        )
+    except HTTPException:
+        return None
+
+    question_ids = select(Question.id).where(Question.bank_id == bank.id)
+    question_count = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(Question)
+                .where(Question.bank_id == bank.id)
+            )
+        ).scalar_one()
+    )
+    training_result = await db.execute(
+        delete(TrainingProgress).where(TrainingProgress.question_id.in_(question_ids))
+    )
+    recall_result = await db.execute(
+        delete(RecallProgress).where(RecallProgress.question_id.in_(question_ids))
+    )
+    event_result = await db.execute(
+        delete(LearningEvent).where(LearningEvent.question_id.in_(question_ids))
+    )
+    await db.commit()
+    return {
+        "questionCount": question_count,
+        "cleared": {
+            "trainingProgress": max(0, int(training_result.rowcount or 0)),
+            "recallProgress": max(0, int(recall_result.rowcount or 0)),
+            "learningEvents": max(0, int(event_result.rowcount or 0)),
+        },
+    }
 
 
 # ---------- 题目 ----------
