@@ -95,7 +95,12 @@
   }
   async function claimWithLocks(storage, lockName, digest) {
     let shown = false;
-    await global.navigator.locks.request(lockName, { mode: "exclusive" }, async function () { shown = await consume(storage, digest); });
+    await global.navigator.locks.request(lockName, { mode: "exclusive" }, async function () {
+      if (typeof storage.refresh === "function") {
+        try { if (await storage.refresh() === false) return; } catch (_error) { return; }
+      }
+      shown = await consume(storage, digest);
+    });
     return shown;
   }
   async function claimWithStorage(storage, digest) {

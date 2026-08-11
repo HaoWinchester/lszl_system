@@ -312,6 +312,41 @@ async function run() {
   assert.equal(typeof runtimePayload.contentRevision, 'number', 'contentRevision must satisfy the backend StrictInt contract');
   assert.deepEqual(runtime.published.map(item => item.revision), [8], 'a successful teaching Runtime State write must publish its returned revision');
 
+  const chooserMarker = '{"schemaVersion":1,"consumedDigest":"server-digest","consumedAt":1786424000000}';
+  const refreshCalls = [];
+  const refreshRuntime = loadServerState({
+    fetchImpl: async (url, options = {}) => {
+      refreshCalls.push({ url, options });
+      return response(200, {
+        storage: { kg_learning_entry_chooser_consumed_v1: chooserMarker },
+        revision: 2,
+        contentRevision: 7,
+      });
+    },
+  });
+  assert.equal(typeof refreshRuntime.storage.refresh, 'function', 'server-state storage must expose refresh()');
+  await refreshRuntime.storage.refresh();
+  assert.equal(refreshCalls.length, 1);
+  assert.equal(refreshCalls[0].url, '/api/v1/runtime/state');
+  assert.equal(refreshCalls[0].options.method, 'GET');
+  assert.equal(refreshCalls[0].options.credentials, 'include');
+  assert.equal(refreshRuntime.storage.getItem('kg_learning_entry_chooser_consumed_v1'), chooserMarker);
+
+  let refreshFailureGets = 0;
+  const refreshFailureRuntime = loadServerState({
+    fetchImpl: async (_url, options = {}) => {
+      if (options.method === 'GET') {
+        refreshFailureGets += 1;
+        return response(200, { storage: {}, revision: 2, contentRevision: 7 });
+      }
+      return response(500, { detail: 'save failed' });
+    },
+  });
+  refreshFailureRuntime.storage.setItem('pending-before-refresh', 'must flush first');
+  await assert.rejects(refreshFailureRuntime.storage.refresh(), /保存失败 \(500\)/);
+  assert.equal(refreshFailureGets, 0, 'refresh must not GET after its preceding flush fails');
+  refreshFailureRuntime.pagehide();
+
   runtime.storage.setItem('pending-local-key', 'local draft');
   await runtime.remote({ revision: 9, source: 'remote' });
   assert.equal(runtime.storage.getItem('pending-local-key'), 'local draft', 'remote snapshots must reapply pending local mutations');

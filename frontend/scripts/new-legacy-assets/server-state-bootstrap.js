@@ -314,6 +314,14 @@
     return flushPromise
   }
 
+  async function refresh() {
+    const precedingFlush = flushPromise
+    if (precedingFlush) await precedingFlush
+    else if (dirty) await flush()
+    await reloadServerState()
+    return true
+  }
+
   function emit(operation, key, value) {
     lastMutation = { operation, key: String(key || ''), value: value == null ? null : String(value) }
     pendingMutations.delete(lastMutation.key)
@@ -352,6 +360,7 @@
   }
   Object.defineProperty(storage, 'length', { enumerable: true, get: () => values.size })
   storage.flush = flush
+  storage.refresh = refresh
 
   Object.defineProperty(global, 'localStorage', {
     configurable: true,

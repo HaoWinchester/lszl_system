@@ -67,7 +67,7 @@ function session(id = 'server-session-a') {
   return { authenticated: true, loginSessionId: id, user: { username: 'learner' } };
 }
 
-function createTab({ shared, authSession = session(), locksImpl = locks(), BroadcastChannelImpl = FakeBroadcastChannel, storageFlush } = {}) {
+function createTab({ shared, authSession = session(), locksImpl = locks(), BroadcastChannelImpl = FakeBroadcastChannel, storageFlush, storageRefresh } = {}) {
   const listeners = new Map();
   const window = {
     crypto: webcrypto,
@@ -92,6 +92,7 @@ function createTab({ shared, authSession = session(), locksImpl = locks(), Broad
     queueMicrotask,
   };
   if (storageFlush) window.localStorage.flush = storageFlush;
+  if (storageRefresh) window.localStorage.refresh = storageRefresh;
   shared.attach(window);
   const auth = { async getCurrentSession() { return authSession; } };
   const context = vm.createContext({
@@ -134,6 +135,63 @@ test('lock-backed VM tabs race to one winning claim', async () => {
   const [first, second] = await Promise.all([a.init(), b.init()]);
   assert.equal(Number(first.shown) + Number(second.shown), 1);
   assert.equal((await a.init()).shown, false);
+});
+
+test('lock-backed tabs with independent runtime maps refresh from one backend before claiming', async () => {
+  const backend = new Map();
+  const sharedLocks = locks();
+  let refreshes = 0;
+  let flushes = 0;
+  function serverTab() {
+    const local = new SharedStorage();
+    return createTab({
+      shared: local,
+      locksImpl: sharedLocks,
+      storageFlush: async () => {
+        flushes += 1;
+        backend.clear();
+        for (const [key, value] of local.values) backend.set(key, value);
+        return true;
+      },
+      storageRefresh: async () => {
+        refreshes += 1;
+        local.values = new Map(backend);
+        return true;
+      },
+    });
+  }
+  const a = serverTab();
+  const b = serverTab();
+  const [first, second] = await Promise.all([a.init(), b.init()]);
+  assert.equal(Number(first.shown) + Number(second.shown), 1);
+  assert.equal(refreshes, 2);
+  assert.equal(flushes, 1);
+});
+
+test('a false runtime refresh result cannot win or flush a lock-backed claim', async () => {
+  const shared = new SharedStorage();
+  let flushes = 0;
+  const tab = createTab({
+    shared,
+    storageFlush: async () => { flushes += 1; return true; },
+    storageRefresh: async () => false,
+  });
+  assert.equal((await tab.init()).shown, false);
+  assert.equal(flushes, 0);
+  assert.equal(shared.getItem(CONSUMED_KEY), null);
+});
+
+test('a rejected runtime refresh cannot win or flush a lock-backed claim', async () => {
+  const shared = new SharedStorage();
+  let flushes = 0;
+  const tab = createTab({
+    shared,
+    storageFlush: async () => { flushes += 1; return true; },
+    storageRefresh: async () => { throw new Error('runtime refresh failed'); },
+  });
+  assert.equal((await tab.init()).shown, false);
+  assert.equal(flushes, 0);
+  assert.equal(shared.getItem(CONSUMED_KEY), null);
 });
 
 test('a new server-issued login ID is eligible after the prior one was consumed', async () => {
