@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import vm from 'node:vm'
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const frontendDir = resolve(scriptsDir, '..')
@@ -163,6 +164,57 @@ test('question edit adapter is injected before the upstream question editor init
   assert.match(adapter, /stopImmediatePropagation/)
   const sync = readFileSync(resolve(frontendDir, 'scripts/sync-new-legacy.js'), 'utf8')
   assert.match(sync, /direct-question-adapter\.js[^]*kg-question-editor:generated[^]*catalogPage\.marker/)
+})
+
+test('question readonly lock leaves the shared principle library available', () => {
+  const adapter = readFileSync(resolve(scriptsDir, 'new-legacy-assets', 'direct-question-adapter.js'), 'utf8')
+  const attributes = new Map()
+  const control = (id, scope = '') => ({
+    id,
+    disabled: false,
+    addEventListener() {},
+    hasAttribute(name) { return attributes.has(`${id}:${name}`) },
+    getAttribute(name) { return attributes.get(`${id}:${name}`) ?? null },
+    setAttribute(name, value) { attributes.set(`${id}:${name}`, String(value)) },
+    removeAttribute(name) { attributes.delete(`${id}:${name}`) },
+    closest(selector) {
+      if (selector === '#qbPrincipleAnnotationPanel') return scope === 'principles-panel' ? this : null
+      return null
+    },
+    matches(selector) {
+      return selector === '[data-annotation-tab]' && ['principles-tab', 'annotation-tab'].includes(scope)
+    },
+  })
+  const questionField = control('questionStemInput', 'question')
+  const saveQuestion = control('qbSaveQuestionBtn', 'question')
+  const principleTab = control('principleTab', 'principles-tab')
+  const principleSave = control('tqSavePrincipleBtn', 'principles-panel')
+  const recallTab = control('recallTab', 'annotation-tab')
+  const annotationControls = [principleTab, principleSave, recallTab]
+  const elements = new Map([
+    ['questionStemInput', questionField],
+    ['qbSaveQuestionBtn', saveQuestion],
+    ['qbQuestionBaseCard', { querySelectorAll: () => [questionField, saveQuestion] }],
+    ['qbAnnotationCard', { querySelectorAll: () => annotationControls }],
+  ])
+  const bodyAttributes = new Map()
+  const document = {
+    body: { setAttribute(name, value) { bodyAttributes.set(name, String(value)) } },
+    getElementById(id) { return elements.get(id) || null },
+  }
+  const window = {
+    KGQuestionCatalogAdapter: {}, document,
+    clearInterval() {}, setInterval() { return 1 }, clearTimeout() {}, setTimeout() { return 1 },
+  }
+  vm.runInNewContext(adapter, { window, document, console })
+
+  window.KGQuestionCatalogEditController.applyReadonlyState(true)
+
+  assert.equal(questionField.disabled, true, 'the locked question form must remain read-only')
+  assert.equal(recallTab.disabled, false, 'read-only annotation panels must remain navigable')
+  assert.equal(principleTab.disabled, false, 'the shared principle tab must still be selectable')
+  assert.equal(principleSave.disabled, false, 'shared principle CRUD must not depend on a question edit lock')
+  assert.equal(bodyAttributes.get('data-question-catalog-readonly'), 'true')
 })
 
 test('generated question preview persists the selected bank and question for recall', () => {

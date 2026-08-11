@@ -1874,7 +1874,8 @@
   }
   function blankSynthesisDraft(questions=[]){
     return {
-      valid:true,
+      valid:false,
+      error:'请为每道题的正确选项绑定同一个且唯一的原则。',
       synthesisType:'principle',
       cardType:'user',
       principleId:'',
@@ -1904,7 +1905,7 @@
     const principleName=principleDisplayName(principleId,principle?.name||'');
     const principleTag='原则：'+principleName;
     const preset=Presets.getByPrincipleId?.(principleId,{activeOnly:true})||null;
-    if(!preset)return blankSynthesisDraft(questions);
+    if(!preset)return {...blankSynthesisDraft(questions),error:'对应原则还没有启用的系统预设归纳卡。'};
     return {
       valid:true,
       synthesisType:'principle',

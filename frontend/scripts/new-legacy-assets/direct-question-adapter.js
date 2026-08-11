@@ -22,6 +22,13 @@
     showError.timer = global.setTimeout(() => toast.classList.remove('show'), 2600)
   }
 
+  function isReadonlyNavigationOrSharedPrincipleControl(control) {
+    return Boolean(
+      control?.matches?.('[data-annotation-tab]')
+      || control?.closest?.('#qbPrincipleAnnotationPanel'),
+    )
+  }
+
   function applyReadonlyState(nextReadonly = readonly) {
     readonly = Boolean(nextReadonly)
     document.body?.setAttribute('data-question-catalog-readonly', readonly ? 'true' : 'false')
@@ -29,6 +36,13 @@
       .map(id => document.getElementById(id))
       .filter(Boolean)
     roots.flatMap(root => Array.from(root.querySelectorAll('input, textarea, select, button'))).forEach(control => {
+      if (isReadonlyNavigationOrSharedPrincipleControl(control)) {
+        if (control.hasAttribute('data-catalog-disabled-before-lock')) {
+          control.disabled = control.getAttribute('data-catalog-disabled-before-lock') === 'true'
+          control.removeAttribute('data-catalog-disabled-before-lock')
+        }
+        return
+      }
       if (readonly) {
         if (!control.hasAttribute('data-catalog-disabled-before-lock')) {
           control.setAttribute('data-catalog-disabled-before-lock', control.disabled ? 'true' : 'false')
