@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import require_permissions
 from app.db.session import get_db
 from app.models.user import User
+from app.schemas.question_catalog import QuestionBankImportRequest, QuestionBankImportResponse
 from app.services import question_service
 
 router = APIRouter(tags=["question-bank"])
@@ -48,6 +49,15 @@ async def list_banks(db: DB, user: QuestionBankReader, subject: str | None = Que
 async def create_bank(body: dict, db: DB, user: QuestionBankManager):
     b = await question_service.create_bank(db, user, body)
     return {"bank": question_service.bank_to_dict(b)}
+
+
+@router.post("/banks/import", response_model=QuestionBankImportResponse)
+async def import_banks(
+    request: QuestionBankImportRequest,
+    db: DB,
+    user: QuestionBankManager,
+):
+    return await question_service.import_question_banks(db, user, request)
 
 
 @router.put("/banks/{bank_id}")

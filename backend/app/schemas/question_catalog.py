@@ -36,6 +36,35 @@ class QuestionPayload(BaseModel):
     explanation: Any = None
 
 
+class QuestionBankImportItem(BaseModel):
+    """One JSON-import source bank; its IDs are references, never DB primary keys."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    id: str = Field(min_length=1, max_length=128)
+    name: str = Field(min_length=1, max_length=200)
+    subject: str = Field(default="PMP", min_length=1, max_length=32)
+    description: str | None = None
+    version: str = Field(default="1.0", max_length=32)
+    visibility: str = Field(default="private", max_length=32)
+    questions: list[QuestionPayload] = Field(min_length=1)
+
+
+class QuestionBankImportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    banks: list[QuestionBankImportItem] = Field(min_length=1)
+
+
+class QuestionBankImportResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    banks: list[dict[str, Any]]
+    source_bank_id_map: dict[str, str] = Field(alias="sourceBankIdMap")
+    source_question_id_map: dict[str, str] = Field(alias="sourceQuestionIdMap")
+    content_revision: int = Field(alias="contentRevision", ge=1)
+
+
 class CatalogQuestionPayload(QuestionPayload):
     bank_id: str = Field(alias="bankId", min_length=1, max_length=64)
     content_hash: str | None = Field(default=None, alias="contentHash", max_length=64)

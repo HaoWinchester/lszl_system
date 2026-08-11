@@ -11,6 +11,7 @@ from app.core.security import now_utc, uid
 from app.models.content_prep import QuestionUploadBatch
 from app.models.question import DRAFT, ExamPaper, PaperQuestion, PUBLISHED, Question, QuestionBank
 from app.models.user import User
+from app.schemas.question_catalog import QuestionBankImportRequest
 from app.services import (
     question_access_service,
     question_catalog_service,
@@ -114,6 +115,172 @@ async def create_bank(db: AsyncSession, owner: User | str, data: dict) -> Questi
     await db.commit()
     await db.refresh(b)
     return b
+
+
+def _import_validation_error(message: str) -> HTTPException:
+    return HTTPException(
+        status_code=422,
+        detail={"code": "IMPORT_VALIDATION_FAILED", "message": message},
+    )
+
+
+async def import_question_banks(
+    db: AsyncSession,
+    owner: User | str,
+    request: QuestionBankImportRequest,
+) -> dict:
+    """Persist a normalized JSON import as one all-or-nothing content change."""
+
+    actor = await _resolve_actor(db, owner)
+    if actor is None:
+        raise _import_validation_error("用户不存在")
+    actor_username = str(actor.username)
+
+    source_bank_ids = [str(item.id or "").strip() for item in request.banks]
+    if any(not source_bank_id for source_bank_id in source_bank_ids):
+        raise _import_validation_error("导入题库缺少源题库 ID")
+    duplicate_bank_ids = {
+        source_bank_id
+        for source_bank_id in source_bank_ids
+        if source_bank_ids.count(source_bank_id) > 1
+    }
+    if duplicate_bank_ids:
+        raise _import_validation_error(
+            f"导入题库存在重复源 ID：{sorted(duplicate_bank_ids)[0]}"
+        )
+
+    source_question_keys: list[str] = []
+    for imported_bank in request.banks:
+        source_bank_id = str(imported_bank.id or "").strip()
+        for imported_question in imported_bank.questions:
+            source_question_id = str(imported_question.id or "").strip()
+            if not source_question_id:
+                raise _import_validation_error(
+                    f"题库 {source_bank_id} 存在缺少源题目 ID 的记录"
+                )
+            source_question_keys.append(f"{source_bank_id}::{source_question_id}")
+    duplicate_question_keys = {
+        source_question_key
+        for source_question_key in source_question_keys
+        if source_question_keys.count(source_question_key) > 1
+    }
+    if duplicate_question_keys:
+        raise _import_validation_error(
+            f"导入题库存在重复源题目 ID：{sorted(duplicate_question_keys)[0]}"
+        )
+
+    if db.in_transaction():
+        await db.rollback()
+    try:
+        async with db.begin():
+            await teaching_content_revision_service.acquire_lock(db)
+            source_bank_id_map: dict[str, str] = {}
+            source_question_id_map: dict[str, str] = {}
+            imported_rows: list[tuple[QuestionBank, list[Question]]] = []
+            content_changes: list[dict[str, str]] = []
+
+            for imported_bank in request.banks:
+                source_bank_id = str(imported_bank.id).strip()
+                visibility = str(imported_bank.visibility or "private")
+                if visibility not in {"private", "published"}:
+                    visibility = "private"
+                bank = QuestionBank(
+                    id=uid("b_"),
+                    owner_id=actor_username,
+                    name=str(imported_bank.name).strip(),
+                    subject=str(imported_bank.subject or "PMP").strip(),
+                    description=imported_bank.description,
+                    version=str(imported_bank.version or "1.0"),
+                    visibility=visibility,
+                    revision=1,
+                    created_by=actor_username,
+                    updated_by=actor_username,
+                )
+                db.add(bank)
+                await db.flush()
+                source_bank_id_map[source_bank_id] = bank.id
+                content_changes.append(
+                    {"entityType": "bank", "entityId": bank.id, "action": "created"}
+                )
+                imported_questions: list[Question] = []
+
+                for imported_question in imported_bank.questions:
+                    source_question_id = str(imported_question.id).strip()
+                    question_id = uid("q_")
+                    raw_question = imported_question.model_dump(by_alias=True)
+                    normalized = question_content_service.normalize_question_payload(
+                        {**raw_question, "id": question_id},
+                        subject=bank.subject,
+                    )
+                    normalized["scope"] = "internal"
+                    content_hash = question_content_service.canonical_question_hash(
+                        normalized
+                    )
+                    question = Question(
+                        id=question_id,
+                        bank_id=bank.id,
+                        title=normalized["title"],
+                        type=normalized["type"],
+                        subject=normalized["subject"],
+                        difficulty=normalized.get("difficulty"),
+                        domain=normalized.get("domain"),
+                        topic=normalized.get("topic"),
+                        teacher_number=normalized.get("teacherNumber"),
+                        scope="internal",
+                        content_hash=content_hash,
+                        created_by=actor_username,
+                        updated_by=actor_username,
+                        revision=1,
+                        tags=normalized["tags"],
+                        stem_parts=normalized["stemParts"],
+                        options=normalized["options"],
+                        correct_answer=str(normalized.get("correctAnswer") or "") or None,
+                        analysis=normalized.get("analysis"),
+                        clues=normalized["clues"],
+                        concepts=normalized["concepts"],
+                        reasoning_steps=normalized["reasoningSteps"],
+                        status=normalized["status"],
+                        translations=normalized["translations"],
+                        content_metadata=normalized["metadata"],
+                        key_path=normalized["keyPath"],
+                        lifecycle=normalized["lifecycle"],
+                    )
+                    db.add(question)
+                    imported_questions.append(question)
+                    source_question_id_map[
+                        f"{source_bank_id}::{source_question_id}"
+                    ] = question.id
+                    content_changes.append(
+                        {
+                            "entityType": "question",
+                            "entityId": question.id,
+                            "action": "created",
+                        }
+                    )
+                imported_rows.append((bank, imported_questions))
+
+            await db.flush()
+            revision_state = await teaching_content_revision_service.bump(
+                db,
+                actor_username,
+                content_changes,
+            )
+            saved_banks = []
+            for bank, questions in imported_rows:
+                saved_bank = bank_to_dict(bank, question_count=len(questions))
+                saved_bank["questions"] = [question_to_dict(question) for question in questions]
+                saved_banks.append(saved_bank)
+
+        return {
+            "banks": saved_banks,
+            "sourceBankIdMap": source_bank_id_map,
+            "sourceQuestionIdMap": source_question_id_map,
+            "contentRevision": int(revision_state["revision"]),
+        }
+    except HTTPException:
+        raise
+    except ValueError as error:
+        raise _import_validation_error(str(error)) from error
 
 
 async def update_bank(db: AsyncSession, owner: User | str, bank_id: str, patch: dict) -> QuestionBank | None:
