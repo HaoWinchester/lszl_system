@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="styles/admin-context-nav.css"/>
 <link rel="stylesheet" href="styles/workspace-placement.css"/>
 <link rel="stylesheet" href="styles/question-classification.css"/>
+<link rel="stylesheet" href="styles/admin-module-help.css"/>
 <link rel="stylesheet" href="styles/focus-vega-typography.css"/>
 <link rel="stylesheet" href="styles/focus-vega-teacher.css"/>
 </head>
@@ -72,6 +73,7 @@
 <button class="active" data-layout-nav="banks" type="button">题库管理</button>
 <button type="button" onclick="location.href='paper-management.html'">试卷管理 ↗</button>
 <button data-layout-nav="base" type="button">题目基本信息</button>
+<button data-layout-nav="principles" type="button">原则与归纳卡</button>
 <button data-layout-nav="recall" type="button">快速回忆配置</button>
 <button data-layout-nav="clues" type="button">高级关键词</button>
 <button data-layout-nav="concepts" type="button">训练知识关联</button>
@@ -211,6 +213,8 @@
 <div class="qb-bulk-actions" id="qbBulkActiveActions">
 <button type="button" id="qbBulkKnowledgeBtn">修改知识点</button>
 <button type="button" id="qbBulkUnclassifiedBtn">移入待分类</button>
+<button type="button" id="qbBulkDifficultyBtn">设置难度</button>
+<button type="button" id="qbBulkPrinciplesBtn">关联原则</button>
 <button type="button" id="qbBulkTagsBtn">设置标签</button>
 <button type="button" class="danger" id="qbBulkDeleteBtn">删除</button>
 </div>
@@ -320,6 +324,12 @@
       <button type="button" class="qb-classification-value" id="qbKnowledgePickerBtn"><span id="qbKnowledgePathLabel">待分类</span><b>选择</b></button>
       <div class="qb-classification-subline"><span id="qbKnowledgeStatus" class="qb-classification-status unmapped">待分类</span><button type="button" id="qbSetUnclassifiedBtn">设为待分类</button></div>
     </div>
+    <div class="qb-classification-field principles">
+      <span>做题原则</span>
+      <button type="button" class="qb-classification-value" id="qbPrinciplePickerBtn"><span id="qbPrincipleSummary">未关联原则</span><b>选择</b></button>
+      <div class="qb-selected-chips" id="qbSelectedPrincipleChips" aria-live="polite"></div>
+      <input id="questionPrincipleIdsInput" type="hidden"/>
+    </div>
     <div class="qb-classification-field tags">
       <span>普通标签</span>
       <button type="button" class="qb-classification-value" id="qbTagPickerBtn"><span id="qbTagSummary">未选择标签</span><b>选择</b></button>
@@ -351,20 +361,19 @@
 <option value="case_analysis">案例分析题</option>
 </select>
 </label>
+<label class="qb-field tq-difficulty-field">
+<span>难度</span>
+<div class="tq-star-rating" id="questionDifficultyStars" role="radiogroup" aria-label="题目难度">
+<button type="button" data-difficulty="easy" aria-label="一星，简单" title="★ 简单">★</button>
+<button type="button" data-difficulty="medium" aria-label="二星，中等" title="★★ 中等">★</button>
+<button type="button" data-difficulty="hard" aria-label="三星，困难" title="★★★ 困难">★</button>
+<button type="button" class="clear" data-difficulty="" aria-label="清除难度" title="清除难度">×</button>
+</div>
+<select id="questionDifficultyInput" hidden aria-hidden="true" tabindex="-1"><option value="">未设置</option><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select>
+</label>
 <details class="tq-more-info wide">
 <summary>更多信息（可选）</summary>
-<div class="qb-grid four tq-more-info-grid">
-<label class="qb-field">
-<span>难度</span>
-<select id="questionDifficultyInput">
-<option value="">未设置</option>
-<option value="基础">基础</option>
-<option value="中等">中等</option>
-<option value="重点">重点</option>
-<option value="难点">难点</option>
-<option value="易错点">易错点</option>
-</select>
-</label>
+<div class="qb-grid three tq-more-info-grid">
 <label class="qb-field">
 <span>知识领域 / 域</span>
 <input id="questionDomainInput" placeholder="例如：敏捷、治理、产品管理"/>
@@ -417,16 +426,33 @@
 <p>关键词、知识点和推理逻辑改为标签栏，录入时不需要在长页面中上下寻找。</p>
 </div>
 <div aria-label="认知标注类型" class="qb-annotation-tabs" role="tablist">
+<button aria-controls="qbPrincipleAnnotationPanel" aria-selected="false" data-annotation-tab="principles" role="tab" type="button">原则与归纳卡</button>
 <button aria-controls="qbRecallAnnotationPanel" aria-selected="true" class="active" data-annotation-tab="recall" role="tab" type="button">快速回忆配置</button>
 <button aria-controls="qbClueAnnotationPanel" aria-selected="false" data-annotation-tab="clues" role="tab" type="button">高级关键词</button>
 <button aria-controls="qbConceptAnnotationPanel" aria-selected="false" data-annotation-tab="concepts" role="tab" type="button">训练知识概念</button>
 <button aria-controls="qbReasoningAnnotationPanel" aria-selected="false" data-annotation-tab="reasoning" role="tab" type="button">高级推理</button>
 </div>
 </div>
+<section class="qb-annotation-panel tq-principle-config-panel" data-annotation-panel="principles" id="qbPrincipleAnnotationPanel" role="tabpanel" hidden>
+<div class="qb-panel-head"><div><h3>原则与系统预设归纳卡</h3><p>原则用于连接题目、归纳卡和练习抽题；学员只能编辑自己的归纳卡。</p></div><div class="qb-inline-actions"><button type="button" id="tqNewPrincipleBtn">+ 新建原则</button><button type="button" class="primary" id="tqSavePrincipleBtn">保存</button></div></div>
+<div class="tq-principle-workspace">
+<aside class="tq-principle-list" id="tqPrincipleList"></aside>
+<section class="tq-principle-editor">
+<input type="hidden" id="tqPrincipleId"/>
+<label class="qb-field"><span>原则名称</span><input id="tqPrincipleName" maxlength="80" placeholder="例如：先分析后行动"/></label>
+<label class="qb-field"><span>状态</span><select id="tqPrincipleStatus"><option value="active">启用</option><option value="inactive">停用</option></select></label>
+<label class="qb-field wide"><span>易混淆原则</span><div class="tq-confusable-principles" id="tqConfusablePrinciples"><small>保存原则后可配置。</small></div></label>
+<div class="tq-preset-divider"><span>系统预设归纳卡</span><small>学员只读，可复制为个人归纳卡。</small></div>
+<input type="hidden" id="tqPresetId"/>
+<label class="qb-field wide"><span>标题</span><input id="tqPresetTitle" maxlength="100" placeholder="原则：先分析后行动"/></label>
+<label class="qb-field wide"><span>一句原则说明</span><textarea id="tqPresetContent" rows="4" maxlength="500" placeholder="先明确目标、信息和约束，再决定行动方式。"></textarea></label>
+<label class="qb-field"><span>预设状态</span><select id="tqPresetStatus"><option value="draft">草稿</option><option value="active">启用</option><option value="inactive">停用</option></select></label>
+</section></div>
+</section>
 <section class="qb-annotation-panel active qb-recall-config-panel" data-annotation-panel="recall" id="qbRecallAnnotationPanel" role="tabpanel">
 <div class="qb-panel-head">
 <div>
-<h3>快速回忆配置</h3>
+<h3 class="kg-module-title">快速回忆配置 <button class="kg-module-help-trigger" type="button" data-module-help="training-recall" aria-label="查看快速回忆配置帮助" title="查看帮助">?</button></h3>
 <p>教师只需输入关键词与知识联想入口，系统自动在题干和选项中定位；不需要使用 <code>[[关键词]]</code>。</p>
 </div>
 <div class="qb-inline-actions">
@@ -823,6 +849,10 @@
   </form>
 </dialog>
 
+<dialog class="qb-classification-dialog tq-principle-picker-dialog" id="qbPrinciplePickerDialog"><form method="dialog"><header class="qb-dialog-head"><div><p>PRINCIPLE</p><h2>关联做题原则</h2><span>可多选；原则的详细配置位于“训练配置”。</span></div><button value="cancel" aria-label="关闭">×</button></header><div class="tq-principle-picker-options" id="qbPrinciplePickerOptions"></div><footer><button type="button" id="qbPrinciplePickerManageBtn">管理原则</button><span></span><button value="cancel">取消</button><button type="button" class="primary" id="qbPrinciplePickerConfirmBtn">应用</button></footer></form></dialog>
+<dialog class="qb-classification-dialog compact" id="qbBulkDifficultyDialog"><form method="dialog"><header class="qb-dialog-head"><div><p>DIFFICULTY</p><h2>批量设置难度</h2><span>统一使用三星制。</span></div><button value="cancel" aria-label="关闭">×</button></header><div class="tq-bulk-star-options"><button type="button" data-bulk-difficulty="easy">★<small>简单</small></button><button type="button" data-bulk-difficulty="medium">★★<small>中等</small></button><button type="button" data-bulk-difficulty="hard">★★★<small>困难</small></button></div><footer><span></span><button value="cancel">取消</button></footer></form></dialog>
+<dialog class="qb-classification-dialog" id="qbBulkPrincipleDialog"><form method="dialog"><header class="qb-dialog-head"><div><p>PRINCIPLE</p><h2>批量关联原则</h2><span>所选原则将替换当前原则关联。</span></div><button value="cancel" aria-label="关闭">×</button></header><div class="tq-principle-picker-options" id="qbBulkPrincipleOptions"></div><footer><span></span><button value="cancel">取消</button><button type="button" class="primary" id="qbBulkPrincipleConfirmBtn">应用</button></footer></form></dialog>
+
 <script defer src="src/01-runtime-config.js"></script>
   <script defer src="src/28-app-storage.js"></script>
 <script defer src="src/29-auth-core.js"></script>
@@ -837,11 +867,41 @@
 <script defer src="src/91-learning-content-core.js"></script>
 <script defer src="src/95-recall-association-library.js"></script>
 <script defer src="question-studio/question-studio-parser.js"></script>
-<script defer src="src/98-teacher-workflow-p2-services.js"></script>
+<script defer src="src/teacher/shared/domain-core.js"></script>
+<script defer src="src/teacher/shared/difficulty-service.js"></script>
+<script defer src="src/principles/principle-repository.js"></script>
+<script defer src="src/principles/synthesis-preset-repository.js"></script>
+<script defer src="src/practice/practice-selection-service.js"></script>
+<script defer src="src/teacher/question-bank/batch-operation-service.js"></script>
+<script defer src="src/teacher/question-bank/safe-delete-service.js"></script>
+<script defer src="src/teacher/question-bank/question-preview.js"></script>
+<script defer src="src/teacher/question-bank/workspace-layout.js"></script>
+<script defer src="src/teacher/question-bank/bank-list-controller.js"></script>
+<script defer src="src/teacher/question-bank/question-list-controller.js"></script>
+<script defer src="src/teacher/question-editor/question-editor-controller.js"></script>
+<script defer src="src/teacher/question-classification/question-classification-service.js"></script>
+<script defer src="src/teacher/training-config/training-config-service.js"></script>
+<script defer src="src/teacher/training-config/training-preview.js"></script>
+<script defer src="src/teacher/training-config/training-config-controller.js"></script>
+<script defer src="src/teacher/training-config/workspace-layout.js"></script>
+<script defer src="src/teacher/training-config/principle-preset-controller.js"></script>
+<script defer src="src/teacher/paper-management/paper-list-controller.js"></script>
+<script defer src="src/teacher/paper-management/paper-category-service.js"></script>
+<script defer src="src/teacher/paper-management/paper-editor-controller.js"></script>
+<script defer src="src/teacher/paper-management/paper-question-picker.js"></script>
+<script defer src="src/teacher/paper-management/paper-preview.js"></script>
+<script defer src="src/teacher/paper-management/paper-audit-service.js"></script>
 <script defer src="src/59c-active-learning-mode-policy.js"></script>
+<script defer src="src/teacher/paper-management/paper-release-service.js"></script>
+<script defer src="src/teacher/knowledge-tree/knowledge-tree-adapter.js"></script>
+<script defer src="src/teacher/association-library/association-library-adapter.js"></script>
+<script defer src="src/teacher/teacher-domain-registry.js"></script>
+<script defer src="src/98-teacher-workflow-p2-services.js"></script>
 <script defer src="src/65-question-bank-admin.js"></script>
 <script defer src="src/98-question-classification.js"></script>
 <script defer src="src/97-teacher-question-workflow.js"></script>
+<script defer src="src/admin/module-help-content.js"></script>
+<script defer src="src/admin/module-help-controller.js"></script>
 <script src="src/admin/48-admin-context-nav.js"></script>
 <script src="src/99-workspace-placement.js"></script>
 <script src="src/109-focus-vega-ui-icons.js"></script>

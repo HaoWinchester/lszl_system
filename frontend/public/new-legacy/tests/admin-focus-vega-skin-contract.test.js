@@ -47,24 +47,25 @@ const engagementScripts=[
 ];
 const existingScripts={
   'admin-console.html':[...commonAdminScripts,'src/admin/50-admin-shell-app.js'],
-  'admin-operations.html':[...commonAdminScripts,'src/admin/52-admin-operations-app.js'],
+  'admin-operations.html':[...commonAdminScripts,'src/admin/52-admin-operations-app.js','src/admin/resizable-region.js'],
   'admin-settings.html':[...commonAdminScripts,'src/admin/53-admin-settings-app.js'],
   'admin-subjects.html':[
     ...commonAdminScripts,
     'src/95-recall-association-library.js',
     'src/admin/51-admin-subjects-app.js',
     'src/admin/53-recall-association-management.js',
+    'src/admin/resizable-region.js','src/admin/module-help-content.js','src/admin/module-help-controller.js',
     'src/99-workspace-placement.js',
   ],
-  'feedback-management.html':[...engagementScripts,'src/105-feedback-management-app.js'],
-  'message-management.html':[...engagementScripts,'src/106-message-management-app.js'],
+  'feedback-management.html':[...engagementScripts,'src/105-feedback-management-app.js','src/admin/resizable-region.js'],
+  'message-management.html':[...engagementScripts,'src/106-message-management-app.js','src/admin/resizable-region.js'],
   'user-management.html':[
     'src/01-runtime-config.js','src/28-app-storage.js','src/29-auth-core.js',
     'src/34-role-permissions.js','src/37-subscription-plans.js',
     'src/37-subscription-orders.js','src/37-subscription-redeem-codes.js',
     'src/37-subscription-core.js','src/33-user-center.js','src/39-global-shortcuts.js',
     'src/35-user-management-service.js','src/35-user-management.js',
-    'src/admin/48-admin-context-nav.js',
+    'src/admin/48-admin-context-nav.js','src/admin/resizable-region.js',
   ],
   'system-settings.html':[
     'src/01-runtime-config.js','src/28-app-storage.js','src/29-auth-core.js',
@@ -72,7 +73,7 @@ const existingScripts={
     'src/37-subscription-orders.js','src/37-subscription-redeem-codes.js',
     'src/37-subscription-core.js','src/31-admin-utils.js','src/32-wechat-login.js',
     'src/33-user-center.js','src/39-global-shortcuts.js','src/36-system-settings.js',
-    'src/admin/48-admin-context-nav.js',
+    'src/admin/48-admin-context-nav.js','src/admin/resizable-region.js',
   ],
 };
 

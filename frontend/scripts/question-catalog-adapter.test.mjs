@@ -159,7 +159,6 @@ test('sync injects the adapter before each page question repository and marks it
     const pages = new Map([
       ['question-bank.html', ['managed', 'src/65-question-bank-admin.js']],
       ['paper-management.html', ['managed', 'src/65-question-bank-admin.js']],
-      ['question-training.html', ['learning', 'src/59-published-paper-repository.js']],
       ['question-workspace.html', ['learning', 'src/59-published-paper-repository.js']],
       ['knowledge-recall.html', ['learning', 'src/59-published-paper-repository.js']],
       ['practice-mode.html', ['learning', 'src/59-published-paper-repository.js']],

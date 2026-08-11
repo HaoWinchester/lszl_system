@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PMP Content Prep Studio</title>
+<script src="/teaching-content-sync.js"></script>
+<script src="/server-state-bootstrap.js"></script>
+<style>
+/*__BUILD_CSS__*/
+</style>
+</head>
+<body id="prepApp">
+<header>
+  <div><div class="brand">PMP Content Prep Studio</div><div class="version">v0.4.0 · 架构重构版 · 语义标签ID→Service层→Workspace v4 · Keyword System v2</div></div>
+  <div class="header-meta">
+    <span class="badge" id="hdrTree">知识树 0</span>
+    <span class="badge" id="hdrRecall">联想库 0</span>
+    <span class="badge" id="hdrQuestions">题目 0</span>
+    <span class="badge" id="hdrCreator">制作人：未选择</span>
+    <div class="theme-control"><span>主题</span><select id="themeSelect" aria-label="工作主题">
+      <option value="default">清爽蓝</option>
+      <option value="sakura">樱花粉</option>
+      <option value="mint">薄荷绿</option>
+      <option value="sunshine">暖阳橙</option>
+      <option value="grape">葡萄紫</option>
+      <option value="ocean">海盐青</option>
+    </select></div>
+    <button class="help-center-btn" id="btnHelpCenter" type="button">帮助中心</button>
+    <button class="creator-switch-btn" id="btnSwitchCreator" type="button">切换制作人</button>
+    <button class="header-save-btn" id="btnQuickSaveWorkspace" type="button">保存工作区</button>
+    <span class="badge" id="hdrSaveStatus">尚未保存</span>
+    <span class="badge">独立本地保存 · 不写正式程序存储</span>
+  </div>
+</header>
+
+<nav id="tabs">
+  <button data-tab="base" class="active">① 基础数据与导入</button>
+  <button data-tab="management">② 原则归纳卡 / 标签</button>
+  <button data-tab="questions">③ 题目录入与检查</button>
+  <button data-tab="association">④ 联想词编辑</button>
+  <button data-tab="demo">⑤ 题目演示校验</button>
+  <button data-tab="validate">⑥ 校验中心</button>
+  <button data-tab="export">⑦ 导出中心</button>
+</nav>
+
+<main>
+<section class="tab active" id="tab-base">
+  <div class="card">
+    <div class="card-hd">
+      <span>① 基础数据与导入</span>
+      <button class="help-btn" id="btnHelp" title="新手使用说明">?</button>
+    </div>
+    <div class="card-bd">
+      <div class="workflow">
+        <span class="step">外部 AI / Word 基础题</span><span class="arrow">→</span>
+        <span class="step">导入基础文件</span><span class="arrow">→</span>
+        <span class="step">人工可视化校核</span><span class="arrow">→</span>
+        <span class="step">校验</span><span class="arrow">→</span>
+        <span class="step">导出成品 JSON</span>
+      </div>
+      <div class="help" style="margin-top:10px">
+        推荐工作方式：先让外部 AI 把 Word 中的“题干、选项、正确答案、解析”转换为本工具模板 JSON，再导入人工校核。
+        如果暂时不想转换 JSON，也可以把 Word 文字直接复制到下面的“Word/AI 文本粘贴助手”。
+      </div>
+
+
+      <div class="creator-fixed-panel">
+        <div class="section-title"><span>当前制作人</span><span class="muted tiny">强制选择 · 当前页面会话有效</span></div>
+        <div class="creator-fixed-current">
+          <div class="creator-fixed-badge" id="creatorFixedName">尚未选择</div>
+          <div>
+            <div class="muted smalltxt">Creator ID：<code id="creatorFixedId">—</code></div>
+            <div class="muted smalltxt">Device ID：<code id="deviceFixedId">正在初始化…</code></div>
+          </div>
+          <button class="btn" id="btnSwitchCreatorBase" type="button">切换制作人</button>
+        </div>
+        <div class="system-id-note">
+          本版固定 6 个制作人：波塞冬、狗娃、阿浩、杰瑞、天才、女帝。每人使用永久固定 Creator ID；
+          当前制作人必须在进入程序前选择。关闭页面后下次重新选择，避免共用电脑误记作者。
+          Device ID 仍由当前浏览器/设备独立保存。
+        </div>
+      </div>
+      <div class="server-catalog-panel">
+        <div class="section-title"><span>服务器题库</span><span><span class="muted tiny">服务器状态：</span><span class="server-status" id="serverCatalogStatus">等待连接</span></span></div>
+        <div class="server-identity-grid">
+          <div><span class="muted tiny">登录账号</span><strong id="serverActorName">未登录</strong></div>
+          <div><span class="muted tiny">制作人</span><strong id="serverCreatorName">请先选择</strong></div>
+          <label><span class="muted tiny">目标题库</span><select id="serverBankSelect"><option value="">请选择题库</option></select></label>
+        </div>
+        <div class="toolbar server-actions">
+          <button class="btn" id="btnCreateServerBank" type="button">新建题库</button>
+          <input id="serverQuestionIdInput" type="text" placeholder="服务器 Question ID">
+          <button class="btn" id="btnLoadServerQuestion" type="button">从服务器载入</button>
+          <button class="btn primary" id="btnSyncToCatalog" type="button">同步到题库</button>
+        </div>
+        <div class="server-catalog-help">上传成功后立即进入正式题库；失败时本地 IndexedDB 草稿不会被删除。</div>
+        <div class="server-catalog-issues" id="serverCatalogIssues" aria-live="polite"></div>
+      </div>
+      <div class="data-summary">
+        <div class="filebox bundle-box">
+          <h3>完整内容准备包 JSON（推荐）</h3>
+          <input type="file" id="fileContentBundle" accept=".json,application/json">
+          <p class="muted smalltxt">一次导入：题库 + 原则 + 归纳卡 + 标签配置；也可携带知识树/联想库。</p>
+        </div>
+        <div class="filebox">
+          <h3>知识树 JSON</h3>
+          <input type="file" id="fileTree" accept=".json,application/json">
+          <p class="muted smalltxt">支持知识树 package：<code>taxonomy.nodes</code></p>
+        </div>
+        <div class="filebox">
+          <h3>科目级联想库 JSON</h3>
+          <input type="file" id="fileRecall" accept=".json,application/json">
+          <p class="muted smalltxt">同义词/不同翻译请放在同一节点的 <code>aliases</code>。</p>
+        </div>
+        <div class="filebox">
+          <h3>基础题库 JSON</h3>
+          <input type="file" id="fileQuestionBank" accept=".json,application/json">
+          <p class="muted smalltxt">支持 <code>questions[]</code>；也兼容 <code>banks[0]</code></p>
+        </div>
+      </div>
+
+      <div class="toolbar" style="margin-top:12px">
+        <button class="btn primary" id="btnDownloadCompleteBundle">下载“完整内容包”模板</button>
+        <button class="btn primary" id="btnDownloadCompleteAiPrompt">下载完整 AI 制作提示词</button>
+        <button class="btn" id="btnDownloadQuestionTemplate">下载题库 JSON 模板</button>
+        <button class="btn" id="btnDownloadAiPrompt">下载“Word→JSON”AI 提示词</button>
+        <button class="btn" id="btnOpenHelp">查看导入说明</button>
+      </div>
+
+      <div class="import-assistant">
+        <div class="section-title"><span>Word / AI 文本粘贴助手</span><span class="muted tiny">适合只有题干、选项、答案、解析的基础资料</span></div>
+        <p class="smalltxt muted">
+          从 Word 复制后粘贴。建议格式：<code>【题目1】</code>、<code>题干：</code>、<code>A.</code>～<code>D.</code>、<code>答案：</code>、<code>解析：</code>。
+          可一次粘贴多题。
+        </p>
+        <textarea id="rawQuestionPaste" placeholder="【题目1】
+标题：已发送不等于已沟通
+难度：基础
+领域：PMP 沟通绩效域 / 利益相关方与沟通管理
+主题：项目沟通管理的概念
+阶段：基础练习
+标签：基础练习、核心题、自编题、内部使用
+题干：项目经理……
+A. 选项A
+A陷阱：……
+B. 选项B
+B陷阱：……
+C. 选项C
+D. 选项D
+答案：B
+解析：完整中文解析……
+English Title：Sent Does Not Mean Understood
+English Stem：The project manager...
+A_EN：...
+B_EN：...
+C_EN：...
+D_EN：...
+English Analysis：Complete English analysis...
+A反馈EN：...
+B反馈EN：...
+C反馈EN：...
+D反馈EN：...
+主知识点ID：kp-...
+普通关键词：项目经理=>recall-...；通知=>recall-...
+核心关键词：首先=>recall-...|decision-cue|题目要求识别优先行动；有效沟通=>recall-...|answer-anchor|决定答案判断
+原则IDs：principle-1、principle-2
+A原则：principle-1
+B原则：principle-2"></textarea>
+        <div class="toolbar" style="margin-top:8px">
+          <select id="pasteImportMode" style="width:auto"><option value="append">追加到当前题库</option><option value="replace">替换当前题库</option></select>
+          <button class="btn primary" id="btnParsePastedQuestions">解析并导入</button>
+          <span class="muted smalltxt" id="pasteParseResult"></span>
+        </div>
+        <details class="full-paste-example">
+          <summary>查看“完整版 Word / AI 文本粘贴格式”说明</summary>
+          <p class="smalltxt muted">可解析题目基础信息、标签、Trap、双语、英文逐选项反馈、主知识点 ID、普通/核心关键词、原则 IDs 和 A/B/C/D 原则映射。原则库/归纳卡定义本身仍建议使用“完整内容准备包 JSON”。</p>
+          <pre>【题目1】
+标题：已发送不等于已沟通
+难度：基础
+领域：PMP 沟通绩效域 / 利益相关方与沟通管理
+主题：项目沟通管理的概念
+阶段：基础练习
+标签：基础练习、核心题、自编题、内部使用
+
+题干：项目经理按计划向团队发送重要变更通知，但成员仍按旧方案工作。项目经理首先应该认识到什么？
+A. 只要邮件发送成功，沟通责任就已经完成
+A陷阱：把发送等同于有效沟通
+B. 有效沟通不仅是发送信息，还要确认信息被接收和理解
+B陷阱：
+C. 应立即处罚没有阅读邮件的成员
+C陷阱：过早升级
+D. 以后所有信息都应由发起人亲自传达
+D陷阱：角色责任错置
+
+答案：B
+解析：沟通的效果不以“已经发送”为终点，而应确认接收、理解并产生预期行动。
+
+English Title：Sent Does Not Mean Understood
+English Stem：The project manager sent an important change notice...
+A_EN：Once the email is sent, communication is complete.
+B_EN：Effective communication requires confirmation of receipt and understanding.
+C_EN：Discipline the team members immediately.
+D_EN：Ask the sponsor to deliver all future messages.
+English Analysis：Communication effectiveness requires receipt, understanding, and intended action.
+A反馈EN：Incorrect: sending alone does not prove effectiveness.
+B反馈EN：Correct: confirmation closes the communication loop.
+C反馈EN：Incorrect: this is premature escalation.
+D反馈EN：Incorrect: this shifts responsibility to the wrong role.
+
+主知识点ID：kp-pmp-people-1-1-4
+普通关键词：项目经理=>recall-tax-kp-pmp-people-2-2-1-k01；通知=>recall-tax-kp-pmp-people-1-1-4
+核心关键词：首先=>recall-keyword-pmp-action-order|decision-cue|题目要求识别优先行动；有效沟通=>recall-tax-kp-pmp-people-1-1-4|answer-anchor|决定本题对沟通有效性的判断
+原则IDs：principle-effective-communication、principle-no-premature-escalation
+A原则：principle-effective-communication
+B原则：principle-effective-communication
+C原则：principle-no-premature-escalation
+D原则：principle-role-accountability</pre>
+        </details>
+      </div>
+
+      <div class="data-summary">
+        <div class="filebox"><h3>原则库 JSON（可选）</h3><input type="file" id="filePrinciples" accept=".json,application/json"><p class="muted smalltxt">兼容主程序 principle repository。</p></div>
+        <div class="filebox"><h3>归纳卡 JSON（可选）</h3><input type="file" id="filePresets" accept=".json,application/json"><p class="muted smalltxt">兼容主程序 synthesis preset repository。</p></div>
+        <div class="filebox"><h3>标签配置 JSON（可选）</h3><input type="file" id="fileTagConfig" accept=".json,application/json"><p class="muted smalltxt">兼容主程序标签名称/别名配置。</p></div>
+      </div>
+      <div class="data-summary">
+        <div class="data-card"><h3>知识树</h3><b id="baseTreeCount">0</b><div class="muted" id="baseTreeName">未加载</div></div>
+        <div class="data-card"><h3>联想库</h3><b id="baseRecallCount">0</b><div class="muted" id="baseRecallInfo">未加载</div></div>
+        <div class="data-card"><h3>题库</h3><b id="baseQuestionCount">0</b><div class="muted" id="baseQuestionName">未加载</div></div>
+        <div class="data-card"><h3>原则 / 归纳卡</h3><b id="basePrincipleCount">0</b><div class="muted" id="basePresetInfo">归纳卡 0</div></div>
+        <div class="data-card"><h3>标签配置</h3><b id="baseTagCount">0</b><div class="muted">主程序预设槽位</div></div>
+      </div>
+      <div class="save-panel">
+        <div class="section-title"><span>本地工作区保存</span><span class="save-status" id="localSaveStatus">尚未保存</span></div>
+        <div class="help">
+          适合几百题分多次处理。保存内容包括题库、知识树、联想库、原则、归纳卡、标签配置和当前编辑位置。
+          数据写入本工具独立 IndexedDB：<code>pmp_content_prep_studio_v1</code>，不会使用正式程序的 <code>kg_*</code> 存储。
+          重要项目仍建议定期“导出工作区草稿”，用于跨浏览器/跨目录备份。
+        </div>
+        <div class="toolbar" style="margin-top:9px">
+          <button class="btn primary" id="btnSaveWorkspaceLocal">保存到本机</button>
+          <button class="btn" id="btnRestoreWorkspaceLocal">恢复上次保存</button>
+          <button class="btn danger" id="btnDeleteWorkspaceLocal">删除本机保存</button>
+          <label style="display:inline-flex;align-items:center;gap:6px;margin:0"><input type="checkbox" id="chkAutoSaveWorkspace"> 每 60 秒自动保存有变更的工作区</label>
+        </div>
+      </div>
+      <div class="section toolbar">
+        <button class="btn" id="btnNewWorkspace">清空工作区</button>
+        <button class="btn" id="btnImportWorkspace">导入 Prep Studio 草稿</button>
+        <input type="file" id="fileWorkspace" class="hidden" accept=".json,application/json">
+      </div>
+    </div>
+  </div>
+</section>
+<section class="tab" id="tab-management">
+  <div class="grid-manage">
+    <div class="card"><div class="card-hd"><span>② 原则列表</span><button class="help-btn" data-page-help="management" title="本页帮助">?</button></div><div class="card-bd toolbar"><button class="btn small primary" id="btnNewPrinciple">+ 新原则</button></div><div class="manager-list" id="principleList"></div></div>
+    <div class="card"><div class="card-hd">原则与系统预设归纳卡</div><div class="card-bd" id="principleEditor"><div class="no-data">请选择或新建原则。</div></div></div>
+  </div>
+  <div class="card" style="margin-top:14px"><div class="card-hd"><span>轻量标签管理</span><span class="muted tiny">对齐主程序用途 / 质量 / 来源标签槽位</span></div><div class="card-bd"><div class="help">管理预设标签名称和兼容别名。自由文本标签仍可保留；在题目演示校验中，不能绑定预设槽位的标签会显示为灰色。</div><div id="tagManager" style="margin-top:12px"></div></div></div>
+</section>
+<section class="tab" id="tab-questions">
+  <div class="grid3">
+    <div class="card">
+      <div class="card-hd"><span>题目列表</span><span class="muted tiny" id="qCount"></span></div>
+      <div class="card-bd toolbar">
+        <button class="btn small primary" id="btnNewQuestion">+ 新建</button>
+        <button class="btn small" id="btnDuplicateQuestion">复制</button>
+        <button class="btn small danger" id="btnDeleteQuestion">删除草稿</button>
+      </div>
+      <div class="q-list" id="questionList"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><span>③ 题目预览与编辑</span><button class="help-btn" data-page-help="questions" title="本页帮助">?</button><span class="muted tiny" id="currentQuestionId"></span></div>
+      <div class="card-bd">
+        <div class="question-lock-banner" id="questionLockBanner">
+          <span id="questionLockMessage">本地新题无需编辑锁</span>
+          <button class="btn small" id="btnReconfirmQuestionLock" type="button">重新确认编辑权</button>
+          <button class="btn small primary" id="btnCopyConflictQuestion" type="button">复制为新题</button>
+        </div>
+        <div class="preview-tip">
+          主要操作区：点击已标记关键词可直接修改；框选其他词/术语后会弹出关键词编辑浮层。核心关键词为橙色，普通关键词为蓝色。
+        </div>
+        <div class="preview-core" id="questionPreview"></div>
+        <details class="fold-editor" open>
+          <summary>详细表单编辑（保留传统编辑方式）</summary>
+          <div id="questionEditor">
+            <div class="no-data">请在“基础数据与导入”加载题库，或新建题目。</div>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="card">
+        <div class="card-hd">关键词、联想与检查</div>
+        <div class="card-bd">
+          <div class="help">
+            预览区是主要关键词编辑方式；这里继续保留完整列表编辑作为校核工具。<br>
+            <b>普通关键词</b>：知识回忆；<b>核心关键词</b>：知识回忆 + 本题解题关键。
+          </div>
+          <div class="kw-actions" style="margin-top:10px">
+            <button class="btn small" id="btnAddNormalKeyword">+ 普通关键词</button>
+            <button class="btn small primary" id="btnAddCoreKeyword">★ 核心关键词</button>
+            <span class="kw-hint" id="selectionHint">也可在下方表单文本框选词</span>
+          </div>
+          <div class="section">
+            <div class="section-title">本题快速检查</div>
+            <div id="questionIssues"></div>
+          </div>
+          <div class="section">
+            <div class="section-title"><span>关键词明细</span><span class="muted tiny" id="kwSummary"></span></div>
+            <div class="kw-list" id="keywordList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="tab" id="tab-association">
+  <div class="grid2">
+    <div class="card">
+      <div class="card-hd">④ 联想词编辑</div>
+      <div class="card-bd">
+        <div class="toolbar">
+          <input type="text" id="recallSearch" placeholder="搜索名称 / Alias / ID">
+          <button class="btn small primary" id="btnNewRecall">+ 节点</button>
+        </div>
+        <div class="smalltxt muted" style="margin-top:7px" id="aliasConflictSummary"></div>
+        <div class="synonym-note"><b>同义词/不同翻译：</b>只建一个规范节点。例：规范词“相关方”；Aliases 填“利益相关方、干系人、Stakeholder、Stakeholders”。不要为这些译名分别建节点。</div>
+      </div>
+      <div class="node-list" id="recallNodeList"></div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><span>联想词编辑 · 关系预览</span><button class="help-btn" data-page-help="association" title="本页帮助">?</button><span class="muted tiny" id="currentRecallId"></span></div>
+      <div class="card-bd" id="recallEditor">
+        <div class="no-data">请在“基础数据”导入科目级联想库，或新建联想节点。</div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="tab" id="tab-demo">
+  <div class="demo-layout">
+    <div class="card">
+      <div class="card-hd"><span>⑤ 题目列表</span><button class="help-btn" data-page-help="demo" title="本页帮助">?</button><span class="muted tiny" id="demoQuestionCount"></span></div>
+      <div class="demo-question-list" id="demoQuestionList"></div>
+    </div>
+    <div class="card">
+      <div class="card-hd">
+        <span>完整题目演示</span>
+        <div class="demo-lang-switch">
+          <button type="button" data-demo-lang="zh" class="active">中</button>
+          <button type="button" data-demo-lang="en">EN</button>
+          <button type="button" data-demo-lang="bi">双语</button>
+        </div>
+      </div>
+      <div class="card-bd">
+        <div class="help" style="margin-bottom:10px">关键词默认不高亮，鼠标悬浮时临时高亮；点击关键词只在右侧检查最多 4 层联想通路。正确答案在演示区直接高亮。</div>
+        <div id="demoQuestion"></div>
+      </div>
+    </div>
+    <div class="demo-side">
+      <div class="demo-card-panel">
+        <h3>原则归纳卡</h3>
+        <div id="demoPrincipleResult" class="muted">点击 A/B/C/D 选项查看对应原则归纳卡。</div>
+      </div>
+      <div class="demo-recall-panel">
+        <h3>关键词联想通路</h3>
+        <div id="demoRecallResult" class="muted">点击题目中的关键词进行检查。</div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="tab" id="tab-validate">
+  <div class="card">
+    <div class="card-hd"><span>⑥ 整体校验中心</span><button class="help-btn" data-page-help="validate" title="本页帮助">?</button><button class="btn small primary" id="btnRunValidation">重新校验</button></div>
+    <div class="card-bd">
+      <div class="metric-grid" id="validationMetrics"></div>
+      <div class="section">
+        <div class="section-title">问题清单</div>
+        <div style="max-height:570px;overflow:auto">
+          <table class="check-table">
+            <thead><tr><th style="width:85px">级别</th><th style="width:170px">对象</th><th>问题</th><th>建议</th></tr></thead>
+            <tbody id="validationRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="tab" id="tab-export">
+  <div class="export-grid">
+    <div class="card export-card"><div style="display:flex;align-items:center;gap:8px"><h3 style="margin-right:auto">完整内容成品包</h3><button class="help-btn" data-page-help="export" title="本页帮助">?</button></div><p>题库 + 原则库 + 归纳卡 + 标签配置，作为未来服务器内容导入的推荐格式。</p><button class="btn primary" id="btnExportCompleteBundle">导出完整成品包 JSON</button></div>
+    <div class="card export-card">
+      <h3>题库 JSON</h3>
+      <p>输出可供正式题目管理/未来服务器端口接收的 Question Bank JSON。知识点仅保存稳定 <code>primaryNodeId</code>，不写死 taxonomy 版本。</p>
+      <button class="btn primary" id="btnExportQuestions">导出题库 JSON</button>
+    </div>
+    <div class="card export-card">
+      <h3>科目级联想库 JSON</h3>
+      <p>输出 <code>schemaVersion: 1</code>、<code>nodes</code>、<code>edges</code>，可导回正式系统。</p>
+      <button class="btn primary" id="btnExportRecall">导出联想库 JSON</button>
+    </div>
+    <div class="card export-card">
+      <h3>校验报告</h3>
+      <p>导出题目、知识点、普通/核心关键词、联想入口、Alias 冲突等完整检查结果。</p>
+      <button class="btn" id="btnExportValidation">导出校验报告 JSON</button>
+    </div>
+    <div class="card export-card">
+      <h3>Prep Studio 草稿</h3>
+      <p>保存当前全部工作数据，方便下次继续编辑。该草稿不是正式服务器导入格式。</p>
+      <button class="btn" id="btnExportWorkspace">导出工作区草稿</button>
+    </div>
+  <div class="card export-card"><h3>原则 / 归纳卡 / 标签配置</h3><p>分别输出与当前主程序 repository/storage 结构对齐的 JSON。</p><div class="toolbar"><button class="btn" id="btnExportPrinciples">原则库</button><button class="btn" id="btnExportPresets">归纳卡</button><button class="btn" id="btnExportTagConfig">标签配置</button></div></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="card-hd">Keyword System v2 导出规则</div>
+    <div class="card-bd">
+      <div class="help">
+        每个关键词会输出 <code>keywordLevel: normal|core</code>、<code>isCore</code>、
+        <code>solutionRole</code>、<code>coreReason</code>。同时在
+        <code>metadata.keywordSystemV2</code> 保存兼容镜像。<br>
+        原因：当前正式程序 P4.3.44.2 / 后续服务器接口 的 <code>normalizeClue()</code> 尚不会保留这些新字段；
+        镜像可以保证导入当前版本后，未来升级“做题大厅核心关键词显示”时仍有可迁移的数据。
+      </div>
+    </div>
+  </div>
+
+  <div class="audit-card">
+    <div class="card-hd" style="padding:0 0 8px">
+      <span>导出审计记录</span>
+      <span class="muted tiny" id="auditCount">0 条</span>
+      <span class="spacer"></span>
+      <button class="btn" id="btnExportAuditTrail">导出审计日志 JSON</button>
+      <button class="btn danger" id="btnClearAuditTrail">清空本机审计记录</button>
+    </div>
+    <div class="help">
+      每次正式导出都会记录制作人、设备、时间、导出类型、文件名、题目数量、校验摘要和导出 payload 的 SHA-256。
+      这里只记录审计元数据，不复制整份题目内容。
+    </div>
+    <div class="audit-list" id="auditList"></div>
+  </div>
+
+</section>
+</main>
+
+
+<div class="keyword-float" id="keywordFloat" aria-live="polite"></div>
+
+
+<div class="modal-backdrop" id="helpModal">
+  <div class="modal-panel help-center-panel">
+    <div class="help-center-head">
+      <h2 style="margin:0">PMP Content Prep Studio · 帮助中心</h2>
+      <span class="spacer"></span>
+      <span class="muted smalltxt" id="helpCurrentHint"></span>
+      <button class="btn" id="btnCloseHelp">关闭</button>
+    </div>
+    <div class="help-center-body">
+      <div class="help-center-nav">
+        <button data-help-topic="base">① 基础数据与导入</button>
+        <button data-help-topic="management">② 原则归纳卡 / 标签</button>
+        <button data-help-topic="questions">③ 题目录入与检查</button>
+        <button data-help-topic="association">④ 联想词编辑</button>
+        <button data-help-topic="demo">⑤ 题目演示校验</button>
+        <button data-help-topic="validate">⑥ 校验中心</button>
+        <button data-help-topic="export">⑦ 导出与审计</button>
+        <button data-help-topic="global">全局：身份 / 保存 / 主题</button>
+      </div>
+      <div class="help-center-content">
+        <article class="help-topic" data-help-content="base">
+          <h2>① 基础数据与导入</h2>
+          <p>这里负责把外部 AI / Word 内容、知识树、联想库、原则、归纳卡和标签配置装入当前工作区。建议先选择制作人，再导入基础数据。</p>
+          <h3>推荐顺序</h3>
+          <ol><li>确认当前制作人。</li><li>导入知识树和科目级联想库。</li><li>优先导入“完整内容准备包 JSON”，或使用 Word / AI 文本粘贴助手。</li><li>题量大时开启本机保存或自动保存。</li></ol>
+          <div class="help-example"><b>示例：</b>一次导入 50 道沟通题后，程序会自动给 50 道题生成 Question UUID，并给整批题记录同一个 Batch ID。</div>
+          <h3>Word / AI 完整文本示例</h3>
+          <pre>【题目1】
+标题：已发送不等于已沟通
+难度：基础
+标签：基础练习、核心题、自编题
+题干：项目经理……
+A. ...
+B. ...
+C. ...
+D. ...
+答案：B
+解析：……
+主知识点ID：kp-...
+普通关键词：项目经理=>recall-...
+核心关键词：首先=>recall-...|decision-cue|判断优先行动
+B原则：principle-effective-communication</pre>
+          <p><b>注意：</b>不要让外部 AI 生成题目 ID、Creator ID、Device ID、Batch ID 或 Content Hash。</p>
+        </article>
+
+        <article class="help-topic" data-help-content="management">
+          <h2>② 原则归纳卡 / 标签</h2>
+          <p>原则用于解释“为什么这个选项应该/不应该这样做”；归纳卡是原则的可阅读教学卡片。标签用于训练阶段、题目特征、来源等分类。</p>
+          <h3>原则示例</h3>
+          <div class="help-example"><b>原则：</b>确认沟通是否真正有效<br><b>归纳卡：</b>信息已经发送，不代表沟通完成。应确认接收、理解并能够据此行动。</div>
+          <h3>训练阶段标签</h3>
+          <div class="help-example">第一个二级标签“训练阶段”现在固定 7 个槽位：<b>基础练习、阶段测试、模拟考试、冲刺复习、预习练习、强化训练、错题复盘</b>。前 4 个保留旧版槽位不变，新增加的 3 个放在后面，避免历史配置错位。后期仍可在标签管理中改名和配置 Alias。</div>
+          <h3>标签 Alias 示例</h3>
+          <div class="help-example">规范标签：<b>基础练习</b><br>兼容别名：<code>入门题, 基础题</code><br>旧资料出现“基础题”时可归一到“基础练习”。</div>
+          <p>修改标签名不会自动把旧名称偷偷加入 Alias；Alias 只按当前槽位明确保存。</p>
+        </article>
+
+        <article class="help-topic" data-help-content="questions">
+          <h2>③ 题目录入与检查</h2>
+          <p>这是主要人工校核区。中部题目预览用于快速标关键词；完整表单位于下方，用于细改双语、解析、知识点和原则映射。</p>
+          <h3>关键词操作</h3>
+          <ul><li>框选未标记词：弹出新增关键词编辑框。</li><li>点击已有关键词：修改普通/核心、联想入口、Solution Role、Core Reason。</li><li>点击其他区域：关键词编辑浮窗自动关闭。</li></ul>
+          <div class="help-example"><b>普通关键词：</b>“项目经理”“相关方”——用于知识回忆。<br><b>核心关键词：</b>“首先”——可标为 <code>decision-cue</code>，说明它决定解题顺序。</div>
+          <h3>快速检查</h3>
+          <p>右侧“本题快速检查”会优先提示缺失字段、核心关键词数量、联想入口、知识点等问题，再查看关键词明细。</p>
+        </article>
+
+        <article class="help-topic" data-help-content="association">
+          <h2>④ 联想词编辑</h2>
+          <p>这里维护“看到一个词，应该联想到哪个知识入口，以及还能继续想到什么”的关系网络。</p>
+          <h3>同义词原则</h3>
+          <div class="help-example">规范节点：<b>相关方</b><br>Aliases：<code>利益相关方, 干系人, Stakeholder</code><br>不要为了不同译名建立多个等义节点。</div>
+          <h3>关系图怎么点</h3>
+          <p>上位/下位知识点普通点击只做<b>预览选择</b>，不会修改绑定。只有明确点击“将当前联想词绑定到此知识点”才会改变 <code>metadata.taxonomyNodeId</code>。</p>
+          <p>底部“被哪些节点联想”可点击直接跳到对应联想节点继续编辑。</p>
+        </article>
+
+        <article class="help-topic" data-help-content="demo">
+          <h2>⑤ 题目演示校验</h2>
+          <p>以未来做题大厅的视角检查完整题目，而不是看数据表。</p>
+          <ul><li>左侧按题目列表切换。</li><li>右上角切换：中 / EN / 双语。</li><li>正确答案直接高亮。</li><li>关键词默认不高亮，鼠标悬浮临时高亮。</li><li>点击关键词：右侧显示最多 4 层联想通路。</li><li>点击 A/B/C/D：顶部原则归纳卡显示该选项对应原则。</li></ul>
+          <div class="help-example"><b>检查目标：</b>点击“有效沟通”后，应能看到有效的 Recall 入口和后续通路；点击错误选项 C，应能看到例如“避免过早升级”的原则归纳卡。</div>
+        </article>
+
+        <article class="help-topic" data-help-content="validate">
+          <h2>⑥ 校验中心</h2>
+          <p>这是全工作区的结构完整性检查。建议正式导出前运行一次，并尽量清除所有 Error。</p>
+          <h3>主要检查</h3>
+          <ul><li>题干、选项、正确答案、解析完整性。</li><li>双语内容提醒。</li><li>知识点稳定 Node ID。</li><li>普通/核心关键词及 Core Reason。</li><li>Recall 节点、Alias 冲突、关系端点。</li><li>原则 / 归纳卡 / 标签绑定。</li><li>Question ID 重复。</li><li>不同 Question ID 但 Content Hash 相同的疑似重复题。</li></ul>
+          <div class="help-example"><b>Error：</b>核心关键词指向不存在的 Recall ID。<br><b>Warning：</b>两个不同 UUID 的题目有相同 SHA-256 Content Hash，需要确认是否重复题。</div>
+        </article>
+
+        <article class="help-topic" data-help-content="export">
+          <h2>⑦ 导出与审计</h2>
+          <p>这里输出题库、完整内容包、联想库、原则、归纳卡、标签配置、校验报告和工作区草稿。</p>
+          <h3>v0.3.5 导出审计</h3>
+          <p>每次正式导出会写入一条设备级审计事件，记录：</p>
+          <ul><li>Audit ID</li><li>导出时间</li><li>制作人 Creator ID / 姓名</li><li>Device ID</li><li>导出类型与文件名</li><li>题目数量</li><li>最近 Batch ID</li><li>校验 Error / Warning 数</li><li>导出 payload 的 SHA-256 指纹</li><li>Prep Studio 版本</li></ul>
+          <div class="help-example"><b>用途：</b>未来管理员收到一个 JSON 后，可以把文件重新计算 SHA-256，与 Audit Trail 中的 payloadHash 对比，确认是否就是某位制作人在某个时间导出的那一版。</div>
+          <p>“导出审计日志”本身不会再写一条新的审计事件，避免递归记录。</p>
+        </article>
+
+        <article class="help-topic" data-help-content="global">
+          <h2>全局功能：制作人、保存、主题</h2>
+          <h3>强制制作人</h3>
+          <p>每次打开页面必须从波塞冬、狗娃、阿浩、杰瑞、天才、女帝中选择一人。关闭页面后不会记住当前人物，避免共用电脑误记作者。</p>
+          <h3>数据兼容与重构说明</h3>
+          <p>v0.4.0 是架构重构版：内部标签槽位改用稳定语义 ID，Workspace 升级到 v4；导出到正式主程序时仍自动转换为原数字槽位格式。旧版工作区打开时自动迁移，不需要人工改 JSON。</p>
+          <h3>本机保存</h3>
+          <p>工作区通过独立 IndexedDB 保存；适合几百题分多次处理。重要项目仍建议定期导出工作区草稿 JSON。</p>
+          <h3>开心主题</h3>
+          <p>顶部可切换清爽蓝、樱花粉、薄荷绿、暖阳橙、葡萄紫、海盐青。主题只影响界面颜色，不改变任何题目或导出数据；主题选择会保存在当前浏览器设备中。</p>
+        </article>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div class="creator-gate" id="creatorGate" role="dialog" aria-modal="true" aria-labelledby="creatorGateTitle">
+  <div class="creator-gate-panel">
+    <div class="creator-gate-head">
+      <h1 id="creatorGateTitle">请选择当前制作人</h1>
+      <p>必须选择一位制作人才能进入 PMP Content Prep Studio。选择只在当前页面会话中保持；下次重新打开页面会再次要求选择。</p>
+    </div>
+    <div class="creator-grid">
+      <button class="creator-card peiqi" data-creator-key="peiqi"><span class="creator-avatar">波</span><div class="creator-name">波塞冬</div><div class="creator-id">creator_001</div></button>
+      <button class="creator-card momo" data-creator-key="momo"><span class="creator-avatar">狗</span><div class="creator-name">狗娃</div><div class="creator-id">creator_002</div></button>
+      <button class="creator-card mengmeng" data-creator-key="mengmeng"><span class="creator-avatar">浩</span><div class="creator-name">阿浩</div><div class="creator-id">creator_003</div></button>
+      <button class="creator-card qiaozhi" data-creator-key="qiaozhi"><span class="creator-avatar">杰</span><div class="creator-name">杰瑞</div><div class="creator-id">creator_004</div></button>
+      <button class="creator-card tiancai" data-creator-key="tiancai"><span class="creator-avatar">天</span><div class="creator-name">天才</div><div class="creator-id">creator_005</div></button>
+      <button class="creator-card nvdi" data-creator-key="nvdi"><span class="creator-avatar">女</span><div class="creator-name">女帝</div><div class="creator-id">creator_006</div></button>
+    </div>
+    <div class="creator-gate-foot">Creator ID 用于来源追踪；Question ID 仍由 UUID v4 独立生成，因此不同制作人、不同电脑之间不会依赖人工编号。</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/*__BUILD_JS__*/
+</script>
+</body>
+</html>

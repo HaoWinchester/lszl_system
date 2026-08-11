@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * CanvasSelectionController v1
+ * CanvasSelectionController v2
  * 统一画布框选、多选、组拖动、对齐、分布与尺寸统一。
  */
 (function(global){
@@ -24,6 +24,8 @@
     const canSelect=typeof options.canSelect==='function'?options.canSelect:()=>true;
     const onSelectionChange=typeof options.onSelectionChange==='function'?options.onSelectionChange:()=>{};
     const onPreview=typeof options.onPreview==='function'?options.onPreview:()=>{};
+    const resolveMovement=typeof options.resolveMovement==='function'?options.resolveMovement:null;
+    const isInteractionUI=typeof options.isInteractionUI==='function'?options.isInteractionUI:(target=>!!target?.closest?.('[data-stage-ui],[data-canvas-ui],.uc-floating-toolbar,.node-style-toolbar'));
     const selectedIds=new Set();
     let anchorId='';
     let boxGesture=null;
@@ -115,7 +117,7 @@
     }
     function hideBox(){if(selectionBox)selectionBox.hidden=true}
     function beginBox(event,settings={}){
-      if(isMobile()||event.button!==0||canSelect('box',event)===false)return false;
+      if(isMobile()||event.button!==0||isInteractionUI(event.target,event)||canSelect('box',event)===false)return false;
       if(typeof settings.shouldStart==='function'&&!settings.shouldStart(event))return false;
       const start=localPoint(event);
       boxGesture={
@@ -159,7 +161,7 @@
       return result;
     }
     function beginGroupDrag(event,input=selectedRecords(),settings={}){
-      if(isMobile()||event.button!==0||canSelect('move',event)===false)return false;
+      if(isMobile()||event.button!==0||(!settings.allowInteractionTarget&&isInteractionUI(event.target,event))||canSelect('move',event)===false)return false;
       const chosen=(input||[]).map(item=>typeof item==='string'?recordById(item):item).filter(Boolean);
       if(!chosen.length)return false;
       const before=captureLayouts(chosen);
@@ -172,9 +174,11 @@
     function moveGroupDrag(event){
       if(!groupGesture||groupGesture.pointerId!==event.pointerId)return false;
       const zoom=Math.max(.0001,finite(getZoom(),1));
-      const dx=(event.clientX-groupGesture.startX)/zoom;
-      const dy=(event.clientY-groupGesture.startY)/zoom;
-      if(Math.abs(dx)+Math.abs(dy)>1.5)groupGesture.moved=true;
+      const rawDx=(event.clientX-groupGesture.startX)/zoom;
+      const rawDy=(event.clientY-groupGesture.startY)/zoom;
+      const resolved=resolveMovement?.({dx:rawDx,dy:rawDy,event,records:groupGesture.records,before:groupGesture.before,gesture:groupGesture})||{dx:rawDx,dy:rawDy};
+      const dx=finite(resolved.dx,rawDx),dy=finite(resolved.dy,rawDy);
+      if(Math.abs(rawDx)+Math.abs(rawDy)>1.5)groupGesture.moved=true;
       groupGesture.records.forEach(record=>{
         const origin=groupGesture.before[String(record.id)];
         const layout=layoutOf(record);
@@ -258,7 +262,7 @@
       captureLayouts,restoreLayouts,
       beginBox,moveBox,endBox,hasBox:()=>!!boxGesture,
       beginGroupDrag,moveGroupDrag,endGroupDrag,hasGroupDrag:()=>!!groupGesture,
-      arrange,cancel
+      arrange,cancel,isInteractionTarget:target=>isInteractionUI(target)
     });
   }
 

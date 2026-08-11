@@ -5,35 +5,8 @@
  * 维护建议：继续把本文件中的强耦合函数逐步迁移为显式模块 API。
  */
 
-/* 考题训练打开失败修复兜底 */
-function forceOpenQuestionTrainer(){
-  if(!document.body.classList.contains('question-training-page')){window.open('question-training.html','_blank');return}
-  const modal=$('questionModal');
-  if(!modal){
-    if(typeof showStatus==='function')showStatus('考题训练页面未找到，请检查文件是否完整。');
-    return;
-  }
-  if(typeof qbLoadBanks==='function')qbLoadBanks();
-  if(typeof qbApplyCurrentQuestion==='function')qbApplyCurrentQuestion(false);
-  modal.classList.add('show');
-  if(typeof bindQuestionCaseTabs==='function')bindQuestionCaseTabs();
-  if(typeof ensureQuestionFontScale==='function')ensureQuestionFontScale();
-  if(typeof renderQuestionTrainer==='function')renderQuestionTrainer();
-  if(typeof qSetCaseTab==='function')qSetCaseTab(typeof qActiveCaseTab!=='undefined'?qActiveCaseTab:'question');
-}
 function bindQuestionTrainerSafe(){
   if(typeof bindQuestionCaseTabs==='function')bindQuestionCaseTabs();
-  const btn=$('questionTrainBtn');
-  if(btn){
-    btn.onclick=null;
-    if(btn.dataset.toolbarActionClick !== 'openQuestionTraining'){
-      btn.addEventListener('click',e=>{
-        e.preventDefault();
-        e.stopPropagation();
-        forceOpenQuestionTrainer();
-      });
-    }
-  }
   const close=$('closeQuestionBtn');
   if(close){
     close.onclick=e=>{

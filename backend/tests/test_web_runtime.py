@@ -60,13 +60,15 @@ def test_login_alias_cannot_be_overridden_by_incoming_auth_mode() -> None:
     assert response.headers["location"] == "/practice-mode.html?auth=login&next=%2Fcontent-prep"
 
 
-def test_direct_page_serves_upstream_dom() -> None:
+def test_retired_training_page_serves_practice_redirect_document() -> None:
     with TestClient(app) as client:
         response = client.get("/question-training.html")
 
     assert response.status_code == 200
-    assert 'class="question-training-page"' in response.text
-    assert re.search(r'src="src/72-question-training-page\.js(?:\?v=[^"]+)?"', response.text)
+    assert "单题深学已停用，正在为你切换到刷题。" in response.text
+    assert 'id="practiceRedirectFallback"' in response.text
+    assert "retiredMode" in response.text
+    assert "location.replace(target.toString())" in response.text
 
 
 def test_api_routes_keep_priority_over_static_runtime() -> None:

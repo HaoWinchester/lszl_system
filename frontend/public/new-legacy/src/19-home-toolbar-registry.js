@@ -14,6 +14,7 @@
   const ICONS = {
     grip: '<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="8" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="17" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="17" r="1" fill="currentColor" stroke="none"/></svg>',
     add: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+    textBox: '<span class="home-text-tool-icon" aria-hidden="true">T</span>',
     template: '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 10h16M10 10v10"/></svg>',
     focus: '<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>',
     flow: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3.5c3.2 2.2 6 5.2 6 9.2 0 3.5-2.6 6.3-6 7.8-3.4-1.5-6-4.3-6-7.8 0-4 2.8-7 6-9.2z"/><path d="M9 12.5h6M12 9.5v6"/></svg>',
@@ -39,15 +40,34 @@
     size: '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="6" width="7" height="7" rx="2"/><rect x="13" y="5" width="7" height="14" rx="3"/></svg>'
   };
 
+  let activeMode = "efficient";
+  const MODE_TOOL_IDS = Object.freeze({
+    reading: new Set(["focusBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn"]),
+    efficient: new Set(["templateBtn", "addBtn", "addTextElementBtn", "focusBtn", "flashcardBtn", "pointerModeBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn", "importFile"]),
+    professional: null
+  });
+  function normalizeMode(value){
+    return ["reading", "efficient", "professional"].includes(String(value)) ? String(value) : "efficient";
+  }
+  function toolVisibleInMode(tool){
+    if(!tool) return false;
+    if(activeMode === "professional") return true;
+    const allowed = MODE_TOOL_IDS[activeMode] || MODE_TOOL_IDS.efficient;
+    return allowed.has(String(tool.id || ""));
+  }
+  function visibleToolsForGroup(group){
+    return (group && group.tools || []).filter(tool => toolVisibleInMode(tool));
+  }
+
   const HOME_TOOL_GROUPS = [
     {
       id: "create-learning",
       tools: [
-        {id:"addBtn", label:"新增知识点", tooltip:"新增知识点", icon:"add", shortcut:"N", className:"primary", permission:"editGraph", action:"addNode", shortTip:"新增"},
         {id:"templateBtn", label:"模板", ariaLabel:"选择模板", tooltip:"模板", icon:"template", shortcut:"T", permission:"editGraph", action:"openTemplate", shortTip:"模板"},
+        {id:"addBtn", label:"新增知识点", tooltip:"新增知识点", icon:"add", shortcut:"N", className:"primary", permission:"editGraph", action:"addNode", shortTip:"新增"},
+        {id:"addTextElementBtn", label:"新增文本框", tooltip:"新增独立文本框", icon:"textBox", permission:"editGraph", action:"addTextElement", shortTip:"文本"},
         {id:"focusBtn", label:"重点聚焦", tooltip:"重点聚焦", icon:"focus", shortcut:"F", className:"focus-menu-btn", action:"toggleFocus", shortTip:"聚焦"},
-        {id:"flashcardBtn", label:"记忆闪卡", tooltip:"记忆闪卡", icon:"flashcard", shortcut:"K", className:"flash-menu-btn", permission:"editGraph", action:"openFlashcards", shortTip:"闪卡"},
-        {id:"questionTrainBtn", label:"考题训练", tooltip:"考题训练", title:"考题训练（独立页面）", icon:"question", shortcut:"Q", className:"question-menu-btn", permission:"useTraining", action:"openQuestionTraining", shortTip:"训练"}
+        {id:"flashcardBtn", label:"记忆闪卡", tooltip:"记忆闪卡", icon:"flashcard", shortcut:"K", className:"flash-menu-btn", permission:"editGraph", action:"openFlashcards", shortTip:"闪卡"}
       ]
     },
     {
@@ -276,17 +296,22 @@
   function renderToolbar(){
     const box = document.getElementById("floatingToolbox");
     if(!box) return;
+    const visibleGroups = HOME_TOOL_GROUPS
+      .map(group => ({...group, tools: visibleToolsForGroup(group)}))
+      .filter(group => group.tools.some(tool => tool.type !== "file"));
+    const fileTools = HOME_TOOL_GROUPS.flatMap(group => visibleToolsForGroup(group)).filter(tool => tool.type === "file");
     box.innerHTML = `
       <button aria-label="拖动工具菜单" class="floating-toolbox-handle" id="floatingToolboxHandle" title="按住拖动菜单" type="button">${ICONS.grip}</button>
       <div class="floating-toolbox-grid">
-        ${HOME_TOOL_GROUPS.filter(group => (group.tools || []).some(tool => tool.type !== "file")).map((group, groupIndex) => {
+        ${visibleGroups.map((group, groupIndex) => {
           const html = group.tools.filter(tool => tool.type !== "file").map(renderTool).join("\n");
           return `${groupIndex ? '<div aria-hidden="true" class="floating-toolbox-divider"></div>' : ''}${html}`;
         }).join("\n")}
-        ${HOME_TOOL_GROUPS.flatMap(group => group.tools || []).filter(tool => tool.type === "file").map(renderTool).join("\n")}
+        ${fileTools.map(renderTool).join("\n")}
       </div>
     `;
     box.dataset.renderedBy = "home-toolbar-registry";
+    box.dataset.graphInteractionMode = activeMode;
 
     const roleApi = window.KGRolePermissions;
     if(roleApi && typeof roleApi.decoratePermissionElements === "function"){
@@ -294,12 +319,22 @@
     }
     bindHandlers();
   }
+  function setMode(mode){
+    const next = normalizeMode(mode);
+    if(activeMode === next && document.getElementById("floatingToolbox")?.dataset.graphInteractionMode === next) return activeMode;
+    activeMode = next;
+    closeFloatingSubmenus();
+    renderToolbar();
+    return activeMode;
+  }
 
   window.KGHomeToolbarRegistry = {
     groups: HOME_TOOL_GROUPS,
     render: renderToolbar,
     bindHandlers,
     registerActions,
+    setMode,
+    getMode:()=>activeMode,
     hideTransientMenus:()=>closeFloatingSubmenus()
   };
 

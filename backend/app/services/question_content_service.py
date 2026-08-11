@@ -77,6 +77,28 @@ def _optional_text(value: Any) -> Any:
     return deepcopy(value)
 
 
+def _normalize_correct_answer(
+    value: Any,
+    *,
+    question_type: str,
+    option_ids: set[str],
+) -> Any:
+    if isinstance(value, list):
+        members = [str(item).strip() for item in value]
+        if (
+            question_type == "multiple_choice"
+            and len(members) >= 2
+            and len(members) == len(set(members))
+            and all(
+                len(member) == 1 and member in option_ids
+                for member in members
+            )
+        ):
+            return "".join(members)
+        return deepcopy(value)
+    return deepcopy(value)
+
+
 def normalize_question_payload(payload: dict[str, Any], *, subject: str) -> dict[str, Any]:
     """Normalize known fields without discarding Content Prep extension data."""
 
@@ -101,7 +123,15 @@ def normalize_question_payload(payload: dict[str, Any], *, subject: str) -> dict
             ),
             None,
         )
-    normalized["correctAnswer"] = deepcopy(correct_answer)
+    normalized["correctAnswer"] = _normalize_correct_answer(
+        correct_answer,
+        question_type=normalized["type"],
+        option_ids={
+            str(option.get("id"))
+            for option in normalized["options"]
+            if isinstance(option, dict) and option.get("id")
+        },
+    )
     normalized["analysis"] = deepcopy(payload.get("analysis", payload.get("explanation")))
     normalized["translations"] = deepcopy(payload.get("translations") or {})
     normalized["clues"] = deepcopy(payload.get("clues") or [])

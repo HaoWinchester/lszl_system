@@ -1,22 +1,25 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.18" lang="zh-CN">
+<html data-release="v9.0-p4.1.28" lang="zh-CN">
 <head>
+<script src="./teaching-content-sync.js?v=v9.0-p4.1.28"></script><!-- kg-teaching-content-sync:generated -->
 <script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
-<script src="./runtime-config.override.js?v=v9.0-p4.1.18"></script><!-- kg-runtime:generated -->
-<script defer src="./direct-entry.js?v=v9.0-p4.1.18"></script><!-- kg-direct-entry:generated -->
-<script defer src="./feature-analytics.js?v=v9.0-p4.1.18"></script><!-- kg-feature-analytics:generated -->
+<script src="./runtime-config.override.js?v=v9.0-p4.1.28"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js?v=v9.0-p4.1.28"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js?v=v9.0-p4.1.28"></script><!-- kg-feature-analytics:generated -->
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
   <title>学习路径｜项目管理学习营</title>
 
-  <link rel="stylesheet" href="styles/main.css?v=v9.0-p4.1.18"/>
-  <link rel="stylesheet" href="styles/guided-learning-path.css?v=v9.0-p4.1.18"/>
-  <link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.18"/>
-  <link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.18"/>
-  <link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.18"/>
+  <link rel="stylesheet" href="styles/main.css?v=v9.0-p4.1.28"/>
+  <link rel="stylesheet" href="styles/guided-learning-path.css?v=v9.0-p4.1.28"/>
+  <link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.28"/>
+  <link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.28"/>
+  <link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.28"/>
+  <link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.28"/>
+  <link rel="stylesheet" href="styles/focus-vega-learning.css?v=v9.0-p4.1.28"/>
 </head>
-<body class="guided-learning-page">
+<body class="guided-learning-page" data-ui-skin="focus-vega">
   <div class="gl-app">
     <header class="gl-topbar">
       <div class="gl-topbar-left">
@@ -82,7 +85,7 @@
           <small>课程阶段</small>
           <h2 id="glStagePickerTitle">选择学习阶段</h2>
         </div>
-        <button type="button" class="gl-stage-picker-close" id="glStagePickerClose" aria-label="关闭阶段列表">×</button>
+        <button type="button" class="gl-stage-picker-close" id="glStagePickerClose" aria-label="关闭阶段列表"><span data-ui-icon="x" data-ui-icon-size="18" aria-hidden="true"></span></button>
       </header>
       <div class="gl-stage-list" id="glStageList"></div>
     </section>
@@ -91,7 +94,7 @@
 
   <div class="gl-placement-backdrop" id="glPlacementChoice" aria-hidden="true">
     <section class="gl-placement-dialog" role="dialog" aria-modal="true" aria-labelledby="glPlacementTitle">
-      <button type="button" class="gl-placement-close" id="glPlacementClose" aria-label="关闭">×</button>
+      <button type="button" class="gl-placement-close" id="glPlacementClose" aria-label="关闭"><span data-ui-icon="x" data-ui-icon-size="18" aria-hidden="true"></span></button>
       <small>部分首节点</small>
       <h2 id="glPlacementTitle">选择学习方式</h2>
       <h3 id="glPlacementPartTitle"></h3>
@@ -123,19 +126,20 @@
     </div>
   </div>
 
-  <script defer src="src/01-runtime-config.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/29-auth-core.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/30-standalone-auth-dialog.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/34-role-permissions.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/63-learning-event-repository.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/86-activity-schema-v1.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/87-guided-learning-data.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/94-practice-navigation.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/88-guided-learning-store.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/89-guided-learning-icon-registry.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/89-guided-learning-path-layout.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/41-account-menu.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/89-guided-learning-app.js?v=v9.0-p4.1.18"></script>
+  <script defer src="src/01-runtime-config.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/29-auth-core.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/30-standalone-auth-dialog.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/34-role-permissions.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/63-learning-event-repository.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/86-activity-schema-v1.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/87-guided-learning-data.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/94-practice-navigation.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/88-guided-learning-store.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/89-guided-learning-icon-registry.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/89-guided-learning-path-layout.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/41-account-menu.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/89-guided-learning-app.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.28"></script>
 </body>
 </html>

@@ -74,8 +74,8 @@ test('status labels avoid duplicate role text and keyword punctuation stays atta
   assert.match(learningStyles, /\.gln-activity\.gln-keyword-activity\{min-height:300px\}/)
 })
 
-test('standalone learning headers use one account menu instead of a detached logout button', () => {
-  for (const page of ['learning-path.html', 'question-training.html', 'question-workspace.html']) {
+test('active standalone learning headers use one account menu instead of a detached logout button', () => {
+  for (const page of ['learning-path.html', 'question-workspace.html']) {
     const markup = source(`new-legacy/${page}`)
 
     assert.match(markup, /class="account-menu-shell(?:\s|\")/)

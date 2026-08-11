@@ -138,10 +138,18 @@ with sync_playwright() as playwright:
         assert temporary_user not in {item["username"] for item in listed.json()["users"]}
         assert not dialog_answers
 
-        print("smoke: all stable aliases are direct original pages", flush=True)
+        print("smoke: retired training alias redirects to practice mode", flush=True)
+        page.goto(BASE + "/training", wait_until="networkidle")
+        assert page.url.startswith(BASE + "/practice-mode.html")
+        assert "retiredMode=single_deep_study" in page.url
+        page.locator(".practice-app").wait_for(state="visible", timeout=15_000)
+        assert page.locator(".question-training-app").count() == 0
+        assert page.locator("iframe").count() == 0
+        assert page.evaluate("window.__KG_DIRECT_BOOTSTRAP__?.releaseVersion") == EXPECTED_RELEASE
+
+        print("smoke: all remaining stable aliases are direct original pages", flush=True)
         routes = [
             ("/graph", ".app"),
-            ("/training", ".question-training-app"),
             ("/workspace", ".qw-app"),
             ("/files", ".fm-app"),
             ("/question-bank", ".qb-app"),

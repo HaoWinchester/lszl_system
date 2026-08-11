@@ -33,7 +33,8 @@ const EXPECTED_SCRIPT_SRCS={
     ...ADMIN_CORE_SCRIPTS,'src/admin/50-admin-shell-app.js','src/108-admin-ui-icons.js',
   ],
   'admin-operations.html':[
-    ...ADMIN_CORE_SCRIPTS,'src/admin/52-admin-operations-app.js','src/108-admin-ui-icons.js',
+    ...ADMIN_CORE_SCRIPTS,'src/admin/52-admin-operations-app.js',
+    'src/admin/resizable-region.js','src/108-admin-ui-icons.js',
   ],
   'admin-settings.html':[
     ...ADMIN_CORE_SCRIPTS,'src/admin/53-admin-settings-app.js','src/108-admin-ui-icons.js',
@@ -41,19 +42,23 @@ const EXPECTED_SCRIPT_SRCS={
   'admin-subjects.html':[
     ...ADMIN_CORE_SCRIPTS,'src/95-recall-association-library.js',
     'src/admin/51-admin-subjects-app.js','src/admin/53-recall-association-management.js',
+    'src/admin/resizable-region.js','src/admin/module-help-content.js',
+    'src/admin/module-help-controller.js',
     'src/99-workspace-placement.js','src/108-admin-ui-icons.js',
   ],
   'feedback-management.html':[
     'src/01-runtime-config.js','src/28-app-storage.js','src/29-auth-core.js',
     'src/33-user-center.js','src/34-role-permissions.js',
     'src/101-engagement-repository.js','src/admin/49-admin-ui.js',
-    'src/105-feedback-management-app.js','src/108-admin-ui-icons.js',
+    'src/105-feedback-management-app.js','src/admin/resizable-region.js',
+    'src/108-admin-ui-icons.js',
   ],
   'message-management.html':[
     'src/01-runtime-config.js','src/28-app-storage.js','src/29-auth-core.js',
     'src/33-user-center.js','src/34-role-permissions.js',
     'src/101-engagement-repository.js','src/admin/49-admin-ui.js',
-    'src/106-message-management-app.js','src/108-admin-ui-icons.js',
+    'src/106-message-management-app.js','src/admin/resizable-region.js',
+    'src/108-admin-ui-icons.js',
   ],
   'user-management.html':[
     'src/01-runtime-config.js','src/28-app-storage.js','src/29-auth-core.js',
@@ -61,7 +66,8 @@ const EXPECTED_SCRIPT_SRCS={
     'src/37-subscription-orders.js','src/37-subscription-redeem-codes.js',
     'src/37-subscription-core.js','src/33-user-center.js','src/39-global-shortcuts.js',
     'src/35-user-management-service.js','src/35-user-management.js',
-    'src/admin/48-admin-context-nav.js','src/108-admin-ui-icons.js',
+    'src/admin/48-admin-context-nav.js','src/admin/resizable-region.js',
+    'src/108-admin-ui-icons.js',
   ],
   'system-settings.html':[
     'src/01-runtime-config.js','src/28-app-storage.js','src/29-auth-core.js',
@@ -69,7 +75,8 @@ const EXPECTED_SCRIPT_SRCS={
     'src/37-subscription-orders.js','src/37-subscription-redeem-codes.js',
     'src/37-subscription-core.js','src/31-admin-utils.js','src/32-wechat-login.js',
     'src/33-user-center.js','src/39-global-shortcuts.js','src/36-system-settings.js',
-    'src/admin/48-admin-context-nav.js','src/108-admin-ui-icons.js',
+    'src/admin/48-admin-context-nav.js','src/admin/resizable-region.js',
+    'src/108-admin-ui-icons.js',
   ],
   'practice-mode.html':[
     'src/01-runtime-config.js','src/28-app-storage.js','src/29-auth-core.js',
@@ -77,7 +84,9 @@ const EXPECTED_SCRIPT_SRCS={
     'src/37-subscription-plans.js','src/37-subscription-orders.js',
     'src/37-subscription-redeem-codes.js','src/37-subscription-core.js',
     'src/33-user-center.js','src/107-learning-ui-icons.js','src/41-account-menu.js',
-    'src/101-engagement-repository.js','src/103-support-center.js','src/100-practice-mode.js',
+    'src/101-engagement-repository.js','src/103-support-center.js',
+    'src/59a-paper-learning-modes.js','src/58-paper-access-service.js',
+    'src/59-published-paper-repository.js','src/100-practice-mode.js',
   ],
 };
 const EXPECTED_TOKENS={

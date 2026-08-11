@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="styles/subscription.css"/>
 <link rel="stylesheet" href="styles/user-center.css"/>
 <link rel="stylesheet" href="styles/admin-context-nav.css"/>
+<link rel="stylesheet" href="styles/resizable-region.css"/>
 <link rel="stylesheet" href="styles/focus-vega-typography.css"/>
 <link rel="stylesheet" href="styles/admin-focus-vega.css"/>
 <link rel="stylesheet" href="styles/admin-focus-vega-settings.css"/>
@@ -131,7 +132,7 @@
               </div>
               <button id="ssClearLogsBtn" type="button">清空</button>
             </div>
-            <div class="um-log-list" id="ssLogList"></div>
+            <div class="um-log-list" id="ssLogList" data-kg-resizable-region data-kg-resizable-key="system-operation-log" data-kg-resizable-default="420" data-kg-resizable-min="240" data-kg-resizable-max="1000" data-kg-resizable-breakpoint="820"></div>
           </div>
         </section>
       </section>
@@ -153,6 +154,7 @@
 <script defer src="src/39-global-shortcuts.js"></script>
 <script defer src="src/36-system-settings.js"></script>
 <script src="src/admin/48-admin-context-nav.js"></script>
+<script src="src/admin/resizable-region.js"></script>
 <script defer src="src/108-admin-ui-icons.js"></script>
 </body>
 </html>

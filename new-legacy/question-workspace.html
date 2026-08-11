@@ -17,6 +17,8 @@
   <link rel="stylesheet" href="styles/learning-practice-shell.css"/>
   <link rel="stylesheet" href="styles/question-workspace-p2218.css"/>
   <link rel="stylesheet" href="styles/question-workspace-p2219.css"/>
+  <link rel="stylesheet" href="styles/unified-canvas-runtime.css"/>
+  <link rel="stylesheet" href="styles/selection-bounds-drag-p4327.css"/>
   <link rel="stylesheet" href="styles/focus-vega-typography.css"/>
   <link rel="stylesheet" href="styles/focus-vega-learning.css"/>
 </head>
@@ -24,14 +26,14 @@
   <div class="qw-app">
     <header class="qw-topbar lp-topbar">
       <div class="qw-brand lp-brand">
-        <a class="qw-back" data-practice-back href="index.html?mode=free" title="返回知识图谱">←</a>
+        <a class="qw-back" data-practice-back href="index.html?mode=free" title="返回知识图谱" aria-label="返回知识图谱"><span data-ui-icon="arrow-left" data-ui-icon-size="18" aria-hidden="true"></span></a>
         <div><h1>多题归纳</h1></div>
       </div>
 
       <div class="qw-workspace-tabbar" id="qwWorkspaceTabbar" aria-label="多题画布页签栏">
         <a class="qw-workspace-home" id="qwWorkspaceListBtn" href="file-manager.html?type=workspace" title="进入文件管理" aria-label="进入文件管理，查看多题画布"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"></rect><path d="M8 9h8M8 13h8M8 17h5"></path></svg></a>
         <div class="qw-workspace-tabs" id="qwWorkspaceTabs" role="tablist" aria-label="已打开的多题画布"></div>
-        <button class="qw-workspace-add" id="qwCreateWorkspaceBtn" type="button" title="新建画布" aria-label="新建画布">＋</button>
+        <button class="qw-workspace-add" id="qwCreateWorkspaceBtn" type="button" title="新建画布" aria-label="新建画布"><span data-ui-icon="plus" data-ui-icon-size="18" aria-hidden="true"></span></button>
       </div>
 
       <div class="qw-top-actions lp-top-actions">
@@ -352,10 +354,25 @@
   <script defer src="src/86-free-mode-language.js"></script>
   <script defer src="src/86-question-language-ui.js"></script>
   <script defer src="src/59c-active-learning-mode-policy.js"></script>
+  <script defer src="src/58-paper-access-service.js"></script>
   <script defer src="src/59-published-paper-repository.js"></script>
-  <script defer src="src/60-question-bank.js"></script>
-  <script defer src="src/61-question-repository.js"></script>
+  <script defer src="src/59a-published-question-resolver.js"></script>
+  <script defer src="src/59b-learning-route-context.js"></script>
   <script defer src="src/62-learning-session-store.js"></script>
+  <script defer src="src/62a-learning-progress.js"></script>
+  <script defer src="src/60-question-bank.js"></script>
+  <script defer src="src/teacher/shared/difficulty-service.js"></script>
+  <script defer src="src/principles/principle-repository.js"></script>
+  <script defer src="src/principles/synthesis-preset-repository.js"></script>
+  <script defer src="src/practice/practice-selection-service.js"></script>
+  <script defer src="src/practice/practice-attempt-repository.js"></script>
+  <script defer src="src/97-recall-storage.js"></script>
+  <script defer src="src/96-recall-question-source.js"></script>
+  <script defer src="src/61-question-repository.js"></script>
+  <script defer src="src/graph/color-picker-controller.js"></script>
+  <script defer src="src/graph/floating-color-window-controller.js"></script>
+  <script defer src="src/graph/shared-color-picker-v2.js"></script>
+  <script defer src="src/graph/context-menu-controller.js"></script>
   <script defer src="src/65-canvas-workspace-store.js"></script>
   <script defer src="src/canvas/78-canvas-policy.js"></script>
   <script defer src="src/canvas/79-canvas-viewport-controller.js"></script>
@@ -364,10 +381,19 @@
   <script defer src="src/canvas/82-canvas-selection-controller.js"></script>
   <script defer src="src/canvas/83-canvas-history-controller.js"></script>
   <script defer src="src/canvas/81-canvas-kernel.js"></script>
+  <script defer src="src/canvas/85-canvas-appearance-controller.js"></script>
+  <script defer src="src/canvas/86-canvas-zoom-dock-controller.js"></script>
+  <script defer src="src/canvas/87-canvas-minimap-controller.js"></script>
+  <script defer src="src/canvas/88-canvas-settings-controller.js"></script>
+  <script defer src="src/canvas/90-canvas-selection-filter-controller.js"></script>
+  <script defer src="src/canvas/91-canvas-alignment-controller.js"></script>
+  <script defer src="src/canvas/92-canvas-edge-toolbar-controller.js"></script>
+  <script defer src="src/canvas/89-canvas-runtime.js"></script>
   <script defer src="src/78-multi-question-workspace-tabs.js"></script>
   <script defer src="src/79-multi-question-workspace-filebar.js"></script>
   <script defer src="src/77-multi-question-workspace.js"></script>
 <script defer src="src/94-practice-navigation.js"></script>
 <script defer src="src/99-learning-practice-shell.js"></script>
+<script defer src="src/109-focus-vega-ui-icons.js"></script>
 </body>
 </html>

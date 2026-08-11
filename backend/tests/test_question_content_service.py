@@ -10,6 +10,7 @@ from app.schemas.content_prep import (
     LockGrant,
 )
 from app.schemas.question_catalog import QuestionPayload
+from app.services.content_prep_service import _validate_question_content
 from app.services.question_content_service import (
     canonical_question_hash,
     normalize_question_payload,
@@ -167,6 +168,42 @@ def test_question_payload_round_trips_aliases_and_extension_fields() -> None:
     assert dumped["keyPath"] == raw["keyPath"]
     assert dumped["teacherNumber"] == "PMP-001"
     assert dumped["futurePrepField"] == {"preserved": True}
+
+
+@pytest.mark.parametrize("correct_answer", ["AB", ["A", "B"]])
+def test_content_prep_accepts_multiple_choice_answer_forms(correct_answer: object) -> None:
+    raw = complete_question()
+    raw["type"] = "multiple_choice"
+    raw["correctAnswer"] = correct_answer
+
+    normalized = normalize_question_payload(raw, subject="PMP")
+
+    assert normalized["correctAnswer"] == "AB"
+    assert _validate_question_content(normalized, is_new=True) == []
+
+
+@pytest.mark.parametrize(
+    ("question_type", "correct_answer"),
+    [
+        ("single_choice", ["B"]),
+        ("multiple_choice", ["AB", "C"]),
+        ("multiple_choice", ["A", "", "B"]),
+    ],
+)
+def test_content_prep_rejects_noncanonical_answer_arrays(
+    question_type: str,
+    correct_answer: list[str],
+) -> None:
+    raw = complete_question()
+    raw["type"] = question_type
+    raw["correctAnswer"] = correct_answer
+    raw["options"].append({"id": "C", "text": "继续", "correct": False})
+
+    normalized = normalize_question_payload(raw, subject="PMP")
+    issues = _validate_question_content(normalized, is_new=True)
+
+    assert normalized["correctAnswer"] == correct_answer
+    assert [issue.code for issue in issues] == ["CORRECT_ANSWER_MISSING"]
 
 
 def test_hash_is_stable_across_key_order_identity_and_sync_metadata() -> None:

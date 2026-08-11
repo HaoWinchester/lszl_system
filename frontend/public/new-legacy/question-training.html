@@ -1,385 +1,48 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.18" lang="zh-CN">
+<html data-release="v9.0-p4.1.28" lang="zh-CN">
 <head>
+<script src="./teaching-content-sync.js?v=v9.0-p4.1.28"></script><!-- kg-teaching-content-sync:generated -->
 <script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
-<script src="./runtime-config.override.js?v=v9.0-p4.1.18"></script><!-- kg-runtime:generated -->
-<script defer src="./direct-entry.js?v=v9.0-p4.1.18"></script><!-- kg-direct-entry:generated -->
-<script defer src="./feature-analytics.js?v=v9.0-p4.1.18"></script><!-- kg-feature-analytics:generated -->
+<script src="./runtime-config.override.js?v=v9.0-p4.1.28"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js?v=v9.0-p4.1.28"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js?v=v9.0-p4.1.28"></script><!-- kg-feature-analytics:generated -->
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>考题训练｜项目管理综合训练</title>
-
-  <link rel="stylesheet" href="styles/main.css?v=v9.0-p4.1.18"/>
-  <link rel="stylesheet" href="styles/question-training.css?v=v9.0-p4.1.18"/>
-  <link rel="stylesheet" href="styles/card-runtime.css?v=v9.0-p4.1.18"/>
-  <link rel="stylesheet" href="styles/cards/answer-card.css?v=v9.0-p4.1.18"/>
-  <link rel="stylesheet" href="styles/infinite-learning-canvas.css?v=v9.0-p4.1.18"/>
-  <link rel="stylesheet" href="styles/compact-learning-shell.css?v=v9.0-p4.1.18"/>
-  <link rel="stylesheet" href="styles/learning-path-edges.css?v=v9.0-p4.1.18"/>
-  <link rel="stylesheet" href="styles/progress-workspace-dock.css?v=v9.0-p4.1.18"/>
-  <link rel="stylesheet" href="styles/canvas-interaction-fixes.css?v=v9.0-p4.1.18"/>
-  <link rel="stylesheet" href="styles/dual-canvas.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/support-center.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/learning-practice-shell.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/question-training-p2220.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/question-training-p2221.css?v=v9.0-p4.1.18"/>
-<script>
-try{
-  document.documentElement.classList.add('qt-canvas-initial-pending');
-  if(new URLSearchParams(location.search).has('questionId')){
-    document.documentElement.classList.add('qt-incoming-question-pending');
-  }
-}catch(e){}
-</script>
-<link rel="stylesheet" href="./direct-runtime-fixes.css?v=v9.0-p4.1.18"><!-- kg-runtime-fixes:generated -->
+  <link rel="stylesheet" href="styles/main.css?v=v9.0-p4.1.28"/>
 </head>
-<body class="question-training-page">
-  <div class="question-training-app">
-    <header class="qt-topbar lp-topbar">
-      <div class="qt-brand lp-brand">
-        <a class="qt-back-link" data-practice-back href="question-workspace.html" title="返回多题归纳">←</a>
-        <div><h1>单题深学</h1><span class="lp-context">五步学习 · 当前题目</span></div>
-      </div>
-      <div class="qt-actions lp-top-actions">
-        <div class="qt-language-control lp-language-control"><div class="qt-language-switch lp-language-switch" role="group" aria-label="题目显示方式"><button type="button" data-question-language="zh" aria-pressed="true">中</button><button type="button" data-question-language="bilingual" aria-pressed="false">中英</button></div></div>
-        
-        
-        
-        
-        <div class="account-menu-shell" id="accountMenuShell" data-account-help-href="multi-question-help.html">
-          <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
-            <span class="role-dot"></span><span class="auth-status-label">访客只读</span>
-            <svg aria-hidden="true" class="account-menu-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>
-          </button>
-          <div class="account-menu" hidden id="accountMenu" role="menu" aria-label="账号菜单">
-            <button class="account-menu-item" id="accountMenuUserCenterBtn" role="menuitem" type="button">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
-              <span data-mobile-label="用户">用户中心</span>
-            </button>
-            <button class="account-menu-item" id="accountMenuHelpBtn" role="menuitem" type="button">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.35 2.35 0 1 1 3.5 2.05c-.82.45-1.3.93-1.3 1.95"/><path d="M12 17h.01"/></svg>
-              <span data-mobile-label="帮助">帮助中心</span>
-            </button>
-            <button class="account-menu-item account-menu-upgrade" id="accountMenuUpgradeBtn" role="menuitem" type="button">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 9.6 8.1 4 9l4 3.9-.9 5.6L12 16l4.9 2.5-.9-5.6L20 9l-5.6-.9Z"/></svg>
-              <span data-mobile-label="升级">升级会员</span>
-            </button>
-            <div class="account-menu-separator" role="separator"></div>
-            <button class="account-menu-item account-menu-session" id="accountMenuSessionBtn" role="menuitem" type="button">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></svg>
-              <span data-mobile-label="登录">登录</span>
-            </button>
-          </div>
-        </div>
-        <button class="account-hidden-trigger" hidden id="authLoginBtn" type="button">登录</button>
-        <button class="account-hidden-trigger" hidden id="authLogoutBtn" type="button">退出登录</button>
-        <button class="account-hidden-trigger" hidden id="tutorialBtn" type="button">使用说明</button>
-      </div>
-    </header>
-    <main class="question-page-shell show qt-fullscreen-shell" id="questionModal" aria-label="单题深学页面">
-<div class="question-modal qt-fullscreen-learning-surface">
-<div class="q-tabs qt-legacy-tabs" aria-label="原破案模式内容切换" role="tablist" hidden>
-  <button class="q-tab active" data-q-tab="question" id="qTabQuestion" role="tab" type="button" aria-selected="true">题目</button>
-  <button class="q-tab" data-q-tab="graph" id="qTabGraph" role="tab" type="button" aria-selected="false">推理图谱</button>
-  <button class="q-tab" data-q-tab="notes" id="qTabNotes" role="tab" type="button" aria-selected="false">侦探笔记</button>
-</div>
+<body>
+  <main aria-labelledby="practiceRedirectTitle">
+    <h1 id="practiceRedirectTitle">正在转到刷题…</h1>
+    <p>单题深学已停用，正在为你切换到刷题。</p>
+    <p><a id="practiceRedirectFallback" href="practice-mode.html">如果没有自动跳转，请前往刷题</a></p>
+  </main>
+  <script>
+    (function redirectRetiredSingleDeep() {
+      const allowed = ['paperId', 'releaseId', 'questionId', 'bankId', 'courseId', 'taskId', 'subject', 'returnTo'];
+      const source = new URL(location.href);
+      const params = new URLSearchParams();
+      const target = new URL('practice-mode.html', location.origin + '/');
 
-<div class="qt-canvas-shell" id="qtCanvasShell">
-  <div class="qt-canvas-topline" aria-label="单题深学画布工具与学习进度">
-    <div class="qt-canvas-topline-left">
-      <div class="qt-question-library-nav" role="group" aria-label="题目切换与题目库">
-        <button type="button" id="qtPrevQuestionBtn" class="qt-question-nav-arrow qt-question-library-nav-arrow" title="上一题" aria-label="上一题">‹</button>
-        <button type="button" id="qtQuestionListBtn" class="qt-question-dock-trigger qt-question-library-center" aria-haspopup="dialog" aria-controls="qtQuestionDrawer" title="打开题目库"><span aria-hidden="true">▤</span><span>题目库</span><strong id="qtCanvasQuestionCount">1</strong></button>
-        <button type="button" id="qtNextQuestionBtn" class="qt-question-nav-arrow qt-question-library-nav-arrow" title="下一题" aria-label="下一题">›</button>
-        <span id="qtQuestionPosition" class="lp-visually-hidden">题目 1 / 1</span>
-      </div>
-    </div>
-    <nav class="qt-workflow qt-progress-milestone qt-progress-inline" id="qtWorkflow" aria-label="单题深学进度" style="--qt-progress:0%">
-      <div class="qt-progress-rail" aria-hidden="true"><span class="qt-progress-fill" id="qtWorkflowProgress"></span></div>
-      <button class="qt-workflow-step active" type="button" data-qt-step="1" aria-current="step" aria-label="第1步：独立作答"><span class="qt-workflow-number">1</span><span class="qt-workflow-tooltip" role="tooltip"><strong>独立作答</strong></span></button>
-      <button class="qt-workflow-step" type="button" data-qt-step="2" aria-label="第2步：识别关键词"><span class="qt-workflow-number">2</span><span class="qt-workflow-tooltip" role="tooltip"><strong>识别关键词</strong></span></button>
-      <button class="qt-workflow-step" type="button" data-qt-step="3" aria-label="第3步：回忆知识网"><span class="qt-workflow-number">3</span><span class="qt-workflow-tooltip" role="tooltip"><strong>回忆知识网</strong></span></button>
-      <button class="qt-workflow-step" type="button" data-qt-step="4" aria-label="第4步：破译思路"><span class="qt-workflow-number">4</span><span class="qt-workflow-tooltip" role="tooltip"><strong>破译思路</strong></span></button>
-      <button class="qt-workflow-step" type="button" data-qt-step="5" aria-label="第5步：一句话复述"><span class="qt-workflow-number">5</span><span class="qt-workflow-tooltip" role="tooltip"><strong>一句话复述</strong></span></button>
-    </nav>
-    <div class="qt-canvas-overlay qt-canvas-overlay-right qt-canvas-topline-right" role="group" aria-label="单题画布工具">
-      <button type="button" id="qtCanvasPointerModeBtn" class="qt-canvas-pointer-mode" title="选择/手型（V）" aria-label="选择/手型（V）"></button>
-      <button type="button" id="qtFontScaleBtn" class="qt-font-scale-cycle" title="切换字体大小" aria-label="切换字体大小">Aa</button>
-      <button type="button" id="qtQuestionResetBtn" class="qt-question-reset-btn" title="重置当前题目" aria-label="重置当前题目"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6v5h-5"></path><path d="M19 11a7 7 0 1 0 1 4"></path></svg></button>
-      <span class="qt-canvas-overlay-divider" aria-hidden="true"></span>
-      <button type="button" id="qtCanvasFocusBtn" title="返回当前步骤">当前卡</button>
-      <button type="button" id="qtCanvasResetBtn" title="恢复五步默认布局">重置</button>
-    </div>
-  </div>
+      for (const key of allowed) {
+        if (!source.searchParams.has(key)) continue;
+        const value = source.searchParams.get(key);
+        if (key === 'returnTo') {
+          try {
+            const candidate = new URL(value, location.origin);
+            if (candidate.origin === location.origin && candidate.pathname.startsWith('/')) params.set(key, candidate.pathname);
+          } catch (error) {}
+        } else {
+          params.set(key, value);
+        }
+      }
 
-  <div class="lp-canvas-zoom-dock" id="qtCanvasZoomDock" role="group" aria-label="单题画布缩放控制">
-    <button class="lp-canvas-zoom-btn" id="qtCanvasZoomOutBtn" type="button" aria-label="缩小画布" title="缩小">−</button>
-    <div class="lp-canvas-zoom-percent-wrap"><div class="lp-canvas-zoom-slider-popover" id="qtCanvasZoomSliderPopover" aria-hidden="true"><input id="qtCanvasZoomSlider" type="range" min="1" max="400" step="1" value="100" aria-label="缩放比例"/></div><button class="lp-canvas-zoom-percent" id="qtCanvasZoomLabel" type="button" aria-label="当前缩放比例，点击调整">100%</button></div>
-    <button class="lp-canvas-zoom-btn" id="qtCanvasZoomInBtn" type="button" aria-label="放大画布" title="放大">＋</button><span class="lp-canvas-zoom-divider" aria-hidden="true"></span>
-    <button class="lp-canvas-zoom-btn lp-canvas-fit-btn" id="qtCanvasFitBtn" type="button" aria-label="全览五张学习卡" title="全览"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 4H4v4"></path><path d="M16 4h4v4"></path><path d="M4 16v4h4"></path><path d="M20 16v4h-4"></path><rect x="8" y="8" width="8" height="8" rx="2"></rect></svg></button>
-  </div>
-
-  <div class="qt-question-drawer-backdrop" id="qtQuestionDrawerBackdrop" hidden></div>
-  <aside class="qt-question-drawer lp-question-library-compact" id="qtQuestionDrawer" aria-label="题目库" aria-hidden="true">
-    <div class="qt-question-drawer-tools lp-question-library-tools">
-      <div class="lp-question-paper-row"><select id="qtPublishedPaperSelect" class="lp-question-paper-select" aria-label="选择已发布试卷"></select><button id="qtQuestionDrawerClose" class="lp-question-library-close" type="button" aria-label="关闭题目库" title="关闭">×</button></div>
-      <div class="qt-question-search lp-question-search-row"><input id="qtQuestionSearch" type="search" placeholder="搜索题目" autocomplete="off"/><button id="qtQuestionSearchBtn" class="lp-question-text-action" type="button">搜索</button></div>
-      <div class="qt-question-filters lp-question-filter-links" role="group" aria-label="题目状态筛选">
-        <button type="button" class="active" data-question-filter="all">全部</button>
-        <button type="button" data-question-filter="unfinished">未完成</button>
-        <button type="button" data-question-filter="completed">已完成</button>
-      </div>
-    </div>
-    <div class="qt-question-list lp-question-library-list" id="qtQuestionList" role="list"></div>
-    <div hidden aria-hidden="true"><select id="qtTargetWorkspaceSelect"></select><button type="button" id="qtCreateWorkspaceBtn"></button><span id="qtDrawerProgress"></span></div>
-  </aside>
-
-  <div class="question-body q-case-body qt-canvas-viewport" id="qtCanvasViewport" tabindex="0" aria-label="单题深学画布">
-    <div class="qt-canvas-background" aria-hidden="true"></div>
-  <div class="qt-canvas-world" id="qtCanvasWorld">
-    <svg class="qt-canvas-edge-layer" id="qtCanvasEdgeLayer" width="5200" height="1800" viewBox="0 0 5200 1800" aria-hidden="true">
-      <defs id="qtCanvasEdgeDefs"></defs>
-      <g id="qtCanvasEdges"></g>
-    </svg>
-    <section class="qt-canvas-card current"
-      id="qtCanvasCardStep1"
-      data-canvas-card="step-1"
-      data-step="1"
-      data-default-x="80"
-      data-default-y="120"
-      data-default-width="760"
-      data-default-height="650"
-      aria-labelledby="qtCanvasCardTitle1">
-      <header class="qt-canvas-card-header" data-card-drag-handle>
-        <div class="qt-canvas-card-heading">
-          <span class="qt-canvas-step-number">1</span>
-          <div><small>STEP 1</small><h3 id="qtCanvasCardTitle1">独立作答</h3></div>
-        </div>
-        <span class="qt-canvas-card-status" data-card-status>当前步骤</span>
-      </header>
-      <div class="qt-canvas-card-body">
-        <div id="qtAnswerCardHost" class="learning-card-host" data-learning-card="answer-card" aria-label="独立作答学习卡"></div>
-        <div class="qt-question-switch-loader" id="qtQuestionSwitchLoader" hidden aria-live="polite" aria-label="正在切换题目">
-          <div class="qt-question-switch-loader-core" aria-hidden="true"><span></span><span></span><span></span></div>
-          <strong id="qtQuestionSwitchLoaderText">正在载入题目</strong>
-          <small>正在同步题目与学习状态…</small>
-        </div>
-      </div>
-    </section>
-
-    <section class="qt-canvas-card locked"
-      id="qtCanvasCardStep2"
-      data-canvas-card="step-2"
-      data-step="2"
-      data-default-x="930"
-      data-default-y="180"
-      data-default-width="700"
-      data-default-height="610"
-      aria-labelledby="qtCanvasCardTitle2">
-      <header class="qt-canvas-card-header" data-card-drag-handle>
-        <div class="qt-canvas-card-heading">
-          <span class="qt-canvas-step-number">2</span>
-          <div><small>STEP 2</small><h3 id="qtCanvasCardTitle2">识别关键词</h3></div>
-        </div>
-        <span class="qt-canvas-card-status" data-card-status>等待解锁</span>
-      </header>
-      <div class="qt-canvas-card-body">
-        <div class="qt-card-section-intro">
-          <span>题干线索唤醒</span>
-          <h3 id="qtKeywordQuestionTitle">从题干中找出决定答案的线索</h3>
-          <p>点击真正影响场景、角色、时间点或行动顺序的词句。选中的关键词会唤醒对应知识点。</p>
-        </div>
-        <div class="q-stem qt-keyword-stem" id="qtKeywordStem"></div>
-        <div class="qt-keyword-progress-grid">
-          <div>
-            <div class="q-evidence-head"><span>已发现线索</span><small>关键词</small></div>
-            <div class="q-chip-list" id="qClues"></div>
-          </div>
-          <div class="q-score" id="qScore"></div>
-        </div>
-        <div class="q-mini-note">在引导模式中至少找到一条线索，才能进入局部知识网络。</div>
-      </div>
-    </section>
-
-    <section class="qt-canvas-card locked"
-      id="qtCanvasCardStep3"
-      data-canvas-card="step-3"
-      data-step="3"
-      data-default-x="1720"
-      data-default-y="80"
-      data-default-width="1040"
-      data-default-height="760"
-      aria-labelledby="qtCanvasCardTitle3">
-      <header class="qt-canvas-card-header" data-card-drag-handle>
-        <div class="qt-canvas-card-heading">
-          <span class="qt-canvas-step-number">3</span>
-          <div><small>STEP 3</small><h3 id="qtCanvasCardTitle3">回忆局部知识网</h3></div>
-        </div>
-        <span class="qt-canvas-card-status" data-card-status>等待解锁</span>
-      </header>
-      <div class="qt-canvas-card-body">
-        <div class="q-tab-section-head">
-          <div><h3>关键词 → 知识点 → 判断规则</h3><p>点击关键词和知识节点，通过回忆问题走通本题最短知识路径。</p></div>
-        </div>
-        <div class="q-graph" id="qGraph"></div>
-      </div>
-    </section>
-
-    <section class="qt-canvas-card locked"
-      id="qtCanvasCardStep4"
-      data-canvas-card="step-4"
-      data-step="4"
-      data-default-x="2850"
-      data-default-y="150"
-      data-default-width="920"
-      data-default-height="720"
-      aria-labelledby="qtCanvasCardTitle4">
-      <header class="qt-canvas-card-header" data-card-drag-handle>
-        <div class="qt-canvas-card-heading">
-          <span class="qt-canvas-step-number">4</span>
-          <div><small>STEP 4</small><h3 id="qtCanvasCardTitle4">破译思路</h3></div>
-        </div>
-        <span class="qt-canvas-card-status" data-card-status>等待解锁</span>
-      </header>
-      <div class="qt-canvas-card-body">
-        <div class="qt-card-section-intro">
-          <span>决策依据</span>
-          <h3>检查证据、知识原则和选项陷阱</h3>
-          <p>本阶段暂时沿用现有解析内容；下一阶段将升级为可视化决策路径。</p>
-        </div>
-        <div class="q-detective-notes" id="qDetectiveNotes"></div>
-        <div class="q-concepts" id="qConcepts"></div>
-        <div class="q-review" id="qReview"></div>
-      </div>
-    </section>
-
-    <section class="qt-canvas-card locked"
-      id="qtCanvasCardStep5"
-      data-canvas-card="step-5"
-      data-step="5"
-      data-default-x="3860"
-      data-default-y="230"
-      data-default-width="720"
-      data-default-height="560"
-      aria-labelledby="qtRecapTitle">
-      <header class="qt-canvas-card-header" data-card-drag-handle>
-        <div class="qt-canvas-card-heading">
-          <span class="qt-canvas-step-number">5</span>
-          <div><small>STEP 5</small><h3>一句话复述</h3></div>
-        </div>
-        <span class="qt-canvas-card-status" data-card-status>等待解锁</span>
-      </header>
-      <div class="qt-canvas-card-body">
-        <section class="qt-recap-panel" id="qtRecapPanel" aria-labelledby="qtRecapTitle">
-          <div class="qt-recap-card">
-            <div class="qt-recap-icon" aria-hidden="true">✓</div>
-            <div>
-              <span class="qt-recap-kicker">最后20秒</span>
-              <h3 id="qtRecapTitle">用一句话带走这道题</h3>
-              <p>下次遇到同类情境，你首先应该想到什么判断原则？</p>
-            </div>
-          </div>
-          <label class="qt-recap-input-label" for="qtRecapInput">我的一句话总结</label>
-          <textarea id="qtRecapInput" rows="5" maxlength="180" placeholder="例如：敏捷迭代中期出现新需求时，不直接插入当前迭代，应进入待办列表并由产品负责人评估优先级。"></textarea>
-          <div class="qt-recap-suggestions" id="qtRecapSuggestions"></div>
-          <div class="qt-complete-summary" id="qtCompleteSummary" hidden></div>
-        </section>
-      </div>
-    </section>
-  </div>
-  <div class="qt-minimap-dock collapsed" id="qtMinimapDock">
-    <div class="qt-canvas-minimap" id="qtCanvasMinimap" aria-hidden="true">
-      <div class="qt-canvas-minimap-world" id="qtCanvasMinimapWorld"></div>
-      <div class="qt-canvas-minimap-view" id="qtCanvasMinimapView" title="拖动此框移动画布视野"></div>
-    </div>
-    <button type="button" class="qt-minimap-toggle" id="qtMinimapToggleBtn" aria-expanded="false" aria-controls="qtCanvasMinimap" title="打开缩略图" aria-label="打开缩略图"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6.5 8 4l8 3 5-2.5v13L16 20l-8-3-5 2.5z"></path><path d="M8 4v13M16 7v13"></path></svg></button>
-  </div>
-</div>
-</div>
-<footer class="qt-guided-dock qt-guided-dock-compact" aria-label="学习步骤操作">
-  <button type="button" class="qt-secondary-action qt-back-icon-action" id="qtBackStepBtn" title="上一步" aria-label="上一步"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"></path></svg></button>
-  <button type="button" class="qt-primary-action qt-continue-action" id="qtNextStepBtn">继续</button>
-</footer>
-</div>
-</main>
-
-  </div>
-  <div class="status-chip" id="status"></div>
-  <div class="modal-backdrop auth-backdrop" id="authModal">
-<div aria-labelledby="authTitle" aria-modal="true" class="modal auth-modal" role="dialog">
-<div class="auth-head">
-<div>
-<h2 id="authTitle">登录后可编辑</h2>
-<p id="authReason">未登录时只能查看图谱，登录后可以新增、编辑、连线和保存自己的内容。</p>
-</div>
-<button class="auth-close" id="authCloseBtn" title="关闭登录窗口">×</button>
-</div>
-<div class="auth-body">
-<label>用户名
-        <input autocomplete="username" id="authUsername" placeholder="请输入用户名"/>
-</label>
-<label>密码
-        <input autocomplete="current-password" id="authPassword" placeholder="请输入密码" type="password"/>
-</label>
-<div class="auth-msg" id="authMsg"></div>
-<div class="auth-actions">
-<button class="primary" id="authDoLoginBtn">登录</button>
-<button id="authRegisterBtn">注册并登录</button>
-</div>
-<div class="auth-note">
-        账号身份与业务数据由服务器按用户隔离保存；请勿与他人共享密码。
-      </div>
-</div>
-</div>
-</div>
-<script defer src="src/01-runtime-config.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/29-auth-core.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/34-role-permissions.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/37-subscription-plans.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/37-subscription-orders.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/37-subscription-redeem-codes.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/37-subscription-core.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/32-wechat-login.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/33-user-center.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/94-practice-navigation.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/41-account-menu.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/101-engagement-repository.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/103-support-center.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/39-global-shortcuts.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/50-question-data.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/86-activity-schema-v1.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/86-free-mode-language.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/86-question-language-ui.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/72-question-training-page.js?v=v9.0-p4.1.18"></script>
-<script defer src="./direct-auth-adapter.js?v=v9.0-p4.1.18"></script><!-- kg-auth:generated -->
-<script defer src="src/59-published-paper-repository.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/60-question-bank.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/61-question-repository.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/62-learning-session-store.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/63-learning-event-repository.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/64-flow-orchestrator.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/65-canvas-workspace-store.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/66-question-navigator.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/canvas/78-canvas-policy.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/canvas/79-canvas-viewport-controller.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/canvas/80-canvas-card-controller.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/canvas/81-canvas-kernel.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/67-card-contract.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/68-card-context.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/69-card-registry.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/71-card-runtime.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/cards/answer-card.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/75-learning-path-edges.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/74-infinite-learning-canvas.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/70-question-trainer.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/80-question-font-scale.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/73-guided-learning-canvas.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/99-learning-practice-shell.js?v=v9.0-p4.1.18"></script>
+      params.set('retiredMode', 'single_deep_study');
+      target.search = params.toString();
+      const fallback = document.getElementById('practiceRedirectFallback');
+      if (fallback) fallback.href = target.toString();
+      location.replace(target.toString());
+    })();
+  </script>
 </body>
 </html>

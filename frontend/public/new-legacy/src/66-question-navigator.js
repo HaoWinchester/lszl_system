@@ -35,8 +35,29 @@
   function currentBank(){
     try{return typeof qbCurrentBank==='function'?qbCurrentBank():null}catch(e){return null}
   }
+  function activeRouteContext(source='single-deep'){
+    const routeApi=global.KGLearningRouteContext;
+    const route=routeApi?.parse?.({mode:'single_deep_study'})||{};
+    const paper=currentPaper(),question=global.KGQuestionRepository?.current?.()||global.PMP_QUESTION_MVP||{};
+    const context={...route,paperId:paper?.id||question.sourcePaperId||'',releaseId:paper?.releaseId||question.sourceReleaseId||'',questionId:question.id||question.sourceQuestionId||'',bankId:question.sourceBankId||currentBank()?.id||'',mode:'single_deep_study',source:route.source||source};
+    return routeApi?.normalize?.(context)||context;
+  }
+  function syncRouteContext(source='single-deep'){
+    const context=activeRouteContext(source);
+    global.KGLearningProgress?.activate?.(context,{mode:'single_deep_study',clearTransient:false});
+    if(global.KGLearningRouteContext?.replace)global.KGLearningRouteContext.replace(context,{target:'question-training.html'});
+    else try{
+      const params=new URLSearchParams(global.location?.search||'');
+      const set=(key,value)=>{if(value)params.set(key,String(value));else params.delete(key)};
+      set('paperId',context.paperId);set('releaseId',context.releaseId);set('questionId',context.questionId);set('bankId',context.bankId);
+      ['paper','release','question','bank','collectionId'].forEach(key=>params.delete(key));
+      global.history?.replaceState?.({},'','question-training.html'+(params.toString()?'?'+params.toString():''));
+    }catch(e){}
+    return context;
+  }
   function publishedCatalog(){
     try{
+      if(global.KGPublishedQuestionResolver?.listPapers)return global.KGPublishedQuestionResolver.listPapers({respectRole:true,mode:'single_deep_study'})||[];
       if(typeof qbPublishedPaperCatalog==='function')return qbPublishedPaperCatalog({respectRole:true,mode:'single_deep_study'})||[];
     }catch(e){console.warn('读取已发布试卷失败',e)}
     let papers=[];
@@ -52,17 +73,21 @@
   }
   function ensureSelectedPaper(catalog){
     catalog=Array.isArray(catalog)?catalog:publishedCatalog();
-    state.paperCatalog=catalog;
     let paper=currentPaper();
-    const currentEntry=catalog.find(entry=>String(entry.paper?.id)===String(paper?.id||''))||null;
+    let currentEntry=catalog.find(entry=>String(entry.paper?.id)===String(paper?.id||'')&&String(entry.paper?.releaseId||'')===String(paper?.releaseId||''))||null;
+    if(paper&&!currentEntry){
+      const historical=global.KGPublishedQuestionResolver?.resolvePaper?.({paperId:paper.id,releaseId:paper.releaseId,mode:'single_deep_study'},{respectRole:true,mode:'single_deep_study'});
+      if(historical?.ok){currentEntry=historical;catalog=[historical,...catalog]}
+    }
+    state.paperCatalog=catalog;
     const preferredEntry=(currentEntry?.availableCount>0?currentEntry:null)||catalog.find(entry=>entry.availableCount>0)||currentEntry||catalog[0]||null;
     if(!paper||!currentEntry||preferredEntry!==currentEntry){
       const first=preferredEntry?.paper||null;
-      if(first&&typeof qbSelectPublishedPaper==='function')paper=qbSelectPublishedPaper(first.id,preferredEntry.items[0]?.paperIndex||0,{applyQuestion:true})||first;
+      if(first&&typeof qbSelectPublishedPaper==='function')paper=qbSelectPublishedPaper(first.id,preferredEntry.items[0]?.paperIndex||0,{releaseId:first.releaseId,applyQuestion:true,mode:'single_deep_study'})||first;
       else if(first){
         paper=first;
         if(typeof qBankState!=='undefined'){
-          qBankState.currentPaperId=first.id;
+          qBankState.currentPaperId=first.id;qBankState.currentReleaseId=first.releaseId;
           qBankState.currentPaperIndex=preferredEntry.items[0]?.paperIndex||0;
           if(typeof qbSaveCurrentPaper==='function')qbSaveCurrentPaper();
           if(typeof qbApplyPaperContext==='function')qbApplyPaperContext();
@@ -73,9 +98,8 @@
     return paper;
   }
   function selectedCatalogEntry(){
-    const catalog=publishedCatalog();
-    const paper=ensureSelectedPaper(catalog);
-    return catalog.find(entry=>String(entry.paper?.id)===String(paper?.id||''))||null;
+    const paper=ensureSelectedPaper(publishedCatalog());
+    return state.paperCatalog.find(entry=>String(entry.paper?.id)===String(paper?.id||'')&&String(entry.paper?.releaseId||'')===String(paper?.releaseId||''))||null;
   }
   function listContext(){
     const entry=selectedCatalogEntry();
@@ -97,9 +121,9 @@
     };
   }
   function sessionFor(question){
-    const id=String(question?.id||question?.sourceQuestionId||'');
-    if(!id)return null;
-    return global.KGLearningSessionStore?.get?.(id,currentUserId())||null;
+    const context={paperId:String(question?.sourcePaperId||currentPaper()?.id||''),releaseId:String(question?.sourceReleaseId||currentPaper()?.releaseId||''),questionId:String(question?.id||question?.sourceQuestionId||''),bankId:String(question?.sourceBankId||''),mode:'single_deep_study'};
+    if(!context.questionId)return null;
+    return global.KGLearningSessionStore?.get?.(context,currentUserId())||null;
   }
   function itemStatus(question){
     const session=sessionFor(question);
@@ -130,9 +154,9 @@
       return;
     }
     select.disabled=false;
-    select.innerHTML=catalog.map(entry=>'<option value="'+escapeHTML(entry.paper.id)+'">'+escapeHTML(paperOptionLabel(entry))+'</option>').join('');
-    select.value=String(context?.paper?.id||currentPaper()?.id||catalog[0].paper.id);
-    const entry=catalog.find(item=>String(item.paper.id)===String(select.value))||catalog[0];
+    select.innerHTML=catalog.map(entry=>'<option value="'+escapeHTML(entry.paper.releaseId||entry.paper.id)+'">'+escapeHTML(paperOptionLabel(entry))+(entry.paper.availability==='superseded'?' · 历史会话':'')+'</option>').join('');
+    select.value=String(context?.paper?.releaseId||currentPaper()?.releaseId||catalog[0].paper.releaseId||catalog[0].paper.id);
+    const entry=catalog.find(item=>String(item.paper.releaseId||item.paper.id)===String(select.value))||catalog[0];
     if(status){
       const notes=[];
       if(entry.missingCount)notes.push('失效引用 '+entry.missingCount+' 题');
@@ -140,16 +164,17 @@
       status.textContent='前端可用 '+entry.availableCount+' 题'+(notes.length?' · '+notes.join(' · '):'');
     }
   }
-  function selectPublishedPaper(paperId){
+  function selectPublishedPaper(releaseId){
     const catalog=publishedCatalog();
-    const entry=catalog.find(item=>String(item.paper?.id)===String(paperId||''));
+    const entry=catalog.find(item=>String(item.paper?.releaseId||item.paper?.id)===String(releaseId||''));
     if(!entry||!canSwitch())return false;
     beginQuestionTransition('正在切换试卷');
     global.KGGuidedLearningCanvas?.flushPendingConclusion?.();
     captureCurrent();
-    if(typeof qbSelectPublishedPaper==='function')qbSelectPublishedPaper(entry.paper.id,entry.items[0]?.paperIndex||0,{applyQuestion:true});
+    if(typeof qbSelectPublishedPaper==='function')qbSelectPublishedPaper(entry.paper.id,entry.items[0]?.paperIndex||0,{releaseId:entry.paper.releaseId,applyQuestion:true,mode:'single_deep_study'});
     else if(typeof qBankState!=='undefined'){
       qBankState.currentPaperId=entry.paper.id;
+      qBankState.currentReleaseId=entry.paper.releaseId;
       qBankState.currentPaperIndex=entry.items[0]?.paperIndex||0;
       if(typeof qbSaveCurrentPaper==='function')qbSaveCurrentPaper();
       if(typeof qbApplyPaperContext==='function')qbApplyPaperContext();
@@ -160,6 +185,7 @@
     if(search)search.value='';
     if(typeof renderQuestionTrainer==='function')renderQuestionTrainer();
     global.KGQuestionRepository?.notify?.('published-paper-switch');
+    syncRouteContext('published-paper-switch');
     setTimeout(()=>{
       global.KGFlowOrchestrator?.switchQuestion?.({restartCompleted:false});
       render();
@@ -199,7 +225,10 @@
   }
   function updateWorkspaceLinks(workspaceId,nodeId=''){
     const store=global.KGCanvasWorkspaceStore;
-    const href=store?.workspaceUrl?.(workspaceId,nodeId)||'question-workspace.html';
+    const target=store?.workspaceUrl?.(workspaceId,nodeId)||'question-workspace.html';
+    const current=activeRouteContext('single-deep');
+    const context={...current,mode:'multi_question_canvas',source:'single-deep',workspaceId:String(workspaceId||''),returnUrl:global.location?.pathname?.split('/').pop()+(global.location?.search||'')};
+    const href=global.KGLearningRouteContext?.buildHref?.(target,context)||target;
     ['qtOpenWorkspaceBtn','qtMultiCanvasBtn'].forEach(id=>{
       const link=byId(id);
       if(link)link.href=href;
@@ -246,9 +275,12 @@
     return workspace;
   }
   function openWorkspace(workspaceId,nodeId=''){
-    const href=global.KGCanvasWorkspaceStore?.workspaceUrl?.(workspaceId,nodeId)||'question-workspace.html';
-    global.location.href=href;
-    return href;
+    const target=global.KGCanvasWorkspaceStore?.workspaceUrl?.(workspaceId,nodeId)||'question-workspace.html';
+    const current=activeRouteContext('single-deep');
+    const context={...current,mode:'multi_question_canvas',source:'single-deep',workspaceId:String(workspaceId||''),returnUrl:global.location?.pathname?.split('/').pop()+(global.location?.search||'')};
+    if(global.KGLearningRouteContext)return global.KGLearningRouteContext.navigate(target,context);
+    global.location.href=target;
+    return target;
   }
   function addItemToWorkspace(item){
     const store=global.KGCanvasWorkspaceStore;
@@ -448,9 +480,10 @@
     const item=context.items[Math.max(0,Math.min(index,context.items.length-1))];
     if(!item)return false;
     const paperIndex=Number(item.paperIndex??item.index??index);
-    if(typeof qbSelectPublishedPaper==='function')qbSelectPublishedPaper(context.paper?.id||item.paper?.id,paperIndex,{applyQuestion:true});
+    if(typeof qbSelectPublishedPaper==='function')qbSelectPublishedPaper(context.paper?.id||item.paper?.id,paperIndex,{releaseId:context.paper?.releaseId||item.paper?.releaseId,applyQuestion:true,mode:'single_deep_study'});
     else{
       qBankState.currentPaperId=String(context.paper?.id||item.paper?.id||qBankState.currentPaperId||'');
+      qBankState.currentReleaseId=String(context.paper?.releaseId||item.paper?.releaseId||qBankState.currentReleaseId||'');
       qBankState.currentPaperIndex=paperIndex;
       if(typeof qbSaveCurrentPaper==='function')qbSaveCurrentPaper();
       if(typeof qbApplyPaperContext==='function')qbApplyPaperContext();
@@ -459,6 +492,7 @@
     if(typeof renderQuestionTrainer==='function')renderQuestionTrainer();
     if(typeof renderQuestionBankManager==='function')renderQuestionBankManager();
     if(typeof renderPaperControls==='function')renderPaperControls();
+    syncRouteContext('navigator-switch');
     return true;
   }
   function switchTo(index){
@@ -494,10 +528,11 @@
     beginQuestionTransition('正在载入选中的题目');
     global.KGGuidedLearningCanvas?.flushPendingConclusion?.();
     captureCurrent();
-    if(typeof qbSelectPublishedPaper==='function')qbSelectPublishedPaper(item.paper?.id,item.paperIndex,{applyQuestion:true});
+    if(typeof qbSelectPublishedPaper==='function')qbSelectPublishedPaper(item.paper?.id,item.paperIndex,{releaseId:item.paper?.releaseId,applyQuestion:true,mode:'single_deep_study'});
     else{
       if(typeof qBankState==='undefined'||!item.paper){finishQuestionTransition();return false}
       qBankState.currentPaperId=item.paper.id;
+      qBankState.currentReleaseId=item.paper.releaseId;
       qBankState.currentPaperIndex=Number(item.paperIndex||0);
       if(typeof qbSaveCurrentPaper==='function')qbSaveCurrentPaper();
       if(typeof qbApplyPaperContext==='function')qbApplyPaperContext();
@@ -505,6 +540,7 @@
     }
     if(typeof renderQuestionTrainer==='function')renderQuestionTrainer();
     global.KGQuestionRepository?.notify?.('workspace-question-switch');
+    syncRouteContext('workspace-question-switch');
     setTimeout(()=>{
       global.KGFlowOrchestrator?.switchQuestion?.({restartCompleted:false});
       render();
@@ -526,10 +562,9 @@
     if(!success){finishQuestionTransition();return false}
     state.incomingTargetApplied=true;
     try{
-      params.delete('questionId');params.delete('bankId');params.delete('paperId');params.delete('releaseId');
-      const query=params.toString();
-      const next=(global.location?.pathname?.split('/').pop()||'question-training.html')+(query?'?'+query:'')+(global.location?.hash||'');
-      global.history?.replaceState?.(null,'',next);
+      const paper=currentPaper(),question=global.KGQuestionRepository?.current?.()||global.PMP_QUESTION_MVP||{};
+      const context=global.KGLearningRouteContext?.normalize?.({paperId:paper?.id||paperId,releaseId:paper?.releaseId||releaseId,questionId:question?.id||questionId,bankId:question?.sourceBankId||bankId,mode:'single_deep_study',workspaceId:params.get('workspace')||'',source:params.get('source')||'',returnUrl:params.get('return')||'index.html'})||{};
+      global.KGLearningRouteContext?.replace?.(context,{target:'question-training.html'});
     }catch(e){}
     return true;
   }

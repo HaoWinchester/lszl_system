@@ -6,13 +6,13 @@
  */
 
 const CARD_W=128,CARD_H=132,STORE_KEY='通用知识点关系图谱工具_多科目重点聚焦版_v2';
-const DEFAULTS={nodeSize:'',nodeColor:'#64748b',linkStyle:'solid',linkPathStyle:'curve',linkColor:'#2563eb',flashSwipeSpeed:2};
+const DEFAULTS={nodeSize:'',nodeColor:'#64748b',nodeFillColor:'#ffffff',nodeFillOpacity:1,nodeBorderVisible:true,nodeBorderColor:'#cbd5e1',nodeBorderWidth:1,nodeBorderStyle:'solid',nodeBorderOpacity:1,nodeTextColor:'#0f172a',nodeTextBackgroundColor:'#ffffff',nodeTextBackgroundOpacity:0,nodeCardStyle:'standard',nodeTextAlign:'center',nodeFontSize:15,nodeFontFamily:'system',nodeFontWeight:'bold',nodeFontStyle:'normal',nodeUnderline:false,nodeStrikeThrough:false,nodeLineHeight:1.25,nodeLetterSpacing:0,textElementTextColor:'#0f172a',textElementTextBackgroundColor:'#ffffff',textElementTextBackgroundOpacity:0,textElementTextAlign:'center',textElementFontSize:20,textElementFontFamily:'system',textElementFontWeight:'bold',textElementFontStyle:'normal',textElementUnderline:false,textElementStrikeThrough:false,textElementLineHeight:1.45,textElementLetterSpacing:0,linkStyle:'solid',linkPathStyle:'curve',linkColor:'#2563eb',flashSwipeSpeed:2};
 const SAFE_HEX_COLOR=/^#[0-9a-f]{6}$/i,NODE_SIZES=new Set(['','small','big']),LINE_STYLES=new Set(['solid','dashed','dotted']),LINE_PATH_STYLES=new Set(['curve','straight','elbow']),LEVELS=new Set(['基础','中等','重点','难点','易错点']);
 const $=id=>document.getElementById(id),stage=$('stage'),world=$('world'),cardsLayer=$('cardsLayer'),edgeGroup=$('edgeGroup'),detailPanel=$('detailPanel'),statusEl=$('status');
 const isCoarse=matchMedia('(pointer: coarse)').matches;
 function uid(p){const c=globalThis.crypto;return p+(c&&c.randomUUID?c.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36))}
-function baseState(){return{meta:{title:'知识点关系图谱',subject:'通用课程',audience:'学员自学 / 课堂共创',description:'用于梳理不同学科、课程或考试的知识点关系。'},viewport:{x:260,y:170,scale:1},defaults:{...DEFAULTS},focusMode:false,selectedNodeId:null,selectedLinkId:null,linkSourceId:null,nodes:[],links:[],importedFlashcards:[],flashReviews:{}}}
-function makeNode(title,x,y,color,category='',level='基础',keywords='',summary='',notes='',size=''){return{id:uid('n'),title,x,y,color,category,level,keywords,summary,notes,size}}
+function baseState(){return{meta:{title:'知识点关系图谱',subject:'通用课程',audience:'学员自学 / 课堂共创',description:'用于梳理不同学科、课程或考试的知识点关系。'},viewport:{x:260,y:170,scale:1},defaults:{...DEFAULTS},focusMode:false,selectedNodeId:null,selectedLinkId:null,selectedElementId:null,linkSourceId:null,nodes:[],links:[],elements:[],importedFlashcards:[],flashReviews:{}}}
+function makeNode(title,x,y,color,category='',level='基础',keywords='',summary='',notes='',size=''){const raw={id:uid('n'),title,x,y,color,category,level,keywords,summary,notes,size,cardStyle:DEFAULTS.nodeCardStyle,textAlign:DEFAULTS.nodeTextAlign,fontSize:DEFAULTS.nodeFontSize,fontFamily:DEFAULTS.nodeFontFamily,fontWeight:DEFAULTS.nodeFontWeight,fontStyle:DEFAULTS.nodeFontStyle,underline:DEFAULTS.nodeUnderline,strikeThrough:DEFAULTS.nodeStrikeThrough,lineHeight:DEFAULTS.nodeLineHeight,textBackgroundColor:DEFAULTS.nodeTextBackgroundColor,textBackgroundOpacity:DEFAULTS.nodeTextBackgroundOpacity};return window.KGGraphModel&&window.KGGraphModel.normalizeNode?window.KGGraphModel.normalizeNode(raw):raw}
 function makeLink(from,to,type='',note='',lineStyle=DEFAULTS.linkStyle,color=DEFAULTS.linkColor,pathStyle=DEFAULTS.linkPathStyle){return{id:uid('l'),from,to,type,note,lineStyle,color,pathStyle}}
 function templateState(kind='pmp'){
   const s=baseState();
@@ -136,7 +136,7 @@ function templateState(kind='pmp'){
 }
 let state=templateState('pmp');
 let saveTimer=null,lastSavedSnapshot='',hoverDetailNodeId=null,hoverDetailTimer=null,detailDrag=null,detailPanelDragged=false;
-let selectedNodeIds=new Set(),selectedLinkIds=new Set(),boxSelect=null;
+let selectedNodeIds=new Set(),selectedLinkIds=new Set(),selectedTextElementIds=new Set(),boxSelect=null;
 function safeString(v,fallback='',max=3000){const s=String(v??fallback).trim();return s.length>max?s.slice(0,max):s}
 function safeNumber(v,fallback=0,min=-50000,max=50000){const n=Number(v);return Number.isFinite(n)?clamp(n,min,max):fallback}
 function safeColor(v,fallback='#64748b'){const s=String(v||'').trim();return SAFE_HEX_COLOR.test(s)?s:fallback}
@@ -163,25 +163,83 @@ function sanitizeState(data={}){
   const s={...base};
   s.meta={title:safeString(meta.title||base.meta.title,base.meta.title,80),subject:safeString(meta.subject||base.meta.subject,base.meta.subject,80),audience:safeString(meta.audience||base.meta.audience,base.meta.audience,100),description:safeString(meta.description||base.meta.description,base.meta.description,2000)};
   s.viewport={x:safeNumber(viewport.x,base.viewport.x),y:safeNumber(viewport.y,base.viewport.y),scale:safeNumber(viewport.scale,base.viewport.scale,.01,4)};
-  s.defaults={...DEFAULTS,nodeSize:NODE_SIZES.has(defaults.nodeSize)?defaults.nodeSize:DEFAULTS.nodeSize,nodeColor:safeColor(defaults.nodeColor,DEFAULTS.nodeColor),linkStyle:LINE_STYLES.has(defaults.linkStyle)?defaults.linkStyle:DEFAULTS.linkStyle,linkPathStyle:LINE_PATH_STYLES.has(defaults.linkPathStyle)?defaults.linkPathStyle:DEFAULTS.linkPathStyle,linkColor:safeColor(defaults.linkColor,DEFAULTS.linkColor),flashSwipeSpeed:clamp(Math.round(Number(defaults.flashSwipeSpeed)||DEFAULTS.flashSwipeSpeed),1,5)};
+  s.defaults={...DEFAULTS,nodeSize:NODE_SIZES.has(defaults.nodeSize)?defaults.nodeSize:DEFAULTS.nodeSize,nodeColor:safeColor(defaults.nodeColor,DEFAULTS.nodeColor),nodeFillColor:safeColor(defaults.nodeFillColor,DEFAULTS.nodeFillColor),nodeFillOpacity:safeNumber(defaults.nodeFillOpacity,DEFAULTS.nodeFillOpacity,0,1),nodeBorderVisible:defaults.nodeBorderVisible==null?DEFAULTS.nodeBorderVisible:!!defaults.nodeBorderVisible,nodeBorderColor:safeColor(defaults.nodeBorderColor,DEFAULTS.nodeBorderColor),nodeBorderWidth:safeNumber(defaults.nodeBorderWidth,DEFAULTS.nodeBorderWidth,0,8),nodeBorderStyle:window.KGGraphModel&&window.KGGraphModel.BORDER_STYLES.has(defaults.nodeBorderStyle)?defaults.nodeBorderStyle:DEFAULTS.nodeBorderStyle,nodeBorderOpacity:safeNumber(defaults.nodeBorderOpacity,DEFAULTS.nodeBorderOpacity,0,1),nodeTextColor:safeColor(defaults.nodeTextColor,DEFAULTS.nodeTextColor),nodeTextBackgroundColor:safeColor(defaults.nodeTextBackgroundColor,DEFAULTS.nodeTextBackgroundColor),nodeTextBackgroundOpacity:safeNumber(defaults.nodeTextBackgroundOpacity,DEFAULTS.nodeTextBackgroundOpacity,0,1),nodeCardStyle:(()=>{const model=window.KGGraphModel,style=model&&model.canonicalCardStyle?model.canonicalCardStyle(defaults.nodeCardStyle):defaults.nodeCardStyle;return model&&model.CARD_STYLES.has(style)?style:DEFAULTS.nodeCardStyle})(),nodeTextAlign:window.KGGraphModel&&window.KGGraphModel.TEXT_ALIGNS.has(defaults.nodeTextAlign)?defaults.nodeTextAlign:DEFAULTS.nodeTextAlign,nodeFontSize:window.KGGraphModel&&window.KGGraphModel.fontSizeValue?window.KGGraphModel.fontSizeValue(defaults.nodeFontSize,DEFAULTS.nodeFontSize):safeNumber(defaults.nodeFontSize,DEFAULTS.nodeFontSize,6,288),nodeFontFamily:window.KGGraphModel&&window.KGGraphModel.FONT_FAMILIES.has(defaults.nodeFontFamily)?defaults.nodeFontFamily:DEFAULTS.nodeFontFamily,nodeFontWeight:window.KGGraphModel&&window.KGGraphModel.FONT_WEIGHTS.has(defaults.nodeFontWeight)?defaults.nodeFontWeight:DEFAULTS.nodeFontWeight,nodeFontStyle:window.KGGraphModel&&window.KGGraphModel.FONT_STYLES.has(defaults.nodeFontStyle)?defaults.nodeFontStyle:DEFAULTS.nodeFontStyle,nodeUnderline:!!defaults.nodeUnderline,nodeStrikeThrough:!!defaults.nodeStrikeThrough,nodeLineHeight:window.KGGraphModel&&window.KGGraphModel.lineHeightValue?window.KGGraphModel.lineHeightValue(defaults.nodeLineHeight,DEFAULTS.nodeLineHeight):safeNumber(defaults.nodeLineHeight,DEFAULTS.nodeLineHeight,.8,3),nodeLetterSpacing:0,textElementTextColor:safeColor(defaults.textElementTextColor,DEFAULTS.textElementTextColor),textElementTextBackgroundColor:safeColor(defaults.textElementTextBackgroundColor,DEFAULTS.textElementTextBackgroundColor),textElementTextBackgroundOpacity:safeNumber(defaults.textElementTextBackgroundOpacity,DEFAULTS.textElementTextBackgroundOpacity,0,1),textElementTextAlign:window.KGGraphModel&&window.KGGraphModel.TEXT_ALIGNS.has(defaults.textElementTextAlign)?defaults.textElementTextAlign:DEFAULTS.textElementTextAlign,textElementFontSize:window.KGGraphModel&&window.KGGraphModel.fontSizeValue?window.KGGraphModel.fontSizeValue(defaults.textElementFontSize,DEFAULTS.textElementFontSize):safeNumber(defaults.textElementFontSize,DEFAULTS.textElementFontSize,6,288),textElementFontFamily:window.KGGraphModel&&window.KGGraphModel.FONT_FAMILIES.has(defaults.textElementFontFamily)?defaults.textElementFontFamily:DEFAULTS.textElementFontFamily,textElementFontWeight:window.KGGraphModel&&window.KGGraphModel.FONT_WEIGHTS.has(defaults.textElementFontWeight)?defaults.textElementFontWeight:DEFAULTS.textElementFontWeight,textElementFontStyle:window.KGGraphModel&&window.KGGraphModel.FONT_STYLES.has(defaults.textElementFontStyle)?defaults.textElementFontStyle:DEFAULTS.textElementFontStyle,textElementUnderline:!!defaults.textElementUnderline,textElementStrikeThrough:!!defaults.textElementStrikeThrough,textElementLineHeight:window.KGGraphModel&&window.KGGraphModel.lineHeightValue?window.KGGraphModel.lineHeightValue(defaults.textElementLineHeight,DEFAULTS.textElementLineHeight):safeNumber(defaults.textElementLineHeight,DEFAULTS.textElementLineHeight,.8,3),textElementLetterSpacing:0,linkStyle:LINE_STYLES.has(defaults.linkStyle)?defaults.linkStyle:DEFAULTS.linkStyle,linkPathStyle:LINE_PATH_STYLES.has(defaults.linkPathStyle)?defaults.linkPathStyle:DEFAULTS.linkPathStyle,linkColor:safeColor(defaults.linkColor,DEFAULTS.linkColor),flashSwipeSpeed:clamp(Math.round(Number(defaults.flashSwipeSpeed)||DEFAULTS.flashSwipeSpeed),1,5)};
   s.focusMode=!!input.focusMode;
   const ids=new Set();
   s.nodes=(Array.isArray(input.nodes)?input.nodes:[]).slice(0,2500).map(n=>{
     if(!n||typeof n!=='object')return null;
     let id=safeString(n.id,'',120)||uid('n');if(ids.has(id))id=uid('n');ids.add(id);
-    const level=LEVELS.has(n.level)?n.level:safeString(n.level||'基础','基础',40);
-    return{id,title:safeString(n.title||'未命名知识点','未命名知识点',80),x:Math.round(safeNumber(n.x,0)),y:Math.round(safeNumber(n.y,0)),color:safeColor(n.color),category:safeString(n.category||'','',100),level,keywords:safeString(n.keywords||'','',500),summary:safeString(n.summary||'','',3000),notes:safeString(n.notes||'','',3000),size:NODE_SIZES.has(n.size)?n.size:'',highlightTerms:safeString(n.highlightTerms||'','',500)};
+    const content=n.content&&typeof n.content==='object'?n.content:{};
+    const appearance=n.appearance&&typeof n.appearance==='object'?n.appearance:{};
+    const geometry=n.geometry&&typeof n.geometry==='object'?n.geometry:{};
+    const rawLevel=content.level??n.level;
+    const level=LEVELS.has(rawLevel)?rawLevel:safeString(rawLevel||'基础','基础',40);
+    const rawSize=appearance.size??n.size;
+    const clean={
+      ...n,id,
+      title:safeString(content.title??n.title??'未命名知识点','未命名知识点',80),
+      x:Math.round(safeNumber(geometry.x??n.x,0)),
+      y:Math.round(safeNumber(geometry.y??n.y,0)),
+      color:safeColor(appearance.color??n.color),
+      category:safeString(content.category??n.category??'','',100),
+      level,
+      keywords:safeString(content.keywords??n.keywords??'','',500),
+      summary:safeString(content.description??n.summary??'','',3000),
+      notes:safeString(content.notes??n.notes??'','',3000),
+      size:NODE_SIZES.has(rawSize)?rawSize:'',
+      highlightTerms:safeString(content.highlightTerms??n.highlightTerms??'','',500),
+      cardStyle:window.KGGraphModel&&window.KGGraphModel.canonicalCardStyle?window.KGGraphModel.canonicalCardStyle(appearance.cardStyle||n.cardStyle||DEFAULTS.nodeCardStyle):(appearance.cardStyle||n.cardStyle||DEFAULTS.nodeCardStyle),
+      fillColor:safeColor(appearance.fillColor??n.fillColor,window.KGGraphModel&&window.KGGraphModel.defaultsForCardStyle?window.KGGraphModel.defaultsForCardStyle(appearance.cardStyle||n.cardStyle||DEFAULTS.nodeCardStyle).fillColor:DEFAULTS.nodeFillColor),
+      fillOpacity:safeNumber(appearance.fillOpacity??n.fillOpacity,1,0,1),
+      borderVisible:(appearance.borderVisible??n.borderVisible)!==false,
+      borderColor:safeColor(appearance.borderColor??n.borderColor,DEFAULTS.nodeBorderColor),
+      borderWidth:safeNumber(appearance.borderWidth??n.borderWidth,1,0,8),
+      borderStyle:window.KGGraphModel&&window.KGGraphModel.BORDER_STYLES.has(appearance.borderStyle??n.borderStyle)?(appearance.borderStyle??n.borderStyle):DEFAULTS.nodeBorderStyle,
+      borderOpacity:safeNumber(appearance.borderOpacity??n.borderOpacity,1,0,1),
+      surfaceCustomized:!!(appearance.surfaceCustomized??n.surfaceCustomized),
+      textColor:safeColor(appearance.textColor??n.textColor,window.KGGraphModel&&window.KGGraphModel.contrastTextColor?window.KGGraphModel.contrastTextColor(appearance.fillColor??n.fillColor,appearance.fillOpacity??n.fillOpacity):DEFAULTS.nodeTextColor),
+      textBackgroundColor:safeColor(appearance.textBackgroundColor??n.textBackgroundColor,DEFAULTS.nodeTextBackgroundColor),
+      textBackgroundOpacity:safeNumber(appearance.textBackgroundOpacity??n.textBackgroundOpacity,DEFAULTS.nodeTextBackgroundOpacity,0,1),
+      textAlign:appearance.textAlign||n.textAlign||DEFAULTS.nodeTextAlign,
+      fontSize:appearance.fontSize||n.fontSize||DEFAULTS.nodeFontSize,
+      fontFamily:window.KGGraphModel&&window.KGGraphModel.FONT_FAMILIES.has(appearance.fontFamily??n.fontFamily)?(appearance.fontFamily??n.fontFamily):DEFAULTS.nodeFontFamily,
+      fontWeight:window.KGGraphModel&&window.KGGraphModel.FONT_WEIGHTS.has(appearance.fontWeight??n.fontWeight)?(appearance.fontWeight??n.fontWeight):DEFAULTS.nodeFontWeight,
+      fontStyle:window.KGGraphModel&&window.KGGraphModel.FONT_STYLES.has(appearance.fontStyle??n.fontStyle)?(appearance.fontStyle??n.fontStyle):DEFAULTS.nodeFontStyle,
+      underline:!!(appearance.underline??n.underline),
+      strikeThrough:!!(appearance.strikeThrough??n.strikeThrough),
+      lineHeight:window.KGGraphModel&&window.KGGraphModel.lineHeightValue?window.KGGraphModel.lineHeightValue(appearance.lineHeight??n.lineHeight,DEFAULTS.nodeLineHeight):safeNumber(appearance.lineHeight??n.lineHeight,DEFAULTS.nodeLineHeight,.8,3),
+      letterSpacing:0,
+      geometry:{...geometry,x:Math.round(safeNumber(geometry.x??n.x,0)),y:Math.round(safeNumber(geometry.y??n.y,0))}
+    };
+    return window.KGGraphModel&&window.KGGraphModel.normalizeNode?window.KGGraphModel.normalizeNode(clean):clean;
   }).filter(Boolean);
   const nodeIds=new Set(s.nodes.map(n=>n.id)),linkIds=new Set();
   s.links=(Array.isArray(input.links)?input.links:[]).slice(0,5000).map(l=>{
     if(!l||typeof l!=='object')return null;
-    const from=safeString(l.from,'',120),to=safeString(l.to,'',120);if(!nodeIds.has(from)||!nodeIds.has(to)||from===to)return null;
+    const point=(value)=>value&&typeof value==='object'?{x:safeNumber(value.x,0,-100000,100000),y:safeNumber(value.y,0,-100000,100000)}:null;
+    const pointList=(value,max)=>Array.isArray(value)?value.slice(0,max).map(point).filter(Boolean):[];
+    const rawFrom=safeString(l.from,'',120),rawTo=safeString(l.to,'',120),from=nodeIds.has(rawFrom)?rawFrom:'',to=nodeIds.has(rawTo)?rawTo:'',fromPoint=point(l.fromPoint),toPoint=point(l.toPoint);
+    if((!from&&!fromPoint)||(!to&&!toPoint)||(from&&to&&from===to))return null;
     let id=safeString(l.id,'',120)||uid('l');if(linkIds.has(id))id=uid('l');linkIds.add(id);
-    return{id,from,to,type:safeString(l.type??'','',60),note:safeString(l.note||'','',1200),lineStyle:LINE_STYLES.has(l.lineStyle)?l.lineStyle:DEFAULTS.linkStyle,pathStyle:LINE_PATH_STYLES.has(l.pathStyle)?l.pathStyle:DEFAULTS.linkPathStyle,color:safeColor(l.color,DEFAULTS.linkColor)};
+    const clean={id,from,to,type:safeString(l.type??'','',60),note:safeString(l.note||'','',1200),lineStyle:LINE_STYLES.has(l.lineStyle)?l.lineStyle:DEFAULTS.linkStyle,pathStyle:LINE_PATH_STYLES.has(l.pathStyle)?l.pathStyle:DEFAULTS.linkPathStyle,color:safeColor(l.color,DEFAULTS.linkColor),strokeWidth:safeNumber(l.strokeWidth,4,1,8),arrowStyle:['none','end','both'].includes(String(l.arrowStyle||''))?String(l.arrowStyle):'none'};
+    if(!from)clean.fromPoint=fromPoint;if(!to)clean.toPoint=toPoint;
+    const waypoints=pointList(l.waypoints,12),curveControls=pointList(l.curveControls,2);if(waypoints.length)clean.waypoints=waypoints;if(curveControls.length===2)clean.curveControls=curveControls;return clean;
+  }).filter(Boolean);
+  const elementIds=new Set();
+  s.elements=(Array.isArray(input.elements)?input.elements:[]).slice(0,1500).map(item=>{
+    if(!item||typeof item!=='object')return null;
+    let id=safeString(item.id,'',120)||uid('t');if(elementIds.has(id)||ids.has(id))id=uid('t');elementIds.add(id);
+    const content=item.content&&typeof item.content==='object'?item.content:{};
+    const appearance=item.appearance&&typeof item.appearance==='object'?item.appearance:{};
+    const geometry=item.geometry&&typeof item.geometry==='object'?item.geometry:{};
+    const clean={...item,id,elementType:'text',text:safeString(content.text??item.text??'点击编辑文字','点击编辑文字',3000),textColor:safeColor(appearance.textColor??item.textColor,DEFAULTS.textElementTextColor),textBackgroundColor:safeColor(appearance.textBackgroundColor??item.textBackgroundColor,DEFAULTS.textElementTextBackgroundColor),textBackgroundOpacity:safeNumber(appearance.textBackgroundOpacity??item.textBackgroundOpacity,DEFAULTS.textElementTextBackgroundOpacity,0,1),textAlign:window.KGGraphModel&&window.KGGraphModel.TEXT_ALIGNS.has(appearance.textAlign??item.textAlign)?(appearance.textAlign??item.textAlign):DEFAULTS.textElementTextAlign,fontSize:window.KGGraphModel&&window.KGGraphModel.fontSizeValue?window.KGGraphModel.fontSizeValue(appearance.fontSize??item.fontSize,DEFAULTS.textElementFontSize):safeNumber(appearance.fontSize??item.fontSize,DEFAULTS.textElementFontSize,6,288),fontFamily:window.KGGraphModel&&window.KGGraphModel.FONT_FAMILIES.has(appearance.fontFamily??item.fontFamily)?(appearance.fontFamily??item.fontFamily):DEFAULTS.textElementFontFamily,fontWeight:window.KGGraphModel&&window.KGGraphModel.FONT_WEIGHTS.has(appearance.fontWeight??item.fontWeight)?(appearance.fontWeight??item.fontWeight):DEFAULTS.textElementFontWeight,fontStyle:window.KGGraphModel&&window.KGGraphModel.FONT_STYLES.has(appearance.fontStyle??item.fontStyle)?(appearance.fontStyle??item.fontStyle):DEFAULTS.textElementFontStyle,underline:!!(appearance.underline??item.underline),strikeThrough:!!(appearance.strikeThrough??item.strikeThrough),lineHeight:window.KGGraphModel&&window.KGGraphModel.lineHeightValue?window.KGGraphModel.lineHeightValue(appearance.lineHeight??item.lineHeight,DEFAULTS.textElementLineHeight):safeNumber(appearance.lineHeight??item.lineHeight,DEFAULTS.textElementLineHeight,.8,3),letterSpacing:0,x:Math.round(safeNumber(geometry.x??item.x,0)),y:Math.round(safeNumber(geometry.y??item.y,0)),width:Math.max(24,Math.round(safeNumber(geometry.width??item.width,220))),height:Math.max(24,Math.round(safeNumber(geometry.height??item.height,72))),manualSize:geometry.manualSize??item.manualSize};
+    return window.KGGraphModel&&window.KGGraphModel.normalizeTextElement?window.KGGraphModel.normalizeTextElement(clean):clean;
   }).filter(Boolean);
   const selectedNode=safeString(input.selectedNodeId,'',120),selectedLink=safeString(input.selectedLinkId,'',120),linkSource=safeString(input.linkSourceId,'',120);
   s.selectedNodeId=nodeIds.has(selectedNode)?selectedNode:null;
   s.selectedLinkId=linkIds.has(selectedLink)?selectedLink:null;
+  const selectedElement=safeString(input.selectedElementId,'',120);
+  s.selectedElementId=elementIds.has(selectedElement)?selectedElement:null;
   s.linkSourceId=nodeIds.has(linkSource)?linkSource:null;
   s.importedFlashcards=sanitizeFlashcards(input.importedFlashcards);
   s.flashReviews=sanitizeFlashReviews(input.flashReviews);
@@ -213,11 +271,11 @@ function load(){
 }
 function exportableState(){
   // 导出学习包时仍做完整清洗，保证备份文件干净可靠。
-  return sanitizeState({...state,selectedNodeId:null,selectedLinkId:null,linkSourceId:null});
+  const clean=sanitizeState({...state,selectedNodeId:null,selectedLinkId:null,selectedElementId:null,linkSourceId:null});return window.KGGraphPersistence&&window.KGGraphPersistence.toStorageState?window.KGGraphPersistence.toStorageState(clean):clean;
 }
 function saveableState(){
   // 日常自动保存走轻量路径，避免每次点击/滑动都全量 sanitize，降低长期使用卡顿。
-  return {...state,selectedNodeId:null,selectedLinkId:null,linkSourceId:null};
+  return {...state,selectedNodeId:null,selectedLinkId:null,selectedElementId:null,linkSourceId:null};
 }
 function persistCurrentGraphNow(options={}){
   try{
@@ -243,7 +301,7 @@ function persistCurrentGraphNow(options={}){
     return true;
   }catch(e){
     console.warn(e);
-    if(!options.silent)showStatus('保存失败：账号存储空间可能已满，请先导出学习包备份。');
+    if(!options.silent)showStatus('保存失败：浏览器本地存储空间可能已满，请先导出学习包备份。');
     return false;
   }
 }

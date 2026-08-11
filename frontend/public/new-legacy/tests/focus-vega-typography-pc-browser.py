@@ -156,12 +156,11 @@ PAGES = {
                 '.practice-field small,.practice-choice-group legend,.practice-mode-card small',
                 12,
             ),
-            ('field control', '.practice-field select', 16),
+            ('library filter', '.practice-library-filters button', 14),
             ('choice control', '.practice-choice-group label>span', 14),
             ('mode switch', '.practice-mode-switch a', 14),
             ('card title', '.practice-mode-card h2', 18),
             ('card body', '.practice-mode-card p', 16),
-            ('section title', '.practice-section-head h2', 20),
             ('primary action', '.practice-start-btn', 14),
         ),
         'primary': '.practice-start-btn[data-practice-start="challenge"]',
@@ -382,8 +381,8 @@ def inject_fixture(page, filename):
               const select=document.querySelector('#practicePaperSelect');
               select.innerHTML='<option value="pmp">PMP 综合模拟卷</option>';
               document.querySelector('#practicePaperMeta').textContent='共 180 题 · 已发布';
-              const history=document.querySelector('#practiceHistorySection');
-              history.hidden=false;
+              const history=document.querySelector('#practiceHistoryDrawer');
+              document.querySelector('#practiceHistoryEmpty').hidden=true;
               document.querySelector('#practiceHistoryList').innerHTML=
                 '<article class="practice-history-row"><strong>PMP 综合模拟卷</strong><span>10 题</span><span>正确率 80%</span><em>挑战模式</em></article>';
             }"""
@@ -719,6 +718,41 @@ def inspect_system_settings_panes(page, filename, label, roles):
         raise AssertionError(' | '.join(failures))
 
 
+def inspect_practice_drawer(page, filename, label):
+    failures = []
+    page.evaluate(
+        """() => {
+          const drawer=document.querySelector('#practiceHistoryDrawer');
+          drawer.hidden=false;
+          drawer.setAttribute('aria-hidden','false');
+        }"""
+    )
+    try:
+        for inspection in (
+            lambda: inspect_roles(
+                page,
+                filename,
+                f'{label}/history-drawer',
+                (('section title', '.practice-history-drawer .practice-drawer-head h2', 20),),
+            ),
+            lambda: inspect_visible_text_and_controls(page, filename, f'{label}/history-drawer'),
+        ):
+            try:
+                inspection()
+            except AssertionError as error:
+                failures.append(str(error))
+    finally:
+        page.evaluate(
+            """() => {
+              const drawer=document.querySelector('#practiceHistoryDrawer');
+              drawer.hidden=true;
+              drawer.setAttribute('aria-hidden','true');
+            }"""
+        )
+    if failures:
+        raise AssertionError(' | '.join(failures))
+
+
 def inspect_case(page, filename, spec, label, width, height, zoomed):
     failures = []
     inspections = [lambda: inspect_anchors(page, filename, label, spec['anchors'], width)]
@@ -744,6 +778,11 @@ def inspect_case(page, filename, spec, label, width, height, zoomed):
             failures.append(str(error))
         try:
             inspect_primary_action(page, filename, label, spec['primary'], width, height)
+        except AssertionError as error:
+            failures.append(str(error))
+    if filename == 'practice-mode.html':
+        try:
+            inspect_practice_drawer(page, filename, label)
         except AssertionError as error:
             failures.append(str(error))
     if failures:

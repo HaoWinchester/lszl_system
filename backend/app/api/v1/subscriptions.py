@@ -22,7 +22,11 @@ AdminUser = Annotated[User, Depends(require_role("admin"))]
 
 @router.get("/me")
 async def my_subscription(db: DB, user: CurrentUser):
-    return {"subscription": subscription_service.sub_to_dict(await subscription_service.get_subscription(db, user.username))}
+    subscription = await subscription_service.get_subscription(db, user.username)
+    return {
+        "subscription": subscription_service.sub_to_dict(subscription),
+        "entitlements": subscription_service.entitlements_for(user.role, subscription),
+    }
 
 
 @router.get("/plans")

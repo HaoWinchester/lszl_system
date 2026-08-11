@@ -1482,6 +1482,7 @@ body[data-qw-readonly="1"] .qw-layout-toolbar .qw-smart-picker{display:none}
 .qw-edge-layer .qw-edge-path[data-edge-type="exception"]{stroke:#dc2626;stroke-dasharray:4 5}
 .qw-edge-layer .qw-edge-path[data-edge-type="confused"]{stroke:#d97706;stroke-dasharray:2 5}
 .qw-edge-layer .qw-edge-path[data-edge-type="support"]{stroke:#059669;marker-end:url(#qwArrowDefault)}
+.qw-edge-layer :is(.qw-edge-hover-outline,.qw-edge-selection-line){fill:none;stroke:none;pointer-events:none}
 .qw-edge-layer .qw-edge-hit{fill:none;stroke:transparent;stroke-width:18;pointer-events:stroke;cursor:pointer;vector-effect:non-scaling-stroke}
 .qw-edge-layer .qw-edge-label-bg{fill:rgba(255,255,255,.95);stroke:rgba(100,116,139,.2);stroke-width:1;pointer-events:none}
 .qw-edge-layer .qw-edge-label{fill:#475569;font-size:12px;font-weight:850;text-anchor:middle;dominant-baseline:middle;pointer-events:none}

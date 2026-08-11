@@ -81,7 +81,7 @@ with sync_playwright() as p:
     page.locator('#qbPublishPaperBtn').click();page.wait_for_timeout(180)
     release=page.evaluate("JSON.parse(localStorage.getItem('kg_exam_papers_published_v1')||'[]')[0]")
     assert release['version']==1 and len(release['questions'])==18 and len(release['questionSnapshots'])==18
-    assert set(release['enabledModes'])=={'deep_recall','multi_question_canvas','single_deep_study'}
+    assert set(release['enabledModes'])=={'practice_mode','deep_recall','multi_question_canvas'}
     # Edit draft after publish: released snapshot remains immutable until a new publish.
     page.locator('[data-paper-remove="0"]').click();page.wait_for_timeout(100)
     assert page.locator('[data-paper-preview-check]').count()==17

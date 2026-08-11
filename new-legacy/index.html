@@ -13,6 +13,14 @@
 <link rel="stylesheet" href="styles/home-file-library.css"/>
 <link rel="stylesheet" href="styles/graph-file-tabs.css"/>
 <link rel="stylesheet" href="styles/graph-user-preferences.css"/>
+<link rel="stylesheet" href="styles/unified-canvas-runtime.css"/>
+<link rel="stylesheet" href="styles/home-graph-components.css"/>
+<link rel="stylesheet" href="styles/home-canvas-performance.css"/>
+<link rel="stylesheet" href="styles/home-selection-p4326.css"/>
+<link rel="stylesheet" href="styles/selection-bounds-drag-p4327.css"/>
+<link rel="stylesheet" href="styles/home-selection-drag-controls-p4329.css"/>
+<link rel="stylesheet" href="styles/home-interaction-modes-p4330.css"/>
+<link rel="stylesheet" href="styles/home-selection-geometry-p4332.css"/>
 
 </head>
 <body>
@@ -266,7 +274,7 @@
 <section class="tutorial-section">
 <h3>二、批量整理与框选</h3>
 <div class="tutorial-grid">
-<div class="tutorial-card"><strong><span class="tutorial-badge">5</span> 鼠标框选卡片</strong><p>电脑端按住 <span class="tutorial-kbd">Shift</span>，在画布空白处拖拽，可以框选多个知识点卡片。</p></div>
+<div class="tutorial-card"><strong><span class="tutorial-badge">5</span> 直接框选图元</strong><p>电脑端在画布空白处直接拖出选框，无需按 Shift。可同时框选知识节点、文本框和关系线；Ctrl/Command 或 Shift 可追加选择。</p></div>
 <div class="tutorial-card"><strong><span class="tutorial-badge">6</span> 整体移动选中卡片</strong><p>框选后，拖动任意一个已选中卡片，整组选中的知识点会一起移动，方便快速排版。</p></div>
 <div class="tutorial-card"><strong><span class="tutorial-badge">7</span> 调整卡牌大小</strong><p>双击卡牌进入连线起点状态后，卡牌右侧会显示 “- / o / +” 微型按钮，可切换小卡、默认卡、大卡。</p></div>
 <div class="tutorial-card"><strong><span class="tutorial-badge">8</span> 聚焦重点</strong><p>点击“重点聚焦”会突出重点、难点、易错点，帮助课堂讲解或复习时快速定位核心内容。</p></div>
@@ -359,10 +367,40 @@
 <script defer src="src/32-wechat-login.js"></script>
 <script defer src="src/33-user-center.js"></script>
 <script defer src="src/39-global-shortcuts.js"></script>
+<script defer src="src/graph/graph-model.js"></script>
+<script defer src="src/graph/card-style-registry.js"></script>
+<script defer src="src/graph/graph-persistence.js"></script>
+<script defer src="src/graph/history-controller.js"></script>
+<script defer src="src/graph/selection-controller.js"></script>
+<script defer src="src/graph/drag-controller.js"></script>
+<script defer src="src/graph/element-resize-controller.js"></script>
+<script defer src="src/graph/connection-controller.js"></script>
+<script defer src="src/graph/clipboard-controller.js"></script>
+<script defer src="src/graph/style-controller.js"></script>
+<script defer src="src/graph/node-alignment-controller.js"></script>
+<script defer src="src/graph/layer-controller.js"></script>
+<script defer src="src/graph/context-menu-controller.js"></script>
+<script defer src="src/graph/style-popover-controller.js"></script>
+<script defer src="src/graph/color-picker-controller.js"></script>
+<script defer src="src/graph/floating-color-window-controller.js"></script>
+<script defer src="src/graph/shared-color-picker-v2.js"></script>
+<script defer src="src/graph/inline-text-editor-controller.js"></script>
+<script defer src="src/graph/node-toolbar-controller.js"></script>
+<script defer src="src/graph/viewport-controller.js"></script>
+<script defer src="src/graph/graph-renderer.js"></script>
 <script defer src="src/00-config-state.js"></script>
 <script defer src="src/18-graph-user-preferences.js"></script>
 <script defer src="src/09-graph-connector-drag-controller.js"></script>
 <script defer src="src/canvas/84-canvas-edge-selection-geometry.js"></script>
+<script defer src="src/canvas/85-canvas-appearance-controller.js"></script>
+<script defer src="src/canvas/86-canvas-zoom-dock-controller.js"></script>
+<script defer src="src/canvas/87-canvas-minimap-controller.js"></script>
+<script defer src="src/canvas/88-canvas-settings-controller.js"></script>
+<script defer src="src/canvas/90-canvas-selection-filter-controller.js"></script>
+<script defer src="src/canvas/91-canvas-alignment-controller.js"></script>
+<script defer src="src/canvas/92-canvas-edge-toolbar-controller.js"></script>
+<script defer src="src/canvas/93-canvas-drag-performance-controller.js"></script>
+<script defer src="src/canvas/89-canvas-runtime.js"></script>
 <script defer src="src/10-graph-editor.js"></script>
 <script defer src="src/19-home-toolbar-registry.js"></script>
 <script defer src="src/21-home-package-service.js"></script>
@@ -372,6 +410,7 @@
 <script defer src="src/24-graph-file-autosave.js"></script>
 <script defer src="src/25-graph-file-tabs.js"></script>
 <script defer src="src/20-flashcards-toolbar.js"></script>
+<script defer src="src/27-home-interaction-modes.js"></script>
 <script defer src="src/30-auth-guards.js"></script>
 <script defer src="src/40-guided-tour.js"></script>
 <script defer src="src/41-account-menu.js"></script>

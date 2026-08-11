@@ -76,14 +76,77 @@
     }
     return false;
   }
+
+
+  function polylineBounds(points=[]){
+    const clean=(Array.isArray(points)?points:[]).filter(point=>point&&Number.isFinite(Number(point.x))&&Number.isFinite(Number(point.y)));
+    if(!clean.length)return null;
+    let left=finite(clean[0].x),right=left,top=finite(clean[0].y),bottom=top;
+    for(const point of clean){const x=finite(point.x),y=finite(point.y);left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y)}
+    return{left,top,right,bottom,width:right-left,height:bottom-top};
+  }
+  function polylineIntersectsRect(points,rect){
+    const clean=(Array.isArray(points)?points:[]).filter(point=>point&&Number.isFinite(Number(point.x))&&Number.isFinite(Number(point.y)));
+    if(!clean.length)return false;rect=normalizeRect(rect);const bounds=polylineBounds(clean);if(bounds&&!rectsOverlap(bounds,rect))return false;
+    if(clean.length===1)return pointInRect(clean[0],rect);
+    for(let index=1;index<clean.length;index++)if(segmentIntersectsRect(clean[index-1],clean[index],rect))return true;
+    return false;
+  }
+  function createPolylineIndex(entries=[],options={}){
+    const cellSize=Math.max(64,finite(options.cellSize,320)),cells=new Map(),indexed=[],key=(x,y)=>x+':'+y;
+    for(const entry of entries||[]){
+      const id=String(entry?.id||''),points=Array.isArray(entry?.points)?entry.points:[],bounds=entry?.bounds?normalizeRect(entry.bounds):polylineBounds(points);if(!id||!points.length||!bounds)continue;
+      const item={id,points,bounds};indexed.push(item);const x1=Math.floor(bounds.left/cellSize),x2=Math.floor(bounds.right/cellSize),y1=Math.floor(bounds.top/cellSize),y2=Math.floor(bounds.bottom/cellSize);
+      for(let x=x1;x<=x2;x++)for(let y=y1;y<=y2;y++){const k=key(x,y);if(!cells.has(k))cells.set(k,[]);cells.get(k).push(item)}
+    }
+    function query(rect){
+      rect=normalizeRect(rect);const found=new Map(),x1=Math.floor(rect.left/cellSize),x2=Math.floor(rect.right/cellSize),y1=Math.floor(rect.top/cellSize),y2=Math.floor(rect.bottom/cellSize);
+      for(let x=x1;x<=x2;x++)for(let y=y1;y<=y2;y++)for(const item of cells.get(key(x,y))||[])if(rectsOverlap(item.bounds,rect))found.set(item.id,item);
+      return[...found.values()];
+    }
+    return Object.freeze({cellSize,size:indexed.length,query,entries:()=>[...indexed]});
+  }
+  function collectPolylineIds(entries,rect,options={}){
+    const ids=[],source=options.index?.query?options.index.query(rect):(entries||[]);
+    for(const entry of source){const id=String(entry?.id||''),points=entry?.points||[],bounds=entry?.bounds||polylineBounds(points);if(bounds&&!rectsOverlap(bounds,rect))continue;if(id&&polylineIntersectsRect(points,rect))ids.push(id)}
+    return ids;
+  }
+
+  function createPathIndex(entries=[],options={}){
+    const cellSize=Math.max(64,finite(options.cellSize,320));
+    const cells=new Map(),indexed=[];
+    const key=(x,y)=>x+':'+y;
+    for(const entry of entries||[]){
+      const id=String(entry?.id||''),path=entry?.path||entry?.element||null,bounds=pathBounds(path);
+      if(!id||!path||!bounds)continue;
+      const item={id,path,bounds};indexed.push(item);
+      const x1=Math.floor(bounds.left/cellSize),x2=Math.floor(bounds.right/cellSize),y1=Math.floor(bounds.top/cellSize),y2=Math.floor(bounds.bottom/cellSize);
+      for(let x=x1;x<=x2;x++)for(let y=y1;y<=y2;y++){
+        const k=key(x,y);if(!cells.has(k))cells.set(k,[]);cells.get(k).push(item);
+      }
+    }
+    function query(rect){
+      rect=normalizeRect(rect);
+      const found=new Map(),x1=Math.floor(rect.left/cellSize),x2=Math.floor(rect.right/cellSize),y1=Math.floor(rect.top/cellSize),y2=Math.floor(rect.bottom/cellSize);
+      for(let x=x1;x<=x2;x++)for(let y=y1;y<=y2;y++)for(const item of cells.get(key(x,y))||[]){
+        if(rectsOverlap(item.bounds,rect))found.set(item.id,item);
+      }
+      return [...found.values()];
+    }
+    return Object.freeze({cellSize,size:indexed.length,query,entries:()=>[...indexed]});
+  }
+
   function collectPathIds(entries,rect,options={}){
     const ids=[];
-    for(const entry of entries||[]){
+    const source=options.index?.query?options.index.query(rect):(entries||[]);
+    for(const entry of source){
       const id=String(entry?.id||'');
       const path=entry?.path||entry?.element||null;
+      const bounds=entry?.bounds||pathBounds(path);
+      if(bounds&&!rectsOverlap(bounds,rect))continue;
       if(id&&pathIntersectsRect(path,rect,options))ids.push(id);
     }
     return ids;
   }
-  global.KGCanvasEdgeSelectionGeometry=Object.freeze({normalizeRect,rectsOverlap,pointInRect,segmentIntersectsRect,pathIntersectsRect,collectPathIds});
+  global.KGCanvasEdgeSelectionGeometry=Object.freeze({normalizeRect,rectsOverlap,pointInRect,segmentIntersectsRect,pathBounds,pathIntersectsRect,polylineBounds,polylineIntersectsRect,createPathIndex,collectPathIds,createPolylineIndex,collectPolylineIds});
 })(window);

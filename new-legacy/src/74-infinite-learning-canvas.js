@@ -25,6 +25,7 @@
     viewport:null,
     world:null,
     kernel:null,
+    runtime:null,
     policy:null,
     cards:new Map(),
     edgeLayer:null,
@@ -147,7 +148,8 @@
         state.panY=next.y;
         state.zoom=next.zoom;
         updateZoomLabel();
-        renderMinimap();
+        if(state.runtime)state.runtime.notifyViewport(next);
+        else renderMinimap();
       },
       onViewportPersist(next){
         if(state.mobile)return;
@@ -393,6 +395,34 @@
   function allBounds(){
     return state.kernel?.cards?.bounds?.()||{left:0,top:0,right:1000,bottom:700,width:1000,height:700};
   }
+
+  function singleCanvasMinimapItems(){
+    return [...state.cards.values()].map(record=>{
+      const layout=record.layout||{};
+      return{id:String(record.id||''),kind:record.step===state.step?'current':(record.kind==='learning-step'?'node':'note'),x:Number(layout.x)||0,y:Number(layout.y)||0,width:Math.max(10,Number(layout.width)||420),height:Math.max(10,Number(layout.height)||360)};
+    });
+  }
+  function centerSingleCanvasAt100(){
+    const bounds=allBounds();
+    return state.kernel.viewport.focusBounds(bounds,{zoom:1,minZoom:1,maxZoom:1,duration:420,instant:false,persist:true,source:'percent-reset'});
+  }
+  function initUnifiedCanvasRuntime(){
+    if(state.runtime||!global.KGUnifiedCanvasRuntime)return state.runtime;
+    const adapter=Object.freeze({
+      id:'single-question-canvas-adapter',
+      getSurface:()=>state.viewport,getViewportElement:()=>state.viewport,getZoomDock:()=>byId('qtCanvasZoomDock'),getFullscreenElement:()=>byId('qtCanvasShell')||state.viewport,
+      getViewport:()=>({x:state.panX,y:state.panY,zoom:state.zoom}),
+      setViewport:(next,meta={})=>setViewport(next,{...meta,persist:meta.persist}),
+      getContentBounds:allBounds,getMinimapItems:singleCanvasMinimapItems,centerAt100:centerSingleCanvasAt100,fit:()=>fitAll({persist:true}),persistViewport:scheduleViewportSave,isMobile:()=>state.mobile
+    });
+    global.KGSingleQuestionCanvasAdapter=adapter;
+    state.runtime=global.KGUnifiedCanvasRuntime.register({
+      id:'single-question-canvas',type:'single-question',surface:state.viewport,viewport:state.viewport,zoomDock:byId('qtCanvasZoomDock'),percentButton:byId('qtCanvasZoomLabel'),adapter,baseGrid:24,
+      minimap:{dock:byId('qtMinimapDock'),root:byId('qtCanvasMinimap'),world:byId('qtCanvasMinimapWorld'),view:byId('qtCanvasMinimapView'),toggle:byId('qtMinimapToggleBtn')}
+    });
+    return state.runtime;
+  }
+
   function focusRecord(record,options={}){
     if(!record)return false;
     if(record.step)state.lastFocusedStep=record.step;
@@ -805,6 +835,7 @@
     });
   }
   function renderMinimap(){
+    if(state.runtime?.minimap)return state.runtime.refreshMinimap(true);
     const root=byId('qtCanvasMinimap');
     const world=byId('qtCanvasMinimapWorld');
     const view=byId('qtCanvasMinimapView');
@@ -837,6 +868,7 @@
   }
 
   function bindMinimap(){
+    if(state.runtime?.minimap)return;
     const dock=byId('qtMinimapDock'),root=byId('qtCanvasMinimap'),view=byId('qtCanvasMinimapView'),toggle=byId('qtMinimapToggleBtn');
     if(!dock||!root||!view||!toggle)return;
     toggle.addEventListener('click',()=>{
@@ -901,11 +933,7 @@
         source:'button'
       });
     });
-    byId('qtCanvasZoomLabel')?.addEventListener('click',()=>{
-      const rect=state.viewport.getBoundingClientRect();
-      smoothZoomAt(1,rect.left+rect.width/2,rect.top+rect.height/2,{duration:230,persist:true,source:'percent-reset'});
-      showCanvasZoomSlider(true);
-    });
+    byId('qtCanvasZoomLabel')?.addEventListener('click',()=>{showCanvasZoomSlider(false);if(!state.runtime?.centerAt100?.())centerSingleCanvasAt100()});
     byId('qtCanvasZoomSlider')?.addEventListener('input',event=>{const rect=state.viewport.getBoundingClientRect(),scale=Number(event.target.value)/100;showCanvasZoomSlider(true);smoothZoomAt(scale,rect.left+rect.width/2,rect.top+rect.height/2,{duration:0,persist:true,source:'slider'});});
     byId('qtCanvasZoomSlider')?.addEventListener('pointerdown',event=>event.stopPropagation());
     document.addEventListener('pointerdown',event=>{const dock=byId('qtCanvasZoomDock');if(dock?.classList.contains('slider-open')&&!dock.contains(event.target))showCanvasZoomSlider(false)},true);
@@ -1030,6 +1058,7 @@
     state.initialized=true;
     registerCards();
     initEdgeLayer();
+    initUnifiedCanvasRuntime();
     applyResponsiveMode(true,{focus:false});
     updatePointerModeUI();
     restoreFromSession(undefined,{restoreViewport:false});

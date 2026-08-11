@@ -1,24 +1,27 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.18" lang="zh-CN">
+<html data-release="v9.0-p4.1.28" lang="zh-CN">
 <head>
+<script src="./teaching-content-sync.js?v=v9.0-p4.1.28"></script><!-- kg-teaching-content-sync:generated -->
 <script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
-<script src="./runtime-config.override.js?v=v9.0-p4.1.18"></script><!-- kg-runtime:generated -->
-<script defer src="./direct-entry.js?v=v9.0-p4.1.18"></script><!-- kg-direct-entry:generated -->
-<script defer src="./feature-analytics.js?v=v9.0-p4.1.18"></script><!-- kg-feature-analytics:generated -->
+<script src="./runtime-config.override.js?v=v9.0-p4.1.28"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js?v=v9.0-p4.1.28"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js?v=v9.0-p4.1.28"></script><!-- kg-feature-analytics:generated -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>试卷管理｜教师工作台</title>
-  <link rel="stylesheet" href="styles/teacher-workbench.css?v=v9.0-p4.1.18" />
-  <link rel="stylesheet" href="styles/question-bank-admin.css?v=v9.0-p4.1.18" />
-  <link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.18" />
-  <link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.18" />
-<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.18"/>
-  <link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.18" />
-  <link rel="stylesheet" href="styles/paper-management.css?v=v9.0-p4.1.18" />
-  <link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.18" />
-  <link rel="stylesheet" href="styles/focus-vega-teacher.css?v=v9.0-p4.1.18" />
+  <link rel="stylesheet" href="styles/teacher-workbench.css?v=v9.0-p4.1.28" />
+  <link rel="stylesheet" href="styles/question-bank-admin.css?v=v9.0-p4.1.28" />
+  <link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.28" />
+  <link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.28" />
+<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.28"/>
+  <link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.28" />
+  <link rel="stylesheet" href="styles/paper-management.css?v=v9.0-p4.1.28" />
+  <link rel="stylesheet" href="styles/resizable-region.css?v=v9.0-p4.1.28" />
+  <link rel="stylesheet" href="styles/admin-module-help.css?v=v9.0-p4.1.28" />
+  <link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.28" />
+  <link rel="stylesheet" href="styles/focus-vega-teacher.css?v=v9.0-p4.1.28" />
 </head>
-<body class="teacher-admin-shell paper-management-page" data-admin-context="teacher" data-paper-management-page="true" data-ui-skin="focus-vega">
+<body class="teacher-admin-shell paper-management-page" data-admin-context="teacher" data-paper-management-page="true" data-ui-skin="focus-vega" data-question-catalog-mode="managed">
 <nav class="admin-context-nav" aria-label="管理后台一级导航">
   <a data-admin-nav="overview" href="admin-console.html">总览</a>
   <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
@@ -40,7 +43,7 @@
   <header class="pm-page-head">
     <div>
       <p class="qb-kicker">PAPER MANAGEMENT</p>
-      <h1>试卷管理</h1>
+      <h1 class="kg-module-title">试卷管理 <button class="kg-module-help-trigger" type="button" data-module-help="paper-management" aria-label="查看试卷管理帮助" title="查看帮助">?</button></h1>
       <p>从正式题库手动选择题目组成试卷；发布版本可供学员在独立做题模式中选择。</p>
     </div>
     <div class="qb-inline-actions pm-primary-actions">
@@ -48,7 +51,9 @@
       <button id="qbSavePaperBtn" type="button">保存试卷</button>
       <button id="qbBuildPaperBtn" type="button">按配额补充</button>
       <button id="qbPublishPaperBtn" class="accent" type="button">发布试卷</button>
+      <button id="qbWithdrawPaperBtn" type="button" hidden>取消发布</button>
       <button id="qbArchivePaperBtn" type="button">归档试卷</button>
+      <button id="qbUnarchivePaperBtn" type="button" hidden>取消归档</button>
       <button id="qbDeletePaperBtn" class="danger" type="button">删除草稿</button>
     </div>
   </header>
@@ -59,7 +64,7 @@
         <div><h2>试卷列表</h2><p>按分类、状态和关键词管理试卷；默认批量操作仅作用于当前页勾选项。</p></div>
         <div class="qb-inline-actions"><button id="qbAddPaperCategoryBtn" type="button"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新建分类</button><button id="qbExportPaperBtn" type="button"><span data-ui-icon="download" data-ui-icon-size="16" aria-hidden="true"></span>导出当前试卷</button></div>
       </div>
-      <div class="pm-paper-library-layout">
+      <div class="pm-paper-library-layout" data-kg-resizable-region data-kg-resizable-key="paper-library" data-kg-resizable-default="480" data-kg-resizable-min="340" data-kg-resizable-max="1200" data-kg-resizable-breakpoint="820" data-kg-resizable-label="拖动调整试卷列表高度；双击恢复默认高度">
         <aside class="pm-paper-category-panel" aria-label="试卷分类">
           <div class="pm-paper-category-title"><strong>分类目录</strong><small id="qbPaperCategorySummary">0 个分类</small></div>
           <div class="pm-paper-category-list" id="qbPaperCategoryList"></div>
@@ -91,22 +96,35 @@
         <label class="qb-field"><span>科目</span><select id="paperSubjectInput"></select></label>
         <label class="qb-field"><span>目标题量</span><input id="paperTotalInput" min="1" max="300" type="number" value="180" /></label>
         <label class="qb-field"><span>所属分类</span><select id="paperCategoryInput"></select></label>
-        <label class="qb-field wide"><span>发布说明 / 适用范围</span><textarea id="paperDescriptionInput" rows="2" placeholder="说明知识覆盖范围和适合的学习阶段。"></textarea></label>
+        <label class="qb-field pm-paper-access-field"><span>使用权限</span><select id="paperAccessLevelInput"><option value="free">免费试卷</option><option value="member">VIP 会员专属</option></select><small>VIP 试卷仅对有效会员开放。</small></label>
+        <label class="qb-field pm-paper-description-field"><span>发布说明 / 适用范围</span><textarea id="paperDescriptionInput" rows="2" placeholder="说明知识覆盖范围和适合的学习阶段。"></textarea></label>
       </div>
-      <fieldset class="pm-mode-fieldset" hidden aria-hidden="true">
-        <legend>旧学习模式发布范围（暂时停用）</legend>
+      <fieldset class="pm-mode-fieldset" aria-label="学习模式发布范围">
+        <legend>学习模式</legend>
+        <label><input type="checkbox" data-paper-mode="practice_mode" checked /><span>刷题</span></label>
         <label><input type="checkbox" data-paper-mode="deep_recall" checked /><span>深度回忆</span></label>
-        <label><input type="checkbox" data-paper-mode="multi_question_canvas" checked /><span>多题画布</span></label>
-        <label><input type="checkbox" data-paper-mode="single_deep_study" checked /><span>单题深学</span></label>
-        <small>发布时生成不可变版本；继续编辑草稿不会改变学员当前看到的版本。</small>
+        <label><input type="checkbox" data-paper-mode="multi_question_canvas" checked /><span>归纳</span></label>
+        <small>至少选择一种模式。发布后，只有勾选的学习入口可以调用该试卷版本。</small>
       </fieldset>
       <div class="qb-paper-meta" id="qbPaperMeta"></div>
     </section>
 
     <details class="qb-mini-section pm-quota-section">
-      <summary>按领域配额补充题目</summary>
-      <div class="qb-mini-head"><p>可在手动选题基础上补充题目；不会加入重复题目。</p><div class="qb-inline-actions"><button id="qbAutoQuotaBtn" type="button">自动分配</button><button id="qbClearQuotaBtn" type="button">清空配额</button></div></div>
-      <div class="qb-quota-list" id="qbPaperQuotaList"></div>
+      <summary>按配额补充题目</summary>
+      <div class="qb-mini-head">
+        <div>
+          <p>可在手动选题基础上选择一种补题方式；不会加入重复题目。</p>
+          <div class="qb-inline-actions" role="radiogroup" aria-label="补题方式">
+            <label class="pm-page-check"><input type="radio" name="paperSupplementMode" value="domain" data-paper-supplement-mode checked /><span>按领域配额</span></label>
+            <label class="pm-page-check"><input type="radio" name="paperSupplementMode" value="principle" data-paper-supplement-mode /><span>按原则配额</span></label>
+          </div>
+        </div>
+        <div class="qb-inline-actions"><button id="qbAutoQuotaBtn" type="button">自动分配</button><button id="qbClearQuotaBtn" type="button">清空配额</button></div>
+      </div>
+      <div class="qb-quota-list" id="qbPaperQuotaList">
+        <div id="qbPaperDomainQuotaList" data-paper-quota-panel="domain"></div>
+        <div id="qbPaperPrincipleQuotaList" data-paper-quota-panel="principle" hidden></div>
+      </div>
     </details>
 
     <section class="pm-question-workbench" id="pmQuestionWorkbench" aria-label="试卷选题工作区">
@@ -186,22 +204,51 @@
   </div>
 </aside>
 <div class="qb-toast" id="qbToast" role="status" aria-live="polite"></div>
-<script defer src="src/01-runtime-config.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/28-app-storage.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/29-auth-core.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/34-role-permissions.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/37-subscription-plans.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/37-subscription-orders.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/37-subscription-redeem-codes.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/37-subscription-core.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/33-user-center.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/50-question-data.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/91-learning-content-core.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/95-recall-association-library.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/98-teacher-workflow-p2-services.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/98-question-classification.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/65-question-bank-admin.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/admin/48-admin-context-nav.js?v=v9.0-p4.1.18"></script>
-<script src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.18"></script>
+<script defer src="src/01-runtime-config.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/28-app-storage.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/29-auth-core.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/34-role-permissions.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/37-subscription-plans.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/37-subscription-orders.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/37-subscription-redeem-codes.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/37-subscription-core.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/33-user-center.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/50-question-data.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/91-learning-content-core.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/95-recall-association-library.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/shared/domain-core.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/question-bank/batch-operation-service.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/question-bank/safe-delete-service.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/question-bank/question-preview.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/question-bank/workspace-layout.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/question-bank/bank-list-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/question-bank/question-list-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/question-editor/question-editor-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/question-classification/question-classification-service.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/training-config/training-config-service.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/training-config/training-preview.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/training-config/training-config-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/training-config/workspace-layout.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/paper-management/paper-list-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/paper-management/paper-category-service.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/paper-management/paper-editor-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/paper-management/paper-question-picker.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/paper-management/paper-preview.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/paper-management/paper-audit-service.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/paper-management/paper-release-service.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/knowledge-tree/knowledge-tree-adapter.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/association-library/association-library-adapter.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/teacher/teacher-domain-registry.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/98-teacher-workflow-p2-services.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/98-question-classification.js?v=v9.0-p4.1.28"></script>
+<script defer src="./question-catalog-adapter.js?v=v9.0-p4.1.28"></script><!-- kg-question-catalog:generated -->
+<script defer src="src/teacher/paper-management/paper-quota-service.js?v=v9.0-p4.1.28"></script>
+<script src="src/59c-active-learning-mode-policy.js?v=v9.0-p4.1.28"></script><!-- kg-learning-mode-policy:generated -->
+<script defer src="src/65-question-bank-admin.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/admin/module-help-content.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/admin/module-help-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/admin/48-admin-context-nav.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/admin/resizable-region.js?v=v9.0-p4.1.28"></script>
+<script src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.28"></script>
 </body>
 </html>

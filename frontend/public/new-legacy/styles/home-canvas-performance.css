@@ -1,0 +1,151 @@
+/* V9.0-P4.3.6 · 首页画布独立关系线、轮廓悬浮与稳定便签阴影 */
+.stage .edge-visible{
+  filter:none!important;
+  transition:none!important;
+}
+.stage .edge-hit:hover + .edge-visible,
+.stage .edge-hit.selected + .edge-visible,
+.stage .edge-hit.batch-selected + .edge-visible,
+.stage g.is-batch-selected .edge-visible{
+  filter:none!important;
+  opacity:1!important;
+  stroke-width:var(--edge-base-width,4)!important;
+}
+.edge-hover-layer,
+.edge-feedback-layer,
+.edge-control-layer{pointer-events:none}
+
+/* 悬浮反馈位于原线下方：总宽度比原线多 2 个屏幕像素，因此两侧各露出约 1px 蓝色轮廓。 */
+.edge-hover-overlay{
+  display:none;
+  fill:none;
+  stroke:#2196f3;
+  stroke-width:var(--edge-hover-outline-width,6);
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  pointer-events:none;
+  opacity:1;
+  filter:none!important;
+  transition:none!important;
+}
+.edge-hover-overlay.show{display:block}
+
+/* 选中反馈仍为覆盖原线的轻量蓝色细线。 */
+.edge-selection-overlay{
+  fill:none;
+  stroke:#2196f3;
+  stroke-width:var(--edge-feedback-width,2);
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  vector-effect:non-scaling-stroke;
+  pointer-events:none;
+  opacity:1;
+  filter:none!important;
+  transition:none!important;
+}
+.edge-control-guide{
+  fill:none;
+  stroke:#94a3b8;
+  stroke-width:calc(1px * var(--edge-control-inverse-scale,1));
+  stroke-dasharray:calc(4px * var(--edge-control-inverse-scale,1)) calc(4px * var(--edge-control-inverse-scale,1));
+  pointer-events:none;
+}
+.edge-endpoint-handle,
+.edge-control-handle{pointer-events:all;cursor:move;touch-action:none}
+.edge-endpoint-hit,
+.edge-control-hit{fill:rgba(33,150,243,.001);stroke:none;pointer-events:all}
+.edge-endpoint-dot{
+  fill:#2196f3;
+  stroke:#fff;
+  stroke-width:calc(1.5px * var(--edge-control-inverse-scale,1));
+  pointer-events:none;
+  filter:none;
+}
+.edge-control-dot{
+  fill:#fff;
+  stroke:#2196f3;
+  stroke-width:calc(1.8px * var(--edge-control-inverse-scale,1));
+  pointer-events:none;
+  filter:none;
+}
+.stage .edge-hit{cursor:move}
+.stage.graph-edge-moving .edge-hit,
+.stage.graph-edge-control-dragging .edge-control-handle,
+.stage.graph-edge-endpoint-dragging .edge-endpoint-handle{cursor:grabbing}
+.stage.graph-edge-control-dragging .edge-hover-overlay,
+.stage.graph-edge-endpoint-dragging .edge-hover-overlay,
+.stage.graph-edge-moving .edge-hover-overlay,
+.stage.graph-box-selecting .edge-hover-overlay,
+.stage.is-interacting .edge-hover-overlay{display:none!important}
+.stage .knowledge-card.edge-endpoint-bind-target{
+  outline:calc(2px * var(--graph-ui-inverse-scale,1)) solid #2196f3!important;
+  outline-offset:calc(3px * var(--graph-ui-inverse-scale,1))!important;
+}
+
+/* 卡牌默认不再使用阴影或泛光，选中仅由边框/尺寸控制点表达。 */
+.stage .knowledge-card,
+.stage .knowledge-card:hover,
+.stage .knowledge-card.dragging,
+.stage .knowledge-card.group-dragging,
+.stage .knowledge-card.active,
+.stage .knowledge-card.multi-selected,
+.stage .knowledge-card.large-related-anchor,
+.stage .knowledge-card.large-related-neighbor,
+.stage .knowledge-card.gather-anchor-card,
+.stage .knowledge-card.card-style-rounded,
+.stage .knowledge-card.card-style-rounded:hover,
+.stage .knowledge-card.card-style-rounded.active,
+.stage .knowledge-card.card-style-rounded.multi-selected,
+.stage .knowledge-card.card-style-triangle.active,
+.stage .knowledge-card.card-style-triangle.multi-selected{
+  box-shadow:none!important;
+  filter:none!important;
+}
+.stage .knowledge-card .card-body,
+.stage .knowledge-card.card-style-rounded .card-body{
+  box-shadow:none!important;
+  filter:none!important;
+}
+.stage .knowledge-card{
+  transition:transform .12s ease,border-color .12s ease!important;
+}
+.stage .knowledge-card.active,
+.stage .knowledge-card.multi-selected{
+  outline:calc(2px * var(--graph-ui-inverse-scale,1)) solid #2196f3;
+  outline-offset:calc(2px * var(--graph-ui-inverse-scale,1));
+}
+
+/* 便签阴影始终保持同一静态样式，拖动、缩放、框选和选中时均不隐藏或切换。 */
+.stage .knowledge-card.card-style-sticky .card-body,
+.stage .knowledge-card.card-style-sticky:hover .card-body,
+.stage .knowledge-card.card-style-sticky.active .card-body,
+.stage .knowledge-card.card-style-sticky.multi-selected .card-body,
+.stage .knowledge-card.card-style-sticky.dragging .card-body,
+.stage .knowledge-card.card-style-sticky.group-dragging .card-body,
+.stage.is-interacting .knowledge-card.card-style-sticky .card-body,
+.stage.graph-box-selecting .knowledge-card.card-style-sticky .card-body,
+.stage.viewport-smooth-zooming .knowledge-card.card-style-sticky .card-body,
+.stage.graph-card-dragging .knowledge-card.card-style-sticky .card-body{
+  box-shadow:0 11px 24px rgba(71,85,105,.18),0 3px 7px rgba(71,85,105,.10)!important;
+  filter:none!important;
+  transition:none!important;
+}
+.stage .knowledge-card.card-style-sticky.active,
+.stage .knowledge-card.card-style-sticky.multi-selected,
+.stage .knowledge-card.card-style-sticky:hover{
+  box-shadow:none!important;
+  filter:none!important;
+}
+.kg-perf-no-shadows .edge-visible,
+.kg-perf-no-shadows .edge-hover-overlay,
+.kg-perf-no-shadows .edge-selection-overlay{
+  filter:none!important;
+}
+
+.stage .knowledge-card.active::before,
+.stage .knowledge-card.multi-selected::before,
+.stage.large-graph-mode .knowledge-card.active::before,
+.stage.large-graph-mode .knowledge-card.multi-selected::before{
+  box-shadow:none!important;
+  filter:none!important;
+}

@@ -457,7 +457,27 @@ def _validate_question_content(
             )
         )
     correct_answer = normalized.get("correctAnswer")
-    if not correct_answer or str(correct_answer) not in option_ids:
+    correct_answer_text = str(correct_answer or "")
+    question_type = str(normalized.get("type") or "single_choice").strip()
+    selected_option_ids: list[str] = []
+    if correct_answer_text in option_ids:
+        selected_option_ids = [correct_answer_text]
+    elif (
+        question_type == "multiple_choice"
+        and correct_answer_text
+        and all(len(option_id) == 1 for option_id in option_ids)
+        and all(option_id in option_ids for option_id in correct_answer_text)
+    ):
+        selected_option_ids = list(correct_answer_text)
+    valid_answer = (
+        len(selected_option_ids) == len(set(selected_option_ids))
+        and (
+            len(selected_option_ids) >= 2
+            if question_type == "multiple_choice"
+            else len(selected_option_ids) == 1
+        )
+    )
+    if not valid_answer:
         issues.append(
             _question_issue(
                 question_id,

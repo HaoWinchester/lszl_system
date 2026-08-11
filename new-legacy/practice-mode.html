@@ -7,6 +7,7 @@
   <title>做题模式｜项目管理学习营</title>
   <link rel="stylesheet" href="styles/main.css"/>
   <link rel="stylesheet" href="styles/user-center.css"/>
+  <link rel="stylesheet" href="styles/subscription.css"/>
   <link rel="stylesheet" href="styles/account-menu.css"/>
   <link rel="stylesheet" href="styles/support-center.css"/>
   <link rel="stylesheet" href="styles/practice-mode.css"/>
@@ -45,17 +46,40 @@
     <main class="practice-main">
       <section class="practice-lobby" id="practiceLobby" aria-labelledby="practiceLobbyTitle">
         <header class="practice-lobby-head">
-          <span>READY</span>
-          <h1 id="practiceLobbyTitle">选择一套试卷，开始练习</h1>
+          <div>
+            <span>PRACTICE SPACE</span>
+            <h1 id="practiceLobbyTitle">选择练习模式</h1>
+            <p>先选一份试卷，再进入适合你的练习方式。</p>
+          </div>
+          <button type="button" class="practice-utility-btn" id="practiceHistoryOpenBtn" aria-haspopup="dialog" aria-controls="practiceHistoryDrawer">
+            <span data-kg-icon="history" data-kg-icon-size="18" aria-hidden="true"></span>
+            <span>学习记录</span><em id="practiceHistoryCount" hidden>0</em>
+          </button>
         </header>
         <p class="practice-feedback" id="practiceRetiredModeNotice" role="status" hidden></p>
 
+        <section class="practice-library practice-library-shelf" aria-label="快速选择试卷">
+          <div class="practice-library-toolbar">
+            <div class="practice-library-title"><strong>试卷库</strong><span id="practiceLibrarySummary">选择最近发布的试卷</span></div>
+            <div class="practice-library-actions">
+              <div class="practice-library-filters" id="practiceLibraryFilters" aria-label="筛选试卷">
+                <button type="button" class="is-active" data-paper-filter="all">全部</button>
+                <button type="button" data-paper-filter="free">免费</button>
+                <button type="button" data-paper-filter="member">VIP</button>
+              </div>
+              <button type="button" class="practice-more-btn" id="practiceLibraryMoreBtn" aria-haspopup="dialog" aria-controls="practicePaperDrawer">更多 <span aria-hidden="true">→</span></button>
+            </div>
+          </div>
+          <div class="practice-paper-scroll-shell"><div class="practice-paper-scroll" id="practicePaperLibrary"></div></div>
+          <select id="practicePaperSelect" hidden aria-hidden="true"></select>
+        </section>
+
         <section class="practice-setup-card" aria-label="练习设置">
-          <label class="practice-field">
-            <span>选择试卷</span>
-            <select id="practicePaperSelect" aria-describedby="practicePaperMeta"></select>
+          <div class="practice-selected-paper">
+            <span>当前选择</span>
+            <strong id="practiceSelectedPaperName">请选择试卷</strong>
             <small id="practicePaperMeta">正在读取已发布试卷…</small>
-          </label>
+          </div>
 
           <fieldset class="practice-choice-group">
             <legend>题目数量</legend>
@@ -87,11 +111,6 @@
             <div><small>SCHOLAR</small><h2>学霸模式</h2><p>共享 80 秒倒计时。答对加时间，答错扣时间并损失血量。</p></div>
             <button type="button" class="practice-start-btn" data-practice-start="scholar">进入学霸模式</button>
           </article>
-        </section>
-
-        <section class="practice-history" id="practiceHistorySection" aria-labelledby="practiceHistoryTitle" hidden>
-          <div class="practice-section-head"><h2 id="practiceHistoryTitle">最近练习</h2><button type="button" id="practiceClearHistoryBtn">清空记录</button></div>
-          <div id="practiceHistoryList" class="practice-history-list"></div>
         </section>
 
         <div class="practice-empty" id="practiceEmpty" hidden>
@@ -147,6 +166,35 @@
     </main>
   </div>
 
+  <div class="practice-drawer-backdrop" id="practicePaperDrawer" hidden aria-hidden="true">
+    <aside class="practice-drawer practice-paper-drawer" role="dialog" aria-modal="true" aria-labelledby="practicePaperDrawerTitle">
+      <header class="practice-drawer-head">
+        <div><span>PAPER LIBRARY</span><h2 id="practicePaperDrawerTitle">全部试卷</h2><p id="practicePaperDrawerSummary">浏览并选择已发布试卷</p></div>
+        <button type="button" class="practice-drawer-close" id="practicePaperDrawerClose" aria-label="关闭试卷库">×</button>
+      </header>
+      <div class="practice-drawer-toolbar">
+        <div class="practice-library-filters" aria-label="筛选全部试卷">
+          <button type="button" class="is-active" data-paper-filter="all">全部</button>
+          <button type="button" data-paper-filter="free">免费</button>
+          <button type="button" data-paper-filter="member">VIP</button>
+        </div>
+      </div>
+      <div class="practice-drawer-body"><div class="practice-paper-drawer-grid" id="practicePaperDrawerLibrary"></div></div>
+    </aside>
+  </div>
+
+  <div class="practice-drawer-backdrop" id="practiceHistoryDrawer" hidden aria-hidden="true">
+    <aside class="practice-drawer practice-history-drawer" role="dialog" aria-modal="true" aria-labelledby="practiceHistoryTitle">
+      <header class="practice-drawer-head">
+        <div><span>LEARNING RECORDS</span><h2 id="practiceHistoryTitle">学习记录</h2><p>查看当前账号最近完成的练习</p></div>
+        <button type="button" class="practice-drawer-close" id="practiceHistoryCloseBtn" aria-label="关闭学习记录">×</button>
+      </header>
+      <div class="practice-drawer-toolbar practice-history-toolbar"><span id="practiceHistorySummary">暂无练习记录</span><button type="button" id="practiceClearHistoryBtn">清空记录</button></div>
+      <div class="practice-drawer-body"><div id="practiceHistoryList" class="practice-history-list"></div><div class="practice-history-empty" id="practiceHistoryEmpty">完成一次练习后，记录会显示在这里。</div></div>
+    </aside>
+  </div>
+
+  <div class="practice-toast" id="practiceToast" role="status" aria-live="polite" hidden></div>
   <div class="practice-danger-vignette" id="practiceDangerVignette" aria-hidden="true"></div>
 
   <div class="practice-exit-backdrop" id="practiceExitConfirm" hidden aria-hidden="true">
@@ -175,6 +223,8 @@
   <script defer src="src/101-engagement-repository.js"></script>
   <script defer src="src/103-support-center.js"></script>
   <script defer src="src/59c-active-learning-mode-policy.js"></script>
+  <script defer src="src/58-paper-access-service.js"></script>
+  <script defer src="src/59-published-paper-repository.js"></script>
   <script defer src="src/100-practice-mode.js"></script>
 </body>
 </html>

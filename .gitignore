@@ -7,3 +7,9 @@ UI/
 **/__pycache__/
 docs/superpowers/plans/
 updata-legacy/
+
+# 测试 / 验收生成物与本地素材（不跟踪，文件保留）
+/artifacts/
+/docs/qa/
+/enterinformation/
+/backend/var/

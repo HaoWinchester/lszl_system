@@ -91,6 +91,8 @@ E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
 E2E_RELEASE_VERSION="$RELEASE_VERSION" \
   python3 frontend/e2e/new_legacy_smoke.py
 E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
+  python3 frontend/e2e/practice_mode_initial_view.py
+E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
   python3 frontend/e2e/content_prep_question_bank.py
 E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
   python3 frontend/e2e/content_prep_concurrency.py

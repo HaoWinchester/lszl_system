@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="styles/subscription.css"/>
 <link rel="stylesheet" href="styles/user-center.css"/>
 <link rel="stylesheet" href="styles/admin-context-nav.css"/>
+<link rel="stylesheet" href="styles/resizable-region.css"/>
 <link rel="stylesheet" href="styles/focus-vega-typography.css"/>
 <link rel="stylesheet" href="styles/admin-focus-vega.css"/>
 <link rel="stylesheet" href="styles/admin-focus-vega-users.css"/>
@@ -125,7 +126,7 @@
         </section>
         </div>
 
-        <div class="um-user-list" id="umUserList"></div>
+        <div class="um-user-list" id="umUserList" data-kg-resizable-region data-kg-resizable-key="user-list" data-kg-resizable-default="560" data-kg-resizable-min="300" data-kg-resizable-max="1200" data-kg-resizable-breakpoint="820"></div>
         <div class="um-pagination" id="umPagination" aria-label="用户列表分页">
           <div class="um-page-info" id="umPageInfo">第 1 / 1 页</div>
           <div class="um-page-actions">
@@ -293,7 +294,7 @@
                   </div>
                   <button id="umClearLogsBtn" type="button">清空</button>
                 </div>
-                <div class="um-log-list" id="umLogList"></div>
+                <div class="um-log-list" id="umLogList" data-kg-resizable-region data-kg-resizable-key="user-operation-log" data-kg-resizable-default="420" data-kg-resizable-min="240" data-kg-resizable-max="1000" data-kg-resizable-breakpoint="820"></div>
               </section>
             </section>
           </div>
@@ -316,6 +317,7 @@
 <script defer src="src/35-user-management-service.js"></script>
 <script defer src="src/35-user-management.js"></script>
 <script src="src/admin/48-admin-context-nav.js"></script>
+<script src="src/admin/resizable-region.js"></script>
 <script defer src="src/108-admin-ui-icons.js"></script>
 </body>
 </html>

@@ -1,0 +1,44 @@
+/* V9.0-P4.3.26 — homepage selection parity and lightweight edge dragging. */
+.stage.home-selection-interaction-locked .uc-selection-bounds{
+  pointer-events:auto;
+  cursor:move;
+  touch-action:none;
+}
+.stage.home-selection-interaction-locked .uc-selection-bounds:active,
+.stage.home-selection-bounds-dragging .uc-selection-bounds{
+  cursor:grabbing;
+}
+.stage.home-selection-bounds-dragging .uc-selection-bounds,
+.stage.graph-edge-drag-lite .uc-selection-bounds{
+  display:none!important;
+}
+.stage.graph-edge-drag-lite .edge-hover-layer,
+.stage.graph-edge-drag-lite .edge-feedback-layer,
+.stage.graph-edge-drag-lite .edge-control-layer,
+.stage.graph-edge-drag-lite .edge-hit,
+.stage.graph-edge-drag-lite .edge-label,
+.stage.graph-edge-drag-lite .uc-alignment-guides{
+  display:none!important;
+}
+.stage.graph-edge-drag-lite .edge-visible{
+  display:block!important;
+  opacity:.82!important;
+  stroke-width:var(--edge-base-width,3)!important;
+  stroke-dasharray:none!important;
+  marker-start:none!important;
+  marker-end:none!important;
+  filter:none!important;
+  transition:none!important;
+  animation:none!important;
+}
+.stage.graph-edge-drag-lite .knowledge-card.active,
+.stage.graph-edge-drag-lite .knowledge-card.multi-selected,
+.stage.graph-edge-drag-lite .graph-text-element.active{
+  outline-color:transparent!important;
+  box-shadow:none!important;
+  filter:none!important;
+}
+.stage.graph-edge-drag-lite .knowledge-card.active::before,
+.stage.graph-edge-drag-lite .knowledge-card.multi-selected::before{
+  display:none!important;
+}

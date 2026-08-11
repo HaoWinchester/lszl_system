@@ -48,7 +48,7 @@ body[data-learning-skin="focus-vega"] .kg-icon{display:block;flex:0 0 auto;fill:
 }
 
 /* Learning typography uses explicit non-authentication application roots. */
-body.practice-mode-page[data-learning-skin="focus-vega"] :where(.practice-brand,.practice-mode-switch,.practice-main){
+body.practice-mode-page[data-learning-skin="focus-vega"] :where(.practice-brand,.practice-mode-switch,.practice-main,.practice-drawer){
   font-family:var(--ui-font-sans);
   font-weight:var(--ui-weight-regular);
 }
@@ -99,3 +99,29 @@ body.practice-mode-page[data-learning-skin="focus-vega"] :where(.practice-start-
 }
 body.practice-mode-page[data-learning-skin="focus-vega"] .practice-history-row :where(strong,span,em){font-weight:var(--ui-weight-medium)}
 body.practice-mode-page[data-learning-skin="focus-vega"] .practice-history-row :where(span,em){font-size:var(--ui-text-meta)}
+body.practice-mode-page[data-learning-skin="focus-vega"] :where(.practice-lobby-head>div>span,.practice-paper-subject,.practice-paper-free,.practice-vip-badge,.practice-paper-access,.practice-drawer-head>div>span){
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-bold);
+  line-height:var(--ui-leading-control);
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] :where(.practice-library-title>span,.practice-selected-paper>span,.practice-selected-paper small,.practice-paper-footer,.practice-drawer-head p,.practice-history-toolbar,.practice-history-empty){
+  font-size:var(--ui-text-meta);
+  font-weight:var(--ui-weight-medium);
+  line-height:var(--ui-leading-body);
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-selected-paper strong{
+  font-size:var(--ui-text-body);
+  font-weight:var(--ui-weight-semibold);
+  line-height:var(--ui-leading-heading);
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-drawer-head h2{
+  font-size:var(--ui-text-section-title);
+  font-weight:var(--ui-weight-semibold);
+  line-height:var(--ui-leading-heading);
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-drawer-toolbar button{
+  font-family:var(--ui-font-sans);
+  font-size:var(--ui-text-control);
+  font-weight:var(--ui-weight-semibold);
+  line-height:var(--ui-leading-control);
+}

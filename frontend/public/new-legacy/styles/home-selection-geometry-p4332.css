@@ -1,0 +1,102 @@
+/* V9.0-P4.3.32 — 首页图元几何选框：固定屏幕 1px、单选四角手柄、多选逐图元无手柄。 */
+.stage{--home-selection-blue:#2f9cff}
+.stage .world{
+  --home-selection-blue:#2f9cff;
+  --home-selection-stroke:calc(1px * var(--graph-ui-inverse-scale,1));
+  --home-selection-handle:calc(8px * var(--graph-ui-inverse-scale,1));
+  --home-selection-hit:calc(10px * var(--graph-ui-inverse-scale,1));
+}
+
+/* 选中反馈完全贴合图元的矩形几何边界，不跟随圆角、圆形或三角形轮廓。 */
+.stage .knowledge-card.active,
+.stage .knowledge-card.multi-selected,
+.stage.large-graph-mode .knowledge-card.active,
+.stage.large-graph-mode .knowledge-card.multi-selected,
+.stage .graph-text-element.active,
+.stage .graph-text-element.multi-selected{
+  outline:none!important;
+  box-shadow:none!important;
+  filter:none!important;
+}
+.stage .knowledge-card.active::before,
+.stage .knowledge-card.multi-selected::before,
+.stage.large-graph-mode .knowledge-card.active::before,
+.stage.large-graph-mode .knowledge-card.multi-selected::before{
+  display:none!important;
+}
+.stage .knowledge-card.node-free-resize-mode::after{display:none!important}
+
+body:not([data-graph-interaction-mode="reading"]) .stage :is(.knowledge-card.active,.knowledge-card.multi-selected,.graph-text-element.active,.graph-text-element.multi-selected) > .graph-element-resize-layer{
+  display:block!important;
+  box-sizing:border-box!important;
+  border:var(--home-selection-stroke) solid var(--home-selection-blue)!important;
+  border-radius:0!important;
+  background:transparent!important;
+  overflow:visible!important;
+  pointer-events:none!important;
+}
+
+/* 单选时只绘制四个白底蓝边方形手柄，大小与线宽都不受画布缩放影响。 */
+body:not([data-graph-interaction-mode="reading"]) .stage :is(.knowledge-card.active:not(.multi-selected),.graph-text-element.active:not(.multi-selected)):not(.node-inline-editing)
+  > .graph-element-resize-layer > .graph-element-resize-handle{
+  display:block!important;
+}
+body:not([data-graph-interaction-mode="reading"]) .stage :is(.knowledge-card.active:not(.multi-selected),.graph-text-element.active:not(.multi-selected)):not(.node-inline-editing)
+  > .graph-element-resize-layer > .graph-element-resize-handle:is(.handle-nw,.handle-ne,.handle-se,.handle-sw){
+  width:var(--home-selection-handle)!important;
+  height:var(--home-selection-handle)!important;
+  box-sizing:border-box!important;
+  border:var(--home-selection-stroke) solid var(--home-selection-blue)!important;
+  border-radius:1px!important;
+  background:#fff!important;
+  box-shadow:none!important;
+  pointer-events:auto!important;
+  z-index:3!important;
+}
+
+/* 四边不再显示中点手柄；整条边保留透明拖拽热区，文本框可直接从任意边线调整大小。 */
+body:not([data-graph-interaction-mode="reading"]) .stage :is(.knowledge-card.active:not(.multi-selected),.graph-text-element.active:not(.multi-selected)):not(.node-inline-editing)
+  > .graph-element-resize-layer > .graph-element-resize-handle:is(.handle-n,.handle-s,.handle-e,.handle-w){
+  display:block!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  opacity:0!important;
+  pointer-events:auto!important;
+  z-index:2!important;
+}
+body:not([data-graph-interaction-mode="reading"]) .stage :is(.knowledge-card.active:not(.multi-selected),.graph-text-element.active:not(.multi-selected)):not(.node-inline-editing)
+  > .graph-element-resize-layer > .graph-element-resize-handle:is(.handle-n,.handle-s){
+  width:calc(100% + var(--home-selection-hit))!important;
+  height:var(--home-selection-hit)!important;
+  left:50%!important;
+}
+body:not([data-graph-interaction-mode="reading"]) .stage :is(.knowledge-card.active:not(.multi-selected),.graph-text-element.active:not(.multi-selected)):not(.node-inline-editing)
+  > .graph-element-resize-layer > .graph-element-resize-handle:is(.handle-e,.handle-w){
+  width:var(--home-selection-hit)!important;
+  height:calc(100% + var(--home-selection-hit))!important;
+  top:50%!important;
+}
+
+/* 多选时每个图元独立显示几何边界框，但任何图元都不出现缩放手柄。 */
+body:not([data-graph-interaction-mode="reading"]) .stage :is(.knowledge-card.multi-selected,.graph-text-element.multi-selected)
+  > .graph-element-resize-layer > .graph-element-resize-handle{
+  display:none!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+
+/* 整体多选范围继续承担整体移动与工具栏定位，但不显示缩放手柄。 */
+.stage .uc-selection-bounds{
+  border:1px solid var(--home-selection-blue)!important;
+  background:transparent!important;
+}
+.stage .uc-selection-bounds > i{display:none!important}
+
+/* 交互进行中保持现有轻量策略。 */
+.stage.home-selection-bounds-dragging :is(.graph-element-resize-layer,.graph-element-resize-handle),
+.stage.graph-card-dragging :is(.graph-element-resize-handle),
+.stage.graph-element-resizing :is(.node-growth-layer,.node-growth-handle){
+  transition:none!important;
+}

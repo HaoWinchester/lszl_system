@@ -84,6 +84,7 @@ function applyNoPublishedQuestion(){
   try{
     if(typeof qBankState==='object'){
       qBankState.currentPaperId=null;
+      qBankState.currentReleaseId=null;
       qBankState.currentPaperIndex=0;
       if(typeof qbSaveCurrentPaper==='function')qbSaveCurrentPaper();
     }
@@ -94,6 +95,8 @@ function applyNoPublishedQuestion(){
 }
 function singleDeepCatalog(){
   try{
+    const resolver=window.KGPublishedQuestionResolver;
+    if(resolver)return resolver.listPapers({mode:'single_deep_study',respectRole:true})||[];
     const repository=window.KGPublishedPaperRepository;
     if(repository)return repository.listPublishedPapers({mode:'single_deep_study',respectRole:true})||[];
     if(typeof qbPublishedPaperCatalog==='function')return qbPublishedPaperCatalog({mode:'single_deep_study',respectRole:true})||[];
@@ -101,13 +104,20 @@ function singleDeepCatalog(){
   return [];
 }
 function ensureSingleDeepPublishedSelection(){
-  const catalog=singleDeepCatalog();
+  let catalog=singleDeepCatalog();
   const current=typeof qbCurrentPaper==='function'?qbCurrentPaper():null;
-  let entry=catalog.find(item=>String(item.paper?.id||'')===String(current?.id||'')&&item.availableCount>0)||catalog.find(item=>item.availableCount>0)||null;
+  let currentEntry=catalog.find(item=>String(item.paper?.id||'')===String(current?.id||'')&&String(item.paper?.releaseId||'')===String(current?.releaseId||''))||null;
+  if(current&&!currentEntry){
+    const historical=window.KGPublishedQuestionResolver?.resolvePaper?.({paperId:current.id,releaseId:current.releaseId,mode:'single_deep_study'},{respectRole:true,mode:'single_deep_study'});
+    if(historical?.ok){currentEntry=historical;catalog=[historical,...catalog]}
+  }
+  let entry=(currentEntry?.availableCount>0?currentEntry:null)||catalog.find(item=>item.availableCount>0)||currentEntry||null;
   if(!entry)return applyNoPublishedQuestion();
   const currentIndex=Number(typeof qBankState==='object'?qBankState.currentPaperIndex:0)||0;
   const selectedItem=(entry.items||[]).find(item=>Number(item.paperIndex)===currentIndex)||entry.items?.[0];
-  if(typeof qbSelectPublishedPaper==='function')qbSelectPublishedPaper(entry.paper.id,selectedItem?.paperIndex||0,{applyQuestion:true});
+  if(typeof qbSelectPublishedPaper==='function')qbSelectPublishedPaper(entry.paper.id,selectedItem?.paperIndex||0,{releaseId:entry.paper.releaseId,applyQuestion:true,mode:'single_deep_study'});
+  const context=window.KGLearningRouteContext?.normalize?.({paperId:entry.paper.id,releaseId:entry.paper.releaseId,questionId:selectedItem?.question?.id||selectedItem?.ref?.questionId,bankId:selectedItem?.bank?.id||selectedItem?.ref?.bankId,mode:'single_deep_study',returnUrl:window.KGLearningRouteContext?.parse?.({mode:'single_deep_study'})?.returnUrl||'index.html'})||{};
+  window.KGLearningRouteContext?.replace?.(context,{target:'question-training.html'});
   document.body.classList.remove('qt-no-published-paper');
   return true;
 }
@@ -125,28 +135,22 @@ function initQuestionTrainingAuth(){
 }
 
 function applyQuestionTrainingRoute(){
-  let params=null;
-  try{params=new URLSearchParams(window.location.search||'')}catch(e){return false}
-  const paperId=String(params.get('paperId')||params.get('paper')||'');
-  const releaseId=String(params.get('releaseId')||'');
-  const questionId=String(params.get('questionId')||params.get('question')||'');
-  const bankId=String(params.get('bankId')||params.get('bank')||'');
-  if(!questionId)return false;
+  const route=window.KGLearningRouteContext?.parse?.({mode:'single_deep_study',returnUrl:'index.html'})||{};
+  if(!route.questionId&&!route.releaseId&&!route.paperId)return false;
   try{
-    const repository=window.KGPublishedPaperRepository;
-    const entry=repository?.resolvePublishedPaper?.(releaseId||paperId,{mode:'single_deep_study',respectRole:true})||singleDeepCatalog().find(item=>String(item.paper?.id||'')===paperId)||null;
-    const item=entry?.items?.find(row=>
-      String(row.question?.id||row.ref?.questionId||'')===questionId&&
-      (!bankId||String(row.bank?.id||row.ref?.bankId||'')===bankId)
-    );
-    if(!entry||!item){showStatus('这道题不在当前可用的已发布试卷中。');return false}
-    if(typeof qbSelectPublishedPaper==='function')qbSelectPublishedPaper(entry.paper.id,item.paperIndex,{applyQuestion:true});
+    const result=window.KGPublishedQuestionResolver?.resolveQuestion?.(route,{mode:'single_deep_study',respectRole:true});
+    if(!result?.ok){showStatus(window.KGPublishedQuestionResolver?.message?.(result,'未能打开指定的已发布题目。')||'未能打开指定的已发布题目。');return false}
+    const item=result.item,entry=result.entry;
+    if(typeof qbSelectPublishedPaper==='function')qbSelectPublishedPaper(entry.paper.id,item.paperIndex,{releaseId:entry.paper.releaseId,applyQuestion:true,mode:'single_deep_study'});
     document.body.classList.remove('qt-no-published-paper');
-    try{sessionStorage.setItem('kg_question_training_route_v1',JSON.stringify({paperId:entry.paper.id,releaseId:entry.paper.releaseId,questionId,bankId:String(item.bank?.id||bankId),workspaceId:String(params.get('workspace')||''),source:String(params.get('source')||''),at:Date.now()}))}catch(e){}
+    const context=window.KGLearningRouteContext?.withResolved?.(result,route,{mode:'single_deep_study'})||result.context;
+    window.KGLearningProgress?.activate?.(context,{mode:'single_deep_study',clearTransient:true});
+    window.KGLearningRouteContext?.replace?.(context,{target:'question-training.html'});
+    try{sessionStorage.setItem('kg_question_training_route_v1',JSON.stringify({...context,workspaceId:String(route.workspaceId||''),source:String(route.source||''),at:Date.now()}))}catch(e){}
     return true;
   }catch(error){
     console.error('训练页路由恢复失败',error);
-    showStatus('未能恢复多题画布中的题目，请重新选择已发布试卷。');
+    showStatus('未能恢复指定的发布题目，请重新选择已发布试卷。');
     return false;
   }
 }
@@ -172,6 +176,7 @@ async function initQuestionTrainingPage(){
   installQuestionTrainingReadonlyGuard();
   try{
     await window.KGQuestionCatalogAdapter.ready;
+    window.KGLearningProgress?.registerAdapter?.('single_deep_study',{flush:()=>window.KGGuidedLearningCanvas?.flushPendingConclusion?.(),clearTransient:()=>{try{if(typeof qNewMvpState==='function')qMvpState=qNewMvpState()}catch(e){};try{window.dispatchEvent(new CustomEvent('kg:learning-session-reset',{detail:{reason:'context-switch'}}))}catch(e){}}});
     if(typeof qbLoadBanks==='function')qbLoadBanks();
     const routed=applyQuestionTrainingRoute();
     if(!routed)ensureSingleDeepPublishedSelection();

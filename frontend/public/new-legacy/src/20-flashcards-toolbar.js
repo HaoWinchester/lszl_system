@@ -35,6 +35,7 @@ function importedGraphName(data,file){
 function applyImportedFile(fileRecord){
   if(!fileRecord||!fileRecord.graphData)return false;
   state=sanitizeState(fileRecord.graphData);
+  if(window.KGGraphKernel&&window.KGGraphKernel.resetSession)window.KGGraphKernel.resetSession();
   state.selectedNodeId=null;
   state.selectedLinkId=null;
   state.linkSourceId=null;
@@ -69,6 +70,7 @@ async function importLearningPackageFile(file){
     return created;
   }
   state=clean;
+  if(window.KGGraphKernel&&window.KGGraphKernel.resetSession)window.KGGraphKernel.resetSession();
   render({persist:true});
   showStatus('学习包导入成功，已自动过滤无效节点、关系和颜色值。');
   return clean;
@@ -602,17 +604,107 @@ function toggleFocusMode(){
 }
 function currentNodeSize(){const n=nodeById(state.selectedNodeId);return(n&&n.size)||state.defaults.nodeSize||''}
 function currentLineStyle(){const l=linkById(state.selectedLinkId);return(l&&l.lineStyle)||state.defaults.linkStyle||DEFAULTS.linkStyle}
-function selectedColorNodes(){const ids=selectedNodeIds&&selectedNodeIds.size?[...selectedNodeIds]:(state.selectedNodeId?[state.selectedNodeId]:[]);return ids.map(id=>nodeById(id)).filter(Boolean)} function currentLineColor(){const l=linkById(state.selectedLinkId);return safeColor((l&&l.color)||state.defaults.linkColor||DEFAULTS.linkColor,DEFAULTS.linkColor)} function currentCanvasColor(){const nodes=selectedColorNodes();if(nodes.length)return safeColor(nodes[0].color,DEFAULTS.nodeColor);const l=linkById(state.selectedLinkId);if(l)return safeColor(l.color,DEFAULTS.linkColor);return safeColor(state.defaults.nodeColor||state.defaults.linkColor||DEFAULTS.nodeColor,DEFAULTS.nodeColor)}
+function selectedColorNodes(){const ids=selectedNodeIds&&selectedNodeIds.size?[...selectedNodeIds]:(state.selectedNodeId?[state.selectedNodeId]:[]);return ids.map(id=>nodeById(id)).filter(Boolean)}
+function lockedToolbarNodes(nodes=[]){return nodes.filter(node=>typeof isNodeFullyLocked==='function'?isNodeFullyLocked(node):!!window.KGGraphModel?.interactionOf?.(node).locked)}
+function blockLockedToolbarNodes(nodes=[],action='修改'){
+  const locked=lockedToolbarNodes(nodes);if(!locked.length)return false;
+  showStatus(locked.length>1?`选择中有 ${locked.length} 个已锁定节点，不能${action}；请先解锁。`:`该节点已锁定，不能${action}；请先解锁。`);return true;
+}
+function currentLineColor(){const l=linkById(state.selectedLinkId);return safeColor((l&&l.color)||state.defaults.linkColor||DEFAULTS.linkColor,DEFAULTS.linkColor)} function currentCanvasColor(){const nodes=selectedColorNodes();if(nodes.length){const appearance=window.KGGraphModel&&window.KGGraphModel.appearanceOf?window.KGGraphModel.appearanceOf(nodes[0]):null;return safeColor(appearance&&appearance.fillColor||nodes[0].color,DEFAULTS.nodeColor)}const l=linkById(state.selectedLinkId);if(l)return safeColor(l.color,DEFAULTS.linkColor);return safeColor(state.defaults.nodeFillColor||state.defaults.nodeColor||state.defaults.linkColor||DEFAULTS.nodeColor,DEFAULTS.nodeColor)}
 function nodeSizeLabel(size){return size==='small'?'小卡':size==='big'?'大卡':'默认尺寸'}
-function applyNodeSize(size){size=NODE_SIZES.has(size)?size:'';const n=nodeById(state.selectedNodeId);if(n){n.size=size;showStatus(`已将“${n.title}”设为${nodeSizeLabel(size)}。`)}else{state.defaults.nodeSize=size;showStatus(`新建知识点默认使用${nodeSizeLabel(size)}。`)}render({persist:true})}
+function applyNodeSize(size){
+  size=NODE_SIZES.has(size)?size:'';
+  const nodes=selectedColorNodes(),styleController=typeof ensureGraphStyleController==='function'?ensureGraphStyleController():null;
+  if(nodes.length){
+    if(blockLockedToolbarNodes(nodes,'调整尺寸'))return false;
+    if(styleController)styleController.updateAppearance(nodes.map(n=>n.id),{size},nodes.length>1?`批量调整 ${nodes.length} 张卡牌尺寸`:`调整“${nodes[0].title}”卡牌尺寸`);
+    else{state.defaults.nodeSize=size;nodes.forEach(n=>{n.size=size;if(window.KGGraphModel)window.KGGraphModel.updateAppearance(n,{size})});render({persist:true})}
+    showStatus(nodes.length>1?`已将 ${nodes.length} 张选中卡牌设为${nodeSizeLabel(size)}。`:`已将“${nodes[0].title}”设为${nodeSizeLabel(size)}。`);
+  }else{
+    if(styleController)styleController.updateDefaultAppearance({nodeSize:size},'修改默认卡牌尺寸');else{state.defaults.nodeSize=size;render({persist:true})}
+    showStatus(`新建知识点默认使用${nodeSizeLabel(size)}。`);
+  }
+}
 function toggleNodeSize(){applyNodeSize(currentNodeSize()==='big'?'small':'big')}
 function lineStyleLabel(style){return style==='dotted'?'短虚线':style==='dashed'?'长虚线':'实线'}
-function applyLineStyle(style){if(!LINE_STYLES.has(style))style=DEFAULTS.linkStyle;const l=linkById(state.selectedLinkId);if(l){l.lineStyle=style;showStatus(`已将选中关系线设为${lineStyleLabel(style)}。`)}else{state.defaults.linkStyle=style;showStatus(`新建关系线默认使用${lineStyleLabel(style)}。`)}render({persist:true})}
+function runGraphStyleHistory(label,mutate){const history=typeof ensureGraphHistoryController==='function'?ensureGraphHistoryController():null;return history?history.run(label,mutate):mutate()}
+function selectedToolbarLinks(){const ids=new Set([...selectedLinkIds].map(String));if(state.selectedLinkId)ids.add(String(state.selectedLinkId));return [...ids].map(id=>linkById(id)).filter(Boolean)}
+function applyLineStyle(style){if(!LINE_STYLES.has(style))style=DEFAULTS.linkStyle;const links=selectedToolbarLinks();if(links.length){if(links.some(l=>l.lineStyle!==style))runGraphStyleHistory(links.length>1?`批量修改 ${links.length} 条关系线样式`:'修改关系线样式',()=>links.forEach(l=>{l.lineStyle=style}));showStatus(`已将 ${links.length} 条选中关系线设为${lineStyleLabel(style)}。`)}else{if(state.defaults.linkStyle!==style)runGraphStyleHistory('修改默认关系线样式',()=>{state.defaults.linkStyle=style});showStatus(`新建关系线默认使用${lineStyleLabel(style)}。`)}render({mode:links.length?'edges':'header',persist:true})}
 function currentPathStyle(){const l=linkById(state.selectedLinkId);return LINE_PATH_STYLES.has(l&&l.pathStyle)?l.pathStyle:(LINE_PATH_STYLES.has(state.defaults.linkPathStyle)?state.defaults.linkPathStyle:DEFAULTS.linkPathStyle)}
 function pathStyleLabel(style){return style==='straight'?'直线':style==='elbow'?'折线':'曲线'}
-function applyPathStyle(style){if(!LINE_PATH_STYLES.has(style))style=DEFAULTS.linkPathStyle;const l=linkById(state.selectedLinkId);if(l){l.pathStyle=style;showStatus(`已将选中关系线设为${pathStyleLabel(style)}。`)}else{state.defaults.linkPathStyle=style;showStatus(`新建关系线默认使用${pathStyleLabel(style)}。`)}render({persist:true})}
+function applyPathStyle(style){if(!LINE_PATH_STYLES.has(style))style=DEFAULTS.linkPathStyle;const links=selectedToolbarLinks();if(links.length){if(links.some(l=>l.pathStyle!==style))runGraphStyleHistory(links.length>1?`批量修改 ${links.length} 条关系线路径`:'修改关系线路径',()=>links.forEach(l=>{l.pathStyle=style}));showStatus(`已将 ${links.length} 条选中关系线设为${pathStyleLabel(style)}。`)}else{if(state.defaults.linkPathStyle!==style)runGraphStyleHistory('修改默认关系线路径',()=>{state.defaults.linkPathStyle=style});showStatus(`新建关系线默认使用${pathStyleLabel(style)}。`)}render({mode:links.length?'edges':'header',persist:true})}
 function toggleLineStyle(){applyLineStyle(currentLineStyle()==='dashed'?'solid':'dashed')}
-function applyLineColor(color){color=safeColor(color,'');if(!color)return;const nodes=selectedColorNodes(),l=linkById(state.selectedLinkId);if(nodes.length){nodes.forEach(n=>{n.color=color});state.defaults.nodeColor=color;showStatus(nodes.length>1?`已更新 ${nodes.length} 张选中卡牌颜色。`:`已更新“${nodes[0].title}”卡牌颜色。`)}else if(l){l.color=color;state.defaults.linkColor=color;showStatus('已更新选中关系线颜色。')}else{state.defaults.nodeColor=color;state.defaults.linkColor=color;showStatus('已更新新卡牌和新关系线默认颜色。')}const nodeColorInput=$('nColor');if(nodeColorInput&&nodes.length&&nodeColorInput.value!==color)nodeColorInput.value=color;render({persist:true})}
+function applyLineWidth(width){
+  width=Math.max(1,Math.min(8,Number(width)||4));const links=selectedToolbarLinks();
+  if(!links.length)return false;
+  if(links.some(link=>Number(link.strokeWidth||4)!==width))runGraphStyleHistory(links.length>1?`批量修改 ${links.length} 条关系线粗细`:'修改关系线粗细',()=>links.forEach(link=>{link.strokeWidth=width}));
+  render({mode:'edges',persist:true});showStatus(`已将 ${links.length} 条选中关系线设为 ${width}px。`);return true;
+}
+function applyArrowStyle(style){
+  style=['none','end','both'].includes(String(style))?String(style):'none';const links=selectedToolbarLinks();
+  if(!links.length)return false;
+  if(links.some(link=>String(link.arrowStyle||'none')!==style))runGraphStyleHistory(links.length>1?`批量修改 ${links.length} 条关系线箭头`:'修改关系线箭头',()=>links.forEach(link=>{link.arrowStyle=style}));
+  render({mode:'edges',persist:true});showStatus(`已修改 ${links.length} 条选中关系线的箭头样式。`);return true;
+}
+function graphCanvasDocumentColors(){
+  const colors=[];
+  for(const node of state.nodes||[]){
+    const appearance=window.KGGraphModel&&window.KGGraphModel.appearanceOf?window.KGGraphModel.appearanceOf(node):node;
+    colors.push(appearance.headerIconColor,appearance.fillColor,appearance.headerFillColor,appearance.bodyFillColor,appearance.borderColor,appearance.textColor,appearance.headerTextColor,appearance.bodyTextColor);
+  }
+  for(const link of state.links||[])colors.push(link&&link.color);
+  return colors.filter(Boolean);
+}
+function openCanvasColorPicker(anchor){
+  const picker=window.KGColorPickerV2;
+  const fallback=$('lineColorPicker');
+  if(!picker||typeof picker.open!=='function'){if(fallback)fallback.click();return false}
+  const target=anchor&&anchor.currentTarget?anchor.currentTarget:anchor;
+  picker.open({
+    kind:'canvas-style',
+    title:state.selectedLinkId?'关系线颜色':selectedColorNodes().length?'卡牌整体颜色':'新建卡牌与关系线默认颜色',
+    anchor:target||(fallback&&fallback.parentElement),
+    pointer:anchor&&Number.isFinite(anchor.clientX)?{x:anchor.clientX,y:anchor.clientY}:null,
+    value:{color:currentCanvasColor(),opacity:1},
+    allowOpacity:false,
+    allowTransparent:false,
+    documentColors:graphCanvasDocumentColors(),
+    documentLabel:'当前图谱',
+    onCommit:value=>applyLineColor(value.color)
+  });
+  return true;
+}
+function applyLineColor(color){
+  const next=safeColor(color,'');if(!next)return;
+  const nodes=selectedColorNodes(),links=selectedToolbarLinks(),styleController=typeof ensureGraphStyleController==='function'?ensureGraphStyleController():null;
+  if(nodes.length){
+    if(blockLockedToolbarNodes(nodes,'修改颜色'))return false;
+    if(styleController)styleController.updateAppearance(nodes.map(n=>n.id),{headerIconColor:next,fillColor:next,fillOpacity:1,bodyFillColor:next},nodes.length>1?`批量修改 ${nodes.length} 张卡牌颜色`:`修改“${nodes[0].title}”卡牌颜色`);
+    else{state.defaults.nodeColor=next;nodes.forEach(n=>{n.color=next;if(window.KGGraphModel)window.KGGraphModel.updateAppearance(n,{color:next,headerIconColor:next,fillColor:next,fillOpacity:1,bodyFillColor:next})});render({mode:'appearance',persist:true})}
+    showStatus(nodes.length>1?`已更新 ${nodes.length} 张选中卡牌颜色。`:`已更新“${nodes[0].title}”卡牌颜色。`);
+    const nodeColorInput=$('nColor');if(nodeColorInput&&nodeColorInput.value!==next)nodeColorInput.value=next;
+    return;
+  }
+  if(links.length){
+    if(links.some(link=>safeColor(link.color,DEFAULTS.linkColor)!==next))runGraphStyleHistory(links.length>1?`批量修改 ${links.length} 条关系线颜色`:'修改关系线颜色',()=>links.forEach(link=>{link.color=next}));
+    showStatus(`已修改 ${links.length} 条选中关系线颜色。`);render({mode:'edges',persist:true});return;
+  }
+  if(state.defaults.nodeColor!==next||state.defaults.nodeFillColor!==next||state.defaults.linkColor!==next)runGraphStyleHistory('修改默认卡牌和关系线颜色',()=>{state.defaults.nodeColor=next;state.defaults.nodeFillColor=next;state.defaults.linkColor=next});
+  showStatus('已更新新卡牌和新关系线默认颜色。');render({mode:'header',persist:true});
+}
+function applyCardStyle(cardStyle){
+  const allowed=window.KGGraphModel&&window.KGGraphModel.CARD_STYLES,style=allowed&&allowed.has(cardStyle)?cardStyle:'standard',nodes=selectedColorNodes(),controller=typeof ensureGraphStyleController==='function'?ensureGraphStyleController():null;
+  if(nodes.length){if(blockLockedToolbarNodes(nodes,'修改样式'))return style;if(controller)controller.updateAppearance(nodes.map(n=>n.id),{cardStyle:style},nodes.length>1?`批量修改 ${nodes.length} 张卡牌样式`:'修改卡牌样式');else{state.defaults.nodeCardStyle=style;nodes.forEach(n=>window.KGGraphModel&&window.KGGraphModel.updateAppearance(n,{cardStyle:style}));render({mode:'appearance',persist:true})}}
+  else{if(controller)controller.updateDefaultAppearance({nodeCardStyle:style},'修改默认卡牌样式');else{state.defaults.nodeCardStyle=style;render({mode:'header',persist:true})}}
+  return style;
+}
+function applyNodeTextAlign(textAlign){
+  const allowed=window.KGGraphModel&&window.KGGraphModel.TEXT_ALIGNS,align=allowed&&allowed.has(textAlign)?textAlign:'center',nodes=selectedColorNodes(),controller=typeof ensureGraphStyleController==='function'?ensureGraphStyleController():null;
+  if(nodes.length){if(blockLockedToolbarNodes(nodes,'修改文字对齐'))return align;if(controller)controller.updateAppearance(nodes.map(n=>n.id),{textAlign:align},nodes.length>1?`批量修改 ${nodes.length} 张卡牌文字对齐`:'修改卡牌文字对齐');else{state.defaults.nodeTextAlign=align;nodes.forEach(n=>window.KGGraphModel&&window.KGGraphModel.updateAppearance(n,{textAlign:align}));render({mode:'appearance',persist:true})}}
+  else{if(controller)controller.updateDefaultAppearance({nodeTextAlign:align},'修改默认卡牌文字对齐');else{state.defaults.nodeTextAlign=align;render({mode:'header',persist:true})}}
+  return align;
+}
+window.KGGraphStyleActions=Object.freeze({applyNodeSize,applyLineColor,applyCardStyle,applyNodeTextAlign});
 function updateStyleControls(){const size=currentNodeSize(),lineStyle=currentLineStyle(),pathStyle=currentPathStyle(),canvasColor=currentCanvasColor();[['sizeSmallBtn',size==='small'],['sizeDefaultBtn',!size],['sizeBigBtn',size==='big'],['lineSolidBtn',lineStyle==='solid'],['lineDashedBtn',lineStyle==='dashed'],['lineDottedBtn',lineStyle==='dotted'],['pathStraightBtn',pathStyle==='straight'],['pathElbowBtn',pathStyle==='elbow'],['pathCurveBtn',pathStyle==='curve']].forEach(([id,on])=>{const b=$(id);if(b)b.classList.toggle('active-toggle',!!on)});const sizeMenu=$('sizeMenuBtn');if(sizeMenu)sizeMenu.classList.toggle('active-toggle',!!size);const lineMenu=$('lineStyleMenuBtn');if(lineMenu)lineMenu.classList.toggle('active-toggle',lineStyle!==DEFAULTS.linkStyle||pathStyle!==DEFAULTS.linkPathStyle);['lineColorPicker','mLineColorPicker'].forEach(id=>{const i=$(id);if(i&&i.value!==canvasColor)i.value=canvasColor});const floatingColor=$('lineColorPicker');if(floatingColor&&floatingColor.parentElement)floatingColor.parentElement.style.setProperty('--floating-line-color',canvasColor);const ms=$('mSizeBtn');if(ms)ms.textContent=size==='big'?'小卡':'大卡';const ml=$('mLineStyleBtn');if(ml)ml.textContent=lineStyle==='solid'?'虚线':'实线'}
 
 const FLOATING_TOOLBOX_POSITION_KEY='通用知识点关系图谱工具_悬浮菜单位置_v1';
@@ -629,9 +721,11 @@ function initFloatingToolbox(){
   handle.addEventListener('pointerup',finish,{passive:false});handle.addEventListener('pointercancel',finish,{passive:false});
   window.addEventListener('resize',()=>applyPosition(box.offsetLeft,box.offsetTop));
 }
+initHomeUnifiedCanvasRuntime();
 initCanvasZoomDock();
 window.KGHomeToolbarActions={
   addNode:addAtCenter,
+  addTextElement:()=>window.KGGraphTextElements?.addAtCenter?.(),
   openFlashcards:()=>openFlashcards('current'),
   fitView,
   zoomIn:()=>zoomAtCenterStep(1),
@@ -643,24 +737,22 @@ window.KGHomeToolbarActions={
   toggleLargeGraphOverview:()=>toggleLargeGraphOverviewRelations(),
   toggleLargeGraphRelated:()=>toggleLargeGraphRelatedFocus(),
   openGraphSearch:()=>openGraphSearchPanel(),
-  openQuestionTraining:event=>{
-    if(event){
-      event.preventDefault();
-      event.stopPropagation();
-    }
-    if(typeof forceOpenQuestionTrainer==='function') forceOpenQuestionTrainer();
-    else window.open('question-training.html','_blank');
-  },
   setSmallCards:()=>applyNodeSize('small'),
   setDefaultCards:()=>applyNodeSize(''),
   setBigCards:()=>applyNodeSize('big'),
+  setStandardCards:()=>applyCardStyle('standard'),
+  setStickyCards:()=>applyCardStyle('sticky'),
+  setTextCards:()=>applyCardStyle('rounded'),
+  alignCardTextLeft:()=>applyNodeTextAlign('left'),
+  alignCardTextCenter:()=>applyNodeTextAlign('center'),
+  alignCardTextRight:()=>applyNodeTextAlign('right'),
   setSolidLine:()=>applyLineStyle('solid'),
   setDashedLine:()=>applyLineStyle('dashed'),
   setDottedLine:()=>applyLineStyle('dotted'),
   setStraightPath:()=>applyPathStyle('straight'),
   setElbowPath:()=>applyPathStyle('elbow'),
   setCurvePath:()=>applyPathStyle('curve'),
-  openLineColorPicker:()=>{const input=$('lineColorPicker');if(input)input.click()},
+  openLineColorPicker:event=>openCanvasColorPicker(event),
   setLineColor:event=>applyLineColor(event.target.value),
   exportLearningPackage:()=>{exportLearningPackage().catch(err=>alert('导出学习包失败：'+(err.message||err)))},
   openImportFile:()=>$('importFile').click(),
@@ -675,6 +767,7 @@ window.KGHomeToolbarActions={
     if(confirm('确定清空当前知识图谱吗？建议先导出备份。')){
       state=templateState('blank');
       normalizeState();
+      if(window.KGGraphKernel&&window.KGGraphKernel.resetSession)window.KGGraphKernel.resetSession();
       render({persist:true});
       fitView(true);
       showStatus('已清空为一张空白图谱。');
@@ -687,9 +780,15 @@ if(window.KGHomeToolbarRegistry && typeof window.KGHomeToolbarRegistry.registerA
 }else{
   initFloatingToolbox();
 }
+function bindUnifiedCanvasColorPicker(){
+  const input=$('lineColorPicker'),host=input&&input.parentElement;if(!input||!host||host.dataset.colorPickerV2Bound==='1')return;
+  host.dataset.colorPickerV2Bound='1';input.tabIndex=-1;input.style.pointerEvents='none';input.setAttribute('aria-hidden','true');
+  host.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();openCanvasColorPicker(event)});
+}
+bindUnifiedCanvasColorPicker();
 $('mAddBtn').onclick=addAtCenter;$('mFlashcardBtn').onclick=()=>openFlashcards('current');$('mFitBtn').onclick=fitView;$('mZoomInBtn').onclick=()=>zoomAtCenterStep(1);$('mZoomOutBtn').onclick=()=>zoomAtCenterStep(-1);$('mGraphBtn').onclick=openGraphModal;$('mFocusBtn').onclick=toggleFocusMode;$('mSizeBtn').onclick=toggleNodeSize;$('mLineStyleBtn').onclick=toggleLineStyle;$('mLineColorPicker').oninput=e=>applyLineColor(e.target.value);
 $('mEditBtn').onclick=()=>{if(state.selectedNodeId)return openNodeModal(state.selectedNodeId);if(state.selectedLinkId)return openLinkModal(state.selectedLinkId);showStatus('请先选择一个知识点或关系线。')};
-$('mLinkBtn').onclick=()=>{if(state.selectedNodeId){const n=nodeById(state.selectedNodeId);state.linkSourceId=state.linkSourceId===state.selectedNodeId?null:state.selectedNodeId;showStatus(state.linkSourceId?`“${n.title}”已设为连线起点，请单击另一个知识点建立关系。`:'已取消连线起点。');render();return}if(state.selectedLinkId){openLinkModal(state.selectedLinkId);return}showStatus('请先点击一个知识点作为连线起点。')};
+$('mLinkBtn').onclick=()=>{if(state.selectedNodeId){const n=nodeById(state.selectedNodeId);if(typeof isNodeFullyLocked==='function'&&isNodeFullyLocked(n)){showStatus('该节点已锁定，不能建立关系；请先解锁。');return}const connection=typeof ensureGraphConnectionController==='function'?ensureGraphConnectionController():null;if(state.linkSourceId===state.selectedNodeId){if(connection)connection.cancel();else state.linkSourceId=null}else if(connection)connection.setSource(state.selectedNodeId);else state.linkSourceId=state.selectedNodeId;showStatus(state.linkSourceId?`“${n.title}”已设为连线起点，请单击另一个知识点建立关系。`:'已取消连线起点。');render({mode:'selection'});return}if(state.selectedLinkId){openLinkModal(state.selectedLinkId);return}showStatus('请先点击一个知识点作为连线起点。')};
 $('hideHelpBtn').onclick=()=>$('helpCard').classList.add('hide');
 $('closeFlashcardBtn').onclick=closeFlashcards;
 $('flashToolsToggle').onclick=toggleFlashTools;
@@ -707,8 +806,8 @@ $('flashSwipeSpeed').addEventListener('input',e=>setFlashSwipeSpeed(e.target.val
 $('flashImportFile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{await importFlashcardFile(f)}catch(err){alert('闪卡导入失败：'+(err.message||err))}e.target.value=''});
 
 $('cancelTemplateBtn').onclick=()=>$('templateModal').classList.remove('show');
-document.querySelectorAll('.template-card').forEach(card=>card.addEventListener('click',()=>{const kind=card.dataset.template;if(confirm('使用模板会替换当前图谱。确定继续吗？')){state=templateState(kind);normalizeState();$('templateModal').classList.remove('show');fitView(true);showStatus('模板已载入。')}}));
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){for(const id of ['nodeModal','linkModal','graphModal','templateModal','flashcardModal']){if($(id).classList.contains('show')){$(id).classList.remove('show');return}}clearSelection();return}if(e.key!=='Delete'&&e.key!=='Backspace')return;if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))return;const hasBatchLinks=typeof selectedLinkIds!=='undefined'&&selectedLinkIds&&selectedLinkIds.size;const hasBatchNodes=selectedNodeIds&&selectedNodeIds.size;if((hasBatchLinks||hasBatchNodes||state.selectedLinkId)&&typeof deleteGraphBatchSelection==='function'){deleteGraphBatchSelection()}else if(state.selectedNodeId){deleteNode(state.selectedNodeId)}});
+document.querySelectorAll('.template-card').forEach(card=>card.addEventListener('click',()=>{const kind=card.dataset.template;if(confirm('使用模板会替换当前图谱。确定继续吗？')){state=templateState(kind);normalizeState();if(window.KGGraphKernel&&window.KGGraphKernel.resetSession)window.KGGraphKernel.resetSession();$('templateModal').classList.remove('show');fitView(true);showStatus('模板已载入。')}}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){for(const id of ['nodeModal','linkModal','graphModal','templateModal','flashcardModal']){if($(id).classList.contains('show')){$(id).classList.remove('show');return}}clearSelection();return}if(e.key!=='Delete'&&e.key!=='Backspace')return;if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))return;const hasBatchLinks=typeof selectedLinkIds!=='undefined'&&selectedLinkIds&&selectedLinkIds.size;const hasBatchNodes=selectedNodeIds&&selectedNodeIds.size;if((state.selectedElementId||hasBatchLinks||hasBatchNodes||state.selectedLinkId)&&typeof deleteGraphBatchSelection==='function'){deleteGraphBatchSelection()}else if(state.selectedNodeId){deleteNode(state.selectedNodeId)}});
 function graphMinZoom(){return typeof graphViewportMinScale==='function'?graphViewportMinScale():.01}
 function graphMaxZoom(){return typeof graphViewportMaxScale==='function'?graphViewportMaxScale():4}
 function setZoomAtStageCenter(scale,persist=true){
@@ -779,8 +878,135 @@ function showCanvasZoomSlider(show=true){
   popover.setAttribute('aria-hidden',show?'false':'true');
 }
 function resetCanvasZoomTo100(){
+  if(window.KGHomeCanvasRuntime?.centerAt100?.()){showCanvasZoomSlider(false);showStatus('已恢复 100% 并居中显示画布内容。');return true}
   animateZoomAtStageCenter(1,true,{duration:360});
-  showStatus('缩放已平滑恢复 100%。');
+  showCanvasZoomSlider(false);showStatus('缩放已平滑恢复 100%。');return true;
+}
+
+function homeGraphContentItems(){
+  const items=[];
+  (state.nodes||[]).forEach(node=>{
+    const position=typeof visualPositionForNode==='function'?visualPositionForNode(node):{x:Number(node.x)||0,y:Number(node.y)||0};
+    const dimensions=nodeDims(node);
+    items.push({id:String(node.id||''),kind:'node',x:position.x,y:position.y,width:dimensions.w,height:dimensions.h});
+  });
+  (state.elements||[]).forEach(item=>{
+    const geometry=window.KGGraphModel?.textElementGeometryOf?.(item)||item||{};
+    items.push({id:String(item.id||''),kind:'text',x:Number(geometry.x)||0,y:Number(geometry.y)||0,width:Math.max(24,Number(geometry.width)||160),height:Math.max(24,Number(geometry.height)||80)});
+  });
+  return items;
+}
+function homeGraphContentBounds(){
+  const items=homeGraphContentItems();
+  if(!items.length)return{left:-400,top:-280,right:400,bottom:280,width:800,height:560};
+  const left=Math.min(...items.map(item=>item.x)),top=Math.min(...items.map(item=>item.y));
+  const right=Math.max(...items.map(item=>item.x+item.width)),bottom=Math.max(...items.map(item=>item.y+item.height));
+  return{left,top,right,bottom,width:Math.max(1,right-left),height:Math.max(1,bottom-top)};
+}
+function centerHomeGraphAt100(){
+  const bounds=homeGraphContentBounds(),rect=stage.getBoundingClientRect(),scale=1;
+  animateViewportTo({scale,x:(rect.width-(bounds.left+bounds.right)*scale)/2,y:(rect.height-(bounds.top+bounds.bottom)*scale)/2},true,{duration:420});
+  return true;
+}
+function homeSelectionAnchorRect(){
+  const rects=[];
+  selectedNodeIds.forEach(id=>{const el=cardElementByNodeId(id);if(el)rects.push(el.getBoundingClientRect())});
+  selectedTextElementIds.forEach(id=>{const el=textElementDomByIdValue(id);if(el)rects.push(el.getBoundingClientRect())});
+  selectedLinkIds.forEach(id=>{const dom=edgeDomById.get(String(id));if(dom?.vis)rects.push(dom.vis.getBoundingClientRect())});
+  if(!rects.length&&state.selectedNodeId){const el=cardElementByNodeId(state.selectedNodeId);if(el)rects.push(el.getBoundingClientRect())}
+  if(!rects.length&&state.selectedElementId){const el=textElementDomByIdValue(state.selectedElementId);if(el)rects.push(el.getBoundingClientRect())}
+  if(!rects.length&&state.selectedLinkId){const dom=edgeDomById.get(String(state.selectedLinkId));if(dom?.vis)rects.push(dom.vis.getBoundingClientRect())}
+  if(!rects.length)return null;
+  const left=Math.min(...rects.map(rect=>rect.left)),top=Math.min(...rects.map(rect=>rect.top)),right=Math.max(...rects.map(rect=>rect.right)),bottom=Math.max(...rects.map(rect=>rect.bottom));
+  return{left,top,right,bottom,width:right-left,height:bottom-top};
+}
+function applyHomeFilteredSelection(type,ids=[],meta={}){
+  const next=new Set((ids||[]).map(String));
+  const snapshot=meta.snapshot||window.KGHomeCanvasRuntime?.selectionFilter?.snapshot?.()||{categories:[]};
+  const categoryIds=kind=>new Set((snapshot.categories||[]).find(item=>item.type===kind)?.ids?.map(String)||[]);
+  selectedNodeIds.clear();selectedLinkIds.clear();selectedTextElementIds.clear();
+  state.selectedNodeId=null;state.selectedLinkId=null;state.selectedElementId=null;state.linkSourceId=null;
+  if(!type){
+    selectedNodeIds=new Set([...categoryIds('node')].filter(id=>nodeById(id)));
+    selectedTextElementIds=new Set([...categoryIds('text-element')].filter(id=>textElementById(id)));
+    selectedLinkIds=new Set([...categoryIds('edge')].filter(id=>linkById(id)));
+    state.selectedNodeId=selectedNodeIds.values().next().value||null;
+    state.selectedElementId=!selectedNodeIds.size?(selectedTextElementIds.values().next().value||null):null;
+    state.selectedLinkId=!selectedNodeIds.size&&!selectedTextElementIds.size&&selectedLinkIds.size===1?selectedLinkIds.values().next().value:null;
+  }else if(type==='node'){
+    selectedNodeIds=new Set([...next].filter(id=>nodeById(id)));
+    state.selectedNodeId=selectedNodeIds.values().next().value||null;
+  }else if(type==='text-element'){
+    selectedTextElementIds=new Set([...next].filter(id=>textElementById(id)));
+    state.selectedElementId=selectedTextElementIds.values().next().value||null;
+  }else if(type==='edge'){
+    selectedLinkIds=new Set([...next].filter(id=>linkById(id)));
+    state.selectedLinkId=selectedLinkIds.size===1?selectedLinkIds.values().next().value:null;
+  }
+  refreshSelectionUI();
+  requestAnimationFrame(()=>window.KGHomeCanvasRuntime?.selectionFilter?.refreshPosition?.(homeSelectionAnchorRect()));
+  return selectedNodeIds.size+selectedTextElementIds.size+selectedLinkIds.size;
+}
+function homeAlignmentRecords(){
+  const records=[];
+  for(const node of state.nodes||[]){
+    if(!node?.id)continue;
+    const pos=visualPositionForNode(node),dims=nodeDims(node);
+    records.push({id:String(node.id),type:'node',kind:'node',layout:{x:pos.x,y:pos.y,width:dims.w,height:dims.h},locked:!!window.KGGraphModel?.interactionOf?.(node)?.locked});
+  }
+  for(const item of state.elements||[]){
+    if(!item?.id)continue;
+    const geometry=window.KGGraphModel?.textElementGeometryOf?.(item)||item;
+    records.push({id:String(item.id),type:'text-element',kind:'text-element',layout:{x:Number(geometry.x)||0,y:Number(geometry.y)||0,width:Number(geometry.width)||220,height:Number(geometry.height)||72},locked:!!item.locked});
+  }
+  return records;
+}
+function homeCanvasWorldBounds(){
+  const scale=Math.max(.0001,Number(state.viewport.scale)||1),width=stage.clientWidth||stage.getBoundingClientRect().width||1,height=stage.clientHeight||stage.getBoundingClientRect().height||1;
+  const left=(0-(Number(state.viewport.x)||0))/scale,top=(0-(Number(state.viewport.y)||0))/scale;
+  return{left,top,right:left+width/scale,bottom:top+height/scale,width:width/scale,height:height/scale};
+}
+function homeWorldToScreen(point={}){
+  return{x:(Number(point.x)||0)*(Number(state.viewport.scale)||1)+(Number(state.viewport.x)||0),y:(Number(point.y)||0)*(Number(state.viewport.scale)||1)+(Number(state.viewport.y)||0)};
+}
+function initHomeUnifiedCanvasRuntime(){
+  if(window.KGHomeCanvasRuntime||!window.KGUnifiedCanvasRuntime||!stage)return window.KGHomeCanvasRuntime||null;
+  const adapter=Object.freeze({
+    id:'home-graph-canvas-adapter',
+    getSurface:()=>stage,
+    getViewportElement:()=>stage,
+    getZoomDock:()=>$('canvasZoomDock'),
+    getFullscreenElement:()=>stage,
+    getViewport:()=>({x:Number(state.viewport.x)||0,y:Number(state.viewport.y)||0,zoom:Number(state.viewport.scale)||1}),
+    setViewport(next={},meta={}){
+      state.viewport={x:Number(next.x)||0,y:Number(next.y)||0,scale:clamp(Number(next.zoom??next.scale)||1,graphMinZoom(),graphMaxZoom())};
+      applyTransform();
+      if(meta.persist)save();
+      return true;
+    },
+    getContentBounds:homeGraphContentBounds,
+    getMinimapItems:homeGraphContentItems,
+    getOverlayHost:()=>stage,
+    getGuideHost:()=>stage,
+    getSelectionFilterLabels:()=>({node:'知识节点','text-element':'文本框',edge:'关系线'}),
+    getSelectionFilterOrder:()=>['node','text-element','edge'],
+    applyFilteredSelection:applyHomeFilteredSelection,
+    getSelectionAnchorRect:homeSelectionAnchorRect,
+    onSelectionFilterChange:()=>{refreshSelectionUI();window.KGHomeCanvasRuntime?.selectionFilter?.refreshPosition?.(homeSelectionAnchorRect())},
+    getAlignmentRecords:homeAlignmentRecords,
+    getCanvasBounds:homeCanvasWorldBounds,
+    worldToScreen:homeWorldToScreen,
+    centerAt100:centerHomeGraphAt100,
+    fit:()=>{fitView(true);return true},
+    persistViewport:()=>{save();return true},
+    isMobile:()=>!!isCoarse
+  });
+  window.KGHomeGraphCanvasAdapter=adapter;
+  window.KGHomeCanvasRuntime=window.KGUnifiedCanvasRuntime.register({
+    id:'home-graph-canvas',type:'home-graph',surface:stage,viewport:stage,zoomDock:$('canvasZoomDock'),
+    percentButton:$('canvasZoomPercentBtn'),fullscreenButton:$('canvasFullscreenBtn'),adapter,baseGrid:24
+  });
+  return window.KGHomeCanvasRuntime;
 }
 function updateCanvasFullscreenButton(){
   const btn=$('canvasFullscreenBtn'),active=document.fullscreenElement===stage;
@@ -820,11 +1046,11 @@ function initCanvasZoomDock(){
   dock.dataset.bound='1';
   out&&out.addEventListener('click',e=>{e.preventDefault();zoomAtCenterStep(-1)});
   inn&&inn.addEventListener('click',e=>{e.preventDefault();zoomAtCenterStep(1)});
-  percent&&percent.addEventListener('click',e=>{e.preventDefault();resetCanvasZoomTo100();showCanvasZoomSlider(true)});
+  percent&&percent.addEventListener('click',e=>{e.preventDefault();resetCanvasZoomTo100()});
   slider&&slider.addEventListener('input',e=>{showCanvasZoomSlider(true);setZoomAtStageCenter(Number(e.target.value)/100,true)});
   slider&&slider.addEventListener('pointerdown',e=>e.stopPropagation());
   fit&&fit.addEventListener('click',e=>{e.preventDefault();fitView(true)});
-  full&&full.addEventListener('click',e=>{e.preventDefault();toggleCanvasFullscreen()});
+  if(full&&!window.KGHomeCanvasRuntime)full.addEventListener('click',e=>{e.preventDefault();toggleCanvasFullscreen()});
   document.addEventListener('pointerdown',e=>{if(dock.classList.contains('slider-open')&&!dock.contains(e.target))showCanvasZoomSlider(false)},true);
   document.addEventListener('fullscreenchange',()=>{updateCanvasFullscreenButton();setTimeout(()=>updateCanvasZoomControls(),80)});
   document.addEventListener('webkitfullscreenchange',()=>{updateCanvasFullscreenButton();setTimeout(()=>updateCanvasZoomControls(),80)});

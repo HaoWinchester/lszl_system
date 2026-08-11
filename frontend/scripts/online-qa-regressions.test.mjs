@@ -114,25 +114,29 @@ test('teacher imports honor duplicate settings and reject blank bank metadata', 
 
 test('graph editor uses thresholded large mode, visible labels, and reversible drag history', () => {
   const graph = source('new-legacy/src/10-graph-editor.js')
+  const history = source('new-legacy/src/graph/history-controller.js')
   const tabs = source('new-legacy/src/25-graph-file-tabs.js')
   const css = source('new-legacy/styles/main.css')
   assert.match(graph, /function isLargeGraphMode\(\)\{return isLargeGraphPreferenceEnabled\(\)&&isGraphOverLargeThreshold\(\)\}/)
   assert.match(graph, /function restoreGraphRedoSnapshot/)
   assert.match(graph, /key==='y'\|\|\(key==='z'&&e\.shiftKey\)/)
-  assert.match(graph, /const undoSnapshot=graphUndoSnapshot\(\)/)
-  assert.match(graph, /return true;\s*}\s*function shouldRenderLinkInCurrentMode/)
+  assert.match(graph, /onFirstMove:session=>pushGraphUndoSnapshot\(session\.historyLabel\|\|'移动知识点'\)/)
+  assert.match(history, /function undo\(\)\{return move\(undoStack,redoStack,'undo'\)\}/)
+  assert.match(history, /function redo\(\)\{return move\(redoStack,undoStack,'redo'\)\}/)
+  assert.match(graph, /function shouldRenderLinkInCurrentMode[\s\S]{0,700}if\(!isLargeGraphMode\(\)\)[\s\S]{0,400}return true;/)
   assert.match(css, /\.mobile-bar button\{min-width:0;font-size:11px/)
   assert.match(graph, /function recoverMobileGraphViewport\(\)/)
   assert.match(graph, /fitBoundsToView\(bounds,\{margin:36,minScale:\.05,maxScale:\.85\}\)/)
   assert.match(graph, /function resetGraphHistory\(\)/)
+  assert.match(graph, /window\.resetGraphHistory=resetGraphHistory/)
   assert.match(tabs, /global\.resetGraphHistory\?\.\(\)/)
 })
 
 test('graph size and edit forms participate in undo history', () => {
   const graph = source('new-legacy/src/10-graph-editor.js')
-  assert.match(graph, /pushGraphUndoSnapshot\('调整卡牌尺寸'/)
-  assert.match(graph, /pushGraphUndoSnapshot\('编辑知识点'/)
-  assert.match(graph, /pushGraphUndoSnapshot\('编辑知识关系'/)
+  assert.match(graph, /styleController\.updateAppearance\(\[n\.id\],\{size\},[^;\n]*调整[^;\n]*卡牌尺寸/)
+  assert.match(graph, /saveNodeBtn[\s\S]{0,1600}history\.run\([^;\n]*编辑[^;\n]*n\.title[^;\n]*mutate\)/)
+  assert.match(graph, /saveLinkBtn[\s\S]{0,900}history\.run\('编辑知识关系',mutate\)/)
   assert.match(graph, /deleteLinkFromDetailBtn[\s\S]{0,300}pushGraphUndoSnapshot\('删除关系'/)
 })
 
@@ -154,8 +158,8 @@ test('membership requires confirmation and supports cancelling an own pending or
   assert.match(routes, /@router\.post\("\/orders\/\{order_id\}\/self-cancel"\)/)
 })
 
-test('learning and file pages expose the shared support center', () => {
-  for (const pageName of ['practice-mode.html', 'question-training.html', 'question-workspace.html', 'knowledge-recall.html', 'file-manager.html']) {
+test('active learning and file pages expose the shared support center', () => {
+  for (const pageName of ['practice-mode.html', 'question-workspace.html', 'knowledge-recall.html', 'file-manager.html']) {
     const page = source(`new-legacy/${pageName}`)
     assert.match(page, /styles\/support-center\.css/, `${pageName} 缺少支持中心样式`)
     assert.match(page, /src\/101-engagement-repository\.js/, `${pageName} 缺少消息数据源`)

@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="styles/admin-context-nav.css"/>
 <link rel="stylesheet" href="styles/user-center.css"/>
 <link rel="stylesheet" href="styles/engagement-admin.css"/>
+<link rel="stylesheet" href="styles/resizable-region.css"/>
 <link rel="stylesheet" href="styles/focus-vega-typography.css"/>
 <link rel="stylesheet" href="styles/admin-focus-vega.css"/>
 <link rel="stylesheet" href="styles/admin-focus-vega-common.css"/>
@@ -68,7 +69,7 @@
 </section>
 <section class="engagement-admin-summary" id="messageSummary">
 </section>
-<section class="engagement-admin-grid">
+<section class="engagement-admin-grid" data-kg-resizable-region data-kg-resizable-key="message-workspace" data-kg-resizable-default="620" data-kg-resizable-min="420" data-kg-resizable-max="1200" data-kg-resizable-breakpoint="900" data-kg-resizable-label="拖动调整消息列表与详情工作区高度；双击恢复默认高度">
 <article class="engagement-admin-card">
 <header>
 <div>
@@ -119,6 +120,7 @@
 </script>
 <script src="src/106-message-management-app.js">
 </script>
+<script src="src/admin/resizable-region.js"></script>
 <script defer src="src/108-admin-ui-icons.js"></script>
 </body>
 </html>

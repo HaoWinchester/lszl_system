@@ -1,0 +1,56 @@
+/* v9.0-p4.3.30 — 首页阅读 / 高效 / 专业模式 */
+.graph-mode-switcher{position:relative;display:flex;align-items:flex-end;pointer-events:auto}
+.graph-mode-trigger{display:flex;align-items:center;justify-content:center;gap:6px;height:38px;min-width:78px;padding:0 10px;border:1px solid var(--uc-control-border,#dbe1eb);border-radius:11px;background:var(--uc-control-bg,#fff);color:var(--uc-control-ink,#475569);box-shadow:0 10px 26px rgba(15,23,42,.14);font:700 12px/1 ui-sans-serif,system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer}
+.graph-mode-trigger:hover,.graph-mode-switcher.menu-open .graph-mode-trigger{border-color:#b8b1ff;background:#f5f3ff;color:#5b4ed6}
+.graph-mode-trigger-icon,.graph-mode-option-icon{display:grid;place-items:center;width:18px;height:18px;flex:0 0 18px}
+.graph-mode-trigger-icon svg,.graph-mode-option-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.graph-mode-trigger>svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;transition:transform .16s ease}
+.graph-mode-switcher.menu-open .graph-mode-trigger>svg{transform:rotate(180deg)}
+.graph-mode-menu{position:absolute;right:0;bottom:46px;z-index:140;display:grid;min-width:132px;padding:6px;border:1px solid #dbe1eb;border-radius:12px;background:rgba(255,255,255,.98);box-shadow:0 16px 40px rgba(15,23,42,.18)}
+.graph-mode-menu[hidden]{display:none}
+.graph-mode-menu button{display:flex;align-items:center;gap:9px;width:100%;min-height:36px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:#475569;font-size:12px;font-weight:750;text-align:left;cursor:pointer}
+.graph-mode-menu button:hover,.graph-mode-menu button.active{background:#f1efff;color:#5748d6}
+.graph-mode-menu button.active::after{content:'✓';margin-left:auto;font-weight:900}
+
+/* 模式切换只改变主悬浮工具栏和对象交互，不移动搜索、缩放、居中与缩略图。 */
+body[data-graph-interaction-mode="reading"] .graph-mode-indicator,
+body[data-graph-interaction-mode="efficient"] .graph-mode-indicator{display:none!important}
+body[data-graph-interaction-mode="reading"] .node-style-toolbar,
+body[data-graph-interaction-mode="reading"] .uc-edge-toolbar,
+body[data-graph-interaction-mode="reading"] .edge-control-layer,
+body[data-graph-interaction-mode="reading"] .node-growth-layer{display:none!important}
+body[data-graph-interaction-mode="efficient"] .edge-control-layer,
+body[data-graph-interaction-mode="efficient"] .uc-edge-toolbar{display:none!important}
+
+/* 高效模式节点工具栏：保留高频样式、尺寸、对齐和更多操作。 */
+body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-panel="border"],
+body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-panel="font-family"],
+body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-panel="font-size"],
+body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-panel="font-style"],
+body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-panel="line-height"],
+body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-panel="text-align"],
+body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-action="lock"],
+body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-action="related-canvas"]{display:none!important}
+
+/* 阅读模式不创建编辑命中反馈；高效模式保留框选、多选和基础关系选中。 */
+body[data-graph-interaction-mode="reading"] .edge-hit{pointer-events:none!important}
+body[data-graph-interaction-mode="reading"] :is(.graph-element-resize-layer,.uc-selection-filter,.uc-selection-bounds){display:none!important}
+body[data-graph-interaction-mode="reading"] .knowledge-card{cursor:pointer!important}
+body[data-graph-interaction-mode="efficient"] .knowledge-card{cursor:grab}
+body[data-graph-interaction-mode="efficient"] .knowledge-card:active{cursor:grabbing}
+
+/* 手机端强制阅读模式，隐藏所有编辑入口与模式切换。 */
+body.graph-phone-reading .graph-mode-switcher{display:none!important}
+body.graph-phone-reading #mobileBar :is(#mAddBtn,#mEditBtn,#mLinkBtn,#mSizeBtn,#mLineStyleBtn,#mGraphBtn,.mobile-color-control){display:none!important}
+@media(max-width:720px){.graph-mode-switcher{display:none!important}}
+
+/* 阅读模式详情保持只读，隐藏所有可写操作；关系线也不绘制悬浮/选中反馈层。 */
+body[data-graph-interaction-mode="reading"] .detail-panel :is(.detail-actions-toggle,.detail-actions),
+body[data-graph-interaction-mode="reading"] .edge-hover-layer,
+body[data-graph-interaction-mode="reading"] .edge-feedback-layer,
+body[data-graph-interaction-mode="reading"] .node-resize-handle,
+body[data-graph-interaction-mode="reading"] [data-element-resize-handle]{display:none!important}
+
+/* 高效模式保留框选、多选及批量节点工具，但不开放自由缩放和高级关系线路径编辑。 */
+body[data-graph-interaction-mode="efficient"] :is(.node-resize-handle,[data-element-resize-handle]){display:none!important}
+body[data-graph-interaction-mode="efficient"] .edge-hit{cursor:pointer}

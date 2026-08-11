@@ -272,7 +272,7 @@ function authInstallGuards(){
 
   document.addEventListener('click',e=>{
     if(authIsLoggedIn() && (!window.KGRolePermissions || window.KGRolePermissions.can('editGraph')))return;
-    if(e.target.closest&&e.target.closest('#authModal,#authLoginBtn,#tutorialBtn,#questionTrainBtn,#flashcardBtn,#focusBtn,#fitBtn,#zoomInBtn,#zoomOutBtn,#exportBtn,#hideHelpBtn,#floatingToolboxHandle,#graphMetaDisplay,#closeQuestionBtn,#closeTutorialBtn,#tutorialCloseBottomBtn,#closeFlashcardBtn,#flashCurrentBtn,#flashLibraryBtn,#flashImportedBtn,#flashDueBtn,#flashImportantBtn,#flashShuffleBtn,#flashTemplateBtn,#flashGuideBtn'))return;
+    if(e.target.closest&&e.target.closest('#authModal,#authLoginBtn,#tutorialBtn,#flashcardBtn,#focusBtn,#fitBtn,#zoomInBtn,#zoomOutBtn,#exportBtn,#hideHelpBtn,#floatingToolboxHandle,#graphMetaDisplay,#closeQuestionBtn,#closeTutorialBtn,#tutorialCloseBottomBtn,#closeFlashcardBtn,#flashCurrentBtn,#flashLibraryBtn,#flashImportedBtn,#flashDueBtn,#flashImportantBtn,#flashShuffleBtn,#flashTemplateBtn,#flashGuideBtn'))return;
     const edit=e.target.closest&&e.target.closest(AUTH_EDIT_SELECTOR);
     if(edit){
       e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();

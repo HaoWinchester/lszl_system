@@ -13,7 +13,8 @@ for(const id of ['qbPaperCategoryList','qbAddPaperCategoryBtn','qbPaperListSearc
 assert(page.includes('data-paper-management-page="true"'));
 assert(page.includes('data-paper-mode="deep_recall"'));
 assert(page.includes('data-paper-mode="multi_question_canvas"'));
-assert(page.includes('data-paper-mode="single_deep_study"'));
+assert(page.includes('data-paper-mode="practice_mode"'));
+assert(!page.includes('data-paper-mode="single_deep_study"'));
 const qb=read('question-bank.html');
 assert(!qb.includes('id="qbPaperCard"'),'embedded paper panel must be removed');
 assert(qb.includes("location.href='paper-management.html'"));

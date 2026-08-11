@@ -71,7 +71,8 @@
           personalGraph:true,
           learningPackageImport:true,
           learningPackageExport:true,
-          demoOnly:true
+          demoOnly:true,
+          allExamPapers:false
         },
         limits:{
           dailyTraining:10,
@@ -101,6 +102,7 @@
           basicRecall:true,
           personalGraph:true,
           standardQuestionBank:true,
+          allExamPapers:true,
           learningPackageImport:true,
           learningPackageExport:true
         },
@@ -132,6 +134,7 @@
           basicRecall:true,
           personalGraph:true,
           standardQuestionBank:true,
+          allExamPapers:true,
           learningPackageImport:true,
           learningPackageExport:true,
           advancedRecall:true
@@ -165,6 +168,7 @@
           basicRecall:true,
           personalGraph:true,
           standardQuestionBank:true,
+          allExamPapers:true,
           learningPackageImport:true,
           learningPackageExport:true,
           advancedRecall:true
@@ -197,6 +201,7 @@
           basicRecall:true,
           personalGraph:true,
           standardQuestionBank:true,
+          allExamPapers:true,
           learningPackageImport:true,
           learningPackageExport:true,
           advancedRecall:true,
@@ -215,11 +220,12 @@
     };
 
     const FEATURE_LABELS = {
-      basicTraining:"基础考题训练",
+      basicTraining:"基础刷题",
       basicRecall:"基础深度回忆",
       personalGraph:"个人知识图谱",
       demoOnly:"公开示例体验",
       standardQuestionBank:"标准题库训练",
+      allExamPapers:"全部已发布试卷",
       learningPackageImport:"学习包导入",
       learningPackageExport:"学习包导出",
       advancedRecall:"高级深度回忆",

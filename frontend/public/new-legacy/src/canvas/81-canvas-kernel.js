@@ -57,7 +57,8 @@
       maxHeight:options.maxCardHeight,
       onLayoutChange:options.onCardLayoutChange,
       applyLayout:options.applyCardLayout,
-      onAfterApply:options.afterCardApply
+      onAfterApply:options.afterCardApply,
+      resolveMovement:options.resolveCardMovement
     });
     if(!cards)throw new Error('CanvasKernel requires KGCanvasCardController');
 
@@ -73,8 +74,10 @@
       getViewportState:()=>viewport.getState(),
       isMobile:()=>viewport.getState().mobile,
       canSelect:options.canSelectCards||(()=>policy.can('cardMove')!==false),
+      isInteractionUI:options.isSelectionInteractionUI,
       onSelectionChange:options.onSelectionChange,
-      onPreview:options.onSelectionPreview
+      onPreview:options.onSelectionPreview,
+      resolveMovement:options.resolveSelectionMovement
     })||null;
 
     let destroyed=false;

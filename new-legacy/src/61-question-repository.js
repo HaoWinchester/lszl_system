@@ -67,9 +67,15 @@
 
   function descriptor(){
     const q=current()||{};
+    let currentPaper=null;
+    try{if(typeof qbCurrentPaper==='function')currentPaper=qbCurrentPaper()}catch(e){}
     return {
       id:currentId(),
+      questionId:currentId(),
       bankId:currentBankId(),
+      paperId:String(q.sourcePaperId||currentPaper?.id||''),
+      releaseId:String(q.sourceReleaseId||currentPaper?.releaseId||''),
+      mode:'single_deep_study',
       revision:currentRevision(),
       title:String(q.title||'未命名题目'),
       question:q

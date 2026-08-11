@@ -25,17 +25,24 @@ with sync_playwright() as p:
       const questions=Array.from({length:20},(_,i)=>({bankId:'b1',questionId:'q'+(i+1),order:i+1}));
       const questionSnapshots=Array.from({length:20},(_,i)=>({bankId:'b1',bankName:'发布题库',bankSubject:'PMP',questionId:'q'+(i+1),question:{id:'q'+(i+1),title:'题目 '+(i+1),type:'single_choice',stemParts:[{text:'这是第 '+(i+1)+' 道题的题干'}],options:[{id:'A',text:'正确选项',correct:true},{id:'B',text:'错误选项'}],correctAnswer:'A'}}));
       localStorage.setItem('kg_exam_papers_published_v1',JSON.stringify([{id:'release-1',paperId:'paper-1',version:3,name:'PMP 发布练习卷',subject:'PMP',status:'published',publishedAt:Date.now(),questions,questionSnapshots}]));
+      window.fetch=async url=>{
+        if(String(url).includes('/api/v1/question-catalog/bootstrap'))return new Response(JSON.stringify({banks:[],questions:[],catalogRevision:'0'.repeat(64)}),{status:200,headers:{'content-type':'application/json'}});
+        throw new Error('Unexpected request: '+url);
+      };
       window.confirm=()=>true;
     }""")
     for file in ['styles/main.css','styles/account-menu.css','styles/user-center.css','styles/practice-mode.css','styles/learning-skin.css']:
       page.add_style_tag(content=(ROOT/file).read_text(encoding='utf-8'))
     page.add_script_tag(content=(ROOT/'src/107-learning-ui-icons.js').read_text(encoding='utf-8'))
+    page.add_script_tag(content=(ROOT.parent/'frontend/scripts/new-legacy-assets/question-catalog-adapter.js').read_text(encoding='utf-8'))
     page.add_script_tag(content=(ROOT/'src/100-practice-mode.js').read_text(encoding='utf-8'))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))");page.wait_for_timeout(120)
 
     assert page.locator('[data-kg-icon] svg.kg-icon').count() >= 8
     assert page.locator('[data-kg-icon]:empty').count() == 0
     assert page.locator('#practicePaperSelect option').count()==1
+    assert page.locator('#practicePaperLibrary .practice-paper-card').count()==1
+    assert page.locator('#practiceLibraryFilters [data-paper-filter]').count()==3
     assert '可练习 20 题' in page.locator('#practicePaperMeta').inner_text()
     assert not page.locator('[name="practiceCount"][value="10"]').is_disabled()
     assert not page.locator('[name="practiceCount"][value="20"]').is_disabled()
@@ -74,8 +81,12 @@ with sync_playwright() as p:
     assert page.locator('.practice-result-stats>div').count()==3
 
     page.locator('#practiceLobbyBtn').click();page.wait_for_timeout(80)
-    assert page.locator('#practiceHistorySection').is_visible()
+    assert page.locator('#practiceHistoryCount').inner_text()=='1'
+    page.locator('#practiceHistoryOpenBtn').click();page.wait_for_timeout(80)
+    assert page.locator('#practiceHistoryDrawer').is_visible()
     assert page.locator('.practice-history-row').count()==1
+    page.locator('#practiceHistoryCloseBtn').click();page.wait_for_timeout(80)
+    assert page.locator('#practiceHistoryDrawer').is_hidden()
     page.locator('[data-practice-start="scholar"]').click();page.wait_for_timeout(160)
     assert page.locator('#practiceTimer').is_visible()
     assert page.locator('#practiceTimeRow').is_visible()

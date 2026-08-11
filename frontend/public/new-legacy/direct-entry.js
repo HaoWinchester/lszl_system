@@ -2,12 +2,29 @@
 
 ;(function (global) {
   const bootstrapUsername = String(global.__KG_DIRECT_BOOTSTRAP__?.username || '')
+  const bootstrapAuthenticated = global.__KG_DIRECT_BOOTSTRAP__?.authenticated === true
   let reloadingForSession = false
+
+  function showLearningEntryChooser() {
+    if (!global.KGLearningEntryChooser || typeof global.KGLearningEntryChooser.init !== 'function') {
+      return Promise.resolve({ shown: false })
+    }
+    return Promise.resolve(global.KGLearningEntryChooser.init()).catch(() => ({ shown: false }))
+  }
+
+  function matchesBootstrap(username) {
+    return bootstrapAuthenticated && !!username && username === bootstrapUsername
+  }
+
+  global.addEventListener('kg:auth-session-changed', (event) => {
+    const nextUsername = String(event?.detail?.username || '')
+    if (event?.detail?.authenticated && matchesBootstrap(nextUsername)) showLearningEntryChooser()
+  })
 
   global.addEventListener('kg-auth-session-change', (event) => {
     if (event?.detail?.provider !== 'remote') return
     const nextUsername = String(event?.detail?.username || '')
-    if (reloadingForSession || nextUsername === bootstrapUsername) return
+    if (reloadingForSession || matchesBootstrap(nextUsername)) return
     reloadingForSession = true
     global.location.reload()
   })
@@ -33,6 +50,7 @@
       else global.KGUserCenter?.open?.()
     }
     decorateMemberEntry()
+    showLearningEntryChooser()
   }
 
   if (document.readyState === 'loading') {

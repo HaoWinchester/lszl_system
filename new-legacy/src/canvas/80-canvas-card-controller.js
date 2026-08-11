@@ -28,6 +28,7 @@
     const onLayoutChange=typeof options.onLayoutChange==='function'?options.onLayoutChange:()=>{};
     const customApply=typeof options.applyLayout==='function'?options.applyLayout:null;
     const onAfterApply=typeof options.onAfterApply==='function'?options.onAfterApply:()=>{};
+    const resolveMovement=typeof options.resolveMovement==='function'?options.resolveMovement:null;
     const policyApi=options.policy&&typeof options.policy.can==='function'
       ?options.policy
       :global.KGCanvasPolicy?.create?.(options.policy||{})||{can:()=>true,allowsCardType:()=>true};
@@ -170,9 +171,11 @@
     function moveDrag(event){
       if(!dragGesture||dragGesture.pointerId!==event.pointerId)return false;
       const zoom=Math.max(.0001,finite(getZoom(),1));
-      const dx=(event.clientX-dragGesture.startX)/zoom;
-      const dy=(event.clientY-dragGesture.startY)/zoom;
-      if(Math.abs(dx)+Math.abs(dy)>1.5)dragGesture.moved=true;
+      const rawDx=(event.clientX-dragGesture.startX)/zoom;
+      const rawDy=(event.clientY-dragGesture.startY)/zoom;
+      const resolved=resolveMovement?.({dx:rawDx,dy:rawDy,event,record:dragGesture.record,gesture:dragGesture})||{dx:rawDx,dy:rawDy};
+      const dx=finite(resolved.dx,rawDx),dy=finite(resolved.dy,rawDy);
+      if(Math.abs(rawDx)+Math.abs(rawDy)>1.5)dragGesture.moved=true;
       syncLayout(dragGesture.record,{
         ...recordLayout(dragGesture.record),
         x:dragGesture.originX+dx,

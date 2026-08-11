@@ -212,3 +212,94 @@ body.qb-training-step .tq-training-option b{color:#2563eb}.tq-training-preview-e
 body.qb-training-step #qbRecallPanel .qb-panel-head p::after{content:' 科目级知识联想库已移至知识树页面集中维护。';color:#667085}
 @media(max-width:1080px){body.qb-training-step .qb-editor>#qbMainWorkspace{height:auto;min-height:820px}body.qb-training-step #qbQuestionPaneBody{min-height:430px;max-height:none}body.qb-training-step .tq-training-preview{flex-basis:300px;min-height:300px;max-height:none}}
 @media(max-width:620px){body.qb-training-step .qb-question-tools{grid-template-columns:1fr!important}body.qb-training-step .tq-training-filter-summary b{display:none}}
+
+/* V9.0-P4.2.0 maintenance — restore vertical resizing and full training preview. */
+body.qb-training-step .qb-editor>#qbMainWorkspace{
+  height:var(--tq-training-left-height,880px);
+  min-height:720px;
+}
+body.qb-training-step .tq-training-workspace-splitter{
+  height:var(--tq-training-left-height,880px);
+}
+body.qb-training-step .tq-training-preview{
+  flex:0 0 var(--tq-training-preview-height,380px);
+  min-height:240px;
+  max-height:none;
+  margin-top:0;
+}
+body.qb-training-step .tq-training-height-splitter{
+  position:relative;
+  display:grid;
+  place-items:center;
+  flex:0 0 14px;
+  width:auto;
+  height:14px;
+  min-height:14px;
+  cursor:row-resize;
+  touch-action:none;
+  user-select:none;
+  color:#94a3b8;
+  background:transparent;
+  z-index:12;
+}
+body.qb-training-step .tq-training-height-splitter span{
+  width:min(190px,42%);
+  height:4px;
+  border-radius:999px;
+  background:currentColor;
+  transition:width .15s ease,color .15s ease,box-shadow .15s ease;
+}
+body.qb-training-step .tq-training-height-splitter:hover,
+body.qb-training-step .tq-training-height-splitter.dragging{color:#2563eb;background:rgba(239,246,255,.78)}
+body.qb-training-step .tq-training-height-splitter:hover span,
+body.qb-training-step .tq-training-height-splitter.dragging span{width:min(250px,54%);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+body.qb-training-step .tq-training-height-splitter:focus-visible{outline:3px solid rgba(37,99,235,.22);outline-offset:-2px}
+body.qb-training-step .tq-training-workspace-height-splitter{
+  position:absolute;
+  left:10px;
+  right:10px;
+  bottom:0;
+  width:auto;
+  border-radius:8px 8px 16px 16px;
+  background:rgba(248,250,252,.92);
+  box-shadow:0 -1px 0 rgba(148,163,184,.2);
+}
+body.qb-training-step .tq-training-preview-splitter{margin:0 10px;border-radius:8px;background:#f8fafc}
+html.tq-training-row-resizing,html.tq-training-row-resizing *{cursor:row-resize!important;user-select:none!important}
+body.qb-training-step .tq-training-option{grid-template-columns:26px minmax(0,1fr) auto}
+body.qb-training-step .tq-training-option>em{align-self:center;padding:3px 7px;border-radius:999px;background:#dcfce7;color:#15803d;font-size:9px;font-style:normal;font-weight:900;white-space:nowrap}
+body.qb-training-step .tq-training-option.correct{border-color:#86efac;background:#f0fdf4;box-shadow:0 0 0 1px rgba(34,197,94,.08)}
+body.qb-training-step .tq-training-option.correct b{color:#15803d}
+body.qb-training-step .tq-training-analysis p{margin:0;padding:10px 12px;border-radius:10px;background:#f8fafc;color:#475569;font-size:11px;line-height:1.72;white-space:pre-wrap}
+@media(max-width:1080px){
+  body.qb-training-step .qb-editor>#qbMainWorkspace{height:auto;min-height:820px}
+  body.qb-training-step .tq-training-height-splitter{display:none!important}
+  body.qb-training-step .tq-training-preview{flex-basis:auto;min-height:300px;max-height:none}
+}
+
+/* V9.0-P4.3.13 — lightweight difficulty, principle and preset configuration. */
+.tq-difficulty-field{align-self:end}
+.tq-star-rating{display:flex;align-items:center;gap:3px;min-height:40px;padding:4px 7px;border:1px solid #dbe3ee;border-radius:10px;background:#fff}
+.tq-star-rating button{width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:#cbd5e1;font-size:18px;line-height:1;box-shadow:none}
+.tq-star-rating button:hover,.tq-star-rating button.active{transform:none;background:#fff7ed;color:#f59e0b}
+.tq-star-rating button.clear{width:24px;margin-left:auto;color:#94a3b8;font-size:15px}
+.qb-classification-fields{grid-template-columns:minmax(180px,.9fr) minmax(260px,1.25fr) minmax(230px,1fr) minmax(230px,1fr)!important}
+.tq-principle-config-panel{min-height:500px}
+.tq-principle-workspace{display:grid;grid-template-columns:minmax(220px,31%) minmax(0,1fr);gap:14px;min-height:430px}
+.tq-principle-list{display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid #e2e8f0;border-radius:14px;background:#f8fafc;overflow:auto}
+.tq-principle-row{display:grid;gap:4px;width:100%;padding:11px 12px;border:1px solid transparent;border-radius:11px;background:#fff;color:#334155;text-align:left;box-shadow:none}
+.tq-principle-row:hover,.tq-principle-row.active{transform:none;border-color:#93c5fd;background:#eff6ff}
+.tq-principle-row strong{font-size:13px}.tq-principle-row span,.tq-principle-row small{color:#64748b;font-size:10px}
+.tq-principle-editor{display:grid;grid-template-columns:1fr 180px;gap:12px;align-content:start;padding:14px;border:1px solid #e2e8f0;border-radius:14px;background:#fff}
+.tq-principle-editor .wide{grid-column:1/-1}.tq-preset-divider{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:3px;padding-top:13px;border-top:1px solid #e2e8f0}.tq-preset-divider span{font-weight:900}.tq-preset-divider small{color:#64748b}
+.tq-confusable-principles,.tq-principle-picker-options{display:flex;flex-wrap:wrap;gap:8px;min-height:42px;padding:9px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc}
+.tq-confusable-principles label,.tq-principle-picker-options label{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border:1px solid #e2e8f0;border-radius:999px;background:#fff;font-size:11px;font-weight:750}
+.tq-bulk-star-options{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:18px}.tq-bulk-star-options button{display:grid;gap:6px;place-items:center;min-height:84px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;color:#f59e0b;font-size:20px}.tq-bulk-star-options button small{color:#475569;font-size:11px}
+body.qb-question-step [data-annotation-tab="principles"],body.qb-question-step [data-layout-nav="principles"]{display:none!important}
+body.qb-training-step [data-annotation-tab="principles"],body.qb-training-step [data-layout-nav="principles"]{display:inline-flex!important}
+@media(max-width:1180px){.qb-classification-fields{grid-template-columns:repeat(2,minmax(0,1fr))!important}.tq-principle-workspace{grid-template-columns:1fr}.tq-principle-list{max-height:220px}}
+@media(max-width:720px){.qb-classification-fields{grid-template-columns:1fr!important}.tq-principle-editor{grid-template-columns:1fr}.tq-principle-editor .wide,.tq-preset-divider{grid-column:1}.tq-preset-divider{align-items:flex-start;flex-direction:column}}
+
+/* P4.3.13 training configuration tabs remain visible in the active Teacher Workbench. */
+body.qb-training-step .qb-annotation-tabs{display:flex!important;flex-wrap:wrap;gap:6px}
+body.qb-training-step .qb-annotation-card>.qb-card-title p::after{content:"配置训练关键词、原则与系统预设归纳卡。"}

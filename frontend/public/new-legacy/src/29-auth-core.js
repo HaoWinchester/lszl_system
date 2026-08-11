@@ -154,10 +154,27 @@
       return true;
     }catch(e){return false}
   }
+  function serverLoginSessionId(payload){
+    const value=payload?.loginSessionId||payload?.login_session_id||payload?.user?.loginSessionId||payload?.user?.login_session_id||"";
+    return typeof value==="string"&&value.trim()?value.trim():"";
+  }
+  function notifyRemoteSession(username,loginSessionId,previousLoginSessionId){
+    if(loginSessionId!==previousLoginSessionId){
+      window.dispatchEvent(new CustomEvent("kg:auth-session-changed",{detail:{authenticated:!!username,username,loginSessionId}}));
+    }
+    window.dispatchEvent(new CustomEvent("kg-auth-session-change",{detail:{username,provider:"remote"}}));
+  }
   function remoteUser(){
     const session = readRemoteSession();
     if(!session?.user) return null;
     return normalizeUser(session.user.username || session.username || "remote-user", {...session.user, source:"remote"});
+  }
+  function getCurrentSession(){
+    if(providerConfig().mode!=="remote")return {authenticated:false,user:null,loginSessionId:""};
+    const stored=readRemoteSession();
+    const user=remoteUser();
+    const loginSessionId=String(stored?.loginSessionId||stored?.user?.loginSessionId||"");
+    return {authenticated:!!user&&!!loginSessionId,user,loginSessionId};
   }
   function endpointUrl(path){
     const config = providerConfig();
@@ -279,9 +296,10 @@
       try{
         const payload=await remoteRequest(providerConfig().endpoints.login,{body:{username,password,context}});
         const user=normalizeUser(payload.user?.username||payload.username||username,{...(payload.user||{}),username:payload.user?.username||payload.username||username,source:"remote"});
-        writeRemoteSession({user,token:payload.token||"",issuedAt:Date.now()});
+        const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{}),loginSessionId=serverLoginSessionId(payload);
+        writeRemoteSession({user,token:payload.token||"",loginSessionId,issuedAt:Date.now()});
         try{if(Store.remove)Store.remove(AUTH_SESSION_KEY);else localStorage.removeItem(AUTH_SESSION_KEY)}catch(e){}
-        window.dispatchEvent(new CustomEvent("kg-auth-session-change",{detail:{username:user.username,provider:"remote"}}));
+        notifyRemoteSession(user.username,loginSessionId,previousLoginSessionId);
         return {ok:true,user,message:String(payload.message||"登录成功")};
       }catch(error){return {ok:false,message:String(error?.message||error)}}
     }
@@ -305,9 +323,10 @@
       try{
         const payload=await remoteRequest(config.endpoints.register,{body:{username,password,context}});
         const user=normalizeUser(payload.user?.username||payload.username||username,{...(payload.user||{}),username:payload.user?.username||payload.username||username,source:"remote"});
-        writeRemoteSession({user,token:payload.token||"",issuedAt:Date.now()});
+        const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{}),loginSessionId=serverLoginSessionId(payload);
+        writeRemoteSession({user,token:payload.token||"",loginSessionId,issuedAt:Date.now()});
         try{if(Store.remove)Store.remove(AUTH_SESSION_KEY);else localStorage.removeItem(AUTH_SESSION_KEY)}catch(e){}
-        window.dispatchEvent(new CustomEvent("kg-auth-session-change",{detail:{username:user.username,provider:"remote"}}));
+        notifyRemoteSession(user.username,loginSessionId,previousLoginSessionId);
         return {ok:true,user,message:String(payload.message||"注册成功")};
       }catch(error){return {ok:false,message:String(error?.message||error)}}
     }
@@ -324,9 +343,10 @@
     const username=currentUsername();
     if(config.mode==="remote"){
       try{await remoteRequest(config.endpoints.logout,{body:{context}})}catch(error){console.warn("[KGAuthCore] remote logout failed",error)}
+      const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{});
       writeRemoteSession(null);
       try{if(Store.remove)Store.remove(AUTH_SESSION_KEY);else localStorage.removeItem(AUTH_SESSION_KEY)}catch(e){}
-      window.dispatchEvent(new CustomEvent("kg-auth-session-change",{detail:{username:"",provider:"remote"}}));
+      notifyRemoteSession("","",previousLoginSessionId);
       return {ok:true,username};
     }
     if(username)logAction("用户退出",username,String(context.source||"本地退出"));
@@ -339,12 +359,13 @@
     try{
       const payload=await remoteRequest(config.endpoints.session,{method:"GET"});
       const username=payload.user?.username||payload.username||"";
-      if(!username){writeRemoteSession(null);return {ok:false,user:null,provider:"remote"}}
+      if(!username){const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{});writeRemoteSession(null);notifyRemoteSession("","",previousLoginSessionId);return {ok:false,user:null,provider:"remote"}}
       const user=normalizeUser(username,{...(payload.user||{}),username,source:"remote"});
-      writeRemoteSession({user,token:payload.token||readRemoteSession()?.token||"",issuedAt:Date.now()});
-      window.dispatchEvent(new CustomEvent("kg-auth-session-change",{detail:{username:user.username,provider:"remote"}}));
+      const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{}),loginSessionId=serverLoginSessionId(payload);
+      writeRemoteSession({user,token:payload.token||readRemoteSession()?.token||"",loginSessionId,issuedAt:Date.now()});
+      notifyRemoteSession(user.username,loginSessionId,previousLoginSessionId);
       return {ok:true,user,provider:"remote"};
-    }catch(error){writeRemoteSession(null);return {ok:false,user:null,provider:"remote",message:String(error?.message||error)}}
+    }catch(error){const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{});writeRemoteSession(null);notifyRemoteSession("","",previousLoginSessionId);return {ok:false,user:null,provider:"remote",message:String(error?.message||error)}}
   }
   async function updateProfile(patch={}){
     const username=currentUsername();if(!username)return {ok:false,message:"请先登录。"};
@@ -361,7 +382,8 @@
         new_password:patch.newPassword||undefined
       }});
       const raw=payload.user||{};const user=normalizeUser(raw.username||username,{...raw,source:"remote"});
-      writeRemoteSession({user,token:readRemoteSession()?.token||"",issuedAt:Date.now()});
+      const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{}),loginSessionId=serverLoginSessionId(payload)||serverLoginSessionId(readRemoteSession()||{});
+      writeRemoteSession({user,token:readRemoteSession()?.token||"",loginSessionId,issuedAt:Date.now()});
       window.dispatchEvent(new CustomEvent("kg-user-profile-updated",{detail:{username:user.username,user}}));
       window.dispatchEvent(new CustomEvent("kg-auth-session-change",{detail:{username:user.username,provider:"remote"}}));
       return {ok:true,user,message:String(payload.message||"个人资料已保存。")} ;
@@ -405,6 +427,7 @@
     setCurrentUsername,
     clearSession,
     currentUser,
+    getCurrentSession,
     hasAdmin,
     passwordHash,
     verifyPassword,

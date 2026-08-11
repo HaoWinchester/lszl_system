@@ -1,0 +1,2 @@
+'use strict';
+(function(global){const root=global.KGTeacherDomains=global.KGTeacherDomains||{};root.KnowledgeTree=Object.freeze({subjectFor:id=>global.KGLearningContent?.subjectById?.(id)||null,currentForSubject:id=>global.KGLearningContent?.defaultTaxonomyForSubject?.(id)||null,pathFor:(taxonomyId,nodeId)=>global.KGLearningContent?.pathForNode?.(taxonomyId,nodeId)||[],nodeById:(taxonomyId,nodeId)=>global.KGLearningContent?.nodeById?.(taxonomyId,nodeId)||null})})(globalThis);

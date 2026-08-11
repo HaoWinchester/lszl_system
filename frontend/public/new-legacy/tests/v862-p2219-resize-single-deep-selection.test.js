@@ -10,15 +10,11 @@ assert(css.includes('.qw-card-width-resize::after'));
 assert(css.includes('height:80px!important'));
 
 const workspace=read('src/77-multi-question-workspace.js');
-assert(workspace.includes("singleDeepPendingNodeId:''"));
-assert(workspace.includes("const selectedIds=[...state.selectedNodeIds].map(String)"));
-assert(workspace.includes("byId('qwOpenSingleDeepBtn')?.addEventListener('pointerdown',captureSingleDeepTarget)"));
-assert(workspace.includes("url.searchParams.set('questionId',String(node.questionId))"));
-assert(workspace.includes("url.searchParams.set('bankId',String(node.bankId))"));
-assert(workspace.includes("url.searchParams.set('paperId',String(node.paperId))"));
-assert(workspace.includes("url.searchParams.set('releaseId',String(node.releaseId))"));
-assert(workspace.includes("preferredQuestionNodeForSingleDeep,"));
-assert(workspace.includes("captureSingleDeepTarget,"));
+assert(!workspace.includes("singleDeepPendingNodeId:''"));
+assert(!workspace.includes("qwOpenSingleDeepBtn"));
+assert(!workspace.includes("new URL('question-training.html'"));
+assert(!workspace.includes("preferredQuestionNodeForSingleDeep,"));
+assert(!workspace.includes("captureSingleDeepTarget,"));
 
 const navigator=read('src/66-question-navigator.js');
 assert(navigator.includes("function findQuestion(questionId,bankId='',paperId='',releaseId='')"));

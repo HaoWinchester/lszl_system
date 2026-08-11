@@ -1,0 +1,18 @@
+/* V9.0-P4.3.27 — keep multi-selection bounds visible while grouped items move. */
+.stage.home-selection-bounds-dragging .uc-selection-bounds,
+.stage.home-selection-bounds-dragging.graph-card-dragging .uc-selection-bounds,
+.stage.home-selection-bounds-dragging.graph-edge-drag-lite .uc-selection-bounds{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:none!important;
+  transition:none!important;
+}
+body.question-workspace-page.qw-selection-bounds-dragging .uc-selection-bounds,
+body.question-workspace-page.qw-selection-bounds-dragging.qw-selection-toolbar-motion .uc-selection-bounds{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:none!important;
+  transition:none!important;
+}

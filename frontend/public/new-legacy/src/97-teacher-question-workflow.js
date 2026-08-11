@@ -17,7 +17,10 @@
   const batchEditor={mode:'defaults',itemIndex:-1,tab:'knowledge',knowledgeMode:'auto',knowledgeId:'',tags:new Set(),tagGroupId:'usage',tagCategoryId:'stage'};
   const TRAINING_WORKSPACE_LAYOUT_KEY='kg_question_training_workspace_layout_v1';
   const TRAINING_FILTERS_COLLAPSED_KEY='kg_question_training_filters_collapsed_v1';
+  const TrainingWorkspaceLayout=window.KGTeacherDomains?.TrainingConfig?.WorkspaceLayout?.create?.({key:TRAINING_WORKSPACE_LAYOUT_KEY,store:window.KGAppStorage})||null;
   let trainingWorkspaceRatio=.40;
+  let trainingWorkspaceLeftHeight=880;
+  let trainingPreviewHeight=380;
   let trainingFiltersCollapsed=true;
 
   function click(selector){const node=document.querySelector(selector);if(node)node.click()}
@@ -110,12 +113,15 @@
     splitter.setAttribute('aria-valuetext',`题目区域 ${Math.round(trainingWorkspaceRatio*100)}%，训练配置区域 ${Math.round((1-trainingWorkspaceRatio)*100)}%`);
     document.dispatchEvent(new CustomEvent('kg-training-workspace-resized',{detail:{ratio:trainingWorkspaceRatio}}));
   }
-  function persistTrainingWorkspaceRatio(){
-    try{localStorage.setItem(TRAINING_WORKSPACE_LAYOUT_KEY,JSON.stringify({ratio:trainingWorkspaceRatio}))}catch(error){}
+  function persistTrainingWorkspaceLayout(patch={}){
+    const next={ratio:trainingWorkspaceRatio,leftHeight:trainingWorkspaceLeftHeight,previewHeight:trainingPreviewHeight,...patch};
+    if(TrainingWorkspaceLayout){TrainingWorkspaceLayout.save(next);return}
+    try{localStorage.setItem(TRAINING_WORKSPACE_LAYOUT_KEY,JSON.stringify({...next,updatedAt:Date.now()}))}catch(error){}
   }
+  function persistTrainingWorkspaceRatio(){persistTrainingWorkspaceLayout({ratio:trainingWorkspaceRatio})}
   function initTrainingWorkspaceSplitter(){
     const editor=document.querySelector('body.qb-training-step .qb-editor'),splitter=byId('tqTrainingWorkspaceSplitter');if(!editor||!splitter)return;
-    try{const saved=JSON.parse(localStorage.getItem(TRAINING_WORKSPACE_LAYOUT_KEY)||'{}');if(Number(saved.ratio)>0)trainingWorkspaceRatio=Number(saved.ratio)}catch(error){}
+    try{const saved=TrainingWorkspaceLayout?TrainingWorkspaceLayout.read():JSON.parse(localStorage.getItem(TRAINING_WORKSPACE_LAYOUT_KEY)||'{}');if(Number(saved.ratio)>0)trainingWorkspaceRatio=Number(saved.ratio);if(Number(saved.leftHeight)>0)trainingWorkspaceLeftHeight=Number(saved.leftHeight);if(Number(saved.previewHeight)>0)trainingPreviewHeight=Number(saved.previewHeight)}catch(error){}
     let dragging=false;
     const update=clientX=>{const rect=editor.getBoundingClientRect(),available=Math.max(1,rect.width-(splitter.offsetWidth||14)),bounds=trainingWorkspaceBounds(available);trainingWorkspaceRatio=Math.min(bounds.maximum,Math.max(bounds.minimum,(clientX-rect.left)/available));applyTrainingWorkspaceRatio()};
     splitter.addEventListener('pointerdown',event=>{if(window.innerWidth<=1080)return;dragging=true;splitter.classList.add('dragging');splitter.setPointerCapture?.(event.pointerId);update(event.clientX);event.preventDefault()});
@@ -125,6 +131,56 @@
     splitter.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||window.innerWidth<=1080)return;event.preventDefault();const available=Math.max(1,editor.clientWidth-(splitter.offsetWidth||14)),bounds=trainingWorkspaceBounds(available);if(event.key==='Home')trainingWorkspaceRatio=bounds.minimum;else if(event.key==='End')trainingWorkspaceRatio=bounds.maximum;else trainingWorkspaceRatio=Math.min(bounds.maximum,Math.max(bounds.minimum,trainingWorkspaceRatio+(event.key==='ArrowRight'?.02:-.02)));applyTrainingWorkspaceRatio();persistTrainingWorkspaceRatio()});
     window.addEventListener('resize',applyTrainingWorkspaceRatio,{passive:true});
     requestAnimationFrame(applyTrainingWorkspaceRatio);
+  }
+
+  function trainingHeightBounds(){
+    const minimum=720,maximum=1600;
+    return {minimum,maximum};
+  }
+  function trainingPreviewBounds(){
+    const workspace=byId('qbMainWorkspace'),panel=byId('qbQuestionTabPanel');
+    const available=Math.max(600,workspace?.clientHeight||trainingWorkspaceLeftHeight);
+    const header=panel?.querySelector('.qb-management-pane-head')?.offsetHeight||54;
+    const minimum=240;
+    const maximum=Math.max(minimum,available-header-330-24);
+    return {minimum,maximum:Math.min(900,maximum)};
+  }
+  function applyTrainingWorkspaceHeights(){
+    const workspace=byId('qbMainWorkspace'),widthSplitter=byId('tqTrainingWorkspaceSplitter'),workspaceHandle=byId('tqTrainingWorkspaceHeightSplitter'),preview=byId('tqTrainingPreview'),previewHandle=byId('tqTrainingPreviewSplitter');
+    if(!workspace||!preview)return;
+    if(window.innerWidth<=1080){
+      workspace.style.removeProperty('--tq-training-left-height');
+      preview.style.removeProperty('--tq-training-preview-height');
+      workspaceHandle?.setAttribute('aria-hidden','true');previewHandle?.setAttribute('aria-hidden','true');
+      return;
+    }
+    const heightBounds=trainingHeightBounds();trainingWorkspaceLeftHeight=Math.min(heightBounds.maximum,Math.max(heightBounds.minimum,Number(trainingWorkspaceLeftHeight)||880));
+    workspace.style.setProperty('--tq-training-left-height',`${Math.round(trainingWorkspaceLeftHeight)}px`);
+    widthSplitter?.style.setProperty('--tq-training-left-height',`${Math.round(trainingWorkspaceLeftHeight)}px`);
+    const previewBounds=trainingPreviewBounds();trainingPreviewHeight=Math.min(previewBounds.maximum,Math.max(previewBounds.minimum,Number(trainingPreviewHeight)||380));
+    preview.style.setProperty('--tq-training-preview-height',`${Math.round(trainingPreviewHeight)}px`);
+    if(workspaceHandle){workspaceHandle.removeAttribute('aria-hidden');workspaceHandle.setAttribute('aria-valuemin',String(heightBounds.minimum));workspaceHandle.setAttribute('aria-valuemax',String(heightBounds.maximum));workspaceHandle.setAttribute('aria-valuenow',String(Math.round(trainingWorkspaceLeftHeight)));workspaceHandle.setAttribute('aria-valuetext',`题目工作区 ${Math.round(trainingWorkspaceLeftHeight)} 像素`)}
+    if(previewHandle){previewHandle.removeAttribute('aria-hidden');previewHandle.setAttribute('aria-valuemin',String(Math.round(previewBounds.minimum)));previewHandle.setAttribute('aria-valuemax',String(Math.round(previewBounds.maximum)));previewHandle.setAttribute('aria-valuenow',String(Math.round(trainingPreviewHeight)));previewHandle.setAttribute('aria-valuetext',`题目预览 ${Math.round(trainingPreviewHeight)} 像素`)}
+    document.dispatchEvent(new CustomEvent('kg-training-workspace-height-resized',{detail:{leftHeight:trainingWorkspaceLeftHeight,previewHeight:trainingPreviewHeight}}));
+  }
+  function bindTrainingHeightHandle(handle,{getValue,setValue,bounds,defaultValue}){
+    if(!handle)return;let dragging=false,startY=0,startValue=0;
+    const update=clientY=>{const range=bounds();setValue(Math.min(range.maximum,Math.max(range.minimum,startValue+(clientY-startY))));applyTrainingWorkspaceHeights()};
+    handle.addEventListener('pointerdown',event=>{if(window.innerWidth<=1080)return;dragging=true;startY=event.clientY;startValue=getValue();handle.classList.add('dragging');document.documentElement.classList.add('tq-training-row-resizing');handle.setPointerCapture?.(event.pointerId);event.preventDefault()});
+    handle.addEventListener('pointermove',event=>{if(dragging)update(event.clientY)});
+    const finish=event=>{if(!dragging)return;dragging=false;handle.classList.remove('dragging');document.documentElement.classList.remove('tq-training-row-resizing');try{handle.releasePointerCapture?.(event.pointerId)}catch(error){}persistTrainingWorkspaceLayout()};
+    handle.addEventListener('pointerup',finish);handle.addEventListener('pointercancel',finish);
+    const reset=()=>{setValue(defaultValue);applyTrainingWorkspaceHeights();persistTrainingWorkspaceLayout()};
+    handle.addEventListener('dblclick',event=>{event.preventDefault();reset()});
+    handle.addEventListener('keydown',event=>{if(window.innerWidth<=1080||!['ArrowUp','ArrowDown','PageUp','PageDown','Home','End','Enter'].includes(event.key))return;event.preventDefault();const range=bounds(),step=event.key.startsWith('Page')?64:20;if(event.key==='Home')setValue(range.minimum);else if(event.key==='End')setValue(range.maximum);else if(event.key==='Enter'){reset();return}else setValue(Math.min(range.maximum,Math.max(range.minimum,getValue()+(event.key==='ArrowDown'||event.key==='PageDown'?step:-step))));applyTrainingWorkspaceHeights();persistTrainingWorkspaceLayout()});
+  }
+  function initTrainingHeightSplitters(){
+    const workspace=byId('qbMainWorkspace'),preview=byId('tqTrainingPreview');if(!workspace||!preview)return;
+    let workspaceHandle=byId('tqTrainingWorkspaceHeightSplitter');if(!workspaceHandle){workspaceHandle=document.createElement('div');workspaceHandle.id='tqTrainingWorkspaceHeightSplitter';workspaceHandle.className='tq-training-height-splitter tq-training-workspace-height-splitter';workspaceHandle.setAttribute('role','separator');workspaceHandle.setAttribute('tabindex','0');workspaceHandle.setAttribute('aria-orientation','horizontal');workspaceHandle.setAttribute('aria-label','拖动调整左侧题目工作区高度；双击恢复默认高度');workspaceHandle.innerHTML='<span></span>';workspace.appendChild(workspaceHandle)}
+    let previewHandle=byId('tqTrainingPreviewSplitter');if(!previewHandle){previewHandle=document.createElement('div');previewHandle.id='tqTrainingPreviewSplitter';previewHandle.className='tq-training-height-splitter tq-training-preview-splitter';previewHandle.setAttribute('role','separator');previewHandle.setAttribute('tabindex','0');previewHandle.setAttribute('aria-orientation','horizontal');previewHandle.setAttribute('aria-label','拖动调整题目列表与题目预览高度；双击恢复默认高度');previewHandle.innerHTML='<span></span>';preview.insertAdjacentElement('beforebegin',previewHandle)}
+    bindTrainingHeightHandle(workspaceHandle,{getValue:()=>trainingWorkspaceLeftHeight,setValue:value=>{trainingWorkspaceLeftHeight=value},bounds:trainingHeightBounds,defaultValue:880});
+    bindTrainingHeightHandle(previewHandle,{getValue:()=>trainingPreviewHeight,setValue:value=>{trainingPreviewHeight=value},bounds:trainingPreviewBounds,defaultValue:380});
+    window.addEventListener('resize',applyTrainingWorkspaceHeights,{passive:true});requestAnimationFrame(applyTrainingWorkspaceHeights);
   }
 
   function trainingFilterSummaryText(){
@@ -342,13 +398,17 @@
   }
 
   function installTrainingPreview(){
-    const panel=byId('qbQuestionTabPanel');if(!panel||byId('tqTrainingPreview'))return;const preview=document.createElement('section');preview.className='tq-training-preview';preview.id='tqTrainingPreview';preview.setAttribute('aria-label','当前题目的题干与选项预览');panel.appendChild(preview);
+    const panel=byId('qbQuestionTabPanel');if(!panel||byId('tqTrainingPreview'))return;const preview=document.createElement('section');preview.className='tq-training-preview';preview.id='tqTrainingPreview';preview.setAttribute('aria-label','当前题目的题干、选项与解析预览');panel.appendChild(preview);
     const update=()=>{
       const stem=clean(byId('questionStemInput')?.value)||'从上方题目列表选择一道题目。';
+      const correct=clean(document.querySelector('#qbOptionsEditor input[name="correctOption"]:checked')?.value);
       const options=[...document.querySelectorAll('#qbOptionsEditor .qb-option-row')].map(row=>({id:clean(row.querySelector('.option-id')?.value),text:clean(row.querySelector('.option-text')?.value)})).filter(item=>item.id||item.text);
-      preview.innerHTML=`<div class="tq-training-preview-head"><div><span>题目预览</span><strong>题干与选项</strong></div><em>随当前题目即时更新</em></div><div class="tq-training-preview-scroll"><section class="tq-training-preview-section"><h4>题干</h4><p class="tq-training-stem">${escapeHTML(stem)}</p></section><section class="tq-training-preview-section"><h4>选项</h4><div class="tq-training-options">${options.length?options.map(item=>`<div class="tq-training-option"><b>${escapeHTML(item.id)}</b><span>${escapeHTML(item.text)}</span></div>`).join(''):'<div class="tq-training-preview-empty">尚未设置选项。</div>'}</div></section></div>`;
+      const analysis=clean(byId('questionAnalysisInput')?.value);
+      preview.innerHTML=`<div class="tq-training-preview-head"><div><span>题目预览</span><strong>题干、选项与解析</strong></div><em>随当前题目即时更新</em></div><div class="tq-training-preview-scroll"><section class="tq-training-preview-section"><h4>题干</h4><p class="tq-training-stem">${escapeHTML(stem)}</p></section><section class="tq-training-preview-section"><h4>选项</h4><div class="tq-training-options">${options.length?options.map(item=>`<div class="tq-training-option ${item.id===correct?'correct':''}"><b>${escapeHTML(item.id)}</b><span>${escapeHTML(item.text)}</span>${item.id===correct?'<em>正确答案</em>':''}</div>`).join(''):'<div class="tq-training-preview-empty">尚未设置选项。</div>'}</div></section><section class="tq-training-preview-section tq-training-analysis"><h4>解析</h4><p>${analysis?escapeHTML(analysis):'尚未填写解析。'}</p></section></div>`;
     };
-    document.addEventListener('click',event=>{if(event.target.closest('[data-question-id],#qbAddQuestionBtn'))setTimeout(update,0)});const optionWrap=byId('qbOptionsEditor');if(optionWrap){new MutationObserver(update).observe(optionWrap,{childList:true,subtree:true});optionWrap.addEventListener('input',update);optionWrap.addEventListener('change',update)}byId('questionStemInput')?.addEventListener('input',update);setTimeout(update,0);
+    document.addEventListener('click',event=>{if(event.target.closest('[data-question-id],#qbAddQuestionBtn'))setTimeout(update,0)});document.addEventListener('kg-question-form-filled',()=>setTimeout(update,0));
+    const optionWrap=byId('qbOptionsEditor');if(optionWrap){new MutationObserver(update).observe(optionWrap,{childList:true,subtree:true,attributes:true,attributeFilter:['checked']});optionWrap.addEventListener('input',update);optionWrap.addEventListener('change',update)}
+    byId('questionStemInput')?.addEventListener('input',update);byId('questionAnalysisInput')?.addEventListener('input',update);setTimeout(update,0);
   }
 
   function configureSimple(){
@@ -357,7 +417,7 @@
     document.querySelector('[data-main-tab="banks"]')?.replaceChildren(document.createTextNode('题库与题目'));document.querySelector('[data-main-tab="base"]')?.replaceChildren(document.createTextNode('题目内容'));insertGuide();bindQuickEntry();
     if(step==='training'){
       const strip=document.querySelector('.qb-subject-strip>div');if(strip){const title=strip.querySelector('strong'),hint=strip.querySelector('span');if(title)title.textContent='选择训练科目';if(hint)hint.textContent='点击科目按钮切换；当前科目使用深灰色底纹，题库下拉框只显示该科目的题库。'}
-      click('[data-layout-nav="questions"]');click('[data-annotation-tab="recall"]');installTrainingFilterToggle();installTrainingPreview();initTrainingWorkspaceSplitter();byId('tqSaveTrainingBtn')?.addEventListener('click',()=>byId('qbSyncRecallConfigBtn')?.click())
+      click('[data-layout-nav="questions"]');click('[data-annotation-tab="recall"]');installTrainingFilterToggle();installTrainingPreview();initTrainingWorkspaceSplitter();initTrainingHeightSplitters();byId('tqSaveTrainingBtn')?.addEventListener('click',()=>byId('qbSyncRecallConfigBtn')?.click())
     }
     else{const requestedView=params.get('view'),requestedEntry=params.get('entry');click(requestedView==='content'?'[data-main-tab="base"]':'[data-main-tab="banks"]');const startNew=()=>{click('[data-main-tab="base"]');setEntryMode('paste');setPasteMode('single');resetPaste()};byId('tqNewQuestionBtn')?.addEventListener('click',startNew);byId('tqOpenQuestionBtn')?.addEventListener('click',()=>{click('[data-main-tab="base"]');setEntryMode('manual')});byId('qbAddQuestionBtn')?.addEventListener('click',()=>setTimeout(()=>{click('[data-main-tab="base"]');setEntryMode('paste');setPasteMode('single');resetPaste()},0));setEntryMode(requestedEntry==='manual'?'manual':'paste');if(requestedView==='content'&&requestedEntry!=='manual')requestAnimationFrame(()=>byId('tqPasteInput')?.focus())}
   }

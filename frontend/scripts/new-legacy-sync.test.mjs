@@ -20,6 +20,7 @@ const requiredPages = [
 ]
 const requiredFiles = [
   'src/01-runtime-config.js',
+  'src/31-learning-entry-chooser.js',
   'src/23-graph-file-store.js',
   'src/64-flow-orchestrator.js',
   'src/86-activity-schema-v1.js',
@@ -84,8 +85,10 @@ function fixture({ omit } = {}) {
       ? '<script defer src="src/24-graph-file-autosave.js"></script><script defer src="src/30-auth-guards.js"></script><script defer src="src/60-question-bank.js"></script>'
       : page === 'question-training.html'
         ? '<script defer src="src/59-published-paper-repository.js"></script><script defer src="src/72-question-training-page.js"></script>'
-        : ['question-workspace.html', 'knowledge-recall.html'].includes(page)
-          ? '<script defer src="src/59-published-paper-repository.js"></script>'
+        : page === 'question-workspace.html'
+          ? '<script defer src="src/59-published-paper-repository.js"></script><script defer src="src/77-multi-question-workspace.js"></script>'
+          : page === 'knowledge-recall.html'
+            ? '<script defer src="src/59-published-paper-repository.js"></script><script defer src="src/96-recall-question-source.js"></script>'
           : ''
     write(resolve(upstream, page), `<!doctype html><html><head></head><body><script defer src="src/01-runtime-config.js"></script>${authScript}</body></html>`)
   }

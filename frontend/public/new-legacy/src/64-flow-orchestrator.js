@@ -23,15 +23,19 @@
     const d=questions?.descriptor?.()||{};
     const q=d.question||{};
     return {
-      questionId:String(d.id||q.sourceQuestionId||q.id||q.title||'current'),
+      paperId:String(d.paperId||q.sourcePaperId||''),
+      releaseId:String(d.releaseId||q.sourceReleaseId||''),
+      questionId:String(d.questionId||d.id||q.sourceQuestionId||q.id||q.title||'current'),
       questionRevision:String(d.revision||q.version||q.updatedAt||'1'),
       questionTitle:String(d.title||q.title||''),
       bankId:String(d.bankId||q.sourceBankId||''),
+      mode:String(d.mode||'single_deep_study'),
       correctAnswerId:String(q.correctAnswer||'')
     };
   }
   function makeRuntimeKey(context=descriptor()){
-    return userId()+'::'+String(context.questionId||'current');
+    const key=sessions?.contextKey?.(context)||[context.paperId,context.releaseId,context.questionId].map(String).join('::');
+    return userId()+'::'+key;
   }
   function event(type,payload={},session=active){
     if(!events?.append)return null;
@@ -61,7 +65,7 @@
     const context=descriptor();
     const nextRuntimeKey=makeRuntimeKey(context);
     if(active&&runtimeKey===nextRuntimeKey&&!options.force)return clone(active);
-    const existing=sessions.get(context.questionId,userId());
+    const existing=sessions.get(context,userId());
     const session=sessions.ensure(context,{restartCompleted:!!options.restartCompleted,userId:userId()});
     const reason=existing&&session.id===existing.id?'restore':'start';
     return useSession(session,reason);
@@ -77,7 +81,7 @@
   function persist(mutator,eventType='',eventPayload={}){
     const current=ensureCurrent();
     if(!current||!sessions)return null;
-    const saved=sessions.update(current.questionId,draft=>{
+    const saved=sessions.update(current.context||current,draft=>{
       const next=typeof mutator==='function'?(mutator(draft)||draft):{...draft,...clone(mutator||{})};
       next.updatedAt=Date.now();
       return next;
@@ -211,7 +215,8 @@
     const uid=String(targetUserId||userId());
     if(!id||!sessions?.update)return null;
     const text=String(summary||'').trim();
-    const saved=sessions.update(id,draft=>{
+    const target=active&&String(active.questionId)===id&&String(active.userId||userId())===uid?(active.context||active):id;
+    const saved=sessions.update(target,draft=>{
       draft.conclusion=draft.conclusion&&typeof draft.conclusion==='object'?draft.conclusion:{};
       draft.conclusion.learnerSummary=text;
       draft.updatedAt=Date.now();

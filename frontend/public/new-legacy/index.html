@@ -1,26 +1,35 @@
 <!DOCTYPE html>
 
-<html lang="zh-CN" data-release="v9.0-p4.1.18">
+<html lang="zh-CN" data-release="v9.0-p4.1.28">
 <head>
+<script src="./teaching-content-sync.js?v=v9.0-p4.1.28"></script><!-- kg-teaching-content-sync:generated -->
 <script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
-<script src="./runtime-config.override.js?v=v9.0-p4.1.18"></script><!-- kg-runtime:generated -->
-<script defer src="./direct-entry.js?v=v9.0-p4.1.18"></script><!-- kg-direct-entry:generated -->
-<script defer src="./feature-analytics.js?v=v9.0-p4.1.18"></script><!-- kg-feature-analytics:generated -->
+<script src="./runtime-config.override.js?v=v9.0-p4.1.28"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js?v=v9.0-p4.1.28"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js?v=v9.0-p4.1.28"></script><!-- kg-feature-analytics:generated -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport"/>
-<title>知识点关系图谱｜项目管理学习者</title><link href="styles/main.css?v=v9.0-p4.1.18" rel="stylesheet"/>
-<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/support-center.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/home-file-library.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/graph-file-tabs.css?v=v9.0-p4.1.18"/>
-<link rel="stylesheet" href="styles/graph-user-preferences.css?v=v9.0-p4.1.18"/>
+<title>知识点关系图谱｜项目管理学习者</title><link href="styles/main.css?v=v9.0-p4.1.28" rel="stylesheet"/>
+<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/support-center.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/home-file-library.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/graph-file-tabs.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/graph-user-preferences.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/unified-canvas-runtime.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/home-graph-components.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/home-canvas-performance.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/home-selection-p4326.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/selection-bounds-drag-p4327.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/home-selection-drag-controls-p4329.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/home-interaction-modes-p4330.css?v=v9.0-p4.1.28"/>
+<link rel="stylesheet" href="styles/home-selection-geometry-p4332.css?v=v9.0-p4.1.28"/>
 
 </head>
-<body>
+<body data-question-catalog-mode="learning">
 <div class="app">
 <div class="graph-file-tabbar" id="graphFileTabbar" aria-label="图谱文件页签栏">
 <button class="graph-file-home" id="graphFileHomeBtn" type="button" title="打开文件管理" aria-label="打开文件管理">
@@ -204,6 +213,19 @@
 </div>
 </div>
 <div id="authDialogRoot"></div>
+<div class="modal-backdrop learning-entry-chooser-backdrop" id="learningEntryChooserRoot" hidden>
+<section aria-labelledby="learningEntryChooserTitle" aria-modal="true" class="modal learning-entry-chooser-modal" role="dialog">
+<h2 id="learningEntryChooserTitle">选择学习方式</h2>
+<p class="learning-entry-chooser-intro">请选择本次学习的进入方式</p>
+<div class="learning-entry-chooser-grid">
+<button class="learning-entry-choice" data-description="进入知识图谱" data-destination="index.html" data-learning-entry-choice="知识图谱" type="button"><strong class="learning-entry-choice-title">知识图谱</strong><span class="learning-entry-choice-description">进入知识图谱</span></button>
+<button class="learning-entry-choice" data-description="深度回忆" data-destination="knowledge-recall.html" data-learning-entry-choice="知识回忆" type="button"><strong class="learning-entry-choice-title">知识回忆</strong><span class="learning-entry-choice-description">深度回忆</span></button>
+<button class="learning-entry-choice" data-description="归纳" data-destination="question-workspace.html" data-learning-entry-choice="知识归纳" type="button"><strong class="learning-entry-choice-title">知识归纳</strong><span class="learning-entry-choice-description">归纳</span></button>
+<button class="learning-entry-choice" data-description="刷题" data-destination="practice-mode.html" data-learning-entry-choice="知识巩固" type="button"><strong class="learning-entry-choice-title">知识巩固</strong><span class="learning-entry-choice-description">刷题</span></button>
+</div>
+<p aria-live="polite" class="learning-entry-chooser-error" id="learningEntryChooserError"></p>
+</section>
+</div>
 <div class="modal-backdrop question-bank-backdrop" id="questionBankModal">
 <div aria-labelledby="questionBankTitle" aria-modal="true" class="modal question-bank-modal" role="dialog">
 <div class="qb-head">
@@ -217,7 +239,6 @@
 <button class="primary" id="qbImportBtn">导入 JSON 题库</button>
 <button id="qbExportBtn">导出当前题库</button>
 <button id="qbTemplateBtn">下载题库模板</button>
-<button id="qbSetCurrentBtn">设为当前训练题库</button>
 <input accept=".json,application/json" id="qbImportFile" style="display:none" type="file"/>
 </div>
 <div class="qb-body">
@@ -259,7 +280,7 @@
 <section class="tutorial-section">
 <h3>二、批量整理与框选</h3>
 <div class="tutorial-grid">
-<div class="tutorial-card"><strong><span class="tutorial-badge">5</span> 鼠标框选卡片</strong><p>电脑端按住 <span class="tutorial-kbd">Shift</span>，在画布空白处拖拽，可以框选多个知识点卡片。</p></div>
+<div class="tutorial-card"><strong><span class="tutorial-badge">5</span> 直接框选图元</strong><p>电脑端在画布空白处直接拖出选框，无需按 Shift。可同时框选知识节点、文本框和关系线；Ctrl/Command 或 Shift 可追加选择。</p></div>
 <div class="tutorial-card"><strong><span class="tutorial-badge">6</span> 整体移动选中卡片</strong><p>框选后，拖动任意一个已选中卡片，整组选中的知识点会一起移动，方便快速排版。</p></div>
 <div class="tutorial-card"><strong><span class="tutorial-badge">7</span> 调整卡牌大小</strong><p>双击卡牌进入连线起点状态后，卡牌右侧会显示 “- / o / +” 微型按钮，可切换小卡、默认卡、大卡。</p></div>
 <div class="tutorial-card"><strong><span class="tutorial-badge">8</span> 聚焦重点</strong><p>点击“重点聚焦”会突出重点、难点、易错点，帮助课堂讲解或复习时快速定位核心内容。</p></div>
@@ -339,44 +360,77 @@
 
 
   <!-- Modularized application scripts. Keep this order. -->
-<script defer src="src/01-runtime-config.js?v=v9.0-p4.1.18"></script>
-  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/29-auth-core.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/30-shared-auth-dialog.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/34-role-permissions.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/37-subscription-plans.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/37-subscription-orders.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/37-subscription-redeem-codes.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/37-subscription-core.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/32-wechat-login.js?v=v9.0-p4.1.18"></script>
-<script defer src="./direct-system-adapter.js?v=v9.0-p4.1.18"></script><!-- kg-system:generated -->
-<script defer src="src/33-user-center.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/39-global-shortcuts.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/00-config-state.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/18-graph-user-preferences.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/09-graph-connector-drag-controller.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/canvas/84-canvas-edge-selection-geometry.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/10-graph-editor.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/19-home-toolbar-registry.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/21-home-package-service.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/26-graph-export-service.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/22-home-file-library.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/23-graph-file-store.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/24-graph-file-autosave.js?v=v9.0-p4.1.18"></script>
-<script defer src="./direct-graph-adapter.js?v=v9.0-p4.1.18"></script><!-- kg-graph:generated -->
-<script defer src="src/25-graph-file-tabs.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/20-flashcards-toolbar.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/30-auth-guards.js?v=v9.0-p4.1.18"></script>
-<script defer src="./direct-auth-adapter.js?v=v9.0-p4.1.18"></script><!-- kg-auth:generated -->
-<script defer src="src/40-guided-tour.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/41-account-menu.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/101-engagement-repository.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/102-help-content.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/103-support-center.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/50-question-data.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/60-question-bank.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/70-question-trainer.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/80-question-font-scale.js?v=v9.0-p4.1.18"></script>
-<script defer src="src/90-bootstrap.js?v=v9.0-p4.1.18"></script>
+<script defer src="src/01-runtime-config.js?v=v9.0-p4.1.28"></script>
+  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/29-auth-core.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/31-learning-entry-chooser.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/30-shared-auth-dialog.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/34-role-permissions.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/37-subscription-plans.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/37-subscription-orders.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/37-subscription-redeem-codes.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/37-subscription-core.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/32-wechat-login.js?v=v9.0-p4.1.28"></script>
+<script defer src="./direct-system-adapter.js?v=v9.0-p4.1.28"></script><!-- kg-system:generated -->
+<script defer src="src/33-user-center.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/39-global-shortcuts.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/graph-model.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/card-style-registry.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/graph-persistence.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/history-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/selection-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/drag-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/element-resize-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/connection-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/clipboard-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/style-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/node-alignment-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/layer-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/context-menu-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/style-popover-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/color-picker-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/floating-color-window-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/shared-color-picker-v2.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/inline-text-editor-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/node-toolbar-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/viewport-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/graph/graph-renderer.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/00-config-state.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/18-graph-user-preferences.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/09-graph-connector-drag-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/canvas/84-canvas-edge-selection-geometry.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/canvas/85-canvas-appearance-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/canvas/86-canvas-zoom-dock-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/canvas/87-canvas-minimap-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/canvas/88-canvas-settings-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/canvas/90-canvas-selection-filter-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/canvas/91-canvas-alignment-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/canvas/92-canvas-edge-toolbar-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/canvas/93-canvas-drag-performance-controller.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/canvas/89-canvas-runtime.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/10-graph-editor.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/19-home-toolbar-registry.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/21-home-package-service.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/26-graph-export-service.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/22-home-file-library.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/23-graph-file-store.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/24-graph-file-autosave.js?v=v9.0-p4.1.28"></script>
+<script defer src="./direct-graph-adapter.js?v=v9.0-p4.1.28"></script><!-- kg-graph:generated -->
+<script defer src="src/25-graph-file-tabs.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/20-flashcards-toolbar.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/27-home-interaction-modes.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/30-auth-guards.js?v=v9.0-p4.1.28"></script>
+<script defer src="./direct-auth-adapter.js?v=v9.0-p4.1.28"></script><!-- kg-auth:generated -->
+<script defer src="src/40-guided-tour.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/41-account-menu.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/101-engagement-repository.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/102-help-content.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/103-support-center.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/50-question-data.js?v=v9.0-p4.1.28"></script>
+<script defer src="./question-catalog-adapter.js?v=v9.0-p4.1.28"></script><!-- kg-question-catalog:generated -->
+<script defer src="src/60-question-bank.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/70-question-trainer.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/80-question-font-scale.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/90-bootstrap.js?v=v9.0-p4.1.28"></script>
 </body>
 </html>

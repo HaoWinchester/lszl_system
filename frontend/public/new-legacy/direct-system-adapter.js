@@ -118,6 +118,9 @@
 
   function preloadSubscription() {
     const payload = request('GET', '/api/v1/subscriptions/me')
+    global.KGServerEntitlements = Object.freeze({
+      allExamPapers: payload.entitlements?.allExamPapers === true,
+    })
     return syncSubscription(payload.subscription)
   }
 

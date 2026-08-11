@@ -94,7 +94,7 @@ with sync_playwright() as p:
     drawer_text=page.locator('#qwQuestionDrawer').inner_text()
     assert_no_private_or_demo(drawer_text)
     page.locator('#qwQuestionList [data-add-index="0"]').click();page.wait_for_timeout(180)
-    node=page.evaluate("KGMultiQuestionWorkspace.preferredQuestionNodeForSingleDeep()")
+    node=page.evaluate("""()=>{const state=KGMultiQuestionWorkspace.getState();return KGCanvasWorkspaceStore.listNodes({workspaceId:state.workspaceId}).find(item=>item.nodeType==='question-reference')||null}""")
     assert node and node['questionId']=='q1' and node['paperId']=='paper-p403' and node.get('releaseId')=='release-p403',node
     assert not errors,errors
     page.close()

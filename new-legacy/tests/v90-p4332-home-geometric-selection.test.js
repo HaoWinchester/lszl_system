@@ -1,0 +1,15 @@
+'use strict';
+const fs=require('fs');
+const assert=require('assert');
+const editor=fs.readFileSync('src/10-graph-editor.js','utf8');
+const modes=fs.readFileSync('src/27-home-interaction-modes.js','utf8');
+const css=fs.readFileSync('styles/home-selection-geometry-p4332.css','utf8');
+const index=fs.readFileSync('index.html','utf8');
+assert(editor.includes("multiSelected=selected&&(selectedNodeIds.size+selectedTextElementIds.size+selectedLinkIds.size>1)"));
+assert(editor.includes("card.classList.contains('multi-selected')||currentHomeFilteredSelectionTotal()>1"));
+assert(modes.includes('nodeDrag:true,nodeEdit:true,nodeResize:true,textEdit:true'));
+assert(css.includes('固定屏幕 1px'));
+assert(css.includes('.knowledge-card.multi-selected,.graph-text-element.multi-selected'));
+assert(css.includes('.uc-selection-bounds > i{display:none!important}'));
+assert(index.includes('styles/home-selection-geometry-p4332.css'));
+console.log('v90-p4332-home-geometric-selection-ok');

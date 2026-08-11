@@ -1,0 +1,9 @@
+/* V9.0-P4.3.29 — hide per-item editing handles while a locked home selection moves. */
+.stage.home-selection-bounds-dragging .node-growth-layer,
+.stage.home-selection-bounds-dragging .node-growth-handle,
+.stage.home-selection-bounds-dragging .graph-text-resize-layer,
+.stage.home-selection-bounds-dragging .graph-text-element .graph-element-resize-handle{
+  display:none!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
