@@ -48,9 +48,11 @@ test('P4.5 persistence manifest assigns every state domain', () => {
 })
 
 test('P4.5 source audit locates the repository update source', () => {
+  const normalCheckoutSource = resolve(process.cwd(), '../updata-legacy')
+  const linkedWorktreeSource = resolve(process.cwd(), '../../../updata-legacy')
   assert.equal(
     findSourceDirectory(),
-    resolve(process.cwd(), '../../../updata-legacy')
+    existsSync(normalCheckoutSource) ? normalCheckoutSource : linkedWorktreeSource
   )
 })
 
