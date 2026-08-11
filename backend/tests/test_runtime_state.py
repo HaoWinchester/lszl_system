@@ -1,6 +1,7 @@
 import json
 import re
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
@@ -249,8 +250,20 @@ def test_admin_page_preloads_live_backend_accounts() -> None:
 
 
 def test_graph_page_imports_existing_backend_files_once() -> None:
+    username = f"runtime_graph_{uuid4().hex[:10]}"
     with TestClient(app) as client:
-        login(client, "老师")
+        login(client, "佩奇007")
+        created_user = client.post(
+            "/api/v1/users",
+            json={
+                "username": username,
+                "password": "111111",
+                "role": "teacher",
+                "subject": "PMP",
+            },
+        )
+        assert created_user.status_code == 200, created_user.text
+        login(client, username)
         created = client.post(
             "/api/v1/files",
             json={
