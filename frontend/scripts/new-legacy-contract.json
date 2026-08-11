@@ -146,6 +146,7 @@
       "kg_learning_active_context_v1__",
       "kg_learning_events_v1__",
       "kg_learning_rounds_v1__",
+      "kg_learning_entry_chooser_consumed_v1__",
       "kg_multi_question_analysis_sections_v1__",
       "kg_multi_question_font_scale_v1__",
       "kg_multi_question_highlight_color_v1__",

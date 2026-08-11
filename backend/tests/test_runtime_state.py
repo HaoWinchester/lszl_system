@@ -94,30 +94,77 @@ def test_runtime_state_accepts_scoped_multi_question_preferences() -> None:
     )
 
 
-def test_runtime_state_persists_login_entry_chooser_claim_keys() -> None:
+def test_runtime_state_rejects_direct_login_entry_chooser_claim_mutations() -> None:
     keys = (
         "kg_learning_entry_chooser_claim_v1",
         "kg_learning_entry_chooser_consumed_v1",
+        "kg_learning_entry_chooser_consumed_v1__" + "a" * 64,
     )
     with TestClient(app) as client:
         login(client, "学生")
         current = client.get("/api/v1/runtime/state").json()
-        revision = current["revision"]
         for index, key in enumerate(keys):
             response = client.put(
                 "/api/v1/runtime/state",
                 json=update_payload(
                     key=key,
                     value=json.dumps({"schemaVersion": 1, "marker": index}),
-                    revision=revision,
+                    revision=current["revision"],
                 ),
             )
-            assert response.status_code == 200, response.text
-            revision = response.json()["revision"]
+            assert response.status_code == 403, response.text
 
-        persisted = client.get("/api/v1/runtime/state").json()["storage"]
 
-    assert set(keys).issubset(persisted)
+
+def test_login_entry_claim_is_atomic_per_server_login_session() -> None:
+    with TestClient(app) as first_browser, TestClient(app) as second_browser:
+        login(first_browser, "老师")
+        login(second_browser, "老师")
+        content_before = first_browser.get("/api/v1/runtime/state").json()[
+            "contentRevision"
+        ]
+
+        first = first_browser.post("/api/v1/runtime/learning-entry-claim")
+        same_session = first_browser.post("/api/v1/runtime/learning-entry-claim")
+        second = second_browser.post("/api/v1/runtime/learning-entry-claim")
+
+        assert first.status_code == 200, first.text
+        assert same_session.status_code == 200, same_session.text
+        assert second.status_code == 200, second.text
+        assert first.json()["claimed"] is True
+        assert same_session.json()["claimed"] is False
+        assert second.json()["claimed"] is True
+        assert first.json()["key"] != second.json()["key"]
+        assert same_session.json()["revision"] == first.json()["revision"]
+
+        stale_first_snapshot = {
+            first.json()["key"]: first.json()["value"],
+            "kg_default_entry_mode_v1": "free",
+        }
+        ordinary_write = first_browser.put(
+            "/api/v1/runtime/state",
+            json={
+                **update_payload(
+                    key="kg_default_entry_mode_v1",
+                    value="free",
+                    revision=second.json()["revision"],
+                ),
+                "storage": stale_first_snapshot,
+                "snapshotMode": "full",
+                "requestId": "pytest-claim-preserves-other-session",
+            },
+        )
+        assert ordinary_write.status_code == 200, ordinary_write.text
+
+        current = first_browser.get("/api/v1/runtime/state").json()
+
+    scoped_keys = [
+        key
+        for key in current["storage"]
+        if key.startswith("kg_learning_entry_chooser_consumed_v1__")
+    ]
+    assert set(scoped_keys) == {first.json()["key"], second.json()["key"]}
+    assert current["contentRevision"] == content_before
 
 
 def test_runtime_state_rejects_unknown_storage_keys() -> None:

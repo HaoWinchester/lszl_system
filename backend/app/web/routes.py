@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import CurrentUser
+from app.core.auth import CurrentUser, get_login_session_id
 from app.core.permissions import can
 from app.db.session import get_db
 from app.web.bootstrap import build_bootstrap, optional_user
@@ -301,6 +301,15 @@ async def read_runtime_state(user: CurrentUser, db: DB):
         "revision": revision,
         "contentRevision": content_revision,
     }
+
+
+@router.post("/api/v1/runtime/learning-entry-claim")
+async def claim_learning_entry(request: Request, user: CurrentUser, db: DB):
+    return await runtime_state_service.claim_learning_entry(
+        db,
+        user.username,
+        get_login_session_id(request),
+    )
 
 
 @router.get("/{asset_path:path}")

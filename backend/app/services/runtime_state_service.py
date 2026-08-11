@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import json
+import hashlib
 from datetime import datetime, timezone
 from urllib.parse import quote
 
@@ -28,6 +29,12 @@ from app.web.schemas import RuntimeMutation, RuntimeStateUpdate
 
 MAX_VALUE_BYTES = 8 * 1024 * 1024
 MAX_TOTAL_BYTES = 48 * 1024 * 1024
+LOGIN_ENTRY_CONSUMED_PREFIX = "kg_learning_entry_chooser_consumed_v1__"
+MAX_LOGIN_ENTRY_CLAIMS = 32
+LOGIN_ENTRY_SERVER_OWNED_KEYS = frozenset({
+    "kg_learning_entry_chooser_claim_v1",
+    "kg_learning_entry_chooser_consumed_v1",
+})
 
 DEPRECATED_QUESTION_EXACT_KEYS = frozenset({
     "kg_question_banks_published_v1",
@@ -138,6 +145,7 @@ PREFIXES = (
     "kg_learning_active_context_v1__",
     "kg_learning_events_v1__",
     "kg_learning_rounds_v1__",
+    LOGIN_ENTRY_CONSUMED_PREFIX,
     "kg_multi_question_analysis_sections_v1__",
     "kg_multi_question_font_scale_v1__",
     "kg_multi_question_highlight_color_v1__",
@@ -387,7 +395,11 @@ def shared_key_readable(key: str, role: str) -> bool:
 
 
 def server_owned_key(key: str) -> bool:
-    return key in SERVER_OWNED_KEYS
+    return (
+        key in SERVER_OWNED_KEYS
+        or key in LOGIN_ENTRY_SERVER_OWNED_KEYS
+        or key.startswith(LOGIN_ENTRY_CONSUMED_PREFIX)
+    )
 
 
 def private_runtime_storage(raw: object) -> dict[str, str]:
@@ -1133,7 +1145,7 @@ async def apply_update(
     own_part = {
         k: v for k, v in storage.items()
         if k not in SHARED_KEYS
-        and k not in SERVER_OWNED_KEYS
+        and not server_owned_key(k)
         and not _is_teacher_shared_key(k)
     }
     own_part.update({
@@ -1141,9 +1153,11 @@ async def apply_update(
         for key, value in current_storage.items()
         if _is_teacher_shared_key(key)
     })
-    for key in SERVER_OWNED_KEYS:
-        if key in current_storage:
-            own_part[key] = current_storage[key]
+    own_part.update({
+        key: value
+        for key, value in current_storage.items()
+        if server_owned_key(key)
+    })
 
     total = sum(len(k.encode("utf-8")) + len(v.encode("utf-8")) for k, v in own_part.items())
     if total > MAX_TOTAL_BYTES:
@@ -1245,3 +1259,63 @@ async def apply_update(
     snapshot = await _read_state_snapshot_locked(db, owner, role)
     await db.commit()
     return snapshot[0], snapshot[1], response_content_revision
+
+
+async def claim_learning_entry(
+    db: AsyncSession,
+    owner: str,
+    login_session_id: str,
+) -> dict[str, object]:
+    """Atomically claim the chooser once for one server-issued login session."""
+
+    digest = hashlib.sha256(login_session_id.encode("utf-8")).hexdigest()
+    key = f"{LOGIN_ENTRY_CONSUMED_PREFIX}{digest}"
+    await _lock_owner(db, owner)
+    row = await db.get(RuntimeState, owner)
+    storage = dict(row.storage or {}) if row else {}
+    existing = storage.get(key)
+    if existing is not None:
+        await db.commit()
+        return {
+            "claimed": False,
+            "key": key,
+            "value": str(existing),
+            "revision": int(row.revision if row else 0),
+        }
+
+    consumed_at = int(datetime.now(timezone.utc).timestamp() * 1000)
+    value = _json({
+        "schemaVersion": 1,
+        "consumedDigest": digest,
+        "consumedAt": consumed_at,
+    })
+    storage[key] = value
+
+    scoped: list[tuple[int, str]] = []
+    for candidate_key, candidate_value in storage.items():
+        if not str(candidate_key).startswith(LOGIN_ENTRY_CONSUMED_PREFIX):
+            continue
+        try:
+            parsed = json.loads(str(candidate_value))
+            timestamp = int(parsed.get("consumedAt") or 0) if isinstance(parsed, dict) else 0
+        except (TypeError, ValueError, json.JSONDecodeError):
+            timestamp = 0
+        scoped.append((timestamp, str(candidate_key)))
+    prior_scoped = [item for item in scoped if item[1] != key]
+    for _timestamp, stale_key in sorted(prior_scoped, reverse=True)[MAX_LOGIN_ENTRY_CLAIMS - 1:]:
+        storage.pop(stale_key, None)
+
+    if row is None:
+        row = RuntimeState(owner_id=owner, storage=storage, revision=1)
+        db.add(row)
+    else:
+        row.storage = storage
+        row.revision += 1
+    await db.commit()
+    await db.refresh(row)
+    return {
+        "claimed": True,
+        "key": key,
+        "value": value,
+        "revision": int(row.revision),
+    }
