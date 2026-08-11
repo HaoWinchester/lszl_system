@@ -224,6 +224,26 @@ test('sync permits ordinary collection writes in a migrated module without Index
   assert.equal(result.status, 0, result.stderr)
 })
 
+test('sync rejects split IndexedDB transaction and object-store writes in a migrated module', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/p45-fixture.js'), [
+    "const tx = db.transaction('workspace', 'readwrite')",
+    "const store = tx.objectStore('workspace')",
+    'store.put({ id: 1 })',
+  ].join('\n'))
+  write(resolve(item.upstream, 'p45-migration-manifest.json'), JSON.stringify({
+    migratedBusinessModules: {
+      'src/p45-fixture.js': {},
+    },
+  }))
+
+  const result = runSync(item)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /IndexedDB business persistence is forbidden in migrated module: src\/p45-fixture\.js/)
+})
+
 test('sync permits P4.5 session-only navigation and preview tokens', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))
