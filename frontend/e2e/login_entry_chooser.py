@@ -308,9 +308,16 @@ def wait_for_chooser(page: Page, role: str, phase: str) -> None:
     assert labels == [choice[0] for choice in CHOICES], (role, phase, labels)
 
 
-def sign_in_via_browser(page: Page, base: str, role: str, username: str) -> None:
+def sign_in_via_browser(
+    page: Page,
+    base: str,
+    role: str,
+    username: str,
+    *,
+    entry_path: str = "/practice-mode.html?auth=login",
+) -> None:
     """Drive the deployed login dialog; do not seed a session through requests."""
-    page.goto(base + "/practice-mode.html?auth=login", wait_until="networkidle")
+    page.goto(base + entry_path, wait_until="networkidle")
     page.locator("#authModal.show").wait_for(state="visible", timeout=15_000)
     page.locator("#authUsername").fill(username)
     page.locator("#authPassword").fill(password_for(role))
@@ -365,8 +372,14 @@ def fresh_chooser(
     page.on("pageerror", lambda error: page_errors.append(str(error)))
     setattr(page, "_task5_runtime_responses", runtime_responses)
     setattr(page, "_task5_page_errors", page_errors)
-    sign_in_via_browser(page, base, role, username)
-    visit_non_graph_then_graph(page, base, role, "fresh-login")
+    sign_in_via_browser(
+        page,
+        base,
+        role,
+        username,
+        entry_path="/index.html?auth=login",
+    )
+    wait_for_chooser(page, role, "fresh-login-on-graph")
     return context, page
 
 
@@ -379,7 +392,11 @@ def assert_choice_navigation(page: Page, role: str, label: str, destination: str
         before_url = page.url
         button.click()
         page.locator("#learningEntryChooserRoot").wait_for(state="hidden")
-        assert page.url == before_url and page.url.endswith("/index.html"), (role, label, page.url)
+        assert page.url == before_url and page.url.split("?", 1)[0].endswith("/index.html"), (
+            role,
+            label,
+            page.url,
+        )
         assert page.evaluate("() => document.activeElement?.id") == "stage", (role, label)
         return
     # ``expect_response`` misses this page's fetch-then-location.assign flow
@@ -509,6 +526,36 @@ def assert_two_tabs_claim_once(browser: Browser, base: str, role: str, username:
         context.close()
 
 
+def assert_parallel_login_sessions_remain_consumed(
+    browser: Browser,
+    base: str,
+    role: str,
+    username: str,
+) -> None:
+    first_context, first_page = fresh_chooser(browser, base, role, username)
+    second_context, second_page = fresh_chooser(browser, base, role, username)
+    try:
+        first_session = first_page.evaluate(
+            "() => window.__KG_DIRECT_BOOTSTRAP__?.authUser?.loginSessionId || ''"
+        )
+        second_session = second_page.evaluate(
+            "() => window.__KG_DIRECT_BOOTSTRAP__?.authUser?.loginSessionId || ''"
+        )
+        assert first_session and second_session and first_session != second_session, (
+            role,
+            first_session,
+            second_session,
+        )
+        first_page.reload(wait_until="networkidle")
+        assert not is_visible_chooser(first_page), (
+            role,
+            "a second login session displaced the first session's consumed claim",
+        )
+    finally:
+        second_context.close()
+        first_context.close()
+
+
 def assert_red_visibility_failure() -> None:
     """Mutation-test the first behavioral assertion before green matrix work."""
     harness = IsolatedChooserHarness()
@@ -591,6 +638,14 @@ def run_green_matrix() -> None:
                     checks += 1
                     assert_two_tabs_claim_once(browser, base, role, username)
                     checks += 1
+                    if role == "admin":
+                        assert_parallel_login_sessions_remain_consumed(
+                            browser,
+                            base,
+                            role,
+                            username,
+                        )
+                        checks += 1
                     print(f"task5-role: PASS role={role}", flush=True)
             finally:
                 browser.close()
