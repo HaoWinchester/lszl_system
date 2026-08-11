@@ -28,6 +28,7 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
     teacher_a, teacher_b = f"prep-a-{suffix}", f"prep-b-{suffix}"
     student, viewer = f"prep-student-{suffix}", f"prep-viewer-{suffix}"
     principle_id, preset_id = f"principle-{suffix}", f"preset-{suffix}"
+    tag_sentinel = json.dumps({"legacyTagProjection": suffix}, ensure_ascii=False, separators=(",", ":"))
     snapshots: dict[str, dict | None] = {}
     created_bank_ids: set[str] = set()
     created_batch_ids: set[str] = set()
@@ -53,12 +54,18 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
                     "created_at": row.created_at,
                     "updated_at": row.updated_at,
                 }
-            previous_active_tag_id = (
+                previous_active_tag_id = (
                 await db.execute(
                     select(QuestionTagConfig.id).where(QuestionTagConfig.active.is_(True))
                 )
-            ).scalar_one_or_none()
-            db.add_all([
+                ).scalar_one_or_none()
+                legacy_tag = await db.get(SharedRuntimeState, TAG_KEY)
+                if legacy_tag is None:
+                    db.add(SharedRuntimeState(key=TAG_KEY, value=tag_sentinel))
+                else:
+                    legacy_tag.value = tag_sentinel
+                    legacy_tag.updated_by = None
+                db.add_all([
                 User(username=teacher_a, password_hash=hash_password(PASSWORD), role="teacher", status="active", subject="PMP"),
                 User(username=teacher_b, password_hash=hash_password(PASSWORD), role="teacher", status="active", subject="PMP"),
                 User(username=student, password_hash=hash_password(PASSWORD), role="student", status="active", subject="PMP"),
@@ -119,7 +126,7 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
                     row = await db.get(SharedRuntimeState, TAG_KEY)
                     return None if row is None else row.value
 
-            assert asyncio.run(tag_projection()) is None
+            assert asyncio.run(tag_projection()) == tag_sentinel
             shared = second.get("/api/v1/content-prep/shared-content", params={"subjectId": "PMP"})
             assert shared.status_code == 200, shared.text
             assert shared.json()["knowledgeTree"]["taxonomy"]["id"] == f"tax-{suffix}"
@@ -203,7 +210,7 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
             storage = runtime.json()["storage"]
             assert json.loads(storage[TAXONOMY_KEY])[-1]["id"] == f"empty-tax-{suffix}"
             assert json.loads(storage[RECALL_KEY])["nodes"][0]["title"] == "零题目联想"
-            assert TAG_KEY not in storage
+            assert storage[TAG_KEY] == tag_sentinel
             shared_after_batch = second.get(
                 "/api/v1/content-prep/shared-content",
                 params={"subjectId": "PMP"},
