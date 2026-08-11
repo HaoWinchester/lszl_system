@@ -154,7 +154,7 @@
     if (choice.destination === "index.html") { closeDialog({ focusGraph: true }); return; }
     button.disabled = true; button.setAttribute("aria-busy", "true"); errorMessage("");
     try {
-      const response = await active.fetch(choice.destination, { credentials: "same-origin" });
+      const response = await active.fetch.call(active.fetchReceiver, choice.destination, { credentials: "same-origin" });
       const contentType = response && response.headers && typeof response.headers.get === "function" ? response.headers.get("content-type") : "";
       if (!response || !response.ok || !/\btext\/html\b/i.test(String(contentType || ""))) throw new Error("unavailable");
       navigate(active.location, choice.destination);
@@ -195,7 +195,8 @@
       const next = event.shiftKey ? (index <= 0 ? items.length - 1 : index - 1) : (index === items.length - 1 ? 0 : index + 1);
       event.preventDefault(); items[next].focus();
     };
-    active = { document: doc, root, dialog, error, onKeydown, location: options.location || global.location, fetch: options.fetch || global.fetch, restoreFocus: doc.activeElement, created };
+    const fetchImpl = options.fetch || global.fetch;
+    active = { document: doc, root, dialog, error, onKeydown, location: options.location || global.location, fetch: fetchImpl, fetchReceiver: fetchImpl === global.fetch ? global : undefined, restoreFocus: doc.activeElement, created };
     setPageInert(doc, root, true); doc.addEventListener("keydown", onKeydown); focusChoices()[0].focus();
     return dialog;
   }

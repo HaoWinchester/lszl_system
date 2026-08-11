@@ -284,7 +284,7 @@ class DomDocument extends DomElement {
   getElementById(id) { return this.querySelector(`#${id}`); }
 }
 
-function createChooserDomTab({ fetchImpl = async () => ({ ok: true, headers: { get: () => 'text/html' } }), storageFlush } = {}) {
+function createChooserDomTab({ fetchImpl = async () => ({ ok: true, headers: { get: () => 'text/html' } }), injectFetch = true, storageFlush } = {}) {
   const shared = new SharedStorage();
   const document = new DomDocument();
   const graph = document.createElement('main'); graph.id = 'stage'; graph.setAttribute('tabindex', '-1'); document.body.append(graph);
@@ -303,7 +303,11 @@ function createChooserDomTab({ fetchImpl = async () => ({ ok: true, headers: { g
   const context = vm.createContext({ window, document, location, localStorage: window.localStorage, navigator: window.navigator, crypto: window.crypto, fetch: window.fetch, CustomEvent: DomEvent, setTimeout, clearTimeout, queueMicrotask, Promise, JSON, Date, Math, TextEncoder, Uint8Array, console });
   vm.runInContext(fs.readFileSync(assetPath, 'utf8'), context, { filename: assetPath });
   const auth = { async getCurrentSession() { return session('server-session-dom'); } };
-  return { auth, document, graph, location, window, init: () => window.KGLearningEntryChooser.init({ auth, document, location, storage: window.localStorage, fetch: fetchImpl }) };
+  return { auth, document, graph, location, window, init: () => {
+    const options = { auth, document, location, storage: window.localStorage };
+    if (injectFetch) options.fetch = fetchImpl;
+    return window.KGLearningEntryChooser.init(options);
+  } };
 }
 
 test('winning claim renders a non-dismissible accessible four-choice dialog in the actual VM DOM', async () => {
@@ -357,6 +361,26 @@ test('selection fetches only the fixed same-origin HTML destination before navig
   assert.equal(graphTab.document.querySelector('[role="dialog"]'), null);
   assert.equal(graphTab.graph.inert, false);
   assert.equal(graphTab.document.activeElement, graphTab.graph);
+});
+
+test('native window fetch keeps its window receiver before navigation', async () => {
+  let expectedWindow;
+  let receiverWasWindow = false;
+  let calls = 0;
+  const receiverSensitiveFetch = function () {
+    calls += 1;
+    receiverWasWindow = this === expectedWindow;
+    if (this !== expectedWindow) throw new TypeError('Illegal invocation');
+    return Promise.resolve({ ok: true, headers: { get: () => 'text/html' } });
+  };
+  const tab = createChooserDomTab({ fetchImpl: receiverSensitiveFetch, injectFetch: false });
+  expectedWindow = tab.window;
+  await tab.init();
+  tab.document.querySelectorAll('[data-learning-entry-choice]')[1].dispatchEvent(new DomEvent('click'));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(calls, 1);
+  assert.equal(receiverWasWindow, true);
+  assert.equal(tab.location.href, 'https://example.test/knowledge-recall.html');
 });
 
 test('a failed destination verification keeps the choice dialog open, restores the selected button, and exposes the exact error', async () => {
