@@ -71,14 +71,31 @@
     let channel;
     try { channel = new BroadcastChannel(CHANNEL); channel.postMessage({ type: "consumed", digest }); } catch (_error) {} finally { try { channel && channel.close(); } catch (_error) {} }
   }
-  function consume(storage, digest) {
+  async function rollbackConsumption(storage, digest) {
+    if (!consumed(storage, digest)) return;
+    try { storage.removeItem(CONSUMED_KEY); } catch (_error) { return; }
+    if (typeof storage.flush !== "function") return;
+    try { await storage.flush(); } catch (_error) {}
+  }
+  async function consume(storage, digest) {
     if (consumed(storage, digest)) return false;
     if (!writeJSON(storage, CONSUMED_KEY, { schemaVersion: SCHEMA_VERSION, consumedDigest: digest, consumedAt: Date.now() })) return false;
+    if (typeof storage.flush === "function") {
+      try {
+        if (await storage.flush() === false) {
+          await rollbackConsumption(storage, digest);
+          return false;
+        }
+      } catch (_error) {
+        await rollbackConsumption(storage, digest);
+        return false;
+      }
+    }
     notify(digest); return true;
   }
   async function claimWithLocks(storage, lockName, digest) {
     let shown = false;
-    await global.navigator.locks.request(lockName, { mode: "exclusive" }, async function () { shown = consume(storage, digest); });
+    await global.navigator.locks.request(lockName, { mode: "exclusive" }, async function () { shown = await consume(storage, digest); });
     return shown;
   }
   async function claimWithStorage(storage, digest) {

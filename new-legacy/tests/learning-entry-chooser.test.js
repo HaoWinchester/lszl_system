@@ -67,7 +67,7 @@ function session(id = 'server-session-a') {
   return { authenticated: true, loginSessionId: id, user: { username: 'learner' } };
 }
 
-function createTab({ shared, authSession = session(), locksImpl = locks(), BroadcastChannelImpl = FakeBroadcastChannel } = {}) {
+function createTab({ shared, authSession = session(), locksImpl = locks(), BroadcastChannelImpl = FakeBroadcastChannel, storageFlush } = {}) {
   const listeners = new Map();
   const window = {
     crypto: webcrypto,
@@ -91,6 +91,7 @@ function createTab({ shared, authSession = session(), locksImpl = locks(), Broad
     clearTimeout,
     queueMicrotask,
   };
+  if (storageFlush) window.localStorage.flush = storageFlush;
   shared.attach(window);
   const auth = { async getCurrentSession() { return authSession; } };
   const context = vm.createContext({
@@ -164,12 +165,63 @@ test('fallback VM tabs with neither locks nor BroadcastChannel yield after share
   assert.equal(JSON.parse(shared.getItem(CONSUMED_KEY)).consumedDigest, '22b1cd8d13f99dc13e0bb4c7f4d9096424fe72867aeba5039fbc5da40db6e7db');
 });
 
+test('fallback race flushes only the nonce winner and never the losing tab', async () => {
+  const shared = new SharedStorage();
+  let aFlushes = 0;
+  let bFlushes = 0;
+  const a = createTab({ shared, locksImpl: null, BroadcastChannelImpl: null, storageFlush: async () => { aFlushes += 1; } });
+  const b = createTab({ shared, locksImpl: null, BroadcastChannelImpl: null, storageFlush: async () => { bFlushes += 1; } });
+  const [first, second] = await Promise.all([a.init(), b.init()]);
+  assert.equal(Number(first.shown) + Number(second.shown), 1);
+  assert.equal(aFlushes + bFlushes, 1);
+  assert.equal(first.shown ? aFlushes : bFlushes, 1);
+  assert.equal(first.shown ? bFlushes : aFlushes, 0);
+});
+
 test('a missing auth API may claim only from the server bootstrap session field', async () => {
   const shared = new SharedStorage();
   const tab = createTab({ shared });
   tab.window.__KG_DIRECT_BOOTSTRAP__ = { authUser: { username: 'learner', loginSessionId: 'bootstrap-session-id' } };
   assert.equal((await tab.window.KGLearningEntryChooser.init({ auth: {}, document: tab.window.document, location: tab.window.location, storage: tab.window.localStorage })).shown, true);
   assert.equal(JSON.parse(shared.getItem(CONSUMED_KEY)).consumedDigest, 'ec484f906c17ed7c7293483a396000f90e00faa3bb1b669d7a03a040418a081f');
+});
+
+test('winning init stays pending until deferred server-state storage flush resolves', async () => {
+  const shared = new SharedStorage();
+  let resolveFlush;
+  let markFlushStarted;
+  let flushCalls = 0;
+  const flushGate = new Promise(resolve => { resolveFlush = resolve; });
+  const flushStarted = new Promise(resolve => { markFlushStarted = resolve; });
+  const tab = createTab({
+    shared,
+    storageFlush() { flushCalls += 1; markFlushStarted(); return flushGate; },
+  });
+  let result = 'pending';
+  const initPromise = tab.init().then(value => { result = value; return value; });
+  const firstOutcome = await Promise.race([flushStarted.then(() => 'flush-started'), initPromise.then(() => 'init-settled')]);
+  assert.equal(firstOutcome, 'flush-started');
+  assert.equal(flushCalls, 1);
+  assert.equal(result, 'pending');
+  resolveFlush(true);
+  assert.equal((await initPromise).shown, true);
+});
+
+test('failed flush rolls back the consumed marker and the same session can claim again', async () => {
+  const shared = new SharedStorage();
+  let flushCalls = 0;
+  const tab = createTab({
+    shared,
+    storageFlush: async () => {
+      flushCalls += 1;
+      if (flushCalls === 1) return false;
+      return true;
+    },
+  });
+  assert.equal((await tab.init()).shown, false);
+  assert.equal(shared.getItem(CONSUMED_KEY), null);
+  assert.equal((await tab.init()).shown, true);
+  assert.equal(flushCalls, 3);
 });
 
 class DomEvent {
@@ -232,7 +284,7 @@ class DomDocument extends DomElement {
   getElementById(id) { return this.querySelector(`#${id}`); }
 }
 
-function createChooserDomTab({ fetchImpl = async () => ({ ok: true, headers: { get: () => 'text/html' } }) } = {}) {
+function createChooserDomTab({ fetchImpl = async () => ({ ok: true, headers: { get: () => 'text/html' } }), storageFlush } = {}) {
   const shared = new SharedStorage();
   const document = new DomDocument();
   const graph = document.createElement('main'); graph.id = 'stage'; graph.setAttribute('tabindex', '-1'); document.body.append(graph);
@@ -246,6 +298,7 @@ function createChooserDomTab({ fetchImpl = async () => ({ ok: true, headers: { g
     removeEventListener(type, listener) { listeners.get(type)?.delete(listener); },
     dispatchEvent(event) { for (const listener of listeners.get(event.type) || []) listener(event); return !event.defaultPrevented; },
   };
+  if (storageFlush) window.localStorage.flush = storageFlush;
   document.defaultView = window;
   const context = vm.createContext({ window, document, location, localStorage: window.localStorage, navigator: window.navigator, crypto: window.crypto, fetch: window.fetch, CustomEvent: DomEvent, setTimeout, clearTimeout, queueMicrotask, Promise, JSON, Date, Math, TextEncoder, Uint8Array, console });
   vm.runInContext(fs.readFileSync(assetPath, 'utf8'), context, { filename: assetPath });
@@ -276,6 +329,15 @@ test('winning claim renders a non-dismissible accessible four-choice dialog in t
   assert.equal(backwards.defaultPrevented, true); assert.equal(tab.document.activeElement, choices[3]);
   const forwards = new DomEvent('keydown', { key: 'Tab' }); tab.document.dispatchEvent(forwards);
   assert.equal(forwards.defaultPrevented, true); assert.equal(tab.document.activeElement, choices[0]);
+});
+
+test('failed server-state storage flush neither renders nor reports a winning claim', async () => {
+  const tab = createChooserDomTab({
+    storageFlush: async () => { throw new Error('server persistence failed'); },
+  });
+  const result = await tab.init();
+  assert.equal(result.shown, false);
+  assert.equal(tab.document.querySelector('[role="dialog"]'), null);
 });
 
 test('selection fetches only the fixed same-origin HTML destination before navigating and graph selection restores focus', async () => {
