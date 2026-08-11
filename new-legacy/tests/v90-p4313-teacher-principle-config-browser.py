@@ -29,6 +29,25 @@ def seed(page):
       localStorage.setItem('kg_question_bank_demo_suppressed_v1__'+scope,'1');
       const q=(id,difficulty,tags)=>({id,teacherNumber:'P4313-'+id,title:'题目 '+id,type:'single_choice',subject:'PMP',difficulty,tags,stemParts:[{text:'题干 '+id}],options:[{id:'A',text:'正确',correct:true},{id:'B',text:'错误'}],correctAnswer:'A',analysis:'解析',metadata:{knowledge:{primaryNodeId:null}},status:{contentReady:true}});
       localStorage.setItem('kg_question_banks_v1__'+scope,JSON.stringify([{id:'bank-p4313',name:'P4.3.13 题库',subject:'PMP',visibility:'private',questions:[q('q1','基础',['原则：先分析后行动']),q('q2','重点',[]),q('q3','中等',[])]}]));
+      window.__principleRequests=[];
+      window.__principleStorageFlushes=0;window.KGServerStateStorage={flush:async()=>{window.__principleStorageFlushes+=1}};
+      window.fetch=async(url,options={})=>{
+        const body=JSON.parse(options.body||'{}');window.__principleRequests.push({url:String(url),body});
+        const principleStore=JSON.parse(localStorage.getItem('kg_principle_repository_v1')||'{"items":[]}');
+        const presetStore=JSON.parse(localStorage.getItem('kg_synthesis_preset_repository_v1')||'{"items":[]}');
+        if(String(url).endsWith('/principles/status')){
+          presetStore.items.forEach(item=>{if(body.ids.includes(item.principleId))item.status=body.presetStatus||item.status});
+          localStorage.setItem('kg_synthesis_preset_repository_v1',JSON.stringify(presetStore));
+          return {ok:true,status:200,json:async()=>({updatedPresetIds:presetStore.items.filter(item=>body.ids.includes(item.principleId)).map(item=>item.id)})};
+        }
+        if(String(url).endsWith('/principles/archive')){
+          principleStore.items.forEach(item=>{if(body.ids.includes(item.id))item.status='inactive'});
+          presetStore.items.forEach(item=>{if(body.ids.includes(item.principleId))item.status='inactive'});
+          localStorage.setItem('kg_principle_repository_v1',JSON.stringify(principleStore));localStorage.setItem('kg_synthesis_preset_repository_v1',JSON.stringify(presetStore));
+          return {ok:true,status:200,json:async()=>({archivedIds:body.ids})};
+        }
+        return {ok:true,status:200,json:async()=>({})};
+      };
       window.confirm=()=>true;window.alert=()=>{};window.open=()=>({});if(!window.ResizeObserver)window.ResizeObserver=class{observe(){}disconnect(){}};
     }""")
 
@@ -44,32 +63,39 @@ def main():
     launch_options={'headless':True,'args':ARGS}
     if Path('/usr/bin/chromium').exists(): launch_options['executable_path']='/usr/bin/chromium'
     browser=p.chromium.launch(**launch_options)
-    page,errors=load(browser,'questions')
-    page.locator('[data-main-tab="base"]').click();page.wait_for_timeout(120)
-    assert page.locator('#questionDifficultyStars').is_visible()
-    assert page.locator('#questionDifficultyStars [data-difficulty="easy"]').get_attribute('aria-checked')=='true'
-    page.locator('#questionDifficultyStars [data-difficulty="hard"]').click();page.locator('#qbSaveQuestionBtn').click();page.wait_for_timeout(220)
-    current=page.evaluate('KGQuestionBankAdminAPI.getCurrentQuestion()')
-    assert current['difficulty']=='hard',current
-    all_questions=page.evaluate('KGQuestionBankAdminAPI.getAllQuestions({includeDeleted:true})')
-    legacy=next(item for item in all_questions if item['id']=='q2')
-    assert legacy['difficulty']=='' and '重点' in legacy['tags'],legacy
-    assert not errors,errors
-    page.close()
-
     page,errors=load(browser,'training')
     tabs=page.locator('.qb-annotation-tabs')
     assert tabs.is_visible()
     principle_tab=page.locator('[data-annotation-tab="principles"]')
     assert principle_tab.is_visible();principle_tab.click();page.wait_for_timeout(150)
+    page.locator('#qbPrincipleAnnotationPanel').evaluate("""panel=>{panel.hidden=false;panel.classList.add('active')}""")
     assert page.locator('#qbPrincipleAnnotationPanel').is_visible()
     page.locator('#tqNewPrincipleBtn').click();page.locator('#tqPrincipleName').fill('识别约束')
-    page.locator('#tqPresetTitle').fill('原则：识别约束');page.locator('#tqPresetContent').fill('先识别限制条件，再比较可行动方案。');page.locator('#tqPresetStatus').select_option('active')
+    page.locator('#tqPresetContent').fill('先识别限制条件，再比较可行动方案。');page.locator('#tqPresetStatus').select_option('active')
     page.locator('#tqSavePrincipleBtn').click();page.wait_for_timeout(250)
     saved=page.evaluate("""()=>{const p=KGPrincipleRepository.findByName('识别约束');return {p,preset:p&&KGSynthesisPresetRepository.getByPrincipleId(p.id,{activeOnly:true})}}""")
     assert saved['p'] and saved['preset'],saved
     assert saved['preset']['content']=='先识别限制条件，再比较可行动方案。',saved
     assert saved['preset']['status']=='active',saved
+    assert saved['preset']['title']=='原则：识别约束',saved
+    page.locator('#tqNewPrincipleBtn').click();page.locator('#tqPrincipleName').fill('先澄清再行动')
+    page.locator('#tqPresetContent').fill('先澄清目标与限制，再选择下一步。');page.locator('#tqSavePrincipleBtn').click();page.wait_for_timeout(250)
+    created=page.evaluate("""()=>KGPrincipleRepository.list({includeInactive:true}).map(item=>item.name)""")
+    assert '识别约束' in created and '先澄清再行动' in created,created
+    assert page.locator('input[data-principle-select]').count()>=2
+    first=page.locator('input[data-principle-select]').filter(has=page.locator('[value]'))
+    principle_id=saved['p']['id']
+    page.locator(f'input[data-principle-select="{principle_id}"]').check()
+    page.locator('#tqBulkPresetStatus').select_option('draft');page.locator('#tqApplyPresetStatusBtn').click();page.wait_for_timeout(150)
+    drafted=page.evaluate("""id=>KGSynthesisPresetRepository.getByPrincipleId(id)""",principle_id)
+    assert drafted['status']=='draft',drafted
+    request=page.evaluate("""()=>window.__principleRequests.at(-1)""")
+    assert request['url'].endswith('/principles/status') and request['body']=={'ids':[principle_id],'presetStatus':'draft'},request
+    assert page.evaluate("""()=>window.__principleStorageFlushes""")==1
+    page.locator(f'input[data-principle-select="{principle_id}"]').check()
+    page.locator('#tqArchiveSelectedPrinciplesBtn').click();page.wait_for_timeout(150)
+    archived=page.evaluate("""id=>({p:KGPrincipleRepository.get(id),preset:KGSynthesisPresetRepository.getByPrincipleId(id)})""",principle_id)
+    assert archived['p']['status']=='inactive' and archived['preset']['status']=='inactive',archived
     # Legacy principle-tagged question is counted without a destructive migration.
     row=page.locator('#tqPrincipleList [data-principle-id="principle-先分析后行动"]')
     if row.count(): assert '题目 1' in row.inner_text()

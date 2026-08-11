@@ -434,7 +434,13 @@
 </div>
 </div>
 <section class="qb-annotation-panel tq-principle-config-panel" data-annotation-panel="principles" id="qbPrincipleAnnotationPanel" role="tabpanel" hidden>
-<div class="qb-panel-head"><div><h3>原则与系统预设归纳卡</h3><p>原则用于连接题目、归纳卡和练习抽题；学员只能编辑自己的归纳卡。</p></div><div class="qb-inline-actions"><button type="button" id="tqNewPrincipleBtn">+ 新建原则</button><button type="button" class="primary" id="tqSavePrincipleBtn">保存</button></div></div>
+<div class="qb-panel-head"><div><h3>原则与系统预设归纳卡</h3><p>原则是题目绑定的规则身份；每条原则对应一张系统归纳卡，卡片顶部自动显示原则名称。</p></div><div class="qb-inline-actions"><button type="button" id="tqNewPrincipleBtn">+ 新建原则</button><button type="button" class="primary" id="tqSavePrincipleBtn">保存</button></div></div>
+<div class="tq-principle-bulk-actions" aria-label="批量管理原则与归纳卡">
+<label><input type="checkbox" id="tqSelectAllPrinciples"/> 全选当前列表</label>
+<select id="tqBulkPresetStatus" aria-label="批量预设状态"><option value="draft">预设设为草稿</option><option value="active">预设设为启用</option><option value="inactive">预设设为停用</option></select>
+<button type="button" id="tqApplyPresetStatusBtn">批量修改预设状态</button>
+<button type="button" class="danger" id="tqArchiveSelectedPrinciplesBtn">归档所选</button>
+</div>
 <div class="tq-principle-workspace">
 <aside class="tq-principle-list" id="tqPrincipleList"></aside>
 <section class="tq-principle-editor">
@@ -444,8 +450,8 @@
 <label class="qb-field wide"><span>易混淆原则</span><div class="tq-confusable-principles" id="tqConfusablePrinciples"><small>保存原则后可配置。</small></div></label>
 <div class="tq-preset-divider"><span>系统预设归纳卡</span><small>学员只读，可复制为个人归纳卡。</small></div>
 <input type="hidden" id="tqPresetId"/>
-<label class="qb-field wide"><span>标题</span><input id="tqPresetTitle" maxlength="100" placeholder="原则：先分析后行动"/></label>
-<label class="qb-field wide"><span>一句原则说明</span><textarea id="tqPresetContent" rows="4" maxlength="500" placeholder="先明确目标、信息和约束，再决定行动方式。"></textarea></label>
+<label class="qb-field wide"><span>卡片顶部（自动同步原则名称）</span><input id="tqPresetTitle" readonly tabindex="-1" placeholder="原则：先分析后行动"/></label>
+<label class="qb-field wide"><span>归纳卡说明</span><textarea id="tqPresetContent" rows="4" maxlength="500" placeholder="先明确目标、信息和约束，再决定行动方式。"></textarea></label>
 <label class="qb-field"><span>预设状态</span><select id="tqPresetStatus"><option value="draft">草稿</option><option value="active">启用</option><option value="inactive">停用</option></select></label>
 </section></div>
 </section>

@@ -6,7 +6,7 @@
   const Difficulty=global.KGDifficultyService||global.KGTeacherDomains?.DifficultyService||{};
   const Principles=global.KGPrincipleRepository;
   const Presets=global.KGSynthesisPresetRepository;
-  let pickerDraft=new Set(),bulkDraft=new Set(),activePrincipleId='';
+  let pickerDraft=new Set(),bulkDraft=new Set(),selectedPrincipleIds=new Set(),activePrincipleId='',draftPrincipleId='';
 
   function api(){return global.KGQuestionBankAdminAPI||{}}
   function toast(message){const node=byId('qbToast');if(!node)return;node.textContent=message;node.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>node.classList.remove('show'),2200)}
@@ -59,23 +59,28 @@
   function renderPrincipleList(){
     const list=byId('tqPrincipleList');if(!list)return;
     const questions=seedPrinciples(),items=Principles?.list?.({includeInactive:true})||[];
+    const availableIds=new Set(items.map(item=>item.id));
+    selectedPrincipleIds=new Set([...selectedPrincipleIds].filter(id=>availableIds.has(id)));
+    if(activePrincipleId!==draftPrincipleId&&!availableIds.has(activePrincipleId))activePrincipleId='';
     if(!activePrincipleId&&items[0])activePrincipleId=items[0].id;
+    const selectAll=byId('tqSelectAllPrinciples');if(selectAll){selectAll.checked=items.length>0&&items.every(item=>selectedPrincipleIds.has(item.id));selectAll.indeterminate=selectedPrincipleIds.size>0&&selectedPrincipleIds.size<items.length}
     list.innerHTML=items.length?items.map(item=>{
       const linked=questions.filter(question=>questionMatchesPrinciple(question,item));
       const counts={easy:0,medium:0,hard:0};linked.forEach(question=>{const key=Difficulty.normalize?.(question.difficulty)||'';if(counts[key]!==undefined)counts[key]+=1});
       const preset=Presets?.getByPrincipleId?.(item.id)||null;
-      return `<button type="button" class="tq-principle-row ${item.id===activePrincipleId?'active':''}" data-principle-id="${escapeHTML(item.id)}"><strong>${escapeHTML(item.name)}</strong><span>题目 ${linked.length} · ★ ${counts.easy} · ★★ ${counts.medium} · ★★★ ${counts.hard}</span><small>${preset?.status==='active'?'预设已启用':preset?'预设草稿':'未配置预设'}${item.status==='inactive'?' · 已停用':''}</small></button>`;
+      return `<div class="tq-principle-row ${item.id===activePrincipleId?'active':''}"><label class="tq-principle-select"><input type="checkbox" data-principle-select="${escapeHTML(item.id)}" ${selectedPrincipleIds.has(item.id)?'checked':''} aria-label="选择原则 ${escapeHTML(item.name)}"/></label><button type="button" class="tq-principle-open" data-principle-id="${escapeHTML(item.id)}"><strong>${escapeHTML(item.name)}</strong><span>题目 ${linked.length} · ★ ${counts.easy} · ★★ ${counts.medium} · ★★★ ${counts.hard}</span><small>${preset?.status==='active'?'预设已启用':preset?'预设草稿':'未配置预设'}${item.status==='inactive'?' · 已停用':''}</small></button></div>`;
     }).join(''):'<div class="qb-empty">尚未创建原则。</div>';
     fillPrincipleEditor(activePrincipleId);
   }
   function fillPrincipleEditor(id){
+    const isDraft=!!id&&id===draftPrincipleId;
     const item=Principles?.get?.(id)||null,preset=item?Presets?.getByPrincipleId?.(item.id):null;
-    activePrincipleId=item?.id||'';
-    if(byId('tqPrincipleId'))byId('tqPrincipleId').value=item?.id||'';
+    activePrincipleId=item?.id||(isDraft?id:'');
+    if(byId('tqPrincipleId'))byId('tqPrincipleId').value=item?.id||(isDraft?id:'');
     if(byId('tqPrincipleName'))byId('tqPrincipleName').value=item?.name||'';
     if(byId('tqPrincipleStatus'))byId('tqPrincipleStatus').value=item?.status||'active';
     if(byId('tqPresetId'))byId('tqPresetId').value=preset?.id||'';
-    if(byId('tqPresetTitle'))byId('tqPresetTitle').value=preset?.title|| (item?'原则：'+item.name:'');
+    if(byId('tqPresetTitle'))byId('tqPresetTitle').value=item?'原则：'+item.name:'';
     if(byId('tqPresetContent'))byId('tqPresetContent').value=preset?.content||'';
     if(byId('tqPresetStatus'))byId('tqPresetStatus').value=preset?.status||'draft';
     const confusable=byId('tqConfusablePrinciples');if(confusable){
@@ -90,14 +95,32 @@
     const confusable=[...(byId('tqConfusablePrinciples')?.querySelectorAll('input:checked')||[])].map(input=>input.value);
     // Capture preset values before repository events rerender the editor.
     const presetId=String(byId('tqPresetId')?.value||'');
-    const presetTitle=String(byId('tqPresetTitle')?.value||'').trim();
     const presetContent=String(byId('tqPresetContent')?.value||'').trim();
     const presetStatus=byId('tqPresetStatus')?.value||'draft';
     const item=Principles?.upsert?.({id,name,status:principleStatus,confusablePrincipleIds:confusable});if(!item)return toast('原则保存失败。');
-    if(presetTitle||presetContent||presetId)Presets?.upsert?.({id:presetId,principleId:item.id,title:presetTitle||('原则：'+item.name),content:presetContent,status:presetStatus});
-    activePrincipleId=item.id;renderPrincipleList();toast('原则与系统预设归纳卡已保存。');
+    Presets?.upsert?.({id:presetId,principleId:item.id,title:'原则：'+item.name,content:presetContent,status:presetStatus});
+    draftPrincipleId='';activePrincipleId=item.id;renderPrincipleList();toast('原则与系统预设归纳卡已保存。');
   }
-  function newPrinciple(){activePrincipleId='';fillPrincipleEditor('');byId('tqPrincipleName')?.focus()}
+  function newPrinciple(){draftPrincipleId='principle-draft-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);activePrincipleId=draftPrincipleId;fillPrincipleEditor(draftPrincipleId);byId('tqPrincipleName')?.focus()}
+  function selectedPrinciples(){return [...selectedPrincipleIds]}
+  async function postPrincipleOperation(path,body){
+    await global.KGServerStateStorage?.flush?.();
+    const response=await global.fetch(path,{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+    let payload={};try{payload=await response.json()}catch(error){}
+    if(!response.ok){const detail=payload?.detail||payload;const error=new Error(detail?.message||'操作失败');error.detail=detail;throw error}
+    await global.KGServerStateStorage?.refresh?.();
+    return payload;
+  }
+  async function applySelectedPresetStatus(){
+    const ids=selectedPrinciples(),status=String(byId('tqBulkPresetStatus')?.value||'draft');
+    if(!ids.length)return toast('请先勾选要修改的原则。');
+    try{await postPrincipleOperation('/api/v1/content-prep/principles/status',{ids,presetStatus:status});renderPrincipleList();toast(`已更新 ${ids.length} 条原则的预设状态。`)}catch(error){toast(error?.message||'批量修改预设状态失败。')}
+  }
+  async function archiveSelectedPrinciples(){
+    const ids=selectedPrinciples();if(!ids.length)return toast('请先勾选要归档的原则。');
+    if(!global.confirm?.(`确定归档所选 ${ids.length} 条原则及其系统归纳卡吗？已被题目引用的原则不会被归档。`))return;
+    try{await postPrincipleOperation('/api/v1/content-prep/principles/archive',{ids});selectedPrincipleIds.clear();renderPrincipleList();toast(`已归档 ${ids.length} 条原则及其系统归纳卡。`)}catch(error){const counts=error?.detail?.referenceCounts||{};const total=Object.values(counts).reduce((sum,value)=>sum+Number(value||0),0);toast(total?`所选原则仍被 ${total} 道题引用，请先解除或重新绑定。`:error?.message||'归档失败。')}
+  }
   function bind(){
     seedPrinciples();
     byId('questionDifficultyStars')?.addEventListener('click',event=>{const button=event.target.closest('[data-difficulty]');if(button)setDifficulty(button.dataset.difficulty)});
@@ -109,9 +132,13 @@
     byId('qbBulkDifficultyDialog')?.addEventListener('click',event=>{const button=event.target.closest('[data-bulk-difficulty]');if(!button)return;const response=api().bulkPatchSelectedQuestions?.({difficulty:button.dataset.bulkDifficulty});if(response?.valid){byId('qbBulkDifficultyDialog')?.close();toast(`已为 ${response.updated} 道题设置难度。`)}else toast(response?.error||'请先选择题目。')});
     byId('qbBulkPrinciplesBtn')?.addEventListener('click',openBulkPrinciples);
     byId('qbBulkPrincipleConfirmBtn')?.addEventListener('click',()=>{const ids=selectedFromWrap('qbBulkPrincipleOptions');const response=api().bulkPatchSelectedQuestions?.({principleIds:ids});if(response?.valid){byId('qbBulkPrincipleDialog')?.close();toast(`已更新 ${response.updated} 道题的原则关联。`)}else toast(response?.error||'请先选择题目。')});
-    byId('tqPrincipleList')?.addEventListener('click',event=>{const row=event.target.closest('[data-principle-id]');if(!row)return;activePrincipleId=row.dataset.principleId;renderPrincipleList()});
+    byId('tqPrincipleList')?.addEventListener('change',event=>{const checkbox=event.target.closest('[data-principle-select]');if(!checkbox)return;const id=checkbox.dataset.principleSelect;if(checkbox.checked)selectedPrincipleIds.add(id);else selectedPrincipleIds.delete(id);renderPrincipleList()});
+    byId('tqPrincipleList')?.addEventListener('click',event=>{const row=event.target.closest('[data-principle-id]');if(!row)return;draftPrincipleId='';activePrincipleId=row.dataset.principleId;renderPrincipleList()});
+    byId('tqSelectAllPrinciples')?.addEventListener('change',event=>{const ids=(Principles?.list?.({includeInactive:true})||[]).map(item=>item.id);selectedPrincipleIds=event.target.checked?new Set(ids):new Set();renderPrincipleList()});
+    byId('tqApplyPresetStatusBtn')?.addEventListener('click',()=>{applySelectedPresetStatus()});
+    byId('tqArchiveSelectedPrinciplesBtn')?.addEventListener('click',()=>{archiveSelectedPrinciples()});
     byId('tqNewPrincipleBtn')?.addEventListener('click',newPrinciple);byId('tqSavePrincipleBtn')?.addEventListener('click',savePrinciple);
-    byId('tqPrincipleName')?.addEventListener('input',()=>{if(!byId('tqPresetId')?.value&&!String(byId('tqPresetTitle')?.value||'').trim())byId('tqPresetTitle').value='原则：'+String(byId('tqPrincipleName').value||'').trim()});
+    byId('tqPrincipleName')?.addEventListener('input',()=>{if(byId('tqPresetTitle'))byId('tqPresetTitle').value='原则：'+String(byId('tqPrincipleName').value||'').trim()});
     document.addEventListener('kg-question-form-filled',event=>{const question=event.detail?.question||{};let ids=unique(question.metadata?.principleIds||question.principleIds||[]);if(!ids.length){const created=legacyPrincipleNames(question).map(name=>Principles?.findByName?.(name)||Principles?.upsert?.({name})).filter(Boolean);ids=created.map(item=>item.id)}setCurrentPrincipleIds(ids);if(byId('questionDifficultyInput'))byId('questionDifficultyInput').value=Difficulty.normalize?.(question.difficulty)||'';renderStarRating();renderPrincipleList()});
     global.addEventListener('kg:principles-changed',()=>{renderCurrentPrinciples();renderPrincipleList()});
     renderStarRating();renderCurrentPrinciples();renderPrincipleList();
