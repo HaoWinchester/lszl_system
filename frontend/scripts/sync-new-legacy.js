@@ -839,16 +839,14 @@ function p45MigrationManifest(source) {
     !manifest
     || typeof manifest !== 'object'
     || Array.isArray(manifest)
-    || !manifest.migratedBusinessModules
-    || typeof manifest.migratedBusinessModules !== 'object'
-    || Array.isArray(manifest.migratedBusinessModules)
+    || Object.keys(manifest).length !== 1
+    || Object.keys(manifest)[0] !== 'legacyUnmigratedIndexedDbModules'
     || !Array.isArray(manifest.legacyUnmigratedIndexedDbModules)
     || manifest.legacyUnmigratedIndexedDbModules.some((path) => typeof path !== 'string')
   ) {
     throw new Error('P4.5 migration manifest is invalid')
   }
   return {
-    migratedBusinessModules: new Map(Object.entries(manifest.migratedBusinessModules)),
     legacyUnmigratedIndexedDbModules: new Set(manifest.legacyUnmigratedIndexedDbModules),
   }
 }

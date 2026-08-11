@@ -1,5 +1,4 @@
 {
-  "migratedBusinessModules": {},
   "legacyUnmigratedIndexedDbModules": [
     "content-prep-studio/src/js/10-state-domain.js",
     "content-prep-studio/dist/content-prep.html"

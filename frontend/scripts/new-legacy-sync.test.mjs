@@ -104,7 +104,6 @@ function fixture({ omit, omitP45MigrationManifest = false } = {}) {
   }
   if (!omitP45MigrationManifest) {
     write(resolve(upstream, 'p45-migration-manifest.json'), JSON.stringify({
-      migratedBusinessModules: {},
       legacyUnmigratedIndexedDbModules: [],
     }))
   }
@@ -120,7 +119,6 @@ function runSync(item) {
 test('source manifest limits transitional IndexedDB debt to Prep Studio', () => {
   const manifest = JSON.parse(readFileSync(sourceMigrationManifest, 'utf8'))
 
-  assert.deepEqual(manifest.migratedBusinessModules, {})
   assert.deepEqual(manifest.legacyUnmigratedIndexedDbModules, [
     'content-prep-studio/src/js/10-state-domain.js',
     'content-prep-studio/dist/content-prep.html',
@@ -189,17 +187,10 @@ test('sync reports the P4.5 contract diagnostic for an unregistered persistent k
   assert.match(result.stderr, /P4\.5 persistent state is not registered: kg_p45_unregistered_payload_v1/)
 })
 
-test('sync rejects IndexedDB persistence in a migrated P4.5 business module', (t) => {
+test('sync rejects IndexedDB persistence in every non-debt P4.5 module', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))
   write(resolve(item.upstream, 'src/p45-fixture.js'), "indexedDB.open('business-workspace')\n")
-  write(resolve(item.upstream, 'p45-migration-manifest.json'), JSON.stringify({
-    migratedBusinessModules: {
-      'src/p45-fixture.js': {},
-    },
-    legacyUnmigratedIndexedDbModules: [],
-  }))
-
   const result = runSync(item)
 
   assert.notEqual(result.status, 0)
@@ -217,52 +208,34 @@ test('sync rejects optional IndexedDB open in an unlisted module', (t) => {
   assert.match(result.stderr, /IndexedDB business persistence is forbidden in migrated module: src\/p45-fixture\.js/)
 })
 
-test('sync rejects every IndexedDB persistence shape despite an offline-export-only manifest flag', (t) => {
-  const fixtures = [
-    "indexedDB.open('export-cache')\n",
-    [
-      "const db = indexedDB?.['open']('export-cache')",
-      "const tx = db?.['transaction']('workspace', 'readwrite')",
-      "const store = tx?.['objectStore']('workspace')",
-      "store?.['put']({ id: 1 })",
-    ].join('\n'),
+test('sync rejects obsolete migration and offline-export manifest fields before source scanning', (t) => {
+  const manifests = [
+    { migratedBusinessModules: {}, legacyUnmigratedIndexedDbModules: [] },
+    { legacyUnmigratedIndexedDbModules: [], offlineExportOnly: true },
   ]
 
-  for (const contents of fixtures) {
+  for (const manifest of manifests) {
     const item = fixture()
     t.after(() => rmSync(item.root, { recursive: true, force: true }))
-    write(resolve(item.upstream, 'src/p45-fixture.js'), contents)
-    write(resolve(item.upstream, 'p45-migration-manifest.json'), JSON.stringify({
-      migratedBusinessModules: {
-        'src/p45-fixture.js': { offlineExportOnly: true },
-      },
-      legacyUnmigratedIndexedDbModules: [],
-    }))
+    write(resolve(item.upstream, 'p45-migration-manifest.json'), JSON.stringify(manifest))
 
     const result = runSync(item)
 
     assert.notEqual(result.status, 0)
-    assert.match(result.stderr, /IndexedDB business persistence is forbidden in migrated module: src\/p45-fixture\.js/)
+    assert.match(result.stderr, /P4\.5 migration manifest is invalid/)
   }
 })
 
-test('sync permits ordinary collection writes in a migrated module without IndexedDB', (t) => {
+test('sync permits ordinary collection writes without IndexedDB', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))
   write(resolve(item.upstream, 'src/p45-fixture.js'), "const values = new Set(); values.add('value')\n")
-  write(resolve(item.upstream, 'p45-migration-manifest.json'), JSON.stringify({
-    migratedBusinessModules: {
-      'src/p45-fixture.js': {},
-    },
-    legacyUnmigratedIndexedDbModules: [],
-  }))
-
   const result = runSync(item)
 
   assert.equal(result.status, 0, result.stderr)
 })
 
-test('sync rejects split IndexedDB transaction and object-store writes in a migrated module', (t) => {
+test('sync rejects split IndexedDB transaction and object-store writes in a non-debt module', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))
   write(resolve(item.upstream, 'src/p45-fixture.js'), [
@@ -270,13 +243,6 @@ test('sync rejects split IndexedDB transaction and object-store writes in a migr
     "const store = tx.objectStore('workspace')",
     'store.put({ id: 1 })',
   ].join('\n'))
-  write(resolve(item.upstream, 'p45-migration-manifest.json'), JSON.stringify({
-    migratedBusinessModules: {
-      'src/p45-fixture.js': {},
-    },
-    legacyUnmigratedIndexedDbModules: [],
-  }))
-
   const result = runSync(item)
 
   assert.notEqual(result.status, 0)
@@ -324,13 +290,6 @@ test('sync rejects split IndexedDB writes assigned after declaration in a migrat
     "store = tx.objectStore('workspace')",
     'store.put({ id: 1 })',
   ].join('\n'))
-  write(resolve(item.upstream, 'p45-migration-manifest.json'), JSON.stringify({
-    migratedBusinessModules: {
-      'src/p45-fixture.js': {},
-    },
-    legacyUnmigratedIndexedDbModules: [],
-  }))
-
   const result = runSync(item)
 
   assert.notEqual(result.status, 0)
