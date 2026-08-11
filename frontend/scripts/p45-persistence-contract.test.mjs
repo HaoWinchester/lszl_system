@@ -5,18 +5,10 @@ import test from 'node:test'
 
 const p45Path = new URL('./p45-persistence-contract.json', import.meta.url)
 const migrationMatrixPath = new URL('../../docs/p45-migration-matrix.md', import.meta.url)
-const p45PostgresTableRegistry = new Set([
-  'graph_files',
-  'file_contents',
-  'question_banks',
-  'questions',
-  'principles',
-  'synthesis_presets',
-  'learning_events',
+const backendRoot = resolve(process.cwd(), '../backend')
+const plannedP45PostgresTables = new Set([
   'practice_mistakes',
   'practice_verifications',
-  'recall_progress',
-  'shared_runtime_states',
   'recall_association_libraries',
   'learning_evidence',
   'learning_diagnoses',
@@ -29,8 +21,6 @@ const p45PostgresTableRegistry = new Set([
   'recommendation_records',
   'learner_content_events',
   'content_effect_attributions',
-  'question_upload_batches',
-  'question_audit_logs',
   'prep_workspaces',
 ])
 const placeholderOrWildcard = /—|\bTBD\b|\bfuture\b|后续|\*/iu
@@ -65,6 +55,40 @@ function sourceContains(directory, identifier) {
       : entry.isFile() && readFileSync(entryPath, 'utf8').includes(identifier)
   })
 }
+
+function findFiles(directory, extension) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = resolve(directory, entry.name)
+    if (entry.isDirectory()) return findFiles(entryPath, extension)
+    return entry.isFile() && entry.name.endsWith(extension) ? [entryPath] : []
+  })
+}
+
+function readSqlalchemyTableNames() {
+  return new Set(findFiles(resolve(backendRoot, 'app/models'), '.py').flatMap((path) =>
+    [...readFileSync(path, 'utf8').matchAll(/__tablename__\s*=\s*["']([^"']+)["']/g)].map((match) => match[1])
+  ))
+}
+
+function readRegisteredApiRoutePrefixes() {
+  const apiDirectory = resolve(backendRoot, 'app/api/v1')
+  const routerSource = readFileSync(resolve(apiDirectory, 'router.py'), 'utf8')
+  const modules = [...routerSource.matchAll(/api_router\.include_router\((\w+)\.router/g)].map((match) => match[1])
+
+  return new Set(modules.flatMap((module) => {
+    const source = readFileSync(resolve(apiDirectory, `${module}.py`), 'utf8')
+    const routerPrefix = source.match(/router\s*=\s*APIRouter\(\s*prefix\s*=\s*["']([^"']+)["']/)?.[1] ?? ''
+    return [...source.matchAll(/@router\.(?:get|post|put|patch|delete|head|options)\(\s*["']([^"']+)["']/g)]
+      .map((match) => `${routerPrefix}${match[1]}`.match(/^\/[^/]+/)?.[0])
+      .filter(Boolean)
+  }))
+}
+
+const p45PostgresTableRegistry = new Set([
+  ...readSqlalchemyTableNames(),
+  ...plannedP45PostgresTables,
+])
+const registeredApiRoutePrefixes = readRegisteredApiRoutePrefixes()
 
 test('P4.5 persistence manifest assigns every state domain', () => {
   const p45 = readJson(p45Path)
@@ -112,6 +136,18 @@ test('P4.5 limits session persistence to navigation and preview token prefixes',
   ])
 })
 
+test('P4.5 migration registry accepts all real SQLAlchemy tables and explicit planned tables', () => {
+  assert.ok(p45PostgresTableRegistry.has('training_progress'))
+  assert.ok(p45PostgresTableRegistry.has('canvas_workspaces'))
+  assert.ok(p45PostgresTableRegistry.has('learning_evidence'))
+})
+
+test('P4.5 API registry derives route prefixes from registered API routers', () => {
+  assert.ok(registeredApiRoutePrefixes.has('/files'))
+  assert.ok(registeredApiRoutePrefixes.has('/training'))
+  assert.ok(registeredApiRoutePrefixes.has('/learning'))
+})
+
 test('P4.5 migration matrix assigns database ownership and API routes to every migrated feature group', () => {
   const rows = parseMarkdownTable(readFileSync(migrationMatrixPath, 'utf8'))
   const requiredGroups = [
@@ -146,6 +182,8 @@ test('P4.5 migration matrix rejects blank and placeholder persistence assignment
     assert.ok(apiRoutes.length, `${row['功能组']} requires an API route`)
     for (const route of apiRoutes) {
       assert.match(route, /^\/api\/v1\/[a-z0-9-]+$/, `${row['功能组']} has an invalid API route`)
+      const routePrefix = route.replace('/api/v1', '').match(/^\/[^/]+/)?.[0]
+      assert.ok(routePrefix && registeredApiRoutePrefixes.has(routePrefix), `${row['功能组']} has an unregistered API route: ${route}`)
     }
   }
 })
