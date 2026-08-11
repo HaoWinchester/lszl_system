@@ -54,8 +54,8 @@ const COMPLETE_AI_PROMPT=`你是一名 PMP 内容生产与结构化校核助手�
 5. 关键词必须是词/稳定专业术语，不能是半句话。
 6. 普通关键词 keywordLevel=normal；核心关键词 keywordLevel=core，并填写 solutionRole 和 coreReason；每题建议 2～5 个。
 7. 标签优先使用主程序预设标签。
-8. metadata.principleIds 保存题目原则；metadata.optionPrincipleMap 保存 A/B/C/D 对应原则。
-9. principles 与 synthesisPresets 按模板结构输出；用于解释选项的原则尽量有 active 归纳卡。
+8. metadata.stemPrincipleIds 保存题干 / 通用原则；metadata.optionPrincipleMap 保存 A/B/C/D 对应原则；metadata.principleIds 由两者自动汇总。
+9. 每道题正确选项必须且只能绑定一条原则；principles 与 synthesisPresets 必须一对一，归纳卡标题固定为“原则：{原则名称}”。
 10. 不写死 taxonomyId/taxonomyVersion。
 11. 不要生成题目 id、questionId、contentHash、metadata.origin、creatorId、deviceId 或 batchId；这些全部由 Prep Studio 生成。
 12. 输出纯 JSON，不要 Markdown 代码围栏，不要额外解释。

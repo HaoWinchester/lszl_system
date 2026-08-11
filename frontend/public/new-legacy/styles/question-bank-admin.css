@@ -106,6 +106,13 @@ input:focus,textarea:focus,select:focus{border-color:rgba(37,99,235,.8);box-shad
 .qb-option-row .radio{display:flex;align-items:center;gap:5px;font-size:12px;color:#475569}
 .qb-option-row input[type="radio"]{width:auto}
 .option-id{text-align:center;font-weight:700}
+.qb-option-principle-bindings{grid-column:1/-1;display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 10px;align-items:start;padding:9px 10px;border:1px dashed #cbd5e1;border-radius:11px;background:#fff;color:#475569;font-size:11px}
+.qb-option-principle-bindings>strong{color:#475569;font-size:11px;line-height:1.45}
+.qb-option-principle-bindings>span{line-height:1.45;color:#64748b}
+.qb-option-principle-checks{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px}
+.qb-option-principle-checks label{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid #dbe3ee;border-radius:999px;background:#f8fafc;font-size:11px;font-weight:700;color:#334155;cursor:pointer}
+.qb-option-principle-checks input{width:auto}
+.qb-option-principle-empty{grid-column:1/-1;color:#94a3b8}
 
 .qb-token-list,.qb-concept-list,.qb-reasoning-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
 .qb-token-card,.qb-concept-card{display:flex;justify-content:space-between;gap:12px;padding:13px;border:1px solid rgba(148,163,184,.23);border-radius:18px;background:linear-gradient(135deg,#fff,#f8fafc)}

@@ -174,7 +174,7 @@ B原则：principle-2"></textarea>
         </div>
         <details class="full-paste-example">
           <summary>查看“完整版 Word / AI 文本粘贴格式”说明</summary>
-          <p class="smalltxt muted">可解析题目基础信息、标签、Trap、双语、英文逐选项反馈、主知识点 ID、普通/核心关键词、原则 IDs 和 A/B/C/D 原则映射。原则库/归纳卡定义本身仍建议使用“完整内容准备包 JSON”。</p>
+          <p class="smalltxt muted">可解析题目基础信息、标签、Trap、双语、英文逐选项反馈、主知识点 ID、普通/核心关键词、题干原则和 A/B/C/D 原则映射。原则与归纳卡定义请使用“完整内容准备包 JSON”或“原则与归纳卡组合 JSON”。</p>
           <pre>【题目1】
 标题：已发送不等于已沟通
 难度：基础
@@ -220,8 +220,7 @@ D原则：principle-role-accountability</pre>
       </div>
 
       <div class="data-summary">
-        <div class="filebox"><h3>原则库 JSON（可选）</h3><input type="file" id="filePrinciples" accept=".json,application/json"><p class="muted smalltxt">兼容主程序 principle repository。</p></div>
-        <div class="filebox"><h3>归纳卡 JSON（可选）</h3><input type="file" id="filePresets" accept=".json,application/json"><p class="muted smalltxt">兼容主程序 synthesis preset repository。</p></div>
+        <div class="filebox"><h3>原则与归纳卡组合 JSON（可选）</h3><input type="file" id="filePrincipleCardBundle" accept=".json,application/json"><p class="muted smalltxt">原则和归纳卡按一对一关系同时导入，避免拆分后丢失含义。</p></div>
         <div class="filebox"><h3>标签配置 JSON（可选）</h3><input type="file" id="fileTagConfig" accept=".json,application/json"><p class="muted smalltxt">兼容主程序标签名称/别名配置。</p></div>
       </div>
       <div class="data-summary">
@@ -413,7 +412,7 @@ D原则：principle-role-accountability</pre>
       <p>保存当前全部工作数据，方便下次继续编辑。该草稿不是正式服务器导入格式。</p>
       <button class="btn" id="btnExportWorkspace">导出工作区草稿</button>
     </div>
-  <div class="card export-card"><h3>原则 / 归纳卡 / 标签配置</h3><p>分别输出与当前主程序 repository/storage 结构对齐的 JSON。</p><div class="toolbar"><button class="btn" id="btnExportPrinciples">原则库</button><button class="btn" id="btnExportPresets">归纳卡</button><button class="btn" id="btnExportTagConfig">标签配置</button></div></div>
+  <div class="card export-card"><h3>原则与归纳卡 / 标签配置</h3><p>一个原则对应一张归纳卡；组合文件会同时携带两者并校验一对一关系。标签配置可单独导出。</p><div class="toolbar"><button class="btn" id="btnExportPrincipleCards">导出原则与归纳卡</button><button class="btn" id="btnExportTagConfig">标签配置</button></div></div>
   </div>
   <div class="card" style="margin-top:14px">
     <div class="card-hd">Keyword System v2 导出规则</div>
@@ -422,8 +421,7 @@ D原则：principle-role-accountability</pre>
         每个关键词会输出 <code>keywordLevel: normal|core</code>、<code>isCore</code>、
         <code>solutionRole</code>、<code>coreReason</code>。同时在
         <code>metadata.keywordSystemV2</code> 保存兼容镜像。<br>
-        原因：当前正式程序 P4.3.44.2 / 后续服务器接口 的 <code>normalizeClue()</code> 尚不会保留这些新字段；
-        镜像可以保证导入当前版本后，未来升级“做题大厅核心关键词显示”时仍有可迁移的数据。
+        主程序和服务器接口会保留这些字段；镜像继续用于兼容旧版本与批量迁移。
       </div>
     </div>
   </div>
@@ -544,7 +542,7 @@ B原则：principle-effective-communication</pre>
 
         <article class="help-topic" data-help-content="export">
           <h2>⑦ 导出与审计</h2>
-          <p>这里输出题库、完整内容包、联想库、原则、归纳卡、标签配置、校验报告和工作区草稿。</p>
+          <p>这里输出题库、完整内容包、联想库、原则与归纳卡组合、标签配置、校验报告和工作区草稿。</p>
           <h3>v0.3.5 导出审计</h3>
           <p>每次正式导出会写入一条设备级审计事件，记录：</p>
           <ul><li>Audit ID</li><li>导出时间</li><li>制作人 Creator ID / 姓名</li><li>Device ID</li><li>导出类型与文件名</li><li>题目数量</li><li>最近 Batch ID</li><li>校验 Error / Warning 数</li><li>导出 payload 的 SHA-256 指纹</li><li>Prep Studio 版本</li></ul>

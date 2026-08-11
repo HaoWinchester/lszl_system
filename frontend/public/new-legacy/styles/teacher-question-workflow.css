@@ -286,10 +286,11 @@ body.qb-training-step .tq-training-analysis p{margin:0;padding:10px 12px;border-
 .qb-classification-fields{grid-template-columns:minmax(180px,.9fr) minmax(260px,1.25fr) minmax(230px,1fr) minmax(230px,1fr)!important}
 .tq-principle-config-panel{min-height:500px}
 .tq-principle-workspace{display:grid;grid-template-columns:minmax(220px,31%) minmax(0,1fr);gap:14px;min-height:430px}
+.tq-principle-bulk-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 12px;padding:10px 12px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff}.tq-principle-bulk-actions label{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#334155}.tq-principle-bulk-actions select{min-height:32px;padding:0 8px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;font:inherit;font-size:12px}.tq-principle-bulk-actions .danger{border-color:#fecaca;background:#fff1f2;color:#be123c}
 .tq-principle-list{display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid #e2e8f0;border-radius:14px;background:#f8fafc;overflow:auto}
-.tq-principle-row{display:grid;gap:4px;width:100%;padding:11px 12px;border:1px solid transparent;border-radius:11px;background:#fff;color:#334155;text-align:left;box-shadow:none}
-.tq-principle-row:hover,.tq-principle-row.active{transform:none;border-color:#93c5fd;background:#eff6ff}
-.tq-principle-row strong{font-size:13px}.tq-principle-row span,.tq-principle-row small{color:#64748b;font-size:10px}
+.tq-principle-row{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:stretch;gap:4px;width:100%;padding:4px;border:1px solid transparent;border-radius:11px;background:#fff;color:#334155}
+.tq-principle-row:hover,.tq-principle-row.active{border-color:#93c5fd;background:#eff6ff}.tq-principle-select{display:flex;align-items:center;padding:0 6px}.tq-principle-select input{width:16px;height:16px;accent-color:#2563eb}.tq-principle-open{display:grid;gap:4px;width:100%;padding:7px 8px;border:0;border-radius:8px;background:transparent;color:#334155;text-align:left;box-shadow:none}.tq-principle-open:hover{transform:none;background:rgba(255,255,255,.56)}
+.tq-principle-open strong{font-size:13px}.tq-principle-open span,.tq-principle-open small{color:#64748b;font-size:10px}
 .tq-principle-editor{display:grid;grid-template-columns:1fr 180px;gap:12px;align-content:start;padding:14px;border:1px solid #e2e8f0;border-radius:14px;background:#fff}
 .tq-principle-editor .wide{grid-column:1/-1}.tq-preset-divider{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:3px;padding-top:13px;border-top:1px solid #e2e8f0}.tq-preset-divider span{font-weight:900}.tq-preset-divider small{color:#64748b}
 .tq-confusable-principles,.tq-principle-picker-options{display:flex;flex-wrap:wrap;gap:8px;min-height:42px;padding:9px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc}
@@ -298,7 +299,7 @@ body.qb-training-step .tq-training-analysis p{margin:0;padding:10px 12px;border-
 body.qb-question-step [data-annotation-tab="principles"],body.qb-question-step [data-layout-nav="principles"]{display:none!important}
 body.qb-training-step [data-annotation-tab="principles"],body.qb-training-step [data-layout-nav="principles"]{display:inline-flex!important}
 @media(max-width:1180px){.qb-classification-fields{grid-template-columns:repeat(2,minmax(0,1fr))!important}.tq-principle-workspace{grid-template-columns:1fr}.tq-principle-list{max-height:220px}}
-@media(max-width:720px){.qb-classification-fields{grid-template-columns:1fr!important}.tq-principle-editor{grid-template-columns:1fr}.tq-principle-editor .wide,.tq-preset-divider{grid-column:1}.tq-preset-divider{align-items:flex-start;flex-direction:column}}
+@media(max-width:720px){.qb-classification-fields{grid-template-columns:1fr!important}.tq-principle-bulk-actions{align-items:stretch}.tq-principle-bulk-actions select,.tq-principle-bulk-actions button{width:100%}.tq-principle-editor{grid-template-columns:1fr}.tq-principle-editor .wide,.tq-preset-divider{grid-column:1}.tq-preset-divider{align-items:flex-start;flex-direction:column}}
 
 /* P4.3.13 training configuration tabs remain visible in the active Teacher Workbench. */
 body.qb-training-step .qb-annotation-tabs{display:flex!important;flex-wrap:wrap;gap:6px}

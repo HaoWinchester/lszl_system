@@ -353,13 +353,13 @@ function parsePastedQuestionText(raw){
       mm=line.match(/^(?:主知识点ID|PrimaryNodeId|Primary Node ID)\s*[:：]\s*(.*)$/i);if(mm){primaryNodeId=mm[1].trim();mode='meta';continue}
       mm=line.match(/^普通关键词\s*[:：]\s*(.*)$/);if(mm){normalKw=mm[1].trim();mode='meta';continue}
       mm=line.match(/^核心关键词\s*[:：]\s*(.*)$/);if(mm){coreKw=mm[1].trim();mode='meta';continue}
-      mm=line.match(/^(?:原则IDs|原则ID|PrincipleIds)\s*[:：]\s*(.*)$/i);if(mm){principleIds=cleanList(mm[1]);mode='meta';continue}
+      mm=line.match(/^(?:题干原则IDs|题干原则ID|StemPrincipleIds|原则IDs|原则ID|PrincipleIds)\s*[:：]\s*(.*)$/i);if(mm){principleIds=cleanList(mm[1]);mode='meta';continue}
       mm=line.match(/^([A-D])原则\s*[:：]\s*(.*)$/);if(mm){optionPrinciples[mm[1].toUpperCase()]=cleanList(mm[2]);mode='meta';continue}
       if(mode==='analysis')analysis.push(line);else if(mode==='en-stem')enStem.push(line);else if(mode==='en-analysis')enAnalysis.push(line);else if(mode==='stem')stem.push(line);
     }
     if(stem.length||Object.values(opts).some(Boolean)){
       const clues=[...parseKeywordPasteSpecs(normalKw,'normal'),...parseKeywordPasteSpecs(coreKw,'core')];
-      const nq=normalizeQuestion({title:title||`导入题目 ${bi+1}`,difficulty,domain,topic,tags,stage,stemParts:[{text:stem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:opts[letter],trap:traps[letter]})),correctAnswer:answer||'A',analysis:analysis.join('\n'),translations:{en:{title:enTitle,stemParts:[{text:enStem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:enOpts[letter]})),analysis:enAnalysis.join('\n'),optionFeedback:enFeedback}},clues,metadata:{knowledge:{primaryNodeId,relatedNodeIds:[],mappingStatus:primaryNodeId?'confirmed':'unmapped',pathSnapshot:[]},principleIds,optionPrincipleMap:optionPrinciples}},bi,state.questionBank.subject||'PMP');
+      const nq=normalizeQuestion({title:title||`导入题目 ${bi+1}`,difficulty,domain,topic,tags,stage,stemParts:[{text:stem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:opts[letter],trap:traps[letter]})),correctAnswer:answer||'A',analysis:analysis.join('\n'),translations:{en:{title:enTitle,stemParts:[{text:enStem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:enOpts[letter]})),analysis:enAnalysis.join('\n'),optionFeedback:enFeedback}},clues,metadata:{knowledge:{primaryNodeId,relatedNodeIds:[],mappingStatus:primaryNodeId?'confirmed':'unmapped',pathSnapshot:[]},stemPrincipleIds:principleIds,optionPrincipleMap:optionPrinciples}},bi,state.questionBank.subject||'PMP');
       if(primaryNodeId&&state.knowledgeTree?.map.has(primaryNodeId))nq.metadata.knowledge.pathSnapshot=state.knowledgeTree.pathFor(primaryNodeId);
       nq.clues.forEach(c=>c.conceptIds=primaryNodeId?[primaryNodeId]:[]);recomputeKeywordLocations(nq);syncQuestionPrinciples(nq);nq.tags=unique((nq.tags||[]).map(canonicalTagName));nq.metadata.tagPaths=nq.tags.map(tagPathFor).filter(Boolean);out.push(nq);
     }
@@ -403,6 +403,23 @@ function normalizePrinciples(payload){
 function normalizePresets(payload){
   const raw=Array.isArray(payload)?payload:(Array.isArray(payload?.items)?payload.items:[]);
   return {schemaVersion:1,items:raw.map((item,i)=>({id:String(item?.id||('preset-'+i+'-'+Date.now().toString(36))),principleId:String(item?.principleId||''),title:String(item?.title||'').trim(),content:String(item?.content||item?.description||'').trim(),status:['draft','active','inactive'].includes(String(item?.status||''))?String(item.status):'draft',version:Math.max(1,Number(item?.version||1)),createdAt:Number(item?.createdAt||Date.now()),updatedAt:Number(item?.updatedAt||Date.now())})),updatedAt:Number(payload?.updatedAt||Date.now())};
+}
+function normalizePrincipleCardBundle(payload={}){
+  const principles=normalizePrinciples(payload.principles||payload.principleRepository||{});
+  const synthesisPresets=normalizePresets(payload.synthesisPresets||payload.presets||payload.synthesisPresetRepository||{});
+  const principlesById=new Map(principles.items.map(item=>[item.id,item])),seenPresetPrinciples=new Set();
+  synthesisPresets.items.forEach(preset=>{
+    if(!principlesById.has(preset.principleId))throw new Error(`归纳卡引用了不存在的原则：${preset.principleId}`);
+    if(seenPresetPrinciples.has(preset.principleId))throw new Error(`原则 ${preset.principleId} 存在重复归纳卡`);
+    seenPresetPrinciples.add(preset.principleId);
+  });
+  principles.items.forEach(principle=>{if(!seenPresetPrinciples.has(principle.id))throw new Error(`原则 ${principle.id} 缺少对应归纳卡`)});
+  synthesisPresets.items=synthesisPresets.items.map(preset=>({...preset,title:'原则：'+principlesById.get(preset.principleId).name}));
+  return {principles,synthesisPresets};
+}
+function principleCardBundlePayload(principles=state.principles,synthesisPresets=state.synthesisPresets){
+  const pair=normalizePrincipleCardBundle({principles,synthesisPresets});
+  return {principleCardBundleVersion:1,format:'kg-principle-card-bundle-v1',generatedBy:`PMP Content Prep Studio v${VERSION}`,generatedAt:nowIso(),principles:pair.principles,synthesisPresets:pair.synthesisPresets};
 }
 function baseTagSlotEntries(config={}){
   const out=[];BASE_TAG_GROUPS.forEach(g=>g.categories.forEach(c=>c.options.forEach((baseLabel,i)=>{
@@ -456,8 +473,21 @@ function canonicalTagName(value){let current=String(value||'').trim(),seen=new S
 function tagPathFor(label){const canonical=canonicalTagName(label);return tagCatalogEntries().find(x=>x.label===canonical)||null}
 function principleById(id){return state.principles.items.find(x=>x.id===String(id))||null}
 function presetByPrincipleId(id){return state.synthesisPresets.items.find(x=>x.principleId===String(id))||null}
-function normalizeOptionPrincipleMap(value){const out={};if(value&&typeof value==='object')Object.entries(value).forEach(([key,ids])=>out[String(key)]=unique((Array.isArray(ids)?ids:cleanList(ids)).map(String)));return out}
-function syncQuestionPrinciples(q){q.metadata=q.metadata||{};q.metadata.optionPrincipleMap=normalizeOptionPrincipleMap(q.metadata.optionPrincipleMap);q.metadata.principleIds=unique([...(q.metadata.principleIds||[]),...Object.values(q.metadata.optionPrincipleMap).flat()].map(String).filter(Boolean))}
+function normalizeOptionPrincipleMap(value,optionIds=[]){
+  const out={},allowed=new Set((optionIds||[]).map(String).filter(Boolean));
+  if(value&&typeof value==='object')Object.entries(value).forEach(([key,ids])=>{const optionId=String(key||'');if(!allowed.size||allowed.has(optionId))out[optionId]=unique((Array.isArray(ids)?ids:cleanList(ids)).map(String))});
+  return out;
+}
+function syncQuestionPrinciples(q){
+  q.metadata=q.metadata||{};
+  const legacy=unique([...(Array.isArray(q.principleIds)?q.principleIds:[]),...(Array.isArray(q.metadata.principleIds)?q.metadata.principleIds:[])].map(String));
+  const stem=unique(Array.isArray(q.metadata.stemPrincipleIds)&&q.metadata.stemPrincipleIds.length?q.metadata.stemPrincipleIds:legacy);
+  const optionPrincipleMap=normalizeOptionPrincipleMap(q.metadata.optionPrincipleMap,(q.options||[]).map(option=>option.id));
+  q.metadata.stemPrincipleIds=stem;
+  q.metadata.optionPrincipleMap=optionPrincipleMap;
+  q.metadata.principleIds=unique([...stem,...Object.values(optionPrincipleMap).flat()].map(String));
+  return q.metadata;
+}
 function refreshQuestionTagPaths(){state.questionBank.questions.forEach(q=>{q.tags=unique((q.tags||[]).map(canonicalTagName));q.metadata=q.metadata||{};q.metadata.tagPaths=q.tags.map(tagPathFor).filter(Boolean)})}
 
 function normalizeOption(o,i,correct){
@@ -528,7 +558,7 @@ function normalizeQuestion(q,i=0,subject='PMP'){
     },
     clues,
     reasoningSteps:Array.isArray(q.reasoningSteps)?clone(q.reasoningSteps):[],
-    metadata:{...(q.metadata&&typeof q.metadata==='object'?q.metadata:{}),principleIds:unique([...(Array.isArray(q.principleIds)?q.principleIds:[]),...(Array.isArray(q.metadata?.principleIds)?q.metadata.principleIds:[])].map(String)),optionPrincipleMap:normalizeOptionPrincipleMap(q.metadata?.optionPrincipleMap),tagPaths:Array.isArray(q.metadata?.tagPaths)?clone(q.metadata.tagPaths):[],knowledge},
+    metadata:(()=>{const metadata={...(q.metadata&&typeof q.metadata==='object'?q.metadata:{}),tagPaths:Array.isArray(q.metadata?.tagPaths)?clone(q.metadata.tagPaths):[],knowledge};syncQuestionPrinciples({metadata,principleIds:q.principleIds,options});return metadata})(),
     lifecycle:q.lifecycle&&typeof q.lifecycle==='object'?clone(q.lifecycle):{status:'active',deletedAt:''},
     status:q.status&&typeof q.status==='object'?clone(q.status):{contentReady:false,keywordsReady:false,knowledgeReady:false,reasoningReady:false,published:false}
     ,serverRevision:Number(q.serverRevision)||null
@@ -558,7 +588,7 @@ function importContentBundle(payload){
   stampImportedQuestions(state.questionBank.questions,'complete-content-bundle');
   refreshQuestionTagPaths();state.questionBank.questions.forEach(syncQuestionPrinciples);state.currentQuestionId=state.questionBank.questions[0]?.id||'';state.demoQuestionId=state.currentQuestionId;state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';state.currentPrincipleId=state.principles.items[0]?.id||'';refreshAll();
 }
-function completeBundlePayload(){return {prepContentBundleVersion:1,format:'pmp-content-prep-complete-bundle-v1',generatedBy:`PMP Content Prep Studio v${VERSION}`,generatedAt:nowIso(),exportManifest:{creator:{...currentIdentitySnapshot()},lastBatchId:prepRuntime.lastBatchId||'',applicationVersion:VERSION},questionBank:exportableBank(),principles:clone(state.principles),synthesisPresets:clone(state.synthesisPresets),tagConfig:exportTagConfig(),recallLibraryReference:{schemaVersion:state.recallLibrary.schemaVersion,nodeCount:state.recallLibrary.nodes.length,edgeCount:state.recallLibrary.edges.length},knowledgeTreeReference:state.knowledgeTree?{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:state.knowledgeTree.name,version:state.knowledgeTree.version,nodeCount:state.knowledgeTree.nodes.length}:null}}
+function completeBundlePayload(){const pair=normalizePrincipleCardBundle({principles:state.principles,synthesisPresets:state.synthesisPresets});return {prepContentBundleVersion:1,format:'pmp-content-prep-complete-bundle-v1',generatedBy:`PMP Content Prep Studio v${VERSION}`,generatedAt:nowIso(),exportManifest:{creator:{...currentIdentitySnapshot()},lastBatchId:prepRuntime.lastBatchId||'',applicationVersion:VERSION},questionBank:exportableBank(),principles:pair.principles,synthesisPresets:pair.synthesisPresets,tagConfig:exportTagConfig(),recallLibraryReference:{schemaVersion:state.recallLibrary.schemaVersion,nodeCount:state.recallLibrary.nodes.length,edgeCount:state.recallLibrary.edges.length},knowledgeTreeReference:state.knowledgeTree?{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:state.knowledgeTree.name,version:state.knowledgeTree.version,nodeCount:state.knowledgeTree.nodes.length}:null}}
 
 function recallIndex(){
   const byId=new Map(),terms=new Map();

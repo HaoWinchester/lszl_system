@@ -1,28 +1,28 @@
 <!DOCTYPE html>
 
-<html data-release="v9.0-p4.1.28" lang="zh-CN">
+<html data-release="v9.0-p4.1.30" lang="zh-CN">
 <head>
-<script src="./teaching-content-sync.js?v=v9.0-p4.1.28"></script><!-- kg-teaching-content-sync:generated -->
+<script src="./teaching-content-sync.js?v=v9.0-p4.1.30"></script><!-- kg-teaching-content-sync:generated -->
 <script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
-<script src="./runtime-config.override.js?v=v9.0-p4.1.28"></script><!-- kg-runtime:generated -->
-<script defer src="./direct-entry.js?v=v9.0-p4.1.28"></script><!-- kg-direct-entry:generated -->
-<script defer src="./feature-analytics.js?v=v9.0-p4.1.28"></script><!-- kg-feature-analytics:generated -->
+<script src="./runtime-config.override.js?v=v9.0-p4.1.30"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js?v=v9.0-p4.1.30"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js?v=v9.0-p4.1.30"></script><!-- kg-feature-analytics:generated -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <title>教师原题工作台｜项目管理类科目</title>
-<link href="styles/teacher-workbench.css?v=v9.0-p4.1.28" rel="stylesheet"/>
-<link href="styles/question-bank-admin.css?v=v9.0-p4.1.28" rel="stylesheet"/>
-<link href="styles/teacher-question-workflow.css?v=v9.0-p4.1.28" rel="stylesheet"/>
-<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.28"/>
-<link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.28"/>
-<link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.28"/>
-<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.28"/>
-<link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.28"/>
-<link rel="stylesheet" href="styles/workspace-placement.css?v=v9.0-p4.1.28"/>
-<link rel="stylesheet" href="styles/question-classification.css?v=v9.0-p4.1.28"/>
-<link rel="stylesheet" href="styles/admin-module-help.css?v=v9.0-p4.1.28"/>
-<link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.28"/>
-<link rel="stylesheet" href="styles/focus-vega-teacher.css?v=v9.0-p4.1.28"/>
+<link href="styles/teacher-workbench.css?v=v9.0-p4.1.30" rel="stylesheet"/>
+<link href="styles/question-bank-admin.css?v=v9.0-p4.1.30" rel="stylesheet"/>
+<link href="styles/teacher-question-workflow.css?v=v9.0-p4.1.30" rel="stylesheet"/>
+<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.30"/>
+<link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.30"/>
+<link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.30"/>
+<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.30"/>
+<link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.30"/>
+<link rel="stylesheet" href="styles/workspace-placement.css?v=v9.0-p4.1.30"/>
+<link rel="stylesheet" href="styles/question-classification.css?v=v9.0-p4.1.30"/>
+<link rel="stylesheet" href="styles/admin-module-help.css?v=v9.0-p4.1.30"/>
+<link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.30"/>
+<link rel="stylesheet" href="styles/focus-vega-teacher.css?v=v9.0-p4.1.30"/>
 </head>
 <body class="teacher-admin-shell" data-admin-context="teacher" data-ui-skin="focus-vega" data-question-catalog-mode="managed">
 <nav class="admin-context-nav" aria-label="管理后台一级导航">
@@ -331,10 +331,12 @@
       <div class="qb-classification-subline"><span id="qbKnowledgeStatus" class="qb-classification-status unmapped">待分类</span><button type="button" id="qbSetUnclassifiedBtn">设为待分类</button></div>
     </div>
     <div class="qb-classification-field principles">
-      <span>做题原则</span>
-      <button type="button" class="qb-classification-value" id="qbPrinciplePickerBtn"><span id="qbPrincipleSummary">未关联原则</span><b>选择</b></button>
+      <span>题干 / 通用原则</span>
+      <button type="button" class="qb-classification-value" id="qbPrinciplePickerBtn"><span id="qbPrincipleSummary">未关联题干原则</span><b>选择</b></button>
       <div class="qb-selected-chips" id="qbSelectedPrincipleChips" aria-live="polite"></div>
       <input id="questionPrincipleIdsInput" type="hidden"/>
+      <input id="questionStemPrincipleIdsInput" type="hidden"/>
+      <input id="questionOptionPrincipleMapInput" type="hidden"/>
     </div>
     <div class="qb-classification-field tags">
       <span>普通标签</span>
@@ -440,7 +442,13 @@
 </div>
 </div>
 <section class="qb-annotation-panel tq-principle-config-panel" data-annotation-panel="principles" id="qbPrincipleAnnotationPanel" role="tabpanel" hidden>
-<div class="qb-panel-head"><div><h3>原则与系统预设归纳卡</h3><p>原则用于连接题目、归纳卡和练习抽题；学员只能编辑自己的归纳卡。</p></div><div class="qb-inline-actions"><button type="button" id="tqNewPrincipleBtn">+ 新建原则</button><button type="button" class="primary" id="tqSavePrincipleBtn">保存</button></div></div>
+<div class="qb-panel-head"><div><h3>原则与系统预设归纳卡</h3><p>原则是题目绑定的规则身份；每条原则对应一张系统归纳卡，卡片顶部自动显示原则名称。</p></div><div class="qb-inline-actions"><button type="button" id="tqNewPrincipleBtn">+ 新建原则</button><button type="button" class="primary" id="tqSavePrincipleBtn">保存</button></div></div>
+<div class="tq-principle-bulk-actions" aria-label="批量管理原则与归纳卡">
+<label><input type="checkbox" id="tqSelectAllPrinciples"/> 全选当前列表</label>
+<select id="tqBulkPresetStatus" aria-label="批量预设状态"><option value="draft">预设设为草稿</option><option value="active">预设设为启用</option><option value="inactive">预设设为停用</option></select>
+<button type="button" id="tqApplyPresetStatusBtn">批量修改预设状态</button>
+<button type="button" class="danger" id="tqArchiveSelectedPrinciplesBtn">归档所选</button>
+</div>
 <div class="tq-principle-workspace">
 <aside class="tq-principle-list" id="tqPrincipleList"></aside>
 <section class="tq-principle-editor">
@@ -450,8 +458,8 @@
 <label class="qb-field wide"><span>易混淆原则</span><div class="tq-confusable-principles" id="tqConfusablePrinciples"><small>保存原则后可配置。</small></div></label>
 <div class="tq-preset-divider"><span>系统预设归纳卡</span><small>学员只读，可复制为个人归纳卡。</small></div>
 <input type="hidden" id="tqPresetId"/>
-<label class="qb-field wide"><span>标题</span><input id="tqPresetTitle" maxlength="100" placeholder="原则：先分析后行动"/></label>
-<label class="qb-field wide"><span>一句原则说明</span><textarea id="tqPresetContent" rows="4" maxlength="500" placeholder="先明确目标、信息和约束，再决定行动方式。"></textarea></label>
+<label class="qb-field wide"><span>卡片顶部（自动同步原则名称）</span><input id="tqPresetTitle" readonly tabindex="-1" placeholder="原则：先分析后行动"/></label>
+<label class="qb-field wide"><span>归纳卡说明</span><textarea id="tqPresetContent" rows="4" maxlength="500" placeholder="先明确目标、信息和约束，再决定行动方式。"></textarea></label>
 <label class="qb-field"><span>预设状态</span><select id="tqPresetStatus"><option value="draft">草稿</option><option value="active">启用</option><option value="inactive">停用</option></select></label>
 </section></div>
 </section>
@@ -529,6 +537,22 @@
 </select>
 </label>
 <label class="qb-field">
+<span>关键词层级</span>
+<select id="clueKeywordLevelInput">
+<option value="normal">普通关键词</option>
+<option value="core">核心关键词</option>
+</select>
+</label>
+<label class="qb-field">
+<span>解题角色</span>
+<select id="clueSolutionRoleInput">
+<option value="context">背景语境</option>
+<option value="concept-anchor">概念锚点</option>
+<option value="decision-cue">判断线索</option>
+<option value="answer-anchor">答案锚点</option>
+</select>
+</label>
+<label class="qb-field">
 <span>来源</span>
 <select id="clueSourceInput">
 <option value="stem">题干</option>
@@ -550,6 +574,10 @@
 <label class="qb-field wide">
 <span>关键词解释 / 回忆提示</span>
 <textarea id="clueExplainInput" placeholder="例如：这是诱导动作，不能未经评估就打断当前迭代。" rows="2"></textarea>
+</label>
+<label class="qb-field wide">
+<span>核心原因（仅核心关键词）</span>
+<textarea id="clueCoreReasonInput" placeholder="说明它为什么直接影响解题判断；普通关键词可留空。" rows="2"></textarea>
 </label>
 </div>
 <div class="qb-token-list" id="qbClueList"></div>
@@ -855,63 +883,64 @@
   </form>
 </dialog>
 
-<dialog class="qb-classification-dialog tq-principle-picker-dialog" id="qbPrinciplePickerDialog"><form method="dialog"><header class="qb-dialog-head"><div><p>PRINCIPLE</p><h2>关联做题原则</h2><span>可多选；原则的详细配置位于“训练配置”。</span></div><button value="cancel" aria-label="关闭">×</button></header><div class="tq-principle-picker-options" id="qbPrinciplePickerOptions"></div><footer><button type="button" id="qbPrinciplePickerManageBtn">管理原则</button><span></span><button value="cancel">取消</button><button type="button" class="primary" id="qbPrinciplePickerConfirmBtn">应用</button></footer></form></dialog>
+<dialog class="qb-classification-dialog tq-principle-picker-dialog" id="qbPrinciplePickerDialog"><form method="dialog"><header class="qb-dialog-head"><div><p>PRINCIPLE</p><h2>关联题干 / 通用原则</h2><span>选项原则在各选项下单独绑定；正确选项的唯一原则将用于多题归纳。</span></div><button value="cancel" aria-label="关闭">×</button></header><div class="tq-principle-picker-options" id="qbPrinciplePickerOptions"></div><footer><button type="button" id="qbPrinciplePickerManageBtn">管理原则</button><span></span><button value="cancel">取消</button><button type="button" class="primary" id="qbPrinciplePickerConfirmBtn">应用</button></footer></form></dialog>
 <dialog class="qb-classification-dialog compact" id="qbBulkDifficultyDialog"><form method="dialog"><header class="qb-dialog-head"><div><p>DIFFICULTY</p><h2>批量设置难度</h2><span>统一使用三星制。</span></div><button value="cancel" aria-label="关闭">×</button></header><div class="tq-bulk-star-options"><button type="button" data-bulk-difficulty="easy">★<small>简单</small></button><button type="button" data-bulk-difficulty="medium">★★<small>中等</small></button><button type="button" data-bulk-difficulty="hard">★★★<small>困难</small></button></div><footer><span></span><button value="cancel">取消</button></footer></form></dialog>
 <dialog class="qb-classification-dialog" id="qbBulkPrincipleDialog"><form method="dialog"><header class="qb-dialog-head"><div><p>PRINCIPLE</p><h2>批量关联原则</h2><span>所选原则将替换当前原则关联。</span></div><button value="cancel" aria-label="关闭">×</button></header><div class="tq-principle-picker-options" id="qbBulkPrincipleOptions"></div><footer><span></span><button value="cancel">取消</button><button type="button" class="primary" id="qbBulkPrincipleConfirmBtn">应用</button></footer></form></dialog>
 
-<script defer src="src/01-runtime-config.js?v=v9.0-p4.1.28"></script>
-  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/29-auth-core.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/34-role-permissions.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/37-subscription-plans.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/37-subscription-orders.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/37-subscription-redeem-codes.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/37-subscription-core.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/33-user-center.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/39-global-shortcuts.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/50-question-data.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/91-learning-content-core.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/95-recall-association-library.js?v=v9.0-p4.1.28"></script>
-<script defer src="question-studio/question-studio-parser.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/shared/domain-core.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/shared/difficulty-service.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/principles/principle-repository.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/principles/synthesis-preset-repository.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/practice/practice-selection-service.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/question-bank/batch-operation-service.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/question-bank/safe-delete-service.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/question-bank/question-preview.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/question-bank/workspace-layout.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/question-bank/bank-list-controller.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/question-bank/question-list-controller.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/question-editor/question-editor-controller.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/question-classification/question-classification-service.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/training-config/training-config-service.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/training-config/training-preview.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/training-config/training-config-controller.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/training-config/workspace-layout.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/training-config/principle-preset-controller.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/paper-management/paper-list-controller.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/paper-management/paper-category-service.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/paper-management/paper-editor-controller.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/paper-management/paper-question-picker.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/paper-management/paper-preview.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/paper-management/paper-audit-service.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/paper-management/paper-release-service.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/knowledge-tree/knowledge-tree-adapter.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/association-library/association-library-adapter.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/teacher/teacher-domain-registry.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/98-teacher-workflow-p2-services.js?v=v9.0-p4.1.28"></script>
-<script defer src="./question-catalog-adapter.js?v=v9.0-p4.1.28"></script><!-- kg-question-catalog:generated -->
-<script defer src="./direct-question-adapter.js?v=v9.0-p4.1.28"></script><!-- kg-question-editor:generated -->
-<script src="src/59c-active-learning-mode-policy.js?v=v9.0-p4.1.28"></script><!-- kg-learning-mode-policy:generated -->
-<script defer src="src/65-question-bank-admin.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/98-question-classification.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/97-teacher-question-workflow.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/admin/module-help-content.js?v=v9.0-p4.1.28"></script>
-<script defer src="src/admin/module-help-controller.js?v=v9.0-p4.1.28"></script>
-<script src="src/admin/48-admin-context-nav.js?v=v9.0-p4.1.28"></script>
-<script src="src/99-workspace-placement.js?v=v9.0-p4.1.28"></script>
-<script src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.28"></script>
+<script defer src="src/01-runtime-config.js?v=v9.0-p4.1.30"></script>
+  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/29-auth-core.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/34-role-permissions.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/37-subscription-plans.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/37-subscription-orders.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/37-subscription-redeem-codes.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/37-subscription-core.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/33-user-center.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/39-global-shortcuts.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/50-question-data.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/91-learning-content-core.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/95-recall-association-library.js?v=v9.0-p4.1.30"></script>
+<script defer src="question-studio/question-studio-parser.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/shared/domain-core.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/shared/difficulty-service.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/principles/principle-repository.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/principles/synthesis-preset-repository.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/principles/question-principle-binding.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/practice/practice-selection-service.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/question-bank/batch-operation-service.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/question-bank/safe-delete-service.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/question-bank/question-preview.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/question-bank/workspace-layout.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/question-bank/bank-list-controller.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/question-bank/question-list-controller.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/question-editor/question-editor-controller.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/question-classification/question-classification-service.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/training-config/training-config-service.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/training-config/training-preview.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/training-config/training-config-controller.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/training-config/workspace-layout.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/training-config/principle-preset-controller.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/paper-management/paper-list-controller.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/paper-management/paper-category-service.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/paper-management/paper-editor-controller.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/paper-management/paper-question-picker.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/paper-management/paper-preview.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/paper-management/paper-audit-service.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/paper-management/paper-release-service.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/knowledge-tree/knowledge-tree-adapter.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/association-library/association-library-adapter.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/teacher/teacher-domain-registry.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/98-teacher-workflow-p2-services.js?v=v9.0-p4.1.30"></script>
+<script defer src="./question-catalog-adapter.js?v=v9.0-p4.1.30"></script><!-- kg-question-catalog:generated -->
+<script defer src="./direct-question-adapter.js?v=v9.0-p4.1.30"></script><!-- kg-question-editor:generated -->
+<script src="src/59c-active-learning-mode-policy.js?v=v9.0-p4.1.30"></script><!-- kg-learning-mode-policy:generated -->
+<script defer src="src/65-question-bank-admin.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/98-question-classification.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/97-teacher-question-workflow.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/admin/module-help-content.js?v=v9.0-p4.1.30"></script>
+<script defer src="src/admin/module-help-controller.js?v=v9.0-p4.1.30"></script>
+<script src="src/admin/48-admin-context-nav.js?v=v9.0-p4.1.30"></script>
+<script src="src/99-workspace-placement.js?v=v9.0-p4.1.30"></script>
+<script src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.30"></script>
 </body>
 </html>
