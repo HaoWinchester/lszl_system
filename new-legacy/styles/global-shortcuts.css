@@ -312,6 +312,25 @@
   touch-action:manipulation;
 }
 
+/* 图标栏不能依赖浏览器原生 title：它首悬停会有额外停留阈值，且后续悬停的表现不一致。 */
+.kg-global-shortcuts [data-tooltip]{position:relative}
+.kg-global-shortcuts [data-tooltip]::after{
+  content:attr(data-tooltip);position:absolute;z-index:4;left:calc(100% + 8px);top:50%;
+  transform:translate(4px,-50%);padding:6px 9px;border-radius:8px;background:#0f172a;color:#fff;
+  box-shadow:0 8px 20px rgba(15,23,42,.22);font:750 12px/1.2 "Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  white-space:nowrap;opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity 80ms ease,transform 80ms ease,visibility 0s;transition-delay:0ms;
+}
+.kg-global-shortcuts [data-tooltip][data-tooltip-side="left"]::after{
+  right:calc(100% + 8px);left:auto;transform:translate(-4px,-50%);
+}
+.kg-global-shortcuts [data-tooltip]:hover::after,
+.kg-global-shortcuts [data-tooltip]:focus-visible::after{
+  opacity:1;visibility:visible;transform:translate(0,-50%);transition-delay:0ms;
+}
+.kg-global-shortcuts [data-tooltip][data-tooltip-side="left"]:hover::after,
+.kg-global-shortcuts [data-tooltip][data-tooltip-side="left"]:focus-visible::after{transform:translate(0,-50%)}
+
 
 /* v8.6.2 P2.2.10 — compact icon-only global shortcut bar */
 .kg-global-shortcuts{
