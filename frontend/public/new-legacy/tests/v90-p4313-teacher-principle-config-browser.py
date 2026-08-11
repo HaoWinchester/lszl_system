@@ -57,6 +57,7 @@ def seed(page):
           return {ok:true,status:200,json:async()=>({archivedIds:body.ids})};
         }
         if(String(url).endsWith('/principles/delete')){
+          if(body.ids.includes('principle-先分析后行动'))return {ok:false,status:409,json:async()=>({detail:{code:'PRINCIPLE_IN_USE',referencedIds:['principle-先分析后行动'],referenceCounts:{'principle-先分析后行动':1},referenceQuestions:{'principle-先分析后行动':[{questionId:'q1',questionTitle:'题目 q1',teacherNumber:'P4313-q1',bankId:'bank-p4313',bankName:'P4.3.13 题库'}]}}})};
           principleStore.items=principleStore.items.filter(item=>!body.ids.includes(item.id));
           presetStore.items=presetStore.items.filter(item=>!body.ids.includes(item.principleId));
           localStorage.setItem('kg_principle_repository_v1',JSON.stringify(principleStore));localStorage.setItem('kg_synthesis_preset_repository_v1',JSON.stringify(presetStore));
@@ -154,7 +155,17 @@ def main():
     # Legacy principle-tagged question is counted without a destructive migration.
     row=page.locator('#tqPrincipleList [data-principle-id="principle-先分析后行动"]')
     if row.count(): assert '题目 1' in row.inner_text()
+    page.locator('input[data-principle-select="principle-先分析后行动"]').check()
+    page.locator('#tqDeleteSelectedPrinciplesBtn').click();page.wait_for_timeout(150)
+    assert page.locator('#tqPrincipleQuestionListDialog[open]').is_visible()
+    assert page.locator('#tqPrincipleQuestionListTitle').inner_text()=='原则仍被题目引用'
+    conflict_row=page.locator('[data-principle-question-id="q1"][data-principle-question-bank-id="bank-p4313"]')
+    assert conflict_row.count()==1
+    assert '题目 q1' in conflict_row.inner_text() and 'P4.3.13 题库' in conflict_row.inner_text()
     assert not errors,errors
+    page.route('http://localhost/question-bank.html*',lambda route:route.fulfill(status=200,content_type='text/html',body='<!doctype html><title>target</title>'))
+    conflict_row.click()
+    page.wait_for_url('http://localhost/question-bank.html?mode=simple&step=questions&bankId=bank-p4313&questionId=q1')
     page.close();browser.close()
     browser=p.chromium.launch(**launch_options)
     page,errors=load(browser,'questions')

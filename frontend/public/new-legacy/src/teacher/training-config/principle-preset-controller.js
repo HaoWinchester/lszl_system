@@ -142,6 +142,29 @@
     if(list)list.innerHTML=questions.length?questions.map(question=>`<button type="button" class="tq-principle-question-row" data-principle-question-id="${escapeHTML(question.id)}" data-principle-question-bank-id="${escapeHTML(question.bankId||'')}"><strong>${escapeHTML(question.teacherNumber||question.id)} · ${escapeHTML(question.title||'未命名题目')}</strong><span>${escapeHTML(question.bankName||'未命名题库')} · ${escapeHTML(displayQuestionType(question.type))}${displayDifficulty(question.difficulty)?' · '+escapeHTML(displayDifficulty(question.difficulty)):''}</span></button>`).join(''):'<div class="qb-empty">当前没有题目绑定这条原则。</div>';
     showDialog('tqPrincipleQuestionListDialog');
   }
+  function principleConflictQuestions(detail={}){
+    const grouped=detail?.referenceQuestions;
+    if(!grouped||typeof grouped!=='object'||Array.isArray(grouped))return [];
+    const seen=new Set(),rows=[];
+    Object.keys(grouped).sort().forEach(principleId=>{
+      if(!Array.isArray(grouped[principleId]))return;
+      grouped[principleId].forEach(raw=>{
+        const questionId=String(raw?.questionId||'').trim(),bankId=String(raw?.bankId||'').trim();
+        if(!questionId||!bankId)return;
+        const key=bankId+'::'+questionId;if(seen.has(key))return;seen.add(key);
+        rows.push({questionId,bankId,questionTitle:String(raw?.questionTitle||'未命名题目'),teacherNumber:String(raw?.teacherNumber||''),bankName:String(raw?.bankName||'未命名题库')});
+      });
+    });
+    return rows.sort((left,right)=>left.bankName.localeCompare(right.bankName,'zh-Hans-CN')||left.questionTitle.localeCompare(right.questionTitle,'zh-Hans-CN')||left.questionId.localeCompare(right.questionId));
+  }
+  function openPrincipleReferenceConflict(detail={}){
+    const questions=principleConflictQuestions(detail),title=byId('tqPrincipleQuestionListTitle'),hint=byId('tqPrincipleQuestionListHint'),list=byId('tqPrincipleQuestionList');
+    if(!questions.length)return false;
+    if(title)title.textContent='原则仍被题目引用';
+    if(hint)hint.textContent=`共 ${questions.length} 道题，点击题目可直接定位并解除原则绑定。`;
+    if(list)list.innerHTML=questions.map(question=>`<button type="button" class="tq-principle-question-row" data-principle-conflict-link="true" data-principle-question-id="${escapeHTML(question.questionId)}" data-principle-question-bank-id="${escapeHTML(question.bankId)}"><strong>${escapeHTML(question.teacherNumber||question.questionId)} · ${escapeHTML(question.questionTitle)}</strong><span>${escapeHTML(question.bankName)}</span></button>`).join('');
+    showDialog('tqPrincipleQuestionListDialog');return true;
+  }
   function findQuestionByRef(questionId,bankId=''){
     return (api().getAllQuestions?.({includeDeleted:false})||[]).find(question=>String(question.id)===String(questionId||'')&&(!bankId||String(question.bankId||'')===String(bankId)))||null;
   }
@@ -232,7 +255,7 @@
   async function deleteSelectedPrinciples(){
     const ids=selectedPrinciples();if(!ids.length)return toast('请先勾选要删除的原则。');
     if(!global.confirm?.(`确定删除所选 ${ids.length} 条原则及其系统归纳卡吗？仍被题目引用的原则不会被删除。`))return;
-    try{ensurePairedPresets();const result=await postPrincipleOperation('/api/v1/content-prep/principles/delete',{ids});applyPrincipleCardBundle(result);selectedPrincipleIds.clear();activePrincipleId='';draftPrincipleId='';renderPrincipleList();toast(`已删除 ${ids.length} 条原则及其系统归纳卡。`)}catch(error){const counts=error?.detail?.referenceCounts||{};const total=Object.values(counts).reduce((sum,value)=>sum+Number(value||0),0);toast(total?`所选原则仍被 ${total} 道题引用，请先解除或重新绑定。`:error?.message||'删除失败。')}
+    try{ensurePairedPresets();const result=await postPrincipleOperation('/api/v1/content-prep/principles/delete',{ids});applyPrincipleCardBundle(result);selectedPrincipleIds.clear();activePrincipleId='';draftPrincipleId='';renderPrincipleList();toast(`已删除 ${ids.length} 条原则及其系统归纳卡。`)}catch(error){const counts=error?.detail?.referenceCounts||{},total=Object.values(counts).reduce((sum,value)=>sum+Number(value||0),0);if(total&&openPrincipleReferenceConflict(error?.detail))return;toast(total?`所选原则仍被 ${total} 道题引用，请先解除或重新绑定。`:error?.message||'删除失败。')}
   }
   function bind(){
     seedPrinciples();
@@ -256,6 +279,7 @@
     byId('tqImportPrincipleCardBundleFile')?.addEventListener('change',event=>{const input=event.currentTarget;void importPrincipleCardBundle(input.files?.[0]).finally(()=>{input.value=''})});
     byId('tqPrincipleQuestionListCloseBtn')?.addEventListener('click',()=>closeDialog('tqPrincipleQuestionListDialog'));
     byId('tqPrincipleQuestionPreviewCloseBtn')?.addEventListener('click',()=>closeDialog('tqPrincipleQuestionPreviewDialog'));
+    byId('tqPrincipleQuestionList')?.addEventListener('click',event=>{const row=event.target.closest('[data-principle-conflict-link="true"]');if(!row)return;const url=api().questionBasicInfoUrl?.(row.dataset.principleQuestionId,row.dataset.principleQuestionBankId)||'';if(url)global.location.href=url;else toast('题目定位信息不完整，请刷新后重试。')});
     byId('tqPrincipleQuestionList')?.addEventListener('dblclick',event=>{const row=event.target.closest('[data-principle-question-id]');if(!row)return;event.preventDefault();openPrincipleQuestionPreview(row.dataset.principleQuestionId,row.dataset.principleQuestionBankId)});
     byId('tqNewPrincipleBtn')?.addEventListener('click',newPrinciple);byId('tqSavePrincipleBtn')?.addEventListener('click',savePrinciple);
     byId('tqPrincipleName')?.addEventListener('input',()=>{if(byId('tqPresetTitle'))byId('tqPresetTitle').value='原则：'+String(byId('tqPrincipleName').value||'').trim()});
