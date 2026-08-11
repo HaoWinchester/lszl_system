@@ -531,6 +531,22 @@
 </select>
 </label>
 <label class="qb-field">
+<span>关键词层级</span>
+<select id="clueKeywordLevelInput">
+<option value="normal">普通关键词</option>
+<option value="core">核心关键词</option>
+</select>
+</label>
+<label class="qb-field">
+<span>解题角色</span>
+<select id="clueSolutionRoleInput">
+<option value="context">背景语境</option>
+<option value="concept-anchor">概念锚点</option>
+<option value="decision-cue">判断线索</option>
+<option value="answer-anchor">答案锚点</option>
+</select>
+</label>
+<label class="qb-field">
 <span>来源</span>
 <select id="clueSourceInput">
 <option value="stem">题干</option>
@@ -552,6 +568,10 @@
 <label class="qb-field wide">
 <span>关键词解释 / 回忆提示</span>
 <textarea id="clueExplainInput" placeholder="例如：这是诱导动作，不能未经评估就打断当前迭代。" rows="2"></textarea>
+</label>
+<label class="qb-field wide">
+<span>核心原因（仅核心关键词）</span>
+<textarea id="clueCoreReasonInput" placeholder="说明它为什么直接影响解题判断；普通关键词可留空。" rows="2"></textarea>
 </label>
 </div>
 <div class="qb-token-list" id="qbClueList"></div>

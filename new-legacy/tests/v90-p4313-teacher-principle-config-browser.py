@@ -32,7 +32,7 @@ def seed(page):
         {id:'principle-correct',name:'正确项原则',status:'active'},
         {id:'principle-trap',name:'干扰项原则',status:'active'}
       ]}));
-      const q=(id,difficulty,tags)=>({id,teacherNumber:'P4313-'+id,title:'题目 '+id,type:'single_choice',subject:'PMP',difficulty,tags,stemParts:[{text:'题干 '+id}],options:[{id:'A',text:'正确',correct:true},{id:'B',text:'错误'}],correctAnswer:'A',analysis:'解析',metadata:{knowledge:{primaryNodeId:null}},status:{contentReady:true}});
+      const q=(id,difficulty,tags)=>({id,teacherNumber:'P4313-'+id,title:'题目 '+id,type:'single_choice',subject:'PMP',difficulty,tags,stemParts:[{text:'题干 '+id}],options:[{id:'A',text:'正确',correct:true},{id:'B',text:'错误'}],correctAnswer:'A',analysis:'解析',metadata:{knowledge:{primaryNodeId:null}},clues:id==='q1'?[{id:'core-cue',text:'题干 q1',type:'direction',keywordLevel:'core',isCore:true,solutionRole:'decision-cue',coreReason:'它决定下一步判断。',clueRole:'true',sourceType:'stem',conceptIds:[]}]:[],status:{contentReady:true}});
       let catalog={banks:[{id:'bank-p4313',name:'P4.3.13 题库',subject:'PMP',visibility:'private',revision:1}],questions:[q('q1','基础',['原则：先分析后行动']),q('q2','重点',[]),q('q3','中等',[])].map(question=>({...question,bankId:'bank-p4313',revision:1}))};
       const clone=value=>JSON.parse(JSON.stringify(value));
       window.KGQuestionCatalogAdapter={ready:Promise.resolve(catalog),snapshot:()=>clone(catalog),saveBank:async bank=>bank,saveQuestion:async question=>question,deleteBank:async()=>true,deleteQuestion:async()=>true};
@@ -123,6 +123,13 @@ def main():
     assert bindings['stemPrincipleIds']==['principle-stem'],bindings
     assert bindings['optionPrincipleMap']=={'A':['principle-correct'],'B':['principle-trap']},bindings
     assert bindings['principleIds']==['principle-stem','principle-correct','principle-trap'],bindings
+    page.locator('[data-annotation-tab="clues"]').evaluate("node=>node.click()")
+    page.locator('#qbClueAnnotationPanel').evaluate("panel=>{panel.hidden=false;panel.classList.add('active')}")
+    assert '核心关键词' in page.locator('#qbClueList').inner_text()
+    page.locator('[data-edit-clue="core-cue"]').evaluate("node=>node.click()")
+    assert page.locator('#clueKeywordLevelInput').input_value()=='core'
+    assert page.locator('#clueSolutionRoleInput').input_value()=='decision-cue'
+    assert page.locator('#clueCoreReasonInput').input_value()=='它决定下一步判断。'
     assert not errors,errors
     page.close();browser.close()
   print('v90-p4313-teacher-browser-pass principle-config')

@@ -445,7 +445,7 @@ B原则：principle-2"></textarea>
         </div>
         <details class="full-paste-example">
           <summary>查看“完整版 Word / AI 文本粘贴格式”说明</summary>
-          <p class="smalltxt muted">可解析题目基础信息、标签、Trap、双语、英文逐选项反馈、主知识点 ID、普通/核心关键词、原则 IDs 和 A/B/C/D 原则映射。原则库/归纳卡定义本身仍建议使用“完整内容准备包 JSON”。</p>
+          <p class="smalltxt muted">可解析题目基础信息、标签、Trap、双语、英文逐选项反馈、主知识点 ID、普通/核心关键词、题干原则和 A/B/C/D 原则映射。原则与归纳卡定义请使用“完整内容准备包 JSON”或“原则与归纳卡组合 JSON”。</p>
           <pre>【题目1】
 标题：已发送不等于已沟通
 难度：基础
@@ -491,8 +491,7 @@ D原则：principle-role-accountability</pre>
       </div>
 
       <div class="data-summary">
-        <div class="filebox"><h3>原则库 JSON（可选）</h3><input type="file" id="filePrinciples" accept=".json,application/json"><p class="muted smalltxt">兼容主程序 principle repository。</p></div>
-        <div class="filebox"><h3>归纳卡 JSON（可选）</h3><input type="file" id="filePresets" accept=".json,application/json"><p class="muted smalltxt">兼容主程序 synthesis preset repository。</p></div>
+        <div class="filebox"><h3>原则与归纳卡组合 JSON（可选）</h3><input type="file" id="filePrincipleCardBundle" accept=".json,application/json"><p class="muted smalltxt">原则和归纳卡按一对一关系同时导入，避免拆分后丢失含义。</p></div>
         <div class="filebox"><h3>标签配置 JSON（可选）</h3><input type="file" id="fileTagConfig" accept=".json,application/json"><p class="muted smalltxt">兼容主程序标签名称/别名配置。</p></div>
       </div>
       <div class="data-summary">
@@ -684,7 +683,7 @@ D原则：principle-role-accountability</pre>
       <p>保存当前全部工作数据，方便下次继续编辑。该草稿不是正式服务器导入格式。</p>
       <button class="btn" id="btnExportWorkspace">导出工作区草稿</button>
     </div>
-  <div class="card export-card"><h3>原则 / 归纳卡 / 标签配置</h3><p>分别输出与当前主程序 repository/storage 结构对齐的 JSON。</p><div class="toolbar"><button class="btn" id="btnExportPrinciples">原则库</button><button class="btn" id="btnExportPresets">归纳卡</button><button class="btn" id="btnExportTagConfig">标签配置</button></div></div>
+  <div class="card export-card"><h3>原则与归纳卡 / 标签配置</h3><p>一个原则对应一张归纳卡；组合文件会同时携带两者并校验一对一关系。标签配置可单独导出。</p><div class="toolbar"><button class="btn" id="btnExportPrincipleCards">导出原则与归纳卡</button><button class="btn" id="btnExportTagConfig">标签配置</button></div></div>
   </div>
   <div class="card" style="margin-top:14px">
     <div class="card-hd">Keyword System v2 导出规则</div>
@@ -693,8 +692,7 @@ D原则：principle-role-accountability</pre>
         每个关键词会输出 <code>keywordLevel: normal|core</code>、<code>isCore</code>、
         <code>solutionRole</code>、<code>coreReason</code>。同时在
         <code>metadata.keywordSystemV2</code> 保存兼容镜像。<br>
-        原因：当前正式程序 P4.3.44.2 / 后续服务器接口 的 <code>normalizeClue()</code> 尚不会保留这些新字段；
-        镜像可以保证导入当前版本后，未来升级“做题大厅核心关键词显示”时仍有可迁移的数据。
+        主程序和服务器接口会保留这些字段；镜像继续用于兼容旧版本与批量迁移。
       </div>
     </div>
   </div>
@@ -815,7 +813,7 @@ B原则：principle-effective-communication</pre>
 
         <article class="help-topic" data-help-content="export">
           <h2>⑦ 导出与审计</h2>
-          <p>这里输出题库、完整内容包、联想库、原则、归纳卡、标签配置、校验报告和工作区草稿。</p>
+          <p>这里输出题库、完整内容包、联想库、原则与归纳卡组合、标签配置、校验报告和工作区草稿。</p>
           <h3>v0.3.5 导出审计</h3>
           <p>每次正式导出会写入一条设备级审计事件，记录：</p>
           <ul><li>Audit ID</li><li>导出时间</li><li>制作人 Creator ID / 姓名</li><li>Device ID</li><li>导出类型与文件名</li><li>题目数量</li><li>最近 Batch ID</li><li>校验 Error / Warning 数</li><li>导出 payload 的 SHA-256 指纹</li><li>Prep Studio 版本</li></ul>
@@ -917,8 +915,8 @@ const COMPLETE_AI_PROMPT=`你是一名 PMP 内容生产与结构化校核助手�
 5. 关键词必须是词/稳定专业术语，不能是半句话。
 6. 普通关键词 keywordLevel=normal；核心关键词 keywordLevel=core，并填写 solutionRole 和 coreReason；每题建议 2～5 个。
 7. 标签优先使用主程序预设标签。
-8. metadata.principleIds 保存题目原则；metadata.optionPrincipleMap 保存 A/B/C/D 对应原则。
-9. principles 与 synthesisPresets 按模板结构输出；用于解释选项的原则尽量有 active 归纳卡。
+8. metadata.stemPrincipleIds 保存题干 / 通用原则；metadata.optionPrincipleMap 保存 A/B/C/D 对应原则；metadata.principleIds 由两者自动汇总。
+9. 每道题正确选项必须且只能绑定一条原则；principles 与 synthesisPresets 必须一对一，归纳卡标题固定为“原则：{原则名称}”。
 10. 不写死 taxonomyId/taxonomyVersion。
 11. 不要生成题目 id、questionId、contentHash、metadata.origin、creatorId、deviceId 或 batchId；这些全部由 Prep Studio 生成。
 12. 输出纯 JSON，不要 Markdown 代码围栏，不要额外解释。
@@ -1330,13 +1328,13 @@ function parsePastedQuestionText(raw){
       mm=line.match(/^(?:主知识点ID|PrimaryNodeId|Primary Node ID)\s*[:：]\s*(.*)$/i);if(mm){primaryNodeId=mm[1].trim();mode='meta';continue}
       mm=line.match(/^普通关键词\s*[:：]\s*(.*)$/);if(mm){normalKw=mm[1].trim();mode='meta';continue}
       mm=line.match(/^核心关键词\s*[:：]\s*(.*)$/);if(mm){coreKw=mm[1].trim();mode='meta';continue}
-      mm=line.match(/^(?:原则IDs|原则ID|PrincipleIds)\s*[:：]\s*(.*)$/i);if(mm){principleIds=cleanList(mm[1]);mode='meta';continue}
+      mm=line.match(/^(?:题干原则IDs|题干原则ID|StemPrincipleIds|原则IDs|原则ID|PrincipleIds)\s*[:：]\s*(.*)$/i);if(mm){principleIds=cleanList(mm[1]);mode='meta';continue}
       mm=line.match(/^([A-D])原则\s*[:：]\s*(.*)$/);if(mm){optionPrinciples[mm[1].toUpperCase()]=cleanList(mm[2]);mode='meta';continue}
       if(mode==='analysis')analysis.push(line);else if(mode==='en-stem')enStem.push(line);else if(mode==='en-analysis')enAnalysis.push(line);else if(mode==='stem')stem.push(line);
     }
     if(stem.length||Object.values(opts).some(Boolean)){
       const clues=[...parseKeywordPasteSpecs(normalKw,'normal'),...parseKeywordPasteSpecs(coreKw,'core')];
-      const nq=normalizeQuestion({title:title||`导入题目 ${bi+1}`,difficulty,domain,topic,tags,stage,stemParts:[{text:stem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:opts[letter],trap:traps[letter]})),correctAnswer:answer||'A',analysis:analysis.join('\n'),translations:{en:{title:enTitle,stemParts:[{text:enStem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:enOpts[letter]})),analysis:enAnalysis.join('\n'),optionFeedback:enFeedback}},clues,metadata:{knowledge:{primaryNodeId,relatedNodeIds:[],mappingStatus:primaryNodeId?'confirmed':'unmapped',pathSnapshot:[]},principleIds,optionPrincipleMap:optionPrinciples}},bi,state.questionBank.subject||'PMP');
+      const nq=normalizeQuestion({title:title||`导入题目 ${bi+1}`,difficulty,domain,topic,tags,stage,stemParts:[{text:stem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:opts[letter],trap:traps[letter]})),correctAnswer:answer||'A',analysis:analysis.join('\n'),translations:{en:{title:enTitle,stemParts:[{text:enStem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:enOpts[letter]})),analysis:enAnalysis.join('\n'),optionFeedback:enFeedback}},clues,metadata:{knowledge:{primaryNodeId,relatedNodeIds:[],mappingStatus:primaryNodeId?'confirmed':'unmapped',pathSnapshot:[]},stemPrincipleIds:principleIds,optionPrincipleMap:optionPrinciples}},bi,state.questionBank.subject||'PMP');
       if(primaryNodeId&&state.knowledgeTree?.map.has(primaryNodeId))nq.metadata.knowledge.pathSnapshot=state.knowledgeTree.pathFor(primaryNodeId);
       nq.clues.forEach(c=>c.conceptIds=primaryNodeId?[primaryNodeId]:[]);recomputeKeywordLocations(nq);syncQuestionPrinciples(nq);nq.tags=unique((nq.tags||[]).map(canonicalTagName));nq.metadata.tagPaths=nq.tags.map(tagPathFor).filter(Boolean);out.push(nq);
     }
@@ -1380,6 +1378,23 @@ function normalizePrinciples(payload){
 function normalizePresets(payload){
   const raw=Array.isArray(payload)?payload:(Array.isArray(payload?.items)?payload.items:[]);
   return {schemaVersion:1,items:raw.map((item,i)=>({id:String(item?.id||('preset-'+i+'-'+Date.now().toString(36))),principleId:String(item?.principleId||''),title:String(item?.title||'').trim(),content:String(item?.content||item?.description||'').trim(),status:['draft','active','inactive'].includes(String(item?.status||''))?String(item.status):'draft',version:Math.max(1,Number(item?.version||1)),createdAt:Number(item?.createdAt||Date.now()),updatedAt:Number(item?.updatedAt||Date.now())})),updatedAt:Number(payload?.updatedAt||Date.now())};
+}
+function normalizePrincipleCardBundle(payload={}){
+  const principles=normalizePrinciples(payload.principles||payload.principleRepository||{});
+  const synthesisPresets=normalizePresets(payload.synthesisPresets||payload.presets||payload.synthesisPresetRepository||{});
+  const principlesById=new Map(principles.items.map(item=>[item.id,item])),seenPresetPrinciples=new Set();
+  synthesisPresets.items.forEach(preset=>{
+    if(!principlesById.has(preset.principleId))throw new Error(`归纳卡引用了不存在的原则：${preset.principleId}`);
+    if(seenPresetPrinciples.has(preset.principleId))throw new Error(`原则 ${preset.principleId} 存在重复归纳卡`);
+    seenPresetPrinciples.add(preset.principleId);
+  });
+  principles.items.forEach(principle=>{if(!seenPresetPrinciples.has(principle.id))throw new Error(`原则 ${principle.id} 缺少对应归纳卡`)});
+  synthesisPresets.items=synthesisPresets.items.map(preset=>({...preset,title:'原则：'+principlesById.get(preset.principleId).name}));
+  return {principles,synthesisPresets};
+}
+function principleCardBundlePayload(principles=state.principles,synthesisPresets=state.synthesisPresets){
+  const pair=normalizePrincipleCardBundle({principles,synthesisPresets});
+  return {principleCardBundleVersion:1,format:'kg-principle-card-bundle-v1',generatedBy:`PMP Content Prep Studio v${VERSION}`,generatedAt:nowIso(),principles:pair.principles,synthesisPresets:pair.synthesisPresets};
 }
 function baseTagSlotEntries(config={}){
   const out=[];BASE_TAG_GROUPS.forEach(g=>g.categories.forEach(c=>c.options.forEach((baseLabel,i)=>{
@@ -1433,8 +1448,21 @@ function canonicalTagName(value){let current=String(value||'').trim(),seen=new S
 function tagPathFor(label){const canonical=canonicalTagName(label);return tagCatalogEntries().find(x=>x.label===canonical)||null}
 function principleById(id){return state.principles.items.find(x=>x.id===String(id))||null}
 function presetByPrincipleId(id){return state.synthesisPresets.items.find(x=>x.principleId===String(id))||null}
-function normalizeOptionPrincipleMap(value){const out={};if(value&&typeof value==='object')Object.entries(value).forEach(([key,ids])=>out[String(key)]=unique((Array.isArray(ids)?ids:cleanList(ids)).map(String)));return out}
-function syncQuestionPrinciples(q){q.metadata=q.metadata||{};q.metadata.optionPrincipleMap=normalizeOptionPrincipleMap(q.metadata.optionPrincipleMap);q.metadata.principleIds=unique([...(q.metadata.principleIds||[]),...Object.values(q.metadata.optionPrincipleMap).flat()].map(String).filter(Boolean))}
+function normalizeOptionPrincipleMap(value,optionIds=[]){
+  const out={},allowed=new Set((optionIds||[]).map(String).filter(Boolean));
+  if(value&&typeof value==='object')Object.entries(value).forEach(([key,ids])=>{const optionId=String(key||'');if(!allowed.size||allowed.has(optionId))out[optionId]=unique((Array.isArray(ids)?ids:cleanList(ids)).map(String))});
+  return out;
+}
+function syncQuestionPrinciples(q){
+  q.metadata=q.metadata||{};
+  const legacy=unique([...(Array.isArray(q.principleIds)?q.principleIds:[]),...(Array.isArray(q.metadata.principleIds)?q.metadata.principleIds:[])].map(String));
+  const stem=unique(Array.isArray(q.metadata.stemPrincipleIds)&&q.metadata.stemPrincipleIds.length?q.metadata.stemPrincipleIds:legacy);
+  const optionPrincipleMap=normalizeOptionPrincipleMap(q.metadata.optionPrincipleMap,(q.options||[]).map(option=>option.id));
+  q.metadata.stemPrincipleIds=stem;
+  q.metadata.optionPrincipleMap=optionPrincipleMap;
+  q.metadata.principleIds=unique([...stem,...Object.values(optionPrincipleMap).flat()].map(String));
+  return q.metadata;
+}
 function refreshQuestionTagPaths(){state.questionBank.questions.forEach(q=>{q.tags=unique((q.tags||[]).map(canonicalTagName));q.metadata=q.metadata||{};q.metadata.tagPaths=q.tags.map(tagPathFor).filter(Boolean)})}
 
 function normalizeOption(o,i,correct){
@@ -1505,7 +1533,7 @@ function normalizeQuestion(q,i=0,subject='PMP'){
     },
     clues,
     reasoningSteps:Array.isArray(q.reasoningSteps)?clone(q.reasoningSteps):[],
-    metadata:{...(q.metadata&&typeof q.metadata==='object'?q.metadata:{}),principleIds:unique([...(Array.isArray(q.principleIds)?q.principleIds:[]),...(Array.isArray(q.metadata?.principleIds)?q.metadata.principleIds:[])].map(String)),optionPrincipleMap:normalizeOptionPrincipleMap(q.metadata?.optionPrincipleMap),tagPaths:Array.isArray(q.metadata?.tagPaths)?clone(q.metadata.tagPaths):[],knowledge},
+    metadata:(()=>{const metadata={...(q.metadata&&typeof q.metadata==='object'?q.metadata:{}),tagPaths:Array.isArray(q.metadata?.tagPaths)?clone(q.metadata.tagPaths):[],knowledge};syncQuestionPrinciples({metadata,principleIds:q.principleIds,options});return metadata})(),
     lifecycle:q.lifecycle&&typeof q.lifecycle==='object'?clone(q.lifecycle):{status:'active',deletedAt:''},
     status:q.status&&typeof q.status==='object'?clone(q.status):{contentReady:false,keywordsReady:false,knowledgeReady:false,reasoningReady:false,published:false}
     ,serverRevision:Number(q.serverRevision)||null
@@ -1535,7 +1563,7 @@ function importContentBundle(payload){
   stampImportedQuestions(state.questionBank.questions,'complete-content-bundle');
   refreshQuestionTagPaths();state.questionBank.questions.forEach(syncQuestionPrinciples);state.currentQuestionId=state.questionBank.questions[0]?.id||'';state.demoQuestionId=state.currentQuestionId;state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';state.currentPrincipleId=state.principles.items[0]?.id||'';refreshAll();
 }
-function completeBundlePayload(){return {prepContentBundleVersion:1,format:'pmp-content-prep-complete-bundle-v1',generatedBy:`PMP Content Prep Studio v${VERSION}`,generatedAt:nowIso(),exportManifest:{creator:{...currentIdentitySnapshot()},lastBatchId:prepRuntime.lastBatchId||'',applicationVersion:VERSION},questionBank:exportableBank(),principles:clone(state.principles),synthesisPresets:clone(state.synthesisPresets),tagConfig:exportTagConfig(),recallLibraryReference:{schemaVersion:state.recallLibrary.schemaVersion,nodeCount:state.recallLibrary.nodes.length,edgeCount:state.recallLibrary.edges.length},knowledgeTreeReference:state.knowledgeTree?{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:state.knowledgeTree.name,version:state.knowledgeTree.version,nodeCount:state.knowledgeTree.nodes.length}:null}}
+function completeBundlePayload(){const pair=normalizePrincipleCardBundle({principles:state.principles,synthesisPresets:state.synthesisPresets});return {prepContentBundleVersion:1,format:'pmp-content-prep-complete-bundle-v1',generatedBy:`PMP Content Prep Studio v${VERSION}`,generatedAt:nowIso(),exportManifest:{creator:{...currentIdentitySnapshot()},lastBatchId:prepRuntime.lastBatchId||'',applicationVersion:VERSION},questionBank:exportableBank(),principles:pair.principles,synthesisPresets:pair.synthesisPresets,tagConfig:exportTagConfig(),recallLibraryReference:{schemaVersion:state.recallLibrary.schemaVersion,nodeCount:state.recallLibrary.nodes.length,edgeCount:state.recallLibrary.edges.length},knowledgeTreeReference:state.knowledgeTree?{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:state.knowledgeTree.name,version:state.knowledgeTree.version,nodeCount:state.knowledgeTree.nodes.length}:null}}
 
 function recallIndex(){
   const byId=new Map(),terms=new Map();
@@ -1674,10 +1702,10 @@ function principleCheckMarkup(selected=[],namePrefix='p'){
 }
 function renderQuestionPrincipleBindings(){
   const q=currentQuestion(),box=document.getElementById('questionPrincipleBindingPanel');if(!q||!box)return;syncQuestionPrinciples(q);const map=q.metadata.optionPrincipleMap||{};
-  box.innerHTML=`<div class="help">题目级原则保存到 <code>metadata.principleIds</code>；A/B/C/D 选项级映射保存到 <code>metadata.optionPrincipleMap</code>，用于“题目演示校验”和未来做题大厅。</div>
-  <div style="margin-top:9px"><label>题目级原则</label>${principleCheckMarkup(q.metadata.principleIds,'question')}</div>
+  box.innerHTML=`<div class="help">题干 / 通用原则保存到 <code>metadata.stemPrincipleIds</code>；选项原则保存到 <code>metadata.optionPrincipleMap</code>。兼容字段 <code>metadata.principleIds</code> 由两者自动汇总；多题归纳只使用正确选项的唯一原则。</div>
+  <div style="margin-top:9px"><label>题干 / 通用原则</label>${principleCheckMarkup(q.metadata.stemPrincipleIds,'question')}</div>
   <div style="margin-top:10px">${q.options.slice(0,4).map(o=>`<div class="option-principles"><b>选项 ${esc(o.id)}</b>${principleCheckMarkup(map[o.id]||[],'opt-'+o.id)}</div>`).join('')}</div>`;
-  box.querySelectorAll('[data-principle-check="question"]').forEach(el=>el.addEventListener('change',()=>{q.metadata.principleIds=[...box.querySelectorAll('[data-principle-check="question"]:checked')].map(x=>x.value);syncQuestionPrinciples(q);renderCurrentIssues()}));
+  box.querySelectorAll('[data-principle-check="question"]').forEach(el=>el.addEventListener('change',()=>{q.metadata.stemPrincipleIds=[...box.querySelectorAll('[data-principle-check="question"]:checked')].map(x=>x.value);syncQuestionPrinciples(q);renderCurrentIssues()}));
   q.options.slice(0,4).forEach(o=>box.querySelectorAll(`[data-principle-check="opt-${o.id}"]`).forEach(el=>el.addEventListener('change',()=>{q.metadata.optionPrincipleMap=q.metadata.optionPrincipleMap||{};q.metadata.optionPrincipleMap[o.id]=[...box.querySelectorAll(`[data-principle-check="opt-${o.id}"]:checked`)].map(x=>x.value);syncQuestionPrinciples(q);renderCurrentIssues()})));
 }
 function renderQuestionEditor(){
@@ -2013,9 +2041,9 @@ function renderPrincipleList(){
 function renderPrincipleEditor(){
   const box=document.getElementById('principleEditor');if(!box)return;const p=principleById(state.currentPrincipleId);if(!p){box.innerHTML='<div class="no-data">请选择或新建原则。</div>';return}let preset=presetByPrincipleId(p.id);
   box.innerHTML=`<div class="form-grid"><div><label>原则 ID</label><input type="text" value="${esc(p.id)}" disabled></div><div><label>状态</label><select id="pmPrincipleStatus"><option value="active"${p.status==='active'?' selected':''}>active</option><option value="inactive"${p.status==='inactive'?' selected':''}>inactive</option></select></div><div class="span2"><label>原则名称</label><input id="pmPrincipleName" type="text" value="${esc(p.name)}"></div><div class="span2"><label>易混淆原则 IDs</label><input id="pmConfusable" type="text" value="${esc((p.confusablePrincipleIds||[]).join(', '))}"></div></div>
-  <div class="section"><div class="section-title">系统预设归纳卡</div><div class="form-grid"><div class="span2"><label>标题</label><input id="pmPresetTitle" type="text" value="${esc(preset?.title||('原则：'+p.name))}"></div><div class="span2"><label>内容</label><textarea id="pmPresetContent">${esc(preset?.content||'')}</textarea></div><div><label>状态</label><select id="pmPresetStatus"><option value="draft"${preset?.status==='draft'||!preset?' selected':''}>draft</option><option value="active"${preset?.status==='active'?' selected':''}>active</option><option value="inactive"${preset?.status==='inactive'?' selected':''}>inactive</option></select></div><div><label>版本</label><input id="pmPresetVersion" type="number" min="1" value="${preset?.version||1}"></div></div></div>
+  <div class="section"><div class="section-title">系统预设归纳卡</div><div class="form-grid"><div class="span2"><label>标题（与原则名称自动一致）</label><input id="pmPresetTitle" type="text" readonly value="${esc('原则：'+p.name)}"></div><div class="span2"><label>内容</label><textarea id="pmPresetContent">${esc(preset?.content||'')}</textarea></div><div><label>状态</label><select id="pmPresetStatus"><option value="draft"${preset?.status==='draft'||!preset?' selected':''}>draft</option><option value="active"${preset?.status==='active'?' selected':''}>active</option><option value="inactive"${preset?.status==='inactive'?' selected':''}>inactive</option></select></div><div><label>版本</label><input id="pmPresetVersion" type="number" min="1" value="${preset?.version||1}"></div></div></div>
   <div class="section toolbar"><button class="btn primary" id="pmSave">保存原则与归纳卡</button><button class="btn danger" id="pmDelete">删除原则</button></div>`;
-  document.getElementById('pmSave').onclick=()=>{p.name=document.getElementById('pmPrincipleName').value.trim()||'未命名原则';p.status=document.getElementById('pmPrincipleStatus').value;p.confusablePrincipleIds=unique(cleanList(document.getElementById('pmConfusable').value));p.updatedAt=Date.now();const title=document.getElementById('pmPresetTitle').value.trim(),content=document.getElementById('pmPresetContent').value.trim(),status=document.getElementById('pmPresetStatus').value,version=Math.max(1,Number(document.getElementById('pmPresetVersion').value||1));preset=preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()};Object.assign(preset,{principleId:p.id,title,content,status,version,updatedAt:Date.now()});const idx=state.synthesisPresets.items.findIndex(x=>x.id===preset.id);if(idx>=0)state.synthesisPresets.items[idx]=preset;else state.synthesisPresets.items.push(preset);renderPrincipleList();renderPrincipleEditor();renderQuestions();toast('原则与归纳卡已保存')};
+  document.getElementById('pmSave').onclick=()=>{p.name=document.getElementById('pmPrincipleName').value.trim()||'未命名原则';p.status=document.getElementById('pmPrincipleStatus').value;p.confusablePrincipleIds=unique(cleanList(document.getElementById('pmConfusable').value));p.updatedAt=Date.now();const title='原则：'+p.name,content=document.getElementById('pmPresetContent').value.trim(),status=document.getElementById('pmPresetStatus').value,version=Math.max(1,Number(document.getElementById('pmPresetVersion').value||1));preset=preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()};Object.assign(preset,{principleId:p.id,title,content,status,version,updatedAt:Date.now()});const idx=state.synthesisPresets.items.findIndex(x=>x.id===preset.id);if(idx>=0)state.synthesisPresets.items[idx]=preset;else state.synthesisPresets.items.push(preset);renderPrincipleList();renderPrincipleEditor();renderQuestions();toast('原则与归纳卡已保存')};
   document.getElementById('pmDelete').onclick=()=>{if(!confirm('删除该原则及其归纳卡？题目中的旧原则 ID 会在校验中心提示。'))return;state.principles.items=state.principles.items.filter(x=>x.id!==p.id);state.synthesisPresets.items=state.synthesisPresets.items.filter(x=>x.principleId!==p.id);state.currentPrincipleId=state.principles.items[0]?.id||'';renderPrincipleList();renderPrincipleEditor();renderQuestions()};
 }
 function tagAliasesForSlot(slot){return unique(cleanList(state.tagConfig?.slotAliases?.[slot]||[]))}
@@ -2200,7 +2228,7 @@ function renderDemoRecall(clue){
   box.querySelectorAll('[data-demo-recall-jump]').forEach(b=>b.onclick=()=>{state.currentRecallId=b.dataset.demoRecallJump;state.recallPreviewCandidateId='';setTab('association');renderRecallList();renderRecallEditor()});
 }
 function renderDemoPrinciples(q,optionId){
-  const box=document.getElementById('demoPrincipleResult');if(!box)return;const mapped=q.metadata?.optionPrincipleMap?.[optionId]||[],ids=mapped.length?mapped:(q.metadata?.principleIds||[]);
+  const box=document.getElementById('demoPrincipleResult');if(!box)return;const ids=q.metadata?.optionPrincipleMap?.[optionId]||[];
   const rows=ids.map(id=>{const p=principleById(id);return p?{p,preset:presetByPrincipleId(id)}:null}).filter(Boolean);
   if(!rows.length){box.innerHTML='<div class="issue warn"><strong>该选项未绑定原则归纳卡</strong><span>请在题目录入区配置。</span></div>';return}
   box.innerHTML=`<div class="muted smalltxt">选项 ${esc(optionId)}：</div>`+rows.map(({p,preset})=>`<div class="principle-card"><strong>${esc(p.name)}</strong><div class="status">${esc(preset?.status||'未配置归纳卡')}</div><div>${esc(preset?.title||'')}</div><div style="margin-top:4px">${esc(preset?.content||'暂无归纳卡内容')}</div></div>`).join('');
@@ -2274,7 +2302,7 @@ function runValidation(){
     else contentHashOwners.set(ch,q.id);
     validateQuestion(q,true).forEach(x=>issues.push(x));
   });
-  state.questionBank.questions.forEach(q=>{(q.metadata?.principleIds||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`原则 ID 不存在：${id}`,suggest:'在原则管理中创建或重新绑定。'})});Object.entries(q.metadata?.optionPrincipleMap||{}).forEach(([opt,ids])=>(ids||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`选项 ${opt} 的原则 ID 不存在：${id}`,suggest:'重新绑定选项原则。'})}));(q.tags||[]).forEach(tag=>{if(!tagPathFor(tag))issues.push({level:'warn',object:q.id,message:`标签“${tag}”未绑定主程序预设标签槽位`,suggest:'保留为自由标签，或在标签管理中映射/改名。'})})});
+  state.questionBank.questions.forEach(q=>{const metadata=syncQuestionPrinciples(q);(metadata.stemPrincipleIds||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`题干原则 ID 不存在：${id}`,suggest:'在原则管理中创建或重新绑定。'})});Object.entries(metadata.optionPrincipleMap||{}).forEach(([opt,ids])=>(ids||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`选项 ${opt} 的原则 ID 不存在：${id}`,suggest:'重新绑定选项原则。'})}));const correctIds=metadata.optionPrincipleMap?.[q.correctAnswer]||[];if(correctIds.length!==1)issues.push({level:'error',object:q.id,message:'正确选项必须绑定且只能绑定一条原则',suggest:'在题目录入区为正确选项保留一条原则；多题归纳据此分组。'});(q.tags||[]).forEach(tag=>{if(!tagPathFor(tag))issues.push({level:'warn',object:q.id,message:`标签“${tag}”未绑定主程序预设标签槽位`,suggest:'保留为自由标签，或在标签管理中映射/改名。'})})});
   state.principles.items.forEach(p=>{const preset=presetByPrincipleId(p.id);if(!preset||!preset.content)issues.push({level:'warn',object:p.id,message:`原则“${p.name}”缺少归纳卡内容`,suggest:'补充 synthesis preset。'})});
   const conflicts=aliasConflicts();conflicts.forEach(c=>issues.push({level:'error',object:'联想库',message:`名称/Alias 冲突：“${c.term}” → ${c.nodes.map(n=>n.title).join(' / ')}`,suggest:'保留唯一入口，或把 Alias 改成更具体的词。'}));
   const recallIds=new Set(state.recallLibrary.nodes.map(n=>n.id));
@@ -2753,8 +2781,7 @@ document.getElementById('btnParsePastedQuestions').onclick=()=>{
 };
 
 document.getElementById('fileContentBundle').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{importContentBundle(await readJsonFile(f));markWorkspaceDirty();toast('完整内容包已加载')}catch(err){alert('完整内容包导入失败：'+err.message)}e.target.value=''});
-document.getElementById('filePrinciples').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.principles=normalizePrinciples(await readJsonFile(f));state.currentPrincipleId=state.principles.items[0]?.id||'';refreshAll();markWorkspaceDirty();toast('原则库已加载')}catch(err){alert('原则库导入失败：'+err.message)}e.target.value=''});
-document.getElementById('filePresets').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.synthesisPresets=normalizePresets(await readJsonFile(f));refreshAll();markWorkspaceDirty();toast('归纳卡已加载')}catch(err){alert('归纳卡导入失败：'+err.message)}e.target.value=''});
+document.getElementById('filePrincipleCardBundle').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const pair=normalizePrincipleCardBundle(await readJsonFile(f));state.principles=pair.principles;state.synthesisPresets=pair.synthesisPresets;state.currentPrincipleId=state.principles.items[0]?.id||'';refreshAll();markWorkspaceDirty();toast('原则与归纳卡组合已加载')}catch(err){alert('原则与归纳卡组合导入失败：'+err.message)}e.target.value=''});
 document.getElementById('fileTagConfig').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.tagConfig=ImportService.tagConfig(await readJsonFile(f));refreshQuestionTagPaths();refreshAll();markWorkspaceDirty();toast('标签配置已加载')}catch(err){alert('标签配置导入失败：'+err.message)}e.target.value=''});
 document.getElementById('fileTree').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.knowledgeTree=normalizeTree(await readJsonFile(f));state.questionBank.questions.forEach(q=>{const id=q.metadata?.knowledge?.primaryNodeId;if(id&&state.knowledgeTree.map.has(id))q.metadata.knowledge.pathSnapshot=state.knowledgeTree.pathFor(id)});refreshHeader();renderQuestionEditor();renderRecallEditor();markWorkspaceDirty();toast('知识树已加载')}catch(err){alert('知识树导入失败：'+err.message)}e.target.value=''});
 document.getElementById('fileRecall').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.recallLibrary=normalizeRecall(await readJsonFile(f));state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';refreshHeader();renderRecallList();renderRecallEditor();renderKeywords();markWorkspaceDirty();toast('联想库已加载')}catch(err){alert('联想库导入失败：'+err.message)}e.target.value=''});
@@ -2764,9 +2791,8 @@ document.getElementById('btnNewWorkspace').onclick=()=>{if(!confirm('清空当�
 document.getElementById('btnImportWorkspace').onclick=()=>document.getElementById('fileWorkspace').click();
 document.getElementById('fileWorkspace').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const w=await readJsonFile(f);if(!w.prepStudioWorkspaceVersion)throw new Error('不是 Prep Studio 草稿');applyWorkspacePayload(w);markWorkspaceDirty();toast('草稿已恢复')}catch(err){alert('草稿导入失败：'+err.message)}e.target.value=''});
 
-document.getElementById('btnExportCompleteBundle').onclick=()=>{const v=runValidation();if(v.metrics.errors&&!confirm(`当前有 ${v.metrics.errors} 个错误。仍要导出完整成品包吗？`))return;const payload=completeBundlePayload();downloadJson(payload,'PMP_Content_Complete_Bundle.json',{auditType:'complete-bundle',details:{validation:{errors:v.metrics.errors,warnings:v.metrics.warnings}}})};
-document.getElementById('btnExportPrinciples').onclick=()=>downloadJson(state.principles,'kg_principle_repository_v1.json',{auditType:'principles'});
-document.getElementById('btnExportPresets').onclick=()=>downloadJson(state.synthesisPresets,'kg_synthesis_preset_repository_v1.json',{auditType:'synthesis-presets'});
+document.getElementById('btnExportCompleteBundle').onclick=()=>{const v=runValidation();if(v.metrics.errors&&!confirm(`当前有 ${v.metrics.errors} 个错误。仍要导出完整成品包吗？`))return;try{const payload=completeBundlePayload();downloadJson(payload,'PMP_Content_Complete_Bundle.json',{auditType:'complete-bundle',details:{validation:{errors:v.metrics.errors,warnings:v.metrics.warnings}}})}catch(err){alert('完整成品包导出失败：'+err.message)}};
+document.getElementById('btnExportPrincipleCards').onclick=()=>{try{downloadJson(principleCardBundlePayload(),'kg_principle_card_bundle_v1.json',{auditType:'principle-card-bundle'})}catch(err){alert('原则与归纳卡组合导出失败：'+err.message)}};
 document.getElementById('btnExportTagConfig').onclick=()=>ExportService.json(ExportService.tagConfig(),'kg_question_tag_names_v1.json',{auditType:'tag-config'});
 document.getElementById('btnExportQuestions').onclick=()=>{const v=runValidation();if(v.metrics.errors&&!confirm(`当前有 ${v.metrics.errors} 个错误。仍要导出题库吗？`))return;const payload=exportableBank(),name=safeName(state.questionBank.name||'PMP题库')+'_PrepStudio.json';downloadJson(payload,name,{auditType:'question-bank',details:{validation:{errors:v.metrics.errors,warnings:v.metrics.warnings}}})};
 document.getElementById('btnExportRecall').onclick=()=>{const lib=clone(state.recallLibrary);lib.schemaVersion=1;lib.updatedAt=nowIso();downloadJson(lib,'PMP_科目级联想库_PrepStudio.json',{auditType:'recall-library',details:{nodes:lib.nodes.length,edges:lib.edges.length}})};

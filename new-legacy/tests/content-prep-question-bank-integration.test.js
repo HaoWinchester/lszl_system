@@ -259,9 +259,10 @@ function loadManagedAdmin() {
     innerWidth: 1280, innerHeight: 800,
   };
   class CustomEvent { constructor(type, options = {}) { this.type = type; this.detail = options.detail; } }
+  const location = { search: '?bankId=bank-1&questionId=q-1', href: 'http://test/question-bank.html?bankId=bank-1&questionId=q-1' };
   const context = vm.createContext({
     window, document, CustomEvent, URLSearchParams, URL, Blob, Map, Set, Date, JSON, Math, Number, Object, Array,
-    location: { search: '?bankId=bank-1&questionId=q-1', href: 'http://test/question-bank.html?bankId=bank-1&questionId=q-1' }, navigator: {}, crypto: { randomUUID: () => 'id-test' },
+    location, navigator: {}, crypto: { randomUUID: () => 'id-test' },
     requestAnimationFrame() {}, cancelAnimationFrame() {}, setTimeout, clearTimeout, alert() {}, confirm: () => true, prompt: () => null,
     console, CSS: { escape: value => String(value) },
   });
@@ -271,7 +272,7 @@ function loadManagedAdmin() {
     input(target) { for (const listener of documentListeners.get('input') || []) listener({ target }); },
     change(target) { for (const listener of documentListeners.get('change') || []) listener({ target }); },
     remote(snapshot) { catalogSnapshot = snapshot; window.dispatchEvent(new CustomEvent('kg:question-catalog-changed', { detail: { source: 'remote', snapshot } })); },
-    element, api: context.KGQuestionBankAdminAPI, savedQuestions,
+    element, api: context.KGQuestionBankAdminAPI, savedQuestions, location,
   };
 }
 
@@ -333,7 +334,7 @@ async function testManagedAdminMergePreservesNestedDraft() {
   const managed = loadManagedAdmin();
   await managed.init();
   managed.element('questionStemInput').value = '合并后的本地题干';
-  managed.element('questionPrincipleIdsInput').value = 'principle-dom';
+  managed.element('questionStemPrincipleIdsInput').value = 'principle-dom';
   managed.element('clueTextInput').value = '尚未点击保存的线索';
   managed.element('conceptTitleInput').value = '尚未点击保存的知识点';
   managed.input(managed.element('clueTextInput'));
@@ -451,6 +452,15 @@ async function testManagedAdminMergesFloatingClueDraft() {
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(await managed.api.applyServerCatalogRefresh({ mode: 'merge' }), true);
   assert.ok(managed.savedQuestions.at(-1).value.clues.some(item => item.text === '悬浮面板未存关键词' && item.explain === '悬浮面板未存解释'));
+}
+
+async function testTrainingQuestionEditRoutesToBaseInfo() {
+  const managed = loadManagedAdmin();
+  await managed.init();
+  managed.element('body').dataset.qbWorkflowStep = 'training';
+  const destination = managed.api.openQuestionBasicInfo('q-1');
+  assert.equal(destination, 'question-bank.html?mode=simple&step=questions&bankId=bank-1&questionId=q-1');
+  assert.equal(managed.location.href, destination, 'training question actions must navigate to the selected question basic-info view');
 }
 
 async function testDirtyPrepEditorPreservesFieldsOnRemoteCommit() {
@@ -592,6 +602,7 @@ testPrepPublishesOnlyCommittedServerChanges()
   .then(testManagedAdminBlocksSelectOnlyNestedMerge)
   .then(testManagedAdminResetClearsPendingNestedBlock)
   .then(testManagedAdminMergesFloatingClueDraft)
+  .then(testTrainingQuestionEditRoutesToBaseInfo)
   .then(testDirtyPrepEditorPreservesFieldsOnRemoteCommit)
   .then(testDirtyPrepPrinciplePresetMergePreservesRawFields)
   .then(testPrepRemoteRefreshesSerialize)
