@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_login_session_id
 from app.models.user import ACTIVE
 from app.services import user_service
 
@@ -53,6 +54,8 @@ async def build_bootstrap(
 ) -> dict:
     user = await optional_user(request, db)
     auth_user = user_service.to_dict(user) if user else None
+    if auth_user:
+        auth_user["loginSessionId"] = get_login_session_id(request)
     storage: dict[str, str] = {}
     revision = 0
     content_revision = 0

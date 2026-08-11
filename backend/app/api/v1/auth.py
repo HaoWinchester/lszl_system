@@ -10,9 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import CurrentUser
+from app.core.auth import CurrentUser, establish_authenticated_session, get_login_session_id
 from app.db.session import get_db
-from app.schemas.auth import LoginRequest, RegisterRequest, SelfProfileUpdate
+from app.schemas.auth import AuthenticatedResponse, LoginRequest, RegisterRequest, SelfProfileUpdate
 from app.schemas.user import UserCreate
 from app.models.user import ACTIVE
 from app.services import system_service, user_service, wechat_service
@@ -76,7 +76,7 @@ def _wechat_redirect(return_path: str, result: str) -> RedirectResponse:
     return RedirectResponse(url=location, status_code=303)
 
 
-@router.post("/register")
+@router.post("/register", response_model=AuthenticatedResponse)
 async def register(req: RegisterRequest, request: Request, db: DB):
     ip, ua = _client_info(request)
     data = UserCreate(
@@ -95,11 +95,11 @@ async def register(req: RegisterRequest, request: Request, db: DB):
         raise HTTPException(status_code=400, detail=str(e))
     await user_service.log_action(db, "login_success", user.username, user.username, "注册并登录", ip, ua)
     await db.commit()
-    request.session["username"] = user.username
-    return {"user": user_service.to_dict(user)}
+    login_session_id = establish_authenticated_session(request, user.username)
+    return {"user": user_service.to_dict(user), "loginSessionId": login_session_id}
 
 
-@router.post("/login")
+@router.post("/login", response_model=AuthenticatedResponse)
 async def login(req: LoginRequest, request: Request, db: DB):
     ip, ua = _client_info(request)
     try:
@@ -118,8 +118,8 @@ async def login(req: LoginRequest, request: Request, db: DB):
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     await user_service.log_action(db, "login_success", user.username, user.username, "登录成功", ip, ua)
     await db.commit()
-    request.session["username"] = user.username
-    return {"user": user_service.to_dict(user)}
+    login_session_id = establish_authenticated_session(request, user.username)
+    return {"user": user_service.to_dict(user), "loginSessionId": login_session_id}
 
 
 @router.post("/logout")
@@ -133,9 +133,12 @@ async def logout(request: Request, db: DB):
     return {"ok": True, "username": un}
 
 
-@router.get("/me")
-async def me(user: CurrentUser):
-    return {"user": user_service.to_dict(user)}
+@router.get("/me", response_model=AuthenticatedResponse)
+async def me(request: Request, user: CurrentUser):
+    return {
+        "user": user_service.to_dict(user),
+        "loginSessionId": get_login_session_id(request),
+    }
 
 
 @router.put("/me")
@@ -216,7 +219,7 @@ async def wechat_callback(code: str, state: str, request: Request, db: DB):
             user = await wechat_service.find_or_create_user(db, profile, cfg, "wechat")
             if not user:
                 return _wechat_redirect(return_path, "login-failed")
-            request.session["username"] = user.username
+            establish_authenticated_session(request, user.username)
             action, detail, result = "wechat_login", "微信扫码登录", "login-success"
     except (PermissionError, ValueError):
         return _wechat_redirect(return_path, "bind-failed" if pending.get("intent") == "bind" else "login-failed")
@@ -237,7 +240,7 @@ async def unbind_wechat(request: Request, user: CurrentUser, db: DB):
     return {"user": user_service.to_dict(updated)}
 
 
-@router.post("/wechat/demo-login")
+@router.post("/wechat/demo-login", response_model=AuthenticatedResponse)
 async def wechat_demo_login(request: Request, db: DB):
     cfg = await system_service.get_wechat_config(db)
     if not cfg.get("enableDemo"):
@@ -249,5 +252,5 @@ async def wechat_demo_login(request: Request, db: DB):
         db, "wechat_demo_login", user.username, user.username, "微信演示扫码登录", ip, ua
     )
     await db.commit()
-    request.session["username"] = user.username
-    return {"user": user_service.to_dict(user)}
+    login_session_id = establish_authenticated_session(request, user.username)
+    return {"user": user_service.to_dict(user), "loginSessionId": login_session_id}

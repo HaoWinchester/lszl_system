@@ -4,6 +4,7 @@ session 由 starlette SessionMiddleware（itsdangerous 签名 cookie）提供，
 request.session 是 dict，登录时写入 username，登出时清空。
 """
 
+import secrets
 from typing import Annotated, Callable
 
 from fastapi import Depends, HTTPException, Request
@@ -13,6 +14,27 @@ from app.db.session import get_db
 from app.core.permissions import can
 from app.models.user import ACTIVE, User
 from app.services import user_service
+
+
+def establish_authenticated_session(request: Request, username: str) -> str:
+    """Replace the signed browser session after a successful authentication."""
+
+    login_session_id = secrets.token_urlsafe(24)
+    request.session.clear()
+    request.session["username"] = username
+    request.session["login_session_id"] = login_session_id
+    return login_session_id
+
+
+def get_login_session_id(request: Request) -> str:
+    """Return the existing login identity, upgrading legacy valid sessions once."""
+
+    login_session_id = request.session.get("login_session_id")
+    if isinstance(login_session_id, str) and login_session_id:
+        return login_session_id
+    login_session_id = secrets.token_urlsafe(24)
+    request.session["login_session_id"] = login_session_id
+    return login_session_id
 
 
 async def get_current_user(

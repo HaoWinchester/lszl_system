@@ -1,6 +1,8 @@
 """微信登录与服务器凭证边界回归测试。"""
 
 import asyncio
+import json
+import re
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -12,6 +14,12 @@ from app.main import app
 from app.models.system import SystemSetting
 from app.models.user import ACTIVE, User
 from app.services import system_service, user_service, wechat_service
+
+
+def extract_bootstrap(response) -> dict:
+    match = re.search(r"window\.__KG_DIRECT_BOOTSTRAP__=(.*?);</script>", response.text)
+    assert match, "missing direct bootstrap"
+    return json.loads(match.group(1))
 
 
 def login_admin(client: TestClient) -> None:
@@ -221,12 +229,19 @@ def test_callback_creates_student_sets_session_and_redirects(monkeypatch) -> Non
                 follow_redirects=False,
             )
             current = client.get("/api/v1/auth/me")
+            repeated_current = client.get("/api/v1/auth/me")
+            bootstrap = extract_bootstrap(client.get("/index.html"))
 
         assert callback.status_code == 303
         assert callback.headers["location"].startswith("/training?wechat=login-success")
         assert current.status_code == 200
         assert current.json()["user"]["username"] == username
         assert current.json()["user"]["role"] == "student"
+        login_session_id = current.json()["loginSessionId"]
+        assert isinstance(login_session_id, str)
+        assert login_session_id
+        assert repeated_current.json()["loginSessionId"] == login_session_id
+        assert bootstrap["authUser"]["loginSessionId"] == login_session_id
     finally:
         delete_user(username)
 
@@ -349,3 +364,13 @@ def test_bind_intent_requires_an_authenticated_user(monkeypatch) -> None:
         response = client.get("/api/v1/auth/wechat/auth-url", params={"intent": "bind"})
 
     assert response.status_code == 401
+
+
+def test_demo_login_issues_a_stable_login_session_id(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "WECHAT_ENABLE_DEMO", True)
+    with TestClient(app) as client:
+        response = client.post("/api/v1/auth/wechat/demo-login")
+        assert response.status_code == 200, response.text
+        login_session_id = response.json()["loginSessionId"]
+        assert client.get("/api/v1/auth/me").json()["loginSessionId"] == login_session_id
+        assert extract_bootstrap(client.get("/index.html"))["authUser"]["loginSessionId"] == login_session_id

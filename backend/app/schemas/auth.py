@@ -1,4 +1,6 @@
-"""认证请求 schema。"""
+"""认证请求与响应 schema。"""
+
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,6 +15,11 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=4, max_length=128)
     display_name: str | None = None
     subject: str | None = "PMP"
+
+
+class AuthenticatedResponse(BaseModel):
+    user: dict[str, Any]
+    loginSessionId: str
 
 
 class SelfProfileUpdate(BaseModel):

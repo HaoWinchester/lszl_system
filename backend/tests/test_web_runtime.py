@@ -108,6 +108,7 @@ def test_html_injects_authenticated_user_before_state_bootstrap() -> None:
     payload = _bootstrap(response.text)
     assert payload["authUser"]["username"] == "佩奇007"
     assert payload["authUser"]["role"] == "admin"
+    assert payload["authUser"]["loginSessionId"] == login.json()["loginSessionId"]
     assert revision.status_code == 200
     assert payload["contentRevision"] == revision.json()["revision"]
 
