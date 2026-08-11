@@ -172,7 +172,11 @@ def test_bank_scoped_test_record_cleanup_only_removes_selected_bank_records() ->
         model: type[TrainingProgress | RecallProgress | LearningEvent],
     ) -> set[str]:
         async with AsyncSessionLocal() as db:
-            rows = await db.execute(select(model.question_id))
+            rows = await db.execute(
+                select(model.question_id).where(
+                    model.question_id.in_([question_a_id, question_b_id])
+                )
+            )
             return {str(question_id) for question_id in rows.scalars().all()}
 
     asyncio.run(seed())
