@@ -107,6 +107,8 @@ EXACT_KEYS = {
     "kg_exam_paper_release_history_v1",
     "kg_exam_papers_published_v1",
     "kg_guided_practice_return_v1",
+    "kg_learning_entry_chooser_claim_v1",
+    "kg_learning_entry_chooser_consumed_v1",
     "kg_learning_tasks_v1",
     "kg_paper_workspace_layout_v1",
     "kg_question_classification_collapsed_v1",

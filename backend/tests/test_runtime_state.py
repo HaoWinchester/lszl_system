@@ -93,6 +93,32 @@ def test_runtime_state_accepts_scoped_multi_question_preferences() -> None:
     )
 
 
+def test_runtime_state_persists_login_entry_chooser_claim_keys() -> None:
+    keys = (
+        "kg_learning_entry_chooser_claim_v1",
+        "kg_learning_entry_chooser_consumed_v1",
+    )
+    with TestClient(app) as client:
+        login(client, "学生")
+        current = client.get("/api/v1/runtime/state").json()
+        revision = current["revision"]
+        for index, key in enumerate(keys):
+            response = client.put(
+                "/api/v1/runtime/state",
+                json=update_payload(
+                    key=key,
+                    value=json.dumps({"schemaVersion": 1, "marker": index}),
+                    revision=revision,
+                ),
+            )
+            assert response.status_code == 200, response.text
+            revision = response.json()["revision"]
+
+        persisted = client.get("/api/v1/runtime/state").json()["storage"]
+
+    assert set(keys).issubset(persisted)
+
+
 def test_runtime_state_rejects_unknown_storage_keys() -> None:
     with TestClient(app) as client:
         login(client, "学生")
