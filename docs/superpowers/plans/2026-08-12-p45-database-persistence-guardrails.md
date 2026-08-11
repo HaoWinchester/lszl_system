@@ -398,9 +398,48 @@ git add new-legacy/p45-migration-manifest.json frontend/scripts/sync-new-legacy.
 git commit -m "fix: require database persistence for all P4.5 modules"
 ```
 
+## Task 7: Pin the transitional IndexedDB debt list at the enforcement boundary
+
+**Files:**
+
+- Modify: `frontend/scripts/sync-new-legacy.js`
+- Modify: `frontend/scripts/new-legacy-sync.test.mjs`
+
+**Interfaces:**
+
+- The sole allowed legacy IndexedDB debt set is exactly:
+  - `content-prep-studio/src/js/10-state-domain.js`
+  - `content-prep-studio/dist/content-prep.html`
+- The source manifest is documentary input, not an authority to expand that set: missing, duplicate, additional, or absent expected paths produce `P4.5 migration manifest is invalid` before source scanning.
+
+- [x] **Step 1: Add an unknown-debt-path RED fixture**
+
+Write a source manifest that includes `src/p45-fixture.js` alongside the two permitted debt paths and contains IndexedDB code in that fixture. Assert the sync fails as invalid manifest, rather than allowing the added path.
+
+- [x] **Step 2: Run RED**
+
+Run: `cd frontend && node --test scripts/new-legacy-sync.test.mjs`
+
+Expected: the fixture currently passes because the source manifest can self-declare arbitrary debt paths.
+
+- [x] **Step 3: Enforce an exact fixed debt set**
+
+Declare the two permitted paths in the sync validator and compare the parsed manifest set with that list exactly (including duplicate detection). Do not derive the allowed list from the manifest and do not add a caller-controlled override.
+
+- [x] **Step 4: Run GREEN and real-source regression**
+
+Run the focused Node suite and actual source temp sync via supported CLI flags. Confirm the checked-in manifest matches the exact list and no release/public output changes.
+
+- [x] **Step 5: Commit and re-review**
+
+```bash
+git add frontend/scripts/sync-new-legacy.js frontend/scripts/new-legacy-sync.test.mjs
+git commit -m "fix: pin P4.5 IndexedDB debt allowlist"
+```
+
 ## Plan Self-Review
 
 - Coverage: protects all later P4.2–P4.5 migrations with a server-backed persistence contract, explicit feature ownership, exclusions and release checks.
 - Scope: this plan intentionally implements only Batch 1; Batches 2–7 are independent implementation plans because they each introduce separate data models and user workflows.
-- Consistency: every runtime key is declared in the frontend contract and validated by backend tests; relational domains are prohibited from the compatibility store, and no new browser IndexedDB exception can be self-declared.
+- Consistency: every runtime key is declared in the frontend contract and validated by backend tests; relational domains are prohibited from the compatibility store, and no new browser IndexedDB exception or debt path can be self-declared.
 - No placeholders: each task names its files, expected test command, required behavior and commit boundary.
