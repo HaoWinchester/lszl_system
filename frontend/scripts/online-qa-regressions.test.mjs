@@ -110,6 +110,9 @@ test('teacher imports honor duplicate settings and reject blank bank metadata', 
   assert.match(workflow, /bulkAddQuestions\?\.\(\[question\],\{skipDuplicates:byId\('tqSkipDuplicates'\)\?\.checked!==false\}\)/)
   assert.match(bank, /题库名称不能为空/)
   assert.match(bank, /自定义科目不能为空/)
+  assert.match(bank, /IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED/)
+  assert.match(bank, /确认覆盖/)
+  assert.match(bank, /modifiedQuestions/)
 })
 
 test('graph editor uses thresholded large mode, visible labels, and reversible drag history', () => {

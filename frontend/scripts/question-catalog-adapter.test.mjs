@@ -145,6 +145,37 @@ test('save methods use the canonical bank routes and reload the snapshot', async
   assert.ok(calls.some(call => call.url === '/api/v1/banks/bank-1' && call.options.method === 'DELETE'))
 })
 
+test('question-bank imports forward explicit replacement confirmation and preserve diff details', async () => {
+  const calls = []
+  let replacementAttempt = true
+  const { adapter } = loadAdapter({
+    mode: 'managed',
+    fetchImpl: async (url, options = {}) => {
+      calls.push({ url, options })
+      if (url.includes('/bootstrap')) return response(200, {
+        banks: [], questions: [], catalogRevision: 'e'.repeat(64), contentRevision: 1,
+      })
+      if (replacementAttempt) {
+        replacementAttempt = false
+        return response(409, { detail: {
+          code: 'IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED',
+          message: '需要确认覆盖',
+          importPlan: { replace: 1, summaries: [{ modifiedQuestions: 1 }] },
+        } })
+      }
+      return response(200, { banks: [], contentRevision: 1, importPlan: { skip: 1 } })
+    },
+  })
+  await adapter.ready
+  await assert.rejects(
+    adapter.importBanks({ banks: [{ id: 'source-bank' }] }),
+    error => error.code === 'IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED'
+      && error.detail?.detail?.importPlan?.replace === 1,
+  )
+  await adapter.importBanks({ banks: [{ id: 'source-bank' }], confirmReplace: true })
+  assert.match(calls.at(-2).options.body, /"confirmReplace":true/)
+})
+
 test('sync injects the adapter before each page question repository and marks its mode', () => {
   const root = mkdtempSync(resolve(tmpdir(), 'kg-catalog-adapter-'))
   const output = resolve(root, 'site')

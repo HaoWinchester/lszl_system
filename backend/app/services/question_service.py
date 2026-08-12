@@ -8,7 +8,7 @@ from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
-from app.models.content_prep import QuestionUploadBatch
+from app.models.content_prep import QuestionEditLock, QuestionUploadBatch
 from app.models.question import DRAFT, ExamPaper, PaperQuestion, PUBLISHED, Question, QuestionBank
 from app.models.training import LearningEvent, RecallProgress, TrainingProgress
 from app.models.user import User
@@ -128,6 +128,82 @@ def _import_validation_error(message: str) -> HTTPException:
     )
 
 
+def _import_conflict_error(code: str, message: str, import_plan: dict) -> HTTPException:
+    return HTTPException(
+        status_code=409,
+        detail={"code": code, "message": message, "importPlan": import_plan},
+    )
+
+
+def _question_change_summary(existing: Question, incoming: dict) -> dict:
+    groups = {
+        "content": ["title", "type", "difficulty", "domain", "topic", "stemParts", "options", "correctAnswer"],
+        "analysis": ["analysis", "translations"],
+        "keywords": ["clues", "status"],
+        "tags": ["tags"],
+        "principles": ["metadata"],
+        "knowledge": ["concepts"],
+        "reasoning": ["reasoningSteps", "keyPath"],
+        "family": ["metadata"],
+    }
+    current = question_to_dict(existing)
+    changed = {key: 0 for key in groups}
+    for name, fields in groups.items():
+        if any(current.get(field) != incoming.get(field) for field in fields):
+            changed[name] = 1
+    return changed
+
+
+def _import_plan(actions: list[dict]) -> dict:
+    counts = {"add": 0, "replace": 0, "skip": 0, "conflict": 0}
+    summaries: list[dict] = []
+    for action in actions:
+        action_type = action["type"]
+        counts[action_type] += 1
+        if action_type == "replace":
+            summaries.append(action["summary"])
+    return {**counts, "hasChanges": bool(counts["add"] or counts["replace"]), "hasConflicts": bool(counts["conflict"]), "summaries": summaries}
+
+
+def _normalized_import_bank_values(imported_bank: object) -> dict[str, str | None]:
+    """Use one canonical bank representation for preview, skip, and write."""
+
+    visibility = str(getattr(imported_bank, "visibility", None) or "private")
+    return {
+        "name": str(getattr(imported_bank, "name", None) or "").strip(),
+        "subject": str(getattr(imported_bank, "subject", None) or "PMP").strip(),
+        "description": getattr(imported_bank, "description", None),
+        "version": str(getattr(imported_bank, "version", None) or "1.0"),
+        "visibility": visibility if visibility in {"private", "published"} else "private",
+    }
+
+
+def _apply_normalized_question(target: Question, normalized: dict, actor_username: str) -> None:
+    target.title = normalized["title"]
+    target.type = normalized["type"]
+    target.subject = normalized["subject"]
+    target.difficulty = normalized.get("difficulty")
+    target.domain = normalized.get("domain")
+    target.topic = normalized.get("topic")
+    target.teacher_number = normalized.get("teacherNumber")
+    target.scope = "internal"
+    target.tags = normalized["tags"]
+    target.stem_parts = normalized["stemParts"]
+    target.options = normalized["options"]
+    target.correct_answer = str(normalized.get("correctAnswer") or "") or None
+    target.analysis = normalized.get("analysis")
+    target.clues = normalized["clues"]
+    target.concepts = normalized["concepts"]
+    target.reasoning_steps = normalized["reasoningSteps"]
+    target.status = normalized["status"]
+    target.translations = normalized["translations"]
+    target.content_metadata = normalized["metadata"]
+    target.key_path = normalized["keyPath"]
+    target.lifecycle = normalized["lifecycle"]
+    target.content_hash = question_content_service.canonical_question_hash(normalized)
+    target.updated_by = actor_username
+
+
 async def import_question_banks(
     db: AsyncSession,
     owner: User | str,
@@ -154,6 +230,7 @@ async def import_question_banks(
         )
 
     source_question_keys: list[str] = []
+    source_question_owners: dict[str, str] = {}
     for imported_bank in request.banks:
         source_bank_id = str(imported_bank.id or "").strip()
         for imported_question in imported_bank.questions:
@@ -161,6 +238,15 @@ async def import_question_banks(
             if not source_question_id:
                 raise _import_validation_error(
                     f"题库 {source_bank_id} 存在缺少源题目 ID 的记录"
+                )
+            prior_owner = source_question_owners.setdefault(
+                source_question_id,
+                source_bank_id,
+            )
+            if prior_owner != source_bank_id:
+                raise _import_validation_error(
+                    "导入题库之间存在重复源题目 ID："
+                    f"{source_question_id}（{prior_owner}、{source_bank_id}）"
                 )
             source_question_keys.append(f"{source_bank_id}::{source_question_id}")
     duplicate_question_keys = {
@@ -178,50 +264,125 @@ async def import_question_banks(
     try:
         async with db.begin():
             await teaching_content_revision_service.acquire_lock(db)
+            existing_banks = (
+                await db.execute(
+                    select(QuestionBank)
+                    .where(QuestionBank.owner_id == actor_username)
+                    .with_for_update()
+                )
+            ).scalars().all()
+            existing_by_source = {
+                str(bank.source_id): bank for bank in existing_banks if bank.source_id
+            }
+            existing_questions = (
+                await db.execute(
+                    select(Question).join(QuestionBank, Question.bank_id == QuestionBank.id).where(QuestionBank.owner_id == actor_username)
+                )
+            ).scalars().all()
+            question_sources = {
+                str(question.source_id): question
+                for question in existing_questions
+                if question.source_id
+            }
+            actions: list[dict] = []
+            prepared_banks: list[dict] = []
+            for imported_bank in request.banks:
+                source_bank_id = str(imported_bank.id).strip()
+                bank_values = _normalized_import_bank_values(imported_bank)
+                existing_bank = existing_by_source.get(source_bank_id)
+                normalized_questions: list[tuple[str, dict, Question | None]] = []
+                has_change = existing_bank is None
+                added_questions = removed_questions = modified_questions = unchanged_questions = 0
+                group_counts = {key: 0 for key in ("content", "analysis", "keywords", "tags", "principles", "knowledge", "reasoning", "family")}
+                existing_by_question_source = {}
+                if existing_bank is not None:
+                    rows = await db.execute(select(Question).where(Question.bank_id == existing_bank.id))
+                    existing_by_question_source = {str(item.source_id): item for item in rows.scalars().all() if item.source_id}
+                incoming_source_ids: set[str] = set()
+                for imported_question in imported_bank.questions:
+                    source_question_id = str(imported_question.id).strip()
+                    incoming_source_ids.add(source_question_id)
+                    owner_question = question_sources.get(source_question_id)
+                    if owner_question is not None and (existing_bank is None or owner_question.bank_id != existing_bank.id):
+                        actions.append({"type": "conflict", "sourceBankId": source_bank_id, "sourceQuestionId": source_question_id})
+                        continue
+                    raw_question = imported_question.model_dump(by_alias=True)
+                    normalized = question_content_service.normalize_question_payload(
+                        {**raw_question, "id": owner_question.id if owner_question else uid("q_")},
+                        subject=str(bank_values["subject"]),
+                    )
+                    normalized["scope"] = "internal"
+                    current = existing_by_question_source.get(source_question_id)
+                    if current is None:
+                        added_questions += 1
+                        has_change = True
+                    elif current.content_hash == question_content_service.canonical_question_hash(normalized):
+                        unchanged_questions += 1
+                    else:
+                        modified_questions += 1
+                        has_change = True
+                        for key, value in _question_change_summary(current, normalized).items():
+                            group_counts[key] += value
+                    normalized_questions.append((source_question_id, normalized, current))
+                if existing_bank is not None:
+                    removed_questions = len(set(existing_by_question_source) - incoming_source_ids)
+                    has_change = has_change or bool(removed_questions)
+                if any(action["type"] == "conflict" and action["sourceBankId"] == source_bank_id for action in actions):
+                    continue
+                if existing_bank is None:
+                    actions.append({"type": "add", "sourceBankId": source_bank_id})
+                elif not has_change and all(
+                    getattr(existing_bank, key) == value
+                    for key, value in bank_values.items()
+                ):
+                    actions.append({"type": "skip", "sourceBankId": source_bank_id})
+                else:
+                    actions.append({"type": "replace", "sourceBankId": source_bank_id, "summary": {"bankId": source_bank_id, "bankName": str(bank_values["name"]), "addedQuestions": added_questions, "removedQuestions": removed_questions, "modifiedQuestions": modified_questions, "unchangedQuestions": unchanged_questions, "groups": group_counts}})
+                prepared_banks.append({"sourceBankId": source_bank_id, "input": imported_bank, "values": bank_values, "existing": existing_bank, "questions": normalized_questions})
+            plan = _import_plan(actions)
+            if plan["hasConflicts"]:
+                raise _import_conflict_error("IMPORT_QUESTION_ID_CONFLICT", "导入题目 ID 与其他题库冲突，已取消。", plan)
+            if plan["replace"] and not request.confirm_replace:
+                raise _import_conflict_error("IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED", "导入包含同一来源题库的内容更新，需要确认覆盖。", plan)
             source_bank_id_map: dict[str, str] = {}
             source_question_id_map: dict[str, str] = {}
             imported_rows: list[tuple[QuestionBank, list[Question]]] = []
             content_changes: list[dict[str, str]] = []
 
-            for imported_bank in request.banks:
-                source_bank_id = str(imported_bank.id).strip()
-                visibility = str(imported_bank.visibility or "private")
-                if visibility not in {"private", "published"}:
-                    visibility = "private"
-                bank = QuestionBank(
-                    id=uid("b_"),
-                    owner_id=actor_username,
-                    name=str(imported_bank.name).strip(),
-                    subject=str(imported_bank.subject or "PMP").strip(),
-                    description=imported_bank.description,
-                    version=str(imported_bank.version or "1.0"),
-                    visibility=visibility,
-                    revision=1,
-                    created_by=actor_username,
-                    updated_by=actor_username,
-                )
-                db.add(bank)
-                await db.flush()
+            for prepared in prepared_banks:
+                imported_bank = prepared["input"]
+                source_bank_id = prepared["sourceBankId"]
+                bank_values = prepared["values"]
+                action = next(item for item in actions if item["sourceBankId"] == source_bank_id)
+                existing_bank = prepared["existing"]
+                if action["type"] == "skip":
+                    source_bank_id_map[source_bank_id] = existing_bank.id
+                    rows = await db.execute(select(Question).where(Question.bank_id == existing_bank.id))
+                    existing_rows = list(rows.scalars().all())
+                    for row in existing_rows:
+                        if row.source_id:
+                            source_question_id_map[f"{source_bank_id}::{row.source_id}"] = row.id
+                    imported_rows.append((existing_bank, existing_rows))
+                    continue
+                if existing_bank is None:
+                    bank = QuestionBank(id=uid("b_"), owner_id=actor_username, source_id=source_bank_id, name=bank_values["name"], subject=bank_values["subject"], description=bank_values["description"], version=bank_values["version"], visibility=bank_values["visibility"], revision=1, created_by=actor_username, updated_by=actor_username)
+                    db.add(bank)
+                    await db.flush()
+                    content_changes.append({"entityType": "bank", "entityId": bank.id, "action": "created"})
+                else:
+                    bank = existing_bank
+                    bank.name = bank_values["name"]; bank.subject = bank_values["subject"]; bank.description = bank_values["description"]; bank.version = bank_values["version"]; bank.visibility = bank_values["visibility"]; bank.revision += 1; bank.updated_by = actor_username
+                    content_changes.append({"entityType": "bank", "entityId": bank.id, "action": "updated"})
                 source_bank_id_map[source_bank_id] = bank.id
-                content_changes.append(
-                    {"entityType": "bank", "entityId": bank.id, "action": "created"}
-                )
                 imported_questions: list[Question] = []
 
-                for imported_question in imported_bank.questions:
-                    source_question_id = str(imported_question.id).strip()
-                    question_id = uid("q_")
-                    raw_question = imported_question.model_dump(by_alias=True)
-                    normalized = question_content_service.normalize_question_payload(
-                        {**raw_question, "id": question_id},
-                        subject=bank.subject,
-                    )
-                    normalized["scope"] = "internal"
-                    content_hash = question_content_service.canonical_question_hash(
-                        normalized
-                    )
-                    question = Question(
-                        id=question_id,
+                incoming_question_sources = set()
+                for source_question_id, normalized, existing_question in prepared["questions"]:
+                    incoming_question_sources.add(source_question_id)
+                    if existing_question is None:
+                        content_hash = question_content_service.canonical_question_hash(normalized)
+                        question = Question(
+                        id=normalized["id"], source_id=source_question_id,
                         bank_id=bank.id,
                         title=normalized["title"],
                         type=normalized["type"],
@@ -248,27 +409,69 @@ async def import_question_banks(
                         content_metadata=normalized["metadata"],
                         key_path=normalized["keyPath"],
                         lifecycle=normalized["lifecycle"],
-                    )
-                    db.add(question)
+                        )
+                        db.add(question)
+                        content_changes.append({"entityType": "question", "entityId": question.id, "action": "created"})
+                    else:
+                        question = existing_question
+                        _apply_normalized_question(question, normalized, actor_username)
+                        question.revision += 1
+                        content_changes.append({"entityType": "question", "entityId": question.id, "action": "updated"})
                     imported_questions.append(question)
                     source_question_id_map[
                         f"{source_bank_id}::{source_question_id}"
                     ] = question.id
-                    content_changes.append(
-                        {
-                            "entityType": "question",
-                            "entityId": question.id,
-                            "action": "created",
-                        }
-                    )
+                if existing_bank is not None:
+                    stale = await db.execute(select(Question).where(Question.bank_id == bank.id, Question.source_id.is_not(None), Question.source_id.not_in(incoming_question_sources)))
+                    for stale_question in stale.scalars().all():
+                        # Imported source content is authoritative.  Remove only
+                        # dependent progress/link records; otherwise PostgreSQL
+                        # would reject a legitimate confirmed replacement while
+                        # leaving the old source question visible in the bank.
+                        await db.execute(
+                            delete(PaperQuestion).where(
+                                PaperQuestion.question_id == stale_question.id
+                            )
+                        )
+                        await db.execute(
+                            delete(TrainingProgress).where(
+                                TrainingProgress.question_id == stale_question.id
+                            )
+                        )
+                        await db.execute(
+                            delete(RecallProgress).where(
+                                RecallProgress.question_id == stale_question.id
+                            )
+                        )
+                        await db.execute(
+                            delete(LearningEvent).where(
+                                LearningEvent.question_id == stale_question.id
+                            )
+                        )
+                        await db.execute(
+                            delete(QuestionEditLock).where(
+                                QuestionEditLock.question_id == stale_question.id
+                            )
+                        )
+                        await db.delete(stale_question)
+                        content_changes.append({"entityType": "question", "entityId": stale_question.id, "action": "deleted"})
                 imported_rows.append((bank, imported_questions))
 
+            if not content_changes:
+                return {"banks": [], "sourceBankIdMap": source_bank_id_map, "sourceQuestionIdMap": source_question_id_map, "contentRevision": int((await teaching_content_revision_service.current(db))["revision"]), "importPlan": plan}
             await db.flush()
             revision_state = await teaching_content_revision_service.bump(
                 db,
                 actor_username,
                 content_changes,
             )
+            # The response is built inside the transaction.  Explicitly refresh
+            # server-managed timestamps so async SQLAlchemy never tries a lazy
+            # load after the transaction has committed.
+            for bank, questions in imported_rows:
+                await db.refresh(bank)
+                for question in questions:
+                    await db.refresh(question)
             saved_banks = []
             for bank, questions in imported_rows:
                 saved_bank = bank_to_dict(bank, question_count=len(questions))
@@ -280,6 +483,7 @@ async def import_question_banks(
             "sourceBankIdMap": source_bank_id_map,
             "sourceQuestionIdMap": source_question_id_map,
             "contentRevision": int(revision_state["revision"]),
+            "importPlan": plan,
         }
     except HTTPException:
         raise

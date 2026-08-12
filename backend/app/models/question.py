@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -14,9 +14,16 @@ PUBLISHED = "published"
 
 class QuestionBank(Base):
     __tablename__ = "question_banks"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "source_id", name="uq_question_banks_owner_source_id"),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     owner_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.username"), nullable=False, index=True)
+    # Stable identity supplied by a Question Family / Prep Studio import.  It is
+    # deliberately distinct from the database primary key so retries can update
+    # the same owned bank without exposing internal IDs to clients.
+    source_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     subject: Mapped[str] = mapped_column(String(32), default="PMP")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -40,10 +47,12 @@ class Question(Base):
     __table_args__ = (
         CheckConstraint("scope IN ('public', 'internal')", name="ck_questions_scope"),
         Index("ix_questions_bank_scope_lifecycle", "bank_id", "scope"),
+        UniqueConstraint("bank_id", "source_id", name="uq_questions_bank_source_id"),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     bank_id: Mapped[str] = mapped_column(String(64), ForeignKey("question_banks.id"), nullable=False, index=True)
+    source_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     type: Mapped[str] = mapped_column(String(32), default="single_choice")
     subject: Mapped[str | None] = mapped_column(String(32), nullable=True)

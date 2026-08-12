@@ -189,3 +189,68 @@ def test_question_bank_json_import_is_atomic_and_returns_server_id_maps() -> Non
             )
     finally:
         asyncio.run(_cleanup_users(usernames))
+
+
+def test_question_bank_import_keeps_source_identity_and_requires_confirmed_replacement() -> None:
+    suffix = uuid4().hex[:10]
+    usernames = {"manager": f"question-import-policy-{suffix}", "viewer": f"question-import-policy-viewer-{suffix}"}
+    asyncio.run(_seed_users(usernames))
+    try:
+        with TestClient(app) as client:
+            _login(client, usernames["manager"])
+            original = _source_bank("stable-bank", "stable-question", name="稳定来源题库")
+            first = client.post("/api/v1/banks/import", json={"banks": [original]})
+            assert first.status_code == 200, first.text
+            first_payload = first.json()
+            bank_id = first_payload["banks"][0]["id"]
+            question_id = first_payload["banks"][0]["questions"][0]["id"]
+
+            duplicate = client.post("/api/v1/banks/import", json={"banks": [original]})
+            assert duplicate.status_code == 200, duplicate.text
+            assert duplicate.json()["banks"] == []
+            assert duplicate.json()["importPlan"]["skip"] == 1
+
+            template_visibility = _source_bank("template-bank", "template-question")
+            template_visibility["visibility"] = "template"
+            template_first = client.post("/api/v1/banks/import", json={"banks": [template_visibility]})
+            assert template_first.status_code == 200, template_first.text
+            template_duplicate = client.post("/api/v1/banks/import", json={"banks": [template_visibility]})
+            assert template_duplicate.status_code == 200, template_duplicate.text
+            assert template_duplicate.json()["importPlan"]["skip"] == 1
+
+            changed = _source_bank("stable-bank", "stable-question", name="稳定来源题库")
+            changed["questions"][0]["stemParts"] = [{"text": "更新后的题干"}]
+            needs_confirmation = client.post("/api/v1/banks/import", json={"banks": [changed]})
+            assert needs_confirmation.status_code == 409, needs_confirmation.text
+            detail = needs_confirmation.json()["detail"]
+            assert detail["code"] == "IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED"
+            assert detail["importPlan"]["replace"] == 1
+            assert detail["importPlan"]["summaries"][0]["modifiedQuestions"] == 1
+
+            replaced = client.post(
+                "/api/v1/banks/import",
+                json={"banks": [changed], "confirmReplace": True},
+            )
+            assert replaced.status_code == 200, replaced.text
+            assert replaced.json()["banks"][0]["id"] == bank_id
+            assert replaced.json()["banks"][0]["questions"][0]["id"] == question_id
+            assert replaced.json()["banks"][0]["questions"][0]["stemParts"] == [{"text": "更新后的题干"}]
+
+            conflict = _source_bank("other-bank", "stable-question", name="冲突题库")
+            overlap = client.post("/api/v1/banks/import", json={"banks": [conflict]})
+            assert overlap.status_code == 409, overlap.text
+            assert overlap.json()["detail"]["code"] == "IMPORT_QUESTION_ID_CONFLICT"
+
+            duplicate_source_question = client.post(
+                "/api/v1/banks/import",
+                json={
+                    "banks": [
+                        _source_bank("batch-bank-a", "batch-question"),
+                        _source_bank("batch-bank-b", "batch-question"),
+                    ]
+                },
+            )
+            assert duplicate_source_question.status_code == 422, duplicate_source_question.text
+            assert duplicate_source_question.json()["detail"]["code"] == "IMPORT_VALIDATION_FAILED"
+    finally:
+        asyncio.run(_cleanup_users(usernames))

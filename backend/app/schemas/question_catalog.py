@@ -37,7 +37,7 @@ class QuestionPayload(BaseModel):
 
 
 class QuestionBankImportItem(BaseModel):
-    """One JSON-import source bank; its IDs are references, never DB primary keys."""
+    """One JSON-import source bank; its IDs are stable external identities, not DB primary keys."""
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
@@ -54,6 +54,7 @@ class QuestionBankImportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     banks: list[QuestionBankImportItem] = Field(min_length=1)
+    confirm_replace: bool = Field(default=False, alias="confirmReplace")
 
 
 class QuestionBankImportResponse(BaseModel):
@@ -63,6 +64,7 @@ class QuestionBankImportResponse(BaseModel):
     source_bank_id_map: dict[str, str] = Field(alias="sourceBankIdMap")
     source_question_id_map: dict[str, str] = Field(alias="sourceQuestionIdMap")
     content_revision: int = Field(alias="contentRevision", ge=1)
+    import_plan: dict[str, Any] = Field(alias="importPlan")
 
 
 class CatalogQuestionPayload(QuestionPayload):
