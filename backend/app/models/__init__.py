@@ -24,7 +24,14 @@ from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.subscription import RedeemCode, Subscription, SubscriptionOrder
 from app.models.subject_facet import SubjectFacetSchema
 from app.models.system import RoleTheme, SystemSetting
-from app.models.training import CanvasWorkspace, LearningEvent, RecallProgress, TrainingProgress
+from app.models.training import (
+    CanvasWorkspace,
+    LearningEvent,
+    PracticeMistake,
+    PracticeVerification,
+    RecallProgress,
+    TrainingProgress,
+)
 from app.models.user import User, UserAdminLog
 
 __all__ = [
@@ -54,6 +61,8 @@ __all__ = [
     "TrainingProgress",
     "RecallProgress",
     "LearningEvent",
+    "PracticeMistake",
+    "PracticeVerification",
     "CanvasWorkspace",
     "GuidedCourse",
     "GuidedActivity",

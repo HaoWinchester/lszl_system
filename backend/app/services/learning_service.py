@@ -1,17 +1,28 @@
 """单题深学会话、学习事件和多题工作区服务。"""
 
 import re
+from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import uid
-from app.models.training import CanvasWorkspace, LearningEvent, TrainingProgress
+from app.core.security import now_utc, uid
+from app.models.question import Question, QuestionBank
+from app.models.training import (
+    CanvasWorkspace,
+    LearningEvent,
+    PracticeMistake,
+    PracticeVerification,
+    TrainingProgress,
+)
 from app.services import question_catalog_service, question_service
 
 SESSION_SCHEMA_VERSIONS = {1, 2}
 WORKSPACE_SCHEMA_VERSIONS = set(range(1, 7))
 WORKSPACE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+PRACTICE_MISTAKE_STATUSES = {"pending", "needs_remediation", "verification_due", "mastered"}
+PRACTICE_LANGUAGE_MODES = {"zh", "en", "bilingual"}
+PRACTICE_REVIEW_DELAY = timedelta(days=1)
 
 
 def _iso(value) -> str | None:
@@ -98,6 +109,436 @@ def event_to_dict(event: LearningEvent) -> dict:
     }
 
 
+def _question_snapshot(question: Question) -> dict:
+    """Use the canonical public payload as a durable source-question snapshot."""
+
+    return question_catalog_service.question_to_payload(question)
+
+
+def _practice_knowledge(question: Question) -> dict:
+    metadata = question.content_metadata if isinstance(question.content_metadata, dict) else {}
+    raw = metadata.get("knowledge") if isinstance(metadata.get("knowledge"), dict) else {}
+    taxonomy_id = str(raw.get("taxonomyId") or "").strip()
+    node_id = str(raw.get("primaryNodeId") or raw.get("nodeId") or "").strip()
+    path = raw.get("pathSnapshot") if isinstance(raw.get("pathSnapshot"), list) else []
+    title = ""
+    if path:
+        last = path[-1]
+        if isinstance(last, dict):
+            title = str(last.get("zh") or last.get("title") or "").strip()
+        else:
+            title = str(last or "").strip()
+    title = title or str(raw.get("title") or question.topic or "").strip()
+    return {
+        "taxonomyId": taxonomy_id,
+        "nodeId": node_id,
+        "title": title,
+        "path": path,
+    }
+
+
+def _practice_snapshot_knowledge(snapshot: dict) -> dict:
+    metadata = snapshot.get("metadata") if isinstance(snapshot.get("metadata"), dict) else {}
+    raw = metadata.get("knowledge") if isinstance(metadata.get("knowledge"), dict) else {}
+    taxonomy_id = str(raw.get("taxonomyId") or "").strip()
+    node_id = str(raw.get("primaryNodeId") or raw.get("nodeId") or "").strip()
+    path = raw.get("pathSnapshot") if isinstance(raw.get("pathSnapshot"), list) else []
+    title = ""
+    if path:
+        last = path[-1]
+        title = str(last.get("zh") or last.get("title") or "") if isinstance(last, dict) else str(last or "")
+    return {
+        "taxonomyId": taxonomy_id,
+        "nodeId": node_id,
+        "title": title or str(raw.get("title") or snapshot.get("topic") or "").strip(),
+        "path": path,
+    }
+
+
+def _practice_mistake_to_dict(mistake: PracticeMistake) -> dict:
+    return {
+        "id": mistake.id,
+        "questionId": mistake.question_id,
+        "bankId": mistake.bank_id,
+        "paperId": mistake.paper_id,
+        "releaseId": mistake.release_id,
+        "paperVersion": mistake.paper_version,
+        "paperName": mistake.paper_name,
+        "sourceMode": mistake.source_mode,
+        "languageMode": mistake.language_mode,
+        "questionSnapshot": mistake.question_snapshot or {},
+        "knowledge": mistake.knowledge or {},
+        "selectedAnswers": mistake.selected_answers or [],
+        "status": mistake.status,
+        "wrongCount": mistake.wrong_count,
+        "revengeAttemptCount": mistake.revenge_attempt_count,
+        "revengeWrongCount": mistake.revenge_wrong_count,
+        "revengeCorrectCount": mistake.revenge_correct_count,
+        "verificationAttemptCount": mistake.verification_attempt_count,
+        "verificationPassCount": mistake.verification_pass_count,
+        "verificationFailCount": mistake.verification_fail_count,
+        "firstWrongAt": _iso(mistake.first_wrong_at),
+        "lastWrongAt": _iso(mistake.last_wrong_at),
+        "lastRevengeAt": _iso(mistake.last_revenge_at),
+        "nextReviewAt": _iso(mistake.next_review_at),
+        "remediationReviewedAt": _iso(mistake.remediation_reviewed_at),
+        "masteredAt": _iso(mistake.mastered_at),
+        "createdAt": _iso(mistake.created_at),
+        "updatedAt": _iso(mistake.updated_at),
+    }
+
+
+def _practice_verification_to_dict(verification: PracticeVerification) -> dict:
+    return {
+        "id": verification.id,
+        "mistakeId": verification.mistake_id,
+        "questionId": verification.question_id,
+        "bankId": verification.bank_id,
+        "selectedAnswer": verification.selected_answer,
+        "correct": verification.correct,
+        "createdAt": _iso(verification.created_at),
+    }
+
+
+async def _practice_mistake(db: AsyncSession, owner: str, mistake_id: str) -> PracticeMistake | None:
+    return (
+        await db.execute(
+            select(PracticeMistake).where(
+                PracticeMistake.id == mistake_id,
+                PracticeMistake.owner_id == owner,
+            )
+        )
+    ).scalar_one_or_none()
+
+
+async def _visible_learning_question(db: AsyncSession, question_id: str) -> Question | None:
+    query = (
+        select(Question)
+        .join(QuestionBank, QuestionBank.id == Question.bank_id)
+        .where(
+            Question.id == question_id,
+            QuestionBank.visibility == "published",
+            Question.scope == "public",
+        )
+    )
+    return (await db.execute(query)).scalar_one_or_none()
+
+
+async def _append_practice_event(
+    db: AsyncSession,
+    owner: str,
+    *,
+    event_type: str,
+    question_id: str | None,
+    payload: dict,
+) -> None:
+    db.add(
+        LearningEvent(
+            id=uid("le_"),
+            owner_id=owner,
+            question_id=question_id,
+            event_type=event_type,
+            payload=payload,
+        )
+    )
+
+
+async def record_practice_mistake(db: AsyncSession, owner: str, data: dict) -> PracticeMistake:
+    question_id = str(data.get("questionId") or "").strip()
+    if not question_id:
+        raise ValueError("questionId 不能为空")
+    question = await _visible_learning_question(db, question_id)
+    if question is None:
+        raise LookupError("题目不存在或当前不可学习")
+    requested_bank_id = str(data.get("bankId") or "").strip()
+    if requested_bank_id and requested_bank_id != question.bank_id:
+        raise ValueError("bankId 与题目不一致")
+    release_id = str(data.get("releaseId") or "").strip()
+    selected_answer = str(data.get("selectedAnswer") or data.get("reason") or "").strip()
+    language_mode = str(data.get("languageMode") or "zh").strip().lower()
+    if language_mode not in PRACTICE_LANGUAGE_MODES:
+        raise ValueError("languageMode 不受支持")
+    existing = (
+        await db.execute(
+            select(PracticeMistake).where(
+                PracticeMistake.owner_id == owner,
+                PracticeMistake.question_id == question.id,
+                PracticeMistake.release_id == release_id,
+            )
+        )
+    ).scalar_one_or_none()
+    now = now_utc()
+    if existing is None:
+        existing = PracticeMistake(
+            id=uid("pm_"),
+            owner_id=owner,
+            question_id=question.id,
+            bank_id=question.bank_id,
+            paper_id=str(data.get("paperId") or "").strip() or None,
+            release_id=release_id,
+            paper_version=max(0, int(data.get("paperVersion") or 0)),
+            paper_name=str(data.get("paperName") or "错题来源试卷").strip()[:200] or "错题来源试卷",
+            source_mode=str(data.get("sourceMode") or "challenge").strip()[:32] or "challenge",
+            language_mode=language_mode,
+            question_snapshot=_question_snapshot(question),
+            knowledge=_practice_knowledge(question),
+            selected_answers=[selected_answer] if selected_answer else [],
+            status="pending",
+            wrong_count=1,
+            first_wrong_at=now,
+            last_wrong_at=now,
+        )
+        db.add(existing)
+    else:
+        existing.question_snapshot = _question_snapshot(question)
+        existing.knowledge = _practice_knowledge(question)
+        existing.selected_answers = [*(existing.selected_answers or []), *([selected_answer] if selected_answer else [])][-20:]
+        existing.status = "pending"
+        existing.wrong_count += 1
+        existing.revenge_correct_count = 0
+        existing.last_wrong_at = now
+        existing.next_review_at = None
+        existing.mastered_at = None
+    await _append_practice_event(
+        db,
+        owner,
+        event_type="PRACTICE_MISTAKE_RECORDED",
+        question_id=question.id,
+        payload={"mistakeId": existing.id, "status": existing.status, "knowledge": existing.knowledge},
+    )
+    await db.commit()
+    await db.refresh(existing)
+    return existing
+
+
+async def list_practice_mistakes(db: AsyncSession, owner: str) -> list[dict]:
+    rows = (
+        await db.execute(
+            select(PracticeMistake)
+            .where(PracticeMistake.owner_id == owner)
+            .order_by(PracticeMistake.updated_at.desc(), PracticeMistake.id)
+        )
+    ).scalars().all()
+    return [_practice_mistake_to_dict(row) for row in rows]
+
+
+def _practice_stats(rows: list[PracticeMistake], now) -> dict:
+    pending = [row for row in rows if row.status == "pending"]
+    remediation = [row for row in rows if row.status == "needs_remediation"]
+    due = [row for row in rows if row.status == "verification_due" and (row.next_review_at is None or row.next_review_at <= now)]
+    waiting = [row for row in rows if row.status == "verification_due" and row.next_review_at and row.next_review_at > now]
+    mastered = [row for row in rows if row.status == "mastered"]
+    return {
+        "total": len(rows),
+        "active": len(pending) + len(remediation) + len(due),
+        "pending": len(pending),
+        "needsRemediation": len(remediation),
+        "verificationDue": len(due),
+        "verificationWaiting": len(waiting),
+        "mastered": len(mastered),
+    }
+
+
+def _practice_plan(stats: dict) -> dict:
+    if stats["verificationDue"]:
+        action = {
+            "id": "verification",
+            "title": "优先完成知识验证",
+            "count": stats["verificationDue"],
+            "launchMode": "revenge",
+            "code": "VERIFICATION_DUE",
+            "reason": f"有 {stats['verificationDue']} 道补救后的知识验证已经到期，先确认是否真正掌握。",
+        }
+    elif stats["needsRemediation"]:
+        action = {
+            "id": "remediation",
+            "title": "继续补救薄弱知识",
+            "count": stats["needsRemediation"],
+            "launchMode": "revenge",
+            "code": "REMEDIATION_REQUIRED",
+            "reason": f"有 {stats['needsRemediation']} 道题仍需要知识补救，继续处理比刷新题更重要。",
+        }
+    elif stats["pending"]:
+        action = {
+            "id": "revenge",
+            "title": "清理待复仇错题",
+            "count": stats["pending"],
+            "launchMode": "revenge",
+            "code": "REVENGE_PENDING",
+            "reason": f"有 {stats['pending']} 道真实错题等待复仇，优先把错误变成学习任务。",
+        }
+    else:
+        action = {
+            "id": "challenge",
+            "title": "继续挑战训练",
+            "count": 0,
+            "launchMode": "challenge",
+            "code": "CONTINUE_CHALLENGE",
+            "reason": "当前没有待处理错题，继续用挑战模式累积真实作答证据。",
+        }
+    return {"version": 1, "idealAction": action, "executableAction": dict(action)}
+
+
+async def practice_overview(db: AsyncSession, owner: str) -> dict:
+    rows = (
+        await db.execute(
+            select(PracticeMistake)
+            .where(PracticeMistake.owner_id == owner)
+            .order_by(PracticeMistake.updated_at.desc(), PracticeMistake.id)
+        )
+    ).scalars().all()
+    stats = _practice_stats(rows, now_utc())
+    return {"mistakes": [_practice_mistake_to_dict(row) for row in rows], "stats": stats, "plan": _practice_plan(stats)}
+
+
+async def record_revenge_answer(db: AsyncSession, owner: str, mistake_id: str, data: dict) -> PracticeMistake | None:
+    mistake = await _practice_mistake(db, owner, mistake_id)
+    if mistake is None:
+        return None
+    correct = bool(data.get("correct"))
+    selected_answer = str(data.get("selectedAnswer") or "").strip()
+    now = now_utc()
+    mistake.revenge_attempt_count += 1
+    mistake.last_revenge_at = now
+    if correct:
+        mistake.revenge_correct_count += 1
+        if mistake.status == "needs_remediation":
+            mistake.status = "needs_remediation"
+        elif mistake.status == "verification_due" and (mistake.next_review_at is None or mistake.next_review_at <= now):
+            mistake.status = "mastered"
+            mistake.next_review_at = None
+            mistake.mastered_at = now
+        else:
+            mistake.status = "verification_due"
+            mistake.next_review_at = now + PRACTICE_REVIEW_DELAY
+            mistake.mastered_at = None
+    else:
+        mistake.revenge_wrong_count += 1
+        mistake.revenge_correct_count = 0
+        mistake.status = "needs_remediation"
+        mistake.next_review_at = None
+        mistake.mastered_at = None
+        if selected_answer:
+            mistake.selected_answers = [*(mistake.selected_answers or []), selected_answer][-20:]
+    await _append_practice_event(
+        db,
+        owner,
+        event_type="PRACTICE_REVENGE_ANSWERED",
+        question_id=mistake.question_id,
+        payload={"mistakeId": mistake.id, "correct": correct, "status": mistake.status},
+    )
+    await db.commit()
+    await db.refresh(mistake)
+    return mistake
+
+
+async def mark_remediation_reviewed(db: AsyncSession, owner: str, mistake_id: str) -> PracticeMistake | None:
+    mistake = await _practice_mistake(db, owner, mistake_id)
+    if mistake is None:
+        return None
+    if mistake.status != "needs_remediation":
+        raise ValueError("当前错题不处于待补救状态")
+    mistake.remediation_reviewed_at = now_utc()
+    await _append_practice_event(
+        db,
+        owner,
+        event_type="PRACTICE_REMEDIATION_REVIEWED",
+        question_id=mistake.question_id,
+        payload={"mistakeId": mistake.id, "knowledge": mistake.knowledge or {}},
+    )
+    await db.commit()
+    await db.refresh(mistake)
+    return mistake
+
+
+async def practice_verification_candidate(db: AsyncSession, owner: str, mistake_id: str) -> dict | None:
+    mistake = await _practice_mistake(db, owner, mistake_id)
+    if mistake is None:
+        return None
+    if mistake.status != "needs_remediation" or mistake.remediation_reviewed_at is None:
+        raise ValueError("请先完成错题补救后再获取验证题")
+    knowledge = mistake.knowledge or _practice_snapshot_knowledge(mistake.question_snapshot or {})
+    taxonomy_id = str(knowledge.get("taxonomyId") or "").strip()
+    node_id = str(knowledge.get("nodeId") or "").strip()
+    if not taxonomy_id or not node_id:
+        raise ValueError("当前错题尚未配置可用于验证的主要知识点")
+    query = (
+        select(Question)
+        .join(QuestionBank, QuestionBank.id == Question.bank_id)
+        .where(
+            QuestionBank.visibility == "published",
+            Question.scope == "public",
+            Question.id != mistake.question_id,
+            Question.content_metadata["knowledge"]["taxonomyId"].astext == taxonomy_id,
+            or_(
+                Question.content_metadata["knowledge"]["primaryNodeId"].astext == node_id,
+                Question.content_metadata["knowledge"]["nodeId"].astext == node_id,
+            ),
+        )
+        .order_by(Question.created_at, Question.id)
+        .limit(1)
+    )
+    candidate = (await db.execute(query)).scalar_one_or_none()
+    if candidate is None:
+        return {"available": False, "code": "NO_VERIFICATION_QUESTION", "message": "当前暂无同一核心知识点的其他可用验证题。"}
+    return {
+        "available": True,
+        "code": "READY",
+        "message": "已找到同一核心知识点的不同验证题。",
+        "question": _question_snapshot(candidate),
+    }
+
+
+async def record_practice_verification(
+    db: AsyncSession,
+    owner: str,
+    mistake_id: str,
+    data: dict,
+) -> tuple[PracticeMistake, PracticeVerification] | None:
+    mistake = await _practice_mistake(db, owner, mistake_id)
+    if mistake is None:
+        return None
+    if mistake.status != "needs_remediation" or mistake.remediation_reviewed_at is None:
+        raise ValueError("请先完成错题补救后再提交验证")
+    candidate = await practice_verification_candidate(db, owner, mistake_id)
+    question_id = str(data.get("questionId") or "").strip()
+    if not candidate or not candidate.get("available"):
+        raise ValueError("当前没有可用验证题")
+    candidate_question = candidate["question"]
+    if question_id != str(candidate_question.get("id") or ""):
+        raise ValueError("验证题必须是同一知识点的不同已发布题")
+    selected_answer = str(data.get("selectedAnswer") or "").strip()
+    correct = selected_answer == str(candidate_question.get("correctAnswer") or "")
+    verification = PracticeVerification(
+        id=uid("pv_"),
+        mistake_id=mistake.id,
+        owner_id=owner,
+        question_id=question_id,
+        bank_id=str(candidate_question.get("bankId") or "").strip() or None,
+        selected_answer=selected_answer or None,
+        correct=correct,
+    )
+    db.add(verification)
+    now = now_utc()
+    mistake.verification_attempt_count += 1
+    mistake.verification_pass_count += int(correct)
+    mistake.verification_fail_count += int(not correct)
+    mistake.status = "verification_due" if correct else "needs_remediation"
+    mistake.next_review_at = now + PRACTICE_REVIEW_DELAY if correct else None
+    mistake.mastered_at = None
+    await _append_practice_event(
+        db,
+        owner,
+        event_type="PRACTICE_REMEDIATION_VERIFIED",
+        question_id=question_id,
+        payload={"mistakeId": mistake.id, "correct": correct, "sourceQuestionId": mistake.question_id},
+    )
+    await db.commit()
+    await db.refresh(mistake)
+    await db.refresh(verification)
+    return mistake, verification
+
+
 async def append_event(db: AsyncSession, owner: str, data: dict) -> LearningEvent:
     question_id = data.get("questionId")
     if question_id and not await _owned_question(db, owner, str(question_id)):
@@ -132,6 +573,83 @@ async def list_events(
     query = query.order_by(LearningEvent.created_at.desc()).offset((page - 1) * page_size).limit(min(page_size, 100))
     events = (await db.execute(query)).scalars().all()
     return [event_to_dict(event) for event in events]
+
+
+PRACTICE_SESSION_EVENT_TYPE = "PRACTICE_SESSION_COMPLETED"
+
+
+def _practice_session_payload(data: dict) -> dict:
+    """Accept only the small, display-ready summary used by the history drawer."""
+
+    mode = str(data.get("mode") or "").strip()
+    if mode not in {"challenge", "scholar", "revenge"}:
+        raise ValueError("练习模式无效")
+    status = str(data.get("status") or "completed").strip()
+    if status not in {"completed", "abandoned"}:
+        raise ValueError("练习记录状态无效")
+    answered = max(0, int(data.get("answered") or 0))
+    correct = max(0, min(answered, int(data.get("correct") or 0)))
+    return {
+        "mode": mode,
+        "paperId": str(data.get("paperId") or "").strip()[:120],
+        "paperName": str(data.get("paperName") or "未命名练习").strip()[:200],
+        "answered": answered,
+        "correct": correct,
+        "experience": max(0, int(data.get("experience") or 0)),
+        "durationMs": max(0, int(data.get("durationMs") or 0)),
+        "status": status,
+    }
+
+
+async def record_practice_session(db: AsyncSession, owner: str, data: dict) -> dict:
+    payload = _practice_session_payload(data)
+    event = LearningEvent(
+        id=uid("le_"),
+        owner_id=owner,
+        event_type=PRACTICE_SESSION_EVENT_TYPE,
+        payload=payload,
+    )
+    db.add(event)
+    await db.commit()
+    await db.refresh(event)
+    return {**payload, "eventId": event.id, "createdAt": _iso(event.created_at)}
+
+
+async def list_practice_sessions(db: AsyncSession, owner: str) -> list[dict]:
+    rows = (
+        await db.execute(
+            select(LearningEvent)
+            .where(
+                LearningEvent.owner_id == owner,
+                LearningEvent.event_type == PRACTICE_SESSION_EVENT_TYPE,
+            )
+            .order_by(LearningEvent.created_at.desc())
+            .limit(100)
+        )
+    ).scalars().all()
+    return [
+        {
+            **(row.payload if isinstance(row.payload, dict) else {}),
+            "eventId": row.id,
+            "createdAt": _iso(row.created_at),
+        }
+        for row in rows
+    ]
+
+
+async def clear_practice_sessions(db: AsyncSession, owner: str) -> int:
+    rows = (
+        await db.execute(
+            select(LearningEvent).where(
+                LearningEvent.owner_id == owner,
+                LearningEvent.event_type == PRACTICE_SESSION_EVENT_TYPE,
+            )
+        )
+    ).scalars().all()
+    for row in rows:
+        await db.delete(row)
+    await db.commit()
+    return len(rows)
 
 
 def workspace_to_dict(workspace: CanvasWorkspace) -> dict:

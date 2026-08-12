@@ -722,6 +722,16 @@ function injectPage(html, page, version) {
       `<script defer src="./question-catalog-adapter.js"></script><!-- kg-question-catalog:generated -->\n${page === 'question-bank.html' ? '<script defer src="./direct-question-adapter.js"></script><!-- kg-question-editor:generated -->\n' : ''}${catalogPage.marker}`,
     )
   }
+  if (page === 'practice-mode.html' && !generated.includes('kg-practice-learning:generated')) {
+    const practiceTag = '<script defer src="src/100-practice-mode.js"></script>'
+    if (!generated.includes(practiceTag)) {
+      throw new Error('new-legacy 做题脚本顺序已变化，请复核练习数据库适配器')
+    }
+    generated = generated.replace(
+      practiceTag,
+      `<script defer src="./practice-learning-adapter.js"></script><!-- kg-practice-learning:generated -->\n${practiceTag}`,
+    )
+  }
   if (page === 'paper-management.html') {
     const adminTag = findLocalScriptTag(generated, 'src/65-question-bank-admin.js')
     if (!adminTag) {

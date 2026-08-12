@@ -59,6 +59,86 @@ async def append_learning_event(body: dict, db: DB, user: CurrentUser):
     return {"event": learning_service.event_to_dict(event)}
 
 
+@router.get("/learning/practice/overview")
+async def practice_overview(db: DB, user: CurrentUser):
+    return await learning_service.practice_overview(db, user.username)
+
+
+@router.post("/learning/practice/sessions")
+async def record_practice_session(body: dict, db: DB, user: CurrentUser):
+    try:
+        session = await learning_service.record_practice_session(db, user.username, body)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return {"session": session}
+
+
+@router.get("/learning/practice/sessions")
+async def list_practice_sessions(db: DB, user: CurrentUser):
+    return {"sessions": await learning_service.list_practice_sessions(db, user.username)}
+
+
+@router.delete("/learning/practice/sessions")
+async def clear_practice_sessions(db: DB, user: CurrentUser):
+    return {"ok": True, "deleted": await learning_service.clear_practice_sessions(db, user.username)}
+
+
+@router.post("/learning/practice/mistakes")
+async def record_practice_mistake(body: dict, db: DB, user: CurrentUser):
+    try:
+        mistake = await learning_service.record_practice_mistake(db, user.username, body)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return {"mistake": learning_service._practice_mistake_to_dict(mistake)}
+
+
+@router.post("/learning/practice/mistakes/{mistake_id}/revenge-answer")
+async def record_revenge_answer(mistake_id: str, body: dict, db: DB, user: CurrentUser):
+    mistake = await learning_service.record_revenge_answer(db, user.username, mistake_id, body)
+    if mistake is None:
+        raise HTTPException(status_code=404, detail="错题不存在或无权访问")
+    return {"mistake": learning_service._practice_mistake_to_dict(mistake)}
+
+
+@router.post("/learning/practice/mistakes/{mistake_id}/remediation-reviewed")
+async def remediation_reviewed(mistake_id: str, db: DB, user: CurrentUser):
+    try:
+        mistake = await learning_service.mark_remediation_reviewed(db, user.username, mistake_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    if mistake is None:
+        raise HTTPException(status_code=404, detail="错题不存在或无权访问")
+    return {"mistake": learning_service._practice_mistake_to_dict(mistake)}
+
+
+@router.get("/learning/practice/mistakes/{mistake_id}/verification-candidate")
+async def verification_candidate(mistake_id: str, db: DB, user: CurrentUser):
+    try:
+        candidate = await learning_service.practice_verification_candidate(db, user.username, mistake_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="错题不存在或无权访问")
+    return {"candidate": candidate}
+
+
+@router.post("/learning/practice/mistakes/{mistake_id}/verification")
+async def record_verification(mistake_id: str, body: dict, db: DB, user: CurrentUser):
+    try:
+        result = await learning_service.record_practice_verification(db, user.username, mistake_id, body)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    if result is None:
+        raise HTTPException(status_code=404, detail="错题不存在或无权访问")
+    mistake, verification = result
+    return {
+        "mistake": learning_service._practice_mistake_to_dict(mistake),
+        "verification": learning_service._practice_verification_to_dict(verification),
+    }
+
+
 @router.get("/workspaces")
 async def list_workspaces(db: DB, user: CurrentUser):
     return {"workspaces": await learning_service.list_workspaces(db, user.username)}

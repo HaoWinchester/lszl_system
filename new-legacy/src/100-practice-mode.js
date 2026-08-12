@@ -5,13 +5,6 @@
  * 只读取公开发布试卷与发布快照，不读取教师草稿，不修改题库原题。
  */
 (function(global){
-  const Store=global.KGAppStorage||{};
-  const Keys=global.KGStorageKeys||{};
-  const PUBLISHED_PAPERS_KEY=Keys.PUBLISHED_PAPERS||'kg_exam_papers_published_v1';
-  const PUBLISHED_BANKS_KEY=Keys.PUBLISHED_BANKS||'kg_question_banks_published_v1';
-  const USER_KEY=Keys.AUTH_CURRENT_USER||'kg_local_current_user_v1';
-  const HISTORY_PREFIX='kg_practice_history_v1__';
-  const ACTIVE_ATTEMPT_PREFIX='kg_practice_active_attempt_v1__';
   const COUNTS=[10,20,60,180];
   const MAX_HEALTH=3;
   const SCHOLAR_MAX_SECONDS=80;
@@ -25,13 +18,11 @@
     releases:[],selectedPaperId:'',libraryFilter:'all',selectedCount:10,order:'paper',mode:'',questions:[],index:0,
     health:MAX_HEALTH,streak:0,experience:0,correct:0,answered:0,startedAt:0,endedAt:0,
     locked:false,active:false,completed:false,lastSettings:null,timerId:0,deadline:0,
-    feedbackTimer:0,popTimer:0,toastTimer:0,abandonedRecorded:false,catalogAvailable:false,retiredNavigation:null,retiredNoticeShown:false
+    feedbackTimer:0,popTimer:0,toastTimer:0,abandonedRecorded:false,catalogAvailable:false,retiredNavigation:null,retiredNoticeShown:false,
+    remediationPending:false,verification:null
   };
 
   function clone(value){try{return JSON.parse(JSON.stringify(value))}catch(error){return value}}
-  function safeJson(raw,fallback){try{const parsed=JSON.parse(raw||'');return parsed==null?fallback:parsed}catch(error){return fallback}}
-  function read(key,fallback){try{return Store.readJSON?Store.readJSON(key,fallback):safeJson(global.localStorage?.getItem(key),fallback)}catch(error){return fallback}}
-  function write(key,value){try{return Store.writeJSON?Store.writeJSON(key,value):(global.localStorage?.setItem(key,JSON.stringify(value)),true)}catch(error){return false}}
   function text(value){return String(value==null?'':value)}
   function readRetiredModeNavigation(search=global.location?.search||''){
     const params=new URLSearchParams(search);
@@ -48,25 +39,8 @@
     return [rows[index],...rows.slice(0,index),...rows.slice(index+1)];
   }
   function escapeHTML(value){return text(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]))}
-  function uid(prefix='practice'){return prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8)}
-  function currentUser(){
-    try{return text(global.KGAuthCore?.currentUsername?.()||(Store.readString?Store.readString(USER_KEY,''):global.localStorage?.getItem(USER_KEY))||'guest')}catch(error){return 'guest'}
-  }
-  function historyKey(){return HISTORY_PREFIX+'user__'+encodeURIComponent(currentUser())}
-  function activeAttemptKey(){return ACTIVE_ATTEMPT_PREFIX+'user__'+encodeURIComponent(currentUser())}
-  function clearActiveAttempt(){try{global.sessionStorage?.removeItem(activeAttemptKey())}catch(error){}}
-  function persistActiveAttempt(indexOverride=null){
-    if(!state.active)return;
-    const release=selectedRelease();
-    const attempt={savedAt:Date.now(),paperId:state.selectedPaperId,releaseId:text(release?.releaseId),paperVersion:Number(release?.version||0),selectedCount:state.selectedCount,order:state.order,mode:state.mode,questions:state.questions,index:indexOverride==null?state.index:indexOverride,health:state.health,streak:state.streak,experience:state.experience,correct:state.correct,answered:state.answered,startedAt:state.startedAt,deadline:state.deadline,lastSettings:state.lastSettings};
-    try{global.sessionStorage?.setItem(activeAttemptKey(),JSON.stringify(attempt))}catch(error){}
-  }
-  function loadActiveAttempt(){
-    try{
-      const attempt=safeJson(global.sessionStorage?.getItem(activeAttemptKey()),null);
-      if(!attempt||Date.now()-Number(attempt.savedAt||0)>12*60*60*1000||!Array.isArray(attempt.questions)||!attempt.questions.length){clearActiveAttempt();return null}
-      return attempt;
-    }catch(error){return null}
+  function hasAuthenticatedUser(){
+    try{return !!global.KGAuthCore?.currentUser?.()}catch(error){return false}
   }
   function formatDuration(ms){
     const total=Math.max(0,Math.floor(Number(ms||0)/1000)),minutes=Math.floor(total/60),seconds=total%60;
@@ -86,10 +60,13 @@
       correct:!!option?.correct||text(option?.id)===correct
     })).filter(option=>option.text);
     const resolvedCorrect=correct||text(options.find(option=>option.correct)?.id);
+    const knowledge=q?.metadata?.knowledge||q?.knowledge||{};
+    const path=Array.isArray(knowledge.pathSnapshot)?knowledge.pathSnapshot:[];
     return {
       id:text(q.id||ref?.questionId||('q-'+index)),bankId:text(ref?.bankId||q.sourceBankId),
       title:text(q.title||'未命名题目'),stem:stemText(q),options,correctAnswer:resolvedCorrect,
-      type:text(q.type||'single_choice'),raw:q
+      type:text(q.type||'single_choice'),raw:q,
+      knowledge:{taxonomyId:text(knowledge.taxonomyId),nodeId:text(knowledge.primaryNodeId||knowledge.nodeId),title:text(path[path.length-1]||knowledge.title||q.topic),path}
     };
   }
   function resolveRelease(release){
@@ -135,7 +112,7 @@
     let rows=[];
     if(typeof repo?.listCatalogEntries==='function')rows=repo.listCatalogEntries({mode:'practice_mode'});
     else{
-      const raw=read(PUBLISHED_PAPERS_KEY,[]);
+      const raw=[];
       rows=(Array.isArray(raw)?raw:[]).filter(row=>publishedStatus(row)&&practiceModeEnabled(row)).map(releaseCatalogFallback).filter(row=>row.questionCount);
     }
     const unique=new Map();
@@ -147,6 +124,13 @@
     return state.releases;
   }
   function selectedRelease(){return state.releases.find(row=>row.id===state.selectedPaperId)||state.releases[0]||null}
+  function practiceApi(){return global.KGPracticeLearningApi||null}
+  function getMistakeStats(){try{return practiceApi()?.stats?.()||{active:0,pending:0,needsRemediation:0,mastered:0}}catch(error){return {active:0,pending:0,needsRemediation:0,mastered:0}}}
+  function activeMistakeRecords(){try{return practiceApi()?.active?.()||[]}catch(error){return []}}
+  function questionFromMistake(record,index){
+    const question=normalizeQuestion(record?.questionSnapshot||{}, {bankId:record?.bankId,questionId:record?.questionId}, index);
+    question.mistakeId=text(record?.id);question.mistakeStatus=text(record?.status);question.sourceReleaseId=text(record?.releaseId);return question;
+  }
   function showToast(message){
     if(!dom.toast)return;
     dom.toast.textContent=text(message);dom.toast.hidden=false;
@@ -231,6 +215,110 @@
     dom.feedback.textContent=message;dom.feedback.className='practice-feedback '+type;dom.feedback.hidden=false;
     global.clearTimeout(state.feedbackTimer);state.feedbackTimer=global.setTimeout(()=>{dom.feedback.hidden=true},1400);
   }
+  function clearVerification(){
+    state.verification=null;
+    if(dom.verificationBanner)dom.verificationBanner.hidden=true;
+    delete document.body.dataset.practicePhase;
+  }
+  function hideRemediation(){
+    state.remediationPending=false;
+    if(dom.remediationPanel)dom.remediationPanel.hidden=true;
+    if(dom.remediationExplanation){dom.remediationExplanation.hidden=true;dom.remediationExplanation.textContent=''}
+  }
+  function remediationExplanation(question){return text(question?.raw?.analysis||question?.raw?.explanation||'')}
+  function showRemediation(question,{verificationFailed=false,recoveredCorrect=false}={}){
+    if(!dom.remediationPanel||!question)return;
+    const title=text(question?.knowledge?.title||question?.knowledge?.nodeId||'核心知识点');
+    dom.remediationKnowledge.textContent=title;
+    dom.remediationMessage.textContent=verificationFailed
+      ? '验证题未通过，说明这个知识点还不稳定。请再次查看题目解析后继续补救。'
+      : recoveredCorrect
+        ? '原错题已经答对。请再做一道同知识点的不同题，确认不是只记住了答案。'
+        : '这道题在复仇模式中再次答错。先看解析并重新建立判断规则，再做同知识点验证题。';
+    const explanation=remediationExplanation(question);
+    if(dom.remediationReviewBtn)dom.remediationReviewBtn.hidden=!explanation;
+    if(dom.remediationExplanation)dom.remediationExplanation.textContent=explanation;
+    if(dom.remediationContinueBtn)dom.remediationContinueBtn.textContent='开始验证';
+    state.remediationPending=true;dom.remediationPanel.hidden=false;
+  }
+  function toggleRemediationExplanation(){
+    if(!dom.remediationExplanation)return;
+    const opening=dom.remediationExplanation.hidden;dom.remediationExplanation.hidden=!opening;
+    if(dom.remediationReviewBtn)dom.remediationReviewBtn.textContent=opening?'收起题目解析':'查看题目解析';
+  }
+  function renderVerificationBanner(){
+    if(!dom.verificationBanner)return;
+    const verification=state.verification;dom.verificationBanner.hidden=!verification?.active;
+    if(!verification?.active)return;
+    if(dom.verificationKnowledge)dom.verificationKnowledge.textContent=text(verification.sourceQuestion?.knowledge?.title||'核心知识点');
+    if(dom.verificationMessage)dom.verificationMessage.textContent='这不是原错题。请用新的题干重新判断，验证刚才补救的知识是否真正掌握。';
+  }
+  async function startRemediationVerification(){
+    if(!state.active||state.mode!=='revenge'||!state.remediationPending)return false;
+    const sourceQuestion=state.questions[state.index],api=practiceApi();
+    if(!sourceQuestion?.mistakeId||!api)return false;
+    try{
+      await api.remediationReviewed(sourceQuestion.mistakeId);
+      const candidate=await api.verificationCandidate(sourceQuestion.mistakeId);
+      if(!candidate?.available){showToast(candidate?.message||'当前没有可用的同知识点验证题。');return false}
+      const question=normalizeQuestion(candidate.question,{bankId:candidate.question.bankId,questionId:candidate.question.id},0);
+      if(!question.stem||question.options.length<2||!question.correctAnswer){showToast('验证题内容不完整，请稍后再试。');return false}
+      state.verification={active:true,sourceQuestion,question};hideRemediation();document.body.dataset.practicePhase='verification';renderQuestion();return true;
+    }catch(error){showToast(text(error?.message||'补救验证暂时不可用，请稍后重试。'));return false}
+  }
+  function finishRemediationVerification(correct){
+    const verification=state.verification;if(!verification?.active)return;
+    const sourceQuestion=verification.sourceQuestion;clearVerification();
+    if(correct){advanceAfterAnswer();return}
+    renderQuestion();state.locked=true;lockOptions();showRemediation(sourceQuestion,{verificationFailed:true});
+  }
+  async function recordMistake(question,{selectedAnswer='',reason='wrong'}={}){
+    if(!question||state.mode==='revenge')return null;
+    const release=selectedRelease(),api=practiceApi();if(!api||!hasAuthenticatedUser())return null;
+    try{return await api.upsertWrong({questionId:question.id,bankId:question.bankId,paperId:text(release?.id),releaseId:text(release?.releaseId),paperVersion:Number(release?.version||0),paperName:text(release?.name),sourceMode:state.mode,languageMode:'zh',selectedAnswer:selectedAnswer||reason})}catch(error){showToast('错题未能保存，请检查网络后重试。');return null}
+  }
+  function practiceSessionPayload(status){
+    const release=selectedRelease(),settings=state.lastSettings||{},paperId=text(settings.paperId||release?.id);
+    return {
+      mode:state.mode||'challenge',paperId,paperName:text(release?.name||(state.mode==='revenge'?'复仇错题':'练习试卷')),
+      answered:state.answered,correct:state.correct,experience:state.experience,durationMs:elapsed(),status
+    };
+  }
+  function recordCompletedSession(status){
+    const api=practiceApi();if(!api||!hasAuthenticatedUser())return;
+    api.recordSession(practiceSessionPayload(status)).then(()=>{
+      if(!dom.historyDrawer?.hidden)renderHistory();
+    }).catch(()=>{});
+  }
+  function historyModeLabel(mode){return ({challenge:'挑战模式',scholar:'学霸模式',revenge:'复仇模式'})[text(mode)]||'练习'}
+  function formatHistoryTime(value){
+    const date=new Date(value);if(Number.isNaN(date.getTime()))return '刚刚';
+    return date.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
+  }
+  async function renderHistory(){
+    const api=practiceApi();if(!api||!hasAuthenticatedUser()){
+      if(dom.historyList)dom.historyList.innerHTML='';if(dom.historyEmpty)dom.historyEmpty.hidden=false;
+      if(dom.historySummary)dom.historySummary.textContent='登录后可查看你的学习记录';if(dom.clearHistoryBtn)dom.clearHistoryBtn.disabled=true;
+      if(dom.historyCount)dom.historyCount.hidden=true;return;
+    }
+    try{
+      const records=await api.listSessions();
+      if(dom.historyList)dom.historyList.innerHTML=records.map(record=>{
+        const answered=Math.max(0,Number(record?.answered)||0),correct=Math.max(0,Number(record?.correct)||0),rate=answered?Math.round(correct/answered*100):0;
+        return '<article class="practice-history-row"><div><strong>'+escapeHTML(text(record?.paperName||'未命名练习'))+'</strong><span>'+escapeHTML(historyModeLabel(record?.mode))+' · '+escapeHTML(formatHistoryTime(record?.createdAt))+'</span></div><span>正确率 '+rate+'%</span><em>'+escapeHTML(text(record?.status)==='abandoned'?'已退出':'已完成')+'</em></article>';
+      }).join('');
+      if(dom.historyEmpty)dom.historyEmpty.hidden=records.length>0;
+      if(dom.historySummary)dom.historySummary.textContent=records.length?'最近 '+records.length+' 条记录':'暂无练习记录';
+      if(dom.clearHistoryBtn)dom.clearHistoryBtn.disabled=!records.length;
+      if(dom.historyCount){dom.historyCount.textContent=String(records.length);dom.historyCount.hidden=!records.length}
+    }catch(error){
+      if(dom.historyList)dom.historyList.innerHTML='';if(dom.historyEmpty){dom.historyEmpty.hidden=false;dom.historyEmpty.textContent='学习记录暂时无法读取，请稍后重试。'}
+    }
+  }
+  async function clearHistory(){
+    const api=practiceApi();if(!api||!hasAuthenticatedUser())return;
+    try{await api.clearSessions();await renderHistory();showToast('学习记录已清空。')}catch(error){showToast('学习记录未能清空，请稍后重试。')}
+  }
   function showRetiredModeNotice(){
     if(!state.retiredNavigation||state.retiredNoticeShown||!dom.retiredNotice)return;
     dom.retiredNotice.textContent=state.retiredNavigation.notice;dom.retiredNotice.hidden=false;state.retiredNoticeShown=true;
@@ -240,41 +328,47 @@
     dom.streakPop.textContent=message;dom.streakPop.hidden=false;global.clearTimeout(state.popTimer);state.popTimer=0;
   }
   function renderQuestion(){
-    const question=state.questions[state.index];
+    const question=state.verification?.active?state.verification.question:state.questions[state.index];
     if(!question){finishPractice();return}
-    state.locked=false;dom.feedback.hidden=true;dom.questionCard.classList.remove('is-timeout');
+    state.locked=false;dom.feedback.hidden=true;hideRemediation();dom.questionCard.classList.remove('is-timeout');
     dom.questionStem.textContent=question.stem;
     dom.options.innerHTML=question.options.map(option=>'<button type="button" class="practice-option" data-option-id="'+escapeHTML(option.id)+'"><span class="practice-option-key">'+escapeHTML(option.id)+'</span><span>'+escapeHTML(option.text)+'</span></button>').join('');
     dom.options.querySelectorAll('[data-option-id]').forEach(button=>button.addEventListener('click',()=>answer(button.dataset.optionId,button)));
-    renderProgress();renderHealth();
+    renderProgress();renderHealth();renderVerificationBanner();
     if(state.mode==='scholar')renderTimer();
   }
   function lockOptions(){dom.options.querySelectorAll('button').forEach(button=>button.disabled=true)}
   function animateOption(button,correct){if(!button)return;button.classList.remove('is-correct','is-wrong');void button.offsetWidth;button.classList.add(correct?'is-correct':'is-wrong')}
-  function currentRecord(status){
-    const release=selectedRelease();return {
-      id:uid('practice-record'),status,mode:state.mode,paperId:text(release?.id),releaseId:text(release?.releaseId),paperVersion:Number(release?.version||0),paperName:text(release?.name),
-      requestedCount:Number(state.selectedCount),questionCount:state.questions.length,answeredCount:state.answered,correctCount:state.correct,accuracy:accuracy(),experience:state.experience,
-      startedAt:state.startedAt,endedAt:state.endedAt||Date.now(),durationMs:Math.max(0,(state.endedAt||Date.now())-state.startedAt),order:state.order,userId:currentUser()
-    };
-  }
-  function saveRecord(status){
-    if(!state.startedAt)return null;
-    const record=currentRecord(status),history=read(historyKey(),[]),rows=Array.isArray(history)?history:[];
-    write(historyKey(),[record,...rows].slice(0,100));return record;
-  }
   function advanceAfterAnswer(){
     state.index+=1;
     if(state.index>=state.questions.length||state.health<=0){finishPractice();return}
-    persistActiveAttempt();
     if(state.mode==='challenge'&&state.index%CHECKPOINT_INTERVAL===0){showCheckpoint();return}
     renderQuestion();
   }
   function answer(optionId,button){
     if(!state.active||state.locked)return false;
-    const question=state.questions[state.index];if(!question)return false;
+    const question=state.verification?.active?state.verification.question:state.questions[state.index];if(!question)return false;
     state.locked=true;lockOptions();
     const correct=text(optionId)===text(question.correctAnswer);animateOption(button,correct);state.answered+=1;
+    if(state.verification?.active){
+      const verification=state.verification,api=practiceApi();
+      if(correct){state.correct+=1;state.experience+=5}else{const correctButton=dom.options.querySelector('[data-option-id="'+CSS.escape(text(question.correctAnswer))+'"]');if(correctButton)correctButton.classList.add('is-correct')}
+      Promise.resolve(api?.verify?.(verification.sourceQuestion.mistakeId,{questionId:question.id,selectedAnswer:optionId})).then(result=>{
+        verification.sourceQuestion.mistakeStatus=text(result?.mistake?.status||verification.sourceQuestion.mistakeStatus);
+        showFeedback(correct?'验证通过 · 明日再验证':'验证未通过 · 继续补救',correct?'success':'danger');
+        state.feedbackTimer=global.setTimeout(()=>finishRemediationVerification(correct),correct?900:620);
+      }).catch(error=>{showFeedback('验证未保存，请稍后重试','danger');state.locked=false;dom.options.querySelectorAll('button').forEach(item=>item.disabled=false)});
+      renderHealth();return correct;
+    }
+    if(state.mode==='revenge'){
+      const api=practiceApi();
+      Promise.resolve(api?.answerRevenge?.(question.mistakeId,{correct,selectedAnswer:optionId})).then(updated=>{
+        question.mistakeStatus=text(updated?.status||question.mistakeStatus);
+        if(correct){state.correct+=1;state.streak+=1;state.experience+=10+streakBonus(state.streak);if(question.mistakeStatus==='needs_remediation'){showFeedback('原错题已答对 · 还需新题验证','success');state.feedbackTimer=global.setTimeout(()=>showRemediation(question,{recoveredCorrect:true}),FEEDBACK_DELAY)}else{showFeedback(question.mistakeStatus==='mastered'?'彻底掌握 · 复仇成功':'复仇成功 · 将安排再次验证','success');state.feedbackTimer=global.setTimeout(advanceAfterAnswer,FEEDBACK_DELAY)}}
+        else{state.streak=0;hideStreakPop();const correctButton=dom.options.querySelector('[data-option-id="'+CSS.escape(text(question.correctAnswer))+'"]');if(correctButton)correctButton.classList.add('is-correct');showFeedback('再次答错 · 需要知识补救','danger');showRemediation(question)}
+      }).catch(error=>{showFeedback('错题状态未保存，请稍后重试。','danger');state.locked=false;dom.options.querySelectorAll('button').forEach(item=>item.disabled=false)});
+      renderHealth();return correct;
+    }
     if(correct){
       state.correct+=1;state.streak+=1;const bonus=streakBonus(state.streak);state.experience+=10+bonus;
       let healed=false;
@@ -285,43 +379,52 @@
       if(state.streak>=3)showStreakPop('连胜 ×'+state.streak+(bonus?' · +'+bonus+' 经验':'')+(healed?' · +1 ♥':''));
       showFeedback('正确'+(state.mode==='scholar'?(gainedSeconds?' · +'+gainedSeconds+' 秒':' · 时间已满'):'')+' · +'+(10+bonus)+' 经验','success');
     }else{
-      state.streak=0;hideStreakPop();state.health=Math.max(0,state.health-1);
+      recordMistake(question,{selectedAnswer:optionId});state.streak=0;hideStreakPop();state.health=Math.max(0,state.health-1);
       if(state.mode==='scholar'){
         const after=Math.max(0,remainingSeconds()-20);setScholarSeconds(after>0?after:(state.health>0?40:0));
         showFeedback('错误 · -20 秒 · -1 ♥','danger');
       }else showFeedback('失误 · -1 ♥','danger');
     }
     renderHealth();
-    persistActiveAttempt(state.index+1);
     state.feedbackTimer=global.setTimeout(advanceAfterAnswer,FEEDBACK_DELAY);return correct;
   }
   function handleTimeout(){
     if(!state.active||state.mode!=='scholar'||state.locked||remainingSeconds()>0)return;
-    state.locked=true;lockOptions();state.answered+=1;state.streak=0;hideStreakPop();state.health=Math.max(0,state.health-1);dom.questionCard.classList.add('is-timeout');
+    state.locked=true;lockOptions();state.answered+=1;recordMistake(state.questions[state.index],{reason:'timeout'});state.streak=0;hideStreakPop();state.health=Math.max(0,state.health-1);dom.questionCard.classList.add('is-timeout');
     showFeedback('超时 · -1 ♥','danger');renderHealth();
     if(state.health>0)setScholarSeconds(40);
-    persistActiveAttempt(state.index+1);
     state.feedbackTimer=global.setTimeout(advanceAfterAnswer,FEEDBACK_DELAY);
   }
   function timerTick(){renderTimer();handleTimeout()}
   function startTimer(){
     if(state.mode!=='scholar')return;setScholarSeconds(SCHOLAR_MAX_SECONDS);state.timerId=global.setInterval(timerTick,120);
   }
-  function resumeTimer(){if(state.mode==='scholar'&&!state.timerId)state.timerId=global.setInterval(timerTick,120)}
   function showCheckpoint(){
     state.locked=true;setView('checkpoint');dom.checkpointStreak.textContent=String(state.streak);dom.checkpointExperience.textContent=String(state.experience);dom.checkpointDuration.textContent=formatDuration(elapsed());
   }
-  function continueCheckpoint(){if(!state.active)return;setView('game');renderQuestion();persistActiveAttempt()}
+  function continueCheckpoint(){if(!state.active)return;setView('game');renderQuestion()}
   function finishPractice(){
     if(!state.active)return;
-    state.active=false;state.completed=true;state.endedAt=Date.now();clearTimers();hideStreakPop();setDangerVignette(false);renderProgress();
-    saveRecord('completed');clearActiveAttempt();dom.resultAccuracy.textContent=accuracy()+'%';dom.resultDuration.textContent=formatDuration(elapsed());dom.resultExperience.textContent=String(state.experience);setView('result');renderHistory();
+    state.active=false;state.completed=true;state.endedAt=Date.now();clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);renderProgress();
+    recordCompletedSession('completed');dom.resultAccuracy.textContent=accuracy()+'%';dom.resultDuration.textContent=formatDuration(elapsed());dom.resultExperience.textContent=String(state.experience);setView('result');
   }
   function abandonPractice(){
     if(!state.active)return;
-    state.active=false;state.endedAt=Date.now();clearTimers();hideStreakPop();setDangerVignette(false);if(!state.abandonedRecorded){saveRecord('abandoned');state.abandonedRecorded=true}clearActiveAttempt();closeExitConfirm();showLobby();
+    state.active=false;state.endedAt=Date.now();clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);state.abandonedRecorded=true;recordCompletedSession('abandoned');closeExitConfirm();showLobby();
+  }
+  function startRevenge(){
+    const records=activeMistakeRecords();
+    if(!records.length){showToast('暂无待复仇错题，先去挑战或学霸模式练习吧。');return false}
+    const questions=records.map(questionFromMistake).filter(question=>question.stem&&question.options.length>=2&&question.correctAnswer);
+    if(!questions.length){showToast('错题内容暂不可用，请稍后刷新重试。');return false}
+    const count=Math.min(Math.max(1,Number(state.selectedCount)||10),questions.length);
+    clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);
+    state.mode='revenge';state.order='weakness_first';state.questions=questions.slice(0,count);state.index=0;state.health=MAX_HEALTH;state.streak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
+    state.lastSettings={paperId:'',count,order:'weakness_first',mode:'revenge'};document.body.dataset.practiceMode='revenge';dom.timer.hidden=true;dom.timeRow.hidden=true;dom.health.hidden=true;
+    setView('game');renderQuestion();return true;
   }
   function startPractice(mode){
+    if(mode==='revenge')return startRevenge();
     const catalog=selectedRelease(),count=Number(state.selectedCount);
     if(!catalog){syncLobby();return false}
     const access=paperAccess(catalog);
@@ -338,49 +441,25 @@
       questions=(resolved.items||[]).map((item,index)=>normalizeQuestion(item.question,item.ref,index)).filter(question=>question.stem&&question.options.length>=2&&question.correctAnswer);
     }else questions=(catalog.questions||[]).slice();
     if(questions.length<count){showToast(`当前试卷可用题目不足 ${count} 道。`);syncLobby();return false}
-    clearTimers();hideStreakPop();setDangerVignette(false);
-    state.mode=mode==='scholar'?'scholar':'challenge';state.order=dom.orderInputs.find(input=>input.checked)?.value||'paper';
+    clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);
+    state.mode=mode==='scholar'?'scholar':'challenge';document.body.dataset.practiceMode=state.mode;state.order=dom.orderInputs.find(input=>input.checked)?.value||'paper';
     if(state.order==='random')questions=shuffle(questions);
     if(state.retiredNavigation)questions=prioritizeRetiredQuestion(questions,state.retiredNavigation.questionId);
     state.questions=questions.slice(0,count);
     state.index=0;state.health=MAX_HEALTH;state.streak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
     state.lastSettings={paperId:catalog.id,count,order:state.order,mode:state.mode};
     dom.timer.hidden=state.mode!=='scholar';dom.timeRow.hidden=state.mode!=='scholar';
-    setView('game');renderQuestion();if(state.mode==='scholar')startTimer();persistActiveAttempt();return true;
+    setView('game');renderQuestion();if(state.mode==='scholar')startTimer();return true;
   }
   function startAgain(){
     const settings=state.lastSettings;if(!settings){showLobby();return}
     state.selectedPaperId=settings.paperId;state.selectedCount=settings.count;state.order=settings.order;
+    if(settings.mode==='revenge'){startPractice('revenge');return}
     if(dom.paperSelect)dom.paperSelect.value=settings.paperId;dom.countInputs.forEach(input=>input.checked=Number(input.value)===settings.count);dom.orderInputs.forEach(input=>input.checked=input.value===settings.order);
     startPractice(settings.mode);
   }
   function openExitConfirm(){if(!state.active)return;dom.exitConfirm.hidden=false;dom.exitConfirm.setAttribute('aria-hidden','false')}
   function closeExitConfirm(){dom.exitConfirm.hidden=true;dom.exitConfirm.setAttribute('aria-hidden','true')}
-  function restoreActiveAttempt(){
-    const attempt=loadActiveAttempt();if(!attempt)return false;
-    const release=state.releases.find(row=>row.id===text(attempt.paperId));
-    if(!release||text(release.releaseId)!==text(attempt.releaseId)||Number(release.version)!==Number(attempt.paperVersion)){clearActiveAttempt();return false}
-    state.selectedPaperId=text(attempt.paperId);state.selectedCount=Number(attempt.selectedCount)||attempt.questions.length;state.order=text(attempt.order)||'paper';state.mode=attempt.mode==='scholar'?'scholar':'challenge';state.questions=clone(attempt.questions);
-    state.index=Math.max(0,Number(attempt.index)||0);state.health=Math.max(0,Number(attempt.health));state.streak=Math.max(0,Number(attempt.streak)||0);state.experience=Math.max(0,Number(attempt.experience)||0);state.correct=Math.max(0,Number(attempt.correct)||0);state.answered=Math.max(0,Number(attempt.answered)||0);state.startedAt=Number(attempt.startedAt)||Date.now();state.deadline=Number(attempt.deadline)||0;state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;state.lastSettings=attempt.lastSettings||{paperId:state.selectedPaperId,count:state.selectedCount,order:state.order,mode:state.mode};
-    dom.timer.hidden=state.mode!=='scholar';dom.timeRow.hidden=state.mode!=='scholar';
-    if(state.index>=state.questions.length||state.health<=0){finishPractice();return true}
-    if(state.mode==='challenge'&&state.index>0&&state.index%CHECKPOINT_INTERVAL===0)showCheckpoint();else{setView('game');renderQuestion()}
-    if(state.mode==='scholar'){if(!state.deadline)state.deadline=Date.now()+SCHOLAR_MAX_SECONDS*1000;resumeTimer()}
-    return true;
-  }
-  function completedHistory(){
-    const history=read(historyKey(),[]);
-    return (Array.isArray(history)?history:[]).filter(item=>item?.status==='completed').slice(0,30);
-  }
-  function renderHistory(){
-    const completed=completedHistory();
-    if(dom.historyCount){dom.historyCount.textContent=String(completed.length);dom.historyCount.hidden=!completed.length}
-    if(dom.historySummary)dom.historySummary.textContent=completed.length?`最近 ${completed.length} 条完成记录`:'暂无练习记录';
-    if(dom.clearHistoryBtn)dom.clearHistoryBtn.disabled=!completed.length;
-    if(dom.historyEmpty)dom.historyEmpty.hidden=!!completed.length;
-    if(dom.historyList)dom.historyList.innerHTML=completed.map(item=>'<article class="practice-history-row"><strong>'+escapeHTML(item.paperName||'未命名试卷')+'</strong><em>'+(item.mode==='scholar'?'学霸':'挑战')+'</em><span>正确率 '+Number(item.accuracy||0)+'%</span><span>'+formatDuration(item.durationMs)+'</span><span>'+Number(item.experience||0)+' 经验</span></article>').join('');
-  }
-  function clearHistory(){if(global.confirm&&!global.confirm('清空当前账号的练习记录？'))return;write(historyKey(),[]);renderHistory()}
   function setDrawerOpen(drawer,open,focusTarget=null){
     if(!drawer)return;
     drawer.hidden=!open;drawer.setAttribute('aria-hidden',String(!open));
@@ -389,7 +468,7 @@
   }
   function openPaperDrawer(){renderPaperLibrary();setDrawerOpen(dom.paperDrawer,true,dom.paperDrawerClose)}
   function closePaperDrawer(){setDrawerOpen(dom.paperDrawer,false);dom.libraryMoreBtn?.focus?.()}
-  function openHistoryDrawer(){renderHistory();setDrawerOpen(dom.historyDrawer,true,dom.historyCloseBtn)}
+  function openHistoryDrawer(){setDrawerOpen(dom.historyDrawer,true,dom.historyCloseBtn);renderHistory()}
   function closeHistoryDrawer(){setDrawerOpen(dom.historyDrawer,false);dom.historyOpenBtn?.focus?.()}
   function closeAllDrawers(){
     if(dom.paperDrawer&&!dom.paperDrawer.hidden)setDrawerOpen(dom.paperDrawer,false);
@@ -404,9 +483,10 @@
     if(!currentEnabled)state.selectedCount=firstEnabled||10;
     dom.countInputs.forEach(input=>input.checked=Number(input.value)===state.selectedCount);
     dom.startButtons.forEach(button=>{
-      button.disabled=!release||!firstEnabled;
+      const revenge=button.dataset.practiceStart==='revenge',revengeAvailable=getMistakeStats().active>0;
+      button.disabled=revenge?!revengeAvailable:(!release||!firstEnabled);
       button.classList.toggle('is-upgrade',!!release&&!access.allowed);
-      button.textContent=!release?(button.dataset.defaultLabel||button.textContent):(!access.allowed?'开通会员':button.dataset.defaultLabel||button.textContent);
+      button.textContent=revenge?(revengeAvailable?(button.dataset.defaultLabel||'开始复仇'):'暂无错题'):( !release?(button.dataset.defaultLabel||button.textContent):(!access.allowed?'开通会员':button.dataset.defaultLabel||button.textContent));
     });
     dom.setupCard?.classList.toggle('is-vip-locked',!!release&&!access.allowed);
   }
@@ -450,7 +530,7 @@
       if(dom.empty){dom.empty.hidden=false;const title=dom.empty.querySelector('strong'),detail=dom.empty.querySelector('p');if(title)title.textContent='题目目录暂不可用';if(detail)detail.textContent='请稍后刷新页面重试。'}
       if(dom.setupCard)dom.setupCard.hidden=true;if(dom.modeGrid)dom.modeGrid.hidden=true;
       const library=dom.paperLibrary?.closest('.practice-library');if(library)library.hidden=true;
-      renderHistory();return;
+      return;
     }
     const releases=loadReleases();
     const retiredSelection=state.retiredNavigation&&releases.find(row=>
@@ -460,37 +540,43 @@
     if(retiredSelection)state.selectedPaperId=retiredSelection.id;
     else if(!releases.some(row=>row.id===state.selectedPaperId))state.selectedPaperId=releases.find(row=>paperAccess(row).allowed)?.id||releases[0]?.id||'';
     if(dom.paperSelect){dom.paperSelect.innerHTML=releases.map(row=>'<option value="'+escapeHTML(row.id)+'">'+escapeHTML(row.name)+'</option>').join('');dom.paperSelect.value=state.selectedPaperId}
-    dom.empty.hidden=!!releases.length;dom.setupCard.hidden=!releases.length;dom.modeGrid.hidden=!releases.length;
+    const revengeAvailable=getMistakeStats().active>0;
+    dom.empty.hidden=!!releases.length||revengeAvailable;dom.setupCard.hidden=!releases.length;dom.modeGrid.hidden=!releases.length&&!revengeAvailable;
     const library=dom.paperLibrary?.closest('.practice-library');if(library)library.hidden=!releases.length;
-    renderPaperLibrary();syncCountOptions();syncPaperMeta();renderHistory();
+    renderPaperLibrary();syncCountOptions();syncPaperMeta();syncRevengeStats();
   }
-  function showLobby(){state.completed=false;hideStreakPop();setDangerVignette(0);setView('lobby');syncLobby()}
+  function syncRevengeStats(){
+    const stats=getMistakeStats();
+    if(dom.revengePendingCount)dom.revengePendingCount.textContent=String(stats.pending||0);
+    if(dom.revengeRemediationCount)dom.revengeRemediationCount.textContent=String(stats.needsRemediation||0);
+    if(dom.revengeMasteredCount)dom.revengeMasteredCount.textContent=String(stats.mastered||0);
+  }
+  function showLobby(){state.completed=false;hideStreakPop();hideRemediation();clearVerification();setDangerVignette(0);delete document.body.dataset.practiceMode;setView('lobby');syncLobby()}
   function bind(){
     dom.paperSelect?.addEventListener('change',()=>selectPaper(dom.paperSelect.value));
     dom.filterButtons.forEach(button=>button.addEventListener('click',()=>{state.libraryFilter=button.dataset.paperFilter||'all';renderPaperLibrary()}));
     dom.libraryMoreBtn?.addEventListener('click',openPaperDrawer);dom.paperDrawerClose?.addEventListener('click',closePaperDrawer);
-    dom.historyOpenBtn?.addEventListener('click',openHistoryDrawer);dom.historyCloseBtn?.addEventListener('click',closeHistoryDrawer);
+    dom.historyOpenBtn?.addEventListener('click',openHistoryDrawer);dom.historyCloseBtn?.addEventListener('click',closeHistoryDrawer);dom.clearHistoryBtn?.addEventListener('click',clearHistory);
     dom.paperDrawer?.addEventListener('click',event=>{if(event.target===dom.paperDrawer)closePaperDrawer()});
     dom.historyDrawer?.addEventListener('click',event=>{if(event.target===dom.historyDrawer)closeHistoryDrawer()});
     dom.countInputs.forEach(input=>input.addEventListener('change',()=>{if(input.checked)state.selectedCount=Number(input.value)}));
     dom.startButtons.forEach(button=>button.addEventListener('click',()=>startPractice(button.dataset.practiceStart)));
     dom.exitBtn.addEventListener('click',openExitConfirm);dom.exitCancel.addEventListener('click',closeExitConfirm);dom.exitConfirmBtn.addEventListener('click',abandonPractice);
     dom.exitConfirm.addEventListener('click',event=>{if(event.target===dom.exitConfirm)closeExitConfirm()});
-    dom.checkpointContinue.addEventListener('click',continueCheckpoint);dom.againBtn.addEventListener('click',startAgain);dom.lobbyBtn.addEventListener('click',showLobby);dom.clearHistoryBtn.addEventListener('click',clearHistory);
+    dom.checkpointContinue.addEventListener('click',continueCheckpoint);dom.againBtn.addEventListener('click',startAgain);dom.lobbyBtn.addEventListener('click',showLobby);dom.remediationContinueBtn?.addEventListener('click',startRemediationVerification);dom.remediationReviewBtn?.addEventListener('click',toggleRemediationExplanation);
     document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(!dom.exitConfirm.hidden)closeExitConfirm();else if(dom.paperDrawer&&!dom.paperDrawer.hidden)closePaperDrawer();else if(dom.historyDrawer&&!dom.historyDrawer.hidden)closeHistoryDrawer()});
-    global.addEventListener('storage',event=>{if(event.key===PUBLISHED_PAPERS_KEY&&!state.active)syncLobby();if(event.key===USER_KEY&&!state.active)renderHistory()});
     global.addEventListener('kg-auth-session-change',()=>{if(!state.active)syncLobby()});
     global.addEventListener('kg-subscription-change',()=>{if(!state.active)syncLobby()});
     global.addEventListener('kg-subscription-plan-change',()=>{if(!state.active)syncLobby()});
     global.addEventListener('kg:published-papers-changed',()=>{if(!state.active)syncLobby()});
-    global.addEventListener('pagehide',()=>{const answering=document.body.dataset.practiceView==='game'&&state.locked;persistActiveAttempt(answering?state.index+1:state.index)});
+    global.addEventListener('kg-practice-mistakes-change',()=>{if(!state.active)syncLobby()});
   }
   function cacheDom(){
     Object.assign(dom,{
       lobby:$('practiceLobby'),game:$('practiceGame'),checkpoint:$('practiceCheckpoint'),result:$('practiceResult'),paperSelect:$('practicePaperSelect'),paperMeta:$('practicePaperMeta'),retiredNotice:$('practiceRetiredModeNotice'),selectedPaperName:$('practiceSelectedPaperName'),paperLibrary:$('practicePaperLibrary'),paperDrawerLibrary:$('practicePaperDrawerLibrary'),filterButtons:[...document.querySelectorAll('[data-paper-filter]')],librarySummary:$('practiceLibrarySummary'),paperDrawerSummary:$('practicePaperDrawerSummary'),libraryMoreBtn:$('practiceLibraryMoreBtn'),paperDrawer:$('practicePaperDrawer'),paperDrawerClose:$('practicePaperDrawerClose'),toast:$('practiceToast'),
-      setupCard:document.querySelector('.practice-setup-card'),modeGrid:document.querySelector('.practice-mode-grid'),empty:$('practiceEmpty'),countInputs:[...document.querySelectorAll('[name="practiceCount"]')],orderInputs:[...document.querySelectorAll('[name="practiceOrder"]')],startButtons:[...document.querySelectorAll('[data-practice-start]')],
-      progressShell:$('practiceProgressShell'),progressBar:$('practiceProgressBar'),health:$('practiceHealth'),timer:$('practiceTimer'),timeRow:$('practiceTimeRow'),timeRail:$('practiceTimeRail'),timeBar:$('practiceTimeBar'),dangerVignette:$('practiceDangerVignette'),streakPop:$('practiceStreakPop'),feedback:$('practiceFeedback'),questionCard:$('practiceQuestionCard'),questionStem:$('practiceQuestionStem'),options:$('practiceOptions'),
-      exitBtn:$('practiceExitBtn'),exitConfirm:$('practiceExitConfirm'),exitCancel:$('practiceExitCancel'),exitConfirmBtn:$('practiceExitConfirmBtn'),checkpointStreak:$('practiceCheckpointStreak'),checkpointExperience:$('practiceCheckpointExperience'),checkpointDuration:$('practiceCheckpointDuration'),checkpointContinue:$('practiceCheckpointContinue'),resultAccuracy:$('practiceResultAccuracy'),resultDuration:$('practiceResultDuration'),resultExperience:$('practiceResultExperience'),againBtn:$('practiceAgainBtn'),lobbyBtn:$('practiceLobbyBtn'),historyOpenBtn:$('practiceHistoryOpenBtn'),historyDrawer:$('practiceHistoryDrawer'),historyCloseBtn:$('practiceHistoryCloseBtn'),historyCount:$('practiceHistoryCount'),historySummary:$('practiceHistorySummary'),historyList:$('practiceHistoryList'),historyEmpty:$('practiceHistoryEmpty'),clearHistoryBtn:$('practiceClearHistoryBtn')
+      setupCard:document.querySelector('.practice-setup-card'),modeGrid:document.querySelector('.practice-mode-grid'),empty:$('practiceEmpty'),countInputs:[...document.querySelectorAll('[name="practiceCount"]')],orderInputs:[...document.querySelectorAll('[name="practiceOrder"]')],startButtons:[...document.querySelectorAll('[data-practice-start]')],revengePendingCount:$('practiceRevengePendingCount'),revengeRemediationCount:$('practiceRevengeRemediationCount'),revengeMasteredCount:$('practiceRevengeMasteredCount'),
+      progressShell:$('practiceProgressShell'),progressBar:$('practiceProgressBar'),health:$('practiceHealth'),timer:$('practiceTimer'),timeRow:$('practiceTimeRow'),timeRail:$('practiceTimeRail'),timeBar:$('practiceTimeBar'),dangerVignette:$('practiceDangerVignette'),streakPop:$('practiceStreakPop'),feedback:$('practiceFeedback'),verificationBanner:$('practiceVerificationBanner'),verificationKnowledge:$('practiceVerificationKnowledge'),verificationMessage:$('practiceVerificationMessage'),questionCard:$('practiceQuestionCard'),questionStem:$('practiceQuestionStem'),options:$('practiceOptions'),remediationPanel:$('practiceRemediationPanel'),remediationKnowledge:$('practiceRemediationKnowledge'),remediationMessage:$('practiceRemediationMessage'),remediationReviewBtn:$('practiceRemediationReviewBtn'),remediationContinueBtn:$('practiceRemediationContinueBtn'),remediationExplanation:$('practiceRemediationExplanation'),
+      exitBtn:$('practiceExitBtn'),exitConfirm:$('practiceExitConfirm'),exitCancel:$('practiceExitCancel'),exitConfirmBtn:$('practiceExitConfirmBtn'),checkpointStreak:$('practiceCheckpointStreak'),checkpointExperience:$('practiceCheckpointExperience'),checkpointDuration:$('practiceCheckpointDuration'),checkpointContinue:$('practiceCheckpointContinue'),resultAccuracy:$('practiceResultAccuracy'),resultDuration:$('practiceResultDuration'),resultExperience:$('practiceResultExperience'),againBtn:$('practiceAgainBtn'),lobbyBtn:$('practiceLobbyBtn'),historyOpenBtn:$('practiceHistoryOpenBtn'),historyCount:$('practiceHistoryCount'),historyDrawer:$('practiceHistoryDrawer'),historyCloseBtn:$('practiceHistoryCloseBtn'),historySummary:$('practiceHistorySummary'),historyList:$('practiceHistoryList'),historyEmpty:$('practiceHistoryEmpty'),clearHistoryBtn:$('practiceClearHistoryBtn')
     });
   }
   function snapshot(){return {mode:state.mode,index:state.index,health:state.health,streak:state.streak,experience:state.experience,correct:state.correct,answered:state.answered,remainingSeconds:state.mode==='scholar'?remainingSeconds():null,active:state.active,view:document.body.dataset.practiceView||'',questionCount:state.questions.length}}
@@ -499,8 +585,8 @@
     state.retiredNavigation=readRetiredModeNavigation();
     try{await global.KGQuestionCatalogAdapter.ready;state.catalogAvailable=true}catch(error){state.catalogAvailable=false;console.error(error)}
     syncLobby();showRetiredModeNotice();
-    if(state.retiredNavigation){clearActiveAttempt();setView('lobby');return}
-    if(state.catalogAvailable&&restoreActiveAttempt())return;setView('lobby');
+    if(state.retiredNavigation){setView('lobby');return}
+    setView('lobby');
   }
 
   const api=Object.freeze({init,startPractice,answerById:id=>answer(id,dom.options.querySelector('[data-option-id="'+CSS.escape(text(id))+'"]')),finishPractice,showLobby,loadReleases,snapshot,constants:Object.freeze({COUNTS:[...COUNTS],MAX_HEALTH,SCHOLAR_MAX_SECONDS,CHECKPOINT_INTERVAL})});
