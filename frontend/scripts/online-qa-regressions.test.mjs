@@ -143,6 +143,24 @@ test('graph size and edit forms participate in undo history', () => {
   assert.match(graph, /deleteLinkFromDetailBtn[\s\S]{0,300}pushGraphUndoSnapshot\('删除关系'/)
 })
 
+test('graph knowledge-point creation uses the current simple and professional editor without bypassing server persistence', () => {
+  const page = source('new-legacy/index.html')
+  const graph = source('new-legacy/src/10-graph-editor.js')
+  const css = source('new-legacy/styles/main.css')
+  const persistence = source('new-legacy/src/00-config-state.js')
+
+  assert.match(page, /class="modal node-editor-modal"/)
+  assert.match(page, /id="nodeModalModeBtn"/)
+  assert.match(page, /class="form-grid node-simple-form"/)
+  assert.match(page, /id="nodeAdvancedForm" hidden/)
+  assert.match(graph, /function nodeModalDefaultFullMode\(\)/)
+  assert.match(graph, /function setNodeModalFullMode\(/)
+  assert.match(graph, /\$\('nodeModalModeBtn'\)\.onclick=\(\)=>setNodeModalFullMode\(!nodeModalFullMode,\{announce:true\}\)/)
+  assert.match(graph, /saveNodeBtn[\s\S]{0,1600}model\.updateContent\(n,content\)[\s\S]{0,900}render\(\{mode:'geometry',persist:true\}\)/)
+  assert.match(css, /#nodeModal \.node-simple-form textarea\{min-height:190px\}/)
+  assert.match(persistence, /fileStore\.saveFile\(current\.id,snapshot,saveOptions\)/)
+})
+
 test('content center remains an independent direct page', () => {
   const page = source('new-legacy/content-center.html')
   assert.doesNotMatch(page, /location\.replace\([^)]*admin-subjects\.html/)

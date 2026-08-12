@@ -27,6 +27,6 @@
   },
   "sessionOnlyPrefixes": ["kg_teacher_preview_", "kg_learning_route_context_"],
   "excludedHomeFeatures": [
-    "learning-entry", "new-user-onboarding", "simple-professional-node-editor", "help-entry-refresh"
+    "learning-entry", "new-user-onboarding", "help-entry-refresh"
   ]
 }

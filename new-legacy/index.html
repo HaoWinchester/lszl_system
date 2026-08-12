@@ -136,17 +136,19 @@
 </div>
 </div>
 <div class="modal-backdrop" id="nodeModal">
-<div class="modal">
-<h2 id="nodeModalTitle">编辑知识点</h2>
-<div class="form-grid">
-<label>知识点名称</label><input id="nTitle" maxlength="40" placeholder="例如：关键路径法"/>
-<label>分类/章节</label><input id="nCategory" maxlength="50" placeholder="例如：进度管理"/>
-<label>节点颜色</label><input id="nColor" type="color"/>
-<label>卡牌尺寸</label><select id="nSize"><option value="">默认</option><option value="small">小</option><option value="big">大</option></select>
-<label>难度</label><select id="nLevel"><option>基础</option><option>中等</option><option>重点</option><option>难点</option><option>易错点</option></select>
-<label>关键词</label><input id="nKeywords" maxlength="80" placeholder="用逗号分隔，例如：浮动时间, 路径, 延期"/>
-<label>知识点说明</label><textarea id="nSummary" placeholder="给学员看的简明解释"></textarea>
-<label>学习提示</label><textarea id="nNotes" placeholder="可填写记忆方法、考试提示、例题方向等"></textarea>
+<div class="modal node-editor-modal">
+<div class="node-modal-head"><h2 id="nodeModalTitle">编辑知识点</h2><button class="node-modal-mode-btn" id="nodeModalModeBtn" type="button" aria-pressed="false" aria-label="切换完整模式" title="切换完整模式"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M4 12h4M12 12h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="8" cy="17" r="2"></circle><circle cx="10" cy="12" r="2"></circle></svg></button></div>
+<div class="form-grid node-simple-form">
+<label for="nTitle">名称</label><input id="nTitle" maxlength="80" placeholder="例如：关键路径法"/>
+<label for="nSummary">内容</label><textarea id="nSummary" rows="8" placeholder="输入这个知识点的解释、要点或学习内容"></textarea>
+</div>
+<div class="form-grid node-advanced-form" id="nodeAdvancedForm" hidden>
+<label for="nCategory">分类 / 章节</label><input id="nCategory" maxlength="50" placeholder="例如：进度管理"/>
+<label for="nLevel">学习标记</label><select id="nLevel"><option>基础</option><option>中等</option><option>重点</option><option>难点</option><option>易错点</option></select>
+<label for="nKeywords">关键词</label><input id="nKeywords" maxlength="120" placeholder="用逗号分隔，例如：浮动时间, 路径, 延期"/>
+<label for="nNotes">学习提示</label><textarea id="nNotes" rows="3" placeholder="可填写记忆方法、考试提示、例题方向等"></textarea>
+<label for="nColor">节点颜色</label><input id="nColor" type="color"/>
+<label for="nSize">卡牌尺寸</label><select id="nSize"><option value="">默认</option><option value="small">小</option><option value="big">大</option></select>
 </div>
 <div class="modal-actions">
 <button class="danger left" id="deleteNodeBtn">删除知识点</button>

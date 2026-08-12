@@ -3331,3 +3331,20 @@ g.is-batch-selected .edge-visible{
   opacity:1;
   filter:drop-shadow(0 0 6px rgba(37,99,235,.45)) drop-shadow(0 3px 3px rgba(37,99,235,.18));
 }
+
+/* Current knowledge-point editor: start with the two fields needed for a quick capture. */
+#nodeModal .modal{width:min(520px,100%)}
+#nodeModal .node-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+#nodeModal .node-modal-head h2{margin:0}
+#nodeModal .node-modal-mode-btn{width:34px;height:34px;display:grid;place-items:center;padding:0;border:1px solid #dbe3ef;border-radius:10px;background:#fff;color:#64748b;box-shadow:none;cursor:pointer}
+#nodeModal .node-modal-mode-btn:hover{background:#f8fafc;color:#334155;border-color:#cbd5e1}
+#nodeModal .node-modal-mode-btn[aria-pressed="true"]{background:#eef2ff;color:#4f46e5;border-color:#c7d2fe}
+#nodeModal .node-modal-mode-btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#nodeModal .node-simple-form{grid-template-columns:1fr;gap:7px;align-items:stretch}
+#nodeModal .node-simple-form label{text-align:left;margin-top:2px;font-weight:750;color:#334155}
+#nodeModal .node-simple-form textarea{min-height:190px}
+#nodeModal .node-advanced-form[hidden]{display:none!important}
+#nodeModal .node-advanced-form{margin-top:14px;padding-top:14px;border-top:1px solid #e2e8f0}
+#nodeModal .node-advanced-form textarea{min-height:76px}
+#nodeModal .node-advanced-form input[type="color"]{justify-self:start}
+#nodeModal.node-editor-full .node-simple-form textarea{min-height:120px}

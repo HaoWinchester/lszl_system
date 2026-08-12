@@ -99,7 +99,7 @@ test('P4.5 persistence manifest assigns every state domain', () => {
     ['contentPrep', 'learning', 'questionCatalog', 'training']
   )
   assert.deepEqual(p45.excludedHomeFeatures, [
-    'learning-entry', 'new-user-onboarding', 'simple-professional-node-editor', 'help-entry-refresh'
+    'learning-entry', 'new-user-onboarding', 'help-entry-refresh'
   ])
 
   const sourceDirectory = findSourceDirectory()
@@ -172,6 +172,19 @@ test('P4.5 question catalog matrix keeps tags and subject facets in concrete dat
   }
 })
 
+test('P4.5 migration matrix records the simple and professional node editor as a graph-file migration', () => {
+  const rows = parseMarkdownTable(readFileSync(migrationMatrixPath, 'utf8'))
+  const row = rows.find((candidate) => candidate['功能组'] === '简易/专业知识点编辑切换')
+
+  assert.ok(row, 'expected the knowledge-point editor migration row')
+  assert.equal(row['排除？'], '否')
+  assert.match(row['来源模块'], /src\/10-graph-editor\.js/)
+  for (const owner of ['graph_files', 'file_contents']) {
+    assert.match(row['PostgreSQL 归属'], new RegExp(`\\b${owner}\\b`), owner)
+  }
+  assert.match(row.API, /\/api\/v1\/files/)
+})
+
 test('P4.5 migration matrix rejects blank and placeholder persistence assignments for every migrated row', () => {
   const rows = parseMarkdownTable(readFileSync(migrationMatrixPath, 'utf8'))
 
@@ -199,7 +212,6 @@ test('P4.5 migration matrix records homepage exclusions without a source-copy ta
   const excludedFeatures = [
     '四个学习入口',
     '新手引导',
-    '简易/专业知识点编辑切换',
     '帮助入口改版',
   ]
 

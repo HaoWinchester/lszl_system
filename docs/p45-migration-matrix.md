@@ -26,12 +26,12 @@
 | Prep Studio | `question-studio/*`、`src/teacher/shared/external-ai-question-authoring-contract.js`、`src/teacher/question-bank/question-family-compatibility-core.js` | Prep Studio / `content-prep` | `question_upload_batches`、`question_audit_logs`、`prep_workspaces`（计划） | `/api/v1/content-prep` | 否 | 批次上传、审计、锁和题库读取 API 回归；正式草稿不使用 IndexedDB |
 | 四个学习入口 | 无（不得从 updata-legacy/ 复制） | 首页 | — | — | excluded | 不建立 source-copy 任务；首页回归确认入口未出现 |
 | 新手引导 | 无（不得从 updata-legacy/ 复制） | 首页 | — | — | excluded | 不建立 source-copy 任务；首页回归确认引导未出现 |
-| 简易/专业知识点编辑切换 | 无（不得从 updata-legacy/ 复制） | 首页图谱编辑器 | — | — | excluded | 不建立 source-copy 任务；首页回归确认切换未出现 |
+| 简易/专业知识点编辑切换 | `index.html`、`src/10-graph-editor.js`、`styles/main.css` | 首页图谱编辑器 | `graph_files`、`file_contents` | `/api/v1/files` | 否 | 默认简易编辑仅保存名称/内容；切换专业模式后保存分类、学习标记、关键词、提示和外观；刷新后从图谱文件 API 恢复 |
 | 帮助入口改版 | 无（不得从 updata-legacy/ 复制） | 首页 | — | — | excluded | 不建立 source-copy 任务；首页回归确认改版入口未出现 |
 
 ## 排除项护栏
 
-四个首页能力（四个学习入口、新手引导、简易/专业知识点编辑切换、帮助入口改版）仅作为 `excluded` 行存在：没有源码复制任务、没有数据库归属、没有 API 路由。任何后续批次都不得把这些能力从 `updata-legacy/` 带入目标页面。
+三个首页能力（四个学习入口、新手引导、帮助入口改版）仅作为 `excluded` 行存在：没有源码复制任务、没有数据库归属、没有 API 路由。简易/专业知识点编辑切换已由后续需求纳入图谱画布迁移，持久化真值为 `graph_files` / `file_contents`。
 
 ## 首批验收
 
