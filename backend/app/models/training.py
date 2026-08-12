@@ -42,6 +42,9 @@ class RecallProgress(Base):
     edges: Mapped[list] = mapped_column(JSONB, default=list)
     custom_nodes: Mapped[dict] = mapped_column(JSONB, default=dict)
     active_keywords: Mapped[list] = mapped_column(JSONB, default=list)
+    choice_offsets: Mapped[dict] = mapped_column(JSONB, default=dict)
+    metrics: Mapped[dict] = mapped_column(JSONB, default=dict)
+    transform: Mapped[dict] = mapped_column(JSONB, default=dict)
     saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 

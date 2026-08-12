@@ -732,6 +732,15 @@ function injectPage(html, page, version) {
       `<script defer src="./practice-learning-adapter.js"></script><!-- kg-practice-learning:generated -->\n${practiceTag}`,
     )
   }
+  if (page === 'knowledge-recall.html' && !generated.includes('kg-recall-progress:generated')) {
+    const recallTag = '<script defer src="src/86-knowledge-recall.js"></script>'
+    if (generated.includes(recallTag)) {
+      generated = generated.replace(
+        recallTag,
+        `<script defer src="./recall-progress-adapter.js"></script><!-- kg-recall-progress:generated -->\n${recallTag}`,
+      )
+    }
+  }
   if (page === 'paper-management.html') {
     const adminTag = findLocalScriptTag(generated, 'src/65-question-bank-admin.js')
     if (!adminTag) {

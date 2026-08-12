@@ -1,0 +1,14 @@
+/* V9.0-P4.5.17 · Deep Recall large-graph lightweight rendering */
+.knowledge-recall-page .kr-edge{fill:none;stroke:var(--kr-line);stroke-width:2.75;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;opacity:.78;filter:none!important;transition:none!important;animation:none!important}
+.knowledge-recall-page .kr-edge-glow{display:none!important}
+.knowledge-recall-page .kr-node button,.knowledge-recall-page .kr-node button:hover,.knowledge-recall-page .kr-node button:active,.knowledge-recall-page .kr-node button.is-pressed{background:var(--kr-control-bg)!important;border:1px solid var(--kr-border)!important;box-shadow:none!important;filter:none!important;text-shadow:none!important;transition:border-color .10s ease,transform .08s ease!important;cursor:grab;touch-action:none}
+.knowledge-recall-page .kr-node.is-dragging button{cursor:grabbing;transform:scale(.99)!important}
+.knowledge-recall-page .kr-node button::before{display:none!important}
+.knowledge-recall-page .kr-node button::after{background:var(--kr-node-base-b)!important;box-shadow:none!important;filter:none!important;transition:transform .08s ease!important}
+.knowledge-recall-page .kr-node.depth-0 button::after{background:var(--kr-node-root-b)!important}
+.knowledge-recall-page .kr-node.depth-2 button::after,.knowledge-recall-page .kr-node.depth-5 button::after{background:var(--kr-node-alt-b)!important}
+.knowledge-recall-page .kr-node.depth-3 button::after,.knowledge-recall-page .kr-node.depth-6 button::after{background:var(--kr-node-cool-b)!important}
+.knowledge-recall-page .kr-node button span{filter:none!important;text-shadow:none!important;transition:transform .08s ease!important}
+.knowledge-recall-page .kr-node button:hover::after,.knowledge-recall-page .kr-node button:active::after,.knowledge-recall-page .kr-node button.is-pressed::after{box-shadow:none!important;filter:none!important}
+.knowledge-recall-page .kr-node.is-active button,.knowledge-recall-page .kr-node.is-active button:hover,.knowledge-recall-page .kr-node.is-active button:focus-visible,.knowledge-recall-page .kr-node.is-active button:active,.knowledge-recall-page .kr-node.is-active button.is-pressed{box-shadow:none!important;outline:3px solid var(--kr-selected-ring);outline-offset:2px}
+.knowledge-recall-page .kr-node-label{box-shadow:none!important;text-shadow:none!important}
