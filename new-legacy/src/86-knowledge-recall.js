@@ -59,7 +59,7 @@
     document.body.dataset.krReadonlyGuardBound='1';
     document.addEventListener('click',event=>{
       if(!isRecallReadonly())return;
-      const target=event.target.closest&&event.target.closest('.kr-keyword,.kr-node button,.kr-guide button,#krResetBtn');
+      const target=event.target.closest&&event.target.closest('.kr-keyword,.kr-option,.kr-node button,.kr-guide button,#krResetBtn');
       if(!target)return;
       event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();notifyRecallReadonly();
     },true);
@@ -406,9 +406,25 @@
       if(p.clue&&rootConfig(p.clue))return `<span class="kr-keyword${keywordClass(p.clue)} ${isKeywordActive(p.clue)?'active':''}" data-keyword-id="${escapeHTML(p.clue)}" data-keyword-index="${i}">${text}</span>`;
       return wrapKnownKeywords(text);
     }).join('');
-    const options=(view?.options||[]).length?(view.options||[]).map(o=>`<div class="kr-option"><strong>${escapeHTML(o.id)}</strong><span>${wrapKnownKeywords(escapeHTML(o.display?.zh||''))}${englishLine(o.display)}</span></div>`).join(''):(question.options||[]).map(o=>`<div class="kr-option"><strong>${escapeHTML(o.id)}</strong>${wrapKnownKeywords(escapeHTML(o.text||''))}</div>`).join('');
+    const optionMarkup=(option,content)=>`<button type="button" class="kr-option" data-option-id="${escapeHTML(option.id)}" aria-label="选择 ${escapeHTML(option.id)}，立即显示正误反馈"><strong>${escapeHTML(option.id)}</strong>${content}</button>`;
+    const options=(view?.options||[]).length?(view.options||[]).map(o=>optionMarkup(o,`<span>${wrapKnownKeywords(escapeHTML(o.display?.zh||''))}${englishLine(o.display)}</span>`)).join(''):(question.options||[]).map(o=>optionMarkup(o,wrapKnownKeywords(escapeHTML(o.text||'')))).join('');
     const stemEn=view?.stem||{hasEnglish:false};
-    questionCard.innerHTML=`<div class="kr-stem">${stem}${englishLine(stemEn)}</div><div class="kr-options">${options}</div>`;
+    questionCard.innerHTML=`<div class="kr-stem">${stem}${englishLine(stemEn)}</div><div class="kr-options">${options}</div><p class="kr-option-feedback lp-visually-hidden" data-kr-option-feedback aria-live="polite"></p>`;
+  }
+  function recallOptionIsCorrect(optionId){
+    const id=String(optionId||'');
+    const option=(question.options||[]).find(item=>String(item?.id||'')===id);
+    return !!option?.correct||id===String(question.correctAnswer||'');
+  }
+  function flashRecallOptionFeedback(option){
+    const correct=recallOptionIsCorrect(option?.dataset?.optionId);
+    const feedbackClass=correct?'is-answer-correct':'is-answer-incorrect';
+    questionCard.querySelectorAll('.kr-option.is-answer-correct,.kr-option.is-answer-incorrect').forEach(item=>item.classList.remove('is-answer-correct','is-answer-incorrect'));
+    option.classList.add(feedbackClass);
+    const feedback=questionCard.querySelector('[data-kr-option-feedback]');
+    if(feedback)feedback.textContent=correct?'回答正确。':'回答错误。';
+    clearTimeout(flashRecallOptionFeedback.timer);
+    flashRecallOptionFeedback.timer=setTimeout(()=>{option.classList.remove('is-answer-correct','is-answer-incorrect')},720);
   }
   function buildKeywordMatchers(map){
     const unique=new Set(),matchers=[];
@@ -444,9 +460,15 @@
     if(questionCard.dataset.interactionsBound)return;
     questionCard.dataset.interactionsBound='1';
     questionCard.addEventListener('click',event=>{
+      const option=event.target.closest('.kr-option[data-option-id]');
+      if(option&&questionCard.contains(option)){
+        if(isRecallReadonly())return;
+        event.preventDefault();event.stopPropagation();flashRecallOptionFeedback(option);return;
+      }
       const keyword=event.target.closest('.kr-keyword');
-      if(!keyword||!questionCard.contains(keyword))return;
-      event.preventDefault();event.stopPropagation();activateKeyword(keyword);
+      if(keyword&&questionCard.contains(keyword)){
+        event.preventDefault();event.stopPropagation();activateKeyword(keyword);return;
+      }
     });
   }
   function activateKeyword(el){

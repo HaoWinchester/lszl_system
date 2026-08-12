@@ -55,3 +55,22 @@ test('deep recall carries the update release core-keyword hierarchy', () => {
   assert.match(page, /knowledge-recall-p4526\.css/)
   assert.match(styles, /\.kr-keyword\.is-core/)
 })
+
+test('deep recall options give immediate correct and incorrect answer feedback', () => {
+  const recall = source('new-legacy/src/86-knowledge-recall.js')
+  const styles = source('new-legacy/styles/knowledge-recall.css')
+
+  assert.match(recall, /function recallOptionIsCorrect\(/)
+  assert.match(recall, /data-option-id=/)
+  assert.match(recall, /function flashRecallOptionFeedback\(/)
+  assert.match(recall, /is-answer-correct/)
+  assert.match(recall, /is-answer-incorrect/)
+  assert.match(recall, /setTimeout\(\(\)=>\{[^}]*is-answer-correct[^}]*is-answer-incorrect/)
+  const clickHandler = recall.slice(recall.indexOf("questionCard.addEventListener('click'"), recall.indexOf('function activateKeyword('))
+  assert.ok(clickHandler.indexOf("const option=event.target.closest('.kr-option[data-option-id]')") < clickHandler.indexOf("const keyword=event.target.closest('.kr-keyword')"), 'answer feedback must take priority over nested keyword clicks')
+  assert.match(clickHandler, /const option=event\.target\.closest\('\.kr-option\[data-option-id\]'\);[\s\S]{0,240}isRecallReadonly\(\)[\s\S]{0,240}flashRecallOptionFeedback\(option\)/)
+  assert.match(styles, /\.kr-option\.is-answer-correct/)
+  assert.match(styles, /\.kr-option\.is-answer-incorrect/)
+  assert.match(styles, /@keyframes krOptionCorrectFlash/)
+  assert.match(styles, /@keyframes krOptionIncorrectFlash/)
+})
