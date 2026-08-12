@@ -192,8 +192,14 @@ window.addEventListener('resize',()=>{if(guidedTourState)placeGuidedTour()});
 window.addEventListener('scroll',()=>{if(guidedTourState)placeGuidedTour()},true);
 document.getElementById('guidedTourStartBtn')?.addEventListener('click',()=>startGuidedTour(true));
 let guidedTourAutostartTimer=0;
+function hasAuthenticatedGuidedTourSession(){
+  return window.__KG_DIRECT_BOOTSTRAP__?.authenticated===true;
+}
 function scheduleAutoGuidedTour(){
   clearTimeout(guidedTourAutostartTimer);
+  // Guests may browse membership plans.  The guided layer must never block
+  // that public path; it is only an automatic first-run aid after login.
+  if(!hasAuthenticatedGuidedTourSession())return;
   if(guidedTourState)return;
   if(document.querySelector('.kg-learning-entry-dialog.show')){
     guidedTourAutostartTimer=window.setTimeout(scheduleAutoGuidedTour,160);

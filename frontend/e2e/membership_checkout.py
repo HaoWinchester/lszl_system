@@ -35,6 +35,7 @@ with sync_playwright() as playwright:
         guest = guest_context.new_page()
         guest.goto(BASE_URL + "/index.html?mode=free", wait_until="networkidle")
         dismiss_learning_entry_chooser(guest)
+        assert not guest.locator("#guidedTourLayer.show").count(), "guest membership entry must not be blocked by onboarding"
         guest.locator("#upgradeMemberBtn").click()
         guest.locator("#userSubscriptionDetailModal.show .plans-grid").wait_for(state="visible")
         assert "待配置" not in guest.locator("#userSubscriptionDetailBody").inner_text()

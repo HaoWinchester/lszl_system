@@ -229,6 +229,8 @@ test('home restores the update learning-entry dialog, automatic guided steps, an
   assert.match(directEntry, /waitForInitialLearningEntry/)
   assert.match(tour, /waitForInitialLearningEntry/)
   assert.match(tour, /result\?\.shown/)
+  assert.match(tour, /function hasAuthenticatedGuidedTourSession\(\)/)
+  assert.match(tour, /window\.__KG_DIRECT_BOOTSTRAP__\?\.authenticated===true/)
   assert.doesNotMatch(tour, /不再在页面首次加载时自动启动全屏引导/)
   assert.match(modeStyles, /#graphSearchPanel/)
   assert.match(modes, /closeGraphSearchPanel/)
