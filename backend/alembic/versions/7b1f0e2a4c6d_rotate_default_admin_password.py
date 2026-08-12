@@ -1,7 +1,7 @@
 """rotate the deployed default administrator password
 
 Revision ID: 7b1f0e2a4c6d
-Revises: 6f0f9e1b2d3c
+Revises: f1c9d4e7a261
 Create Date: 2026-08-12 00:00:00
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 revision: str = "7b1f0e2a4c6d"
-down_revision: Union[str, None] = "6f0f9e1b2d3c"
+down_revision: Union[str, None] = "f1c9d4e7a261"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
