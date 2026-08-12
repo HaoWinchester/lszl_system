@@ -70,6 +70,9 @@ INTEGRATED_PORT="$(free_port)"
 cd "$REPO_DIR/backend"
 NEW_LEGACY_RELEASE_ROOT="$VALIDATION_ROOT/releases" \
 QUESTION_CATALOG_CUTOVER_ENABLED=true \
+  .venv/bin/python -m alembic upgrade head
+NEW_LEGACY_RELEASE_ROOT="$VALIDATION_ROOT/releases" \
+QUESTION_CATALOG_CUTOVER_ENABLED=true \
   .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port "$INTEGRATED_PORT" \
   >"$INTEGRATED_LOG" 2>&1 &
 INTEGRATED_PID=$!

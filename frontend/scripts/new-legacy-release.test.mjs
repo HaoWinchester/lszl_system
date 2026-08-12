@@ -276,6 +276,11 @@ test('rollback selects the previous successful release', () => {
 test('release validation runs smoke and visual regression against the candidate', () => {
   const validator = readFileSync(resolve(scriptsDir, 'validate-new-legacy-release.sh'), 'utf8')
 
+  const migration = validator.indexOf('.venv/bin/python -m alembic upgrade head')
+  const server = validator.indexOf('.venv/bin/python -m uvicorn app.main:app')
+  assert.notEqual(migration, -1, 'candidate validation must migrate its isolated database before starting FastAPI')
+  assert.ok(migration < server, 'candidate migration must run before FastAPI starts')
+
   // full_role_regression.py 绑定 v8.6 全字段 UI，v9 重构（简化模式 + 试卷独立页）后待重写，暂移出验收。
   assert.ok(validator.includes('frontend/e2e/new_legacy_smoke.py'))
   assert.ok(validator.includes('content-prep-studio/tests/test_server_catalog.js'))
