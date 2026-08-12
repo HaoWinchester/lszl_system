@@ -285,8 +285,13 @@ function defaultElbowWaypoints(a,b){
   const my=(a.y+b.y)/2;return[{x:a.x,y:my},{x:b.x,y:my}];
 }
 function defaultCurveControls(a,b){
-  const c=Math.max(80,Math.abs(b.x-a.x)*.45);
-  return[{x:a.x+c,y:a.y},{x:b.x-c,y:b.y}];
+  const dx=b.x-a.x,dy=b.y-a.y;
+  if(Math.abs(dx)>=Math.abs(dy)){
+    const offset=Math.sign(dx||1)*Math.max(48,Math.min(220,Math.abs(dx)*.38));
+    return[{x:a.x+offset,y:a.y},{x:b.x-offset,y:b.y}];
+  }
+  const offset=Math.sign(dy||1)*Math.max(48,Math.min(220,Math.abs(dy)*.38));
+  return[{x:a.x,y:a.y+offset},{x:b.x,y:b.y-offset}];
 }
 function cubicEdgePoint(a,c1,c2,b,t){
   const mt=1-t,mt2=mt*mt,t2=t*t;
@@ -328,7 +333,7 @@ function formatSvgNumber(value){
 }
 function relationExists(a,b){return linksForNodeId(a).some(l=>(l.from===a&&l.to===b)||(l.from===b&&l.to===a))}
 function isImportant(n){return String(n&&n.level||'').trim()==='重点'}
-const LARGE_GRAPH_NODE_THRESHOLD=90,LARGE_GRAPH_LINK_THRESHOLD=120,LARGE_GRAPH_OVERVIEW_LINK_LIMIT=140,LARGE_GRAPH_SELECTED_LINK_LIMIT=120,LARGE_GRAPH_SELECTED_LABEL_LIMIT=50;
+const LARGE_GRAPH_NODE_THRESHOLD=50,LARGE_GRAPH_LINK_THRESHOLD=120,LARGE_GRAPH_OVERVIEW_LINK_LIMIT=140,LARGE_GRAPH_SELECTED_LINK_LIMIT=120,LARGE_GRAPH_SELECTED_LABEL_LIMIT=50;
 const GRAPH_VIEWPORT_MIN_SCALE=.01,GRAPH_VIEWPORT_MAX_SCALE=4,GRAPH_FIT_ALL_DESKTOP_MARGIN=240,GRAPH_FIT_ALL_COARSE_MARGIN=130;
 const GRAPH_BUTTON_ZOOM_LEVELS=[.01,.02,.03,.05,.10,.15,.20,.33,.50,.75,1,1.25,1.50,2,2.50,3,4];
 const GRAPH_WHEEL_ZOOM_LEVELS=[.01,.02,.03,.04,.05,.07,.09,.11,.13,.17,.21,.26,.33,.41,.51,.64,.80,1,1.20,1.44,1.73,2.07,2.49,2.99,3.58,4];
@@ -843,7 +848,7 @@ function setFlowModeEnabled(enabled,options={}){
 function toggleFlowMode(){return setFlowModeEnabled(!flowModeEnabled)}
 window.KGGraphFlowMode=Object.freeze({isEnabled:()=>!!flowModeEnabled,set:setFlowModeEnabled,toggle:toggleFlowMode});
 let hoverLargeGraphNodeId=null,hoverLargeGraphTimer=null;
-const LARGE_GRAPH_HOVER_DETAIL_DELAY=650,LARGE_GRAPH_HOVER_RELATION_DELAY=120;
+const NODE_HOVER_DETAIL_DELAY=260,LARGE_GRAPH_HOVER_RELATION_DELAY=120;
 function largeGraphLocalIds(){
   const ids=new Set();
   const lockedAnchor=currentRelatedScopeAnchorId();
@@ -908,7 +913,7 @@ function updateGraphModeIndicator(){
   el.hidden=false;el.classList.toggle('related',mode==='related');el.classList.toggle('flow',mode==='flow');
   el.querySelector('[data-graph-mode-title]').textContent=mode==='related'?'只看相关':'心流状态';
   el.querySelector('[data-graph-mode-copy]').textContent=mode==='related'?'当前仅显示中心节点及其直接相关内容':'当前突出关联内容，弱化无关信息';
-  el.querySelector('[data-graph-mode-exit]').textContent=mode==='related'?'退出只看相关':'退出心流';
+  el.querySelector('[data-graph-mode-exit]').textContent='退出';
 }
 function syncGraphModeClasses(){
   normalizeRelatedScopeAnchor();
@@ -2725,7 +2730,7 @@ cardsLayer.addEventListener('pointerdown',e=>{
 });
 cardsLayer.addEventListener('pointerdown',e=>{
   if(isCanvasPanMode()||e.button===2)return;
-  if(e.target.closest&&e.target.closest('.node-size-btn,.node-inline-text-editor,[data-node-resize-handle]')){e.stopPropagation();return}
+  if(e.target.closest&&e.target.closest('.node-size-btn,[data-node-inline-editor="true"],[data-node-resize-handle]')){e.stopPropagation();return}
   if(nodeInlineTextEditorController&&nodeInlineTextEditorController.isEditing())return;
   const card=cardFromEvent(e);if(!card||e.button!==0)return;
   const id=card.dataset.nodeId,n=nodeById(id);if(!n)return;
@@ -2740,7 +2745,7 @@ cardsLayer.addEventListener('pointerdown',e=>{
   hideNodeGrowthHandles();
   e.stopPropagation();e.preventDefault();
   const toggleMulti=e.ctrlKey||e.metaKey;
-  const editOnRelease=state.selectedNodeId===id&&!state.selectedLinkId&&!state.linkSourceId&&(!selectedNodeIds||selectedNodeIds.size===0)&&!toggleMulti&&!e.shiftKey;
+  const editOnRelease=false;
   const groupIds=toggleMulti?[id]:(selectedNodeIds.has(id)&&selectedNodeIds.size>1?[...selectedNodeIds]:[id]);
   const lockedGroup=groupIds.filter(gid=>window.KGGraphModel?.interactionOf?.(nodeById(gid)).locked);if(lockedGroup.length){showStatus(`选择中有 ${lockedGroup.length} 个锁定节点，已取消整体移动。`);return}
   if(groupIds.length===1&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey)clearMultiSelection();
@@ -2817,9 +2822,10 @@ function finishCardPointer(e,cancelled=false){
 cardsLayer.addEventListener('pointerup',e=>finishCardPointer(e));
 cardsLayer.addEventListener('pointercancel',e=>finishCardPointer(e,true));
 cardsLayer.addEventListener('dblclick',e=>{
+  if(isCanvasPanMode()||e.target.closest?.('button,a,input,textarea,select,[contenteditable="true"],[data-node-resize-handle]'))return;
   const card=cardFromEvent(e);if(!card)return;
-  // P4.2.6: editing is entered by clicking an already-selected node, not by double-clicking.
   e.preventDefault();e.stopPropagation();
+  startNodeInlineEdit(card.dataset.nodeId,card);
 });
 function textElementResizeHandleFromEvent(e){const handle=e.target.closest&&e.target.closest('[data-element-resize-handle]');return handle&&cardsLayer.contains(handle)?handle:null}
 cardsLayer.addEventListener('pointerdown',e=>{
@@ -2835,7 +2841,7 @@ cardsLayer.addEventListener('pointerup',e=>{const controller=graphKernelControll
 cardsLayer.addEventListener('pointercancel',e=>{const controller=graphKernelControllers.resize;if(controller&&controller.isActive())controller.finish(e,{cancelled:true})});
 let textElementDrag=null;
 cardsLayer.addEventListener('pointerdown',e=>{
-  if(isCanvasPanMode()||e.button!==0||e.target.closest('.node-inline-text-editor,[data-element-resize-handle]'))return;
+  if(isCanvasPanMode()||e.button!==0||e.target.closest('[data-node-inline-editor="true"],[data-element-resize-handle]'))return;
   const el=textElementFromEvent(e);if(!el)return;
   const item=textElementById(el.dataset.textElementId);if(!item)return;
   window.KGHomeCanvasRuntime?.selectionFilter?.clear?.({reason:'direct-text-element',apply:false});
@@ -2850,7 +2856,7 @@ cardsLayer.addEventListener('pointerdown',e=>{
     state.selectedElementId=selectedTextElementIds.values().next().value||null;refreshSelectionUI();return;
   }
   const groupIds=selectedTextElementIds.has(String(item.id))&&selectedTextElementIds.size>1?[...selectedTextElementIds]:[String(item.id)];
-  const editOnRelease=groupIds.length===1&&state.selectedElementId===item.id&&!state.selectedNodeId&&!state.selectedLinkId&&!state.linkSourceId;
+  const editOnRelease=false;
   e.preventDefault();e.stopPropagation();if(nodeFloatingColorWindowController)nodeFloatingColorWindowController.close({cancel:true});
   selectedNodeIds.clear();selectedLinkIds.clear();selectedTextElementIds=new Set(groupIds);state.selectedNodeId=null;state.selectedLinkId=null;state.linkSourceId=null;state.selectedElementId=item.id;refreshSelectionUI();
   const startPositions={};
@@ -2877,14 +2883,15 @@ function finishTextElementDrag(e,cancelled=false){
   if(cancelled&&drag.moved){for(const id of drag.ids){const item=textElementById(id),start=drag.startPositions[id];if(item&&start)window.KGGraphModel.updateTextElementGeometry(item,{x:start.x,y:start.y})}render({persist:false});showStatus('已取消移动文本框。')}
   else if(drag.moved){save();showStatus(drag.ids.length>1?`已整体移动 ${drag.ids.length} 个文本框，可撤销。`:'文本框位置已保存，可撤销。')}
   else if(drag.editOnRelease&&startTextElementInlineEdit(drag.id,drag.el)){}
-  else{refreshSelectionUI();showStatus(drag.ids.length>1?`已选择 ${drag.ids.length} 个文本框。`:'已选择文本框；再次点击即可原位编辑文字。')}
+  else{refreshSelectionUI();showStatus(drag.ids.length>1?`已选择 ${drag.ids.length} 个文本框。`:'已选择文本框；双击文字即可编辑。')}
   e.preventDefault();e.stopPropagation();
 }
 cardsLayer.addEventListener('pointerup',finishTextElementDrag);cardsLayer.addEventListener('pointercancel',e=>finishTextElementDrag(e,true));
 cardsLayer.addEventListener('dblclick',e=>{
+  if(isCanvasPanMode()||e.target.closest?.('button,a,input,textarea,select,[contenteditable="true"],[data-element-resize-handle]'))return;
   const el=textElementFromEvent(e);if(!el)return;
-  // P4.2.6: second single click on the selected text element enters editing.
   e.preventDefault();e.stopPropagation();
+  startTextElementInlineEdit(el.dataset.textElementId,el);
 });
 function clearHoverDetail(shouldRender=true){
   clearTimeout(hoverDetailTimer);
@@ -2917,13 +2924,16 @@ function showHoverDetail(id){
       if(isHoverDetailBlocked()||!nodeById(id))return;
       hoverDetailNodeId=id;
       renderDetails();
-    },LARGE_GRAPH_HOVER_DETAIL_DELAY);
+      },NODE_HOVER_DETAIL_DELAY);
     return;
   }
-  if(isCoarse||cardDrag||state.selectedNodeId||state.selectedLinkId)return;
+  if(isHoverDetailBlocked())return;
   clearTimeout(hoverDetailTimer);
-  hoverDetailNodeId=id;
-  renderDetails();
+  hoverDetailTimer=setTimeout(()=>{
+    if(isHoverDetailBlocked()||!nodeById(id))return;
+    hoverDetailNodeId=id;
+    renderDetails();
+  },NODE_HOVER_DETAIL_DELAY);
 }
 function scheduleHoverDetailHide(){
   if((!hoverDetailNodeId&&!hoverLargeGraphNodeId)||state.selectedNodeId||state.selectedLinkId)return;

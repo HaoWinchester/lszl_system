@@ -80,28 +80,31 @@ test('engagement rejects executable attachment URLs and reads every bounded page
   assert.match(admin, /escapeHtml\(safe\)/)
 })
 
-test('practice mode supports short published papers and truthful scholar rewards', () => {
+test('practice mode supports short published papers, truthful scholar rewards, and database-backed histories', () => {
   const html = source('new-legacy/practice-mode.html')
   const practice = source('new-legacy/src/100-practice-mode.js')
+  const adapter = source('frontend/scripts/new-legacy-assets/practice-learning-adapter.js')
+  const routes = source('backend/app/api/v1/learning.py')
   for (const script of ['37-subscription-plans.js', '37-subscription-orders.js', '37-subscription-redeem-codes.js', '37-subscription-core.js']) {
     assert.match(html, new RegExp(script.replaceAll('.', '\\.')))
   }
   assert.match(practice, /available>0&&available<COUNTS\[0\]/)
   assert.match(practice, /gainedSeconds/)
-  assert.match(practice, /ACTIVE_ATTEMPT_PREFIX/)
-  assert.match(practice, /function restoreActiveAttempt/)
-  assert.match(practice, /sessionStorage/)
-  assert.match(practice, /document\.body\.dataset\.practiceView==='game'&&state\.locked/)
+  assert.match(practice, /api\.recordSession\(practiceSessionPayload\(status\)\)/)
+  assert.match(practice, /await api\.listSessions\(\)/)
+  assert.match(adapter, /const API_ROOT = '\/api\/v1\/learning\/practice'/)
+  assert.match(adapter, /request\('\/sessions'/)
+  assert.match(routes, /@router\.post\("\/learning\/practice\/sessions"\)/)
+  assert.doesNotMatch(practice, /(?:session|local)Storage/)
+  assert.match(practice, /if\(!state\.active\|\|state\.locked\)return false/)
   assert.doesNotMatch(practice, /pagehide[^\n]*saveRecord\('abandoned'/)
   assert.doesNotMatch(practice, /showFeedback\('正确'\+\(state\.mode==='scholar'\?' · \+20 秒'/)
 })
 
-test('practice resume requires the exact published release identity', () => {
+test('practice mistakes retain the exact published release identity', () => {
   const practice = source('new-legacy/src/100-practice-mode.js')
-  assert.match(practice, /releaseId:text\(release\?\.releaseId\)/)
-  assert.match(practice, /paperVersion:Number\(release\?\.version\|\|0\)/)
-  assert.match(practice, /text\(release\.releaseId\)!==text\(attempt\.releaseId\)/)
-  assert.match(practice, /Number\(release\.version\)!==Number\(attempt\.paperVersion\)/)
+  assert.match(practice, /async function recordMistake[\s\S]{0,900}releaseId:text\(release\?\.releaseId\)/)
+  assert.match(practice, /async function recordMistake[\s\S]{0,900}paperVersion:Number\(release\?\.version\|\|0\)/)
 })
 
 test('teacher imports honor duplicate settings and reject blank bank metadata', () => {
@@ -115,12 +118,14 @@ test('teacher imports honor duplicate settings and reject blank bank metadata', 
   assert.match(bank, /modifiedQuestions/)
 })
 
-test('graph editor uses thresholded large mode, visible labels, and reversible drag history', () => {
+test('graph editor enters performance mode from fifty cards, keeps visible labels, and preserves reversible drag history', () => {
   const graph = source('new-legacy/src/10-graph-editor.js')
   const history = source('new-legacy/src/graph/history-controller.js')
   const tabs = source('new-legacy/src/25-graph-file-tabs.js')
   const css = source('new-legacy/styles/main.css')
+  assert.match(graph, /const LARGE_GRAPH_NODE_THRESHOLD=50/)
   assert.match(graph, /function isLargeGraphMode\(\)\{return isLargeGraphPreferenceEnabled\(\)&&isGraphOverLargeThreshold\(\)\}/)
+  assert.match(graph, /function isGraphOverLargeThreshold\(\)\{return state\.nodes\.length>=LARGE_GRAPH_NODE_THRESHOLD\|\|state\.links\.length>=LARGE_GRAPH_LINK_THRESHOLD\}/)
   assert.match(graph, /function restoreGraphRedoSnapshot/)
   assert.match(graph, /key==='y'\|\|\(key==='z'&&e\.shiftKey\)/)
   assert.match(graph, /onFirstMove:session=>pushGraphUndoSnapshot\(session\.historyLabel\|\|'移动知识点'\)/)
@@ -159,6 +164,29 @@ test('graph knowledge-point creation uses the current simple and professional ed
   assert.match(graph, /saveNodeBtn[\s\S]{0,1600}model\.updateContent\(n,content\)[\s\S]{0,900}render\(\{mode:'geometry',persist:true\}\)/)
   assert.match(css, /#nodeModal \.node-simple-form textarea\{min-height:190px\}/)
   assert.match(persistence, /fileStore\.saveFile\(current\.id,snapshot,saveOptions\)/)
+})
+
+test('graph canvas bug-list interactions use directional curves, delayed details, color-matched mode tabs, and zero-shift double-click editing', () => {
+  const graph = source('new-legacy/src/10-graph-editor.js')
+  const editor = source('new-legacy/src/graph/inline-text-editor-controller.js')
+  const styles = source('new-legacy/styles/home-graph-components.css')
+
+  // A vertical pair must bend along the Y axis; horizontal-only controls create the S-shaped route in the bug report.
+  assert.match(graph, /function defaultCurveControls\(a,b\)\{[\s\S]{0,500}Math\.abs\(dx\)>=Math\.abs\(dy\)[\s\S]{0,500}x:a\.x,y:a\.y\+offset[\s\S]{0,500}x:b\.x,y:b\.y-offset/)
+  // Hover detail panels are deliberately delayed so moving across cards does not make panels flash.
+  assert.match(graph, /const NODE_HOVER_DETAIL_DELAY=260,LARGE_GRAPH_HOVER_RELATION_DELAY=120/)
+  assert.match(graph, /if\(isHoverDetailBlocked\(\)\)return;[\s\S]{0,220}hoverDetailTimer=setTimeout\([\s\S]{0,180}NODE_HOVER_DETAIL_DELAY\)/)
+  // The visible action stays compact; mode context is already carried by the title/copy/color.
+  assert.match(graph, /data-graph-mode-exit>退出</)
+  assert.doesNotMatch(graph, /textContent=mode==='related'\?'退出只看相关':'退出心流'/)
+  // Reusing the painted span rather than replacing it with a textarea prevents the text baseline from jumping.
+  assert.match(editor, /editor\.setAttribute\('contenteditable','plaintext-only'\)/)
+  assert.doesNotMatch(editor, /document\.createElement\(multiline\?'textarea':'input'\)/)
+  assert.match(graph, /cardsLayer\.addEventListener\('dblclick',[\s\S]{0,420}startNodeInlineEdit\(card\.dataset\.nodeId,card\)/)
+  assert.match(graph, /cardsLayer\.addEventListener\('dblclick',[\s\S]{0,520}startTextElementInlineEdit\(el\.dataset\.textElementId,el\)/)
+  assert.match(styles, /\.graph-mode-indicator\.related\{--graph-mode-color:#f97316;background:var\(--graph-mode-color\)\}/)
+  assert.match(styles, /\.graph-mode-indicator\.flow\{--graph-mode-color:#22c55e;background:var\(--graph-mode-color\)\}/)
+  assert.match(styles, /\.node-text-content\.node-inline-direct-editor/)
 })
 
 test('content center remains an independent direct page', () => {
