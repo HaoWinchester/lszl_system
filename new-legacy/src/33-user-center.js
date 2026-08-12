@@ -198,6 +198,7 @@
     const summary=rec&&typeof sub.subscriptionSummary==="function"?sub.subscriptionSummary(rec.username):null;
     const currentPlanId=summary&&summary.plan&&summary.plan.id || "";
     const plans=typeof sub.enabledPlanList==="function"?sub.enabledPlanList():[];
+    let activeNativeOrder=null;
     body.innerHTML=`<div class="divider"></div><div class="plans-grid">
       ${plans.map(plan=>{
         const current=!!currentPlanId && plan.id===currentPlanId;
@@ -222,6 +223,7 @@
         </article>`;
       }).join('')}
     </div>
+    <section class="membership-checkout" id="membershipCheckout" hidden aria-live="polite"></section>
     <section class="redeem">
       <div class="redeem-intro">
         <div class="redeem-icon"><span class="icon i-ticket"></span></div>
@@ -236,15 +238,14 @@
       const pay=window.KGWechatPay;
       if(!body||!pay||!order||!order.id)return;
       clearNativePayPolling();
-      setMembershipPaymentView(true);
       const amount=`￥${((Number(order.amount)||0)/100).toFixed(2)}`;
-      body.innerHTML=`<div class="divider"></div>
-        <section class="payment-grid">
-          <article class="payment-card payment-card--qr"><div class="payment-card-head"><div class="payment-tag"><span class="icon i-wechat"></span>微信扫码支付</div><h3 class="payment-title">${escapeHTML(plan&&plan.name||order.planName||'会员方案')}</h3><p class="payment-help">请使用微信扫描二维码并完成付款，支付结果将自动刷新。</p></div><div class="qr-frame"><img class="kg-native-pay-qr" src="${escapeHTML(pay.nativeOrderQrCodeUrl(order.id))}" alt="微信支付二维码" /></div><div class="wechat-hint"><div class="wechat-hint-icon"><span class="icon i-wechat"></span></div><div><strong>微信扫一扫</strong><span>支付成功后自动开通会员权益</span></div></div></article>
-          <article class="payment-card payment-summary"><div class="summary-top"><div><p class="summary-label">应付金额</p><div class="summary-amount">${escapeHTML(amount)}</div></div><span class="pill pill-solid"><span class="icon i-clock"></span>待支付</span></div><div class="summary-divider"></div><dl class="summary-list"><div class="summary-row"><dt class="summary-key"><span class="icon i-receipt"></span>订单编号</dt><dd class="summary-value">${escapeHTML(order.id)}</dd></div><div class="summary-row"><dt class="summary-key"><span class="icon i-money"></span>支付金额</dt><dd class="summary-value green">${escapeHTML(amount)}</dd></div><div class="summary-row"><dt class="summary-key"><span class="icon i-clock"></span>订单状态</dt><dd class="summary-value" id="nativePayStatus">等待扫码付款</dd></div></dl><div class="summary-note"><span class="icon i-info"></span>支付成功后页面将自动更新状态</div></article>
-        </section>
-        <div class="payment-actions"><button type="button" class="btn btn-secondary" id="nativePayRefreshBtn"><span class="icon i-refresh"></span>查询支付状态</button><button type="button" class="btn btn-secondary" id="nativePayCancelOrderBtn">取消订单</button><button type="button" class="btn btn-primary" id="nativePayCloseBtn">稍后支付</button></div>
-        <div class="footnote"><span class="icon i-shield-check"></span>支付过程由微信安全保障，请放心使用</div>`;
+      body.querySelectorAll(".plan-card[data-plan-id]").forEach(card=>card.classList.toggle("checkout-selected",card.dataset.planId===String(plan&&plan.id||order.planId||"")));
+      const checkout=$("membershipCheckout");
+      if(!checkout)return;
+      checkout.hidden=false;
+      checkout.innerHTML=`<div class="checkout-qr"><div class="payment-tag"><span class="icon i-wechat"></span>微信扫码支付</div><div class="qr-frame"><img class="kg-native-pay-qr" src="${escapeHTML(pay.nativeOrderQrCodeUrl(order.id))}" alt="微信支付二维码" /></div></div>
+        <div class="checkout-summary"><div><p class="summary-label">正在开通</p><h3 class="checkout-plan-name">${escapeHTML(plan&&plan.name||order.planName||'会员方案')}</h3><p class="checkout-help">请使用微信扫描二维码完成付款，支付结果会自动刷新。</p></div><div class="checkout-amount"><span>应付金额</span><strong>${escapeHTML(amount)}</strong></div><div class="checkout-meta"><span>订单编号：${escapeHTML(order.id)}</span><span id="nativePayStatus">等待扫码付款</span></div></div>
+        <div class="checkout-actions"><button type="button" class="btn btn-secondary" id="nativePayRefreshBtn"><span class="icon i-refresh"></span>查询状态</button><button type="button" class="btn btn-secondary" id="nativePayCancelOrderBtn">取消订单</button><button type="button" class="btn btn-primary" id="nativePayCloseBtn">稍后支付</button></div>`;
       const status=$("nativePayStatus");
       const refresh=async()=>{
         try{
@@ -278,7 +279,10 @@
         cancelOrderBtn.disabled=true;cancelOrderBtn.textContent="正在取消…";
         try{
           await pay.cancelNativeOrder(order.id);clearNativePayPolling();clearTimeout(cancelArmTimer);
-          showStatus("待支付订单已取消。",true);renderSubscriptionDetailPlans();
+          activeNativeOrder=null;
+          checkout.hidden=true;checkout.innerHTML="";
+          body.querySelectorAll(".plan-card.checkout-selected").forEach(card=>card.classList.remove("checkout-selected"));
+          showStatus("待支付订单已取消。",true);
         }catch(error){
           cancelArmed=false;cancelOrderBtn.disabled=false;cancelOrderBtn.textContent="取消订单";
           if(status)status.textContent=String(error&&error.message||"订单取消失败，请重试");
@@ -332,8 +336,20 @@
       card.disabled=true;
       card.textContent="正在生成支付二维码…";
       try{
+        if(activeNativeOrder&&activeNativeOrder.planId===plan.id){
+          card.disabled=false;card.innerHTML=originalLabel;
+          renderNativePayment(plan,activeNativeOrder);
+          return;
+        }
+        if(activeNativeOrder){
+          await pay.cancelNativeOrder(activeNativeOrder.id);
+          clearNativePayPolling();
+          activeNativeOrder=null;
+        }
         const result=await pay.createNativeOrder(plan.id);
         if(!result||!result.order||!result.order.codeUrl)throw new Error("支付二维码生成失败，请重试。");
+        activeNativeOrder={...result.order,planId:plan.id};
+        card.disabled=false;card.innerHTML=originalLabel;
         renderNativePayment(plan,result.order);
         showStatus("支付二维码已生成，请使用微信扫码。");
       }catch(error){

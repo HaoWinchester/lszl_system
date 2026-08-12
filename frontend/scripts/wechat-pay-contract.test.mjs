@@ -24,7 +24,7 @@ test('member purchase uses the server Native order flow and polls its status', (
   assert.match(adapter, /function isAdmin\(\)/)
   assert.match(userCenter, /await\s+pay\.createNativeOrder\(/)
   assert.match(userCenter, /nativeOrderQrCodeUrl/)
-  assert.match(userCenter, /setMembershipPaymentView\(true\)/)
+  assert.match(userCenter, /membershipCheckout/)
   assert.match(userCenter, /getNativeOrderStatus/)
   assert.match(userCenter, /pay\.syncSubscription\(latest\.subscription\)/)
   assert.match(userCenter, /renderOrderSubmitted\(plan,\s*\{order\}\)/)
@@ -47,13 +47,13 @@ test('member purchase keeps the supplied membership-center visual structure arou
 
   assert.match(userCenter, /membership-ui/)
   assert.match(userCenter, /plans-grid/)
-  assert.match(userCenter, /payment-grid/)
+  assert.match(userCenter, /membership-checkout/)
   assert.match(userCenter, /qr-frame/)
   assert.match(userCenter, /nativeOrderQrCodeUrl/)
   assert.match(userCenter, /subscriptionRedeemCodeBtn/)
   assert.match(membershipStyles, /\.membership-ui\s+\.plans-grid/)
-  assert.match(membershipStyles, /\.membership-ui\s+\.payment-grid/)
-  assert.match(membershipStyles, /\.membership-ui\.is-payment-view\{[^}]*overflow:hidden/)
+  assert.match(membershipStyles, /\.membership-ui\s+\.membership-checkout/)
+  assert.match(membershipStyles, /\.membership-ui\s+\.membership-checkout\[hidden\]\{display:none/)
 })
 
 test('visitor plans are public, hand off to login cleanly, and create a Native order in one step', () => {
@@ -69,4 +69,15 @@ test('visitor plans are public, hand off to login cleanly, and create a Native o
   assert.match(membershipStyles, /\.membership-ui\s+\.plans-grid\{display:flex/)
   assert.match(membershipStyles, /overflow-x:auto/)
   assert.match(membershipStyles, /\.membership-ui\s+\.plan-card\{[^}]*flex:0 0/)
+})
+
+test('native payment keeps the membership plan carousel visible and expands a linked checkout below it', () => {
+  const userCenter = readFileSync(resolve(repoDir, 'new-legacy/src/33-user-center.js'), 'utf8')
+  const membershipStyles = readFileSync(resolve(repoDir, 'new-legacy/styles/membership-ui.css'), 'utf8')
+
+  assert.match(userCenter, /class=["']membership-checkout["']/)
+  assert.match(userCenter, /checkout-selected/)
+  assert.match(userCenter, /membershipCheckout/)
+  assert.match(membershipStyles, /\.membership-ui\s+\.membership-checkout\{/)
+  assert.match(membershipStyles, /\.membership-ui\s+\.plan-card\.checkout-selected/)
 })

@@ -96,11 +96,19 @@ with sync_playwright() as playwright:
         assert horizontal_scroll["scrollWidth"] > horizontal_scroll["clientWidth"]
         assert horizontal_scroll["scrollHeight"] <= horizontal_scroll["clientHeight"] + 12
         page.locator('[data-buy-plan="monthly"]').click()
-        page.locator(".kg-native-pay-qr").wait_for(state="visible")
+        checkout = page.locator(".membership-ui .membership-checkout")
+        checkout.wait_for(state="visible")
+        # The checkout must expand below the selectable plan carousel rather than
+        # replacing it with a separate payment-only screen.
+        assert page.locator(".membership-ui .plans-grid").is_visible()
+        assert page.locator('.membership-ui .plan-card.checkout-selected[data-plan-id="monthly"]').count() == 1
+        assert "月度会员" in checkout.inner_text()
+        checkout.locator(".kg-native-pay-qr").wait_for(state="visible")
         assert "确认订阅申请" not in page.locator("#userSubscriptionDetailBody").inner_text()
-        page.locator("#nativePayCancelOrderBtn").click()
-        page.locator("#nativePayCancelOrderBtn").click()
+        checkout.locator("#nativePayCancelOrderBtn").click()
+        checkout.locator("#nativePayCancelOrderBtn").click()
         page.locator(".membership-ui .plans-grid").wait_for(state="visible")
+        assert checkout.is_hidden()
         if release:
             assert page.evaluate("window.__KG_DIRECT_BOOTSTRAP__?.releaseVersion") == release
         page.screenshot(path=str(output), full_page=False)
