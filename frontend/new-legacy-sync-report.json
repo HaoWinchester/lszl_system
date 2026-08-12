@@ -1,10 +1,14 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.41",
-  "toVersion": "v9.0-p4.1.41",
+  "toVersion": "v9.0-p4.1.42",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "VERSION",
+      "src/33-user-center.js",
+      "styles/membership-ui.css"
+    ],
     "removed": []
   },
   "incompatible": []
