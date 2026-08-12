@@ -1,5 +1,5 @@
 /* V9.0-P4.5.17 · 首页学习入口沿用 update 的四色卡片。 */
-.learning-entry-backdrop{z-index:170;background:linear-gradient(135deg,#eef4ff 0%,#f8fbff 42%,#fff7f0 100%);backdrop-filter:none;padding:28px}
+.learning-entry-backdrop{z-index:10010;background:linear-gradient(135deg,#eef4ff 0%,#f8fbff 42%,#fff7f0 100%);backdrop-filter:none;padding:28px}
 .learning-entry-modal{width:min(960px,96vw);max-width:none;padding:28px;border:1px solid #c9d5e6;border-radius:22px;background:rgba(255,255,255,.96);box-shadow:0 24px 80px rgba(36,52,78,.22)}
 .learning-entry-head{position:relative;text-align:center;margin-bottom:24px;padding:0 48px}.learning-entry-head>div{width:100%}.learning-entry-head h2{margin:0;font-size:30px;letter-spacing:.02em;color:#1e2b3f}.learning-entry-head p{margin:9px auto 0;max-width:760px;color:#5b6b7f;font-size:14px;line-height:1.7}
 .learning-entry-close{position:absolute;right:0;top:0;width:34px;height:34px;border:0;border-radius:10px;background:transparent;color:#7a8798;font-size:24px;line-height:1;cursor:pointer}.learning-entry-close:hover{background:#eef2f7;color:#1e2b3f}

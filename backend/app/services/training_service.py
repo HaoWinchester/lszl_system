@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import uid
 from app.models.question import Question
 from app.models.training import RecallProgress, TrainingProgress
-from app.services import question_service
+from app.services import question_catalog_service, question_service
 
 
 # ---------- 训练作答 ----------
@@ -93,6 +93,11 @@ async def get_recall(db: AsyncSession, owner: str, question_id: str) -> dict | N
 
 
 async def save_recall(db: AsyncSession, owner: str, question_id: str, data: dict) -> dict:
+    # The composite progress key is not enough to establish a valid domain
+    # target.  Check the caller can access the question before inserting so an
+    # expired deep-recall route becomes a clean 404 rather than a FK 500.
+    if not await question_catalog_service.is_learning_question_visible(db, question_id):
+        raise LookupError("题目不存在或无权访问")
     r = await db.get(RecallProgress, (owner, question_id))
     payload = {
         "nodes": data.get("nodes") or [],

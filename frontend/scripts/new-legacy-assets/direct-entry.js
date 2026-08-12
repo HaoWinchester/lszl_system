@@ -4,12 +4,21 @@
   const bootstrapUsername = String(global.__KG_DIRECT_BOOTSTRAP__?.username || '')
   const bootstrapAuthenticated = global.__KG_DIRECT_BOOTSTRAP__?.authenticated === true
   let reloadingForSession = false
+  let resolveInitialLearningEntry
+  let initialLearningEntryHandled = false
+  const initialLearningEntry = new Promise((resolve) => { resolveInitialLearningEntry = resolve })
 
   function showLearningEntryChooser() {
     if (!global.KGLearningEntryChooser || typeof global.KGLearningEntryChooser.init !== 'function') {
       return Promise.resolve({ shown: false })
     }
     return Promise.resolve(global.KGLearningEntryChooser.init()).catch(() => ({ shown: false }))
+  }
+
+  function settleInitialLearningEntry(result) {
+    if (initialLearningEntryHandled) return
+    initialLearningEntryHandled = true
+    resolveInitialLearningEntry(result)
   }
 
   function matchesBootstrap(username) {
@@ -50,8 +59,12 @@
       else global.KGUserCenter?.open?.()
     }
     decorateMemberEntry()
-    showLearningEntryChooser()
+    showLearningEntryChooser().then(settleInitialLearningEntry)
   }
+
+  global.KGDirectEntry = Object.freeze({
+    waitForInitialLearningEntry: () => initialLearningEntry,
+  })
 
   if (document.readyState === 'loading') {
     global.addEventListener('DOMContentLoaded', openRequestedSurface, { once: true })

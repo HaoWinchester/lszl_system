@@ -4,7 +4,7 @@ import asyncio
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.db.session import AsyncSessionLocal
 from app.main import app
@@ -118,6 +118,50 @@ def test_student_reuses_the_only_pending_native_payment_order() -> None:
         assert second.status_code == 200, second.text
         assert second.json()["order"]["id"] == first.json()["order"]["id"]
         assert second.json()["order"]["planId"] == "monthly"
+    finally:
+        asyncio.run(_delete_subscription_rows([username]))
+        admin.request("DELETE", "/api/v1/users/batch", json={"usernames": [username]})
+
+
+def test_unavailable_native_payment_is_terminal_and_never_reused_as_pending(monkeypatch) -> None:
+    from app.services import subscription_service
+
+    async def no_native_payment_config(_db):
+        return {"enableDemo": False}
+
+    monkeypatch.setattr(
+        subscription_service.system_service,
+        "get_wechat_pay_config",
+        no_native_payment_config,
+    )
+    token = uuid4().hex[:10]
+    username = f"native-payment-unavailable-{token}"
+    admin = TestClient(app)
+    student = TestClient(app)
+    _login(admin, "admin", "jbgsnmm~123")
+    _create_student(admin, username)
+    try:
+        _login(student, username, "test1234")
+        first = student.post("/api/v1/subscriptions/orders", json={"planId": "monthly"})
+        assert first.status_code == 200, first.text
+        assert first.json()["order"]["status"] == "cancelled"
+        assert first.json()["order"]["payStatus"] == "failed"
+
+        second = student.post("/api/v1/subscriptions/orders", json={"planId": "quarterly"})
+        assert second.status_code == 200, second.text
+        assert second.json()["order"]["id"] != first.json()["order"]["id"]
+
+        async def pending_count() -> int:
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(
+                    select(SubscriptionOrder).where(
+                        SubscriptionOrder.username == username,
+                        SubscriptionOrder.status == "pending",
+                    )
+                )
+                return len(result.scalars().all())
+
+        assert asyncio.run(pending_count()) == 0
     finally:
         asyncio.run(_delete_subscription_rows([username]))
         admin.request("DELETE", "/api/v1/users/batch", json={"usernames": [username]})

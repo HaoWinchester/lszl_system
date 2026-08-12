@@ -55,7 +55,11 @@ async def list_recall_progress(
 
 @router.put("/recall/progress/{question_id}")
 async def save_recall(question_id: str, body: dict, db: DB, user: CurrentUser):
-    return {"progress": await training_service.save_recall(db, user.username, question_id, body)}
+    try:
+        progress = await training_service.save_recall(db, user.username, question_id, body)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return {"progress": progress}
 
 
 @router.delete("/recall/progress/{question_id}")

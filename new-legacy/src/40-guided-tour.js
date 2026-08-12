@@ -201,6 +201,14 @@ function scheduleAutoGuidedTour(){
   }
   startGuidedTour(false);
 }
-window.addEventListener('kg-learning-entry-dialog-closed',scheduleAutoGuidedTour);
+function startGuidedTourAfterLearningEntry(){
+  const waiter=window.KGDirectEntry?.waitForInitialLearningEntry;
+  if(typeof waiter!=='function'){scheduleAutoGuidedTour();return}
+  Promise.resolve(waiter()).then(result=>{
+    if(result?.shown)return;
+    scheduleAutoGuidedTour();
+  }).catch(scheduleAutoGuidedTour);
+}
+window.addEventListener('kg-learning-entry-dialog-closed',()=>{if(!guidedTourState)scheduleAutoGuidedTour()});
 window.addEventListener('kg-learning-entry-dialog-opened',()=>clearTimeout(guidedTourAutostartTimer));
-guidedTourAutostartTimer=window.setTimeout(scheduleAutoGuidedTour,520);
+guidedTourAutostartTimer=window.setTimeout(startGuidedTourAfterLearningEntry,0);

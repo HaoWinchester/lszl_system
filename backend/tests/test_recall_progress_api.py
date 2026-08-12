@@ -84,3 +84,15 @@ def test_recall_progress_persists_the_full_canvas_in_database_and_is_owner_scope
     _login(isolated, other)
     assert isolated.get(f"/api/v1/recall/progress/{question_id}").json()["progress"] is None
     assert isolated.get("/api/v1/recall/progress", params=[("question_ids", question_id)]).json()["questionIds"] == []
+
+
+def test_recall_progress_rejects_a_missing_question_without_a_database_error() -> None:
+    owner = _name("recall_missing")
+    _create_student(owner)
+    client = TestClient(app, raise_server_exceptions=False)
+    _login(client, owner)
+
+    response = client.put("/api/v1/recall/progress/unavailable", json={"nodes": [], "edges": []})
+
+    assert response.status_code == 404, response.text
+    assert response.json()["detail"] == "题目不存在或无权访问"

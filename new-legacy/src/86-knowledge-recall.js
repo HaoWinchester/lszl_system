@@ -232,6 +232,7 @@
   }
   async function writeProgressNow(targetQuestion=question){
     if(isRecallReadonly()||isTeacherDraftPreview())return false;
+    if(!targetQuestion?.sourceQuestionId||String(targetQuestion.sourceQuestionId)==='unavailable')return false;
     if(progressSaveTimer){clearTimeout(progressSaveTimer);progressSaveTimer=0}
     try{
       return Boolean(await RecallProgress.write(targetQuestion,progressPayload()));

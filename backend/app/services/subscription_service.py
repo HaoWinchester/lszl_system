@@ -247,9 +247,16 @@ async def request_order(db: AsyncSession, username: str, plan_id: str) -> Subscr
                 o.id, p["name"], amount_fen, pay_cfg
             )
         except Exception:  # noqa: BLE001
-            o.code_url = None  # 下单失败，前端提示重试
+            o.code_url = None
     else:
-        o.code_url = None  # 未配置，退回管理员审批流程
+        o.code_url = None
+    # A payment attempt without a QR can never be paid.  It must not stay in
+    # the pending-order reuse set, otherwise every retry is trapped behind an
+    # unusable order and the UI cannot present a fresh checkout.
+    if not o.code_url:
+        o.status = "cancelled"
+        o.pay_status = "failed"
+        o.note = "微信支付暂时不可用，请稍后重试"
     await db.commit()
     await db.refresh(o)
     return o

@@ -18,6 +18,11 @@
     return String(question?.sourceQuestionId || question?.id || '').trim()
   }
 
+  function hasPersistedQuestion(question) {
+    const id = questionId(question)
+    return Boolean(id && id !== 'unavailable')
+  }
+
   function bankId(question, fallback = '') {
     return String(question?.sourceBankId || question?.bankId || fallback || '').trim()
   }
@@ -54,7 +59,7 @@
 
   async function read(question) {
     const id = questionId(question)
-    if (!signedIn() || !id) return null
+    if (!signedIn() || !hasPersistedQuestion(question)) return null
     try {
       const payload = await request(`/${encodeURIComponent(id)}`)
       return clone(payload.progress || null)
@@ -66,7 +71,7 @@
 
   async function write(question, payload) {
     const id = questionId(question)
-    if (!signedIn() || !id) return false
+    if (!signedIn() || !hasPersistedQuestion(question)) return false
     const saved = await request(`/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify(payload || {}),
@@ -82,7 +87,7 @@
 
   async function remove(question) {
     const id = questionId(question)
-    if (!signedIn() || !id) return false
+    if (!signedIn() || !hasPersistedQuestion(question)) return false
     const payload = await request(`/${encodeURIComponent(id)}`, { method: 'DELETE' })
     exploredByBank.get(collectionId(question))?.delete(id)
     return Boolean(payload.deleted)
@@ -91,7 +96,7 @@
   async function loadExplored(scope, questions = []) {
     const id = String(scope || '').trim()
     const questionIds = Array.isArray(questions)
-      ? questions.map(questionId).filter(Boolean).slice(0, 200)
+      ? questions.filter(hasPersistedQuestion).map(questionId).slice(0, 200)
       : []
     if (!signedIn() || !id || !questionIds.length) return new Set()
     try {
