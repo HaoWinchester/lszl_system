@@ -23,10 +23,6 @@ function bindTutorial(){
 }
 
 bindTutorial();
-// C-1.4.2：不再在页面首次加载时自动启动全屏引导。
-// 本项目经常通过解压 ZIP / file:// 直接运行，不同路径可能让浏览器把它视为新的存储环境，
-// 从而反复触发引导遮罩并拦截画布顶部左右悬浮模块的鼠标操作。
-// 用户仍可通过右上角账号菜单的“帮助中心”主动启动完整引导。
 
 const TOUR_STORAGE_KEY='通用知识点关系图谱工具_新手引导已看_v1';
 let guidedTourState=null;
@@ -194,3 +190,17 @@ function finishGuidedTour(skipped=false){
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&guidedTourState)finishGuidedTour(true)});
 window.addEventListener('resize',()=>{if(guidedTourState)placeGuidedTour()});
 window.addEventListener('scroll',()=>{if(guidedTourState)placeGuidedTour()},true);
+document.getElementById('guidedTourStartBtn')?.addEventListener('click',()=>startGuidedTour(true));
+let guidedTourAutostartTimer=0;
+function scheduleAutoGuidedTour(){
+  clearTimeout(guidedTourAutostartTimer);
+  if(guidedTourState)return;
+  if(document.querySelector('.kg-learning-entry-dialog.show')){
+    guidedTourAutostartTimer=window.setTimeout(scheduleAutoGuidedTour,160);
+    return;
+  }
+  startGuidedTour(false);
+}
+window.addEventListener('kg-learning-entry-dialog-closed',scheduleAutoGuidedTour);
+window.addEventListener('kg-learning-entry-dialog-opened',()=>clearTimeout(guidedTourAutostartTimer));
+guidedTourAutostartTimer=window.setTimeout(scheduleAutoGuidedTour,520);

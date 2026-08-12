@@ -425,10 +425,14 @@
     });
     const status=scope.querySelector("[data-subscription-status]");
     if(status) status.textContent=subscriptionText();
-    scope.querySelectorAll("#upgradeMemberBtn,[data-subscription-upgrade-label]").forEach(btn=>{
-      const role=currentRole();
-      const plan=currentPlan();
-      btn.textContent=(role==="student" && plan && plan.id && plan.id!=="free") ? "续费" : "升级会员";
+    const current=currentSubscription();
+    const hasActivePaidMembership=!!(current
+      && ACTIVE_STATUSES.has(current.status)
+      && current.planId
+      && current.planId!=="free");
+    scope.querySelectorAll("#upgradeMemberBtn,#accountMenuUpgradeBtn,[data-subscription-upgrade-label]").forEach(btn=>{
+      btn.hidden=hasActivePaidMembership;
+      if(!hasActivePaidMembership) btn.textContent="升级会员";
     });
   }
 

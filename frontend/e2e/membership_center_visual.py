@@ -17,6 +17,13 @@ password = os.environ.get("E2E_PASSWORD", "111111")
 release = os.environ.get("E2E_RELEASE_VERSION")
 output = Path(os.environ.get("E2E_SCREENSHOT", "/tmp/membership-center.png"))
 
+
+def dismiss_learning_entry(page) -> None:
+    chooser = page.locator("#learningEntryModal")
+    if chooser.count() and chooser.is_visible():
+        chooser.locator('[data-learning-entry-choice="知识图谱"]').click()
+        chooser.wait_for(state="hidden")
+
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True)
     try:
@@ -77,6 +84,7 @@ with sync_playwright() as playwright:
         )
         assert login.ok, (login.status, login.text())
         page.goto(base_url + "/index.html?mode=free", wait_until="networkidle")
+        dismiss_learning_entry(page)
         page.locator("#upgradeMemberBtn").click()
         page.locator("#userSubscriptionDetailModal.show .membership-ui .plans-grid").wait_for(state="visible")
         assert page.locator(".membership-ui .plan-card").count() >= 3
@@ -105,10 +113,12 @@ with sync_playwright() as playwright:
         assert "月度会员" in checkout.inner_text()
         checkout.locator(".kg-native-pay-qr").wait_for(state="visible")
         assert "确认订阅申请" not in page.locator("#userSubscriptionDetailBody").inner_text()
-        checkout.locator("#nativePayCancelOrderBtn").click()
-        checkout.locator("#nativePayCancelOrderBtn").click()
-        page.locator(".membership-ui .plans-grid").wait_for(state="visible")
-        assert checkout.is_hidden()
+        assert checkout.locator("#nativePayRefreshBtn").count() == 0
+        assert checkout.locator("#nativePayCancelOrderBtn").count() == 0
+        assert checkout.locator("#nativePayCloseBtn").count() == 0
+        assert checkout.locator(".qr-frame").evaluate(
+            "element => Math.round(element.getBoundingClientRect().width)"
+        ) >= 200
         if release:
             assert page.evaluate("window.__KG_DIRECT_BOOTSTRAP__?.releaseVersion") == release
         page.screenshot(path=str(output), full_page=False)

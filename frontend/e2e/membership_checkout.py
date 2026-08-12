@@ -20,7 +20,7 @@ SCREENSHOT = os.environ.get("E2E_SCREENSHOT")
 
 def dismiss_learning_entry_chooser(page) -> None:
     """Existing onboarding can cover the top-right membership trigger on a fresh context."""
-    chooser = page.locator("#learningEntryChooserRoot")
+    chooser = page.locator("#learningEntryModal")
     if chooser.count() and chooser.is_visible():
         chooser.locator('[data-learning-entry-choice="知识图谱"]').click()
         chooser.wait_for(state="hidden")
@@ -69,9 +69,12 @@ with sync_playwright() as playwright:
         assert "确认订阅申请" not in page.locator("#userSubscriptionDetailBody").inner_text()
         if SCREENSHOT:
             page.screenshot(path=str(Path(SCREENSHOT)), full_page=False)
-        checkout.locator("#nativePayCancelOrderBtn").click()
-        checkout.locator("#nativePayCancelOrderBtn").click()
-        checkout.wait_for(state="hidden")
+        assert checkout.locator("#nativePayRefreshBtn").count() == 0
+        assert checkout.locator("#nativePayCancelOrderBtn").count() == 0
+        assert checkout.locator("#nativePayCloseBtn").count() == 0
+        assert checkout.locator(".qr-frame").evaluate(
+            "element => Math.round(element.getBoundingClientRect().width)"
+        ) >= 200
         if RELEASE:
             assert page.evaluate("window.__KG_DIRECT_BOOTSTRAP__?.releaseVersion") == RELEASE
         print("membership checkout: PASS")

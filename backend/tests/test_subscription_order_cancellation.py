@@ -103,6 +103,26 @@ def test_student_can_cancel_only_their_own_pending_order() -> None:
         )
 
 
+def test_student_reuses_the_only_pending_native_payment_order() -> None:
+    token = uuid4().hex[:10]
+    username = f"single-native-order-{token}"
+    admin = TestClient(app)
+    student = TestClient(app)
+    _login(admin, "admin", "jbgsnmm~123")
+    _create_student(admin, username)
+    try:
+        _login(student, username, "test1234")
+        first = student.post("/api/v1/subscriptions/orders", json={"planId": "monthly"})
+        assert first.status_code == 200, first.text
+        second = student.post("/api/v1/subscriptions/orders", json={"planId": "quarterly"})
+        assert second.status_code == 200, second.text
+        assert second.json()["order"]["id"] == first.json()["order"]["id"]
+        assert second.json()["order"]["planId"] == "monthly"
+    finally:
+        asyncio.run(_delete_subscription_rows([username]))
+        admin.request("DELETE", "/api/v1/users/batch", json={"usernames": [username]})
+
+
 def test_order_terminal_transitions_lock_the_order_row() -> None:
     import inspect
 
@@ -110,3 +130,13 @@ def test_order_terminal_transitions_lock_the_order_row() -> None:
 
     for function in (service.activate_paid_order, service.approve_order, service.cancel_order):
         assert "with_for_update" in inspect.getsource(function)
+
+
+def test_pending_native_orders_use_a_per_student_transaction_lock() -> None:
+    import inspect
+
+    from app.services import subscription_service as service
+
+    source = inspect.getsource(service.request_order)
+    assert "pg_advisory_xact_lock" in source
+    assert "subscription-native-order:{username}" in source

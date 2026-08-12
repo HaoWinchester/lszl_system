@@ -14,7 +14,7 @@ with sync_playwright() as playwright:
         context = browser.new_context(viewport={"width": 1440, "height": 900})
         page = context.new_page()
         page.goto(BASE_URL + "/index.html?mode=free", wait_until="networkidle")
-        chooser = page.locator("#learningEntryChooserRoot")
+        chooser = page.locator("#learningEntryModal")
         if chooser.count() and chooser.is_visible():
             chooser.locator('[data-learning-entry-choice="知识图谱"]').click()
             chooser.wait_for(state="hidden")

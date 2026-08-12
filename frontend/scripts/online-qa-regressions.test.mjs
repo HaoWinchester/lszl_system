@@ -176,9 +176,9 @@ test('graph canvas bug-list interactions use directional curves, delayed details
   // Hover detail panels are deliberately delayed so moving across cards does not make panels flash.
   assert.match(graph, /const NODE_HOVER_DETAIL_DELAY=260,LARGE_GRAPH_HOVER_RELATION_DELAY=120/)
   assert.match(graph, /if\(isHoverDetailBlocked\(\)\)return;[\s\S]{0,220}hoverDetailTimer=setTimeout\([\s\S]{0,180}NODE_HOVER_DETAIL_DELAY\)/)
-  // The visible action stays compact; mode context is already carried by the title/copy/color.
+  // The update source names the precise mode that will be exited, avoiding an ambiguous compact action.
   assert.match(graph, /data-graph-mode-exit>退出</)
-  assert.doesNotMatch(graph, /textContent=mode==='related'\?'退出只看相关':'退出心流'/)
+  assert.match(graph, /textContent=mode==='related'\?'退出只看相关':'退出心流'/)
   // Reusing the painted span rather than replacing it with a textarea prevents the text baseline from jumping.
   assert.match(editor, /editor\.setAttribute\('contenteditable','plaintext-only'\)/)
   assert.doesNotMatch(editor, /document\.createElement\(multiline\?'textarea':'input'\)/)
@@ -195,17 +195,52 @@ test('content center remains an independent direct page', () => {
   assert.match(page, /src="src\/91-content-center-app\.js"/)
 })
 
-test('membership starts the server payment flow directly and supports cancelling an own pending order', () => {
+test('membership checkout relies on automatic status refresh without manual payment actions', () => {
   const center = source('new-legacy/src/33-user-center.js')
-  const adapter = source('frontend/scripts/new-legacy-assets/direct-system-adapter.js')
-  const routes = source('backend/app/api/v1/subscriptions.py')
   assert.doesNotMatch(center, /确认订阅申请/)
-  assert.match(center, /handlePlanPick[\s\S]*await pay\.createNativeOrder\(plan\.id\)[\s\S]*renderNativePayment\(plan,result\.order\)/)
-  assert.match(center, /id="nativePayCancelOrderBtn"/)
-  assert.match(center, /cancelNativeOrder\(order\.id\)/)
-  assert.match(adapter, /async cancelNativeOrder\(orderId\)/)
-  assert.match(adapter, /\/self-cancel/)
-  assert.match(routes, /@router\.post\("\/orders\/\{order_id\}\/self-cancel"\)/)
+  assert.match(center, /handlePlanPick[\s\S]*await pay\.createNativeOrder\(plan\.id\)[\s\S]*renderNativePayment\(checkoutPlan\|\|plan,result\.order\)/)
+  assert.match(center, /nativePayPollTimer=setInterval\(refresh,3000\)/)
+  assert.doesNotMatch(center, /nativePayRefreshBtn|nativePayCancelOrderBtn|nativePayCloseBtn/)
+  assert.doesNotMatch(center, /cancelNativeOrder\(order\.id\)/)
+})
+
+test('home restores the update learning-entry dialog, automatic guided steps, and the mobile reading shell', () => {
+  const page = source('new-legacy/index.html')
+  const chooser = source('new-legacy/src/31-learning-entry-chooser.js')
+  const tour = source('new-legacy/src/40-guided-tour.js')
+  const modeStyles = source('new-legacy/styles/home-interaction-modes-p4330.css')
+
+  assert.match(page, /<button class="learning-mode-entry" id="learningEntryTopBtn"[^>]*>学习入口<\/button>/)
+  assert.match(page, /id="learningEntryModal"/)
+  assert.match(page, /从这里开始学习/)
+  assert.match(page, /选择你现在最想做的事，直接进入对应学习板块。/)
+  assert.match(page, /class="learning-entry-card entry-graph is-current"/)
+  assert.match(page, /主动回忆关键词与知识线索 · 深度回忆/)
+  assert.match(chooser, /learningEntryTopBtn/)
+  assert.match(chooser, /梳理知识结构与关系 · 当前首页/)
+  assert.match(chooser, /event\.key === "Escape"[\s\S]*closeDialog\(\{ focusGraph: true \}\)/)
+  assert.match(chooser, /kg-learning-entry-dialog/)
+  assert.match(chooser, /kg-learning-entry-dialog-opened/)
+  assert.match(tour, /scheduleAutoGuidedTour/)
+  assert.match(tour, /kg-learning-entry-dialog/)
+  assert.match(tour, /kg-learning-entry-dialog-opened/)
+  assert.doesNotMatch(tour, /不再在页面首次加载时自动启动全屏引导/)
+  assert.match(modeStyles, /\.mobile-reading-mode-indicator/)
+  assert.match(modeStyles, /body\.graph-phone-reading[\s\S]*#mobileBar\{display:none!important\}/)
+  assert.match(modeStyles, /body\.graph-phone-reading[\s\S]*\.graph-file-tabbar\{display:none!important\}/)
+  assert.match(modeStyles, /body\.graph-phone-reading[\s\S]*#kgGlobalShortcuts/)
+  assert.match(modeStyles, /body\.graph-phone-reading[\s\S]*\.uc-minimap-dock/)
+})
+
+test('an active paid membership hides renewal calls to action while preserving membership status', () => {
+  const core = source('new-legacy/src/37-subscription-core.js')
+  const center = source('new-legacy/src/33-user-center.js')
+
+  assert.match(core, /#upgradeMemberBtn,#accountMenuUpgradeBtn,\[data-subscription-upgrade-label\]/)
+  assert.match(core, /btn\.hidden=hasActivePaidMembership/)
+  assert.doesNotMatch(core, /\? "续费" : "升级会员"/)
+  assert.match(center, /ACTIVE_PAID_MEMBERSHIP_STATUSES\.has\(record\.status\)/)
+  assert.match(center, /current\?\(plan\.id==="free"\?"当前使用中":"当前方案"\)/)
 })
 
 test('deep recall restores search for nodes on the current canvas', () => {

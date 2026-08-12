@@ -3,7 +3,7 @@
 import secrets
 from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import DEFAULT_PLANS
@@ -196,6 +196,30 @@ async def redeem(db: AsyncSession, username: str, code: str) -> Subscription:
 async def request_order(db: AsyncSession, username: str, plan_id: str) -> SubscriptionOrder:
     """创建订单并按支付配置生成微信扫码 code_url。"""
     plan_id = validate_plan_id(plan_id, allow_free=False)
+    # Serialize order creation per learner.  A pending Native QR is an open
+    # payment commitment, so every device must continue that same order rather
+    # than creating another payable QR for a different plan.
+    await db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+        {"key": f"subscription-native-order:{username}"},
+    )
+    await _subscription_for_update(db, username)
+    pending_result = await db.execute(
+        select(SubscriptionOrder)
+        .where(
+            SubscriptionOrder.username == username,
+            SubscriptionOrder.status == "pending",
+            SubscriptionOrder.pay_status == "pending",
+            SubscriptionOrder.pay_method == "wechat",
+            SubscriptionOrder.code_url.is_not(None),
+        )
+        .order_by(SubscriptionOrder.created_at.desc())
+        .limit(1)
+        .with_for_update()
+    )
+    pending = pending_result.scalar_one_or_none()
+    if pending is not None:
+        return pending
     p = next(
         plan for plan in await system_service.get_subscription_plans(db)
         if plan["planId"] == plan_id

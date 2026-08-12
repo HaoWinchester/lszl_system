@@ -277,12 +277,12 @@ def password_for(role: str) -> str:
 
 
 def is_visible_chooser(page: Page) -> bool:
-    root = page.locator("#learningEntryChooserRoot")
+    root = page.locator("#learningEntryModal")
     return root.count() == 1 and root.is_visible()
 
 
 def wait_for_chooser(page: Page, role: str, phase: str) -> None:
-    root = page.locator("#learningEntryChooserRoot")
+    root = page.locator("#learningEntryModal")
     try:
         root.wait_for(state="visible", timeout=15_000)
     except TimeoutError as error:
@@ -306,6 +306,10 @@ def wait_for_chooser(page: Page, role: str, phase: str) -> None:
         "nodes => nodes.map(node => node.dataset.learningEntryChoice)"
     )
     assert labels == [choice[0] for choice in CHOICES], (role, phase, labels)
+    assert root.locator("#learningEntryTitle").inner_text() == "从这里开始学习", (role, phase)
+    assert page.locator('[data-learning-entry-choice="知识回忆"]').get_attribute(
+        "data-description"
+    ) == "主动回忆关键词与知识线索 · 深度回忆", (role, phase)
 
 
 def sign_in_via_browser(
@@ -391,7 +395,7 @@ def assert_choice_navigation(page: Page, role: str, label: str, destination: str
         # focus restoration instead of treating a no-op URL as a navigation.
         before_url = page.url
         button.click()
-        page.locator("#learningEntryChooserRoot").wait_for(state="hidden")
+        page.locator("#learningEntryModal").wait_for(state="hidden")
         assert page.url == before_url and page.url.split("?", 1)[0].endswith("/index.html"), (
             role,
             label,
@@ -427,30 +431,11 @@ def assert_choice_navigation(page: Page, role: str, label: str, destination: str
     assert page.url.split("?", 1)[0].endswith("/" + destination), (role, label, page.url)
 
 
-def assert_modal_cannot_be_dismissed(page: Page, role: str) -> None:
-    root = page.locator("#learningEntryChooserRoot")
+def assert_modal_can_be_dismissed(page: Page, role: str) -> None:
+    root = page.locator("#learningEntryModal")
     page.keyboard.press("Escape")
-    assert root.is_visible(), (role, "Escape dismissed chooser")
-    root.click(position={"x": 2, "y": 2}, force=True)
-    assert root.is_visible(), (role, "backdrop dismissed chooser")
-
-    expected = [choice[0] for choice in CHOICES]
-    # A real backdrop click leaves focus on the backdrop/document; start the
-    # keyboard-loop assertion from the first in-dialog control explicitly.
-    page.locator(f'[data-learning-entry-choice="{expected[0]}"]').focus()
-    assert page.evaluate("() => document.activeElement?.dataset.learningEntryChoice") == expected[0]
-    for label in expected[1:] + expected[:1]:
-        page.keyboard.press("Tab")
-        assert page.evaluate("() => document.activeElement?.dataset.learningEntryChoice") == label, (
-            role,
-            "Tab focus escaped",
-            label,
-        )
-    page.keyboard.press("Shift+Tab")
-    assert page.evaluate("() => document.activeElement?.dataset.learningEntryChoice") == expected[-1], (
-        role,
-        "reverse focus trap",
-    )
+    root.wait_for(state="hidden")
+    assert page.evaluate("() => document.activeElement?.id") == "stage", (role, "Escape focus")
 
 
 def unavailable_target(route: Route) -> None:
@@ -515,7 +500,7 @@ def assert_two_tabs_claim_once(browser: Browser, base: str, role: str, username:
                       consumed: localStorage.getItem('kg_learning_entry_chooser_consumed_v1'),
                       claim: localStorage.getItem('kg_learning_entry_chooser_claim_v1'),
                       locks: typeof navigator.locks?.request,
-                      visible: !document.getElementById('learningEntryChooserRoot')?.hidden,
+                      visible: !document.getElementById('learningEntryModal')?.hidden,
                     })"""
                 )
                 for tab in tabs
@@ -621,7 +606,7 @@ def run_green_matrix() -> None:
                             second_login_session_id,
                         )
                         visit_non_graph_then_graph(page, base, role, "same-account-relogin")
-                        assert_modal_cannot_be_dismissed(page, role)
+                        assert_modal_can_be_dismissed(page, role)
                         checks += 3
                     finally:
                         context.close()

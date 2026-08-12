@@ -587,18 +587,15 @@ function patchFeatureAnalytics(path, source) {
     )
   }
   if (path === '86-knowledge-recall.js') {
-    return injectTrack(
-      source,
-      "track('recall','outcome','recall_saved')",
-      `  function saveProgress(){
-    if(isRecallReadonly())return;
-    if(progressSaveTimer)clearTimeout(progressSaveTimer);`,
-      `  function saveProgress(){
-    if(isRecallReadonly())return;
-    ${ANALYTICS_TRACK}track('recall','key_action','recall_saved');track('recall','outcome','recall_saved');
-    if(progressSaveTimer)clearTimeout(progressSaveTimer);`,
-      'new-legacy 回忆保存埋点',
-    )
+    const marker = "track('recall','outcome','recall_saved')"
+    if (source.includes(marker)) return source
+    const before = '      return Boolean(await RecallProgress.write(targetQuestion,progressPayload()));'
+    const after = `      const saved=Boolean(await RecallProgress.write(targetQuestion,progressPayload()));
+      if(saved){${ANALYTICS_TRACK}track('recall','key_action','recall_saved');track('recall','outcome','recall_saved');}
+      return saved;`
+    return source.includes(before)
+      ? replaceExactlyOnce(source, before, after, 'new-legacy 回忆数据库保存埋点')
+      : source
   }
   if (path === '88-guided-learning-store.js') {
     let out = injectTrack(

@@ -21,6 +21,7 @@
 <link rel="stylesheet" href="styles/home-selection-drag-controls-p4329.css"/>
 <link rel="stylesheet" href="styles/home-interaction-modes-p4330.css"/>
 <link rel="stylesheet" href="styles/home-selection-geometry-p4332.css"/>
+<link rel="stylesheet" href="styles/home-learning-entry-p4515.css"/>
 
 </head>
 <body>
@@ -49,7 +50,7 @@
 </button>
 </div>
 <div class="canvas-toolbar-right" data-stage-ui="true">
-<a class="learning-mode-entry" href="practice-mode.html" title="进入独立做题模式">做题模式</a>
+<button class="learning-mode-entry" id="learningEntryTopBtn" type="button" title="打开学习入口">学习入口</button>
 <button class="upgrade-member-btn" id="upgradeMemberBtn" type="button" data-open-subscription-detail>升级会员</button>
 <div class="account-menu-shell" id="accountMenuShell" data-account-help-href="help-center.html">
 <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
@@ -99,6 +100,7 @@
 <button id="hideHelpBtn">×</button>
 <strong>通用知识图谱操作</strong><br/>
       新增知识点后，填写分类、难度、关键词、说明。选中卡牌后会显示四个连接点：点击连接点可快速创建相邻卡牌，按住并拖到其他卡牌可建立无文字关系线；双击关系线可补充关系文字。手机端可长按知识点编辑，双指缩放画布。
+      <div class="help-card-actions"><button class="help-card-tour-btn" id="guidedTourStartBtn" type="button">查看使用说明</button></div>
     </div>
 <aside class="detail-panel" id="detailPanel"></aside>
 <div class="status-chip" id="status"></div>
@@ -133,6 +135,7 @@
 <button class="small" id="mZoomOutBtn">－</button>
 <button class="small" id="mZoomInBtn">＋</button>
 </div>
+<div class="mobile-reading-mode-indicator" aria-live="polite">阅读模式</div>
 </div>
 </div>
 <div class="modal-backdrop" id="nodeModal">
@@ -209,18 +212,21 @@
 </div>
 </div>
 <div id="authDialogRoot"></div>
-<div class="modal-backdrop learning-entry-chooser-backdrop" id="learningEntryChooserRoot" hidden>
-<section aria-labelledby="learningEntryChooserTitle" aria-modal="true" class="modal learning-entry-chooser-modal" role="dialog">
-<h2 id="learningEntryChooserTitle">选择学习方式</h2>
-<p class="learning-entry-chooser-intro">请选择本次学习的进入方式</p>
-<div class="learning-entry-chooser-grid">
-<button class="learning-entry-choice" data-description="进入知识图谱" data-destination="index.html" data-learning-entry-choice="知识图谱" type="button"><strong class="learning-entry-choice-title">知识图谱</strong><span class="learning-entry-choice-description">进入知识图谱</span></button>
-<button class="learning-entry-choice" data-description="深度回忆" data-destination="knowledge-recall.html" data-learning-entry-choice="知识回忆" type="button"><strong class="learning-entry-choice-title">知识回忆</strong><span class="learning-entry-choice-description">深度回忆</span></button>
-<button class="learning-entry-choice" data-description="归纳" data-destination="question-workspace.html" data-learning-entry-choice="知识归纳" type="button"><strong class="learning-entry-choice-title">知识归纳</strong><span class="learning-entry-choice-description">归纳</span></button>
-<button class="learning-entry-choice" data-description="刷题" data-destination="practice-mode.html" data-learning-entry-choice="知识巩固" type="button"><strong class="learning-entry-choice-title">知识巩固</strong><span class="learning-entry-choice-description">刷题</span></button>
-</div>
-<p aria-live="polite" class="learning-entry-chooser-error" id="learningEntryChooserError"></p>
-</section>
+<div aria-hidden="true" class="modal-backdrop learning-entry-backdrop" id="learningEntryModal" hidden>
+  <section aria-labelledby="learningEntryTitle" aria-modal="true" class="modal learning-entry-modal" role="dialog">
+    <div class="learning-entry-head">
+      <div><h2 id="learningEntryTitle">从这里开始学习</h2><p>选择你现在最想做的事，直接进入对应学习板块。</p></div>
+      <button class="learning-entry-close" id="learningEntryCloseBtn" type="button" aria-label="关闭学习入口" data-learning-entry-focusable>×</button>
+    </div>
+    <div class="learning-entry-grid">
+      <button class="learning-entry-card entry-graph is-current" data-destination="index.html" data-learning-entry-choice="知识图谱" data-description="梳理知识结构与关系 · 当前首页" data-learning-entry="graph" type="button"><span class="learning-entry-avatar">图</span><span class="learning-entry-name">知识图谱</span><span class="learning-entry-id">梳理知识结构与关系 · 当前首页</span></button>
+      <button class="learning-entry-card entry-recall" data-destination="knowledge-recall.html" data-learning-entry-choice="知识回忆" data-description="主动回忆关键词与知识线索 · 深度回忆" data-learning-entry="recall" type="button"><span class="learning-entry-avatar">忆</span><span class="learning-entry-name">知识回忆</span><span class="learning-entry-id">主动回忆关键词与知识线索 · 深度回忆</span></button>
+      <button class="learning-entry-card entry-synthesis" data-destination="question-workspace.html" data-learning-entry-choice="知识归纳" data-description="多题比较、归纳与连接 · 多题画布" data-learning-entry="synthesis" type="button"><span class="learning-entry-avatar">归</span><span class="learning-entry-name">知识归纳</span><span class="learning-entry-id">多题比较、归纳与连接 · 多题画布</span></button>
+      <button class="learning-entry-card entry-practice" data-destination="practice-mode.html" data-learning-entry-choice="知识巩固" data-description="通过做题检验并巩固掌握 · 做题模式" data-learning-entry="practice" type="button"><span class="learning-entry-avatar">练</span><span class="learning-entry-name">知识巩固</span><span class="learning-entry-id">通过做题检验并巩固掌握 · 做题模式</span></button>
+    </div>
+    <p aria-live="polite" class="learning-entry-error" id="learningEntryChooserError"></p>
+    <div class="learning-entry-foot"><span>以后可从首页右上角“学习入口”再次打开。</span><button id="learningEntryDismissBtn" type="button" data-learning-entry-focusable>进入知识图谱</button></div>
+  </section>
 </div>
 <div class="modal-backdrop question-bank-backdrop" id="questionBankModal">
 <div aria-labelledby="questionBankTitle" aria-modal="true" class="modal question-bank-modal" role="dialog">
