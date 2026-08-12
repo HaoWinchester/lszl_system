@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.38",
-  "toVersion": "v9.0-p4.1.39",
+  "fromVersion": "v9.0-p4.1.39",
+  "toVersion": "v9.0-p4.1.40",
   "changes": {
-    "added": [],
+    "added": [
+      "p45-migration-manifest.json"
+    ],
     "changed": [
-      "VERSION",
-      "src/teacher/training-config/principle-preset-controller.js",
-      "tests/v90-p4313-teacher-principle-config-browser.py"
+      "VERSION"
     ],
     "removed": []
   },

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "v9.0-p4.1.39",
+  "version": "v9.0-p4.1.40",
   "bridgeVersion": 2,
   "sourceFiles": {
     ".DS_Store": "81ecfdeb19e3d2138a7d27bc21c2b4de2378c0b85afe90ab0cf6ab962e3668f7",
@@ -161,7 +161,7 @@
     "V9.0_P4.1_DATA_INTEGRITY.json": "65a6d63dfac46ce58dfc27d34bbcecad45a019302c419e7967f2e1ed46ead3f4",
     "V9.0_P4.1_HELP_FEEDBACK_MESSAGES_REPORT.md": "edfc028219fece4c0e4893f868470f1f00f8836bce74ec6de3acbc54f3fcc5cd",
     "V9.0_P4.1_QUICK_START.md": "1316de5b831a2109176f627b3e7bbaf1bb030c14f3ae93ba8945b4a83deb864c",
-    "VERSION": "6fabcf1951c01ed619210fdfbcdbe9131306dc9cba81bda22359edcc52c3d3b6",
+    "VERSION": "4b5fa07aa0e1d17cdcacba5f6845fd82ee26c550e997b362b6cdd0f878234244",
     "admin-console.html": "5a035e641353a34ff243cb1ecdf138e62a950424a7cfc5d8ab3993e8e64fa95d",
     "admin-operations.html": "7ca550a81b49842c5881f89f0beafc2aefef2dc2aee9117452c7c7db2aa66ddc",
     "admin-settings.html": "97256ac2ae03513cbdc7ab55e784dcf3f8fccf2df4e5608f35a1c273299e63a0",
@@ -231,6 +231,7 @@
     "learning-path.html": "c285d4cfc5e2134a65aa0f25e63e9886513defc322eafdbeeca932c594fa25b8",
     "message-management.html": "483043244097af222ca141b07c08d8f219318a82b3b2ed7768bf04db63c3dbba",
     "multi-question-help.html": "7f8784b49ac3a82debedcf56241907e8839416a8c5274687da27937d7bc86f56",
+    "p45-migration-manifest.json": "8371e98b286ced24cb6055e4a2bf904b276a5236ad9441955d45f78a3533b661",
     "paper-management.html": "3fceed20fa7cded59b0b8f1379ebf7c7c3cd5cc91cba3943999edc8215aa5026",
     "practice-mode.html": "9b68b672a24539a5d0386093b9697d83ad8f181c5fe092662c85b676c6850968",
     "question-bank.html": "d317426db961c5de4846da72726d456326c6c8f7a04d81787b272e9731bf8186",
