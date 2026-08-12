@@ -75,7 +75,10 @@ async def subscription_plans(db: DB, _: CurrentUser):
 
 @router.put("/subscription-plans/{plan_id}")
 async def update_plan(plan_id: str, body: dict, db: DB, _: AdminUser):
-    plan = await system_service.set_plan_setting(db, plan_id, body)
+    try:
+        plan = await system_service.set_plan_setting(db, plan_id, body)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     return {"plan": plan}
 
 

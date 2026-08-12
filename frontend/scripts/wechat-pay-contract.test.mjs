@@ -81,3 +81,17 @@ test('native payment keeps the membership plan carousel visible and expands a li
   assert.match(membershipStyles, /\.membership-ui\s+\.membership-checkout\{/)
   assert.match(membershipStyles, /\.membership-ui\s+\.plan-card\.checkout-selected/)
 })
+
+test('membership card price and payment amount use the server paymentAmountFen source', () => {
+  const planModule = readFileSync(resolve(repoDir, 'new-legacy/src/37-subscription-plans.js'), 'utf8')
+  const settings = readFileSync(resolve(repoDir, 'new-legacy/src/36-system-settings.js'), 'utf8')
+  const subscriptionService = readFileSync(resolve(repoDir, 'backend/app/services/subscription_service.py'), 'utf8')
+  const systemService = readFileSync(resolve(repoDir, 'backend/app/services/system_service.py'), 'utf8')
+
+  assert.match(planModule, /formatPaymentAmountFen\(merged\.paymentAmountFen\)/)
+  assert.match(planModule, /priceText:serverPrice \|\| autoPrice \|\| merged\.priceText/)
+  assert.match(settings, /data-plan-field="paymentAmountFen"/)
+  assert.match(subscriptionService, /await system_service\.get_subscription_plans\(db\)/)
+  assert.match(subscriptionService, /amount_fen = p\["paymentAmountFen"\]/)
+  assert.match(systemService, /merged\["priceText"\] = format_payment_amount_fen\(merged\["paymentAmountFen"\]\)/)
+})

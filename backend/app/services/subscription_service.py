@@ -6,18 +6,11 @@ from datetime import timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.permissions import DEFAULT_PLANS
 from app.core.security import now_utc, uid
 from app.models.subscription import RedeemCode, Subscription, SubscriptionOrder
 from app.services import system_service, wechat_pay_service
 
-PLAN_AMOUNT_FEN = {
-    "monthly": 2900,
-    "quarterly": 7900,
-    "half_year": 13900,
-    "lifetime": 39900,
-}
 FINITE_PAID_PLAN_IDS = frozenset({"monthly", "quarterly", "half_year"})
 PAID_PLAN_IDS = FINITE_PAID_PLAN_IDS | {"lifetime"}
 VALID_PLAN_IDS = PAID_PLAN_IDS | {"free"}
@@ -44,12 +37,6 @@ def _plan(plan_id: str) -> dict:
         if p["planId"] == normalized:
             return p
     raise ValueError("套餐不存在")
-
-
-def _plan_amount_fen(plan_id: str) -> int:
-    if plan_id == "monthly":
-        return settings.WECHAT_PAY_MONTHLY_AMOUNT_FEN
-    return PLAN_AMOUNT_FEN.get(plan_id, 0)
 
 
 def entitlements_for(role: str, subscription: Subscription | None) -> dict[str, bool]:
@@ -209,8 +196,11 @@ async def redeem(db: AsyncSession, username: str, code: str) -> Subscription:
 async def request_order(db: AsyncSession, username: str, plan_id: str) -> SubscriptionOrder:
     """创建订单并按支付配置生成微信扫码 code_url。"""
     plan_id = validate_plan_id(plan_id, allow_free=False)
-    p = _plan(plan_id)
-    amount_fen = _plan_amount_fen(plan_id)
+    p = next(
+        plan for plan in await system_service.get_subscription_plans(db)
+        if plan["planId"] == plan_id
+    )
+    amount_fen = p["paymentAmountFen"]
     o = SubscriptionOrder(
         id=native_out_trade_no(),
         username=username,

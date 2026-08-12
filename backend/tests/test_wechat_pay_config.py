@@ -1,6 +1,7 @@
 """微信支付生产凭证只允许从部署环境读取的回归测试。"""
 
 from app.services import system_service
+from app.core.config import settings
 from app.services import subscription_service
 from app.services import wechat_pay_service
 
@@ -70,10 +71,11 @@ def test_payment_callback_amount_must_equal_order_amount() -> None:
     assert not subscription_service.payment_amount_matches(2900, None)
 
 
-def test_monthly_native_payment_amount_can_be_set_by_deployment_environment(monkeypatch) -> None:
-    monkeypatch.setattr(subscription_service.settings, "WECHAT_PAY_MONTHLY_AMOUNT_FEN", 1)
+def test_deployment_environment_cannot_override_database_plan_amount(monkeypatch) -> None:
+    """Avoid recreating the former split between displayed plan and Native order."""
+    monkeypatch.setattr(settings, "WECHAT_PAY_MONTHLY_AMOUNT_FEN", 1)
 
-    assert subscription_service._plan_amount_fen("monthly") == 1
+    assert not hasattr(subscription_service, "_plan_amount_fen")
 
 
 def test_native_out_trade_no_never_exceeds_wechat_limit() -> None:

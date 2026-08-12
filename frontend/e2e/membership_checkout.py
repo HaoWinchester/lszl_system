@@ -18,6 +18,14 @@ RELEASE = os.environ.get("E2E_RELEASE_VERSION")
 SCREENSHOT = os.environ.get("E2E_SCREENSHOT")
 
 
+def dismiss_learning_entry_chooser(page) -> None:
+    """Existing onboarding can cover the top-right membership trigger on a fresh context."""
+    chooser = page.locator("#learningEntryChooserRoot")
+    if chooser.count() and chooser.is_visible():
+        chooser.locator('[data-learning-entry-choice="知识图谱"]').click()
+        chooser.wait_for(state="hidden")
+
+
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True)
     try:
@@ -26,6 +34,7 @@ with sync_playwright() as playwright:
         guest_context = browser.new_context(viewport={"width": 1440, "height": 1000})
         guest = guest_context.new_page()
         guest.goto(BASE_URL + "/index.html?mode=free", wait_until="networkidle")
+        dismiss_learning_entry_chooser(guest)
         guest.locator("#upgradeMemberBtn").click()
         guest.locator("#userSubscriptionDetailModal.show .plans-grid").wait_for(state="visible")
         assert "待配置" not in guest.locator("#userSubscriptionDetailBody").inner_text()
@@ -46,6 +55,7 @@ with sync_playwright() as playwright:
         assert login.ok, (login.status, login.text())
         page = context.new_page()
         page.goto(BASE_URL + "/index.html?mode=free", wait_until="networkidle")
+        dismiss_learning_entry_chooser(page)
         page.locator("#upgradeMemberBtn").click()
         carousel = page.locator(".membership-ui .plans-grid")
         carousel.wait_for(state="visible")
@@ -61,7 +71,7 @@ with sync_playwright() as playwright:
             page.screenshot(path=str(Path(SCREENSHOT)), full_page=False)
         checkout.locator("#nativePayCancelOrderBtn").click()
         checkout.locator("#nativePayCancelOrderBtn").click()
-        assert checkout.is_hidden()
+        checkout.wait_for(state="hidden")
         if RELEASE:
             assert page.evaluate("window.__KG_DIRECT_BOOTSTRAP__?.releaseVersion") == RELEASE
         print("membership checkout: PASS")

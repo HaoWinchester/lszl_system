@@ -764,6 +764,11 @@
 .graph-mode-indicator.flow button{color:#15803d}
 @media(max-width:720px){.graph-mode-indicator{top:0}}
 
+/* V9.0-P4.5.15 · 状态提示条使用画布外围状态色与白色文字。 */
+.graph-mode-indicator.related strong,.graph-mode-indicator.flow strong,
+.graph-mode-indicator.related span,.graph-mode-indicator.flow span,
+.graph-mode-indicator.related button,.graph-mode-indicator.flow button{color:#fff}
+
 /* V9.0-P4.3.2 · compact batch relationship toolbar */
 .edge-radial-style-panel.edge-quick-style-panel{
   width:min(560px,calc(100% - 20px))!important;

@@ -389,6 +389,7 @@
             <label>套餐名称<input data-plan-field="name" value="${escapeHTML(plan.name||'')}"></label>
             <label>短名称<input data-plan-field="shortName" value="${escapeHTML(plan.shortName||'')}"></label>
             <label>原价<input data-plan-field="originalPriceText" value="${escapeHTML(plan.originalPriceText||'')}" placeholder="例如：¥129 / 季"></label>
+            <label>实际支付金额（分）<input data-plan-field="paymentAmountFen" type="number" min="0" step="1" value="${escapeHTML(String(plan.paymentAmountFen??''))}" placeholder="例如：2900 表示 ￥29"></label>
             <label>折扣系数（%）<input data-plan-field="discountPercent" type="number" min="0" max="100" step="1" value="${escapeHTML(plan.discountPercent||'')}" placeholder="例如：80 表示 8 折"></label>
             <label>标签文案<input data-plan-field="badgeText" value="${escapeHTML(plan.badgeText||'')}"></label>
             <label class="full">权益说明<textarea data-plan-field="description" rows="3">${escapeHTML(plan.description||'')}</textarea></label>

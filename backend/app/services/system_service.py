@@ -1,6 +1,8 @@
 """系统设置：主题覆盖、微信配置、订阅套餐展示配置（DB KV 覆盖默认常量）。"""
 
 from collections.abc import Mapping
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import re
 from pathlib import Path
 
 from sqlalchemy import select
@@ -244,23 +246,90 @@ async def set_wechat_pay_config(db: AsyncSession, patch: dict) -> dict:
 
 
 # ---------- 订阅套餐展示配置 ----------
+def format_payment_amount_fen(amount_fen: int) -> str:
+    """Return the exact server-authoritative amount in the UI's currency format."""
+    yuan = amount_fen / 100
+    return f"￥{int(yuan)}" if amount_fen % 100 == 0 else f"￥{yuan:.2f}"
+
+
+def normalize_payment_amount_fen(plan_id: str, value: object) -> int:
+    """Reject ambiguous money input before storing it in the JSONB plan config."""
+    if isinstance(value, bool):
+        raise ValueError("支付金额必须是整数分")
+    try:
+        amount_fen = int(str(value).strip())
+    except (TypeError, ValueError) as error:
+        raise ValueError("支付金额必须是整数分") from error
+    if str(value).strip() != str(amount_fen):
+        raise ValueError("支付金额必须是整数分")
+    if plan_id == "free":
+        if amount_fen != 0:
+            raise ValueError("免费套餐支付金额必须为 0")
+    elif amount_fen <= 0:
+        raise ValueError("付费套餐支付金额必须大于 0")
+    return amount_fen
+
+
+def legacy_payment_amount_fen(plan: dict) -> int | None:
+    """Translate pre-paymentAmountFen price config once, without using it as a future source of truth."""
+    price_text = str(plan.get("priceText") or "").strip()
+    raw = price_text if re.search(r"\d", price_text) else str(plan.get("originalPriceText") or "").strip()
+    match = re.search(r"\d+(?:\.\d+)?", raw)
+    if not match:
+        return None
+    try:
+        yuan = Decimal(match.group(0))
+        if not re.search(r"\d", price_text):
+            discount = Decimal(str(plan.get("discountPercent") or "100").replace("%", "").strip())
+            if Decimal("0") < discount <= Decimal("1"):
+                discount *= Decimal("100")
+            yuan *= discount / Decimal("100")
+            decimals = len(match.group(0).partition(".")[2])
+            if decimals:
+                yuan = yuan.quantize(Decimal("1." + "0" * decimals), rounding=ROUND_HALF_UP)
+        return int((yuan * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _merged_subscription_plan(default: dict, override: object) -> dict:
+    patch = override if isinstance(override, dict) else {}
+    merged = {**default, **patch}
+    if "paymentAmountFen" not in patch:
+        legacy_amount = legacy_payment_amount_fen(patch)
+        if legacy_amount is not None:
+            merged["paymentAmountFen"] = legacy_amount
+    merged["paymentAmountFen"] = normalize_payment_amount_fen(
+        str(default["planId"]), merged.get("paymentAmountFen", default["paymentAmountFen"])
+    )
+    # 价格牌、订单、回调三者都由 paymentAmountFen 派生；不要再由原价/折扣文案推导。
+    merged["priceText"] = format_payment_amount_fen(merged["paymentAmountFen"])
+    return merged
+
+
 async def get_subscription_plans(db: AsyncSession) -> list[dict]:
     s = await _get_setting(db, "subscription_plan_settings")
     overrides = s.value if s else {}
     plans = []
     for p in DEFAULT_PLANS:
-        merged = {**p, **overrides.get(p["planId"], {})}
-        plans.append(merged)
+        plans.append(_merged_subscription_plan(p, overrides.get(p["planId"], {})))
     return plans
 
 
 async def set_plan_setting(db: AsyncSession, plan_id: str, patch: dict) -> dict | None:
+    default = next((plan for plan in DEFAULT_PLANS if plan["planId"] == plan_id), None)
+    if default is None:
+        raise ValueError("套餐不存在")
+    if not isinstance(patch, dict):
+        raise ValueError("套餐配置必须是对象")
     s = await _get_setting(db, "subscription_plan_settings")
     # JSON columns do not track nested in-place mutations reliably. Build fresh
     # dicts so SQLAlchemy always emits the UPDATE and a new request sees it.
     val = dict(s.value or {}) if s else {}
     plan = dict(val.get(plan_id) or {})
     plan.update(patch)
+    if "paymentAmountFen" in plan:
+        plan["paymentAmountFen"] = normalize_payment_amount_fen(plan_id, plan["paymentAmountFen"])
     val[plan_id] = plan
     if s:
         s.value = val

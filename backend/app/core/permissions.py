@@ -71,13 +71,14 @@ DEFAULT_THEMES = {
     "viewer":  {"primary_color": "#64748b", "accent_color": "#475569", "soft_color": "#f1f5f9", "text_color": "#334155"},
 }
 
-# 套餐默认（展示与有效期；权益服务端校验在阶段 7 完善）
+# 套餐默认（展示、实际支付金额与有效期；权益服务端校验在阶段 7 完善）。
+# paymentAmountFen 是唯一的收费真值；原价和折扣只用于辅助展示，不能反推订单金额。
 DEFAULT_PLANS = [
-    {"planId": "free", "name": "免费学员", "shortName": "免费", "validDays": 0, "originalPriceText": "￥0", "discountPercent": "100", "enabled": True, "recommended": False, "badgeText": "", "description": "示例体验与轻量练习", "benefitText": "示例体验与轻量练习", "usageText": "图谱卡牌≤50；回忆知识点≤30"},
-    {"planId": "monthly", "name": "月度会员", "shortName": "月度", "validDays": 30, "originalPriceText": "￥29", "discountPercent": "100", "enabled": True, "recommended": False, "badgeText": "", "description": "短期备考", "benefitText": "完整训练与回忆", "usageText": "不限图谱/回忆"},
-    {"planId": "quarterly", "name": "季度会员", "shortName": "季度", "validDays": 90, "originalPriceText": "￥79", "discountPercent": "100", "enabled": True, "recommended": True, "badgeText": "推荐", "description": "阶段性备考", "benefitText": "阶段性备考套餐", "usageText": "不限图谱/回忆"},
-    {"planId": "half_year", "name": "半年会员", "shortName": "半年", "validDays": 180, "originalPriceText": "￥139", "discountPercent": "100", "enabled": True, "recommended": False, "badgeText": "", "description": "主推备考周期", "benefitText": "主推备考周期套餐", "usageText": "不限图谱/回忆"},
-    {"planId": "lifetime", "name": "终身会员", "shortName": "终身", "validDays": 0, "originalPriceText": "￥399", "discountPercent": "100", "enabled": True, "recommended": False, "badgeText": "", "description": "长期学习", "benefitText": "长期学习与高级能力", "usageText": "不限图谱/回忆"},
+    {"planId": "free", "name": "免费学员", "shortName": "免费", "validDays": 0, "paymentAmountFen": 0, "originalPriceText": "￥0", "discountPercent": "100", "enabled": True, "recommended": False, "badgeText": "", "description": "示例体验与轻量练习", "benefitText": "示例体验与轻量练习", "usageText": "图谱卡牌≤50；回忆知识点≤30"},
+    {"planId": "monthly", "name": "月度会员", "shortName": "月度", "validDays": 30, "paymentAmountFen": 2900, "originalPriceText": "￥29", "discountPercent": "100", "enabled": True, "recommended": False, "badgeText": "", "description": "短期备考", "benefitText": "完整训练与回忆", "usageText": "不限图谱/回忆"},
+    {"planId": "quarterly", "name": "季度会员", "shortName": "季度", "validDays": 90, "paymentAmountFen": 7900, "originalPriceText": "￥79", "discountPercent": "100", "enabled": True, "recommended": True, "badgeText": "推荐", "description": "阶段性备考", "benefitText": "阶段性备考套餐", "usageText": "不限图谱/回忆"},
+    {"planId": "half_year", "name": "半年会员", "shortName": "半年", "validDays": 180, "paymentAmountFen": 13900, "originalPriceText": "￥139", "discountPercent": "100", "enabled": True, "recommended": False, "badgeText": "", "description": "主推备考周期", "benefitText": "主推备考周期套餐", "usageText": "不限图谱/回忆"},
+    {"planId": "lifetime", "name": "终身会员", "shortName": "终身", "validDays": 0, "paymentAmountFen": 39900, "originalPriceText": "￥399", "discountPercent": "100", "enabled": True, "recommended": False, "badgeText": "", "description": "长期学习", "benefitText": "长期学习与高级能力", "usageText": "不限图谱/回忆"},
 ]
 
 DEFAULT_WECHAT_CONFIG = {

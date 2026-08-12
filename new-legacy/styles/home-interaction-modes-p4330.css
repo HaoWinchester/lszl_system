@@ -13,8 +13,7 @@
 .graph-mode-menu button.active::after{content:'✓';margin-left:auto;font-weight:900}
 
 /* 模式切换只改变主悬浮工具栏和对象交互，不移动搜索、缩放、居中与缩略图。 */
-body[data-graph-interaction-mode="reading"] .graph-mode-indicator,
-body[data-graph-interaction-mode="efficient"] .graph-mode-indicator{display:none!important}
+body[data-graph-interaction-mode="reading"] .graph-mode-indicator{display:none!important}
 body[data-graph-interaction-mode="reading"] .node-style-toolbar,
 body[data-graph-interaction-mode="reading"] .uc-edge-toolbar,
 body[data-graph-interaction-mode="reading"] .edge-control-layer,
