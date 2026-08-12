@@ -57,6 +57,12 @@ with sync_playwright() as playwright:
         page = context.new_page()
         page.goto(BASE_URL + "/index.html?mode=free", wait_until="networkidle")
         dismiss_learning_entry_chooser(page)
+        # New students are intentionally offered guided onboarding.  Payment
+        # remains reachable by an explicit, ordinary user dismissal.
+        tour = page.locator("#guidedTourLayer.show")
+        if tour.count():
+            tour.locator(".tour-skip").click()
+            tour.wait_for(state="hidden")
         page.locator("#upgradeMemberBtn").click()
         carousel = page.locator(".membership-ui .plans-grid")
         carousel.wait_for(state="visible")
