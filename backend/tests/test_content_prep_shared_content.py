@@ -54,18 +54,18 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
                     "created_at": row.created_at,
                     "updated_at": row.updated_at,
                 }
-                previous_active_tag_id = (
+            previous_active_tag_id = (
                 await db.execute(
                     select(QuestionTagConfig.id).where(QuestionTagConfig.active.is_(True))
                 )
-                ).scalar_one_or_none()
-                legacy_tag = await db.get(SharedRuntimeState, TAG_KEY)
-                if legacy_tag is None:
-                    db.add(SharedRuntimeState(key=TAG_KEY, value=tag_sentinel))
-                else:
-                    legacy_tag.value = tag_sentinel
-                    legacy_tag.updated_by = None
-                db.add_all([
+            ).scalar_one_or_none()
+            legacy_tag = await db.get(SharedRuntimeState, TAG_KEY)
+            if legacy_tag is None:
+                db.add(SharedRuntimeState(key=TAG_KEY, value=tag_sentinel))
+            else:
+                legacy_tag.value = tag_sentinel
+                legacy_tag.updated_by = None
+            db.add_all([
                 User(username=teacher_a, password_hash=hash_password(PASSWORD), role="teacher", status="active", subject="PMP"),
                 User(username=teacher_b, password_hash=hash_password(PASSWORD), role="teacher", status="active", subject="PMP"),
                 User(username=student, password_hash=hash_password(PASSWORD), role="student", status="active", subject="PMP"),
@@ -99,8 +99,8 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
             await db.execute(delete(User).where(User.username.in_([teacher_a, teacher_b, student, viewer])))
             await db.commit()
 
-    asyncio.run(seed())
     try:
+        asyncio.run(seed())
         with TestClient(app) as first, TestClient(app) as second, TestClient(app) as admin:
             assert first.post("/api/v1/auth/login", json={"username": teacher_a, "password": PASSWORD}).status_code == 200
             assert second.post("/api/v1/auth/login", json={"username": teacher_b, "password": PASSWORD}).status_code == 200

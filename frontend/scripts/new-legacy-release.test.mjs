@@ -81,13 +81,17 @@ test('content prep studio ships reproducible modular source and backend bootstra
   assert.match(built, /<script src="\/server-state-bootstrap\.js"><\/script>/)
 
   const enterinformation = resolve(repoDir, 'enterinformation')
-  const before = hashTree(enterinformation)
+  const existedBeforeBuild = existsSync(enterinformation)
+  const before = existedBeforeBuild ? hashTree(enterinformation) : null
   const result = spawnSync('python3', [resolve(source, 'content-prep-studio/build.py')], {
     cwd: repoDir,
     encoding: 'utf8',
   })
   assert.equal(result.status, 0, result.stderr)
-  assert.equal(hashTree(enterinformation), before, 'build must not modify enterinformation')
+  assert.equal(existsSync(enterinformation), existedBeforeBuild, 'build must not create or remove enterinformation')
+  if (existedBeforeBuild) {
+    assert.equal(hashTree(enterinformation), before, 'build must not modify enterinformation')
+  }
   assert.equal(
     readFileSync(resolve(source, 'content-prep-studio/dist/content-prep.html'), 'utf8'),
     built,
