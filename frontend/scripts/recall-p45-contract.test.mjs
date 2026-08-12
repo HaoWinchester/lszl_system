@@ -18,6 +18,8 @@ test('deep recall writes the complete canvas through its database adapter', () =
   assert.match(adapter, /async function write\(/)
   assert.match(adapter, /async function remove\(/)
   assert.match(adapter, /async function loadExplored\(/)
+  assert.match(adapter, /function signedIn\(/)
+  assert.match(adapter, /if \(!signedIn\(\) \|\| !id\) return null/)
   assert.match(sync, /recall-progress-adapter\.js/)
   assert.match(recall, /KGRecallProgressAdapter/)
   assert.match(recall, /await RecallProgress\.read\(/)

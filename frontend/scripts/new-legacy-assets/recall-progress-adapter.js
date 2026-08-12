@@ -26,6 +26,10 @@
     return String(question?.sourceCollectionId || fallback || bankId(question)).trim()
   }
 
+  function signedIn() {
+    return Boolean(global.KGRolePermissions?.currentUser?.())
+  }
+
   async function request(path, options = {}) {
     const response = await global.fetch(`${API_ROOT}${path}`, {
       ...options,
@@ -50,7 +54,7 @@
 
   async function read(question) {
     const id = questionId(question)
-    if (!id) return null
+    if (!signedIn() || !id) return null
     try {
       const payload = await request(`/${encodeURIComponent(id)}`)
       return clone(payload.progress || null)
@@ -62,7 +66,7 @@
 
   async function write(question, payload) {
     const id = questionId(question)
-    if (!id) return false
+    if (!signedIn() || !id) return false
     const saved = await request(`/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify(payload || {}),
@@ -78,7 +82,7 @@
 
   async function remove(question) {
     const id = questionId(question)
-    if (!id) return false
+    if (!signedIn() || !id) return false
     const payload = await request(`/${encodeURIComponent(id)}`, { method: 'DELETE' })
     exploredByBank.get(collectionId(question))?.delete(id)
     return Boolean(payload.deleted)
@@ -89,7 +93,7 @@
     const questionIds = Array.isArray(questions)
       ? questions.map(questionId).filter(Boolean).slice(0, 200)
       : []
-    if (!id || !questionIds.length) return new Set()
+    if (!signedIn() || !id || !questionIds.length) return new Set()
     try {
       const query = new URLSearchParams()
       questionIds.forEach((questionId) => query.append('question_ids', questionId))
