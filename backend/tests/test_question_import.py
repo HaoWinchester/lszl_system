@@ -226,6 +226,16 @@ def test_question_bank_import_keeps_source_identity_and_requires_confirmed_repla
             assert detail["code"] == "IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED"
             assert detail["importPlan"]["replace"] == 1
             assert detail["importPlan"]["summaries"][0]["modifiedQuestions"] == 1
+            assert detail["importPlan"]["summaries"][0]["groups"] == {
+                "content": 1,
+                "analysis": 0,
+                "keywords": 0,
+                "tags": 0,
+                "principles": 0,
+                "knowledge": 0,
+                "reasoning": 0,
+                "family": 0,
+            }
 
             replaced = client.post(
                 "/api/v1/banks/import",

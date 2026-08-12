@@ -136,21 +136,36 @@ def _import_conflict_error(code: str, message: str, import_plan: dict) -> HTTPEx
 
 
 def _question_change_summary(existing: Question, incoming: dict) -> dict:
-    groups = {
-        "content": ["title", "type", "difficulty", "domain", "topic", "stemParts", "options", "correctAnswer"],
-        "analysis": ["analysis", "translations"],
-        "keywords": ["clues", "status"],
-        "tags": ["tags"],
-        "principles": ["metadata"],
-        "knowledge": ["concepts"],
-        "reasoning": ["reasoningSteps", "keyPath"],
-        "family": ["metadata"],
-    }
     current = question_to_dict(existing)
-    changed = {key: 0 for key in groups}
-    for name, fields in groups.items():
-        if any(current.get(field) != incoming.get(field) for field in fields):
-            changed[name] = 1
+    current_metadata = (
+        current.get("metadata") if isinstance(current.get("metadata"), dict) else {}
+    )
+    incoming_metadata = (
+        incoming.get("metadata") if isinstance(incoming.get("metadata"), dict) else {}
+    )
+
+    def fields_changed(fields: tuple[str, ...]) -> bool:
+        return any(current.get(field) != incoming.get(field) for field in fields)
+
+    def metadata_changed(fields: tuple[str, ...]) -> bool:
+        return any(
+            current_metadata.get(field) != incoming_metadata.get(field)
+            for field in fields
+        )
+
+    # Keep the confirmation dialog human-meaningful: source imports retain a
+    # broad metadata object, but only the relevant metadata paths should mark a
+    # product-facing category as changed.
+    changed = {
+        "content": int(fields_changed(("title", "type", "difficulty", "domain", "topic", "stemParts", "options", "correctAnswer"))),
+        "analysis": int(fields_changed(("analysis", "translations"))),
+        "keywords": int(fields_changed(("clues", "status")) or metadata_changed(("keywordSystemV2",))),
+        "tags": int(fields_changed(("tags",)) or metadata_changed(("tagPaths", "subjectFacets"))),
+        "principles": int(metadata_changed(("principleIds", "stemPrincipleIds", "optionPrincipleMap"))),
+        "knowledge": int(fields_changed(("concepts",)) or metadata_changed(("knowledge",))),
+        "reasoning": int(fields_changed(("reasoningSteps", "keyPath"))),
+        "family": int(metadata_changed(("questionFamily",))),
+    }
     return changed
 
 
