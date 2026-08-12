@@ -10,7 +10,7 @@ from app.main import app
 def login_admin(client: TestClient) -> None:
     response = client.post(
         "/api/v1/auth/login",
-        json={"username": "admin", "password": "admin123"},
+        json={"username": "admin", "password": "jbgsnmm~123"},
     )
     assert response.status_code == 200
 

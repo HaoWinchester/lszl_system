@@ -132,7 +132,7 @@ with sync_playwright() as playwright:
             denied = role_context.request.get(BASE + "/content-prep")
             assert denied.status == 403, (role, denied.status, denied.text())
 
-        login(admin.request, "admin", "admin123")
+        login(admin.request, "admin", "jbgsnmm~123")
         login(teacher.request, "老师", "111111")
         for role_context in (admin, teacher):
             allowed = role_context.request.get(BASE + "/content-prep")

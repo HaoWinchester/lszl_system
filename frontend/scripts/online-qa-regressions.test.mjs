@@ -146,16 +146,36 @@ test('content center remains an independent direct page', () => {
   assert.match(page, /src="src\/91-content-center-app\.js"/)
 })
 
-test('membership requires confirmation and supports cancelling an own pending order', () => {
+test('membership starts the server payment flow directly and supports cancelling an own pending order', () => {
   const center = source('new-legacy/src/33-user-center.js')
   const adapter = source('frontend/scripts/new-legacy-assets/direct-system-adapter.js')
   const routes = source('backend/app/api/v1/subscriptions.py')
-  assert.match(center, /handlePlanPick[\s\S]*renderPlanConfirm\(plan\)/)
+  assert.doesNotMatch(center, /确认订阅申请/)
+  assert.match(center, /handlePlanPick[\s\S]*await pay\.createNativeOrder\(plan\.id\)[\s\S]*renderNativePayment\(plan,result\.order\)/)
   assert.match(center, /id="nativePayCancelOrderBtn"/)
   assert.match(center, /cancelNativeOrder\(order\.id\)/)
   assert.match(adapter, /async cancelNativeOrder\(orderId\)/)
   assert.match(adapter, /\/self-cancel/)
   assert.match(routes, /@router\.post\("\/orders\/\{order_id\}\/self-cancel"\)/)
+})
+
+test('deep recall restores search for nodes on the current canvas', () => {
+  const page = source('new-legacy/knowledge-recall.html')
+  const runtime = source('new-legacy/src/86-knowledge-recall.js')
+  assert.match(page, /id="krNodeSearchBtn"/)
+  assert.match(page, /id="krNodeSearchInput"/)
+  assert.match(page, /id="krNodeSearchResults"/)
+  assert.match(runtime, /function renderNodeSearchResults\(query=''/)
+  assert.match(runtime, /bindNodeSearch\(\)/)
+})
+
+test('global shortcuts never auto-collapse and retain a high-contrast surface', () => {
+  const runtime = source('new-legacy/src/39-global-shortcuts.js')
+  const styles = source('new-legacy/styles/global-shortcuts.css')
+  assert.doesNotMatch(runtime, /shouldStartCollapsed/)
+  assert.doesNotMatch(runtime, /setCollapsed\(el,/)
+  assert.match(styles, /#1f2937/)
+  assert.match(styles, /#f97316/)
 })
 
 test('active learning and file pages expose the shared support center', () => {

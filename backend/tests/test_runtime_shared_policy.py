@@ -579,7 +579,7 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
     asyncio.run(_delete_shared_rows(set(snapshot) | canonical_keys))
     provisioner = TestClient(app)
     clients: dict[str, TestClient] = {}
-    _login(provisioner, "admin", "admin123")
+    _login(provisioner, "admin", "jbgsnmm~123")
     cleanup_errors: list[BaseException] = []
     try:
         for account, role in (
@@ -836,7 +836,7 @@ def test_first_direct_manager_mutation_promotes_before_set_or_remove(
     provisioner = TestClient(app)
     client = TestClient(app)
     cleanup_errors: list[BaseException] = []
-    _login(provisioner, "admin", "admin123")
+    _login(provisioner, "admin", "jbgsnmm~123")
     try:
         created = provisioner.post(
             "/api/v1/users",
@@ -1101,7 +1101,7 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
     snapshot = asyncio.run(_snapshot_teacher_promotion_rows())
     provisioner = TestClient(app)
     clients: dict[str, TestClient] = {}
-    _login(provisioner, "admin", "admin123")
+    _login(provisioner, "admin", "jbgsnmm~123")
     try:
         for account, role in (
             ("admin", "admin"),
@@ -1251,7 +1251,7 @@ def test_personal_runtime_boundary_stays_isolated_between_two_teachers() -> None
     provisioner = TestClient(app)
     clients = {"a": TestClient(app), "b": TestClient(app)}
     promotion_snapshot = asyncio.run(_snapshot_teacher_promotion_rows())
-    _login(provisioner, "admin", "admin123")
+    _login(provisioner, "admin", "jbgsnmm~123")
     try:
         for username in (teacher_a, teacher_b):
             created = provisioner.post(

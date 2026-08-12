@@ -629,7 +629,7 @@ def test_admin_can_update_and_delete_teacher_owned_bank_content() -> None:
             created_question_ids.add(removable_question_id)
 
             client.post("/api/v1/auth/logout")
-            _login(client, "admin", "admin123")
+            _login(client, "admin", "jbgsnmm~123")
             updated_bank = client.put(
                 f"/api/v1/banks/{mutable_bank_id}",
                 json={"name": "由管理员更新"},
@@ -962,7 +962,7 @@ def test_catalog_access_pagination_round_trip_and_learning_visibility() -> None:
             assert client.get("/api/v1/question-catalog/banks?mode=managed").status_code == 403
             client.post("/api/v1/auth/logout")
 
-            _login(client, "admin", "admin123")
+            _login(client, "admin", "jbgsnmm~123")
             admin_ids = {
                 bank["id"]
                 for bank in client.get(

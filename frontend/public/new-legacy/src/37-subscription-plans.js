@@ -297,6 +297,14 @@
       return out;
     }
     function readPlanSettings(){
+      const remote=window.KGSubscriptionRemotePlanSettings;
+      if(remote && typeof remote === "object"){
+        const out={};
+        PLAN_ORDER.forEach(id=>{
+          if(remote[id] && typeof remote[id] === "object") out[id]=cleanPlanPatch(remote[id]);
+        });
+        return out;
+      }
       const raw=readJSON(PLAN_SETTINGS_KEY,{});
       const out={};
       if(raw && typeof raw === "object"){
@@ -313,7 +321,9 @@
           if(settings[id] && typeof settings[id] === "object") out[id]=cleanPlanPatch(settings[id]);
         });
       }
-      writeJSON(PLAN_SETTINGS_KEY,out);
+      if(window.KGSubscriptionRemotePlanSettings && typeof window.KGSubscriptionRemotePlanSettings === "object"){
+        window.KGSubscriptionRemotePlanSettings=Object.freeze(out);
+      }else writeJSON(PLAN_SETTINGS_KEY,out);
       window.dispatchEvent(new CustomEvent("kg-subscription-plan-change",{detail:{settings:out}}));
       refresh();
       return out;

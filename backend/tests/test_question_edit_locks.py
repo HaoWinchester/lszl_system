@@ -301,7 +301,7 @@ def test_per_question_lock_lifecycle_conflicts_and_force_release() -> None:
             client.post("/api/v1/auth/logout")
             assert client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "admin123"},
+                json={"username": "admin", "password": "jbgsnmm~123"},
             ).status_code == 200
             forced = client.delete(
                 f"/api/v1/content-prep/locks/{question_ids[1]}/force"

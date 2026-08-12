@@ -39,7 +39,7 @@ def test_health_returns_503_when_database_is_unavailable(monkeypatch):
 
 
 def test_auth_flow():
-    r = client.post("/api/v1/auth/login", json={"username": "admin", "password": "admin123"})
+    r = client.post("/api/v1/auth/login", json={"username": "admin", "password": "jbgsnmm~123"})
     assert r.status_code == 200
     assert r.json()["user"]["username"] == "admin"
     assert client.get("/api/v1/auth/me").status_code == 200
@@ -48,7 +48,7 @@ def test_auth_flow():
 
 
 def test_wrong_password():
-    r = client.post("/api/v1/auth/login", json={"username": "admin", "password": "wrong"})
+    r = client.post("/api/v1/auth/login", json={"username": "admin", "password": "admin123"})
     assert r.status_code == 401
 
 
@@ -58,7 +58,7 @@ def test_unauth_blocked():
 
 
 def test_file_crud():
-    client.post("/api/v1/auth/login", json={"username": "admin", "password": "admin123"})
+    client.post("/api/v1/auth/login", json={"username": "admin", "password": "jbgsnmm~123"})
     r = client.post("/api/v1/files", json={"name": "pytest文件"})
     assert r.status_code == 200
     fid = r.json()["file"]["id"]
@@ -83,7 +83,7 @@ def test_file_crud():
 
 
 def test_question_bank_and_paper():
-    client.post("/api/v1/auth/login", json={"username": "admin", "password": "admin123"})
+    client.post("/api/v1/auth/login", json={"username": "admin", "password": "jbgsnmm~123"})
     b = client.post("/api/v1/banks", json={"name": "pytest题库", "subject": "PMP"}).json()["bank"]["id"]
     question = client.post(
         f"/api/v1/banks/{b}/questions",

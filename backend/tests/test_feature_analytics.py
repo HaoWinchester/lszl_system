@@ -34,7 +34,7 @@ def _login(client: TestClient, username: str, password: str = "test1234") -> Non
 
 def _create_user(username: str, role: str = "student") -> None:
     admin = TestClient(app)
-    _login(admin, "admin", "admin123")
+    _login(admin, "admin", "jbgsnmm~123")
     response = admin.post(
         "/api/v1/users",
         json={"username": username, "password": "test1234", "role": role, "subject": "PMP"},
@@ -52,7 +52,7 @@ def _student_client() -> TestClient:
 
 def _admin_client() -> TestClient:
     client = TestClient(app)
-    _login(client, "admin", "admin123")
+    _login(client, "admin", "jbgsnmm~123")
     return client
 
 

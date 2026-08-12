@@ -199,7 +199,7 @@ def test_legacy_question_endpoints_delegate_access_and_preserve_new_fields() -> 
             assert reader_question["updatedBy"] == usernames["reader"]
 
             client.post("/api/v1/auth/logout")
-            _login(client, "admin", "admin123")
+            _login(client, "admin", "jbgsnmm~123")
             assert client.get(f"/api/v1/questions/{created_question_id}").status_code == 200
 
             legacy_page = client.get(
@@ -499,7 +499,7 @@ def test_admin_and_teacher_share_paper_crud_compose_publish_and_audit() -> None:
             assert_shared_lifecycle(
                 client,
                 actor="admin",
-                actor_password="admin123",
+                actor_password="jbgsnmm~123",
                 paper_id=paper_ids[1],
                 original_name="管理员共同试卷",
             )
@@ -606,7 +606,7 @@ def test_all_paper_mutations_reject_non_bounded_ascii_revision(
 
     try:
         with TestClient(app, raise_server_exceptions=False) as client:
-            _login(client, "admin", "admin123")
+            _login(client, "admin", "jbgsnmm~123")
             paper = client.post(
                 "/api/v1/papers",
                 json={"name": "非法修订号验证", "subject": "PMP"},
@@ -704,7 +704,7 @@ def test_all_paper_mutations_reject_revision_that_cannot_be_incremented(
 
     try:
         with TestClient(app, raise_server_exceptions=False) as client:
-            _login(client, "admin", "admin123")
+            _login(client, "admin", "jbgsnmm~123")
             paper = client.post(
                 "/api/v1/papers",
                 json={"name": "修订号上限验证", "subject": "PMP"},

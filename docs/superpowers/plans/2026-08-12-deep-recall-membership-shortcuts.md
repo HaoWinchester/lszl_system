@@ -23,10 +23,8 @@
 **Files:**
 - Modify: `new-legacy/knowledge-recall.html`
 - Modify: `new-legacy/src/86-knowledge-recall.js`
-- Copy/adapt: `updata-legacy/styles/knowledge-recall-p4517.css`
 - Copy/adapt: `updata-legacy/styles/knowledge-recall-p4519.css`
 - Copy/adapt: `updata-legacy/styles/knowledge-recall-p4520.css`
-- Copy/adapt: `updata-legacy/styles/knowledge-recall-p4526.css`
 - Test: `frontend/scripts/online-qa-regressions.test.mjs`
 
 **Interfaces:**
@@ -69,7 +67,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add new-legacy/knowledge-recall.html new-legacy/src/86-knowledge-recall.js new-legacy/styles/knowledge-recall-p4517.css new-legacy/styles/knowledge-recall-p4519.css new-legacy/styles/knowledge-recall-p4520.css new-legacy/styles/knowledge-recall-p4526.css frontend/scripts/online-qa-regressions.test.mjs
+git add new-legacy/knowledge-recall.html new-legacy/src/86-knowledge-recall.js new-legacy/styles/knowledge-recall-p4519.css new-legacy/styles/knowledge-recall-p4520.css frontend/scripts/online-qa-regressions.test.mjs
 git commit -m "feat: restore deep recall canvas search"
 ```
 
@@ -240,7 +238,40 @@ git add new-legacy/src/39-global-shortcuts.js new-legacy/styles/global-shortcuts
 git commit -m "fix: keep global shortcuts visible on canvases"
 ```
 
-### Task 5: Integrated validation and managed release
+### Task 5: Change the default and existing administrator credential
+
+**Files:**
+- Modify: `backend/app/main.py`
+- Create: `backend/alembic/versions/<revision>_set_admin_password.py`
+- Modify: backend authentication test helpers and default-account documentation
+- Test: `backend/tests/test_smoke.py` and migration/authentication regression coverage
+
+**Interfaces:**
+- Consumes: the startup default-account seed and the existing `users.password_hash` PostgreSQL column.
+- Produces: a newly initialized `admin` account and the already deployed `admin` account that both authenticate only with the newly supplied credential.
+
+- [ ] **Step 1: Write failing seed and migration contract tests**
+
+Verify the startup seed no longer embeds the retired default, and that the migration hashes the supplied password before it updates the single `admin` account.
+
+- [ ] **Step 2: Update the startup seed and create an idempotent password migration**
+
+Use the application bcrypt helper to derive the migration hash. Scope the SQL update to `username = 'admin'`; never log the credential and do not touch any other account.
+
+- [ ] **Step 3: Run focused authentication and migration tests**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_smoke.py -q`
+
+Expected: the default administrator logs in with the new credential and the previous credential is refused.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add backend/app/main.py backend/alembic/versions backend/tests
+git commit -m "fix: rotate default administrator credential"
+```
+
+### Task 6: Integrated validation and managed release
 
 **Files:**
 - Modify: `new-legacy/VERSION`
@@ -284,7 +315,7 @@ git push origin main
 
 ## Plan Self-Review
 
-- Coverage: Tasks 1–4 each cover one requested user-visible defect; Task 5 covers release and production verification.
+- Coverage: Tasks 1–4 each cover one requested user-visible defect; Task 5 rotates the requested administrator credential in both new and deployed databases; Task 6 covers release and production verification.
 - Data ownership: Tasks 2–3 use only existing FastAPI subscription plans/orders endpoints; no business browser storage is introduced.
 - Exclusions: no homepage learning entries, onboarding, simple/professional knowledge edit, or help-entry migration task appears.
 - Test alignment: every functional change has a RED/GREEN contract; visitor and student browser paths include modal, payment, and retry/visibility assertions.

@@ -157,7 +157,7 @@ def test_html_bootstrap_does_not_pair_old_state_with_a_later_content_token(
     with TestClient(app) as client:
         assert client.post(
             "/api/v1/auth/login",
-            json={"username": "admin", "password": "admin123"},
+            json={"username": "admin", "password": "jbgsnmm~123"},
         ).status_code == 200
         payload = _bootstrap(client.get("/practice-mode.html").text)
 

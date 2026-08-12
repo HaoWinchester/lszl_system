@@ -92,7 +92,7 @@ with sync_playwright() as playwright:
     question_ids = [str(uuid4()) for _ in range(4)]
     try:
         login(owner.request, "老师", "111111")
-        login(admin.request, "admin", "admin123")
+        login(admin.request, "admin", "jbgsnmm~123")
         bank = assert_ok(
             owner.request.post(
                 BASE + "/api/v1/content-prep/banks",

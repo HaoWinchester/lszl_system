@@ -49,7 +49,7 @@ def test_student_can_cancel_only_their_own_pending_order() -> None:
     admin = TestClient(app)
     owner = TestClient(app)
     other = TestClient(app)
-    _login(admin, "admin", "admin123")
+    _login(admin, "admin", "jbgsnmm~123")
     _create_student(admin, owner_name)
     _create_student(admin, other_name)
     try:

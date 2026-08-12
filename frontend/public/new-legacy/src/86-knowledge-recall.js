@@ -746,6 +746,66 @@
     const wrap=nodeLayer.querySelector(`[data-instance-id="${cssAttr(instanceId)}"]`);if(wrap){wrap.classList.add('kr-focus-ring');setTimeout(()=>wrap.classList.remove('kr-focus-ring'),1300)}
     if(openGuide&&wrap){const btn=wrap.querySelector('button');setTimeout(()=>openNodeGuide(instanceId,btn),430)}
   }
+  function nodeSearchRecord(node){
+    const data=getNodeData(node?.dataId),libraryNode=node?.custom?null:associationNode(node?.dataId);
+    const title=String(data?.title||node?.title||'知识点');
+    const titleEn=String(data?.titleEn||libraryNode?.titleEn||'');
+    const aliases=Array.isArray(libraryNode?.aliases)?libraryNode.aliases:[];
+    const haystack=[title,titleEn,...aliases].join('\u0000').toLowerCase();
+    return {node,title,titleEn,aliases,haystack};
+  }
+  function renderNodeSearchResults(query=''){
+    const results=$('krNodeSearchResults'),status=$('krNodeSearchStatus');if(!results||!status)return;
+    const q=String(query||'').trim().toLowerCase();
+    status.textContent=q?`当前画布 ${state.nodes.length} 个知识点 · 搜索“${String(query||'').trim()}”`:`当前画布 ${state.nodes.length} 个知识点`;
+    if(!q){
+      results.innerHTML='<div class="kr-node-search-empty">输入知识点名称或别名，定位后可继续回忆。</div>';
+      return;
+    }
+    const rows=state.nodes.map(nodeSearchRecord).filter(row=>row.haystack.includes(q)).sort((a,b)=>{
+      const at=a.title.toLowerCase(),bt=b.title.toLowerCase();
+      const ae=at===q?0:at.startsWith(q)?1:2,be=bt===q?0:bt.startsWith(q)?1:2;
+      return ae-be||Number(b.node?.createdAt||0)-Number(a.node?.createdAt||0)||at.localeCompare(bt,'zh-CN');
+    }).slice(0,30);
+    if(!rows.length){results.innerHTML='<div class="kr-node-search-empty">当前画布没有匹配的知识点。</div>';return}
+    results.innerHTML=rows.map(row=>`<button class="kr-node-search-result" type="button" role="option" data-instance-id="${escapeHTML(row.node.instanceId)}"><strong>${escapeHTML(row.title)}</strong>${row.titleEn?`<small>${escapeHTML(row.titleEn)}</small>`:''}</button>`).join('');
+    results.querySelectorAll('.kr-node-search-result').forEach(button=>button.onclick=()=>{
+      const instanceId=button.dataset.instanceId||'';closeNodeSearch();
+      if(instanceId)focusNode(instanceId,true);
+    });
+  }
+  function openNodeSearch(){
+    const panel=$('krNodeSearchPanel'),button=$('krNodeSearchBtn'),input=$('krNodeSearchInput');if(!panel)return;
+    panel.hidden=false;button?.setAttribute('aria-expanded','true');renderNodeSearchResults(input?.value||'');
+    requestAnimationFrame(()=>input?.focus());
+  }
+  function closeNodeSearch(){
+    const panel=$('krNodeSearchPanel'),button=$('krNodeSearchBtn');if(panel)panel.hidden=true;
+    button?.setAttribute('aria-expanded','false');
+  }
+  function toggleNodeSearch(){
+    const panel=$('krNodeSearchPanel');if(!panel)return;
+    if(panel.hidden)openNodeSearch();else closeNodeSearch();
+  }
+  function bindNodeSearch(){
+    const button=$('krNodeSearchBtn'),panel=$('krNodeSearchPanel'),input=$('krNodeSearchInput'),close=$('krNodeSearchCloseBtn');
+    if(!button||!panel)return;
+    button.onclick=event=>{event.preventDefault();event.stopPropagation();toggleNodeSearch()};
+    close?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();closeNodeSearch()});
+    input?.addEventListener('input',()=>renderNodeSearchResults(input.value));
+    input?.addEventListener('keydown',event=>{
+      if(event.key==='Escape'){event.preventDefault();closeNodeSearch();button.focus();return}
+      if(event.key==='Enter'){
+        const first=$('krNodeSearchResults')?.querySelector('.kr-node-search-result');
+        if(first){event.preventDefault();first.click()}
+      }
+    });
+    panel.addEventListener('pointerdown',event=>event.stopPropagation());
+    document.addEventListener('pointerdown',event=>{
+      if(panel.hidden||panel.contains(event.target)||button.contains(event.target))return;
+      closeNodeSearch();
+    },true);
+  }
   function cssAttr(value){return (window.CSS&&CSS.escape)?CSS.escape(String(value)):String(value).replace(/"/g,'\\"')}
   function centerOn(x,y,smooth=false){
     const vp=viewport.getBoundingClientRect();
@@ -1009,7 +1069,7 @@
     keywordMatchers=buildKeywordMatchers(rootMap);
     if(!enforceRecallPermission())return;
     window.KGLearningProgress?.registerAdapter?.('deep_recall',{flush:flushProgress,clearTransient:()=>{cancelProgressSave();destroyingNodeIds.clear();state.nodes=[];state.edges=[];state.customNodes={};state.activeKeywords=[];state.choiceOffsets={};state.activeNodeId=null;state.lastNewEdgeId='';state.lastNewNodeId='';}});
-    applyRandomHighlight();bindThemeSelect();bindCanvas();bindQuestionInteractions();bindNodeInteractions();bindQuestionDrawer();bindLanguageMode();loadProgress();renderAll();initUnifiedCanvasRuntime();bindTools();
+    applyRandomHighlight();bindThemeSelect();bindCanvas();bindQuestionInteractions();bindNodeInteractions();bindQuestionDrawer();bindLanguageMode();bindNodeSearch();loadProgress();renderAll();initUnifiedCanvasRuntime();bindTools();
     if(!recallViewportRestored)setTimeout(()=>centerOn(0,0,false),30);
   }
   window.addEventListener('pagehide',flushProgress);

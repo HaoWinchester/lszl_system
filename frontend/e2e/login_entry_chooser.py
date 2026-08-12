@@ -38,7 +38,7 @@ ACTIVE_RELEASE_ROOT = REPO_ROOT / "frontend" / "new-legacy-releases"
 SOURCE_ROOT = REPO_ROOT / "new-legacy"
 PASSWORD = "Task5-Chooser-111111"
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin123"
+ADMIN_PASSWORD = "jbgsnmm~123"
 CHOICES = (
     ("知识图谱", "index.html"),
     ("知识回忆", "knowledge-recall.html"),

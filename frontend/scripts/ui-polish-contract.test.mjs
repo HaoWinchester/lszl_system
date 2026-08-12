@@ -7,14 +7,14 @@ const frontend = resolve(import.meta.dirname, '..')
 const repo = resolve(frontend, '..')
 const source = (path) => readFileSync(resolve(repo, path), 'utf8')
 
-test('global shortcuts default to a compact, non-obstructive launcher outside the graph', () => {
+test('global shortcuts remain expanded and high-contrast outside the graph', () => {
   const shortcuts = source('new-legacy/src/39-global-shortcuts.js')
   const styles = source('new-legacy/styles/global-shortcuts.css')
 
-  assert.match(shortcuts, /function shouldStartCollapsed\(\)/)
-  assert.match(shortcuts, /currentPage\(\) !== ['"]index\.html['"]/)
-  assert.match(shortcuts, /setCollapsed\(el,shouldStartCollapsed\(\)\)/)
-  assert.match(styles, /\.kg-global-shortcuts\.is-collapsed/)
+  assert.doesNotMatch(shortcuts, /shouldStartCollapsed/)
+  assert.doesNotMatch(shortcuts, /is-collapsed/)
+  assert.match(styles, /background:#1f2937!important/)
+  assert.match(styles, /background:#f97316!important/)
 })
 
 test('mobile file manager offers clear exits and user-center keeps submit controls visible', () => {

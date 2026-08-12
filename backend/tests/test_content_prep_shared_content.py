@@ -104,7 +104,7 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
         with TestClient(app) as first, TestClient(app) as second, TestClient(app) as admin:
             assert first.post("/api/v1/auth/login", json={"username": teacher_a, "password": PASSWORD}).status_code == 200
             assert second.post("/api/v1/auth/login", json={"username": teacher_b, "password": PASSWORD}).status_code == 200
-            assert admin.post("/api/v1/auth/login", json={"username": "admin", "password": "admin123"}).status_code == 200
+            assert admin.post("/api/v1/auth/login", json={"username": "admin", "password": "jbgsnmm~123"}).status_code == 200
 
             revision = first.get("/api/v1/question-catalog/revision").json()["revision"]
             saved = first.put(

@@ -33,7 +33,7 @@ async def _seed_admin() -> None:
                 db,
                 UserCreate(
                     username="admin",
-                    password="admin123",
+                    password="jbgsnmm~123",
                     role="admin",
                     display_name="管理员",
                     subject="PMP",
@@ -41,7 +41,7 @@ async def _seed_admin() -> None:
                 ),
                 actor="system",
             )
-            logger.info("Seeded default admin: admin / admin123")
+            logger.info("Seeded default admin account")
 
         seed_users = (
             ("佩奇007", "admin"),

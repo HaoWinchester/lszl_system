@@ -50,7 +50,7 @@ def test_engagement_rejects_blank_admin_message_without_writing() -> None:
     with TestClient(app) as client:
         assert client.post(
             "/api/v1/auth/login",
-            json={"username": "admin", "password": "admin123"},
+            json={"username": "admin", "password": "jbgsnmm~123"},
         ).status_code == 200
         response = client.post(
             "/api/v1/engagement/admin/messages",

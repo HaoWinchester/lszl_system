@@ -293,7 +293,7 @@ def test_revision_endpoint_filters_non_object_changes_from_a_damaged_row() -> No
         with TestClient(app) as client:
             assert client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "admin123"},
+                json={"username": "admin", "password": "jbgsnmm~123"},
             ).status_code == 200
             response = client.get("/api/v1/question-catalog/revision")
         assert response.status_code == 200, response.text
@@ -907,7 +907,7 @@ def test_runtime_get_returns_storage_and_content_revision_from_one_snapshot(
         with TestClient(app) as client:
             assert client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "admin123"},
+                json={"username": "admin", "password": "jbgsnmm~123"},
             ).status_code == 200
             response = client.get("/api/v1/runtime/state")
 
@@ -1259,7 +1259,7 @@ def test_single_question_save_returns_current_content_revision(
         with TestClient(app) as client:
             assert client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "admin123"},
+                json={"username": "admin", "password": "jbgsnmm~123"},
             ).status_code == 200
             lock = client.post(
                 f"/api/v1/content-prep/locks/{question_id}",
@@ -1885,7 +1885,7 @@ def test_runtime_projection_rejects_invalid_bounds_before_revision_lock(
     with TestClient(app) as client:
         assert client.post(
             "/api/v1/auth/login",
-            json={"username": "admin", "password": "admin123"},
+            json={"username": "admin", "password": "jbgsnmm~123"},
         ).status_code == 200
         state = client.get("/api/v1/runtime/state").json()
         monkeypatch.setattr(revision_service, "acquire_lock", counted_acquire)
@@ -1924,7 +1924,7 @@ def test_runtime_projection_rejects_large_item_count_before_revision_lock(
     with TestClient(app) as client:
         assert client.post(
             "/api/v1/auth/login",
-            json={"username": "admin", "password": "admin123"},
+            json={"username": "admin", "password": "jbgsnmm~123"},
         ).status_code == 200
         state = client.get("/api/v1/runtime/state").json()
         monkeypatch.setattr(revision_service, "acquire_lock", counted_acquire)
@@ -1978,7 +1978,7 @@ def test_runtime_projection_rejects_content_prep_omission_sentinel(
     with TestClient(app) as client:
         assert client.post(
             "/api/v1/auth/login",
-            json={"username": "admin", "password": "admin123"},
+            json={"username": "admin", "password": "jbgsnmm~123"},
         ).status_code == 200
         state = client.get("/api/v1/runtime/state").json()
         monkeypatch.setattr(revision_service, "acquire_lock", counted_acquire)
@@ -2006,7 +2006,7 @@ def test_runtime_preset_projection_rejects_missing_principle_as_422() -> None:
     with TestClient(app) as client:
         assert client.post(
             "/api/v1/auth/login",
-            json={"username": "admin", "password": "admin123"},
+            json={"username": "admin", "password": "jbgsnmm~123"},
         ).status_code == 200
         state = client.get("/api/v1/runtime/state").json()
         value = json.dumps(
@@ -2048,7 +2048,7 @@ def test_runtime_content_revision_is_a_strict_integer(invalid_revision) -> None:
     with TestClient(app) as client:
         assert client.post(
             "/api/v1/auth/login",
-            json={"username": "admin", "password": "admin123"},
+            json={"username": "admin", "password": "jbgsnmm~123"},
         ).status_code == 200
         state = client.get("/api/v1/runtime/state").json()
         response = client.put(

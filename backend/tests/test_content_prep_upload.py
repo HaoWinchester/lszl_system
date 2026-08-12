@@ -283,7 +283,7 @@ def test_content_prep_http_rejects_invalid_projection_before_revision_lock(
     with TestClient(app) as client:
         assert client.post(
             "/api/v1/auth/login",
-            json={"username": "admin", "password": "admin123"},
+            json={"username": "admin", "password": "jbgsnmm~123"},
         ).status_code == 200
         monkeypatch.setattr(
             teaching_content_revision_service,
@@ -375,7 +375,7 @@ def test_deleting_bank_removes_upload_batches_and_preserves_audit_history() -> N
         with TestClient(app) as client:
             assert client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "admin123"},
+                json={"username": "admin", "password": "jbgsnmm~123"},
             ).status_code == 200
             deleted = client.delete(f"/api/v1/banks/{bank_id}")
             assert deleted.status_code == 200, deleted.text
@@ -825,7 +825,7 @@ def test_transactional_upload_create_skip_update_idempotency_and_single_save(
             client.post("/api/v1/auth/logout")
             assert client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "admin123"},
+                json={"username": "admin", "password": "jbgsnmm~123"},
             ).status_code == 200
             forced = client.delete(
                 f"/api/v1/content-prep/locks/{new_question_id}/force"

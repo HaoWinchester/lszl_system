@@ -32,7 +32,7 @@ BACKEND_ROOT = REPO_ROOT / "backend"
 ACTIVE_RELEASE_ROOT = REPO_ROOT / "frontend" / "new-legacy-releases"
 BASE = ""
 ADMIN_USERNAME = os.environ.get("E2E_ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.environ.get("E2E_ADMIN_PASSWORD", "admin123")
+ADMIN_PASSWORD = os.environ.get("E2E_ADMIN_PASSWORD", "jbgsnmm~123")
 TEST_PASSWORD = "Task7-111111"
 SHARED_KEYS = (
     "kg_assessment_papers_v1",

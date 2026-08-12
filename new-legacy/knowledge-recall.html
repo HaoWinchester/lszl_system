@@ -14,6 +14,8 @@
 <link rel="stylesheet" href="styles/knowledge-recall-p2224.css"/>
 <link rel="stylesheet" href="styles/knowledge-recall-p2225.css"/>
 <link rel="stylesheet" href="styles/knowledge-recall-p4322.css"/>
+<link rel="stylesheet" href="styles/knowledge-recall-p4519.css"/>
+<link rel="stylesheet" href="styles/knowledge-recall-p4520.css"/>
 <link rel="stylesheet" href="styles/unified-canvas-runtime.css"/>
 <link rel="stylesheet" href="styles/focus-vega-typography.css"/>
 <link rel="stylesheet" href="styles/focus-vega-learning.css"/>
@@ -89,9 +91,22 @@
         </div>
       </div>
       <div class="kr-canvas-overlay-right">
-        <button class="kr-reset-question-btn" id="krResetBtn" type="button" title="重置本题知识点" aria-label="重置本题知识点">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.34-5.66"/><path d="M4 4v6h6"/></svg>
-        </button>
+        <div class="kr-canvas-action-group" role="group" aria-label="本题知识点工具">
+          <button class="kr-reset-question-btn kr-node-search-btn" id="krNodeSearchBtn" type="button" title="搜索本页知识点" aria-label="搜索本页知识点" aria-expanded="false" aria-controls="krNodeSearchPanel">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
+          </button>
+          <button class="kr-reset-question-btn" id="krResetBtn" type="button" title="重置本题知识点" aria-label="重置本题知识点">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.34-5.66"/><path d="M4 4v6h6"/></svg>
+          </button>
+        </div>
+        <div class="kr-node-search-panel" id="krNodeSearchPanel" hidden>
+          <div class="kr-node-search-input-row">
+            <input id="krNodeSearchInput" type="search" placeholder="搜索当前画布知识点" autocomplete="off" aria-label="搜索当前画布知识点"/>
+            <button id="krNodeSearchCloseBtn" type="button" aria-label="关闭搜索" title="关闭">×</button>
+          </div>
+          <div class="kr-node-search-status" id="krNodeSearchStatus"></div>
+          <div class="kr-node-search-results" id="krNodeSearchResults" role="listbox" aria-label="知识点搜索结果"></div>
+        </div>
       </div>
       <div class="kr-world" id="krWorld">
         <svg class="kr-edges" id="krEdges" aria-hidden="true"></svg>

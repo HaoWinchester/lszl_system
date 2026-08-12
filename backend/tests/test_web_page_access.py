@@ -44,7 +44,7 @@ def test_anonymous_cannot_download_privileged_page_html() -> None:
 
 def test_admin_can_download_privileged_page_html() -> None:
     with TestClient(app) as client:
-        _login(client, "admin", "admin123")
+        _login(client, "admin", "jbgsnmm~123")
         response = client.get("/admin-console.html")
     assert response.status_code == 200
     assert "管理后台" in response.text

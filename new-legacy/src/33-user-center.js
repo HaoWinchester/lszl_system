@@ -232,71 +232,6 @@
       <div class="redeem-message" id="subscriptionRedeemCodeMsg"></div>
     </section>
     <div class="footnote"><span class="icon i-shield-check"></span>卡密兑换成功后，权益将自动开通并即时生效</div>`;
-    function renderPlanConfirm(plan){
-      setMembershipPaymentView(false);
-      if(!body||!plan)return;
-      const features=planFeatureList(plan).slice(0,8);
-      const limitText=planLimitText(plan);
-      const latest=currentRecord();
-      const username=latest&&latest.username||"";
-      body.innerHTML=`<div class="divider"></div>
-        <div class="toolbar"><button type="button" class="back-button" id="subscriptionBackToPlansBtn"><span class="icon i-arrow-left"></span>返回会员方案</button></div>
-        <section class="confirm-card">
-          <div class="confirm-main">
-            <div class="confirm-head">
-              <div><p class="kicker">确认订阅申请</p><h3 class="confirm-title">${escapeHTML(plan.name||'会员方案')}</h3></div>
-              <span class="pill">${escapeHTML(plan.badgeText||plan.shortName||'会员')}</span>
-            </div>
-          <div class="confirm-price">
-            <strong>${escapeHTML(plan.priceText||'待配置')}</strong>
-            ${plan.originalPriceText?`<del>${escapeHTML(plan.originalPriceText)}</del>`:''}
-          </div>
-          <p class="confirm-help">确认后生成微信支付二维码。请使用微信扫码并在手机上完成付款，权益会在支付成功后自动开通。</p>
-          <div class="meta-grid">
-            <div class="meta-card"><div class="meta-icon"><span class="icon i-user"></span></div><div><div class="meta-label">申请账号</div><div class="meta-value">${escapeHTML(username||'未登录')}</div></div></div>
-            <div class="meta-card"><div class="meta-icon green"><span class="icon i-wallet"></span></div><div><div class="meta-label">开通方式</div><div class="meta-value">微信扫码支付</div></div></div>
-            <div class="meta-card"><div class="meta-icon"><span class="icon i-clock"></span></div><div><div class="meta-label">订单状态</div><div class="meta-value">待支付</div></div></div>
-          </div>
-          <section class="benefits"><h4 class="section-title">包含权益</h4>${features.map(item=>`<div class="benefit-item"><span class="icon i-check-circle"></span>${escapeHTML(item)}</div>`).join('')}${limitText?`<div class="benefit-item usage-item"><span class="icon i-infinity"></span>${escapeHTML(limitText)}</div>`:''}</section>
-          </div>
-          <aside class="guide">
-            <div class="guide-visual"><div class="guide-browser"></div><div class="guide-wechat"><span class="icon i-wechat"></span></div></div>
-            <h4 class="guide-title">微信扫码支付</h4><p class="guide-copy">支付成功后，会员权益将自动开通</p>
-            <div class="steps"><div><div class="step-icon"><span class="icon i-qr-code"></span></div><div class="step-title">1. 打开微信</div><div class="step-copy">扫一扫</div></div><div class="step-arrow"><span class="icon i-chevron-right"></span></div><div><div class="step-icon"><span class="icon i-scan"></span></div><div class="step-title">2. 扫描二维码</div><div class="step-copy">确认订单</div></div><div class="step-arrow"><span class="icon i-chevron-right"></span></div><div><div class="step-icon"><span class="icon i-check-circle"></span></div><div class="step-title">3. 完成支付</div><div class="step-copy">权益自动开通</div></div></div>
-          </aside>
-        </section>
-        <div class="confirm-actions"><button type="button" class="btn btn-secondary" id="subscriptionCancelOrderBtn">取消</button><button type="button" class="btn btn-primary" id="subscriptionSubmitOrderBtn">生成支付二维码</button></div>
-        <div class="footnote"><span class="icon i-shield-check"></span>支付过程由微信安全保障，请放心使用</div>`;
-      const back=$("subscriptionBackToPlansBtn");
-      const cancel=$("subscriptionCancelOrderBtn");
-      const submit=$("subscriptionSubmitOrderBtn");
-      if(back)back.addEventListener("click",renderSubscriptionDetailPlans);
-      if(cancel)cancel.addEventListener("click",renderSubscriptionDetailPlans);
-      if(submit)submit.addEventListener("click",async()=>{
-        const pay=window.KGWechatPay;
-        if(!pay||typeof pay.createNativeOrder!=="function"){
-          showStatus("支付服务不可用，请刷新页面后重试。");
-          return;
-        }
-        submit.disabled=true;
-        submit.textContent="正在生成…";
-        try{
-          const result=await pay.createNativeOrder(plan.id);
-          if(!result||!result.order||!result.order.codeUrl){
-            showStatus("支付二维码生成失败，请重试。");
-            submit.disabled=false;
-            submit.textContent="重新生成支付二维码";
-            return;
-          }
-          renderNativePayment(plan,result.order);
-          showStatus("支付二维码已生成，请使用微信扫码。");
-        }catch(error){
-          showStatus(String(error&&error.message||"支付二维码生成失败，请重试。"));
-          submit.disabled=false;
-          submit.textContent="重新生成支付二维码";
-        }
-      });
-    }
     function renderNativePayment(plan,order){
       const pay=window.KGWechatPay;
       if(!body||!pay||!order||!order.id)return;
@@ -359,6 +294,13 @@
       body.innerHTML=`<div class="divider"></div><section class="payment-success"><div class="success-icon"><span class="icon i-check-circle"></span></div><h3>支付成功</h3><p>会员权益已开通，即将返回首页。</p><div class="success-meta"><span>开通方案：${escapeHTML(plan&&plan.name||order.planName||'会员')}</span><span>订单编号：${escapeHTML(order.id||'—')}</span></div><button type="button" class="btn btn-primary" id="subscriptionCloseAfterSubmitBtn">知道了</button></section>`;
       $("subscriptionCloseAfterSubmitBtn")?.addEventListener("click",closeSubscriptionDetailModal);
     }
+    function requestAuthenticationForPlan(plan){
+      closeSubscriptionDetailModal();
+      const reason=`登录后即可开通${plan&&plan.name||'会员方案'}。`;
+      showStatus(reason);
+      if(typeof window.authOpen==="function"){window.authOpen(reason);return}
+      $("authLoginBtn")?.click();
+    }
     async function handlePlanPick(card){
       const planId=card&&card.dataset.buyPlan;
       if(!planId)return;
@@ -366,9 +308,7 @@
       const latest=currentRecord();
       const role=latest&&latest.user&&latest.user.role || "guest";
       if(!latest){
-        showStatus("请先登录学员账号后再购买或开通会员。");
-        const login=$("authLoginBtn");
-        if(login)login.click();
+        requestAuthenticationForPlan(plan);
         return;
       }
       if(role==="admin"||role==="teacher"){
@@ -376,14 +316,31 @@
         return;
       }
       if(role==="viewer"){
-        showStatus("游客不进入订阅体系，请切换为学员账号后购买会员。 ");
+        requestAuthenticationForPlan(plan);
         return;
       }
       if(plan&&plan.id==="free"){
         showStatus("免费学员无需购买，可直接使用免费权益。");
         return;
       }
-      renderPlanConfirm(plan);
+      const pay=window.KGWechatPay;
+      if(!pay||typeof pay.createNativeOrder!=="function"){
+        showStatus("支付服务不可用，请刷新页面后重试。");
+        return;
+      }
+      const originalLabel=card.innerHTML;
+      card.disabled=true;
+      card.textContent="正在生成支付二维码…";
+      try{
+        const result=await pay.createNativeOrder(plan.id);
+        if(!result||!result.order||!result.order.codeUrl)throw new Error("支付二维码生成失败，请重试。");
+        renderNativePayment(plan,result.order);
+        showStatus("支付二维码已生成，请使用微信扫码。");
+      }catch(error){
+        showStatus(String(error&&error.message||"支付二维码生成失败，请重试。"));
+        card.disabled=false;
+        card.innerHTML=originalLabel;
+      }
     }
     body.querySelectorAll('[data-buy-plan]').forEach(card=>card.addEventListener('click',()=>handlePlanPick(card)));
     const redeemBtn=$("subscriptionRedeemCodeBtn");

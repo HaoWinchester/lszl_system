@@ -95,8 +95,13 @@
   }
 
   function preloadPlans() {
-    const plans = request('GET', '/api/v1/system/subscription-plans').plans || []
-    storage.setItem('kg_subscription_plan_settings_v1', JSON.stringify(planSettings(plans)))
+    const plans = request('GET', '/api/v1/subscriptions/plans').plans || []
+    // 套餐配置以 PostgreSQL 为唯一来源；仅在当前页面内存中提供给旧 UI 模块，
+    // 不把展示配置写回浏览器缓存或运行时状态表。
+    global.KGSubscriptionRemotePlanSettings = Object.freeze(planSettings(plans))
+    global.dispatchEvent(new CustomEvent('kg-subscription-plan-change', {
+      detail: { settings: global.KGSubscriptionRemotePlanSettings },
+    }))
   }
 
   function subscriptionTimestamp(value) {
@@ -135,12 +140,17 @@
     }
 
     try {
-      // 学员也需要读取套餐金额。
-      preloadPlans()
       preloadSubscription()
     } catch (error) {
       console.error('[DirectSystemAdapter] subscription preload failed:', error)
     }
+  }
+
+  try {
+    // 访客同样需要看到管理员在数据库中配置的套餐，而不是旧页面的“待配置”占位。
+    preloadPlans()
+  } catch (error) {
+    console.error('[DirectSystemAdapter] subscription plans preload failed:', error)
   }
 
   if (isAdmin()) {

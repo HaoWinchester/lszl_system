@@ -37,7 +37,7 @@ test('member purchase offers a retryable payment failure instead of local approv
   const userCenter = readFileSync(resolve(repoDir, 'new-legacy/src/33-user-center.js'), 'utf8')
 
   assert.match(userCenter, /支付二维码生成失败/)
-  assert.match(userCenter, /重新生成支付二维码/)
+  assert.match(userCenter, /card\.disabled=false;[\s\S]*card\.innerHTML=originalLabel/)
   assert.doesNotMatch(userCenter, /管理员确认后会自动生效/)
 })
 
@@ -47,7 +47,6 @@ test('member purchase keeps the supplied membership-center visual structure arou
 
   assert.match(userCenter, /membership-ui/)
   assert.match(userCenter, /plans-grid/)
-  assert.match(userCenter, /confirm-card/)
   assert.match(userCenter, /payment-grid/)
   assert.match(userCenter, /qr-frame/)
   assert.match(userCenter, /nativeOrderQrCodeUrl/)
@@ -57,12 +56,16 @@ test('member purchase keeps the supplied membership-center visual structure arou
   assert.match(membershipStyles, /\.membership-ui\.is-payment-view\{[^}]*overflow:hidden/)
 })
 
-test('member plans confirm before generating the Native QR and stay in one horizontal scroll row', () => {
+test('visitor plans are public, hand off to login cleanly, and create a Native order in one step', () => {
+  const adapter = readFileSync(resolve(scriptsDir, 'new-legacy-assets', 'direct-system-adapter.js'), 'utf8')
   const userCenter = readFileSync(resolve(repoDir, 'new-legacy/src/33-user-center.js'), 'utf8')
   const membershipStyles = readFileSync(resolve(repoDir, 'new-legacy/styles/membership-ui.css'), 'utf8')
 
-  assert.match(userCenter, /async function handlePlanPick\(card\)[\s\S]*?renderPlanConfirm\(plan\)/)
-  assert.match(userCenter, /id="subscriptionSubmitOrderBtn"[\s\S]*?await pay\.createNativeOrder\(plan\.id\)[\s\S]*?renderNativePayment\(plan,result\.order\)/)
+  assert.match(adapter, /\/api\/v1\/subscriptions\/plans/)
+  assert.doesNotMatch(adapter, /request\('GET', '\/api\/v1\/system\/subscription-plans'\)/)
+  assert.match(userCenter, /function requestAuthenticationForPlan\(plan\)[\s\S]*?closeSubscriptionDetailModal\(\)[\s\S]*?window\.authOpen/)
+  assert.doesNotMatch(userCenter, /function renderPlanConfirm\(/)
+  assert.match(userCenter, /async function handlePlanPick\(card\)[\s\S]*?await pay\.createNativeOrder\(plan\.id\)[\s\S]*?renderNativePayment\(plan,result\.order\)/)
   assert.match(membershipStyles, /\.membership-ui\s+\.plans-grid\{display:flex/)
   assert.match(membershipStyles, /overflow-x:auto/)
   assert.match(membershipStyles, /\.membership-ui\s+\.plan-card\{[^}]*flex:0 0/)

@@ -249,7 +249,7 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
             client.post("/api/v1/auth/logout")
             admin_login = client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "admin123"},
+                json={"username": "admin", "password": "jbgsnmm~123"},
             )
             assert admin_login.status_code == 200
             admin_created = client.post(

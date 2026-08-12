@@ -37,7 +37,7 @@ def install_harness(page, file_name, initial_username=''):
         async login(username,password){
           calls.login+=1;
           await new Promise(resolve=>setTimeout(resolve,35));
-          if(username!=='admin'||password!=='admin123')return {ok:false,message:'密码不正确。'};
+          if(username!=='admin'||password!=='jbgsnmm~123')return {ok:false,message:'密码不正确。'};
           user={username:'admin',displayName:'管理员'};
           return {ok:true,user};
         },
@@ -127,7 +127,7 @@ def exercise_dialog(page):
     page.locator('#authMsg').get_by_text('密码不正确。').wait_for()
     assert not page.locator('#authDoLoginBtn').is_disabled()
 
-    page.locator('#authPassword').fill('admin123')
+    page.locator('#authPassword').fill('jbgsnmm~123')
     page.evaluate("""()=>{
       document.getElementById('authDoLoginBtn').click();
       document.getElementById('authDoLoginBtn').click();
@@ -155,7 +155,7 @@ def exercise_dialog(page):
     page.evaluate("KGSharedAuthDialog.logout()")
     page.evaluate("KGSharedAuthDialog.open()")
     page.locator('#authUsername').fill('admin')
-    page.locator('#authPassword').fill('admin123')
+    page.locator('#authPassword').fill('jbgsnmm~123')
     page.locator('#authPassword').press('Enter')
     page.wait_for_function("!document.getElementById('authModal').classList.contains('show')")
     assert page.evaluate('__authHarness.current().username') == 'admin'

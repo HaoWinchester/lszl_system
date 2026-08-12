@@ -61,6 +61,16 @@ def test_lifetime_is_the_only_paid_plan_allowed_without_expiry() -> None:
     ) == {"allExamPapers": False}
 
 
+def test_visitor_can_read_database_backed_subscription_plans() -> None:
+    with TestClient(app) as visitor:
+        response = visitor.get("/api/v1/subscriptions/plans")
+
+    assert response.status_code == 200, response.text
+    plans = response.json()["plans"]
+    assert {plan["planId"] for plan in plans} >= {"free", "monthly", "quarterly", "half_year", "lifetime"}
+    assert all(plan["originalPriceText"] for plan in plans)
+
+
 def test_subscription_write_endpoints_reject_unknown_plan_ids() -> None:
     token = uuid4().hex[:10]
     username = f"plan-validation-{token}"
@@ -98,7 +108,7 @@ def test_subscription_write_endpoints_reject_unknown_plan_ids() -> None:
     with TestClient(app) as admin, TestClient(app) as student:
         assert admin.post(
             "/api/v1/auth/login",
-            json={"username": "admin", "password": "admin123"},
+            json={"username": "admin", "password": "jbgsnmm~123"},
         ).status_code == 200
         created = admin.post(
             "/api/v1/users",

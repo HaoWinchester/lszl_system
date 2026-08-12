@@ -57,17 +57,6 @@
     const path = (location.pathname.split("/").pop() || "index.html").toLowerCase();
     return path || "index.html";
   }
-  function shouldStartCollapsed(){return currentPage() !== 'index.html'}
-  function setCollapsed(el,collapsed){
-    if(!el)return;
-    el.classList.toggle('is-collapsed',!!collapsed);
-    const toggle=el.querySelector('#kgGlobalShortcutsToggle');
-    if(toggle){
-      const label=collapsed?'展开全局快捷入口':'切换快捷入口排布';
-      toggle.setAttribute('aria-label',label);
-      toggle.dataset.tooltip=label;
-    }
-  }
   function isCurrent(item){
     return currentPage() === item.href.toLowerCase();
   }
@@ -256,7 +245,6 @@
 
     document.body.appendChild(el);
     applyLayout(el, layout);
-    setCollapsed(el,shouldStartCollapsed());
     applySavedPosition(el);
 
     const handle = document.getElementById("kgGlobalShortcutsHandle");
@@ -268,7 +256,6 @@
       toggle.addEventListener("click", event => {
         event.preventDefault();
         event.stopPropagation();
-        if(el.classList.contains('is-collapsed')){setCollapsed(el,false);applySavedPosition(el);return}
         const next = el.dataset.layout === "horizontal" ? "vertical" : "horizontal";
         writeJSON(STORAGE_LAYOUT, next);
         applyLayout(el, next);

@@ -22,11 +22,6 @@
   font-family:"Microsoft YaHei","PingFang SC",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
 .kg-global-shortcuts[hidden]{display:none!important}
-.kg-global-shortcuts.is-collapsed{width:48px!important;padding:5px!important;border-radius:15px!important}
-.kg-global-shortcuts.is-collapsed .kg-global-shortcuts-body{display:none!important}
-.kg-global-shortcuts.is-collapsed .kg-global-shortcuts-head{padding:0!important;justify-content:center!important}
-.kg-global-shortcuts.is-collapsed .kg-global-shortcuts-title{display:none!important}
-.kg-global-shortcuts.is-collapsed .kg-global-shortcuts-toggle{width:36px!important;height:36px!important}
 .kg-global-shortcuts.dragging{
   opacity:.95;
   box-shadow:0 24px 66px rgba(15,23,42,.26);
@@ -487,4 +482,28 @@
 .kg-global-shortcuts-link.current.settings,
 .kg-global-shortcuts-link.current.workspace{
   color:#fff;
+}
+
+/* P4.5 · canvas pages must retain a visible shortcut surface after every redraw. */
+.kg-global-shortcuts{
+  background:#1f2937!important;
+  border-color:#475569!important;
+  color:#f8fafc!important;
+  box-shadow:0 16px 38px rgba(15,23,42,.34)!important;
+}
+.kg-global-shortcuts-grip{
+  background:#334155!important;
+  color:#e2e8f0!important;
+  box-shadow:inset 0 0 0 1px rgba(226,232,240,.18)!important;
+}
+.kg-global-shortcuts-toggle{
+  background:#f97316!important;
+  color:#fff!important;
+  box-shadow:0 5px 12px rgba(249,115,22,.38)!important;
+}
+.kg-global-shortcuts-toggle:hover,
+.kg-global-shortcuts-toggle:focus-visible{
+  background:#ea580c!important;
+  outline:2px solid #fed7aa!important;
+  outline-offset:2px;
 }

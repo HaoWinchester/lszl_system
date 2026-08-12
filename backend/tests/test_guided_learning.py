@@ -23,7 +23,7 @@ def _login(client: TestClient, username: str, password: str = "test1234") -> Non
 def _student() -> TestClient:
     username = _name("guided")
     admin = TestClient(app)
-    _login(admin, "admin", "admin123")
+    _login(admin, "admin", "jbgsnmm~123")
     created = admin.post(
         "/api/v1/users",
         json={"username": username, "password": "test1234", "role": "student", "subject": "PMP"},
@@ -128,7 +128,7 @@ def test_progress_requires_auth_is_owner_isolated_and_admin_preview_never_writes
     assert second_progress["nodes"][first_node_id]["status"] == "available"
 
     admin = TestClient(app)
-    _login(admin, "admin", "admin123")
+    _login(admin, "admin", "jbgsnmm~123")
     preview = admin.get(f"/api/v1/guided-learning/courses/{course_id}/progress", params={"preview": "true"})
     assert preview.status_code == 200
     assert preview.json()["preview"] is True

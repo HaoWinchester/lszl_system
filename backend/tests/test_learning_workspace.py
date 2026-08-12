@@ -16,7 +16,7 @@ def _login(client: TestClient, username: str, password: str = "test1234") -> Non
 
 def _create_student(username: str) -> None:
     admin = TestClient(app)
-    _login(admin, "admin", "admin123")
+    _login(admin, "admin", "jbgsnmm~123")
     response = admin.post(
         "/api/v1/users",
         json={"username": username, "password": "test1234", "role": "student", "subject": "PMP"},
@@ -26,7 +26,7 @@ def _create_student(username: str) -> None:
 
 def _create_published_question() -> str:
     admin = TestClient(app)
-    _login(admin, "admin", "admin123")
+    _login(admin, "admin", "jbgsnmm~123")
     bank = admin.post(
         "/api/v1/banks",
         json={"name": _name("学习题库"), "subject": "PMP", "visibility": "published"},

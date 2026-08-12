@@ -63,7 +63,7 @@ def test_learning_roles_cannot_open_content_prep(
 
 @pytest.mark.parametrize(
     ("username", "password", "role"),
-    [("老师", "111111", "teacher"), ("admin", "admin123", "admin")],
+    [("老师", "111111", "teacher"), ("admin", "jbgsnmm~123", "admin")],
 )
 def test_teaching_roles_receive_the_prep_page_and_actor_bootstrap(
     content_prep_release: WebRelease,

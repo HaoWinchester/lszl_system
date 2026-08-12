@@ -50,7 +50,7 @@ def ensure_test_accounts(browser: Browser) -> None:
         for username, password in (
             (ACCOUNTS["admin"], PASSWORD),
             ("佩奇007", PASSWORD),
-            ("admin", "admin123"),
+            ("admin", "jbgsnmm~123"),
         ):
             login_response = context.request.post(
                 f"{BASE}/api/v1/auth/login",

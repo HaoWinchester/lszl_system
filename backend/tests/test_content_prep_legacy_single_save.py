@@ -146,7 +146,7 @@ def test_single_save_replay_precedes_mutable_question_routing(
         with TestClient(app) as client:
             assert client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "admin123"},
+                json={"username": "admin", "password": "jbgsnmm~123"},
             ).status_code == 200
             lock_body = {"clientInstanceId": "replay-routing-editor"}
             if initial_creator_id:
@@ -298,7 +298,7 @@ def test_locked_single_save_preserves_null_legacy_creator_and_audits_actor(
         with TestClient(app) as client:
             login = client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "admin123"},
+                json={"username": "admin", "password": "jbgsnmm~123"},
             )
             assert login.status_code == 200
             grant_response = client.post(
