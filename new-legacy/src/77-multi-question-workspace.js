@@ -12,6 +12,7 @@
   const PrincipleBinding=global.KGQuestionPrincipleBinding||{};
   const PracticeSelector=global.KGPracticeSelectionService||{};
   const PracticeAttempts=global.KGPracticeAttemptRepository||{};
+  const PersonalCards=global.KGPersonalSynthesisCardApi||{};
   const BUTTON_LEVELS=viewportLibrary.BUTTON_ZOOM_LEVELS||[.01,.02,.03,.05,.10,.15,.20,.33,.50,.75,1,1.25,1.50,2,2.50,3,4];
   const WHEEL_LEVELS=viewportLibrary.WHEEL_ZOOM_LEVELS||[.01,.02,.03,.04,.05,.07,.09,.11,.13,.17,.21,.26,.33,.41,.51,.64,.80,1,1.20,1.44,1.73,2.07,2.49,2.99,3.58,4];
   const MIN_ZOOM=viewportLibrary.MIN_ZOOM||.01;
@@ -84,6 +85,7 @@
     editingGroupId:'',
     editingEdgeId:'',
     pendingSynthesisPosition:null,
+    personalCardRefresh:null,
     activeGroupId:'',
     analysisNodeIds:[],
     analysisLayer:null,
@@ -1077,8 +1079,10 @@
     const editableTitle=system?'':' data-qw-inline-field="title" title="双击编辑原则"';
     const editableContent=system?'':' data-qw-inline-field="content" title="双击编辑"';
     const copyButton=system?cardIconButtonMarkup('copy-synthesis','复制为我的归纳',CARD_ACTION_ICONS.edit):'';
+    const syncState=!system&&node.archived?'<span class="qw-synthesis-sync-state is-archived">已归档</span>'
+      :!system&&node.personalCardSyncError?'<span class="qw-synthesis-sync-state is-error" title="'+escapeHTML(node.personalCardSyncError)+'">尚未同步到我的归纳卡</span>':'';
     return '<header class="qw-card-header qw-synthesis-header" data-card-drag-handle>'
-      +'<div class="qw-synthesis-title-wrap"><small class="qw-synthesis-owner-badge">'+(system?'系统':'我的')+'</small><h3 class="qw-synthesis-principle"'+editableTitle+'>'+escapeHTML(title)+'</h3></div>'
+      +'<div class="qw-synthesis-title-wrap"><small class="qw-synthesis-owner-badge">'+(system?'系统':'我的')+'</small>'+syncState+'<h3 class="qw-synthesis-principle"'+editableTitle+'>'+escapeHTML(title)+'</h3></div>'
       +'<div class="qw-card-header-actions">'+copyButton+cardCloseButtonMarkup('移除归纳卡')+'</div>'
       +'</header><div class="qw-card-body qw-synthesis-simple-body">'
       +'<p class="qw-synthesis-content'+(content?'':' qw-synthesis-placeholder')+'"'+editableContent+'>'+escapeHTML(content||(system?'暂无原则说明':'双击补充你的理解'))+'</p>'
@@ -1872,6 +1876,94 @@
     const preset=synthesisPresetForNode(node);
     return {title:String(preset?.title||node.title||node.principleTag||'原则：待提炼'),content:String(preset?.content||node.content||''),preset};
   }
+  function sourceQuestionRefsForSynthesis(node={}){
+    return [...new Set((node.sourceNodeIds||[]).map(String))].map(nodeId=>state.workspace?.nodes?.[nodeId]).filter(item=>item?.nodeType==='question-reference').map(item=>({
+      questionId:String(item.questionId||''),
+      bankId:String(item.bankId||''),
+      paperId:String(item.paperId||''),
+      releaseId:String(item.releaseId||''),
+      title:String(item.title||'')
+    })).filter(item=>item.questionId);
+  }
+  function personalCardInput(node={}){
+    return {
+      title:String(node.title||'未命名归纳卡').trim()||'未命名归纳卡',
+      synthesisType:String(node.synthesisType||'principle'),
+      content:String(node.content||''),
+      tags:Array.isArray(node.tags)?node.tags:[],
+      status:String(node.status||'draft'),
+      sourceQuestionRefs:sourceQuestionRefsForSynthesis(node)
+    };
+  }
+  function personalCardNodeFields(card={}){
+    return store()?.personalCardNodePatch?.(card)||{
+      personalCardId:String(card.id||''),personalCardRevision:Number(card.revision||0),archived:!!card.archivedAt,
+      personalCardSyncError:'',synthesisType:String(card.synthesisType||'principle'),title:String(card.title||'未命名归纳卡'),
+      content:String(card.content||''),tags:Array.isArray(card.tags)?card.tags:[],status:String(card.status||'draft')
+    };
+  }
+  function hydratePersonalCards(cards=[]){
+    if(!state.workspaceId)return {changed:0,workspace:state.workspace};
+    state.suppressStoreEvent=true;
+    let result=null;
+    try{result=store()?.hydratePersonalCards?.(cards,workspaceOptions())||{changed:0,workspace:state.workspace}}finally{state.suppressStoreEvent=false}
+    if(result?.workspace)state.workspace=result.workspace;
+    if(result?.changed&&state.initialized)renderCards();
+    return result;
+  }
+  async function insertPersonalCard(card,position=null,options={}){
+    if(!canEdit()||!card?.id)return {created:false,error:'PERSONAL_CARD_REQUIRED'};
+    const duplicate=Object.values(state.workspace?.nodes||{}).find(node=>String(node.personalCardId||'')===String(card.id));
+    if(duplicate){
+      hydratePersonalCards([card]);
+      if(options.focus!==false)focusNode(duplicate.id,{zoom:Math.max(state.zoom,.75)});
+      return {created:false,reason:'already-exists',node:duplicate,workspace:state.workspace};
+    }
+    const before=workspaceSnapshot();
+    const target=position||findOpenCardPosition(viewportCenterWorld(),{width:420,height:280});
+    state.suppressStoreEvent=true;
+    let result=null;
+    try{result=store()?.addSynthesisCard?.({...clone(options.nodePatch||{}),...personalCardNodeFields(card),cardType:'user'},target,workspaceOptions())}finally{state.suppressStoreEvent=false}
+    if(!result?.created)return result||{created:false,error:'INSERT_FAILED'};
+    state.workspace=result.workspace;
+    pushWorkspaceHistory('插入我的归纳卡',before,workspaceSnapshot());
+    renderCards();
+    if(options.focus!==false){setCardSelection([result.node.id]);focusNode(result.node.id,{zoom:Math.max(state.zoom,.75)})}
+    return result;
+  }
+  async function migrateLegacyPersonalCards(){
+    if(!loggedIn()||typeof PersonalCards.create!=='function')return 0;
+    const legacy=Object.values(state.workspace?.nodes||{}).filter(node=>node.nodeType==='synthesis-card'&&String(node.cardType||'user')==='user'&&!node.personalCardId);
+    let migrated=0;
+    for(const node of legacy){
+      try{
+        const card=await PersonalCards.create(personalCardInput(node));
+        state.suppressStoreEvent=true;
+        let result=null;
+        try{result=store()?.updateNode?.(node.id,personalCardNodeFields(card),workspaceOptions())}finally{state.suppressStoreEvent=false}
+        if(result?.workspace){state.workspace=result.workspace;migrated+=1}
+      }catch(error){
+        state.suppressStoreEvent=true;
+        try{
+          const result=store()?.updateNode?.(node.id,{personalCardSyncError:String(error?.message||'同步失败')},workspaceOptions());
+          if(result?.workspace)state.workspace=result.workspace;
+        }finally{state.suppressStoreEvent=false}
+      }
+    }
+    if(legacy.length&&state.initialized)renderCards();
+    return migrated;
+  }
+  async function refreshPersonalCardReferences(){
+    if(!loggedIn()||typeof PersonalCards.refresh!=='function')return null;
+    if(state.personalCardRefresh)return state.personalCardRefresh;
+    state.personalCardRefresh=(async()=>{
+      const snapshot=await PersonalCards.refresh({includeArchived:true});
+      hydratePersonalCards([...(snapshot?.active||[]),...(snapshot?.archived||[])]);
+      await migrateLegacyPersonalCards();
+      return snapshot;
+    })().catch(error=>{console.warn('个人归纳卡同步失败',error);return null}).finally(()=>{state.personalCardRefresh=null});
+    return state.personalCardRefresh;
+  }
   function blankSynthesisDraft(questions=[]){
     return {
       valid:false,
@@ -2130,13 +2222,20 @@
     return {first:true,mastered,synthesisId:String(node.practiceForSynthesisId)};
   }
 
-  function copySystemSynthesis(nodeId){
+  async function copySystemSynthesis(nodeId){
     if(!canEdit())return false;
     const source=state.workspace?.nodes?.[String(nodeId)];if(!source||source.nodeType!=='synthesis-card'||String(source.cardType||'user')!=='system')return false;
-    const display=synthesisDisplay(source),before=workspaceSnapshot();let result=null;
-    state.suppressStoreEvent=true;
-    try{result=store()?.addSynthesisCard?.({...source,id:'',cardType:'user',sourcePresetId:source.sourcePresetId,presetVersion:source.presetVersion,title:display.title,content:display.content,autoGenerated:false,practiceRound:0,practiceBatchNodeIds:[],practiceMasteredCount:0},{x:Number(source.x)+48,y:Number(source.y)+48,width:source.width,height:source.height},workspaceOptions())}finally{state.suppressStoreEvent=false}
-    if(!result?.created)return false;state.workspace=result.workspace;pushWorkspaceHistory('复制系统归纳卡',before,workspaceSnapshot());renderCards();setCardSelection([result.node.id],{reason:'copy-synthesis'});notify('已复制为“我的归纳”，可双击编辑。');return true;
+    if(typeof PersonalCards.create!=='function'){notify('个人归纳卡服务暂不可用，请刷新后重试。');return false}
+    const display=synthesisDisplay(source);
+    try{
+      const card=await PersonalCards.create(personalCardInput({...source,title:display.title,content:display.content,cardType:'user'}));
+      const result=await insertPersonalCard(card,{x:Number(source.x)+48,y:Number(source.y)+48,width:source.width,height:source.height},{
+        nodePatch:{...source,id:'',cardType:'user',title:display.title,content:display.content,autoGenerated:false,practiceRound:0,practiceBatchNodeIds:[],practiceMasteredCount:0}
+      });
+      if(!result?.created)return false;
+      notify('已复制到“我的归纳卡”，可双击编辑。');
+      return true;
+    }catch(error){notify('复制失败：'+String(error?.message||'请稍后重试'));return false}
   }
 
   function quickCreateSynthesis(){
@@ -2273,7 +2372,7 @@
       if(resizeRaf){cancelAnimationFrame(resizeRaf);resizeRaf=0}
       if(state.inlineEdit?.element===element)state.inlineEdit=null;
     };
-    const finish=(commit)=>{
+    const finish=async(commit)=>{
       if(settled)return;settled=true;
       if(resizeRaf){cancelAnimationFrame(resizeRaf);resizeRaf=0}
       const next=String(element.innerText||element.textContent||'').trim();
@@ -2291,8 +2390,17 @@
       if(value===original&&Math.abs(measuredHeight-originalHeight)<.5){refreshSingleCardMarkup(record);applyCard(record);return}
       const before=workspaceSnapshot();
       let result=null;
-      state.suppressStoreEvent=true;
-      try{result=store()?.updateNode?.(nodeId,{[field]:value,height:measuredHeight},workspaceOptions())}finally{state.suppressStoreEvent=false}
+      try{
+        const proposed={...record.node,[field]:value};
+        const card=record.node.personalCardId
+          ?await PersonalCards.update?.(record.node.personalCardId,{...personalCardInput(proposed),revision:Number(record.node.personalCardRevision||1)})
+          :await PersonalCards.create?.(personalCardInput(proposed));
+        if(!card?.id)throw new Error('个人归纳卡服务暂不可用');
+        state.suppressStoreEvent=true;
+        try{result=store()?.updateNode?.(nodeId,{...personalCardNodeFields(card),height:measuredHeight},workspaceOptions())}finally{state.suppressStoreEvent=false}
+      }catch(error){
+        record.node.height=originalHeight;refreshSingleCardMarkup(record);applyCard(record);notify('归纳卡更新失败：'+String(error?.message||'请重试'));return;
+      }
       if(!result?.node){
         record.node.height=originalHeight;refreshSingleCardMarkup(record);applyCard(record);notify('归纳卡更新失败，请重试。');return;
       }
@@ -2304,7 +2412,11 @@
       applyCard(record);
       renderStructure();updateEdgesGeometry();renderMinimap();scheduleLayoutDiagnosis();
       setCardSelection([nodeId],{reason:'inline-edit-retain'});
-      notify('归纳卡已更新。');
+      hydratePersonalCards([{
+        id:result.node.personalCardId,revision:result.node.personalCardRevision,title:result.node.title,content:result.node.content,
+        tags:result.node.tags,status:result.node.status,synthesisType:result.node.synthesisType,archivedAt:result.node.archived?new Date().toISOString():null
+      }]);
+      notify('归纳卡已更新，并同步到“我的归纳卡”。');
     };
     keydownHandler=event=>{
       if(event.key==='Escape'){event.preventDefault();finish(false)}
@@ -2583,7 +2695,7 @@
     return true;
   }
   function parseTags(value){return [...new Set(String(value||'').split(/[，,、;；\n]/).map(item=>item.trim()).filter(Boolean))].slice(0,24)}
-  function saveSynthesisCard(){
+  async function saveSynthesisCard(){
     if(!canEdit())return false;
     const payload={
       synthesisType:String(byId('qwSynthesisType')?.value||'principle'),
@@ -2597,14 +2709,22 @@
     if(!payload.title)payload.title='未命名'+meta.label;
     const editingId=state.editingSynthesisNodeId;
     const position=state.pendingSynthesisPosition||viewportCenterWorld();
-    const before=workspaceSnapshot();
-    state.suppressStoreEvent=true;
+    const before=workspaceSnapshot(),existing=editingId?state.workspace?.nodes?.[String(editingId)]:null;
     let result=null;
     try{
-      result=editingId
-        ?store()?.updateNode?.(editingId,payload,workspaceOptions())
-        :store()?.addSynthesisCard?.(payload,position,workspaceOptions());
-    }finally{state.suppressStoreEvent=false}
+      const input=personalCardInput({...existing,...payload});
+      const card=existing?.personalCardId
+        ?await PersonalCards.update?.(existing.personalCardId,{...input,revision:Number(existing.personalCardRevision||1)})
+        :await PersonalCards.create?.(input);
+      if(!card?.id)throw new Error('个人归纳卡服务暂不可用');
+      if(editingId){
+        state.suppressStoreEvent=true;
+        try{result=store()?.updateNode?.(editingId,{...payload,...personalCardNodeFields(card)},workspaceOptions())}finally{state.suppressStoreEvent=false}
+        hydratePersonalCards([card]);
+      }else{
+        result=await insertPersonalCard(card,position,{focus:false,nodePatch:{color:payload.color}});
+      }
+    }catch(error){notify('归纳卡保存失败：'+String(error?.message||'请重试'));return false}
     if(!result){notify('归纳卡保存失败，请重试。');return false}
     const nodeId=String(result.node?.id||editingId||'');
     const after=workspaceSnapshot();
@@ -2613,7 +2733,7 @@
     state.workspace=after;
     renderCards();
     if(nodeId){setCardSelection([nodeId]);focusNode(nodeId,{zoom:Math.max(state.zoom,.75)})}
-    notify((editingId?'已更新':'已新增')+meta.label+'。可与题目卡建立关系。');
+    notify((editingId?'已更新':'已新增')+meta.label+'，并同步到“我的归纳卡”。');
     return true;
   }
   function groupBoundsFromNodeIds(nodeIds,padding=42){
@@ -3504,6 +3624,7 @@
     renderWorkspaceSelector();
     renderCards();
     applyViewport();
+    refreshPersonalCardReferences();
     replaceUrl(workspace.id,options.focusNodeId||'');
     if(options.focusNodeId)setTimeout(()=>focusNode(options.focusNodeId),0);
     global.KGMultiQuestionWorkspaceFilebar?.markSaved?.();
@@ -5017,7 +5138,12 @@
       const workspace=store()?.ensure?.({activate:true});
       if(workspace)loadWorkspace(workspace.id);
       buildQuestionList();
+      refreshPersonalCardReferences();
       if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
+    });
+    global.addEventListener('kg-personal-synthesis-cards-change',event=>{
+      const detail=event.detail||{};
+      hydratePersonalCards([...(detail.active||[]),...(detail.archived||[])]);
     });
     global.addEventListener('focus',()=>{
       updateReadonly();
@@ -5108,6 +5234,10 @@
     renderCards,
     renderQuestionDock,
     addQuestionItem,
+    insertPersonalCard,
+    hydratePersonalCards,
+    activeWorkspaceId:()=>String(state.workspaceId||''),
+    activeWorkspace:()=>clone(state.workspace),
     focusNode,
     fitAll,
     setViewport,
