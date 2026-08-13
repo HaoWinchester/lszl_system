@@ -20,6 +20,12 @@ const expectedAdminPages = [
   'teacher-workbench.html',
   'user-management.html'
 ].sort();
+const expectedShortcutPages = [
+  ...expectedAdminPages,
+  'index.html',
+  'knowledge-recall.html',
+  'question-workspace.html'
+].sort();
 
 function read(file) {
   return fs.readFileSync(path.join(root, file), 'utf8');
@@ -27,6 +33,11 @@ function read(file) {
 
 function count(source, pattern) {
   return [...source.matchAll(pattern)].length;
+}
+
+function scriptTag(html, source) {
+  const escaped = source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return html.match(new RegExp(`<script\\b[^>]*src=["']${escaped}["'][^>]*>`, 'i'))?.[0] || '';
 }
 
 const discoveredAdminPages = fs.readdirSync(root)
@@ -56,11 +67,24 @@ for (const page of expectedAdminPages) {
     const shortcutIndex = html.indexOf('src/39-global-shortcuts.js');
     assert.ok(authIndex < roleIndex, 'authentication must load before role permissions');
     assert.ok(roleIndex < shortcutIndex, 'role permissions must load before global shortcuts');
+
+    const authTag = scriptTag(html, 'src/29-auth-core.js');
+    const roleTag = scriptTag(html, 'src/34-role-permissions.js');
+    const shortcutTag = scriptTag(html, 'src/39-global-shortcuts.js');
+    assert.doesNotMatch(authTag + roleTag + shortcutTag, /\basync\b/i, 'ordered runtimes must not use async');
+    if (/\bdefer\b/i.test(authTag)) {
+      assert.match(roleTag, /\bdefer\b/i, 'deferred authentication requires deferred role permissions');
+    }
+    if (/\bdefer\b/i.test(roleTag)) {
+      assert.match(shortcutTag, /\bdefer\b/i, 'deferred role permissions require deferred global shortcuts');
+    }
   });
 }
 
-test('learner pages remain outside the admin navigation boundary', () => {
-  for (const page of ['practice-mode.html', 'knowledge-recall.html']) {
-    assert.doesNotMatch(read(page), /class=["']admin-context-nav["']/);
-  }
+test('global shortcut coverage expands only to the admin navigation pages', () => {
+  const htmlPages = fs.readdirSync(root).filter(file => file.endsWith('.html'));
+  const scriptPages = htmlPages.filter(file => read(file).includes('src/39-global-shortcuts.js')).sort();
+  const stylesheetPages = htmlPages.filter(file => read(file).includes('styles/global-shortcuts.css')).sort();
+  assert.deepEqual(scriptPages, expectedShortcutPages);
+  assert.deepEqual(stylesheetPages, expectedShortcutPages);
 });
