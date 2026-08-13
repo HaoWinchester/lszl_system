@@ -913,7 +913,7 @@ function updateGraphModeIndicator(){
   el.hidden=false;el.classList.toggle('related',mode==='related');el.classList.toggle('flow',mode==='flow');
   el.querySelector('[data-graph-mode-title]').textContent=mode==='related'?'只看相关':'心流状态';
   el.querySelector('[data-graph-mode-copy]').textContent=mode==='related'?'当前仅显示中心节点及其直接相关内容':'当前突出关联内容，弱化无关信息';
-  el.querySelector('[data-graph-mode-exit]').textContent=mode==='related'?'退出只看相关':'退出心流';
+  el.querySelector('[data-graph-mode-exit]').textContent='退出';
 }
 function syncGraphModeClasses(){
   normalizeRelatedScopeAnchor();
