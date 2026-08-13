@@ -285,6 +285,7 @@ test('release validation runs smoke and visual regression against the candidate'
   assert.ok(validator.includes('frontend/e2e/new_legacy_smoke.py'))
   assert.ok(validator.includes('content-prep-studio/tests/test_server_catalog.js'))
   assert.ok(validator.includes('frontend/e2e/content_prep_question_bank.py'))
+  assert.ok(validator.includes('frontend/e2e/content_prep_bank_load.py'))
   assert.ok(validator.includes('frontend/e2e/content_prep_concurrency.py'))
   assert.ok(validator.includes('frontend/e2e/practice_mode_initial_view.py'))
   assert.ok(validator.includes('frontend/e2e/direct_new_legacy_visual.py'))

@@ -565,6 +565,7 @@ function normalizeQuestion(q,i=0,subject='PMP'){
     ,serverRevision:Number(q.serverRevision)||null
     ,serverContentHash:String(q.serverContentHash||'')
     ,lastSyncedAt:String(q.lastSyncedAt||'')
+    ,serverExportSnapshot:String(q.serverExportSnapshot||'')
   };
 }
 function normalizeBank(payload){

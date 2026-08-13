@@ -98,6 +98,8 @@ E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
 E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
   python3 frontend/e2e/content_prep_question_bank.py
 E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
+  python3 frontend/e2e/content_prep_bank_load.py
+E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
   python3 frontend/e2e/content_prep_concurrency.py
 # v9 重构了题库（简化模式，高级字段折叠）与试卷管理（拆为独立页 paper-management.html），
 # full_role_regression.py 绑定的是 v8.6 全字段 UI 流程，已过时——其失败不代表 v9 功能损坏，
