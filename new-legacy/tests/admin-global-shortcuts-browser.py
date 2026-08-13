@@ -85,19 +85,26 @@ def open_page(page: Page, base_url: str, filename: str) -> None:
     page.locator("#kgGlobalShortcuts").wait_for(state="visible")
 
 
-def assert_collapsed_shortcuts(page: Page, filename: str) -> None:
+def assert_expanded_shortcuts(page: Page, filename: str) -> None:
     shortcuts = page.locator("#kgGlobalShortcuts")
     assert shortcuts.count() == 1, filename
-    assert "is-collapsed" in (shortcuts.get_attribute("class") or ""), filename
+    assert "is-collapsed" not in (shortcuts.get_attribute("class") or ""), filename
+    assert page.locator("#kgGlobalShortcuts .kg-global-shortcuts-body").is_visible(), filename
     assert page.locator("#kgGlobalShortcutsToggle").is_visible(), filename
     assert page.evaluate(
         "getComputedStyle(document.querySelector('#kgGlobalShortcuts')).position"
     ) == "fixed", filename
 
 
-def expand(page: Page) -> None:
+def toggle_layout(page: Page) -> None:
+    shortcuts = page.locator("#kgGlobalShortcuts")
+    before = shortcuts.get_attribute("data-layout")
     page.locator("#kgGlobalShortcutsToggle").click()
-    page.locator('#kgGlobalShortcuts:not(.is-collapsed)').wait_for(state="visible")
+    expected = "horizontal" if before == "vertical" else "vertical"
+    page.wait_for_function(
+        "expected => document.querySelector('#kgGlobalShortcuts')?.dataset.layout === expected",
+        arg=expected,
+    )
 
 
 def drag_and_assert_persistence(page: Page, base_url: str) -> None:
@@ -136,8 +143,7 @@ with site_url() as base_url, sync_playwright() as playwright:
     for admin_filename in ADMIN_PAGES:
         admin_errors.clear()
         open_page(admin_page, base_url, admin_filename)
-        assert_collapsed_shortcuts(admin_page, admin_filename)
-        expand(admin_page)
+        assert_expanded_shortcuts(admin_page, admin_filename)
         for shortcut_id in ["home", "bank", "users", "settings"]:
             assert admin_page.locator(
                 f'[data-global-shortcut="{shortcut_id}"]'
@@ -145,9 +151,9 @@ with site_url() as base_url, sync_playwright() as playwright:
         assert not admin_errors, (admin_filename, admin_errors)
 
     open_page(admin_page, base_url, "admin-console.html")
-    expand(admin_page)
+    assert_expanded_shortcuts(admin_page, "admin-console.html")
+    toggle_layout(admin_page)
     drag_and_assert_persistence(admin_page, base_url)
-    expand(admin_page)
     admin_page.locator('[data-global-shortcut="bank"]').click()
     admin_page.wait_for_url("**/teacher-workbench.html")
     assert admin_page.locator("#kgGlobalShortcuts").count() == 1
@@ -161,7 +167,7 @@ with site_url() as base_url, sync_playwright() as playwright:
     teacher_errors: list[str] = []
     teacher_page.on("pageerror", lambda error: teacher_errors.append(str(error)))
     open_page(teacher_page, base_url, "teacher-workbench.html")
-    expand(teacher_page)
+    assert_expanded_shortcuts(teacher_page, "teacher-workbench.html")
     assert teacher_page.locator('[data-global-shortcut="bank"]').is_visible()
     assert teacher_page.locator('[data-global-shortcut="users"]').count() == 0
     assert teacher_page.locator('[data-global-shortcut="settings"]').count() == 0
