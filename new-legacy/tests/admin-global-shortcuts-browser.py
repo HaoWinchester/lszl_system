@@ -48,6 +48,12 @@ def seed_role(context: BrowserContext, role: str) -> None:
             subject: 'PMP',
             source: 'shortcut-browser-test'
           }};
+          window.__KG_DIRECT_BOOTSTRAP__ = {{
+            ...(window.__KG_DIRECT_BOOTSTRAP__ || {{}}),
+            authenticated: true,
+            username,
+            authUser: user
+          }};
           localStorage.setItem('kg_local_users_v1', JSON.stringify({{[username]: user}}));
           localStorage.setItem('kg_local_current_user_v1', username);
         }})()
