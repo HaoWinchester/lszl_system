@@ -125,6 +125,21 @@ def drag_and_assert_persistence(page: Page, base_url: str) -> None:
     page.mouse.up()
     stored = page.evaluate("JSON.parse(localStorage.getItem('kg_global_shortcuts_position_v1'))")
     assert stored and isinstance(stored.get("x"), int) and isinstance(stored.get("y"), int)
+    persisted_position = json.dumps(stored, ensure_ascii=False)
+    page.context.add_init_script(
+        f"""
+        (() => {{
+          const entry = window.__KG_DIRECT_BOOTSTRAP__ || {{}};
+          window.__KG_DIRECT_BOOTSTRAP__ = {{
+            ...entry,
+            storage: {{
+              ...(entry.storage || {{}}),
+              kg_global_shortcuts_position_v1: JSON.stringify({persisted_position})
+            }}
+          }};
+        }})()
+        """
+    )
     moved = page.locator("#kgGlobalShortcuts").bounding_box()
     assert moved is not None and abs(moved["x"] - before["x"]) >= 30
 
