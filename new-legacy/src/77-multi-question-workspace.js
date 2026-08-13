@@ -707,6 +707,16 @@
       source:'workspace-fit'
     });
   }
+  function recoverOffscreenWorkspaceViewport(){
+    if(state.mobile||!state.cards.size||!state.viewport)return false;
+    const viewport=state.viewport.getBoundingClientRect();
+    const visible=[...state.cards.values()].some(record=>{
+      const rect=record.element?.getBoundingClientRect?.();
+      return rect&&rect.right>viewport.left+8&&rect.left<viewport.right-8&&rect.bottom>viewport.top+8&&rect.top<viewport.bottom-8;
+    });
+    if(visible)return false;
+    return fitAll();
+  }
 
   function multiCanvasMinimapItems(){
     const items=[];
@@ -3705,6 +3715,7 @@
     refreshPersonalCardReferences();
     replaceUrl(workspace.id,options.focusNodeId||'');
     if(options.focusNodeId)setTimeout(()=>focusNode(options.focusNodeId),0);
+    else recoverOffscreenWorkspaceViewport();
     global.KGMultiQuestionWorkspaceFilebar?.markSaved?.();
     return true;
   }

@@ -70,6 +70,20 @@ def main():
     assert page.evaluate("""()=>({state:KGMultiQuestionWorkspace?.getState?.(),workspace:KGCanvasWorkspaceStore?.getActiveWorkspace?.()})""")['workspace'],errors
     page.evaluate("""items=>{KGMultiQuestionWorkspace.setViewport({x:0,y:0,zoom:1});[0,1].forEach((index)=>KGMultiQuestionWorkspace.addQuestionItem({question:items[index],bank:{id:'p4313-bank'},paper:{id:'p4313-paper',releaseId:'p4313-release'}},{x:240+index*500,y:120,width:400,height:340}));}""",items)
     page.wait_for_timeout(350)
+    page.evaluate("""()=>{
+      const workspace=KGCanvasWorkspaceStore.getActiveWorkspace();
+      KGCanvasWorkspaceStore.updateViewport({x:-1590,y:-4125,zoom:4},{workspaceId:workspace.id});
+      KGMultiQuestionWorkspace.loadWorkspace(workspace.id);
+    }""")
+    page.wait_for_timeout(500)
+    visible_cards=page.evaluate("""()=>{
+      const viewport=document.querySelector('#qwCanvasViewport').getBoundingClientRect();
+      return [...document.querySelectorAll('.qw-question-card')].filter(card=>{
+        const rect=card.getBoundingClientRect();
+        return rect.right>viewport.left&&rect.left<viewport.right&&rect.bottom>viewport.top&&rect.top<viewport.bottom;
+      }).length;
+    }""")
+    assert visible_cards>=1,visible_cards
     ids=page.evaluate("""()=>{const w=KGCanvasWorkspaceStore.getActiveWorkspace();return Object.values(w.nodes).filter(n=>['source-1','source-2'].includes(n.questionId)).map(n=>n.id)}""")
     page.evaluate("ids=>{KGMultiQuestionWorkspace.selectNodes(ids);KGMultiQuestionWorkspace.quickCreateSynthesis()}",ids);page.wait_for_timeout(650)
     workspace=page.evaluate('KGCanvasWorkspaceStore.getActiveWorkspace()')
