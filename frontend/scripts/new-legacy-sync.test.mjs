@@ -29,6 +29,7 @@ const requiredFiles = [
   'src/88-guided-learning-store.js',
   'src/89-guided-learning-app.js',
   'src/90-guided-learning-node-app.js',
+  'src/108-multi-question-learning-assets.js',
   'schemas/activity-schema-v1.json',
   'content-prep-studio/README.md',
   'content-prep-studio/build.py',

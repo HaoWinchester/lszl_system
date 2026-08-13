@@ -39,6 +39,10 @@
       <div class="qw-top-actions lp-top-actions">
         <span class="lp-visually-hidden" data-practice-only>自由练习，不计成绩</span>
         <span class="qw-readonly-badge" id="qwReadOnlyBadge" hidden>只读查看</span>
+        <div class="qw-learning-assets-shortcuts" role="group" aria-label="学习资产">
+          <button type="button" id="qwPersonalCardsBtn" aria-controls="qwPersonalCardsDrawer" aria-expanded="false">我的归纳卡 <strong id="qwPersonalCardsCount">0</strong></button>
+          <button type="button" id="qwMistakesBtn" aria-controls="qwMistakesDrawer" aria-expanded="false">错题集 <strong id="qwMistakesCount">0</strong></button>
+        </div>
         <div class="qw-language-control">
           <div class="qw-language-switch" role="group" aria-label="题目显示方式">
             <button type="button" data-question-language="zh" aria-pressed="true">中</button>
@@ -80,6 +84,35 @@
     </header>
 
     <main class="qw-canvas-shell" id="qwCanvasShell">
+      <div class="qw-learning-assets-backdrop" id="qwLearningAssetsBackdrop" hidden></div>
+      <aside class="qw-learning-assets-drawer" id="qwPersonalCardsDrawer" hidden aria-label="我的归纳卡">
+        <header><div><small>全局个人资产</small><h2>我的归纳卡</h2></div><button type="button" id="qwPersonalCardsClose" aria-label="关闭我的归纳卡">×</button></header>
+        <div class="qw-learning-assets-tools">
+          <input id="qwPersonalCardsSearch" type="search" placeholder="搜索标题、正文或标签" aria-label="搜索我的归纳卡"/>
+          <div role="group" aria-label="归纳卡筛选"><button type="button" class="active" data-personal-card-filter="active">使用中</button><button type="button" data-personal-card-filter="archived">已归档</button></div>
+        </div>
+        <div class="qw-learning-assets-list" id="qwPersonalCardsList"></div>
+        <div class="qw-learning-assets-error" id="qwPersonalCardsError" hidden><span>个人归纳卡加载失败</span><button type="button" id="qwPersonalCardsRetry">重试</button></div>
+      </aside>
+      <aside class="qw-learning-assets-drawer" id="qwMistakesDrawer" hidden aria-label="错题集">
+        <header><div><small>自动收集</small><h2>错题集</h2></div><button type="button" id="qwMistakesClose" aria-label="关闭错题集">×</button></header>
+        <div class="qw-learning-assets-tools">
+          <input id="qwMistakesSearch" type="search" placeholder="搜索错题" aria-label="搜索错题集"/>
+          <div role="group" aria-label="错题筛选"><button type="button" class="active" data-mistake-filter="active">待掌握</button><button type="button" data-mistake-filter="mastered">已掌握</button></div>
+        </div>
+        <div class="qw-learning-assets-list" id="qwMistakesList"></div>
+        <div class="qw-learning-assets-error" id="qwMistakesError" hidden><span>错题集加载失败</span><button type="button" id="qwMistakesRetry">重试</button></div>
+      </aside>
+      <section class="qw-personal-card-editor" id="qwPersonalCardEditor" hidden role="dialog" aria-modal="true" aria-labelledby="qwPersonalCardEditorTitle">
+        <form><header><h2 id="qwPersonalCardEditorTitle">编辑归纳卡</h2><button type="button" id="qwPersonalCardEditorCancel" aria-label="关闭编辑">×</button></header>
+          <label>标题<input id="qwPersonalCardEditorTitleInput" maxlength="200" required/></label>
+          <label>正文<textarea id="qwPersonalCardEditorContent" rows="7" maxlength="20000"></textarea></label>
+          <label>标签<input id="qwPersonalCardEditorTags" placeholder="用逗号分隔"/></label>
+          <div class="qw-personal-card-editor-meta"><label>类型<select id="qwPersonalCardEditorType"><option value="principle">原则</option><option value="routine">套路</option><option value="trap">陷阱</option><option value="note">笔记</option></select></label><label>状态<select id="qwPersonalCardEditorStatus"><option value="draft">待验证</option><option value="verified">已验证</option><option value="mastered">已掌握</option></select></label></div>
+          <p class="qw-personal-card-conflict" id="qwPersonalCardConflict" hidden>此卡已在其他页面修改。<button type="button" id="qwPersonalCardConflictReload">重新加载最新版本</button></p>
+          <footer><button type="button" id="qwPersonalCardEditorDismiss">取消</button><button type="submit" id="qwPersonalCardEditorSave">保存</button></footer>
+        </form>
+      </section>
       <div class="qw-overlay qw-overlay-left">
         <button type="button" class="qw-tool-btn" id="qwQuestionDockBtn" aria-controls="qwQuestionDrawer">
           <span aria-hidden="true">▤</span><span>题目库</span><strong id="qwQuestionCount">0</strong>
@@ -398,6 +431,7 @@
   <script defer src="src/78-multi-question-workspace-tabs.js"></script>
   <script defer src="src/79-multi-question-workspace-filebar.js"></script>
   <script defer src="src/77-multi-question-workspace.js"></script>
+  <script defer src="src/108-multi-question-learning-assets.js"></script>
 <script defer src="src/94-practice-navigation.js"></script>
 <script defer src="src/99-learning-practice-shell.js"></script>
 <script defer src="src/109-focus-vega-ui-icons.js"></script>

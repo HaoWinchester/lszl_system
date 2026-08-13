@@ -3839,6 +3839,15 @@
     notify('已加入 '+created.length+' 道题'+(skipped?'，跳过 '+skipped+' 道已存在题目':'')+'。');
     return {created,skipped};
   }
+  function addQuestionByReference(reference={},position){
+    const item=state.questions.find(candidate=>
+      String(candidate.question?.id||candidate.question?.sourceQuestionId||'')===String(reference.questionId||'')
+      &&(!reference.bankId||String(candidate.bank?.id||candidate.question?.sourceBankId||'')===String(reference.bankId))
+      &&(!reference.releaseId||String(candidate.paper?.releaseId||candidate.question?.sourceReleaseId||'')===String(reference.releaseId))
+    );
+    if(!item){notify('这道错题不在当前已发布试卷中。');return {created:false,reason:'not-visible'}}
+    return addQuestionItem(item,position);
+  }
   function addQuestionItem(item,position){
     if(!canEdit())return null;
     if(!item?.question)return null;
@@ -5296,6 +5305,7 @@
     renderCards,
     renderQuestionDock,
     addQuestionItem,
+    addQuestionByReference,
     insertPersonalCard,
     hydratePersonalCards,
     activeWorkspaceId:()=>String(state.workspaceId||''),

@@ -135,6 +135,7 @@ test('update builds an isolated release and atomically selects it', () => {
   const workspacePage = readFileSync(resolve(root, sourceVersion, 'site', 'question-workspace.html'), 'utf8')
   assert.match(workspacePage, /practice-learning-adapter\.js/)
   assert.match(workspacePage, /personal-card-adapter\.js/)
+  assert.match(workspacePage, /src\/108-multi-question-learning-assets\.js/)
   assert.ok(workspacePage.indexOf('personal-card-adapter.js') < workspacePage.indexOf('src/77-multi-question-workspace.js'))
   assert.match(
     practicePage,
