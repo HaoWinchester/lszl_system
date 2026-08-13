@@ -29,7 +29,8 @@ with sync_playwright() as playwright:
         indicator = page.locator(".graph-mode-indicator.flow")
         indicator.wait_for(state="visible")
         assert "心流状态" in indicator.inner_text()
-        assert "退出心流" in indicator.inner_text()
+        assert "退出" in indicator.inner_text()
+        assert "退出心流" not in indicator.inner_text()
         assert indicator.locator("strong").evaluate("el => getComputedStyle(el).color") == "rgb(255, 255, 255)"
         assert indicator.locator("span").evaluate("el => getComputedStyle(el).color") == "rgb(255, 255, 255)"
         indicator.locator("[data-graph-mode-exit]").click()
