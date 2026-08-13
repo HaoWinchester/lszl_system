@@ -1,23 +1,24 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.62",
-  "toVersion": "v9.0-p4.1.63",
+  "fromVersion": "v9.0-p4.1.63",
+  "toVersion": "v9.0-p4.1.67",
   "changes": {
     "added": [
-      "assets/landing/SOURCES.md",
-      "assets/landing/graph.png",
-      "assets/landing/practice.png",
-      "assets/landing/recall.png",
-      "assets/landing/workspace.png",
-      "landing.html",
-      "src/landing.js",
-      "styles/landing.css",
-      "tests/landing-page-browser.py",
-      "tests/landing-page-contract.test.js",
-      "tests/landing-page-live-browser.py"
+      "tests/admin-global-shortcuts-browser.py",
+      "tests/admin-global-shortcuts-coverage.test.js"
     ],
     "changed": [
-      "VERSION"
+      "VERSION",
+      "admin-console.html",
+      "admin-operations.html",
+      "admin-settings.html",
+      "admin-subjects.html",
+      "course-admin.html",
+      "feedback-management.html",
+      "message-management.html",
+      "paper-management.html",
+      "teacher-workbench.html",
+      "tests/v90-p402-navigation-role-danger.test.js"
     ],
     "removed": []
   },
