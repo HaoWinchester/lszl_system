@@ -27,22 +27,24 @@ def install_harness(page, file_name, initial_username=''):
         page.add_style_tag(content=(ROOT / 'styles/learning-skin.css').read_text(encoding='utf-8'))
     page.evaluate("""initialUsername=>{
       let user=initialUsername?{username:initialUsername,displayName:'管理员'}:null;
-      const calls={login:0,register:0,logout:0};
+      const calls={login:0,register:0,logout:0,loginContexts:[],registerContexts:[]};
       window.__authHarness={calls,current:()=>user};
       window.KGAuthCore={
         cleanUsername:value=>String(value||'').trim().replace(/\s+/g,'_').slice(0,32),
         currentUser:()=>user,
         currentUsername:()=>user?.username||'',
         providerStatus:()=>({remote:true,label:'测试后端'}),
-        async login(username,password){
+        async login(username,password,context){
           calls.login+=1;
+          calls.loginContexts.push(context||{});
           await new Promise(resolve=>setTimeout(resolve,35));
           if(username!=='admin'||password!=='jbgsnmm~123')return {ok:false,message:'密码不正确。'};
           user={username:'admin',displayName:'管理员'};
           return {ok:true,user};
         },
-        async register(username,password){
+        async register(username,password,context){
           calls.register+=1;
+          calls.registerContexts.push(context||{});
           await new Promise(resolve=>setTimeout(resolve,20));
           if(username==='admin')return {ok:false,message:'该用户名已存在，请直接登录。'};
           user={username,displayName:username};
@@ -124,6 +126,10 @@ def exercise_dialog(page):
     page.locator('#authUsername').fill('admin')
     page.locator('#authPassword').fill('wrong')
     page.locator('#authDoLoginBtn').click()
+    assert '请先阅读并勾选同意' in page.locator('#authMsg').inner_text()
+    assert page.evaluate('__authHarness.calls.login') == 0
+    page.locator('#authLegalConsent').check()
+    page.locator('#authDoLoginBtn').click()
     page.locator('#authMsg').get_by_text('密码不正确。').wait_for()
     assert not page.locator('#authDoLoginBtn').is_disabled()
 
@@ -134,6 +140,7 @@ def exercise_dialog(page):
     }""")
     page.wait_for_function("!document.getElementById('authModal').classList.contains('show')")
     assert page.evaluate('__authHarness.calls.login') == 2
+    assert page.evaluate('__authHarness.calls.loginContexts.at(-1).acceptedTermsVersion') == '2026-08-13-v1'
     assert page.evaluate('__authHarness.current().username') == 'admin'
 
     page.evaluate("KGSharedAuthDialog.logout()")
@@ -148,6 +155,11 @@ def exercise_dialog(page):
     page.locator('#authRegisterBtn').click()
     assert '密码至少需要 4 个字符' in page.locator('#authMsg').inner_text()
     page.locator('#authPassword').fill('1234')
+    page.locator('#authLegalConsent').uncheck()
+    page.locator('#authRegisterBtn').click()
+    assert '请先阅读并勾选同意' in page.locator('#authMsg').inner_text()
+    assert page.evaluate('__authHarness.calls.register') == 0
+    page.locator('#authLegalConsent').check()
     page.locator('#authRegisterBtn').click()
     page.wait_for_function("!document.getElementById('authModal').classList.contains('show')")
     assert page.evaluate('__authHarness.current().username') == 'new_student'
@@ -156,12 +168,18 @@ def exercise_dialog(page):
     page.evaluate("KGSharedAuthDialog.open()")
     page.locator('#authUsername').fill('admin')
     page.locator('#authPassword').fill('jbgsnmm~123')
+    page.locator('#authLegalConsent').check()
     page.locator('#authPassword').press('Enter')
     page.wait_for_function("!document.getElementById('authModal').classList.contains('show')")
     assert page.evaluate('__authHarness.current().username') == 'admin'
 
     page.evaluate("KGSharedAuthDialog.logout()")
     page.evaluate("KGSharedAuthDialog.open()")
+    page.locator('#authLegalConsent').uncheck()
+    page.locator('.wechat-login-entry').click()
+    assert '请先阅读并勾选同意' in page.locator('#authMsg').inner_text()
+    assert 'wechat-login-mode' not in (page.locator('#authModal').get_attribute('class') or '')
+    page.locator('#authLegalConsent').check()
     page.locator('.wechat-login-entry').click()
     page.locator('[data-test-qr="true"]').wait_for()
     assert 'wechat-login-mode' in (page.locator('#authModal').get_attribute('class') or '')

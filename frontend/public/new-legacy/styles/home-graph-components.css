@@ -735,34 +735,68 @@
 
 /* Mode reminder is a small rectangular tab joined to the coloured canvas border. */
 .graph-mode-indicator{
+  --graph-mode-color:#475569;
   top:0;
-  min-height:31px;
-  padding:4px 5px 4px 10px;
-  border-width:0 2px 2px;
-  border-style:solid;
-  border-radius:0 0 7px 7px;
-  background:#fff;
-  box-shadow:none;
+  min-height:32px;
+  padding:4px 5px 4px 11px;
+  border:0;
+  border-radius:0 0 8px 8px;
+  background:var(--graph-mode-color);
+  color:#fff;
+  box-shadow:0 7px 18px rgba(15,23,42,.14);
   backdrop-filter:none;
 }
-.graph-mode-indicator strong{font-size:12px}
-.graph-mode-indicator span{font-size:11px}
+.graph-mode-indicator strong{font-size:12px;color:#fff}
+.graph-mode-indicator span{font-size:11px;color:rgba(255,255,255,.92)}
 .graph-mode-indicator button{
-  height:23px;
-  margin-left:2px;
-  padding:0 8px;
-  border:0;
-  border-left:1px solid currentColor;
-  border-radius:3px;
-  background:transparent!important;
+  height:24px;
+  margin-left:3px;
+  padding:0 9px;
+  border:1px solid rgba(255,255,255,.48);
+  border-radius:5px;
+  background:rgba(255,255,255,.12)!important;
+  color:#fff;
   box-shadow:none;
 }
-.graph-mode-indicator button:hover{background:rgba(15,23,42,.055)!important}
-.graph-mode-indicator.related{border-color:#f97316;background:#fff7ed}
-.graph-mode-indicator.related button{color:#c2410c}
-.graph-mode-indicator.flow{border-color:#22c55e;background:#f0fdf4}
-.graph-mode-indicator.flow button{color:#15803d}
+.graph-mode-indicator button:hover{background:rgba(255,255,255,.22)!important}
+.graph-mode-indicator.related{--graph-mode-color:#f97316;background:var(--graph-mode-color)}
+.graph-mode-indicator.flow{--graph-mode-color:#22c55e;background:var(--graph-mode-color)}
 @media(max-width:720px){.graph-mode-indicator{top:0}}
+
+/* 状态提示条使用画布外围状态色与白色文字。 */
+.graph-mode-indicator.related strong,.graph-mode-indicator.flow strong,
+.graph-mode-indicator.related span,.graph-mode-indicator.flow span,
+.graph-mode-indicator.related button,.graph-mode-indicator.flow button{color:#fff}
+
+/* Directly edit the painted text node so opening an editor never changes its box geometry. */
+.node-text-content.node-inline-direct-editor,
+.graph-text-inline.node-inline-direct-editor{
+  visibility:visible!important;
+  position:static!important;
+  inset:auto!important;
+  display:inline!important;
+  width:auto!important;
+  height:auto!important;
+  min-width:1px!important;
+  min-height:0!important;
+  margin:0!important;
+  border:0!important;
+  outline:0!important;
+  box-shadow:none!important;
+  background:inherit;
+  color:inherit!important;
+  font:inherit!important;
+  line-height:inherit!important;
+  letter-spacing:inherit!important;
+  text-align:inherit!important;
+  text-decoration:inherit!important;
+  white-space:pre-wrap!important;
+  overflow-wrap:anywhere!important;
+  user-select:text!important;
+  -webkit-user-select:text!important;
+  cursor:text!important;
+  caret-color:currentColor;
+}
 
 /* V9.0-P4.3.2 · compact batch relationship toolbar */
 .edge-radial-style-panel.edge-quick-style-panel{

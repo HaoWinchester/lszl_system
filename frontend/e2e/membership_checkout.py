@@ -51,7 +51,7 @@ with sync_playwright() as playwright:
         # checkout stay visibly linked.
         context = browser.new_context(viewport={"width": 1440, "height": 1000})
         login = context.request.post(
-            BASE_URL + "/api/v1/auth/login", data={"username": USERNAME, "password": PASSWORD}
+            BASE_URL + "/api/v1/auth/login", data={"username": USERNAME, "password": PASSWORD, "acceptedTermsVersion": "2026-08-13-v1"}
         )
         assert login.ok, (login.status, login.text())
         page = context.new_page()

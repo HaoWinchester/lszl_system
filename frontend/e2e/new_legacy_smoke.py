@@ -19,7 +19,7 @@ ACCOUNTS = {
 def login_api(context, username: str) -> None:
     response = context.request.post(
         BASE + "/api/v1/auth/login",
-        data={"username": username, "password": "111111"},
+        data={"username": username, "password": "111111", "acceptedTermsVersion": "2026-08-13-v1"},
     )
     assert response.ok, (username, response.status, response.text())
     me = context.request.get(BASE + "/api/v1/auth/me")
@@ -96,6 +96,9 @@ with sync_playwright() as playwright:
         page.locator("#authModal.show").wait_for(state="visible")
         page.locator("#authUsername").fill("佩奇007")
         page.locator("#authPassword").fill("111111")
+        page.locator("#authDoLoginBtn").click()
+        assert "请先阅读并勾选同意" in page.locator("#authMsg").inner_text()
+        page.locator("#authLegalConsent").check()
         page.locator("#authDoLoginBtn").click()
         page.wait_for_function("window.__KG_DIRECT_BOOTSTRAP__?.authenticated === true")
         page.locator("#authModal").wait_for(state="hidden")

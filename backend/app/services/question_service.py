@@ -33,6 +33,7 @@ _MAX_PAPER_REVISION_DIGITS = len(str(_POSTGRES_INTEGER_MAX))
 def bank_to_dict(b: QuestionBank, question_count: int = 0) -> dict:
     return {
         "id": b.id,
+        "sourceId": b.source_id,
         "ownerId": b.owner_id,
         "name": b.name,
         "subject": b.subject,
@@ -50,6 +51,11 @@ def bank_to_dict(b: QuestionBank, question_count: int = 0) -> dict:
 
 def question_to_dict(q: Question) -> dict:
     return question_catalog_service.question_to_payload(q)
+
+
+def _import_source_identity(item) -> str:
+    """Prefer the stable source identity retained in catalog export payloads."""
+    return str(getattr(item, "source_id", None) or getattr(item, "id", "") or "").strip()
 
 
 def paper_to_dict(p: ExamPaper, question_count: int = 0) -> dict:
@@ -99,8 +105,10 @@ async def create_bank(db: AsyncSession, owner: User | str, data: dict) -> Questi
     visibility = str(data.get("visibility") or "private")
     if visibility not in {"private", "published"}:
         visibility = "private"
+    bank_id = uid("b_")
     b = QuestionBank(
-        id=uid("b_"),
+        id=bank_id,
+        source_id=bank_id,
         owner_id=actor.username,
         name=data.get("name", "新题库"),
         subject=data.get("subject", "PMP"),
@@ -231,7 +239,7 @@ async def import_question_banks(
         raise _import_validation_error("用户不存在")
     actor_username = str(actor.username)
 
-    source_bank_ids = [str(item.id or "").strip() for item in request.banks]
+    source_bank_ids = [_import_source_identity(item) for item in request.banks]
     if any(not source_bank_id for source_bank_id in source_bank_ids):
         raise _import_validation_error("导入题库缺少源题库 ID")
     duplicate_bank_ids = {
@@ -247,9 +255,9 @@ async def import_question_banks(
     source_question_keys: list[str] = []
     source_question_owners: dict[str, str] = {}
     for imported_bank in request.banks:
-        source_bank_id = str(imported_bank.id or "").strip()
+        source_bank_id = _import_source_identity(imported_bank)
         for imported_question in imported_bank.questions:
-            source_question_id = str(imported_question.id or "").strip()
+            source_question_id = _import_source_identity(imported_question)
             if not source_question_id:
                 raise _import_validation_error(
                     f"题库 {source_bank_id} 存在缺少源题目 ID 的记录"
@@ -287,7 +295,7 @@ async def import_question_banks(
                 )
             ).scalars().all()
             existing_by_source = {
-                str(bank.source_id): bank for bank in existing_banks if bank.source_id
+                str(bank.source_id or bank.id): bank for bank in existing_banks
             }
             existing_questions = (
                 await db.execute(
@@ -295,14 +303,13 @@ async def import_question_banks(
                 )
             ).scalars().all()
             question_sources = {
-                str(question.source_id): question
+                str(question.source_id or question.id): question
                 for question in existing_questions
-                if question.source_id
             }
             actions: list[dict] = []
             prepared_banks: list[dict] = []
             for imported_bank in request.banks:
-                source_bank_id = str(imported_bank.id).strip()
+                source_bank_id = _import_source_identity(imported_bank)
                 bank_values = _normalized_import_bank_values(imported_bank)
                 existing_bank = existing_by_source.get(source_bank_id)
                 normalized_questions: list[tuple[str, dict, Question | None]] = []
@@ -312,16 +319,19 @@ async def import_question_banks(
                 existing_by_question_source = {}
                 if existing_bank is not None:
                     rows = await db.execute(select(Question).where(Question.bank_id == existing_bank.id))
-                    existing_by_question_source = {str(item.source_id): item for item in rows.scalars().all() if item.source_id}
+                    existing_by_question_source = {
+                        str(item.source_id or item.id): item for item in rows.scalars().all()
+                    }
                 incoming_source_ids: set[str] = set()
                 for imported_question in imported_bank.questions:
-                    source_question_id = str(imported_question.id).strip()
+                    source_question_id = _import_source_identity(imported_question)
                     incoming_source_ids.add(source_question_id)
                     owner_question = question_sources.get(source_question_id)
                     if owner_question is not None and (existing_bank is None or owner_question.bank_id != existing_bank.id):
                         actions.append({"type": "conflict", "sourceBankId": source_bank_id, "sourceQuestionId": source_question_id})
                         continue
                     raw_question = imported_question.model_dump(by_alias=True)
+                    raw_question.pop("sourceId", None)
                     normalized = question_content_service.normalize_question_payload(
                         {**raw_question, "id": owner_question.id if owner_question else uid("q_")},
                         subject=str(bank_values["subject"]),
@@ -375,8 +385,9 @@ async def import_question_banks(
                     rows = await db.execute(select(Question).where(Question.bank_id == existing_bank.id))
                     existing_rows = list(rows.scalars().all())
                     for row in existing_rows:
-                        if row.source_id:
-                            source_question_id_map[f"{source_bank_id}::{row.source_id}"] = row.id
+                        source_question_id_map[
+                            f"{source_bank_id}::{row.source_id or row.id}"
+                        ] = row.id
                     imported_rows.append((existing_bank, existing_rows))
                     continue
                 if existing_bank is None:
@@ -684,6 +695,7 @@ async def create_question(db: AsyncSession, owner: User | str, bank_id: str, dat
     content_hash = question_content_service.canonical_question_hash(normalized)
     q = Question(
         id=question_id,
+        source_id=question_id,
         bank_id=bank_id,
         title=normalized["title"],
         type=normalized["type"],

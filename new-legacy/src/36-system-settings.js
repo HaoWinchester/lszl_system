@@ -149,7 +149,7 @@
     const cfg=api.saveConfig(collectWechatConfig());
     if(!cfg.appId){toast('请先填写 AppID');renderWechatConfig();return}
     try{
-      const result=await api.createOfficialAuthRequest('login',location.pathname+location.search+location.hash);
+      const result=await api.createOfficialAuthRequest('login',location.pathname+location.search+location.hash,window.KGAuthRuntime?.legalConsentVersion||'2026-08-13-v1');
       prompt('微信授权地址预览，可复制给技术人员调试：',result.authUrl);
     }catch(error){
       toast(error?.message||'授权地址生成失败，请检查服务端微信配置。');

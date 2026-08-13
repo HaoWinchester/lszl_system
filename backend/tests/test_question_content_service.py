@@ -264,6 +264,8 @@ def test_hash_is_stable_across_key_order_identity_and_sync_metadata() -> None:
         "lockToken": "secret",
         "creatorId": "creator_006",
         "creatorName": "女帝",
+        "sourceId": "reimported-question-id",
+        "source_id": "legacy-source-question-id",
     })
     retried["metadata"]["origin"] = {
         "creatorId": "creator_006",

@@ -310,6 +310,11 @@ def _canonical_payload(
     return normalized
 
 
+def _migration_question_payload(raw: dict[str, Any]) -> dict[str, Any]:
+    """Drop catalog-only source metadata before comparing historical content."""
+    return {key: value for key, value in raw.items() if key != "sourceId"}
+
+
 def _invalid(
     invalid_records: list[dict[str, Any]],
     *,
@@ -643,7 +648,7 @@ async def _build_snapshot(
                 continue
             try:
                 payload = _canonical_payload(
-                    raw_question,
+                    _migration_question_payload(raw_question),
                     subject=candidate.subject,
                     force_public=question_id in published_public_question_ids,
                 )

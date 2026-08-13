@@ -5,6 +5,7 @@
  * 为不加载图谱编辑器或训练页运行时的独立页面提供登录、注册、退出和弹窗控制。
  */
 (function(global){
+  const LEGAL_CONSENT_VERSION='2026-08-13-v1';
   const core=()=>global.KGAuthCore||null;
   const byId=id=>document.getElementById(id);
   let initialized=false;
@@ -75,6 +76,13 @@
   function cleanUsername(value){
     return core()?.cleanUsername?.(value)||String(value||'').trim().replace(/\s+/g,'_').slice(0,32);
   }
+  function hasLegalConsent(){return !!byId('authLegalConsent')?.checked}
+  function requireLegalConsent(){
+    if(hasLegalConsent())return true;
+    message('请先阅读并勾选同意《隐私政策》和《使用条款》。');
+    byId('authLegalConsent')?.focus?.();
+    return false;
+  }
   function setBusy(busy){
     ['authDoLoginBtn','authRegisterBtn'].forEach(id=>{const button=byId(id);if(button)button.disabled=!!busy});
   }
@@ -83,10 +91,11 @@
     if(!auth){message('认证模块未加载，请刷新页面后重试。');return false}
     username=cleanUsername(username);password=String(password||'');
     if(!username||!password){message('请输入用户名和密码。');return false}
+    if(!requireLegalConsent())return false;
     setBusy(true);message('正在验证账号…');
     try{
       const result=typeof auth.login==='function'
-        ?await auth.login(username,password,{source:'多题归纳画布登录'})
+        ?await auth.login(username,password,{source:'多题归纳画布登录',acceptedTermsVersion:LEGAL_CONSENT_VERSION})
         :{ok:false,message:'当前认证核心不支持统一登录接口。'};
       if(!result?.ok){message(result?.message||'登录失败，请重试。');return false}
       close();renderStatus();
@@ -101,10 +110,11 @@
     username=cleanUsername(username);password=String(password||'');
     if(username.length<2){message('用户名至少需要 2 个字符。');return false}
     if(password.length<4){message('密码至少需要 4 个字符。');return false}
+    if(!requireLegalConsent())return false;
     setBusy(true);message('正在创建账号…');
     try{
       const result=typeof auth.register==='function'
-        ?await auth.register(username,password,{source:'多题归纳画布注册'})
+        ?await auth.register(username,password,{source:'多题归纳画布注册',acceptedTermsVersion:LEGAL_CONSENT_VERSION})
         :{ok:false,message:'当前认证核心不支持统一注册接口。'};
       if(!result?.ok){message(result?.message||'注册失败，请重试。');return false}
       close();renderStatus();
@@ -172,9 +182,12 @@
     renderStatus,
     isLoggedIn,
     currentUsername,
-    afterExternalLogin
+    afterExternalLogin,
+    hasLegalConsent,
+    requireLegalConsent,
+    legalConsentVersion:LEGAL_CONSENT_VERSION
   };
-  global.KGStandaloneAuthDialog=Object.freeze({bind,open,close,login,register,logout,renderStatus,isLoggedIn,currentUsername});
+  global.KGStandaloneAuthDialog=Object.freeze({bind,open,close,login,register,logout,renderStatus,isLoggedIn,currentUsername,hasLegalConsent,requireLegalConsent,legalConsentVersion:LEGAL_CONSENT_VERSION});
 
   document.addEventListener('DOMContentLoaded',bind);
   global.addEventListener('load',()=>setTimeout(bind,0));

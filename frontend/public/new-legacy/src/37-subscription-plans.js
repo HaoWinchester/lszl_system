@@ -58,7 +58,8 @@
         shortName:"免费",
         level:0,
         billingCycle:"free",
-        durationDays:0,
+      durationDays:0,
+        paymentAmountFen:0,
         priceText:"¥0",
         originalPriceText:"",
         discountPercent:"",
@@ -90,7 +91,8 @@
         shortName:"月度",
         level:1,
         billingCycle:"monthly",
-        durationDays:30,
+      durationDays:30,
+        paymentAmountFen:2900,
         priceText:"待配置",
         originalPriceText:"",
         discountPercent:"",
@@ -122,7 +124,8 @@
         shortName:"季度",
         level:2,
         billingCycle:"quarterly",
-        durationDays:90,
+      durationDays:90,
+        paymentAmountFen:7900,
         priceText:"待配置",
         originalPriceText:"",
         discountPercent:"",
@@ -155,7 +158,8 @@
         shortName:"半年",
         level:3,
         billingCycle:"half_year",
-        durationDays:180,
+      durationDays:180,
+        paymentAmountFen:13900,
         priceText:"待配置",
         originalPriceText:"",
         discountPercent:"",
@@ -189,7 +193,8 @@
         shortName:"终身",
         level:4,
         billingCycle:"lifetime",
-        durationDays:-1,
+      durationDays:-1,
+        paymentAmountFen:39900,
         priceText:"待配置",
         originalPriceText:"",
         discountPercent:"",
@@ -258,6 +263,16 @@
       n=Math.max(0,Math.min(100,n));
       return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)));
     }
+    function normalizePaymentAmountFen(value){
+      const amount=Number(value);
+      return Number.isInteger(amount)&&amount>=0?amount:null;
+    }
+    function formatPaymentAmountFen(amountFen){
+      const amount=normalizePaymentAmountFen(amountFen);
+      if(amount===null)return "";
+      const yuan=amount/100;
+      return amount%100===0?`￥${yuan}`:`￥${yuan.toFixed(2)}`;
+    }
     function splitPriceText(text){
       const raw=String(text || "").trim();
       const match=raw.match(/^([^0-9]*)([0-9]+(?:\.[0-9]+)?)(.*)$/);
@@ -293,6 +308,10 @@
       ["name","shortName","priceText","originalPriceText","durationText","badgeText","description","benefitText","usageText"].forEach(key=>{
         if(Object.prototype.hasOwnProperty.call(patch,key)) out[key]=String(patch[key] == null ? "" : patch[key]).trim();
       });
+      if(Object.prototype.hasOwnProperty.call(patch,"paymentAmountFen")){
+        const amount=normalizePaymentAmountFen(patch.paymentAmountFen);
+        if(amount!==null)out.paymentAmountFen=amount;
+      }
       if(Object.prototype.hasOwnProperty.call(patch,"discountPercent")) out.discountPercent=normalizeDiscountPercent(patch.discountPercent);
       return out;
     }
@@ -345,9 +364,10 @@
       const base=basePlanById(planId);
       const settings=readPlanSettings()[base.id] || {};
       const merged={...base,...settings,id:base.id,level:base.level,billingCycle:base.billingCycle,durationDays:base.durationDays,features:{...base.features},limits:{...base.limits}};
+      const serverPrice=formatPaymentAmountFen(merged.paymentAmountFen);
       const autoPrice=deriveDiscountPrice(merged.originalPriceText,merged.discountPercent);
       const discountText=deriveDiscountLabel(merged.discountPercent);
-      return {...merged,priceText:autoPrice || merged.priceText,discountText};
+      return {...merged,priceText:serverPrice || autoPrice || merged.priceText,discountText};
     }
     function featureLabel(feature){
       return FEATURE_LABELS[feature] || feature;
@@ -416,6 +436,7 @@
       expiresAtForPlan,
       deriveDiscountPrice,
       deriveDiscountLabel,
+      formatPaymentAmountFen,
       featureLabel,
       planBenefitItems,
       planUsageText,

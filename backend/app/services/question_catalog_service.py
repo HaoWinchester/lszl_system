@@ -36,6 +36,7 @@ def question_to_payload(question: Question) -> dict:
 
     return {
         "id": question.id,
+        "sourceId": question.source_id,
         "bankId": question.bank_id,
         "title": question.title,
         "type": question.type,
@@ -77,6 +78,7 @@ def bank_to_payload(
 ) -> dict:
     return {
         "id": bank.id,
+        "sourceId": bank.source_id,
         "ownerId": bank.owner_id,
         "name": bank.name,
         "subject": bank.subject,

@@ -94,6 +94,8 @@ test('graph and training login use remote authentication then reload account sta
   assert.match(adapter, /core\.login/)
   assert.match(adapter, /core\.register/)
   assert.match(adapter, /core\.logout/)
+  assert.match(adapter, /requireLegalConsent/)
+  assert.match(adapter, /acceptedTermsVersion/)
   const graphPage = readFileSync(resolve(frontendDir, 'public/new-legacy/index.html'), 'utf8')
   assert.match(graphPage, /direct-auth-adapter\.js/)
   const retiredTrainingPage = readFileSync(resolve(frontendDir, 'public/new-legacy/question-training.html'), 'utf8')

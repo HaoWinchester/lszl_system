@@ -8,6 +8,7 @@
   const AUTH_USERS_KEY="kg_local_users_v1";
   const AUTH_SESSION_KEY="kg_local_current_user_v1";
   const USER_LOG_KEY="kg_user_admin_logs_v1";
+  const ACTIVE_PAID_MEMBERSHIP_STATUSES=new Set(["active","trial","manual"]);
   const Store=window.KGAppStorage||{};
 
   const $=id=>document.getElementById(id);
@@ -110,11 +111,16 @@
     const statusText=summary&&summary.statusText || "有效";
     const expiresText=summary&&summary.expiresFullText || summary&&summary.expiresText || "长期有效";
     const countdownText=summary&&summary.countdownText || "长期有效";
-    const actionText=plan&&plan.id&&plan.id!=="free"?"续费":"续费 / 升级";
+    const hasActivePaidMembership=!!(record
+      && ACTIVE_PAID_MEMBERSHIP_STATUSES.has(record.status)
+      && plan
+      && plan.id
+      && plan.id!=="free");
+    const actionText="升级会员";
     panel.innerHTML=`<div class="uc-card-icon uc-card-icon-membership">◇</div>
-      <div class="uc-membership-main"><div class="uc-membership-heading"><div><h3>${escapeHTML(plan.name||"免费学员")}</h3><p>${escapeHTML(plan.description||"当前学员订阅状态。")}</p></div><button type="button" class="uc-button uc-button-primary uc-button-compact" id="ucSubscriptionRenewBtn">${escapeHTML(actionText)}</button></div>
+      <div class="uc-membership-main"><div class="uc-membership-heading"><div><h3>${escapeHTML(plan.name||"免费学员")}</h3><p>${escapeHTML(plan.description||"当前学员订阅状态。")}</p></div>${hasActivePaidMembership?"":`<button type="button" class="uc-button uc-button-primary uc-button-compact" id="ucSubscriptionRenewBtn">${escapeHTML(actionText)}</button>`}</div>
       <div class="uc-meta-chips"><span>✓ 状态：${escapeHTML(statusText)}</span><span>▣ 有效期：${escapeHTML(expiresText)}</span><span>◷ 倒计时：${escapeHTML(countdownText)}</span><span>◇ 来源：${escapeHTML(record&&record.source||"default")}</span></div>
-      <p class="uc-membership-note">此处只展示当前订阅状态。点击续费可查看会员权益详情并进入购买 / 开通流程。</p></div>`;
+      <p class="uc-membership-note">此处展示当前订阅状态和权益有效期。</p></div>`;
     const btn=$("ucSubscriptionRenewBtn");
     if(btn)btn.addEventListener("click",openSubscriptionDetailModal);
   }
@@ -199,13 +205,23 @@
     const currentPlanId=summary&&summary.plan&&summary.plan.id || "";
     const plans=typeof sub.enabledPlanList==="function"?sub.enabledPlanList():[];
     let activeNativeOrder=null;
+    let planPickLocked=false;
+    function setPlanPickLocked(locked){
+      planPickLocked=!!locked;
+      body.querySelectorAll('[data-buy-plan]').forEach(button=>{
+        const isActive=activeNativeOrder&&button.dataset.buyPlan===String(activeNativeOrder.planId||"");
+        button.disabled=planPickLocked&&!isActive;
+        button.setAttribute("aria-disabled",String(planPickLocked&&!isActive));
+      });
+    }
     body.innerHTML=`<div class="divider"></div><div class="plans-grid">
       ${plans.map(plan=>{
         const current=!!currentPlanId && plan.id===currentPlanId;
         const features=planFeatureList(plan);
         const limitText=planLimitText(plan);
         const featured=plan.id==="monthly"||!!plan.recommended;
-        const cta=current?(plan.id==="free"?"当前使用中":"续费当前方案"):(plan.id==="free"?"免费使用":"选择该方案");
+        const canPurchase=!current && plan.id!=="free";
+        const cta=current?(plan.id==="free"?"当前使用中":"当前方案"):(plan.id==="free"?"免费使用":"选择该方案");
         return `<article class="plan-card${featured?' featured':''}${current?' current':''}" data-plan-id="${escapeHTML(plan.id)}">
           <div class="plan-head">
             <h3 class="plan-title">${escapeHTML(plan.name||'套餐')}</h3>
@@ -219,7 +235,7 @@
           <div class="plan-rule"></div>
           <div class="benefit-line"><span class="benefit-dot"></span><span>${escapeHTML(features[0]||'会员权益')}</span></div>
           ${limitText?`<div class="feature-chip"><span class="icon i-infinity"></span><span>${escapeHTML(limitText)}</span></div>`:''}
-          <button type="button" class="btn ${current?'current-btn':'btn-primary'}" data-buy-plan="${escapeHTML(plan.id)}">${current?'<span class="icon i-check-circle"></span>':''}${escapeHTML(cta)}${!current&&plan.id!=="free"?'<span class="icon i-chevron-right"></span>':''}</button>
+          <button type="button" class="btn ${current?'current-btn':'btn-primary'}"${canPurchase?` data-buy-plan="${escapeHTML(plan.id)}"`:" disabled"}>${current?'<span class="icon i-check-circle"></span>':''}${escapeHTML(cta)}${canPurchase?'<span class="icon i-chevron-right"></span>':''}</button>
         </article>`;
       }).join('')}
     </div>
@@ -238,14 +254,17 @@
       const pay=window.KGWechatPay;
       if(!body||!pay||!order||!order.id)return;
       clearNativePayPolling();
-      const amount=`￥${((Number(order.amount)||0)/100).toFixed(2)}`;
+      setPlanPickLocked(true);
+      setMembershipPaymentView(true);
+      const amountFen=Math.max(0,Number(order.amount)||0);
+      const amount=`￥${amountFen%100===0?String(amountFen/100):(amountFen/100).toFixed(2)}`;
       body.querySelectorAll(".plan-card[data-plan-id]").forEach(card=>card.classList.toggle("checkout-selected",card.dataset.planId===String(plan&&plan.id||order.planId||"")));
       const checkout=$("membershipCheckout");
       if(!checkout)return;
       checkout.hidden=false;
       checkout.innerHTML=`<div class="checkout-qr"><div class="payment-tag"><span class="icon i-wechat"></span>微信扫码支付</div><div class="qr-frame"><img class="kg-native-pay-qr" src="${escapeHTML(pay.nativeOrderQrCodeUrl(order.id))}" alt="微信支付二维码" /></div></div>
         <div class="checkout-summary"><div><p class="summary-label">正在开通</p><h3 class="checkout-plan-name">${escapeHTML(plan&&plan.name||order.planName||'会员方案')}</h3><p class="checkout-help">请使用微信扫描二维码完成付款，支付结果会自动刷新。</p></div><div class="checkout-amount"><span>应付金额</span><strong>${escapeHTML(amount)}</strong></div><div class="checkout-meta"><span>订单编号：${escapeHTML(order.id)}</span><span id="nativePayStatus">等待扫码付款</span></div></div>
-        <div class="checkout-actions"><button type="button" class="btn btn-secondary" id="nativePayRefreshBtn"><span class="icon i-refresh"></span>查询状态</button><button type="button" class="btn btn-secondary" id="nativePayCancelOrderBtn">取消订单</button><button type="button" class="btn btn-primary" id="nativePayCloseBtn">稍后支付</button></div>`;
+        `;
       const status=$("nativePayStatus");
       const refresh=async()=>{
         try{
@@ -263,32 +282,9 @@
           }
           if(status)status.textContent="等待扫码付款";
         }catch(error){
-          if(status)status.textContent="查询失败，可点击重试";
+          if(status)status.textContent="支付状态同步失败，正在自动重试";
         }
       };
-      $("nativePayRefreshBtn")?.addEventListener("click",refresh);
-      const cancelOrderBtn=$("nativePayCancelOrderBtn");
-      let cancelArmed=false,cancelArmTimer=0;
-      cancelOrderBtn?.addEventListener("click",async()=>{
-        if(!cancelArmed){
-          cancelArmed=true;cancelOrderBtn.textContent="再次点击确认取消";
-          if(status)status.textContent="订单尚未取消";
-          clearTimeout(cancelArmTimer);cancelArmTimer=setTimeout(()=>{cancelArmed=false;cancelOrderBtn.textContent="取消订单"},4000);
-          return;
-        }
-        cancelOrderBtn.disabled=true;cancelOrderBtn.textContent="正在取消…";
-        try{
-          await pay.cancelNativeOrder(order.id);clearNativePayPolling();clearTimeout(cancelArmTimer);
-          activeNativeOrder=null;
-          checkout.hidden=true;checkout.innerHTML="";
-          body.querySelectorAll(".plan-card.checkout-selected").forEach(card=>card.classList.remove("checkout-selected"));
-          showStatus("待支付订单已取消。",true);
-        }catch(error){
-          cancelArmed=false;cancelOrderBtn.disabled=false;cancelOrderBtn.textContent="取消订单";
-          if(status)status.textContent=String(error&&error.message||"订单取消失败，请重试");
-        }
-      });
-      $("nativePayCloseBtn")?.addEventListener("click",closeSubscriptionDetailModal);
       nativePayPollTimer=setInterval(refresh,3000);
       refresh();
     }
@@ -309,6 +305,11 @@
       const planId=card&&card.dataset.buyPlan;
       if(!planId)return;
       const plan=sub.planById?sub.planById(planId):null;
+      if(planPickLocked){
+        if(activeNativeOrder&&activeNativeOrder.planId===planId)renderNativePayment(plan,activeNativeOrder);
+        else showStatus("已有待支付订单，请完成当前扫码支付后再选择其他套餐。");
+        return;
+      }
       const latest=currentRecord();
       const role=latest&&latest.user&&latest.user.role || "guest";
       if(!latest){
@@ -333,28 +334,24 @@
         return;
       }
       const originalLabel=card.innerHTML;
-      card.disabled=true;
+      setPlanPickLocked(true);
       card.textContent="正在生成支付二维码…";
       try{
         if(activeNativeOrder&&activeNativeOrder.planId===plan.id){
-          card.disabled=false;card.innerHTML=originalLabel;
+          card.innerHTML=originalLabel;
           renderNativePayment(plan,activeNativeOrder);
           return;
         }
-        if(activeNativeOrder){
-          await pay.cancelNativeOrder(activeNativeOrder.id);
-          clearNativePayPolling();
-          activeNativeOrder=null;
-        }
         const result=await pay.createNativeOrder(plan.id);
         if(!result||!result.order||!result.order.codeUrl)throw new Error("支付二维码生成失败，请重试。");
-        activeNativeOrder={...result.order,planId:plan.id};
-        card.disabled=false;card.innerHTML=originalLabel;
-        renderNativePayment(plan,result.order);
-        showStatus("支付二维码已生成，请使用微信扫码。");
+        const checkoutPlan=sub.planById?sub.planById(result.order.planId):null;
+        activeNativeOrder={...result.order,planId:result.order.planId||plan.id};
+        card.innerHTML=originalLabel;
+        renderNativePayment(checkoutPlan||plan,result.order);
+        showStatus(result.order.planId&&result.order.planId!==plan.id?"已有待支付订单，请继续完成该订单。":"支付二维码已生成，请使用微信扫码。");
       }catch(error){
         showStatus(String(error&&error.message||"支付二维码生成失败，请重试。"));
-        card.disabled=false;
+        setPlanPickLocked(false);
         card.innerHTML=originalLabel;
       }
     }

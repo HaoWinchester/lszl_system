@@ -44,6 +44,8 @@ def to_dict(user: User) -> dict:
         "note": user.note,
         "source": user.source,
         "wechat": wechat_summary(user.wechat),
+        "legalConsentVersion": user.legal_consent_version,
+        "legalConsentAt": user.legal_consent_at.isoformat() if user.legal_consent_at else None,
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "updated_at": user.updated_at.isoformat() if user.updated_at else None,
         "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
@@ -309,6 +311,15 @@ async def authenticate(db: AsyncSession, username: str, password: str) -> User |
     await db.commit()
     await db.refresh(user)
     return user
+
+
+def record_legal_consent(user: User, accepted_terms_version: str | None) -> None:
+    """Record the policy version only when a browser explicitly supplied one."""
+    version = str(accepted_terms_version or "").strip()
+    if not version:
+        return
+    user.legal_consent_version = version
+    user.legal_consent_at = now_utc()
 
 
 # ---------- 导入导出 ----------

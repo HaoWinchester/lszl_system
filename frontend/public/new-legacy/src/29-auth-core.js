@@ -294,7 +294,7 @@
     if(!username||!password)return {ok:false,message:"请输入用户名和密码。"};
     if(providerConfig().mode==="remote"){
       try{
-        const payload=await remoteRequest(providerConfig().endpoints.login,{body:{username,password,context}});
+        const payload=await remoteRequest(providerConfig().endpoints.login,{body:{username,password,acceptedTermsVersion:context.acceptedTermsVersion||undefined,context}});
         const user=normalizeUser(payload.user?.username||payload.username||username,{...(payload.user||{}),username:payload.user?.username||payload.username||username,source:"remote"});
         const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{}),loginSessionId=serverLoginSessionId(payload);
         writeRemoteSession({user,token:payload.token||"",loginSessionId,issuedAt:Date.now()});
@@ -321,7 +321,7 @@
     const config=providerConfig();
     if(config.mode==="remote"){
       try{
-        const payload=await remoteRequest(config.endpoints.register,{body:{username,password,context}});
+        const payload=await remoteRequest(config.endpoints.register,{body:{username,password,acceptedTermsVersion:context.acceptedTermsVersion||undefined,context}});
         const user=normalizeUser(payload.user?.username||payload.username||username,{...(payload.user||{}),username:payload.user?.username||payload.username||username,source:"remote"});
         const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{}),loginSessionId=serverLoginSessionId(payload);
         writeRemoteSession({user,token:payload.token||"",loginSessionId,issuedAt:Date.now()});

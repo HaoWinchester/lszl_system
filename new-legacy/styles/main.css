@@ -1195,6 +1195,10 @@ input[type=file]{display:none}
   font-size:12px;
   line-height:1.55;
 }
+.auth-body .auth-agreement{display:flex;align-items:flex-start;gap:8px;margin:14px 0 0;color:#64748b;font-size:12px;font-weight:600;line-height:1.6;cursor:pointer}
+.auth-body .auth-agreement input[type="checkbox"]{width:16px;height:16px;min-width:16px;margin:2px 0 0;padding:0;accent-color:#7c5cff;box-shadow:none;cursor:pointer}
+.auth-body .auth-agreement input[type="checkbox"]:focus{box-shadow:0 0 0 3px rgba(124,92,255,.18);border-color:#7c5cff}
+.auth-agreement a{color:#7058e8;font-weight:800;text-decoration:none}.auth-agreement a:hover{text-decoration:underline}
 body.auth-readonly .knowledge-card{
   cursor:default;
 }

@@ -18,6 +18,12 @@
     }
   }
 
+  function acceptedTermsVersion() {
+    const runtime = global.KGAuthRuntime
+    if (typeof runtime?.requireLegalConsent === 'function' && !runtime.requireLegalConsent()) return ''
+    return String(runtime?.legalConsentVersion || '')
+  }
+
   async function remoteLogin(username, password) {
     username = core.cleanUsername(username)
     password = String(password || '')
@@ -25,10 +31,15 @@
       message('请输入用户名和密码。')
       return false
     }
+    const consentVersion = acceptedTermsVersion()
+    if (!consentVersion) return false
     setBusy(true)
     message('正在验证账号…')
     try {
-      const result = await core.login(username, password, { source: 'new-legacy-direct' })
+      const result = await core.login(username, password, {
+        source: 'new-legacy-direct',
+        acceptedTermsVersion: consentVersion,
+      })
       if (!result?.ok) {
         message(result?.message || '登录失败，请重试。')
         return false
@@ -54,10 +65,15 @@
       message('密码至少需要 4 个字符。')
       return false
     }
+    const consentVersion = acceptedTermsVersion()
+    if (!consentVersion) return false
     setBusy(true)
     message('正在创建账号…')
     try {
-      const result = await core.register(username, password, { source: 'new-legacy-direct' })
+      const result = await core.register(username, password, {
+        source: 'new-legacy-direct',
+        acceptedTermsVersion: consentVersion,
+      })
       if (!result?.ok) {
         message(result?.message || '注册失败，请重试。')
         return false

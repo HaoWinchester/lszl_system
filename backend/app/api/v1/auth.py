@@ -11,6 +11,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser, establish_authenticated_session, get_login_session_id
+from app.core.config import settings
 from app.db.session import get_db
 from app.schemas.auth import AuthenticatedResponse, LoginRequest, RegisterRequest, SelfProfileUpdate
 from app.schemas.user import UserCreate
@@ -47,6 +48,7 @@ SAFE_WECHAT_RETURN_PATHS = {
     "/guided-learning-node.html",
     "/guided-learning-placement-test.html",
 }
+LEGAL_CONSENT_VERSION = "2026-08-13-v1"
 
 
 def _client_info(request: Request) -> tuple[str | None, str | None]:
@@ -76,8 +78,19 @@ def _wechat_redirect(return_path: str, result: str) -> RedirectResponse:
     return RedirectResponse(url=location, status_code=303)
 
 
+def _accepted_legal_consent(version: str | None) -> str | None:
+    """Enforce the current legal documents at the server boundary."""
+    if not settings.LEGAL_CONSENT_REQUIRED:
+        return str(version or "").strip() or None
+    normalized = str(version or "").strip()
+    if normalized != LEGAL_CONSENT_VERSION:
+        raise HTTPException(status_code=400, detail="请先阅读并同意《隐私政策》和《使用条款》")
+    return normalized
+
+
 @router.post("/register", response_model=AuthenticatedResponse)
 async def register(req: RegisterRequest, request: Request, db: DB):
+    accepted_terms_version = _accepted_legal_consent(req.accepted_terms_version)
     ip, ua = _client_info(request)
     data = UserCreate(
         username=req.username,
@@ -93,14 +106,17 @@ async def register(req: RegisterRequest, request: Request, db: DB):
         await user_service.log_action(db, "register_failed", req.username, req.username, str(e), ip, ua)
         await db.commit()
         raise HTTPException(status_code=400, detail=str(e))
+    user_service.record_legal_consent(user, accepted_terms_version)
     await user_service.log_action(db, "login_success", user.username, user.username, "注册并登录", ip, ua)
     await db.commit()
+    await db.refresh(user)
     login_session_id = establish_authenticated_session(request, user.username)
     return {"user": user_service.to_dict(user), "loginSessionId": login_session_id}
 
 
 @router.post("/login", response_model=AuthenticatedResponse)
 async def login(req: LoginRequest, request: Request, db: DB):
+    accepted_terms_version = _accepted_legal_consent(req.accepted_terms_version)
     ip, ua = _client_info(request)
     try:
         user = await user_service.authenticate(db, req.username, req.password)
@@ -116,8 +132,10 @@ async def login(req: LoginRequest, request: Request, db: DB):
         )
         await db.commit()
         raise HTTPException(status_code=401, detail="用户名或密码错误")
+    user_service.record_legal_consent(user, accepted_terms_version)
     await user_service.log_action(db, "login_success", user.username, user.username, "登录成功", ip, ua)
     await db.commit()
+    await db.refresh(user)
     login_session_id = establish_authenticated_session(request, user.username)
     return {"user": user_service.to_dict(user), "loginSessionId": login_session_id}
 
@@ -170,7 +188,13 @@ async def wechat_auth_url(
     db: DB,
     intent: Literal["login", "bind"] = "login",
     return_path: str = "/",
+    accepted_terms_version: str | None = None,
 ):
+    requested_terms_version = accepted_terms_version
+    if intent == "login":
+        accepted_terms_version = _accepted_legal_consent(requested_terms_version)
+    else:
+        accepted_terms_version = None
     cfg = await system_service.get_wechat_config(db)
     if wechat_service.compute_mode(cfg) != "official":
         raise HTTPException(status_code=400, detail="未配置正式微信登录（缺 AppID/AppSecret 或未启用）")
@@ -183,6 +207,7 @@ async def wechat_auth_url(
         "intent": intent,
         "returnPath": _safe_return_path(return_path),
         "username": username,
+        "acceptedTermsVersion": accepted_terms_version,
     }
     return {"authUrl": url, "state": state}
 
@@ -216,9 +241,11 @@ async def wechat_callback(code: str, state: str, request: Request, db: DB):
             user = await wechat_service.bind_user(db, user, profile, "wechat-bind")
             action, detail, result = "wechat_bind", "微信账号绑定成功", "bind-success"
         else:
+            accepted_terms_version = _accepted_legal_consent(pending.get("acceptedTermsVersion"))
             user = await wechat_service.find_or_create_user(db, profile, cfg, "wechat")
             if not user:
                 return _wechat_redirect(return_path, "login-failed")
+            user_service.record_legal_consent(user, accepted_terms_version)
             establish_authenticated_session(request, user.username)
             action, detail, result = "wechat_login", "微信扫码登录", "login-success"
     except (PermissionError, ValueError):
@@ -241,16 +268,23 @@ async def unbind_wechat(request: Request, user: CurrentUser, db: DB):
 
 
 @router.post("/wechat/demo-login", response_model=AuthenticatedResponse)
-async def wechat_demo_login(request: Request, db: DB):
+async def wechat_demo_login(
+    request: Request,
+    db: DB,
+    accepted_terms_version: str | None = None,
+):
+    accepted_terms_version = _accepted_legal_consent(accepted_terms_version)
     cfg = await system_service.get_wechat_config(db)
     if not cfg.get("enableDemo"):
         raise HTTPException(status_code=403, detail="演示模式未开启")
     profile = wechat_service.profile_for_demo()
     user = await wechat_service.find_or_create_user(db, profile, cfg, "wechat-demo")
+    user_service.record_legal_consent(user, accepted_terms_version)
     ip, ua = _client_info(request)
     await user_service.log_action(
         db, "wechat_demo_login", user.username, user.username, "微信演示扫码登录", ip, ua
     )
     await db.commit()
+    await db.refresh(user)
     login_session_id = establish_authenticated_session(request, user.username)
     return {"user": user_service.to_dict(user), "loginSessionId": login_session_id}

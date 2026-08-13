@@ -4345,17 +4345,46 @@
     state.cluePage=snapshot.cluePage||1;state.conceptPage=snapshot.conceptPage||1;state.questionPage=snapshot.questionPage||1;
     state.dirty=!!snapshot.dirty;state.serverCatalogNewerRevision=Number(snapshot.serverCatalogNewerRevision||0);state.serverCatalogLocalDraft=clone(snapshot.serverCatalogLocalDraft);state.serverCatalogConflictReason=snapshot.serverCatalogConflictReason||'';
   }
+  function importReplacementMessage(plan={}){
+    const groupNames={content:'题干与选项',analysis:'解析与翻译',keywords:'关键词',tags:'标签',principles:'原理绑定',knowledge:'知识点',reasoning:'推理链',family:'题目家族'};
+    const rows=Array.isArray(plan?.summaries)?plan.summaries:[];
+    const lines=rows.map(summary=>{
+      const groups=Object.entries(summary?.groups||{}).filter(([,count])=>Number(count)>0).map(([key])=>groupNames[key]||key);
+      const changes=[
+        Number(summary?.addedQuestions)>0?`新增 ${summary.addedQuestions} 题`:'',
+        Number(summary?.modifiedQuestions)>0?`更新 ${summary.modifiedQuestions} 题`:'',
+        Number(summary?.removedQuestions)>0?`移除 ${summary.removedQuestions} 题`:'',
+        groups.length?`涉及：${groups.join('、')}`:''
+      ].filter(Boolean);
+      return `• ${text(summary?.bankName||summary?.bankId||'未命名题库')}：${changes.join('；')||'题库设置更新'}`;
+    });
+    return `检测到同一来源题库的更新：\n${lines.join('\n')||'• 导入内容将覆盖同来源题库'}\n\n已完全跳过内容相同的题库。确认覆盖上述变更吗？`;
+  }
   async function importQuestionBanks(data){
     const incoming=importBanksFromPayload(data);
     if(!incoming.length){alert('导入未提交：未找到可导入的题库。');return {ok:false,error:'未找到可导入的题库。'};}
     if(!Catalog?.importBanks){alert('导入未提交：题目目录服务未加载。');return {ok:false,error:'题目目录服务未加载。'};}
     const snapshot=questionImportStateSnapshot();
     try{
-      const result=await Catalog.importBanks({banks:incoming});
+      let result;
+      try{result=await Catalog.importBanks({banks:incoming});}
+      catch(error){
+        const plan=error?.detail?.detail?.importPlan;
+        if(error?.code!=='IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED')throw error;
+        if(!global.confirm(importReplacementMessage(plan))){
+          restoreQuestionImportState(snapshot);render();toast('已取消覆盖导入。');
+          return {ok:false,cancelled:true,error:'已取消覆盖导入。'};
+        }
+        result=await Catalog.importBanks({banks:incoming,confirmReplace:true});
+      }
       const savedBanks=Array.isArray(result?.banks)?result.banks:[];
-      const last=savedBanks[savedBanks.length-1];
+      const lastIncoming=incoming[incoming.length-1]||{};
+      const sourceBankId=String(lastIncoming.sourceId||lastIncoming.id||'');
+      const last=savedBanks[savedBanks.length-1]||{id:result?.sourceBankIdMap?.[sourceBankId]};
       if(!last?.id)throw new Error('服务器未返回已保存题库。');
-      const savedQuestionId=String(last.questions?.[0]?.id||'');
+      const firstIncomingQuestion=lastIncoming.questions?.[0]||{};
+      const sourceQuestionId=String(firstIncomingQuestion.sourceId||firstIncomingQuestion.id||'');
+      const savedQuestionId=String(last.questions?.[0]?.id||result?.sourceQuestionIdMap?.[`${sourceBankId}::${sourceQuestionId}`]||'');
       reloadBanksFromCatalog(String(last.id),savedQuestionId);
       const importedPapers=remapImportedPaperRefs(data?.papers,{sourceBankIdMap:result.sourceBankIdMap,sourceQuestionIdMap:result.sourceQuestionIdMap});
       if(importedPapers.length){
@@ -4363,7 +4392,8 @@
         savePapers(state.papers,{silent:true});
       }
       state.cluePage=1;state.conceptPage=1;state.questionPage=1;state.dirty=false;render();
-      toast(`已导入并保存 ${savedBanks.length} 个题库${importedPapers.length?'，并导入 '+importedPapers.length+' 套试卷':''}。`);
+      const skipped=Number(result?.importPlan?.skip||0);
+      toast(`已导入并保存 ${savedBanks.length} 个题库${skipped?`，跳过 ${skipped} 个相同题库`:''}${importedPapers.length?'，并导入 '+importedPapers.length+' 套试卷':''}。`);
       return {ok:true,bankId:state.selectedBankId,questionId:state.selectedQuestionId,importedBankCount:savedBanks.length,importedPaperCount:importedPapers.length};
     }catch(error){
       restoreQuestionImportState(snapshot);render();

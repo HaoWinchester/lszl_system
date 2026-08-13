@@ -36,6 +36,8 @@ class User(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str] = mapped_column(String(32), nullable=False, default="self-register")
     wechat: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    legal_consent_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    legal_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -219,7 +219,11 @@ def test_callback_creates_student_sets_session_and_redirects(monkeypatch) -> Non
         with TestClient(app) as client:
             start = client.get(
                 "/api/v1/auth/wechat/auth-url",
-                params={"intent": "login", "return_path": "/training"},
+                params={
+                    "intent": "login",
+                    "return_path": "/training",
+                    "accepted_terms_version": "2026-08-13-v1",
+                },
             )
             assert start.status_code == 200, start.text
             state = start.json()["state"]
@@ -237,6 +241,8 @@ def test_callback_creates_student_sets_session_and_redirects(monkeypatch) -> Non
         assert current.status_code == 200
         assert current.json()["user"]["username"] == username
         assert current.json()["user"]["role"] == "student"
+        assert current.json()["user"]["legalConsentVersion"] == "2026-08-13-v1"
+        assert current.json()["user"]["legalConsentAt"]
         login_session_id = current.json()["loginSessionId"]
         assert isinstance(login_session_id, str)
         assert login_session_id
@@ -328,11 +334,17 @@ def test_callback_binds_and_unbinds_an_existing_password_user(monkeypatch) -> No
     monkeypatch.setattr(wechat_service, "exchange_code", exchange)
     monkeypatch.setattr(wechat_service, "fetch_userinfo", userinfo)
     configure_official_wechat(monkeypatch)
+    monkeypatch.setattr(settings, "LEGAL_CONSENT_REQUIRED", True)
     try:
         with TestClient(app) as client:
             registered = client.post(
                 "/api/v1/auth/register",
-                json={"username": username, "password": "test-password", "display_name": "绑定用户"},
+                json={
+                    "username": username,
+                    "password": "test-password",
+                    "display_name": "绑定用户",
+                    "acceptedTermsVersion": "2026-08-13-v1",
+                },
             )
             assert registered.status_code == 200, registered.text
             start = client.get(

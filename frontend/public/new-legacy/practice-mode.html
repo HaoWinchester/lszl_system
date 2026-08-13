@@ -1,24 +1,24 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.42" lang="zh-CN">
+<html data-release="v9.0-p4.1.57" lang="zh-CN">
 <head>
-<script src="./teaching-content-sync.js?v=v9.0-p4.1.42"></script><!-- kg-teaching-content-sync:generated -->
+<script src="./teaching-content-sync.js?v=v9.0-p4.1.57"></script><!-- kg-teaching-content-sync:generated -->
 <script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
-<script src="./runtime-config.override.js?v=v9.0-p4.1.42"></script><!-- kg-runtime:generated -->
-<script defer src="./direct-entry.js?v=v9.0-p4.1.42"></script><!-- kg-direct-entry:generated -->
-<script defer src="./feature-analytics.js?v=v9.0-p4.1.42"></script><!-- kg-feature-analytics:generated -->
+<script src="./runtime-config.override.js?v=v9.0-p4.1.57"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js?v=v9.0-p4.1.57"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js?v=v9.0-p4.1.57"></script><!-- kg-feature-analytics:generated -->
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
   <meta name="color-scheme" content="light"/>
   <title>做题模式｜项目管理学习营</title>
-  <link rel="stylesheet" href="styles/main.css?v=v9.0-p4.1.42"/>
-  <link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.42"/>
-<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.42"/>
-  <link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.42"/>
-  <link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.42"/>
-  <link rel="stylesheet" href="styles/support-center.css?v=v9.0-p4.1.42"/>
-  <link rel="stylesheet" href="styles/practice-mode.css?v=v9.0-p4.1.42"/>
-  <link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.42"/>
-  <link rel="stylesheet" href="styles/learning-skin.css?v=v9.0-p4.1.42"/>
+  <link rel="stylesheet" href="styles/main.css?v=v9.0-p4.1.57"/>
+  <link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.57"/>
+<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.57"/>
+  <link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.57"/>
+  <link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.57"/>
+  <link rel="stylesheet" href="styles/support-center.css?v=v9.0-p4.1.57"/>
+  <link rel="stylesheet" href="styles/practice-mode.css?v=v9.0-p4.1.57"/>
+  <link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.57"/>
+  <link rel="stylesheet" href="styles/learning-skin.css?v=v9.0-p4.1.57"/>
 </head>
 <body class="practice-mode-page" data-learning-skin="focus-vega" data-question-catalog-mode="learning">
   <div class="practice-app">
@@ -117,6 +117,12 @@
             <div><small>SCHOLAR</small><h2>学霸模式</h2><p>共享 80 秒倒计时。答对加时间，答错扣时间并损失血量。</p></div>
             <button type="button" class="practice-start-btn" data-practice-start="scholar">进入学霸模式</button>
           </article>
+          <article class="practice-mode-card revenge">
+            <span class="practice-mode-icon" data-kg-icon="rotate-ccw" data-kg-icon-size="20" aria-hidden="true"></span>
+            <div><small>REVENGE</small><h2>复仇模式</h2><p>集中处理真实错题；再次答错先补知识点，再用不同题目验证是否真正掌握。</p></div>
+            <div class="practice-revenge-stats" aria-label="复仇错题统计"><span>待复仇 <strong id="practiceRevengePendingCount">0</strong></span><span>需补救 <strong id="practiceRevengeRemediationCount">0</strong></span><span>已掌握 <strong id="practiceRevengeMasteredCount">0</strong></span></div>
+            <button type="button" class="practice-start-btn" data-practice-start="revenge">开始复仇</button>
+          </article>
         </section>
 
         <div class="practice-empty" id="practiceEmpty" hidden>
@@ -138,11 +144,26 @@
         </div>
         <div class="practice-streak-pop" id="practiceStreakPop" hidden role="status"></div>
         <div class="practice-feedback" id="practiceFeedback" hidden role="status"></div>
+        <div class="practice-verification-banner" id="practiceVerificationBanner" hidden aria-live="polite">
+          <span>KNOWLEDGE CHECK</span>
+          <div><strong id="practiceVerificationKnowledge">核心知识点</strong><small id="practiceVerificationMessage">这不是原错题。请用新的题干重新判断。</small></div>
+        </div>
 
         <article class="practice-question-card" id="practiceQuestionCard">
           <div class="practice-question-stem" id="practiceQuestionStem"></div>
           <div class="practice-options" id="practiceOptions"></div>
         </article>
+        <aside class="practice-remediation-panel" id="practiceRemediationPanel" hidden aria-live="assertive">
+          <span>NEEDS REMEDIATION</span>
+          <h2>你需要补这个知识点</h2>
+          <strong id="practiceRemediationKnowledge">核心知识点</strong>
+          <p id="practiceRemediationMessage">这道题在复仇模式中再次答错，建议先补齐这个知识点，再回来验证。</p>
+          <div class="practice-remediation-actions">
+            <button type="button" class="practice-secondary-btn" id="practiceRemediationReviewBtn">查看题目解析</button>
+            <button type="button" class="practice-primary-btn" id="practiceRemediationContinueBtn">开始验证</button>
+          </div>
+          <div class="practice-remediation-explanation" id="practiceRemediationExplanation" hidden></div>
+        </aside>
       </section>
 
       <section class="practice-checkpoint" id="practiceCheckpoint" hidden aria-labelledby="practiceCheckpointTitle">
@@ -213,25 +234,26 @@
 
   <div id="authDialogRoot"></div>
 
-  <script defer src="src/01-runtime-config.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/29-auth-core.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/30-shared-auth-dialog.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/32-wechat-login.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/34-role-permissions.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/37-subscription-plans.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/37-subscription-orders.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/37-subscription-redeem-codes.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/37-subscription-core.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/33-user-center.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/107-learning-ui-icons.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/41-account-menu.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/101-engagement-repository.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/103-support-center.js?v=v9.0-p4.1.42"></script>
-  <script defer src="src/58-paper-access-service.js?v=v9.0-p4.1.42"></script>
-  <script defer src="./question-catalog-adapter.js?v=v9.0-p4.1.42"></script><!-- kg-question-catalog:generated -->
-<script defer src="src/59-published-paper-repository.js?v=v9.0-p4.1.42"></script>
-  <script src="src/59c-active-learning-mode-policy.js?v=v9.0-p4.1.42"></script><!-- kg-learning-mode-policy:generated -->
-  <script defer src="src/100-practice-mode.js?v=v9.0-p4.1.42"></script>
+  <script defer src="src/01-runtime-config.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/29-auth-core.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/30-shared-auth-dialog.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/32-wechat-login.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/34-role-permissions.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/37-subscription-plans.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/37-subscription-orders.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/37-subscription-redeem-codes.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/37-subscription-core.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/33-user-center.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/107-learning-ui-icons.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/41-account-menu.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/101-engagement-repository.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/103-support-center.js?v=v9.0-p4.1.57"></script>
+  <script defer src="src/58-paper-access-service.js?v=v9.0-p4.1.57"></script>
+  <script defer src="./question-catalog-adapter.js?v=v9.0-p4.1.57"></script><!-- kg-question-catalog:generated -->
+<script defer src="src/59-published-paper-repository.js?v=v9.0-p4.1.57"></script>
+  <script defer src="./practice-learning-adapter.js?v=v9.0-p4.1.57"></script><!-- kg-practice-learning:generated -->
+<script src="src/59c-active-learning-mode-policy.js?v=v9.0-p4.1.57"></script><!-- kg-learning-mode-policy:generated -->
+<script defer src="src/100-practice-mode.js?v=v9.0-p4.1.57"></script>
 </body>
 </html>

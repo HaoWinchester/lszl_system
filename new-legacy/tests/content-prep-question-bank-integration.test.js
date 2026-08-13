@@ -405,6 +405,37 @@ async function testManagedAdminJsonImportPersistsBeforeAnyQuestionSave() {
   assert.match(managed.alerts.at(-1), /导入未提交/);
 }
 
+async function testManagedAdminReimportUsesExportedSourceIdsWhenTheServerSkipsDuplicates() {
+  const managed = loadManagedAdmin();
+  await managed.init();
+  const exportedBank = {
+    id: 'b-internal-server-id', sourceId: 'stable-export-bank', name: '已导出的服务器题库', subject: 'PMP',
+    questions: [{
+      id: 'q-internal-server-id', sourceId: 'stable-export-question', title: '已导出的服务器题目',
+      stemParts: [{ text: '原样再导入不得重复创建' }], options: [{ id: 'A', text: '正确' }, { id: 'B', text: '错误' }], correctAnswer: 'A',
+    }],
+  };
+  managed.remote({
+    banks: [{ id: exportedBank.id, sourceId: exportedBank.sourceId, name: exportedBank.name, subject: 'PMP', revision: 1 }],
+    questions: [{ ...exportedBank.questions[0], bankId: exportedBank.id, revision: 1 }],
+    contentRevision: 3,
+  });
+  managed.Catalog.importBanks = async () => ({
+    banks: [],
+    sourceBankIdMap: { 'stable-export-bank': 'b-internal-server-id' },
+    sourceQuestionIdMap: { 'stable-export-bank::stable-export-question': 'q-internal-server-id' },
+    contentRevision: 3,
+    importPlan: { skip: 1 },
+  });
+
+  const result = await managed.api.importQuestionBanks({ banks: [exportedBank] });
+
+  assert.equal(result.ok, true, 'a duplicate export must resolve through sourceId rather than be reported as a failed import');
+  assert.equal(managed.api.getCurrentBank().id, 'b-internal-server-id');
+  assert.equal(managed.api.getCurrentQuestion().id, 'q-internal-server-id');
+  assert.equal(managed.alerts.length, 0);
+}
+
 async function testManagedAdminMergePreservesNestedDraft() {
   const managed = loadManagedAdmin();
   await managed.init();
@@ -673,6 +704,7 @@ testPrepPublishesOnlyCommittedServerChanges()
   .then(testPrepPrincipleCrudAndWorkspaceSaveAreServerBacked)
   .then(testManagedAdminDirtyEditorPreservesFields)
   .then(testManagedAdminJsonImportPersistsBeforeAnyQuestionSave)
+  .then(testManagedAdminReimportUsesExportedSourceIdsWhenTheServerSkipsDuplicates)
   .then(testManagedAdminMergePreservesNestedDraft)
   .then(testManagedAdminDeletionRequiresConflictCopy)
   .then(testManagedAdminBlocksIncompleteNestedMerge)

@@ -4379,10 +4379,12 @@
       }
       const savedBanks=Array.isArray(result?.banks)?result.banks:[];
       const lastIncoming=incoming[incoming.length-1]||{};
-      const last=savedBanks[savedBanks.length-1]||{id:result?.sourceBankIdMap?.[String(lastIncoming.id||'')]};
+      const sourceBankId=String(lastIncoming.sourceId||lastIncoming.id||'');
+      const last=savedBanks[savedBanks.length-1]||{id:result?.sourceBankIdMap?.[sourceBankId]};
       if(!last?.id)throw new Error('服务器未返回已保存题库。');
       const firstIncomingQuestion=lastIncoming.questions?.[0]||{};
-      const savedQuestionId=String(last.questions?.[0]?.id||result?.sourceQuestionIdMap?.[`${String(lastIncoming.id||'')}::${String(firstIncomingQuestion.id||'')}`]||'');
+      const sourceQuestionId=String(firstIncomingQuestion.sourceId||firstIncomingQuestion.id||'');
+      const savedQuestionId=String(last.questions?.[0]?.id||result?.sourceQuestionIdMap?.[`${sourceBankId}::${sourceQuestionId}`]||'');
       reloadBanksFromCatalog(String(last.id),savedQuestionId);
       const importedPapers=remapImportedPaperRefs(data?.papers,{sourceBankIdMap:result.sourceBankIdMap,sourceQuestionIdMap:result.sourceQuestionIdMap});
       if(importedPapers.length){

@@ -15,6 +15,8 @@ _HASH_EXCLUDED_FIELDS = {
     "bankId",
     "sourceQuestionId",
     "sourceBankId",
+    "sourceId",
+    "source_id",
     "contentHash",
     "revision",
     "serverRevision",

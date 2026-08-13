@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     APP_NAME: str = "KG Graph API"
     API_V1_PREFIX: str = "/api/v1"
     QUESTION_CATALOG_CUTOVER_ENABLED: bool = False
+    # Production authentication requires the browser to submit this release's
+    # legal-consent version. Tests disable it only for pre-existing fixtures.
+    LEGAL_CONSENT_REQUIRED: bool = True
 
     # itsdangerous 签名密钥（生产必改）
     SECRET_KEY: str = "change-me-in-prod"

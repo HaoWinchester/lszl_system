@@ -22,7 +22,8 @@ test('login modal embeds the official QR code below the login button', () => {
 
   assert.match(source, /class="wechat-login-entry" type="button">微信扫码登录<\/button><div class="wechat-login-panel" hidden><\/div>/)
   assert.match(source, /new window\.WxLogin\(\{[\s\S]*?self_redirect:false/)
-  assert.match(source, /entry\.onclick=\(\)=>\{setWechatLoginMode\(modal,true\);panel\.hidden=false;renderPanel\(panel\)\}/)
+  assert.match(source, /entry\.onclick=\(\)=>\{[\s\S]*?requireLegalConsent[\s\S]*?setWechatLoginMode\(modal,true\);panel\.hidden=false;renderPanel\(panel\)/)
+  assert.match(source, /accepted_terms_version/)
   assert.doesNotMatch(source, /模拟扫码成功/)
   assert.doesNotMatch(source, /wechat-pseudo-qr/)
 })
@@ -63,4 +64,5 @@ test('system settings do not expose an obsolete browser code-exchange setting', 
   assert.doesNotMatch(source, /wxBackendExchangeUrl/)
   assert.doesNotMatch(source, /backendExchangeUrl/)
   assert.doesNotMatch(source, /buildOfficialAuthUrl/)
+  assert.match(source, /createOfficialAuthRequest\('login',[\s\S]*?legalConsentVersion/)
 })

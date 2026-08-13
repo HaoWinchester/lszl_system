@@ -17,7 +17,7 @@ def login(request: APIRequestContext, username: str, password: str) -> None:
     assert_ok(
         request.post(
             BASE + "/api/v1/auth/login",
-            data={"username": username, "password": password},
+            data={"username": username, "password": password, "acceptedTermsVersion": "2026-08-13-v1"},
         ),
         f"login {username}",
     )

@@ -7,6 +7,7 @@
  */
 (function(global){
   const byId=id=>document.getElementById(id);
+  const LEGAL_CONSENT_VERSION='2026-08-13-v1';
   const ownHandlers={};
   const state={
     mounted:false,
@@ -47,6 +48,7 @@
             <button id="authRegisterBtn" type="button">注册并登录</button>
           </div>
           <div class="auth-note">账号身份与业务数据由服务器按用户隔离保存；请勿与他人共享密码。</div>
+          <label class="auth-agreement"><input id="authLegalConsent" type="checkbox"/><span>阅读并同意 <a href="privacy-policy.html" rel="noopener" target="_blank">隐私政策</a> 和 <a href="terms-of-service.html" rel="noopener" target="_blank">使用条款</a></span></label>
         </div>
       </div>
     </div>`;
@@ -112,6 +114,13 @@
       password:String(byId('authPassword')?.value||'')
     };
   }
+  function hasLegalConsent(){return !!byId('authLegalConsent')?.checked}
+  function requireLegalConsent(){
+    if(hasLegalConsent())return true;
+    message('请先阅读并勾选同意《隐私政策》和《使用条款》。');
+    byId('authLegalConsent')?.focus?.();
+    return false;
+  }
   function handlerFor(kind){
     if(typeof state.options[kind]==='function')return state.options[kind];
     const globalName='auth'+kind[0].toUpperCase()+kind.slice(1);
@@ -136,12 +145,13 @@
       message('密码至少需要 4 个字符。');
       return false;
     }
+    if(!requireLegalConsent())return false;
     const handler=handlerFor(kind);
     if(!handler){message('认证模块未加载，请刷新页面后重试。');return false}
     setBusy(true);
     message(kind==='register'?'正在创建账号…':'正在验证账号…');
     try{
-      const result=await handler(credentials.username,credentials.password,{source:state.options.source});
+      const result=await handler(credentials.username,credentials.password,{source:state.options.source,acceptedTermsVersion:LEGAL_CONSENT_VERSION});
       const ok=result===true||!!result?.ok;
       if(!ok){
         if(!String(byId('authMsg')?.textContent||'').trim()||String(byId('authMsg')?.textContent||'').includes('正在')){
@@ -232,7 +242,7 @@
     }
   }
 
-  const api={mount,configure,open,close,message,setBusy,login,register,logout,renderStatus,isLoggedIn,currentUsername,afterExternalLogin};
+  const api={mount,configure,open,close,message,setBusy,login,register,logout,renderStatus,isLoggedIn,currentUsername,afterExternalLogin,hasLegalConsent,requireLegalConsent,legalConsentVersion:LEGAL_CONSENT_VERSION};
   ownHandlers.login=login;
   ownHandlers.register=register;
   ownHandlers.logout=logout;
@@ -249,7 +259,10 @@
     renderStatus,
     isLoggedIn,
     currentUsername,
-    afterExternalLogin
+    afterExternalLogin,
+    hasLegalConsent,
+    requireLegalConsent,
+    legalConsentVersion:LEGAL_CONSENT_VERSION
   };
   mount();
 })(window);

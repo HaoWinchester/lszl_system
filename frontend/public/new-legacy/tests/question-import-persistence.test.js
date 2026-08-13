@@ -75,7 +75,7 @@ test('catalog adapter posts an import and refreshes only after the server commit
   assert.deepEqual(result.sourceBankIdMap, fixture.imported.sourceBankIdMap);
   const importCall = fixture.calls.find(call => call.url === '/api/v1/banks/import');
   assert.equal(importCall.options.method, 'POST');
-  assert.deepEqual(JSON.parse(importCall.options.body), { banks: [sourceBank] });
+  assert.deepEqual(JSON.parse(importCall.options.body), { banks: [sourceBank], confirmReplace: false });
   assert.equal(fixture.adapter.snapshot().banks[0].id, 'b-server-a');
   assert.equal(fixture.published.at(-1).revision, 4);
   assert.ok(fixture.events.some(event => event.type === 'kg:question-catalog-changed'));

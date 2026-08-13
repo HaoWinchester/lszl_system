@@ -176,9 +176,9 @@ test('graph canvas bug-list interactions use directional curves, delayed details
   // Hover detail panels are deliberately delayed so moving across cards does not make panels flash.
   assert.match(graph, /const NODE_HOVER_DETAIL_DELAY=260,LARGE_GRAPH_HOVER_RELATION_DELAY=120/)
   assert.match(graph, /if\(isHoverDetailBlocked\(\)\)return;[\s\S]{0,220}hoverDetailTimer=setTimeout\([\s\S]{0,180}NODE_HOVER_DETAIL_DELAY\)/)
-  // The update source names the precise mode that will be exited, avoiding an ambiguous compact action.
+  // The product keeps the compact exit control consistently labelled “退出” in both modes.
   assert.match(graph, /data-graph-mode-exit>退出</)
-  assert.match(graph, /textContent=mode==='related'\?'退出只看相关':'退出心流'/)
+  assert.match(graph, /\[data-graph-mode-exit\]\'\)\.textContent='退出'/)
   // Reusing the painted span rather than replacing it with a textarea prevents the text baseline from jumping.
   assert.match(editor, /editor\.setAttribute\('contenteditable','plaintext-only'\)/)
   assert.doesNotMatch(editor, /document\.createElement\(multiline\?'textarea':'input'\)/)

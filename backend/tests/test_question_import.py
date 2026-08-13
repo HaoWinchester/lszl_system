@@ -264,3 +264,82 @@ def test_question_bank_import_keeps_source_identity_and_requires_confirmed_repla
             assert duplicate_source_question.json()["detail"]["code"] == "IMPORT_VALIDATION_FAILED"
     finally:
         asyncio.run(_cleanup_users(usernames))
+
+
+def test_exported_catalog_bank_reimports_by_source_identity() -> None:
+    """A downloaded server-backed bank must be safe to import again unchanged."""
+    suffix = uuid4().hex[:10]
+    usernames = {
+        "manager": f"question-import-roundtrip-{suffix}",
+        "viewer": f"question-import-roundtrip-viewer-{suffix}",
+    }
+    asyncio.run(_seed_users(usernames))
+    try:
+        with TestClient(app) as client:
+            _login(client, usernames["manager"])
+            created = client.post(
+                "/api/v1/banks/import",
+                json={"banks": [_source_bank("roundtrip-bank", "roundtrip-question")]},
+            )
+            assert created.status_code == 200, created.text
+
+            catalog = client.get("/api/v1/question-catalog/bootstrap?mode=managed")
+            assert catalog.status_code == 200, catalog.text
+            snapshot = catalog.json()
+            exported_bank = next(
+                bank for bank in snapshot["banks"] if bank["id"] == created.json()["banks"][0]["id"]
+            )
+            exported = {
+                **exported_bank,
+                "questions": [
+                    question
+                    for question in snapshot["questions"]
+                    if question["bankId"] == exported_bank["id"]
+                ],
+            }
+
+            round_trip = client.post("/api/v1/banks/import", json={"banks": [exported]})
+            assert round_trip.status_code == 200, round_trip.text
+            assert round_trip.json()["banks"] == []
+            assert round_trip.json()["importPlan"]["skip"] == 1
+    finally:
+        asyncio.run(_cleanup_users(usernames))
+
+
+def test_exported_directly_created_bank_reimports_without_duplicate() -> None:
+    """Exports of normal in-app banks have no import source ID to begin with."""
+    suffix = uuid4().hex[:10]
+    usernames = {
+        "manager": f"question-import-direct-roundtrip-{suffix}",
+        "viewer": f"question-import-direct-roundtrip-viewer-{suffix}",
+    }
+    asyncio.run(_seed_users(usernames))
+    try:
+        with TestClient(app) as client:
+            _login(client, usernames["manager"])
+            created_bank = client.post(
+                "/api/v1/banks",
+                json={"name": "直接创建并导出的题库", "subject": "PMP"},
+            )
+            assert created_bank.status_code == 200, created_bank.text
+            bank_id = created_bank.json()["bank"]["id"]
+            created_question = client.post(
+                f"/api/v1/banks/{bank_id}/questions",
+                json=_source_bank("unused-bank", "direct-question")["questions"][0],
+            )
+            assert created_question.status_code == 200, created_question.text
+
+            snapshot = client.get("/api/v1/question-catalog/bootstrap?mode=managed").json()
+            exported_bank = next(bank for bank in snapshot["banks"] if bank["id"] == bank_id)
+            exported = {
+                **exported_bank,
+                "questions": [
+                    question for question in snapshot["questions"] if question["bankId"] == bank_id
+                ],
+            }
+            round_trip = client.post("/api/v1/banks/import", json={"banks": [exported]})
+            assert round_trip.status_code == 200, round_trip.text
+            assert round_trip.json()["banks"] == []
+            assert round_trip.json()["importPlan"]["skip"] == 1
+    finally:
+        asyncio.run(_cleanup_users(usernames))

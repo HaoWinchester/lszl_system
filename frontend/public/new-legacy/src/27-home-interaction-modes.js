@@ -96,6 +96,7 @@
   function cancelTransient(){
     try{global.KGGraphModeRuntime&&global.KGGraphModeRuntime.cancel&&global.KGGraphModeRuntime.cancel()}catch(error){}
     try{global.KGHomeToolbarRegistry&&global.KGHomeToolbarRegistry.hideTransientMenus&&global.KGHomeToolbarRegistry.hideTransientMenus()}catch(error){}
+    if(isPhone())try{global.closeGraphSearchPanel&&global.closeGraphSearchPanel()}catch(error){}
   }
   function refreshModeUI(){
     try{global.KGHomeToolbarRegistry&&global.KGHomeToolbarRegistry.setMode&&global.KGHomeToolbarRegistry.setMode(getMode())}catch(error){}
@@ -107,7 +108,7 @@
     if(!isPhone()&&options.persist!==false){preferredDesktopMode=requested;storageWrite(STORAGE_KEY,preferredDesktopMode)}
     const resolved=isPhone()?MODES.READING:requested;
     const previous=effectiveMode||resolved;
-    if(previous===resolved&&options.force!==true){setDocumentMode(resolved);updateMenu();return resolved}
+    if(previous===resolved&&options.force!==true){cancelTransient();setDocumentMode(resolved);updateMenu();return resolved}
     cancelTransient();
     effectiveMode=resolved;
     setDocumentMode(resolved);

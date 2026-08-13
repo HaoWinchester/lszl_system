@@ -7,6 +7,7 @@ const path=require('node:path');
 const root=path.resolve(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const targetPages=['index.html','practice-mode.html'];
+const standalonePages=['knowledge-recall.html','learning-path.html','question-workspace.html'];
 
 for(const file of targetPages){
   const html=read(file);
@@ -35,6 +36,18 @@ assert.ok(fs.existsSync(sharedPath),'the shared auth dialog controller must exis
 const shared=fs.readFileSync(sharedPath,'utf8');
 for(const name of ['mount','configure','open','close','message','setBusy','login','register','logout','renderStatus','isLoggedIn','currentUsername']){
   assert.match(shared,new RegExp(`\\b${name}\\b`),`shared controller must expose ${name}`);
+}
+
+assert.match(shared,/id="authLegalConsent"/,'the shared dialog must expose an explicit agreement checkbox');
+assert.match(shared,/acceptedTermsVersion/,'the shared dialog must forward the accepted legal version to the auth core');
+for(const page of standalonePages){
+  const html=read(page);
+  assert.match(html,/id="authLegalConsent"/,`${page} must require legal consent before authentication`);
+  assert.match(html,/href="privacy-policy\.html"/,`${page} must link to the privacy policy`);
+  assert.match(html,/href="terms-of-service\.html"/,`${page} must link to the terms of service`);
+}
+for(const page of ['privacy-policy.html','terms-of-service.html']){
+  assert.ok(fs.existsSync(path.join(root,page)),`${page} must be available from the login agreement`);
 }
 
 console.log('shared-auth-dialog-static-ok');

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=64)
     password: str = Field(min_length=1, max_length=128)
+    accepted_terms_version: str | None = Field(default=None, alias="acceptedTermsVersion", max_length=32)
 
 
 class RegisterRequest(BaseModel):
@@ -15,6 +16,7 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=4, max_length=128)
     display_name: str | None = None
     subject: str | None = "PMP"
+    accepted_terms_version: str | None = Field(default=None, alias="acceptedTermsVersion", max_length=32)
 
 
 class AuthenticatedResponse(BaseModel):

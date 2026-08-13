@@ -23,10 +23,6 @@ function bindTutorial(){
 }
 
 bindTutorial();
-// C-1.4.2：不再在页面首次加载时自动启动全屏引导。
-// 本项目经常通过解压 ZIP / file:// 直接运行，不同路径可能让浏览器把它视为新的存储环境，
-// 从而反复触发引导遮罩并拦截画布顶部左右悬浮模块的鼠标操作。
-// 用户仍可通过右上角账号菜单的“帮助中心”主动启动完整引导。
 
 const TOUR_STORAGE_KEY='通用知识点关系图谱工具_新手引导已看_v1';
 let guidedTourState=null;
@@ -194,3 +190,31 @@ function finishGuidedTour(skipped=false){
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&guidedTourState)finishGuidedTour(true)});
 window.addEventListener('resize',()=>{if(guidedTourState)placeGuidedTour()});
 window.addEventListener('scroll',()=>{if(guidedTourState)placeGuidedTour()},true);
+document.getElementById('guidedTourStartBtn')?.addEventListener('click',()=>startGuidedTour(true));
+let guidedTourAutostartTimer=0;
+function hasAuthenticatedGuidedTourSession(){
+  return window.__KG_DIRECT_BOOTSTRAP__?.authenticated===true;
+}
+function scheduleAutoGuidedTour(){
+  clearTimeout(guidedTourAutostartTimer);
+  // Guests may browse membership plans.  The guided layer must never block
+  // that public path; it is only an automatic first-run aid after login.
+  if(!hasAuthenticatedGuidedTourSession())return;
+  if(guidedTourState)return;
+  if(document.querySelector('.kg-learning-entry-dialog.show')){
+    guidedTourAutostartTimer=window.setTimeout(scheduleAutoGuidedTour,160);
+    return;
+  }
+  startGuidedTour(false);
+}
+function startGuidedTourAfterLearningEntry(){
+  const waiter=window.KGDirectEntry?.waitForInitialLearningEntry;
+  if(typeof waiter!=='function'){scheduleAutoGuidedTour();return}
+  Promise.resolve(waiter()).then(result=>{
+    if(result?.shown)return;
+    scheduleAutoGuidedTour();
+  }).catch(scheduleAutoGuidedTour);
+}
+window.addEventListener('kg-learning-entry-dialog-closed',()=>{if(!guidedTourState)scheduleAutoGuidedTour()});
+window.addEventListener('kg-learning-entry-dialog-opened',()=>clearTimeout(guidedTourAutostartTimer));
+guidedTourAutostartTimer=window.setTimeout(startGuidedTourAfterLearningEntry,0);

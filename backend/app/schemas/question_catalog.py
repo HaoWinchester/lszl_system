@@ -36,18 +36,25 @@ class QuestionPayload(BaseModel):
     explanation: Any = None
 
 
+class QuestionBankImportQuestionPayload(QuestionPayload):
+    """Question import payload with the external identity needed for idempotent imports."""
+
+    source_id: str | None = Field(default=None, alias="sourceId", max_length=128)
+
+
 class QuestionBankImportItem(BaseModel):
     """One JSON-import source bank; its IDs are stable external identities, not DB primary keys."""
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     id: str = Field(min_length=1, max_length=128)
+    source_id: str | None = Field(default=None, alias="sourceId", max_length=128)
     name: str = Field(min_length=1, max_length=200)
     subject: str = Field(default="PMP", min_length=1, max_length=32)
     description: str | None = None
     version: str = Field(default="1.0", max_length=32)
     visibility: str = Field(default="private", max_length=32)
-    questions: list[QuestionPayload] = Field(min_length=1)
+    questions: list[QuestionBankImportQuestionPayload] = Field(min_length=1)
 
 
 class QuestionBankImportRequest(BaseModel):
@@ -68,6 +75,7 @@ class QuestionBankImportResponse(BaseModel):
 
 
 class CatalogQuestionPayload(QuestionPayload):
+    source_id: str | None = Field(default=None, alias="sourceId", max_length=128)
     bank_id: str = Field(alias="bankId", min_length=1, max_length=64)
     content_hash: str | None = Field(default=None, alias="contentHash", max_length=64)
     creator_id: str | None = Field(default=None, alias="creatorId", max_length=64)
@@ -83,6 +91,7 @@ class CatalogBankPayload(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     id: str
+    source_id: str | None = Field(default=None, alias="sourceId")
     owner_id: str = Field(alias="ownerId")
     name: str
     subject: str

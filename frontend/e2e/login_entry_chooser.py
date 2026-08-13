@@ -325,6 +325,7 @@ def sign_in_via_browser(
     page.locator("#authModal.show").wait_for(state="visible", timeout=15_000)
     page.locator("#authUsername").fill(username)
     page.locator("#authPassword").fill(password_for(role))
+    page.locator("#authLegalConsent").check()
     page.locator("#authDoLoginBtn").click()
     page.wait_for_function("() => window.__KG_DIRECT_BOOTSTRAP__?.authenticated === true")
     page.locator("#authModal").wait_for(state="hidden", timeout=15_000)

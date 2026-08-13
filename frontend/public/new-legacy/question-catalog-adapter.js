@@ -121,7 +121,10 @@
   async function importBanks(input) {
     const payload = await request('/banks/import', {
       method: 'POST',
-      body: JSON.stringify({ banks: Array.isArray(input?.banks) ? input.banks : [] }),
+      body: JSON.stringify({
+        banks: Array.isArray(input?.banks) ? input.banks : [],
+        confirmReplace: input?.confirmReplace === true,
+      }),
     })
     publishCommit(payload, {
       entityType: 'question-import',

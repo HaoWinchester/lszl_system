@@ -429,29 +429,30 @@ function createChooserDomTab({ fetchImpl = async () => ({ ok: true, headers: { g
   } };
 }
 
-test('winning claim renders a non-dismissible accessible four-choice dialog in the actual VM DOM', async () => {
+test('winning claim renders the update-style dismissible four-choice dialog in the actual VM DOM', async () => {
   const tab = createChooserDomTab();
   assert.equal((await tab.init()).shown, true);
   const dialog = tab.document.querySelector('[role="dialog"]');
   assert.ok(dialog, 'the winning claim must create a dialog');
   assert.equal(dialog.getAttribute('aria-modal'), 'true');
-  assert.equal(dialog.getAttribute('aria-labelledby'), 'learningEntryChooserTitle');
-  assert.equal(tab.document.getElementById('learningEntryChooserTitle').textContent, '选择学习方式');
+  assert.equal(dialog.getAttribute('aria-labelledby'), 'learningEntryTitle');
+  assert.equal(tab.document.getElementById('learningEntryTitle').textContent, '从这里开始学习');
   const choices = tab.document.querySelectorAll('[data-learning-entry-choice]');
   assert.deepEqual(Array.from(choices, button => [button.getAttribute('data-learning-entry-choice'), button.getAttribute('data-destination')]), [
     ['知识图谱', 'index.html'], ['知识回忆', 'knowledge-recall.html'], ['知识归纳', 'question-workspace.html'], ['知识巩固', 'practice-mode.html'],
   ]);
-  assert.deepEqual(Array.from(choices, button => button.getAttribute('data-description')), ['进入知识图谱', '深度回忆', '归纳', '刷题']);
-  assert.equal(tab.document.querySelectorAll('[aria-label="关闭学习方式选择"]').length, 0);
-  assert.equal(tab.document.querySelectorAll('[data-learning-entry-cancel]').length, 0);
-  assert.equal(tab.document.activeElement, choices[0], 'the first choice receives focus');
-  assert.equal(tab.graph.inert, true, 'the graph is inert while a decision is required');
+  assert.deepEqual(Array.from(choices, button => button.getAttribute('data-description')), [
+    '梳理知识结构与关系 · 当前首页', '主动回忆关键词与知识线索 · 深度回忆', '多题比较、归纳与连接 · 多题画布', '通过做题检验并巩固掌握 · 做题模式',
+  ]);
+  const close = tab.document.querySelector('[aria-label="关闭学习入口"]');
+  assert.ok(close, 'the update-style dialog provides a close control');
+  assert.equal(tab.document.activeElement, close, 'the close control receives initial focus');
+  assert.equal(tab.graph.inert, true, 'the graph is inert while the dialog is open');
   const escape = new DomEvent('keydown', { key: 'Escape' }); tab.document.dispatchEvent(escape);
-  assert.equal(escape.defaultPrevented, true); assert.ok(tab.document.querySelector('[role="dialog"]'));
-  const backwards = new DomEvent('keydown', { key: 'Tab', shiftKey: true }); tab.document.dispatchEvent(backwards);
-  assert.equal(backwards.defaultPrevented, true); assert.equal(tab.document.activeElement, choices[3]);
-  const forwards = new DomEvent('keydown', { key: 'Tab' }); tab.document.dispatchEvent(forwards);
-  assert.equal(forwards.defaultPrevented, true); assert.equal(tab.document.activeElement, choices[0]);
+  assert.equal(escape.defaultPrevented, true);
+  assert.equal(tab.document.querySelector('[role="dialog"]'), null, 'Escape closes the entry dialog');
+  assert.equal(tab.graph.inert, false);
+  assert.equal(tab.document.activeElement, tab.graph);
 });
 
 test('failed server-state storage flush neither renders nor reports a winning claim', async () => {

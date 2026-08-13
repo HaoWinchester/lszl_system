@@ -13,8 +13,7 @@
 .graph-mode-menu button.active::after{content:'✓';margin-left:auto;font-weight:900}
 
 /* 模式切换只改变主悬浮工具栏和对象交互，不移动搜索、缩放、居中与缩略图。 */
-body[data-graph-interaction-mode="reading"] .graph-mode-indicator,
-body[data-graph-interaction-mode="efficient"] .graph-mode-indicator{display:none!important}
+body[data-graph-interaction-mode="reading"] .graph-mode-indicator{display:none!important}
 body[data-graph-interaction-mode="reading"] .node-style-toolbar,
 body[data-graph-interaction-mode="reading"] .uc-edge-toolbar,
 body[data-graph-interaction-mode="reading"] .edge-control-layer,
@@ -41,7 +40,12 @@ body[data-graph-interaction-mode="efficient"] .knowledge-card:active{cursor:grab
 
 /* 手机端强制阅读模式，隐藏所有编辑入口与模式切换。 */
 body.graph-phone-reading .graph-mode-switcher{display:none!important}
-body.graph-phone-reading #mobileBar :is(#mAddBtn,#mEditBtn,#mLinkBtn,#mSizeBtn,#mLineStyleBtn,#mGraphBtn,.mobile-color-control){display:none!important}
+body.graph-phone-reading #mobileBar{display:none!important}
+body.graph-phone-reading .graph-file-tabbar{display:none!important}
+body.graph-phone-reading :is(.floating-toolbox,.canvas-toolbar-left,.canvas-toolbar-right,.canvas-zoom-dock,.support-center-shell,#kgGlobalShortcuts,.uc-minimap-dock,#graphSearchPanel){display:none!important}
+.mobile-reading-mode-indicator{display:none}
+body.graph-phone-reading .mobile-reading-mode-indicator{position:fixed;z-index:80;right:14px;bottom:14px;display:inline-flex;align-items:center;min-height:32px;padding:0 12px;border:1px solid rgba(15,23,42,.18);border-radius:999px;background:#1f2937;color:#fff;box-shadow:0 8px 20px rgba(15,23,42,.22);font:800 12px/1 ui-sans-serif,system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+body.home-mobile-readonly-notice-open .help-card{top:var(--home-mobile-readonly-offset,112px)}
 @media(max-width:720px){.graph-mode-switcher{display:none!important}}
 
 /* 阅读模式详情保持只读，隐藏所有可写操作；关系线也不绘制悬浮/选中反馈层。 */

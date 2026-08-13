@@ -84,6 +84,9 @@ if _query_items:
 os.environ[SOURCE_DATABASE_URL_ENV] = _SOURCE_DATABASE_URL
 os.environ[TEST_DATABASE_NAME_ENV] = _TEST_DATABASE_NAME
 os.environ["DATABASE_URL"] = _TEST_DATABASE_URL
+# Existing test fixtures deliberately exercise permissions rather than the
+# consent prompt. Consent-specific tests enable the production guard directly.
+os.environ["LEGAL_CONSENT_REQUIRED"] = "false"
 
 _database_created = False
 _database_dropped = False

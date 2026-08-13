@@ -12,10 +12,10 @@
   const SCHEMA_VERSION = 1;
   const ERROR_TEXT = "该学习页面暂时不可用，请稍后重试";
   const CHOICES = [
-    { label: "知识图谱", description: "进入知识图谱", destination: "index.html" },
-    { label: "知识回忆", description: "深度回忆", destination: "knowledge-recall.html" },
-    { label: "知识归纳", description: "归纳", destination: "question-workspace.html" },
-    { label: "知识巩固", description: "刷题", destination: "practice-mode.html" },
+    { label: "知识图谱", description: "梳理知识结构与关系 · 当前首页", destination: "index.html" },
+    { label: "知识回忆", description: "主动回忆关键词与知识线索 · 深度回忆", destination: "knowledge-recall.html" },
+    { label: "知识归纳", description: "多题比较、归纳与连接 · 多题画布", destination: "question-workspace.html" },
+    { label: "知识巩固", description: "通过做题检验并巩固掌握 · 做题模式", destination: "practice-mode.html" },
   ];
   let active = null;
 
@@ -121,7 +121,15 @@
     return node;
   }
 
-  function focusChoices() { return active ? Array.from(active.dialog.querySelectorAll("[data-learning-entry-choice]")) : []; }
+  function focusChoices() {
+    if (!active) return [];
+    const dialog = active.dialog;
+    return [
+      dialog.querySelector('[aria-label="关闭学习入口"]'),
+      ...Array.from(dialog.querySelectorAll("[data-learning-entry-choice]")),
+      dialog.querySelector("#learningEntryDismissBtn"),
+    ].filter(Boolean);
+  }
   function setPageInert(doc, dialogRoot, inert) {
     Array.from(doc.body.children).forEach(child => {
       if (child === dialogRoot) return;
@@ -143,8 +151,9 @@
     current.document.removeEventListener("keydown", current.onKeydown);
     setPageInert(current.document, current.root, false);
     if (current.created) current.root.remove();
-    else { current.root.classList.remove("show"); current.root.hidden = true; }
+    else { current.root.classList.remove("show"); current.root.hidden = true; current.root.setAttribute("aria-hidden", "true"); }
     active = null;
+    if (typeof global.CustomEvent === "function") global.dispatchEvent(new global.CustomEvent("kg-learning-entry-dialog-closed"));
     if (focusGraph) restoreGraphFocus(current.document);
     else if (current.restoreFocus && typeof current.restoreFocus.focus === "function") current.restoreFocus.focus();
     return true;
@@ -167,33 +176,52 @@
       button.disabled = false; button.setAttribute("aria-busy", "false"); errorMessage(ERROR_TEXT); button.focus();
     }
   }
+  function bindOnce(node, eventName, listener) {
+    if (!node || node.getAttribute("data-learning-entry-bound") === "true") return;
+    node.setAttribute("data-learning-entry-bound", "true");
+    node.addEventListener(eventName, listener);
+  }
   function showDialog(options) {
     if (active) return active.dialog;
     const doc = options.document || global.document;
     if (!doc || !doc.body || typeof doc.createElement !== "function") return null;
-    let root = doc.getElementById("learningEntryChooserRoot");
+    let root = doc.getElementById("learningEntryModal") || doc.getElementById("learningEntryChooserRoot");
     const created = !root;
     if (!root) {
-      root = element(doc, "div", { class: "modal-backdrop learning-entry-chooser-backdrop", id: "learningEntryChooserRoot" });
-      const dialog = element(doc, "section", { class: "modal learning-entry-chooser-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "learningEntryChooserTitle" });
-      const title = element(doc, "h2", { id: "learningEntryChooserTitle" }, "选择学习方式");
-      const intro = element(doc, "p", { class: "learning-entry-chooser-intro" }, "请选择本次学习的进入方式");
-      const choices = element(doc, "div", { class: "learning-entry-chooser-grid" });
-      const error = element(doc, "p", { class: "learning-entry-chooser-error", id: "learningEntryChooserError", "aria-live": "polite" });
+      root = element(doc, "div", { class: "modal-backdrop learning-entry-backdrop kg-learning-entry-dialog", id: "learningEntryModal", "aria-hidden": "true" });
+      const dialog = element(doc, "section", { class: "modal learning-entry-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "learningEntryTitle" });
+      const head = element(doc, "div", { class: "learning-entry-head" });
+      const heading = element(doc, "div");
+      heading.append(element(doc, "h2", { id: "learningEntryTitle" }, "从这里开始学习"), element(doc, "p", {}, "选择你现在最想做的事，直接进入对应学习板块。"));
+      const close = element(doc, "button", { type: "button", class: "learning-entry-close", "aria-label": "关闭学习入口", "data-learning-entry-focusable": "" }, "×");
+      head.append(heading, close);
+      const choices = element(doc, "div", { class: "learning-entry-grid" });
+      const error = element(doc, "p", { class: "learning-entry-error", id: "learningEntryChooserError", "aria-live": "polite" });
       CHOICES.forEach(choice => {
-        const button = element(doc, "button", { type: "button", class: "learning-entry-choice", "data-learning-entry-choice": choice.label, "data-destination": choice.destination, "data-description": choice.description });
-        button.append(element(doc, "strong", { class: "learning-entry-choice-title" }, choice.label), element(doc, "span", { class: "learning-entry-choice-description" }, choice.description)); choices.append(button);
+        const style = { "知识图谱": "entry-graph is-current", "知识回忆": "entry-recall", "知识归纳": "entry-synthesis", "知识巩固": "entry-practice" }[choice.label];
+        const avatar = { "知识图谱": "图", "知识回忆": "忆", "知识归纳": "归", "知识巩固": "练" }[choice.label];
+        const button = element(doc, "button", { type: "button", class: `learning-entry-card ${style}`, "data-learning-entry": choice.label, "data-learning-entry-choice": choice.label, "data-destination": choice.destination, "data-description": choice.description });
+        button.append(element(doc, "span", { class: "learning-entry-avatar" }, avatar), element(doc, "span", { class: "learning-entry-name" }, choice.label), element(doc, "span", { class: "learning-entry-id" }, choice.description)); choices.append(button);
       });
-      dialog.append(title, intro, choices, error); root.append(dialog); doc.body.append(root);
+      const foot = element(doc, "div", { class: "learning-entry-foot" });
+      const dismiss = element(doc, "button", { type: "button", id: "learningEntryDismissBtn", "data-learning-entry-focusable": "" }, "进入知识图谱");
+      foot.append(element(doc, "span", {}, "以后可从首页右上角“学习入口”再次打开。"), dismiss);
+      dialog.append(head, choices, error, foot); root.append(dialog); doc.body.append(root);
     }
-    root.hidden = false; root.classList.add("show");
-    const dialog = root.querySelector("[role=dialog]") || root.querySelector(".learning-entry-chooser-modal");
+    root.classList.add("kg-learning-entry-dialog"); root.hidden = false; root.classList.add("show"); root.setAttribute("aria-hidden", "false");
+    if (typeof global.CustomEvent === "function") global.dispatchEvent(new global.CustomEvent("kg-learning-entry-dialog-opened"));
+    const dialog = root.querySelector("[role=dialog]") || root.querySelector(".learning-entry-modal");
     const error = root.querySelector("#learningEntryChooserError");
     const buttons = root.querySelectorAll("[data-learning-entry-choice]");
-    buttons.forEach((button, index) => button.addEventListener("click", () => choose(button, CHOICES[index])));
+    bindOnce(root.querySelector('[aria-label="关闭学习入口"]'), "click", () => closeDialog({ focusGraph: true }));
+    bindOnce(root.querySelector("#learningEntryDismissBtn"), "click", () => closeDialog({ focusGraph: true }));
+    buttons.forEach(button => {
+      const choice = CHOICES.find(item => item.label === button.getAttribute("data-learning-entry-choice"));
+      if (choice) bindOnce(button, "click", () => choose(button, choice));
+    });
     const onKeydown = event => {
       if (!active || active.dialog !== dialog) return;
-      if (event.key === "Escape") { event.preventDefault(); return; }
+      if (event.key === "Escape") { event.preventDefault(); closeDialog({ focusGraph: true }); return; }
       if (event.key !== "Tab") return;
       const items = focusChoices(); if (!items.length) return;
       const index = items.indexOf(doc.activeElement);
@@ -226,5 +254,19 @@
     return { shown: !!shown };
   }
 
-  global.KGLearningEntryChooser = { init };
+  function bindManualEntry() {
+    const doc = global.document;
+    const trigger = doc && doc.getElementById ? doc.getElementById("learningEntryTopBtn") : null;
+    bindOnce(trigger, "click", event => {
+      event.preventDefault();
+      showDialog({ document: doc, location: global.location });
+    });
+  }
+
+  if (global.document) {
+    if (global.document.readyState === "loading") global.document.addEventListener("DOMContentLoaded", bindManualEntry, { once: true });
+    else bindManualEntry();
+  }
+
+  global.KGLearningEntryChooser = { init, show: showDialog };
 })(window);
