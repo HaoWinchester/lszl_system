@@ -277,6 +277,10 @@
     const release=selectedRelease(),api=practiceApi();if(!api||!hasAuthenticatedUser())return null;
     try{return await api.upsertWrong({questionId:question.id,bankId:question.bankId,paperId:text(release?.id),releaseId:text(release?.releaseId),paperVersion:Number(release?.version||0),paperName:text(release?.name),sourceMode:state.mode,languageMode:'zh',selectedAnswer:selectedAnswer||reason})}catch(error){showToast('错题未能保存，请检查网络后重试。');return null}
   }
+  function standardAnswerPayload(question,selectedAnswer){
+    const release=selectedRelease();
+    return {questionId:question.id,bankId:question.bankId,paperId:text(release?.id),releaseId:text(release?.releaseId),paperVersion:Number(release?.version||0),paperName:text(release?.name),sourceMode:state.mode,languageMode:'zh',selectedAnswer:text(selectedAnswer)};
+  }
   function practiceSessionPayload(status){
     const release=selectedRelease(),settings=state.lastSettings||{},paperId=text(settings.paperId||release?.id);
     return {
@@ -345,11 +349,23 @@
     if(state.mode==='challenge'&&state.index%CHECKPOINT_INTERVAL===0){showCheckpoint();return}
     renderQuestion();
   }
-  function answer(optionId,button){
+  async function answer(optionId,button){
     if(!state.active||state.locked)return false;
     const question=state.verification?.active?state.verification.question:state.questions[state.index];if(!question)return false;
     state.locked=true;lockOptions();
-    const correct=text(optionId)===text(question.correctAnswer);animateOption(button,correct);state.answered+=1;
+    let correct=text(optionId)===text(question.correctAnswer);
+    if(!state.verification?.active&&state.mode!=='revenge'&&hasAuthenticatedUser()){
+      const api=practiceApi();
+      if(typeof api?.answer!=='function'){showFeedback('作答服务暂不可用，请刷新后重试。','danger');state.locked=false;dom.options.querySelectorAll('button').forEach(item=>item.disabled=false);return false}
+      try{
+        const result=await api.answer(standardAnswerPayload(question,optionId));
+        correct=Boolean(result?.correct);
+        question.mistakeStatus=text(result?.mistake?.status||question.mistakeStatus);
+      }catch(error){
+        showFeedback('作答未保存，请检查网络后重试。','danger');state.locked=false;dom.options.querySelectorAll('button').forEach(item=>item.disabled=false);return false;
+      }
+    }
+    animateOption(button,correct);state.answered+=1;
     if(state.verification?.active){
       const verification=state.verification,api=practiceApi();
       if(correct){state.correct+=1;state.experience+=5}else{const correctButton=dom.options.querySelector('[data-option-id="'+CSS.escape(text(question.correctAnswer))+'"]');if(correctButton)correctButton.classList.add('is-correct')}
@@ -379,7 +395,7 @@
       if(state.streak>=3)showStreakPop('连胜 ×'+state.streak+(bonus?' · +'+bonus+' 经验':'')+(healed?' · +1 ♥':''));
       showFeedback('正确'+(state.mode==='scholar'?(gainedSeconds?' · +'+gainedSeconds+' 秒':' · 时间已满'):'')+' · +'+(10+bonus)+' 经验','success');
     }else{
-      recordMistake(question,{selectedAnswer:optionId});state.streak=0;hideStreakPop();state.health=Math.max(0,state.health-1);
+      state.streak=0;hideStreakPop();state.health=Math.max(0,state.health-1);
       if(state.mode==='scholar'){
         const after=Math.max(0,remainingSeconds()-20);setScholarSeconds(after>0?after:(state.health>0?40:0));
         showFeedback('错误 · -20 秒 · -1 ♥','danger');

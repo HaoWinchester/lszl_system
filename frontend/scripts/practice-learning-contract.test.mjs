@@ -22,6 +22,8 @@ test('P4.5 practice workflow uses a database API adapter instead of a local mist
   assert.match(adapter, /request\('\/answers'/)
   assert.match(adapter, /async function verify\(mistakeId, input\)/)
   assert.match(practice, /KGPracticeLearningApi/)
+  assert.match(practice, /await api\.answer\(standardAnswerPayload\(question,optionId\)\)/)
+  assert.doesNotMatch(practice, /recordMistake\(question,\{selectedAnswer:optionId\}\)/)
   assert.doesNotMatch(practice, /kg_practice_mistakes_v1/)
   assert.doesNotMatch(practice, /kg_practice_history_v1/)
   assert.doesNotMatch(practice, /sessionStorage/)

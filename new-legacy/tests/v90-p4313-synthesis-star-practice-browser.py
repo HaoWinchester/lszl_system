@@ -39,9 +39,9 @@ def install_storage(page,items):
         refresh:async()=>({mistakes:[],stats:{active:0,mastered:0}}),
         snapshot:()=>({mistakes:[],stats:{active:0,mastered:0}})
       };
-      window.KGPersonalSynthesisCardApi={
+      let personalCardSequence=0;window.KGPersonalSynthesisCardApi={
         refresh:async()=>({active:[],archived:[]}),snapshot:()=>({active:[],archived:[]}),
-        create:async input=>({...input,id:'psc-p4313',revision:1,archivedAt:null})
+        create:async input=>({...input,id:'psc-p4313-'+(++personalCardSequence),revision:1,archivedAt:null})
       };
       window.alert=()=>{};window.confirm=()=>true;window.open=()=>null;
     }""",{'items':items,'main':MAIN,'other':OTHER})
@@ -105,14 +105,18 @@ def main():
     unbound={**question('unbound','easy',MAIN),'metadata':{'principleIds':[MAIN]}}
     page.evaluate("""item=>{KGMultiQuestionWorkspace.addQuestionItem({question:item,bank:{id:'p4313-bank'},paper:{id:'p4313-paper',releaseId:'p4313-release'}},{x:180,y:620,width:400,height:340})}""",unbound);page.wait_for_timeout(250)
     source_and_unbound=page.evaluate("""()=>{const w=KGCanvasWorkspaceStore.getActiveWorkspace();return Object.values(w.nodes).filter(n=>['source-1','unbound'].includes(n.questionId)).map(n=>n.id)}""")
-    page.evaluate("""ids=>{KGMultiQuestionWorkspace.selectNodes(ids);KGMultiQuestionWorkspace.quickCreateSynthesis()}""",source_and_unbound);page.wait_for_timeout(250)
+    page.evaluate("""ids=>{KGMultiQuestionWorkspace.selectNodes(ids);return KGMultiQuestionWorkspace.quickCreateSynthesis()}""",source_and_unbound);page.wait_for_timeout(650)
     workspace=page.evaluate('KGCanvasWorkspaceStore.getActiveWorkspace()')
-    assert len([node for node in workspace['nodes'].values() if node.get('nodeType')=='synthesis-card'])==1
+    personal=[node for node in workspace['nodes'].values() if node.get('nodeType')=='synthesis-card' and node.get('cardType')=='user']
+    assert len(personal)==1 and personal[0].get('personalCardId')=='psc-p4313-1',personal
+    assert personal[0].get('title')=='我的归纳（2 题）',personal
+    assert len(personal[0].get('sourceNodeIds') or [])==2,personal
+    page.evaluate("document.querySelector('#qwSynthesisModal')?.querySelector('[data-modal-close],button[type=button]')?.click()")
     card=page.locator(f'[data-node-id="{synth["id"]}"]')
-    card.locator('[data-qw-action="copy-synthesis"]').click(force=True);page.wait_for_timeout(350)
+    card.locator('[data-qw-action="copy-synthesis"]').evaluate("el=>el.click()");page.wait_for_timeout(350)
     workspace=page.evaluate('KGCanvasWorkspaceStore.getActiveWorkspace()')
     copies=[node for node in workspace['nodes'].values() if node.get('nodeType')=='synthesis-card' and node.get('cardType')=='user']
-    assert len(copies)==1 and copies[0]['sourcePresetId']=='preset-main',copies
+    assert len(copies)==2 and any(item.get('sourcePresetId')=='preset-main' for item in copies),copies
     assert not errors,errors
     page.close();browser.close()
   print('v90-p4313-workspace-browser-pass system-card-star-practice')

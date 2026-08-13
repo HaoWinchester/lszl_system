@@ -1,26 +1,24 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.59",
-  "toVersion": "v9.0-p4.1.60",
+  "fromVersion": "v9.0-p4.1.60",
+  "toVersion": "v9.0-p4.1.61",
   "changes": {
     "added": [
-      "src/108-multi-question-learning-assets.js",
-      "tests/multi-question-batch-selection-browser.py",
-      "tests/multi-question-batch-selection.test.js",
-      "tests/multi-question-learning-assets-browser.py",
-      "tests/multi-question-learning-assets.test.js",
-      "tests/multi-question-mistake-sync-browser.py",
-      "tests/multi-question-mistake-sync.test.js",
-      "tests/multi-question-personal-card-reference.test.js"
+      "tests/practice-server-answer-browser.py",
+      "tests/question-import-duplicate-confirmation.test.js"
     ],
     "changed": [
       "VERSION",
-      "question-workspace.html",
-      "src/65-canvas-workspace-store.js",
+      "content-prep-studio/dist/content-prep.html",
+      "content-prep-studio/src/js/10-state-domain.js",
+      "content-prep-studio/src/js/40-events-bootstrap.js",
+      "question-bank.html",
+      "src/100-practice-mode.js",
+      "src/65-question-bank-admin.js",
       "src/77-multi-question-workspace.js",
-      "styles/question-workspace.css",
-      "tests/multi-question-correct-flash.test.js",
-      "tests/v862-p2216-multi-question-ui-browser.py",
+      "src/97-teacher-question-workflow.js",
+      "tests/multi-question-mistake-sync-browser.py",
+      "tests/multi-question-mistake-sync.test.js",
       "tests/v90-p4313-synthesis-star-practice-browser.py"
     ],
     "removed": []

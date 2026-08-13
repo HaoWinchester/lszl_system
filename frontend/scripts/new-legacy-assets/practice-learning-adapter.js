@@ -75,7 +75,7 @@
   async function answer(input) {
     const payload = await request('/answers', { method: 'POST', body: JSON.stringify(input || {}) })
     await refresh()
-    return { correct: Boolean(payload.correct), mistake: clone(payload.mistake || null) }
+    return { correct: Boolean(payload.correct), mistake: clone(payload.mistake || null), completion: clone(payload.completion || null) }
   }
   async function upsertWrong(input) {
     const payload = await request('/mistakes', { method: 'POST', body: JSON.stringify(input || {}) })

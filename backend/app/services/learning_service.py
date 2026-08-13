@@ -3,7 +3,7 @@
 import re
 from datetime import timedelta
 
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
@@ -45,6 +45,23 @@ async def _progress(db: AsyncSession, owner: str, question_id: str) -> TrainingP
     return result.scalar_one_or_none()
 
 
+async def _practice_write_lock(db: AsyncSession, owner: str, question_id: str) -> None:
+    """Serialize every state mutation for one learner/question pair.
+
+    PostgreSQL transaction advisory locks also cover the first insert, where a
+    row lock cannot exist yet.  Using the question (not the release) in the
+    scope protects both the release-specific mistake row and the
+    owner/question-unique training progress row.
+    """
+
+    await db.execute(
+        sql_text(
+            "SELECT pg_advisory_xact_lock(hashtext(:owner), hashtext(:scope))"
+        ),
+        {"owner": owner, "scope": f"practice-answer:{question_id}"},
+    )
+
+
 def _legacy_session(progress: TrainingProgress) -> dict:
     return {
         "schemaVersion": 1,
@@ -70,6 +87,7 @@ async def save_session(db: AsyncSession, owner: str, question_id: str, data: dic
     version = int(data.get("schemaVersion") or 1)
     if version not in SESSION_SCHEMA_VERSIONS:
         raise ValueError("不支持的学习会话版本")
+    await _practice_write_lock(db, owner, question_id)
     progress = await _progress(db, owner, question_id)
     answer = data.get("answer") if isinstance(data.get("answer"), dict) else {}
     if progress is None:
@@ -200,14 +218,21 @@ def _practice_verification_to_dict(verification: PracticeVerification) -> dict:
     }
 
 
-async def _practice_mistake(db: AsyncSession, owner: str, mistake_id: str) -> PracticeMistake | None:
+async def _practice_mistake(
+    db: AsyncSession,
+    owner: str,
+    mistake_id: str,
+    *,
+    for_update: bool = False,
+) -> PracticeMistake | None:
+    query = select(PracticeMistake).where(
+        PracticeMistake.id == mistake_id,
+        PracticeMistake.owner_id == owner,
+    )
+    if for_update:
+        query = query.with_for_update()
     return (
-        await db.execute(
-            select(PracticeMistake).where(
-                PracticeMistake.id == mistake_id,
-                PracticeMistake.owner_id == owner,
-            )
-        )
+        await db.execute(query)
     ).scalar_one_or_none()
 
 
@@ -258,13 +283,25 @@ async def record_practice_mistake(db: AsyncSession, owner: str, data: dict) -> P
     language_mode = str(data.get("languageMode") or "zh").strip().lower()
     if language_mode not in PRACTICE_LANGUAGE_MODES:
         raise ValueError("languageMode 不受支持")
+    canonical_answer = _canonical_practice_answer(question)
+    option_ids = {
+        str(option.get("id") or "").strip()
+        for option in (question.options or [])
+        if isinstance(option, dict) and str(option.get("id") or "").strip()
+    }
+    if selected_answer != "timeout":
+        if not selected_answer or selected_answer not in option_ids:
+            raise ValueError("selectedAnswer 不是该题的有效选项")
+        if canonical_answer and selected_answer == canonical_answer:
+            raise ValueError("正确答案不能记录为错题")
+    await _practice_write_lock(db, owner, question.id)
     existing = (
         await db.execute(
             select(PracticeMistake).where(
                 PracticeMistake.owner_id == owner,
                 PracticeMistake.question_id == question.id,
                 PracticeMistake.release_id == release_id,
-            )
+            ).with_for_update()
         )
     ).scalar_one_or_none()
     now = now_utc()
@@ -293,11 +330,16 @@ async def record_practice_mistake(db: AsyncSession, owner: str, data: dict) -> P
         existing.question_snapshot = _question_snapshot(question)
         existing.knowledge = _practice_knowledge(question)
         existing.selected_answers = [*(existing.selected_answers or []), *([selected_answer] if selected_answer else [])][-20:]
-        existing.status = "pending"
+        # A fresh wrong answer always reactivates a previously mastered or
+        # waiting item.  Remediation is the one exception: answering the
+        # original option again cannot bypass the required repair activity.
+        if existing.status != "needs_remediation":
+            existing.status = "pending"
         existing.wrong_count += 1
         existing.revenge_correct_count = 0
         existing.last_wrong_at = now
-        existing.next_review_at = None
+        if existing.status != "needs_remediation":
+            existing.next_review_at = None
         existing.mastered_at = None
     await _append_practice_event(
         db,
@@ -324,6 +366,103 @@ def _canonical_practice_answer(question: Question) -> str:
     return correct_options[0] if len(correct_options) == 1 else ""
 
 
+async def _record_answer_completion(
+    db: AsyncSession,
+    owner: str,
+    question: Question,
+    data: dict,
+    *,
+    selected_answer: str,
+    correct: bool,
+) -> dict:
+    """Persist the fact that one option was accepted, independently of mastery."""
+
+    progress = await _progress(db, owner, question.id)
+    now = now_utc()
+    previous_session = progress.session_data if progress and isinstance(progress.session_data, dict) else {}
+    previous_context = previous_session.get("context") if isinstance(previous_session.get("context"), dict) else {}
+    context = {
+        **previous_context,
+        "paperId": str(data.get("paperId") or previous_context.get("paperId") or ""),
+        "releaseId": str(data.get("releaseId") or previous_context.get("releaseId") or ""),
+        "questionId": question.id,
+        "bankId": question.bank_id,
+        "mode": str(data.get("sourceMode") or previous_context.get("mode") or "practice_mode"),
+    }
+    completed_at = previous_session.get("completedAt") or _iso(now)
+    answer = previous_session.get("answer") if isinstance(previous_session.get("answer"), dict) else {}
+    session_data = {
+        **previous_session,
+        "schemaVersion": 2,
+        "status": "completed",
+        "context": context,
+        "paperId": context["paperId"],
+        "releaseId": context["releaseId"],
+        "questionId": question.id,
+        "bankId": question.bank_id,
+        "mode": context["mode"],
+        "currentStep": max(1, int(previous_session.get("currentStep") or 1)),
+        "completedAt": completed_at,
+        "updatedAt": _iso(now),
+        "answer": {
+            **answer,
+            "selectedAnswer": selected_answer,
+            "selectedOptionId": selected_answer,
+            "submitted": True,
+            "isCorrect": correct,
+        },
+    }
+    if progress is None:
+        progress = TrainingProgress(
+            id=uid("tp_"),
+            owner_id=owner,
+            question_id=question.id,
+            bank_id=question.bank_id,
+            paper_id=context["paperId"] or None,
+            selected_answer=selected_answer,
+            submitted=True,
+            found_clues=[],
+            reasoning_state={},
+            session_data=session_data,
+        )
+        db.add(progress)
+    else:
+        progress.bank_id = question.bank_id
+        progress.paper_id = context["paperId"] or None
+        progress.selected_answer = selected_answer
+        progress.submitted = True
+        progress.session_data = session_data
+    return {
+        "status": "completed",
+        "questionId": question.id,
+        "bankId": question.bank_id,
+        "paperId": context["paperId"],
+        "releaseId": context["releaseId"],
+        "selectedAnswer": selected_answer,
+        "correct": correct,
+        "completedAt": completed_at,
+    }
+
+
+def _advance_mistake_after_correct(mistake: PracticeMistake, now) -> str:
+    """Apply the Update delayed-verification rule without bypassing remediation."""
+
+    if mistake.status == "needs_remediation":
+        return mistake.status
+    if mistake.status == "verification_due":
+        if mistake.next_review_at is None or mistake.next_review_at <= now:
+            mistake.status = "mastered"
+            mistake.next_review_at = None
+            mistake.mastered_at = now
+        return mistake.status
+    if mistake.status == "mastered":
+        return mistake.status
+    mistake.status = "verification_due"
+    mistake.next_review_at = now + PRACTICE_REVIEW_DELAY
+    mistake.mastered_at = None
+    return mistake.status
+
+
 async def record_practice_answer(db: AsyncSession, owner: str, data: dict) -> dict:
     """Grade a canvas answer from server-owned question content and update its mistake."""
 
@@ -348,49 +487,72 @@ async def record_practice_answer(db: AsyncSession, owner: str, data: dict) -> di
     if not canonical_answer:
         raise ValueError("题目尚未配置可判定的正确答案")
     correct = selected_answer == canonical_answer
-    if not correct:
-        mistake = await record_practice_mistake(
-            db,
-            owner,
-            {
-                **data,
-                "questionId": question.id,
-                "bankId": question.bank_id,
-                "selectedAnswer": selected_answer,
-            },
-        )
-        return {"correct": False, "mistake": _practice_mistake_to_dict(mistake)}
-
     release_id = str(data.get("releaseId") or "").strip()
+    await _practice_write_lock(db, owner, question.id)
     mistake = (
         await db.execute(
             select(PracticeMistake).where(
                 PracticeMistake.owner_id == owner,
                 PracticeMistake.question_id == question.id,
                 PracticeMistake.release_id == release_id,
-            )
+            ).with_for_update()
         )
     ).scalar_one_or_none()
-    if mistake is None:
-        return {"correct": True, "mistake": None}
-    if mistake.status != "mastered":
-        mistake.status = "mastered"
-        mistake.next_review_at = None
-        mistake.mastered_at = now_utc()
+    now = now_utc()
+    if not correct:
+        if mistake is None:
+            mistake = PracticeMistake(
+                id=uid("pm_"), owner_id=owner, question_id=question.id, bank_id=question.bank_id,
+                paper_id=str(data.get("paperId") or "").strip() or None, release_id=release_id,
+                paper_version=max(0, int(data.get("paperVersion") or 0)),
+                paper_name=str(data.get("paperName") or "错题来源试卷").strip()[:200] or "错题来源试卷",
+                source_mode=str(data.get("sourceMode") or "challenge").strip()[:32] or "challenge",
+                language_mode=str(data.get("languageMode") or "zh").strip().lower(),
+                question_snapshot=_question_snapshot(question), knowledge=_practice_knowledge(question),
+                selected_answers=[selected_answer], status="pending", wrong_count=1,
+                first_wrong_at=now, last_wrong_at=now,
+            )
+            db.add(mistake)
+        else:
+            mistake.question_snapshot = _question_snapshot(question)
+            mistake.knowledge = _practice_knowledge(question)
+            mistake.selected_answers = [*(mistake.selected_answers or []), selected_answer][-20:]
+            if mistake.status != "needs_remediation":
+                mistake.status = "pending"
+            mistake.wrong_count += 1
+            mistake.revenge_correct_count = 0
+            mistake.last_wrong_at = now
+            mistake.next_review_at = None
+            mistake.mastered_at = None
         await _append_practice_event(
             db,
             owner,
-            event_type="PRACTICE_MISTAKE_MASTERED",
+            event_type="PRACTICE_MISTAKE_RECORDED",
             question_id=question.id,
-            payload={
-                "mistakeId": mistake.id,
-                "releaseId": release_id,
-                "selectedAnswer": selected_answer,
-            },
+            payload={"mistakeId": mistake.id, "status": mistake.status, "knowledge": mistake.knowledge},
         )
-        await db.commit()
+    elif mistake is not None:
+        previous_status = mistake.status
+        next_status = _advance_mistake_after_correct(mistake, now)
+        if next_status != previous_status:
+            await _append_practice_event(
+                db,
+                owner,
+                event_type="PRACTICE_MISTAKE_MASTERED" if next_status == "mastered" else "PRACTICE_MISTAKE_VERIFICATION_SCHEDULED",
+                question_id=question.id,
+                payload={"mistakeId": mistake.id, "releaseId": release_id, "selectedAnswer": selected_answer, "status": next_status},
+            )
+    completion = await _record_answer_completion(
+        db, owner, question, data, selected_answer=selected_answer, correct=correct
+    )
+    await _append_practice_event(
+        db, owner, event_type="PRACTICE_ANSWER_COMPLETED", question_id=question.id,
+        payload={**completion, "mistakeId": mistake.id if mistake else None},
+    )
+    await db.commit()
+    if mistake is not None:
         await db.refresh(mistake)
-    return {"correct": True, "mistake": _practice_mistake_to_dict(mistake)}
+    return {"correct": correct, "mistake": _practice_mistake_to_dict(mistake) if mistake else None, "completion": completion}
 
 
 async def list_practice_mistakes(db: AsyncSession, owner: str) -> list[dict]:
@@ -477,23 +639,40 @@ async def record_revenge_answer(db: AsyncSession, owner: str, mistake_id: str, d
     mistake = await _practice_mistake(db, owner, mistake_id)
     if mistake is None:
         return None
-    correct = bool(data.get("correct"))
+    if not mistake.question_id:
+        raise ValueError("错题已缺少可判定的原题")
+    await _practice_write_lock(db, owner, mistake.question_id)
+    mistake = await _practice_mistake(db, owner, mistake_id, for_update=True)
+    if mistake is None:
+        return None
     selected_answer = str(data.get("selectedAnswer") or "").strip()
+    snapshot = mistake.question_snapshot if isinstance(mistake.question_snapshot, dict) else {}
+    option_ids = {
+        str(option.get("id") or "").strip()
+        for option in snapshot.get("options") or []
+        if isinstance(option, dict) and str(option.get("id") or "").strip()
+    }
+    if not selected_answer or selected_answer not in option_ids:
+        raise ValueError("selectedAnswer 不是该题的有效选项")
+    canonical_answer = str(snapshot.get("correctAnswer") or "").strip()
+    if not canonical_answer:
+        canonical_answer = next(
+            (
+                str(option.get("id") or "").strip()
+                for option in snapshot.get("options") or []
+                if isinstance(option, dict) and option.get("correct") is True
+            ),
+            "",
+        )
+    if not canonical_answer:
+        raise ValueError("错题快照尚未配置可判定的正确答案")
+    correct = selected_answer == canonical_answer
     now = now_utc()
     mistake.revenge_attempt_count += 1
     mistake.last_revenge_at = now
     if correct:
         mistake.revenge_correct_count += 1
-        if mistake.status == "needs_remediation":
-            mistake.status = "needs_remediation"
-        elif mistake.status == "verification_due" and (mistake.next_review_at is None or mistake.next_review_at <= now):
-            mistake.status = "mastered"
-            mistake.next_review_at = None
-            mistake.mastered_at = now
-        else:
-            mistake.status = "verification_due"
-            mistake.next_review_at = now + PRACTICE_REVIEW_DELAY
-            mistake.mastered_at = None
+        _advance_mistake_after_correct(mistake, now)
     else:
         mistake.revenge_wrong_count += 1
         mistake.revenge_correct_count = 0
@@ -516,6 +695,12 @@ async def record_revenge_answer(db: AsyncSession, owner: str, mistake_id: str, d
 
 async def mark_remediation_reviewed(db: AsyncSession, owner: str, mistake_id: str) -> PracticeMistake | None:
     mistake = await _practice_mistake(db, owner, mistake_id)
+    if mistake is None:
+        return None
+    if not mistake.question_id:
+        raise ValueError("错题已缺少原题")
+    await _practice_write_lock(db, owner, mistake.question_id)
+    mistake = await _practice_mistake(db, owner, mistake_id, for_update=True)
     if mistake is None:
         return None
     if mistake.status != "needs_remediation":
@@ -578,6 +763,12 @@ async def record_practice_verification(
     data: dict,
 ) -> tuple[PracticeMistake, PracticeVerification] | None:
     mistake = await _practice_mistake(db, owner, mistake_id)
+    if mistake is None:
+        return None
+    if not mistake.question_id:
+        raise ValueError("错题已缺少原题")
+    await _practice_write_lock(db, owner, mistake.question_id)
+    mistake = await _practice_mistake(db, owner, mistake_id, for_update=True)
     if mistake is None:
         return None
     if mistake.status != "needs_remediation" or mistake.remediation_reviewed_at is None:

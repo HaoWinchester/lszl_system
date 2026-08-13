@@ -62,6 +62,7 @@ class QuestionBankImportRequest(BaseModel):
 
     banks: list[QuestionBankImportItem] = Field(min_length=1)
     confirm_replace: bool = Field(default=False, alias="confirmReplace")
+    confirm_duplicate_cleanup: bool = Field(default=False, alias="confirmDuplicateCleanup")
 
 
 class QuestionBankImportResponse(BaseModel):

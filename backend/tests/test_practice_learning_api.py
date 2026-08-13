@@ -1,8 +1,16 @@
+import asyncio
+from datetime import timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 
+from app.core.security import now_utc
+from app.db.session import AsyncSessionLocal
 from app.main import app
+from app.models.training import PracticeMistake
+from app.models.training import TrainingProgress
+from app.services import learning_service
 
 
 def _name(prefix: str) -> str:
@@ -112,6 +120,55 @@ def test_practice_mistake_remediation_and_verification_are_database_backed() -> 
     assert revenge_wrong.status_code == 200, revenge_wrong.text
     assert revenge_wrong.json()["mistake"]["status"] == "needs_remediation"
 
+    direct_wrong_cannot_reset_remediation = client.post(
+        "/api/v1/learning/practice/mistakes",
+        json={
+            "questionId": source["question"]["id"],
+            "bankId": source["bankId"],
+            "releaseId": "release-source",
+            "selectedAnswer": "B",
+        },
+    )
+    assert direct_wrong_cannot_reset_remediation.status_code == 200
+    assert direct_wrong_cannot_reset_remediation.json()["mistake"]["status"] == "needs_remediation"
+
+    ordinary_wrong_cannot_reset_remediation = client.post(
+        "/api/v1/learning/practice/answers",
+        json={
+            "questionId": source["question"]["id"],
+            "bankId": source["bankId"],
+            "releaseId": "release-source",
+            "selectedAnswer": "B",
+        },
+    )
+    assert ordinary_wrong_cannot_reset_remediation.status_code == 200
+    assert ordinary_wrong_cannot_reset_remediation.json()["mistake"]["status"] == "needs_remediation"
+
+    cannot_bypass = client.post(
+        "/api/v1/learning/practice/answers",
+        json={
+            "questionId": source["question"]["id"],
+            "bankId": source["bankId"],
+            "releaseId": "release-source",
+            "selectedAnswer": "A",
+        },
+    )
+    assert cannot_bypass.status_code == 200, cannot_bypass.text
+    assert cannot_bypass.json()["mistake"]["status"] == "needs_remediation"
+
+    spoofed_revenge = client.post(
+        f"/api/v1/learning/practice/mistakes/{mistake['id']}/revenge-answer",
+        json={"correct": True, "selectedAnswer": "B"},
+    )
+    assert spoofed_revenge.status_code == 200, spoofed_revenge.text
+    assert spoofed_revenge.json()["mistake"]["status"] == "needs_remediation"
+
+    invalid_revenge = client.post(
+        f"/api/v1/learning/practice/mistakes/{mistake['id']}/revenge-answer",
+        json={"selectedAnswer": "Z"},
+    )
+    assert invalid_revenge.status_code == 422
+
     before_review = client.get(f"/api/v1/learning/practice/mistakes/{mistake['id']}/verification-candidate")
     assert before_review.status_code == 422
 
@@ -152,7 +209,7 @@ def test_practice_mistake_routes_require_authentication() -> None:
     assert client.post("/api/v1/learning/practice/answers", json={}).status_code == 401
 
 
-def test_practice_answer_uses_server_truth_and_reactivates_mastered_mistakes() -> None:
+def test_practice_answer_uses_server_truth_delays_mastery_and_reactivates_mistakes() -> None:
     username = _name("practice_answer_owner")
     _create_student(username)
     source = _create_public_question(title="自动错题来源", taxonomy_id="taxonomy-pmp", node_id="scope-baseline")
@@ -177,6 +234,8 @@ def test_practice_answer_uses_server_truth_and_reactivates_mastered_mistakes() -
     assert wrong.json()["correct"] is False
     assert wrong.json()["mistake"]["status"] == "pending"
     assert wrong.json()["mistake"]["wrongCount"] == 1
+    assert wrong.json()["completion"]["status"] == "completed"
+    assert wrong.json()["completion"]["selectedAnswer"] == "B"
 
     right = client.post(
         "/api/v1/learning/practice/answers",
@@ -184,14 +243,48 @@ def test_practice_answer_uses_server_truth_and_reactivates_mastered_mistakes() -
     )
     assert right.status_code == 200, right.text
     assert right.json()["correct"] is True
-    assert right.json()["mistake"]["status"] == "mastered"
+    assert right.json()["mistake"]["status"] == "verification_due"
     assert right.json()["mistake"]["wrongCount"] == 1
-    assert right.json()["mistake"]["masteredAt"] is not None
+    assert right.json()["mistake"]["masteredAt"] is None
+    assert right.json()["mistake"]["nextReviewAt"] is not None
+    assert right.json()["completion"]["status"] == "completed"
 
     overview = client.get("/api/v1/learning/practice/overview")
     assert overview.status_code == 200, overview.text
     assert overview.json()["stats"]["active"] == 0
-    assert overview.json()["stats"]["mastered"] == 1
+    assert overview.json()["stats"]["verificationWaiting"] == 1
+    assert overview.json()["stats"]["mastered"] == 0
+
+    # Re-answering before the 24-hour review point cannot master the mistake.
+    too_early = client.post(
+        "/api/v1/learning/practice/answers",
+        json={**base, "selectedAnswer": "A"},
+    )
+    assert too_early.status_code == 200, too_early.text
+    assert too_early.json()["mistake"]["status"] == "verification_due"
+
+    async def make_review_due() -> None:
+        async with AsyncSessionLocal() as db:
+            mistake = (
+                await db.execute(
+                    select(PracticeMistake).where(
+                        PracticeMistake.owner_id == username,
+                        PracticeMistake.question_id == source["question"]["id"],
+                        PracticeMistake.release_id == "release-answer-source",
+                    )
+                )
+            ).scalar_one()
+            mistake.next_review_at = now_utc() - timedelta(seconds=1)
+            await db.commit()
+
+    asyncio.run(make_review_due())
+    mastered = client.post(
+        "/api/v1/learning/practice/answers",
+        json={**base, "selectedAnswer": "A"},
+    )
+    assert mastered.status_code == 200, mastered.text
+    assert mastered.json()["mistake"]["status"] == "mastered"
+    assert mastered.json()["mistake"]["masteredAt"] is not None
 
     reactivated = client.post(
         "/api/v1/learning/practice/answers",
@@ -217,7 +310,9 @@ def test_practice_answer_validates_options_visibility_and_release_identity() -> 
         json={**base, "releaseId": "release-clean", "selectedAnswer": "A"},
     )
     assert correct_first.status_code == 200, correct_first.text
-    assert correct_first.json() == {"correct": True, "mistake": None}
+    assert correct_first.json()["correct"] is True
+    assert correct_first.json()["mistake"] is None
+    assert correct_first.json()["completion"]["status"] == "completed"
 
     for release_id in ("release-one", "release-two"):
         response = client.post(
@@ -252,6 +347,74 @@ def test_practice_answer_validates_options_visibility_and_release_identity() -> 
         },
     )
     assert not_visible.status_code == 404
+
+
+def test_concurrent_first_answers_are_serialized_without_duplicate_rows() -> None:
+    username = _name("practice_answer_concurrent")
+    _create_student(username)
+    source = _create_public_question(title="并发首次作答", taxonomy_id="taxonomy-pmp", node_id="scope-baseline")
+    base = {
+        "questionId": source["question"]["id"],
+        "bankId": source["bankId"],
+        "releaseId": "release-concurrent",
+        "sourceMode": "workspace",
+    }
+
+    async def submit_pair() -> list[dict]:
+        async def submit(selected_answer: str) -> dict:
+            async with AsyncSessionLocal() as db:
+                return await learning_service.record_practice_answer(
+                    db,
+                    username,
+                    {**base, "selectedAnswer": selected_answer},
+                )
+
+        return await asyncio.gather(submit("B"), submit("B"))
+
+    results = asyncio.run(submit_pair())
+    assert all(result["correct"] is False for result in results)
+
+    async def load_counts() -> tuple[int, int, int]:
+        async with AsyncSessionLocal() as db:
+            mistakes = int(
+                (
+                    await db.execute(
+                        select(func.count())
+                        .select_from(PracticeMistake)
+                        .where(
+                            PracticeMistake.owner_id == username,
+                            PracticeMistake.question_id == source["question"]["id"],
+                            PracticeMistake.release_id == "release-concurrent",
+                        )
+                    )
+                ).scalar_one()
+            )
+            wrong_count = int(
+                (
+                    await db.execute(
+                        select(PracticeMistake.wrong_count).where(
+                            PracticeMistake.owner_id == username,
+                            PracticeMistake.question_id == source["question"]["id"],
+                            PracticeMistake.release_id == "release-concurrent",
+                        )
+                    )
+                ).scalar_one()
+            )
+            progress = int(
+                (
+                    await db.execute(
+                        select(func.count())
+                        .select_from(TrainingProgress)
+                        .where(
+                            TrainingProgress.owner_id == username,
+                            TrainingProgress.question_id == source["question"]["id"],
+                        )
+                    )
+                ).scalar_one()
+            )
+            return mistakes, wrong_count, progress
+
+    assert asyncio.run(load_counts()) == (1, 2, 1)
 
 
 def test_practice_session_history_is_database_backed_and_owner_scoped() -> None:

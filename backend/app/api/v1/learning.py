@@ -176,7 +176,10 @@ async def record_practice_mistake(body: dict, db: DB, user: CurrentUser):
 
 @router.post("/learning/practice/mistakes/{mistake_id}/revenge-answer")
 async def record_revenge_answer(mistake_id: str, body: dict, db: DB, user: CurrentUser):
-    mistake = await learning_service.record_revenge_answer(db, user.username, mistake_id, body)
+    try:
+        mistake = await learning_service.record_revenge_answer(db, user.username, mistake_id, body)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     if mistake is None:
         raise HTTPException(status_code=404, detail="错题不存在或无权访问")
     return {"mistake": learning_service._practice_mistake_to_dict(mistake)}

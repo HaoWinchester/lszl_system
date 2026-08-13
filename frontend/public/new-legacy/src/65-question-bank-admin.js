@@ -4360,6 +4360,9 @@
     });
     return `检测到同一来源题库的更新：\n${lines.join('\n')||'• 导入内容将覆盖同来源题库'}\n\n已完全跳过内容相同的题库。确认覆盖上述变更吗？`;
   }
+  function importDuplicateMessage(plan={}){
+    return `检测到重复题目：已有重复 ${Number(plan?.duplicateExistingCount||0)} 道，本批重复 ${Number(plan?.duplicateBatchCount||0)} 道。\n是否自动清除重复题目后继续导入？`;
+  }
   async function importQuestionBanks(data){
     const incoming=importBanksFromPayload(data);
     if(!incoming.length){alert('导入未提交：未找到可导入的题库。');return {ok:false,error:'未找到可导入的题库。'};}
@@ -4370,12 +4373,19 @@
       try{result=await Catalog.importBanks({banks:incoming});}
       catch(error){
         const plan=error?.detail?.detail?.importPlan;
-        if(error?.code!=='IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED')throw error;
-        if(!global.confirm(importReplacementMessage(plan))){
+        if(!['IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED','QUESTION_DUPLICATES_CONFIRMATION_REQUIRED'].includes(error?.code))throw error;
+        const duplicateConfirmation=error?.code==='QUESTION_DUPLICATES_CONFIRMATION_REQUIRED';
+        if(!global.confirm(duplicateConfirmation?importDuplicateMessage(plan):importReplacementMessage(plan))){
           restoreQuestionImportState(snapshot);render();toast('已取消覆盖导入。');
           return {ok:false,cancelled:true,error:'已取消覆盖导入。'};
         }
-        result=await Catalog.importBanks({banks:incoming,confirmReplace:true});
+        try{result=await Catalog.importBanks({banks:incoming,confirmReplace:!duplicateConfirmation,confirmDuplicateCleanup:duplicateConfirmation});}
+        catch(secondError){
+          const secondPlan=secondError?.detail?.detail?.importPlan;
+          if(secondError?.code!=='QUESTION_DUPLICATES_CONFIRMATION_REQUIRED'||duplicateConfirmation)throw secondError;
+          if(!global.confirm(importDuplicateMessage(secondPlan)))return {ok:false,cancelled:true,error:'已取消重复题清理。'};
+          result=await Catalog.importBanks({banks:incoming,confirmReplace:true,confirmDuplicateCleanup:true});
+        }
       }
       const savedBanks=Array.isArray(result?.banks)?result.banks:[];
       const lastIncoming=incoming[incoming.length-1]||{};
@@ -4452,39 +4462,60 @@
     return ({true:'有效线索', decoy:'诱导线索', context:'背景信息'})[role] || role || '线索';
   }
 
-  function normalizedStemForDuplicate(question){return stemText(question).replace(/\s+/g,'').toLowerCase()}
-  function normalizedEnglishStemForDuplicate(question){return englishStemText(question).replace(/\s+/g,'').toLowerCase()}
-  function bulkAddQuestions(items, options={}){
+  function canonicalDuplicateText(value){return String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase()}
+  function canonicalQuestionDuplicateSignature(question={}){
+    const primaryStem=stemText(question)||englishStemText(question);
+    const options=(question.options||[]).map(option=>[canonicalDuplicateText(option?.id),canonicalDuplicateText(option?.text)]);
+    return JSON.stringify({stem:canonicalDuplicateText(primaryStem),options,correctAnswer:canonicalDuplicateText(question.correctAnswer)});
+  }
+  function preflightQuestionDuplicates(incoming,existing=[]){
+    const known=new Set((existing||[]).map(canonicalQuestionDuplicateSignature).filter(Boolean)),batch=new Set(),unique=[],duplicates=[];
+    (incoming||[]).forEach((question,index)=>{
+      const signature=canonicalQuestionDuplicateSignature(question),source=known.has(signature)?'existing':batch.has(signature)?'batch':'';
+      if(source)duplicates.push({index:index+1,title:String(question?.title||'未命名题目'),reason:source==='existing'?'目标题库已有完全相同题目':'本批已有完全相同题目',source,signature});
+      else{batch.add(signature);unique.push(question)}
+    });
+    return {unique,duplicates,existingCount:duplicates.filter(item=>item.source==='existing').length,batchCount:duplicates.filter(item=>item.source==='batch').length};
+  }
+  function questionDuplicateConfirmationMessage(report={}){
+    return `检测到重复题目：已有重复 ${Number(report.existingCount||0)} 道，本批重复 ${Number(report.batchCount||0)} 道。\n自动清除后将保留 ${Number(report.unique?.length||0)} 道题，是否继续导入？`;
+  }
+  async function bulkAddQuestions(items, options={}){
     const bank=state.banks.find(item=>item.id===String(options.bankId||''))||currentBank();
     if(!bank)return {valid:false,added:[],duplicates:[],errors:['请先选择题库。']};
-    const incoming=Array.isArray(items)?items:[],skipDuplicates=options.skipDuplicates!==false,service=teacherDomainServices().batch;
+    const incoming=Array.isArray(items)?items:[];
     if(!incoming.length)return {valid:false,added:[],duplicates:[],errors:['没有可导入的题目。'],bankId:bank.id};
-    if(!service)return {valid:false,added:[],duplicates:[],errors:['批量操作服务尚未加载。'],bankId:bank.id};
-    const knownIds=new Set(bank.questions.map(item=>item.id)),knownStems=new Set(bank.questions.map(normalizedStemForDuplicate).filter(Boolean)),knownEnglishStems=new Set(bank.questions.map(normalizedEnglishStemForDuplicate).filter(Boolean));
-    let nextNumber=Number(nextTeacherNumber(bank.subject).split('-').pop())||1;const prefix=subjectNumberPrefix(bank.subject),duplicates=[];
-    const wrappers=incoming.map((raw,index)=>({id:`incoming-${index+1}`,raw,index,candidate:null,duplicate:null})),beforeBank=clone(bank);
-    const response=service.execute({
-      prefix:'question-import',items:wrappers,
-      apply:wrapper=>{
-        const question=normalizeQuestion({...wrapper.raw,subject:wrapper.raw?.subject||bank.subject},wrapper.index);
-        const normalizedStem=normalizedStemForDuplicate(question),normalizedEnglishStem=normalizedEnglishStemForDuplicate(question);
-        if(skipDuplicates&&((normalizedStem&&knownStems.has(normalizedStem))||(normalizedEnglishStem&&knownEnglishStems.has(normalizedEnglishStem)))){wrapper.duplicate={index:wrapper.index+1,title:question.title,reason:'中英文题干重复'};duplicates.push(wrapper.duplicate);return {ok:true,value:wrapper}}
-        if(!question.teacherNumber){question.teacherNumber=prefix+'-'+String(nextNumber).padStart(6,'0');nextNumber+=1}
-        if(knownIds.has(question.id))question.id=safeId('q');while(knownIds.has(question.id))question.id=safeId('q');
-        knownIds.add(question.id);if(normalizedStem)knownStems.add(normalizedStem);if(normalizedEnglishStem)knownEnglishStems.add(normalizedEnglishStem);wrapper.candidate=question;return {ok:true,value:wrapper};
-      },
-      persist:(_transactionId,itemResults)=>{
-        const added=itemResults.map(item=>item.value?.candidate).filter(Boolean);bank.questions.push(...added);if(added.length)bank.updatedAt=Date.now();
-        return true;
-      },
-      rollback:()=>{const index=state.banks.findIndex(item=>item.id===bank.id);if(index>=0)state.banks[index]=normalizeBank(beforeBank)},
-      audit:{action:'question.import.bulk',entityType:'question-batch',entityId:bank.id,summary:`批量导入 ${incoming.length} 道题`,metadata:{bankId:bank.id,inputCount:incoming.length}}
-    });
-    const added=response.ok?wrappers.map(item=>item.candidate).filter(Boolean):[];
-    const errors=response.ok?[]:(response.errors||['批量导入失败，所有改动已回滚。']);
-    if(response.ok&&added.length){state.selectedBankId=bank.id;state.selectedQuestionId=added[added.length-1].id;state.activeSidebarTab='questions';state.activeMainTab='banks';state.questionPage=Math.max(1,Math.ceil(bank.questions.length/QUESTION_PAGE_SIZE));Promise.all(added.map(question=>{const draft={...question};delete draft.revision;delete draft.contentHash;delete draft.createdAt;delete draft.updatedAt;return Catalog.saveQuestion(draft,{bankId:bank.id})})).then(results=>{reloadBanksFromCatalog(bank.id,results.at(-1)?.id||'');render()}).catch(error=>{const index=state.banks.findIndex(item=>item.id===bank.id);if(index>=0)state.banks[index]=normalizeBank(beforeBank);render();alert('批量导入失败：'+(error.message||error))});render()}
-    if(options.notify!==false)toast(response.ok?`已导入 ${added.length} 道题${duplicates.length?`，跳过 ${duplicates.length} 道重复题`:''}。`:`导入失败，已回滚：${errors[0]||'未知错误'}`);
-    return {valid:response.ok,added:clone(added),duplicates:clone(duplicates),errors,bankId:bank.id,transactionId:response.value?.transactionId||''};
+    if(typeof Catalog?.importQuestions!=='function')return {valid:false,added:[],duplicates:[],errors:['题目批量导入服务尚未加载。'],bankId:bank.id};
+    const normalizedIncoming=incoming.map((raw,index)=>normalizeQuestion({...raw,subject:raw?.subject||bank.subject},index));
+    const report=preflightQuestionDuplicates(normalizedIncoming,bank.questions);
+    if(report.duplicates.length&&!global.confirm(questionDuplicateConfirmationMessage(report))){
+      if(options.notify!==false)toast('已取消导入，题库没有变化。');
+      return {valid:false,cancelled:true,added:[],duplicates:clone(report.duplicates),errors:[],bankId:bank.id};
+    }
+    try{
+      let result;
+      try{result=await Catalog.importQuestions(bank.id,report.unique,{confirmDuplicateCleanup:report.duplicates.length>0});}
+      catch(error){
+        if(error?.code!=='QUESTION_DUPLICATES_CONFIRMATION_REQUIRED')throw error;
+        const serverReport=error?.detail?.detail?.importPlan||{};
+        if(!global.confirm(questionDuplicateConfirmationMessage({
+          existingCount:serverReport.existingCount,batchCount:serverReport.batchCount,
+          unique:Array.from({length:Number(serverReport.keepCount||0)})
+        })))return {valid:false,cancelled:true,added:[],duplicates:clone(report.duplicates),errors:[],bankId:bank.id};
+        result=await Catalog.importQuestions(bank.id,report.unique,{confirmDuplicateCleanup:true});
+      }
+      const added=Array.isArray(result?.questions)?result.questions:[];
+      const serverDuplicates=Array.isArray(result?.duplicatePlan?.duplicates)?result.duplicatePlan.duplicates:[];
+      const duplicates=[...report.duplicates,...serverDuplicates.filter(server=>!report.duplicates.some(local=>local.index===server.index&&local.source===server.source))];
+      reloadBanksFromCatalog(bank.id,added.at(-1)?.id||'');
+      state.selectedBankId=bank.id;state.selectedQuestionId=added.at(-1)?.id||state.selectedQuestionId;state.activeSidebarTab='questions';state.activeMainTab='banks';render();
+      if(options.notify!==false)toast(`已导入 ${added.length} 道题${duplicates.length?`，自动清除 ${duplicates.length} 道重复题`:''}。`);
+      return {valid:true,added:clone(added),duplicates:clone(duplicates),errors:[],bankId:bank.id};
+    }catch(error){
+      const message=String(error?.message||error||'未知错误');
+      if(options.notify!==false)toast('导入失败，题库没有变化：'+message);
+      return {valid:false,added:[],duplicates:clone(report.duplicates),errors:[message],bankId:bank.id};
+    }
   }
 
   function updateCurrentQuestion(patch={}){
@@ -4543,6 +4574,8 @@
     openQuestionBasicInfo,
     renameTagAcrossQuestions,
     bulkAddQuestions,
+    canonicalQuestionDuplicateSignature,
+    preflightQuestionDuplicates,
     recordQuestionAudit:(action,before,after,options={})=>{const question=currentQuestion();if(!question)return null;return recordQuestionAudit(action,question,before,after,options.batchId||safeId('batch-single'),options.summary||`题目分类变更：${question.title}`,options.status||'success',options.metadata||{})},
     isQuestionDeleted:question=>isQuestionDeleted(question),
     referenceSummaryForQuestion:(questionId,bankId='')=>{const bank=state.banks.find(item=>item.id===String(bankId||''))||currentBank();const question=bank?.questions.find(item=>item.id===String(questionId||''));return clone(referenceSummaryForQuestion(question,bank))},

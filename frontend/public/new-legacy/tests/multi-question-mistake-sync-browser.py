@@ -127,6 +127,8 @@ with sync_playwright() as p:
     page.evaluate("window._answerResolve({correct:false,mistake:{status:'pending'}})")
     page.wait_for_timeout(80)
     assert card.locator('[data-qw-option-key="B"]').evaluate("el=>el.classList.contains('is-wrong-flash')")
+    completion_status = page.locator('#qwQuestionList [data-question-id="q-sync-1"] em').text_content()
+    assert completion_status == '已完成', (completion_status, page.evaluate("""()=>({sessions:KGLearningSessionStore.list(),item:document.querySelector('#qwQuestionList [data-question-id="q-sync-1"]')?.outerHTML})"""))
 
     # A failed answer retains selection and retries the exact same stable payload.
     page.evaluate("window._answerMode='fail'")

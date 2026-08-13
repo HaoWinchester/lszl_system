@@ -156,6 +156,16 @@ function canonicalQuestionContent(q){
   });
 }
 function computeQuestionContentHash(q){return 'sha256:'+sha256Hex(canonicalQuestionContent(q))}
+function canonicalDuplicateText(v){return String(v||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase()}
+function canonicalQuestionDuplicateSignature(q={}){
+  const primaryStem=questionStem(q)||String(q?.translations?.en?.stemParts?.map(part=>part?.text||'').join('')||'');
+  return JSON.stringify({stem:canonicalDuplicateText(primaryStem),options:(q.options||[]).map(option=>[canonicalDuplicateText(option?.id),canonicalDuplicateText(option?.text)]),correctAnswer:canonicalDuplicateText(q.correctAnswer)});
+}
+function preflightQuestionDuplicates(incoming,existing=[]){
+  const known=new Set((existing||[]).map(canonicalQuestionDuplicateSignature)),batch=new Set(),unique=[],duplicates=[];
+  (incoming||[]).forEach((question,index)=>{const signature=canonicalQuestionDuplicateSignature(question),source=known.has(signature)?'existing':batch.has(signature)?'batch':'';if(source)duplicates.push({index:index+1,title:String(question?.title||'未命名题目'),source,signature});else{batch.add(signature);unique.push(question)}});
+  return {unique,duplicates,existingCount:duplicates.filter(item=>item.source==='existing').length,batchCount:duplicates.filter(item=>item.source==='batch').length};
+}
 function currentIdentitySnapshot(){
   const c=prepRuntime.creatorProfile||{},d=prepRuntime.deviceProfile||{};
   return {creatorId:c.creatorId||'',creatorName:c.name||'',deviceId:d.deviceId||''};
@@ -557,9 +567,11 @@ function normalizeContentBundle(payload){
   return {prepContentBundleVersion:Number(payload.prepContentBundleVersion||1),questionBank:normalizeBank(qb),principles:normalizePrinciples(payload.principles||{}),synthesisPresets:normalizePresets(payload.synthesisPresets||payload.presets||{}),tagConfig:normalizeTagConfig(payload.tagConfig||{}),recallLibrary:payload.recallLibrary?normalizeRecall(payload.recallLibrary):null,knowledgeTree:payload.knowledgeTree?normalizeTree(payload.knowledgeTree):null};
 }
 function importContentBundle(payload){
-  const b=ImportService.completeBundle(payload);state.tagConfig=b.tagConfig;state.principles=b.principles;state.synthesisPresets=b.synthesisPresets;state.questionBank=b.questionBank;if(b.recallLibrary)state.recallLibrary=b.recallLibrary;if(b.knowledgeTree)state.knowledgeTree=b.knowledgeTree;
+  const b=ImportService.completeBundle(payload),report=preflightQuestionDuplicates(b.questionBank.questions,[]);
+  if(report.duplicates.length&&!confirm(`检测到重复题目：已有重复 ${report.existingCount} 道，本批重复 ${report.batchCount} 道。\n是否自动清除后继续导入？`))return {ok:false,cancelled:true,report};
+  b.questionBank.questions=report.unique;state.tagConfig=b.tagConfig;state.principles=b.principles;state.synthesisPresets=b.synthesisPresets;state.questionBank=b.questionBank;if(b.recallLibrary)state.recallLibrary=b.recallLibrary;if(b.knowledgeTree)state.knowledgeTree=b.knowledgeTree;
   stampImportedQuestions(state.questionBank.questions,'complete-content-bundle');
-  refreshQuestionTagPaths();state.questionBank.questions.forEach(syncQuestionPrinciples);state.currentQuestionId=state.questionBank.questions[0]?.id||'';state.demoQuestionId=state.currentQuestionId;state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';state.currentPrincipleId=state.principles.items[0]?.id||'';refreshAll();
+  refreshQuestionTagPaths();state.questionBank.questions.forEach(syncQuestionPrinciples);state.currentQuestionId=state.questionBank.questions[0]?.id||'';state.demoQuestionId=state.currentQuestionId;state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';state.currentPrincipleId=state.principles.items[0]?.id||'';refreshAll();return {ok:true,report};
 }
 function completeBundlePayload(){const pair=normalizePrincipleCardBundle({principles:state.principles,synthesisPresets:state.synthesisPresets});return {prepContentBundleVersion:1,format:'pmp-content-prep-complete-bundle-v1',generatedBy:`PMP Content Prep Studio v${VERSION}`,generatedAt:nowIso(),exportManifest:{creator:{...currentIdentitySnapshot()},lastBatchId:prepRuntime.lastBatchId||'',applicationVersion:VERSION},questionBank:exportableBank(),principles:pair.principles,synthesisPresets:pair.synthesisPresets,tagConfig:exportTagConfig(),recallLibrary:clone(state.recallLibrary),knowledgeTree:state.knowledgeTree?{taxonomy:{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:{zh:state.knowledgeTree.name},version:state.knowledgeTree.version,status:state.knowledgeTree.status||'draft',nodes:clone(state.knowledgeTree.nodes)}}:null,recallLibraryReference:{schemaVersion:state.recallLibrary.schemaVersion,nodeCount:state.recallLibrary.nodes.length,edgeCount:state.recallLibrary.edges.length},knowledgeTreeReference:state.knowledgeTree?{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:state.knowledgeTree.name,version:state.knowledgeTree.version,nodeCount:state.knowledgeTree.nodes.length}:null}}
 

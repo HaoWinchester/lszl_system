@@ -113,6 +113,20 @@ async def create_question(bank_id: str, body: dict, db: DB, user: QuestionEditor
     return {"question": question_service.question_to_dict(q)}
 
 
+@router.post("/banks/{bank_id}/questions/import")
+async def import_questions(bank_id: str, body: dict, db: DB, user: QuestionEditor):
+    items = body.get("questions") if isinstance(body.get("questions"), list) else []
+    if not items:
+        raise HTTPException(status_code=422, detail="没有可导入的题目")
+    return await question_service.import_questions_into_bank(
+        db,
+        user,
+        bank_id,
+        items,
+        confirm_duplicate_cleanup=body.get("confirmDuplicateCleanup") is True,
+    )
+
+
 @router.get("/questions/{question_id}")
 async def get_question(question_id: str, db: DB, user: QuestionBankReader):
     q = await question_service.get_question(db, user, question_id)
