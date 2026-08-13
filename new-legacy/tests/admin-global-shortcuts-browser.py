@@ -147,8 +147,12 @@ def drag_and_assert_persistence(page: Page, base_url: str) -> None:
     page.locator("#kgGlobalShortcuts").wait_for(state="visible")
     restored = page.locator("#kgGlobalShortcuts").bounding_box()
     assert restored is not None
-    assert abs(restored["x"] - stored["x"]) <= 2
-    assert abs(restored["y"] - stored["y"]) <= 2
+    max_x = max(8, page.viewport_size["width"] - restored["width"] - 8)
+    max_y = max(8, page.viewport_size["height"] - restored["height"] - 8)
+    expected_x = max(8, min(stored["x"], max_x))
+    expected_y = max(8, min(stored["y"], max_y))
+    assert abs(restored["x"] - expected_x) <= 2, (stored, restored)
+    assert abs(restored["y"] - expected_y) <= 2, (stored, restored)
 
 
 with site_url() as base_url, sync_playwright() as playwright:
