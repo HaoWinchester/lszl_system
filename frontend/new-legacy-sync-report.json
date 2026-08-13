@@ -1,24 +1,14 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.60",
-  "toVersion": "v9.0-p4.1.61",
+  "fromVersion": "v9.0-p4.1.61",
+  "toVersion": "v9.0-p4.1.62",
   "changes": {
-    "added": [
-      "tests/practice-server-answer-browser.py",
-      "tests/question-import-duplicate-confirmation.test.js"
-    ],
+    "added": [],
     "changed": [
       "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "content-prep-studio/src/js/10-state-domain.js",
-      "content-prep-studio/src/js/40-events-bootstrap.js",
-      "question-bank.html",
-      "src/100-practice-mode.js",
-      "src/65-question-bank-admin.js",
       "src/77-multi-question-workspace.js",
-      "src/97-teacher-question-workflow.js",
-      "tests/multi-question-mistake-sync-browser.py",
-      "tests/multi-question-mistake-sync.test.js",
+      "styles/learning-practice-shell.css",
+      "tests/multi-question-batch-selection-browser.py",
       "tests/v90-p4313-synthesis-star-practice-browser.py"
     ],
     "removed": []
