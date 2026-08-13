@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -137,4 +137,39 @@ class CanvasWorkspace(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), index=True
+    )
+
+
+class PersonalSynthesisCard(Base):
+    """A learner-owned synthesis card reusable across canvas workspaces."""
+
+    __tablename__ = "personal_synthesis_cards"
+    __table_args__ = (
+        Index("ix_personal_cards_owner_archived_updated", "owner_id", "archived_at", "updated_at"),
+        CheckConstraint(
+            "synthesis_type IN ('principle', 'routine', 'trap', 'note')",
+            name="ck_personal_cards_type",
+        ),
+        CheckConstraint(
+            "status IN ('draft', 'verified', 'mastered')",
+            name="ck_personal_cards_status",
+        ),
+        CheckConstraint("revision >= 1", name="ck_personal_cards_revision"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("users.username", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    synthesis_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    tags: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
+    source_question_refs: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False, index=True
     )

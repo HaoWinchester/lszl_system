@@ -28,6 +28,7 @@ from app.models.system import RoleTheme, SystemSetting
 from app.models.training import (
     CanvasWorkspace,
     LearningEvent,
+    PersonalSynthesisCard,
     PracticeMistake,
     PracticeVerification,
     RecallProgress,
@@ -63,6 +64,7 @@ __all__ = [
     "TrainingProgress",
     "RecallProgress",
     "LearningEvent",
+    "PersonalSynthesisCard",
     "PracticeMistake",
     "PracticeVerification",
     "CanvasWorkspace",

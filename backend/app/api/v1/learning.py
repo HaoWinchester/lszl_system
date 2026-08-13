@@ -7,10 +7,80 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser
 from app.db.session import get_db
-from app.services import learning_service
+from app.schemas.personal_card import PersonalCardCreate, PersonalCardUpdate
+from app.services import learning_service, personal_card_service
 
 router = APIRouter(tags=["learning"])
 DB = Annotated[AsyncSession, Depends(get_db)]
+
+
+@router.get("/learning/personal-cards")
+async def list_personal_cards(
+    db: DB,
+    user: CurrentUser,
+    archived: bool = Query(False),
+    query: str = Query("", max_length=200),
+):
+    cards = await personal_card_service.list_cards(
+        db,
+        user.username,
+        archived=archived,
+        query=query,
+    )
+    return {"cards": cards, "count": len(cards)}
+
+
+@router.post("/learning/personal-cards")
+async def create_personal_card(body: PersonalCardCreate, db: DB, user: CurrentUser):
+    card = await personal_card_service.create_card(db, user.username, body)
+    return {"card": personal_card_service.card_to_dict(card)}
+
+
+@router.get("/learning/personal-cards/{card_id}")
+async def get_personal_card(card_id: str, db: DB, user: CurrentUser):
+    card = await personal_card_service.get_card(db, user.username, card_id)
+    if card is None:
+        raise HTTPException(status_code=404, detail="归纳卡不存在或无权访问")
+    return {"card": personal_card_service.card_to_dict(card)}
+
+
+@router.put("/learning/personal-cards/{card_id}")
+async def update_personal_card(
+    card_id: str,
+    body: PersonalCardUpdate,
+    db: DB,
+    user: CurrentUser,
+):
+    try:
+        card = await personal_card_service.update_card(db, user.username, card_id, body)
+    except personal_card_service.PersonalCardConflict as error:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "PERSONAL_CARD_REVISION_CONFLICT",
+                "message": str(error),
+                "currentRevision": error.current_revision,
+            },
+        ) from error
+    if card is None:
+        raise HTTPException(status_code=404, detail="归纳卡不存在或无权访问")
+    return {"card": personal_card_service.card_to_dict(card)}
+
+
+@router.post("/learning/personal-cards/{card_id}/archive")
+async def archive_personal_card(card_id: str, db: DB, user: CurrentUser):
+    card = await personal_card_service.set_archived(db, user.username, card_id, True)
+    if card is None:
+        raise HTTPException(status_code=404, detail="归纳卡不存在或无权访问")
+    return {"card": personal_card_service.card_to_dict(card)}
+
+
+@router.post("/learning/personal-cards/{card_id}/restore")
+async def restore_personal_card(card_id: str, db: DB, user: CurrentUser):
+    card = await personal_card_service.set_archived(db, user.username, card_id, False)
+    if card is None:
+        raise HTTPException(status_code=404, detail="归纳卡不存在或无权访问")
+    return {"card": personal_card_service.card_to_dict(card)}
 
 
 @router.get("/training/session/{question_id}")
