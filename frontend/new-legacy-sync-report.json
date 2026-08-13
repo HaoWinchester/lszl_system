@@ -1,15 +1,23 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.61",
-  "toVersion": "v9.0-p4.1.62",
+  "fromVersion": "v9.0-p4.1.62",
+  "toVersion": "v9.0-p4.1.63",
   "changes": {
-    "added": [],
+    "added": [
+      "assets/landing/SOURCES.md",
+      "assets/landing/graph.png",
+      "assets/landing/practice.png",
+      "assets/landing/recall.png",
+      "assets/landing/workspace.png",
+      "landing.html",
+      "src/landing.js",
+      "styles/landing.css",
+      "tests/landing-page-browser.py",
+      "tests/landing-page-contract.test.js",
+      "tests/landing-page-live-browser.py"
+    ],
     "changed": [
-      "VERSION",
-      "src/77-multi-question-workspace.js",
-      "styles/learning-practice-shell.css",
-      "tests/multi-question-batch-selection-browser.py",
-      "tests/v90-p4313-synthesis-star-practice-browser.py"
+      "VERSION"
     ],
     "removed": []
   },
