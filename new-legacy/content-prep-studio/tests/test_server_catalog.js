@@ -91,6 +91,7 @@ async function testUploadSkipsUnchangedQuestionsLoadedFromServer(){
     correctAnswer:'A',metadata:{},serverRevision:2,serverContentHash:'a'.repeat(64),lastSyncedAt:'2026-08-13T00:00:00Z',
   };
   loaded.serverExportSnapshot=service.captureServerSnapshot(loaded);
+  loaded.contentHash='sha256:recomputed-by-local-validation';
   const workspace={serverBankId:'bank-1',serverBankRevision:2,clientInstanceId:'client-1',lastIdempotencyKey:'',lastBatchId:''};
 
   await service.uploadBundle(

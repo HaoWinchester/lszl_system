@@ -186,6 +186,9 @@ with sync_playwright() as playwright:
             "() => state.questionBank.questions.map(question => question.id)"
         )
 
+        page.locator('button[data-tab="validate"]').click()
+        page.locator('#tab-validate.active').wait_for(state="visible")
+        page.locator('button[data-tab="base"]').click()
         batch_payload(page)
         page.locator("#btnSyncToCatalog").click()
         wait_for_status(page, "已保存到服务器")

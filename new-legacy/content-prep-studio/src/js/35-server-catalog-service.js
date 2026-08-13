@@ -51,7 +51,7 @@
   }
   function stripSyncFields(question){
     const payload=cloneJson(question);
-    for(const key of ['serverRevision','serverContentHash','lastSyncedAt','serverExportSnapshot','lockToken','lock'])delete payload[key];
+    for(const key of ['contentHash','serverRevision','serverContentHash','lastSyncedAt','serverExportSnapshot','lockToken','lock'])delete payload[key];
     return payload;
   }
   function stableJson(value){
