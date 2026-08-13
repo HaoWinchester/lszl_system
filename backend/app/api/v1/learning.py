@@ -134,6 +134,16 @@ async def practice_overview(db: DB, user: CurrentUser):
     return await learning_service.practice_overview(db, user.username)
 
 
+@router.post("/learning/practice/answers")
+async def record_practice_answer(body: dict, db: DB, user: CurrentUser):
+    try:
+        return await learning_service.record_practice_answer(db, user.username, body)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
 @router.post("/learning/practice/sessions")
 async def record_practice_session(body: dict, db: DB, user: CurrentUser):
     try:

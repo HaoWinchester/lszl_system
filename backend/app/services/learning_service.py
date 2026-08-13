@@ -311,6 +311,88 @@ async def record_practice_mistake(db: AsyncSession, owner: str, data: dict) -> P
     return existing
 
 
+def _canonical_practice_answer(question: Question) -> str:
+    explicit = str(question.correct_answer or "").strip()
+    if explicit:
+        return explicit
+    correct_options = [
+        str(option.get("id") or "").strip()
+        for option in (question.options or [])
+        if isinstance(option, dict) and option.get("correct") is True
+    ]
+    correct_options = [option_id for option_id in correct_options if option_id]
+    return correct_options[0] if len(correct_options) == 1 else ""
+
+
+async def record_practice_answer(db: AsyncSession, owner: str, data: dict) -> dict:
+    """Grade a canvas answer from server-owned question content and update its mistake."""
+
+    question_id = str(data.get("questionId") or "").strip()
+    if not question_id:
+        raise ValueError("questionId 不能为空")
+    question = await _visible_learning_question(db, question_id)
+    if question is None:
+        raise LookupError("题目不存在或当前不可学习")
+    requested_bank_id = str(data.get("bankId") or "").strip()
+    if requested_bank_id and requested_bank_id != question.bank_id:
+        raise ValueError("bankId 与题目不一致")
+    selected_answer = str(data.get("selectedAnswer") or "").strip()
+    option_ids = {
+        str(option.get("id") or "").strip()
+        for option in (question.options or [])
+        if isinstance(option, dict) and str(option.get("id") or "").strip()
+    }
+    if not selected_answer or selected_answer not in option_ids:
+        raise ValueError("selectedAnswer 不是该题的有效选项")
+    canonical_answer = _canonical_practice_answer(question)
+    if not canonical_answer:
+        raise ValueError("题目尚未配置可判定的正确答案")
+    correct = selected_answer == canonical_answer
+    if not correct:
+        mistake = await record_practice_mistake(
+            db,
+            owner,
+            {
+                **data,
+                "questionId": question.id,
+                "bankId": question.bank_id,
+                "selectedAnswer": selected_answer,
+            },
+        )
+        return {"correct": False, "mistake": _practice_mistake_to_dict(mistake)}
+
+    release_id = str(data.get("releaseId") or "").strip()
+    mistake = (
+        await db.execute(
+            select(PracticeMistake).where(
+                PracticeMistake.owner_id == owner,
+                PracticeMistake.question_id == question.id,
+                PracticeMistake.release_id == release_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if mistake is None:
+        return {"correct": True, "mistake": None}
+    if mistake.status != "mastered":
+        mistake.status = "mastered"
+        mistake.next_review_at = None
+        mistake.mastered_at = now_utc()
+        await _append_practice_event(
+            db,
+            owner,
+            event_type="PRACTICE_MISTAKE_MASTERED",
+            question_id=question.id,
+            payload={
+                "mistakeId": mistake.id,
+                "releaseId": release_id,
+                "selectedAnswer": selected_answer,
+            },
+        )
+        await db.commit()
+        await db.refresh(mistake)
+    return {"correct": True, "mistake": _practice_mistake_to_dict(mistake)}
+
+
 async def list_practice_mistakes(db: AsyncSession, owner: str) -> list[dict]:
     rows = (
         await db.execute(

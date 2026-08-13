@@ -149,6 +149,109 @@ def test_practice_mistake_routes_require_authentication() -> None:
     client = TestClient(app)
     assert client.get("/api/v1/learning/practice/overview").status_code == 401
     assert client.post("/api/v1/learning/practice/mistakes", json={}).status_code == 401
+    assert client.post("/api/v1/learning/practice/answers", json={}).status_code == 401
+
+
+def test_practice_answer_uses_server_truth_and_reactivates_mastered_mistakes() -> None:
+    username = _name("practice_answer_owner")
+    _create_student(username)
+    source = _create_public_question(title="自动错题来源", taxonomy_id="taxonomy-pmp", node_id="scope-baseline")
+    client = TestClient(app)
+    _login(client, username)
+    base = {
+        "questionId": source["question"]["id"],
+        "bankId": source["bankId"],
+        "paperId": "paper-answer-source",
+        "releaseId": "release-answer-source",
+        "paperVersion": 3,
+        "paperName": "自动收集练习",
+        "sourceMode": "workspace",
+        "languageMode": "zh",
+    }
+
+    wrong = client.post(
+        "/api/v1/learning/practice/answers",
+        json={**base, "selectedAnswer": "B", "correct": True},
+    )
+    assert wrong.status_code == 200, wrong.text
+    assert wrong.json()["correct"] is False
+    assert wrong.json()["mistake"]["status"] == "pending"
+    assert wrong.json()["mistake"]["wrongCount"] == 1
+
+    right = client.post(
+        "/api/v1/learning/practice/answers",
+        json={**base, "selectedAnswer": "A", "correct": False},
+    )
+    assert right.status_code == 200, right.text
+    assert right.json()["correct"] is True
+    assert right.json()["mistake"]["status"] == "mastered"
+    assert right.json()["mistake"]["wrongCount"] == 1
+    assert right.json()["mistake"]["masteredAt"] is not None
+
+    overview = client.get("/api/v1/learning/practice/overview")
+    assert overview.status_code == 200, overview.text
+    assert overview.json()["stats"]["active"] == 0
+    assert overview.json()["stats"]["mastered"] == 1
+
+    reactivated = client.post(
+        "/api/v1/learning/practice/answers",
+        json={**base, "selectedAnswer": "B"},
+    )
+    assert reactivated.status_code == 200, reactivated.text
+    assert reactivated.json()["correct"] is False
+    assert reactivated.json()["mistake"]["status"] == "pending"
+    assert reactivated.json()["mistake"]["wrongCount"] == 2
+    assert reactivated.json()["mistake"]["masteredAt"] is None
+
+
+def test_practice_answer_validates_options_visibility_and_release_identity() -> None:
+    username = _name("practice_answer_validation")
+    _create_student(username)
+    source = _create_public_question(title="多发布错题", taxonomy_id="taxonomy-pmp", node_id="scope-baseline")
+    client = TestClient(app)
+    _login(client, username)
+    base = {"questionId": source["question"]["id"], "bankId": source["bankId"]}
+
+    correct_first = client.post(
+        "/api/v1/learning/practice/answers",
+        json={**base, "releaseId": "release-clean", "selectedAnswer": "A"},
+    )
+    assert correct_first.status_code == 200, correct_first.text
+    assert correct_first.json() == {"correct": True, "mistake": None}
+
+    for release_id in ("release-one", "release-two"):
+        response = client.post(
+            "/api/v1/learning/practice/answers",
+            json={**base, "releaseId": release_id, "selectedAnswer": "B"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["mistake"]["releaseId"] == release_id
+
+    overview = client.get("/api/v1/learning/practice/overview").json()
+    assert overview["stats"]["active"] == 2
+    assert {row["releaseId"] for row in overview["mistakes"]} == {"release-one", "release-two"}
+
+    invalid = client.post(
+        "/api/v1/learning/practice/answers",
+        json={**base, "releaseId": "release-invalid", "selectedAnswer": "Z"},
+    )
+    assert invalid.status_code == 422
+
+    hidden = _create_public_question(title="稍后隐藏的题", taxonomy_id="taxonomy-pmp", node_id="scope-baseline")
+    admin = TestClient(app)
+    _login(admin, "admin", "jbgsnmm~123")
+    hidden_response = admin.put(f"/api/v1/questions/{hidden['question']['id']}", json={"scope": "internal"})
+    assert hidden_response.status_code == 200, hidden_response.text
+    not_visible = client.post(
+        "/api/v1/learning/practice/answers",
+        json={
+            "questionId": hidden["question"]["id"],
+            "bankId": hidden["bankId"],
+            "releaseId": "release-hidden",
+            "selectedAnswer": "A",
+        },
+    )
+    assert not_visible.status_code == 404
 
 
 def test_practice_session_history_is_database_backed_and_owner_scoped() -> None:
