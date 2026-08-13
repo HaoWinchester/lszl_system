@@ -66,6 +66,20 @@ def assert_image_failure_recovery(page) -> None:
     assert graph_image.get_attribute("hidden") is not None
 
 
+def assert_header_cta_visible_without_hover(page) -> None:
+    cta = page.locator(".landing-header-cta")
+    assert cta.is_visible()
+    assert cta.locator("span").inner_text() == "进入知识图谱"
+    style = cta.evaluate(
+        "el => ({color:getComputedStyle(el).color, opacity:getComputedStyle(el).opacity, visibility:getComputedStyle(el).visibility})"
+    )
+    assert style == {
+        "color": "rgb(255, 255, 255)",
+        "opacity": "1",
+        "visibility": "visible",
+    }, style
+
+
 def assert_mobile_menu_and_layout(page) -> None:
     page.set_viewport_size({"width": 390, "height": 844})
     page.wait_for_timeout(80)
@@ -142,6 +156,7 @@ def main() -> None:
 
         assert page.title() == "幻谱｜PMP 知识图谱学习平台"
         assert page.locator('a[href="/graph"]').count() >= 3
+        assert_header_cta_visible_without_hover(page)
         assert_product_tabs(page)
         assert_faq(page)
         assert_image_failure_recovery(page)

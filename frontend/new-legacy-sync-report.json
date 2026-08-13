@@ -1,24 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.63",
-  "toVersion": "v9.0-p4.1.67",
+  "fromVersion": "v9.0-p4.1.67",
+  "toVersion": "v9.0-p4.1.68",
   "changes": {
-    "added": [
-      "tests/admin-global-shortcuts-browser.py",
-      "tests/admin-global-shortcuts-coverage.test.js"
-    ],
+    "added": [],
     "changed": [
       "VERSION",
-      "admin-console.html",
-      "admin-operations.html",
-      "admin-settings.html",
-      "admin-subjects.html",
-      "course-admin.html",
-      "feedback-management.html",
-      "message-management.html",
-      "paper-management.html",
-      "teacher-workbench.html",
-      "tests/v90-p402-navigation-role-danger.test.js"
+      "styles/landing.css",
+      "tests/landing-page-browser.py"
     ],
     "removed": []
   },
