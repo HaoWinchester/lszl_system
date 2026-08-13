@@ -188,6 +188,12 @@ code{background:#f1f5f9;padding:1px 4px;border-radius:4px}
 /* v0.3.4: forced creator selection */
 .creator-gate{position:fixed;inset:0;z-index:200;background:linear-gradient(135deg,#eef4ff 0%,#f8fbff 42%,#fff7f0 100%);display:flex;align-items:center;justify-content:center;padding:28px}
 .creator-gate.hidden{display:none}
+.shared-draft-gate{position:fixed;inset:0;z-index:190;background:linear-gradient(135deg,#eef4ff 0%,#f8fbff 42%,#fff7f0 100%);display:flex;align-items:center;justify-content:center;padding:28px}
+.shared-draft-gate.hidden{display:none}
+.shared-draft-gate-panel{width:min(920px,96vw);max-height:88vh;overflow:auto;background:rgba(255,255,255,.97);border:1px solid #c9d5e6;border-radius:22px;box-shadow:0 24px 80px rgba(36,52,78,.22);padding:28px}
+.shared-draft-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:16px}
+.shared-draft-status{color:#5b6b7f;font-size:12px}.shared-draft-status.good{color:var(--good)}.shared-draft-status.bad{color:var(--bad)}
+.shared-draft-list{display:grid;gap:9px}.shared-draft-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px;border:1px solid var(--line);border-radius:11px;background:#fff}.shared-draft-row strong,.shared-draft-row small{display:block}.shared-draft-row small{margin-top:4px;color:var(--muted);font-size:12px}.shared-draft-empty{padding:28px;text-align:center;border:1px dashed #cbd5e1;border-radius:11px;color:var(--muted)}
 .creator-gate-panel{width:min(1120px,96vw);background:rgba(255,255,255,.96);border:1px solid #c9d5e6;border-radius:22px;box-shadow:0 24px 80px rgba(36,52,78,.22);padding:28px}
 .creator-gate-head{text-align:center;margin-bottom:24px}
 .creator-gate-head h1{margin:0;font-size:30px;letter-spacing:.02em;color:#1e2b3f}
@@ -299,9 +305,9 @@ nav button.active{color:var(--brand)!important}
     </select></div>
     <button class="help-center-btn" id="btnHelpCenter" type="button">帮助中心</button>
     <button class="creator-switch-btn" id="btnSwitchCreator" type="button">切换制作人</button>
-    <button class="header-save-btn" id="btnQuickSaveWorkspace" type="button">保存到服务器</button>
+    <button class="header-save-btn" id="btnQuickSaveWorkspace" type="button">保存草稿</button>
     <span class="badge" id="hdrSaveStatus">尚未保存</span>
-    <span class="badge">服务端共享 · 本机仅作故障恢复副本</span>
+    <span class="badge">共享草稿 · 第七步同步主程序</span>
   </div>
 </header>
 
@@ -312,7 +318,7 @@ nav button.active{color:var(--brand)!important}
   <button data-tab="association">④ 联想词编辑</button>
   <button data-tab="demo">⑤ 题目演示校验</button>
   <button data-tab="validate">⑥ 校验中心</button>
-  <button data-tab="export">⑦ 导出中心</button>
+  <button data-tab="export">⑦ 同步与导出</button>
 </nav>
 
 <main>
@@ -357,15 +363,12 @@ nav button.active{color:var(--brand)!important}
         <div class="server-identity-grid">
           <div><span class="muted tiny">登录账号</span><strong id="serverActorName">未登录</strong></div>
           <div><span class="muted tiny">制作人</span><strong id="serverCreatorName">请先选择</strong></div>
-          <label><span class="muted tiny">目标题库</span><select id="serverBankSelect"><option value="">请选择题库</option></select></label>
         </div>
         <div class="toolbar server-actions">
-          <button class="btn" id="btnCreateServerBank" type="button">新建题库</button>
           <input id="serverQuestionIdInput" type="text" placeholder="服务器 Question ID">
           <button class="btn" id="btnLoadServerQuestion" type="button">从服务器载入</button>
-          <button class="btn primary" id="btnSyncToCatalog" type="button">同步到题库</button>
         </div>
-        <div class="server-catalog-help">上传成功后立即进入正式题库；失败时本地 IndexedDB 草稿不会被删除。</div>
+        <div class="server-catalog-help">前六步只编辑共享草稿；第七步才会新建题库并同步到主程序。</div>
         <div class="server-catalog-issues" id="serverCatalogIssues" aria-live="polite"></div>
       </div>
       <div class="data-summary">
@@ -502,17 +505,14 @@ D原则：principle-role-accountability</pre>
         <div class="data-card"><h3>标签配置</h3><b id="baseTagCount">0</b><div class="muted">主程序预设槽位</div></div>
       </div>
       <div class="save-panel">
-        <div class="section-title"><span>服务端共享工作区</span><span class="save-status" id="localSaveStatus">尚未保存</span></div>
+        <div class="section-title"><span>共享草稿</span><span class="save-status" id="localSaveStatus">尚未保存</span></div>
         <div class="help">
-          点击保存会把题库、知识树、联想库、原则、归纳卡和标签配置一起提交到服务器，管理员与所有教师共享，主程序无需手工导入即可读取。
-          IndexedDB <code>pmp_content_prep_studio_v1</code> 仅保留故障恢复副本，不再作为正式数据源。
-          重要项目仍建议定期“导出工作区草稿”作为额外备份。
+          点击保存只会更新数据库中的共享草稿，管理员与教师均可继续编辑；不会写入正式题库、知识树或原则库。
+          完成第六步校验后，请进入第七步选择目标题库并执行同步；同步成功才更新主程序，并自动删除本草稿。
         </div>
         <div class="toolbar" style="margin-top:9px">
-          <button class="btn primary" id="btnSaveWorkspaceLocal">保存到服务器</button>
-          <button class="btn" id="btnRestoreWorkspaceLocal">恢复本机副本</button>
-          <button class="btn danger" id="btnDeleteWorkspaceLocal">删除本机副本</button>
-          <label style="display:inline-flex;align-items:center;gap:6px;margin:0"><input type="checkbox" id="chkAutoSaveWorkspace"> 每 60 秒自动保存有变更的工作区</label>
+          <button class="btn primary" id="btnSaveWorkspaceLocal">保存共享草稿</button>
+          <button class="btn" id="btnOpenSharedDrafts">打开共享草稿列表</button>
         </div>
       </div>
       <div class="section toolbar">
@@ -662,6 +662,7 @@ D原则：principle-role-accountability</pre>
 </section>
 <section class="tab" id="tab-export">
   <div class="export-grid">
+    <div class="card export-card shared-draft-sync-card"><h3>同步到主程序</h3><p>这是第七步，也是唯一会写入正式题库、知识树、联想库、原则、归纳卡和标签配置的操作。同步成功后，本共享草稿会自动删除。</p><label>目标题库 <select id="serverBankSelect"><option value="">请选择题库</option></select></label><div class="toolbar" style="margin-top:10px"><button class="btn" id="btnCreateServerBank" type="button">新建题库</button><button class="btn primary" id="btnSyncToCatalog" type="button">确认同步到主程序</button></div></div>
     <div class="card export-card"><div style="display:flex;align-items:center;gap:8px"><h3 style="margin-right:auto">完整内容成品包</h3><button class="help-btn" data-page-help="export" title="本页帮助">?</button></div><p>题库 + 原则库 + 归纳卡 + 标签配置，作为未来服务器内容导入的推荐格式。</p><button class="btn primary" id="btnExportCompleteBundle">导出完整成品包 JSON</button></div>
     <div class="card export-card">
       <h3>题库 JSON</h3>
@@ -743,7 +744,7 @@ D原则：principle-role-accountability</pre>
           <h2>① 基础数据与导入</h2>
           <p>这里负责把外部 AI / Word 内容、知识树、联想库、原则、归纳卡和标签配置装入当前工作区。建议先选择制作人，再导入基础数据。</p>
           <h3>推荐顺序</h3>
-          <ol><li>确认当前制作人。</li><li>导入知识树和科目级联想库。</li><li>优先导入“完整内容准备包 JSON”，或使用 Word / AI 文本粘贴助手。</li><li>题量大时开启本机保存或自动保存。</li></ol>
+          <ol><li>确认当前制作人。</li><li>新建或打开一个共享草稿。</li><li>导入知识树和科目级联想库。</li><li>优先导入“完整内容准备包 JSON”，或使用 Word / AI 文本粘贴助手。</li><li>每次阶段性完成后点击“保存共享草稿”。</li></ol>
           <div class="help-example"><b>示例：</b>一次导入 50 道沟通题后，程序会自动给 50 道题生成 Question UUID，并给整批题记录同一个 Batch ID。</div>
           <h3>Word / AI 完整文本示例</h3>
           <pre>【题目1】
@@ -812,8 +813,8 @@ B原则：principle-effective-communication</pre>
         </article>
 
         <article class="help-topic" data-help-content="export">
-          <h2>⑦ 导出与审计</h2>
-          <p>这里输出题库、完整内容包、联想库、原则与归纳卡组合、标签配置、校验报告和工作区草稿。</p>
+          <h2>⑦ 同步与导出</h2>
+          <p>先选择或新建目标题库，确认同步后才将共享草稿写入正式题库、知识树、联想库、原则、归纳卡和标签配置；同步成功会自动删除该草稿。其余按钮用于导出 JSON 和审计记录。</p>
           <h3>v0.3.5 导出审计</h3>
           <p>每次正式导出会写入一条设备级审计事件，记录：</p>
           <ul><li>Audit ID</li><li>导出时间</li><li>制作人 Creator ID / 姓名</li><li>Device ID</li><li>导出类型与文件名</li><li>题目数量</li><li>最近 Batch ID</li><li>校验 Error / Warning 数</li><li>导出 payload 的 SHA-256 指纹</li><li>Prep Studio 版本</li></ul>
@@ -827,8 +828,8 @@ B原则：principle-effective-communication</pre>
           <p>每次打开页面必须从波塞冬、狗娃、阿浩、杰瑞、天才、女帝中选择一人。关闭页面后不会记住当前人物，避免共用电脑误记作者。</p>
           <h3>数据兼容与重构说明</h3>
           <p>v0.4.0 是架构重构版：内部标签槽位改用稳定语义 ID，Workspace 升级到 v4；导出到正式主程序时仍自动转换为原数字槽位格式。旧版工作区打开时自动迁移，不需要人工改 JSON。</p>
-          <h3>本机保存</h3>
-          <p>工作区通过独立 IndexedDB 保存；适合几百题分多次处理。重要项目仍建议定期导出工作区草稿 JSON。</p>
+          <h3>共享草稿</h3>
+          <p>工作区草稿保存在数据库，管理员与教师均可打开和继续编辑。点击“保存共享草稿”只保存草稿；只有第七步确认同步才会更新正式主程序。</p>
           <h3>开心主题</h3>
           <p>顶部可切换清爽蓝、樱花粉、薄荷绿、暖阳橙、葡萄紫、海盐青。主题只影响界面颜色，不改变任何题目或导出数据；主题选择会保存在当前浏览器设备中。</p>
         </article>
@@ -837,6 +838,14 @@ B原则：principle-effective-communication</pre>
   </div>
 </div>
 
+
+<div class="shared-draft-gate" id="sharedDraftGate" role="dialog" aria-modal="true" aria-labelledby="sharedDraftGateTitle">
+  <div class="shared-draft-gate-panel">
+    <div class="creator-gate-head"><h1 id="sharedDraftGateTitle">共享草稿</h1><p>选择一个数据库共享草稿继续编辑，或新建草稿。前六步保存均不会写入主程序。</p></div>
+    <div class="shared-draft-actions"><button class="btn primary" id="btnCreateSharedDraft" type="button">新建共享草稿</button><button class="btn" id="btnRefreshSharedDrafts" type="button">刷新列表</button><span class="shared-draft-status" id="sharedDraftGateStatus" aria-live="polite">正在准备草稿列表…</span></div>
+    <div class="shared-draft-list" id="sharedDraftList"></div>
+  </div>
+</div>
 
 <div class="creator-gate" id="creatorGate" role="dialog" aria-modal="true" aria-labelledby="creatorGateTitle">
   <div class="creator-gate-panel">
@@ -999,7 +1008,8 @@ const FIXED_CREATORS={
 };
 const prepBootstrap=window.__KG_DIRECT_BOOTSTRAP__||{};
 const prepRuntime={
-  dirty:false,autoSave:false,lastSavedAt:'',saveInFlight:false,
+  dirty:false,saveInFlight:false,
+  draftId:'',draftRevision:0,draftTitle:'',
   creatorProfile:null,deviceProfile:null,lastBatchId:'',
   serverActor:prepBootstrap.authenticated?(prepBootstrap.authUser||{username:prepBootstrap.username}):null,
   serverContentRevision:Number(prepBootstrap.contentRevision||0),
@@ -1012,7 +1022,6 @@ const prepRuntime={
 const PREP_DB_NAME='pmp_content_prep_studio_v1';
 const PREP_DB_VERSION=1;
 const PREP_DB_STORE='workspaces';
-const PREP_DB_KEY='latest';
 const UI_SETTINGS_KEY='ui-settings';
 const AUDIT_TRAIL_KEY='audit-trail';
 const THEMES=new Set(['default','sakura','mint','sunshine','grape','ocean']);
@@ -1021,31 +1030,31 @@ function updateWorkspaceSaveStatus(message='',kind=''){
   const header=document.getElementById('hdrSaveStatus'),local=document.getElementById('localSaveStatus');
   let text=message;
   if(!text){
-    if(prepRuntime.saveInFlight)text='正在保存…';
-    else if(prepRuntime.dirty)text=prepRuntime.lastSavedAt?`有未保存变更 · 上次 ${prepRuntime.lastSavedAt}`:'有未保存变更';
-    else text=prepRuntime.lastSavedAt?`已保存 ${prepRuntime.lastSavedAt}`:'尚未保存';
+    if(prepRuntime.saveInFlight)text='正在保存共享草稿…';
+    else if(prepRuntime.dirty)text='共享草稿有未保存修改';
+    else if(prepRuntime.draftId)text=`正在编辑共享草稿：${prepRuntime.draftTitle||'未命名草稿'}`;
+    else text='请选择或新建共享草稿';
   }
   if(header)header.textContent=text;
-  if(local){local.textContent=text;local.className='save-status '+(kind||(prepRuntime.dirty?'warn':prepRuntime.lastSavedAt?'good':''))}
+  if(local){local.textContent=text;local.className='save-status '+(kind||(prepRuntime.dirty?'warn':prepRuntime.draftId?'good':''))}
 }
 function markWorkspaceDirty(){prepRuntime.dirty=true;updateWorkspaceSaveStatus()}
-function formatLocalSaveTime(value){const d=value?new Date(value):new Date();return Number.isNaN(d.getTime())?'':d.toLocaleString()}
 function openPrepDb(){
   return new Promise((resolve,reject)=>{
-    if(!('indexedDB' in window)){reject(new Error('当前浏览器不支持 IndexedDB'));return}
+    if(!('indexedDB' in window)){reject(new Error('当前浏览器不支持设备设置存储'));return}
     let req;try{req=indexedDB.open(PREP_DB_NAME,PREP_DB_VERSION)}catch(err){reject(err);return}
     req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(PREP_DB_STORE))db.createObjectStore(PREP_DB_STORE,{keyPath:'id'})};
-    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error('无法打开本地工作区数据库'));
+    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error('无法打开设备设置存储'));
   });
 }
 async function prepDbPut(record){
   const db=await openPrepDb();return new Promise((resolve,reject)=>{const tx=db.transaction(PREP_DB_STORE,'readwrite');tx.objectStore(PREP_DB_STORE).put(record);tx.oncomplete=()=>{db.close();resolve(true)};tx.onerror=()=>{const err=tx.error;db.close();reject(err||new Error('本地保存失败'))};tx.onabort=tx.onerror});
 }
-async function prepDbGet(key=PREP_DB_KEY){
-  const db=await openPrepDb();return new Promise((resolve,reject)=>{const tx=db.transaction(PREP_DB_STORE,'readonly'),req=tx.objectStore(PREP_DB_STORE).get(key);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error||new Error('读取本地数据失败'));tx.oncomplete=()=>db.close()});
+async function prepDbGet(key){
+  const db=await openPrepDb();return new Promise((resolve,reject)=>{const tx=db.transaction(PREP_DB_STORE,'readonly'),req=tx.objectStore(PREP_DB_STORE).get(key);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error||new Error('读取设备设置失败'));tx.oncomplete=()=>db.close()});
 }
-async function prepDbDelete(key=PREP_DB_KEY){
-  const db=await openPrepDb();return new Promise((resolve,reject)=>{const tx=db.transaction(PREP_DB_STORE,'readwrite');tx.objectStore(PREP_DB_STORE).delete(key);tx.oncomplete=()=>{db.close();resolve(true)};tx.onerror=()=>{const err=tx.error;db.close();reject(err||new Error('删除本地数据失败'))}});
+async function prepDbDelete(key){
+  const db=await openPrepDb();return new Promise((resolve,reject)=>{const tx=db.transaction(PREP_DB_STORE,'readwrite');tx.objectStore(PREP_DB_STORE).delete(key);tx.oncomplete=()=>{db.close();resolve(true)};tx.onerror=()=>{const err=tx.error;db.close();reject(err||new Error('删除设备设置失败'))}});
 }
 
 function applyTheme(theme,{persist=false}={}){
@@ -1058,34 +1067,6 @@ async function initThemeSettings(){
   try{const row=await prepDbGet(UI_SETTINGS_KEY);applyTheme(row?.theme||'default')}
   catch(_err){applyTheme('default')}
 }
-
-async function saveWorkspaceLocal({silent=false}={}){
-  if(prepRuntime.saveInFlight)return;
-  prepRuntime.saveInFlight=true;updateWorkspaceSaveStatus();
-  try{
-    const savedAt=nowIso(),workspace=workspacePayload();await prepDbPut({id:PREP_DB_KEY,savedAt,workspace});
-    prepRuntime.lastSavedAt=formatLocalSaveTime(savedAt);prepRuntime.dirty=false;updateWorkspaceSaveStatus('', 'good');
-    if(!silent)toast('工作区已保存到本机');
-  }catch(err){
-    updateWorkspaceSaveStatus('保存失败，请导出工作区草稿','bad');
-    if(!silent)alert('本地保存失败：'+(err?.message||err)+'\n\n建议立即使用“导出工作区草稿”。某些浏览器的 file:// 环境可能限制 IndexedDB。');
-  }finally{prepRuntime.saveInFlight=false;updateWorkspaceSaveStatus()}
-}
-async function restoreWorkspaceLocal(){
-  try{
-    const row=await prepDbGet();if(!row?.workspace){alert('没有找到本机保存的工作区。');return}
-    if(!confirm(`恢复本机工作区？\n保存时间：${formatLocalSaveTime(row.savedAt)}\n\n当前未导出的修改会被替换。`))return;
-    applyWorkspacePayload(row.workspace);prepRuntime.lastSavedAt=formatLocalSaveTime(row.savedAt);prepRuntime.dirty=false;updateWorkspaceSaveStatus('', 'good');toast('已恢复本机工作区');
-  }catch(err){alert('恢复本机工作区失败：'+(err?.message||err))}
-}
-async function deleteWorkspaceLocal(){
-  if(!confirm('删除本工具在当前浏览器中的本机工作区保存？不会删除已经导出的 JSON 文件。'))return;
-  try{await prepDbDelete();prepRuntime.lastSavedAt='';updateWorkspaceSaveStatus('本机保存已删除','');toast('本机保存已删除')}catch(err){alert('删除本机保存失败：'+(err?.message||err))}
-}
-async function detectLocalWorkspace(){
-  try{const row=await prepDbGet();if(row?.savedAt){prepRuntime.lastSavedAt=formatLocalSaveTime(row.savedAt);updateWorkspaceSaveStatus()}}catch(_err){updateWorkspaceSaveStatus('本地保存不可用 · 可导出草稿','warn')}
-}
-setInterval(()=>{if(prepRuntime.autoSave&&prepRuntime.dirty)saveWorkspaceLocal({silent:true})},60000);
 window.addEventListener('beforeunload',e=>{if(!prepRuntime.dirty)return;e.preventDefault();e.returnValue=''});
 
 
@@ -1665,7 +1646,7 @@ async function duplicateQuestion(){
   state.questionBank.questions.push(copy);state.currentQuestionId=copy.id;renderQuestions();toast('已复制 · 新全局 ID 已生成');
 }
 async function deleteQuestion(){
-  const q=currentQuestion();if(!q)return;if(!confirm('删除当前本地草稿题目？不会影响正式程序。'))return;
+  const q=currentQuestion();if(!q)return;if(!confirm('删除当前草稿题目？不会影响正式程序。'))return;
   await switchQuestionForEdit(null);
   state.questionBank.questions=state.questionBank.questions.filter(x=>x.id!==q.id);
   state.currentQuestionId=state.questionBank.questions[0]?.id||'';renderQuestions();
@@ -2045,20 +2026,22 @@ function renderPrincipleEditor(){
   <div class="section"><div class="section-title">系统预设归纳卡</div><div class="form-grid"><div class="span2"><label>标题（与原则名称自动一致）</label><input id="pmPresetTitle" type="text" readonly value="${esc('原则：'+p.name)}"></div><div class="span2"><label>内容</label><textarea id="pmPresetContent">${esc(preset?.content||'')}</textarea></div><div><label>状态</label><select id="pmPresetStatus"><option value="draft"${preset?.status==='draft'||!preset?' selected':''}>draft</option><option value="active"${preset?.status==='active'?' selected':''}>active</option><option value="inactive"${preset?.status==='inactive'?' selected':''}>inactive</option></select></div><div><label>版本</label><input id="pmPresetVersion" type="number" min="1" value="${preset?.version||1}"></div></div></div>
   <div class="section toolbar"><button class="btn primary" id="pmSave">保存原则与归纳卡</button><button class="btn danger" id="pmDelete">删除原则</button></div>`;
   document.getElementById('pmSave').onclick=async()=>{
-    const controller=window.PMPPrepServerPrinciples;if(!controller){alert('服务器原则接口尚未就绪，请登录后重试。');return}
     const button=document.getElementById('pmSave');button.disabled=true;
     const principle={...p,name:document.getElementById('pmPrincipleName').value.trim()||'未命名原则',status:document.getElementById('pmPrincipleStatus').value,confusablePrincipleIds:unique(cleanList(document.getElementById('pmConfusable').value)),updatedAt:Date.now()};
     const nextPreset={...(preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()}),principleId:p.id,title:'原则：'+principle.name,content:document.getElementById('pmPresetContent').value.trim(),status:document.getElementById('pmPresetStatus').value,version:Math.max(1,Number(document.getElementById('pmPresetVersion').value||1)),updatedAt:Date.now()};
-    try{await controller.save(principle,nextPreset);toast('原则与归纳卡已保存到服务器')}
-    catch(error){alert('服务器保存失败：'+(error?.message||error))}
+    try{
+      Object.assign(p,principle);
+      const index=state.synthesisPresets.items.findIndex(item=>item.id===nextPreset.id||item.principleId===p.id);
+      if(index>=0)state.synthesisPresets.items[index]=nextPreset;else state.synthesisPresets.items.push(nextPreset);
+      refreshAll();markWorkspaceDirty();toast('原则与归纳卡已保存到共享草稿');
+    }catch(error){alert('草稿保存失败：'+(error?.message||error))}
     finally{button.disabled=false}
   };
   document.getElementById('pmDelete').onclick=async()=>{
-    if(!confirm('从共享服务器删除该原则及其归纳卡？题目中的旧原则 ID 会在校验中心提示。'))return;
-    const controller=window.PMPPrepServerPrinciples;if(!controller){alert('服务器原则接口尚未就绪，请登录后重试。');return}
+    if(!confirm('从当前共享草稿删除该原则及其归纳卡？题目中的旧原则 ID 会在校验中心提示。'))return;
     const button=document.getElementById('pmDelete');button.disabled=true;
-    try{await controller.remove(p.id);toast('原则与归纳卡已从服务器删除')}
-    catch(error){alert('服务器删除失败：'+(error?.message||error))}
+    try{state.principles.items=state.principles.items.filter(item=>item.id!==p.id);state.synthesisPresets.items=state.synthesisPresets.items.filter(item=>item.principleId!==p.id);state.currentPrincipleId=state.principles.items[0]?.id||'';refreshAll();markWorkspaceDirty();toast('原则与归纳卡已从共享草稿删除')}
+    catch(error){alert('草稿删除失败：'+(error?.message||error))}
     finally{button.disabled=false}
   };
 }
@@ -2412,17 +2395,15 @@ document.querySelectorAll('[data-creator-key]').forEach(btn=>btn.addEventListene
 document.getElementById('btnSwitchCreator').onclick=requireCreatorSelection;
 document.getElementById('btnSwitchCreatorBase').onclick=requireCreatorSelection;
 document.getElementById('themeSelect').addEventListener('change',e=>applyTheme(e.target.value,{persist:true}));
-document.getElementById('btnQuickSaveWorkspace').onclick=()=>saveWorkspaceLocal();
-document.getElementById('btnSaveWorkspaceLocal').onclick=()=>saveWorkspaceLocal();
-document.getElementById('btnRestoreWorkspaceLocal').onclick=restoreWorkspaceLocal;
-document.getElementById('btnDeleteWorkspaceLocal').onclick=deleteWorkspaceLocal;
-document.getElementById('chkAutoSaveWorkspace').addEventListener('change',e=>{prepRuntime.autoSave=!!e.target.checked;updateWorkspaceSaveStatus(e.target.checked?'自动保存已开启（60 秒）':'自动保存已关闭',e.target.checked?'good':'')});
+document.getElementById('btnQuickSaveWorkspace').onclick=()=>window.PMPPrepDraftUi?.save?.().catch(error=>alert(error.message||error));
+document.getElementById('btnSaveWorkspaceLocal').onclick=()=>window.PMPPrepDraftUi?.save?.().catch(error=>alert(error.message||error));
+document.getElementById('btnOpenSharedDrafts').onclick=()=>window.PMPPrepDraftUi?.open?.();
 
 
 
 
 document.addEventListener('input',()=>markWorkspaceDirty(),true);
-document.addEventListener('change',e=>{if(!['chkAutoSaveWorkspace','themeSelect'].includes(e.target.id))markWorkspaceDirty()},true);
+document.addEventListener('change',e=>{if(e.target.id!=='themeSelect')markWorkspaceDirty()},true);
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   const mutationIds=new Set(['btnNewQuestion','btnDuplicateQuestion','btnDeleteQuestion','btnAddNormalKeyword','btnAddCoreKeyword','btnNewRecall','btnNewPrinciple','btnParsePastedQuestions','pmSave','pmDelete','floatSave','floatDelete','btnAddEdge','btnDeleteRecall','btnBindRecallCandidate']);
@@ -2473,10 +2454,7 @@ const QuestionService=Object.freeze({
 const StorageService=Object.freeze({
   put:prepDbPut,
   get:prepDbGet,
-  remove:prepDbDelete,
-  saveWorkspace:saveWorkspaceLocal,
-  restoreWorkspace:restoreWorkspaceLocal,
-  deleteWorkspace:deleteWorkspaceLocal
+  remove:prepDbDelete
 });
 const WorkspaceService=Object.freeze({
   currentPayload:workspacePayload,
@@ -2508,7 +2486,7 @@ const AppServices=Object.freeze({
 });
 window.PMPPrepServices=AppServices;
 
-/* Server-backed question catalog client. Local IndexedDB remains the draft store. */
+/* Server-backed question catalog and shared-draft client. */
 (function(global){
   const API_ROOT='/api/v1';
   const STATUS_CODES={
@@ -2547,7 +2525,7 @@ window.PMPPrepServices=AppServices;
       });
     }catch(cause){
       if(cause instanceof ServerCatalogError)throw cause;
-      throw new ServerCatalogError('NETWORK_ERROR','无法连接服务器，本地草稿已保留。',{cause});
+      throw new ServerCatalogError('NETWORK_ERROR','无法连接服务器；共享草稿尚未保存，请恢复连接后重试。',{cause});
     }
     let payload={};
     try{payload=await response.json()}catch(_error){}
@@ -2720,6 +2698,7 @@ window.PMPPrepServices=AppServices;
 
   const ServerCatalogService=Object.freeze({
     Error:ServerCatalogError,
+    request,
     migrateWorkspaceMetadata,
     withStableIdempotencyKey,
     acquireLock,
@@ -2806,6 +2785,111 @@ window.PMPPrepServices=AppServices;
   }
 })(window);
 
+/* Database-backed shared Content Prep draft client. */
+(function(global){
+  function api(){
+    const service=global.PMPPrepServerCatalogService;
+    if(!service?.request)throw new Error('共享草稿服务尚未就绪。');
+    return service;
+  }
+  async function list(){return (await api().request('/content-prep/drafts')).drafts||[]}
+  async function create(input){return (await api().request('/content-prep/drafts',{method:'POST',body:JSON.stringify(input)})).draft}
+  async function get(id){return (await api().request(`/content-prep/drafts/${encodeURIComponent(id)}`)).draft}
+  async function save(id,input){return (await api().request(`/content-prep/drafts/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify(input)})).draft}
+  async function remove(id){return api().request(`/content-prep/drafts/${encodeURIComponent(id)}`,{method:'DELETE'})}
+  async function sync(id,input){return (await api().request(`/content-prep/drafts/${encodeURIComponent(id)}/sync`,{method:'POST',body:JSON.stringify(input)})).result}
+  global.PMPPrepSharedDrafts=Object.freeze({list,create,get,save,remove,sync});
+})(window);
+
+/* Shared-draft landing and explicit save/sync workflow. */
+(function(global){
+  const Drafts=global.PMPPrepSharedDrafts;
+  function root(){return document.getElementById('sharedDraftGate')}
+  function listBox(){return document.getElementById('sharedDraftList')}
+  function status(){return document.getElementById('sharedDraftGateStatus')}
+  function setGateStatus(message,kind=''){const box=status();if(box){box.textContent=message;box.className=`shared-draft-status ${kind}`}}
+  function setWorkspaceStatus(message,kind=''){
+    const header=document.getElementById('hdrSaveStatus'),local=document.getElementById('localSaveStatus');
+    if(header)header.textContent=message;
+    if(local){local.textContent=message;local.className=`save-status ${kind}`}
+  }
+  function show(){root()?.classList.remove('hidden')}
+  function hide(){root()?.classList.add('hidden')}
+  function active(){return !!prepRuntime.draftId}
+  function resetWorkspace(){
+    state.knowledgeTree=null;
+    state.recallLibrary={schemaVersion:1,nodes:[],edges:[],updatedAt:''};
+    state.questionBank={id:generateSystemId('bank'),name:'PMP 内容准备题库',subject:'PMP',description:'',version:'1.0',visibility:'private',createdAt:Date.now(),updatedAt:Date.now(),questions:[]};
+    state.principles={schemaVersion:1,items:[],updatedAt:Date.now()};
+    state.synthesisPresets={schemaVersion:1,items:[],updatedAt:Date.now()};
+    state.tagConfig={names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}};
+    state.currentQuestionId='';state.currentRecallId='';state.currentPrincipleId='';state.demoQuestionId='';state.demoLang='zh';state.recallPreviewCandidateId='';
+    prepRuntime.serverBankId='';prepRuntime.serverBankRevision=null;prepRuntime.lastIdempotencyKey='';prepRuntime.lastBatchId='';prepRuntime.lastUploadFingerprint='';
+    refreshAll();setTab('base');
+  }
+  function activate(draft,{dirty=false}={}){
+    prepRuntime.draftId=String(draft.id||'');prepRuntime.draftRevision=Number(draft.revision||0);prepRuntime.draftTitle=String(draft.title||'未命名草稿');
+    prepRuntime.dirty=dirty;setWorkspaceStatus(dirty?`共享草稿“${prepRuntime.draftTitle}”有未保存修改`:`正在编辑共享草稿：${prepRuntime.draftTitle}`,dirty?'warn':'good');
+    hide();
+  }
+  function renderList(drafts){
+    const box=listBox();if(!box)return;
+    if(!drafts.length){box.innerHTML='<div class="shared-draft-empty">暂无共享草稿。点击“新建共享草稿”开始录入。</div>';return}
+    box.innerHTML=drafts.map(draft=>`<article class="shared-draft-row"><div><strong>${esc(draft.title)}</strong><small>更新人：${esc(draft.updatedBy||'—')} · ${draft.updatedAt?esc(new Date(draft.updatedAt).toLocaleString()):'刚刚'}</small></div><div class="toolbar"><button class="btn primary" data-open-draft="${esc(draft.id)}">打开</button><button class="btn danger" data-delete-draft="${esc(draft.id)}">删除</button></div></article>`).join('');
+    box.querySelectorAll('[data-open-draft]').forEach(button=>button.onclick=()=>openDraft(button.dataset.openDraft));
+    box.querySelectorAll('[data-delete-draft]').forEach(button=>button.onclick=()=>remove(button.dataset.deleteDraft));
+  }
+  async function reload(){
+    const actor=prepRuntime.serverActor;if(!actor){setGateStatus('请先登录具有题库编辑权限的管理员或教师账号。','bad');renderList([]);return []}
+    setGateStatus('正在读取共享草稿…');
+    try{const drafts=await Drafts.list();renderList(drafts);setGateStatus(`共有 ${drafts.length} 个共享草稿，管理员和教师均可打开。`,'good');return drafts}
+    catch(error){setGateStatus(error.message||'读取共享草稿失败。','bad');renderList([]);return []}
+  }
+  async function openDraft(id){
+    setGateStatus('正在打开共享草稿…');
+    try{const draft=await Drafts.get(id);applyWorkspacePayload(draft.payload);activate(draft);toast(`已打开共享草稿：${draft.title}`)}
+    catch(error){setGateStatus(error.message||'打开共享草稿失败。','bad')}
+  }
+  async function create(){
+    if(!prepRuntime.serverActor){setGateStatus('请先登录后再创建共享草稿。','bad');return}
+    const title=String(prompt('请输入共享草稿名称','PMP 内容准备草稿')||'').trim();if(!title)return;
+    resetWorkspace();setGateStatus('正在创建共享草稿…');
+    try{const draft=await Drafts.create({title,payload:workspacePayload()});activate(draft);toast('共享草稿已创建')}
+    catch(error){setGateStatus(error.message||'创建共享草稿失败。','bad')}
+  }
+  async function save(){
+    if(!active())throw new Error('请先从共享草稿列表新建或打开一个草稿。');
+    const saveButton=document.getElementById('btnSaveWorkspaceLocal');const headerButton=document.getElementById('btnQuickSaveWorkspace');
+    if(prepRuntime.saveInFlight)return;prepRuntime.saveInFlight=true;saveButton&&(saveButton.disabled=true);headerButton&&(headerButton.disabled=true);
+    setWorkspaceStatus('正在保存共享草稿…');
+    try{
+      const draft=await Drafts.save(prepRuntime.draftId,{title:prepRuntime.draftTitle,payload:workspacePayload(),revision:prepRuntime.draftRevision});
+      activate(draft);prepRuntime.dirty=false;setWorkspaceStatus(`共享草稿已保存：${prepRuntime.draftTitle}`,'good');toast('共享草稿已保存');return draft;
+    }catch(error){setWorkspaceStatus(error.message||'共享草稿保存失败','bad');throw error}
+    finally{prepRuntime.saveInFlight=false;saveButton&&(saveButton.disabled=false);headerButton&&(headerButton.disabled=false)}
+  }
+  async function sync(){
+    if(!active())throw new Error('请先保存或打开一个共享草稿。');
+    if(prepRuntime.dirty)throw new Error('当前草稿有未保存修改，请先点击“保存共享草稿”。');
+    if(!prepRuntime.serverActor)throw new Error('请先登录后再同步。');
+    if(!prepRuntime.creatorProfile?.creatorId)throw new Error('请先选择制作人。');
+    if(!prepRuntime.serverBankId)throw new Error('请先选择目标题库，或在第七步新建题库。');
+    const button=document.getElementById('btnSyncToCatalog');button&&(button.disabled=true);setWorkspaceStatus('正在同步到主程序…');
+    try{
+      const result=await Drafts.sync(prepRuntime.draftId,{revision:prepRuntime.draftRevision,creatorId:prepRuntime.creatorProfile.creatorId});
+      prepRuntime.draftId='';prepRuntime.draftRevision=0;prepRuntime.draftTitle='';prepRuntime.dirty=false;
+      setWorkspaceStatus(`已同步到主程序 · 批次 ${result.batchId}`,'good');toast('同步成功，草稿已删除');show();await reload();return result;
+    }catch(error){setWorkspaceStatus(error.message||'同步失败，草稿已保留','bad');throw error}
+    finally{button&&(button.disabled=false)}
+  }
+  async function remove(id){
+    if(!confirm('删除这个共享草稿？未同步的内容将无法恢复。'))return;
+    try{await Drafts.remove(id);toast('共享草稿已删除');await reload()}catch(error){setGateStatus(error.message||'删除共享草稿失败。','bad')}
+  }
+  function openLanding(){show();return reload()}
+  global.PMPPrepDraftUi=Object.freeze({open:openLanding,reload,create,openDraft,save,sync,remove,resetWorkspace,active});
+})(window);
+
 document.getElementById('btnHelp').onclick=()=>openHelp('base');
 document.getElementById('btnOpenHelp').onclick=openHelp;
 document.getElementById('btnHelpCenter').onclick=()=>openHelp(currentTabName());
@@ -2850,7 +2934,10 @@ document.getElementById('btnExportAuditTrail').onclick=()=>downloadJson(auditTra
 document.getElementById('btnClearAuditTrail').onclick=clearAuditTrail;
 function safeName(s){return String(s||'file').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_')}
 
-refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initThemeSettings();loadAuditTrail();requireCreatorSelection();
+refreshAll();setTab('base');initDeviceProfile();initThemeSettings();loadAuditTrail();requireCreatorSelection();
+document.getElementById('btnCreateSharedDraft').onclick=()=>window.PMPPrepDraftUi?.create?.();
+document.getElementById('btnRefreshSharedDrafts').onclick=()=>window.PMPPrepDraftUi?.reload?.();
+window.PMPPrepDraftUi?.open?.();
 
 /* Server catalog UI wiring. Runs after the original local event bootstrap. */
 (function(){
@@ -2871,9 +2958,6 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
 
   function onLeaseState(lease){
     prepRuntime.editLeaseState=lease;renderQuestionLockState();refreshButtons();
-    if(['offline-unsynced','server-readonly','conflict-copy-required'].includes(lease.mode)){
-      saveWorkspaceLocal({silent:true});
-    }
   }
   async function ensureLockController(){
     const creatorId=prepRuntime.creatorProfile?.creatorId||'';
@@ -2906,7 +2990,7 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
     const issues=Array.isArray(error?.issues)?error.issues:[];
     issuesBox.innerHTML=issues.map(issue=>`<div>${esc(issue.field||issue.questionId||'题目')}：${esc(issue.message||issue.code||'校验失败')}</div>`).join('');
   }
-  function serverEnabled(){return !!(actor&&prepRuntime.creatorProfile&&prepRuntime.serverBankId)}
+  function serverEnabled(){return !!(actor&&prepRuntime.creatorProfile&&prepRuntime.serverBankId&&prepRuntime.draftId)}
   function refreshButtons(){
     const authenticated=!!actor;
     const question=currentQuestion(),lease=prepRuntime.editLeaseState||{};
@@ -2918,7 +3002,7 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
   function renderActor(){
     actorName.textContent=actor?(actor.display_name||actor.displayName||actor.username):'未登录';
     creatorName.textContent=prepRuntime.creatorProfile?.name||'请先选择';
-    if(!actor)setStatus('未登录 · 本地草稿仍可编辑','warn');
+    if(!actor)setStatus('未登录 · 请登录后选择共享草稿','warn');
   }
   function renderBanks(banks){
     bankSelect.innerHTML='<option value="">请选择题库</option>'+banks.map(bank=>`<option value="${esc(bank.id)}">${esc(bank.name)} · ${esc(bank.accessMode||'可编辑')}</option>`).join('');
@@ -2966,47 +3050,26 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
     if(!actor)return null;
     const subjectId=state.knowledgeTree?.subjectId||state.questionBank.subject||'PMP';
     const payload=await Catalog.loadSharedContent(subjectId);
-    if(!prepRuntime.dirty)applySharedContent(payload);
+    if(!prepRuntime.draftId&&!prepRuntime.dirty)applySharedContent(payload);
     return payload;
   }
   const ServerPrinciples=Object.freeze({
     async save(principle,preset){
-      if(!actor)throw new Error('请先登录后再保存原则。');
-      const payload=await Catalog.savePrinciple(principle,preset,{contentRevision:Number(prepRuntime.serverContentRevision||0)});
-      applySharedContent(payload);markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
-      return payload;
+      throw new Error('原则请先保存到共享草稿，并在第七步统一同步。');
     },
     async remove(principleId){
-      if(!actor)throw new Error('请先登录后再删除原则。');
-      const payload=await Catalog.deletePrinciple(principleId,{contentRevision:Number(prepRuntime.serverContentRevision||0)});
-      applySharedContent(payload);markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
-      return payload;
+      throw new Error('原则请先在共享草稿内删除，并在第七步统一同步。');
     }
   });
   window.PMPPrepServerPrinciples=ServerPrinciples;
 
-  async function syncWorkspaceToServer({source='sync'}={}){
-    if(!serverEnabled())throw new Error('请先登录、选择制作人和服务器题库。');
-    syncButton.disabled=true;setStatus(source==='save'?'正在保存到服务器…':'正在同步到题库…');setIssues(null);
-    try{
-      const result=await Catalog.uploadBundle(ExportService.completeBundle(),{
-        workspace:prepRuntime,creatorId:prepRuntime.creatorProfile.creatorId,
-        questions:state.questionBank.questions,prepVersion:VERSION,workspaceVersion:'4'
-      });
-      prepRuntime.lastBatchId=result.batchId;
-      prepRuntime.serverContentRevision=Math.max(Number(prepRuntime.serverContentRevision||0),Number(result.contentRevision||0));
-      markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
-      setStatus(`已保存到服务器 · 批次 ${result.batchId}`,'good');toast('保存成功，主程序已同步');
-      return result;
-    }catch(error){
-      QuestionLocks.handleSaveError(error);
-      setStatus(error.message||'服务器保存失败，本机恢复副本已保留','bad');setIssues(error);
-      await saveWorkspaceLocal({silent:true});markWorkspaceDirty();throw error;
-    }finally{refreshButtons()}
+  async function syncWorkspaceToServer(){
+    syncButton.disabled=true;setStatus('正在同步共享草稿到主程序…');setIssues(null);
+    try{const result=await window.PMPPrepDraftUi.sync();setStatus(`已同步到主程序 · 批次 ${result.batchId}`,'good');return result}
+    catch(error){setStatus(error.message||'同步失败，草稿已保留','bad');setIssues(error);throw error}
+    finally{refreshButtons()}
   }
   window.PMPPrepSyncWorkspace=syncWorkspaceToServer;
-  document.getElementById('btnQuickSaveWorkspace').onclick=()=>syncWorkspaceToServer({source:'save'}).catch(()=>{});
-  document.getElementById('btnSaveWorkspaceLocal').onclick=()=>syncWorkspaceToServer({source:'save'}).catch(()=>{});
   function readServerProjection(key,normalizer){
     try{
       const raw=window.localStorage?.getItem?.(key);if(!raw)return null;
@@ -3110,6 +3173,7 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
   }
   window.PMPPrepServerContentRefresh=Object.freeze({apply:applyRemoteContent,snapshot:remoteContentSnapshot});
   function handleServerStateReload(){
+    if(prepRuntime.draftId)return;
     prepRuntime.serverPrinciples=readServerProjection('kg_principle_repository_v1',normalizePrinciples)||prepRuntime.serverPrinciples||null;
     prepRuntime.serverSynthesisPresets=readServerProjection('kg_synthesis_preset_repository_v1',normalizePresets)||prepRuntime.serverSynthesisPresets||null;
     if(!prepRuntime.serverCatalogSnapshot)return;
@@ -3125,6 +3189,7 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
     remoteRetryTimer=setTimeout(()=>{remoteRetryTimer=0;refreshRemoteRevision({revision:remoteRefreshTarget,source:'retry'})},delay);
   }
   function refreshRemoteRevision(detail){
+    if(prepRuntime.draftId)return;
     if(remoteRetryStopped)return;
     const revision=Number(detail?.revision);
     if(!Number.isSafeInteger(revision)||revision<=Number(prepRuntime.serverContentRevision||0))return;
@@ -3181,8 +3246,8 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
         visibility:state.questionBank.visibility==='published'?'published':'private',creatorId:prepRuntime.creatorProfile.creatorId
       });
       prepRuntime.serverBankId=bank.id;prepRuntime.serverBankRevision=Number(bank.revision||1);
-      await refreshBanks();bankSelect.value=bank.id;markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
-      setStatus('题库已创建，可开始同步','good');
+      await refreshBanks();bankSelect.value=bank.id;markWorkspaceDirty();
+      setStatus('题库已创建，请先保存共享草稿，再确认同步内容','good');
     }catch(error){setStatus(error.message,'bad');setIssues(error)}finally{refreshButtons()}
   });
   questionInput.addEventListener('input',refreshButtons);
@@ -3197,11 +3262,11 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
       const index=state.questionBank.questions.findIndex(item=>item.id===question.id);
       if(index>=0)state.questionBank.questions[index]=question;else state.questionBank.questions.push(question);
       prepRuntime.serverBankId=remote.bankId||prepRuntime.serverBankId;
-      state.currentQuestionId=question.id;refreshAll();markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
+      state.currentQuestionId=question.id;refreshAll();markWorkspaceDirty();
       setStatus('题目已从服务器载入','good');
     }catch(error){setStatus(error.message,'bad');setIssues(error)}finally{refreshButtons()}
   });
-  syncButton.addEventListener('click',()=>syncWorkspaceToServer({source:'sync'}).catch(()=>{}));
+  syncButton.addEventListener('click',()=>syncWorkspaceToServer().catch(()=>{}));
 
   document.querySelectorAll('[data-creator-key]').forEach(button=>button.addEventListener('click',()=>{
     QuestionLocks.close().finally(()=>{
@@ -3223,8 +3288,8 @@ refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initTheme
     try{await QuestionLocks.reconfirm()}finally{reconfirmButton.disabled=false;renderQuestionLockState()}
   });
   copyConflictButton.addEventListener('click',async()=>{
-    await duplicateQuestion();markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
-    setStatus('冲突内容已复制为本地新题，可作为新题上传','good');
+    await duplicateQuestion();markWorkspaceDirty();
+    setStatus('冲突内容已复制为草稿新题，可在第七步同步','good');
   });
   window.addEventListener('beforeunload',()=>{
     const lease=QuestionLocks.snapshot();

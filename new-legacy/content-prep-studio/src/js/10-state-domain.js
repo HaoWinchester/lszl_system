@@ -24,7 +24,8 @@ const FIXED_CREATORS={
 };
 const prepBootstrap=window.__KG_DIRECT_BOOTSTRAP__||{};
 const prepRuntime={
-  dirty:false,autoSave:false,lastSavedAt:'',saveInFlight:false,
+  dirty:false,saveInFlight:false,
+  draftId:'',draftRevision:0,draftTitle:'',
   creatorProfile:null,deviceProfile:null,lastBatchId:'',
   serverActor:prepBootstrap.authenticated?(prepBootstrap.authUser||{username:prepBootstrap.username}):null,
   serverContentRevision:Number(prepBootstrap.contentRevision||0),
@@ -37,7 +38,6 @@ const prepRuntime={
 const PREP_DB_NAME='pmp_content_prep_studio_v1';
 const PREP_DB_VERSION=1;
 const PREP_DB_STORE='workspaces';
-const PREP_DB_KEY='latest';
 const UI_SETTINGS_KEY='ui-settings';
 const AUDIT_TRAIL_KEY='audit-trail';
 const THEMES=new Set(['default','sakura','mint','sunshine','grape','ocean']);
@@ -46,31 +46,31 @@ function updateWorkspaceSaveStatus(message='',kind=''){
   const header=document.getElementById('hdrSaveStatus'),local=document.getElementById('localSaveStatus');
   let text=message;
   if(!text){
-    if(prepRuntime.saveInFlight)text='正在保存…';
-    else if(prepRuntime.dirty)text=prepRuntime.lastSavedAt?`有未保存变更 · 上次 ${prepRuntime.lastSavedAt}`:'有未保存变更';
-    else text=prepRuntime.lastSavedAt?`已保存 ${prepRuntime.lastSavedAt}`:'尚未保存';
+    if(prepRuntime.saveInFlight)text='正在保存共享草稿…';
+    else if(prepRuntime.dirty)text='共享草稿有未保存修改';
+    else if(prepRuntime.draftId)text=`正在编辑共享草稿：${prepRuntime.draftTitle||'未命名草稿'}`;
+    else text='请选择或新建共享草稿';
   }
   if(header)header.textContent=text;
-  if(local){local.textContent=text;local.className='save-status '+(kind||(prepRuntime.dirty?'warn':prepRuntime.lastSavedAt?'good':''))}
+  if(local){local.textContent=text;local.className='save-status '+(kind||(prepRuntime.dirty?'warn':prepRuntime.draftId?'good':''))}
 }
 function markWorkspaceDirty(){prepRuntime.dirty=true;updateWorkspaceSaveStatus()}
-function formatLocalSaveTime(value){const d=value?new Date(value):new Date();return Number.isNaN(d.getTime())?'':d.toLocaleString()}
 function openPrepDb(){
   return new Promise((resolve,reject)=>{
-    if(!('indexedDB' in window)){reject(new Error('当前浏览器不支持 IndexedDB'));return}
+    if(!('indexedDB' in window)){reject(new Error('当前浏览器不支持设备设置存储'));return}
     let req;try{req=indexedDB.open(PREP_DB_NAME,PREP_DB_VERSION)}catch(err){reject(err);return}
     req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(PREP_DB_STORE))db.createObjectStore(PREP_DB_STORE,{keyPath:'id'})};
-    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error('无法打开本地工作区数据库'));
+    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error('无法打开设备设置存储'));
   });
 }
 async function prepDbPut(record){
   const db=await openPrepDb();return new Promise((resolve,reject)=>{const tx=db.transaction(PREP_DB_STORE,'readwrite');tx.objectStore(PREP_DB_STORE).put(record);tx.oncomplete=()=>{db.close();resolve(true)};tx.onerror=()=>{const err=tx.error;db.close();reject(err||new Error('本地保存失败'))};tx.onabort=tx.onerror});
 }
-async function prepDbGet(key=PREP_DB_KEY){
-  const db=await openPrepDb();return new Promise((resolve,reject)=>{const tx=db.transaction(PREP_DB_STORE,'readonly'),req=tx.objectStore(PREP_DB_STORE).get(key);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error||new Error('读取本地数据失败'));tx.oncomplete=()=>db.close()});
+async function prepDbGet(key){
+  const db=await openPrepDb();return new Promise((resolve,reject)=>{const tx=db.transaction(PREP_DB_STORE,'readonly'),req=tx.objectStore(PREP_DB_STORE).get(key);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error||new Error('读取设备设置失败'));tx.oncomplete=()=>db.close()});
 }
-async function prepDbDelete(key=PREP_DB_KEY){
-  const db=await openPrepDb();return new Promise((resolve,reject)=>{const tx=db.transaction(PREP_DB_STORE,'readwrite');tx.objectStore(PREP_DB_STORE).delete(key);tx.oncomplete=()=>{db.close();resolve(true)};tx.onerror=()=>{const err=tx.error;db.close();reject(err||new Error('删除本地数据失败'))}});
+async function prepDbDelete(key){
+  const db=await openPrepDb();return new Promise((resolve,reject)=>{const tx=db.transaction(PREP_DB_STORE,'readwrite');tx.objectStore(PREP_DB_STORE).delete(key);tx.oncomplete=()=>{db.close();resolve(true)};tx.onerror=()=>{const err=tx.error;db.close();reject(err||new Error('删除设备设置失败'))}});
 }
 
 function applyTheme(theme,{persist=false}={}){
@@ -83,34 +83,6 @@ async function initThemeSettings(){
   try{const row=await prepDbGet(UI_SETTINGS_KEY);applyTheme(row?.theme||'default')}
   catch(_err){applyTheme('default')}
 }
-
-async function saveWorkspaceLocal({silent=false}={}){
-  if(prepRuntime.saveInFlight)return;
-  prepRuntime.saveInFlight=true;updateWorkspaceSaveStatus();
-  try{
-    const savedAt=nowIso(),workspace=workspacePayload();await prepDbPut({id:PREP_DB_KEY,savedAt,workspace});
-    prepRuntime.lastSavedAt=formatLocalSaveTime(savedAt);prepRuntime.dirty=false;updateWorkspaceSaveStatus('', 'good');
-    if(!silent)toast('工作区已保存到本机');
-  }catch(err){
-    updateWorkspaceSaveStatus('保存失败，请导出工作区草稿','bad');
-    if(!silent)alert('本地保存失败：'+(err?.message||err)+'\n\n建议立即使用“导出工作区草稿”。某些浏览器的 file:// 环境可能限制 IndexedDB。');
-  }finally{prepRuntime.saveInFlight=false;updateWorkspaceSaveStatus()}
-}
-async function restoreWorkspaceLocal(){
-  try{
-    const row=await prepDbGet();if(!row?.workspace){alert('没有找到本机保存的工作区。');return}
-    if(!confirm(`恢复本机工作区？\n保存时间：${formatLocalSaveTime(row.savedAt)}\n\n当前未导出的修改会被替换。`))return;
-    applyWorkspacePayload(row.workspace);prepRuntime.lastSavedAt=formatLocalSaveTime(row.savedAt);prepRuntime.dirty=false;updateWorkspaceSaveStatus('', 'good');toast('已恢复本机工作区');
-  }catch(err){alert('恢复本机工作区失败：'+(err?.message||err))}
-}
-async function deleteWorkspaceLocal(){
-  if(!confirm('删除本工具在当前浏览器中的本机工作区保存？不会删除已经导出的 JSON 文件。'))return;
-  try{await prepDbDelete();prepRuntime.lastSavedAt='';updateWorkspaceSaveStatus('本机保存已删除','');toast('本机保存已删除')}catch(err){alert('删除本机保存失败：'+(err?.message||err))}
-}
-async function detectLocalWorkspace(){
-  try{const row=await prepDbGet();if(row?.savedAt){prepRuntime.lastSavedAt=formatLocalSaveTime(row.savedAt);updateWorkspaceSaveStatus()}}catch(_err){updateWorkspaceSaveStatus('本地保存不可用 · 可导出草稿','warn')}
-}
-setInterval(()=>{if(prepRuntime.autoSave&&prepRuntime.dirty)saveWorkspaceLocal({silent:true})},60000);
 window.addEventListener('beforeunload',e=>{if(!prepRuntime.dirty)return;e.preventDefault();e.returnValue=''});
 
 

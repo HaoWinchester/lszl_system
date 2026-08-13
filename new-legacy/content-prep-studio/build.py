@@ -9,6 +9,8 @@ JS_ORDER=[
     "20-page-runtime.js",
     "30-service-layer.js",
     "35-server-catalog-service.js",
+    "36-server-draft-service.js",
+    "37-shared-draft-ui.js",
     "40-events-bootstrap.js",
     "45-server-events.js",
 ]

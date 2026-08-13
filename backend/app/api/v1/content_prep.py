@@ -15,6 +15,9 @@ from app.schemas.content_prep import (
     ContentPrepActivityImportRequest,
     ContentPrepBatchRequest,
     ContentPrepBatchResult,
+    ContentPrepDraftCreateRequest,
+    ContentPrepDraftSyncRequest,
+    ContentPrepDraftUpdateRequest,
     ContentPrepDeleteRequest,
     ContentPrepPrincipleWriteRequest,
     ContentPrepQuestionSaveRequest,
@@ -24,6 +27,7 @@ from app.schemas.content_prep import (
 )
 from app.services import (
     content_prep_shared_service,
+    content_prep_draft_service,
     content_prep_service,
     question_lock_service,
     subject_facet_service,
@@ -77,6 +81,13 @@ def _raise_upload_error(error: content_prep_service.ContentPrepOperationError) -
     ) from error
 
 
+def _raise_draft_error(error: content_prep_draft_service.ContentPrepDraftError) -> None:
+    detail = {"code": error.code, "message": error.message}
+    if error.current_revision is not None:
+        detail["currentRevision"] = error.current_revision
+    raise HTTPException(status_code=error.status_code, detail=detail) from error
+
+
 def _raise_shared_error(error: Exception) -> None:
     if isinstance(error, content_prep_shared_service.ContentRevisionConflict):
         raise HTTPException(
@@ -128,6 +139,82 @@ async def get_shared_content(subjectId: str, db: DB, actor: PrepEditor):
         return await content_prep_shared_service.read_shared_content(db, subjectId)
     except ValueError as error:
         _raise_shared_error(error)
+
+
+@router.get("/drafts")
+async def list_content_prep_drafts(db: DB, actor: PrepEditor):
+    return {"drafts": await content_prep_draft_service.list_drafts(db)}
+
+
+@router.post("/drafts", status_code=201)
+async def create_content_prep_draft(
+    request: ContentPrepDraftCreateRequest, db: DB, actor: PrepEditor
+):
+    draft = await content_prep_draft_service.create_draft(
+        db, actor, title=request.title, payload=request.payload
+    )
+    return {"draft": content_prep_draft_service.draft_payload(draft, include_payload=True)}
+
+
+@router.get("/drafts/{draft_id}")
+async def get_content_prep_draft(draft_id: str, db: DB, actor: PrepEditor):
+    try:
+        draft = await content_prep_draft_service.get_draft(db, draft_id)
+    except content_prep_draft_service.ContentPrepDraftError as error:
+        _raise_draft_error(error)
+    return {"draft": content_prep_draft_service.draft_payload(draft, include_payload=True)}
+
+
+@router.put("/drafts/{draft_id}")
+async def update_content_prep_draft(
+    draft_id: str,
+    request: ContentPrepDraftUpdateRequest,
+    db: DB,
+    actor: PrepEditor,
+):
+    try:
+        draft = await content_prep_draft_service.update_draft(
+            db,
+            actor,
+            draft_id,
+            title=request.title,
+            payload=request.payload,
+            revision=request.revision,
+        )
+    except content_prep_draft_service.ContentPrepDraftError as error:
+        _raise_draft_error(error)
+    return {"draft": content_prep_draft_service.draft_payload(draft, include_payload=True)}
+
+
+@router.delete("/drafts/{draft_id}")
+async def delete_content_prep_draft(draft_id: str, db: DB, actor: PrepEditor):
+    try:
+        await content_prep_draft_service.delete_draft(db, draft_id)
+    except content_prep_draft_service.ContentPrepDraftError as error:
+        _raise_draft_error(error)
+    return {"ok": True}
+
+
+@router.post("/drafts/{draft_id}/sync")
+async def sync_content_prep_draft(
+    draft_id: str,
+    request: ContentPrepDraftSyncRequest,
+    db: DB,
+    actor: PrepEditor,
+):
+    try:
+        result = await content_prep_draft_service.sync_draft(
+            db,
+            actor,
+            draft_id,
+            revision=request.revision,
+            creator_id=request.creator_id,
+        )
+    except content_prep_draft_service.ContentPrepDraftError as error:
+        _raise_draft_error(error)
+    except content_prep_service.ContentPrepOperationError as error:
+        _raise_upload_error(error)
+    return {"result": result.model_dump(by_alias=True)}
 
 
 @router.put("/shared-content")

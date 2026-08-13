@@ -56,6 +56,8 @@ test('content prep studio ships reproducible modular source and backend bootstra
     'content-prep-studio/src/js/20-page-runtime.js',
     'content-prep-studio/src/js/30-service-layer.js',
     'content-prep-studio/src/js/35-server-catalog-service.js',
+    'content-prep-studio/src/js/36-server-draft-service.js',
+    'content-prep-studio/src/js/37-shared-draft-ui.js',
     'content-prep-studio/src/js/40-events-bootstrap.js',
     'content-prep-studio/src/js/45-server-events.js',
     'content-prep-studio/src/tag-slot-schema.json',
@@ -64,6 +66,7 @@ test('content prep studio ships reproducible modular source and backend bootstra
     'content-prep-studio/tests/test_tag_migration.js',
     'content-prep-studio/tests/test_server_catalog.js',
     'content-prep-studio/tests/test_edit_lock_client.js',
+    'content-prep-studio/tests/test_shared_draft_service.js',
     'content-prep-studio/tests/test_server_ui_contract.py',
     'content-prep-studio/dist/content-prep.html',
   ]
@@ -74,6 +77,8 @@ test('content prep studio ships reproducible modular source and backend bootstra
 
   const built = readFileSync(resolve(source, 'content-prep-studio/dist/content-prep.html'), 'utf8')
   assert.match(built, /window\.PMPPrepServices/)
+  assert.match(built, /global\.PMPPrepSharedDrafts/)
+  assert.match(built, /确认同步到主程序/)
   for (let index = 1; index <= 6; index += 1) {
     assert.match(built, new RegExp(`creator_00${index}`))
   }

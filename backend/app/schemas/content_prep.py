@@ -145,6 +145,24 @@ class ContentPrepBatchResult(BaseModel):
     questions: list[ContentPrepQuestionResult]
 
 
+class ContentPrepDraftCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    title: str = Field(min_length=1, max_length=160)
+    payload: dict[str, Any]
+
+
+class ContentPrepDraftUpdateRequest(ContentPrepDraftCreateRequest):
+    revision: StrictInt = Field(ge=1)
+
+
+class ContentPrepDraftSyncRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    revision: StrictInt = Field(ge=1)
+    creator_id: str = Field(alias="creatorId", min_length=1, max_length=64)
+
+
 class LockGrant(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 

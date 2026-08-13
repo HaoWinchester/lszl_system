@@ -44,6 +44,38 @@ class QuestionBankCollaborator(Base):
     )
 
 
+class ContentPrepDraft(Base):
+    """Shared, unsynchronised Content Prep Studio workspace.
+
+    Drafts deliberately have no owner filter: all administrators and teachers
+    work from the same preparation queue, while only the final sync writes the
+    formal question/content tables.
+    """
+
+    __tablename__ = "content_prep_drafts"
+    __table_args__ = (
+        CheckConstraint("revision >= 1", name="ck_content_prep_drafts_revision"),
+        Index("ix_content_prep_drafts_updated_at", "updated_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_by: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("users.username", ondelete="SET NULL"), nullable=True, index=True
+    )
+    updated_by: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("users.username", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
 class Principle(Base):
     __tablename__ = "principles"
 
