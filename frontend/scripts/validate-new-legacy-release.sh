@@ -39,6 +39,8 @@ cd "$REPO_DIR/frontend"
 pnpm test
 
 cd "$REPO_DIR"
+node new-legacy/tests/landing-page-contract.test.js
+python3 new-legacy/tests/landing-page-browser.py
 python3 new-legacy/content-prep-studio/tests/test_services.py
 python3 new-legacy/content-prep-studio/tests/test_build.py
 python3 new-legacy/content-prep-studio/tests/test_server_ui_contract.py

@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "baselineVersion": "v8.6.1",
   "requiredPages": [
+    "landing.html",
     "index.html",
     "learning-path.html",
     "guided-learning-node.html",
@@ -11,6 +12,13 @@
     "knowledge-recall.html"
   ],
   "requiredFiles": [
+    "styles/landing.css",
+    "src/landing.js",
+    "assets/landing/graph.png",
+    "assets/landing/practice.png",
+    "assets/landing/workspace.png",
+    "assets/landing/recall.png",
+    "assets/landing/SOURCES.md",
     "src/01-runtime-config.js",
     "src/23-graph-file-store.js",
     "src/64-flow-orchestrator.js",

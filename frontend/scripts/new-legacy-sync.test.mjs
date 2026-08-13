@@ -11,6 +11,7 @@ const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const syncScript = resolve(scriptsDir, 'sync-new-legacy.js')
 const sourceMigrationManifest = resolve(scriptsDir, '..', '..', 'new-legacy', 'p45-migration-manifest.json')
 const requiredPages = [
+  'landing.html',
   'index.html',
   'learning-path.html',
   'guided-learning-node.html',
@@ -20,6 +21,13 @@ const requiredPages = [
   'knowledge-recall.html',
 ]
 const requiredFiles = [
+  'styles/landing.css',
+  'src/landing.js',
+  'assets/landing/graph.png',
+  'assets/landing/practice.png',
+  'assets/landing/workspace.png',
+  'assets/landing/recall.png',
+  'assets/landing/SOURCES.md',
   'src/01-runtime-config.js',
   'src/31-learning-entry-chooser.js',
   'src/23-graph-file-store.js',
