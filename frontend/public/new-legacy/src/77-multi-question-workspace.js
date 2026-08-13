@@ -12,6 +12,8 @@
   const PrincipleBinding=global.KGQuestionPrincipleBinding||{};
   const PracticeSelector=global.KGPracticeSelectionService||{};
   const PracticeAttempts=global.KGPracticeAttemptRepository||{};
+  const PracticeLearning=global.KGPracticeLearningApi||{};
+  const PersonalCards=global.KGPersonalSynthesisCardApi||{};
   const BUTTON_LEVELS=viewportLibrary.BUTTON_ZOOM_LEVELS||[.01,.02,.03,.05,.10,.15,.20,.33,.50,.75,1,1.25,1.50,2,2.50,3,4];
   const WHEEL_LEVELS=viewportLibrary.WHEEL_ZOOM_LEVELS||[.01,.02,.03,.04,.05,.07,.09,.11,.13,.17,.21,.26,.33,.41,.51,.64,.80,1,1.20,1.44,1.73,2.07,2.49,2.99,3.58,4];
   const MIN_ZOOM=viewportLibrary.MIN_ZOOM||.01;
@@ -84,6 +86,7 @@
     editingGroupId:'',
     editingEdgeId:'',
     pendingSynthesisPosition:null,
+    personalCardRefresh:null,
     activeGroupId:'',
     analysisNodeIds:[],
     analysisLayer:null,
@@ -91,6 +94,8 @@
     analysisPanelDrag:null,
     analysisSections:new Set(ANALYSIS_SECTION_DEFAULTS),
     answerSelections:new Map(),
+    persistentCorrectAnswers:new Map(),
+    answerSync:new Map(),
     optionClickTimers:new Map(),
     optionFlashTimers:new Map(),
     edgeElements:new Map(),
@@ -128,6 +133,7 @@
     questionLoadError:'',
     selection:null,
     selectedNodeIds:new Set(),
+    selectedQuestionKeys:new Set(),
     selectionLockClickSuppressUntil:0,
     highlightColor:'#fde68a',
     sessionHighlights:new Map(),
@@ -1039,15 +1045,19 @@
     const stem=view.stem?.zh||questionStem(question,node.stemSummary||'打开题目查看完整题干。');
     const options=Array.isArray(view.options)?view.options:[];
     const displayMode=node.displayMode==='compact'?'compact':'full';
-    const activeAnswer=String(state.answerSelections.get(String(node.id))||'');
-    const correctId=correctAnswerId(question)||String(node.correctAnswer||'');
+    const nodeId=String(node.id),activeAnswer=String(state.answerSelections.get(nodeId)||'');
+    const persistentAnswer=String(state.persistentCorrectAnswers.get(nodeId)||'');
+    const syncState=state.answerSync.get(nodeId)||{};
     const optionsMarkup=displayMode==='compact'?'':(options.length?'<ol class="qw-card-options">'+options.map((option,index)=>{
       const key=String(option?.id||String.fromCharCode(65+index));
       const region='option:'+key;
-      const active=activeAnswer===key&&key===correctId;
-      return '<li class="qw-card-option"><button type="button" class="qw-card-option-key'+(active?' is-correct-active':'')+'" data-qw-option-key="'+escapeHTML(key)+'" title="选择 '+escapeHTML(key)+'" aria-pressed="'+(active?'true':'false')+'">'+escapeHTML(key)+'</button>'
+      const selected=activeAnswer===key,persistent=persistentAnswer===key;
+      return '<li class="qw-card-option"><button type="button" class="qw-card-option-key'+(selected?' is-answer-selected':'')+(persistent?' is-correct-active':'')+'" data-qw-option-key="'+escapeHTML(key)+'" title="选择 '+escapeHTML(key)+'" aria-pressed="'+(selected?'true':'false')+'"'+(syncState.pending?' disabled aria-disabled="true"':'')+'>'+escapeHTML(key)+'</button>'
         +'<span class="qw-card-option-copy"><span class="qw-highlight-region" data-highlight-region="'+escapeHTML(region)+'" data-highlight-language="zh">'+highlightedMarkup(option?.display?.zh||'',node,region)+'</span>'+englishLine(option?.display)+'</span></li>';
     }).join('')+'</ol>':'<p class="qw-card-question-stem">当前题目没有可用选项。</p>');
+    const syncMarkup=displayMode==='compact'?'':(syncState.pending
+      ?'<div class="qw-option-sync-status is-pending" data-qw-option-sync-status role="status">正在保存作答…</div>'
+      :syncState.error?'<div class="qw-option-sync-error" data-qw-option-sync-error role="alert"><span>作答尚未保存：'+escapeHTML(syncState.error)+'</span><button type="button" data-qw-option-retry>重试</button></div>':'');
     const analysisOpen=analysisPanelOpen(node.id);
     const titleZh=view.title?.zh||node.title||'未命名题目';
     const practiceLabel=practiceCardLabel(node);
@@ -1062,7 +1072,7 @@
       +'<div class="qw-card-body">'
       +'<div class="qw-card-content">'
       +'<p class="qw-card-question-stem"><span class="qw-highlight-region" data-highlight-region="stem" data-highlight-language="zh">'+highlightedMarkup(stem,node,'stem')+'</span>'+englishLine(view.stem)+'</p>'
-      +optionsMarkup+'</div>'
+      +optionsMarkup+syncMarkup+'</div>'
       +'<div class="qw-card-actions qw-card-learning-actions">'
       +cardIconButtonMarkup('analysis','显示或关闭本题解析',CARD_ACTION_ICONS.analysis,{active:analysisOpen,pressed:analysisOpen})
       +'</div></div>'+cardWidthResizeMarkup();
@@ -1077,8 +1087,10 @@
     const editableTitle=system?'':' data-qw-inline-field="title" title="双击编辑原则"';
     const editableContent=system?'':' data-qw-inline-field="content" title="双击编辑"';
     const copyButton=system?cardIconButtonMarkup('copy-synthesis','复制为我的归纳',CARD_ACTION_ICONS.edit):'';
+    const syncState=!system&&node.archived?'<span class="qw-synthesis-sync-state is-archived">已归档</span>'
+      :!system&&node.personalCardSyncError?'<span class="qw-synthesis-sync-state is-error" title="'+escapeHTML(node.personalCardSyncError)+'">尚未同步到我的归纳卡</span>':'';
     return '<header class="qw-card-header qw-synthesis-header" data-card-drag-handle>'
-      +'<div class="qw-synthesis-title-wrap"><small class="qw-synthesis-owner-badge">'+(system?'系统':'我的')+'</small><h3 class="qw-synthesis-principle"'+editableTitle+'>'+escapeHTML(title)+'</h3></div>'
+      +'<div class="qw-synthesis-title-wrap"><small class="qw-synthesis-owner-badge">'+(system?'系统':'我的')+'</small>'+syncState+'<h3 class="qw-synthesis-principle"'+editableTitle+'>'+escapeHTML(title)+'</h3></div>'
       +'<div class="qw-card-header-actions">'+copyButton+cardCloseButtonMarkup('移除归纳卡')+'</div>'
       +'</header><div class="qw-card-body qw-synthesis-simple-body">'
       +'<p class="qw-synthesis-content'+(content?'':' qw-synthesis-placeholder')+'"'+editableContent+'>'+escapeHTML(content||(system?'暂无原则说明':'双击补充你的理解'))+'</p>'
@@ -1336,7 +1348,12 @@
     const edgeIds=new Set([...selectedEdgeIds()].filter(id=>edgeById(id)).map(String));
     if(state.activeEdgeId&&edgeById(state.activeEdgeId))edgeIds.add(String(state.activeEdgeId));
     if(!cardIds.size&&!edgeIds.size)return false;
-    cardIds.forEach(id=>{if(analysisPanelOpen(id))closeAnalysisPanel(id);state.answerSelections.delete(String(id))});
+    cardIds.forEach(id=>{
+      if(analysisPanelOpen(id))closeAnalysisPanel(id);
+      state.answerSelections.delete(String(id));
+      state.persistentCorrectAnswers.delete(String(id));
+      state.answerSync.delete(String(id));
+    });
     hideEdgeQuickMenu();hideEdgeInlineEditor();
     const before=workspaceSnapshot(),draft=clone(before);
     cardIds.forEach(id=>{delete draft.nodes?.[id]});
@@ -1497,34 +1514,78 @@
     state.optionFlashTimers.set(timerKey,timer);return true;
   }
   function setPersistentCorrectAnswer(record,key){
-    const nodeId=String(record.id),active=String(state.answerSelections.get(nodeId)||'')===String(key);
-    if(active)state.answerSelections.delete(nodeId);else state.answerSelections.set(nodeId,String(key));
+    const nodeId=String(record.id),active=String(state.persistentCorrectAnswers.get(nodeId)||'')===String(key);
+    if(active)state.persistentCorrectAnswers.delete(nodeId);else state.persistentCorrectAnswers.set(nodeId,String(key));
     record.element?.querySelectorAll?.('[data-qw-option-key]').forEach(item=>{
       const on=!active&&String(item.dataset.qwOptionKey||'')===String(key);
-      item.classList.toggle('is-correct-active',on);item.setAttribute('aria-pressed',on?'true':'false');
+      item.classList.toggle('is-correct-active',on);
     });
     notify(active?'已取消本题常绿标记。':'回答正确，已将该选项设为常绿；再次双击可取消。');return true;
   }
-  function handleOptionSingleChoice(record,key){
+  function practiceAnswerPayload(record,key){
+    const node=record?.node||{},question=resolvedQuestionForNode(node)||{};
+    const paper=state.papers.find(item=>String(item.id||'')===String(node.paperId||question.sourcePaperId||'')&&(!node.releaseId||String(item.releaseId||'')===String(node.releaseId)))||selectedPaper()||{};
+    return {
+      questionId:String(node.questionId||question.id||question.sourceQuestionId||''),
+      bankId:String(node.bankId||question.sourceBankId||''),
+      paperId:String(node.paperId||question.sourcePaperId||paper.id||state.paperId||''),
+      releaseId:String(node.releaseId||question.sourceReleaseId||paper.releaseId||state.releaseId||''),
+      paperVersion:Math.max(0,Number(paper.version||0)),
+      paperName:String(paper.name||'多题归纳画布'),
+      sourceMode:'multi_question_canvas',
+      languageMode:languageMode(),
+      selectedAnswer:String(key||'')
+    };
+  }
+  async function submitPracticeAnswer(record,key,options={}){
     if(!record||record.node?.nodeType!=='question-reference')return false;
-    const question=resolvedQuestionForNode(record.node)||{},correct=correctAnswerId(question)||String(record.node.correctAnswer||'');
+    const nodeId=String(record.id),current=state.answerSync.get(nodeId);
+    if(current?.pending)return current.promise;
     key=String(key||'');
-    if(!correct){notify('当前题目尚未配置正确答案。');return false}
-    const practice=recordPracticeAttempt(record,key,correct);
-    if(key===correct){
-      flashOption(record,key,'is-correct-flash',CORRECT_FLASH_DURATION);
-      notify(practice?.first?'首次答对，已掌握这道练习题。':'回答正确。');
-      return true;
-    }
-    flashOption(record,key,'is-wrong-flash',WRONG_FLASH_DURATION);
-    notify(practice?.first?'首次判断未通过，本题已标记为复习。':'该选项不正确，请继续判断。');
-    return false;
+    const payload=options.retryPayload?{...options.retryPayload}:practiceAnswerPayload(record,key);
+    if(!payload.questionId||!key){notify('当前题目缺少可提交的作答信息。');return false}
+    payload.selectedAnswer=key;
+    const requestWorkspaceId=String(state.workspaceId||'');
+    const syncState={pending:true,error:'',payload,persistent:Boolean(options.persistent),promise:null,workspaceId:requestWorkspaceId};
+    state.answerSelections.set(nodeId,key);
+    state.answerSync.set(nodeId,syncState);
+    refreshSingleCardMarkup(record);
+    syncState.promise=Promise.resolve().then(()=>{
+      if(typeof PracticeLearning.answer!=='function')throw new Error('错题同步服务暂不可用');
+      return PracticeLearning.answer(payload);
+    }).then(result=>{
+      if(state.answerSync.get(nodeId)!==syncState||String(state.workspaceId||'')!==requestWorkspaceId)return result;
+      state.answerSync.set(nodeId,{...syncState,pending:false,error:'',promise:null,result});
+      const practice=recordPracticeAttempt(record,key,'',Boolean(result.correct));
+      refreshSingleCardMarkup(record);
+      flashOption(record,key,result.correct?'is-correct-flash':'is-wrong-flash',result.correct?CORRECT_FLASH_DURATION:WRONG_FLASH_DURATION);
+      if(syncState.persistent&&result.correct)setPersistentCorrectAnswer(record,key);
+      else if(syncState.persistent)notify(practice?.first?'首次判断未通过，本题已进入错题集。':'只有正确选项可以设为常绿，本题已进入错题集。');
+      else if(result.correct)notify(practice?.first?'首次答对，已掌握这道练习题。':'回答正确；已有错题记录已设为掌握。');
+      else notify(practice?.first?'首次判断未通过，本题已标记为复习并进入错题集。':'该选项不正确，本题已进入错题集。');
+      return result;
+    }).catch(error=>{
+      if(state.answerSync.get(nodeId)===syncState&&String(state.workspaceId||'')===requestWorkspaceId){
+        state.answerSync.set(nodeId,{...syncState,pending:false,error:String(error?.message||'网络错误，请重试'),promise:null});
+        refreshSingleCardMarkup(record);
+        notify('作答尚未保存，请重试。');
+      }
+      return {saved:false,error};
+    });
+    return syncState.promise;
+  }
+  function retryPracticeAnswer(record){
+    const current=state.answerSync.get(String(record?.id||''));
+    const key=String(current?.payload?.selectedAnswer||'');
+    if(!current?.payload||!key)return false;
+    return submitPracticeAnswer(record,key,{retryPayload:current.payload,persistent:current.persistent});
+  }
+  function handleOptionSingleChoice(record,key){
+    return submitPracticeAnswer(record,String(key||''));
   }
   function scheduleOptionChoice(record,key){
     if(!record)return false;
-    const question=resolvedQuestionForNode(record.node)||{},correct=correctAnswerId(question)||String(record.node.correctAnswer||'');
     key=String(key||'');
-    if(!correct||key!==correct)return handleOptionSingleChoice(record,key);
     clearOptionClickTimer(record.id,key);
     const timerKey=optionTimerKey(record.id,key),timer=global.setTimeout(()=>{
       state.optionClickTimers.delete(timerKey);handleOptionSingleChoice(record,key);
@@ -1533,19 +1594,9 @@
   }
   function handleOptionDoubleChoice(record,key){
     if(!record||record.node?.nodeType!=='question-reference')return false;
-    const question=resolvedQuestionForNode(record.node)||{},correct=correctAnswerId(question)||String(record.node.correctAnswer||'');
     key=String(key||'');clearOptionClickTimer(record.id,key);
-    if(!correct){notify('当前题目尚未配置正确答案。');return false}
-    if(key!==correct){
-      const practice=recordPracticeAttempt(record,key,correct);
-      notify(practice?.first?'首次判断未通过，本题已标记为复习。':'只有正确选项可以设为常绿。');
-      return false;
-    }
-    const practice=recordPracticeAttempt(record,key,correct);
     clearOptionTransientState(record.id);
-    const result=setPersistentCorrectAnswer(record,key);
-    if(practice?.first)notify('首次答对，已掌握这道练习题。');
-    return result;
+    return submitPracticeAnswer(record,key,{persistent:true});
   }
   function applyCard(record){
     const applied=state.kernel?.cards?.apply?.(record)||false;
@@ -1872,6 +1923,94 @@
     const preset=synthesisPresetForNode(node);
     return {title:String(preset?.title||node.title||node.principleTag||'原则：待提炼'),content:String(preset?.content||node.content||''),preset};
   }
+  function sourceQuestionRefsForSynthesis(node={}){
+    return [...new Set((node.sourceNodeIds||[]).map(String))].map(nodeId=>state.workspace?.nodes?.[nodeId]).filter(item=>item?.nodeType==='question-reference').map(item=>({
+      questionId:String(item.questionId||''),
+      bankId:String(item.bankId||''),
+      paperId:String(item.paperId||''),
+      releaseId:String(item.releaseId||''),
+      title:String(item.title||'')
+    })).filter(item=>item.questionId);
+  }
+  function personalCardInput(node={}){
+    return {
+      title:String(node.title||'未命名归纳卡').trim()||'未命名归纳卡',
+      synthesisType:String(node.synthesisType||'principle'),
+      content:String(node.content||''),
+      tags:Array.isArray(node.tags)?node.tags:[],
+      status:String(node.status||'draft'),
+      sourceQuestionRefs:sourceQuestionRefsForSynthesis(node)
+    };
+  }
+  function personalCardNodeFields(card={}){
+    return store()?.personalCardNodePatch?.(card)||{
+      personalCardId:String(card.id||''),personalCardRevision:Number(card.revision||0),archived:!!card.archivedAt,
+      personalCardSyncError:'',synthesisType:String(card.synthesisType||'principle'),title:String(card.title||'未命名归纳卡'),
+      content:String(card.content||''),tags:Array.isArray(card.tags)?card.tags:[],status:String(card.status||'draft')
+    };
+  }
+  function hydratePersonalCards(cards=[]){
+    if(!state.workspaceId)return {changed:0,workspace:state.workspace};
+    state.suppressStoreEvent=true;
+    let result=null;
+    try{result=store()?.hydratePersonalCards?.(cards,workspaceOptions())||{changed:0,workspace:state.workspace}}finally{state.suppressStoreEvent=false}
+    if(result?.workspace)state.workspace=result.workspace;
+    if(result?.changed&&state.initialized)renderCards();
+    return result;
+  }
+  async function insertPersonalCard(card,position=null,options={}){
+    if(!canEdit()||!card?.id)return {created:false,error:'PERSONAL_CARD_REQUIRED'};
+    const duplicate=Object.values(state.workspace?.nodes||{}).find(node=>String(node.personalCardId||'')===String(card.id));
+    if(duplicate){
+      hydratePersonalCards([card]);
+      if(options.focus!==false)focusNode(duplicate.id,{zoom:Math.max(state.zoom,.75)});
+      return {created:false,reason:'already-exists',node:duplicate,workspace:state.workspace};
+    }
+    const before=workspaceSnapshot();
+    const target=position||findOpenCardPosition(viewportCenterWorld(),{width:420,height:280});
+    state.suppressStoreEvent=true;
+    let result=null;
+    try{result=store()?.addSynthesisCard?.({...clone(options.nodePatch||{}),...personalCardNodeFields(card),cardType:'user'},target,workspaceOptions())}finally{state.suppressStoreEvent=false}
+    if(!result?.created)return result||{created:false,error:'INSERT_FAILED'};
+    state.workspace=result.workspace;
+    pushWorkspaceHistory('插入我的归纳卡',before,workspaceSnapshot());
+    renderCards();
+    if(options.focus!==false){setCardSelection([result.node.id]);focusNode(result.node.id,{zoom:Math.max(state.zoom,.75)})}
+    return result;
+  }
+  async function migrateLegacyPersonalCards(){
+    if(!loggedIn()||typeof PersonalCards.create!=='function')return 0;
+    const legacy=Object.values(state.workspace?.nodes||{}).filter(node=>node.nodeType==='synthesis-card'&&String(node.cardType||'user')==='user'&&!node.personalCardId);
+    let migrated=0;
+    for(const node of legacy){
+      try{
+        const card=await PersonalCards.create(personalCardInput(node));
+        state.suppressStoreEvent=true;
+        let result=null;
+        try{result=store()?.updateNode?.(node.id,personalCardNodeFields(card),workspaceOptions())}finally{state.suppressStoreEvent=false}
+        if(result?.workspace){state.workspace=result.workspace;migrated+=1}
+      }catch(error){
+        state.suppressStoreEvent=true;
+        try{
+          const result=store()?.updateNode?.(node.id,{personalCardSyncError:String(error?.message||'同步失败')},workspaceOptions());
+          if(result?.workspace)state.workspace=result.workspace;
+        }finally{state.suppressStoreEvent=false}
+      }
+    }
+    if(legacy.length&&state.initialized)renderCards();
+    return migrated;
+  }
+  async function refreshPersonalCardReferences(){
+    if(!loggedIn()||typeof PersonalCards.refresh!=='function')return null;
+    if(state.personalCardRefresh)return state.personalCardRefresh;
+    state.personalCardRefresh=(async()=>{
+      const snapshot=await PersonalCards.refresh({includeArchived:true});
+      hydratePersonalCards([...(snapshot?.active||[]),...(snapshot?.archived||[])]);
+      await migrateLegacyPersonalCards();
+      return snapshot;
+    })().catch(error=>{console.warn('个人归纳卡同步失败',error);return null}).finally(()=>{state.personalCardRefresh=null});
+    return state.personalCardRefresh;
+  }
   function blankSynthesisDraft(questions=[]){
     return {
       valid:false,
@@ -2097,10 +2236,10 @@
     notify('已生成 '+('★'.repeat(level))+' 练习：'+createdIds.length+' 道题。首次答对才计为掌握。');
     return createdIds.length>0;
   }
-  function recordPracticeAttempt(record,key,correct){
+  function recordPracticeAttempt(record,key,correct,serverCorrect){
     const node=record?.node;
     if(!node?.practiceForSynthesisId||node.practiceAttempted)return null;
-    const mastered=String(key||'')===String(correct||'');
+    const mastered=typeof serverCorrect==='boolean'?serverCorrect:String(key||'')===String(correct||'');
     state.suppressStoreEvent=true;
     let result=null;
     try{
@@ -2130,13 +2269,20 @@
     return {first:true,mastered,synthesisId:String(node.practiceForSynthesisId)};
   }
 
-  function copySystemSynthesis(nodeId){
+  async function copySystemSynthesis(nodeId){
     if(!canEdit())return false;
     const source=state.workspace?.nodes?.[String(nodeId)];if(!source||source.nodeType!=='synthesis-card'||String(source.cardType||'user')!=='system')return false;
-    const display=synthesisDisplay(source),before=workspaceSnapshot();let result=null;
-    state.suppressStoreEvent=true;
-    try{result=store()?.addSynthesisCard?.({...source,id:'',cardType:'user',sourcePresetId:source.sourcePresetId,presetVersion:source.presetVersion,title:display.title,content:display.content,autoGenerated:false,practiceRound:0,practiceBatchNodeIds:[],practiceMasteredCount:0},{x:Number(source.x)+48,y:Number(source.y)+48,width:source.width,height:source.height},workspaceOptions())}finally{state.suppressStoreEvent=false}
-    if(!result?.created)return false;state.workspace=result.workspace;pushWorkspaceHistory('复制系统归纳卡',before,workspaceSnapshot());renderCards();setCardSelection([result.node.id],{reason:'copy-synthesis'});notify('已复制为“我的归纳”，可双击编辑。');return true;
+    if(typeof PersonalCards.create!=='function'){notify('个人归纳卡服务暂不可用，请刷新后重试。');return false}
+    const display=synthesisDisplay(source);
+    try{
+      const card=await PersonalCards.create(personalCardInput({...source,title:display.title,content:display.content,cardType:'user'}));
+      const result=await insertPersonalCard(card,{x:Number(source.x)+48,y:Number(source.y)+48,width:source.width,height:source.height},{
+        nodePatch:{...source,id:'',cardType:'user',title:display.title,content:display.content,autoGenerated:false,practiceRound:0,practiceBatchNodeIds:[],practiceMasteredCount:0}
+      });
+      if(!result?.created)return false;
+      notify('已复制到“我的归纳卡”，可双击编辑。');
+      return true;
+    }catch(error){notify('复制失败：'+String(error?.message||'请稍后重试'));return false}
   }
 
   function quickCreateSynthesis(){
@@ -2273,7 +2419,7 @@
       if(resizeRaf){cancelAnimationFrame(resizeRaf);resizeRaf=0}
       if(state.inlineEdit?.element===element)state.inlineEdit=null;
     };
-    const finish=(commit)=>{
+    const finish=async(commit)=>{
       if(settled)return;settled=true;
       if(resizeRaf){cancelAnimationFrame(resizeRaf);resizeRaf=0}
       const next=String(element.innerText||element.textContent||'').trim();
@@ -2291,8 +2437,17 @@
       if(value===original&&Math.abs(measuredHeight-originalHeight)<.5){refreshSingleCardMarkup(record);applyCard(record);return}
       const before=workspaceSnapshot();
       let result=null;
-      state.suppressStoreEvent=true;
-      try{result=store()?.updateNode?.(nodeId,{[field]:value,height:measuredHeight},workspaceOptions())}finally{state.suppressStoreEvent=false}
+      try{
+        const proposed={...record.node,[field]:value};
+        const card=record.node.personalCardId
+          ?await PersonalCards.update?.(record.node.personalCardId,{...personalCardInput(proposed),revision:Number(record.node.personalCardRevision||1)})
+          :await PersonalCards.create?.(personalCardInput(proposed));
+        if(!card?.id)throw new Error('个人归纳卡服务暂不可用');
+        state.suppressStoreEvent=true;
+        try{result=store()?.updateNode?.(nodeId,{...personalCardNodeFields(card),height:measuredHeight},workspaceOptions())}finally{state.suppressStoreEvent=false}
+      }catch(error){
+        record.node.height=originalHeight;refreshSingleCardMarkup(record);applyCard(record);notify('归纳卡更新失败：'+String(error?.message||'请重试'));return;
+      }
       if(!result?.node){
         record.node.height=originalHeight;refreshSingleCardMarkup(record);applyCard(record);notify('归纳卡更新失败，请重试。');return;
       }
@@ -2304,7 +2459,11 @@
       applyCard(record);
       renderStructure();updateEdgesGeometry();renderMinimap();scheduleLayoutDiagnosis();
       setCardSelection([nodeId],{reason:'inline-edit-retain'});
-      notify('归纳卡已更新。');
+      hydratePersonalCards([{
+        id:result.node.personalCardId,revision:result.node.personalCardRevision,title:result.node.title,content:result.node.content,
+        tags:result.node.tags,status:result.node.status,synthesisType:result.node.synthesisType,archivedAt:result.node.archived?new Date().toISOString():null
+      }]);
+      notify('归纳卡已更新，并同步到“我的归纳卡”。');
     };
     keydownHandler=event=>{
       if(event.key==='Escape'){event.preventDefault();finish(false)}
@@ -2583,7 +2742,7 @@
     return true;
   }
   function parseTags(value){return [...new Set(String(value||'').split(/[，,、;；\n]/).map(item=>item.trim()).filter(Boolean))].slice(0,24)}
-  function saveSynthesisCard(){
+  async function saveSynthesisCard(){
     if(!canEdit())return false;
     const payload={
       synthesisType:String(byId('qwSynthesisType')?.value||'principle'),
@@ -2597,14 +2756,22 @@
     if(!payload.title)payload.title='未命名'+meta.label;
     const editingId=state.editingSynthesisNodeId;
     const position=state.pendingSynthesisPosition||viewportCenterWorld();
-    const before=workspaceSnapshot();
-    state.suppressStoreEvent=true;
+    const before=workspaceSnapshot(),existing=editingId?state.workspace?.nodes?.[String(editingId)]:null;
     let result=null;
     try{
-      result=editingId
-        ?store()?.updateNode?.(editingId,payload,workspaceOptions())
-        :store()?.addSynthesisCard?.(payload,position,workspaceOptions());
-    }finally{state.suppressStoreEvent=false}
+      const input=personalCardInput({...existing,...payload});
+      const card=existing?.personalCardId
+        ?await PersonalCards.update?.(existing.personalCardId,{...input,revision:Number(existing.personalCardRevision||1)})
+        :await PersonalCards.create?.(input);
+      if(!card?.id)throw new Error('个人归纳卡服务暂不可用');
+      if(editingId){
+        state.suppressStoreEvent=true;
+        try{result=store()?.updateNode?.(editingId,{...payload,...personalCardNodeFields(card)},workspaceOptions())}finally{state.suppressStoreEvent=false}
+        hydratePersonalCards([card]);
+      }else{
+        result=await insertPersonalCard(card,position,{focus:false,nodePatch:{color:payload.color}});
+      }
+    }catch(error){notify('归纳卡保存失败：'+String(error?.message||'请重试'));return false}
     if(!result){notify('归纳卡保存失败，请重试。');return false}
     const nodeId=String(result.node?.id||editingId||'');
     const after=workspaceSnapshot();
@@ -2613,7 +2780,7 @@
     state.workspace=after;
     renderCards();
     if(nodeId){setCardSelection([nodeId]);focusNode(nodeId,{zoom:Math.max(state.zoom,.75)})}
-    notify((editingId?'已更新':'已新增')+meta.label+'。可与题目卡建立关系。');
+    notify((editingId?'已更新':'已新增')+meta.label+'，并同步到“我的归纳卡”。');
     return true;
   }
   function groupBoundsFromNodeIds(nodeIds,padding=42){
@@ -3444,6 +3611,8 @@
     if(analysisPanelOpen(nodeId))closeAnalysisPanel(nodeId);
     clearOptionTransientState(nodeId);
     state.answerSelections.delete(String(nodeId));
+    state.persistentCorrectAnswers.delete(String(nodeId));
+    state.answerSync.delete(String(nodeId));
     const before=workspaceSnapshot();
     state.suppressStoreEvent=true;
     try{store()?.removeNode?.(nodeId,workspaceOptions())}finally{state.suppressStoreEvent=false}
@@ -3477,6 +3646,8 @@
     closeAnalysisPanel();
     clearOptionTransientState();
     state.answerSelections.clear();
+    state.persistentCorrectAnswers.clear();
+    state.answerSync.clear();
     clearCardSelection();
     state.kernel?.history?.clear?.();
     if(state.workspace&&state.workspaceId&&state.workspaceId!==workspaceId){
@@ -3504,6 +3675,7 @@
     renderWorkspaceSelector();
     renderCards();
     applyViewport();
+    refreshPersonalCardReferences();
     replaceUrl(workspace.id,options.focusNodeId||'');
     if(options.focusNodeId)setTimeout(()=>focusNode(options.focusNodeId),0);
     global.KGMultiQuestionWorkspaceFilebar?.markSaved?.();
@@ -3592,6 +3764,18 @@
       item.bank.name
     ].join(' ').toLowerCase().includes(query);
   }
+  function questionSelectionKey(item={}){return questionItemIdentity(item)}
+  function selectedQuestionItems(){return state.questions.filter(item=>state.selectedQuestionKeys.has(questionSelectionKey(item)))}
+  function updateQuestionSelectionMeta(){
+    const count=state.selectedQuestionKeys.size,meta=byId('qwQuestionSelectionMeta'),clear=byId('qwQuestionSelectionClear');
+    if(meta)meta.textContent='已选 '+count+' 题';
+    if(clear)clear.disabled=count===0;
+  }
+  function clearQuestionSelection({render=true}={}){
+    state.selectedQuestionKeys.clear();
+    updateQuestionSelectionMeta();
+    if(render)renderQuestionDock();
+  }
   function renderQuestionDock(){
     const list=byId('qwQuestionList');
     if(!list)return;
@@ -3603,6 +3787,7 @@
     if(meta)meta.textContent=paper
       ?'已发布试卷“'+String(paper.name||'')+'” · 已组 '+Number(stats?.configuredCount||0)+'/'+Number(stats?.targetCount||0)+' 题 · 前端可用 '+state.questions.length+' 题 · 当前画布已有 '+state.cards.size+' 题'
       :'暂无已发布试卷，后台草稿题库不会在前端显示。';
+    updateQuestionSelectionMeta();
     if(!state.questions.length){
       const reason=state.questionLoadError
         ?'读取发布试卷时发生错误：'+state.questionLoadError
@@ -3620,8 +3805,10 @@
       const stableBankId=String(item.bank?.id||question.sourceBankId||'');
       const stablePaperId=String(item.paper?.id||question.sourcePaperId||state.paperId||'');
       const stableReleaseId=String(item.paper?.releaseId||question.sourceReleaseId||'');
+      const checked=state.selectedQuestionKeys.has(questionSelectionKey(item));
       const view=questionDisplayView(question);
-      return '<div class="qw-question-item '+(existing?'in-workspace':'')+'" data-question-index="'+state.questions.indexOf(item)+'" data-question-id="'+escapeHTML(stableQuestionId)+'" data-bank-id="'+escapeHTML(stableBankId)+'" data-paper-id="'+escapeHTML(stablePaperId)+'" data-release-id="'+escapeHTML(stableReleaseId)+'" draggable="'+(!state.readonly)+'">'
+      return '<div class="qw-question-item '+(existing?'in-workspace':'')+(checked?' is-question-selected':'')+'" data-question-index="'+state.questions.indexOf(item)+'" data-question-id="'+escapeHTML(stableQuestionId)+'" data-bank-id="'+escapeHTML(stableBankId)+'" data-paper-id="'+escapeHTML(stablePaperId)+'" data-release-id="'+escapeHTML(stableReleaseId)+'" draggable="'+(!state.readonly)+'">'
+        +'<label class="qw-question-select" title="选择后可整批拖入画布"><input type="checkbox" data-qw-question-select="'+state.questions.indexOf(item)+'" aria-label="选择第 '+String(visibleIndex+1)+' 题"'+(checked?' checked':'')+'><span aria-hidden="true"></span></label>'
         +'<span class="qw-question-drag" data-drag-handle draggable="'+(!state.readonly)+'">⋮⋮</span>'
         +'<div class="qw-question-copy"><span>'+String(visibleIndex+1)+'</span><div><strong>'+escapeHTML(view.title?.zh||question.title||'未命名题目')+englishLine(view.title,'qw-question-title-en')+'</strong>'
         +'<small>'+escapeHTML([question.topic||question.domain||'未分类',question.difficulty||''].filter(Boolean).join(' · '))+'</small></div>'
@@ -3659,6 +3846,57 @@
       width:430,
       height:420
     };
+  }
+  function batchDragPayload(item){
+    const items=state.selectedQuestionKeys.has(questionSelectionKey(item))?selectedQuestionItems():[item];
+    return {kind:'question-batch',items:items.map(source=>({
+      questionId:String(source.question?.id||source.question?.sourceQuestionId||''),
+      bankId:String(source.bank?.id||source.question?.sourceBankId||''),
+      paperId:String(source.paper?.id||source.question?.sourcePaperId||state.paperId||''),
+      releaseId:String(source.paper?.releaseId||source.question?.sourceReleaseId||'')
+    }))};
+  }
+  function batchQuestionPositions(count,anchor={}){
+    const columns=Math.min(3,Math.max(1,Number(count||0))),width=430,height=420,gapX=34,gapY=42;
+    return Array.from({length:Math.max(0,Number(count||0))},(_,index)=>({
+      x:Number(anchor.x||0)+(index%columns)*(width+gapX),
+      y:Number(anchor.y||0)+Math.floor(index/columns)*(height+gapY),width,height
+    }));
+  }
+  function addQuestionItems(items,anchor){
+    if(!canEdit())return {created:[],skipped:0};
+    const ordered=(Array.isArray(items)?items:[]).filter(item=>item?.question);
+    const addable=ordered.filter(item=>!currentNodeByQuestion(item.question,item.bank));
+    const skipped=ordered.length-addable.length;
+    if(!addable.length){notify('所选 '+skipped+' 道题已在当前画布中，未重复添加。');return {created:[],skipped}}
+    const before=workspaceSnapshot(),positions=batchQuestionPositions(addable.length,anchor||defaultNodePosition()),created=[];
+    state.suppressStoreEvent=true;
+    try{
+      addable.forEach((item,index)=>{
+        const preferred=findOpenCardPosition(positions[index],{width:430,height:420});
+        const result=store()?.addQuestionReference?.(
+          {...item.question,sourcePaperId:String(item.paper?.id||item.question.sourcePaperId||state.paperId||''),sourceReleaseId:String(item.paper?.releaseId||item.question.sourceReleaseId||'')},
+          String(item.bank?.id||item.question.sourceBankId||''),preferred,workspaceOptions()
+        );
+        if(result?.created&&result.node)created.push(String(result.node.id));
+      });
+    }finally{state.suppressStoreEvent=false}
+    state.workspace=store()?.ensure?.(workspaceOptions())||state.workspace;
+    const after=workspaceSnapshot();
+    pushWorkspaceHistory('批量加入题目',before,after);
+    renderCards();
+    if(created.length){setCardSelection(created,{reason:'question-batch-added'});focusNode(created[0],{zoom:Math.max(state.zoom,.62)})}
+    notify('已加入 '+created.length+' 道题'+(skipped?'，跳过 '+skipped+' 道已存在题目':'')+'。');
+    return {created,skipped};
+  }
+  function addQuestionByReference(reference={},position){
+    const item=state.questions.find(candidate=>
+      String(candidate.question?.id||candidate.question?.sourceQuestionId||'')===String(reference.questionId||'')
+      &&(!reference.bankId||String(candidate.bank?.id||candidate.question?.sourceBankId||'')===String(reference.bankId))
+      &&(!reference.releaseId||String(candidate.paper?.releaseId||candidate.question?.sourceReleaseId||'')===String(reference.releaseId))
+    );
+    if(!item){notify('这道错题不在当前已发布试卷中。');return {created:false,reason:'not-visible'}}
+    return addQuestionItem(item,position);
   }
   function addQuestionItem(item,position){
     if(!canEdit())return null;
@@ -3985,19 +4223,12 @@
       return;
     }
     const element=event.target?.closest?.('[data-question-index],[data-question-id]');
-    const index=Number(element?.dataset?.questionIndex);
     const item=resolveQuestionItem(element);
     if(!element||!item?.question||!event.dataTransfer){
       event.preventDefault();
       return;
     }
-    state.dragPayload={
-      index,
-      questionId:String(item.question.id||item.question.sourceQuestionId||''),
-      bankId:String(item.bank?.id||item.question.sourceBankId||''),
-      paperId:String(item.paper?.id||item.question.sourcePaperId||state.paperId||''),
-      releaseId:String(item.paper?.releaseId||item.question.sourceReleaseId||'')
-    };
+    state.dragPayload=batchDragPayload(item);
     const raw=JSON.stringify(state.dragPayload);
     event.dataTransfer.effectAllowed='copy';
     safeSetData(event.dataTransfer,MIME,raw);
@@ -4021,7 +4252,8 @@
           const raw=transfer.getData(type);
           if(!raw)continue;
           const parsed=JSON.parse(raw);
-          if(parsed?.questionId)return parsed;
+          if(parsed?.kind==='question-batch'&&Array.isArray(parsed.items))return parsed;
+          if(parsed?.questionId)return {kind:'question-batch',items:[parsed]};
         }catch(e){}
       }
     }
@@ -4073,20 +4305,18 @@
       notify('未能读取拖拽题目，请使用题目右侧的“＋”按钮。');
       return;
     }
-    const indexed=state.questions[payload.index];
-    const item=indexed&&String(indexed.question?.id||indexed.question?.sourceQuestionId||'')===String(payload.questionId||'')
-      &&String(indexed.bank?.id||'')===String(payload.bankId||'')
-      ?indexed
-      :state.questions.find(candidate=>
-        String(candidate.question?.id||candidate.question?.sourceQuestionId||'')===String(payload.questionId||'')
-        &&String(candidate.bank?.id||'')===String(payload.bankId||'')
-      );
-    if(!item){
-      notify('这道题不在当前已发布试卷中，请重新打开题目库。');
+    const items=(payload.items||[]).map(reference=>state.questions.find(candidate=>
+      String(candidate.question?.id||candidate.question?.sourceQuestionId||'')===String(reference.questionId||'')
+      &&String(candidate.bank?.id||candidate.question?.sourceBankId||'')===String(reference.bankId||'')
+      &&(!reference.paperId||String(candidate.paper?.id||candidate.question?.sourcePaperId||'')===String(reference.paperId))
+      &&(!reference.releaseId||String(candidate.paper?.releaseId||candidate.question?.sourceReleaseId||'')===String(reference.releaseId))
+    )).filter(Boolean);
+    if(!items.length){
+      notify('这些题不在当前已发布试卷中，请重新打开题目库。');
       return;
     }
     const point=clientToWorld(event.clientX,event.clientY);
-    addQuestionItem(item,{x:point.x-215,y:point.y-120,width:430,height:420});
+    addQuestionItems(items,{x:point.x-215,y:point.y-120,width:430,height:420});
   }
 
   function beginCardWidthResize(event){
@@ -4552,6 +4782,8 @@
     state.dragPayload=null;
     clearOptionTransientState();
     state.answerSelections.clear();
+    state.persistentCorrectAnswers.clear();
+    state.answerSync.clear();
     state.analysisNodeIds=[];
     state.analysisPanelOffsets.clear();
     clearCardSelection();
@@ -4763,6 +4995,7 @@
       const entry=state.paperCatalog.find(item=>String(item.paper?.releaseId||item.paper?.id)===releaseId)||null;
       state.paperId=String(entry?.paper?.id||'');
       state.releaseId=String(entry?.paper?.releaseId||'');
+      state.selectedQuestionKeys.clear();
       clearPaperTransientState();
       savePaperSelection();
       buildQuestionList();
@@ -4778,6 +5011,7 @@
       });
     });
     byId('qwQuestionList')?.addEventListener('click',event=>{
+      if(event.target.closest?.('[data-qw-question-select]'))return;
       if(event.target.closest?.('[data-qw-retry-questions]')){
         buildQuestionList();
         renderQuestionDock();
@@ -4790,6 +5024,16 @@
       if(existing)focusNode(existing.id);
       else addQuestionItem(item);
     });
+    byId('qwQuestionList')?.addEventListener('change',event=>{
+      const checkbox=event.target.closest?.('[data-qw-question-select]');
+      if(!checkbox)return;
+      const item=resolveQuestionItem(checkbox);
+      if(!item)return;
+      const key=questionSelectionKey(item);
+      if(checkbox.checked)state.selectedQuestionKeys.add(key);else state.selectedQuestionKeys.delete(key);
+      renderQuestionDock();
+    });
+    byId('qwQuestionSelectionClear')?.addEventListener('click',()=>clearQuestionSelection());
     byId('qwQuestionList')?.addEventListener('dragstart',questionDragStart);
     byId('qwQuestionList')?.addEventListener('dragend',questionDragEnd);
     state.nodeLayer.addEventListener('pointerdown',event=>{if(event.target.closest?.('[data-qw-connector]'))beginConnectorDrag(event)});
@@ -4808,6 +5052,12 @@
       if(!card)return;
       const record=state.cards.get(String(card.dataset.nodeId||''));
       if(!record)return;
+      const retryButton=event.target.closest?.('[data-qw-option-retry]');
+      if(retryButton){
+        event.preventDefault();event.stopPropagation();
+        retryPracticeAnswer(record);
+        return;
+      }
       const optionButton=event.target.closest?.('[data-qw-option-key]');
       if(optionButton){
         event.preventDefault();event.stopPropagation();
@@ -5017,7 +5267,12 @@
       const workspace=store()?.ensure?.({activate:true});
       if(workspace)loadWorkspace(workspace.id);
       buildQuestionList();
+      refreshPersonalCardReferences();
       if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
+    });
+    global.addEventListener('kg-personal-synthesis-cards-change',event=>{
+      const detail=event.detail||{};
+      hydratePersonalCards([...(detail.active||[]),...(detail.archived||[])]);
     });
     global.addEventListener('focus',()=>{
       updateReadonly();
@@ -5108,6 +5363,11 @@
     renderCards,
     renderQuestionDock,
     addQuestionItem,
+    addQuestionByReference,
+    insertPersonalCard,
+    hydratePersonalCards,
+    activeWorkspaceId:()=>String(state.workspaceId||''),
+    activeWorkspace:()=>clone(state.workspace),
     focusNode,
     fitAll,
     setViewport,

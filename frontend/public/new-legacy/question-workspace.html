@@ -1,32 +1,32 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.59" lang="zh-CN">
+<html data-release="v9.0-p4.1.60" lang="zh-CN">
 <head>
-<script src="./teaching-content-sync.js?v=v9.0-p4.1.59"></script><!-- kg-teaching-content-sync:generated -->
+<script src="./teaching-content-sync.js?v=v9.0-p4.1.60"></script><!-- kg-teaching-content-sync:generated -->
 <script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
-<script src="./runtime-config.override.js?v=v9.0-p4.1.59"></script><!-- kg-runtime:generated -->
-<script defer src="./direct-entry.js?v=v9.0-p4.1.59"></script><!-- kg-direct-entry:generated -->
-<script defer src="./feature-analytics.js?v=v9.0-p4.1.59"></script><!-- kg-feature-analytics:generated -->
+<script src="./runtime-config.override.js?v=v9.0-p4.1.60"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js?v=v9.0-p4.1.60"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js?v=v9.0-p4.1.60"></script><!-- kg-feature-analytics:generated -->
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-  <title>多题归纳画布｜项目管理综合训练</title><link rel="stylesheet" href="styles/main.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/question-training.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/infinite-learning-canvas.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/progress-workspace-dock.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/canvas-interaction-fixes.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/question-workspace.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.59"/>
-<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/support-center.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/learning-practice-shell.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/question-workspace-p2218.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/question-workspace-p2219.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/unified-canvas-runtime.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/selection-bounds-drag-p4327.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.59"/>
-  <link rel="stylesheet" href="styles/focus-vega-learning.css?v=v9.0-p4.1.59"/>
+  <title>多题归纳画布｜项目管理综合训练</title><link rel="stylesheet" href="styles/main.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/question-training.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/infinite-learning-canvas.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/progress-workspace-dock.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/canvas-interaction-fixes.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/question-workspace.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.60"/>
+<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/support-center.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/learning-practice-shell.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/question-workspace-p2218.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/question-workspace-p2219.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/unified-canvas-runtime.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/selection-bounds-drag-p4327.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.60"/>
+  <link rel="stylesheet" href="styles/focus-vega-learning.css?v=v9.0-p4.1.60"/>
 </head>
 <body class="question-workspace-page" data-ui-skin="focus-vega" data-question-catalog-mode="learning">
   <div class="qw-app">
@@ -45,6 +45,10 @@
       <div class="qw-top-actions lp-top-actions">
         <span class="lp-visually-hidden" data-practice-only>自由练习，不计成绩</span>
         <span class="qw-readonly-badge" id="qwReadOnlyBadge" hidden>只读查看</span>
+        <div class="qw-learning-assets-shortcuts" role="group" aria-label="学习资产">
+          <button type="button" id="qwPersonalCardsBtn" aria-controls="qwPersonalCardsDrawer" aria-expanded="false">我的归纳卡 <strong id="qwPersonalCardsCount">0</strong></button>
+          <button type="button" id="qwMistakesBtn" aria-controls="qwMistakesDrawer" aria-expanded="false">错题集 <strong id="qwMistakesCount">0</strong></button>
+        </div>
         <div class="qw-language-control">
           <div class="qw-language-switch" role="group" aria-label="题目显示方式">
             <button type="button" data-question-language="zh" aria-pressed="true">中</button>
@@ -86,6 +90,35 @@
     </header>
 
     <main class="qw-canvas-shell" id="qwCanvasShell">
+      <div class="qw-learning-assets-backdrop" id="qwLearningAssetsBackdrop" hidden></div>
+      <aside class="qw-learning-assets-drawer" id="qwPersonalCardsDrawer" hidden aria-label="我的归纳卡">
+        <header><div><small>全局个人资产</small><h2>我的归纳卡</h2></div><button type="button" id="qwPersonalCardsClose" aria-label="关闭我的归纳卡">×</button></header>
+        <div class="qw-learning-assets-tools">
+          <input id="qwPersonalCardsSearch" type="search" placeholder="搜索标题、正文或标签" aria-label="搜索我的归纳卡"/>
+          <div role="group" aria-label="归纳卡筛选"><button type="button" class="active" data-personal-card-filter="active">使用中</button><button type="button" data-personal-card-filter="archived">已归档</button></div>
+        </div>
+        <div class="qw-learning-assets-list" id="qwPersonalCardsList"></div>
+        <div class="qw-learning-assets-error" id="qwPersonalCardsError" hidden><span>个人归纳卡加载失败</span><button type="button" id="qwPersonalCardsRetry">重试</button></div>
+      </aside>
+      <aside class="qw-learning-assets-drawer" id="qwMistakesDrawer" hidden aria-label="错题集">
+        <header><div><small>自动收集</small><h2>错题集</h2></div><button type="button" id="qwMistakesClose" aria-label="关闭错题集">×</button></header>
+        <div class="qw-learning-assets-tools">
+          <input id="qwMistakesSearch" type="search" placeholder="搜索错题" aria-label="搜索错题集"/>
+          <div role="group" aria-label="错题筛选"><button type="button" class="active" data-mistake-filter="active">待掌握</button><button type="button" data-mistake-filter="mastered">已掌握</button></div>
+        </div>
+        <div class="qw-learning-assets-list" id="qwMistakesList"></div>
+        <div class="qw-learning-assets-error" id="qwMistakesError" hidden><span>错题集加载失败</span><button type="button" id="qwMistakesRetry">重试</button></div>
+      </aside>
+      <section class="qw-personal-card-editor" id="qwPersonalCardEditor" hidden role="dialog" aria-modal="true" aria-labelledby="qwPersonalCardEditorTitle">
+        <form><header><h2 id="qwPersonalCardEditorTitle">编辑归纳卡</h2><button type="button" id="qwPersonalCardEditorCancel" aria-label="关闭编辑">×</button></header>
+          <label>标题<input id="qwPersonalCardEditorTitleInput" maxlength="200" required/></label>
+          <label>正文<textarea id="qwPersonalCardEditorContent" rows="7" maxlength="20000"></textarea></label>
+          <label>标签<input id="qwPersonalCardEditorTags" placeholder="用逗号分隔"/></label>
+          <div class="qw-personal-card-editor-meta"><label>类型<select id="qwPersonalCardEditorType"><option value="principle">原则</option><option value="routine">套路</option><option value="trap">陷阱</option><option value="note">笔记</option></select></label><label>状态<select id="qwPersonalCardEditorStatus"><option value="draft">待验证</option><option value="verified">已验证</option><option value="mastered">已掌握</option></select></label></div>
+          <p class="qw-personal-card-conflict" id="qwPersonalCardConflict" hidden>此卡已在其他页面修改。<button type="button" id="qwPersonalCardConflictReload">重新加载最新版本</button></p>
+          <footer><button type="button" id="qwPersonalCardEditorDismiss">取消</button><button type="submit" id="qwPersonalCardEditorSave">保存</button></footer>
+        </form>
+      </section>
       <div class="qw-overlay qw-overlay-left">
         <button type="button" class="qw-tool-btn" id="qwQuestionDockBtn" aria-controls="qwQuestionDrawer">
           <span aria-hidden="true">▤</span><span>题目库</span><strong id="qwQuestionCount">0</strong>
@@ -221,6 +254,10 @@
             <button type="button" data-qw-filter="completed">已完成</button>
           </div>
           <div class="lp-question-library-meta" id="qwQuestionDrawerMeta" aria-live="polite"></div>
+          <div class="qw-question-selection-bar" aria-live="polite">
+            <span id="qwQuestionSelectionMeta">已选 0 题</span>
+            <button type="button" id="qwQuestionSelectionClear" disabled>清空选择</button>
+          </div>
         </div>
         <div class="qw-question-list lp-question-library-list" id="qwQuestionList" role="list"></div>
       </aside>
@@ -341,68 +378,71 @@
     </div>
   </div>
 
-  <script defer src="src/01-runtime-config.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/29-auth-core.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/30-standalone-auth-dialog.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/34-role-permissions.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/37-subscription-plans.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/37-subscription-orders.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/37-subscription-redeem-codes.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/37-subscription-core.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/32-wechat-login.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/33-user-center.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/41-account-menu.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/101-engagement-repository.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/103-support-center.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/39-global-shortcuts.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/50-question-data.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/86-activity-schema-v1.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/86-free-mode-language.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/86-question-language-ui.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/58-paper-access-service.js?v=v9.0-p4.1.59"></script>
-  <script defer src="./question-catalog-adapter.js?v=v9.0-p4.1.59"></script><!-- kg-question-catalog:generated -->
-<script defer src="src/59-published-paper-repository.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/59a-published-question-resolver.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/59b-learning-route-context.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/62-learning-session-store.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/62a-learning-progress.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/60-question-bank.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/teacher/shared/difficulty-service.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/principles/principle-repository.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/principles/synthesis-preset-repository.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/principles/question-principle-binding.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/practice/practice-selection-service.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/practice/practice-attempt-repository.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/97-recall-storage.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/96-recall-question-source.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/61-question-repository.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/graph/color-picker-controller.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/graph/floating-color-window-controller.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/graph/shared-color-picker-v2.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/graph/context-menu-controller.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/65-canvas-workspace-store.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/canvas/78-canvas-policy.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/canvas/79-canvas-viewport-controller.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/canvas/80-canvas-card-controller.js?v=v9.0-p4.1.59"></script>
-<script defer src="src/canvas/84-canvas-edge-selection-geometry.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/canvas/82-canvas-selection-controller.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/canvas/83-canvas-history-controller.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/canvas/81-canvas-kernel.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/canvas/85-canvas-appearance-controller.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/canvas/86-canvas-zoom-dock-controller.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/canvas/87-canvas-minimap-controller.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/canvas/88-canvas-settings-controller.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/canvas/90-canvas-selection-filter-controller.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/canvas/91-canvas-alignment-controller.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/canvas/92-canvas-edge-toolbar-controller.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/canvas/89-canvas-runtime.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/78-multi-question-workspace-tabs.js?v=v9.0-p4.1.59"></script>
-  <script defer src="src/79-multi-question-workspace-filebar.js?v=v9.0-p4.1.59"></script>
-  <script src="src/59c-active-learning-mode-policy.js?v=v9.0-p4.1.59"></script><!-- kg-learning-mode-policy:generated -->
-  <script defer src="src/77-multi-question-workspace.js?v=v9.0-p4.1.59"></script>
-<script defer src="src/94-practice-navigation.js?v=v9.0-p4.1.59"></script>
-<script defer src="src/99-learning-practice-shell.js?v=v9.0-p4.1.59"></script>
-<script defer src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.59"></script>
+  <script defer src="src/01-runtime-config.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/29-auth-core.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/30-standalone-auth-dialog.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/34-role-permissions.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/37-subscription-plans.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/37-subscription-orders.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/37-subscription-redeem-codes.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/37-subscription-core.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/32-wechat-login.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/33-user-center.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/41-account-menu.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/101-engagement-repository.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/103-support-center.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/39-global-shortcuts.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/50-question-data.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/86-activity-schema-v1.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/86-free-mode-language.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/86-question-language-ui.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/58-paper-access-service.js?v=v9.0-p4.1.60"></script>
+  <script defer src="./question-catalog-adapter.js?v=v9.0-p4.1.60"></script><!-- kg-question-catalog:generated -->
+<script defer src="src/59-published-paper-repository.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/59a-published-question-resolver.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/59b-learning-route-context.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/62-learning-session-store.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/62a-learning-progress.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/60-question-bank.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/teacher/shared/difficulty-service.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/principles/principle-repository.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/principles/synthesis-preset-repository.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/principles/question-principle-binding.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/practice/practice-selection-service.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/practice/practice-attempt-repository.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/97-recall-storage.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/96-recall-question-source.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/61-question-repository.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/graph/color-picker-controller.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/graph/floating-color-window-controller.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/graph/shared-color-picker-v2.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/graph/context-menu-controller.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/65-canvas-workspace-store.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/canvas/78-canvas-policy.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/canvas/79-canvas-viewport-controller.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/canvas/80-canvas-card-controller.js?v=v9.0-p4.1.60"></script>
+<script defer src="src/canvas/84-canvas-edge-selection-geometry.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/canvas/82-canvas-selection-controller.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/canvas/83-canvas-history-controller.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/canvas/81-canvas-kernel.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/canvas/85-canvas-appearance-controller.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/canvas/86-canvas-zoom-dock-controller.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/canvas/87-canvas-minimap-controller.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/canvas/88-canvas-settings-controller.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/canvas/90-canvas-selection-filter-controller.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/canvas/91-canvas-alignment-controller.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/canvas/92-canvas-edge-toolbar-controller.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/canvas/89-canvas-runtime.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/78-multi-question-workspace-tabs.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/79-multi-question-workspace-filebar.js?v=v9.0-p4.1.60"></script>
+  <script defer src="./practice-learning-adapter.js?v=v9.0-p4.1.60"></script><!-- kg-practice-learning:generated -->
+<script defer src="./personal-card-adapter.js?v=v9.0-p4.1.60"></script><!-- kg-personal-cards:generated -->
+<script src="src/59c-active-learning-mode-policy.js?v=v9.0-p4.1.60"></script><!-- kg-learning-mode-policy:generated -->
+<script defer src="src/77-multi-question-workspace.js?v=v9.0-p4.1.60"></script>
+  <script defer src="src/108-multi-question-learning-assets.js?v=v9.0-p4.1.60"></script>
+<script defer src="src/94-practice-navigation.js?v=v9.0-p4.1.60"></script>
+<script defer src="src/99-learning-practice-shell.js?v=v9.0-p4.1.60"></script>
+<script defer src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.60"></script>
 </body>
 </html>

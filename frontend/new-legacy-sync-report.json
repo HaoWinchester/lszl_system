@@ -1,27 +1,27 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.57",
-  "toVersion": "v9.0-p4.1.59",
+  "fromVersion": "v9.0-p4.1.59",
+  "toVersion": "v9.0-p4.1.60",
   "changes": {
     "added": [
-      "content-prep-studio/src/js/36-server-draft-service.js",
-      "content-prep-studio/src/js/37-shared-draft-ui.js",
-      "content-prep-studio/tests/test_shared_draft_service.js"
+      "src/108-multi-question-learning-assets.js",
+      "tests/multi-question-batch-selection-browser.py",
+      "tests/multi-question-batch-selection.test.js",
+      "tests/multi-question-learning-assets-browser.py",
+      "tests/multi-question-learning-assets.test.js",
+      "tests/multi-question-mistake-sync-browser.py",
+      "tests/multi-question-mistake-sync.test.js",
+      "tests/multi-question-personal-card-reference.test.js"
     ],
     "changed": [
       "VERSION",
-      "content-prep-studio/build.py",
-      "content-prep-studio/dist/content-prep.html",
-      "content-prep-studio/src/css/app.css",
-      "content-prep-studio/src/index.template.html",
-      "content-prep-studio/src/js/10-state-domain.js",
-      "content-prep-studio/src/js/20-page-runtime.js",
-      "content-prep-studio/src/js/30-service-layer.js",
-      "content-prep-studio/src/js/35-server-catalog-service.js",
-      "content-prep-studio/src/js/40-events-bootstrap.js",
-      "content-prep-studio/src/js/45-server-events.js",
-      "content-prep-studio/tests/test_edit_lock_client.js",
-      "content-prep-studio/tests/test_server_ui_contract.py"
+      "question-workspace.html",
+      "src/65-canvas-workspace-store.js",
+      "src/77-multi-question-workspace.js",
+      "styles/question-workspace.css",
+      "tests/multi-question-correct-flash.test.js",
+      "tests/v862-p2216-multi-question-ui-browser.py",
+      "tests/v90-p4313-synthesis-star-practice-browser.py"
     ],
     "removed": []
   },

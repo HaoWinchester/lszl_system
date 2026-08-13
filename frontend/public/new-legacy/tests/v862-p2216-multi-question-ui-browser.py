@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+import shutil
 from playwright.sync_api import sync_playwright
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -9,7 +10,16 @@ def body_html(p):
     return re.sub(r'<script[\s\S]*?</script>','',m.group(1),flags=re.I)
 
 with sync_playwright() as p:
-    b=p.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu'])
+    candidates=[
+        shutil.which('chromium'),
+        shutil.which('chromium-browser'),
+        shutil.which('google-chrome'),
+        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+        '/Applications/Chromium.app/Contents/MacOS/Chromium',
+        p.chromium.executable_path,
+    ]
+    executable=next((item for item in candidates if item and Path(item).exists()),None)
+    b=p.chromium.launch(headless=True,executable_path=executable,args=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu'])
     page=b.new_page(viewport={'width':1366,'height':768})
     page.set_content('<meta name="viewport" content="width=device-width,initial-scale=1"><body class="question-workspace-page">'+body_html('question-workspace.html')+'</body>')
     for st in ['styles/question-workspace.css','styles/learning-practice-shell.css','styles/user-center.css','styles/account-menu.css']:
