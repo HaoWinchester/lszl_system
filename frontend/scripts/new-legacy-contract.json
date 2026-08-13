@@ -202,5 +202,10 @@
     "localStorage": false,
     "sessionStorage": true,
     "indexedDB": true
+  },
+  "releaseValidation": {
+    "commands": [
+      "python3 frontend/e2e/multi_question_learning_assets.py"
+    ]
   }
 }

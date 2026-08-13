@@ -297,5 +297,9 @@ test('release validation runs smoke and visual regression against the candidate'
   assert.ok(validator.includes('frontend/e2e/content_prep_question_bank.py'))
   assert.ok(validator.includes('frontend/e2e/content_prep_concurrency.py'))
   assert.ok(validator.includes('frontend/e2e/practice_mode_initial_view.py'))
+  assert.ok(validator.includes('frontend/e2e/multi_question_learning_assets.py'))
   assert.ok(validator.includes('frontend/e2e/direct_new_legacy_visual.py'))
+
+  const contract = readJson(resolve(scriptsDir, 'new-legacy-contract.json'))
+  assert.ok(contract.releaseValidation?.commands?.includes('python3 frontend/e2e/multi_question_learning_assets.py'))
 })
