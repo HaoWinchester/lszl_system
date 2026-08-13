@@ -109,8 +109,13 @@ def _redirect(request: Request, page: str, defaults: dict[str, str] | None = Non
 
 
 @router.get("/")
-async def practice_entry_page():
-    return RedirectResponse("/practice-mode.html", status_code=307)
+async def landing_page(request: Request):
+    release = _release_or_503()
+    try:
+        path = resolve_asset(release, "landing.html")
+    except ReleaseNotFoundError as exc:
+        raise HTTPException(status_code=503, detail="当前版本缺少官网首页") from exc
+    return FileResponse(path, headers=_static_headers(request, release))
 
 
 @router.get("/learning-path.html")
@@ -231,16 +236,21 @@ async def admin_alias(request: Request):
 
 
 @router.get("/__preview/{version}")
+async def preview_root_redirect(version: str, request: Request):
+    query = f"?{request.url.query}" if request.url.query else ""
+    return RedirectResponse(f"/__preview/{version}/{query}", status_code=307)
+
+
 @router.get("/__preview/{version}/")
-async def preview_root(version: str, request: Request, db: DB):
+async def preview_root(version: str, request: Request):
     try:
         release = preview_release(version)
     except ReleaseNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    bootstrap = await build_bootstrap(
-        request, db, page="learning-path.html", release_version=release.version, read_only=True
+    return FileResponse(
+        _asset_or_404(release, "landing.html"),
+        headers=_static_headers(request, release),
     )
-    return html_response(_asset_or_404(release, "learning-path.html"), bootstrap)
 
 
 @router.get("/__preview/{version}/{asset_path:path}")
@@ -250,6 +260,8 @@ async def preview_asset(version: str, asset_path: str, request: Request, db: DB)
     except ReleaseNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     path = _asset_or_404(release, asset_path)
+    if path.name == "landing.html":
+        return FileResponse(path, headers=_static_headers(request, release))
     if path.suffix.lower() == ".html":
         if await _page_access_denied(request, db, path.name):
             return _forbidden_page()
@@ -316,6 +328,8 @@ async def claim_learning_entry(request: Request, user: CurrentUser, db: DB):
 async def active_asset(asset_path: str, request: Request, db: DB) -> Response:
     release = _release_or_503()
     path = _asset_or_404(release, asset_path)
+    if path.name == "landing.html":
+        return FileResponse(path, headers=_static_headers(request, release))
     if path.suffix.lower() == ".html":
         if await _page_access_denied(request, db, path.name):
             return _forbidden_page()

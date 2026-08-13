@@ -121,6 +121,10 @@ test('update builds an isolated release and atomically selects it', () => {
       && page.indexOf('src/31-learning-entry-chooser.js') < page.indexOf('src/10-graph-editor.js'),
     'release chooser must run after auth core and before graph initialization',
   )
+  const landingPage = readFileSync(resolve(root, sourceVersion, 'site', 'landing.html'), 'utf8')
+  assert.match(landingPage, new RegExp(`styles/landing\\.css\\?v=${sourceVersion}`))
+  assert.match(landingPage, new RegExp(`src/landing\\.js\\?v=${sourceVersion}`))
+  assert.doesNotMatch(landingPage, /server-state-bootstrap|direct-entry|feature-analytics/, 'public landing must not load business runtime adapters')
   const practicePage = readFileSync(resolve(root, sourceVersion, 'site', 'practice-mode.html'), 'utf8')
   assert.match(
     practicePage,
@@ -256,6 +260,42 @@ test('candidate missing a critical content page is rejected before promotion', (
   assert.match(report.error, /admin-console\.html/)
 })
 
+test('candidate missing the public landing page is rejected before promotion', () => {
+  const root = makeRoot()
+  assert.equal(run(root, 'update', source).status, 0)
+  const before = readFileSync(resolve(root, 'current.json'), 'utf8')
+  const harness = resolve(root, 'landing-gate-harness', 'frontend')
+  mkdirSync(harness, { recursive: true })
+  cpSync(resolve(frontendDir, 'scripts'), resolve(harness, 'scripts'), { recursive: true })
+  const harnessSync = resolve(harness, 'scripts', 'sync-new-legacy.js')
+  writeFileSync(
+    harnessSync,
+    readFileSync(harnessSync, 'utf8').replace(
+      "  cpSync(source, out, { recursive: true })",
+      "  cpSync(source, out, { recursive: true })\n  rmSync(resolve(out, 'landing.html'), { force: true })",
+    ),
+  )
+  const harnessCommand = resolve(harness, 'scripts', 'manage-new-legacy.js')
+  const next = resolve(root, 'missing-landing-source')
+  const nextVersion = `${sourceVersion}-missing-landing`
+  cpSync(source, next, { recursive: true })
+  writeFileSync(resolve(next, 'VERSION'), `${nextVersion}\n`)
+  writeFileSync(resolve(next, 'landing-gate-padding.txt'), 'keeps the candidate file count equal to active\n')
+
+  const result = spawnSync(
+    process.execPath,
+    [harnessCommand, 'update', next, '--root', root, '--skip-browser'],
+    { cwd: repoDir, encoding: 'utf8' },
+  )
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /候选 site 缺少关键文件.*landing\.html/s)
+  assert.equal(readFileSync(resolve(root, 'current.json'), 'utf8'), before)
+  const report = readJson(resolve(root, nextVersion, 'validation.json'))
+  assert.equal(report.passed, false)
+  assert.match(report.error, /landing\.html/)
+})
+
 test('rollback selects the previous successful release', () => {
   const root = makeRoot()
   assert.equal(run(root, 'update', source).status, 0)
@@ -283,6 +323,8 @@ test('release validation runs smoke and visual regression against the candidate'
 
   // full_role_regression.py 绑定 v8.6 全字段 UI，v9 重构（简化模式 + 试卷独立页）后待重写，暂移出验收。
   assert.ok(validator.includes('frontend/e2e/new_legacy_smoke.py'))
+  assert.ok(validator.includes('new-legacy/tests/landing-page-contract.test.js'))
+  assert.ok(validator.includes('new-legacy/tests/landing-page-browser.py'))
   assert.ok(validator.includes('content-prep-studio/tests/test_server_catalog.js'))
   assert.ok(validator.includes('frontend/e2e/content_prep_question_bank.py'))
   assert.ok(validator.includes('frontend/e2e/content_prep_concurrency.py'))

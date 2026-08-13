@@ -659,6 +659,9 @@ function versionPageRelease(html, version) {
 }
 
 function injectPage(html, page, version) {
+  if (page === 'landing.html') {
+    return versionPageAssets(versionPageRelease(html, version), version)
+  }
   const injection = [
     '<script src="./teaching-content-sync.js"></script><!-- kg-teaching-content-sync:generated -->',
     '<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->',

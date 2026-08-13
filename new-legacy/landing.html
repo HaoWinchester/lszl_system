@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="zh-CN" class="landing-page">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="description" content="幻谱是为 PMP 备考打造的知识图谱学习平台，用图谱、做题、归纳和主动回忆，把零散考点连成完整知识网络。"/>
+  <meta name="theme-color" content="#f4f0e6"/>
+  <title>幻谱｜PMP 知识图谱学习平台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23153c34'/%3E%3Ccircle cx='13' cy='13' r='3' fill='%23f3c45e'/%3E%3Ccircle cx='51' cy='13' r='3' fill='%23f3c45e'/%3E%3Ccircle cx='13' cy='51' r='3' fill='%23f3c45e'/%3E%3Ccircle cx='51' cy='51' r='3' fill='%23f3c45e'/%3E%3Cpath d='M15 15 49 49M49 15 15 49' stroke='%23f3c45e' stroke-opacity='.35'/%3E%3Ctext x='32' y='43' text-anchor='middle' font-size='30' font-weight='700' fill='%23f4f0e6'%3E%E5%B9%BB%3C/text%3E%3C/svg%3E"/>
+  <link rel="stylesheet" href="styles/landing.css"/>
+</head>
+<body>
+  <a class="landing-skip-link" href="#main-content">跳到主要内容</a>
+
+  <header class="landing-header" data-landing-header>
+    <div class="landing-header-inner">
+      <a class="landing-brand" href="/" aria-label="幻谱首页">
+        <span class="landing-brand-mark" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+          <b>幻</b>
+        </span>
+        <span class="landing-brand-copy"><strong>幻谱</strong><small>PMP KNOWLEDGE ATLAS</small></span>
+      </a>
+
+      <button class="landing-nav-toggle" type="button" aria-label="打开导航菜单" aria-expanded="false" aria-controls="landingNavigation" data-landing-nav-toggle>
+        <span></span><span></span><span></span>
+      </button>
+
+      <div class="landing-nav-wrap" id="landingNavigation" data-landing-nav>
+        <nav class="landing-nav" aria-label="主要导航">
+          <a href="#why-huanpu">为什么选择幻谱</a>
+          <a href="#learning-loop">备考闭环</a>
+          <a href="#product-tour">产品体验</a>
+          <a href="#faq">常见问题</a>
+        </nav>
+        <div class="landing-header-actions">
+          <a class="landing-login-link" href="/login">登录</a>
+          <a class="landing-button landing-button-dark landing-header-cta" href="/graph">
+            <span>进入知识图谱</span>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 6l4 4-4 4"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <section class="landing-hero" aria-labelledby="landingHeroTitle">
+      <div class="landing-grain" aria-hidden="true"></div>
+      <div class="landing-hero-orbit landing-hero-orbit-one" aria-hidden="true"></div>
+      <div class="landing-hero-orbit landing-hero-orbit-two" aria-hidden="true"></div>
+      <div class="landing-container landing-hero-layout">
+        <div class="landing-hero-copy" data-reveal>
+          <p class="landing-eyebrow"><span></span>为 PMP 备考而生</p>
+          <h1 id="landingHeroTitle">把零散考点，<br/>连成一张<span>会生长的图谱。</span></h1>
+          <p class="landing-hero-lead">从理解、做题到主动回忆，让每一个知识点都找到位置。告别反复翻书，用一张看得见的知识网络掌握 PMP。</p>
+          <div class="landing-hero-actions">
+            <a class="landing-button landing-button-accent" href="/graph">
+              <span>免费进入知识图谱</span>
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 6l4 4-4 4"/></svg>
+            </a>
+            <a class="landing-text-link" href="#learning-loop">看看如何备考 <span aria-hidden="true">↓</span></a>
+          </div>
+          <div class="landing-hero-proof" aria-label="幻谱核心学习方式">
+            <span><i aria-hidden="true"></i>知识成网</span>
+            <span><i aria-hidden="true"></i>错题归位</span>
+            <span><i aria-hidden="true"></i>主动回忆</span>
+          </div>
+        </div>
+
+        <div class="landing-hero-visual" aria-label="PMP 知识点关系示意图" data-reveal>
+          <svg class="landing-hero-lines" viewBox="0 0 640 560" aria-hidden="true">
+            <path class="line line-a" d="M180 172C268 161 313 176 385 221"/>
+            <path class="line line-b" d="M186 191C240 264 232 326 178 382"/>
+            <path class="line line-c" d="M432 259C466 314 469 351 446 407"/>
+            <path class="line line-d" d="M218 402C296 423 344 427 406 420"/>
+            <path class="line line-e" d="M429 224C494 181 531 170 585 175"/>
+            <circle cx="286" cy="171" r="4"/><circle cx="236" cy="296" r="4"/><circle cx="466" cy="329" r="4"/><circle cx="323" cy="423" r="4"/>
+          </svg>
+          <div class="landing-graph-card landing-graph-card-root">
+            <span class="landing-graph-glyph">路</span>
+            <div><small>进度管理</small><strong>关键路径法</strong></div>
+          </div>
+          <div class="landing-graph-card landing-graph-card-float">
+            <span class="landing-graph-glyph">浮</span>
+            <div><small>进度分析</small><strong>总浮动时间</strong></div>
+          </div>
+          <div class="landing-graph-card landing-graph-card-crash">
+            <span class="landing-graph-glyph">压</span>
+            <div><small>进度优化</small><strong>进度压缩</strong></div>
+          </div>
+          <div class="landing-graph-card landing-graph-card-value">
+            <span class="landing-graph-glyph">值</span>
+            <div><small>绩效测量</small><strong>挣值分析</strong></div>
+          </div>
+          <div class="landing-graph-card landing-graph-card-change">
+            <span class="landing-graph-glyph">变</span>
+            <div><small>整合管理</small><strong>实施整体变更控制</strong></div>
+          </div>
+          <div class="landing-hero-note">
+            <span aria-hidden="true">01</span>
+            <p>知识不是一排孤立的定义，<br/><strong>关系才是理解的起点。</strong></p>
+          </div>
+        </div>
+      </div>
+      <div class="landing-scroll-cue" aria-hidden="true"><span></span>向下探索</div>
+    </section>
+
+    <section class="landing-problem" id="why-huanpu" aria-labelledby="problemTitle">
+      <div class="landing-container">
+        <div class="landing-section-heading landing-section-heading-centered" data-reveal>
+          <p class="landing-section-kicker">WHY HUANPU <span>01</span></p>
+          <h2 id="problemTitle">PMP 难的不是内容多，<br/>而是知识始终<span>没有连起来。</span></h2>
+          <p>你缺少的可能不是下一本资料，而是一套能把理解、错误和记忆连在一起的方法。</p>
+        </div>
+        <div class="landing-problem-grid">
+          <article class="landing-problem-card" data-reveal>
+            <span class="landing-problem-index">01</span>
+            <div class="landing-problem-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 5a11 11 0 1 0 7.8 3.2M16 10v7l5 3"/><path d="M23 3v6h6"/></svg></div>
+            <h3>看完就忘</h3>
+            <p>章节学完了，面对情境题却想不起该用哪个知识点，熟悉感并不等于真正掌握。</p>
+            <div class="landing-problem-thread" aria-hidden="true"></div>
+          </article>
+          <article class="landing-problem-card landing-problem-card-shifted" data-reveal>
+            <span class="landing-problem-index">02</span>
+            <div class="landing-problem-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M5 8h8v8H5zM19 16h8v8h-8zM13 12l6 4M13 20l6-4"/></svg></div>
+            <h3>错题零散</h3>
+            <p>做过很多题，错误原因却没有回到知识体系里。下次换一个情境，同样的误区再次出现。</p>
+            <div class="landing-problem-thread" aria-hidden="true"></div>
+          </article>
+          <article class="landing-problem-card" data-reveal>
+            <span class="landing-problem-index">03</span>
+            <div class="landing-problem-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M7 25C8 13 14 7 25 6M11 11h9v9"/><circle cx="8" cy="25" r="2"/></svg></div>
+            <h3>复习失焦</h3>
+            <p>不知道哪里薄弱，只能一遍又一遍从头翻书。花了很多时间，却没有形成清晰的提升路径。</p>
+            <div class="landing-problem-thread" aria-hidden="true"></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-loop" id="learning-loop" aria-labelledby="loopTitle">
+      <div class="landing-loop-grid" aria-hidden="true"></div>
+      <div class="landing-container">
+        <div class="landing-section-heading landing-section-heading-light" data-reveal>
+          <p class="landing-section-kicker">THE LEARNING LOOP <span>02</span></p>
+          <h2 id="loopTitle">不是多学一遍，<br/>而是让知识真正<span>形成闭环。</span></h2>
+          <p>每一步都有清晰产出，下一步都建立在前一步之上。</p>
+        </div>
+        <ol class="landing-loop-steps">
+          <li class="landing-loop-step" data-reveal>
+            <div class="landing-loop-number">01</div>
+            <div class="landing-loop-symbol" aria-hidden="true"><svg viewBox="0 0 40 40"><circle cx="12" cy="13" r="4"/><circle cx="29" cy="11" r="4"/><circle cx="24" cy="29" r="4"/><path d="M16 13l9-2M14 17l8 9M28 15l-3 10"/></svg></div>
+            <p class="landing-loop-meta">SEE THE RELATIONSHIP</p>
+            <h3>构建图谱</h3>
+            <p>看见过程、原则与知识领域之间的关系，让每个考点在体系中找到位置。</p>
+          </li>
+          <li class="landing-loop-step" data-reveal>
+            <div class="landing-loop-number">02</div>
+            <div class="landing-loop-symbol" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M10 7h20v26H10zM15 14h10M15 20h10M15 26h6"/><path d="M27 25l3 3 5-7"/></svg></div>
+            <p class="landing-loop-meta">TEST YOUR MODEL</p>
+            <h3>做题验证</h3>
+            <p>在真实情境中检验理解，关注为什么选择，而不是记住一个答案。</p>
+          </li>
+          <li class="landing-loop-step" data-reveal>
+            <div class="landing-loop-number">03</div>
+            <div class="landing-loop-symbol" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M8 10h9v9H8zM23 21h9v9h-9zM17 14h10M27 14v7M17 25h6"/></svg></div>
+            <p class="landing-loop-meta">RETURN TO THE MAP</p>
+            <h3>归纳错因</h3>
+            <p>把题目、线索和易错点重新放回知识网络，让每次错误都留下结构。</p>
+          </li>
+          <li class="landing-loop-step" data-reveal>
+            <div class="landing-loop-number">04</div>
+            <div class="landing-loop-symbol" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M9 20a11 11 0 1 0 4-8.5M8 8v8h8"/><path d="M20 14v7l5 3"/></svg></div>
+            <p class="landing-loop-meta">REBUILD FROM MEMORY</p>
+            <h3>主动回忆</h3>
+            <p>脱离答案重建路径，用真正的提取练习形成更牢固的长期记忆。</p>
+          </li>
+        </ol>
+        <div class="landing-loop-statement" data-reveal>
+          <span>理解</span><i aria-hidden="true"></i><span>应用</span><i aria-hidden="true"></i><span>记住</span>
+          <p>一次学习循环，完成从“看过”到“掌握”的转变。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-products" id="product-tour" aria-labelledby="productTitle">
+      <div class="landing-container">
+        <div class="landing-products-heading" data-reveal>
+          <div class="landing-section-heading">
+            <p class="landing-section-kicker">INSIDE HUANPU <span>03</span></p>
+            <h2 id="productTitle">你的备考，<br/>不止停留在<span>笔记里。</span></h2>
+          </div>
+          <p>四种学习方式，共享同一套知识脉络。这里展示的每一屏，都来自幻谱当前真实产品。</p>
+        </div>
+
+        <div class="landing-product-tabs" role="tablist" aria-label="幻谱产品功能" data-product-tabs>
+          <button class="landing-product-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="productPanelGraph" id="productTabGraph" tabindex="0" data-product-tab="graph"><span>01</span>知识图谱</button>
+          <button class="landing-product-tab" type="button" role="tab" aria-selected="false" aria-controls="productPanelPractice" id="productTabPractice" tabindex="-1" data-product-tab="practice"><span>02</span>做题模式</button>
+          <button class="landing-product-tab" type="button" role="tab" aria-selected="false" aria-controls="productPanelWorkspace" id="productTabWorkspace" tabindex="-1" data-product-tab="workspace"><span>03</span>知识归纳</button>
+          <button class="landing-product-tab" type="button" role="tab" aria-selected="false" aria-controls="productPanelRecall" id="productTabRecall" tabindex="-1" data-product-tab="recall"><span>04</span>深度回忆</button>
+        </div>
+
+        <div class="landing-product-panels">
+          <article class="landing-product-panel is-active" role="tabpanel" aria-labelledby="productTabGraph" id="productPanelGraph" data-product="graph" data-product-panel="graph">
+            <div class="landing-product-browser">
+              <div class="landing-product-browser-bar" aria-hidden="true"><span></span><span></span><span></span><b>幻谱 · 知识图谱</b></div>
+              <div class="landing-product-media">
+                <img src="assets/landing/graph.png" alt="幻谱知识图谱真实界面，画布上展示 PMP 知识领域节点与关系" width="1440" height="900" loading="eager" data-product-image/>
+                <div class="landing-image-fallback" data-image-fallback><strong>知识图谱</strong><p>查看知识节点、关系线与完整画布结构。</p><a href="/graph">进入知识图谱</a></div>
+              </div>
+            </div>
+            <div class="landing-product-copy">
+              <p class="landing-product-count">01 / 04</p>
+              <h3>让知识的关系<br/><span>一眼可见</span></h3>
+              <p>把过程组、知识领域和关键方法放进同一张无限画布。拖动、连接、补充说明，在整理中完成理解。</p>
+              <ul><li>自由组织知识节点</li><li>用关系线表达前置、包含与因果</li><li>支持缩放、搜索和多图谱管理</li></ul>
+              <a class="landing-product-link" href="/graph">打开知识图谱 <span aria-hidden="true">↗</span></a>
+            </div>
+          </article>
+
+          <article class="landing-product-panel" role="tabpanel" aria-labelledby="productTabPractice" id="productPanelPractice" data-product="practice" data-product-panel="practice">
+            <div class="landing-product-browser">
+              <div class="landing-product-browser-bar" aria-hidden="true"><span></span><span></span><span></span><b>幻谱 · 做题模式</b></div>
+              <div class="landing-product-media">
+                <img src="assets/landing/practice.png" alt="幻谱做题模式真实界面，展示试卷选择与练习入口" width="1440" height="900" loading="lazy" data-product-image/>
+                <div class="landing-image-fallback" data-image-fallback><strong>做题模式</strong><p>通过已发布试卷检验当前知识掌握情况。</p><a href="/practice-mode.html">进入做题模式</a></div>
+              </div>
+            </div>
+            <div class="landing-product-copy">
+              <p class="landing-product-count">02 / 04</p>
+              <h3>用真实情境<br/><span>验证理解</span></h3>
+              <p>选择已发布试卷开始练习，在选项反馈与解析中定位误区。不是追求刷题数量，而是看清自己为什么会错。</p>
+              <ul><li>按试卷进入完整练习</li><li>即时反馈答案状态</li><li>把练习结果带回后续归纳</li></ul>
+              <a class="landing-product-link" href="/practice-mode.html">进入做题模式 <span aria-hidden="true">↗</span></a>
+            </div>
+          </article>
+
+          <article class="landing-product-panel" role="tabpanel" aria-labelledby="productTabWorkspace" id="productPanelWorkspace" data-product="workspace" data-product-panel="workspace">
+            <div class="landing-product-browser">
+              <div class="landing-product-browser-bar" aria-hidden="true"><span></span><span></span><span></span><b>幻谱 · 多题归纳</b></div>
+              <div class="landing-product-media">
+                <img src="assets/landing/workspace.png" alt="幻谱知识归纳真实界面，展示多题归纳画布与题目入口" width="1440" height="900" loading="lazy" data-product-image/>
+                <div class="landing-image-fallback" data-image-fallback><strong>知识归纳</strong><p>把多道题放进同一张画布，对比线索与解题规律。</p><a href="/question-workspace.html">进入知识归纳</a></div>
+              </div>
+            </div>
+            <div class="landing-product-copy">
+              <p class="landing-product-count">03 / 04</p>
+              <h3>把错题重新放回<br/><span>知识网络</span></h3>
+              <p>在同一张画布中对比多道题，提炼触发词、干扰项和解题原则，让零散错误沉淀成可复用的判断方法。</p>
+              <ul><li>多道题并排对比</li><li>归纳线索、知识点与关联</li><li>形成自己的解题规律画布</li></ul>
+              <a class="landing-product-link" href="/question-workspace.html">进入知识归纳 <span aria-hidden="true">↗</span></a>
+            </div>
+          </article>
+
+          <article class="landing-product-panel" role="tabpanel" aria-labelledby="productTabRecall" id="productPanelRecall" data-product="recall" data-product-panel="recall">
+            <div class="landing-product-browser">
+              <div class="landing-product-browser-bar" aria-hidden="true"><span></span><span></span><span></span><b>幻谱 · 深度回忆</b></div>
+              <div class="landing-product-media">
+                <img src="assets/landing/recall.png" alt="幻谱深度回忆真实界面，展示联想画布与回忆状态" width="1440" height="900" loading="lazy" data-product-image/>
+                <div class="landing-image-fallback" data-image-fallback><strong>深度回忆</strong><p>脱离答案，在联想画布上主动重建知识路径。</p><a href="/knowledge-recall.html">进入深度回忆</a></div>
+              </div>
+            </div>
+            <div class="landing-product-copy">
+              <p class="landing-product-count">04 / 04</p>
+              <h3>离开答案，检验<br/><span>真正掌握</span></h3>
+              <p>从一个线索开始回忆相关概念和关系。只有能主动重建出来的知识，才真正属于你。</p>
+              <ul><li>用关键词触发联想</li><li>在画布上重建知识路径</li><li>直观看见回忆的完整程度</li></ul>
+              <a class="landing-product-link" href="/knowledge-recall.html">进入深度回忆 <span aria-hidden="true">↗</span></a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-method" aria-labelledby="methodTitle">
+      <div class="landing-container landing-method-layout">
+        <div class="landing-method-visual" aria-hidden="true" data-reveal>
+          <div class="landing-method-orbit landing-method-orbit-a"></div>
+          <div class="landing-method-orbit landing-method-orbit-b"></div>
+          <div class="landing-method-core"><span>真正掌握</span><small>LONG-TERM<br/>MEMORY</small></div>
+          <span class="landing-method-node landing-method-node-a">理解关系</span>
+          <span class="landing-method-node landing-method-node-b">情境应用</span>
+          <span class="landing-method-node landing-method-node-c">主动提取</span>
+        </div>
+        <div class="landing-method-copy" data-reveal>
+          <p class="landing-section-kicker">WHY IT WORKS <span>04</span></p>
+          <h2 id="methodTitle">每一种操作，<br/>都对应一种<span>更扎实的学习行为。</span></h2>
+          <p class="landing-method-lead">幻谱不堆叠功能，而是把有效的备考动作变成一条可以执行、可以回看的路径。</p>
+          <ol class="landing-method-list">
+            <li><span>01</span><div><strong>用关系理解，而不是孤立背诵</strong><p>把新知识放进已有结构，知道它从哪里来、和什么相连。</p></div></li>
+            <li><span>02</span><div><strong>用题目暴露误区，而不是追求数量</strong><p>每一次错误都指向一个具体的理解缺口。</p></div></li>
+            <li><span>03</span><div><strong>用主动回忆检验，而不是反复阅读</strong><p>不看答案重建知识，才能知道自己是否真的记住。</p></div></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-faq" id="faq" aria-labelledby="faqTitle">
+      <div class="landing-container landing-faq-layout">
+        <div class="landing-section-heading landing-faq-heading" data-reveal>
+          <p class="landing-section-kicker">BEFORE YOU START <span>05</span></p>
+          <h2 id="faqTitle">开始之前，<br/>你可能还想知道。</h2>
+          <p>找不到答案？登录后可以从软件内进入帮助中心。</p>
+        </div>
+        <div class="landing-faq-list" data-reveal>
+          <details class="landing-faq-item">
+            <summary data-faq-trigger aria-expanded="false" aria-controls="faqAnswer1"><span><i>01</i>没有整理过知识图谱，可以直接开始吗？</span><b aria-hidden="true"></b></summary>
+            <div class="landing-faq-answer" id="faqAnswer1"><p>可以。你可以从空白图谱开始，也可以先浏览现有的 PMP 示例结构。建议从正在学习的章节选出 5—10 个核心考点，先建立第一组关系。</p></div>
+          </details>
+          <details class="landing-faq-item">
+            <summary data-faq-trigger aria-expanded="false" aria-controls="faqAnswer2"><span><i>02</i>幻谱适合哪个阶段的 PMP 学员？</span><b aria-hidden="true"></b></summary>
+            <div class="landing-faq-answer" id="faqAnswer2"><p>从刚开始建立知识框架，到冲刺阶段整理错题和主动回忆，都可以使用。基础阶段侧重构建图谱，强化阶段侧重做题归纳，冲刺阶段侧重快速回忆。</p></div>
+          </details>
+          <details class="landing-faq-item">
+            <summary data-faq-trigger aria-expanded="false" aria-controls="faqAnswer3"><span><i>03</i>需要安装软件吗？</span><b aria-hidden="true"></b></summary>
+            <div class="landing-faq-answer" id="faqAnswer3"><p>不需要。幻谱在现代浏览器中即可使用。为获得更舒适的图谱编辑体验，建议优先使用电脑端浏览器。</p></div>
+          </details>
+          <details class="landing-faq-item">
+            <summary data-faq-trigger aria-expanded="false" aria-controls="faqAnswer4"><span><i>04</i>我的学习内容会自动保存吗？</span><b aria-hidden="true"></b></summary>
+            <div class="landing-faq-answer" id="faqAnswer4"><p>登录后创建和修改的正式学习内容会通过系统服务保存；页面会显示保存状态。访客进入时请留意页面提示，重要内容建议先登录再编辑。</p></div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-closing" aria-labelledby="closingTitle">
+      <div class="landing-closing-lines" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="landing-closing-node landing-closing-node-a" aria-hidden="true">范</div>
+      <div class="landing-closing-node landing-closing-node-b" aria-hidden="true">进</div>
+      <div class="landing-closing-node landing-closing-node-c" aria-hidden="true">风</div>
+      <div class="landing-container landing-closing-content" data-reveal>
+        <p>YOUR KNOWLEDGE, CONNECTED.</p>
+        <h2 id="closingTitle">从第一个知识点开始，<br/>让备考真正<span>连起来。</span></h2>
+        <p>打开幻谱，建立属于你的 PMP 知识网络。</p>
+        <a class="landing-button landing-button-dark landing-closing-button" href="/graph">
+          <span>进入知识图谱</span>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 6l4 4-4 4"/></svg>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="landing-footer">
+    <div class="landing-container landing-footer-main">
+      <div>
+        <a class="landing-brand landing-brand-footer" href="/" aria-label="幻谱首页">
+          <span class="landing-brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><b>幻</b></span>
+          <span class="landing-brand-copy"><strong>幻谱</strong><small>PMP KNOWLEDGE ATLAS</small></span>
+        </a>
+        <p>让零散知识形成结构，<br/>让每一次学习留下连接。</p>
+      </div>
+      <nav aria-label="页脚导航">
+        <div><strong>开始使用</strong><a href="/graph">知识图谱</a><a href="/practice-mode.html">做题模式</a><a href="/question-workspace.html">知识归纳</a><a href="/knowledge-recall.html">深度回忆</a></div>
+        <div><strong>支持</strong><a href="/help-center.html">帮助中心</a><a href="/login">登录</a></div>
+      </nav>
+    </div>
+    <div class="landing-container landing-footer-bottom"><span>© 2026 幻谱 · PMP 知识图谱学习平台</span><span>从理解到记住，让知识真正属于你。</span></div>
+  </footer>
+
+  <script src="src/landing.js"></script>
+</body>
+</html>
