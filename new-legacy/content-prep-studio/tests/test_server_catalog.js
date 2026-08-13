@@ -40,6 +40,29 @@ async function testRelativeUrlsAndCredentials(){
   assert.ok(calls.every(call=>call.options.credentials==='include'));
 }
 
+async function testListBankQuestionsReadsEveryCatalogPage(){
+  const calls=[];
+  const service=loadService(async(url,options={})=>{
+    calls.push({url,options});
+    if(url==='/api/v1/question-catalog/banks/bank-1/questions?page=1&page_size=200'){
+      return response(200,{questions:[{id:'q-1'},{id:'q-2'}],total:3,page:1,pageSize:200});
+    }
+    if(url==='/api/v1/question-catalog/banks/bank-1/questions?page=2&page_size=200'){
+      return response(200,{questions:[{id:'q-3'}],total:3,page:2,pageSize:200});
+    }
+    throw new Error(`unexpected request ${url}`);
+  });
+
+  const questions=await service.listBankQuestions('bank-1');
+
+  assert.deepEqual(Array.from(questions,question=>question.id),['q-1','q-2','q-3']);
+  assert.deepEqual(calls.map(call=>call.url),[
+    '/api/v1/question-catalog/banks/bank-1/questions?page=1&page_size=200',
+    '/api/v1/question-catalog/banks/bank-1/questions?page=2&page_size=200',
+  ]);
+  assert.ok(calls.every(call=>call.options.credentials==='include'));
+}
+
 async function testStableErrorMapping(){
   const expected=new Map([
     [401,'AUTH_REQUIRED'],
@@ -183,6 +206,7 @@ async function testSharedContentAndPrincipleCrudUseServerApis(){
 
 Promise.resolve()
   .then(testRelativeUrlsAndCredentials)
+  .then(testListBankQuestionsReadsEveryCatalogPage)
   .then(testStableErrorMapping)
   .then(testWorkspaceMetadataMigrationIsStableAndContentSafe)
   .then(testNetworkRetryReusesIdempotencyKeyAndCommitsMetadataLast)

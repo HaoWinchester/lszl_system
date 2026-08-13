@@ -254,6 +254,19 @@
       publishContentRevision(result,{entityType:'bank',entityId:String(result?.bank?.id||'')});
       return result.bank;
     },
+    async listBankQuestions(bankId){
+      const id=String(bankId||'').trim();
+      if(!id)return [];
+      const pageSize=200,questions=[];
+      let page=1,total=0;
+      do{
+        const result=await request(`/question-catalog/banks/${encodeURIComponent(id)}/questions?page=${page}&page_size=${pageSize}`);
+        questions.push(...(Array.isArray(result.questions)?result.questions:[]));
+        total=Number(result.total??questions.length);
+        page+=1;
+      }while(questions.length<total);
+      return questions;
+    },
     async loadQuestion(questionId){return (await request(`/question-catalog/questions/${encodeURIComponent(questionId)}`)).question},
     async getBatch(batchId){return (await request(`/content-prep/batches/${encodeURIComponent(batchId)}`)).batch},
     syncMetadata,
