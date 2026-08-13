@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, relative, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -148,6 +148,13 @@ test('sync copies v8.6.0 and injects the direct runtime without editing upstream
   assert.doesNotMatch(page, /new-legacy-navigation-bridge\.js/)
   assert.match(readFileSync(resolve(item.output, 'src/64-flow-orchestrator.js'), 'utf8'), /publishingSessionChange/)
   assert.match(readFileSync(resolve(item.output, 'src/64-flow-orchestrator.js'), 'utf8'), /if\(!saved\)return clone\(current\)/)
+  const workspacePage = readFileSync(resolve(item.output, 'question-workspace.html'), 'utf8')
+  assert.ok(
+    workspacePage.indexOf('practice-learning-adapter.js') < workspacePage.indexOf('personal-card-adapter.js')
+      && workspacePage.indexOf('personal-card-adapter.js') < workspacePage.indexOf('src/77-multi-question-workspace.js'),
+    'workspace learning adapters must load before the page behavior',
+  )
+  assert.ok(existsSync(resolve(item.output, 'personal-card-adapter.js')))
 })
 
 test('sync fails closed when a required page is missing', (t) => {

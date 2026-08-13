@@ -729,6 +729,22 @@ function injectPage(html, page, version) {
       `<script defer src="./practice-learning-adapter.js"></script><!-- kg-practice-learning:generated -->\n${practiceTag}`,
     )
   }
+  if (page === 'question-workspace.html'
+    && (!generated.includes('kg-practice-learning:generated') || !generated.includes('kg-personal-cards:generated'))) {
+    const workspaceTag = '<script defer src="src/77-multi-question-workspace.js"></script>'
+    if (!generated.includes(workspaceTag)) {
+      throw new Error('new-legacy 多题归纳脚本顺序已变化，请复核学习资产适配器')
+    }
+    const adapters = [
+      !generated.includes('kg-practice-learning:generated')
+        ? '<script defer src="./practice-learning-adapter.js"></script><!-- kg-practice-learning:generated -->'
+        : '',
+      !generated.includes('kg-personal-cards:generated')
+        ? '<script defer src="./personal-card-adapter.js"></script><!-- kg-personal-cards:generated -->'
+        : '',
+    ].filter(Boolean).join('\n')
+    generated = generated.replace(workspaceTag, `${adapters}\n${workspaceTag}`)
+  }
   if (page === 'knowledge-recall.html' && !generated.includes('kg-recall-progress:generated')) {
     const recallTag = '<script defer src="src/86-knowledge-recall.js"></script>'
     if (generated.includes(recallTag)) {

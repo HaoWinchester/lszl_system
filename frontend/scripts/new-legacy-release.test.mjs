@@ -132,6 +132,10 @@ test('update builds an isolated release and atomically selects it', () => {
     new RegExp(`src/41-account-menu\\.js\\?v=${sourceVersion}`),
     'release pages must cache-bust local business scripts',
   )
+  const workspacePage = readFileSync(resolve(root, sourceVersion, 'site', 'question-workspace.html'), 'utf8')
+  assert.match(workspacePage, /practice-learning-adapter\.js/)
+  assert.match(workspacePage, /personal-card-adapter\.js/)
+  assert.ok(workspacePage.indexOf('personal-card-adapter.js') < workspacePage.indexOf('src/77-multi-question-workspace.js'))
   assert.match(
     practicePage,
     /<script src="\.\/server-state-bootstrap\.js"><\/script>/,
