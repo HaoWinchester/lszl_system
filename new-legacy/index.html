@@ -97,11 +97,11 @@
 <div class="cards-layer" id="cardsLayer"></div>
 </div>
 <div class="help-card" id="helpCard">
-<button id="hideHelpBtn">×</button>
-<strong>通用知识图谱操作</strong><br/>
-      新增知识点后，填写分类、难度、关键词、说明。选中卡牌后会显示四个连接点：点击连接点可快速创建相邻卡牌，按住并拖到其他卡牌可建立无文字关系线；双击关系线可补充关系文字。手机端可长按知识点编辑，双指缩放画布。
-      <div class="help-card-actions"><button class="help-card-tour-btn" id="guidedTourStartBtn" type="button">查看使用说明</button></div>
-    </div>
+<button class="help-card-close" id="hideHelpBtn" type="button" aria-label="关闭使用提示">×</button>
+<div class="help-card-copy"><strong>通用知识图谱操作</strong><br/>
+      新增知识点后，填写分类、难度、关键词、说明。选中卡牌后会显示四个连接点：点击连接点可快速创建相邻卡牌，按住并拖到其他卡牌可建立无文字关系线；双击关系线可补充关系文字。手机端可长按知识点编辑，双指缩放画布。</div>
+<div class="help-card-actions"><button class="help-card-tour-btn" id="guidedTourStartBtn" type="button">查看使用说明</button></div>
+</div>
 <aside class="detail-panel" id="detailPanel"></aside>
 <div class="status-chip" id="status"></div>
 <div class="canvas-zoom-dock" id="canvasZoomDock" data-stage-ui="true" role="group" aria-label="画布缩放控制">
@@ -419,6 +419,7 @@
 <script defer src="src/25-graph-file-tabs.js"></script>
 <script defer src="src/20-flashcards-toolbar.js"></script>
 <script defer src="src/27-home-interaction-modes.js"></script>
+<script defer src="src/32-home-mobile-readonly-notice.js"></script>
 <script defer src="src/30-auth-guards.js"></script>
 <script defer src="src/40-guided-tour.js"></script>
 <script defer src="src/41-account-menu.js"></script>

@@ -45,6 +45,7 @@ body.graph-phone-reading .graph-file-tabbar{display:none!important}
 body.graph-phone-reading :is(.floating-toolbox,.canvas-toolbar-left,.canvas-toolbar-right,.canvas-zoom-dock,.support-center-shell,#kgGlobalShortcuts,.uc-minimap-dock,#graphSearchPanel){display:none!important}
 .mobile-reading-mode-indicator{display:none}
 body.graph-phone-reading .mobile-reading-mode-indicator{position:fixed;z-index:80;right:14px;bottom:14px;display:inline-flex;align-items:center;min-height:32px;padding:0 12px;border:1px solid rgba(15,23,42,.18);border-radius:999px;background:#1f2937;color:#fff;box-shadow:0 8px 20px rgba(15,23,42,.22);font:800 12px/1 ui-sans-serif,system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+body.home-mobile-readonly-notice-open .help-card{top:var(--home-mobile-readonly-offset,112px)}
 @media(max-width:720px){.graph-mode-switcher{display:none!important}}
 
 /* 阅读模式详情保持只读，隐藏所有可写操作；关系线也不绘制悬浮/选中反馈层。 */
