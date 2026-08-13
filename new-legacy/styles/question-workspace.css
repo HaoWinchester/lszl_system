@@ -1665,6 +1665,40 @@ body[data-qw-readonly="1"] .qw-layout-toolbar .qw-smart-picker{display:none}
   box-shadow:0 0 0 3px rgba(34,197,94,.15);
 }
 .qw-card-option-key.is-wrong-flash{animation:qw-option-wrong-flash .42s ease}
+.qw-card-option-key.is-answer-selected{
+  border-color:#6d5dfc;
+  background:#ede9fe;
+  color:#5b21b6;
+  box-shadow:0 0 0 3px rgba(109,93,252,.12);
+}
+.qw-card-option-key:disabled{cursor:wait;opacity:.62;transform:none}
+.qw-option-sync-status,
+.qw-option-sync-error{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-top:9px;
+  padding:8px 10px;
+  border-radius:10px;
+  font-size:10px;
+  font-weight:760;
+  line-height:1.45;
+}
+.qw-option-sync-status.is-pending{background:#f5f3ff;color:#6d28d9}
+.qw-option-sync-error{border:1px solid #fecaca;background:#fff1f2;color:#b91c1c}
+.qw-option-sync-error button{
+  flex:0 0 auto;
+  min-height:28px;
+  padding:0 10px;
+  border:1px solid #fca5a5;
+  border-radius:8px;
+  background:#fff;
+  color:#b91c1c;
+  font:inherit;
+  cursor:pointer;
+}
+.qw-option-sync-error button:hover{border-color:#ef4444;background:#fee2e2}
 @keyframes qw-option-wrong-flash{
   0%,100%{border-color:rgba(100,116,139,.18);background:#f1f5f9;color:#64748b;transform:translateX(0)}
   18%,72%{border-color:#dc2626;background:#ef4444;color:#fff;transform:translateX(-2px)}

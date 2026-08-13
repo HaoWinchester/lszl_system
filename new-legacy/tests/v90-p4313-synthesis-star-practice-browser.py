@@ -34,6 +34,15 @@ def install_storage(page,items):
       const release={id:'p4313-release',releaseId:'p4313-release',paperId:'p4313-paper',version:1,name:'P4.3.13 发布卷',title:'P4.3.13 发布卷',subject:'PMP',status:'published',publishedAt:1,enabledModes:['multi_question_canvas'],totalCount:items.length,questions:items.map((q,index)=>({bankId:'p4313-bank',questionId:q.id,order:index+1})),questionSnapshots:snapshots};
       localStorage.setItem('kg_exam_papers_published_v1',JSON.stringify([release]));localStorage.setItem('kg_question_banks_v1__user__'+username,JSON.stringify([{id:'p4313-bank',name:'P4.3.13 题库',subject:'PMP',questions:items}]));
       window.KGQuestionCatalogAdapter={ready:Promise.resolve()};
+      window.KGPracticeLearningApi={
+        answer:async input=>({correct:String(input?.selectedAnswer||'')==='A',mistake:null}),
+        refresh:async()=>({mistakes:[],stats:{active:0,mastered:0}}),
+        snapshot:()=>({mistakes:[],stats:{active:0,mastered:0}})
+      };
+      window.KGPersonalSynthesisCardApi={
+        refresh:async()=>({active:[],archived:[]}),snapshot:()=>({active:[],archived:[]}),
+        create:async input=>({...input,id:'psc-p4313',revision:1,archivedAt:null})
+      };
       window.alert=()=>{};window.confirm=()=>true;window.open=()=>null;
     }""",{'items':items,'main':MAIN,'other':OTHER})
 
