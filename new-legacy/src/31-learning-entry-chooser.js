@@ -148,6 +148,7 @@
   function closeDialog({ focusGraph = false } = {}) {
     if (!active) return false;
     const current = active;
+    global.KGLearningWeeklyOpen?.stopEntryCountdowns?.();
     current.document.removeEventListener("keydown", current.onKeydown);
     setPageInert(current.document, current.root, false);
     if (current.created) current.root.remove();
@@ -166,6 +167,11 @@
   async function choose(button, choice) {
     if (!active || button.disabled) return;
     if (choice.destination === "index.html") { closeDialog({ focusGraph: true }); return; }
+    if (global.KGLearningWeeklyOpen && !global.KGLearningWeeklyOpen.isDestinationOpen(choice.destination)) {
+      errorMessage(global.KGLearningWeeklyOpen.countdownLabel() || "该学习板块尚未开放");
+      button.focus();
+      return;
+    }
     button.disabled = true; button.setAttribute("aria-busy", "true"); errorMessage("");
     try {
       const response = await active.fetch.call(active.fetchReceiver, choice.destination, { credentials: "same-origin" });
@@ -219,6 +225,7 @@
       const choice = CHOICES.find(item => item.label === button.getAttribute("data-learning-entry-choice"));
       if (choice) bindOnce(button, "click", () => choose(button, choice));
     });
+    global.KGLearningWeeklyOpen?.bindEntryCountdowns?.(root);
     const onKeydown = event => {
       if (!active || active.dialog !== dialog) return;
       if (event.key === "Escape") { event.preventDefault(); closeDialog({ focusGraph: true }); return; }
