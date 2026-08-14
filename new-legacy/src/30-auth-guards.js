@@ -221,7 +221,10 @@ function authAfterExternalLogin(username,message='第三方登录成功'){
   showStatus(`${message}：${username}`);
   return true;
 }
+// 合并而非整体覆盖：保留共享登录弹窗挂上的 legalConsentVersion / requireLegalConsent 等字段，
+// 否则 direct-auth-adapter 读不到条款版本会静默拦截登录（P4.1.72 事故）。
 window.KGAuthRuntime={
+  ...(window.KGAuthRuntime||{}),
   afterExternalLogin:authAfterExternalLogin,
   openAuth:authOpen,
   closeAuth:authClose,
