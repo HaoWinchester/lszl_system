@@ -5,8 +5,8 @@ const path=require('path');
 const ROOT=path.resolve(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(ROOT,file),'utf8');
 
-assert.equal(read('VERSION').trim(),'v9.0-p4.1.1');
-assert(read('src/admin/00-admin-core.js').includes("VERSION='9.0-p4.1.1'"));
+assert.match(read('VERSION').trim(),/^v9\.0-p4\.1\.\d+$/);
+assert(read('src/admin/00-admin-core.js').includes("const VERSION='9.0-p4.1."));
 
 const bankHtml=read('question-bank.html');
 assert(bankHtml.includes('id="qbRecallLibraryRelocatedNotice"'));
@@ -21,7 +21,7 @@ assert(!/function renderTrainingBankSelect\(\)[\s\S]{0,1400}<optgroup/.test(bank
 
 const workflow=read('src/97-teacher-question-workflow.js');
 assert(workflow.includes('题目预览'));
-assert(workflow.includes('题干与选项'));
+assert(workflow.includes('题干、选项与解析'));
 assert(!workflow.includes('<section class="tq-training-answer"'));
 assert(!workflow.includes('<section class="tq-training-analysis"'));
 assert(workflow.includes("title.textContent='选择训练科目'"));

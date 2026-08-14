@@ -27,6 +27,10 @@ const validationScript = process.env.KG_RELEASE_VALIDATION_SCRIPT
   ? resolve(process.env.KG_RELEASE_VALIDATION_SCRIPT)
   : resolve(scriptsDir, 'validate-new-legacy-release.sh')
 const criticalSiteFiles = [
+  'landing.html',
+  'styles/landing.css',
+  'src/landing.js',
+  'assets/landing/graph.png',
   'admin-console.html',
   'question-bank.html',
   'content-prep-studio/dist/content-prep.html',

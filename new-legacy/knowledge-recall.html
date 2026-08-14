@@ -17,10 +17,10 @@
 <link rel="stylesheet" href="styles/knowledge-recall-p4517.css"/>
 <link rel="stylesheet" href="styles/knowledge-recall-p4519.css"/>
 <link rel="stylesheet" href="styles/knowledge-recall-p4520.css"/>
-<link rel="stylesheet" href="styles/knowledge-recall-p4526.css"/>
 <link rel="stylesheet" href="styles/unified-canvas-runtime.css"/>
 <link rel="stylesheet" href="styles/focus-vega-typography.css"/>
 <link rel="stylesheet" href="styles/focus-vega-learning.css"/>
+<link rel="stylesheet" href="styles/knowledge-recall-p4529.css"/>
 </head>
 <body class="knowledge-recall-page" data-ui-skin="focus-vega">
   <div class="kr-app" id="krApp">
@@ -36,6 +36,11 @@
             <button type="button" data-question-language="zh" aria-pressed="true">中</button>
             <button type="button" data-question-language="bilingual" aria-pressed="false">中英</button>
           </div>
+        </div>
+        <button class="kr-reveal-keywords-btn" id="krRevealKeywordsBtn" type="button">揭示关键词</button>
+        <div class="kr-save-status" id="krSaveStatus" role="status" aria-live="polite" data-state="idle">
+          <span id="krSaveStatusText">正在载入</span>
+          <button id="krSaveRetryBtn" type="button" hidden>重试保存</button>
         </div>
         <div class="account-menu-shell" id="accountMenuShell" data-account-help-href="multi-question-help.html">
           <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
@@ -136,6 +141,17 @@
     </aside>
   </div>
 
+  <div class="kr-version-choice" id="krVersionChoice" hidden>
+    <div class="kr-version-choice-card" role="dialog" aria-modal="true" aria-labelledby="krVersionChoiceTitle">
+      <h2 id="krVersionChoiceTitle">题目已有新版本</h2>
+      <p>旧回忆图会保留原题目与原联想库，不会与新版本自动混合。</p>
+      <div class="kr-version-choice-actions">
+        <button id="krViewHistoryBtn" type="button">查看旧图</button>
+        <button id="krResetToCurrentBtn" type="button">按新题重置</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop auth-backdrop" id="authModal">
     <div aria-labelledby="authTitle" aria-modal="true" class="modal auth-modal" role="dialog">
       <div class="auth-head">
@@ -153,7 +169,6 @@
           <button class="primary" id="authDoLoginBtn">登录</button>
           <button id="authRegisterBtn">注册</button>
         </div>
-        <label class="auth-agreement"><input id="authLegalConsent" type="checkbox"/><span>阅读并同意 <a href="privacy-policy.html" rel="noopener" target="_blank">隐私政策</a> 和 <a href="terms-of-service.html" rel="noopener" target="_blank">使用条款</a></span></label>
       </div>
     </div>
   </div>
@@ -177,9 +192,11 @@
 <script defer src="src/86-question-language-ui.js"></script>
 <script defer src="src/85-knowledge-recall-data.js"></script>
 <script defer src="src/question-keyword/keyword-runtime-service.js"></script>
+<script defer src="src/recall/deep-recall-flow-model.js"></script>
 <script defer src="src/94-practice-navigation.js"></script>
 <script defer src="src/95-recall-association-library.js"></script>
 <script defer src="src/97-recall-storage.js"></script>
+<script defer src="src/99-deep-recall-server-adapter.js"></script>
 <script defer src="src/59c-active-learning-mode-policy.js"></script>
 <script defer src="src/58-paper-access-service.js"></script>
 <script defer src="src/59-published-paper-repository.js"></script>

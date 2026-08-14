@@ -27,21 +27,16 @@ const sameA={id:'same-id',sourceQuestionId:'same-id',sourceBankId:'bank-a'};
 const sameB={id:'same-id',sourceQuestionId:'same-id',sourceBankId:'bank-b'};
 
 assert(storage.writeCurrent({question:sameA,sourceBankId:'bank-a',sourceQuestionId:'same-id',savedAt:1}));
-assert(storage.writeProgress(sameA,'bank-a',{nodes:[{instanceId:'a'}],edges:[],activeKeywords:['a']}));
 const aliceKey=storage.progressKey(sameA,'bank-a');
-assert(aliceKey.includes('user__alice')&&aliceKey.includes('bank__bank-a')&&aliceKey.includes('question__same-id'));
-assert.strictEqual(storage.readProgress(sameA,'bank-a').nodes.length,1);
-assert.strictEqual(storage.readProgress(sameB,'bank-b'),null,'同题号不同题库不得共用进度');
-assert(storage.exploredSet('bank-a').has('same-id'));
+assert(aliceKey.includes('/alice/')&&aliceKey.includes('/bank-a/')&&aliceKey.includes('/same-id'));
+assert.throws(()=>storage.writeProgress(sameA,'bank-a',{nodes:[{instanceId:'a'}],edges:[],activeKeywords:['a']}),/KGDeepRecallServerAdapter/);
+assert.throws(()=>storage.readProgress(sameA,'bank-a'),/KGDeepRecallServerAdapter/);
+assert.strictEqual(map.size,0,'深度回忆业务进度不得写浏览器存储');
 
 setUser('bob');
 assert.strictEqual(storage.readCurrent(),null,'新账号不得读取旧账号当前题目');
-assert.strictEqual(storage.readProgress(sameA,'bank-a'),null,'新账号不得读取旧账号进度');
-assert(storage.writeProgress(sameB,'bank-b',{nodes:[{instanceId:'b'}],edges:[],activeKeywords:[]}));
 const bobKey=storage.progressKey(sameB,'bank-b');
-assert(bobKey.includes('user__bob')&&bobKey!==aliceKey);
-assert.strictEqual(JSON.parse(map.get(aliceKey)).nodes[0].instanceId,'a');
-assert.strictEqual(JSON.parse(map.get(bobKey)).nodes[0].instanceId,'b');
+assert(bobKey.includes('/bob/')&&bobKey!==aliceKey);
 
 
 // The published-paper question source should reuse its normalized list until the release JSON changes.
@@ -76,10 +71,10 @@ const css23=read('styles/knowledge-recall-p2223.css');
 assert(html.includes('src/97-recall-storage.js')&&html.indexOf('src/97-recall-storage.js')<html.indexOf('src/86-knowledge-recall.js'),'页面应在主控制器前加载存储服务');
 assert(recall.includes('const map={};')&&!recall.includes('const map={...(DATA.roots||{})}'),'关键词根映射不得全局注入 PMP 示例词');
 assert(recall.includes("nodeLayer.addEventListener('dblclick'")&&recall.includes("if(event.detail>1){clearCardClick();return}"),'双击删除应取消待执行的单击动作');
-assert(recall.includes('const nodeById=new Map(state.nodes.map'),'连线渲染应使用 Map，避免逐边线性查找');
+assert(recall.includes('const nodeMap=new Map(state.nodes.map'),'连线渲染应使用 Map，避免逐边线性查找');
 assert(recall.includes('searchTimer=setTimeout(renderQuestionList,130)'),'题目搜索应防抖');
 assert(recall.includes("$('krQuestionList')?.addEventListener('click'"),'题目列表应使用事件委托');
-assert(recall.includes("window.addEventListener('pagehide',flushProgress)")&&recall.includes('progressSaveTimer=setTimeout'),'进度保存应防抖并在离开页面时刷新');
+assert(recall.includes("window.addEventListener('pagehide',()=>")&&recall.includes('progressSaveTimer=setTimeout'),'服务器进度保存应防抖并在离开页面时刷新');
 assert(!recall.includes('最长链')&&!recall.includes('maxDepth'),'最长链计算与展示应完全移除');
 assert(source.includes('cache.signature===raw')&&source.includes('cache.list'),'发布试卷读取服务应缓存未变化的解析结果');
 assert(css25.includes('.knowledge-recall-page .account-menu{')&&css25.includes('background:var(--kr-surface-glass)'),'账号菜单应跟随主题变量');

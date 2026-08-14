@@ -6,15 +6,86 @@ from app.main import app
 from app.db.session import AsyncSessionLocal
 from app.services import runtime_state_service
 from app.services import teaching_content_revision_service as revision_service
-from app.web.releases import active_release
+from app.web import routes
+from app.web.releases import WebRelease, active_release
 
 
-def test_root_redirects_to_practice_mode_without_query_context() -> None:
+def test_root_serves_public_landing_page_without_business_bootstrap(monkeypatch, tmp_path) -> None:
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "landing.html").write_text(
+        "<!doctype html><html><head><title>幻谱｜PMP 知识图谱学习平台</title></head>"
+        '<body><a href="/graph">进入知识图谱</a></body></html>',
+        encoding="utf-8",
+    )
+    release = WebRelease(version="landing-test", site=site, source_hash="test-hash")
+    monkeypatch.setattr(routes, "_release_or_503", lambda: release)
+
     with TestClient(app) as client:
         response = client.get("/?auth=login&stage=foundation", follow_redirects=False)
 
-    assert response.status_code == 307
-    assert response.headers["location"] == "/practice-mode.html"
+    assert response.status_code == 200
+    assert "幻谱｜PMP 知识图谱学习平台" in response.text
+    assert 'href="/graph"' in response.text
+    assert "__KG_DIRECT_BOOTSTRAP__" not in response.text
+    assert response.headers["cache-control"] == "no-cache"
+    assert response.headers["x-content-type-options"] == "nosniff"
+
+
+def test_root_returns_503_when_active_release_has_no_landing_page(monkeypatch, tmp_path) -> None:
+    site = tmp_path / "site"
+    site.mkdir()
+    release = WebRelease(version="missing-landing", site=site, source_hash="test-hash")
+    monkeypatch.setattr(routes, "_release_or_503", lambda: release)
+
+    with TestClient(app) as client:
+        response = client.get("/", follow_redirects=False)
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "当前版本缺少官网首页"
+
+
+def test_explicit_landing_asset_stays_public_and_unmodified(monkeypatch, tmp_path) -> None:
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "landing.html").write_text(
+        '<!doctype html><link rel="stylesheet" href="styles/landing.css"><h1>公开官网</h1>',
+        encoding="utf-8",
+    )
+    release = WebRelease(version="landing-test", site=site, source_hash="test-hash")
+    monkeypatch.setattr(routes, "_release_or_503", lambda: release)
+
+    with TestClient(app) as client:
+        response = client.get("/landing.html", follow_redirects=False)
+
+    assert response.status_code == 200
+    assert "公开官网" in response.text
+    assert 'href="styles/landing.css"' in response.text
+    assert "__KG_DIRECT_BOOTSTRAP__" not in response.text
+
+
+def test_preview_landing_uses_canonical_directory_and_no_business_bootstrap(monkeypatch, tmp_path) -> None:
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "landing.html").write_text(
+        '<!doctype html><link rel="stylesheet" href="styles/landing.css"><h1>候选官网</h1>',
+        encoding="utf-8",
+    )
+    release = WebRelease(version="preview-test", site=site, source_hash="test-hash")
+    monkeypatch.setattr(routes, "preview_release", lambda version: release)
+
+    with TestClient(app) as client:
+        canonical = client.get("/__preview/preview-test", follow_redirects=False)
+        root = client.get("/__preview/preview-test/", follow_redirects=False)
+        explicit = client.get("/__preview/preview-test/landing.html", follow_redirects=False)
+
+    assert canonical.status_code == 307
+    assert canonical.headers["location"] == "/__preview/preview-test/"
+    for response in (root, explicit):
+        assert response.status_code == 200
+        assert "候选官网" in response.text
+        assert 'href="styles/landing.css"' in response.text
+        assert "__KG_DIRECT_BOOTSTRAP__" not in response.text
 
 
 def test_learning_path_redirects_to_practice_mode_without_query_context() -> None:

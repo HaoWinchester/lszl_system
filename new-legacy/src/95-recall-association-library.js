@@ -8,9 +8,12 @@
 (function(global){
   const STORAGE_PREFIX='kg_recall_association_library_v1__';
   const AUTH_SESSION_KEY='kg_local_current_user_v1';
+  const indexCache=new WeakMap();
+  let sessionBinding=null;
 
   function clone(value){try{return JSON.parse(JSON.stringify(value))}catch(error){return value}}
   function clean(value){return String(value??'').trim()}
+  function lookupKey(value){return clean(value).toLocaleLowerCase()}
   function cleanList(value){
     if(Array.isArray(value))return value.map(clean).filter(Boolean);
     return clean(value).split(/[,，、;；|]/).map(clean).filter(Boolean);
@@ -185,6 +188,7 @@
     return normalizeLibrary({nodes:[...nodeMap.values()],edges:[...edgeMap.values()]});
   }
   function read(subjectId='PMP'){
+    if(sessionBinding)return sessionBinding.library;
     try{
       const primary=global.localStorage?.getItem(storageKey(subjectId));
       if(primary)return normalizeLibrary(JSON.parse(primary)||{});
@@ -194,6 +198,7 @@
     }catch(error){return normalizeLibrary({})}
   }
   function write(subjectId='PMP',library={}){
+    if(sessionBinding)return {valid:false,errors:['当前为学员只读联想库快照，不能修改正式 Recall 数据。'],library:sessionBinding.library};
     const normalized=normalizeLibrary(library);
     try{global.localStorage?.setItem(storageKey(subjectId),JSON.stringify(normalized));return {valid:true,library:normalized}}catch(error){return {valid:false,errors:['保存失败：'+error.message],library:normalized}}
   }
@@ -205,14 +210,20 @@
     return {...parsed,...saved,library:saved.library||library};
   }
   function index(library){
+    if(library&&typeof library==='object'){
+      const cached=indexCache.get(library);if(cached)return cached;
+    }
     const normalized=normalizeLibrary(library);const byId=new Map();const lookup=new Map();const outgoing=new Map();
-    normalized.nodes.forEach(node=>{byId.set(node.id,node);lookup.set(node.id,node.id);lookup.set(node.title,node.id);if(node.titleEn)lookup.set(node.titleEn,node.id);node.aliases.forEach(alias=>lookup.set(alias,node.id))});
+    normalized.nodes.forEach(node=>{byId.set(node.id,node);lookup.set(lookupKey(node.id),node.id);lookup.set(lookupKey(node.title),node.id);if(node.titleEn)lookup.set(lookupKey(node.titleEn),node.id);node.aliases.forEach(alias=>lookup.set(lookupKey(alias),node.id))});
     normalized.edges.forEach(edge=>{if(!outgoing.has(edge.from))outgoing.set(edge.from,[]);outgoing.get(edge.from).push(edge)});
     outgoing.forEach(list=>list.sort((a,b)=>Number(b.priority)-Number(a.priority)||String(byId.get(a.to)?.title||'').localeCompare(String(byId.get(b.to)?.title||''),'zh-CN')));
-    return {library:normalized,byId,lookup,outgoing};
+    const result={library:normalized,byId,lookup,outgoing};
+    if(library&&typeof library==='object')indexCache.set(library,result);
+    indexCache.set(normalized,result);
+    return result;
   }
   function resolve(library,value){
-    const idx=index(library);const key=clean(value);const id=idx.lookup.get(key)||'';return id?idx.byId.get(id)||null:null;
+    const idx=index(library);const id=idx.lookup.get(lookupKey(value))||'';return id?idx.byId.get(id)||null:null;
   }
   function choices(library,value,{limit=4,offset=0}={}){
     const idx=index(library);const node=resolve(idx.library,value);if(!node)return {node:null,choices:[],total:0,offset:0,hasMore:false};
@@ -266,7 +277,15 @@
     const saved=write(subjectId,ordered.library);return {...saved,node:resolve(saved.library||ordered.library,updated.node.id)};
   }
 
-  const api=Object.freeze({storageKey,legacyStorageKey,normalizeLibrary,parseText,merge,read,write,saveText,index,resolve,choices,toText,asRecallNode,nodeId,reconcileIncoming,updateNode,setChoices,saveNode});
+  function setSessionLibrary(library={},contentHash=''){
+    const normalized=normalizeLibrary(library);
+    sessionBinding={library:normalized,contentHash:clean(contentHash)};
+    return normalized;
+  }
+  function clearSessionLibrary(){sessionBinding=null}
+  function sessionInfo(){return sessionBinding?{contentHash:sessionBinding.contentHash,library:sessionBinding.library}:null}
+
+  const api=Object.freeze({storageKey,legacyStorageKey,normalizeLibrary,parseText,merge,read,write,saveText,index,resolve,choices,toText,asRecallNode,nodeId,reconcileIncoming,updateNode,setChoices,saveNode,setSessionLibrary,clearSessionLibrary,sessionInfo});
   global.KGRecallAssociationLibrary=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

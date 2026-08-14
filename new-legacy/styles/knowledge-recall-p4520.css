@@ -1,8 +1,36 @@
-/* P4.5 · Keep the current-canvas search and reset actions visually connected. */
-.knowledge-recall-page .kr-canvas-overlay-right{display:block}
-.knowledge-recall-page .kr-canvas-action-group{display:flex;align-items:center;gap:0;border:1px solid var(--kr-border);border-radius:12px;overflow:hidden;background:var(--kr-surface-glass)}
-.knowledge-recall-page .kr-canvas-action-group .kr-reset-question-btn{border:0!important;border-radius:0!important;box-shadow:none!important;backdrop-filter:none!important;background:var(--kr-control-bg)!important}
-.knowledge-recall-page .kr-canvas-action-group .kr-reset-question-btn + .kr-reset-question-btn{border-left:1px solid var(--kr-border)!important}
-.knowledge-recall-page .kr-canvas-action-group .kr-reset-question-btn:hover,.knowledge-recall-page .kr-canvas-action-group .kr-reset-question-btn:focus-visible{background:var(--kr-control-hover)!important;box-shadow:none!important;outline:none}
-.knowledge-recall-page .kr-canvas-action-group .kr-reset-question-btn:focus-visible{box-shadow:inset 0 0 0 2px var(--kr-selected-ring)!important}
-.knowledge-recall-page .kr-node-search-panel{top:48px;right:0}
+/* V9.0-P4.5.21 · Connected Deep Recall action toolbar */
+.knowledge-recall-page .kr-canvas-overlay-right{
+  display:block;
+}
+.knowledge-recall-page .kr-canvas-action-group{
+  display:flex;
+  align-items:center;
+  gap:0;
+  border:1px solid var(--kr-border);
+  border-radius:12px;
+  overflow:hidden;
+  background:var(--kr-surface-glass);
+}
+.knowledge-recall-page .kr-canvas-action-group .kr-reset-question-btn{
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  background:var(--kr-control-bg)!important;
+}
+.knowledge-recall-page .kr-canvas-action-group .kr-reset-question-btn + .kr-reset-question-btn{
+  border-left:1px solid var(--kr-border)!important;
+}
+.knowledge-recall-page .kr-canvas-action-group .kr-reset-question-btn:hover,
+.knowledge-recall-page .kr-canvas-action-group .kr-reset-question-btn:focus-visible{
+  background:var(--kr-control-hover)!important;
+  box-shadow:none!important;
+  outline:none;
+}
+.knowledge-recall-page .kr-canvas-action-group .kr-reset-question-btn:focus-visible{
+  box-shadow:inset 0 0 0 2px var(--kr-selected-ring)!important;
+}
+.knowledge-recall-page .kr-node-search-panel{
+  top:48px;
+  right:0;
+}

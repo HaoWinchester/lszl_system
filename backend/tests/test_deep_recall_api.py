@@ -1,0 +1,358 @@
+from __future__ import annotations
+
+import asyncio
+import json
+from uuid import uuid4
+
+from fastapi.testclient import TestClient
+from sqlalchemy import delete, select
+
+from app.core.security import hash_password
+from app.db.session import AsyncSessionLocal
+from app.main import app
+from app.models.question import Question, QuestionBank
+from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.training import (
+    RecallLibrarySnapshot,
+    RecallProgress,
+    RecallQuestionSnapshot,
+)
+from app.models.user import User
+
+
+PASSWORD = "deep-recall-pass"
+RECALL_KEY = "kg_recall_association_library_v1__subject__subject-pmp"
+
+
+def _login(client: TestClient, username: str) -> None:
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"username": username, "password": PASSWORD},
+    )
+    assert response.status_code == 200, response.text
+
+
+def _graph_payload(session: dict, title: str = "我的口诀") -> dict:
+    return {
+        "expectedRevision": session["progressRevision"],
+        "questionRevision": session["currentQuestion"]["revision"],
+        "libraryHash": session["library"]["contentHash"],
+        "graphSchemaVersion": 3,
+        "nodes": [
+            {
+                "instanceId": "node-personal-1",
+                "dataId": "personal:node-1",
+                "title": title,
+                "custom": True,
+            }
+        ],
+        "edges": [],
+        "customNodes": {
+            "personal:node-1": {"title": title, "aliases": []},
+        },
+        "activeKeywords": ["keyword-1"],
+        "choiceOffsets": {},
+        "transform": {"x": 12, "y": -4, "scale": 1},
+        "metrics": {"keywordClicks": 1},
+    }
+
+
+def test_recall_progress_is_owner_isolated_revision_checked_and_library_read_only() -> None:
+    suffix = uuid4().hex[:10]
+    teacher = f"recall-teacher-{suffix}"
+    student_a = f"recall-student-a-{suffix}"
+    student_b = f"recall-student-b-{suffix}"
+    bank_id = f"recall-bank-{suffix}"
+    question_id = f"recall-question-{suffix}"
+    previous_recall: dict | None = None
+
+    async def seed() -> None:
+        nonlocal previous_recall
+        async with AsyncSessionLocal() as db:
+            row = await db.get(SharedRuntimeState, RECALL_KEY)
+            if row is not None:
+                previous_recall = {
+                    "value": row.value,
+                    "schema_version": row.schema_version,
+                    "updated_by": row.updated_by,
+                    "created_at": row.created_at,
+                    "updated_at": row.updated_at,
+                }
+            db.add_all(
+                [
+                    User(username=teacher, password_hash=hash_password(PASSWORD), role="teacher", status="active", subject="PMP"),
+                    User(username=student_a, password_hash=hash_password(PASSWORD), role="student", status="active", subject="PMP"),
+                    User(username=student_b, password_hash=hash_password(PASSWORD), role="student", status="active", subject="PMP"),
+                ]
+            )
+            await db.flush()
+            db.add(
+                QuestionBank(
+                    id=bank_id,
+                    owner_id=teacher,
+                    name="深度回忆公开题库",
+                    subject="PMP",
+                    visibility="published",
+                )
+            )
+            await db.flush()
+            db.add(
+                Question(
+                    id=question_id,
+                    bank_id=bank_id,
+                    title="风险发生后应该先做什么？",
+                    subject="PMP",
+                    scope="public",
+                    revision=1,
+                    content_hash="a" * 64,
+                    stem_parts=[{"text": "风险发生后应该先分析影响。"}],
+                    concepts=[{"id": "keyword-1", "title": "分析影响", "isCore": True}],
+                )
+            )
+            recall_payload = {
+                "schemaVersion": 1,
+                "nodes": [
+                    {
+                        "id": "recall:impact-analysis",
+                        "title": "影响分析",
+                        "english": "impact analysis",
+                        "aliases": ["影响评估"],
+                    }
+                ],
+                "edges": [],
+                "updatedAt": "2026-08-14T00:00:00Z",
+            }
+            if row is None:
+                db.add(
+                    SharedRuntimeState(
+                        key=RECALL_KEY,
+                        value=json.dumps(recall_payload, ensure_ascii=False),
+                        updated_by=teacher,
+                    )
+                )
+            else:
+                row.value = json.dumps(recall_payload, ensure_ascii=False)
+                row.updated_by = teacher
+            await db.commit()
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(RecallProgress).where(RecallProgress.question_id == question_id))
+            await db.execute(delete(RecallQuestionSnapshot).where(RecallQuestionSnapshot.question_id == question_id))
+            await db.execute(delete(RecallLibrarySnapshot).where(RecallLibrarySnapshot.subject == "subject-pmp"))
+            await db.execute(delete(Question).where(Question.id == question_id))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.execute(delete(SharedRuntimeState).where(SharedRuntimeState.key == RECALL_KEY))
+            if previous_recall is not None:
+                db.add(SharedRuntimeState(key=RECALL_KEY, **previous_recall))
+            await db.execute(delete(User).where(User.username.in_([teacher, student_a, student_b])))
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as first, TestClient(app) as second:
+            _login(first, student_a)
+            _login(second, student_b)
+
+            session_response = first.get(f"/api/v1/recall/session/{question_id}")
+            assert session_response.status_code == 200, session_response.text
+            session = session_response.json()
+            assert session["versionState"] == "current"
+            assert session["progressRevision"] == 0
+            assert session["currentQuestion"]["revision"] == 1
+            assert session["library"]["payload"]["nodes"][0]["id"] == "recall:impact-analysis"
+            library_before = first.get("/api/v1/recall/libraries/PMP")
+            assert library_before.status_code == 200, library_before.text
+
+            body = _graph_payload(session)
+            saved = first.put(f"/api/v1/recall/progress/{question_id}", json=body)
+            assert saved.status_code == 200, saved.text
+            assert saved.json()["revision"] == 1
+            assert saved.json()["nodes"][0]["title"] == "我的口诀"
+
+            conflict = first.put(f"/api/v1/recall/progress/{question_id}", json=body)
+            assert conflict.status_code == 409
+            assert conflict.json()["detail"]["code"] == "recall_revision_conflict"
+
+            other = second.get(f"/api/v1/recall/session/{question_id}")
+            assert other.status_code == 200, other.text
+            assert other.json()["progress"]["nodes"] == []
+            assert other.json()["progressRevision"] == 0
+
+            library_after = first.get("/api/v1/recall/libraries/PMP")
+            assert library_after.status_code == 200
+            assert library_after.json() == library_before.json()
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_question_revision_change_requires_explicit_reset_and_viewer_is_read_only() -> None:
+    suffix = uuid4().hex[:10]
+    teacher = f"recall-version-teacher-{suffix}"
+    student = f"recall-version-student-{suffix}"
+    viewer = f"recall-version-viewer-{suffix}"
+    bank_id = f"recall-version-bank-{suffix}"
+    question_id = f"recall-version-question-{suffix}"
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add_all(
+                [
+                    User(username=teacher, password_hash=hash_password(PASSWORD), role="teacher", status="active", subject="PMP"),
+                    User(username=student, password_hash=hash_password(PASSWORD), role="student", status="active", subject="PMP"),
+                    User(username=viewer, password_hash=hash_password(PASSWORD), role="viewer", status="active", subject="PMP"),
+                ]
+            )
+            await db.flush()
+            db.add(QuestionBank(id=bank_id, owner_id=teacher, name="版本题库", subject="PMP", visibility="published"))
+            await db.flush()
+            db.add(
+                Question(
+                    id=question_id,
+                    bank_id=bank_id,
+                    title="版本一题目",
+                    subject="PMP",
+                    scope="public",
+                    revision=1,
+                    content_hash="b" * 64,
+                )
+            )
+            await db.commit()
+
+    async def bump() -> None:
+        async with AsyncSessionLocal() as db:
+            question = await db.get(Question, question_id)
+            assert question is not None
+            source_library = (
+                await db.execute(
+                    select(RecallLibrarySnapshot).where(
+                        RecallLibrarySnapshot.subject == "subject-pmp"
+                    )
+                )
+            ).scalars().first()
+            assert source_library is not None
+            db.add(
+                RecallLibrarySnapshot(
+                    id=str(uuid4()),
+                    subject=f"subject-other-{suffix}",
+                    content_hash=source_library.content_hash,
+                    payload=source_library.payload,
+                    source_revision=source_library.source_revision,
+                )
+            )
+            question.title = "版本二题目"
+            question.revision = 2
+            question.content_hash = "c" * 64
+            await db.commit()
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(RecallProgress).where(RecallProgress.question_id == question_id))
+            await db.execute(delete(RecallQuestionSnapshot).where(RecallQuestionSnapshot.question_id == question_id))
+            await db.execute(
+                delete(RecallLibrarySnapshot).where(
+                    RecallLibrarySnapshot.subject == f"subject-other-{suffix}"
+                )
+            )
+            await db.execute(delete(Question).where(Question.id == question_id))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.execute(delete(User).where(User.username.in_([teacher, student, viewer])))
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as learner:
+            _login(learner, student)
+            original = learner.get(f"/api/v1/recall/session/{question_id}").json()
+            saved = learner.put(
+                f"/api/v1/recall/progress/{question_id}",
+                json=_graph_payload(original, "旧版本节点"),
+            )
+            assert saved.status_code == 200, saved.text
+            asyncio.run(bump())
+
+            mismatch = learner.get(f"/api/v1/recall/session/{question_id}")
+            assert mismatch.status_code == 200, mismatch.text
+            body = mismatch.json()
+            assert body["versionState"] == "mismatch"
+            assert body["historyQuestion"]["title"] == "版本一题目"
+            assert body["currentQuestion"]["title"] == "版本二题目"
+            assert body["progress"]["readOnly"] is True
+
+            reset = learner.post(
+                f"/api/v1/recall/progress/{question_id}/reset",
+                json={
+                    "expectedRevision": body["progressRevision"],
+                    "targetQuestionRevision": 2,
+                },
+            )
+            assert reset.status_code == 200, reset.text
+            assert reset.json()["revision"] == 2
+            assert reset.json()["nodes"] == []
+            current = learner.get(f"/api/v1/recall/session/{question_id}").json()
+            assert current["versionState"] == "current"
+            assert current["historyQuestion"] is None
+
+        with TestClient(app) as read_only:
+            _login(read_only, viewer)
+            session = read_only.get(f"/api/v1/recall/session/{question_id}")
+            assert session.status_code == 200
+            assert session.json()["permissions"]["canWrite"] is False
+            denied = read_only.put(
+                f"/api/v1/recall/progress/{question_id}",
+                json=_graph_payload(session.json()),
+            )
+            assert denied.status_code == 403
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_free_student_cannot_save_more_than_thirty_recall_nodes() -> None:
+    suffix = uuid4().hex[:10]
+    teacher = f"recall-limit-teacher-{suffix}"
+    student = f"recall-limit-student-{suffix}"
+    bank_id = f"recall-limit-bank-{suffix}"
+    question_id = f"recall-limit-question-{suffix}"
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add_all(
+                [
+                    User(username=teacher, password_hash=hash_password(PASSWORD), role="teacher", status="active"),
+                    User(username=student, password_hash=hash_password(PASSWORD), role="student", status="active"),
+                ]
+            )
+            await db.flush()
+            db.add(QuestionBank(id=bank_id, owner_id=teacher, name="限额题库", subject="PMP", visibility="published"))
+            await db.flush()
+            db.add(Question(id=question_id, bank_id=bank_id, title="限额题", subject="PMP", scope="public", revision=1, content_hash="d" * 64))
+            await db.commit()
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(RecallProgress).where(RecallProgress.question_id == question_id))
+            await db.execute(delete(RecallQuestionSnapshot).where(RecallQuestionSnapshot.question_id == question_id))
+            await db.execute(delete(Question).where(Question.id == question_id))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.execute(delete(User).where(User.username.in_([teacher, student])))
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as client:
+            _login(client, student)
+            session = client.get(f"/api/v1/recall/session/{question_id}").json()
+            assert session["nodeLimit"] == 30
+            body = _graph_payload(session)
+            body["nodes"] = [
+                {"instanceId": f"node-{index}", "dataId": f"personal:{index}", "title": str(index), "custom": True}
+                for index in range(31)
+            ]
+            body["customNodes"] = {
+                f"personal:{index}": {"title": str(index)} for index in range(31)
+            }
+            response = client.put(f"/api/v1/recall/progress/{question_id}", json=body)
+            assert response.status_code == 422
+            assert response.json()["detail"]["code"] == "recall_node_limit"
+    finally:
+        asyncio.run(cleanup())
