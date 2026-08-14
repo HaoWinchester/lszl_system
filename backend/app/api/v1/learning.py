@@ -137,7 +137,9 @@ async def practice_overview(db: DB, user: CurrentUser):
 @router.post("/learning/practice/answers")
 async def record_practice_answer(body: dict, db: DB, user: CurrentUser):
     try:
-        return await learning_service.record_practice_answer(db, user.username, body)
+        return await learning_service.record_practice_answer(
+            db, user.username, body, current_user=user
+        )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except LookupError as error:
@@ -166,7 +168,9 @@ async def clear_practice_sessions(db: DB, user: CurrentUser):
 @router.post("/learning/practice/mistakes")
 async def record_practice_mistake(body: dict, db: DB, user: CurrentUser):
     try:
-        mistake = await learning_service.record_practice_mistake(db, user.username, body)
+        mistake = await learning_service.record_practice_mistake(
+            db, user.username, body, current_user=user
+        )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except LookupError as error:

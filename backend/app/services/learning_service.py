@@ -236,7 +236,11 @@ async def _practice_mistake(
     ).scalar_one_or_none()
 
 
-async def _visible_learning_question(db: AsyncSession, question_id: str) -> Question | None:
+async def _visible_learning_question(
+    db: AsyncSession,
+    question_id: str,
+    current_user: "object | None" = None,
+) -> Question | None:
     query = (
         select(Question)
         .join(QuestionBank, QuestionBank.id == Question.bank_id)
@@ -246,7 +250,25 @@ async def _visible_learning_question(db: AsyncSession, question_id: str) -> Ques
             Question.scope == "public",
         )
     )
-    return (await db.execute(query)).scalar_one_or_none()
+    question = (await db.execute(query)).scalar_one_or_none()
+    if question is not None:
+        return question
+    # 题库未公开但题目出现在已发布试卷的冻结快照中时，同样允许学习
+    # （与深度回忆 published_paper_access_service 的投影授权保持一致）。
+    if current_user is None:
+        return None
+    from app.services import published_paper_access_service
+
+    question = await published_paper_access_service.load_or_project_published_question(
+        db, current_user, question_id
+    )
+    if question is None:
+        return None
+    if await published_paper_access_service.can_learn_published_question(
+        db, current_user, question
+    ):
+        return question
+    return None
 
 
 async def _append_practice_event(
@@ -268,11 +290,13 @@ async def _append_practice_event(
     )
 
 
-async def record_practice_mistake(db: AsyncSession, owner: str, data: dict) -> PracticeMistake:
+async def record_practice_mistake(
+    db: AsyncSession, owner: str, data: dict, current_user: "object | None" = None
+) -> PracticeMistake:
     question_id = str(data.get("questionId") or "").strip()
     if not question_id:
         raise ValueError("questionId 不能为空")
-    question = await _visible_learning_question(db, question_id)
+    question = await _visible_learning_question(db, question_id, current_user)
     if question is None:
         raise LookupError("题目不存在或当前不可学习")
     requested_bank_id = str(data.get("bankId") or "").strip()
@@ -463,13 +487,15 @@ def _advance_mistake_after_correct(mistake: PracticeMistake, now) -> str:
     return mistake.status
 
 
-async def record_practice_answer(db: AsyncSession, owner: str, data: dict) -> dict:
+async def record_practice_answer(
+    db: AsyncSession, owner: str, data: dict, current_user: "object | None" = None
+) -> dict:
     """Grade a canvas answer from server-owned question content and update its mistake."""
 
     question_id = str(data.get("questionId") or "").strip()
     if not question_id:
         raise ValueError("questionId 不能为空")
-    question = await _visible_learning_question(db, question_id)
+    question = await _visible_learning_question(db, question_id, current_user)
     if question is None:
         raise LookupError("题目不存在或当前不可学习")
     requested_bank_id = str(data.get("bankId") or "").strip()

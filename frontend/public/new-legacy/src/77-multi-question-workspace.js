@@ -353,8 +353,9 @@
     document.body.dataset.qwReadonly=state.readonly?'1':'0';
     const badge=byId('qwReadOnlyBadge');
     if(badge){
-      badge.hidden=!state.readonly;
-      badge.textContent=state.mobile?'移动端只读':'访客只读';
+      // 访客只读状态已在右上角账号菜单显示，顶部徽章仅保留“移动端只读”，避免重复提醒。
+      badge.hidden=!state.mobile;
+      badge.textContent='移动端只读';
     }
     if(state.mobile){
       state.gesture=null;

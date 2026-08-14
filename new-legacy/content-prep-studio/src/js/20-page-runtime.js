@@ -464,14 +464,14 @@ function renderKeywords(){
         <div><label>英文</label><input type="text" data-kwfield="textEn" data-kwid="${esc(c.id)}" value="${esc(c.textEn||'')}"></div>
         <div><label>级别</label><select data-kwfield="keywordLevel" data-kwid="${esc(c.id)}"><option value="normal"${level==='normal'?' selected':''}>普通关键词</option><option value="core"${level==='core'?' selected':''}>核心关键词</option></select></div>
         <div class="span2"><label>联想入口 ${resolved?'✓':c.recallNodeId?'⚠':'（可选）'}</label>
-          <div class="recall-search-row"><input type="search" data-transient-ui data-kw-recall-search="${esc(c.id)}" placeholder="输入名称 / Alias / ID 模糊搜索"><button class="btn small" type="button" data-kw-recall-clear="${esc(c.id)}">清空</button></div>
+          <div class="recall-search-row"><input type="search" data-transient-ui data-kw-recall-search="${esc(c.id)}" placeholder="输入名称 / Alias / ID 搜索，或输入新名称后点“手动输入”"><button class="btn small" type="button" data-kw-recall-manual="${esc(c.id)}">手动输入</button><button class="btn small" type="button" data-kw-recall-clear="${esc(c.id)}">清空</button></div>
           <select class="recall-filtered" data-kwfield="recallNodeId" data-kwid="${esc(c.id)}" data-kw-recall-select="${esc(c.id)}">${recallNodeOptions(c.recallNodeId)}</select>
           <div class="recall-search-meta" data-kw-recall-meta="${esc(c.id)}"></div>
         </div>
         ${level==='core'?`<div><label>解题作用</label><select data-kwfield="solutionRole" data-kwid="${esc(c.id)}">
           ${[['decision-cue','Decision Cue / 决策提示'],['concept-anchor','Concept Anchor / 知识锚点'],['condition-anchor','Condition Anchor / 情境条件'],['answer-anchor','Answer Anchor / 答案判断']].map(([v,t])=>`<option value="${v}"${c.solutionRole===v?' selected':''}>${t}</option>`).join('')}
         </select></div><div><label>核心理由</label><input type="text" data-kwfield="coreReason" data-kwid="${esc(c.id)}" value="${esc(c.coreReason||'')}" placeholder="为什么这个词影响本题推理？"></div>`:''}
-        <div class="span2 tiny muted">${resolved?`→ ${esc(resolved.title)}`:c.recallNodeId?`联想入口 ${esc(c.recallNodeId)} 已失效，请重新选择或清除。`:'未关联（可选）'}</div>
+        <div class="span2 tiny muted">${resolved?`→ ${esc(resolved.title)}`:c.recallNodeId?`联想入口 ${esc(c.recallNodeId)} 已失效，请重新选择或清除。`:c.recallEntryLabel?`已手动输入：${esc(c.recallEntryLabel)}（未关联稳定 ID）`:'未关联（可选）'}</div>
       </div>
     </div>`;
   }).join('');
@@ -479,12 +479,20 @@ function renderKeywords(){
   box.querySelectorAll('[data-kwfield]').forEach(el=>el.addEventListener('change',()=>updateKeywordField(el)));
   box.querySelectorAll('input[data-kwfield]').forEach(el=>el.addEventListener('input',()=>updateKeywordField(el,false)));
   q.clues.forEach(c=>{
-    const input=keywordRecallControl(box,'data-kw-recall-search',c.id),select=keywordRecallControl(box,'data-kw-recall-select',c.id),clear=keywordRecallControl(box,'data-kw-recall-clear',c.id),meta=keywordRecallControl(box,'data-kw-recall-meta',c.id);
+    const input=keywordRecallControl(box,'data-kw-recall-search',c.id),select=keywordRecallControl(box,'data-kw-recall-select',c.id),clear=keywordRecallControl(box,'data-kw-recall-clear',c.id),meta=keywordRecallControl(box,'data-kw-recall-meta',c.id),manual=keywordRecallControl(box,'data-kw-recall-manual',c.id);
     if(!input||!select||!clear||!meta)return;
     const filter=()=>{const result=recallFilteredOptions(input.value,c.recallNodeId||'');select.innerHTML=result.html;meta.textContent=input.value?`找到 ${result.count} 个候选；选择后才会保存稳定 ID。`:`共 ${result.count} 个正式联想入口。`;return result};
     input.addEventListener('input',filter);
     input.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();input.value='';filter()}else if(event.key==='Enter'){event.preventDefault();const first=filter().rows[0];if(first){select.value=first.n.id;updateKeywordField(select)}}});
     clear.onclick=()=>{input.value='';filter();input.focus()};
+    if(manual)manual.onclick=()=>{
+      const typed=String(input.value||'').trim();
+      if(!typed){meta.textContent='请先在输入框中输入要手动保存的联想入口名称。';input.focus();return}
+      const exact=state.recallLibrary.nodes.find(n=>n.title===typed||n.titleEn===typed||(n.aliases||[]).includes(typed));
+      if(exact){select.value=exact.id;updateKeywordField(select);return}
+      c.recallEntryLabel=typed;c.recallNodeId='';
+      renderKeywords();renderPreview();renderCurrentIssues();
+    };
     filter();
   });
 }
@@ -541,6 +549,7 @@ function showKeywordFloatEditor({clue=null,text='',sourceType='stem',optionId=''
   const existing=clue||q.clues.find(c=>c.text===text&&keywordMatchesSource(c,sourceType,optionId))||null;
   const resolved=existing?.recallNodeId?recallIndex().byId.get(existing.recallNodeId):resolveRecall(text).unique;
   let floatRecallSelectedId=existing?.recallNodeId||'';
+  let floatManualEntryLabel=existing?.recallNodeId?'':(existing?.recallEntryLabel||'');
   const level=existing?.keywordLevel==='core'?'core':'normal';
   const role=existing?.solutionRole||(level==='core'?'concept-anchor':'context');
   box.innerHTML=`<div class="float-title"><span>${existing?'编辑关键词':'新增关键词'}：</span><span class="kw-word">${esc(existing?.text||text)}</span><span class="spacer"></span><button class="btn small" id="floatClose">×</button></div>
@@ -548,7 +557,7 @@ function showKeywordFloatEditor({clue=null,text='',sourceType='stem',optionId=''
     <div><label>级别</label><select id="floatLevel"><option value="normal"${level==='normal'?' selected':''}>普通关键词</option><option value="core"${level==='core'?' selected':''}>核心关键词</option></select></div>
     <div><label>English</label><input id="floatTextEn" type="text" value="${esc(existing?.textEn||'')}"></div>
     <div class="span2"><label>联想入口（可选）</label>
-      <div class="recall-search-row"><input id="floatRecallSearch" type="search" data-transient-ui placeholder="输入名称 / Alias / ID 模糊搜索"><button class="btn small" id="floatRecallSearchClear" type="button">清空</button></div>
+      <div class="recall-search-row"><input id="floatRecallSearch" type="search" data-transient-ui placeholder="输入名称 / Alias / ID 搜索，或输入新名称后点“手动输入”"><button class="btn small" id="floatRecallManual" type="button">手动输入</button><button class="btn small" id="floatRecallSearchClear" type="button">清空</button></div>
       <select id="floatRecall" class="recall-filtered">${recallNodeOptions(floatRecallSelectedId)}</select>
       <div id="floatRecallSearchMeta" class="recall-search-meta"></div>
     </div>
@@ -567,10 +576,18 @@ function showKeywordFloatEditor({clue=null,text='',sourceType='stem',optionId=''
   };
   const recallSearch=document.getElementById('floatRecallSearch'),recallSelect=document.getElementById('floatRecall'),recallMeta=document.getElementById('floatRecallSearchMeta');
   const filterFloatRecall=()=>{const result=recallFilteredOptions(recallSearch.value,floatRecallSelectedId);recallSelect.innerHTML=result.html;recallMeta.textContent=recallSearch.value?`找到 ${result.count} 个候选；选择后才会保存稳定 ID。`:`共 ${result.count} 个正式联想入口。`;return result};
-  recallSearch.oninput=filterFloatRecall;
-  recallSearch.onkeydown=event=>{if(event.key==='Escape'){event.preventDefault();recallSearch.value='';filterFloatRecall()}else if(event.key==='Enter'){event.preventDefault();const first=filterFloatRecall().rows[0];if(first){floatRecallSelectedId=first.n.id;recallSelect.value=floatRecallSelectedId;recallMeta.textContent=`已选择：${first.n.title} · ${first.n.id}`}}};
-  recallSelect.onchange=()=>{floatRecallSelectedId=recallSelect.value;const selected=recallIndex().byId.get(floatRecallSelectedId);recallMeta.textContent=selected?`已选择：${selected.title} · ${selected.id}`:'未关联（可选）'};
-  document.getElementById('floatRecallSearchClear').onclick=()=>{recallSearch.value='';filterFloatRecall();recallSearch.focus()};
+  recallSearch.oninput=()=>{floatManualEntryLabel='';filterFloatRecall()};
+  recallSearch.onkeydown=event=>{if(event.key==='Escape'){event.preventDefault();recallSearch.value='';floatManualEntryLabel='';filterFloatRecall()}else if(event.key==='Enter'){event.preventDefault();const first=filterFloatRecall().rows[0];if(first){floatRecallSelectedId=first.n.id;floatManualEntryLabel='';recallSelect.value=floatRecallSelectedId;recallMeta.textContent=`已选择：${first.n.title} · ${first.n.id}`}}};
+  recallSelect.onchange=()=>{floatRecallSelectedId=recallSelect.value;floatManualEntryLabel='';const selected=recallIndex().byId.get(floatRecallSelectedId);recallMeta.textContent=selected?`已选择：${selected.title} · ${selected.id}`:'未关联（可选）'};
+  document.getElementById('floatRecallSearchClear').onclick=()=>{recallSearch.value='';floatManualEntryLabel='';filterFloatRecall();recallSearch.focus()};
+  document.getElementById('floatRecallManual').onclick=()=>{
+    const typed=String(recallSearch.value||'').trim();
+    if(!typed){recallMeta.textContent='请先在输入框中输入要手动保存的联想入口名称。';recallSearch.focus();return}
+    const exact=state.recallLibrary.nodes.find(n=>n.title===typed||n.titleEn===typed||(n.aliases||[]).includes(typed));
+    if(exact){floatRecallSelectedId=exact.id;recallSelect.value=exact.id;recallMeta.textContent=`已选择：${exact.title} · ${exact.id}`;return}
+    floatRecallSelectedId='';floatManualEntryLabel=typed;
+    recallMeta.textContent=`已手动输入：${typed}（未关联稳定 ID）`;
+  };
   filterFloatRecall();
   document.getElementById('floatSave').onclick=()=>{
     const selectedLevel=document.getElementById('floatLevel').value==='core'?'core':'normal';
@@ -586,7 +603,7 @@ function showKeywordFloatEditor({clue=null,text='',sourceType='stem',optionId=''
     c.solutionRole=c.isCore?document.getElementById('floatRole').value:'context';
     c.coreReason=c.isCore?document.getElementById('floatReason').value:'';
     c.recallNodeId=floatRecallSelectedId;
-    const rn=recallIndex().byId.get(c.recallNodeId);c.recallEntryLabel=rn?.title||'';
+    const rn=recallIndex().byId.get(c.recallNodeId);c.recallEntryLabel=rn?.title||(floatRecallSelectedId?'':floatManualEntryLabel);
     c.sourceType=sourceType||c.sourceType;c.sourceOptionId=optionId||c.sourceOptionId||'';
     const primary=q.metadata?.knowledge?.primaryNodeId||'';c.conceptIds=primary?[primary]:[];
     recomputeKeywordLocations(q);hideKeywordFloat();renderKeywords();renderPreview();renderCurrentIssues();

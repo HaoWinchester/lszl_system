@@ -1,0 +1,85 @@
+/*
+ * 独立认证弹窗样式（auth-dialog.css）
+ * 供未引入 main.css 的学习页（如 knowledge-recall.html）使用：
+ * 弹窗本体样式与 main.css 保持一致，但全部收敛在 #authModal / .modal-backdrop.auth-backdrop
+ * 作用域内，避免影响页面其余布局。
+ */
+.modal-backdrop.auth-backdrop{
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,.44);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:60;
+  padding:20px;
+  touch-action:none;
+}
+.modal-backdrop.auth-backdrop.show{display:flex}
+#authModal .modal.auth-modal{
+  width:min(430px,calc(100vw - 28px));
+  max-height:calc(100vh - 42px);
+  overflow:hidden;
+  padding:0;
+  border-radius:24px;
+  background:linear-gradient(135deg,#ffffff 0%,#f8fbff 100%);
+  box-shadow:0 30px 90px rgba(0,0,0,.30);
+  border:1px solid rgba(255,255,255,.7);
+}
+#authModal button{font:inherit;border:0;border-radius:12px;background:#fff;color:#172033;padding:9px 12px;box-shadow:0 1px 0 rgba(15,23,42,.08),0 0 0 1px rgba(15,23,42,.08);cursor:pointer;transition:.15s ease;touch-action:manipulation;white-space:nowrap}
+#authModal button:hover{transform:none;box-shadow:0 7px 20px rgba(15,23,42,.12),0 0 0 1px rgba(15,23,42,.1)}
+#authModal button.primary{background:#2563eb;color:#fff;box-shadow:0 8px 22px rgba(37,99,235,.24)}
+#authModal button:disabled{opacity:.6;cursor:default}
+#authModal .auth-head{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:20px 20px 12px;
+  border-bottom:1px solid rgba(148,163,184,.18);
+  background:rgba(255,255,255,.92);
+}
+#authModal .auth-head h2{margin:0;font-size:21px}
+#authModal .auth-head p{margin:6px 0 0;color:#64748b;font-size:13px;line-height:1.55}
+#authModal .auth-close{width:34px;height:34px;padding:0;border-radius:12px;box-shadow:none;background:#f1f5f9;color:#64748b}
+#authModal .auth-body{padding:18px 20px 20px}
+#authModal .auth-body label{display:block;margin-bottom:12px;color:#334155;font-size:13px;font-weight:850}
+#authModal .auth-body input{
+  width:100%;
+  margin-top:6px;
+  padding:11px 12px;
+  border:1px solid rgba(148,163,184,.35);
+  border-radius:14px;
+  font-size:15px;
+  outline:none;
+  box-sizing:border-box;
+}
+#authModal .auth-body input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+#authModal .auth-msg{min-height:20px;color:#dc2626;font-size:13px;line-height:1.45;margin:2px 0 10px}
+#authModal .auth-msg.ok{color:#16a34a}
+#authModal .auth-actions{display:flex;gap:10px;flex-wrap:wrap}
+#authModal .auth-actions button{flex:1 1 140px;border-radius:14px}
+#authModal .auth-note{margin-top:13px;padding:10px 11px;border-radius:14px;background:#fffbeb;color:#92400e;font-size:12px;line-height:1.55}
+#authModal .auth-agreement{display:flex;align-items:flex-start;gap:8px;margin:14px 0 0;color:#64748b;font-size:12px;font-weight:600;line-height:1.6;cursor:pointer}
+#authModal .auth-agreement input[type="checkbox"]{width:16px;height:16px;min-width:16px;margin:2px 0 0;padding:0;accent-color:#7c5cff;box-shadow:none;cursor:pointer}
+#authModal .auth-agreement input[type="checkbox"]:focus{box-shadow:0 0 0 3px rgba(124,92,255,.18);border-color:#7c5cff}
+#authModal .auth-agreement a{color:#7058e8;font-weight:800;text-decoration:none}
+#authModal .auth-agreement a:hover{text-decoration:underline}
+#authModal .wechat-login-section{margin-top:14px;border-top:1px dashed #cbd5e1;padding-top:14px}
+#authModal .wechat-divider{display:flex;align-items:center;gap:10px;margin-bottom:12px;color:#94a3b8;font-size:12px;font-weight:900}
+#authModal .wechat-divider:before,#authModal .wechat-divider:after{content:"";height:1px;background:#e2e8f0;flex:1}
+#authModal .wechat-divider span{white-space:nowrap}
+#authModal .wechat-login-entry{width:100%;border:0;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border-radius:14px;padding:11px 14px;font-weight:900;box-shadow:0 12px 26px rgba(22,163,74,.22);cursor:pointer}
+#authModal .wechat-login-entry:hover{transform:translateY(-1px);box-shadow:0 16px 32px rgba(22,163,74,.28)}
+#authModal .wechat-login-panel{margin-top:12px}
+#authModal .wechat-login-card{border:1px solid #bbf7d0;border-radius:18px;background:linear-gradient(135deg,#f0fdf4,#fff);padding:14px;box-shadow:0 12px 28px rgba(22,163,74,.09)}
+#authModal .wechat-login-title{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+#authModal .wechat-icon{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;background:#22c55e;color:#fff;font-weight:1000;box-shadow:0 8px 18px rgba(34,197,94,.24)}
+#authModal .wechat-login-title strong{display:block;color:#14532d}
+#authModal .wechat-login-title small{display:block;margin-top:2px;color:#64748b;font-size:12px;line-height:1.4}
+#authModal .wechat-login-hint{margin:0 0 10px;color:#64748b;font-size:13px;line-height:1.6}
+#authModal.wechat-login-mode .auth-body>label,#authModal.wechat-login-mode .auth-msg,#authModal.wechat-login-mode .auth-actions,#authModal.wechat-login-mode .auth-note{display:none}
+#authModal.wechat-login-mode .wechat-login-section{margin-top:0;padding-top:0;border-top:0}
+#authModal.wechat-login-mode .wechat-divider,#authModal.wechat-login-mode .wechat-login-hint,#authModal.wechat-login-mode .wechat-login-entry{display:none}
+#authModal .wechat-login-copy{text-align:center}
+#authModal .wechat-login-copy strong{display:block;margin-bottom:6px;color:#14532d;font-size:15px;font-weight:900}
+#authModal .wechat-login-copy p{margin:0 0 12px;color:#64748b;font-size:13px;line-height:1.5}

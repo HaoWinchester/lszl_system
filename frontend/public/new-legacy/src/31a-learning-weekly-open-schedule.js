@@ -176,6 +176,31 @@
     return gateRoot;
   }
 
+  function schedulePageGate() {
+    const doc = global.document;
+    if (!doc || !doc.body) return;
+    if (isOpen()) return;
+    // 新标签页里认证会话是异步恢复的：先等 kg-auth-session-change 再判定，
+    // 避免已登录的老师/管理员在新开页面时被倒计时门槛短暂误拦。
+    const knownUser = (() => {
+      try { return !!global.KGRolePermissions?.currentUser?.(); } catch (e) { return false; }
+    })();
+    if (knownUser || !global.KGRolePermissions) {
+      mountPageGate();
+      return;
+    }
+    let settled = false;
+    const proceed = () => {
+      if (settled) return;
+      settled = true;
+      doc.removeEventListener("kg-auth-session-change", proceed);
+      if (gateTimer) return; // 已挂载
+      mountPageGate();
+    };
+    doc.addEventListener("kg-auth-session-change", proceed, { once: true });
+    global.setTimeout(proceed, 2500);
+  }
+
   const api = Object.freeze({
     OPEN_AT,
     OPEN_AT_MS,
@@ -198,7 +223,7 @@
   global.KGLearningWeeklyOpen = api;
 
   if (global.document) {
-    const boot = () => mountPageGate();
+    const boot = () => schedulePageGate();
     if (global.document.readyState === "loading") global.document.addEventListener("DOMContentLoaded", boot, { once: true });
     else boot();
   }
