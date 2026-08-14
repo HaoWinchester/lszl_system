@@ -9,35 +9,36 @@ const BASE_TAG_GROUPS=[
 /* v0.4.0 internal tag identity.
    Formal/main-program exports still use legacy numeric slots. */
 const TAG_SLOT_SEMANTIC_MAP=Object.freeze({
-  'usage/stage/0':'usage/stage/basic',
-  'usage/stage/1':'usage/stage/phase-test',
-  'usage/stage/2':'usage/stage/mock-exam',
-  'usage/stage/3':'usage/stage/sprint-review',
-  'usage/stage/4':'usage/stage/preview',
-  'usage/stage/5':'usage/stage/intensive',
-  'usage/stage/6':'usage/stage/mistake-review',
-  'usage/scene/0':'usage/scene/after-class',
-  'usage/scene/1':'usage/scene/classroom-discussion',
-  'usage/scene/2':'usage/scene/homework',
-  'usage/scene/3':'usage/scene/special-training',
-  'quality/feature/0':'quality/feature/error-prone',
-  'quality/feature/1':'quality/feature/high-frequency',
-  'quality/feature/2':'quality/feature/core',
-  'quality/feature/3':'quality/feature/comprehensive',
-  'quality/review/0':'quality/review/pending-review',
-  'quality/review/1':'quality/review/reviewed',
-  'quality/review/2':'quality/review/needs-update',
-  'source/origin/0':'source/origin/real-exam',
-  'source/origin/1':'source/origin/self-authored',
-  'source/origin/2':'source/origin/adapted',
-  'source/origin/3':'source/origin/textbook-example',
-  'source/scope/0':'source/scope/public',
-  'source/scope/1':'source/scope/internal'
+  'usage/stage/0':'global/usage/stage/basic','usage/stage/basic':'global/usage/stage/basic',
+  'usage/stage/1':'global/usage/stage/phase-test','usage/stage/phase-test':'global/usage/stage/phase-test',
+  'usage/stage/2':'global/usage/stage/mock-exam','usage/stage/mock-exam':'global/usage/stage/mock-exam',
+  'usage/stage/3':'global/usage/stage/sprint-review','usage/stage/sprint-review':'global/usage/stage/sprint-review',
+  'usage/stage/4':'global/usage/stage/preview','usage/stage/preview':'global/usage/stage/preview',
+  'usage/stage/5':'global/usage/stage/intensive','usage/stage/intensive':'global/usage/stage/intensive',
+  'usage/stage/6':'global/usage/stage/mistake-review','usage/stage/mistake-review':'global/usage/stage/mistake-review',
+  'usage/scene/0':'global/usage/scene/after-class','usage/scene/after-class':'global/usage/scene/after-class',
+  'usage/scene/1':'global/usage/scene/classroom-discussion','usage/scene/classroom-discussion':'global/usage/scene/classroom-discussion',
+  'usage/scene/2':'global/usage/scene/homework','usage/scene/homework':'global/usage/scene/homework',
+  'usage/scene/3':'global/usage/scene/special-training','usage/scene/special-training':'global/usage/scene/special-training',
+  'quality/feature/0':'global/quality/feature/error-prone','quality/feature/error-prone':'global/quality/feature/error-prone',
+  'quality/feature/1':'global/quality/feature/high-frequency','quality/feature/high-frequency':'global/quality/feature/high-frequency',
+  'quality/feature/2':'global/quality/feature/core','quality/feature/core':'global/quality/feature/core',
+  'quality/feature/3':'global/quality/feature/comprehensive','quality/feature/comprehensive':'global/quality/feature/comprehensive',
+  'quality/review/0':'global/quality/review/pending-review','quality/review/pending-review':'global/quality/review/pending-review',
+  'quality/review/1':'global/quality/review/reviewed','quality/review/reviewed':'global/quality/review/reviewed',
+  'quality/review/2':'global/quality/review/needs-update','quality/review/needs-update':'global/quality/review/needs-update',
+  'source/origin/0':'global/source/origin/real-exam','source/origin/real-exam':'global/source/origin/real-exam',
+  'source/origin/1':'global/source/origin/self-authored','source/origin/self-authored':'global/source/origin/self-authored',
+  'source/origin/2':'global/source/origin/adapted','source/origin/adapted':'global/source/origin/adapted',
+  'source/origin/3':'global/source/origin/textbook-example','source/origin/textbook-example':'global/source/origin/textbook-example',
+  'source/scope/0':'global/source/scope/public','source/scope/public':'global/source/scope/public',
+  'source/scope/1':'global/source/scope/internal','source/scope/internal':'global/source/scope/internal'
 });
-const TAG_SLOT_LEGACY_MAP=Object.freeze(Object.fromEntries(Object.entries(TAG_SLOT_SEMANTIC_MAP).map(([legacy,semantic])=>[semantic,legacy])));
+/* P4.5.29 差异 26：内部真源一律 global/...；正式导出只回退旧数字槽位（主程序兼容），usage/... 不再作为保存形态 */
+const TAG_SLOT_LEGACY_MAP=Object.freeze(Object.fromEntries(Object.entries(TAG_SLOT_SEMANTIC_MAP).filter(([legacy])=>/\d+$/.test(legacy)).map(([legacy,semantic])=>[semantic,legacy])));
 function legacyTagSlotKey(g,c,i){return `${g.id}/${c.id}/${i}`}
-function semanticTagSlot(slot){slot=String(slot||'');return TAG_SLOT_SEMANTIC_MAP[slot]||slot}
-function formalTagSlot(slot){slot=String(slot||'');return TAG_SLOT_LEGACY_MAP[slot]||slot}
+function semanticTagSlot(slot){slot=String(slot||'').trim();if(!slot)return '';if(slot.startsWith('global/')){return TAG_SLOT_SEMANTIC_MAP[slot.slice(7)]||slot}return TAG_SLOT_SEMANTIC_MAP[slot]||slot}
+function formalTagSlot(slot){slot=semanticTagSlot(slot);return TAG_SLOT_LEGACY_MAP[slot]||slot}
 function tagSlotKey(g,c,i){return semanticTagSlot(legacyTagSlotKey(g,c,i))}
 function tagCategoryKey(g,c){return `${g.id}/${c.id}`}
 function tagGroupKey(g){return g.id}
@@ -111,3 +112,17 @@ const WORD_TO_JSON_AI_PROMPT=`你是一名 PMP 题库结构化编辑助手。
 参考模板：
 ${JSON.stringify(QUESTION_TEMPLATE,null,2)}
 `;
+
+/* P4.5.29 差异 18：题目家族 JSON 模板与外部 AI 生成提示词 */
+function familyTemplateQuestion({title,role,relationToRoot='standalone',variantType='none',equivalenceGrade='',diagnosticTarget='general',difficultyLevel=2,purposes=['practice'],difficulty='中等',stem='请填写题干',answer='B'}){
+  return {title,difficulty,domain:'',topic:'',tags:[],stage:'',stemParts:[{text:stem}],options:[{id:'A',text:'选项 A',correct:answer==='A'},{id:'B',text:'选项 B',correct:answer==='B'},{id:'C',text:'选项 C',correct:answer==='C'},{id:'D',text:'选项 D',correct:answer==='D'}],correctAnswer:answer,analysis:'请填写解析。',translations:{en:{title:'',stemParts:[{text:''}],options:[{id:'A',text:''},{id:'B',text:''},{id:'C',text:''},{id:'D',text:''}],analysis:''}},clues:[],reasoningSteps:[],metadata:{knowledge:{primaryNodeId:'',relatedNodeIds:[],mappingStatus:'unmapped',pathSnapshot:[]},subjectFacets:[],tagPaths:[],questionFamily:{schemaVersion:1,familyKey:'FAMILY-001',role,relationToRoot:role==='root'?'root':relationToRoot,variantType:role==='root'?'none':variantType,equivalenceGrade:role==='member'?equivalenceGrade:'',diagnosticTarget,difficultyLevel,purposes,qualityConfirmed:false,notes:''}},lifecycle:{status:'active',deletedAt:''}};
+}
+const QUESTION_FAMILY_TEMPLATE={name:'PMP 题目家族最低配置模板',subject:'PMP',description:'Question Family v1。外部文件不填写 Question ID / Family ID / rootQuestionId；导入后由 Prep Studio 生成并按 familyKey 绑定。qualityConfirmed 必须由教师人工确认。',version:'1.0',visibility:'private',questions:[
+  familyTemplateQuestion({title:'母题',role:'root',diagnosticTarget:'application',difficultyLevel:2,purposes:['practice'],stem:'母题题干……'}),
+  familyTemplateQuestion({title:'强等价变体 1',role:'member',relationToRoot:'equivalent',variantType:'stem',equivalenceGrade:'A',diagnosticTarget:'application',difficultyLevel:2,purposes:['practice','error-confirmation'],stem:'更换表述但保持同知识目标、同能力层级和核心推理链……'}),
+  familyTemplateQuestion({title:'强等价变体 2',role:'member',relationToRoot:'equivalent',variantType:'scenario',equivalenceGrade:'A',diagnosticTarget:'application',difficultyLevel:2,purposes:['post-remediation-verification','delayed-verification'],stem:'更换情境但保持同知识目标、同能力层级和核心推理链……'}),
+  familyTemplateQuestion({title:'概念诊断',role:'member',relationToRoot:'decomposed',variantType:'decomposed',equivalenceGrade:'C',diagnosticTarget:'concept',difficultyLevel:1,purposes:['diagnosis'],difficulty:'简单',stem:'检测最基础概念是否建立……'}),
+  familyTemplateQuestion({title:'理解诊断',role:'member',relationToRoot:'decomposed',variantType:'decomposed',equivalenceGrade:'C',diagnosticTarget:'understanding',difficultyLevel:2,purposes:['diagnosis'],stem:'检测概念边界、含义或相近概念辨析……'}),
+  familyTemplateQuestion({title:'高阶验证',role:'member',relationToRoot:'equivalent',variantType:'advanced',equivalenceGrade:'A',diagnosticTarget:'analysis',difficultyLevel:4,purposes:['post-remediation-verification','mastery-check'],difficulty:'困难',stem:'新的复杂情境 / 案例，用于证明能够迁移并回到母题能力层级……'})
+]};
+const QUESTION_FAMILY_AI_PROMPT=`你是一名题目家族设计助手。请围绕我提供的一道母题，生成符合 External AI Question Authoring Contract v1、可导入 PMP Content Prep Studio 的 Question Bank JSON。\n\n目标：建立一个可用于高可信学习诊断的题目家族，而不是简单换皮。\n最低覆盖：A 级强等价变体至少 2 道、concept 概念诊断至少 1 道、understanding 理解诊断至少 1 道、高阶验证至少 1 道。教师可以后续继续增加。\n\n关键边界：\n0. 普通题目 difficulty 使用三档“简单 / 中等 / 困难”；metadata.questionFamily.difficultyLevel 使用 L1–L4 诊断层级。L4 不代表主程序存在第四档题目难度。\n1. “与母题的关系”与“学习用途”分开。一道题可同时是情境变体 + 应用检测 + 补救后验证。\n2. A 级强等价必须保持：主知识目标相同、核心能力层级相同或相近、核心推理链相同、难度相近；同时改变足够的表面情境/题干/选项，使学员不能靠记忆母题答案通过。\n3. 能力拆解题用于定位概念/理解等问题，不能单独证明原母题能力已掌握。\n4. 高阶验证必须回到与母题相同或更高的应用/分析/案例迁移层级，并使用学员未见过的新情境。\n5. qualityConfirmed 一律输出 false；只有教师人工审核后才能在 Prep Studio 勾选确认。\n6. 同一题目家族所有题使用同一个 metadata.questionFamily.familyKey（例如 FAMILY-001），且只能有 1 道 role=root。\n7. 不要生成 question id、familyId、rootQuestionId、contentHash、creatorId、deviceId、batchId 或 metadata.origin；全部由 Prep Studio 生成。\n8. 输出纯 JSON，不要 Markdown 围栏。\n\n字段参考：metadata.questionFamily = {familyKey, role, relationToRoot, variantType, equivalenceGrade, diagnosticTarget, difficultyLevel, purposes, qualityConfirmed:false, notes}。\n\n模板：\n${JSON.stringify(QUESTION_FAMILY_TEMPLATE,null,2)}`;

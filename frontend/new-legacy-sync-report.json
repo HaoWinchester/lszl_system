@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.71",
-  "toVersion": "v9.0-p4.1.72",
+  "fromVersion": "v9.0-p4.1.73",
+  "toVersion": "v9.0-p4.1.73",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "content-prep-studio/src/js/45-server-events.js"
+      "content-prep-studio/src/js/00-core-bootstrap.js",
+      "content-prep-studio/src/js/10-state-domain.js",
+      "content-prep-studio/src/js/20-page-runtime.js"
     ],
     "removed": []
   },

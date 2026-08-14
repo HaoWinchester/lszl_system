@@ -82,7 +82,9 @@ function renderQuestionListOnly(){
   state.questionBank.questions.forEach((q,i)=>{
     const d=document.createElement('div');d.className='list-item'+(q.id===state.currentQuestionId?' active':'');
     const st=questionCompleteness(q);
-    d.innerHTML=`<div class="list-title"><span class="status-dot ${st}"></span>${i+1}. ${esc(q.title)}</div><div class="list-meta">${esc(q.id)} · ${esc(q.difficulty||'')}</div>`;
+    const fam=questionFamily(q);
+    const famBadge=fam.role==='standalone'?'':`<span class="family-badge family-${fam.role}" title="${fam.role==='root'?'母题':'家族成员'} ${esc(fam.familyKey)}">【${fam.role==='root'?'母题':'成员'}${fam.role==='member'&&fam.equivalenceGrade?'·'+fam.equivalenceGrade:''}】</span>`;
+    d.innerHTML=`<div class="list-title"><span class="status-dot ${st}"></span>${i+1}. ${famBadge}${esc(q.title)}</div><div class="list-meta">${esc(q.id)} · ${esc(q.difficulty||'')}${fam.role!=='standalone'?' · L'+fam.difficultyLevel:''}</div>`;
     d.onclick=async()=>{if(q.id===state.currentQuestionId)return;await switchQuestionForEdit(q);state.currentQuestionId=q.id;renderQuestions()};list.appendChild(d);
   });
 }
@@ -110,6 +112,154 @@ function renderQuestionPrincipleBindings(){
   box.querySelectorAll('[data-principle-check="question"]').forEach(el=>el.addEventListener('change',()=>{q.metadata.stemPrincipleIds=[...box.querySelectorAll('[data-principle-check="question"]:checked')].map(x=>x.value);syncQuestionPrinciples(q);renderCurrentIssues()}));
   q.options.slice(0,4).forEach(o=>box.querySelectorAll(`[data-principle-check="opt-${o.id}"]`).forEach(el=>el.addEventListener('change',()=>{q.metadata.optionPrincipleMap=q.metadata.optionPrincipleMap||{};q.metadata.optionPrincipleMap[o.id]=[...box.querySelectorAll(`[data-principle-check="opt-${o.id}"]:checked`)].map(x=>x.value);syncQuestionPrinciples(q);renderCurrentIssues()})));
 }
+function renderQuestionFacetBindings(){
+  const q=currentQuestion(),box=document.getElementById('questionFacetBindingPanel');if(!q||!box)return;
+  const subject=q.subject||state.questionBank.subject||'PMP',schema=facetSchemaForSubject(subject);
+  if(!schema){box.innerHTML=`<div class="help">当前科目 <b>${esc(subject)}</b> 尚未配置科目分类 Schema；可到「① 基础数据与导入」导入 Facet Schema。未配置时题目不携带 subjectFacets。</div>`;return}
+  const catalog=facetCatalog(subject),selected=new Set(normalizeQuestionFacets(q.metadata?.subjectFacets,subject).map(x=>x.facetId));
+  const unknown=[...selected].filter(id=>!catalog.some(x=>x.facetId===id));
+  box.innerHTML=`<div class="help">按当前科目 Schema（${esc(schema.name)} · <code>${esc(schema.schemaId)}</code>）绑定；保存为 <code>metadata.subjectFacets</code>，仅允许引用 Schema 中的真实 ID，界面只显示教师业务名称。</div>
+  ${schema.dimensions.filter(d=>d.status!=='inactive').map(d=>`
+    <div style="margin-top:9px"><label>${esc(d.label)}（${d.selection==='single'?'单选':'多选'}）</label>
+    <div class="principle-checks">${d.values.filter(v=>v.status!=='inactive').map(v=>{
+      const fid=facetIdFor(schema,d.id,v.id);
+      return `<label><input type="checkbox" data-facet-check value="${esc(fid)}"${selected.has(fid)?' checked':''}> ${esc(v.label)}${v.status==='deprecated'?'（已废弃）':''}</label>`;
+    }).join('')}</div></div>`).join('')}
+  ${unknown.length?`<div class="muted tiny" style="margin-top:8px;color:#c0392b">未知分类引用（不在当前 Schema，校验中心会标红并阻止正式同步）：${unknown.map(esc).join('、')} <button class="btn small" type="button" id="btnClearUnknownFacets">清除未知引用</button></div>`:''}`;
+  const clearBtn=document.getElementById('btnClearUnknownFacets');
+  if(clearBtn)clearBtn.onclick=()=>{const ids=[...box.querySelectorAll('[data-facet-check]:checked')].map(x=>x.value);q.metadata.subjectFacets=selectedFacetsFromIds(ids,subject);renderQuestionFacetBindings();renderCurrentIssues();markWorkspaceDirty()};
+  box.querySelectorAll('[data-facet-check]').forEach(el=>el.addEventListener('change',()=>{
+    const ids=[...box.querySelectorAll('[data-facet-check]:checked')].map(x=>x.value);
+    q.metadata.subjectFacets=selectedFacetsFromIds(ids,subject).concat(normalizeQuestionFacets(q.metadata?.subjectFacets,subject).filter(x=>x.status==='unknown'));
+    renderCurrentIssues();markWorkspaceDirty();
+  }));
+}
+function renderQuestionFamilyEditor(){
+  const q=currentQuestion(),box=document.getElementById('questionFamilyPanel');if(!q||!box)return;
+  const f=questionFamily(q);
+  const root=familyRootFor(q),members=root?familyMembersFor(root):[],coverage=root?familyCoverageFor(root):null;
+  const rootOptions=state.questionBank.questions.filter(x=>x.id!==q.id&&questionFamily(x).role==='root');
+  const purposesChecked=new Set(f.purposes);
+  box.innerHTML=`<div class="help">三种角色：母题（root）/ 家族成员（member）/ 独立题（standalone）。普通难度是三档，<code>questionFamily.difficultyLevel</code> 是独立 L1–L4 诊断层级。外部导入的质量确认一律为否，只有教师可以勾选确认。</div>
+  <div class="form-grid" style="margin-top:10px">
+    <div><label>家族角色</label><select id="qfRole">
+      ${['standalone|独立题','root|母题','member|家族成员'].map(x=>{const [v,l]=x.split('|');return `<option value="${v}"${f.role===v?' selected':''}>${l}</option>`}).join('')}
+    </select></div>
+    <div><label>家族代号 familyKey</label><input type="text" id="qfFamilyKey" value="${esc(f.familyKey)}" ${f.role==='standalone'?'disabled':''} placeholder="FAMILY-001"></div>
+    <div><label>与母题关系（成员）</label><select id="qfRelation" ${f.role!=='member'?'disabled':''}>
+      ${[['equivalent','等价变体'],['decomposed','能力拆解'],['extension','扩展/高阶']].map(([v,l])=>`<option value="${v}"${f.relationToRoot===v?' selected':''}>${l}</option>`).join('')}
+    </select></div>
+    <div><label>变体类型（成员）</label><select id="qfVariant" ${f.role!=='member'?'disabled':''}>
+      ${[['stem','题干'],['options','选项'],['scenario','情境'],['parameter','参数'],['mixed','混合'],['decomposed','拆解'],['advanced','高阶']].map(([v,l])=>`<option value="${v}"${f.variantType===v?' selected':''}>${l}</option>`).join('')}
+    </select></div>
+    <div><label>等价等级（等价变体）</label><select id="qfGrade" ${f.role!=='member'||f.relationToRoot!=='equivalent'?'disabled':''}>
+      ${['','A','B','C'].map(v=>`<option value="${v}"${f.equivalenceGrade===v?' selected':''}>${v||'— 未设置 —'}</option>`).join('')}
+    </select></div>
+    <div><label>诊断目标</label><select id="qfTarget">
+      ${[['general','一般'],['concept','概念'],['understanding','理解'],['discrimination','辨析'],['application','应用'],['analysis','分析'],['case-transfer','案例迁移']].map(([v,l])=>`<option value="${v}"${f.diagnosticTarget===v?' selected':''}>${l}</option>`).join('')}
+    </select></div>
+    <div><label>诊断层级 L1–L4</label><select id="qfLevel">
+      ${[1,2,3,4].map(v=>`<option value="${v}"${f.difficultyLevel===v?' selected':''}>L${v}</option>`).join('')}
+    </select></div>
+    <div><label>绑定母题（成员）</label><select id="qfRoot" ${f.role!=='member'?'disabled':''}>
+      <option value="">— 选择母题 —</option>
+      ${rootOptions.map(x=>`<option value="${esc(x.id)}"${f.rootQuestionId===x.id?' selected':''}>${esc(x.title)}（${esc(x.id.slice(0,8))}）</option>`).join('')}
+    </select></div>
+    <div class="span2"><label>学习用途（多选）</label><div class="principle-checks">
+      ${Object.entries(FAMILY_PURPOSE_LABELS).map(([v,l])=>`<label><input type="checkbox" data-qf-purpose="${v}"${purposesChecked.has(v)?' checked':''}> ${l}</label>`).join('')}
+    </div></div>
+    <div class="span2"><label><input type="checkbox" id="qfConfirmed"${f.qualityConfirmed?' checked':''}> 教师质量确认（qualityConfirmed；外部导入固定为否）</label></div>
+    <div class="span2"><label>备注</label><input type="text" id="qfNotes" value="${esc(f.notes)}"></div>
+  </div>
+  <div class="toolbar" style="margin-top:10px">
+    <button class="btn small primary" id="btnCreateFamilyMember" type="button">从母题创建成员题</button>
+    <button class="btn small" id="btnGoFamilyRoot" type="button" ${root?'':'disabled'}>跳到母题</button>
+    <span class="muted tiny">${f.role==='standalone'?'独立题不参与家族分组。':root?`家族 ${esc(questionFamily(root).familyKey)} · 成员 ${members.length} 道 · ${coverage.ready?'已达到诊断就绪':coverage.complete?'结构完整，待人工确认':'未达到诊断就绪（强等价 '+coverage.strong+'/2 · 概念 '+(coverage.concept?1:0)+'/1 · 理解 '+(coverage.understanding?1:0)+'/1 · 高阶 '+(coverage.highOrder?1:0)+'/1）'}（Root-only 批次合法，这只是就绪提示）`:'尚未绑定母题。'}</span>
+  </div>
+  ${members.length?`<div class="muted tiny" style="margin-top:8px">家族成员：${members.map(m=>`<a href="javascript:void(0)" data-qf-goto="${esc(m.id)}" style="margin-right:8px">${esc(m.title)}（${familyRelationLabel(questionFamily(m).relationToRoot)}${questionFamily(m).equivalenceGrade?'·'+questionFamily(m).equivalenceGrade:''}）</a>`).join('')}</div>`:''}`;
+  const rerender=()=>{renderQuestionFamilyEditor();renderQuestionListOnly();renderCurrentIssues();markWorkspaceDirty()};
+  document.getElementById('qfRole').onchange=e=>{
+    const role=e.target.value;
+    if(role==='root')makeQuestionFamilyRoot(q);
+    else if(role==='standalone')makeQuestionStandalone(q);
+    else{const target=root&&root.id!==q.id?root:rootOptions[0];if(target)makeQuestionFamilyMember(q,target,{applyDefaults:false});else{q.metadata.questionFamily.role='member'}}
+    rerender();
+  };
+  const keyInput=document.getElementById('qfFamilyKey');keyInput.oninput=()=>{questionFamily(q).familyKey=keyInput.value.trim();if(root&&root.id===q.id)renameQuestionFamilyKey(q,keyInput.value.trim());renderQuestionListOnly();renderCurrentIssues();markWorkspaceDirty()};
+  // 注意：questionFamily(q) 每次调用都会重新归一并替换 q.metadata.questionFamily 对象，
+  // 校验中心等流程也会触发替换，因此 handler 内必须现取对象，不能依赖渲染时的闭包 f。
+  const bind=(id,apply)=>{const el=document.getElementById(id);if(el)el.onchange=()=>{apply(el.value);rerender()}};
+  bind('qfRelation',v=>{const fam=questionFamily(q);fam.relationToRoot=normalizeFamilyRelation(v);if(fam.role==='member')fam.relationToRoot=['equivalent','decomposed','extension'].includes(fam.relationToRoot)?fam.relationToRoot:'equivalent'});
+  bind('qfVariant',v=>{questionFamily(q).variantType=normalizeFamilyVariantType(v)});
+  bind('qfGrade',v=>{questionFamily(q).equivalenceGrade=normalizeEquivalenceGrade(v)});
+  bind('qfTarget',v=>{questionFamily(q).diagnosticTarget=normalizeDiagnosticTarget(v)});
+  bind('qfLevel',v=>{questionFamily(q).difficultyLevel=Math.min(4,Math.max(1,Number(v)||2))});
+  bind('qfRoot',v=>{const target=state.questionBank.questions.find(x=>x.id===v);if(target){makeQuestionFamilyMember(q,target,{applyDefaults:false})}else{questionFamily(q).rootQuestionId=''}});
+  box.querySelectorAll('[data-qf-purpose]').forEach(el=>el.addEventListener('change',()=>{
+    const fam=questionFamily(q);
+    fam.purposes=[...box.querySelectorAll('[data-qf-purpose]:checked')].map(x=>x.dataset.qfPurpose);
+    if(!fam.purposes.length)fam.purposes=['practice'];
+    renderCurrentIssues();markWorkspaceDirty();
+  }));
+  document.getElementById('qfConfirmed').onchange=e=>{questionFamily(q).qualityConfirmed=e.target.checked;renderCurrentIssues();markWorkspaceDirty()};
+  document.getElementById('qfNotes').oninput=e=>{questionFamily(q).notes=e.target.value.trim();markWorkspaceDirty()};
+  box.querySelectorAll('[data-qf-goto]').forEach(el=>el.addEventListener('click',()=>{state.currentQuestionId=el.dataset.qfGoto;renderQuestions();renderQuestionEditor()}));
+  const createBtn=document.getElementById('btnCreateFamilyMember');
+  createBtn.onclick=()=>{
+    const base=root&&root.id!==q.id?root:q;
+    if(questionFamily(base).role!=='root'&&!confirm('当前题不是母题，先把它设为母题再创建成员？'))return;
+    makeQuestionFamilyRoot(base);
+    const copy=QuestionService.duplicatePayload(base);
+    copy.title=base.title+'（家族成员）';
+    state.questionBank.questions.push(copy);
+    makeQuestionFamilyMember(copy,base);
+    questionFamily(copy).qualityConfirmed=false;
+    state.currentQuestionId=copy.id;state.questionBank.updatedAt=Date.now();
+    renderQuestions();renderQuestionEditor();markWorkspaceDirty();toast('已从母题创建家族成员');
+  };
+  const goRoot=document.getElementById('btnGoFamilyRoot');
+  if(goRoot&&!root)goRoot.disabled=true;
+  else if(goRoot)goRoot.onclick=()=>{state.currentQuestionId=root.id;renderQuestions();renderQuestionEditor()};
+}
+function renderSubjectFacetManager(){  const box=document.getElementById('subjectFacetManager');if(!box)return;
+  const subject=state.questionBank.subject||'PMP',schema=facetSchemaForSubject(subject);
+  if(!schema){
+    box.innerHTML=`<div class="help">当前科目 <b>${esc(subject)}</b> 尚未配置科目分类。</div><div class="toolbar"><button class="btn small primary" id="btnImportFacetSchema">导入科目分类</button><input type="file" id="fileFacetSchema" accept=".json,application/json" hidden></div>`;
+  }else{
+    box.innerHTML=`
+    <div class="toolbar"><b>${esc(schema.name||subject+' 科目分类')}</b><span class="spacer"></span><button class="btn small" id="btnLoadServerFacets">从服务器拉取</button><button class="btn small" id="btnPushServerFacets">推送到服务器</button><button class="btn small" id="btnExportCurrentFacetSchema">导出分类配置</button><button class="btn small primary" id="btnImportFacetSchema">导入 / 替换分类</button><input type="file" id="fileFacetSchema" accept=".json,application/json" hidden></div>
+    ${schema.dimensions.map(d=>`<div style="margin-top:8px"><label>${esc(d.label)}（${d.selection==='single'?'单选':'多选'} · ${d.values.length} 值）</label><div class="muted tiny">${d.values.map(v=>esc(v.label)+(v.status==='deprecated'?'（已废弃）':'')).join(' · ')}</div></div>`).join('')}
+    <div class="muted tiny" style="margin-top:8px">Schema ID：<code>${esc(schema.schemaId)}</code> · 科目：<code>${esc(schema.subjectId)}</code>；维度与取值使用稳定 ID，历史使用过的 ID 不可硬删除或改写。服务器 Schema 是正式真源，推送遇到版本冲突时会自动刷新最新版并要求重新确认。</div>`;
+  }
+  const importBtn=document.getElementById('btnImportFacetSchema'),file=document.getElementById('fileFacetSchema');
+  if(importBtn)importBtn.onclick=()=>file?.click();
+  if(file)file.onchange=async()=>{const f=file.files?.[0];if(!f)return;try{
+    const imported=importFacetSchema(await readJsonFile(f));
+    state.questionBank.questions.forEach(q=>q.metadata.subjectFacets=normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||state.questionBank.subject));
+    renderSubjectFacetManager();renderQuestionEditor();renderCurrentIssues();markWorkspaceDirty();toast(`已导入科目分类：${imported.name}`);
+  }catch(err){alert('科目分类导入失败：'+err.message)}file.value=''};
+  const exportBtn=document.getElementById('btnExportCurrentFacetSchema');
+  if(exportBtn&&schema)exportBtn.onclick=()=>downloadJson({format:'pmp-facet-schema-v1',...clone(schema)},`${schema.schemaId}.json`,{auditType:'subject-facet-schema'});
+  const loadBtn=document.getElementById('btnLoadServerFacets');
+  if(loadBtn)loadBtn.onclick=async()=>{
+    if(!window.PMPPrepP45Server){toast('服务器适配器未加载');return}
+    try{const result=await window.PMPPrepP45Server.loadSubjectFacetSchemas();state.questionBank.questions.forEach(q=>q.metadata.subjectFacets=normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||state.questionBank.subject));renderSubjectFacetManager();renderQuestionEditor();renderCurrentIssues();toast(`已从服务器拉取 ${result.schemas.length} 份 Facet Schema`)}
+    catch(error){alert('从服务器拉取科目分类失败：'+error.message)}
+  };
+  const pushBtn=document.getElementById('btnPushServerFacets');
+  if(pushBtn&&schema)pushBtn.onclick=async()=>{
+    if(!window.PMPPrepP45Server){toast('服务器适配器未加载');return}
+    if(!confirm(`将当前科目分类（${schema.name}）推送到服务器？\n服务器将按科目替换同名 Schema；历史使用过的 ID 会被保留，不会被硬删除。`))return;
+    try{
+      const result=await window.PMPPrepP45Server.pushSubjectFacetSchema(schema,{contentRevision:prepRuntime.serverContentRevision||0});
+      prepRuntime.serverContentRevision=Math.max(Number(prepRuntime.serverContentRevision||0),Number(result?.contentRevision||0));
+      toast('科目分类已推送到服务器');
+    }catch(error){
+      alert(error.code==='SUBJECT_FACET_REVISION_CONFLICT'?error.message:'推送到服务器失败：'+error.message);
+      if(error.code==='SUBJECT_FACET_REVISION_CONFLICT'&&error.detail?.latestContentRevision)prepRuntime.serverContentRevision=error.detail.latestContentRevision;
+    }
+  };
+}
 function renderQuestionEditor(){
   const q=currentQuestion(),ed=document.getElementById('questionEditor');
   document.getElementById('currentQuestionId').textContent=q?.id||'';
@@ -120,7 +270,7 @@ function renderQuestionEditor(){
   <div class="form-grid">
     <div><label>题目 ID</label><input type="text" data-qfield="id" value="${esc(q.id)}"></div>
     <div><label>标题</label><input type="text" data-qfield="title" value="${esc(q.title)}"></div>
-    <div><label>难度</label><select data-qfield="difficulty">${['基础','中等','困难'].map(x=>`<option${q.difficulty===x?' selected':''}>${x}</option>`).join('')}</select></div>
+    <div><label>难度</label><select data-qfield="difficulty">${['简单','中等','困难'].map(x=>`<option${q.difficulty===x?' selected':''}>${x}</option>`).join('')}</select></div>
     <div><label>阶段</label><input type="text" data-qfield="stage" value="${esc(q.stage||'')}"></div>
     <div><label>领域 / Domain</label><input type="text" data-qfield="domain" value="${esc(q.domain||'')}"></div>
     <div><label>主题 / Topic</label><input type="text" data-qfield="topic" value="${esc(q.topic||'')}"></div>
@@ -143,6 +293,14 @@ function renderQuestionEditor(){
     <div id="questionPrincipleBindingPanel"></div>
   </div>
   <div class="section">
+    <div class="section-title">科目分类（Subject Facets）</div>
+    <div id="questionFacetBindingPanel"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">题目家族（Question Family v1）</div>
+    <div id="questionFamilyPanel"></div>
+  </div>
+  <div class="section">
     <div class="section-title">知识点</div>
     <label>主知识点（只保存稳定 Node ID）</label>
     <select id="primaryNode">${treeOptions(q.metadata?.knowledge?.primaryNodeId||'')}</select>
@@ -157,7 +315,7 @@ function renderQuestionEditor(){
     </div>
   </div>`;
   bindQuestionEditor();
-  renderQuestionPrincipleBindings();renderKeywords();renderPreview();renderCurrentIssues();renderQuestionLockState();
+  renderQuestionPrincipleBindings();renderQuestionFacetBindings();renderQuestionFamilyEditor();renderKeywords();renderPreview();renderCurrentIssues();renderQuestionLockState();
 }
 function bindQuestionEditor(){
   const q=currentQuestion();if(!q)return;
@@ -231,14 +389,59 @@ function addKeyword(level){
 function recomputeKeywordLocations(q){
   const stem=questionStem(q);
   q.clues.forEach(c=>{
-    const locs=[],sc=countOccurrences(stem,c.text);if(sc)locs.push({field:'stem',optionId:'',count:sc});
-    q.options.forEach(o=>{const n=countOccurrences(o.text,c.text);if(n)locs.push({field:'option',optionId:o.id,count:n})});
+    const locs=[],sourceType=String(c.sourceType||'stem'),sourceOptionId=String(c.sourceOptionId||'');
+    if(sourceType==='option'){
+      const option=q.options.find(o=>String(o.id)===sourceOptionId),count=option?countOccurrences(option.text,c.text):0;
+      if(count)locs.push({field:'option',optionId:sourceOptionId,count});
+    }else{
+      const count=countOccurrences(stem,c.text);if(count)locs.push({field:'stem',optionId:'',count});
+    }
     c.matchLocations=locs;
-    const first=locs[0];if(first){c.sourceType=first.field;c.sourceOptionId=first.optionId||''}
   });
 }
 function recallNodeOptions(selected){
   return '<option value="">— 未关联 —</option>'+state.recallLibrary.nodes.slice().sort((a,b)=>a.title.localeCompare(b.title,'zh-CN')).map(n=>`<option value="${esc(n.id)}"${n.id===selected?' selected':''}>${esc(n.title)}${n.titleEn?' / '+esc(n.titleEn):''}</option>`).join('');
+}
+function normalizeRecallSearchText(value){return String(value||'').trim().toLowerCase().replace(/\s+/g,' ')}
+function fuzzySubsequenceMatch(needle,haystack){
+  needle=normalizeRecallSearchText(needle).replace(/\s+/g,'');haystack=normalizeRecallSearchText(haystack).replace(/\s+/g,'');
+  if(!needle)return true;let i=0;for(const ch of haystack){if(ch===needle[i])i++;if(i>=needle.length)return true}return false;
+}
+function recallSearchNodes(term,limit=80){
+  const q=normalizeRecallSearchText(term),tokens=q.split(' ').filter(Boolean),rows=[];
+  state.recallLibrary.nodes.forEach(n=>{
+    const fields=[{v:n.title,w:120},{v:n.titleEn,w:80},{v:n.id,w:70},...(n.aliases||[]).map(v=>({v,w:100}))];
+    let score=0,best='';
+    if(!q){score=1}else fields.forEach(({v,w})=>{
+      const text=normalizeRecallSearchText(v);if(!text)return;
+      let local=0;
+      if(text===q)local=w+100;else if(text.startsWith(q))local=w+70;else if(text.includes(q))local=w+50;
+      else if(tokens.length>1&&tokens.every(token=>text.includes(token)))local=w+35;
+      else if(q.length>=2&&fuzzySubsequenceMatch(q,text))local=w+18;
+      if(local>score){score=local;best=String(v||'')}
+    });
+    if(score)rows.push({n,score,best});
+  });
+  return rows.sort((a,b)=>b.score-a.score||Number(b.n.priority||0)-Number(a.n.priority||0)||String(a.n.title||'').localeCompare(String(b.n.title||''),'zh-CN')).slice(0,limit);
+}
+function recallFilteredOptions(term,selectedId=''){
+  const rows=recallSearchNodes(term,80),q=normalizeRecallSearchText(term);
+  let html='<option value="">— 未关联 —</option>';
+  if(selectedId&&!rows.some(({n})=>n.id===selectedId)){
+    const selected=state.recallLibrary.nodes.find(n=>n.id===selectedId);
+    html+=selected
+      ?`<option value="${esc(selected.id)}" selected>当前选择：${esc(selected.title)} · ${esc(selected.id)}</option>`
+      :`<option value="${esc(selectedId)}" selected>已失效：${esc(selectedId)}</option>`;
+  }
+  html+=rows.map(({n,best})=>{
+    const alias=(n.aliases||[]).find(a=>q&&normalizeRecallSearchText(a).includes(q));
+    const extra=alias?` · Alias: ${alias}`:(q&&best&&best!==n.title?` · ${best}`:'');
+    return `<option value="${esc(n.id)}"${n.id===selectedId?' selected':''}>${esc(n.title)}${extra?esc(extra):''} · ${esc(n.id)}</option>`;
+  }).join('');
+  return {html,count:rows.length,rows};
+}
+function keywordRecallControl(box,attribute,clueId){
+  return [...box.querySelectorAll(`[${attribute}]`)].find(element=>element.getAttribute(attribute)===String(clueId))||null;
 }
 function renderKeywords(){
   const q=currentQuestion(),box=document.getElementById('keywordList');if(!box)return;
@@ -260,17 +463,30 @@ function renderKeywords(){
       <div class="kw-grid">
         <div><label>英文</label><input type="text" data-kwfield="textEn" data-kwid="${esc(c.id)}" value="${esc(c.textEn||'')}"></div>
         <div><label>级别</label><select data-kwfield="keywordLevel" data-kwid="${esc(c.id)}"><option value="normal"${level==='normal'?' selected':''}>普通关键词</option><option value="core"${level==='core'?' selected':''}>核心关键词</option></select></div>
-        <div class="span2"><label>联想入口 ${resolved?'✓':'⚠'}</label><select data-kwfield="recallNodeId" data-kwid="${esc(c.id)}">${recallNodeOptions(c.recallNodeId)}</select></div>
+        <div class="span2"><label>联想入口 ${resolved?'✓':c.recallNodeId?'⚠':'（可选）'}</label>
+          <div class="recall-search-row"><input type="search" data-transient-ui data-kw-recall-search="${esc(c.id)}" placeholder="输入名称 / Alias / ID 模糊搜索"><button class="btn small" type="button" data-kw-recall-clear="${esc(c.id)}">清空</button></div>
+          <select class="recall-filtered" data-kwfield="recallNodeId" data-kwid="${esc(c.id)}" data-kw-recall-select="${esc(c.id)}">${recallNodeOptions(c.recallNodeId)}</select>
+          <div class="recall-search-meta" data-kw-recall-meta="${esc(c.id)}"></div>
+        </div>
         ${level==='core'?`<div><label>解题作用</label><select data-kwfield="solutionRole" data-kwid="${esc(c.id)}">
           ${[['decision-cue','Decision Cue / 决策提示'],['concept-anchor','Concept Anchor / 知识锚点'],['condition-anchor','Condition Anchor / 情境条件'],['answer-anchor','Answer Anchor / 答案判断']].map(([v,t])=>`<option value="${v}"${c.solutionRole===v?' selected':''}>${t}</option>`).join('')}
         </select></div><div><label>核心理由</label><input type="text" data-kwfield="coreReason" data-kwid="${esc(c.id)}" value="${esc(c.coreReason||'')}" placeholder="为什么这个词影响本题推理？"></div>`:''}
-        <div class="span2 tiny muted">${resolved?`→ ${esc(resolved.title)}`:`未找到稳定联想入口。${esc(suggestionText(c.text))}`}</div>
+        <div class="span2 tiny muted">${resolved?`→ ${esc(resolved.title)}`:c.recallNodeId?`联想入口 ${esc(c.recallNodeId)} 已失效，请重新选择或清除。`:'未关联（可选）'}</div>
       </div>
     </div>`;
   }).join('');
   box.querySelectorAll('[data-remove-kw]').forEach(b=>b.onclick=()=>{q.clues=q.clues.filter(c=>c.id!==b.dataset.removeKw);renderKeywords();renderPreview();renderCurrentIssues()});
   box.querySelectorAll('[data-kwfield]').forEach(el=>el.addEventListener('change',()=>updateKeywordField(el)));
   box.querySelectorAll('input[data-kwfield]').forEach(el=>el.addEventListener('input',()=>updateKeywordField(el,false)));
+  q.clues.forEach(c=>{
+    const input=keywordRecallControl(box,'data-kw-recall-search',c.id),select=keywordRecallControl(box,'data-kw-recall-select',c.id),clear=keywordRecallControl(box,'data-kw-recall-clear',c.id),meta=keywordRecallControl(box,'data-kw-recall-meta',c.id);
+    if(!input||!select||!clear||!meta)return;
+    const filter=()=>{const result=recallFilteredOptions(input.value,c.recallNodeId||'');select.innerHTML=result.html;meta.textContent=input.value?`找到 ${result.count} 个候选；选择后才会保存稳定 ID。`:`共 ${result.count} 个正式联想入口。`;return result};
+    input.addEventListener('input',filter);
+    input.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();input.value='';filter()}else if(event.key==='Enter'){event.preventDefault();const first=filter().rows[0];if(first){select.value=first.n.id;updateKeywordField(select)}}});
+    clear.onclick=()=>{input.value='';filter();input.focus()};
+    filter();
+  });
 }
 function updateKeywordField(el,rerender=true){
   const q=currentQuestion(),c=q?.clues.find(x=>x.id===el.dataset.kwid);if(!c)return;
@@ -324,13 +540,18 @@ function showKeywordFloatEditor({clue=null,text='',sourceType='stem',optionId=''
   const q=currentQuestion(),box=document.getElementById('keywordFloat');if(!q||!box)return;
   const existing=clue||q.clues.find(c=>c.text===text&&keywordMatchesSource(c,sourceType,optionId))||null;
   const resolved=existing?.recallNodeId?recallIndex().byId.get(existing.recallNodeId):resolveRecall(text).unique;
+  let floatRecallSelectedId=existing?.recallNodeId||'';
   const level=existing?.keywordLevel==='core'?'core':'normal';
   const role=existing?.solutionRole||(level==='core'?'concept-anchor':'context');
   box.innerHTML=`<div class="float-title"><span>${existing?'编辑关键词':'新增关键词'}：</span><span class="kw-word">${esc(existing?.text||text)}</span><span class="spacer"></span><button class="btn small" id="floatClose">×</button></div>
   <div class="float-grid">
     <div><label>级别</label><select id="floatLevel"><option value="normal"${level==='normal'?' selected':''}>普通关键词</option><option value="core"${level==='core'?' selected':''}>核心关键词</option></select></div>
     <div><label>English</label><input id="floatTextEn" type="text" value="${esc(existing?.textEn||'')}"></div>
-    <div class="span2"><label>联想入口</label><select id="floatRecall">${recallNodeOptions(existing?.recallNodeId||resolved?.id||'')}</select></div>
+    <div class="span2"><label>联想入口（可选）</label>
+      <div class="recall-search-row"><input id="floatRecallSearch" type="search" data-transient-ui placeholder="输入名称 / Alias / ID 模糊搜索"><button class="btn small" id="floatRecallSearchClear" type="button">清空</button></div>
+      <select id="floatRecall" class="recall-filtered">${recallNodeOptions(floatRecallSelectedId)}</select>
+      <div id="floatRecallSearchMeta" class="recall-search-meta"></div>
+    </div>
     <div id="floatCoreRoleWrap"${level==='core'?'':' class="hidden"'}><label>解题作用</label><select id="floatRole">
       ${[['decision-cue','Decision Cue / 决策提示'],['concept-anchor','Concept Anchor / 知识锚点'],['condition-anchor','Condition Anchor / 情境条件'],['answer-anchor','Answer Anchor / 答案判断']].map(([v,t])=>`<option value="${v}"${role===v?' selected':''}>${t}</option>`).join('')}
     </select></div>
@@ -344,6 +565,13 @@ function showKeywordFloatEditor({clue=null,text='',sourceType='stem',optionId=''
     document.getElementById('floatCoreRoleWrap').classList.toggle('hidden',!core);
     document.getElementById('floatCoreReasonWrap').classList.toggle('hidden',!core);
   };
+  const recallSearch=document.getElementById('floatRecallSearch'),recallSelect=document.getElementById('floatRecall'),recallMeta=document.getElementById('floatRecallSearchMeta');
+  const filterFloatRecall=()=>{const result=recallFilteredOptions(recallSearch.value,floatRecallSelectedId);recallSelect.innerHTML=result.html;recallMeta.textContent=recallSearch.value?`找到 ${result.count} 个候选；选择后才会保存稳定 ID。`:`共 ${result.count} 个正式联想入口。`;return result};
+  recallSearch.oninput=filterFloatRecall;
+  recallSearch.onkeydown=event=>{if(event.key==='Escape'){event.preventDefault();recallSearch.value='';filterFloatRecall()}else if(event.key==='Enter'){event.preventDefault();const first=filterFloatRecall().rows[0];if(first){floatRecallSelectedId=first.n.id;recallSelect.value=floatRecallSelectedId;recallMeta.textContent=`已选择：${first.n.title} · ${first.n.id}`}}};
+  recallSelect.onchange=()=>{floatRecallSelectedId=recallSelect.value;const selected=recallIndex().byId.get(floatRecallSelectedId);recallMeta.textContent=selected?`已选择：${selected.title} · ${selected.id}`:'未关联（可选）'};
+  document.getElementById('floatRecallSearchClear').onclick=()=>{recallSearch.value='';filterFloatRecall();recallSearch.focus()};
+  filterFloatRecall();
   document.getElementById('floatSave').onclick=()=>{
     const selectedLevel=document.getElementById('floatLevel').value==='core'?'core':'normal';
     let c=existing;
@@ -357,7 +585,7 @@ function showKeywordFloatEditor({clue=null,text='',sourceType='stem',optionId=''
     c.keywordLevel=selectedLevel;c.isCore=selectedLevel==='core';c.type=c.isCore?'core-keyword':'recall-keyword';
     c.solutionRole=c.isCore?document.getElementById('floatRole').value:'context';
     c.coreReason=c.isCore?document.getElementById('floatReason').value:'';
-    c.recallNodeId=document.getElementById('floatRecall').value;
+    c.recallNodeId=floatRecallSelectedId;
     const rn=recallIndex().byId.get(c.recallNodeId);c.recallEntryLabel=rn?.title||'';
     c.sourceType=sourceType||c.sourceType;c.sourceOptionId=optionId||c.sourceOptionId||'';
     const primary=q.metadata?.knowledge?.primaryNodeId||'';c.conceptIds=primary?[primary]:[];
@@ -392,7 +620,7 @@ function validateKeyword(q,c){
   const issues=[],word=keywordLooksLikeWord(c.text);
   if(!word.ok)issues.push({level:'warn',message:`关键词“${c.text}”：${word.msg}`,suggest:'缩短为词或稳定专业术语。'});
   if(!(c.matchLocations||[]).length)issues.push({level:'error',message:`关键词“${c.text}”已不在题干/选项中`,suggest:'重新标记或删除该关键词。'});
-  if(!c.recallNodeId||!recallIndex().byId.has(c.recallNodeId))issues.push({level:c.keywordLevel==='core'?'error':'warn',message:`关键词“${c.text}”没有有效联想入口`,suggest:suggestionText(c.text)});
+  if(c.recallNodeId&&!recallIndex().byId.has(c.recallNodeId))issues.push({level:'error',message:`关键词“${c.text}”引用的联想入口不存在：${c.recallNodeId}`,suggest:'清除该引用，或重新选择一个现有联想入口。'});
   if(c.keywordLevel==='core'){
     if(!c.solutionRole||c.solutionRole==='context')issues.push({level:'error',message:`核心关键词“${c.text}”缺少解题作用`,suggest:'选择 Decision Cue / Concept Anchor / Condition Anchor / Answer Anchor。'});
     if(!String(c.coreReason||'').trim())issues.push({level:'error',message:`核心关键词“${c.text}”缺少核心理由`,suggest:'说明这个词为什么影响本题推理或答案选择。'});
@@ -619,7 +847,7 @@ function exportableQuestion(q){
   out.analysis=String(out.analysis||out.explanation||'');out.explanation=out.analysis;
   out.status=out.status||{};
   out.status.contentReady=!!(questionStem(out)&&out.options.every(o=>o.text)&&out.analysis);
-  out.status.keywordsReady=!!(out.clues.length&&out.clues.every(c=>c.recallNodeId));
+  out.status.keywordsReady=!!out.clues.length;
   out.status.knowledgeReady=!!primary;
   out.status.reasoningReady=!!(out.reasoningSteps||[]).length;
   return out;
@@ -720,8 +948,10 @@ function runValidation(){
     if(contentHashOwners.has(ch))issues.push({level:'warn',object:q.id,message:`疑似重复题内容：与 ${contentHashOwners.get(ch)} 的 Content Hash 相同`,suggest:'确认是否为重复题；服务器未来可用 contentHash 做二次去重。'});
     else contentHashOwners.set(ch,q.id);
     validateQuestion(q,true).forEach(x=>issues.push(x));
+    validateQuestionFamily(q).forEach(x=>issues.push(x));
   });
-  state.questionBank.questions.forEach(q=>{const metadata=syncQuestionPrinciples(q);(metadata.stemPrincipleIds||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`题干原则 ID 不存在：${id}`,suggest:'在原则管理中创建或重新绑定。'})});Object.entries(metadata.optionPrincipleMap||{}).forEach(([opt,ids])=>(ids||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`选项 ${opt} 的原则 ID 不存在：${id}`,suggest:'重新绑定选项原则。'})}));const correctIds=metadata.optionPrincipleMap?.[q.correctAnswer]||[];if(correctIds.length!==1)issues.push({level:'error',object:q.id,message:'正确选项必须绑定且只能绑定一条原则',suggest:'在题目录入区为正确选项保留一条原则；多题归纳据此分组。'});(q.tags||[]).forEach(tag=>{if(!tagPathFor(tag))issues.push({level:'warn',object:q.id,message:`标签“${tag}”未绑定主程序预设标签槽位`,suggest:'保留为自由标签，或在标签管理中映射/改名。'})})});
+  validateFamilyStructure(state.questionBank.questions).forEach(x=>issues.push(x));
+  state.questionBank.questions.forEach(q=>{const metadata=syncQuestionPrinciples(q);(metadata.stemPrincipleIds||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`题干原则 ID 不存在：${id}`,suggest:'在原则管理中创建或重新绑定。'})});Object.entries(metadata.optionPrincipleMap||{}).forEach(([opt,ids])=>(ids||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`选项 ${opt} 的原则 ID 不存在：${id}`,suggest:'重新绑定选项原则。'})}));const correctIds=metadata.optionPrincipleMap?.[q.correctAnswer]||[];if(correctIds.length!==1)issues.push({level:'error',object:q.id,message:'正确选项必须绑定且只能绑定一条原则',suggest:'在题目录入区为正确选项保留一条原则；多题归纳据此分组。'});validateQuestionFacets(q).forEach(x=>issues.push({level:x.level,object:q.id,message:x.message,suggest:x.suggest}));(q.tags||[]).forEach(tag=>{if(!tagPathFor(tag))issues.push({level:'warn',object:q.id,message:`标签“${tag}”未绑定主程序预设标签槽位`,suggest:'保留为自由标签，或在标签管理中映射/改名。'})})});
   state.principles.items.forEach(p=>{const preset=presetByPrincipleId(p.id);if(!preset||!preset.content)issues.push({level:'warn',object:p.id,message:`原则“${p.name}”缺少归纳卡内容`,suggest:'补充 synthesis preset。'})});
   const conflicts=aliasConflicts();conflicts.forEach(c=>issues.push({level:'error',object:'联想库',message:`名称/Alias 冲突：“${c.term}” → ${c.nodes.map(n=>n.title).join(' / ')}`,suggest:'保留唯一入口，或把 Alias 改成更具体的词。'}));
   const recallIds=new Set(state.recallLibrary.nodes.map(n=>n.id));
@@ -743,7 +973,7 @@ function workspacePayload(){return {
   prepStudioWorkspaceVersion:4,prepStudioVersion:VERSION,savedAt:nowIso(),
   schema:{tagSlots:'semantic-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA},
   knowledgeTree:state.knowledgeTree?{taxonomy:{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:{zh:state.knowledgeTree.name},version:state.knowledgeTree.version,nodes:state.knowledgeTree.nodes}}:null,
-  recallLibrary:state.recallLibrary,questionBank:state.questionBank,principles:state.principles,synthesisPresets:state.synthesisPresets,tagConfig:state.tagConfig,
+  recallLibrary:state.recallLibrary,questionBank:state.questionBank,principles:state.principles,synthesisPresets:state.synthesisPresets,tagConfig:state.tagConfig,subjectFacetRegistry:state.subjectFacetRegistry,
   server:{
     serverBankId:prepRuntime.serverBankId||'',serverBankRevision:prepRuntime.serverBankRevision??null,
     clientInstanceId:prepRuntime.clientInstanceId,lastIdempotencyKey:prepRuntime.lastIdempotencyKey||'',
@@ -787,6 +1017,7 @@ function applyWorkspacePayload(input){
   state.knowledgeTree=w.knowledgeTree?normalizeTree(w.knowledgeTree):null;
   state.recallLibrary=normalizeRecall(w.recallLibrary||{});
   state.tagConfig=normalizeTagConfig(w.tagConfig||{});
+  state.subjectFacetRegistry=normalizeSubjectFacetRegistry(w.subjectFacetRegistry||{});
   state.principles=normalizePrinciples(w.principles||{});
   state.synthesisPresets=normalizePresets(w.synthesisPresets||{});
   state.questionBank=normalizeBank(w.questionBank||{questions:[]});
@@ -801,7 +1032,7 @@ function applyWorkspacePayload(input){
   state.recallPreviewCandidateId='';refreshQuestionTagPaths();refreshAll();
 }
 
-function refreshAll(){refreshHeader();renderQuestions();renderRecallList();renderRecallEditor();renderPrincipleList();renderPrincipleEditor();renderTagManager();if(document.getElementById('tab-demo')?.classList.contains('active'))renderDemoValidation()}
+function refreshAll(){refreshHeader();renderQuestions();renderRecallList();renderRecallEditor();renderPrincipleList();renderPrincipleEditor();renderTagManager();renderSubjectFacetManager();if(document.getElementById('tab-demo')?.classList.contains('active'))renderDemoValidation()}
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b)setTab(b.dataset.tab)});
 document.getElementById('btnNewQuestion').onclick=newQuestion;
 document.getElementById('btnDuplicateQuestion').onclick=duplicateQuestion;
@@ -823,7 +1054,7 @@ document.getElementById('btnOpenSharedDrafts').onclick=()=>window.PMPPrepDraftUi
 
 
 
-document.addEventListener('input',()=>markWorkspaceDirty(),true);
+document.addEventListener('input',event=>{if(!event.target.closest?.('[data-transient-ui]'))markWorkspaceDirty()},true);
 document.addEventListener('change',e=>{if(e.target.id!=='themeSelect')markWorkspaceDirty()},true);
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;

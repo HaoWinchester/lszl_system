@@ -19,9 +19,13 @@
   }
 
   function acceptedTermsVersion() {
+    // 优先走共享登录弹窗本体：KGAuthRuntime 曾被其他脚本整体覆盖丢掉条款字段，
+    // 回退到 KGSharedAuthDialog 保证登录链路不因字段缺失而静默失败。
+    const dialog = global.KGSharedAuthDialog
     const runtime = global.KGAuthRuntime
-    if (typeof runtime?.requireLegalConsent === 'function' && !runtime.requireLegalConsent()) return ''
-    return String(runtime?.legalConsentVersion || '')
+    const requireConsent = dialog?.requireLegalConsent || runtime?.requireLegalConsent
+    if (typeof requireConsent === 'function' && !requireConsent()) return ''
+    return String(runtime?.legalConsentVersion || dialog?.legalConsentVersion || '')
   }
 
   async function remoteLogin(username, password) {

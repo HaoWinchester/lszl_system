@@ -77,7 +77,7 @@ function authAfterExternalLogin(username,message='第三方登录成功'){
   showStatus(message+'：'+username);
   return true;
 }
-window.KGAuthRuntime={afterExternalLogin:authAfterExternalLogin,closeAuth:authClose,logout:authLogout,renderStatus:authRenderStatus,isLoggedIn:authIsLoggedIn,currentUsername:()=>authCurrentUser&&authCurrentUser.username||''};
+window.KGAuthRuntime={...(window.KGAuthRuntime||{}),afterExternalLogin:authAfterExternalLogin,closeAuth:authClose,logout:authLogout,renderStatus:authRenderStatus,isLoggedIn:authIsLoggedIn,currentUsername:()=>authCurrentUser&&authCurrentUser.username||''};
 function authRequire(reason,permission='useTraining'){if(!authIsLoggedIn()){authOpen(reason||'该操作需要登录后才能使用。');return false}const roleApi=window.KGRolePermissions;if(roleApi&&permission&&!roleApi.can(permission)){showStatus('当前角色（'+roleApi.currentRoleLabel()+'）没有考题训练操作权限。');return false}return true}
 
 function applyNoPublishedQuestion(){

@@ -6,6 +6,8 @@ ROOT=Path(__file__).resolve().parent
 JS_ORDER=[
     "00-core-bootstrap.js",
     "10-state-domain.js",
+    "12-p45-authoring-domain.js",
+    "14-principle-bundle-domain.js",
     "20-page-runtime.js",
     "30-service-layer.js",
     "35-server-catalog-service.js",
@@ -13,6 +15,7 @@ JS_ORDER=[
     "37-shared-draft-ui.js",
     "40-events-bootstrap.js",
     "45-server-events.js",
+    "46-server-p45-adapter.js",
 ]
 
 def build(output=None):
