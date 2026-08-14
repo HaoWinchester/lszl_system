@@ -1398,6 +1398,18 @@ async def save_legacy_question_without_creator(
             request.question.model_dump(by_alias=True),
             subject=question.subject or "PMP",
         )
+        reference_issues = await content_reference_service.validate_recall_references(
+            db,
+            question.subject or "PMP",
+            normalized,
+        )
+        if reference_issues:
+            raise ContentPrepOperationError(
+                "QUESTION_VALIDATION_FAILED",
+                "题目内容校验失败",
+                issues=reference_issues,
+                record_failure=False,
+            )
         content_hash = canonical_question_hash(normalized)
         before_hash = question.content_hash
         before_revision = question.revision

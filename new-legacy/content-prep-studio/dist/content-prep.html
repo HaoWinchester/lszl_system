@@ -1860,12 +1860,21 @@ function recallSearchNodes(term,limit=80){
 function recallFilteredOptions(term,selectedId=''){
   const rows=recallSearchNodes(term,80),q=normalizeRecallSearchText(term);
   let html='<option value="">— 未关联 —</option>';
+  if(selectedId&&!rows.some(({n})=>n.id===selectedId)){
+    const selected=state.recallLibrary.nodes.find(n=>n.id===selectedId);
+    html+=selected
+      ?`<option value="${esc(selected.id)}" selected>当前选择：${esc(selected.title)} · ${esc(selected.id)}</option>`
+      :`<option value="${esc(selectedId)}" selected>已失效：${esc(selectedId)}</option>`;
+  }
   html+=rows.map(({n,best})=>{
     const alias=(n.aliases||[]).find(a=>q&&normalizeRecallSearchText(a).includes(q));
     const extra=alias?` · Alias: ${alias}`:(q&&best&&best!==n.title?` · ${best}`:'');
     return `<option value="${esc(n.id)}"${n.id===selectedId?' selected':''}>${esc(n.title)}${extra?esc(extra):''} · ${esc(n.id)}</option>`;
   }).join('');
   return {html,count:rows.length,rows};
+}
+function keywordRecallControl(box,attribute,clueId){
+  return [...box.querySelectorAll(`[${attribute}]`)].find(element=>element.getAttribute(attribute)===String(clueId))||null;
 }
 function renderKeywords(){
   const q=currentQuestion(),box=document.getElementById('keywordList');if(!box)return;
@@ -1903,7 +1912,7 @@ function renderKeywords(){
   box.querySelectorAll('[data-kwfield]').forEach(el=>el.addEventListener('change',()=>updateKeywordField(el)));
   box.querySelectorAll('input[data-kwfield]').forEach(el=>el.addEventListener('input',()=>updateKeywordField(el,false)));
   q.clues.forEach(c=>{
-    const input=box.querySelector(`[data-kw-recall-search="${c.id}"]`),select=box.querySelector(`[data-kw-recall-select="${c.id}"]`),clear=box.querySelector(`[data-kw-recall-clear="${c.id}"]`),meta=box.querySelector(`[data-kw-recall-meta="${c.id}"]`);
+    const input=keywordRecallControl(box,'data-kw-recall-search',c.id),select=keywordRecallControl(box,'data-kw-recall-select',c.id),clear=keywordRecallControl(box,'data-kw-recall-clear',c.id),meta=keywordRecallControl(box,'data-kw-recall-meta',c.id);
     if(!input||!select||!clear||!meta)return;
     const filter=()=>{const result=recallFilteredOptions(input.value,c.recallNodeId||'');select.innerHTML=result.html;meta.textContent=input.value?`找到 ${result.count} 个候选；选择后才会保存稳定 ID。`:`共 ${result.count} 个正式联想入口。`;return result};
     input.addEventListener('input',filter);

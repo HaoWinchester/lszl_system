@@ -196,6 +196,15 @@ def exercise_prep(page: Page, context: BrowserContext, base: str, bundle_path: P
     assert "找到 1 个候选" in page.locator(
         "[data-kw-recall-meta='clue-overloaded']"
     ).inner_text()
+
+    detail_select.select_option("")
+    assert page.evaluate(
+        "state.questionBank.questions[0].clues[0].recallNodeId"
+    ) == ""
+    detail_search = page.locator("[data-kw-recall-search='clue-overloaded']")
+    detail_search.fill("recall:overloaded")
+    detail_select = page.locator("[data-kw-recall-select='clue-overloaded']")
+    detail_select.select_option("recall:overloaded")
     page.screenshot(path="/tmp/content-prep-recall-search-p4529.png", full_page=True)
 
     page.locator("#tabs button[data-tab='export']").click()
@@ -205,6 +214,60 @@ def exercise_prep(page: Page, context: BrowserContext, base: str, bundle_path: P
     page.wait_for_function(
         "document.querySelector('#hdrSaveStatus').textContent.includes('共享草稿已保存')"
     )
+
+    page.reload(wait_until="networkidle")
+    page.locator("[data-creator-key='peiqi']").click()
+    page.locator("#sharedDraftGate").wait_for(state="visible")
+    page.locator("[data-open-draft]").first.wait_for()
+    page.locator("[data-open-draft]").first.click()
+    page.locator("#sharedDraftGate").wait_for(state="hidden")
+    page.locator("#tabs button[data-tab='questions']").click()
+    restored_select = page.locator("[data-kw-recall-select='clue-overloaded']")
+    assert restored_select.input_value() == "recall:overloaded"
+    assert page.evaluate("prepRuntime.serverBankId") == BANK_ID
+
+    page.evaluate(
+        """
+        const clue=state.questionBank.questions[0].clues[0];
+        clue.recallNodeId='recall:missing';
+        clue.recallEntryLabel='';
+        renderKeywords();
+        markWorkspaceDirty();
+        """
+    )
+    invalid_select = page.locator("[data-kw-recall-select='clue-overloaded']")
+    assert invalid_select.input_value() == "recall:missing"
+    assert "已失效：recall:missing" in invalid_select.locator("option:checked").inner_text()
+    page.locator("#tabs button[data-tab='export']").click()
+    page.locator("#serverBankSelect").select_option(BANK_ID)
+    page.locator("#btnQuickSaveWorkspace").click()
+    page.wait_for_function(
+        "document.querySelector('#hdrSaveStatus').textContent.includes('共享草稿已保存')"
+    )
+    assert errors == [], errors
+    page.locator("#btnSyncToCatalog").click()
+    page.wait_for_function(
+        "document.querySelector('#serverCatalogIssues').textContent.includes('联想节点不存在')"
+    )
+    assert errors and all("422" in error for error in errors), errors
+    errors.clear()
+    assert page.locator("#sharedDraftGate").is_hidden()
+
+    page.locator("#tabs button[data-tab='questions']").click()
+    page.locator("[data-kw-recall-select='clue-overloaded']").select_option("")
+    assert page.evaluate(
+        "state.questionBank.questions[0].clues[0].recallNodeId"
+    ) == ""
+    corrected_search = page.locator("[data-kw-recall-search='clue-overloaded']")
+    corrected_search.fill("不堪重负")
+    page.locator("[data-kw-recall-select='clue-overloaded']").select_option(
+        "recall:overloaded"
+    )
+    page.locator("#btnQuickSaveWorkspace").click()
+    page.wait_for_function(
+        "document.querySelector('#hdrSaveStatus').textContent.includes('共享草稿已保存')"
+    )
+    page.locator("#tabs button[data-tab='export']").click()
     page.locator("#btnSyncToCatalog").click()
     page.wait_for_function(
         "document.querySelector('#hdrSaveStatus').textContent.includes('已同步到主程序')"

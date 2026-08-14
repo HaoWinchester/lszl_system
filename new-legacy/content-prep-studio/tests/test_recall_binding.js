@@ -32,6 +32,15 @@ function countOccurrences(text, term) {
   return count;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 const recallNodes = [
   {
     id: 'recall:load',
@@ -115,4 +124,47 @@ test('A non-empty missing Recall ID is a validation error', () => {
   assert.equal(issues.length, 1);
   assert.equal(issues[0].level, 'error');
   assert.match(issues[0].message, /recall:missing/);
+});
+
+test('Recall filtering pins the current selection without making it a search hit', () => {
+  const {recallFilteredOptions} = loadFunctions(
+    [
+      'normalizeRecallSearchText',
+      'fuzzySubsequenceMatch',
+      'recallSearchNodes',
+      'recallFilteredOptions',
+    ],
+    {state: {recallLibrary: {nodes: recallNodes}}, esc: escapeHtml},
+  );
+
+  const filtered = recallFilteredOptions('collaboration', 'recall:load');
+  assert.equal(filtered.count, 1);
+  assert.equal(filtered.rows[0].n.id, 'recall:team');
+  assert.match(filtered.html, /value="recall:load" selected>当前选择：工作负荷与团队支持/);
+  assert.match(filtered.html, /value="recall:team">团队协作/);
+
+  const invalid = recallFilteredOptions('', 'recall:"legacy"');
+  assert.match(invalid.html, /value="recall:&quot;legacy&quot;" selected>已失效：/);
+});
+
+test('Keyword Recall controls are found by dataset value, not a dynamic CSS selector', () => {
+  const {keywordRecallControl} = loadFunctions(['keywordRecallControl']);
+  const wanted = {
+    getAttribute: attribute =>
+      attribute === 'data-kw-recall-search' ? 'clue:"quoted\\id' : null,
+  };
+  const box = {
+    querySelectorAll: selector => {
+      assert.equal(selector, '[data-kw-recall-search]');
+      return [
+        {getAttribute: () => 'other'},
+        wanted,
+      ];
+    },
+  };
+
+  assert.equal(
+    keywordRecallControl(box, 'data-kw-recall-search', 'clue:"quoted\\id'),
+    wanted,
+  );
 });

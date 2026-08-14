@@ -68,6 +68,7 @@ def test_batch_uses_incoming_recall_library_and_rolls_back_invalid_references() 
     valid_question_id = str(uuid4())
     blank_question_id = str(uuid4())
     invalid_question_id = str(uuid4())
+    fallback_question_id = str(uuid4())
     previous_recall: dict | None = None
 
     async def snapshot() -> None:
@@ -202,5 +203,167 @@ def test_batch_uses_incoming_recall_library_and_rolls_back_invalid_references() 
                 for issue in detail["issues"]
             )
             asyncio.run(verify_rollback())
+
+            fallback = client.post(
+                "/api/v1/content-prep/batches",
+                json=batch_payload(
+                    bank_id,
+                    f"recall-empty-object-{suffix}",
+                    [question_payload(fallback_question_id, "recall:overloaded")],
+                    {},
+                ),
+            )
+            assert fallback.status_code == 200, fallback.text
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_legacy_single_save_rejects_invalid_recall_and_allows_retry() -> None:
+    suffix = uuid4().hex[:10]
+    bank_id = f"legacy-recall-bank-{suffix}"
+    question_id = f"legacy-recall-question-{suffix}"
+    previous_recall: dict | None = None
+
+    async def seed() -> None:
+        nonlocal previous_recall
+        async with AsyncSessionLocal() as db:
+            row = await db.get(SharedRuntimeState, RECALL_KEY)
+            if row is not None:
+                previous_recall = {
+                    "value": row.value,
+                    "schema_version": row.schema_version,
+                    "updated_by": row.updated_by,
+                }
+                row.value = json.dumps(
+                    {
+                        "schemaVersion": 1,
+                        "nodes": [{"id": "recall:overloaded", "title": "工作负荷"}],
+                        "edges": [],
+                    },
+                    ensure_ascii=False,
+                )
+                row.updated_by = "admin"
+            else:
+                db.add(
+                    SharedRuntimeState(
+                        key=RECALL_KEY,
+                        value=json.dumps(
+                            {
+                                "schemaVersion": 1,
+                                "nodes": [
+                                    {"id": "recall:overloaded", "title": "工作负荷"}
+                                ],
+                                "edges": [],
+                            },
+                            ensure_ascii=False,
+                        ),
+                        updated_by="admin",
+                    )
+                )
+            db.add(
+                QuestionBank(
+                    id=bank_id,
+                    owner_id="admin",
+                    name="历史单题 Recall 校验",
+                    subject="PMP",
+                    visibility="private",
+                )
+            )
+            await db.flush()
+            db.add(
+                Question(
+                    id=question_id,
+                    bank_id=bank_id,
+                    title="历史单题",
+                    subject="PMP",
+                    revision=1,
+                    content_hash="a" * 64,
+                    stem_parts=[{"text": "团队成员不堪重负。"}],
+                    options=[
+                        {"id": "A", "text": "忽略", "correct": False},
+                        {"id": "B", "text": "支持", "correct": True},
+                    ],
+                    correct_answer="B",
+                    analysis="支持团队。",
+                    clues=[],
+                    content_metadata={
+                        "knowledge": {"primaryNodeId": "", "relatedNodeIds": []}
+                    },
+                )
+            )
+            await db.commit()
+
+    async def verify(recall_node_id: str, revision: int) -> None:
+        async with AsyncSessionLocal() as db:
+            question = await db.get(Question, question_id)
+            assert question is not None
+            assert question.revision == revision
+            actual = question.clues[0]["recallNodeId"] if question.clues else ""
+            assert actual == recall_node_id
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(QuestionAuditLog).where(QuestionAuditLog.bank_id == bank_id))
+            await db.execute(delete(QuestionUploadBatch).where(QuestionUploadBatch.bank_id == bank_id))
+            await db.execute(delete(Question).where(Question.bank_id == bank_id))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            row = await db.get(SharedRuntimeState, RECALL_KEY)
+            if previous_recall is None:
+                if row is not None:
+                    await db.delete(row)
+            elif row is None:
+                db.add(SharedRuntimeState(key=RECALL_KEY, **previous_recall))
+            else:
+                row.value = previous_recall["value"]
+                row.schema_version = previous_recall["schema_version"]
+                row.updated_by = previous_recall["updated_by"]
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": ADMIN_PASSWORD},
+            ).status_code == 200
+            grant = client.post(
+                f"/api/v1/content-prep/locks/{question_id}",
+                json={"clientInstanceId": "legacy-recall-test"},
+            )
+            assert grant.status_code == 200, grant.text
+            lock_token = grant.json()["lockToken"]
+
+            def save_payload(key: str, recall_node_id: str) -> dict:
+                return {
+                    "idempotencyKey": key,
+                    "clientInstanceId": "legacy-recall-test",
+                    "prepVersion": "9.0-p4.5.29",
+                    "workspaceVersion": "6",
+                    "question": question_payload(question_id, recall_node_id),
+                    "baseRevision": 1,
+                    "lockToken": lock_token,
+                    "principles": {},
+                    "synthesisPresets": {},
+                    "tagConfig": {},
+                }
+
+            invalid = client.put(
+                f"/api/v1/content-prep/questions/{question_id}",
+                json=save_payload(f"legacy-recall-invalid-{suffix}", "recall:missing"),
+            )
+            assert invalid.status_code == 422, invalid.text
+            assert any(
+                issue["field"] == "clues[0].recallNodeId"
+                and issue["code"] == "REFERENCE_NOT_FOUND"
+                for issue in invalid.json()["detail"]["issues"]
+            )
+            asyncio.run(verify("", 1))
+
+            corrected = client.put(
+                f"/api/v1/content-prep/questions/{question_id}",
+                json=save_payload(f"legacy-recall-valid-{suffix}", "recall:overloaded"),
+            )
+            assert corrected.status_code == 200, corrected.text
+            asyncio.run(verify("recall:overloaded", 2))
     finally:
         asyncio.run(cleanup())

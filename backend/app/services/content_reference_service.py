@@ -93,7 +93,7 @@ async def _effective_recall_node_ids(
     incoming_library: dict[str, Any] | None,
 ) -> set[str]:
     library: Any = incoming_library
-    if library is None:
+    if library in (None, {}):
         key = RECALL_LIBRARY_KEY_PREFIX + quote(_recall_subject_id(subject), safe="")
         row = await db.get(SharedRuntimeState, key)
         if row is None:
@@ -128,6 +128,44 @@ def _principle_references(metadata: dict) -> list[tuple[str, str]]:
     return references
 
 
+async def validate_recall_references(
+    db: AsyncSession,
+    subject: str,
+    payload: dict,
+    *,
+    recall_library: dict[str, Any] | None = None,
+) -> list[CatalogIssue]:
+    question_id = str(payload.get("id") or "").strip() or None
+    recall_references = [
+        (index, str(clue.get("recallNodeId") or "").strip())
+        for index, clue in enumerate(payload.get("clues") or [])
+        if isinstance(clue, dict) and clue.get("recallNodeId")
+    ]
+    if not recall_references:
+        return []
+    try:
+        recall_ids = await _effective_recall_node_ids(db, subject, recall_library)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return [
+            _issue(
+                "clues",
+                "REFERENCE_CATALOG_UNAVAILABLE",
+                "当前科目联想库不可用",
+                question_id,
+            )
+        ]
+    return [
+        _issue(
+            f"clues[{index}].recallNodeId",
+            "REFERENCE_NOT_FOUND",
+            f"联想节点不存在：{recall_id}",
+            question_id,
+        )
+        for index, recall_id in recall_references
+        if recall_id not in recall_ids
+    ]
+
+
 async def validate_question_references(
     db: AsyncSession,
     actor_username: str,
@@ -145,11 +183,6 @@ async def validate_question_references(
     knowledge = metadata.get("knowledge") if isinstance(metadata.get("knowledge"), dict) else {}
     primary_id = str(knowledge.get("primaryNodeId") or "").strip()
     related_ids = [str(value).strip() for value in (knowledge.get("relatedNodeIds") or []) if value]
-    recall_references = [
-        (index, str(clue.get("recallNodeId") or "").strip())
-        for index, clue in enumerate(payload.get("clues") or [])
-        if isinstance(clue, dict) and clue.get("recallNodeId")
-    ]
     issues: list[CatalogIssue] = []
 
     taxonomy_row: SharedRuntimeState | None = None
@@ -192,29 +225,14 @@ async def validate_question_references(
                     )
                 )
 
-    if recall_references:
-        try:
-            recall_ids = await _effective_recall_node_ids(db, subject, recall_library)
-        except (TypeError, ValueError, json.JSONDecodeError):
-            issues.append(
-                _issue(
-                    "clues",
-                    "REFERENCE_CATALOG_UNAVAILABLE",
-                    "当前科目联想库不可用",
-                    question_id,
-                )
-            )
-        else:
-            for index, recall_id in recall_references:
-                if recall_id not in recall_ids:
-                    issues.append(
-                        _issue(
-                            f"clues[{index}].recallNodeId",
-                            "REFERENCE_NOT_FOUND",
-                            f"联想节点不存在：{recall_id}",
-                            question_id,
-                        )
-                    )
+    issues.extend(
+        await validate_recall_references(
+            db,
+            subject,
+            payload,
+            recall_library=recall_library,
+        )
+    )
 
     principle_references = _principle_references(metadata)
     if principle_references:
