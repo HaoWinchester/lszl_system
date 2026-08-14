@@ -24,6 +24,7 @@ from app.models.user import User
 from app.schemas.deep_recall import RecallProgressResetRequest, RecallProgressSaveRequest
 from app.services import (
     content_prep_shared_service,
+    published_paper_access_service,
     question_catalog_service,
     subscription_service,
 )
@@ -54,11 +55,25 @@ def _error(status_code: int, code: str, message: str, **extra: Any) -> HTTPExcep
     )
 
 
-async def _visible_question(db: AsyncSession, question_id: str) -> Question:
-    if not await question_catalog_service.is_learning_question_visible(db, question_id):
-        raise _error(404, "recall_question_not_found", "题目不存在或当前不可学习")
+async def _visible_question(
+    db: AsyncSession,
+    user: User,
+    question_id: str,
+) -> Question:
     question = await db.get(Question, question_id)
     if question is None:
+        question = (
+            await published_paper_access_service.load_or_project_published_question(
+                db, user, question_id
+            )
+        )
+        if question is None:
+            raise _error(404, "recall_question_not_found", "题目不存在或当前不可学习")
+    if not await question_catalog_service.is_learning_question_visible(
+        db, question_id
+    ) and not await published_paper_access_service.can_learn_published_question(
+        db, user, question
+    ):
         raise _error(404, "recall_question_not_found", "题目不存在或当前不可学习")
     return question
 
@@ -250,7 +265,7 @@ async def get_session(
 ) -> dict[str, Any]:
     if not can(user.role, "useDeepRecall"):
         raise _error(403, "deep_recall_permission_denied", "当前账号无权使用深度回忆")
-    question = await _visible_question(db, question_id)
+    question = await _visible_question(db, user, question_id)
     question_snapshot, question_created = await _ensure_question_snapshot(db, question)
     library_snapshot, library_created = await _ensure_library_snapshot(
         db,
@@ -304,9 +319,10 @@ async def get_session(
 
 async def _current_snapshots(
     db: AsyncSession,
+    user: User,
     question_id: str,
 ) -> tuple[Question, RecallQuestionSnapshot, RecallLibrarySnapshot]:
-    question = await _visible_question(db, question_id)
+    question = await _visible_question(db, user, question_id)
     question_snapshot, _ = await _ensure_question_snapshot(db, question)
     library_snapshot, _ = await _ensure_library_snapshot(
         db,
@@ -324,7 +340,9 @@ async def save_progress(
     permissions = _permissions(user)
     if not permissions["canWrite"]:
         raise _error(403, "deep_recall_read_only", "当前账号只能查看深度回忆")
-    question, question_snapshot, library_snapshot = await _current_snapshots(db, question_id)
+    question, question_snapshot, library_snapshot = await _current_snapshots(
+        db, user, question_id
+    )
     if request.question_revision != question_snapshot.question_revision:
         raise _error(409, "question_revision_mismatch", "题目版本已更新，请重新载入")
     if request.library_hash != library_snapshot.content_hash:
@@ -388,7 +406,9 @@ async def reset_progress(
     permissions = _permissions(user)
     if not permissions["canReset"]:
         raise _error(403, "deep_recall_read_only", "当前账号不能重置深度回忆")
-    question, question_snapshot, library_snapshot = await _current_snapshots(db, question_id)
+    question, question_snapshot, library_snapshot = await _current_snapshots(
+        db, user, question_id
+    )
     if request.target_question_revision != question_snapshot.question_revision:
         raise _error(409, "question_revision_mismatch", "目标题目版本不是当前版本")
     progress = (

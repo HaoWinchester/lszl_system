@@ -22,6 +22,7 @@ from app.models.user import User
 
 PASSWORD = "deep-recall-pass"
 RECALL_KEY = "kg_recall_association_library_v1__subject__subject-pmp"
+PUBLISHED_PAPERS_KEY = "kg_exam_papers_published_v1"
 
 
 def _login(client: TestClient, username: str) -> None:
@@ -182,6 +183,318 @@ def test_recall_progress_is_owner_isolated_revision_checked_and_library_read_onl
             library_after = first.get("/api/v1/recall/libraries/PMP")
             assert library_after.status_code == 200
             assert library_after.json() == library_before.json()
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_published_paper_grants_recall_access_to_private_bank_question() -> None:
+    suffix = uuid4().hex[:10]
+    teacher = f"recall-paper-teacher-{suffix}"
+    student = f"recall-paper-student-{suffix}"
+    bank_id = f"recall-paper-bank-{suffix}"
+    question_id = f"recall-paper-question-{suffix}"
+    paper_id = f"recall-paper-{suffix}"
+    release_id = f"recall-release-{suffix}"
+    previous_shared: dict[str, dict] = {}
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            for key in (RECALL_KEY, PUBLISHED_PAPERS_KEY):
+                row = await db.get(SharedRuntimeState, key)
+                if row is not None:
+                    previous_shared[key] = {
+                        "value": row.value,
+                        "schema_version": row.schema_version,
+                        "updated_by": row.updated_by,
+                        "created_at": row.created_at,
+                        "updated_at": row.updated_at,
+                    }
+            db.add_all(
+                [
+                    User(
+                        username=teacher,
+                        password_hash=hash_password(PASSWORD),
+                        role="teacher",
+                        status="active",
+                        subject="PMP",
+                    ),
+                    User(
+                        username=student,
+                        password_hash=hash_password(PASSWORD),
+                        role="student",
+                        status="active",
+                        subject="PMP",
+                    ),
+                ]
+            )
+            await db.flush()
+            db.add(
+                QuestionBank(
+                    id=bank_id,
+                    owner_id=teacher,
+                    name="仅教师可见题库",
+                    subject="PMP",
+                    visibility="private",
+                )
+            )
+            await db.flush()
+            db.add(
+                Question(
+                    id=question_id,
+                    bank_id=bank_id,
+                    title="已发布试卷中的私有源题目",
+                    subject="PMP",
+                    scope="internal",
+                    revision=1,
+                    content_hash="e" * 64,
+                    stem_parts=[{"text": "发布试卷应授予该题学习权限。"}],
+                )
+            )
+            recall_payload = {
+                "schemaVersion": 1,
+                "nodes": [],
+                "edges": [],
+                "updatedAt": "2026-08-14T00:00:00Z",
+            }
+            published_payload = [
+                {
+                    "paperId": paper_id,
+                    "releaseId": release_id,
+                    "name": "已发布深度回忆试卷",
+                    "status": "published",
+                    "enabledModes": ["deep_recall"],
+                    "accessPolicy": {"accessLevel": "free"},
+                    "publishedBy": teacher,
+                    "questions": [
+                        {
+                            "bankId": bank_id,
+                            "questionId": question_id,
+                            "order": 1,
+                        }
+                    ],
+                    "questionSnapshots": [
+                        {
+                            "bankId": bank_id,
+                            "questionId": question_id,
+                            "bankName": "仅教师可见题库",
+                            "bankSubject": "PMP",
+                            "question": {
+                                "id": question_id,
+                                "bankId": bank_id,
+                                "title": "已发布试卷中的私有源题目",
+                                "subject": "PMP",
+                                "scope": "internal",
+                                "revision": 1,
+                                "contentHash": "e" * 64,
+                                "stemParts": [
+                                    {"text": "发布试卷应授予该题学习权限。"}
+                                ],
+                            },
+                        }
+                    ],
+                }
+            ]
+            for key, payload in (
+                (RECALL_KEY, recall_payload),
+                (PUBLISHED_PAPERS_KEY, published_payload),
+            ):
+                row = await db.get(SharedRuntimeState, key)
+                value = json.dumps(payload, ensure_ascii=False)
+                if row is None:
+                    db.add(
+                        SharedRuntimeState(
+                            key=key,
+                            value=value,
+                            updated_by=teacher,
+                        )
+                    )
+                else:
+                    row.value = value
+                    row.updated_by = teacher
+            await db.commit()
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                delete(RecallQuestionSnapshot).where(
+                    RecallQuestionSnapshot.question_id == question_id
+                )
+            )
+            await db.execute(delete(Question).where(Question.id == question_id))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            for key in (RECALL_KEY, PUBLISHED_PAPERS_KEY):
+                await db.execute(
+                    delete(SharedRuntimeState).where(SharedRuntimeState.key == key)
+                )
+                if key in previous_shared:
+                    db.add(SharedRuntimeState(key=key, **previous_shared[key]))
+            await db.execute(delete(User).where(User.username.in_([teacher, student])))
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as client:
+            _login(client, student)
+            response = client.get(f"/api/v1/recall/session/{question_id}")
+            assert response.status_code == 200, response.text
+            body = response.json()
+            assert body["questionId"] == question_id
+            assert body["bankId"] == bank_id
+            assert body["currentQuestion"]["title"] == "已发布试卷中的私有源题目"
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_published_snapshot_is_projected_before_recall_session() -> None:
+    suffix = uuid4().hex[:10]
+    teacher = f"recall-project-teacher-{suffix}"
+    student = f"recall-project-student-{suffix}"
+    bank_id = f"recall-project-bank-{suffix}"
+    question_id = f"recall-project-question-{suffix}"
+    previous_shared: dict[str, dict] = {}
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            for key in (RECALL_KEY, PUBLISHED_PAPERS_KEY):
+                row = await db.get(SharedRuntimeState, key)
+                if row is not None:
+                    previous_shared[key] = {
+                        "value": row.value,
+                        "schema_version": row.schema_version,
+                        "updated_by": row.updated_by,
+                        "created_at": row.created_at,
+                        "updated_at": row.updated_at,
+                    }
+            db.add_all(
+                [
+                    User(
+                        username=teacher,
+                        password_hash=hash_password(PASSWORD),
+                        role="teacher",
+                        status="active",
+                        subject="PMP",
+                    ),
+                    User(
+                        username=student,
+                        password_hash=hash_password(PASSWORD),
+                        role="student",
+                        status="active",
+                        subject="PMP",
+                    ),
+                ]
+            )
+            await db.flush()
+            recall_payload = {
+                "schemaVersion": 1,
+                "nodes": [],
+                "edges": [],
+                "updatedAt": "2026-08-14T00:00:00Z",
+            }
+            published_payload = [
+                {
+                    "paperId": f"recall-project-paper-{suffix}",
+                    "releaseId": f"recall-project-release-{suffix}",
+                    "name": "存量发布试卷",
+                    "status": "published",
+                    "enabledModes": ["deep_recall"],
+                    "accessPolicy": {"accessLevel": "free"},
+                    "publishedBy": {
+                        "id": teacher,
+                        "username": teacher,
+                        "role": "teacher",
+                    },
+                    "questions": [
+                        {
+                            "bankId": bank_id,
+                            "questionId": question_id,
+                            "order": 1,
+                        }
+                    ],
+                    "questionSnapshots": [
+                        {
+                            "bankId": bank_id,
+                            "questionId": question_id,
+                            "bankName": "存量快照题库",
+                            "bankSubject": "PMP",
+                            "question": {
+                                "id": question_id,
+                                "bankId": bank_id,
+                                "title": "仅存在于存量发布快照中的题目",
+                                "type": "single_choice",
+                                "subject": "PMP",
+                                "difficulty": "medium",
+                                "revision": 3,
+                                "contentHash": "f" * 64,
+                                "stemParts": [{"text": "存量快照需要投影到数据库。"}],
+                                "options": [
+                                    {"id": "A", "text": "正确", "correct": True},
+                                    {"id": "B", "text": "错误", "correct": False},
+                                ],
+                                "correctAnswer": "A",
+                                "lifecycle": {"status": "active"},
+                            },
+                        }
+                    ],
+                }
+            ]
+            for key, payload in (
+                (RECALL_KEY, recall_payload),
+                (PUBLISHED_PAPERS_KEY, published_payload),
+            ):
+                row = await db.get(SharedRuntimeState, key)
+                value = json.dumps(payload, ensure_ascii=False)
+                if row is None:
+                    db.add(
+                        SharedRuntimeState(
+                            key=key,
+                            value=value,
+                            updated_by=teacher,
+                        )
+                    )
+                else:
+                    row.value = value
+                    row.updated_by = teacher
+            await db.commit()
+
+    async def assert_projection() -> None:
+        async with AsyncSessionLocal() as db:
+            bank = await db.get(QuestionBank, bank_id)
+            question = await db.get(Question, question_id)
+            assert bank is not None
+            assert bank.visibility == "private"
+            assert question is not None
+            assert question.bank_id == bank_id
+            assert question.scope == "internal"
+            assert question.revision == 3
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                delete(RecallQuestionSnapshot).where(
+                    RecallQuestionSnapshot.question_id == question_id
+                )
+            )
+            await db.execute(delete(Question).where(Question.id == question_id))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            for key in (RECALL_KEY, PUBLISHED_PAPERS_KEY):
+                await db.execute(
+                    delete(SharedRuntimeState).where(SharedRuntimeState.key == key)
+                )
+                if key in previous_shared:
+                    db.add(SharedRuntimeState(key=key, **previous_shared[key]))
+            await db.execute(delete(User).where(User.username.in_([teacher, student])))
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as client:
+            _login(client, student)
+            response = client.get(f"/api/v1/recall/session/{question_id}")
+            assert response.status_code == 200, response.text
+            body = response.json()
+            assert body["currentQuestion"]["title"] == "仅存在于存量发布快照中的题目"
+            assert body["currentQuestion"]["revision"] == 3
+        asyncio.run(assert_projection())
     finally:
         asyncio.run(cleanup())
 
