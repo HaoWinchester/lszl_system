@@ -214,7 +214,7 @@ D原则：principle-role-accountability</pre>
       </div>
 
       <div class="data-summary">
-        <div class="filebox"><h3>原则与归纳卡组合 JSON（可选）</h3><input type="file" id="filePrincipleCardBundle" accept=".json,application/json"><p class="muted smalltxt">原则和归纳卡按一对一关系同时导入，避免拆分后丢失含义。</p></div>
+        <div class="filebox"><h3>原则与归纳卡 JSON（可选）</h3><input type="file" id="filePrincipleCardBundle" accept=".json,application/json"><p class="muted smalltxt">支持 kg-principle-card-bundle-v1 / pmp-principle-preset-bundle-v1 两种组合包，也支持旧原则库 JSON、旧归纳卡 JSON 单独迁移。导入采用安全合并：默认保留现有配置，同 ID 改名、同名不同 ID、归纳卡改绑会逐项提示确认，不静默覆盖、不删除已有配置。</p></div>
         <div class="filebox"><h3>标签配置 JSON（可选）</h3><input type="file" id="fileTagConfig" accept=".json,application/json"><p class="muted smalltxt">兼容主程序标签名称/别名配置。</p></div>
       </div>
       <div class="data-summary">
