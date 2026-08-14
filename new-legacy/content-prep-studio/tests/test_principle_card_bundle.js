@@ -30,6 +30,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(normalized.metadata)),{
   stemPrincipleIds:['legacy-stem'],
   optionPrincipleMap:{A:['trap'],B:['answer']},
   tagPaths:[],
+  subjectFacets:[],
   knowledge:{},
 });
 

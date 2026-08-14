@@ -392,6 +392,8 @@ nav button.active{color:var(--brand)!important}
         </div>
       </div>
 
+      <div class="card" style="margin-top:14px"><div class="card-hd"><span>科目分类</span><span class="muted tiny">当前科目的考试框架分类（Subject Facets）</span></div><div class="card-bd"><div class="help">这里仅显示教师实际使用的分类名称；系统内部编码（稳定 facet ID）随数据保存和导出，不需要人工维护。题目绑定保存在 <code>metadata.subjectFacets</code>，只允许引用 Schema 中的真实 ID。</div><div id="subjectFacetManager" style="margin-top:10px"></div></div></div>
+
       <div class="toolbar" style="margin-top:12px">
         <button class="btn primary" id="btnDownloadCompleteBundle">下载“完整内容包”模板</button>
         <button class="btn primary" id="btnDownloadCompleteAiPrompt">下载完整 AI 制作提示词</button>
@@ -1523,7 +1525,7 @@ function normalizeQuestion(q,i=0,subject='PMP'){
     },
     clues,
     reasoningSteps:Array.isArray(q.reasoningSteps)?clone(q.reasoningSteps):[],
-    metadata:(()=>{const metadata={...(q.metadata&&typeof q.metadata==='object'?q.metadata:{}),tagPaths:Array.isArray(q.metadata?.tagPaths)?clone(q.metadata.tagPaths):[],knowledge};syncQuestionPrinciples({metadata,principleIds:q.principleIds,options});return metadata})(),
+    metadata:(()=>{const metadata={...(q.metadata&&typeof q.metadata==='object'?q.metadata:{}),tagPaths:Array.isArray(q.metadata?.tagPaths)?clone(q.metadata.tagPaths):[],subjectFacets:typeof normalizeQuestionFacets==='function'?normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||subject):(Array.isArray(q.metadata?.subjectFacets)?clone(q.metadata.subjectFacets):[]),knowledge};syncQuestionPrinciples({metadata,principleIds:q.principleIds,options});return metadata})(),
     lifecycle:q.lifecycle&&typeof q.lifecycle==='object'?clone(q.lifecycle):{status:'active',deletedAt:''},
     status:q.status&&typeof q.status==='object'?clone(q.status):{contentReady:false,keywordsReady:false,knowledgeReady:false,reasoningReady:false,published:false}
     ,serverRevision:Number(q.serverRevision)||null
@@ -1547,16 +1549,16 @@ function normalizeBank(payload){
 function normalizeContentBundle(payload){
   if(!payload||typeof payload!=='object')throw new Error('完整内容包必须是 JSON 对象。');
   const qb=payload.questionBank||payload.bank||(Array.isArray(payload.questions)?payload:null);if(!qb)throw new Error('完整内容包缺少 questionBank。');
-  return {prepContentBundleVersion:Number(payload.prepContentBundleVersion||1),questionBank:normalizeBank(qb),principles:normalizePrinciples(payload.principles||{}),synthesisPresets:normalizePresets(payload.synthesisPresets||payload.presets||{}),tagConfig:normalizeTagConfig(payload.tagConfig||{}),recallLibrary:payload.recallLibrary?normalizeRecall(payload.recallLibrary):null,knowledgeTree:payload.knowledgeTree?normalizeTree(payload.knowledgeTree):null};
+  return {prepContentBundleVersion:Number(payload.prepContentBundleVersion||1),questionBank:normalizeBank(qb),principles:normalizePrinciples(payload.principles||{}),synthesisPresets:normalizePresets(payload.synthesisPresets||payload.presets||{}),tagConfig:normalizeTagConfig(payload.tagConfig||{}),subjectFacetRegistry:typeof normalizeSubjectFacetRegistry==='function'?normalizeSubjectFacetRegistry(payload.subjectFacetRegistry||{}):null,recallLibrary:payload.recallLibrary?normalizeRecall(payload.recallLibrary):null,knowledgeTree:payload.knowledgeTree?normalizeTree(payload.knowledgeTree):null};
 }
 function importContentBundle(payload){
   const b=ImportService.completeBundle(payload),report=preflightQuestionDuplicates(b.questionBank.questions,[]);
   if(report.duplicates.length&&!confirm(`检测到重复题目：已有重复 ${report.existingCount} 道，本批重复 ${report.batchCount} 道。\n是否自动清除后继续导入？`))return {ok:false,cancelled:true,report};
-  b.questionBank.questions=report.unique;state.tagConfig=b.tagConfig;state.principles=b.principles;state.synthesisPresets=b.synthesisPresets;state.questionBank=b.questionBank;if(b.recallLibrary)state.recallLibrary=b.recallLibrary;if(b.knowledgeTree)state.knowledgeTree=b.knowledgeTree;
+  b.questionBank.questions=report.unique;state.tagConfig=b.tagConfig;state.principles=b.principles;state.synthesisPresets=b.synthesisPresets;state.questionBank=b.questionBank;if(b.subjectFacetRegistry)state.subjectFacetRegistry=b.subjectFacetRegistry;if(b.recallLibrary)state.recallLibrary=b.recallLibrary;if(b.knowledgeTree)state.knowledgeTree=b.knowledgeTree;
   stampImportedQuestions(state.questionBank.questions,'complete-content-bundle');
   refreshQuestionTagPaths();state.questionBank.questions.forEach(syncQuestionPrinciples);state.currentQuestionId=state.questionBank.questions[0]?.id||'';state.demoQuestionId=state.currentQuestionId;state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';state.currentPrincipleId=state.principles.items[0]?.id||'';refreshAll();return {ok:true,report};
 }
-function completeBundlePayload(){const pair=normalizePrincipleCardBundle({principles:state.principles,synthesisPresets:state.synthesisPresets});return {prepContentBundleVersion:1,format:'pmp-content-prep-complete-bundle-v1',generatedBy:`PMP Content Prep Studio v${VERSION}`,generatedAt:nowIso(),exportManifest:{creator:{...currentIdentitySnapshot()},lastBatchId:prepRuntime.lastBatchId||'',applicationVersion:VERSION},questionBank:exportableBank(),principles:pair.principles,synthesisPresets:pair.synthesisPresets,tagConfig:exportTagConfig(),recallLibrary:clone(state.recallLibrary),knowledgeTree:state.knowledgeTree?{taxonomy:{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:{zh:state.knowledgeTree.name},version:state.knowledgeTree.version,status:state.knowledgeTree.status||'draft',nodes:clone(state.knowledgeTree.nodes)}}:null,recallLibraryReference:{schemaVersion:state.recallLibrary.schemaVersion,nodeCount:state.recallLibrary.nodes.length,edgeCount:state.recallLibrary.edges.length},knowledgeTreeReference:state.knowledgeTree?{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:state.knowledgeTree.name,version:state.knowledgeTree.version,nodeCount:state.knowledgeTree.nodes.length}:null}}
+function completeBundlePayload(){const pair=normalizePrincipleCardBundle({principles:state.principles,synthesisPresets:state.synthesisPresets});return {prepContentBundleVersion:1,format:'pmp-content-prep-complete-bundle-v1',generatedBy:`PMP Content Prep Studio v${VERSION}`,generatedAt:nowIso(),exportManifest:{creator:{...currentIdentitySnapshot()},lastBatchId:prepRuntime.lastBatchId||'',applicationVersion:VERSION},questionBank:exportableBank(),principles:pair.principles,synthesisPresets:pair.synthesisPresets,tagConfig:exportTagConfig(),subjectFacetRegistry:clone(state.subjectFacetRegistry),recallLibrary:clone(state.recallLibrary),knowledgeTree:state.knowledgeTree?{taxonomy:{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:{zh:state.knowledgeTree.name},version:state.knowledgeTree.version,status:state.knowledgeTree.status||'draft',nodes:clone(state.knowledgeTree.nodes)}}:null,recallLibraryReference:{schemaVersion:state.recallLibrary.schemaVersion,nodeCount:state.recallLibrary.nodes.length,edgeCount:state.recallLibrary.edges.length},knowledgeTreeReference:state.knowledgeTree?{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:state.knowledgeTree.name,version:state.knowledgeTree.version,nodeCount:state.knowledgeTree.nodes.length}:null}}
 
 function recallIndex(){
   const byId=new Map(),terms=new Map();
@@ -1588,6 +1590,100 @@ function recallSuggestions(term){
 }
 function currentQuestion(){return state.questionBank.questions.find(q=>q.id===state.currentQuestionId)||null}
 function currentRecall(){return state.recallLibrary.nodes.find(n=>n.id===state.currentRecallId)||null}
+
+/*
+ * P4.5 Authoring Domain：Family / Facet / 难度 / Global Tag 的纯归一与校验函数（无 DOM）。
+ * 参考 V9.0-P4.5.29 单文件业务规则，按服务器版口径收紧：
+ * - Facet 无效引用是 error（阻止正式同步），deprecated 引用是 warning（兼容历史 Schema）。
+ * - Registry 显式传参（默认取 state），保证纯函数可测。
+ */
+
+const DEFAULT_PMP_FACET_SCHEMA={
+  schemaId:'pmp-facet-schema-v1',schemaVersion:1,subjectId:'subject-pmp',subjectCodes:['PMP'],name:'PMP 科目分类',status:'active',
+  dimensions:[
+    {id:'performance-domain',label:'绩效域',selection:'multi',values:[
+      {id:'governance',label:'治理',status:'active',aliases:[],replacedBy:[]},{id:'stakeholder',label:'相关方',status:'active',aliases:[],replacedBy:[]},{id:'resources',label:'资源',status:'active',aliases:[],replacedBy:[]},{id:'scope',label:'范围',status:'active',aliases:[],replacedBy:[]},{id:'schedule',label:'进度',status:'active',aliases:[],replacedBy:[]},{id:'finance',label:'财务',status:'active',aliases:[],replacedBy:[]},{id:'risk',label:'风险',status:'active',aliases:[],replacedBy:[]}
+    ]},
+    {id:'exam-domain',label:'考试域',selection:'multi',values:[
+      {id:'people',label:'人员',status:'active',aliases:[],replacedBy:[]},{id:'process',label:'过程',status:'active',aliases:[],replacedBy:[]},{id:'business-environment',label:'业务环境',status:'active',aliases:[],replacedBy:[]}
+    ]},
+    {id:'delivery-approach',label:'交付方式',selection:'multi',values:[
+      {id:'predictive',label:'预测型',status:'active',aliases:[],replacedBy:[]},{id:'adaptive-agile',label:'敏捷 / 自适应',status:'active',aliases:[],replacedBy:[]},{id:'hybrid',label:'混合型',status:'active',aliases:[],replacedBy:[]}
+    ]},
+    {id:'focus-area',label:'焦点阶段',selection:'multi',values:[
+      {id:'initiating',label:'启动',status:'active',aliases:[],replacedBy:[]},{id:'planning',label:'规划',status:'active',aliases:[],replacedBy:[]},{id:'executing',label:'执行',status:'active',aliases:[],replacedBy:[]},{id:'monitoring-controlling',label:'监控',status:'active',aliases:[],replacedBy:[]},{id:'closing',label:'收尾',status:'active',aliases:[],replacedBy:[]}
+    ]}
+  ],createdAt:'2026-08-08T00:00:00.000Z',updatedAt:'2026-08-08T00:00:00.000Z'
+};
+
+function normalizeFacetValue(v={}){
+  return {id:String(v.id||'').trim(),label:String(v.label||v.name||'').trim(),status:['active','inactive','deprecated'].includes(String(v.status||''))?String(v.status):'active',aliases:unique(cleanList(v.aliases)),replacedBy:unique(cleanList(v.replacedBy)),createdAt:String(v.createdAt||''),updatedAt:String(v.updatedAt||'')};
+}
+function normalizeFacetDimension(d={}){
+  return {id:String(d.id||'').trim(),label:String(d.label||d.name||'').trim(),selection:d.selection==='single'?'single':'multi',status:['active','inactive','deprecated'].includes(String(d.status||''))?String(d.status):'active',values:(Array.isArray(d.values)?d.values:[]).map(normalizeFacetValue).filter(v=>v.id&&v.label)};
+}
+function normalizeFacetSchema(s={}){
+  return {schemaId:String(s.schemaId||s.id||'').trim(),schemaVersion:Math.max(1,Number(s.schemaVersion||s.version||1)),subjectId:String(s.subjectId||'').trim(),subjectCodes:unique(cleanList(s.subjectCodes||[s.subjectCode,s.code])),name:String(s.name||'科目分类').trim(),status:['active','inactive','deprecated'].includes(String(s.status||''))?String(s.status):'active',dimensions:(Array.isArray(s.dimensions)?s.dimensions:[]).map(normalizeFacetDimension).filter(d=>d.id&&d.label),createdAt:String(s.createdAt||''),updatedAt:String(s.updatedAt||''),...(Number(s.revision)>0?{revision:Number(s.revision)}:{})};
+}
+function normalizeSubjectFacetRegistry(payload){
+  const rows=Array.isArray(payload?.schemas)?payload.schemas:(payload?.schemaId?[payload]:[]),bySubject=new Map();
+  [clone(DEFAULT_PMP_FACET_SCHEMA),...rows].map(normalizeFacetSchema).filter(s=>s.schemaId&&s.subjectId).forEach(s=>bySubject.set(s.subjectId,s));
+  return {schemaVersion:1,format:'subject-facet-registry-v1',schemas:[...bySubject.values()],updatedAt:String(payload?.updatedAt||nowIso())};
+}
+function facetSchemaForSubject(subject,registry){
+  const token=String(subject||state?.questionBank?.subject||'').trim().toLowerCase();
+  return ((registry||state?.subjectFacetRegistry)?.schemas||[]).find(s=>[s.subjectId,...(s.subjectCodes||[])].some(x=>String(x||'').trim().toLowerCase()===token||String(x||'').trim().toLowerCase()===`subject-${token}`))||null;
+}
+function facetIdFor(schema,dimensionId,valueId){
+  const slug=String(schema?.subjectId||'').replace(/^subject-/,'')||String(schema?.subjectCodes?.[0]||'').toLowerCase();
+  return `subject/${slug}/${dimensionId}/${valueId}`;
+}
+function facetCatalog(subject,registry){
+  const schema=facetSchemaForSubject(subject,registry);if(!schema)return [];const out=[];
+  schema.dimensions.forEach(d=>d.values.forEach(v=>out.push({facetId:facetIdFor(schema,d.id,v.id),subjectId:schema.subjectId,schemaId:schema.schemaId,schemaVersion:schema.schemaVersion,dimensionId:d.id,dimension:d.label,valueId:v.id,label:v.label,status:v.status,replacedBy:v.replacedBy||[],aliases:v.aliases||[]})));
+  return out;
+}
+function normalizeQuestionFacets(value,subject,registry){
+  const raw=Array.isArray(value)?value:[],byId=new Map(facetCatalog(subject,registry).map(x=>[x.facetId,x])),schema=facetSchemaForSubject(subject,registry),out=[];
+  raw.forEach(item=>{
+    const id=String(typeof item==='string'?item:(item?.facetId||item?.slotId||item?.id)||'').trim();
+    if(!id)return;
+    const found=byId.get(id);
+    if(found)out.push(clone(found));
+    else if(typeof item==='object')out.push({...clone(item),facetId:id,subjectId:String(item.subjectId||schema?.subjectId||''),status:String(item.status||'unknown')});
+    else out.push({facetId:id,subjectId:schema?.subjectId||'',label:id,status:'unknown'});
+  });
+  return [...new Map(out.map(x=>[x.facetId,x])).values()];
+}
+function selectedFacetsFromIds(ids,subject,registry){
+  const map=new Map(facetCatalog(subject,registry).map(x=>[x.facetId,x]));
+  return unique(ids).map(id=>map.get(id)).filter(Boolean).map(clone);
+}
+function importFacetSchema(payload){
+  const schema=normalizeFacetSchema(payload?.schema||payload);
+  if(!schema.schemaId)throw new Error('Facet Schema 缺少 schemaId');
+  if(!schema.subjectId)throw new Error('Facet Schema 缺少 subjectId');
+  if(!schema.dimensions.length)throw new Error('Facet Schema 缺少 dimensions（至少一个维度）');
+  const reg=normalizeSubjectFacetRegistry(state.subjectFacetRegistry);
+  const idx=reg.schemas.findIndex(s=>s.schemaId===schema.schemaId||s.subjectId===schema.subjectId);
+  schema.updatedAt=nowIso();if(!schema.createdAt)schema.createdAt=nowIso();
+  if(idx>=0)reg.schemas[idx]=schema;else reg.schemas.push(schema);
+  state.subjectFacetRegistry=reg;
+  return schema;
+}
+function validateQuestionFacets(q,registry){
+  const subject=q?.subject||state?.questionBank?.subject;
+  const rows=normalizeQuestionFacets(q?.metadata?.subjectFacets||[],subject,registry);
+  const issues=[];
+  rows.forEach(row=>{
+    if(row.status==='unknown')issues.push({level:'error',message:`科目分类 ${row.facetId} 不在当前 Schema 中，已阻止正式同步`,suggest:'在题目编辑区清除该分类，或先导入包含该 ID 的 Facet Schema。'});
+    else if(row.status==='deprecated')issues.push({level:'warning',message:`科目分类 ${row.label||row.facetId} 已 deprecated`,suggest:'保留为历史兼容引用，或改选当前值。'});
+  });
+  return issues;
+}
+
+/* 加载顺序保证 state 初始化后 registry 可用 */
+state.subjectFacetRegistry=normalizeSubjectFacetRegistry(state.subjectFacetRegistry||{});
 
 /*
  * P4.5.29 差异 6–8：原则包双格式兼容、旧库迁移与安全合并（纯领域函数，无 DOM）。
@@ -1803,6 +1899,68 @@ function renderQuestionPrincipleBindings(){
   box.querySelectorAll('[data-principle-check="question"]').forEach(el=>el.addEventListener('change',()=>{q.metadata.stemPrincipleIds=[...box.querySelectorAll('[data-principle-check="question"]:checked')].map(x=>x.value);syncQuestionPrinciples(q);renderCurrentIssues()}));
   q.options.slice(0,4).forEach(o=>box.querySelectorAll(`[data-principle-check="opt-${o.id}"]`).forEach(el=>el.addEventListener('change',()=>{q.metadata.optionPrincipleMap=q.metadata.optionPrincipleMap||{};q.metadata.optionPrincipleMap[o.id]=[...box.querySelectorAll(`[data-principle-check="opt-${o.id}"]:checked`)].map(x=>x.value);syncQuestionPrinciples(q);renderCurrentIssues()})));
 }
+function renderQuestionFacetBindings(){
+  const q=currentQuestion(),box=document.getElementById('questionFacetBindingPanel');if(!q||!box)return;
+  const subject=q.subject||state.questionBank.subject||'PMP',schema=facetSchemaForSubject(subject);
+  if(!schema){box.innerHTML=`<div class="help">当前科目 <b>${esc(subject)}</b> 尚未配置科目分类 Schema；可到「① 基础数据与导入」导入 Facet Schema。未配置时题目不携带 subjectFacets。</div>`;return}
+  const catalog=facetCatalog(subject),selected=new Set(normalizeQuestionFacets(q.metadata?.subjectFacets,subject).map(x=>x.facetId));
+  const unknown=[...selected].filter(id=>!catalog.some(x=>x.facetId===id));
+  box.innerHTML=`<div class="help">按当前科目 Schema（${esc(schema.name)} · <code>${esc(schema.schemaId)}</code>）绑定；保存为 <code>metadata.subjectFacets</code>，仅允许引用 Schema 中的真实 ID，界面只显示教师业务名称。</div>
+  ${schema.dimensions.filter(d=>d.status!=='inactive').map(d=>`
+    <div style="margin-top:9px"><label>${esc(d.label)}（${d.selection==='single'?'单选':'多选'}）</label>
+    <div class="principle-checks">${d.values.filter(v=>v.status!=='inactive').map(v=>{
+      const fid=facetIdFor(schema,d.id,v.id);
+      return `<label><input type="checkbox" data-facet-check value="${esc(fid)}"${selected.has(fid)?' checked':''}> ${esc(v.label)}${v.status==='deprecated'?'（已废弃）':''}</label>`;
+    }).join('')}</div></div>`).join('')}
+  ${unknown.length?`<div class="muted tiny" style="margin-top:8px;color:#c0392b">未知分类引用（不在当前 Schema，校验中心会标红并阻止正式同步）：${unknown.map(esc).join('、')} <button class="btn small" type="button" id="btnClearUnknownFacets">清除未知引用</button></div>`:''}`;
+  const clearBtn=document.getElementById('btnClearUnknownFacets');
+  if(clearBtn)clearBtn.onclick=()=>{const ids=[...box.querySelectorAll('[data-facet-check]:checked')].map(x=>x.value);q.metadata.subjectFacets=selectedFacetsFromIds(ids,subject);renderQuestionFacetBindings();renderCurrentIssues();markWorkspaceDirty()};
+  box.querySelectorAll('[data-facet-check]').forEach(el=>el.addEventListener('change',()=>{
+    const ids=[...box.querySelectorAll('[data-facet-check]:checked')].map(x=>x.value);
+    q.metadata.subjectFacets=selectedFacetsFromIds(ids,subject).concat(normalizeQuestionFacets(q.metadata?.subjectFacets,subject).filter(x=>x.status==='unknown'));
+    renderCurrentIssues();markWorkspaceDirty();
+  }));
+}
+function renderSubjectFacetManager(){
+  const box=document.getElementById('subjectFacetManager');if(!box)return;
+  const subject=state.questionBank.subject||'PMP',schema=facetSchemaForSubject(subject);
+  if(!schema){
+    box.innerHTML=`<div class="help">当前科目 <b>${esc(subject)}</b> 尚未配置科目分类。</div><div class="toolbar"><button class="btn small primary" id="btnImportFacetSchema">导入科目分类</button><input type="file" id="fileFacetSchema" accept=".json,application/json" hidden></div>`;
+  }else{
+    box.innerHTML=`
+    <div class="toolbar"><b>${esc(schema.name||subject+' 科目分类')}</b><span class="spacer"></span><button class="btn small" id="btnLoadServerFacets">从服务器拉取</button><button class="btn small" id="btnPushServerFacets">推送到服务器</button><button class="btn small" id="btnExportCurrentFacetSchema">导出分类配置</button><button class="btn small primary" id="btnImportFacetSchema">导入 / 替换分类</button><input type="file" id="fileFacetSchema" accept=".json,application/json" hidden></div>
+    ${schema.dimensions.map(d=>`<div style="margin-top:8px"><label>${esc(d.label)}（${d.selection==='single'?'单选':'多选'} · ${d.values.length} 值）</label><div class="muted tiny">${d.values.map(v=>esc(v.label)+(v.status==='deprecated'?'（已废弃）':'')).join(' · ')}</div></div>`).join('')}
+    <div class="muted tiny" style="margin-top:8px">Schema ID：<code>${esc(schema.schemaId)}</code> · 科目：<code>${esc(schema.subjectId)}</code>；维度与取值使用稳定 ID，历史使用过的 ID 不可硬删除或改写。服务器 Schema 是正式真源，推送遇到版本冲突时会自动刷新最新版并要求重新确认。</div>`;
+  }
+  const importBtn=document.getElementById('btnImportFacetSchema'),file=document.getElementById('fileFacetSchema');
+  if(importBtn)importBtn.onclick=()=>file?.click();
+  if(file)file.onchange=async()=>{const f=file.files?.[0];if(!f)return;try{
+    const imported=importFacetSchema(await readJsonFile(f));
+    state.questionBank.questions.forEach(q=>q.metadata.subjectFacets=normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||state.questionBank.subject));
+    renderSubjectFacetManager();renderQuestionEditor();renderCurrentIssues();markWorkspaceDirty();toast(`已导入科目分类：${imported.name}`);
+  }catch(err){alert('科目分类导入失败：'+err.message)}file.value=''};
+  const exportBtn=document.getElementById('btnExportCurrentFacetSchema');
+  if(exportBtn&&schema)exportBtn.onclick=()=>downloadJson({format:'pmp-facet-schema-v1',...clone(schema)},`${schema.schemaId}.json`,{auditType:'subject-facet-schema'});
+  const loadBtn=document.getElementById('btnLoadServerFacets');
+  if(loadBtn)loadBtn.onclick=async()=>{
+    if(!window.PMPPrepP45Server){toast('服务器适配器未加载');return}
+    try{const result=await window.PMPPrepP45Server.loadSubjectFacetSchemas();state.questionBank.questions.forEach(q=>q.metadata.subjectFacets=normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||state.questionBank.subject));renderSubjectFacetManager();renderQuestionEditor();renderCurrentIssues();toast(`已从服务器拉取 ${result.schemas.length} 份 Facet Schema`)}
+    catch(error){alert('从服务器拉取科目分类失败：'+error.message)}
+  };
+  const pushBtn=document.getElementById('btnPushServerFacets');
+  if(pushBtn&&schema)pushBtn.onclick=async()=>{
+    if(!window.PMPPrepP45Server){toast('服务器适配器未加载');return}
+    if(!confirm(`将当前科目分类（${schema.name}）推送到服务器？\n服务器将按科目替换同名 Schema；历史使用过的 ID 会被保留，不会被硬删除。`))return;
+    try{
+      const result=await window.PMPPrepP45Server.pushSubjectFacetSchema(schema,{contentRevision:prepRuntime.serverContentRevision||0});
+      prepRuntime.serverContentRevision=Math.max(Number(prepRuntime.serverContentRevision||0),Number(result?.contentRevision||0));
+      toast('科目分类已推送到服务器');
+    }catch(error){
+      alert(error.code==='SUBJECT_FACET_REVISION_CONFLICT'?error.message:'推送到服务器失败：'+error.message);
+      if(error.code==='SUBJECT_FACET_REVISION_CONFLICT'&&error.detail?.latestContentRevision)prepRuntime.serverContentRevision=error.detail.latestContentRevision;
+    }
+  };
+}
 function renderQuestionEditor(){
   const q=currentQuestion(),ed=document.getElementById('questionEditor');
   document.getElementById('currentQuestionId').textContent=q?.id||'';
@@ -1836,6 +1994,10 @@ function renderQuestionEditor(){
     <div id="questionPrincipleBindingPanel"></div>
   </div>
   <div class="section">
+    <div class="section-title">科目分类（Subject Facets）</div>
+    <div id="questionFacetBindingPanel"></div>
+  </div>
+  <div class="section">
     <div class="section-title">知识点</div>
     <label>主知识点（只保存稳定 Node ID）</label>
     <select id="primaryNode">${treeOptions(q.metadata?.knowledge?.primaryNodeId||'')}</select>
@@ -1850,7 +2012,7 @@ function renderQuestionEditor(){
     </div>
   </div>`;
   bindQuestionEditor();
-  renderQuestionPrincipleBindings();renderKeywords();renderPreview();renderCurrentIssues();renderQuestionLockState();
+  renderQuestionPrincipleBindings();renderQuestionFacetBindings();renderKeywords();renderPreview();renderCurrentIssues();renderQuestionLockState();
 }
 function bindQuestionEditor(){
   const q=currentQuestion();if(!q)return;
@@ -2484,7 +2646,7 @@ function runValidation(){
     else contentHashOwners.set(ch,q.id);
     validateQuestion(q,true).forEach(x=>issues.push(x));
   });
-  state.questionBank.questions.forEach(q=>{const metadata=syncQuestionPrinciples(q);(metadata.stemPrincipleIds||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`题干原则 ID 不存在：${id}`,suggest:'在原则管理中创建或重新绑定。'})});Object.entries(metadata.optionPrincipleMap||{}).forEach(([opt,ids])=>(ids||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`选项 ${opt} 的原则 ID 不存在：${id}`,suggest:'重新绑定选项原则。'})}));const correctIds=metadata.optionPrincipleMap?.[q.correctAnswer]||[];if(correctIds.length!==1)issues.push({level:'error',object:q.id,message:'正确选项必须绑定且只能绑定一条原则',suggest:'在题目录入区为正确选项保留一条原则；多题归纳据此分组。'});(q.tags||[]).forEach(tag=>{if(!tagPathFor(tag))issues.push({level:'warn',object:q.id,message:`标签“${tag}”未绑定主程序预设标签槽位`,suggest:'保留为自由标签，或在标签管理中映射/改名。'})})});
+  state.questionBank.questions.forEach(q=>{const metadata=syncQuestionPrinciples(q);(metadata.stemPrincipleIds||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`题干原则 ID 不存在：${id}`,suggest:'在原则管理中创建或重新绑定。'})});Object.entries(metadata.optionPrincipleMap||{}).forEach(([opt,ids])=>(ids||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`选项 ${opt} 的原则 ID 不存在：${id}`,suggest:'重新绑定选项原则。'})}));const correctIds=metadata.optionPrincipleMap?.[q.correctAnswer]||[];if(correctIds.length!==1)issues.push({level:'error',object:q.id,message:'正确选项必须绑定且只能绑定一条原则',suggest:'在题目录入区为正确选项保留一条原则；多题归纳据此分组。'});validateQuestionFacets(q).forEach(x=>issues.push({level:x.level,object:q.id,message:x.message,suggest:x.suggest}));(q.tags||[]).forEach(tag=>{if(!tagPathFor(tag))issues.push({level:'warn',object:q.id,message:`标签“${tag}”未绑定主程序预设标签槽位`,suggest:'保留为自由标签，或在标签管理中映射/改名。'})})});
   state.principles.items.forEach(p=>{const preset=presetByPrincipleId(p.id);if(!preset||!preset.content)issues.push({level:'warn',object:p.id,message:`原则“${p.name}”缺少归纳卡内容`,suggest:'补充 synthesis preset。'})});
   const conflicts=aliasConflicts();conflicts.forEach(c=>issues.push({level:'error',object:'联想库',message:`名称/Alias 冲突：“${c.term}” → ${c.nodes.map(n=>n.title).join(' / ')}`,suggest:'保留唯一入口，或把 Alias 改成更具体的词。'}));
   const recallIds=new Set(state.recallLibrary.nodes.map(n=>n.id));
@@ -2506,7 +2668,7 @@ function workspacePayload(){return {
   prepStudioWorkspaceVersion:4,prepStudioVersion:VERSION,savedAt:nowIso(),
   schema:{tagSlots:'semantic-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA},
   knowledgeTree:state.knowledgeTree?{taxonomy:{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:{zh:state.knowledgeTree.name},version:state.knowledgeTree.version,nodes:state.knowledgeTree.nodes}}:null,
-  recallLibrary:state.recallLibrary,questionBank:state.questionBank,principles:state.principles,synthesisPresets:state.synthesisPresets,tagConfig:state.tagConfig,
+  recallLibrary:state.recallLibrary,questionBank:state.questionBank,principles:state.principles,synthesisPresets:state.synthesisPresets,tagConfig:state.tagConfig,subjectFacetRegistry:state.subjectFacetRegistry,
   server:{
     serverBankId:prepRuntime.serverBankId||'',serverBankRevision:prepRuntime.serverBankRevision??null,
     clientInstanceId:prepRuntime.clientInstanceId,lastIdempotencyKey:prepRuntime.lastIdempotencyKey||'',
@@ -2550,6 +2712,7 @@ function applyWorkspacePayload(input){
   state.knowledgeTree=w.knowledgeTree?normalizeTree(w.knowledgeTree):null;
   state.recallLibrary=normalizeRecall(w.recallLibrary||{});
   state.tagConfig=normalizeTagConfig(w.tagConfig||{});
+  state.subjectFacetRegistry=normalizeSubjectFacetRegistry(w.subjectFacetRegistry||{});
   state.principles=normalizePrinciples(w.principles||{});
   state.synthesisPresets=normalizePresets(w.synthesisPresets||{});
   state.questionBank=normalizeBank(w.questionBank||{questions:[]});
@@ -2564,7 +2727,7 @@ function applyWorkspacePayload(input){
   state.recallPreviewCandidateId='';refreshQuestionTagPaths();refreshAll();
 }
 
-function refreshAll(){refreshHeader();renderQuestions();renderRecallList();renderRecallEditor();renderPrincipleList();renderPrincipleEditor();renderTagManager();if(document.getElementById('tab-demo')?.classList.contains('active'))renderDemoValidation()}
+function refreshAll(){refreshHeader();renderQuestions();renderRecallList();renderRecallEditor();renderPrincipleList();renderPrincipleEditor();renderTagManager();renderSubjectFacetManager();if(document.getElementById('tab-demo')?.classList.contains('active'))renderDemoValidation()}
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b)setTab(b.dataset.tab)});
 document.getElementById('btnNewQuestion').onclick=newQuestion;
 document.getElementById('btnDuplicateQuestion').onclick=duplicateQuestion;
@@ -3166,7 +3329,7 @@ document.getElementById('fileTree').addEventListener('change',async e=>{const f=
 document.getElementById('fileRecall').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.recallLibrary=normalizeRecall(await readJsonFile(f));state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';refreshHeader();renderRecallList();renderRecallEditor();renderKeywords();markWorkspaceDirty();toast('联想库已加载')}catch(err){alert('联想库导入失败：'+err.message)}e.target.value=''});
 document.getElementById('fileQuestionBank').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const imported=ImportService.questionBank(await readJsonFile(f)),report=confirmQuestionDuplicateCleanup(imported.questions,[]);if(report.cancelled)return;imported.questions=report.unique;state.questionBank=imported;stampImportedQuestions(state.questionBank.questions,'question-bank-json');state.currentQuestionId=state.questionBank.questions[0]?.id||'';refreshHeader();renderQuestions();markWorkspaceDirty();toast(`题库已加载${report.duplicates.length?` · 已清除 ${report.duplicates.length} 道重复题`:''} · 已记录导入批次`)}catch(err){alert('题库导入失败：'+err.message)}e.target.value=''});
 
-document.getElementById('btnNewWorkspace').onclick=()=>{if(!confirm('清空当前 Prep Studio 工作区？请先导出需要保留的草稿。'))return;state.knowledgeTree=null;state.recallLibrary={schemaVersion:1,nodes:[],edges:[],updatedAt:''};state.questionBank={id:generateSystemId('bank'),name:'PMP 内容准备题库',subject:'PMP',description:'',version:'1.0',visibility:'private',createdAt:Date.now(),updatedAt:Date.now(),questions:[]};state.principles={schemaVersion:1,items:[],updatedAt:Date.now()};state.synthesisPresets={schemaVersion:1,items:[],updatedAt:Date.now()};state.tagConfig={names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}};state.currentQuestionId='';state.currentRecallId='';state.currentPrincipleId='';state.demoQuestionId='';state.demoLang='zh';state.recallPreviewCandidateId='';refreshAll();setTab('base');markWorkspaceDirty();toast('已清空')};
+document.getElementById('btnNewWorkspace').onclick=()=>{if(!confirm('清空当前 Prep Studio 工作区？请先导出需要保留的草稿。'))return;state.knowledgeTree=null;state.recallLibrary={schemaVersion:1,nodes:[],edges:[],updatedAt:''};state.questionBank={id:generateSystemId('bank'),name:'PMP 内容准备题库',subject:'PMP',description:'',version:'1.0',visibility:'private',createdAt:Date.now(),updatedAt:Date.now(),questions:[]};state.principles={schemaVersion:1,items:[],updatedAt:Date.now()};state.synthesisPresets={schemaVersion:1,items:[],updatedAt:Date.now()};state.tagConfig={names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}};state.subjectFacetRegistry=normalizeSubjectFacetRegistry({});state.currentQuestionId='';state.currentRecallId='';state.currentPrincipleId='';state.demoQuestionId='';state.demoLang='zh';state.recallPreviewCandidateId='';refreshAll();setTab('base');markWorkspaceDirty();toast('已清空')};
 document.getElementById('btnImportWorkspace').onclick=()=>document.getElementById('fileWorkspace').click();
 document.getElementById('fileWorkspace').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const w=await readJsonFile(f);if(!w.prepStudioWorkspaceVersion)throw new Error('不是 Prep Studio 草稿');applyWorkspacePayload(w);markWorkspaceDirty();toast('草稿已恢复')}catch(err){alert('草稿导入失败：'+err.message)}e.target.value=''});
 
@@ -3571,8 +3734,102 @@ window.PMPPrepDraftUi?.open?.();
   window.addEventListener('pagehide',()=>{remoteRetryStopped=true;clearTimeout(remoteRetryTimer);unsubscribeTeachingSync?.();window.removeEventListener?.('kg:server-state-reloaded',handleServerStateReload)});
   renderActor();refreshButtons();refreshBanks();
   refreshSharedContent().catch(error=>{setStatus(error.message||'共享内容读取失败','bad');setIssues(error)});
+  if(actor&&window.PMPPrepP45Server)window.PMPPrepP45Server.loadSubjectFacetSchemas().catch(error=>{if(error.code!=='AUTH_REQUIRED')console.warn('[p45] facet schema load failed:',error.message)});
   const initial=currentQuestion();if(initial?.serverRevision)QuestionLocks.switchTo(initial).then(()=>renderQuestionLockState());
 })();
+
+/*
+ * P4.5 服务器适配器：Subject Facet Schema 的服务器加载与推送（差异 9–11）。
+ * - loadSubjectFacetSchemas：从 /content-prep/subject-facets 读取服务器 Schema（正式真源），
+ *   按 subjectId 合并进本地 state.subjectFacetRegistry；服务器数据不整包覆盖，只按科目替换。
+ * - pushSubjectFacetSchema：显式推送编辑后的 Schema；revision/contentRevision 冲突（409）时
+ *   拒绝覆盖：自动刷新服务器最新版并要求教师重新确认，不做静默合并。
+ */
+(function(global){
+  const API_ROOT='/api/v1';
+  class P45ServerError extends Error{
+    constructor(code,message,{status=0,serverCode='',detail=null}={}){
+      super(message);this.name='P45ServerError';this.code=code;this.status=status;this.serverCode=serverCode;this.detail=detail;
+    }
+  }
+  async function request(path,options={}){
+    let response;
+    try{
+      response=await global.fetch(`${API_ROOT}${path}`,{
+        ...options,
+        credentials:'include',
+        headers:{...(options.body?{'content-type':'application/json'}:{}),...(options.headers||{})}
+      });
+    }catch(cause){
+      throw new P45ServerError('NETWORK_ERROR','无法连接服务器，本地 Facet 配置保持不变。',{cause});
+    }
+    let payload={};
+    try{payload=await response.json()}catch(_error){payload={}}
+    if(!response.ok){
+      const detail=payload?.detail??payload??{};
+      const serverCode=String(detail?.code||'');
+      throw new P45ServerError(serverCode||`HTTP_${response.status}`,String(detail?.message||detail||`请求失败（${response.status}）`),{status:response.status,serverCode,detail});
+    }
+    return payload;
+  }
+
+  function currentState(){
+    return typeof state!=='undefined'?state:null;
+  }
+  function registryWithServerSchemas(serverSchemas){
+    const reg=normalizeSubjectFacetRegistry(currentState()?.subjectFacetRegistry||{});
+    (serverSchemas||[]).forEach(schema=>{
+      const normalized=normalizeFacetSchema(schema);
+      if(!normalized.schemaId||!normalized.subjectId)return;
+      const index=reg.schemas.findIndex(s=>s.schemaId===normalized.schemaId||s.subjectId===normalized.subjectId);
+      if(index>=0)reg.schemas[index]=normalized;else reg.schemas.push(normalized);
+    });
+    return reg;
+  }
+  function refreshFacetUI(){
+    if(typeof renderSubjectFacetManager==='function')renderSubjectFacetManager();
+  }
+
+  async function loadSubjectFacetSchemas(){
+    const payload=await request('/content-prep/subject-facets');
+    const appState=currentState();
+    if(appState){
+      appState.subjectFacetRegistry=registryWithServerSchemas(payload?.schemas);
+      refreshFacetUI();
+    }
+    return {schemas:payload?.schemas||[],contentRevision:Number(payload?.contentRevision||0)};
+  }
+
+  async function pushSubjectFacetSchema(schema,{contentRevision=0}={}){
+    let result;
+    try{
+      result=await request('/content-prep/subject-facets',{
+        method:'PUT',
+        body:JSON.stringify({contentRevision:Number(contentRevision),schema:JSON.parse(JSON.stringify(schema||{}))})
+      });
+    }catch(error){
+      if(error.status===409){
+        const latest=await loadSubjectFacetSchemas();
+        throw new P45ServerError('SUBJECT_FACET_REVISION_CONFLICT',
+          `服务器 Facet Schema 已更新（当前 revision ${latest.contentRevision}），已刷新为最新版；请重新确认你的修改后再次推送。`,
+          {status:409,serverCode:error.serverCode,detail:{latestContentRevision:latest.contentRevision}});
+      }
+      throw error;
+    }
+    const appState=currentState();
+    if(appState){
+      appState.subjectFacetRegistry=registryWithServerSchemas([result?.schema]);
+      refreshFacetUI();
+    }
+    return result;
+  }
+
+  global.PMPPrepP45Server=Object.freeze({
+    P45ServerError,
+    loadSubjectFacetSchemas,
+    pushSubjectFacetSchema,
+  });
+})(window);
 </script>
 </body>
 </html>

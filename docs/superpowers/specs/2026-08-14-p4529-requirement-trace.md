@@ -14,9 +14,9 @@
 | 6 | 双原则包格式 kg-v1 / pmp-v1 | DONE | `#filePrincipleCardBundle` | `canonicalPrincipleDomain`（14-principle-bundle-domain.js） | GET/PUT /content-prep/shared-content | tests/test_principle_bundle_domain.js + v90-p4529-principle-safe-merge-browser.py（双格式） | 同上（未知 format 拒绝且状态不变） | 同上（合并保留现有） |
 | 7 | 旧原则库/旧归纳卡 JSON 单独迁移 | DONE | `#filePrincipleCardBundle` | `canonicalPrincipleDomain`（legacy-* 分支） | 同上 | tests/test_principle_bundle_domain.js（legacy-principle-library / legacy-synthesis-presets） | 同上（非对象/缺 items 拒绝） | 浏览器 E2E（旧库合并不清归纳卡） |
 | 8 | 原则与归纳卡安全合并 | DONE | `#filePrincipleCardBundle` 冲突 confirm 流程 | `planPrincipleMerge`/`applyPrincipleMergePlan`（14-principle-bundle-domain.js） | POST/PUT/DELETE /content-prep/principles（删除引用阻断 409 PRINCIPLE_IN_USE） | tests/test_principle_bundle_domain.js（Added/Unchanged/Conflict 三分类） | 同上（同 ID 改名/同名不同 ID/preset 改绑默认不覆盖）+ backend/tests/test_content_prep_shared_content.py（403/409） | 同上（take-incoming 显式裁决才覆盖）+ v90-p4529-principle-safe-merge-browser.py |
-| 9 | Subject Facets 系统 | PARTIAL(G2) | | | GET/PUT /content-prep/subject-facets（后端已存在） | | | |
-| 10 | Facet Registry 导入/编辑/校验/导出 | MISSING(G2) | | | 同上 | | | |
-| 11 | 题目绑定 Subject Facets | MISSING(G2) | | | | | | |
+| 9 | Subject Facets 系统 | DONE | base 页 `#subjectFacetManager`（含"从服务器拉取/推送到服务器"） | `facetSchemaForSubject`/`facetCatalog`/`facetIdFor` + 46-server-p45-adapter.js | GET/PUT /content-prep/subject-facets | v90-p4529-facet-binding-browser.py（服务器加载） | 同上（409 revision 冲突拒绝覆盖并刷新最新） | 同上（conflict 后 UI 提示重新确认） |
+| 10 | Facet Registry 导入/编辑/校验/导出 | DONE | `#fileFacetSchema` 导入 / `#btnExportCurrentFacetSchema` 导出 / 管理器展示维度取值 | `normalizeFacetSchema`/`importFacetSchema`（12-p45-authoring-domain.js） | 同上（推送带历史 ID 保护） | tests/test_p45_facets.js（导入按 subjectId 替换）+ 浏览器 E2E（pmp-facet-schema-v1 导入） | 同上（缺 schemaId/subjectId/dimensions 报错） | 同上 |
+| 11 | 题目绑定 Subject Facets | DONE | 题目编辑区 `#questionFacetBindingPanel` 复选 + 清除未知引用 | `normalizeQuestionFacets`/`selectedFacetsFromIds` | — | tests/test_p45_facets.js（稳定 facetId 绑定/去重） | 同上（未知引用 error 阻断） | 浏览器 E2E（清除后错误恢复） |
 | 12 | Question Family v1 | PARTIAL(G3) | | frontend/scripts/question-family-contract.test.mjs（主程序侧契约已存在） | | | | |
 | 13 | 母题/成员/独立题角色 | MISSING(G3) | | | | | | |
 | 14 | 等价/拆解/扩展家族关系 | MISSING(G3) | | | | | | |
@@ -32,9 +32,9 @@
 | 24 | 手动保存/恢复/删除 Workspace | MISSING(G5) | `#btnQuickSaveWorkspace`/`#btnSaveWorkspaceLocal`（待接 syncWorkspaceToServer） | | | new-legacy/tests/content-prep-question-bank-integration.test.js（RED 已就位） | | |
 | 25 | Workspace 保存范围（题库/知识树/Recall/原则/归纳卡/标签/位置） | PARTIAL(G5) | | WorkspaceService.currentPayload | | | | |
 | 26 | Global Tag 语义 ID global/... + 兼容旧 ID | PARTIAL(G4) | | `semanticTagSlot`（10-state-domain.js，槽位迁移已有）；global/... 前缀待统一 | | tests/test_tag_migration.js（往返） | | |
-| 27 | 完整内容包携带 Facet Registry | MISSING(G2) | | completeBundlePayload 已含 subjectFacetRegistry 字段位 | | | | |
+| 27 | 完整内容包携带 Facet Registry | DONE | — | completeBundlePayload 输出 subjectFacetRegistry（10-state-domain.js） | — | v90-p4529-facet-binding-browser.py（导出含 schema 快照） | 同上 | 同上 |
 | 28 | 校验中心 Family 校验 | MISSING(G3) | | | | | | |
-| 29 | 校验中心 Facet 校验 | MISSING(G2) | | | | | | |
+| 29 | 校验中心 Facet 校验 | DONE | 校验中心 `#validationRows`（object=题目 ID 定位）+ 编辑区红色提示 | `validateQuestionFacets`（12-p45-authoring-domain.js）接入 runValidation | — | tests/test_p45_facets.js（无效 error/deprecated warning/有效无问题） | 同上 | 浏览器 E2E（清除未知引用后错误恢复） |
 | 30 | 校验结果题目定位/跳转 | MISSING(G7) | | | | | | |
 | 31 | 导出 programCompatibility 分层契约 | MISSING(G6) | | | | | | |
 | 32 | deepRecallKeywordRevealPolicy=click-to-reveal-all-keywords | MISSING(G6) | | | | | | |

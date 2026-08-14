@@ -110,6 +110,68 @@ function renderQuestionPrincipleBindings(){
   box.querySelectorAll('[data-principle-check="question"]').forEach(el=>el.addEventListener('change',()=>{q.metadata.stemPrincipleIds=[...box.querySelectorAll('[data-principle-check="question"]:checked')].map(x=>x.value);syncQuestionPrinciples(q);renderCurrentIssues()}));
   q.options.slice(0,4).forEach(o=>box.querySelectorAll(`[data-principle-check="opt-${o.id}"]`).forEach(el=>el.addEventListener('change',()=>{q.metadata.optionPrincipleMap=q.metadata.optionPrincipleMap||{};q.metadata.optionPrincipleMap[o.id]=[...box.querySelectorAll(`[data-principle-check="opt-${o.id}"]:checked`)].map(x=>x.value);syncQuestionPrinciples(q);renderCurrentIssues()})));
 }
+function renderQuestionFacetBindings(){
+  const q=currentQuestion(),box=document.getElementById('questionFacetBindingPanel');if(!q||!box)return;
+  const subject=q.subject||state.questionBank.subject||'PMP',schema=facetSchemaForSubject(subject);
+  if(!schema){box.innerHTML=`<div class="help">当前科目 <b>${esc(subject)}</b> 尚未配置科目分类 Schema；可到「① 基础数据与导入」导入 Facet Schema。未配置时题目不携带 subjectFacets。</div>`;return}
+  const catalog=facetCatalog(subject),selected=new Set(normalizeQuestionFacets(q.metadata?.subjectFacets,subject).map(x=>x.facetId));
+  const unknown=[...selected].filter(id=>!catalog.some(x=>x.facetId===id));
+  box.innerHTML=`<div class="help">按当前科目 Schema（${esc(schema.name)} · <code>${esc(schema.schemaId)}</code>）绑定；保存为 <code>metadata.subjectFacets</code>，仅允许引用 Schema 中的真实 ID，界面只显示教师业务名称。</div>
+  ${schema.dimensions.filter(d=>d.status!=='inactive').map(d=>`
+    <div style="margin-top:9px"><label>${esc(d.label)}（${d.selection==='single'?'单选':'多选'}）</label>
+    <div class="principle-checks">${d.values.filter(v=>v.status!=='inactive').map(v=>{
+      const fid=facetIdFor(schema,d.id,v.id);
+      return `<label><input type="checkbox" data-facet-check value="${esc(fid)}"${selected.has(fid)?' checked':''}> ${esc(v.label)}${v.status==='deprecated'?'（已废弃）':''}</label>`;
+    }).join('')}</div></div>`).join('')}
+  ${unknown.length?`<div class="muted tiny" style="margin-top:8px;color:#c0392b">未知分类引用（不在当前 Schema，校验中心会标红并阻止正式同步）：${unknown.map(esc).join('、')} <button class="btn small" type="button" id="btnClearUnknownFacets">清除未知引用</button></div>`:''}`;
+  const clearBtn=document.getElementById('btnClearUnknownFacets');
+  if(clearBtn)clearBtn.onclick=()=>{const ids=[...box.querySelectorAll('[data-facet-check]:checked')].map(x=>x.value);q.metadata.subjectFacets=selectedFacetsFromIds(ids,subject);renderQuestionFacetBindings();renderCurrentIssues();markWorkspaceDirty()};
+  box.querySelectorAll('[data-facet-check]').forEach(el=>el.addEventListener('change',()=>{
+    const ids=[...box.querySelectorAll('[data-facet-check]:checked')].map(x=>x.value);
+    q.metadata.subjectFacets=selectedFacetsFromIds(ids,subject).concat(normalizeQuestionFacets(q.metadata?.subjectFacets,subject).filter(x=>x.status==='unknown'));
+    renderCurrentIssues();markWorkspaceDirty();
+  }));
+}
+function renderSubjectFacetManager(){
+  const box=document.getElementById('subjectFacetManager');if(!box)return;
+  const subject=state.questionBank.subject||'PMP',schema=facetSchemaForSubject(subject);
+  if(!schema){
+    box.innerHTML=`<div class="help">当前科目 <b>${esc(subject)}</b> 尚未配置科目分类。</div><div class="toolbar"><button class="btn small primary" id="btnImportFacetSchema">导入科目分类</button><input type="file" id="fileFacetSchema" accept=".json,application/json" hidden></div>`;
+  }else{
+    box.innerHTML=`
+    <div class="toolbar"><b>${esc(schema.name||subject+' 科目分类')}</b><span class="spacer"></span><button class="btn small" id="btnLoadServerFacets">从服务器拉取</button><button class="btn small" id="btnPushServerFacets">推送到服务器</button><button class="btn small" id="btnExportCurrentFacetSchema">导出分类配置</button><button class="btn small primary" id="btnImportFacetSchema">导入 / 替换分类</button><input type="file" id="fileFacetSchema" accept=".json,application/json" hidden></div>
+    ${schema.dimensions.map(d=>`<div style="margin-top:8px"><label>${esc(d.label)}（${d.selection==='single'?'单选':'多选'} · ${d.values.length} 值）</label><div class="muted tiny">${d.values.map(v=>esc(v.label)+(v.status==='deprecated'?'（已废弃）':'')).join(' · ')}</div></div>`).join('')}
+    <div class="muted tiny" style="margin-top:8px">Schema ID：<code>${esc(schema.schemaId)}</code> · 科目：<code>${esc(schema.subjectId)}</code>；维度与取值使用稳定 ID，历史使用过的 ID 不可硬删除或改写。服务器 Schema 是正式真源，推送遇到版本冲突时会自动刷新最新版并要求重新确认。</div>`;
+  }
+  const importBtn=document.getElementById('btnImportFacetSchema'),file=document.getElementById('fileFacetSchema');
+  if(importBtn)importBtn.onclick=()=>file?.click();
+  if(file)file.onchange=async()=>{const f=file.files?.[0];if(!f)return;try{
+    const imported=importFacetSchema(await readJsonFile(f));
+    state.questionBank.questions.forEach(q=>q.metadata.subjectFacets=normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||state.questionBank.subject));
+    renderSubjectFacetManager();renderQuestionEditor();renderCurrentIssues();markWorkspaceDirty();toast(`已导入科目分类：${imported.name}`);
+  }catch(err){alert('科目分类导入失败：'+err.message)}file.value=''};
+  const exportBtn=document.getElementById('btnExportCurrentFacetSchema');
+  if(exportBtn&&schema)exportBtn.onclick=()=>downloadJson({format:'pmp-facet-schema-v1',...clone(schema)},`${schema.schemaId}.json`,{auditType:'subject-facet-schema'});
+  const loadBtn=document.getElementById('btnLoadServerFacets');
+  if(loadBtn)loadBtn.onclick=async()=>{
+    if(!window.PMPPrepP45Server){toast('服务器适配器未加载');return}
+    try{const result=await window.PMPPrepP45Server.loadSubjectFacetSchemas();state.questionBank.questions.forEach(q=>q.metadata.subjectFacets=normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||state.questionBank.subject));renderSubjectFacetManager();renderQuestionEditor();renderCurrentIssues();toast(`已从服务器拉取 ${result.schemas.length} 份 Facet Schema`)}
+    catch(error){alert('从服务器拉取科目分类失败：'+error.message)}
+  };
+  const pushBtn=document.getElementById('btnPushServerFacets');
+  if(pushBtn&&schema)pushBtn.onclick=async()=>{
+    if(!window.PMPPrepP45Server){toast('服务器适配器未加载');return}
+    if(!confirm(`将当前科目分类（${schema.name}）推送到服务器？\n服务器将按科目替换同名 Schema；历史使用过的 ID 会被保留，不会被硬删除。`))return;
+    try{
+      const result=await window.PMPPrepP45Server.pushSubjectFacetSchema(schema,{contentRevision:prepRuntime.serverContentRevision||0});
+      prepRuntime.serverContentRevision=Math.max(Number(prepRuntime.serverContentRevision||0),Number(result?.contentRevision||0));
+      toast('科目分类已推送到服务器');
+    }catch(error){
+      alert(error.code==='SUBJECT_FACET_REVISION_CONFLICT'?error.message:'推送到服务器失败：'+error.message);
+      if(error.code==='SUBJECT_FACET_REVISION_CONFLICT'&&error.detail?.latestContentRevision)prepRuntime.serverContentRevision=error.detail.latestContentRevision;
+    }
+  };
+}
 function renderQuestionEditor(){
   const q=currentQuestion(),ed=document.getElementById('questionEditor');
   document.getElementById('currentQuestionId').textContent=q?.id||'';
@@ -143,6 +205,10 @@ function renderQuestionEditor(){
     <div id="questionPrincipleBindingPanel"></div>
   </div>
   <div class="section">
+    <div class="section-title">科目分类（Subject Facets）</div>
+    <div id="questionFacetBindingPanel"></div>
+  </div>
+  <div class="section">
     <div class="section-title">知识点</div>
     <label>主知识点（只保存稳定 Node ID）</label>
     <select id="primaryNode">${treeOptions(q.metadata?.knowledge?.primaryNodeId||'')}</select>
@@ -157,7 +223,7 @@ function renderQuestionEditor(){
     </div>
   </div>`;
   bindQuestionEditor();
-  renderQuestionPrincipleBindings();renderKeywords();renderPreview();renderCurrentIssues();renderQuestionLockState();
+  renderQuestionPrincipleBindings();renderQuestionFacetBindings();renderKeywords();renderPreview();renderCurrentIssues();renderQuestionLockState();
 }
 function bindQuestionEditor(){
   const q=currentQuestion();if(!q)return;
@@ -791,7 +857,7 @@ function runValidation(){
     else contentHashOwners.set(ch,q.id);
     validateQuestion(q,true).forEach(x=>issues.push(x));
   });
-  state.questionBank.questions.forEach(q=>{const metadata=syncQuestionPrinciples(q);(metadata.stemPrincipleIds||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`题干原则 ID 不存在：${id}`,suggest:'在原则管理中创建或重新绑定。'})});Object.entries(metadata.optionPrincipleMap||{}).forEach(([opt,ids])=>(ids||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`选项 ${opt} 的原则 ID 不存在：${id}`,suggest:'重新绑定选项原则。'})}));const correctIds=metadata.optionPrincipleMap?.[q.correctAnswer]||[];if(correctIds.length!==1)issues.push({level:'error',object:q.id,message:'正确选项必须绑定且只能绑定一条原则',suggest:'在题目录入区为正确选项保留一条原则；多题归纳据此分组。'});(q.tags||[]).forEach(tag=>{if(!tagPathFor(tag))issues.push({level:'warn',object:q.id,message:`标签“${tag}”未绑定主程序预设标签槽位`,suggest:'保留为自由标签，或在标签管理中映射/改名。'})})});
+  state.questionBank.questions.forEach(q=>{const metadata=syncQuestionPrinciples(q);(metadata.stemPrincipleIds||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`题干原则 ID 不存在：${id}`,suggest:'在原则管理中创建或重新绑定。'})});Object.entries(metadata.optionPrincipleMap||{}).forEach(([opt,ids])=>(ids||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`选项 ${opt} 的原则 ID 不存在：${id}`,suggest:'重新绑定选项原则。'})}));const correctIds=metadata.optionPrincipleMap?.[q.correctAnswer]||[];if(correctIds.length!==1)issues.push({level:'error',object:q.id,message:'正确选项必须绑定且只能绑定一条原则',suggest:'在题目录入区为正确选项保留一条原则；多题归纳据此分组。'});validateQuestionFacets(q).forEach(x=>issues.push({level:x.level,object:q.id,message:x.message,suggest:x.suggest}));(q.tags||[]).forEach(tag=>{if(!tagPathFor(tag))issues.push({level:'warn',object:q.id,message:`标签“${tag}”未绑定主程序预设标签槽位`,suggest:'保留为自由标签，或在标签管理中映射/改名。'})})});
   state.principles.items.forEach(p=>{const preset=presetByPrincipleId(p.id);if(!preset||!preset.content)issues.push({level:'warn',object:p.id,message:`原则“${p.name}”缺少归纳卡内容`,suggest:'补充 synthesis preset。'})});
   const conflicts=aliasConflicts();conflicts.forEach(c=>issues.push({level:'error',object:'联想库',message:`名称/Alias 冲突：“${c.term}” → ${c.nodes.map(n=>n.title).join(' / ')}`,suggest:'保留唯一入口，或把 Alias 改成更具体的词。'}));
   const recallIds=new Set(state.recallLibrary.nodes.map(n=>n.id));
@@ -813,7 +879,7 @@ function workspacePayload(){return {
   prepStudioWorkspaceVersion:4,prepStudioVersion:VERSION,savedAt:nowIso(),
   schema:{tagSlots:'semantic-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA},
   knowledgeTree:state.knowledgeTree?{taxonomy:{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:{zh:state.knowledgeTree.name},version:state.knowledgeTree.version,nodes:state.knowledgeTree.nodes}}:null,
-  recallLibrary:state.recallLibrary,questionBank:state.questionBank,principles:state.principles,synthesisPresets:state.synthesisPresets,tagConfig:state.tagConfig,
+  recallLibrary:state.recallLibrary,questionBank:state.questionBank,principles:state.principles,synthesisPresets:state.synthesisPresets,tagConfig:state.tagConfig,subjectFacetRegistry:state.subjectFacetRegistry,
   server:{
     serverBankId:prepRuntime.serverBankId||'',serverBankRevision:prepRuntime.serverBankRevision??null,
     clientInstanceId:prepRuntime.clientInstanceId,lastIdempotencyKey:prepRuntime.lastIdempotencyKey||'',
@@ -857,6 +923,7 @@ function applyWorkspacePayload(input){
   state.knowledgeTree=w.knowledgeTree?normalizeTree(w.knowledgeTree):null;
   state.recallLibrary=normalizeRecall(w.recallLibrary||{});
   state.tagConfig=normalizeTagConfig(w.tagConfig||{});
+  state.subjectFacetRegistry=normalizeSubjectFacetRegistry(w.subjectFacetRegistry||{});
   state.principles=normalizePrinciples(w.principles||{});
   state.synthesisPresets=normalizePresets(w.synthesisPresets||{});
   state.questionBank=normalizeBank(w.questionBank||{questions:[]});
@@ -871,7 +938,7 @@ function applyWorkspacePayload(input){
   state.recallPreviewCandidateId='';refreshQuestionTagPaths();refreshAll();
 }
 
-function refreshAll(){refreshHeader();renderQuestions();renderRecallList();renderRecallEditor();renderPrincipleList();renderPrincipleEditor();renderTagManager();if(document.getElementById('tab-demo')?.classList.contains('active'))renderDemoValidation()}
+function refreshAll(){refreshHeader();renderQuestions();renderRecallList();renderRecallEditor();renderPrincipleList();renderPrincipleEditor();renderTagManager();renderSubjectFacetManager();if(document.getElementById('tab-demo')?.classList.contains('active'))renderDemoValidation()}
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b)setTab(b.dataset.tab)});
 document.getElementById('btnNewQuestion').onclick=newQuestion;
 document.getElementById('btnDuplicateQuestion').onclick=duplicateQuestion;
