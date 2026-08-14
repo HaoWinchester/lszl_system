@@ -30,14 +30,14 @@ assert.doesNotMatch(repositorySource, /function current\(\)[\s\S]*?appliedQuesti
 for (const [name, source, initializer] of [
   ['training', trainingSource, 'initQuestionTrainingPage'],
   ['workspace', workspaceSource, 'init'],
-  ['recall', recallSource, 'init'],
   ['practice', practiceSource, 'init'],
 ]) {
   assert.match(source, new RegExp(`async function ${initializer}\\(\\)[\\s\\S]*?await (?:window|global)\\.KGQuestionCatalogAdapter\\.ready`), `${name} must await the catalog before rendering`);
 }
+assert.match(recallSource,/async function loadDatabaseSession\(questionId=''\)[\s\S]*?if\(!id\)\{[\s\S]*?await window\.KGQuestionCatalogAdapter\?\.ready/,'recall must await the catalog only when the route has no database question id');
 
 assert.match(recallQuestionSource, /const catalogReady=Promise\.resolve\(global\.KGQuestionCatalogAdapter\?\.ready\)/);
-assert.match(recallQuestionSource, /function list\(\)\{if\(!catalogLoaded\)return \[\]/);
+assert.match(recallQuestionSource, /function list\(\)\{const raw=signature\(\);if\(cache\.signature===raw\)return cache\.list/);
 assert(recallQuestionSource.includes('questionSnapshots') || practiceSource.includes('questionSnapshots'), 'published release snapshots must remain immutable inputs');
 assert(practiceSource.includes('questionSnapshots'), 'practice mode must keep release snapshots');
 

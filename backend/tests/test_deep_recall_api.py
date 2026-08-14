@@ -5,7 +5,7 @@ import json
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
@@ -223,6 +223,23 @@ def test_question_revision_change_requires_explicit_reset_and_viewer_is_read_onl
         async with AsyncSessionLocal() as db:
             question = await db.get(Question, question_id)
             assert question is not None
+            source_library = (
+                await db.execute(
+                    select(RecallLibrarySnapshot).where(
+                        RecallLibrarySnapshot.subject == "subject-pmp"
+                    )
+                )
+            ).scalars().first()
+            assert source_library is not None
+            db.add(
+                RecallLibrarySnapshot(
+                    id=str(uuid4()),
+                    subject=f"subject-other-{suffix}",
+                    content_hash=source_library.content_hash,
+                    payload=source_library.payload,
+                    source_revision=source_library.source_revision,
+                )
+            )
             question.title = "版本二题目"
             question.revision = 2
             question.content_hash = "c" * 64
@@ -232,6 +249,11 @@ def test_question_revision_change_requires_explicit_reset_and_viewer_is_read_onl
         async with AsyncSessionLocal() as db:
             await db.execute(delete(RecallProgress).where(RecallProgress.question_id == question_id))
             await db.execute(delete(RecallQuestionSnapshot).where(RecallQuestionSnapshot.question_id == question_id))
+            await db.execute(
+                delete(RecallLibrarySnapshot).where(
+                    RecallLibrarySnapshot.subject == f"subject-other-{suffix}"
+                )
+            )
             await db.execute(delete(Question).where(Question.id == question_id))
             await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
             await db.execute(delete(User).where(User.username.in_([teacher, student, viewer])))

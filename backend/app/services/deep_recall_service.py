@@ -161,12 +161,17 @@ async def _history_question(
 async def _history_library(
     db: AsyncSession,
     progress: RecallProgress,
+    subject: str,
 ) -> RecallLibrarySnapshot | None:
     if not progress.recall_library_hash:
         return None
+    normalized_subject = str(
+        (await content_prep_shared_service.read_shared_content(db, subject))["subjectId"]
+    )
     return (
         await db.execute(
             select(RecallLibrarySnapshot).where(
+                RecallLibrarySnapshot.subject == normalized_subject,
                 RecallLibrarySnapshot.content_hash == progress.recall_library_hash,
             )
         )
@@ -267,7 +272,15 @@ async def get_session(
     )
     permissions = _permissions(user, mismatch=mismatch)
     history_question = await _history_question(db, progress) if mismatch and progress else None
-    history_library = await _history_library(db, progress) if mismatch and progress else None
+    history_library = (
+        await _history_library(
+            db,
+            progress,
+            history_question.subject if history_question else library_snapshot.subject,
+        )
+        if mismatch and progress
+        else None
+    )
     bound_library = history_library or library_snapshot
     graph = (
         progress_payload(progress, read_only=permissions["readOnly"])
