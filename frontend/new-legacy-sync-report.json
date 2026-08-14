@@ -1,19 +1,14 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.78",
-  "toVersion": "v9.0-p4.1.80",
+  "fromVersion": "v9.0-p4.1.80",
+  "toVersion": "v9.0-p4.1.81",
   "changes": {
-    "added": [
-      "styles/auth-dialog.css"
-    ],
+    "added": [],
     "changed": [
       "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "content-prep-studio/src/js/20-page-runtime.js",
-      "index.html",
-      "knowledge-recall.html",
-      "src/31a-learning-weekly-open-schedule.js",
-      "src/77-multi-question-workspace.js"
+      "question-workspace.html",
+      "src/77-multi-question-workspace.js",
+      "src/86-knowledge-recall.js"
     ],
     "removed": []
   },

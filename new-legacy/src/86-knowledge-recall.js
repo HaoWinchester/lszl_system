@@ -501,7 +501,7 @@
       return wrapKnownKeywords(text);
     }).join('');
     const optionMarkup=(option,content)=>`<button type="button" class="kr-option" data-option-id="${escapeHTML(option.id)}" aria-label="选择 ${escapeHTML(option.id)}，立即显示正误反馈"><strong>${escapeHTML(option.id)}</strong>${content}</button>`;
-    const options=(view?.options||[]).length?(view.options||[]).map(o=>optionMarkup(o,`<span>${wrapKnownKeywords(escapeHTML(o.display?.zh||''))}${englishLine(o.display)}</span>`)).join(''):(question.options||[]).map(o=>optionMarkup(o,wrapKnownKeywords(escapeHTML(o.text||'')))).join('');
+    const options=(view?.options||[]).length?(view.options||[]).map(o=>optionMarkup(o,`<span>${wrapKnownKeywords(escapeHTML(o.display?.zh||''),{inline:true})}${englishLine(o.display)}</span>`)).join(''):(question.options||[]).map(o=>optionMarkup(o,wrapKnownKeywords(escapeHTML(o.text||''),{inline:true}))).join('');
     const stemEn=view?.stem||{hasEnglish:false};
     questionCard.innerHTML=`<div class="kr-stem">${stem}${englishLine(stemEn)}</div><div class="kr-options">${options}</div><p class="kr-option-feedback lp-visually-hidden" data-kr-option-feedback aria-live="polite"></p>`;
   }
@@ -536,15 +536,20 @@
     });
     return matchers.sort((a,b)=>(Number(b.profile?.priority)||0)-(Number(a.profile?.priority)||0)||b.text.length-a.text.length);
   }
-  function wrapKnownKeywords(escapedText){
+  function wrapKnownKeywords(escapedText,{inline=false}={}){
     let value=String(escapedText||'');
     if(!keywordsRevealed)return value;
+    // inline 模式用于选项行：选项本身是 <button>，内部不能再嵌 <button>，
+    // 否则浏览器会提前闭合外层按钮，把关键词挤出到选项之外、破坏整行结构。
+    const tokenMarkup=inline
+      ?(cls,id,match)=>`<span role="button" tabindex="0" class="kr-keyword-token${cls}" data-keyword-id="${id}">${match}</span>`
+      :(cls,id,match)=>`<button type="button" class="kr-keyword-token${cls}" data-keyword-id="${id}">${match}</button>`;
     const replacements=[];
     for(const item of keywordMatchers){
       item.regex.lastIndex=0;
       value=value.replace(item.regex,match=>{
         const token=`__KR_MATCH_${replacements.length}__`;
-        replacements.push(`<button type="button" class="kr-keyword-token${isKeywordActive(item.key)?' active':''}" data-keyword-id="${escapeHTML(item.key)}">${match}</button>`);
+        replacements.push(tokenMarkup(isKeywordActive(item.key)?' active':'',escapeHTML(item.key),match));
         return token;
       });
     }
@@ -555,14 +560,22 @@
     if(questionCard.dataset.interactionsBound)return;
     questionCard.dataset.interactionsBound='1';
     questionCard.addEventListener('click',event=>{
+      // 关键词优先：选项行内也有可点击关键词，先判 token 再判选项。
+      const keyword=event.target.closest('.kr-keyword-token');
+      if(keyword&&questionCard.contains(keyword)){
+        event.preventDefault();event.stopPropagation();activateKeyword(keyword);return;
+      }
       const option=event.target.closest('.kr-option[data-option-id]');
       if(option&&questionCard.contains(option)){
         if(isRecallReadonly())return;
         event.preventDefault();event.stopPropagation();flashRecallOptionFeedback(option);return;
       }
-      const keyword=event.target.closest('.kr-keyword-token');
+    });
+    questionCard.addEventListener('keydown',event=>{
+      if(event.key!=='Enter'&&event.key!==' ')return;
+      const keyword=event.target.closest?.('.kr-keyword-token');
       if(!keyword||!questionCard.contains(keyword))return;
-      event.preventDefault();event.stopPropagation();activateKeyword(keyword);
+      event.preventDefault();activateKeyword(keyword);
     });
   }
   function revealKeywords(){

@@ -3806,9 +3806,10 @@
   function questionSelectionKey(item={}){return questionItemIdentity(item)}
   function selectedQuestionItems(){return state.questions.filter(item=>state.selectedQuestionKeys.has(questionSelectionKey(item)))}
   function updateQuestionSelectionMeta(){
-    const count=state.selectedQuestionKeys.size,meta=byId('qwQuestionSelectionMeta'),clear=byId('qwQuestionSelectionClear');
+    const count=state.selectedQuestionKeys.size,meta=byId('qwQuestionSelectionMeta'),clear=byId('qwQuestionSelectionClear'),add=byId('qwQuestionSelectionAdd');
     if(meta)meta.textContent='已选 '+count+' 题';
     if(clear)clear.disabled=count===0;
+    if(add)add.disabled=count===0;
   }
   function clearQuestionSelection({render=true}={}){
     state.selectedQuestionKeys.clear();
@@ -5073,6 +5074,22 @@
       renderQuestionDock();
     });
     byId('qwQuestionSelectionClear')?.addEventListener('click',()=>clearQuestionSelection());
+    byId('qwQuestionSelectionAdd')?.addEventListener('click',()=>{
+      const picked=selectedQuestionItems();
+      if(!picked.length){notify('请先勾选要加入画布的题目。');return}
+      const result=addQuestionItems(picked);
+      if(result?.created?.length)clearQuestionSelection();
+    });
+    byId('qwQuestionSelectionToggleAll')?.addEventListener('click',()=>{
+      const filtered=state.questions.filter(questionMatches);
+      if(!filtered.length)return;
+      const keys=filtered.map(item=>questionSelectionKey(item));
+      const allSelected=keys.every(key=>state.selectedQuestionKeys.has(key));
+      if(allSelected)keys.forEach(key=>state.selectedQuestionKeys.delete(key));
+      else keys.forEach(key=>state.selectedQuestionKeys.add(key));
+      updateQuestionSelectionMeta();
+      renderQuestionDock();
+    });
     byId('qwQuestionList')?.addEventListener('dragstart',questionDragStart);
     byId('qwQuestionList')?.addEventListener('dragend',questionDragEnd);
     state.nodeLayer.addEventListener('pointerdown',event=>{if(event.target.closest?.('[data-qw-connector]'))beginConnectorDrag(event)});
