@@ -10,9 +10,11 @@ JS_ORDER=[
     "14-principle-bundle-domain.js",
     "20-page-runtime.js",
     "30-service-layer.js",
+    "32-p45-contract-service.js",
     "35-server-catalog-service.js",
     "36-server-draft-service.js",
     "37-shared-draft-ui.js",
+    "38-shared-draft-autosave.js",
     "40-events-bootstrap.js",
     "45-server-events.js",
     "46-server-p45-adapter.js",
@@ -22,7 +24,8 @@ def build(output=None):
     template=(ROOT/"src"/"index.template.html").read_text(encoding="utf-8")
     css=(ROOT/"src"/"css"/"app.css").read_text(encoding="utf-8").rstrip()
     js="\n\n".join((ROOT/"src"/"js"/name).read_text(encoding="utf-8").rstrip() for name in JS_ORDER)
-    result=template.replace("/*__BUILD_CSS__*/",css).replace("/*__BUILD_JS__*/",js)
+    product_release=(ROOT.parent/"VERSION").read_text(encoding="utf-8").strip()
+    result=template.replace("__PRODUCT_RELEASE__",product_release).replace("/*__BUILD_CSS__*/",css).replace("/*__BUILD_JS__*/",js)
     out=Path(output) if output else ROOT/"dist"/"content-prep.html"
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(result,encoding="utf-8")

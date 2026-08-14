@@ -181,6 +181,7 @@ function loadPrepEvents({ listWritableBanks, loadCatalog } = {}) {
     PMPPrepServices: { ServerCatalogService: catalog },
     KGTeachingContentSync: { subscribe(listener) { syncListener = listener; return () => { syncListener = null; }; } },
     localStorage: { getItem(key) { return projections.get(String(key)) || null; } },
+    PMPPrepDraftUi: { save: async () => { serverWrites.push({ type: 'workspace-save' }); return { id: 'draft-1', revision: 2, title: '本地草稿' }; } },
     addEventListener(type, listener) { windowListeners.set(type, listener); },
     dispatchEvent(event) { dispatched.push(event); },
   };
@@ -343,20 +344,17 @@ async function testPrepPublishesOnlyCommittedServerChanges() {
 async function testPrepPrincipleCrudAndWorkspaceSaveAreServerBacked() {
   const prep = loadPrepEvents();
   await new Promise(resolve => setTimeout(resolve, 0));
+  // P4.5.29 冻结架构：原则先写入数据库共享草稿，第七步统一原子同步；
+  // 直接 CRUD 正式库被拒绝，防止绕过 Lock/Revision/审计。
   const principle = { id: 'principle-local', name: '服务器原则', status: 'active', confusablePrincipleIds: [] };
   const preset = { id: 'preset-local', principleId: principle.id, title: '原则：服务器原则', content: '服务器内容', status: 'active', version: 1 };
-  await prep.serverPrinciples().save(principle,preset);
-  assert.equal(prep.serverWrites[0].type,'principle-save');
-  assert.equal(prep.state.principles.items[0].name,'服务器原则');
-  assert.equal(prep.prepRuntime.serverContentRevision,2);
-  await prep.serverPrinciples().remove(principle.id);
-  assert.equal(prep.serverWrites[1].type,'principle-delete');
-  assert.deepEqual(prep.state.principles.items,[]);
+  await assert.rejects(() => prep.serverPrinciples().save(principle, preset), /共享草稿/);
+  await assert.rejects(() => prep.serverPrinciples().remove(principle.id), /共享草稿/);
+  assert.deepEqual(prep.serverWrites, [], '正式内容不得绕过共享草稿直接写服务器');
+  // 头部保存按钮必须提交到数据库共享草稿（服务器），而不是浏览器存储
   await prep.element('btnQuickSaveWorkspace').onclick();
-  assert.equal(prep.serverWrites[2].type,'workspace-save');
-  assert.equal(prep.serverWrites[2].bundle.knowledgeTree.taxonomy.id,'tax-local');
-  assert.ok(Object.hasOwn(prep.serverWrites[2].bundle,'recallLibrary'));
-  assert.equal(prep.prepRuntime.serverContentRevision,4);
+  assert.equal(prep.serverWrites[0].type, 'workspace-save');
+  assert.equal(prep.serverWrites.length, 1);
 }
 
 async function testManagedAdminDirtyEditorPreservesFields() {

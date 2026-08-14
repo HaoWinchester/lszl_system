@@ -127,6 +127,21 @@
   });
   window.PMPPrepServerPrinciples=ServerPrinciples;
 
+  /* P4.5.29 差异 24：手动保存统一提交到数据库共享草稿（服务器），不落浏览器存储；
+     保存成功后正式内容仍需第七步 syncWorkspaceToServer 显式同步。 */
+  const quickSaveButton=document.getElementById('btnQuickSaveWorkspace');
+  const localSaveButton=document.getElementById('btnSaveWorkspaceLocal');
+  const saveDraftToServer=async()=>{
+    try{
+      await window.PMPPrepDraftUi.save();
+      window.PMPPrepAutosave?.rememberDraftId?.();
+    }catch(_error){
+      /* 37 已在保存状态条展示失败原因并保留 dirty，可手动重试 */
+    }
+  };
+  if(quickSaveButton)quickSaveButton.onclick=()=>saveDraftToServer();
+  if(localSaveButton)localSaveButton.onclick=()=>saveDraftToServer();
+
   async function syncWorkspaceToServer(){
     syncButton.disabled=true;setStatus('正在同步共享草稿到主程序…');setIssues(null);
     try{const result=await window.PMPPrepDraftUi.sync();setStatus(`已同步到主程序 · 批次 ${result.batchId}`,'good');return result}
@@ -383,6 +398,12 @@
   window.addEventListener('pagehide',()=>{remoteRetryStopped=true;clearTimeout(remoteRetryTimer);unsubscribeTeachingSync?.();window.removeEventListener?.('kg:server-state-reloaded',handleServerStateReload)});
   renderActor();refreshButtons();refreshBanks();
   refreshSharedContent().catch(error=>{setStatus(error.message||'共享内容读取失败','bad');setIssues(error)});
-  if(actor&&window.PMPPrepP45Server)window.PMPPrepP45Server.loadSubjectFacetSchemas().catch(error=>{if(error.code!=='AUTH_REQUIRED')console.warn('[p45] facet schema load failed:',error.message)});
+  window.PMPPrepAuthoringContract?.renderVersionHeader?.();
+  if(actor&&window.PMPPrepP45Server){
+    window.PMPPrepP45Server.loadSubjectFacetSchemas().catch(error=>{if(error.code!=='AUTH_REQUIRED')console.warn('[p45] facet schema load failed:',error.message)});
+    window.PMPPrepP45Server.loadBuildMetadata().catch(error=>{if(error.code!=='AUTH_REQUIRED')console.warn('[p45] build metadata load failed:',error.message)});
+  }
+  /* P4.5.29 差异 23：刷新/重新登录后自动恢复上次打开的数据库共享草稿 */
+  if(actor&&window.PMPPrepAutosave)window.PMPPrepAutosave.restoreLastDraft().catch(()=>{});
   const initial=currentQuestion();if(initial?.serverRevision)QuestionLocks.switchTo(initial).then(()=>renderQuestionLockState());
 })();

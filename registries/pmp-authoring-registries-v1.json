@@ -1,0 +1,23 @@
+{
+  "id": "pmp-authoring-registries",
+  "version": "1.0.0",
+  "hashAlgorithm": "sha256-canonical-json",
+  "hash": "sha256:8d641db17cc2cf6ccccab5332f25fa11419f318ed7f08c9d67796402899dd030",
+  "registries": {
+    "difficulty": {
+      "id": "difficulty-v1",
+      "values": ["简单", "中等", "困难"],
+      "legacyAliases": {"基础": "简单", "easy": "简单", "medium": "中等", "hard": "困难"}
+    },
+    "globalTags": {
+      "id": "global-tags-v1",
+      "prefix": "global/",
+      "legacyPrefixes": ["usage/", "quality/", "source/"]
+    },
+    "subjectFacets": {
+      "id": "subject-facets-v1",
+      "identityPattern": "subject/{subjectSlug}/{dimensionId}/{valueId}",
+      "serverEndpoint": "/api/v1/content-prep/subject-facets"
+    }
+  }
+}

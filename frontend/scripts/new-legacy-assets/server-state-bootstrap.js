@@ -2,6 +2,8 @@
 
 ;(function (global) {
   const entry = global.__KG_DIRECT_BOOTSTRAP__ || {}
+  const browserLocalStorage = global.localStorage
+  const browserOnlyKeys = new Set(['prep.lastDraftId'])
   const page = entry.page || global.location.pathname.split('/').pop() || 'learning-path.html'
   const namespace = entry.namespace || 'page'
   let revision = Number(entry.revision || 0)
@@ -353,16 +355,27 @@
   const storage = {
     getItem(key) {
       const normalized = String(key)
+      if (browserOnlyKeys.has(normalized)) {
+        try { return browserLocalStorage?.getItem(normalized) ?? null } catch (_error) { return null }
+      }
       return values.has(normalized) ? values.get(normalized) : null
     },
     setItem(key, value) {
       const normalized = String(key)
       const stringValue = String(value)
+      if (browserOnlyKeys.has(normalized)) {
+        try { browserLocalStorage?.setItem(normalized, stringValue) } catch (_error) {}
+        return
+      }
       values.set(normalized, stringValue)
       emit('setItem', normalized, stringValue)
     },
     removeItem(key) {
       const normalized = String(key)
+      if (browserOnlyKeys.has(normalized)) {
+        try { browserLocalStorage?.removeItem(normalized) } catch (_error) {}
+        return
+      }
       values.delete(normalized)
       emit('removeItem', normalized, null)
     },
@@ -370,12 +383,30 @@
       const keys = Array.from(values.keys())
       values.clear()
       keys.forEach((key) => emit('removeItem', key, null))
+      for (const key of browserOnlyKeys) {
+        try { browserLocalStorage?.removeItem(key) } catch (_error) {}
+      }
     },
     key(index) {
-      return Array.from(values.keys())[Number(index)] ?? null
+      const keys = Array.from(values.keys())
+      for (const key of browserOnlyKeys) {
+        try {
+          if (browserLocalStorage?.getItem(key) != null) keys.push(key)
+        } catch (_error) {}
+      }
+      return keys[Number(index)] ?? null
     },
   }
-  Object.defineProperty(storage, 'length', { enumerable: true, get: () => values.size })
+  Object.defineProperty(storage, 'length', {
+    enumerable: true,
+    get: () => {
+      let total = values.size
+      for (const key of browserOnlyKeys) {
+        try { if (browserLocalStorage?.getItem(key) != null) total += 1 } catch (_error) {}
+      }
+      return total
+    },
+  })
   storage.claimLearningEntry = claimLearningEntry
   storage.flush = flush
   storage.refresh = refresh

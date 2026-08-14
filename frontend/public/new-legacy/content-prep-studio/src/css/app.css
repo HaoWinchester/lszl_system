@@ -83,13 +83,18 @@ code{background:#f1f5f9;padding:1px 4px;border-radius:4px}
 .workflow .step{font-weight:750}.workflow .arrow{color:#8391a7}
 .import-assistant{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:14px}
 .import-assistant textarea{min-height:190px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-.preview-core{border:1px solid #bdc9d9;border-radius:12px;background:#fff;padding:14px;min-height:180px;line-height:1.9;user-select:text}
+.preview-core{position:sticky;top:76px;z-index:4;border:1px solid #bdc9d9;border-radius:12px;background:#fff;padding:14px;min-height:180px;line-height:1.9;user-select:text;box-shadow:0 5px 16px rgba(15,23,42,.06)}
 .preview-core .stem-view{font-size:15px;font-weight:700;margin-bottom:12px}
 .preview-core .option-view{padding:7px 9px;margin:5px 0;border:1px solid #e4e9ef;border-radius:8px;background:#fbfcfe}
 .preview-core .option-view.correct{border-color:#a6d6c5;background:#f5fcf8}
 .preview-core mark{cursor:pointer;border-radius:4px;padding:1px 2px}
 .preview-core mark.normal{background:#dceaff;border-bottom:2px solid #5c8df3}
 .preview-core mark.core{background:#ffe0a6;border-bottom:2px solid #d78008;font-weight:850}
+#questionFamilyPanel{position:sticky;top:286px;z-index:3;background:#fff;border-radius:10px;box-shadow:0 5px 16px rgba(15,23,42,.05)}
+.validation-row-action{cursor:pointer}
+.validation-row-action:hover,.validation-row-action:focus{outline:none;background:#eef6ff}
+.validation-target-pulse{animation:validation-target-pulse 1.2s ease-out}
+@keyframes validation-target-pulse{0%,45%{box-shadow:0 0 0 4px rgba(37,99,235,.28)}100%{box-shadow:none}}
 .preview-tip{font-size:12px;color:var(--muted);margin:0 0 8px}
 .keyword-float{position:fixed;z-index:80;width:min(420px,calc(100vw - 24px));border:1px solid #aebbd0;border-radius:12px;background:#fff;box-shadow:0 14px 40px rgba(15,23,42,.22);padding:11px;display:none}
 .keyword-float.show{display:block}.keyword-float .float-title{font-weight:900;margin-bottom:7px;display:flex;gap:8px;align-items:center}.keyword-float .float-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.keyword-float .float-grid .span2{grid-column:1/-1}

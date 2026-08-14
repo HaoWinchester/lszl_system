@@ -27,22 +27,22 @@
 | 19 | 家族最低覆盖检查 | DONE | 家族面板就绪提示条 | `familyCoverageFor`（coverage/complete/ready） | —（Root-only 合法） | tests/test_p45_family.js（Root-only 只 warn；补齐 complete；确认 ready） | 同上 | v90-p4529-question-family-browser.py（Root-only warn 不增 error） |
 | 20 | 家族导航/页签/视觉识别 | DONE | 列表 `【母题】/【成员·A】` 徽章 + `#btnGoFamilyRoot`/成员链接 | renderQuestionListOnly + renderQuestionFamilyEditor | — | v90-p4529-question-family-browser.py（徽章+跳转） | — | — |
 | 21 | 三档难度与 L1-L4 分离 | DONE | 编辑器 `#difficulty` 三档下拉（简单/中等/困难） | `normalizeQuestionDifficulty`（前端）+ `normalize_difficulty`（backend question_content_service） | POST /content-prep/batches（归一后入库） | tests/test_p45_difficulty_tags.js + backend test_question_content_service.py（12 组别名参数化） | 同上（旧“基础”/L1–L4 误写只迁移不报错） | v90-p4529-difficulty-global-tags-browser.py（旧题库导入迁移） |
-| 22 | Workspace 自动保存（映射共享草稿） | MISSING(G5) | | | | | | |
-| 23 | 自动恢复上次工作区（从数据库） | MISSING(G5) | | | | | | |
-| 24 | 手动保存/恢复/删除 Workspace | MISSING(G5) | `#btnQuickSaveWorkspace`/`#btnSaveWorkspaceLocal`（待接 syncWorkspaceToServer） | | | new-legacy/tests/content-prep-question-bank-integration.test.js（RED 已就位） | | |
-| 25 | Workspace 保存范围（题库/知识树/Recall/原则/归纳卡/标签/位置） | PARTIAL(G5) | | WorkspaceService.currentPayload | | | | |
+| 22 | Workspace 自动保存（映射共享草稿） | DONE | 保存状态条 | `38-shared-draft-autosave.js` 防抖保存 | PUT /content-prep/drafts/{id} | tests/test_shared_draft_autosave.js | 同上（网络失败保持 dirty） | v90-p4529-workspace-autosave-browser.py |
+| 23 | 自动恢复上次工作区（从数据库） | DONE | 共享草稿恢复提示 | `restoreLastDraft`；`prep.lastDraftId` 仅浏览器偏好 | GET /content-prep/drafts/{id} | tests/test_shared_draft_autosave.js | 同上（404 清除偏好） | v90-p4529-workspace-autosave-browser.py |
+| 24 | 手动保存/恢复/删除 Workspace | DONE | `#btnQuickSaveWorkspace`/`#btnSaveWorkspaceLocal`/共享草稿 Gate | 37-shared-draft-ui.js + 45-server-events.js | Draft CRUD + sync | content-prep-question-bank-integration.test.js | backend/tests/test_content_prep_drafts.py | 同上 |
+| 25 | Workspace 保存范围（题库/知识树/Recall/原则/归纳卡/标签/位置） | DONE | — | `workspacePayload`/`applyWorkspacePayload` | Draft payload JSONB | content-prep-question-bank-integration.test.js | test_shared_draft_service.js | v90-p4529-workspace-autosave-browser.py |
 | 26 | Global Tag 语义 ID global/... + 兼容旧 ID | DONE | 标签管理器（槽位显示 global/...） | TAG_SLOT_SEMANTIC_MAP 升级 global-semantic-v1 / schemaVersion 3（00+10） | PUT /shared-content（tagConfig 内部 global 单真源） | tests/test_p45_difficulty_tags.js + tests/test_tag_migration.js（往返） | 同上（未知槽位原样保留不猜） | v90-p4529-difficulty-global-tags-browser.py（导出回退数字槽位） |
 | 27 | 完整内容包携带 Facet Registry | DONE | — | completeBundlePayload 输出 subjectFacetRegistry（10-state-domain.js） | — | v90-p4529-facet-binding-browser.py（导出含 schema 快照） | 同上 | 同上 |
 | 28 | 校验中心 Family 校验 | DONE | 校验中心 family 行（object=题目 ID） | `validateQuestionFamily` + `validateFamilyStructure` 接入 runValidation | POST /content-prep/batches（FAMILY_DUPLICATE_ROOT/FAMILY_MEMBER_ROOT_MISSING 硬 Gate） | tests/test_p45_family.js（孤儿成员 error/重复母题 error） | backend/tests/test_content_prep_question_family.py（422 阻断含跨 Bank 形态） | v90-p4529-question-family-browser.py（清除引用后恢复） |
 | 29 | 校验中心 Facet 校验 | DONE | 校验中心 `#validationRows`（object=题目 ID 定位）+ 编辑区红色提示 | `validateQuestionFacets`（12-p45-authoring-domain.js）接入 runValidation | — | tests/test_p45_facets.js（无效 error/deprecated warning/有效无问题） | 同上 | 浏览器 E2E（清除未知引用后错误恢复） |
-| 30 | 校验结果题目定位/跳转 | MISSING(G7) | | | | | | |
-| 31 | 导出 programCompatibility 分层契约 | MISSING(G6) | | | | | | |
-| 32 | deepRecallKeywordRevealPolicy=click-to-reveal-all-keywords | MISSING(G6) | | | | | | |
-| 33 | 核心关键词仅用于重叠匹配优先级 | MISSING(G6) | | | | | | |
-| 34 | Recall=optional-existing-id-only | PARTIAL(G6) | | 行为已实现（差异 3），policy 字段输出待 G6 | | | | |
-| 35 | keywordLocationPolicy=source-isolated-derived | PARTIAL(G6) | | 行为已实现（差异 4），policy 字段输出待 G6 | | | | |
-| 36 | 顶部版本分离 Product Release / Prep Build / Authoring Contract | MISSING(G6) | | | | | | |
-| 37 | 显示当前 Product Release 与已测试 Contract | MISSING(G6) | | | | | | |
-| 38 | 粘性题目预览/家族页签 | PARTIAL(G7) | 题目编辑区家族面板已加（G3）；粘性布局待 G7 | renderQuestionFamilyEditor | — | — | — | — |
-| 39 | Delete 快捷删题 + 输入态保护 | MISSING(G7) | | | | | | |
-| 40 | External AI Contract 覆盖 Family/Facet/Keyword v2 | MISSING(G3/G6) | | COMPLETE_AI_PROMPT 已含 external-ai-question-authoring-v1 雏形（P4.5.28 单文件） | | | | |
+| 30 | 校验结果题目定位/跳转 | DONE | `#validationRows [data-question-id]` | `goToValidationIssue` + 字段路径定位 | — | v90-p4529-validation-ux-browser.py | 非题目问题不生成跳转 | 键盘 Enter/Space 与点击均支持 |
+| 31 | 导出 programCompatibility 分层契约 | DONE | — | `32-p45-contract-service.js` | GET /content-prep/build-metadata | test_p45_contract_service.js | Contract schema 拒绝缺失字段 | test_authoring_contract_files.py |
+| 32 | deepRecallKeywordRevealPolicy=click-to-reveal-all-keywords | DONE | — | `POLICIES.deepRecallReveal` | build-metadata | test_p45_contract_service.js | — | v90-p4529-deep-recall-database-browser.py |
+| 33 | 核心关键词仅用于重叠匹配优先级 | DONE | — | `POLICIES.keywordCorePriority` | build-metadata | test_p45_contract_service.js | — | — |
+| 34 | Recall=optional-existing-id-only | DONE | — | `POLICIES.recallBinding` | build-metadata | test_p45_contract_service.js + test_recall_binding.js | 非空失效 ID 仍阻断 | Recall 浏览器链路 |
+| 35 | keywordLocationPolicy=source-isolated-derived | DONE | — | `POLICIES.keywordLocation` | build-metadata | test_p45_contract_service.js + test_recall_binding.js | 跨来源不串位 | — |
+| 36 | 顶部版本分离 Product Release / Prep Build / Authoring Contract | DONE | `#hdrProductRelease/#hdrPrepBuild/#hdrAuthoringContract/#hdrServerBuild` | Contract service header renderer | build-metadata | test_p45_contract_service.js | metadata 读取失败保留明确占位 | — |
+| 37 | 显示当前 Product Release 与已测试 Contract | DONE | 顶部版本行 | build 注入 Product Release + testedAgainstProductRelease | build-metadata | test_build.py + test_p45_contract_service.js | — | — |
+| 38 | 粘性题目预览/家族页签 | DONE | `#questionPreview/#questionFamilyPanel` | sticky CSS + Family 导航 | — | v90-p4529-validation-ux-browser.py | — | — |
+| 39 | Delete 快捷删题 + 输入态保护 | DONE | 题目页 Delete | `isTextEntryTarget` + keydown | — | v90-p4529-validation-ux-browser.py | input/textarea/select/contenteditable 不触发删题 | 同上 |
+| 40 | External AI Contract 覆盖 Family/Facet/Keyword v2 | DONE | 完整 AI 提示词下载 | COMPLETE_AI_PROMPT + pmp-authoring-contract-v1 | build-metadata | test_p45_contract_service.js | 禁止猜测受控 ID/Source Facts | — |

@@ -629,22 +629,22 @@ function validateKeyword(q,c){
 }
 function validateQuestion(q,deep=true){
   const issues=[],id=q.id||'未命名';
-  const push=(level,message,suggest='')=>issues.push({level,object:id,message,suggest});
-  if(!String(q.title||'').trim())push('error','缺少题目标题','填写 title。');
-  if(!String(questionStem(q)||'').trim())push('error','缺少中文题干','填写题干。');
-  if(!Array.isArray(q.options)||q.options.length<4||q.options.slice(0,4).some(o=>!String(o.text||'').trim()))push('error','A/B/C/D 选项不完整','补齐四个选项。');
-  if(!q.options.some(o=>o.id===q.correctAnswer))push('error','正确答案无效','从 A/B/C/D 选择正确答案。');
-  if(!String(q.analysis||'').trim())push('error','缺少中文解析','填写 analysis。');
+  const push=(level,message,suggest='',field='')=>issues.push({level,object:id,questionId:q.id||'',field,message,suggest});
+  if(!String(q.title||'').trim())push('error','缺少题目标题','填写 title。','title');
+  if(!String(questionStem(q)||'').trim())push('error','缺少中文题干','填写题干。','stemParts');
+  if(!Array.isArray(q.options)||q.options.length<4||q.options.slice(0,4).some(o=>!String(o.text||'').trim()))push('error','A/B/C/D 选项不完整','补齐四个选项。','options');
+  if(!q.options.some(o=>o.id===q.correctAnswer))push('error','正确答案无效','从 A/B/C/D 选择正确答案。','correctAnswer');
+  if(!String(q.analysis||'').trim())push('error','缺少中文解析','填写 analysis。','analysis');
   const en=q.translations?.en||{};
-  if(!String(englishStem(q)||'').trim())push('warn','缺少英文题干','若要双语题库，请补齐 English Stem。');
-  if((en.options||[]).length<4||(en.options||[]).slice(0,4).some(o=>!String(o.text||'').trim()))push('warn','英文选项不完整','补齐英文 A/B/C/D。');
-  if(!String(en.analysis||'').trim())push('warn','缺少英文解析','补齐 English Analysis。');
+  if(!String(englishStem(q)||'').trim())push('warn','缺少英文题干','若要双语题库，请补齐 English Stem。','translations.en.stemParts');
+  if((en.options||[]).length<4||(en.options||[]).slice(0,4).some(o=>!String(o.text||'').trim()))push('warn','英文选项不完整','补齐英文 A/B/C/D。','translations.en.options');
+  if(!String(en.analysis||'').trim())push('warn','缺少英文解析','补齐 English Analysis。','translations.en.analysis');
   const primary=q.metadata?.knowledge?.primaryNodeId||'';
-  if(!primary)push('error','未关联主知识点','从知识树选择 primaryNodeId。');
-  else if(state.knowledgeTree&&!state.knowledgeTree.map.has(primary))push('error',`主知识点 ${primary} 不在已加载知识树中`,'重新选择当前知识树节点。');
+  if(!primary)push('error','未关联主知识点','从知识树选择 primaryNodeId。','metadata.knowledge.primaryNodeId');
+  else if(state.knowledgeTree&&!state.knowledgeTree.map.has(primary))push('error',`主知识点 ${primary} 不在已加载知识树中`,'重新选择当前知识树节点。','metadata.knowledge.primaryNodeId');
   const normal=q.clues.filter(c=>c.keywordLevel!=='core').length,core=q.clues.filter(c=>c.keywordLevel==='core').length;
-  if(!q.clues.length)push('error','没有关键词','至少标记普通关键词和核心关键词。');
-  if(core===0)push('error','没有核心关键词','核心关键词用于未来做题大厅的解题提示。');
+  if(!q.clues.length)push('error','没有关键词','至少标记普通关键词和核心关键词。','clues');
+  if(core===0)push('error','没有核心关键词','核心关键词用于未来做题大厅的解题提示。','clues');
   if(core>6)push('warn',`核心关键词 ${core} 个，可能过多`,'建议保留 2～5 个真正影响解题的词。');
   if(core===1)push('warn','只有 1 个核心关键词','通常建议 2～5 个。');
   if(normal===0)push('warn','没有普通关键词','建议补充知识回忆类词汇。');
@@ -854,7 +854,11 @@ function exportableQuestion(q){
 }
 function exportableBank(){
   const b=clone(state.questionBank);b.updatedAt=Date.now();b.questions=state.questionBank.questions.map(QuestionService.prepareForExport);
-  b.programCompatibility={...(b.programCompatibility||{}),prepStudioVersion:VERSION,architecture:'service-layer-v1',keywordSystem:'Question Keyword System v2',knowledgeBindingStrategy:'current-default-taxonomy-by-subject'};
+  if(window.PMPPrepAuthoringContract){
+    window.PMPPrepAuthoringContract.attachToQuestionBank(b,{serverBuildEvidence:prepRuntime.serverBuildMetadata||{}});
+  }else{
+    b.programCompatibility={...(b.programCompatibility||{}),prepStudioVersion:VERSION,architecture:'service-layer-v1',keywordSystem:'Question Keyword System v2',knowledgeBindingStrategy:'current-default-taxonomy-by-subject'};
+  }
   return b;
 }
 function demoKeywordMarkedText(text,q,field,optionId=''){
@@ -948,10 +952,10 @@ function runValidation(){
     if(contentHashOwners.has(ch))issues.push({level:'warn',object:q.id,message:`疑似重复题内容：与 ${contentHashOwners.get(ch)} 的 Content Hash 相同`,suggest:'确认是否为重复题；服务器未来可用 contentHash 做二次去重。'});
     else contentHashOwners.set(ch,q.id);
     validateQuestion(q,true).forEach(x=>issues.push(x));
-    validateQuestionFamily(q).forEach(x=>issues.push(x));
+    validateQuestionFamily(q).forEach(x=>issues.push({...x,questionId:q.id,field:'metadata.questionFamily'}));
   });
   validateFamilyStructure(state.questionBank.questions).forEach(x=>issues.push(x));
-  state.questionBank.questions.forEach(q=>{const metadata=syncQuestionPrinciples(q);(metadata.stemPrincipleIds||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`题干原则 ID 不存在：${id}`,suggest:'在原则管理中创建或重新绑定。'})});Object.entries(metadata.optionPrincipleMap||{}).forEach(([opt,ids])=>(ids||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`选项 ${opt} 的原则 ID 不存在：${id}`,suggest:'重新绑定选项原则。'})}));const correctIds=metadata.optionPrincipleMap?.[q.correctAnswer]||[];if(correctIds.length!==1)issues.push({level:'error',object:q.id,message:'正确选项必须绑定且只能绑定一条原则',suggest:'在题目录入区为正确选项保留一条原则；多题归纳据此分组。'});validateQuestionFacets(q).forEach(x=>issues.push({level:x.level,object:q.id,message:x.message,suggest:x.suggest}));(q.tags||[]).forEach(tag=>{if(!tagPathFor(tag))issues.push({level:'warn',object:q.id,message:`标签“${tag}”未绑定主程序预设标签槽位`,suggest:'保留为自由标签，或在标签管理中映射/改名。'})})});
+  state.questionBank.questions.forEach(q=>{const metadata=syncQuestionPrinciples(q);(metadata.stemPrincipleIds||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,questionId:q.id,field:'metadata.stemPrincipleIds',message:`题干原则 ID 不存在：${id}`,suggest:'在原则管理中创建或重新绑定。'})});Object.entries(metadata.optionPrincipleMap||{}).forEach(([opt,ids])=>(ids||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,questionId:q.id,field:`metadata.optionPrincipleMap.${opt}`,message:`选项 ${opt} 的原则 ID 不存在：${id}`,suggest:'重新绑定选项原则。'})}));const correctIds=metadata.optionPrincipleMap?.[q.correctAnswer]||[];if(correctIds.length!==1)issues.push({level:'error',object:q.id,questionId:q.id,field:'metadata.optionPrincipleMap',message:'正确选项必须绑定且只能绑定一条原则',suggest:'在题目录入区为正确选项保留一条原则；多题归纳据此分组。'});validateQuestionFacets(q).forEach(x=>issues.push({level:x.level,object:q.id,questionId:q.id,field:'metadata.subjectFacets',message:x.message,suggest:x.suggest}));(q.tags||[]).forEach(tag=>{if(!tagPathFor(tag))issues.push({level:'warn',object:q.id,questionId:q.id,field:'metadata.tagPaths',message:`标签“${tag}”未绑定主程序预设标签槽位`,suggest:'保留为自由标签，或在标签管理中映射/改名。'})})});
   state.principles.items.forEach(p=>{const preset=presetByPrincipleId(p.id);if(!preset||!preset.content)issues.push({level:'warn',object:p.id,message:`原则“${p.name}”缺少归纳卡内容`,suggest:'补充 synthesis preset。'})});
   const conflicts=aliasConflicts();conflicts.forEach(c=>issues.push({level:'error',object:'联想库',message:`名称/Alias 冲突：“${c.term}” → ${c.nodes.map(n=>n.title).join(' / ')}`,suggest:'保留唯一入口，或把 Alias 改成更具体的词。'}));
   const recallIds=new Set(state.recallLibrary.nodes.map(n=>n.id));
@@ -967,7 +971,38 @@ function renderValidation(){
     ['题目',m.questions],['错误',m.errors],['提醒',m.warnings],['普通关键词',m.normalKeywords],
     ['核心关键词',m.coreKeywords],['联想节点',m.recallNodes],['原则',m.principles],['归纳卡',m.presets],['Alias 冲突',m.aliasConflicts]
   ].map(([k,n])=>`<div class="metric"><span class="muted">${k}</span><b>${n}</b></div>`).join('');
-  document.getElementById('validationRows').innerHTML=v.issues.length?v.issues.map(x=>`<tr><td>${x.level==='error'?'❌ 错误':'⚠ 提醒'}</td><td>${esc(x.object||'')}</td><td>${esc(x.message)}</td><td>${esc(x.suggest||'')}</td></tr>`).join(''):'<tr><td colspan="4">✓ 未发现问题</td></tr>';
+  const rows=document.getElementById('validationRows');
+  rows.innerHTML=v.issues.length?v.issues.map(x=>`<tr${x.questionId?` class="validation-row-action" tabindex="0" data-question-id="${esc(x.questionId)}" data-field-path="${esc(x.field||'')}" title="点击定位到题目编辑区"`:''}><td>${x.level==='error'?'❌ 错误':'⚠ 提醒'}</td><td>${esc(x.object||'')}</td><td>${esc(x.message)}</td><td>${esc(x.suggest||'')}</td></tr>`).join(''):'<tr><td colspan="4">✓ 未发现问题</td></tr>';
+  rows.querySelectorAll('[data-question-id]').forEach(row=>{
+    const jump=()=>goToValidationIssue(row.dataset.questionId,row.dataset.fieldPath||'');
+    row.onclick=jump;
+    row.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();jump()}};
+  });
+}
+function validationFieldTarget(field){
+  if(field==='title')return '[data-qfield="title"]';
+  if(field==='stemParts')return '#stemZh';
+  if(field==='options'||field==='correctAnswer')return '[data-option]';
+  if(field==='analysis')return '#analysisZh';
+  if(field.startsWith('translations.en.stemParts'))return '#stemEn';
+  if(field.startsWith('translations.en.options'))return '[data-enoption]';
+  if(field.startsWith('translations.en.analysis'))return '#analysisEn';
+  if(field.startsWith('metadata.knowledge'))return '#primaryNode';
+  if(field.startsWith('metadata.questionFamily'))return '#questionFamilyPanel';
+  if(field.startsWith('metadata.subjectFacets'))return '#questionFacetBindingPanel';
+  if(field.startsWith('metadata.stemPrincipleIds')||field.startsWith('metadata.optionPrincipleMap'))return '#questionPrincipleBindingPanel';
+  if(field.startsWith('clues'))return '#keywordManager';
+  return '#questionEditor';
+}
+function goToValidationIssue(questionId,field=''){
+  if(!state.questionBank.questions.some(q=>q.id===questionId))return false;
+  state.currentQuestionId=questionId;
+  setTab('questions');renderQuestions();
+  const target=document.querySelector(validationFieldTarget(field));
+  target?.scrollIntoView?.({behavior:'smooth',block:'center'});
+  if(target?.matches?.('input,textarea,select,button'))target.focus();
+  else target?.classList?.add('validation-target-pulse');
+  return true;
 }
 function workspacePayload(){return {
   prepStudioWorkspaceVersion:4,prepStudioVersion:VERSION,savedAt:nowIso(),
@@ -1061,6 +1096,15 @@ document.addEventListener('click',e=>{
   const mutationIds=new Set(['btnNewQuestion','btnDuplicateQuestion','btnDeleteQuestion','btnAddNormalKeyword','btnAddCoreKeyword','btnNewRecall','btnNewPrinciple','btnParsePastedQuestions','pmSave','pmDelete','floatSave','floatDelete','btnAddEdge','btnDeleteRecall','btnBindRecallCandidate']);
   if(mutationIds.has(b.id)||b.dataset.removeKw||b.dataset.removeEdge)markWorkspaceDirty();
 },true);
+function isTextEntryTarget(target){
+  return !!target?.closest?.('input,textarea,select,[contenteditable="true"],[contenteditable=""]');
+}
+document.addEventListener('keydown',event=>{
+  if(event.key!=='Delete'||event.repeat||event.defaultPrevented||isTextEntryTarget(event.target))return;
+  if(currentTabName()!=='questions'||!currentQuestion())return;
+  event.preventDefault();
+  deleteQuestion();
+});
 function currentTabName(){return document.querySelector('nav button.active')?.dataset.tab||'base'}
 function setHelpTopic(topic){
   const valid=new Set(['base','management','questions','association','demo','validate','export','global']);topic=valid.has(topic)?topic:'global';

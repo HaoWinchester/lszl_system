@@ -8,10 +8,10 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.content_prep import QuestionTagConfig
+from app.models.content_prep import Principle, QuestionTagConfig, SynthesisPreset
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.user import User
 from app.services import (
@@ -33,6 +33,12 @@ class ContentRevisionConflict(RuntimeError):
     def __init__(self, current_revision: int):
         super().__init__("服务器内容已更新，请重新载入后再保存")
         self.current_revision = current_revision
+
+
+class PrincipleMergeValidationError(ValueError):
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
 
 
 def _json_text(value: object, label: str) -> str:
@@ -355,6 +361,160 @@ async def read_principles(db: AsyncSession) -> dict[str, Any]:
     return {
         **(await teaching_content_projection_service.principle_card_bundle(db)),
         "contentRevision": int(revision["revision"]),
+    }
+
+
+async def preview_principle_merge(
+    db: AsyncSession, bundle: object
+) -> dict[str, Any]:
+    incoming = teaching_content_projection_service.validate_principle_card_bundle(
+        bundle
+    )
+    await teaching_content_revision_service.acquire_read_lock(db)
+    existing = await teaching_content_projection_service.principle_card_bundle(db)
+    plan = teaching_content_projection_service.plan_principle_bundle_merge(
+        incoming, existing
+    )
+    revision = await teaching_content_revision_service.current(db)
+    return {"plan": plan, "contentRevision": int(revision["revision"])}
+
+
+async def apply_principle_merge(
+    db: AsyncSession,
+    actor: User,
+    *,
+    content_revision: int,
+    bundle: object,
+    resolutions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    incoming = teaching_content_projection_service.validate_principle_card_bundle(
+        bundle
+    )
+    await _assert_revision(db, content_revision)
+    existing = await teaching_content_projection_service.principle_card_bundle(db)
+    plan = teaching_content_projection_service.plan_principle_bundle_merge(
+        incoming, existing
+    )
+    resolution_by_id: dict[str, str] = {}
+    for item in resolutions:
+        if not isinstance(item, dict):
+            raise PrincipleMergeValidationError(
+                "INVALID_PRINCIPLE_RESOLUTION", "原则冲突处理必须是对象"
+            )
+        conflict_id = str(item.get("conflictId") or "").strip()
+        resolution = str(item.get("resolution") or "").strip()
+        if not conflict_id or resolution not in {"keep-existing", "take-incoming"}:
+            raise PrincipleMergeValidationError(
+                "INVALID_PRINCIPLE_RESOLUTION",
+                "原则冲突处理必须指定 keep-existing 或 take-incoming",
+            )
+        resolution_by_id[conflict_id] = resolution
+    conflict_ids = {str(item["conflictId"]) for item in plan["conflicts"]}
+    if conflict_ids - set(resolution_by_id):
+        raise PrincipleMergeValidationError(
+            "UNRESOLVED_PRINCIPLE_CONFLICT", "原则冲突尚未全部处理"
+        )
+    if set(resolution_by_id) - conflict_ids:
+        raise PrincipleMergeValidationError(
+            "INVALID_PRINCIPLE_RESOLUTION", "包含不属于当前合并计划的冲突处理"
+        )
+
+    selected_ids = {str(item["id"]) for item in plan["added"]}
+    replaced_existing_ids: set[str] = set()
+    for conflict in plan["conflicts"]:
+        resolution = resolution_by_id[str(conflict["conflictId"])]
+        incoming_id = str(conflict.get("principleId") or "")
+        if conflict["type"] == "same-id-different-name":
+            if resolution == "take-incoming":
+                selected_ids.add(incoming_id)
+        elif conflict["type"] == "same-normalized-name-different-id":
+            if resolution == "take-incoming":
+                selected_ids.add(incoming_id)
+                replaced_existing_ids.add(str(conflict["existingId"]))
+        elif conflict["type"] == "preset-rebind":
+            if resolution == "keep-existing":
+                selected_ids.discard(incoming_id)
+
+    if replaced_existing_ids:
+        referenced = (
+            await teaching_content_projection_service.principle_reference_questions(
+                db, replaced_existing_ids
+            )
+        )
+        if referenced:
+            raise teaching_content_projection_service.PrincipleArchiveConflict(
+                referenced
+            )
+        await db.execute(
+            delete(SynthesisPreset).where(
+                SynthesisPreset.principle_id.in_(replaced_existing_ids)
+            )
+        )
+        await db.execute(
+            delete(Principle).where(Principle.id.in_(replaced_existing_ids))
+        )
+
+    incoming_principles = {
+        str(item["id"]): item for item in incoming["principles"]["items"]
+    }
+    incoming_presets = {
+        str(item["principleId"]): item
+        for item in incoming["synthesisPresets"]["items"]
+    }
+    selected_principles = [
+        incoming_principles[principle_id]
+        for principle_id in sorted(selected_ids)
+        if principle_id in incoming_principles
+    ]
+    selected_presets = [
+        incoming_presets[principle_id]
+        for principle_id in sorted(selected_ids)
+        if principle_id in incoming_presets
+    ]
+    selected_preset_ids = {str(item["id"]) for item in selected_presets}
+    if selected_ids:
+        await db.execute(
+            delete(SynthesisPreset).where(
+                SynthesisPreset.principle_id.in_(selected_ids),
+                SynthesisPreset.id.not_in(selected_preset_ids),
+            )
+        )
+    actor_context = content_prep_service._actor_context(actor)
+    changes = await content_prep_service._upsert_principles(
+        db, actor_context, {"items": selected_principles}
+    )
+    await db.flush()
+    changes.extend(
+        await content_prep_service._upsert_presets(
+            db, actor_context, {"items": selected_presets}
+        )
+    )
+    if replaced_existing_ids:
+        changes.extend(
+            {
+                "entityType": "principle",
+                "entityId": principle_id,
+                "action": "replaced",
+            }
+            for principle_id in sorted(replaced_existing_ids)
+        )
+    await teaching_content_projection_service.write_principle_projection(
+        db, actor.username
+    )
+    revision = (
+        await teaching_content_revision_service.bump(db, actor.username, changes)
+        if changes
+        else await teaching_content_revision_service.current(db)
+    )
+    await db.commit()
+    return {
+        **(await teaching_content_projection_service.principle_card_bundle(db)),
+        "contentRevision": int(revision["revision"]),
+        "summary": {
+            "added": len(plan["added"]),
+            "unchanged": len(plan["unchanged"]),
+            "conflicts": len(plan["conflicts"]),
+        },
     }
 
 

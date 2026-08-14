@@ -15,10 +15,10 @@ const screenshotSources = read('assets/landing/SOURCES.md');
 const contract = JSON.parse(fs.readFileSync(CONTRACT, 'utf8'));
 
 assert.match(html, /<html[^>]*lang="zh-CN"[^>]*class="landing-page"/);
-assert.match(html, /<title>幻谱｜PMP 知识图谱学习平台<\/title>/);
+assert.match(html, /<title>幻谱｜知识图谱学习平台<\/title>/);
 assert.match(html, /<link rel="icon" href="data:image\/svg\+xml,/);
 assert.match(html, /<h1[^>]*>[\s\S]*把零散考点[\s\S]*会生长的图谱[\s\S]*<\/h1>/);
-assert.match(html, /PMP 难的不是内容多，[\s\S]*知识始终[\s\S]*没有连起来/);
+assert.match(html, /知识难的不是内容多，[\s\S]*知识始终[\s\S]*没有连起来/);
 assert.match(html, /构建图谱[\s\S]*做题验证[\s\S]*归纳错因[\s\S]*主动回忆/);
 
 const graphLinks = [...html.matchAll(/href="\/graph"/g)];
@@ -46,7 +46,7 @@ for (const [key, label, image] of products) {
 assert.equal([...html.matchAll(/data-faq-trigger/g)].length, 4, '首版必须提供四个 FAQ');
 assert.equal([...html.matchAll(/aria-controls="faqAnswer/g)].length, 4, '每个 FAQ 触发器必须关联答案区域');
 assert.match(html, /没有整理过知识图谱，可以直接开始吗/);
-assert.match(html, /幻谱适合哪个阶段的 PMP 学员/);
+assert.match(html, /幻谱适合哪个阶段的学员/);
 assert.match(html, /需要安装软件吗/);
 assert.match(html, /我的学习内容会自动保存吗/);
 

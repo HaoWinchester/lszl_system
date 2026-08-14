@@ -202,9 +202,14 @@ with sync_playwright() as playwright:
         prep_page.wait_for_function("() => prepRuntime.draftRevision >= 2 && !prepRuntime.dirty")
         prep_page.reload(wait_until="networkidle")
         select_creator(prep_page)
-        prep_page.locator(f'[data-open-draft="{draft_id}"]').wait_for(state="visible")
-        prep_page.locator(f'[data-open-draft="{draft_id}"]').click()
-        prep_page.locator("#sharedDraftGate").wait_for(state="hidden")
+        prep_page.wait_for_function(
+            "draftId => prepRuntime.draftId === draftId || !document.querySelector('#sharedDraftGate').classList.contains('hidden')",
+            arg=draft_id,
+        )
+        if prep_page.locator("#sharedDraftGate").is_visible():
+            prep_page.locator(f'[data-open-draft="{draft_id}"]').wait_for(state="visible")
+            prep_page.locator(f'[data-open-draft="{draft_id}"]').click()
+            prep_page.locator("#sharedDraftGate").wait_for(state="hidden")
         prep_page.wait_for_function(
             "bankId => prepRuntime.serverBankId === bankId",
             arg=private_bank["id"],

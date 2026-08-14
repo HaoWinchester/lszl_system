@@ -48,7 +48,12 @@ def validate_principle_card_bundle(payload: object) -> dict[str, dict[str, Any]]
     if type(bundle_version) is not int or bundle_version != 1:
         raise ValueError("原则与归纳卡组合版本必须是 1")
     bundle_format = payload.get("format")
-    if bundle_format not in {None, "", "kg-principle-card-bundle-v1"}:
+    if bundle_format not in {
+        None,
+        "",
+        "kg-principle-card-bundle-v1",
+        "pmp-principle-preset-bundle-v1",
+    }:
         raise ValueError("不是支持的原则与归纳卡组合文件")
     raw_principles = payload.get("principles") or payload.get("principleRepository")
     raw_presets = (
@@ -56,6 +61,11 @@ def validate_principle_card_bundle(payload: object) -> dict[str, dict[str, Any]]
         or payload.get("presets")
         or payload.get("synthesisPresetRepository")
     )
+    if bundle_format == "pmp-principle-preset-bundle-v1":
+        if isinstance(raw_principles, list):
+            raw_principles = {"schemaVersion": 1, "items": raw_principles}
+        if isinstance(raw_presets, list):
+            raw_presets = {"schemaVersion": 1, "items": raw_presets}
     if not isinstance(raw_principles, dict):
         raise ValueError("原则必须包含 items 数组")
     if not isinstance(raw_presets, dict):
@@ -87,6 +97,96 @@ def validate_principle_card_bundle(payload: object) -> dict[str, dict[str, Any]]
     return {
         "principles": {**principles, "items": list(principles["items"])},
         "synthesisPresets": {**presets, "items": normalized_presets},
+    }
+
+
+def _normalized_principle_name(value: object) -> str:
+    return "".join(str(value or "").strip().casefold().split())
+
+
+def plan_principle_bundle_merge(
+    incoming: dict[str, dict[str, Any]],
+    existing: dict[str, dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    """Classify a canonical bundle without mutating or silently overwriting."""
+
+    incoming_principles = list(incoming["principles"]["items"])
+    incoming_presets = list(incoming["synthesisPresets"]["items"])
+    existing_principles = list(existing["principles"]["items"])
+    existing_presets = list(existing["synthesisPresets"]["items"])
+    existing_by_id = {str(item["id"]): item for item in existing_principles}
+    existing_by_name = {
+        _normalized_principle_name(item.get("name")): item
+        for item in existing_principles
+        if _normalized_principle_name(item.get("name"))
+    }
+    existing_preset_by_id = {
+        str(item["id"]): item for item in existing_presets
+    }
+    added: list[dict[str, Any]] = []
+    unchanged: list[dict[str, Any]] = []
+    conflicts: list[dict[str, Any]] = []
+
+    for item in incoming_principles:
+        principle_id = str(item["id"])
+        current = existing_by_id.get(principle_id)
+        if current is not None:
+            if _normalized_principle_name(current.get("name")) != _normalized_principle_name(
+                item.get("name")
+            ):
+                conflicts.append(
+                    {
+                        "conflictId": f"same-id-different-name:{principle_id}",
+                        "type": "same-id-different-name",
+                        "principleId": principle_id,
+                        "existingId": principle_id,
+                        "existingName": str(current.get("name") or ""),
+                        "incomingName": str(item.get("name") or ""),
+                    }
+                )
+            else:
+                unchanged.append(item)
+            continue
+        name_owner = existing_by_name.get(
+            _normalized_principle_name(item.get("name"))
+        )
+        if name_owner is not None:
+            conflicts.append(
+                {
+                    "conflictId": (
+                        "same-normalized-name-different-id:"
+                        f"{principle_id}:{name_owner['id']}"
+                    ),
+                    "type": "same-normalized-name-different-id",
+                    "principleId": principle_id,
+                    "existingId": str(name_owner["id"]),
+                    "existingName": str(name_owner.get("name") or ""),
+                    "incomingName": str(item.get("name") or ""),
+                }
+            )
+        else:
+            added.append(item)
+
+    for preset in incoming_presets:
+        current = existing_preset_by_id.get(str(preset["id"]))
+        if current is not None and str(current["principleId"]) != str(
+            preset["principleId"]
+        ):
+            conflicts.append(
+                {
+                    "conflictId": f"preset-rebind:{preset['id']}",
+                    "type": "preset-rebind",
+                    "presetId": str(preset["id"]),
+                    "principleId": str(preset["principleId"]),
+                    "existingPrincipleId": str(current["principleId"]),
+                    "incomingPrincipleId": str(preset["principleId"]),
+                }
+            )
+
+    return {
+        "added": added,
+        "unchanged": unchanged,
+        "conflicts": conflicts,
     }
 
 

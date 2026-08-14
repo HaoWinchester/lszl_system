@@ -32,6 +32,7 @@ from app.services import (
     question_lock_service,
     subject_facet_service,
     teaching_content_projection_service,
+    teaching_content_revision_service,
 )
 
 router = APIRouter(prefix="/content-prep", tags=["content-prep"])
@@ -47,6 +48,19 @@ PrepEditor = Annotated[
     ),
 ]
 AdminUser = Annotated[User, Depends(require_role("admin"))]
+
+AUTHORING_CONTRACT = {"id": "pmp-authoring-contract-v1", "version": "1.0.0"}
+REGISTRY_MANIFEST = {
+    "id": "pmp-authoring-registries",
+    "version": "1.0.0",
+    "hash": "sha256:8d641db17cc2cf6ccccab5332f25fa11419f318ed7f08c9d67796402899dd030",
+}
+AUTHORING_POLICIES = {
+    "keywordLocation": "source-isolated-derived",
+    "recallBinding": "optional-existing-id-only",
+    "deepRecallReveal": "click-to-reveal-all-keywords",
+    "keywordCorePriority": "overlap-match-priority-only",
+}
 
 
 def _principle_conflict_detail(
@@ -106,6 +120,13 @@ def _raise_shared_error(error: Exception) -> None:
                 **_principle_conflict_detail(error),
             },
         ) from error
+    if isinstance(
+        error, content_prep_shared_service.PrincipleMergeValidationError
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail={"code": error.code, "message": str(error)},
+        ) from error
     raise HTTPException(
         status_code=422,
         detail={"code": "INVALID_SHARED_CONTENT", "message": str(error)},
@@ -131,6 +152,18 @@ def _raise_subject_facet_error(error: Exception) -> None:
         status_code=422,
         detail={"code": "INVALID_SUBJECT_FACET_SCHEMA", "message": str(error)},
     ) from error
+
+
+@router.get("/build-metadata")
+async def get_build_metadata(db: DB, actor: PrepEditor):
+    revision = await teaching_content_revision_service.current(db)
+    return {
+        "serverBuild": "backend-api-v1",
+        "authoringContract": AUTHORING_CONTRACT,
+        "registryManifest": REGISTRY_MANIFEST,
+        "policies": AUTHORING_POLICIES,
+        "contentRevision": int(revision["revision"]),
+    }
 
 
 @router.get("/shared-content")
@@ -272,6 +305,36 @@ async def upsert_subject_facet_schema(
 @router.get("/principles")
 async def list_principles(db: DB, actor: PrepEditor):
     return await content_prep_shared_service.read_principles(db)
+
+
+@router.post("/principle-merges/preview")
+async def preview_principle_merge(body: dict, db: DB, actor: PrepEditor):
+    try:
+        return await content_prep_shared_service.preview_principle_merge(
+            db, body.get("bundle")
+        )
+    except ValueError as error:
+        _raise_shared_error(error)
+
+
+@router.post("/principle-merges/apply")
+async def apply_principle_merge(body: dict, db: DB, actor: PrepEditor):
+    try:
+        return await content_prep_shared_service.apply_principle_merge(
+            db,
+            actor,
+            content_revision=int(body.get("contentRevision", -1)),
+            bundle=body.get("bundle"),
+            resolutions=body.get("resolutions")
+            if isinstance(body.get("resolutions"), list)
+            else [],
+        )
+    except (
+        ValueError,
+        content_prep_shared_service.ContentRevisionConflict,
+        teaching_content_projection_service.PrincipleArchiveConflict,
+    ) as error:
+        _raise_shared_error(error)
 
 
 @router.post("/principles")

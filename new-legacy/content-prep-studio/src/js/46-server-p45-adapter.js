@@ -84,9 +84,39 @@
     return result;
   }
 
+  async function loadBuildMetadata(){
+    const metadata=await request('/content-prep/build-metadata');
+    if(typeof prepRuntime!=='undefined')prepRuntime.serverBuildMetadata=metadata;
+    global.PMPPrepAuthoringContract?.renderVersionHeader?.({
+      serverBuild:metadata.serverBuild,
+    });
+    return metadata;
+  }
+
+  async function previewPrincipleMerge(bundle){
+    return request('/content-prep/principle-merges/preview',{
+      method:'POST',
+      body:JSON.stringify({bundle}),
+    });
+  }
+
+  async function applyPrincipleMerge(bundle,{contentRevision,resolutions}={}){
+    return request('/content-prep/principle-merges/apply',{
+      method:'POST',
+      body:JSON.stringify({
+        contentRevision:Number(contentRevision),
+        bundle,
+        resolutions:Array.isArray(resolutions)?resolutions:[],
+      }),
+    });
+  }
+
   global.PMPPrepP45Server=Object.freeze({
     P45ServerError,
     loadSubjectFacetSchemas,
     pushSubjectFacetSchema,
+    loadBuildMetadata,
+    previewPrincipleMerge,
+    applyPrincipleMerge,
   });
 })(window);

@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pmp-authoring-contract-v1",
+  "title": "PMP Authoring Contract v1",
+  "type": "object",
+  "required": ["questionBank", "programCompatibility"],
+  "properties": {
+    "questionBank": {"$ref": "#/$defs/questionBank"},
+    "programCompatibility": {"$ref": "#/$defs/programCompatibility"}
+  },
+  "$defs": {
+    "question": {
+      "type": "object",
+      "required": ["id", "title", "type", "metadata"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "title": {"type": "string"},
+        "type": {"type": "string"},
+        "difficulty": {"enum": ["简单", "中等", "困难"]},
+        "clues": {"type": "array", "items": {"$ref": "#/$defs/keyword"}},
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "questionFamily": {"$ref": "#/$defs/questionFamily"},
+            "subjectFacets": {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {"type": "string", "pattern": "^subject/"},
+                  {
+                    "type": "object",
+                    "required": ["facetId"],
+                    "properties": {"facetId": {"type": "string", "pattern": "^subject/"}}
+                  }
+                ]
+              }
+            },
+            "tagPaths": {"type": "array"},
+            "stemPrincipleIds": {"type": "array", "items": {"type": "string"}},
+            "optionPrincipleMap": {"type": "object"}
+          }
+        }
+      }
+    },
+    "questionBank": {
+      "type": "object",
+      "required": ["id", "questions"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "questions": {"type": "array", "items": {"$ref": "#/$defs/question"}},
+        "programCompatibility": {"$ref": "#/$defs/programCompatibility"}
+      }
+    },
+    "questionFamily": {
+      "type": "object",
+      "required": ["schemaVersion", "role", "difficultyLevel", "qualityConfirmed"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "familyId": {"type": "string"},
+        "familyKey": {"type": "string"},
+        "role": {"enum": ["root", "member", "standalone"]},
+        "rootQuestionId": {"type": "string"},
+        "relationToRoot": {"enum": ["root", "equivalent", "decomposed", "extension", "standalone"]},
+        "equivalenceGrade": {"enum": ["", "A", "B", "C"]},
+        "difficultyLevel": {"type": "integer", "minimum": 1, "maximum": 4},
+        "qualityConfirmed": {"type": "boolean"}
+      }
+    },
+    "principle": {
+      "type": "object",
+      "required": ["id", "name", "status"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "status": {"enum": ["active", "inactive"]}
+      }
+    },
+    "principleBundle": {
+      "type": "object",
+      "required": ["format", "principles", "presets"],
+      "properties": {
+        "format": {"enum": ["kg-principle-card-bundle-v1", "pmp-principle-preset-bundle-v1"]},
+        "principles": {"type": ["array", "object"]},
+        "presets": {"type": ["array", "object"]}
+      }
+    },
+    "keyword": {
+      "type": "object",
+      "required": ["id", "keywordLevel", "locations"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "keywordLevel": {"enum": ["normal", "core"]},
+        "recallNodeId": {"type": "string"},
+        "locations": {"type": "array"}
+      }
+    },
+    "recallBinding": {
+      "type": "object",
+      "properties": {"recallNodeId": {"type": "string"}},
+      "additionalProperties": false
+    },
+    "programCompatibility": {
+      "type": "object",
+      "required": [
+        "authoringContract",
+        "contractSnapshot",
+        "registryManifest",
+        "testedAgainstProductRelease",
+        "prepBuild",
+        "serverBuildEvidence",
+        "policies"
+      ],
+      "properties": {
+        "authoringContract": {
+          "type": "object",
+          "required": ["id", "version"],
+          "properties": {
+            "id": {"const": "pmp-authoring-contract-v1"},
+            "version": {"const": "1.0.0"}
+          }
+        },
+        "contractSnapshot": {"type": "object"},
+        "registryManifest": {"type": "object"},
+        "testedAgainstProductRelease": {"type": "string", "minLength": 1},
+        "prepBuild": {"type": "string", "minLength": 1},
+        "serverBuildEvidence": {"type": "object"},
+        "policies": {
+          "type": "object",
+          "required": ["keywordLocation", "recallBinding", "deepRecallReveal", "keywordCorePriority"],
+          "properties": {
+            "keywordLocation": {"const": "source-isolated-derived"},
+            "recallBinding": {"const": "optional-existing-id-only"},
+            "deepRecallReveal": {"const": "click-to-reveal-all-keywords"},
+            "keywordCorePriority": {"const": "overlap-match-priority-only"}
+          }
+        }
+      }
+    }
+  }
+}

@@ -217,10 +217,13 @@ def exercise_prep(page: Page, context: BrowserContext, base: str, bundle_path: P
 
     page.reload(wait_until="networkidle")
     page.locator("[data-creator-key='peiqi']").click()
-    page.locator("#sharedDraftGate").wait_for(state="visible")
-    page.locator("[data-open-draft]").first.wait_for()
-    page.locator("[data-open-draft]").first.click()
-    page.locator("#sharedDraftGate").wait_for(state="hidden")
+    page.wait_for_function(
+        "prepRuntime.draftId || !document.querySelector('#sharedDraftGate').classList.contains('hidden')"
+    )
+    if page.locator("#sharedDraftGate").is_visible():
+        page.locator("[data-open-draft]").first.wait_for()
+        page.locator("[data-open-draft]").first.click()
+        page.locator("#sharedDraftGate").wait_for(state="hidden")
     page.locator("#tabs button[data-tab='questions']").click()
     restored_select = page.locator("[data-kw-recall-select='clue-overloaded']")
     assert restored_select.input_value() == "recall:overloaded"

@@ -1,5 +1,6 @@
 {
-  "sourceVersion": "v9.0-p4.5.28",
+  "sourceVersion": "v9.0-p4.5.29",
+  "browserOnlyExactKeys": ["prep.lastDraftId"],
   "runtime": {
     "exactKeys": [
       "kg_canvas_view_preferences_v1",

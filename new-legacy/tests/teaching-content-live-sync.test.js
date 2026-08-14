@@ -79,6 +79,14 @@ function loadServerState({ fetchImpl, contentRevision = 7, role = 'teacher' }) {
   const events = [];
   const published = [];
   let syncListener = null;
+  const browserValues = new Map();
+  const browserStorage = {
+    getItem(key) { return browserValues.has(String(key)) ? browserValues.get(String(key)) : null; },
+    setItem(key, value) { browserValues.set(String(key), String(value)); },
+    removeItem(key) { browserValues.delete(String(key)); },
+    clear() { browserValues.clear(); },
+    key(index) { return Array.from(browserValues.keys())[Number(index)] ?? null; },
+  };
   const window = {
     __KG_DIRECT_BOOTSTRAP__: {
       authenticated: true,
@@ -93,6 +101,7 @@ function loadServerState({ fetchImpl, contentRevision = 7, role = 'teacher' }) {
     crypto: { randomUUID: () => `request-${Math.random()}` },
     navigator: {},
     document: { visibilityState: 'visible', addEventListener() {} },
+    localStorage: browserStorage,
     fetch: fetchImpl,
     setTimeout,
     clearTimeout,
@@ -119,7 +128,7 @@ function loadServerState({ fetchImpl, contentRevision = 7, role = 'teacher' }) {
   const context = vm.createContext({ window, document: window.document, fetch: fetchImpl, CustomEvent, Blob, JSON, Date, Math, Map, Object, Number, Promise, console, setTimeout, clearTimeout, setInterval, clearInterval, queueMicrotask });
   vm.runInContext(fs.readFileSync(bootstrapPath, 'utf8'), context, { filename: bootstrapPath });
   return {
-    window, storage: window.KGServerStateStorage, published, events,
+    window, storage: window.KGServerStateStorage, browserStorage, published, events,
     remote: detail => syncListener?.(detail),
     pagehide: () => { for (const listener of listeners.get('pagehide') || []) listener({ type: 'pagehide' }); },
   };
@@ -311,6 +320,11 @@ async function run() {
   assert.equal(runtimePayload.contentRevision, 7, 'teaching Runtime State writes must carry the exact bootstrap content revision');
   assert.equal(typeof runtimePayload.contentRevision, 'number', 'contentRevision must satisfy the backend StrictInt contract');
   assert.deepEqual(runtime.published.map(item => item.revision), [8], 'a successful teaching Runtime State write must publish its returned revision');
+  const callsBeforeLocalPreference = runtimeCalls.length;
+  runtime.storage.setItem('prep.lastDraftId', 'draft-1');
+  await wait(180);
+  assert.equal(runtime.browserStorage.getItem('prep.lastDraftId'), 'draft-1', 'Prep lastDraftId must stay in browser-only preference storage');
+  assert.equal(runtimeCalls.length, callsBeforeLocalPreference, 'browser-only preferences must not be uploaded to Runtime State');
 
   const chooserMarker = '{"schemaVersion":1,"consumedDigest":"server-digest","consumedAt":1786424000000}';
   const refreshCalls = [];

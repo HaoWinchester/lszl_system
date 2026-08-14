@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_prep import Principle
 from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.subject_facet import SubjectFacetSchema
 from app.schemas.content_prep import CatalogIssue
 
 TAXONOMY_KEY = "kg_content_taxonomies_v1"
@@ -128,6 +129,59 @@ def _principle_references(metadata: dict) -> list[tuple[str, str]]:
     return references
 
 
+def _subject_facet_references(metadata: dict) -> list[tuple[str, str]]:
+    references: list[tuple[str, str]] = []
+    raw_facets = metadata.get("subjectFacets")
+    if not isinstance(raw_facets, list):
+        return references
+    for index, raw_facet in enumerate(raw_facets):
+        facet_id = (
+            raw_facet
+            if isinstance(raw_facet, str)
+            else raw_facet.get("facetId")
+            if isinstance(raw_facet, dict)
+            else ""
+        )
+        normalized = str(facet_id or "").strip()
+        if normalized:
+            references.append((f"metadata.subjectFacets[{index}]", normalized))
+    return references
+
+
+def _facet_schema_matches_subject(row: SubjectFacetSchema, subject: str) -> bool:
+    normalized = str(subject or "").strip().casefold()
+    candidates = {
+        str(row.subject_id or "").strip().casefold(),
+        *(str(code or "").strip().casefold() for code in (row.subject_codes or [])),
+    }
+    return normalized in candidates or f"subject-{normalized}" in candidates
+
+
+async def _effective_subject_facet_ids(
+    db: AsyncSession, subject: str
+) -> set[str] | None:
+    rows = (await db.execute(select(SubjectFacetSchema))).scalars().all()
+    matching = [row for row in rows if _facet_schema_matches_subject(row, subject)]
+    if not matching:
+        return None
+    facet_ids: set[str] = set()
+    for row in matching:
+        subject_slug = str(row.subject_id or "").removeprefix("subject-")
+        for dimension in row.dimensions or []:
+            if not isinstance(dimension, dict):
+                continue
+            dimension_id = str(dimension.get("id") or "").strip()
+            for value in dimension.get("values") or []:
+                if not isinstance(value, dict):
+                    continue
+                value_id = str(value.get("id") or "").strip()
+                if subject_slug and dimension_id and value_id:
+                    facet_ids.add(
+                        f"subject/{subject_slug}/{dimension_id}/{value_id}"
+                    )
+    return facet_ids
+
+
 async def validate_recall_references(
     db: AsyncSession,
     subject: str,
@@ -233,6 +287,30 @@ async def validate_question_references(
             recall_library=recall_library,
         )
     )
+
+    facet_references = _subject_facet_references(metadata)
+    if facet_references:
+        allowed_facet_ids = await _effective_subject_facet_ids(db, subject)
+        if allowed_facet_ids is None:
+            issues.append(
+                _issue(
+                    "metadata.subjectFacets",
+                    "SUBJECT_FACET_CATALOG_UNAVAILABLE",
+                    "当前科目分类 Schema 不可用",
+                    question_id,
+                )
+            )
+        else:
+            for field, facet_id in facet_references:
+                if facet_id not in allowed_facet_ids:
+                    issues.append(
+                        _issue(
+                            field,
+                            "SUBJECT_FACET_REFERENCE_NOT_FOUND",
+                            f"科目分类不存在：{facet_id}",
+                            question_id,
+                        )
+                    )
 
     principle_references = _principle_references(metadata)
     if principle_references:

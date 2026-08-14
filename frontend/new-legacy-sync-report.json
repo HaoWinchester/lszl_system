@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.73",
-  "toVersion": "v9.0-p4.1.73",
+  "fromVersion": "v9.0-p4.1.76",
+  "toVersion": "v9.0-p4.1.77",
   "changes": {
     "added": [],
     "changed": [
-      "content-prep-studio/src/js/00-core-bootstrap.js",
-      "content-prep-studio/src/js/10-state-domain.js",
-      "content-prep-studio/src/js/20-page-runtime.js"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html",
+      "tests/v90-p4529-content-prep-recall-link-browser.py"
     ],
     "removed": []
   },
