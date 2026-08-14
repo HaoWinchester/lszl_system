@@ -12,9 +12,9 @@ required_ui = {
     "serverActorName": "登录账号",
     "creatorFixedName": "制作人",
     "serverCatalogStatus": "服务器状态",
+    "serverSourceBankSelect": "选择题库后整库载入",
     "serverBankSelect": "目标题库",
     "btnCreateServerBank": "新建题库",
-    "btnLoadServerQuestion": "从服务器载入",
     "btnSyncToCatalog": "确认同步到主程序",
     "sharedDraftGate": "共享草稿",
     "btnCreateSharedDraft": "新建共享草稿",
@@ -23,6 +23,10 @@ required_ui = {
 for element_id, label in required_ui.items():
     if f'id="{element_id}"' not in template or label not in template:
         raise SystemExit(f"missing server UI contract: {element_id} / {label}")
+
+for retired_control in ("serverQuestionIdInput", "btnLoadServerQuestion", "btnLoadServerBank", "serverLoadBankSelect"):
+    if retired_control in template:
+        raise SystemExit(f"manual Question ID loader must not remain: {retired_control}")
 
 workspace_fields = [
     "serverBankId",

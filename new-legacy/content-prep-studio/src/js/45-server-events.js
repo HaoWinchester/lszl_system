@@ -5,11 +5,10 @@
   const actorName=document.getElementById('serverActorName');
   const creatorName=document.getElementById('serverCreatorName');
   const status=document.getElementById('serverCatalogStatus');
+  const sourceBankSelect=document.getElementById('serverSourceBankSelect');
   const bankSelect=document.getElementById('serverBankSelect');
   const createButton=document.getElementById('btnCreateServerBank');
-  const loadButton=document.getElementById('btnLoadServerQuestion');
   const syncButton=document.getElementById('btnSyncToCatalog');
-  const questionInput=document.getElementById('serverQuestionIdInput');
   const issuesBox=document.getElementById('serverCatalogIssues');
   const reconfirmButton=document.getElementById('btnReconfirmQuestionLock');
   const copyConflictButton=document.getElementById('btnCopyConflictQuestion');
@@ -55,7 +54,8 @@
     const question=currentQuestion(),lease=prepRuntime.editLeaseState||{};
     const canSyncQuestion=!question?.serverRevision||lease.questionId===question.id&&lease.canSave;
     createButton.disabled=!authenticated||!prepRuntime.creatorProfile;
-    loadButton.disabled=!authenticated||!prepRuntime.creatorProfile||!questionInput.value.trim();
+    sourceBankSelect.disabled=!authenticated||!prepRuntime.creatorProfile;
+    bankSelect.disabled=!authenticated||!prepRuntime.creatorProfile;
     syncButton.disabled=!serverEnabled()||!canSyncQuestion;
   }
   function renderActor(){
@@ -64,8 +64,13 @@
     if(!actor)setStatus('未登录 · 请登录后选择共享草稿','warn');
   }
   function renderBanks(banks){
-    bankSelect.innerHTML='<option value="">请选择题库</option>'+banks.map(bank=>`<option value="${esc(bank.id)}">${esc(bank.name)} · ${esc(bank.accessMode||'可编辑')}</option>`).join('');
-    if(prepRuntime.serverBankId&&banks.some(bank=>bank.id===prepRuntime.serverBankId))bankSelect.value=prepRuntime.serverBankId;
+    const options=banks.map(bank=>`<option value="${esc(bank.id)}">${esc(bank.name)} · ${esc(bank.accessMode||'可编辑')}</option>`).join('');
+    sourceBankSelect.innerHTML='<option value="">请选择题库</option>'+options;
+    bankSelect.innerHTML='<option value="">请选择题库</option>'+options;
+    if(prepRuntime.serverBankId&&banks.some(bank=>bank.id===prepRuntime.serverBankId)){
+      sourceBankSelect.value=prepRuntime.serverBankId;
+      bankSelect.value=prepRuntime.serverBankId;
+    }
     refreshButtons();
   }
   async function refreshBanks({throwOnError=false}={}){
@@ -290,12 +295,6 @@
     return remoteRefreshPromise;
   }
   const unsubscribeTeachingSync=teachingSync?.subscribe?.(refreshRemoteRevision);
-  bankSelect.addEventListener('change',()=>{
-    prepRuntime.serverBankId=bankSelect.value;
-    const bank=prepRuntime.serverBanks?.find(item=>item.id===bankSelect.value);
-    prepRuntime.serverBankRevision=Number(bank?.revision||0)||null;
-    markWorkspaceDirty();refreshButtons();
-  });
   createButton.addEventListener('click',async()=>{
     const name=prompt('请输入新题库名称',state.questionBank.name||'PMP 内容准备题库');if(!name?.trim())return;
     createButton.disabled=true;setStatus('正在新建题库…');setIssues(null);
@@ -309,23 +308,37 @@
       setStatus('题库已创建，请先保存共享草稿，再确认同步内容','good');
     }catch(error){setStatus(error.message,'bad');setIssues(error)}finally{refreshButtons()}
   });
-  questionInput.addEventListener('input',refreshButtons);
-  loadButton.addEventListener('click',async()=>{
-    const id=questionInput.value.trim();if(!id)return;
-    loadButton.disabled=true;setStatus('正在从服务器载入题目…');setIssues(null);
+  async function loadSelectedBankIntoWorkspace(){
+    const bankId=sourceBankSelect.value;if(!bankId)return;
+    const previousBankId=prepRuntime.serverBankId||'';
+    const hasWorkspaceContent=state.questionBank.questions.length>0;
+    if(prepRuntime.dirty&&hasWorkspaceContent&&!confirm('载入题库会替换当前工作区的题目。未保存内容可能丢失，是否继续？')){
+      sourceBankSelect.value=previousBankId;setStatus('已取消载入，当前工作区未改变。','warn');return;
+    }
+    sourceBankSelect.disabled=true;setStatus('正在载入题库题目…');setIssues(null);
     try{
-      const remote=await Catalog.loadQuestion(id),question=QuestionService.normalize({
+      const remoteQuestions=await Catalog.listBankQuestions(bankId);
+      if(!remoteQuestions.length){
+        sourceBankSelect.value=previousBankId;setStatus('该题库暂无题目，当前工作区未改变。','warn');return;
+      }
+      const bank=prepRuntime.serverBanks.find(item=>String(item.id)===String(bankId));
+      const questions=remoteQuestions.map((remote,index)=>QuestionService.normalize({
         ...remote,serverRevision:remote.revision,serverContentHash:remote.contentHash,lastSyncedAt:nowIso()
-      },state.questionBank.questions.length,remote.subject||state.questionBank.subject);
-      await QuestionLocks.switchTo(question);
-      const index=state.questionBank.questions.findIndex(item=>item.id===question.id);
-      if(index>=0)state.questionBank.questions[index]=question;else state.questionBank.questions.push(question);
-      prepRuntime.serverBankId=remote.bankId||prepRuntime.serverBankId;
-      state.currentQuestionId=question.id;refreshAll();markWorkspaceDirty();
-      setStatus('题目已从服务器载入','good');
-    }catch(error){setStatus(error.message,'bad');setIssues(error)}finally{refreshButtons()}
-  });
-  syncButton.addEventListener('click',()=>syncWorkspaceToServer().catch(()=>{}));
+      },index,remote.subject||bank?.subject||state.questionBank.subject));
+      await QuestionLocks.switchTo(questions[0]);
+      state.questionBank={...state.questionBank,...(bank||{}),questions};
+      prepRuntime.serverBankId=bankId;
+      prepRuntime.serverBankRevision=Number(bank?.revision||0)||null;
+      sourceBankSelect.value=bankId;
+      bankSelect.value=bankId;
+      state.currentQuestionId=questions[0].id;refreshAll();
+      questions.forEach(question=>question.serverExportSnapshot=Catalog.captureServerSnapshot(question));
+      await saveWorkspaceLocal({silent:true});
+      setStatus(`已载入 ${questions.length} 道题目，请保存后继续编辑。`,'good');
+    }catch(error){sourceBankSelect.value=previousBankId;setStatus(error.message,'bad');setIssues(error)}finally{refreshButtons()}
+  }
+  sourceBankSelect.addEventListener('change',()=>{loadSelectedBankIntoWorkspace().catch(()=>{})});
+  syncButton.addEventListener('click',()=>syncWorkspaceToServer({source:'sync'}).catch(()=>{}));
 
   document.querySelectorAll('[data-creator-key]').forEach(button=>button.addEventListener('click',()=>{
     QuestionLocks.close().finally(()=>{

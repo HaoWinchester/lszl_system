@@ -101,6 +101,8 @@ E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
 E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
   python3 frontend/e2e/content_prep_question_bank.py
 E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
+  python3 frontend/e2e/content_prep_bank_load.py
+E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
   python3 frontend/e2e/content_prep_concurrency.py
 E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
   python3 frontend/e2e/membership_checkout.py

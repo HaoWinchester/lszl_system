@@ -774,7 +774,8 @@ function migrateWorkspacePayload(input){
   };
   if(w.questionBank&&Array.isArray(w.questionBank.questions))w.questionBank.questions=w.questionBank.questions.map(question=>({
     ...question,serverRevision:Number(question.serverRevision)||null,
-    serverContentHash:String(question.serverContentHash||''),lastSyncedAt:String(question.lastSyncedAt||'')
+    serverContentHash:String(question.serverContentHash||''),lastSyncedAt:String(question.lastSyncedAt||''),
+    serverExportSnapshot:String(question.serverExportSnapshot||'')
   }));
   return w;
 }

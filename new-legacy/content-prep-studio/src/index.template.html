@@ -86,12 +86,9 @@
         <div class="server-identity-grid">
           <div><span class="muted tiny">登录账号</span><strong id="serverActorName">未登录</strong></div>
           <div><span class="muted tiny">制作人</span><strong id="serverCreatorName">请先选择</strong></div>
+          <label><span class="muted tiny">选择题库后整库载入</span><select id="serverSourceBankSelect"><option value="">请选择题库</option></select></label>
         </div>
-        <div class="toolbar server-actions">
-          <input id="serverQuestionIdInput" type="text" placeholder="服务器 Question ID">
-          <button class="btn" id="btnLoadServerQuestion" type="button">从服务器载入</button>
-        </div>
-        <div class="server-catalog-help">前六步只编辑共享草稿；第七步才会新建题库并同步到主程序。</div>
+        <div class="server-catalog-help">选择题库会把该题库全部题目载入当前共享草稿，仅用于继续编辑；前六步只编辑共享草稿，第七步才会更新服务器中的正式内容。</div>
         <div class="server-catalog-issues" id="serverCatalogIssues" aria-live="polite"></div>
       </div>
       <div class="data-summary">

@@ -363,12 +363,9 @@ nav button.active{color:var(--brand)!important}
         <div class="server-identity-grid">
           <div><span class="muted tiny">登录账号</span><strong id="serverActorName">未登录</strong></div>
           <div><span class="muted tiny">制作人</span><strong id="serverCreatorName">请先选择</strong></div>
+          <label><span class="muted tiny">选择题库后整库载入</span><select id="serverSourceBankSelect"><option value="">请选择题库</option></select></label>
         </div>
-        <div class="toolbar server-actions">
-          <input id="serverQuestionIdInput" type="text" placeholder="服务器 Question ID">
-          <button class="btn" id="btnLoadServerQuestion" type="button">从服务器载入</button>
-        </div>
-        <div class="server-catalog-help">前六步只编辑共享草稿；第七步才会新建题库并同步到主程序。</div>
+        <div class="server-catalog-help">选择题库会把该题库全部题目载入当前共享草稿，仅用于继续编辑；前六步只编辑共享草稿，第七步才会更新服务器中的正式内容。</div>
         <div class="server-catalog-issues" id="serverCatalogIssues" aria-live="polite"></div>
       </div>
       <div class="data-summary">
@@ -1531,6 +1528,7 @@ function normalizeQuestion(q,i=0,subject='PMP'){
     ,serverRevision:Number(q.serverRevision)||null
     ,serverContentHash:String(q.serverContentHash||'')
     ,lastSyncedAt:String(q.lastSyncedAt||'')
+    ,serverExportSnapshot:String(q.serverExportSnapshot||'')
   };
 }
 function normalizeBank(payload){
@@ -2366,7 +2364,8 @@ function migrateWorkspacePayload(input){
   };
   if(w.questionBank&&Array.isArray(w.questionBank.questions))w.questionBank.questions=w.questionBank.questions.map(question=>({
     ...question,serverRevision:Number(question.serverRevision)||null,
-    serverContentHash:String(question.serverContentHash||''),lastSyncedAt:String(question.lastSyncedAt||'')
+    serverContentHash:String(question.serverContentHash||''),lastSyncedAt:String(question.lastSyncedAt||''),
+    serverExportSnapshot:String(question.serverExportSnapshot||'')
   }));
   return w;
 }
@@ -2453,7 +2452,7 @@ const QuestionService=Object.freeze({
   normalizeBank,
   duplicatePayload:(question)=>{
     const copy=clone(question),parentQuestionId=copy.id;copy.id=generateQuestionId();delete copy.contentHash;
-    delete copy.serverRevision;delete copy.serverContentHash;delete copy.lastSyncedAt;delete copy.lockToken;delete copy.lock;
+    delete copy.serverRevision;delete copy.serverContentHash;delete copy.lastSyncedAt;delete copy.serverExportSnapshot;delete copy.lockToken;delete copy.lock;
     copy.metadata=copy.metadata||{};delete copy.metadata.origin;delete copy.metadata.lastImport;
     stampQuestionOrigin(copy,{batchId:generateBatchId(),source:'duplicate',forceOrigin:true,parentQuestionId});
     return copy;
@@ -2551,13 +2550,22 @@ window.PMPPrepServices=AppServices;
   }
   function stripSyncFields(question){
     const payload=cloneJson(question);
-    for(const key of ['serverRevision','serverContentHash','lastSyncedAt','lockToken','lock'])delete payload[key];
+    for(const key of ['contentHash','serverRevision','serverContentHash','lastSyncedAt','serverExportSnapshot','lockToken','lock'])delete payload[key];
     return payload;
   }
-  function uploadFingerprint(bundle,workspace,creatorId){
+  function stableJson(value){
+    if(value===null||typeof value!=='object')return JSON.stringify(value);
+    if(Array.isArray(value))return `[${value.map(stableJson).join(',')}]`;
+    return `{${Object.keys(value).sort().map(key=>`${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+  }
+  function serverSnapshot(question){return stableJson(stripSyncFields(question));}
+  function isUnchangedServerQuestion(question){
+    return !!question?.serverRevision&&String(question.serverExportSnapshot||'')===serverSnapshot(question);
+  }
+  function uploadFingerprint(bundle,workspace,creatorId,questions){
     return JSON.stringify({
       targetBankId:workspace.serverBankId||'',creatorId,
-      questions:(bundle?.questionBank?.questions||[]).map(question=>({
+      questions:(questions||[]).map(question=>({
         id:question.id,contentHash:question.contentHash||'',serverRevision:question.serverRevision??null
       })),
       principles:bundle?.principles||{},synthesisPresets:bundle?.synthesisPresets||{},tagConfig:bundle?.tagConfig||{},
@@ -2596,7 +2604,8 @@ window.PMPPrepServices=AppServices;
         ...question,
         serverRevision:Number(question.serverRevision)||null,
         serverContentHash:String(question.serverContentHash||''),
-        lastSyncedAt:String(question.lastSyncedAt||'')
+        lastSyncedAt:String(question.lastSyncedAt||''),
+        serverExportSnapshot:String(question.serverExportSnapshot||'')
       }));
     }
     return workspace;
@@ -2612,6 +2621,7 @@ window.PMPPrepServices=AppServices;
       question.serverRevision=Number(item.revision||1);
       question.serverContentHash=String(item.contentHash||'');
       question.lastSyncedAt=syncedAt;
+      question.serverExportSnapshot=serverSnapshot(question);
     }
     emit('prep:sync-committed',{result});
     publishContentRevision(result,{entityType:'content-prep-batch',entityId:String(result.batchId||'')});
@@ -2711,6 +2721,7 @@ window.PMPPrepServices=AppServices;
   const ServerCatalogService=Object.freeze({
     Error:ServerCatalogError,
     request,
+    captureServerSnapshot:serverSnapshot,
     migrateWorkspaceMetadata,
     withStableIdempotencyKey,
     acquireLock,
@@ -2755,6 +2766,23 @@ window.PMPPrepServices=AppServices;
       publishContentRevision(result,{entityType:'bank',entityId:String(result?.bank?.id||'')});
       return result.bank;
     },
+    async listBankQuestions(bankId){
+      const id=String(bankId||'').trim();
+      if(!id)return [];
+      const pageSize=200,questions=[];
+      let page=1,total=0;
+      do{
+        const result=await request(`/question-catalog/banks/${encodeURIComponent(id)}/questions?page=${page}&page_size=${pageSize}`);
+        const rows=Array.isArray(result.questions)?result.questions:[];
+        questions.push(...rows);
+        total=Number(result.total??questions.length);
+        if(questions.length<total&&!rows.length){
+          throw new ServerCatalogError('PAGINATION_INCOMPLETE','服务器题库返回不完整，请稍后重试。');
+        }
+        page+=1;
+      }while(questions.length<total);
+      return questions;
+    },
     async loadQuestion(questionId){return (await request(`/question-catalog/questions/${encodeURIComponent(questionId)}`)).question},
     async getBatch(batchId){return (await request(`/content-prep/batches/${encodeURIComponent(batchId)}`)).batch},
     syncMetadata,
@@ -2762,8 +2790,10 @@ window.PMPPrepServices=AppServices;
       if(!workspace?.serverBankId)throw new ServerCatalogError('BANK_REQUIRED','请先选择目标题库。');
       if(!workspace?.clientInstanceId)throw new ServerCatalogError('CLIENT_INSTANCE_REQUIRED','本地工作区缺少客户端标识。');
       if(!creatorId)throw new ServerCatalogError('CREATOR_REQUIRED','请先选择制作人。');
-      const sourceQuestions=bundle?.questionBank?.questions||[];
-      const fingerprint=uploadFingerprint(bundle,workspace,creatorId);
+      const workspaceQuestions=questions||bundle?.questionBank?.questions||[];
+      const changedQuestionIds=new Set(workspaceQuestions.filter(question=>!isUnchangedServerQuestion(question)).map(question=>String(question.id)));
+      const sourceQuestions=(bundle?.questionBank?.questions||[]).filter(question=>changedQuestionIds.has(String(question.id)));
+      const fingerprint=uploadFingerprint(bundle,workspace,creatorId,sourceQuestions);
       return withStableIdempotencyKey(workspace,fingerprint,async key=>{
         const payload={
         idempotencyKey:key,
@@ -2965,11 +2995,10 @@ window.PMPPrepDraftUi?.open?.();
   const actorName=document.getElementById('serverActorName');
   const creatorName=document.getElementById('serverCreatorName');
   const status=document.getElementById('serverCatalogStatus');
+  const sourceBankSelect=document.getElementById('serverSourceBankSelect');
   const bankSelect=document.getElementById('serverBankSelect');
   const createButton=document.getElementById('btnCreateServerBank');
-  const loadButton=document.getElementById('btnLoadServerQuestion');
   const syncButton=document.getElementById('btnSyncToCatalog');
-  const questionInput=document.getElementById('serverQuestionIdInput');
   const issuesBox=document.getElementById('serverCatalogIssues');
   const reconfirmButton=document.getElementById('btnReconfirmQuestionLock');
   const copyConflictButton=document.getElementById('btnCopyConflictQuestion');
@@ -3015,7 +3044,8 @@ window.PMPPrepDraftUi?.open?.();
     const question=currentQuestion(),lease=prepRuntime.editLeaseState||{};
     const canSyncQuestion=!question?.serverRevision||lease.questionId===question.id&&lease.canSave;
     createButton.disabled=!authenticated||!prepRuntime.creatorProfile;
-    loadButton.disabled=!authenticated||!prepRuntime.creatorProfile||!questionInput.value.trim();
+    sourceBankSelect.disabled=!authenticated||!prepRuntime.creatorProfile;
+    bankSelect.disabled=!authenticated||!prepRuntime.creatorProfile;
     syncButton.disabled=!serverEnabled()||!canSyncQuestion;
   }
   function renderActor(){
@@ -3024,8 +3054,13 @@ window.PMPPrepDraftUi?.open?.();
     if(!actor)setStatus('未登录 · 请登录后选择共享草稿','warn');
   }
   function renderBanks(banks){
-    bankSelect.innerHTML='<option value="">请选择题库</option>'+banks.map(bank=>`<option value="${esc(bank.id)}">${esc(bank.name)} · ${esc(bank.accessMode||'可编辑')}</option>`).join('');
-    if(prepRuntime.serverBankId&&banks.some(bank=>bank.id===prepRuntime.serverBankId))bankSelect.value=prepRuntime.serverBankId;
+    const options=banks.map(bank=>`<option value="${esc(bank.id)}">${esc(bank.name)} · ${esc(bank.accessMode||'可编辑')}</option>`).join('');
+    sourceBankSelect.innerHTML='<option value="">请选择题库</option>'+options;
+    bankSelect.innerHTML='<option value="">请选择题库</option>'+options;
+    if(prepRuntime.serverBankId&&banks.some(bank=>bank.id===prepRuntime.serverBankId)){
+      sourceBankSelect.value=prepRuntime.serverBankId;
+      bankSelect.value=prepRuntime.serverBankId;
+    }
     refreshButtons();
   }
   async function refreshBanks({throwOnError=false}={}){
@@ -3250,12 +3285,6 @@ window.PMPPrepDraftUi?.open?.();
     return remoteRefreshPromise;
   }
   const unsubscribeTeachingSync=teachingSync?.subscribe?.(refreshRemoteRevision);
-  bankSelect.addEventListener('change',()=>{
-    prepRuntime.serverBankId=bankSelect.value;
-    const bank=prepRuntime.serverBanks?.find(item=>item.id===bankSelect.value);
-    prepRuntime.serverBankRevision=Number(bank?.revision||0)||null;
-    markWorkspaceDirty();refreshButtons();
-  });
   createButton.addEventListener('click',async()=>{
     const name=prompt('请输入新题库名称',state.questionBank.name||'PMP 内容准备题库');if(!name?.trim())return;
     createButton.disabled=true;setStatus('正在新建题库…');setIssues(null);
@@ -3269,23 +3298,37 @@ window.PMPPrepDraftUi?.open?.();
       setStatus('题库已创建，请先保存共享草稿，再确认同步内容','good');
     }catch(error){setStatus(error.message,'bad');setIssues(error)}finally{refreshButtons()}
   });
-  questionInput.addEventListener('input',refreshButtons);
-  loadButton.addEventListener('click',async()=>{
-    const id=questionInput.value.trim();if(!id)return;
-    loadButton.disabled=true;setStatus('正在从服务器载入题目…');setIssues(null);
+  async function loadSelectedBankIntoWorkspace(){
+    const bankId=sourceBankSelect.value;if(!bankId)return;
+    const previousBankId=prepRuntime.serverBankId||'';
+    const hasWorkspaceContent=state.questionBank.questions.length>0;
+    if(prepRuntime.dirty&&hasWorkspaceContent&&!confirm('载入题库会替换当前工作区的题目。未保存内容可能丢失，是否继续？')){
+      sourceBankSelect.value=previousBankId;setStatus('已取消载入，当前工作区未改变。','warn');return;
+    }
+    sourceBankSelect.disabled=true;setStatus('正在载入题库题目…');setIssues(null);
     try{
-      const remote=await Catalog.loadQuestion(id),question=QuestionService.normalize({
+      const remoteQuestions=await Catalog.listBankQuestions(bankId);
+      if(!remoteQuestions.length){
+        sourceBankSelect.value=previousBankId;setStatus('该题库暂无题目，当前工作区未改变。','warn');return;
+      }
+      const bank=prepRuntime.serverBanks.find(item=>String(item.id)===String(bankId));
+      const questions=remoteQuestions.map((remote,index)=>QuestionService.normalize({
         ...remote,serverRevision:remote.revision,serverContentHash:remote.contentHash,lastSyncedAt:nowIso()
-      },state.questionBank.questions.length,remote.subject||state.questionBank.subject);
-      await QuestionLocks.switchTo(question);
-      const index=state.questionBank.questions.findIndex(item=>item.id===question.id);
-      if(index>=0)state.questionBank.questions[index]=question;else state.questionBank.questions.push(question);
-      prepRuntime.serverBankId=remote.bankId||prepRuntime.serverBankId;
-      state.currentQuestionId=question.id;refreshAll();markWorkspaceDirty();
-      setStatus('题目已从服务器载入','good');
-    }catch(error){setStatus(error.message,'bad');setIssues(error)}finally{refreshButtons()}
-  });
-  syncButton.addEventListener('click',()=>syncWorkspaceToServer().catch(()=>{}));
+      },index,remote.subject||bank?.subject||state.questionBank.subject));
+      await QuestionLocks.switchTo(questions[0]);
+      state.questionBank={...state.questionBank,...(bank||{}),questions};
+      prepRuntime.serverBankId=bankId;
+      prepRuntime.serverBankRevision=Number(bank?.revision||0)||null;
+      sourceBankSelect.value=bankId;
+      bankSelect.value=bankId;
+      state.currentQuestionId=questions[0].id;refreshAll();
+      questions.forEach(question=>question.serverExportSnapshot=Catalog.captureServerSnapshot(question));
+      await saveWorkspaceLocal({silent:true});
+      setStatus(`已载入 ${questions.length} 道题目，请保存后继续编辑。`,'good');
+    }catch(error){sourceBankSelect.value=previousBankId;setStatus(error.message,'bad');setIssues(error)}finally{refreshButtons()}
+  }
+  sourceBankSelect.addEventListener('change',()=>{loadSelectedBankIntoWorkspace().catch(()=>{})});
+  syncButton.addEventListener('click',()=>syncWorkspaceToServer({source:'sync'}).catch(()=>{}));
 
   document.querySelectorAll('[data-creator-key]').forEach(button=>button.addEventListener('click',()=>{
     QuestionLocks.close().finally(()=>{
