@@ -1,13 +1,20 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.76",
-  "toVersion": "v9.0-p4.1.77",
+  "fromVersion": "v9.0-p4.1.77",
+  "toVersion": "v9.0-p4.1.78",
   "changes": {
-    "added": [],
+    "added": [
+      "src/31a-learning-weekly-open-schedule.js",
+      "styles/learning-weekly-open-gate.css",
+      "tests/learning-weekly-open-schedule.test.js"
+    ],
     "changed": [
       "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "tests/v90-p4529-content-prep-recall-link-browser.py"
+      "index.html",
+      "knowledge-recall.html",
+      "practice-mode.html",
+      "question-workspace.html",
+      "src/31-learning-entry-chooser.js"
     ],
     "removed": []
   },
