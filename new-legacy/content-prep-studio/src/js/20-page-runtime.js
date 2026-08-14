@@ -270,7 +270,7 @@ function renderQuestionEditor(){
   <div class="form-grid">
     <div><label>题目 ID</label><input type="text" data-qfield="id" value="${esc(q.id)}"></div>
     <div><label>标题</label><input type="text" data-qfield="title" value="${esc(q.title)}"></div>
-    <div><label>难度</label><select data-qfield="difficulty">${['基础','中等','困难'].map(x=>`<option${q.difficulty===x?' selected':''}>${x}</option>`).join('')}</select></div>
+    <div><label>难度</label><select data-qfield="difficulty">${['简单','中等','困难'].map(x=>`<option${q.difficulty===x?' selected':''}>${x}</option>`).join('')}</select></div>
     <div><label>阶段</label><input type="text" data-qfield="stage" value="${esc(q.stage||'')}"></div>
     <div><label>领域 / Domain</label><input type="text" data-qfield="domain" value="${esc(q.domain||'')}"></div>
     <div><label>主题 / Topic</label><input type="text" data-qfield="topic" value="${esc(q.topic||'')}"></div>

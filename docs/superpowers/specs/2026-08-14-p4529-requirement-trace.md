@@ -26,12 +26,12 @@
 | 18 | 家族 JSON 模板 + AI 提示词 | DONE | `#btnDownloadFamilyTemplate`/`#btnDownloadFamilyAiPrompt` | QUESTION_FAMILY_TEMPLATE/QUESTION_FAMILY_AI_PROMPT（00-core-bootstrap.js） | — | 模板下载含 6 题最低覆盖结构 | — | — |
 | 19 | 家族最低覆盖检查 | DONE | 家族面板就绪提示条 | `familyCoverageFor`（coverage/complete/ready） | —（Root-only 合法） | tests/test_p45_family.js（Root-only 只 warn；补齐 complete；确认 ready） | 同上 | v90-p4529-question-family-browser.py（Root-only warn 不增 error） |
 | 20 | 家族导航/页签/视觉识别 | DONE | 列表 `【母题】/【成员·A】` 徽章 + `#btnGoFamilyRoot`/成员链接 | renderQuestionListOnly + renderQuestionFamilyEditor | — | v90-p4529-question-family-browser.py（徽章+跳转） | — | — |
-| 21 | 三档难度与 L1-L4 分离 | MISSING(G4) | | | | | | |
+| 21 | 三档难度与 L1-L4 分离 | DONE | 编辑器 `#difficulty` 三档下拉（简单/中等/困难） | `normalizeQuestionDifficulty`（前端）+ `normalize_difficulty`（backend question_content_service） | POST /content-prep/batches（归一后入库） | tests/test_p45_difficulty_tags.js + backend test_question_content_service.py（12 组别名参数化） | 同上（旧“基础”/L1–L4 误写只迁移不报错） | v90-p4529-difficulty-global-tags-browser.py（旧题库导入迁移） |
 | 22 | Workspace 自动保存（映射共享草稿） | MISSING(G5) | | | | | | |
 | 23 | 自动恢复上次工作区（从数据库） | MISSING(G5) | | | | | | |
 | 24 | 手动保存/恢复/删除 Workspace | MISSING(G5) | `#btnQuickSaveWorkspace`/`#btnSaveWorkspaceLocal`（待接 syncWorkspaceToServer） | | | new-legacy/tests/content-prep-question-bank-integration.test.js（RED 已就位） | | |
 | 25 | Workspace 保存范围（题库/知识树/Recall/原则/归纳卡/标签/位置） | PARTIAL(G5) | | WorkspaceService.currentPayload | | | | |
-| 26 | Global Tag 语义 ID global/... + 兼容旧 ID | PARTIAL(G4) | | `semanticTagSlot`（10-state-domain.js，槽位迁移已有）；global/... 前缀待统一 | | tests/test_tag_migration.js（往返） | | |
+| 26 | Global Tag 语义 ID global/... + 兼容旧 ID | DONE | 标签管理器（槽位显示 global/...） | TAG_SLOT_SEMANTIC_MAP 升级 global-semantic-v1 / schemaVersion 3（00+10） | PUT /shared-content（tagConfig 内部 global 单真源） | tests/test_p45_difficulty_tags.js + tests/test_tag_migration.js（往返） | 同上（未知槽位原样保留不猜） | v90-p4529-difficulty-global-tags-browser.py（导出回退数字槽位） |
 | 27 | 完整内容包携带 Facet Registry | DONE | — | completeBundlePayload 输出 subjectFacetRegistry（10-state-domain.js） | — | v90-p4529-facet-binding-browser.py（导出含 schema 快照） | 同上 | 同上 |
 | 28 | 校验中心 Family 校验 | DONE | 校验中心 family 行（object=题目 ID） | `validateQuestionFamily` + `validateFamilyStructure` 接入 runValidation | POST /content-prep/batches（FAMILY_DUPLICATE_ROOT/FAMILY_MEMBER_ROOT_MISSING 硬 Gate） | tests/test_p45_family.js（孤儿成员 error/重复母题 error） | backend/tests/test_content_prep_question_family.py（422 阻断含跨 Bank 形态） | v90-p4529-question-family-browser.py（清除引用后恢复） |
 | 29 | 校验中心 Facet 校验 | DONE | 校验中心 `#validationRows`（object=题目 ID 定位）+ 编辑区红色提示 | `validateQuestionFacets`（12-p45-authoring-domain.js）接入 runValidation | — | tests/test_p45_facets.js（无效 error/deprecated warning/有效无问题） | 同上 | 浏览器 E2E（清除未知引用后错误恢复） |

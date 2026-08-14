@@ -9,35 +9,36 @@ const BASE_TAG_GROUPS=[
 /* v0.4.0 internal tag identity.
    Formal/main-program exports still use legacy numeric slots. */
 const TAG_SLOT_SEMANTIC_MAP=Object.freeze({
-  'usage/stage/0':'usage/stage/basic',
-  'usage/stage/1':'usage/stage/phase-test',
-  'usage/stage/2':'usage/stage/mock-exam',
-  'usage/stage/3':'usage/stage/sprint-review',
-  'usage/stage/4':'usage/stage/preview',
-  'usage/stage/5':'usage/stage/intensive',
-  'usage/stage/6':'usage/stage/mistake-review',
-  'usage/scene/0':'usage/scene/after-class',
-  'usage/scene/1':'usage/scene/classroom-discussion',
-  'usage/scene/2':'usage/scene/homework',
-  'usage/scene/3':'usage/scene/special-training',
-  'quality/feature/0':'quality/feature/error-prone',
-  'quality/feature/1':'quality/feature/high-frequency',
-  'quality/feature/2':'quality/feature/core',
-  'quality/feature/3':'quality/feature/comprehensive',
-  'quality/review/0':'quality/review/pending-review',
-  'quality/review/1':'quality/review/reviewed',
-  'quality/review/2':'quality/review/needs-update',
-  'source/origin/0':'source/origin/real-exam',
-  'source/origin/1':'source/origin/self-authored',
-  'source/origin/2':'source/origin/adapted',
-  'source/origin/3':'source/origin/textbook-example',
-  'source/scope/0':'source/scope/public',
-  'source/scope/1':'source/scope/internal'
+  'usage/stage/0':'global/usage/stage/basic','usage/stage/basic':'global/usage/stage/basic',
+  'usage/stage/1':'global/usage/stage/phase-test','usage/stage/phase-test':'global/usage/stage/phase-test',
+  'usage/stage/2':'global/usage/stage/mock-exam','usage/stage/mock-exam':'global/usage/stage/mock-exam',
+  'usage/stage/3':'global/usage/stage/sprint-review','usage/stage/sprint-review':'global/usage/stage/sprint-review',
+  'usage/stage/4':'global/usage/stage/preview','usage/stage/preview':'global/usage/stage/preview',
+  'usage/stage/5':'global/usage/stage/intensive','usage/stage/intensive':'global/usage/stage/intensive',
+  'usage/stage/6':'global/usage/stage/mistake-review','usage/stage/mistake-review':'global/usage/stage/mistake-review',
+  'usage/scene/0':'global/usage/scene/after-class','usage/scene/after-class':'global/usage/scene/after-class',
+  'usage/scene/1':'global/usage/scene/classroom-discussion','usage/scene/classroom-discussion':'global/usage/scene/classroom-discussion',
+  'usage/scene/2':'global/usage/scene/homework','usage/scene/homework':'global/usage/scene/homework',
+  'usage/scene/3':'global/usage/scene/special-training','usage/scene/special-training':'global/usage/scene/special-training',
+  'quality/feature/0':'global/quality/feature/error-prone','quality/feature/error-prone':'global/quality/feature/error-prone',
+  'quality/feature/1':'global/quality/feature/high-frequency','quality/feature/high-frequency':'global/quality/feature/high-frequency',
+  'quality/feature/2':'global/quality/feature/core','quality/feature/core':'global/quality/feature/core',
+  'quality/feature/3':'global/quality/feature/comprehensive','quality/feature/comprehensive':'global/quality/feature/comprehensive',
+  'quality/review/0':'global/quality/review/pending-review','quality/review/pending-review':'global/quality/review/pending-review',
+  'quality/review/1':'global/quality/review/reviewed','quality/review/reviewed':'global/quality/review/reviewed',
+  'quality/review/2':'global/quality/review/needs-update','quality/review/needs-update':'global/quality/review/needs-update',
+  'source/origin/0':'global/source/origin/real-exam','source/origin/real-exam':'global/source/origin/real-exam',
+  'source/origin/1':'global/source/origin/self-authored','source/origin/self-authored':'global/source/origin/self-authored',
+  'source/origin/2':'global/source/origin/adapted','source/origin/adapted':'global/source/origin/adapted',
+  'source/origin/3':'global/source/origin/textbook-example','source/origin/textbook-example':'global/source/origin/textbook-example',
+  'source/scope/0':'global/source/scope/public','source/scope/public':'global/source/scope/public',
+  'source/scope/1':'global/source/scope/internal','source/scope/internal':'global/source/scope/internal'
 });
-const TAG_SLOT_LEGACY_MAP=Object.freeze(Object.fromEntries(Object.entries(TAG_SLOT_SEMANTIC_MAP).map(([legacy,semantic])=>[semantic,legacy])));
+/* P4.5.29 差异 26：内部真源一律 global/...；正式导出只回退旧数字槽位（主程序兼容），usage/... 不再作为保存形态 */
+const TAG_SLOT_LEGACY_MAP=Object.freeze(Object.fromEntries(Object.entries(TAG_SLOT_SEMANTIC_MAP).filter(([legacy])=>/\d+$/.test(legacy)).map(([legacy,semantic])=>[semantic,legacy])));
 function legacyTagSlotKey(g,c,i){return `${g.id}/${c.id}/${i}`}
-function semanticTagSlot(slot){slot=String(slot||'');return TAG_SLOT_SEMANTIC_MAP[slot]||slot}
-function formalTagSlot(slot){slot=String(slot||'');return TAG_SLOT_LEGACY_MAP[slot]||slot}
+function semanticTagSlot(slot){slot=String(slot||'').trim();if(!slot)return '';if(slot.startsWith('global/')){return TAG_SLOT_SEMANTIC_MAP[slot.slice(7)]||slot}return TAG_SLOT_SEMANTIC_MAP[slot]||slot}
+function formalTagSlot(slot){slot=semanticTagSlot(slot);return TAG_SLOT_LEGACY_MAP[slot]||slot}
 function tagSlotKey(g,c,i){return semanticTagSlot(legacyTagSlotKey(g,c,i))}
 function tagCategoryKey(g,c){return `${g.id}/${c.id}`}
 function tagGroupKey(g){return g.id}

@@ -382,3 +382,29 @@ def test_response_dtos_emit_stable_camel_case_contracts() -> None:
             }
         ],
     }
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("基础", "简单"),
+        ("简单", "简单"),
+        ("easy", "简单"),
+        ("L1", "简单"),
+        ("中等", "中等"),
+        ("medium", "中等"),
+        ("困难", "困难"),
+        ("hard", "困难"),
+        ("L4", "困难"),
+        ("", "中等"),
+        (None, "中等"),
+    ],
+)
+def test_question_difficulty_normalizes_to_three_levels(raw: object, expected: str) -> None:
+    """P4.5.29 差异 21：正式难度统一三档；旧“基础”/英文/L1–L4 只在导入迁移层归一。"""
+    question = complete_question()
+    question["difficulty"] = raw  # type: ignore[assignment]
+
+    normalized = normalize_question_payload(question, subject="PMP")
+
+    assert normalized["difficulty"] == expected

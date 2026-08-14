@@ -150,6 +150,42 @@ def _normalize_correct_answer(
     return deepcopy(value)
 
 
+_DIFFICULTY_ALIASES: dict[str, str] = {
+    "基础": "简单",
+    "简单": "简单",
+    "初级": "简单",
+    "easy": "简单",
+    "simple": "简单",
+    "l1": "简单",
+    "1": "简单",
+    "中等": "中等",
+    "中级": "中等",
+    "常规": "中等",
+    "medium": "中等",
+    "l2": "中等",
+    "2": "中等",
+    "困难": "困难",
+    "难点": "困难",
+    "复杂": "困难",
+    "高阶": "困难",
+    "hard": "困难",
+    "l3": "困难",
+    "l4": "困难",
+    "3": "困难",
+    "4": "困难",
+}
+
+
+def normalize_difficulty(value: object) -> str:
+    """P4.5.29 差异 21：正式难度统一 简单/中等/困难 三档（Runtime 映射 easy/medium/hard）。
+
+    旧“基础”与英文/L1–L4 只在导入迁移层归一；Question Family 的 difficultyLevel
+    是独立的 L1–L4 诊断层级，不走这个字段。
+    """
+    token = str(value or "").strip().lower()
+    return _DIFFICULTY_ALIASES.get(token, "中等")
+
+
 def normalize_question_payload(payload: dict[str, Any], *, subject: str) -> dict[str, Any]:
     """Normalize known fields without discarding Content Prep extension data."""
 
@@ -158,7 +194,8 @@ def normalize_question_payload(payload: dict[str, Any], *, subject: str) -> dict
     normalized["title"] = str(payload.get("title") or "").strip()
     normalized["type"] = str(payload.get("type") or "single_choice").strip()
     normalized["subject"] = str(payload.get("subject") or subject).strip()
-    for field in ("difficulty", "domain", "topic", "stage"):
+    normalized["difficulty"] = normalize_difficulty(payload.get("difficulty"))
+    for field in ("domain", "topic", "stage"):
         normalized[field] = _optional_text(payload.get(field))
     normalized["tags"] = deepcopy(payload.get("tags") or [])
     normalized["stemParts"] = deepcopy(payload.get("stemParts") or [])

@@ -425,7 +425,7 @@ function normalizeTagConfig(payload){
   const names={};Object.entries(payload.names&&typeof payload.names==='object'?payload.names:{}).forEach(([slot,value])=>names[semanticTagSlot(slot)]=value);
   const slotAliases={};Object.entries(payload.slotAliases&&typeof payload.slotAliases==='object'?payload.slotAliases:{}).forEach(([slot,items])=>slotAliases[semanticTagSlot(slot)]=unique(cleanList(items)));
   const config={
-    schemaVersion:2,slotIdStrategy:'semantic-v1',
+    schemaVersion:3,slotIdStrategy:'global-semantic-v1',
     names,
     groupNames:payload.groupNames&&typeof payload.groupNames==='object'?{...payload.groupNames}:{},
     categoryNames:payload.categoryNames&&typeof payload.categoryNames==='object'?{...payload.categoryNames}:{},
@@ -521,7 +521,7 @@ function normalizeQuestion(q,i=0,subject='PMP'){
     title:String(q.title||'未命名题目'),
     type:String(q.type||'single_choice'),
     subject:String(q.subject||subject||'PMP'),
-    difficulty:String(q.difficulty||'中等'),
+    difficulty:typeof normalizeQuestionDifficulty==='function'?normalizeQuestionDifficulty(q.difficulty):String(q.difficulty||'中等'),
     domain:String(q.domain||''),
     topic:String(q.topic||''),
     tags:cleanList(q.tags),
