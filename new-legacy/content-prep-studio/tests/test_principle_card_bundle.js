@@ -31,6 +31,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(normalized.metadata)),{
   optionPrincipleMap:{A:['trap'],B:['answer']},
   tagPaths:[],
   subjectFacets:[],
+  questionFamily:{},
   knowledge:{},
 });
 

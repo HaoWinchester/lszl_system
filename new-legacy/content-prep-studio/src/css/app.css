@@ -277,3 +277,8 @@ nav button.active{color:var(--brand)!important}
   .help-center-body{grid-template-columns:1fr;height:82vh}.help-center-nav{display:flex;gap:5px;border-right:0;border-bottom:1px solid var(--line);overflow:auto}.help-center-nav button{min-width:160px}
   .audit-row{grid-template-columns:1fr}
 }
+
+/* P4.5.29 Question Family 列表徽章与编辑区 */
+.family-badge{font-size:11px;margin-right:4px;padding:1px 5px;border-radius:8px;font-weight:600}
+.family-badge.family-root{background:#1f6feb;color:#fff}
+.family-badge.family-member{background:#e8a33d;color:#fff}

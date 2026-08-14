@@ -286,6 +286,11 @@ nav button.active{color:var(--brand)!important}
   .help-center-body{grid-template-columns:1fr;height:82vh}.help-center-nav{display:flex;gap:5px;border-right:0;border-bottom:1px solid var(--line);overflow:auto}.help-center-nav button{min-width:160px}
   .audit-row{grid-template-columns:1fr}
 }
+
+/* P4.5.29 Question Family 列表徽章与编辑区 */
+.family-badge{font-size:11px;margin-right:4px;padding:1px 5px;border-radius:8px;font-weight:600}
+.family-badge.family-root{background:#1f6feb;color:#fff}
+.family-badge.family-member{background:#e8a33d;color:#fff}
 </style>
 </head>
 <body id="prepApp">
@@ -396,6 +401,8 @@ nav button.active{color:var(--brand)!important}
 
       <div class="toolbar" style="margin-top:12px">
         <button class="btn primary" id="btnDownloadCompleteBundle">下载“完整内容包”模板</button>
+        <button class="btn good" id="btnDownloadFamilyTemplate">下载题目家族 JSON 模板</button>
+        <button class="btn" id="btnDownloadFamilyAiPrompt">下载题目家族 AI 提示词</button>
         <button class="btn primary" id="btnDownloadCompleteAiPrompt">下载完整 AI 制作提示词</button>
         <button class="btn" id="btnDownloadQuestionTemplate">下载题库 JSON 模板</button>
         <button class="btn" id="btnDownloadAiPrompt">下载“Word→JSON”AI 提示词</button>
@@ -982,6 +989,20 @@ const WORD_TO_JSON_AI_PROMPT=`你是一名 PMP 题库结构化编辑助手。
 ${JSON.stringify(QUESTION_TEMPLATE,null,2)}
 `;
 
+/* P4.5.29 差异 18：题目家族 JSON 模板与外部 AI 生成提示词 */
+function familyTemplateQuestion({title,role,relationToRoot='standalone',variantType='none',equivalenceGrade='',diagnosticTarget='general',difficultyLevel=2,purposes=['practice'],difficulty='中等',stem='请填写题干',answer='B'}){
+  return {title,difficulty,domain:'',topic:'',tags:[],stage:'',stemParts:[{text:stem}],options:[{id:'A',text:'选项 A',correct:answer==='A'},{id:'B',text:'选项 B',correct:answer==='B'},{id:'C',text:'选项 C',correct:answer==='C'},{id:'D',text:'选项 D',correct:answer==='D'}],correctAnswer:answer,analysis:'请填写解析。',translations:{en:{title:'',stemParts:[{text:''}],options:[{id:'A',text:''},{id:'B',text:''},{id:'C',text:''},{id:'D',text:''}],analysis:''}},clues:[],reasoningSteps:[],metadata:{knowledge:{primaryNodeId:'',relatedNodeIds:[],mappingStatus:'unmapped',pathSnapshot:[]},subjectFacets:[],tagPaths:[],questionFamily:{schemaVersion:1,familyKey:'FAMILY-001',role,relationToRoot:role==='root'?'root':relationToRoot,variantType:role==='root'?'none':variantType,equivalenceGrade:role==='member'?equivalenceGrade:'',diagnosticTarget,difficultyLevel,purposes,qualityConfirmed:false,notes:''}},lifecycle:{status:'active',deletedAt:''}};
+}
+const QUESTION_FAMILY_TEMPLATE={name:'PMP 题目家族最低配置模板',subject:'PMP',description:'Question Family v1。外部文件不填写 Question ID / Family ID / rootQuestionId；导入后由 Prep Studio 生成并按 familyKey 绑定。qualityConfirmed 必须由教师人工确认。',version:'1.0',visibility:'private',questions:[
+  familyTemplateQuestion({title:'母题',role:'root',diagnosticTarget:'application',difficultyLevel:2,purposes:['practice'],stem:'母题题干……'}),
+  familyTemplateQuestion({title:'强等价变体 1',role:'member',relationToRoot:'equivalent',variantType:'stem',equivalenceGrade:'A',diagnosticTarget:'application',difficultyLevel:2,purposes:['practice','error-confirmation'],stem:'更换表述但保持同知识目标、同能力层级和核心推理链……'}),
+  familyTemplateQuestion({title:'强等价变体 2',role:'member',relationToRoot:'equivalent',variantType:'scenario',equivalenceGrade:'A',diagnosticTarget:'application',difficultyLevel:2,purposes:['post-remediation-verification','delayed-verification'],stem:'更换情境但保持同知识目标、同能力层级和核心推理链……'}),
+  familyTemplateQuestion({title:'概念诊断',role:'member',relationToRoot:'decomposed',variantType:'decomposed',equivalenceGrade:'C',diagnosticTarget:'concept',difficultyLevel:1,purposes:['diagnosis'],difficulty:'简单',stem:'检测最基础概念是否建立……'}),
+  familyTemplateQuestion({title:'理解诊断',role:'member',relationToRoot:'decomposed',variantType:'decomposed',equivalenceGrade:'C',diagnosticTarget:'understanding',difficultyLevel:2,purposes:['diagnosis'],stem:'检测概念边界、含义或相近概念辨析……'}),
+  familyTemplateQuestion({title:'高阶验证',role:'member',relationToRoot:'equivalent',variantType:'advanced',equivalenceGrade:'A',diagnosticTarget:'analysis',difficultyLevel:4,purposes:['post-remediation-verification','mastery-check'],difficulty:'困难',stem:'新的复杂情境 / 案例，用于证明能够迁移并回到母题能力层级……'})
+]};
+const QUESTION_FAMILY_AI_PROMPT=`你是一名题目家族设计助手。请围绕我提供的一道母题，生成符合 External AI Question Authoring Contract v1、可导入 PMP Content Prep Studio 的 Question Bank JSON。\n\n目标：建立一个可用于高可信学习诊断的题目家族，而不是简单换皮。\n最低覆盖：A 级强等价变体至少 2 道、concept 概念诊断至少 1 道、understanding 理解诊断至少 1 道、高阶验证至少 1 道。教师可以后续继续增加。\n\n关键边界：\n0. 普通题目 difficulty 使用三档“简单 / 中等 / 困难”；metadata.questionFamily.difficultyLevel 使用 L1–L4 诊断层级。L4 不代表主程序存在第四档题目难度。\n1. “与母题的关系”与“学习用途”分开。一道题可同时是情境变体 + 应用检测 + 补救后验证。\n2. A 级强等价必须保持：主知识目标相同、核心能力层级相同或相近、核心推理链相同、难度相近；同时改变足够的表面情境/题干/选项，使学员不能靠记忆母题答案通过。\n3. 能力拆解题用于定位概念/理解等问题，不能单独证明原母题能力已掌握。\n4. 高阶验证必须回到与母题相同或更高的应用/分析/案例迁移层级，并使用学员未见过的新情境。\n5. qualityConfirmed 一律输出 false；只有教师人工审核后才能在 Prep Studio 勾选确认。\n6. 同一题目家族所有题使用同一个 metadata.questionFamily.familyKey（例如 FAMILY-001），且只能有 1 道 role=root。\n7. 不要生成 question id、familyId、rootQuestionId、contentHash、creatorId、deviceId、batchId 或 metadata.origin；全部由 Prep Studio 生成。\n8. 输出纯 JSON，不要 Markdown 围栏。\n\n字段参考：metadata.questionFamily = {familyKey, role, relationToRoot, variantType, equivalenceGrade, diagnosticTarget, difficultyLevel, purposes, qualityConfirmed:false, notes}。\n\n模板：\n${JSON.stringify(QUESTION_FAMILY_TEMPLATE,null,2)}`;
+
 const state={
   knowledgeTree:null,
   recallLibrary:{schemaVersion:1,nodes:[],edges:[],updatedAt:''},
@@ -1237,6 +1258,8 @@ function stampQuestionOrigin(q,{batchId='',source='manual',forceOrigin=false,par
 }
 function stampImportedQuestions(questions,source){
   const batchId=generateBatchId();
+  // P4.5.29 差异 16：外部导入一律强制 qualityConfirmed=false，只有教师操作可以设为 true
+  if(typeof forceExternalFamilyUnconfirmed==='function')forceExternalFamilyUnconfirmed(questions);
   (questions||[]).forEach(q=>stampQuestionOrigin(q,{batchId,source,forceOrigin:!q.metadata?.origin}));
   return batchId;
 }
@@ -1525,7 +1548,7 @@ function normalizeQuestion(q,i=0,subject='PMP'){
     },
     clues,
     reasoningSteps:Array.isArray(q.reasoningSteps)?clone(q.reasoningSteps):[],
-    metadata:(()=>{const metadata={...(q.metadata&&typeof q.metadata==='object'?q.metadata:{}),tagPaths:Array.isArray(q.metadata?.tagPaths)?clone(q.metadata.tagPaths):[],subjectFacets:typeof normalizeQuestionFacets==='function'?normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||subject):(Array.isArray(q.metadata?.subjectFacets)?clone(q.metadata.subjectFacets):[]),knowledge};syncQuestionPrinciples({metadata,principleIds:q.principleIds,options});return metadata})(),
+    metadata:(()=>{const metadata={...(q.metadata&&typeof q.metadata==='object'?q.metadata:{}),tagPaths:Array.isArray(q.metadata?.tagPaths)?clone(q.metadata.tagPaths):[],subjectFacets:typeof normalizeQuestionFacets==='function'?normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||subject):(Array.isArray(q.metadata?.subjectFacets)?clone(q.metadata.subjectFacets):[]),questionFamily:typeof normalizeQuestionFamily==='function'?normalizeQuestionFamily(q.metadata?.questionFamily||{},systemQuestionId,q.difficulty):(q.metadata?.questionFamily||{}),knowledge};syncQuestionPrinciples({metadata,principleIds:q.principleIds,options});return metadata})(),
     lifecycle:q.lifecycle&&typeof q.lifecycle==='object'?clone(q.lifecycle):{status:'active',deletedAt:''},
     status:q.status&&typeof q.status==='object'?clone(q.status):{contentReady:false,keywordsReady:false,knowledgeReady:false,reasoningReady:false,published:false}
     ,serverRevision:Number(q.serverRevision)||null
@@ -1540,10 +1563,12 @@ function normalizeBank(payload){
   if(Array.isArray(payload))b={name:'导入题库',subject:'PMP',questions:payload};
   if(!b||!Array.isArray(b.questions))throw new Error('题库缺少 questions 数组。');
   const subject=String(b.subject||'PMP');
+  const questions=b.questions.map((q,i)=>{const nq=QuestionService.normalize(q,i,subject);syncQuestionPrinciples(nq);nq.tags=unique((nq.tags||[]).map(canonicalTagName));nq.metadata.tagPaths=nq.tags.map(tagPathFor).filter(Boolean);return nq});
+  if(typeof resolveQuestionFamilies==='function')resolveQuestionFamilies(questions);
   return {
     id:String(b.id||b.bankId||generateSystemId('bank')),name:String(b.name||b.bankName||'PMP 题库'),subject,description:String(b.description||''),
     version:String(b.version||'1.0'),visibility:String(b.visibility||'private'),createdAt:Number(b.createdAt||Date.now()),updatedAt:Number(b.updatedAt||Date.now()),
-    questions:b.questions.map((q,i)=>{const nq=QuestionService.normalize(q,i,subject);syncQuestionPrinciples(nq);nq.tags=unique((nq.tags||[]).map(canonicalTagName));nq.metadata.tagPaths=nq.tags.map(tagPathFor).filter(Boolean);return nq})
+    questions
   };
 }
 function normalizeContentBundle(payload){
@@ -1684,6 +1709,165 @@ function validateQuestionFacets(q,registry){
 
 /* 加载顺序保证 state 初始化后 registry 可用 */
 state.subjectFacetRegistry=normalizeSubjectFacetRegistry(state.subjectFacetRegistry||{});
+
+/*
+ * Question Family v1（P4.5.29 差异 12–20、28）
+ * 领域规则与 V9.0-P4.5.29 单文件一致：三种角色、等价/拆解/扩展关系、A/B/C 等价等级、
+ * 独立 L1–L4 诊断层级、用途多选、教师人工 qualityConfirmed；外部导入一律强制 false。
+ */
+
+const QUESTION_FAMILY_SCHEMA='question-family-v1';
+const FAMILY_ROLES=new Set(['standalone','root','member']);
+const FAMILY_RELATIONS=new Set(['standalone','root','equivalent','decomposed','extension']);
+const FAMILY_VARIANT_TYPES=new Set(['none','stem','options','scenario','parameter','mixed','decomposed','advanced']);
+const FAMILY_EQUIVALENCE_GRADES=new Set(['','A','B','C']);
+const FAMILY_DIAGNOSTIC_TARGETS=new Set(['general','concept','understanding','discrimination','application','analysis','case-transfer']);
+const FAMILY_PURPOSES=new Set(['practice','error-confirmation','diagnosis','post-remediation-verification','delayed-verification','mastery-check']);
+const FAMILY_HIGH_ORDER_TARGETS=new Set(['application','analysis','case-transfer']);
+const FAMILY_PURPOSE_LABELS={practice:'普通练习','error-confirmation':'错误确认',diagnosis:'诊断','post-remediation-verification':'补救后验证','delayed-verification':'延迟验证','mastery-check':'掌握度检测'};
+
+function normalizeQuestionDifficulty(value){
+  const d=String(value||'').trim().toLowerCase();
+  if(['easy','simple','基础','简单','初级','1','l1','★'].includes(d))return '简单';
+  if(['medium','中等','中级','常规','2','l2','★★'].includes(d))return '中等';
+  if(['hard','困难','难点','高级','复杂','高阶','专家','3','4','l3','l4','★★★'].includes(d))return '困难';
+  return '中等';
+}
+function difficultyLevelFromQuestion(difficulty){
+  const d=String(difficulty||'').trim();
+  if(/^L?4$/i.test(d)||/高阶|专家/.test(d))return 4;
+  if(/^L?3$/i.test(d)||/困难|复杂|难/.test(d))return 3;
+  if(/^L?1$/i.test(d)||/基础|简单|易/.test(d))return 1;
+  return 2;
+}
+function normalizeFamilyRole(v){v=String(v||'').trim().toLowerCase();if(['母题','root','parent','master'].includes(v))return 'root';if(['成员','member','child','变体','诊断题'].includes(v))return 'member';return FAMILY_ROLES.has(v)?v:'standalone'}
+function normalizeFamilyRelation(v){v=String(v||'').trim().toLowerCase();const map={'母题':'root','等价':'equivalent','强等价':'equivalent','变体':'equivalent','拆解':'decomposed','能力拆解':'decomposed','扩展':'extension','高阶扩展':'extension','独立':'standalone'};v=map[v]||v;return FAMILY_RELATIONS.has(v)?v:'standalone'}
+function normalizeFamilyVariantType(v){v=String(v||'').trim().toLowerCase();const map={'题干':'stem','题干变体':'stem','选项':'options','选项变体':'options','情境':'scenario','案例':'scenario','情境变体':'scenario','参数':'parameter','数字':'parameter','混合':'mixed','拆解':'decomposed','能力拆解':'decomposed','高阶':'advanced','高阶变体':'advanced','无':'none'};v=map[v]||v;return FAMILY_VARIANT_TYPES.has(v)?v:'none'}
+function normalizeDiagnosticTarget(v){v=String(v||'').trim().toLowerCase();const map={'概念':'concept','概念识别':'concept','理解':'understanding','辨析':'discrimination','应用':'application','分析':'analysis','案例':'case-transfer','案例迁移':'case-transfer','迁移':'case-transfer','综合':'case-transfer','一般':'general'};v=map[v]||v;return FAMILY_DIAGNOSTIC_TARGETS.has(v)?v:'general'}
+function normalizeFamilyPurposes(v){return unique(cleanList(v).map(x=>{const s=String(x||'').trim().toLowerCase(),map={'练习':'practice','普通练习':'practice','错误确认':'error-confirmation','确认':'error-confirmation','诊断':'diagnosis','补救后验证':'post-remediation-verification','验证':'post-remediation-verification','延迟验证':'delayed-verification','掌握度检测':'mastery-check','掌握验证':'mastery-check'};return map[s]||s}).filter(x=>FAMILY_PURPOSES.has(x)))}
+function normalizeEquivalenceGrade(v){v=String(v||'').trim().toUpperCase();const map={'强等价':'A','近似等价':'B','关联':'C'};v=map[v]||v;return FAMILY_EQUIVALENCE_GRADES.has(v)?v:''}
+function normalizeQuestionFamily(raw={},qId='',difficulty='中等'){
+  raw=raw&&typeof raw==='object'?clone(raw):{};
+  const role=normalizeFamilyRole(raw.role||raw.familyRole);
+  const relation=role==='root'?'root':role==='member'?normalizeFamilyRelation(raw.relationToRoot||raw.relation):'standalone';
+  let level=Math.round(Number(raw.difficultyLevel||raw.level||difficultyLevelFromQuestion(difficulty)));
+  if(!Number.isFinite(level))level=difficultyLevelFromQuestion(difficulty);
+  level=Math.min(4,Math.max(1,level));
+  let purposes=normalizeFamilyPurposes(raw.purposes||raw.learningPurposes||[]);if(!purposes.length)purposes=['practice'];
+  return {schemaVersion:1,familyId:String(raw.familyId||'').trim(),familyKey:String(raw.familyKey||raw.groupKey||'').trim(),role,rootQuestionId:role==='root'?String(qId||raw.rootQuestionId||'').trim():String(raw.rootQuestionId||'').trim(),relationToRoot:relation,variantType:role==='root'?'none':normalizeFamilyVariantType(raw.variantType),equivalenceGrade:role==='member'?normalizeEquivalenceGrade(raw.equivalenceGrade||raw.equivalence):'',diagnosticTarget:normalizeDiagnosticTarget(raw.diagnosticTarget||raw.target),difficultyLevel:level,purposes,qualityConfirmed:raw.qualityConfirmed===true||['true','1','yes','y','是','已确认'].includes(String(raw.qualityConfirmed||'').trim().toLowerCase()),notes:String(raw.notes||'').trim()};
+}
+function questionFamily(q){q.metadata=q.metadata||{};q.metadata.questionFamily=normalizeQuestionFamily(q.metadata.questionFamily||{},q.id,q.difficulty);return q.metadata.questionFamily}
+function familyQuestionById(id){return state.questionBank.questions.find(q=>q.id===String(id||''))||null}
+function familyRootFor(q){
+  if(!q)return null;const f=questionFamily(q);
+  if(f.role==='root')return q;
+  if(f.role==='member'&&f.rootQuestionId)return familyQuestionById(f.rootQuestionId);
+  if(f.familyId)return state.questionBank.questions.find(x=>{const xf=questionFamily(x);return xf.role==='root'&&xf.familyId===f.familyId})||null;
+  return null;
+}
+function makeQuestionFamilyRoot(q){
+  const f=questionFamily(q);
+  if(!f.familyId)f.familyId=generateSystemId('family');
+  if(!f.familyKey)f.familyKey=`FAMILY-${String(q.id||'').replace(/[^a-z0-9]/gi,'').slice(0,8).toUpperCase()||Date.now().toString(36).toUpperCase()}`;
+  f.role='root';f.rootQuestionId=q.id;f.relationToRoot='root';f.variantType='none';f.equivalenceGrade='';
+  f.purposes=unique(['practice',...(f.purposes||[])]);return f;
+}
+function makeQuestionStandalone(q){
+  q.metadata=q.metadata||{};
+  q.metadata.questionFamily=normalizeQuestionFamily({role:'standalone',difficultyLevel:questionFamily(q).difficultyLevel,diagnosticTarget:questionFamily(q).diagnosticTarget,purposes:['practice']},q.id,q.difficulty);
+  return q.metadata.questionFamily;
+}
+function makeQuestionFamilyMember(q,root,options={}){
+  if(!q||!root)return questionFamily(q);
+  const rf=makeQuestionFamilyRoot(root),f=questionFamily(q),applyDefaults=options.applyDefaults!==false;
+  f.familyId=rf.familyId;f.familyKey=rf.familyKey;f.role='member';f.rootQuestionId=root.id;
+  if(!['equivalent','decomposed','extension'].includes(f.relationToRoot))f.relationToRoot='equivalent';
+  if(applyDefaults){
+    if(f.variantType==='none')f.variantType='stem';
+    if(!f.equivalenceGrade&&f.relationToRoot==='equivalent')f.equivalenceGrade='A';
+    if(!Array.isArray(f.purposes)||!f.purposes.length||f.purposes.length===1&&f.purposes[0]==='practice')f.purposes=['practice','error-confirmation','post-remediation-verification'];
+  }
+  return f;
+}
+function renameQuestionFamilyKey(root,newKey){
+  if(!root)return;const rf=makeQuestionFamilyRoot(root),oldId=rf.familyId;
+  rf.familyKey=String(newKey||'').trim();
+  state.questionBank.questions.forEach(q=>{const f=questionFamily(q);if(f.familyId===oldId)f.familyKey=rf.familyKey});
+}
+function resolveQuestionFamilies(questions=state.questionBank.questions){
+  questions.forEach(q=>questionFamily(q));
+  const byId=new Map(questions.map(q=>[q.id,q]));
+  const rootByFamilyId=new Map(),rootByKey=new Map();
+  questions.filter(q=>questionFamily(q).role==='root').forEach(root=>{const f=makeQuestionFamilyRoot(root);rootByFamilyId.set(f.familyId,root);if(f.familyKey)rootByKey.set(f.familyKey,root)});
+  questions.filter(q=>questionFamily(q).role==='member').forEach(q=>{
+    const f=questionFamily(q);
+    let root=byId.get(f.rootQuestionId)||rootByFamilyId.get(f.familyId)||rootByKey.get(f.familyKey)||null;
+    if(root)makeQuestionFamilyMember(q,root,{applyDefaults:false});
+    else{f.familyId=String(f.familyId||'');f.rootQuestionId=String(f.rootQuestionId||'')}
+  });
+  return questions;
+}
+function familyMembersFor(q){
+  const root=familyRootFor(q);if(!root)return [];
+  const rf=questionFamily(root);
+  return state.questionBank.questions.filter(x=>x.id!==root.id&&questionFamily(x).role==='member'&&questionFamily(x).familyId===rf.familyId);
+}
+function familyCoverageFor(q){
+  const root=familyRootFor(q);
+  if(!root)return {root:null,members:[],strong:0,concept:0,understanding:0,highOrder:0,confirmedStrong:0,confirmedConcept:0,confirmedUnderstanding:0,confirmedHighOrder:0,coverage:0,complete:false,ready:false};
+  const members=familyMembersFor(root),rootLevel=questionFamily(root).difficultyLevel;
+  const isStrong=x=>{const f=questionFamily(x);return f.relationToRoot==='equivalent'&&f.equivalenceGrade==='A'};
+  const isHigh=x=>{const f=questionFamily(x);return FAMILY_HIGH_ORDER_TARGETS.has(f.diagnosticTarget)&&f.difficultyLevel>=rootLevel&&f.purposes.some(p=>['post-remediation-verification','delayed-verification','mastery-check'].includes(p))};
+  const strong=members.filter(isStrong).length,concept=members.filter(x=>questionFamily(x).diagnosticTarget==='concept').length,understanding=members.filter(x=>questionFamily(x).diagnosticTarget==='understanding').length,highOrder=members.filter(isHigh).length;
+  const confirmedStrong=members.filter(x=>isStrong(x)&&questionFamily(x).qualityConfirmed).length,confirmedConcept=members.filter(x=>questionFamily(x).diagnosticTarget==='concept'&&questionFamily(x).qualityConfirmed).length,confirmedUnderstanding=members.filter(x=>questionFamily(x).diagnosticTarget==='understanding'&&questionFamily(x).qualityConfirmed).length,confirmedHighOrder=members.filter(x=>isHigh(x)&&questionFamily(x).qualityConfirmed).length;
+  const coverage=Math.min(strong,2)+(concept?1:0)+(understanding?1:0)+(highOrder?1:0),complete=coverage===5,ready=complete&&confirmedStrong>=2&&confirmedConcept>=1&&confirmedUnderstanding>=1&&confirmedHighOrder>=1;
+  return {root,members,strong,concept,understanding,highOrder,confirmedStrong,confirmedConcept,confirmedUnderstanding,confirmedHighOrder,coverage,complete,ready};
+}
+function validateQuestionFamily(q){
+  const issues=[],f=questionFamily(q),id=q.id||'未命名';
+  const push=(level,message,suggest='')=>issues.push({level,object:id,message,suggest});
+  if(f.role==='standalone')return issues;
+  if(f.role==='root'){
+    if(!f.familyId)push('error','母题缺少系统 Family ID','重新切换一次"家族角色 = 母题"以自动生成。');
+    if(f.rootQuestionId!==q.id)push('error','母题 rootQuestionId 与自身 Question ID 不一致','重新保存母题家族设置。');
+    const c=familyCoverageFor(q);
+    if(!c.complete)push('warn',`题目家族最低配置未达标：强等价 ${c.strong}/2、概念 ${c.concept?1:0}/1、理解 ${c.understanding?1:0}/1、高阶验证 ${c.highOrder?1:0}/1`,'补齐缺失成员；同一道成员允许同时承担多个用途。Root-only 批次合法，这只是"未达到诊断就绪"提示。');
+    else if(!c.ready)push('warn','题目家族结构已完整，但尚未达到"诊断就绪"','至少确认 2 道强等价、1 道概念、1 道理解和 1 道高阶验证的内容质量。');
+  }
+  if(f.role==='member'){
+    if(!f.rootQuestionId)push('error',`家族成员（${f.familyKey||'未命名家族'}）尚未绑定母题`,'在题目家族区域选择母题。');
+    const root=f.rootQuestionId?familyQuestionById(f.rootQuestionId):null;
+    if(f.rootQuestionId&&!root)push('error',`母题 ${f.rootQuestionId} 不存在`,'重新选择母题。');
+    if(root&&questionFamily(root).role!=='root')push('error','绑定对象不是母题','请选择角色为"母题"的题目。');
+    if(!['equivalent','decomposed','extension'].includes(f.relationToRoot))push('error','家族成员缺少有效关系','选择等价变体 / 能力拆解 / 扩展。');
+    if(f.relationToRoot==='equivalent'&&!f.equivalenceGrade)push('warn','等价变体尚未设置等价等级','正式验证建议使用 A 级强等价。');
+    if(f.purposes.some(p=>['post-remediation-verification','mastery-check'].includes(p))&&f.relationToRoot==='decomposed')push('warn','能力拆解题被标记为最终验证用途','拆解题适合定位问题；最终掌握验证建议回到强等价或高阶变体。');
+    if((f.equivalenceGrade==='A'||f.purposes.some(p=>['post-remediation-verification','mastery-check'].includes(p)))&&!f.qualityConfirmed)push('warn','高价值诊断/验证成员尚未人工确认质量','确认知识目标、能力层级、难度和推理链后勾选"质量确认"。');
+  }
+  return issues;
+}
+function validateFamilyStructure(questions=state.questionBank.questions){
+  const issues=[],familyRootKeys=new Map(),familyRootIds=new Map();
+  questions.filter(q=>questionFamily(q).role==='root').forEach(q=>{
+    const f=questionFamily(q);
+    if(f.familyKey){
+      if(familyRootKeys.has(f.familyKey))issues.push({level:'error',object:q.id,message:`家族代号重复：${f.familyKey} 存在多个母题`,suggest:'同一个 familyKey 只能有 1 道母题。'});
+      else familyRootKeys.set(f.familyKey,q.id);
+    }
+    if(f.familyId){
+      if(familyRootIds.has(f.familyId))issues.push({level:'error',object:q.id,message:`Family ID ${f.familyId} 存在多个母题`,suggest:'重新拆分或绑定题目家族。'});
+      else familyRootIds.set(f.familyId,q.id);
+    }
+  });
+  return issues;
+}
+function forceExternalFamilyUnconfirmed(questions=[]){
+  (questions||[]).forEach(q=>{if(q?.metadata?.questionFamily)q.metadata.questionFamily.qualityConfirmed=false});
+}
+function familyRoleLabel(role){return role==='root'?'母题':role==='member'?'家族成员':'独立题'}
+function familyRelationLabel(v){return ({root:'母题',equivalent:'等价变体',decomposed:'能力拆解',extension:'扩展/高阶',standalone:'独立'})[v]||v}
+function diagnosticTargetLabel(v){return ({general:'一般',concept:'概念',understanding:'理解',discrimination:'辨析',application:'应用',analysis:'分析','case-transfer':'案例迁移'})[v]||v}
+function familyPurposeLabels(v){return (v||[]).map(x=>FAMILY_PURPOSE_LABELS[x]||x).join('、')}
 
 /*
  * P4.5.29 差异 6–8：原则包双格式兼容、旧库迁移与安全合并（纯领域函数，无 DOM）。
@@ -1871,7 +2055,9 @@ function renderQuestionListOnly(){
   state.questionBank.questions.forEach((q,i)=>{
     const d=document.createElement('div');d.className='list-item'+(q.id===state.currentQuestionId?' active':'');
     const st=questionCompleteness(q);
-    d.innerHTML=`<div class="list-title"><span class="status-dot ${st}"></span>${i+1}. ${esc(q.title)}</div><div class="list-meta">${esc(q.id)} · ${esc(q.difficulty||'')}</div>`;
+    const fam=questionFamily(q);
+    const famBadge=fam.role==='standalone'?'':`<span class="family-badge family-${fam.role}" title="${fam.role==='root'?'母题':'家族成员'} ${esc(fam.familyKey)}">【${fam.role==='root'?'母题':'成员'}${fam.role==='member'&&fam.equivalenceGrade?'·'+fam.equivalenceGrade:''}】</span>`;
+    d.innerHTML=`<div class="list-title"><span class="status-dot ${st}"></span>${i+1}. ${famBadge}${esc(q.title)}</div><div class="list-meta">${esc(q.id)} · ${esc(q.difficulty||'')}${fam.role!=='standalone'?' · L'+fam.difficultyLevel:''}</div>`;
     d.onclick=async()=>{if(q.id===state.currentQuestionId)return;await switchQuestionForEdit(q);state.currentQuestionId=q.id;renderQuestions()};list.appendChild(d);
   });
 }
@@ -1921,8 +2107,94 @@ function renderQuestionFacetBindings(){
     renderCurrentIssues();markWorkspaceDirty();
   }));
 }
-function renderSubjectFacetManager(){
-  const box=document.getElementById('subjectFacetManager');if(!box)return;
+function renderQuestionFamilyEditor(){
+  const q=currentQuestion(),box=document.getElementById('questionFamilyPanel');if(!q||!box)return;
+  const f=questionFamily(q);
+  const root=familyRootFor(q),members=root?familyMembersFor(root):[],coverage=root?familyCoverageFor(root):null;
+  const rootOptions=state.questionBank.questions.filter(x=>x.id!==q.id&&questionFamily(x).role==='root');
+  const purposesChecked=new Set(f.purposes);
+  box.innerHTML=`<div class="help">三种角色：母题（root）/ 家族成员（member）/ 独立题（standalone）。普通难度是三档，<code>questionFamily.difficultyLevel</code> 是独立 L1–L4 诊断层级。外部导入的质量确认一律为否，只有教师可以勾选确认。</div>
+  <div class="form-grid" style="margin-top:10px">
+    <div><label>家族角色</label><select id="qfRole">
+      ${['standalone|独立题','root|母题','member|家族成员'].map(x=>{const [v,l]=x.split('|');return `<option value="${v}"${f.role===v?' selected':''}>${l}</option>`}).join('')}
+    </select></div>
+    <div><label>家族代号 familyKey</label><input type="text" id="qfFamilyKey" value="${esc(f.familyKey)}" ${f.role==='standalone'?'disabled':''} placeholder="FAMILY-001"></div>
+    <div><label>与母题关系（成员）</label><select id="qfRelation" ${f.role!=='member'?'disabled':''}>
+      ${[['equivalent','等价变体'],['decomposed','能力拆解'],['extension','扩展/高阶']].map(([v,l])=>`<option value="${v}"${f.relationToRoot===v?' selected':''}>${l}</option>`).join('')}
+    </select></div>
+    <div><label>变体类型（成员）</label><select id="qfVariant" ${f.role!=='member'?'disabled':''}>
+      ${[['stem','题干'],['options','选项'],['scenario','情境'],['parameter','参数'],['mixed','混合'],['decomposed','拆解'],['advanced','高阶']].map(([v,l])=>`<option value="${v}"${f.variantType===v?' selected':''}>${l}</option>`).join('')}
+    </select></div>
+    <div><label>等价等级（等价变体）</label><select id="qfGrade" ${f.role!=='member'||f.relationToRoot!=='equivalent'?'disabled':''}>
+      ${['','A','B','C'].map(v=>`<option value="${v}"${f.equivalenceGrade===v?' selected':''}>${v||'— 未设置 —'}</option>`).join('')}
+    </select></div>
+    <div><label>诊断目标</label><select id="qfTarget">
+      ${[['general','一般'],['concept','概念'],['understanding','理解'],['discrimination','辨析'],['application','应用'],['analysis','分析'],['case-transfer','案例迁移']].map(([v,l])=>`<option value="${v}"${f.diagnosticTarget===v?' selected':''}>${l}</option>`).join('')}
+    </select></div>
+    <div><label>诊断层级 L1–L4</label><select id="qfLevel">
+      ${[1,2,3,4].map(v=>`<option value="${v}"${f.difficultyLevel===v?' selected':''}>L${v}</option>`).join('')}
+    </select></div>
+    <div><label>绑定母题（成员）</label><select id="qfRoot" ${f.role!=='member'?'disabled':''}>
+      <option value="">— 选择母题 —</option>
+      ${rootOptions.map(x=>`<option value="${esc(x.id)}"${f.rootQuestionId===x.id?' selected':''}>${esc(x.title)}（${esc(x.id.slice(0,8))}）</option>`).join('')}
+    </select></div>
+    <div class="span2"><label>学习用途（多选）</label><div class="principle-checks">
+      ${Object.entries(FAMILY_PURPOSE_LABELS).map(([v,l])=>`<label><input type="checkbox" data-qf-purpose="${v}"${purposesChecked.has(v)?' checked':''}> ${l}</label>`).join('')}
+    </div></div>
+    <div class="span2"><label><input type="checkbox" id="qfConfirmed"${f.qualityConfirmed?' checked':''}> 教师质量确认（qualityConfirmed；外部导入固定为否）</label></div>
+    <div class="span2"><label>备注</label><input type="text" id="qfNotes" value="${esc(f.notes)}"></div>
+  </div>
+  <div class="toolbar" style="margin-top:10px">
+    <button class="btn small primary" id="btnCreateFamilyMember" type="button">从母题创建成员题</button>
+    <button class="btn small" id="btnGoFamilyRoot" type="button" ${root?'':'disabled'}>跳到母题</button>
+    <span class="muted tiny">${f.role==='standalone'?'独立题不参与家族分组。':root?`家族 ${esc(questionFamily(root).familyKey)} · 成员 ${members.length} 道 · ${coverage.ready?'已达到诊断就绪':coverage.complete?'结构完整，待人工确认':'未达到诊断就绪（强等价 '+coverage.strong+'/2 · 概念 '+(coverage.concept?1:0)+'/1 · 理解 '+(coverage.understanding?1:0)+'/1 · 高阶 '+(coverage.highOrder?1:0)+'/1）'}（Root-only 批次合法，这只是就绪提示）`:'尚未绑定母题。'}</span>
+  </div>
+  ${members.length?`<div class="muted tiny" style="margin-top:8px">家族成员：${members.map(m=>`<a href="javascript:void(0)" data-qf-goto="${esc(m.id)}" style="margin-right:8px">${esc(m.title)}（${familyRelationLabel(questionFamily(m).relationToRoot)}${questionFamily(m).equivalenceGrade?'·'+questionFamily(m).equivalenceGrade:''}）</a>`).join('')}</div>`:''}`;
+  const rerender=()=>{renderQuestionFamilyEditor();renderQuestionListOnly();renderCurrentIssues();markWorkspaceDirty()};
+  document.getElementById('qfRole').onchange=e=>{
+    const role=e.target.value;
+    if(role==='root')makeQuestionFamilyRoot(q);
+    else if(role==='standalone')makeQuestionStandalone(q);
+    else{const target=root&&root.id!==q.id?root:rootOptions[0];if(target)makeQuestionFamilyMember(q,target,{applyDefaults:false});else{q.metadata.questionFamily.role='member'}}
+    rerender();
+  };
+  const keyInput=document.getElementById('qfFamilyKey');keyInput.oninput=()=>{questionFamily(q).familyKey=keyInput.value.trim();if(root&&root.id===q.id)renameQuestionFamilyKey(q,keyInput.value.trim());renderQuestionListOnly();renderCurrentIssues();markWorkspaceDirty()};
+  // 注意：questionFamily(q) 每次调用都会重新归一并替换 q.metadata.questionFamily 对象，
+  // 校验中心等流程也会触发替换，因此 handler 内必须现取对象，不能依赖渲染时的闭包 f。
+  const bind=(id,apply)=>{const el=document.getElementById(id);if(el)el.onchange=()=>{apply(el.value);rerender()}};
+  bind('qfRelation',v=>{const fam=questionFamily(q);fam.relationToRoot=normalizeFamilyRelation(v);if(fam.role==='member')fam.relationToRoot=['equivalent','decomposed','extension'].includes(fam.relationToRoot)?fam.relationToRoot:'equivalent'});
+  bind('qfVariant',v=>{questionFamily(q).variantType=normalizeFamilyVariantType(v)});
+  bind('qfGrade',v=>{questionFamily(q).equivalenceGrade=normalizeEquivalenceGrade(v)});
+  bind('qfTarget',v=>{questionFamily(q).diagnosticTarget=normalizeDiagnosticTarget(v)});
+  bind('qfLevel',v=>{questionFamily(q).difficultyLevel=Math.min(4,Math.max(1,Number(v)||2))});
+  bind('qfRoot',v=>{const target=state.questionBank.questions.find(x=>x.id===v);if(target){makeQuestionFamilyMember(q,target,{applyDefaults:false})}else{questionFamily(q).rootQuestionId=''}});
+  box.querySelectorAll('[data-qf-purpose]').forEach(el=>el.addEventListener('change',()=>{
+    const fam=questionFamily(q);
+    fam.purposes=[...box.querySelectorAll('[data-qf-purpose]:checked')].map(x=>x.dataset.qfPurpose);
+    if(!fam.purposes.length)fam.purposes=['practice'];
+    renderCurrentIssues();markWorkspaceDirty();
+  }));
+  document.getElementById('qfConfirmed').onchange=e=>{questionFamily(q).qualityConfirmed=e.target.checked;renderCurrentIssues();markWorkspaceDirty()};
+  document.getElementById('qfNotes').oninput=e=>{questionFamily(q).notes=e.target.value.trim();markWorkspaceDirty()};
+  box.querySelectorAll('[data-qf-goto]').forEach(el=>el.addEventListener('click',()=>{state.currentQuestionId=el.dataset.qfGoto;renderQuestions();renderQuestionEditor()}));
+  const createBtn=document.getElementById('btnCreateFamilyMember');
+  createBtn.onclick=()=>{
+    const base=root&&root.id!==q.id?root:q;
+    if(questionFamily(base).role!=='root'&&!confirm('当前题不是母题，先把它设为母题再创建成员？'))return;
+    makeQuestionFamilyRoot(base);
+    const copy=QuestionService.duplicatePayload(base);
+    copy.title=base.title+'（家族成员）';
+    state.questionBank.questions.push(copy);
+    makeQuestionFamilyMember(copy,base);
+    questionFamily(copy).qualityConfirmed=false;
+    state.currentQuestionId=copy.id;state.questionBank.updatedAt=Date.now();
+    renderQuestions();renderQuestionEditor();markWorkspaceDirty();toast('已从母题创建家族成员');
+  };
+  const goRoot=document.getElementById('btnGoFamilyRoot');
+  if(goRoot&&!root)goRoot.disabled=true;
+  else if(goRoot)goRoot.onclick=()=>{state.currentQuestionId=root.id;renderQuestions();renderQuestionEditor()};
+}
+function renderSubjectFacetManager(){  const box=document.getElementById('subjectFacetManager');if(!box)return;
   const subject=state.questionBank.subject||'PMP',schema=facetSchemaForSubject(subject);
   if(!schema){
     box.innerHTML=`<div class="help">当前科目 <b>${esc(subject)}</b> 尚未配置科目分类。</div><div class="toolbar"><button class="btn small primary" id="btnImportFacetSchema">导入科目分类</button><input type="file" id="fileFacetSchema" accept=".json,application/json" hidden></div>`;
@@ -1998,6 +2270,10 @@ function renderQuestionEditor(){
     <div id="questionFacetBindingPanel"></div>
   </div>
   <div class="section">
+    <div class="section-title">题目家族（Question Family v1）</div>
+    <div id="questionFamilyPanel"></div>
+  </div>
+  <div class="section">
     <div class="section-title">知识点</div>
     <label>主知识点（只保存稳定 Node ID）</label>
     <select id="primaryNode">${treeOptions(q.metadata?.knowledge?.primaryNodeId||'')}</select>
@@ -2012,7 +2288,7 @@ function renderQuestionEditor(){
     </div>
   </div>`;
   bindQuestionEditor();
-  renderQuestionPrincipleBindings();renderQuestionFacetBindings();renderKeywords();renderPreview();renderCurrentIssues();renderQuestionLockState();
+  renderQuestionPrincipleBindings();renderQuestionFacetBindings();renderQuestionFamilyEditor();renderKeywords();renderPreview();renderCurrentIssues();renderQuestionLockState();
 }
 function bindQuestionEditor(){
   const q=currentQuestion();if(!q)return;
@@ -2645,7 +2921,9 @@ function runValidation(){
     if(contentHashOwners.has(ch))issues.push({level:'warn',object:q.id,message:`疑似重复题内容：与 ${contentHashOwners.get(ch)} 的 Content Hash 相同`,suggest:'确认是否为重复题；服务器未来可用 contentHash 做二次去重。'});
     else contentHashOwners.set(ch,q.id);
     validateQuestion(q,true).forEach(x=>issues.push(x));
+    validateQuestionFamily(q).forEach(x=>issues.push(x));
   });
+  validateFamilyStructure(state.questionBank.questions).forEach(x=>issues.push(x));
   state.questionBank.questions.forEach(q=>{const metadata=syncQuestionPrinciples(q);(metadata.stemPrincipleIds||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`题干原则 ID 不存在：${id}`,suggest:'在原则管理中创建或重新绑定。'})});Object.entries(metadata.optionPrincipleMap||{}).forEach(([opt,ids])=>(ids||[]).forEach(id=>{if(!principleById(id))issues.push({level:'error',object:q.id,message:`选项 ${opt} 的原则 ID 不存在：${id}`,suggest:'重新绑定选项原则。'})}));const correctIds=metadata.optionPrincipleMap?.[q.correctAnswer]||[];if(correctIds.length!==1)issues.push({level:'error',object:q.id,message:'正确选项必须绑定且只能绑定一条原则',suggest:'在题目录入区为正确选项保留一条原则；多题归纳据此分组。'});validateQuestionFacets(q).forEach(x=>issues.push({level:x.level,object:q.id,message:x.message,suggest:x.suggest}));(q.tags||[]).forEach(tag=>{if(!tagPathFor(tag))issues.push({level:'warn',object:q.id,message:`标签“${tag}”未绑定主程序预设标签槽位`,suggest:'保留为自由标签，或在标签管理中映射/改名。'})})});
   state.principles.items.forEach(p=>{const preset=presetByPrincipleId(p.id);if(!preset||!preset.content)issues.push({level:'warn',object:p.id,message:`原则“${p.name}”缺少归纳卡内容`,suggest:'补充 synthesis preset。'})});
   const conflicts=aliasConflicts();conflicts.forEach(c=>issues.push({level:'error',object:'联想库',message:`名称/Alias 冲突：“${c.term}” → ${c.nodes.map(n=>n.title).join(' / ')}`,suggest:'保留唯一入口，或把 Alias 改成更具体的词。'}));
@@ -3278,6 +3556,8 @@ document.getElementById('helpModal').addEventListener('click',e=>{if(e.target.id
 document.getElementById('btnDownloadCompleteBundle').onclick=()=>downloadJson(COMPLETE_CONTENT_BUNDLE_TEMPLATE,'PMP_Content_Prep_完整内容包模板_v1.json');
 document.getElementById('btnDownloadCompleteAiPrompt').onclick=()=>downloadText(COMPLETE_AI_PROMPT,'PMP_Content_Prep_完整AI制作提示词.txt');
 document.getElementById('btnDownloadQuestionTemplate').onclick=()=>downloadJson(QUESTION_TEMPLATE,'PMP_Content_Prep_题库导入模板_v3_自动ID.json');
+document.getElementById('btnDownloadFamilyTemplate').onclick=()=>downloadJson(QUESTION_FAMILY_TEMPLATE,'PMP_Content_Prep_题目家族最低配置模板_v1.json',{auditType:'question-family-template'});
+document.getElementById('btnDownloadFamilyAiPrompt').onclick=()=>downloadText(QUESTION_FAMILY_AI_PROMPT,'PMP_Content_Prep_题目家族_AI提示词_v1.txt');
 document.getElementById('btnDownloadAiPrompt').onclick=()=>downloadText(WORD_TO_JSON_AI_PROMPT,'Word题目转PrepStudio_JSON_AI提示词.txt');
 function confirmQuestionDuplicateCleanup(incoming,existing=[]){
   const report=preflightQuestionDuplicates(incoming,existing);if(!report.duplicates.length)return report;

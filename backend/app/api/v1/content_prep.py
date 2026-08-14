@@ -509,6 +509,12 @@ async def force_release_question_lock(question_id: str, db: DB, actor: AdminUser
 
 @router.post("/batches", response_model=ContentPrepBatchResult)
 async def upload_batch(request: ContentPrepBatchRequest, db: DB, actor: PrepEditor):
+    # P4.5.29 差异 16：外部批次导入一律强制 qualityConfirmed=false，只有教师人工确认可为 true。
+    # 教师编辑流（共享草稿同步）不走这里，保留教师已确认的状态。
+    for item in request.questions:
+        family = item.question.metadata.get("questionFamily")
+        if isinstance(family, dict):
+            family["qualityConfirmed"] = False
     try:
         return await content_prep_service.upload_bundle(db, actor, request)
     except content_prep_service.ContentPrepOperationError as error:

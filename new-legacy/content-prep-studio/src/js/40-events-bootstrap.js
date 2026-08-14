@@ -8,6 +8,8 @@ document.getElementById('helpModal').addEventListener('click',e=>{if(e.target.id
 document.getElementById('btnDownloadCompleteBundle').onclick=()=>downloadJson(COMPLETE_CONTENT_BUNDLE_TEMPLATE,'PMP_Content_Prep_完整内容包模板_v1.json');
 document.getElementById('btnDownloadCompleteAiPrompt').onclick=()=>downloadText(COMPLETE_AI_PROMPT,'PMP_Content_Prep_完整AI制作提示词.txt');
 document.getElementById('btnDownloadQuestionTemplate').onclick=()=>downloadJson(QUESTION_TEMPLATE,'PMP_Content_Prep_题库导入模板_v3_自动ID.json');
+document.getElementById('btnDownloadFamilyTemplate').onclick=()=>downloadJson(QUESTION_FAMILY_TEMPLATE,'PMP_Content_Prep_题目家族最低配置模板_v1.json',{auditType:'question-family-template'});
+document.getElementById('btnDownloadFamilyAiPrompt').onclick=()=>downloadText(QUESTION_FAMILY_AI_PROMPT,'PMP_Content_Prep_题目家族_AI提示词_v1.txt');
 document.getElementById('btnDownloadAiPrompt').onclick=()=>downloadText(WORD_TO_JSON_AI_PROMPT,'Word题目转PrepStudio_JSON_AI提示词.txt');
 function confirmQuestionDuplicateCleanup(incoming,existing=[]){
   const report=preflightQuestionDuplicates(incoming,existing);if(!report.duplicates.length)return report;

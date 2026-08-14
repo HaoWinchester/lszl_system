@@ -253,6 +253,8 @@ function stampQuestionOrigin(q,{batchId='',source='manual',forceOrigin=false,par
 }
 function stampImportedQuestions(questions,source){
   const batchId=generateBatchId();
+  // P4.5.29 差异 16：外部导入一律强制 qualityConfirmed=false，只有教师操作可以设为 true
+  if(typeof forceExternalFamilyUnconfirmed==='function')forceExternalFamilyUnconfirmed(questions);
   (questions||[]).forEach(q=>stampQuestionOrigin(q,{batchId,source,forceOrigin:!q.metadata?.origin}));
   return batchId;
 }
@@ -541,7 +543,7 @@ function normalizeQuestion(q,i=0,subject='PMP'){
     },
     clues,
     reasoningSteps:Array.isArray(q.reasoningSteps)?clone(q.reasoningSteps):[],
-    metadata:(()=>{const metadata={...(q.metadata&&typeof q.metadata==='object'?q.metadata:{}),tagPaths:Array.isArray(q.metadata?.tagPaths)?clone(q.metadata.tagPaths):[],subjectFacets:typeof normalizeQuestionFacets==='function'?normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||subject):(Array.isArray(q.metadata?.subjectFacets)?clone(q.metadata.subjectFacets):[]),knowledge};syncQuestionPrinciples({metadata,principleIds:q.principleIds,options});return metadata})(),
+    metadata:(()=>{const metadata={...(q.metadata&&typeof q.metadata==='object'?q.metadata:{}),tagPaths:Array.isArray(q.metadata?.tagPaths)?clone(q.metadata.tagPaths):[],subjectFacets:typeof normalizeQuestionFacets==='function'?normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||subject):(Array.isArray(q.metadata?.subjectFacets)?clone(q.metadata.subjectFacets):[]),questionFamily:typeof normalizeQuestionFamily==='function'?normalizeQuestionFamily(q.metadata?.questionFamily||{},systemQuestionId,q.difficulty):(q.metadata?.questionFamily||{}),knowledge};syncQuestionPrinciples({metadata,principleIds:q.principleIds,options});return metadata})(),
     lifecycle:q.lifecycle&&typeof q.lifecycle==='object'?clone(q.lifecycle):{status:'active',deletedAt:''},
     status:q.status&&typeof q.status==='object'?clone(q.status):{contentReady:false,keywordsReady:false,knowledgeReady:false,reasoningReady:false,published:false}
     ,serverRevision:Number(q.serverRevision)||null
@@ -556,10 +558,12 @@ function normalizeBank(payload){
   if(Array.isArray(payload))b={name:'导入题库',subject:'PMP',questions:payload};
   if(!b||!Array.isArray(b.questions))throw new Error('题库缺少 questions 数组。');
   const subject=String(b.subject||'PMP');
+  const questions=b.questions.map((q,i)=>{const nq=QuestionService.normalize(q,i,subject);syncQuestionPrinciples(nq);nq.tags=unique((nq.tags||[]).map(canonicalTagName));nq.metadata.tagPaths=nq.tags.map(tagPathFor).filter(Boolean);return nq});
+  if(typeof resolveQuestionFamilies==='function')resolveQuestionFamilies(questions);
   return {
     id:String(b.id||b.bankId||generateSystemId('bank')),name:String(b.name||b.bankName||'PMP 题库'),subject,description:String(b.description||''),
     version:String(b.version||'1.0'),visibility:String(b.visibility||'private'),createdAt:Number(b.createdAt||Date.now()),updatedAt:Number(b.updatedAt||Date.now()),
-    questions:b.questions.map((q,i)=>{const nq=QuestionService.normalize(q,i,subject);syncQuestionPrinciples(nq);nq.tags=unique((nq.tags||[]).map(canonicalTagName));nq.metadata.tagPaths=nq.tags.map(tagPathFor).filter(Boolean);return nq})
+    questions
   };
 }
 function normalizeContentBundle(payload){

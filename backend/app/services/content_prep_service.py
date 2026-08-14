@@ -611,6 +611,156 @@ async def _effective_tag_config(
     }
 
 
+_FAMILY_ROLES = {"standalone", "root", "member"}
+_FAMILY_MEMBER_RELATIONS = {"equivalent", "decomposed", "extension"}
+
+
+def _question_family(normalized: dict[str, Any]) -> dict[str, Any]:
+    metadata = normalized.get("metadata") if isinstance(normalized.get("metadata"), dict) else {}
+    family = metadata.get("questionFamily")
+    return family if isinstance(family, dict) else {}
+
+
+def _validate_question_family(normalized: dict[str, Any]) -> list[CatalogIssue]:
+    """单题级 Question Family v1 校验（P4.5.29 差异 28 / P0-FAMILY-01）。
+
+    Root-only 批次合法：覆盖不足不在这里报错（是编辑端的就绪提示，不是导入错误）。
+    """
+    family = _question_family(normalized)
+    if not family:
+        return []
+    question_id = str(normalized.get("id") or "")
+    issues: list[CatalogIssue] = []
+    role = str(family.get("role") or "").strip()
+    if role not in _FAMILY_ROLES:
+        issues.append(
+            _question_issue(
+                question_id,
+                "metadata.questionFamily.role",
+                "FAMILY_ROLE_INVALID",
+                f"题目家族角色非法：{role or '（空）'}（允许 standalone/root/member）",
+            )
+        )
+        return issues
+    if role == "member":
+        relation = str(family.get("relationToRoot") or "").strip()
+        if relation not in _FAMILY_MEMBER_RELATIONS:
+            issues.append(
+                _question_issue(
+                    question_id,
+                    "metadata.questionFamily.relationToRoot",
+                    "FAMILY_MEMBER_RELATION_INVALID",
+                    f"家族成员关系非法：{relation or '（空）'}（允许 equivalent/decomposed/extension）",
+                )
+            )
+    level = family.get("difficultyLevel")
+    if level is not None:
+        try:
+            numeric_level = int(level)
+        except (TypeError, ValueError):
+            numeric_level = -1
+        if not 1 <= numeric_level <= 4:
+            issues.append(
+                _question_issue(
+                    question_id,
+                    "metadata.questionFamily.difficultyLevel",
+                    "FAMILY_LEVEL_INVALID",
+                    "题目家族诊断层级必须是 L1–L4",
+                )
+            )
+    return issues
+
+
+async def _validate_question_family_batch(
+    db: AsyncSession,
+    bank: QuestionBank,
+    normalized_questions: list[dict[str, Any]],
+) -> list[CatalogIssue]:
+    """批次级结构校验：同 familyKey 重复母题、成员母题必须在同一 Bank 内存在。
+
+    成员引用的母题不在本批且不在本 Bank 已有题目中（含跨 Bank 引用形态）即阻断。
+    """
+    issues: list[CatalogIssue] = []
+    family_rows = [(str(q.get("id") or ""), _question_family(q)) for q in normalized_questions]
+    family_rows = [row for row in family_rows if row[1]]
+    if not family_rows:
+        return issues
+
+    roots_by_key: dict[str, str] = {}
+    batch_ids = {question_id for question_id, _family in family_rows}
+    for question_id, family in family_rows:
+        if str(family.get("role") or "") != "root":
+            continue
+        family_key = str(family.get("familyKey") or "").strip()
+        if not family_key:
+            continue
+        if family_key in roots_by_key:
+            issues.extend(
+                [
+                    _question_issue(
+                        question_id,
+                        "metadata.questionFamily.familyKey",
+                        "FAMILY_DUPLICATE_ROOT",
+                        f"家族代号重复：{family_key} 存在多个母题（同一 Bank 只能有 1 道母题）",
+                    ),
+                    _question_issue(
+                        roots_by_key[family_key],
+                        "metadata.questionFamily.familyKey",
+                        "FAMILY_DUPLICATE_ROOT",
+                        f"家族代号重复：{family_key} 存在多个母题（同一 Bank 只能有 1 道母题）",
+                    ),
+                ]
+            )
+        else:
+            roots_by_key[family_key] = question_id
+
+    bank_root_ids = set(roots_by_key.values()) | {
+        question_id
+        for question_id, family in family_rows
+        if str(family.get("role") or "") == "root"
+    }
+    member_root_ids = {
+        question_id: str(family.get("rootQuestionId") or "").strip()
+        for question_id, family in family_rows
+        if str(family.get("role") or "") == "member"
+    }
+    unresolved = {
+        question_id: root_id
+        for question_id, root_id in member_root_ids.items()
+        if root_id and root_id not in bank_root_ids and root_id not in batch_ids
+    }
+    if unresolved:
+        existing_rows = (
+            await db.execute(
+                select(Question.id, Question.content_metadata).where(
+                    Question.bank_id == bank.id,
+                    Question.id.in_(unresolved.values()),
+                )
+            )
+        ).all()
+        existing_root_ids = {
+            str(row.id)
+            for row in existing_rows
+            if str(((row.content_metadata or {}).get("questionFamily") or {}).get("role") or "")
+            == "root"
+        }
+        unresolved = {
+            question_id: root_id
+            for question_id, root_id in unresolved.items()
+            if root_id not in existing_root_ids
+        }
+    for question_id, root_id in unresolved.items():
+        issues.append(
+            _question_issue(
+                question_id,
+                "metadata.questionFamily.rootQuestionId",
+                "FAMILY_MEMBER_ROOT_MISSING",
+                f"母题 {root_id} 不在本题库中（家族成员只能引用同一题库内的母题）",
+            )
+        )
+    return issues
+
+
 def _validate_tag_paths(
     normalized: dict[str, Any],
     config: dict[str, Any],
@@ -998,6 +1148,7 @@ async def _prepare_questions(
             else "updated"
         )
         issues.extend(_validate_question_content(normalized, is_new=existing is None))
+        issues.extend(_validate_question_family(normalized))
         issues.extend(_validate_tag_paths(normalized, effective_tag_config))
         prepared.append(
             _PreparedQuestion(
@@ -1008,6 +1159,10 @@ async def _prepare_questions(
                 status=status,
             )
         )
+
+    issues.extend(
+        await _validate_question_family_batch(db, bank, [item.normalized for item in prepared])
+    )
 
     incoming_principle_ids, input_issues = await _validate_principle_and_preset_inputs(
         db,
