@@ -103,8 +103,11 @@ users / role_themes / system_settings(KV) / user_admin_logs / folders / graph_fi
 - **发布回退**：曾基于旧源（new-legacy v8.6.29，146 文件）发布 v9.0-p4.1.2，把生产 v9 内容（597 文件、含 admin-console 等新页面）回退掉。根因：没核对源 vs active release 文件数，凭"版本号体系"假设行事。
 - **漏页**：曾修 `isLoggedIn` 后只在 training/workspace/index 验证退出，漏掉 `knowledge-recall.html` 有账号菜单但缺 `authModal` DOM + `standalone-auth-dialog.js`（点登录无反应）。根因：没遍历所有做题页测登录/退出，把"跳转一致"当成了"功能一致"。
 
-## 功能分支收尾纪律（强制执行）
+## 功能分支工作流（强制执行）
 
-- 每个功能开发完成并通过相应验证后，必须合入 `main` 并推送远端；不要长期保留已完成的功能分支。
+- **开发任何新功能必须先从 `main` 拉功能分支**（如 `feat/xxx`），不要直接在 `main` 上开发。
+- 功能开发完成并通过相应验证后：合入 `main` → 推送远端 → 执行发布（`node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser` 等）→ **删除该功能分支**。
+- 同一时间仓库只保留 `main` 加至多一个进行中的功能分支；不要出现过多并存分支。
 - 合入成功后删除对应的本地/远端功能分支，并移除对应工作树；最终核对仓库只保留 `main`（托管工具创建的临时 detached 工作树除外）。
 - 不得为清理分支丢弃尚未合入的有效修改；发现脏工作树时，先审计并把有效内容纳入 `main`，再执行清理。
+- **发布的 sync 产物（`frontend/public/new-legacy/`、manifest、sync-report、seed 版本号）必须随发布提交**，不要只提交源（`new-legacy/`）漏掉产物，避免仓库状态与线上内容脱节。
