@@ -2,6 +2,7 @@
 
 from app.models.analytics import FeatureUsageEvent
 from app.models.content_prep import (
+    ContentPrepDraft,
     Principle,
     QuestionAuditLog,
     QuestionBankCollaborator,
@@ -41,6 +42,7 @@ __all__ = [
     "CurrentFile",
     "QuestionBank",
     "QuestionBankCollaborator",
+    "ContentPrepDraft",
     "Question",
     "Principle",
     "SynthesisPreset",

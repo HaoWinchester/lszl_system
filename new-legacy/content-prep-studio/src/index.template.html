@@ -28,9 +28,9 @@
     </select></div>
     <button class="help-center-btn" id="btnHelpCenter" type="button">帮助中心</button>
     <button class="creator-switch-btn" id="btnSwitchCreator" type="button">切换制作人</button>
-    <button class="header-save-btn" id="btnQuickSaveWorkspace" type="button">保存到服务器</button>
+    <button class="header-save-btn" id="btnQuickSaveWorkspace" type="button">保存草稿</button>
     <span class="badge" id="hdrSaveStatus">尚未保存</span>
-    <span class="badge">服务端共享 · 本机仅作故障恢复副本</span>
+    <span class="badge">共享草稿 · 第七步同步主程序</span>
   </div>
 </header>
 
@@ -41,7 +41,7 @@
   <button data-tab="association">④ 联想词编辑</button>
   <button data-tab="demo">⑤ 题目演示校验</button>
   <button data-tab="validate">⑥ 校验中心</button>
-  <button data-tab="export">⑦ 导出中心</button>
+  <button data-tab="export">⑦ 同步与导出</button>
 </nav>
 
 <main>
@@ -86,15 +86,12 @@
         <div class="server-identity-grid">
           <div><span class="muted tiny">登录账号</span><strong id="serverActorName">未登录</strong></div>
           <div><span class="muted tiny">制作人</span><strong id="serverCreatorName">请先选择</strong></div>
-          <label><span class="muted tiny">目标题库</span><select id="serverBankSelect"><option value="">请选择题库</option></select></label>
         </div>
         <div class="toolbar server-actions">
-          <button class="btn" id="btnCreateServerBank" type="button">新建题库</button>
           <input id="serverQuestionIdInput" type="text" placeholder="服务器 Question ID">
           <button class="btn" id="btnLoadServerQuestion" type="button">从服务器载入</button>
-          <button class="btn primary" id="btnSyncToCatalog" type="button">同步到题库</button>
         </div>
-        <div class="server-catalog-help">上传成功后立即进入正式题库；失败时本地 IndexedDB 草稿不会被删除。</div>
+        <div class="server-catalog-help">前六步只编辑共享草稿；第七步才会新建题库并同步到主程序。</div>
         <div class="server-catalog-issues" id="serverCatalogIssues" aria-live="polite"></div>
       </div>
       <div class="data-summary">
@@ -231,17 +228,14 @@ D原则：principle-role-accountability</pre>
         <div class="data-card"><h3>标签配置</h3><b id="baseTagCount">0</b><div class="muted">主程序预设槽位</div></div>
       </div>
       <div class="save-panel">
-        <div class="section-title"><span>服务端共享工作区</span><span class="save-status" id="localSaveStatus">尚未保存</span></div>
+        <div class="section-title"><span>共享草稿</span><span class="save-status" id="localSaveStatus">尚未保存</span></div>
         <div class="help">
-          点击保存会把题库、知识树、联想库、原则、归纳卡和标签配置一起提交到服务器，管理员与所有教师共享，主程序无需手工导入即可读取。
-          IndexedDB <code>pmp_content_prep_studio_v1</code> 仅保留故障恢复副本，不再作为正式数据源。
-          重要项目仍建议定期“导出工作区草稿”作为额外备份。
+          点击保存只会更新数据库中的共享草稿，管理员与教师均可继续编辑；不会写入正式题库、知识树或原则库。
+          完成第六步校验后，请进入第七步选择目标题库并执行同步；同步成功才更新主程序，并自动删除本草稿。
         </div>
         <div class="toolbar" style="margin-top:9px">
-          <button class="btn primary" id="btnSaveWorkspaceLocal">保存到服务器</button>
-          <button class="btn" id="btnRestoreWorkspaceLocal">恢复本机副本</button>
-          <button class="btn danger" id="btnDeleteWorkspaceLocal">删除本机副本</button>
-          <label style="display:inline-flex;align-items:center;gap:6px;margin:0"><input type="checkbox" id="chkAutoSaveWorkspace"> 每 60 秒自动保存有变更的工作区</label>
+          <button class="btn primary" id="btnSaveWorkspaceLocal">保存共享草稿</button>
+          <button class="btn" id="btnOpenSharedDrafts">打开共享草稿列表</button>
         </div>
       </div>
       <div class="section toolbar">
@@ -391,6 +385,7 @@ D原则：principle-role-accountability</pre>
 </section>
 <section class="tab" id="tab-export">
   <div class="export-grid">
+    <div class="card export-card shared-draft-sync-card"><h3>同步到主程序</h3><p>这是第七步，也是唯一会写入正式题库、知识树、联想库、原则、归纳卡和标签配置的操作。同步成功后，本共享草稿会自动删除。</p><label>目标题库 <select id="serverBankSelect"><option value="">请选择题库</option></select></label><div class="toolbar" style="margin-top:10px"><button class="btn" id="btnCreateServerBank" type="button">新建题库</button><button class="btn primary" id="btnSyncToCatalog" type="button">同步到题库（主程序）</button></div></div>
     <div class="card export-card"><div style="display:flex;align-items:center;gap:8px"><h3 style="margin-right:auto">完整内容成品包</h3><button class="help-btn" data-page-help="export" title="本页帮助">?</button></div><p>题库 + 原则库 + 归纳卡 + 标签配置，作为未来服务器内容导入的推荐格式。</p><button class="btn primary" id="btnExportCompleteBundle">导出完整成品包 JSON</button></div>
     <div class="card export-card">
       <h3>题库 JSON</h3>
@@ -472,7 +467,7 @@ D原则：principle-role-accountability</pre>
           <h2>① 基础数据与导入</h2>
           <p>这里负责把外部 AI / Word 内容、知识树、联想库、原则、归纳卡和标签配置装入当前工作区。建议先选择制作人，再导入基础数据。</p>
           <h3>推荐顺序</h3>
-          <ol><li>确认当前制作人。</li><li>导入知识树和科目级联想库。</li><li>优先导入“完整内容准备包 JSON”，或使用 Word / AI 文本粘贴助手。</li><li>题量大时开启本机保存或自动保存。</li></ol>
+          <ol><li>确认当前制作人。</li><li>新建或打开一个共享草稿。</li><li>导入知识树和科目级联想库。</li><li>优先导入“完整内容准备包 JSON”，或使用 Word / AI 文本粘贴助手。</li><li>每次阶段性完成后点击“保存共享草稿”。</li></ol>
           <div class="help-example"><b>示例：</b>一次导入 50 道沟通题后，程序会自动给 50 道题生成 Question UUID，并给整批题记录同一个 Batch ID。</div>
           <h3>Word / AI 完整文本示例</h3>
           <pre>【题目1】
@@ -541,8 +536,8 @@ B原则：principle-effective-communication</pre>
         </article>
 
         <article class="help-topic" data-help-content="export">
-          <h2>⑦ 导出与审计</h2>
-          <p>这里输出题库、完整内容包、联想库、原则与归纳卡组合、标签配置、校验报告和工作区草稿。</p>
+          <h2>⑦ 同步与导出</h2>
+          <p>先选择或新建目标题库，确认同步后才将共享草稿写入正式题库、知识树、联想库、原则、归纳卡和标签配置；同步成功会自动删除该草稿。其余按钮用于导出 JSON 和审计记录。</p>
           <h3>v0.3.5 导出审计</h3>
           <p>每次正式导出会写入一条设备级审计事件，记录：</p>
           <ul><li>Audit ID</li><li>导出时间</li><li>制作人 Creator ID / 姓名</li><li>Device ID</li><li>导出类型与文件名</li><li>题目数量</li><li>最近 Batch ID</li><li>校验 Error / Warning 数</li><li>导出 payload 的 SHA-256 指纹</li><li>Prep Studio 版本</li></ul>
@@ -556,8 +551,8 @@ B原则：principle-effective-communication</pre>
           <p>每次打开页面必须从波塞冬、狗娃、阿浩、杰瑞、天才、女帝中选择一人。关闭页面后不会记住当前人物，避免共用电脑误记作者。</p>
           <h3>数据兼容与重构说明</h3>
           <p>v0.4.0 是架构重构版：内部标签槽位改用稳定语义 ID，Workspace 升级到 v4；导出到正式主程序时仍自动转换为原数字槽位格式。旧版工作区打开时自动迁移，不需要人工改 JSON。</p>
-          <h3>本机保存</h3>
-          <p>工作区通过独立 IndexedDB 保存；适合几百题分多次处理。重要项目仍建议定期导出工作区草稿 JSON。</p>
+          <h3>共享草稿</h3>
+          <p>工作区草稿保存在数据库，管理员与教师均可打开和继续编辑。点击“保存共享草稿”只保存草稿；只有第七步确认同步才会更新正式主程序。</p>
           <h3>开心主题</h3>
           <p>顶部可切换清爽蓝、樱花粉、薄荷绿、暖阳橙、葡萄紫、海盐青。主题只影响界面颜色，不改变任何题目或导出数据；主题选择会保存在当前浏览器设备中。</p>
         </article>
@@ -566,6 +561,14 @@ B原则：principle-effective-communication</pre>
   </div>
 </div>
 
+
+<div class="shared-draft-gate" id="sharedDraftGate" role="dialog" aria-modal="true" aria-labelledby="sharedDraftGateTitle">
+  <div class="shared-draft-gate-panel">
+    <div class="creator-gate-head"><h1 id="sharedDraftGateTitle">共享草稿</h1><p>选择一个数据库共享草稿继续编辑，或新建草稿。前六步保存均不会写入主程序。</p></div>
+    <div class="shared-draft-actions"><button class="btn primary" id="btnCreateSharedDraft" type="button">新建共享草稿</button><button class="btn" id="btnRefreshSharedDrafts" type="button">刷新列表</button><span class="shared-draft-status" id="sharedDraftGateStatus" aria-live="polite">正在准备草稿列表…</span></div>
+    <div class="shared-draft-list" id="sharedDraftList"></div>
+  </div>
+</div>
 
 <div class="creator-gate" id="creatorGate" role="dialog" aria-modal="true" aria-labelledby="creatorGateTitle">
   <div class="creator-gate-panel">

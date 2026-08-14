@@ -1602,17 +1602,18 @@ async def upload_bundle(
     *,
     require_existing_locks: bool = False,
 ) -> ContentPrepBatchResult:
+    # A request-scoped SELECT may already have started a transaction.  Capture
+    # the authenticated identity before rolling it back, because rollback
+    # expires SQLAlchemy ORM attributes in async sessions.
     actor_context = _actor_context(actor)
-    manifest_hash = _manifest_hash(request)
     if db.in_transaction():
         await db.rollback()
     try:
         async with db.begin():
-            return await _execute_upload(
+            return await upload_bundle_in_transaction(
                 db,
                 actor_context,
                 request,
-                manifest_hash,
                 require_existing_locks=require_existing_locks,
             )
     except ContentPrepInputError as error:
@@ -1634,6 +1635,39 @@ async def upload_bundle(
         )
         await record_failed_batch(db, actor_context, request, error)
         raise error from unexpected
+
+
+async def upload_bundle_in_transaction(
+    db: AsyncSession,
+    actor: User | _ActorContext,
+    request: ContentPrepBatchRequest,
+    *,
+    require_existing_locks: bool = False,
+) -> ContentPrepBatchResult:
+    """Run a bundle upload inside a caller-owned database transaction.
+
+    Content Prep drafts use this to remove the draft only when the formal
+    upload commits.  The public upload route continues to own its transaction
+    through :func:`upload_bundle`.
+    """
+
+    actor_context = _actor_context(actor)
+    manifest_hash = _manifest_hash(request)
+    try:
+        return await _execute_upload(
+            db,
+            actor_context,
+            request,
+            manifest_hash,
+            require_existing_locks=require_existing_locks,
+        )
+    except ContentPrepInputError as error:
+        raise ContentPrepOperationError(
+            error.code,
+            error.message,
+            status_code=422,
+            record_failure=False,
+        ) from error
 
 
 async def get_batch(

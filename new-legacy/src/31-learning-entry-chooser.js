@@ -226,5 +226,21 @@
     return { shown: !!shown };
   }
 
-  global.KGLearningEntryChooser = { init };
+  function bindManualEntry() {
+    const doc = global.document;
+    const trigger = doc && typeof doc.getElementById === "function" ? doc.getElementById("learningEntryBtn") : null;
+    if (!trigger || trigger.dataset.learningEntryBound === "true") return;
+    trigger.dataset.learningEntryBound = "true";
+    trigger.addEventListener("click", event => {
+      event.preventDefault();
+      showDialog({ document: doc, location: global.location });
+    });
+  }
+
+  if (global.document) {
+    if (global.document.readyState === "loading") global.document.addEventListener("DOMContentLoaded", bindManualEntry, { once: true });
+    else bindManualEntry();
+  }
+
+  global.KGLearningEntryChooser = { init, show: showDialog };
 })(window);

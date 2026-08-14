@@ -70,10 +70,13 @@ def test_payment_callback_amount_must_equal_order_amount() -> None:
     assert not subscription_service.payment_amount_matches(2900, None)
 
 
-def test_monthly_native_payment_amount_can_be_set_by_deployment_environment(monkeypatch) -> None:
-    monkeypatch.setattr(subscription_service.settings, "WECHAT_PAY_MONTHLY_AMOUNT_FEN", 1)
-
-    assert subscription_service._plan_amount_fen("monthly") == 1
+def test_native_payment_amount_uses_the_visible_plan_price_and_discount() -> None:
+    assert subscription_service._configured_plan_amount_fen(
+        {"originalPriceText": "￥39.9 / 月", "discountPercent": "80"}
+    ) == 3190
+    assert subscription_service._configured_plan_amount_fen(
+        {"originalPriceText": "119.9", "discountPercent": "75"}
+    ) == 8990
 
 
 def test_native_out_trade_no_never_exceeds_wechat_limit() -> None:

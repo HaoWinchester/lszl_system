@@ -87,7 +87,7 @@
           else if(selected===id)cls+=' wrong';
         }
         const pair=displayById.get(id);
-        return '<button type="button" class="'+cls+'" data-option-id="'+escapeHTML(id)+'" aria-pressed="'+(selected===id?'true':'false')+'">'
+        return '<button type="button" class="'+cls+'" data-option-id="'+escapeHTML(id)+'" aria-pressed="'+(selected===id?'true':'false')+'" '+(submitted?'disabled="disabled" aria-disabled="true"':'')+'>'
           +'<strong>'+escapeHTML(id)+'.</strong> '+escapeHTML(pair?.zh||option.text)+englishLine(pair)
           +'</button>';
       }).join('');
@@ -140,8 +140,21 @@
       if(!canOperate('当前角色不能选择这道题的答案。'))return;
       const state=legacyState();
       if(state?.submitted)return;
-      context.dispatch({type:'ANSWER_SELECTED',payload:{optionId:button.dataset.optionId}});
+      const optionId=button.dataset.optionId;
+      const selected=context.dispatch({type:'ANSWER_SELECTED',payload:{optionId}});
+      if(selected?.ok===false)return;
+      const submitted=context.dispatch({type:'ANSWER_SUBMITTED',payload:{optionId}});
+      if(submitted?.ok===false)return;
       render();
+      const q=question();
+      const correct=String(q.correctAnswer||'')===String(optionId)
+        || (q.options||[]).some(option=>String(option.id)===String(optionId)&&option.correct);
+      const flashed=host?.querySelector?.('[data-option-id="'+String(optionId).replace(/"/g,'\\\"')+'"]');
+      if(flashed){
+        const flashClass=correct?'is-correct-flash':'is-wrong-flash';
+        flashed.classList.add(flashClass);
+        global.setTimeout(()=>flashed.classList.remove(flashClass),correct?560:430);
+      }
       refreshSupportingPanels();
     }
     function handleClick(event){

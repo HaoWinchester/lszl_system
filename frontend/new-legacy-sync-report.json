@@ -1,14 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.39",
-  "toVersion": "v9.0-p4.1.40",
+  "fromVersion": "v9.0-p4.1.41",
+  "toVersion": "v9.0-p4.1.41",
   "changes": {
-    "added": [
-      "p45-migration-manifest.json"
-    ],
-    "changed": [
-      "VERSION"
-    ],
+    "added": [],
+    "changed": [],
     "removed": []
   },
   "incompatible": []

@@ -66,6 +66,25 @@ def assert_image_failure_recovery(page) -> None:
     assert graph_image.get_attribute("hidden") is not None
 
 
+def assert_primary_button_labels_are_visible(page) -> None:
+    for selector, label, background, hover_background in (
+        (".landing-header-cta", "进入知识图谱", "rgb(21, 60, 52)", "rgb(14, 45, 39)"),
+        (".landing-button-accent", "免费进入知识图谱", "rgb(231, 98, 56)", "rgb(201, 76, 39)"),
+        (".landing-closing-button", "进入知识图谱", "rgb(21, 60, 52)", "rgb(14, 45, 39)"),
+    ):
+        button = page.locator(selector)
+        expect(button).to_contain_text(label)
+        colors = button.evaluate(
+            "el => ({foreground: getComputedStyle(el).color, background: getComputedStyle(el).backgroundColor})"
+        )
+        assert colors["foreground"] == "rgb(255, 255, 255)", f"{label} 的文字未以白色显示: {colors}"
+        assert colors["background"] == background, f"{label} 的背景色异常: {colors}"
+        button.hover()
+        page.wait_for_timeout(220)
+        actual_hover_background = button.evaluate("el => getComputedStyle(el).backgroundColor")
+        assert actual_hover_background == hover_background, f"{label} 的悬停反馈异常: {actual_hover_background}"
+
+
 def assert_mobile_menu_and_layout(page) -> None:
     page.set_viewport_size({"width": 390, "height": 844})
     page.wait_for_timeout(80)
@@ -142,6 +161,7 @@ def main() -> None:
 
         assert page.title() == "幻谱｜PMP 知识图谱学习平台"
         assert page.locator('a[href="/graph"]').count() >= 3
+        assert_primary_button_labels_are_visible(page)
         assert_product_tabs(page)
         assert_faq(page)
         assert_image_failure_recovery(page)

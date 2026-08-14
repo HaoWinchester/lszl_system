@@ -1526,6 +1526,9 @@
 
     const questionSearch = $('qbQuestionSearch');
     if(questionSearch){
+      // 搜索框绝不继承浏览器保存的登录名或上次账户自动填充内容。
+      questionSearch.value = '';
+      state.questionSearch = '';
       questionSearch.addEventListener('input', () => {
         state.questionSearch = questionSearch.value.trim();
         state.questionPage = 1;

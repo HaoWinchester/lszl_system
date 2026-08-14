@@ -121,6 +121,7 @@ with sync_playwright() as playwright:
     viewer = browser.new_context()
     stamp = str(int(time.time() * 1000))
     bank_ids: list[str] = []
+    draft_ids: list[str] = []
     try:
         guest_response = guest.request.get(BASE + "/content-prep", max_redirects=0)
         assert guest_response.status == 307
@@ -156,6 +157,17 @@ with sync_playwright() as playwright:
         prep_page = admin.new_page()
         prep_page.goto(BASE + "/content-prep", wait_until="networkidle")
         select_creator(prep_page)
+        prep_page.wait_for_function("() => Boolean(prepRuntime.serverActor)")
+        draft_title = f"Prep 共享草稿 {stamp}"
+        prep_page.once("dialog", lambda dialog: dialog.accept(draft_title))
+        prep_page.locator("#btnCreateSharedDraft").click()
+        prep_page.locator("#sharedDraftGate").wait_for(state="hidden")
+        draft_id = prep_page.evaluate("prepRuntime.draftId")
+        assert draft_id
+        draft_ids.append(draft_id)
+
+        prep_page.locator('[data-tab="export"]').click()
+        prep_page.locator("#tab-export.active").wait_for(state="visible")
         prep_page.locator(
             f'#serverBankSelect option[value="{private_bank["id"]}"]'
         ).wait_for(state="attached")
@@ -184,11 +196,12 @@ with sync_playwright() as playwright:
         assert round_trip["name"]
 
         prep_page.locator("#btnQuickSaveWorkspace").click()
-        prep_page.wait_for_function("() => prepDbGet().then(row => !!row?.workspace)")
+        prep_page.wait_for_function("() => prepRuntime.dirty === false && prepRuntime.draftRevision >= 2")
         prep_page.reload(wait_until="networkidle")
         select_creator(prep_page)
-        prep_page.once("dialog", lambda dialog: dialog.accept())
-        prep_page.locator("#btnRestoreWorkspaceLocal").click()
+        prep_page.locator(f'[data-open-draft="{draft_id}"]').wait_for(state="visible")
+        prep_page.locator(f'[data-open-draft="{draft_id}"]').click()
+        prep_page.locator("#sharedDraftGate").wait_for(state="hidden")
         prep_page.wait_for_function(
             "bankId => prepRuntime.serverBankId === bankId",
             arg=private_bank["id"],
@@ -263,6 +276,8 @@ with sync_playwright() as playwright:
         assert current["revision"] == 1
         print("content-prep-question-bank-e2e-ok")
     finally:
+        for draft_id in reversed(draft_ids):
+            admin.request.delete(BASE + f"/api/v1/content-prep/drafts/{draft_id}")
         for bank_id in reversed(bank_ids):
             admin.request.delete(BASE + f"/api/v1/banks/{bank_id}")
         guest.close()

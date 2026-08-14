@@ -94,10 +94,10 @@
 .landing-button:hover { transform: translateY(-3px); box-shadow: 0 16px 34px rgba(14, 45, 39, 0.18); }
 .landing-button svg { width: 19px; height: 19px; transition: transform 180ms ease; }
 .landing-button:hover svg { transform: translateX(3px); }
-.landing-button-dark { color: #fff; background: var(--landing-ink); }
-.landing-button-dark:hover { background: var(--landing-ink-deep); }
-.landing-button-accent { min-height: 56px; padding-inline: 28px; color: #fff; background: var(--landing-accent); box-shadow: 0 15px 35px rgba(213, 79, 39, 0.23); }
-.landing-button-accent:hover { background: var(--landing-accent-deep); }
+.landing-page a.landing-button-dark { color: #fff; background: var(--landing-ink); }
+.landing-page a.landing-button-dark:hover { background: var(--landing-ink-deep); }
+.landing-page a.landing-button-accent { min-height: 56px; padding-inline: 28px; color: #fff; background: var(--landing-accent); box-shadow: 0 15px 35px rgba(213, 79, 39, 0.23); }
+.landing-page a.landing-button-accent:hover { background: var(--landing-accent-deep); }
 .landing-header-cta { min-height: 44px; padding-inline: 18px; font-size: 13px; }
 
 .landing-hero { position: relative; display: grid; min-height: 780px; overflow: hidden; align-items: center; padding: 120px 0 62px; background: var(--landing-paper); }

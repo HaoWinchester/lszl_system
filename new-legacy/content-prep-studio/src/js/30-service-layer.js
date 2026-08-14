@@ -33,10 +33,7 @@ const QuestionService=Object.freeze({
 const StorageService=Object.freeze({
   put:prepDbPut,
   get:prepDbGet,
-  remove:prepDbDelete,
-  saveWorkspace:saveWorkspaceLocal,
-  restoreWorkspace:restoreWorkspaceLocal,
-  deleteWorkspace:deleteWorkspaceLocal
+  remove:prepDbDelete
 });
 const WorkspaceService=Object.freeze({
   currentPayload:workspacePayload,

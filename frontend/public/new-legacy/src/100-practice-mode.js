@@ -250,7 +250,15 @@
     if(state.mode==='scholar')renderTimer();
   }
   function lockOptions(){dom.options.querySelectorAll('button').forEach(button=>button.disabled=true)}
-  function animateOption(button,correct){if(!button)return;button.classList.remove('is-correct','is-wrong');void button.offsetWidth;button.classList.add(correct?'is-correct':'is-wrong')}
+  function revealOptionResult(selectedId,correctId){
+    const selected=text(selectedId),correct=text(correctId);
+    dom.options.querySelectorAll('[data-option-id]').forEach(button=>{
+      button.classList.remove('is-correct','is-wrong');
+      const id=text(button.dataset.optionId);
+      if(id===correct)button.classList.add('is-correct');
+      else if(id===selected)button.classList.add('is-wrong');
+    });
+  }
   function currentRecord(status){
     const release=selectedRelease();return {
       id:uid('practice-record'),status,mode:state.mode,paperId:text(release?.id),releaseId:text(release?.releaseId),paperVersion:Number(release?.version||0),paperName:text(release?.name),
@@ -273,8 +281,8 @@
   function answer(optionId,button){
     if(!state.active||state.locked)return false;
     const question=state.questions[state.index];if(!question)return false;
-    state.locked=true;lockOptions();
-    const correct=text(optionId)===text(question.correctAnswer);animateOption(button,correct);state.answered+=1;
+    state.locked=true;lockOptions();revealOptionResult(optionId,question.correctAnswer);
+    const correct=text(optionId)===text(question.correctAnswer);state.answered+=1;
     if(correct){
       state.correct+=1;state.streak+=1;const bonus=streakBonus(state.streak);state.experience+=10+bonus;
       let healed=false;

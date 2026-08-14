@@ -1,4 +1,4 @@
-/* Server-backed question catalog client. Local IndexedDB remains the draft store. */
+/* Server-backed question catalog and shared-draft client. */
 (function(global){
   const API_ROOT='/api/v1';
   const STATUS_CODES={
@@ -37,7 +37,7 @@
       });
     }catch(cause){
       if(cause instanceof ServerCatalogError)throw cause;
-      throw new ServerCatalogError('NETWORK_ERROR','无法连接服务器，本地草稿已保留。',{cause});
+      throw new ServerCatalogError('NETWORK_ERROR','无法连接服务器；共享草稿尚未保存，请恢复连接后重试。',{cause});
     }
     let payload={};
     try{payload=await response.json()}catch(_error){}
@@ -210,6 +210,7 @@
 
   const ServerCatalogService=Object.freeze({
     Error:ServerCatalogError,
+    request,
     migrateWorkspaceMetadata,
     withStableIdempotencyKey,
     acquireLock,

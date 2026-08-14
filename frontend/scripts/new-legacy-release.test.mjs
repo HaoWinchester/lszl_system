@@ -318,8 +318,14 @@ test('release validation runs smoke and visual regression against the candidate'
 
   const migration = validator.indexOf('.venv/bin/python -m alembic upgrade head')
   const server = validator.indexOf('.venv/bin/python -m uvicorn app.main:app')
+  const createDatabase = validator.indexOf('createdb')
+  const dropDatabase = validator.indexOf('dropdb')
   assert.notEqual(migration, -1, 'candidate validation must migrate its isolated database before starting FastAPI')
+  assert.notEqual(createDatabase, -1, 'candidate validation must create a disposable database')
+  assert.notEqual(dropDatabase, -1, 'candidate validation must remove its disposable database')
+  assert.ok(createDatabase < migration, 'candidate database must exist before migrations run')
   assert.ok(migration < server, 'candidate migration must run before FastAPI starts')
+  assert.ok(validator.includes('DATABASE_URL="$VALIDATION_DATABASE_URL"'), 'migration and server must use the disposable database URL')
 
   // full_role_regression.py 绑定 v8.6 全字段 UI，v9 重构（简化模式 + 试卷独立页）后待重写，暂移出验收。
   assert.ok(validator.includes('frontend/e2e/new_legacy_smoke.py'))

@@ -9,6 +9,7 @@ const EVENT_SOURCE=fs.readFileSync(path.join(ROOT,'src/js/45-server-events.js'),
 const RUNTIME_SOURCE=fs.readFileSync(path.join(ROOT,'src/js/20-page-runtime.js'),'utf8');
 const DOMAIN_SOURCE=fs.readFileSync(path.join(ROOT,'src/js/10-state-domain.js'),'utf8');
 const SERVICES_SOURCE=fs.readFileSync(path.join(ROOT,'src/js/30-service-layer.js'),'utf8');
+const DRAFT_UI_SOURCE=fs.readFileSync(path.join(ROOT,'src/js/37-shared-draft-ui.js'),'utf8');
 
 function response(status,payload){return {ok:status>=200&&status<300,status,async json(){return payload}}}
 function harness(fetchImpl){
@@ -101,8 +102,11 @@ async function testSaveConflictStopsOldPageAndSupportsConflictCopyContract(){
   assert.equal(controller.snapshot().mode,'conflict-copy-required');
   assert.equal(controller.snapshot().canSave,false);
 
-  for(const marker of ['keepalive:true','releaseLock','saveWorkspaceLocal','conflict-copy-required','btnCopyConflictQuestion']){
+  for(const marker of ['keepalive:true','releaseLock','conflict-copy-required','btnCopyConflictQuestion','markWorkspaceDirty()']){
     assert.ok(EVENT_SOURCE.includes(marker)||RUNTIME_SOURCE.includes(marker),`missing UI lock marker: ${marker}`);
+  }
+  for(const marker of ['async function save()','Drafts.save(','prepRuntime.dirty=false']){
+    assert.ok(DRAFT_UI_SOURCE.includes(marker),`shared-draft recovery must include ${marker}`);
   }
   for(const marker of ['delete copy.serverRevision','delete copy.serverContentHash','delete copy.lockToken','parentQuestionId']){
     assert.ok((DOMAIN_SOURCE+SERVICES_SOURCE).includes(marker),`duplicate recovery must include ${marker}`);

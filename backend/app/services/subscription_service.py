@@ -1,23 +1,19 @@
 """订阅业务逻辑：当前订阅、卡密兑换、订单申请/审批/支付、管理员开通、卡密生成。"""
 
 import secrets
+import re
+from collections.abc import Mapping
 from datetime import timedelta
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.permissions import DEFAULT_PLANS
 from app.core.security import now_utc, uid
 from app.models.subscription import RedeemCode, Subscription, SubscriptionOrder
 from app.services import system_service, wechat_pay_service
 
-PLAN_AMOUNT_FEN = {
-    "monthly": 2900,
-    "quarterly": 7900,
-    "half_year": 13900,
-    "lifetime": 39900,
-}
 FINITE_PAID_PLAN_IDS = frozenset({"monthly", "quarterly", "half_year"})
 PAID_PLAN_IDS = FINITE_PAID_PLAN_IDS | {"lifetime"}
 VALID_PLAN_IDS = PAID_PLAN_IDS | {"free"}
@@ -46,10 +42,40 @@ def _plan(plan_id: str) -> dict:
     raise ValueError("套餐不存在")
 
 
-def _plan_amount_fen(plan_id: str) -> int:
-    if plan_id == "monthly":
-        return settings.WECHAT_PAY_MONTHLY_AMOUNT_FEN
-    return PLAN_AMOUNT_FEN.get(plan_id, 0)
+def _configured_plan_amount_fen(plan: Mapping[str, object]) -> int:
+    """Derive a payment amount from the same stored fields shown to users.
+
+    ``originalPriceText`` may include currency and duration copy (for example
+    ``￥39.9 / 月``); the first decimal amount is the configured base price.
+    The rounding precision intentionally matches the browser's visible plan
+    price, so a QR code can never charge a different amount from the UI.
+    """
+
+    raw_price = str(plan.get("originalPriceText") or plan.get("priceText") or "").strip()
+    match = re.search(r"(?<![\d.])(\d+(?:\.\d+)?)(?![\d.])", raw_price)
+    if match is None:
+        raise ValueError("套餐价格未配置，请联系管理员在系统设置中填写原价")
+    price_number = match.group(1)
+    decimal_places = min(len(price_number.partition(".")[2]), 2)
+    try:
+        base_amount = Decimal(price_number)
+        raw_discount = str(plan.get("discountPercent") or "").strip().rstrip("%")
+        discount = Decimal("100") if not raw_discount else Decimal(raw_discount)
+        if Decimal("0") < discount <= Decimal("1"):
+            discount *= Decimal("100")
+    except (InvalidOperation, ValueError) as error:
+        raise ValueError("套餐价格或折扣配置无效，请联系管理员检查系统设置") from error
+    if base_amount <= 0 or discount <= 0 or discount > 100:
+        raise ValueError("套餐价格或折扣配置无效，请联系管理员检查系统设置")
+    visible_amount = base_amount * discount / Decimal("100")
+    precision = Decimal("1") if decimal_places == 0 else Decimal(f"1e-{decimal_places}")
+    visible_amount = visible_amount.quantize(precision, rounding=ROUND_HALF_UP)
+    amount_fen = (visible_amount * Decimal("100")).quantize(
+        Decimal("1"), rounding=ROUND_HALF_UP
+    )
+    if amount_fen < 1:
+        raise ValueError("套餐实付金额必须大于 0")
+    return int(amount_fen)
 
 
 def entitlements_for(role: str, subscription: Subscription | None) -> dict[str, bool]:
@@ -209,8 +235,11 @@ async def redeem(db: AsyncSession, username: str, code: str) -> Subscription:
 async def request_order(db: AsyncSession, username: str, plan_id: str) -> SubscriptionOrder:
     """创建订单并按支付配置生成微信扫码 code_url。"""
     plan_id = validate_plan_id(plan_id, allow_free=False)
-    p = _plan(plan_id)
-    amount_fen = _plan_amount_fen(plan_id)
+    plans = await system_service.get_subscription_plans(db)
+    p = next((plan for plan in plans if plan.get("planId") == plan_id), None)
+    if p is None:
+        raise ValueError("套餐不存在")
+    amount_fen = _configured_plan_amount_fen(p)
     o = SubscriptionOrder(
         id=native_out_trade_no(),
         username=username,

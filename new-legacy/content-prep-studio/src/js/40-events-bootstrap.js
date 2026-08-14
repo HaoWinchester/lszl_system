@@ -42,4 +42,7 @@ document.getElementById('btnExportAuditTrail').onclick=()=>downloadJson(auditTra
 document.getElementById('btnClearAuditTrail').onclick=clearAuditTrail;
 function safeName(s){return String(s||'file').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_')}
 
-refreshAll();setTab('base');detectLocalWorkspace();initDeviceProfile();initThemeSettings();loadAuditTrail();requireCreatorSelection();
+refreshAll();setTab('base');initDeviceProfile();initThemeSettings();loadAuditTrail();requireCreatorSelection();
+document.getElementById('btnCreateSharedDraft').onclick=()=>window.PMPPrepDraftUi?.create?.();
+document.getElementById('btnRefreshSharedDrafts').onclick=()=>window.PMPPrepDraftUi?.reload?.();
+window.PMPPrepDraftUi?.open?.();
