@@ -1,14 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.80",
-  "toVersion": "v9.0-p4.1.81",
+  "fromVersion": "v9.0-p4.1.81",
+  "toVersion": "v9.0-p4.1.82",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "question-workspace.html",
-      "src/77-multi-question-workspace.js",
-      "src/86-knowledge-recall.js"
+      "src/86-knowledge-recall.js",
+      "styles/knowledge-recall-p4529.css"
     ],
     "removed": []
   },

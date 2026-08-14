@@ -497,10 +497,10 @@
     const view=recallQuestionDisplay();
     const stem=(question.stemParts||[]).map((p,i)=>{
       const text=escapeHTML(p.text||'');
-      if(keywordsRevealed&&p.clue&&rootConfig(p.clue))return `<button type="button" class="kr-keyword-token${isKeywordActive(p.clue)?' active':''}" data-keyword-id="${escapeHTML(p.clue)}" data-keyword-index="${i}">${text}</button>`;
+      if(p.clue&&rootConfig(p.clue))return `<button type="button" class="kr-keyword-token${keywordsRevealed?'':' undiscovered'}${isKeywordActive(p.clue)?' active':''}" data-keyword-id="${escapeHTML(p.clue)}" data-keyword-index="${i}">${text}</button>`;
       return wrapKnownKeywords(text);
     }).join('');
-    const optionMarkup=(option,content)=>`<button type="button" class="kr-option" data-option-id="${escapeHTML(option.id)}" aria-label="选择 ${escapeHTML(option.id)}，立即显示正误反馈"><strong>${escapeHTML(option.id)}</strong>${content}</button>`;
+    const optionMarkup=(option,content)=>`<button type="button" class="kr-option" data-option-id="${escapeHTML(option.id)}" aria-label="点击字母 ${escapeHTML(option.id)} 判断正误；选项文字中的关键词可直接点击回忆"><strong>${escapeHTML(option.id)}</strong>${content}</button>`;
     const options=(view?.options||[]).length?(view.options||[]).map(o=>optionMarkup(o,`<span>${wrapKnownKeywords(escapeHTML(o.display?.zh||''),{inline:true})}${englishLine(o.display)}</span>`)).join(''):(question.options||[]).map(o=>optionMarkup(o,wrapKnownKeywords(escapeHTML(o.text||''),{inline:true}))).join('');
     const stemEn=view?.stem||{hasEnglish:false};
     questionCard.innerHTML=`<div class="kr-stem">${stem}${englishLine(stemEn)}</div><div class="kr-options">${options}</div><p class="kr-option-feedback lp-visually-hidden" data-kr-option-feedback aria-live="polite"></p>`;
@@ -538,12 +538,14 @@
   }
   function wrapKnownKeywords(escapedText,{inline=false}={}){
     let value=String(escapedText||'');
-    if(!keywordsRevealed)return value;
+    // 未揭示时关键词同样可点击（学员自己“找”关键词），但以 undiscovered 样式
+    // 与普通文字保持一致，点击命中才点亮；揭示后恢复黄色高亮。
     // inline 模式用于选项行：选项本身是 <button>，内部不能再嵌 <button>，
     // 否则浏览器会提前闭合外层按钮，把关键词挤出到选项之外、破坏整行结构。
+    const stateCls=keywordsRevealed?'':' undiscovered';
     const tokenMarkup=inline
-      ?(cls,id,match)=>`<span role="button" tabindex="0" class="kr-keyword-token${cls}" data-keyword-id="${id}">${match}</span>`
-      :(cls,id,match)=>`<button type="button" class="kr-keyword-token${cls}" data-keyword-id="${id}">${match}</button>`;
+      ?(cls,id,match)=>`<span role="button" tabindex="0" class="kr-keyword-token${stateCls}${cls}" data-keyword-id="${id}">${match}</span>`
+      :(cls,id,match)=>`<button type="button" class="kr-keyword-token${stateCls}${cls}" data-keyword-id="${id}">${match}</button>`;
     const replacements=[];
     for(const item of keywordMatchers){
       item.regex.lastIndex=0;
@@ -566,7 +568,9 @@
         event.preventDefault();event.stopPropagation();activateKeyword(keyword);return;
       }
       const option=event.target.closest('.kr-option[data-option-id]');
-      if(option&&questionCard.contains(option)){
+      // 对错反馈只由 A/B/C/D 字母圆框触发（键盘激活时 target 为选项按钮本身）；
+      // 点击选项文字行不判定对错——那一片留给点击关键词。
+      if(option&&questionCard.contains(option)&&(event.target===option||event.target.closest('.kr-option>strong'))){
         if(isRecallReadonly())return;
         event.preventDefault();event.stopPropagation();flashRecallOptionFeedback(option);return;
       }

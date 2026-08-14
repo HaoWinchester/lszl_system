@@ -27,3 +27,21 @@
 .knowledge-recall-page .kr-version-choice-actions button{min-height:38px;padding:0 14px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#0f172a;font-weight:700;cursor:pointer}
 .knowledge-recall-page #krResetToCurrentBtn{border-color:#2563eb;background:#2563eb;color:#fff}
 @media (max-width:760px){.knowledge-recall-page .kr-save-status{display:none}.knowledge-recall-page .kr-reveal-keywords-btn{padding:0 10px}}
+/* 未揭示（undiscovered）关键词：可点击但外观与普通文字一致，hover 不提示，点击命中才点亮。 */
+.knowledge-recall-page .kr-keyword-token.undiscovered{
+  background:transparent;
+  color:inherit;
+  cursor:default;
+}
+.knowledge-recall-page .kr-keyword-token.undiscovered:hover,
+.knowledge-recall-page .kr-keyword-token.undiscovered:focus-visible{
+  background:transparent;
+  outline:none;
+}
+.knowledge-recall-page .kr-keyword-token.undiscovered.active{
+  background:var(--kr-highlight-to,rgba(253,230,138,.9));
+  cursor:pointer;
+}
+/* 对错判定入口聚焦在字母圆框上，整行不再暗示可点。 */
+.knowledge-recall-page .kr-option>strong{cursor:pointer}
+.knowledge-recall-page .kr-option{cursor:default}
