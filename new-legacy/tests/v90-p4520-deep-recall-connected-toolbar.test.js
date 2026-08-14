@@ -1,0 +1,16 @@
+'use strict';
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const root=path.resolve(__dirname,'..');
+const read=file=>fs.readFileSync(path.join(root,file),'utf8');
+const html=read('knowledge-recall.html');
+const css=read('styles/knowledge-recall-p4520.css');
+const js=read('src/86-knowledge-recall.js');
+assert(html.includes('class="kr-canvas-action-group"'),'connected toolbar wrapper missing');
+const groupStart=html.indexOf('class="kr-canvas-action-group"'),groupEnd=html.indexOf('</div>',groupStart);
+assert(html.indexOf('id="krNodeSearchBtn"',groupStart)<groupEnd,'search not inside toolbar');
+assert(html.indexOf('id="krResetBtn"',groupStart)<groupEnd,'reset not inside toolbar');
+assert(css.includes('gap:0')&&css.includes('border-left:1px solid var(--kr-border)'),'toolbar must visually connect buttons');
+assert(css.includes('box-shadow:none!important')&&css.includes('backdrop-filter:none!important'),'toolbar should remain lightweight');
+for(const perf of ['function appendNodeElement(node)','function appendEdgeElement(edge)','let nodeDrag=null',"centerAt100:()=>{const r=viewport.getBoundingClientRect();setZoomScale(1"])assert(js.includes(perf),`performance regression: ${perf}`);
+for(const search of ['function renderNodeSearchResults','focusNode(instanceId,true)'])assert(js.includes(search),`search regression: ${search}`);
+console.log('v90-p4520-deep-recall-connected-toolbar-ok');

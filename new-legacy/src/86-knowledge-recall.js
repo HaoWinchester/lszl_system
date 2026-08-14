@@ -17,7 +17,7 @@
   let state={nodes:[],edges:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
   let isDragging=false,dragStart=null,worldStart=null,panPointerId=null,panButton=0,rightPanStart=null,contextMenuSuppressUntil=0,contextMenu=null,customOpen=false;
   let canvasRuntime=null,recallViewportRestored=false;
-  let progressSaveTimer=0,questionSessionToken=0,cardClickTimer=0,searchTimer=0;
+  let progressSaveTimer=0,questionSessionToken=0,cardClickTimer=0,searchTimer=0,nodeSearchTimer=0;
   let associationRuntime={subject:'',library:null,nodeCache:new Map(),resolveCache:new Map()};
   let nodeDrag=null,suppressNodeClickUntil=0;
   let recallAdapter=null,recallSession=null,keywordsRevealed=false;
@@ -1152,6 +1152,7 @@
   }
   function closeNodeSearch(){
     const panel=$('krNodeSearchPanel'),button=$('krNodeSearchBtn');if(panel)panel.hidden=true;
+    if(nodeSearchTimer){clearTimeout(nodeSearchTimer);nodeSearchTimer=0}
     button?.setAttribute('aria-expanded','false');
   }
   function toggleNodeSearch(){
@@ -1163,10 +1164,11 @@
     if(!button||!panel)return;
     button.onclick=event=>{event.preventDefault();event.stopPropagation();toggleNodeSearch()};
     close?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();closeNodeSearch()});
-    input?.addEventListener('input',()=>renderNodeSearchResults(input.value));
+    input?.addEventListener('input',()=>{clearTimeout(nodeSearchTimer);nodeSearchTimer=setTimeout(()=>renderNodeSearchResults(input.value),420)});
     input?.addEventListener('keydown',event=>{
       if(event.key==='Escape'){event.preventDefault();closeNodeSearch();button.focus();return}
       if(event.key==='Enter'){
+        clearTimeout(nodeSearchTimer);nodeSearchTimer=0;renderNodeSearchResults(input.value);
         const first=$('krNodeSearchResults')?.querySelector('.kr-node-search-result');
         if(first){event.preventDefault();first.click()}
       }

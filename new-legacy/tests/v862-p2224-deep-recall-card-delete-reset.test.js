@@ -15,7 +15,7 @@ assert(js.includes("$('krResetBtn').onclick=resetProgress"),'重置按钮必须�
 assert(js.includes("nodeLayer.addEventListener('dblclick'")&&js.includes("event.key!=='Delete'"),'知识卡应通过事件委托支持双击和 Delete 键删除');
 assert(!js.includes("event.key!=='Delete'&&event.key!=='Backspace'"),'本轮删除快捷键不应扩大到 Backspace');
 assert(js.includes("wrap.classList.add('is-destroying')")&&js.includes('setTimeout(()=>finalizeNodeDeletion(id,token),360)'),'删除前应播放短时销毁动画，并避免跨题定时器污染');
-assert(js.includes('state.transform.scale=1;centerOn(0,0,true)'),'点击缩放百分比应同时恢复 100% 并回到题目');
+assert(js.includes("centerAt100:()=>{const r=viewport.getBoundingClientRect();setZoomScale(1")&&js.includes("$('krCenterBtn').onclick=()=>centerOn(0,0,true)"),'100% 与回到题目应是两个独立操作');
 assert(js.includes("count.textContent=context.total?`${position}/${context.total}`:'0/0'"),'题目库按钮应显示 1/20 格式');
 assert(/\.kr-keyword\s*\{[\s\S]*?padding:0;[\s\S]*?margin:0;/.test(css),'关键词包裹不应改变文字间距');
 assert(css.includes('.kr-node button:hover')&&css.includes('transform:none'),'知识卡悬浮时不应发生位移动画');

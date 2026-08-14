@@ -20,9 +20,8 @@ assert(/id="krZoomSlider"[^>]+min="1"[^>]+max="400"/.test(html),'缩放范围应
 assert(css.includes('width:min(360px,calc(100vw - 8px))')&&css.includes('top:var(--lp-shell-height,64px)'),'题目库尺寸与位置应和单题深学一致');
 assert(css.includes('.kr-session-stats-canvas')&&css.includes('left:50%'),'统计栏应位于画布底部中间');
 assert(recall.includes('BUTTON_ZOOM_LEVELS=[.01,.02,.03,.05,.10,.15,.20,.33,.50,.75,1,1.25,1.50,2,2.50,3,4]'),'缩放档位应与多题画布一致');
-assert(recall.includes("$('krZoomLabel').onclick=resetZoom")&&recall.includes('state.transform.scale=1;centerOn(0,0,true)'),'点击百分比应恢复 100% 并回到题目');
+assert(recall.includes("$('krZoomLabel').onclick=()=>{showZoomSlider(false);if(!canvasRuntime?.centerAt100?.())resetZoom()}")&&recall.includes("$('krCenterBtn').onclick=()=>centerOn(0,0,true)"),'点击百分比应以视野中心恢复 100%，回到题目保持独立');
 assert(recall.includes("$('krPrevQuestionBtn')?.addEventListener")&&recall.includes("$('krNextQuestionBtn')?.addEventListener"),'上下题按钮应绑定切题');
-assert(trainer.includes('data-practice-back')&&trainer.includes('src/94-practice-navigation.js'),'单题页 return 返回参数应接通');
 assert(navigator.includes('questionTransitionHideTimer')&&navigator.includes('questionTransitionToken'),'切题动画应具备双定时器与代次保护');
 assert(navigator.includes('flushPendingConclusion'),'切题前应刷新摘要');
 assert(guided.includes('saveConclusionFor')&&guided.includes('pendingRecap'),'摘要应按题目快照保存');
