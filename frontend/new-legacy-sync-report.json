@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.67",
-  "toVersion": "v9.0-p4.1.68",
+  "fromVersion": "v9.0-p4.1.71",
+  "toVersion": "v9.0-p4.1.72",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "styles/landing.css",
-      "tests/landing-page-browser.py"
+      "content-prep-studio/dist/content-prep.html",
+      "content-prep-studio/src/js/45-server-events.js"
     ],
     "removed": []
   },

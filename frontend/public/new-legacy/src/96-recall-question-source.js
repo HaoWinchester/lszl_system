@@ -34,7 +34,7 @@
     };
   }
   function buildList(){return (resolver()?.listPapers?.({mode:MODE,respectRole:true})||repository()?.listPublishedPapers?.({mode:MODE,respectRole:true})||[]).map(collectionFromEntry).filter(item=>item.id&&item.questions.length)}
-  function list(){if(!catalogLoaded)return [];const raw=signature();if(cache.signature===raw)return cache.list;cache={signature:raw,list:buildList()};return cache.list}
+  function list(){const raw=signature();if(cache.signature===raw)return cache.list;cache={signature:raw,list:buildList()};return cache.list}
   function banks(){return list()}
   function invalidate(){cache={signature:'',list:[]}}
   function resolveCollection(identifier){const id=text(identifier);return list().find(item=>item.id===id||item.paperId===id||item.releaseId===id)||null}

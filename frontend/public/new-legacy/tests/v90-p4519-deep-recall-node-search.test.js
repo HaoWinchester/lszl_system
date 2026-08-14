@@ -1,0 +1,16 @@
+'use strict';
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const root=path.resolve(__dirname,'..');
+const read=file=>fs.readFileSync(path.join(root,file),'utf8');
+const html=read('knowledge-recall.html');
+const js=read('src/86-knowledge-recall.js');
+const css=read('styles/knowledge-recall-p4519.css');
+assert(html.indexOf('id="krNodeSearchBtn"')<html.indexOf('id="krResetBtn"'),'search button must be left of reset');
+for(const token of ['id="krNodeSearchPanel"','id="krNodeSearchInput"','id="krNodeSearchResults"'])assert(html.includes(token),token);
+for(const token of ['function renderNodeSearchResults','function bindNodeSearch','focusNode(instanceId,true)','bindNodeSearch();'])assert(js.includes(token),token);
+assert(js.includes('state.nodes.map(nodeSearchRecord)'),'search must scan current-canvas nodes');
+assert(!js.includes("renderNodeSearchResults(query=''){renderAll"),'search must not rebuild graph');
+assert(js.includes('nodeSearchTimer=setTimeout(()=>renderNodeSearchResults(input.value),420)'),'large-canvas search must debounce for 420ms');
+assert(css.includes('.kr-node-search-panel')&&css.includes('box-shadow:none'),'search panel should stay lightweight');
+for(const perf of ['function appendNodeElement(node)','function appendEdgeElement(edge)','let nodeDrag=null',"centerAt100:()=>{const r=viewport.getBoundingClientRect();setZoomScale(1"])assert(js.includes(perf),`performance regression: ${perf}`);
+console.log('v90-p4519-deep-recall-node-search-ok');

@@ -40,6 +40,68 @@ async function testRelativeUrlsAndCredentials(){
   assert.ok(calls.every(call=>call.options.credentials==='include'));
 }
 
+async function testListBankQuestionsReadsEveryCatalogPage(){
+  const calls=[];
+  const service=loadService(async(url,options={})=>{
+    calls.push({url,options});
+    if(url==='/api/v1/question-catalog/banks/bank-1/questions?page=1&page_size=200'){
+      return response(200,{questions:[{id:'q-1'},{id:'q-2'}],total:3,page:1,pageSize:200});
+    }
+    if(url==='/api/v1/question-catalog/banks/bank-1/questions?page=2&page_size=200'){
+      return response(200,{questions:[{id:'q-3'}],total:3,page:2,pageSize:200});
+    }
+    throw new Error(`unexpected request ${url}`);
+  });
+
+  const questions=await service.listBankQuestions('bank-1');
+
+  assert.deepEqual(Array.from(questions,question=>question.id),['q-1','q-2','q-3']);
+  assert.deepEqual(calls.map(call=>call.url),[
+    '/api/v1/question-catalog/banks/bank-1/questions?page=1&page_size=200',
+    '/api/v1/question-catalog/banks/bank-1/questions?page=2&page_size=200',
+  ]);
+  assert.ok(calls.every(call=>call.options.credentials==='include'));
+}
+
+async function testListBankQuestionsRejectsIncompletePage(){
+  const service=loadService(async(url)=>{
+    assert.equal(url,'/api/v1/question-catalog/banks/bank-1/questions?page=1&page_size=200');
+    return response(200,{questions:[],total:1,page:1,pageSize:200});
+  });
+
+  await assert.rejects(
+    service.listBankQuestions('bank-1'),
+    error=>error.code==='PAGINATION_INCOMPLETE'&&error.message==='服务器题库返回不完整，请稍后重试。',
+  );
+}
+
+async function testUploadSkipsUnchangedQuestionsLoadedFromServer(){
+  let posted=null;
+  const service=loadService(async(url,options={})=>{
+    assert.equal(url,'/api/v1/content-prep/batches');
+    posted=JSON.parse(options.body);
+    return response(200,{batchId:'batch-loaded',bankId:'bank-1',bankRevision:2,contentRevision:5,questions:[]});
+  });
+  const loaded={
+    id:'q-loaded',title:'已载入题目',type:'single_choice',subject:'PMP',
+    options:[
+      {id:'A',text:'选项 A',correct:true},{id:'B',text:'选项 B',correct:false},
+      {id:'C',text:'',correct:false},{id:'D',text:'',correct:false},
+    ],
+    correctAnswer:'A',metadata:{},serverRevision:2,serverContentHash:'a'.repeat(64),lastSyncedAt:'2026-08-13T00:00:00Z',
+  };
+  loaded.serverExportSnapshot=service.captureServerSnapshot(loaded);
+  loaded.contentHash='sha256:recomputed-by-local-validation';
+  const workspace={serverBankId:'bank-1',serverBankRevision:2,clientInstanceId:'client-1',lastIdempotencyKey:'',lastBatchId:''};
+
+  await service.uploadBundle(
+    {questionBank:{subject:'PMP',questions:[{...loaded}]},principles:{},synthesisPresets:{},tagConfig:{}},
+    {workspace,creatorId:'creator_001',questions:[loaded]},
+  );
+
+  assert.deepEqual(posted.questions,[],'unchanged loaded questions must not require another edit lock');
+}
+
 async function testStableErrorMapping(){
   const expected=new Map([
     [401,'AUTH_REQUIRED'],
@@ -70,7 +132,7 @@ async function testWorkspaceMetadataMigrationIsStableAndContentSafe(){
     assert.ok(Object.hasOwn(migrated.server,field),`missing ${field}`);
   }
   const question={...migrated.questionBank.questions[0]};
-  for(const field of ['serverRevision','serverContentHash','lastSyncedAt'])delete question[field];
+  for(const field of ['serverRevision','serverContentHash','lastSyncedAt','serverExportSnapshot'])delete question[field];
   assert.deepEqual(question,original.questionBank.questions[0]);
   assert.deepEqual(original.questionBank.questions[0],{id:'q-1',title:'原题',analysis:'内容不能变化'});
 }
@@ -183,6 +245,9 @@ async function testSharedContentAndPrincipleCrudUseServerApis(){
 
 Promise.resolve()
   .then(testRelativeUrlsAndCredentials)
+  .then(testListBankQuestionsReadsEveryCatalogPage)
+  .then(testListBankQuestionsRejectsIncompletePage)
+  .then(testUploadSkipsUnchangedQuestionsLoadedFromServer)
   .then(testStableErrorMapping)
   .then(testWorkspaceMetadataMigrationIsStableAndContentSafe)
   .then(testNetworkRetryReusesIdempotencyKeyAndCommitsMetadataLast)

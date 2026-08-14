@@ -166,6 +166,27 @@ test('sync copies v8.6.0 and injects the direct runtime without editing upstream
   assert.ok(existsSync(resolve(item.output, 'personal-card-adapter.js')))
 })
 
+test('sync reports a database-backed deep recall save only after persistence succeeds', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/86-knowledge-recall.js'), [
+    "'use strict';",
+    'async function writeProgressNow(){',
+    '    try{await recallAdapter.saveGraph(progressPayload());return true}',
+    '    catch(error){return false}',
+    '}',
+  ].join('\n'))
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+  const generated = readFileSync(resolve(item.output, 'src/86-knowledge-recall.js'), 'utf8')
+  const persisted = generated.indexOf('await recallAdapter.saveGraph(progressPayload())')
+  const tracked = generated.indexOf("track('recall','outcome','recall_saved')")
+  assert.ok(persisted >= 0 && tracked > persisted, 'recall_saved must follow a successful database write')
+  assert.match(generated, /if\(saved\)\{[\s\S]*track\('recall','outcome','recall_saved'\)/)
+})
+
 test('sync fails closed when a required page is missing', (t) => {
   const item = fixture({ omit: 'learning-path.html' })
   t.after(() => rmSync(item.root, { recursive: true, force: true }))

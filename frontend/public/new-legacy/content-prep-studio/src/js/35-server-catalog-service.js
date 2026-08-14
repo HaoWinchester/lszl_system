@@ -51,13 +51,22 @@
   }
   function stripSyncFields(question){
     const payload=cloneJson(question);
-    for(const key of ['serverRevision','serverContentHash','lastSyncedAt','lockToken','lock'])delete payload[key];
+    for(const key of ['contentHash','serverRevision','serverContentHash','lastSyncedAt','serverExportSnapshot','lockToken','lock'])delete payload[key];
     return payload;
   }
-  function uploadFingerprint(bundle,workspace,creatorId){
+  function stableJson(value){
+    if(value===null||typeof value!=='object')return JSON.stringify(value);
+    if(Array.isArray(value))return `[${value.map(stableJson).join(',')}]`;
+    return `{${Object.keys(value).sort().map(key=>`${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+  }
+  function serverSnapshot(question){return stableJson(stripSyncFields(question));}
+  function isUnchangedServerQuestion(question){
+    return !!question?.serverRevision&&String(question.serverExportSnapshot||'')===serverSnapshot(question);
+  }
+  function uploadFingerprint(bundle,workspace,creatorId,questions){
     return JSON.stringify({
       targetBankId:workspace.serverBankId||'',creatorId,
-      questions:(bundle?.questionBank?.questions||[]).map(question=>({
+      questions:(questions||[]).map(question=>({
         id:question.id,contentHash:question.contentHash||'',serverRevision:question.serverRevision??null
       })),
       principles:bundle?.principles||{},synthesisPresets:bundle?.synthesisPresets||{},tagConfig:bundle?.tagConfig||{},
@@ -96,7 +105,8 @@
         ...question,
         serverRevision:Number(question.serverRevision)||null,
         serverContentHash:String(question.serverContentHash||''),
-        lastSyncedAt:String(question.lastSyncedAt||'')
+        lastSyncedAt:String(question.lastSyncedAt||''),
+        serverExportSnapshot:String(question.serverExportSnapshot||'')
       }));
     }
     return workspace;
@@ -112,6 +122,7 @@
       question.serverRevision=Number(item.revision||1);
       question.serverContentHash=String(item.contentHash||'');
       question.lastSyncedAt=syncedAt;
+      question.serverExportSnapshot=serverSnapshot(question);
     }
     emit('prep:sync-committed',{result});
     publishContentRevision(result,{entityType:'content-prep-batch',entityId:String(result.batchId||'')});
@@ -211,6 +222,7 @@
   const ServerCatalogService=Object.freeze({
     Error:ServerCatalogError,
     request,
+    captureServerSnapshot:serverSnapshot,
     migrateWorkspaceMetadata,
     withStableIdempotencyKey,
     acquireLock,
@@ -255,6 +267,23 @@
       publishContentRevision(result,{entityType:'bank',entityId:String(result?.bank?.id||'')});
       return result.bank;
     },
+    async listBankQuestions(bankId){
+      const id=String(bankId||'').trim();
+      if(!id)return [];
+      const pageSize=200,questions=[];
+      let page=1,total=0;
+      do{
+        const result=await request(`/question-catalog/banks/${encodeURIComponent(id)}/questions?page=${page}&page_size=${pageSize}`);
+        const rows=Array.isArray(result.questions)?result.questions:[];
+        questions.push(...rows);
+        total=Number(result.total??questions.length);
+        if(questions.length<total&&!rows.length){
+          throw new ServerCatalogError('PAGINATION_INCOMPLETE','服务器题库返回不完整，请稍后重试。');
+        }
+        page+=1;
+      }while(questions.length<total);
+      return questions;
+    },
     async loadQuestion(questionId){return (await request(`/question-catalog/questions/${encodeURIComponent(questionId)}`)).question},
     async getBatch(batchId){return (await request(`/content-prep/batches/${encodeURIComponent(batchId)}`)).batch},
     syncMetadata,
@@ -262,8 +291,10 @@
       if(!workspace?.serverBankId)throw new ServerCatalogError('BANK_REQUIRED','请先选择目标题库。');
       if(!workspace?.clientInstanceId)throw new ServerCatalogError('CLIENT_INSTANCE_REQUIRED','本地工作区缺少客户端标识。');
       if(!creatorId)throw new ServerCatalogError('CREATOR_REQUIRED','请先选择制作人。');
-      const sourceQuestions=bundle?.questionBank?.questions||[];
-      const fingerprint=uploadFingerprint(bundle,workspace,creatorId);
+      const workspaceQuestions=questions||bundle?.questionBank?.questions||[];
+      const changedQuestionIds=new Set(workspaceQuestions.filter(question=>!isUnchangedServerQuestion(question)).map(question=>String(question.id)));
+      const sourceQuestions=(bundle?.questionBank?.questions||[]).filter(question=>changedQuestionIds.has(String(question.id)));
+      const fingerprint=uploadFingerprint(bundle,workspace,creatorId,sourceQuestions);
       return withStableIdempotencyKey(workspace,fingerprint,async key=>{
         const payload={
         idempotencyKey:key,

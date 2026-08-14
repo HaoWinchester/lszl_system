@@ -69,7 +69,9 @@ def upload_payload(stamp: str, bank_id: str, questions: list[dict], key: str) ->
     }
 
 
-def choose_creator_and_load(page: Page, question_id: str, draft_title: str) -> str:
+def choose_creator_and_load(
+    page: Page, bank_id: str, question_id: str, draft_title: str
+) -> str:
     page.goto(BASE + "/content-prep", wait_until="networkidle")
     page.locator('[data-creator-key="peiqi"]').click()
     page.locator("#creatorGate").wait_for(state="hidden")
@@ -79,13 +81,20 @@ def choose_creator_and_load(page: Page, question_id: str, draft_title: str) -> s
     page.locator("#sharedDraftGate").wait_for(state="hidden")
     draft_id = page.evaluate("prepRuntime.draftId")
     assert draft_id
-    page.locator("#serverQuestionIdInput").fill(question_id)
-    page.locator("#btnLoadServerQuestion").click()
+    page.locator(f'#serverSourceBankSelect option[value="{bank_id}"]').wait_for(
+        state="attached"
+    )
+    page.locator("#serverSourceBankSelect").select_option(bank_id)
+    page.wait_for_function(
+        "values => prepRuntime.serverBankId === values[0] && state.questionBank.questions.some(question => question.id === values[1])",
+        arg=[bank_id, question_id],
+    )
+    page.locator('#tabs [data-tab="questions"]').click()
+    page.locator("#questionList .list-item", has_text=question_id).click()
     page.wait_for_function(
         "id => window.PMPPrepQuestionLocks?.snapshot?.().questionId === id",
         arg=question_id,
     )
-    page.locator('#tabs [data-tab="questions"]').click()
     page.locator('#tab-questions [data-qfield="title"]').wait_for(state="visible")
     return draft_id
 
@@ -202,6 +211,7 @@ with sync_playwright() as playwright:
         offline_page = owner.new_page()
         offline_draft_id = choose_creator_and_load(
             offline_page,
+            bank_id,
             question_ids[2],
             f"离线恢复共享草稿 {stamp}",
         )

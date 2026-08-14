@@ -18,7 +18,7 @@ const selectionCss = read('styles/home-selection-geometry-p4332.css');
 const questionBank = read('question-bank.html');
 const questionAdmin = read('src/65-question-bank-admin.js');
 
-assert.match(index, /id="learningEntryBtn"[^>]*>学习入口<\/a>/);
+assert.match(index, /id="learningEntryTopBtn"[^>]*>学习入口<\/button>/);
 assert.match(chooser, /global\.KGLearningEntryChooser\s*=\s*\{\s*init\s*,\s*show:\s*showDialog\s*\}/);
 
 assert.match(flow, /type==='ANSWER_SUBMITTED'/);
@@ -35,7 +35,7 @@ assert.match(trainingCss, /\.question-training-page \.q-option:disabled\{[^}]*po
 assert.match(practiceMode, /function revealOptionResult\(selectedId,correctId\)/);
 assert.match(practiceMode, /button\.classList\.add\('is-correct'\)/);
 assert.match(practiceMode, /button\.classList\.add\('is-wrong'\)/);
-assert.match(practiceMode, /state\.locked=true;lockOptions\(\);revealOptionResult\(optionId,question\.correctAnswer\)/);
+assert.match(practiceMode, /revealOptionResult\(optionId,question\.correctAnswer\);state\.answered/);
 assert.match(practiceCss, /\.practice-option\.is-correct\{[^}]*background:#dcfce7/);
 assert.match(practiceCss, /\.practice-option\.is-wrong\{[^}]*background:#ffe4e6/);
 

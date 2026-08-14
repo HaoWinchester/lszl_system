@@ -76,7 +76,7 @@ const Graph=require('../src/98-recall-graph-model.js');
   ]);
 }
 
-// Repeated progress writes should not rewrite the explored index once the state is already explored.
+// Progress persistence is server-only; the compatibility facade keeps only transient navigation hints.
 {
   const map=new Map(),writes=[];
   const context={console,globalThis:null,window:null,CustomEvent:function(){},setTimeout,clearTimeout,
@@ -92,15 +92,12 @@ const Graph=require('../src/98-recall-graph-model.js');
   context.globalThis=context;context.window=context;vm.createContext(context);
   vm.runInContext(read('src/97-recall-storage.js'),context,{filename:'97-recall-storage.js'});
   const storage=context.KGRecallStorage,q={id:'q1',sourceQuestionId:'q1',sourceBankId:'bank-1'};
-  assert(storage.writeProgress(q,'bank-1',{nodes:[{instanceId:'n1'}],edges:[],activeKeywords:[]}));
-  const exploredKey=writes.find(key=>key.startsWith('kg_deep_recall_explored_v2__'));
-  assert(exploredKey);
-  const firstIndexWrites=writes.filter(key=>key===exploredKey).length;
-  assert(storage.writeProgress(q,'bank-1',{nodes:[{instanceId:'n1'},{instanceId:'n2'}],edges:[],activeKeywords:[]}));
-  storage.readProgress(q,'bank-1');
-  assert.strictEqual(writes.filter(key=>key===exploredKey).length,firstIndexWrites,'已探索状态未变化时不应重复写索引');
-  assert(storage.removeProgress(q,'bank-1'));
-  assert.strictEqual(writes.filter(key=>key===exploredKey).length,firstIndexWrites+1,'从已探索变为未探索时应更新一次索引');
+  assert.throws(()=>storage.writeProgress(q,'bank-1',{nodes:[{instanceId:'n1'}],edges:[],activeKeywords:[]}),/KGDeepRecallServerAdapter/);
+  assert.throws(()=>storage.readProgress(q,'bank-1'),/KGDeepRecallServerAdapter/);
+  assert.throws(()=>storage.removeProgress(q,'bank-1'),/KGDeepRecallServerAdapter/);
+  storage.markExplored(q,'bank-1',true);
+  assert(storage.exploredSet('bank-1').has('q1'));
+  assert.deepStrictEqual(writes,[],'兼容层不得把探索索引写入浏览器存储');
 }
 
 const html=read('knowledge-recall.html');

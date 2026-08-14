@@ -1,4 +1,5 @@
 import asyncio
+import json
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -22,11 +23,32 @@ def _workspace_payload(
     *,
     title: str = "仅在同步后进入正式题库",
     server_revision: int | None = None,
+    unchanged_snapshot: bool = False,
 ) -> dict:
     question = question_payload(question_id, title=title)
     question["metadata"] = {"principleIds": [], "optionPrincipleMap": {}}
     if server_revision is not None:
         question["serverRevision"] = server_revision
+    if unchanged_snapshot:
+        question["serverExportSnapshot"] = json.dumps(
+            {
+                key: value
+                for key, value in question.items()
+                if key
+                not in {
+                    "contentHash",
+                    "serverRevision",
+                    "serverContentHash",
+                    "lastSyncedAt",
+                    "serverExportSnapshot",
+                    "lockToken",
+                    "lock",
+                }
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
     return {
         "prepStudioWorkspaceVersion": 4,
         "prepStudioVersion": "0.4.0",
@@ -140,6 +162,28 @@ def test_shared_content_prep_draft_is_versioned_and_sync_deletes_only_after_comm
             assert client.get(f"/api/v1/content-prep/drafts/{draft['id']}").status_code == 404
             assert asyncio.run(_formal_question_count(bank_id)) == before_sync + 1
 
+            unchanged_draft = client.post(
+                "/api/v1/content-prep/drafts",
+                json={
+                    "title": "未修改的已有题目",
+                    "payload": _workspace_payload(
+                        bank_id,
+                        question_id,
+                        server_revision=1,
+                        unchanged_snapshot=True,
+                    ),
+                },
+            )
+            assert unchanged_draft.status_code == 201, unchanged_draft.text
+            unchanged = unchanged_draft.json()["draft"]
+            unchanged_sync = client.post(
+                f"/api/v1/content-prep/drafts/{unchanged['id']}/sync",
+                json={"revision": 1, "creatorId": "creator_001"},
+            )
+            assert unchanged_sync.status_code == 200, unchanged_sync.text
+            assert unchanged_sync.json()["result"]["questions"] == []
+            assert asyncio.run(_formal_question_revision(question_id)) == 1
+
             updated_draft = client.post(
                 "/api/v1/content-prep/drafts",
                 json={
@@ -174,3 +218,8 @@ async def _formal_question_count(bank_id: str) -> int:
 async def _formal_question_title(question_id: str) -> str | None:
     async with AsyncSessionLocal() as db:
         return await db.scalar(select(Question.title).where(Question.id == question_id))
+
+
+async def _formal_question_revision(question_id: str) -> int | None:
+    async with AsyncSessionLocal() as db:
+        return await db.scalar(select(Question.revision).where(Question.id == question_id))

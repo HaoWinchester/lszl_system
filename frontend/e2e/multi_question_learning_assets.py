@@ -306,7 +306,9 @@ def test_workflow(browser, username_a: str, username_b: str, release: dict, ques
         page.wait_for_timeout(150)
         assert page.locator('.qw-synthesis-card').count() == before_count
 
-        # Server-graded wrong -> mastered -> active transitions update drawer counts without reload.
+        # Server-graded wrong -> delayed verification -> active transitions update
+        # drawer counts without reload. A first correct retry intentionally stays
+        # active until the 24-hour verification window has elapsed.
         question_id = questions[0]["id"]
         question_node_id = page.evaluate(
             "questionId=>Object.values(KGMultiQuestionWorkspace.activeWorkspace().nodes).find(node=>node.questionId===questionId)?.id||''",
@@ -322,10 +324,28 @@ def test_workflow(browser, username_a: str, username_b: str, release: dict, ques
         set_drawer_open(page, "#qwMistakesDrawer", "#qwMistakesBtn", False)
         click_option(question_card, "A")
         page.wait_for_timeout(500)
-        assert page.locator("#qwMistakesCount").inner_text() == "0"
+        assert page.locator("#qwMistakesCount").inner_text() == "1"
+        verification_overview = assert_ok(
+            context_a.request.get(BASE + "/api/v1/learning/practice/overview"),
+            "verification overview A",
+        )
+        verification_mistake = next(
+            row
+            for row in verification_overview["mistakes"]
+            if row["questionId"] == question_id
+            and row["releaseId"] == release["releaseId"]
+        )
+        assert verification_mistake["status"] == "verification_due"
+        assert verification_overview["stats"]["verificationWaiting"] == 1
         set_drawer_open(page, "#qwMistakesDrawer", "#qwMistakesBtn", True)
         page.locator('[data-mistake-filter="mastered"]').click()
-        assert page.locator(f'[data-mistake-id]:has-text("{questions[0]["title"]}")').is_visible()
+        assert page.locator(
+            f'[data-mistake-id]:has-text("{questions[0]["title"]}")'
+        ).count() == 0
+        page.locator('[data-mistake-filter="active"]').click()
+        assert page.locator(
+            f'[data-mistake-id]:has-text("{questions[0]["title"]}")'
+        ).is_visible()
         set_drawer_open(page, "#qwMistakesDrawer", "#qwMistakesBtn", False)
         click_option(question_card, "B")
         page.wait_for_timeout(500)

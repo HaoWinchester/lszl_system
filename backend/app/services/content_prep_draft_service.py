@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from pydantic import ValidationError
@@ -14,6 +15,17 @@ from app.models.question import Question
 from app.models.user import User
 from app.schemas.content_prep import ContentPrepBatchRequest, ContentPrepBatchResult
 from app.services import content_prep_service, question_lock_service
+
+
+_QUESTION_SYNC_FIELDS = {
+    "contentHash",
+    "serverRevision",
+    "serverContentHash",
+    "lastSyncedAt",
+    "serverExportSnapshot",
+    "lockToken",
+    "lock",
+}
 
 
 class ContentPrepDraftError(ValueError):
@@ -49,6 +61,25 @@ def _clean_title(value: str) -> str:
     if not title:
         raise ContentPrepDraftError("DRAFT_TITLE_REQUIRED", "草稿名称不能为空")
     return title[:160]
+
+
+def _server_snapshot(question: dict[str, Any]) -> str:
+    return json.dumps(
+        {
+            key: value
+            for key, value in question.items()
+            if key not in _QUESTION_SYNC_FIELDS
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _is_unchanged_server_question(question: Any) -> bool:
+    if not isinstance(question, dict) or not question.get("serverRevision"):
+        return False
+    return str(question.get("serverExportSnapshot") or "") == _server_snapshot(question)
 
 
 async def list_drafts(db: AsyncSession) -> list[dict[str, Any]]:
@@ -137,6 +168,7 @@ def _sync_request(draft: ContentPrepDraft, creator_id: str) -> ContentPrepBatchR
             "baseRevision": question.get("serverRevision") if isinstance(question, dict) else None,
         }
         for question in questions
+        if not _is_unchanged_server_question(question)
     ]
     try:
         return ContentPrepBatchRequest.model_validate(

@@ -342,7 +342,15 @@
     if(state.mode==='scholar')renderTimer();
   }
   function lockOptions(){dom.options.querySelectorAll('button').forEach(button=>button.disabled=true)}
-  function animateOption(button,correct){if(!button)return;button.classList.remove('is-correct','is-wrong');void button.offsetWidth;button.classList.add(correct?'is-correct':'is-wrong')}
+  function revealOptionResult(selectedId,correctId){
+    const selected=text(selectedId),correct=text(correctId);
+    dom.options.querySelectorAll('[data-option-id]').forEach(button=>{
+      button.classList.remove('is-correct','is-wrong');
+      const optionId=text(button.dataset.optionId);
+      if(optionId===correct)button.classList.add('is-correct');
+      else if(optionId===selected)button.classList.add('is-wrong');
+    });
+  }
   function advanceAfterAnswer(){
     state.index+=1;
     if(state.index>=state.questions.length||state.health<=0){finishPractice();return}
@@ -365,7 +373,7 @@
         showFeedback('作答未保存，请检查网络后重试。','danger');state.locked=false;dom.options.querySelectorAll('button').forEach(item=>item.disabled=false);return false;
       }
     }
-    animateOption(button,correct);state.answered+=1;
+    revealOptionResult(optionId,question.correctAnswer);state.answered+=1;
     if(state.verification?.active){
       const verification=state.verification,api=practiceApi();
       if(correct){state.correct+=1;state.experience+=5}else{const correctButton=dom.options.querySelector('[data-option-id="'+CSS.escape(text(question.correctAnswer))+'"]');if(correctButton)correctButton.classList.add('is-correct')}

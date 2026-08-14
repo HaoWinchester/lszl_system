@@ -1,7 +1,7 @@
 'use strict';
 const assert=require('assert'),fs=require('fs'),path=require('path');
 const ROOT=path.resolve(__dirname,'..'),read=file=>fs.readFileSync(path.join(ROOT,file),'utf8');
-assert.equal(read('VERSION').trim(),'v9.0-p4.1.1');
+assert.match(read('VERSION').trim(),/^v9\.0-p4\.1\.\d+$/);
 const subjects=read('admin-subjects.html'),content=read('content-center.html'),subjectApp=read('src/admin/51-admin-subjects-app.js'),manager=read('src/admin/53-recall-association-management.js'),treeApp=read('src/91-content-center-app.js');
 assert(subjects.includes('data-subject-tab="current"')&&subjects.includes('data-subject-tab="association"')&&subjects.includes('data-subject-tab="history"'));
 assert(!subjects.includes('data-subject-tab="unmapped"'));

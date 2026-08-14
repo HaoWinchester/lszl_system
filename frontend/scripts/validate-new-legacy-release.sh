@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RELEASE_ROOT="${1:?缺少 release root}"
+RELEASE_ROOT_INPUT="${1:?缺少 release root}"
 RELEASE_VERSION="${2:?缺少 release version}"
+RELEASE_ROOT="$(cd "$RELEASE_ROOT_INPUT" && pwd)"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 VALIDATION_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/kg-release-validation.XXXXXX")"
 INTEGRATED_LOG="$VALIDATION_ROOT/integrated.log"

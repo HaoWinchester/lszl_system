@@ -3285,6 +3285,12 @@ window.PMPPrepDraftUi?.open?.();
     return remoteRefreshPromise;
   }
   const unsubscribeTeachingSync=teachingSync?.subscribe?.(refreshRemoteRevision);
+  bankSelect.addEventListener('change',()=>{
+    prepRuntime.serverBankId=bankSelect.value;
+    const bank=prepRuntime.serverBanks?.find(item=>item.id===bankSelect.value);
+    prepRuntime.serverBankRevision=Number(bank?.revision||0)||null;
+    markWorkspaceDirty();refreshButtons();
+  });
   createButton.addEventListener('click',async()=>{
     const name=prompt('请输入新题库名称',state.questionBank.name||'PMP 内容准备题库');if(!name?.trim())return;
     createButton.disabled=true;setStatus('正在新建题库…');setIssues(null);
@@ -3301,6 +3307,9 @@ window.PMPPrepDraftUi?.open?.();
   async function loadSelectedBankIntoWorkspace(){
     const bankId=sourceBankSelect.value;if(!bankId)return;
     const previousBankId=prepRuntime.serverBankId||'';
+    if(!prepRuntime.draftId){
+      sourceBankSelect.value=previousBankId;setStatus('请先新建或打开共享草稿。','warn');return;
+    }
     const hasWorkspaceContent=state.questionBank.questions.length>0;
     if(prepRuntime.dirty&&hasWorkspaceContent&&!confirm('载入题库会替换当前工作区的题目。未保存内容可能丢失，是否继续？')){
       sourceBankSelect.value=previousBankId;setStatus('已取消载入，当前工作区未改变。','warn');return;
@@ -3323,7 +3332,7 @@ window.PMPPrepDraftUi?.open?.();
       bankSelect.value=bankId;
       state.currentQuestionId=questions[0].id;refreshAll();
       questions.forEach(question=>question.serverExportSnapshot=Catalog.captureServerSnapshot(question));
-      await saveWorkspaceLocal({silent:true});
+      await window.PMPPrepDraftUi.save();
       setStatus(`已载入 ${questions.length} 道题目，请保存后继续编辑。`,'good');
     }catch(error){sourceBankSelect.value=previousBankId;setStatus(error.message,'bad');setIssues(error)}finally{refreshButtons()}
   }

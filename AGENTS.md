@@ -102,3 +102,9 @@ users / role_themes / system_settings(KV) / user_admin_logs / folders / graph_fi
 ### 事故案例（别再犯）
 - **发布回退**：曾基于旧源（new-legacy v8.6.29，146 文件）发布 v9.0-p4.1.2，把生产 v9 内容（597 文件、含 admin-console 等新页面）回退掉。根因：没核对源 vs active release 文件数，凭"版本号体系"假设行事。
 - **漏页**：曾修 `isLoggedIn` 后只在 training/workspace/index 验证退出，漏掉 `knowledge-recall.html` 有账号菜单但缺 `authModal` DOM + `standalone-auth-dialog.js`（点登录无反应）。根因：没遍历所有做题页测登录/退出，把"跳转一致"当成了"功能一致"。
+
+## 功能分支收尾纪律（强制执行）
+
+- 每个功能开发完成并通过相应验证后，必须合入 `main` 并推送远端；不要长期保留已完成的功能分支。
+- 合入成功后删除对应的本地/远端功能分支，并移除对应工作树；最终核对仓库只保留 `main`（托管工具创建的临时 detached 工作树除外）。
+- 不得为清理分支丢弃尚未合入的有效修改；发现脏工作树时，先审计并把有效内容纳入 `main`，再执行清理。

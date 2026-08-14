@@ -9,7 +9,7 @@ from playwright.sync_api import APIRequestContext, Page, sync_playwright
 
 
 BASE = os.environ.get("E2E_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
-ADMIN_PASSWORD = os.environ.get("E2E_ADMIN_PASSWORD", "admin123")
+ADMIN_PASSWORD = os.environ.get("E2E_ADMIN_PASSWORD", "jbgsnmm~123")
 
 
 def assert_ok(response, label: str) -> dict:
@@ -21,7 +21,11 @@ def login(request: APIRequestContext) -> None:
     assert_ok(
         request.post(
             BASE + "/api/v1/auth/login",
-            data={"username": "admin", "password": ADMIN_PASSWORD},
+            data={
+                "username": "admin",
+                "password": ADMIN_PASSWORD,
+                "acceptedTermsVersion": "2026-08-13-v1",
+            },
         ),
         "login admin",
     )
@@ -96,26 +100,19 @@ def upload_questions(
     assert_ok(response, "upload source questions")
 
 
-def batch_payload(page: Page) -> dict:
-    return page.evaluate(
-        """() => {
-          const original = window.fetch;
-          let posted = null;
-          window.fetch = async (url, options = {}) => {
-            if (String(url).includes('/api/v1/content-prep/batches')) {
-              posted = JSON.parse(options.body);
-            }
-            return original(url, options);
-          };
-          window.__contentPrepPostedBatch = () => posted;
-          return {};
-        }"""
-    )
-
-
 def choose_creator(page: Page) -> None:
     page.locator('[data-creator-key="peiqi"]').click()
     page.locator("#creatorGate").wait_for(state="hidden")
+
+
+def create_shared_draft(page: Page, title: str) -> str:
+    page.locator("#sharedDraftGate").wait_for(state="visible")
+    page.once("dialog", lambda dialog: dialog.accept(title))
+    page.locator("#btnCreateSharedDraft").click()
+    page.locator("#sharedDraftGate").wait_for(state="hidden")
+    draft_id = page.evaluate("prepRuntime.draftId")
+    assert draft_id
+    return draft_id
 
 
 def wait_for_status(page: Page, text: str) -> None:
@@ -150,6 +147,7 @@ with sync_playwright() as playwright:
         page = context.new_page()
         page.goto(BASE + "/content-prep", wait_until="networkidle")
         choose_creator(page)
+        create_shared_draft(page, f"整库载入共享草稿 {stamp}")
         page.locator(
             f'#serverSourceBankSelect option[value="{populated["id"]}"]'
         ).wait_for(state="attached")
@@ -181,18 +179,11 @@ with sync_playwright() as playwright:
         assert "已载入 2 道题目" in page.locator("#serverCatalogStatus").inner_text()
         assert page.locator("#serverSourceBankSelect").input_value() == populated["id"]
         assert page.evaluate("() => prepRuntime.dirty") is False
+        assert page.evaluate("() => prepRuntime.draftRevision >= 2")
 
         loaded_ids = page.evaluate(
             "() => state.questionBank.questions.map(question => question.id)"
         )
-
-        page.locator('button[data-tab="validate"]').click()
-        page.locator('#tab-validate.active').wait_for(state="visible")
-        page.locator('button[data-tab="base"]').click()
-        batch_payload(page)
-        page.locator("#btnSyncToCatalog").click()
-        wait_for_status(page, "已保存到服务器")
-        assert page.evaluate("() => window.__contentPrepPostedBatch().questions") == []
 
         page.locator('button[data-tab="questions"]').click()
         page.locator("#btnNewQuestion").click()
@@ -212,6 +203,31 @@ with sync_playwright() as playwright:
         assert page.evaluate("() => state.questionBank.questions.some(question => question.id === state.currentQuestionId)")
         assert page.locator("#serverSourceBankSelect").input_value() == populated["id"]
         assert page.locator("#serverSourceBankSelect").is_enabled()
+
+        page.locator('button[data-tab="questions"]').click()
+        page.once("dialog", lambda dialog: dialog.accept())
+        page.locator("#btnDeleteQuestion").click()
+        page.wait_for_function(
+            "count => state.questionBank.questions.length === count", arg=len(loaded_ids)
+        )
+        page.locator('button[data-tab="base"]').click()
+        page.locator("#btnQuickSaveWorkspace").click()
+        page.wait_for_function("() => !prepRuntime.dirty && prepRuntime.draftRevision >= 3")
+
+        page.locator('button[data-tab="export"]').click()
+        page.locator('#tab-export.active').wait_for(state="visible")
+        page.locator("#btnSyncToCatalog").click()
+        wait_for_status(page, "已同步到主程序")
+        page.locator("#sharedDraftGate").wait_for(state="visible")
+        server_questions = assert_ok(
+            context.request.get(
+                BASE
+                + f'/api/v1/question-catalog/banks/{populated["id"]}/questions?page_size=200'
+            ),
+            "reload populated bank",
+        )["questions"]
+        assert {item["id"] for item in server_questions} == set(question_ids)
+        assert all(item["revision"] == 1 for item in server_questions), server_questions
         print("content-prep-bank-load-e2e-ok")
     finally:
         for bank_id in reversed(bank_ids):
