@@ -124,6 +124,7 @@
       body: JSON.stringify({
         banks: Array.isArray(input?.banks) ? input.banks : [],
         confirmReplace: input?.confirmReplace === true,
+        confirmDuplicateCleanup: input?.confirmDuplicateCleanup === true,
       }),
     })
     publishCommit(payload, {
@@ -173,6 +174,19 @@
     publishCommit(payload, { entityType: 'question', entityId: payload.question?.id || questionId })
     await refreshAfterCommit(payload)
     return clone(payload.question || null)
+  }
+
+  async function importQuestions(bankId, questions, options = {}) {
+    const payload = await request(`/banks/${encodeURIComponent(bankId)}/questions/import`, {
+      method: 'POST',
+      body: JSON.stringify({
+        questions: Array.isArray(questions) ? questions : [],
+        confirmDuplicateCleanup: options.confirmDuplicateCleanup === true,
+      }),
+    })
+    publishCommit(payload, { entityType: 'question-import', entityId: bankId, action: 'created' })
+    await refreshAfterCommit(payload)
+    return clone(payload)
   }
 
   async function deleteQuestion(questionId) {
@@ -280,6 +294,7 @@
     reload,
     saveBank,
     importBanks,
+    importQuestions,
     deleteBank,
     saveQuestion,
     deleteQuestion,

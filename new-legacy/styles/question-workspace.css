@@ -123,6 +123,23 @@ html,body{
   justify-content:flex-end;
   gap:8px;
 }
+.qw-learning-assets-shortcuts{display:flex;align-items:center;gap:6px}
+.qw-learning-assets-shortcuts button{
+  display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border:1px solid #dfe4ed;border-radius:11px;background:#fff;color:#475569;font-size:11px;font-weight:900;white-space:nowrap;
+}
+.qw-learning-assets-shortcuts button:hover,.qw-learning-assets-shortcuts button[aria-expanded="true"]{border-color:rgba(109,93,252,.35);background:#f5f3ff;color:#5b4dd1}
+.qw-learning-assets-shortcuts strong{display:grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#ede9fe;color:#5b4dd1;font-size:9px}
+.qw-learning-assets-backdrop{position:fixed;inset:var(--lp-shell-height,64px) 0 0;z-index:5190;background:rgba(15,23,42,.08)}
+.qw-learning-assets-backdrop[hidden],.qw-learning-assets-drawer[hidden],.qw-personal-card-editor[hidden]{display:none!important}
+.qw-learning-assets-drawer{
+  position:fixed;top:var(--lp-shell-height,64px);right:0;bottom:0;z-index:5200;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;width:min(420px,calc(100vw - 12px));border-left:1px solid rgba(100,116,139,.18);background:rgba(255,255,255,.98);box-shadow:-18px 0 48px rgba(15,23,42,.14);backdrop-filter:blur(18px)
+}
+.qw-learning-assets-drawer>header{display:flex;align-items:flex-start;justify-content:space-between;padding:18px;border-bottom:1px solid #edf0f5}
+.qw-learning-assets-drawer>header small{color:#7c8799;font-size:9px;font-weight:900;letter-spacing:.08em}.qw-learning-assets-drawer>header h2{margin:4px 0 0;color:#1f2937;font-size:18px}.qw-learning-assets-drawer>header>button{width:34px;height:34px;border:0;border-radius:10px;background:#f1f5f9;color:#64748b;font-size:20px}
+.qw-learning-assets-tools{display:grid;gap:10px;padding:12px 14px;border-bottom:1px solid #edf0f5}.qw-learning-assets-tools input{height:40px;padding:0 12px;border:1px solid #dfe4ed;border-radius:11px;outline:0;font:inherit}.qw-learning-assets-tools>div{display:flex;gap:7px}.qw-learning-assets-tools button{min-height:32px;padding:0 12px;border:1px solid #dfe4ed;border-radius:999px;background:#fff;color:#64748b;font-size:10px;font-weight:900}.qw-learning-assets-tools button.active{border-color:rgba(109,93,252,.25);background:#f3f1ff;color:#5b4dd1}
+.qw-learning-assets-list{min-height:0;overflow:auto;padding:12px}.qw-learning-asset-card{margin-bottom:10px;padding:13px;border:1px solid #e2e8f0;border-radius:14px;background:#fff}.qw-learning-asset-card>header{display:flex;align-items:center;gap:8px}.qw-learning-asset-card>header span{padding:4px 7px;border-radius:7px;background:#fef3c7;color:#b45309;font-size:9px;font-weight:900}.qw-learning-asset-card>header strong{overflow:hidden;color:#334155;font-size:12px;text-overflow:ellipsis;white-space:nowrap}.qw-learning-asset-card p{margin:10px 0 6px;color:#475569;font-size:11px;line-height:1.55}.qw-learning-asset-card small{display:block;color:#94a3b8;font-size:9px}.qw-learning-asset-card footer{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.qw-learning-asset-card footer button{min-height:30px;padding:0 10px;border:1px solid rgba(109,93,252,.2);border-radius:9px;background:#f5f3ff;color:#5b4dd1;font-size:10px;font-weight:900}.qw-learning-assets-empty{padding:44px 16px;color:#94a3b8;text-align:center;font-size:11px}.qw-learning-assets-error{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid #fee2e2;background:#fff7ed;color:#c2410c;font-size:10px}.qw-learning-assets-error button{border:0;background:transparent;color:inherit;font-weight:900}
+.qw-personal-card-editor{position:fixed;inset:0;z-index:5300;display:grid;place-items:center;padding:18px;background:rgba(15,23,42,.26)}.qw-personal-card-editor form{display:grid;gap:12px;width:min(540px,100%);max-height:calc(100dvh - 36px);overflow:auto;padding:18px;border-radius:18px;background:#fff;box-shadow:0 28px 90px rgba(15,23,42,.26)}.qw-personal-card-editor header,.qw-personal-card-editor footer{display:flex;align-items:center;justify-content:space-between;gap:10px}.qw-personal-card-editor h2{margin:0;font-size:18px}.qw-personal-card-editor header button{border:0;background:transparent;color:#64748b;font-size:22px}.qw-personal-card-editor label{display:grid;gap:6px;color:#475569;font-size:10px;font-weight:900}.qw-personal-card-editor input,.qw-personal-card-editor textarea,.qw-personal-card-editor select{padding:10px;border:1px solid #dfe4ed;border-radius:10px;font:inherit}.qw-personal-card-editor-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px}.qw-personal-card-editor footer{justify-content:flex-end}.qw-personal-card-editor footer button{min-height:36px;padding:0 14px;border:1px solid #dfe4ed;border-radius:10px;background:#fff;color:#475569;font-weight:900}.qw-personal-card-editor footer button[type="submit"]{border-color:#6d5dfc;background:#6d5dfc;color:#fff}.qw-personal-card-conflict{padding:10px;border-radius:10px;background:#fff7ed;color:#c2410c;font-size:10px}.qw-personal-card-conflict button{border:0;background:transparent;color:inherit;font-weight:900;text-decoration:underline}
+@media(max-width:900px),(pointer:coarse){.qw-learning-assets-shortcuts button{padding:0 8px;font-size:0}.qw-learning-assets-shortcuts button::first-letter{font-size:0}.qw-learning-assets-shortcuts strong{font-size:9px}.qw-learning-assets-drawer{width:min(390px,100vw)}.qw-learning-asset-card footer [data-card-action="edit"],.qw-learning-asset-card footer [data-card-action="archive"],.qw-learning-asset-card footer [data-card-action="restore"]{display:none}}
 .qw-node-count,
 .qw-readonly-badge{
   display:inline-flex;
@@ -611,9 +628,22 @@ html,body{
   overflow:auto;
   padding:9px;
 }
+.qw-question-selection-bar{
+  display:flex!important;
+  justify-content:space-between;
+  width:100%;
+  color:#64748b;
+  font-size:10px;
+  font-weight:850;
+}
+.qw-question-selection-bar button{
+  min-height:26px;
+  padding:0 9px;
+}
+.qw-question-selection-bar button:disabled{opacity:.45;cursor:default}
 .qw-question-item{
   display:grid;
-  grid-template-columns:20px minmax(0,1fr) auto;
+  grid-template-columns:24px 20px minmax(0,1fr) auto;
   align-items:stretch;
   gap:6px;
   margin-bottom:7px;
@@ -621,6 +651,38 @@ html,body{
   border-radius:13px;
   background:#fff;
 }
+.qw-question-item.is-question-selected{
+  border-color:rgba(109,93,252,.32);
+  background:#f5f3ff;
+}
+.qw-question-select{
+  display:grid;
+  place-items:center;
+  width:24px;
+  margin-left:4px;
+  cursor:pointer;
+}
+.qw-question-select input{
+  position:absolute;
+  width:1px;
+  height:1px;
+  overflow:hidden;
+  opacity:0;
+}
+.qw-question-select span{
+  display:block;
+  width:16px;
+  height:16px;
+  border:1.5px solid #94a3b8;
+  border-radius:5px;
+  background:#fff;
+}
+.qw-question-select input:checked+span{
+  border-color:#6d5dfc;
+  background:#6d5dfc;
+  box-shadow:inset 0 0 0 3px #fff;
+}
+.qw-question-select input:focus-visible+span{outline:2px solid rgba(109,93,252,.35);outline-offset:2px}
 .qw-question-item:hover{
   border-color:#e2e8f0;
   background:#f8fafc;
@@ -1603,6 +1665,40 @@ body[data-qw-readonly="1"] .qw-layout-toolbar .qw-smart-picker{display:none}
   box-shadow:0 0 0 3px rgba(34,197,94,.15);
 }
 .qw-card-option-key.is-wrong-flash{animation:qw-option-wrong-flash .42s ease}
+.qw-card-option-key.is-answer-selected{
+  border-color:#6d5dfc;
+  background:#ede9fe;
+  color:#5b21b6;
+  box-shadow:0 0 0 3px rgba(109,93,252,.12);
+}
+.qw-card-option-key:disabled{cursor:wait;opacity:.62;transform:none}
+.qw-option-sync-status,
+.qw-option-sync-error{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-top:9px;
+  padding:8px 10px;
+  border-radius:10px;
+  font-size:10px;
+  font-weight:760;
+  line-height:1.45;
+}
+.qw-option-sync-status.is-pending{background:#f5f3ff;color:#6d28d9}
+.qw-option-sync-error{border:1px solid #fecaca;background:#fff1f2;color:#b91c1c}
+.qw-option-sync-error button{
+  flex:0 0 auto;
+  min-height:28px;
+  padding:0 10px;
+  border:1px solid #fca5a5;
+  border-radius:8px;
+  background:#fff;
+  color:#b91c1c;
+  font:inherit;
+  cursor:pointer;
+}
+.qw-option-sync-error button:hover{border-color:#ef4444;background:#fee2e2}
 @keyframes qw-option-wrong-flash{
   0%,100%{border-color:rgba(100,116,139,.18);background:#f1f5f9;color:#64748b;transform:translateX(0)}
   18%,72%{border-color:#dc2626;background:#ef4444;color:#fff;transform:translateX(-2px)}

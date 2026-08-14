@@ -101,7 +101,7 @@ async function testSaveConflictStopsOldPageAndSupportsConflictCopyContract(){
   assert.equal(controller.snapshot().mode,'conflict-copy-required');
   assert.equal(controller.snapshot().canSave,false);
 
-  for(const marker of ['keepalive:true','releaseLock','saveWorkspaceLocal','conflict-copy-required','btnCopyConflictQuestion']){
+  for(const marker of ['keepalive:true','releaseLock','markWorkspaceDirty','conflict-copy-required','btnCopyConflictQuestion']){
     assert.ok(EVENT_SOURCE.includes(marker)||RUNTIME_SOURCE.includes(marker),`missing UI lock marker: ${marker}`);
   }
   for(const marker of ['delete copy.serverRevision','delete copy.serverContentHash','delete copy.lockToken','parentQuestionId']){

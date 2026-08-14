@@ -112,6 +112,16 @@ def select_creator(page: Page) -> None:
     page.locator("#creatorGate").wait_for(state="hidden")
 
 
+def create_shared_draft(page: Page, title: str) -> str:
+    page.locator("#sharedDraftGate").wait_for(state="visible")
+    page.once("dialog", lambda dialog: dialog.accept(title))
+    page.locator("#btnCreateSharedDraft").click()
+    page.locator("#sharedDraftGate").wait_for(state="hidden")
+    draft_id = page.evaluate("prepRuntime.draftId")
+    assert draft_id
+    return draft_id
+
+
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True)
     guest = browser.new_context()
@@ -121,6 +131,7 @@ with sync_playwright() as playwright:
     viewer = browser.new_context()
     stamp = str(int(time.time() * 1000))
     bank_ids: list[str] = []
+    draft_id = ""
     try:
         guest_response = guest.request.get(BASE + "/content-prep", max_redirects=0)
         assert guest_response.status == 307
@@ -156,6 +167,10 @@ with sync_playwright() as playwright:
         prep_page = admin.new_page()
         prep_page.goto(BASE + "/content-prep", wait_until="networkidle")
         select_creator(prep_page)
+        draft_title = f"Prep 共享草稿 {stamp}"
+        draft_id = create_shared_draft(prep_page, draft_title)
+        prep_page.locator('#tabs [data-tab="export"]').click()
+        prep_page.locator("#serverBankSelect").wait_for(state="visible")
         prep_page.locator(
             f'#serverBankSelect option[value="{private_bank["id"]}"]'
         ).wait_for(state="attached")
@@ -184,15 +199,19 @@ with sync_playwright() as playwright:
         assert round_trip["name"]
 
         prep_page.locator("#btnQuickSaveWorkspace").click()
-        prep_page.wait_for_function("() => prepDbGet().then(row => !!row?.workspace)")
+        prep_page.wait_for_function("() => prepRuntime.draftRevision >= 2 && !prepRuntime.dirty")
         prep_page.reload(wait_until="networkidle")
         select_creator(prep_page)
-        prep_page.once("dialog", lambda dialog: dialog.accept())
-        prep_page.locator("#btnRestoreWorkspaceLocal").click()
+        prep_page.locator(f'[data-open-draft="{draft_id}"]').wait_for(state="visible")
+        prep_page.locator(f'[data-open-draft="{draft_id}"]').click()
+        prep_page.locator("#sharedDraftGate").wait_for(state="hidden")
         prep_page.wait_for_function(
             "bankId => prepRuntime.serverBankId === bankId",
             arg=private_bank["id"],
         )
+        prep_page.locator('#tabs [data-tab="export"]').click()
+        prep_page.locator("#btnSyncToCatalog").wait_for(state="visible")
+        assert prep_page.locator("#btnSyncToCatalog").inner_text() == "确认同步到主程序"
 
         private_question_id = str(uuid4())
         private_title = f"Prep 上传后立即可见 {stamp}"
@@ -263,6 +282,8 @@ with sync_playwright() as playwright:
         assert current["revision"] == 1
         print("content-prep-question-bank-e2e-ok")
     finally:
+        if draft_id:
+            admin.request.delete(BASE + f"/api/v1/content-prep/drafts/{draft_id}")
         for bank_id in reversed(bank_ids):
             admin.request.delete(BASE + f"/api/v1/banks/{bank_id}")
         guest.close()

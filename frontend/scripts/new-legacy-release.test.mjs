@@ -56,6 +56,8 @@ test('content prep studio ships reproducible modular source and backend bootstra
     'content-prep-studio/src/js/20-page-runtime.js',
     'content-prep-studio/src/js/30-service-layer.js',
     'content-prep-studio/src/js/35-server-catalog-service.js',
+    'content-prep-studio/src/js/36-server-draft-service.js',
+    'content-prep-studio/src/js/37-shared-draft-ui.js',
     'content-prep-studio/src/js/40-events-bootstrap.js',
     'content-prep-studio/src/js/45-server-events.js',
     'content-prep-studio/src/tag-slot-schema.json',
@@ -64,6 +66,7 @@ test('content prep studio ships reproducible modular source and backend bootstra
     'content-prep-studio/tests/test_tag_migration.js',
     'content-prep-studio/tests/test_server_catalog.js',
     'content-prep-studio/tests/test_edit_lock_client.js',
+    'content-prep-studio/tests/test_shared_draft_service.js',
     'content-prep-studio/tests/test_server_ui_contract.py',
     'content-prep-studio/dist/content-prep.html',
   ]
@@ -74,6 +77,8 @@ test('content prep studio ships reproducible modular source and backend bootstra
 
   const built = readFileSync(resolve(source, 'content-prep-studio/dist/content-prep.html'), 'utf8')
   assert.match(built, /window\.PMPPrepServices/)
+  assert.match(built, /global\.PMPPrepSharedDrafts/)
+  assert.match(built, /确认同步到主程序/)
   for (let index = 1; index <= 6; index += 1) {
     assert.match(built, new RegExp(`creator_00${index}`))
   }
@@ -131,6 +136,11 @@ test('update builds an isolated release and atomically selects it', () => {
     new RegExp(`src/41-account-menu\\.js\\?v=${sourceVersion}`),
     'release pages must cache-bust local business scripts',
   )
+  const workspacePage = readFileSync(resolve(root, sourceVersion, 'site', 'question-workspace.html'), 'utf8')
+  assert.match(workspacePage, /practice-learning-adapter\.js/)
+  assert.match(workspacePage, /personal-card-adapter\.js/)
+  assert.match(workspacePage, /src\/108-multi-question-learning-assets\.js/)
+  assert.ok(workspacePage.indexOf('personal-card-adapter.js') < workspacePage.indexOf('src/77-multi-question-workspace.js'))
   assert.match(
     practicePage,
     /<script src="\.\/server-state-bootstrap\.js"><\/script>/,
@@ -329,5 +339,9 @@ test('release validation runs smoke and visual regression against the candidate'
   assert.ok(validator.includes('frontend/e2e/content_prep_question_bank.py'))
   assert.ok(validator.includes('frontend/e2e/content_prep_concurrency.py'))
   assert.ok(validator.includes('frontend/e2e/practice_mode_initial_view.py'))
+  assert.ok(validator.includes('frontend/e2e/multi_question_learning_assets.py'))
   assert.ok(validator.includes('frontend/e2e/direct_new_legacy_visual.py'))
+
+  const contract = readJson(resolve(scriptsDir, 'new-legacy-contract.json'))
+  assert.ok(contract.releaseValidation?.commands?.includes('python3 frontend/e2e/multi_question_learning_assets.py'))
 })

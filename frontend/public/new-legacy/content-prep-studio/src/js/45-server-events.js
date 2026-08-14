@@ -17,9 +17,6 @@
 
   function onLeaseState(lease){
     prepRuntime.editLeaseState=lease;renderQuestionLockState();refreshButtons();
-    if(['offline-unsynced','server-readonly','conflict-copy-required'].includes(lease.mode)){
-      saveWorkspaceLocal({silent:true});
-    }
   }
   async function ensureLockController(){
     const creatorId=prepRuntime.creatorProfile?.creatorId||'';
@@ -52,7 +49,7 @@
     const issues=Array.isArray(error?.issues)?error.issues:[];
     issuesBox.innerHTML=issues.map(issue=>`<div>${esc(issue.field||issue.questionId||'题目')}：${esc(issue.message||issue.code||'校验失败')}</div>`).join('');
   }
-  function serverEnabled(){return !!(actor&&prepRuntime.creatorProfile&&prepRuntime.serverBankId)}
+  function serverEnabled(){return !!(actor&&prepRuntime.creatorProfile&&prepRuntime.serverBankId&&prepRuntime.draftId)}
   function refreshButtons(){
     const authenticated=!!actor;
     const question=currentQuestion(),lease=prepRuntime.editLeaseState||{};
@@ -64,7 +61,7 @@
   function renderActor(){
     actorName.textContent=actor?(actor.display_name||actor.displayName||actor.username):'未登录';
     creatorName.textContent=prepRuntime.creatorProfile?.name||'请先选择';
-    if(!actor)setStatus('未登录 · 本地草稿仍可编辑','warn');
+    if(!actor)setStatus('未登录 · 请登录后选择共享草稿','warn');
   }
   function renderBanks(banks){
     bankSelect.innerHTML='<option value="">请选择题库</option>'+banks.map(bank=>`<option value="${esc(bank.id)}">${esc(bank.name)} · ${esc(bank.accessMode||'可编辑')}</option>`).join('');
@@ -112,47 +109,26 @@
     if(!actor)return null;
     const subjectId=state.knowledgeTree?.subjectId||state.questionBank.subject||'PMP';
     const payload=await Catalog.loadSharedContent(subjectId);
-    if(!prepRuntime.dirty)applySharedContent(payload);
+    if(!prepRuntime.draftId&&!prepRuntime.dirty)applySharedContent(payload);
     return payload;
   }
   const ServerPrinciples=Object.freeze({
     async save(principle,preset){
-      if(!actor)throw new Error('请先登录后再保存原则。');
-      const payload=await Catalog.savePrinciple(principle,preset,{contentRevision:Number(prepRuntime.serverContentRevision||0)});
-      applySharedContent(payload);markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
-      return payload;
+      throw new Error('原则请先保存到共享草稿，并在第七步统一同步。');
     },
     async remove(principleId){
-      if(!actor)throw new Error('请先登录后再删除原则。');
-      const payload=await Catalog.deletePrinciple(principleId,{contentRevision:Number(prepRuntime.serverContentRevision||0)});
-      applySharedContent(payload);markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
-      return payload;
+      throw new Error('原则请先在共享草稿内删除，并在第七步统一同步。');
     }
   });
   window.PMPPrepServerPrinciples=ServerPrinciples;
 
-  async function syncWorkspaceToServer({source='sync'}={}){
-    if(!serverEnabled())throw new Error('请先登录、选择制作人和服务器题库。');
-    syncButton.disabled=true;setStatus(source==='save'?'正在保存到服务器…':'正在同步到题库…');setIssues(null);
-    try{
-      const result=await Catalog.uploadBundle(ExportService.completeBundle(),{
-        workspace:prepRuntime,creatorId:prepRuntime.creatorProfile.creatorId,
-        questions:state.questionBank.questions,prepVersion:VERSION,workspaceVersion:'4'
-      });
-      prepRuntime.lastBatchId=result.batchId;
-      prepRuntime.serverContentRevision=Math.max(Number(prepRuntime.serverContentRevision||0),Number(result.contentRevision||0));
-      markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
-      setStatus(`已保存到服务器 · 批次 ${result.batchId}`,'good');toast('保存成功，主程序已同步');
-      return result;
-    }catch(error){
-      QuestionLocks.handleSaveError(error);
-      setStatus(error.message||'服务器保存失败，本机恢复副本已保留','bad');setIssues(error);
-      await saveWorkspaceLocal({silent:true});markWorkspaceDirty();throw error;
-    }finally{refreshButtons()}
+  async function syncWorkspaceToServer(){
+    syncButton.disabled=true;setStatus('正在同步共享草稿到主程序…');setIssues(null);
+    try{const result=await window.PMPPrepDraftUi.sync();setStatus(`已同步到主程序 · 批次 ${result.batchId}`,'good');return result}
+    catch(error){setStatus(error.message||'同步失败，草稿已保留','bad');setIssues(error);throw error}
+    finally{refreshButtons()}
   }
   window.PMPPrepSyncWorkspace=syncWorkspaceToServer;
-  document.getElementById('btnQuickSaveWorkspace').onclick=()=>syncWorkspaceToServer({source:'save'}).catch(()=>{});
-  document.getElementById('btnSaveWorkspaceLocal').onclick=()=>syncWorkspaceToServer({source:'save'}).catch(()=>{});
   function readServerProjection(key,normalizer){
     try{
       const raw=window.localStorage?.getItem?.(key);if(!raw)return null;
@@ -256,6 +232,7 @@
   }
   window.PMPPrepServerContentRefresh=Object.freeze({apply:applyRemoteContent,snapshot:remoteContentSnapshot});
   function handleServerStateReload(){
+    if(prepRuntime.draftId)return;
     prepRuntime.serverPrinciples=readServerProjection('kg_principle_repository_v1',normalizePrinciples)||prepRuntime.serverPrinciples||null;
     prepRuntime.serverSynthesisPresets=readServerProjection('kg_synthesis_preset_repository_v1',normalizePresets)||prepRuntime.serverSynthesisPresets||null;
     if(!prepRuntime.serverCatalogSnapshot)return;
@@ -271,6 +248,7 @@
     remoteRetryTimer=setTimeout(()=>{remoteRetryTimer=0;refreshRemoteRevision({revision:remoteRefreshTarget,source:'retry'})},delay);
   }
   function refreshRemoteRevision(detail){
+    if(prepRuntime.draftId)return;
     if(remoteRetryStopped)return;
     const revision=Number(detail?.revision);
     if(!Number.isSafeInteger(revision)||revision<=Number(prepRuntime.serverContentRevision||0))return;
@@ -327,8 +305,8 @@
         visibility:state.questionBank.visibility==='published'?'published':'private',creatorId:prepRuntime.creatorProfile.creatorId
       });
       prepRuntime.serverBankId=bank.id;prepRuntime.serverBankRevision=Number(bank.revision||1);
-      await refreshBanks();bankSelect.value=bank.id;markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
-      setStatus('题库已创建，可开始同步','good');
+      await refreshBanks();bankSelect.value=bank.id;markWorkspaceDirty();
+      setStatus('题库已创建，请先保存共享草稿，再确认同步内容','good');
     }catch(error){setStatus(error.message,'bad');setIssues(error)}finally{refreshButtons()}
   });
   questionInput.addEventListener('input',refreshButtons);
@@ -343,11 +321,11 @@
       const index=state.questionBank.questions.findIndex(item=>item.id===question.id);
       if(index>=0)state.questionBank.questions[index]=question;else state.questionBank.questions.push(question);
       prepRuntime.serverBankId=remote.bankId||prepRuntime.serverBankId;
-      state.currentQuestionId=question.id;refreshAll();markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
+      state.currentQuestionId=question.id;refreshAll();markWorkspaceDirty();
       setStatus('题目已从服务器载入','good');
     }catch(error){setStatus(error.message,'bad');setIssues(error)}finally{refreshButtons()}
   });
-  syncButton.addEventListener('click',()=>syncWorkspaceToServer({source:'sync'}).catch(()=>{}));
+  syncButton.addEventListener('click',()=>syncWorkspaceToServer().catch(()=>{}));
 
   document.querySelectorAll('[data-creator-key]').forEach(button=>button.addEventListener('click',()=>{
     QuestionLocks.close().finally(()=>{
@@ -369,8 +347,8 @@
     try{await QuestionLocks.reconfirm()}finally{reconfirmButton.disabled=false;renderQuestionLockState()}
   });
   copyConflictButton.addEventListener('click',async()=>{
-    await duplicateQuestion();markWorkspaceDirty();await saveWorkspaceLocal({silent:true});
-    setStatus('冲突内容已复制为本地新题，可作为新题上传','good');
+    await duplicateQuestion();markWorkspaceDirty();
+    setStatus('冲突内容已复制为草稿新题，可在第七步同步','good');
   });
   window.addEventListener('beforeunload',()=>{
     const lease=QuestionLocks.snapshot();

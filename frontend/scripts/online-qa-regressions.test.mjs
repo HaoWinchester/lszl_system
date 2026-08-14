@@ -103,6 +103,7 @@ test('practice mode supports short published papers, truthful scholar rewards, a
 
 test('practice mistakes retain the exact published release identity', () => {
   const practice = source('new-legacy/src/100-practice-mode.js')
+  assert.match(practice, /await api\.answer\(standardAnswerPayload\(question,optionId\)\)/)
   assert.match(practice, /async function recordMistake[\s\S]{0,900}releaseId:text\(release\?\.releaseId\)/)
   assert.match(practice, /async function recordMistake[\s\S]{0,900}paperVersion:Number\(release\?\.version\|\|0\)/)
 })
@@ -110,7 +111,7 @@ test('practice mistakes retain the exact published release identity', () => {
 test('teacher imports honor duplicate settings and reject blank bank metadata', () => {
   const workflow = source('new-legacy/src/97-teacher-question-workflow.js')
   const bank = source('new-legacy/src/65-question-bank-admin.js')
-  assert.match(workflow, /bulkAddQuestions\?\.\(\[question\],\{skipDuplicates:byId\('tqSkipDuplicates'\)\?\.checked!==false\}\)/)
+  assert.match(workflow, /await api\.bulkAddQuestions\?\.\(\[question\]\)/)
   assert.match(bank, /题库名称不能为空/)
   assert.match(bank, /自定义科目不能为空/)
   assert.match(bank, /IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED/)

@@ -72,6 +72,11 @@
   }
   function stats() { return clone(overview.stats) }
   function plan() { return clone(overview.plan) }
+  async function answer(input) {
+    const payload = await request('/answers', { method: 'POST', body: JSON.stringify(input || {}) })
+    await refresh()
+    return { correct: Boolean(payload.correct), mistake: clone(payload.mistake || null), completion: clone(payload.completion || null) }
+  }
   async function upsertWrong(input) {
     const payload = await request('/mistakes', { method: 'POST', body: JSON.stringify(input || {}) })
     await refresh()
@@ -111,7 +116,7 @@
   async function clearSessions() {
     await request('/sessions', { method: 'DELETE' })
   }
-  const api = Object.freeze({ refresh, snapshot, list, active, stats, plan, upsertWrong, answerRevenge, remediationReviewed, verificationCandidate, verify, recordSession, listSessions, clearSessions })
+  const api = Object.freeze({ refresh, snapshot, list, active, stats, plan, answer, upsertWrong, answerRevenge, remediationReviewed, verificationCandidate, verify, recordSession, listSessions, clearSessions })
   global.KGPracticeLearningApi = api
   global.addEventListener('kg-auth-session-change', () => { refresh().catch(() => setOverview({})) })
   if (authenticated()) refresh().catch(() => setOverview({}))

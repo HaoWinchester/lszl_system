@@ -69,10 +69,16 @@ def upload_payload(stamp: str, bank_id: str, questions: list[dict], key: str) ->
     }
 
 
-def choose_creator_and_load(page: Page, question_id: str) -> None:
+def choose_creator_and_load(page: Page, question_id: str, draft_title: str) -> str:
     page.goto(BASE + "/content-prep", wait_until="networkidle")
     page.locator('[data-creator-key="peiqi"]').click()
     page.locator("#creatorGate").wait_for(state="hidden")
+    page.locator("#sharedDraftGate").wait_for(state="visible")
+    page.once("dialog", lambda dialog: dialog.accept(draft_title))
+    page.locator("#btnCreateSharedDraft").click()
+    page.locator("#sharedDraftGate").wait_for(state="hidden")
+    draft_id = page.evaluate("prepRuntime.draftId")
+    assert draft_id
     page.locator("#serverQuestionIdInput").fill(question_id)
     page.locator("#btnLoadServerQuestion").click()
     page.wait_for_function(
@@ -81,6 +87,7 @@ def choose_creator_and_load(page: Page, question_id: str) -> None:
     )
     page.locator('#tabs [data-tab="questions"]').click()
     page.locator('#tab-questions [data-qfield="title"]').wait_for(state="visible")
+    return draft_id
 
 
 with sync_playwright() as playwright:
@@ -89,6 +96,7 @@ with sync_playwright() as playwright:
     admin = browser.new_context()
     stamp = str(int(time.time() * 1000))
     bank_id = ""
+    draft_ids: list[str] = []
     question_ids = [str(uuid4()) for _ in range(4)]
     try:
         login(owner.request, "老师", "111111")
@@ -192,7 +200,12 @@ with sync_playwright() as playwright:
         assert sum(row["id"] == question_ids[3] for row in catalog["questions"]) == 1
 
         offline_page = owner.new_page()
-        choose_creator_and_load(offline_page, question_ids[2])
+        offline_draft_id = choose_creator_and_load(
+            offline_page,
+            question_ids[2],
+            f"离线恢复共享草稿 {stamp}",
+        )
+        draft_ids.append(offline_draft_id)
         offline_page.wait_for_function(
             "() => window.PMPPrepQuestionLocks.snapshot().mode === 'server-editable'"
         )
@@ -203,20 +216,30 @@ with sync_playwright() as playwright:
         )
         offline_title = f"离线草稿 {stamp}"
         offline_page.locator('[data-qfield="title"]').fill(offline_title)
-        offline_page.locator("#btnQuickSaveWorkspace").click()
-        offline_page.wait_for_function(
-            "title => prepDbGet().then(row => row?.workspace?.questionBank?.questions?.some(q => q.title === title))",
-            arg=offline_title,
-        )
+        assert offline_page.evaluate("prepRuntime.dirty") is True
         offline_page.context.set_offline(False)
         offline_page.locator("#btnReconfirmQuestionLock").click()
         offline_page.wait_for_function(
             "() => window.PMPPrepQuestionLocks.snapshot().mode === 'server-editable'"
         )
+        offline_page.locator("#btnQuickSaveWorkspace").click()
+        offline_page.wait_for_function(
+            "() => prepRuntime.draftRevision >= 2 && !prepRuntime.dirty",
+        )
+        saved_draft = assert_ok(
+            owner.request.get(BASE + f"/api/v1/content-prep/drafts/{offline_draft_id}"),
+            "read saved shared draft",
+        )["draft"]
+        assert any(
+            item["title"] == offline_title
+            for item in saved_draft["payload"]["questionBank"]["questions"]
+        )
         offline_page.close()
 
         print("content-prep-concurrency-e2e-ok")
     finally:
+        for draft_id in draft_ids:
+            admin.request.delete(BASE + f"/api/v1/content-prep/drafts/{draft_id}")
         if bank_id:
             for question_id in question_ids:
                 admin.request.delete(BASE + f"/api/v1/content-prep/locks/{question_id}/force")

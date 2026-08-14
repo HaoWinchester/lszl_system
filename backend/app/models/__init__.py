@@ -2,6 +2,7 @@
 
 from app.models.analytics import FeatureUsageEvent
 from app.models.content_prep import (
+    ContentPrepDraft,
     Principle,
     QuestionAuditLog,
     QuestionBankCollaborator,
@@ -27,6 +28,7 @@ from app.models.system import RoleTheme, SystemSetting
 from app.models.training import (
     CanvasWorkspace,
     LearningEvent,
+    PersonalSynthesisCard,
     PracticeMistake,
     PracticeVerification,
     RecallProgress,
@@ -48,6 +50,7 @@ __all__ = [
     "CurrentFile",
     "QuestionBank",
     "QuestionBankCollaborator",
+    "ContentPrepDraft",
     "Question",
     "Principle",
     "SynthesisPreset",
@@ -61,6 +64,7 @@ __all__ = [
     "TrainingProgress",
     "RecallProgress",
     "LearningEvent",
+    "PersonalSynthesisCard",
     "PracticeMistake",
     "PracticeVerification",
     "CanvasWorkspace",

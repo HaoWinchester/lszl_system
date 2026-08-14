@@ -191,6 +191,85 @@ def test_question_bank_json_import_is_atomic_and_returns_server_id_maps() -> Non
         asyncio.run(_cleanup_users(usernames))
 
 
+def test_question_bank_file_import_confirms_and_cleans_content_duplicates() -> None:
+    suffix = uuid4().hex[:10]
+    usernames = {"manager": f"question-import-dedupe-{suffix}", "viewer": f"question-import-dedupe-viewer-{suffix}"}
+    asyncio.run(_seed_users(usernames))
+    try:
+        with TestClient(app) as client:
+            _login(client, usernames["manager"])
+            bank = _source_bank("dedupe-bank", "dedupe-question-a")
+            duplicate = dict(bank["questions"][0])
+            duplicate["id"] = "dedupe-question-b"
+            duplicate["title"] = "同内容不同 ID"
+            bank["questions"].append(duplicate)
+            preview = client.post("/api/v1/banks/import", json={"banks": [bank]})
+            assert preview.status_code == 409, preview.text
+            detail = preview.json()["detail"]
+            assert detail["code"] == "QUESTION_DUPLICATES_CONFIRMATION_REQUIRED"
+            assert detail["importPlan"]["duplicateBatchCount"] == 1
+            imported = client.post(
+                "/api/v1/banks/import",
+                json={"banks": [bank], "confirmDuplicateCleanup": True},
+            )
+            assert imported.status_code == 200, imported.text
+            questions = imported.json()["banks"][0]["questions"]
+            assert len(questions) == 1
+            assert questions[0]["teacherNumber"].startswith("PMP-")
+            source_map = imported.json()["sourceQuestionIdMap"]
+            assert source_map["dedupe-bank::dedupe-question-a"] == questions[0]["id"]
+            assert source_map["dedupe-bank::dedupe-question-b"] == questions[0]["id"]
+    finally:
+        asyncio.run(_cleanup_users(usernames))
+
+
+def test_question_bank_replacement_detects_existing_source_updated_into_duplicate() -> None:
+    suffix = uuid4().hex[:10]
+    usernames = {"manager": f"question-import-update-dedupe-{suffix}", "viewer": f"question-import-update-viewer-{suffix}"}
+    asyncio.run(_seed_users(usernames))
+    try:
+        with TestClient(app) as client:
+            _login(client, usernames["manager"])
+            original = _source_bank("update-dedupe-bank", "update-dedupe-a")
+            second = dict(original["questions"][0])
+            second["id"] = "update-dedupe-b"
+            second["stemParts"] = [{"text": "原本不同的题干"}]
+            original["questions"].append(second)
+            first = client.post("/api/v1/banks/import", json={"banks": [original]})
+            assert first.status_code == 200, first.text
+            retained_id = first.json()["sourceQuestionIdMap"]["update-dedupe-bank::update-dedupe-a"]
+
+            replacement = _source_bank("update-dedupe-bank", "update-dedupe-a")
+            duplicate_update = dict(replacement["questions"][0])
+            duplicate_update["id"] = "update-dedupe-b"
+            duplicate_update["title"] = "更新后变成重复"
+            replacement["questions"].append(duplicate_update)
+            preview = client.post(
+                "/api/v1/banks/import",
+                json={"banks": [replacement], "confirmReplace": True},
+            )
+            assert preview.status_code == 409, preview.text
+            detail = preview.json()["detail"]
+            assert detail["code"] == "QUESTION_DUPLICATES_CONFIRMATION_REQUIRED"
+            assert detail["importPlan"]["duplicateExistingCount"] == 1
+
+            imported = client.post(
+                "/api/v1/banks/import",
+                json={
+                    "banks": [replacement],
+                    "confirmReplace": True,
+                    "confirmDuplicateCleanup": True,
+                },
+            )
+            assert imported.status_code == 200, imported.text
+            payload = imported.json()
+            assert len(payload["banks"][0]["questions"]) == 1
+            assert payload["sourceQuestionIdMap"]["update-dedupe-bank::update-dedupe-a"] == retained_id
+            assert payload["sourceQuestionIdMap"]["update-dedupe-bank::update-dedupe-b"] == retained_id
+    finally:
+        asyncio.run(_cleanup_users(usernames))
+
+
 def test_question_bank_import_keeps_source_identity_and_requires_confirmed_replacement() -> None:
     suffix = uuid4().hex[:10]
     usernames = {"manager": f"question-import-policy-{suffix}", "viewer": f"question-import-policy-viewer-{suffix}"}

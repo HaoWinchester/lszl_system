@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, relative, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -37,6 +37,7 @@ const requiredFiles = [
   'src/88-guided-learning-store.js',
   'src/89-guided-learning-app.js',
   'src/90-guided-learning-node-app.js',
+  'src/108-multi-question-learning-assets.js',
   'schemas/activity-schema-v1.json',
   'content-prep-studio/README.md',
   'content-prep-studio/build.py',
@@ -47,6 +48,8 @@ const requiredFiles = [
   'content-prep-studio/src/js/20-page-runtime.js',
   'content-prep-studio/src/js/30-service-layer.js',
   'content-prep-studio/src/js/35-server-catalog-service.js',
+  'content-prep-studio/src/js/36-server-draft-service.js',
+  'content-prep-studio/src/js/37-shared-draft-ui.js',
   'content-prep-studio/src/js/40-events-bootstrap.js',
   'content-prep-studio/src/js/45-server-events.js',
   'content-prep-studio/src/tag-slot-schema.json',
@@ -55,6 +58,7 @@ const requiredFiles = [
   'content-prep-studio/tests/test_tag_migration.js',
   'content-prep-studio/tests/test_server_catalog.js',
   'content-prep-studio/tests/test_edit_lock_client.js',
+  'content-prep-studio/tests/test_shared_draft_service.js',
   'content-prep-studio/tests/test_server_ui_contract.py',
   'content-prep-studio/dist/content-prep.html',
 ]
@@ -153,6 +157,13 @@ test('sync copies v8.6.0 and injects the direct runtime without editing upstream
   assert.doesNotMatch(page, /new-legacy-navigation-bridge\.js/)
   assert.match(readFileSync(resolve(item.output, 'src/64-flow-orchestrator.js'), 'utf8'), /publishingSessionChange/)
   assert.match(readFileSync(resolve(item.output, 'src/64-flow-orchestrator.js'), 'utf8'), /if\(!saved\)return clone\(current\)/)
+  const workspacePage = readFileSync(resolve(item.output, 'question-workspace.html'), 'utf8')
+  assert.ok(
+    workspacePage.indexOf('practice-learning-adapter.js') < workspacePage.indexOf('personal-card-adapter.js')
+      && workspacePage.indexOf('personal-card-adapter.js') < workspacePage.indexOf('src/77-multi-question-workspace.js'),
+    'workspace learning adapters must load before the page behavior',
+  )
+  assert.ok(existsSync(resolve(item.output, 'personal-card-adapter.js')))
 })
 
 test('sync fails closed when a required page is missing', (t) => {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import unicodedata
 from copy import deepcopy
 from typing import Any, Literal
 
@@ -32,6 +33,8 @@ _HASH_EXCLUDED_FIELDS = {
     "actorRole",
     "creatorId",
     "creatorName",
+    "teacherNumber",
+    "displayNumber",
 }
 
 _HASH_EXCLUDED_METADATA_FIELDS = {"origin", "lastImport", "idSystem"}
@@ -227,3 +230,40 @@ def canonical_question_hash(payload: dict[str, Any]) -> str:
         separators=(",", ":"),
     )
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _duplicate_text(value: Any) -> str:
+    normalized = unicodedata.normalize("NFKC", str(value or ""))
+    return " ".join(normalized.strip().split()).casefold()
+
+
+def duplicate_question_signature(payload: dict[str, Any]) -> str:
+    """Exact import duplicate key: primary stem, ordered options, answer."""
+
+    normalized = normalize_question_payload(
+        payload,
+        subject=str(payload.get("subject") or "PMP"),
+    )
+    stem = "".join(
+        str(part.get("text") or "")
+        for part in normalized.get("stemParts") or []
+        if isinstance(part, dict)
+    )
+    if not stem:
+        translations = normalized.get("translations")
+        english = translations.get("en") if isinstance(translations, dict) else {}
+        stem = "".join(
+            str(part.get("text") or "")
+            for part in (english.get("stemParts") or [])
+            if isinstance(part, dict)
+        )
+    signature = {
+        "stem": _duplicate_text(stem),
+        "options": [
+            [_duplicate_text(option.get("id")), _duplicate_text(option.get("text"))]
+            for option in normalized.get("options") or []
+            if isinstance(option, dict)
+        ],
+        "correctAnswer": _duplicate_text(normalized.get("correctAnswer")),
+    }
+    return json.dumps(signature, ensure_ascii=False, separators=(",", ":"))

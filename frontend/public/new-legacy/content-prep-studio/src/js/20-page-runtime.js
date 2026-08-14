@@ -66,7 +66,7 @@ async function duplicateQuestion(){
   state.questionBank.questions.push(copy);state.currentQuestionId=copy.id;renderQuestions();toast('已复制 · 新全局 ID 已生成');
 }
 async function deleteQuestion(){
-  const q=currentQuestion();if(!q)return;if(!confirm('删除当前本地草稿题目？不会影响正式程序。'))return;
+  const q=currentQuestion();if(!q)return;if(!confirm('删除当前草稿题目？不会影响正式程序。'))return;
   await switchQuestionForEdit(null);
   state.questionBank.questions=state.questionBank.questions.filter(x=>x.id!==q.id);
   state.currentQuestionId=state.questionBank.questions[0]?.id||'';renderQuestions();
@@ -446,20 +446,22 @@ function renderPrincipleEditor(){
   <div class="section"><div class="section-title">系统预设归纳卡</div><div class="form-grid"><div class="span2"><label>标题（与原则名称自动一致）</label><input id="pmPresetTitle" type="text" readonly value="${esc('原则：'+p.name)}"></div><div class="span2"><label>内容</label><textarea id="pmPresetContent">${esc(preset?.content||'')}</textarea></div><div><label>状态</label><select id="pmPresetStatus"><option value="draft"${preset?.status==='draft'||!preset?' selected':''}>draft</option><option value="active"${preset?.status==='active'?' selected':''}>active</option><option value="inactive"${preset?.status==='inactive'?' selected':''}>inactive</option></select></div><div><label>版本</label><input id="pmPresetVersion" type="number" min="1" value="${preset?.version||1}"></div></div></div>
   <div class="section toolbar"><button class="btn primary" id="pmSave">保存原则与归纳卡</button><button class="btn danger" id="pmDelete">删除原则</button></div>`;
   document.getElementById('pmSave').onclick=async()=>{
-    const controller=window.PMPPrepServerPrinciples;if(!controller){alert('服务器原则接口尚未就绪，请登录后重试。');return}
     const button=document.getElementById('pmSave');button.disabled=true;
     const principle={...p,name:document.getElementById('pmPrincipleName').value.trim()||'未命名原则',status:document.getElementById('pmPrincipleStatus').value,confusablePrincipleIds:unique(cleanList(document.getElementById('pmConfusable').value)),updatedAt:Date.now()};
     const nextPreset={...(preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()}),principleId:p.id,title:'原则：'+principle.name,content:document.getElementById('pmPresetContent').value.trim(),status:document.getElementById('pmPresetStatus').value,version:Math.max(1,Number(document.getElementById('pmPresetVersion').value||1)),updatedAt:Date.now()};
-    try{await controller.save(principle,nextPreset);toast('原则与归纳卡已保存到服务器')}
-    catch(error){alert('服务器保存失败：'+(error?.message||error))}
+    try{
+      Object.assign(p,principle);
+      const index=state.synthesisPresets.items.findIndex(item=>item.id===nextPreset.id||item.principleId===p.id);
+      if(index>=0)state.synthesisPresets.items[index]=nextPreset;else state.synthesisPresets.items.push(nextPreset);
+      refreshAll();markWorkspaceDirty();toast('原则与归纳卡已保存到共享草稿');
+    }catch(error){alert('草稿保存失败：'+(error?.message||error))}
     finally{button.disabled=false}
   };
   document.getElementById('pmDelete').onclick=async()=>{
-    if(!confirm('从共享服务器删除该原则及其归纳卡？题目中的旧原则 ID 会在校验中心提示。'))return;
-    const controller=window.PMPPrepServerPrinciples;if(!controller){alert('服务器原则接口尚未就绪，请登录后重试。');return}
+    if(!confirm('从当前共享草稿删除该原则及其归纳卡？题目中的旧原则 ID 会在校验中心提示。'))return;
     const button=document.getElementById('pmDelete');button.disabled=true;
-    try{await controller.remove(p.id);toast('原则与归纳卡已从服务器删除')}
-    catch(error){alert('服务器删除失败：'+(error?.message||error))}
+    try{state.principles.items=state.principles.items.filter(item=>item.id!==p.id);state.synthesisPresets.items=state.synthesisPresets.items.filter(item=>item.principleId!==p.id);state.currentPrincipleId=state.principles.items[0]?.id||'';refreshAll();markWorkspaceDirty();toast('原则与归纳卡已从共享草稿删除')}
+    catch(error){alert('草稿删除失败：'+(error?.message||error))}
     finally{button.disabled=false}
   };
 }
@@ -813,17 +815,15 @@ document.querySelectorAll('[data-creator-key]').forEach(btn=>btn.addEventListene
 document.getElementById('btnSwitchCreator').onclick=requireCreatorSelection;
 document.getElementById('btnSwitchCreatorBase').onclick=requireCreatorSelection;
 document.getElementById('themeSelect').addEventListener('change',e=>applyTheme(e.target.value,{persist:true}));
-document.getElementById('btnQuickSaveWorkspace').onclick=()=>saveWorkspaceLocal();
-document.getElementById('btnSaveWorkspaceLocal').onclick=()=>saveWorkspaceLocal();
-document.getElementById('btnRestoreWorkspaceLocal').onclick=restoreWorkspaceLocal;
-document.getElementById('btnDeleteWorkspaceLocal').onclick=deleteWorkspaceLocal;
-document.getElementById('chkAutoSaveWorkspace').addEventListener('change',e=>{prepRuntime.autoSave=!!e.target.checked;updateWorkspaceSaveStatus(e.target.checked?'自动保存已开启（60 秒）':'自动保存已关闭',e.target.checked?'good':'')});
+document.getElementById('btnQuickSaveWorkspace').onclick=()=>window.PMPPrepDraftUi?.save?.().catch(error=>alert(error.message||error));
+document.getElementById('btnSaveWorkspaceLocal').onclick=()=>window.PMPPrepDraftUi?.save?.().catch(error=>alert(error.message||error));
+document.getElementById('btnOpenSharedDrafts').onclick=()=>window.PMPPrepDraftUi?.open?.();
 
 
 
 
 document.addEventListener('input',()=>markWorkspaceDirty(),true);
-document.addEventListener('change',e=>{if(!['chkAutoSaveWorkspace','themeSelect'].includes(e.target.id))markWorkspaceDirty()},true);
+document.addEventListener('change',e=>{if(e.target.id!=='themeSelect')markWorkspaceDirty()},true);
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   const mutationIds=new Set(['btnNewQuestion','btnDuplicateQuestion','btnDeleteQuestion','btnAddNormalKeyword','btnAddCoreKeyword','btnNewRecall','btnNewPrinciple','btnParsePastedQuestions','pmSave','pmDelete','floatSave','floatDelete','btnAddEdge','btnDeleteRecall','btnBindRecallCandidate']);

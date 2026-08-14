@@ -322,10 +322,22 @@ async def import_question_banks(
                     existing_by_question_source = {
                         str(item.source_id or item.id): item for item in rows.scalars().all()
                     }
-                incoming_source_ids: set[str] = set()
-                for imported_question in imported_bank.questions:
+                incoming_source_ids = {
+                    _import_source_identity(item)
+                    for item in imported_bank.questions
+                }
+                existing_duplicate_signatures = {
+                    question_content_service.duplicate_question_signature(question_to_dict(item)): item
+                    for item in existing_by_question_source.values()
+                    if str(item.source_id or item.id) not in incoming_source_ids
+                }
+                retained_duplicate_signatures: dict[str, dict] = {}
+                duplicate_questions: list[dict] = []
+                deduplicated_existing_source_ids: set[str] = set()
+                preserved_existing_source_ids: set[str] = set()
+                candidates: list[tuple[int, str, dict, Question | None, str]] = []
+                for imported_index, imported_question in enumerate(imported_bank.questions):
                     source_question_id = _import_source_identity(imported_question)
-                    incoming_source_ids.add(source_question_id)
                     owner_question = question_sources.get(source_question_id)
                     if owner_question is not None and (existing_bank is None or owner_question.bank_id != existing_bank.id):
                         actions.append({"type": "conflict", "sourceBankId": source_bank_id, "sourceQuestionId": source_question_id})
@@ -338,6 +350,50 @@ async def import_question_banks(
                     )
                     normalized["scope"] = "internal"
                     current = existing_by_question_source.get(source_question_id)
+                    duplicate_signature = question_content_service.duplicate_question_signature(normalized)
+                    candidates.append((imported_index, source_question_id, normalized, current, duplicate_signature))
+
+                retained_questions: list[tuple[int, str, dict, Question | None]] = []
+                # Existing source rows win over new rows regardless of input
+                # order; otherwise the first incoming row wins.  Old content
+                # for a source that is itself being replaced is deliberately
+                # excluded from existing_duplicate_signatures above.
+                for imported_index, source_question_id, normalized, current, duplicate_signature in sorted(
+                    candidates,
+                    key=lambda item: (item[3] is None, item[0]),
+                ):
+                    existing_match = existing_duplicate_signatures.get(duplicate_signature)
+                    retained_match = retained_duplicate_signatures.get(duplicate_signature)
+                    kept_source_id = ""
+                    kept_question_id = ""
+                    duplicate_source = ""
+                    if existing_match is not None:
+                        duplicate_source = "existing"
+                        kept_source_id = str(existing_match.source_id or existing_match.id)
+                        kept_question_id = existing_match.id
+                    elif retained_match is not None:
+                        duplicate_source = "existing" if retained_match["questionId"] else "batch"
+                        kept_source_id = retained_match["sourceQuestionId"]
+                        kept_question_id = retained_match["questionId"]
+                    if duplicate_source:
+                        duplicate_questions.append({
+                            "sourceQuestionId": source_question_id,
+                            "title": normalized["title"],
+                            "source": duplicate_source,
+                            "reason": "目标题库已有完全相同题目" if duplicate_source == "existing" else "本批已有完全相同题目",
+                            "keptQuestionSourceId": kept_source_id,
+                            "keptQuestionId": kept_question_id,
+                        })
+                        if kept_question_id:
+                            preserved_existing_source_ids.add(kept_source_id)
+                        if current is not None:
+                            deduplicated_existing_source_ids.add(source_question_id)
+                            has_change = True
+                        continue
+                    retained_duplicate_signatures[duplicate_signature] = {
+                        "sourceQuestionId": source_question_id,
+                        "questionId": current.id if current is not None else "",
+                    }
                     if current is None:
                         added_questions += 1
                         has_change = True
@@ -348,9 +404,19 @@ async def import_question_banks(
                         has_change = True
                         for key, value in _question_change_summary(current, normalized).items():
                             group_counts[key] += value
-                    normalized_questions.append((source_question_id, normalized, current))
+                    retained_questions.append((imported_index, source_question_id, normalized, current))
+                normalized_questions = [
+                    (source_question_id, normalized, current)
+                    for _, source_question_id, normalized, current in sorted(retained_questions)
+                ]
                 if existing_bank is not None:
-                    removed_questions = len(set(existing_by_question_source) - incoming_source_ids)
+                    removed_questions = len(
+                        (
+                            (set(existing_by_question_source) - incoming_source_ids)
+                            | deduplicated_existing_source_ids
+                        )
+                        - preserved_existing_source_ids
+                    )
                     has_change = has_change or bool(removed_questions)
                 if any(action["type"] == "conflict" and action["sourceBankId"] == source_bank_id for action in actions):
                     continue
@@ -363,16 +429,46 @@ async def import_question_banks(
                     actions.append({"type": "skip", "sourceBankId": source_bank_id})
                 else:
                     actions.append({"type": "replace", "sourceBankId": source_bank_id, "summary": {"bankId": source_bank_id, "bankName": str(bank_values["name"]), "addedQuestions": added_questions, "removedQuestions": removed_questions, "modifiedQuestions": modified_questions, "unchangedQuestions": unchanged_questions, "groups": group_counts}})
-                prepared_banks.append({"sourceBankId": source_bank_id, "input": imported_bank, "values": bank_values, "existing": existing_bank, "questions": normalized_questions})
+                prepared_banks.append({"sourceBankId": source_bank_id, "input": imported_bank, "values": bank_values, "existing": existing_bank, "questions": normalized_questions, "duplicateQuestions": duplicate_questions})
             plan = _import_plan(actions)
+            duplicate_rows = [
+                {"sourceBankId": prepared["sourceBankId"], **{key:value for key,value in row.items() if key != "keptQuestionId"}}
+                for prepared in prepared_banks
+                for row in prepared.get("duplicateQuestions", [])
+            ]
+            plan["duplicateQuestions"] = duplicate_rows
+            plan["duplicateQuestionCount"] = len(duplicate_rows)
+            plan["duplicateExistingCount"] = sum(row["source"] == "existing" for row in duplicate_rows)
+            plan["duplicateBatchCount"] = sum(row["source"] == "batch" for row in duplicate_rows)
             if plan["hasConflicts"]:
                 raise _import_conflict_error("IMPORT_QUESTION_ID_CONFLICT", "导入题目 ID 与其他题库冲突，已取消。", plan)
             if plan["replace"] and not request.confirm_replace:
                 raise _import_conflict_error("IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED", "导入包含同一来源题库的内容更新，需要确认覆盖。", plan)
+            if duplicate_rows and not request.confirm_duplicate_cleanup:
+                raise _import_conflict_error("QUESTION_DUPLICATES_CONFIRMATION_REQUIRED", "检测到完全重复题目，请确认自动清除后继续导入。", plan)
             source_bank_id_map: dict[str, str] = {}
             source_question_id_map: dict[str, str] = {}
             imported_rows: list[tuple[QuestionBank, list[Question]]] = []
             content_changes: list[dict[str, str]] = []
+            teacher_number_states: dict[str, dict] = {}
+
+            def teacher_number_state(subject: str) -> dict:
+                key = str(subject or "PMP")
+                if key in teacher_number_states:
+                    return teacher_number_states[key]
+                prefix = re.sub(r"[^A-Z0-9]+", "", key.upper())[:8] or "Q"
+                used = {
+                    str(question.teacher_number or "").strip().upper()
+                    for question in existing_questions
+                    if str(question.subject or "PMP") == key and str(question.teacher_number or "").strip()
+                }
+                pattern = re.compile(rf"^{re.escape(prefix)}-(\d+)$", re.IGNORECASE)
+                maximum = max(
+                    (int(match.group(1)) for number in used if (match := pattern.match(number))),
+                    default=0,
+                )
+                teacher_number_states[key] = {"prefix": prefix, "used": used, "maximum": maximum}
+                return teacher_number_states[key]
 
             for prepared in prepared_banks:
                 imported_bank = prepared["input"]
@@ -388,6 +484,15 @@ async def import_question_banks(
                         source_question_id_map[
                             f"{source_bank_id}::{row.source_id or row.id}"
                         ] = row.id
+                    for duplicate_row in prepared.get("duplicateQuestions", []):
+                        kept_id = str(duplicate_row.get("keptQuestionId") or "") or source_question_id_map.get(
+                            f"{source_bank_id}::{duplicate_row.get('keptQuestionSourceId') or ''}",
+                            "",
+                        )
+                        if kept_id:
+                            source_question_id_map[
+                                f"{source_bank_id}::{duplicate_row.get('sourceQuestionId') or ''}"
+                            ] = kept_id
                     imported_rows.append((existing_bank, existing_rows))
                     continue
                 if existing_bank is None:
@@ -402,9 +507,34 @@ async def import_question_banks(
                 source_bank_id_map[source_bank_id] = bank.id
                 imported_questions: list[Question] = []
 
-                incoming_question_sources = set()
+                # Assign one stable teacher number to every retained imported
+                # question; skipped duplicates never consume a number.
+                number_state = teacher_number_state(str(bank.subject or "PMP"))
+                prefix = number_state["prefix"]
+                used_numbers = number_state["used"]
+
+                incoming_question_sources = {
+                    str(row.get("keptQuestionSourceId") or "")
+                    for row in prepared.get("duplicateQuestions", [])
+                    if row.get("keptQuestionSourceId")
+                }
+                for row in prepared.get("duplicateQuestions", []):
+                    if row.get("keptQuestionId"):
+                        source_question_id_map[f"{source_bank_id}::{row['sourceQuestionId']}"] = str(row["keptQuestionId"])
                 for source_question_id, normalized, existing_question in prepared["questions"]:
                     incoming_question_sources.add(source_question_id)
+                    requested_number = str(normalized.get("teacherNumber") or "").strip().upper()
+                    current_number = str(existing_question.teacher_number or "").strip().upper() if existing_question else ""
+                    if current_number:
+                        requested_number = current_number
+                    if not requested_number or (requested_number in used_numbers and requested_number != current_number):
+                        while True:
+                            number_state["maximum"] += 1
+                            requested_number = f"{prefix}-{number_state['maximum']:06d}"
+                            if requested_number not in used_numbers:
+                                break
+                    used_numbers.add(requested_number)
+                    normalized["teacherNumber"] = requested_number
                     if existing_question is None:
                         content_hash = question_content_service.canonical_question_hash(normalized)
                         question = Question(
@@ -447,6 +577,22 @@ async def import_question_banks(
                     source_question_id_map[
                         f"{source_bank_id}::{source_question_id}"
                     ] = question.id
+                # Papers in the same bundle may still refer to an incoming
+                # duplicate source ID.  Point every skipped alias at the
+                # retained database question so deduplication never breaks a
+                # paper-question relationship.
+                for duplicate_row in prepared.get("duplicateQuestions", []):
+                    skipped_source_id = str(duplicate_row.get("sourceQuestionId") or "")
+                    kept_question_id = str(duplicate_row.get("keptQuestionId") or "")
+                    kept_source_id = str(duplicate_row.get("keptQuestionSourceId") or "")
+                    resolved_question_id = kept_question_id or source_question_id_map.get(
+                        f"{source_bank_id}::{kept_source_id}",
+                        "",
+                    )
+                    if skipped_source_id and resolved_question_id:
+                        source_question_id_map[
+                            f"{source_bank_id}::{skipped_source_id}"
+                        ] = resolved_question_id
                 if existing_bank is not None:
                     stale = await db.execute(select(Question).where(Question.bank_id == bank.id, Question.source_id.is_not(None), Question.source_id.not_in(incoming_question_sources)))
                     for stale_question in stale.scalars().all():
@@ -732,6 +878,135 @@ async def create_question(db: AsyncSession, owner: User | str, bank_id: str, dat
     await db.commit()
     await db.refresh(q)
     return q
+
+
+async def import_questions_into_bank(
+    db: AsyncSession,
+    owner: User | str,
+    bank_id: str,
+    items: list[dict],
+    *,
+    confirm_duplicate_cleanup: bool,
+) -> dict:
+    """Atomically de-duplicate and number a question batch for one bank."""
+
+    actor = await _resolve_actor(db, owner)
+    if actor is None:
+        raise ValueError("用户不存在")
+    await teaching_content_revision_service.acquire_lock(db)
+    bank = await question_access_service.require_bank_access(db, actor, bank_id, edit=True)
+    existing = list(
+        (
+            await db.execute(
+                select(Question).where(Question.bank_id == bank.id).order_by(Question.created_at, Question.id)
+            )
+        ).scalars().all()
+    )
+    known_signatures = {
+        question_content_service.duplicate_question_signature(question_to_dict(question))
+        for question in existing
+    }
+    batch_signatures: set[str] = set()
+    prepared: list[dict] = []
+    duplicates: list[dict] = []
+    for index, raw in enumerate(items):
+        question_id = uid("q_")
+        normalized = question_content_service.normalize_question_payload(
+            {**raw, "id": question_id, "title": raw.get("title") or f"导入题目 {index + 1}"},
+            subject=bank.subject,
+        )
+        signature = question_content_service.duplicate_question_signature(normalized)
+        source = "existing" if signature in known_signatures else "batch" if signature in batch_signatures else ""
+        if source:
+            duplicates.append(
+                {
+                    "index": index + 1,
+                    "title": normalized["title"],
+                    "source": source,
+                    "reason": "目标题库已有完全相同题目" if source == "existing" else "本批已有完全相同题目",
+                }
+            )
+            continue
+        batch_signatures.add(signature)
+        prepared.append(normalized)
+
+    duplicate_plan = {
+        "existingCount": sum(item["source"] == "existing" for item in duplicates),
+        "batchCount": sum(item["source"] == "batch" for item in duplicates),
+        "duplicateCount": len(duplicates),
+        "inputCount": len(items),
+        "keepCount": len(prepared),
+        "duplicates": duplicates,
+    }
+    if duplicates and not confirm_duplicate_cleanup:
+        raise _import_conflict_error(
+            "QUESTION_DUPLICATES_CONFIRMATION_REQUIRED",
+            "检测到完全重复题目，请确认自动清除后继续导入。",
+            duplicate_plan,
+        )
+
+    prefix = re.sub(r"[^A-Z0-9]+", "", str(bank.subject or "PMP").upper())[:8] or "Q"
+    subject_questions = list(
+        (
+            await db.execute(
+                select(Question)
+                .join(QuestionBank, QuestionBank.id == Question.bank_id)
+                .where(QuestionBank.owner_id == bank.owner_id, QuestionBank.subject == bank.subject)
+            )
+        ).scalars().all()
+    )
+    used_numbers = {
+        str(question.teacher_number or "").strip().upper()
+        for question in subject_questions
+        if str(question.teacher_number or "").strip()
+    }
+    maximum = 0
+    pattern = re.compile(rf"^{re.escape(prefix)}-(\d+)$", re.IGNORECASE)
+    for value in used_numbers:
+        match = pattern.match(value)
+        if match:
+            maximum = max(maximum, int(match.group(1)))
+
+    created: list[Question] = []
+    for normalized in prepared:
+        requested_number = str(normalized.get("teacherNumber") or "").strip().upper()
+        if not requested_number or requested_number in used_numbers:
+            while True:
+                maximum += 1
+                requested_number = f"{prefix}-{maximum:06d}"
+                if requested_number not in used_numbers:
+                    break
+        used_numbers.add(requested_number)
+        normalized["teacherNumber"] = requested_number
+        question = Question(
+            id=normalized["id"], source_id=normalized["id"], bank_id=bank.id,
+            title=normalized["title"], type=normalized["type"], subject=normalized["subject"],
+            difficulty=normalized.get("difficulty"), domain=normalized.get("domain"), topic=normalized.get("topic"),
+            teacher_number=requested_number, scope="internal",
+            content_hash=question_content_service.canonical_question_hash(normalized),
+            created_by=actor.username, updated_by=actor.username, revision=1,
+            tags=normalized["tags"], stem_parts=normalized["stemParts"], options=normalized["options"],
+            correct_answer=str(normalized.get("correctAnswer") or "") or None,
+            analysis=normalized.get("analysis"), clues=normalized["clues"], concepts=normalized["concepts"],
+            reasoning_steps=normalized["reasoningSteps"], status=normalized["status"],
+            translations=normalized["translations"], content_metadata=normalized["metadata"],
+            key_path=normalized["keyPath"], lifecycle=normalized["lifecycle"],
+        )
+        db.add(question)
+        created.append(question)
+    if created:
+        await teaching_content_revision_service.bump(
+            db,
+            actor.username,
+            [{"entityType": "question", "entityId": question.id, "action": "created"} for question in created],
+        )
+    await db.commit()
+    for question in created:
+        await db.refresh(question)
+    return {
+        "questions": [question_to_dict(question) for question in created],
+        "duplicatePlan": duplicate_plan,
+    }
 
 
 async def get_question(db: AsyncSession, owner: User | str, question_id: str) -> Question | None:

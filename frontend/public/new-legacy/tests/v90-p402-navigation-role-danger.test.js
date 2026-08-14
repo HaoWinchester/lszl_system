@@ -5,12 +5,12 @@ const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const practice=read('src/100-practice-mode.js');
 const style=read('styles/practice-mode.css');
 const shortcuts=read('src/39-global-shortcuts.js');
-assert.equal(read('VERSION').trim(),'v9.0-p4.1.1');
+assert.match(read('VERSION').trim(),/^v9\.0-p4\.1\.\d+$/);
 for(const file of ['index.html','question-workspace.html','knowledge-recall.html']){
   const source=read(file);
   assert(!source.includes("location.replace('practice-mode.html"),`${file} still redirects to practice`);
 }
-assert(read('index.html').includes('href="practice-mode.html"'));
+assert(read('index.html').includes('data-destination="practice-mode.html" data-learning-entry-choice="知识巩固"'));
 assert(read('practice-mode.html').includes('href="index.html">自由</a>'));
 assert(shortcuts.includes('label:"多题画布"'));
 assert(!shortcuts.includes('allowWhenNoAdmin:true'));
