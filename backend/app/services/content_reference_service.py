@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from urllib.parse import quote
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_prep import Principle
-from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.schemas.content_prep import CatalogIssue
 
@@ -82,6 +82,28 @@ def _active_node_ids(nodes: list[Any]) -> set[str]:
     }
 
 
+def _recall_subject_id(subject: str) -> str:
+    normalized = str(subject or "").strip()
+    return "subject-pmp" if normalized.upper() == "PMP" else normalized
+
+
+async def _effective_recall_node_ids(
+    db: AsyncSession,
+    subject: str,
+    incoming_library: dict[str, Any] | None,
+) -> set[str]:
+    library: Any = incoming_library
+    if library is None:
+        key = RECALL_LIBRARY_KEY_PREFIX + quote(_recall_subject_id(subject), safe="")
+        row = await db.get(SharedRuntimeState, key)
+        if row is None:
+            raise ValueError("recall library row missing")
+        library = _decode_json(row.value)
+    if not isinstance(library, dict) or not isinstance(library.get("nodes"), list):
+        raise ValueError("recall library unavailable")
+    return _active_node_ids(library["nodes"])
+
+
 def _principle_references(metadata: dict) -> list[tuple[str, str]]:
     references: list[tuple[str, str]] = []
     for index, principle_id in enumerate(metadata.get("stemPrincipleIds") or []):
@@ -113,6 +135,7 @@ async def validate_question_references(
     payload: dict,
     *,
     incoming_principle_ids: set[str] | None = None,
+    recall_library: dict[str, Any] | None = None,
 ) -> list[CatalogIssue]:
     """Validate references without mutating taxonomy or association data."""
 
@@ -131,7 +154,7 @@ async def validate_question_references(
 
     taxonomy_row: SharedRuntimeState | None = None
     selected_taxonomy: dict | None = None
-    if primary_id or related_ids or recall_references:
+    if primary_id or related_ids:
         taxonomy_row = await db.get(SharedRuntimeState, TAXONOMY_KEY)
         try:
             if taxonomy_row is None:
@@ -169,32 +192,15 @@ async def validate_question_references(
                     )
                 )
 
-    if recall_references and selected_taxonomy is not None and taxonomy_row is not None:
-        publisher = next(
-            (
-                str(selected_taxonomy.get(key)).strip()
-                for key in ("publishedBy", "updatedBy", "ownerId")
-                if selected_taxonomy.get(key)
-            ),
-            str(taxonomy_row.updated_by or "").strip(),
-        )
-        runtime = await db.get(RuntimeState, publisher) if publisher else None
-        stored_library = (
-            (runtime.storage or {}).get(f"{RECALL_LIBRARY_KEY_PREFIX}{subject.upper()}")
-            if runtime is not None
-            else None
-        )
+    if recall_references:
         try:
-            library = _decode_json(stored_library)
-            if not isinstance(library, dict) or not isinstance(library.get("nodes"), list):
-                raise ValueError("recall library unavailable")
-            recall_ids = _active_node_ids(library["nodes"])
+            recall_ids = await _effective_recall_node_ids(db, subject, recall_library)
         except (TypeError, ValueError, json.JSONDecodeError):
             issues.append(
                 _issue(
                     "clues",
                     "REFERENCE_CATALOG_UNAVAILABLE",
-                    "当前发布者的科目联想库不可用",
+                    "当前科目联想库不可用",
                     question_id,
                 )
             )

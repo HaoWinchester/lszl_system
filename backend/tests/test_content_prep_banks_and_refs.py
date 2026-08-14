@@ -11,7 +11,6 @@ from app.db.session import AsyncSessionLocal
 from app.main import app
 from app.models.content_prep import Principle
 from app.models.question import QuestionBank
-from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.user import User
 from app.services.content_reference_service import validate_question_references
@@ -19,6 +18,7 @@ from app.services.content_prep_service import CREATORS
 
 
 TAXONOMY_KEY = "kg_content_taxonomies_v1"
+RECALL_KEY = "kg_recall_association_library_v1__subject__subject-pmp"
 PASSWORD = "prep-bank-pass"
 
 
@@ -28,9 +28,10 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
     principle_id = f"principle-existing-{suffix}"
     created_bank_ids: set[str] = set()
     previous_taxonomy: dict | None = None
+    previous_recall: dict | None = None
 
     async def seed() -> None:
-        nonlocal previous_taxonomy
+        nonlocal previous_taxonomy, previous_recall
         async with AsyncSessionLocal() as db:
             existing = await db.get(SharedRuntimeState, TAXONOMY_KEY)
             if existing is not None:
@@ -38,6 +39,13 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
                     "value": existing.value,
                     "schema_version": existing.schema_version,
                     "updated_by": existing.updated_by,
+                }
+            existing_recall = await db.get(SharedRuntimeState, RECALL_KEY)
+            if existing_recall is not None:
+                previous_recall = {
+                    "value": existing_recall.value,
+                    "schema_version": existing_recall.schema_version,
+                    "updated_by": existing_recall.updated_by,
                 }
             db.add(
                 User(
@@ -80,22 +88,25 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
             else:
                 existing.value = taxonomy_value
                 existing.updated_by = teacher_username
-            db.add(
-                RuntimeState(
-                    owner_id=teacher_username,
-                    storage={
-                        "kg_recall_association_library_v1__subject__PMP": json.dumps(
-                            {
-                                "schemaVersion": 1,
-                                "nodes": [{"id": "recall-known", "title": "有效节点"}],
-                                "edges": [],
-                            },
-                            ensure_ascii=False,
-                        )
-                    },
-                    revision=1,
-                )
+            recall_value = json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "nodes": [{"id": "recall-known", "title": "有效节点"}],
+                    "edges": [],
+                },
+                ensure_ascii=False,
             )
+            if existing_recall is None:
+                db.add(
+                    SharedRuntimeState(
+                        key=RECALL_KEY,
+                        value=recall_value,
+                        updated_by=teacher_username,
+                    )
+                )
+            else:
+                existing_recall.value = recall_value
+                existing_recall.updated_by = teacher_username
             db.add(
                 Principle(
                     id=principle_id,
@@ -190,7 +201,6 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
         async with AsyncSessionLocal() as db:
             await db.execute(delete(QuestionBank).where(QuestionBank.id.in_(created_bank_ids)))
             await db.execute(delete(Principle).where(Principle.id == principle_id))
-            await db.execute(delete(RuntimeState).where(RuntimeState.owner_id == teacher_username))
             taxonomy = await db.get(SharedRuntimeState, TAXONOMY_KEY)
             if previous_taxonomy is None:
                 if taxonomy is not None:
@@ -199,6 +209,16 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
                 taxonomy.value = previous_taxonomy["value"]
                 taxonomy.schema_version = previous_taxonomy["schema_version"]
                 taxonomy.updated_by = previous_taxonomy["updated_by"]
+            recall = await db.get(SharedRuntimeState, RECALL_KEY)
+            if previous_recall is None:
+                if recall is not None:
+                    await db.delete(recall)
+            elif recall is None:
+                db.add(SharedRuntimeState(key=RECALL_KEY, **previous_recall))
+            else:
+                recall.value = previous_recall["value"]
+                recall.schema_version = previous_recall["schema_version"]
+                recall.updated_by = previous_recall["updated_by"]
             await db.execute(delete(User).where(User.username == teacher_username))
             await db.commit()
 

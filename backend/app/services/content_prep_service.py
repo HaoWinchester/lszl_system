@@ -1022,6 +1022,7 @@ async def _prepare_questions(
                 bank.subject,
                 prepared_question.normalized,
                 incoming_principle_ids=incoming_principle_ids,
+                recall_library=request.recall_library,
             )
         )
     return prepared, issues
