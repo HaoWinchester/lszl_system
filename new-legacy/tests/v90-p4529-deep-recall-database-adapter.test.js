@@ -205,3 +205,67 @@ test('legacy recall storage refuses progress reads and writes without touching s
   );
   assert.deepEqual(calls, []);
 });
+
+test('teacher draft handoff stays transient and can be explicitly cleared', () => {
+  const calls = [];
+  const forbidden = new Proxy({}, {
+    get(_target, property) {
+      calls.push(String(property));
+      throw new Error('browser persistence accessed');
+    },
+  });
+  const context = {
+    console,
+    localStorage: forbidden,
+    sessionStorage: forbidden,
+    indexedDB: forbidden,
+    KGAppStorage: forbidden,
+    KGAuthCore: { currentUsername: () => 'alice' },
+    globalThis: null,
+    window: null,
+  };
+  context.globalThis = context;
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext(storageSource(), context, { filename: '97-recall-storage.js' });
+
+  const storage = context.KGRecallStorage;
+  assert.equal(storage.writeCurrent({
+    question: { id: 'draft-1' },
+    previewMode: 'teacher-draft',
+    previewToken: 'token-1',
+  }), true);
+  assert.equal(storage.readCurrent().sourceQuestionId, 'draft-1');
+  assert.equal(storage.clearCurrent({ previewToken: 'wrong-token' }), false);
+  assert.equal(storage.clearCurrent({ previewToken: 'token-1' }), true);
+  assert.equal(storage.readCurrent(), null);
+  assert.deepEqual(calls, []);
+});
+
+test('overlapping saves are serialized so the second request uses the first response revision', async () => {
+  const revisions = [];
+  let releaseFirst;
+  const firstGate = new Promise(resolve => { releaseFirst = resolve; });
+  let saveCount = 0;
+  const { adapterApi } = loadAdapter(async (_url, init = {}) => {
+    if (!init.method) return jsonResponse(sessionFixture());
+    const body = JSON.parse(init.body);
+    revisions.push(body.expectedRevision);
+    saveCount += 1;
+    if (saveCount === 1) await firstGate;
+    return jsonResponse({ ...body, revision: 4 + saveCount });
+  });
+  const adapter = adapterApi.create({ questionId: 'q1' });
+  await adapter.loadSession();
+
+  const first = adapter.saveGraph(graphFixture());
+  const secondGraph = graphFixture();
+  secondGraph.nodes[0].title = '第二次编辑';
+  const second = adapter.saveGraph(secondGraph);
+  releaseFirst();
+  await Promise.all([first, second]);
+
+  assert.deepEqual(revisions, [4, 5]);
+  assert.equal(adapter.getState().progressRevision, 6);
+  assert.equal(adapter.getState().graph.nodes[0].title, '第二次编辑');
+});

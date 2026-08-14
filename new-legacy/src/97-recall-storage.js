@@ -79,6 +79,15 @@
     currentPayload=next;
     return true;
   }
+  function clearCurrent(criteria={}){
+    if(!currentPayload||currentPayload.userId!==currentUserId())return false;
+    const expectedToken=clean(criteria?.previewToken);
+    const expectedMode=clean(criteria?.previewMode);
+    if(expectedToken&&clean(currentPayload.previewToken)!==expectedToken)return false;
+    if(expectedMode&&clean(currentPayload.previewMode)!==expectedMode)return false;
+    currentPayload=null;
+    return true;
+  }
   function persistenceDisabled(){
     const error=new Error('深度回忆进度已数据库化，请使用 KGDeepRecallServerAdapter');
     error.name='DeepRecallPersistenceDisabledError';
@@ -103,7 +112,7 @@
   const api=Object.freeze({
     LEGACY_CURRENT_KEY,LEGACY_PROGRESS_PREFIX,CURRENT_PREFIX,PROGRESS_PREFIX,
     currentUserId,currentKey,questionIdentity,identityToken,progressKey,legacyProgressKey,
-    readCurrent,writeCurrent,
+    readCurrent,writeCurrent,clearCurrent,
     readProgress:persistenceDisabled,
     writeProgress:persistenceDisabled,
     removeProgress:persistenceDisabled,

@@ -65,6 +65,7 @@
     const request=fetchImpl||global.fetch;
     if(typeof request!=='function')throw new TypeError('当前环境缺少 fetch');
     const listeners=new Set();
+    let saveChain=Promise.resolve(),saveSequence=0,latestRequestedSave=0;
     const state={
       session:null,
       graph:null,
@@ -112,10 +113,8 @@
       }
     }
 
-    async function saveGraph(graph){
+    async function performSave(pending,sequence){
       if(!state.session)throw new Error('请先加载深度回忆会话');
-      const pending=normalizeGraph(graph);
-      update({saveState:'saving',error:null,lastUnsavedGraph:pending,graph:pending});
       const libraryHash=String(
         state.session.currentLibrary?.contentHash||state.session.library?.contentHash||''
       );
@@ -140,24 +139,35 @@
         const nextGraph=normalizeGraph(saved);
         const nextRevision=Number(saved.revision)||Number(state.progressRevision)||0;
         const nextSession={...state.session,progressRevision:nextRevision,progress:clone(saved),versionState:'current'};
+        const isLatest=sequence===latestRequestedSave;
         update({
           session:nextSession,
-          graph:nextGraph,
+          graph:isLatest?nextGraph:state.graph,
           progressRevision:nextRevision,
-          saveState:'saved',
+          saveState:isLatest?'saved':'saving',
           error:null,
-          lastUnsavedGraph:null
+          lastUnsavedGraph:isLatest?null:state.lastUnsavedGraph
         });
         return clone(saved);
       }catch(error){
+        const isLatest=sequence===latestRequestedSave;
         update({
-          graph:pending,
-          saveState:Number(error?.status)===409?'conflict':'failed',
+          graph:isLatest?pending:state.graph,
+          saveState:isLatest?(Number(error?.status)===409?'conflict':'failed'):'saving',
           error,
-          lastUnsavedGraph:pending
+          lastUnsavedGraph:isLatest?pending:state.lastUnsavedGraph
         });
         throw error;
       }
+    }
+
+    function saveGraph(graph){
+      if(!state.session)return Promise.reject(new Error('请先加载深度回忆会话'));
+      const pending=normalizeGraph(graph),sequence=++saveSequence;latestRequestedSave=sequence;
+      update({saveState:'saving',error:null,lastUnsavedGraph:pending,graph:pending});
+      const operation=saveChain.catch(()=>undefined).then(()=>performSave(pending,sequence));
+      saveChain=operation;
+      return operation;
     }
 
     async function retryLastSave(){
@@ -167,6 +177,7 @@
 
     async function resetToCurrent(){
       if(!state.session)throw new Error('请先加载深度回忆会话');
+      await saveChain.catch(()=>undefined);
       update({saveState:'saving',error:null});
       const body={
         expectedRevision:Number(state.progressRevision)||0,

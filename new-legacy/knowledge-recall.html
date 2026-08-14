@@ -14,9 +14,13 @@
 <link rel="stylesheet" href="styles/knowledge-recall-p2224.css"/>
 <link rel="stylesheet" href="styles/knowledge-recall-p2225.css"/>
 <link rel="stylesheet" href="styles/knowledge-recall-p4322.css"/>
+<link rel="stylesheet" href="styles/knowledge-recall-p4517.css"/>
+<link rel="stylesheet" href="styles/knowledge-recall-p4519.css"/>
+<link rel="stylesheet" href="styles/knowledge-recall-p4520.css"/>
 <link rel="stylesheet" href="styles/unified-canvas-runtime.css"/>
 <link rel="stylesheet" href="styles/focus-vega-typography.css"/>
 <link rel="stylesheet" href="styles/focus-vega-learning.css"/>
+<link rel="stylesheet" href="styles/knowledge-recall-p4529.css"/>
 </head>
 <body class="knowledge-recall-page" data-ui-skin="focus-vega">
   <div class="kr-app" id="krApp">
@@ -32,6 +36,11 @@
             <button type="button" data-question-language="zh" aria-pressed="true">中</button>
             <button type="button" data-question-language="bilingual" aria-pressed="false">中英</button>
           </div>
+        </div>
+        <button class="kr-reveal-keywords-btn" id="krRevealKeywordsBtn" type="button">揭示关键词</button>
+        <div class="kr-save-status" id="krSaveStatus" role="status" aria-live="polite" data-state="idle">
+          <span id="krSaveStatusText">正在载入</span>
+          <button id="krSaveRetryBtn" type="button" hidden>重试保存</button>
         </div>
         <div class="account-menu-shell" id="accountMenuShell" data-account-help-href="multi-question-help.html">
           <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
@@ -89,9 +98,22 @@
         </div>
       </div>
       <div class="kr-canvas-overlay-right">
-        <button class="kr-reset-question-btn" id="krResetBtn" type="button" title="重置本题知识点" aria-label="重置本题知识点">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.34-5.66"/><path d="M4 4v6h6"/></svg>
-        </button>
+        <div class="kr-canvas-action-group" role="group" aria-label="本题知识点工具">
+          <button class="kr-reset-question-btn kr-node-search-btn" id="krNodeSearchBtn" type="button" title="搜索本页知识点" aria-label="搜索本页知识点" aria-expanded="false" aria-controls="krNodeSearchPanel">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
+          </button>
+          <button class="kr-reset-question-btn" id="krResetBtn" type="button" title="重置本题知识点" aria-label="重置本题知识点">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.34-5.66"/><path d="M4 4v6h6"/></svg>
+          </button>
+        </div>
+        <div class="kr-node-search-panel" id="krNodeSearchPanel" hidden>
+          <div class="kr-node-search-input-row">
+            <input id="krNodeSearchInput" type="search" placeholder="搜索当前画布知识点" autocomplete="off" aria-label="搜索当前画布知识点"/>
+            <button id="krNodeSearchCloseBtn" type="button" aria-label="关闭搜索" title="关闭">×</button>
+          </div>
+          <div class="kr-node-search-status" id="krNodeSearchStatus"></div>
+          <div class="kr-node-search-results" id="krNodeSearchResults" role="listbox" aria-label="知识点搜索结果"></div>
+        </div>
       </div>
       <div class="kr-world" id="krWorld">
         <svg class="kr-edges" id="krEdges" aria-hidden="true"></svg>
@@ -117,6 +139,17 @@
       </div>
       <div class="kr-question-list lp-question-library-list" id="krQuestionList"></div>
     </aside>
+  </div>
+
+  <div class="kr-version-choice" id="krVersionChoice" hidden>
+    <div class="kr-version-choice-card" role="dialog" aria-modal="true" aria-labelledby="krVersionChoiceTitle">
+      <h2 id="krVersionChoiceTitle">题目已有新版本</h2>
+      <p>旧回忆图会保留原题目与原联想库，不会与新版本自动混合。</p>
+      <div class="kr-version-choice-actions">
+        <button id="krViewHistoryBtn" type="button">查看旧图</button>
+        <button id="krResetToCurrentBtn" type="button">按新题重置</button>
+      </div>
+    </div>
   </div>
 
   <div class="modal-backdrop auth-backdrop" id="authModal">
@@ -158,6 +191,8 @@
 <script defer src="src/86-free-mode-language.js"></script>
 <script defer src="src/86-question-language-ui.js"></script>
 <script defer src="src/85-knowledge-recall-data.js"></script>
+<script defer src="src/question-keyword/keyword-runtime-service.js"></script>
+<script defer src="src/recall/deep-recall-flow-model.js"></script>
 <script defer src="src/94-practice-navigation.js"></script>
 <script defer src="src/95-recall-association-library.js"></script>
 <script defer src="src/97-recall-storage.js"></script>
