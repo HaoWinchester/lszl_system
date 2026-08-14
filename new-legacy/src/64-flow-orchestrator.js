@@ -288,6 +288,20 @@
       }catch(error){return {ok:false,type,error:String(error?.message||error)}}
       const session=captureLegacyState({force:true});
       result={ok:true,type,session,optionId};
+    }else if(type==='ANSWER_SUBMITTED'){
+      try{
+        if(typeof qCanOperateCurrentQuestion==='function'&&!qCanOperateCurrentQuestion('当前角色不能提交这道题。')){
+          return {ok:false,type,error:'PERMISSION_DENIED'};
+        }
+        if(typeof qEnsureReasoningState==='function')qEnsureReasoningState();
+        if(typeof qMvpState!=='undefined'){
+          if(qMvpState.submitted)return {ok:false,type,error:'ANSWER_ALREADY_SUBMITTED'};
+          if(!qMvpState.selected)return {ok:false,type,error:'ANSWER_REQUIRED'};
+          qMvpState.submitted=true;
+        }
+      }catch(error){return {ok:false,type,error:String(error?.message||error)}}
+      const session=captureLegacyState({force:true});
+      result={ok:true,type,session,optionId:String(qMvpState?.selected||'')};
     }else if(type==='KEYWORD_TOGGLED'){
       const keywordId=String(payload.keywordId||'');
       if(!keywordId)return {ok:false,type,error:'KEYWORD_REQUIRED'};

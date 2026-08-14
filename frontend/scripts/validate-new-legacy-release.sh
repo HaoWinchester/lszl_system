@@ -9,10 +9,73 @@ INTEGRATED_LOG="$VALIDATION_ROOT/integrated.log"
 RAW_LOG="$VALIDATION_ROOT/raw.log"
 INTEGRATED_PID=""
 RAW_PID=""
+VALIDATION_DATABASE_NAME="kg_release_validation_${RELEASE_VERSION//[^A-Za-z0-9]/_}_$$"
+VALIDATION_DATABASE_CREATED="0"
+
+postgres_database_command() {
+  local command="$1"
+  local database_name="$2"
+  cd "$REPO_DIR/backend"
+  RELEASE_DATABASE_COMMAND="$command" RELEASE_DATABASE_NAME="$database_name" \
+    .venv/bin/python - <<'PY'
+import os
+import subprocess
+
+from dotenv import dotenv_values
+from sqlalchemy.engine import make_url
+
+source = os.environ.get("DATABASE_URL") or dotenv_values(".env").get("DATABASE_URL")
+source = str(source or "postgresql+asyncpg://menghao@/kg_graph_dev?host=/tmp")
+url = make_url(source)
+command = os.environ["RELEASE_DATABASE_COMMAND"]
+database = os.environ["RELEASE_DATABASE_NAME"]
+args = [command]
+host = url.query.get("host") or url.host
+if host:
+    args.extend(["--host", str(host)])
+if url.port:
+    args.extend(["--port", str(url.port)])
+if url.username:
+    args.extend(["--username", url.username])
+if command == "dropdb":
+    args.extend(["--if-exists", "--force"])
+args.append(database)
+env = dict(os.environ)
+if url.password:
+    env["PGPASSWORD"] = url.password
+subprocess.run(args, check=True, env=env, capture_output=True, text=True)
+PY
+}
+
+validation_database_url() {
+  cd "$REPO_DIR/backend"
+  RELEASE_DATABASE_NAME="$VALIDATION_DATABASE_NAME" .venv/bin/python - <<'PY'
+import os
+from urllib.parse import urlencode
+
+from dotenv import dotenv_values
+from sqlalchemy.engine import make_url
+
+source = os.environ.get("DATABASE_URL") or dotenv_values(".env").get("DATABASE_URL")
+source = str(source or "postgresql+asyncpg://menghao@/kg_graph_dev?host=/tmp")
+url = make_url(source)
+query = []
+for key, value in url.query.items():
+    if isinstance(value, tuple):
+        query.extend((key, str(item)) for item in value)
+    else:
+        query.append((key, str(value)))
+rendered = url.set(database=os.environ["RELEASE_DATABASE_NAME"], query={}).render_as_string(hide_password=False)
+if query:
+    rendered += "?" + urlencode(query, doseq=True, safe="/")
+print(rendered)
+PY
+}
 
 cleanup() {
   if [[ -n "$INTEGRATED_PID" ]]; then kill "$INTEGRATED_PID" 2>/dev/null || true; fi
   if [[ -n "$RAW_PID" ]]; then kill "$RAW_PID" 2>/dev/null || true; fi
+  if [[ "$VALIDATION_DATABASE_CREATED" == "1" ]]; then postgres_database_command dropdb "$VALIDATION_DATABASE_NAME" || true; fi
   rm -rf "$VALIDATION_ROOT"
 }
 trap cleanup EXIT INT TERM
@@ -69,11 +132,17 @@ path.write_text(json.dumps({
 }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 PY
 
+postgres_database_command createdb "$VALIDATION_DATABASE_NAME"
+VALIDATION_DATABASE_CREATED="1"
+VALIDATION_DATABASE_URL="$(validation_database_url)"
+
 INTEGRATED_PORT="$(free_port)"
 cd "$REPO_DIR/backend"
+DATABASE_URL="$VALIDATION_DATABASE_URL" \
 NEW_LEGACY_RELEASE_ROOT="$VALIDATION_ROOT/releases" \
 QUESTION_CATALOG_CUTOVER_ENABLED=true \
   .venv/bin/python -m alembic upgrade head
+DATABASE_URL="$VALIDATION_DATABASE_URL" \
 NEW_LEGACY_RELEASE_ROOT="$VALIDATION_ROOT/releases" \
 QUESTION_CATALOG_CUTOVER_ENABLED=true \
   .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port "$INTEGRATED_PORT" \
