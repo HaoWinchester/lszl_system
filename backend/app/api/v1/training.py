@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser
 from app.db.session import get_db
-from app.services import training_service
+from app.schemas.deep_recall import RecallProgressResetRequest, RecallProgressSaveRequest
+from app.services import deep_recall_service, training_service
 
 router = APIRouter(tags=["training-recall"])
 DB = Annotated[AsyncSession, Depends(get_db)]
@@ -37,5 +38,30 @@ async def get_recall(question_id: str, db: DB, user: CurrentUser):
 
 
 @router.put("/recall/progress/{question_id}")
-async def save_recall(question_id: str, body: dict, db: DB, user: CurrentUser):
-    return {"progress": await training_service.save_recall(db, user.username, question_id, body)}
+async def save_recall(
+    question_id: str,
+    body: RecallProgressSaveRequest,
+    db: DB,
+    user: CurrentUser,
+):
+    return await deep_recall_service.save_progress(db, user, question_id, body)
+
+
+@router.get("/recall/session/{question_id}")
+async def recall_session(question_id: str, db: DB, user: CurrentUser):
+    return await deep_recall_service.get_session(db, user, question_id)
+
+
+@router.post("/recall/progress/{question_id}/reset")
+async def reset_recall(
+    question_id: str,
+    body: RecallProgressResetRequest,
+    db: DB,
+    user: CurrentUser,
+):
+    return await deep_recall_service.reset_progress(db, user, question_id, body)
+
+
+@router.get("/recall/libraries/{subject}")
+async def recall_library(subject: str, db: DB, user: CurrentUser):
+    return await deep_recall_service.get_library(db, user, subject)
