@@ -1,6 +1,7 @@
 """训练进度与深度回忆进度模型。按 owner + question 隔离。"""
 
 from datetime import datetime
+import uuid
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -38,11 +39,73 @@ class RecallProgress(Base):
 
     owner_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.username"), primary_key=True)
     question_id: Mapped[str] = mapped_column(String(64), ForeignKey("questions.id"), primary_key=True)
+    bank_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_question_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    source_content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    recall_library_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    graph_schema_version: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
     nodes: Mapped[list] = mapped_column(JSONB, default=list)
     edges: Mapped[list] = mapped_column(JSONB, default=list)
-    custom_nodes: Mapped[dict] = mapped_column(JSONB, default=dict)
+    custom_nodes: Mapped[list | dict] = mapped_column(JSONB, default=list)
     active_keywords: Mapped[list] = mapped_column(JSONB, default=list)
+    choice_offsets: Mapped[dict] = mapped_column(JSONB, default=dict)
+    transform: Mapped[dict] = mapped_column(
+        JSONB,
+        default=lambda: {"x": 0, "y": 0, "scale": 1},
+    )
+    metrics: Mapped[dict] = mapped_column(JSONB, default=dict)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class RecallQuestionSnapshot(Base):
+    """深度回忆使用的不可变题目版本快照。"""
+
+    __tablename__ = "recall_question_snapshots"
+    __table_args__ = (
+        UniqueConstraint(
+            "question_id",
+            "question_revision",
+            name="uq_recall_question_snapshot_revision",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+    question_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    bank_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    question_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    subject: Mapped[str] = mapped_column(String(100), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class RecallLibrarySnapshot(Base):
+    """深度回忆使用的不可变正式 Recall 联想库快照。"""
+
+    __tablename__ = "recall_library_snapshots"
+    __table_args__ = (
+        UniqueConstraint(
+            "subject",
+            "content_hash",
+            name="uq_recall_library_snapshot_hash",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+    subject: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    source_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class LearningEvent(Base):
