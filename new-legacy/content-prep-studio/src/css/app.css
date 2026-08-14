@@ -93,6 +93,7 @@ code{background:#f1f5f9;padding:1px 4px;border-radius:4px}
 .preview-tip{font-size:12px;color:var(--muted);margin:0 0 8px}
 .keyword-float{position:fixed;z-index:80;width:min(420px,calc(100vw - 24px));border:1px solid #aebbd0;border-radius:12px;background:#fff;box-shadow:0 14px 40px rgba(15,23,42,.22);padding:11px;display:none}
 .keyword-float.show{display:block}.keyword-float .float-title{font-weight:900;margin-bottom:7px;display:flex;gap:8px;align-items:center}.keyword-float .float-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.keyword-float .float-grid .span2{grid-column:1/-1}
+.keyword-float .recall-search-row,.kw-card .recall-search-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}.recall-search-row input{flex:1}.recall-search-meta{font-size:11px;color:var(--muted);margin-top:4px;min-height:16px}select.recall-filtered{max-height:190px}
 .modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:90;display:none;align-items:center;justify-content:center;padding:20px}
 .modal-backdrop.show{display:flex}.modal-panel{width:min(900px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:14px;border:1px solid #c8d2df;padding:18px}
 .modal-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}.modal-head h2{margin:0;font-size:20px}.modal-head .spacer{flex:1}

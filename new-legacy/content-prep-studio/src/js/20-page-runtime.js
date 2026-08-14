@@ -231,14 +231,50 @@ function addKeyword(level){
 function recomputeKeywordLocations(q){
   const stem=questionStem(q);
   q.clues.forEach(c=>{
-    const locs=[],sc=countOccurrences(stem,c.text);if(sc)locs.push({field:'stem',optionId:'',count:sc});
-    q.options.forEach(o=>{const n=countOccurrences(o.text,c.text);if(n)locs.push({field:'option',optionId:o.id,count:n})});
+    const locs=[],sourceType=String(c.sourceType||'stem'),sourceOptionId=String(c.sourceOptionId||'');
+    if(sourceType==='option'){
+      const option=q.options.find(o=>String(o.id)===sourceOptionId),count=option?countOccurrences(option.text,c.text):0;
+      if(count)locs.push({field:'option',optionId:sourceOptionId,count});
+    }else{
+      const count=countOccurrences(stem,c.text);if(count)locs.push({field:'stem',optionId:'',count});
+    }
     c.matchLocations=locs;
-    const first=locs[0];if(first){c.sourceType=first.field;c.sourceOptionId=first.optionId||''}
   });
 }
 function recallNodeOptions(selected){
   return '<option value="">— 未关联 —</option>'+state.recallLibrary.nodes.slice().sort((a,b)=>a.title.localeCompare(b.title,'zh-CN')).map(n=>`<option value="${esc(n.id)}"${n.id===selected?' selected':''}>${esc(n.title)}${n.titleEn?' / '+esc(n.titleEn):''}</option>`).join('');
+}
+function normalizeRecallSearchText(value){return String(value||'').trim().toLowerCase().replace(/\s+/g,' ')}
+function fuzzySubsequenceMatch(needle,haystack){
+  needle=normalizeRecallSearchText(needle).replace(/\s+/g,'');haystack=normalizeRecallSearchText(haystack).replace(/\s+/g,'');
+  if(!needle)return true;let i=0;for(const ch of haystack){if(ch===needle[i])i++;if(i>=needle.length)return true}return false;
+}
+function recallSearchNodes(term,limit=80){
+  const q=normalizeRecallSearchText(term),tokens=q.split(' ').filter(Boolean),rows=[];
+  state.recallLibrary.nodes.forEach(n=>{
+    const fields=[{v:n.title,w:120},{v:n.titleEn,w:80},{v:n.id,w:70},...(n.aliases||[]).map(v=>({v,w:100}))];
+    let score=0,best='';
+    if(!q){score=1}else fields.forEach(({v,w})=>{
+      const text=normalizeRecallSearchText(v);if(!text)return;
+      let local=0;
+      if(text===q)local=w+100;else if(text.startsWith(q))local=w+70;else if(text.includes(q))local=w+50;
+      else if(tokens.length>1&&tokens.every(token=>text.includes(token)))local=w+35;
+      else if(q.length>=2&&fuzzySubsequenceMatch(q,text))local=w+18;
+      if(local>score){score=local;best=String(v||'')}
+    });
+    if(score)rows.push({n,score,best});
+  });
+  return rows.sort((a,b)=>b.score-a.score||Number(b.n.priority||0)-Number(a.n.priority||0)||String(a.n.title||'').localeCompare(String(b.n.title||''),'zh-CN')).slice(0,limit);
+}
+function recallFilteredOptions(term,selectedId=''){
+  const rows=recallSearchNodes(term,80),q=normalizeRecallSearchText(term);
+  let html='<option value="">— 未关联 —</option>';
+  html+=rows.map(({n,best})=>{
+    const alias=(n.aliases||[]).find(a=>q&&normalizeRecallSearchText(a).includes(q));
+    const extra=alias?` · Alias: ${alias}`:(q&&best&&best!==n.title?` · ${best}`:'');
+    return `<option value="${esc(n.id)}"${n.id===selectedId?' selected':''}>${esc(n.title)}${extra?esc(extra):''} · ${esc(n.id)}</option>`;
+  }).join('');
+  return {html,count:rows.length,rows};
 }
 function renderKeywords(){
   const q=currentQuestion(),box=document.getElementById('keywordList');if(!box)return;
@@ -260,17 +296,30 @@ function renderKeywords(){
       <div class="kw-grid">
         <div><label>英文</label><input type="text" data-kwfield="textEn" data-kwid="${esc(c.id)}" value="${esc(c.textEn||'')}"></div>
         <div><label>级别</label><select data-kwfield="keywordLevel" data-kwid="${esc(c.id)}"><option value="normal"${level==='normal'?' selected':''}>普通关键词</option><option value="core"${level==='core'?' selected':''}>核心关键词</option></select></div>
-        <div class="span2"><label>联想入口 ${resolved?'✓':'⚠'}</label><select data-kwfield="recallNodeId" data-kwid="${esc(c.id)}">${recallNodeOptions(c.recallNodeId)}</select></div>
+        <div class="span2"><label>联想入口 ${resolved?'✓':c.recallNodeId?'⚠':'（可选）'}</label>
+          <div class="recall-search-row"><input type="search" data-transient-ui data-kw-recall-search="${esc(c.id)}" placeholder="输入名称 / Alias / ID 模糊搜索"><button class="btn small" type="button" data-kw-recall-clear="${esc(c.id)}">清空</button></div>
+          <select class="recall-filtered" data-kwfield="recallNodeId" data-kwid="${esc(c.id)}" data-kw-recall-select="${esc(c.id)}">${recallNodeOptions(c.recallNodeId)}</select>
+          <div class="recall-search-meta" data-kw-recall-meta="${esc(c.id)}"></div>
+        </div>
         ${level==='core'?`<div><label>解题作用</label><select data-kwfield="solutionRole" data-kwid="${esc(c.id)}">
           ${[['decision-cue','Decision Cue / 决策提示'],['concept-anchor','Concept Anchor / 知识锚点'],['condition-anchor','Condition Anchor / 情境条件'],['answer-anchor','Answer Anchor / 答案判断']].map(([v,t])=>`<option value="${v}"${c.solutionRole===v?' selected':''}>${t}</option>`).join('')}
         </select></div><div><label>核心理由</label><input type="text" data-kwfield="coreReason" data-kwid="${esc(c.id)}" value="${esc(c.coreReason||'')}" placeholder="为什么这个词影响本题推理？"></div>`:''}
-        <div class="span2 tiny muted">${resolved?`→ ${esc(resolved.title)}`:`未找到稳定联想入口。${esc(suggestionText(c.text))}`}</div>
+        <div class="span2 tiny muted">${resolved?`→ ${esc(resolved.title)}`:c.recallNodeId?`联想入口 ${esc(c.recallNodeId)} 已失效，请重新选择或清除。`:'未关联（可选）'}</div>
       </div>
     </div>`;
   }).join('');
   box.querySelectorAll('[data-remove-kw]').forEach(b=>b.onclick=()=>{q.clues=q.clues.filter(c=>c.id!==b.dataset.removeKw);renderKeywords();renderPreview();renderCurrentIssues()});
   box.querySelectorAll('[data-kwfield]').forEach(el=>el.addEventListener('change',()=>updateKeywordField(el)));
   box.querySelectorAll('input[data-kwfield]').forEach(el=>el.addEventListener('input',()=>updateKeywordField(el,false)));
+  q.clues.forEach(c=>{
+    const input=box.querySelector(`[data-kw-recall-search="${c.id}"]`),select=box.querySelector(`[data-kw-recall-select="${c.id}"]`),clear=box.querySelector(`[data-kw-recall-clear="${c.id}"]`),meta=box.querySelector(`[data-kw-recall-meta="${c.id}"]`);
+    if(!input||!select||!clear||!meta)return;
+    const filter=()=>{const result=recallFilteredOptions(input.value,c.recallNodeId||'');select.innerHTML=result.html;meta.textContent=input.value?`找到 ${result.count} 个候选；选择后才会保存稳定 ID。`:`共 ${result.count} 个正式联想入口。`;return result};
+    input.addEventListener('input',filter);
+    input.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();input.value='';filter()}else if(event.key==='Enter'){event.preventDefault();const first=filter().rows[0];if(first){select.value=first.n.id;updateKeywordField(select)}}});
+    clear.onclick=()=>{input.value='';filter();input.focus()};
+    filter();
+  });
 }
 function updateKeywordField(el,rerender=true){
   const q=currentQuestion(),c=q?.clues.find(x=>x.id===el.dataset.kwid);if(!c)return;
@@ -324,13 +373,18 @@ function showKeywordFloatEditor({clue=null,text='',sourceType='stem',optionId=''
   const q=currentQuestion(),box=document.getElementById('keywordFloat');if(!q||!box)return;
   const existing=clue||q.clues.find(c=>c.text===text&&keywordMatchesSource(c,sourceType,optionId))||null;
   const resolved=existing?.recallNodeId?recallIndex().byId.get(existing.recallNodeId):resolveRecall(text).unique;
+  let floatRecallSelectedId=existing?.recallNodeId||'';
   const level=existing?.keywordLevel==='core'?'core':'normal';
   const role=existing?.solutionRole||(level==='core'?'concept-anchor':'context');
   box.innerHTML=`<div class="float-title"><span>${existing?'编辑关键词':'新增关键词'}：</span><span class="kw-word">${esc(existing?.text||text)}</span><span class="spacer"></span><button class="btn small" id="floatClose">×</button></div>
   <div class="float-grid">
     <div><label>级别</label><select id="floatLevel"><option value="normal"${level==='normal'?' selected':''}>普通关键词</option><option value="core"${level==='core'?' selected':''}>核心关键词</option></select></div>
     <div><label>English</label><input id="floatTextEn" type="text" value="${esc(existing?.textEn||'')}"></div>
-    <div class="span2"><label>联想入口</label><select id="floatRecall">${recallNodeOptions(existing?.recallNodeId||resolved?.id||'')}</select></div>
+    <div class="span2"><label>联想入口（可选）</label>
+      <div class="recall-search-row"><input id="floatRecallSearch" type="search" data-transient-ui placeholder="输入名称 / Alias / ID 模糊搜索"><button class="btn small" id="floatRecallSearchClear" type="button">清空</button></div>
+      <select id="floatRecall" class="recall-filtered">${recallNodeOptions(floatRecallSelectedId)}</select>
+      <div id="floatRecallSearchMeta" class="recall-search-meta"></div>
+    </div>
     <div id="floatCoreRoleWrap"${level==='core'?'':' class="hidden"'}><label>解题作用</label><select id="floatRole">
       ${[['decision-cue','Decision Cue / 决策提示'],['concept-anchor','Concept Anchor / 知识锚点'],['condition-anchor','Condition Anchor / 情境条件'],['answer-anchor','Answer Anchor / 答案判断']].map(([v,t])=>`<option value="${v}"${role===v?' selected':''}>${t}</option>`).join('')}
     </select></div>
@@ -344,6 +398,13 @@ function showKeywordFloatEditor({clue=null,text='',sourceType='stem',optionId=''
     document.getElementById('floatCoreRoleWrap').classList.toggle('hidden',!core);
     document.getElementById('floatCoreReasonWrap').classList.toggle('hidden',!core);
   };
+  const recallSearch=document.getElementById('floatRecallSearch'),recallSelect=document.getElementById('floatRecall'),recallMeta=document.getElementById('floatRecallSearchMeta');
+  const filterFloatRecall=()=>{const result=recallFilteredOptions(recallSearch.value,floatRecallSelectedId);recallSelect.innerHTML=result.html;recallMeta.textContent=recallSearch.value?`找到 ${result.count} 个候选；选择后才会保存稳定 ID。`:`共 ${result.count} 个正式联想入口。`;return result};
+  recallSearch.oninput=filterFloatRecall;
+  recallSearch.onkeydown=event=>{if(event.key==='Escape'){event.preventDefault();recallSearch.value='';filterFloatRecall()}else if(event.key==='Enter'){event.preventDefault();const first=filterFloatRecall().rows[0];if(first){floatRecallSelectedId=first.n.id;recallSelect.value=floatRecallSelectedId;recallMeta.textContent=`已选择：${first.n.title} · ${first.n.id}`}}};
+  recallSelect.onchange=()=>{floatRecallSelectedId=recallSelect.value;const selected=recallIndex().byId.get(floatRecallSelectedId);recallMeta.textContent=selected?`已选择：${selected.title} · ${selected.id}`:'未关联（可选）'};
+  document.getElementById('floatRecallSearchClear').onclick=()=>{recallSearch.value='';filterFloatRecall();recallSearch.focus()};
+  filterFloatRecall();
   document.getElementById('floatSave').onclick=()=>{
     const selectedLevel=document.getElementById('floatLevel').value==='core'?'core':'normal';
     let c=existing;
@@ -357,7 +418,7 @@ function showKeywordFloatEditor({clue=null,text='',sourceType='stem',optionId=''
     c.keywordLevel=selectedLevel;c.isCore=selectedLevel==='core';c.type=c.isCore?'core-keyword':'recall-keyword';
     c.solutionRole=c.isCore?document.getElementById('floatRole').value:'context';
     c.coreReason=c.isCore?document.getElementById('floatReason').value:'';
-    c.recallNodeId=document.getElementById('floatRecall').value;
+    c.recallNodeId=floatRecallSelectedId;
     const rn=recallIndex().byId.get(c.recallNodeId);c.recallEntryLabel=rn?.title||'';
     c.sourceType=sourceType||c.sourceType;c.sourceOptionId=optionId||c.sourceOptionId||'';
     const primary=q.metadata?.knowledge?.primaryNodeId||'';c.conceptIds=primary?[primary]:[];
@@ -392,7 +453,7 @@ function validateKeyword(q,c){
   const issues=[],word=keywordLooksLikeWord(c.text);
   if(!word.ok)issues.push({level:'warn',message:`关键词“${c.text}”：${word.msg}`,suggest:'缩短为词或稳定专业术语。'});
   if(!(c.matchLocations||[]).length)issues.push({level:'error',message:`关键词“${c.text}”已不在题干/选项中`,suggest:'重新标记或删除该关键词。'});
-  if(!c.recallNodeId||!recallIndex().byId.has(c.recallNodeId))issues.push({level:c.keywordLevel==='core'?'error':'warn',message:`关键词“${c.text}”没有有效联想入口`,suggest:suggestionText(c.text)});
+  if(c.recallNodeId&&!recallIndex().byId.has(c.recallNodeId))issues.push({level:'error',message:`关键词“${c.text}”引用的联想入口不存在：${c.recallNodeId}`,suggest:'清除该引用，或重新选择一个现有联想入口。'});
   if(c.keywordLevel==='core'){
     if(!c.solutionRole||c.solutionRole==='context')issues.push({level:'error',message:`核心关键词“${c.text}”缺少解题作用`,suggest:'选择 Decision Cue / Concept Anchor / Condition Anchor / Answer Anchor。'});
     if(!String(c.coreReason||'').trim())issues.push({level:'error',message:`核心关键词“${c.text}”缺少核心理由`,suggest:'说明这个词为什么影响本题推理或答案选择。'});
@@ -619,7 +680,7 @@ function exportableQuestion(q){
   out.analysis=String(out.analysis||out.explanation||'');out.explanation=out.analysis;
   out.status=out.status||{};
   out.status.contentReady=!!(questionStem(out)&&out.options.every(o=>o.text)&&out.analysis);
-  out.status.keywordsReady=!!(out.clues.length&&out.clues.every(c=>c.recallNodeId));
+  out.status.keywordsReady=!!out.clues.length;
   out.status.knowledgeReady=!!primary;
   out.status.reasoningReady=!!(out.reasoningSteps||[]).length;
   return out;
@@ -823,7 +884,7 @@ document.getElementById('btnOpenSharedDrafts').onclick=()=>window.PMPPrepDraftUi
 
 
 
-document.addEventListener('input',()=>markWorkspaceDirty(),true);
+document.addEventListener('input',event=>{if(!event.target.closest?.('[data-transient-ui]'))markWorkspaceDirty()},true);
 document.addEventListener('change',e=>{if(e.target.id!=='themeSelect')markWorkspaceDirty()},true);
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
