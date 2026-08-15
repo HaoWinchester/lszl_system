@@ -516,7 +516,7 @@
     const index=context.index>=0?context.index:Number.isFinite(Number(order?.index))?Math.max(0,Number(order.index)):-1;
     const total=context.total||Number(order?.total)||0;
     const questionIndex=total&&index>=0
-      ?`<span class="kr-question-index" title="本试卷第 ${index+1} 题，共 ${total} 题"><b>${index+1}</b><small>/${total}</small></span>`
+      ?`<span class="kr-question-order-badge" title="本试卷第 ${index+1} 题，共 ${total} 题"><b>${index+1}</b><small>/${total}</small></span>`
       :'';
     const stem=(question.stemParts||[]).map((p,i)=>{
       const text=escapeHTML(p.text||'');
@@ -672,7 +672,15 @@
         if(!KR_ANALYSIS_SECTION_ORDER.includes(key))return;
         if(checkbox.checked)krAnalysisSections.add(key);else krAnalysisSections.delete(key);
         if(!krAnalysisSections.size){krAnalysisSections.add('answer');checkbox.checked=false}
-        saveKrAnalysisSections();renderKrAnalysisPanel();
+        saveKrAnalysisSections();refreshKrAnalysisPanelContents();
+      });
+      // P4.5.33：勾选后下拉保持展开（refreshKrAnalysisPanelContents 不重建 details），
+      // 点击"显示内容"以外区域才收起下拉，方便连续勾选。
+      document.addEventListener('click',event=>{
+        const details=analysisLayer.querySelector('.qw-analysis-config-wrap');
+        if(!details?.open)return;
+        if(event.target.closest('.qw-analysis-config-wrap'))return;
+        details.open=false;
       });
     }
   }
@@ -704,6 +712,24 @@
     const option=(Array.isArray(question.options)?question.options:[]).find(item=>item?.correct);
     return String(option?.id||'');
   }
+  // P4.5.33：题目未录 concepts 时，按关键词 recallNodeId 从联想库解析本题对应知识点
+  // （只取节点 title 与 hint 解释，不展开关系链条），去重后作为解析面板的知识点内容。
+  function krLibraryConcepts(){
+    const library=associationLibrary();
+    if(!library?.nodes?.length)return [];
+    const api=window.KGRecallAssociationLibrary;
+    if(!api?.resolve)return [];
+    const seen=new Set(),result=[];
+    (Array.isArray(question.clues)?question.clues:[]).forEach(clue=>{
+      const nodeId=String(clue?.recallNodeId||'').trim();
+      if(!nodeId||seen.has(nodeId))return;
+      const node=api.resolve(library,nodeId);
+      if(!node)return;
+      seen.add(nodeId);
+      result.push({title:node.title,rule:String(node.hint||'').trim()});
+    });
+    return result.slice(0,6);
+  }
   function krQuestionAnalysisMarkup(){
     const view=recallQuestionDisplay()||{};
     const options=Array.isArray(question.options)?question.options:[];
@@ -713,8 +739,15 @@
     const displayCorrect=viewOptions.find(item=>String(item.id)===String(answerId))||null;
     const explicit=String(view.explanation?.zh||question.analysis||question.explanation||question.rationale||question.solution||'').trim();
     const pathText=String(view.path?.zh||question.keyPath?.ruleText||question.keyPath?.label||'').trim();
-    const concepts=(Array.isArray(question.concepts)?question.concepts:[]).slice(0,6);
-    const clues=(Array.isArray(question.clues)?question.clues:[]).filter(item=>String(item?.explain||'').trim()).slice(0,6);
+    // P4.5.33 知识点：题目 concepts 为空时，用关键词的 recallNodeId 从联想库解析
+    // 对应知识点（title + hint 解释）——录入侧只需照常绑定关键词入口，无需额外录入。
+    const rawConcepts=(Array.isArray(question.concepts)?question.concepts:[]).filter(item=>String(item?.title||'').trim()).slice(0,6);
+    const concepts=rawConcepts.length?rawConcepts:krLibraryConcepts();
+    // P4.5.33 关键词：优先显示核心关键词（isCore 标记，Prep Studio 录入时已标注），
+    // 有讲解（explain）则附上；无核心标记时回退为带讲解的关键词。
+    const allClues=Array.isArray(question.clues)?question.clues:[];
+    const coreClues=allClues.filter(item=>item?.isCore).slice(0,6);
+    const clues=coreClues.length?coreClues:allClues.filter(item=>String(item?.explain||'').trim()).slice(0,6);
     const traps=options.filter(item=>String(item?.trap||'').trim()).slice(0,8);
     const sections=[];
     if(krAnalysisSectionEnabled('analysis')&&explicit)sections.push(krAnalysisSectionMarkup('analysis','题目解析',`<p>${escapeHTML(explicit)}${englishLine(view.explanation)}</p>`));
@@ -725,7 +758,7 @@
     }
     if(krAnalysisSectionEnabled('path')&&pathText)sections.push(krAnalysisSectionMarkup('path','判断主线',`<p>${escapeHTML(pathText)}${englishLine(view.path)}</p>`));
     if(krAnalysisSectionEnabled('concepts')&&concepts.length)sections.push(krAnalysisSectionMarkup('concepts','知识点',`<ul>${concepts.map(item=>`<li><strong>${escapeHTML(item.title||'知识点')}</strong>${item.rule||item.summary?'：'+escapeHTML(item.rule||item.summary):''}</li>`).join('')}</ul>`));
-    if(krAnalysisSectionEnabled('clues')&&clues.length)sections.push(krAnalysisSectionMarkup('clues','关键词讲解',`<ul>${clues.map(item=>`<li><strong>${escapeHTML(item.text||'线索')}</strong>：${escapeHTML(item.explain||'')}</li>`).join('')}</ul>`));
+    if(krAnalysisSectionEnabled('clues')&&clues.length)sections.push(krAnalysisSectionMarkup('clues',coreClues.length?'核心关键词':'关键词讲解',`<ul>${clues.map(item=>`<li><strong>${escapeHTML(item.text||'线索')}</strong>${String(item.explain||'').trim()?'：'+escapeHTML(item.explain):''}</li>`).join('')}</ul>`));
     if(krAnalysisSectionEnabled('traps')&&traps.length)sections.push(krAnalysisSectionMarkup('traps','选项提示',`<ul>${traps.map(item=>`<li><strong>${escapeHTML(item.id||'')}</strong>：${escapeHTML(item.trap||'')}</li>`).join('')}</ul>`));
     if(!sections.length)sections.push('<section class="qw-analysis-empty"><h4>暂无可展示内容</h4><p>可在“显示内容”中勾选其他项目；若仍为空，请先在题库中补充解析、知识点或选项提示。</p></section>');
     return sections.join('');
@@ -738,6 +771,19 @@
     if(!krAnalysisOpen){analysisLayer.innerHTML='';return false}
     const title=String(question.title||'本题解析');
     analysisLayer.innerHTML=`<aside class="qw-analysis-panel" data-analysis-node-id="kr-question" data-side="right" aria-label="本题解析 ${escapeHTML(title)}"><header data-qw-analysis-drag title="解析面板位置跟随题目卡"><div><small>QUESTION EXPLANATION</small><h3>${escapeHTML(title)}</h3></div><div class="qw-analysis-header-actions">${krAnalysisConfigMarkup()}<button type="button" data-qw-analysis-close="kr-question" title="关闭解析" aria-label="关闭解析"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div></header><div class="qw-analysis-content">${krQuestionAnalysisMarkup()}</div></aside>`;
+    requestAnimationFrame(positionKrAnalysisPanel);
+    return true;
+  }
+  // P4.5.33：勾选后只刷新内容区（镜像多题画布 refreshAnalysisPanelContents），
+  // 不重建 details——避免"点一下复选框整个下拉菜单消失"。
+  function refreshKrAnalysisPanelContents(){
+    const panel=analysisLayer?.querySelector?.('.qw-analysis-panel');
+    if(!panel||!krAnalysisOpen)return false;
+    const content=panel.querySelector('.qw-analysis-content');
+    if(content)content.innerHTML=krQuestionAnalysisMarkup();
+    panel.querySelectorAll('[data-qw-analysis-section]').forEach(input=>{
+      if(input instanceof HTMLInputElement)input.checked=krAnalysisSectionEnabled(input.dataset.qwAnalysisSection||'');
+    });
     requestAnimationFrame(positionKrAnalysisPanel);
     return true;
   }

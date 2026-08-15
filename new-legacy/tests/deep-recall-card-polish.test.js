@@ -30,7 +30,7 @@ assert.match(recall, /\.qw-analysis-panel,summary,label/);
 assert.match(recall, /setTimeout\(\(\)=>\{centerOn\(0,0,true\);playQuestionCardEntry\(\)\},30\)/);
 
 // ④ 序号徽标：目录顺序优先，预览回退 payload.questionOrder
-assert.match(recall, /kr-question-index/);
+assert.match(recall, /kr-question-order-badge/);
 assert.match(recall, /question\.questionOrder/);
 assert.match(bankAdmin, /payloadQuestion\.questionOrder=\{index:/);
 

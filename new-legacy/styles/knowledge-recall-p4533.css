@@ -1,0 +1,10 @@
+/* V9.0-P4.5.33 · 解析面板勾选交互与序号徽标微调。 */
+
+/* 题目序号徽标：圆角矩形底纹，完整覆盖"n / N"数字信息 */
+.knowledge-recall-page .kr-question-order-badge{
+  border-radius:9px;
+  padding:5px 12px;
+  gap:3px;
+}
+.knowledge-recall-page .kr-question-order-badge b{font-size:14px}
+.knowledge-recall-page .kr-question-order-badge small{font-size:11px;opacity:.72;font-weight:760}
