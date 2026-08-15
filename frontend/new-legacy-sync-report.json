@@ -1,13 +1,40 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.81",
-  "toVersion": "v9.0-p4.1.82",
+  "fromVersion": "v9.0-p4.1.82",
+  "toVersion": "v9.0-p4.1.83",
   "changes": {
-    "added": [],
+    "added": [
+      "styles/close-button.css"
+    ],
     "changed": [
       "VERSION",
-      "src/86-knowledge-recall.js",
-      "styles/knowledge-recall-p4529.css"
+      "admin-console.html",
+      "admin-operations.html",
+      "admin-settings.html",
+      "admin-subjects.html",
+      "content-center.html",
+      "course-admin.html",
+      "feedback-management.html",
+      "file-manager.html",
+      "guided-learning-node.html",
+      "guided-learning-placement-test.html",
+      "help-center.html",
+      "index.html",
+      "knowledge-recall.html",
+      "landing.html",
+      "learning-path.html",
+      "message-management.html",
+      "multi-question-help.html",
+      "paper-management.html",
+      "practice-mode.html",
+      "privacy-policy.html",
+      "question-bank.html",
+      "question-training.html",
+      "question-workspace.html",
+      "system-settings.html",
+      "teacher-workbench.html",
+      "terms-of-service.html",
+      "user-management.html"
     ],
     "removed": []
   },
