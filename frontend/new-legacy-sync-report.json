@@ -1,18 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.91",
-  "toVersion": "v9.0-p4.1.92",
+  "fromVersion": "v9.0-p4.1.93",
+  "toVersion": "v9.0-p4.1.93",
   "changes": {
-    "added": [
-      "tests\\deep-recall-association-server-sync.test.js"
-    ],
-    "changed": [
-      "VERSION",
-      "src\\86-knowledge-recall.js",
-      "src\\95-recall-association-library.js",
-      "src\\96-recall-association-admin.js",
-      "src\\admin\\53-recall-association-management.js"
-    ],
+    "added": [],
+    "changed": [],
     "removed": []
   },
   "incompatible": []

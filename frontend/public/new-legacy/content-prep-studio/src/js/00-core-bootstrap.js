@@ -95,24 +95,161 @@ const QUESTION_TEMPLATE={
     lifecycle:{status:"active",deletedAt:""}
   }]
 };
-const WORD_TO_JSON_AI_PROMPT=`你是一名 PMP 题库结构化编辑助手。
-请把我提供的 Word/文本题目转换成“PMP Content Prep Studio”可导入的 Question Bank JSON。
+const WORD_TO_JSON_AI_PROMPT=`你是一名 PMP 题库结构化编辑助手。请把我提供的题目（中文模板格式）逐一转换为 PMP Content Prep Studio 可直接导入的「完整内容准备包 JSON」。
 
-硬性要求：
-1. 顶层必须是一个对象，包含 name、subject、questions；不要生成题库 id 或题目 id。
-2. 每道题保留原始题干、A/B/C/D、正确答案、解析；不得擅自补写原资料没有的事实。
-3. correctAnswer 使用 A/B/C/D。
-4. 中文题干放 stemParts:[{text:"..."}]。
-5. 中文解析同时放 analysis。
-6. 如果原资料没有英文，不要编造英文；translations.en 对应字段可留空。
-7. 如果原资料没有知识点，不要猜；metadata.knowledge.primaryNodeId 留空。
-8. 如果原资料没有关键词，不要猜；clues 留空，后续在 Prep Studio 人工标记。
-9. 不写死 taxonomyId / taxonomyVersion。
-10. 不要生成题目 id、questionId、contentHash、creatorId、deviceId、batchId 或 metadata.origin；这些由 Prep Studio 自动生成。
-11. 输出纯 JSON，不要 Markdown 代码围栏，不要解释。
+━━━ 一、输入模板格式（每道题一段，序号递增）━━━
 
-参考模板：
-${JSON.stringify(QUESTION_TEMPLATE,null,2)}
+1、考点：<领域/知识点>
+英文题：
+<English stem>
+A. <option A> B. <option B> C. <option C> D. <option D>
+中文题：
+<中文题干>
+A. <选项A> B. <选项B> C. <选项C> D. <选项D>
+答案：<字母>
+解析：
+<解析正文>
+做题原则（八大）：
+题干原则：<编号+名称+说明>
+正确选项原则：<编号+名称+说明>
+题干关键词：<词1、词2…>
+选项关键词：A：<…>　B：<…>　C：<…>（正确项）　D：<…>
+
+━━━ 二、八大原则与稳定 ID（必须原样使用，禁止自造 ID/名称）━━━
+
+| 编号 | 原则名称 | principleId |
+|---|---|---|
+| 1 | 圣人原则 | principle-draft-mspo5rlg-5vpx8kvq022 |
+| 2 | 先分析后行动—人 | principle-draft-mspo6qww-wtj1a868he |
+| 3 | 先分析后行动—事 | principle-draft-mspo7do2-ya6yr143i1g |
+| 4 | 先分析后行动—直白 | principle-draft-mspo7u1i-yrnuybvbufb |
+| 5 | 有分歧不站队 | principle-draft-mspo8rg8-hnndorn2e9g |
+| 6 | 遥相呼应 | principle-draft-mspo9x6m-xkzw63hhybs |
+| 7 | 先内后外 | principle-draft-mspob6q1-j77twycugd |
+| 8 | 有变更走流程 | principle-draft-mspobniu-y2fkekoytb |
+
+━━━ 三、字段映射规则 ━━━
+
+1. 「考点」→ domain（考试域/绩效域）；若能细分再填 topic（具体知识点）。
+2. 英文题 → stemParts（中文为主）+ translations.en（英文全文）；模板以中文为主语言，stemParts 填中文题干，translations.en 填英文题干与选项。
+3. 答案 → correctAnswer（A/B/C/D 单字母）。
+4. 解析 → analysis；如模板含英文解析则放入 translations.en.analysis。
+5. 做题原则：
+   - 题干原则 → metadata.stemPrincipleIds（按上表编号换算成 principleId 数组）
+   - 正确选项原则 → metadata.optionPrincipleMap.<正确字母>（必须且只能绑定 1 条）
+   - 错误选项：解析中明确指出"违反/误用"某原则时，绑定该原则；否则填 []
+6. 题干关键词 → clues[]：sourceType="stem"；直接决定解题判断的词 keywordLevel="core"、isCore=true，其余 "normal"/false。
+7. 选项关键词 → clues[]：sourceType="option"、sourceOptionId=对应字母；正确项关键词尽量标注 keywordLevel="core"。
+7a.【硬性】每个 keywordLevel="core" 的关键词必须填 coreReason（一句话说明它为何决定解题判断，如"该词直接区分'发送信息'与'真正完成沟通'"）；normal 关键词 coreReason 留空字符串。
+7b.【硬性】clues 的 text 必须从中文题干/选项原文中逐字摘取，禁止改写、缩写或自造词；英文 textEn 对应翻译。
+8. 不要生成 question id、contentHash、creatorId、deviceId、batchId、metadata.origin——全部由 Prep Studio 导入时自动生成。
+9. tags 固定为：["基础练习","自编题","内部使用"]（如模板另有说明按模板）。
+10. difficulty 按解析难度判断："简单/中等/困难" 三选一。
+
+━━━ 四、输出 JSON 结构（整体输出，纯 JSON，无 Markdown 围栏、无注释）━━━
+
+{
+  "prepContentBundleVersion": 1,
+  "format": "pmp-content-prep-complete-bundle-v1",
+  "questionBank": {
+    "name": "<批次名，如：PMP 自编题批次 001>",
+    "subject": "PMP",
+    "description": "",
+    "version": "1.0",
+    "visibility": "private",
+    "questions": [
+      {
+        "title": "<简短题目标题，如：高级管理人员未回应沟通>",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "domain": "管理与监督利益相关方争取（沟通技能、人际关系技能、会议）",
+        "topic": "<细分知识点，可留空字符串>",
+        "tags": ["基础练习","自编题","内部使用"],
+        "stage": "基础练习",
+        "stemParts": [{"text": "<中文题干>"}],
+        "options": [
+          {"id": "A", "text": "<中文选项A>", "trap": "<错误原因，取自解析/选项关键词>"},
+          {"id": "B", "text": "<中文选项B>", "trap": ""},
+          {"id": "C", "text": "<中文选项C>", "trap": ""},
+          {"id": "D", "text": "<中文选项D>", "trap": ""}
+        ],
+        "correctAnswer": "C",
+        "analysis": "<完整中文解析>",
+        "translations": {
+          "en": {
+            "title": "<English title>",
+            "stemParts": [{"text": "<English stem>"}],
+            "options": [
+              {"id": "A", "text": "<English A>"},
+              {"id": "B", "text": "<English B>"},
+              {"id": "C", "text": "<English C>"},
+              {"id": "D", "text": "<English D>"}
+            ],
+            "analysis": ""
+          }
+        },
+        "clues": [
+          {"text": "项目经理", "textEn": "project manager", "keywordLevel": "normal", "isCore": false, "type": "recall-keyword", "clueRole": "true", "sourceType": "stem", "sourceOptionId": "", "solutionRole": "context", "coreReason": ""},
+          {"text": "高级管理人员", "textEn": "senior executive", "keywordLevel": "core", "isCore": true, "type": "core-keyword", "clueRole": "true", "sourceType": "stem", "sourceOptionId": "", "solutionRole": "context", "coreReason": "高管身份决定了应优先用人际网络而非上报"},
+          {"text": "人际网络", "textEn": "networking", "keywordLevel": "core", "isCore": true, "type": "core-keyword", "clueRole": "true", "sourceType": "option", "sourceOptionId": "C", "solutionRole": "answer-anchor", "coreReason": "正确选项的核心动作，直接对应人际关系技能"}
+        ],
+        "metadata": {
+          "knowledge": {"primaryNodeId": "", "relatedNodeIds": [], "mappingStatus": "unmapped", "pathSnapshot": []},
+          "stemPrincipleIds": ["principle-draft-mspob6q1-j77twycugd"],
+          "optionPrincipleMap": {"A": [], "B": [], "C": ["principle-draft-mspo6qww-wtj1a868he"], "D": []}
+        }
+      }
+    ]
+  },
+  "principles": {
+    "schemaVersion": 1,
+    "items": [
+      {"id": "principle-draft-mspo5rlg-5vpx8kvq022", "name": "1、圣人原则", "status": "active", "confusablePrincipleIds": []},
+      {"id": "principle-draft-mspo6qww-wtj1a868he", "name": "2、先分析后行动—人", "status": "active", "confusablePrincipleIds": []},
+      {"id": "principle-draft-mspo7do2-ya6yr143i1g", "name": "3、先分析后行动—事", "status": "active", "confusablePrincipleIds": []},
+      {"id": "principle-draft-mspo7u1i-yrnuybvbufb", "name": "4、先分析后行动—直白", "status": "active", "confusablePrincipleIds": []},
+      {"id": "principle-draft-mspo8rg8-hnndorn2e9g", "name": "5、有分歧不站队", "status": "active", "confusablePrincipleIds": []},
+      {"id": "principle-draft-mspo9x6m-xkzw63hhybs", "name": "6、遥相呼应", "status": "active", "confusablePrincipleIds": []},
+      {"id": "principle-draft-mspob6q1-j77twycugd", "name": "7、先内后外", "status": "active", "confusablePrincipleIds": []},
+      {"id": "principle-draft-mspobniu-y2fkekoytb", "name": "8、有变更走流程", "status": "active", "confusablePrincipleIds": []}
+    ]
+  },
+  "synthesisPresets": {"schemaVersion": 1, "items": []},
+  "tagConfig": {"schemaVersion": 3, "slotIdStrategy": "global-semantic-v1", "names": {}, "groupNames": {}, "categoryNames": {}, "aliases": {}, "slotAliases": {}, "looseAliases": {}}
+}
+
+━━━ 五、硬性要求 ━━━
+
+1. principles 数组必须原样包含上表 8 条（ID、名称一字不改），这样导入后题目里的原则引用才能全部匹配上。
+2. 每题的 optionPrincipleMap 中，正确选项必须且只能有 1 条原则 ID。
+3. 多道题输入时，全部放入同一个 questionBank.questions 数组。
+4. 所有关键词 text 必须逐字来自题干/选项原文；core 关键词必须带 coreReason（否则导入后校验中心会报错）。
+4. 只输出 JSON 本体，不要任何解释文字、Markdown 代码围栏或注释。
+
+现在请等待我粘贴题目，或直接转换下面这题：
+
+1、考点：管理与监督利益相关方争取（沟通技能、人际关系技能、会议）
+英文题：
+A project manager has been assigned to a multimillion-dollar project already in execution. During a project status meeting, one of the team members mentions that there are some delays because a senior executive is not responding to communications. What should the project manager do?
+A. Establish a process to send daily reminders to the senior executive.
+B. Remove the task from the critical path so it will not affect the project schedule.
+C. Use networking to contact the senior executive to get a response.
+D. Escalate the concern to the senior executive's manager.
+中文题：
+一位项目经理被指派管理一个正在执行中的数百万美元项目。在一次项目状态会议上，一名团队成员提到由于一位高级管理人员未回应沟通，导致部分任务出现延迟。项目经理应采取什么措施?
+A. 建立流程，每日向该高级管理人员发送提醒
+B. 将该任务从关键路径中移除，以避免影响项目进度
+C. 利用人际网络联系该高级管理人员以获得回应
+D. 将该问题升级上报给该高级管理人员的上级
+答案：C
+解析：
+①本题核心考点为"管理沟通"与"干系人参与"中的软技能应用。面对高级管理人员（高管）不回复的情况，项目经理应首先利用人际关系技能解决问题，而非直接上报或机械提醒。②A项"每日提醒"属于骚扰式沟通，可能引起高管反感，是不专业的做法；B项"移出关键路径"掩盖了延迟事实，属于欺骗性行为，无法解决问题；D项"直接升级上报"跳过了与高管的直接沟通，属于打破组织政治层级的激进做法，通常在直接沟通无效后才使用。③C项"利用人际网络联系高管"属于《PMBOK指南》定义的"人际关系技能"（如建立信任、通过非正式渠道解决问题）和"管理沟通"中的推荐做法，既体现了解决问题的主动性，又维护了对高管的尊重，是当前场景下的最佳措施。
+做题原则（八大）：
+题干原则：7.先内后外 — 优先通过人际网络内部解决沟通问题
+正确选项原则：2.先分析后行动·人 — 因沟通受阻导致任务延迟，应先主动沟通解决
+题干关键词：项目经理、高级管理人员、沟通、延迟
+选项关键词：A：流程、每日、发送、提醒　B：移除、关键路径、进度　C：人际网络、联系、回应（正确项）　D：升级、上报、上级
 `;
 
 /* P4.5.29 差异 18：题目家族 JSON 模板与外部 AI 生成提示词 */
