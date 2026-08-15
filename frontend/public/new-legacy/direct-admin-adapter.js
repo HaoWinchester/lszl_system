@@ -58,6 +58,7 @@
       subject: user.subject || 'PMP',
       tags: user.tags || [],
       note: user.note || '',
+      subscription: user.subscription || null,
       source: user.source || 'server',
       createdAt: milliseconds(user.created_at),
       updatedAt: milliseconds(user.updated_at),

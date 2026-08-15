@@ -115,6 +115,53 @@ async def list_users(
     return list(users), total
 
 
+async def subscription_summaries(db: AsyncSession, usernames: list[str]) -> dict[str, dict]:
+    """按用户名汇总订阅与付款信息，供用户管理列表展示。"""
+    from app.core.permissions import DEFAULT_PLANS
+    from app.models.subscription import Subscription, SubscriptionOrder
+
+    names = [str(name).strip() for name in usernames if str(name or "").strip()]
+    if not names:
+        return {}
+    plan_names = {p["planId"]: p["name"] for p in DEFAULT_PLANS}
+    subs = (
+        await db.execute(select(Subscription).where(Subscription.username.in_(names)))
+    ).scalars().all()
+    paid_rows = (
+        await db.execute(
+            select(SubscriptionOrder.username)
+            .where(
+                SubscriptionOrder.username.in_(names),
+                SubscriptionOrder.pay_status == "paid",
+            )
+            .distinct()
+        )
+    ).scalars().all()
+    paid_set = {str(name) for name in paid_rows}
+    out: dict[str, dict] = {}
+    for s in subs:
+        out[s.username] = {
+            "planId": s.plan_id,
+            "planName": plan_names.get(s.plan_id, s.plan_id),
+            "status": s.status,
+            "expiresAt": s.expires_at.isoformat() if s.expires_at else None,
+            "source": s.source or "default",
+            # 真实付款：存在已支付订单，或订阅由微信支付开通。
+            "paid": s.username in paid_set or s.source == "wechat_pay",
+        }
+    for name in names:
+        if name not in out:
+            out[name] = {
+                "planId": "free",
+                "planName": plan_names.get("free", "免费学员"),
+                "status": "none",
+                "expiresAt": None,
+                "source": "default",
+                "paid": name in paid_set,
+            }
+    return out
+
+
 async def list_logs(db: AsyncSession, limit: int = 100) -> list[UserAdminLog]:
     r = await db.execute(select(UserAdminLog).order_by(UserAdminLog.at.desc()).limit(limit))
     return list(r.scalars().all())

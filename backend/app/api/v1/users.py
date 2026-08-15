@@ -43,8 +43,12 @@ async def list_users(
     users, total = await user_service.list_users(
         db, query=query, role=role, status=status, page=page, page_size=page_size
     )
+    summaries = await user_service.subscription_summaries(db, [u.username for u in users])
     return {
-        "users": [user_service.to_dict(u) for u in users],
+        "users": [
+            {**user_service.to_dict(u), "subscription": summaries.get(u.username)}
+            for u in users
+        ],
         "total": total,
         "page": page,
         "page_size": page_size,

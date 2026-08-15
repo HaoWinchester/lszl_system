@@ -204,6 +204,11 @@
       const role=roleLabel(u.role);
       const status=statusLabel(u.status);
       const subject=escapeHTML(u.subject||'PMP');
+      const sub=u.subscription&&typeof u.subscription==='object'?u.subscription:null;
+      const subBadges=sub&&sub.planId&&sub.planId!=='free'
+        ?`<span class="um-pill plan" title="当前套餐：${escapeHTML(sub.planName||sub.planId)}${sub.expiresAt?' · 至 '+fmtTime(Date.parse(sub.expiresAt)):''}">${escapeHTML(sub.planName||sub.planId)}</span>`
+          +(sub.paid?'<span class="um-pill paid" title="存在已支付订单或微信支付开通">已付款</span>':'<span class="um-pill unpaid" title="套餐由兑换码或管理员开通，无线上付款记录">未在线付款</span>')
+        :'';
       return `<div class="um-user-item compact ${username===state.selected?'active':''} ${checked?'selected':''}" data-user="${escapeHTML(username)}" role="button" tabindex="0" title="@${escapeHTML(username)} · ${escapeHTML(role)} · ${subject} · ${stats.questions} 题" aria-label="选择用户 ${escapeHTML(username)}，${escapeHTML(role)}，${status}">
         <label class="um-user-check" title="加入批量选择">
           <input class="um-user-checkbox" data-select-user="${escapeHTML(username)}" type="checkbox" ${checked?'checked':''}/>
@@ -220,6 +225,7 @@
             <span>${subject}</span>
             <span>${stats.questions} 题</span>
           </div>
+          ${subBadges?`<div class="um-user-compact-meta um-sub-meta">${subBadges}</div>`:''}
         </div>
       </div>`;
     }).join('');
