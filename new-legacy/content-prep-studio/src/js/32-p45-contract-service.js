@@ -31,11 +31,14 @@
     }),
   });
   const POLICIES=Object.freeze({
-    keywordLocation:'source-isolated-derived',
-    recallBinding:'optional-existing-id-only',
-    deepRecallReveal:'click-to-reveal-all-keywords',
-    keywordCorePriority:'overlap-match-priority-only',
+    deepRecallKeywordRevealPolicy:'click-to-reveal-all-keywords',
+    keywordCorePriorityPolicy:'overlap-match-priority-only',
+    keywordLocationPolicy:'source-isolated-derived-matchLocations',
+    recallBindingPolicy:'optional-existing-node-only',
   });
+  /* P4.5.29 合并规格 §13：对外兼容声明以扁平合同键为准 */
+  const TARGET_MAIN_VERSION='V9.0-P4.5.29';
+  const EXTERNAL_AI_AUTHORING_CONTRACT='external-ai-question-authoring-v1';
 
   function productRelease(){
     const bootstrap=global.__KG_DIRECT_BOOTSTRAP__||{};
@@ -43,13 +46,31 @@
   }
   function buildProgramCompatibility({serverBuildEvidence={}}={}){
     return {
+      contractVersion:1,
+      targetMainVersion:TARGET_MAIN_VERSION,
+      architecture:'service-layer-v1',
+      classificationArchitecture:'global-tags+subject-facets-v1',
+      globalTagSchemaVersion:3,
+      globalTagSlotIdStrategy:'global-semantic-v1',
+      subjectFacetRegistry:'subject-facet-registry-v1',
+      pmpSubjectFacetSchema:'pmp-facet-schema-v1',
+      keywordSystem:'Question Keyword System v2',
+      knowledgeBindingStrategy:'current-default-taxonomy-by-subject',
+      questionFamilySchema:'question-family-v1',
+      questionFamilyScope:'single-question-bank',
+      questionIdStrategy:'uuid-v4',
+      questionDifficultyScale:'three-level',
+      questionDifficultyLabels:['简单','中等','困难'],
+      questionDifficultyMainValues:['easy','medium','hard'],
+      questionFamilyDiagnosticLevelScale:'L1-L4',
+      externalAIQuestionAuthoringContract:EXTERNAL_AI_AUTHORING_CONTRACT,
+      ...POLICIES,
       authoringContract:{...AUTHORING_CONTRACT},
       contractSnapshot:JSON.parse(JSON.stringify(CONTRACT_SNAPSHOT)),
       registryManifest:JSON.parse(JSON.stringify(REGISTRY_MANIFEST)),
       testedAgainstProductRelease:productRelease(),
       prepBuild:'0.4.0',
       serverBuildEvidence:JSON.parse(JSON.stringify(serverBuildEvidence||{})),
-      policies:{...POLICIES},
     };
   }
   function attachToQuestionBank(bank,options={}){

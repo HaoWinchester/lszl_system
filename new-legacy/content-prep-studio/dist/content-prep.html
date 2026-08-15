@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PMP Content Prep Studio</title>
-<script>window.__PMP_PRODUCT_RELEASE__="v9.0-p4.1.86";</script>
+<script>window.__PMP_PRODUCT_RELEASE__="v9.0-p4.1.85";</script>
 <script src="/teaching-content-sync.js"></script>
 <script src="/server-state-bootstrap.js"></script>
 <style>
@@ -459,19 +459,12 @@ B原则：principle-2"></textarea>
           <button class="btn primary" id="btnParsePastedQuestions">解析并导入</button>
           <span class="muted smalltxt" id="pasteParseResult"></span>
         </div>
-        <section class="section" id="importReportPanel" hidden style="margin-top:10px">
-          <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-            <span id="importReportTitle">导入结果</span>
-            <button class="btn small" type="button" id="importReportClose">收起</button>
-          </div>
-          <div id="importReportBody" class="smalltxt" style="max-height:260px;overflow:auto;line-height:1.9"></div>
-        </section>
         <details class="full-paste-example">
           <summary>查看“完整版 Word / AI 文本粘贴格式”说明</summary>
           <p class="smalltxt muted">可解析题目基础信息、标签、Trap、双语、英文逐选项反馈、主知识点 ID、普通/核心关键词、题干原则和 A/B/C/D 原则映射。原则与归纳卡定义请使用“完整内容准备包 JSON”或“原则与归纳卡组合 JSON”。</p>
           <pre>【题目1】
 标题：已发送不等于已沟通
-难度：基础
+难度：简单
 领域：PMP 沟通绩效域 / 利益相关方与沟通管理
 主题：项目沟通管理的概念
 阶段：基础练习
@@ -769,7 +762,7 @@ D原则：principle-role-accountability</pre>
           <h3>Word / AI 完整文本示例</h3>
           <pre>【题目1】
 标题：已发送不等于已沟通
-难度：基础
+难度：简单
 标签：基础练习、核心题、自编题
 题干：项目经理……
 A. ...
@@ -896,8 +889,8 @@ const BASE_TAG_GROUPS=[
   {id:'quality',label:'质量标签',categories:[{id:'feature',label:'题目特征',options:['易错题','高频题','核心题','综合题']},{id:'review',label:'内容状态',options:['待复核','已复核','需更新']}]},
   {id:'source',label:'来源标签',categories:[{id:'origin',label:'来源类型',options:['真题','自编题','改编题','教材例题']},{id:'scope',label:'使用范围',options:['可公开','内部使用']}]}];
 
-/* v0.4.0 internal tag identity.
-   Formal/main-program exports still use legacy numeric slots. */
+/* P4.5.29 合同：内部真源与正式导出一律 global/... canonical；
+   formalTagSlot 仅保留旧数字槽位映射，供旧主程序数据读取兼容。 */
 const TAG_SLOT_SEMANTIC_MAP=Object.freeze({
   'usage/stage/0':'global/usage/stage/basic','usage/stage/basic':'global/usage/stage/basic',
   'usage/stage/1':'global/usage/stage/phase-test','usage/stage/phase-test':'global/usage/stage/phase-test',
@@ -932,7 +925,7 @@ function formalTagSlot(slot){slot=semanticTagSlot(slot);return TAG_SLOT_LEGACY_M
 function tagSlotKey(g,c,i){return semanticTagSlot(legacyTagSlotKey(g,c,i))}
 function tagCategoryKey(g,c){return `${g.id}/${c.id}`}
 function tagGroupKey(g){return g.id}
-const COMPLETE_CONTENT_BUNDLE_TEMPLATE={"prepContentBundleVersion":1,"format":"pmp-content-prep-complete-bundle-v1","questionBank":{"name":"PMP 完整内容模板题库","subject":"PMP","description":"完整字段示例：双语、知识点、关键词、推理、标签、原则与选项归纳卡映射。","version":"1.0","visibility":"private","questions":[{"title":"已发送不等于已沟通","type":"single_choice","subject":"PMP","difficulty":"基础","domain":"PMP 沟通绩效域 / 利益相关方与沟通管理","topic":"项目沟通管理的概念","tags":["基础练习","核心题","自编题","内部使用"],"stage":"基础练习","stemParts":[{"text":"项目经理按计划向团队发送了一份重要变更通知，但第二天发现多名成员仍按旧方案工作。项目经理首先应该认识到什么？"}],"options":[{"id":"A","text":"只要邮件发送成功，沟通责任就已经完成","trap":"把发送等同于有效沟通","correct":false},{"id":"B","text":"有效沟通不仅是发送信息，还要确认信息被接收和理解","trap":"","correct":true},{"id":"C","text":"应立即处罚没有阅读邮件的成员","trap":"过早升级 / 命令控制","correct":false},{"id":"D","text":"以后所有信息都应由发起人亲自传达","trap":"角色责任错置","correct":false}],"correctAnswer":"B","analysis":"沟通的效果不以“已经发送”为终点，而以信息是否被正确接收、理解并产生预期行动来判断。项目经理应建立反馈或确认机制，而不是把发送动作等同于沟通完成。","translations":{"en":{"title":"Sent Does Not Mean Understood","stemParts":[{"text":"The project manager sent an important change notice to the team as planned, but several members were still working from the old approach the next day. What should the project manager recognize first?"}],"options":[{"id":"A","text":"Once the email is successfully sent, the communication responsibility is complete"},{"id":"B","text":"Effective communication requires more than sending information; receipt and understanding should be confirmed"},{"id":"C","text":"Members who did not read the email should be disciplined immediately"},{"id":"D","text":"All future information should be delivered personally by the sponsor"}],"analysis":"Communication effectiveness is measured by whether the message is received, understood, and translated into the intended action, not merely by transmission.","optionFeedback":{"A":"Incorrect: sending alone does not prove communication effectiveness.","B":"Correct: effective communication requires receipt and understanding.","C":"Incorrect: this is premature escalation.","D":"Incorrect: this shifts communication responsibility to the wrong role."},"keyPath":{"label":"Communication effectiveness → confirmation → B","ruleText":"Communication is effective when the message is received, understood, and acted upon."},"explanationStatus":"complete"}},"clues":[{"id":"kw-001","text":"项目经理","textEn":"project manager","keywordLevel":"normal","isCore":false,"type":"recall-keyword","clueRole":"true","sourceType":"stem","sourceOptionId":"","recallNodeId":"recall-tax-kp-pmp-people-2-2-1-k01","recallEntryLabel":"项目经理","solutionRole":"context","coreReason":"","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"stem","optionId":"","count":2}],"explain":"关键词“项目经理”连接到联想入口“项目经理”。","sourceMode":"prep-studio-keyword-v2"},{"id":"kw-002","text":"首先","textEn":"first","keywordLevel":"core","isCore":true,"type":"core-keyword","clueRole":"true","sourceType":"stem","sourceOptionId":"","recallNodeId":"recall-keyword-pmp-action-order","recallEntryLabel":"PMP 情景题动作顺序","solutionRole":"decision-cue","coreReason":"题目要求识别优先判断，而不是最终处置。","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"stem","optionId":"","count":1}],"explain":"关键词“首先”连接到联想入口“PMP 情景题动作顺序”。","sourceMode":"prep-studio-keyword-v2"},{"id":"kw-003","text":"有效沟通","textEn":"effective communication","keywordLevel":"core","isCore":true,"type":"core-keyword","clueRole":"true","sourceType":"option","sourceOptionId":"B","recallNodeId":"recall-tax-kp-pmp-people-1-1-4","recallEntryLabel":"项目沟通管理的概念","solutionRole":"answer-anchor","coreReason":"该词直接区分“发送信息”与“真正完成沟通”。","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"option","optionId":"B","count":1}],"explain":"关键词“有效沟通”连接到联想入口“项目沟通管理的概念”。","sourceMode":"prep-studio-keyword-v2"}],"concepts":[{"id":"kp-pmp-people-1-1-4","title":"项目沟通管理的概念","category":"PMP 沟通绩效域","level":"基础","keywords":"沟通,有效沟通,反馈,理解","summary":"PMP > 人 > 利益相关方与沟通管理 > 项目沟通管理的概念","notes":"映射稳定知识节点 ID。","rule":"有效沟通需要接收、理解和反馈闭环。"}],"reasoningSteps":[{"id":"rs-1","title":"识别核心线索","content":"首先 + 有效沟通，说明题目在问优先判断与沟通有效性。","relatedKeywords":["首先","有效沟通"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]},{"id":"rs-2","title":"匹配知识点","content":"信息发送不等于被正确理解，应检查反馈闭环。","relatedKeywords":["沟通","理解"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]},{"id":"rs-3","title":"比较选项","content":"B 直接体现有效沟通的接收与理解确认。","relatedKeywords":["有效沟通"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]}],"keyPath":{"label":"沟通有效性 → 反馈确认 → B","clueIds":["kw-002","kw-003"],"conceptIds":["kp-pmp-people-1-1-4"],"primaryConceptId":"kp-pmp-people-1-1-4","ruleConceptId":"kp-pmp-people-1-1-4","answerId":"B","ruleText":"有效沟通不以发送为完成标准，应确认接收、理解和行动。"},"metadata":{"subjectId":"subject-pmp","translationStatus":"bilingual","knowledge":{"primaryNodeId":"kp-pmp-people-1-1-4","relatedNodeIds":[],"mappingStatus":"confirmed","mappingSource":"prep-studio","pathSnapshot":["PMP","人","利益相关方与沟通管理","项目沟通管理的概念"]},"principleIds":["principle-effective-communication","principle-no-premature-escalation","principle-role-accountability"],"optionPrincipleMap":{"A":["principle-effective-communication"],"B":["principle-effective-communication"],"C":["principle-no-premature-escalation"],"D":["principle-role-accountability"]},"tagPaths":[{"groupId":"usage","group":"用途标签","categoryId":"stage","category":"训练阶段","label":"基础练习"},{"groupId":"quality","group":"质量标签","categoryId":"feature","category":"题目特征","label":"核心题"},{"groupId":"source","group":"来源标签","categoryId":"origin","category":"来源类型","label":"自编题"},{"groupId":"source","group":"来源标签","categoryId":"scope","category":"使用范围","label":"内部使用"}],"keywordSystemV2":{"schemaVersion":2,"name":"Question Keyword System v2","keywords":[{"clueId":"kw-001","text":"项目经理","textEn":"project manager","keywordLevel":"normal","isCore":false,"solutionRole":"context","coreReason":"","recallNodeId":"recall-tax-kp-pmp-people-2-2-1-k01","recallEntryLabel":"项目经理"},{"clueId":"kw-002","text":"首先","textEn":"first","keywordLevel":"core","isCore":true,"solutionRole":"decision-cue","coreReason":"题目要求识别优先判断，而不是最终处置。","recallNodeId":"recall-keyword-pmp-action-order","recallEntryLabel":"PMP 情景题动作顺序"},{"clueId":"kw-003","text":"有效沟通","textEn":"effective communication","keywordLevel":"core","isCore":true,"solutionRole":"answer-anchor","coreReason":"该词直接区分“发送信息”与“真正完成沟通”。","recallNodeId":"recall-tax-kp-pmp-people-1-1-4","recallEntryLabel":"项目沟通管理的概念"}]},"englishOptionFeedback":{"A":"Incorrect: sending alone does not prove communication effectiveness.","B":"Correct: effective communication requires receipt and understanding.","C":"Incorrect: this is premature escalation.","D":"Incorrect: this shifts communication responsibility to the wrong role."},"contentPreparation":{"source":"external-ai-or-manual","reviewStatus":"ready-for-human-check","prepStudioTargetVersion":"0.4.0"}},"status":{"contentReady":true,"keywordsReady":true,"knowledgeReady":true,"reasoningReady":true,"published":false},"lifecycle":{"status":"active","deletedAt":""},"teacherNumber":"","explanation":"沟通的效果不以“已经发送”为终点，而以信息是否被正确接收、理解并产生预期行动来判断。项目经理应建立反馈或确认机制，而不是把发送动作等同于沟通完成。"}]},"principles":{"schemaVersion":1,"items":[{"id":"principle-effective-communication","name":"确认沟通是否真正有效","status":"active","confusablePrincipleIds":[]},{"id":"principle-no-premature-escalation","name":"先分析并处理，再考虑升级","status":"active","confusablePrincipleIds":[]},{"id":"principle-role-accountability","name":"按正确角色承担沟通责任","status":"active","confusablePrincipleIds":[]}]},"synthesisPresets":{"schemaVersion":1,"items":[{"id":"preset-effective-communication","principleId":"principle-effective-communication","title":"原则：有效沟通需要反馈闭环","content":"信息已经发送，不代表沟通完成。应确认接收方收到、理解并能够据此行动。","status":"active","version":1},{"id":"preset-no-premature-escalation","principleId":"principle-no-premature-escalation","title":"原则：避免过早升级","content":"遇到沟通偏差时先澄清、确认和解决根因；除非情境要求，否则不要直接处罚或升级。","status":"active","version":1},{"id":"preset-role-accountability","principleId":"principle-role-accountability","title":"原则：角色责任不应被错误转移","content":"项目经理应根据沟通管理计划和角色职责管理沟通，而不是把所有信息传递责任转移给发起人。","status":"active","version":1}]},"tagConfig":{"names":{},"groupNames":{},"categoryNames":{},"aliases":{}}};
+const COMPLETE_CONTENT_BUNDLE_TEMPLATE={"prepContentBundleVersion":1,"format":"pmp-content-prep-complete-bundle-v1","questionBank":{"name":"PMP 完整内容模板题库","subject":"PMP","description":"完整字段示例：双语、知识点、关键词、推理、标签、原则与选项归纳卡映射。","version":"1.0","visibility":"private","questions":[{"title":"已发送不等于已沟通","type":"single_choice","subject":"PMP","difficulty":"简单","domain":"PMP 沟通绩效域 / 利益相关方与沟通管理","topic":"项目沟通管理的概念","tags":["基础练习","核心题","自编题","内部使用"],"stage":"基础练习","stemParts":[{"text":"项目经理按计划向团队发送了一份重要变更通知，但第二天发现多名成员仍按旧方案工作。项目经理首先应该认识到什么？"}],"options":[{"id":"A","text":"只要邮件发送成功，沟通责任就已经完成","trap":"把发送等同于有效沟通","correct":false},{"id":"B","text":"有效沟通不仅是发送信息，还要确认信息被接收和理解","trap":"","correct":true},{"id":"C","text":"应立即处罚没有阅读邮件的成员","trap":"过早升级 / 命令控制","correct":false},{"id":"D","text":"以后所有信息都应由发起人亲自传达","trap":"角色责任错置","correct":false}],"correctAnswer":"B","analysis":"沟通的效果不以“已经发送”为终点，而以信息是否被正确接收、理解并产生预期行动来判断。项目经理应建立反馈或确认机制，而不是把发送动作等同于沟通完成。","translations":{"en":{"title":"Sent Does Not Mean Understood","stemParts":[{"text":"The project manager sent an important change notice to the team as planned, but several members were still working from the old approach the next day. What should the project manager recognize first?"}],"options":[{"id":"A","text":"Once the email is successfully sent, the communication responsibility is complete"},{"id":"B","text":"Effective communication requires more than sending information; receipt and understanding should be confirmed"},{"id":"C","text":"Members who did not read the email should be disciplined immediately"},{"id":"D","text":"All future information should be delivered personally by the sponsor"}],"analysis":"Communication effectiveness is measured by whether the message is received, understood, and translated into the intended action, not merely by transmission.","optionFeedback":{"A":"Incorrect: sending alone does not prove communication effectiveness.","B":"Correct: effective communication requires receipt and understanding.","C":"Incorrect: this is premature escalation.","D":"Incorrect: this shifts communication responsibility to the wrong role."},"keyPath":{"label":"Communication effectiveness → confirmation → B","ruleText":"Communication is effective when the message is received, understood, and acted upon."},"explanationStatus":"complete"}},"clues":[{"id":"kw-001","text":"项目经理","textEn":"project manager","keywordLevel":"normal","isCore":false,"type":"recall-keyword","clueRole":"true","sourceType":"stem","sourceOptionId":"","recallNodeId":"recall-tax-kp-pmp-people-2-2-1-k01","recallEntryLabel":"项目经理","solutionRole":"context","coreReason":"","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"stem","optionId":"","count":2}],"explain":"关键词“项目经理”连接到联想入口“项目经理”。","sourceMode":"prep-studio-keyword-v2"},{"id":"kw-002","text":"首先","textEn":"first","keywordLevel":"core","isCore":true,"type":"core-keyword","clueRole":"true","sourceType":"stem","sourceOptionId":"","recallNodeId":"recall-keyword-pmp-action-order","recallEntryLabel":"PMP 情景题动作顺序","solutionRole":"decision-cue","coreReason":"题目要求识别优先判断，而不是最终处置。","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"stem","optionId":"","count":1}],"explain":"关键词“首先”连接到联想入口“PMP 情景题动作顺序”。","sourceMode":"prep-studio-keyword-v2"},{"id":"kw-003","text":"有效沟通","textEn":"effective communication","keywordLevel":"core","isCore":true,"type":"core-keyword","clueRole":"true","sourceType":"option","sourceOptionId":"B","recallNodeId":"recall-tax-kp-pmp-people-1-1-4","recallEntryLabel":"项目沟通管理的概念","solutionRole":"answer-anchor","coreReason":"该词直接区分“发送信息”与“真正完成沟通”。","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"option","optionId":"B","count":1}],"explain":"关键词“有效沟通”连接到联想入口“项目沟通管理的概念”。","sourceMode":"prep-studio-keyword-v2"}],"concepts":[{"id":"kp-pmp-people-1-1-4","title":"项目沟通管理的概念","category":"PMP 沟通绩效域","level":"基础","keywords":"沟通,有效沟通,反馈,理解","summary":"PMP > 人 > 利益相关方与沟通管理 > 项目沟通管理的概念","notes":"映射稳定知识节点 ID。","rule":"有效沟通需要接收、理解和反馈闭环。"}],"reasoningSteps":[{"id":"rs-1","title":"识别核心线索","content":"首先 + 有效沟通，说明题目在问优先判断与沟通有效性。","relatedKeywords":["首先","有效沟通"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]},{"id":"rs-2","title":"匹配知识点","content":"信息发送不等于被正确理解，应检查反馈闭环。","relatedKeywords":["沟通","理解"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]},{"id":"rs-3","title":"比较选项","content":"B 直接体现有效沟通的接收与理解确认。","relatedKeywords":["有效沟通"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]}],"keyPath":{"label":"沟通有效性 → 反馈确认 → B","clueIds":["kw-002","kw-003"],"conceptIds":["kp-pmp-people-1-1-4"],"primaryConceptId":"kp-pmp-people-1-1-4","ruleConceptId":"kp-pmp-people-1-1-4","answerId":"B","ruleText":"有效沟通不以发送为完成标准，应确认接收、理解和行动。"},"metadata":{"subjectId":"subject-pmp","subjectFacets":[{"facetId":"subject/pmp/exam-domain/people","subjectId":"subject-pmp","schemaId":"pmp-facet-schema-v1","schemaVersion":1,"dimensionId":"exam-domain","dimension":"考试域","valueId":"people","label":"人员","status":"active","replacedBy":[],"aliases":[]}],"questionFamily":{"schemaVersion":1,"familyId":"","familyKey":"","role":"standalone","rootQuestionId":"","relationToRoot":"standalone","variantType":"none","equivalenceGrade":"","diagnosticTarget":"general","difficultyLevel":2,"purposes":["practice"],"qualityConfirmed":false,"notes":""},"translationStatus":"bilingual","knowledge":{"primaryNodeId":"kp-pmp-people-1-1-4","relatedNodeIds":[],"mappingStatus":"confirmed","mappingSource":"prep-studio","pathSnapshot":["PMP","人","利益相关方与沟通管理","项目沟通管理的概念"]},"principleIds":["principle-effective-communication","principle-no-premature-escalation","principle-role-accountability"],"optionPrincipleMap":{"A":["principle-effective-communication"],"B":["principle-effective-communication"],"C":["principle-no-premature-escalation"],"D":["principle-role-accountability"]},"tagPaths":[{"groupId":"usage","group":"用途标签","categoryId":"stage","category":"训练阶段","label":"基础练习"},{"groupId":"quality","group":"质量标签","categoryId":"feature","category":"题目特征","label":"核心题"},{"groupId":"source","group":"来源标签","categoryId":"origin","category":"来源类型","label":"自编题"},{"groupId":"source","group":"来源标签","categoryId":"scope","category":"使用范围","label":"内部使用"}],"keywordSystemV2":{"schemaVersion":2,"name":"Question Keyword System v2","keywords":[{"clueId":"kw-001","text":"项目经理","textEn":"project manager","keywordLevel":"normal","isCore":false,"solutionRole":"context","coreReason":"","recallNodeId":"recall-tax-kp-pmp-people-2-2-1-k01","recallEntryLabel":"项目经理"},{"clueId":"kw-002","text":"首先","textEn":"first","keywordLevel":"core","isCore":true,"solutionRole":"decision-cue","coreReason":"题目要求识别优先判断，而不是最终处置。","recallNodeId":"recall-keyword-pmp-action-order","recallEntryLabel":"PMP 情景题动作顺序"},{"clueId":"kw-003","text":"有效沟通","textEn":"effective communication","keywordLevel":"core","isCore":true,"solutionRole":"answer-anchor","coreReason":"该词直接区分“发送信息”与“真正完成沟通”。","recallNodeId":"recall-tax-kp-pmp-people-1-1-4","recallEntryLabel":"项目沟通管理的概念"}]},"englishOptionFeedback":{"A":"Incorrect: sending alone does not prove communication effectiveness.","B":"Correct: effective communication requires receipt and understanding.","C":"Incorrect: this is premature escalation.","D":"Incorrect: this shifts communication responsibility to the wrong role."},"contentPreparation":{"source":"external-ai-or-manual","reviewStatus":"ready-for-human-check","prepStudioTargetVersion":"0.4.0"}},"status":{"contentReady":true,"keywordsReady":true,"knowledgeReady":true,"reasoningReady":true,"published":false},"lifecycle":{"status":"active","deletedAt":""},"teacherNumber":"","explanation":"沟通的效果不以“已经发送”为终点，而以信息是否被正确接收、理解并产生预期行动来判断。项目经理应建立反馈或确认机制，而不是把发送动作等同于沟通完成。"}]},"principles":{"schemaVersion":1,"items":[{"id":"principle-effective-communication","name":"确认沟通是否真正有效","status":"active","confusablePrincipleIds":[]},{"id":"principle-no-premature-escalation","name":"先分析并处理，再考虑升级","status":"active","confusablePrincipleIds":[]},{"id":"principle-role-accountability","name":"按正确角色承担沟通责任","status":"active","confusablePrincipleIds":[]}]},"synthesisPresets":{"schemaVersion":1,"items":[{"id":"preset-effective-communication","principleId":"principle-effective-communication","title":"确认沟通是否真正有效","content":"信息已经发送，不代表沟通完成。应确认接收方收到、理解并能够据此行动。","status":"active","version":1},{"id":"preset-no-premature-escalation","principleId":"principle-no-premature-escalation","title":"先分析并处理，再考虑升级","content":"遇到沟通偏差时先澄清、确认和解决根因；除非情境要求，否则不要直接处罚或升级。","status":"active","version":1},{"id":"preset-role-accountability","principleId":"principle-role-accountability","title":"按正确角色承担沟通责任","content":"项目经理应根据沟通管理计划和角色职责管理沟通，而不是把所有信息传递责任转移给发起人。","status":"active","version":1}]},"tagConfig":{"schemaVersion":3,"slotIdStrategy":"global-semantic-v1","names":{},"groupNames":{},"categoryNames":{},"aliases":{},"slotAliases":{},"looseAliases":{}}};
 const COMPLETE_AI_PROMPT=`你是一名 PMP 内容生产与结构化校核助手。请根据我提供的 Word/文本基础题目，按 pmp-authoring-contract-v1 输出 PMP Content Prep Studio v0.4.0 的“完整内容准备包 JSON”。
 
 目标：尽量在外部 AI 阶段完成题干、选项、答案、解析、双语、知识点、普通/核心关键词、推理步骤、Question Family、Subject Facet、Global Tag、原则、归纳卡和选项→原则映射，使进入 Prep Studio 后主要进行人工校核。
@@ -942,13 +935,13 @@ const COMPLETE_AI_PROMPT=`你是一名 PMP 内容生产与结构化校核助手�
 2. Source Facts 保护：来源已明确的题干、选项、答案、解析、数字、时间、角色和限定条件必须忠实保留；不得静默改题或补写来源中没有的事实。
 3. 知识点只能使用我提供知识树中真实存在的稳定 node ID；无法确定时留空。
 4. 联想词只能使用我提供联想库中真实存在且唯一匹配的 recallNodeId；无法确定时留空。
-5. Keyword v2：关键词必须是词/稳定专业术语，不能是半句话；普通关键词 keywordLevel=normal，核心关键词 keywordLevel=core，并填写 solutionRole、coreReason、sourceType、sourceOptionId 和 locations；每题建议 2～5 个。
+5. Keyword v2：关键词必须是词/稳定专业术语，不能是半句话；普通关键词 keywordLevel=normal，核心关键词 keywordLevel=core，并填写 solutionRole、coreReason、sourceType、sourceOptionId 和 locations；每题建议 2～5 个，并同步生成 metadata.keywordSystemV2 汇总。
 6. reasoningSteps、keyPath 与双语 translations 必须从 Source Facts 和题目推理链派生，不得引入新事实。
 7. metadata.questionFamily 使用 question-family-v1；同一 familyKey 只能有一道 root，外部生成的 qualityConfirmed 必须为 false。普通 difficulty 只用“简单/中等/困难”，Family difficultyLevel 独立使用 1–4。
 8. metadata.subjectFacets 只能引用我提供的 Facet Schema 中真实存在的 subject/... 稳定 ID；无法确定时留空，不得创建 Facet ID。
 9. metadata.tagPaths 只使用我提供 Registry 中的 global/... 稳定 ID；不得把 Knowledge、Subject Facet、Global Tag 混为同一字段。
-10. metadata.stemPrincipleIds 保存题干/通用原则；metadata.optionPrincipleMap 保存 A/B/C/D 对应原则；metadata.principleIds 由两者自动汇总。
-11. 每道题正确选项必须且只能绑定一条原则；principles 与 synthesisPresets 必须一对一，归纳卡标题固定为“原则：{原则名称}”。
+10. metadata.principleIds 保存本题全部原则汇总；metadata.optionPrincipleMap 保存 A/B/C/D 对应原则；正确选项原则优先从 optionPrincipleMap 解析。
+11. 每道题正确选项必须且只能绑定一条原则；principles 与 synthesisPresets 必须一对一，归纳卡标题等于原则名称本身（不带“原则：”前缀）。
 12. 不写死 taxonomyId/taxonomyVersion；不自动创建 Recall、Facet、Global Tag、Knowledge 或 Principle 稳定 ID。
 13. 不要生成题目 id、questionId、familyId、rootQuestionId、contentHash、metadata.origin、creatorId、deviceId 或 batchId；这些全部由 Prep Studio 生成。
 14. 输出纯 JSON，不要 Markdown 代码围栏，不要额外解释。
@@ -981,7 +974,7 @@ const QUESTION_TEMPLATE={
     translations:{en:{title:"",stemParts:[{text:""}],options:[{id:"A",text:""},{id:"B",text:""},{id:"C",text:""},{id:"D",text:""}],analysis:""}},
     clues:[],
     reasoningSteps:[],
-    metadata:{knowledge:{primaryNodeId:"",relatedNodeIds:[],mappingStatus:"unmapped",pathSnapshot:[]}},
+    metadata:{knowledge:{primaryNodeId:"",relatedNodeIds:[],mappingStatus:"unmapped",pathSnapshot:[]},subjectFacets:[],questionFamily:{schemaVersion:1,familyKey:"",role:"standalone",relationToRoot:"standalone",variantType:"none",equivalenceGrade:"",diagnosticTarget:"general",difficultyLevel:2,purposes:["practice"],qualityConfirmed:false,notes:""}},
     lifecycle:{status:"active",deletedAt:""}
   }]
 };
@@ -1025,7 +1018,7 @@ const state={
   questionBank:{id:generateSystemId('bank'),name:'PMP 内容准备题库',subject:'PMP',description:'',version:'1.0',visibility:'private',createdAt:Date.now(),updatedAt:Date.now(),questions:[]},
   principles:{schemaVersion:1,items:[],updatedAt:Date.now()},
   synthesisPresets:{schemaVersion:1,items:[],updatedAt:Date.now()},
-  tagConfig:{schemaVersion:2,slotIdStrategy:'semantic-v1',names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}},
+  tagConfig:{schemaVersion:3,slotIdStrategy:'global-semantic-v1',names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}},
   currentQuestionId:'',
   currentRecallId:'',
   currentPrincipleId:'',
@@ -1420,7 +1413,7 @@ function normalizePrincipleCardBundle(payload={}){
     seenPresetPrinciples.add(preset.principleId);
   });
   principles.items.forEach(principle=>{if(!seenPresetPrinciples.has(principle.id))throw new Error(`原则 ${principle.id} 缺少对应归纳卡`)});
-  synthesisPresets.items=synthesisPresets.items.map(preset=>({...preset,title:'原则：'+principlesById.get(preset.principleId).name}));
+  synthesisPresets.items=synthesisPresets.items.map(preset=>({...preset,title:principlesById.get(preset.principleId).name}));
   return {principles,synthesisPresets};
 }
 function principleCardBundlePayload(principles=state.principles,synthesisPresets=state.synthesisPresets){
@@ -2677,12 +2670,12 @@ function renderPrincipleList(){
 function renderPrincipleEditor(){
   const box=document.getElementById('principleEditor');if(!box)return;const p=principleById(state.currentPrincipleId);if(!p){box.innerHTML='<div class="no-data">请选择或新建原则。</div>';return}let preset=presetByPrincipleId(p.id);
   box.innerHTML=`<div class="form-grid"><div><label>原则 ID</label><input type="text" value="${esc(p.id)}" disabled></div><div><label>状态</label><select id="pmPrincipleStatus"><option value="active"${p.status==='active'?' selected':''}>active</option><option value="inactive"${p.status==='inactive'?' selected':''}>inactive</option></select></div><div class="span2"><label>原则名称</label><input id="pmPrincipleName" type="text" value="${esc(p.name)}"></div><div class="span2"><label>易混淆原则 IDs</label><input id="pmConfusable" type="text" value="${esc((p.confusablePrincipleIds||[]).join(', '))}"></div></div>
-  <div class="section"><div class="section-title">系统预设归纳卡</div><div class="form-grid"><div class="span2"><label>标题（与原则名称自动一致）</label><input id="pmPresetTitle" type="text" readonly value="${esc('原则：'+p.name)}"></div><div class="span2"><label>内容</label><textarea id="pmPresetContent">${esc(preset?.content||'')}</textarea></div><div><label>状态</label><select id="pmPresetStatus"><option value="draft"${preset?.status==='draft'||!preset?' selected':''}>draft</option><option value="active"${preset?.status==='active'?' selected':''}>active</option><option value="inactive"${preset?.status==='inactive'?' selected':''}>inactive</option></select></div><div><label>版本</label><input id="pmPresetVersion" type="number" min="1" value="${preset?.version||1}"></div></div></div>
+  <div class="section"><div class="section-title">系统预设归纳卡</div><div class="form-grid"><div class="span2"><label>标题（与原则名称自动一致）</label><input id="pmPresetTitle" type="text" readonly value="${esc(p.name)}"></div><div class="span2"><label>内容</label><textarea id="pmPresetContent">${esc(preset?.content||'')}</textarea></div><div><label>状态</label><select id="pmPresetStatus"><option value="draft"${preset?.status==='draft'||!preset?' selected':''}>draft</option><option value="active"${preset?.status==='active'?' selected':''}>active</option><option value="inactive"${preset?.status==='inactive'?' selected':''}>inactive</option></select></div><div><label>版本</label><input id="pmPresetVersion" type="number" min="1" value="${preset?.version||1}"></div></div></div>
   <div class="section toolbar"><button class="btn primary" id="pmSave">保存原则与归纳卡</button><button class="btn danger" id="pmDelete">删除原则</button></div>`;
   document.getElementById('pmSave').onclick=async()=>{
     const button=document.getElementById('pmSave');button.disabled=true;
     const principle={...p,name:document.getElementById('pmPrincipleName').value.trim()||'未命名原则',status:document.getElementById('pmPrincipleStatus').value,confusablePrincipleIds:unique(cleanList(document.getElementById('pmConfusable').value)),updatedAt:Date.now()};
-    const nextPreset={...(preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()}),principleId:p.id,title:'原则：'+principle.name,content:document.getElementById('pmPresetContent').value.trim(),status:document.getElementById('pmPresetStatus').value,version:Math.max(1,Number(document.getElementById('pmPresetVersion').value||1)),updatedAt:Date.now()};
+    const nextPreset={...(preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()}),principleId:p.id,title:principle.name,content:document.getElementById('pmPresetContent').value.trim(),status:document.getElementById('pmPresetStatus').value,version:Math.max(1,Number(document.getElementById('pmPresetVersion').value||1)),updatedAt:Date.now()};
     try{
       Object.assign(p,principle);
       const index=state.synthesisPresets.items.findIndex(item=>item.id===nextPreset.id||item.principleId===p.id);
@@ -2702,8 +2695,10 @@ function renderPrincipleEditor(){
 function tagAliasesForSlot(slot){return unique(cleanList(state.tagConfig?.slotAliases?.[slot]||[]))}
 function exportTagConfig(){
   syncFlatTagAliases(state.tagConfig);
-  const names={};Object.entries(state.tagConfig.names||{}).forEach(([slot,value])=>names[formalTagSlot(slot)]=value);
-  return {names,groupNames:{...(state.tagConfig.groupNames||{})},categoryNames:{...(state.tagConfig.categoryNames||{})},aliases:{...(state.tagConfig.aliases||{})}};
+  const names={};Object.entries(state.tagConfig.names||{}).forEach(([slot,value])=>names[semanticTagSlot(slot)]=value);
+  const slotAliases={};Object.entries(state.tagConfig.slotAliases||{}).forEach(([slot,items])=>slotAliases[semanticTagSlot(slot)]=unique(cleanList(items)));
+  const looseAliases={};Object.entries(state.tagConfig.looseAliases||{}).forEach(([from,to])=>looseAliases[String(from)]=to);
+  return {schemaVersion:3,slotIdStrategy:'global-semantic-v1',names,groupNames:{...(state.tagConfig.groupNames||{})},categoryNames:{...(state.tagConfig.categoryNames||{})},aliases:{...(state.tagConfig.aliases||{})},slotAliases,looseAliases,updatedAt:nowIso()};
 }
 function renderTagManager(){
   const box=document.getElementById('tagManager');if(!box)return;
@@ -2853,7 +2848,7 @@ function exportableQuestion(q){
   out.analysis=String(out.analysis||out.explanation||'');out.explanation=out.analysis;
   out.status=out.status||{};
   out.status.contentReady=!!(questionStem(out)&&out.options.every(o=>o.text)&&out.analysis);
-  out.status.keywordsReady=!!out.clues.length;
+  out.status.keywordsReady=out.clues.length>0&&out.clues.every(c=>String(c.text||'').trim());
   out.status.knowledgeReady=!!primary;
   out.status.reasoningReady=!!(out.reasoningSteps||[]).length;
   return out;
@@ -3011,8 +3006,8 @@ function goToValidationIssue(questionId,field=''){
   return true;
 }
 function workspacePayload(){return {
-  prepStudioWorkspaceVersion:4,prepStudioVersion:VERSION,savedAt:nowIso(),
-  schema:{tagSlots:'semantic-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA},
+  prepStudioWorkspaceVersion:6,prepStudioVersion:VERSION,savedAt:nowIso(),
+  schema:{tagSlots:'global-semantic-v1',subjectFacets:'subject-facet-registry-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA,questionFamily:'question-family-v1'},
   knowledgeTree:state.knowledgeTree?{taxonomy:{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:{zh:state.knowledgeTree.name},version:state.knowledgeTree.version,nodes:state.knowledgeTree.nodes}}:null,
   recallLibrary:state.recallLibrary,questionBank:state.questionBank,principles:state.principles,synthesisPresets:state.synthesisPresets,tagConfig:state.tagConfig,subjectFacetRegistry:state.subjectFacetRegistry,
   server:{
@@ -3027,13 +3022,33 @@ function workspacePayload(){return {
 function migrateWorkspacePayload(input){
   if(!input||!input.prepStudioWorkspaceVersion)throw new Error('不是 Prep Studio 工作区草稿');
   const w=clone(input),from=Number(w.prepStudioWorkspaceVersion||1);
+  let migrated=false;
   if(from<4){
     w.tagConfig=normalizeTagConfig(w.tagConfig||{});
-    w.prepStudioWorkspaceVersion=4;
     w.schema={...(w.schema||{}),tagSlots:'semantic-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA};
-    w.migratedFromVersion=from;
-    w.migratedAt=nowIso();
+    w.prepStudioWorkspaceVersion=4;migrated=true;
   }
+  if(from<5){
+    /* P4.5.29 v5：Tag 统一 global-semantic-v1，补 Subject Facet Registry，题目补 subjectFacets 默认 [] */
+    w.tagConfig=normalizeTagConfig(w.tagConfig||{});
+    if(typeof normalizeSubjectFacetRegistry==='function')w.subjectFacetRegistry=normalizeSubjectFacetRegistry(w.subjectFacetRegistry||{});
+    if(w.questionBank&&Array.isArray(w.questionBank.questions))w.questionBank.questions=w.questionBank.questions.map(q=>{
+      const metadata=q.metadata&&typeof q.metadata==='object'?q.metadata:{};
+      return {...q,metadata:{...metadata,subjectFacets:Array.isArray(metadata.subjectFacets)?metadata.subjectFacets:[]}};
+    });
+    w.schema={...(w.schema||{}),tagSlots:'global-semantic-v1',subjectFacets:'subject-facet-registry-v1'};
+    w.prepStudioWorkspaceVersion=5;migrated=true;
+  }
+  if(from<6){
+    /* P4.5.29 v6：Question Family v1 归一（缺省 standalone） */
+    if(w.questionBank&&Array.isArray(w.questionBank.questions)&&typeof normalizeQuestionFamily==='function')w.questionBank.questions=w.questionBank.questions.map(q=>{
+      const metadata=q.metadata&&typeof q.metadata==='object'?q.metadata:{};
+      return {...q,metadata:{...metadata,questionFamily:normalizeQuestionFamily(metadata.questionFamily||{},q.id,q.difficulty)}};
+    });
+    w.schema={...(w.schema||{}),questionFamily:'question-family-v1'};
+    w.prepStudioWorkspaceVersion=6;migrated=true;
+  }
+  if(migrated){w.migratedFromVersion=from;w.migratedAt=nowIso()}
   const server=w.server&&typeof w.server==='object'?w.server:{};
   w.server={
     serverBankId:String(server.serverBankId||''),
@@ -3221,11 +3236,14 @@ window.PMPPrepServices=AppServices;
     }),
   });
   const POLICIES=Object.freeze({
-    keywordLocation:'source-isolated-derived',
-    recallBinding:'optional-existing-id-only',
-    deepRecallReveal:'click-to-reveal-all-keywords',
-    keywordCorePriority:'overlap-match-priority-only',
+    deepRecallKeywordRevealPolicy:'click-to-reveal-all-keywords',
+    keywordCorePriorityPolicy:'overlap-match-priority-only',
+    keywordLocationPolicy:'source-isolated-derived-matchLocations',
+    recallBindingPolicy:'optional-existing-node-only',
   });
+  /* P4.5.29 合并规格 §13：对外兼容声明以扁平合同键为准 */
+  const TARGET_MAIN_VERSION='V9.0-P4.5.29';
+  const EXTERNAL_AI_AUTHORING_CONTRACT='external-ai-question-authoring-v1';
 
   function productRelease(){
     const bootstrap=global.__KG_DIRECT_BOOTSTRAP__||{};
@@ -3233,13 +3251,31 @@ window.PMPPrepServices=AppServices;
   }
   function buildProgramCompatibility({serverBuildEvidence={}}={}){
     return {
+      contractVersion:1,
+      targetMainVersion:TARGET_MAIN_VERSION,
+      architecture:'service-layer-v1',
+      classificationArchitecture:'global-tags+subject-facets-v1',
+      globalTagSchemaVersion:3,
+      globalTagSlotIdStrategy:'global-semantic-v1',
+      subjectFacetRegistry:'subject-facet-registry-v1',
+      pmpSubjectFacetSchema:'pmp-facet-schema-v1',
+      keywordSystem:'Question Keyword System v2',
+      knowledgeBindingStrategy:'current-default-taxonomy-by-subject',
+      questionFamilySchema:'question-family-v1',
+      questionFamilyScope:'single-question-bank',
+      questionIdStrategy:'uuid-v4',
+      questionDifficultyScale:'three-level',
+      questionDifficultyLabels:['简单','中等','困难'],
+      questionDifficultyMainValues:['easy','medium','hard'],
+      questionFamilyDiagnosticLevelScale:'L1-L4',
+      externalAIQuestionAuthoringContract:EXTERNAL_AI_AUTHORING_CONTRACT,
+      ...POLICIES,
       authoringContract:{...AUTHORING_CONTRACT},
       contractSnapshot:JSON.parse(JSON.stringify(CONTRACT_SNAPSHOT)),
       registryManifest:JSON.parse(JSON.stringify(REGISTRY_MANIFEST)),
       testedAgainstProductRelease:productRelease(),
       prepBuild:'0.4.0',
       serverBuildEvidence:JSON.parse(JSON.stringify(serverBuildEvidence||{})),
-      policies:{...POLICIES},
     };
   }
   function attachToQuestionBank(bank,options={}){
@@ -3557,7 +3593,7 @@ window.PMPPrepServices=AppServices;
     async loadQuestion(questionId){return (await request(`/question-catalog/questions/${encodeURIComponent(questionId)}`)).question},
     async getBatch(batchId){return (await request(`/content-prep/batches/${encodeURIComponent(batchId)}`)).batch},
     syncMetadata,
-    async uploadBundle(bundle,{workspace,creatorId,questions,prepVersion='0.4.0',workspaceVersion='4'}={}){
+    async uploadBundle(bundle,{workspace,creatorId,questions,prepVersion='0.4.0',workspaceVersion='6'}={}){
       if(!workspace?.serverBankId)throw new ServerCatalogError('BANK_REQUIRED','请先选择目标题库。');
       if(!workspace?.clientInstanceId)throw new ServerCatalogError('CLIENT_INSTANCE_REQUIRED','本地工作区缺少客户端标识。');
       if(!creatorId)throw new ServerCatalogError('CREATOR_REQUIRED','请先选择制作人。');
@@ -3824,24 +3860,6 @@ function confirmQuestionDuplicateCleanup(incoming,existing=[]){
   const approved=confirm(`检测到重复题目：已有重复 ${report.existingCount} 道，本批重复 ${report.batchCount} 道。\n自动清除后将保留 ${report.unique.length} 道题，是否继续导入？`);
   return {...report,cancelled:!approved};
 }
-
-function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-// 导入结果面板：显示数据名与导入清单，便于确认导入内容。
-function showImportReport(kind,name,summaryLines,items){
-  const panel=document.getElementById('importReportPanel');if(!panel)return;
-  document.getElementById('importReportTitle').textContent='导入结果 · '+esc(kind)+(name?'：'+esc(name):'');
-  const body=document.getElementById('importReportBody');
-  const summary=Array.isArray(summaryLines)&&summaryLines.length?'<p class="muted" style="margin:4px 0 8px">'+summaryLines.map(esc).join(' · ')+'</p>':'';
-  const list=Array.isArray(items)&&items.length
-    ?'<ol style="margin:0;padding-left:20px">'+items.map(t=>'<li>'+esc(t)+'</li>').join('')+'</ol>'
-    :'<p class="muted">没有可列出的条目。</p>';
-  body.innerHTML=summary+list;
-  panel.hidden=false;
-  panel.scrollIntoView({block:'nearest',behavior:'smooth'});
-}
-(function bindImportReportClose(){const btn=document.getElementById('importReportClose');if(btn)btn.onclick=()=>{const p=document.getElementById('importReportPanel');if(p)p.hidden=true}})();
-function questionTitles(list){return (Array.isArray(list)?list:[]).map(q=>String(q.title||q.stemParts?.[0]?.text||'未命名题目').slice(0,60))}
-
 document.getElementById('btnParsePastedQuestions').onclick=()=>{
   const raw=document.getElementById('rawQuestionPaste').value;
   const qs=parsePastedQuestionText(raw);
@@ -3852,14 +3870,10 @@ document.getElementById('btnParsePastedQuestions').onclick=()=>{
   if(replace)state.questionBank.questions=uniqueQuestions;else state.questionBank.questions.push(...uniqueQuestions);
   state.questionBank.updatedAt=Date.now();state.currentQuestionId=uniqueQuestions[0]?.id||state.currentQuestionId;renderQuestions();refreshHeader();
   document.getElementById('pasteParseResult').textContent=`已导入 ${uniqueQuestions.length} 题${report.duplicates.length?`，自动清除 ${report.duplicates.length} 道重复题`:''}；Batch：${batchId.slice(0,24)}…；每题 ID 已由程序生成。`;
-  showImportReport(replace?'替换导入 · 文本粘贴':'追加导入 · 文本粘贴',state.questionBank.name||'当前题库',[`共 ${uniqueQuestions.length} 题`,report.duplicates.length?`清除重复 ${report.duplicates.length} 题`:null].filter(Boolean),questionTitles(uniqueQuestions));
   markWorkspaceDirty();toast(`已解析 ${uniqueQuestions.length} 题`);
 };
 
-document.getElementById('fileContentBundle').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const result=importContentBundle(await readJsonFile(f));if(result?.cancelled){toast('已取消导入，当前内容没有变化');return}markWorkspaceDirty();
-  {const qs=state.questionBank.questions||[];
-   showImportReport('完整内容包',state.questionBank.name||'未命名题库',[`题目 ${qs.length} 道`,`知识树节点 ${(state.knowledgeTree?.nodes||[]).length} 个`,`联想库节点 ${(state.recallLibrary?.nodes||[]).length} 个`,`原则 ${(state.principles?.items||[]).length} 条`,result?.report?.duplicates?.length?`清除重复 ${result.report.duplicates.length} 题`:null].filter(Boolean),questionTitles(qs));}
-  toast(`完整内容包已加载${result?.report?.duplicates?.length?` · 已清除 ${result.report.duplicates.length} 道重复题`:''}`)}catch(err){alert('完整内容包导入失败：'+err.message)}finally{e.target.value=''}});
+document.getElementById('fileContentBundle').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const result=importContentBundle(await readJsonFile(f));if(result?.cancelled){toast('已取消导入，当前内容没有变化');return}markWorkspaceDirty();toast(`完整内容包已加载${result?.report?.duplicates?.length?` · 已清除 ${result.report.duplicates.length} 道重复题`:''}`)}catch(err){alert('完整内容包导入失败：'+err.message)}finally{e.target.value=''}});
 document.getElementById('filePrincipleCardBundle').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const merged=importPrincipleBundleSafe(await readJsonFile(f));if(merged.cancelled){toast('已取消导入，原则与归纳卡没有变化');return}state.principles=merged.applied.principles;state.synthesisPresets=merged.applied.synthesisPresets;state.currentPrincipleId=state.principles.items.some(p=>p.id===state.currentPrincipleId)?state.currentPrincipleId:(state.principles.items[0]?.id||'');refreshAll();markWorkspaceDirty();toast(`原则已安全合并 · 新增 ${merged.added} · 保持 ${merged.unchanged} · 冲突 ${merged.conflicts}（保留现有）`)}catch(err){alert('原则与归纳卡导入失败：'+err.message)}finally{e.target.value=''}});
 function importPrincipleBundleSafe(payload){
   const domain=canonicalPrincipleDomain(payload);
@@ -3887,15 +3901,9 @@ function importPrincipleBundleSafe(payload){
   return {cancelled:false,applied:applyPrincipleMergePlan(plan,{principles:state.principles,synthesisPresets:state.synthesisPresets}),added:plan.added.length,unchanged:plan.unchanged.length,conflicts:plan.conflicts.length};
 }
 document.getElementById('fileTagConfig').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.tagConfig=ImportService.tagConfig(await readJsonFile(f));refreshQuestionTagPaths();refreshAll();markWorkspaceDirty();toast('标签配置已加载')}catch(err){alert('标签配置导入失败：'+err.message)}e.target.value=''});
-document.getElementById('fileTree').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.knowledgeTree=normalizeTree(await readJsonFile(f));state.questionBank.questions.forEach(q=>{const id=q.metadata?.knowledge?.primaryNodeId;if(id&&state.knowledgeTree.map.has(id))q.metadata.knowledge.pathSnapshot=state.knowledgeTree.pathFor(id)});refreshHeader();renderQuestionEditor();renderRecallEditor();markWorkspaceDirty();
-  showImportReport('知识树',state.knowledgeTree.name||'知识树',[`节点 ${(state.knowledgeTree.nodes||[]).length} 个`,`关系 ${(state.knowledgeTree.edges||[]).length} 条`],(state.knowledgeTree.nodes||[]).map(n=>n.title?.zh||n.title||n.id));
-  toast('知识树已加载')}catch(err){alert('知识树导入失败：'+err.message)}e.target.value=''});
-document.getElementById('fileRecall').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.recallLibrary=normalizeRecall(await readJsonFile(f));state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';refreshHeader();renderRecallList();renderRecallEditor();renderKeywords();markWorkspaceDirty();
-  showImportReport('联想库',state.recallLibrary.name||'联想库',[`节点 ${(state.recallLibrary.nodes||[]).length} 个`,`关系 ${(state.recallLibrary.edges||[]).length} 条`],(state.recallLibrary.nodes||[]).map(n=>n.title));
-  toast('联想库已加载')}catch(err){alert('联想库导入失败：'+err.message)}e.target.value=''});
-document.getElementById('fileQuestionBank').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const imported=ImportService.questionBank(await readJsonFile(f)),report=confirmQuestionDuplicateCleanup(imported.questions,[]);if(report.cancelled)return;imported.questions=report.unique;state.questionBank=imported;stampImportedQuestions(state.questionBank.questions,'question-bank-json');state.currentQuestionId=state.questionBank.questions[0]?.id||'';refreshHeader();renderQuestions();markWorkspaceDirty();
-  showImportReport('题库 JSON',imported.name||'未命名题库',[`共 ${state.questionBank.questions.length} 题`,report.duplicates.length?`清除重复 ${report.duplicates.length} 题`:null].filter(Boolean),questionTitles(state.questionBank.questions));
-  toast(`题库已加载${report.duplicates.length?` · 已清除 ${report.duplicates.length} 道重复题`:''} · 已记录导入批次`)}catch(err){alert('题库导入失败：'+err.message)}e.target.value=''});
+document.getElementById('fileTree').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.knowledgeTree=normalizeTree(await readJsonFile(f));state.questionBank.questions.forEach(q=>{const id=q.metadata?.knowledge?.primaryNodeId;if(id&&state.knowledgeTree.map.has(id))q.metadata.knowledge.pathSnapshot=state.knowledgeTree.pathFor(id)});refreshHeader();renderQuestionEditor();renderRecallEditor();markWorkspaceDirty();toast('知识树已加载')}catch(err){alert('知识树导入失败：'+err.message)}e.target.value=''});
+document.getElementById('fileRecall').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.recallLibrary=normalizeRecall(await readJsonFile(f));state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';refreshHeader();renderRecallList();renderRecallEditor();renderKeywords();markWorkspaceDirty();toast('联想库已加载')}catch(err){alert('联想库导入失败：'+err.message)}e.target.value=''});
+document.getElementById('fileQuestionBank').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const imported=ImportService.questionBank(await readJsonFile(f)),report=confirmQuestionDuplicateCleanup(imported.questions,[]);if(report.cancelled)return;imported.questions=report.unique;state.questionBank=imported;stampImportedQuestions(state.questionBank.questions,'question-bank-json');state.currentQuestionId=state.questionBank.questions[0]?.id||'';refreshHeader();renderQuestions();markWorkspaceDirty();toast(`题库已加载${report.duplicates.length?` · 已清除 ${report.duplicates.length} 道重复题`:''} · 已记录导入批次`)}catch(err){alert('题库导入失败：'+err.message)}e.target.value=''});
 
 document.getElementById('btnNewWorkspace').onclick=()=>{if(!confirm('清空当前 Prep Studio 工作区？请先导出需要保留的草稿。'))return;state.knowledgeTree=null;state.recallLibrary={schemaVersion:1,nodes:[],edges:[],updatedAt:''};state.questionBank={id:generateSystemId('bank'),name:'PMP 内容准备题库',subject:'PMP',description:'',version:'1.0',visibility:'private',createdAt:Date.now(),updatedAt:Date.now(),questions:[]};state.principles={schemaVersion:1,items:[],updatedAt:Date.now()};state.synthesisPresets={schemaVersion:1,items:[],updatedAt:Date.now()};state.tagConfig={names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}};state.subjectFacetRegistry=normalizeSubjectFacetRegistry({});state.currentQuestionId='';state.currentRecallId='';state.currentPrincipleId='';state.demoQuestionId='';state.demoLang='zh';state.recallPreviewCandidateId='';refreshAll();setTab('base');markWorkspaceDirty();toast('已清空')};
 document.getElementById('btnImportWorkspace').onclick=()=>document.getElementById('fileWorkspace').click();
@@ -4123,7 +4131,7 @@ window.PMPPrepDraftUi?.open?.();
     };
     const unchanged=draft.name===String(principle.name||'')&&draft.status===String(principle.status||'active')
       &&JSON.stringify(draft.confusablePrincipleIds)===JSON.stringify(principle.confusablePrincipleIds||[])
-      &&draft.presetTitle===String(preset?.title||('原则：'+principle.name))&&draft.presetContent===String(preset?.content||'')
+      &&draft.presetTitle===String(preset?.title||principle.name)&&draft.presetContent===String(preset?.content||'')
       &&draft.presetStatus===String(preset?.status||'draft')&&draft.presetVersion===Number(preset?.version||1);
     return unchanged?null:draft;
   }

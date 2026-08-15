@@ -688,12 +688,12 @@ function renderPrincipleList(){
 function renderPrincipleEditor(){
   const box=document.getElementById('principleEditor');if(!box)return;const p=principleById(state.currentPrincipleId);if(!p){box.innerHTML='<div class="no-data">请选择或新建原则。</div>';return}let preset=presetByPrincipleId(p.id);
   box.innerHTML=`<div class="form-grid"><div><label>原则 ID</label><input type="text" value="${esc(p.id)}" disabled></div><div><label>状态</label><select id="pmPrincipleStatus"><option value="active"${p.status==='active'?' selected':''}>active</option><option value="inactive"${p.status==='inactive'?' selected':''}>inactive</option></select></div><div class="span2"><label>原则名称</label><input id="pmPrincipleName" type="text" value="${esc(p.name)}"></div><div class="span2"><label>易混淆原则 IDs</label><input id="pmConfusable" type="text" value="${esc((p.confusablePrincipleIds||[]).join(', '))}"></div></div>
-  <div class="section"><div class="section-title">系统预设归纳卡</div><div class="form-grid"><div class="span2"><label>标题（与原则名称自动一致）</label><input id="pmPresetTitle" type="text" readonly value="${esc('原则：'+p.name)}"></div><div class="span2"><label>内容</label><textarea id="pmPresetContent">${esc(preset?.content||'')}</textarea></div><div><label>状态</label><select id="pmPresetStatus"><option value="draft"${preset?.status==='draft'||!preset?' selected':''}>draft</option><option value="active"${preset?.status==='active'?' selected':''}>active</option><option value="inactive"${preset?.status==='inactive'?' selected':''}>inactive</option></select></div><div><label>版本</label><input id="pmPresetVersion" type="number" min="1" value="${preset?.version||1}"></div></div></div>
+  <div class="section"><div class="section-title">系统预设归纳卡</div><div class="form-grid"><div class="span2"><label>标题（与原则名称自动一致）</label><input id="pmPresetTitle" type="text" readonly value="${esc(p.name)}"></div><div class="span2"><label>内容</label><textarea id="pmPresetContent">${esc(preset?.content||'')}</textarea></div><div><label>状态</label><select id="pmPresetStatus"><option value="draft"${preset?.status==='draft'||!preset?' selected':''}>draft</option><option value="active"${preset?.status==='active'?' selected':''}>active</option><option value="inactive"${preset?.status==='inactive'?' selected':''}>inactive</option></select></div><div><label>版本</label><input id="pmPresetVersion" type="number" min="1" value="${preset?.version||1}"></div></div></div>
   <div class="section toolbar"><button class="btn primary" id="pmSave">保存原则与归纳卡</button><button class="btn danger" id="pmDelete">删除原则</button></div>`;
   document.getElementById('pmSave').onclick=async()=>{
     const button=document.getElementById('pmSave');button.disabled=true;
     const principle={...p,name:document.getElementById('pmPrincipleName').value.trim()||'未命名原则',status:document.getElementById('pmPrincipleStatus').value,confusablePrincipleIds:unique(cleanList(document.getElementById('pmConfusable').value)),updatedAt:Date.now()};
-    const nextPreset={...(preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()}),principleId:p.id,title:'原则：'+principle.name,content:document.getElementById('pmPresetContent').value.trim(),status:document.getElementById('pmPresetStatus').value,version:Math.max(1,Number(document.getElementById('pmPresetVersion').value||1)),updatedAt:Date.now()};
+    const nextPreset={...(preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()}),principleId:p.id,title:principle.name,content:document.getElementById('pmPresetContent').value.trim(),status:document.getElementById('pmPresetStatus').value,version:Math.max(1,Number(document.getElementById('pmPresetVersion').value||1)),updatedAt:Date.now()};
     try{
       Object.assign(p,principle);
       const index=state.synthesisPresets.items.findIndex(item=>item.id===nextPreset.id||item.principleId===p.id);
@@ -713,8 +713,10 @@ function renderPrincipleEditor(){
 function tagAliasesForSlot(slot){return unique(cleanList(state.tagConfig?.slotAliases?.[slot]||[]))}
 function exportTagConfig(){
   syncFlatTagAliases(state.tagConfig);
-  const names={};Object.entries(state.tagConfig.names||{}).forEach(([slot,value])=>names[formalTagSlot(slot)]=value);
-  return {names,groupNames:{...(state.tagConfig.groupNames||{})},categoryNames:{...(state.tagConfig.categoryNames||{})},aliases:{...(state.tagConfig.aliases||{})}};
+  const names={};Object.entries(state.tagConfig.names||{}).forEach(([slot,value])=>names[semanticTagSlot(slot)]=value);
+  const slotAliases={};Object.entries(state.tagConfig.slotAliases||{}).forEach(([slot,items])=>slotAliases[semanticTagSlot(slot)]=unique(cleanList(items)));
+  const looseAliases={};Object.entries(state.tagConfig.looseAliases||{}).forEach(([from,to])=>looseAliases[String(from)]=to);
+  return {schemaVersion:3,slotIdStrategy:'global-semantic-v1',names,groupNames:{...(state.tagConfig.groupNames||{})},categoryNames:{...(state.tagConfig.categoryNames||{})},aliases:{...(state.tagConfig.aliases||{})},slotAliases,looseAliases,updatedAt:nowIso()};
 }
 function renderTagManager(){
   const box=document.getElementById('tagManager');if(!box)return;
@@ -864,7 +866,7 @@ function exportableQuestion(q){
   out.analysis=String(out.analysis||out.explanation||'');out.explanation=out.analysis;
   out.status=out.status||{};
   out.status.contentReady=!!(questionStem(out)&&out.options.every(o=>o.text)&&out.analysis);
-  out.status.keywordsReady=!!out.clues.length;
+  out.status.keywordsReady=out.clues.length>0&&out.clues.every(c=>String(c.text||'').trim());
   out.status.knowledgeReady=!!primary;
   out.status.reasoningReady=!!(out.reasoningSteps||[]).length;
   return out;
@@ -1022,8 +1024,8 @@ function goToValidationIssue(questionId,field=''){
   return true;
 }
 function workspacePayload(){return {
-  prepStudioWorkspaceVersion:4,prepStudioVersion:VERSION,savedAt:nowIso(),
-  schema:{tagSlots:'semantic-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA},
+  prepStudioWorkspaceVersion:6,prepStudioVersion:VERSION,savedAt:nowIso(),
+  schema:{tagSlots:'global-semantic-v1',subjectFacets:'subject-facet-registry-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA,questionFamily:'question-family-v1'},
   knowledgeTree:state.knowledgeTree?{taxonomy:{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:{zh:state.knowledgeTree.name},version:state.knowledgeTree.version,nodes:state.knowledgeTree.nodes}}:null,
   recallLibrary:state.recallLibrary,questionBank:state.questionBank,principles:state.principles,synthesisPresets:state.synthesisPresets,tagConfig:state.tagConfig,subjectFacetRegistry:state.subjectFacetRegistry,
   server:{
@@ -1038,13 +1040,33 @@ function workspacePayload(){return {
 function migrateWorkspacePayload(input){
   if(!input||!input.prepStudioWorkspaceVersion)throw new Error('不是 Prep Studio 工作区草稿');
   const w=clone(input),from=Number(w.prepStudioWorkspaceVersion||1);
+  let migrated=false;
   if(from<4){
     w.tagConfig=normalizeTagConfig(w.tagConfig||{});
-    w.prepStudioWorkspaceVersion=4;
     w.schema={...(w.schema||{}),tagSlots:'semantic-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA};
-    w.migratedFromVersion=from;
-    w.migratedAt=nowIso();
+    w.prepStudioWorkspaceVersion=4;migrated=true;
   }
+  if(from<5){
+    /* P4.5.29 v5：Tag 统一 global-semantic-v1，补 Subject Facet Registry，题目补 subjectFacets 默认 [] */
+    w.tagConfig=normalizeTagConfig(w.tagConfig||{});
+    if(typeof normalizeSubjectFacetRegistry==='function')w.subjectFacetRegistry=normalizeSubjectFacetRegistry(w.subjectFacetRegistry||{});
+    if(w.questionBank&&Array.isArray(w.questionBank.questions))w.questionBank.questions=w.questionBank.questions.map(q=>{
+      const metadata=q.metadata&&typeof q.metadata==='object'?q.metadata:{};
+      return {...q,metadata:{...metadata,subjectFacets:Array.isArray(metadata.subjectFacets)?metadata.subjectFacets:[]}};
+    });
+    w.schema={...(w.schema||{}),tagSlots:'global-semantic-v1',subjectFacets:'subject-facet-registry-v1'};
+    w.prepStudioWorkspaceVersion=5;migrated=true;
+  }
+  if(from<6){
+    /* P4.5.29 v6：Question Family v1 归一（缺省 standalone） */
+    if(w.questionBank&&Array.isArray(w.questionBank.questions)&&typeof normalizeQuestionFamily==='function')w.questionBank.questions=w.questionBank.questions.map(q=>{
+      const metadata=q.metadata&&typeof q.metadata==='object'?q.metadata:{};
+      return {...q,metadata:{...metadata,questionFamily:normalizeQuestionFamily(metadata.questionFamily||{},q.id,q.difficulty)}};
+    });
+    w.schema={...(w.schema||{}),questionFamily:'question-family-v1'};
+    w.prepStudioWorkspaceVersion=6;migrated=true;
+  }
+  if(migrated){w.migratedFromVersion=from;w.migratedAt=nowIso()}
   const server=w.server&&typeof w.server==='object'?w.server:{};
   w.server={
     serverBankId:String(server.serverBankId||''),

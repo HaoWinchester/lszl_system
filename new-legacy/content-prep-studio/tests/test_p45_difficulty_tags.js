@@ -64,8 +64,8 @@ assert.equal(cfg.schemaVersion,3);
 assert.deepEqual(Object.keys(cfg.names).sort(),['global/quality/feature/core','global/usage/stage/basic'].sort(),JSON.stringify(cfg.names));
 assert.deepEqual(Object.keys(cfg.slotAliases),['global/usage/stage/mistake-review']);
 
-// 导出兼容旧数字槽位（往返）
-assert.equal(run(`formalTagSlot('global/usage/stage/basic')`),'usage/stage/0','正式导出映射回旧数字槽位供主程序消费');
+// formalTagSlot 保留旧数字槽位映射（读取兼容工具；P4.5.29 合同下正式导出以 global/... 为 canonical）
+assert.equal(run(`formalTagSlot('global/usage/stage/basic')`),'usage/stage/0','旧数字槽位映射保留供主程序读取兼容');
 assert.equal(run(`formalTagSlot('global/quality/feature/core')`),'quality/feature/2');
 
 // 槽位目录：内部 slot 一律 global/...，legacySlot 保留供兼容

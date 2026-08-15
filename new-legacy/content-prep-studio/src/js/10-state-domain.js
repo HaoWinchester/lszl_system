@@ -4,7 +4,7 @@ const state={
   questionBank:{id:generateSystemId('bank'),name:'PMP 内容准备题库',subject:'PMP',description:'',version:'1.0',visibility:'private',createdAt:Date.now(),updatedAt:Date.now(),questions:[]},
   principles:{schemaVersion:1,items:[],updatedAt:Date.now()},
   synthesisPresets:{schemaVersion:1,items:[],updatedAt:Date.now()},
-  tagConfig:{schemaVersion:2,slotIdStrategy:'semantic-v1',names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}},
+  tagConfig:{schemaVersion:3,slotIdStrategy:'global-semantic-v1',names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}},
   currentQuestionId:'',
   currentRecallId:'',
   currentPrincipleId:'',
@@ -399,7 +399,7 @@ function normalizePrincipleCardBundle(payload={}){
     seenPresetPrinciples.add(preset.principleId);
   });
   principles.items.forEach(principle=>{if(!seenPresetPrinciples.has(principle.id))throw new Error(`原则 ${principle.id} 缺少对应归纳卡`)});
-  synthesisPresets.items=synthesisPresets.items.map(preset=>({...preset,title:'原则：'+principlesById.get(preset.principleId).name}));
+  synthesisPresets.items=synthesisPresets.items.map(preset=>({...preset,title:principlesById.get(preset.principleId).name}));
   return {principles,synthesisPresets};
 }
 function principleCardBundlePayload(principles=state.principles,synthesisPresets=state.synthesisPresets){
