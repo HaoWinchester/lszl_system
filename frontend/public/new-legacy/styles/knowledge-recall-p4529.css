@@ -7,7 +7,8 @@
 .knowledge-recall-page .kr-reveal-keywords-btn:focus-visible{background:var(--kr-control-hover,#f8fafc);outline:2px solid var(--kr-selected-ring,#93c5fd);outline-offset:1px}
 .knowledge-recall-page .kr-reveal-keywords-btn[disabled]{cursor:not-allowed;opacity:.55}
 .knowledge-recall-page .kr-keyword-token{
-  appearance:none;display:inline;padding:0 2px;border:0;border-radius:4px;
+  /* P4.5.30：padding 归零，关键词与左右文字间距一致；高亮为背景渐变，贴合文字宽度。 */
+  appearance:none;display:inline;padding:0;border:0;border-radius:4px;
   background:linear-gradient(transparent 56%,var(--kr-highlight-to,rgba(253,230,138,.9)) 56%);
   color:inherit;font:inherit;font-weight:inherit;line-height:inherit;cursor:pointer;
 }
@@ -42,6 +43,4 @@
   background:var(--kr-highlight-to,rgba(253,230,138,.9));
   cursor:pointer;
 }
-/* 对错判定入口聚焦在字母圆框上，整行不再暗示可点。 */
-.knowledge-recall-page .kr-option>strong{cursor:pointer}
-.knowledge-recall-page .kr-option{cursor:default}
+/* P4.5.30：选项改用 qw-card-option-key 字母按钮判定，旧整行 cursor 规则随之移除。 */
