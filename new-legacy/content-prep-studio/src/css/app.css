@@ -295,3 +295,39 @@ nav button.active{color:var(--brand)!important}
 .family-legend-chip.decomposed{background:#eaf8f0;border-color:#8cc9aa;color:#146744}
 .family-legend-chip.extension{background:#f2ecff;border-color:#b39be8;color:#5c3ca3}
 .family-legend-chip.standalone{background:#f2f4f7;border-color:#d0d5dd;color:#667085}
+/* P4.5.29 科目分类预览 chips */
+.facet-preview-dim{margin-top:10px}
+.facet-preview-dim>label{font-weight:700;display:block;margin-bottom:4px}
+.facet-chip-row{display:flex;gap:6px;flex-wrap:wrap}
+.facet-chip{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;background:#f7f9fc}
+.facet-chip.deprecated{text-decoration:line-through;opacity:.55}
+.facet-chip.inactive{opacity:.45}
+/* P4.5.29 家族成员切换 tabs 与列表 tone（对齐官方配套版） */
+.family-editor-tabs-wrap{margin-bottom:10px;border:1px solid var(--line);border-radius:11px;background:#fff;overflow:hidden}
+.family-editor-tabs-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);background:#f8fafc}
+.family-editor-tabs-head b{font-size:12px}
+.family-editor-tabs-head .muted{margin-left:auto}
+.family-editor-tabs{display:flex;gap:7px;overflow-x:auto;padding:9px}
+.family-editor-tab{flex:0 0 auto;max-width:190px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:7px 9px;text-align:left;cursor:pointer}
+.family-editor-tab:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,23,42,.08)}
+.family-editor-tab strong,.family-editor-tab span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.family-editor-tab span{font-size:11px;color:var(--muted);margin-top:2px}
+.family-editor-tab.active{box-shadow:inset 0 0 0 2px var(--brand)}
+.family-editor-tab.root{background:#fff9ed;border-color:#e7b253}
+.family-editor-tab.equivalent{background:#f3f7ff;border-color:#8baef5}
+.family-editor-tab.decomposed{background:#f1fbf5;border-color:#8cc9aa}
+.family-editor-tab.extension{background:#f8f4ff;border-color:#b39be8}
+.family-editor-standalone{padding:8px 10px;border:1px dashed #d0d5dd;border-radius:9px;background:#f8fafc;color:var(--muted);font-size:12px;margin-bottom:10px}
+.family-list-root{background:#fff9ed;border-left:4px solid #e5a72d}
+.family-list-member{margin-left:6px}
+.family-list-equivalent{background:#f3f7ff;border-left:4px solid #6f97ea;margin-left:12px}
+.family-list-decomposed{background:#f1fbf5;border-left:4px solid #65b58d;margin-left:12px}
+.family-list-extension{background:#f8f4ff;border-left:4px solid #9674db;margin-left:12px}
+.question-edit-card.family-tone-root>.card-hd{background:#fff3dc;border-bottom-color:#e7b253}
+.question-edit-card.family-tone-equivalent>.card-hd{background:#edf4ff;border-bottom-color:#8baef5}
+.question-edit-card.family-tone-decomposed>.card-hd{background:#edf9f2;border-bottom-color:#8cc9aa}
+.question-edit-card.family-tone-extension>.card-hd{background:#f4efff;border-bottom-color:#b39be8}
+.question-edit-card.family-tone-root #questionPreview{border-color:#e7b253;background:#fffdf8}
+.question-edit-card.family-tone-equivalent #questionPreview{border-color:#8baef5;background:#fbfdff}
+.question-edit-card.family-tone-decomposed #questionPreview{border-color:#8cc9aa;background:#fbfffc}
+.question-edit-card.family-tone-extension #questionPreview{border-color:#b39be8;background:#fdfbff}
