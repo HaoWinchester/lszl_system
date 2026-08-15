@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PMP Content Prep Studio</title>
-<script>window.__PMP_PRODUCT_RELEASE__="v9.0-p4.1.86";</script>
+<script>window.__PMP_PRODUCT_RELEASE__="v9.0-p4.1.89";</script>
 <script src="/teaching-content-sync.js"></script>
 <script src="/server-state-bootstrap.js"></script>
 <style>
@@ -297,11 +297,89 @@ nav button.active{color:var(--brand)!important}
 .family-badge{font-size:11px;margin-right:4px;padding:1px 5px;border-radius:8px;font-weight:600}
 .family-badge.family-root{background:#1f6feb;color:#fff}
 .family-badge.family-member{background:#e8a33d;color:#fff}
+/* P4.5.29 题目列表家族图例（对齐官方配套版） */
+.family-list-legend{display:flex;gap:6px;flex-wrap:wrap;padding:7px 10px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#fbfcfe}
+.family-legend-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid transparent;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:850;white-space:nowrap}
+.family-legend-chip.root{background:#fff0d2;border-color:#e7b253;color:#875000}
+.family-legend-chip.equivalent{background:#eaf2ff;border-color:#8baef5;color:#2252a8}
+.family-legend-chip.decomposed{background:#eaf8f0;border-color:#8cc9aa;color:#146744}
+.family-legend-chip.extension{background:#f2ecff;border-color:#b39be8;color:#5c3ca3}
+.family-legend-chip.standalone{background:#f2f4f7;border-color:#d0d5dd;color:#667085}
+/* P4.5.29 科目分类预览 chips */
+.facet-preview-dim{margin-top:10px}
+.facet-preview-dim>label{font-weight:700;display:block;margin-bottom:4px}
+.facet-chip-row{display:flex;gap:6px;flex-wrap:wrap}
+.facet-chip{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;background:#f7f9fc}
+.facet-chip.deprecated{text-decoration:line-through;opacity:.55}
+.facet-chip.inactive{opacity:.45}
+/* P4.5.29 家族成员切换 tabs 与列表 tone（对齐官方配套版） */
+.family-editor-tabs-wrap{margin-bottom:10px;border:1px solid var(--line);border-radius:11px;background:#fff;overflow:hidden}
+.family-editor-tabs-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);background:#f8fafc}
+.family-editor-tabs-head b{font-size:12px}
+.family-editor-tabs-head .muted{margin-left:auto}
+.family-editor-tabs{display:flex;gap:7px;overflow-x:auto;padding:9px}
+.family-editor-tab{flex:0 0 auto;max-width:190px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:7px 9px;text-align:left;cursor:pointer}
+.family-editor-tab:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,23,42,.08)}
+.family-editor-tab strong,.family-editor-tab span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.family-editor-tab span{font-size:11px;color:var(--muted);margin-top:2px}
+.family-editor-tab.active{box-shadow:inset 0 0 0 2px var(--brand)}
+.family-editor-tab.root{background:#fff9ed;border-color:#e7b253}
+.family-editor-tab.equivalent{background:#f3f7ff;border-color:#8baef5}
+.family-editor-tab.decomposed{background:#f1fbf5;border-color:#8cc9aa}
+.family-editor-tab.extension{background:#f8f4ff;border-color:#b39be8}
+.family-editor-standalone{padding:8px 10px;border:1px dashed #d0d5dd;border-radius:9px;background:#f8fafc;color:var(--muted);font-size:12px;margin-bottom:10px}
+.family-list-root{background:#fff9ed;border-left:4px solid #e5a72d}
+.family-list-member{margin-left:6px}
+.family-list-equivalent{background:#f3f7ff;border-left:4px solid #6f97ea;margin-left:12px}
+.family-list-decomposed{background:#f1fbf5;border-left:4px solid #65b58d;margin-left:12px}
+.family-list-extension{background:#f8f4ff;border-left:4px solid #9674db;margin-left:12px}
+.question-edit-card.family-tone-root>.card-hd{background:#fff3dc;border-bottom-color:#e7b253}
+.question-edit-card.family-tone-equivalent>.card-hd{background:#edf4ff;border-bottom-color:#8baef5}
+.question-edit-card.family-tone-decomposed>.card-hd{background:#edf9f2;border-bottom-color:#8cc9aa}
+.question-edit-card.family-tone-extension>.card-hd{background:#f4efff;border-bottom-color:#b39be8}
+.question-edit-card.family-tone-root #questionPreview{border-color:#e7b253;background:#fffdf8}
+.question-edit-card.family-tone-equivalent #questionPreview{border-color:#8baef5;background:#fbfdff}
+.question-edit-card.family-tone-decomposed #questionPreview{border-color:#8cc9aa;background:#fbfffc}
+.question-edit-card.family-tone-extension #questionPreview{border-color:#b39be8;background:#fdfbff}
+.tag-chip-row-title{margin-top:6px}
+/* P4.5.29 联想库验收器（页签④，参照 V8 智能记录版） */
+.ra-quick{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.ra-status{font-size:13px;color:var(--muted);margin-top:9px}
+.ra-status.ok{color:#176b45}.ra-status.warn{color:#9a6700}.ra-status.bad{color:#a23a36}
+#raCurrentCard h2{margin:0 0 4px;font-size:22px}
+.ra-en{font-size:14px;color:var(--muted);margin-bottom:9px}
+.ra-prompt{font-size:15px;line-height:1.7}
+.ra-hint{font-size:13px;line-height:1.6;color:var(--muted);margin-top:4px}
+.ra-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.ra-pill{padding:4px 8px;border-radius:999px;background:#eef1f4;color:#4d5560;font-size:12px}
+.ra-aliases{font-size:12px;color:var(--muted);line-height:1.7;word-break:break-word}
+.ra-choices{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:6px}
+.ra-choice{text-align:left;padding:13px;border:1px solid var(--line);border-radius:11px;background:#fff;min-height:70px;cursor:pointer;font:inherit}
+.ra-choice:hover{border-color:#9ca3ad;background:#fafafa}
+.ra-ct{font-size:16px;font-weight:650;margin-bottom:5px}
+.ra-cl{font-size:12px;color:var(--muted)}
+.ra-pri{float:right;color:#a0a6ae;font-size:11px}
+.ra-empty{grid-column:1/-1;border:1px dashed var(--line);border-radius:10px;padding:16px;text-align:center;color:var(--muted)}
+.ra-path{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.ra-crumb{font-size:12px;padding:6px 8px}
+.ra-verdicts{display:flex;gap:7px;flex-wrap:wrap;margin:6px 0}
+.ra-v-ok{border-color:#a8d5c0}.ra-v-miss{border-color:#e3b3af}.ra-v-weird{border-color:#e4cf9f}.ra-v-alias{border-color:#bec8e5}
+.ra-summary{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:10px}
+.ra-stat{background:#eef1f4;border-radius:10px;padding:9px;text-align:center}
+.ra-stat b{display:block;font-size:18px}.ra-stat span{font-size:12px;color:var(--muted)}
+.ra-log{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:10px}
+.ra-logitem{padding:10px 11px;border-bottom:1px solid var(--line);font-size:12px;line-height:1.55}
+.ra-logitem:last-child{border-bottom:none}
+.ra-logtop{display:flex;justify-content:space-between;gap:8px}
+.ra-tag{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.ra-tag.ok{background:#e7f4ec;color:#176b45}.ra-tag.warn{background:#fdf3dd;color:#9a6700}.ra-tag.bad{background:#fbe9e8;color:#a23a36}
+#raNote{width:100%;min-height:70px;resize:vertical}
+@media(max-width:760px){.ra-choices{grid-template-columns:1fr}.ra-summary{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
 <body id="prepApp">
 <header>
-  <div><div class="brand">PMP Content Prep Studio</div><div class="version"><span id="hdrProductRelease">Product Release —</span> · <span id="hdrPrepBuild">Prep Build 0.4.0</span> · <span id="hdrAuthoringContract">Authoring Contract pmp-authoring-contract-v1</span> · <span id="hdrServerBuild">Server Build —</span></div></div>
+  <div><div class="brand">PMP Content Prep Studio</div><div class="version"><span id="hdrProductRelease">Product Release —</span> · <span id="hdrPrepBuild">Prep Build 0.4.0</span> · <span>目标主程序 V9.0-P4.5.29</span> · <span id="hdrAuthoringContract">Authoring Contract pmp-authoring-contract-v1</span> · <span id="hdrServerBuild">Server Build —</span></div></div>
   <div class="header-meta">
     <span class="badge" id="hdrTree">知识树 0</span>
     <span class="badge" id="hdrRecall">联想库 0</span>
@@ -325,9 +403,9 @@ nav button.active{color:var(--brand)!important}
 
 <nav id="tabs">
   <button data-tab="base" class="active">① 基础数据与导入</button>
-  <button data-tab="management">② 原则归纳卡 / 标签</button>
+  <button data-tab="management">② 原则 / 科目分类 / 公共标签</button>
   <button data-tab="questions">③ 题目录入与检查</button>
-  <button data-tab="association">④ 联想词编辑</button>
+  <button data-tab="association">④ 联想库验收器</button>
   <button data-tab="demo">⑤ 题目演示校验</button>
   <button data-tab="validate">⑥ 校验中心</button>
   <button data-tab="export">⑦ 同步与导出</button>
@@ -403,8 +481,6 @@ nav button.active{color:var(--brand)!important}
         </div>
       </div>
 
-      <div class="card" style="margin-top:14px"><div class="card-hd"><span>科目分类</span><span class="muted tiny">当前科目的考试框架分类（Subject Facets）</span></div><div class="card-bd"><div class="help">这里仅显示教师实际使用的分类名称；系统内部编码（稳定 facet ID）随数据保存和导出，不需要人工维护。题目绑定保存在 <code>metadata.subjectFacets</code>，只允许引用 Schema 中的真实 ID。</div><div id="subjectFacetManager" style="margin-top:10px"></div></div></div>
-
       <div class="toolbar" style="margin-top:12px">
         <button class="btn primary" id="btnDownloadCompleteBundle">下载“完整内容包”模板</button>
         <button class="btn good" id="btnDownloadFamilyTemplate">下载题目家族 JSON 模板</button>
@@ -412,6 +488,7 @@ nav button.active{color:var(--brand)!important}
         <button class="btn primary" id="btnDownloadCompleteAiPrompt">下载完整 AI 制作提示词</button>
         <button class="btn" id="btnDownloadQuestionTemplate">下载题库 JSON 模板</button>
         <button class="btn" id="btnDownloadAiPrompt">下载“Word→JSON”AI 提示词</button>
+        <a class="btn good" id="btnDownloadAiToolkit" href="content-prep-studio/assets/PMP_外部AI母题整理工具包_V2.2_P4.5.29.md" download="PMP_外部AI母题整理工具包_V2.2_P4.5.29.md" title="V2.2 / P4.5.29：含知识树、原则卡、联想库、Global Tags、Subject Facets 权威附录">下载外部 AI 工具包 V2.2</a>
         <button class="btn" id="btnOpenHelp">查看导入说明</button>
       </div>
 
@@ -424,6 +501,14 @@ nav button.active{color:var(--brand)!important}
         <textarea id="rawQuestionPaste" placeholder="【题目1】
 标题：已发送不等于已沟通
 难度：简单
+家族代号：FAMILY-001
+家族角色：母题
+家族关系：root
+变体类型：none
+诊断目标：application
+诊断层级：2
+家族用途：practice
+质量确认：否（外部 AI 固定为否；导入后由教师人工确认）
 领域：PMP 沟通绩效域 / 利益相关方与沟通管理
 主题：项目沟通管理的概念
 阶段：基础练习
@@ -468,10 +553,18 @@ B原则：principle-2"></textarea>
         </section>
         <details class="full-paste-example">
           <summary>查看“完整版 Word / AI 文本粘贴格式”说明</summary>
-          <p class="smalltxt muted">可解析题目基础信息、标签、Trap、双语、英文逐选项反馈、主知识点 ID、普通/核心关键词、题干原则和 A/B/C/D 原则映射。原则与归纳卡定义请使用“完整内容准备包 JSON”或“原则与归纳卡组合 JSON”。</p>
+          <p class="smalltxt muted">可解析题目基础信息、标签、Trap、双语、英文逐选项反馈、主知识点 ID、普通/核心关键词、题干原则、A/B/C/D 原则映射和题目家族常用字段（家族代号/角色/关系/变体类型/诊断目标/诊断层级/家族用途；质量确认一律为否，由教师导入后人工确认）。完整 Subject Facets、Keyword metadata、原则与归纳卡定义请使用“完整内容准备包 JSON”或“原则与归纳卡组合 JSON”。</p>
           <pre>【题目1】
 标题：已发送不等于已沟通
-难度：基础
+难度：简单
+家族代号：FAMILY-001
+家族角色：母题
+家族关系：root
+变体类型：none
+诊断目标：application
+诊断层级：2
+家族用途：practice
+质量确认：否（外部 AI 固定为否；导入后由教师人工确认）
 领域：PMP 沟通绩效域 / 利益相关方与沟通管理
 主题：项目沟通管理的概念
 阶段：基础练习
@@ -548,7 +641,8 @@ D原则：principle-role-accountability</pre>
     <div class="card"><div class="card-hd"><span>② 原则列表</span><button class="help-btn" data-page-help="management" title="本页帮助">?</button></div><div class="card-bd toolbar"><button class="btn small primary" id="btnNewPrinciple">+ 新原则</button></div><div class="manager-list" id="principleList"></div></div>
     <div class="card"><div class="card-hd">原则与系统预设归纳卡</div><div class="card-bd" id="principleEditor"><div class="no-data">请选择或新建原则。</div></div></div>
   </div>
-  <div class="card" style="margin-top:14px"><div class="card-hd"><span>轻量标签管理</span><span class="muted tiny">对齐主程序用途 / 质量 / 来源标签槽位</span></div><div class="card-bd"><div class="help">管理预设标签名称和兼容别名。自由文本标签仍可保留；在题目演示校验中，不能绑定预设槽位的标签会显示为灰色。</div><div id="tagManager" style="margin-top:12px"></div></div></div>
+  <div class="card" style="margin-top:14px"><div class="card-hd"><span>科目分类</span><span class="muted tiny">当前科目的考试框架分类（Subject Facets）</span></div><div class="card-bd"><div class="help">这里仅显示教师实际使用的分类名称；系统内部编码（稳定 facet ID）随数据保存和导出，不需要人工维护。题目绑定保存在 <code>metadata.subjectFacets</code>，只允许引用 Schema 中的真实 ID。</div><div id="subjectFacetManager" style="margin-top:10px"></div></div></div>
+  <div class="card" style="margin-top:14px"><div class="card-hd"><span>公共标签</span><span class="muted tiny">跨科目共用：用途 / 质量 / 来源</span></div><div class="card-bd"><div class="help">这里只维护教师日常看到的标签名称。兼容别名和内部编码（global/... 稳定槽位）继续由系统保留，不在日常界面展示。自由文本标签仍可保留；在题目演示校验中，不能绑定预设槽位的标签会显示为灰色。</div><div id="tagManager" style="margin-top:12px"></div></div></div>
 </section>
 <section class="tab" id="tab-questions">
   <div class="grid3">
@@ -557,12 +651,20 @@ D原则：principle-role-accountability</pre>
       <div class="card-bd toolbar">
         <button class="btn small primary" id="btnNewQuestion">+ 新建</button>
         <button class="btn small" id="btnDuplicateQuestion">复制</button>
+        <button class="btn small good" id="btnCreateFamilyMemberToolbar" title="以当前题（或其母题）为基准创建一道家族成员题">+ 家族成员</button>
         <button class="btn small danger" id="btnDeleteQuestion">删除草稿</button>
+      </div>
+      <div class="family-list-legend">
+        <span class="family-legend-chip root">母题</span>
+        <span class="family-legend-chip equivalent">等价成员</span>
+        <span class="family-legend-chip decomposed">能力拆解</span>
+        <span class="family-legend-chip extension">高阶扩展</span>
+        <span class="family-legend-chip standalone">独立题</span>
       </div>
       <div class="q-list" id="questionList"></div>
     </div>
 
-    <div class="card">
+    <div class="card question-edit-card" id="questionEditCard">
       <div class="card-hd"><span>③ 题目预览与编辑</span><button class="help-btn" data-page-help="questions" title="本页帮助">?</button><span class="muted tiny" id="currentQuestionId"></span></div>
       <div class="card-bd">
         <div class="question-lock-banner" id="questionLockBanner">
@@ -570,6 +672,7 @@ D原则：principle-role-accountability</pre>
           <button class="btn small" id="btnReconfirmQuestionLock" type="button">重新确认编辑权</button>
           <button class="btn small primary" id="btnCopyConflictQuestion" type="button">复制为新题</button>
         </div>
+        <div id="familyQuestionTabs"></div>
         <div class="preview-tip">
           主要操作区：点击已标记关键词可直接修改；框选其他词/术语后会弹出关键词编辑浮层。核心关键词为橙色，普通关键词为蓝色。
         </div>
@@ -610,24 +713,70 @@ D原则：principle-role-accountability</pre>
   </div>
 </section>
 <section class="tab" id="tab-association">
-  <div class="grid2">
-    <div class="card">
-      <div class="card-hd">④ 联想词编辑</div>
-      <div class="card-bd">
-        <div class="toolbar">
-          <input type="text" id="recallSearch" placeholder="搜索名称 / Alias / ID">
-          <button class="btn small primary" id="btnNewRecall">+ 节点</button>
-        </div>
-        <div class="smalltxt muted" style="margin-top:7px" id="aliasConflictSummary"></div>
-        <div class="synonym-note"><b>同义词/不同翻译：</b>只建一个规范节点。例：规范词“相关方”；Aliases 填“利益相关方、干系人、Stakeholder、Stakeholders”。不要为这些译名分别建节点。</div>
+  <div class="card">
+    <div class="card-hd"><span>④ 联想库验收器</span><button class="help-btn" data-page-help="association" title="本页帮助">?</button><span class="muted tiny" id="raLibrarySource"></span></div>
+    <div class="card-bd">
+      <div class="toolbar">
+        <input type="text" id="raQuery" placeholder="输入知识点、简称、英文或口语：PM / ST / 产品待办 / 燃烧图…" style="flex:1;min-width:230px">
+        <button class="btn primary" id="raGo">生成</button>
+        <label class="btn" style="margin:0">载入其他 JSON<input type="file" id="raFile" accept=".json,application/json" hidden></label>
+        <button class="btn" id="raResetPath">重置路径</button>
       </div>
-      <div class="node-list" id="recallNodeList"></div>
+      <div class="ra-quick">
+        <button class="btn small" data-raq="PM">PM</button><button class="btn small" data-raq="ST">ST</button>
+        <button class="btn small" data-raq="产品经理">产品经理</button><button class="btn small" data-raq="敏捷教练">敏捷教练</button>
+        <button class="btn small" data-raq="需求池">需求池</button><button class="btn small" data-raq="燃烧图">燃烧图</button>
+        <button class="btn small" data-raq="可交付成果">可交付成果</button>
+      </div>
+      <div id="raStatus" class="ra-status"></div>
     </div>
-    <div class="card">
-      <div class="card-hd"><span>联想词编辑 · 关系预览</span><button class="help-btn" data-page-help="association" title="本页帮助">?</button><span class="muted tiny" id="currentRecallId"></span></div>
-      <div class="card-bd" id="recallEditor">
-        <div class="no-data">请在“基础数据”导入科目级联想库，或新建联想节点。</div>
+  </div>
+
+  <div class="card" id="raCurrentCard">
+    <div class="card-bd"><div class="ra-empty">输入关键词或点击快速入口开始。</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><span>继续联想</span><span class="muted tiny" id="raInfo"></span></div>
+    <div class="card-bd">
+      <div id="raChoices" class="ra-choices"><div class="ra-empty">尚未选择节点。</div></div>
+      <div class="toolbar" style="margin-top:8px">
+        <div><button class="btn small" id="raBack" disabled>← 回退一步</button> <button class="btn small" id="raNext" disabled>换一组</button></div>
+        <span class="muted tiny">祖先节点会被过滤，模拟主程序防回跳。</span>
       </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd">当前节点验收</div>
+    <div class="card-bd">
+      <div class="muted tiny" style="margin-bottom:6px">客观断链会自动记录；这里主要用于标记“能走但质量不好”的情况。</div>
+      <div class="ra-verdicts">
+        <button class="btn small ra-v-ok" data-rav="正常">✓ 正常</button>
+        <button class="btn small ra-v-miss" data-rav="缺失/断链">缺失 / 断链</button>
+        <button class="btn small ra-v-weird" data-rav="联想不自然">联想不自然</button>
+        <button class="btn small ra-v-alias" data-rav="需补入口/Alias">需补入口 / Alias</button>
+        <button class="btn small" data-rav="其他问题">其他问题</button>
+      </div>
+      <textarea id="raNote" placeholder="可选备注，例如：这里应该先想到“核实的可交付成果”；或“PM 应该接项目经理”。"></textarea>
+      <div class="toolbar" style="margin-top:8px"><button class="btn small" id="raSaveNote">保存到最近一条记录</button><span class="muted tiny" id="raNoteStatus"></span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd">当前回忆路径</div>
+    <div class="card-bd"><div id="raPath" class="ra-path"><span class="muted tiny">暂无</span></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><span>验收记录</span><span class="muted tiny">记录自动保存在浏览器本地（最近 2000 条）</span></div>
+    <div class="card-bd">
+      <div class="toolbar">
+        <div></div>
+        <div><button class="btn small" id="raExportJson">导出 JSON 报告</button> <button class="btn small" id="raExportMd">导出 Markdown 报告</button> <button class="btn small danger" id="raClearLog">清空记录</button></div>
+      </div>
+      <div id="raSummary" class="ra-summary"></div>
+      <div id="raLog" class="ra-log"><div class="ra-logitem muted tiny">暂无记录。</div></div>
     </div>
   </div>
 </section>
@@ -751,9 +900,9 @@ D原则：principle-role-accountability</pre>
     <div class="help-center-body">
       <div class="help-center-nav">
         <button data-help-topic="base">① 基础数据与导入</button>
-        <button data-help-topic="management">② 原则归纳卡 / 标签</button>
+        <button data-help-topic="management">② 原则 / 科目分类 / 公共标签</button>
         <button data-help-topic="questions">③ 题目录入与检查</button>
-        <button data-help-topic="association">④ 联想词编辑</button>
+        <button data-help-topic="association">④ 联想库验收器</button>
         <button data-help-topic="demo">⑤ 题目演示校验</button>
         <button data-help-topic="validate">⑥ 校验中心</button>
         <button data-help-topic="export">⑦ 导出与审计</button>
@@ -769,7 +918,7 @@ D原则：principle-role-accountability</pre>
           <h3>Word / AI 完整文本示例</h3>
           <pre>【题目1】
 标题：已发送不等于已沟通
-难度：基础
+难度：简单
 标签：基础练习、核心题、自编题
 题干：项目经理……
 A. ...
@@ -786,7 +935,7 @@ B原则：principle-effective-communication</pre>
         </article>
 
         <article class="help-topic" data-help-content="management">
-          <h2>② 原则归纳卡 / 标签</h2>
+          <h2>② 原则 / 科目分类 / 公共标签</h2>
           <p>原则用于解释“为什么这个选项应该/不应该这样做”；归纳卡是原则的可阅读教学卡片。标签用于训练阶段、题目特征、来源等分类。</p>
           <h3>原则示例</h3>
           <div class="help-example"><b>原则：</b>确认沟通是否真正有效<br><b>归纳卡：</b>信息已经发送，不代表沟通完成。应确认接收、理解并能够据此行动。</div>
@@ -808,13 +957,14 @@ B原则：principle-effective-communication</pre>
         </article>
 
         <article class="help-topic" data-help-content="association">
-          <h2>④ 联想词编辑</h2>
-          <p>这里维护“看到一个词，应该联想到哪个知识入口，以及还能继续想到什么”的关系网络。</p>
-          <h3>同义词原则</h3>
-          <div class="help-example">规范节点：<b>相关方</b><br>Aliases：<code>利益相关方, 干系人, Stakeholder</code><br>不要为了不同译名建立多个等义节点。</div>
-          <h3>关系图怎么点</h3>
-          <p>上位/下位知识点普通点击只做<b>预览选择</b>，不会修改绑定。只有明确点击“将当前联想词绑定到此知识点”才会改变 <code>metadata.taxonomyNodeId</code>。</p>
-          <p>底部“被哪些节点联想”可点击直接跳到对应联想节点继续编辑。</p>
+          <h2>④ 联想库验收器</h2>
+          <p>模拟学员深度回忆走库：输入词 → 命中节点 → 沿推荐继续联想，同时自动记录<b>未命中 / 过宽词 / 多义 / 断链 / 单候选</b>五类客观问题。</p>
+          <h3>怎么用</h3>
+          <p>1. 输入知识点、简称、英文或口语（如 PM / ST / 燃烧图），或点快速入口；命中后点击候选继续走库。祖先节点会被过滤，模拟主程序防回跳。</p>
+          <p>2. 对"能走但质量不好"的情况，用当前节点验收区的按钮标记：正常 / 缺失断链 / 联想不自然 / 需补入口 Alias，可附备注。</p>
+          <p>3. 验收记录自动保存在浏览器本地（最近 2000 条），可导出 JSON / Markdown 报告发给联想库维护方。</p>
+          <h3>数据来源</h3>
+          <p>默认验收<b>当前工作区联想库</b>（在"① 基础数据与导入"导入完整内容包或联想库 JSON 后生效）；也可临时载入其他 JSON 验收，并在确认后设为工作区联想库。</p>
         </article>
 
         <article class="help-topic" data-help-content="demo">
@@ -896,8 +1046,8 @@ const BASE_TAG_GROUPS=[
   {id:'quality',label:'质量标签',categories:[{id:'feature',label:'题目特征',options:['易错题','高频题','核心题','综合题']},{id:'review',label:'内容状态',options:['待复核','已复核','需更新']}]},
   {id:'source',label:'来源标签',categories:[{id:'origin',label:'来源类型',options:['真题','自编题','改编题','教材例题']},{id:'scope',label:'使用范围',options:['可公开','内部使用']}]}];
 
-/* v0.4.0 internal tag identity.
-   Formal/main-program exports still use legacy numeric slots. */
+/* P4.5.29 合同：内部真源与正式导出一律 global/... canonical；
+   formalTagSlot 仅保留旧数字槽位映射，供旧主程序数据读取兼容。 */
 const TAG_SLOT_SEMANTIC_MAP=Object.freeze({
   'usage/stage/0':'global/usage/stage/basic','usage/stage/basic':'global/usage/stage/basic',
   'usage/stage/1':'global/usage/stage/phase-test','usage/stage/phase-test':'global/usage/stage/phase-test',
@@ -932,7 +1082,7 @@ function formalTagSlot(slot){slot=semanticTagSlot(slot);return TAG_SLOT_LEGACY_M
 function tagSlotKey(g,c,i){return semanticTagSlot(legacyTagSlotKey(g,c,i))}
 function tagCategoryKey(g,c){return `${g.id}/${c.id}`}
 function tagGroupKey(g){return g.id}
-const COMPLETE_CONTENT_BUNDLE_TEMPLATE={"prepContentBundleVersion":1,"format":"pmp-content-prep-complete-bundle-v1","questionBank":{"name":"PMP 完整内容模板题库","subject":"PMP","description":"完整字段示例：双语、知识点、关键词、推理、标签、原则与选项归纳卡映射。","version":"1.0","visibility":"private","questions":[{"title":"已发送不等于已沟通","type":"single_choice","subject":"PMP","difficulty":"基础","domain":"PMP 沟通绩效域 / 利益相关方与沟通管理","topic":"项目沟通管理的概念","tags":["基础练习","核心题","自编题","内部使用"],"stage":"基础练习","stemParts":[{"text":"项目经理按计划向团队发送了一份重要变更通知，但第二天发现多名成员仍按旧方案工作。项目经理首先应该认识到什么？"}],"options":[{"id":"A","text":"只要邮件发送成功，沟通责任就已经完成","trap":"把发送等同于有效沟通","correct":false},{"id":"B","text":"有效沟通不仅是发送信息，还要确认信息被接收和理解","trap":"","correct":true},{"id":"C","text":"应立即处罚没有阅读邮件的成员","trap":"过早升级 / 命令控制","correct":false},{"id":"D","text":"以后所有信息都应由发起人亲自传达","trap":"角色责任错置","correct":false}],"correctAnswer":"B","analysis":"沟通的效果不以“已经发送”为终点，而以信息是否被正确接收、理解并产生预期行动来判断。项目经理应建立反馈或确认机制，而不是把发送动作等同于沟通完成。","translations":{"en":{"title":"Sent Does Not Mean Understood","stemParts":[{"text":"The project manager sent an important change notice to the team as planned, but several members were still working from the old approach the next day. What should the project manager recognize first?"}],"options":[{"id":"A","text":"Once the email is successfully sent, the communication responsibility is complete"},{"id":"B","text":"Effective communication requires more than sending information; receipt and understanding should be confirmed"},{"id":"C","text":"Members who did not read the email should be disciplined immediately"},{"id":"D","text":"All future information should be delivered personally by the sponsor"}],"analysis":"Communication effectiveness is measured by whether the message is received, understood, and translated into the intended action, not merely by transmission.","optionFeedback":{"A":"Incorrect: sending alone does not prove communication effectiveness.","B":"Correct: effective communication requires receipt and understanding.","C":"Incorrect: this is premature escalation.","D":"Incorrect: this shifts communication responsibility to the wrong role."},"keyPath":{"label":"Communication effectiveness → confirmation → B","ruleText":"Communication is effective when the message is received, understood, and acted upon."},"explanationStatus":"complete"}},"clues":[{"id":"kw-001","text":"项目经理","textEn":"project manager","keywordLevel":"normal","isCore":false,"type":"recall-keyword","clueRole":"true","sourceType":"stem","sourceOptionId":"","recallNodeId":"recall-tax-kp-pmp-people-2-2-1-k01","recallEntryLabel":"项目经理","solutionRole":"context","coreReason":"","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"stem","optionId":"","count":2}],"explain":"关键词“项目经理”连接到联想入口“项目经理”。","sourceMode":"prep-studio-keyword-v2"},{"id":"kw-002","text":"首先","textEn":"first","keywordLevel":"core","isCore":true,"type":"core-keyword","clueRole":"true","sourceType":"stem","sourceOptionId":"","recallNodeId":"recall-keyword-pmp-action-order","recallEntryLabel":"PMP 情景题动作顺序","solutionRole":"decision-cue","coreReason":"题目要求识别优先判断，而不是最终处置。","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"stem","optionId":"","count":1}],"explain":"关键词“首先”连接到联想入口“PMP 情景题动作顺序”。","sourceMode":"prep-studio-keyword-v2"},{"id":"kw-003","text":"有效沟通","textEn":"effective communication","keywordLevel":"core","isCore":true,"type":"core-keyword","clueRole":"true","sourceType":"option","sourceOptionId":"B","recallNodeId":"recall-tax-kp-pmp-people-1-1-4","recallEntryLabel":"项目沟通管理的概念","solutionRole":"answer-anchor","coreReason":"该词直接区分“发送信息”与“真正完成沟通”。","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"option","optionId":"B","count":1}],"explain":"关键词“有效沟通”连接到联想入口“项目沟通管理的概念”。","sourceMode":"prep-studio-keyword-v2"}],"concepts":[{"id":"kp-pmp-people-1-1-4","title":"项目沟通管理的概念","category":"PMP 沟通绩效域","level":"基础","keywords":"沟通,有效沟通,反馈,理解","summary":"PMP > 人 > 利益相关方与沟通管理 > 项目沟通管理的概念","notes":"映射稳定知识节点 ID。","rule":"有效沟通需要接收、理解和反馈闭环。"}],"reasoningSteps":[{"id":"rs-1","title":"识别核心线索","content":"首先 + 有效沟通，说明题目在问优先判断与沟通有效性。","relatedKeywords":["首先","有效沟通"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]},{"id":"rs-2","title":"匹配知识点","content":"信息发送不等于被正确理解，应检查反馈闭环。","relatedKeywords":["沟通","理解"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]},{"id":"rs-3","title":"比较选项","content":"B 直接体现有效沟通的接收与理解确认。","relatedKeywords":["有效沟通"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]}],"keyPath":{"label":"沟通有效性 → 反馈确认 → B","clueIds":["kw-002","kw-003"],"conceptIds":["kp-pmp-people-1-1-4"],"primaryConceptId":"kp-pmp-people-1-1-4","ruleConceptId":"kp-pmp-people-1-1-4","answerId":"B","ruleText":"有效沟通不以发送为完成标准，应确认接收、理解和行动。"},"metadata":{"subjectId":"subject-pmp","translationStatus":"bilingual","knowledge":{"primaryNodeId":"kp-pmp-people-1-1-4","relatedNodeIds":[],"mappingStatus":"confirmed","mappingSource":"prep-studio","pathSnapshot":["PMP","人","利益相关方与沟通管理","项目沟通管理的概念"]},"principleIds":["principle-effective-communication","principle-no-premature-escalation","principle-role-accountability"],"optionPrincipleMap":{"A":["principle-effective-communication"],"B":["principle-effective-communication"],"C":["principle-no-premature-escalation"],"D":["principle-role-accountability"]},"tagPaths":[{"groupId":"usage","group":"用途标签","categoryId":"stage","category":"训练阶段","label":"基础练习"},{"groupId":"quality","group":"质量标签","categoryId":"feature","category":"题目特征","label":"核心题"},{"groupId":"source","group":"来源标签","categoryId":"origin","category":"来源类型","label":"自编题"},{"groupId":"source","group":"来源标签","categoryId":"scope","category":"使用范围","label":"内部使用"}],"keywordSystemV2":{"schemaVersion":2,"name":"Question Keyword System v2","keywords":[{"clueId":"kw-001","text":"项目经理","textEn":"project manager","keywordLevel":"normal","isCore":false,"solutionRole":"context","coreReason":"","recallNodeId":"recall-tax-kp-pmp-people-2-2-1-k01","recallEntryLabel":"项目经理"},{"clueId":"kw-002","text":"首先","textEn":"first","keywordLevel":"core","isCore":true,"solutionRole":"decision-cue","coreReason":"题目要求识别优先判断，而不是最终处置。","recallNodeId":"recall-keyword-pmp-action-order","recallEntryLabel":"PMP 情景题动作顺序"},{"clueId":"kw-003","text":"有效沟通","textEn":"effective communication","keywordLevel":"core","isCore":true,"solutionRole":"answer-anchor","coreReason":"该词直接区分“发送信息”与“真正完成沟通”。","recallNodeId":"recall-tax-kp-pmp-people-1-1-4","recallEntryLabel":"项目沟通管理的概念"}]},"englishOptionFeedback":{"A":"Incorrect: sending alone does not prove communication effectiveness.","B":"Correct: effective communication requires receipt and understanding.","C":"Incorrect: this is premature escalation.","D":"Incorrect: this shifts communication responsibility to the wrong role."},"contentPreparation":{"source":"external-ai-or-manual","reviewStatus":"ready-for-human-check","prepStudioTargetVersion":"0.4.0"}},"status":{"contentReady":true,"keywordsReady":true,"knowledgeReady":true,"reasoningReady":true,"published":false},"lifecycle":{"status":"active","deletedAt":""},"teacherNumber":"","explanation":"沟通的效果不以“已经发送”为终点，而以信息是否被正确接收、理解并产生预期行动来判断。项目经理应建立反馈或确认机制，而不是把发送动作等同于沟通完成。"}]},"principles":{"schemaVersion":1,"items":[{"id":"principle-effective-communication","name":"确认沟通是否真正有效","status":"active","confusablePrincipleIds":[]},{"id":"principle-no-premature-escalation","name":"先分析并处理，再考虑升级","status":"active","confusablePrincipleIds":[]},{"id":"principle-role-accountability","name":"按正确角色承担沟通责任","status":"active","confusablePrincipleIds":[]}]},"synthesisPresets":{"schemaVersion":1,"items":[{"id":"preset-effective-communication","principleId":"principle-effective-communication","title":"原则：有效沟通需要反馈闭环","content":"信息已经发送，不代表沟通完成。应确认接收方收到、理解并能够据此行动。","status":"active","version":1},{"id":"preset-no-premature-escalation","principleId":"principle-no-premature-escalation","title":"原则：避免过早升级","content":"遇到沟通偏差时先澄清、确认和解决根因；除非情境要求，否则不要直接处罚或升级。","status":"active","version":1},{"id":"preset-role-accountability","principleId":"principle-role-accountability","title":"原则：角色责任不应被错误转移","content":"项目经理应根据沟通管理计划和角色职责管理沟通，而不是把所有信息传递责任转移给发起人。","status":"active","version":1}]},"tagConfig":{"names":{},"groupNames":{},"categoryNames":{},"aliases":{}}};
+const COMPLETE_CONTENT_BUNDLE_TEMPLATE={"prepContentBundleVersion":1,"format":"pmp-content-prep-complete-bundle-v1","questionBank":{"name":"PMP 完整内容模板题库","subject":"PMP","description":"完整字段示例：双语、知识点、关键词、推理、标签、原则与选项归纳卡映射。","version":"1.0","visibility":"private","questions":[{"title":"已发送不等于已沟通","type":"single_choice","subject":"PMP","difficulty":"简单","domain":"PMP 沟通绩效域 / 利益相关方与沟通管理","topic":"项目沟通管理的概念","tags":["基础练习","核心题","自编题","内部使用"],"stage":"基础练习","stemParts":[{"text":"项目经理按计划向团队发送了一份重要变更通知，但第二天发现多名成员仍按旧方案工作。项目经理首先应该认识到什么？"}],"options":[{"id":"A","text":"只要邮件发送成功，沟通责任就已经完成","trap":"把发送等同于有效沟通","correct":false},{"id":"B","text":"有效沟通不仅是发送信息，还要确认信息被接收和理解","trap":"","correct":true},{"id":"C","text":"应立即处罚没有阅读邮件的成员","trap":"过早升级 / 命令控制","correct":false},{"id":"D","text":"以后所有信息都应由发起人亲自传达","trap":"角色责任错置","correct":false}],"correctAnswer":"B","analysis":"沟通的效果不以“已经发送”为终点，而以信息是否被正确接收、理解并产生预期行动来判断。项目经理应建立反馈或确认机制，而不是把发送动作等同于沟通完成。","translations":{"en":{"title":"Sent Does Not Mean Understood","stemParts":[{"text":"The project manager sent an important change notice to the team as planned, but several members were still working from the old approach the next day. What should the project manager recognize first?"}],"options":[{"id":"A","text":"Once the email is successfully sent, the communication responsibility is complete"},{"id":"B","text":"Effective communication requires more than sending information; receipt and understanding should be confirmed"},{"id":"C","text":"Members who did not read the email should be disciplined immediately"},{"id":"D","text":"All future information should be delivered personally by the sponsor"}],"analysis":"Communication effectiveness is measured by whether the message is received, understood, and translated into the intended action, not merely by transmission.","optionFeedback":{"A":"Incorrect: sending alone does not prove communication effectiveness.","B":"Correct: effective communication requires receipt and understanding.","C":"Incorrect: this is premature escalation.","D":"Incorrect: this shifts communication responsibility to the wrong role."},"keyPath":{"label":"Communication effectiveness → confirmation → B","ruleText":"Communication is effective when the message is received, understood, and acted upon."},"explanationStatus":"complete"}},"clues":[{"id":"kw-001","text":"项目经理","textEn":"project manager","keywordLevel":"normal","isCore":false,"type":"recall-keyword","clueRole":"true","sourceType":"stem","sourceOptionId":"","recallNodeId":"recall-tax-kp-pmp-people-2-2-1-k01","recallEntryLabel":"项目经理","solutionRole":"context","coreReason":"","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"stem","optionId":"","count":2}],"explain":"关键词“项目经理”连接到联想入口“项目经理”。","sourceMode":"prep-studio-keyword-v2"},{"id":"kw-002","text":"首先","textEn":"first","keywordLevel":"core","isCore":true,"type":"core-keyword","clueRole":"true","sourceType":"stem","sourceOptionId":"","recallNodeId":"recall-keyword-pmp-action-order","recallEntryLabel":"PMP 情景题动作顺序","solutionRole":"decision-cue","coreReason":"题目要求识别优先判断，而不是最终处置。","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"stem","optionId":"","count":1}],"explain":"关键词“首先”连接到联想入口“PMP 情景题动作顺序”。","sourceMode":"prep-studio-keyword-v2"},{"id":"kw-003","text":"有效沟通","textEn":"effective communication","keywordLevel":"core","isCore":true,"type":"core-keyword","clueRole":"true","sourceType":"option","sourceOptionId":"B","recallNodeId":"recall-tax-kp-pmp-people-1-1-4","recallEntryLabel":"项目沟通管理的概念","solutionRole":"answer-anchor","coreReason":"该词直接区分“发送信息”与“真正完成沟通”。","conceptIds":["kp-pmp-people-1-1-4"],"matchLocations":[{"field":"option","optionId":"B","count":1}],"explain":"关键词“有效沟通”连接到联想入口“项目沟通管理的概念”。","sourceMode":"prep-studio-keyword-v2"}],"concepts":[{"id":"kp-pmp-people-1-1-4","title":"项目沟通管理的概念","category":"PMP 沟通绩效域","level":"基础","keywords":"沟通,有效沟通,反馈,理解","summary":"PMP > 人 > 利益相关方与沟通管理 > 项目沟通管理的概念","notes":"映射稳定知识节点 ID。","rule":"有效沟通需要接收、理解和反馈闭环。"}],"reasoningSteps":[{"id":"rs-1","title":"识别核心线索","content":"首先 + 有效沟通，说明题目在问优先判断与沟通有效性。","relatedKeywords":["首先","有效沟通"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]},{"id":"rs-2","title":"匹配知识点","content":"信息发送不等于被正确理解，应检查反馈闭环。","relatedKeywords":["沟通","理解"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]},{"id":"rs-3","title":"比较选项","content":"B 直接体现有效沟通的接收与理解确认。","relatedKeywords":["有效沟通"],"relatedKnowledgePoints":["kp-pmp-people-1-1-4"]}],"keyPath":{"label":"沟通有效性 → 反馈确认 → B","clueIds":["kw-002","kw-003"],"conceptIds":["kp-pmp-people-1-1-4"],"primaryConceptId":"kp-pmp-people-1-1-4","ruleConceptId":"kp-pmp-people-1-1-4","answerId":"B","ruleText":"有效沟通不以发送为完成标准，应确认接收、理解和行动。"},"metadata":{"subjectId":"subject-pmp","subjectFacets":[{"facetId":"subject/pmp/exam-domain/people","subjectId":"subject-pmp","schemaId":"pmp-facet-schema-v1","schemaVersion":1,"dimensionId":"exam-domain","dimension":"考试域","valueId":"people","label":"人员","status":"active","replacedBy":[],"aliases":[]}],"questionFamily":{"schemaVersion":1,"familyId":"","familyKey":"","role":"standalone","rootQuestionId":"","relationToRoot":"standalone","variantType":"none","equivalenceGrade":"","diagnosticTarget":"general","difficultyLevel":2,"purposes":["practice"],"qualityConfirmed":false,"notes":""},"translationStatus":"bilingual","knowledge":{"primaryNodeId":"kp-pmp-people-1-1-4","relatedNodeIds":[],"mappingStatus":"confirmed","mappingSource":"prep-studio","pathSnapshot":["PMP","人","利益相关方与沟通管理","项目沟通管理的概念"]},"principleIds":["principle-effective-communication","principle-no-premature-escalation","principle-role-accountability"],"optionPrincipleMap":{"A":["principle-effective-communication"],"B":["principle-effective-communication"],"C":["principle-no-premature-escalation"],"D":["principle-role-accountability"]},"tagPaths":[{"groupId":"usage","group":"用途标签","categoryId":"stage","category":"训练阶段","label":"基础练习"},{"groupId":"quality","group":"质量标签","categoryId":"feature","category":"题目特征","label":"核心题"},{"groupId":"source","group":"来源标签","categoryId":"origin","category":"来源类型","label":"自编题"},{"groupId":"source","group":"来源标签","categoryId":"scope","category":"使用范围","label":"内部使用"}],"keywordSystemV2":{"schemaVersion":2,"name":"Question Keyword System v2","keywords":[{"clueId":"kw-001","text":"项目经理","textEn":"project manager","keywordLevel":"normal","isCore":false,"solutionRole":"context","coreReason":"","recallNodeId":"recall-tax-kp-pmp-people-2-2-1-k01","recallEntryLabel":"项目经理"},{"clueId":"kw-002","text":"首先","textEn":"first","keywordLevel":"core","isCore":true,"solutionRole":"decision-cue","coreReason":"题目要求识别优先判断，而不是最终处置。","recallNodeId":"recall-keyword-pmp-action-order","recallEntryLabel":"PMP 情景题动作顺序"},{"clueId":"kw-003","text":"有效沟通","textEn":"effective communication","keywordLevel":"core","isCore":true,"solutionRole":"answer-anchor","coreReason":"该词直接区分“发送信息”与“真正完成沟通”。","recallNodeId":"recall-tax-kp-pmp-people-1-1-4","recallEntryLabel":"项目沟通管理的概念"}]},"englishOptionFeedback":{"A":"Incorrect: sending alone does not prove communication effectiveness.","B":"Correct: effective communication requires receipt and understanding.","C":"Incorrect: this is premature escalation.","D":"Incorrect: this shifts communication responsibility to the wrong role."},"contentPreparation":{"source":"external-ai-or-manual","reviewStatus":"ready-for-human-check","prepStudioTargetVersion":"0.4.0"}},"status":{"contentReady":true,"keywordsReady":true,"knowledgeReady":true,"reasoningReady":true,"published":false},"lifecycle":{"status":"active","deletedAt":""},"teacherNumber":"","explanation":"沟通的效果不以“已经发送”为终点，而以信息是否被正确接收、理解并产生预期行动来判断。项目经理应建立反馈或确认机制，而不是把发送动作等同于沟通完成。"}]},"principles":{"schemaVersion":1,"items":[{"id":"principle-effective-communication","name":"确认沟通是否真正有效","status":"active","confusablePrincipleIds":[]},{"id":"principle-no-premature-escalation","name":"先分析并处理，再考虑升级","status":"active","confusablePrincipleIds":[]},{"id":"principle-role-accountability","name":"按正确角色承担沟通责任","status":"active","confusablePrincipleIds":[]}]},"synthesisPresets":{"schemaVersion":1,"items":[{"id":"preset-effective-communication","principleId":"principle-effective-communication","title":"确认沟通是否真正有效","content":"信息已经发送，不代表沟通完成。应确认接收方收到、理解并能够据此行动。","status":"active","version":1},{"id":"preset-no-premature-escalation","principleId":"principle-no-premature-escalation","title":"先分析并处理，再考虑升级","content":"遇到沟通偏差时先澄清、确认和解决根因；除非情境要求，否则不要直接处罚或升级。","status":"active","version":1},{"id":"preset-role-accountability","principleId":"principle-role-accountability","title":"按正确角色承担沟通责任","content":"项目经理应根据沟通管理计划和角色职责管理沟通，而不是把所有信息传递责任转移给发起人。","status":"active","version":1}]},"tagConfig":{"schemaVersion":3,"slotIdStrategy":"global-semantic-v1","names":{},"groupNames":{},"categoryNames":{},"aliases":{},"slotAliases":{},"looseAliases":{}}};
 const COMPLETE_AI_PROMPT=`你是一名 PMP 内容生产与结构化校核助手。请根据我提供的 Word/文本基础题目，按 pmp-authoring-contract-v1 输出 PMP Content Prep Studio v0.4.0 的“完整内容准备包 JSON”。
 
 目标：尽量在外部 AI 阶段完成题干、选项、答案、解析、双语、知识点、普通/核心关键词、推理步骤、Question Family、Subject Facet、Global Tag、原则、归纳卡和选项→原则映射，使进入 Prep Studio 后主要进行人工校核。
@@ -942,13 +1092,13 @@ const COMPLETE_AI_PROMPT=`你是一名 PMP 内容生产与结构化校核助手�
 2. Source Facts 保护：来源已明确的题干、选项、答案、解析、数字、时间、角色和限定条件必须忠实保留；不得静默改题或补写来源中没有的事实。
 3. 知识点只能使用我提供知识树中真实存在的稳定 node ID；无法确定时留空。
 4. 联想词只能使用我提供联想库中真实存在且唯一匹配的 recallNodeId；无法确定时留空。
-5. Keyword v2：关键词必须是词/稳定专业术语，不能是半句话；普通关键词 keywordLevel=normal，核心关键词 keywordLevel=core，并填写 solutionRole、coreReason、sourceType、sourceOptionId 和 locations；每题建议 2～5 个。
+5. Keyword v2：关键词必须是词/稳定专业术语，不能是半句话；普通关键词 keywordLevel=normal，核心关键词 keywordLevel=core，并填写 solutionRole、coreReason、sourceType、sourceOptionId 和 locations；每题建议 2～5 个，并同步生成 metadata.keywordSystemV2 汇总。
 6. reasoningSteps、keyPath 与双语 translations 必须从 Source Facts 和题目推理链派生，不得引入新事实。
 7. metadata.questionFamily 使用 question-family-v1；同一 familyKey 只能有一道 root，外部生成的 qualityConfirmed 必须为 false。普通 difficulty 只用“简单/中等/困难”，Family difficultyLevel 独立使用 1–4。
 8. metadata.subjectFacets 只能引用我提供的 Facet Schema 中真实存在的 subject/... 稳定 ID；无法确定时留空，不得创建 Facet ID。
 9. metadata.tagPaths 只使用我提供 Registry 中的 global/... 稳定 ID；不得把 Knowledge、Subject Facet、Global Tag 混为同一字段。
-10. metadata.stemPrincipleIds 保存题干/通用原则；metadata.optionPrincipleMap 保存 A/B/C/D 对应原则；metadata.principleIds 由两者自动汇总。
-11. 每道题正确选项必须且只能绑定一条原则；principles 与 synthesisPresets 必须一对一，归纳卡标题固定为“原则：{原则名称}”。
+10. metadata.principleIds 保存本题全部原则汇总；metadata.optionPrincipleMap 保存 A/B/C/D 对应原则；正确选项原则优先从 optionPrincipleMap 解析。
+11. 每道题正确选项必须且只能绑定一条原则；principles 与 synthesisPresets 必须一对一，归纳卡标题等于原则名称本身（不带“原则：”前缀）。
 12. 不写死 taxonomyId/taxonomyVersion；不自动创建 Recall、Facet、Global Tag、Knowledge 或 Principle 稳定 ID。
 13. 不要生成题目 id、questionId、familyId、rootQuestionId、contentHash、metadata.origin、creatorId、deviceId 或 batchId；这些全部由 Prep Studio 生成。
 14. 输出纯 JSON，不要 Markdown 代码围栏，不要额外解释。
@@ -981,7 +1131,7 @@ const QUESTION_TEMPLATE={
     translations:{en:{title:"",stemParts:[{text:""}],options:[{id:"A",text:""},{id:"B",text:""},{id:"C",text:""},{id:"D",text:""}],analysis:""}},
     clues:[],
     reasoningSteps:[],
-    metadata:{knowledge:{primaryNodeId:"",relatedNodeIds:[],mappingStatus:"unmapped",pathSnapshot:[]}},
+    metadata:{knowledge:{primaryNodeId:"",relatedNodeIds:[],mappingStatus:"unmapped",pathSnapshot:[]},subjectFacets:[],questionFamily:{schemaVersion:1,familyKey:"",role:"standalone",relationToRoot:"standalone",variantType:"none",equivalenceGrade:"",diagnosticTarget:"general",difficultyLevel:2,purposes:["practice"],qualityConfirmed:false,notes:""}},
     lifecycle:{status:"active",deletedAt:""}
   }]
 };
@@ -1025,7 +1175,8 @@ const state={
   questionBank:{id:generateSystemId('bank'),name:'PMP 内容准备题库',subject:'PMP',description:'',version:'1.0',visibility:'private',createdAt:Date.now(),updatedAt:Date.now(),questions:[]},
   principles:{schemaVersion:1,items:[],updatedAt:Date.now()},
   synthesisPresets:{schemaVersion:1,items:[],updatedAt:Date.now()},
-  tagConfig:{schemaVersion:2,slotIdStrategy:'semantic-v1',names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}},
+  tagConfig:{schemaVersion:3,slotIdStrategy:'global-semantic-v1',names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}},
+  subjectFacetRegistry:null,
   currentQuestionId:'',
   currentRecallId:'',
   currentPrincipleId:'',
@@ -1335,7 +1486,7 @@ function parsePastedQuestionText(raw){
   const out=[];
   blocks.forEach((block,bi)=>{
     const lines=block.split('\n').map(x=>x.trim()).filter(Boolean);
-    let title='',difficulty='中等',domain='',topic='',stage='',tags=[],stem=[],analysis=[],answer='',mode='stem',enTitle='',enStem=[],enAnalysis=[],primaryNodeId='',normalKw='',coreKw='',principleIds=[];
+    let title='',difficulty='中等',domain='',topic='',stage='',tags=[],stem=[],analysis=[],answer='',mode='stem',enTitle='',enStem=[],enAnalysis=[],primaryNodeId='',normalKw='',coreKw='',principleIds=[],familySpec=null;
     const opts={A:'',B:'',C:'',D:''},traps={A:'',B:'',C:'',D:''},enOpts={A:'',B:'',C:'',D:''},enFeedback={A:'',B:'',C:'',D:''},optionPrinciples={A:[],B:[],C:[],D:[]};
     for(const line of lines){
       if(/^【\s*题目\s*\d+\s*】$/.test(line)||/^题目\s*\d+\s*[:：.]?$/.test(line)||/^Q(?:uestion)?\s*\d+\s*[:：.]?$/i.test(line))continue;
@@ -1355,17 +1506,26 @@ function parsePastedQuestionText(raw){
       mm=line.match(/^(?:English Stem|英文题干)\s*[:：]\s*(.*)$/i);if(mm){mode='en-stem';if(mm[1])enStem.push(mm[1]);continue}
       mm=line.match(/^([A-D])(?:_EN|\s+EN)\s*[:：]\s*(.*)$/i);if(mm){enOpts[mm[1].toUpperCase()]=mm[2].trim();mode='en-option';continue}
       mm=line.match(/^(?:English Analysis|英文解析|Analysis EN)\s*[:：]\s*(.*)$/i);if(mm){mode='en-analysis';if(mm[1])enAnalysis.push(mm[1]);continue}
-      mm=line.match(/^([A-D])(?:反馈EN|反馈\s*EN|Feedback\s*EN)\s*[:：]\s*(.*)$/i);if(mm){enFeedback[mm[1].toUpperCase()]=mm[2].trim();continue}
-      mm=line.match(/^(?:主知识点ID|PrimaryNodeId|Primary Node ID)\s*[:：]\s*(.*)$/i);if(mm){primaryNodeId=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^([A-D])\s*(?:反馈EN|反馈\s*EN|Feedback\s*EN)\s*[:：]\s*(.*)$/i);if(mm){enFeedback[mm[1].toUpperCase()]=mm[2].trim();continue}
+      mm=line.match(/^(?:主知识点\s*ID|PrimaryNodeId|Primary Node ID)\s*[:：]\s*(.*)$/i);if(mm){primaryNodeId=mm[1].trim();mode='meta';continue}
       mm=line.match(/^普通关键词\s*[:：]\s*(.*)$/);if(mm){normalKw=mm[1].trim();mode='meta';continue}
       mm=line.match(/^核心关键词\s*[:：]\s*(.*)$/);if(mm){coreKw=mm[1].trim();mode='meta';continue}
-      mm=line.match(/^(?:题干原则IDs|题干原则ID|StemPrincipleIds|原则IDs|原则ID|PrincipleIds)\s*[:：]\s*(.*)$/i);if(mm){principleIds=cleanList(mm[1]);mode='meta';continue}
-      mm=line.match(/^([A-D])原则\s*[:：]\s*(.*)$/);if(mm){optionPrinciples[mm[1].toUpperCase()]=cleanList(mm[2]);mode='meta';continue}
+      mm=line.match(/^(?:题干原则\s*IDs?|StemPrincipleIds?|原则\s*IDs?|PrincipleIds?)\s*[:：]\s*(.*)$/i);if(mm){principleIds=cleanList(mm[1]);mode='meta';continue}
+      mm=line.match(/^([A-D])\s*原则\s*[:：]\s*(.*)$/);if(mm){optionPrinciples[mm[1].toUpperCase()]=cleanList(mm[2]);mode='meta';continue}
+      /* P4.5.29 Quick Text 家族字段（规格 §10.2 快捷子集；质量确认一律 false，由教师导入后人工确认） */
+      mm=line.match(/^(?:家族代号|FamilyKey|Family Key)\s*[:：]\s*(.*)$/i);if(mm){(familySpec=familySpec||{}).familyKey=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^(?:家族角色|FamilyRole|Family Role)\s*[:：]\s*(.*)$/i);if(mm){(familySpec=familySpec||{}).role=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^(?:家族关系|FamilyRelation|Family Relation)\s*[:：]\s*(.*)$/i);if(mm){(familySpec=familySpec||{}).relationToRoot=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^(?:变体类型|VariantType|Variant Type)\s*[:：]\s*(.*)$/i);if(mm){(familySpec=familySpec||{}).variantType=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^(?:诊断目标|DiagnosticTarget|Diagnostic Target)\s*[:：]\s*(.*)$/i);if(mm){(familySpec=familySpec||{}).diagnosticTarget=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^(?:诊断层级|诊断难度|DifficultyLevel|Difficulty Level)\s*[:：]\s*(.*)$/i);if(mm){const lv=Number(String(mm[1]).replace(/[^1-4]/g,''));if(lv)(familySpec=familySpec||{}).difficultyLevel=lv;mode='meta';continue}
+      mm=line.match(/^(?:家族用途|LearningPurposes|Purposes)\s*[:：]\s*(.*)$/i);if(mm){(familySpec=familySpec||{}).purposes=cleanList(mm[1]);mode='meta';continue}
+      mm=line.match(/^(?:质量确认|QualityConfirmed|Quality Confirmed)\s*[:：]\s*(.*)$/i);if(mm){if(familySpec)familySpec.qualityConfirmed=false;mode='meta';continue}
       if(mode==='analysis')analysis.push(line);else if(mode==='en-stem')enStem.push(line);else if(mode==='en-analysis')enAnalysis.push(line);else if(mode==='stem')stem.push(line);
     }
     if(stem.length||Object.values(opts).some(Boolean)){
       const clues=[...parseKeywordPasteSpecs(normalKw,'normal'),...parseKeywordPasteSpecs(coreKw,'core')];
-      const nq=normalizeQuestion({title:title||`导入题目 ${bi+1}`,difficulty,domain,topic,tags,stage,stemParts:[{text:stem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:opts[letter],trap:traps[letter]})),correctAnswer:answer||'A',analysis:analysis.join('\n'),translations:{en:{title:enTitle,stemParts:[{text:enStem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:enOpts[letter]})),analysis:enAnalysis.join('\n'),optionFeedback:enFeedback}},clues,metadata:{knowledge:{primaryNodeId,relatedNodeIds:[],mappingStatus:primaryNodeId?'confirmed':'unmapped',pathSnapshot:[]},stemPrincipleIds:principleIds,optionPrincipleMap:optionPrinciples}},bi,state.questionBank.subject||'PMP');
+      const nq=normalizeQuestion({title:title||`导入题目 ${bi+1}`,difficulty,domain,topic,tags,stage,stemParts:[{text:stem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:opts[letter],trap:traps[letter]})),correctAnswer:answer||'A',analysis:analysis.join('\n'),translations:{en:{title:enTitle,stemParts:[{text:enStem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:enOpts[letter]})),analysis:enAnalysis.join('\n'),optionFeedback:enFeedback}},clues,metadata:{knowledge:{primaryNodeId,relatedNodeIds:[],mappingStatus:primaryNodeId?'confirmed':'unmapped',pathSnapshot:[]},stemPrincipleIds:principleIds,optionPrincipleMap:optionPrinciples,...(familySpec?{questionFamily:{...familySpec,qualityConfirmed:false}}:{})}},bi,state.questionBank.subject||'PMP');
       if(primaryNodeId&&state.knowledgeTree?.map.has(primaryNodeId))nq.metadata.knowledge.pathSnapshot=state.knowledgeTree.pathFor(primaryNodeId);
       nq.clues.forEach(c=>c.conceptIds=primaryNodeId?[primaryNodeId]:[]);recomputeKeywordLocations(nq);syncQuestionPrinciples(nq);nq.tags=unique((nq.tags||[]).map(canonicalTagName));nq.metadata.tagPaths=nq.tags.map(tagPathFor).filter(Boolean);out.push(nq);
     }
@@ -1420,7 +1580,7 @@ function normalizePrincipleCardBundle(payload={}){
     seenPresetPrinciples.add(preset.principleId);
   });
   principles.items.forEach(principle=>{if(!seenPresetPrinciples.has(principle.id))throw new Error(`原则 ${principle.id} 缺少对应归纳卡`)});
-  synthesisPresets.items=synthesisPresets.items.map(preset=>({...preset,title:'原则：'+principlesById.get(preset.principleId).name}));
+  synthesisPresets.items=synthesisPresets.items.map(preset=>({...preset,title:principlesById.get(preset.principleId).name}));
   return {principles,synthesisPresets};
 }
 function principleCardBundlePayload(principles=state.principles,synthesisPresets=state.synthesisPresets){
@@ -1535,6 +1695,7 @@ function normalizeQuestion(q,i=0,subject='PMP'){
   }).filter(c=>c.text);
   const knowledge=q?.metadata?.knowledge&&typeof q.metadata.knowledge==='object'?clone(q.metadata.knowledge):{};
   delete knowledge.taxonomyId; delete knowledge.taxonomyVersion;
+  knowledge.mappingStatus=String(knowledge.primaryNodeId||'')?'confirmed':'unmapped';
   const systemQuestionId=registerQuestionId(String(q.id||generateQuestionId()));
   return {
     ...q,
@@ -1579,7 +1740,7 @@ function normalizeBank(payload){
   if(Array.isArray(payload))b={name:'导入题库',subject:'PMP',questions:payload};
   if(!b||!Array.isArray(b.questions))throw new Error('题库缺少 questions 数组。');
   const subject=String(b.subject||'PMP');
-  const questions=b.questions.map((q,i)=>{const nq=QuestionService.normalize(q,i,subject);syncQuestionPrinciples(nq);nq.tags=unique((nq.tags||[]).map(canonicalTagName));nq.metadata.tagPaths=nq.tags.map(tagPathFor).filter(Boolean);return nq});
+  const questions=b.questions.map((q,i)=>{const nq=QuestionService.normalize(q,i,subject);syncQuestionPrinciples(nq);if(typeof recomputeKeywordLocations==='function')recomputeKeywordLocations(nq);nq.tags=unique((nq.tags||[]).map(canonicalTagName));nq.metadata.tagPaths=nq.tags.map(tagPathFor).filter(Boolean);return nq});
   if(typeof resolveQuestionFamilies==='function')resolveQuestionFamilies(questions);
   return {
     id:String(b.id||b.bankId||generateSystemId('bank')),name:String(b.name||b.bankName||'PMP 题库'),subject,description:String(b.description||''),
@@ -1885,6 +2046,40 @@ function familyRelationLabel(v){return ({root:'母题',equivalent:'等价变体'
 function diagnosticTargetLabel(v){return ({general:'一般',concept:'概念',understanding:'理解',discrimination:'辨析',application:'应用',analysis:'分析','case-transfer':'案例迁移'})[v]||v}
 function familyPurposeLabels(v){return (v||[]).map(x=>FAMILY_PURPOSE_LABELS[x]||x).join('、')}
 
+/* P4.5.29 家族视觉 tone（对齐官方配套版）：root/equivalent/decomposed/extension/standalone 五色 */
+function familyToneKey(q){
+  const f=questionFamily(q);
+  if(f.role==='root')return 'root';
+  if(f.role!=='member')return 'standalone';
+  if(f.relationToRoot==='decomposed')return 'decomposed';
+  if(f.relationToRoot==='extension'||f.variantType==='advanced')return 'extension';
+  return 'equivalent';
+}
+function familyToneClass(q){return 'family-tone-'+familyToneKey(q)}
+function familyHoverToneKey(q){
+  const f=questionFamily(q);
+  if(f.role!=='member')return '';
+  const target=String(f.diagnosticTarget||'general');
+  const purposes=Array.isArray(f.purposes)?f.purposes:[];
+  if(target==='concept')return 'concept';
+  if(target==='understanding'||target==='discrimination')return 'understanding';
+  const highOrderTarget=['application','analysis','case-transfer'].includes(target);
+  const highOrderPurpose=purposes.some(x=>['post-remediation-verification','delayed-verification','mastery-check'].includes(x));
+  if(f.relationToRoot==='extension'||f.variantType==='advanced'||(highOrderTarget&&highOrderPurpose))return 'advanced';
+  return 'equivalent';
+}
+function familyHoverClass(q){const k=familyHoverToneKey(q);return k?` family-hover-${k}`:''}
+function familyTabMeta(q){
+  const f=questionFamily(q);
+  if(f.role==='root')return `${f.familyKey||'未命名家族'} · 母题`;
+  if(f.role==='member')return `${familyRelationLabel(f.relationToRoot)} · ${diagnosticTargetLabel(f.diagnosticTarget)} · L${f.difficultyLevel}`;
+  return '独立题';
+}
+function familyListClass(q){
+  const tone=familyToneKey(q),f=questionFamily(q);
+  return f.role==='root'?'family-list-root':f.role==='member'?`family-list-member family-list-${tone}`:'';
+}
+
 /*
  * P4.5.29 差异 6–8：原则包双格式兼容、旧库迁移与安全合并（纯领域函数，无 DOM）。
  *
@@ -1987,6 +2182,269 @@ function applyPrincipleMergePlan(plan,existing){
   return {principles:{schemaVersion:1,items:principles,updatedAt:now},synthesisPresets:{schemaVersion:1,items:presets,updatedAt:now}};
 }
 
+/*
+ * P4.5.29 联想库验收器（页签④）
+ * 参照《联想库快速验收器 V8 · 智能记录版》移植：模拟深度回忆走库、
+ * 自动记录未命中/过宽词/多义/断链/单候选，支持人工判定与备注，
+ * 可导出 JSON / Markdown 验收报告。默认验收当前工作区联想库。
+ * 记录持久化键：pmp_recall_acceptance_records_v1（会话外仍保留，最近 2000 条）。
+ */
+const RA_STORAGE_KEY='pmp_recall_acceptance_records_v1';
+const RA_PAGE_SIZE=4;
+const RA={L:null,LSource:'',byId:new Map(),titles:new Map(),aliases:new Map(),outs:new Map(),path:[],page:0,records:[],lastRecordId:null};
+
+function raEsc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function raN(s){return String(s??'').trim().replace(/\s+/g,' ').toLocaleLowerCase()}
+function raIso(){return new Date().toISOString()}
+function raRid(){return 'ra-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7)}
+function raAddIndex(m,k,id){if(!k)return;if(!m.has(k))m.set(k,[]);if(!m.get(k).includes(id))m.get(k).push(id)}
+function raIndex(){
+  RA.byId=new Map();RA.titles=new Map();RA.aliases=new Map();RA.outs=new Map();
+  for(const n of RA.L?.nodes||[]){
+    RA.byId.set(n.id,n);raAddIndex(RA.titles,raN(n.title),n.id);raAddIndex(RA.titles,raN(n.titleEn),n.id);
+    for(const a of n.aliases||[])raAddIndex(RA.aliases,raN(a),n.id);
+  }
+  for(const e of RA.L?.edges||[]){if(!RA.outs.has(e.from))RA.outs.set(e.from,[]);RA.outs.get(e.from).push(e)}
+  for(const a of RA.outs.values())a.sort((x,y)=>(y.priority||0)-(x.priority||0));
+}
+function raSyncFromWorkspace(force=false){
+  const lib=state.recallLibrary;
+  if(!force&&RA.LSource==='workspace'&&RA.L===lib)return;
+  RA.L=lib;RA.LSource='workspace';RA.path=[];RA.page=0;raIndex();
+}
+function raResolve(q){
+  if(RA.byId.has(q))return{ids:[q],mode:'ID'};
+  const k=raN(q),t=RA.titles.get(k)||[];
+  if(t.length)return{ids:t,mode:'正式标题'};
+  return{ids:RA.aliases.get(k)||[],mode:'Alias'};
+}
+function raCurrent(){return RA.path[RA.path.length-1]}
+function raEligibleFor(id,pth=RA.path){
+  if(!id)return[];
+  const ancestors=new Set(pth.slice(0,-1));
+  return(RA.outs.get(id)||[]).filter(e=>e.to!==id&&!ancestors.has(e.to)&&RA.byId.has(e.to));
+}
+function raPathTitles(pth=RA.path){return pth.map(id=>RA.byId.get(id)?.title||id)}
+function raAutoStatusFor(count){return count===0?'断链':count===1?'单候选':'可继续'}
+function raPersist(){try{localStorage.setItem(RA_STORAGE_KEY,JSON.stringify(RA.records.slice(-2000)))}catch(e){}}
+function raRestore(){try{const raw=localStorage.getItem(RA_STORAGE_KEY);if(raw){const a=JSON.parse(raw);if(Array.isArray(a))RA.records=a}}catch(e){}}
+function raLatest(){return [...RA.records].reverse().find(r=>r.id===RA.lastRecordId)}
+function raAddRecord(rec){
+  rec.id=raRid();rec.at=raIso();rec.manualVerdict='';rec.note='';
+  RA.records.push(rec);RA.lastRecordId=rec.id;raPersist();raRenderRecords();
+  return rec;
+}
+function raRecordNodeEntry(id,source,query='',mode=''){
+  const c=raEligibleFor(id),n=RA.byId.get(id);
+  return raAddRecord({
+    type:'node',source,query,matchMode:mode,
+    nodeId:id,nodeTitle:n?.title||id,
+    autoStatus:raAutoStatusFor(c.length),candidateCount:c.length,
+    firstChoices:c.slice(0,4).map(e=>({id:e.to,title:RA.byId.get(e.to)?.title||e.to,label:e.label||'',priority:e.priority??null})),
+    path:raPathTitles()
+  });
+}
+function raRecordMiss(query){
+  const broad=(RA.L?.metadata?.testerBroadTerms&&RA.L.metadata.testerBroadTerms[query])||'';
+  if(broad)return raAddRecord({type:'input',source:'input',query,matchMode:'',nodeId:'',nodeTitle:'',autoStatus:'过宽词',candidateCount:0,firstChoices:[],path:raPathTitles(),suggestion:broad});
+  return raAddRecord({type:'input',source:'input',query,matchMode:'',nodeId:'',nodeTitle:'',autoStatus:'未命中',candidateCount:0,firstChoices:[],path:raPathTitles()});
+}
+function raRecordAmbiguous(query,ids){
+  return raAddRecord({type:'input',source:'input',query,matchMode:'',nodeId:'',nodeTitle:'',autoStatus:'多义',candidateCount:null,
+    matches:ids.map(id=>({id,title:RA.byId.get(id)?.title||id})),firstChoices:[],path:raPathTitles()});
+}
+function raSetStatus(s,cls=''){const el=document.getElementById('raStatus');if(!el)return;el.className='ra-status '+(cls||'');el.innerHTML=s}
+function raLibraryLabel(){return RA.LSource==='workspace'?'当前工作区联想库':'临时载入的外部 JSON'}
+function raRenderCurrent(mode=''){
+  const box=document.getElementById('raCurrent');if(!box)return;
+  if(!raCurrent()){box.innerHTML='<div class="ra-empty">输入关键词或点击快速入口开始。</div>';return}
+  const n=RA.byId.get(raCurrent()),al=(n.aliases||[]).map(raEsc).join(' · ');
+  box.innerHTML=`<h2>${raEsc(n.title)}</h2>${n.titleEn?`<div class="ra-en">${raEsc(n.titleEn)}</div>`:''}
+  <div class="ra-prompt">${raEsc(n.prompt||'')}</div>${n.hint?`<div class="ra-hint">${raEsc(n.hint)}</div>`:''}
+  <div class="ra-pills"><span class="ra-pill">ID: ${raEsc(n.id)}</span><span class="ra-pill">Priority: ${raEsc(n.priority??'—')}</span>${mode?`<span class="ra-pill">${raEsc(mode)}</span>`:''}</div>
+  <details><summary>查看 Alias</summary><div class="ra-aliases">${al||'无'}</div></details>`;
+}
+function raRenderPath(){
+  const b=document.getElementById('raPath');if(!b)return;
+  if(!RA.path.length){b.innerHTML='<span class="muted tiny">暂无</span>';return}
+  b.innerHTML=RA.path.map((id,i)=>`<button class="btn small ra-crumb" data-ra-i="${i}">${raEsc(RA.byId.get(id)?.title||id)}</button>`).join('');
+  b.querySelectorAll('[data-ra-i]').forEach(x=>x.onclick=()=>{
+    RA.path=RA.path.slice(0,Number(x.dataset.raI)+1);RA.page=0;raRenderAll();
+    raRecordNodeEntry(raCurrent(),'path-jump','','路径回跳');
+  });
+}
+function raRenderChoices(){
+  const info=document.getElementById('raInfo'),box=document.getElementById('raChoices');if(!box)return;
+  const a=raEligibleFor(raCurrent()),pages=Math.max(1,Math.ceil(a.length/RA_PAGE_SIZE));
+  if(RA.page>=pages)RA.page=0;
+  const s=a.slice(RA.page*RA_PAGE_SIZE,RA.page*RA_PAGE_SIZE+RA_PAGE_SIZE);
+  if(info)info.textContent=a.length?`有效候选 ${a.length} 个 · 第 ${RA.page+1}/${pages} 组`:'有效候选 0 个';
+  box.innerHTML=s.length?s.map(e=>`<button class="ra-choice" data-ra-to="${raEsc(e.to)}">
+    <div class="ra-ct">${raEsc(RA.byId.get(e.to)?.title||e.to)}<span class="ra-pri">${raEsc(e.priority??'')}</span></div>
+    <div class="ra-cl">${raEsc(e.label||'关联')}</div></button>`).join(''):
+    '<div class="ra-empty">没有更多系统推荐。此状态会自动记录为"断链"；也可以继续手动输入词测试能否重新接库。</div>';
+  box.querySelectorAll('[data-ra-to]').forEach(x=>x.onclick=()=>{
+    RA.path.push(x.dataset.raTo);RA.page=0;raRenderAll();raRecordNodeEntry(x.dataset.raTo,'click','','候选点击');
+  });
+  const next=document.getElementById('raNext'),back=document.getElementById('raBack');
+  if(next)next.disabled=a.length<=RA_PAGE_SIZE;
+  if(back)back.disabled=RA.path.length<=1;
+}
+function raRenderRecords(){
+  const sum=document.getElementById('raSummary'),box=document.getElementById('raLog');if(!box)return;
+  const total=RA.records.length;
+  const counts=k=>RA.records.filter(r=>r.autoStatus===k).length;
+  const manualBad=RA.records.filter(r=>r.manualVerdict&&r.manualVerdict!=='正常').length;
+  if(sum)sum.innerHTML=[
+    ['记录',total],['未命中',counts('未命中')],['过宽词',counts('过宽词')],['多义',counts('多义')],
+    ['断链',counts('断链')],['单候选',counts('单候选')],['人工问题',manualBad]
+  ].map(([l,n])=>`<div class="ra-stat"><b>${n}</b><span>${l}</span></div>`).join('');
+  if(!total){box.innerHTML='<div class="ra-logitem muted tiny">暂无记录。</div>';return}
+  box.innerHTML=RA.records.slice(-120).reverse().map(r=>{
+    const cls=['未命中','断链'].includes(r.autoStatus)?'bad':(['多义','单候选','过宽词'].includes(r.autoStatus)?'warn':'ok');
+    const name=r.query?`输入“${raEsc(r.query)}”${r.nodeTitle?' → '+raEsc(r.nodeTitle):''}`:raEsc(r.nodeTitle||r.type);
+    const manual=r.manualVerdict?` · 人工：<b>${raEsc(r.manualVerdict)}</b>`:'';
+    const note=r.note?`<div>备注：${raEsc(r.note)}</div>`:'';
+    const suggestion=r.suggestion?`<div>建议：${raEsc(r.suggestion)}</div>`:'';
+    const choices=(r.firstChoices||[]).length?`<div>第一屏：${r.firstChoices.map(x=>raEsc(x.title)).join(' / ')}</div>`:'';
+    return `<div class="ra-logitem"><div class="ra-logtop"><b>${name}</b><span class="ra-tag ${cls}">${raEsc(r.autoStatus||'')}</span></div>
+      <div>候选：${r.candidateCount??'—'}${manual}</div>${choices}${suggestion}${note}</div>`;
+  }).join('');
+}
+function raRenderAll(mode=''){raRenderCurrent(mode);raRenderChoices();raRenderPath()}
+function raRenderAcceptance(){
+  const box=document.getElementById('raChoices');if(!box)return;
+  raSyncFromWorkspace();
+  const src=document.getElementById('raLibrarySource');
+  if(src)src.textContent=`${raLibraryLabel()}：${(RA.L?.nodes||[]).length} 节点 / ${(RA.L?.edges||[]).length} 边`;
+  raRenderAll();raRenderRecords();
+}
+function raSubmit(q){
+  q=String(q||'').trim();if(!q)return;
+  raSyncFromWorkspace();
+  if(!(RA.L?.nodes||[]).length){raSetStatus('联想库为空：请先在“① 基础数据与导入”导入联想库，或在此载入 JSON。','bad');return}
+  const r=raResolve(q);
+  if(r.ids.length===1){
+    const id=r.ids[0];RA.path.push(id);RA.page=0;raRenderAll(r.mode);
+    raRecordNodeEntry(id,'input',q,r.mode);
+    raSetStatus(`✓ <b>${raEsc(q)}</b> → <b>${raEsc(RA.byId.get(id).title)}</b>（${r.mode}）`,'ok');
+  }else if(r.ids.length>1){
+    raRecordAmbiguous(q,r.ids);
+    raSetStatus(`“${raEsc(q)}”命中多个节点：`+r.ids.map(id=>`<button class="btn small ra-crumb" data-ra-id="${raEsc(id)}">${raEsc(RA.byId.get(id)?.title||id)}</button>`).join(' '),'warn');
+    document.getElementById('raStatus')?.querySelectorAll('[data-ra-id]').forEach(x=>x.onclick=()=>{
+      RA.path.push(x.dataset.raId);RA.page=0;raRenderAll('消歧选择');raRecordNodeEntry(x.dataset.raId,'disambiguation',q,'消歧选择');
+      raSetStatus('已手动消歧。','ok');
+    });
+  }else{
+    const rec=raRecordMiss(q);
+    if(rec.autoStatus==='过宽词')raSetStatus(`输入词过宽：<b>${raEsc(q)}</b>。${raEsc(rec.suggestion||'建议补充更具体上下文。')}`,'warn');
+    else raSetStatus(`未命中：<b>${raEsc(q)}</b>。已自动记录为“未命中”。`,'bad');
+  }
+  const input=document.getElementById('raQuery');if(input)input.select();
+}
+function raFocusNode(nodeId){
+  raSyncFromWorkspace();
+  if(!RA.byId.has(nodeId))return false;
+  RA.path.push(nodeId);RA.page=0;raRenderAll('演示跳转');raRecordNodeEntry(nodeId,'demo-jump','','演示跳转');
+  return true;
+}
+function raUpdateLatest(verdict,noteOnly=false){
+  const r=raLatest(),status=document.getElementById('raNoteStatus');
+  if(!r){if(status)status.textContent='还没有记录。';return}
+  if(!noteOnly)r.manualVerdict=verdict;
+  const note=document.getElementById('raNote');
+  r.note=note?note.value.trim():'';
+  r.updatedAt=raIso();raPersist();raRenderRecords();
+  if(status)status.textContent=`已保存到：${r.query||r.nodeTitle||r.autoStatus}`;
+}
+function raReportObject(){
+  const summary={
+    total:RA.records.length,
+    unresolved:RA.records.filter(r=>r.autoStatus==='未命中').length,
+    broadTerms:RA.records.filter(r=>r.autoStatus==='过宽词').length,
+    ambiguous:RA.records.filter(r=>r.autoStatus==='多义').length,
+    deadEnds:RA.records.filter(r=>r.autoStatus==='断链').length,
+    singleChoice:RA.records.filter(r=>r.autoStatus==='单候选').length,
+    manualNormal:RA.records.filter(r=>r.manualVerdict==='正常').length,
+    manualIssues:RA.records.filter(r=>r.manualVerdict&&r.manualVerdict!=='正常').length
+  };
+  return{
+    reportType:'PMP Recall Association Acceptance Report',
+    testerVersion:'V8-recording · Prep Studio integration',
+    exportedAt:raIso(),
+    librarySource:raLibraryLabel(),
+    library:{updatedAt:RA.L?.updatedAt||'',nodeCount:(RA.L?.nodes||[]).length,edgeCount:(RA.L?.edges||[]).length},
+    summary,records:RA.records
+  };
+}
+function raDownload(name,text,type){
+  const blob=new Blob([text],{type:type||'text/plain;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+}
+
+/* ── 事件绑定（脚本位于 body 末尾，元素已就绪）──────────── */
+function raBindEvents(){
+  const go=document.getElementById('raGo'),input=document.getElementById('raQuery');
+  if(!go||!input)return;
+  go.onclick=()=>raSubmit(input.value);
+  input.onkeydown=e=>{if(e.key==='Enter')raSubmit(e.currentTarget.value)};
+  document.querySelectorAll('[data-raq]').forEach(x=>x.onclick=()=>{input.value=x.dataset.raq;raSubmit(x.dataset.raq)});
+  const next=document.getElementById('raNext'),back=document.getElementById('raBack');
+  if(next)next.onclick=()=>{const a=raEligibleFor(raCurrent());if(a.length>RA_PAGE_SIZE){RA.page=(RA.page+1)%Math.ceil(a.length/RA_PAGE_SIZE);raRenderChoices()}};
+  if(back)back.onclick=()=>{if(RA.path.length>1){RA.path.pop();RA.page=0;raRenderAll();raRecordNodeEntry(raCurrent(),'back','','回退一步')}};
+  const reset=document.getElementById('raResetPath');
+  if(reset)reset.onclick=()=>{RA.path=[];RA.page=0;input.value='';raRenderAll();raSetStatus('路径已重置；验收记录不会被清空。')};
+  document.querySelectorAll('[data-rav]').forEach(b=>b.onclick=()=>raUpdateLatest(b.dataset.rav,false));
+  const saveNote=document.getElementById('raSaveNote');
+  if(saveNote)saveNote.onclick=()=>raUpdateLatest('',true);
+  const exportJson=document.getElementById('raExportJson');
+  if(exportJson)exportJson.onclick=()=>{
+    raDownload(`PMP联想库验收报告_${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(raReportObject(),null,2),'application/json');
+  };
+  const exportMd=document.getElementById('raExportMd');
+  if(exportMd)exportMd.onclick=()=>{
+    const R=raReportObject(),s=R.summary;
+    let md=`# PMP 联想库验收报告\n\n- 导出时间：${R.exportedAt}\n- 联想库：${R.librarySource}（${R.library.nodeCount} 节点 / ${R.library.edgeCount} 边）\n- 总记录：${s.total}\n- 未命中：${s.unresolved}\n- 过宽词：${s.broadTerms}\n- 多义：${s.ambiguous}\n- 断链：${s.deadEnds}\n- 单候选：${s.singleChoice}\n- 人工正常：${s.manualNormal}\n- 人工问题：${s.manualIssues}\n`;
+    R.records.forEach((r,i)=>{
+      md+=`\n### ${i+1}. ${r.query?`输入「${r.query}」`:r.nodeTitle||r.type}\n`;
+      md+=`- 自动状态：${r.autoStatus||''}\n- 命中节点：${r.nodeTitle||'—'}\n- 命中方式：${r.matchMode||'—'}\n- 有效候选：${r.candidateCount??'—'}\n`;
+      if((r.firstChoices||[]).length)md+=`- 第一屏：${r.firstChoices.map(x=>x.title).join(' / ')}\n`;
+      if((r.path||[]).length)md+=`- 当时路径：${r.path.join(' → ')}\n`;
+      if(r.manualVerdict)md+=`- 人工判断：${r.manualVerdict}\n`;
+      if(r.note)md+=`- 备注：${r.note}\n`;
+    });
+    raDownload(`PMP联想库验收报告_${new Date().toISOString().slice(0,10)}.md`,md,'text/markdown;charset=utf-8');
+  };
+  const clearLog=document.getElementById('raClearLog');
+  if(clearLog)clearLog.onclick=()=>{
+    if(!confirm('确认清空本验收器保存的测试记录？')){
+      return;
+    }
+    RA.records=[];RA.lastRecordId=null;try{localStorage.removeItem(RA_STORAGE_KEY)}catch(e){}
+    raRenderRecords();const ns=document.getElementById('raNoteStatus');if(ns)ns.textContent='';
+  };
+  const file=document.getElementById('raFile');
+  if(file)file.onchange=async e=>{
+    const f=e.target.files?.[0];if(!f)return;
+    try{
+      const j=JSON.parse(await f.text());
+      if(!Array.isArray(j.nodes)||!Array.isArray(j.edges))throw new Error('JSON 缺少 nodes / edges');
+      RA.L=j;RA.LSource='external';RA.path=[];RA.page=0;raIndex();raRenderAll();
+      raRenderAcceptance();
+      raSetStatus(`✓ 已临时加载 ${raEsc(f.name)}：${j.nodes.length} 节点 / ${j.edges.length} 边。记录将继续累计。`,'ok');
+      if(confirm('是否同时将其设为当前工作区联想库？（会更新工作区并标记草稿待保存）')){
+        state.recallLibrary=normalizeRecall(j);markWorkspaceDirty();raSyncFromWorkspace(true);raRenderAcceptance();
+        raSetStatus(`✓ 已设为工作区联想库：${j.nodes.length} 节点 / ${j.edges.length} 边。`,'ok');
+      }
+    }catch(err){raSetStatus('加载失败：'+raEsc(err.message),'bad')}
+    finally{e.target.value=''}
+  };
+}
+raBindEvents();
+raRestore();
+raRenderRecords();
+
 function refreshHeader(){
   document.getElementById('hdrTree').textContent='知识树 '+(state.knowledgeTree?.nodes.length||0);
   document.getElementById('hdrRecall').textContent='联想库 '+state.recallLibrary.nodes.length;
@@ -2006,7 +2464,7 @@ function setTab(name){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.id==='tab-'+name));
   if(name==='validate')runValidation();
-  if(name==='association')renderRecallList();
+  if(name==='association')renderRecallAcceptance();
   if(name==='management'){renderPrincipleList();renderPrincipleEditor();renderTagManager()}
   if(name==='demo')renderDemoValidation();
   if(name==='export')renderAuditTrail();
@@ -2069,7 +2527,7 @@ function renderQuestionListOnly(){
   const list=document.getElementById('questionList');if(!list)return;list.innerHTML='';
   document.getElementById('qCount').textContent=state.questionBank.questions.length+' 题';
   state.questionBank.questions.forEach((q,i)=>{
-    const d=document.createElement('div');d.className='list-item'+(q.id===state.currentQuestionId?' active':'');
+    const d=document.createElement('div');d.className='list-item'+(q.id===state.currentQuestionId?' active':'')+(typeof familyListClass==='function'&&familyListClass(q)?' '+familyListClass(q):'');
     const st=questionCompleteness(q);
     const fam=questionFamily(q);
     const famBadge=fam.role==='standalone'?'':`<span class="family-badge family-${fam.role}" title="${fam.role==='root'?'母题':'家族成员'} ${esc(fam.familyKey)}">【${fam.role==='root'?'母题':'成员'}${fam.role==='member'&&fam.equivalenceGrade?'·'+fam.equivalenceGrade:''}】</span>`;
@@ -2081,6 +2539,7 @@ function renderQuestions(){
   if(!state.currentQuestionId&&state.questionBank.questions[0])state.currentQuestionId=state.questionBank.questions[0].id;
   renderQuestionListOnly();
   renderQuestionEditor();
+  if(typeof renderFamilyQuestionTabs==='function')renderFamilyQuestionTabs();
 }
 function treeOptions(selected){
   if(!state.knowledgeTree)return '<option value="">未加载知识树</option>';
@@ -2122,6 +2581,44 @@ function renderQuestionFacetBindings(){
     q.metadata.subjectFacets=selectedFacetsFromIds(ids,subject).concat(normalizeQuestionFacets(q.metadata?.subjectFacets,subject).filter(x=>x.status==='unknown'));
     renderCurrentIssues();markWorkspaceDirty();
   }));
+}
+function createFamilyMemberFromCurrent(){
+  const q=currentQuestion();if(!q)return;
+  const root=familyRootFor(q);
+  const base=root&&root.id!==q.id?root:q;
+  if(questionFamily(base).role!=='root'&&!confirm('当前题不是母题，先把它设为母题再创建成员？'))return;
+  makeQuestionFamilyRoot(base);
+  const copy=QuestionService.duplicatePayload(base);
+  copy.title=base.title+'（家族成员）';
+  /* 插入到母题（及其已有成员）正下方，不排到列表末尾 */
+  const famKey=questionFamily(base).familyKey;
+  let insertAt=state.questionBank.questions.findIndex(x=>x.id===base.id);
+  if(insertAt>=0){
+    for(let i=insertAt+1;i<state.questionBank.questions.length;i++){
+      const f2=questionFamily(state.questionBank.questions[i]);
+      if(f2.role!=='standalone'&&(f2.familyKey===famKey||f2.rootQuestionId===base.id))insertAt=i;else break;
+    }
+    state.questionBank.questions.splice(insertAt+1,0,copy);
+  }else state.questionBank.questions.push(copy);
+  makeQuestionFamilyMember(copy,base);
+  questionFamily(copy).qualityConfirmed=false;
+  state.currentQuestionId=copy.id;state.questionBank.updatedAt=Date.now();
+  renderQuestions();renderQuestionEditor();markWorkspaceDirty();toast('已从母题创建家族成员');
+}
+function renderFamilyQuestionTabs(){
+  const host=document.getElementById('familyQuestionTabs'),card=document.getElementById('questionEditCard');if(!host||!card)return;
+  card.classList.remove('family-tone-root','family-tone-equivalent','family-tone-decomposed','family-tone-extension','family-tone-standalone');
+  const q=currentQuestion();if(!q){host.innerHTML='';return}
+  card.classList.add(familyToneClass(q));
+  const f=questionFamily(q),root=familyRootFor(q);
+  if(f.role==='standalone'||!root){host.innerHTML='<div class="family-editor-standalone"><span class="family-role-chip standalone">独立题</span> 当前题尚未加入题目家族。</div>';return}
+  const members=familyMembersFor(root),items=[root,...members],rf=questionFamily(root);
+  host.innerHTML=`<div class="family-editor-tabs-wrap"><div class="family-editor-tabs-head"><b>当前题目家族</b><span class="family-role-chip ${familyToneKey(q)}">${esc(familyRoleLabel(f.role))}</span><span class="muted tiny">${esc(rf.familyKey||'未命名家族')} · ${items.length} 题</span></div><div class="family-editor-tabs">${items.map((item,idx)=>{const tone=familyToneKey(item),ff=questionFamily(item),label=ff.role==='root'?'母题':`成员 ${idx}`;return `<button type="button" class="family-editor-tab ${tone}${familyHoverClass(item)}${item.id===q.id?' active':''}" data-family-tab="${esc(item.id)}"><strong>${esc(label)} · ${esc(item.title||'未命名题')}</strong><span>${esc(familyTabMeta(item))}</span></button>`}).join('')}</div></div>`;
+  host.querySelectorAll('[data-family-tab]').forEach(btn=>btn.onclick=async()=>{
+    if(btn.dataset.familyTab===state.currentQuestionId)return;
+    const target=state.questionBank.questions.find(x=>x.id===btn.dataset.familyTab);if(!target)return;
+    await switchQuestionForEdit(target);state.currentQuestionId=target.id;renderQuestions();
+  });
 }
 function renderQuestionFamilyEditor(){
   const q=currentQuestion(),box=document.getElementById('questionFamilyPanel');if(!q||!box)return;
@@ -2166,7 +2663,7 @@ function renderQuestionFamilyEditor(){
     <span class="muted tiny">${f.role==='standalone'?'独立题不参与家族分组。':root?`家族 ${esc(questionFamily(root).familyKey)} · 成员 ${members.length} 道 · ${coverage.ready?'已达到诊断就绪':coverage.complete?'结构完整，待人工确认':'未达到诊断就绪（强等价 '+coverage.strong+'/2 · 概念 '+(coverage.concept?1:0)+'/1 · 理解 '+(coverage.understanding?1:0)+'/1 · 高阶 '+(coverage.highOrder?1:0)+'/1）'}（Root-only 批次合法，这只是就绪提示）`:'尚未绑定母题。'}</span>
   </div>
   ${members.length?`<div class="muted tiny" style="margin-top:8px">家族成员：${members.map(m=>`<a href="javascript:void(0)" data-qf-goto="${esc(m.id)}" style="margin-right:8px">${esc(m.title)}（${familyRelationLabel(questionFamily(m).relationToRoot)}${questionFamily(m).equivalenceGrade?'·'+questionFamily(m).equivalenceGrade:''}）</a>`).join('')}</div>`:''}`;
-  const rerender=()=>{renderQuestionFamilyEditor();renderQuestionListOnly();renderCurrentIssues();markWorkspaceDirty()};
+  const rerender=()=>{renderQuestionFamilyEditor();renderQuestionListOnly();renderFamilyQuestionTabs();renderCurrentIssues();markWorkspaceDirty()};
   document.getElementById('qfRole').onchange=e=>{
     const role=e.target.value;
     if(role==='root')makeQuestionFamilyRoot(q);
@@ -2194,31 +2691,22 @@ function renderQuestionFamilyEditor(){
   document.getElementById('qfNotes').oninput=e=>{questionFamily(q).notes=e.target.value.trim();markWorkspaceDirty()};
   box.querySelectorAll('[data-qf-goto]').forEach(el=>el.addEventListener('click',()=>{state.currentQuestionId=el.dataset.qfGoto;renderQuestions();renderQuestionEditor()}));
   const createBtn=document.getElementById('btnCreateFamilyMember');
-  createBtn.onclick=()=>{
-    const base=root&&root.id!==q.id?root:q;
-    if(questionFamily(base).role!=='root'&&!confirm('当前题不是母题，先把它设为母题再创建成员？'))return;
-    makeQuestionFamilyRoot(base);
-    const copy=QuestionService.duplicatePayload(base);
-    copy.title=base.title+'（家族成员）';
-    state.questionBank.questions.push(copy);
-    makeQuestionFamilyMember(copy,base);
-    questionFamily(copy).qualityConfirmed=false;
-    state.currentQuestionId=copy.id;state.questionBank.updatedAt=Date.now();
-    renderQuestions();renderQuestionEditor();markWorkspaceDirty();toast('已从母题创建家族成员');
-  };
+  createBtn.onclick=()=>createFamilyMemberFromCurrent();
   const goRoot=document.getElementById('btnGoFamilyRoot');
   if(goRoot&&!root)goRoot.disabled=true;
   else if(goRoot)goRoot.onclick=()=>{state.currentQuestionId=root.id;renderQuestions();renderQuestionEditor()};
 }
 function renderSubjectFacetManager(){  const box=document.getElementById('subjectFacetManager');if(!box)return;
+  /* 默认兜底：内置 PMP 官方 Schema，保证首次进入即有分类预览 */
+  if(!state.subjectFacetRegistry&&typeof normalizeSubjectFacetRegistry==='function')state.subjectFacetRegistry=normalizeSubjectFacetRegistry({});
   const subject=state.questionBank.subject||'PMP',schema=facetSchemaForSubject(subject);
   if(!schema){
     box.innerHTML=`<div class="help">当前科目 <b>${esc(subject)}</b> 尚未配置科目分类。</div><div class="toolbar"><button class="btn small primary" id="btnImportFacetSchema">导入科目分类</button><input type="file" id="fileFacetSchema" accept=".json,application/json" hidden></div>`;
   }else{
     box.innerHTML=`
     <div class="toolbar"><b>${esc(schema.name||subject+' 科目分类')}</b><span class="spacer"></span><button class="btn small" id="btnLoadServerFacets">从服务器拉取</button><button class="btn small" id="btnPushServerFacets">推送到服务器</button><button class="btn small" id="btnExportCurrentFacetSchema">导出分类配置</button><button class="btn small primary" id="btnImportFacetSchema">导入 / 替换分类</button><input type="file" id="fileFacetSchema" accept=".json,application/json" hidden></div>
-    ${schema.dimensions.map(d=>`<div style="margin-top:8px"><label>${esc(d.label)}（${d.selection==='single'?'单选':'多选'} · ${d.values.length} 值）</label><div class="muted tiny">${d.values.map(v=>esc(v.label)+(v.status==='deprecated'?'（已废弃）':'')).join(' · ')}</div></div>`).join('')}
-    <div class="muted tiny" style="margin-top:8px">Schema ID：<code>${esc(schema.schemaId)}</code> · 科目：<code>${esc(schema.subjectId)}</code>；维度与取值使用稳定 ID，历史使用过的 ID 不可硬删除或改写。服务器 Schema 是正式真源，推送遇到版本冲突时会自动刷新最新版并要求重新确认。</div>`;
+    ${schema.dimensions.map(d=>`<div class="facet-preview-dim"><label>${esc(d.label)}<span class="muted tiny">（${d.selection==='single'?'单选':'多选'}）</span></label><div class="facet-chip-row">${d.values.map(v=>`<span class="facet-chip${v.status==='deprecated'?' deprecated':''}${v.status==='inactive'?' inactive':''}">${esc(v.label)}</span>`).join('')}</div></div>`).join('')}
+    <div class="muted tiny" style="margin-top:8px">分类取值使用系统稳定编码，随题目数据保存与导出，无需人工维护；历史使用过的编码不可删除。服务器 Schema 是正式真源，推送遇到版本冲突时会自动刷新最新版并要求重新确认。</div>`;
   }
   const importBtn=document.getElementById('btnImportFacetSchema'),file=document.getElementById('fileFacetSchema');
   if(importBtn)importBtn.onclick=()=>file?.click();
@@ -2627,6 +3115,7 @@ function validateKeyword(q,c){
   if(!word.ok)issues.push({level:'warn',message:`关键词“${c.text}”：${word.msg}`,suggest:'缩短为词或稳定专业术语。'});
   if(!(c.matchLocations||[]).length)issues.push({level:'error',message:`关键词“${c.text}”已不在题干/选项中`,suggest:'重新标记或删除该关键词。'});
   if(c.recallNodeId&&!recallIndex().byId.has(c.recallNodeId))issues.push({level:'error',message:`关键词“${c.text}”引用的联想入口不存在：${c.recallNodeId}`,suggest:'清除该引用，或重新选择一个现有联想入口。'});
+  if(!c.recallNodeId)issues.push({level:'warn',message:`${c.keywordLevel==='core'?'核心':'普通'}关键词“${c.text}”未关联联想入口`,suggest:'Recall 为可选增强；如需联想通路，可在关键词卡片中选择联想入口。'});
   if(c.keywordLevel==='core'){
     if(!c.solutionRole||c.solutionRole==='context')issues.push({level:'error',message:`核心关键词“${c.text}”缺少解题作用`,suggest:'选择 Decision Cue / Concept Anchor / Condition Anchor / Answer Anchor。'});
     if(!String(c.coreReason||'').trim())issues.push({level:'error',message:`核心关键词“${c.text}”缺少核心理由`,suggest:'说明这个词为什么影响本题推理或答案选择。'});
@@ -2660,7 +3149,7 @@ function validateQuestion(q,deep=true){
 function renderCurrentIssues(){
   const q=currentQuestion(),box=document.getElementById('questionIssues');if(!box)return;
   if(!q){box.innerHTML='';return}
-  const issues=validateQuestion(q,true);
+  const issues=validateQuestion(q,true).sort((a,b)=>(a.level==='error'?0:1)-(b.level==='error'?0:1));
   if(!issues.length){box.innerHTML='<div class="issue ok"><strong>✓ 当前题通过</strong>结构、知识点、关键词和核心关键词规则均通过。</div>';return}
   box.innerHTML=issues.slice(0,12).map(x=>`<div class="issue ${x.level}"><strong>${x.level==='error'?'错误':'提醒'}：${esc(x.message)}</strong><span class="smalltxt">${esc(x.suggest||'')}</span></div>`).join('');
 }
@@ -2677,12 +3166,12 @@ function renderPrincipleList(){
 function renderPrincipleEditor(){
   const box=document.getElementById('principleEditor');if(!box)return;const p=principleById(state.currentPrincipleId);if(!p){box.innerHTML='<div class="no-data">请选择或新建原则。</div>';return}let preset=presetByPrincipleId(p.id);
   box.innerHTML=`<div class="form-grid"><div><label>原则 ID</label><input type="text" value="${esc(p.id)}" disabled></div><div><label>状态</label><select id="pmPrincipleStatus"><option value="active"${p.status==='active'?' selected':''}>active</option><option value="inactive"${p.status==='inactive'?' selected':''}>inactive</option></select></div><div class="span2"><label>原则名称</label><input id="pmPrincipleName" type="text" value="${esc(p.name)}"></div><div class="span2"><label>易混淆原则 IDs</label><input id="pmConfusable" type="text" value="${esc((p.confusablePrincipleIds||[]).join(', '))}"></div></div>
-  <div class="section"><div class="section-title">系统预设归纳卡</div><div class="form-grid"><div class="span2"><label>标题（与原则名称自动一致）</label><input id="pmPresetTitle" type="text" readonly value="${esc('原则：'+p.name)}"></div><div class="span2"><label>内容</label><textarea id="pmPresetContent">${esc(preset?.content||'')}</textarea></div><div><label>状态</label><select id="pmPresetStatus"><option value="draft"${preset?.status==='draft'||!preset?' selected':''}>draft</option><option value="active"${preset?.status==='active'?' selected':''}>active</option><option value="inactive"${preset?.status==='inactive'?' selected':''}>inactive</option></select></div><div><label>版本</label><input id="pmPresetVersion" type="number" min="1" value="${preset?.version||1}"></div></div></div>
+  <div class="section"><div class="section-title">系统预设归纳卡</div><div class="form-grid"><div class="span2"><label>标题（与原则名称自动一致）</label><input id="pmPresetTitle" type="text" readonly value="${esc(p.name)}"></div><div class="span2"><label>内容</label><textarea id="pmPresetContent">${esc(preset?.content||'')}</textarea></div><div><label>状态</label><select id="pmPresetStatus"><option value="draft"${preset?.status==='draft'||!preset?' selected':''}>draft</option><option value="active"${preset?.status==='active'?' selected':''}>active</option><option value="inactive"${preset?.status==='inactive'?' selected':''}>inactive</option></select></div><div><label>版本</label><input id="pmPresetVersion" type="number" min="1" value="${preset?.version||1}"></div></div></div>
   <div class="section toolbar"><button class="btn primary" id="pmSave">保存原则与归纳卡</button><button class="btn danger" id="pmDelete">删除原则</button></div>`;
   document.getElementById('pmSave').onclick=async()=>{
     const button=document.getElementById('pmSave');button.disabled=true;
     const principle={...p,name:document.getElementById('pmPrincipleName').value.trim()||'未命名原则',status:document.getElementById('pmPrincipleStatus').value,confusablePrincipleIds:unique(cleanList(document.getElementById('pmConfusable').value)),updatedAt:Date.now()};
-    const nextPreset={...(preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()}),principleId:p.id,title:'原则：'+principle.name,content:document.getElementById('pmPresetContent').value.trim(),status:document.getElementById('pmPresetStatus').value,version:Math.max(1,Number(document.getElementById('pmPresetVersion').value||1)),updatedAt:Date.now()};
+    const nextPreset={...(preset||{id:'preset-'+Date.now().toString(36),principleId:p.id,createdAt:Date.now()}),principleId:p.id,title:principle.name,content:document.getElementById('pmPresetContent').value.trim(),status:document.getElementById('pmPresetStatus').value,version:Math.max(1,Number(document.getElementById('pmPresetVersion').value||1)),updatedAt:Date.now()};
     try{
       Object.assign(p,principle);
       const index=state.synthesisPresets.items.findIndex(item=>item.id===nextPreset.id||item.principleId===p.id);
@@ -2702,12 +3191,26 @@ function renderPrincipleEditor(){
 function tagAliasesForSlot(slot){return unique(cleanList(state.tagConfig?.slotAliases?.[slot]||[]))}
 function exportTagConfig(){
   syncFlatTagAliases(state.tagConfig);
-  const names={};Object.entries(state.tagConfig.names||{}).forEach(([slot,value])=>names[formalTagSlot(slot)]=value);
-  return {names,groupNames:{...(state.tagConfig.groupNames||{})},categoryNames:{...(state.tagConfig.categoryNames||{})},aliases:{...(state.tagConfig.aliases||{})}};
+  const names={};Object.entries(state.tagConfig.names||{}).forEach(([slot,value])=>names[semanticTagSlot(slot)]=value);
+  const slotAliases={};Object.entries(state.tagConfig.slotAliases||{}).forEach(([slot,items])=>slotAliases[semanticTagSlot(slot)]=unique(cleanList(items)));
+  const looseAliases={};Object.entries(state.tagConfig.looseAliases||{}).forEach(([from,to])=>looseAliases[String(from)]=to);
+  return {schemaVersion:3,slotIdStrategy:'global-semantic-v1',names,groupNames:{...(state.tagConfig.groupNames||{})},categoryNames:{...(state.tagConfig.categoryNames||{})},aliases:{...(state.tagConfig.aliases||{})},slotAliases,looseAliases,updatedAt:nowIso()};
 }
+let tagManagerEditOpen=false;
 function renderTagManager(){
   const box=document.getElementById('tagManager');if(!box)return;
-  box.innerHTML=effectiveTagGroups().map(g=>`<div class="tag-group-card"><div class="tag-group-head"><label>一级分类</label><input type="text" data-tag-group="${esc(g.id)}" value="${esc(g.label)}"></div>${g.categories.map(c=>`<div class="tag-category"><div class="tag-category-title"><label>二级分类</label><input type="text" data-tag-category="${esc(g.id+'/'+c.id)}" value="${esc(c.label)}"></div>${c.options.map((name,oi)=>{const slot=tagSlotKey(g,c,oi),aliases=tagAliasesForSlot(slot);return `<div class="tag-slot"><span class="muted tiny">${esc(slot)}</span><div><input type="text" data-tag-name="${esc(slot)}" value="${esc(name)}"><div class="tag-alias-help">修改标签名不会自动把旧名称加入 Alias。</div></div><div><input type="text" data-tag-aliases="${esc(slot)}" value="${esc(aliases.join(', '))}" placeholder="兼容别名，逗号分隔"><div class="tag-alias-status" data-tag-alias-status="${esc(slot)}">${aliases.length?`已保存 ${aliases.length} 个别名`:'无别名'}</div></div></div>`}).join('')}</div>`).join('')}</div>`).join('');
+  if(!tagManagerEditOpen){
+    /* 轻量预览：与科目分类一致的 chips；点击"编辑"进入完整编辑 */
+    box.innerHTML=`<div class="toolbar" style="margin-bottom:4px"><span class="muted tiny">展示教师日常使用的中文名称；改名与别名管理点"编辑"。</span><span class="spacer"></span><button class="btn small" id="btnToggleTagEdit" type="button">编辑</button></div>`
+      +effectiveTagGroups().map(g=>`<div class="facet-preview-dim"><label>${esc(g.label)}</label>${g.categories.map(c=>`<div class="tag-chip-row-title muted tiny">${esc(c.label)}</div><div class="facet-chip-row">${c.options.map(name=>`<span class="facet-chip">${esc(name)}</span>`).join('')}</div>`).join('')}</div>`).join('');
+    const editBtn=document.getElementById('btnToggleTagEdit');
+    if(editBtn)editBtn.onclick=()=>{tagManagerEditOpen=true;renderTagManager()};
+    return;
+  }
+  box.innerHTML=`<div class="toolbar" style="margin-bottom:4px"><span class="muted tiny">修改标签名不会自动把旧名称加入 Alias；需要兼容旧名称请在别名栏补填。</span><span class="spacer"></span><button class="btn small primary" id="btnToggleTagEdit" type="button">完成编辑</button></div>`
+    +effectiveTagGroups().map(g=>`<div class="tag-group-card"><div class="tag-group-head"><label>一级分类</label><input type="text" data-tag-group="${esc(g.id)}" value="${esc(g.label)}"></div>${g.categories.map(c=>`<div class="tag-category"><div class="tag-category-title"><label>二级分类</label><input type="text" data-tag-category="${esc(g.id+'/'+c.id)}" value="${esc(c.label)}"></div>${c.options.map((name,oi)=>{const slot=tagSlotKey(g,c,oi),aliases=tagAliasesForSlot(slot);return `<div class="tag-slot"><div><input type="text" data-tag-name="${esc(slot)}" value="${esc(name)}"><div class="tag-alias-help">修改标签名不会自动把旧名称加入 Alias。</div></div><div><input type="text" data-tag-aliases="${esc(slot)}" value="${esc(aliases.join(', '))}" placeholder="兼容别名，逗号分隔"><div class="tag-alias-status" data-tag-alias-status="${esc(slot)}">${aliases.length?`已保存 ${aliases.length} 个别名`:'无别名'}</div></div></div>`}).join('')}</div>`).join('')}</div>`).join('');
+  const doneBtn=document.getElementById('btnToggleTagEdit');
+  if(doneBtn)doneBtn.onclick=()=>{tagManagerEditOpen=false;renderTagManager()};
   box.querySelectorAll('[data-tag-group]').forEach(el=>el.addEventListener('change',()=>{state.tagConfig.groupNames[el.dataset.tagGroup]=el.value.trim();refreshQuestionTagPaths();renderTagManager()}));
   box.querySelectorAll('[data-tag-category]').forEach(el=>el.addEventListener('change',()=>{state.tagConfig.categoryNames[el.dataset.tagCategory]=el.value.trim();refreshQuestionTagPaths();renderTagManager()}));
   box.querySelectorAll('[data-tag-name]').forEach(el=>el.addEventListener('change',()=>{
@@ -2720,10 +3223,6 @@ function renderTagManager(){
   box.querySelectorAll('[data-tag-aliases]').forEach(el=>el.addEventListener('change',()=>{const slot=el.dataset.tagAliases,current=tagCatalogEntries().find(x=>x.slot===slot)?.label||'';state.tagConfig.slotAliases=state.tagConfig.slotAliases||{};state.tagConfig.slotAliases[slot]=unique(cleanList(el.value)).filter(a=>a&&a!==current);syncFlatTagAliases(state.tagConfig);refreshQuestionTagPaths();const status=box.querySelector(`[data-tag-alias-status="${CSS.escape(slot)}"]`);if(status)status.textContent=state.tagConfig.slotAliases[slot].length?`已保存 ${state.tagConfig.slotAliases[slot].length} 个别名`:'无别名';el.value=state.tagConfig.slotAliases[slot].join(', ')}));
 }
 
-function newRecallNode(){
-  const n={id:uid('recall'),title:'新联想节点',titleEn:'',aliases:[],prompt:'',promptEn:'',hint:'',hintEn:'',priority:0,metadata:{taxonomyNodeId:'',status:'active',source:'prep-studio'}};
-  state.recallLibrary.nodes.push(n);state.currentRecallId=n.id;renderRecallList();renderRecallEditor();toast('已新建联想节点');
-}
 function aliasConflicts(){
   const map=new Map();
   state.recallLibrary.nodes.forEach(n=>[n.title,...(n.aliases||[])].filter(Boolean).forEach(t=>{
@@ -2733,84 +3232,8 @@ function aliasConflicts(){
   }));
   return [...map.entries()].filter(([,a])=>a.length>1).map(([term,nodes])=>({term,nodes}));
 }
-function renderRecallList(){
-  const search=String(document.getElementById('recallSearch')?.value||'').trim().toLowerCase();
-  const list=document.getElementById('recallNodeList');if(!list)return;
-  const rows=state.recallLibrary.nodes.filter(n=>!search||[n.id,n.title,n.titleEn,...(n.aliases||[])].join(' ').toLowerCase().includes(search)).sort((a,b)=>b.priority-a.priority||a.title.localeCompare(b.title,'zh-CN'));
-  list.innerHTML=rows.length?rows.map(n=>`<div class="list-item${n.id===state.currentRecallId?' active':''}" data-recall="${esc(n.id)}"><div class="list-title">${esc(n.title)}</div><div class="list-meta">${esc(n.id)} · Alias ${(n.aliases||[]).length} · Priority ${n.priority}</div></div>`).join(''):'<div class="no-data">没有匹配节点</div>';
-  list.querySelectorAll('[data-recall]').forEach(el=>el.onclick=()=>{state.currentRecallId=el.dataset.recall;state.recallPreviewCandidateId='';renderRecallList();renderRecallEditor()});
-  const conflicts=aliasConflicts();document.getElementById('aliasConflictSummary').textContent=conflicts.length?`⚠ ${conflicts.length} 个名称/Alias 冲突`:'✓ 无名称/Alias 冲突';
-}
 
-function recallPreviewHtml(n){
-  const taxId=n.metadata?.taxonomyNodeId||'',tax=taxId&&state.knowledgeTree?.map.get(taxId),parent=tax?.parentId?state.knowledgeTree?.map.get(tax.parentId):null;
-  const children=tax?state.knowledgeTree.nodes.filter(x=>x.parentId===tax.id).slice(0,7):[],incoming=state.recallLibrary.edges.filter(e=>e.to===n.id),byId=recallIndex().byId;
-  const path=tax?state.knowledgeTree.pathFor(tax.id).join(' > '):'未关联知识点',aliases=unique([n.title,...(n.aliases||[])]).slice(0,7);
-  const selectedId=state.recallPreviewCandidateId||'';
-  const taxNode=(node,extra='')=>node?`<button class="relation-node ${extra}${selectedId===node.id?' selected':''}" data-tax-preview-id="${esc(node.id)}"><b>${esc(state.knowledgeTree.title(node))}</b><small>${esc(node.id)}</small></button>`:`<div class="relation-node mini muted">无</div>`;
-  const childHtml=children.length?children.map(c=>taxNode(c,'mini')).join(''):'<div class="relation-node mini muted">暂无下位知识点</div>';
-  const incomingHtml=incoming.length?incoming.map(e=>{const x=byId.get(e.from);return x?`<button class="chip-btn" data-preview-recall-id="${esc(x.id)}">${esc(x.title)}${e.label?' · '+esc(e.label):''}</button>`:''}).join(''):'<span class="muted">暂无反向联想</span>';
-  const selected=selectedId&&state.knowledgeTree?.map.get(selectedId);
-  return `<div class="relation-map"><div class="relation-breadcrumb">${esc(path)}</div><div class="relation-top">
-    <div class="relation-col"><div class="relation-title">上位概念</div>${taxNode(parent)}</div><div class="relation-arrow"></div>
-    <div class="relation-col"><div class="relation-title">当前联想词</div><div class="relation-node current"><b>${esc(n.title)}</b>${aliases.map(x=>`<small>${esc(x)}</small>`).join('')}</div></div><div class="relation-arrow"></div>
-    <div class="relation-col"><div class="relation-title">下位知识点</div>${childHtml}</div></div>
-    <div class="relation-bottom"><div class="relation-title" style="text-align:left">被哪些节点联想</div><div class="relation-bottom-box">${incomingHtml}</div></div>
-    ${selected?`<div class="relation-selection"><b>当前仅预览：</b>${esc(state.knowledgeTree.title(selected))}<div class="muted tiny">${esc(state.knowledgeTree.pathFor(selected.id).join(' > '))}</div><div class="relation-selection-actions"><button class="btn primary small" id="btnBindRecallCandidate">将“${esc(n.title)}”绑定到此知识点</button><button class="btn small" id="btnCancelRecallCandidate">取消选择</button></div></div>`:''}
-    <div class="synonym-note">上位/下位知识点现在采用<b>“点击预览、明确按钮才改绑”</b>。普通点击不会修改数据；只有点击“绑定到此知识点”才会改变当前联想词的 <code>metadata.taxonomyNodeId</code>。</div></div>`;
-}
-function bindRecallPreview(n){
-  document.querySelectorAll('[data-preview-recall-id]').forEach(b=>b.onclick=()=>{state.currentRecallId=b.dataset.previewRecallId;state.recallPreviewCandidateId='';renderRecallList();renderRecallEditor()});
-  document.querySelectorAll('[data-tax-preview-id]').forEach(b=>b.onclick=()=>{state.recallPreviewCandidateId=b.dataset.taxPreviewId;renderRecallEditor()});
-  const bind=document.getElementById('btnBindRecallCandidate');if(bind)bind.onclick=()=>{const id=state.recallPreviewCandidateId,node=state.knowledgeTree?.map.get(id);if(!node)return;n.metadata=n.metadata||{};n.metadata.taxonomyNodeId=id;state.recallPreviewCandidateId='';renderRecallEditor();renderRecallList();toast(`已绑定到：${state.knowledgeTree.title(node)}`)};
-  const cancel=document.getElementById('btnCancelRecallCandidate');if(cancel)cancel.onclick=()=>{state.recallPreviewCandidateId='';renderRecallEditor()};
-}
 
-function renderRecallEditor(){
-  const n=currentRecall(),ed=document.getElementById('recallEditor');document.getElementById('currentRecallId').textContent=n?.id||'';
-  if(!n){ed.innerHTML='<div class="no-data">请选择或新建联想节点。</div>';return}
-  const outgoing=state.recallLibrary.edges.filter(e=>e.from===n.id);
-  ed.innerHTML=`
-  ${recallPreviewHtml(n)}
-  <div class="node-editor">
-    <div><label>ID</label><input type="text" value="${esc(n.id)}" disabled></div>
-    <div><label>Priority</label><input type="number" data-rfield="priority" value="${n.priority||0}"></div>
-    <div><label>中文名称</label><input type="text" data-rfield="title" value="${esc(n.title)}"></div>
-    <div><label>English</label><input type="text" data-rfield="titleEn" value="${esc(n.titleEn||'')}"></div>
-    <div class="span2"><label>Aliases / 同义词 / 旧译名（每行一个或逗号分隔）</label>
-    <div class="synonym-note">示例：规范词“相关方”；Aliases：利益相关方、干系人、Stakeholder、Stakeholders。所有译名应指向同一个联想节点。</div><textarea data-rfield="aliases">${esc((n.aliases||[]).join('\n'))}</textarea></div>
-    <div class="span2"><label>关联知识点 Node ID</label><select id="recallTaxonomyNode">${treeOptions(n.metadata?.taxonomyNodeId||'')}</select></div>
-    <div><label>Prompt</label><textarea data-rfield="prompt">${esc(n.prompt||'')}</textarea></div>
-    <div><label>Prompt EN</label><textarea data-rfield="promptEn">${esc(n.promptEn||'')}</textarea></div>
-    <div><label>Hint</label><textarea data-rfield="hint">${esc(n.hint||'')}</textarea></div>
-    <div><label>Hint EN</label><textarea data-rfield="hintEn">${esc(n.hintEn||'')}</textarea></div>
-  </div>
-  <div class="section">
-    <div class="section-title"><span>从本节点出发的关系</span><button class="btn small" id="btnAddEdge">+ 关系</button></div>
-    <div id="edgeList">${outgoing.length?outgoing.map(e=>edgeRowHtml(e)).join(''):'<div class="muted smalltxt">暂无关系</div>'}</div>
-  </div>
-  <div class="section toolbar"><button class="btn danger" id="btnDeleteRecall">删除联想节点</button></div>`;
-  bindRecallPreview(n);
-  ed.querySelectorAll('[data-rfield]').forEach(el=>{
-    el.addEventListener('input',()=>{
-      const f=el.dataset.rfield;if(f==='aliases')n.aliases=unique(cleanList(el.value));else if(f==='priority')n.priority=Number(el.value||0);else n[f]=el.value;
-      state.recallLibrary.updatedAt=nowIso();renderRecallList();
-    });
-    el.addEventListener('change',()=>renderRecallEditor());
-  });
-  document.getElementById('recallTaxonomyNode').onchange=e=>{n.metadata=n.metadata||{};n.metadata.taxonomyNodeId=e.target.value};
-  document.getElementById('btnAddEdge').onclick=()=>{state.recallLibrary.edges.push({id:uid('edge'),from:n.id,to:state.recallLibrary.nodes.find(x=>x.id!==n.id)?.id||'',priority:0,label:'关联',metadata:{source:'prep-studio'}});renderRecallEditor()};
-  ed.querySelectorAll('[data-edgefield]').forEach(el=>el.addEventListener('change',()=>updateEdge(el)));
-  ed.querySelectorAll('[data-remove-edge]').forEach(el=>el.onclick=()=>{state.recallLibrary.edges=state.recallLibrary.edges.filter(e=>e.id!==el.dataset.removeEdge);renderRecallEditor()});
-  document.getElementById('btnDeleteRecall').onclick=()=>{if(!confirm('删除该联想节点及其全部关系？'))return;state.recallLibrary.nodes=state.recallLibrary.nodes.filter(x=>x.id!==n.id);state.recallLibrary.edges=state.recallLibrary.edges.filter(e=>e.from!==n.id&&e.to!==n.id);state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';renderRecallList();renderRecallEditor();renderKeywords()};
-}
-function edgeRowHtml(e){
-  const opts=state.recallLibrary.nodes.filter(n=>n.id!==e.from).map(n=>`<option value="${esc(n.id)}"${n.id===e.to?' selected':''}>${esc(n.title)}</option>`).join('');
-  return `<div class="edge-row"><select data-edgefield="to" data-edgeid="${esc(e.id)}">${opts}</select><input type="text" data-edgefield="label" data-edgeid="${esc(e.id)}" value="${esc(e.label||'关联')}"><input type="number" data-edgefield="priority" data-edgeid="${esc(e.id)}" value="${e.priority||0}"><button class="btn small danger" data-remove-edge="${esc(e.id)}">×</button></div>`;
-}
-function updateEdge(el){
-  const e=state.recallLibrary.edges.find(x=>x.id===el.dataset.edgeid);if(!e)return;e[el.dataset.edgefield]=el.dataset.edgefield==='priority'?Number(el.value||0):el.value;
-}
 
 function exportableQuestion(q){
   const out=clone(q),primary=out.metadata?.knowledge?.primaryNodeId||'';
@@ -2853,7 +3276,7 @@ function exportableQuestion(q){
   out.analysis=String(out.analysis||out.explanation||'');out.explanation=out.analysis;
   out.status=out.status||{};
   out.status.contentReady=!!(questionStem(out)&&out.options.every(o=>o.text)&&out.analysis);
-  out.status.keywordsReady=!!out.clues.length;
+  out.status.keywordsReady=out.clues.length>0&&out.clues.every(c=>String(c.text||'').trim());
   out.status.knowledgeReady=!!primary;
   out.status.reasoningReady=!!(out.reasoningSteps||[]).length;
   return out;
@@ -2882,7 +3305,7 @@ function renderDemoRecall(clue){
   const knowledge=layers[0][0]?.metadata?.taxonomyNodeId||'',path=knowledge&&state.knowledgeTree?.map.has(knowledge)?state.knowledgeTree.pathFor(knowledge).join(' > '):'未绑定知识树节点';
   box.innerHTML=`<div><b>关键词：</b>${esc(clue.text)} ${clue.keywordLevel==='core'?'<span class="pill core">核心</span>':'<span class="pill normal">普通</span>'}</div><div class="muted tiny" style="margin:5px 0">${esc(path)}</div>`+
     layers.map((layer,i)=>`<div class="recall-layer"><b>${i===0?'入口':`第${i}层`}</b><span>${layer.map(n=>`<button class="chip-btn" data-demo-recall-jump="${esc(n.id)}">${esc(n.title)}</button>`).join(' ')}</span></div>`).join('');
-  box.querySelectorAll('[data-demo-recall-jump]').forEach(b=>b.onclick=()=>{state.currentRecallId=b.dataset.demoRecallJump;state.recallPreviewCandidateId='';setTab('association');renderRecallList();renderRecallEditor()});
+  box.querySelectorAll('[data-demo-recall-jump]').forEach(b=>b.onclick=()=>{state.currentRecallId=b.dataset.demoRecallJump;state.recallPreviewCandidateId='';setTab('association');if(typeof raFocusNode==='function')raFocusNode(b.dataset.demoRecallJump)});
 }
 function renderDemoPrinciples(q,optionId){
   const box=document.getElementById('demoPrincipleResult');if(!box)return;const ids=q.metadata?.optionPrincipleMap?.[optionId]||[];
@@ -3011,8 +3434,8 @@ function goToValidationIssue(questionId,field=''){
   return true;
 }
 function workspacePayload(){return {
-  prepStudioWorkspaceVersion:4,prepStudioVersion:VERSION,savedAt:nowIso(),
-  schema:{tagSlots:'semantic-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA},
+  prepStudioWorkspaceVersion:6,prepStudioVersion:VERSION,savedAt:nowIso(),
+  schema:{tagSlots:'global-semantic-v1',subjectFacets:'subject-facet-registry-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA,questionFamily:'question-family-v1'},
   knowledgeTree:state.knowledgeTree?{taxonomy:{id:state.knowledgeTree.id,subjectId:state.knowledgeTree.subjectId,name:{zh:state.knowledgeTree.name},version:state.knowledgeTree.version,nodes:state.knowledgeTree.nodes}}:null,
   recallLibrary:state.recallLibrary,questionBank:state.questionBank,principles:state.principles,synthesisPresets:state.synthesisPresets,tagConfig:state.tagConfig,subjectFacetRegistry:state.subjectFacetRegistry,
   server:{
@@ -3027,13 +3450,33 @@ function workspacePayload(){return {
 function migrateWorkspacePayload(input){
   if(!input||!input.prepStudioWorkspaceVersion)throw new Error('不是 Prep Studio 工作区草稿');
   const w=clone(input),from=Number(w.prepStudioWorkspaceVersion||1);
+  let migrated=false;
   if(from<4){
     w.tagConfig=normalizeTagConfig(w.tagConfig||{});
-    w.prepStudioWorkspaceVersion=4;
     w.schema={...(w.schema||{}),tagSlots:'semantic-v1',questionIds:'uuid-v4',keywordSystem:KEYWORD_SCHEMA};
-    w.migratedFromVersion=from;
-    w.migratedAt=nowIso();
+    w.prepStudioWorkspaceVersion=4;migrated=true;
   }
+  if(from<5){
+    /* P4.5.29 v5：Tag 统一 global-semantic-v1，补 Subject Facet Registry，题目补 subjectFacets 默认 [] */
+    w.tagConfig=normalizeTagConfig(w.tagConfig||{});
+    if(typeof normalizeSubjectFacetRegistry==='function')w.subjectFacetRegistry=normalizeSubjectFacetRegistry(w.subjectFacetRegistry||{});
+    if(w.questionBank&&Array.isArray(w.questionBank.questions))w.questionBank.questions=w.questionBank.questions.map(q=>{
+      const metadata=q.metadata&&typeof q.metadata==='object'?q.metadata:{};
+      return {...q,metadata:{...metadata,subjectFacets:Array.isArray(metadata.subjectFacets)?metadata.subjectFacets:[]}};
+    });
+    w.schema={...(w.schema||{}),tagSlots:'global-semantic-v1',subjectFacets:'subject-facet-registry-v1'};
+    w.prepStudioWorkspaceVersion=5;migrated=true;
+  }
+  if(from<6){
+    /* P4.5.29 v6：Question Family v1 归一（缺省 standalone） */
+    if(w.questionBank&&Array.isArray(w.questionBank.questions)&&typeof normalizeQuestionFamily==='function')w.questionBank.questions=w.questionBank.questions.map(q=>{
+      const metadata=q.metadata&&typeof q.metadata==='object'?q.metadata:{};
+      return {...q,metadata:{...metadata,questionFamily:normalizeQuestionFamily(metadata.questionFamily||{},q.id,q.difficulty)}};
+    });
+    w.schema={...(w.schema||{}),questionFamily:'question-family-v1'};
+    w.prepStudioWorkspaceVersion=6;migrated=true;
+  }
+  if(migrated){w.migratedFromVersion=from;w.migratedAt=nowIso()}
   const server=w.server&&typeof w.server==='object'?w.server:{};
   w.server={
     serverBankId:String(server.serverBankId||''),
@@ -3073,16 +3516,15 @@ function applyWorkspacePayload(input){
   state.recallPreviewCandidateId='';refreshQuestionTagPaths();refreshAll();
 }
 
-function refreshAll(){refreshHeader();renderQuestions();renderRecallList();renderRecallEditor();renderPrincipleList();renderPrincipleEditor();renderTagManager();renderSubjectFacetManager();if(document.getElementById('tab-demo')?.classList.contains('active'))renderDemoValidation()}
+function refreshAll(){refreshHeader();renderQuestions();if(typeof renderRecallAcceptance==='function')renderRecallAcceptance();renderPrincipleList();renderPrincipleEditor();renderTagManager();renderSubjectFacetManager();if(document.getElementById('tab-demo')?.classList.contains('active'))renderDemoValidation()}
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b)setTab(b.dataset.tab)});
 document.getElementById('btnNewQuestion').onclick=newQuestion;
+document.getElementById('btnCreateFamilyMemberToolbar').onclick=createFamilyMemberFromCurrent;
 document.getElementById('btnDuplicateQuestion').onclick=duplicateQuestion;
 document.getElementById('btnDeleteQuestion').onclick=deleteQuestion;
 document.getElementById('btnAddNormalKeyword').onclick=()=>addKeyword('normal');
 document.getElementById('btnAddCoreKeyword').onclick=()=>addKeyword('core');
-document.getElementById('btnNewRecall').onclick=newRecallNode;
 document.getElementById('btnNewPrinciple').onclick=newPrinciple;
-document.getElementById('recallSearch').addEventListener('input',()=>renderRecallList());
 document.getElementById('btnRunValidation').onclick=runValidation;
 document.querySelectorAll('[data-creator-key]').forEach(btn=>btn.addEventListener('click',()=>selectFixedCreator(btn.dataset.creatorKey)));
 document.getElementById('btnSwitchCreator').onclick=requireCreatorSelection;
@@ -3099,7 +3541,7 @@ document.addEventListener('input',event=>{if(!event.target.closest?.('[data-tran
 document.addEventListener('change',e=>{if(e.target.id!=='themeSelect')markWorkspaceDirty()},true);
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
-  const mutationIds=new Set(['btnNewQuestion','btnDuplicateQuestion','btnDeleteQuestion','btnAddNormalKeyword','btnAddCoreKeyword','btnNewRecall','btnNewPrinciple','btnParsePastedQuestions','pmSave','pmDelete','floatSave','floatDelete','btnAddEdge','btnDeleteRecall','btnBindRecallCandidate']);
+  const mutationIds=new Set(['btnNewQuestion','btnCreateFamilyMemberToolbar','btnDuplicateQuestion','btnDeleteQuestion','btnAddNormalKeyword','btnAddCoreKeyword','btnNewPrinciple','btnParsePastedQuestions','pmSave','pmDelete','floatSave','floatDelete']);
   if(mutationIds.has(b.id)||b.dataset.removeKw||b.dataset.removeEdge)markWorkspaceDirty();
 },true);
 function isTextEntryTarget(target){
@@ -3221,11 +3663,14 @@ window.PMPPrepServices=AppServices;
     }),
   });
   const POLICIES=Object.freeze({
-    keywordLocation:'source-isolated-derived',
-    recallBinding:'optional-existing-id-only',
-    deepRecallReveal:'click-to-reveal-all-keywords',
-    keywordCorePriority:'overlap-match-priority-only',
+    deepRecallKeywordRevealPolicy:'click-to-reveal-all-keywords',
+    keywordCorePriorityPolicy:'overlap-match-priority-only',
+    keywordLocationPolicy:'source-isolated-derived-matchLocations',
+    recallBindingPolicy:'optional-existing-node-only',
   });
+  /* P4.5.29 合并规格 §13：对外兼容声明以扁平合同键为准 */
+  const TARGET_MAIN_VERSION='V9.0-P4.5.29';
+  const EXTERNAL_AI_AUTHORING_CONTRACT='external-ai-question-authoring-v1';
 
   function productRelease(){
     const bootstrap=global.__KG_DIRECT_BOOTSTRAP__||{};
@@ -3233,13 +3678,31 @@ window.PMPPrepServices=AppServices;
   }
   function buildProgramCompatibility({serverBuildEvidence={}}={}){
     return {
+      contractVersion:1,
+      targetMainVersion:TARGET_MAIN_VERSION,
+      architecture:'service-layer-v1',
+      classificationArchitecture:'global-tags+subject-facets-v1',
+      globalTagSchemaVersion:3,
+      globalTagSlotIdStrategy:'global-semantic-v1',
+      subjectFacetRegistry:'subject-facet-registry-v1',
+      pmpSubjectFacetSchema:'pmp-facet-schema-v1',
+      keywordSystem:'Question Keyword System v2',
+      knowledgeBindingStrategy:'current-default-taxonomy-by-subject',
+      questionFamilySchema:'question-family-v1',
+      questionFamilyScope:'single-question-bank',
+      questionIdStrategy:'uuid-v4',
+      questionDifficultyScale:'three-level',
+      questionDifficultyLabels:['简单','中等','困难'],
+      questionDifficultyMainValues:['easy','medium','hard'],
+      questionFamilyDiagnosticLevelScale:'L1-L4',
+      externalAIQuestionAuthoringContract:EXTERNAL_AI_AUTHORING_CONTRACT,
+      ...POLICIES,
       authoringContract:{...AUTHORING_CONTRACT},
       contractSnapshot:JSON.parse(JSON.stringify(CONTRACT_SNAPSHOT)),
       registryManifest:JSON.parse(JSON.stringify(REGISTRY_MANIFEST)),
       testedAgainstProductRelease:productRelease(),
       prepBuild:'0.4.0',
       serverBuildEvidence:JSON.parse(JSON.stringify(serverBuildEvidence||{})),
-      policies:{...POLICIES},
     };
   }
   function attachToQuestionBank(bank,options={}){
@@ -3557,7 +4020,7 @@ window.PMPPrepServices=AppServices;
     async loadQuestion(questionId){return (await request(`/question-catalog/questions/${encodeURIComponent(questionId)}`)).question},
     async getBatch(batchId){return (await request(`/content-prep/batches/${encodeURIComponent(batchId)}`)).batch},
     syncMetadata,
-    async uploadBundle(bundle,{workspace,creatorId,questions,prepVersion='0.4.0',workspaceVersion='4'}={}){
+    async uploadBundle(bundle,{workspace,creatorId,questions,prepVersion='0.4.0',workspaceVersion='6'}={}){
       if(!workspace?.serverBankId)throw new ServerCatalogError('BANK_REQUIRED','请先选择目标题库。');
       if(!workspace?.clientInstanceId)throw new ServerCatalogError('CLIENT_INSTANCE_REQUIRED','本地工作区缺少客户端标识。');
       if(!creatorId)throw new ServerCatalogError('CREATOR_REQUIRED','请先选择制作人。');
@@ -4123,7 +4586,7 @@ window.PMPPrepDraftUi?.open?.();
     };
     const unchanged=draft.name===String(principle.name||'')&&draft.status===String(principle.status||'active')
       &&JSON.stringify(draft.confusablePrincipleIds)===JSON.stringify(principle.confusablePrincipleIds||[])
-      &&draft.presetTitle===String(preset?.title||('原则：'+principle.name))&&draft.presetContent===String(preset?.content||'')
+      &&draft.presetTitle===String(preset?.title||principle.name)&&draft.presetContent===String(preset?.content||'')
       &&draft.presetStatus===String(preset?.status||'draft')&&draft.presetVersion===Number(preset?.version||1);
     return unchanged?null:draft;
   }

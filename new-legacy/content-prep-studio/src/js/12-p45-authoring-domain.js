@@ -250,3 +250,37 @@ function familyRoleLabel(role){return role==='root'?'母题':role==='member'?'�
 function familyRelationLabel(v){return ({root:'母题',equivalent:'等价变体',decomposed:'能力拆解',extension:'扩展/高阶',standalone:'独立'})[v]||v}
 function diagnosticTargetLabel(v){return ({general:'一般',concept:'概念',understanding:'理解',discrimination:'辨析',application:'应用',analysis:'分析','case-transfer':'案例迁移'})[v]||v}
 function familyPurposeLabels(v){return (v||[]).map(x=>FAMILY_PURPOSE_LABELS[x]||x).join('、')}
+
+/* P4.5.29 家族视觉 tone（对齐官方配套版）：root/equivalent/decomposed/extension/standalone 五色 */
+function familyToneKey(q){
+  const f=questionFamily(q);
+  if(f.role==='root')return 'root';
+  if(f.role!=='member')return 'standalone';
+  if(f.relationToRoot==='decomposed')return 'decomposed';
+  if(f.relationToRoot==='extension'||f.variantType==='advanced')return 'extension';
+  return 'equivalent';
+}
+function familyToneClass(q){return 'family-tone-'+familyToneKey(q)}
+function familyHoverToneKey(q){
+  const f=questionFamily(q);
+  if(f.role!=='member')return '';
+  const target=String(f.diagnosticTarget||'general');
+  const purposes=Array.isArray(f.purposes)?f.purposes:[];
+  if(target==='concept')return 'concept';
+  if(target==='understanding'||target==='discrimination')return 'understanding';
+  const highOrderTarget=['application','analysis','case-transfer'].includes(target);
+  const highOrderPurpose=purposes.some(x=>['post-remediation-verification','delayed-verification','mastery-check'].includes(x));
+  if(f.relationToRoot==='extension'||f.variantType==='advanced'||(highOrderTarget&&highOrderPurpose))return 'advanced';
+  return 'equivalent';
+}
+function familyHoverClass(q){const k=familyHoverToneKey(q);return k?` family-hover-${k}`:''}
+function familyTabMeta(q){
+  const f=questionFamily(q);
+  if(f.role==='root')return `${f.familyKey||'未命名家族'} · 母题`;
+  if(f.role==='member')return `${familyRelationLabel(f.relationToRoot)} · ${diagnosticTargetLabel(f.diagnosticTarget)} · L${f.difficultyLevel}`;
+  return '独立题';
+}
+function familyListClass(q){
+  const tone=familyToneKey(q),f=questionFamily(q);
+  return f.role==='root'?'family-list-root':f.role==='member'?`family-list-member family-list-${tone}`:'';
+}

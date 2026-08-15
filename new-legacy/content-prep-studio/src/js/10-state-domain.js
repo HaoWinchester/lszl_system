@@ -4,7 +4,8 @@ const state={
   questionBank:{id:generateSystemId('bank'),name:'PMP 内容准备题库',subject:'PMP',description:'',version:'1.0',visibility:'private',createdAt:Date.now(),updatedAt:Date.now(),questions:[]},
   principles:{schemaVersion:1,items:[],updatedAt:Date.now()},
   synthesisPresets:{schemaVersion:1,items:[],updatedAt:Date.now()},
-  tagConfig:{schemaVersion:2,slotIdStrategy:'semantic-v1',names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}},
+  tagConfig:{schemaVersion:3,slotIdStrategy:'global-semantic-v1',names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}},
+  subjectFacetRegistry:null,
   currentQuestionId:'',
   currentRecallId:'',
   currentPrincipleId:'',
@@ -314,7 +315,7 @@ function parsePastedQuestionText(raw){
   const out=[];
   blocks.forEach((block,bi)=>{
     const lines=block.split('\n').map(x=>x.trim()).filter(Boolean);
-    let title='',difficulty='中等',domain='',topic='',stage='',tags=[],stem=[],analysis=[],answer='',mode='stem',enTitle='',enStem=[],enAnalysis=[],primaryNodeId='',normalKw='',coreKw='',principleIds=[];
+    let title='',difficulty='中等',domain='',topic='',stage='',tags=[],stem=[],analysis=[],answer='',mode='stem',enTitle='',enStem=[],enAnalysis=[],primaryNodeId='',normalKw='',coreKw='',principleIds=[],familySpec=null;
     const opts={A:'',B:'',C:'',D:''},traps={A:'',B:'',C:'',D:''},enOpts={A:'',B:'',C:'',D:''},enFeedback={A:'',B:'',C:'',D:''},optionPrinciples={A:[],B:[],C:[],D:[]};
     for(const line of lines){
       if(/^【\s*题目\s*\d+\s*】$/.test(line)||/^题目\s*\d+\s*[:：.]?$/.test(line)||/^Q(?:uestion)?\s*\d+\s*[:：.]?$/i.test(line))continue;
@@ -334,17 +335,26 @@ function parsePastedQuestionText(raw){
       mm=line.match(/^(?:English Stem|英文题干)\s*[:：]\s*(.*)$/i);if(mm){mode='en-stem';if(mm[1])enStem.push(mm[1]);continue}
       mm=line.match(/^([A-D])(?:_EN|\s+EN)\s*[:：]\s*(.*)$/i);if(mm){enOpts[mm[1].toUpperCase()]=mm[2].trim();mode='en-option';continue}
       mm=line.match(/^(?:English Analysis|英文解析|Analysis EN)\s*[:：]\s*(.*)$/i);if(mm){mode='en-analysis';if(mm[1])enAnalysis.push(mm[1]);continue}
-      mm=line.match(/^([A-D])(?:反馈EN|反馈\s*EN|Feedback\s*EN)\s*[:：]\s*(.*)$/i);if(mm){enFeedback[mm[1].toUpperCase()]=mm[2].trim();continue}
-      mm=line.match(/^(?:主知识点ID|PrimaryNodeId|Primary Node ID)\s*[:：]\s*(.*)$/i);if(mm){primaryNodeId=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^([A-D])\s*(?:反馈EN|反馈\s*EN|Feedback\s*EN)\s*[:：]\s*(.*)$/i);if(mm){enFeedback[mm[1].toUpperCase()]=mm[2].trim();continue}
+      mm=line.match(/^(?:主知识点\s*ID|PrimaryNodeId|Primary Node ID)\s*[:：]\s*(.*)$/i);if(mm){primaryNodeId=mm[1].trim();mode='meta';continue}
       mm=line.match(/^普通关键词\s*[:：]\s*(.*)$/);if(mm){normalKw=mm[1].trim();mode='meta';continue}
       mm=line.match(/^核心关键词\s*[:：]\s*(.*)$/);if(mm){coreKw=mm[1].trim();mode='meta';continue}
-      mm=line.match(/^(?:题干原则IDs|题干原则ID|StemPrincipleIds|原则IDs|原则ID|PrincipleIds)\s*[:：]\s*(.*)$/i);if(mm){principleIds=cleanList(mm[1]);mode='meta';continue}
-      mm=line.match(/^([A-D])原则\s*[:：]\s*(.*)$/);if(mm){optionPrinciples[mm[1].toUpperCase()]=cleanList(mm[2]);mode='meta';continue}
+      mm=line.match(/^(?:题干原则\s*IDs?|StemPrincipleIds?|原则\s*IDs?|PrincipleIds?)\s*[:：]\s*(.*)$/i);if(mm){principleIds=cleanList(mm[1]);mode='meta';continue}
+      mm=line.match(/^([A-D])\s*原则\s*[:：]\s*(.*)$/);if(mm){optionPrinciples[mm[1].toUpperCase()]=cleanList(mm[2]);mode='meta';continue}
+      /* P4.5.29 Quick Text 家族字段（规格 §10.2 快捷子集；质量确认一律 false，由教师导入后人工确认） */
+      mm=line.match(/^(?:家族代号|FamilyKey|Family Key)\s*[:：]\s*(.*)$/i);if(mm){(familySpec=familySpec||{}).familyKey=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^(?:家族角色|FamilyRole|Family Role)\s*[:：]\s*(.*)$/i);if(mm){(familySpec=familySpec||{}).role=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^(?:家族关系|FamilyRelation|Family Relation)\s*[:：]\s*(.*)$/i);if(mm){(familySpec=familySpec||{}).relationToRoot=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^(?:变体类型|VariantType|Variant Type)\s*[:：]\s*(.*)$/i);if(mm){(familySpec=familySpec||{}).variantType=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^(?:诊断目标|DiagnosticTarget|Diagnostic Target)\s*[:：]\s*(.*)$/i);if(mm){(familySpec=familySpec||{}).diagnosticTarget=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^(?:诊断层级|诊断难度|DifficultyLevel|Difficulty Level)\s*[:：]\s*(.*)$/i);if(mm){const lv=Number(String(mm[1]).replace(/[^1-4]/g,''));if(lv)(familySpec=familySpec||{}).difficultyLevel=lv;mode='meta';continue}
+      mm=line.match(/^(?:家族用途|LearningPurposes|Purposes)\s*[:：]\s*(.*)$/i);if(mm){(familySpec=familySpec||{}).purposes=cleanList(mm[1]);mode='meta';continue}
+      mm=line.match(/^(?:质量确认|QualityConfirmed|Quality Confirmed)\s*[:：]\s*(.*)$/i);if(mm){if(familySpec)familySpec.qualityConfirmed=false;mode='meta';continue}
       if(mode==='analysis')analysis.push(line);else if(mode==='en-stem')enStem.push(line);else if(mode==='en-analysis')enAnalysis.push(line);else if(mode==='stem')stem.push(line);
     }
     if(stem.length||Object.values(opts).some(Boolean)){
       const clues=[...parseKeywordPasteSpecs(normalKw,'normal'),...parseKeywordPasteSpecs(coreKw,'core')];
-      const nq=normalizeQuestion({title:title||`导入题目 ${bi+1}`,difficulty,domain,topic,tags,stage,stemParts:[{text:stem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:opts[letter],trap:traps[letter]})),correctAnswer:answer||'A',analysis:analysis.join('\n'),translations:{en:{title:enTitle,stemParts:[{text:enStem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:enOpts[letter]})),analysis:enAnalysis.join('\n'),optionFeedback:enFeedback}},clues,metadata:{knowledge:{primaryNodeId,relatedNodeIds:[],mappingStatus:primaryNodeId?'confirmed':'unmapped',pathSnapshot:[]},stemPrincipleIds:principleIds,optionPrincipleMap:optionPrinciples}},bi,state.questionBank.subject||'PMP');
+      const nq=normalizeQuestion({title:title||`导入题目 ${bi+1}`,difficulty,domain,topic,tags,stage,stemParts:[{text:stem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:opts[letter],trap:traps[letter]})),correctAnswer:answer||'A',analysis:analysis.join('\n'),translations:{en:{title:enTitle,stemParts:[{text:enStem.join(' ')}],options:['A','B','C','D'].map(letter=>({id:letter,text:enOpts[letter]})),analysis:enAnalysis.join('\n'),optionFeedback:enFeedback}},clues,metadata:{knowledge:{primaryNodeId,relatedNodeIds:[],mappingStatus:primaryNodeId?'confirmed':'unmapped',pathSnapshot:[]},stemPrincipleIds:principleIds,optionPrincipleMap:optionPrinciples,...(familySpec?{questionFamily:{...familySpec,qualityConfirmed:false}}:{})}},bi,state.questionBank.subject||'PMP');
       if(primaryNodeId&&state.knowledgeTree?.map.has(primaryNodeId))nq.metadata.knowledge.pathSnapshot=state.knowledgeTree.pathFor(primaryNodeId);
       nq.clues.forEach(c=>c.conceptIds=primaryNodeId?[primaryNodeId]:[]);recomputeKeywordLocations(nq);syncQuestionPrinciples(nq);nq.tags=unique((nq.tags||[]).map(canonicalTagName));nq.metadata.tagPaths=nq.tags.map(tagPathFor).filter(Boolean);out.push(nq);
     }
@@ -399,7 +409,7 @@ function normalizePrincipleCardBundle(payload={}){
     seenPresetPrinciples.add(preset.principleId);
   });
   principles.items.forEach(principle=>{if(!seenPresetPrinciples.has(principle.id))throw new Error(`原则 ${principle.id} 缺少对应归纳卡`)});
-  synthesisPresets.items=synthesisPresets.items.map(preset=>({...preset,title:'原则：'+principlesById.get(preset.principleId).name}));
+  synthesisPresets.items=synthesisPresets.items.map(preset=>({...preset,title:principlesById.get(preset.principleId).name}));
   return {principles,synthesisPresets};
 }
 function principleCardBundlePayload(principles=state.principles,synthesisPresets=state.synthesisPresets){
@@ -514,6 +524,7 @@ function normalizeQuestion(q,i=0,subject='PMP'){
   }).filter(c=>c.text);
   const knowledge=q?.metadata?.knowledge&&typeof q.metadata.knowledge==='object'?clone(q.metadata.knowledge):{};
   delete knowledge.taxonomyId; delete knowledge.taxonomyVersion;
+  knowledge.mappingStatus=String(knowledge.primaryNodeId||'')?'confirmed':'unmapped';
   const systemQuestionId=registerQuestionId(String(q.id||generateQuestionId()));
   return {
     ...q,
@@ -558,7 +569,7 @@ function normalizeBank(payload){
   if(Array.isArray(payload))b={name:'导入题库',subject:'PMP',questions:payload};
   if(!b||!Array.isArray(b.questions))throw new Error('题库缺少 questions 数组。');
   const subject=String(b.subject||'PMP');
-  const questions=b.questions.map((q,i)=>{const nq=QuestionService.normalize(q,i,subject);syncQuestionPrinciples(nq);nq.tags=unique((nq.tags||[]).map(canonicalTagName));nq.metadata.tagPaths=nq.tags.map(tagPathFor).filter(Boolean);return nq});
+  const questions=b.questions.map((q,i)=>{const nq=QuestionService.normalize(q,i,subject);syncQuestionPrinciples(nq);if(typeof recomputeKeywordLocations==='function')recomputeKeywordLocations(nq);nq.tags=unique((nq.tags||[]).map(canonicalTagName));nq.metadata.tagPaths=nq.tags.map(tagPathFor).filter(Boolean);return nq});
   if(typeof resolveQuestionFamilies==='function')resolveQuestionFamilies(questions);
   return {
     id:String(b.id||b.bankId||generateSystemId('bank')),name:String(b.name||b.bankName||'PMP 题库'),subject,description:String(b.description||''),

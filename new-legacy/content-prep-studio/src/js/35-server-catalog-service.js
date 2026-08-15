@@ -287,7 +287,7 @@
     async loadQuestion(questionId){return (await request(`/question-catalog/questions/${encodeURIComponent(questionId)}`)).question},
     async getBatch(batchId){return (await request(`/content-prep/batches/${encodeURIComponent(batchId)}`)).batch},
     syncMetadata,
-    async uploadBundle(bundle,{workspace,creatorId,questions,prepVersion='0.4.0',workspaceVersion='4'}={}){
+    async uploadBundle(bundle,{workspace,creatorId,questions,prepVersion='0.4.0',workspaceVersion='6'}={}){
       if(!workspace?.serverBankId)throw new ServerCatalogError('BANK_REQUIRED','请先选择目标题库。');
       if(!workspace?.clientInstanceId)throw new ServerCatalogError('CLIENT_INSTANCE_REQUIRED','本地工作区缺少客户端标识。');
       if(!creatorId)throw new ServerCatalogError('CREATOR_REQUIRED','请先选择制作人。');

@@ -115,8 +115,13 @@ function validateRecallId(recallNodeId) {
   });
 }
 
-test('Blank Recall ID is valid because the binding is optional', () => {
-  assert.deepEqual(JSON.parse(JSON.stringify(validateRecallId(''))), []);
+test('Blank Recall ID is valid (no error) but yields an optional-enhancement reminder', () => {
+  /* P4.5.29：Recall 可选 —— 空 ID 不产生 error，只产生提醒级提示 */
+  const issues = JSON.parse(JSON.stringify(validateRecallId('')));
+  assert.ok(issues.every(x => x.level !== 'error'), '空 Recall ID 不是错误');
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].level, 'warn');
+  assert.match(issues[0].message, /未关联联想入口/);
 });
 
 test('A non-empty missing Recall ID is a validation error', () => {

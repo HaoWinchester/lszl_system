@@ -287,3 +287,81 @@ nav button.active{color:var(--brand)!important}
 .family-badge{font-size:11px;margin-right:4px;padding:1px 5px;border-radius:8px;font-weight:600}
 .family-badge.family-root{background:#1f6feb;color:#fff}
 .family-badge.family-member{background:#e8a33d;color:#fff}
+/* P4.5.29 题目列表家族图例（对齐官方配套版） */
+.family-list-legend{display:flex;gap:6px;flex-wrap:wrap;padding:7px 10px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#fbfcfe}
+.family-legend-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid transparent;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:850;white-space:nowrap}
+.family-legend-chip.root{background:#fff0d2;border-color:#e7b253;color:#875000}
+.family-legend-chip.equivalent{background:#eaf2ff;border-color:#8baef5;color:#2252a8}
+.family-legend-chip.decomposed{background:#eaf8f0;border-color:#8cc9aa;color:#146744}
+.family-legend-chip.extension{background:#f2ecff;border-color:#b39be8;color:#5c3ca3}
+.family-legend-chip.standalone{background:#f2f4f7;border-color:#d0d5dd;color:#667085}
+/* P4.5.29 科目分类预览 chips */
+.facet-preview-dim{margin-top:10px}
+.facet-preview-dim>label{font-weight:700;display:block;margin-bottom:4px}
+.facet-chip-row{display:flex;gap:6px;flex-wrap:wrap}
+.facet-chip{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;background:#f7f9fc}
+.facet-chip.deprecated{text-decoration:line-through;opacity:.55}
+.facet-chip.inactive{opacity:.45}
+/* P4.5.29 家族成员切换 tabs 与列表 tone（对齐官方配套版） */
+.family-editor-tabs-wrap{margin-bottom:10px;border:1px solid var(--line);border-radius:11px;background:#fff;overflow:hidden}
+.family-editor-tabs-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);background:#f8fafc}
+.family-editor-tabs-head b{font-size:12px}
+.family-editor-tabs-head .muted{margin-left:auto}
+.family-editor-tabs{display:flex;gap:7px;overflow-x:auto;padding:9px}
+.family-editor-tab{flex:0 0 auto;max-width:190px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:7px 9px;text-align:left;cursor:pointer}
+.family-editor-tab:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,23,42,.08)}
+.family-editor-tab strong,.family-editor-tab span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.family-editor-tab span{font-size:11px;color:var(--muted);margin-top:2px}
+.family-editor-tab.active{box-shadow:inset 0 0 0 2px var(--brand)}
+.family-editor-tab.root{background:#fff9ed;border-color:#e7b253}
+.family-editor-tab.equivalent{background:#f3f7ff;border-color:#8baef5}
+.family-editor-tab.decomposed{background:#f1fbf5;border-color:#8cc9aa}
+.family-editor-tab.extension{background:#f8f4ff;border-color:#b39be8}
+.family-editor-standalone{padding:8px 10px;border:1px dashed #d0d5dd;border-radius:9px;background:#f8fafc;color:var(--muted);font-size:12px;margin-bottom:10px}
+.family-list-root{background:#fff9ed;border-left:4px solid #e5a72d}
+.family-list-member{margin-left:6px}
+.family-list-equivalent{background:#f3f7ff;border-left:4px solid #6f97ea;margin-left:12px}
+.family-list-decomposed{background:#f1fbf5;border-left:4px solid #65b58d;margin-left:12px}
+.family-list-extension{background:#f8f4ff;border-left:4px solid #9674db;margin-left:12px}
+.question-edit-card.family-tone-root>.card-hd{background:#fff3dc;border-bottom-color:#e7b253}
+.question-edit-card.family-tone-equivalent>.card-hd{background:#edf4ff;border-bottom-color:#8baef5}
+.question-edit-card.family-tone-decomposed>.card-hd{background:#edf9f2;border-bottom-color:#8cc9aa}
+.question-edit-card.family-tone-extension>.card-hd{background:#f4efff;border-bottom-color:#b39be8}
+.question-edit-card.family-tone-root #questionPreview{border-color:#e7b253;background:#fffdf8}
+.question-edit-card.family-tone-equivalent #questionPreview{border-color:#8baef5;background:#fbfdff}
+.question-edit-card.family-tone-decomposed #questionPreview{border-color:#8cc9aa;background:#fbfffc}
+.question-edit-card.family-tone-extension #questionPreview{border-color:#b39be8;background:#fdfbff}
+.tag-chip-row-title{margin-top:6px}
+/* P4.5.29 联想库验收器（页签④，参照 V8 智能记录版） */
+.ra-quick{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.ra-status{font-size:13px;color:var(--muted);margin-top:9px}
+.ra-status.ok{color:#176b45}.ra-status.warn{color:#9a6700}.ra-status.bad{color:#a23a36}
+#raCurrentCard h2{margin:0 0 4px;font-size:22px}
+.ra-en{font-size:14px;color:var(--muted);margin-bottom:9px}
+.ra-prompt{font-size:15px;line-height:1.7}
+.ra-hint{font-size:13px;line-height:1.6;color:var(--muted);margin-top:4px}
+.ra-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.ra-pill{padding:4px 8px;border-radius:999px;background:#eef1f4;color:#4d5560;font-size:12px}
+.ra-aliases{font-size:12px;color:var(--muted);line-height:1.7;word-break:break-word}
+.ra-choices{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:6px}
+.ra-choice{text-align:left;padding:13px;border:1px solid var(--line);border-radius:11px;background:#fff;min-height:70px;cursor:pointer;font:inherit}
+.ra-choice:hover{border-color:#9ca3ad;background:#fafafa}
+.ra-ct{font-size:16px;font-weight:650;margin-bottom:5px}
+.ra-cl{font-size:12px;color:var(--muted)}
+.ra-pri{float:right;color:#a0a6ae;font-size:11px}
+.ra-empty{grid-column:1/-1;border:1px dashed var(--line);border-radius:10px;padding:16px;text-align:center;color:var(--muted)}
+.ra-path{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.ra-crumb{font-size:12px;padding:6px 8px}
+.ra-verdicts{display:flex;gap:7px;flex-wrap:wrap;margin:6px 0}
+.ra-v-ok{border-color:#a8d5c0}.ra-v-miss{border-color:#e3b3af}.ra-v-weird{border-color:#e4cf9f}.ra-v-alias{border-color:#bec8e5}
+.ra-summary{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:10px}
+.ra-stat{background:#eef1f4;border-radius:10px;padding:9px;text-align:center}
+.ra-stat b{display:block;font-size:18px}.ra-stat span{font-size:12px;color:var(--muted)}
+.ra-log{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:10px}
+.ra-logitem{padding:10px 11px;border-bottom:1px solid var(--line);font-size:12px;line-height:1.55}
+.ra-logitem:last-child{border-bottom:none}
+.ra-logtop{display:flex;justify-content:space-between;gap:8px}
+.ra-tag{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.ra-tag.ok{background:#e7f4ec;color:#176b45}.ra-tag.warn{background:#fdf3dd;color:#9a6700}.ra-tag.bad{background:#fbe9e8;color:#a23a36}
+#raNote{width:100%;min-height:70px;resize:vertical}
+@media(max-width:760px){.ra-choices{grid-template-columns:1fr}.ra-summary{grid-template-columns:repeat(3,1fr)}}
