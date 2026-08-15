@@ -39,7 +39,7 @@
   <button data-tab="base" class="active">① 基础数据与导入</button>
   <button data-tab="management">② 原则 / 科目分类 / 公共标签</button>
   <button data-tab="questions">③ 题目录入与检查</button>
-  <button data-tab="association">④ 联想词编辑</button>
+  <button data-tab="association">④ 联想库验收器</button>
   <button data-tab="demo">⑤ 题目演示校验</button>
   <button data-tab="validate">⑥ 校验中心</button>
   <button data-tab="export">⑦ 同步与导出</button>
@@ -122,6 +122,7 @@
         <button class="btn primary" id="btnDownloadCompleteAiPrompt">下载完整 AI 制作提示词</button>
         <button class="btn" id="btnDownloadQuestionTemplate">下载题库 JSON 模板</button>
         <button class="btn" id="btnDownloadAiPrompt">下载“Word→JSON”AI 提示词</button>
+        <a class="btn good" id="btnDownloadAiToolkit" href="content-prep-studio/assets/PMP_外部AI母题整理工具包_V2.2_P4.5.29.md" download="PMP_外部AI母题整理工具包_V2.2_P4.5.29.md" title="V2.2 / P4.5.29：含知识树、原则卡、联想库、Global Tags、Subject Facets 权威附录">下载外部 AI 工具包 V2.2</a>
         <button class="btn" id="btnOpenHelp">查看导入说明</button>
       </div>
 
@@ -346,24 +347,70 @@ D原则：principle-role-accountability</pre>
   </div>
 </section>
 <section class="tab" id="tab-association">
-  <div class="grid2">
-    <div class="card">
-      <div class="card-hd">④ 联想词编辑</div>
-      <div class="card-bd">
-        <div class="toolbar">
-          <input type="text" id="recallSearch" placeholder="搜索名称 / Alias / ID">
-          <button class="btn small primary" id="btnNewRecall">+ 节点</button>
-        </div>
-        <div class="smalltxt muted" style="margin-top:7px" id="aliasConflictSummary"></div>
-        <div class="synonym-note"><b>同义词/不同翻译：</b>只建一个规范节点。例：规范词“相关方”；Aliases 填“利益相关方、干系人、Stakeholder、Stakeholders”。不要为这些译名分别建节点。</div>
+  <div class="card">
+    <div class="card-hd"><span>④ 联想库验收器</span><button class="help-btn" data-page-help="association" title="本页帮助">?</button><span class="muted tiny" id="raLibrarySource"></span></div>
+    <div class="card-bd">
+      <div class="toolbar">
+        <input type="text" id="raQuery" placeholder="输入知识点、简称、英文或口语：PM / ST / 产品待办 / 燃烧图…" style="flex:1;min-width:230px">
+        <button class="btn primary" id="raGo">生成</button>
+        <label class="btn" style="margin:0">载入其他 JSON<input type="file" id="raFile" accept=".json,application/json" hidden></label>
+        <button class="btn" id="raResetPath">重置路径</button>
       </div>
-      <div class="node-list" id="recallNodeList"></div>
+      <div class="ra-quick">
+        <button class="btn small" data-raq="PM">PM</button><button class="btn small" data-raq="ST">ST</button>
+        <button class="btn small" data-raq="产品经理">产品经理</button><button class="btn small" data-raq="敏捷教练">敏捷教练</button>
+        <button class="btn small" data-raq="需求池">需求池</button><button class="btn small" data-raq="燃烧图">燃烧图</button>
+        <button class="btn small" data-raq="可交付成果">可交付成果</button>
+      </div>
+      <div id="raStatus" class="ra-status"></div>
     </div>
-    <div class="card">
-      <div class="card-hd"><span>联想词编辑 · 关系预览</span><button class="help-btn" data-page-help="association" title="本页帮助">?</button><span class="muted tiny" id="currentRecallId"></span></div>
-      <div class="card-bd" id="recallEditor">
-        <div class="no-data">请在“基础数据”导入科目级联想库，或新建联想节点。</div>
+  </div>
+
+  <div class="card" id="raCurrentCard">
+    <div class="card-bd"><div class="ra-empty">输入关键词或点击快速入口开始。</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><span>继续联想</span><span class="muted tiny" id="raInfo"></span></div>
+    <div class="card-bd">
+      <div id="raChoices" class="ra-choices"><div class="ra-empty">尚未选择节点。</div></div>
+      <div class="toolbar" style="margin-top:8px">
+        <div><button class="btn small" id="raBack" disabled>← 回退一步</button> <button class="btn small" id="raNext" disabled>换一组</button></div>
+        <span class="muted tiny">祖先节点会被过滤，模拟主程序防回跳。</span>
       </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd">当前节点验收</div>
+    <div class="card-bd">
+      <div class="muted tiny" style="margin-bottom:6px">客观断链会自动记录；这里主要用于标记“能走但质量不好”的情况。</div>
+      <div class="ra-verdicts">
+        <button class="btn small ra-v-ok" data-rav="正常">✓ 正常</button>
+        <button class="btn small ra-v-miss" data-rav="缺失/断链">缺失 / 断链</button>
+        <button class="btn small ra-v-weird" data-rav="联想不自然">联想不自然</button>
+        <button class="btn small ra-v-alias" data-rav="需补入口/Alias">需补入口 / Alias</button>
+        <button class="btn small" data-rav="其他问题">其他问题</button>
+      </div>
+      <textarea id="raNote" placeholder="可选备注，例如：这里应该先想到“核实的可交付成果”；或“PM 应该接项目经理”。"></textarea>
+      <div class="toolbar" style="margin-top:8px"><button class="btn small" id="raSaveNote">保存到最近一条记录</button><span class="muted tiny" id="raNoteStatus"></span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd">当前回忆路径</div>
+    <div class="card-bd"><div id="raPath" class="ra-path"><span class="muted tiny">暂无</span></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><span>验收记录</span><span class="muted tiny">记录自动保存在浏览器本地（最近 2000 条）</span></div>
+    <div class="card-bd">
+      <div class="toolbar">
+        <div></div>
+        <div><button class="btn small" id="raExportJson">导出 JSON 报告</button> <button class="btn small" id="raExportMd">导出 Markdown 报告</button> <button class="btn small danger" id="raClearLog">清空记录</button></div>
+      </div>
+      <div id="raSummary" class="ra-summary"></div>
+      <div id="raLog" class="ra-log"><div class="ra-logitem muted tiny">暂无记录。</div></div>
     </div>
   </div>
 </section>
@@ -489,7 +536,7 @@ D原则：principle-role-accountability</pre>
         <button data-help-topic="base">① 基础数据与导入</button>
         <button data-help-topic="management">② 原则 / 科目分类 / 公共标签</button>
         <button data-help-topic="questions">③ 题目录入与检查</button>
-        <button data-help-topic="association">④ 联想词编辑</button>
+        <button data-help-topic="association">④ 联想库验收器</button>
         <button data-help-topic="demo">⑤ 题目演示校验</button>
         <button data-help-topic="validate">⑥ 校验中心</button>
         <button data-help-topic="export">⑦ 导出与审计</button>
@@ -544,13 +591,14 @@ B原则：principle-effective-communication</pre>
         </article>
 
         <article class="help-topic" data-help-content="association">
-          <h2>④ 联想词编辑</h2>
-          <p>这里维护“看到一个词，应该联想到哪个知识入口，以及还能继续想到什么”的关系网络。</p>
-          <h3>同义词原则</h3>
-          <div class="help-example">规范节点：<b>相关方</b><br>Aliases：<code>利益相关方, 干系人, Stakeholder</code><br>不要为了不同译名建立多个等义节点。</div>
-          <h3>关系图怎么点</h3>
-          <p>上位/下位知识点普通点击只做<b>预览选择</b>，不会修改绑定。只有明确点击“将当前联想词绑定到此知识点”才会改变 <code>metadata.taxonomyNodeId</code>。</p>
-          <p>底部“被哪些节点联想”可点击直接跳到对应联想节点继续编辑。</p>
+          <h2>④ 联想库验收器</h2>
+          <p>模拟学员深度回忆走库：输入词 → 命中节点 → 沿推荐继续联想，同时自动记录<b>未命中 / 过宽词 / 多义 / 断链 / 单候选</b>五类客观问题。</p>
+          <h3>怎么用</h3>
+          <p>1. 输入知识点、简称、英文或口语（如 PM / ST / 燃烧图），或点快速入口；命中后点击候选继续走库。祖先节点会被过滤，模拟主程序防回跳。</p>
+          <p>2. 对"能走但质量不好"的情况，用当前节点验收区的按钮标记：正常 / 缺失断链 / 联想不自然 / 需补入口 Alias，可附备注。</p>
+          <p>3. 验收记录自动保存在浏览器本地（最近 2000 条），可导出 JSON / Markdown 报告发给联想库维护方。</p>
+          <h3>数据来源</h3>
+          <p>默认验收<b>当前工作区联想库</b>（在"① 基础数据与导入"导入完整内容包或联想库 JSON 后生效）；也可临时载入其他 JSON 验收，并在确认后设为工作区联想库。</p>
         </article>
 
         <article class="help-topic" data-help-content="demo">

@@ -8,6 +8,7 @@ JS_ORDER=[
     "10-state-domain.js",
     "12-p45-authoring-domain.js",
     "14-principle-bundle-domain.js",
+    "16-recall-acceptance.js",
     "20-page-runtime.js",
     "30-service-layer.js",
     "32-p45-contract-service.js",

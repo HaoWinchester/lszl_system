@@ -17,7 +17,7 @@ function setTab(name){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.id==='tab-'+name));
   if(name==='validate')runValidation();
-  if(name==='association')renderRecallList();
+  if(name==='association')renderRecallAcceptance();
   if(name==='management'){renderPrincipleList();renderPrincipleEditor();renderTagManager()}
   if(name==='demo')renderDemoValidation();
   if(name==='export')renderAuditTrail();
@@ -776,10 +776,6 @@ function renderTagManager(){
   box.querySelectorAll('[data-tag-aliases]').forEach(el=>el.addEventListener('change',()=>{const slot=el.dataset.tagAliases,current=tagCatalogEntries().find(x=>x.slot===slot)?.label||'';state.tagConfig.slotAliases=state.tagConfig.slotAliases||{};state.tagConfig.slotAliases[slot]=unique(cleanList(el.value)).filter(a=>a&&a!==current);syncFlatTagAliases(state.tagConfig);refreshQuestionTagPaths();const status=box.querySelector(`[data-tag-alias-status="${CSS.escape(slot)}"]`);if(status)status.textContent=state.tagConfig.slotAliases[slot].length?`已保存 ${state.tagConfig.slotAliases[slot].length} 个别名`:'无别名';el.value=state.tagConfig.slotAliases[slot].join(', ')}));
 }
 
-function newRecallNode(){
-  const n={id:uid('recall'),title:'新联想节点',titleEn:'',aliases:[],prompt:'',promptEn:'',hint:'',hintEn:'',priority:0,metadata:{taxonomyNodeId:'',status:'active',source:'prep-studio'}};
-  state.recallLibrary.nodes.push(n);state.currentRecallId=n.id;renderRecallList();renderRecallEditor();toast('已新建联想节点');
-}
 function aliasConflicts(){
   const map=new Map();
   state.recallLibrary.nodes.forEach(n=>[n.title,...(n.aliases||[])].filter(Boolean).forEach(t=>{
@@ -789,84 +785,8 @@ function aliasConflicts(){
   }));
   return [...map.entries()].filter(([,a])=>a.length>1).map(([term,nodes])=>({term,nodes}));
 }
-function renderRecallList(){
-  const search=String(document.getElementById('recallSearch')?.value||'').trim().toLowerCase();
-  const list=document.getElementById('recallNodeList');if(!list)return;
-  const rows=state.recallLibrary.nodes.filter(n=>!search||[n.id,n.title,n.titleEn,...(n.aliases||[])].join(' ').toLowerCase().includes(search)).sort((a,b)=>b.priority-a.priority||a.title.localeCompare(b.title,'zh-CN'));
-  list.innerHTML=rows.length?rows.map(n=>`<div class="list-item${n.id===state.currentRecallId?' active':''}" data-recall="${esc(n.id)}"><div class="list-title">${esc(n.title)}</div><div class="list-meta">${esc(n.id)} · Alias ${(n.aliases||[]).length} · Priority ${n.priority}</div></div>`).join(''):'<div class="no-data">没有匹配节点</div>';
-  list.querySelectorAll('[data-recall]').forEach(el=>el.onclick=()=>{state.currentRecallId=el.dataset.recall;state.recallPreviewCandidateId='';renderRecallList();renderRecallEditor()});
-  const conflicts=aliasConflicts();document.getElementById('aliasConflictSummary').textContent=conflicts.length?`⚠ ${conflicts.length} 个名称/Alias 冲突`:'✓ 无名称/Alias 冲突';
-}
 
-function recallPreviewHtml(n){
-  const taxId=n.metadata?.taxonomyNodeId||'',tax=taxId&&state.knowledgeTree?.map.get(taxId),parent=tax?.parentId?state.knowledgeTree?.map.get(tax.parentId):null;
-  const children=tax?state.knowledgeTree.nodes.filter(x=>x.parentId===tax.id).slice(0,7):[],incoming=state.recallLibrary.edges.filter(e=>e.to===n.id),byId=recallIndex().byId;
-  const path=tax?state.knowledgeTree.pathFor(tax.id).join(' > '):'未关联知识点',aliases=unique([n.title,...(n.aliases||[])]).slice(0,7);
-  const selectedId=state.recallPreviewCandidateId||'';
-  const taxNode=(node,extra='')=>node?`<button class="relation-node ${extra}${selectedId===node.id?' selected':''}" data-tax-preview-id="${esc(node.id)}"><b>${esc(state.knowledgeTree.title(node))}</b><small>${esc(node.id)}</small></button>`:`<div class="relation-node mini muted">无</div>`;
-  const childHtml=children.length?children.map(c=>taxNode(c,'mini')).join(''):'<div class="relation-node mini muted">暂无下位知识点</div>';
-  const incomingHtml=incoming.length?incoming.map(e=>{const x=byId.get(e.from);return x?`<button class="chip-btn" data-preview-recall-id="${esc(x.id)}">${esc(x.title)}${e.label?' · '+esc(e.label):''}</button>`:''}).join(''):'<span class="muted">暂无反向联想</span>';
-  const selected=selectedId&&state.knowledgeTree?.map.get(selectedId);
-  return `<div class="relation-map"><div class="relation-breadcrumb">${esc(path)}</div><div class="relation-top">
-    <div class="relation-col"><div class="relation-title">上位概念</div>${taxNode(parent)}</div><div class="relation-arrow"></div>
-    <div class="relation-col"><div class="relation-title">当前联想词</div><div class="relation-node current"><b>${esc(n.title)}</b>${aliases.map(x=>`<small>${esc(x)}</small>`).join('')}</div></div><div class="relation-arrow"></div>
-    <div class="relation-col"><div class="relation-title">下位知识点</div>${childHtml}</div></div>
-    <div class="relation-bottom"><div class="relation-title" style="text-align:left">被哪些节点联想</div><div class="relation-bottom-box">${incomingHtml}</div></div>
-    ${selected?`<div class="relation-selection"><b>当前仅预览：</b>${esc(state.knowledgeTree.title(selected))}<div class="muted tiny">${esc(state.knowledgeTree.pathFor(selected.id).join(' > '))}</div><div class="relation-selection-actions"><button class="btn primary small" id="btnBindRecallCandidate">将“${esc(n.title)}”绑定到此知识点</button><button class="btn small" id="btnCancelRecallCandidate">取消选择</button></div></div>`:''}
-    <div class="synonym-note">上位/下位知识点现在采用<b>“点击预览、明确按钮才改绑”</b>。普通点击不会修改数据；只有点击“绑定到此知识点”才会改变当前联想词的 <code>metadata.taxonomyNodeId</code>。</div></div>`;
-}
-function bindRecallPreview(n){
-  document.querySelectorAll('[data-preview-recall-id]').forEach(b=>b.onclick=()=>{state.currentRecallId=b.dataset.previewRecallId;state.recallPreviewCandidateId='';renderRecallList();renderRecallEditor()});
-  document.querySelectorAll('[data-tax-preview-id]').forEach(b=>b.onclick=()=>{state.recallPreviewCandidateId=b.dataset.taxPreviewId;renderRecallEditor()});
-  const bind=document.getElementById('btnBindRecallCandidate');if(bind)bind.onclick=()=>{const id=state.recallPreviewCandidateId,node=state.knowledgeTree?.map.get(id);if(!node)return;n.metadata=n.metadata||{};n.metadata.taxonomyNodeId=id;state.recallPreviewCandidateId='';renderRecallEditor();renderRecallList();toast(`已绑定到：${state.knowledgeTree.title(node)}`)};
-  const cancel=document.getElementById('btnCancelRecallCandidate');if(cancel)cancel.onclick=()=>{state.recallPreviewCandidateId='';renderRecallEditor()};
-}
 
-function renderRecallEditor(){
-  const n=currentRecall(),ed=document.getElementById('recallEditor');document.getElementById('currentRecallId').textContent=n?.id||'';
-  if(!n){ed.innerHTML='<div class="no-data">请选择或新建联想节点。</div>';return}
-  const outgoing=state.recallLibrary.edges.filter(e=>e.from===n.id);
-  ed.innerHTML=`
-  ${recallPreviewHtml(n)}
-  <div class="node-editor">
-    <div><label>ID</label><input type="text" value="${esc(n.id)}" disabled></div>
-    <div><label>Priority</label><input type="number" data-rfield="priority" value="${n.priority||0}"></div>
-    <div><label>中文名称</label><input type="text" data-rfield="title" value="${esc(n.title)}"></div>
-    <div><label>English</label><input type="text" data-rfield="titleEn" value="${esc(n.titleEn||'')}"></div>
-    <div class="span2"><label>Aliases / 同义词 / 旧译名（每行一个或逗号分隔）</label>
-    <div class="synonym-note">示例：规范词“相关方”；Aliases：利益相关方、干系人、Stakeholder、Stakeholders。所有译名应指向同一个联想节点。</div><textarea data-rfield="aliases">${esc((n.aliases||[]).join('\n'))}</textarea></div>
-    <div class="span2"><label>关联知识点 Node ID</label><select id="recallTaxonomyNode">${treeOptions(n.metadata?.taxonomyNodeId||'')}</select></div>
-    <div><label>Prompt</label><textarea data-rfield="prompt">${esc(n.prompt||'')}</textarea></div>
-    <div><label>Prompt EN</label><textarea data-rfield="promptEn">${esc(n.promptEn||'')}</textarea></div>
-    <div><label>Hint</label><textarea data-rfield="hint">${esc(n.hint||'')}</textarea></div>
-    <div><label>Hint EN</label><textarea data-rfield="hintEn">${esc(n.hintEn||'')}</textarea></div>
-  </div>
-  <div class="section">
-    <div class="section-title"><span>从本节点出发的关系</span><button class="btn small" id="btnAddEdge">+ 关系</button></div>
-    <div id="edgeList">${outgoing.length?outgoing.map(e=>edgeRowHtml(e)).join(''):'<div class="muted smalltxt">暂无关系</div>'}</div>
-  </div>
-  <div class="section toolbar"><button class="btn danger" id="btnDeleteRecall">删除联想节点</button></div>`;
-  bindRecallPreview(n);
-  ed.querySelectorAll('[data-rfield]').forEach(el=>{
-    el.addEventListener('input',()=>{
-      const f=el.dataset.rfield;if(f==='aliases')n.aliases=unique(cleanList(el.value));else if(f==='priority')n.priority=Number(el.value||0);else n[f]=el.value;
-      state.recallLibrary.updatedAt=nowIso();renderRecallList();
-    });
-    el.addEventListener('change',()=>renderRecallEditor());
-  });
-  document.getElementById('recallTaxonomyNode').onchange=e=>{n.metadata=n.metadata||{};n.metadata.taxonomyNodeId=e.target.value};
-  document.getElementById('btnAddEdge').onclick=()=>{state.recallLibrary.edges.push({id:uid('edge'),from:n.id,to:state.recallLibrary.nodes.find(x=>x.id!==n.id)?.id||'',priority:0,label:'关联',metadata:{source:'prep-studio'}});renderRecallEditor()};
-  ed.querySelectorAll('[data-edgefield]').forEach(el=>el.addEventListener('change',()=>updateEdge(el)));
-  ed.querySelectorAll('[data-remove-edge]').forEach(el=>el.onclick=()=>{state.recallLibrary.edges=state.recallLibrary.edges.filter(e=>e.id!==el.dataset.removeEdge);renderRecallEditor()});
-  document.getElementById('btnDeleteRecall').onclick=()=>{if(!confirm('删除该联想节点及其全部关系？'))return;state.recallLibrary.nodes=state.recallLibrary.nodes.filter(x=>x.id!==n.id);state.recallLibrary.edges=state.recallLibrary.edges.filter(e=>e.from!==n.id&&e.to!==n.id);state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';renderRecallList();renderRecallEditor();renderKeywords()};
-}
-function edgeRowHtml(e){
-  const opts=state.recallLibrary.nodes.filter(n=>n.id!==e.from).map(n=>`<option value="${esc(n.id)}"${n.id===e.to?' selected':''}>${esc(n.title)}</option>`).join('');
-  return `<div class="edge-row"><select data-edgefield="to" data-edgeid="${esc(e.id)}">${opts}</select><input type="text" data-edgefield="label" data-edgeid="${esc(e.id)}" value="${esc(e.label||'关联')}"><input type="number" data-edgefield="priority" data-edgeid="${esc(e.id)}" value="${e.priority||0}"><button class="btn small danger" data-remove-edge="${esc(e.id)}">×</button></div>`;
-}
-function updateEdge(el){
-  const e=state.recallLibrary.edges.find(x=>x.id===el.dataset.edgeid);if(!e)return;e[el.dataset.edgefield]=el.dataset.edgefield==='priority'?Number(el.value||0):el.value;
-}
 
 function exportableQuestion(q){
   const out=clone(q),primary=out.metadata?.knowledge?.primaryNodeId||'';
@@ -938,7 +858,7 @@ function renderDemoRecall(clue){
   const knowledge=layers[0][0]?.metadata?.taxonomyNodeId||'',path=knowledge&&state.knowledgeTree?.map.has(knowledge)?state.knowledgeTree.pathFor(knowledge).join(' > '):'未绑定知识树节点';
   box.innerHTML=`<div><b>关键词：</b>${esc(clue.text)} ${clue.keywordLevel==='core'?'<span class="pill core">核心</span>':'<span class="pill normal">普通</span>'}</div><div class="muted tiny" style="margin:5px 0">${esc(path)}</div>`+
     layers.map((layer,i)=>`<div class="recall-layer"><b>${i===0?'入口':`第${i}层`}</b><span>${layer.map(n=>`<button class="chip-btn" data-demo-recall-jump="${esc(n.id)}">${esc(n.title)}</button>`).join(' ')}</span></div>`).join('');
-  box.querySelectorAll('[data-demo-recall-jump]').forEach(b=>b.onclick=()=>{state.currentRecallId=b.dataset.demoRecallJump;state.recallPreviewCandidateId='';setTab('association');renderRecallList();renderRecallEditor()});
+  box.querySelectorAll('[data-demo-recall-jump]').forEach(b=>b.onclick=()=>{state.currentRecallId=b.dataset.demoRecallJump;state.recallPreviewCandidateId='';setTab('association');if(typeof raFocusNode==='function')raFocusNode(b.dataset.demoRecallJump)});
 }
 function renderDemoPrinciples(q,optionId){
   const box=document.getElementById('demoPrincipleResult');if(!box)return;const ids=q.metadata?.optionPrincipleMap?.[optionId]||[];
@@ -1149,7 +1069,7 @@ function applyWorkspacePayload(input){
   state.recallPreviewCandidateId='';refreshQuestionTagPaths();refreshAll();
 }
 
-function refreshAll(){refreshHeader();renderQuestions();renderRecallList();renderRecallEditor();renderPrincipleList();renderPrincipleEditor();renderTagManager();renderSubjectFacetManager();if(document.getElementById('tab-demo')?.classList.contains('active'))renderDemoValidation()}
+function refreshAll(){refreshHeader();renderQuestions();if(typeof renderRecallAcceptance==='function')renderRecallAcceptance();renderPrincipleList();renderPrincipleEditor();renderTagManager();renderSubjectFacetManager();if(document.getElementById('tab-demo')?.classList.contains('active'))renderDemoValidation()}
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b)setTab(b.dataset.tab)});
 document.getElementById('btnNewQuestion').onclick=newQuestion;
 document.getElementById('btnCreateFamilyMemberToolbar').onclick=createFamilyMemberFromCurrent;
@@ -1157,9 +1077,7 @@ document.getElementById('btnDuplicateQuestion').onclick=duplicateQuestion;
 document.getElementById('btnDeleteQuestion').onclick=deleteQuestion;
 document.getElementById('btnAddNormalKeyword').onclick=()=>addKeyword('normal');
 document.getElementById('btnAddCoreKeyword').onclick=()=>addKeyword('core');
-document.getElementById('btnNewRecall').onclick=newRecallNode;
 document.getElementById('btnNewPrinciple').onclick=newPrinciple;
-document.getElementById('recallSearch').addEventListener('input',()=>renderRecallList());
 document.getElementById('btnRunValidation').onclick=runValidation;
 document.querySelectorAll('[data-creator-key]').forEach(btn=>btn.addEventListener('click',()=>selectFixedCreator(btn.dataset.creatorKey)));
 document.getElementById('btnSwitchCreator').onclick=requireCreatorSelection;
@@ -1176,7 +1094,7 @@ document.addEventListener('input',event=>{if(!event.target.closest?.('[data-tran
 document.addEventListener('change',e=>{if(e.target.id!=='themeSelect')markWorkspaceDirty()},true);
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
-  const mutationIds=new Set(['btnNewQuestion','btnCreateFamilyMemberToolbar','btnDuplicateQuestion','btnDeleteQuestion','btnAddNormalKeyword','btnAddCoreKeyword','btnNewRecall','btnNewPrinciple','btnParsePastedQuestions','pmSave','pmDelete','floatSave','floatDelete','btnAddEdge','btnDeleteRecall','btnBindRecallCandidate']);
+  const mutationIds=new Set(['btnNewQuestion','btnCreateFamilyMemberToolbar','btnDuplicateQuestion','btnDeleteQuestion','btnAddNormalKeyword','btnAddCoreKeyword','btnNewPrinciple','btnParsePastedQuestions','pmSave','pmDelete','floatSave','floatDelete']);
   if(mutationIds.has(b.id)||b.dataset.removeKw||b.dataset.removeEdge)markWorkspaceDirty();
 },true);
 function isTextEntryTarget(target){

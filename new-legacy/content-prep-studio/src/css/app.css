@@ -332,3 +332,36 @@ nav button.active{color:var(--brand)!important}
 .question-edit-card.family-tone-decomposed #questionPreview{border-color:#8cc9aa;background:#fbfffc}
 .question-edit-card.family-tone-extension #questionPreview{border-color:#b39be8;background:#fdfbff}
 .tag-chip-row-title{margin-top:6px}
+/* P4.5.29 联想库验收器（页签④，参照 V8 智能记录版） */
+.ra-quick{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.ra-status{font-size:13px;color:var(--muted);margin-top:9px}
+.ra-status.ok{color:#176b45}.ra-status.warn{color:#9a6700}.ra-status.bad{color:#a23a36}
+#raCurrentCard h2{margin:0 0 4px;font-size:22px}
+.ra-en{font-size:14px;color:var(--muted);margin-bottom:9px}
+.ra-prompt{font-size:15px;line-height:1.7}
+.ra-hint{font-size:13px;line-height:1.6;color:var(--muted);margin-top:4px}
+.ra-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.ra-pill{padding:4px 8px;border-radius:999px;background:#eef1f4;color:#4d5560;font-size:12px}
+.ra-aliases{font-size:12px;color:var(--muted);line-height:1.7;word-break:break-word}
+.ra-choices{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:6px}
+.ra-choice{text-align:left;padding:13px;border:1px solid var(--line);border-radius:11px;background:#fff;min-height:70px;cursor:pointer;font:inherit}
+.ra-choice:hover{border-color:#9ca3ad;background:#fafafa}
+.ra-ct{font-size:16px;font-weight:650;margin-bottom:5px}
+.ra-cl{font-size:12px;color:var(--muted)}
+.ra-pri{float:right;color:#a0a6ae;font-size:11px}
+.ra-empty{grid-column:1/-1;border:1px dashed var(--line);border-radius:10px;padding:16px;text-align:center;color:var(--muted)}
+.ra-path{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.ra-crumb{font-size:12px;padding:6px 8px}
+.ra-verdicts{display:flex;gap:7px;flex-wrap:wrap;margin:6px 0}
+.ra-v-ok{border-color:#a8d5c0}.ra-v-miss{border-color:#e3b3af}.ra-v-weird{border-color:#e4cf9f}.ra-v-alias{border-color:#bec8e5}
+.ra-summary{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:10px}
+.ra-stat{background:#eef1f4;border-radius:10px;padding:9px;text-align:center}
+.ra-stat b{display:block;font-size:18px}.ra-stat span{font-size:12px;color:var(--muted)}
+.ra-log{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:10px}
+.ra-logitem{padding:10px 11px;border-bottom:1px solid var(--line);font-size:12px;line-height:1.55}
+.ra-logitem:last-child{border-bottom:none}
+.ra-logtop{display:flex;justify-content:space-between;gap:8px}
+.ra-tag{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.ra-tag.ok{background:#e7f4ec;color:#176b45}.ra-tag.warn{background:#fdf3dd;color:#9a6700}.ra-tag.bad{background:#fbe9e8;color:#a23a36}
+#raNote{width:100%;min-height:70px;resize:vertical}
+@media(max-width:760px){.ra-choices{grid-template-columns:1fr}.ra-summary{grid-template-columns:repeat(3,1fr)}}
