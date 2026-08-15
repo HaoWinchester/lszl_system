@@ -514,6 +514,14 @@
   function markKeywordActive(key){if(!isKeywordActive(key))state.activeKeywords.push(String(key))}
   function renderQuestion(){
     const view=recallQuestionDisplay();
+    // P4.5.32：题目卡顶部显示本试卷内的题目序号（学习端按题库目录顺序；
+    // 教师预览无目录上下文，回退 payload.questionOrder）。
+    const context=questionContext(),order=question.questionOrder;
+    const index=context.index>=0?context.index:Number.isFinite(Number(order?.index))?Math.max(0,Number(order.index)):-1;
+    const total=context.total||Number(order?.total)||0;
+    const questionIndex=total&&index>=0
+      ?`<span class="kr-question-index" title="本试卷第 ${index+1} 题，共 ${total} 题"><b>${index+1}</b><small>/${total}</small></span>`
+      :'';
     const stem=(question.stemParts||[]).map((p,i)=>{
       const text=escapeHTML(p.text||'');
       if(p.clue&&rootConfig(p.clue))return `<button type="button" class="kr-keyword-token${keywordsRevealed?'':' undiscovered'}${isKeywordActive(p.clue)?' active':''}" data-keyword-id="${escapeHTML(p.clue)}" data-keyword-index="${i}">${text}</button>`;
@@ -531,8 +539,14 @@
       ?viewOptions.map((o,i)=>optionRow(o,i,`${wrapKnownKeywords(escapeHTML(o.display?.zh||''),{inline:true})}${englishLine(o.display)}`))
       :(question.options||[]).map((o,i)=>optionRow(o,i,wrapKnownKeywords(escapeHTML(o.text||''),{inline:true})));
     const stemEn=view?.stem||{hasEnglish:false};
-    questionCard.innerHTML=`<div class="kr-stem">${stem}${englishLine(stemEn)}</div>${rows.length?`<ol class="qw-card-options">${rows.join('')}</ol>`:''}<p class="kr-option-feedback lp-visually-hidden" data-kr-option-feedback aria-live="polite"></p><div class="qw-card-actions qw-card-learning-actions"><button type="button" class="qw-card-action-square qw-card-icon-action${krAnalysisOpen?' is-active':''}" data-qw-action="analysis" title="显示或关闭本题解析" aria-label="显示或关闭本题解析" aria-pressed="${krAnalysisOpen?'true':'false'}">${KR_ANALYSIS_ICON}</button></div>`;
+    questionCard.innerHTML=`${questionIndex}<div class="kr-stem">${stem}${englishLine(stemEn)}</div>${rows.length?`<ol class="qw-card-options">${rows.join('')}</ol>`:''}<p class="kr-option-feedback lp-visually-hidden" data-kr-option-feedback aria-live="polite"></p><div class="qw-card-actions qw-card-learning-actions"><button type="button" class="qw-card-action-square qw-card-icon-action${krAnalysisOpen?' is-active':''}" data-qw-action="analysis" title="显示或关闭本题解析" aria-label="显示或关闭本题解析" aria-pressed="${krAnalysisOpen?'true':'false'}">${KR_ANALYSIS_ICON}</button></div>`;
     if(krAnalysisOpen)requestAnimationFrame(positionKrAnalysisPanel);
+  }
+  // P4.5.32：题目卡入场动画——从左上滑入并缓停在画布中心（初始载入与切题时触发）。
+  function playQuestionCardEntry(){
+    questionCard.classList.remove('kr-card-enter');
+    void questionCard.offsetWidth;
+    questionCard.classList.add('kr-card-enter');
   }
   function recallOptionIsCorrect(optionId){
     const id=String(optionId||'');
@@ -734,13 +748,21 @@
   function positionKrAnalysisPanel(){
     const panel=analysisLayer?.querySelector?.('.qw-analysis-panel');
     if(!panel||!krAnalysisOpen)return false;
-    // 题目卡以世界原点为中心（translate(-50%,-50%)），面板贴其右侧，与多题画布一致。
+    // 题目卡以世界原点为中心（translate(-50%,-50%)）。面板优先贴卡片右侧；
+    // 右侧放不下（会溢出视口，导致"显示内容"等头部按钮点不到）时翻到左侧。
     const width=Number(questionCard.offsetWidth||0),height=Number(questionCard.offsetHeight||0);
-    const x=width/2+24+Number(krAnalysisOffset.x||0);
-    const y=-height/2+Number(krAnalysisOffset.y||0);
-    const panelHeight=Math.max(148,Number(panel.offsetHeight||260));
+    const panelWidth=Math.max(148,Number(panel.offsetWidth||460)),panelHeight=Math.max(148,Number(panel.offsetHeight||260));
+    const scale=Math.max(.0001,Number(state.transform.scale)||1),t=state.transform,vp=viewport.getBoundingClientRect();
+    const worldLeft=(-Number(t.x||0))/scale,worldRight=(vp.width-Number(t.x||0))/scale,worldTop=(-Number(t.y||0))/scale;
+    const rightX=width/2+24+Number(krAnalysisOffset.x||0);
+    let x=rightX;
+    if(x+panelWidth>worldRight-12){
+      const leftX=-width/2-24-Number(krAnalysisOffset.x||0)-panelWidth;
+      x=leftX>worldLeft+12?leftX:Math.max(worldLeft+12,worldRight-12-panelWidth);
+    }
+    let y=Math.max(-height/2+Number(krAnalysisOffset.y||0),worldTop+12);
     const anchorY=0;
-    panel.dataset.side='right';
+    panel.dataset.side=x<-width/2-12?'left':'right';
     panel.style.setProperty('--qw-analysis-pointer-y',Math.max(28,Math.min(panelHeight-28,anchorY-y))+'px');
     panel.style.removeProperty('--qw-analysis-pointer-x');
     panel.style.left=x+'px';
@@ -1177,7 +1199,7 @@
     if(isDragging)return false;
     if(!rightPan&&event.button!==0)return false;
     if(rightPan&&event.button!==2)return false;
-    if(!rightPan&&event.target.closest('.kr-node,.kr-question-card,.kr-guide,.kr-tools,.kr-topbar,.kr-canvas-overlay-left,.kr-canvas-overlay-right,.kr-question-library-trigger,.lp-canvas-zoom-dock,button,a,input,select,textarea'))return false;
+    if(!rightPan&&event.target.closest('.kr-node,.kr-question-card,.kr-guide,.kr-tools,.kr-topbar,.kr-canvas-overlay-left,.kr-canvas-overlay-right,.kr-question-library-trigger,.lp-canvas-zoom-dock,.qw-analysis-panel,summary,label,button,a,input,select,textarea'))return false;
     isDragging=true;panPointerId=event.pointerId;panButton=event.button;
     dragStart={x:event.clientX,y:event.clientY};worldStart={x:state.transform.x,y:state.transform.y};
     rightPanStart=rightPan?{x:event.clientX,y:event.clientY,moved:false}:null;
@@ -1293,7 +1315,7 @@
     destroyingNodeIds.clear();
     state={nodes:[],edges:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
     try{await loadDatabaseSession(selected.id)}catch(error){notifyRecallLimit(error?.message||'题目载入失败。');return false}
-    closeGuide();closeNodeSearch();closeQuestionDrawer();renderAll();if(!recallViewportRestored)setTimeout(()=>centerOn(0,0,true),30);enforceRecallPermission();return true;
+    closeGuide();closeNodeSearch();closeQuestionDrawer();renderAll();setTimeout(()=>{centerOn(0,0,true);playQuestionCardEntry()},30);enforceRecallPermission();return true;
   }
   function bindQuestionDrawer(){
     $('krQuestionListBtn')?.addEventListener('click',openQuestionDrawer);
@@ -1475,7 +1497,9 @@
     $('krSaveRetryBtn')?.addEventListener('click',async()=>{
       try{await recallAdapter?.retryLastSave?.()}catch(error){notifyRecallLimit(error?.message||'重试保存失败。')}
     });
-    if(!recallViewportRestored)setTimeout(()=>centerOn(0,0,false),30);
+    // P4.5.32：初始始终聚焦题目卡（居中）并播放滑入动画——题目卡是本页的作业锚点，
+    // 恢复的历史视图不再优先于它。
+    setTimeout(()=>{centerOn(0,0,true);playQuestionCardEntry()},30);
   }
   /* P4.5.31 教师草稿预览不走服务器会话（无 sessionBinding），联想库只能读浏览器
      localStorage——本机未导入过联想库时，关键词卡牌会退化成显示 recallNodeId。

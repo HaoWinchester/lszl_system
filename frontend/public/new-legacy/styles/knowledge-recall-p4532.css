@@ -1,0 +1,33 @@
+/* V9.0-P4.5.32 · 题目卡体验打磨：序号徽标、入场动画、解析按钮右下、面板视口感知。 */
+/* 选项作答选中视觉已在 question-workspace.css 中移除（闪烁后恢复原色，两页共用）。 */
+
+/* 题目序号徽标：显示本试卷内顺序（第 n / 共 N 题） */
+.knowledge-recall-page .kr-question-index{
+  position:relative;
+  display:inline-flex;
+  align-items:baseline;
+  gap:2px;
+  margin:0 0 8px;
+  padding:4px 10px;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--kr-primary) 12%,transparent);
+  border:1px solid color-mix(in srgb,var(--kr-primary) 26%,transparent);
+  color:var(--kr-primary-dark,var(--kr-title));
+  font-weight:850;
+  line-height:1;
+}
+.knowledge-recall-page .kr-question-index b{font-size:15px}
+.knowledge-recall-page .kr-question-index small{font-size:11px;opacity:.72;font-weight:760}
+
+/* 题目卡入场动画：从左上滑入，缓出缓停（ease-out-expo 类曲线） */
+@keyframes krCardSlideIn{
+  from{opacity:0;transform:translate(-50%,-50%) translate(-46vw,-46vh) scale(.92)}
+  to{opacity:1;transform:translate(-50%,-50%)}
+}
+.knowledge-recall-page .kr-question-card.kr-card-enter{animation:krCardSlideIn .62s cubic-bezier(.22,1,.36,1) both}
+@media (prefers-reduced-motion:reduce){
+  .knowledge-recall-page .kr-question-card.kr-card-enter{animation:none}
+}
+
+/* 解析按钮贴题目卡右下角 */
+.knowledge-recall-page .qw-card-actions.qw-card-learning-actions{justify-content:flex-end}

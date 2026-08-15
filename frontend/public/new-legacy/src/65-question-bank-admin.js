@@ -4272,6 +4272,8 @@
       payloadQuestion.sourceBankId=bank?.id||'';
       payloadQuestion.sourceQuestionId=q.id||'';
       payloadQuestion.subject=payloadQuestion.subject||bank.subject||'PMP';
+      // P4.5.32：教师预览无题库目录上下文，把本试卷内题序随 payload 带给深度回忆。
+      payloadQuestion.questionOrder={index:(bank.questions||[]).findIndex(item=>String(item.id)===String(q.id||'')),total:(bank.questions||[]).length};
       const payload={question:payloadQuestion,savedAt:Date.now(),source:'question-bank-admin-preview',previewMode:'teacher-draft',previewToken,sourceBankId:bank?.id||'',sourceQuestionId:q.id||'',userId:window.KGAuthCore?.currentUsername?.()||readString(AUTH_SESSION_KEY,'')||'guest'};
       const saved=window.KGRecallStorage?.writeCurrent?window.KGRecallStorage.writeCurrent(payload):writeJSON(DEEP_RECALL_KEY,payload);
       if(saved===false)throw new Error('预览数据写入失败');
