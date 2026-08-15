@@ -128,6 +128,8 @@ function raRenderRecords(){
   }).join('');
 }
 function raRenderAll(mode=''){raRenderCurrent(mode);raRenderChoices();raRenderPath()}
+/* 全局入口：setTab/refreshAll/导入事件以 renderRecallAcceptance 调用本模块 */
+function renderRecallAcceptance(){raRenderAcceptance()}
 function raRenderAcceptance(){
   const box=document.getElementById('raChoices');if(!box)return;
   raSyncFromWorkspace();

@@ -1,0 +1,4847 @@
+{
+  "schemaVersion": "knowledge-taxonomy-package-v1",
+  "packageId": "pmp-complete-knowledge-tree-v1",
+  "packageName": "PMP 完整知识树（人·过程·环境）",
+  "sourceApplicationVersion": "8.6.2",
+  "createdAt": "2026-07-25T00:00:00.000Z",
+  "setAsDefault": true,
+  "importPolicy": "add-or-replace-by-id",
+  "taxonomy": {
+    "id": "taxonomy-pmp-complete-v1",
+    "subjectId": "subject-pmp",
+    "name": {
+      "zh": "PMP 完整知识树（人·过程·环境）",
+      "en": ""
+    },
+    "version": 1,
+    "maxDepth": 6,
+    "status": "published",
+    "isDefault": true,
+    "sortOrder": 5,
+    "nodes": [
+      {
+        "id": "kp-pmp-complete",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": null,
+        "level": 1,
+        "title": {
+          "zh": "PMP",
+          "en": ""
+        },
+        "code": "PMP",
+        "aliases": [
+          "项目管理专业人士认证",
+          "Project Management Professional"
+        ],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-people",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-complete",
+        "level": 2,
+        "title": {
+          "zh": "人",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-people",
+        "level": 3,
+        "title": {
+          "zh": "利益相关方与沟通管理",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1",
+        "level": 4,
+        "title": {
+          "zh": "利益相关方识别",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-1-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-1",
+        "level": 5,
+        "title": {
+          "zh": "概念与重要性",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_1.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-1-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-1",
+        "level": 5,
+        "title": {
+          "zh": "分析",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_1.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-1-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-1",
+        "level": 5,
+        "title": {
+          "zh": "映射",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_1.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-1-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-1",
+        "level": 5,
+        "title": {
+          "zh": "登记册",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_1.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1",
+        "level": 4,
+        "title": {
+          "zh": "规划利益相关方争取",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_2",
+        "aliases": [
+          "规划相关方参与"
+        ],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-2-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-2",
+        "level": 5,
+        "title": {
+          "zh": "参与评估矩阵",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_2.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-2-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-2",
+        "level": 5,
+        "title": {
+          "zh": "争取计划",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_2.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1",
+        "level": 4,
+        "title": {
+          "zh": "管理与监督利益相关方争取",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_3",
+        "aliases": [
+          "管理相关方参与",
+          "监督相关方参与"
+        ],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-3-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-3",
+        "level": 5,
+        "title": {
+          "zh": "沟通技能",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_3.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-3-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-3",
+        "level": 5,
+        "title": {
+          "zh": "人际关系技能",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_3.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-3-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-3",
+        "level": 5,
+        "title": {
+          "zh": "会议",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_3.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-4",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1",
+        "level": 4,
+        "title": {
+          "zh": "项目沟通管理的概念",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_4",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-5",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1",
+        "level": 4,
+        "title": {
+          "zh": "规划沟通管理",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_5",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-5-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-5",
+        "level": 5,
+        "title": {
+          "zh": "活动分类",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_5.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-5-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-5",
+        "level": 5,
+        "title": {
+          "zh": "需求分析",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_5.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-5-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-5",
+        "level": 5,
+        "title": {
+          "zh": "沟通渠道数",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_5.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-5-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-5",
+        "level": 5,
+        "title": {
+          "zh": "沟通模型",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_5.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-5-k05",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-5",
+        "level": 5,
+        "title": {
+          "zh": "交互式/拉式/推式",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_5.K05",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-5-k06",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-5",
+        "level": 5,
+        "title": {
+          "zh": "沟通管理计划",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_5.K06",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-6",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1",
+        "level": 4,
+        "title": {
+          "zh": "管理与监督沟通",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_6",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-7",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1",
+        "level": 4,
+        "title": {
+          "zh": "区分三类文档",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_7",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 70,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-7-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-7",
+        "level": 5,
+        "title": {
+          "zh": "利益相关方登记册",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_7.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-7-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-7",
+        "level": 5,
+        "title": {
+          "zh": "参与计划",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_7.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-1-1-7-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-1-1-7",
+        "level": 5,
+        "title": {
+          "zh": "沟通管理计划",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.1.1_7.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-people",
+        "level": 3,
+        "title": {
+          "zh": "项目团队与领导力",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2",
+        "level": 4,
+        "title": {
+          "zh": "项目管理角色",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-1-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2-2-1",
+        "level": 5,
+        "title": {
+          "zh": "项目经理",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_1.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-1-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2-2-1",
+        "level": 5,
+        "title": {
+          "zh": "项目管理团队",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_1.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-1-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2-2-1",
+        "level": 5,
+        "title": {
+          "zh": "PMO",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_1.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-1-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2-2-1",
+        "level": 5,
+        "title": {
+          "zh": "与项目有关的职能",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_1.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2",
+        "level": 4,
+        "title": {
+          "zh": "团队建设与发展",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-2-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "高绩效团队",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_2.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-2-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "集中办公和虚拟团队",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_2.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-2-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "塔克曼阶梯理论",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_2.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-2-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "虚拟协作工具",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_2.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-2-k05",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "团队绩效评价",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_2.K05",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2",
+        "level": 4,
+        "title": {
+          "zh": "冲突管理及五种解决方法",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_3",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-4",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2",
+        "level": 4,
+        "title": {
+          "zh": "激励理论",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_4",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-5",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2",
+        "level": 4,
+        "title": {
+          "zh": "教练与指导、培训",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_5",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-6",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2",
+        "level": 4,
+        "title": {
+          "zh": "六顶思考帽、认可与奖励",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_6",
+        "aliases": [
+          "六顶思考帽",
+          "认可与奖励"
+        ],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-7",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2",
+        "level": 4,
+        "title": {
+          "zh": "情商与领导力",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_7",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 70,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-2-2-8",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-2",
+        "level": 4,
+        "title": {
+          "zh": "谈判、问题解决",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.2.2_8",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 80,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-people",
+        "level": 3,
+        "title": {
+          "zh": "敏捷中的人与团队",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3",
+        "level": 4,
+        "title": {
+          "zh": "Scrum 三个角色",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_1",
+        "aliases": [
+          "Scrum"
+        ],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-1-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3-3-1",
+        "level": 5,
+        "title": {
+          "zh": "产品负责人 PO",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_1.K01",
+        "aliases": [
+          "PO",
+          "Product Owner"
+        ],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-1-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3-3-1",
+        "level": 5,
+        "title": {
+          "zh": "敏捷教练 SM",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_1.K02",
+        "aliases": [
+          "SM",
+          "Scrum Master"
+        ],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-1-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3-3-1",
+        "level": 5,
+        "title": {
+          "zh": "开发团队",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_1.K03",
+        "aliases": [
+          "Developers"
+        ],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3",
+        "level": 4,
+        "title": {
+          "zh": "Scrum 五大价值观",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_2",
+        "aliases": [
+          "Scrum"
+        ],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-2-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3-3-2",
+        "level": 5,
+        "title": {
+          "zh": "承诺",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_2.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-2-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3-3-2",
+        "level": 5,
+        "title": {
+          "zh": "专注",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_2.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-2-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3-3-2",
+        "level": 5,
+        "title": {
+          "zh": "开放",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_2.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-2-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3-3-2",
+        "level": 5,
+        "title": {
+          "zh": "尊重",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_2.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-2-k05",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3-3-2",
+        "level": 5,
+        "title": {
+          "zh": "勇气",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_2.K05",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3",
+        "level": 4,
+        "title": {
+          "zh": "自组织团队",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_3",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-4",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3",
+        "level": 4,
+        "title": {
+          "zh": "团队沟通与支持",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_4",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-4-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3-3-4",
+        "level": 5,
+        "title": {
+          "zh": "面对面沟通",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_4.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-4-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3-3-4",
+        "level": 5,
+        "title": {
+          "zh": "激励团队",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_4.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-4-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3-3-4",
+        "level": 5,
+        "title": {
+          "zh": "给予环境和支持",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_4.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-people-3-3-5",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-people-3",
+        "level": 4,
+        "title": {
+          "zh": "用户画像与用户故事",
+          "en": ""
+        },
+        "code": "PMP.PEOPLE.3.3_5",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-process",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-complete",
+        "level": 2,
+        "title": {
+          "zh": "过程",
+          "en": ""
+        },
+        "code": "PMP.PROCESS",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-process",
+        "level": 3,
+        "title": {
+          "zh": "项目管理方法论与生命周期",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1",
+        "level": 4,
+        "title": {
+          "zh": "项目与项目管理",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-1-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1-1-1",
+        "level": 5,
+        "title": {
+          "zh": "临时性和独特性",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_1.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-1-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1-1-1",
+        "level": 5,
+        "title": {
+          "zh": "项目的启动背景",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_1.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1",
+        "level": 4,
+        "title": {
+          "zh": "项目管理方法论",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-2-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1-1-2",
+        "level": 5,
+        "title": {
+          "zh": "组织级项目管理",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_2.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-2-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1-1-2",
+        "level": 5,
+        "title": {
+          "zh": "项目集和项目组合",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_2.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-2-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1-1-2",
+        "level": 5,
+        "title": {
+          "zh": "项目和运营的区别",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_2.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1",
+        "level": 4,
+        "title": {
+          "zh": "项目生命周期",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_3",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-3-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1-1-3",
+        "level": 5,
+        "title": {
+          "zh": "预测型",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_3.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-3-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1-1-3",
+        "level": 5,
+        "title": {
+          "zh": "敏捷型",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_3.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-3-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1-1-3",
+        "level": 5,
+        "title": {
+          "zh": "混合型",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_3.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-4",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1",
+        "level": 4,
+        "title": {
+          "zh": "项目管理原则 · 概述",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_4",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-4-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1-1-4",
+        "level": 5,
+        "title": {
+          "zh": "项目管理的思维模式",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_4.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-5",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1",
+        "level": 4,
+        "title": {
+          "zh": "项目管理原则1：采用整体视角",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_5",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-5-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1-1-5",
+        "level": 5,
+        "title": {
+          "zh": "系统思考",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_5.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-5-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1-1-5",
+        "level": 5,
+        "title": {
+          "zh": "识别、评估和响应系统交互",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_5.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-6",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1",
+        "level": 4,
+        "title": {
+          "zh": "项目管理原则2：聚焦于价值",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_6",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-6-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1-1-6",
+        "level": 5,
+        "title": {
+          "zh": "以价值为导向进行决策",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_6.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-7",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1",
+        "level": 4,
+        "title": {
+          "zh": "项目管理原则3：将质量融入过程和可交付物",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_7",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 70,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-8",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1",
+        "level": 4,
+        "title": {
+          "zh": "项目管理原则4：成为负责任的领导者",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_8",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 80,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-8-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1-1-8",
+        "level": 5,
+        "title": {
+          "zh": "展现领导力行为",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_8.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-9",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1",
+        "level": 4,
+        "title": {
+          "zh": "项目管理原则5：将可持续性融入所有项目领域",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_9",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 90,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-10",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1",
+        "level": 4,
+        "title": {
+          "zh": "项目管理原则6：构建赋能型文化",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_10",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 100,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-1-1-10-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-1-1-10",
+        "level": 5,
+        "title": {
+          "zh": "营造协作的团队氛围",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.1.1_10.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-process",
+        "level": 3,
+        "title": {
+          "zh": "范围管理过程",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2",
+        "level": 4,
+        "title": {
+          "zh": "规划范围管理",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-1-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-1",
+        "level": 5,
+        "title": {
+          "zh": "需求管理计划",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_1.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-1-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-1",
+        "level": 5,
+        "title": {
+          "zh": "范围管理计划",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_1.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2",
+        "level": 4,
+        "title": {
+          "zh": "需求启发与分析",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-2-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "引导",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_2.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-2-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "亲和图",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_2.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-2-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "问卷",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_2.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-2-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "标杆对照",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_2.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-2-k05",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "原型法",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_2.K05",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-2-k06",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "需求文件",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_2.K06",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-2-k07",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "需求跟踪矩阵",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_2.K07",
+        "aliases": [
+          "RTM",
+          "需求追踪矩阵",
+          "需求可追溯矩阵"
+        ],
+        "status": "active",
+        "sortOrder": 70,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2",
+        "level": 4,
+        "title": {
+          "zh": "定义范围",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_3",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-3-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-3",
+        "level": 5,
+        "title": {
+          "zh": "范围说明书",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_3.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-3-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-3",
+        "level": 5,
+        "title": {
+          "zh": "质量管理计划",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_3.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-4",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2",
+        "level": 4,
+        "title": {
+          "zh": "制定范围结构",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_4",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-4-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-4",
+        "level": 5,
+        "title": {
+          "zh": "WBS",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_4.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-4-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-4",
+        "level": 5,
+        "title": {
+          "zh": "WBS 词典",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_4.K02",
+        "aliases": [
+          "WBS"
+        ],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-4-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-4",
+        "level": 5,
+        "title": {
+          "zh": "分解与滚动式规划",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_4.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-5",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2",
+        "level": 4,
+        "title": {
+          "zh": "监控范围",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_5",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-5-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-5",
+        "level": 5,
+        "title": {
+          "zh": "根本原因分析",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_5.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-5-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-5",
+        "level": 5,
+        "title": {
+          "zh": "审计与检查",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_5.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-5-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-5",
+        "level": 5,
+        "title": {
+          "zh": "绩效审查",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_5.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-5-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-5",
+        "level": 5,
+        "title": {
+          "zh": "范围基准争议处理",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_5.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-5-k05",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-5",
+        "level": 5,
+        "title": {
+          "zh": "范围蔓延与镀金",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_5.K05",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-5-k06",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-5",
+        "level": 5,
+        "title": {
+          "zh": "有变更走流程",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_5.K06",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-6",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2",
+        "level": 4,
+        "title": {
+          "zh": "确认范围",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_6",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-6-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-6",
+        "level": 5,
+        "title": {
+          "zh": "确认范围",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_6.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-2-2-6-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-2-2-6",
+        "level": 5,
+        "title": {
+          "zh": "确认依据",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.2.2_6.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-process",
+        "level": 3,
+        "title": {
+          "zh": "进度管理过程",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3-3-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-3",
+        "level": 4,
+        "title": {
+          "zh": "规划进度管理",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3.3_1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3-3-1-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-3-3-1",
+        "level": 5,
+        "title": {
+          "zh": "进度管理计划",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3.3_1.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3-3-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-3",
+        "level": 4,
+        "title": {
+          "zh": "制定进度计划",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3.3_2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3-3-2-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-3-3-2",
+        "level": 5,
+        "title": {
+          "zh": "定义活动",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3.3_2.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3-3-2-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-3-3-2",
+        "level": 5,
+        "title": {
+          "zh": "确定顺序",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3.3_2.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3-3-2-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-3-3-2",
+        "level": 5,
+        "title": {
+          "zh": "估算持续时间",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3.3_2.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3-3-2-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-3-3-2",
+        "level": 5,
+        "title": {
+          "zh": "调整进度表",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3.3_2.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3-3-2-k05",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-3-3-2",
+        "level": 5,
+        "title": {
+          "zh": "关键路径法",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3.3_2.K05",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3-3-2-k06",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-3-3-2",
+        "level": 5,
+        "title": {
+          "zh": "进度压缩之快速跟进与赶工",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3.3_2.K06",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3-3-2-k07",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-3-3-2",
+        "level": 5,
+        "title": {
+          "zh": "资源平衡和平滑",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3.3_2.K07",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 70,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3-3-2-k08",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-3-3-2",
+        "level": 5,
+        "title": {
+          "zh": "模拟和假设情景",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3.3_2.K08",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 80,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3-3-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-3",
+        "level": 4,
+        "title": {
+          "zh": "监控进度",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3.3_3",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3-3-3-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-3-3-3",
+        "level": 5,
+        "title": {
+          "zh": "先评估后行动",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3.3_3.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-3-3-3-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-3-3-3",
+        "level": 5,
+        "title": {
+          "zh": "有变更走流程",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.3.3_3.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-process",
+        "level": 3,
+        "title": {
+          "zh": "财务（成本）管理过程",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4",
+        "aliases": [
+          "成本管理过程"
+        ],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4",
+        "level": 4,
+        "title": {
+          "zh": "规划财务管理",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-1-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4-4-1",
+        "level": 5,
+        "title": {
+          "zh": "财务管理计划",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_1.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-1-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4-4-1",
+        "level": 5,
+        "title": {
+          "zh": "资金策略",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_1.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4",
+        "level": 4,
+        "title": {
+          "zh": "估算成本",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-2-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4-4-2",
+        "level": 5,
+        "title": {
+          "zh": "多点估算",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_2.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-2-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4-4-2",
+        "level": 5,
+        "title": {
+          "zh": "类比估算",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_2.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-2-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4-4-2",
+        "level": 5,
+        "title": {
+          "zh": "自下而上估算",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_2.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-2-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4-4-2",
+        "level": 5,
+        "title": {
+          "zh": "成本估算",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_2.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4",
+        "level": 4,
+        "title": {
+          "zh": "制定预算",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_3",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-3-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4-4-3",
+        "level": 5,
+        "title": {
+          "zh": "成本基准",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_3.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-4",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4",
+        "level": 4,
+        "title": {
+          "zh": "监控财务",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_4",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-4-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4-4-4",
+        "level": 5,
+        "title": {
+          "zh": "控制成本",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_4.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-4-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4-4-4",
+        "level": 5,
+        "title": {
+          "zh": "挣值分析",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_4.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-4-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4-4-4",
+        "level": 5,
+        "title": {
+          "zh": "趋势分析",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_4.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-4-4-4-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-4-4-4",
+        "level": 5,
+        "title": {
+          "zh": "收入与成本预测",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.4.4_4.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-process",
+        "level": 3,
+        "title": {
+          "zh": "风险管理过程",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5",
+        "level": 4,
+        "title": {
+          "zh": "规划风险管理",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-1-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5-5-1",
+        "level": 5,
+        "title": {
+          "zh": "风险管理计划",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_1.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5",
+        "level": 4,
+        "title": {
+          "zh": "识别风险",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-2-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5-5-2",
+        "level": 5,
+        "title": {
+          "zh": "德尔菲",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_2.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-2-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5-5-2",
+        "level": 5,
+        "title": {
+          "zh": "访谈",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_2.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-2-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5-5-2",
+        "level": 5,
+        "title": {
+          "zh": "SWOT 分析",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_2.K03",
+        "aliases": [
+          "SWOT"
+        ],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-2-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5-5-2",
+        "level": 5,
+        "title": {
+          "zh": "风险登记册",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_2.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5",
+        "level": 4,
+        "title": {
+          "zh": "实施风险分析",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_3",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-3-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5-5-3",
+        "level": 5,
+        "title": {
+          "zh": "概率和影响矩阵",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_3.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-3-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5-5-3",
+        "level": 5,
+        "title": {
+          "zh": "模拟",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_3.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-3-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5-5-3",
+        "level": 5,
+        "title": {
+          "zh": "敏感性分析",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_3.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-3-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5-5-3",
+        "level": 5,
+        "title": {
+          "zh": "决策树",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_3.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-4",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5",
+        "level": 4,
+        "title": {
+          "zh": "规划风险应对",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_4",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-4-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5-5-4",
+        "level": 5,
+        "title": {
+          "zh": "威胁应对策略",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_4.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-4-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5-5-4",
+        "level": 5,
+        "title": {
+          "zh": "机会应对策略",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_4.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-4-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5-5-4",
+        "level": 5,
+        "title": {
+          "zh": "应急应对策略及权变措施",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_4.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-5",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5",
+        "level": 4,
+        "title": {
+          "zh": "实施风险应对",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_5",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-6",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5",
+        "level": 4,
+        "title": {
+          "zh": "监督风险",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_6",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-6-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5-5-6",
+        "level": 5,
+        "title": {
+          "zh": "储备分析",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_6.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-5-5-6-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-5-5-6",
+        "level": 5,
+        "title": {
+          "zh": "风险审计",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.5.5_6.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-6",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-process",
+        "level": 3,
+        "title": {
+          "zh": "资源管理过程",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.6",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-6-6-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-6",
+        "level": 4,
+        "title": {
+          "zh": "规划资源管理",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.6.6_1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-6-6-1-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-6-6-1",
+        "level": 5,
+        "title": {
+          "zh": "资源分解结构",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.6.6_1.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-6-6-1-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-6-6-1",
+        "level": 5,
+        "title": {
+          "zh": "RACI 矩阵",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.6.6_1.K02",
+        "aliases": [
+          "RACI"
+        ],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-6-6-1-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-6-6-1",
+        "level": 5,
+        "title": {
+          "zh": "资源管理计划",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.6.6_1.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-6-6-1-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-6-6-1",
+        "level": 5,
+        "title": {
+          "zh": "团队章程",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.6.6_1.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-6-6-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-6",
+        "level": 4,
+        "title": {
+          "zh": "估算活动资源",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.6.6_2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-6-6-2-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-6-6-2",
+        "level": 5,
+        "title": {
+          "zh": "资源需求",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.6.6_2.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-6-6-2-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-6-6-2",
+        "level": 5,
+        "title": {
+          "zh": "资源日历",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.6.6_2.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-6-6-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-6",
+        "level": 4,
+        "title": {
+          "zh": "获取资源",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.6.6_3",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-6-6-4",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-6",
+        "level": 4,
+        "title": {
+          "zh": "监控资源",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.6.6_4",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-6-6-4-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-6-6-4",
+        "level": 5,
+        "title": {
+          "zh": "先评估再行动",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.6.6_4.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-6-6-4-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-6-6-4",
+        "level": 5,
+        "title": {
+          "zh": "有变更走流程",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.6.6_4.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-process",
+        "level": 3,
+        "title": {
+          "zh": "治理与整合过程",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 70,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7",
+        "level": 4,
+        "title": {
+          "zh": "启动项目或阶段",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-1-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-1",
+        "level": 5,
+        "title": {
+          "zh": "项目章程编制与审核",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_1.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-1-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-1",
+        "level": 5,
+        "title": {
+          "zh": "项目章程内容",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_1.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-1-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-1",
+        "level": 5,
+        "title": {
+          "zh": "项目章程作用",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_1.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-1-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-1",
+        "level": 5,
+        "title": {
+          "zh": "假设日志",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_1.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7",
+        "level": 4,
+        "title": {
+          "zh": "整合与对齐项目计划",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-2-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-2",
+        "level": 5,
+        "title": {
+          "zh": "项目管理计划内容",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_2.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-2-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-2",
+        "level": 5,
+        "title": {
+          "zh": "项目管理计划作用",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_2.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-2-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-2",
+        "level": 5,
+        "title": {
+          "zh": "开工会议",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_2.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7",
+        "level": 4,
+        "title": {
+          "zh": "管理项目执行",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_3",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-3-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-3",
+        "level": 5,
+        "title": {
+          "zh": "指导与管理项目工作",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_3.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-3-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-3",
+        "level": 5,
+        "title": {
+          "zh": "问题日志或解决问题",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_3.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-4",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7",
+        "level": 4,
+        "title": {
+          "zh": "管理质量保证",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_4",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-4-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-4",
+        "level": 5,
+        "title": {
+          "zh": "质量保证工具与技术",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_4.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-4-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-4",
+        "level": 5,
+        "title": {
+          "zh": "质量报告",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_4.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-5",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7",
+        "level": 4,
+        "title": {
+          "zh": "管理项目知识",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_5",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-5-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-5",
+        "level": 5,
+        "title": {
+          "zh": "知识管理与信息管理方法",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_5.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-5-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-5",
+        "level": 5,
+        "title": {
+          "zh": "经验教训登记册及更新",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_5.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-6",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7",
+        "level": 4,
+        "title": {
+          "zh": "监控项目绩效",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_6",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-6-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-6",
+        "level": 5,
+        "title": {
+          "zh": "工作绩效数据/信息/报告",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_6.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-6-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-6",
+        "level": 5,
+        "title": {
+          "zh": "监控方法：偏差、趋势、根因、备选方案、成本效益分析",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_6.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-7",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7",
+        "level": 4,
+        "title": {
+          "zh": "实施整体变更控制",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_7",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 70,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-7-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-7",
+        "level": 5,
+        "title": {
+          "zh": "变更控制流程作用",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_7.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-7-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-7",
+        "level": 5,
+        "title": {
+          "zh": "变更请求分类",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_7.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-7-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-7",
+        "level": 5,
+        "title": {
+          "zh": "变更流程",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_7.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-7-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-7",
+        "level": 5,
+        "title": {
+          "zh": "变更日志",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_7.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-8",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7",
+        "level": 4,
+        "title": {
+          "zh": "结束项目或阶段",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_8",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 80,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-8-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-8",
+        "level": 5,
+        "title": {
+          "zh": "收尾内容",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_8.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-8-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-8",
+        "level": 5,
+        "title": {
+          "zh": "收尾变更处理",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_8.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-8-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-8",
+        "level": 5,
+        "title": {
+          "zh": "最终版文件及报告",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_8.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-8-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-8",
+        "level": 5,
+        "title": {
+          "zh": "成果移交",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_8.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-8-k05",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-8",
+        "level": 5,
+        "title": {
+          "zh": "提前终止",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_8.K05",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-7-7-8-k06",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-7-7-8",
+        "level": 5,
+        "title": {
+          "zh": "组织过程资产更新",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.7.7_8.K06",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-process",
+        "level": 3,
+        "title": {
+          "zh": "采购管理过程",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 80,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8",
+        "level": 4,
+        "title": {
+          "zh": "规划采购",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-1-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8-8-1",
+        "level": 5,
+        "title": {
+          "zh": "自制或外购分析",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_1.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-1-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8-8-1",
+        "level": 5,
+        "title": {
+          "zh": "采购管理计划",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_1.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-1-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8-8-1",
+        "level": 5,
+        "title": {
+          "zh": "合同支付类型",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_1.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-1-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8-8-1",
+        "level": 5,
+        "title": {
+          "zh": "采购工作说明书",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_1.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-1-k05",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8-8-1",
+        "level": 5,
+        "title": {
+          "zh": "供方选择标准",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_1.K05",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8",
+        "level": 4,
+        "title": {
+          "zh": "实施采购",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-2-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8-8-2",
+        "level": 5,
+        "title": {
+          "zh": "投标人会议",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_2.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-2-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8-8-2",
+        "level": 5,
+        "title": {
+          "zh": "采购建议书及评价",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_2.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-2-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8-8-2",
+        "level": 5,
+        "title": {
+          "zh": "协议或合同",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_2.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8",
+        "level": 4,
+        "title": {
+          "zh": "控制采购",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_3",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-3-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8-8-3",
+        "level": 5,
+        "title": {
+          "zh": "绩效审查",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_3.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-3-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8-8-3",
+        "level": 5,
+        "title": {
+          "zh": "检查",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_3.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-3-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8-8-3",
+        "level": 5,
+        "title": {
+          "zh": "审计",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_3.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-3-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8-8-3",
+        "level": 5,
+        "title": {
+          "zh": "索赔管理",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_3.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-3-k05",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8-8-3",
+        "level": 5,
+        "title": {
+          "zh": "采购变更",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_3.K05",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-8-8-3-k06",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-8-8-3",
+        "level": 5,
+        "title": {
+          "zh": "终止合同及提前终止",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.8.8_3.K06",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-process",
+        "level": 3,
+        "title": {
+          "zh": "敏捷过程与实践",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 90,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷宣言四大价值观",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-1-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-1",
+        "level": 5,
+        "title": {
+          "zh": "个体与互动高于流程工具",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_1.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-1-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-1",
+        "level": 5,
+        "title": {
+          "zh": "可工作软件高于详尽文档",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_1.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-1-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-1",
+        "level": 5,
+        "title": {
+          "zh": "客户合作高于合同谈判",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_1.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-1-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-1",
+        "level": 5,
+        "title": {
+          "zh": "响应变化高于遵循计划",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_1.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷原则1：满足客户",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-2-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-2",
+        "level": 5,
+        "title": {
+          "zh": "最高优先级是通过尽早和持续交付有价值的软件",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_2.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷原则2：拥抱变化",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_3",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-3-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-3",
+        "level": 5,
+        "title": {
+          "zh": "欢迎需求变化，即使到开发后期",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_3.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-4",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷原则3：频繁交付",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_4",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-4-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-4",
+        "level": 5,
+        "title": {
+          "zh": "经常交付可工作软件，倾向于较短的周期",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_4.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-5",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷原则4：协作",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_5",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-5-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-5",
+        "level": 5,
+        "title": {
+          "zh": "业务人员与开发人员每天一起工作",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_5.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-6",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷原则5：激励团队、给予环境和支持",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_6",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-6-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-6",
+        "level": 5,
+        "title": {
+          "zh": "围绕有积极性的个人，并信任他们",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_6.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-7",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷原则6：面对面沟通",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_7",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 70,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-7-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-7",
+        "level": 5,
+        "title": {
+          "zh": "最有效的沟通方式",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_7.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-8",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷原则7：可工作的软件",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_8",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 80,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-8-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-8",
+        "level": 5,
+        "title": {
+          "zh": "进度的首要度量标准",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_8.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-9",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷原则8：可持续步调",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_9",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 90,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-9-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-9",
+        "level": 5,
+        "title": {
+          "zh": "发起人、开发者和用户保持恒定步调",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_9.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-10",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷原则9：精益求精",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_10",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 100,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-10-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-10",
+        "level": 5,
+        "title": {
+          "zh": "持续关注卓越的技术和良好的设计",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_10.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-11",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷原则10：简洁",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_11",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 110,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-11-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-11",
+        "level": 5,
+        "title": {
+          "zh": "最大化未完成工作数量的艺术",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_11.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-12",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷原则11：自组织团队",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_12",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 120,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-12-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-12",
+        "level": 5,
+        "title": {
+          "zh": "最好的架构、需求和设计出自于此",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_12.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-13",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷原则12：定期反省",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_13",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 130,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-13-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-13",
+        "level": 5,
+        "title": {
+          "zh": "团队定期反省如何更有效，并相应调整",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_13.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-14",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "Scrum 框架",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_14",
+        "aliases": [
+          "Scrum"
+        ],
+        "status": "active",
+        "sortOrder": 140,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-14-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-14",
+        "level": 5,
+        "title": {
+          "zh": "三支柱：透明性、检查、适应",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_14.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-14-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-14",
+        "level": 5,
+        "title": {
+          "zh": "三工件：Product Backlog、Sprint Backlog、Increment",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_14.K02",
+        "aliases": [
+          "Product",
+          "Backlog",
+          "Sprint",
+          "Increment"
+        ],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-14-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-14",
+        "level": 5,
+        "title": {
+          "zh": "五事件：Sprint、Sprint Planning、Daily Scrum、Sprint Review、Retrospective",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_14.K03",
+        "aliases": [
+          "Sprint",
+          "Planning",
+          "Daily",
+          "Scrum",
+          "Review",
+          "Retrospective"
+        ],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-15",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷阶段框架",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_15",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 150,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-15-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-15",
+        "level": 5,
+        "title": {
+          "zh": "构想、推测、探索、适应、结束",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_15.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-15-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-15",
+        "level": 5,
+        "title": {
+          "zh": "构想阶段：产品愿景、项目章程、团队章程",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_15.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-16",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "产品需求规划",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_16",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 160,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-16-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-16",
+        "level": 5,
+        "title": {
+          "zh": "洋葱圈",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_16.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-16-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-16",
+        "level": 5,
+        "title": {
+          "zh": "产品路线图",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_16.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-16-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-16",
+        "level": 5,
+        "title": {
+          "zh": "MMF",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_16.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-16-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-16",
+        "level": 5,
+        "title": {
+          "zh": "MVP",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_16.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-16-k05",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-16",
+        "level": 5,
+        "title": {
+          "zh": "敏捷发布规划",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_16.K05",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-16-k06",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-16",
+        "level": 5,
+        "title": {
+          "zh": "时间盒",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_16.K06",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-17",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "用户故事与估算",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_17",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 170,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-17-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-17",
+        "level": 5,
+        "title": {
+          "zh": "用户故事及 DoD",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_17.K01",
+        "aliases": [
+          "DoD"
+        ],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-17-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-17",
+        "level": 5,
+        "title": {
+          "zh": "INVEST 原则",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_17.K02",
+        "aliases": [
+          "INVEST"
+        ],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-17-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-17",
+        "level": 5,
+        "title": {
+          "zh": "理想时间",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_17.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-17-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-17",
+        "level": 5,
+        "title": {
+          "zh": "计划扑克",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_17.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-17-k05",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-17",
+        "level": 5,
+        "title": {
+          "zh": "优先级排序：MoSCoW、KANO、风险四象限、举手表决法",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_17.K05",
+        "aliases": [
+          "MoSCoW",
+          "KANO"
+        ],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-18",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "敏捷风险与适应",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_18",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 180,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-18-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-18",
+        "level": 5,
+        "title": {
+          "zh": "敏捷风险管理",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_18.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-18-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-18",
+        "level": 5,
+        "title": {
+          "zh": "风险调整待办事项列表",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_18.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-18-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-18",
+        "level": 5,
+        "title": {
+          "zh": "刺探 Spike",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_18.K03",
+        "aliases": [
+          "Spike"
+        ],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-18-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-18",
+        "level": 5,
+        "title": {
+          "zh": "速度",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_18.K04",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-18-k05",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-18",
+        "level": 5,
+        "title": {
+          "zh": "燃尽图、燃起图",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_18.K05",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-18-k06",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-18",
+        "level": 5,
+        "title": {
+          "zh": "问题解决",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_18.K06",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 60,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-19",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9",
+        "level": 4,
+        "title": {
+          "zh": "其他敏捷实践",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_19",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 190,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-19-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-19",
+        "level": 5,
+        "title": {
+          "zh": "精益价值流图",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_19.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-19-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-19",
+        "level": 5,
+        "title": {
+          "zh": "设计思维",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_19.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-19-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-19",
+        "level": 5,
+        "title": {
+          "zh": "看板：累积流图/限制 WIP/任务板/信息发射器",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_19.K03",
+        "aliases": [
+          "WIP"
+        ],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-19-k04",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-19",
+        "level": 5,
+        "title": {
+          "zh": "极限编程 XP",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_19.K04",
+        "aliases": [
+          "XP"
+        ],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-process-9-9-19-k05",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-process-9-9-19",
+        "level": 5,
+        "title": {
+          "zh": "敏捷扩展框架 Scrum of Scrums",
+          "en": ""
+        },
+        "code": "PMP.PROCESS.9.9_19.K05",
+        "aliases": [
+          "Scrum of Scrums"
+        ],
+        "status": "active",
+        "sortOrder": 50,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-environment",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-complete",
+        "level": 2,
+        "title": {
+          "zh": "环境",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-environment",
+        "level": 3,
+        "title": {
+          "zh": "价值交付系统",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-1-1-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-1",
+        "level": 4,
+        "title": {
+          "zh": "创造价值",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.1.1_1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-1-1-1-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-1-1-1",
+        "level": 5,
+        "title": {
+          "zh": "价值交付系统",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.1.1_1.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-1-1-1-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-1-1-1",
+        "level": 5,
+        "title": {
+          "zh": "项目成功标准",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.1.1_1.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-1-1-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-1",
+        "level": 4,
+        "title": {
+          "zh": "产品管理考虑因素",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.1.1_2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-environment",
+        "level": 3,
+        "title": {
+          "zh": "组织与环境因素",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-2-2-1",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-2",
+        "level": 4,
+        "title": {
+          "zh": "项目影响因素",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.2.2_1",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-2-2-1-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-2-2-1",
+        "level": 5,
+        "title": {
+          "zh": "事业环境因素 EEF",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.2.2_1.K01",
+        "aliases": [
+          "EEF"
+        ],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-2-2-1-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-2-2-1",
+        "level": 5,
+        "title": {
+          "zh": "组织过程资产 OPA",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.2.2_1.K02",
+        "aliases": [
+          "OPA"
+        ],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-2-2-2",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-2",
+        "level": 4,
+        "title": {
+          "zh": "项目组织结构类型",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.2.2_2",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-2-2-2-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "职能型",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.2.2_2.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-2-2-2-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "矩阵型",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.2.2_2.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-2-2-2-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-2-2-2",
+        "level": 5,
+        "title": {
+          "zh": "项目型",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.2.2_2.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-2-2-3",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-2",
+        "level": 4,
+        "title": {
+          "zh": "项目治理",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.2.2_3",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-2-2-4",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-2",
+        "level": 4,
+        "title": {
+          "zh": "项目管理商业文件",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.2.2_4",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 40,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-2-2-4-k01",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-2-2-4",
+        "level": 5,
+        "title": {
+          "zh": "需求评估",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.2.2_4.K01",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 10,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-2-2-4-k02",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-2-2-4",
+        "level": 5,
+        "title": {
+          "zh": "商业论证",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.2.2_4.K02",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 20,
+        "replacedByNodeIds": []
+      },
+      {
+        "id": "kp-pmp-environment-2-2-4-k03",
+        "taxonomyId": "taxonomy-pmp-complete-v1",
+        "parentId": "kp-pmp-environment-2-2-4",
+        "level": 5,
+        "title": {
+          "zh": "效益管理计划",
+          "en": ""
+        },
+        "code": "PMP.ENVIRONMENT.2.2_4.K03",
+        "aliases": [],
+        "status": "active",
+        "sortOrder": 30,
+        "replacedByNodeIds": []
+      }
+    ]
+  }
+}
