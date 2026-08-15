@@ -1,8 +1,10 @@
 /* V9.0-P4.5.32 · 题目卡体验打磨：序号徽标、入场动画、解析按钮右下、面板视口感知。 */
 /* 选项作答选中视觉已在 question-workspace.css 中移除（闪烁后恢复原色，两页共用）。 */
 
-/* 题目序号徽标：显示本试卷内顺序（第 n / 共 N 题） */
-.knowledge-recall-page .kr-question-index{
+/* 题目序号徽标：显示本试卷内顺序（第 n / 共 N 题）。
+   注意使用专属类名 kr-question-order-badge——kr-question-index 是题目库抽屉
+   列表项的既有类名（固定 28×28 格子），复用会被其全局规则压扁。 */
+.knowledge-recall-page .kr-question-order-badge{
   position:relative;
   display:inline-flex;
   align-items:baseline;
@@ -16,8 +18,8 @@
   font-weight:850;
   line-height:1;
 }
-.knowledge-recall-page .kr-question-index b{font-size:15px}
-.knowledge-recall-page .kr-question-index small{font-size:11px;opacity:.72;font-weight:760}
+.knowledge-recall-page .kr-question-order-badge b{font-size:15px}
+.knowledge-recall-page .kr-question-order-badge small{font-size:11px;opacity:.72;font-weight:760}
 
 /* 题目卡入场动画：从左上滑入，缓出缓停（ease-out-expo 类曲线） */
 @keyframes krCardSlideIn{
