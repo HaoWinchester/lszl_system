@@ -106,7 +106,8 @@ users / role_themes / system_settings(KV) / user_admin_logs / folders / graph_fi
 ## 功能分支工作流（强制执行）
 
 - **开发任何新功能必须先从 `main` 拉功能分支**（如 `feat/xxx`），不要直接在 `main` 上开发。
-- 功能开发完成并通过相应验证后：合入 `main` → 推送远端 → 执行发布（`node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser` 等）→ **删除该功能分支**。
+- **【铁律】功能分支开发完成并通过验证后，必须先提醒用户、征得同意，才能合入 `main`**；用户同意后：合入 `main` → 推送远端 → 执行发布（`node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser` 等）→ **删除该功能分支**。绝不在用户未同意时自行合并。
+- **推送失败走代理**：`git push` 因网络失败时，用本机代理重试：`git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 push`（单次生效，不改全局配置；本机代理监听端口 7897）。
 - 同一时间仓库只保留 `main` 加至多一个进行中的功能分支；不要出现过多并存分支。
 - 合入成功后删除对应的本地/远端功能分支，并移除对应工作树；最终核对仓库只保留 `main`（托管工具创建的临时 detached 工作树除外）。
 - 不得为清理分支丢弃尚未合入的有效修改；发现脏工作树时，先审计并把有效内容纳入 `main`，再执行清理。
