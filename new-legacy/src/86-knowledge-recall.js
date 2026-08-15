@@ -1454,6 +1454,7 @@
       if(previewQuestion){
         question=previewQuestion;recallSession=null;rootMap=buildRootMap(question);keywordMatchers=buildKeywordMatchers(rootMap);keywordsRevealed=false;
         setRecallReadonly(false);renderSaveState({saveState:'idle'});
+        await hydratePreviewLibrary();
       }else await loadDatabaseSession();
     }
     catch(error){
@@ -1471,6 +1472,22 @@
       try{await recallAdapter?.retryLastSave?.()}catch(error){notifyRecallLimit(error?.message||'重试保存失败。')}
     });
     if(!recallViewportRestored)setTimeout(()=>centerOn(0,0,false),30);
+  }
+  /* P4.5.31 教师草稿预览不走服务器会话（无 sessionBinding），联想库只能读浏览器
+     localStorage——本机未导入过联想库时，关键词卡牌会退化成显示 recallNodeId。
+     此时从服务器拉取当前科目正式库兜底（需教师/管理员登录态；失败静默保持原状）。 */
+  async function hydratePreviewLibrary(){
+    if(!isTeacherDraftPreview())return;
+    try{
+      const subject=currentSubject();
+      if((associationLibrary()?.nodes||[]).length)return;
+      const serverLibrary=await window.KGRecallAssociationLibrary?.readServer?.(subject);
+      if(serverLibrary&&(serverLibrary.nodes||[]).length){
+        window.KGRecallAssociationLibrary?.write?.(subject,serverLibrary);
+        resetAssociationRuntime();
+        rootMap=buildRootMap(question);keywordMatchers=buildKeywordMatchers(rootMap);
+      }
+    }catch(error){}
   }
   window.addEventListener('storage',event=>{
     const prefix=window.KGStorageKeys?.PREFIXES?.RECALL_ASSOCIATION||'kg_recall_association_library_v1__';
