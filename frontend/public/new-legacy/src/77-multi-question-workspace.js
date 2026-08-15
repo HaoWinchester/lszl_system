@@ -1066,14 +1066,20 @@
       return '<li class="qw-card-option"><button type="button" class="qw-card-option-key'+(selected?' is-answer-selected':'')+(persistent?' is-correct-active':'')+'" data-qw-option-key="'+escapeHTML(key)+'" title="选择 '+escapeHTML(key)+'" aria-pressed="'+(selected?'true':'false')+'"'+(syncState.pending?' disabled aria-disabled="true"':'')+'>'+escapeHTML(key)+'</button>'
         +'<span class="qw-card-option-copy"><span class="qw-highlight-region" data-highlight-region="'+escapeHTML(region)+'" data-highlight-language="zh">'+highlightedMarkup(option?.display?.zh||'',node,region)+'</span>'+englishLine(option?.display)+'</span></li>';
     }).join('')+'</ol>':'<p class="qw-card-question-stem">当前题目没有可用选项。</p>');
-    const syncMarkup=displayMode==='compact'?'':(syncState.pending
-      ?'<div class="qw-option-sync-status is-pending" data-qw-option-sync-status role="status">正在保存作答…</div>'
-      :syncState.error?'<div class="qw-option-sync-error" data-qw-option-sync-error role="alert"><span>作答尚未保存：'+escapeHTML(syncState.error)+'</span><button type="button" data-qw-option-retry>重试</button></div>':'');
+    // P4.5.34：取消"正在保存作答…"常驻提示（干扰做题体验）；
+    // 保存失败仍显示错误与重试按钮。提交中的防重复禁用逻辑保持不变。
+    const syncMarkup=displayMode==='compact'?'':(syncState.error?'<div class="qw-option-sync-error" data-qw-option-sync-error role="alert"><span>作答尚未保存：'+escapeHTML(syncState.error)+'</span><button type="button" data-qw-option-retry>重试</button></div>':'');
     const analysisOpen=analysisPanelOpen(node.id);
     const titleZh=view.title?.zh||node.title||'未命名题目';
     const practiceLabel=practiceCardLabel(node);
+    // P4.5.34：题目卡显示试卷内题号（paperIndex 为 0 基数组下标），与深度回忆序号徽标同款。
+    const orderItem=displayMode==='compact'?null:questionItemForNode(node);
+    const orderTotal=displayMode==='compact'?0:(orderedQuestionItems(node.paperId,node.releaseId).length||0);
+    const orderBadge=orderItem&&Number.isFinite(Number(orderItem.paperIndex))&&orderTotal
+      ?'<span class="qw-card-question-order-badge" title="本试卷第 '+(Number(orderItem.paperIndex)+1)+' 题，共 '+orderTotal+' 题"><b>'+(Number(orderItem.paperIndex)+1)+'</b><small>/'+orderTotal+'</small></span>'
+      :'';
     return '<header class="qw-card-header" data-card-drag-handle>'
-      +'<div class="qw-card-heading"><span class="qw-card-icon">题</span>'
+      +'<div class="qw-card-heading"><span class="qw-card-icon">题</span>'+orderBadge
       +(practiceLabel?'<div><small data-qw-practice-label>'+escapeHTML(practiceLabel)+'</small></div>':'')+'</div>'
       +'<div class="qw-card-header-actions">'
       +(node.difficulty?'<span class="qw-card-difficulty" title="题目难度">'+escapeHTML(Difficulty.stars?.(node.difficulty)||node.difficulty)+'</span>':'')
@@ -1409,17 +1415,27 @@
   }
   function positionAnalysisPanels(){
     if(!state.analysisNodeIds.length||!state.analysisLayer)return false;
+    // P4.5.34：视口感知定位——面板默认贴卡片右侧；右侧放不下（会溢出视口，
+    // "显示内容"等头部按钮点到屏幕外）时翻到左侧，仍放不下再 clamp 进视口。
+    const vpRect=state.viewport?.getBoundingClientRect?.();
+    const vpLeft=vpRect?clientToWorld(vpRect.left+12,vpRect.top).x:null;
+    const vpRight=vpRect?clientToWorld(vpRect.right-12,vpRect.top).x:null;
     state.analysisNodeIds.slice().forEach((nodeId,index)=>{
       const record=state.cards.get(String(nodeId));
       const panel=analysisPanelElement(nodeId);
       if(!record||!panel)return;
       const node=record.node||{};
       const offset=state.analysisPanelOffsets.get(String(nodeId))||{x:0,y:0};
-      const x=Number(node.x||0)+Number(node.width||0)+24+Number(offset.x||0);
+      const panelWidth=Math.max(148,Number(panel.offsetWidth||460)),panelHeight=Math.max(148,Number(panel.offsetHeight||260));
+      const rightX=Number(node.x||0)+Number(node.width||0)+24+Number(offset.x||0);
+      let x=rightX;
+      if(vpLeft!=null&&vpRight!=null&&x+panelWidth>vpRight){
+        const leftX=Number(node.x||0)-24-Number(offset.x||0)-panelWidth;
+        x=leftX>=vpLeft?leftX:Math.max(vpLeft,vpRight-panelWidth);
+      }
       const y=Number(node.y||0)+Number(offset.y||0);
-      const panelHeight=Math.max(148,Number(panel.offsetHeight||260));
       const anchorY=Number(node.y||0)+Number(node.height||0)/2;
-      panel.dataset.side='right';
+      panel.dataset.side=x<Number(node.x||0)-12?'left':'right';
       panel.style.setProperty('--qw-analysis-pointer-y',clamp(anchorY-y,28,Math.max(28,panelHeight-28))+'px');
       panel.style.removeProperty('--qw-analysis-pointer-x');
       panel.style.left=x+'px';
@@ -2065,20 +2081,48 @@
       practiceMasteredCount:0
     };
   }
+  // P4.5.34：放宽共同原则判定——正确选项原则一致（原规则，最强匹配）之外，
+  // 也接受"所选题目的 principleIds 有交集"：交集里第一个有启用预设的原则即命中。
+  function commonPresetFromPrincipleIntersection(questions=[]){
+    let common=null;
+    for(const record of questions){
+      const question=resolvedQuestionForNode(record?.node||{})||{};
+      const ids=(principleIdsForQuestion(question)||[]).map(String).filter(Boolean);
+      if(!ids.length)return null;
+      common=common==null?new Set(ids):new Set([...common].filter(id=>ids.includes(id)));
+      if(!common.size)return null;
+    }
+    if(!common)return null;
+    for(const principleId of common){
+      const preset=Presets.getByPrincipleId?.(principleId,{activeOnly:true});
+      if(preset)return {principleId:String(principleId),preset};
+    }
+    return null;
+  }
   function synthesisDraftFromSelection(records=selectedRecords()){
     const questions=records.filter(record=>record.node?.nodeType==='question-reference');
+    let principleId='',preset=null,fallbackReason='所选题目没有共同且唯一的启用原则预设。';
     const resolved=PrincipleBinding.selectionPrinciple?.(questions.map(record=>resolvedQuestionForNode(record?.node||{})||{}));
-    if(!resolved?.ok)return blankSynthesisDraft(questions);
-    const principleId=String(resolved.principleId||'');
+    if(resolved?.ok){
+      principleId=String(resolved.principleId||'');
+      preset=Presets.getByPrincipleId?.(principleId,{activeOnly:true})||null;
+      if(!preset)fallbackReason='共同原则没有启用中的系统预设归纳卡。';
+    }
+    if(!preset){
+      const intersection=commonPresetFromPrincipleIntersection(questions);
+      if(intersection){principleId=intersection.principleId;preset=intersection.preset;fallbackReason=''}
+    }
+    if(!preset)return {...blankSynthesisDraft(questions),fallbackReason};
     const principle=Principles.get?.(principleId)||null;
     const principleName=principleDisplayName(principleId,principle?.name||'');
     const principleTag='原则：'+principleName;
-    const preset=Presets.getByPrincipleId?.(principleId,{activeOnly:true})||null;
-    if(!preset)return {...blankSynthesisDraft(questions),fallbackReason:'共同原则没有启用中的系统预设归纳卡。'};
+    // P4.5.34：预设卡默认以"我的归纳卡"落地（复制预设内容；后续编辑只写个人卡，
+    // 不回写后台预设/题库数据）。个人卡服务不可用时降级为原系统预设卡（只读）。
+    const asPersonal=typeof PersonalCards.create==='function';
     return {
       valid:true,
       synthesisType:'principle',
-      cardType:'system',
+      cardType:asPersonal?'user':'system',
       principleId,
       sourcePresetId:String(preset.id||''),
       presetVersion:Number(preset.version||0),
@@ -2356,8 +2400,7 @@
     renderCards();
     setCardSelection([result.node.id],{reason:'quick-synthesis-select'});
     focusNode(result.node.id,{zoom:Math.max(state.zoom,.72)});
-    notify(payload.cardType==='system'?'已生成系统预设归纳卡。学员只读，可复制为自己的归纳卡。':'已生成个人归纳卡，可双击编辑。');
-    if(payload.cardType==='user')global.setTimeout(()=>openSynthesisModal(result.node.id),0);
+    notify(payload.cardType==='system'?'已生成系统预设归纳卡。学员只读，可复制为自己的归纳卡。':'已按共同原则生成归纳卡（基于预设复制），双击卡片即可编辑。');
     return true;
   }
   function selectedCommonGroup(ids=[...state.selectedNodeIds]){

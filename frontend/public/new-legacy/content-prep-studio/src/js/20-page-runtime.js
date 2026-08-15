@@ -94,12 +94,19 @@ function renderQuestions(){
   renderQuestionEditor();
   if(typeof renderFamilyQuestionTabs==='function')renderFamilyQuestionTabs();
 }
-function treeOptions(selected){
+let primaryNodeFilter='';
+function treeOptions(selected,filter=''){
   if(!state.knowledgeTree)return '<option value="">未加载知识树</option>';
-  return '<option value="">— 未关联 —</option>'+state.knowledgeTree.nodes.map(n=>{
+  const kw=String(filter||'').trim().toLowerCase();
+  const matched=kw?state.knowledgeTree.nodes.filter(n=>{
+    const label=state.knowledgeTree.pathFor(n.id).join(' > ');
+    return label.toLowerCase().includes(kw)||String(n.id).toLowerCase().includes(kw);
+  }):state.knowledgeTree.nodes;
+  const kept=selected&&!matched.some(n=>n.id===selected); // 当前已选项被过滤掉时仍保留,避免静默丢失关联
+  return '<option value="">— 未关联 —</option>'+matched.map(n=>{
     const label=state.knowledgeTree.pathFor(n.id).join(' > ');
     return `<option value="${esc(n.id)}"${n.id===selected?' selected':''}>${esc(label)} [${esc(n.id)}]</option>`;
-  }).join('');
+  }).join('')+(kept?treeOptions(selected).replace('<option value="">— 未关联 —</option>',''):'');
 }
 function principleCheckMarkup(selected=[],namePrefix='p'){
   const set=new Set((selected||[]).map(String));if(!state.principles.items.length)return '<span class="muted smalltxt">尚未导入/创建原则。</span>';
@@ -333,7 +340,8 @@ function renderQuestionEditor(){
   <div class="section">
     <div class="section-title">知识点</div>
     <label>主知识点（只保存稳定 Node ID）</label>
-    <select id="primaryNode">${treeOptions(q.metadata?.knowledge?.primaryNodeId||'')}</select>
+    <input type="text" id="primaryNodeSearch" placeholder="搜索知识点路径或 ID，如：进度 / kp-pmp" autocomplete="off" value="${esc(primaryNodeFilter)}">
+    <select id="primaryNode">${treeOptions(q.metadata?.knowledge?.primaryNodeId||'',primaryNodeFilter)}</select>
   </div>
   <div class="section">
     <div class="section-title">English</div>
@@ -368,6 +376,13 @@ function bindQuestionEditor(){
   document.querySelectorAll('input[name=correctOption]').forEach(el=>el.addEventListener('change',()=>{q.correctAnswer=el.value;q.options.forEach(o=>o.correct=o.id===el.value);renderCurrentIssues()}));
   document.getElementById('analysisZh').addEventListener('input',e=>{q.analysis=e.target.value;q.explanation=e.target.value;renderCurrentIssues()});
   document.getElementById('primaryNode').addEventListener('change',e=>{setPrimaryKnowledge(q,e.target.value);renderKeywords();renderCurrentIssues()});
+  const primarySearch=document.getElementById('primaryNodeSearch');
+  if(primarySearch)primarySearch.addEventListener('input',e=>{
+    primaryNodeFilter=e.target.value;
+    const sel=document.getElementById('primaryNode');if(!sel)return;
+    const current=q.metadata?.knowledge?.primaryNodeId||'';
+    sel.innerHTML=treeOptions(current,primaryNodeFilter);
+  });
   document.getElementById('titleEn').addEventListener('input',e=>q.translations.en.title=e.target.value);
   document.getElementById('stemEn').addEventListener('input',e=>q.translations.en.stemParts=[{text:e.target.value}]);
   document.querySelectorAll('[data-enoption]').forEach(el=>el.addEventListener('input',()=>{let o=q.translations.en.options.find(x=>x.id===el.dataset.enoption);if(!o){o={id:el.dataset.enoption,text:''};q.translations.en.options.push(o)}o.text=el.value}));
@@ -670,7 +685,7 @@ function validateKeyword(q,c){
   if(c.recallNodeId&&!recallIndex().byId.has(c.recallNodeId))issues.push({level:'error',message:`关键词“${c.text}”引用的联想入口不存在：${c.recallNodeId}`,suggest:'清除该引用，或重新选择一个现有联想入口。'});
   if(!c.recallNodeId)issues.push({level:'warn',message:`${c.keywordLevel==='core'?'核心':'普通'}关键词“${c.text}”未关联联想入口`,suggest:'Recall 为可选增强；如需联想通路，可在关键词卡片中选择联想入口。'});
   if(c.keywordLevel==='core'){
-    if(!c.solutionRole||c.solutionRole==='context')issues.push({level:'error',message:`核心关键词“${c.text}”缺少解题作用`,suggest:'选择 Decision Cue / Concept Anchor / Condition Anchor / Answer Anchor。'});
+    if(!c.solutionRole||c.solutionRole==='context')issues.push({level:'warn',message:`核心关键词“${c.text}”缺少解题作用`,suggest:'建议选择 Decision Cue / Concept Anchor / Condition Anchor / Answer Anchor（P4.5.29：solutionRole 仅用于审核与诊断，不作合法性门槛）。'});
     if(!String(c.coreReason||'').trim())issues.push({level:'warn',message:`核心关键词“${c.text}”缺少核心理由`,suggest:'建议补充说明这个词为什么影响本题推理或答案选择。'});
   }
   return issues;
