@@ -20,6 +20,7 @@ const bundle=vm.runInContext(`principleCardBundlePayload({
 assert.equal(bundle.format,'kg-principle-card-bundle-v1');
 assert.equal(bundle.principles.items.length,1);
 assert.equal(bundle.synthesisPresets.items[0].principleId,'principle-a');
+assert.equal(bundle.synthesisPresets.items[0].title,'先识别约束','规格书 Test 7：归纳卡标题归一为原则名称（去掉旧“原则：”前缀）');
 
 const normalized=vm.runInContext(`normalizeQuestion({
   correctAnswer:'B',options:[{id:'A'},{id:'B',correct:true}],
@@ -32,7 +33,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(normalized.metadata)),{
   tagPaths:[],
   subjectFacets:[],
   questionFamily:{},
-  knowledge:{},
+  knowledge:{mappingStatus:'unmapped'},
 });
 
 assert.throws(

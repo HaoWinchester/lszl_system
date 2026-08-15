@@ -204,7 +204,7 @@
     };
     const unchanged=draft.name===String(principle.name||'')&&draft.status===String(principle.status||'active')
       &&JSON.stringify(draft.confusablePrincipleIds)===JSON.stringify(principle.confusablePrincipleIds||[])
-      &&draft.presetTitle===String(preset?.title||('原则：'+principle.name))&&draft.presetContent===String(preset?.content||'')
+      &&draft.presetTitle===String(preset?.title||principle.name)&&draft.presetContent===String(preset?.content||'')
       &&draft.presetStatus===String(preset?.status||'draft')&&draft.presetVersion===Number(preset?.version||1);
     return unchanged?null:draft;
   }
