@@ -194,7 +194,11 @@
     });
     let payload={};
     try{payload=await response.json()}catch(e){}
-    if(!response.ok)throw new Error(String(payload.detail||payload.message||payload.error||("认证服务请求失败（"+response.status+"）")));
+    if(!response.ok){
+      const failure=new Error(String(payload.detail||payload.message||payload.error||("认证服务请求失败（"+response.status+"）")));
+      failure.status=Number(response.status)||0;
+      throw failure;
+    }
     return payload;
   }
   function currentUsername(){
@@ -365,7 +369,19 @@
       writeRemoteSession({user,token:payload.token||readRemoteSession()?.token||"",loginSessionId,issuedAt:Date.now()});
       notifyRemoteSession(user.username,loginSessionId,previousLoginSessionId);
       return {ok:true,user,provider:"remote"};
-    }catch(error){const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{});writeRemoteSession(null);notifyRemoteSession("","",previousLoginSessionId);return {ok:false,user:null,provider:"remote",message:String(error?.message||error)}}
+    }catch(error){
+      const status=Number(error?.status||0);
+      // 仅在服务器明确判定未认证（401/403）时才清除登录态；
+      // 网络抖动、部署重启等瞬时故障保留本地会话，下次成功刷新自动恢复，
+      // 避免用户被莫名登出（微信注册账号没有密码，登出后难以重新登录）。
+      if(status===401||status===403){
+        const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{});
+        writeRemoteSession(null);notifyRemoteSession("","",previousLoginSessionId);
+        return {ok:false,user:null,provider:"remote",message:String(error?.message||error)};
+      }
+      const stale=readRemoteSession();
+      return {ok:false,stale:true,user:remoteUser(),provider:"remote",message:String(error?.message||error),preservedSession:!!stale?.user};
+    }
   }
   async function updateProfile(patch={}){
     const username=currentUsername();if(!username)return {ok:false,message:"请先登录。"};

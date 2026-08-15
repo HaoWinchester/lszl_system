@@ -1,29 +1,29 @@
 <!DOCTYPE html>
 
-<html data-release="v9.0-p4.1.85" lang="zh-CN">
+<html data-release="v9.0-p4.1.87" lang="zh-CN">
 <head>
-<script src="./teaching-content-sync.js?v=v9.0-p4.1.85"></script><!-- kg-teaching-content-sync:generated -->
+<script src="./teaching-content-sync.js?v=v9.0-p4.1.87"></script><!-- kg-teaching-content-sync:generated -->
 <script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
-<script src="./runtime-config.override.js?v=v9.0-p4.1.85"></script><!-- kg-runtime:generated -->
-<script defer src="./direct-entry.js?v=v9.0-p4.1.85"></script><!-- kg-direct-entry:generated -->
-<script defer src="./feature-analytics.js?v=v9.0-p4.1.85"></script><!-- kg-feature-analytics:generated -->
+<script src="./runtime-config.override.js?v=v9.0-p4.1.87"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js?v=v9.0-p4.1.87"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js?v=v9.0-p4.1.87"></script><!-- kg-feature-analytics:generated -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <title>教师原题工作台｜项目管理类科目</title>
-<link href="styles/teacher-workbench.css?v=v9.0-p4.1.85" rel="stylesheet"/>
-<link href="styles/question-bank-admin.css?v=v9.0-p4.1.85" rel="stylesheet"/>
-<link href="styles/teacher-question-workflow.css?v=v9.0-p4.1.85" rel="stylesheet"/>
-<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.85"/>
-<link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.85"/>
-<link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.85"/>
-<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.85"/>
-<link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.85"/>
-<link rel="stylesheet" href="styles/workspace-placement.css?v=v9.0-p4.1.85"/>
-<link rel="stylesheet" href="styles/question-classification.css?v=v9.0-p4.1.85"/>
-<link rel="stylesheet" href="styles/admin-module-help.css?v=v9.0-p4.1.85"/>
-<link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.85"/>
-<link rel="stylesheet" href="styles/focus-vega-teacher.css?v=v9.0-p4.1.85"/>
-  <link rel="stylesheet" href="styles/close-button.css?v=v9.0-p4.1.85"/>
+<link href="styles/teacher-workbench.css?v=v9.0-p4.1.87" rel="stylesheet"/>
+<link href="styles/question-bank-admin.css?v=v9.0-p4.1.87" rel="stylesheet"/>
+<link href="styles/teacher-question-workflow.css?v=v9.0-p4.1.87" rel="stylesheet"/>
+<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.87"/>
+<link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.87"/>
+<link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.87"/>
+<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.87"/>
+<link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.87"/>
+<link rel="stylesheet" href="styles/workspace-placement.css?v=v9.0-p4.1.87"/>
+<link rel="stylesheet" href="styles/question-classification.css?v=v9.0-p4.1.87"/>
+<link rel="stylesheet" href="styles/admin-module-help.css?v=v9.0-p4.1.87"/>
+<link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.87"/>
+<link rel="stylesheet" href="styles/focus-vega-teacher.css?v=v9.0-p4.1.87"/>
+  <link rel="stylesheet" href="styles/close-button.css?v=v9.0-p4.1.87"/>
 </head>
 <body class="teacher-admin-shell" data-admin-context="teacher" data-ui-skin="focus-vega" data-question-catalog-mode="managed">
 <nav class="admin-context-nav" aria-label="管理后台一级导航">
@@ -891,61 +891,61 @@
 <dialog class="qb-classification-dialog tq-principle-question-dialog" id="tqPrincipleQuestionListDialog" aria-labelledby="tqPrincipleQuestionListTitle"><header class="qb-dialog-head"><div><p>LINKED QUESTIONS</p><h2 id="tqPrincipleQuestionListTitle">所属题目</h2><span id="tqPrincipleQuestionListHint">双击题目查看完整预览。</span></div><button type="button" id="tqPrincipleQuestionListCloseBtn" aria-label="关闭">×</button></header><div class="tq-principle-question-list" id="tqPrincipleQuestionList"></div></dialog>
 <dialog class="qb-classification-dialog tq-principle-question-dialog tq-principle-question-preview-dialog" id="tqPrincipleQuestionPreviewDialog" aria-labelledby="tqPrincipleQuestionPreviewTitle"><header class="qb-dialog-head"><div><p>QUESTION PREVIEW</p><h2 id="tqPrincipleQuestionPreviewTitle">题目预览</h2><span id="tqPrincipleQuestionPreviewMeta"></span></div><div class="tq-principle-preview-actions"><a id="tqPrincipleQuestionPreviewEditLink" class="tq-principle-icon-button" aria-label="编辑题目" title="编辑题目">✎</a><button type="button" id="tqPrincipleQuestionPreviewCloseBtn" aria-label="关闭">×</button></div></header><div class="tq-principle-question-preview" id="tqPrincipleQuestionPreviewContent"></div></dialog>
 
-<script defer src="src/01-runtime-config.js?v=v9.0-p4.1.85"></script>
-  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/29-auth-core.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/34-role-permissions.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/37-subscription-plans.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/37-subscription-orders.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/37-subscription-redeem-codes.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/37-subscription-core.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/33-user-center.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/39-global-shortcuts.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/50-question-data.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/91-learning-content-core.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/95-recall-association-library.js?v=v9.0-p4.1.85"></script>
-<script defer src="question-studio/question-studio-parser.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/shared/domain-core.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/shared/difficulty-service.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/principles/principle-repository.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/principles/synthesis-preset-repository.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/principles/question-principle-binding.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/practice/practice-selection-service.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/question-bank/batch-operation-service.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/question-bank/safe-delete-service.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/question-bank/question-preview.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/question-bank/workspace-layout.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/question-bank/bank-list-controller.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/question-bank/question-list-controller.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/question-bank/question-family-compatibility-core.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/question-editor/question-editor-controller.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/question-classification/question-classification-service.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/training-config/training-config-service.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/training-config/training-preview.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/training-config/training-config-controller.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/training-config/workspace-layout.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/training-config/principle-preset-controller.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/paper-management/paper-list-controller.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/paper-management/paper-category-service.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/paper-management/paper-editor-controller.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/paper-management/paper-question-picker.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/paper-management/paper-preview.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/paper-management/paper-audit-service.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/paper-management/paper-release-service.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/knowledge-tree/knowledge-tree-adapter.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/association-library/association-library-adapter.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/teacher/teacher-domain-registry.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/98-teacher-workflow-p2-services.js?v=v9.0-p4.1.85"></script>
-<script defer src="./question-catalog-adapter.js?v=v9.0-p4.1.85"></script><!-- kg-question-catalog:generated -->
-<script defer src="./direct-question-adapter.js?v=v9.0-p4.1.85"></script><!-- kg-question-editor:generated -->
-<script src="src/59c-active-learning-mode-policy.js?v=v9.0-p4.1.85"></script><!-- kg-learning-mode-policy:generated -->
-<script defer src="src/65-question-bank-admin.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/98-question-classification.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/97-teacher-question-workflow.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/admin/module-help-content.js?v=v9.0-p4.1.85"></script>
-<script defer src="src/admin/module-help-controller.js?v=v9.0-p4.1.85"></script>
-<script src="src/admin/48-admin-context-nav.js?v=v9.0-p4.1.85"></script>
-<script src="src/99-workspace-placement.js?v=v9.0-p4.1.85"></script>
-<script src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.85"></script>
+<script defer src="src/01-runtime-config.js?v=v9.0-p4.1.87"></script>
+  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/29-auth-core.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/34-role-permissions.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/37-subscription-plans.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/37-subscription-orders.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/37-subscription-redeem-codes.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/37-subscription-core.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/33-user-center.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/39-global-shortcuts.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/50-question-data.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/91-learning-content-core.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/95-recall-association-library.js?v=v9.0-p4.1.87"></script>
+<script defer src="question-studio/question-studio-parser.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/shared/domain-core.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/shared/difficulty-service.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/principles/principle-repository.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/principles/synthesis-preset-repository.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/principles/question-principle-binding.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/practice/practice-selection-service.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/question-bank/batch-operation-service.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/question-bank/safe-delete-service.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/question-bank/question-preview.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/question-bank/workspace-layout.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/question-bank/bank-list-controller.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/question-bank/question-list-controller.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/question-bank/question-family-compatibility-core.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/question-editor/question-editor-controller.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/question-classification/question-classification-service.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/training-config/training-config-service.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/training-config/training-preview.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/training-config/training-config-controller.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/training-config/workspace-layout.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/training-config/principle-preset-controller.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/paper-management/paper-list-controller.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/paper-management/paper-category-service.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/paper-management/paper-editor-controller.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/paper-management/paper-question-picker.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/paper-management/paper-preview.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/paper-management/paper-audit-service.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/paper-management/paper-release-service.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/knowledge-tree/knowledge-tree-adapter.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/association-library/association-library-adapter.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/teacher/teacher-domain-registry.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/98-teacher-workflow-p2-services.js?v=v9.0-p4.1.87"></script>
+<script defer src="./question-catalog-adapter.js?v=v9.0-p4.1.87"></script><!-- kg-question-catalog:generated -->
+<script defer src="./direct-question-adapter.js?v=v9.0-p4.1.87"></script><!-- kg-question-editor:generated -->
+<script src="src/59c-active-learning-mode-policy.js?v=v9.0-p4.1.87"></script><!-- kg-learning-mode-policy:generated -->
+<script defer src="src/65-question-bank-admin.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/98-question-classification.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/97-teacher-question-workflow.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/admin/module-help-content.js?v=v9.0-p4.1.87"></script>
+<script defer src="src/admin/module-help-controller.js?v=v9.0-p4.1.87"></script>
+<script src="src/admin/48-admin-context-nav.js?v=v9.0-p4.1.87"></script>
+<script src="src/99-workspace-placement.js?v=v9.0-p4.1.87"></script>
+<script src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.87"></script>
 </body>
 </html>

@@ -171,6 +171,13 @@ B原则：principle-2"></textarea>
           <button class="btn primary" id="btnParsePastedQuestions">解析并导入</button>
           <span class="muted smalltxt" id="pasteParseResult"></span>
         </div>
+        <section class="section" id="importReportPanel" hidden style="margin-top:10px">
+          <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+            <span id="importReportTitle">导入结果</span>
+            <button class="btn small" type="button" id="importReportClose">收起</button>
+          </div>
+          <div id="importReportBody" class="smalltxt" style="max-height:260px;overflow:auto;line-height:1.9"></div>
+        </section>
         <details class="full-paste-example">
           <summary>查看“完整版 Word / AI 文本粘贴格式”说明</summary>
           <p class="smalltxt muted">可解析题目基础信息、标签、Trap、双语、英文逐选项反馈、主知识点 ID、普通/核心关键词、题干原则和 A/B/C/D 原则映射。原则与归纳卡定义请使用“完整内容准备包 JSON”或“原则与归纳卡组合 JSON”。</p>

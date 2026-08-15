@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PMP Content Prep Studio</title>
-<script>window.__PMP_PRODUCT_RELEASE__="v9.0-p4.1.78";</script>
+<script>window.__PMP_PRODUCT_RELEASE__="v9.0-p4.1.86";</script>
 <script src="/teaching-content-sync.js"></script>
 <script src="/server-state-bootstrap.js"></script>
 <style>
@@ -459,6 +459,13 @@ B原则：principle-2"></textarea>
           <button class="btn primary" id="btnParsePastedQuestions">解析并导入</button>
           <span class="muted smalltxt" id="pasteParseResult"></span>
         </div>
+        <section class="section" id="importReportPanel" hidden style="margin-top:10px">
+          <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+            <span id="importReportTitle">导入结果</span>
+            <button class="btn small" type="button" id="importReportClose">收起</button>
+          </div>
+          <div id="importReportBody" class="smalltxt" style="max-height:260px;overflow:auto;line-height:1.9"></div>
+        </section>
         <details class="full-paste-example">
           <summary>查看“完整版 Word / AI 文本粘贴格式”说明</summary>
           <p class="smalltxt muted">可解析题目基础信息、标签、Trap、双语、英文逐选项反馈、主知识点 ID、普通/核心关键词、题干原则和 A/B/C/D 原则映射。原则与归纳卡定义请使用“完整内容准备包 JSON”或“原则与归纳卡组合 JSON”。</p>
@@ -3817,6 +3824,24 @@ function confirmQuestionDuplicateCleanup(incoming,existing=[]){
   const approved=confirm(`检测到重复题目：已有重复 ${report.existingCount} 道，本批重复 ${report.batchCount} 道。\n自动清除后将保留 ${report.unique.length} 道题，是否继续导入？`);
   return {...report,cancelled:!approved};
 }
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+// 导入结果面板：显示数据名与导入清单，便于确认导入内容。
+function showImportReport(kind,name,summaryLines,items){
+  const panel=document.getElementById('importReportPanel');if(!panel)return;
+  document.getElementById('importReportTitle').textContent='导入结果 · '+esc(kind)+(name?'：'+esc(name):'');
+  const body=document.getElementById('importReportBody');
+  const summary=Array.isArray(summaryLines)&&summaryLines.length?'<p class="muted" style="margin:4px 0 8px">'+summaryLines.map(esc).join(' · ')+'</p>':'';
+  const list=Array.isArray(items)&&items.length
+    ?'<ol style="margin:0;padding-left:20px">'+items.map(t=>'<li>'+esc(t)+'</li>').join('')+'</ol>'
+    :'<p class="muted">没有可列出的条目。</p>';
+  body.innerHTML=summary+list;
+  panel.hidden=false;
+  panel.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+(function bindImportReportClose(){const btn=document.getElementById('importReportClose');if(btn)btn.onclick=()=>{const p=document.getElementById('importReportPanel');if(p)p.hidden=true}})();
+function questionTitles(list){return (Array.isArray(list)?list:[]).map(q=>String(q.title||q.stemParts?.[0]?.text||'未命名题目').slice(0,60))}
+
 document.getElementById('btnParsePastedQuestions').onclick=()=>{
   const raw=document.getElementById('rawQuestionPaste').value;
   const qs=parsePastedQuestionText(raw);
@@ -3827,10 +3852,14 @@ document.getElementById('btnParsePastedQuestions').onclick=()=>{
   if(replace)state.questionBank.questions=uniqueQuestions;else state.questionBank.questions.push(...uniqueQuestions);
   state.questionBank.updatedAt=Date.now();state.currentQuestionId=uniqueQuestions[0]?.id||state.currentQuestionId;renderQuestions();refreshHeader();
   document.getElementById('pasteParseResult').textContent=`已导入 ${uniqueQuestions.length} 题${report.duplicates.length?`，自动清除 ${report.duplicates.length} 道重复题`:''}；Batch：${batchId.slice(0,24)}…；每题 ID 已由程序生成。`;
+  showImportReport(replace?'替换导入 · 文本粘贴':'追加导入 · 文本粘贴',state.questionBank.name||'当前题库',[`共 ${uniqueQuestions.length} 题`,report.duplicates.length?`清除重复 ${report.duplicates.length} 题`:null].filter(Boolean),questionTitles(uniqueQuestions));
   markWorkspaceDirty();toast(`已解析 ${uniqueQuestions.length} 题`);
 };
 
-document.getElementById('fileContentBundle').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const result=importContentBundle(await readJsonFile(f));if(result?.cancelled){toast('已取消导入，当前内容没有变化');return}markWorkspaceDirty();toast(`完整内容包已加载${result?.report?.duplicates?.length?` · 已清除 ${result.report.duplicates.length} 道重复题`:''}`)}catch(err){alert('完整内容包导入失败：'+err.message)}finally{e.target.value=''}});
+document.getElementById('fileContentBundle').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const result=importContentBundle(await readJsonFile(f));if(result?.cancelled){toast('已取消导入，当前内容没有变化');return}markWorkspaceDirty();
+  {const qs=state.questionBank.questions||[];
+   showImportReport('完整内容包',state.questionBank.name||'未命名题库',[`题目 ${qs.length} 道`,`知识树节点 ${(state.knowledgeTree?.nodes||[]).length} 个`,`联想库节点 ${(state.recallLibrary?.nodes||[]).length} 个`,`原则 ${(state.principles?.items||[]).length} 条`,result?.report?.duplicates?.length?`清除重复 ${result.report.duplicates.length} 题`:null].filter(Boolean),questionTitles(qs));}
+  toast(`完整内容包已加载${result?.report?.duplicates?.length?` · 已清除 ${result.report.duplicates.length} 道重复题`:''}`)}catch(err){alert('完整内容包导入失败：'+err.message)}finally{e.target.value=''}});
 document.getElementById('filePrincipleCardBundle').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const merged=importPrincipleBundleSafe(await readJsonFile(f));if(merged.cancelled){toast('已取消导入，原则与归纳卡没有变化');return}state.principles=merged.applied.principles;state.synthesisPresets=merged.applied.synthesisPresets;state.currentPrincipleId=state.principles.items.some(p=>p.id===state.currentPrincipleId)?state.currentPrincipleId:(state.principles.items[0]?.id||'');refreshAll();markWorkspaceDirty();toast(`原则已安全合并 · 新增 ${merged.added} · 保持 ${merged.unchanged} · 冲突 ${merged.conflicts}（保留现有）`)}catch(err){alert('原则与归纳卡导入失败：'+err.message)}finally{e.target.value=''}});
 function importPrincipleBundleSafe(payload){
   const domain=canonicalPrincipleDomain(payload);
@@ -3858,9 +3887,15 @@ function importPrincipleBundleSafe(payload){
   return {cancelled:false,applied:applyPrincipleMergePlan(plan,{principles:state.principles,synthesisPresets:state.synthesisPresets}),added:plan.added.length,unchanged:plan.unchanged.length,conflicts:plan.conflicts.length};
 }
 document.getElementById('fileTagConfig').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.tagConfig=ImportService.tagConfig(await readJsonFile(f));refreshQuestionTagPaths();refreshAll();markWorkspaceDirty();toast('标签配置已加载')}catch(err){alert('标签配置导入失败：'+err.message)}e.target.value=''});
-document.getElementById('fileTree').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.knowledgeTree=normalizeTree(await readJsonFile(f));state.questionBank.questions.forEach(q=>{const id=q.metadata?.knowledge?.primaryNodeId;if(id&&state.knowledgeTree.map.has(id))q.metadata.knowledge.pathSnapshot=state.knowledgeTree.pathFor(id)});refreshHeader();renderQuestionEditor();renderRecallEditor();markWorkspaceDirty();toast('知识树已加载')}catch(err){alert('知识树导入失败：'+err.message)}e.target.value=''});
-document.getElementById('fileRecall').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.recallLibrary=normalizeRecall(await readJsonFile(f));state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';refreshHeader();renderRecallList();renderRecallEditor();renderKeywords();markWorkspaceDirty();toast('联想库已加载')}catch(err){alert('联想库导入失败：'+err.message)}e.target.value=''});
-document.getElementById('fileQuestionBank').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const imported=ImportService.questionBank(await readJsonFile(f)),report=confirmQuestionDuplicateCleanup(imported.questions,[]);if(report.cancelled)return;imported.questions=report.unique;state.questionBank=imported;stampImportedQuestions(state.questionBank.questions,'question-bank-json');state.currentQuestionId=state.questionBank.questions[0]?.id||'';refreshHeader();renderQuestions();markWorkspaceDirty();toast(`题库已加载${report.duplicates.length?` · 已清除 ${report.duplicates.length} 道重复题`:''} · 已记录导入批次`)}catch(err){alert('题库导入失败：'+err.message)}e.target.value=''});
+document.getElementById('fileTree').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.knowledgeTree=normalizeTree(await readJsonFile(f));state.questionBank.questions.forEach(q=>{const id=q.metadata?.knowledge?.primaryNodeId;if(id&&state.knowledgeTree.map.has(id))q.metadata.knowledge.pathSnapshot=state.knowledgeTree.pathFor(id)});refreshHeader();renderQuestionEditor();renderRecallEditor();markWorkspaceDirty();
+  showImportReport('知识树',state.knowledgeTree.name||'知识树',[`节点 ${(state.knowledgeTree.nodes||[]).length} 个`,`关系 ${(state.knowledgeTree.edges||[]).length} 条`],(state.knowledgeTree.nodes||[]).map(n=>n.title?.zh||n.title||n.id));
+  toast('知识树已加载')}catch(err){alert('知识树导入失败：'+err.message)}e.target.value=''});
+document.getElementById('fileRecall').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.recallLibrary=normalizeRecall(await readJsonFile(f));state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';refreshHeader();renderRecallList();renderRecallEditor();renderKeywords();markWorkspaceDirty();
+  showImportReport('联想库',state.recallLibrary.name||'联想库',[`节点 ${(state.recallLibrary.nodes||[]).length} 个`,`关系 ${(state.recallLibrary.edges||[]).length} 条`],(state.recallLibrary.nodes||[]).map(n=>n.title));
+  toast('联想库已加载')}catch(err){alert('联想库导入失败：'+err.message)}e.target.value=''});
+document.getElementById('fileQuestionBank').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const imported=ImportService.questionBank(await readJsonFile(f)),report=confirmQuestionDuplicateCleanup(imported.questions,[]);if(report.cancelled)return;imported.questions=report.unique;state.questionBank=imported;stampImportedQuestions(state.questionBank.questions,'question-bank-json');state.currentQuestionId=state.questionBank.questions[0]?.id||'';refreshHeader();renderQuestions();markWorkspaceDirty();
+  showImportReport('题库 JSON',imported.name||'未命名题库',[`共 ${state.questionBank.questions.length} 题`,report.duplicates.length?`清除重复 ${report.duplicates.length} 题`:null].filter(Boolean),questionTitles(state.questionBank.questions));
+  toast(`题库已加载${report.duplicates.length?` · 已清除 ${report.duplicates.length} 道重复题`:''} · 已记录导入批次`)}catch(err){alert('题库导入失败：'+err.message)}e.target.value=''});
 
 document.getElementById('btnNewWorkspace').onclick=()=>{if(!confirm('清空当前 Prep Studio 工作区？请先导出需要保留的草稿。'))return;state.knowledgeTree=null;state.recallLibrary={schemaVersion:1,nodes:[],edges:[],updatedAt:''};state.questionBank={id:generateSystemId('bank'),name:'PMP 内容准备题库',subject:'PMP',description:'',version:'1.0',visibility:'private',createdAt:Date.now(),updatedAt:Date.now(),questions:[]};state.principles={schemaVersion:1,items:[],updatedAt:Date.now()};state.synthesisPresets={schemaVersion:1,items:[],updatedAt:Date.now()};state.tagConfig={names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}};state.subjectFacetRegistry=normalizeSubjectFacetRegistry({});state.currentQuestionId='';state.currentRecallId='';state.currentPrincipleId='';state.demoQuestionId='';state.demoLang='zh';state.recallPreviewCandidateId='';refreshAll();setTab('base');markWorkspaceDirty();toast('已清空')};
 document.getElementById('btnImportWorkspace').onclick=()=>document.getElementById('fileWorkspace').click();

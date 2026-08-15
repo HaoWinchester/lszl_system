@@ -1,12 +1,16 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.84",
-  "toVersion": "v9.0-p4.1.85",
+  "fromVersion": "v9.0-p4.1.85",
+  "toVersion": "v9.0-p4.1.87",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "src/35-user-management.js",
+      "content-prep-studio/dist/content-prep.html",
+      "content-prep-studio/src/index.template.html",
+      "content-prep-studio/src/js/40-events-bootstrap.js",
+      "knowledge-recall.html",
+      "src/29-auth-core.js",
       "styles/user-management.css"
     ],
     "removed": []
