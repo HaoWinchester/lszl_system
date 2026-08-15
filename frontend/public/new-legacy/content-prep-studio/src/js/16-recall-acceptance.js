@@ -32,7 +32,37 @@ function raResolve(q){
   if(RA.byId.has(q))return{ids:[q],mode:'ID'};
   const k=raN(q),t=RA.titles.get(k)||[];
   if(t.length)return{ids:t,mode:'正式标题'};
-  return{ids:RA.aliases.get(k)||[],mode:'Alias'};
+  const aliasHit=RA.aliases.get(k)||[];
+  if(aliasHit.length)return{ids:aliasHit,mode:'Alias'};
+  // 子串兜底：与深度回忆端 resolve 规则一致——开头匹配(短词优先) > 互相包含(长词优先) > 关键词子串再匹配，命中标注“子串”
+  const scan=(key,rankStartsWith,rankContains)=>{
+    let best=null;
+    const consider=(term,ids,rank)=>{
+      if(!best||rank>best.rank||(rank===best.rank&&(rank===rankContains?term.length>best.termLen:term.length<best.termLen)))best={ids,rank,termLen:term.length};
+    };
+    for(const [term,ids] of RA.titles){
+      if(!ids.length||term===key)continue;
+      if(term.startsWith(key))consider(term,ids,rankStartsWith);
+      else if(term.includes(key)||key.includes(term))consider(term,ids,rankContains);
+    }
+    for(const [term,ids] of RA.aliases){
+      if(!ids.length||term===key)continue;
+      if(term.startsWith(key))consider(term,ids,rankStartsWith);
+      else if(term.includes(key)||key.includes(term))consider(term,ids,rankContains);
+    }
+    return best;
+  };
+  let best=scan(k,2,0);
+  if(!best){
+    for(let len=k.length-1;len>=2&&!best;len--){
+      for(let i=0;i+len<=k.length;i++){
+        best=scan(k.slice(i,i+len),1,0.5);
+        if(best)break;
+      }
+    }
+  }
+  if(best)return{ids:best.ids,mode:'子串'};
+  return{ids:[],mode:'未命中'};
 }
 function raCurrent(){return RA.path[RA.path.length-1]}
 function raEligibleFor(id,pth=RA.path){

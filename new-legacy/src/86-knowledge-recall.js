@@ -343,7 +343,9 @@
       if(raw&&Array.isArray(raw.nodes)&&Array.isArray(raw.edges)){
         state.nodes=raw.nodes;state.edges=raw.edges;state.customNodes=raw.customNodes&&typeof raw.customNodes==='object'?raw.customNodes:{};state.activeKeywords=Array.isArray(raw.activeKeywords)?raw.activeKeywords:[];state.choiceOffsets=raw.choiceOffsets&&typeof raw.choiceOffsets==='object'?raw.choiceOffsets:{};state.metrics=raw.metrics&&typeof raw.metrics==='object'?{keywordClicks:Number(raw.metrics.keywordClicks)||0,choiceClicks:Number(raw.metrics.choiceClicks)||0,nodeOpens:Number(raw.metrics.nodeOpens)||0,sessionStartedAt:Date.now()}:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()};
         if(raw.optionState&&typeof raw.optionState==='object')krOptionState={selected:String(raw.optionState.selected||''),persistent:String(raw.optionState.persistent||'')};
-        if(raw.transform&&Number.isFinite(Number(raw.transform.x))&&Number.isFinite(Number(raw.transform.y))&&Number.isFinite(Number(raw.transform.scale))){state.transform={x:Number(raw.transform.x),y:Number(raw.transform.y),scale:Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(raw.transform.scale)))};recallViewportRestored=true}
+        // P4.5.32 进入页面不再恢复上次保存的画布平移/缩放：跨窗口尺寸或上次聚焦后视图会偏在一边，
+        // 体验差；改为每次进入都以题目卡片(world 0,0)重新居中，会话内仍可自由拖动并保存。
+        if(raw.transform&&Number.isFinite(Number(raw.transform.scale))){state.transform.scale=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(raw.transform.scale)))}
         normalizeGraph();
         return true;
       }

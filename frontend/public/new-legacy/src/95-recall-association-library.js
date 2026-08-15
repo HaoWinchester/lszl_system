@@ -223,7 +223,48 @@
     return result;
   }
   function resolve(library,value){
-    const idx=index(library);const id=idx.lookup.get(lookupKey(value))||'';return id?idx.byId.get(id)||null:null;
+    const idx=index(library);const key=lookupKey(value);
+    const exact=idx.lookup.get(key)||'';if(exact)return idx.byId.get(exact)||null;
+    // P4.5.32 子串兜底：关键词不是任何标题/别名的全等项时（如“进度”），退化为模糊匹配。
+    // 优先级：③标题/别名以关键词开头（“进度”→“进度基准”，同档词更短者优先）
+    //        ②互相包含（“基线范围”含“范围”类；关键词包含节点名时节点名更长更精确）
+    //        ①关键词的子串（长度≥2，从长到短）再走一遍上述匹配（“超出范围”→“范围”→“范围基准”）
+    if(!key)return null;
+    const best={id:'',rank:-1,termLen:0,edges:-1};
+    const pick=(term,nodeId,rank)=>{
+      const edges=(idx.outgoing.get(nodeId)||[]).length;
+      // 开头匹配(rank2)/子串开头(rank1)偏好短词(更直接的概念)；
+      // 互相包含(rank0,term⊂key)偏好长词(更精确)；其余按出边数多者。
+      const better=rank>best.rank
+        ||(rank===best.rank&&((rank===0?term.length>best.termLen:term.length<best.termLen)
+          ||(term.length===best.termLen&&edges>best.edges)));
+      if(best.id===''||better){best.id=nodeId;best.rank=rank;best.termLen=term.length;best.edges=edges}
+    };
+    const matchTerm=(term,nodeId,rank)=>{
+      if(term.startsWith(key))pick(term,nodeId,rank+2);
+      else if(term.includes(key)||key.includes(term))pick(term,nodeId,rank);
+    };
+    idx.library.nodes.forEach(node=>{
+      for(const raw of [node.title,node.titleEn,...(node.aliases||[])]){
+        const term=lookupKey(raw);if(!term||term===key)continue;
+        matchTerm(term,node.id,0);
+      }
+    });
+    if(best.id===''){
+      for(let len=key.length-1;len>=2&&!best.id;len--){
+        for(let i=0;i+len<=key.length;i++){
+          const part=key.slice(i,i+len);
+          idx.library.nodes.forEach(node=>{
+            for(const raw of [node.title,...(node.aliases||[])]){
+              const term=lookupKey(raw);if(!term||term===part)continue;
+              if(term.startsWith(part))pick(term,node.id,1);
+              else if(term.includes(part)||part.includes(term))pick(term,node.id,0.5);
+            }
+          });
+        }
+      }
+    }
+    return best.id?idx.byId.get(best.id)||null:null;
   }
   function choices(library,value,{limit=4,offset=0}={}){
     const idx=index(library);const node=resolve(idx.library,value);if(!node)return {node:null,choices:[],total:0,offset:0,hasMore:false};

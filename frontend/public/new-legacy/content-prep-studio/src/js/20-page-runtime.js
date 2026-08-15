@@ -671,7 +671,7 @@ function validateKeyword(q,c){
   if(!c.recallNodeId)issues.push({level:'warn',message:`${c.keywordLevel==='core'?'核心':'普通'}关键词“${c.text}”未关联联想入口`,suggest:'Recall 为可选增强；如需联想通路，可在关键词卡片中选择联想入口。'});
   if(c.keywordLevel==='core'){
     if(!c.solutionRole||c.solutionRole==='context')issues.push({level:'error',message:`核心关键词“${c.text}”缺少解题作用`,suggest:'选择 Decision Cue / Concept Anchor / Condition Anchor / Answer Anchor。'});
-    if(!String(c.coreReason||'').trim())issues.push({level:'error',message:`核心关键词“${c.text}”缺少核心理由`,suggest:'说明这个词为什么影响本题推理或答案选择。'});
+    if(!String(c.coreReason||'').trim())issues.push({level:'warn',message:`核心关键词“${c.text}”缺少核心理由`,suggest:'建议补充说明这个词为什么影响本题推理或答案选择。'});
   }
   return issues;
 }
