@@ -285,7 +285,35 @@
   function clearSessionLibrary(){sessionBinding=null}
   function sessionInfo(){return sessionBinding?{contentHash:sessionBinding.contentHash,library:sessionBinding.library}:null}
 
-  const api=Object.freeze({storageKey,legacyStorageKey,normalizeLibrary,parseText,merge,read,write,saveText,index,resolve,choices,toText,asRecallNode,nodeId,reconcileIncoming,updateNode,setChoices,saveNode,setSessionLibrary,clearSessionLibrary,sessionInfo});
+  /* P4.5.31 服务器权威联想库读写：深度回忆会话由 GET /recall/session 下发快照，
+     而管理端导入/发布必须落到服务器 SharedRuntimeState 才能到达学员端。 */
+  const SHARED_CONTENT_PATH='/api/v1/content-prep/shared-content';
+  async function requestJson(url,init={}){
+    const request=global.fetch;
+    if(typeof request!=='function')throw new Error('当前环境缺少 fetch');
+    const response=await request(url,{credentials:'include',headers:{Accept:'application/json',...(init.body?{'Content-Type':'application/json'}:{}),...(init.headers||{})},...init});
+    let payload=null;try{payload=await response.json()}catch(_){}
+    if(!response.ok){
+      const error=new Error(String(payload?.detail||('HTTP '+response.status)));
+      error.status=response.status;error.payload=payload;
+      throw error;
+    }
+    return payload;
+  }
+  async function readServer(subjectId='PMP'){
+    const data=await requestJson(SHARED_CONTENT_PATH+'?subjectId='+encodeURIComponent(clean(subjectId)||'PMP'));
+    const library=data?.recallLibrary;
+    return library&&typeof library==='object'?normalizeLibrary(library):null;
+  }
+  async function writeServer(subjectId='PMP',library={}){
+    const subject=clean(subjectId)||'PMP';
+    const current=await requestJson(SHARED_CONTENT_PATH+'?subjectId='+encodeURIComponent(subject));
+    const revision=Number(current?.contentRevision)||0;
+    const saved=await requestJson(SHARED_CONTENT_PATH,{method:'PUT',body:JSON.stringify({subjectId:subject,contentRevision:revision,recallLibrary:normalizeLibrary(library)})});
+    return {valid:true,revision:Number(saved?.contentRevision)||revision+1,library:normalizeLibrary(saved?.recallLibrary||library)};
+  }
+
+  const api=Object.freeze({storageKey,legacyStorageKey,normalizeLibrary,parseText,merge,read,write,saveText,index,resolve,choices,toText,asRecallNode,nodeId,reconcileIncoming,updateNode,setChoices,saveNode,setSessionLibrary,clearSessionLibrary,sessionInfo,readServer,writeServer});
   global.KGRecallAssociationLibrary=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
