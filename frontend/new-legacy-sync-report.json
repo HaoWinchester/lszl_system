@@ -1,16 +1,19 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.93",
-  "toVersion": "v9.0-p4.1.94",
+  "fromVersion": "v9.0-p4.1.94",
+  "toVersion": "v9.0-p4.1.96",
   "changes": {
-    "added": [],
+    "added": [
+      "styles/knowledge-recall-p4532.css",
+      "styles/knowledge-recall-p4533.css",
+      "tests/deep-recall-card-polish.test.js"
+    ],
     "changed": [
       "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "content-prep-studio/src/js/16-recall-acceptance.js",
-      "content-prep-studio/src/js/20-page-runtime.js",
+      "knowledge-recall.html",
+      "src/65-question-bank-admin.js",
       "src/86-knowledge-recall.js",
-      "src/95-recall-association-library.js"
+      "styles/question-workspace.css"
     ],
     "removed": []
   },
