@@ -331,3 +331,4 @@ nav button.active{color:var(--brand)!important}
 .question-edit-card.family-tone-equivalent #questionPreview{border-color:#8baef5;background:#fbfdff}
 .question-edit-card.family-tone-decomposed #questionPreview{border-color:#8cc9aa;background:#fbfffc}
 .question-edit-card.family-tone-extension #questionPreview{border-color:#b39be8;background:#fdfbff}
+.tag-chip-row-title{margin-top:6px}

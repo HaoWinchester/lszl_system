@@ -33,7 +33,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(normalized.metadata)),{
   tagPaths:[],
   subjectFacets:[],
   questionFamily:{},
-  knowledge:{},
+  knowledge:{mappingStatus:'unmapped'},
 });
 
 assert.throws(

@@ -335,12 +335,12 @@ function parsePastedQuestionText(raw){
       mm=line.match(/^(?:English Stem|英文题干)\s*[:：]\s*(.*)$/i);if(mm){mode='en-stem';if(mm[1])enStem.push(mm[1]);continue}
       mm=line.match(/^([A-D])(?:_EN|\s+EN)\s*[:：]\s*(.*)$/i);if(mm){enOpts[mm[1].toUpperCase()]=mm[2].trim();mode='en-option';continue}
       mm=line.match(/^(?:English Analysis|英文解析|Analysis EN)\s*[:：]\s*(.*)$/i);if(mm){mode='en-analysis';if(mm[1])enAnalysis.push(mm[1]);continue}
-      mm=line.match(/^([A-D])(?:反馈EN|反馈\s*EN|Feedback\s*EN)\s*[:：]\s*(.*)$/i);if(mm){enFeedback[mm[1].toUpperCase()]=mm[2].trim();continue}
-      mm=line.match(/^(?:主知识点ID|PrimaryNodeId|Primary Node ID)\s*[:：]\s*(.*)$/i);if(mm){primaryNodeId=mm[1].trim();mode='meta';continue}
+      mm=line.match(/^([A-D])\s*(?:反馈EN|反馈\s*EN|Feedback\s*EN)\s*[:：]\s*(.*)$/i);if(mm){enFeedback[mm[1].toUpperCase()]=mm[2].trim();continue}
+      mm=line.match(/^(?:主知识点\s*ID|PrimaryNodeId|Primary Node ID)\s*[:：]\s*(.*)$/i);if(mm){primaryNodeId=mm[1].trim();mode='meta';continue}
       mm=line.match(/^普通关键词\s*[:：]\s*(.*)$/);if(mm){normalKw=mm[1].trim();mode='meta';continue}
       mm=line.match(/^核心关键词\s*[:：]\s*(.*)$/);if(mm){coreKw=mm[1].trim();mode='meta';continue}
-      mm=line.match(/^(?:题干原则IDs|题干原则ID|StemPrincipleIds|原则IDs|原则ID|PrincipleIds)\s*[:：]\s*(.*)$/i);if(mm){principleIds=cleanList(mm[1]);mode='meta';continue}
-      mm=line.match(/^([A-D])原则\s*[:：]\s*(.*)$/);if(mm){optionPrinciples[mm[1].toUpperCase()]=cleanList(mm[2]);mode='meta';continue}
+      mm=line.match(/^(?:题干原则\s*IDs?|StemPrincipleIds?|原则\s*IDs?|PrincipleIds?)\s*[:：]\s*(.*)$/i);if(mm){principleIds=cleanList(mm[1]);mode='meta';continue}
+      mm=line.match(/^([A-D])\s*原则\s*[:：]\s*(.*)$/);if(mm){optionPrinciples[mm[1].toUpperCase()]=cleanList(mm[2]);mode='meta';continue}
       /* P4.5.29 Quick Text 家族字段（规格 §10.2 快捷子集；质量确认一律 false，由教师导入后人工确认） */
       mm=line.match(/^(?:家族代号|FamilyKey|Family Key)\s*[:：]\s*(.*)$/i);if(mm){(familySpec=familySpec||{}).familyKey=mm[1].trim();mode='meta';continue}
       mm=line.match(/^(?:家族角色|FamilyRole|Family Role)\s*[:：]\s*(.*)$/i);if(mm){(familySpec=familySpec||{}).role=mm[1].trim();mode='meta';continue}
@@ -524,6 +524,7 @@ function normalizeQuestion(q,i=0,subject='PMP'){
   }).filter(c=>c.text);
   const knowledge=q?.metadata?.knowledge&&typeof q.metadata.knowledge==='object'?clone(q.metadata.knowledge):{};
   delete knowledge.taxonomyId; delete knowledge.taxonomyVersion;
+  knowledge.mappingStatus=String(knowledge.primaryNodeId||'')?'confirmed':'unmapped';
   const systemQuestionId=registerQuestionId(String(q.id||generateQuestionId()));
   return {
     ...q,

@@ -668,7 +668,7 @@ function validateKeyword(q,c){
   if(!word.ok)issues.push({level:'warn',message:`关键词“${c.text}”：${word.msg}`,suggest:'缩短为词或稳定专业术语。'});
   if(!(c.matchLocations||[]).length)issues.push({level:'error',message:`关键词“${c.text}”已不在题干/选项中`,suggest:'重新标记或删除该关键词。'});
   if(c.recallNodeId&&!recallIndex().byId.has(c.recallNodeId))issues.push({level:'error',message:`关键词“${c.text}”引用的联想入口不存在：${c.recallNodeId}`,suggest:'清除该引用，或重新选择一个现有联想入口。'});
-  if(c.keywordLevel==='core'&&!c.recallNodeId)issues.push({level:'warn',message:`核心关键词“${c.text}”未关联联想入口`,suggest:'Recall 为可选增强；如需联想通路，可在关键词卡片中选择联想入口。'});
+  if(!c.recallNodeId)issues.push({level:'warn',message:`${c.keywordLevel==='core'?'核心':'普通'}关键词“${c.text}”未关联联想入口`,suggest:'Recall 为可选增强；如需联想通路，可在关键词卡片中选择联想入口。'});
   if(c.keywordLevel==='core'){
     if(!c.solutionRole||c.solutionRole==='context')issues.push({level:'error',message:`核心关键词“${c.text}”缺少解题作用`,suggest:'选择 Decision Cue / Concept Anchor / Condition Anchor / Answer Anchor。'});
     if(!String(c.coreReason||'').trim())issues.push({level:'error',message:`核心关键词“${c.text}”缺少核心理由`,suggest:'说明这个词为什么影响本题推理或答案选择。'});
@@ -702,7 +702,7 @@ function validateQuestion(q,deep=true){
 function renderCurrentIssues(){
   const q=currentQuestion(),box=document.getElementById('questionIssues');if(!box)return;
   if(!q){box.innerHTML='';return}
-  const issues=validateQuestion(q,true);
+  const issues=validateQuestion(q,true).sort((a,b)=>(a.level==='error'?0:1)-(b.level==='error'?0:1));
   if(!issues.length){box.innerHTML='<div class="issue ok"><strong>✓ 当前题通过</strong>结构、知识点、关键词和核心关键词规则均通过。</div>';return}
   box.innerHTML=issues.slice(0,12).map(x=>`<div class="issue ${x.level}"><strong>${x.level==='error'?'错误':'提醒'}：${esc(x.message)}</strong><span class="smalltxt">${esc(x.suggest||'')}</span></div>`).join('');
 }
@@ -749,9 +749,21 @@ function exportTagConfig(){
   const looseAliases={};Object.entries(state.tagConfig.looseAliases||{}).forEach(([from,to])=>looseAliases[String(from)]=to);
   return {schemaVersion:3,slotIdStrategy:'global-semantic-v1',names,groupNames:{...(state.tagConfig.groupNames||{})},categoryNames:{...(state.tagConfig.categoryNames||{})},aliases:{...(state.tagConfig.aliases||{})},slotAliases,looseAliases,updatedAt:nowIso()};
 }
+let tagManagerEditOpen=false;
 function renderTagManager(){
   const box=document.getElementById('tagManager');if(!box)return;
-  box.innerHTML=effectiveTagGroups().map(g=>`<div class="tag-group-card"><div class="tag-group-head"><label>一级分类</label><input type="text" data-tag-group="${esc(g.id)}" value="${esc(g.label)}"></div>${g.categories.map(c=>`<div class="tag-category"><div class="tag-category-title"><label>二级分类</label><input type="text" data-tag-category="${esc(g.id+'/'+c.id)}" value="${esc(c.label)}"></div>${c.options.map((name,oi)=>{const slot=tagSlotKey(g,c,oi),aliases=tagAliasesForSlot(slot);return `<div class="tag-slot"><div><input type="text" data-tag-name="${esc(slot)}" value="${esc(name)}"><div class="tag-alias-help">修改标签名不会自动把旧名称加入 Alias。</div></div><div><input type="text" data-tag-aliases="${esc(slot)}" value="${esc(aliases.join(', '))}" placeholder="兼容别名，逗号分隔"><div class="tag-alias-status" data-tag-alias-status="${esc(slot)}">${aliases.length?`已保存 ${aliases.length} 个别名`:'无别名'}</div></div></div>`}).join('')}</div>`).join('')}</div>`).join('');
+  if(!tagManagerEditOpen){
+    /* 轻量预览：与科目分类一致的 chips；点击"编辑"进入完整编辑 */
+    box.innerHTML=`<div class="toolbar" style="margin-bottom:4px"><span class="muted tiny">展示教师日常使用的中文名称；改名与别名管理点"编辑"。</span><span class="spacer"></span><button class="btn small" id="btnToggleTagEdit" type="button">编辑</button></div>`
+      +effectiveTagGroups().map(g=>`<div class="facet-preview-dim"><label>${esc(g.label)}</label>${g.categories.map(c=>`<div class="tag-chip-row-title muted tiny">${esc(c.label)}</div><div class="facet-chip-row">${c.options.map(name=>`<span class="facet-chip">${esc(name)}</span>`).join('')}</div>`).join('')}</div>`).join('');
+    const editBtn=document.getElementById('btnToggleTagEdit');
+    if(editBtn)editBtn.onclick=()=>{tagManagerEditOpen=true;renderTagManager()};
+    return;
+  }
+  box.innerHTML=`<div class="toolbar" style="margin-bottom:4px"><span class="muted tiny">修改标签名不会自动把旧名称加入 Alias；需要兼容旧名称请在别名栏补填。</span><span class="spacer"></span><button class="btn small primary" id="btnToggleTagEdit" type="button">完成编辑</button></div>`
+    +effectiveTagGroups().map(g=>`<div class="tag-group-card"><div class="tag-group-head"><label>一级分类</label><input type="text" data-tag-group="${esc(g.id)}" value="${esc(g.label)}"></div>${g.categories.map(c=>`<div class="tag-category"><div class="tag-category-title"><label>二级分类</label><input type="text" data-tag-category="${esc(g.id+'/'+c.id)}" value="${esc(c.label)}"></div>${c.options.map((name,oi)=>{const slot=tagSlotKey(g,c,oi),aliases=tagAliasesForSlot(slot);return `<div class="tag-slot"><div><input type="text" data-tag-name="${esc(slot)}" value="${esc(name)}"><div class="tag-alias-help">修改标签名不会自动把旧名称加入 Alias。</div></div><div><input type="text" data-tag-aliases="${esc(slot)}" value="${esc(aliases.join(', '))}" placeholder="兼容别名，逗号分隔"><div class="tag-alias-status" data-tag-alias-status="${esc(slot)}">${aliases.length?`已保存 ${aliases.length} 个别名`:'无别名'}</div></div></div>`}).join('')}</div>`).join('')}</div>`).join('');
+  const doneBtn=document.getElementById('btnToggleTagEdit');
+  if(doneBtn)doneBtn.onclick=()=>{tagManagerEditOpen=false;renderTagManager()};
   box.querySelectorAll('[data-tag-group]').forEach(el=>el.addEventListener('change',()=>{state.tagConfig.groupNames[el.dataset.tagGroup]=el.value.trim();refreshQuestionTagPaths();renderTagManager()}));
   box.querySelectorAll('[data-tag-category]').forEach(el=>el.addEventListener('change',()=>{state.tagConfig.categoryNames[el.dataset.tagCategory]=el.value.trim();refreshQuestionTagPaths();renderTagManager()}));
   box.querySelectorAll('[data-tag-name]').forEach(el=>el.addEventListener('change',()=>{
