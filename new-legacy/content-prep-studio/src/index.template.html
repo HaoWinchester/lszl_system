@@ -13,7 +13,7 @@
 </head>
 <body id="prepApp">
 <header>
-  <div><div class="brand">PMP Content Prep Studio</div><div class="version"><span id="hdrProductRelease">Product Release —</span> · <span id="hdrPrepBuild">Prep Build 0.4.0</span> · <span id="hdrAuthoringContract">Authoring Contract pmp-authoring-contract-v1</span> · <span id="hdrServerBuild">Server Build —</span></div></div>
+  <div><div class="brand">PMP Content Prep Studio</div><div class="version"><span id="hdrProductRelease">Product Release —</span> · <span id="hdrPrepBuild">Prep Build 0.4.0</span> · <span>目标主程序 V9.0-P4.5.29</span> · <span id="hdrAuthoringContract">Authoring Contract pmp-authoring-contract-v1</span> · <span id="hdrServerBuild">Server Build —</span></div></div>
   <div class="header-meta">
     <span class="badge" id="hdrTree">知识树 0</span>
     <span class="badge" id="hdrRecall">联想库 0</span>
@@ -37,7 +37,7 @@
 
 <nav id="tabs">
   <button data-tab="base" class="active">① 基础数据与导入</button>
-  <button data-tab="management">② 原则归纳卡 / 标签</button>
+  <button data-tab="management">② 原则 / 科目分类 / 公共标签</button>
   <button data-tab="questions">③ 题目录入与检查</button>
   <button data-tab="association">④ 联想词编辑</button>
   <button data-tab="demo">⑤ 题目演示校验</button>
@@ -136,6 +136,14 @@
         <textarea id="rawQuestionPaste" placeholder="【题目1】
 标题：已发送不等于已沟通
 难度：简单
+家族代号：FAMILY-001
+家族角色：母题
+家族关系：root
+变体类型：none
+诊断目标：application
+诊断层级：2
+家族用途：practice
+质量确认：否（外部 AI 固定为否；导入后由教师人工确认）
 领域：PMP 沟通绩效域 / 利益相关方与沟通管理
 主题：项目沟通管理的概念
 阶段：基础练习
@@ -180,10 +188,18 @@ B原则：principle-2"></textarea>
         </section>
         <details class="full-paste-example">
           <summary>查看“完整版 Word / AI 文本粘贴格式”说明</summary>
-          <p class="smalltxt muted">可解析题目基础信息、标签、Trap、双语、英文逐选项反馈、主知识点 ID、普通/核心关键词、题干原则和 A/B/C/D 原则映射。原则与归纳卡定义请使用“完整内容准备包 JSON”或“原则与归纳卡组合 JSON”。</p>
+          <p class="smalltxt muted">可解析题目基础信息、标签、Trap、双语、英文逐选项反馈、主知识点 ID、普通/核心关键词、题干原则、A/B/C/D 原则映射和题目家族常用字段（家族代号/角色/关系/变体类型/诊断目标/诊断层级/家族用途；质量确认一律为否，由教师导入后人工确认）。完整 Subject Facets、Keyword metadata、原则与归纳卡定义请使用“完整内容准备包 JSON”或“原则与归纳卡组合 JSON”。</p>
           <pre>【题目1】
 标题：已发送不等于已沟通
 难度：简单
+家族代号：FAMILY-001
+家族角色：母题
+家族关系：root
+变体类型：none
+诊断目标：application
+诊断层级：2
+家族用途：practice
+质量确认：否（外部 AI 固定为否；导入后由教师人工确认）
 领域：PMP 沟通绩效域 / 利益相关方与沟通管理
 主题：项目沟通管理的概念
 阶段：基础练习
@@ -260,7 +276,7 @@ D原则：principle-role-accountability</pre>
     <div class="card"><div class="card-hd"><span>② 原则列表</span><button class="help-btn" data-page-help="management" title="本页帮助">?</button></div><div class="card-bd toolbar"><button class="btn small primary" id="btnNewPrinciple">+ 新原则</button></div><div class="manager-list" id="principleList"></div></div>
     <div class="card"><div class="card-hd">原则与系统预设归纳卡</div><div class="card-bd" id="principleEditor"><div class="no-data">请选择或新建原则。</div></div></div>
   </div>
-  <div class="card" style="margin-top:14px"><div class="card-hd"><span>轻量标签管理</span><span class="muted tiny">对齐主程序用途 / 质量 / 来源标签槽位</span></div><div class="card-bd"><div class="help">管理预设标签名称和兼容别名。自由文本标签仍可保留；在题目演示校验中，不能绑定预设槽位的标签会显示为灰色。</div><div id="tagManager" style="margin-top:12px"></div></div></div>
+  <div class="card" style="margin-top:14px"><div class="card-hd"><span>公共标签</span><span class="muted tiny">跨科目共用：用途 / 质量 / 来源</span></div><div class="card-bd"><div class="help">这里只维护教师日常看到的标签名称。兼容别名和内部编码（global/... 稳定槽位）继续由系统保留，不在日常界面展示。自由文本标签仍可保留；在题目演示校验中，不能绑定预设槽位的标签会显示为灰色。</div><div id="tagManager" style="margin-top:12px"></div></div></div>
 </section>
 <section class="tab" id="tab-questions">
   <div class="grid3">
@@ -269,7 +285,15 @@ D原则：principle-role-accountability</pre>
       <div class="card-bd toolbar">
         <button class="btn small primary" id="btnNewQuestion">+ 新建</button>
         <button class="btn small" id="btnDuplicateQuestion">复制</button>
+        <button class="btn small good" id="btnCreateFamilyMemberToolbar" title="以当前题（或其母题）为基准创建一道家族成员题">+ 家族成员</button>
         <button class="btn small danger" id="btnDeleteQuestion">删除草稿</button>
+      </div>
+      <div class="family-list-legend">
+        <span class="family-legend-chip root">母题</span>
+        <span class="family-legend-chip equivalent">等价成员</span>
+        <span class="family-legend-chip decomposed">能力拆解</span>
+        <span class="family-legend-chip extension">高阶扩展</span>
+        <span class="family-legend-chip standalone">独立题</span>
       </div>
       <div class="q-list" id="questionList"></div>
     </div>
@@ -463,7 +487,7 @@ D原则：principle-role-accountability</pre>
     <div class="help-center-body">
       <div class="help-center-nav">
         <button data-help-topic="base">① 基础数据与导入</button>
-        <button data-help-topic="management">② 原则归纳卡 / 标签</button>
+        <button data-help-topic="management">② 原则 / 科目分类 / 公共标签</button>
         <button data-help-topic="questions">③ 题目录入与检查</button>
         <button data-help-topic="association">④ 联想词编辑</button>
         <button data-help-topic="demo">⑤ 题目演示校验</button>
@@ -498,7 +522,7 @@ B原则：principle-effective-communication</pre>
         </article>
 
         <article class="help-topic" data-help-content="management">
-          <h2>② 原则归纳卡 / 标签</h2>
+          <h2>② 原则 / 科目分类 / 公共标签</h2>
           <p>原则用于解释“为什么这个选项应该/不应该这样做”；归纳卡是原则的可阅读教学卡片。标签用于训练阶段、题目特征、来源等分类。</p>
           <h3>原则示例</h3>
           <div class="help-example"><b>原则：</b>确认沟通是否真正有效<br><b>归纳卡：</b>信息已经发送，不代表沟通完成。应确认接收、理解并能够据此行动。</div>

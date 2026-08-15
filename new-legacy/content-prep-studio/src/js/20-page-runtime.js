@@ -134,6 +134,20 @@ function renderQuestionFacetBindings(){
     renderCurrentIssues();markWorkspaceDirty();
   }));
 }
+function createFamilyMemberFromCurrent(){
+  const q=currentQuestion();if(!q)return;
+  const root=familyRootFor(q);
+  const base=root&&root.id!==q.id?root:q;
+  if(questionFamily(base).role!=='root'&&!confirm('当前题不是母题，先把它设为母题再创建成员？'))return;
+  makeQuestionFamilyRoot(base);
+  const copy=QuestionService.duplicatePayload(base);
+  copy.title=base.title+'（家族成员）';
+  state.questionBank.questions.push(copy);
+  makeQuestionFamilyMember(copy,base);
+  questionFamily(copy).qualityConfirmed=false;
+  state.currentQuestionId=copy.id;state.questionBank.updatedAt=Date.now();
+  renderQuestions();renderQuestionEditor();markWorkspaceDirty();toast('已从母题创建家族成员');
+}
 function renderQuestionFamilyEditor(){
   const q=currentQuestion(),box=document.getElementById('questionFamilyPanel');if(!q||!box)return;
   const f=questionFamily(q);
@@ -205,18 +219,7 @@ function renderQuestionFamilyEditor(){
   document.getElementById('qfNotes').oninput=e=>{questionFamily(q).notes=e.target.value.trim();markWorkspaceDirty()};
   box.querySelectorAll('[data-qf-goto]').forEach(el=>el.addEventListener('click',()=>{state.currentQuestionId=el.dataset.qfGoto;renderQuestions();renderQuestionEditor()}));
   const createBtn=document.getElementById('btnCreateFamilyMember');
-  createBtn.onclick=()=>{
-    const base=root&&root.id!==q.id?root:q;
-    if(questionFamily(base).role!=='root'&&!confirm('当前题不是母题，先把它设为母题再创建成员？'))return;
-    makeQuestionFamilyRoot(base);
-    const copy=QuestionService.duplicatePayload(base);
-    copy.title=base.title+'（家族成员）';
-    state.questionBank.questions.push(copy);
-    makeQuestionFamilyMember(copy,base);
-    questionFamily(copy).qualityConfirmed=false;
-    state.currentQuestionId=copy.id;state.questionBank.updatedAt=Date.now();
-    renderQuestions();renderQuestionEditor();markWorkspaceDirty();toast('已从母题创建家族成员');
-  };
+  createBtn.onclick=()=>createFamilyMemberFromCurrent();
   const goRoot=document.getElementById('btnGoFamilyRoot');
   if(goRoot&&!root)goRoot.disabled=true;
   else if(goRoot)goRoot.onclick=()=>{state.currentQuestionId=root.id;renderQuestions();renderQuestionEditor()};
@@ -1109,6 +1112,7 @@ function applyWorkspacePayload(input){
 function refreshAll(){refreshHeader();renderQuestions();renderRecallList();renderRecallEditor();renderPrincipleList();renderPrincipleEditor();renderTagManager();renderSubjectFacetManager();if(document.getElementById('tab-demo')?.classList.contains('active'))renderDemoValidation()}
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b)setTab(b.dataset.tab)});
 document.getElementById('btnNewQuestion').onclick=newQuestion;
+document.getElementById('btnCreateFamilyMemberToolbar').onclick=createFamilyMemberFromCurrent;
 document.getElementById('btnDuplicateQuestion').onclick=duplicateQuestion;
 document.getElementById('btnDeleteQuestion').onclick=deleteQuestion;
 document.getElementById('btnAddNormalKeyword').onclick=()=>addKeyword('normal');
@@ -1132,7 +1136,7 @@ document.addEventListener('input',event=>{if(!event.target.closest?.('[data-tran
 document.addEventListener('change',e=>{if(e.target.id!=='themeSelect')markWorkspaceDirty()},true);
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
-  const mutationIds=new Set(['btnNewQuestion','btnDuplicateQuestion','btnDeleteQuestion','btnAddNormalKeyword','btnAddCoreKeyword','btnNewRecall','btnNewPrinciple','btnParsePastedQuestions','pmSave','pmDelete','floatSave','floatDelete','btnAddEdge','btnDeleteRecall','btnBindRecallCandidate']);
+  const mutationIds=new Set(['btnNewQuestion','btnCreateFamilyMemberToolbar','btnDuplicateQuestion','btnDeleteQuestion','btnAddNormalKeyword','btnAddCoreKeyword','btnNewRecall','btnNewPrinciple','btnParsePastedQuestions','pmSave','pmDelete','floatSave','floatDelete','btnAddEdge','btnDeleteRecall','btnBindRecallCandidate']);
   if(mutationIds.has(b.id)||b.dataset.removeKw||b.dataset.removeEdge)markWorkspaceDirty();
 },true);
 function isTextEntryTarget(target){

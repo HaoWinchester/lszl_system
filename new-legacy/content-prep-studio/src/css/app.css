@@ -287,3 +287,11 @@ nav button.active{color:var(--brand)!important}
 .family-badge{font-size:11px;margin-right:4px;padding:1px 5px;border-radius:8px;font-weight:600}
 .family-badge.family-root{background:#1f6feb;color:#fff}
 .family-badge.family-member{background:#e8a33d;color:#fff}
+/* P4.5.29 题目列表家族图例（对齐官方配套版） */
+.family-list-legend{display:flex;gap:6px;flex-wrap:wrap;padding:7px 10px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#fbfcfe}
+.family-legend-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid transparent;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:850;white-space:nowrap}
+.family-legend-chip.root{background:#fff0d2;border-color:#e7b253;color:#875000}
+.family-legend-chip.equivalent{background:#eaf2ff;border-color:#8baef5;color:#2252a8}
+.family-legend-chip.decomposed{background:#eaf8f0;border-color:#8cc9aa;color:#146744}
+.family-legend-chip.extension{background:#f2ecff;border-color:#b39be8;color:#5c3ca3}
+.family-legend-chip.standalone{background:#f2f4f7;border-color:#d0d5dd;color:#667085}
