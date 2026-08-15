@@ -43,6 +43,8 @@ A. <选项A> B. <选项B> C. <选项C> D. <选项D>
    - 错误选项：解析中明确指出"违反/误用"某原则时，绑定该原则；否则填 []
 6. 题干关键词 → clues[]：sourceType="stem"；直接决定解题判断的词 keywordLevel="core"、isCore=true，其余 "normal"/false。
 7. 选项关键词 → clues[]：sourceType="option"、sourceOptionId=对应字母；正确项关键词尽量标注 keywordLevel="core"。
+7a.【硬性】每个 keywordLevel="core" 的关键词必须填 coreReason（一句话说明它为何决定解题判断，如"该词直接区分'发送信息'与'真正完成沟通'"）；normal 关键词 coreReason 留空字符串。
+7b.【硬性】clues 的 text 必须从中文题干/选项原文中逐字摘取，禁止改写、缩写或自造词；英文 textEn 对应翻译。
 8. 不要生成 question id、contentHash、creatorId、deviceId、batchId、metadata.origin——全部由 Prep Studio 导入时自动生成。
 9. tags 固定为：["基础练习","自编题","内部使用"]（如模板另有说明按模板）。
 10. difficulty 按解析难度判断："简单/中等/困难" 三选一。
@@ -91,9 +93,9 @@ A. <选项A> B. <选项B> C. <选项C> D. <选项D>
           }
         },
         "clues": [
-          {"text": "项目经理", "textEn": "project manager", "keywordLevel": "normal", "isCore": false, "type": "recall-keyword", "clueRole": "true", "sourceType": "stem", "sourceOptionId": "", "solutionRole": "context"},
-          {"text": "高级管理人员", "textEn": "senior executive", "keywordLevel": "core", "isCore": true, "type": "core-keyword", "clueRole": "true", "sourceType": "stem", "sourceOptionId": "", "solutionRole": "context"},
-          {"text": "人际网络", "textEn": "networking", "keywordLevel": "core", "isCore": true, "type": "core-keyword", "clueRole": "true", "sourceType": "option", "sourceOptionId": "C", "solutionRole": "answer-anchor"}
+          {"text": "项目经理", "textEn": "project manager", "keywordLevel": "normal", "isCore": false, "type": "recall-keyword", "clueRole": "true", "sourceType": "stem", "sourceOptionId": "", "solutionRole": "context", "coreReason": ""},
+          {"text": "高级管理人员", "textEn": "senior executive", "keywordLevel": "core", "isCore": true, "type": "core-keyword", "clueRole": "true", "sourceType": "stem", "sourceOptionId": "", "solutionRole": "context", "coreReason": "高管身份决定了应优先用人际网络而非上报"},
+          {"text": "人际网络", "textEn": "networking", "keywordLevel": "core", "isCore": true, "type": "core-keyword", "clueRole": "true", "sourceType": "option", "sourceOptionId": "C", "solutionRole": "answer-anchor", "coreReason": "正确选项的核心动作，直接对应人际关系技能"}
         ],
         "metadata": {
           "knowledge": {"primaryNodeId": "", "relatedNodeIds": [], "mappingStatus": "unmapped", "pathSnapshot": []},
@@ -125,6 +127,7 @@ A. <选项A> B. <选项B> C. <选项C> D. <选项D>
 1. principles 数组必须原样包含上表 8 条（ID、名称一字不改），这样导入后题目里的原则引用才能全部匹配上。
 2. 每题的 optionPrincipleMap 中，正确选项必须且只能有 1 条原则 ID。
 3. 多道题输入时，全部放入同一个 questionBank.questions 数组。
+4. 所有关键词 text 必须逐字来自题干/选项原文；core 关键词必须带 coreReason（否则导入后校验中心会报错）。
 4. 只输出 JSON 本体，不要任何解释文字、Markdown 代码围栏或注释。
 
 现在请等待我粘贴题目，或直接转换下面这题：
