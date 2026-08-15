@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "v9.0-p4.1.88",
+  "version": "v9.0-p4.1.89",
   "bridgeVersion": 2,
   "sourceFiles": {
     ".DS_Store": "81ecfdeb19e3d2138a7d27bc21c2b4de2378c0b85afe90ab0cf6ab962e3668f7",
@@ -161,7 +161,7 @@
     "V9.0_P4.1_DATA_INTEGRITY.json": "65a6d63dfac46ce58dfc27d34bbcecad45a019302c419e7967f2e1ed46ead3f4",
     "V9.0_P4.1_HELP_FEEDBACK_MESSAGES_REPORT.md": "edfc028219fece4c0e4893f868470f1f00f8836bce74ec6de3acbc54f3fcc5cd",
     "V9.0_P4.1_QUICK_START.md": "1316de5b831a2109176f627b3e7bbaf1bb030c14f3ae93ba8945b4a83deb864c",
-    "VERSION": "b0fd5d810bb315e4ac8b9a3dbcef4abc1de14cca57b357328d502390e738ccfe",
+    "VERSION": "bfabb5c585e5734c9e9e767a6b1ef959ca7858c5e62b7586a340f77a53f34e3d",
     "admin-console.html": "7bc9cd182d56e32a6ac6758c40f3925964f019977442c869c50a1b833524c666",
     "admin-operations.html": "db7b4997af6ef1db472a08d3a4270c0fd537e68c7e5edc6641bd4770acdda73c",
     "admin-settings.html": "dfe8f206e745ea3099afe22dd3d814ab20aab999677e5b6d4cc9c0af4ea1be76",
@@ -327,7 +327,7 @@
     "src/33-user-center.js": "330bcf16b9dd42bccaa5288b41ba8d96ea21b4feddda994624c77cc94ab84170",
     "src/34-role-permissions.js": "2a494c44d440b8203a397d9e68f2a928f72688be2e84a6272117751322c95156",
     "src/35-user-management-service.js": "ef16306b1cf794dc9f365fddfeb80bd805c61136396cb6b4e9d9f81afa534ee7",
-    "src/35-user-management.js": "8d6951669d1ebe8938e28b6af6a8071deba30e84c801ab0e7cd46d02c51c0b43",
+    "src/35-user-management.js": "a41a02a81507ff371a1394405a77b43f7eb643014b17bcf299ac7c79add7695a",
     "src/36-system-settings.js": "2f78b9a2450d948ab2e3ec5002f9dd3f2de561f137ee417e43b1ccb3ded6df6d",
     "src/37-subscription-core.js": "fef991992609c73f2a5b3126a7c9abf5c163ccfcb50044a48d50e1b3c4497d3a",
     "src/37-subscription-orders.js": "2a275dd9844d24acbff703346ebf148beec1f6a244d4c63360defe416c7cd399",

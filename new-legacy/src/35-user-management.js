@@ -207,7 +207,7 @@
       const sub=u.subscription&&typeof u.subscription==='object'?u.subscription:null;
       const subShort=String(sub?.planName||sub?.planId||'').replace(/会员|学员/g,'')||'会员';
       const subBadges=sub&&sub.planId&&sub.planId!=='free'
-        ?`<b class="um-pill plan ${sub.paid?'paid':'unpaid'}" title="当前套餐：${escapeHTML(sub.planName||sub.planId)} · ${sub.paid?'已付款':'未在线付款（兑换码/人工开通）'}${sub.expiresAt?' · 至 '+fmtTime(Date.parse(sub.expiresAt)):''}">${escapeHTML(subShort)} · ${sub.paid?'已付款':'未付款'}</b>`
+        ?`<b class="um-pill plan ${sub.paid?'paid':'unpaid'}" title="当前套餐：${escapeHTML(sub.planName||sub.planId)} · ${sub.paid?'已付款':'未在线付款（兑换码/人工开通）'}${sub.expiresAt?' · 至 '+fmtTime(Date.parse(sub.expiresAt)):''}">${escapeHTML(subShort)}</b>`
         :'';
       return `<div class="um-user-item compact ${username===state.selected?'active':''} ${checked?'selected':''}" data-user="${escapeHTML(username)}" role="button" tabindex="0" title="@${escapeHTML(username)} · ${escapeHTML(role)} · ${subject} · ${stats.questions} 题" aria-label="选择用户 ${escapeHTML(username)}，${escapeHTML(role)}，${status}">
         <label class="um-user-check" title="加入批量选择">

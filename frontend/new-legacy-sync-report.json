@@ -1,13 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.87",
-  "toVersion": "v9.0-p4.1.88",
+  "fromVersion": "v9.0-p4.1.88",
+  "toVersion": "v9.0-p4.1.89",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "src/35-user-management.js",
-      "styles/user-management.css"
+      "src/35-user-management.js"
     ],
     "removed": []
   },
