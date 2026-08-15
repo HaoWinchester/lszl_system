@@ -1,0 +1,17 @@
+/* V9.0-P4.5.30 · 深度回忆选项与解析对齐多题画布（question-workspace）。 */
+/* 选项/解析样式单一来源：question-workspace.css（qw-card-options / qw-analysis-panel 系列）。
+   本补丁只为 kr 页补齐 qw 作用域内的字号变量，并对 kr 题目卡（780px，比 qw 卡宽）做少量尺寸适配。 */
+.knowledge-recall-page{
+  --qw-font-xxs:11px;
+  --qw-font-xs:12px;
+  --qw-font-sm:13px;
+  --qw-font-md:15px;
+  --qw-font-lg:18px;
+  --qw-font-xl:22px;
+}
+.knowledge-recall-page .qw-card-options{gap:8px;margin-top:10px}
+.knowledge-recall-page .qw-card-option{padding:9px 10px}
+.knowledge-recall-page .qw-card-actions.qw-card-learning-actions{margin-top:10px}
+@media (max-width:760px){
+  .knowledge-recall-page .qw-card-option{padding:7px 8px}
+}

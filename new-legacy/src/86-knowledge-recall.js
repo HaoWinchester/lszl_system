@@ -3,6 +3,7 @@
 (function(){
   const $=id=>document.getElementById(id);
   const viewport=$('krViewport'),world=$('krWorld'),edges=$('krEdges'),questionCard=$('krQuestionCard'),nodeLayer=$('krNodeLayer'),guide=$('krGuide');
+  const analysisLayer=$('krAnalysisLayer');
   const RecallStorage=window.KGRecallStorage||{};
   const GraphModel=window.KGRecallGraphModel||{};
   const DeepRecallFlow=window.KGDeepRecallFlowModel||{};
@@ -28,6 +29,16 @@
   const BUTTON_ZOOM_LEVELS=[.01,.02,.03,.05,.10,.15,.20,.33,.50,.75,1,1.25,1.50,2,2.50,3,4];
   const WHEEL_ZOOM_LEVELS=[.01,.02,.03,.04,.05,.07,.09,.11,.13,.17,.21,.26,.33,.41,.51,.64,.80,1,1.20,1.44,1.73,2.07,2.49,2.99,3.58,4];
   const MIN_ZOOM=.01,MAX_ZOOM=4;
+  // P4.5.30：选项与解析对齐多题画布（77-multi-question-workspace.js）的行为常量。
+  const KR_OPTION_SINGLE_CLICK_DELAY=230,KR_OPTION_CORRECT_FLASH=560,KR_OPTION_WRONG_FLASH=430;
+  const KR_ANALYSIS_SECTION_KEY='kg_multi_question_analysis_sections_v1';
+  const KR_ANALYSIS_SECTION_ORDER=['analysis','answer','path','concepts','clues','traps'];
+  const KR_ANALYSIS_SECTION_LABELS={analysis:'题目解析',answer:'正确答案',path:'判断主线',concepts:'知识点',clues:'关键词',traps:'选项提示'};
+  const KR_ANALYSIS_SECTION_DEFAULTS=['analysis','answer','path'];
+  const KR_ANALYSIS_ICON='<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4.5h10a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3V4.5z"/><path d="M8 7.5h7M8 11h6M8 14.5h4"/></svg>';
+  let krOptionState={selected:'',persistent:''};
+  let krOptionClickTimer=0,krOptionFlashTimer=0;
+  let krAnalysisOpen=false,krAnalysisOffset={x:0,y:0};
   const HIGHLIGHT_PALETTES=[
     {'--kr-highlight-from':'rgba(251,191,36,.34)','--kr-highlight-to':'rgba(253,230,138,.90)','--kr-highlight-ring':'rgba(251,191,36,.26)','--kr-highlight-hover':'rgba(251,191,36,.18)','--kr-highlight-text':'#3a1f0a'},
     {'--kr-highlight-from':'rgba(52,211,153,.28)','--kr-highlight-to':'rgba(167,243,208,.86)','--kr-highlight-ring':'rgba(16,185,129,.24)','--kr-highlight-hover':'rgba(16,185,129,.16)','--kr-highlight-text':'#064e3b'},
@@ -268,6 +279,9 @@
     resetAssociationRuntime();
     rootMap=buildRootMap(question);keywordMatchers=buildKeywordMatchers(rootMap);keywordsRevealed=false;
     loadProgress(session.progress||{});
+    // 切换题目后：关闭解析面板并复位选项瞬时状态（选中/常绿已由 loadProgress 恢复）。
+    clearTimeout(krOptionClickTimer);clearTimeout(krOptionFlashTimer);
+    krAnalysisOpen=false;krAnalysisOffset={x:0,y:0};setKrAnalysisButtonState(false);if(analysisLayer)analysisLayer.innerHTML='';
     RecallStorage.markExplored?.(question,recallQuestionBankId(),Boolean(state.nodes.length||state.activeKeywords.length));
     setRecallReadonly(!recallSession.permissions?.canWrite);
     const reveal=$('krRevealKeywordsBtn');if(reveal){reveal.disabled=!recallSession.permissions?.canReveal;reveal.textContent='揭示关键词'}
@@ -304,7 +318,7 @@
     return latest;
   }
   function progressPayload(){
-    return {nodes:state.nodes,edges:state.edges,customNodes:state.customNodes,activeKeywords:state.activeKeywords,choiceOffsets:state.choiceOffsets,metrics:state.metrics,graphSchemaVersion:3,transform:{x:Number(state.transform.x)||0,y:Number(state.transform.y)||0,scale:Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(state.transform.scale)||1))}};
+    return {nodes:state.nodes,edges:state.edges,customNodes:state.customNodes,activeKeywords:state.activeKeywords,choiceOffsets:state.choiceOffsets,metrics:state.metrics,graphSchemaVersion:3,transform:{x:Number(state.transform.x)||0,y:Number(state.transform.y)||0,scale:Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(state.transform.scale)||1))},optionState:{selected:String(krOptionState.selected||''),persistent:String(krOptionState.persistent||'')}};
   }
   async function writeProgressNow(){
     if(isRecallReadonly()||isTeacherDraftPreview()||!recallAdapter)return false;
@@ -328,6 +342,7 @@
       raw=raw||recallAdapter?.getState?.().graph||null;
       if(raw&&Array.isArray(raw.nodes)&&Array.isArray(raw.edges)){
         state.nodes=raw.nodes;state.edges=raw.edges;state.customNodes=raw.customNodes&&typeof raw.customNodes==='object'?raw.customNodes:{};state.activeKeywords=Array.isArray(raw.activeKeywords)?raw.activeKeywords:[];state.choiceOffsets=raw.choiceOffsets&&typeof raw.choiceOffsets==='object'?raw.choiceOffsets:{};state.metrics=raw.metrics&&typeof raw.metrics==='object'?{keywordClicks:Number(raw.metrics.keywordClicks)||0,choiceClicks:Number(raw.metrics.choiceClicks)||0,nodeOpens:Number(raw.metrics.nodeOpens)||0,sessionStartedAt:Date.now()}:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()};
+        if(raw.optionState&&typeof raw.optionState==='object')krOptionState={selected:String(raw.optionState.selected||''),persistent:String(raw.optionState.persistent||'')};
         if(raw.transform&&Number.isFinite(Number(raw.transform.x))&&Number.isFinite(Number(raw.transform.y))&&Number.isFinite(Number(raw.transform.scale))){state.transform={x:Number(raw.transform.x),y:Number(raw.transform.y),scale:Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(raw.transform.scale)))};recallViewportRestored=true}
         normalizeGraph();
         return true;
@@ -500,25 +515,62 @@
       if(p.clue&&rootConfig(p.clue))return `<button type="button" class="kr-keyword-token${keywordsRevealed?'':' undiscovered'}${isKeywordActive(p.clue)?' active':''}" data-keyword-id="${escapeHTML(p.clue)}" data-keyword-index="${i}">${text}</button>`;
       return wrapKnownKeywords(text);
     }).join('');
-    const optionMarkup=(option,content)=>`<button type="button" class="kr-option" data-option-id="${escapeHTML(option.id)}" aria-label="点击字母 ${escapeHTML(option.id)} 判断正误；选项文字中的关键词可直接点击回忆"><strong>${escapeHTML(option.id)}</strong>${content}</button>`;
-    const options=(view?.options||[]).length?(view.options||[]).map(o=>optionMarkup(o,`<span>${wrapKnownKeywords(escapeHTML(o.display?.zh||''),{inline:true})}${englishLine(o.display)}</span>`)).join(''):(question.options||[]).map(o=>optionMarkup(o,wrapKnownKeywords(escapeHTML(o.text||''),{inline:true}))).join('');
+    // P4.5.30：选项结构与多题画布一致（qw-card-options + qw-card-option-key 字母按钮），
+    // 样式单一来源 question-workspace.css；kr-option 类保留在 <li> 上作测试/兼容钩子。
+    const optionRow=(option,index,content)=>{
+      const key=String(option?.id||String.fromCharCode(65+index));
+      const selected=String(krOptionState.selected||'')===key,persistent=String(krOptionState.persistent||'')===key;
+      return `<li class="qw-card-option kr-option"><button type="button" class="qw-card-option-key${selected?' is-answer-selected':''}${persistent?' is-correct-active':''}" data-qw-option-key="${escapeHTML(key)}" title="选择 ${escapeHTML(key)}" aria-pressed="${selected?'true':'false'}">${escapeHTML(key)}</button><span class="qw-card-option-copy">${content}</span></li>`;
+    };
+    const viewOptions=view?.options||[];
+    const rows=viewOptions.length
+      ?viewOptions.map((o,i)=>optionRow(o,i,`${wrapKnownKeywords(escapeHTML(o.display?.zh||''),{inline:true})}${englishLine(o.display)}`))
+      :(question.options||[]).map((o,i)=>optionRow(o,i,wrapKnownKeywords(escapeHTML(o.text||''),{inline:true})));
     const stemEn=view?.stem||{hasEnglish:false};
-    questionCard.innerHTML=`<div class="kr-stem">${stem}${englishLine(stemEn)}</div><div class="kr-options">${options}</div><p class="kr-option-feedback lp-visually-hidden" data-kr-option-feedback aria-live="polite"></p>`;
+    questionCard.innerHTML=`<div class="kr-stem">${stem}${englishLine(stemEn)}</div>${rows.length?`<ol class="qw-card-options">${rows.join('')}</ol>`:''}<p class="kr-option-feedback lp-visually-hidden" data-kr-option-feedback aria-live="polite"></p><div class="qw-card-actions qw-card-learning-actions"><button type="button" class="qw-card-action-square qw-card-icon-action${krAnalysisOpen?' is-active':''}" data-qw-action="analysis" title="显示或关闭本题解析" aria-label="显示或关闭本题解析" aria-pressed="${krAnalysisOpen?'true':'false'}">${KR_ANALYSIS_ICON}</button></div>`;
+    if(krAnalysisOpen)requestAnimationFrame(positionKrAnalysisPanel);
   }
   function recallOptionIsCorrect(optionId){
     const id=String(optionId||'');
     const option=(question.options||[]).find(item=>String(item?.id||'')===id);
     return !!option?.correct||id===String(question.correctAnswer||'');
   }
-  function flashRecallOptionFeedback(option){
-    const correct=recallOptionIsCorrect(option?.dataset?.optionId);
-    const feedbackClass=correct?'is-answer-correct':'is-answer-incorrect';
-    questionCard.querySelectorAll('.kr-option.is-answer-correct,.kr-option.is-answer-incorrect').forEach(item=>item.classList.remove('is-answer-correct','is-answer-incorrect'));
-    option.classList.add(feedbackClass);
+  function krOptionKeyButton(key){
+    return [...questionCard.querySelectorAll('[data-qw-option-key]')].find(item=>String(item.dataset.qwOptionKey||'')===String(key))||null;
+  }
+  function flashKrOption(key,correct){
+    const button=krOptionKeyButton(key);if(!button)return false;
+    const className=correct?'is-correct-flash':'is-wrong-flash';
+    clearTimeout(krOptionFlashTimer);
+    questionCard.querySelectorAll('.is-correct-flash,.is-wrong-flash').forEach(item=>item.classList.remove('is-correct-flash','is-wrong-flash'));
+    void button.offsetWidth;button.classList.add(className);
+    krOptionFlashTimer=setTimeout(()=>button.classList.remove(className),correct?KR_OPTION_CORRECT_FLASH:KR_OPTION_WRONG_FLASH);
+    return true;
+  }
+  function judgeKrOption(key){
+    if(isRecallReadonly()){notifyRecallReadonly();return}
+    krOptionState.selected=String(key||'');
+    questionCard.querySelectorAll('[data-qw-option-key]').forEach(button=>{
+      const on=String(button.dataset.qwOptionKey||'')===krOptionState.selected;
+      button.classList.toggle('is-answer-selected',on);
+      button.setAttribute('aria-pressed',String(on));
+    });
+    const correct=recallOptionIsCorrect(krOptionState.selected);
+    flashKrOption(krOptionState.selected,correct);
     const feedback=questionCard.querySelector('[data-kr-option-feedback]');
     if(feedback)feedback.textContent=correct?'回答正确。':'回答错误。';
-    clearTimeout(flashRecallOptionFeedback.timer);
-    flashRecallOptionFeedback.timer=setTimeout(()=>{option.classList.remove('is-answer-correct','is-answer-incorrect')},720);
+    saveProgress();
+  }
+  function toggleKrPersistentAnswer(key){
+    if(isRecallReadonly()){notifyRecallReadonly();return}
+    key=String(key||'');
+    if(!recallOptionIsCorrect(key)){flashKrOption(key,false);notifyRecallLimit('双击仅用于把正确选项设为常绿标记。');return}
+    const active=String(krOptionState.persistent||'')===key;
+    krOptionState.persistent=active?'':key;
+    questionCard.querySelectorAll('[data-qw-option-key]').forEach(button=>{
+      button.classList.toggle('is-correct-active',!active&&String(button.dataset.qwOptionKey||'')===key);
+    });
+    saveProgress();
   }
   function buildKeywordMatchers(map){
     const unique=new Set(),matchers=[];
@@ -567,13 +619,26 @@
       if(keyword&&questionCard.contains(keyword)){
         event.preventDefault();event.stopPropagation();activateKeyword(keyword);return;
       }
-      const option=event.target.closest('.kr-option[data-option-id]');
-      // 对错反馈只由 A/B/C/D 字母圆框触发（键盘激活时 target 为选项按钮本身）；
-      // 点击选项文字行不判定对错——那一片留给点击关键词。
-      if(option&&questionCard.contains(option)&&(event.target===option||event.target.closest('.kr-option>strong'))){
-        if(isRecallReadonly())return;
-        event.preventDefault();event.stopPropagation();flashRecallOptionFeedback(option);return;
+      // 选项判定与多题画布一致：点击字母按钮（键盘 Enter/Space 也走这里的 click），
+      // 单击延迟 230ms 给双击常绿让路；选项文字行不判定，留给点击关键词。
+      const optionKey=event.target.closest('[data-qw-option-key]');
+      if(optionKey&&questionCard.contains(optionKey)){
+        event.preventDefault();event.stopPropagation();
+        clearTimeout(krOptionClickTimer);
+        krOptionClickTimer=setTimeout(()=>judgeKrOption(optionKey.dataset.qwOptionKey),KR_OPTION_SINGLE_CLICK_DELAY);
+        return;
       }
+      const analysis=event.target.closest('[data-qw-action="analysis"]');
+      if(analysis&&questionCard.contains(analysis)){
+        event.preventDefault();event.stopPropagation();toggleKrAnalysisPanel();return;
+      }
+    });
+    questionCard.addEventListener('dblclick',event=>{
+      const optionKey=event.target.closest('[data-qw-option-key]');
+      if(!optionKey||!questionCard.contains(optionKey))return;
+      event.preventDefault();event.stopPropagation();
+      clearTimeout(krOptionClickTimer);
+      toggleKrPersistentAnswer(optionKey.dataset.qwOptionKey);
     });
     questionCard.addEventListener('keydown',event=>{
       if(event.key!=='Enter'&&event.key!==' ')return;
@@ -581,6 +646,114 @@
       if(!keyword||!questionCard.contains(keyword))return;
       event.preventDefault();activateKeyword(keyword);
     });
+    window.addEventListener('resize',()=>{if(krAnalysisOpen)positionKrAnalysisPanel()});
+    if(analysisLayer){
+      analysisLayer.addEventListener('click',event=>{
+        if(event.target.closest('[data-qw-analysis-close]')){event.preventDefault();toggleKrAnalysisPanel()}
+      });
+      analysisLayer.addEventListener('change',event=>{
+        const checkbox=event.target.closest('[data-qw-analysis-section]');
+        if(!(checkbox instanceof HTMLInputElement))return;
+        const key=String(checkbox.dataset.qwAnalysisSection||'');
+        if(!KR_ANALYSIS_SECTION_ORDER.includes(key))return;
+        if(checkbox.checked)krAnalysisSections.add(key);else krAnalysisSections.delete(key);
+        if(!krAnalysisSections.size){krAnalysisSections.add('answer');checkbox.checked=false}
+        saveKrAnalysisSections();renderKrAnalysisPanel();
+      });
+    }
+  }
+  /* P4.5.30 解析面板：结构与样式复用多题画布 qw-analysis-panel，
+     显示内容勾选偏好与 question-workspace 共用同一 localStorage key（按用户分域），两页互通。 */
+  let krAnalysisSections=readKrAnalysisSections();
+  function krScopedPreferenceKey(prefix){
+    const userId=window.KGLearningSessionStore?.currentUserId?.()||'guest';
+    return prefix+'__'+encodeURIComponent(String(userId||'guest'));
+  }
+  function readKrAnalysisSections(){
+    try{
+      const raw=JSON.parse(localStorage.getItem(krScopedPreferenceKey(KR_ANALYSIS_SECTION_KEY))||'null');
+      const selected=Array.isArray(raw)?raw.map(String).filter(key=>KR_ANALYSIS_SECTION_ORDER.includes(key)):[];
+      return new Set(selected.length?selected:KR_ANALYSIS_SECTION_DEFAULTS);
+    }catch(error){return new Set(KR_ANALYSIS_SECTION_DEFAULTS)}
+  }
+  function saveKrAnalysisSections(){
+    try{localStorage.setItem(krScopedPreferenceKey(KR_ANALYSIS_SECTION_KEY),JSON.stringify([...krAnalysisSections]))}catch(error){}
+    return krAnalysisSections;
+  }
+  function krAnalysisSectionEnabled(key){return krAnalysisSections.has(String(key||''))}
+  function krAnalysisSectionMarkup(key,title,body,className=''){
+    return `<section class="qw-analysis-section ${escapeHTML(className)}" data-analysis-section="${escapeHTML(key)}"><h4>${escapeHTML(title)}</h4><div class="qw-analysis-section-body">${body}</div></section>`;
+  }
+  function krCorrectAnswerId(){
+    const explicit=String(question.correctAnswer||'').trim();
+    if(explicit)return explicit;
+    const option=(Array.isArray(question.options)?question.options:[]).find(item=>item?.correct);
+    return String(option?.id||'');
+  }
+  function krQuestionAnalysisMarkup(){
+    const view=recallQuestionDisplay()||{};
+    const options=Array.isArray(question.options)?question.options:[];
+    const viewOptions=Array.isArray(view.options)?view.options:[];
+    const answerId=krCorrectAnswerId();
+    const correct=options.find(item=>String(item?.id||'')===answerId)||options.find(item=>item?.correct)||null;
+    const displayCorrect=viewOptions.find(item=>String(item.id)===String(answerId))||null;
+    const explicit=String(view.explanation?.zh||question.analysis||question.explanation||question.rationale||question.solution||'').trim();
+    const pathText=String(view.path?.zh||question.keyPath?.ruleText||question.keyPath?.label||'').trim();
+    const concepts=(Array.isArray(question.concepts)?question.concepts:[]).slice(0,6);
+    const clues=(Array.isArray(question.clues)?question.clues:[]).filter(item=>String(item?.explain||'').trim()).slice(0,6);
+    const traps=options.filter(item=>String(item?.trap||'').trim()).slice(0,8);
+    const sections=[];
+    if(krAnalysisSectionEnabled('analysis')&&explicit)sections.push(krAnalysisSectionMarkup('analysis','题目解析',`<p>${escapeHTML(explicit)}${englishLine(view.explanation)}</p>`));
+    if(krAnalysisSectionEnabled('answer')&&(answerId||correct)){
+      const zhText=displayCorrect?.display?.zh||correct?.text||'';
+      const enText=displayCorrect?.display?.en||'';
+      sections.push(krAnalysisSectionMarkup('answer','正确答案',`<p><strong>${escapeHTML(answerId||correct?.id||'')}</strong>${zhText?' · '+escapeHTML(zhText):''}${enText&&languageMode()==='bilingual'?`<span class="qw-bilingual-en">${escapeHTML(enText)}</span>`:''}</p>`,'qw-analysis-answer'));
+    }
+    if(krAnalysisSectionEnabled('path')&&pathText)sections.push(krAnalysisSectionMarkup('path','判断主线',`<p>${escapeHTML(pathText)}${englishLine(view.path)}</p>`));
+    if(krAnalysisSectionEnabled('concepts')&&concepts.length)sections.push(krAnalysisSectionMarkup('concepts','知识点',`<ul>${concepts.map(item=>`<li><strong>${escapeHTML(item.title||'知识点')}</strong>${item.rule||item.summary?'：'+escapeHTML(item.rule||item.summary):''}</li>`).join('')}</ul>`));
+    if(krAnalysisSectionEnabled('clues')&&clues.length)sections.push(krAnalysisSectionMarkup('clues','关键词讲解',`<ul>${clues.map(item=>`<li><strong>${escapeHTML(item.text||'线索')}</strong>：${escapeHTML(item.explain||'')}</li>`).join('')}</ul>`));
+    if(krAnalysisSectionEnabled('traps')&&traps.length)sections.push(krAnalysisSectionMarkup('traps','选项提示',`<ul>${traps.map(item=>`<li><strong>${escapeHTML(item.id||'')}</strong>：${escapeHTML(item.trap||'')}</li>`).join('')}</ul>`));
+    if(!sections.length)sections.push('<section class="qw-analysis-empty"><h4>暂无可展示内容</h4><p>可在“显示内容”中勾选其他项目；若仍为空，请先在题库中补充解析、知识点或选项提示。</p></section>');
+    return sections.join('');
+  }
+  function krAnalysisConfigMarkup(){
+    return `<details class="qw-analysis-config-wrap"><summary title="选择解析显示内容" aria-label="选择解析显示内容"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg></summary><fieldset class="qw-analysis-config"><legend>显示内容</legend>${KR_ANALYSIS_SECTION_ORDER.map(key=>`<label><input type="checkbox" data-qw-analysis-section="${escapeHTML(key)}" ${krAnalysisSectionEnabled(key)?'checked':''}><span>${escapeHTML(KR_ANALYSIS_SECTION_LABELS[key]||key)}</span></label>`).join('')}</fieldset></details>`;
+  }
+  function renderKrAnalysisPanel(){
+    if(!analysisLayer)return false;
+    if(!krAnalysisOpen){analysisLayer.innerHTML='';return false}
+    const title=String(question.title||'本题解析');
+    analysisLayer.innerHTML=`<aside class="qw-analysis-panel" data-analysis-node-id="kr-question" data-side="right" aria-label="本题解析 ${escapeHTML(title)}"><header data-qw-analysis-drag title="解析面板位置跟随题目卡"><div><small>QUESTION EXPLANATION</small><h3>${escapeHTML(title)}</h3></div><div class="qw-analysis-header-actions">${krAnalysisConfigMarkup()}<button type="button" data-qw-analysis-close="kr-question" title="关闭解析" aria-label="关闭解析"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div></header><div class="qw-analysis-content">${krQuestionAnalysisMarkup()}</div></aside>`;
+    requestAnimationFrame(positionKrAnalysisPanel);
+    return true;
+  }
+  function positionKrAnalysisPanel(){
+    const panel=analysisLayer?.querySelector?.('.qw-analysis-panel');
+    if(!panel||!krAnalysisOpen)return false;
+    // 题目卡以世界原点为中心（translate(-50%,-50%)），面板贴其右侧，与多题画布一致。
+    const width=Number(questionCard.offsetWidth||0),height=Number(questionCard.offsetHeight||0);
+    const x=width/2+24+Number(krAnalysisOffset.x||0);
+    const y=-height/2+Number(krAnalysisOffset.y||0);
+    const panelHeight=Math.max(148,Number(panel.offsetHeight||260));
+    const anchorY=0;
+    panel.dataset.side='right';
+    panel.style.setProperty('--qw-analysis-pointer-y',Math.max(28,Math.min(panelHeight-28,anchorY-y))+'px');
+    panel.style.removeProperty('--qw-analysis-pointer-x');
+    panel.style.left=x+'px';
+    panel.style.top=y+'px';
+    return true;
+  }
+  function setKrAnalysisButtonState(active){
+    questionCard.querySelectorAll('[data-qw-action="analysis"]').forEach(button=>{
+      button.classList.toggle('is-active',!!active);
+      button.setAttribute('aria-pressed',String(Boolean(active)));
+    });
+  }
+  function toggleKrAnalysisPanel(){
+    krAnalysisOpen=!krAnalysisOpen;
+    setKrAnalysisButtonState(krAnalysisOpen);
+    renderKrAnalysisPanel();
+    return true;
   }
   function revealKeywords(){
     if(isRecallReadonly()){notifyRecallReadonly();return false}
