@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { dirname, relative, resolve } from 'node:path'
+import { dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
@@ -981,7 +981,9 @@ function validateStorageContract(source) {
   for (const path of walk(source).filter((item) => item.endsWith('.js') || item.endsWith('.html'))) {
     const contents = readFileSync(resolve(source, path), 'utf8')
     if (!hasIndexedDbBusinessPersistence(contents)) continue
-    if (p45Migration.legacyUnmigratedIndexedDbModules.has(path)) continue
+    /* walk() 在 Windows 返回反斜杠路径，豁免清单统一为正斜杠，比较前先归一 */
+    const normalizedPath = path.split(sep).join('/')
+    if (p45Migration.legacyUnmigratedIndexedDbModules.has(normalizedPath)) continue
     throw new Error(`IndexedDB business persistence is forbidden in migrated module: ${path}`)
   }
 }
