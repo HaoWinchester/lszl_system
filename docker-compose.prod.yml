@@ -37,6 +37,8 @@ services:
       WECHAT_REDIRECT_URI: ${WECHAT_REDIRECT_URI:-https://lszl.aihuanpu.com/api/v1/auth/wechat/callback}
       WECHAT_ENABLE_OFFICIAL: ${WECHAT_ENABLE_OFFICIAL:-false}
       WECHAT_ENABLE_DEMO: ${WECHAT_ENABLE_DEMO:-false}
+      # Prep Studio 题目校验临时关闭（2026-08 录入提速；恢复校验：删 .env.prod 中该变量并重启）
+      CONTENT_PREP_VALIDATION_DISABLED: ${CONTENT_PREP_VALIDATION_DISABLED:-false}
     env_file:
       - /opt/lszl/secrets/wechatpay/payment.env
     ports:
