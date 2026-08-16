@@ -43,6 +43,8 @@
   const PRACTICE_BATCH_SIZE=3;
   const PRACTICE_EDGE_COLORS=Object.freeze({pending:'#94a3b8',mastered:'#16a34a',review:'#dc2626'});
   const OPTION_SINGLE_CLICK_DELAY=230;
+  // P4.5.37：作答异步同步——本地判题即时反馈，服务端记录空闲 2.5s 批量提交
+  const ANSWER_FLUSH_DELAY=2500;
   const CORRECT_FLASH_DURATION=560;
   const WRONG_FLASH_DURATION=430;
   const POINTER_ARROW_ICON='<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 3l13 8-6 1.2 3.7 6.2-2.8 1.6-3.6-6.1L5 18V3z"/></svg>';
@@ -99,6 +101,9 @@
     answerSelections:new Map(),
     persistentCorrectAnswers:new Map(),
     answerSync:new Map(),
+    answerQueue:[],
+    answerFlushTimer:0,
+    answerFlushing:false,
     optionClickTimers:new Map(),
     optionFlashTimers:new Map(),
     edgeElements:new Map(),
@@ -1613,49 +1618,92 @@
     renderQuestionDock();
     return session;
   }
+  // P4.5.37：作答改为本地判题即时反馈 + 异步队列同步（类似首页 autosave 机制）。
+  // 发布快照含正确答案（correctAnswerId），点击后立即闪烁/选中/完成标记；
+  // 服务端记录（错题本/进度）进入队列：空闲批量按序提交，pagehide/隐藏时
+  // flush，失败保留"作答尚未保存"重试入口（answerSync.error 形态不变）。
+  function localAnswerCorrect(record,key){
+    const question=resolvedQuestionForNode(record?.node||{})||{};
+    const canonical=correctAnswerId(question)||String(record?.node?.correctAnswer||'');
+    return !!canonical&&String(key||'')===String(canonical);
+  }
+  function enqueueAnswer(payload,nodeId){
+    state.answerQueue.push({payload:payload,nodeId:String(nodeId||'')});
+    scheduleAnswerFlush();
+  }
+  function scheduleAnswerFlush(){
+    global.clearTimeout(state.answerFlushTimer);
+    state.answerFlushTimer=global.setTimeout(flushAnswerQueue,ANSWER_FLUSH_DELAY);
+  }
+  async function flushAnswerQueue(){
+    if(state.answerFlushing)return;
+    const queue=state.answerQueue.splice(0);
+    if(!queue.length)return;
+    if(typeof PracticeLearning.answer!=='function'){
+      failAnswerQueue(queue,new Error('错题同步服务暂不可用'));
+      return;
+    }
+    state.answerFlushing=true;
+    try{
+      // 顺序提交保序（错题"延迟验证"推进依赖作答顺序）
+      for(let index=0;index<queue.length;index+=1){
+        const item=queue[index];
+        try{await PracticeLearning.answer(item.payload,{skipRefresh:true})}
+        catch(error){
+          failAnswerQueue(queue.slice(index),error);
+          return;
+        }
+        const syncState=state.answerSync.get(item.nodeId);
+        if(syncState?.error){state.answerSync.set(item.nodeId,{...syncState,error:''});refreshSingleCardMarkupById(item.nodeId)}
+      }
+    }finally{state.answerFlushing=false}
+  }
+  function failAnswerQueue(rest,error){
+    state.answerQueue=[...rest,...state.answerQueue];
+    rest.forEach(item=>{
+      const record=state.cards.get(item.nodeId);
+      const syncState=state.answerSync.get(item.nodeId)||{};
+      state.answerSync.set(item.nodeId,{...syncState,pending:false,error:String(error?.message||'网络错误，请重试'),payload:item.payload});
+      if(record)refreshSingleCardMarkup(record);
+    });
+    notify('作答尚未保存，将自动重试；也可点击题目卡上的"重试"。');
+    scheduleAnswerFlush();
+  }
+  function refreshSingleCardMarkupById(nodeId){
+    const record=state.cards.get(String(nodeId||''));
+    if(record)refreshSingleCardMarkup(record);
+  }
   async function submitPracticeAnswer(record,key,options={}){
     if(!record||record.node?.nodeType!=='question-reference')return false;
-    const nodeId=String(record.id),current=state.answerSync.get(nodeId);
-    if(current?.pending)return current.promise;
+    const nodeId=String(record.id);
     key=String(key||'');
     const payload=options.retryPayload?{...options.retryPayload}:practiceAnswerPayload(record,key);
     if(!payload.questionId||!key){notify('当前题目缺少可提交的作答信息。');return false}
     payload.selectedAnswer=key;
-    const requestWorkspaceId=String(state.workspaceId||'');
-    const syncState={pending:true,error:'',payload,persistent:Boolean(options.persistent),promise:null,workspaceId:requestWorkspaceId};
+    const persistent=Boolean(options.persistent);
+    const correct=localAnswerCorrect(record,key);
     state.answerSelections.set(nodeId,key);
-    state.answerSync.set(nodeId,syncState);
+    state.answerSync.set(nodeId,{pending:false,error:'',payload,persistent});
+    // 即时反馈（原服务端成功回调的一套，判题改本地快照）
+    const result={correct,completion:{status:'completed',selectedAnswer:key,correct,completedAt:Date.now()}};
+    markQuestionCompleted(record,result);
+    const practice=recordPracticeAttempt(record,key,'',correct);
     refreshSingleCardMarkup(record);
-    syncState.promise=Promise.resolve().then(()=>{
-      if(typeof PracticeLearning.answer!=='function')throw new Error('错题同步服务暂不可用');
-      return PracticeLearning.answer(payload);
-    }).then(result=>{
-      if(state.answerSync.get(nodeId)!==syncState||String(state.workspaceId||'')!==requestWorkspaceId)return result;
-      state.answerSync.set(nodeId,{...syncState,pending:false,error:'',promise:null,result});
-      markQuestionCompleted(record,result);
-      const practice=recordPracticeAttempt(record,key,'',Boolean(result.correct));
-      refreshSingleCardMarkup(record);
-      flashOption(record,key,result.correct?'is-correct-flash':'is-wrong-flash',result.correct?CORRECT_FLASH_DURATION:WRONG_FLASH_DURATION);
-      if(syncState.persistent&&result.correct)setPersistentCorrectAnswer(record,key);
-      else if(syncState.persistent)notify(practice?.first?'首次判断未通过，本题已进入错题集。':'只有正确选项可以设为常绿，本题已进入错题集。');
-      else if(result.correct)notify(result?.mistake?.status==='mastered'?'回答正确，延迟验证已通过，本题已掌握。':result?.mistake?.status==='verification_due'?'回答正确，已完成；错题将在 24 小时后再次验证。':'回答正确，本题已完成。');
-      else notify(practice?.first?'首次判断未通过，本题已标记为复习并进入错题集。':'该选项不正确，本题已进入错题集。');
-      return result;
-    }).catch(error=>{
-      if(state.answerSync.get(nodeId)===syncState&&String(state.workspaceId||'')===requestWorkspaceId){
-        state.answerSync.set(nodeId,{...syncState,pending:false,error:String(error?.message||'网络错误，请重试'),promise:null});
-        refreshSingleCardMarkup(record);
-        notify('作答尚未保存，请重试。');
-      }
-      return {saved:false,error};
-    });
-    return syncState.promise;
+    flashOption(record,key,correct?'is-correct-flash':'is-wrong-flash',correct?CORRECT_FLASH_DURATION:WRONG_FLASH_DURATION);
+    if(persistent&&correct)setPersistentCorrectAnswer(record,key);
+    else if(persistent)notify(practice?.first?'首次判断未通过，本题已进入错题集。':'只有正确选项可以设为常绿，本题已进入错题集。');
+    else if(correct)notify('回答正确，本题已完成。');
+    else notify(practice?.first?'首次判断未通过，本题已标记为复习并进入错题集。':'该选项不正确，本题已进入错题集。');
+    enqueueAnswer(payload,nodeId);
+    return result;
   }
   function retryPracticeAnswer(record){
     const current=state.answerSync.get(String(record?.id||''));
-    const key=String(current?.payload?.selectedAnswer||'');
-    if(!current?.payload||!key)return false;
-    return submitPracticeAnswer(record,key,{retryPayload:current.payload,persistent:current.persistent});
+    const payload=current?.payload;
+    if(!payload)return false;
+    enqueueAnswer(payload,String(record?.id||''));
+    void flushAnswerQueue();
+    return true;
   }
   function handleOptionSingleChoice(record,key){
     return submitPracticeAnswer(record,String(key||''));
@@ -5470,9 +5518,13 @@
     if(route.paperId)state.paperId=String(route.paperId);
     if(route.releaseId)state.releaseId=String(route.releaseId);
     global.KGLearningProgress?.registerAdapter?.('multi_question_canvas',{
-      flush:()=>{if(state.workspace)store()?.write?.(state.workspace,{reason:'learning-context-flush'});return true},
+      flush:()=>{if(state.workspace)store()?.write?.(state.workspace,{reason:'learning-context-flush'});void flushAnswerQueue();return true},
       clearTransient:()=>clearPaperTransientState()
     });
+    // P4.5.37：退出/隐藏页面时把待同步作答一次性提交（keepalive 请求可存活于卸载）。
+    global.addEventListener('pagehide',()=>{void flushAnswerQueue()});
+    global.addEventListener('beforeunload',()=>{void flushAnswerQueue()});
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')void flushAnswerQueue()});
     buildQuestionList();
     const params=queryParams();
     const requested=String(params.get('workspace')||store()?.getActiveWorkspaceId?.()||'');
