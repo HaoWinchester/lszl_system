@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.103",
-  "toVersion": "v9.0-p4.1.103",
+  "toVersion": "v9.0-p4.1.104",
   "changes": {
     "added": [],
     "changed": [
-      "src/37-subscription-core.js",
-      "src/37-subscription-plans.js"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
