@@ -1,0 +1,53 @@
+/* V9.0-P4.5.34 · 多题画布题目卡打磨：题号徽标、解析按钮右下、练习按钮居中加宽。 */
+
+/* 题目卡题号徽标：与深度回忆 kr-question-order-badge 同款（圆角矩形底纹覆盖 n/N） */
+.qw-card-heading{flex-wrap:wrap;row-gap:4px}
+.qw-card-question-order-badge{
+  display:inline-flex;
+  align-items:baseline;
+  gap:3px;
+  padding:5px 12px;
+  border-radius:9px;
+  border:1px solid rgba(109,93,252,.26);
+  background:rgba(109,93,252,.10);
+  color:#4c3fd0;
+  font-weight:850;
+  line-height:1;
+  white-space:nowrap;
+}
+.qw-card-question-order-badge b{font-size:14px}
+.qw-card-question-order-badge small{font-size:11px;opacity:.72;font-weight:760}
+
+/* 解析按钮贴题目卡右下角 */
+.qw-card-actions.qw-card-learning-actions{justify-content:flex-end}
+
+/* 归纳卡"练习 + 🌟"按钮：整组居中，练习按钮加宽 */
+.qw-synthesis-practice-bar{display:flex;flex-direction:column;gap:8px;padding-top:10px}
+.qw-synthesis-practice-split{display:flex;align-items:center;justify-content:center;gap:10px}
+.qw-synthesis-practice-btn{
+  min-width:148px;
+  min-height:34px;
+  padding:0 18px;
+  border:1px solid rgba(109,93,252,.34);
+  border-radius:10px;
+  background:#f5f3ff;
+  color:#4c3fd0;
+  font-size:13px;
+  font-weight:850;
+  cursor:pointer;
+  transition:background .14s ease,border-color .14s ease;
+}
+.qw-synthesis-practice-btn:hover{background:#ede9fe;border-color:#8b7cf6}
+.qw-synthesis-practice-btn:disabled{cursor:not-allowed;opacity:.6}
+.qw-synthesis-practice-level-btn{
+  min-height:34px;
+  padding:0 10px;
+  border:1px solid rgba(100,116,139,.22);
+  border-radius:10px;
+  background:#fff;
+  color:#d97706;
+  font-size:14px;
+  letter-spacing:2px;
+  cursor:pointer;
+}
+.qw-synthesis-practice-progress{align-self:center;color:#64748b;font-size:11px}

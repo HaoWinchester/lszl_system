@@ -1,0 +1,7 @@
+/* V9.0-P4.5.37 · 深度回忆保存体验优化。 */
+
+/* 右上角保存状态提醒默认隐藏（保存已不阻塞交互，无需常驻提示）；
+   仅失败/冲突时显示，保留"重试"入口不丢失败感知。 */
+.knowledge-recall-page .kr-save-status{display:none}
+.knowledge-recall-page .kr-save-status[data-state="failed"],
+.knowledge-recall-page .kr-save-status[data-state="conflict"]{display:inline-flex}

@@ -26,8 +26,11 @@
   const FONT_SCALE_KEY='kg_multi_question_font_scale_v1';
   const FONT_SCALE_LEVELS=['normal','large','xlarge'];
   const ANALYSIS_SECTION_KEY='kg_multi_question_analysis_sections_v1';
-  const ANALYSIS_SECTION_ORDER=['analysis','answer','path','concepts','clues','traps'];
-  const ANALYSIS_SECTION_LABELS=Object.freeze({analysis:'题目解析',answer:'正确答案',path:'判断主线',concepts:'知识点',clues:'关键词',traps:'选项提示'});
+  // P4.5.35：新增 principle（原则解析）段——显示题目关联原则的"做题原则"
+  // （原则名 + 启用中预设归纳卡内容，来自 KGPrincipleRepository/KGSynthesisPresetRepository）。
+  // 深度回忆侧 KR_ANALYSIS_SECTION_ORDER 暂未包含 principle，读偏好时会被过滤，互不影响。
+  const ANALYSIS_SECTION_ORDER=['analysis','answer','path','principle','concepts','clues','traps'];
+  const ANALYSIS_SECTION_LABELS=Object.freeze({analysis:'题目解析',answer:'正确答案',path:'判断主线',principle:'原则解析',concepts:'知识点',clues:'关键词',traps:'选项提示'});
   const ANALYSIS_SECTION_DEFAULTS=['analysis','answer','path'];
   const MAX_ANALYSIS_PANELS=2;
   const CARD_COLORS=['#ffffff','#ede9fe','#dbeafe','#dcfce7','#fef3c7','#fee2e2','#fce7f3','#e0f2fe'];
@@ -40,6 +43,8 @@
   const PRACTICE_BATCH_SIZE=3;
   const PRACTICE_EDGE_COLORS=Object.freeze({pending:'#94a3b8',mastered:'#16a34a',review:'#dc2626'});
   const OPTION_SINGLE_CLICK_DELAY=230;
+  // P4.5.37：作答异步同步——本地判题即时反馈，服务端记录空闲 2.5s 批量提交
+  const ANSWER_FLUSH_DELAY=2500;
   const CORRECT_FLASH_DURATION=560;
   const WRONG_FLASH_DURATION=430;
   const POINTER_ARROW_ICON='<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 3l13 8-6 1.2 3.7 6.2-2.8 1.6-3.6-6.1L5 18V3z"/></svg>';
@@ -96,6 +101,9 @@
     answerSelections:new Map(),
     persistentCorrectAnswers:new Map(),
     answerSync:new Map(),
+    answerQueue:[],
+    answerFlushTimer:0,
+    answerFlushing:false,
     optionClickTimers:new Map(),
     optionFlashTimers:new Map(),
     edgeElements:new Map(),
@@ -987,6 +995,27 @@
     return '<section class="qw-analysis-section '+escapeHTML(className)+'" data-analysis-section="'+escapeHTML(key)+'">'
       +'<h4>'+escapeHTML(title)+'</h4><div class="qw-analysis-section-body">'+body+'</div></section>';
   }
+  // P4.5.35：原则解析——列出题目关联原则的"做题原则"（原则名 + 启用中预设归纳卡内容）。
+  // 优先正确选项映射的原则，其次题目 principleIds 全量；无关联原则时返回空（不显示该段）。
+  function principleAnalysisMarkup(question={},node={}){
+    const ids=[];
+    const push=id=>{id=String(id||'').trim();if(id&&!ids.includes(id))ids.push(id)};
+    const optionMap=question?.metadata?.optionPrincipleMap;
+    const answerId=correctAnswerId(question)||String(node.correctAnswer||'');
+    if(optionMap&&Array.isArray(optionMap[answerId]))optionMap[answerId].forEach(push);
+    (principleIdsForQuestion(question)||[]).forEach(push);
+    if(!ids.length)return '';
+    const rows=ids.slice(0,3).map(principleId=>{
+      const principle=Principles.get?.(principleId)||null;
+      const preset=Presets.getByPrincipleId?.(principleId,{activeOnly:true})||null;
+      const name=principleDisplayName(principleId,principle?.name||preset?.title||'');
+      if(!principle&&!preset)return '';
+      return '<div class="qw-analysis-principle-item"><strong>'+escapeHTML(name)+'</strong>'
+        +(preset?.content?'<p>'+escapeHTML(String(preset.content||''))+'</p>':'<p class="qw-analysis-principle-empty">该原则暂无启用中的预设做题原则，可在培训配置中补充。</p>')
+        +'</div>';
+    }).filter(Boolean);
+    return rows.length?rows.join(''):'';
+  }
   function questionAnalysisMarkup(question={},node={}){
     const view=questionDisplayView(question);
     const options=Array.isArray(question.options)?question.options:[];
@@ -1006,6 +1035,10 @@
       sections.push(analysisSectionMarkup('answer','正确答案','<p><strong>'+escapeHTML(answerId||correct?.id||'')+'</strong>'+(zhText?' · '+escapeHTML(zhText):'')+(enText&&languageMode()==='bilingual'?'<span class="qw-bilingual-en">'+escapeHTML(enText)+'</span>':'')+'</p>','qw-analysis-answer'));
     }
     if(analysisSectionEnabled('path')&&pathText)sections.push(analysisSectionMarkup('path','判断主线','<p>'+escapeHTML(pathText)+englishLine(view.path)+'</p>'));
+    if(analysisSectionEnabled('principle')){
+      const principleBody=principleAnalysisMarkup(question,node);
+      if(principleBody)sections.push(analysisSectionMarkup('principle','原则解析',principleBody,'qw-analysis-principle'));
+    }
     if(analysisSectionEnabled('concepts')&&concepts.length)sections.push(analysisSectionMarkup('concepts','知识点','<ul>'+concepts.map(item=>'<li><strong>'+escapeHTML(item.title||'知识点')+'</strong>'+(item.rule||item.summary?'：'+escapeHTML(item.rule||item.summary):'')+(languageMode()==='bilingual'&&String(item.titleEn||item.ruleEn||item.summaryEn||'').trim()?'<span class="qw-bilingual-en">'+escapeHTML([item.titleEn,item.ruleEn||item.summaryEn].filter(Boolean).join(': '))+'</span>':'')+'</li>').join('')+'</ul>'));
     if(analysisSectionEnabled('clues')&&clues.length)sections.push(analysisSectionMarkup('clues','关键词讲解','<ul>'+clues.map(item=>'<li><strong>'+escapeHTML(item.text||'线索')+'</strong>：'+escapeHTML(item.explain||'')+(languageMode()==='bilingual'&&String(item.textEn||item.explainEn||'').trim()?'<span class="qw-bilingual-en">'+escapeHTML([item.textEn,item.explainEn].filter(Boolean).join(': '))+'</span>':'')+'</li>').join('')+'</ul>'));
     if(analysisSectionEnabled('traps')&&traps.length)sections.push(analysisSectionMarkup('traps','选项提示','<ul>'+traps.map(item=>'<li><strong>'+escapeHTML(item.id||'')+'</strong>：'+escapeHTML(item.trap||'')+(languageMode()==='bilingual'&&String(item.trapEn||'').trim()?'<span class="qw-bilingual-en">'+escapeHTML(item.trapEn)+'</span>':'')+'</li>').join('')+'</ul>'));
@@ -1063,17 +1096,26 @@
       const key=String(option?.id||String.fromCharCode(65+index));
       const region='option:'+key;
       const selected=activeAnswer===key,persistent=persistentAnswer===key;
-      return '<li class="qw-card-option"><button type="button" class="qw-card-option-key'+(selected?' is-answer-selected':'')+(persistent?' is-correct-active':'')+'" data-qw-option-key="'+escapeHTML(key)+'" title="选择 '+escapeHTML(key)+'" aria-pressed="'+(selected?'true':'false')+'"'+(syncState.pending?' disabled aria-disabled="true"':'')+'>'+escapeHTML(key)+'</button>'
+      // P4.5.35：与深度回忆一致——作答提交期间不禁用字母按钮（禁用会触发
+      // :disabled 的 cursor:wait 漏斗光标，观感像卡顿）；重复点击由
+      // submitPracticeAnswer 的 pending promise 去重保证，不会重复提交。
+      return '<li class="qw-card-option"><button type="button" class="qw-card-option-key'+(selected?' is-answer-selected':'')+(persistent?' is-correct-active':'')+'" data-qw-option-key="'+escapeHTML(key)+'" title="选择 '+escapeHTML(key)+'" aria-pressed="'+(selected?'true':'false')+'">'+escapeHTML(key)+'</button>'
         +'<span class="qw-card-option-copy"><span class="qw-highlight-region" data-highlight-region="'+escapeHTML(region)+'" data-highlight-language="zh">'+highlightedMarkup(option?.display?.zh||'',node,region)+'</span>'+englishLine(option?.display)+'</span></li>';
     }).join('')+'</ol>':'<p class="qw-card-question-stem">当前题目没有可用选项。</p>');
-    const syncMarkup=displayMode==='compact'?'':(syncState.pending
-      ?'<div class="qw-option-sync-status is-pending" data-qw-option-sync-status role="status">正在保存作答…</div>'
-      :syncState.error?'<div class="qw-option-sync-error" data-qw-option-sync-error role="alert"><span>作答尚未保存：'+escapeHTML(syncState.error)+'</span><button type="button" data-qw-option-retry>重试</button></div>':'');
+    // P4.5.34：取消"正在保存作答…"常驻提示（干扰做题体验）；
+    // 保存失败仍显示错误与重试按钮。提交中的防重复禁用逻辑保持不变。
+    const syncMarkup=displayMode==='compact'?'':(syncState.error?'<div class="qw-option-sync-error" data-qw-option-sync-error role="alert"><span>作答尚未保存：'+escapeHTML(syncState.error)+'</span><button type="button" data-qw-option-retry>重试</button></div>':'');
     const analysisOpen=analysisPanelOpen(node.id);
     const titleZh=view.title?.zh||node.title||'未命名题目';
     const practiceLabel=practiceCardLabel(node);
+    // P4.5.34：题目卡显示试卷内题号（paperIndex 为 0 基数组下标），与深度回忆序号徽标同款。
+    const orderItem=displayMode==='compact'?null:questionItemForNode(node);
+    const orderTotal=displayMode==='compact'?0:(orderedQuestionItems(node.paperId,node.releaseId).length||0);
+    const orderBadge=orderItem&&Number.isFinite(Number(orderItem.paperIndex))&&orderTotal
+      ?'<span class="qw-card-question-order-badge" title="本试卷第 '+(Number(orderItem.paperIndex)+1)+' 题，共 '+orderTotal+' 题"><b>'+(Number(orderItem.paperIndex)+1)+'</b><small>/'+orderTotal+'</small></span>'
+      :'';
     return '<header class="qw-card-header" data-card-drag-handle>'
-      +'<div class="qw-card-heading"><span class="qw-card-icon">题</span>'
+      +'<div class="qw-card-heading"><span class="qw-card-icon">题</span>'+orderBadge
       +(practiceLabel?'<div><small data-qw-practice-label>'+escapeHTML(practiceLabel)+'</small></div>':'')+'</div>'
       +'<div class="qw-card-header-actions">'
       +(node.difficulty?'<span class="qw-card-difficulty" title="题目难度">'+escapeHTML(Difficulty.stars?.(node.difficulty)||node.difficulty)+'</span>':'')
@@ -1409,17 +1451,27 @@
   }
   function positionAnalysisPanels(){
     if(!state.analysisNodeIds.length||!state.analysisLayer)return false;
+    // P4.5.34：视口感知定位——面板默认贴卡片右侧；右侧放不下（会溢出视口，
+    // "显示内容"等头部按钮点到屏幕外）时翻到左侧，仍放不下再 clamp 进视口。
+    const vpRect=state.viewport?.getBoundingClientRect?.();
+    const vpLeft=vpRect?clientToWorld(vpRect.left+12,vpRect.top).x:null;
+    const vpRight=vpRect?clientToWorld(vpRect.right-12,vpRect.top).x:null;
     state.analysisNodeIds.slice().forEach((nodeId,index)=>{
       const record=state.cards.get(String(nodeId));
       const panel=analysisPanelElement(nodeId);
       if(!record||!panel)return;
       const node=record.node||{};
       const offset=state.analysisPanelOffsets.get(String(nodeId))||{x:0,y:0};
-      const x=Number(node.x||0)+Number(node.width||0)+24+Number(offset.x||0);
+      const panelWidth=Math.max(148,Number(panel.offsetWidth||460)),panelHeight=Math.max(148,Number(panel.offsetHeight||260));
+      const rightX=Number(node.x||0)+Number(node.width||0)+24+Number(offset.x||0);
+      let x=rightX;
+      if(vpLeft!=null&&vpRight!=null&&x+panelWidth>vpRight){
+        const leftX=Number(node.x||0)-24-Number(offset.x||0)-panelWidth;
+        x=leftX>=vpLeft?leftX:Math.max(vpLeft,vpRight-panelWidth);
+      }
       const y=Number(node.y||0)+Number(offset.y||0);
-      const panelHeight=Math.max(148,Number(panel.offsetHeight||260));
       const anchorY=Number(node.y||0)+Number(node.height||0)/2;
-      panel.dataset.side='right';
+      panel.dataset.side=x<Number(node.x||0)-12?'left':'right';
       panel.style.setProperty('--qw-analysis-pointer-y',clamp(anchorY-y,28,Math.max(28,panelHeight-28))+'px');
       panel.style.removeProperty('--qw-analysis-pointer-x');
       panel.style.left=x+'px';
@@ -1566,49 +1618,92 @@
     renderQuestionDock();
     return session;
   }
+  // P4.5.37：作答改为本地判题即时反馈 + 异步队列同步（类似首页 autosave 机制）。
+  // 发布快照含正确答案（correctAnswerId），点击后立即闪烁/选中/完成标记；
+  // 服务端记录（错题本/进度）进入队列：空闲批量按序提交，pagehide/隐藏时
+  // flush，失败保留"作答尚未保存"重试入口（answerSync.error 形态不变）。
+  function localAnswerCorrect(record,key){
+    const question=resolvedQuestionForNode(record?.node||{})||{};
+    const canonical=correctAnswerId(question)||String(record?.node?.correctAnswer||'');
+    return !!canonical&&String(key||'')===String(canonical);
+  }
+  function enqueueAnswer(payload,nodeId){
+    state.answerQueue.push({payload:payload,nodeId:String(nodeId||'')});
+    scheduleAnswerFlush();
+  }
+  function scheduleAnswerFlush(){
+    global.clearTimeout(state.answerFlushTimer);
+    state.answerFlushTimer=global.setTimeout(flushAnswerQueue,ANSWER_FLUSH_DELAY);
+  }
+  async function flushAnswerQueue(){
+    if(state.answerFlushing)return;
+    const queue=state.answerQueue.splice(0);
+    if(!queue.length)return;
+    if(typeof PracticeLearning.answer!=='function'){
+      failAnswerQueue(queue,new Error('错题同步服务暂不可用'));
+      return;
+    }
+    state.answerFlushing=true;
+    try{
+      // 顺序提交保序（错题"延迟验证"推进依赖作答顺序）
+      for(let index=0;index<queue.length;index+=1){
+        const item=queue[index];
+        try{await PracticeLearning.answer(item.payload,{skipRefresh:true})}
+        catch(error){
+          failAnswerQueue(queue.slice(index),error);
+          return;
+        }
+        const syncState=state.answerSync.get(item.nodeId);
+        if(syncState?.error){state.answerSync.set(item.nodeId,{...syncState,error:''});refreshSingleCardMarkupById(item.nodeId)}
+      }
+    }finally{state.answerFlushing=false}
+  }
+  function failAnswerQueue(rest,error){
+    state.answerQueue=[...rest,...state.answerQueue];
+    rest.forEach(item=>{
+      const record=state.cards.get(item.nodeId);
+      const syncState=state.answerSync.get(item.nodeId)||{};
+      state.answerSync.set(item.nodeId,{...syncState,pending:false,error:String(error?.message||'网络错误，请重试'),payload:item.payload});
+      if(record)refreshSingleCardMarkup(record);
+    });
+    notify('作答尚未保存，将自动重试；也可点击题目卡上的"重试"。');
+    scheduleAnswerFlush();
+  }
+  function refreshSingleCardMarkupById(nodeId){
+    const record=state.cards.get(String(nodeId||''));
+    if(record)refreshSingleCardMarkup(record);
+  }
   async function submitPracticeAnswer(record,key,options={}){
     if(!record||record.node?.nodeType!=='question-reference')return false;
-    const nodeId=String(record.id),current=state.answerSync.get(nodeId);
-    if(current?.pending)return current.promise;
+    const nodeId=String(record.id);
     key=String(key||'');
     const payload=options.retryPayload?{...options.retryPayload}:practiceAnswerPayload(record,key);
     if(!payload.questionId||!key){notify('当前题目缺少可提交的作答信息。');return false}
     payload.selectedAnswer=key;
-    const requestWorkspaceId=String(state.workspaceId||'');
-    const syncState={pending:true,error:'',payload,persistent:Boolean(options.persistent),promise:null,workspaceId:requestWorkspaceId};
+    const persistent=Boolean(options.persistent);
+    const correct=localAnswerCorrect(record,key);
     state.answerSelections.set(nodeId,key);
-    state.answerSync.set(nodeId,syncState);
+    state.answerSync.set(nodeId,{pending:false,error:'',payload,persistent});
+    // 即时反馈（原服务端成功回调的一套，判题改本地快照）
+    const result={correct,completion:{status:'completed',selectedAnswer:key,correct,completedAt:Date.now()}};
+    markQuestionCompleted(record,result);
+    const practice=recordPracticeAttempt(record,key,'',correct);
     refreshSingleCardMarkup(record);
-    syncState.promise=Promise.resolve().then(()=>{
-      if(typeof PracticeLearning.answer!=='function')throw new Error('错题同步服务暂不可用');
-      return PracticeLearning.answer(payload);
-    }).then(result=>{
-      if(state.answerSync.get(nodeId)!==syncState||String(state.workspaceId||'')!==requestWorkspaceId)return result;
-      state.answerSync.set(nodeId,{...syncState,pending:false,error:'',promise:null,result});
-      markQuestionCompleted(record,result);
-      const practice=recordPracticeAttempt(record,key,'',Boolean(result.correct));
-      refreshSingleCardMarkup(record);
-      flashOption(record,key,result.correct?'is-correct-flash':'is-wrong-flash',result.correct?CORRECT_FLASH_DURATION:WRONG_FLASH_DURATION);
-      if(syncState.persistent&&result.correct)setPersistentCorrectAnswer(record,key);
-      else if(syncState.persistent)notify(practice?.first?'首次判断未通过，本题已进入错题集。':'只有正确选项可以设为常绿，本题已进入错题集。');
-      else if(result.correct)notify(result?.mistake?.status==='mastered'?'回答正确，延迟验证已通过，本题已掌握。':result?.mistake?.status==='verification_due'?'回答正确，已完成；错题将在 24 小时后再次验证。':'回答正确，本题已完成。');
-      else notify(practice?.first?'首次判断未通过，本题已标记为复习并进入错题集。':'该选项不正确，本题已进入错题集。');
-      return result;
-    }).catch(error=>{
-      if(state.answerSync.get(nodeId)===syncState&&String(state.workspaceId||'')===requestWorkspaceId){
-        state.answerSync.set(nodeId,{...syncState,pending:false,error:String(error?.message||'网络错误，请重试'),promise:null});
-        refreshSingleCardMarkup(record);
-        notify('作答尚未保存，请重试。');
-      }
-      return {saved:false,error};
-    });
-    return syncState.promise;
+    flashOption(record,key,correct?'is-correct-flash':'is-wrong-flash',correct?CORRECT_FLASH_DURATION:WRONG_FLASH_DURATION);
+    if(persistent&&correct)setPersistentCorrectAnswer(record,key);
+    else if(persistent)notify(practice?.first?'首次判断未通过，本题已进入错题集。':'只有正确选项可以设为常绿，本题已进入错题集。');
+    else if(correct)notify('回答正确，本题已完成。');
+    else notify(practice?.first?'首次判断未通过，本题已标记为复习并进入错题集。':'该选项不正确，本题已进入错题集。');
+    enqueueAnswer(payload,nodeId);
+    return result;
   }
   function retryPracticeAnswer(record){
     const current=state.answerSync.get(String(record?.id||''));
-    const key=String(current?.payload?.selectedAnswer||'');
-    if(!current?.payload||!key)return false;
-    return submitPracticeAnswer(record,key,{retryPayload:current.payload,persistent:current.persistent});
+    const payload=current?.payload;
+    if(!payload)return false;
+    enqueueAnswer(payload,String(record?.id||''));
+    void flushAnswerQueue();
+    return true;
   }
   function handleOptionSingleChoice(record,key){
     return submitPracticeAnswer(record,String(key||''));
@@ -2065,20 +2160,48 @@
       practiceMasteredCount:0
     };
   }
+  // P4.5.34：放宽共同原则判定——正确选项原则一致（原规则，最强匹配）之外，
+  // 也接受"所选题目的 principleIds 有交集"：交集里第一个有启用预设的原则即命中。
+  function commonPresetFromPrincipleIntersection(questions=[]){
+    let common=null;
+    for(const record of questions){
+      const question=resolvedQuestionForNode(record?.node||{})||{};
+      const ids=(principleIdsForQuestion(question)||[]).map(String).filter(Boolean);
+      if(!ids.length)return null;
+      common=common==null?new Set(ids):new Set([...common].filter(id=>ids.includes(id)));
+      if(!common.size)return null;
+    }
+    if(!common)return null;
+    for(const principleId of common){
+      const preset=Presets.getByPrincipleId?.(principleId,{activeOnly:true});
+      if(preset)return {principleId:String(principleId),preset};
+    }
+    return null;
+  }
   function synthesisDraftFromSelection(records=selectedRecords()){
     const questions=records.filter(record=>record.node?.nodeType==='question-reference');
+    let principleId='',preset=null,fallbackReason='所选题目没有共同且唯一的启用原则预设。';
     const resolved=PrincipleBinding.selectionPrinciple?.(questions.map(record=>resolvedQuestionForNode(record?.node||{})||{}));
-    if(!resolved?.ok)return blankSynthesisDraft(questions);
-    const principleId=String(resolved.principleId||'');
+    if(resolved?.ok){
+      principleId=String(resolved.principleId||'');
+      preset=Presets.getByPrincipleId?.(principleId,{activeOnly:true})||null;
+      if(!preset)fallbackReason='共同原则没有启用中的系统预设归纳卡。';
+    }
+    if(!preset){
+      const intersection=commonPresetFromPrincipleIntersection(questions);
+      if(intersection){principleId=intersection.principleId;preset=intersection.preset;fallbackReason=''}
+    }
+    if(!preset)return {...blankSynthesisDraft(questions),fallbackReason};
     const principle=Principles.get?.(principleId)||null;
     const principleName=principleDisplayName(principleId,principle?.name||'');
     const principleTag='原则：'+principleName;
-    const preset=Presets.getByPrincipleId?.(principleId,{activeOnly:true})||null;
-    if(!preset)return {...blankSynthesisDraft(questions),fallbackReason:'共同原则没有启用中的系统预设归纳卡。'};
+    // P4.5.34：预设卡默认以"我的归纳卡"落地（复制预设内容；后续编辑只写个人卡，
+    // 不回写后台预设/题库数据）。个人卡服务不可用时降级为原系统预设卡（只读）。
+    const asPersonal=typeof PersonalCards.create==='function';
     return {
       valid:true,
       synthesisType:'principle',
-      cardType:'system',
+      cardType:asPersonal?'user':'system',
       principleId,
       sourcePresetId:String(preset.id||''),
       presetVersion:Number(preset.version||0),
@@ -2356,8 +2479,7 @@
     renderCards();
     setCardSelection([result.node.id],{reason:'quick-synthesis-select'});
     focusNode(result.node.id,{zoom:Math.max(state.zoom,.72)});
-    notify(payload.cardType==='system'?'已生成系统预设归纳卡。学员只读，可复制为自己的归纳卡。':'已生成个人归纳卡，可双击编辑。');
-    if(payload.cardType==='user')global.setTimeout(()=>openSynthesisModal(result.node.id),0);
+    notify(payload.cardType==='system'?'已生成系统预设归纳卡。学员只读，可复制为自己的归纳卡。':'已按共同原则生成归纳卡（基于预设复制），双击卡片即可编辑。');
     return true;
   }
   function selectedCommonGroup(ids=[...state.selectedNodeIds]){
@@ -4725,7 +4847,9 @@
 
   function wheel(event){
     if(state.mobile)return;
-    if(event.target.closest?.('.qw-question-drawer'))return;
+    // P4.5.36：解析面板内滚轮留给面板内容原生滚动（qw-analysis-content overflow:auto），
+    // 不再触发画布缩放。
+    if(event.target.closest?.('.qw-question-drawer,.qw-analysis-panel'))return;
     const preserveSelectionLock=hasLockedSelectionBounds();
     event.preventDefault();
     beginViewportMotion('zoom');
@@ -5394,9 +5518,13 @@
     if(route.paperId)state.paperId=String(route.paperId);
     if(route.releaseId)state.releaseId=String(route.releaseId);
     global.KGLearningProgress?.registerAdapter?.('multi_question_canvas',{
-      flush:()=>{if(state.workspace)store()?.write?.(state.workspace,{reason:'learning-context-flush'});return true},
+      flush:()=>{if(state.workspace)store()?.write?.(state.workspace,{reason:'learning-context-flush'});void flushAnswerQueue();return true},
       clearTransient:()=>clearPaperTransientState()
     });
+    // P4.5.37：退出/隐藏页面时把待同步作答一次性提交（keepalive 请求可存活于卸载）。
+    global.addEventListener('pagehide',()=>{void flushAnswerQueue()});
+    global.addEventListener('beforeunload',()=>{void flushAnswerQueue()});
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')void flushAnswerQueue()});
     buildQuestionList();
     const params=queryParams();
     const requested=String(params.get('workspace')||store()?.getActiveWorkspaceId?.()||'');

@@ -1,0 +1,17 @@
+/* V9.0-P4.5.35 · 作答漏斗光标取消 + 解析面板"原则解析"段样式。 */
+
+/* 原则解析段：突出做题原则，多个原则逐项分块 */
+.qw-analysis-section.qw-analysis-principle{
+  border-color:#ddd6fe;
+  background:#faf5ff;
+}
+.qw-analysis-principle .qw-analysis-principle-item{
+  padding:8px 10px;
+  border:1px solid #e9e2fb;
+  border-radius:10px;
+  background:#fff;
+}
+.qw-analysis-principle .qw-analysis-principle-item+.qw-analysis-principle-item{margin-top:8px}
+.qw-analysis-principle .qw-analysis-principle-item strong{color:#5b21b6}
+.qw-analysis-principle .qw-analysis-principle-item p{margin:6px 0 0;color:#414458}
+.qw-analysis-principle .qw-analysis-principle-empty{color:#94a3b8}

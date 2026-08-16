@@ -336,7 +336,8 @@
   function saveProgress(){
     if(isRecallReadonly()||isTeacherDraftPreview())return;
     if(progressSaveTimer)clearTimeout(progressSaveTimer);
-    progressSaveTimer=setTimeout(()=>{progressSaveTimer=0;void writeProgressNow()},420);
+    // P4.5.37：防抖 420→1200ms，降低高频写库；pagehide/visibilitychange 仍即时 flush。
+    progressSaveTimer=setTimeout(()=>{progressSaveTimer=0;void writeProgressNow()},1200);
   }
   function flushProgress(){return writeProgressNow()}
   function cancelProgressSave(){if(progressSaveTimer){clearTimeout(progressSaveTimer);progressSaveTimer=0}}
@@ -1287,7 +1288,7 @@
       event.preventDefault();event.stopPropagation();
       showCanvasContextMenu(event);
     },true);
-    viewport.addEventListener('wheel',e=>{if(e.target.closest('.kr-canvas-overlay-left,.kr-question-library-trigger,button,a,input,select,textarea'))return;e.preventDefault();zoomByLevel(e.deltaY<0?1:-1,WHEEL_ZOOM_LEVELS,e.clientX,e.clientY,false)},{passive:false});
+    viewport.addEventListener('wheel',e=>{if(e.target.closest('.kr-canvas-overlay-left,.kr-question-library-trigger,.qw-analysis-panel,button,a,input,select,textarea'))return;e.preventDefault();zoomByLevel(e.deltaY<0?1:-1,WHEEL_ZOOM_LEVELS,e.clientX,e.clientY,false)},{passive:false});
     viewport.addEventListener('dblclick',e=>{if(e.target.closest('.kr-node,.kr-question-card,.kr-guide,.kr-canvas-overlay-left,.kr-question-library-trigger,button,a,input,select,textarea'))return;centerOn(0,0,true)});
     const rect=viewport.getBoundingClientRect();lastViewportSize={width:rect.width,height:rect.height};
     window.addEventListener('resize',()=>{
