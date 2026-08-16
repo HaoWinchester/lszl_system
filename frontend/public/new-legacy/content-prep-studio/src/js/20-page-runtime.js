@@ -94,12 +94,19 @@ function renderQuestions(){
   renderQuestionEditor();
   if(typeof renderFamilyQuestionTabs==='function')renderFamilyQuestionTabs();
 }
-function treeOptions(selected){
+let primaryNodeFilter='';
+function treeOptions(selected,filter=''){
   if(!state.knowledgeTree)return '<option value="">未加载知识树</option>';
-  return '<option value="">— 未关联 —</option>'+state.knowledgeTree.nodes.map(n=>{
+  const kw=String(filter||'').trim().toLowerCase();
+  const matched=kw?state.knowledgeTree.nodes.filter(n=>{
+    const label=state.knowledgeTree.pathFor(n.id).join(' > ');
+    return label.toLowerCase().includes(kw)||String(n.id).toLowerCase().includes(kw);
+  }):state.knowledgeTree.nodes;
+  const kept=selected&&!matched.some(n=>n.id===selected); // 当前已选项被过滤掉时仍保留,避免静默丢失关联
+  return '<option value="">— 未关联 —</option>'+matched.map(n=>{
     const label=state.knowledgeTree.pathFor(n.id).join(' > ');
     return `<option value="${esc(n.id)}"${n.id===selected?' selected':''}>${esc(label)} [${esc(n.id)}]</option>`;
-  }).join('');
+  }).join('')+(kept?treeOptions(selected).replace('<option value="">— 未关联 —</option>',''):'');
 }
 function principleCheckMarkup(selected=[],namePrefix='p'){
   const set=new Set((selected||[]).map(String));if(!state.principles.items.length)return '<span class="muted smalltxt">尚未导入/创建原则。</span>';
@@ -333,7 +340,8 @@ function renderQuestionEditor(){
   <div class="section">
     <div class="section-title">知识点</div>
     <label>主知识点（只保存稳定 Node ID）</label>
-    <select id="primaryNode">${treeOptions(q.metadata?.knowledge?.primaryNodeId||'')}</select>
+    <input type="text" id="primaryNodeSearch" placeholder="搜索知识点路径或 ID，如：进度 / kp-pmp" autocomplete="off" value="${esc(primaryNodeFilter)}">
+    <select id="primaryNode">${treeOptions(q.metadata?.knowledge?.primaryNodeId||'',primaryNodeFilter)}</select>
   </div>
   <div class="section">
     <div class="section-title">English</div>
@@ -368,6 +376,13 @@ function bindQuestionEditor(){
   document.querySelectorAll('input[name=correctOption]').forEach(el=>el.addEventListener('change',()=>{q.correctAnswer=el.value;q.options.forEach(o=>o.correct=o.id===el.value);renderCurrentIssues()}));
   document.getElementById('analysisZh').addEventListener('input',e=>{q.analysis=e.target.value;q.explanation=e.target.value;renderCurrentIssues()});
   document.getElementById('primaryNode').addEventListener('change',e=>{setPrimaryKnowledge(q,e.target.value);renderKeywords();renderCurrentIssues()});
+  const primarySearch=document.getElementById('primaryNodeSearch');
+  if(primarySearch)primarySearch.addEventListener('input',e=>{
+    primaryNodeFilter=e.target.value;
+    const sel=document.getElementById('primaryNode');if(!sel)return;
+    const current=q.metadata?.knowledge?.primaryNodeId||'';
+    sel.innerHTML=treeOptions(current,primaryNodeFilter);
+  });
   document.getElementById('titleEn').addEventListener('input',e=>q.translations.en.title=e.target.value);
   document.getElementById('stemEn').addEventListener('input',e=>q.translations.en.stemParts=[{text:e.target.value}]);
   document.querySelectorAll('[data-enoption]').forEach(el=>el.addEventListener('input',()=>{let o=q.translations.en.options.find(x=>x.id===el.dataset.enoption);if(!o){o={id:el.dataset.enoption,text:''};q.translations.en.options.push(o)}o.text=el.value}));
@@ -670,7 +685,7 @@ function validateKeyword(q,c){
   if(c.recallNodeId&&!recallIndex().byId.has(c.recallNodeId))issues.push({level:'error',message:`关键词“${c.text}”引用的联想入口不存在：${c.recallNodeId}`,suggest:'清除该引用，或重新选择一个现有联想入口。'});
   if(!c.recallNodeId)issues.push({level:'warn',message:`${c.keywordLevel==='core'?'核心':'普通'}关键词“${c.text}”未关联联想入口`,suggest:'Recall 为可选增强；如需联想通路，可在关键词卡片中选择联想入口。'});
   if(c.keywordLevel==='core'){
-    if(!c.solutionRole||c.solutionRole==='context')issues.push({level:'error',message:`核心关键词“${c.text}”缺少解题作用`,suggest:'选择 Decision Cue / Concept Anchor / Condition Anchor / Answer Anchor。'});
+    if(!c.solutionRole||c.solutionRole==='context')issues.push({level:'warn',message:`核心关键词“${c.text}”缺少解题作用`,suggest:'建议选择 Decision Cue / Concept Anchor / Condition Anchor / Answer Anchor（P4.5.29：solutionRole 仅用于审核与诊断，不作合法性门槛）。'});
     if(!String(c.coreReason||'').trim())issues.push({level:'warn',message:`核心关键词“${c.text}”缺少核心理由`,suggest:'建议补充说明这个词为什么影响本题推理或答案选择。'});
   }
   return issues;
@@ -924,6 +939,13 @@ function renderDemoValidation(){
 }
 
 function runValidation(){
+  /* 校验临时关闭(PREP_VALIDATION_DISABLED,见 00-core-bootstrap.js):跳过全部题目级校验,
+   * 仅保留导出依赖的副作用(contentHash 计算 + 原则引用规整);恢复开关后走原逻辑。 */
+  if(typeof PREP_VALIDATION_DISABLED!=='undefined'&&PREP_VALIDATION_DISABLED){
+    state.questionBank.questions.forEach(q=>{q.contentHash=computeQuestionContentHash(q);syncQuestionPrinciples(q)});
+    state.validation={at:nowIso(),issues:[],metrics:{questions:state.questionBank.questions.length,errors:0,warnings:0,normalKeywords:state.questionBank.questions.reduce((n,q)=>n+q.clues.filter(c=>c.keywordLevel!=='core').length,0),coreKeywords:state.questionBank.questions.reduce((n,q)=>n+q.clues.filter(c=>c.keywordLevel==='core').length,0),recallNodes:state.recallLibrary.nodes.length,recallEdges:state.recallLibrary.edges.length,principles:state.principles.items.length,presets:state.synthesisPresets.items.length,aliasConflicts:0},disabled:true};
+    renderValidation();return state.validation;
+  }
   const issues=[];
   if(!prepRuntime.creatorProfile?.name)issues.push({level:'error',object:'制作人身份',message:'当前页面尚未选择制作人',suggest:'返回制作人入口，必须选择 6 人之一后才能继续。'});
   const contentHashOwners=new Map();;
@@ -949,12 +971,14 @@ function runValidation(){
 }
 function renderValidation(){
   const v=state.validation||runValidation(),m=v.metrics;
+  const banner=document.getElementById('validationDisabledBanner');
+  if(banner)banner.hidden=!v.disabled;
   document.getElementById('validationMetrics').innerHTML=[
     ['题目',m.questions],['错误',m.errors],['提醒',m.warnings],['普通关键词',m.normalKeywords],
     ['核心关键词',m.coreKeywords],['联想节点',m.recallNodes],['原则',m.principles],['归纳卡',m.presets],['Alias 冲突',m.aliasConflicts]
   ].map(([k,n])=>`<div class="metric"><span class="muted">${k}</span><b>${n}</b></div>`).join('');
   const rows=document.getElementById('validationRows');
-  rows.innerHTML=v.issues.length?v.issues.map(x=>`<tr${x.questionId?` class="validation-row-action" tabindex="0" data-question-id="${esc(x.questionId)}" data-field-path="${esc(x.field||'')}" title="点击定位到题目编辑区"`:''}><td>${x.level==='error'?'❌ 错误':'⚠ 提醒'}</td><td>${esc(x.object||'')}</td><td>${esc(x.message)}</td><td>${esc(x.suggest||'')}</td></tr>`).join(''):'<tr><td colspan="4">✓ 未发现问题</td></tr>';
+  rows.innerHTML=v.disabled?'<tr><td colspan="4">校验已临时关闭，未执行题目级校验。</td></tr>':v.issues.length?v.issues.map(x=>`<tr${x.questionId?` class="validation-row-action" tabindex="0" data-question-id="${esc(x.questionId)}" data-field-path="${esc(x.field||'')}" title="点击定位到题目编辑区"`:''}><td>${x.level==='error'?'❌ 错误':'⚠ 提醒'}</td><td>${esc(x.object||'')}</td><td>${esc(x.message)}</td><td>${esc(x.suggest||'')}</td></tr>`).join(''):'<tr><td colspan="4">✓ 未发现问题</td></tr>';
   rows.querySelectorAll('[data-question-id]').forEach(row=>{
     const jump=()=>goToValidationIssue(row.dataset.questionId,row.dataset.fieldPath||'');
     row.onclick=jump;

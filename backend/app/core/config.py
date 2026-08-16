@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     APP_NAME: str = "KG Graph API"
     API_V1_PREFIX: str = "/api/v1"
     QUESTION_CATALOG_CUTOVER_ENABLED: bool = False
+    # Content Prep 题目级校验临时关闭（2026-08 录入提速需求）：
+    # true 时共享草稿同步/批量上传/单题保存跳过题目校验阻断（仅记录 warning 日志，批次内重复 ID 仍拦截）。
+    # 恢复校验：删掉环境变量并重启即可，无需改代码。
+    CONTENT_PREP_VALIDATION_DISABLED: bool = False
     # Production authentication requires the browser to submit this release's
     # legal-consent version. Tests disable it only for pre-existing fixtures.
     LEGAL_CONSENT_REQUIRED: bool = True

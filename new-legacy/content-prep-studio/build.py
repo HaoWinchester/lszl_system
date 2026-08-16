@@ -9,6 +9,7 @@ JS_ORDER=[
     "12-p45-authoring-domain.js",
     "14-principle-bundle-domain.js",
     "16-recall-acceptance.js",
+    "18-baseline-bootstrap.js",
     "20-page-runtime.js",
     "30-service-layer.js",
     "32-p45-contract-service.js",
@@ -26,7 +27,14 @@ def build(output=None):
     css=(ROOT/"src"/"css"/"app.css").read_text(encoding="utf-8").rstrip()
     js="\n\n".join((ROOT/"src"/"js"/name).read_text(encoding="utf-8").rstrip() for name in JS_ORDER)
     product_release=(ROOT.parent/"VERSION").read_text(encoding="utf-8").strip()
-    result=template.replace("__PRODUCT_RELEASE__",product_release).replace("/*__BUILD_CSS__*/",css).replace("/*__BUILD_JS__*/",js)
+    # 固定基准数据(知识树/联想库/原则/归纳卡/标签配置)内嵌;baseline.json 不存在时回退 null
+    baseline_path=ROOT/"baseline"/"baseline.json"
+    baseline="null"
+    if baseline_path.exists():
+        baseline=baseline_path.read_text(encoding="utf-8").strip() or "null"
+        if "</" in baseline:  # 防止 JSON 内容截断 </script>
+            baseline=baseline.replace("</","<\\/")
+    result=template.replace("__PRODUCT_RELEASE__",product_release).replace("/*__BUILD_BASELINE__*/null",baseline).replace("/*__BUILD_CSS__*/",css).replace("/*__BUILD_JS__*/",js)
     out=Path(output) if output else ROOT/"dist"/"content-prep.html"
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(result,encoding="utf-8")

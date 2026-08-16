@@ -163,9 +163,17 @@ function canonicalQuestionDuplicateSignature(q={}){
   return JSON.stringify({stem:canonicalDuplicateText(primaryStem),options:(q.options||[]).map(option=>[canonicalDuplicateText(option?.id),canonicalDuplicateText(option?.text)]),correctAnswer:canonicalDuplicateText(q.correctAnswer)});
 }
 function preflightQuestionDuplicates(incoming,existing=[]){
-  const known=new Set((existing||[]).map(canonicalQuestionDuplicateSignature)),batch=new Set(),unique=[],duplicates=[];
-  (incoming||[]).forEach((question,index)=>{const signature=canonicalQuestionDuplicateSignature(question),source=known.has(signature)?'existing':batch.has(signature)?'batch':'';if(source)duplicates.push({index:index+1,title:String(question?.title||'未命名题目'),source,signature});else{batch.add(signature);unique.push(question)}});
-  return {unique,duplicates,existingCount:duplicates.filter(item=>item.source==='existing').length,batchCount:duplicates.filter(item=>item.source==='batch').length};
+  /* 与已有题内容相同(题干+选项+答案)的导入题不再丢弃,而是覆盖旧题(2026-08 录入需求):
+   * unique 保留导入的新题;overriddenExisting 返回被覆盖的旧题,调用方需将其从工作区移除。 */
+  const known=new Map((existing||[]).map(q=>[canonicalQuestionDuplicateSignature(q),q])),batch=new Set(),unique=[],duplicates=[],overriddenExisting=[];
+  (incoming||[]).forEach((question,index)=>{
+    const signature=canonicalQuestionDuplicateSignature(question);
+    if(batch.has(signature)){duplicates.push({index:index+1,title:String(question?.title||'未命名题目'),source:'batch',signature});return}
+    batch.add(signature);unique.push(question);
+    const oldQuestion=known.get(signature);
+    if(oldQuestion){overriddenExisting.push(oldQuestion);duplicates.push({index:index+1,title:String(question?.title||'未命名题目'),source:'existing',signature})}
+  });
+  return {unique,duplicates,overriddenExisting,existingCount:duplicates.filter(item=>item.source==='existing').length,batchCount:duplicates.filter(item=>item.source==='batch').length};
 }
 function currentIdentitySnapshot(){
   const c=prepRuntime.creatorProfile||{},d=prepRuntime.deviceProfile||{};

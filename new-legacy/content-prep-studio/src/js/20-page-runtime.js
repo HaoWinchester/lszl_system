@@ -939,6 +939,13 @@ function renderDemoValidation(){
 }
 
 function runValidation(){
+  /* 校验临时关闭(PREP_VALIDATION_DISABLED,见 00-core-bootstrap.js):跳过全部题目级校验,
+   * 仅保留导出依赖的副作用(contentHash 计算 + 原则引用规整);恢复开关后走原逻辑。 */
+  if(typeof PREP_VALIDATION_DISABLED!=='undefined'&&PREP_VALIDATION_DISABLED){
+    state.questionBank.questions.forEach(q=>{q.contentHash=computeQuestionContentHash(q);syncQuestionPrinciples(q)});
+    state.validation={at:nowIso(),issues:[],metrics:{questions:state.questionBank.questions.length,errors:0,warnings:0,normalKeywords:state.questionBank.questions.reduce((n,q)=>n+q.clues.filter(c=>c.keywordLevel!=='core').length,0),coreKeywords:state.questionBank.questions.reduce((n,q)=>n+q.clues.filter(c=>c.keywordLevel==='core').length,0),recallNodes:state.recallLibrary.nodes.length,recallEdges:state.recallLibrary.edges.length,principles:state.principles.items.length,presets:state.synthesisPresets.items.length,aliasConflicts:0},disabled:true};
+    renderValidation();return state.validation;
+  }
   const issues=[];
   if(!prepRuntime.creatorProfile?.name)issues.push({level:'error',object:'制作人身份',message:'当前页面尚未选择制作人',suggest:'返回制作人入口，必须选择 6 人之一后才能继续。'});
   const contentHashOwners=new Map();;
@@ -964,12 +971,14 @@ function runValidation(){
 }
 function renderValidation(){
   const v=state.validation||runValidation(),m=v.metrics;
+  const banner=document.getElementById('validationDisabledBanner');
+  if(banner)banner.hidden=!v.disabled;
   document.getElementById('validationMetrics').innerHTML=[
     ['题目',m.questions],['错误',m.errors],['提醒',m.warnings],['普通关键词',m.normalKeywords],
     ['核心关键词',m.coreKeywords],['联想节点',m.recallNodes],['原则',m.principles],['归纳卡',m.presets],['Alias 冲突',m.aliasConflicts]
   ].map(([k,n])=>`<div class="metric"><span class="muted">${k}</span><b>${n}</b></div>`).join('');
   const rows=document.getElementById('validationRows');
-  rows.innerHTML=v.issues.length?v.issues.map(x=>`<tr${x.questionId?` class="validation-row-action" tabindex="0" data-question-id="${esc(x.questionId)}" data-field-path="${esc(x.field||'')}" title="点击定位到题目编辑区"`:''}><td>${x.level==='error'?'❌ 错误':'⚠ 提醒'}</td><td>${esc(x.object||'')}</td><td>${esc(x.message)}</td><td>${esc(x.suggest||'')}</td></tr>`).join(''):'<tr><td colspan="4">✓ 未发现问题</td></tr>';
+  rows.innerHTML=v.disabled?'<tr><td colspan="4">校验已临时关闭，未执行题目级校验。</td></tr>':v.issues.length?v.issues.map(x=>`<tr${x.questionId?` class="validation-row-action" tabindex="0" data-question-id="${esc(x.questionId)}" data-field-path="${esc(x.field||'')}" title="点击定位到题目编辑区"`:''}><td>${x.level==='error'?'❌ 错误':'⚠ 提醒'}</td><td>${esc(x.object||'')}</td><td>${esc(x.message)}</td><td>${esc(x.suggest||'')}</td></tr>`).join(''):'<tr><td colspan="4">✓ 未发现问题</td></tr>';
   rows.querySelectorAll('[data-question-id]').forEach(row=>{
     const jump=()=>goToValidationIssue(row.dataset.questionId,row.dataset.fieldPath||'');
     row.onclick=jump;

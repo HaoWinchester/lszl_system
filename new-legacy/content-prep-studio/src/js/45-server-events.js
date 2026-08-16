@@ -378,6 +378,10 @@
     const lockedQuestionId=QuestionLocks.snapshot().questionId;
     clearWorkspace.call(newWorkspaceButton,event);
     if(lockedQuestionId&&!state.questionBank.questions.some(question=>question.id===lockedQuestionId))await QuestionLocks.close();
+    if(actor&&!prepRuntime.draftId){
+      /* server 模式清空工作区后用服务器最新基准覆盖内嵌快照;失败则保留内嵌基线 */
+      try{applySharedContent(await Catalog.loadSharedContent(state.questionBank.subject||'PMP'))}catch(error){console.warn('[prep-baseline] 服务器基准刷新失败,保留内嵌基线:',error)}
+    }
   };
   reconfirmButton.addEventListener('click',async()=>{
     reconfirmButton.disabled=true;

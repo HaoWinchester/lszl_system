@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PMP Content Prep Studio</title>
 <script>window.__PMP_PRODUCT_RELEASE__="__PRODUCT_RELEASE__";</script>
+<script>window.__PMP_PREP_BASELINE__=/*__BUILD_BASELINE__*/null;</script>
 <script src="/teaching-content-sync.js"></script>
 <script src="/server-state-bootstrap.js"></script>
 <style>
@@ -450,6 +451,7 @@ D原则：principle-role-accountability</pre>
   <div class="card">
     <div class="card-hd"><span>⑥ 整体校验中心</span><button class="help-btn" data-page-help="validate" title="本页帮助">?</button><button class="btn small primary" id="btnRunValidation">重新校验</button></div>
     <div class="card-bd">
+      <div class="section" id="validationDisabledBanner" hidden style="border:1px solid #e6a700;background:#fffbe6;padding:10px 14px;border-radius:8px;margin-bottom:12px">⚠ 校验已临时关闭(PREP_VALIDATION_DISABLED)——题目级校验与导出前确认均已跳过,仅保留内容哈希等必要计算。恢复校验请将该开关改回 false 并重新发布。</div>
       <div class="metric-grid" id="validationMetrics"></div>
       <div class="section">
         <div class="section-title">问题清单</div>
