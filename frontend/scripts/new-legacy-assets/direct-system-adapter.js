@@ -130,6 +130,29 @@
     return syncSubscription(payload.subscription)
   }
 
+  function clearEntitlements() {
+    global.KGServerEntitlements = Object.freeze({ allExamPapers: false })
+  }
+
+  // 页面内切换/退出账号时，服务端权益必须跟随当前账号重新拉取；
+  // 否则上一个账号（如会员）的 KGServerEntitlements 会残留，普通账号也被误判为有 VIP 权益。
+  function refreshEntitlementsForCurrentUser(detail = {}) {
+    const username = String(detail.username || global.KGAuthCore?.currentUser?.()?.username || '').trim()
+    try {
+      if (username) preloadSubscription()
+      else clearEntitlements()
+    } catch (error) {
+      console.error('[DirectSystemAdapter] refresh entitlements after auth change failed:', error)
+      clearEntitlements()
+    }
+  }
+
+  if (typeof global.addEventListener === 'function') {
+    global.addEventListener('kg-auth-session-change', (event) => {
+      refreshEntitlementsForCurrentUser(event?.detail || {})
+    })
+  }
+
   if (isAuthenticated()) {
     try {
       const themes = request('GET', '/api/v1/system/themes').themes || {}
