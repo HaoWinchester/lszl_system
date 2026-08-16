@@ -1,10 +1,14 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.102",
-  "toVersion": "v9.0-p4.1.102",
+  "toVersion": "v9.0-p4.1.103",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "VERSION",
+      "src/31a-learning-weekly-open-schedule.js",
+      "tests/learning-weekly-open-schedule.test.js"
+    ],
     "removed": []
   },
   "incompatible": []

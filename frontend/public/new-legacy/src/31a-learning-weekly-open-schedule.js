@@ -1,13 +1,13 @@
 "use strict";
 
 /*
- * 回忆 / 归纳 / 做题三板块于 2026-08-17（周日）14:00 一次性开放。
+ * 回忆 / 归纳 / 做题三板块于 2026-08-16（周日）16:08 一次性开放。
  * 开放前在学习入口弹窗与三页显示倒计时；开放后永久可用。admin/teacher 不受限。
  */
 (function (global) {
-  const OPEN_AT = new Date(2026, 7, 17, 14, 0, 0, 0);
+  const OPEN_AT = new Date(2026, 7, 16, 16, 8, 0, 0);
   const OPEN_AT_MS = OPEN_AT.getTime();
-  const OPEN_LABEL = "8月17日（周日）14:00";
+  const OPEN_LABEL = "8月16日（周日）16:08";
   const SCHEDULED_ENTRIES = Object.freeze({ recall: true, synthesis: true, practice: true });
   const SCHEDULED_DESTINATIONS = Object.freeze({
     "knowledge-recall.html": "recall",

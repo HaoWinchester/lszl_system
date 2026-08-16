@@ -23,17 +23,17 @@ function loadSchedule(role = 'student') {
 }
 
 const schedule = loadSchedule();
-const openAt = new Date(2026, 7, 17, 14, 0, 0, 0);
-const beforeOpen = new Date(2026, 7, 17, 13, 30, 0, 0);
-const afterOpen = new Date(2026, 7, 17, 14, 30, 0, 0);
+const openAt = new Date(2026, 7, 16, 16, 8, 0, 0);
+const beforeOpen = new Date(2026, 7, 16, 15, 38, 0, 0);
+const afterOpen = new Date(2026, 7, 16, 16, 38, 0, 0);
 const muchLater = new Date(2026, 8, 1, 10, 0, 0, 0);
 
 assert.equal(schedule.OPEN_AT_MS, openAt.getTime());
-assert.equal(schedule.isOpen(beforeOpen.getTime()), false, 'Before Aug 17 14:00 should stay closed');
-assert.equal(schedule.isOpen(afterOpen.getTime()), true, 'After Aug 17 14:00 should open');
+assert.equal(schedule.isOpen(beforeOpen.getTime()), false, 'Before Aug 16 16:08 should stay closed');
+assert.equal(schedule.isOpen(afterOpen.getTime()), true, 'After Aug 16 16:08 should open');
 assert.equal(schedule.isOpen(muchLater.getTime()), true, 'After launch should stay open permanently');
 assert.equal(schedule.nextOpenAt(beforeOpen.getTime()).getTime(), openAt.getTime());
-assert.match(schedule.countdownLabel(beforeOpen.getTime()), /8月17日（周日）14:00 开放 · 倒计时/);
+assert.match(schedule.countdownLabel(beforeOpen.getTime()), /8月16日（周日）16:08 开放 · 倒计时/);
 assert.equal(schedule.countdownLabel(afterOpen.getTime()), '');
 assert.equal(schedule.isDestinationOpen('index.html', beforeOpen.getTime()), true);
 assert.equal(schedule.isDestinationOpen('knowledge-recall.html', beforeOpen.getTime()), false);
