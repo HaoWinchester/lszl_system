@@ -4799,7 +4799,9 @@
 
   function wheel(event){
     if(state.mobile)return;
-    if(event.target.closest?.('.qw-question-drawer'))return;
+    // P4.5.36：解析面板内滚轮留给面板内容原生滚动（qw-analysis-content overflow:auto），
+    // 不再触发画布缩放。
+    if(event.target.closest?.('.qw-question-drawer,.qw-analysis-panel'))return;
     const preserveSelectionLock=hasLockedSelectionBounds();
     event.preventDefault();
     beginViewportMotion('zoom');
