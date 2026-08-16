@@ -5,7 +5,8 @@
   const roleApi = global.KGRolePermissions
   const wechatApi = global.KGWechatLogin
   const subscriptionApi = global.KGSubscription
-  if (!storage || !roleApi || !wechatApi || !subscriptionApi) return
+  // wechatApi 仅管理端配置保存需要；部分学员页未加载 32-wechat-login.js，不应因此跳过套餐价格预载。
+  if (!storage || !roleApi || !subscriptionApi) return
 
   function errorMessage(payload, status) {
     const detail = payload?.detail ?? payload?.message ?? payload?.error
@@ -177,10 +178,12 @@
     return originalSaveTheme(role, toLegacyTheme(saved))
   }
 
-  const originalSaveConfig = wechatApi.saveConfig.bind(wechatApi)
-  wechatApi.saveConfig = function (config) {
-    const saved = request('PUT', '/api/v1/system/wechat-config', config).config
-    return originalSaveConfig(saved)
+  if (wechatApi) {
+    const originalSaveConfig = wechatApi.saveConfig.bind(wechatApi)
+    wechatApi.saveConfig = function (config) {
+      const saved = request('PUT', '/api/v1/system/wechat-config', config).config
+      return originalSaveConfig(saved)
+    }
   }
 
   const originalSetPlanSettings = subscriptionApi.setPlanSettings.bind(subscriptionApi)

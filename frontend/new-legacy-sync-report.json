@@ -1,13 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.102",
+  "fromVersion": "v9.0-p4.1.103",
   "toVersion": "v9.0-p4.1.103",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "src/31a-learning-weekly-open-schedule.js",
-      "tests/learning-weekly-open-schedule.test.js"
+      "src/37-subscription-core.js",
+      "src/37-subscription-plans.js"
     ],
     "removed": []
   },

@@ -829,6 +829,21 @@ function injectPage(html, page, version) {
       `<script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->\n${settingsTag}`,
     )
   }
+  // 会员中心弹窗(33-user-center)读 KGSubscriptionRemotePlanSettings 展示套餐价格；
+  // 凡是同时加载订阅运行时与会员中心的页面都注入 system adapter，让价格与支付始终来自后端接口，
+  // 否则学员页(如 practice-mode)会回落到源码默认价，与后台配置脱节。
+  if (generated.includes('src/37-subscription-core.js')
+    && generated.includes('src/33-user-center.js')
+    && !generated.includes('kg-system:generated')) {
+    const userCenterTag = findLocalScriptTag(generated, 'src/33-user-center.js')
+    if (!userCenterTag) {
+      throw new Error('new-legacy 会员中心脚本顺序已变化，请复核系统适配器注入')
+    }
+    generated = generated.replace(
+      userCenterTag,
+      `<script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->\n${userCenterTag}`,
+    )
+  }
   const authTag = page === 'index.html'
     ? '<script defer src="src/30-auth-guards.js"></script>'
     : page === 'question-training.html' && !retiredSingleDeepRedirectShell
