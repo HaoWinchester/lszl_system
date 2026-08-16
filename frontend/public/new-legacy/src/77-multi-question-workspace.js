@@ -26,8 +26,11 @@
   const FONT_SCALE_KEY='kg_multi_question_font_scale_v1';
   const FONT_SCALE_LEVELS=['normal','large','xlarge'];
   const ANALYSIS_SECTION_KEY='kg_multi_question_analysis_sections_v1';
-  const ANALYSIS_SECTION_ORDER=['analysis','answer','path','concepts','clues','traps'];
-  const ANALYSIS_SECTION_LABELS=Object.freeze({analysis:'题目解析',answer:'正确答案',path:'判断主线',concepts:'知识点',clues:'关键词',traps:'选项提示'});
+  // P4.5.35：新增 principle（原则解析）段——显示题目关联原则的"做题原则"
+  // （原则名 + 启用中预设归纳卡内容，来自 KGPrincipleRepository/KGSynthesisPresetRepository）。
+  // 深度回忆侧 KR_ANALYSIS_SECTION_ORDER 暂未包含 principle，读偏好时会被过滤，互不影响。
+  const ANALYSIS_SECTION_ORDER=['analysis','answer','path','principle','concepts','clues','traps'];
+  const ANALYSIS_SECTION_LABELS=Object.freeze({analysis:'题目解析',answer:'正确答案',path:'判断主线',principle:'原则解析',concepts:'知识点',clues:'关键词',traps:'选项提示'});
   const ANALYSIS_SECTION_DEFAULTS=['analysis','answer','path'];
   const MAX_ANALYSIS_PANELS=2;
   const CARD_COLORS=['#ffffff','#ede9fe','#dbeafe','#dcfce7','#fef3c7','#fee2e2','#fce7f3','#e0f2fe'];
@@ -987,6 +990,27 @@
     return '<section class="qw-analysis-section '+escapeHTML(className)+'" data-analysis-section="'+escapeHTML(key)+'">'
       +'<h4>'+escapeHTML(title)+'</h4><div class="qw-analysis-section-body">'+body+'</div></section>';
   }
+  // P4.5.35：原则解析——列出题目关联原则的"做题原则"（原则名 + 启用中预设归纳卡内容）。
+  // 优先正确选项映射的原则，其次题目 principleIds 全量；无关联原则时返回空（不显示该段）。
+  function principleAnalysisMarkup(question={},node={}){
+    const ids=[];
+    const push=id=>{id=String(id||'').trim();if(id&&!ids.includes(id))ids.push(id)};
+    const optionMap=question?.metadata?.optionPrincipleMap;
+    const answerId=correctAnswerId(question)||String(node.correctAnswer||'');
+    if(optionMap&&Array.isArray(optionMap[answerId]))optionMap[answerId].forEach(push);
+    (principleIdsForQuestion(question)||[]).forEach(push);
+    if(!ids.length)return '';
+    const rows=ids.slice(0,3).map(principleId=>{
+      const principle=Principles.get?.(principleId)||null;
+      const preset=Presets.getByPrincipleId?.(principleId,{activeOnly:true})||null;
+      const name=principleDisplayName(principleId,principle?.name||preset?.title||'');
+      if(!principle&&!preset)return '';
+      return '<div class="qw-analysis-principle-item"><strong>'+escapeHTML(name)+'</strong>'
+        +(preset?.content?'<p>'+escapeHTML(String(preset.content||''))+'</p>':'<p class="qw-analysis-principle-empty">该原则暂无启用中的预设做题原则，可在培训配置中补充。</p>')
+        +'</div>';
+    }).filter(Boolean);
+    return rows.length?rows.join(''):'';
+  }
   function questionAnalysisMarkup(question={},node={}){
     const view=questionDisplayView(question);
     const options=Array.isArray(question.options)?question.options:[];
@@ -1006,6 +1030,10 @@
       sections.push(analysisSectionMarkup('answer','正确答案','<p><strong>'+escapeHTML(answerId||correct?.id||'')+'</strong>'+(zhText?' · '+escapeHTML(zhText):'')+(enText&&languageMode()==='bilingual'?'<span class="qw-bilingual-en">'+escapeHTML(enText)+'</span>':'')+'</p>','qw-analysis-answer'));
     }
     if(analysisSectionEnabled('path')&&pathText)sections.push(analysisSectionMarkup('path','判断主线','<p>'+escapeHTML(pathText)+englishLine(view.path)+'</p>'));
+    if(analysisSectionEnabled('principle')){
+      const principleBody=principleAnalysisMarkup(question,node);
+      if(principleBody)sections.push(analysisSectionMarkup('principle','原则解析',principleBody,'qw-analysis-principle'));
+    }
     if(analysisSectionEnabled('concepts')&&concepts.length)sections.push(analysisSectionMarkup('concepts','知识点','<ul>'+concepts.map(item=>'<li><strong>'+escapeHTML(item.title||'知识点')+'</strong>'+(item.rule||item.summary?'：'+escapeHTML(item.rule||item.summary):'')+(languageMode()==='bilingual'&&String(item.titleEn||item.ruleEn||item.summaryEn||'').trim()?'<span class="qw-bilingual-en">'+escapeHTML([item.titleEn,item.ruleEn||item.summaryEn].filter(Boolean).join(': '))+'</span>':'')+'</li>').join('')+'</ul>'));
     if(analysisSectionEnabled('clues')&&clues.length)sections.push(analysisSectionMarkup('clues','关键词讲解','<ul>'+clues.map(item=>'<li><strong>'+escapeHTML(item.text||'线索')+'</strong>：'+escapeHTML(item.explain||'')+(languageMode()==='bilingual'&&String(item.textEn||item.explainEn||'').trim()?'<span class="qw-bilingual-en">'+escapeHTML([item.textEn,item.explainEn].filter(Boolean).join(': '))+'</span>':'')+'</li>').join('')+'</ul>'));
     if(analysisSectionEnabled('traps')&&traps.length)sections.push(analysisSectionMarkup('traps','选项提示','<ul>'+traps.map(item=>'<li><strong>'+escapeHTML(item.id||'')+'</strong>：'+escapeHTML(item.trap||'')+(languageMode()==='bilingual'&&String(item.trapEn||'').trim()?'<span class="qw-bilingual-en">'+escapeHTML(item.trapEn)+'</span>':'')+'</li>').join('')+'</ul>'));
@@ -1063,7 +1091,10 @@
       const key=String(option?.id||String.fromCharCode(65+index));
       const region='option:'+key;
       const selected=activeAnswer===key,persistent=persistentAnswer===key;
-      return '<li class="qw-card-option"><button type="button" class="qw-card-option-key'+(selected?' is-answer-selected':'')+(persistent?' is-correct-active':'')+'" data-qw-option-key="'+escapeHTML(key)+'" title="选择 '+escapeHTML(key)+'" aria-pressed="'+(selected?'true':'false')+'"'+(syncState.pending?' disabled aria-disabled="true"':'')+'>'+escapeHTML(key)+'</button>'
+      // P4.5.35：与深度回忆一致——作答提交期间不禁用字母按钮（禁用会触发
+      // :disabled 的 cursor:wait 漏斗光标，观感像卡顿）；重复点击由
+      // submitPracticeAnswer 的 pending promise 去重保证，不会重复提交。
+      return '<li class="qw-card-option"><button type="button" class="qw-card-option-key'+(selected?' is-answer-selected':'')+(persistent?' is-correct-active':'')+'" data-qw-option-key="'+escapeHTML(key)+'" title="选择 '+escapeHTML(key)+'" aria-pressed="'+(selected?'true':'false')+'">'+escapeHTML(key)+'</button>'
         +'<span class="qw-card-option-copy"><span class="qw-highlight-region" data-highlight-region="'+escapeHTML(region)+'" data-highlight-language="zh">'+highlightedMarkup(option?.display?.zh||'',node,region)+'</span>'+englishLine(option?.display)+'</span></li>';
     }).join('')+'</ol>':'<p class="qw-card-question-stem">当前题目没有可用选项。</p>');
     // P4.5.34：取消"正在保存作答…"常驻提示（干扰做题体验）；
