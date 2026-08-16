@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
@@ -13,6 +14,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import now_utc, uid
 from app.models.content_prep import (
     Principle,
@@ -42,8 +44,11 @@ from app.services import (
 )
 from app.services.question_content_service import (
     canonical_question_hash,
+    duplicate_question_signature,
     normalize_question_payload,
 )
+
+logger = logging.getLogger(__name__)
 
 
 CREATORS = {
@@ -106,6 +111,9 @@ class _PreparedQuestion:
     existing: Question | None
     status: str
     lock: QuestionEditLock | None = None
+    # 内容签名覆盖：题目 ID 在库内不存在，但题干+选项+答案与库内已有题相同，
+    # 此时沿用已有题 ID 用新内容覆盖（保留稳定 ID），且跳过该题的编辑锁校验。
+    duplicate_override: bool = False
 
 
 BASE_TAG_OPTIONS: dict[tuple[str, str], set[str]] = {
@@ -1124,6 +1132,25 @@ async def _prepare_questions(
         )
     ).scalars().all()
     existing_by_id = {question.id: question for question in existing_rows}
+    # 内容签名覆盖（2026-08 录入需求）：ID 未命中的题，若题干+选项+答案与库内已有题
+    # 完全相同，则覆盖那条已有题（沿用其稳定 ID），避免同内容题目重复入库。
+    existing_by_signature: dict[str, Question] = {}
+    missing_id_rows = [qid for qid in ids if qid not in existing_by_id]
+    if missing_id_rows:
+        requested_ids = set(ids)
+        bank_rows = (
+            await db.execute(select(Question).where(Question.bank_id == bank.id))
+        ).scalars().all()
+        for bank_question in bank_rows:
+            if bank_question.id in requested_ids:
+                # 本批次已按 ID 显式命中(更新/跳过)的题不进签名池,
+                # 避免同批另一道内容相同的新题被映射到同一 ID 造成双写。
+                continue
+            existing_by_signature[
+                duplicate_question_signature(
+                    question_catalog_service.question_to_payload(bank_question)
+                )
+            ] = bank_question
     prepared: list[_PreparedQuestion] = []
     issues: list[CatalogIssue] = []
     effective_tag_config = await _effective_tag_config(db, request.tag_config)
@@ -1139,6 +1166,15 @@ async def _prepare_questions(
                 "同一题目 ID 不能移动到其他题库",
                 status_code=409,
             )
+        duplicate_override = False
+        if existing is None:
+            signature = duplicate_question_signature(normalized)
+            matched = existing_by_signature.get(signature)
+            if matched is not None:
+                normalized["id"] = matched.id
+                question_id = matched.id
+                existing = matched
+                duplicate_override = True
         content_hash = canonical_question_hash(normalized)
         status = (
             "created"
@@ -1157,6 +1193,7 @@ async def _prepare_questions(
                 content_hash=content_hash,
                 existing=existing,
                 status=status,
+                duplicate_override=duplicate_override,
             )
         )
 
@@ -1265,17 +1302,28 @@ async def _execute_upload(
 
     prepared, issues = await _prepare_questions(db, actor, bank, request)
     if issues:
-        raise ContentPrepOperationError(
-            "QUESTION_VALIDATION_FAILED",
-            "题目内容校验失败",
-            issues=issues,
-            batch_id=batch_id,
-        )
+        if settings.CONTENT_PREP_VALIDATION_DISABLED:
+            # 校验临时关闭（CONTENT_PREP_VALIDATION_DISABLED）：只记日志不阻断，便于事后审计。
+            logger.warning(
+                "CONTENT_PREP_VALIDATION_DISABLED=true: skipping %d question validation issues (batch %s)",
+                len(issues),
+                batch_id,
+            )
+        else:
+            raise ContentPrepOperationError(
+                "QUESTION_VALIDATION_FAILED",
+                "题目内容校验失败",
+                issues=issues,
+                batch_id=batch_id,
+            )
 
     for prepared_question in prepared:
         if prepared_question.existing is None or (
             prepared_question.status != "updated" and not require_existing_locks
         ):
+            continue
+        if prepared_question.duplicate_override:
+            # 内容签名覆盖：请求里携带的是新 ID 的锁，服务器已有题未被本请求锁定，跳过锁校验直接覆盖
             continue
         item = request.questions[prepared_question.item_index]
         try:
@@ -1559,12 +1607,20 @@ async def save_legacy_question_without_creator(
             normalized,
         )
         if reference_issues:
-            raise ContentPrepOperationError(
-                "QUESTION_VALIDATION_FAILED",
-                "题目内容校验失败",
-                issues=reference_issues,
-                record_failure=False,
-            )
+            if settings.CONTENT_PREP_VALIDATION_DISABLED:
+                # 校验临时关闭（CONTENT_PREP_VALIDATION_DISABLED）：只记日志不阻断。
+                logger.warning(
+                    "CONTENT_PREP_VALIDATION_DISABLED=true: skipping %d reference validation issues (question %s)",
+                    len(reference_issues),
+                    question.id,
+                )
+            else:
+                raise ContentPrepOperationError(
+                    "QUESTION_VALIDATION_FAILED",
+                    "题目内容校验失败",
+                    issues=reference_issues,
+                    record_failure=False,
+                )
         content_hash = canonical_question_hash(normalized)
         before_hash = question.content_hash
         before_revision = question.revision

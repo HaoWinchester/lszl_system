@@ -22,6 +22,7 @@
     state.tagConfig={names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}};
     state.currentQuestionId='';state.currentRecallId='';state.currentPrincipleId='';state.demoQuestionId='';state.demoLang='zh';state.recallPreviewCandidateId='';
     prepRuntime.serverBankId='';prepRuntime.serverBankRevision=null;prepRuntime.lastIdempotencyKey='';prepRuntime.lastBatchId='';prepRuntime.lastUploadFingerprint='';
+    applyPrepBaseline();  /* 共享草稿新建/打开失败回退时,固定基准数据自动就绪 */
     refreshAll();setTab('base');
   }
   function activate(draft,{dirty=false}={}){
