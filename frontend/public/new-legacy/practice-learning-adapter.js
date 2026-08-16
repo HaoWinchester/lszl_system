@@ -72,9 +72,10 @@
   }
   function stats() { return clone(overview.stats) }
   function plan() { return clone(overview.plan) }
-  async function answer(input) {
-    const payload = await request('/answers', { method: 'POST', body: JSON.stringify(input || {}) })
-    await refresh()
+  async function answer(input, options = {}) {
+    // P4.5.37：keepalive 让 pagehide 时的批量同步请求可在页面卸载后存活
+    const payload = await request('/answers', { method: 'POST', body: JSON.stringify(input || {}), keepalive: true })
+    if (options.skipRefresh !== true) await refresh()
     return { correct: Boolean(payload.correct), mistake: clone(payload.mistake || null), completion: clone(payload.completion || null) }
   }
   async function upsertWrong(input) {

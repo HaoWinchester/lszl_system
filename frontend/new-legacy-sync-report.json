@@ -1,13 +1,21 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.99",
-  "toVersion": "v9.0-p4.1.100",
+  "fromVersion": "v9.0-p4.1.100",
+  "toVersion": "v9.0-p4.1.101",
   "changes": {
-    "added": [],
+    "added": [
+      "styles\\knowledge-recall-p4537.css",
+      "tests\\multi-question-local-answer.test.js"
+    ],
     "changed": [
       "VERSION",
+      "knowledge-recall.html",
       "src\\77-multi-question-workspace.js",
-      "src\\86-knowledge-recall.js"
+      "src\\86-knowledge-recall.js",
+      "src\\graph\\context-menu-controller.js",
+      "tests\\multi-question-correct-flash.test.js",
+      "tests\\multi-question-mistake-sync.test.js",
+      "tests\\multi-question-principle-analysis.test.js"
     ],
     "removed": []
   },

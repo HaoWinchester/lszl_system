@@ -336,7 +336,8 @@
   function saveProgress(){
     if(isRecallReadonly()||isTeacherDraftPreview())return;
     if(progressSaveTimer)clearTimeout(progressSaveTimer);
-    progressSaveTimer=setTimeout(()=>{progressSaveTimer=0;void writeProgressNow()},420);
+    // P4.5.37：防抖 420→1200ms，降低高频写库；pagehide/visibilitychange 仍即时 flush。
+    progressSaveTimer=setTimeout(()=>{progressSaveTimer=0;void writeProgressNow()},1200);
   }
   function flushProgress(){return writeProgressNow()}
   function cancelProgressSave(){if(progressSaveTimer){clearTimeout(progressSaveTimer);progressSaveTimer=0}}

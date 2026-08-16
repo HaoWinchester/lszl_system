@@ -42,7 +42,7 @@
           </div>
         </div>
         <div class="graph-context-separator" role="separator"></div>
-        ${actionButton('refresh','刷新',ICONS.refresh,'role="menuitem"')}
+        ${actionButton('refresh','文字高清',ICONS.refresh,'role="menuitem"')}
       </div>`;
       root.addEventListener('pointerdown',event=>event.stopPropagation());
       root.addEventListener('contextmenu',event=>{event.preventDefault();event.stopPropagation()});
