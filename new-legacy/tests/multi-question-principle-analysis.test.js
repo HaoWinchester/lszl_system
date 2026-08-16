@@ -14,9 +14,9 @@ const read = file => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const controller = read('src/77-multi-question-workspace.js');
 const html = read('question-workspace.html');
 
-// ① 无 pending 禁用
+// ① 无 pending 禁用（P4.5.37 起本地判题即时反馈，无等待期；同步走队列）
 assert.doesNotMatch(controller, /syncState\.pending\?' disabled aria-disabled="true"':'/);
-assert.match(controller, /if\(current\?\.pending\)return current\.promise/);
+assert.match(controller, /function flushAnswerQueue\(\)/);
 
 // ② 原则解析段
 assert.match(controller, /ANALYSIS_SECTION_ORDER=\['analysis','answer','path','principle','concepts','clues','traps'\]/);

@@ -11,14 +11,14 @@ const css=fs.readFileSync(path.join(root,'styles/question-workspace.css'),'utf8'
 assert.match(controller,/const PracticeLearning=global\.KGPracticeLearningApi/);
 assert.match(controller,/function practiceAnswerPayload\(record,key\)/);
 assert.match(controller,/async function submitPracticeAnswer\(record,key/);
-assert.match(controller,/PracticeLearning\.answer\(payload\)/);
-assert.doesNotMatch(controller,/PracticeLearning\.answer\(\{[^}]*correct/s);
-assert.match(controller,/if\(current\?\.pending\)return current\.promise/);
+// P4.5.37：作答本地判题即时反馈 + 异步队列同步（pagehide/失败重试保留）
+assert.match(controller,/localAnswerCorrect\(record,key\)/);
+assert.match(controller,/enqueueAnswer\(payload,nodeId\)/);
+assert.match(controller,/await PracticeLearning\.answer\(item\.payload,\{skipRefresh:true\}\)/);
+assert.match(controller,/function failAnswerQueue\(rest,error\)/);
+assert.match(controller,/pagehide.*flushAnswerQueue/s);
 assert.match(controller,/data-qw-option-retry/);
-assert.match(controller,/submitPracticeAnswer\(record,key,\{retryPayload:current\.payload/);
-assert.match(controller,/result\.correct\?'is-correct-flash':'is-wrong-flash'/);
-assert.match(controller,/recordPracticeAttempt\(record,key,'',Boolean\(result\.correct\)\)/);
-assert.match(controller,/function markQuestionCompleted\(record,result/);
+assert.match(controller,/function retryPracticeAnswer\(record\)/);
 assert.match(controller,/KGLearningSessionStore/);
 assert.match(controller,/renderQuestionDock\(\)/);
 assert.match(controller,/作答尚未保存/);
