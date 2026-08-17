@@ -264,6 +264,7 @@
   const PUBLISHED_PAPER_KEYS = new Set([
     'kg_exam_papers_published_v1',
     'kg_exam_paper_release_history_v1',
+    'kg_synthesis_preset_repository_v1',
   ])
 
   async function reloadServerState({ announce = false } = {}) {

@@ -161,15 +161,10 @@
   }
   function writeRemoteSession(session){
     try{
-      console.log('[AUTH] writeRemoteSession called:', session?.user?.username);
       if (session) AUTH_REMOTE_SESSION_STORAGE?.setItem(AUTH_REMOTE_SESSION_KEY, JSON.stringify(session));
       else AUTH_REMOTE_SESSION_STORAGE?.removeItem(AUTH_REMOTE_SESSION_KEY);
-      console.log('[AUTH] writeRemoteSession success, storage:', AUTH_REMOTE_SESSION_STORAGE);
       return true;
-    }catch(e){
-      console.error('[AUTH] writeRemoteSession failed:', e);
-      return false;
-    }
+    }catch(e){return false}
   }
   function serverLoginSessionId(payload){
     const value=payload?.loginSessionId||payload?.login_session_id||payload?.user?.loginSessionId||payload?.user?.login_session_id||"";

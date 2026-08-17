@@ -5503,7 +5503,12 @@
   async function init(){
     if(state.initialized||state.initializing||!document.body.classList.contains('question-workspace-page'))return;
     state.initializing=true;
-    try{await global.KGQuestionCatalogAdapter.ready}catch(error){state.initializing=false;document.body.dataset.questionCatalogUnavailable='true';notify('题目目录暂不可用，请稍后刷新重试。');return}
+    // P4.5.38：不阻塞等待 catalog ready，先初始化 UI，catalog 完成后再填充数据（性能优化）
+    const catalogPromise=global.KGQuestionCatalogAdapter?.ready||Promise.resolve();
+    catalogPromise.catch(error=>{
+      console.warn('题目目录加载失败，部分功能受限',error);
+      document.body.dataset.questionCatalogUnavailable='true';
+    });
     state.viewport=byId('qwCanvasViewport');
     state.world=byId('qwCanvasWorld');
     state.nodeLayer=byId('qwNodeLayer');

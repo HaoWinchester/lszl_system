@@ -303,7 +303,8 @@
   async function loadDatabaseSession(questionId=''){
     let id=String(questionId||requestedQuestionId()).trim();
     if(!id){
-      try{await window.KGQuestionCatalogAdapter?.ready}catch(error){}
+      // P4.5.38：不阻塞等待 catalog（题目数据独立加载，性能优化）
+      window.KGQuestionCatalogAdapter?.ready?.catch(()=>{});
       const candidate=loadQuestion();id=String(candidate?.id||candidate?.sourceQuestionId||'').trim();
     }
     if(!id||id==='unavailable')throw new Error('当前没有可用于深度回忆的已发布题目。');

@@ -608,7 +608,9 @@
   async function init(){
     cacheDom();dom.startButtons.forEach(button=>button.dataset.defaultLabel=button.textContent);bind();
     state.retiredNavigation=readRetiredModeNavigation();
-    try{await global.KGQuestionCatalogAdapter.ready;state.catalogAvailable=true}catch(error){state.catalogAvailable=false;console.error(error)}
+    // P4.5.38：不阻塞等待 catalog ready，先显示 UI，数据异步加载（性能优化）
+    const catalogPromise=global.KGQuestionCatalogAdapter?.ready||Promise.resolve();
+    catalogPromise.then(()=>{state.catalogAvailable=true;syncLobby()}).catch(error=>{state.catalogAvailable=false;console.warn('题目目录加载失败',error);syncLobby()});
     syncLobby();showRetiredModeNotice();
     if(state.retiredNavigation){setView('lobby');return}
     setView('lobby');
