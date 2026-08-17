@@ -129,7 +129,18 @@ EXACT_KEYS = {
     "kg_announcements_v1",
     "kg_question_training_filters_collapsed_v1",
     "kg_question_training_workspace_layout_v1",
+    "kg_training_workspace_layout_v1",
+    "kg_multi_question_release_selection_v1",
     "kg_user_feedback_v1",
+    "pmp_recall_acceptance_records_v1",
+    "question_studio_draft_v010",
+    "question_studio_draft_v020",
+    "question_studio_draft_v021",
+    "question_studio_backups_v010",
+    "question_studio_backups_v020",
+    "question_studio_backups_v021",
+    "question_studio_recent_knowledge_v1",
+    "question_studio_favorite_knowledge_v1",
 }
 
 PREFIXES = (
@@ -237,6 +248,180 @@ PUBLISHER_COLLECTION_KEYS = frozenset({
 SERVER_OWNED_KEYS = frozenset({"kg_announcements_v1", "kg_user_feedback_v1"})
 
 
+BOOTSTRAP_COMMON_EXACT_KEYS = frozenset({
+    "kg_local_current_user_v1",
+    "kg_role_themes_v1",
+    "kg_question_language_mode_v1",
+    "kg_default_entry_mode_v1",
+    "kg_graph_user_preferences_v1",
+    "kg_canvas_view_preferences_v1",
+    "kg_graph_recent_colors_v1",
+    "kg_global_shortcuts_layout_v1",
+    "kg_global_shortcuts_position_v1",
+    "kg_home_interaction_mode_v1",
+    "kg_home_professional_flow_v1",
+    "kg_home_file_library_v1",
+})
+
+BOOTSTRAP_COMMON_PREFIXES = frozenset({
+})
+
+BOOTSTRAP_FILE_EXACT_KEYS = frozenset({
+    "kg_graph_file_library_v1",
+    "kg_graph_file_index_v2",
+    "kg_graph_current_file_v2",
+    "kg_graph_current_file_v1",
+    "kg_graph_folders_v1",
+    "kg_graph_file_tags_v2",
+    "kg_graph_file_tags_v1",
+    "kg_graph_file_migration_v2",
+    "kg_graph_recent_opened_migration_v1",
+    "kg_file_manager_details_open_v1",
+    "kg_file_manager_folder_section_collapsed_v1",
+    "kg_file_manager_recent_folders_v1",
+    "kg_file_manager_sidebar_collapsed_v1",
+    "kg_file_manager_sort_v1",
+    "kg_file_manager_theme_v1",
+    "kg_file_manager_layout_v1",
+    "kg_graph_closed_tabs_v1",
+})
+
+BOOTSTRAP_FILE_PREFIXES = frozenset({
+    "kg_graph_file_content_v2__{encoded_owner}__",
+})
+
+BOOTSTRAP_GUIDED_EXACT_KEYS = frozenset({
+    "kg_guided_practice_return_v1",
+})
+
+BOOTSTRAP_GUIDED_PREFIXES = frozenset({
+    "kg_guided_learning_progress_v1__",
+    "kg_guided_learning_progress_v2__",
+    "kg_guided_path_scroll_v2__",
+    "kg_guided_path_scroll_v3__",
+    "kg_learning_route_context_v1__",
+})
+
+BOOTSTRAP_RECALL_EXACT_KEYS = frozenset({
+    "kg_deep_recall_current_question_v1",
+    "kg_deep_recall_theme_platform_migrated_v1",
+    "kg_deep_recall_theme_v1",
+})
+
+BOOTSTRAP_RECALL_PREFIXES = frozenset({
+    "kg_deep_recall_progress_v1__",
+    "kg_deep_recall_progress_v2__",
+    "kg_deep_recall_current_question_v2__",
+    "kg_deep_recall_explored_v2__",
+})
+
+BOOTSTRAP_QUESTION_EXACT_KEYS = frozenset({
+    "kg_question_language_mode_v1",
+    "kg_question_training_route_v1",
+    "kg_question_tag_names_v1",
+    "kg_question_training_filters_collapsed_v1",
+    "kg_question_training_workspace_layout_v1",
+    "kg_training_workspace_layout_v1",
+    "kg_multi_question_release_selection_v1",
+    "kg_multi_question_analysis_sections_v1",
+    "kg_multi_question_font_scale_v1",
+    "kg_multi_question_highlight_color_v1",
+    "kg_multi_question_paper_selection_v1",
+    "kg_paper_workspace_layout_v1",
+    "kg_question_library_workspace_layout_v1",
+    "kg_deep_recall_current_question_v1",
+    "kg_learning_entry_chooser_claim_v1",
+    "kg_learning_entry_chooser_consumed_v1",
+    "kg_announcements_v1",
+    "kg_user_feedback_v1",
+    "kg_teacher_workbench_subject_v1",
+    "kg_multi_workspace_closed_tabs_v1",
+    "pmp_recall_acceptance_records_v1",
+    "question_studio_draft_v010",
+    "question_studio_draft_v020",
+    "question_studio_draft_v021",
+    "question_studio_backups_v010",
+    "question_studio_backups_v020",
+    "question_studio_backups_v021",
+    "question_studio_recent_knowledge_v1",
+    "question_studio_favorite_knowledge_v1",
+    "kg_deep_recall_current_question_v2__",
+    "kg_deep_recall_progress_v1__",
+    "kg_deep_recall_explored_v2__",
+    "kg_deep_recall_progress_v2__",
+    "kg_exam_papers_published_v1",  # 多题归纳和深度回忆需要已发布试卷列表
+    "kg_exam_paper_release_history_v1",  # 试卷发布历史
+})
+
+BOOTSTRAP_QUESTION_PREFIXES = frozenset({
+    "kg_canvas_workspace_v1__",
+    "kg_canvas_workspace_catalog_v2__",
+    "kg_multi_question_analysis_sections_v1__",
+    "kg_multi_question_font_scale_v1__",
+    "kg_multi_question_highlight_color_v1__",
+    "kg_multi_question_paper_selection_v1__",
+    "kg_multi_question_release_selection_v1__",
+    "kg_multi_workspace_closed_tabs_v1__",
+})
+
+BOOTSTRAP_MANAGEMENT_EXACT_KEYS = frozenset({
+    "kg_admin_audit_log_v1",
+    "kg_admin_settings_v1",
+    "kg_admin_transaction_snapshots_v1",
+    "kg_wechat_login_config_v1",
+    "kg_student_subscriptions_v1",
+    "kg_student_subscription_orders_v1",
+    "kg_student_subscription_redeem_codes_v1",
+    "kg_subscription_plan_model_v2_migrated",
+    "kg_subscription_plan_settings_v1",
+    "kg_course_config_active_release_v1",
+    "kg_course_config_releases_v1",
+    "kg_course_config_drafts_v1",
+    "kg_course_admin_recent_v862_p2",
+    "kg_course_admin_workspace_v862_p1",
+    "kg_teacher_workbench_subject_v1",
+    "kg_assessment_papers_v1",
+    "kg_learning_tasks_v1",
+})
+
+BOOTSTRAP_MANAGEMENT_PREFIXES = frozenset({
+})
+
+BOOTSTRAP_NAMESPACE_EXACT_KEYS: dict[str, frozenset[str]] = {
+    "files": BOOTSTRAP_FILE_EXACT_KEYS,
+    "guided-learning": BOOTSTRAP_GUIDED_EXACT_KEYS,
+    "questions": BOOTSTRAP_QUESTION_EXACT_KEYS | BOOTSTRAP_RECALL_EXACT_KEYS,
+    "workspace": BOOTSTRAP_QUESTION_EXACT_KEYS | BOOTSTRAP_RECALL_EXACT_KEYS,
+    "recall": BOOTSTRAP_QUESTION_EXACT_KEYS | BOOTSTRAP_RECALL_EXACT_KEYS,
+    "users": frozenset({"kg_local_users_v1", "kg_user_admin_logs_v1"}),
+    "system": frozenset({"kg_wechat_login_config_v1", "kg_student_subscription_orders_v1", "kg_student_subscription_redeem_codes_v1", "kg_student_subscriptions_v1", "kg_subscription_plan_model_v2_migrated", "kg_subscription_plan_settings_v1"}),
+    "teacher": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
+    "papers": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
+    "admin": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
+    "operations": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
+    "subjects": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
+    "content": BOOTSTRAP_MANAGEMENT_EXACT_KEYS | frozenset({"pmp_recall_acceptance_records_v1"}),
+    "courses": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
+}
+
+BOOTSTRAP_NAMESPACE_PREFIXES: dict[str, frozenset[str]] = {
+    "files": BOOTSTRAP_FILE_PREFIXES,
+    "guided-learning": BOOTSTRAP_GUIDED_PREFIXES,
+    "questions": BOOTSTRAP_QUESTION_PREFIXES,
+    "workspace": BOOTSTRAP_QUESTION_PREFIXES,
+    "recall": BOOTSTRAP_QUESTION_PREFIXES | BOOTSTRAP_RECALL_PREFIXES,
+    "users": frozenset(),
+    "system": frozenset(),
+    "teacher": BOOTSTRAP_MANAGEMENT_PREFIXES,
+    "papers": BOOTSTRAP_MANAGEMENT_PREFIXES,
+    "admin": BOOTSTRAP_MANAGEMENT_PREFIXES,
+    "operations": BOOTSTRAP_MANAGEMENT_PREFIXES,
+    "subjects": BOOTSTRAP_MANAGEMENT_PREFIXES,
+    "content": BOOTSTRAP_MANAGEMENT_PREFIXES,
+    "courses": BOOTSTRAP_MANAGEMENT_PREFIXES,
+}
+
+
 class RuntimeStateValidationError(ValueError):
     pass
 
@@ -254,6 +439,93 @@ class RuntimeStateConflictError(ValueError):
 
 class RuntimeStatePermissionError(ValueError):
     pass
+
+
+def _bootstrap_selector_tokens(owner: str, role: str, page: str | None) -> tuple[set[str], set[str]]:
+    namespace = PAGE_NAMESPACES.get(page or "", "page")
+    exact = set(BOOTSTRAP_COMMON_EXACT_KEYS)
+    prefixes = set(BOOTSTRAP_COMMON_PREFIXES)
+    exact.update(BOOTSTRAP_NAMESPACE_EXACT_KEYS.get(namespace, frozenset()))
+    prefixes.update(BOOTSTRAP_NAMESPACE_PREFIXES.get(namespace, frozenset()))
+    if namespace in {"admin", "teacher", "content", "subjects", "operations", "papers", "courses"}:
+        if role == "admin":
+            exact.update(BOOTSTRAP_MANAGEMENT_EXACT_KEYS)
+            prefixes.update(BOOTSTRAP_MANAGEMENT_PREFIXES)
+        else:
+            # 非管理员页面不下发大范围管理面板状态，避免把未授权数据也塞进首包
+            exact.discard("kg_local_users_v1")
+            exact.discard("kg_admin_audit_log_v1")
+            exact.discard("kg_admin_settings_v1")
+            exact.discard("kg_admin_transaction_snapshots_v1")
+    if page and page == "file-manager.html":
+        # 文件管理器侧重文件与导航树信息；避免一次下发 owner 全量图谱内容，仅保留当前打开文件。
+        pass
+    encoded_owner = quote(owner, safe="")
+    expanded_exact: set[str] = set()
+    expanded_prefixes: set[str] = set()
+    for key in exact:
+        try:
+            expanded_exact.add(str(key).format(owner=encoded_owner, raw_owner=owner))
+        except KeyError:
+            expanded_exact.add(key)
+    for prefix in prefixes:
+        try:
+            expanded_prefixes.add(str(prefix).format(owner=encoded_owner, raw_owner=owner))
+        except KeyError:
+            expanded_prefixes.add(prefix)
+    return expanded_exact, expanded_prefixes
+
+
+def _select_current_graph_file_id(storage: dict[str, object], owner: str) -> str | None:
+    current = storage.get("kg_graph_current_file_v2")
+    if not isinstance(current, str):
+        return None
+    try:
+        parsed = json.loads(current)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(parsed, dict):
+        if isinstance(parsed, str):
+            return parsed.strip() or None
+        return None
+    file_id = parsed.get(owner)
+    if not file_id:
+        encoded_owner = quote(owner, safe="")
+        file_id = parsed.get(encoded_owner)
+    return str(file_id).strip() if file_id else None
+
+
+def _filter_bootstrap_storage(
+    storage: dict[str, str],
+    owner: str,
+    role: str,
+    page: str | None,
+) -> dict[str, str]:
+    namespace = PAGE_NAMESPACES.get(page or "", "page")
+    exact, prefixes = _bootstrap_selector_tokens(owner, role, page or "")
+    selected: dict[str, str] = {}
+
+    if not exact and not prefixes:
+        return selected
+
+    for key, value in storage.items():
+        if key in exact:
+            selected[key] = str(value)
+            continue
+        if any(key.startswith(prefix) for prefix in prefixes):
+            selected[key] = str(value)
+            continue
+
+    if namespace == "files":
+        current_file_id = _select_current_graph_file_id(storage, owner)
+        if current_file_id:
+            key = f"kg_graph_file_content_v2__{quote(owner, safe='')}__{current_file_id}"
+            value = storage.get(key)
+            if value is not None:
+                selected[key] = str(value)
+    if not selected:
+        selected.update({key: str(storage[key]) for key in exact if key in storage})
+    return selected
 
 
 async def _lock_owner(db: AsyncSession, owner: str) -> None:
@@ -836,6 +1108,8 @@ async def _read_state_snapshot_locked(
     db: AsyncSession,
     owner: str,
     role: str,
+    mode: str = "full",
+    page: str | None = None,
 ) -> tuple[dict[str, str], int, int]:
     row = await db.get(RuntimeState, owner)
     subscription = await db.get(Subscription, owner)
@@ -860,6 +1134,8 @@ async def _read_state_snapshot_locked(
     content_revision = int(
         (await teaching_content_revision_service.current(db))["revision"]
     )
+    if mode == "bootstrap":
+        storage = _filter_bootstrap_storage(storage, owner, role, page)
     return storage, revision, content_revision
 
 
@@ -867,11 +1143,23 @@ async def get_state(
     db: AsyncSession,
     owner: str,
     role: str,
+    mode: str = "full",
+    page: str | None = None,
 ) -> tuple[dict[str, str], int, int]:
     if role in TEACHING_MANAGER_ROLES:
         await _promote_legacy_teacher_state(db)
     await teaching_content_revision_service.acquire_read_lock(db)
-    snapshot = await _read_state_snapshot_locked(db, owner, role)
+    if mode == "bootstrap":
+        user = await db.get(User, owner)
+        if user is not None:
+            return await ensure_domain_seed(
+                db,
+                user,
+                page=page,
+                storage={},
+                revision=0,
+            )
+    snapshot = await _read_state_snapshot_locked(db, owner, role, mode=mode, page=page)
     await db.commit()
     return snapshot
 
@@ -884,8 +1172,20 @@ def _milliseconds(value) -> int:
     return int(value.timestamp() * 1000) if value else 0
 
 
-async def _seed_users(db: AsyncSession, storage: dict[str, str]) -> bool:
-    users, _ = await user_service.list_users(db, page=1, page_size=1000)
+async def _seed_users(db: AsyncSession, owner: str, storage: dict[str, str]) -> bool:
+    owner_user = await user_service.get_by_username(db, owner)
+    admins, _ = await user_service.list_users(db, role="admin", page=1, page_size=50)
+
+    user_map: dict[str, User] = {}
+    if owner_user:
+        user_map[owner_user.username] = owner_user
+    for admin in admins:
+        user_map[admin.username] = admin
+
+    users = list(user_map.values())
+    if not users:
+        return False
+
     payload = {
         user.username: {
             "username": user.username,
@@ -1020,7 +1320,7 @@ async def _seed_guided(db: AsyncSession, owner: str, storage: dict[str, str]) ->
 async def ensure_domain_seed(
     db: AsyncSession,
     user: User,
-    page: str,
+    page: str | None,
     storage: dict[str, str],
     revision: int,
 ) -> tuple[dict[str, str], int, int]:
@@ -1035,7 +1335,7 @@ async def ensure_domain_seed(
 
     changed = False
     if page in {"user-management.html", "system-settings.html"} and user.role == "admin":
-        changed = await _seed_users(db, storage) or changed
+        changed = await _seed_users(db, user.username, storage) or changed
     if page in {"index.html", "file-manager.html"}:
         changed = await _seed_files(db, user.username, storage) or changed
     if page in {
@@ -1046,7 +1346,13 @@ async def ensure_domain_seed(
         changed = await _seed_guided(db, user.username, storage) or changed
     if not changed:
         await db.commit()
-        return await get_state(db, user.username, user.role)
+        return await _read_state_snapshot_locked(
+            db,
+            user.username,
+            user.role,
+            mode="bootstrap",
+            page=page,
+        )
 
     if row is None:
         row = RuntimeState(owner_id=user.username, storage=storage, revision=1)
@@ -1056,7 +1362,13 @@ async def ensure_domain_seed(
         row.revision += 1
     await db.commit()
     await db.refresh(row)
-    return await get_state(db, user.username, user.role)
+    return await _read_state_snapshot_locked(
+        db,
+        user.username,
+        user.role,
+        mode="bootstrap",
+        page=page,
+    )
 
 
 async def apply_update(

@@ -18,7 +18,7 @@ class RuntimeStateUpdate(BaseModel):
     key: str = Field(default="", max_length=240)
     value: str | None = None
     storage: dict[str, str] = Field(default_factory=dict)
-    snapshotMode: Literal["merge", "full"] = "merge"
+    snapshotMode: Literal["merge", "full", "bootstrap"] = "merge"
     mutations: list[RuntimeMutation] = Field(default_factory=list, max_length=500)
     requestId: str = Field(min_length=1, max_length=120)
     revision: int = Field(default=0, ge=0)

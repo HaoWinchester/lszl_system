@@ -1,7 +1,8 @@
 /* Server catalog UI wiring. Runs after the original local event bootstrap. */
 (function(){
   const Catalog=PMPPrepServices.ServerCatalogService;
-  const actor=prepRuntime.serverActor;
+  /* serverActor 由缓存同步给出初值、/api/v1/auth/me 异步校验补齐，动态读取 */
+  const actor=()=>prepRuntime.serverActor;
   const actorName=document.getElementById('serverActorName');
   const creatorName=document.getElementById('serverCreatorName');
   const status=document.getElementById('serverCatalogStatus');
@@ -29,7 +30,7 @@
   }
   const QuestionLocks={
     async switchTo(question){
-      if(!actor&&question?.serverRevision){
+      if(!actor()&&question?.serverRevision){
         return onLeaseState({questionId:question.id,mode:'server-readonly',connection:'online',canSave:false,readOnly:true,lockToken:'',message:'请先登录后再编辑服务器题目'});
       }
       const controller=await ensureLockController();return controller.open(question);
@@ -48,9 +49,9 @@
     const issues=Array.isArray(error?.issues)?error.issues:[];
     issuesBox.innerHTML=issues.map(issue=>`<div>${esc(issue.field||issue.questionId||'题目')}：${esc(issue.message||issue.code||'校验失败')}</div>`).join('');
   }
-  function serverEnabled(){return !!(actor&&prepRuntime.creatorProfile&&prepRuntime.serverBankId&&prepRuntime.draftId)}
+  function serverEnabled(){return !!(actor()&&prepRuntime.creatorProfile&&prepRuntime.serverBankId&&prepRuntime.draftId)}
   function refreshButtons(){
-    const authenticated=!!actor;
+    const authenticated=!!actor();
     const question=currentQuestion(),lease=prepRuntime.editLeaseState||{};
     const canSyncQuestion=!question?.serverRevision||lease.questionId===question.id&&lease.canSave;
     createButton.disabled=!authenticated||!prepRuntime.creatorProfile;
@@ -59,9 +60,10 @@
     syncButton.disabled=!serverEnabled()||!canSyncQuestion;
   }
   function renderActor(){
-    actorName.textContent=actor?(actor.display_name||actor.displayName||actor.username):'未登录';
+    const current=actor();
+    actorName.textContent=current?(current.display_name||current.displayName||current.username):'未登录';
     creatorName.textContent=prepRuntime.creatorProfile?.name||'请先选择';
-    if(!actor)setStatus('未登录 · 请登录后选择共享草稿','warn');
+    if(!current)setStatus('未登录 · 请登录后选择共享草稿','warn');
   }
   function renderBanks(banks){
     const options=banks.map(bank=>`<option value="${esc(bank.id)}">${esc(bank.name)} · ${esc(bank.accessMode||'可编辑')}</option>`).join('');
@@ -74,7 +76,7 @@
     refreshButtons();
   }
   async function refreshBanks({throwOnError=false}={}){
-    if(!actor){renderBanks([]);return}
+    if(!actor()){renderBanks([]);return}
     setStatus('正在连接服务器…');setIssues(null);
     try{
       const banks=await Catalog.listWritableBanks(state.questionBank.subject||'PMP');prepRuntime.serverBanks=banks;renderBanks(banks);
@@ -111,7 +113,7 @@
     return shared;
   }
   async function refreshSharedContent(){
-    if(!actor)return null;
+    if(!actor())return null;
     const subjectId=state.knowledgeTree?.subjectId||state.questionBank.subject||'PMP';
     const payload=await Catalog.loadSharedContent(subjectId);
     if(!prepRuntime.draftId&&!prepRuntime.dirty)applySharedContent(payload);
@@ -378,7 +380,7 @@
     const lockedQuestionId=QuestionLocks.snapshot().questionId;
     clearWorkspace.call(newWorkspaceButton,event);
     if(lockedQuestionId&&!state.questionBank.questions.some(question=>question.id===lockedQuestionId))await QuestionLocks.close();
-    if(actor&&!prepRuntime.draftId){
+    if(actor()&&!prepRuntime.draftId){
       /* server 模式清空工作区后用服务器最新基准覆盖内嵌快照;失败则保留内嵌基线 */
       try{applySharedContent(await Catalog.loadSharedContent(state.questionBank.subject||'PMP'))}catch(error){console.warn('[prep-baseline] 服务器基准刷新失败,保留内嵌基线:',error)}
     }
@@ -400,14 +402,22 @@
     }
   });
   window.addEventListener('pagehide',()=>{remoteRetryStopped=true;clearTimeout(remoteRetryTimer);unsubscribeTeachingSync?.();window.removeEventListener?.('kg:server-state-reloaded',handleServerStateReload)});
-  renderActor();refreshButtons();refreshBanks();
-  refreshSharedContent().catch(error=>{setStatus(error.message||'共享内容读取失败','bad');setIssues(error)});
-  window.PMPPrepAuthoringContract?.renderVersionHeader?.();
-  if(actor&&window.PMPPrepP45Server){
-    window.PMPPrepP45Server.loadSubjectFacetSchemas().catch(error=>{if(error.code!=='AUTH_REQUIRED')console.warn('[p45] facet schema load failed:',error.message)});
-    window.PMPPrepP45Server.loadBuildMetadata().catch(error=>{if(error.code!=='AUTH_REQUIRED')console.warn('[p45] build metadata load failed:',error.message)});
+  function initServerSession(){
+    renderActor();refreshButtons();refreshBanks();
+    refreshSharedContent().catch(error=>{setStatus(error.message||'共享内容读取失败','bad');setIssues(error)});
+    if(actor()&&window.PMPPrepP45Server){
+      window.PMPPrepP45Server.loadSubjectFacetSchemas().catch(error=>{if(error.code!=='AUTH_REQUIRED')console.warn('[p45] facet schema load failed:',error.message)});
+      window.PMPPrepP45Server.loadBuildMetadata().catch(error=>{if(error.code!=='AUTH_REQUIRED')console.warn('[p45] build metadata load failed:',error.message)});
+    }
+    /* P4.5.29 差异 23：刷新/重新登录后自动恢复上次打开的数据库共享草稿 */
+    if(actor()&&window.PMPPrepAutosave)window.PMPPrepAutosave.restoreLastDraft().catch(()=>{});
   }
-  /* P4.5.29 差异 23：刷新/重新登录后自动恢复上次打开的数据库共享草稿 */
-  if(actor&&window.PMPPrepAutosave)window.PMPPrepAutosave.restoreLastDraft().catch(()=>{});
+  window.PMPPrepAuthoringContract?.renderVersionHeader?.();
   const initial=currentQuestion();if(initial?.serverRevision)QuestionLocks.switchTo(initial).then(()=>renderQuestionLockState());
+  /* serverActor 先用缓存值初始化；/api/v1/auth/me 异步校验拿到不同结果后再刷新一次会话 UI */
+  const initialActor=actor();
+  initServerSession();
+  Promise.resolve(prepRuntime.serverActorReady||null).then(()=>{
+    if(actor()&&actor()!==initialActor)initServerSession();
+  }).catch(()=>{});
 })();

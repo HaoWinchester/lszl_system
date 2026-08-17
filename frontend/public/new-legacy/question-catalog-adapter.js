@@ -7,7 +7,10 @@
     : 'learning'
   const clientInstanceId = global.crypto?.randomUUID?.()
     || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  const QUESTION_PAGE_SIZE = 200
   let catalog = { banks: [], questions: [], catalogRevision: '', contentRevision: 0 }
+  const bankQuestionCache = new Map()
+  const bankQuestionLoad = new Map()
 
   class CatalogRequestError extends Error {
     constructor(message, { status = 0, code = '', detail = null } = {}) {
@@ -56,7 +59,7 @@
   }
 
   function normalizedSnapshot(payload) {
-    return {
+    const snapshot = {
       banks: Array.isArray(payload?.banks) ? clone(payload.banks) : [],
       questions: Array.isArray(payload?.questions) ? clone(payload.questions) : [],
       catalogRevision: String(payload?.catalogRevision || ''),
@@ -64,10 +67,61 @@
         ? Number(payload.contentRevision)
         : 0,
     }
+    const lookup = snapshot.questions.reduce((carry, item) => {
+      const bankId = String(item?.bankId || '').trim()
+      if (!bankId) return carry
+      const list = carry.get(bankId) || []
+      list.push(item)
+      carry.set(bankId, list)
+      return carry
+    }, new Map())
+    for (const [bankId, rows] of lookup.entries()) bankQuestionCache.set(bankId, clone(rows))
+    return snapshot
+  }
+
+  async function loadBankQuestions(bankId, options = {}) {
+    const id = String(bankId || '').trim()
+    if (!id) return []
+    if (options.forceReload !== true && bankQuestionCache.has(id)) {
+      return clone(bankQuestionCache.get(id) || [])
+    }
+    if (bankQuestionLoad.has(id)) return bankQuestionLoad.get(id)
+
+    const pageSize = Math.max(1, Math.min(200, Number(options.pageSize || QUESTION_PAGE_SIZE)))
+    const maxQuestions = Number(options.maxQuestions || 0)
+    const task = (async () => {
+      const questions = []
+      let page = 1
+      let total = 0
+      do {
+        const result = await request(`/question-catalog/banks/${encodeURIComponent(id)}/questions?page=${page}&page_size=${pageSize}`)
+        const rows = Array.isArray(result?.questions) ? result.questions : []
+        questions.push(...rows)
+        total = Number(result?.total || total || questions.length)
+        page += 1
+      } while (questions.length < total && rows.length > 0 && (maxQuestions <= 0 || questions.length < maxQuestions))
+      const finalRows = maxQuestions > 0 ? questions.slice(0, maxQuestions) : questions
+      bankQuestionCache.set(id, clone(finalRows))
+      return clone(finalRows)
+    })().finally(() => {
+      bankQuestionLoad.delete(id)
+    })
+    bankQuestionLoad.set(id, task)
+    return task
+  }
+
+  async function loadQuestion(questionId) {
+    const direct = question(questionId)
+    if (direct) return direct
+    const payload = await request(`/question-catalog/questions/${encodeURIComponent(String(questionId || ''))}`)
+    return payload?.question ? clone(payload.question) : null
   }
 
   async function reload(options = {}) {
-    const next = normalizedSnapshot(await request(`/question-catalog/bootstrap?mode=${mode}`))
+    const query = new URLSearchParams({ mode })
+    if (options.includeQuestions === true) query.set('include_questions', 'true')
+    if (Number.isFinite(Number(options.questionPageSize))) query.set('page_size', String(Math.max(1, Number(options.questionPageSize))))
+    const next = normalizedSnapshot(await request(`/question-catalog/bootstrap?${query.toString()}`))
     if (next.contentRevision < catalog.contentRevision) return clone(catalog)
     catalog = next
     const source = String(options.source || 'manual')
@@ -84,7 +138,15 @@
   function snapshot() { return clone(catalog) }
   function banks() { return clone(catalog.banks) }
   function bank(id) { return clone(catalog.banks.find(item => String(item.id) === String(id)) || null) }
-  function question(id) { return clone(catalog.questions.find(item => String(item.id) === String(id)) || null) }
+  function question(id) {
+    const direct = catalog.questions.find(item => String(item.id) === String(id))
+    if (direct) return clone(direct)
+    for (const rows of bankQuestionCache.values()) {
+      const found = rows.find(item => String(item.id) === String(id))
+      if (found) return clone(found)
+    }
+    return null
+  }
 
   function publishCommit(payload, detail = {}) {
     const revision = payload?.contentRevision

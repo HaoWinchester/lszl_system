@@ -5,6 +5,8 @@
   const roleApi = global.KGRolePermissions
   const wechatApi = global.KGWechatLogin
   const subscriptionApi = global.KGSubscription
+  let userProfile = null
+  let userLoadPromise
   // wechatApi 仅管理端配置保存需要；部分学员页未加载 32-wechat-login.js，不应因此跳过套餐价格预载。
   if (!storage || !roleApi || !subscriptionApi) return
 
@@ -87,12 +89,29 @@
     )
   }
 
-  function isAuthenticated() {
-    return global.__KG_DIRECT_BOOTSTRAP__?.authenticated === true
+  function cachedRole() {
+    return String(userProfile?.role || 'guest')
   }
 
   function isAdmin() {
-    return global.__KG_DIRECT_BOOTSTRAP__?.authUser?.role === 'admin'
+    return cachedRole() === 'admin'
+  }
+
+  function preloadUserProfile() {
+    if (userProfile || userLoadPromise) return userLoadPromise || Promise.resolve(userProfile)
+    userLoadPromise = requestJson('GET', '/api/v1/auth/me')
+      .then((payload) => {
+        userProfile = payload?.user || null
+        return userProfile
+      })
+      .catch(() => {
+        userProfile = null
+        return null
+      })
+      .finally(() => {
+        userLoadPromise = null
+      })
+    return userLoadPromise
   }
 
   function preloadPlans() {
@@ -147,46 +166,54 @@
     }
   }
 
-  if (typeof global.addEventListener === 'function') {
-    global.addEventListener('kg-auth-session-change', (event) => {
-      refreshEntitlementsForCurrentUser(event?.detail || {})
+  function preloadAuthenticatedContext() {
+    preloadUserProfile().then(() => {
+      if (!userProfile) {
+        clearEntitlements()
+      } else {
+        try {
+          const themes = request('GET', '/api/v1/system/themes').themes || {}
+          storage.setItem('kg_role_themes_v1', JSON.stringify(
+            Object.fromEntries(Object.entries(themes).map(([role, theme]) => [role, toLegacyTheme(theme)])),
+          ))
+        } catch (error) {
+          console.error('[DirectSystemAdapter] role themes preload failed:', error)
+        }
+
+        try {
+          preloadSubscription()
+        } catch (error) {
+          console.error('[DirectSystemAdapter] subscription preload failed:', error)
+        }
+      }
+
+      if (isAdmin()) {
+        try {
+          const wechat = request('GET', '/api/v1/system/wechat-config').config || {}
+          storage.setItem('kg_wechat_login_config_v1', JSON.stringify(wechat))
+          const wechatPay = request('GET', '/api/v1/system/wechat-pay-config').config || {}
+          global.KGDirectSystemSettings = { wechatPayConfig: wechatPay }
+        } catch (error) {
+          console.error('[DirectSystemAdapter] admin settings preload failed:', error)
+        }
+      }
+    }).catch((error) => {
+      console.error('[DirectSystemAdapter] preloadAuthenticatedContext failed:', error)
     })
   }
 
-  if (isAuthenticated()) {
-    try {
-      const themes = request('GET', '/api/v1/system/themes').themes || {}
-      storage.setItem('kg_role_themes_v1', JSON.stringify(
-        Object.fromEntries(Object.entries(themes).map(([role, theme]) => [role, toLegacyTheme(theme)])),
-      ))
-    } catch (error) {
-      console.error('[DirectSystemAdapter] role themes preload failed:', error)
-    }
-
-    try {
-      preloadSubscription()
-    } catch (error) {
-      console.error('[DirectSystemAdapter] subscription preload failed:', error)
-    }
+  if (typeof global.addEventListener === 'function') {
+    global.addEventListener('kg-auth-session-change', (event) => {
+      userProfile = null
+      userLoadPromise = null
+      refreshEntitlementsForCurrentUser(event?.detail || {})
+      if (event?.detail?.authenticated) preloadAuthenticatedContext()
+      else clearEntitlements()
+    })
   }
 
-  try {
-    // 访客同样需要看到管理员在数据库中配置的套餐，而不是旧页面的“待配置”占位。
-    preloadPlans()
-  } catch (error) {
-    console.error('[DirectSystemAdapter] subscription plans preload failed:', error)
-  }
-
-  if (isAdmin()) {
-    try {
-      const wechat = request('GET', '/api/v1/system/wechat-config').config || {}
-      storage.setItem('kg_wechat_login_config_v1', JSON.stringify(wechat))
-      const wechatPay = request('GET', '/api/v1/system/wechat-pay-config').config || {}
-      global.KGDirectSystemSettings = { wechatPayConfig: wechatPay }
-    } catch (error) {
-      console.error('[DirectSystemAdapter] admin settings preload failed:', error)
-    }
-  }
+  preloadAuthenticatedContext()
+  preloadPlans()
 
   const originalSaveTheme = roleApi.saveTheme.bind(roleApi)
   const originalResetTheme = roleApi.resetTheme.bind(roleApi)

@@ -23,12 +23,27 @@ const FIXED_CREATORS={
   tiancai:{creatorId:'creator_005',name:'天才'},
   nvdi:{creatorId:'creator_006',name:'女帝'}
 };
+/* 登录态判定：进入本页不要求登录。优先同步读跨页共享缓存（其他页面的
+   server-state-bootstrap / auth-core 写入 localStorage 的 kg_remote_auth_session_v1），
+   再异步调 /api/v1/auth/me 校验补齐（缓存为空但会话 cookie 有效时也能恢复）。 */
+function readCachedSessionUser(){
+  try{
+    const raw=window.localStorage?.getItem?.('kg_remote_auth_session_v1');
+    if(!raw)return null;
+    const parsed=JSON.parse(raw);
+    const user=parsed&&typeof parsed==='object'?parsed.user:null;
+    return user&&user.username?user:null;
+  }catch(_error){return null}
+}
+function teachingActorFrom(user){
+  return user&&(user.role==='admin'||user.role==='teacher')?user:null;
+}
 const prepBootstrap=window.__KG_DIRECT_BOOTSTRAP__||{};
 const prepRuntime={
   dirty:false,saveInFlight:false,
   draftId:'',draftRevision:0,draftTitle:'',
   creatorProfile:null,deviceProfile:null,lastBatchId:'',
-  serverActor:prepBootstrap.authenticated?(prepBootstrap.authUser||{username:prepBootstrap.username}):null,
+  serverActor:teachingActorFrom(readCachedSessionUser())||(prepBootstrap.authenticated?(prepBootstrap.authUser||{username:prepBootstrap.username}):null),
   serverContentRevision:Number(prepBootstrap.contentRevision||0),
   serverBankId:'',serverBankRevision:null,clientInstanceId:generateSystemId('prep_client'),
   lastIdempotencyKey:'',lastUploadFingerprint:'',serverBanks:[],
@@ -36,6 +51,19 @@ const prepRuntime={
   theme:'default',auditTrail:[],
   issuedQuestionIds:new Set()
 };
+/* 异步校验会话：/api/v1/auth/me 成功则补齐/刷新 serverActor；401/403 清空，
+   网络异常保留缓存值，交给下一次刷新恢复。 */
+prepRuntime.serverActorReady=(async()=>{
+  try{
+    const response=await fetch('/api/v1/auth/me',{method:'GET',credentials:'include'});
+    if(response.status===401||response.status===403){prepRuntime.serverActor=null;return null}
+    if(!response.ok)return prepRuntime.serverActor;
+    const payload=await response.json().catch(()=>null);
+    const user=teachingActorFrom(payload&&payload.user);
+    if(user)prepRuntime.serverActor=user;
+    return prepRuntime.serverActor;
+  }catch(_error){return prepRuntime.serverActor}
+})();
 const PREP_DB_NAME='pmp_content_prep_studio_v1';
 const PREP_DB_VERSION=1;
 const PREP_DB_STORE='workspaces';

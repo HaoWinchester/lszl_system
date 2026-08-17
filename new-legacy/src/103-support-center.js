@@ -59,7 +59,7 @@
       errorBox.hidden=true;const button=event.submitter||$('feedbackForm').querySelector('[type="submit"]');button.disabled=true;
       try{
         const attachment=await filePayload($('feedbackAttachment').files?.[0]);
-        await Repository().submitFeedback({type:$('feedbackType').value,title,detail,contact:$('feedbackContact').value,page:location.pathname.split('/').pop()||'index.html',appVersion:global.__KG_DIRECT_BOOTSTRAP__?.releaseVersion||document.documentElement.dataset.release||'',attachment});
+        await Repository().submitFeedback({type:$('feedbackType').value,title,detail,contact:$('feedbackContact').value,page:location.pathname.split('/').pop()||'index.html',appVersion:document.documentElement.dataset.release||'',attachment});
         toast('反馈已提交，谢谢你的建议！');$('feedbackForm').reset();
       }catch(error){toast(error.message||'反馈提交失败。',true)}finally{button.disabled=false}
     });

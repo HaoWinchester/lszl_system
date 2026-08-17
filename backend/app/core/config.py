@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     # itsdangerous 签名密钥（生产必改）
     SECRET_KEY: str = "change-me-in-prod"
 
+    # 会话 Cookie 配置（本地联机默认同站点同浏览器 7 天）
+    SESSION_COOKIE_NAME: str = "kg_session"
+    SESSION_MAX_AGE_SECONDS: int = 60 * 60 * 24 * 7
+    SESSION_HOST_CANONICAL: str = "127.0.0.1"
+    SESSION_CANONICALIZE_LOCALHOST: bool = False
+
     # PostgreSQL（async）。本机 Homebrew PG 用 /tmp socket，不监听 TCP。
     DATABASE_URL: str = "postgresql+asyncpg://menghao@/kg_graph_dev?host=/tmp"
 

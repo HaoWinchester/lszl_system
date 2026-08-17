@@ -444,9 +444,8 @@ test('winning claim renders the update-style dismissible four-choice dialog in t
   assert.deepEqual(Array.from(choices, button => button.getAttribute('data-description')), [
     '梳理知识结构与关系 · 当前首页', '主动回忆关键词与知识线索 · 深度回忆', '多题比较、归纳与连接 · 多题画布', '通过做题检验并巩固掌握 · 做题模式',
   ]);
-  const close = tab.document.querySelector('[aria-label="关闭学习入口"]');
-  assert.ok(close, 'the update-style dialog provides a close control');
-  assert.equal(tab.document.activeElement, close, 'the close control receives initial focus');
+  assert.equal(tab.document.querySelector('[aria-label="关闭学习入口"]'), null, 'the dialog no longer renders a close control');
+  assert.equal(tab.document.activeElement, choices[0], 'the first choice receives initial focus');
   assert.equal(tab.graph.inert, true, 'the graph is inert while the dialog is open');
   const escape = new DomEvent('keydown', { key: 'Escape' }); tab.document.dispatchEvent(escape);
   assert.equal(escape.defaultPrevented, true);

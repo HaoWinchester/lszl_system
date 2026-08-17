@@ -1,23 +1,16 @@
 """HTML response helpers for the direct upstream runtime."""
 
-import json
 from pathlib import Path
 
 from fastapi.responses import HTMLResponse
 
 
 def inject_bootstrap(html: str, payload: dict) -> str:
-    encoded = (
-        json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-        .replace("<", "\\u003c")
-        .replace("\u2028", "\\u2028")
-        .replace("\u2029", "\\u2029")
-    )
     guest_practice = (
         payload.get("page") == "practice-mode.html"
         and payload.get("authenticated") is False
     )
-    direct = f"<script>window.__KG_DIRECT_BOOTSTRAP__={encoded};</script><!-- kg-direct-bootstrap -->"
+    direct = ""
     if guest_practice:
         direct += """
 <script>

@@ -42,17 +42,19 @@
     } catch (_error) { return null; }
   }
 
-  function sessionFromBootstrap() {
-    const entry = global.__KG_DIRECT_BOOTSTRAP__;
-    if (!entry || !entry.authUser || typeof entry.authUser !== "object") return null;
-    return { authenticated: true, loginSessionId: entry.authUser.loginSessionId, user: entry.authUser };
-  }
-
   async function currentServerSession(auth) {
     if (auth && typeof auth.getCurrentSession === "function") {
       try { const result = await auth.getCurrentSession(); if (result && typeof result === "object") return result; } catch (_error) {}
     }
-    return sessionFromBootstrap();
+    try {
+      const response = await fetch('/api/v1/auth/me', { method: 'GET', credentials: 'include' })
+      if (!response.ok) return null
+      const me = await response.json()
+      if (me && me.user && typeof me.user === 'object') return { authenticated: true, user: me.user, loginSessionId: me.loginSessionId }
+      return null
+    } catch (_error) {
+      return null
+    }
   }
 
   function authenticatedSession(session) {
@@ -125,7 +127,6 @@
     if (!active) return [];
     const dialog = active.dialog;
     return [
-      dialog.querySelector('[aria-label="关闭学习入口"]'),
       ...Array.from(dialog.querySelectorAll("[data-learning-entry-choice]")),
       dialog.querySelector("#learningEntryDismissBtn"),
     ].filter(Boolean);
@@ -199,8 +200,7 @@
       const head = element(doc, "div", { class: "learning-entry-head" });
       const heading = element(doc, "div");
       heading.append(element(doc, "h2", { id: "learningEntryTitle" }, "从这里开始学习"), element(doc, "p", {}, "选择你现在最想做的事，直接进入对应学习板块。"));
-      const close = element(doc, "button", { type: "button", class: "learning-entry-close", "aria-label": "关闭学习入口", "data-learning-entry-focusable": "" }, "×");
-      head.append(heading, close);
+      head.append(heading);
       const choices = element(doc, "div", { class: "learning-entry-grid" });
       const error = element(doc, "p", { class: "learning-entry-error", id: "learningEntryChooserError", "aria-live": "polite" });
       CHOICES.forEach(choice => {
@@ -219,7 +219,6 @@
     const dialog = root.querySelector("[role=dialog]") || root.querySelector(".learning-entry-modal");
     const error = root.querySelector("#learningEntryChooserError");
     const buttons = root.querySelectorAll("[data-learning-entry-choice]");
-    bindOnce(root.querySelector('[aria-label="关闭学习入口"]'), "click", () => closeDialog({ focusGraph: true }));
     bindOnce(root.querySelector("#learningEntryDismissBtn"), "click", () => closeDialog({ focusGraph: true }));
     buttons.forEach(button => {
       const choice = CHOICES.find(item => item.label === button.getAttribute("data-learning-entry-choice"));

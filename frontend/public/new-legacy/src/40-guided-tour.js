@@ -193,7 +193,8 @@ window.addEventListener('scroll',()=>{if(guidedTourState)placeGuidedTour()},true
 document.getElementById('guidedTourStartBtn')?.addEventListener('click',()=>startGuidedTour(true));
 let guidedTourAutostartTimer=0;
 function hasAuthenticatedGuidedTourSession(){
-  return window.__KG_DIRECT_BOOTSTRAP__?.authenticated===true;
+  const user = window.KGAuthCore?.currentUser?.()
+  return Boolean(user && user.username && user.username !== 'guest');
 }
 function scheduleAutoGuidedTour(){
   clearTimeout(guidedTourAutostartTimer);

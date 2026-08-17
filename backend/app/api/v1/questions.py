@@ -10,6 +10,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.question_catalog import QuestionBankImportRequest, QuestionBankImportResponse
 from app.services import question_service
+from app.services import question_migration_service
 
 router = APIRouter(tags=["question-bank"])
 DB = Annotated[AsyncSession, Depends(get_db)]
@@ -37,6 +38,18 @@ PaperPublisher = Annotated[
 
 def _nf() -> HTTPException:
     return HTTPException(status_code=404, detail="不存在或无权访问")
+
+
+def _parse_id_set(ids: list[str] | None) -> set[str] | None:
+    if not ids:
+        return None
+    result: set[str] = set()
+    for item in ids:
+        for chunk in str(item).split(","):
+            value = chunk.strip()
+            if value:
+                result.add(value)
+    return result
 
 
 # ---------- 题库 ----------
@@ -168,6 +181,75 @@ async def get_paper(paper_id: str, db: DB, user: PaperManager):
     if not p:
         raise _nf()
     return {"paper": p}
+
+
+@router.get("/papers/migration/runtime/scan")
+async def scan_runtime_paper_state(
+    db: DB,
+    user: PaperManager,
+    ownerIds: list[str] | None = Query(default=None),
+    paperIds: list[str] | None = Query(default=None),
+):
+    return {
+        "report": await question_migration_service.scan_runtime_paper_sources(
+            db,
+            owner_ids=_parse_id_set(ownerIds),
+            paper_ids=_parse_id_set(paperIds),
+        )
+    }
+
+
+@router.post("/papers/migration/runtime")
+async def migrate_runtime_papers(
+    db: DB,
+    user: PaperManager,
+    apply: bool = Query(default=False),
+    ownerIds: list[str] | None = Query(default=None),
+    paperIds: list[str] | None = Query(default=None),
+):
+    return {
+        "report": await question_migration_service.migrate_runtime_papers(
+            db,
+            actor=user,
+            apply=apply,
+            owner_ids=_parse_id_set(ownerIds),
+            paper_ids=_parse_id_set(paperIds),
+        )
+    }
+
+
+@router.get("/banks/migration/runtime/scan")
+async def scan_runtime_bank_state(
+    db: DB,
+    user: QuestionBankManager,
+    ownerIds: list[str] | None = Query(default=None),
+    bankIds: list[str] | None = Query(default=None),
+):
+    return {
+        "report": await question_migration_service.scan_runtime_question_sources(
+            db,
+            owner_ids=_parse_id_set(ownerIds),
+            bank_ids=_parse_id_set(bankIds),
+        )
+    }
+
+
+@router.post("/banks/migration/runtime")
+async def migrate_runtime_banks(
+    db: DB,
+    user: QuestionBankManager,
+    apply: bool = Query(default=False),
+    ownerIds: list[str] | None = Query(default=None),
+    bankIds: list[str] | None = Query(default=None),
+):
+    return {
+        "report": await question_migration_service.migrate_runtime_questions(
+            db,
+            apply=apply,
+            owner_ids=_parse_id_set(ownerIds),
+            bank_ids=_parse_id_set(bankIds),
+        )
+    }
 
 
 @router.put("/papers/{paper_id}")

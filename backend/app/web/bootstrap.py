@@ -5,8 +5,6 @@ from __future__ import annotations
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import get_login_session_id
-from app.models.user import ACTIVE
 from app.services import user_service
 
 PAGE_NAMESPACES = {
@@ -22,7 +20,7 @@ PAGE_NAMESPACES = {
     "user-management.html": "users",
     "system-settings.html": "system",
     "paper-management.html": "papers",
-    "content-prep.html": "content-prep",
+    "content-prep.html": "content",
     "course-admin.html": "courses",
     "content-center.html": "content",
     "teacher-workbench.html": "teacher",
@@ -38,7 +36,7 @@ async def optional_user(request: Request, db: AsyncSession):
     if not username:
         return None
     user = await user_service.get_by_username(db, str(username))
-    if not user or user.status != ACTIVE:
+    if not user or user.status != "active":
         request.session.clear()
         return None
     return user
@@ -53,31 +51,12 @@ async def build_bootstrap(
     read_only: bool = False,
 ) -> dict:
     user = await optional_user(request, db)
-    auth_user = user_service.to_dict(user) if user else None
-    if auth_user:
-        auth_user["loginSessionId"] = get_login_session_id(request)
-    storage: dict[str, str] = {}
-    revision = 0
-    content_revision = 0
-    if user:
-        from app.services import runtime_state_service
 
-        storage, revision, content_revision = await runtime_state_service.get_state(
-            db, user.username, user.role
-        )
-        storage, revision, content_revision = await runtime_state_service.ensure_domain_seed(
-            db, user, page, storage, revision
-        )
     return {
         "schemaVersion": 1,
         "releaseVersion": release_version,
         "page": page,
         "namespace": PAGE_NAMESPACES.get(page, "page"),
         "authenticated": user is not None,
-        "username": user.username if user else None,
-        "authUser": auth_user,
-        "revision": revision,
-        "contentRevision": content_revision,
         "readOnly": read_only,
-        "storage": storage,
     }

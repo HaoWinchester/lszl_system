@@ -1,39 +1,121 @@
 'use strict'
 
 ;(function (global) {
-  const entry = global.__KG_DIRECT_BOOTSTRAP__ || {}
   const browserLocalStorage = global.localStorage
-  const browserOnlyKeys = new Set(['prep.lastDraftId'])
-  const page = entry.page || global.location.pathname.split('/').pop() || 'learning-path.html'
-  const namespace = entry.namespace || 'page'
+  const browserOnlyKeys = new Set([
+    'prep.lastDraftId',
+    '__kg_admin_repository_probe__',
+    '__kg_teaching_content_sync_v1__',
+    'kg_remote_auth_session_v1',  // 认证会话必须写入真实 localStorage
+  ])
+  const path = global.location.pathname.split('/').pop() || 'learning-path.html'
+  const namespaces = {
+    'index.html': 'files',
+    'learning-path.html': 'guided-learning',
+    'question-training.html': 'training',
+    'question-workspace.html': 'workspace',
+    'question-bank.html': 'questions',
+    'knowledge-recall.html': 'recall',
+    'file-manager.html': 'files',
+    'user-management.html': 'users',
+    'system-settings.html': 'system',
+    'admin-console.html': 'admin',
+  }
+  const page = path
+  const namespace = namespaces[page] || 'page'
+  const stateQuery = new URLSearchParams({
+    mode: 'bootstrap',
+    page,
+  })
+  const entry = {
+    page,
+    namespace,
+    revision: 0,
+    contentRevision: 0,
+    authenticated: false,
+    readOnly: false,
+    authUser: null,
+    username: null,
+  }
   let revision = Number(entry.revision || 0)
   let contentRevision = Number.isSafeInteger(Number(entry.contentRevision))
     ? Number(entry.contentRevision)
     : 0
-
-  try {
-    const authUser = entry.authUser
-    if (entry.username && authUser && typeof authUser === 'object') {
-      global.sessionStorage.setItem('kg_remote_auth_session_v1', JSON.stringify({
-        user: {
-          ...authUser,
-          username: entry.username,
-          displayName: authUser.display_name || authUser.displayName || entry.username,
-        },
-        issuedAt: Date.now(),
-      }))
-    } else {
-      global.sessionStorage.removeItem('kg_remote_auth_session_v1')
+  function currentSession() {
+    try {
+      const cached = global.localStorage?.getItem('kg_remote_auth_session_v1')
+      if (!cached) return null
+      const parsed = JSON.parse(cached)
+      if (parsed && typeof parsed === 'object' && parsed.user && parsed.user.username) return parsed.user
+      return null
+    } catch (_error) {
+      return null
     }
-  } catch (error) {
-    // sessionStorage 不可用时，远程认证仍可通过登录接口恢复。
   }
 
-  const initial = entry.storage
-  const values = new Map()
-  if (initial && typeof initial === 'object' && !Array.isArray(initial)) {
-    Object.entries(initial).forEach(([key, value]) => values.set(String(key), String(value)))
+  function sessionUser() {
+    const user = currentSession()
+    if (!user) return null
+    return { user }
   }
+
+  async function preloadSessionFromServer() {
+    try {
+      const response = await fetch('/api/v1/auth/me', { method: 'GET', credentials: 'include' })
+      if (!response.ok) return null
+      const me = await response.json()
+      if (me && me.user && typeof me.user === 'object') return me
+    } catch (_error) {
+      // 会话同步失败时，保留本地缓存（如存在）避免首次渲染阻塞
+    }
+    return null
+  }
+
+  async function hydrateEntryFromSession() {
+    const cached = sessionUser()
+    if (cached?.user) {
+      entry.authenticated = true
+      entry.authUser = cached.user
+      entry.username = cached.user.username || ''
+      entry.revision = Number(cached.revision || 0) || 0
+      entry.contentRevision = Number.isSafeInteger(Number(cached.contentRevision))
+        ? Number(cached.contentRevision)
+        : 0
+      revision = entry.revision
+      contentRevision = entry.contentRevision
+    }
+    const me = await preloadSessionFromServer()
+    if (me?.user) {
+      entry.authenticated = true
+      entry.authUser = me.user
+      entry.username = me.user.username || ''
+      entry.revision = 0
+      entry.contentRevision = 0
+      revision = entry.revision
+      contentRevision = entry.contentRevision
+      try {
+        global.localStorage?.setItem(
+          'kg_remote_auth_session_v1',
+          JSON.stringify({ user: me.user, token: '', loginSessionId: me.loginSessionId || '', issuedAt: Date.now() }),
+        )
+      } catch (_error) {}
+      global.dispatchEvent(new CustomEvent('kg-auth-session-change', {
+        detail: { username: me.user.username, provider: 'remote' }
+      }))
+    } else if (cached?.user == null) {
+      entry.authenticated = false
+      entry.authUser = null
+      entry.username = ''
+      try {
+        global.localStorage?.removeItem('kg_remote_auth_session_v1')
+      } catch (_error) {}
+    }
+  }
+
+  const values = new Map()
+
+  // 提前暴露临时 bootstrap 对象，避免其他脚本访问 undefined
+  global.KGServerStateBootstrap = Object.freeze({ ...entry, page, namespace })
 
   let timer = 0
   let inFlight = false
@@ -45,6 +127,7 @@
   let remoteRetryDelay = 250
   let remoteRetryStopped = false
   const pendingMutations = new Map()
+  const nonPersistableKeys = new Set()
   let lastMutation = { operation: 'bootstrap', key: '', value: null }
 
   function snapshot(source = values) {
@@ -55,6 +138,46 @@
     return global.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
   }
 
+  function isPersistableKey(key) {
+    return !nonPersistableKeys.has(key)
+  }
+
+  function storageForPayload(batch = pendingMutations, source = values) {
+    const mutationKeys = new Set(
+      mutationsForPayload(batch)
+        .filter((mutation) => mutation.operation === 'setItem')
+        .map((mutation) => mutation.key),
+    )
+    return Object.fromEntries(
+      Array.from(source.entries())
+        .filter(([key]) => isPersistableKey(key) && mutationKeys.has(key)),
+    )
+  }
+
+  function mutationsForPayload(source = pendingMutations) {
+    return Array.from(source.values()).filter((mutation) => isPersistableKey(mutation.key))
+  }
+
+  async function extractRejectedKey(response) {
+    if (!response?.text) return null
+    try {
+      const raw = await response.text()
+      if (!raw) return null
+      let detail = raw
+      try {
+        const parsed = JSON.parse(raw)
+        if (typeof parsed === 'string') detail = parsed
+        else if (parsed && typeof parsed.detail === 'string') detail = parsed.detail
+      } catch (_error) {
+        detail = raw
+      }
+      const match = String(detail).match(/\u5b58\u50a8\u952e\u672a\u767b\u8bb0[:\uff1a\:]\s*([^\s]+)/)
+      return match ? match[1] : null
+    } catch (_error) {
+      return null
+    }
+  }
+
   function saveEvent(status, detail) {
     try {
       global.dispatchEvent(new CustomEvent('kg:save-state', { detail: { status, ...detail } }))
@@ -63,15 +186,16 @@
     }
   }
 
-  function payload(batch = pendingMutations, storage = snapshot()) {
-    const mutations = Array.from(batch.values())
+  function payload(batch = pendingMutations, storage = values) {
+    const mutations = mutationsForPayload(batch)
+    if (!mutations.length) return null
     const latestMutation = mutations.at(-1) || lastMutation
     return {
       page,
       namespace,
       ...latestMutation,
-      storage,
-      snapshotMode: 'full',
+      storage: storageForPayload(batch, storage),
+      snapshotMode: 'merge',
       mutations,
       requestId: requestId(),
       revision,
@@ -104,7 +228,7 @@
   }
 
   async function fetchServerSnapshot() {
-    const latest = await fetch('/api/v1/runtime/state', {
+    const latest = await fetch(`/api/v1/runtime/state?${stateQuery.toString()}`, {
       method: 'GET',
       credentials: 'include',
     })
@@ -137,13 +261,31 @@
     return error
   }
 
+  const PUBLISHED_PAPER_KEYS = new Set([
+    'kg_exam_papers_published_v1',
+    'kg_exam_paper_release_history_v1',
+  ])
+
   async function reloadServerState({ announce = false } = {}) {
     const serverValues = await fetchServerSnapshot()
     if (!serverValues) throw staleSnapshotError()
+    const prevPublishedPapers = values.get('kg_exam_papers_published_v1')
     values.clear()
     for (const [key, value] of serverValues) values.set(key, value)
     applyPendingMutations()
     dirty = pendingMutations.size > 0
+    // 如果已发布试卷数据有变化，通知 KGRecallQuestionSource 等依赖方失效缓存
+    if (prevPublishedPapers !== values.get('kg_exam_papers_published_v1')) {
+      try {
+        for (const key of PUBLISHED_PAPER_KEYS) {
+          if (serverValues.has(key)) {
+            global.dispatchEvent(new CustomEvent('kg-app-storage-change', {
+              detail: { key, value: values.get(key) ?? null },
+            }))
+          }
+        }
+      } catch (error) {}
+    }
     if (announce) {
       try {
         global.dispatchEvent(new CustomEvent('kg:server-state-reloaded', {
@@ -178,12 +320,21 @@
       if (remoteRetryStopped) throw teardownError()
       const candidate = new Map(serverValues)
       for (const mutation of part.values()) applyMutation(candidate, mutation)
+      const outgoing = payload(part, candidate)
+      if (!outgoing) {
+        discardBatch(part)
+        return
+      }
       const response = await fetch('/api/v1/runtime/state', {
         method: 'PUT',
         credentials: 'include',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload(part, snapshot(candidate))),
+        body: JSON.stringify(outgoing),
       })
+      const rejectedKey =
+        response.status === 403 || response.status === 422
+          ? await extractRejectedKey(response)
+          : null
       if (remoteRetryStopped && !response.ok) throw teardownError()
       if (response.status === 409) {
         if (conflictAttempt >= 1) {
@@ -196,6 +347,17 @@
         return submitPart(part, conflictAttempt + 1)
       }
       if (response.status === 403 || response.status === 422) {
+        if (rejectedKey) {
+          nonPersistableKeys.add(rejectedKey)
+          const invalidMutation = part.get(rejectedKey)
+          if (invalidMutation) {
+            part.delete(rejectedKey)
+            discardBatch(new Map([[rejectedKey, invalidMutation]]))
+            if (part.size === 0) return
+            return submitPart(part, conflictAttempt)
+          }
+          return submitPart(part, conflictAttempt)
+        }
         if (part.size === 1) {
           rejected.push(part.values().next().value)
           discardBatch(part)
@@ -229,6 +391,10 @@
   async function sendOnce(conflictAttempt = 0) {
     const batch = new Map(pendingMutations)
     const outgoing = payload(batch)
+    if (!outgoing) {
+      dirty = pendingMutations.size > 0
+      return 'saved'
+    }
     let retryable = true
     inFlight = true
     saveEvent('saving', { page, namespace })
@@ -239,6 +405,10 @@
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(outgoing),
       })
+      const rejectedKey =
+        response.status === 403 || response.status === 422
+          ? await extractRejectedKey(response)
+          : null
       if (remoteRetryStopped && !response.ok) return 'stopped'
       if (response.status === 409) {
         retryable = false
@@ -252,6 +422,19 @@
         return 'retry'
       }
       if (response.status===403||response.status===422) {
+        if (rejectedKey) {
+          nonPersistableKeys.add(rejectedKey)
+          const invalidMutation = batch.get(rejectedKey)
+          if (invalidMutation) {
+            const onlyInvalid = new Map([[rejectedKey, invalidMutation]])
+            batch.delete(rejectedKey)
+            discardBatch(onlyInvalid)
+            if (batch.size === 0) {
+              dirty = pendingMutations.size > 0
+              return 'saved'
+            }
+          }
+        }
         const rejected = await submitIsolatedBatch(batch)
         if (!rejected.length) {
           saveEvent('saved', { page, namespace, revision })
@@ -419,7 +602,9 @@
 
   function sendLatestBeacon() {
     if (!entry.authenticated || entry.readOnly || !dirty || !global.navigator?.sendBeacon) return
-    const blob = new Blob([JSON.stringify(payload())], { type: 'application/json' })
+    const outgoing = payload()
+    if (!outgoing) return
+    const blob = new Blob([JSON.stringify(outgoing)], { type: 'application/json' })
     global.navigator.sendBeacon('/api/v1/runtime/state', blob)
   }
 
@@ -495,5 +680,25 @@
   }
 
   global.KGServerStateStorage = storage
-  global.KGServerStateBootstrap = Object.freeze({ ...entry, page, namespace })
+
+  // 暴露原生浏览器 localStorage，供其他模块（如 auth-core）使用
+  global.__nativeLocalStorage__ = browserLocalStorage
+
+  // 异步初始化用户会话，完成后更新 bootstrap 对象并通知页面
+  ;(async () => {
+    await hydrateEntryFromSession().catch(() => {
+      entry.authenticated = false
+      entry.authUser = null
+      entry.username = ''
+    })
+    global.KGServerStateBootstrap = Object.freeze({ ...entry, page, namespace })
+    global.dispatchEvent(new CustomEvent('kg:bootstrap-ready', {
+      detail: { authenticated: entry.authenticated, username: entry.username }
+    }))
+    if (entry.authenticated && !entry.readOnly) {
+      global.setTimeout(() => {
+        reloadServerState({ announce: true }).catch(() => {})
+      }, 120)
+    }
+  })()
 })(window)

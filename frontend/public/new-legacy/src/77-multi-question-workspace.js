@@ -5613,4 +5613,10 @@
     buildQuestionList();
     if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
   },0));
+  global.addEventListener('kg-app-storage-change',event=>{
+    const key=String(event?.detail?.key||'');
+    if(key==='kg_exam_papers_published_v1'||key==='kg_exam_paper_release_history_v1'){
+      if(state.initialized)try{buildQuestionList()}catch(error){}
+    }
+  });
 })(window);

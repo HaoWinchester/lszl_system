@@ -1,9 +1,40 @@
 'use strict'
 
 ;(function (global) {
-  const bootstrapUsername = String(global.__KG_DIRECT_BOOTSTRAP__?.username || '')
-  const bootstrapAuthenticated = global.__KG_DIRECT_BOOTSTRAP__?.authenticated === true
-  let reloadingForSession = false
+  function cachedRoleFromAuth() {
+    try {
+      const user = global.KGAuthCore?.currentUser?.()
+      if (user && user.username && user.role) return String(user.role)
+    } catch (_error) {}
+    return 'guest'
+  }
+
+  let role = cachedRoleFromAuth()
+  let userLoading
+
+  function requestCurrentUser() {
+    if (userLoading) return userLoading
+    userLoading = fetch('/api/v1/auth/me', {
+      method: 'GET',
+      credentials: 'include',
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('未登录')
+        const payload = await response.json().catch(() => ({}))
+        const nextRole = String(payload?.user?.role || 'guest')
+        role = nextRole
+        return payload?.user || {}
+      })
+      .catch(() => {
+        role = cachedRoleFromAuth()
+        return {}
+      })
+      .finally(() => {
+        userLoading = null
+      })
+    return userLoading
+  }
+
   let resolveInitialLearningEntry
   let initialLearningEntryHandled = false
   const initialLearningEntry = new Promise((resolve) => { resolveInitialLearningEntry = resolve })
@@ -21,26 +52,24 @@
     resolveInitialLearningEntry(result)
   }
 
-  function matchesBootstrap(username) {
-    return bootstrapAuthenticated && !!username && username === bootstrapUsername
+  function currentRole() {
+    return role
   }
 
   global.addEventListener('kg:auth-session-changed', (event) => {
-    const nextUsername = String(event?.detail?.username || '')
-    if (event?.detail?.authenticated && matchesBootstrap(nextUsername)) showLearningEntryChooser()
+    if (event?.detail?.authenticated) {
+      requestCurrentUser().then(() => {
+        showLearningEntryChooser()
+      })
+    }
   })
 
   global.addEventListener('kg-auth-session-change', (event) => {
     if (event?.detail?.provider !== 'remote') return
-    const nextUsername = String(event?.detail?.username || '')
-    if (reloadingForSession || matchesBootstrap(nextUsername)) return
-    reloadingForSession = true
-    global.location.reload()
+    requestCurrentUser().catch(() => {
+      role = cachedRoleFromAuth()
+    })
   })
-
-  function currentRole() {
-    return String(global.__KG_DIRECT_BOOTSTRAP__?.authUser?.role || 'guest')
-  }
 
   function decorateMemberEntry() {
     if (currentRole() === 'student') return
@@ -50,13 +79,15 @@
 
   function openRequestedSurface() {
     const params = new URLSearchParams(global.location.search || '')
-    if (params.get('auth') === 'login' && !global.__KG_DIRECT_BOOTSTRAP__?.authenticated && typeof global.authOpen === 'function') {
+    if (params.get('auth') === 'login' && currentRole() === 'guest' && typeof global.authOpen === 'function') {
       global.authOpen('请登录后继续使用。')
     }
     if (params.get('member') === '1') {
-      const role = currentRole()
-      if (role === 'student') global.KGUserCenter?.openSubscriptionDetail?.()
-      else global.KGUserCenter?.open?.()
+      requestCurrentUser().then(() => {
+        const userRole = currentRole()
+        if (userRole === 'student') global.KGUserCenter?.openSubscriptionDetail?.()
+        else global.KGUserCenter?.open?.()
+      }).catch(() => {})
     }
     decorateMemberEntry()
     showLearningEntryChooser().then(settleInitialLearningEntry)
@@ -66,6 +97,7 @@
     waitForInitialLearningEntry: () => initialLearningEntry,
   })
 
+  requestCurrentUser().then(decorateMemberEntry)
   if (document.readyState === 'loading') {
     global.addEventListener('DOMContentLoaded', openRequestedSurface, { once: true })
   } else {

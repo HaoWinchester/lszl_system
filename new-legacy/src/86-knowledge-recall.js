@@ -1566,6 +1566,13 @@
     const prefix=window.KGStorageKeys?.PREFIXES?.RECALL_ASSOCIATION||'kg_recall_association_library_v1__';
     if(String(event?.key||'').startsWith(prefix))resetAssociationRuntime();
   });
+  window.addEventListener('kg-app-storage-change',event=>{
+    const key=String(event?.detail?.key||'');
+    if(key==='kg_exam_papers_published_v1'||key==='kg_exam_paper_release_history_v1'){
+      // 试卷数据更新后，重新渲染题目导航和列表
+      try{updateQuestionNavigator();renderQuestionList()}catch(error){}
+    }
+  });
   window.addEventListener('pagehide',()=>{if(isTeacherDraftPreview())cleanupTeacherDraftPreview();else flushProgress()});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&!isTeacherDraftPreview())flushProgress()});
   document.addEventListener('DOMContentLoaded',init);

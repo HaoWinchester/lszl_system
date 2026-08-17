@@ -15,6 +15,17 @@
   const AUTH_SESSION_KEY = "kg_local_current_user_v1";
   const USER_LOG_KEY = "kg_user_admin_logs_v1";
   const AUTH_REMOTE_SESSION_KEY = "kg_remote_auth_session_v1";
+  const AUTH_REMOTE_SESSION_STORAGE = (() => {
+    try {
+      // 优先使用 server-state-bootstrap 暴露的原生 localStorage
+      if (globalThis.__nativeLocalStorage__) {
+        return globalThis.__nativeLocalStorage__;
+      }
+      return globalThis.localStorage;
+    } catch (_error) {
+      return null;
+    }
+  })();
 
   const ROLES = ["admin","teacher","student","viewer"];
   const STATUSES = ["active","paused","archived"];
@@ -143,16 +154,22 @@
   }
   function readRemoteSession(){
     try{
-      const raw = sessionStorage.getItem(AUTH_REMOTE_SESSION_KEY);
+      const storage = AUTH_REMOTE_SESSION_STORAGE || globalThis.localStorage;
+      const raw = storage?.getItem(AUTH_REMOTE_SESSION_KEY);
       return raw ? JSON.parse(raw) : null;
     }catch(e){return null}
   }
   function writeRemoteSession(session){
     try{
-      if(session) sessionStorage.setItem(AUTH_REMOTE_SESSION_KEY, JSON.stringify(session));
-      else sessionStorage.removeItem(AUTH_REMOTE_SESSION_KEY);
+      console.log('[AUTH] writeRemoteSession called:', session?.user?.username);
+      if (session) AUTH_REMOTE_SESSION_STORAGE?.setItem(AUTH_REMOTE_SESSION_KEY, JSON.stringify(session));
+      else AUTH_REMOTE_SESSION_STORAGE?.removeItem(AUTH_REMOTE_SESSION_KEY);
+      console.log('[AUTH] writeRemoteSession success, storage:', AUTH_REMOTE_SESSION_STORAGE);
       return true;
-    }catch(e){return false}
+    }catch(e){
+      console.error('[AUTH] writeRemoteSession failed:', e);
+      return false;
+    }
   }
   function serverLoginSessionId(payload){
     const value=payload?.loginSessionId||payload?.login_session_id||payload?.user?.loginSessionId||payload?.user?.login_session_id||"";

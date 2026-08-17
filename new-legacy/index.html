@@ -218,7 +218,6 @@
   <section aria-labelledby="learningEntryTitle" aria-modal="true" class="modal learning-entry-modal" role="dialog">
     <div class="learning-entry-head">
       <div><h2 id="learningEntryTitle">从这里开始学习</h2><p>选择你现在最想做的事，直接进入对应学习板块。</p></div>
-      <button class="learning-entry-close" id="learningEntryCloseBtn" type="button" aria-label="关闭学习入口" data-learning-entry-focusable>×</button>
     </div>
     <div class="learning-entry-grid">
       <button class="learning-entry-card entry-graph is-current" data-destination="index.html" data-learning-entry-choice="知识图谱" data-description="梳理知识结构与关系 · 当前首页" data-learning-entry="graph" type="button"><span class="learning-entry-avatar">图</span><span class="learning-entry-name">知识图谱</span><span class="learning-entry-id">梳理知识结构与关系 · 当前首页</span></button>
@@ -434,5 +433,34 @@
 <script defer src="src/70-question-trainer.js"></script>
 <script defer src="src/80-question-font-scale.js"></script>
 <script defer src="src/90-bootstrap.js"></script>
+
+<!-- 维护公告弹窗 -->
+<div id="maintenanceNoticeBackdrop" style="
+  position:fixed;inset:0;z-index:99999;
+  background:rgba(0,0,0,0.55);
+  display:flex;align-items:center;justify-content:center;
+">
+  <div style="
+    background:#fff;border-radius:12px;
+    padding:36px 40px 28px;
+    max-width:420px;width:90%;
+    box-shadow:0 8px 40px rgba(0,0,0,0.22);
+    text-align:center;
+    font-family:system-ui,-apple-system,sans-serif;
+  ">
+    <div style="font-size:36px;margin-bottom:12px;">🔧</div>
+    <h2 style="margin:0 0 12px;font-size:20px;color:#1a1a1a;font-weight:700;">服务器维护升级中</h2>
+    <p style="margin:0 0 20px;font-size:15px;color:#555;line-height:1.7;">
+      我们正在对服务器进行紧急维护升级，部分功能暂时可能无法正常使用。<br>
+      技术团队正在紧急处理中，感谢您的耐心等待。
+    </p>
+    <p style="margin:0 0 24px;font-size:13px;color:#999;">如有紧急需要，请联系客服。</p>
+    <button onclick="document.getElementById('maintenanceNoticeBackdrop').style.display='none'" style="
+      background:#4f7ef8;color:#fff;border:none;
+      border-radius:8px;padding:10px 32px;
+      font-size:15px;cursor:pointer;font-weight:600;
+    ">我知道了</button>
+  </div>
+</div>
 </body>
 </html>

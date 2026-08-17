@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 import pytest
@@ -20,13 +19,6 @@ def _login(client: TestClient, username: str, password: str = "111111") -> None:
     assert response.status_code == 200
 
 
-def _bootstrap(response_text: str) -> dict:
-    marker = "window.__KG_DIRECT_BOOTSTRAP__="
-    start = response_text.index(marker) + len(marker)
-    end = response_text.index(";</script>", start)
-    return json.loads(response_text[start:end])
-
-
 @pytest.fixture
 def content_prep_release(monkeypatch: pytest.MonkeyPatch) -> WebRelease:
     release = WebRelease(
@@ -39,14 +31,18 @@ def content_prep_release(monkeypatch: pytest.MonkeyPatch) -> WebRelease:
     return release
 
 
-def test_anonymous_content_prep_redirects_to_login_with_return_path(
+def test_anonymous_content_prep_opens_without_login(
     content_prep_release: WebRelease,
 ) -> None:
     with TestClient(app) as client:
         response = client.get("/content-prep", follow_redirects=False)
 
-    assert response.status_code == 307
-    assert response.headers["location"] == "/login?next=%2Fcontent-prep"
+    assert response.status_code == 200
+    assert 'id="prepApp"' in response.text
+    # 匿名进入不弹登录框；登录态由页面读取缓存 + 调 /api/v1/auth/me 判定
+    assert "kg-content-prep-login-overlay" not in response.text
+    assert "kg_remote_auth_session_v1" in response.text
+    assert "/api/v1/auth/me" in response.text
 
 
 @pytest.mark.parametrize("username", ["学生", "乔治008"])
@@ -61,11 +57,12 @@ def test_learning_roles_cannot_open_content_prep(
     assert response.status_code == 403
     assert "无权访问" in response.text
 
+
 @pytest.mark.parametrize(
     ("username", "password", "role"),
     [("老师", "111111", "teacher"), ("admin", "jbgsnmm~123", "admin")],
 )
-def test_teaching_roles_receive_the_prep_page_and_actor_bootstrap(
+def test_teaching_roles_receive_the_prep_page_with_session_hydration(
     content_prep_release: WebRelease,
     username: str,
     password: str,
@@ -77,13 +74,10 @@ def test_teaching_roles_receive_the_prep_page_and_actor_bootstrap(
 
     assert response.status_code == 200
     assert 'id="prepApp"' in response.text
-    payload = _bootstrap(response.text)
-    assert payload["authenticated"] is True
-    assert payload["authUser"]["username"] == username
-    assert payload["authUser"]["role"] == role
-    assert payload["releaseVersion"] == content_prep_release.version
-    assert payload["page"] == "content-prep.html"
-    assert payload["namespace"] == "content-prep"
+    # 登录态不再走 window.__KG_DIRECT_BOOTSTRAP__ 内联注入，改为缓存 + /me 接口水合
+    assert "window.__KG_DIRECT_BOOTSTRAP__=" not in response.text
+    assert "kg_remote_auth_session_v1" in response.text
+    assert "prepRuntime.serverActorReady" in response.text
 
 
 @pytest.mark.parametrize(
