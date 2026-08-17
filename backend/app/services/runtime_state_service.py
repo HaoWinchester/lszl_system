@@ -351,6 +351,7 @@ BOOTSTRAP_QUESTION_EXACT_KEYS = frozenset({
     "kg_deep_recall_progress_v2__",
     "kg_exam_papers_published_v1",  # 多题归纳和深度回忆需要已发布试卷列表
     "kg_exam_paper_release_history_v1",  # 试卷发布历史
+    "kg_synthesis_preset_repository_v1",  # 归纳卡原则预设
 })
 
 BOOTSTRAP_QUESTION_PREFIXES = frozenset({
@@ -393,6 +394,15 @@ BOOTSTRAP_NAMESPACE_EXACT_KEYS: dict[str, frozenset[str]] = {
     "questions": BOOTSTRAP_QUESTION_EXACT_KEYS | BOOTSTRAP_RECALL_EXACT_KEYS,
     "workspace": BOOTSTRAP_QUESTION_EXACT_KEYS | BOOTSTRAP_RECALL_EXACT_KEYS,
     "recall": BOOTSTRAP_QUESTION_EXACT_KEYS | BOOTSTRAP_RECALL_EXACT_KEYS,
+    "practice": frozenset({
+        "kg_exam_papers_published_v1",
+        "kg_exam_paper_release_history_v1",
+        "kg_announcements_v1",
+        "kg_user_feedback_v1",
+        "kg_learning_entry_chooser_claim_v1",
+        "kg_learning_entry_chooser_consumed_v1",
+        "pmp_recall_acceptance_records_v1",
+    }),
     "users": frozenset({"kg_local_users_v1", "kg_user_admin_logs_v1"}),
     "system": frozenset({"kg_wechat_login_config_v1", "kg_student_subscription_orders_v1", "kg_student_subscription_redeem_codes_v1", "kg_student_subscriptions_v1", "kg_subscription_plan_model_v2_migrated", "kg_subscription_plan_settings_v1"}),
     "teacher": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
@@ -410,6 +420,7 @@ BOOTSTRAP_NAMESPACE_PREFIXES: dict[str, frozenset[str]] = {
     "questions": BOOTSTRAP_QUESTION_PREFIXES,
     "workspace": BOOTSTRAP_QUESTION_PREFIXES,
     "recall": BOOTSTRAP_QUESTION_PREFIXES | BOOTSTRAP_RECALL_PREFIXES,
+    "practice": frozenset(),
     "users": frozenset(),
     "system": frozenset(),
     "teacher": BOOTSTRAP_MANAGEMENT_PREFIXES,

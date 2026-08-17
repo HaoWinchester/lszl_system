@@ -16,6 +16,7 @@ PAGE_NAMESPACES = {
     "question-workspace.html": "workspace",
     "question-bank.html": "questions",
     "knowledge-recall.html": "recall",
+    "practice-mode.html": "practice",
     "file-manager.html": "files",
     "user-management.html": "users",
     "system-settings.html": "system",

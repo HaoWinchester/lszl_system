@@ -116,7 +116,12 @@
     cache={catalogRaw,historyRaw,catalog,history,all:[...deduped.values()]};
     return cache;
   }
-  function invalidate(){cache={catalogRaw:null,historyRaw:null,catalog:[],history:[],all:[]}}
+  function invalidate(){
+    cache={catalogRaw:null,historyRaw:null,catalog:[],history:[],all:[]};
+    try{
+      global.dispatchEvent?.(new CustomEvent('kg:published-papers-changed',{detail:{source:'invalidate'}}));
+    }catch(error){}
+  }
   function sortNewest(rows){
     return rows.slice().sort((a,b)=>number(b.version)-number(a.version)||number(b.publishedAt)-number(a.publishedAt));
   }

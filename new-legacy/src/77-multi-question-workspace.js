@@ -2181,16 +2181,27 @@
   function synthesisDraftFromSelection(records=selectedRecords()){
     const questions=records.filter(record=>record.node?.nodeType==='question-reference');
     let principleId='',preset=null,fallbackReason='所选题目没有共同且唯一的启用原则预设。';
-    const resolved=PrincipleBinding.selectionPrinciple?.(questions.map(record=>resolvedQuestionForNode(record?.node||{})||{}));
+    const resolvedQuestions=questions.map(record=>resolvedQuestionForNode(record?.node||{})||{});
+    console.log('[归纳卡调试] 解析后的题目数据:', resolvedQuestions.map(q=>({
+      id: q.id,
+      correctAnswer: q.correctAnswer,
+      metadata: q.metadata,
+      optionPrincipleMap: q.metadata?.optionPrincipleMap
+    })));
+    const resolved=PrincipleBinding.selectionPrinciple?.(resolvedQuestions);
+    console.log('[归纳卡调试] selectionPrinciple 结果:', resolved);
     if(resolved?.ok){
       principleId=String(resolved.principleId||'');
+      console.log('[归纳卡调试] 共同原则ID:', principleId);
+      console.log('[归纳卡调试] 所有预设卡:', Presets.list?.());
       preset=Presets.getByPrincipleId?.(principleId,{activeOnly:true})||null;
+      console.log('[归纳卡调试] 预设卡:', preset);
       if(!preset)fallbackReason='共同原则没有启用中的系统预设归纳卡。';
+    }else{
+      console.log('[归纳卡调试] 未找到共同原则，原因:', resolved?.reason, '详情:', resolved);
     }
-    if(!preset){
-      const intersection=commonPresetFromPrincipleIntersection(questions);
-      if(intersection){principleId=intersection.principleId;preset=intersection.preset;fallbackReason=''}
-    }
+    // 严格模式：只有全部题目的正确选项都指向同一唯一原则时才显示原则卡
+    // 移除交集判断逻辑，不允许部分绑定或不同原则的情况命中预设
     if(!preset)return {...blankSynthesisDraft(questions),fallbackReason};
     const principle=Principles.get?.(principleId)||null;
     const principleName=principleDisplayName(principleId,principle?.name||'');

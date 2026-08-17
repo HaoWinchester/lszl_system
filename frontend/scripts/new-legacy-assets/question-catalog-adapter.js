@@ -289,7 +289,7 @@
     })
   }
 
-  const ready = reload({ source: 'bootstrap' })
+  const ready = reload({ source: 'bootstrap', includeQuestions: mode === 'managed' })
   ready.catch(() => {})
   let remoteReloadTarget = 0
   let remoteReloadPromise = null

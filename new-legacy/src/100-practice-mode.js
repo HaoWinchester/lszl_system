@@ -549,13 +549,14 @@
     if(dom.paperDrawerSummary)dom.paperDrawerSummary.textContent=rows.length?`共 ${rows.length} 份已发布试卷`:'当前筛选下暂无试卷';
   }
   function syncLobby(){
-    if(!state.catalogAvailable){
-      state.releases=[];state.selectedPaperId='';
-      if(dom.empty){dom.empty.hidden=false;const title=dom.empty.querySelector('strong'),detail=dom.empty.querySelector('p');if(title)title.textContent='题目目录暂不可用';if(detail)detail.textContent='请稍后刷新页面重试。'}
-      if(dom.setupCard)dom.setupCard.hidden=true;if(dom.modeGrid)dom.modeGrid.hidden=true;
-      const library=dom.paperLibrary?.closest('.practice-library');if(library)library.hidden=true;
-      return;
-    }
+    // 练习模式不依赖题库目录，试卷数据已包含题目快照
+    // if(!state.catalogAvailable){
+    //   state.releases=[];state.selectedPaperId='';
+    //   if(dom.empty){dom.empty.hidden=false;const title=dom.empty.querySelector('strong'),detail=dom.empty.querySelector('p');if(title)title.textContent='题目目录暂不可用';if(detail)detail.textContent='请稍后刷新页面重试。'}
+    //   if(dom.setupCard)dom.setupCard.hidden=true;if(dom.modeGrid)dom.modeGrid.hidden=true;
+    //   const library=dom.paperLibrary?.closest('.practice-library');if(library)library.hidden=true;
+    //   return;
+    // }
     const releases=loadReleases();
     const retiredSelection=state.retiredNavigation&&releases.find(row=>
       (state.retiredNavigation.paperId&&row.id===state.retiredNavigation.paperId&&(!state.retiredNavigation.releaseId||row.releaseId===state.retiredNavigation.releaseId))||
