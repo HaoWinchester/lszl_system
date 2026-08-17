@@ -354,6 +354,10 @@ BOOTSTRAP_QUESTION_EXACT_KEYS = frozenset({
     "kg_synthesis_preset_repository_v1",  # 归纳卡原则预设
 })
 
+BOOTSTRAP_QUESTION_EXACT_KEYS_WITHOUT_HISTORY = (
+    BOOTSTRAP_QUESTION_EXACT_KEYS - {"kg_exam_paper_release_history_v1"}
+)
+
 BOOTSTRAP_QUESTION_PREFIXES = frozenset({
     "kg_canvas_workspace_v1__",
     "kg_canvas_workspace_catalog_v2__",
@@ -392,11 +396,10 @@ BOOTSTRAP_NAMESPACE_EXACT_KEYS: dict[str, frozenset[str]] = {
     "files": BOOTSTRAP_FILE_EXACT_KEYS,
     "guided-learning": BOOTSTRAP_GUIDED_EXACT_KEYS,
     "questions": BOOTSTRAP_QUESTION_EXACT_KEYS | BOOTSTRAP_RECALL_EXACT_KEYS,
-    "workspace": BOOTSTRAP_QUESTION_EXACT_KEYS | BOOTSTRAP_RECALL_EXACT_KEYS,
-    "recall": BOOTSTRAP_QUESTION_EXACT_KEYS | BOOTSTRAP_RECALL_EXACT_KEYS,
+    "workspace": BOOTSTRAP_QUESTION_EXACT_KEYS_WITHOUT_HISTORY | BOOTSTRAP_RECALL_EXACT_KEYS,
+    "recall": BOOTSTRAP_QUESTION_EXACT_KEYS_WITHOUT_HISTORY | BOOTSTRAP_RECALL_EXACT_KEYS,
     "practice": frozenset({
         "kg_exam_papers_published_v1",
-        "kg_exam_paper_release_history_v1",
         "kg_announcements_v1",
         "kg_user_feedback_v1",
         "kg_learning_entry_chooser_claim_v1",

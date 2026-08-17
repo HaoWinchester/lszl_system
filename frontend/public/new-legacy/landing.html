@@ -1,5 +1,5 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.120" lang="zh-CN" class="landing-page">
+<html data-release="v9.0-p4.1.123" lang="zh-CN" class="landing-page">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
@@ -7,8 +7,8 @@
   <meta name="theme-color" content="#f4f0e6"/>
   <title>幻谱｜知识图谱学习平台</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23153c34'/%3E%3Ccircle cx='13' cy='13' r='3' fill='%23f3c45e'/%3E%3Ccircle cx='51' cy='13' r='3' fill='%23f3c45e'/%3E%3Ccircle cx='13' cy='51' r='3' fill='%23f3c45e'/%3E%3Ccircle cx='51' cy='51' r='3' fill='%23f3c45e'/%3E%3Cpath d='M15 15 49 49M49 15 15 49' stroke='%23f3c45e' stroke-opacity='.35'/%3E%3Ctext x='32' y='43' text-anchor='middle' font-size='30' font-weight='700' fill='%23f4f0e6'%3E%E5%B9%BB%3C/text%3E%3C/svg%3E"/>
-  <link rel="stylesheet" href="styles/landing.css?v=v9.0-p4.1.120"/>
-  <link rel="stylesheet" href="styles/close-button.css?v=v9.0-p4.1.120"/>
+  <link rel="stylesheet" href="styles/landing.css?v=v9.0-p4.1.123"/>
+  <link rel="stylesheet" href="styles/close-button.css?v=v9.0-p4.1.123"/>
 </head>
 <body>
   <a class="landing-skip-link" href="#main-content">跳到主要内容</a>
@@ -33,6 +33,7 @@
           <a href="#learning-loop">备考闭环</a>
           <a href="#product-tour">产品体验</a>
           <a href="#faq">常见问题</a>
+          <button class="landing-contact-btn" type="button" data-open-contact>联系我们</button>
         </nav>
         <div class="landing-header-actions">
           <a class="landing-login-link" href="/login">登录</a>
@@ -353,12 +354,22 @@
       </div>
       <nav aria-label="页脚导航">
         <div><strong>开始使用</strong><a href="/graph">知识图谱</a><a href="/practice-mode.html">做题模式</a><a href="/question-workspace.html">知识归纳</a><a href="/knowledge-recall.html">深度回忆</a></div>
-        <div><strong>支持</strong><a href="/help-center.html">帮助中心</a><a href="/login">登录</a></div>
+        <div><strong>支持</strong><a href="/help-center.html">帮助中心</a><a href="#" data-open-contact>联系我们</a><a href="/login">登录</a></div>
       </nav>
     </div>
     <div class="landing-container landing-footer-bottom"><span>© 2026 幻谱 · 知识图谱学习平台</span><span>从理解到记住，让知识真正属于你。</span></div>
   </footer>
 
-  <script src="src/landing.js?v=v9.0-p4.1.120"></script>
+  <div aria-hidden="true" class="landing-contact-modal-backdrop" id="landingContactModal" hidden>
+    <section class="landing-contact-modal" aria-label="客服联系二维码" role="dialog" aria-modal="true">
+      <button class="landing-contact-modal-close" id="landingContactModalClose" type="button" aria-label="关闭客服二维码弹窗">×</button>
+      <p class="landing-contact-modal-title">扫码添加客服</p>
+      <p class="landing-contact-modal-subtitle">账号问题、课程问题、学习问题可在二维码备注中说明。</p>
+      <img class="landing-contact-modal-qrcode" src="assets/%E5%AE%A2%E6%9C%8D%E4%BA%8C%E7%BB%B4%E7%A0%81/1.jpg" alt="客服联系二维码"/>
+      <p class="landing-contact-modal-tip">添加后请说明课程阶段与问题截图，客服会尽快协助处理。</p>
+    </section>
+  </div>
+
+  <script src="src/landing.js?v=v9.0-p4.1.123"></script>
 </body>
 </html>
