@@ -114,12 +114,17 @@ test('native payment enlarges the QR code and removes the manual later, cancel, 
   assert.match(membershipStyles, /\.membership-ui\s+\.checkout-help\{[^}]*font-size:11px/)
 })
 
-test('plan pick cancels a reused pending order of another plan before re-ordering', () => {
+test('every plan pick orders the selected plan fresh; the server cancels stale pending orders', () => {
   const userCenter = readFileSync(resolve(repoDir, 'new-legacy/src/33-user-center.js'), 'utf8')
+  const subscriptionService = readFileSync(resolve(repoDir, 'backend/app/services/subscription_service.py'), 'utf8')
 
-  assert.match(userCenter, /order\.planId&&order\.planId!==plan\.id&&typeof pay\.cancelNativeOrder==="function"/)
-  assert.match(userCenter, /await pay\.cancelNativeOrder\(order\.id\);/)
-  assert.match(userCenter, /const retry=await pay\.createNativeOrder\(plan\.id\);/)
+  // 前端不再做“取消旧单再重试”的补救；二维码生成后解锁套餐按钮，可随时换套餐重新下单
+  assert.doesNotMatch(userCenter, /pay\.cancelNativeOrder\(order\.id\)/)
+  assert.match(userCenter, /if\(activeNativeOrder&&activeNativeOrder\.planId===planId\)\{renderNativePayment\(plan,activeNativeOrder\);return\}/)
+  assert.match(userCenter, /const order=result\.order;/)
+  // 服务端不复用待支付订单：每次请求作废旧待支付订单并按当前套餐新下单
+  assert.match(subscriptionService, /已发起新的支付订单，原待支付订单自动作废/)
+  assert.doesNotMatch(subscriptionService, /if pending is not None:\n        return pending/)
 })
 
 test('membership card price and payment amount use the server paymentAmountFen source', () => {

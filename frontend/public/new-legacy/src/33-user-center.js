@@ -254,7 +254,9 @@
       const pay=window.KGWechatPay;
       if(!body||!pay||!order||!order.id)return;
       clearNativePayPolling();
-      setPlanPickLocked(true);
+      // 二维码已生成后解锁套餐按钮：点击其他套餐会重新下单（服务端自动作废旧
+      // 待支付订单），点击同一套餐则继续展示当前二维码。
+      setPlanPickLocked(false);
       setMembershipPaymentView(true);
       const amountFen=Math.max(0,Number(order.amount)||0);
       const amount=`￥${amountFen%100===0?String(amountFen/100):(amountFen/100).toFixed(2)}`;
@@ -305,11 +307,8 @@
       const planId=card&&card.dataset.buyPlan;
       if(!planId)return;
       const plan=sub.planById?sub.planById(planId):null;
-      if(planPickLocked){
-        if(activeNativeOrder&&activeNativeOrder.planId===planId)renderNativePayment(plan,activeNativeOrder);
-        else showStatus("已有待支付订单，请完成当前扫码支付后再选择其他套餐。");
-        return;
-      }
+      if(planPickLocked)return; // 正在生成支付二维码，防止连点重复下单
+      if(activeNativeOrder&&activeNativeOrder.planId===planId){renderNativePayment(plan,activeNativeOrder);return}
       const latest=currentRecord();
       const role=latest&&latest.user&&latest.user.role || "guest";
       if(!latest){
@@ -344,20 +343,14 @@
         }
         const result=await pay.createNativeOrder(plan.id);
         if(!result||!result.order||!result.order.codeUrl)throw new Error("支付二维码生成失败，请重试。");
-        let order=result.order;
-        if(order.planId&&order.planId!==plan.id&&typeof pay.cancelNativeOrder==="function"){
-          // 服务端会复用账号下已有的待支付订单（不分套餐）。所选套餐与返回订单
-          // 不一致时，先自助取消旧订单，再按当前选择重新下单，避免“选什么都
-          // 变成之前那个套餐”。
-          try{await pay.cancelNativeOrder(order.id);}catch(_cancelError){}
-          const retry=await pay.createNativeOrder(plan.id);
-          if(retry&&retry.order&&retry.order.codeUrl)order=retry.order;
-        }
+        // 服务端不复用待支付订单：每次点击都按当前所选套餐重新下单，
+        // 并自动作废旧待支付订单（点击哪个套餐就显示哪个套餐）。
+        const order=result.order;
         const checkoutPlan=sub.planById?sub.planById(order.planId):null;
         activeNativeOrder={...order,planId:order.planId||plan.id};
         card.innerHTML=originalLabel;
         renderNativePayment(checkoutPlan||plan,order);
-        showStatus(order.planId&&order.planId!==plan.id?"已有待支付订单，请继续完成该订单。":"支付二维码已生成，请使用微信扫码。");
+        showStatus("支付二维码已生成，请使用微信扫码。");
       }catch(error){
         showStatus(String(error&&error.message||"支付二维码生成失败，请重试。"));
         setPlanPickLocked(false);

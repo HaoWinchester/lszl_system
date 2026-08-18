@@ -103,7 +103,7 @@ def test_student_can_cancel_only_their_own_pending_order() -> None:
         )
 
 
-def test_student_reuses_the_only_pending_native_payment_order() -> None:
+def test_each_order_request_creates_a_fresh_order_and_cancels_stale_pending() -> None:
     token = uuid4().hex[:10]
     username = f"single-native-order-{token}"
     admin = TestClient(app)
@@ -116,8 +116,24 @@ def test_student_reuses_the_only_pending_native_payment_order() -> None:
         assert first.status_code == 200, first.text
         second = student.post("/api/v1/subscriptions/orders", json={"planId": "quarterly"})
         assert second.status_code == 200, second.text
-        assert second.json()["order"]["id"] == first.json()["order"]["id"]
-        assert second.json()["order"]["planId"] == "monthly"
+        # 不复用待支付订单：点击哪个套餐就出现哪个套餐的新订单
+        assert second.json()["order"]["id"] != first.json()["order"]["id"]
+        assert second.json()["order"]["planId"] == "quarterly"
+        # 旧待支付订单被自动作废，避免旧二维码仍可支付
+        from app.db.session import AsyncSessionLocal
+
+        async def stale_count() -> int:
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(
+                    select(SubscriptionOrder).where(
+                        SubscriptionOrder.username == username,
+                        SubscriptionOrder.id == first.json()["order"]["id"],
+                        SubscriptionOrder.status == "pending",
+                    )
+                )
+                return len(result.scalars().all())
+
+        assert asyncio.run(stale_count()) == 0
     finally:
         asyncio.run(_delete_subscription_rows([username]))
         admin.request("DELETE", "/api/v1/users/batch", json={"usernames": [username]})

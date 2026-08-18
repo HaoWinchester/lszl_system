@@ -4,7 +4,9 @@
   "toVersion": "v9.0-p4.1.102",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "src/33-user-center.js"
+    ],
     "removed": []
   },
   "incompatible": []

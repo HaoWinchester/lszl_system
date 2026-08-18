@@ -196,30 +196,27 @@ async def redeem(db: AsyncSession, username: str, code: str) -> Subscription:
 async def request_order(db: AsyncSession, username: str, plan_id: str) -> SubscriptionOrder:
     """创建订单并按支付配置生成微信扫码 code_url。"""
     plan_id = validate_plan_id(plan_id, allow_free=False)
-    # Serialize order creation per learner.  A pending Native QR is an open
-    # payment commitment, so every device must continue that same order rather
-    # than creating another payable QR for a different plan.
+    # Serialize order creation per learner so concurrent clicks cannot race.
     await db.execute(
         text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
         {"key": f"subscription-native-order:{username}"},
     )
     await _subscription_for_update(db, username)
-    pending_result = await db.execute(
+    # 不复用待支付订单：每次点击都按当前套餐与当前配置价生成新订单（点击哪个
+    # 套餐就出现哪个套餐）。同时作废该账号所有旧待支付订单，避免旧二维码
+    # （含历史 1 分钱测试单、调价前的旧价单）仍被扫码支付。
+    stale_result = await db.execute(
         select(SubscriptionOrder)
         .where(
             SubscriptionOrder.username == username,
             SubscriptionOrder.status == "pending",
             SubscriptionOrder.pay_status == "pending",
-            SubscriptionOrder.pay_method == "wechat",
-            SubscriptionOrder.code_url.is_not(None),
         )
-        .order_by(SubscriptionOrder.created_at.desc())
-        .limit(1)
         .with_for_update()
     )
-    pending = pending_result.scalar_one_or_none()
-    if pending is not None:
-        return pending
+    for stale in stale_result.scalars().all():
+        stale.status = "cancelled"
+        stale.note = "已发起新的支付订单，原待支付订单自动作废"
     p = next(
         plan for plan in await system_service.get_subscription_plans(db)
         if plan["planId"] == plan_id
