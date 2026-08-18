@@ -444,9 +444,11 @@ test('winning claim renders the update-style dismissible four-choice dialog in t
   assert.deepEqual(Array.from(choices, button => button.getAttribute('data-description')), [
     '梳理知识结构与关系 · 当前首页', '主动回忆关键词与知识线索 · 深度回忆', '多题比较、归纳与连接 · 多题画布', '通过做题检验并巩固掌握 · 做题模式',
   ]);
-  const close = tab.document.querySelector('[aria-label="关闭学习入口"]');
-  assert.ok(close, 'the update-style dialog provides a close control');
-  assert.equal(tab.document.activeElement, close, 'the close control receives initial focus');
+  assert.equal(tab.document.querySelector('[aria-label="关闭学习入口"]'), null, 'the dialog must not contain a close control');
+  assert.equal(tab.document.querySelector('.learning-entry-close'), null, 'the dialog must not contain a learning-entry-close element');
+  const focusables = Array.from(dialog.querySelectorAll('[data-learning-entry-focusable]'));
+  assert.equal(focusables.some(node => node.getAttribute('aria-label') === '关闭学习入口'), false);
+  assert.equal(tab.document.activeElement, choices[0], 'the first choice receives initial focus');
   assert.equal(tab.graph.inert, true, 'the graph is inert while the dialog is open');
   const escape = new DomEvent('keydown', { key: 'Escape' }); tab.document.dispatchEvent(escape);
   assert.equal(escape.defaultPrevented, true);
@@ -513,6 +515,15 @@ test('a failed destination verification keeps the choice dialog open, restores t
   assert.equal(recall.disabled, false);
   assert.equal(tab.document.activeElement, recall);
   assert.equal(tab.document.getElementById('learningEntryChooserError').textContent, '该学习页面暂时不可用，请稍后重试');
+});
+
+test('static markup keeps the learning entry head without a close control and keeps the dismiss path', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  assert.equal(html.includes('learningEntryCloseBtn'), false, 'the static learning entry head must not embed a close button');
+  assert.equal(html.includes('learning-entry-close'), false);
+  assert.equal(html.includes('aria-label="关闭学习入口"'), false);
+  assert.ok(html.includes('id="learningEntryDismissBtn"'), 'the static dismiss button must remain');
+  assert.ok(html.includes('learningEntryTitle'));
 });
 
 test('source markup and execution order keep the chooser after auth core and before graph initialization', () => {

@@ -810,6 +810,15 @@ function injectPage(html, page, version) {
       )
     }
   }
+  if (page === 'practice-mode.html') {
+    const wechatLoginTag = '<script defer src="src/32-wechat-login.js"></script>'
+    if (generated.includes(wechatLoginTag) && !generated.includes('kg-system:generated')) {
+      generated = generated.replace(
+        wechatLoginTag,
+        `${wechatLoginTag}\n<script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->`,
+      )
+    }
+  }
   if (page === 'question-bank.html') {
     const editorTag = findLocalScriptTag(generated, 'src/65-question-bank-admin.js')
     if (!editorTag) {

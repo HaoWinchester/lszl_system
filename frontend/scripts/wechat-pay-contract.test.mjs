@@ -33,6 +33,13 @@ test('member purchase uses the server Native order flow and polls its status', (
   assert.ok(homePage.indexOf('direct-system-adapter.js') < homePage.indexOf('src/33-user-center.js'))
 })
 
+test('practice mode loads the system adapter between wechat login and user center scripts', () => {
+  const practicePage = readFileSync(resolve(frontendDir, 'public/new-legacy/practice-mode.html'), 'utf8')
+
+  assert.ok(practicePage.indexOf('src/32-wechat-login.js') < practicePage.indexOf('direct-system-adapter.js'))
+  assert.ok(practicePage.indexOf('direct-system-adapter.js') < practicePage.indexOf('src/33-user-center.js'))
+})
+
 test('member purchase offers a retryable payment failure instead of local approval fallback', () => {
   const userCenter = readFileSync(resolve(repoDir, 'new-legacy/src/33-user-center.js'), 'utf8')
 
