@@ -8,6 +8,9 @@
   const tabs = Array.from(document.querySelectorAll('[data-product-tab]'));
   const panels = Array.from(document.querySelectorAll('[data-product-panel]'));
   const faqTriggers = Array.from(document.querySelectorAll('[data-faq-trigger]'));
+  const contactTriggers = Array.from(document.querySelectorAll('[data-open-contact]'));
+  const contactModal = document.getElementById('landingContactModal');
+  const contactModalClose = document.getElementById('landingContactModalClose');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   root.classList.add('is-enhanced');
@@ -44,6 +47,23 @@
     trigger.setAttribute('aria-expanded', String(Boolean(expanded)));
   }
 
+  function openContactModal() {
+    if (!contactModal) return;
+    contactModal.hidden = false;
+    contactModal.setAttribute('aria-hidden', 'false');
+    contactModal.querySelector('.landing-contact-modal')?.focus();
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeContactModal() {
+    if (!contactModal) return;
+    contactModal.hidden = true;
+    contactModal.setAttribute('aria-hidden', 'true');
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
+  }
+
   function productAt(index) {
     const normalized = (index + tabs.length) % tabs.length;
     return tabs[normalized];
@@ -63,7 +83,10 @@
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') setMenu(false);
+    if (event.key === 'Escape') {
+      setMenu(false);
+      closeContactModal();
+    }
   });
 
   tabs.forEach((tab, index) => {
@@ -96,6 +119,24 @@
       image.hidden = true;
       image.closest('.landing-product-media')?.querySelector('[data-image-fallback]')?.classList.add('is-visible');
     });
+  });
+
+  if (contactModal) {
+    contactModal.setAttribute('aria-hidden', 'true');
+    const contactModalDialog = contactModal.querySelector('.landing-contact-modal');
+    if (contactModalDialog) contactModalDialog.tabIndex = -1;
+  }
+
+  contactTriggers.forEach((trigger) => {
+    trigger.addEventListener('click', (event) => {
+      event.preventDefault();
+      openContactModal();
+    });
+  });
+
+  contactModalClose?.addEventListener('click', closeContactModal);
+  contactModal?.addEventListener('click', (event) => {
+    if (event.target === contactModal) closeContactModal();
   });
 
   function updateHeader() {
