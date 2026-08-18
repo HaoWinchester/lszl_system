@@ -84,7 +84,7 @@ def test_practice_mistake_remediation_and_verification_are_database_backed() -> 
             "questionId": source["question"]["id"],
             "bankId": source["bankId"],
             "paperId": "paper-release-source",
-            "releaseId": "release-source",
+            "releaseId": "",
             "paperVersion": 1,
             "paperName": "范围练习",
             "sourceMode": "challenge",
@@ -125,7 +125,7 @@ def test_practice_mistake_remediation_and_verification_are_database_backed() -> 
         json={
             "questionId": source["question"]["id"],
             "bankId": source["bankId"],
-            "releaseId": "release-source",
+            "releaseId": "",
             "selectedAnswer": "B",
         },
     )
@@ -137,7 +137,7 @@ def test_practice_mistake_remediation_and_verification_are_database_backed() -> 
         json={
             "questionId": source["question"]["id"],
             "bankId": source["bankId"],
-            "releaseId": "release-source",
+            "releaseId": "",
             "selectedAnswer": "B",
         },
     )
@@ -149,7 +149,7 @@ def test_practice_mistake_remediation_and_verification_are_database_backed() -> 
         json={
             "questionId": source["question"]["id"],
             "bankId": source["bankId"],
-            "releaseId": "release-source",
+            "releaseId": "",
             "selectedAnswer": "A",
         },
     )
@@ -219,7 +219,7 @@ def test_practice_answer_uses_server_truth_delays_mastery_and_reactivates_mistak
         "questionId": source["question"]["id"],
         "bankId": source["bankId"],
         "paperId": "paper-answer-source",
-        "releaseId": "release-answer-source",
+        "releaseId": "",
         "paperVersion": 3,
         "paperName": "自动收集练习",
         "sourceMode": "workspace",
@@ -270,7 +270,7 @@ def test_practice_answer_uses_server_truth_delays_mastery_and_reactivates_mistak
                     select(PracticeMistake).where(
                         PracticeMistake.owner_id == username,
                         PracticeMistake.question_id == source["question"]["id"],
-                        PracticeMistake.release_id == "release-answer-source",
+                        PracticeMistake.release_id.is_(None),
                     )
                 )
             ).scalar_one()
@@ -305,30 +305,35 @@ def test_practice_answer_validates_options_visibility_and_release_identity() -> 
     _login(client, username)
     base = {"questionId": source["question"]["id"], "bankId": source["bankId"]}
 
+    denied_unknown_release = client.post(
+        "/api/v1/learning/practice/answers",
+        json={**base, "releaseId": "release-does-not-exist", "selectedAnswer": "A"},
+    )
+    assert denied_unknown_release.status_code == 404
+
     correct_first = client.post(
         "/api/v1/learning/practice/answers",
-        json={**base, "releaseId": "release-clean", "selectedAnswer": "A"},
+        json={**base, "selectedAnswer": "A"},
     )
     assert correct_first.status_code == 200, correct_first.text
     assert correct_first.json()["correct"] is True
     assert correct_first.json()["mistake"] is None
     assert correct_first.json()["completion"]["status"] == "completed"
 
-    for release_id in ("release-one", "release-two"):
-        response = client.post(
-            "/api/v1/learning/practice/answers",
-            json={**base, "releaseId": release_id, "selectedAnswer": "B"},
-        )
-        assert response.status_code == 200, response.text
-        assert response.json()["mistake"]["releaseId"] == release_id
+    wrong = client.post(
+        "/api/v1/learning/practice/answers",
+        json={**base, "selectedAnswer": "B"},
+    )
+    assert wrong.status_code == 200, wrong.text
+    assert wrong.json()["mistake"]["releaseId"] == ""
 
     overview = client.get("/api/v1/learning/practice/overview").json()
-    assert overview["stats"]["active"] == 2
-    assert {row["releaseId"] for row in overview["mistakes"]} == {"release-one", "release-two"}
+    assert overview["stats"]["active"] == 1
+    assert {row["releaseId"] for row in overview["mistakes"]} == {""}
 
     invalid = client.post(
         "/api/v1/learning/practice/answers",
-        json={**base, "releaseId": "release-invalid", "selectedAnswer": "Z"},
+        json={**base, "selectedAnswer": "Z"},
     )
     assert invalid.status_code == 422
 
@@ -356,7 +361,7 @@ def test_concurrent_first_answers_are_serialized_without_duplicate_rows() -> Non
     base = {
         "questionId": source["question"]["id"],
         "bankId": source["bankId"],
-        "releaseId": "release-concurrent",
+        "releaseId": "",
         "sourceMode": "workspace",
     }
 
@@ -384,7 +389,7 @@ def test_concurrent_first_answers_are_serialized_without_duplicate_rows() -> Non
                         .where(
                             PracticeMistake.owner_id == username,
                             PracticeMistake.question_id == source["question"]["id"],
-                            PracticeMistake.release_id == "release-concurrent",
+                            PracticeMistake.release_id.is_(None),
                         )
                     )
                 ).scalar_one()
@@ -395,7 +400,7 @@ def test_concurrent_first_answers_are_serialized_without_duplicate_rows() -> Non
                         select(PracticeMistake.wrong_count).where(
                             PracticeMistake.owner_id == username,
                             PracticeMistake.question_id == source["question"]["id"],
-                            PracticeMistake.release_id == "release-concurrent",
+                            PracticeMistake.release_id.is_(None),
                         )
                     )
                 ).scalar_one()

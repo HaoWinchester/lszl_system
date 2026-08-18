@@ -3,7 +3,7 @@
 from datetime import datetime
 import uuid
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -11,14 +11,23 @@ from app.db.base import Base
 
 
 class TrainingProgress(Base):
-    """用户对每道题的作答进度（owner + question 唯一）。"""
+    """用户对每个发布版本内题目的作答进度。"""
 
     __tablename__ = "training_progress"
-    __table_args__ = (UniqueConstraint("owner_id", "question_id", name="uq_training_owner_question"),)
+    __table_args__ = (
+        Index(
+            "uq_training_owner_question_release",
+            "owner_id", "question_id", func.coalesce(text("release_id"), text("''")), unique=True,
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     owner_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.username"), nullable=False)
-    question_id: Mapped[str] = mapped_column(String(64), ForeignKey("questions.id"), nullable=False)
+    # 发布快照在 canonical 题目删除后仍需可续学，因此这里只保存稳定引用。
+    question_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    release_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("paper_releases.id", ondelete="RESTRICT"), nullable=True
+    )
     bank_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     paper_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     selected_answer: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -33,12 +42,22 @@ class TrainingProgress(Base):
 
 
 class RecallProgress(Base):
-    """用户对每道题的深度回忆画布进度（owner + question 复合主键）。"""
+    """用户对每道题及可选发布版本的深度回忆画布进度。"""
 
     __tablename__ = "recall_progress"
+    __table_args__ = (
+        Index(
+            "uq_recall_progress_owner_question_release",
+            "owner_id", "question_id", func.coalesce(text("release_id"), text("''")), unique=True,
+        ),
+    )
 
-    owner_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.username"), primary_key=True)
-    question_id: Mapped[str] = mapped_column(String(64), ForeignKey("questions.id"), primary_key=True)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    owner_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.username"), nullable=False)
+    question_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    release_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("paper_releases.id", ondelete="RESTRICT"), nullable=True
+    )
     bank_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_question_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     source_content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -63,10 +82,9 @@ class RecallQuestionSnapshot(Base):
 
     __tablename__ = "recall_question_snapshots"
     __table_args__ = (
-        UniqueConstraint(
-            "question_id",
-            "question_revision",
-            name="uq_recall_question_snapshot_revision",
+        Index(
+            "uq_recall_question_snapshot_revision_release",
+            "question_id", "question_revision", func.coalesce(text("release_id"), text("''")), unique=True,
         ),
     )
 
@@ -76,6 +94,9 @@ class RecallQuestionSnapshot(Base):
         default=lambda: str(uuid.uuid4()),
     )
     question_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    release_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("paper_releases.id", ondelete="RESTRICT"), nullable=True
+    )
     bank_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     question_revision: Mapped[int] = mapped_column(Integer, nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -115,7 +136,9 @@ class LearningEvent(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     owner_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.username"), nullable=False, index=True)
-    question_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("questions.id"), nullable=True, index=True)
+    question_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("questions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     payload: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
@@ -126,7 +149,10 @@ class PracticeMistake(Base):
 
     __tablename__ = "practice_mistakes"
     __table_args__ = (
-        UniqueConstraint("owner_id", "question_id", "release_id", name="uq_practice_mistake_owner_question_release"),
+        Index(
+            "uq_practice_mistake_owner_question_release",
+            "owner_id", "question_id", func.coalesce(text("release_id"), text("''")), unique=True,
+        ),
         CheckConstraint(
             "status IN ('pending', 'needs_remediation', 'verification_due', 'mastered')",
             name="ck_practice_mistakes_status",
@@ -135,10 +161,12 @@ class PracticeMistake(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     owner_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.username", ondelete="CASCADE"), nullable=False, index=True)
-    question_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("questions.id", ondelete="SET NULL"), nullable=True, index=True)
+    question_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     bank_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("question_banks.id", ondelete="SET NULL"), nullable=True)
     paper_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    release_id: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    release_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("paper_releases.id", ondelete="RESTRICT"), nullable=True
+    )
     paper_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     paper_name: Mapped[str] = mapped_column(String(200), nullable=False, default="错题来源试卷")
     source_mode: Mapped[str] = mapped_column(String(32), nullable=False, default="challenge")

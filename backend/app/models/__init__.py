@@ -12,7 +12,9 @@ from app.models.content_prep import (
     SynthesisPreset,
 )
 from app.models.file import CurrentFile, FileContent, FileTag, Folder, GraphFile, Tag
+from app.models.engagement import Announcement, AnnouncementAudience, Feedback, FeedbackReceipt, FeedbackReply, MessageReceipt
 from app.models.guided_learning import GuidedActivity, GuidedCourse, GuidedCourseActivity, GuidedLearningProgress
+from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import (
     ExamPaper,
     PaperQuestion,
@@ -20,11 +22,22 @@ from app.models.question import (
     QuestionBank,
     QuestionCleanupAudit,
 )
+from app.models.runtime_migration import RuntimeMigrationItem, RuntimeMigrationRun
 from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.subscription import RedeemCode, Subscription, SubscriptionOrder
 from app.models.subject_facet import SubjectFacetSchema
 from app.models.system import RoleTheme, SystemSetting
+from app.models.teaching_content import (
+    ActivityCollection,
+    ActivityOverride,
+    ActivityTag,
+    ContentSubject,
+    ContentTaxonomy,
+    RecallAssociationLibrary,
+    TaxonomyNode,
+    TeachingContentAudit,
+)
 from app.models.training import (
     CanvasWorkspace,
     LearningEvent,
@@ -60,6 +73,8 @@ __all__ = [
     "QuestionAuditLog",
     "ExamPaper",
     "PaperQuestion",
+    "PaperRelease",
+    "PaperReleaseQuestion",
     "QuestionCleanupAudit",
     "TrainingProgress",
     "RecallProgress",
@@ -74,5 +89,15 @@ __all__ = [
     "GuidedLearningProgress",
     "RuntimeState",
     "SharedRuntimeState",
+    "RuntimeMigrationRun",
+    "RuntimeMigrationItem",
     "SubjectFacetSchema",
+    "ContentSubject",
+    "ContentTaxonomy",
+    "TaxonomyNode",
+    "ActivityCollection",
+    "ActivityTag",
+    "ActivityOverride",
+    "RecallAssociationLibrary",
+    "TeachingContentAudit",
 ]

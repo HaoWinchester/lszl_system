@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from urllib.parse import quote
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_prep import Principle
-from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.subject_facet import SubjectFacetSchema
+from app.models.teaching_content import ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode
 from app.schemas.content_prep import CatalogIssue
 
 TAXONOMY_KEY = "kg_content_taxonomies_v1"
@@ -95,11 +93,15 @@ async def _effective_recall_node_ids(
 ) -> set[str]:
     library: Any = incoming_library
     if library in (None, {}):
-        key = RECALL_LIBRARY_KEY_PREFIX + quote(_recall_subject_id(subject), safe="")
-        row = await db.get(SharedRuntimeState, key)
+        row = (await db.execute(
+            select(RecallAssociationLibrary)
+            .where(RecallAssociationLibrary.subject_id == _recall_subject_id(subject), RecallAssociationLibrary.status == "published")
+            .order_by(RecallAssociationLibrary.version.desc())
+            .limit(1)
+        )).scalar_one_or_none()
         if row is None:
             raise ValueError("recall library row missing")
-        library = _decode_json(row.value)
+        library = {"nodes": row.nodes}
     if not isinstance(library, dict) or not isinstance(library.get("nodes"), list):
         raise ValueError("recall library unavailable")
     return _active_node_ids(library["nodes"])
@@ -239,15 +241,15 @@ async def validate_question_references(
     related_ids = [str(value).strip() for value in (knowledge.get("relatedNodeIds") or []) if value]
     issues: list[CatalogIssue] = []
 
-    taxonomy_row: SharedRuntimeState | None = None
-    selected_taxonomy: dict | None = None
+    selected_taxonomy: ContentTaxonomy | None = None
     if primary_id or related_ids:
-        taxonomy_row = await db.get(SharedRuntimeState, TAXONOMY_KEY)
-        try:
-            if taxonomy_row is None:
-                raise ValueError("taxonomy row missing")
-            selected_taxonomy = _current_taxonomy(taxonomy_row.value, subject)
-        except (TypeError, ValueError, json.JSONDecodeError):
+        selected_taxonomy = (await db.execute(
+            select(ContentTaxonomy)
+            .where(ContentTaxonomy.subject_id == _recall_subject_id(subject), ContentTaxonomy.status == "published")
+            .order_by(ContentTaxonomy.version.desc())
+            .limit(1)
+        )).scalar_one_or_none()
+        if selected_taxonomy is None:
             issues.append(
                 _issue(
                     "metadata.knowledge",
@@ -258,7 +260,12 @@ async def validate_question_references(
             )
 
     if selected_taxonomy is not None:
-        knowledge_ids = _active_node_ids(selected_taxonomy["nodes"])
+        knowledge_ids = set((await db.execute(
+            select(TaxonomyNode.node_id).where(
+                TaxonomyNode.taxonomy_id == selected_taxonomy.id,
+                TaxonomyNode.status.not_in(("deleted", "inactive", "archived")),
+            )
+        )).scalars())
         if primary_id and primary_id not in knowledge_ids:
             issues.append(
                 _issue(

@@ -77,7 +77,23 @@ def test_engagement_lists_return_bounded_pagination_metadata() -> None:
     assert response.json()["pagination"]["total"] >= len(response.json()["items"])
 
 
-def test_engagement_rejects_overlong_fields_before_writing() -> None:
+def test_engagement_lists_preserve_nonzero_offset_in_service_contract() -> None:
+    from fastapi.testclient import TestClient
+
+    with TestClient(app) as client:
+        assert client.post(
+            "/api/v1/auth/login",
+            json={"username": "学生", "password": "111111"},
+        ).status_code == 200
+        response = client.get("/api/v1/engagement/feedback/mine?limit=1&offset=1")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["pagination"]["limit"] == 1
+    assert payload["pagination"]["offset"] == 1
+    assert payload["pagination"]["total"] >= len(payload["items"])
+
+
     from fastapi.testclient import TestClient
 
     with TestClient(app) as client:

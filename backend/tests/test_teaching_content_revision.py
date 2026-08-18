@@ -21,6 +21,7 @@ from app.models.content_prep import (
     SynthesisPreset,
 )
 from app.models.runtime_state import RuntimeState
+from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.user import User
@@ -396,6 +397,7 @@ def test_principle_archive_rejects_bound_questions_then_archives_the_pair() -> N
             await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id == preset_id))
             await db.execute(delete(Principle).where(Principle.id == principle_id))
             await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
             await db.execute(delete(User).where(User.username == username))
             await db.commit()
 
@@ -522,6 +524,7 @@ def test_principle_delete_removes_an_unreferenced_principle_and_its_card() -> No
         async with AsyncSessionLocal() as db:
             await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id == preset_id))
             await db.execute(delete(Principle).where(Principle.id == principle_id))
+            await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
             await db.execute(delete(User).where(User.username == username))
             await db.commit()
         await _restore_shared_rows(shared_keys, shared_snapshot)
@@ -607,6 +610,7 @@ def test_principle_bundle_import_replaces_unused_pairs_as_one_canonical_bundle()
                     Principle.id.in_([old_principle_id, new_principle_id])
                 )
             )
+            await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
             await db.execute(delete(User).where(User.username == username))
             await db.commit()
 
@@ -735,6 +739,7 @@ def test_synthesis_preset_enforces_one_card_per_principle() -> None:
                 delete(SynthesisPreset).where(SynthesisPreset.id.in_(preset_ids))
             )
             await db.execute(delete(Principle).where(Principle.id == principle_id))
+            await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
             await db.execute(delete(User).where(User.username == username))
             await db.commit()
 
@@ -939,6 +944,7 @@ def test_personal_runtime_put_returns_its_old_content_token_not_a_later_writer(
     async def cleanup() -> None:
         async with AsyncSessionLocal() as db:
             await db.execute(delete(RuntimeState).where(RuntimeState.owner_id == username))
+            await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
             await db.execute(delete(User).where(User.username == username))
             await db.commit()
 
@@ -1500,6 +1506,8 @@ def test_content_prep_batch_projects_canonical_relations_and_bumps_once() -> Non
                 )
                 await db.execute(delete(Principle).where(Principle.id == principle_id))
                 await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+                await db.execute(delete(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id.in_(select(PaperRelease.id).where(PaperRelease.publisher_id == username))))
+                await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
                 await db.execute(delete(User).where(User.username == username))
                 await db.commit()
             await _restore_shared_rows(shared_keys, shared_snapshot)
@@ -1582,6 +1590,8 @@ def test_rejected_content_prep_batch_keeps_projection_and_revision_unchanged() -
                 )
                 await db.execute(delete(Question).where(Question.id == question_id))
                 await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+                await db.execute(delete(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id.in_(select(PaperRelease.id).where(PaperRelease.publisher_id == username))))
+                await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
                 await db.execute(delete(User).where(User.username == username))
                 await db.commit()
             await _restore_shared_rows(shared_keys, shared_snapshot)
@@ -1742,6 +1752,7 @@ def test_runtime_principle_projection_upserts_present_marks_missing_inactive_and
     ) -> None:
         async with AsyncSessionLocal() as db:
             await db.execute(delete(RuntimeState).where(RuntimeState.owner_id == username))
+            await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
             await db.execute(delete(User).where(User.username == username))
             await db.commit()
         await _restore_principle_relations(
@@ -2252,6 +2263,7 @@ def test_runtime_request_id_replay_skips_content_cas_and_second_bump() -> None:
     async def cleanup(snapshot: dict[str, dict]) -> None:
         async with AsyncSessionLocal() as db:
             await db.execute(delete(RuntimeState).where(RuntimeState.owner_id == username))
+            await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
             await db.execute(delete(User).where(User.username == username))
             await db.commit()
         await _restore_shared_rows(shared_keys, snapshot)
@@ -2315,6 +2327,7 @@ def test_admin_settings_runtime_write_neither_requires_nor_bumps_content_revisio
     async def cleanup(snapshot: dict[str, dict]) -> None:
         async with AsyncSessionLocal() as db:
             await db.execute(delete(RuntimeState).where(RuntimeState.owner_id == username))
+            await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
             await db.execute(delete(User).where(User.username == username))
             await db.commit()
         await _restore_shared_rows(shared_keys, snapshot)
@@ -2532,6 +2545,8 @@ def test_each_bank_question_and_paper_mutation_bumps_exactly_once() -> None:
                     )
                     await db.execute(delete(Question).where(Question.bank_id == bank_id))
                     await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+                await db.execute(delete(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id.in_(select(PaperRelease.id).where(PaperRelease.publisher_id == username))))
+                await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
                 await db.execute(delete(User).where(User.username == username))
                 await db.commit()
             await _restore_shared_rows(shared_keys, snapshot)
@@ -2582,6 +2597,7 @@ def test_content_prep_bank_creation_bumps_once() -> None:
         async with AsyncSessionLocal() as db:
             if bank_id:
                 await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
             await db.execute(delete(User).where(User.username == username))
             await db.commit()
         await _restore_shared_rows({revision_service.REVISION_KEY}, snapshot)

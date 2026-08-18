@@ -122,6 +122,8 @@ class ContentPrepActivityImportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     content_revision: StrictInt = Field(alias="contentRevision", ge=0)
+    subject_id: str = Field(default="subject-pmp", alias="subjectId", min_length=1, max_length=128)
+    collection_id: str = Field(default="default", alias="collectionId", min_length=1, max_length=128)
     activities: list[dict[str, Any]] = Field(min_length=1, max_length=5000)
 
 

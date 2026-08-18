@@ -1353,32 +1353,41 @@ async def set_published(
     published: bool,
     expected_revision: object,
 ) -> ExamPaper | None:
-    await teaching_content_revision_service.acquire_lock(db)
-    updated_id = await _cas_paper_mutation(
-        db,
-        actor,
-        paper_id,
-        expected_revision,
-        {
-            "status": PUBLISHED if published else DRAFT,
-            "published_at": now_utc() if published else None,
-        },
-    )
-    if updated_id is None:
-        return None
-    await teaching_content_revision_service.bump(
-        db,
-        actor.username,
-        [
-            {
-                "entityType": "paper",
-                "entityId": updated_id,
-                "action": "published" if published else "unpublished",
-            }
-        ],
-    )
-    await db.commit()
-    p = await db.get(ExamPaper, updated_id)
+    from app.services import paper_release_service
+
+    if published:
+        await paper_release_service.publish(
+            db,
+            actor,
+            paper_id,
+            expected_revision=expected_revision,
+            access_level="free",
+            enabled_modes=["practice_mode"],
+            allowed_roles=["student", "viewer"],
+            metadata={},
+        )
+    else:
+        active_release = (
+            await db.execute(
+                select(paper_release_service.PaperRelease)
+                .where(
+                    paper_release_service.PaperRelease.paper_id == paper_id,
+                    paper_release_service.PaperRelease.status == paper_release_service.ACTIVE_STATUS,
+                )
+                .order_by(paper_release_service.PaperRelease.version.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if active_release is None:
+            _require_paper_revision(expected_revision)
+            return None
+        await paper_release_service.withdraw(
+            db,
+            actor,
+            active_release.id,
+            expected_revision=expected_revision,
+        )
+    p = await db.get(ExamPaper, paper_id)
     if p is None:
         return None
     await db.refresh(p)

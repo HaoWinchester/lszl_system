@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import can
@@ -59,23 +59,22 @@ async def _visible_question(
     db: AsyncSession,
     user: User,
     question_id: str,
+    *,
+    release_id: str = "",
 ) -> Question:
-    question = await db.get(Question, question_id)
-    if question is None:
-        question = (
-            await published_paper_access_service.load_or_project_published_question(
-                db, user, question_id
-            )
+    if release_id:
+        frozen = await published_paper_access_service.load_published_question(
+            db, user, release_id, question_id, mode="deep_recall"
         )
-        if question is None:
-            raise _error(404, "recall_question_not_found", "题目不存在或当前不可学习")
-    if not await question_catalog_service.is_learning_question_visible(
-        db, question_id
-    ) and not await published_paper_access_service.can_learn_published_question(
-        db, user, question
-    ):
+        if frozen is not None:
+            return frozen
         raise _error(404, "recall_question_not_found", "题目不存在或当前不可学习")
-    return question
+    question = await db.get(Question, question_id)
+    if question is not None and await question_catalog_service.is_learning_question_visible(
+        db, question_id
+    ):
+        return question
+    raise _error(404, "recall_question_not_found", "题目不存在或当前不可学习")
 
 
 async def _question_subject(db: AsyncSession, question: Question) -> str:
@@ -89,7 +88,13 @@ async def _question_subject(db: AsyncSession, question: Question) -> str:
 async def _ensure_question_snapshot(
     db: AsyncSession,
     question: Question,
+    *,
+    release_id: str = "",
 ) -> tuple[RecallQuestionSnapshot, bool]:
+    release_filter = (
+        RecallQuestionSnapshot.release_id == release_id
+        if release_id else RecallQuestionSnapshot.release_id.is_(None)
+    )
     payload = question_catalog_service.question_to_payload(question)
     content_hash = str(question.content_hash or "").strip() or canonical_hash(payload)
     snapshot = (
@@ -97,6 +102,7 @@ async def _ensure_question_snapshot(
             select(RecallQuestionSnapshot).where(
                 RecallQuestionSnapshot.question_id == question.id,
                 RecallQuestionSnapshot.question_revision == int(question.revision or 1),
+                release_filter,
             )
         )
     ).scalar_one_or_none()
@@ -112,6 +118,7 @@ async def _ensure_question_snapshot(
     snapshot = RecallQuestionSnapshot(
         id=str(uuid4()),
         question_id=question.id,
+        release_id=release_id or None,
         bank_id=question.bank_id,
         question_revision=int(question.revision or 1),
         content_hash=content_hash,
@@ -168,6 +175,7 @@ async def _history_question(
                 RecallQuestionSnapshot.question_id == progress.question_id,
                 RecallQuestionSnapshot.question_revision
                 == progress.source_question_revision,
+                RecallQuestionSnapshot.release_id == progress.release_id,
             )
         )
     ).scalar_one_or_none()
@@ -262,11 +270,15 @@ async def get_session(
     db: AsyncSession,
     user: User,
     question_id: str,
+    *,
+    release_id: str = "",
 ) -> dict[str, Any]:
     if not can(user.role, "useDeepRecall"):
         raise _error(403, "deep_recall_permission_denied", "当前账号无权使用深度回忆")
-    question = await _visible_question(db, user, question_id)
-    question_snapshot, question_created = await _ensure_question_snapshot(db, question)
+    question = await _visible_question(db, user, question_id, release_id=release_id)
+    question_snapshot, question_created = await _ensure_question_snapshot(
+        db, question, release_id=release_id
+    )
     library_snapshot, library_created = await _ensure_library_snapshot(
         db,
         await _question_subject(db, question),
@@ -276,7 +288,17 @@ async def get_session(
         await db.refresh(question_snapshot)
         await db.refresh(library_snapshot)
 
-    progress = await db.get(RecallProgress, (user.username, question_id))
+    release_filter = (
+        RecallProgress.release_id == release_id
+        if release_id else RecallProgress.release_id.is_(None)
+    )
+    progress = (
+        await db.execute(select(RecallProgress).where(
+            RecallProgress.owner_id == user.username,
+            RecallProgress.question_id == question_id,
+            release_filter,
+        ))
+    ).scalar_one_or_none()
     mismatch = bool(
         progress
         and (
@@ -321,9 +343,13 @@ async def _current_snapshots(
     db: AsyncSession,
     user: User,
     question_id: str,
+    *,
+    release_id: str = "",
 ) -> tuple[Question, RecallQuestionSnapshot, RecallLibrarySnapshot]:
-    question = await _visible_question(db, user, question_id)
-    question_snapshot, _ = await _ensure_question_snapshot(db, question)
+    question = await _visible_question(db, user, question_id, release_id=release_id)
+    question_snapshot, _ = await _ensure_question_snapshot(
+        db, question, release_id=release_id
+    )
     library_snapshot, _ = await _ensure_library_snapshot(
         db,
         await _question_subject(db, question),
@@ -336,12 +362,14 @@ async def save_progress(
     user: User,
     question_id: str,
     request: RecallProgressSaveRequest,
+    *,
+    release_id: str = "",
 ) -> dict[str, Any]:
     permissions = _permissions(user)
     if not permissions["canWrite"]:
         raise _error(403, "deep_recall_read_only", "当前账号只能查看深度回忆")
     question, question_snapshot, library_snapshot = await _current_snapshots(
-        db, user, question_id
+        db, user, question_id, release_id=release_id
     )
     if request.question_revision != question_snapshot.question_revision:
         raise _error(409, "question_revision_mismatch", "题目版本已更新，请重新载入")
@@ -357,12 +385,18 @@ async def save_progress(
             limit=limit,
         )
 
+    await db.execute(
+        sql_text("SELECT pg_advisory_xact_lock(hashtext(:owner), hashtext(:scope))"),
+        {"owner": user.username, "scope": f"deep-recall:{release_id}:{question_id}"},
+    )
     progress = (
         await db.execute(
             select(RecallProgress)
             .where(
                 RecallProgress.owner_id == user.username,
                 RecallProgress.question_id == question_id,
+                (RecallProgress.release_id == release_id)
+                if release_id else RecallProgress.release_id.is_(None),
             )
             .with_for_update()
         )
@@ -377,7 +411,9 @@ async def save_progress(
         )
 
     if progress is None:
-        progress = RecallProgress(owner_id=user.username, question_id=question_id)
+        progress = RecallProgress(
+            owner_id=user.username, question_id=question_id, release_id=release_id or None
+        )
         db.add(progress)
     progress.bank_id = question.bank_id
     progress.source_question_revision = question_snapshot.question_revision
@@ -402,21 +438,29 @@ async def reset_progress(
     user: User,
     question_id: str,
     request: RecallProgressResetRequest,
+    *,
+    release_id: str = "",
 ) -> dict[str, Any]:
     permissions = _permissions(user)
     if not permissions["canReset"]:
         raise _error(403, "deep_recall_read_only", "当前账号不能重置深度回忆")
     question, question_snapshot, library_snapshot = await _current_snapshots(
-        db, user, question_id
+        db, user, question_id, release_id=release_id
     )
     if request.target_question_revision != question_snapshot.question_revision:
         raise _error(409, "question_revision_mismatch", "目标题目版本不是当前版本")
+    await db.execute(
+        sql_text("SELECT pg_advisory_xact_lock(hashtext(:owner), hashtext(:scope))"),
+        {"owner": user.username, "scope": f"deep-recall:{release_id}:{question_id}"},
+    )
     progress = (
         await db.execute(
             select(RecallProgress)
             .where(
                 RecallProgress.owner_id == user.username,
                 RecallProgress.question_id == question_id,
+                (RecallProgress.release_id == release_id)
+                if release_id else RecallProgress.release_id.is_(None),
             )
             .with_for_update()
         )
@@ -430,7 +474,9 @@ async def reset_progress(
             currentRevision=current_revision,
         )
     if progress is None:
-        progress = RecallProgress(owner_id=user.username, question_id=question_id)
+        progress = RecallProgress(
+            owner_id=user.username, question_id=question_id, release_id=release_id or None
+        )
         db.add(progress)
     progress.bank_id = question.bank_id
     progress.source_question_revision = question_snapshot.question_revision

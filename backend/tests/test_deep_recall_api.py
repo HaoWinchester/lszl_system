@@ -10,8 +10,10 @@ from sqlalchemy import delete, select
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
 from app.main import app
-from app.models.question import Question, QuestionBank
+from app.models.paper_release import PaperRelease, PaperReleaseQuestion
+from app.models.question import ExamPaper, Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.teaching_content import ContentSubject, RecallAssociationLibrary
 from app.models.training import (
     RecallLibrarySnapshot,
     RecallProgress,
@@ -123,17 +125,15 @@ def test_recall_progress_is_owner_isolated_revision_checked_and_library_read_onl
                 "edges": [],
                 "updatedAt": "2026-08-14T00:00:00Z",
             }
-            if row is None:
-                db.add(
-                    SharedRuntimeState(
-                        key=RECALL_KEY,
-                        value=json.dumps(recall_payload, ensure_ascii=False),
-                        updated_by=teacher,
-                    )
-                )
+            subject = await db.get(ContentSubject, "subject-pmp")
+            if subject is None:
+                db.add(ContentSubject(id="subject-pmp", code="PMP", name="PMP", content_metadata={}))
+                await db.flush()
+            existing_library = (await db.execute(select(RecallAssociationLibrary).where(RecallAssociationLibrary.subject_id == "subject-pmp", RecallAssociationLibrary.version == 1))).scalar_one_or_none()
+            if existing_library is None:
+                db.add(RecallAssociationLibrary(id=f"recall-library-{suffix}", subject_id="subject-pmp", version=1, status="published", nodes=recall_payload["nodes"], edges=recall_payload["edges"], content_metadata=recall_payload, updated_by=teacher))
             else:
-                row.value = json.dumps(recall_payload, ensure_ascii=False)
-                row.updated_by = teacher
+                existing_library.nodes, existing_library.edges, existing_library.content_metadata, existing_library.updated_by = recall_payload["nodes"], recall_payload["edges"], recall_payload, teacher
             await db.commit()
 
     async def cleanup() -> None:
@@ -294,6 +294,23 @@ def test_published_paper_grants_recall_access_to_private_bank_question() -> None
                     ],
                 }
             ]
+            db.add(ExamPaper(
+                id=paper_id, owner_id=teacher, name="已发布深度回忆试卷",
+                subject="PMP", status="published",
+            ))
+            await db.flush()
+            db.add(PaperRelease(
+                id=release_id, paper_id=paper_id, version=1, status="published",
+                name="已发布深度回忆试卷", subject="PMP", publisher_id=teacher,
+                access_level="free", enabled_modes=["deep_recall"],
+                allowed_roles=["student"], question_count=1,
+            ))
+            await db.flush()
+            db.add(PaperReleaseQuestion(
+                release_id=release_id, order_index=0, bank_id=bank_id,
+                question_id=question_id,
+                snapshot=published_payload[0]["questionSnapshots"][0]["question"],
+            ))
             for key, payload in (
                 (RECALL_KEY, recall_payload),
                 (PUBLISHED_PAPERS_KEY, published_payload),
@@ -315,6 +332,9 @@ def test_published_paper_grants_recall_access_to_private_bank_question() -> None
 
     async def cleanup() -> None:
         async with AsyncSessionLocal() as db:
+            await db.execute(delete(RecallProgress).where(
+                RecallProgress.question_id == question_id
+            ))
             await db.execute(
                 delete(RecallQuestionSnapshot).where(
                     RecallQuestionSnapshot.question_id == question_id
@@ -328,6 +348,9 @@ def test_published_paper_grants_recall_access_to_private_bank_question() -> None
                 )
                 if key in previous_shared:
                     db.add(SharedRuntimeState(key=key, **previous_shared[key]))
+            await db.execute(delete(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == release_id))
+            await db.execute(delete(PaperRelease).where(PaperRelease.id == release_id))
+            await db.execute(delete(ExamPaper).where(ExamPaper.id == paper_id))
             await db.execute(delete(User).where(User.username.in_([teacher, student])))
             await db.commit()
 
@@ -335,12 +358,37 @@ def test_published_paper_grants_recall_access_to_private_bank_question() -> None
     try:
         with TestClient(app) as client:
             _login(client, student)
-            response = client.get(f"/api/v1/recall/session/{question_id}")
+            response = client.get(
+                f"/api/v1/recall/session/{question_id}?releaseId={release_id}"
+            )
             assert response.status_code == 200, response.text
             body = response.json()
             assert body["questionId"] == question_id
             assert body["bankId"] == bank_id
             assert body["currentQuestion"]["title"] == "已发布试卷中的私有源题目"
+            saved = client.put(
+                f"/api/v1/recall/progress/{question_id}?releaseId={release_id}",
+                json=_graph_payload(body, "发布版本节点"),
+            )
+            assert saved.status_code == 200, saved.text
+            assert saved.json()["revision"] == 1
+            resumed = client.get(
+                f"/api/v1/recall/session/{question_id}?releaseId={release_id}"
+            )
+            assert resumed.status_code == 200, resumed.text
+            assert resumed.json()["progress"]["nodes"][0]["title"] == "发布版本节点"
+            ordinary = client.get(f"/api/v1/recall/session/{question_id}")
+            assert ordinary.status_code == 404
+            reset = client.post(
+                f"/api/v1/recall/progress/{question_id}/reset?releaseId={release_id}",
+                json={
+                    "expectedRevision": resumed.json()["progressRevision"],
+                    "targetQuestionRevision": body["currentQuestion"]["revision"],
+                },
+            )
+            assert reset.status_code == 200, reset.text
+            assert reset.json()["revision"] == 2
+            assert reset.json()["nodes"] == []
     finally:
         asyncio.run(cleanup())
 
@@ -460,12 +508,8 @@ def test_published_snapshot_is_projected_before_recall_session() -> None:
         async with AsyncSessionLocal() as db:
             bank = await db.get(QuestionBank, bank_id)
             question = await db.get(Question, question_id)
-            assert bank is not None
-            assert bank.visibility == "private"
-            assert question is not None
-            assert question.bank_id == bank_id
-            assert question.scope == "internal"
-            assert question.revision == 3
+            assert bank is None
+            assert question is None
 
     async def cleanup() -> None:
         async with AsyncSessionLocal() as db:
@@ -490,10 +534,8 @@ def test_published_snapshot_is_projected_before_recall_session() -> None:
         with TestClient(app) as client:
             _login(client, student)
             response = client.get(f"/api/v1/recall/session/{question_id}")
-            assert response.status_code == 200, response.text
-            body = response.json()
-            assert body["currentQuestion"]["title"] == "仅存在于存量发布快照中的题目"
-            assert body["currentQuestion"]["revision"] == 3
+            assert response.status_code == 404
+            assert response.json()["detail"]["code"] == "recall_question_not_found"
         asyncio.run(assert_projection())
     finally:
         asyncio.run(cleanup())

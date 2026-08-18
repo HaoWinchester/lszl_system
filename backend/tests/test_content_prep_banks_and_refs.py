@@ -4,7 +4,7 @@ from copy import deepcopy
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
@@ -12,6 +12,7 @@ from app.main import app
 from app.models.content_prep import Principle
 from app.models.question import QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.teaching_content import ContentSubject, ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode
 from app.models.user import User
 from app.services.content_reference_service import validate_question_references
 from app.services.content_prep_service import CREATORS
@@ -116,6 +117,17 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
                     updated_by=teacher_username,
                 )
             )
+            subject = ContentSubject(id="subject-pmp", code="PMP", name="PMP", content_metadata={})
+            db.add(subject)
+            await db.flush()
+            for version, taxonomy in enumerate(json.loads(taxonomy_value), start=1):
+                row = ContentTaxonomy(id=taxonomy["id"], subject_id="subject-pmp", version=version, status=taxonomy["status"], title="", content_metadata=taxonomy, updated_by=teacher_username)
+                db.add(row)
+                await db.flush()
+                for position, node in enumerate(taxonomy["nodes"]):
+                    db.add(TaxonomyNode(id=f"{row.id}:{node['id']}", taxonomy_id=row.id, node_id=node["id"], record=node, position=position))
+            recall_payload = json.loads(recall_value)
+            db.add(RecallAssociationLibrary(id=f"recall-subject-pmp-{suffix}", subject_id="subject-pmp", version=1, nodes=recall_payload["nodes"], edges=recall_payload["edges"], content_metadata=recall_payload, updated_by=teacher_username))
             await db.commit()
 
     async def verify_created_banks() -> None:
@@ -184,9 +196,9 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
                 incoming_principle_ids={"principle-incoming"},
             ) == []
 
-            taxonomy = await db.get(SharedRuntimeState, TAXONOMY_KEY)
-            assert taxonomy is not None
-            taxonomy.value = "{broken-json"
+            taxonomy = (await db.execute(select(ContentTaxonomy).where(ContentTaxonomy.subject_id == "subject-pmp", ContentTaxonomy.status == "published").order_by(ContentTaxonomy.version.desc()).limit(1))).scalar_one()
+            await db.execute(delete(TaxonomyNode).where(TaxonomyNode.taxonomy_id == taxonomy.id))
+            taxonomy.status = "archived"
             await db.commit()
             unavailable = await validate_question_references(
                 db,

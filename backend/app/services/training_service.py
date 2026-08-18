@@ -1,6 +1,6 @@
 """训练作答与深度回忆进度的读写。"""
 
-from sqlalchemy import select
+from sqlalchemy import select, text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import uid
@@ -10,10 +10,15 @@ from app.services import question_catalog_service, question_service
 
 
 # ---------- 训练作答 ----------
-async def get_progress(db: AsyncSession, owner: str, question_id: str) -> dict | None:
+async def get_progress(
+    db: AsyncSession, owner: str, question_id: str, release_id: str = ""
+) -> dict | None:
     r = await db.execute(
         select(TrainingProgress).where(
-            TrainingProgress.owner_id == owner, TrainingProgress.question_id == question_id
+            TrainingProgress.owner_id == owner,
+            TrainingProgress.question_id == question_id,
+            (TrainingProgress.release_id == release_id)
+            if release_id else TrainingProgress.release_id.is_(None),
         )
     )
     p = r.scalar_one_or_none()
@@ -27,10 +32,19 @@ async def get_progress(db: AsyncSession, owner: str, question_id: str) -> dict |
     }
 
 
-async def save_progress(db: AsyncSession, owner: str, question_id: str, data: dict) -> dict:
+async def save_progress(
+    db: AsyncSession, owner: str, question_id: str, data: dict, release_id: str = ""
+) -> dict:
+    await db.execute(
+        sql_text("SELECT pg_advisory_xact_lock(hashtext(:owner), hashtext(:scope))"),
+        {"owner": owner, "scope": f"training-progress:{release_id}:{question_id}"},
+    )
     r = await db.execute(
         select(TrainingProgress).where(
-            TrainingProgress.owner_id == owner, TrainingProgress.question_id == question_id
+            TrainingProgress.owner_id == owner,
+            TrainingProgress.question_id == question_id,
+            (TrainingProgress.release_id == release_id)
+            if release_id else TrainingProgress.release_id.is_(None),
         )
     )
     p = r.scalar_one_or_none()
@@ -52,6 +66,7 @@ async def save_progress(db: AsyncSession, owner: str, question_id: str, data: di
             id=uid("tp_"),
             owner_id=owner,
             question_id=question_id,
+            release_id=release_id or None,
             bank_id=data.get("bankId"),
             paper_id=data.get("paperId"),
             selected_answer=data.get("selectedAnswer"),
@@ -77,8 +92,20 @@ async def get_question_for_recall(db: AsyncSession, owner: str, question_id: str
     return question_service.question_to_dict(q)
 
 
+async def _legacy_recall_progress(
+    db: AsyncSession, owner: str, question_id: str
+) -> RecallProgress | None:
+    return (
+        await db.execute(select(RecallProgress).where(
+            RecallProgress.owner_id == owner,
+            RecallProgress.question_id == question_id,
+            RecallProgress.release_id.is_(None),
+        ))
+    ).scalar_one_or_none()
+
+
 async def get_recall(db: AsyncSession, owner: str, question_id: str) -> dict | None:
-    r = await db.get(RecallProgress, (owner, question_id))
+    r = await _legacy_recall_progress(db, owner, question_id)
     if not r:
         return None
     return {
@@ -98,7 +125,7 @@ async def save_recall(db: AsyncSession, owner: str, question_id: str, data: dict
     # expired deep-recall route becomes a clean 404 rather than a FK 500.
     if not await question_catalog_service.is_learning_question_visible(db, question_id):
         raise LookupError("题目不存在或无权访问")
-    r = await db.get(RecallProgress, (owner, question_id))
+    r = await _legacy_recall_progress(db, owner, question_id)
     payload = {
         "nodes": data.get("nodes") or [],
         "edges": data.get("edges") or [],
@@ -140,27 +167,40 @@ async def list_recall_progress_question_ids(
     *,
     bank_id: str | None = None,
     question_ids: list[str] | None = None,
+    release_id: str = "",
 ) -> list[str]:
     """Return explored ids for one bank or a bounded published-collection snapshot."""
 
-    filters = [RecallProgress.owner_id == owner]
+    filters = [
+        RecallProgress.owner_id == owner,
+        (RecallProgress.release_id == release_id)
+        if release_id else RecallProgress.release_id.is_(None),
+    ]
     if bank_id:
-        filters.append(Question.bank_id == bank_id)
+        filters.append(RecallProgress.bank_id == bank_id)
     elif question_ids:
         filters.append(RecallProgress.question_id.in_(question_ids))
     else:
         return []
     rows = await db.execute(
         select(RecallProgress.question_id)
-        .join(Question, Question.id == RecallProgress.question_id)
         .where(*filters)
         .order_by(RecallProgress.saved_at.desc(), RecallProgress.question_id)
     )
     return [str(question_id) for question_id in rows.scalars().all()]
 
 
-async def delete_recall(db: AsyncSession, owner: str, question_id: str) -> bool:
-    progress = await db.get(RecallProgress, (owner, question_id))
+async def delete_recall(
+    db: AsyncSession, owner: str, question_id: str, release_id: str = ""
+) -> bool:
+    progress = (
+        await db.execute(select(RecallProgress).where(
+            RecallProgress.owner_id == owner,
+            RecallProgress.question_id == question_id,
+            (RecallProgress.release_id == release_id)
+            if release_id else RecallProgress.release_id.is_(None),
+        ))
+    ).scalar_one_or_none()
     if progress is None:
         return False
     await db.delete(progress)

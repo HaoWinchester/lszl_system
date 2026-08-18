@@ -15,13 +15,35 @@ DB = Annotated[AsyncSession, Depends(get_db)]
 
 
 @router.get("/training/progress/{question_id}")
-async def get_progress(question_id: str, db: DB, user: CurrentUser):
-    return {"progress": await training_service.get_progress(db, user.username, question_id)}
+async def get_progress(
+    question_id: str,
+    db: DB,
+    user: CurrentUser,
+    release_id: str = Query("", alias="releaseId", max_length=64),
+):
+    return {"progress": await training_service.get_progress(
+        db, user.username, question_id, release_id
+    )}
 
 
 @router.put("/training/progress/{question_id}")
-async def save_progress(question_id: str, body: dict, db: DB, user: CurrentUser):
-    return {"progress": await training_service.save_progress(db, user.username, question_id, body)}
+async def save_progress(
+    question_id: str,
+    body: dict,
+    db: DB,
+    user: CurrentUser,
+    release_id: str = Query("", alias="releaseId", max_length=64),
+):
+    if release_id:
+        from app.services import published_paper_access_service
+        question = await published_paper_access_service.load_published_question(
+            db, user, release_id, question_id, mode="single_deep_study"
+        )
+        if question is None:
+            raise HTTPException(status_code=404, detail="题目不存在或当前不可学习")
+    return {"progress": await training_service.save_progress(
+        db, user.username, question_id, body, release_id
+    )}
 
 
 @router.get("/recall/question/{question_id}")
@@ -43,6 +65,7 @@ async def list_recall_progress(
     user: CurrentUser,
     bank_id: str | None = Query(None, min_length=1),
     question_ids: list[str] = Query(default=[]),
+    release_id: str = Query("", alias="releaseId", max_length=64),
 ):
     return {
         "questionIds": await training_service.list_recall_progress_question_ids(
@@ -50,6 +73,7 @@ async def list_recall_progress(
             user.username,
             bank_id=bank_id,
             question_ids=[question_id for question_id in question_ids if question_id][:200],
+            release_id=release_id,
         )
     }
 
@@ -60,13 +84,21 @@ async def save_recall(
     body: RecallProgressSaveRequest,
     db: DB,
     user: CurrentUser,
+    release_id: str = Query("", alias="releaseId", max_length=64),
 ):
-    return await deep_recall_service.save_progress(db, user, question_id, body)
+    return await deep_recall_service.save_progress(
+        db, user, question_id, body, release_id=release_id
+    )
 
 
 @router.get("/recall/session/{question_id}")
-async def recall_session(question_id: str, db: DB, user: CurrentUser):
-    return await deep_recall_service.get_session(db, user, question_id)
+async def recall_session(
+    question_id: str,
+    db: DB,
+    user: CurrentUser,
+    release_id: str = Query("", alias="releaseId", max_length=64),
+):
+    return await deep_recall_service.get_session(db, user, question_id, release_id=release_id)
 
 
 @router.post("/recall/progress/{question_id}/reset")
@@ -75,8 +107,11 @@ async def reset_recall(
     body: RecallProgressResetRequest,
     db: DB,
     user: CurrentUser,
+    release_id: str = Query("", alias="releaseId", max_length=64),
 ):
-    return await deep_recall_service.reset_progress(db, user, question_id, body)
+    return await deep_recall_service.reset_progress(
+        db, user, question_id, body, release_id=release_id
+    )
 
 
 @router.get("/recall/libraries/{subject}")
@@ -85,6 +120,13 @@ async def recall_library(subject: str, db: DB, user: CurrentUser):
 
 
 @router.delete("/recall/progress/{question_id}")
-async def delete_recall(question_id: str, db: DB, user: CurrentUser):
+async def delete_recall(
+    question_id: str,
+    db: DB,
+    user: CurrentUser,
+    release_id: str = Query("", alias="releaseId", max_length=64),
+):
     """Compatibility endpoint for older clients; new clients use explicit reset."""
-    return {"deleted": await training_service.delete_recall(db, user.username, question_id)}
+    return {"deleted": await training_service.delete_recall(
+        db, user.username, question_id, release_id
+    )}
