@@ -801,38 +801,38 @@ function injectPage(html, page, version) {
       autosaveTag,
       `${autosaveTag}\n<script defer src="./direct-graph-adapter.js"></script><!-- kg-graph:generated -->`,
     )
-    const wechatLoginTag = '<script defer src="src/32-wechat-login.js"></script>'
-    // 较早的发布包没有订阅模块；只在提供微信登录与订阅运行时的首页注入支付适配器。
-    if (generated.includes(wechatLoginTag)) {
-      generated = generated.replace(
-        wechatLoginTag,
-        `${wechatLoginTag}\n<script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->`,
-      )
-    }
-  }
-  if (page === 'practice-mode.html') {
-    const wechatLoginTag = '<script defer src="src/32-wechat-login.js"></script>'
-    if (generated.includes(wechatLoginTag) && !generated.includes('kg-system:generated')) {
-      generated = generated.replace(
-        wechatLoginTag,
-        `${wechatLoginTag}\n<script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->`,
-      )
-    }
+    // 支付适配器（direct-system-adapter）统一由下方 33-user-center 通用规则注入并保证
+    // 位于 37-subscription-core 之后；此处不再按 32-wechat-login 位置单独注入。
   }
   {
     // 会员权益弹窗（33-user-center）可能在任何页面打开；支付与服务端套餐价依赖
-    // direct-system-adapter。凡加载 33-user-center 的页面一律在其之前注入适配器，
-    // 否则套餐价回落到前端写死的默认值（如季度 ¥79）。
+    // direct-system-adapter。适配器执行时必须已存在 KGSubscription（37-subscription-core）、
+    // KGRolePermissions（34-role-permissions）、KGWechatLogin（32-wechat-login），否则开头
+    // 直接 return，不预载服务端套餐价——弹窗价格就会回落到前端写死的默认值
+    // （月 ¥29 / 季 ¥79 / 半年 ¥139 / 终身 ¥399），与后台配置价不一致。
+    // 因此：先剥离历史注入（含错误位置，如曾注入在 32-wechat-login 之后、34/37 之前的
+    // practice-mode），再统一注入到 33-user-center 之前，并断言顺序防回退。
     let userCenterTag = findLocalScriptTag(generated, 'src/33-user-center.js')
     if (!userCenterTag) {
       // 兼容 </script> 另起一行的写法（如 message-management.html）：只匹配开始标签。
       userCenterTag = generated.match(/<script\b[^>]*\bsrc=(['"])(?:\.\/)?src\/33-user-center\.js(?:\?[^'"]*)?\1[^>]*>/i)?.[0] || ''
     }
-    if (userCenterTag && !generated.includes('direct-system-adapter.js')) {
+    if (userCenterTag) {
+      generated = removeLocalScriptTags(generated, 'direct-system-adapter.js')
+      generated = generated.replace(/^[ \t]*<!--\s*kg-system:generated\s*-->[ \t]*(?:\r?\n)?/gim, '')
+      const adapterTag = '<script defer src="./direct-system-adapter.js"></script>'
       generated = generated.replace(
         userCenterTag,
-        `<script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->\n${userCenterTag}`,
+        `${adapterTag}<!-- kg-system:generated -->\n${userCenterTag}`,
       )
+      const subscriptionCoreTag = findLocalScriptTag(generated, 'src/37-subscription-core.js')
+      if (subscriptionCoreTag) {
+        const adapterIndex = generated.indexOf(adapterTag)
+        const coreIndex = generated.indexOf(subscriptionCoreTag)
+        if (adapterIndex < 0 || coreIndex < 0 || adapterIndex < coreIndex) {
+          throw new Error(`new-legacy ${page} 支付适配器必须位于 37-subscription-core.js 之后，请复核会员价格加载顺序`)
+        }
+      }
     }
   }
   if (page === 'question-bank.html') {
