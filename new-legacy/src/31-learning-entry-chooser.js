@@ -125,7 +125,6 @@
     if (!active) return [];
     const dialog = active.dialog;
     return [
-      dialog.querySelector('[aria-label="关闭学习入口"]'),
       ...Array.from(dialog.querySelectorAll("[data-learning-entry-choice]")),
       dialog.querySelector("#learningEntryDismissBtn"),
     ].filter(Boolean);
@@ -199,8 +198,7 @@
       const head = element(doc, "div", { class: "learning-entry-head" });
       const heading = element(doc, "div");
       heading.append(element(doc, "h2", { id: "learningEntryTitle" }, "从这里开始学习"), element(doc, "p", {}, "选择你现在最想做的事，直接进入对应学习板块。"));
-      const close = element(doc, "button", { type: "button", class: "learning-entry-close", "aria-label": "关闭学习入口", "data-learning-entry-focusable": "" }, "×");
-      head.append(heading, close);
+      head.append(heading);
       const choices = element(doc, "div", { class: "learning-entry-grid" });
       const error = element(doc, "p", { class: "learning-entry-error", id: "learningEntryChooserError", "aria-live": "polite" });
       CHOICES.forEach(choice => {
@@ -219,7 +217,6 @@
     const dialog = root.querySelector("[role=dialog]") || root.querySelector(".learning-entry-modal");
     const error = root.querySelector("#learningEntryChooserError");
     const buttons = root.querySelectorAll("[data-learning-entry-choice]");
-    bindOnce(root.querySelector('[aria-label="关闭学习入口"]'), "click", () => closeDialog({ focusGraph: true }));
     bindOnce(root.querySelector("#learningEntryDismissBtn"), "click", () => closeDialog({ focusGraph: true }));
     buttons.forEach(button => {
       const choice = CHOICES.find(item => item.label === button.getAttribute("data-learning-entry-choice"));
