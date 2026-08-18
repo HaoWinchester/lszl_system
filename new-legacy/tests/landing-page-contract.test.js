@@ -17,7 +17,7 @@ const contract = JSON.parse(fs.readFileSync(CONTRACT, 'utf8'));
 assert.match(html, /<html[^>]*lang="zh-CN"[^>]*class="landing-page"/);
 assert.match(html, /<title>幻谱｜知识图谱学习平台<\/title>/);
 assert.match(html, /<link rel="icon" href="data:image\/svg\+xml,/);
-assert.match(html, /<h1[^>]*>[\s\S]*把零散考点[\s\S]*会生长的图谱[\s\S]*<\/h1>/);
+assert.match(html, /<h1[^>]*>[\s\S]*把零散知识点[\s\S]*会生长的图谱[\s\S]*<\/h1>/);
 assert.match(html, /知识难的不是内容多，[\s\S]*知识始终[\s\S]*没有连起来/);
 assert.match(html, /构建图谱[\s\S]*做题验证[\s\S]*归纳错因[\s\S]*主动回忆/);
 
