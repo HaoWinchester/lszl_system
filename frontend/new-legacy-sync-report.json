@@ -3,38 +3,9 @@
   "fromVersion": "v9.0-p4.1.102",
   "toVersion": "v9.0-p4.1.102",
   "changes": {
-    "added": [
-      "assets/客服二维码/1.jpg",
-      "tests/contact-entry.test.js",
-      "tests/practice-mode-close-buttons.test.js"
-    ],
-    "changed": [
-      "index.html",
-      "landing.html",
-      "src/103-support-center.js",
-      "src/31-learning-entry-chooser.js",
-      "src/landing.js",
-      "styles/landing.css",
-      "styles/practice-mode.css",
-      "styles/support-center.css",
-      "tests/landing-page-contract.test.js",
-      "tests/learning-entry-chooser.test.js"
-    ],
-    "removed": [
-      ".DS_Store",
-      "content-prep-studio/.pytest_cache/.gitignore",
-      "content-prep-studio/.pytest_cache/CACHEDIR.TAG",
-      "content-prep-studio/.pytest_cache/README.md",
-      "content-prep-studio/.pytest_cache/v/cache/nodeids",
-      "content-prep-studio/.pytest_cache/v/cache/stepwise",
-      "content-prep-studio/tests/__pycache__/test_authoring_contract_files.cpython-311-pytest-8.3.4.pyc",
-      "content-prep-studio/tests/__pycache__/test_build.cpython-311-pytest-8.3.4.pyc",
-      "content-prep-studio/tests/__pycache__/test_server_ui_contract.cpython-311-pytest-8.3.4.pyc",
-      "content-prep-studio/tests/__pycache__/test_services.cpython-311-pytest-8.3.4.pyc",
-      "tests/__pycache__/global-shortcut-tooltip-speed-browser.cpython-311.pyc",
-      "tests/__pycache__/v90-p4529-deep-recall-database-browser.cpython-311.pyc",
-      "tests/__pycache__/v90-p4529-deep-recall-database-browser.cpython-312.pyc"
-    ]
+    "added": [],
+    "changed": [],
+    "removed": []
   },
   "incompatible": []
 }

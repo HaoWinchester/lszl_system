@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -40,6 +40,20 @@ test('practice mode loads the system adapter between wechat login and user cente
   assert.ok(practicePage.indexOf('direct-system-adapter.js') < practicePage.indexOf('src/33-user-center.js'))
 })
 
+test('every page loading user center gets the system adapter before it', () => {
+  const siteDir = resolve(frontendDir, 'public/new-legacy')
+  const pages = readdirSync(siteDir).filter(name => name.endsWith('.html'))
+  const offenders = []
+  for (const name of pages) {
+    const html = readFileSync(resolve(siteDir, name), 'utf8')
+    const userCenterAt = html.indexOf('src/33-user-center.js')
+    if (userCenterAt < 0) continue
+    const adapterAt = html.indexOf('direct-system-adapter.js')
+    if (adapterAt < 0 || adapterAt > userCenterAt) offenders.push(name)
+  }
+  assert.deepEqual(offenders, [], `以下页面缺少 direct-system-adapter 或顺序错误：${offenders.join(', ')}`)
+})
+
 test('member purchase offers a retryable payment failure instead of local approval fallback', () => {
   const userCenter = readFileSync(resolve(repoDir, 'new-legacy/src/33-user-center.js'), 'utf8')
 
@@ -72,7 +86,7 @@ test('visitor plans are public, hand off to login cleanly, and create a Native o
   assert.doesNotMatch(adapter, /request\('GET', '\/api\/v1\/system\/subscription-plans'\)/)
   assert.match(userCenter, /function requestAuthenticationForPlan\(plan\)[\s\S]*?closeSubscriptionDetailModal\(\)[\s\S]*?window\.authOpen/)
   assert.doesNotMatch(userCenter, /function renderPlanConfirm\(/)
-  assert.match(userCenter, /async function handlePlanPick\(card\)[\s\S]*?await pay\.createNativeOrder\(plan\.id\)[\s\S]*?renderNativePayment\(checkoutPlan\|\|plan,result\.order\)/)
+  assert.match(userCenter, /async function handlePlanPick\(card\)[\s\S]*?await pay\.createNativeOrder\(plan\.id\)[\s\S]*?renderNativePayment\(checkoutPlan\|\|plan,order\)/)
   assert.match(membershipStyles, /\.membership-ui\s+\.plans-grid\{display:flex/)
   assert.match(membershipStyles, /overflow-x:auto/)
   assert.match(membershipStyles, /\.membership-ui\s+\.plan-card\{[^}]*flex:0 0/)
@@ -98,6 +112,14 @@ test('native payment enlarges the QR code and removes the manual later, cancel, 
   assert.match(userCenter, /setPlanPickLocked\(true\)/)
   assert.match(membershipStyles, /\.membership-ui\s+\.checkout-qr\s+\.qr-frame\{width:220px/)
   assert.match(membershipStyles, /\.membership-ui\s+\.checkout-help\{[^}]*font-size:11px/)
+})
+
+test('plan pick cancels a reused pending order of another plan before re-ordering', () => {
+  const userCenter = readFileSync(resolve(repoDir, 'new-legacy/src/33-user-center.js'), 'utf8')
+
+  assert.match(userCenter, /order\.planId&&order\.planId!==plan\.id&&typeof pay\.cancelNativeOrder==="function"/)
+  assert.match(userCenter, /await pay\.cancelNativeOrder\(order\.id\);/)
+  assert.match(userCenter, /const retry=await pay\.createNativeOrder\(plan\.id\);/)
 })
 
 test('membership card price and payment amount use the server paymentAmountFen source', () => {

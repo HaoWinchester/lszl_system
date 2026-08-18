@@ -344,11 +344,20 @@
         }
         const result=await pay.createNativeOrder(plan.id);
         if(!result||!result.order||!result.order.codeUrl)throw new Error("支付二维码生成失败，请重试。");
-        const checkoutPlan=sub.planById?sub.planById(result.order.planId):null;
-        activeNativeOrder={...result.order,planId:result.order.planId||plan.id};
+        let order=result.order;
+        if(order.planId&&order.planId!==plan.id&&typeof pay.cancelNativeOrder==="function"){
+          // 服务端会复用账号下已有的待支付订单（不分套餐）。所选套餐与返回订单
+          // 不一致时，先自助取消旧订单，再按当前选择重新下单，避免“选什么都
+          // 变成之前那个套餐”。
+          try{await pay.cancelNativeOrder(order.id);}catch(_cancelError){}
+          const retry=await pay.createNativeOrder(plan.id);
+          if(retry&&retry.order&&retry.order.codeUrl)order=retry.order;
+        }
+        const checkoutPlan=sub.planById?sub.planById(order.planId):null;
+        activeNativeOrder={...order,planId:order.planId||plan.id};
         card.innerHTML=originalLabel;
-        renderNativePayment(checkoutPlan||plan,result.order);
-        showStatus(result.order.planId&&result.order.planId!==plan.id?"已有待支付订单，请继续完成该订单。":"支付二维码已生成，请使用微信扫码。");
+        renderNativePayment(checkoutPlan||plan,order);
+        showStatus(order.planId&&order.planId!==plan.id?"已有待支付订单，请继续完成该订单。":"支付二维码已生成，请使用微信扫码。");
       }catch(error){
         showStatus(String(error&&error.message||"支付二维码生成失败，请重试。"));
         setPlanPickLocked(false);

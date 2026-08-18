@@ -819,6 +819,22 @@ function injectPage(html, page, version) {
       )
     }
   }
+  {
+    // 会员权益弹窗（33-user-center）可能在任何页面打开；支付与服务端套餐价依赖
+    // direct-system-adapter。凡加载 33-user-center 的页面一律在其之前注入适配器，
+    // 否则套餐价回落到前端写死的默认值（如季度 ¥79）。
+    let userCenterTag = findLocalScriptTag(generated, 'src/33-user-center.js')
+    if (!userCenterTag) {
+      // 兼容 </script> 另起一行的写法（如 message-management.html）：只匹配开始标签。
+      userCenterTag = generated.match(/<script\b[^>]*\bsrc=(['"])(?:\.\/)?src\/33-user-center\.js(?:\?[^'"]*)?\1[^>]*>/i)?.[0] || ''
+    }
+    if (userCenterTag && !generated.includes('direct-system-adapter.js')) {
+      generated = generated.replace(
+        userCenterTag,
+        `<script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->\n${userCenterTag}`,
+      )
+    }
+  }
   if (page === 'question-bank.html') {
     const editorTag = findLocalScriptTag(generated, 'src/65-question-bank-admin.js')
     if (!editorTag) {
@@ -833,10 +849,14 @@ function injectPage(html, page, version) {
     if (!generated.includes(settingsTag)) {
       throw new Error('new-legacy 系统设置脚本顺序已变化，请复核归一化设置适配器')
     }
-    generated = generated.replace(
-      settingsTag,
-      `<script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->\n${settingsTag}`,
-    )
+    // 适配器统一由上方 33-user-center 通用规则注入（保证先于 33-user-center），
+    // 此处仅兜底：极旧源若没有 33-user-center，仍需在系统设置前注入。
+    if (!generated.includes('direct-system-adapter.js')) {
+      generated = generated.replace(
+        settingsTag,
+        `<script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->\n${settingsTag}`,
+      )
+    }
   }
   const authTag = page === 'index.html'
     ? '<script defer src="src/30-auth-guards.js"></script>'
