@@ -360,7 +360,9 @@ BOOTSTRAP_QUESTION_EXACT_KEYS_WITHOUT_HISTORY = (
 
 # P4.6 第 1 轮：练题页的已发布试卷改走 /api/v1/paper-releases 细粒度 API
 # （轻量目录 + 按 release 分页取题，单响应 ≤1MB），不再通过 bootstrap 整包下发
-# 7.65MB 的 kg_exam_papers_published_v1。questions namespace（题库管理页）暂保留旧键。
+# 7.65MB 的 kg_exam_papers_published_v1。
+# 第 2 轮（R2-3）：题库管理页（questions namespace）也已切换——65 的试卷列表来自
+# 教师共享试卷键，发布目录由 API 提供，两个发布大键从所有 namespace 移除。
 BOOTSTRAP_QUESTION_EXACT_KEYS_WITHOUT_PUBLISHED = (
     BOOTSTRAP_QUESTION_EXACT_KEYS
     - {"kg_exam_paper_release_history_v1", "kg_exam_papers_published_v1"}
@@ -403,7 +405,7 @@ BOOTSTRAP_MANAGEMENT_PREFIXES = frozenset({
 BOOTSTRAP_NAMESPACE_EXACT_KEYS: dict[str, frozenset[str]] = {
     "files": BOOTSTRAP_FILE_EXACT_KEYS,
     "guided-learning": BOOTSTRAP_GUIDED_EXACT_KEYS,
-    "questions": BOOTSTRAP_QUESTION_EXACT_KEYS | BOOTSTRAP_RECALL_EXACT_KEYS,
+    "questions": BOOTSTRAP_QUESTION_EXACT_KEYS_WITHOUT_PUBLISHED | BOOTSTRAP_RECALL_EXACT_KEYS,
     "workspace": BOOTSTRAP_QUESTION_EXACT_KEYS_WITHOUT_PUBLISHED | BOOTSTRAP_RECALL_EXACT_KEYS,
     "recall": BOOTSTRAP_QUESTION_EXACT_KEYS_WITHOUT_PUBLISHED | BOOTSTRAP_RECALL_EXACT_KEYS,
     "practice": frozenset({

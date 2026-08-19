@@ -44,12 +44,14 @@ def _teaching_subject_from_key(source_key: str) -> str:
 def _teaching_canonical(payload: Any, source_key: str) -> dict[str, Any]:
     if source_key == "kg_content_taxonomies_v1":
         entries = payload if isinstance(payload, list) else [payload]
-        subject_ids = {str(item.get("subjectId") or "").strip() for item in entries if isinstance(item, Mapping)}
-        subject_ids.discard("")
-        if len(subject_ids) > 1:
-            raise ValueError("taxonomy source contains multiple subjects")
-        subject_id = next(iter(subject_ids), "subject-pmp")
-        return {"subjectId": subject_id, "taxonomies": entries}
+        # taxonomy 源可含多个科目（PMP/CSPM/P2/ACP/NPDP…）：按 subjectId 分组迁移
+        groups: dict[str, list[Any]] = {}
+        for item in entries:
+            subject_id = "subject-pmp"
+            if isinstance(item, Mapping):
+                subject_id = str(item.get("subjectId") or "").strip() or "subject-pmp"
+            groups.setdefault(subject_id, []).append(item)
+        return {"taxonomiesBySubject": groups}
     subject_id = _teaching_subject_from_key(source_key)
     if not isinstance(payload, Mapping):
         raise ValueError("recall source must be an object")
@@ -279,35 +281,42 @@ async def _paper_release_mapper(db: AsyncSession, item: RuntimeMigrationItem) ->
 
 async def _teaching_content_mapper(db: AsyncSession, item: RuntimeMigrationItem) -> Mapping[str, Any]:
     canonical = _teaching_canonical(item.source_payload, item.source_key)
+    if item.source_key == "kg_content_taxonomies_v1":
+        count = 0
+        for group_subject_id, entries in canonical["taxonomiesBySubject"].items():
+            subject = await db.get(ContentSubject, group_subject_id)
+            if subject is None:
+                first = next((entry for entry in entries if isinstance(entry, Mapping)), {})
+                label = str(first.get("subjectName") or first.get("subject") or group_subject_id.removeprefix("subject-") or group_subject_id)
+                subject = ContentSubject(id=group_subject_id, code=str(first.get("subjectCode") or group_subject_id), name=label, content_metadata={})
+                db.add(subject)
+                await db.flush()
+            for raw in entries:
+                if not isinstance(raw, Mapping):
+                    continue
+                taxonomy_id = str(raw.get("id") or "").strip()
+                if not taxonomy_id:
+                    continue
+                row = await db.get(ContentTaxonomy, taxonomy_id)
+                if row is None:
+                    row = ContentTaxonomy(id=taxonomy_id, subject_id=str(raw.get("subjectId") or group_subject_id), version=int(raw.get("version") or 1), status=str(raw.get("status") or "draft"), title=str(raw.get("title") or raw.get("name") or ""), content_metadata=dict(raw), updated_by=None if item.owner_scope in {"shared", ""} else item.owner_scope)
+                    db.add(row)
+                    await db.flush()
+                for position, node in enumerate(raw.get("nodes") or []):
+                    if not isinstance(node, Mapping) or not node.get("id"):
+                        continue
+                    node_id = str(node["id"])
+                    existing = await db.get(TaxonomyNode, f"{taxonomy_id}:{node_id}")
+                    if existing is None:
+                        db.add(TaxonomyNode(id=f"{taxonomy_id}:{node_id}", taxonomy_id=taxonomy_id, node_id=node_id, parent_node_id=node.get("parentId"), title=str(node.get("title") or ""), record=dict(node), position=position))
+                        count += 1
+        return {"canonical_payload": canonical}
     subject_id = str(canonical["subjectId"])
     subject = await db.get(ContentSubject, subject_id)
     if subject is None:
         subject = ContentSubject(id=subject_id, code="PMP", name="PMP", content_metadata={})
         db.add(subject)
         await db.flush()
-    if item.source_key == "kg_content_taxonomies_v1":
-        entries = item.source_payload if isinstance(item.source_payload, list) else [item.source_payload]
-        count = 0
-        for raw in entries:
-            if not isinstance(raw, Mapping):
-                continue
-            taxonomy_id = str(raw.get("id") or "").strip()
-            if not taxonomy_id:
-                continue
-            row = await db.get(ContentTaxonomy, taxonomy_id)
-            if row is None:
-                row = ContentTaxonomy(id=taxonomy_id, subject_id=str(raw.get("subjectId") or subject_id), version=int(raw.get("version") or 1), status=str(raw.get("status") or "draft"), title=str(raw.get("title") or raw.get("name") or ""), content_metadata=dict(raw), updated_by=None if item.owner_scope in {"shared", ""} else item.owner_scope)
-                db.add(row)
-                await db.flush()
-            for position, node in enumerate(raw.get("nodes") or []):
-                if not isinstance(node, Mapping) or not node.get("id"):
-                    continue
-                node_id = str(node["id"])
-                existing = await db.get(TaxonomyNode, f"{taxonomy_id}:{node_id}")
-                if existing is None:
-                    db.add(TaxonomyNode(id=f"{taxonomy_id}:{node_id}", taxonomy_id=taxonomy_id, node_id=node_id, parent_node_id=node.get("parentId"), title=str(node.get("title") or ""), record=dict(node), position=position))
-                    count += 1
-        return {"canonical_payload": _teaching_canonical(item.source_payload, item.source_key)}
     if item.source_key.startswith("kg_recall_association_library_v1__subject__"):
         raw = canonical["library"]
         row = (await db.execute(select(RecallAssociationLibrary).where(RecallAssociationLibrary.subject_id == subject_id, RecallAssociationLibrary.version == 1))).scalar_one_or_none()
@@ -719,15 +728,18 @@ async def _read_engagement_canonical(db: AsyncSession, item: RuntimeMigrationIte
 
 async def _read_teaching_canonical(db: AsyncSession, item: RuntimeMigrationItem) -> dict[str, Any]:
     expected = _teaching_canonical(item.source_payload, item.source_key)
-    subject_id = str(expected["subjectId"])
     if item.source_key == "kg_content_taxonomies_v1":
-        target = []
-        for source in expected["taxonomies"]:
-            taxonomy_id = str(source.get("id") or "") if isinstance(source, Mapping) else ""
-            row = await db.get(ContentTaxonomy, taxonomy_id) if taxonomy_id else None
-            if row is not None:
-                target.append(dict(row.content_metadata or {}))
-        return {"subjectId": subject_id, "taxonomies": target}
+        target_by_subject: dict[str, list[Any]] = {}
+        for group_subject_id, entries in expected["taxonomiesBySubject"].items():
+            rows = []
+            for source in entries:
+                taxonomy_id = str(source.get("id") or "") if isinstance(source, Mapping) else ""
+                row = await db.get(ContentTaxonomy, taxonomy_id) if taxonomy_id else None
+                if row is not None:
+                    rows.append(dict(row.content_metadata or {}))
+            target_by_subject[group_subject_id] = rows
+        return {"taxonomiesBySubject": target_by_subject}
+    subject_id = str(expected["subjectId"])
     row = (await db.execute(select(RecallAssociationLibrary).where(
         RecallAssociationLibrary.subject_id == subject_id,
         RecallAssociationLibrary.version == 1,
@@ -767,16 +779,25 @@ async def verify(db: AsyncSession, run_id: str) -> dict[str, Any]:
                 item.target_count = _payload_count(target_payload)
                 item.target_hash = canonical_json_hash(target_payload)
                 if item.source_key == PAPER_RELEASE_HISTORY_KEY:
+                    # 与当前目录键重叠的 release（教师重发同版本）由目录条目权威校验；
+                    # 历史条目只对"仅存在于历史"的部分做数量与哈希比对。
                     try:
                         history_sources = _normalize_release_source(item.source_payload, item.source_key)
                     except ValueError:
                         history_sources = []
-                    for source in history_sources:
-                        current = current_target_by_release.get(str(source["releaseId"]))
-                        if current is not None:
-                            item.status = "failed"
-                            item.error = "current release source must remain authoritative"
-                            break
+                    history_only_ids = {
+                        str(source["releaseId"]) for source in history_sources
+                        if str(source["releaseId"]) not in current_target_by_release
+                    }
+                    if history_only_ids:
+                        target_payload = [row for row in target_payload if str(row.get("releaseId")) in history_only_ids]
+                        item.target_count = _payload_count(target_payload)
+                        item.target_hash = canonical_json_hash(target_payload)
+                        item.expected_hash = canonical_json_hash([
+                            source for source in history_sources
+                            if str(source["releaseId"]) in history_only_ids
+                        ])
+                        item.expected_count = len(history_only_ids)
             expected_count = item.expected_count if item.expected_count is not None else item.source_count
             expected_hash = item.expected_hash or item.source_hash
             counts_match = expected_count == item.target_count

@@ -5,6 +5,12 @@
 
 ## 进行中（feat/runtime-state-to-domain-apis 分支 · 2026-08-19，未发布）
 
+- **P4.6 第 2 轮 R2-2/R2-3：迁移遗留收口 + 发布大键全量退场**：
+  - taxonomy 迁移支持多科目源（按 subjectId 分组，dev 库 5 科目/6 taxonomy/333 节点全部落库）；发布历史键迁移成功（6 条历史版本，superseded 状态正确）。
+  - verify 修复：历史条目与当前目录键重叠的 release（教师重发同版本）改由目录条目权威校验，历史侧只比对"仅存在于历史"的部分；`_read_teaching_canonical` 适配新归一化结构。四个领域键（发布目录/发布历史/taxonomy/联想库）全部 verified；剩余 48 项 pending 为设计内 unknown 处置（等第 3 轮显式决策后 drop）。
+  - questions namespace（题库管理页）剔除最后两个发布大键——至此**所有 namespace 的 bootstrap 均不再下发 `kg_exam_papers_published_v1`/`kg_exam_paper_release_history_v1`**；65 的试卷列表本就来自教师共享试卷键，发布目录改由 API 提供。浏览器遍历 question-bank/paper-management 无报错。
+  - 性能门禁更新：新增"无任何 namespace 下发发布大键"断言；后端 19 项相关测试全绿。
+
 - **P4.6 第 2 轮 R2-1：教师发布/撤回切换 paper-releases API**（打通"教师发布 → 学员立即可见"闭环）：
   - 后端新增 `POST /paper-releases/publish-payload`（按载荷发布：复用迁移同款归一化校验，发布者以登录账号为准，先 supersede 同试卷旧 active 再插入，避开"每试卷仅一个 active"部分唯一索引）与 `POST /paper-releases/papers/{id}/withdraw-all`（按试卷下架全部 active 版本）。
   - 65-question-bank-admin 的 `publishPaperRelease`/`withdrawPaperRelease` 改为 API 权威 + 旧 runtime 目录尽力双写（供未切换的管理视图过渡）；发布/撤回成功后广播 `kg:paper-release-published`，paper-release-adapter 收到后自动重载学员目录。5 处调用点（发布/取消发布/归档/删除/批量归档）异步化，失败给出明确 toast 且不再落旧目录。

@@ -41,10 +41,17 @@ def test_learner_bootstrap_payload_has_no_published_paper_blob() -> None:
             assert HISTORY_KEY not in storage, page
 
 
-def test_question_bank_management_page_keeps_legacy_keys_until_round_2() -> None:
+def test_question_bank_management_page_no_longer_ships_published_keys() -> None:
+    # R2-3：题库管理页也已切换，发布大键从所有 namespace 移除
     keys = BOOTSTRAP_NAMESPACE_EXACT_KEYS.get("questions", frozenset())
-    assert PUBLISHED_KEY in keys
-    assert HISTORY_KEY in keys
+    assert PUBLISHED_KEY not in keys
+    assert HISTORY_KEY not in keys
+
+
+def test_no_namespace_ships_published_paper_keys() -> None:
+    for namespace, keys in BOOTSTRAP_NAMESPACE_EXACT_KEYS.items():
+        assert PUBLISHED_KEY not in keys, namespace
+        assert HISTORY_KEY not in keys, namespace
 
 
 def test_paper_release_catalog_is_paginated_and_limited() -> None:
