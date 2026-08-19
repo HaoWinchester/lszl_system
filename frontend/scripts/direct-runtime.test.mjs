@@ -37,6 +37,8 @@ test('question catalog runtime keys are legacy-read-only after cutover', () => {
 
 test('direct bootstrap consumes the FastAPI-injected payload', () => {
   assert.match(source, /__KG_DIRECT_BOOTSTRAP__/)
+  assert.match(source, /const injected = global\.__KG_DIRECT_BOOTSTRAP__/)
+  assert.match(source, /serverInjected/)
   assert.doesNotMatch(source, /__KG_NEW_LEGACY_BOOTSTRAP__/)
 })
 
@@ -48,7 +50,7 @@ test('direct state persistence never posts to a parent window', () => {
 
 test('direct storage exposes save state and pagehide recovery', () => {
   assert.match(source, /kg:save-state/)
-  assert.match(source, /snapshotMode:\s*['"]full['"]/) // full coalesced snapshot
+  assert.match(source, /snapshotMode:\s*['"]merge['"]/) // merge 快照 + mutations 全量键标识
   assert.match(source, /pagehide/)
   assert.match(source, /sendBeacon/)
 })
@@ -103,7 +105,7 @@ test('graph and training login use remote authentication then reload account sta
   assert.doesNotMatch(retiredTrainingPage, /direct-auth-adapter\.js/)
   const entry = readFileSync(resolve(frontendDir, 'scripts/new-legacy-assets/direct-entry.js'), 'utf8')
   assert.match(entry, /kg-auth-session-change/)
-  assert.match(entry, /location\.reload/)
+  assert.match(entry, /requestCurrentUser/)
 })
 
 test('graph account menu clears the remote session through the backend logout path', () => {
@@ -119,25 +121,25 @@ test('graph account menu clears the remote session through the backend logout pa
   assert.match(training, /KGAuthRuntime=.*logout:authLogout/)
 })
 
-test('graph autosave adapter runs after the upstream autosave module', () => {
+test('graph autosave adapter uses the domain file save result', () => {
   const adapterPath = resolve(frontendDir, 'scripts/new-legacy-assets/direct-graph-adapter.js')
   assert.ok(existsSync(adapterPath), 'direct-graph-adapter.js should exist')
   const adapter = readFileSync(adapterPath, 'utf8')
   assert.match(adapter, /KGGraphFileAutosave/)
   assert.match(adapter, /saveNow/)
-  assert.match(adapter, /KGServerStateStorage/)
-  assert.match(adapter, /\.flush/)
+  assert.doesNotMatch(adapter, /KGServerStateStorage|runtime\/state/)
   const graphPage = readFileSync(resolve(frontendDir, 'public/new-legacy/index.html'), 'utf8')
   assert.ok(graphPage.indexOf('src/24-graph-file-autosave.js') < graphPage.indexOf('direct-graph-adapter.js'))
 })
 
-test('file manager waits for server state before navigating', () => {
-  const manager = readFileSync(resolve(frontendDir, 'public/new-legacy/src/27-graph-file-manager.js'), 'utf8')
-  assert.match(manager, /await global\.KGServerStateStorage\.flush\(\)/)
-  assert.match(manager, /await flushServerStateBeforeNavigation\(\)/)
-  assert.match(manager, /async function openFile/)
-  assert.match(manager, /onSubmit:async value/)
-  assert.equal((manager.match(/location\.href='index\.html\?mode=free'/g) || []).length, 2)
+test('file manager navigates after the domain store write without runtime flush', () => {
+  const manager = readFileSync(resolve(scriptsDir, '..', '..', 'new-legacy', 'src', '27-graph-file-manager.js'), 'utf8')
+  assert.match(manager, /function openFile\(id\)/)
+  assert.match(manager, /store\.openFile\(id,\{owner:currentOwner\(\)\}\)/)
+  assert.match(manager, /onSubmit:value=>\{/)
+  assert.doesNotMatch(manager, /KGServerStateStorage\.flush/)
+  assert.doesNotMatch(manager, /flushServerStateBeforeNavigation/)
+  assert.doesNotMatch(manager, /location\.href='index\.html\?mode=free'/)
 })
 
 test('generated graph editor discards new-node drafts and avoids exact overlap', () => {
@@ -226,7 +228,7 @@ test('generated question preview persists the selected bank and question for rec
   assert.ok(preview)
   assert.match(preview[1], /const bank\s*=\s*currentBank\(\)/)
   assert.match(preview[1], /sourceBankId:bank\?\.id/)
-  assert.match(preview[1], /await window\.KGServerStateStorage\.flush\(\)/)
+  assert.doesNotMatch(preview[1], /KGServerStateStorage|runtime\/state/)
 })
 
 test('retired training shell does not load the former training runtime', () => {
@@ -242,8 +244,9 @@ test('retired training shell does not load the former training runtime', () => {
 
 test('member deep link opens plans only for student accounts', () => {
   const entry = readFileSync(resolve(frontendDir, 'scripts/new-legacy-assets/direct-entry.js'), 'utf8')
-  assert.match(entry, /authUser\?\.role/)
-  assert.match(entry, /role\s*===\s*['"]student['"]/)
+  assert.match(entry, /requestCurrentUser\(\)/)
+  assert.match(entry, /currentRole\(\)/)
+  assert.match(entry, /userRole\s*===\s*['"]student['"]/)
   assert.match(entry, /KGUserCenter\?\.open\?\.\(\)/)
   assert.match(entry, /upgradeMemberBtn/)
 })

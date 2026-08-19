@@ -27,6 +27,9 @@
     mode: 'bootstrap',
     page,
   })
+  // 优先消费 FastAPI 内联注入的会话元数据（__KG_DIRECT_BOOTSTRAP__），
+  // 保证 revision/contentRevision 与页面渲染同一快照；无注入时回退本地推导。
+  const injected = global.__KG_DIRECT_BOOTSTRAP__
   const entry = {
     page,
     namespace,
@@ -36,6 +39,18 @@
     readOnly: false,
     authUser: null,
     username: null,
+    ...(injected && typeof injected === 'object' ? {
+      page: String(injected.page || page),
+      namespace: String(injected.namespace || namespace),
+      revision: Number(injected.revision || 0),
+      contentRevision: Number.isSafeInteger(Number(injected.contentRevision))
+        ? Number(injected.contentRevision)
+        : 0,
+      authenticated: injected.authenticated === true,
+      readOnly: injected.readOnly === true,
+      authUser: injected.authUser || null,
+      username: injected.username || null,
+    } : {}),
   }
   let revision = Number(entry.revision || 0)
   let contentRevision = Number.isSafeInteger(Number(entry.contentRevision))
@@ -72,8 +87,9 @@
   }
 
   async function hydrateEntryFromSession() {
+    const serverInjected = entry.authenticated === true && entry.authUser != null
     const cached = sessionUser()
-    if (cached?.user) {
+    if (!serverInjected && cached?.user) {
       entry.authenticated = true
       entry.authUser = cached.user
       entry.username = cached.user.username || ''
@@ -89,10 +105,14 @@
       entry.authenticated = true
       entry.authUser = me.user
       entry.username = me.user.username || ''
-      entry.revision = 0
-      entry.contentRevision = 0
-      revision = entry.revision
-      contentRevision = entry.contentRevision
+      // 服务端注入的 revision 与页面渲染同一快照，必须保留；
+      // 仅在无注入（如 content-prep 缓存路径）时才回退为 0 等待 bootstrap 拉取。
+      if (!serverInjected) {
+        entry.revision = 0
+        entry.contentRevision = 0
+        revision = entry.revision
+        contentRevision = entry.contentRevision
+      }
       try {
         global.localStorage?.setItem(
           'kg_remote_auth_session_v1',
@@ -102,7 +122,7 @@
       global.dispatchEvent(new CustomEvent('kg-auth-session-change', {
         detail: { username: me.user.username, provider: 'remote' }
       }))
-    } else if (cached?.user == null) {
+    } else if (!serverInjected && cached?.user == null) {
       entry.authenticated = false
       entry.authUser = null
       entry.username = ''

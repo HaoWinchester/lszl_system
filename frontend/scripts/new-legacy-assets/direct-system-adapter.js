@@ -7,6 +7,11 @@
   const subscriptionApi = global.KGSubscription
   let userProfile = null
   let userLoadPromise
+  // FastAPI 内联注入的会话元数据可同步提供登录态；/me 仍在后台校正。
+  const injectedBootstrap = global.__KG_DIRECT_BOOTSTRAP__
+  if (injectedBootstrap?.authenticated && injectedBootstrap.authUser) {
+    userProfile = injectedBootstrap.authUser
+  }
   // wechatApi 仅管理端配置保存需要；部分学员页未加载 32-wechat-login.js，不应因此跳过套餐价格预载。
   if (!storage || !roleApi || !subscriptionApi) return
 
@@ -91,6 +96,10 @@
 
   function cachedRole() {
     return String(userProfile?.role || 'guest')
+  }
+
+  function isAuthenticated() {
+    return userProfile != null
   }
 
   function isAdmin() {

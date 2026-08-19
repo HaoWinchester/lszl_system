@@ -28,10 +28,14 @@ global.KGSubscription = {
   resetPlanSettings() {},
   savePlanSettings() {},
 }
+global.CustomEvent = class FakeCustomEvent {
+  constructor(type, init) { this.type = type; this.detail = init?.detail }
+}
+global.dispatchEvent = () => true
 
 const responses = new Map([
   ['/api/v1/system/themes', { themes: {} }],
-  ['/api/v1/system/subscription-plans', { plans: [] }],
+  ['/api/v1/subscriptions/plans', { plans: [] }],
   ['/api/v1/subscriptions/me', {
     subscription: {
       username: 'student',

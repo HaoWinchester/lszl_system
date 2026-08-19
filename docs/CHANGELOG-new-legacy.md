@@ -3,6 +3,23 @@
 按版本号倒序记录每次迭代的更新内容。每次功能合并/发布时同步更新本文件并随发布一起提交。
 （本文件自 v9.0-p4.1.90 起补录；更早历史见 git log。）
 
+## 进行中（feat/runtime-state-to-domain-apis 分支 · 2026-08-19，未发布）
+
+- **P4.6 第 1 轮性能优化：练题链路发布试卷切换到细粒度 API**（解决线上整包拉取 7.65MB `kg_exam_papers_published_v1` 导致的卡顿）：
+  - 新增 `paper-release-adapter.js`（注入 practice-mode/question-workspace/knowledge-recall/index 四页，先于 59-repository）：轻量目录 `GET /paper-releases/catalog` 分页预取（KB 级），题目按 release `GET /paper-releases/{id}/questions` 分页取冻结快照（服务端单响应 1MB 上限）；载入完成沿用 `kg:published-papers-changed`/`kg-app-storage-change` 旧失效协议广播，页面既有监听器直接复用；401 派发 `kg:auth-required`。
+  - `59-published-paper-repository.js` 重写为 v3：目录接口同步读 adapter 缓存，`resolvePublishedPaper`/`listPublishedPapers`/`findQuestion`/`listCollections` 改异步按 release 解析；新增同步 `peekResolved`/`findQuestionCached`/`prefetchMissing` 供深度同步的旧消费者（60-question-bank）过渡使用；不再读取 runtime localStorage 键。
+  - 消费方异步化：59a-resolver 转发层 async；practice-mode `startPractice` await 解析；workspace `loadPublishedPapers`/`buildQuestionList` 缓存化 + `rebuildQuestionSources`；深度回忆 96 源改缓存 + 异步 `rebuild`（新增 `kg:recall-source-updated` 事件驱动 86 页重渲染），`loadQuestion`/`activate`/`switchQuestion` await；60-question-bank 三处 repo 调用改同步 peek + 后台预取。
+  - 后端 bootstrap 减重：practice/workspace/recall namespace 剔除 `kg_exam_papers_published_v1`/`kg_exam_paper_release_history_v1`（题库管理页 questions namespace 暂保留，第 2 轮切换）。
+  - 性能门禁测试：后端 `test_paper_release_perf_gate.py`（4 项：学习 namespace 不下发大键、bootstrap 载荷无发布快照、管理页保留断言、catalog 分页 + 1MB 上限）；前端 `paper-release-adapter.test.mjs`（11 项：分页模式、不写 localStorage、事件协议、repo 不读 runtime 键、四页注入恰一次）。
+  - 顺带修复：direct-admin-adapter `refreshed()` 分页 `...result` 覆盖新建用户回归（a3dd91f 引入）；practice-learning-contract/recall-p45-contract 3 处 P4.5.37 后过时断言对齐（answer 签名、防抖 1200ms、flashKrOption 闪烁标记）。
+  - 浏览器遍历验证（Playwright，8011 静态 + API 代理）中发现并修复：① catalog `allowed_roles=[]`（不限制）被 contains 过滤掉 → 服务端补空数组放行；② 深度回忆 96 源 `rebuild()` 并发守卫返回空缓存 → 改为复用重建 Promise；③ 86 `loadQuestion` 列表为空时未等 rebuild → 显式 await；④ 深度回忆会话/进度请求未带 releaseId，服务端按题库查不到冻结快照 404 → 99-adapter 与 86 补传 releaseId。四页终验：practice 卡片渲染 + 开始练习按 release 取题、workspace 44 选项、recall 真实题干 1/60 + 21 关键词 + 进度 saved、bootstrap 载荷均无发布大键。
+  - 迁移工具链修复：alembic e5b9c3d7a120 置 NULL 先于改 nullable 的顺序 bug；runtime_domain_migration 失败分支 rollback 后访问过期 ORM 属性触发 MissingGreenlet（记录 id + 重查剩余条目）；teaching 映射器 `updated_by='shared'` 违反 users 外键（shared 归 None）。开发库已实跑迁移：2 个 active release（各 60 题）入 paper_releases；遗留 known-issue：`kg_content_taxonomies_v1`（多科目源）与 `kg_exam_paper_release_history_v1`（autoflush 连带）两键迁移失败，属第 2 轮教学内容域收口范围。
+- 恢复页面内联 `window.__KG_DIRECT_BOOTSTRAP__` 会话元数据注入（a3dd91f 移除导致后端 test_web_runtime 3 项、e2e 与 content-prep 版本读取全部失效）：`html.py` 重新注入轻量元数据（authUser/loginSessionId/revision/contentRevision，**不内联 storage**，MB 级试卷键仍走 bootstrap API），content-prep 页保持例外（缓存 + /me 水合）。前端 `server-state-bootstrap.js` 消费注入 payload 初始化 entry 并在 `/me` 校正时保留服务端注入的 revision。
+- 修复 practice-mode namespace 回归：`PAGE_NAMESPACES` 误加 `practice` 与前端派发 `page` 不一致，导致做题页 runtime 保存被 422 拒绝；移除该条目恢复默认 `page`。
+- 用户管理页账号镜像 `_seed_users` 改为全量账号（原先只装 owner+admin，旧 UI 首屏缺 teacher/student/viewer）。
+- runtime domain migration 账本收口：unknown 处置项保持 `pending` 等待显式决策（不再 scan 即 failed）；`migrate`/`verify` 报告全链路保留 `source_snapshot_payload`（drop 门禁在运行时表清空后仍可回验快照）；scan 报告补 `source_snapshot_hash`。
+- 测试对齐现架构：direct-runtime/online-qa/wechat-pay/new-legacy-sync 共 14 处过时断言更新（`__KG_DIRECT_BOOTSTRAP__` 消费、snapshotMode `merge` 协议、direct-entry 事件化登录、tour/support 版本读取、preview 不再注入 runtime flush、isAuthenticated 同步化、Windows 路径分隔符）；sync 错误消息改用归一化路径。前端 113 项 + 权益适配器 + 2 项集成测试全绿。
+
 ## v9.0-p4.1.101（2026-08-16 · P4.5.37）
 
 - 多题画布空白处右键菜单与首页/深度回忆为同一组件（此前已具备），菜单项文案"刷新"统一改为"文字高清"（三页一致）。

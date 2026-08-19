@@ -9,6 +9,7 @@ const repoDir = resolve(scriptsDir, '../..')
 
 const ROOTS = ['new-legacy', 'frontend/scripts', 'backend/app']
 const IGNORED = [
+  'new-legacy/tests/',
   'frontend/public/',
   'frontend/new-legacy-releases/',
   'frontend/scripts/runtime-removal-contract.test.mjs',
@@ -21,24 +22,31 @@ const TOKENS = {
 }
 const DYNAMIC_KEY = /(?:(?:global|window)\s*(?:\?\.|\.)\s*)?(?:localStorage|sessionStorage)\s*(?:\?\.|\.)\s*(?:getItem|setItem|removeItem)\s*(?:\?\.)?\s*\(\s*([A-Za-z_$][\w$]*(?:\([^\n)]*\))?)/g
 
+function repoRelative(path) {
+  return relative(repoDir, path).replaceAll('\\', '/')
+}
+
 function filesUnder(path) {
   const absolute = resolve(repoDir, path)
   if (statSync(absolute).isFile()) return [absolute]
   return readdirSync(absolute, { withFileTypes: true }).flatMap(entry => {
     const child = resolve(absolute, entry.name)
-    return entry.isDirectory() ? filesUnder(relative(repoDir, child)) : [child]
+    return entry.isDirectory() ? filesUnder(repoRelative(child)) : [child]
   })
 }
 
 function occurrenceInventory(overrides = new Map()) {
   const result = { endpoint: [], consumer: [], runtimeKey: [], dynamicRuntimeKey: [] }
-  const paths = new Set(ROOTS.flatMap(filesUnder).map(absolute => relative(repoDir, absolute)))
-  for (const path of overrides.keys()) paths.add(path)
+  const normalizedOverrides = new Map(
+    [...overrides].map(([path, source]) => [path.replaceAll('\\', '/'), source]),
+  )
+  const paths = new Set(ROOTS.flatMap(filesUnder).map(repoRelative))
+  for (const path of normalizedOverrides.keys()) paths.add(path)
   for (const path of paths) {
     const absolute = resolve(repoDir, path)
     if (IGNORED.some(ignored => path === ignored || path.startsWith(ignored))) continue
     if (!/\.(?:js|mjs|py|html|json)$/.test(path)) continue
-    const source = overrides.get(path) ?? readFileSync(absolute, 'utf8')
+    const source = normalizedOverrides.get(path) ?? readFileSync(absolute, 'utf8')
     for (const [kind, pattern] of Object.entries(TOKENS)) {
       for (const match of source.matchAll(pattern)) {
         const token = kind === 'runtimeKey'

@@ -47,7 +47,11 @@ test('managed and learning pages bootstrap the right in-memory catalog with cook
       },
     })
     await adapter.ready
-    assert.equal(calls[0].url, `/api/v1/question-catalog/bootstrap?mode=${mode}`)
+    // managed 页面引导时顺带拉全量题目，learning 页面只拉题库索引
+    const expectedUrl = mode === 'managed'
+      ? `/api/v1/question-catalog/bootstrap?mode=managed&include_questions=true`
+      : `/api/v1/question-catalog/bootstrap?mode=learning`
+    assert.equal(calls[0].url, expectedUrl)
     assert.equal(calls[0].options.credentials, 'include')
     assert.equal(adapter.banks()[0].id, `${mode}-bank`)
   }

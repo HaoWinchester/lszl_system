@@ -44,6 +44,7 @@ test('creating a user retains the POST result when the first list page is alread
     Array,
     String,
     Number,
+    URLSearchParams,
     XMLHttpRequest: FakeXMLHttpRequest,
     KGUserAdminService: service,
     KGAuthCore: { normalizeUser: (username, user) => ({ ...user, username }) },
