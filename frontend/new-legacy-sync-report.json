@@ -1,11 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.123",
-  "toVersion": "v9.0-p4.1.124",
+  "fromVersion": "v9.0-p4.1.124",
+  "toVersion": "v9.0-p4.1.125",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION"
+      "VERSION",
+      "index.html"
     ],
     "removed": []
   },

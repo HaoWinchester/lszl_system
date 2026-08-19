@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "v9.0-p4.1.124",
+  "version": "v9.0-p4.1.125",
   "bridgeVersion": 2,
   "sourceFiles": {
     "ACTIVITY_SCHEMA_V1.md": "5b42cb917237d6a6eb4e7438ac491543a653918fb172d49e3a2a05b1d98c20b9",
@@ -160,7 +160,7 @@
     "V9.0_P4.1_DATA_INTEGRITY.json": "65a6d63dfac46ce58dfc27d34bbcecad45a019302c419e7967f2e1ed46ead3f4",
     "V9.0_P4.1_HELP_FEEDBACK_MESSAGES_REPORT.md": "edfc028219fece4c0e4893f868470f1f00f8836bce74ec6de3acbc54f3fcc5cd",
     "V9.0_P4.1_QUICK_START.md": "1316de5b831a2109176f627b3e7bbaf1bb030c14f3ae93ba8945b4a83deb864c",
-    "VERSION": "77f46852a4a354cce7b1407141c89cbed7accdc0be9a8fc4eb7e87fdea63b45d",
+    "VERSION": "0db3864eb25a7fb1ce90f97d414daf25dad154e300fa429729cce2745b6ce553",
     "admin-console.html": "7bc9cd182d56e32a6ac6758c40f3925964f019977442c869c50a1b833524c666",
     "admin-operations.html": "db7b4997af6ef1db472a08d3a4270c0fd537e68c7e5edc6641bd4770acdda73c",
     "admin-settings.html": "dfe8f206e745ea3099afe22dd3d814ab20aab999677e5b6d4cc9c0af4ea1be76",
@@ -253,7 +253,7 @@
     "guided-learning-node.html": "0a227c2b8a07070cf859ec9f006e3ad58c9aec3152fe2a2c774006f4e94131b0",
     "guided-learning-placement-test.html": "7b42c6cb14c109ed41ef3af67ef8358a49965d885b2b8bdd983b78f2fd5ab5e0",
     "help-center.html": "0d8f9f88ca3dfa0c7bc57431a7cffcc18362f7e087621f0234f22b5de7ed8a17",
-    "index.html": "1635edb0978c4cf36366de30c3e087e5e318e169e91c815b62e934af136ca217",
+    "index.html": "d5ae1422b6cc66b52bbb1694dc773a088b02739e6915f5c33c5544b1c33c5160",
     "knowledge-recall.html": "c0038f8e1c3027c53cc04a3f1bef2521c34e3b11d6f0b41a894cffe52d88f7a5",
     "landing.html": "aba8903ef380c2c1ed81058a657e539012801433168371e7bc4c8bd9481d2c4c",
     "learning-path.html": "728da674bda11be36a1f2d563e96d814ecc17669ea76fa0d867913df169cdeaf",
