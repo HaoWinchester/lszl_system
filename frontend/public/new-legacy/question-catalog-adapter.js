@@ -121,9 +121,11 @@
     const query = new URLSearchParams({ mode })
     if (options.includeQuestions === true) query.set('include_questions', 'true')
     if (Number.isFinite(Number(options.questionPageSize))) query.set('page_size', String(Math.max(1, Number(options.questionPageSize))))
-    const next = normalizedSnapshot(await request(`/question-catalog/bootstrap?${query.toString()}`))
-    if (next.contentRevision < catalog.contentRevision) return clone(catalog)
-    catalog = next
+    const next = await request(`/question-catalog/bootstrap?${query.toString()}`)
+    bankQuestionCache.clear()
+    const snapshot = normalizedSnapshot(next)
+    if (snapshot.contentRevision < catalog.contentRevision) return clone(catalog)
+    catalog = snapshot
     const source = String(options.source || 'manual')
     emit('kg:question-catalog-ready', {
       mode,

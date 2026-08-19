@@ -682,25 +682,20 @@
   }
   function selectFile(id,options){selectItem('file',id,options)}
   function selectFolder(id,options){selectItem('folder',id,options)}
-  async function flushServerStateBeforeNavigation(){
-    if(global.KGServerStateStorage&&typeof global.KGServerStateStorage.flush==='function')await global.KGServerStateStorage.flush();
-  }
   function openFolder(id){const value=String(id??'');if(state.view!=='trash'){state.view='files';state.tagFilter=''}state.showAllFiles=value==='__all__';state.currentFolderId=state.showAllFiles?null:(value||null);if(state.currentFolderId)folderAncestors(state.currentFolderId).forEach(folder=>state.expandedFolders.add(folder.id));state.selectedId='';state.selectedType='file';state.selectedItems.clear();state.selectionMode=false;state.query='';$('fmSearchInput').value='';closeFavoriteTagsPopover();render()}
-  async function openFile(id){
+  function openFile(id){
     if(state.navigating)return;
     const file=store.openFile(id,{owner:currentOwner()});
     if(!file){toast(store.getLastError&&store.getLastError()||'图谱文件打开失败。','error');return}
-    state.navigating=true;
-    try{await flushServerStateBeforeNavigation();location.href='index.html?mode=free'}catch(err){state.navigating=false;toast(err&&err.message||'服务器保存失败，请稍后重试。','error')}
+    state.navigating=true;location.href='index.html';
   }
   function openCreateModal(){
     if(!requireEdit('登录后才能新建图谱文件。'))return;
     const name=uniqueName('新图谱文件');
-    openModal({title:'新建图谱',description:'创建一个空白知识图谱文件，并进入编辑器。',name,submitLabel:'创建并打开',onSubmit:async value=>{
+    openModal({title:'新建图谱',description:'创建一个空白知识图谱文件，并进入编辑器。',name,submitLabel:'创建并打开',onSubmit:value=>{
       const safe=uniqueName(value||name),file=store.createFile({name:safe,graphData:blankGraph(safe),source:'created',folderId:state.currentFolderId},{owner:currentOwner(),makeCurrent:true});
       if(!file)throw new Error(store.getLastError&&store.getLastError()||'新建图谱失败。');
-      await flushServerStateBeforeNavigation();
-      location.href='index.html?mode=free';
+      location.href='index.html';
     }});
   }
   function beginInlineRename(file,card,{value=file&&file.name||'',selectAll=true,kind='file'}={}){

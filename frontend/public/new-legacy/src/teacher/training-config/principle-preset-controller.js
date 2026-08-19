@@ -227,20 +227,22 @@
   function newPrinciple(){draftPrincipleId='principle-draft-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);activePrincipleId=draftPrincipleId;fillPrincipleEditor(draftPrincipleId);byId('tqPrincipleName')?.focus()}
   function selectedPrinciples(){return [...selectedPrincipleIds]}
   async function postPrincipleOperation(path,body){
-    await global.KGServerStateStorage?.flush?.();
     const response=await global.fetch(path,{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
     let payload={};try{payload=await response.json()}catch(error){}
     if(!response.ok){const detail=payload?.detail||payload;const error=new Error(detail?.message||'操作失败');error.detail=detail;throw error}
-    await global.KGServerStateStorage?.refresh?.();
     return payload;
+  }
+  function reloadPrincipleProjection(){
+    if(typeof global.location?.reload==='function')return global.location.reload();
+    return undefined;
   }
   async function applySelectedPresetStatus(){
     const ids=selectedPrinciples(),status=String(byId('tqBulkPresetStatus')?.value||'draft');
     if(!ids.length)return toast('请先勾选要修改的原则。');
-    try{await postPrincipleOperation('/api/v1/content-prep/principles/status',{ids,presetStatus:status});renderPrincipleList();toast(`已更新 ${ids.length} 条原则的预设状态。`)}catch(error){toast(error?.message||'批量修改预设状态失败。')}
+    try{await postPrincipleOperation('/api/v1/content-prep/principles/status',{ids,presetStatus:status});reloadPrincipleProjection();toast(`已更新 ${ids.length} 条原则的预设状态。`)}catch(error){toast(error?.message||'批量修改预设状态失败。')}
   }
   async function exportPrincipleCardBundle(){
-    try{ensurePairedPresets();await global.KGServerStateStorage?.flush?.();downloadPrincipleCardBundle(currentPrincipleCardBundle());toast('原则与归纳卡组合已导出。')}catch(error){toast('组合导出失败：'+(error?.message||error))}
+    try{ensurePairedPresets();downloadPrincipleCardBundle(currentPrincipleCardBundle());toast('原则与归纳卡组合已导出。')}catch(error){toast('组合导出失败：'+(error?.message||error))}
   }
   async function importPrincipleCardBundle(file){
     if(!file)return;

@@ -33,8 +33,8 @@
     rolePromise = fetch('/api/v1/auth/me', { credentials: 'include' })
       .then(async (response) => {
         if (!response.ok) return 'guest'
-        const payload = await response.json().catch(() => ({}))
-        role = String(payload?.user?.role || 'guest')
+        const meBody = await response.json().catch(() => ({}))
+        role = String(meBody?.user?.role || 'guest')
         return role
       })
       .catch(() => 'guest')

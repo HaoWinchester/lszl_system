@@ -358,6 +358,14 @@ BOOTSTRAP_QUESTION_EXACT_KEYS_WITHOUT_HISTORY = (
     BOOTSTRAP_QUESTION_EXACT_KEYS - {"kg_exam_paper_release_history_v1"}
 )
 
+# P4.6 第 1 轮：练题页的已发布试卷改走 /api/v1/paper-releases 细粒度 API
+# （轻量目录 + 按 release 分页取题，单响应 ≤1MB），不再通过 bootstrap 整包下发
+# 7.65MB 的 kg_exam_papers_published_v1。questions namespace（题库管理页）暂保留旧键。
+BOOTSTRAP_QUESTION_EXACT_KEYS_WITHOUT_PUBLISHED = (
+    BOOTSTRAP_QUESTION_EXACT_KEYS
+    - {"kg_exam_paper_release_history_v1", "kg_exam_papers_published_v1"}
+)
+
 BOOTSTRAP_QUESTION_PREFIXES = frozenset({
     "kg_canvas_workspace_v1__",
     "kg_canvas_workspace_catalog_v2__",
@@ -396,10 +404,10 @@ BOOTSTRAP_NAMESPACE_EXACT_KEYS: dict[str, frozenset[str]] = {
     "files": BOOTSTRAP_FILE_EXACT_KEYS,
     "guided-learning": BOOTSTRAP_GUIDED_EXACT_KEYS,
     "questions": BOOTSTRAP_QUESTION_EXACT_KEYS | BOOTSTRAP_RECALL_EXACT_KEYS,
-    "workspace": BOOTSTRAP_QUESTION_EXACT_KEYS_WITHOUT_HISTORY | BOOTSTRAP_RECALL_EXACT_KEYS,
-    "recall": BOOTSTRAP_QUESTION_EXACT_KEYS_WITHOUT_HISTORY | BOOTSTRAP_RECALL_EXACT_KEYS,
+    "workspace": BOOTSTRAP_QUESTION_EXACT_KEYS_WITHOUT_PUBLISHED | BOOTSTRAP_RECALL_EXACT_KEYS,
+    "recall": BOOTSTRAP_QUESTION_EXACT_KEYS_WITHOUT_PUBLISHED | BOOTSTRAP_RECALL_EXACT_KEYS,
     "practice": frozenset({
-        "kg_exam_papers_published_v1",
+        # P4.6：kg_exam_papers_published_v1 改走 paper-releases API，不再整包下发
         "kg_announcements_v1",
         "kg_user_feedback_v1",
         "kg_learning_entry_chooser_claim_v1",
@@ -1187,14 +1195,16 @@ def _milliseconds(value) -> int:
 
 
 async def _seed_users(db: AsyncSession, owner: str, storage: dict[str, str]) -> bool:
-    owner_user = await user_service.get_by_username(db, owner)
-    admins, _ = await user_service.list_users(db, role="admin", page=1, page_size=50)
+    # 用户管理页需要全量账号镜像（admin 能看到 teacher/student/viewer），
+    # 只装 owner+admin 会让旧 UI 首屏缺账号。
+    accounts, _ = await user_service.list_users(db, page=1, page_size=200)
 
     user_map: dict[str, User] = {}
+    for user in accounts:
+        user_map[user.username] = user
+    owner_user = await user_service.get_by_username(db, owner)
     if owner_user:
         user_map[owner_user.username] = owner_user
-    for admin in admins:
-        user_map[admin.username] = admin
 
     users = list(user_map.values())
     if not users:

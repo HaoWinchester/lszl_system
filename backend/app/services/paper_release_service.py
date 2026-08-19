@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import String, cast, func, select, update
+from sqlalchemy import String, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
@@ -286,7 +286,11 @@ async def history(
 
 async def catalog(db: AsyncSession, user: User, *, page: int, page_size: int) -> dict:
     entitled = await entitlement_for_request(db, user)
-    role_filter = PaperRelease.allowed_roles.contains([user.role])
+    # allowed_roles 为空数组表示不限制角色（与 can_access_with_entitlement 语义一致）
+    role_filter = or_(
+        func.jsonb_array_length(PaperRelease.allowed_roles) == 0,
+        PaperRelease.allowed_roles.contains([user.role]),
+    )
     base = select(PaperRelease).where(PaperRelease.status == ACTIVE_STATUS, role_filter)
     total = int(await db.scalar(select(func.count()).select_from(base.subquery())) or 0)
     releases = (await db.execute(

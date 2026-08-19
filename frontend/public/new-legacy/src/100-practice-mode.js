@@ -111,6 +111,8 @@
     const repo=global.KGPublishedPaperRepository;
     let rows=[];
     if(typeof repo?.listCatalogEntries==='function')rows=repo.listCatalogEntries({mode:'practice_mode'});
+    // 发布试卷目录由 KGPaperReleaseApi 异步预取；载入前 rows 为空，
+    // 载入完成后 adapter 广播 kg:published-papers-changed → syncLobby 重渲染（见下方监听）
     else{
       const raw=[];
       rows=(Array.isArray(raw)?raw:[]).filter(row=>publishedStatus(row)&&practiceModeEnabled(row)).map(releaseCatalogFallback).filter(row=>row.questionCount);
@@ -447,7 +449,7 @@
     state.lastSettings={paperId:'',count,order:'weakness_first',mode:'revenge'};document.body.dataset.practiceMode='revenge';dom.timer.hidden=true;dom.timeRow.hidden=true;dom.health.hidden=true;
     setView('game');renderQuestion();return true;
   }
-  function startPractice(mode){
+  async function startPractice(mode){
     if(mode==='revenge')return startRevenge();
     const catalog=selectedRelease(),count=Number(state.selectedCount);
     if(!catalog){syncLobby();return false}
@@ -456,7 +458,7 @@
     const repo=global.KGPublishedPaperRepository;
     let questions=[];
     if(typeof repo?.resolvePublishedPaper==='function'){
-      const resolved=repo.resolvePublishedPaper({paperId:catalog.paperId||catalog.id,releaseId:catalog.releaseId},{mode:'practice_mode',respectRole:false});
+      const resolved=await repo.resolvePublishedPaper({paperId:catalog.paperId||catalog.id,releaseId:catalog.releaseId},{mode:'practice_mode',respectRole:false});
       if(!resolved?.ok){
         if(['LOGIN_REQUIRED','MEMBERSHIP_REQUIRED'].includes(resolved?.code))return openMembership(resolved.access||access);
         showToast(resolved?.message||'试卷暂时无法打开。');

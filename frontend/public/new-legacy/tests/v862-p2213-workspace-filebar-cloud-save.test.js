@@ -20,6 +20,8 @@ assert(filebar.includes('is-error'));
 const controller=read('src/77-multi-question-workspace.js');
 assert(controller.includes('function renameWorkspaceTo(workspaceId,title)'));
 assert(controller.includes('function manualSaveWorkspace()'));
+assert(controller.includes("store()?.write?.(latest,{reason:'manual-save'})"));
+assert(!controller.includes('KGServerStateStorage?.flush?.()'));
 assert(controller.includes('KGMultiQuestionWorkspaceFilebar?.configure?.'));
 assert(controller.includes('KGMultiQuestionWorkspaceFilebar?.markDirty?.'));
 assert(controller.includes('KGMultiQuestionWorkspaceFilebar?.markSaved?.'));

@@ -120,13 +120,19 @@ function qbCurrentPaper(){const rows=qbPublishedPapers().filter(p=>p.id===qBankS
 function qbPaperQuestionByRef(ref,paper=null){
   const published=paper&&paper.status==='published';
   if(published&&window.KGPublishedPaperRepository){
-    const item=window.KGPublishedPaperRepository.findQuestion({
+    const repository=window.KGPublishedPaperRepository;
+    // 细粒度 API 后解析是异步的：先读同步缓存；未命中触发后台预取，缓存落地后事件驱动重渲染
+    const item=repository.findQuestionCached?.({
       releaseId:paper.releaseId,
       paperId:paper.id,
       bankId:ref?.bankId,
       questionId:ref?.questionId
-    },{respectRole:false});
-    return item?{bank:qbNormalizeBank(item.bank),question:qbNormalizeQuestion(item.question)}:{bank:null,question:null};
+    });
+    if(item)return {bank:qbNormalizeBank(item.bank),question:qbNormalizeQuestion(item.question)};
+    if(!item&&typeof repository.resolvePublishedPaper==='function'&&paper.releaseId){
+      repository.resolvePublishedPaper({paperId:paper.id,releaseId:paper.releaseId},{respectRole:false}).catch(()=>{});
+    }
+    return {bank:null,question:null};
   }
   const banks=qbLoadBanks();let bank=banks.find(b=>b.id===ref.bankId);let question=bank&&(bank.questions||[]).find(q=>q.id===ref.questionId);
   if(!question&&paper){const snapshot=(paper.questionSnapshots||[]).find(item=>String(item.bankId)===String(ref.bankId)&&String(item.questionId)===String(ref.questionId));if(snapshot?.question){question=qbNormalizeQuestion(qbClone(snapshot.question));bank=bank||qbNormalizeBank({id:snapshot.bankId,name:snapshot.bankName,subject:snapshot.bankSubject||paper.subject,visibility:'published-paper',questions:[question]})}}
@@ -141,8 +147,10 @@ function qbQuestionAllowedForRole(question,bankId=''){
 function qbResolvePublishedPaper(paper,options={}){
   const repository=window.KGPublishedPaperRepository;
   if(repository&&paper?.status==='published'){
-    const resolved=repository.resolvePublishedPaper(paper.releaseId||paper.id,options);
-    if(resolved)return resolved;
+    // 同步缓存优先；未命中触发异步解析（P4.6 细粒度 API）
+    const cached=repository.peekResolved?.(paper.releaseId||paper.id);
+    if(cached)return cached;
+    if(paper.releaseId)repository.resolvePublishedPaper({paperId:paper.id,releaseId:paper.releaseId},options).catch(()=>{});
   }
   const respectRole=options.respectRole!==false;
   const refs=Array.isArray(paper?.questions)?paper.questions:[];
@@ -160,7 +168,17 @@ function qbResolvePublishedPaper(paper,options={}){
 }
 function qbPublishedPaperCatalog(options={}){
   const repository=window.KGPublishedPaperRepository;
-  if(repository)return repository.listPublishedPapers(options);
+  if(repository){
+    const mode=String(options.mode||'');
+    const entries=(repository.listCatalogEntries(options)||[]).map(catalog=>{
+      const cached=repository.peekResolved?.(catalog.releaseId);
+      if(cached)return cached;
+      return {ok:true,paper:{...catalog,id:catalog.paperId,availability:'published',questionSnapshots:[]},items:[],configuredCount:catalog.totalCount,targetCount:catalog.totalCount,availableCount:0,missingCount:0,damagedCount:0,blockedCount:0,issues:[]};
+    });
+    // 有未解析的 release 时后台预取，落地后经 kg:published-papers-changed 重渲染
+    void repository.prefetchMissing?.();
+    return entries;
+  }
   const mode=String(options.mode||'');
   return qbPublishedPapers().filter(paper=>!mode||(paper.enabledModes||[]).includes(mode)).map(paper=>qbResolvePublishedPaper(paper,options));
 }

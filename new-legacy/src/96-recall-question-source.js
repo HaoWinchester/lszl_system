@@ -1,24 +1,25 @@
 'use strict';
 
-/* 深度回忆发布题目源：页面只保留交互，发布版本与快照解析由共享模块完成。 */
+/* 深度回忆发布题目源：页面只保留交互，发布版本与快照解析由共享模块完成。
+ * P4.6 第 1 轮：数据源改为 KGPaperReleaseApi 细粒度 API（经 59-repository），
+ * list() 保持同步读内存缓存；缓存由异步 rebuild 填充，rebuild 完成后广播
+ * kg:recall-source-updated 让页面重渲染。 */
 (function(global){
   const LEGACY_CURRENT_KEY='kg_deep_recall_current_question_v1';
   const AUTH_SESSION_KEY='kg_local_current_user_v1';
   const MODE='deep_recall';
   const catalogReady=Promise.resolve(global.KGQuestionCatalogAdapter?.ready);
   let catalogLoaded=false;
-  let cache={signature:'',list:[]};
+  let cache={generation:0,list:[]};
+  let rebuilding=false;
 
   function clone(value){try{return JSON.parse(JSON.stringify(value))}catch(error){return value}}
   function text(value){return String(value==null?'':value)}
   function repository(){return global.KGPublishedPaperRepository||null}
   function resolver(){return global.KGPublishedQuestionResolver||null}
   function collectionId(releaseId){return 'paper-release:'+text(releaseId)}
-  function signature(){
-    try{const repo=repository();return (global.localStorage?.getItem(repo?.storageKey||'kg_exam_papers_published_v1')||'')+'\n'+(global.localStorage?.getItem(repo?.historyKey||'kg_exam_paper_release_history_v1')||'')}catch(error){return ''}
-  }
   function emptyQuestion(message='当前没有可用于深度回忆的已发布试卷。'){
-    return {id:'unavailable',title:'暂无可用题目',stemParts:[{text:message}],options:[],clues:[],concepts:[],tags:[],sourceCollectionId:'',sourceBankId:'',sourceQuestionId:'unavailable',sourcePaperId:'',sourceReleaseId:''};
+    return {id:'unavailable',title:'暂无题目',stemParts:[{text:message}],options:[],clues:[],concepts:[],tags:[],sourceCollectionId:'',sourceBankId:'',sourceQuestionId:'unavailable',sourcePaperId:'',sourceReleaseId:''};
   }
   function collectionFromEntry(entry){
     const paper=entry.paper||{};
@@ -33,39 +34,63 @@
       })
     };
   }
-  function buildList(){return (resolver()?.listPapers?.({mode:MODE,respectRole:true})||repository()?.listPublishedPapers?.({mode:MODE,respectRole:true})||[]).map(collectionFromEntry).filter(item=>item.id&&item.questions.length)}
-  function list(){const raw=signature();if(cache.signature===raw)return cache.list;cache={signature:raw,list:buildList()};return cache.list}
+  let rebuildPromise=null;
+  async function rebuild(){
+    // 并发调用复用同一次重建 Promise，避免"正在重建"时返回空缓存
+    if(rebuildPromise)return rebuildPromise;
+    rebuildPromise=(async()=>{
+      try{
+        await repository()?.ready?.();
+        const entries=await (resolver()?.listPapers?.({mode:MODE,respectRole:true})||repository()?.listPublishedPapers?.({mode:MODE,respectRole:true})||[]);
+        const list=(Array.isArray(entries)?entries:[]).map(collectionFromEntry).filter(item=>item.id&&item.questions.length);
+        cache={generation:cache.generation+1,list};
+        try{global.dispatchEvent?.(new CustomEvent('kg:recall-source-updated',{detail:{generation:cache.generation}}))}catch(error){}
+        return list;
+      }catch(error){
+        console.error('深度回忆发布题目载入失败',error);
+        return cache.list;
+      }finally{rebuilding=false}
+    })();
+    rebuilding=true;
+    return rebuildPromise;
+  }
+  function list(){
+    if(!cache.list.length)void rebuild();
+    return cache.list;
+  }
   function banks(){return list()}
-  function invalidate(){cache={signature:'',list:[]}}
-  function resolveCollection(identifier){const id=text(identifier);return list().find(item=>item.id===id||item.paperId===id||item.releaseId===id)||null}
+  function invalidate(){cache={generation:cache.generation+1,list:[]};void rebuild()}
+  function resolveCollection(identifier){const id=text(identifier);return cache.list.find(item=>item.id===id||item.paperId===id||item.releaseId===id)||null}
   function find(collectionIdentifier,questionId){const collection=resolveCollection(collectionIdentifier);if(!collection)return null;const item=collection.questions.find(row=>row.id===text(questionId));return item?{bank:collection,collection,question:clone(item.question),item:clone(item)}:null}
-  function foundFromResolution(result){
+  async function foundFromResolution(result){
     if(!result?.ok)return null;
     const collection=collectionFromEntry(result.entry);
     const item=collection.questions.find(row=>row.id===text(result.question?.id)&&(!result.context?.bankId||row.bankId===text(result.context.bankId)));
     return item?{bank:collection,collection,question:clone(item.question),item:clone(item),resolution:result}:null;
   }
-  function findPublished(input={}){
+  async function findPublished(input={}){
     if(typeof input==='string')input={questionId:input};
     const context=global.KGLearningRouteContext?.normalize?.({...input,mode:MODE})||{...input,mode:MODE};
     if(context.releaseId||context.paperId){
-      const result=resolver()?.resolveQuestion?.(context,{mode:MODE,respectRole:true});
-      const found=foundFromResolution(result);if(found)return found;
+      const result=await resolver()?.resolveQuestion?.(context,{mode:MODE,respectRole:true});
+      const found=await foundFromResolution(result);if(found)return found;
     }
+    if(!cache.list.length)await rebuild();
     const collection=resolveCollection(input.collectionId||input.releaseId||input.paperId);
     if(collection){const item=collection.questions.find(row=>row.id===text(input.questionId)&&(!input.bankId||row.bankId===text(input.bankId)));if(item)return {bank:collection,collection,question:clone(item.question),item:clone(item)}}
-    for(const row of list()){
+    for(const row of cache.list){
       const item=row.questions.find(candidate=>candidate.id===text(input.questionId)&&(!input.bankId||candidate.bankId===text(input.bankId))&&(!input.paperId||row.paperId===text(input.paperId))&&(!input.releaseId||row.releaseId===text(input.releaseId)));
       if(item)return {bank:row,collection:row,question:clone(item.question),item:clone(item)};
     }
     return null;
   }
-  function findAny(questionId,options={}){return findPublished({...options,questionId})}
-  function activate(collectionIdentifier,questionId,options={}){
+  async function findAny(questionId,options={}){return findPublished({...options,questionId})}
+  async function activate(collectionIdentifier,questionId,options={}){
+    if(!cache.list.length)await rebuild();
     const collection=resolveCollection(collectionIdentifier);
     const input=typeof collectionIdentifier==='object'?collectionIdentifier:{collectionId:collectionIdentifier,paperId:collection?.paperId||'',releaseId:collection?.releaseId||'',questionId,bankId:options.bankId||'',mode:MODE};
-    const result=resolver()?.resolveQuestion?.(input,{mode:MODE,respectRole:true});
-    const found=foundFromResolution(result)||find(collectionIdentifier,questionId)||findAny(questionId,{collectionId:collectionIdentifier});
+    const result=await resolver()?.resolveQuestion?.(input,{mode:MODE,respectRole:true});
+    const found=(await foundFromResolution(result))||find(collectionIdentifier,questionId)||await findAny(questionId,{collectionId:collectionIdentifier});
     if(!found)return {valid:false,code:result?.code||'QUESTION_NOT_FOUND',errors:[resolver()?.message?.(result,'这道题不在当前可用的已发布试卷中。')||'这道题不在当前可用的已发布试卷中。'],resolution:result||null};
     const question=clone(found.question),context=global.KGLearningRouteContext?.normalize?.({paperId:found.collection.paperId,releaseId:found.collection.releaseId,questionId:question.id,bankId:question.sourceBankId,mode:MODE,source:options.source||'published-paper-deep-recall',returnUrl:options.returnUrl||''})||{};
     question.sourceCollectionId=found.collection.id;question.sourcePaperId=found.collection.paperId;question.sourceReleaseId=found.collection.releaseId;question.sourceQuestionId=text(question.id);
@@ -86,7 +111,7 @@
     global.addEventListener?.('kg-app-storage-change',event=>{if([repository()?.storageKey||'kg_exam_papers_published_v1',repository()?.historyKey||'kg_exam_paper_release_history_v1'].includes(text(event?.detail?.key)))invalidate()});
   }catch(error){}
 
-  const api=Object.freeze({ready:catalogReady,banks,list,find,findPublished,findAny,activate,invalidate,emptyQuestion});
+  const api=Object.freeze({ready:catalogReady,banks,list,find,findPublished,findAny,activate,invalidate,rebuild,emptyQuestion});
   global.KGRecallQuestionSource=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

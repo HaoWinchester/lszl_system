@@ -125,7 +125,9 @@
     if (!result.ok) return result
     const users = { ...result.users }
     if (extra.user?.username) users[extra.user.username] = extra.user
-    return { ok: true, users: service.normalizeUsers(users), ...result, ...extra }
+    // ...result 的 users 只是首页分页，必须在合并结果之前展开，避免覆盖 extra.user
+    const { users: _firstPage, ...rest } = result
+    return { ok: true, ...rest, users: service.normalizeUsers(users), ...extra }
   }
 
   function userPayload(user = {}) {

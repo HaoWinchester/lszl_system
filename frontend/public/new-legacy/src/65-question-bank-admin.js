@@ -3787,7 +3787,6 @@
     const confirmed=confirm(`确定清除题库“${bank.name}”的测试答题记录吗？\n\n只会清除本题库题目的训练进度、深度回忆和答题事件，其他题库不会受影响。`);
     if(!confirmed)return;
     try{
-      await window.KGServerStateStorage?.flush?.();
       const response=await fetch(`/api/v1/banks/${encodeURIComponent(bank.id)}/test-learning-records/clear`,{method:'POST',credentials:'include'});
       let payload={};try{payload=await response.json()}catch(error){}
       if(!response.ok)throw new Error(payload?.detail?.message||payload?.detail||'清除测试答题记录失败。');
@@ -4279,9 +4278,6 @@
       if(saved===false)throw new Error('预览数据写入失败');
       setRecallConfigSaveState('saved','已保存');
     }catch(e){alert('预览失败：'+(e.message||e));return}
-    try{
-      if(window.KGServerStateStorage&&typeof window.KGServerStateStorage.flush==='function')await window.KGServerStateStorage.flush();
-    }catch(error){alert('服务器保存失败，请稍后重试。');return}
     const url='knowledge-recall.html?preview=teacher-draft&previewToken='+encodeURIComponent(previewToken)+'&bankId='+encodeURIComponent(bank.id||'')+'&questionId='+encodeURIComponent(q.id||'current');
     window.open(url,'_blank');
   }
