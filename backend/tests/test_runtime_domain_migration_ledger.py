@@ -14,6 +14,7 @@ from app.models.shared_runtime_state import SharedRuntimeState
 from app.services.runtime_domain_migration_service import (
     can_drop_runtime,
     canonical_json_hash,
+    drop_check,
     migrate,
     scan,
     verify,
@@ -70,6 +71,8 @@ def test_scan_deduplicates_identical_source_hashes_and_required_failure_blocks_d
             )
             assert first["created"] == 1
             assert first["deduplicated"] == 1
+            assert first["source_snapshot_hash"]
+            assert first["source_snapshot_payload"]
             assert second["created"] == 0
             assert second["deduplicated"] == 1
             count = await db.scalar(
@@ -85,6 +88,14 @@ def test_scan_deduplicates_identical_source_hashes_and_required_failure_blocks_d
             )
             assert item is not None
             assert item.status == "pending"
+            assert item.disposition == "unknown"
+            assert item.target_domain is None
+            assert item.discard_reason is not None
+            assert item.verification_metadata["source_hash"] == item.source_hash
+            assert await can_drop_runtime(db, run_id) is False
+            unknown_drop_report = await drop_check(db, run_id)
+            assert unknown_drop_report["can_drop"] is False
+            assert unknown_drop_report["unknown"] == 1
 
             async def missing_target(_db, _item):
                 return None
@@ -128,11 +139,32 @@ def test_scan_deduplicates_identical_source_hashes_and_required_failure_blocks_d
             item.status = "migrated"
             item.error = None
             item.target_hash = item.source_hash
+            item.disposition = "migrate"
+            item.target_domain = "test-relational-domain"
+            item.discard_reason = None
             await db.commit()
             assert (await verify(db, run_id))["required_failures"] == 0
             assert await can_drop_runtime(db, run_id) is True
 
-            item.status = "failed"
+            drop_report = await drop_check(db, run_id)
+            assert drop_report["can_drop"] is True
+            assert drop_report["ddl_executed"] is False
+            assert drop_report["status"] == "drop_allowed"
+            run.source_snapshot_hash = "0" * 64
+            await db.commit()
+            assert await can_drop_runtime(db, run_id) is False
+            # 第二次 scan（单源）已覆盖快照哈希，恢复时必须用当前账本快照而非首扫双源哈希。
+            run.source_snapshot_hash = second["source_snapshot_hash"]
+            run.backup_reference = None
+            await db.commit()
+            blocked_backup = await drop_check(db, run_id)
+            assert blocked_backup["can_drop"] is False
+            assert blocked_backup["ddl_executed"] is False
+            run.backup_reference = f"backup:{run_id}"
+            await db.commit()
+            assert await can_drop_runtime(db, run_id) is True
+            # verify 以账本计数为准重算状态；制造真实计数不匹配而不是只写 error。
+            item.target_count = item.source_count + 1
             item.error = "target count mismatch"
             await db.commit()
 

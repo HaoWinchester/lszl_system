@@ -16,6 +16,14 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.engagement import (
+    Announcement,
+    AnnouncementAudience,
+    Feedback,
+    FeedbackReceipt,
+    FeedbackReply,
+    MessageReceipt,
+)
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.runtime_migration import RuntimeMigrationItem, RuntimeMigrationRun
 from app.models.runtime_state import RuntimeState
@@ -63,6 +71,34 @@ Mapper = Callable[[AsyncSession, RuntimeMigrationItem], Any]
 
 # Production migrations register trusted callables here; callers cannot submit payload summaries.
 TARGET_MAPPER_REGISTRY: dict[str, Mapper] = {}
+
+DISPOSITION_MIGRATE = "migrate"
+DISPOSITION_ALREADY_RELATIONAL_VERIFY = "already-relational-verify"
+DISPOSITION_UI_ONLY_DROP = "ui-only-drop"
+DISPOSITION_DEPRECATED_DROP = "deprecated-drop"
+DISPOSITION_UNKNOWN = "unknown"
+
+
+def _mapper_for_key(registry: Mapping[str, Mapper], source_key: str) -> Mapper | None:
+    mapper = registry.get(source_key)
+    if mapper is not None:
+        return mapper
+    # Engagement receipt mappers intentionally cover owner-scoped key prefixes.
+    for key, candidate in registry.items():
+        if key.endswith("__") and source_key.startswith(key):
+            return candidate
+    return None
+
+
+def _disposition_for_key(source_key: str, mapper: Mapper | None) -> tuple[str, str | None, str | None]:
+    if mapper is not None:
+        if source_key in ENGAGEMENT_SOURCE_KEYS or source_key.startswith("kg_user_message_reads_v1__") or source_key.startswith("kg_user_feedback_reply_reads_v1__"):
+            return DISPOSITION_MIGRATE, "engagement", None
+        if source_key in PAPER_RELEASE_SOURCE_KEYS:
+            return DISPOSITION_MIGRATE, "paper-release", None
+        if source_key == "kg_content_taxonomies_v1" or source_key.startswith(TEACHING_RECALL_PREFIX):
+            return DISPOSITION_MIGRATE, "teaching-content", None
+    return DISPOSITION_UNKNOWN, None, "no registered relational target or explicit product disposition"
 
 
 def _release_id(row: Mapping[str, Any]) -> str:
@@ -245,7 +281,7 @@ async def _teaching_content_mapper(db: AsyncSession, item: RuntimeMigrationItem)
         db.add(subject)
         await db.flush()
     if item.source_key == "kg_content_taxonomies_v1":
-        entries = payload if isinstance(payload, list) else [payload]
+        entries = item.source_payload if isinstance(item.source_payload, list) else [item.source_payload]
         count = 0
         for raw in entries:
             if not isinstance(raw, Mapping):
@@ -255,7 +291,7 @@ async def _teaching_content_mapper(db: AsyncSession, item: RuntimeMigrationItem)
                 continue
             row = await db.get(ContentTaxonomy, taxonomy_id)
             if row is None:
-                row = ContentTaxonomy(id=taxonomy_id, subject_id=str(raw.get("subjectId") or subject_id), version=int(raw.get("version") or 1), status=str(raw.get("status") or "draft"), title=str(raw.get("title") or raw.get("name") or ""), content_metadata=dict(raw), updated_by=item.owner_scope or None)
+                row = ContentTaxonomy(id=taxonomy_id, subject_id=str(raw.get("subjectId") or subject_id), version=int(raw.get("version") or 1), status=str(raw.get("status") or "draft"), title=str(raw.get("title") or raw.get("name") or ""), content_metadata=dict(raw), updated_by=None if item.owner_scope in {"shared", ""} else item.owner_scope)
                 db.add(row)
                 await db.flush()
             for position, node in enumerate(raw.get("nodes") or []):
@@ -271,7 +307,7 @@ async def _teaching_content_mapper(db: AsyncSession, item: RuntimeMigrationItem)
         raw = canonical["library"]
         row = (await db.execute(select(RecallAssociationLibrary).where(RecallAssociationLibrary.subject_id == subject_id, RecallAssociationLibrary.version == 1))).scalar_one_or_none()
         if row is None:
-            db.add(RecallAssociationLibrary(id=f"recall-{subject_id}", subject_id=subject_id, version=1, nodes=list(raw.get("nodes") or []), edges=list(raw.get("edges") or []), content_metadata=dict(raw), updated_by=item.owner_scope or None))
+            db.add(RecallAssociationLibrary(id=f"recall-{subject_id}", subject_id=subject_id, version=1, nodes=list(raw.get("nodes") or []), edges=list(raw.get("edges") or []), content_metadata=dict(raw), updated_by=None if item.owner_scope in {"shared", ""} else item.owner_scope))
         else:
             row.nodes, row.edges, row.content_metadata = list(raw.get("nodes") or []), list(raw.get("edges") or []), dict(raw)
         return {"canonical_payload": _teaching_canonical(item.source_payload, item.source_key)}
@@ -338,16 +374,64 @@ async def _runtime_sources(db: AsyncSession) -> list[Mapping[str, Any]]:
     for key, raw_value in shared_rows:
         try:
             payload = json.loads(str(raw_value))
-        except (TypeError, ValueError, json.JSONDecodeError):
+            parse_error = None
+        except (TypeError, ValueError, json.JSONDecodeError) as error:
             payload = str(raw_value)
+            parse_error = f"shared runtime JSON parse failed: {error}"
         sources.append({
             "source_type": "shared_runtime",
             "source_key": str(key),
             "owner_scope": "shared",
             "payload": payload,
+            "parse_error": parse_error,
             "required": True,
         })
     return sources
+
+
+def _source_snapshot_payload(sources: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    payload = [
+        {
+            "source_type": str(source.get("source_type") or "runtime"),
+            "source_key": str(source.get("source_key") or ""),
+            "owner_scope": str(source.get("owner_id") or source.get("owner_scope") or ""),
+            "payload": source.get("payload"),
+            "required": bool(source.get("required", True)),
+        }
+        for source in sources
+    ]
+    return sorted(payload, key=lambda row: (row["source_type"], row["source_key"], row["owner_scope"], canonical_json_hash(row["payload"])))
+
+
+async def plan(db: AsyncSession) -> dict[str, Any]:
+    """Build a read-only migration plan without creating a run or ledger rows."""
+    sources = await _runtime_sources(db)
+    items = []
+    for source in sources:
+        source_key = str(source.get("source_key") or "")
+        disposition, target_domain, discard_reason = _disposition_for_key(
+            source_key, _mapper_for_key(TARGET_MAPPER_REGISTRY, source_key)
+        )
+        if source.get("parse_error"):
+            disposition, target_domain, discard_reason = DISPOSITION_UNKNOWN, None, str(source["parse_error"])
+        items.append({
+            "source_type": str(source.get("source_type") or "runtime"),
+            "source_key": source_key,
+            "owner_scope": str(source.get("owner_id") or source.get("owner_scope") or ""),
+            "required": bool(source.get("required", True)),
+            "disposition": disposition,
+            "target_domain": target_domain,
+            "discard_reason": discard_reason,
+            "source_hash": canonical_json_hash(source.get("payload")),
+            "source_count": _payload_count(source.get("payload")),
+        })
+    return {
+        "status": "planned",
+        "items": len(items),
+        "unknown": sum(item["disposition"] == DISPOSITION_UNKNOWN for item in items),
+        "source_snapshot_hash": canonical_json_hash(_source_snapshot_payload(sources)),
+        "plan": items,
+    }
 
 
 async def scan(
@@ -362,12 +446,22 @@ async def scan(
     deduplicated = 0
 
     source_rows = list(sources) if sources is not None else await _runtime_sources(db)
+    snapshot_payload = _source_snapshot_payload(source_rows)
+    snapshot_hash = canonical_json_hash(snapshot_payload)
+    run.source_snapshot_hash = snapshot_hash
+    run.source_snapshot_count = len(snapshot_payload)
+    run.snapshot_created_at = datetime.now(timezone.utc)
+    run.backup_reference = run.backup_reference or f"runtime-migration:{run_id}:{snapshot_hash}"
+
     for source in source_rows:
         source_type = str(source.get("source_type") or "runtime")
         source_key = str(source.get("source_key") or "")
         owner_scope = str(source.get("owner_id") or source.get("owner_scope") or "")
         payload = source.get("payload")
         source_hash = canonical_json_hash(payload)
+        mapper = _mapper_for_key(TARGET_MAPPER_REGISTRY, source_key)
+        disposition, target_domain, discard_reason = _disposition_for_key(source_key, mapper)
+        parse_error = source.get("parse_error")
         try:
             is_teaching_source = source_key == "kg_content_taxonomies_v1" or source_key.startswith(TEACHING_RECALL_PREFIX)
             is_domain_source = source_key in {PUBLISHED_PAPERS_KEY, PAPER_RELEASE_HISTORY_KEY} or source_key in ENGAGEMENT_SOURCE_KEYS or is_teaching_source
@@ -377,6 +471,15 @@ async def scan(
             is_domain_source = True
             expected_payload = None
             expected_error = str(error)
+        if disposition == DISPOSITION_UNKNOWN:
+            # Unknown keys stay pending: the ledger must await an explicit
+            # disposition decision before migrate/verify can act on them.
+            expected_error = None
+        if parse_error:
+            expected_error = parse_error
+            disposition = DISPOSITION_UNKNOWN
+            target_domain = None
+            discard_reason = parse_error
         statement = (
             insert(RuntimeMigrationItem)
             .values(
@@ -390,6 +493,15 @@ async def scan(
                 source_hash=source_hash,
                 source_payload=payload,
                 required=bool(source.get("required", True)),
+                disposition=disposition,
+                target_domain=target_domain,
+                discard_reason=discard_reason,
+                verification_metadata={
+                    "source_hash": source_hash,
+                    "source_count": int(source.get("source_count") or _payload_count(payload)),
+                    "expected_hash": canonical_json_hash(expected_payload) if expected_payload is not None else None,
+                    "expected_count": _payload_count(expected_payload) if expected_payload is not None else None,
+                },
                 source_count=int(source.get("source_count") or _payload_count(payload)),
                 expected_count=_payload_count(expected_payload) if expected_payload is not None else None,
                 expected_hash=canonical_json_hash(expected_payload) if expected_payload is not None else None,
@@ -418,6 +530,8 @@ async def scan(
         "created": created,
         "deduplicated": deduplicated,
         "items": int(total_items or 0),
+        "source_snapshot_hash": snapshot_hash,
+        "source_snapshot_payload": snapshot_payload,
     }
     run.report = report
     await db.commit()
@@ -447,10 +561,13 @@ async def migrate(
         )).all()
     )
     migrated = 0
-    for item in items:
+    for index, item in enumerate(items):
+        # rollback 会把所有已加载 ORM 对象标记过期；异步会话下过期属性只能
+        # 经 await refresh 恢复，因此先记录 id，失败分支内全部重新加载。
+        item_id = item.id
         if item.status != "pending":
             continue
-        mapper = registry.get(item.source_key)
+        mapper = _mapper_for_key(registry, item.source_key)
         if mapper is None:
             continue
         try:
@@ -461,11 +578,21 @@ async def migrate(
             error_message = str(error)
             await db.rollback()
             run = await _require_run(db, run_id)
-            item = await db.get(RuntimeMigrationItem, item.id)
+            item = await db.get(RuntimeMigrationItem, item_id)
             item.status = "failed"
             item.error = error_message
             await db.commit()
             run = await _require_run(db, run_id)
+            # rollback 使其余条目过期：重新查询本批剩余条目，避免同步路径触发懒加载
+            remaining = list((await db.scalars(
+                select(RuntimeMigrationItem)
+                .where(RuntimeMigrationItem.run_id == run_id)
+                .order_by(
+                    (RuntimeMigrationItem.source_key != PUBLISHED_PAPERS_KEY),
+                    RuntimeMigrationItem.created_at,
+                )
+            )).all())
+            items[index:] = remaining[index:] if len(remaining) > index else []
             continue
         if not isinstance(result, Mapping) or "canonical_payload" not in result:
             item.error = "target mapper must return a mapping with canonical_payload"
@@ -478,7 +605,16 @@ async def migrate(
         migrated += 1
     pending = sum(1 for item in items if item.required and item.status == "pending")
     run.status = "applied" if pending == 0 else "verification_failed"
-    report = {"run_id": run_id, "status": run.status, "items": len(items), "migrated": migrated, "pending": pending}
+    report = {
+        "run_id": run_id,
+        "status": run.status,
+        "items": len(items),
+        "migrated": migrated,
+        "pending": pending,
+        # Carry the frozen scan snapshot forward; every stage must keep it so
+        # the drop gate can re-verify after the live tables are emptied.
+        "source_snapshot_payload": (run.report or {}).get("source_snapshot_payload"),
+    }
     run.report = report
     await db.commit()
     return report
@@ -527,6 +663,73 @@ async def _read_paper_release_canonical(
     return canonical
 
 
+async def _read_engagement_canonical(db: AsyncSession, item: RuntimeMigrationItem) -> list[dict[str, Any]]:
+    """Read canonical values from relational tables; never derive verification from source JSON."""
+    source_key = item.source_key
+    source_ids = [str(row.get("id") or "") for row in (item.source_payload if isinstance(item.source_payload, list) else []) if isinstance(row, Mapping) and row.get("id")]
+    if source_key == "kg_announcements_v1":
+        rows_by_id = {row.id: row for row in (await db.scalars(select(Announcement).where(Announcement.id.in_(source_ids)))).all()}
+        result = []
+        for identifier in source_ids:
+            row = rows_by_id.get(identifier)
+            if row is None:
+                continue
+            audiences = list((await db.scalars(select(AnnouncementAudience).where(AnnouncementAudience.announcement_id == row.id))).all())
+            audience_type = audiences[0].audience_type if audiences else "all"
+            result.append({
+                "id": row.id, "title": row.title, "body": row.body, "link": row.link,
+                "status": row.status, "publishAt": row.publish_at, "expiresAt": row.expires_at,
+                "publishedAt": row.published_at, "withdrawnAt": row.withdrawn_at,
+                "createdBy": row.created_by,
+                "audience": {"type": audience_type,
+                             "roles": [x.audience_value for x in audiences if x.audience_type == "roles"],
+                             "users": [x.audience_value for x in audiences if x.audience_type == "users"]},
+            })
+        return result
+    if source_key == "kg_user_feedback_v1":
+        rows_by_id = {row.id: row for row in (await db.scalars(select(Feedback).where(Feedback.id.in_(source_ids)))).all()}
+        result = []
+        for identifier in source_ids:
+            row = rows_by_id.get(identifier)
+            if row is None:
+                continue
+            replies = list((await db.scalars(select(FeedbackReply).where(FeedbackReply.feedback_id == row.id))).all())
+            result.append({
+                "id": row.id, "type": row.type, "title": row.title, "detail": row.detail,
+                "page": row.page, "appVersion": row.app_version, "contact": row.contact,
+                "attachment": row.attachment, "status": row.status,
+                "submittedBy": {"username": row.submitted_by},
+                "replies": [{"id": x.id, "message": x.message, "actor": x.actor,
+                             "actorUsername": x.actor_username, "createdAt": x.created_at} for x in replies],
+            })
+        return result
+    if source_key.startswith("kg_user_message_reads_v1__"):
+        rows = list((await db.scalars(select(MessageReceipt))).all())
+        return sorted([{"id": x.id, "announcement_id": x.announcement_id, "username": x.username, "read_at": x.read_at} for x in rows], key=lambda x: (x["announcement_id"], x["username"]))
+    if source_key.startswith("kg_user_feedback_reply_reads_v1__"):
+        rows = list((await db.scalars(select(FeedbackReceipt))).all())
+        return sorted([{"id": x.id, "feedback_id": x.feedback_id, "username": x.username, "read_at": x.read_at} for x in rows], key=lambda x: (x["feedback_id"], x["username"]))
+    raise ValueError("unsupported engagement source")
+
+
+async def _read_teaching_canonical(db: AsyncSession, item: RuntimeMigrationItem) -> dict[str, Any]:
+    expected = _teaching_canonical(item.source_payload, item.source_key)
+    subject_id = str(expected["subjectId"])
+    if item.source_key == "kg_content_taxonomies_v1":
+        target = []
+        for source in expected["taxonomies"]:
+            taxonomy_id = str(source.get("id") or "") if isinstance(source, Mapping) else ""
+            row = await db.get(ContentTaxonomy, taxonomy_id) if taxonomy_id else None
+            if row is not None:
+                target.append(dict(row.content_metadata or {}))
+        return {"subjectId": subject_id, "taxonomies": target}
+    row = (await db.execute(select(RecallAssociationLibrary).where(
+        RecallAssociationLibrary.subject_id == subject_id,
+        RecallAssociationLibrary.version == 1,
+    ))).scalar_one_or_none()
+    return {"subjectId": subject_id, "library": dict(row.content_metadata or {}) if row else {}}
+
+
 async def verify(db: AsyncSession, run_id: str) -> dict[str, Any]:
     run = await _require_run(db, run_id)
     items = list(
@@ -546,8 +749,12 @@ async def verify(db: AsyncSession, run_id: str) -> dict[str, Any]:
         })
     for item in items:
         if item.status in {"migrated", "verified"}:
-            if item.source_key in ENGAGEMENT_SOURCE_KEYS:
-                target_payload = engagement_expected_canonical(item.source_payload, item.source_key)
+            if item.source_key in ENGAGEMENT_SOURCE_KEYS or item.source_key.startswith("kg_user_message_reads_v1__") or item.source_key.startswith("kg_user_feedback_reply_reads_v1__"):
+                target_payload = await _read_engagement_canonical(db, item)
+                item.target_count = _payload_count(target_payload)
+                item.target_hash = canonical_json_hash(target_payload)
+            elif item.source_key == "kg_content_taxonomies_v1" or item.source_key.startswith(TEACHING_RECALL_PREFIX):
+                target_payload = await _read_teaching_canonical(db, item)
                 item.target_count = _payload_count(target_payload)
                 item.target_hash = canonical_json_hash(target_payload)
             elif item.source_key in {PUBLISHED_PAPERS_KEY, PAPER_RELEASE_HISTORY_KEY}:
@@ -566,13 +773,7 @@ async def verify(db: AsyncSession, run_id: str) -> dict[str, Any]:
                             item.error = "current release source must remain authoritative"
                             break
             expected_count = item.expected_count if item.expected_count is not None else item.source_count
-            expected_hash = item.expected_hash if item.source_key in ENGAGEMENT_SOURCE_KEYS else (item.expected_hash or item.source_hash)
-            if item.source_key in ENGAGEMENT_SOURCE_KEYS:
-                expected_payload = engagement_expected_canonical(item.source_payload, item.source_key)
-                expected_hash = canonical_json_hash(expected_payload)
-                expected_count = _payload_count(expected_payload)
-            if item.source_key in ENGAGEMENT_SOURCE_KEYS and expected_hash is None:
-                item.status="failed"; item.error="engagement expected canonical hash is required"; continue
+            expected_hash = item.expected_hash or item.source_hash
             counts_match = expected_count == item.target_count
             hashes_match = bool(item.target_hash) and expected_hash == item.target_hash
             item.status = "verified" if counts_match and hashes_match else "failed"
@@ -582,6 +783,7 @@ async def verify(db: AsyncSession, run_id: str) -> dict[str, Any]:
                 item.error = "source and target hashes differ"
             else:
                 item.error = None
+    unknown = sum(1 for item in items if item.disposition == DISPOSITION_UNKNOWN)
     required_failures = sum(
         1 for item in items if item.required and item.status != "verified"
     )
@@ -593,6 +795,12 @@ async def verify(db: AsyncSession, run_id: str) -> dict[str, Any]:
         "status": run.status,
         "items": len(items),
         "required_failures": required_failures,
+        "unknown": unknown,
+        "source_snapshot_hash": run.source_snapshot_hash,
+        "backup_reference": run.backup_reference,
+        # Preserve the frozen scan snapshot so drop gates can re-verify even
+        # after the live runtime tables have been emptied.
+        "source_snapshot_payload": (run.report or {}).get("source_snapshot_payload"),
     }
     run.report = report
     await db.commit()
@@ -602,6 +810,20 @@ async def verify(db: AsyncSession, run_id: str) -> dict[str, Any]:
 async def can_drop_runtime(db: AsyncSession, run_id: str) -> bool:
     run = await db.get(RuntimeMigrationRun, run_id)
     if run is None or run.status != "verified":
+        return False
+    # A drop is only safe when the immutable source snapshot and its backup marker exist.
+    if not run.source_snapshot_hash or run.source_snapshot_count <= 0 or not run.backup_reference:
+        return False
+    current_sources = await _runtime_sources(db)
+    current_snapshot = _source_snapshot_payload(current_sources)
+    if not current_snapshot:
+        stored_snapshot = (run.report or {}).get("source_snapshot_payload")
+        if not isinstance(stored_snapshot, list):
+            return False
+        current_snapshot = stored_snapshot
+    if len(current_snapshot) != run.source_snapshot_count:
+        return False
+    if canonical_json_hash(current_snapshot) != run.source_snapshot_hash:
         return False
     required_items = list(
         (
@@ -615,14 +837,34 @@ async def can_drop_runtime(db: AsyncSession, run_id: str) -> bool:
     )
     if not required_items:
         return False
+    if any(item.disposition == DISPOSITION_UNKNOWN for item in required_items):
+        return False
+    if any(item.status != "verified" for item in required_items):
+        return False
     source_keys = {item.source_key for item in required_items}
     paper_items_present = bool(source_keys & PAPER_RELEASE_SOURCE_KEYS)
     if paper_items_present and not PAPER_RELEASE_SOURCE_KEYS.issubset(source_keys):
         return False
     return all(
-        item.status == "verified"
-        and (item.expected_count if item.expected_count is not None else item.source_count) == item.target_count
+        (item.expected_count if item.expected_count is not None else item.source_count) == item.target_count
         and bool(item.target_hash)
         and (item.expected_hash or item.source_hash) == item.target_hash
         for item in required_items
     )
+
+
+async def drop_check(db: AsyncSession, run_id: str) -> dict[str, Any]:
+    """Read-only drop gate report; this function never executes DDL."""
+    run = await db.get(RuntimeMigrationRun, run_id)
+    allowed = await can_drop_runtime(db, run_id)
+    items = list((await db.scalars(select(RuntimeMigrationItem).where(RuntimeMigrationItem.run_id == run_id))).all()) if run else []
+    return {
+        "run_id": run_id,
+        "status": "drop_allowed" if allowed else "drop_blocked",
+        "can_drop": allowed,
+        "unknown": sum(item.disposition == DISPOSITION_UNKNOWN for item in items),
+        "required_failures": sum(item.required and item.status != "verified" for item in items),
+        "source_snapshot_hash": run.source_snapshot_hash if run else None,
+        "backup_reference": run.backup_reference if run else None,
+        "ddl_executed": False,
+    }

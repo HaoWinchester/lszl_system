@@ -59,9 +59,10 @@ def upgrade() -> None:
         ["owner_id", "question_id", sa.text("COALESCE(release_id, '')")], unique=True,
     )
 
-    op.execute("UPDATE practice_mistakes SET release_id = NULL WHERE release_id = ''")
+    # 先放开 NOT NULL 再把 '' 归一为 NULL，否则存量 NOT NULL 列会违反约束
     op.drop_constraint("uq_practice_mistake_owner_question_release", "practice_mistakes", type_="unique")
     op.alter_column("practice_mistakes", "release_id", type_=sa.String(length=64), nullable=True)
+    op.execute("UPDATE practice_mistakes SET release_id = NULL WHERE release_id = ''")
     op.execute("""
         DO $$
         BEGIN
