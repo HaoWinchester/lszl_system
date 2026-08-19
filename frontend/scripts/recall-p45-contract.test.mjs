@@ -35,7 +35,8 @@ test('deep recall carries the update release performance and association safegua
   assert.match(recall, /function renderGraphDelta\(/)
   assert.match(recall, /function updateConnectedEdges\(/)
   assert.match(recall, /edgeCreated/)
-  assert.match(recall, /setTimeout\(\(\)=>\{progressSaveTimer=0;(?:void )?writeProgressNow\(\)\},420\)/)
+  // P4.5.37 起进度保存防抖 420→1200ms，降低高频写库。
+  assert.match(recall, /setTimeout\(\(\)=>\{progressSaveTimer=0;(?:void )?writeProgressNow\(\)\},1200\)/)
   assert.match(recall, /拖动整理位置/)
 })
 
@@ -54,19 +55,20 @@ test('deep recall keeps core priority semantic and reveals one learner keyword c
 
 test('deep recall options give immediate correct and incorrect answer feedback', () => {
   const recall = source('new-legacy/src/86-knowledge-recall.js')
-  const styles = source('new-legacy/styles/knowledge-recall.css')
+  const styles = source('new-legacy/styles/question-workspace.css')
 
+  // P4.5.37 起与多题画布共用单一来源：点击字母按钮走 judgeKrOption（内含只读守卫），
+  // flashKrOption 按对错加 is-correct-flash / is-wrong-flash 类；选项行内关键词优先于选项判定。
   assert.match(recall, /function recallOptionIsCorrect\(/)
-  assert.match(recall, /data-option-id=/)
-  assert.match(recall, /function flashRecallOptionFeedback\(/)
-  assert.match(recall, /is-answer-correct/)
-  assert.match(recall, /is-answer-incorrect/)
-  assert.match(recall, /setTimeout\(\(\)=>\{[^}]*is-answer-correct[^}]*is-answer-incorrect/)
+  assert.match(recall, /data-qw-option-key/)
+  assert.match(recall, /function flashKrOption\(key,correct\)/)
+  assert.match(recall, /correct\?'is-correct-flash':'is-wrong-flash'/)
   const clickHandler = recall.slice(recall.indexOf("questionCard.addEventListener('click'"), recall.indexOf('function activateKeyword('))
-  assert.ok(clickHandler.indexOf("const option=event.target.closest('.kr-option[data-option-id]')") < clickHandler.indexOf("const keyword=event.target.closest('.kr-keyword-token')"), 'answer feedback must take priority over nested keyword clicks')
-  assert.match(clickHandler, /const option=event\.target\.closest\('\.kr-option\[data-option-id\]'\);[\s\S]{0,240}isRecallReadonly\(\)[\s\S]{0,240}flashRecallOptionFeedback\(option\)/)
-  assert.match(styles, /\.kr-option\.is-answer-correct/)
-  assert.match(styles, /\.kr-option\.is-answer-incorrect/)
-  assert.match(styles, /@keyframes krOptionCorrectFlash/)
-  assert.match(styles, /@keyframes krOptionIncorrectFlash/)
+  assert.ok(clickHandler.indexOf("const keyword=event.target.closest('.kr-keyword-token')") < clickHandler.indexOf("const optionKey=event.target.closest('[data-qw-option-key]')"), 'keywords nested inside option rows must win over option judging')
+  assert.match(clickHandler, /const optionKey=event\.target\.closest\('\[data-qw-option-key\]'\);[\s\S]{0,400}judgeKrOption\(optionKey\.dataset\.qwOptionKey\)/)
+  assert.match(recall, /function judgeKrOption\(key\)\{[\s\S]{0,160}isRecallReadonly\(\)/)
+  assert.match(styles, /\.qw-card-option-key\.is-correct-flash/)
+  assert.match(styles, /\.qw-card-option-key\.is-wrong-flash/)
+  assert.match(styles, /@keyframes qw-option-correct-flash/)
+  assert.match(styles, /@keyframes qw-option-wrong-flash/)
 })

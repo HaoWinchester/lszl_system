@@ -35,11 +35,18 @@ async def _owned_question(db: AsyncSession, owner: str, question_id: str) -> boo
     return await question_catalog_service.is_learning_question_visible(db, question_id)
 
 
-async def _progress(db: AsyncSession, owner: str, question_id: str) -> TrainingProgress | None:
+async def _progress(
+    db: AsyncSession, owner: str, question_id: str, release_id: str = ""
+) -> TrainingProgress | None:
+    release_filter = (
+        TrainingProgress.release_id == release_id
+        if release_id else TrainingProgress.release_id.is_(None)
+    )
     result = await db.execute(
         select(TrainingProgress).where(
             TrainingProgress.owner_id == owner,
             TrainingProgress.question_id == question_id,
+            release_filter,
         )
     )
     return result.scalar_one_or_none()
@@ -74,27 +81,44 @@ def _legacy_session(progress: TrainingProgress) -> dict:
     }
 
 
-async def get_session(db: AsyncSession, owner: str, question_id: str) -> dict | None:
-    progress = await _progress(db, owner, question_id)
+async def get_session(
+    db: AsyncSession, owner: str, question_id: str, release_id: str = ""
+) -> dict | None:
+    progress = await _progress(db, owner, question_id, release_id)
     if not progress:
         return None
     return progress.session_data or _legacy_session(progress)
 
 
-async def save_session(db: AsyncSession, owner: str, question_id: str, data: dict) -> dict | None:
-    if not await _owned_question(db, owner, question_id):
+async def save_session(
+    db: AsyncSession,
+    owner: str,
+    question_id: str,
+    data: dict,
+    *,
+    release_id: str = "",
+    current_user: "object | None" = None,
+) -> dict | None:
+    if release_id:
+        question = await _visible_learning_question(
+            db, question_id, current_user, release_id=release_id, mode="single_deep_study"
+        )
+        if question is None:
+            return None
+    elif not await _owned_question(db, owner, question_id):
         return None
     version = int(data.get("schemaVersion") or 1)
     if version not in SESSION_SCHEMA_VERSIONS:
         raise ValueError("不支持的学习会话版本")
-    await _practice_write_lock(db, owner, question_id)
-    progress = await _progress(db, owner, question_id)
+    await _practice_write_lock(db, owner, f"{release_id}:{question_id}")
+    progress = await _progress(db, owner, question_id, release_id)
     answer = data.get("answer") if isinstance(data.get("answer"), dict) else {}
     if progress is None:
         progress = TrainingProgress(
             id=uid("tp_"),
             owner_id=owner,
             question_id=question_id,
+            release_id=release_id or None,
             selected_answer=answer.get("selectedAnswer"),
             submitted=bool(answer.get("submitted", False)),
             found_clues=data.get("foundClues") or [],
@@ -179,7 +203,7 @@ def _practice_mistake_to_dict(mistake: PracticeMistake) -> dict:
         "questionId": mistake.question_id,
         "bankId": mistake.bank_id,
         "paperId": mistake.paper_id,
-        "releaseId": mistake.release_id,
+        "releaseId": mistake.release_id or "",
         "paperVersion": mistake.paper_version,
         "paperName": mistake.paper_name,
         "sourceMode": mistake.source_mode,
@@ -240,7 +264,19 @@ async def _visible_learning_question(
     db: AsyncSession,
     question_id: str,
     current_user: "object | None" = None,
+    *,
+    release_id: str = "",
+    mode: str = "practice_mode",
 ) -> Question | None:
+    if current_user is not None and release_id:
+        from app.services import published_paper_access_service
+
+        frozen = await published_paper_access_service.load_published_question(
+            db, current_user, release_id, question_id, mode=mode
+        )
+        if frozen is not None:
+            return frozen
+        return None
     query = (
         select(Question)
         .join(QuestionBank, QuestionBank.id == Question.bank_id)
@@ -253,21 +289,7 @@ async def _visible_learning_question(
     question = (await db.execute(query)).scalar_one_or_none()
     if question is not None:
         return question
-    # 题库未公开但题目出现在已发布试卷的冻结快照中时，同样允许学习
-    # （与深度回忆 published_paper_access_service 的投影授权保持一致）。
-    if current_user is None:
-        return None
-    from app.services import published_paper_access_service
-
-    question = await published_paper_access_service.load_or_project_published_question(
-        db, current_user, question_id
-    )
-    if question is None:
-        return None
-    if await published_paper_access_service.can_learn_published_question(
-        db, current_user, question
-    ):
-        return question
+    # 题库未公开且没有发布版本上下文时不可学习。
     return None
 
 
@@ -278,14 +300,23 @@ async def _append_practice_event(
     event_type: str,
     question_id: str | None,
     payload: dict,
+    snapshot_only: bool = False,
 ) -> None:
+    event_payload = dict(payload)
+    stored_question_id = question_id
+    if question_id and await db.get(Question, question_id) is None:
+        event_payload.setdefault("sourceQuestionId", question_id)
+        stored_question_id = None
+    if snapshot_only and question_id:
+        event_payload.setdefault("sourceQuestionId", question_id)
+        stored_question_id = None
     db.add(
         LearningEvent(
             id=uid("le_"),
             owner_id=owner,
-            question_id=question_id,
+            question_id=stored_question_id,
             event_type=event_type,
-            payload=payload,
+            payload=event_payload,
         )
     )
 
@@ -296,13 +327,15 @@ async def record_practice_mistake(
     question_id = str(data.get("questionId") or "").strip()
     if not question_id:
         raise ValueError("questionId 不能为空")
-    question = await _visible_learning_question(db, question_id, current_user)
+    release_id = str(data.get("releaseId") or "").strip()
+    question = await _visible_learning_question(
+        db, question_id, current_user, release_id=release_id, mode="practice_mode"
+    )
     if question is None:
         raise LookupError("题目不存在或当前不可学习")
     requested_bank_id = str(data.get("bankId") or "").strip()
     if requested_bank_id and requested_bank_id != question.bank_id:
         raise ValueError("bankId 与题目不一致")
-    release_id = str(data.get("releaseId") or "").strip()
     selected_answer = str(data.get("selectedAnswer") or data.get("reason") or "").strip()
     language_mode = str(data.get("languageMode") or "zh").strip().lower()
     if language_mode not in PRACTICE_LANGUAGE_MODES:
@@ -318,13 +351,14 @@ async def record_practice_mistake(
             raise ValueError("selectedAnswer 不是该题的有效选项")
         if canonical_answer and selected_answer == canonical_answer:
             raise ValueError("正确答案不能记录为错题")
-    await _practice_write_lock(db, owner, question.id)
+    await _practice_write_lock(db, owner, f"{release_id}:{question.id}")
     existing = (
         await db.execute(
             select(PracticeMistake).where(
                 PracticeMistake.owner_id == owner,
                 PracticeMistake.question_id == question.id,
-                PracticeMistake.release_id == release_id,
+                (PracticeMistake.release_id == release_id)
+                if release_id else PracticeMistake.release_id.is_(None),
             ).with_for_update()
         )
     ).scalar_one_or_none()
@@ -336,7 +370,7 @@ async def record_practice_mistake(
             question_id=question.id,
             bank_id=question.bank_id,
             paper_id=str(data.get("paperId") or "").strip() or None,
-            release_id=release_id,
+            release_id=release_id or None,
             paper_version=max(0, int(data.get("paperVersion") or 0)),
             paper_name=str(data.get("paperName") or "错题来源试卷").strip()[:200] or "错题来源试卷",
             source_mode=str(data.get("sourceMode") or "challenge").strip()[:32] or "challenge",
@@ -401,7 +435,9 @@ async def _record_answer_completion(
 ) -> dict:
     """Persist the fact that one option was accepted, independently of mastery."""
 
-    progress = await _progress(db, owner, question.id)
+    progress = await _progress(
+        db, owner, question.id, str(data.get("releaseId") or "").strip()
+    )
     now = now_utc()
     previous_session = progress.session_data if progress and isinstance(progress.session_data, dict) else {}
     previous_context = previous_session.get("context") if isinstance(previous_session.get("context"), dict) else {}
@@ -441,6 +477,7 @@ async def _record_answer_completion(
             id=uid("tp_"),
             owner_id=owner,
             question_id=question.id,
+            release_id=context["releaseId"] or None,
             bank_id=question.bank_id,
             paper_id=context["paperId"] or None,
             selected_answer=selected_answer,
@@ -495,7 +532,10 @@ async def record_practice_answer(
     question_id = str(data.get("questionId") or "").strip()
     if not question_id:
         raise ValueError("questionId 不能为空")
-    question = await _visible_learning_question(db, question_id, current_user)
+    release_id = str(data.get("releaseId") or "").strip()
+    question = await _visible_learning_question(
+        db, question_id, current_user, release_id=release_id, mode="practice_mode"
+    )
     if question is None:
         raise LookupError("题目不存在或当前不可学习")
     requested_bank_id = str(data.get("bankId") or "").strip()
@@ -513,14 +553,14 @@ async def record_practice_answer(
     if not canonical_answer:
         raise ValueError("题目尚未配置可判定的正确答案")
     correct = selected_answer == canonical_answer
-    release_id = str(data.get("releaseId") or "").strip()
-    await _practice_write_lock(db, owner, question.id)
+    await _practice_write_lock(db, owner, f"{release_id}:{question.id}")
     mistake = (
         await db.execute(
             select(PracticeMistake).where(
                 PracticeMistake.owner_id == owner,
                 PracticeMistake.question_id == question.id,
-                PracticeMistake.release_id == release_id,
+                (PracticeMistake.release_id == release_id)
+                if release_id else PracticeMistake.release_id.is_(None),
             ).with_for_update()
         )
     ).scalar_one_or_none()
@@ -529,7 +569,7 @@ async def record_practice_answer(
         if mistake is None:
             mistake = PracticeMistake(
                 id=uid("pm_"), owner_id=owner, question_id=question.id, bank_id=question.bank_id,
-                paper_id=str(data.get("paperId") or "").strip() or None, release_id=release_id,
+                paper_id=str(data.get("paperId") or "").strip() or None, release_id=release_id or None,
                 paper_version=max(0, int(data.get("paperVersion") or 0)),
                 paper_name=str(data.get("paperName") or "错题来源试卷").strip()[:200] or "错题来源试卷",
                 source_mode=str(data.get("sourceMode") or "challenge").strip()[:32] or "challenge",
@@ -840,17 +880,22 @@ async def record_practice_verification(
 
 async def append_event(db: AsyncSession, owner: str, data: dict) -> LearningEvent:
     question_id = data.get("questionId")
-    if question_id and not await _owned_question(db, owner, str(question_id)):
-        raise LookupError("题目不存在或无权访问")
+    source_question_id = str(question_id or "").strip() or None
+    if question_id and await db.get(Question, str(question_id)) is None:
+        question_id = None
     event_type = str(data.get("eventType") or "").strip()
     if not event_type:
         raise ValueError("eventType 不能为空")
+    payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
+    payload = dict(payload)
+    if source_question_id and question_id is None:
+        payload.setdefault("sourceQuestionId", source_question_id)
     event = LearningEvent(
         id=uid("le_"),
         owner_id=owner,
         question_id=str(question_id) if question_id else None,
         event_type=event_type,
-        payload=data.get("payload") if isinstance(data.get("payload"), dict) else {},
+        payload=payload,
     )
     db.add(event)
     await db.commit()

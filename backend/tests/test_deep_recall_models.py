@@ -1,4 +1,4 @@
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Index, UniqueConstraint
 
 from app.models.training import (
     RecallLibrarySnapshot,
@@ -15,18 +15,20 @@ def _unique_constraint_names(model: type) -> set[str | None]:
     }
 
 
+def _index_names(model: type) -> set[str | None]:
+    return {index.name for index in model.__table__.indexes if isinstance(index, Index)}
+
+
 def test_recall_snapshots_have_stable_content_identities() -> None:
     assert {column.name for column in RecallQuestionSnapshot.__table__.primary_key} == {"id"}
     assert {column.name for column in RecallLibrarySnapshot.__table__.primary_key} == {"id"}
-    assert "uq_recall_question_snapshot_revision" in _unique_constraint_names(RecallQuestionSnapshot)
+    assert "uq_recall_question_snapshot_revision_release" in _index_names(RecallQuestionSnapshot)
     assert "uq_recall_library_snapshot_hash" in _unique_constraint_names(RecallLibrarySnapshot)
 
 
-def test_recall_progress_remains_isolated_by_owner_and_question() -> None:
-    assert {column.name for column in RecallProgress.__table__.primary_key} == {
-        "owner_id",
-        "question_id",
-    }
+def test_recall_progress_isolated_by_owner_question_and_release() -> None:
+    assert {column.name for column in RecallProgress.__table__.primary_key} == {"id"}
+    assert "uq_recall_progress_owner_question_release" in _index_names(RecallProgress)
 
 
 def test_recall_progress_contains_versioned_graph_columns() -> None:

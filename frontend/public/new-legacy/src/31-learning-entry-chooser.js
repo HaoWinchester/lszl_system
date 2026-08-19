@@ -42,17 +42,19 @@
     } catch (_error) { return null; }
   }
 
-  function sessionFromBootstrap() {
-    const entry = global.__KG_DIRECT_BOOTSTRAP__;
-    if (!entry || !entry.authUser || typeof entry.authUser !== "object") return null;
-    return { authenticated: true, loginSessionId: entry.authUser.loginSessionId, user: entry.authUser };
-  }
-
   async function currentServerSession(auth) {
     if (auth && typeof auth.getCurrentSession === "function") {
       try { const result = await auth.getCurrentSession(); if (result && typeof result === "object") return result; } catch (_error) {}
     }
-    return sessionFromBootstrap();
+    try {
+      const response = await fetch('/api/v1/auth/me', { method: 'GET', credentials: 'include' })
+      if (!response.ok) return null
+      const me = await response.json()
+      if (me && me.user && typeof me.user === 'object') return { authenticated: true, user: me.user, loginSessionId: me.loginSessionId }
+      return null
+    } catch (_error) {
+      return null
+    }
   }
 
   function authenticatedSession(session) {

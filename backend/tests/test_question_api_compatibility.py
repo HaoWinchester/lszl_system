@@ -11,6 +11,7 @@ from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
 from app.main import app
 from app.models.content_prep import QuestionBankCollaborator
+from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.user import User
 from app.services import question_service, teaching_content_revision_service
@@ -246,6 +247,17 @@ def test_admin_and_teacher_share_paper_crud_compose_publish_and_audit() -> None:
     async def cleanup() -> None:
         async with AsyncSessionLocal() as db:
             if paper_ids:
+                release_ids = select(PaperRelease.id).where(
+                    PaperRelease.paper_id.in_(paper_ids)
+                )
+                await db.execute(
+                    delete(PaperReleaseQuestion).where(
+                        PaperReleaseQuestion.release_id.in_(release_ids)
+                    )
+                )
+                await db.execute(
+                    delete(PaperRelease).where(PaperRelease.paper_id.in_(paper_ids))
+                )
                 await db.execute(
                     delete(PaperQuestion).where(PaperQuestion.paper_id.in_(paper_ids))
                 )

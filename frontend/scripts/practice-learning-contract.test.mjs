@@ -18,7 +18,7 @@ test('P4.5 practice workflow uses a database API adapter instead of a local mist
   const practice = source('new-legacy/src/100-practice-mode.js')
   assert.match(adapter, /\/api\/v1\/learning\/practice/)
   assert.match(adapter, /request\('\/sessions'/)
-  assert.match(adapter, /async function answer\(input\)/)
+  assert.match(adapter, /async function answer\(input[^)]*\)/)
   assert.match(adapter, /request\('\/answers'/)
   assert.match(adapter, /async function verify\(mistakeId, input\)/)
   assert.match(practice, /KGPracticeLearningApi/)

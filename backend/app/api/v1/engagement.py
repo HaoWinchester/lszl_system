@@ -27,11 +27,6 @@ Limit = Annotated[int, Query(ge=1, le=service.MAX_PAGE_SIZE)]
 Offset = Annotated[int, Query(ge=0)]
 
 
-def _page(rows: list[dict], limit: int, offset: int) -> dict:
-    items, pagination = service.page_rows(rows, limit=limit, offset=offset)
-    return {"items": items, "pagination": pagination}
-
-
 @router.post("/feedback", status_code=status.HTTP_201_CREATED)
 async def submit_feedback(body: dict, db: DB, user: CurrentUser):
     try:
@@ -42,7 +37,7 @@ async def submit_feedback(body: dict, db: DB, user: CurrentUser):
 
 @router.get("/feedback/mine")
 async def my_feedback(db: DB, user: CurrentUser, limit: Limit = 100, offset: Offset = 0):
-    return _page(await service.list_my_feedback(db, user), limit, offset)
+    return await service.list_my_feedback(db, user, limit=limit, offset=offset)
 
 
 @router.post("/feedback/{feedback_id}/read", status_code=status.HTTP_204_NO_CONTENT)
@@ -56,7 +51,7 @@ async def mark_feedback_read(feedback_id: str, db: DB, user: CurrentUser):
 
 @router.get("/admin/feedback")
 async def admin_feedback(db: DB, user: AdminUser, limit: Limit = 100, offset: Offset = 0):
-    return _page(await service.list_feedback(db), limit, offset)
+    return await service.list_feedback(db, limit=limit, offset=offset)
 
 
 @router.patch("/admin/feedback/{feedback_id}")
@@ -77,7 +72,7 @@ async def reply_feedback(feedback_id: str, body: dict, db: DB, user: AdminUser):
 
 @router.get("/messages")
 async def messages(db: DB, user: CurrentUser, limit: Limit = 100, offset: Offset = 0):
-    return _page(await service.list_user_messages(db, user), limit, offset)
+    return await service.list_user_messages(db, user, limit=limit, offset=offset)
 
 
 @router.get("/unread-summary")
@@ -102,7 +97,7 @@ async def mark_message_read(message_id: str, db: DB, user: CurrentUser):
 
 @router.get("/admin/messages")
 async def admin_messages(db: DB, user: AdminUser, limit: Limit = 100, offset: Offset = 0):
-    return _page(await service.list_announcements(db), limit, offset)
+    return await service.list_announcements(db, limit=limit, offset=offset)
 
 
 @router.post("/admin/messages", status_code=status.HTTP_201_CREATED)

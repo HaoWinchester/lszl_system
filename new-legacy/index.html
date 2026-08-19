@@ -434,5 +434,33 @@
 <script defer src="src/70-question-trainer.js"></script>
 <script defer src="src/80-question-font-scale.js"></script>
 <script defer src="src/90-bootstrap.js"></script>
+
+<!-- 维护公告弹窗 -->
+<div id="maintenanceNoticeBackdrop" style="
+  position:fixed;inset:0;z-index:99999;
+  background:rgba(0,0,0,0.55);
+  display:flex;align-items:center;justify-content:center;
+">
+  <div style="
+    background:#fff;border-radius:12px;
+    padding:36px 40px 28px;
+    max-width:420px;width:90%;
+    box-shadow:0 8px 40px rgba(0,0,0,0.22);
+    text-align:center;
+    font-family:system-ui,-apple-system,sans-serif;
+  ">
+    <div style="font-size:36px;margin-bottom:12px;">🔧</div>
+    <h2 style="margin:0 0 12px;font-size:20px;color:#1a1a1a;font-weight:700;">服务器维护与会员补偿公告</h2>
+    <p style="margin:0 0 20px;font-size:15px;color:#555;line-height:1.7;">
+      由于我们近期正在集中筹备并上线中英试题，平台部分功能正在进行维护与升级。由此给您的学习体验带来的不便，我们深表歉意。<br>
+      如您是会员用户，感谢您一直以来的支持：<strong>维护完成后，所有会员将统一获赠半个月会员时长</strong>，请您放心使用。感谢理解与陪伴，我们会持续优化服务，尽快为您带来更稳定的学习体验。
+    </p>
+    <button onclick="document.getElementById('maintenanceNoticeBackdrop').style.display='none'" style="
+      background:#4f7ef8;color:#fff;border:none;
+      border-radius:8px;padding:10px 32px;
+      font-size:15px;cursor:pointer;font-weight:600;
+    ">我知道了</button>
+  </div>
+</div>
 </body>
 </html>

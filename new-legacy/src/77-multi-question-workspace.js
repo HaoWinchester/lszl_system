@@ -429,14 +429,14 @@
     const entry=state.paperCatalog.find(item=>String(item.paper?.id)===String(paper?.id||'')&&(!paper?.releaseId||String(item.paper?.releaseId)===String(paper.releaseId)));
     return entry?entry.availableCount>0:true;
   }
-  function loadPublishedPapers(){
+  async function loadPublishedPapers(){
     let catalog=[];
     try{
       const resolver=global.KGPublishedQuestionResolver;
-      if(resolver)catalog=resolver.listPapers({respectRole:true,mode:'multi_question_canvas'})||[];
+      if(resolver)catalog=await resolver.listPapers({respectRole:true,mode:'multi_question_canvas'})||[];
       else if(typeof qbPublishedPaperCatalog==='function')catalog=qbPublishedPaperCatalog({respectRole:true,mode:'multi_question_canvas'})||[];
       if(resolver&&state.releaseId&&!catalog.some(entry=>String(entry.paper?.releaseId)===String(state.releaseId))){
-        const exact=resolver.resolvePaper({paperId:state.paperId,releaseId:state.releaseId,mode:'multi_question_canvas'},{respectRole:true,mode:'multi_question_canvas'});
+        const exact=await resolver.resolvePaper({paperId:state.paperId,releaseId:state.releaseId,mode:'multi_question_canvas'},{respectRole:true,mode:'multi_question_canvas'});
         if(exact?.ok&&exact.paper?.availability!=='withdrawn')catalog=[exact,...catalog];
         else if(exact?.code)state.questionLoadError=resolver.message(exact,'指定发布版本不可用。');
       }
@@ -453,6 +453,18 @@
     });
     state.papers=state.paperCatalog.map(entry=>entry.paper);
     return state.papers;
+  }
+  let questionSourcesLoading=false;
+  async function rebuildQuestionSources(){
+    // 发布试卷走细粒度 API 后是异步的：先取数、再建列表、最后补渲染
+    if(questionSourcesLoading)return;
+    questionSourcesLoading=true;
+    try{
+      invalidateQuestionSources();
+      await loadPublishedPapers();
+      buildQuestionList();
+      if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
+    }finally{questionSourcesLoading=false}
   }
   function scopedPreferenceKey(prefix){
     const userId=global.KGLearningSessionStore?.currentUserId?.()||'guest';
@@ -559,10 +571,11 @@
   }
   function buildQuestionList(){
     state.questionLoadError='';
+    // 发布试卷目录未就绪（细粒度 API 异步载入）时先触发载入，载入完成后 rebuild 会重建列表
+    if(!state.paperCatalog.length){void rebuildQuestionSources();return}
     const saved=readPaperSelection();
     if(!state.paperId)state.paperId=String(saved.paperId||'');
     if(!state.releaseId)state.releaseId=String(saved.releaseId||'');
-    loadPublishedPapers();
     const preferredEntry=state.paperCatalog.find(entry=>String(entry.paper?.id)===String(state.paperId||'')&&(!state.releaseId||String(entry.paper?.releaseId)===String(state.releaseId)))
       ||state.paperCatalog.find(entry=>String(entry.paper?.id)===String(state.paperId||''))||null;
     const selectedEntry=(preferredEntry?.availableCount>0?preferredEntry:null)||state.paperCatalog.find(entry=>entry.availableCount>0)||preferredEntry||state.paperCatalog[0]||null;
@@ -2181,16 +2194,27 @@
   function synthesisDraftFromSelection(records=selectedRecords()){
     const questions=records.filter(record=>record.node?.nodeType==='question-reference');
     let principleId='',preset=null,fallbackReason='所选题目没有共同且唯一的启用原则预设。';
-    const resolved=PrincipleBinding.selectionPrinciple?.(questions.map(record=>resolvedQuestionForNode(record?.node||{})||{}));
+    const resolvedQuestions=questions.map(record=>resolvedQuestionForNode(record?.node||{})||{});
+    console.log('[归纳卡调试] 解析后的题目数据:', resolvedQuestions.map(q=>({
+      id: q.id,
+      correctAnswer: q.correctAnswer,
+      metadata: q.metadata,
+      optionPrincipleMap: q.metadata?.optionPrincipleMap
+    })));
+    const resolved=PrincipleBinding.selectionPrinciple?.(resolvedQuestions);
+    console.log('[归纳卡调试] selectionPrinciple 结果:', resolved);
     if(resolved?.ok){
       principleId=String(resolved.principleId||'');
+      console.log('[归纳卡调试] 共同原则ID:', principleId);
+      console.log('[归纳卡调试] 所有预设卡:', Presets.list?.());
       preset=Presets.getByPrincipleId?.(principleId,{activeOnly:true})||null;
+      console.log('[归纳卡调试] 预设卡:', preset);
       if(!preset)fallbackReason='共同原则没有启用中的系统预设归纳卡。';
+    }else{
+      console.log('[归纳卡调试] 未找到共同原则，原因:', resolved?.reason, '详情:', resolved);
     }
-    if(!preset){
-      const intersection=commonPresetFromPrincipleIntersection(questions);
-      if(intersection){principleId=intersection.principleId;preset=intersection.preset;fallbackReason=''}
-    }
+    // 严格模式：只有全部题目的正确选项都指向同一唯一原则时才显示原则卡
+    // 移除交集判断逻辑，不允许部分绑定或不同原则的情况命中预设
     if(!preset)return {...blankSynthesisDraft(questions),fallbackReason};
     const principle=Principles.get?.(principleId)||null;
     const principleName=principleDisplayName(principleId,principle?.name||'');
@@ -3884,12 +3908,12 @@
     }catch(e){}
     return renameWorkspaceTo(workspaceId,title);
   }
-  async function manualSaveWorkspace(){
+  function manualSaveWorkspace(){
     if(!state.workspaceId)return false;
     const latest=store()?.ensure?.(workspaceOptions())||state.workspace;
     if(!latest)return false;
     const saved=store()?.write?.(latest,{reason:'manual-save'});
-    if(saved){state.workspace=saved;await global.KGServerStateStorage?.flush?.();return saved}
+    if(saved){state.workspace=saved;return saved}
     return false;
   }
 
@@ -4089,7 +4113,7 @@
   }
 
   function openQuestionDrawer(){
-    buildQuestionList();
+    void rebuildQuestionSources();
     renderQuestionDock();
     byId('qwQuestionDrawer')?.classList.add('open');
     byId('qwQuestionDrawer')?.setAttribute('aria-hidden','false');
@@ -5162,7 +5186,7 @@
       state.selectedQuestionKeys.clear();
       clearPaperTransientState();
       savePaperSelection();
-      buildQuestionList();
+      void rebuildQuestionSources();
       renderQuestionDock();
     });
     byId('qwQuestionSearch')?.addEventListener('input',event=>{state.query=String(event.target.value||'');renderQuestionDock()});
@@ -5177,7 +5201,7 @@
     byId('qwQuestionList')?.addEventListener('click',event=>{
       if(event.target.closest?.('[data-qw-question-select]'))return;
       if(event.target.closest?.('[data-qw-retry-questions]')){
-        buildQuestionList();
+        void rebuildQuestionSources();
         renderQuestionDock();
         return;
       }
@@ -5446,7 +5470,7 @@
       clearCardSelection();
       const workspace=store()?.ensure?.({activate:true});
       if(workspace)loadWorkspace(workspace.id);
-      buildQuestionList();
+      void rebuildQuestionSources();
       refreshPersonalCardReferences();
       if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
     });
@@ -5457,7 +5481,7 @@
     global.addEventListener('focus',()=>{
       updateReadonly();
       invalidateQuestionSources();
-      buildQuestionList();
+      void rebuildQuestionSources();
       if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
     });
     global.addEventListener('kg:question-language-mode',()=>{
@@ -5470,7 +5494,7 @@
       const key=String(event.key||'');
       if(!key.includes('question')&&!key.includes('exam_papers'))return;
       invalidateQuestionSources();
-      buildQuestionList();
+      void rebuildQuestionSources();
       if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
     });
     global.addEventListener('kg:workspace-changed',event=>{
@@ -5492,7 +5516,12 @@
   async function init(){
     if(state.initialized||state.initializing||!document.body.classList.contains('question-workspace-page'))return;
     state.initializing=true;
-    try{await global.KGQuestionCatalogAdapter.ready}catch(error){state.initializing=false;document.body.dataset.questionCatalogUnavailable='true';notify('题目目录暂不可用，请稍后刷新重试。');return}
+    // P4.5.38：不阻塞等待 catalog ready，先初始化 UI，catalog 完成后再填充数据（性能优化）
+    const catalogPromise=global.KGQuestionCatalogAdapter?.ready||Promise.resolve();
+    catalogPromise.catch(error=>{
+      console.warn('题目目录加载失败，部分功能受限',error);
+      document.body.dataset.questionCatalogUnavailable='true';
+    });
     state.viewport=byId('qwCanvasViewport');
     state.world=byId('qwCanvasWorld');
     state.nodeLayer=byId('qwNodeLayer');
@@ -5525,7 +5554,7 @@
     global.addEventListener('pagehide',()=>{void flushAnswerQueue()});
     global.addEventListener('beforeunload',()=>{void flushAnswerQueue()});
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')void flushAnswerQueue()});
-    buildQuestionList();
+    void rebuildQuestionSources();
     const params=queryParams();
     const requested=String(params.get('workspace')||store()?.getActiveWorkspaceId?.()||'');
     const focusNodeId=String(params.get('focus')||'');
@@ -5610,7 +5639,13 @@
   global.addEventListener('load',()=>setTimeout(async()=>{
     await init();
     if(!state.initialized)return;
-    buildQuestionList();
+    void rebuildQuestionSources();
     if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
   },0));
+  global.addEventListener('kg-app-storage-change',event=>{
+    const key=String(event?.detail?.key||'');
+    if(key==='kg_exam_papers_published_v1'||key==='kg_exam_paper_release_history_v1'){
+      if(state.initialized)try{void rebuildQuestionSources()}catch(error){}
+    }
+  });
 })(window);

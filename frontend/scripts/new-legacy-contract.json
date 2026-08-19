@@ -145,10 +145,21 @@
       "kg_taxonomy_release_records_v1",
       "kg_teacher_workbench_subject_v1",
       "kg_wechat_login_pending_v1",
+      "kg_multi_question_release_selection_v1",
+      "kg_training_workspace_layout_v1",
       "kg_announcements_v1",
       "kg_question_training_filters_collapsed_v1",
       "kg_question_training_workspace_layout_v1",
-      "kg_user_feedback_v1"
+      "kg_user_feedback_v1",
+      "pmp_recall_acceptance_records_v1",
+      "question_studio_draft_v010",
+      "question_studio_draft_v020",
+      "question_studio_draft_v021",
+      "question_studio_backups_v010",
+      "question_studio_backups_v020",
+      "question_studio_backups_v021",
+      "question_studio_recent_knowledge_v1",
+      "question_studio_favorite_knowledge_v1"
     ],
     "prefixes": [
       "kg_graph_file_content_v2__",
@@ -208,7 +219,9 @@
       "kg_remote_auth_session_v1",
       "kg_learning_route_context_v1__",
       "kg_multi_question_release_selection_v1",
-      "kg_training_workspace_layout_v1"
+      "kg_training_workspace_layout_v1",
+      "__kg_admin_repository_probe__",
+      "__kg_teaching_content_sync_v1__"
     ]
   },
   "allowedPersistentStorage": {

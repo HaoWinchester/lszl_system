@@ -1,9 +1,7 @@
 'use strict'
 
 ;(function (global) {
-  // 仅读取后端注入的 bootstrap 负载做认证判断；身份由服务端会话决定，
-  // 客户端不携带、不存储任何用户标识或自由字段。
-  const ENTRY = global.__KG_DIRECT_BOOTSTRAP__ || {}
+  // 仅在 session 与角色已确认时上报；不依赖服务端注入用户快照。
   const ENDPOINT = '/api/v1/analytics/feature-events'
 
   const FEATURE_BY_PAGE = {
@@ -22,12 +20,32 @@
   const MIN_ENGAGED_SECONDS = 10
   const MAX_ENGAGED_SECONDS = 1800
 
+  let role = 'guest'
+  let rolePromise
+
   function currentRole() {
-    return String((ENTRY.authUser && ENTRY.authUser.role) || 'guest')
+    return role
+  }
+
+  function ensureRole() {
+    if (role !== 'guest') return Promise.resolve(role)
+    if (rolePromise) return rolePromise
+    rolePromise = fetch('/api/v1/auth/me', { credentials: 'include' })
+      .then(async (response) => {
+        if (!response.ok) return 'guest'
+        const meBody = await response.json().catch(() => ({}))
+        role = String(meBody?.user?.role || 'guest')
+        return role
+      })
+      .catch(() => 'guest')
+      .finally(() => {
+        rolePromise = null
+      })
+    return rolePromise
   }
 
   function isActive() {
-    return !!ENTRY.authenticated && !ENTRY.readOnly && currentRole() !== 'guest'
+    return currentRole() !== 'guest'
   }
 
   function warn(message, error) {
@@ -80,21 +98,28 @@
   }
 
   function pageFeature() {
-    const path = String((global.location && global.location.pathname) || '').split('/').pop() || String(ENTRY.page || '')
+    const path = String((global.location && global.location.pathname) || '').split('/').pop() || ''
     return FEATURE_BY_PAGE[path] || null
   }
 
+  let installed = false
   function installPageEngagement() {
-    if (!isActive()) return
+    if (installed || !isActive()) return
     const featureKey = pageFeature()
     if (!featureKey) return
+    installed = true
 
     send(buildBody(featureKey, 'opened', undefined, undefined))
 
     let activeStart = global.document && global.document.visibilityState === 'visible' ? Date.now() : 0
     let accumulated = 0
     const startActive = () => { if (!activeStart) activeStart = Date.now() }
-    const stopActive = () => { if (activeStart) { accumulated += Date.now() - activeStart; activeStart = 0 } }
+    const stopActive = () => {
+      if (activeStart) {
+        accumulated += Date.now() - activeStart
+        activeStart = 0
+      }
+    }
 
     global.addEventListener('visibilitychange', () => {
       if (global.document && global.document.visibilityState === 'visible') startActive()
@@ -109,9 +134,20 @@
 
   global.KGFeatureAnalytics = Object.freeze({ track: track })
 
-  if (global.document && global.document.readyState && global.document.readyState !== 'loading') {
-    installPageEngagement()
-  } else if (global.document) {
-    global.document.addEventListener('DOMContentLoaded', installPageEngagement, { once: true })
+  function bindLifecycle() {
+    if (global.document && global.document.readyState && global.document.readyState !== 'loading') {
+      ensureRole().finally(() => installPageEngagement())
+    } else if (global.document) {
+      global.document.addEventListener('DOMContentLoaded', () => ensureRole().finally(installPageEngagement), { once: true })
+    }
+
+    if (typeof global.addEventListener === 'function') {
+      global.addEventListener('kg-auth-session-change', () => {
+        role = role !== 'guest' ? role : 'guest'
+        ensureRole().finally(() => installPageEngagement())
+      })
+    }
   }
+
+  bindLifecycle()
 })(window)

@@ -937,11 +937,53 @@
   function buildPaperRelease(paper){
     const response=teacherDomainServices().paperRelease?.build?.(paper);return response?.ok?response.value:null;
   }
-  function publishPaperRelease(paper){
-    const response=teacherDomainServices().paperRelease?.publish?.(paper);if(!response?.ok){console.warn('发布试卷失败',response?.errors||response);return null}return response.value;
+  // P4.6 第 2 轮：发布/撤回以 /api/v1/paper-releases 为权威（学员端已读 API），
+  // 同时保留旧 runtime 目录双写，供尚未切换的管理视图过渡。
+  async function publishPaperRelease(paper){
+    const services=teacherDomainServices();
+    const built=services.paperRelease?.build?.(paper);
+    if(!built?.ok){console.warn('发布试卷失败',built?.errors||built);toast((built?.errors||['发布失败，请检查试卷内容。'])[0]);return null}
+    const release=built.value;
+    try{
+      const response=await fetch('/api/v1/paper-releases/publish-payload',{
+        method:'POST',credentials:'include',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify(release)
+      });
+      if(!response.ok){
+        const detail=await response.json().catch(()=>({}));
+        toast(detail?.detail?.message||`发布失败（${response.status}），试卷未发布。`);
+        return null;
+      }
+      window.dispatchEvent?.(new CustomEvent('kg:paper-release-published'));
+    }catch(error){
+      console.warn('发布请求失败',error);
+      toast('发布请求失败，请检查网络后重试。');
+      return null;
+    }
+    // 旧 runtime 目录双写（尽力而为）：发布事件已通知适配器重载 API 目录
+    try{services.paperRelease?.publish?.(paper)}catch(error){console.warn('runtime 目录双写失败',error)}
+    return release;
   }
-  function withdrawPaperRelease(paper){
-    const response=teacherDomainServices().paperRelease?.withdraw?.(paper);if(!response?.ok)console.warn('撤回试卷失败',response?.errors||response);return !!response?.ok;
+  async function withdrawPaperRelease(paper){
+    const services=teacherDomainServices();
+    try{
+      const response=await fetch(`/api/v1/paper-releases/papers/${encodeURIComponent(String(paper?.id||''))}/withdraw-all`,{
+        method:'POST',credentials:'include'
+      });
+      if(!response.ok){
+        const detail=await response.json().catch(()=>({}));
+        toast(detail?.detail?.message||`取消发布失败（${response.status}）。`);
+        return false;
+      }
+      window.dispatchEvent?.(new CustomEvent('kg:paper-release-published'));
+    }catch(error){
+      console.warn('撤回请求失败',error);
+      toast('取消发布请求失败，请检查网络后重试。');
+      return false;
+    }
+    try{services.paperRelease?.withdraw?.(paper)}catch(error){console.warn('runtime 目录双写失败',error)}
+    return true;
   }
 
   function slugify(value){
@@ -2990,13 +3032,13 @@
   function moveSelectedPapersToCategory(){
     if(!state.selectedPaperIds.size)return;const categoryId=$('qbPaperBulkCategorySelect')?.value||'',categoryName=paperCategoryName(categoryId),count=state.selectedPaperIds.size;state.papers.forEach(paper=>{if(state.selectedPaperIds.has(paper.id)){paper.categoryId=categoryId;paper.updatedAt=Date.now()}});savePapers(state.papers,{silent:true});state.selectedPaperIds=new Set();ensureSelectedPaperVisible();renderPaperManager();toast(`已将 ${count} 张试卷移动到“${categoryName}”。`)
   }
-  function archiveSelectedPapers(){
+  async function archiveSelectedPapers(){
     const selected=state.papers.filter(paper=>state.selectedPaperIds.has(paper.id)&&!isPaperArchived(paper));
     if(!selected.length)return toast('选中的试卷均已归档。');
     if(!confirm(`确定归档选中的 ${selected.length} 张试卷吗？
 
 已发布试卷将从学员端下架，历史发布记录仍保留。`))return;
-    const failed=[];selected.forEach(paper=>{if(isPaperPublished(paper)&&!withdrawPaperRelease(paper)){failed.push(paper.name);return}paper.status='archived';paper.archivedAt=Date.now();paper.publishedReleaseId='';paper.updatedAt=Date.now()});
+    const failed=[];for(const paper of selected){if(isPaperPublished(paper)&&!(await withdrawPaperRelease(paper))){failed.push(paper.name);continue}paper.status='archived';paper.archivedAt=Date.now();paper.publishedReleaseId='';paper.updatedAt=Date.now()}
     const archived=selected.length-failed.length;if(!archived)return toast('批量归档失败，请重试。');
     if(selected.some(paper=>paper.id===currentPaper()?.id))setCurrentPaper(null);
     savePapers(state.papers,{silent:true});state.selectedPaperIds=new Set();ensureSelectedPaperVisible();renderPaperManager();toast(`已归档 ${archived} 张试卷${failed.length?`，${failed.length} 张下架失败已跳过`:''}。`);
@@ -3279,7 +3321,7 @@
       return result;
     }catch(error){toast(`配额补题失败：${error.message||error}`);return false}
   }
-  function togglePublishPaper(){
+  async function togglePublishPaper(){
     if(window.KGRolePermissions&&!window.KGRolePermissions.can('publishPapers'))return toast('当前角色无试卷发布权限。');
     const paper=currentPaper();if(!paper)return toast('请先新建试卷。');
     if(isPaperArchived(paper))return toast('请先取消归档，再发布新版本。');
@@ -3287,23 +3329,23 @@
     if(!(paper.questions||[]).length)return toast('请先从题库选择题目后再发布。');
     const integrity=paperIntegrity(paper);if(integrity.missingCount)return toast(`试卷中有 ${integrity.missingCount} 道题目引用已失效，请先移除。`);if(integrity.duplicateCount)return toast(`试卷中有 ${integrity.duplicateCount} 个重复题目引用，请先处理。`);
     if(!(paper.enabledModes||[]).length)return toast('请至少选择一种学习模式后再发布。');
-    const release=publishPaperRelease(paper);if(!release)return toast('发布失败，请检查浏览器存储空间。');paper.withdrawnAt=0;paper.restoredAt=0;paper.updatedAt=Date.now();savePapers(state.papers,{silent:true});setCurrentPaper(paper);renderPaperManager();toast(`已发布 v${release.version}，开放：${(paper.enabledModes||[]).map(mode=>PAPER_MODE_LABELS[mode]||mode).join('、')}。`);
+    const release=await publishPaperRelease(paper);if(!release)return;paper.withdrawnAt=0;paper.restoredAt=0;paper.updatedAt=Date.now();savePapers(state.papers,{silent:true});setCurrentPaper(paper);renderPaperManager();toast(`已发布 v${release.version}，开放：${(paper.enabledModes||[]).map(mode=>PAPER_MODE_LABELS[mode]||mode).join('、')}。`);
   }
-  function withdrawCurrentPaper(){
+  async function withdrawCurrentPaper(){
     if(window.KGRolePermissions&&!window.KGRolePermissions.can('publishPapers'))return toast('当前角色无试卷取消发布权限。');
     const paper=currentPaper();if(!paper)return toast('请先选择试卷。');if(!isPaperPublished(paper))return toast('当前试卷未处于发布状态。');
     if(!confirm(`确定取消发布试卷“${paper.name}”吗？
 
 学员端将立即下架当前版本；历史发布记录继续保留，试卷恢复为可编辑草稿。`))return;
-    if(!withdrawPaperRelease(paper))return toast('取消发布失败，请重试。');
+    if(!(await withdrawPaperRelease(paper)))return;
     paper.status='draft';paper.withdrawnAt=Date.now();paper.restoredAt=0;paper.publishedReleaseId='';paper.updatedAt=Date.now();setCurrentPaper(null);savePapers(state.papers,{silent:true});renderPaperManager();toast(`已取消发布；历史 v${paper.publishedVersion} 已保留。`);
   }
-  function archiveCurrentPaper(){
+  async function archiveCurrentPaper(){
     const paper=currentPaper();if(!paper)return;if(isPaperArchived(paper))return toast('当前试卷已经归档。');
     if(!confirm(`确定归档试卷“${paper.name}”吗？
 
 归档后学员端不再显示，历史发布记录仍保留。`))return;
-    if(isPaperPublished(paper)&&!withdrawPaperRelease(paper))return toast('归档前下架试卷失败，请重试。');
+    if(isPaperPublished(paper)&&!(await withdrawPaperRelease(paper)))return;
     paper.status='archived';paper.archivedAt=Date.now();paper.publishedReleaseId='';paper.updatedAt=Date.now();setCurrentPaper(null);savePapers(state.papers,{silent:true});renderPaperManager();toast('试卷已归档。');
   }
   function unarchiveCurrentPaper(){
@@ -3326,7 +3368,7 @@
     savePapers(state.papers, {silent:true});
     renderPaperManager();
   }
-  function deleteCurrentPaper(){
+  async function deleteCurrentPaper(){
     const paper = currentPaper();
     if(!paper) return;
     if(paperStatusKey(paper)!=='draft'||hasPaperReleaseHistory(paper))return toast('只有从未发布的草稿可以删除；有发布历史或已归档试卷受到保护。');
@@ -3334,7 +3376,7 @@
     const index = state.papers.findIndex(p => p.id === paper.id);
     if(index >= 0) state.papers.splice(index, 1);
     state.selectedPaperId = state.papers[Math.max(0, index - 1)]?.id || state.papers[0]?.id || '';
-    if(paper.publishedVersion>0){withdrawPaperRelease(paper);setCurrentPaper(null);}
+    if(paper.publishedVersion>0){await withdrawPaperRelease(paper);setCurrentPaper(null);}
     savePapers(state.papers, {silent:true});
     renderPaperManager();
     toast('已删除试卷。');
@@ -3787,7 +3829,6 @@
     const confirmed=confirm(`确定清除题库“${bank.name}”的测试答题记录吗？\n\n只会清除本题库题目的训练进度、深度回忆和答题事件，其他题库不会受影响。`);
     if(!confirmed)return;
     try{
-      await window.KGServerStateStorage?.flush?.();
       const response=await fetch(`/api/v1/banks/${encodeURIComponent(bank.id)}/test-learning-records/clear`,{method:'POST',credentials:'include'});
       let payload={};try{payload=await response.json()}catch(error){}
       if(!response.ok)throw new Error(payload?.detail?.message||payload?.detail||'清除测试答题记录失败。');
@@ -4279,9 +4320,6 @@
       if(saved===false)throw new Error('预览数据写入失败');
       setRecallConfigSaveState('saved','已保存');
     }catch(e){alert('预览失败：'+(e.message||e));return}
-    try{
-      if(window.KGServerStateStorage&&typeof window.KGServerStateStorage.flush==='function')await window.KGServerStateStorage.flush();
-    }catch(error){alert('服务器保存失败，请稍后重试。');return}
     const url='knowledge-recall.html?preview=teacher-draft&previewToken='+encodeURIComponent(previewToken)+'&bankId='+encodeURIComponent(bank.id||'')+'&questionId='+encodeURIComponent(q.id||'current');
     window.open(url,'_blank');
   }

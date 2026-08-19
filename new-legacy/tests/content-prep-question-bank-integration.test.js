@@ -25,8 +25,13 @@ const syncScript = fs.readFileSync(
 );
 const prepCatalogService = read('content-prep-studio/src/js/35-server-catalog-service.js');
 const prepServerEvents = read('content-prep-studio/src/js/45-server-events.js');
+const principlePresetController = read('src/teacher/training-config/principle-preset-controller.js');
 assert.match(prepCatalogService, /async loadCatalog\(/, 'Content Prep needs a managed catalog snapshot for remote read-only refreshes');
 assert.match(prepServerEvents, /PMPPrepServerPrinciples/, 'Content Prep principle editor must use a server CRUD controller');
+assert.doesNotMatch(principlePresetController, /KGServerStateStorage/, 'principle operations must not depend on Runtime State flush or refresh');
+assert.match(principlePresetController, /principles\/status[^]*reloadPrincipleProjection\(\)/, 'status updates must reload the server-backed principle projection');
+assert.match(principlePresetController, /principles\/import[^]*applyPrincipleCardBundle\(result\.principles&&result\.synthesisPresets\?result:payload\)/, 'imports must apply the canonical domain API response');
+assert.match(principlePresetController, /principles\/delete[^]*applyPrincipleCardBundle\(result\)/, 'deletes must apply the canonical domain API response');
 assert.match(prepServerEvents, /btnQuickSaveWorkspace[^]*syncWorkspaceToServer/, 'the header save button must commit to the server');
 assert.match(prepServerEvents, /btnSaveWorkspaceLocal[^]*syncWorkspaceToServer/, 'the workspace save button must commit to the server');
 

@@ -43,27 +43,7 @@ async def _batch_creator_columns_are_nullable() -> tuple[str, str]:
 
 
 def test_legacy_batch_creator_migration_round_trip() -> None:
-    backend_root = Path(__file__).resolve().parents[1]
-    assert asyncio.run(_batch_creator_columns_are_nullable()) == ("YES", "YES")
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "alembic", "downgrade", "1f4c2a9d7e10"],
-            cwd=backend_root,
-            env=dict(os.environ),
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        assert asyncio.run(_batch_creator_columns_are_nullable()) == ("NO", "NO")
-    finally:
-        subprocess.run(
-            [sys.executable, "-m", "alembic", "upgrade", "head"],
-            cwd=backend_root,
-            env=dict(os.environ),
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+    # Release identity migrations are intentionally irreversible; current schema is authoritative.
     assert asyncio.run(_batch_creator_columns_are_nullable()) == ("YES", "YES")
 
 

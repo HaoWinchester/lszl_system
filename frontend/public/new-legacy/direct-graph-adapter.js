@@ -8,9 +8,8 @@
   let timer = 0
 
   async function persistToServer() {
-    autosave.saveNow({ force: true, silent: true, reason: 'server-debounce' })
-    const storage = global.KGServerStateStorage
-    if (storage && typeof storage.flush === 'function') await storage.flush()
+    const saved = autosave.saveNow({ force: true, silent: true, reason: 'server-debounce' })
+    if (saved === false) throw new Error('图谱文件保存失败。')
     autosave.reportSaved?.('server-saved')
     const track=(global.KGFeatureAnalytics&&global.KGFeatureAnalytics.track)||function(){}
     track('graph','key_action','graph_saved')

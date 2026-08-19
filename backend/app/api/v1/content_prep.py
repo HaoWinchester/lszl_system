@@ -25,6 +25,30 @@ from app.schemas.content_prep import (
     LockGrant,
     SubjectFacetSchemaWriteRequest,
 )
+from app.schemas.teaching_content import (
+    ActivityOverrideWriteRequest,
+    RecallLibraryWriteRequest,
+    SubjectWriteRequest,
+    TaxonomyReleaseRequest,
+)
+from app.schemas.teaching_content import (
+    ActivityOverrideWriteRequest,
+    RecallLibraryWriteRequest,
+    SubjectWriteRequest,
+    TaxonomyReleaseRequest,
+)
+from app.schemas.teaching_content import (
+    ActivityOverrideWriteRequest,
+    RecallLibraryWriteRequest,
+    SubjectWriteRequest,
+    TaxonomyReleaseRequest,
+)
+from app.schemas.teaching_content import (
+    ActivityOverrideWriteRequest,
+    RecallLibraryWriteRequest,
+    SubjectWriteRequest,
+    TaxonomyReleaseRequest,
+)
 from app.services import (
     content_prep_shared_service,
     content_prep_draft_service,
@@ -33,6 +57,7 @@ from app.services import (
     subject_facet_service,
     teaching_content_projection_service,
     teaching_content_revision_service,
+    teaching_content_service,
 )
 
 router = APIRouter(prefix="/content-prep", tags=["content-prep"])
@@ -152,6 +177,77 @@ def _raise_subject_facet_error(error: Exception) -> None:
         status_code=422,
         detail={"code": "INVALID_SUBJECT_FACET_SCHEMA", "message": str(error)},
     ) from error
+
+
+@router.post("/subjects", status_code=201)
+async def create_teaching_subject(request: SubjectWriteRequest, db: DB, actor: PrepEditor):
+    return {"subject": (await teaching_content_service.upsert_subject(db, subject_id=request.id, code=request.code, name=request.name, actor=actor.username, metadata=request.metadata)).id}
+
+
+@router.post("/taxonomies/{taxonomy_id}/release")
+async def release_teaching_taxonomy(taxonomy_id: str, request: TaxonomyReleaseRequest, db: DB, actor: PrepEditor):
+    row = await teaching_content_service.release_taxonomy(db, subject_id=request.subject_id, taxonomy_id=taxonomy_id, version=request.version, title=request.title, nodes=request.nodes, actor=actor.username)
+    return {"taxonomy": {"id": row.id, "subjectId": row.subject_id, "version": row.version, "status": row.status}}
+
+
+@router.put("/activity-overrides/{collection_id}/{activity_id}")
+async def write_activity_override(collection_id: str, activity_id: str, request: ActivityOverrideWriteRequest, db: DB, actor: PrepEditor):
+    row = await teaching_content_service.apply_activity_override(db, collection_id=collection_id, activity_id=activity_id, record=request.record, actor=actor.username)
+    return {"override": {"id": row.id, "collectionId": row.collection_id, "activityId": row.activity_id, "record": row.record, "revision": row.revision}}
+
+
+
+@router.put("/recall-libraries/{subject_id}")
+async def write_recall_library(subject_id: str, request: RecallLibraryWriteRequest, db: DB, actor: PrepEditor):
+    try:
+        return await teaching_content_service.upsert_recall_library(db, subject_id=subject_id, version=request.version, nodes=request.nodes, edges=request.edges, metadata=request.metadata, actor=actor.username)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_RECALL_LIBRARY", "message": str(error)}) from error
+
+
+@router.delete("/taxonomies/{taxonomy_id}")
+async def remove_teaching_taxonomy(taxonomy_id: str, subjectId: str, db: DB, actor: PrepEditor):
+    try:
+        return await teaching_content_service.delete_taxonomy(db, taxonomy_id=taxonomy_id, subject_id=subjectId, actor=actor.username)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_TAXONOMY", "message": str(error)}) from error
+
+
+@router.delete("/activity-overrides/{collection_id}/{activity_id}")
+async def remove_activity_override(collection_id: str, activity_id: str, db: DB, actor: PrepEditor):
+    try:
+        return await teaching_content_service.delete_activity_override(db, collection_id=collection_id, activity_id=activity_id, actor=actor.username)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_ACTIVITY_OVERRIDE", "message": str(error)}) from error
+
+
+
+async def list_teaching_subjects(offset: int = 0, limit: int = 50, db: DB = None, actor: PrepEditor = None):
+    if limit > 200:
+        raise HTTPException(status_code=422, detail="limit must be <= 200")
+    return await teaching_content_service.list_subjects(db, offset=offset, limit=limit)
+
+
+@router.get("/taxonomies")
+async def list_teaching_taxonomies(subjectId: str, offset: int = 0, limit: int = 50, db: DB = None, actor: PrepEditor = None):
+    if limit > 200:
+        raise HTTPException(status_code=422, detail="limit must be <= 200")
+    return await teaching_content_service.list_taxonomies(db, subject_id=subjectId, offset=offset, limit=limit)
+
+
+@router.get("/recall-libraries")
+async def list_teaching_recall_libraries(subjectId: str, offset: int = 0, limit: int = 50, db: DB = None, actor: PrepEditor = None):
+    if limit > 200:
+        raise HTTPException(status_code=422, detail="limit must be <= 200")
+    return await teaching_content_service.list_recall_libraries(db, subject_id=subjectId, offset=offset, limit=limit)
+
+
+@router.get("/audits")
+async def list_teaching_content_audits(entityType: str | None = None, entityId: str | None = None, offset: int = 0, limit: int = 50, db: DB = None, actor: PrepEditor = None):
+    if limit > 200:
+        raise HTTPException(status_code=422, detail="limit must be <= 200")
+    return await teaching_content_service.list_audits(db, entity_type=entityType, entity_id=entityId, offset=offset, limit=limit)
+
 
 
 @router.get("/build-metadata")

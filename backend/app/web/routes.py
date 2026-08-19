@@ -6,6 +6,8 @@ from urllib.parse import urlencode
 
 from typing import Annotated
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -64,7 +66,9 @@ async def _page_access_denied(request: Request, db: AsyncSession, page: str) -> 
         return False
     username = request.session.get("username")
     user = await user_service.get_by_username(db, str(username)) if username else None
-    return not user or user.status != "active" or user.role not in allowed_roles
+    if user is None or user.status != "active":
+        return page != "content-prep.html"
+    return user.role not in allowed_roles
 
 
 def _forbidden_page() -> HTMLResponse:
@@ -207,10 +211,9 @@ async def content_alias(request: Request):
 @router.get("/content-prep")
 async def content_prep_page(request: Request, db: DB):
     actor = await optional_user(request, db)
-    if actor is None:
-        query = urlencode({"next": "/content-prep"})
-        return RedirectResponse(f"/login?{query}", status_code=307)
-    if not all(can(actor.role, permission) for permission in CONTENT_PREP_PERMISSIONS):
+    if actor is not None and not all(
+        can(actor.role, permission) for permission in CONTENT_PREP_PERMISSIONS
+    ):
         return _forbidden_page()
     release = _release_or_503()
     bootstrap = await build_bootstrap(
@@ -304,9 +307,16 @@ async def save_runtime_state(update: RuntimeStateUpdate, user: CurrentUser, db: 
 
 
 @router.get("/api/v1/runtime/state")
-async def read_runtime_state(user: CurrentUser, db: DB):
+async def read_runtime_state(
+    user: CurrentUser,
+    db: DB,
+    mode: Literal["full", "bootstrap"] | None = None,
+    page: str | None = None,
+):
+    if mode is None:
+        mode = "full"
     storage, revision, content_revision = await runtime_state_service.get_state(
-        db, user.username, user.role
+        db, user.username, user.role, mode=mode, page=page
     )
     return {
         "storage": storage,

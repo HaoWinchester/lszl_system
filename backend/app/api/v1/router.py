@@ -11,6 +11,7 @@ from app.api.v1 import (
     guided_learning,
     health,
     learning,
+    paper_releases,
     question_catalog,
     questions,
     subscriptions,
@@ -26,6 +27,7 @@ api_router.include_router(users.router)
 api_router.include_router(system.router)
 api_router.include_router(files.router)
 api_router.include_router(questions.router)
+api_router.include_router(paper_releases.router)
 api_router.include_router(question_catalog.router)
 api_router.include_router(content_prep.router)
 api_router.include_router(training.router)

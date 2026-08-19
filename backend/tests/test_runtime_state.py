@@ -24,6 +24,13 @@ def bootstrap(html: str) -> dict:
     return json.loads(match.group(1))
 
 
+def bootstrap_api(client: TestClient, page: str) -> dict:
+    """页面预载等价路径：与 HTML 渲染走同一 ensure_domain_seed。"""
+    response = client.get(f"/api/v1/runtime/state?mode=bootstrap&page={page}")
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
 def login(client: TestClient, username: str) -> None:
     response = client.post("/api/v1/auth/login", json={"username": username, "password": "111111"})
     assert response.status_code == 200
@@ -45,7 +52,7 @@ def update_payload(*, key: str, value: str, revision: int = 0) -> dict:
 def test_runtime_state_is_saved_in_postgres_and_preloaded_after_refresh() -> None:
     with TestClient(app) as client:
         login(client, "学生")
-        initial = bootstrap(client.get("/guided-learning-node.html?node=awareness-keywords").text)
+        initial = bootstrap_api(client, "guided-learning-node.html")
         content_before = client.get("/api/v1/runtime/state").json()[
             "contentRevision"
         ]
@@ -62,7 +69,7 @@ def test_runtime_state_is_saved_in_postgres_and_preloaded_after_refresh() -> Non
         content_after = client.get("/api/v1/runtime/state").json()[
             "contentRevision"
         ]
-        refreshed = bootstrap(client.get("/guided-learning-node.html?node=awareness-keywords").text)
+        refreshed = bootstrap_api(client, "guided-learning-node.html")
 
     assert refreshed["storage"]["kg_default_entry_mode_v1"] == "free"
     assert refreshed["revision"] == response.json()["revision"]
@@ -219,7 +226,7 @@ def test_runtime_state_rejects_a_stale_revision_without_overwriting() -> None:
 def test_runtime_state_persists_all_coalesced_snapshot_changes() -> None:
     with TestClient(app) as client:
         login(client, "佩奇007")
-        current = bootstrap(client.get("/question-training.html").text)
+        current = bootstrap_api(client, "question-training.html")
         storage = {
             **current["storage"],
             "pmp_question_font_size_v1": "compact",
@@ -247,7 +254,7 @@ def test_runtime_state_persists_all_coalesced_snapshot_changes() -> None:
 def test_runtime_state_is_isolated_between_accounts() -> None:
     with TestClient(app) as student, TestClient(app) as teacher:
         login(student, "学生")
-        state = bootstrap(student.get("/guided-learning-node.html?node=awareness-keywords").text)
+        state = bootstrap_api(student, "guided-learning-node.html")
         assert student.put(
             "/api/v1/runtime/state",
             json=update_payload(
@@ -258,7 +265,7 @@ def test_runtime_state_is_isolated_between_accounts() -> None:
         ).status_code == 200
 
         login(teacher, "老师")
-        teacher_state = bootstrap(teacher.get("/guided-learning-node.html?node=awareness-keywords").text)
+        teacher_state = bootstrap_api(teacher, "guided-learning-node.html")
 
     assert teacher_state["storage"].get("kg_question_language_mode_v1") != "bilingual"
 
@@ -287,7 +294,7 @@ def test_every_upstream_page_declares_the_expected_namespace() -> None:
 def test_admin_page_preloads_live_backend_accounts() -> None:
     with TestClient(app) as client:
         login(client, "佩奇007")
-        payload = bootstrap(client.get("/user-management.html").text)
+        payload = bootstrap_api(client, "user-management.html")
 
     users = json.loads(payload["storage"]["kg_local_users_v1"])
     assert users["佩奇007"]["role"] == "admin"
@@ -323,7 +330,7 @@ def test_graph_page_imports_existing_backend_files_once() -> None:
             },
         )
         assert created.status_code == 200
-        payload = bootstrap(client.get("/index.html?mode=free").text)
+        payload = bootstrap_api(client, "index.html")
 
     index = json.loads(payload["storage"]["kg_graph_file_index_v2"])
     imported = next(item for item in index if item["name"] == "直接运行迁移图谱")
@@ -335,7 +342,7 @@ def test_graph_page_imports_existing_backend_files_once() -> None:
 def test_guided_page_imports_server_progress_and_course_metadata() -> None:
     with TestClient(app) as client:
         login(client, "学生")
-        payload = bootstrap(client.get("/guided-learning-node.html?node=awareness-keywords").text)
+        payload = bootstrap_api(client, "guided-learning-node.html")
 
     progress_keys = [key for key in payload["storage"] if key.startswith("kg_guided_learning_progress_v2__")]
     assert len(progress_keys) == 1

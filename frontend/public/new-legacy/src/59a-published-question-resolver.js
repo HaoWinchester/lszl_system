@@ -39,13 +39,13 @@
   function failure(code,details={}){
     return {ok:false,code,message:text(details.message||ERROR_MESSAGES[code]||'发布内容不可用。'),context:normalizeContext(details.context||{}),paper:details.paper||null,release:details.release||details.paper||null,item:null,issues:clone(details.issues||[]),...details};
   }
-  function resolvePaper(identifier,options={}){
+  async function resolvePaper(identifier,options={}){
     const repo=repository();
     if(!repo)return failure('PAPER_NOT_FOUND');
     const context=normalizeContext(typeof identifier==='object'?identifier:{releaseId:text(identifier)},options);
-    const result=repo.__resolveInternally
+    const result=await (repo.__resolveInternally
       ?repo.__resolveInternally({paperId:context.paperId,releaseId:context.releaseId},{...options,mode:context.mode||options.mode,__repositoryInternal:true})
-      :repo.resolvePublishedPaper?.({paperId:context.paperId,releaseId:context.releaseId},{...options,mode:context.mode||options.mode,__repositoryInternal:true});
+      :repo.resolvePublishedPaper?.({paperId:context.paperId,releaseId:context.releaseId},{...options,mode:context.mode||options.mode,__repositoryInternal:true}));
     if(!result)return failure(context.releaseId?'RELEASE_NOT_FOUND':'PAPER_NOT_FOUND',{context});
     if(result.ok===false)return failure(result.code||'PAPER_NOT_FOUND',{...result,context:{...context,paperId:result.release?.paperId||context.paperId,releaseId:result.release?.releaseId||context.releaseId}});
     const canonical=normalizeContext({...context,paperId:result.paper?.paperId,releaseId:result.paper?.releaseId,mode:context.mode||options.mode});
@@ -58,9 +58,9 @@
     if(issue)return failure(issue.code||'QUESTION_NOT_FOUND',{message:issue.message,context,paper:entry.paper,release:entry.release,issues:[issue],entry});
     return failure('QUESTION_NOT_FOUND',{context,paper:entry?.paper,release:entry?.release,issues:entry?.issues||[],entry});
   }
-  function resolveQuestion(input={},options={}){
+  async function resolveQuestion(input={},options={}){
     const context=normalizeContext(input,options);
-    const entry=resolvePaper(context,{...options,mode:context.mode||options.mode});
+    const entry=await resolvePaper(context,{...options,mode:context.mode||options.mode});
     if(!entry.ok)return entry;
     const canonicalBase=normalizeContext({...context,paperId:entry.paper.paperId,releaseId:entry.paper.releaseId,mode:context.mode||options.mode});
     if(!canonicalBase.questionId){
@@ -77,10 +77,11 @@
     const resolvedContext=normalizeContext({...canonicalBase,bankId:item.bank?.id||item.ref?.bankId,questionId:item.question?.id||item.ref?.questionId});
     return {ok:true,code:entry.code||'READY',message:entry.message||'发布题目可用。',context:resolvedContext,paper:entry.paper,release:entry.release,item:clone(item),question:clone(item.question),bank:clone(item.bank),entry};
   }
-  function listPapers(options={}){
+  async function listPapers(options={}){
     const repo=repository();
     if(!repo)return [];
-    return (repo.listPublishedPapers?.(options)||[]).map(entry=>({...entry,context:normalizeContext({paperId:entry.paper?.paperId,releaseId:entry.paper?.releaseId,mode:options.mode})}));
+    const entries=await (repo.listPublishedPapers?.(options)||[]);
+    return (Array.isArray(entries)?entries:[]).map(entry=>({...entry,context:normalizeContext({paperId:entry.paper?.paperId,releaseId:entry.paper?.releaseId,mode:options.mode})}));
   }
   function message(result,fallback='发布内容不可用。'){
     if(!result)return fallback;

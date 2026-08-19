@@ -497,12 +497,11 @@
   window.addEventListener("kg-subscription-change",()=>setTimeout(decorateSubscriptionElements,0));
   window.addEventListener("kg-subscription-plan-change",()=>setTimeout(decorateSubscriptionElements,0));
   window.addEventListener("storage",event=>{
-    if(!event.key || event.key===STORAGE_KEY || event.key===Plans.PLAN_SETTINGS_KEY || event.key===Orders.ORDER_KEY || event.key===RedeemCodes.REDEEM_CODE_KEY || event.key.indexOf("kg_local_")===0) setTimeout(decorateSubscriptionElements,0);
+    if(!event.key || event.key===STORAGE_KEY || event.key===Orders.ORDER_KEY || event.key===RedeemCodes.REDEEM_CODE_KEY || event.key.indexOf("kg_local_")===0) setTimeout(decorateSubscriptionElements,0);
   });
 
   window.KGSubscription={
     STORAGE_KEY,
-    PLAN_SETTINGS_KEY:Plans.PLAN_SETTINGS_KEY,
     ORDER_KEY:Orders.ORDER_KEY,
     REDEEM_CODE_KEY:RedeemCodes.REDEEM_CODE_KEY,
     MIGRATION_KEY,

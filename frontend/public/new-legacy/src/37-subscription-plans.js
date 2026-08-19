@@ -8,20 +8,9 @@
  */
 (function(){
   window.KGSubscriptionPlansModule = function(ctx={}){
-    const Store = window.KGAppStorage || {};
-    const readJSON = typeof ctx.readJSON === "function" ? ctx.readJSON : function(key,fallback){
-      if(Store.readJSON) return Store.readJSON(key,fallback);
-      try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}
-    };
-    const writeJSON = typeof ctx.writeJSON === "function" ? ctx.writeJSON : function(key,value){
-      if(Store.writeJSON) return Store.writeJSON(key,value);
-      try{localStorage.setItem(key,JSON.stringify(value));return true}catch(e){return false}
-    };
     const refresh = function(){
       if(typeof ctx.decorateSubscriptionElements === "function") ctx.decorateSubscriptionElements();
     };
-
-    const PLAN_SETTINGS_KEY = "kg_subscription_plan_settings_v1";
 
     const PLAN_ALIASES = {
       free:"free",
@@ -316,19 +305,13 @@
       return out;
     }
     function readPlanSettings(){
+      // 套餐价格只认后端：remote 由 direct-system-adapter 启动时从 /api/v1/subscriptions/plans 预载。
+      // 不再读写 localStorage，避免本机缓存价与后台配置脱节。
       const remote=window.KGSubscriptionRemotePlanSettings;
+      const out={};
       if(remote && typeof remote === "object"){
-        const out={};
         PLAN_ORDER.forEach(id=>{
           if(remote[id] && typeof remote[id] === "object") out[id]=cleanPlanPatch(remote[id]);
-        });
-        return out;
-      }
-      const raw=readJSON(PLAN_SETTINGS_KEY,{});
-      const out={};
-      if(raw && typeof raw === "object"){
-        PLAN_ORDER.forEach(id=>{
-          if(raw[id] && typeof raw[id] === "object") out[id]=cleanPlanPatch(raw[id]);
         });
       }
       return out;
@@ -340,9 +323,7 @@
           if(settings[id] && typeof settings[id] === "object") out[id]=cleanPlanPatch(settings[id]);
         });
       }
-      if(window.KGSubscriptionRemotePlanSettings && typeof window.KGSubscriptionRemotePlanSettings === "object"){
-        window.KGSubscriptionRemotePlanSettings=Object.freeze(out);
-      }else writeJSON(PLAN_SETTINGS_KEY,out);
+      window.KGSubscriptionRemotePlanSettings=Object.freeze(out);
       window.dispatchEvent(new CustomEvent("kg-subscription-plan-change",{detail:{settings:out}}));
       refresh();
       return out;
@@ -418,7 +399,6 @@
     }
 
     return {
-      PLAN_SETTINGS_KEY,
       PLAN_ALIASES,
       PLAN_ORDER,
       PLANS,

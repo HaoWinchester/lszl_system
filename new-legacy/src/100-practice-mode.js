@@ -111,6 +111,8 @@
     const repo=global.KGPublishedPaperRepository;
     let rows=[];
     if(typeof repo?.listCatalogEntries==='function')rows=repo.listCatalogEntries({mode:'practice_mode'});
+    // 发布试卷目录由 KGPaperReleaseApi 异步预取；载入前 rows 为空，
+    // 载入完成后 adapter 广播 kg:published-papers-changed → syncLobby 重渲染（见下方监听）
     else{
       const raw=[];
       rows=(Array.isArray(raw)?raw:[]).filter(row=>publishedStatus(row)&&practiceModeEnabled(row)).map(releaseCatalogFallback).filter(row=>row.questionCount);
@@ -447,7 +449,7 @@
     state.lastSettings={paperId:'',count,order:'weakness_first',mode:'revenge'};document.body.dataset.practiceMode='revenge';dom.timer.hidden=true;dom.timeRow.hidden=true;dom.health.hidden=true;
     setView('game');renderQuestion();return true;
   }
-  function startPractice(mode){
+  async function startPractice(mode){
     if(mode==='revenge')return startRevenge();
     const catalog=selectedRelease(),count=Number(state.selectedCount);
     if(!catalog){syncLobby();return false}
@@ -456,7 +458,7 @@
     const repo=global.KGPublishedPaperRepository;
     let questions=[];
     if(typeof repo?.resolvePublishedPaper==='function'){
-      const resolved=repo.resolvePublishedPaper({paperId:catalog.paperId||catalog.id,releaseId:catalog.releaseId},{mode:'practice_mode',respectRole:false});
+      const resolved=await repo.resolvePublishedPaper({paperId:catalog.paperId||catalog.id,releaseId:catalog.releaseId},{mode:'practice_mode',respectRole:false});
       if(!resolved?.ok){
         if(['LOGIN_REQUIRED','MEMBERSHIP_REQUIRED'].includes(resolved?.code))return openMembership(resolved.access||access);
         showToast(resolved?.message||'试卷暂时无法打开。');
@@ -549,13 +551,14 @@
     if(dom.paperDrawerSummary)dom.paperDrawerSummary.textContent=rows.length?`共 ${rows.length} 份已发布试卷`:'当前筛选下暂无试卷';
   }
   function syncLobby(){
-    if(!state.catalogAvailable){
-      state.releases=[];state.selectedPaperId='';
-      if(dom.empty){dom.empty.hidden=false;const title=dom.empty.querySelector('strong'),detail=dom.empty.querySelector('p');if(title)title.textContent='题目目录暂不可用';if(detail)detail.textContent='请稍后刷新页面重试。'}
-      if(dom.setupCard)dom.setupCard.hidden=true;if(dom.modeGrid)dom.modeGrid.hidden=true;
-      const library=dom.paperLibrary?.closest('.practice-library');if(library)library.hidden=true;
-      return;
-    }
+    // 练习模式不依赖题库目录，试卷数据已包含题目快照
+    // if(!state.catalogAvailable){
+    //   state.releases=[];state.selectedPaperId='';
+    //   if(dom.empty){dom.empty.hidden=false;const title=dom.empty.querySelector('strong'),detail=dom.empty.querySelector('p');if(title)title.textContent='题目目录暂不可用';if(detail)detail.textContent='请稍后刷新页面重试。'}
+    //   if(dom.setupCard)dom.setupCard.hidden=true;if(dom.modeGrid)dom.modeGrid.hidden=true;
+    //   const library=dom.paperLibrary?.closest('.practice-library');if(library)library.hidden=true;
+    //   return;
+    // }
     const releases=loadReleases();
     const retiredSelection=state.retiredNavigation&&releases.find(row=>
       (state.retiredNavigation.paperId&&row.id===state.retiredNavigation.paperId&&(!state.retiredNavigation.releaseId||row.releaseId===state.retiredNavigation.releaseId))||
@@ -607,7 +610,9 @@
   async function init(){
     cacheDom();dom.startButtons.forEach(button=>button.dataset.defaultLabel=button.textContent);bind();
     state.retiredNavigation=readRetiredModeNavigation();
-    try{await global.KGQuestionCatalogAdapter.ready;state.catalogAvailable=true}catch(error){state.catalogAvailable=false;console.error(error)}
+    // P4.5.38：不阻塞等待 catalog ready，先显示 UI，数据异步加载（性能优化）
+    const catalogPromise=global.KGQuestionCatalogAdapter?.ready||Promise.resolve();
+    catalogPromise.then(()=>{state.catalogAvailable=true;syncLobby()}).catch(error=>{state.catalogAvailable=false;console.warn('题目目录加载失败',error);syncLobby()});
     syncLobby();showRetiredModeNotice();
     if(state.retiredNavigation){setView('lobby');return}
     setView('lobby');

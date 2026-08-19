@@ -274,40 +274,6 @@ function patchTrainingSessionReentrancy(source) {
     .replace(persistAssignment, `    if(!saved)return clone(current);\n${persistAssignment}`)
 }
 
-function patchFileManagerNavigation(source) {
-  let generated = replaceExactlyOnce(
-    source,
-    "  function selectFolder(id,options){selectItem('folder',id,options)}\n  function openFolder(id)",
-    "  function selectFolder(id,options){selectItem('folder',id,options)}\n  async function flushServerStateBeforeNavigation(){\n    if(global.KGServerStateStorage&&typeof global.KGServerStateStorage.flush==='function')await global.KGServerStateStorage.flush();\n  }\n  function openFolder(id)",
-    'new-legacy 文件管理保存屏障',
-  )
-  generated = replaceExactlyOnce(
-    generated,
-    '  function openFile(id){',
-    '  async function openFile(id){',
-    'new-legacy 文件打开异步入口',
-  )
-  generated = replaceExactlyOnce(
-    generated,
-    "    state.navigating=true;location.href='index.html';",
-    "    state.navigating=true;\n    try{await flushServerStateBeforeNavigation();location.href='index.html?mode=free'}catch(err){state.navigating=false;toast(err&&err.message||'服务器保存失败，请稍后重试。','error')}",
-    'new-legacy 文件打开跳转',
-  )
-  generated = replaceExactlyOnce(
-    generated,
-    "submitLabel:'创建并打开',onSubmit:value=>{",
-    "submitLabel:'创建并打开',onSubmit:async value=>{",
-    'new-legacy 创建并打开异步入口',
-  )
-  generated = replaceExactlyOnce(
-    generated,
-    "      if(!file)throw new Error(store.getLastError&&store.getLastError()||'新建图谱失败。');\n      location.href='index.html';",
-    "      if(!file)throw new Error(store.getLastError&&store.getLastError()||'新建图谱失败。');\n      await flushServerStateBeforeNavigation();\n      location.href='index.html?mode=free';",
-    'new-legacy 创建文件跳转',
-  )
-  return generated
-}
-
 function patchGraphInteractions(source) {
   const migratedMarkers = [
     'function findAvailableNodePosition(',
@@ -354,46 +320,6 @@ function patchGraphInteractions(source) {
     "    if(relationExists(source,id)){\n      const existing=linksForNodeId(source).find(link=>(link.from===source&&link.to===id)||(link.from===id&&link.to===source));\n      state.selectedLinkId=existing?existing.id:null;\n      showStatus(`“${a?a.title:'起点'}”与“${b.title}”之间已有关系线。`);\n    }else{",
     'new-legacy 重复关系保持可见',
   )
-  return generated
-}
-
-function patchQuestionRecallPreview(source) {
-  const preview = namedFunctionRegion(source, 'previewDeepRecall')
-  if (!preview) return source
-  if (preview.text.includes("KGServerStateStorage&&typeof window.KGServerStateStorage.flush==='function'")) return source
-  // 兼容两个基线：
-  //  - v9：previewDeepRecall 已自带 `const bank = currentBank()`，window.open 带 `bankId=`。
-  //  - v8.6：用 `questionId=` 且无 bank 传递（需补 bank）。
-  // 两版都要在打开深度回忆页前先 flush 到服务器，避免 120ms 防抖让新窗口读不到刚写入的题。
-  const isV9 = preview.text.includes('knowledge-recall.html?bankId=')
-  const isAsync = /(?:^|\n)[ \t]*async[ \t]+function[ \t]+previewDeepRecall[ \t]*\(/.test(preview.text)
-  let generated = isV9
-    ? isAsync ? source : replaceExactlyOnce(
-      source,
-      '  function previewDeepRecall(){',
-      '  async function previewDeepRecall(){',
-      'new-legacy 深度回忆异步入口',
-    )
-    : replaceExactlyOnce(
-      source,
-      "  function previewDeepRecall(){\n    if(!saveQuestionForm({silent:true})) return;\n    const q = currentQuestion();",
-      "  async function previewDeepRecall(){\n    if(!saveQuestionForm({silent:true})) return;\n    const bank = currentBank();\n    const q = currentQuestion();",
-      'new-legacy 深度回忆当前题传递',
-    )
-  const openBefore = isV9
-    ? "    }catch(e){}\n    window.open('knowledge-recall.html?bankId=' + encodeURIComponent(bank.id||'') + '&questionId=' + encodeURIComponent(q.id || 'current'), '_blank');"
-    : "    }catch(e){}\n    window.open('knowledge-recall.html?questionId=' + encodeURIComponent(q.id || 'current'), '_blank');"
-  const openAfter = openBefore.replace('    }catch(e){}\n    ', [
-    '    }catch(e){}',
-    '    try{',
-    "      if(window.KGServerStateStorage&&typeof window.KGServerStateStorage.flush==='function')await window.KGServerStateStorage.flush();",
-    '    }catch(error){',
-    "      toast(error&&error.message||'服务器保存失败，请稍后重试。');",
-    '      return;',
-    '    }',
-    '    ',
-  ].join('\n'))
-  generated = replaceExactlyOnce(generated, openBefore, openAfter, 'new-legacy 深度回忆打开前保存')
   return generated
 }
 
@@ -741,6 +667,20 @@ function injectPage(html, page, version) {
       `<script defer src="./practice-learning-adapter.js"></script><!-- kg-practice-learning:generated -->\n${practiceTag}`,
     )
   }
+  // P4.6 第 1 轮：已发布试卷改走 /api/v1/paper-releases 细粒度 API，
+  // 适配器必须先于 59-repository（其同步目录接口读它的内存缓存）注入。
+  if (['practice-mode.html', 'question-workspace.html', 'knowledge-recall.html', 'index.html'].includes(page)
+    && !generated.includes('kg-paper-releases:generated')) {
+    const repositoryTag = findLocalScriptTag(generated, 'src/59-published-paper-repository.js')
+      || findLocalScriptTag(generated, 'src/60-question-bank.js')
+    if (!repositoryTag) {
+      throw new Error(`new-legacy ${page} 发布试卷脚本顺序已变化，请复核发布试卷适配器`)
+    }
+    generated = generated.replace(
+      repositoryTag,
+      `<script defer src="./paper-release-adapter.js"></script><!-- kg-paper-releases:generated -->\n${repositoryTag}`,
+    )
+  }
   if (page === 'question-workspace.html'
     && (!generated.includes('kg-practice-learning:generated') || !generated.includes('kg-personal-cards:generated'))) {
     const workspaceTag = '<script defer src="src/77-multi-question-workspace.js"></script>'
@@ -857,6 +797,21 @@ function injectPage(html, page, version) {
         `<script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->\n${settingsTag}`,
       )
     }
+  }
+  // 会员中心弹窗(33-user-center)读 KGSubscriptionRemotePlanSettings 展示套餐价格；
+  // 凡是同时加载订阅运行时与会员中心的页面都注入 system adapter，让价格与支付始终来自后端接口，
+  // 否则学员页(如 practice-mode)会回落到源码默认价，与后台配置脱节。
+  if (generated.includes('src/37-subscription-core.js')
+    && generated.includes('src/33-user-center.js')
+    && !generated.includes('kg-system:generated')) {
+    const userCenterTag = findLocalScriptTag(generated, 'src/33-user-center.js')
+    if (!userCenterTag) {
+      throw new Error('new-legacy 会员中心脚本顺序已变化，请复核系统适配器注入')
+    }
+    generated = generated.replace(
+      userCenterTag,
+      `<script defer src="./direct-system-adapter.js"></script><!-- kg-system:generated -->\n${userCenterTag}`,
+    )
   }
   const authTag = page === 'index.html'
     ? '<script defer src="src/30-auth-guards.js"></script>'
@@ -1013,7 +968,7 @@ function validateStorageContract(source) {
     /* walk() 在 Windows 返回反斜杠路径，豁免清单统一为正斜杠，比较前先归一 */
     const normalizedPath = path.split(sep).join('/')
     if (p45Migration.legacyUnmigratedIndexedDbModules.has(normalizedPath)) continue
-    throw new Error(`IndexedDB business persistence is forbidden in migrated module: ${path}`)
+    throw new Error(`IndexedDB business persistence is forbidden in migrated module: ${normalizedPath}`)
   }
 }
 
@@ -1061,11 +1016,9 @@ function sync({ source, out }) {
     let generated = patchArchitectureCopy(`src/${path}`, readFileSync(target, 'utf8'))
     if (path === '10-graph-editor.js') generated = patchGraphInteractions(generated)
     if (path === '65-question-bank-admin.js') {
-      generated = patchQuestionRecallPreview(generated)
       generated = patchAddQuestionTab(generated)
     }
     if (path === '64-flow-orchestrator.js') generated = patchTrainingSessionReentrancy(generated)
-    if (path === '27-graph-file-manager.js') generated = patchFileManagerNavigation(generated)
     if (path === '36-system-settings.js') generated = patchSystemSettingsAnalyticsJs(generated)
     generated = patchFeatureAnalytics(path, generated)
     writeFileSync(target, generated)

@@ -59,8 +59,9 @@
     };
   }
 
-  function create({questionId,fetchImpl}={}){
+  function create({questionId,releaseId,fetchImpl}={}){
     const id=String(questionId||'').trim();
+    const releaseQuery=String(releaseId||'').trim()?`?releaseId=${encodeURIComponent(String(releaseId).trim())}`:'';
     if(!id)throw new TypeError('questionId 不能为空');
     const request=fetchImpl||global.fetch;
     if(typeof request!=='function')throw new TypeError('当前环境缺少 fetch');
@@ -96,7 +97,7 @@
     async function loadSession(){
       update({saveState:'loading',error:null});
       try{
-        const session=await send(`/api/v1/recall/session/${questionPath(id)}`);
+        const session=await send(`/api/v1/recall/session/${questionPath(id)}${releaseQuery}`);
         const graph=graphFromSession(session);
         update({
           session:clone(session),
@@ -132,7 +133,7 @@
         metrics:pending.metrics
       };
       try{
-        const saved=await send(`/api/v1/recall/progress/${questionPath(id)}`,{
+        const saved=await send(`/api/v1/recall/progress/${questionPath(id)}${releaseQuery}`,{
           method:'PUT',
           body:JSON.stringify(body)
         });
@@ -184,7 +185,7 @@
         targetQuestionRevision:Number(state.session.currentQuestion?.revision)||1
       };
       try{
-        const saved=await send(`/api/v1/recall/progress/${questionPath(id)}/reset`,{
+        const saved=await send(`/api/v1/recall/progress/${questionPath(id)}${releaseQuery}/reset`,{
           method:'POST',
           body:JSON.stringify(body)
         });

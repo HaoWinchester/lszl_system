@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import text
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -96,11 +96,46 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 
+
+def _normalize_localhost_request(request: Request):
+    if (
+        not settings.SESSION_CANONICALIZE_LOCALHOST
+        or settings.ENV == "prod"
+        or (hostname := request.url.hostname or "") == ""
+        or settings.SESSION_HOST_CANONICAL is None
+    ):
+        return None
+
+    # Accept localhost family hostnames (including local test domains) for stable
+    # cookie/session sharing in development environments.
+    if request.url.path.startswith("/api/"):
+        return None
+
+    if hostname != "localhost" and not hostname.startswith("localhost."):
+        return None
+
+    canonical_host = settings.SESSION_HOST_CANONICAL
+    canonical_netloc = (
+        str(canonical_host)
+        if request.url.port is None
+        else f"{canonical_host}:{request.url.port}"
+    )
+    canonical_url = request.url.replace(netloc=canonical_netloc)
+    return RedirectResponse(str(canonical_url), status_code=307)
+
+
+@app.middleware("http")
+async def ensure_shared_local_session(request: Request, call_next):
+    redirect_response = _normalize_localhost_request(request)
+    if redirect_response is not None:
+        return redirect_response
+    return await call_next(request)
+
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.SECRET_KEY,
-    session_cookie="kg_session",
-    max_age=60 * 60 * 24 * 7,  # 7 天
+    session_cookie=settings.SESSION_COOKIE_NAME,
+    max_age=settings.SESSION_MAX_AGE_SECONDS,
     same_site="lax",
 )
 

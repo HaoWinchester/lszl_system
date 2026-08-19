@@ -11,6 +11,7 @@ from app.main import app
 from app.models.content_prep import Principle, QuestionTagConfig, QuestionUploadBatch, SynthesisPreset
 from app.models.question import Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.teaching_content import ActivityOverride, ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode
 from app.models.user import User
 from app.services import teaching_content_revision_service
 
@@ -205,21 +206,25 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
             assert imported.status_code == 200, imported.text
             assert imported.json()["summary"]["created"] == 1
 
-            runtime = first.get("/api/v1/runtime/state")
-            assert runtime.status_code == 200, runtime.text
-            storage = runtime.json()["storage"]
-            assert json.loads(storage[TAXONOMY_KEY])[-1]["id"] == f"empty-tax-{suffix}"
-            assert json.loads(storage[RECALL_KEY])["nodes"][0]["title"] == "零题目联想"
-            assert storage[TAG_KEY] == tag_sentinel
             shared_after_batch = second.get(
                 "/api/v1/content-prep/shared-content",
                 params={"subjectId": "PMP"},
             )
             assert shared_after_batch.status_code == 200, shared_after_batch.text
+            assert shared_after_batch.json()["knowledgeTree"]["taxonomy"]["id"] == f"empty-tax-{suffix}"
+            assert shared_after_batch.json()["recallLibrary"]["nodes"][0]["title"] == "零题目联想"
             assert shared_after_batch.json()["tagConfig"]["names"]["stage"] == "零题目阶段"
-            activities = json.loads(storage[ACTIVITY_KEY])
-            assert activities[activity_id]["title"] == "共享活动"
-            assert activities[activity_id]["metadata"]["authorship"]["createdByUserId"] == teacher_b
+            async def relational_assets():
+                async with AsyncSessionLocal() as db:
+                    taxonomy = (await db.execute(select(ContentTaxonomy).where(ContentTaxonomy.id == f"empty-tax-{suffix}"))).scalar_one()
+                    recall = (await db.execute(select(RecallAssociationLibrary).where(RecallAssociationLibrary.subject_id == "subject-pmp").order_by(RecallAssociationLibrary.version.desc()).limit(1))).scalar_one()
+                    activity = (await db.execute(select(ActivityOverride).where(ActivityOverride.activity_id == activity_id))).scalar_one()
+                    return taxonomy, recall, activity
+            taxonomy, recall, activity = asyncio.run(relational_assets())
+            assert taxonomy.id == f"empty-tax-{suffix}"
+            assert recall.nodes[0]["title"] == "零题目联想"
+            assert activity.record["title"] == "共享活动"
+            assert activity.record["metadata"]["authorship"]["createdByUserId"] == teacher_b
 
         for username in (student, viewer):
             with TestClient(app) as denied:

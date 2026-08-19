@@ -6,13 +6,24 @@ import json
 from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
-from urllib.parse import quote
+from uuid import uuid4
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_prep import Principle, QuestionTagConfig, SynthesisPreset
-from app.models.shared_runtime_state import SharedRuntimeState
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+
+from app.models.teaching_content import (
+    ActivityCollection,
+    ActivityOverride,
+    ContentSubject,
+    ContentTaxonomy,
+    RecallAssociationLibrary,
+    TaxonomyNode,
+    TeachingContentAudit,
+)
 from app.models.user import User
 from app.services import (
     content_prep_service,
@@ -67,27 +78,50 @@ def _subject_id(value: object) -> str:
     return "subject-pmp" if subject_id.upper() == "PMP" else subject_id
 
 
-async def _read_row(db: AsyncSession, key: str) -> SharedRuntimeState | None:
-    return await db.get(SharedRuntimeState, key)
-
-
-async def _write_row(
-    db: AsyncSession,
-    key: str,
-    value: object,
-    actor_username: str,
-    label: str,
-) -> bool:
-    encoded = _json_text(value, label)
-    row = await _read_row(db, key)
-    if row is not None and row.value == encoded:
-        return False
+async def _ensure_subject(db: AsyncSession, subject_id: str) -> ContentSubject:
+    row = await db.get(ContentSubject, subject_id)
     if row is None:
-        db.add(SharedRuntimeState(key=key, value=encoded, updated_by=actor_username))
-    else:
-        row.value = encoded
-        row.updated_by = actor_username
-    return True
+        code = subject_id.removeprefix("subject-").upper()
+        row = ContentSubject(id=subject_id, code=code, name=code, content_metadata={})
+        db.add(row)
+        await db.flush()
+    return row
+
+
+def _taxonomy_payload(row: ContentTaxonomy, nodes: list[TaxonomyNode]) -> dict[str, Any]:
+    return {
+        **dict(row.content_metadata or {}),
+        "id": row.id,
+        "subjectId": row.subject_id,
+        "version": row.version,
+        "status": row.status,
+        "title": row.title,
+        "nodes": [dict(node.record or {}) for node in nodes],
+    }
+
+
+async def _latest_taxonomy(db: AsyncSession, subject_id: str) -> tuple[ContentTaxonomy, list[TaxonomyNode]] | None:
+    row = (await db.execute(
+        select(ContentTaxonomy)
+        .where(ContentTaxonomy.subject_id == subject_id)
+        .order_by(ContentTaxonomy.updated_at.desc(), ContentTaxonomy.version.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+    if row is None:
+        return None
+    nodes = list((await db.execute(
+        select(TaxonomyNode).where(TaxonomyNode.taxonomy_id == row.id).order_by(TaxonomyNode.position, TaxonomyNode.node_id)
+    )).scalars())
+    return row, nodes
+
+
+async def _latest_recall(db: AsyncSession, subject_id: str) -> RecallAssociationLibrary | None:
+    return (await db.execute(
+        select(RecallAssociationLibrary)
+        .where(RecallAssociationLibrary.subject_id == subject_id)
+        .order_by((RecallAssociationLibrary.status == "published").desc(), RecallAssociationLibrary.version.desc(), RecallAssociationLibrary.updated_at.desc())
+        .limit(1)
+    )).scalar_one_or_none()
 
 
 def _normalize_tree(value: object, subject_id: str) -> dict[str, Any] | None:
@@ -159,28 +193,30 @@ async def _assert_revision(db: AsyncSession, expected_revision: int) -> int:
     return current
 
 
+async def _principle_card_bundle(db: AsyncSession) -> dict[str, Any]:
+    principles = (await db.execute(select(Principle).order_by(Principle.id))).scalars().all()
+    presets = (await db.execute(select(SynthesisPreset).order_by(SynthesisPreset.id))).scalars().all()
+    return {
+        "principleCardBundleVersion": 1,
+        "format": "kg-principle-card-bundle-v1",
+        "principles": {"schemaVersion": 1, "items": [{"id": row.id, "name": row.name, "status": row.status, "confusablePrincipleIds": row.confusable_principle_ids or []} for row in principles]},
+        "synthesisPresets": {"schemaVersion": 1, "items": [{"id": row.id, "principleId": row.principle_id, "title": row.title, "content": row.content, "status": row.status, "version": row.business_version} for row in presets]},
+    }
+
+
 async def read_shared_content(db: AsyncSession, subject_id: str) -> dict[str, Any]:
     subject_id = _subject_id(subject_id)
     await teaching_content_revision_service.acquire_read_lock(db)
-    bundle = await teaching_content_projection_service.principle_card_bundle(db)
-    taxonomy_row = await _read_row(db, TAXONOMY_KEY)
-    taxonomies = _decode(taxonomy_row.value if taxonomy_row else None, [], "知识树")
-    if not isinstance(taxonomies, list):
-        raise ValueError("服务器知识树必须是数组")
-    matching = [
-        item
-        for item in taxonomies
-        if isinstance(item, dict)
-        and str(item.get("subjectId") or "").strip()
-        and _subject_id(item.get("subjectId")) == subject_id
-    ]
-    recall_key = RECALL_PREFIX + quote(subject_id, safe="")
-    recall_row = await _read_row(db, recall_key)
-    recall = _decode(
-        recall_row.value if recall_row else None,
-        {"schemaVersion": 1, "nodes": [], "edges": [], "updatedAt": ""},
-        "联想库",
-    )
+    bundle = await _principle_card_bundle(db)
+    taxonomy_result = await _latest_taxonomy(db, subject_id)
+    taxonomy = _taxonomy_payload(*taxonomy_result) if taxonomy_result else None
+    recall_row = await _latest_recall(db, subject_id)
+    recall = {
+        "schemaVersion": 1,
+        "nodes": list(recall_row.nodes or []),
+        "edges": list(recall_row.edges or []),
+        "updatedAt": recall_row.updated_at.isoformat() if recall_row and recall_row.updated_at else "",
+    } if recall_row else {"schemaVersion": 1, "nodes": [], "edges": [], "updatedAt": ""}
     facet_snapshot = await subject_facet_service.list_schemas(db)
     subject_facet_schemas = [
         schema
@@ -191,7 +227,7 @@ async def read_shared_content(db: AsyncSession, subject_id: str) -> dict[str, An
     revision = int((await teaching_content_revision_service.current(db))["revision"])
     return {
         "subjectId": subject_id,
-        "knowledgeTree": {"taxonomy": matching[-1]} if matching else None,
+        "knowledgeTree": {"taxonomy": taxonomy} if taxonomy else None,
         "recallLibrary": recall,
         "principles": bundle["principles"],
         "synthesisPresets": bundle["synthesisPresets"],
@@ -216,28 +252,46 @@ async def apply_auxiliary_assets(
     changes: list[dict[str, str]] = []
     tree = _normalize_tree(knowledge_tree, subject_id)
     if tree is not None:
-        row = await _read_row(db, TAXONOMY_KEY)
-        current = _decode(row.value if row else None, [], "知识树")
-        if not isinstance(current, list):
-            raise ValueError("服务器知识树必须是数组")
-        next_value = [
-            item
-            for item in current
-            if not isinstance(item, dict) or str(item.get("id") or "") != tree["id"]
-        ]
-        next_value.append(tree)
-        if await _write_row(db, TAXONOMY_KEY, next_value, actor_username, "知识树"):
-            changes.append(
-                {"entityType": "taxonomy", "entityId": tree["id"], "action": "upserted"}
-            )
+        subject = await _ensure_subject(db, subject_id)
+        taxonomy_id = tree["id"]
+        row = await db.get(ContentTaxonomy, taxonomy_id)
+        requested_version = int(tree.get("version") or 1)
+        if row is None:
+            conflicting = (await db.execute(select(ContentTaxonomy).where(ContentTaxonomy.subject_id == subject_id, ContentTaxonomy.version == requested_version).limit(1))).scalar_one_or_none()
+            if conflicting is not None:
+                await db.execute(delete(TaxonomyNode).where(TaxonomyNode.taxonomy_id == conflicting.id))
+                await db.delete(conflicting)
+                await db.flush()
+        if row is None:
+            row = ContentTaxonomy(id=taxonomy_id, subject_id=subject.id, version=requested_version, status=str(tree.get("status") or "published"), title=str(tree.get("title") or tree.get("name") or ""), content_metadata={k: v for k, v in tree.items() if k != "nodes"}, updated_by=actor_username, created_by=actor_username)
+            db.add(row)
+        else:
+            row.version = int(tree.get("version") or row.version)
+            row.status = str(tree.get("status") or row.status)
+            row.title = str(tree.get("title") or row.title)
+            row.content_metadata = {k: v for k, v in tree.items() if k != "nodes"}
+            row.updated_by = actor_username
+        await db.flush()
+        await db.execute(delete(TaxonomyNode).where(TaxonomyNode.taxonomy_id == taxonomy_id))
+        for position, node in enumerate(tree["nodes"]):
+            if not isinstance(node, dict) or not str(node.get("id") or "").strip():
+                raise ValueError("知识点必须包含 ID")
+            node_id = str(node["id"])
+            db.add(TaxonomyNode(id=f"{taxonomy_id}:{node_id}", taxonomy_id=taxonomy_id, node_id=node_id, parent_node_id=node.get("parentId"), title=str(node.get("title") or ""), record=node, position=position, status=str(node.get("status") or "active")))
+        db.add(TeachingContentAudit(id=uuid4().hex, entity_type="taxonomy", entity_id=taxonomy_id, action="published" if row.status == "published" else "upserted", actor_username=actor_username, after=tree))
+        changes.append({"entityType": "taxonomy", "entityId": taxonomy_id, "action": "upserted"})
 
     recall = _normalize_recall(recall_library)
     if recall is not None:
-        key = RECALL_PREFIX + quote(subject_id, safe="")
-        if await _write_row(db, key, recall, actor_username, "联想库"):
-            changes.append(
-                {"entityType": "recallLibrary", "entityId": subject_id, "action": "upserted"}
-            )
+        await _ensure_subject(db, subject_id)
+        row = (await db.execute(select(RecallAssociationLibrary).where(RecallAssociationLibrary.subject_id == subject_id, RecallAssociationLibrary.version == int(recall.get("version") or 1)))).scalar_one_or_none()
+        if row is None:
+            row = RecallAssociationLibrary(id=uuid4().hex, subject_id=subject_id, version=int(recall.get("version") or 1), status="published", nodes=recall["nodes"], edges=recall["edges"], content_metadata={k: v for k, v in recall.items() if k not in {"nodes", "edges"}}, updated_by=actor_username)
+            db.add(row)
+        else:
+            row.nodes, row.edges, row.content_metadata, row.updated_by = recall["nodes"], recall["edges"], {k: v for k, v in recall.items() if k not in {"nodes", "edges"}}, actor_username
+        db.add(TeachingContentAudit(id=uuid4().hex, entity_type="recallLibrary", entity_id=row.id, action="upserted", actor_username=actor_username, after=recall))
+        changes.append({"entityType": "recallLibrary", "entityId": subject_id, "action": "upserted"})
 
     return changes
 
@@ -262,18 +316,10 @@ async def save_shared_content(
         bundle = teaching_content_projection_service.validate_principle_card_bundle(
             {"principles": principles, "synthesisPresets": synthesis_presets}
         )
-        for key, value in (
-            (teaching_content_projection_service.PRINCIPLE_KEY, bundle["principles"]),
-            (teaching_content_projection_service.PRESET_KEY, bundle["synthesisPresets"]),
-        ):
-            changes.extend(
-                await teaching_content_projection_service.apply_principle_projection(
-                    db, actor.username, key, _json_text(value, "原则投影")
-                )
-            )
-        await teaching_content_projection_service.write_principle_projection(
-            db, actor.username
-        )
+        actor_context = content_prep_service._actor_context(actor)
+        changes.extend(await content_prep_service._upsert_principles(db, actor_context, bundle["principles"]))
+        await db.flush()
+        changes.extend(await content_prep_service._upsert_presets(db, actor_context, bundle["synthesisPresets"]))
 
     tag_changed = False
     if tag_config:
@@ -340,9 +386,7 @@ async def upsert_principle(
             db, actor_context, {"items": [preset_item]}
         )
     )
-    await teaching_content_projection_service.write_principle_projection(
-        db, actor.username
-    )
+
     revision = (
         await teaching_content_revision_service.bump(db, actor.username, changes)
         if changes
@@ -350,7 +394,7 @@ async def upsert_principle(
     )
     await db.commit()
     return {
-        **(await teaching_content_projection_service.principle_card_bundle(db)),
+        **(await _principle_card_bundle(db)),
         "contentRevision": int(revision["revision"]),
     }
 
@@ -359,7 +403,7 @@ async def read_principles(db: AsyncSession) -> dict[str, Any]:
     await teaching_content_revision_service.acquire_read_lock(db)
     revision = await teaching_content_revision_service.current(db)
     return {
-        **(await teaching_content_projection_service.principle_card_bundle(db)),
+        **(await _principle_card_bundle(db)),
         "contentRevision": int(revision["revision"]),
     }
 
@@ -371,7 +415,7 @@ async def preview_principle_merge(
         bundle
     )
     await teaching_content_revision_service.acquire_read_lock(db)
-    existing = await teaching_content_projection_service.principle_card_bundle(db)
+    existing = await _principle_card_bundle(db)
     plan = teaching_content_projection_service.plan_principle_bundle_merge(
         incoming, existing
     )
@@ -391,7 +435,7 @@ async def apply_principle_merge(
         bundle
     )
     await _assert_revision(db, content_revision)
-    existing = await teaching_content_projection_service.principle_card_bundle(db)
+    existing = await _principle_card_bundle(db)
     plan = teaching_content_projection_service.plan_principle_bundle_merge(
         incoming, existing
     )
@@ -498,9 +542,7 @@ async def apply_principle_merge(
             }
             for principle_id in sorted(replaced_existing_ids)
         )
-    await teaching_content_projection_service.write_principle_projection(
-        db, actor.username
-    )
+
     revision = (
         await teaching_content_revision_service.bump(db, actor.username, changes)
         if changes
@@ -508,7 +550,7 @@ async def apply_principle_merge(
     )
     await db.commit()
     return {
-        **(await teaching_content_projection_service.principle_card_bundle(db)),
+        **(await _principle_card_bundle(db)),
         "contentRevision": int(revision["revision"]),
         "summary": {
             "added": len(plan["added"]),
@@ -526,9 +568,18 @@ async def delete_principle(
     content_revision: int,
 ) -> dict[str, Any]:
     await _assert_revision(db, content_revision)
-    return await teaching_content_projection_service.delete_principles(
-        db, actor.username, [principle_id]
-    )
+    principle = await db.get(Principle, principle_id)
+    if principle is None:
+        raise ValueError(f"原则不存在：{principle_id}")
+    referenced = await teaching_content_projection_service.principle_reference_questions(db, [principle_id])
+    if referenced:
+        raise teaching_content_projection_service.PrincipleArchiveConflict(referenced)
+    await db.execute(delete(SynthesisPreset).where(SynthesisPreset.principle_id == principle_id))
+    await db.delete(principle)
+    db.add(TeachingContentAudit(id=uuid4().hex, entity_type="principle", entity_id=principle_id, action="deleted", actor_username=actor.username, after={}))
+    revision = await teaching_content_revision_service.bump(db, actor.username, [{"entityType": "principle", "entityId": principle_id, "action": "deleted"}])
+    await db.commit()
+    return {**(await _principle_card_bundle(db)), "contentRevision": int(revision["revision"])}
 
 
 def _business_activity(value: object) -> object:
@@ -546,15 +597,21 @@ async def import_activities(
     actor: User,
     *,
     content_revision: int,
+    subject_id: str = "subject-pmp",
+    collection_id: str = "default",
     activities: list[dict[str, Any]],
 ) -> dict[str, Any]:
     if not activities or len(activities) > MAX_ACTIVITIES:
         raise ValueError("活动数量必须在 1 到 5000 之间")
     await _assert_revision(db, content_revision)
-    row = await _read_row(db, ACTIVITY_KEY)
-    current = _decode(row.value if row else None, {}, "活动库")
-    if not isinstance(current, dict):
-        raise ValueError("服务器活动库必须是 JSON 对象")
+    row = (await db.execute(select(ActivityOverride).where(ActivityOverride.collection_id == collection_id))).scalars().all()
+    current = {item.activity_id: item for item in row}
+    collection = await db.get(ActivityCollection, collection_id)
+    if collection is None:
+        await _ensure_subject(db, subject_id)
+        collection = ActivityCollection(id=collection_id, subject_id=subject_id, title="默认活动库", content_metadata={})
+        db.add(collection)
+        await db.flush()
     created = updated = unchanged = 0
     changes: list[dict[str, str]] = []
     now = datetime.now(timezone.utc).isoformat()
@@ -565,7 +622,8 @@ async def import_activities(
         if not activity_id or len(activity_id) > 128:
             raise ValueError("活动 ID 格式不正确")
         activity = json.loads(_json_text(source, "活动"))
-        existing = current.get(activity_id)
+        existing_row = current.get(activity_id)
+        existing = existing_row.record if existing_row is not None else None
         if existing is not None and _business_activity(existing) == _business_activity(activity):
             unchanged += 1
             continue
@@ -585,15 +643,17 @@ async def import_activities(
             "updatedAt": now,
         }
         activity["metadata"] = metadata
-        current[activity_id] = activity
+        if existing_row is None:
+            db.add(ActivityOverride(id=uuid4().hex, collection_id=collection_id, activity_id=activity_id, record=activity, updated_by=actor.username))
+        else:
+            existing_row.record = activity
+            existing_row.revision += 1
+            existing_row.updated_by = actor.username
         action = "created" if existing is None else "updated"
         created += existing is None
         updated += existing is not None
-        changes.append(
-            {"entityType": "activity", "entityId": activity_id, "action": action}
-        )
+        changes.append({"entityType": "activity", "entityId": activity_id, "action": action})
     if changes:
-        await _write_row(db, ACTIVITY_KEY, current, actor.username, "活动库")
         revision = await teaching_content_revision_service.bump(
             db, actor.username, changes
         )

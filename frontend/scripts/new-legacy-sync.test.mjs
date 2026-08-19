@@ -490,10 +490,10 @@ test('sync adds the server flush when recall preview is already async', (t) => {
 
   assert.equal(result.status, 0, result.stderr)
   const generated = readFileSync(resolve(item.output, 'src/65-question-bank-admin.js'), 'utf8')
-  const flush = generated.indexOf('await window.KGServerStateStorage.flush()')
   const open = generated.indexOf("window.open('knowledge-recall.html?bankId='")
-  assert.ok(flush >= 0)
-  assert.ok(flush < open)
+  assert.ok(open >= 0)
+  // 迁移后预览不再依赖 runtime flush：参数直开，recall 端经 previewToken 读取领域数据。
+  assert.doesNotMatch(generated, /KGServerStateStorage\.flush/)
 })
 
 test('sync accepts the server-catalog add-question flow without applying the legacy tab patch', (t) => {
@@ -553,9 +553,10 @@ test('sync does not mistake an unrelated flush for a recall-preview flush', (t) 
   const generated = readFileSync(resolve(item.output, 'src/65-question-bank-admin.js'), 'utf8')
   const preview = generated.indexOf('function previewDeepRecall')
   const open = generated.indexOf("window.open('knowledge-recall.html?bankId='", preview)
-  const flush = generated.lastIndexOf('await window.KGServerStateStorage.flush()', open)
-  assert.ok(flush > preview)
-  assert.ok(flush < open)
+  assert.ok(open > preview)
+  // 不再为预览注入 flush；无关 flush 保持在 unrelatedSave 内，不被复制到预览路径。
+  const flush = generated.indexOf('await window.KGServerStateStorage.flush()', preview)
+  assert.ok(flush < 0 || flush > open)
 })
 
 test('sync does not mistake an unrelated catalog save for the catalog add-question flow', (t) => {
@@ -619,9 +620,10 @@ test('sync bounds recall preview before a following arrow-function flush', (t) =
   const generated = readFileSync(resolve(item.output, 'src/65-question-bank-admin.js'), 'utf8')
   const preview = generated.indexOf('function previewDeepRecall')
   const open = generated.indexOf("window.open('knowledge-recall.html?bankId='", preview)
-  const flush = generated.lastIndexOf('await window.KGServerStateStorage.flush()', open)
-  assert.ok(flush > preview)
-  assert.ok(flush < open)
+  assert.ok(open > preview)
+  // 不再注入 flush；源中已有的箭头函数 flush 保持在原位，不进入预览路径。
+  const flush = generated.indexOf('await window.KGServerStateStorage.flush()', preview)
+  assert.ok(flush < 0 || flush > open)
 })
 
 test('sync bounds add-question before a following arrow-function catalog save', (t) => {

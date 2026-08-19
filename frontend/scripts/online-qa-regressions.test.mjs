@@ -11,8 +11,10 @@ const source = (path) => readFileSync(resolve(repoDir, path), 'utf8')
 
 test('coalesced runtime saves identify every mutated key', () => {
   const bootstrap = source('frontend/scripts/new-legacy-assets/server-state-bootstrap.js')
-  assert.match(bootstrap, /const mutations\s*=\s*Array\.from\(batch\.values\(\)\)/)
-  assert.match(bootstrap, /snapshotMode:\s*'full',[\s\S]*mutations,[\s\S]*revision/)
+  // merge 协议：批量合并后仍以 mutations 列表标识每个被改动的键，后端按键校验。
+  assert.match(bootstrap, /function mutationsForPayload\(/)
+  assert.match(bootstrap, /Array\.from\(source\.values\(\)\)\.filter\(\(mutation\)\s*=>\s*isPersistableKey\(mutation\.key\)\)/)
+  assert.match(bootstrap, /snapshotMode:\s*'merge',[\s\S]*mutations,[\s\S]*requestId[\s\S]*revision/)
 })
 
 test('non-retryable runtime mutations are discarded and server state is restored', () => {
@@ -231,7 +233,7 @@ test('home restores the update learning-entry dialog, automatic guided steps, an
   assert.match(tour, /waitForInitialLearningEntry/)
   assert.match(tour, /result\?\.shown/)
   assert.match(tour, /function hasAuthenticatedGuidedTourSession\(\)/)
-  assert.match(tour, /window\.__KG_DIRECT_BOOTSTRAP__\?\.authenticated===true/)
+  assert.match(tour, /KGAuthCore\?\.currentUser\?\.\(\)/)
   assert.doesNotMatch(tour, /不再在页面首次加载时自动启动全屏引导/)
   assert.match(modeStyles, /#graphSearchPanel/)
   assert.match(modes, /closeGraphSearchPanel/)
@@ -289,7 +291,7 @@ test('support dialogs trap and restore focus with Chinese inline validation', ()
   assert.match(support, /!backdrop\.contains\(document\.activeElement\)/)
   assert.match(support, /target\?\.focus\?\.\(\)/)
   assert.match(support, /请填写反馈标题和详细描述/)
-  assert.match(support, /__KG_DIRECT_BOOTSTRAP__\?\.releaseVersion/)
+  assert.match(support, /documentElement\.dataset\.release/)
   assert.doesNotMatch(support, /id="feedbackTitle"[^>]*required/)
 })
 
@@ -364,15 +366,15 @@ test('file tags and explicit favorites are independent', () => {
   assert.doesNotMatch(organizer, /并加入我的收藏|并退出我的收藏/)
 })
 
-test('workspace and graph manual saves await the server flush result', () => {
+test('workspace and graph manual saves use domain store results', () => {
   const filebar = source('new-legacy/src/79-multi-question-workspace-filebar.js')
   const workspace = source('new-legacy/src/77-multi-question-workspace.js')
   const adapter = source('frontend/scripts/new-legacy-assets/direct-graph-adapter.js')
   const autosave = source('new-legacy/src/24-graph-file-autosave.js')
   assert.match(filebar, /async function manualSave/)
-  assert.match(workspace, /async function manualSaveWorkspace/)
-  assert.match(workspace, /await global\.KGServerStateStorage\?\.flush/)
-  assert.match(adapter, /autosave\.reportError/)
+  assert.match(workspace, /function manualSaveWorkspace/)
+  assert.doesNotMatch(workspace, /KGServerStateStorage|runtime\/state/)
+  assert.match(adapter, /saveNow/)
   assert.match(autosave, /function reportError/)
 })
 

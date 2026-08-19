@@ -116,6 +116,8 @@ async def bootstrap(
     db: DB,
     mode: Literal["managed", "learning"] = Query("learning"),
     subject: str | None = Query(None),
+    include_questions: bool = Query(False),
+    page_size: int = Query(200, ge=1, le=200),
 ):
     user = await optional_current_user(request, db)
     if mode == "managed":
@@ -137,23 +139,50 @@ async def bootstrap(
             subject=subject,
         )
         questions: list[dict] = []
-        for bank in banks:
-            rows, _ = await question_catalog_service.list_bank_questions(
-                db,
-                user,
-                bank["id"],
-                page=1,
-                page_size=200,
-            )
-            questions.extend(rows)
+        if include_questions:
+            async def _load_bank_questions(bank_id: str) -> list[dict]:
+                page = 1
+                rows: list[dict] = []
+                total = 0
+                while True:
+                    chunk, total_count = await question_catalog_service.list_bank_questions(
+                        db,
+                        user,
+                        bank_id,
+                        page=page,
+                        page_size=page_size,
+                    )
+                    rows.extend(chunk)
+                    total = max(total, int(total_count or 0))
+                    if len(rows) >= total:
+                        break
+                    if not chunk:
+                        break
+                    page += 1
+                return rows
+
+            for bank in banks:
+                questions.extend(await _load_bank_questions(str(bank["id"])))
     else:
         banks = await question_catalog_service.list_learning_banks(db, subject=subject)
-        questions, _ = await question_catalog_service.list_learning_questions(
-            db,
-            subject=subject,
-            page=1,
-            page_size=200,
-        )
+        questions: list[dict] = []
+        if include_questions:
+            page = 1
+            total_questions = 0
+            while True:
+                chunk, total = await question_catalog_service.list_learning_questions(
+                    db,
+                    subject=subject,
+                    page=page,
+                    page_size=page_size,
+                )
+                questions.extend(chunk)
+                total_questions = max(total_questions, int(total or 0))
+                if len(questions) >= total_questions:
+                    break
+                if not chunk:
+                    break
+                page += 1
     content_revision = await teaching_content_revision_service.current(db)
     return {
         "banks": banks,

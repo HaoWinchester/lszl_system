@@ -84,14 +84,36 @@ async def restore_personal_card(card_id: str, db: DB, user: CurrentUser):
 
 
 @router.get("/training/session/{question_id}")
-async def get_training_session(question_id: str, db: DB, user: CurrentUser):
-    return {"session": await learning_service.get_session(db, user.username, question_id)}
+async def get_training_session(
+    question_id: str,
+    db: DB,
+    user: CurrentUser,
+    release_id: str = Query("", alias="releaseId", max_length=64),
+):
+    return {
+        "session": await learning_service.get_session(
+            db, user.username, question_id, release_id
+        )
+    }
 
 
 @router.put("/training/session/{question_id}")
-async def save_training_session(question_id: str, body: dict, db: DB, user: CurrentUser):
+async def save_training_session(
+    question_id: str,
+    body: dict,
+    db: DB,
+    user: CurrentUser,
+    release_id: str = Query("", alias="releaseId", max_length=64),
+):
     try:
-        session = await learning_service.save_session(db, user.username, question_id, body)
+        session = await learning_service.save_session(
+            db,
+            user.username,
+            question_id,
+            body,
+            release_id=release_id,
+            current_user=user,
+        )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if session is None:

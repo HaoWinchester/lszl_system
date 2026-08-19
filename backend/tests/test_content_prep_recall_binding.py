@@ -3,13 +3,14 @@ import json
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.db.session import AsyncSessionLocal
 from app.main import app
 from app.models.content_prep import QuestionAuditLog, QuestionUploadBatch
 from app.models.question import Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.teaching_content import ContentSubject, RecallAssociationLibrary
 
 
 ADMIN_PASSWORD = "jbgsnmm~123"
@@ -90,9 +91,9 @@ def test_batch_uses_incoming_recall_library_and_rolls_back_invalid_references() 
             assert bound.clues[0]["recallNodeId"] == "recall:overloaded"
             assert blank is not None
             assert blank.clues[0]["recallNodeId"] == ""
-            row = await db.get(SharedRuntimeState, RECALL_KEY)
+            row = (await db.execute(select(RecallAssociationLibrary).where(RecallAssociationLibrary.subject_id == "subject-pmp").order_by(RecallAssociationLibrary.version.desc()).limit(1))).scalar_one_or_none()
             assert row is not None
-            library = json.loads(row.value)
+            library = {"nodes": row.nodes, "edges": row.edges}
             assert [node["id"] for node in library["nodes"]] == [
                 "recall:overloaded",
                 "recall:support",
@@ -104,9 +105,9 @@ def test_batch_uses_incoming_recall_library_and_rolls_back_invalid_references() 
     async def verify_rollback() -> None:
         async with AsyncSessionLocal() as db:
             assert await db.get(Question, invalid_question_id) is None
-            row = await db.get(SharedRuntimeState, RECALL_KEY)
+            row = (await db.execute(select(RecallAssociationLibrary).where(RecallAssociationLibrary.subject_id == "subject-pmp").order_by(RecallAssociationLibrary.version.desc()).limit(1))).scalar_one_or_none()
             assert row is not None
-            library = json.loads(row.value)
+            library = {"nodes": row.nodes, "edges": row.edges}
             assert all(node["id"] != "recall:rollback-only" for node in library["nodes"])
 
     async def cleanup() -> None:

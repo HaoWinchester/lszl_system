@@ -208,7 +208,7 @@
     document.body.dataset.recallPreview='teacher-draft';document.body.dataset.recallPreviewToken=String(payload.previewToken||requestedToken||'');
     return q;
   }
-  function loadQuestion(){
+  async function loadQuestion(){
     try{
       const route=window.KGLearningRouteContext?.parse?.({mode:'deep_recall',returnUrl:'index.html'})||{};
       const params=new URLSearchParams(location.search||'');
@@ -222,11 +222,11 @@
       const draftPreview=teacherDraftPreviewQuestion(params,input,route);
       if(draftPreview)return draftPreview;
       const source=window.KGRecallQuestionSource;
-      let found=input.questionId&&source?.findPublished?.(input);
+      let found=input.questionId&&await source?.findPublished?.(input);
       if(!found){
         const payload=RecallStorage.readCurrent?.()||null;
         if(payload?.sourceQuestionId){
-          found=source?.findPublished?.({
+          found=await source?.findPublished?.({
             collectionId:payload.sourceCollectionId||payload.question?.sourceCollectionId||'',
             paperId:payload.sourcePaperId||payload.question?.sourcePaperId||'',
             releaseId:payload.sourceReleaseId||payload.question?.sourceReleaseId||'',
@@ -236,8 +236,10 @@
         }
       }
       if(!found){
+        // 目录经细粒度 API 异步载入：列表为空时先等一次 rebuild 再取首个 release
+        if(source&&!source.list().length)await source.rebuild?.();
         const first=source?.list?.()?.[0]?.questions?.[0];
-        if(first)found=source.findPublished({releaseId:first.releaseId,paperId:first.paperId,bankId:first.bankId,questionId:first.id});
+        if(first)found=await source.findPublished({releaseId:first.releaseId,paperId:first.paperId,bankId:first.bankId,questionId:first.id});
       }
       if(found?.question){
         const q=cloneValue(found.question);
@@ -303,11 +305,16 @@
   async function loadDatabaseSession(questionId=''){
     let id=String(questionId||requestedQuestionId()).trim();
     if(!id){
-      try{await window.KGQuestionCatalogAdapter?.ready}catch(error){}
-      const candidate=loadQuestion();id=String(candidate?.id||candidate?.sourceQuestionId||'').trim();
+      // P4.5.38：不阻塞等待 catalog（题目数据独立加载，性能优化）
+      window.KGQuestionCatalogAdapter?.ready?.catch(()=>{});
+      const candidate=await loadQuestion();id=String(candidate?.id||candidate?.sourceQuestionId||'').trim();
     }
     if(!id||id==='unavailable')throw new Error('当前没有可用于深度回忆的已发布题目。');
-    recallAdapter=window.KGDeepRecallServerAdapter?.create?.({questionId:id});
+    // 会话与进度保存绑定发布版本（releaseId），服务端按冻结快照鉴权
+    const releaseId=(question&&question.sourceReleaseId)
+      ||(window.KGRecallQuestionSource?.list?.()||[]).flatMap(collection=>collection.questions).find(item=>String(item.id)===String(id))?.releaseId
+      ||'';
+    recallAdapter=window.KGDeepRecallServerAdapter?.create?.({questionId:id,releaseId});
     if(!recallAdapter)throw new Error('深度回忆服务器适配器加载失败。');
     recallAdapter.subscribe(renderSaveState);renderSaveState({saveState:'loading'});
     const session=await recallAdapter.loadSession();
@@ -1353,7 +1360,7 @@
   function closeQuestionDrawer(){const drawer=$('krQuestionDrawer'),backdrop=$('krDrawerBackdrop');if(!drawer)return;drawer.classList.remove('open');drawer.setAttribute('aria-hidden','true');if(backdrop){backdrop.classList.remove('show');setTimeout(()=>backdrop.hidden=true,180)}}
   async function switchQuestion(bankId,questionId){
     await flushProgress();questionSessionToken+=1;cancelProgressSave();
-    const result=window.KGRecallQuestionSource?.activate?.(bankId,questionId);if(!result?.valid){notifyRecallLimit((result?.errors||['题目切换失败。']).join('；'));return false}
+    const result=await window.KGRecallQuestionSource?.activate?.(bankId,questionId);if(!result?.valid){notifyRecallLimit((result?.errors||['题目切换失败。']).join('；'));return false}
     const selected=result.question;questionBrowser.bankId=String(result.collection?.id||result.bank?.id||bankId||selected.sourceCollectionId||'');
     const routeContext=window.KGLearningRouteContext?.normalize?.({paperId:selected.sourcePaperId,releaseId:selected.sourceReleaseId,bankId:selected.sourceBankId,questionId:selected.id,mode:'deep_recall',returnUrl:window.KGLearningRouteContext?.parse?.({mode:'deep_recall'})?.returnUrl||'index.html'})||{};
     window.KGLearningRouteContext?.replace?.(routeContext,{target:'knowledge-recall.html'});
@@ -1565,6 +1572,17 @@
   window.addEventListener('storage',event=>{
     const prefix=window.KGStorageKeys?.PREFIXES?.RECALL_ASSOCIATION||'kg_recall_association_library_v1__';
     if(String(event?.key||'').startsWith(prefix))resetAssociationRuntime();
+  });
+  window.addEventListener('kg-app-storage-change',event=>{
+    const key=String(event?.detail?.key||'');
+    if(key==='kg_exam_papers_published_v1'||key==='kg_exam_paper_release_history_v1'){
+      // 试卷数据更新后，重新渲染题目导航和列表
+      try{updateQuestionNavigator();renderQuestionList()}catch(error){}
+    }
+  });
+  // 发布题目源经细粒度 API 异步重建完成后重渲染（P4.6 第 1 轮）
+  window.addEventListener('kg:recall-source-updated',()=>{
+    try{updateQuestionNavigator();renderQuestionList()}catch(error){}
   });
   window.addEventListener('pagehide',()=>{if(isTeacherDraftPreview())cleanupTeacherDraftPreview();else flushProgress()});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&!isTeacherDraftPreview())flushProgress()});

@@ -146,6 +146,6 @@ class CatalogBootstrapResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     banks: list[CatalogBankPayload]
-    questions: list[CatalogQuestionPayload]
+    questions: list[CatalogQuestionPayload] = Field(default_factory=list)
     catalog_revision: str = Field(alias="catalogRevision", min_length=64, max_length=64)
     content_revision: int = Field(alias="contentRevision", ge=0)

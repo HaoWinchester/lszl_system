@@ -7,7 +7,8 @@ from typing import Annotated, Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi import status
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser, establish_authenticated_session, get_login_session_id
@@ -148,7 +149,12 @@ async def logout(request: Request, db: DB):
         await user_service.log_action(db, "logout", un, un, "退出登录", ip, ua)
         await db.commit()
     request.session.clear()
-    return {"ok": True, "username": un}
+    response = JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"ok": True, "username": un},
+    )
+    response.delete_cookie(key=settings.SESSION_COOKIE_NAME)
+    return response
 
 
 @router.get("/me", response_model=AuthenticatedResponse)

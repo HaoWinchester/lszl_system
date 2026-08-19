@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy import DateTime, Index, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,6 +23,14 @@ ARCHIVED = "archived"
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        Index(
+            "uix_users_wechat_openid",
+            text("(wechat ->> 'openid')"),
+            unique=True,
+            postgresql_where=text("wechat ->> 'openid' IS NOT NULL"),
+        ),
+    )
 
     username: Mapped[str] = mapped_column(String(64), primary_key=True)
     password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
