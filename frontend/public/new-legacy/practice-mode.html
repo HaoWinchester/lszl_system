@@ -99,18 +99,11 @@
             </div>
           </fieldset>
 
-          <fieldset class="practice-choice-group practice-order-group">
+          <fieldset class="practice-choice-group">
             <legend>答题顺序</legend>
-            <div class="practice-order-row">
-              <div class="practice-order-options">
-                <label><input type="radio" name="practiceOrder" value="paper" checked/><span>试卷顺序</span></label>
-                <label><input type="radio" name="practiceOrder" value="random"/><span>随机顺序</span></label>
-              </div>
-              <div class="practice-language-switch" role="group" aria-label="题目显示语言">
-                <button type="button" data-question-language="zh" aria-pressed="true">中</button>
-                <button type="button" data-question-language="en" aria-pressed="false">EN</button>
-                <button type="button" data-question-language="bilingual" aria-pressed="false">双语</button>
-              </div>
+            <div class="practice-order-options">
+              <label><input type="radio" name="practiceOrder" value="paper" checked/><span>试卷顺序</span></label>
+              <label><input type="radio" name="practiceOrder" value="random"/><span>随机顺序</span></label>
             </div>
           </fieldset>
         </section>
@@ -148,7 +141,7 @@
           <div class="practice-language-switch practice-game-language" role="group" aria-label="题目显示语言">
             <button type="button" data-question-language="zh" aria-pressed="true">中</button>
             <button type="button" data-question-language="en" aria-pressed="false">EN</button>
-            <button type="button" data-question-language="bilingual" aria-pressed="false">双语</button>
+            <button type="button" data-question-language="bilingual" aria-pressed="false">双</button>
           </div>
           <div class="practice-scholar-stat practice-timer" id="practiceTimer" hidden><strong>80</strong><span>秒</span></div>
         </header>

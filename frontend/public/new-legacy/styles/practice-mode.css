@@ -229,15 +229,13 @@ body[data-practice-phase="verification"] .practice-question-card{border-color:#a
 
 /* P4.6 双语切换：中 / EN / 双语 三态，作答与判题始终与语言无关。
  * 大厅：位于"答题顺序"右侧，样式与设置卡单选药丸一致；做题页：游戏顶栏右侧一组。 */
-.practice-order-row{display:flex;align-items:center;gap:10px;justify-content:space-between}
-.practice-order-row .practice-order-options{flex:1;min-width:0}
 .practice-language-switch{display:flex;align-items:center;gap:7px;flex:none}
 .practice-language-switch button{height:44px;min-width:52px;padding:0 16px;border:1px solid #dce2eb;border-radius:12px;background:#fff;color:#536075;font-size:13px;font-weight:700;cursor:pointer;transition:.15s ease;box-shadow:none}
 .practice-language-switch button:hover{border-color:#9da8b9}
 .practice-language-switch button.is-active{background:var(--practice-text,#111827);border-color:var(--practice-text,#111827);color:#fff}
 .practice-language-switch button:focus-visible{outline:2px solid #7c3aed;outline-offset:2px}
 .practice-game-language button{height:34px;min-width:44px;padding:0 12px;border-radius:10px;font-size:12px}
-.practice-bilingual-en{display:block;margin-top:4px;color:#667085;font-size:.88em;line-height:1.5;font-weight:560;overflow-wrap:anywhere;word-break:break-word}
-.practice-option span:last-child{min-width:0;overflow-wrap:anywhere;word-break:break-word}
+.practice-bilingual-en{display:block;margin-top:4px;color:#667085;font-size:.88em;line-height:1.5;font-weight:560;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.practice-option span:last-child{min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
 .practice-option .practice-bilingual-en{margin-top:3px}
-@media(max-width:720px){.practice-order-row{flex-direction:column;align-items:stretch}.practice-language-switch{justify-content:stretch}.practice-language-switch button{flex:1}.practice-game-language button{height:30px;min-width:38px;padding:0 8px;font-size:11px}}
+@media(max-width:720px){.practice-game-language button{height:30px;min-width:38px;padding:0 8px;font-size:11px}}
