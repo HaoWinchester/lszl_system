@@ -3,7 +3,15 @@
 按版本号倒序记录每次迭代的更新内容。每次功能合并/发布时同步更新本文件并随发布一起提交。
 （本文件自 v9.0-p4.1.90 起补录；更早历史见 git log。）
 
-## 进行中（feat/runtime-state-to-domain-apis 分支 · 2026-08-19，未发布）
+## 进行中（feat/practice-bilingual-switch 分支 · 2026-08-19，未发布）
+
+- **做题页三态语言切换（中 / EN / 双语）**：
+  - 做题页顶部新增切换控件（practice-header-actions 内），挑战/学霸/复仇三种模式共用即时生效，作答与判题不受影响。
+  - `86-free-mode-language` 增加 `en` 态与 `displayText`/`englishLineText` 工具：en 缺英文时单行回落中文（录入标准保证双语，不做按题降级的复杂设计）；双语态中文为主 + 英文附行（题干/选项/补救解析）。
+  - `86-question-language-ui` 将 `.practice-mode-page` 纳入"免刷新即时重渲染"页面组；practice-mode 注入语言脚本组件，`kg:question-language-mode` 事件触发当前题重渲染。
+  - 浏览器实测：三态切换、双语 5 条英文行、切换后继续答题推进均正常（存量题目快照已含英文翻译）。
+
+## 已并入 feat/runtime-state-to-domain-apis（2026-08-19，未发布）
 
 - **P4.6 第 2 轮 R2-2/R2-3：迁移遗留收口 + 发布大键全量退场**：
   - taxonomy 迁移支持多科目源（按 subjectId 分组，dev 库 5 科目/6 taxonomy/333 节点全部落库）；发布历史键迁移成功（6 条历史版本，superseded 状态正确）。

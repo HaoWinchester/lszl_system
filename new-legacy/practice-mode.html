@@ -24,6 +24,11 @@
         <span><strong>做题模式</strong><small>轻量练习</small></span>
       </a>
       <div class="practice-header-actions">
+        <div class="practice-language-switch" role="group" aria-label="题目显示语言">
+          <button type="button" data-question-language="zh" aria-pressed="true">中</button>
+          <button type="button" data-question-language="en" aria-pressed="false">EN</button>
+          <button type="button" data-question-language="bilingual" aria-pressed="false">双语</button>
+        </div>
         <nav class="practice-mode-switch" aria-label="模式切换" title="切换做题或自由模式">
           <a class="is-active" href="practice-mode.html" aria-current="page">做题</a>
           <a href="index.html">自由</a>
@@ -248,6 +253,9 @@
   <script defer src="src/103-support-center.js"></script>
   <script defer src="src/59c-active-learning-mode-policy.js"></script>
   <script defer src="src/58-paper-access-service.js"></script>
+  <script defer src="src/86-activity-schema-v1.js"></script>
+  <script defer src="src/86-free-mode-language.js"></script>
+  <script defer src="src/86-question-language-ui.js"></script>
   <script defer src="src/59-published-paper-repository.js"></script>
   <script defer src="src/100-practice-mode.js"></script>
 </body>

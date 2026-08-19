@@ -5,7 +5,11 @@
   "changes": {
     "added": [],
     "changed": [
-      "src\\65-question-bank-admin.js"
+      "practice-mode.html",
+      "src\\100-practice-mode.js",
+      "src\\86-free-mode-language.js",
+      "src\\86-question-language-ui.js",
+      "styles\\practice-mode.css"
     ],
     "removed": []
   },

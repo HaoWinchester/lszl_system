@@ -226,3 +226,13 @@ body[data-practice-phase="verification"] .practice-question-card{border-color:#a
   .practice-mode-grid{gap:10px}
   .practice-mode-card{padding:16px}
 }
+
+/* P4.6 双语切换（做题页顶部）：中 / EN / 双语 三态，作答与判题始终与语言无关 */
+.practice-language-switch{display:flex;align-items:center;gap:2px;padding:3px;border:1px solid rgba(100,116,139,.18);border-radius:10px;background:#f3f4f8}
+.practice-language-switch button{height:28px;min-width:0;padding:0 9px;border:0;border-radius:7px;background:transparent;color:#70798b;font-size:10px;font-weight:900;cursor:pointer;box-shadow:none}
+.practice-language-switch button:hover{background:#fff;color:#1f2a44}
+.practice-language-switch button.is-active{background:#fff;color:#1f2a44;box-shadow:0 1px 5px rgba(40,47,70,.09)}
+.practice-language-switch button:focus-visible{outline:2px solid #6366f1;outline-offset:1px}
+.practice-bilingual-en{display:block;margin-top:4px;color:#667085;font-size:.88em;line-height:1.5;font-weight:560}
+.practice-option .practice-bilingual-en{margin-top:3px}
+@media(max-width:720px){.practice-language-switch button{height:26px;padding:0 6px;font-size:9px}}

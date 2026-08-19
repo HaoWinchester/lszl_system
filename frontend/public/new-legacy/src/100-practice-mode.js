@@ -227,7 +227,15 @@
     if(dom.remediationPanel)dom.remediationPanel.hidden=true;
     if(dom.remediationExplanation){dom.remediationExplanation.hidden=true;dom.remediationExplanation.textContent=''}
   }
-  function remediationExplanation(question){return text(question?.raw?.analysis||question?.raw?.explanation||'')}
+  function remediationExplanation(question){
+    const raw=question?.raw||{};
+    const view=questionLanguageView(question);
+    if(view&&view.explanation){
+      const markup=escapeHTML(languageText(view.explanation))+englishLine(view.explanation);
+      return markup||'';
+    }
+    return text(raw.analysis||raw.explanation||'')
+  }
   function showRemediation(question,{verificationFailed=false,recoveredCorrect=false}={}){
     if(!dom.remediationPanel||!question)return;
     const title=text(question?.knowledge?.title||question?.knowledge?.nodeId||'核心知识点');
@@ -239,7 +247,7 @@
         : '这道题在复仇模式中再次答错。先看解析并重新建立判断规则，再做同知识点验证题。';
     const explanation=remediationExplanation(question);
     if(dom.remediationReviewBtn)dom.remediationReviewBtn.hidden=!explanation;
-    if(dom.remediationExplanation)dom.remediationExplanation.textContent=explanation;
+    if(dom.remediationExplanation&&explanation)dom.remediationExplanation.innerHTML=explanation;
     if(dom.remediationContinueBtn)dom.remediationContinueBtn.textContent='开始验证';
     state.remediationPending=true;dom.remediationPanel.hidden=false;
   }
@@ -333,12 +341,41 @@
   function showStreakPop(message){
     dom.streakPop.textContent=message;dom.streakPop.hidden=false;global.clearTimeout(state.popTimer);state.popTimer=0;
   }
+  function languageMode(){
+    try{return global.KGActivitySchemaV1?.getLanguageMode?.()||'zh'}catch(error){return 'zh'}
+  }
+  function languageText(display){
+    // 三态取文案：en 缺英文回落中文（录入标准保证双语，不做更复杂降级）
+    const lang=languageMode();
+    const helpers=global.KGFreeModeLanguage;
+    if(helpers?.displayText)return helpers.displayText(display,lang);
+    return String(display?.zh||'');
+  }
+  function englishLine(display){
+    if(languageMode()!=='bilingual')return '';
+    const helpers=global.KGFreeModeLanguage;
+    const text=helpers?.englishLineText?helpers.englishLineText(display):(display?.hasEnglish?String(display.en||''):'');
+    return text?'<span class="practice-bilingual-en">'+escapeHTML(text)+'</span>':'';
+  }
+  function questionLanguageView(question){
+    const helpers=global.KGFreeModeLanguage;
+    return helpers?.questionView?.(question.raw||question,languageMode())||null;
+  }
   function renderQuestion(){
     const question=state.verification?.active?state.verification.question:state.questions[state.index];
     if(!question){finishPractice();return}
     state.locked=false;dom.feedback.hidden=true;hideRemediation();dom.questionCard.classList.remove('is-timeout');
-    dom.questionStem.textContent=question.stem;
-    dom.options.innerHTML=question.options.map(option=>'<button type="button" class="practice-option" data-option-id="'+escapeHTML(option.id)+'"><span class="practice-option-key">'+escapeHTML(option.id)+'</span><span>'+escapeHTML(option.text)+'</span></button>').join('');
+    const view=questionLanguageView(question);
+    if(view){
+      dom.questionStem.innerHTML=escapeHTML(languageText(view.stem))+englishLine(view.stem);
+      dom.options.innerHTML=question.options.map(option=>{
+        const display=view.options.find(item=>item.id===option.id)?.display||{zh:option.text,en:''};
+        return '<button type="button" class="practice-option" data-option-id="'+escapeHTML(option.id)+'"><span class="practice-option-key">'+escapeHTML(option.id)+'</span><span>'+escapeHTML(languageText(display))+englishLine(display)+'</span></button>';
+      }).join('');
+    }else{
+      dom.questionStem.textContent=question.stem;
+      dom.options.innerHTML=question.options.map(option=>'<button type="button" class="practice-option" data-option-id="'+escapeHTML(option.id)+'"><span class="practice-option-key">'+escapeHTML(option.id)+'</span><span>'+escapeHTML(option.text)+'</span></button>').join('');
+    }
     dom.options.querySelectorAll('[data-option-id]').forEach(button=>button.addEventListener('click',()=>answer(button.dataset.optionId,button)));
     renderProgress();renderHealth();renderVerificationBanner();
     if(state.mode==='scholar')renderTimer();
@@ -596,6 +633,8 @@
     global.addEventListener('kg-subscription-change',()=>{if(!state.active)syncLobby()});
     global.addEventListener('kg-subscription-plan-change',()=>{if(!state.active)syncLobby()});
     global.addEventListener('kg:published-papers-changed',()=>{if(!state.active)syncLobby()});
+    // 三态语言切换即时重渲染当前题（作答与判题不受影响）
+    global.addEventListener('kg:question-language-mode',()=>{if(state.active)try{renderQuestion()}catch(error){}});
     global.addEventListener('kg-practice-mistakes-change',()=>{if(!state.active)syncLobby()});
   }
   function cacheDom(){
