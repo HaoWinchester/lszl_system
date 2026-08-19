@@ -1,5 +1,6 @@
 """HTML response helpers for the direct upstream runtime."""
 
+import json
 from pathlib import Path
 
 from fastapi.responses import HTMLResponse
@@ -31,6 +32,20 @@ html.kg-practice-guest-first-paint .practice-setup-card,
 html.kg-practice-guest-first-paint .practice-mode-grid{display:none!important}
 html.kg-practice-guest-first-paint #practiceEmpty{display:block!important}
 </style>"""
+    # 只内联轻量会话元数据；storage 体积大（含发布试卷 MB 级键），
+    # 一律走运行时状态 bootstrap 接口由前端水合。
+    # content-prep 页面例外：登录态走缓存 + /me 接口水合，不内联注入。
+    if payload.get("page") != "content-prep.html":
+        encoded = (
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+            .replace("<", "\\u003c")
+            .replace(" ", "\\u2028")
+            .replace(" ", "\\u2029")
+        )
+        direct += (
+            f"\n<script>window.__KG_DIRECT_BOOTSTRAP__={encoded};</script>"
+            "<!-- kg-direct-bootstrap -->"
+        )
     markers = (
         '<script src="./server-state-bootstrap.js"></script>',
         '<script src="/server-state-bootstrap.js"></script>',
