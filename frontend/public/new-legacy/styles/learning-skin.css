@@ -74,9 +74,20 @@ body.practice-mode-page[data-learning-skin="focus-vega"] .practice-field select{
   font-weight:var(--ui-weight-regular);
 }
 body.practice-mode-page[data-learning-skin="focus-vega"] .practice-choice-group label>span,
-body.practice-mode-page[data-learning-skin="focus-vega"] .practice-mode-switch a{
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-mode-switch a,
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-language-switch button{
   font-size:var(--ui-text-control);
   font-weight:var(--ui-weight-semibold);
+}
+/* P4.6 三态语言切换与设置卡药丸同款视觉（含选中态）。
+ * 皮肤通用控件规则带 :not(#authModal *) 的 ID 级优先级，这里定点压制圆角。 */
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-language-switch button{
+  border-radius:12px!important;
+}
+body.practice-mode-page[data-learning-skin="focus-vega"] .practice-language-switch button.is-active{
+  background:var(--learn-primary);
+  border-color:var(--learn-primary);
+  color:var(--learn-primary-foreground);
 }
 body.practice-mode-page[data-learning-skin="focus-vega"] .practice-mode-card h2{
   font-size:var(--ui-text-card-title);

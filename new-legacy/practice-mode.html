@@ -24,11 +24,6 @@
         <span><strong>做题模式</strong><small>轻量练习</small></span>
       </a>
       <div class="practice-header-actions">
-        <div class="practice-language-switch" role="group" aria-label="题目显示语言">
-          <button type="button" data-question-language="zh" aria-pressed="true">中</button>
-          <button type="button" data-question-language="en" aria-pressed="false">EN</button>
-          <button type="button" data-question-language="bilingual" aria-pressed="false">双语</button>
-        </div>
         <nav class="practice-mode-switch" aria-label="模式切换" title="切换做题或自由模式">
           <a class="is-active" href="practice-mode.html" aria-current="page">做题</a>
           <a href="index.html">自由</a>
@@ -98,11 +93,18 @@
             </div>
           </fieldset>
 
-          <fieldset class="practice-choice-group">
+          <fieldset class="practice-choice-group practice-order-group">
             <legend>答题顺序</legend>
-            <div class="practice-order-options">
-              <label><input type="radio" name="practiceOrder" value="paper" checked/><span>试卷顺序</span></label>
-              <label><input type="radio" name="practiceOrder" value="random"/><span>随机顺序</span></label>
+            <div class="practice-order-row">
+              <div class="practice-order-options">
+                <label><input type="radio" name="practiceOrder" value="paper" checked/><span>试卷顺序</span></label>
+                <label><input type="radio" name="practiceOrder" value="random"/><span>随机顺序</span></label>
+              </div>
+              <div class="practice-language-switch" role="group" aria-label="题目显示语言">
+                <button type="button" data-question-language="zh" aria-pressed="true">中</button>
+                <button type="button" data-question-language="en" aria-pressed="false">EN</button>
+                <button type="button" data-question-language="bilingual" aria-pressed="false">双语</button>
+              </div>
             </div>
           </fieldset>
         </section>
@@ -137,6 +139,11 @@
           <button type="button" class="practice-exit-btn" id="practiceExitBtn" aria-label="退出本次练习" title="退出"><span data-kg-icon="x" data-kg-icon-size="18" aria-hidden="true"></span></button>
           <div class="practice-progress-shell" id="practiceProgressShell" role="progressbar" aria-label="做题进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="practiceProgressBar"></span></div>
           <div class="practice-health" id="practiceHealth" aria-label="剩余血量"></div>
+          <div class="practice-language-switch practice-game-language" role="group" aria-label="题目显示语言">
+            <button type="button" data-question-language="zh" aria-pressed="true">中</button>
+            <button type="button" data-question-language="en" aria-pressed="false">EN</button>
+            <button type="button" data-question-language="bilingual" aria-pressed="false">双语</button>
+          </div>
           <div class="practice-scholar-stat practice-timer" id="practiceTimer" hidden><strong>80</strong><span>秒</span></div>
         </header>
         <div class="practice-time-row" id="practiceTimeRow" hidden aria-hidden="true">

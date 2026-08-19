@@ -6,10 +6,12 @@
 ## 进行中（feat/practice-bilingual-switch 分支 · 2026-08-19，未发布）
 
 - **做题页三态语言切换（中 / EN / 双语）**：
-  - 做题页顶部新增切换控件（practice-header-actions 内），挑战/学霸/复仇三种模式共用即时生效，作答与判题不受影响。
+  - 切换控件两处布局：大厅置于"答题顺序"设置组右侧（与单选药丸同款视觉：44px 高、12px 圆角、同字重，选中态同色）；做题界面置于游戏顶栏右侧（退出/进度/血量之后），两组按钮状态自动同步，切换即时重渲染当前题。
   - `86-free-mode-language` 增加 `en` 态与 `displayText`/`englishLineText` 工具：en 缺英文时单行回落中文（录入标准保证双语，不做按题降级的复杂设计）；双语态中文为主 + 英文附行（题干/选项/补救解析）。
-  - `86-question-language-ui` 将 `.practice-mode-page` 纳入"免刷新即时重渲染"页面组；practice-mode 注入语言脚本组件，`kg:question-language-mode` 事件触发当前题重渲染。
-  - 浏览器实测：三态切换、双语 5 条英文行、切换后继续答题推进均正常（存量题目快照已含英文翻译）。
+  - 修复双语态英文溢出选项按钮边界：选项文案容器与英文行加 `overflow-wrap:anywhere`，浏览器实测 0 越界。
+  - 皮肤层（learning-skin focus-vega）补语言切换按钮同款规则；通用控件规则带 ID 级优先级，圆角定点 `!important` 压制。
+  - `86-question-language-ui` 将 `.practice-mode-page` 纳入"免刷新即时重渲染"页面组；`kg:question-language-mode` 事件触发当前题重渲染。
+  - 浏览器实测：三态切换、双语英文行均在按钮内、两组控件同步、切换后答题推进正常（存量题目快照已含英文翻译）。
 
 ## 已并入 feat/runtime-state-to-domain-apis（2026-08-19，未发布）
 
