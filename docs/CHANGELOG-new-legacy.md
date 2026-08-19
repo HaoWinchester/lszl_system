@@ -5,6 +5,11 @@
 
 ## 进行中（feat/runtime-state-to-domain-apis 分支 · 2026-08-19，未发布）
 
+- **P4.6 第 2 轮 R2-1：教师发布/撤回切换 paper-releases API**（打通"教师发布 → 学员立即可见"闭环）：
+  - 后端新增 `POST /paper-releases/publish-payload`（按载荷发布：复用迁移同款归一化校验，发布者以登录账号为准，先 supersede 同试卷旧 active 再插入，避开"每试卷仅一个 active"部分唯一索引）与 `POST /paper-releases/papers/{id}/withdraw-all`（按试卷下架全部 active 版本）。
+  - 65-question-bank-admin 的 `publishPaperRelease`/`withdrawPaperRelease` 改为 API 权威 + 旧 runtime 目录尽力双写（供未切换的管理视图过渡）；发布/撤回成功后广播 `kg:paper-release-published`，paper-release-adapter 收到后自动重载学员目录。5 处调用点（发布/取消发布/归档/删除/批量归档）异步化，失败给出明确 toast 且不再落旧目录。
+  - 测试：后端 `test_paper_release_publish_payload.py` 4 项（发布/重复 409/缺快照 422/新旧版本 supersede/撤回后学员不可见）；浏览器端到端验证发布→学员目录可见→撤回全通。
+
 - **P4.6 第 1 轮性能优化：练题链路发布试卷切换到细粒度 API**（解决线上整包拉取 7.65MB `kg_exam_papers_published_v1` 导致的卡顿）：
   - 新增 `paper-release-adapter.js`（注入 practice-mode/question-workspace/knowledge-recall/index 四页，先于 59-repository）：轻量目录 `GET /paper-releases/catalog` 分页预取（KB 级），题目按 release `GET /paper-releases/{id}/questions` 分页取冻结快照（服务端单响应 1MB 上限）；载入完成沿用 `kg:published-papers-changed`/`kg-app-storage-change` 旧失效协议广播，页面既有监听器直接复用；401 派发 `kg:auth-required`。
   - `59-published-paper-repository.js` 重写为 v3：目录接口同步读 adapter 缓存，`resolvePublishedPaper`/`listPublishedPapers`/`findQuestion`/`listCollections` 改异步按 release 解析；新增同步 `peekResolved`/`findQuestionCached`/`prefetchMissing` 供深度同步的旧消费者（60-question-bank）过渡使用；不再读取 runtime localStorage 键。

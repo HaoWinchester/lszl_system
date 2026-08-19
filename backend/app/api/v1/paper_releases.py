@@ -52,6 +52,20 @@ async def withdraw_release(
     return {"release": paper_release_service.release_to_dict(release)}
 
 
+@router.post("/publish-payload")
+async def publish_from_payload(body: dict, db: DB, user: Publisher):
+    """教师发布入口（P4.6 第 2 轮）：接受前端构建的完整发布载荷（含冻结快照）。"""
+    release = await paper_release_service.publish_from_payload(db, user, body)
+    return {"release": paper_release_service.release_to_dict(release)}
+
+
+@router.post("/papers/{paper_id}/withdraw-all")
+async def withdraw_paper_releases(paper_id: str, db: DB, user: Publisher):
+    """教师撤回入口：下架该试卷全部 active 发布版本。"""
+    withdrawn = await paper_release_service.withdraw_paper(db, user, paper_id)
+    return {"withdrawn": withdrawn}
+
+
 @router.get("/papers/{paper_id}/history")
 async def release_history(
     paper_id: str,

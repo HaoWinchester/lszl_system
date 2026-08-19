@@ -378,3 +378,78 @@ async def questions(
         "nextOffset": offset + len(question_payloads),
         "questions": question_payloads,
     }
+
+
+async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> PaperRelease:
+    """教师发布入口：接受前端构建的完整发布载荷（题目引用 + 冻结快照）。
+
+    与迁移共用同一套归一化校验；发布者以当前登录账号为准，
+    同试卷旧的 active 版本自动 superseded。
+    """
+    from app.services import runtime_domain_migration_service
+
+    if actor.role not in {"admin", "teacher"}:
+        raise _error(403, "PUBLISH_FORBIDDEN", "仅教师或管理员可以发布试卷")
+    try:
+        canonical = runtime_domain_migration_service.normalize_release_payload(payload)
+    except ValueError as exc:
+        raise _error(422, "RELEASE_PAYLOAD_INVALID", str(exc)) from exc
+
+    release_id = canonical["releaseId"]
+    if await db.get(PaperRelease, release_id) is not None:
+        raise _error(409, "RELEASE_EXISTS", "该发布版本已存在，请刷新后重试")
+
+    # 先 supersede 同试卷旧 active 版本，避免触发"每试卷仅一个 active"部分唯一索引
+    await db.execute(
+        update(PaperRelease)
+        .where(
+            PaperRelease.paper_id == canonical["paperId"],
+            PaperRelease.status == ACTIVE_STATUS,
+            PaperRelease.id != release_id,
+        )
+        .values(status="superseded")
+    )
+    release = PaperRelease(
+        id=release_id,
+        paper_id=canonical["paperId"],
+        version=canonical["version"],
+        status=ACTIVE_STATUS,
+        name=canonical["name"],
+        subject=canonical["subject"],
+        description=canonical["description"],
+        publisher_id=actor.username,
+        access_level=canonical["accessLevel"],
+        enabled_modes=canonical["enabledModes"],
+        allowed_roles=canonical["allowedRoles"],
+        release_metadata=canonical["metadata"],
+        source_payload=dict(payload),
+        question_count=len(canonical["questions"]),
+        published_at=now_utc(),
+    )
+    db.add(release)
+    await db.flush()
+    for question in canonical["questions"]:
+        db.add(PaperReleaseQuestion(
+            release_id=release_id,
+            order_index=question["order"] - 1,
+            bank_id=question["bankId"],
+            question_id=question["questionId"],
+            snapshot=question["question"],
+        ))
+    await db.commit()
+    await db.refresh(release)
+    return release
+
+
+async def withdraw_paper(db: AsyncSession, actor: User, paper_id: str) -> int:
+    """教师撤回入口：下架该试卷全部 active 发布版本。"""
+    if actor.role not in {"admin", "teacher"}:
+        raise _error(403, "WITHDRAW_FORBIDDEN", "仅教师或管理员可以撤回试卷")
+    result = await db.execute(
+        update(PaperRelease)
+        .where(PaperRelease.paper_id == paper_id, PaperRelease.status == ACTIVE_STATUS)
+        .values(status="withdrawn", withdrawn_at=now_utc(), withdrawn_by=actor.username)
+    )
+    withdrawn = int(result.rowcount or 0)
+    await db.commit()
+    return withdrawn

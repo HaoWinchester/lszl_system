@@ -223,6 +223,11 @@ def _normalize_release_source(payload: Any, source_key: str) -> list[dict[str, A
             for raw in payload]
 
 
+def normalize_release_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """校验并归一化单个发布载荷（教师发布入口复用迁移同款规则）。"""
+    return _release_canonical(payload, "", set())
+
+
 def _domain_verification_payload(payload: Any, source_key: str) -> list[dict[str, Any]]:
     return _normalize_release_source(payload, source_key)
 
