@@ -12,7 +12,9 @@
   --practice-shadow:0 18px 50px rgba(31,41,55,.08);
 }
 *{box-sizing:border-box}
-html,body{min-height:100%;margin:0}
+/* main.css 全局 html,body{height:100%;overflow:hidden} 会锁死本页滚动：
+   大厅选完试卷/题量后下方"开始"按钮被截断、做题时解析面板展示不全，这里必须显式恢复滚动。 */
+html,body{height:auto;min-height:100%;margin:0;overflow:visible}
 body.practice-mode-page{background:var(--practice-bg);color:var(--practice-text);font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif}
 button,select,input{font:inherit}
 button{cursor:pointer}
