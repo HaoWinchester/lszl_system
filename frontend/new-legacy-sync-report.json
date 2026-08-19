@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.102",
-  "toVersion": "v9.0-p4.1.102",
+  "fromVersion": "v9.0-p4.1.123",
+  "toVersion": "v9.0-p4.1.124",
   "changes": {
     "added": [],
     "changed": [
-      "src/33-user-center.js"
+      "VERSION"
     ],
     "removed": []
   },
