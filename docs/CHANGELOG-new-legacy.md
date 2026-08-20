@@ -5,6 +5,9 @@
 
 ## 进行中（feat/practice-bilingual-switch 分支 · 2026-08-19，未发布）
 
+- **Task 4 收尾验证轮（2026-08-20，runtime state 迁移分支联测）**：`feat/runtime-state-to-domain-apis` 的收口验证在本机完成——后端全量 pytest 通过；前端脚本测试 177/179（2 项失败为 Windows 环境性：`.sh` 无法直接 exec、缺 `updata-legacy/` 源目录，CI 环境可通过）；浏览器遍历 9 页（index/learning-path/question-training/question-workspace/question-bank/knowledge-recall/practice-mode/user-management/system-settings）登录/退出/runtime state 读写全过、0 页面错误、遍历期间 revision 1045→1054 递增证实各页真实落库。修复与测试对齐已随 057d044 入库（admin `refreshed()` 分页覆盖新建用户回归、practice `answer(input)` 签名、深度回忆防抖 420→1200、选项闪烁改 P4.5.37 flashKrOption/qw-* 单一来源断言）。**剩余**：migration 账本 unknown 项处置决策；两个功能分支（runtime-state、practice-bilingual-switch）分别走「用户确认 → 合入 main → 发布 → 删分支」。
+
+
 - **帮助中心/做题大厅收口**：
   - 帮助中心删除"后台：试卷管理/训练配置/科目级联想库"三个模块说明及其他页面的后台引用（学员不可见后台信息）；做题模式帮助更新为 V2 规则（挑战动态生命 30% 容错、学霸 60 秒回血、复仇、语言切换、经验值、学习周），新增"练习模式（按卷复习）"专节说明其学习记录入口。
   - 大厅移除练习模式卡片（入口仅保留学习记录点击）；模式卡片回到挑战/学霸/复仇三张。
