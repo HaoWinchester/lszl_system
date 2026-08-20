@@ -231,15 +231,12 @@ body[data-practice-phase="verification"] .practice-question-card{border-color:#a
 html:has(body.practice-mode-page){height:auto;overflow-y:auto;scroll-behavior:smooth}
 body.practice-mode-page{height:auto;overflow-y:auto}
 body.practice-mode-page.is-practice-drawer-open{overflow:hidden}
-/* 语言滑轨：题目区域右侧竖排三段，无文字，悬浮提示 */
+/* 语言切换按钮：题目区域右侧单个细长按钮，点击循环 中→EN→双 */
 .practice-question-wrap{position:relative}
-.practice-language-rail{position:absolute;top:50%;right:-56px;transform:translateY(-50%);display:flex;flex-direction:column;gap:3px;padding:5px 4px;border:1px solid #dfe4ec;border-radius:999px;background:#fff;box-shadow:0 8px 22px rgba(15,23,42,.08);z-index:3}
-.practice-language-rail button{width:30px;height:30px;border:0;border-radius:999px;background:transparent;cursor:pointer;padding:0;box-shadow:none}
-.practice-language-rail button::before{content:'';display:block;width:13px;height:4px;border-radius:999px;background:#c3cad6;transition:background .15s ease}
-.practice-language-rail button:hover::before{background:#8b95a6}
-.practice-language-rail button.is-active{background:var(--practice-text,#172033)}
-.practice-language-rail button.is-active::before{background:#fff}
-.practice-language-rail button:focus-visible{outline:2px solid #7c3aed;outline-offset:2px}
+.practice-language-rail{position:absolute;top:50%;right:-56px;transform:translateY(-50%);width:34px;height:64px;border:1px solid #dfe4ec;border-radius:999px;background:#fff;color:#475569;font-size:12px;font-weight:850;cursor:pointer;box-shadow:0 8px 22px rgba(15,23,42,.08);z-index:3;padding:0;letter-spacing:.02em}
+.practice-language-rail:hover{border-color:#9aa5b5;color:#1f2a44}
+.practice-language-rail:active{transform:translateY(-50%) scale(.96)}
+.practice-language-rail:focus-visible{outline:2px solid #7c3aed;outline-offset:2px}
 /* 复仇模式切题导航（底部） */
 .practice-question-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:22px;padding-top:16px;border-top:1px solid #eef1f5}
 .practice-nav-btn{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 16px;border:1px solid #d7dde6;border-radius:11px;background:#fff;color:#475569;font-size:13px;font-weight:720;transition:.15s ease}
@@ -249,5 +246,5 @@ body.practice-mode-page.is-practice-drawer-open{overflow:hidden}
 .practice-bilingual-en{display:block;margin-top:4px;color:#667085;font-size:.88em;line-height:1.5;font-weight:560;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
 .practice-option span:last-child{min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
 .practice-option .practice-bilingual-en{margin-top:3px}
-@media(max-width:1240px){.practice-language-rail{right:12px;top:14px;transform:none;flex-direction:row}.practice-question-card{padding-right:66px}}
-@media(max-width:720px){.practice-language-rail{right:8px;top:10px;padding:4px 5px}.practice-language-rail button{width:26px;height:26px}.practice-question-card{padding-right:58px}.practice-nav-btn{height:34px;padding:0 12px;font-size:12px}}
+@media(max-width:1240px){.practice-language-rail{right:12px;top:14px;transform:none;height:34px;width:44px}.practice-language-rail:active{transform:scale(.96)}.practice-question-card{padding-right:66px}}
+@media(max-width:720px){.practice-language-rail{right:8px;top:10px;height:30px;width:40px;font-size:11px}.practice-question-card{padding-right:58px}.practice-nav-btn{height:34px;padding:0 12px;font-size:12px}}

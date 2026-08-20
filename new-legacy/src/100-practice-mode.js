@@ -653,6 +653,25 @@
     // 复仇模式：底部按钮 + 触屏左右滑动切题
     dom.prevBtn?.addEventListener('click',()=>switchQuestion(-1));
     dom.nextBtn?.addEventListener('click',()=>switchQuestion(1));
+    // 语言单按钮循环切换：中 → EN → 双 → 中
+    const languageCycle=$('practiceLanguageCycle');
+    const LANGUAGE_CYCLE=['zh','en','bilingual'];
+    const LANGUAGE_LABELS={zh:'中',en:'EN',bilingual:'双'};
+    const LANGUAGE_NAMES={zh:'中文',en:'English',bilingual:'双语对照'};
+    const syncLanguageCycle=()=>{
+      if(!languageCycle)return;
+      const current=languageMode();
+      languageCycle.textContent=LANGUAGE_LABELS[current]||'中';
+      const next=LANGUAGE_CYCLE[(LANGUAGE_CYCLE.indexOf(current)+1)%LANGUAGE_CYCLE.length];
+      languageCycle.title='题目显示语言：'+LANGUAGE_NAMES[current]+'（点击切换为'+LANGUAGE_NAMES[next]+'）';
+      languageCycle.setAttribute('aria-label','当前'+LANGUAGE_NAMES[current]+'，点击切换为'+LANGUAGE_NAMES[next]);
+    };
+    if(languageCycle)languageCycle.addEventListener('click',()=>{
+      const next=LANGUAGE_CYCLE[(LANGUAGE_CYCLE.indexOf(languageMode())+1)%LANGUAGE_CYCLE.length];
+      global.KGActivitySchemaV1?.setLanguageMode?.(next);
+    });
+    global.addEventListener('kg:question-language-mode',syncLanguageCycle);
+    syncLanguageCycle();
     if(dom.questionCard){
       let swipeStartX=0,swipeStartY=0;
       dom.questionCard.addEventListener('touchstart',event=>{const t=event.touches[0];swipeStartX=t.clientX;swipeStartY=t.clientY},{passive:true});

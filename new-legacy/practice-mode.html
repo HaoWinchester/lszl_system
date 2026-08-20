@@ -155,11 +155,7 @@
               <button type="button" class="practice-nav-btn" id="practiceNextBtn" aria-label="下一题">下一题<span data-kg-icon="chevron-right" data-kg-icon-size="16" aria-hidden="true"></span></button>
             </div>
           </article>
-          <div class="practice-language-rail" role="group" aria-label="题目显示语言" aria-description="中 / 英 / 双语三段切换">
-            <button type="button" data-question-language="zh" title="中文" aria-label="中文" aria-pressed="true"></button>
-            <button type="button" data-question-language="en" title="English" aria-label="英文" aria-pressed="false"></button>
-            <button type="button" data-question-language="bilingual" title="双语对照" aria-label="双语对照" aria-pressed="false"></button>
-          </div>
+          <button type="button" class="practice-language-rail" id="practiceLanguageCycle" title="题目显示语言：中文（点击切换）" aria-label="切换题目显示语言" aria-live="polite">中</button>
         </div>
         <aside class="practice-remediation-panel" id="practiceRemediationPanel" hidden aria-live="assertive">
           <span>NEEDS REMEDIATION</span>
