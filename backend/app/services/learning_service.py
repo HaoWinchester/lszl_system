@@ -926,7 +926,7 @@ def _practice_session_payload(data: dict) -> dict:
     """Accept only the small, display-ready summary used by the history drawer."""
 
     mode = str(data.get("mode") or "").strip()
-    if mode not in {"challenge", "scholar", "revenge"}:
+    if mode not in {"challenge", "scholar", "revenge", "practice"}:
         raise ValueError("练习模式无效")
     status = str(data.get("status") or "completed").strip()
     if status not in {"completed", "abandoned"}:

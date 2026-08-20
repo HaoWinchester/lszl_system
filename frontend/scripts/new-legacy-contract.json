@@ -138,8 +138,8 @@
       "kg_learning_entry_chooser_consumed_v1",
       "kg_learning_tasks_v1",
       "kg_paper_workspace_layout_v1",
-    "kg_question_classification_collapsed_v1",
-    "kg_question_library_workspace_layout_v1",
+      "kg_question_classification_collapsed_v1",
+      "kg_question_library_workspace_layout_v1",
       "kg_taxonomy_deletion_records_v1",
       "kg_taxonomy_import_records_v1",
       "kg_taxonomy_release_records_v1",
@@ -159,7 +159,8 @@
       "question_studio_backups_v020",
       "question_studio_backups_v021",
       "question_studio_recent_knowledge_v1",
-      "question_studio_favorite_knowledge_v1"
+      "question_studio_favorite_knowledge_v1",
+      "kg_practice_auto_explanation_v1"
     ],
     "prefixes": [
       "kg_graph_file_content_v2__",
@@ -167,7 +168,7 @@
       "kg_guided_learning_progress_v2__",
       "kg_guided_path_scroll_v2__",
       "kg_question_bank_demo_suppressed_v1__",
-    "kg_question_current_v1__",
+      "kg_question_current_v1__",
       "kg_exam_papers_v1__",
       "kg_exam_current_v1__",
       "kg_learning_sessions_v2__",
@@ -202,18 +203,18 @@
       "kg_user_feedback_reply_reads_v1__",
       "kg_user_message_reads_v1__"
     ],
-  "legacyReadOnlyKeys": {
-    "exactKeys": [
-      "kg_question_banks_published_v1",
-      "kg_principle_repository_v1",
-      "kg_synthesis_preset_repository_v1",
-      "kg_question_tag_names_v1"
-    ],
-    "prefixes": [
-      "kg_question_banks_v1__"
-    ]
-  },
-  "ignoredLiterals": [
+    "legacyReadOnlyKeys": {
+      "exactKeys": [
+        "kg_question_banks_published_v1",
+        "kg_principle_repository_v1",
+        "kg_synthesis_preset_repository_v1",
+        "kg_question_tag_names_v1"
+      ],
+      "prefixes": [
+        "kg_question_banks_v1__"
+      ]
+    },
+    "ignoredLiterals": [
       "kg_graph_",
       "kg_local_",
       "kg_remote_auth_session_v1",

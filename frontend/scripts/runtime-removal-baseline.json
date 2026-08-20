@@ -2541,6 +2541,11 @@
     },
     {
       "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_practice_auto_explanation_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_practice_history_v1__",
       "ordinal": 1
     },
@@ -3678,6 +3683,16 @@
       "path": "new-legacy/src/78-multi-question-workspace-tabs.js",
       "token": "kg_multi_workspace_closed_tabs_v1__",
       "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/86-activity-schema-v1.js",
+      "token": "kg_practice_auto_explanation_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/86-activity-schema-v1.js",
+      "token": "kg_practice_auto_explanation_v1",
+      "ordinal": 2
     },
     {
       "path": "new-legacy/src/86-activity-schema-v1.js",

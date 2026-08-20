@@ -57,7 +57,6 @@
             <svg id="practiceExpChart" viewBox="0 0 236 84" preserveAspectRatio="none" role="img"></svg>
             <div class="practice-exp-chart-x" id="practiceExpChartX"></div>
           </div>
-          <p class="practice-exp-note">学习周：周日 19:00 — 下周日 19:00</p>
         </div>
       </aside>
       <button type="button" class="practice-exp-fab" id="practiceExpFab" hidden aria-expanded="false" aria-controls="practiceExpPanel" aria-label="展开做题经验面板">XP</button>
@@ -123,6 +122,11 @@
             <div><small>CHALLENGE</small><h2>挑战模式</h2><p>初始生命随题量动态计算（约 30% 容错）。答错扣血，血尽判负但仍可完成全卷。</p></div>
             <button type="button" class="practice-start-btn" data-practice-start="challenge">开始挑战</button>
           </article>
+          <article class="practice-mode-card practice">
+            <span class="practice-mode-icon" data-kg-icon="book-open" data-kg-icon-size="20" aria-hidden="true"></span>
+            <div><small>PRACTICE</small><h2>练习模式</h2><p>无计时与血量压力，答题后即时反馈答案与解析，可自由切换题目复习。</p></div>
+            <button type="button" class="practice-start-btn" data-practice-start="practice">进入练习</button>
+          </article>
           <article class="practice-mode-card scholar">
             <span class="practice-mode-icon" data-kg-icon="zap" data-kg-icon-size="20" aria-hidden="true"></span>
             <div><small>SCHOLAR</small><h2>学霸模式</h2><p>共享 60 秒时间池。答对 +20 秒并连对 5 题回血，答错扣时间扣血，血尽即败。</p></div>
@@ -165,8 +169,14 @@
         <article class="practice-question-card" id="practiceQuestionCard">
           <div class="practice-question-stem" id="practiceQuestionStem"></div>
           <div class="practice-options" id="practiceOptions"></div>
+          <div class="practice-explanation" id="practiceExplanationPanel" hidden aria-live="polite">
+            <div class="practice-explanation-head" id="practiceExplanationHead">答案与解析</div>
+            <div class="practice-explanation-body" id="practiceExplanationBody"></div>
+            <div class="practice-explanation-actions" id="practiceExplanationActions"></div>
+          </div>
           <div class="practice-question-nav" id="practiceQuestionNav" hidden>
             <button type="button" class="practice-nav-btn" id="practicePrevBtn" aria-label="上一题"><span data-kg-icon="chevron-left" data-kg-icon-size="16" aria-hidden="true"></span>上一题</button>
+            <label class="practice-explanation-toggle" title="答题后自动显示解析"><input type="checkbox" id="practiceAutoExplain" checked/><span>自动解析</span></label>
             <span class="practice-question-pos" id="practiceQuestionPos">1 / 10</span>
             <button type="button" class="practice-nav-btn" id="practiceNextBtn" aria-label="下一题">下一题<span data-kg-icon="chevron-right" data-kg-icon-size="16" aria-hidden="true"></span></button>
           </div>

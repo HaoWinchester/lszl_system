@@ -19,7 +19,7 @@
     health:MAX_HEALTH,streak:0,experience:0,correct:0,answered:0,startedAt:0,endedAt:0,
     locked:false,active:false,completed:false,lastSettings:null,timerId:0,deadline:0,
     feedbackTimer:0,popTimer:0,toastTimer:0,abandonedRecorded:false,catalogAvailable:false,retiredNavigation:null,retiredNoticeShown:false,
-    remediationPending:false,verification:null
+    remediationPending:false,verification:null,practiceAnswers:{}
   };
 
   function clone(value){try{return JSON.parse(JSON.stringify(value))}catch(error){return value}}
@@ -326,7 +326,17 @@
       refreshExperiencePanel();
     }).catch(()=>{});
   }
-  function historyModeLabel(mode){return ({challenge:'挑战模式',scholar:'学霸模式',revenge:'复仇模式'})[text(mode)]||'练习'}
+  function historyModeLabel(mode){return ({challenge:'挑战模式',scholar:'学霸模式',revenge:'复仇模式',practice:'练习模式'})[text(mode)]||'练习'}
+  function row_paperId(rawId){return text(rawId).replace('__','')}
+  function startPaperFromHistory(paperId){
+    // 点击学习记录直接进入该试卷练习模式（试卷仍需在发布目录中）
+    loadReleases();
+    const release=state.releases.find(row=>row.id===paperId||row.paperId===paperId);
+    if(!release){showToast('该试卷已不在当前发布目录，无法继续练习。');return}
+    state.selectedPaperId=release.id;
+    closeHistoryDrawer();
+    startPractice('practice');
+  }
   function formatHistoryTime(value){
     const date=new Date(value);if(Number.isNaN(date.getTime()))return '刚刚';
     return date.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
@@ -339,14 +349,30 @@
     }
     try{
       const records=await api.listSessions();
-      if(dom.historyList)dom.historyList.innerHTML=records.map(record=>{
-        const answered=Math.max(0,Number(record?.answered)||0),correct=Math.max(0,Number(record?.correct)||0),rate=answered?Math.round(correct/answered*100):0;
-        return '<article class="practice-history-row"><div><strong>'+escapeHTML(text(record?.paperName||'未命名练习'))+'</strong><span>'+escapeHTML(historyModeLabel(record?.mode))+' · '+escapeHTML(formatHistoryTime(record?.createdAt))+'</span></div><span>正确率 '+rate+'%</span><em>'+escapeHTML(text(record?.status)==='abandoned'?'已退出':'已完成')+'</em></article>';
-      }).join('');
-      if(dom.historyEmpty)dom.historyEmpty.hidden=records.length>0;
-      if(dom.historySummary)dom.historySummary.textContent=records.length?'最近 '+records.length+' 条记录':'暂无练习记录';
-      if(dom.clearHistoryBtn)dom.clearHistoryBtn.disabled=!records.length;
-      if(dom.historyCount){dom.historyCount.textContent=String(records.length);dom.historyCount.hidden=!records.length}
+      // 以试卷为记录单位：同卷重复练习只更新次数/最近时间/最近成绩，不新增行
+      const byPaper=new Map();
+      records.forEach(record=>{
+        const paperId=text(record?.paperId)||('__'+text(record?.paperName||'未命名练习'));
+        const answered=Math.max(0,Number(record?.answered)||0),correct=Math.max(0,Number(record?.correct)||0);
+        const rate=answered?Math.round(correct/answered*100):0;
+        const created=Number(new Date(record?.createdAt||0).getTime())||0;
+        const row=byPaper.get(paperId);
+        if(row){
+          row.count+=1;
+          if(created>=row.lastAt){row.lastAt=created;row.lastRate=rate;row.paperName=text(record?.paperName)||row.paperName}
+        }else byPaper.set(paperId,{paperId:row_paperId(paperId),paperName:text(record?.paperName||'未命名练习'),count:1,lastAt:created,lastRate:rate});
+      });
+      const papers=[...byPaper.values()].sort((a,b)=>b.lastAt-a.lastAt);
+      if(dom.historyList){
+        dom.historyList.innerHTML=papers.map(paper=>'<article class="practice-history-row is-paper" data-history-paper="'+escapeHTML(paper.paperId)+'" tabindex="0" role="button" aria-label="练习试卷 '+escapeHTML(paper.paperName)+'"><div><strong>'+escapeHTML(paper.paperName)+'</strong><span>练习 '+paper.count+' 次 · 最近 '+escapeHTML(formatHistoryTime(paper.lastAt))+'</span></div><span>最近正确率 '+paper.lastRate+'%</span><em>点击继续练习</em></article>').join('');
+        dom.historyList.querySelectorAll('[data-history-paper]').forEach(row=>{
+          row.addEventListener('click',()=>startPaperFromHistory(row.dataset.historyPaper));
+        });
+      }
+      if(dom.historyEmpty)dom.historyEmpty.hidden=papers.length>0;
+      if(dom.historySummary)dom.historySummary.textContent=papers.length?'共练习过 '+papers.length+' 份试卷':'暂无练习记录';
+      if(dom.clearHistoryBtn)dom.clearHistoryBtn.disabled=!papers.length;
+      if(dom.historyCount){dom.historyCount.textContent=String(papers.length);dom.historyCount.hidden=!papers.length}
     }catch(error){
       if(dom.historyList)dom.historyList.innerHTML='';if(dom.historyEmpty){dom.historyEmpty.hidden=false;dom.historyEmpty.textContent='学习记录暂时无法读取，请稍后重试。'}
     }
@@ -383,10 +409,26 @@
     const helpers=global.KGFreeModeLanguage;
     return helpers?.questionView?.(question.raw||question,languageMode())||null;
   }
+  function autoExplainEnabled(){
+    try{return global.KGActivitySchemaV1?.getPracticeAutoExplain?.()!==false}catch(error){return true}
+  }
+  function renderPracticeExplanation(question,correct){
+    const panel=$('practiceExplanationPanel');if(!panel||state.mode!=='practice')return;
+    const head=$('practiceExplanationHead'),body=$('practiceExplanationBody');
+    const view=questionLanguageView(question);
+    const correctText='正确答案：'+text(question.correctAnswer);
+    const explanationMarkup=view?escapeHTML(languageText(view.explanation))+englishLine(view.explanation):escapeHTML(text(question?.raw?.analysis||question?.raw?.explanation||'暂无解析'));
+    if(head){head.textContent=(correct?'回答正确':'回答错误')+' · '+correctText;head.className='practice-explanation-head '+(correct?'is-correct':'is-wrong')}
+    if(body)body.innerHTML='<p class="practice-answer-line">'+escapeHTML(correctText)+'</p>'+explanationMarkup;
+    panel.hidden=false;
+    panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
   function renderQuestion(){
     const question=state.verification?.active?state.verification.question:state.questions[state.index];
     if(!question){finishPractice();return}
+    const practiceAnswered=state.mode==='practice'?state.practiceAnswers[state.index]:null;
     state.locked=false;dom.feedback.hidden=true;hideRemediation();dom.questionCard.classList.remove('is-timeout');
+    if($('practiceExplanationPanel'))$('practiceExplanationPanel').hidden=true;
     const view=questionLanguageView(question);
     if(view){
       dom.questionStem.innerHTML=escapeHTML(languageText(view.stem))+englishLine(view.stem);
@@ -399,24 +441,30 @@
       dom.options.innerHTML=question.options.map(option=>'<button type="button" class="practice-option" data-option-id="'+escapeHTML(option.id)+'"><span class="practice-option-key">'+escapeHTML(option.id)+'</span><span>'+escapeHTML(option.text)+'</span></button>').join('');
     }
     dom.options.querySelectorAll('[data-option-id]').forEach(button=>button.addEventListener('click',()=>answer(button.dataset.optionId,button)));
+    if(practiceAnswered){
+      state.locked=true;lockOptions();
+      revealOptionResult(practiceAnswered.selected,question.correctAnswer);
+      if(autoExplainEnabled())renderPracticeExplanation(question,practiceAnswered.correct);
+    }
     renderProgress();renderHealth();renderVerificationBanner();
     updateQuestionNav();
     if(state.mode==='scholar')renderTimer();
   }
   function updateQuestionNav(){
-    // 复仇模式：底部切题按钮 + 左右滑动切换；其他模式隐藏
+    // 复仇/练习模式：底部切题按钮 + 左右滑动切换；其他模式隐藏
     if(!dom.questionNav)return;
-    const revenge=state.active&&state.mode==='revenge';
-    dom.questionNav.hidden=!revenge;
-    if(!revenge)return;
+    const navMode=state.active&&(state.mode==='revenge'||state.mode==='practice');
+    dom.questionNav.hidden=!navMode;
+    if(!navMode)return;
     dom.questionPos.textContent=(state.index+1)+' / '+state.questions.length;
     if(dom.prevBtn)dom.prevBtn.disabled=state.index<=0;
     if(dom.nextBtn)dom.nextBtn.disabled=state.index>=state.questions.length-1;
   }
   function switchQuestion(delta){
-    if(!state.active||state.mode!=='revenge')return false;
+    if(!state.active||(state.mode!=='revenge'&&state.mode!=='practice'))return false;
     const next=state.index+Number(delta);
     if(next<0||next>=state.questions.length)return false;
+    global.clearTimeout(state.feedbackTimer);state.feedbackTimer=0;
     state.index=next;state.locked=false;
     dom.feedback.hidden=true;hideRemediation();clearVerification();
     renderQuestion();
@@ -476,6 +524,35 @@
         else{state.streak=0;hideStreakPop();const correctButton=dom.options.querySelector('[data-option-id="'+CSS.escape(text(question.correctAnswer))+'"]');if(correctButton)correctButton.classList.add('is-correct');showFeedback('再次答错 · 需要知识补救','danger');showRemediation(question)}
       }).catch(error=>{showFeedback('错题状态未保存，请稍后重试。','danger');state.locked=false;dom.options.querySelectorAll('button').forEach(item=>item.disabled=false)});
       renderHealth();return correct;
+    }
+    if(state.mode==='practice'){
+      // 练习模式：无生命/计时压力；作答后即时反馈答案与解析，切题由底部导航/滑动驱动
+      state.practiceAnswers[state.index]={selected:text(optionId),correct};
+      state.locked=true;lockOptions();
+      if(correct){state.correct+=1;state.streak+=1;state.experience+=10+streakBonus(state.streak)}
+      else state.streak=0;
+      showFeedback(correct?'回答正确':'回答错误',correct?'success':'danger');
+      if(autoExplainEnabled())renderPracticeExplanation(question,correct);
+      else{
+        // 自动解析关闭时提供手动查看入口
+        const panel=$('practiceExplanationPanel'),actions=$('practiceExplanationActions');
+        if(panel&&actions){
+          panel.hidden=false;
+          $('practiceExplanationHead').textContent=correct?'回答正确':'回答错误';
+          $('practiceExplanationHead').className='practice-explanation-head '+(correct?'is-correct':'is-wrong');
+          $('practiceExplanationBody').textContent='';
+          actions.innerHTML='';
+          const btn=document.createElement('button');btn.type='button';btn.textContent='查看解析';
+          btn.addEventListener('click',()=>renderPracticeExplanation(question,correct));
+          actions.appendChild(btn);
+        }
+      }
+      updateQuestionNav();
+      // 最后一题答完自动交卷（记录会话）
+      if(state.index>=state.questions.length-1){
+        state.feedbackTimer=global.setTimeout(()=>{finishPractice()},1200);
+      }
+      return correct;
     }
     if(correct){
       state.correct+=1;state.streak+=1;state.maxStreak=Math.max(state.maxStreak||0,state.streak);const bonus=streakBonus(state.streak);state.experience+=10+bonus;
@@ -578,13 +655,13 @@
     }else questions=(catalog.questions||[]).slice();
     if(questions.length<count){showToast(`当前试卷可用题目不足 ${count} 道。`);syncLobby();return false}
     clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);
-    state.mode=mode==='scholar'?'scholar':'challenge';document.body.dataset.practiceMode=state.mode;state.order=dom.orderInputs.find(input=>input.checked)?.value||'paper';
+    state.mode=mode==='scholar'?'scholar':mode==='practice'?'practice':'challenge';document.body.dataset.practiceMode=state.mode;state.order=dom.orderInputs.find(input=>input.checked)?.value||'paper';
     if(state.order==='random')questions=shuffle(questions);
     if(state.retiredNavigation)questions=prioritizeRetiredQuestion(questions,state.retiredNavigation.questionId);
     state.questions=questions.slice(0,count);
-    state.index=0;state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;state.health=state.maxHealth;state.challengeFailedShown=false;state.streak=0;state.maxStreak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
+    state.index=0;state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;state.health=state.maxHealth;state.challengeFailedShown=false;state.practiceAnswers={};state.streak=0;state.maxStreak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
     state.lastSettings={paperId:catalog.id,count,order:state.order,mode:state.mode};
-    dom.timer.hidden=true;dom.timeRow.hidden=state.mode!=='scholar';
+    dom.timer.hidden=true;dom.timeRow.hidden=state.mode!=='scholar';dom.health.hidden=state.mode==='practice';
     setView('game');renderQuestion();if(state.mode==='scholar')startTimer();return true;
   }
   function startAgain(){
@@ -707,9 +784,9 @@
     // PC 端把面板锚定到大厅主区左侧空白（皮肤可能改变主区宽度，故按实际位置计算）
     const panel=$('practiceExpPanel');
     if(!panel)return;
-    if(!global.matchMedia?.('(max-width:1420px)').matches){
+    if(!global.matchMedia?.('(max-width:1720px)').matches){
       const main=document.querySelector('.practice-main');
-      const left=main?Math.max(12,Math.round(main.getBoundingClientRect().left-244)):12;
+      const left=main?Math.max(12,Math.round(main.getBoundingClientRect().left-294)):12;
       panel.style.left=left+'px';
     }else panel.style.left='';
   }
@@ -723,8 +800,13 @@
       if(week)week.textContent=String(Number(data.weekExperience)||0);
       const daily=Array.isArray(data.daily)?data.daily.slice(-7):[];
       if(chart)chart.innerHTML=daily.length?expChartMarkup(daily):'';
-      if(chartX)chartX.innerHTML=daily.map(day=>'<span>'+day.date.slice(5).replace('-','/')+'</span>').join('');
-      const compact=global.matchMedia?.('(max-width:1420px)').matches;
+      const WEEKDAY_LABELS=['周日','周一','周二','周三','周四','周五','周六'];
+      if(chartX)chartX.innerHTML=daily.map(day=>{
+        const parsed=new Date(day.date+'T00:00:00');
+        const label=Number.isNaN(parsed.getTime())?day.date.slice(5):WEEKDAY_LABELS[parsed.getDay()];
+        return '<span>'+escapeHTML(label)+'</span>';
+      }).join('');
+      const compact=global.matchMedia?.('(max-width:1720px)').matches;
       positionExperiencePanel();
       if(fab){
         fab.hidden=false;
@@ -780,6 +862,13 @@
     });
     global.addEventListener('kg:question-language-mode',syncLanguageCycle);
     syncLanguageCycle();
+    const autoExplain=$('practiceAutoExplain');
+    if(autoExplain){
+      autoExplain.checked=autoExplainEnabled();
+      autoExplain.addEventListener('change',()=>{
+        try{global.KGActivitySchemaV1?.setPracticeAutoExplain?.(autoExplain.checked)}catch(error){}
+      });
+    }
     if(dom.questionCard){
       let swipeStartX=0,swipeStartY=0;
       dom.questionCard.addEventListener('touchstart',event=>{const t=event.touches[0];swipeStartX=t.clientX;swipeStartY=t.clientY},{passive:true});

@@ -262,7 +262,7 @@ body.practice-mode-page.is-practice-drawer-open{overflow:hidden}
 .practice-time-rail{flex:1;height:4px;margin:0}
 
 /* P4.6 做题经验面板：PC 常驻大厅左侧空白区；窄屏折叠为悬浮入口 */
-.practice-exp-panel{position:fixed;top:150px;width:220px;z-index:20;left:max(12px,calc((100vw - 1060px)/2 - 244px))}
+.practice-exp-panel{position:fixed;top:150px;width:270px;z-index:20;left:max(12px,calc((100vw - 1060px)/2 - 244px))}
 body.practice-mode-page:not([data-practice-view="lobby"]) .practice-exp-panel,
 body.practice-mode-page:not([data-practice-view="lobby"]) .practice-exp-fab{display:none}
 .practice-exp-card{background:var(--practice-card,#fff);border:1px solid var(--practice-border,#e4e8f0);border-radius:18px;padding:16px 16px 13px;box-shadow:0 10px 30px rgba(15,23,42,.06)}
@@ -279,8 +279,27 @@ body.practice-mode-page:not([data-practice-view="lobby"]) .practice-exp-fab{disp
 .practice-exp-chart-x{display:flex;justify-content:space-between;margin-top:4px;font-size:9px;color:var(--practice-muted,#738096);font-weight:700}
 .practice-exp-note{margin:10px 0 0;color:var(--practice-muted,#738096);font-size:10.5px;line-height:1.5}
 .practice-exp-fab{position:fixed;right:14px;bottom:78px;z-index:40;width:46px;height:46px;border:0;border-radius:999px;background:var(--practice-text,#172033);color:#fff;font-size:13px;font-weight:900;letter-spacing:.03em;box-shadow:0 10px 26px rgba(15,23,42,.24);display:none}
-@media(max-width:1420px){
-  .practice-exp-panel{top:auto;bottom:134px;right:14px;left:auto;width:262px}
+@media(max-width:1720px){
+  .practice-exp-panel{top:auto;bottom:134px;right:14px;left:auto;width:270px}
   .practice-exp-fab{display:inline-flex;align-items:center;justify-content:center}
   body.practice-mode-page:not(.is-exp-panel-open) .practice-exp-panel{display:none}
 }
+
+/* P4.6 练习模式：即时答案与解析面板 + 底部导航自动解析开关 */
+.practice-mode-card.practice .practice-mode-icon{background:#e8f7ef;color:#0f8a4d}
+.practice-mode-card.practice .practice-start-btn{background:#0f8a4d}
+.practice-explanation{margin-top:18px;padding:16px 18px;border-radius:15px;background:#f7faf8;border:1px solid #dcefe3}
+.practice-explanation-head{font-size:12px;font-weight:850;letter-spacing:.06em;margin-bottom:8px}
+.practice-explanation-head.is-correct{color:var(--practice-success,#16a34a)}
+.practice-explanation-head.is-wrong{color:var(--practice-danger,#e11d48)}
+.practice-explanation-body{font-size:13.5px;line-height:1.7;color:#33415c;white-space:normal;overflow-wrap:anywhere}
+.practice-explanation-body .practice-answer-line{font-weight:800;margin-bottom:6px}
+.practice-explanation-body .practice-bilingual-en{font-size:.9em}
+.practice-explanation-actions{margin-top:10px}
+.practice-explanation-actions button{height:32px;padding:0 14px;border:1px solid #cfe3d8;border-radius:10px;background:#fff;color:#335; font-size:12px;font-weight:750}
+.practice-explanation-toggle{display:inline-flex;align-items:center;gap:6px;color:#536075;font-size:12px;font-weight:750;cursor:pointer}
+.practice-explanation-toggle input{accent-color:#0f8a4d;width:15px;height:15px;cursor:pointer}
+/* 学习记录按试卷聚合：可点击行 */
+.practice-history-row.is-paper{cursor:pointer;transition:border-color .15s ease,transform .15s ease}
+.practice-history-row.is-paper:hover{border-color:#9aa5b5;transform:translateY(-1px)}
+.practice-history-row.is-paper em{color:var(--practice-accent,#6d28d9)}

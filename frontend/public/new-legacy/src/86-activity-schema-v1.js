@@ -57,6 +57,12 @@
     try{global.dispatchEvent?.(new CustomEvent('kg:question-language-mode',{detail:{mode:value}}))}catch(error){}
     return value;
   }
+  function getPracticeAutoExplain(){
+    try{const value=global.localStorage?.getItem('kg_practice_auto_explanation_v1');return value===null?true:value==='1'}catch(error){return true}
+  }
+  function setPracticeAutoExplain(enabled){
+    try{global.localStorage?.setItem('kg_practice_auto_explanation_v1',enabled?'1':'0')}catch(error){}
+  }
   function canonicalType(type){
     const value=String(type||'').trim();
     return TYPE_TO_CANONICAL[value]||(SUPPORTED_TYPES.has(value)?value:value||'unknown');
@@ -673,6 +679,7 @@
     normalizeStudentLanguageMode,
     getLanguageMode,
     setLanguageMode,
+    getPracticeAutoExplain,setPracticeAutoExplain,
     fromLegacy,
     normalizeActivityRecord,
     migrateLibrary,
