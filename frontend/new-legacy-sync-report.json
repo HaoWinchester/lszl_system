@@ -5,9 +5,7 @@
   "changes": {
     "added": [],
     "changed": [
-      "practice-mode.html",
-      "src\\100-practice-mode.js",
-      "src\\102-help-content.js"
+      "src\\100-practice-mode.js"
     ],
     "removed": []
   },

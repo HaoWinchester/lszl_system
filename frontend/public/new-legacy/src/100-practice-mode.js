@@ -265,8 +265,12 @@
         ? '原错题已经答对。请再做一道同知识点的不同题，确认不是只记住了答案。'
         : '这道题在复仇模式中再次答错。先看解析并重新建立判断规则，再做同知识点验证题。';
     const explanation=remediationExplanation(question);
-    if(dom.remediationReviewBtn)dom.remediationReviewBtn.hidden=!explanation;
-    if(dom.remediationExplanation&&explanation)dom.remediationExplanation.innerHTML=explanation;
+    // 复仇新规则：补救面板出现时自动展开题目解析（答错即见正确答案与解析）
+    if(dom.remediationExplanation){
+      if(explanation){dom.remediationExplanation.innerHTML=explanation;dom.remediationExplanation.hidden=false}
+      else dom.remediationExplanation.hidden=true;
+    }
+    if(dom.remediationReviewBtn){dom.remediationReviewBtn.hidden=!explanation;dom.remediationReviewBtn.textContent=explanation?'收起题目解析':'查看题目解析'}
     if(dom.remediationContinueBtn){dom.remediationContinueBtn.textContent='开始验证';dom.remediationContinueBtn.hidden=true}
     state.remediationPending=true;dom.remediationPanel.hidden=false;
   }
@@ -364,7 +368,7 @@
       });
       const papers=[...byPaper.values()].sort((a,b)=>b.lastAt-a.lastAt);
       if(dom.historyList){
-        dom.historyList.innerHTML=papers.map(paper=>'<article class="practice-history-row is-paper" data-history-paper="'+escapeHTML(paper.paperId)+'" tabindex="0" role="button" aria-label="练习试卷 '+escapeHTML(paper.paperName)+'"><div><strong>'+escapeHTML(paper.paperName)+'</strong><span>练习 '+paper.count+' 次 · 最近 '+escapeHTML(formatHistoryTime(paper.lastAt))+'</span></div><span>最近正确率 '+paper.lastRate+'%</span><em>点击继续练习</em></article>').join('');
+        dom.historyList.innerHTML=papers.map(paper=>'<article class="practice-history-row is-paper" data-history-paper="'+escapeHTML(paper.paperId)+'" tabindex="0" role="button" aria-label="练习试卷 '+escapeHTML(paper.paperName)+'"><div><strong>'+escapeHTML(paper.paperName)+'</strong><span>练习 '+paper.count+' 次 · 最近 '+escapeHTML(formatHistoryTime(paper.lastAt))+'</span></div><span>最近正确率 '+paper.lastRate+'%</span><em>进入练习模式</em></article>').join('');
         dom.historyList.querySelectorAll('[data-history-paper]').forEach(row=>{
           row.addEventListener('click',()=>startPaperFromHistory(row.dataset.historyPaper));
         });
@@ -455,6 +459,9 @@
     if(!dom.questionNav)return;
     const navMode=state.active&&(state.mode==='revenge'||state.mode==='practice');
     dom.questionNav.hidden=!navMode;
+    // 自动解析开关仅练习模式可用（复仇模式解析由"答错才触发"规则驱动，不受开关控制）
+    const autoToggle=document.querySelector('.practice-explanation-toggle');
+    if(autoToggle)autoToggle.hidden=state.mode!=='practice';
     if(!navMode)return;
     dom.questionPos.textContent=(state.index+1)+' / '+state.questions.length;
     if(dom.prevBtn)dom.prevBtn.disabled=state.index<=0;
@@ -520,8 +527,25 @@
       const api=practiceApi();
       Promise.resolve(api?.answerRevenge?.(question.mistakeId,{correct,selectedAnswer:optionId})).then(updated=>{
         question.mistakeStatus=text(updated?.status||question.mistakeStatus);
-        if(correct){state.correct+=1;state.streak+=1;state.experience+=10+streakBonus(state.streak);if(question.mistakeStatus==='needs_remediation'){showFeedback('原错题已答对 · 还需新题验证','success');state.feedbackTimer=global.setTimeout(()=>showRemediation(question,{recoveredCorrect:true}),FEEDBACK_DELAY)}else{showFeedback(question.mistakeStatus==='mastered'?'彻底掌握 · 复仇成功':'复仇成功 · 将安排再次验证','success');state.feedbackTimer=global.setTimeout(advanceAfterAnswer,FEEDBACK_DELAY)}}
-        else{state.streak=0;hideStreakPop();const correctButton=dom.options.querySelector('[data-option-id="'+CSS.escape(text(question.correctAnswer))+'"]');if(correctButton)correctButton.classList.add('is-correct');showFeedback('再次答错 · 需要知识补救','danger');showRemediation(question)}
+        // 复仇交互原则：答错才触发解析与补救；答对只给成功反馈并继续。
+        // 是否真正掌握交给后续不同题目的验证机制判断，不在答对时强弹解析。
+        if(correct){
+          state.correct+=1;state.streak+=1;state.experience+=10+streakBonus(state.streak);
+          if(question.mistakeStatus==='needs_remediation'){
+            // 已处 needs_remediation 的题重新答对：后台保留"仍需新题验证"状态，直接进入验证题
+            showFeedback('原错题已答对 · 直接进入新题验证','success');
+            state.remediationPending=true;
+            state.feedbackTimer=global.setTimeout(()=>{startRemediationVerification()},FEEDBACK_DELAY+400);
+          }else{
+            showFeedback(question.mistakeStatus==='mastered'?'彻底掌握 · 复仇成功':'复仇成功 · 将安排再次验证','success');
+            state.feedbackTimer=global.setTimeout(advanceAfterAnswer,FEEDBACK_DELAY);
+          }
+        }else{
+          state.streak=0;hideStreakPop();
+          const correctButton=dom.options.querySelector('[data-option-id="'+CSS.escape(text(question.correctAnswer))+'"]');if(correctButton)correctButton.classList.add('is-correct');
+          showFeedback('再次答错 · 需要知识补救','danger');
+          showRemediation(question);
+        }
       }).catch(error=>{showFeedback('错题状态未保存，请稍后重试。','danger');state.locked=false;dom.options.querySelectorAll('button').forEach(item=>item.disabled=false)});
       renderHealth();return correct;
     }
