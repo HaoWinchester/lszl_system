@@ -5,7 +5,8 @@
   "changes": {
     "added": [],
     "changed": [
-      "styles\\learning-skin.css"
+      "practice-mode.html",
+      "styles\\practice-mode.css"
     ],
     "removed": []
   },
