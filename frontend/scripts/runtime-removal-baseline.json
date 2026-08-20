@@ -2061,6 +2061,11 @@
     },
     {
       "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
+      "token": "kg_practice_auto_explanation_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
       "token": "kg_remote_auth_session_v1",
       "ordinal": 1
     },
