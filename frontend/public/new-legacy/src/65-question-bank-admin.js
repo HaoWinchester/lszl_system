@@ -1517,7 +1517,19 @@
     if(window.KGRolePermissions){
       window.KGRolePermissions.applyTheme();
       window.KGRolePermissions.decoratePermissionElements();
+      // 认证会话异步就绪：未拿到当前用户时不能立即判无权限。
+      // 事件 + 轮询双通道等待（auth 静默就绪时可能不广播会话事件）。
+      const authReady=()=>{try{return !!window.KGAuthCore?.currentUser?.()}catch(error){return false}};
       if(!window.KGRolePermissions.can('accessQuestionBank')){
+        if(!authReady()){
+          let retried=false;
+          const retry=()=>{if(retried)return;retried=true;clearInterval(pollTimer);initPaperManagementPage()};
+          const pollTimer=window.setInterval(()=>{if(authReady())retry()},150);
+          window.setTimeout(()=>{clearInterval(pollTimer);if(!retried){retried=true;initPaperManagementPage()}},6000);
+          window.addEventListener('kg:auth-session-changed',retry,{once:true});
+          window.addEventListener('kg:bootstrap-ready',retry,{once:true});
+          return;
+        }
         window.KGRolePermissions.renderPermissionDenied(document.querySelector('.qb-app')||document.body,'试卷管理仅限管理员、教师/教研角色访问。');
         return;
       }
@@ -4632,6 +4644,19 @@
   document.addEventListener('input',markCatalogEditorDirty,true);
   document.addEventListener('change',markCatalogEditorDirty,true);
   window.addEventListener('kg:question-catalog-changed',handleQuestionCatalogChanged);
+  // 试卷正文经 runtime shim 异步到达（页面加载后 ~120ms）：数据晚于初始化时
+  // 需要重新加载试卷/分类并重渲染，否则管理页试卷列表为空（与学员端目录脱节）。
+  const refreshPapersFromStorage=()=>{
+    if(!catalogUiReady)return;
+    state.papers=loadPapers();state.paperCategories=loadPaperCategories();
+    if(!state.papers.some(paper=>paper.id===state.selectedPaperId))state.selectedPaperId=state.papers[0]?.id||'';
+    renderPaperManager();
+  };
+  window.addEventListener('kg:server-state-reloaded',refreshPapersFromStorage);
+  window.addEventListener('kg-app-storage-change',event=>{
+    const key=String(event?.detail?.key||'');
+    if(key.startsWith('kg_exam_papers_v1__')||key.startsWith('kg_exam_paper_categories_v1__'))refreshPapersFromStorage();
+  });
   window.addEventListener('pagehide',()=>window.removeEventListener?.('kg:question-catalog-changed',handleQuestionCatalogChanged));
   window.addEventListener('beforeunload',()=>{if(CatalogEditor)CatalogEditor.release({keepalive:true})});
   document.addEventListener('DOMContentLoaded', init);
