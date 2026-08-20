@@ -46,6 +46,21 @@
     </header>
 
     <main class="practice-main">
+      <aside class="practice-exp-panel" id="practiceExpPanel" hidden aria-label="做题学习经验">
+        <div class="practice-exp-card">
+          <header><span>LEARNING XP</span><h2>做题经验</h2></header>
+          <div class="practice-exp-totals">
+            <div><span>累计经验</span><strong id="practiceExpTotal">0</strong></div>
+            <div><span>本周经验</span><strong id="practiceExpWeek">0</strong></div>
+          </div>
+          <div class="practice-exp-chart" aria-label="最近 7 天每日经验">
+            <svg id="practiceExpChart" viewBox="0 0 236 84" preserveAspectRatio="none" role="img"></svg>
+            <div class="practice-exp-chart-x" id="practiceExpChartX"></div>
+          </div>
+          <p class="practice-exp-note">学习周：周日 19:00 — 下周日 19:00</p>
+        </div>
+      </aside>
+      <button type="button" class="practice-exp-fab" id="practiceExpFab" hidden aria-expanded="false" aria-controls="practiceExpPanel" aria-label="展开做题经验面板">XP</button>
       <section class="practice-lobby" id="practiceLobby" aria-labelledby="practiceLobbyTitle">
         <header class="practice-lobby-head">
           <div>
@@ -135,8 +150,9 @@
           <button type="button" class="practice-language-cycle" id="practiceLanguageCycle" title="题目显示语言：中文（点击切换）" aria-label="切换题目显示语言" aria-live="polite">中</button>
           <div class="practice-scholar-stat practice-timer" id="practiceTimer" hidden><strong>60</strong><span>秒</span></div>
         </header>
-        <div class="practice-time-row" id="practiceTimeRow" hidden aria-hidden="true">
+        <div class="practice-time-row" id="practiceTimeRow" hidden>
           <span class="practice-time-icon" data-kg-icon="timer" data-kg-icon-size="18" aria-hidden="true"></span>
+          <strong class="practice-time-ms" id="practiceTimerMs">60.0</strong>
           <div class="practice-time-rail" id="practiceTimeRail"><span id="practiceTimeBar"></span></div>
         </div>
         <div class="practice-streak-pop" id="practiceStreakPop" hidden role="status"></div>

@@ -1086,3 +1086,66 @@ async def delete_workspace(db: AsyncSession, owner: str, workspace_id: str) -> b
     await db.delete(workspace)
     await db.commit()
     return True
+
+
+def _learning_week_start(now_local):
+    """学霸学习周：每周日 19:00 开始，到下一周日 19:00 结束。返回本期起点。"""
+    from datetime import datetime, time as dt_time, timezone
+
+    aware = now_local if now_local.tzinfo else now_local.replace(tzinfo=timezone.utc)
+    candidate = aware.replace(hour=19, minute=0, second=0, microsecond=0)
+    # Python weekday(): 周一=0 … 周日=6；目标周日
+    days_since_sunday = (aware.weekday() + 1) % 7
+    week_sunday = candidate - timedelta(days=days_since_sunday)
+    if aware < week_sunday:
+        week_sunday = week_sunday - timedelta(days=7)
+    return week_sunday
+
+
+async def practice_experience_summary(db: AsyncSession, owner: str) -> dict:
+    """做题经验聚合：累计 / 本学习周（周日19:00 起）/ 最近 7 个自然日。
+
+    经验数据来自已结构化保存的 practice.session 事件（每次练习会话携带
+    experience 字段），未来可在此之上扩展周排行榜。
+    """
+    from datetime import datetime, timezone
+
+    rows = (
+        await db.execute(
+            select(LearningEvent).where(
+                LearningEvent.owner_id == owner,
+                LearningEvent.event_type == PRACTICE_SESSION_EVENT_TYPE,
+            )
+        )
+    ).scalars().all()
+    now_local = datetime.now(timezone.utc).astimezone()
+    week_start = _learning_week_start(now_local)
+    week_start_utc = week_start.astimezone(timezone.utc)
+    daily: dict[str, int] = {}
+    for offset in range(6, -1, -1):
+        day = (now_local - timedelta(days=offset)).date()
+        daily[day.isoformat()] = 0
+    total = 0
+    weekly = 0
+    for row in rows:
+        experience = 0
+        payload = row.payload if isinstance(row.payload, dict) else {}
+        try:
+            experience = int(payload.get("experience") or 0)
+        except (TypeError, ValueError):
+            experience = 0
+        total += experience
+        created_local = row.created_at.astimezone(now_local.tzinfo) if row.created_at else None
+        if created_local and created_local >= week_start:
+            weekly += experience
+        if created_local:
+            key = created_local.date().isoformat()
+            if key in daily:
+                daily[key] += experience
+    return {
+        "totalExperience": total,
+        "weekExperience": weekly,
+        "weekStart": week_start.isoformat(),
+        "weekEnd": (week_start + timedelta(days=7)).isoformat(),
+        "daily": [{"date": key, "experience": value} for key, value in daily.items()],
+    }

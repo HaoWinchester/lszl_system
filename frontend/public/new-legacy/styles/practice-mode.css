@@ -255,3 +255,32 @@ body.practice-mode-page.is-practice-drawer-open{overflow:hidden}
 .practice-challenge-outcome span{color:var(--practice-muted);font-size:12px;font-weight:750}
 /* 大生命值试卷的紧凑计数显示 */
 .practice-health-count{font-size:12px;font-weight:850;color:#526071;font-variant-numeric:tabular-nums;margin-left:3px}
+
+/* P4.6 学霸计时：毫秒数字与进度条同行 */
+.practice-time-row{display:flex;align-items:center;gap:9px;margin:0 0 16px}
+.practice-time-ms{font-size:15px;font-weight:850;color:var(--practice-text);font-variant-numeric:tabular-nums;min-width:40px;text-align:right}
+.practice-time-rail{flex:1;height:4px;margin:0}
+
+/* P4.6 做题经验面板：PC 常驻大厅左侧空白区；窄屏折叠为悬浮入口 */
+.practice-exp-panel{position:fixed;top:150px;width:220px;z-index:20;left:max(12px,calc((100vw - 1060px)/2 - 244px))}
+body.practice-mode-page:not([data-practice-view="lobby"]) .practice-exp-panel,
+body.practice-mode-page:not([data-practice-view="lobby"]) .practice-exp-fab{display:none}
+.practice-exp-card{background:var(--practice-card,#fff);border:1px solid var(--practice-border,#e4e8f0);border-radius:18px;padding:16px 16px 13px;box-shadow:0 10px 30px rgba(15,23,42,.06)}
+.practice-exp-card header span{font-size:10px;font-weight:850;letter-spacing:.16em;color:var(--practice-accent,#6d28d9)}
+.practice-exp-card header h2{margin:5px 0 0;font-size:17px;letter-spacing:-.02em}
+.practice-exp-totals{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:13px 0}
+.practice-exp-totals div{padding:10px 11px;border-radius:12px;background:#f7f8fb}
+.practice-exp-totals span{display:block;font-size:11px;color:var(--practice-muted,#738096);font-weight:750}
+.practice-exp-totals strong{display:block;margin-top:4px;font-size:21px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.practice-exp-chart{margin-top:2px}
+.practice-exp-chart svg{display:block;width:100%;height:84px}
+.practice-exp-chart polyline{fill:none;stroke:var(--practice-accent,#6d28d9);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.practice-exp-chart circle{fill:var(--practice-accent,#6d28d9)}
+.practice-exp-chart-x{display:flex;justify-content:space-between;margin-top:4px;font-size:9px;color:var(--practice-muted,#738096);font-weight:700}
+.practice-exp-note{margin:10px 0 0;color:var(--practice-muted,#738096);font-size:10.5px;line-height:1.5}
+.practice-exp-fab{position:fixed;right:14px;bottom:78px;z-index:40;width:46px;height:46px;border:0;border-radius:999px;background:var(--practice-text,#172033);color:#fff;font-size:13px;font-weight:900;letter-spacing:.03em;box-shadow:0 10px 26px rgba(15,23,42,.24);display:none}
+@media(max-width:1420px){
+  .practice-exp-panel{top:auto;bottom:134px;right:14px;left:auto;width:262px}
+  .practice-exp-fab{display:inline-flex;align-items:center;justify-content:center}
+  body.practice-mode-page:not(.is-exp-panel-open) .practice-exp-panel{display:none}
+}
