@@ -7,7 +7,7 @@
 (function(global){
   const COUNTS=[10,20,60,180];
   const MAX_HEALTH=3;
-  const SCHOLAR_MAX_SECONDS=80;
+  const SCHOLAR_MAX_SECONDS=60;
   const CHECKPOINT_INTERVAL=5;
   const FEEDBACK_DELAY=520;
   const RETIRED_SINGLE_DEEP_NOTICE='单题深学已停用，已为你切换到刷题';
@@ -183,6 +183,10 @@
   function challengeInitialHealth(questionCount){
     // 挑战 V2：初始生命 = max(3, ceil(题数 × 30%))；答错 -1，归零仅判失败不中断
     return Math.max(3,Math.ceil(Number(questionCount||0)*0.3));
+  }
+  function scholarInitialHealth(questionCount){
+    // 学霸 V2（高水平稳定挑战）：初始生命 = max(3, ceil(题数 × 10%))；归零立即结束
+    return Math.max(3,Math.ceil(Number(questionCount||0)*0.1));
   }
   function renderHealth(){
     if(state.mode==='revenge'){dom.health.hidden=true;return}
@@ -470,8 +474,10 @@
       renderHealth();return correct;
     }
     if(correct){
-      state.correct+=1;state.streak+=1;const bonus=streakBonus(state.streak);state.experience+=10+bonus;
+      state.correct+=1;state.streak+=1;state.maxStreak=Math.max(state.maxStreak||0,state.streak);const bonus=streakBonus(state.streak);state.experience+=10+bonus;
       let healed=false;
+      // 学霸 V2：连续答对 5 题回血 1 点，不超过初始生命上限
+      if(state.mode==='scholar'&&state.streak%5===0&&state.health<state.maxHealth){state.health+=1;healed=true}
       const beforeSeconds=state.mode==='scholar'?remainingSeconds():0;
       if(state.mode==='scholar')setScholarSeconds(Math.min(SCHOLAR_MAX_SECONDS,beforeSeconds+20));
       const gainedSeconds=state.mode==='scholar'?Math.max(0,remainingSeconds()-beforeSeconds):0;
@@ -514,14 +520,22 @@
     state.active=false;state.completed=true;state.endedAt=Date.now();clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);renderProgress();closeChallengeFailDialog();
     recordCompletedSession('completed');dom.resultAccuracy.textContent=accuracy()+'%';dom.resultDuration.textContent=formatDuration(elapsed());dom.resultExperience.textContent=String(state.experience);
     // 挑战 V2 结果页双展示：试卷完成结果 + 挑战模式结果（独立判定：生命值 > 0 为成功）
+    // 学霸 V2：生命归零立即结束判定失败，结果含完成状态/剩余生命/最高连胜
     if(dom.challengeOutcome){
       const isChallenge=state.mode==='challenge';
-      dom.challengeOutcome.hidden=!isChallenge;
+      const isScholar=state.mode==='scholar';
+      dom.challengeOutcome.hidden=!(isChallenge||isScholar);
       if(isChallenge){
         const success=state.health>0;
         dom.challengeResult.textContent=success?'挑战成功':'挑战失败';
         dom.challengeResult.className=success?'is-success':'is-failed';
         dom.challengeDetail.textContent='剩余生命 '+state.health+' / '+(state.maxHealth||MAX_HEALTH);
+      }else if(isScholar){
+        const success=state.health>0;
+        const completed=state.index>=state.questions.length;
+        dom.challengeResult.textContent=success?'学霸挑战成功':'学霸挑战失败';
+        dom.challengeResult.className=success?'is-success':'is-failed';
+        dom.challengeDetail.textContent=(completed?'已完成全部题目':'完成 '+state.index+' / '+state.questions.length+' 题')+' · 剩余生命 '+state.health+' / '+(state.maxHealth||MAX_HEALTH)+' · 最高连胜 '+(state.maxStreak||0);
       }
     }
     setView('result');
@@ -564,7 +578,7 @@
     if(state.order==='random')questions=shuffle(questions);
     if(state.retiredNavigation)questions=prioritizeRetiredQuestion(questions,state.retiredNavigation.questionId);
     state.questions=questions.slice(0,count);
-    state.index=0;state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):MAX_HEALTH;state.health=state.maxHealth;state.challengeFailedShown=false;state.streak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
+    state.index=0;state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;state.health=state.maxHealth;state.challengeFailedShown=false;state.streak=0;state.maxStreak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
     state.lastSettings={paperId:catalog.id,count,order:state.order,mode:state.mode};
     dom.timer.hidden=state.mode!=='scholar';dom.timeRow.hidden=state.mode!=='scholar';
     setView('game');renderQuestion();if(state.mode==='scholar')startTimer();return true;

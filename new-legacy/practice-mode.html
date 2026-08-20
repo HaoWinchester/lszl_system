@@ -105,12 +105,12 @@
         <section class="practice-mode-grid" aria-label="选择练习模式">
           <article class="practice-mode-card challenge">
             <span class="practice-mode-icon" data-kg-icon="diamond" data-kg-icon-size="20" aria-hidden="true"></span>
-            <div><small>CHALLENGE</small><h2>挑战模式</h2><p>用三点血量持续闯关。连续答对可获得额外经验，并恢复血量。</p></div>
+            <div><small>CHALLENGE</small><h2>挑战模式</h2><p>初始生命随题量动态计算（约 30% 容错）。答错扣血，血尽判负但仍可完成全卷。</p></div>
             <button type="button" class="practice-start-btn" data-practice-start="challenge">开始挑战</button>
           </article>
           <article class="practice-mode-card scholar">
             <span class="practice-mode-icon" data-kg-icon="zap" data-kg-icon-size="20" aria-hidden="true"></span>
-            <div><small>SCHOLAR</small><h2>学霸模式</h2><p>共享 80 秒倒计时。答对加时间，答错扣时间并损失血量。</p></div>
+            <div><small>SCHOLAR</small><h2>学霸模式</h2><p>共享 60 秒时间池。答对 +20 秒并连对 5 题回血，答错扣时间扣血，血尽即败。</p></div>
             <button type="button" class="practice-start-btn" data-practice-start="scholar">进入学霸模式</button>
           </article>
           <article class="practice-mode-card revenge">
@@ -133,7 +133,7 @@
           <div class="practice-progress-shell" id="practiceProgressShell" role="progressbar" aria-label="做题进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="practiceProgressBar"></span></div>
           <div class="practice-health" id="practiceHealth" aria-label="剩余血量"></div>
           <button type="button" class="practice-language-cycle" id="practiceLanguageCycle" title="题目显示语言：中文（点击切换）" aria-label="切换题目显示语言" aria-live="polite">中</button>
-          <div class="practice-scholar-stat practice-timer" id="practiceTimer" hidden><strong>80</strong><span>秒</span></div>
+          <div class="practice-scholar-stat practice-timer" id="practiceTimer" hidden><strong>60</strong><span>秒</span></div>
         </header>
         <div class="practice-time-row" id="practiceTimeRow" hidden aria-hidden="true">
           <span class="practice-time-icon" data-kg-icon="timer" data-kg-icon-size="18" aria-hidden="true"></span>
