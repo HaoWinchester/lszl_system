@@ -246,3 +246,12 @@ body.practice-mode-page.is-practice-drawer-open{overflow:hidden}
 .practice-option span:last-child{min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
 .practice-option .practice-bilingual-en{margin-top:3px}
 @media(max-width:720px){.practice-language-cycle{height:24px;min-width:28px;padding:0 6px;font-size:10px}.practice-nav-btn{height:34px;padding:0 12px;font-size:12px}}
+
+/* 挑战 V2：结果页挑战判定横幅（试卷结果与挑战结果独立展示） */
+.practice-challenge-outcome{display:flex;align-items:center;justify-content:center;gap:10px;margin:16px auto 0;padding:12px 18px;border-radius:14px;background:#f7f8fb}
+.practice-challenge-outcome strong{font-size:16px}
+.practice-challenge-outcome strong.is-success{color:var(--practice-success)}
+.practice-challenge-outcome strong.is-failed{color:var(--practice-danger)}
+.practice-challenge-outcome span{color:var(--practice-muted);font-size:12px;font-weight:750}
+/* 大生命值试卷的紧凑计数显示 */
+.practice-health-count{font-size:12px;font-weight:850;color:#526071;font-variant-numeric:tabular-nums;margin-left:3px}

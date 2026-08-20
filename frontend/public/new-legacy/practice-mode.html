@@ -188,6 +188,10 @@
       <section class="practice-result" id="practiceResult" hidden aria-labelledby="practiceResultTitle">
         <span>COMPLETE</span>
         <h1 id="practiceResultTitle">练习结束</h1>
+        <div class="practice-challenge-outcome" id="practiceChallengeOutcome" hidden>
+          <strong id="practiceChallengeResult">挑战成功</strong>
+          <span id="practiceChallengeDetail">剩余生命 0 / 0</span>
+        </div>
         <div class="practice-result-stats">
           <div><span>正确率</span><strong id="practiceResultAccuracy">0%</strong></div>
           <div><span>总耗时</span><strong id="practiceResultDuration">00:00</strong></div>
@@ -199,6 +203,16 @@
         </div>
       </section>
     </main>
+    <div class="practice-exit-backdrop" id="practiceFailBackdrop" hidden>
+      <div class="practice-exit-dialog" role="dialog" aria-modal="true" aria-labelledby="practiceFailTitle">
+        <h2 id="practiceFailTitle">挑战失败</h2>
+        <p>生命值已归零，本次挑战判定失败。你仍可以继续完成剩余题目，试卷完成情况与学习记录不受影响。</p>
+        <div>
+          <button type="button" class="practice-secondary-btn" id="practiceFailLobbyBtn">退回大厅</button>
+          <button type="button" class="practice-primary-btn" id="practiceFailContinueBtn">继续作答</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="practice-drawer-backdrop" id="practicePaperDrawer" hidden aria-hidden="true">
