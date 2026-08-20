@@ -781,14 +781,17 @@
     return '<polygon points="'+points.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ')+' '+(width-pad)+','+(height-pad)+' '+pad+','+(height-pad)+'" fill="rgba(109,40,217,.08)"/><polyline points="'+polyline+'"/>'+circles;
   }
   function positionExperiencePanel(){
-    // PC 端把面板锚定到大厅主区左侧空白（皮肤可能改变主区宽度，故按实际位置计算）
+    // PC 端把面板锚定到大厅左侧空白，顶部与试卷库对齐（按实际布局计算，皮肤可能改变主区宽度）
     const panel=$('practiceExpPanel');
     if(!panel)return;
     if(!global.matchMedia?.('(max-width:1720px)').matches){
       const main=document.querySelector('.practice-main');
+      const shelf=document.querySelector('.practice-library-shelf')||document.querySelector('.practice-lobby-head');
       const left=main?Math.max(12,Math.round(main.getBoundingClientRect().left-294)):12;
+      const top=shelf?Math.max(70,Math.round(shelf.getBoundingClientRect().top)):150;
       panel.style.left=left+'px';
-    }else panel.style.left='';
+      panel.style.top=top+'px';
+    }else{panel.style.left='';panel.style.top=''}
   }
   function refreshExperiencePanel(){
     const panel=$('practiceExpPanel'),fab=$('practiceExpFab');
