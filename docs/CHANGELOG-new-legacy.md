@@ -5,6 +5,8 @@
 
 ## 进行中（feat/runtime-state-to-domain-apis 分支 · 2026-08-19，未发布）
 
+- **runtime 通用 KV 退役一次性切换（2026-08-20，设计 §11）**：业务数据已全部走领域 API（dev 库 runtime_states 仅剩 65 个已处置键：设备偏好/一次性标记/旧镜像/测试内容），本切换关闭旧通道——①前端 `server-state-bootstrap.js` 转本地模式（`REMOTE_SYNC=false`）：初始化仍 GET bootstrap 一次做下拉迁移（老用户服务器侧偏好落到本机 localStorage，之后服务器只读不动），所有读写只走浏览器，PUT/beacon 不再发出，保存事件直接报"已保存"；`clear()` 保留 browserOnlyKeys（含认证会话）。②后端新增 `RUNTIME_SYNC_DISABLED`（默认 true）：PUT/POST /runtime/state 变为 drain——鉴权后回当前 revision/contentRevision 的成功响应但不落库（旧缓存页无保存失败提示）；GET bootstrap 保留只读供下拉迁移与旧页兼容。③测试：新增 drain 行为测试（写入被接收即弃、revision 不动、旧值不被覆盖）；conftest 显式 `RUNTIME_SYNC_DISABLED=false` 保持既有持久化测试原语义；runtime 相关 81 项全绿。浏览器遍历 9 页：偏好写入只落本机（native=bilingual）服务器保持旧值（zh）、登录/退出正常、0 页面错误。**已知既有问题（与本次无关，stash 基线复现）**：test_question_import 2 项（banks questions 空校验）、test_question_pool_cleanup 6 项（POSIX symlink/inode 语义）、test_question_api_compatibility 并发用例本机 Windows 死锁，均待单独处理。账本第 3 轮处置见 `docs/runtime-ledger-disposition-proposal-2026-08-20.md`（0 unknown，drop-check 绿灯但未执行 DDL）。
+
 - **P4.6 第 2 轮 R2-2/R2-3：迁移遗留收口 + 发布大键全量退场**：
   - taxonomy 迁移支持多科目源（按 subjectId 分组，dev 库 5 科目/6 taxonomy/333 节点全部落库）；发布历史键迁移成功（6 条历史版本，superseded 状态正确）。
   - verify 修复：历史条目与当前目录键重叠的 release（教师重发同版本）改由目录条目权威校验，历史侧只比对"仅存在于历史"的部分；`_read_teaching_canonical` 适配新归一化结构。四个领域键（发布目录/发布历史/taxonomy/联想库）全部 verified；剩余 48 项 pending 为设计内 unknown 处置（等第 3 轮显式决策后 drop）。

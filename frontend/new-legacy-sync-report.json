@@ -4,9 +4,7 @@
   "toVersion": "v9.0-p4.1.123",
   "changes": {
     "added": [],
-    "changed": [
-      "src\\65-question-bank-admin.js"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
