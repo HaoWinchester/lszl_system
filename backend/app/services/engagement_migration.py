@@ -1,5 +1,6 @@
 """Engagement runtime migration mappers, isolated from the domain service."""
 from __future__ import annotations
+import hashlib
 import json
 import re
 from typing import Any, Mapping
@@ -19,6 +20,15 @@ def _rows(value: Any) -> list[dict[str, Any]]:
     try: value = json.loads(value) if isinstance(value, str) else value
     except (TypeError, ValueError, json.JSONDecodeError): return []
     return [dict(x) for x in value if isinstance(x, Mapping)] if isinstance(value, list) else []
+
+def _canonical_hash(value: Any) -> str:
+    encoded = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 def expected_canonical(payload: Any, source_key: str) -> list[dict[str, Any]]:
     rows=_rows(payload); result=[]
@@ -130,6 +140,9 @@ async def _receipt_mapper(db: AsyncSession, item: Any) -> Mapping[str, Any]:
         if identifier and identifier in valid: rows.append({"id":f"receipt-{owner}-{identifier}"[:64],id_field:identifier,"username":owner,"read_at":int(timestamp or 0)})
     if rows:
         await db.execute(insert(model).values(rows).on_conflict_do_update(constraint=constraint,set_={"read_at":insert(model).excluded.read_at})); await db.flush()
-    return {"canonical_payload":sorted(rows,key=lambda x:(x[id_field],x["username"]))}
+    canonical_rows=sorted(rows,key=lambda x:(x[id_field],x["username"]))
+    item.expected_count=len(canonical_rows)
+    item.expected_hash=_canonical_hash(canonical_rows)
+    return {"canonical_payload":canonical_rows}
 
 MAPPERS = {FEEDBACK_KEY: _feedback_mapper, ANNOUNCEMENT_KEY: _announcement_mapper, "kg_user_message_reads_v1__": _receipt_mapper, "kg_user_feedback_reply_reads_v1__": _receipt_mapper}

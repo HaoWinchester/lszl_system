@@ -7,10 +7,12 @@ from sqlalchemy import delete, func, select
 
 from app.cli.runtime_domain_migration import _run, build_parser, report_exit_code
 from app.db.session import AsyncSessionLocal
+from app.models.engagement import Announcement, MessageReceipt
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import ExamPaper, Question, QuestionBank
 from app.models.runtime_migration import RuntimeMigrationItem, RuntimeMigrationRun
 from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.user import User
 from app.services.runtime_domain_migration_service import (
     PAPER_RELEASE_HISTORY_KEY,
     PUBLISHED_PAPERS_KEY,
@@ -42,6 +44,98 @@ def test_cli_accepts_repeated_source_key_filters() -> None:
     ])
 
     assert args.source_keys == [PUBLISHED_PAPERS_KEY, PAPER_RELEASE_HISTORY_KEY]
+
+
+def test_message_receipt_verification_is_scoped_to_each_runtime_owner() -> None:
+    suffix = uuid4().hex[:10]
+    run_id = f"message-receipts-{suffix}"
+    announcement_id = f"message-{suffix}"
+    first_username = f"receipt-a-{suffix}"
+    second_username = f"receipt-b-{suffix}"
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add_all([
+                User(
+                    username=first_username,
+                    password_hash="test-only",
+                    role="student",
+                    status="active",
+                ),
+                User(
+                    username=second_username,
+                    password_hash="test-only",
+                    role="student",
+                    status="active",
+                ),
+            ])
+            await db.flush()
+            db.add(Announcement(
+                id=announcement_id,
+                title="迁移验证公告",
+                body="验证每个账号只读取自己的公告收据。",
+                link="",
+                status="published",
+                publish_at=100,
+                expires_at=0,
+                published_at=100,
+                withdrawn_at=0,
+                created_by=first_username,
+                created_at=100,
+                updated_at=100,
+            ))
+            await db.commit()
+
+            try:
+                source_rows = [
+                    {
+                        "source_type": "runtime",
+                        "source_key": f"kg_user_message_reads_v1__{username}",
+                        "owner_id": username,
+                        "payload": {announcement_id: read_at},
+                        "required": True,
+                    }
+                    for username, read_at in (
+                        (first_username, 111),
+                        (second_username, 222),
+                    )
+                ]
+                scanned = await scan(db, run_id=run_id, sources=source_rows)
+                assert scanned["items"] == 2
+                assert (await migrate(db, run_id))["migrated"] == 2
+
+                verified = await verify(db, run_id)
+
+                assert verified["status"] == "verified"
+                assert verified["required_failures"] == 0
+                items = list((await db.scalars(
+                    select(RuntimeMigrationItem)
+                    .where(RuntimeMigrationItem.run_id == run_id)
+                    .order_by(RuntimeMigrationItem.owner_scope)
+                )).all())
+                assert [(item.owner_scope, item.target_count) for item in items] == [
+                    (first_username, 1),
+                    (second_username, 1),
+                ]
+                receipts = list((await db.scalars(
+                    select(MessageReceipt)
+                    .where(MessageReceipt.announcement_id == announcement_id)
+                    .order_by(MessageReceipt.username)
+                )).all())
+                assert [(row.username, row.read_at) for row in receipts] == [
+                    (first_username, 111),
+                    (second_username, 222),
+                ]
+            finally:
+                await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
+                await db.execute(delete(Announcement).where(Announcement.id == announcement_id))
+                await db.execute(delete(User).where(User.username.in_([
+                    first_username,
+                    second_username,
+                ])))
+                await db.commit()
+
+    asyncio.run(scenario())
 
 
 def test_plan_and_scan_can_isolate_paper_release_sources() -> None:

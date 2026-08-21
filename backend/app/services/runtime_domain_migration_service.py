@@ -778,10 +778,38 @@ async def _read_engagement_canonical(db: AsyncSession, item: RuntimeMigrationIte
             })
         return result
     if source_key.startswith("kg_user_message_reads_v1__"):
-        rows = list((await db.scalars(select(MessageReceipt))).all())
+        payload = item.source_payload
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                payload = {}
+        source_receipt_ids = {
+            str(identifier) for identifier in payload
+        } if isinstance(payload, Mapping) else set()
+        rows = list((await db.scalars(
+            select(MessageReceipt).where(
+                MessageReceipt.username == item.owner_scope,
+                MessageReceipt.announcement_id.in_(source_receipt_ids),
+            )
+        )).all())
         return sorted([{"id": x.id, "announcement_id": x.announcement_id, "username": x.username, "read_at": x.read_at} for x in rows], key=lambda x: (x["announcement_id"], x["username"]))
     if source_key.startswith("kg_user_feedback_reply_reads_v1__"):
-        rows = list((await db.scalars(select(FeedbackReceipt))).all())
+        payload = item.source_payload
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                payload = {}
+        source_receipt_ids = {
+            str(identifier) for identifier in payload
+        } if isinstance(payload, Mapping) else set()
+        rows = list((await db.scalars(
+            select(FeedbackReceipt).where(
+                FeedbackReceipt.username == item.owner_scope,
+                FeedbackReceipt.feedback_id.in_(source_receipt_ids),
+            )
+        )).all())
         return sorted([{"id": x.id, "feedback_id": x.feedback_id, "username": x.username, "read_at": x.read_at} for x in rows], key=lambda x: (x["feedback_id"], x["username"]))
     raise ValueError("unsupported engagement source")
 
