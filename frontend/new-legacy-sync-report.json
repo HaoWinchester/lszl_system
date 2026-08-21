@@ -1,17 +1,18 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.126",
+  "fromVersion": "v9.0-p4.1.127",
   "toVersion": "v9.0-p4.1.127",
   "changes": {
-    "added": [
-      "content-prep-studio\\src\\js\\22-round3-extras.js"
-    ],
+    "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio\\build.py",
-      "content-prep-studio\\dist\\content-prep.html",
-      "content-prep-studio\\src\\css\\app.css",
-      "content-prep-studio\\src\\index.template.html"
+      "practice-mode.html",
+      "src\\100-practice-mode.js",
+      "src\\102-help-content.js",
+      "src\\65-question-bank-admin.js",
+      "src\\86-activity-schema-v1.js",
+      "src\\86-free-mode-language.js",
+      "src\\86-question-language-ui.js",
+      "styles\\practice-mode.css"
     ],
     "removed": []
   },
