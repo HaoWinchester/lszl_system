@@ -372,6 +372,8 @@ D原则：principle-role-accountability</pre>
         <input type="text" id="raQuery" placeholder="输入知识点、简称、英文或口语：PM / ST / 产品待办 / 燃烧图…" style="flex:1;min-width:230px">
         <button class="btn primary" id="raGo">生成</button>
         <label class="btn" style="margin:0">载入其他 JSON<input type="file" id="raFile" accept=".json,application/json" hidden></label>
+        <button class="btn" id="raSyncWorkspace" type="button" title="丢弃临时数据源，重新读取当前工作区联想库">同步当前工作区</button>
+        <button class="btn" id="raUseEmbedded" type="button" title="清空临时载入的外部 JSON，回到工作区联想库">清空临时数据源</button>
         <button class="btn" id="raResetPath">重置路径</button>
       </div>
       <div class="ra-quick">
@@ -506,7 +508,7 @@ D原则：principle-role-accountability</pre>
       <p>保存当前全部工作数据，方便下次继续编辑。该草稿不是正式服务器导入格式。</p>
       <button class="btn" id="btnExportWorkspace">导出工作区草稿</button>
     </div>
-  <div class="card export-card"><h3>原则与归纳卡 / 标签配置</h3><p>一个原则对应一张归纳卡；组合文件会同时携带两者并校验一对一关系。标签配置可单独导出。</p><div class="toolbar"><button class="btn" id="btnExportPrincipleCards">导出原则与归纳卡</button><button class="btn" id="btnExportTagConfig">标签配置</button></div></div>
+  <div class="card export-card"><h3>原则与归纳卡 / 标签配置</h3><p>一个原则对应一张归纳卡；组合文件会同时携带两者并校验一对一关系。标签配置可单独导出。</p><div class="toolbar"><button class="btn" id="btnExportPrincipleCards">导出原则与归纳卡</button><button class="btn" id="btnExportTagConfig">标签配置</button><button class="btn" id="btnExportFacetRegistry">科目 Facet Registry</button></div></div>
   </div>
   <div class="card" style="margin-top:14px">
     <div class="card-hd">Keyword System v2 导出规则</div>
@@ -526,13 +528,29 @@ D原则：principle-role-accountability</pre>
       <span class="muted tiny" id="auditCount">0 条</span>
       <span class="spacer"></span>
       <button class="btn" id="btnExportAuditTrail">导出审计日志 JSON</button>
+      <button class="btn" id="btnImportAuditTrail">导入审计日志 JSON</button>
       <button class="btn danger" id="btnClearAuditTrail">清空本机审计记录</button>
+      <input type="file" id="fileAuditTrail" accept=".json,application/json" hidden>
     </div>
     <div class="help">
       每次正式导出都会记录制作人、设备、时间、导出类型、文件名、题目数量、校验摘要和导出 payload 的 SHA-256。
-      这里只记录审计元数据，不复制整份题目内容。
+      这里只记录审计元数据，不复制整份题目内容。导入按 auditId 去重，冲突保留本机记录。
     </div>
+    <div class="muted smalltxt" id="auditImportStatus" style="margin-top:8px"></div>
     <div class="audit-list" id="auditList"></div>
+  </div>
+
+  <div class="audit-card">
+    <div class="card-hd" style="padding:0 0 8px">
+      <span>开发变更记录</span>
+      <span class="muted tiny" id="developmentVersionBadge"></span>
+      <span class="spacer"></span>
+      <button class="btn" id="btnExportDevelopmentLog" type="button">导出开发变更记录 JSON</button>
+    </div>
+    <div class="help">
+      记录每次程序开发的版本、日期和功能变更；当前版本信息随审计事件导出，可跨机导入合并。
+    </div>
+    <div class="dev-log-list" id="developmentLogList"></div>
   </div>
 
 </section>

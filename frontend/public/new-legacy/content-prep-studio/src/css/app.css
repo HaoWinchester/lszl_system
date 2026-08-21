@@ -417,3 +417,12 @@ nav button.active{color:var(--brand)!important}
 @media (max-width:720px){
   .question-preview-float{left:12px;top:120px;width:calc(100vw - 24px);height:min(520px,calc(100vh - 136px));min-width:280px}
 }
+
+/* 单机版回补第 3 轮：开发变更记录面板 */
+.dev-log-list{display:grid;gap:8px;margin-top:8px;max-height:320px;overflow:auto}
+.dev-log-row{border:1px solid var(--line);border-radius:9px;background:var(--panel);padding:8px 10px}
+.dev-log-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.dev-log-row ul{margin:4px 0 0 18px;padding:0;font-size:12px;line-height:1.6;color:var(--text)}
+.smalltxt.warn{color:#b45309}
+.smalltxt.ok{color:#0f766e}
+.smalltxt.bad{color:#b91c1c}
