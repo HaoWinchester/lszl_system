@@ -1,0 +1,53 @@
+# UAT deployment for uat.aihuanpu.com. Keep isolated from lszl-kg production.
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kg_graph_uat
+      POSTGRES_USER: kg_uat
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - uat_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kg_uat -d kg_graph_uat"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: lszl-kg-backend:uat-27c39ab
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENV: uat
+      SECRET_KEY: ${SECRET_KEY}
+      DATABASE_URL: postgresql+asyncpg://kg_uat:${POSTGRES_PASSWORD}@db:5432/kg_graph_uat
+      CORS_ORIGINS: '["http://uat.aihuanpu.com"]'
+      QUESTION_CATALOG_CUTOVER_ENABLED: "true"
+      CONTENT_PREP_VALIDATION_DISABLED: "false"
+      WECHAT_APP_ID: ""
+      WECHAT_APP_SECRET: ""
+      WECHAT_REDIRECT_URI: ""
+      WECHAT_ENABLE_OFFICIAL: "false"
+      WECHAT_ENABLE_DEMO: "false"
+      WECHAT_PAY_ENABLE_DEMO: "false"
+      WECHAT_PAY_MCH_ID: ""
+      WECHAT_PAY_API_V3_KEY: ""
+      WECHAT_PAY_MCH_SERIAL_NO: ""
+      WECHAT_PAY_MCH_PRIVATE_KEY_FILE: ""
+      WECHAT_PAY_WX_PUBLIC_KEY_FILE: ""
+      WECHAT_PAY_WX_PUBLIC_KEY_ID: ""
+      WECHAT_PAY_APP_ID: ""
+      WECHAT_PAY_NOTIFY_URL: ""
+    ports:
+      - "127.0.0.1:18087:8000"
+
+volumes:
+  uat_pg_data:
+    name: lszl-kg-uat_pg_data

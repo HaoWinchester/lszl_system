@@ -2,11 +2,11 @@
 
 ;(function (global) {
   const browserLocalStorage = global.localStorage
-  // runtime 通用 KV 退役（设计 §11 一次性切换）：业务数据已全部走领域 API，
-  // 剩余同步键均为设备级偏好/旧镜像——本 shim 转本地模式：
-  // 初始化时从服务器 GET 一次做下拉迁移（老用户的偏好落到本机），
-  // 之后所有读写只走浏览器 localStorage，不再上传 /runtime/state。
-  const REMOTE_SYNC = false
+  // 2026-08-21 回退"runtime KV 退役本地模式"（原设计 §11 一次性切换）：
+  // 试卷/分类等教师业务草稿尚未迁移到领域 API，仍依赖 /runtime/state 上传持久化；
+  // 本地模式下这些修改只落本机，且会被服务端旧存量下拉覆盖，表现为"保存不生效"。
+  // 业务数据全部迁入领域 API 之前，保持服务端同步。
+  const REMOTE_SYNC = true
   const browserOnlyKeys = new Set([
     'prep.lastDraftId',
     '__kg_admin_repository_probe__',
