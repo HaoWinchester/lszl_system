@@ -4,7 +4,7 @@
 (function(global){
   const schema=()=>global.KGActivitySchemaV1;
   function isStudentPage(){return Boolean(document.body?.matches?.('.guided-node-page,.guided-placement-page'))}
-  function isLiveFreeModePage(){return Boolean(document.body?.matches?.('.question-workspace-page,.knowledge-recall-page,.question-training-page'))}
+  function isLiveFreeModePage(){return Boolean(document.body?.matches?.('.question-workspace-page,.knowledge-recall-page,.question-training-page,.practice-mode-page'))}
   function mode(){
     const current=schema()?.getLanguageMode?.()||'zh';
     return isStudentPage()?(schema()?.normalizeStudentLanguageMode?.(current)||'zh'):current;

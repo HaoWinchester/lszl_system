@@ -182,6 +182,12 @@ async def list_practice_sessions(db: DB, user: CurrentUser):
     return {"sessions": await learning_service.list_practice_sessions(db, user.username)}
 
 
+@router.get("/learning/practice/experience-summary")
+async def practice_experience_summary(db: DB, user: CurrentUser):
+    """做题经验聚合（累计 / 本学习周 / 最近 7 日），供做题大厅经验面板展示。"""
+    return await learning_service.practice_experience_summary(db, user.username)
+
+
 @router.delete("/learning/practice/sessions")
 async def clear_practice_sessions(db: DB, user: CurrentUser):
     return {"ok": True, "deleted": await learning_service.clear_practice_sessions(db, user.username)}

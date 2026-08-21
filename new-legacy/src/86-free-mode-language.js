@@ -30,7 +30,8 @@
   function questionView(question={},requestedMode=mode()){
     const zh=chineseRecord(question)||{};
     const en=translationRecord(question)||{};
-    const bilingual=requestedMode==='bilingual';
+    // 三态显示：zh / en / bilingual（录入标准保证双语，en 缺失时由渲染层回落中文）
+    const normalized=requestedMode==='en'?'en':(requestedMode==='bilingual'?'bilingual':'zh');
     const zhOptions=Array.isArray(zh.options)?zh.options:Array.isArray(question.options)?question.options:[];
     const enById=englishOptions(question,en);
     const options=zhOptions.map((item,index)=>{
@@ -52,7 +53,7 @@
     const zhPath=clean(question.keyPath?.ruleText||question.keyPath?.label||zh.keyPath?.ruleText||zh.keyPath?.label);
     const enPath=clean(en.keyPath?.ruleText||en.keyPath?.label||question.keyPath?.ruleTextEn||question.keyPath?.labelEn);
     return {
-      mode:bilingual?'bilingual':'zh',
+      mode:normalized,
       title:pair(zhTitle,enTitle),
       stem:pair(zhStem,enStem),
       options,
@@ -96,5 +97,15 @@
     });
     return {...base,stemParts};
   }
-  global.KGFreeModeLanguage=Object.freeze({mode,pair,questionView,recallNodeView,recallQuestionView,englishNodeTitle});
+  // 三态取文案：zh→中文；en→英文（缺英文回落中文，不做更复杂的按题降级）；bilingual→中文 + 附英文行
+  function displayText(display={},requestedMode=mode()){
+    const zh=clean(display?.zh),en=clean(display?.en);
+    if(requestedMode==='en')return en||zh;
+    return zh;
+  }
+  function englishLineText(display){
+    const en=clean(display?.en);
+    return display?.hasEnglish&&en?en:'';
+  }
+  global.KGFreeModeLanguage=Object.freeze({mode,pair,questionView,recallNodeView,recallQuestionView,englishNodeTitle,displayText,englishLineText});
 })(window);

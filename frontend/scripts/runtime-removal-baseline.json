@@ -896,6 +896,11 @@
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_exam_current_v1__user__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_exam_paper_categories_v1__",
       "ordinal": 1
     },
@@ -913,6 +918,11 @@
       "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_exam_paper_categories_v1__user__",
       "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_exam_paper_categories_v1__user__",
+      "ordinal": 2
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
@@ -993,6 +1003,11 @@
       "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_exam_papers_v1__user__",
       "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_exam_papers_v1__user__",
+      "ordinal": 2
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
@@ -2061,6 +2076,11 @@
     },
     {
       "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
+      "token": "kg_practice_auto_explanation_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
       "token": "kg_remote_auth_session_v1",
       "ordinal": 1
     },
@@ -2537,6 +2557,11 @@
     {
       "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_practice_attempts_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_practice_auto_explanation_v1",
       "ordinal": 1
     },
     {
@@ -3566,6 +3591,11 @@
     },
     {
       "path": "new-legacy/src/65-question-bank-admin.js",
+      "token": "kg_exam_paper_categories_v1__",
+      "ordinal": 2
+    },
+    {
+      "path": "new-legacy/src/65-question-bank-admin.js",
       "token": "kg_exam_paper_release_history_v1",
       "ordinal": 1
     },
@@ -3578,6 +3608,11 @@
       "path": "new-legacy/src/65-question-bank-admin.js",
       "token": "kg_exam_papers_v1__",
       "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/65-question-bank-admin.js",
+      "token": "kg_exam_papers_v1__",
+      "ordinal": 2
     },
     {
       "path": "new-legacy/src/65-question-bank-admin.js",
@@ -3678,6 +3713,16 @@
       "path": "new-legacy/src/78-multi-question-workspace-tabs.js",
       "token": "kg_multi_workspace_closed_tabs_v1__",
       "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/86-activity-schema-v1.js",
+      "token": "kg_practice_auto_explanation_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/86-activity-schema-v1.js",
+      "token": "kg_practice_auto_explanation_v1",
+      "ordinal": 2
     },
     {
       "path": "new-legacy/src/86-activity-schema-v1.js",
