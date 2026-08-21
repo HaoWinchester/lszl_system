@@ -362,7 +362,9 @@ def test_exported_catalog_bank_reimports_by_source_identity() -> None:
             )
             assert created.status_code == 200, created.text
 
-            catalog = client.get("/api/v1/question-catalog/bootstrap?mode=managed")
+            catalog = client.get(
+                "/api/v1/question-catalog/bootstrap?mode=managed&include_questions=true"
+            )
             assert catalog.status_code == 200, catalog.text
             snapshot = catalog.json()
             exported_bank = next(
@@ -408,7 +410,9 @@ def test_exported_directly_created_bank_reimports_without_duplicate() -> None:
             )
             assert created_question.status_code == 200, created_question.text
 
-            snapshot = client.get("/api/v1/question-catalog/bootstrap?mode=managed").json()
+            snapshot = client.get(
+                "/api/v1/question-catalog/bootstrap?mode=managed&include_questions=true"
+            ).json()
             exported_bank = next(bank for bank in snapshot["banks"] if bank["id"] == bank_id)
             exported = {
                 **exported_bank,

@@ -5,17 +5,20 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import delete, func, select
 
-from app.cli.runtime_domain_migration import report_exit_code
+from app.cli.runtime_domain_migration import _run, build_parser, report_exit_code
 from app.db.session import AsyncSessionLocal
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import ExamPaper, Question, QuestionBank
 from app.models.runtime_migration import RuntimeMigrationItem, RuntimeMigrationRun
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.services.runtime_domain_migration_service import (
+    PAPER_RELEASE_HISTORY_KEY,
+    PUBLISHED_PAPERS_KEY,
     can_drop_runtime,
     canonical_json_hash,
     drop_check,
     migrate,
+    plan,
     scan,
     verify,
 )
@@ -25,6 +28,65 @@ def test_canonical_json_hash_ignores_object_key_order() -> None:
     assert canonical_json_hash({"b": 2, "a": [1, {"d": 4, "c": 3}]}) == canonical_json_hash(
         {"a": [1, {"c": 3, "d": 4}], "b": 2}
     )
+
+
+def test_cli_accepts_repeated_source_key_filters() -> None:
+    args = build_parser().parse_args([
+        "plan",
+        "--report-json",
+        "/tmp/runtime-plan.json",
+        "--source-key",
+        PUBLISHED_PAPERS_KEY,
+        "--source-key",
+        PAPER_RELEASE_HISTORY_KEY,
+    ])
+
+    assert args.source_keys == [PUBLISHED_PAPERS_KEY, PAPER_RELEASE_HISTORY_KEY]
+
+
+def test_plan_and_scan_can_isolate_paper_release_sources() -> None:
+    suffix = uuid4().hex[:10]
+    run_id = f"paper-source-filter-{suffix}"
+    unrelated_key = f"unrelated-runtime-key-{suffix}"
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            previous = await db.get(SharedRuntimeState, PUBLISHED_PAPERS_KEY)
+            previous_values = None if previous is None else {
+                "value": previous.value,
+                "updated_by": previous.updated_by,
+            }
+            if previous is not None:
+                await db.delete(previous)
+            db.add_all([
+                SharedRuntimeState(key=PUBLISHED_PAPERS_KEY, value="[]"),
+                SharedRuntimeState(key=unrelated_key, value='{"keep":true}'),
+            ])
+            await db.commit()
+
+            planned = await plan(db, source_keys={PUBLISHED_PAPERS_KEY})
+            assert planned["items"] == 1
+            assert planned["unknown"] == 0
+            assert [item["source_key"] for item in planned["plan"]] == [PUBLISHED_PAPERS_KEY]
+
+            scanned = await scan(db, run_id=run_id, source_keys={PUBLISHED_PAPERS_KEY})
+            assert scanned["items"] == 1
+            source_keys = set((await db.scalars(
+                select(RuntimeMigrationItem.source_key).where(
+                    RuntimeMigrationItem.run_id == run_id
+                )
+            )).all())
+            assert source_keys == {PUBLISHED_PAPERS_KEY}
+
+            await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
+            await db.execute(delete(SharedRuntimeState).where(
+                SharedRuntimeState.key.in_([PUBLISHED_PAPERS_KEY, unrelated_key])
+            ))
+            if previous_values is not None:
+                db.add(SharedRuntimeState(key=PUBLISHED_PAPERS_KEY, **previous_values))
+            await db.commit()
+
+    asyncio.run(scenario())
 
 
 def test_scan_deduplicates_identical_source_hashes_and_required_failure_blocks_drop() -> None:
@@ -197,6 +259,96 @@ def test_scan_deduplicates_identical_source_hashes_and_required_failure_blocks_d
     asyncio.run(scenario())
 
 
+def test_backfill_rescans_changed_sources_with_the_same_run_id() -> None:
+    suffix = uuid4().hex[:10]
+    run_id = f"repeat-backfill-{suffix}"
+    subject_id = f"subject-repeat-{suffix}"
+    first_id = f"taxonomy-first-{suffix}"
+    second_id = f"taxonomy-second-{suffix}"
+    source_key = "kg_content_taxonomies_v1"
+    first_payload = [{
+        "id": first_id,
+        "subjectId": subject_id,
+        "subjectName": "重复回填科目",
+        "title": "第一版分类",
+        "version": 1,
+        "status": "published",
+        "nodes": [],
+    }]
+    second_payload = [
+        *first_payload,
+        {
+            "id": second_id,
+            "subjectId": subject_id,
+            "subjectName": "重复回填科目",
+            "title": "第二版新增分类",
+            "version": 2,
+            "status": "published",
+            "nodes": [],
+        },
+    ]
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            previous = await db.get(SharedRuntimeState, source_key)
+            previous_values = None if previous is None else {
+                "value": previous.value,
+                "updated_by": previous.updated_by,
+            }
+            if previous is not None:
+                await db.delete(previous)
+            db.add(SharedRuntimeState(
+                key=source_key,
+                value=__import__("json").dumps(first_payload),
+                updated_by="admin",
+            ))
+            await db.commit()
+
+        first = await _run("backfill", run_id, {source_key})
+        assert first["status"] == "verified"
+        assert first["scan"]["created"] == 1
+
+        async with AsyncSessionLocal() as db:
+            item = await db.scalar(select(RuntimeMigrationItem).where(
+                RuntimeMigrationItem.run_id == run_id,
+                RuntimeMigrationItem.required.is_(True),
+            ))
+            assert item is not None
+            item.status = "failed"
+            item.error = "模拟上次部署中断"
+            await db.commit()
+
+        retried = await _run("backfill", run_id, {source_key})
+        assert retried["status"] == "verified", retried
+
+        async with AsyncSessionLocal() as db:
+            row = await db.get(SharedRuntimeState, source_key)
+            assert row is not None
+            row.value = __import__("json").dumps(second_payload)
+            await db.commit()
+
+        second = await _run("backfill", run_id, {source_key})
+        assert second["status"] == "verified", second
+        assert second["scan"] is not None
+        assert second["scan"]["created"] == 1
+
+        async with AsyncSessionLocal() as db:
+            assert await db.get(ContentTaxonomy, second_id) is not None
+            await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
+            await db.execute(delete(ContentTaxonomy).where(
+                ContentTaxonomy.id.in_([first_id, second_id])
+            ))
+            await db.execute(delete(ContentSubject).where(ContentSubject.id == subject_id))
+            await db.execute(delete(SharedRuntimeState).where(SharedRuntimeState.key == source_key))
+            if previous_values is not None:
+                db.add(SharedRuntimeState(key=source_key, **previous_values))
+            await db.commit()
+
+    from app.models.teaching_content import ContentSubject, ContentTaxonomy
+
+    asyncio.run(scenario())
+
+
 def test_concurrent_scan_upserts_one_run_and_item() -> None:
     run_id = f"concurrent-ledger-{uuid4().hex}"
     sources = [{
@@ -323,12 +475,43 @@ def test_paper_release_mappers_materialize_shared_catalog_and_history() -> None:
             assert verified["status"] == "verified"
             assert await can_drop_runtime(db, run_id) is True
 
+            overlap_run_id = f"paper-release-overlap-{suffix}"
+            await scan(db, run_id=overlap_run_id, sources=[
+                {"source_type": "shared_runtime", "source_key": PUBLISHED_PAPERS_KEY, "owner_scope": "shared", "payload": catalog},
+                {"source_type": "shared_runtime", "source_key": PAPER_RELEASE_HISTORY_KEY, "owner_scope": "shared", "payload": catalog},
+            ])
+            overlap_items = list((await db.scalars(select(RuntimeMigrationItem).where(
+                RuntimeMigrationItem.run_id == overlap_run_id
+            ))).all())
+            assert len(overlap_items) == 2
+            for item in overlap_items:
+                item.status = "migrated"
+            await db.commit()
+            overlap_verified = await verify(db, overlap_run_id)
+            assert overlap_verified["status"] == "verified"
+
+            current_release = await db.get(PaperRelease, current_id)
+            assert current_release is not None
+            current_release.name = "关系域合法改名"
+            await db.commit()
+            repeated = await _run(
+                "backfill",
+                run_id,
+                {PUBLISHED_PAPERS_KEY, PAPER_RELEASE_HISTORY_KEY},
+            )
+            assert repeated["status"] == "verified", repeated
+            await db.refresh(current_release)
+            assert current_release.name == "关系域合法改名"
+
             rows[0].snapshot = {**rows[0].snapshot, "title": "被污染"}
             await db.commit()
+            blocked_drop = await drop_check(db, run_id)
+            assert blocked_drop["can_drop"] is False
             polluted = await verify(db, run_id)
             assert polluted["status"] == "verification_failed"
             assert await can_drop_runtime(db, run_id) is False
 
+            await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == overlap_run_id))
             await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
             await db.execute(delete(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id.in_([current_id, history_id])))
             await db.execute(delete(PaperRelease).where(PaperRelease.paper_id == paper_id))

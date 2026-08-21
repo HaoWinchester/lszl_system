@@ -66,6 +66,51 @@ def _timestamp(value) -> int:
     return int(value.timestamp() * 1000) if value else 0
 
 
+async def sync_active_release_names_from_draft_payload(
+    db: AsyncSession,
+    raw_payload: str,
+) -> list[str]:
+    """Project saved draft names onto active catalog rows only.
+
+    The release version and frozen question snapshots stay immutable. Invalid
+    draft rows are ignored so an unrelated legacy row cannot make a valid save
+    fail at the relational projection boundary.
+    """
+    try:
+        rows = json.loads(raw_payload or "[]")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return []
+    if not isinstance(rows, list):
+        return []
+
+    names: dict[str, str] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        paper_id = str(row.get("id") or row.get("paperId") or "").strip()
+        name = str(row.get("name") or row.get("title") or "").strip()
+        if paper_id and name and len(name) <= 200:
+            names[paper_id] = name
+    if not names:
+        return []
+
+    releases = list((await db.execute(
+        select(PaperRelease)
+        .where(
+            PaperRelease.paper_id.in_(names),
+            PaperRelease.status == ACTIVE_STATUS,
+        )
+        .with_for_update()
+    )).scalars().all())
+    changed: list[str] = []
+    for release in releases:
+        name = names[release.paper_id]
+        if release.name != name:
+            release.name = name
+            changed.append(release.id)
+    return changed
+
+
 def release_to_dict(release: PaperRelease, *, content_restricted: bool = False) -> dict:
     payload = {
         "id": release.id,

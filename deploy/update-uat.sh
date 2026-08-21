@@ -27,7 +27,7 @@ bump_version() {
   printf '%s' "${v%.*}.$n" > "$version_file"
 }
 
-echo "[0/7] 服务器磁盘预检（剩余 < ${MIN_FREE_GB}GB 则中止）"
+echo "[0/8] 服务器磁盘预检（剩余 < ${MIN_FREE_GB}GB 则中止）"
 free_kb=$(ssh "$REMOTE" "df -P / | awk 'NR==2 {print \$4}'")
 free_gb=$((free_kb / 1024 / 1024))
 echo "      / 剩余 ${free_gb}GB"
@@ -36,13 +36,13 @@ if [ "$free_gb" -lt "$MIN_FREE_GB" ]; then
   exit 1
 fi
 
-echo "[1/7] 本地构建 new-legacy 产物（前端页面 + 引导课程 seed）"
+echo "[1/8] 本地构建 new-legacy 产物（前端页面 + 引导课程 seed）"
 cd "$REPO_DIR/frontend"
 node scripts/sync-new-legacy.js
 node scripts/export-guided-course.mjs
 cd "$REPO_DIR"
 
-echo "[2/7] 打包并发布 new-legacy release"
+echo "[2/8] 打包并发布 new-legacy release"
 cd "$REPO_DIR/frontend"
 # 若本地已有同版本号但内容不同的 release（开发分支忘记递增 VERSION），自动递增末段重打包。
 # 只有 update 真正成功才允许继续，防止把旧包当新版本发布出去。
@@ -79,7 +79,7 @@ node scripts/manage-new-legacy.js promote "$VERSION"
 cd "$REPO_DIR"
 echo "      当前发布版本：$VERSION"
 
-echo "[3/7] rsync 代码与 release 到 $REMOTE:$REMOTE_DIR"
+echo "[3/8] rsync 代码与 release 到 $REMOTE:$REMOTE_DIR"
 rsync -az --delete \
   --exclude '/.git' --exclude '/legacy' --exclude '/new-legacy' --exclude '/docs' \
   --exclude '/.superpowers' --exclude '/.pytest_cache' --exclude '/.gitattributes' \
@@ -92,18 +92,26 @@ rsync -az "$REPO_DIR/frontend/new-legacy-releases/current.json" \
   "$REPO_DIR/frontend/new-legacy-releases/$VERSION" \
   "$REMOTE:$REMOTE_DIR/frontend/new-legacy-releases/"
 
-echo "[4/7] 重建 UAT 后端镜像并重启（alembic 迁移自动执行）"
+echo "[4/8] 重建 UAT 后端镜像并重启（alembic 迁移自动执行）"
 ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE up -d --build"
 
-echo "[5/7] 等待健康检查（18087）"
+echo "[5/8] 等待健康检查（18087）"
 ssh "$REMOTE" "healthy=0; for attempt in \$(seq 1 40); do if curl -fsS $HEALTH_URL >/dev/null; then healthy=1; break; fi; sleep 1; done; test \"\$healthy\" -eq 1" \
   || { echo "✗ 健康检查失败，查看日志：ssh $REMOTE 'cd $REMOTE_DIR && docker compose -p $PROJECT logs backend --tail 50'" >&2; exit 1; }
 echo "      HEALTH_OK"
 
-echo "[6/7] 清理构建缓存与悬空镜像（仅清理 dangling 资源，不动运行中容器）"
+echo "[6/8] 回填历史已发布试卷到关系化目录（仅限两个试卷发布键）"
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE exec -T backend python -m app.cli.runtime_domain_migration backfill \
+  --run-id uat-paper-release-backfill-v1 \
+  --source-key kg_exam_papers_published_v1 \
+  --source-key kg_exam_paper_release_history_v1 \
+  --report-json /tmp/uat-paper-release-backfill.json"
+echo "      PAPER_RELEASE_BACKFILL_OK"
+
+echo "[7/8] 清理构建缓存与悬空镜像（仅清理 dangling 资源，不动运行中容器）"
 ssh "$REMOTE" 'docker image prune -f >/dev/null; docker builder prune -f --filter until=168h >/dev/null; true'
 
-echo "[7/7] 磁盘水位与 UAT 版本核对"
+echo "[8/8] 磁盘水位与 UAT 版本核对"
 ssh "$REMOTE" 'df -h / | tail -1'
 curl -fsS "http://uat.aihuanpu.com/" | grep -o 'data-release="[^"]*"' | head -1 || true
 

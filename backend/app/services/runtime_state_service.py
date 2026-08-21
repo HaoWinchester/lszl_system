@@ -19,6 +19,7 @@ from app.models.user import User
 from app.services import (
     file_service,
     guided_learning_service,
+    paper_release_service,
     subscription_service,
     teaching_content_projection_service,
     teaching_content_revision_service,
@@ -1582,6 +1583,11 @@ async def apply_update(
         else:
             shared_row.value = merge_shared_value(key, shared_row.value, value, owner)
             shared_row.updated_by = owner
+        if key == "kg_exam_papers_v1__teacher_shared":
+            await paper_release_service.sync_active_release_names_from_draft_payload(
+                db,
+                value,
+            )
         if mutation in teaching_mutations:
             content_changes.append(
                 {"entityType": "runtimeShared", "entityId": key, "action": "updated"}

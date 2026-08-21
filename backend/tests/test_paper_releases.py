@@ -9,7 +9,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from app.core.security import now_utc
 from app.db.session import AsyncSessionLocal
@@ -311,6 +311,59 @@ def test_publish_increments_version_and_keeps_prior_snapshot_immutable() -> None
             assert [item.version for item in history] == [2, 1]
             assert first_questions["questions"][0]["question"]["title"] == "冻结题目 0"
             assert second_questions["questions"][0]["question"]["title"] == "发布后被编辑"
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(_cleanup(ids))
+
+
+def test_draft_save_syncs_active_release_name_without_mutating_frozen_questions() -> None:
+    ids = _ids()
+    asyncio.run(_seed(ids))
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            teacher = await db.get(User, ids["teacher"])
+            release = await paper_release_service.publish(
+                db,
+                teacher,
+                ids["paper"],
+                expected_revision=1,
+                access_level="free",
+                enabled_modes=["practice_mode"],
+                allowed_roles=["teacher", "student"],
+                metadata={},
+            )
+            frozen = await db.scalar(
+                select(PaperReleaseQuestion)
+                .where(PaperReleaseQuestion.release_id == release.id)
+                .order_by(PaperReleaseQuestion.order_index)
+                .limit(1)
+            )
+            original_snapshot = dict(frozen.snapshot)
+            original_version = release.version
+
+            changed = await paper_release_service.sync_active_release_names_from_draft_payload(
+                db,
+                json.dumps([
+                    {"id": ids["paper"], "name": "保存后立即展示的新名称"},
+                    {"id": ids["other_paper"], "name": "未发布试卷不应创建版本"},
+                ], ensure_ascii=False),
+            )
+            await db.commit()
+            await db.refresh(release)
+            await db.refresh(frozen)
+
+            assert changed == [release.id]
+            assert release.name == "保存后立即展示的新名称"
+            assert release.version == original_version
+            assert frozen.snapshot == original_snapshot
+            assert await db.scalar(
+                select(func.count()).select_from(PaperRelease).where(
+                    PaperRelease.paper_id == ids["other_paper"]
+                )
+            ) == 0
 
     try:
         asyncio.run(scenario())

@@ -15,9 +15,14 @@
     'kg_practice_auto_explanation_v1',  // 做题"自动解析"开关：设备级 UI 偏好，只存本浏览器
   ])
   const path = global.location.pathname.split('/').pop() || 'learning-path.html'
+  // FastAPI 注入值是页面与数据域的权威配对；发送 runtime 请求时必须
+  // 与后端 PAGE_NAMESPACES 一致，否则会被 422“页面与数据域不匹配”拒绝。
+  const injected = global.__KG_DIRECT_BOOTSTRAP__
   const namespaces = {
     'index.html': 'files',
     'learning-path.html': 'guided-learning',
+    'guided-learning-node.html': 'guided-learning',
+    'guided-learning-placement-test.html': 'guided-learning',
     'question-training.html': 'training',
     'question-workspace.html': 'workspace',
     'question-bank.html': 'questions',
@@ -25,17 +30,24 @@
     'file-manager.html': 'files',
     'user-management.html': 'users',
     'system-settings.html': 'system',
+    'paper-management.html': 'papers',
+    'content-prep.html': 'content',
+    'course-admin.html': 'courses',
+    'content-center.html': 'content',
+    'teacher-workbench.html': 'teacher',
     'admin-console.html': 'admin',
+    'admin-operations.html': 'operations',
+    'admin-settings.html': 'admin',
+    'admin-subjects.html': 'subjects',
   }
-  const page = path
-  const namespace = namespaces[page] || 'page'
+  const page = String(injected?.page || path)
+  const namespace = String(injected?.namespace || namespaces[page] || 'page')
   const stateQuery = new URLSearchParams({
     mode: 'bootstrap',
     page,
   })
   // 优先消费 FastAPI 内联注入的会话元数据（__KG_DIRECT_BOOTSTRAP__），
   // 保证 revision/contentRevision 与页面渲染同一快照；无注入时回退本地推导。
-  const injected = global.__KG_DIRECT_BOOTSTRAP__
   const entry = {
     page,
     namespace,

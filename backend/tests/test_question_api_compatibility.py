@@ -828,7 +828,7 @@ def test_concurrent_compose_and_publish_share_one_atomic_revision(monkeypatch) -
                         paper_id,
                         [bank_id],
                         {"并发领域": 1},
-                        1,
+                        2,
                     )
                     return "compose", picked
                 except HTTPException as exc:
@@ -841,13 +841,25 @@ def test_concurrent_compose_and_publish_share_one_atomic_revision(monkeypatch) -
                         publish_actor,
                         paper_id,
                         True,
-                        1,
+                        2,
                     )
                     return "publish", 1
                 except HTTPException as exc:
                     return "publish-conflict", exc.status_code
 
-            results = await asyncio.gather(compose(), publish())
+            tasks = [
+                asyncio.create_task(compose(), name="compose-paper"),
+                asyncio.create_task(publish(), name="publish-paper"),
+            ]
+            done, pending = await asyncio.wait(tasks, timeout=3)
+            if pending:
+                for task in tasks:
+                    task.print_stack()
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
+                pytest.fail("concurrent paper mutations did not finish within 3 seconds")
+            results = [task.result() for task in tasks]
 
         async with AsyncSessionLocal() as db:
             paper = await db.get(ExamPaper, paper_id)
@@ -912,6 +924,16 @@ def test_concurrent_compose_and_publish_share_one_atomic_revision(monkeypatch) -
                 json={"name": "并发互斥试卷", "subject": "PMP"},
             ).json()["paper"]
             paper_id = paper["id"]
+            seeded = client.post(
+                f"/api/v1/papers/{paper_id}/compose",
+                json={
+                    "bankIds": [bank_id],
+                    "quotas": {"并发领域": 1},
+                    "revision": 1,
+                },
+            )
+            assert seeded.status_code == 200
+            assert seeded.json()["picked"] == 1
 
         result = asyncio.run(run_race())
         assert sorted(item[0] for item in result["results"]) in (
@@ -919,7 +941,7 @@ def test_concurrent_compose_and_publish_share_one_atomic_revision(monkeypatch) -
             ["compose-conflict", "publish"],
         )
         assert [item[1] for item in result["results"] if "conflict" in item[0]] == [409]
-        assert result["revision"] == 2
+        assert result["revision"] == 3
         if result["results"][0][0] == "compose":
             assert result["status"] == "draft"
             assert result["updatedBy"] == teacher_b
@@ -927,6 +949,6 @@ def test_concurrent_compose_and_publish_share_one_atomic_revision(monkeypatch) -
         else:
             assert result["status"] == "published"
             assert result["updatedBy"] == "admin"
-            assert result["referenceCount"] == 0
+            assert result["referenceCount"] == 1
     finally:
         asyncio.run(cleanup())

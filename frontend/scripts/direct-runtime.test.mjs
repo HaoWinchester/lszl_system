@@ -42,6 +42,66 @@ test('direct bootstrap consumes the FastAPI-injected payload', () => {
   assert.doesNotMatch(source, /__KG_NEW_LEGACY_BOOTSTRAP__/)
 })
 
+test('direct bootstrap preserves the backend namespace for paper management saves', async () => {
+  class CustomEvent {
+    constructor(type, options = {}) {
+      this.type = type
+      this.detail = options.detail
+    }
+  }
+  const nativeStorage = {
+    values: new Map(),
+    get length() { return this.values.size },
+    getItem(key) { return this.values.get(String(key)) ?? null },
+    setItem(key, value) { this.values.set(String(key), String(value)) },
+    removeItem(key) { this.values.delete(String(key)) },
+    clear() { this.values.clear() },
+    key(index) { return [...this.values.keys()][Number(index)] ?? null },
+  }
+  const listeners = new Map()
+  const fetch = async (url) => {
+    if (String(url).startsWith('/api/v1/auth/me')) {
+      return { ok: true, json: async () => ({ user: { username: 'teacher-a', role: 'teacher' } }) }
+    }
+    return {
+      ok: true,
+      json: async () => ({ storage: {}, revision: 1, contentRevision: 1 }),
+    }
+  }
+  const window = {
+    location: { pathname: '/paper-management.html' },
+    localStorage: nativeStorage,
+    __KG_DIRECT_BOOTSTRAP__: {
+      page: 'paper-management.html',
+      namespace: 'papers',
+      authenticated: true,
+      authUser: { username: 'teacher-a', role: 'teacher' },
+      username: 'teacher-a',
+      revision: 1,
+      contentRevision: 1,
+      readOnly: false,
+    },
+    crypto: { randomUUID: () => 'runtime-test-request' },
+    navigator: {},
+    setTimeout: () => 0,
+    clearTimeout() {},
+    queueMicrotask(callback) { callback() },
+    addEventListener(type, callback) { listeners.set(type, callback) },
+    dispatchEvent() {},
+  }
+  window.window = window
+  vm.runInNewContext(source, {
+    window,
+    fetch,
+    CustomEvent,
+    URLSearchParams,
+    console,
+  })
+  await new Promise(resolve => setImmediate(resolve))
+
+  assert.equal(window.KGServerStateBootstrap.namespace, 'papers')
+})
+
 test('direct state persistence never posts to a parent window', () => {
   assert.doesNotMatch(source, /parent\.postMessage/)
   assert.match(source, /fetch\(['"]\/api\/v1\/runtime\/state['"]/)

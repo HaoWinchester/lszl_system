@@ -239,12 +239,15 @@ async def _paper_release_mapper(db: AsyncSession, item: RuntimeMigrationItem) ->
         raise ValueError("frozen migration source hash mismatch")
     canonical = _normalize_release_source(item.source_payload, item.source_key)
     result: list[dict[str, Any]] = []
+    created_sources: list[dict[str, Any]] = []
     for raw, source in zip(item.source_payload, canonical, strict=True):
         release_id = source["releaseId"]
         existing = await db.get(PaperRelease, release_id)
         if existing is not None:
-            if item.source_key != PAPER_RELEASE_HISTORY_KEY:
-                raise ValueError(f"paper release target already exists: {release_id}")
+            # The relational domain owns an existing release.  A compatibility
+            # snapshot may be stale after a legitimate rename, so only newly
+            # materialized releases belong to this migration item's proof.
+            continue
         else:
             published_at = datetime.fromisoformat(source["publishedAt"].replace("Z", "+00:00"))
             existing = PaperRelease(
@@ -275,7 +278,14 @@ async def _paper_release_mapper(db: AsyncSession, item: RuntimeMigrationItem) ->
                     snapshot=question["question"],
                 ))
             await db.flush()
+            created_sources.append(source)
         result.append(await _read_one_paper_release_canonical(db, existing))
+    item.expected_count = len(created_sources)
+    item.expected_hash = canonical_json_hash(created_sources)
+    item.verification_metadata = {
+        **dict(item.verification_metadata or {}),
+        "migrated_release_ids": [source["releaseId"] for source in created_sources],
+    }
     return {"canonical_payload": result}
 
 
@@ -417,9 +427,24 @@ def _source_snapshot_payload(sources: Iterable[Mapping[str, Any]]) -> list[dict[
     return sorted(payload, key=lambda row: (row["source_type"], row["source_key"], row["owner_scope"], canonical_json_hash(row["payload"])))
 
 
-async def plan(db: AsyncSession) -> dict[str, Any]:
+def _select_source_keys(
+    sources: Iterable[Mapping[str, Any]],
+    source_keys: set[str] | None,
+) -> list[Mapping[str, Any]]:
+    rows = list(sources)
+    if source_keys is None:
+        return rows
+    selected = {str(key) for key in source_keys}
+    return [row for row in rows if str(row.get("source_key") or "") in selected]
+
+
+async def plan(
+    db: AsyncSession,
+    *,
+    source_keys: set[str] | None = None,
+) -> dict[str, Any]:
     """Build a read-only migration plan without creating a run or ledger rows."""
-    sources = await _runtime_sources(db)
+    sources = _select_source_keys(await _runtime_sources(db), source_keys)
     items = []
     for source in sources:
         source_key = str(source.get("source_key") or "")
@@ -452,6 +477,8 @@ async def scan(
     db: AsyncSession,
     run_id: str | None = None,
     sources: Iterable[Mapping[str, Any]] | None = None,
+    *,
+    source_keys: set[str] | None = None,
 ) -> dict[str, Any]:
     run_id = run_id or "runtime-domain-migration"
     run = await _require_run(db, run_id)
@@ -459,13 +486,46 @@ async def scan(
     created = 0
     deduplicated = 0
 
-    source_rows = list(sources) if sources is not None else await _runtime_sources(db)
+    source_rows = _select_source_keys(
+        list(sources) if sources is not None else await _runtime_sources(db),
+        source_keys,
+    )
     snapshot_payload = _source_snapshot_payload(source_rows)
     snapshot_hash = canonical_json_hash(snapshot_payload)
     run.source_snapshot_hash = snapshot_hash
     run.source_snapshot_count = len(snapshot_payload)
     run.snapshot_created_at = datetime.now(timezone.utc)
     run.backup_reference = run.backup_reference or f"runtime-migration:{run_id}:{snapshot_hash}"
+
+    current_sources = {
+        (
+            str(source.get("source_type") or "runtime"),
+            str(source.get("source_key") or ""),
+            str(source.get("owner_id") or source.get("owner_scope") or ""),
+            canonical_json_hash(source.get("payload")),
+        ): bool(source.get("required", True))
+        for source in source_rows
+    }
+    existing_items = list((await db.scalars(
+        select(RuntimeMigrationItem).where(RuntimeMigrationItem.run_id == run_id)
+    )).all())
+    for existing in existing_items:
+        identity = (
+            existing.source_type,
+            existing.source_key,
+            existing.owner_scope,
+            existing.source_hash,
+        )
+        if identity in current_sources:
+            existing.required = current_sources[identity]
+            if existing.status in {"superseded", "failed"}:
+                existing.status = "pending"
+                existing.error = None
+        else:
+            existing.required = False
+            existing.status = "superseded"
+            existing.error = None
+    await db.flush()
 
     for source in source_rows:
         source_type = str(source.get("source_type") or "runtime")
@@ -747,7 +807,12 @@ async def _read_teaching_canonical(db: AsyncSession, item: RuntimeMigrationItem)
     return {"subjectId": subject_id, "library": dict(row.content_metadata or {}) if row else {}}
 
 
-async def verify(db: AsyncSession, run_id: str) -> dict[str, Any]:
+async def verify(
+    db: AsyncSession,
+    run_id: str,
+    *,
+    recheck_verified: bool = True,
+) -> dict[str, Any]:
     run = await _require_run(db, run_id)
     items = list(
         (await db.scalars(select(RuntimeMigrationItem).where(RuntimeMigrationItem.run_id == run_id))).all()
@@ -765,7 +830,7 @@ async def verify(db: AsyncSession, run_id: str) -> dict[str, Any]:
             for source in current_sources
         })
     for item in items:
-        if item.status in {"migrated", "verified"}:
+        if item.status == "migrated" or (recheck_verified and item.status == "verified"):
             if item.source_key in ENGAGEMENT_SOURCE_KEYS or item.source_key.startswith("kg_user_message_reads_v1__") or item.source_key.startswith("kg_user_feedback_reply_reads_v1__"):
                 target_payload = await _read_engagement_canonical(db, item)
                 item.target_count = _payload_count(target_payload)
@@ -776,6 +841,16 @@ async def verify(db: AsyncSession, run_id: str) -> dict[str, Any]:
                 item.target_hash = canonical_json_hash(target_payload)
             elif item.source_key in {PUBLISHED_PAPERS_KEY, PAPER_RELEASE_HISTORY_KEY}:
                 target_payload = await _read_paper_release_canonical(db, item)
+                proof_ids: set[str] | None = None
+                migrated_release_ids = (item.verification_metadata or {}).get(
+                    "migrated_release_ids"
+                )
+                if isinstance(migrated_release_ids, list):
+                    proof_ids = {str(release_id) for release_id in migrated_release_ids}
+                    target_payload = [
+                        row for row in target_payload
+                        if str(row.get("releaseId")) in proof_ids
+                    ]
                 item.target_count = _payload_count(target_payload)
                 item.target_hash = canonical_json_hash(target_payload)
                 if item.source_key == PAPER_RELEASE_HISTORY_KEY:
@@ -789,15 +864,20 @@ async def verify(db: AsyncSession, run_id: str) -> dict[str, Any]:
                         str(source["releaseId"]) for source in history_sources
                         if str(source["releaseId"]) not in current_target_by_release
                     }
-                    if history_only_ids:
-                        target_payload = [row for row in target_payload if str(row.get("releaseId")) in history_only_ids]
-                        item.target_count = _payload_count(target_payload)
-                        item.target_hash = canonical_json_hash(target_payload)
-                        item.expected_hash = canonical_json_hash([
-                            source for source in history_sources
-                            if str(source["releaseId"]) in history_only_ids
-                        ])
-                        item.expected_count = len(history_only_ids)
+                    if proof_ids is not None:
+                        history_only_ids &= proof_ids
+                    target_payload = [
+                        row for row in target_payload
+                        if str(row.get("releaseId")) in history_only_ids
+                    ]
+                    expected_history = [
+                        source for source in history_sources
+                        if str(source["releaseId"]) in history_only_ids
+                    ]
+                    item.target_count = _payload_count(target_payload)
+                    item.target_hash = canonical_json_hash(target_payload)
+                    item.expected_hash = canonical_json_hash(expected_history)
+                    item.expected_count = len(history_only_ids)
             expected_count = item.expected_count if item.expected_count is not None else item.source_count
             expected_hash = item.expected_hash or item.source_hash
             counts_match = expected_count == item.target_count
@@ -809,7 +889,10 @@ async def verify(db: AsyncSession, run_id: str) -> dict[str, Any]:
                 item.error = "source and target hashes differ"
             else:
                 item.error = None
-    unknown = sum(1 for item in items if item.disposition == DISPOSITION_UNKNOWN)
+    unknown = sum(
+        1 for item in items
+        if item.required and item.disposition == DISPOSITION_UNKNOWN
+    )
     required_failures = sum(
         1 for item in items if item.required and item.status != "verified"
     )
@@ -840,12 +923,28 @@ async def can_drop_runtime(db: AsyncSession, run_id: str) -> bool:
     # A drop is only safe when the immutable source snapshot and its backup marker exist.
     if not run.source_snapshot_hash or run.source_snapshot_count <= 0 or not run.backup_reference:
         return False
-    current_sources = await _runtime_sources(db)
+    stored_snapshot = (run.report or {}).get("source_snapshot_payload")
+    if not isinstance(stored_snapshot, list):
+        return False
+    stored_identities = {
+        (
+            str(row.get("source_type") or "runtime"),
+            str(row.get("source_key") or ""),
+            str(row.get("owner_scope") or ""),
+        )
+        for row in stored_snapshot
+        if isinstance(row, Mapping)
+    }
+    current_sources = [
+        source for source in await _runtime_sources(db)
+        if (
+            str(source.get("source_type") or "runtime"),
+            str(source.get("source_key") or ""),
+            str(source.get("owner_id") or source.get("owner_scope") or ""),
+        ) in stored_identities
+    ]
     current_snapshot = _source_snapshot_payload(current_sources)
     if not current_snapshot:
-        stored_snapshot = (run.report or {}).get("source_snapshot_payload")
-        if not isinstance(stored_snapshot, list):
-            return False
         current_snapshot = stored_snapshot
     if len(current_snapshot) != run.source_snapshot_count:
         return False
@@ -882,6 +981,8 @@ async def can_drop_runtime(db: AsyncSession, run_id: str) -> bool:
 async def drop_check(db: AsyncSession, run_id: str) -> dict[str, Any]:
     """Read-only drop gate report; this function never executes DDL."""
     run = await db.get(RuntimeMigrationRun, run_id)
+    if run is not None:
+        await verify(db, run_id)
     allowed = await can_drop_runtime(db, run_id)
     items = list((await db.scalars(select(RuntimeMigrationItem).where(RuntimeMigrationItem.run_id == run_id))).all()) if run else []
     return {
