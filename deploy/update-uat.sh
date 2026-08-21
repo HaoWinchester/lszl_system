@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# 一键更新 uat.aihuanpu.com（佩奇老师 UAT 测试环境）
+# 流程：磁盘预检 → 本地构建 new-legacy 产物 → 打包并发布 release → rsync 到服务器
+#       → 重建后端镜像并重启 → 健康检查 → 清理构建缓存（防磁盘打满，2026-08-21 事故教训）
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REMOTE="resume-prod"
+REMOTE_DIR="/home/ubuntu/lszl-kg-uat"
+PROJECT="lszl-kg-uat"
+COMPOSE_FILE="docker-compose.uat.yml"
+ENV_FILE=".env.uat"
+HEALTH_URL="http://127.0.0.1:18087/api/v1/health"
+MIN_FREE_GB=5   # 部署前服务器最低剩余磁盘（GB），不足则中止
+
+version_file="$REPO_DIR/new-legacy/VERSION"
+
+bump_version() {
+  # v9.0-p4.1.127 -> v9.0-p4.1.128（末段自增）
+  local v n
+  v="$(cat "$version_file")"
+  n="$(("${v##*.}" + 1))"
+  printf '%s' "${v%.*}.$n" > "$version_file"
+}
+
+echo "[0/7] 服务器磁盘预检（剩余 < ${MIN_FREE_GB}GB 则中止）"
+free_kb=$(ssh "$REMOTE" "df -P / | awk 'NR==2 {print \$4}'")
+free_gb=$((free_kb / 1024 / 1024))
+echo "      / 剩余 ${free_gb}GB"
+if [ "$free_gb" -lt "$MIN_FREE_GB" ]; then
+  echo "✗ 磁盘剩余不足 ${MIN_FREE_GB}GB，先执行清理（docker builder prune -f）再部署" >&2
+  exit 1
+fi
+
+echo "[1/7] 本地构建 new-legacy 产物（前端页面 + 引导课程 seed）"
+cd "$REPO_DIR/frontend"
+node scripts/sync-new-legacy.js
+node scripts/export-guided-course.mjs
+cd "$REPO_DIR"
+
+echo "[2/7] 打包并发布 new-legacy release"
+cd "$REPO_DIR/frontend"
+# 若本地已有同版本号但内容不同的 release（开发分支忘记递增 VERSION），自动递增末段重打包
+for _ in 1 2 3; do
+  if node scripts/manage-new-legacy.js update ../new-legacy 2>&1 | tee /tmp/kg-uat-release.log; then
+    break
+  fi
+  if grep -q '相同版本号' /tmp/kg-uat-release.log; then
+    old="$(cat "$version_file")"
+    bump_version
+    echo "      版本号冲突：$old -> $(cat "$version_file")，重新生成产物"
+    cd "$REPO_DIR/frontend" && node scripts/sync-new-legacy.js && cd "$REPO_DIR"
+  else
+    echo "✗ release 打包失败，见上方验证输出" >&2
+    exit 1
+  fi
+done
+VERSION="$(cat "$version_file")"
+node scripts/manage-new-legacy.js promote "$VERSION"
+cd "$REPO_DIR"
+echo "      当前发布版本：$VERSION"
+
+echo "[3/7] rsync 代码与 release 到 $REMOTE:$REMOTE_DIR"
+rsync -az --delete \
+  --exclude '/.git' --exclude '/legacy' --exclude '/new-legacy' --exclude '/docs' \
+  --exclude '/.superpowers' --exclude '/.pytest_cache' --exclude '/.gitattributes' \
+  --exclude 'node_modules' --exclude '.venv' --exclude '__pycache__' --exclude '*.pyc' \
+  --exclude '.DS_Store' --exclude '._*' --exclude '/frontend/e2e' --exclude '/e2e' \
+  --exclude '.env.prod' --exclude '/backend/.env' --exclude '.env.uat' \
+  --exclude '/deploy' \
+  "$REPO_DIR/" "$REMOTE:$REMOTE_DIR/"
+rsync -az "$REPO_DIR/frontend/new-legacy-releases/current.json" \
+  "$REPO_DIR/frontend/new-legacy-releases/$VERSION" \
+  "$REMOTE:$REMOTE_DIR/frontend/new-legacy-releases/"
+
+echo "[4/7] 重建 UAT 后端镜像并重启（alembic 迁移自动执行）"
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE up -d --build"
+
+echo "[5/7] 等待健康检查（18087）"
+ssh "$REMOTE" "healthy=0; for attempt in \$(seq 1 40); do if curl -fsS $HEALTH_URL >/dev/null; then healthy=1; break; fi; sleep 1; done; test \"\$healthy\" -eq 1" \
+  || { echo "✗ 健康检查失败，查看日志：ssh $REMOTE 'cd $REMOTE_DIR && docker compose -p $PROJECT logs backend --tail 50'" >&2; exit 1; }
+echo "      HEALTH_OK"
+
+echo "[6/7] 清理构建缓存与悬空镜像（仅清理 dangling 资源，不动运行中容器）"
+ssh "$REMOTE" 'docker image prune -f >/dev/null; docker builder prune -f --filter until=168h >/dev/null; true'
+
+echo "[7/7] 磁盘水位与 UAT 版本核对"
+ssh "$REMOTE" 'df -h / | tail -1'
+curl -fsS "http://uat.aihuanpu.com/" | grep -o 'data-release="[^"]*"' | head -1 || true
+
+echo
+echo "✓ UAT 更新完成：http://uat.aihuanpu.com ($VERSION)"
+echo "  查看日志：ssh $REMOTE 'cd $REMOTE_DIR && docker compose -p $PROJECT logs backend --tail 50'"
