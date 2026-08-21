@@ -164,7 +164,9 @@
   async function refreshAfterCommit(payload) {
     const revision = payload?.contentRevision
     try {
-      await reload({ source: 'local-commit' })
+      // 提交后重建快照必须带回题目列表：题目管理页 loadBanks() 直接从
+      // snapshot.questions 读题，不带 include_questions 会把题目清成 0。
+      await reload({ source: 'local-commit', includeQuestions: true })
     } catch (error) {}
     if (Number.isSafeInteger(revision) && revision > catalog.contentRevision) {
       reloadRemoteRevision({ revision, source: 'local-commit-retry' })

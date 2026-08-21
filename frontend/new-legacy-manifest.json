@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "v9.0-p4.1.123",
+  "version": "v9.0-p4.1.124",
   "bridgeVersion": 2,
   "sourceFiles": {
     "ACTIVITY_SCHEMA_V1.md": "5b42cb917237d6a6eb4e7438ac491543a653918fb172d49e3a2a05b1d98c20b9",
@@ -160,7 +160,7 @@
     "V9.0_P4.1_DATA_INTEGRITY.json": "65a6d63dfac46ce58dfc27d34bbcecad45a019302c419e7967f2e1ed46ead3f4",
     "V9.0_P4.1_HELP_FEEDBACK_MESSAGES_REPORT.md": "edfc028219fece4c0e4893f868470f1f00f8836bce74ec6de3acbc54f3fcc5cd",
     "V9.0_P4.1_QUICK_START.md": "1316de5b831a2109176f627b3e7bbaf1bb030c14f3ae93ba8945b4a83deb864c",
-    "VERSION": "9e8566b61b79c7f68f138b2d6b62c3f1e17f2430dde6d436f5abfdace899dfce",
+    "VERSION": "6ee130e6f1cbed90a2042bd8d5473123fa694983b4a990f99a1c475a7fbf9e83",
     "admin-console.html": "7bc9cd182d56e32a6ac6758c40f3925964f019977442c869c50a1b833524c666",
     "admin-operations.html": "db7b4997af6ef1db472a08d3a4270c0fd537e68c7e5edc6641bd4770acdda73c",
     "admin-settings.html": "dfe8f206e745ea3099afe22dd3d814ab20aab999677e5b6d4cc9c0af4ea1be76",
@@ -352,7 +352,7 @@
     "src\\63-learning-event-repository.js": "0e077eb249009a2c0e6de1160e4e65ca1cd2125d11a6ac6f8c719e1e1444914e",
     "src\\64-flow-orchestrator.js": "df1a7e7595245a43fd3c4bec1a0c70b04ab7b741c08b951daf8497c0aea68d97",
     "src\\65-canvas-workspace-store.js": "60e60f2d243c3e3d384bf898b8227772b7710381df9726d01d966e1d3b5448ef",
-    "src\\65-question-bank-admin.js": "ed9b2f431fe34ce07848e254e3d4a49a7dda79a8b0e886fbe6c40fe2fb83f169",
+    "src\\65-question-bank-admin.js": "3909dea5b8c3c494447354201203d4bccd56d5f2ab70d621ce96719564baed98",
     "src\\66-question-navigator.js": "5575cdd66c92fcef7c42a975baa969249b053d0e74632d8b8b9423862e03c1d6",
     "src\\67-card-contract.js": "0875a89e34389e9ed5faf8a95eecebab8dc948315e2b17132e00adb666bb4bfd",
     "src\\68-card-context.js": "afa86c164ac7b31609ae43740f4800d57cec2a404449d2a500c8a6812116913b",
