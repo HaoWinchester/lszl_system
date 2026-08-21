@@ -227,8 +227,10 @@ body[data-practice-phase="verification"] .practice-question-card{border-color:#a
   .practice-mode-card{padding:16px}
 }
 
-/* P4.6 做题页允许滚屏：解析展开/长题可滚动查看（main.css 的 html,body overflow:hidden 在本页放开） */
-html:has(body.practice-mode-page){height:auto;overflow-y:auto;scroll-behavior:smooth}
+/* P4.6 做题页允许滚屏：解析展开/长题可滚动查看（main.css 的 html,body overflow:hidden 在本页放开）。
+   直接元素选择器覆盖 html 与 body——不能用 html:has()，微信内置浏览器等环境不支持 :has() 会导致
+   整条规则失效、页面滚动锁死、大厅"开始"按钮被截断（uat 2d1056e 修复回归，2026-08-21 补回）。 */
+html,body{height:auto;min-height:100%;margin:0;overflow:visible;scroll-behavior:smooth}
 body.practice-mode-page{height:auto;overflow-y:auto}
 body.practice-mode-page.is-practice-drawer-open{overflow:hidden}
 /* 语言切换按钮：顶栏血量右侧小药丸，点击循环 中→EN→双（与血量同高，不遮挡其他元素） */
