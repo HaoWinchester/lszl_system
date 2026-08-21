@@ -259,3 +259,47 @@ def test_runtime_state_requires_a_login() -> None:
         )
 
     assert response.status_code == 401
+
+
+def test_runtime_state_drain_mode_accepts_and_ignores_writes() -> None:
+    """退役 drain（设计 §11）：RUNTIME_SYNC_DISABLED 时 PUT 返回成功与当前版本号，不落库。"""
+    from app.core.config import settings as app_settings
+
+    with TestClient(app) as client:
+        login = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "admin",
+                "password": "jbgsnmm~123",
+                "acceptedTermsVersion": "2026-08-13-v1",
+            },
+        )
+        assert login.status_code == 200
+        before = client.get("/api/v1/runtime/state?mode=full").json()
+
+        original = app_settings.RUNTIME_SYNC_DISABLED
+        app_settings.RUNTIME_SYNC_DISABLED = True
+        try:
+            response = client.put(
+                "/api/v1/runtime/state",
+                json={
+                    "page": "learning-path.html",
+                    "namespace": "guided-learning",
+                    "operation": "setItem",
+                    "key": "kg_default_entry_mode_v1",
+                    "value": "drain-probe",
+                    "storage": {"kg_default_entry_mode_v1": "drain-probe"},
+                    "requestId": "pytest-drain",
+                },
+            )
+        finally:
+            app_settings.RUNTIME_SYNC_DISABLED = original
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["ok"] is True
+        assert body["requestId"] == "pytest-drain"
+        after = client.get("/api/v1/runtime/state?mode=full").json()
+        assert after["revision"] == body["revision"]
+        assert after["storage"].get("kg_default_entry_mode_v1") != "drain-probe"
+        assert before["revision"] == after["revision"]

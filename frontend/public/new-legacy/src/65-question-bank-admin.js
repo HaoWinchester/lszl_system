@@ -4399,7 +4399,7 @@
         Number(summary?.removedQuestions)>0?`移除 ${summary.removedQuestions} 题`:'',
         groups.length?`涉及：${groups.join('、')}`:''
       ].filter(Boolean);
-      return `• ${text(summary?.bankName||summary?.bankId||'未命名题库')}：${changes.join('；')||'题库设置更新'}`;
+      return `• ${escapeHTML(summary?.bankName||summary?.bankId||'未命名题库')}：${changes.join('；')||'题库设置更新'}`;
     });
     return `检测到同一来源题库的更新：\n${lines.join('\n')||'• 导入内容将覆盖同来源题库'}\n\n已完全跳过内容相同的题库。确认覆盖上述变更吗？`;
   }
@@ -4418,7 +4418,7 @@
         const plan=error?.detail?.detail?.importPlan;
         if(!['IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED','QUESTION_DUPLICATES_CONFIRMATION_REQUIRED'].includes(error?.code))throw error;
         const duplicateConfirmation=error?.code==='QUESTION_DUPLICATES_CONFIRMATION_REQUIRED';
-        if(!global.confirm(duplicateConfirmation?importDuplicateMessage(plan):importReplacementMessage(plan))){
+        if(!window.confirm(duplicateConfirmation?importDuplicateMessage(plan):importReplacementMessage(plan))){
           restoreQuestionImportState(snapshot);render();toast('已取消覆盖导入。');
           return {ok:false,cancelled:true,error:'已取消覆盖导入。'};
         }
@@ -4426,7 +4426,7 @@
         catch(secondError){
           const secondPlan=secondError?.detail?.detail?.importPlan;
           if(secondError?.code!=='QUESTION_DUPLICATES_CONFIRMATION_REQUIRED'||duplicateConfirmation)throw secondError;
-          if(!global.confirm(importDuplicateMessage(secondPlan)))return {ok:false,cancelled:true,error:'已取消重复题清理。'};
+          if(!window.confirm(importDuplicateMessage(secondPlan)))return {ok:false,cancelled:true,error:'已取消重复题清理。'};
           result=await Catalog.importBanks({banks:incoming,confirmReplace:true,confirmDuplicateCleanup:true});
         }
       }
@@ -4531,7 +4531,7 @@
     if(typeof Catalog?.importQuestions!=='function')return {valid:false,added:[],duplicates:[],errors:['题目批量导入服务尚未加载。'],bankId:bank.id};
     const normalizedIncoming=incoming.map((raw,index)=>normalizeQuestion({...raw,subject:raw?.subject||bank.subject},index));
     const report=preflightQuestionDuplicates(normalizedIncoming,bank.questions);
-    if(report.duplicates.length&&!global.confirm(questionDuplicateConfirmationMessage(report))){
+    if(report.duplicates.length&&!window.confirm(questionDuplicateConfirmationMessage(report))){
       if(options.notify!==false)toast('已取消导入，题库没有变化。');
       return {valid:false,cancelled:true,added:[],duplicates:clone(report.duplicates),errors:[],bankId:bank.id};
     }
@@ -4541,7 +4541,7 @@
       catch(error){
         if(error?.code!=='QUESTION_DUPLICATES_CONFIRMATION_REQUIRED')throw error;
         const serverReport=error?.detail?.detail?.importPlan||{};
-        if(!global.confirm(questionDuplicateConfirmationMessage({
+        if(!window.confirm(questionDuplicateConfirmationMessage({
           existingCount:serverReport.existingCount,batchCount:serverReport.batchCount,
           unique:Array.from({length:Number(serverReport.keepCount||0)})
         })))return {valid:false,cancelled:true,added:[],duplicates:clone(report.duplicates),errors:[],bankId:bank.id};

@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Resp
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser, get_login_session_id
+from app.core.config import settings
 from app.core.permissions import can
 from app.db.session import get_db
 from app.web.bootstrap import build_bootstrap, optional_user
@@ -279,6 +280,20 @@ async def preview_asset(version: str, asset_path: str, request: Request, db: DB)
 @router.post("/api/v1/runtime/state")
 async def save_runtime_state(update: RuntimeStateUpdate, user: CurrentUser, db: DB):
     """Persist one validated mutation in the user's PostgreSQL runtime state."""
+    if settings.RUNTIME_SYNC_DISABLED:
+        # 退役 drain：领域 API 已承接全部业务数据，通用 KV 不再落库；
+        # 对旧缓存页返回成功与当前版本号，避免保存失败提示。
+        _, revision, content_revision = await runtime_state_service.get_state(
+            db, user.username, user.role, mode="full"
+        )
+        return {
+            "ok": True,
+            "username": user.username,
+            "namespace": update.namespace,
+            "revision": revision,
+            "contentRevision": content_revision,
+            "requestId": update.requestId,
+        }
     try:
         _, revision, content_revision = await runtime_state_service.apply_update(
             db, user.username, user.role, update

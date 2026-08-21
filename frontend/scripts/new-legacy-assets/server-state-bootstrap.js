@@ -2,6 +2,11 @@
 
 ;(function (global) {
   const browserLocalStorage = global.localStorage
+  // runtime 通用 KV 退役（设计 §11 一次性切换）：业务数据已全部走领域 API，
+  // 剩余同步键均为设备级偏好/旧镜像——本 shim 转本地模式：
+  // 初始化时从服务器 GET 一次做下拉迁移（老用户的偏好落到本机），
+  // 之后所有读写只走浏览器 localStorage，不再上传 /runtime/state。
+  const REMOTE_SYNC = false
   const browserOnlyKeys = new Set([
     'prep.lastDraftId',
     '__kg_admin_repository_probe__',
@@ -292,7 +297,14 @@
     if (!serverValues) throw staleSnapshotError()
     const prevPublishedPapers = values.get('kg_exam_papers_published_v1')
     values.clear()
-    for (const [key, value] of serverValues) values.set(key, value)
+    for (const [key, value] of serverValues) {
+      values.set(key, value)
+      // 退役下拉迁移：服务器侧最后一次下发的偏好同步落到本机 localStorage，
+      // 之后本 shim 只读写本机，服务器数据只读不动。
+      if (!browserOnlyKeys.has(key)) {
+        try { browserLocalStorage?.setItem(key, value) } catch (_error) {}
+      }
+    }
     applyPendingMutations()
     dirty = pendingMutations.size > 0
     // 如果已发布试卷数据有变化，通知 KGRecallQuestionSource 等依赖方失效缓存
@@ -505,6 +517,12 @@
   }
 
   function flush() {
+    if (!REMOTE_SYNC) {
+      // 本地模式：无远端可写，脏标记直接清空，页面保存状态显示"已保存"。
+      dirty = false
+      if (entry.authenticated && !entry.readOnly) saveEvent('saved', { page, namespace, local: true })
+      return Promise.resolve(true)
+    }
     if (remoteRetryStopped || !entry.authenticated || entry.readOnly || !dirty) return Promise.resolve(true)
     global.clearTimeout(timer)
     timer = 0
@@ -547,6 +565,7 @@
 
   function emit(operation, key, value) {
     lastMutation = { operation, key: String(key || ''), value: value == null ? null : String(value) }
+    if (!REMOTE_SYNC) return
     pendingMutations.delete(lastMutation.key)
     pendingMutations.set(lastMutation.key, lastMutation)
     dirty = true
@@ -559,7 +578,7 @@
   const storage = {
     getItem(key) {
       const normalized = String(key)
-      if (browserOnlyKeys.has(normalized)) {
+      if (!REMOTE_SYNC || browserOnlyKeys.has(normalized)) {
         try { return browserLocalStorage?.getItem(normalized) ?? null } catch (_error) { return null }
       }
       return values.has(normalized) ? values.get(normalized) : null
@@ -567,7 +586,7 @@
     setItem(key, value) {
       const normalized = String(key)
       const stringValue = String(value)
-      if (browserOnlyKeys.has(normalized)) {
+      if (!REMOTE_SYNC || browserOnlyKeys.has(normalized)) {
         try { browserLocalStorage?.setItem(normalized, stringValue) } catch (_error) {}
         return
       }
@@ -576,7 +595,7 @@
     },
     removeItem(key) {
       const normalized = String(key)
-      if (browserOnlyKeys.has(normalized)) {
+      if (!REMOTE_SYNC || browserOnlyKeys.has(normalized)) {
         try { browserLocalStorage?.removeItem(normalized) } catch (_error) {}
         return
       }
@@ -584,6 +603,20 @@
       emit('removeItem', normalized, null)
     },
     clear() {
+      if (!REMOTE_SYNC) {
+        // 本地模式：清空本机 localStorage（browserOnlyKeys——含认证会话——保留）。
+        try {
+          const keep = new Map()
+          for (const key of browserOnlyKeys) {
+            const value = browserLocalStorage?.getItem(key)
+            if (value != null) keep.set(key, value)
+          }
+          browserLocalStorage?.clear()
+          for (const [key, value] of keep) browserLocalStorage?.setItem(key, value)
+        } catch (_error) {}
+        values.clear()
+        return
+      }
       const keys = Array.from(values.keys())
       values.clear()
       keys.forEach((key) => emit('removeItem', key, null))
@@ -592,6 +625,9 @@
       }
     },
     key(index) {
+      if (!REMOTE_SYNC) {
+        try { return browserLocalStorage?.key(Number(index)) ?? null } catch (_error) { return null }
+      }
       const keys = Array.from(values.keys())
       for (const key of browserOnlyKeys) {
         try {
@@ -604,6 +640,9 @@
   Object.defineProperty(storage, 'length', {
     enumerable: true,
     get: () => {
+      if (!REMOTE_SYNC) {
+        try { return browserLocalStorage?.length ?? 0 } catch (_error) { return 0 }
+      }
       let total = values.size
       for (const key of browserOnlyKeys) {
         try { if (browserLocalStorage?.getItem(key) != null) total += 1 } catch (_error) {}
@@ -622,6 +661,7 @@
   })
 
   function sendLatestBeacon() {
+    if (!REMOTE_SYNC) return
     if (!entry.authenticated || entry.readOnly || !dirty || !global.navigator?.sendBeacon) return
     const outgoing = payload()
     if (!outgoing) return

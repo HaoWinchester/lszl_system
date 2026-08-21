@@ -85,7 +85,9 @@ function renderQuestionListOnly(){
     const fam=questionFamily(q);
     const famBadge=fam.role==='standalone'?'':`<span class="family-badge family-${fam.role}" title="${fam.role==='root'?'母题':'家族成员'} ${esc(fam.familyKey)}">【${fam.role==='root'?'母题':'成员'}${fam.role==='member'&&fam.equivalenceGrade?'·'+fam.equivalenceGrade:''}】</span>`;
     d.innerHTML=`<div class="list-title"><span class="status-dot ${st}"></span>${i+1}. ${famBadge}${esc(q.title)}</div><div class="list-meta">${esc(q.id)} · ${esc(q.difficulty||'')}${fam.role!=='standalone'?' · L'+fam.difficultyLevel:''}</div>`;
-    d.onclick=async()=>{if(q.id===state.currentQuestionId)return;await switchQuestionForEdit(q);state.currentQuestionId=q.id;renderQuestions()};list.appendChild(d);
+    d.onclick=async()=>{if(q.id===state.currentQuestionId)return;await switchQuestionForEdit(q);state.currentQuestionId=q.id;renderQuestions()};
+    d.ondblclick=e=>{e.preventDefault();openQuestionPreviewFloat()};
+    list.appendChild(d);
   });
 }
 function renderQuestions(){
@@ -338,10 +340,25 @@ function renderQuestionEditor(){
     <div id="questionFamilyPanel"></div>
   </div>
   <div class="section">
+    <div class="section-title">公共标签 · Global Tags</div>
+    <div class="help" style="margin-bottom:8px">勾选后同时维护 <code>q.tags</code> 与结构化 <code>metadata.tagPaths</code>；历史自由标签如果无法映射，会显示为“未归类标签”。</div>
+    <div id="questionTagEditor"></div>
+  </div>
+  <div class="section">
     <div class="section-title">知识点</div>
     <label>主知识点（只保存稳定 Node ID）</label>
     <input type="text" id="primaryNodeSearch" placeholder="搜索知识点路径或 ID，如：进度 / kp-pmp" autocomplete="off" value="${esc(primaryNodeFilter)}">
     <select id="primaryNode">${treeOptions(q.metadata?.knowledge?.primaryNodeId||'',primaryNodeFilter)}</select>
+    <div class="related-knowledge-box">
+      <label>辅助知识点（多选）</label>
+      <div class="related-knowledge-add">
+        <input id="relatedNodeSearch" type="text" placeholder="搜索辅助知识点名称 / 路径 / Node ID" autocomplete="off">
+        <button class="btn small" id="btnAddRelatedNode" type="button">+ 添加</button>
+        <select id="relatedNodeSelect">${relatedKnowledgeOptions('')}</select>
+      </div>
+      <div class="knowledge-search-meta" id="relatedNodeSearchMeta"></div>
+      <div class="related-knowledge-chips" id="relatedKnowledgeChips"></div>
+    </div>
   </div>
   <div class="section">
     <div class="section-title">English</div>
@@ -354,6 +371,7 @@ function renderQuestionEditor(){
   </div>`;
   bindQuestionEditor();
   renderQuestionPrincipleBindings();renderQuestionFacetBindings();renderQuestionFamilyEditor();renderKeywords();renderPreview();renderCurrentIssues();renderQuestionLockState();
+  renderQuestionTagEditor();renderRelatedKnowledgeUi('');
 }
 function bindQuestionEditor(){
   const q=currentQuestion();if(!q)return;
@@ -375,13 +393,21 @@ function bindQuestionEditor(){
   });
   document.querySelectorAll('input[name=correctOption]').forEach(el=>el.addEventListener('change',()=>{q.correctAnswer=el.value;q.options.forEach(o=>o.correct=o.id===el.value);renderCurrentIssues()}));
   document.getElementById('analysisZh').addEventListener('input',e=>{q.analysis=e.target.value;q.explanation=e.target.value;renderCurrentIssues()});
-  document.getElementById('primaryNode').addEventListener('change',e=>{setPrimaryKnowledge(q,e.target.value);renderKeywords();renderCurrentIssues()});
+  document.getElementById('primaryNode').addEventListener('change',e=>{setPrimaryKnowledge(q,e.target.value);renderKeywords();renderCurrentIssues();renderRelatedKnowledgeUi(document.getElementById('relatedNodeSearch')?.value||'')});
   const primarySearch=document.getElementById('primaryNodeSearch');
   if(primarySearch)primarySearch.addEventListener('input',e=>{
     primaryNodeFilter=e.target.value;
     const sel=document.getElementById('primaryNode');if(!sel)return;
     const current=q.metadata?.knowledge?.primaryNodeId||'';
     sel.innerHTML=treeOptions(current,primaryNodeFilter);
+  });
+  const relatedSearch=document.getElementById('relatedNodeSearch'),relatedSelect=document.getElementById('relatedNodeSelect'),addRelated=document.getElementById('btnAddRelatedNode');
+  if(relatedSearch)relatedSearch.addEventListener('input',()=>renderRelatedKnowledgeUi(relatedSearch.value));
+  if(addRelated)addRelated.addEventListener('click',()=>{
+    const id=relatedSelect?.value||'';if(!id)return;
+    const knowledge=q.metadata.knowledge=q.metadata.knowledge||{},primary=knowledge.primaryNodeId||'';
+    knowledge.relatedNodeIds=unique([...(knowledge.relatedNodeIds||[]),id].map(String).filter(x=>x&&x!==primary));
+    relatedSearch.value='';renderRelatedKnowledgeUi('');renderCurrentIssues();markWorkspaceDirty();
   });
   document.getElementById('titleEn').addEventListener('input',e=>q.translations.en.title=e.target.value);
   document.getElementById('stemEn').addEventListener('input',e=>q.translations.en.stemParts=[{text:e.target.value}]);
@@ -569,13 +595,18 @@ function markText(text,clues,field,optionId=''){
   return out+esc(text.slice(cur));
 }
 function renderPreview(){
-  const q=currentQuestion(),p=document.getElementById('questionPreview');if(!p)return;
-  if(!q){p.innerHTML='<div class="no-data">请导入或新建题目。</div>';return}
+  const q=currentQuestion(),p=document.getElementById('questionPreview');
+  const floatTarget=document.getElementById('floatingQuestionPreview');
+  const floatTitle=document.getElementById('questionPreviewFloatTitle');
+  if(floatTitle)floatTitle.textContent=q?(q.title?`· ${q.title}`:`· ${q.id}`):'';
+  if(!p)return;
+  if(!q){p.innerHTML='<div class="no-data">请导入或新建题目。</div>';if(floatTarget)floatTarget.innerHTML=p.innerHTML;return}
   let html=`<div class="stem-view" data-preview-source="stem" data-preview-option="">${markText(questionStem(q),q.clues,'stem')}</div>`;
   q.options.forEach(o=>{
     html+=`<div class="option-view${q.correctAnswer===o.id?' correct':''}" data-preview-source="option" data-preview-option="${esc(o.id)}"><b>${esc(o.id)}.</b> ${markText(o.text,q.clues,'option',o.id)} ${q.correctAnswer===o.id?'<span class="pill">正确答案</span>':''}</div>`;
   });
   p.innerHTML=html;
+  if(floatTarget)floatTarget.innerHTML=html;
   bindInteractivePreview();
 }
 
