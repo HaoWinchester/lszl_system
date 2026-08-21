@@ -213,10 +213,14 @@
 
   if (typeof global.addEventListener === 'function') {
     global.addEventListener('kg-auth-session-change', (event) => {
+      const detail = event?.detail || {}
+      const username = String(detail.username || '').trim()
+      const authenticated = detail.authenticated === true
+        || (detail.authenticated !== false && Boolean(username))
       userProfile = null
       userLoadPromise = null
-      refreshEntitlementsForCurrentUser(event?.detail || {})
-      if (event?.detail?.authenticated) preloadAuthenticatedContext()
+      refreshEntitlementsForCurrentUser(detail)
+      if (authenticated) preloadAuthenticatedContext()
       else clearEntitlements()
     })
   }
