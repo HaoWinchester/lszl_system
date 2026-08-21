@@ -32,6 +32,17 @@ global.CustomEvent = class FakeCustomEvent {
   constructor(type, init) { this.type = type; this.detail = init?.detail }
 }
 global.dispatchEvent = () => true
+const listeners = new Map()
+global.addEventListener = (type, listener) => { listeners.set(type, listener) }
+global.fetch = async (url) => ({
+  ok: url === '/api/v1/auth/me',
+  status: url === '/api/v1/auth/me' ? 200 : 404,
+  async json() {
+    return url === '/api/v1/auth/me'
+      ? { user: { username: 'student', role: 'student' } }
+      : { detail: 'not found' }
+  },
+})
 
 const responses = new Map([
   ['/api/v1/system/themes', { themes: {} }],
@@ -64,5 +75,15 @@ await import(`${pathToFileURL(adapterPath).href}?entitlements-test=1`)
 
 assert.deepEqual(global.KGServerEntitlements, { allExamPapers: true })
 assert.equal(Object.isFrozen(global.KGServerEntitlements), true)
+
+listeners.get('kg-auth-session-change')({
+  detail: { username: 'student', provider: 'remote' },
+})
+await new Promise(resolve => setImmediate(resolve))
+assert.deepEqual(
+  global.KGServerEntitlements,
+  { allExamPapers: true },
+  'restoring an authenticated member session must not clear server entitlements',
+)
 
 console.log('direct system entitlement adapter test passed')
