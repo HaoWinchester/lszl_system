@@ -12,6 +12,7 @@ JS_ORDER=[
     "17-question-supplement.js",
     "18-baseline-bootstrap.js",
     "20-page-runtime.js",
+    "21-question-edit-extras.js",
     "30-service-layer.js",
     "32-p45-contract-service.js",
     "35-server-catalog-service.js",

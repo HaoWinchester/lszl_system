@@ -293,8 +293,11 @@ D原则：principle-role-accountability</pre>
 </section>
 <section class="tab" id="tab-questions">
   <div class="grid3">
-    <div class="card">
-      <div class="card-hd"><span>题目列表</span><span class="muted tiny" id="qCount"></span></div>
+    <div class="card question-list-card" id="questionListCard">
+      <div class="card-hd"><span>题目列表</span><span class="muted tiny" id="qCount"></span><span class="spacer"></span>
+        <button class="btn small question-list-collapse-btn" id="btnToggleQuestionListTop" type="button" title="收起/展开题目列表顶部标签和按钮" aria-expanded="true">^</button>
+      </div>
+      <div class="question-list-top-controls" id="questionListTopControls">
       <div class="card-bd toolbar">
         <button class="btn small primary" id="btnNewQuestion">+ 新建</button>
         <button class="btn small" id="btnDuplicateQuestion">复制</button>
@@ -307,6 +310,8 @@ D原则：principle-role-accountability</pre>
         <span class="family-legend-chip decomposed">能力拆解</span>
         <span class="family-legend-chip extension">高阶扩展</span>
         <span class="family-legend-chip standalone">独立题</span>
+        <span class="muted tiny" style="margin-left:auto">双击题目打开悬浮预览</span>
+      </div>
       </div>
       <div class="q-list" id="questionList"></div>
     </div>
@@ -535,6 +540,19 @@ D原则：principle-role-accountability</pre>
 
 
 <div class="keyword-float" id="keywordFloat" aria-live="polite"></div>
+<div class="question-preview-float" id="questionPreviewFloat" aria-hidden="true">
+  <div class="question-preview-float-head" id="questionPreviewFloatHead" title="拖拽标题栏移动预览窗">
+    <span>题目预览</span>
+    <span class="question-preview-float-title muted tiny" id="questionPreviewFloatTitle"></span>
+    <span class="spacer"></span>
+    <span class="question-preview-resize-hint">拖动标题栏移动 · 右下角缩放</span>
+    <button class="btn small" id="btnCloseQuestionPreviewFloat" type="button" title="关闭题目预览">×</button>
+  </div>
+  <div class="question-preview-float-body">
+    <div class="preview-tip">点击已标记关键词可直接修改；框选其他词/术语后会弹出关键词编辑浮层。</div>
+    <div class="preview-core" id="floatingQuestionPreview"></div>
+  </div>
+</div>
 
 
 <div class="modal-backdrop" id="helpModal">

@@ -1,17 +1,18 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.124",
-  "toVersion": "v9.0-p4.1.125",
+  "fromVersion": "v9.0-p4.1.125",
+  "toVersion": "v9.0-p4.1.126",
   "changes": {
     "added": [
-      "content-prep-studio\\src\\js\\17-question-supplement.js"
+      "content-prep-studio\\src\\js\\21-question-edit-extras.js"
     ],
     "changed": [
       "VERSION",
       "content-prep-studio\\build.py",
       "content-prep-studio\\dist\\content-prep.html",
       "content-prep-studio\\src\\css\\app.css",
-      "content-prep-studio\\src\\index.template.html"
+      "content-prep-studio\\src\\index.template.html",
+      "content-prep-studio\\src\\js\\20-page-runtime.js"
     ],
     "removed": []
   },
