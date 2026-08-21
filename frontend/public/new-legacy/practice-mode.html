@@ -52,6 +52,20 @@
     </header>
 
     <main class="practice-main">
+      <aside class="practice-exp-panel" id="practiceExpPanel" hidden aria-label="做题学习经验">
+        <div class="practice-exp-card">
+          <header><span>LEARNING XP</span><h2>做题经验</h2></header>
+          <div class="practice-exp-totals">
+            <div><span>累计经验</span><strong id="practiceExpTotal">0</strong></div>
+            <div><span>本周经验</span><strong id="practiceExpWeek">0</strong></div>
+          </div>
+          <div class="practice-exp-chart" aria-label="最近 7 天每日经验">
+            <svg id="practiceExpChart" viewBox="0 0 236 84" preserveAspectRatio="none" role="img"></svg>
+            <div class="practice-exp-chart-x" id="practiceExpChartX"></div>
+          </div>
+        </div>
+      </aside>
+      <button type="button" class="practice-exp-fab" id="practiceExpFab" hidden aria-expanded="false" aria-controls="practiceExpPanel" aria-label="展开做题经验面板">XP</button>
       <section class="practice-lobby" id="practiceLobby" aria-labelledby="practiceLobbyTitle">
         <header class="practice-lobby-head">
           <div>
@@ -111,12 +125,12 @@
         <section class="practice-mode-grid" aria-label="选择练习模式">
           <article class="practice-mode-card challenge">
             <span class="practice-mode-icon" data-kg-icon="diamond" data-kg-icon-size="20" aria-hidden="true"></span>
-            <div><small>CHALLENGE</small><h2>挑战模式</h2><p>用三点血量持续闯关。连续答对可获得额外经验，并恢复血量。</p></div>
+            <div><small>CHALLENGE</small><h2>挑战模式</h2><p>初始生命随题量动态计算（约 30% 容错）。答错扣血，血尽判负但仍可完成全卷。</p></div>
             <button type="button" class="practice-start-btn" data-practice-start="challenge">开始挑战</button>
           </article>
           <article class="practice-mode-card scholar">
             <span class="practice-mode-icon" data-kg-icon="zap" data-kg-icon-size="20" aria-hidden="true"></span>
-            <div><small>SCHOLAR</small><h2>学霸模式</h2><p>共享 80 秒倒计时。答对加时间，答错扣时间并损失血量。</p></div>
+            <div><small>SCHOLAR</small><h2>学霸模式</h2><p>共享 60 秒时间池。答对 +20 秒并连对 5 题回血，答错扣时间扣血，血尽即败。</p></div>
             <button type="button" class="practice-start-btn" data-practice-start="scholar">进入学霸模式</button>
           </article>
           <article class="practice-mode-card revenge">
@@ -138,10 +152,12 @@
           <button type="button" class="practice-exit-btn" id="practiceExitBtn" aria-label="退出本次练习" title="退出"><span data-kg-icon="x" data-kg-icon-size="18" aria-hidden="true"></span></button>
           <div class="practice-progress-shell" id="practiceProgressShell" role="progressbar" aria-label="做题进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="practiceProgressBar"></span></div>
           <div class="practice-health" id="practiceHealth" aria-label="剩余血量"></div>
-          <div class="practice-scholar-stat practice-timer" id="practiceTimer" hidden><strong>80</strong><span>秒</span></div>
+          <button type="button" class="practice-language-cycle" id="practiceLanguageCycle" title="题目显示语言：中文（点击切换）" aria-label="切换题目显示语言" aria-live="polite">中</button>
+          <div class="practice-scholar-stat practice-timer" id="practiceTimer" hidden><strong>60</strong><span>秒</span></div>
         </header>
-        <div class="practice-time-row" id="practiceTimeRow" hidden aria-hidden="true">
+        <div class="practice-time-row" id="practiceTimeRow" hidden>
           <span class="practice-time-icon" data-kg-icon="timer" data-kg-icon-size="18" aria-hidden="true"></span>
+          <strong class="practice-time-ms" id="practiceTimerMs">60.0</strong>
           <div class="practice-time-rail" id="practiceTimeRail"><span id="practiceTimeBar"></span></div>
         </div>
         <div class="practice-streak-pop" id="practiceStreakPop" hidden role="status"></div>
@@ -154,6 +170,17 @@
         <article class="practice-question-card" id="practiceQuestionCard">
           <div class="practice-question-stem" id="practiceQuestionStem"></div>
           <div class="practice-options" id="practiceOptions"></div>
+          <div class="practice-explanation" id="practiceExplanationPanel" hidden aria-live="polite">
+            <div class="practice-explanation-head" id="practiceExplanationHead">答案与解析</div>
+            <div class="practice-explanation-body" id="practiceExplanationBody"></div>
+            <div class="practice-explanation-actions" id="practiceExplanationActions"></div>
+          </div>
+          <div class="practice-question-nav" id="practiceQuestionNav" hidden>
+            <button type="button" class="practice-nav-btn" id="practicePrevBtn" aria-label="上一题"><span data-kg-icon="chevron-left" data-kg-icon-size="16" aria-hidden="true"></span>上一题</button>
+            <label class="practice-explanation-toggle" title="答题后自动显示解析"><input type="checkbox" id="practiceAutoExplain" checked/><span>自动解析</span></label>
+            <span class="practice-question-pos" id="practiceQuestionPos">1 / 10</span>
+            <button type="button" class="practice-nav-btn" id="practiceNextBtn" aria-label="下一题">下一题<span data-kg-icon="chevron-right" data-kg-icon-size="16" aria-hidden="true"></span></button>
+          </div>
         </article>
         <aside class="practice-remediation-panel" id="practiceRemediationPanel" hidden aria-live="assertive">
           <span>NEEDS REMEDIATION</span>
@@ -182,6 +209,10 @@
       <section class="practice-result" id="practiceResult" hidden aria-labelledby="practiceResultTitle">
         <span>COMPLETE</span>
         <h1 id="practiceResultTitle">练习结束</h1>
+        <div class="practice-challenge-outcome" id="practiceChallengeOutcome" hidden>
+          <strong id="practiceChallengeResult">挑战成功</strong>
+          <span id="practiceChallengeDetail">剩余生命 0 / 0</span>
+        </div>
         <div class="practice-result-stats">
           <div><span>正确率</span><strong id="practiceResultAccuracy">0%</strong></div>
           <div><span>总耗时</span><strong id="practiceResultDuration">00:00</strong></div>
@@ -193,6 +224,16 @@
         </div>
       </section>
     </main>
+    <div class="practice-exit-backdrop" id="practiceFailBackdrop" hidden>
+      <div class="practice-exit-dialog" role="dialog" aria-modal="true" aria-labelledby="practiceFailTitle">
+        <h2 id="practiceFailTitle">挑战失败</h2>
+        <p>生命值已归零，本次挑战判定失败。你仍可以继续完成剩余题目，试卷完成情况与学习记录不受影响。</p>
+        <div>
+          <button type="button" class="practice-secondary-btn" id="practiceFailLobbyBtn">退回大厅</button>
+          <button type="button" class="practice-primary-btn" id="practiceFailContinueBtn">继续作答</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="practice-drawer-backdrop" id="practicePaperDrawer" hidden aria-hidden="true">
@@ -254,6 +295,9 @@
   <script defer src="src/101-engagement-repository.js?v=v9.0-p4.1.127"></script>
   <script defer src="src/103-support-center.js?v=v9.0-p4.1.127"></script>
   <script defer src="src/58-paper-access-service.js?v=v9.0-p4.1.127"></script>
+  <script defer src="src/86-activity-schema-v1.js?v=v9.0-p4.1.127"></script>
+  <script defer src="src/86-free-mode-language.js?v=v9.0-p4.1.127"></script>
+  <script defer src="src/86-question-language-ui.js?v=v9.0-p4.1.127"></script>
   <script defer src="./question-catalog-adapter.js?v=v9.0-p4.1.127"></script><!-- kg-question-catalog:generated -->
 <script defer src="./paper-release-adapter.js?v=v9.0-p4.1.127"></script><!-- kg-paper-releases:generated -->
 <script defer src="src/59-published-paper-repository.js?v=v9.0-p4.1.127"></script>

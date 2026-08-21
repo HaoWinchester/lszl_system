@@ -400,6 +400,12 @@ BOOTSTRAP_MANAGEMENT_EXACT_KEYS = frozenset({
 })
 
 BOOTSTRAP_MANAGEMENT_PREFIXES = frozenset({
+    # 试卷管理页的试卷/分类正文：teacher_shared 在读取阶段已按 owner 别名展开为
+    # kg_exam_papers_v1__user__<owner>，管理 namespace 必须放行这些前缀，
+    # 否则管理页试卷列表为空（与学员端 paper-releases 目录脱节）。
+    "kg_exam_papers_v1__user__",
+    "kg_exam_paper_categories_v1__user__",
+    "kg_exam_current_v1__user__",
 })
 
 BOOTSTRAP_NAMESPACE_EXACT_KEYS: dict[str, frozenset[str]] = {

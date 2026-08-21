@@ -73,3 +73,28 @@ def test_new_version_supersedes_previous_active_release() -> None:
         superseded = client.get(f"/api/v1/paper-releases/{first['releaseId']}").json()["release"]
         assert superseded["status"] == "superseded"
         client.post("/api/v1/paper-releases/papers/paper-t3/withdraw-all")
+
+
+def test_experience_summary_week_and_daily() -> None:
+    """学霸学习周（周日19:00起）与最近7日经验聚合。"""
+    from app.services.learning_service import _learning_week_start
+    from datetime import datetime, timezone, timedelta
+
+    tz8 = timezone(timedelta(hours=8))
+    # 2026-08-19 是周三：本周日为 08-16，学习周起点 08-16 19:00
+    assert _learning_week_start(datetime(2026, 8, 19, 12, 0, tzinfo=tz8)) == datetime(2026, 8, 16, 19, 0, tzinfo=tz8)
+    # 周日 20:00 已进入新学习周
+    assert _learning_week_start(datetime(2026, 8, 16, 20, 0, tzinfo=tz8)) == datetime(2026, 8, 16, 19, 0, tzinfo=tz8)
+    # 周日 18:00 仍属上一学习周（08-09 起）
+    assert _learning_week_start(datetime(2026, 8, 16, 18, 0, tzinfo=tz8)) == datetime(2026, 8, 9, 19, 0, tzinfo=tz8)
+
+    with TestClient(app) as client:
+        login(client)
+        response = client.get("/api/v1/learning/practice/experience-summary")
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["totalExperience"] >= 0
+        assert data["weekExperience"] >= 0
+        assert len(data["daily"]) == 7
+        assert all(set(day) == {"date", "experience"} for day in data["daily"])
+        assert data["weekStart"] < data["weekEnd"]

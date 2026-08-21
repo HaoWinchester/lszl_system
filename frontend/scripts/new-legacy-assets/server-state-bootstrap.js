@@ -12,6 +12,7 @@
     '__kg_admin_repository_probe__',
     '__kg_teaching_content_sync_v1__',
     'kg_remote_auth_session_v1',  // 认证会话必须写入真实 localStorage
+    'kg_practice_auto_explanation_v1',  // 做题"自动解析"开关：设备级 UI 偏好，只存本浏览器
   ])
   const path = global.location.pathname.split('/').pop() || 'learning-path.html'
   const namespaces = {
@@ -425,6 +426,8 @@
     const batch = new Map(pendingMutations)
     const outgoing = payload(batch)
     if (!outgoing) {
+      // 只剩不可持久化键：本地生效即可，并清空队列，避免 flushLoop 死循环
+      for (const [key, mutation] of batch) discardBatch(new Map([[key, mutation]]))
       dirty = pendingMutations.size > 0
       return 'saved'
     }
@@ -566,6 +569,9 @@
   function emit(operation, key, value) {
     lastMutation = { operation, key: String(key || ''), value: value == null ? null : String(value) }
     if (!REMOTE_SYNC) return
+    // 已被服务端拒绝过的键只更新本地值，不再进入保存队列：
+    // 否则 flushLoop 会因 dirty 永真且无可发请求而陷入紧密死循环（页面冻结）。
+    if (nonPersistableKeys.has(lastMutation.key)) return
     pendingMutations.delete(lastMutation.key)
     pendingMutations.set(lastMutation.key, lastMutation)
     dirty = true
