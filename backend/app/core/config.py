@@ -18,9 +18,11 @@ class Settings(BaseSettings):
     APP_NAME: str = "KG Graph API"
     API_V1_PREFIX: str = "/api/v1"
     QUESTION_CATALOG_CUTOVER_ENABLED: bool = False
-    # runtime 通用 KV 退役（设计 §11 一次性切换）：true 时 PUT/POST /runtime/state
-    # 接收即弃（回当前版本号，不落库），GET bootstrap 保留只读供旧页下拉迁移。
-    RUNTIME_SYNC_DISABLED: bool = True
+    # runtime KV 同步开关：true 时 PUT/POST /runtime/state 接收即弃（回当前版本号，不落库）。
+    # 2026-08-21 回退退役切换（原设计 §11）：教师试卷/分类草稿尚未迁入领域 API，
+    # 仍依赖 runtime KV 持久化；丢弃写入会导致"保存显示成功但刷新即回退"。
+    # 待业务数据全部迁入领域 API 后再置回 true。
+    RUNTIME_SYNC_DISABLED: bool = False
     # Content Prep 题目级校验临时关闭（2026-08 录入提速需求）：
     # true 时共享草稿同步/批量上传/单题保存跳过题目校验阻断（仅记录 warning 日志，批次内重复 ID 仍拦截）。
     # 恢复校验：删掉环境变量并重启即可，无需改代码。
