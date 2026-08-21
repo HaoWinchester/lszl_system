@@ -5,6 +5,8 @@
 
 ## 进行中（feat/runtime-state-to-domain-apis 分支 · 2026-08-19，未发布）
 
+- **单机版功能回补第 1 轮：题目补充（Supplement）模块移植（2026-08-21，v9.0-p4.1.125）**：新增 `content-prep-studio/src/js/17-question-supplement.js`——补录模板导出（`pmp-question-supplement-v1` 契约与单机版 P4.5.29 逐行一致，模板互通）、按 Question ID 合并（fill-empty / overwrite 双策略、锁定字段保护、UNION 数组路径、supplementHistory 落戳最近 50 条）、合并明细报告面板、supplement-import 审计事件；UI（补录 filebox + 策略下拉）与样式（.supplement-box/.supplement-report）随模板与 app.css 落地。合并后经 normalizeQuestion/recomputeKeywordLocations/syncQuestionPrinciples 走 B 版规范化（principleIds 按服务器原则注册表过滤属预期）。浏览器 E2E：60 题题库导入 → 模板导出 60 → 3 题补录 3/3 匹配更新、非空冲突保留本机、历史落戳正确。前后端测试全绿（前端 188/190，2 项为已知本机环境失败）。单机版差异分析与补齐计划见本轮对话记录；后续第 2 轮（标签编辑器/知识点关联 UI/浮动预览）、第 3 轮（小件收尾）待做。
+
 - **runtime 通用 KV 退役一次性切换（2026-08-20，设计 §11）**：业务数据已全部走领域 API（dev 库 runtime_states 仅剩 65 个已处置键：设备偏好/一次性标记/旧镜像/测试内容），本切换关闭旧通道——①前端 `server-state-bootstrap.js` 转本地模式（`REMOTE_SYNC=false`）：初始化仍 GET bootstrap 一次做下拉迁移（老用户服务器侧偏好落到本机 localStorage，之后服务器只读不动），所有读写只走浏览器，PUT/beacon 不再发出，保存事件直接报"已保存"；`clear()` 保留 browserOnlyKeys（含认证会话）。②后端新增 `RUNTIME_SYNC_DISABLED`（默认 true）：PUT/POST /runtime/state 变为 drain——鉴权后回当前 revision/contentRevision 的成功响应但不落库（旧缓存页无保存失败提示）；GET bootstrap 保留只读供下拉迁移与旧页兼容。③测试：新增 drain 行为测试（写入被接收即弃、revision 不动、旧值不被覆盖）；conftest 显式 `RUNTIME_SYNC_DISABLED=false` 保持既有持久化测试原语义；runtime 相关 81 项全绿。浏览器遍历 9 页：偏好写入只落本机（native=bilingual）服务器保持旧值（zh）、登录/退出正常、0 页面错误。**已知既有问题（与本次无关，stash 基线复现）**：test_question_import 2 项（banks questions 空校验）、test_question_pool_cleanup 6 项（POSIX symlink/inode 语义）、test_question_api_compatibility 并发用例本机 Windows 死锁，均待单独处理。账本第 3 轮处置见 `docs/runtime-ledger-disposition-proposal-2026-08-20.md`（0 unknown，drop-check 绿灯但未执行 DDL）。
 
 - **P4.6 第 2 轮 R2-2/R2-3：迁移遗留收口 + 发布大键全量退场**：

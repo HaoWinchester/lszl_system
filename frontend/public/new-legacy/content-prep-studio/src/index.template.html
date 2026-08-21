@@ -1,18 +1,18 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.124" lang="zh-CN">
+<html data-release="v9.0-p4.1.125" lang="zh-CN">
 <head>
-<script src="./teaching-content-sync.js?v=v9.0-p4.1.124"></script><!-- kg-teaching-content-sync:generated -->
+<script src="./teaching-content-sync.js?v=v9.0-p4.1.125"></script><!-- kg-teaching-content-sync:generated -->
 <script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
-<script src="./runtime-config.override.js?v=v9.0-p4.1.124"></script><!-- kg-runtime:generated -->
-<script defer src="./direct-entry.js?v=v9.0-p4.1.124"></script><!-- kg-direct-entry:generated -->
-<script defer src="./feature-analytics.js?v=v9.0-p4.1.124"></script><!-- kg-feature-analytics:generated -->
+<script src="./runtime-config.override.js?v=v9.0-p4.1.125"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js?v=v9.0-p4.1.125"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js?v=v9.0-p4.1.125"></script><!-- kg-feature-analytics:generated -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PMP Content Prep Studio</title>
 <script>window.__PMP_PRODUCT_RELEASE__="__PRODUCT_RELEASE__";</script>
 <script>window.__PMP_PREP_BASELINE__=/*__BUILD_BASELINE__*/null;</script>
-<script src="/teaching-content-sync.js?v=v9.0-p4.1.124"></script>
-<script src="/server-state-bootstrap.js?v=v9.0-p4.1.124"></script>
+<script src="/teaching-content-sync.js?v=v9.0-p4.1.125"></script>
+<script src="/server-state-bootstrap.js?v=v9.0-p4.1.125"></script>
 <style>
 /*__BUILD_CSS__*/
 </style>
@@ -118,6 +118,18 @@
           <h3>基础题库 JSON</h3>
           <input type="file" id="fileQuestionBank" accept=".json,application/json">
           <p class="muted smalltxt">支持 <code>questions[]</code>；也兼容 <code>banks[0]</code></p>
+        </div>
+        <div class="filebox supplement-box">
+          <h3>同批题目补录 / 按 Question ID 合并</h3>
+          <input type="file" id="fileQuestionSupplement" accept=".json,application/json">
+          <select id="questionSupplementMode" aria-label="补录合并策略">
+            <option value="fill-empty">仅填充空缺（推荐）</option>
+            <option value="overwrite">非空补录值覆盖已有</option>
+          </select>
+          <button class="btn small" id="btnExportSupplementTemplate" type="button">导出当前题库补录模板</button>
+          <p class="muted smalltxt">只匹配当前工作区已经存在的 Question ID；未匹配题目跳过且不新建。</p>
+          <div class="supplement-status" id="questionSupplementStatus"></div>
+          <div id="questionSupplementReport"></div>
         </div>
       </div>
 

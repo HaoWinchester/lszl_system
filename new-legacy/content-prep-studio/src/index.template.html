@@ -114,6 +114,18 @@
           <input type="file" id="fileQuestionBank" accept=".json,application/json">
           <p class="muted smalltxt">支持 <code>questions[]</code>；也兼容 <code>banks[0]</code></p>
         </div>
+        <div class="filebox supplement-box">
+          <h3>同批题目补录 / 按 Question ID 合并</h3>
+          <input type="file" id="fileQuestionSupplement" accept=".json,application/json">
+          <select id="questionSupplementMode" aria-label="补录合并策略">
+            <option value="fill-empty">仅填充空缺（推荐）</option>
+            <option value="overwrite">非空补录值覆盖已有</option>
+          </select>
+          <button class="btn small" id="btnExportSupplementTemplate" type="button">导出当前题库补录模板</button>
+          <p class="muted smalltxt">只匹配当前工作区已经存在的 Question ID；未匹配题目跳过且不新建。</p>
+          <div class="supplement-status" id="questionSupplementStatus"></div>
+          <div id="questionSupplementReport"></div>
+        </div>
       </div>
 
       <div class="toolbar" style="margin-top:12px">

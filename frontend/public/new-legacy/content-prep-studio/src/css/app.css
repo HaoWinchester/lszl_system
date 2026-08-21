@@ -365,3 +365,16 @@ nav button.active{color:var(--brand)!important}
 .ra-tag.ok{background:#e7f4ec;color:#176b45}.ra-tag.warn{background:#fdf3dd;color:#9a6700}.ra-tag.bad{background:#fbe9e8;color:#a23a36}
 #raNote{width:100%;min-height:70px;resize:vertical}
 @media(max-width:760px){.ra-choices{grid-template-columns:1fr}.ra-summary{grid-template-columns:repeat(3,1fr)}}
+
+/* 同批题目补录（pmp-question-supplement-v1，自单机版移植） */
+.supplement-box{border-color:#88b7a3;background:#f6fcf9}
+.supplement-box select{margin-top:7px}
+.supplement-box .btn{margin-top:8px}
+.supplement-status{margin-top:8px;font-size:12px;line-height:1.6}
+.supplement-status.ok{color:#0f766e}
+.supplement-status.warn{color:#b45309}
+.supplement-status.bad{color:#b91c1c}
+.supplement-report{margin-top:9px;text-align:left;border:1px solid var(--line);border-radius:9px;background:var(--panel);padding:8px;max-height:260px;overflow:auto}
+.supplement-report summary{font-weight:800;cursor:pointer}
+.supplement-report-row{padding:6px 2px;border-bottom:1px dashed var(--line);font-size:11px;line-height:1.55}
+.supplement-report-row:last-child{border-bottom:0}

@@ -9,6 +9,7 @@ JS_ORDER=[
     "12-p45-authoring-domain.js",
     "14-principle-bundle-domain.js",
     "16-recall-acceptance.js",
+    "17-question-supplement.js",
     "18-baseline-bootstrap.js",
     "20-page-runtime.js",
     "30-service-layer.js",
