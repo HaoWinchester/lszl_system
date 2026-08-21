@@ -17,9 +17,13 @@ version_file="$REPO_DIR/new-legacy/VERSION"
 
 bump_version() {
   # v9.0-p4.1.127 -> v9.0-p4.1.128（末段自增）
+  # 注意：macOS 自带 bash 3.2 的算术展开不支持表达式内引号，必须写成 $(( x + 1 ))
   local v n
   v="$(cat "$version_file")"
-  n="$(("${v##*.}" + 1))"
+  case "${v##*.}" in
+    ''|*[!0-9]*) echo "✗ VERSION 内容异常：$v" >&2; return 1 ;;
+  esac
+  n=$(( ${v##*.} + 1 )) || return 1
   printf '%s' "${v%.*}.$n" > "$version_file"
 }
 
@@ -40,21 +44,29 @@ cd "$REPO_DIR"
 
 echo "[2/7] 打包并发布 new-legacy release"
 cd "$REPO_DIR/frontend"
-# 若本地已有同版本号但内容不同的 release（开发分支忘记递增 VERSION），自动递增末段重打包
+# 若本地已有同版本号但内容不同的 release（开发分支忘记递增 VERSION），自动递增末段重打包。
+# 只有 update 真正成功才允许继续，防止把旧包当新版本发布出去。
+updated=0
 for _ in 1 2 3; do
-  if node scripts/manage-new-legacy.js update ../new-legacy 2>&1 | tee /tmp/kg-uat-release.log; then
+  if node scripts/manage-new-legacy.js update ../new-legacy > /tmp/kg-uat-release.log 2>&1; then
+    updated=1
     break
   fi
   if grep -q '相同版本号' /tmp/kg-uat-release.log; then
     old="$(cat "$version_file")"
-    bump_version
+    bump_version || { echo "✗ 版本号递增失败" >&2; exit 1; }
     echo "      版本号冲突：$old -> $(cat "$version_file")，重新生成产物"
-    cd "$REPO_DIR/frontend" && node scripts/sync-new-legacy.js && cd "$REPO_DIR"
+    node scripts/sync-new-legacy.js || exit 1
   else
+    cat /tmp/kg-uat-release.log
     echo "✗ release 打包失败，见上方验证输出" >&2
     exit 1
   fi
 done
+if [ "$updated" -ne 1 ]; then
+  echo "✗ release 打包重试 3 次仍未成功，中止（未发布任何内容）" >&2
+  exit 1
+fi
 VERSION="$(cat "$version_file")"
 node scripts/manage-new-legacy.js promote "$VERSION"
 cd "$REPO_DIR"
