@@ -1,11 +1,17 @@
+import asyncio
 import json
 import re
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+from sqlalchemy import delete
 
+from app.core.security import hash_password
+from app.db.session import AsyncSessionLocal
 from app.main import app
+from app.models.runtime_state import RuntimeState
+from app.models.user import User
 from app.services.runtime_state_service import (
     DEPRECATED_QUESTION_EXACT_KEYS,
     DEPRECATED_QUESTION_PREFIXES,
@@ -172,6 +178,52 @@ def test_login_entry_claim_is_atomic_per_server_login_session() -> None:
     ]
     assert set(scoped_keys) == {first.json()["key"], second.json()["key"]}
     assert current["contentRevision"] == content_before
+
+
+def test_guided_tour_claim_is_atomic_once_per_account() -> None:
+    suffix = uuid4().hex[:10]
+    first_username = f"tour-first-{suffix}"
+    second_username = f"tour-second-{suffix}"
+    tour_key = "通用知识点关系图谱工具_新手引导已看_v1"
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add_all([
+                User(username=first_username, password_hash=hash_password("111111"), role="teacher", status="active"),
+                User(username=second_username, password_hash=hash_password("111111"), role="teacher", status="active"),
+            ])
+            await db.commit()
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(RuntimeState).where(RuntimeState.owner_id.in_([first_username, second_username])))
+            await db.execute(delete(User).where(User.username.in_([first_username, second_username])))
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as first_browser, TestClient(app) as second_browser, TestClient(app) as other_account:
+            login(first_browser, first_username)
+            login(second_browser, first_username)
+            login(other_account, second_username)
+            content_before = first_browser.get("/api/v1/runtime/state").json()["contentRevision"]
+
+            first = first_browser.post("/api/v1/runtime/guided-tour-claim")
+            repeated = second_browser.post("/api/v1/runtime/guided-tour-claim")
+            other = other_account.post("/api/v1/runtime/guided-tour-claim")
+
+            assert first.status_code == 200, first.text
+            assert repeated.status_code == 200, repeated.text
+            assert other.status_code == 200, other.text
+            assert first.json()["claimed"] is True
+            assert repeated.json()["claimed"] is False
+            assert other.json()["claimed"] is True
+            assert first.json()["key"] == repeated.json()["key"] == other.json()["key"] == tour_key
+            assert repeated.json()["revision"] == first.json()["revision"]
+            assert first_browser.get("/api/v1/runtime/state").json()["storage"][tour_key] == "1"
+            assert first_browser.get("/api/v1/runtime/state").json()["contentRevision"] == content_before
+    finally:
+        asyncio.run(cleanup())
 
 
 def test_runtime_state_rejects_unknown_storage_keys() -> None:

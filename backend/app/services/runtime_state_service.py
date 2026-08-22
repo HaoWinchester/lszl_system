@@ -32,6 +32,7 @@ MAX_VALUE_BYTES = 8 * 1024 * 1024
 MAX_TOTAL_BYTES = 48 * 1024 * 1024
 LOGIN_ENTRY_CONSUMED_PREFIX = "kg_learning_entry_chooser_consumed_v1__"
 MAX_LOGIN_ENTRY_CLAIMS = 32
+GUIDED_TOUR_KEY = "通用知识点关系图谱工具_新手引导已看_v1"
 LOGIN_ENTRY_SERVER_OWNED_KEYS = frozenset({
     "kg_learning_entry_chooser_claim_v1",
     "kg_learning_entry_chooser_consumed_v1",
@@ -1672,5 +1673,38 @@ async def claim_learning_entry(
         "claimed": True,
         "key": key,
         "value": value,
+        "revision": int(row.revision),
+    }
+
+
+async def claim_guided_tour(db: AsyncSession, owner: str) -> dict[str, object]:
+    """Atomically claim the one-time home tour for an account."""
+
+    await _lock_owner(db, owner)
+    row = await db.get(RuntimeState, owner)
+    storage = dict(row.storage or {}) if row else {}
+    existing = storage.get(GUIDED_TOUR_KEY)
+    if existing is not None:
+        await db.commit()
+        return {
+            "claimed": False,
+            "key": GUIDED_TOUR_KEY,
+            "value": str(existing),
+            "revision": int(row.revision if row else 0),
+        }
+
+    storage[GUIDED_TOUR_KEY] = "1"
+    if row is None:
+        row = RuntimeState(owner_id=owner, storage=storage, revision=1)
+        db.add(row)
+    else:
+        row.storage = storage
+        row.revision += 1
+    await db.commit()
+    await db.refresh(row)
+    return {
+        "claimed": True,
+        "key": GUIDED_TOUR_KEY,
+        "value": "1",
         "revision": int(row.revision),
     }

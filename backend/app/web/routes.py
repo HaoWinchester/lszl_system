@@ -349,6 +349,11 @@ async def claim_learning_entry(request: Request, user: CurrentUser, db: DB):
     )
 
 
+@router.post("/api/v1/runtime/guided-tour-claim")
+async def claim_guided_tour(user: CurrentUser, db: DB):
+    return await runtime_state_service.claim_guided_tour(db, user.username)
+
+
 @router.get("/{asset_path:path}")
 async def active_asset(asset_path: str, request: Request, db: DB) -> Response:
     release = _release_or_503()
