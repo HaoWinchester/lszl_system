@@ -93,6 +93,18 @@ async def release_catalog(
     return await paper_release_service.catalog(db, user, page=page, page_size=page_size)
 
 
+@router.get("/management-catalog")
+async def release_management_catalog(
+    db: DB,
+    user: Publisher,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=100, alias="pageSize", ge=1, le=200),
+):
+    return await paper_release_service.management_catalog(
+        db, user, page=page, page_size=page_size
+    )
+
+
 @router.get("/{release_id}")
 async def release_detail(release_id: str, db: DB, user: CurrentUser):
     release = await paper_release_service.detail(db, user, release_id)

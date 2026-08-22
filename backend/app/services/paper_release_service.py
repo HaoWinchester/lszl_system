@@ -353,6 +353,58 @@ async def catalog(db: AsyncSession, user: User, *, page: int, page_size: int) ->
     }
 
 
+async def management_catalog(
+    db: AsyncSession,
+    actor: User,
+    *,
+    page: int,
+    page_size: int,
+) -> dict:
+    """Return active releases as lightweight editable-paper projections.
+
+    The management page needs ordered question references, but not the frozen
+    question snapshots used by learners. Keeping snapshots out of this response
+    avoids restoring the retired multi-megabyte runtime bootstrap payload.
+    """
+    if actor.role not in {"admin", "teacher"}:
+        raise _error(403, "MANAGE_PAPERS_FORBIDDEN", "仅教师或管理员可以管理试卷")
+    base = select(PaperRelease).where(PaperRelease.status == ACTIVE_STATUS)
+    total = int(await db.scalar(select(func.count()).select_from(base.subquery())) or 0)
+    releases = list((await db.execute(
+        base.order_by(PaperRelease.published_at.desc(), PaperRelease.id)
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+    )).scalars().all())
+    release_ids = [release.id for release in releases]
+    question_rows = list((await db.execute(
+        select(PaperReleaseQuestion)
+        .where(PaperReleaseQuestion.release_id.in_(release_ids))
+        .order_by(PaperReleaseQuestion.release_id, PaperReleaseQuestion.order_index)
+    )).scalars().all()) if release_ids else []
+    refs_by_release: dict[str, list[dict[str, Any]]] = {release_id: [] for release_id in release_ids}
+    for row in question_rows:
+        refs_by_release[row.release_id].append({
+            "bankId": row.bank_id,
+            "questionId": row.question_id,
+            "order": row.order_index + 1,
+            "score": 1,
+        })
+    papers = []
+    for release in releases:
+        payload = release_to_dict(release)
+        source = release.source_payload if isinstance(release.source_payload, dict) else {}
+        payload.update({
+            "id": release.paper_id,
+            "publishedVersion": release.version,
+            "publishedReleaseId": release.id,
+            "categoryId": str(source.get("categoryId") or ""),
+            "categoryName": str(source.get("categoryName") or ""),
+            "questions": refs_by_release.get(release.id, []),
+        })
+        papers.append(payload)
+    return {"papers": papers, "page": page, "pageSize": page_size, "total": total}
+
+
 async def detail(db: AsyncSession, user: User, release_id: str) -> dict | None:
     release = await db.get(PaperRelease, release_id)
     if release is None or release.status not in {ACTIVE_STATUS, "superseded"}:

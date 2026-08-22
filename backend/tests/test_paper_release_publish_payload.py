@@ -41,6 +41,16 @@ def test_publish_payload_creates_release_and_withdraw_all(client=None) -> None:
         questions = client.get(f"/api/v1/paper-releases/{release['releaseId']}/questions?limit=10")
         assert questions.status_code == 200
         assert questions.json()["total"] == 1
+        managed = client.get("/api/v1/paper-releases/management-catalog")
+        assert managed.status_code == 200
+        managed_paper = next(
+            row for row in managed.json()["papers"] if row["paperId"] == "paper-t1"
+        )
+        assert managed_paper["publishedReleaseId"] == release["releaseId"]
+        assert managed_paper["questions"] == [
+            {"bankId": "b_test", "questionId": "q_test_1", "order": 1, "score": 1}
+        ]
+        assert "questionSnapshots" not in managed_paper
         # 重复发布同一 releaseId → 409
         again = client.post("/api/v1/paper-releases/publish-payload", json=payload)
         assert again.status_code == 409

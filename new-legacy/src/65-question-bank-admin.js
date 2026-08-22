@@ -3,6 +3,7 @@
 (function(){
   const $ = id => document.getElementById(id);
   const Catalog = window.KGQuestionCatalogAdapter;
+  const ReleaseApi = window.KGPaperReleaseApi;
   const CatalogEditor = window.KGQuestionCatalogEditController;
   const Store=window.KGAppStorage||{};
   const Keys=window.KGStorageKeys||{};
@@ -1536,7 +1537,7 @@
     }
     if(!Catalog){alert('题目目录服务未加载，请刷新页面后重试。');return}
     try{await Catalog.ready}catch(error){alert('题目目录加载失败：'+(error.message||error));return}
-    state.banks=loadBanks();state.papers=loadPapers();state.paperCategories=loadPaperCategories();state.selectedPaperId=state.papers[0]?.id||'';
+    state.banks=loadBanks();const localPapers=loadPapers();let releasedPapers=[];try{releasedPapers=await ReleaseApi?.managementCatalog?.()||[]}catch(error){console.warn('已发布试卷管理目录加载失败',error)}state.papers=(ReleaseApi?.mergeManagementPapers?.(localPapers,releasedPapers)||localPapers).map(normalizePaper);state.paperCategories=loadPaperCategories();state.selectedPaperId=state.papers[0]?.id||'';
     const on=(id,event,handler)=>$(id)?.addEventListener(event,handler);
     on('qbAddPaperBtn','click',addPaper);on('qbSavePaperBtn','click',savePaperForm);on('qbBuildPaperBtn','click',buildCurrentPaper);on('qbPublishPaperBtn','click',togglePublishPaper);on('qbWithdrawPaperBtn','click',withdrawCurrentPaper);on('qbArchivePaperBtn','click',archiveCurrentPaper);on('qbUnarchivePaperBtn','click',unarchiveCurrentPaper);on('qbDeletePaperBtn','click',deleteCurrentPaper);on('qbExportPaperBtn','click',exportCurrentPaper);on('qbAutoQuotaBtn','click',autoDistributeQuota);on('qbClearQuotaBtn','click',clearPaperQuota);
     on('qbAddPaperCategoryBtn','click',addPaperCategory);on('qbPaperListSearch','input',event=>applyPaperCatalogFilter({search:String(event.currentTarget.value||'')}));on('qbPaperStatusFilter','change',event=>applyPaperCatalogFilter({status:String(event.currentTarget.value||'ALL')}));on('qbPaperListSelectPage','change',toggleSelectPaperPage);on('qbPaperBulkMoveCategoryBtn','click',moveSelectedPapersToCategory);on('qbPaperBulkArchiveBtn','click',archiveSelectedPapers);on('qbPaperBulkDeleteDraftBtn','click',deleteSelectedPaperDrafts);

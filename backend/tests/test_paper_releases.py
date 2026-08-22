@@ -371,6 +371,41 @@ def test_draft_save_syncs_active_release_name_without_mutating_frozen_questions(
         asyncio.run(_cleanup(ids))
 
 
+def test_management_catalog_projects_active_releases_as_lightweight_editable_papers() -> None:
+    ids = _ids()
+    asyncio.run(_seed(ids))
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            teacher = await db.get(User, ids["teacher"])
+            release = await paper_release_service.publish(
+                db,
+                teacher,
+                ids["paper"],
+                expected_revision=1,
+                access_level="free",
+                enabled_modes=["practice_mode", "deep_recall"],
+                allowed_roles=["teacher", "student"],
+                metadata={},
+            )
+            catalog = await paper_release_service.management_catalog(
+                db, teacher, page=1, page_size=50
+            )
+            row = next(item for item in catalog["papers"] if item["paperId"] == ids["paper"])
+
+            assert row["releaseId"] == release.id
+            assert row["status"] == "published"
+            assert row["publishedVersion"] == 1
+            assert len(row["questions"]) == 6
+            assert set(row["questions"][0]) == {"bankId", "questionId", "order", "score"}
+            assert "question" not in row["questions"][0]
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(_cleanup(ids))
+
+
 def test_withdraw_permissions_pagination_seed_and_release_isolation() -> None:
     ids = _ids()
     asyncio.run(_seed(ids))

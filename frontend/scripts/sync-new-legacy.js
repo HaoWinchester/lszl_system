@@ -714,7 +714,10 @@ function injectPage(html, page, version) {
     const quotaAsset = 'src/teacher/paper-management/paper-quota-service.js'
     const quotaTag = `<script defer src="${quotaAsset}"></script>`
     generated = removeLocalScriptTags(generated, quotaAsset)
-    generated = generated.replace(adminTag, `${quotaTag}\n${adminTag}`)
+    generated = generated.replace(
+      adminTag,
+      `<script defer src="./paper-release-adapter.js"></script><!-- kg-paper-releases:generated -->\n${quotaTag}\n${adminTag}`,
+    )
   }
   if (page === 'question-training.html' && !retiredSingleDeepRedirectShell && !generated.includes('kg-runtime-fixes:generated')) {
     const styleTag = '<link rel="stylesheet" href="./direct-runtime-fixes.css"><!-- kg-runtime-fixes:generated -->'
