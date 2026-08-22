@@ -28,6 +28,7 @@ from app.models.user import User
 from app.schemas.content_prep import ContentPrepBatchResult, ContentPrepBatchRequest
 from app.services import teaching_content_revision_service as revision_service
 from app.services import teaching_content_projection_service
+from app.services import builtin_teaching_content_seed_service
 from app.services import question_service
 from app.services.content_prep_service import (
     ContentPrepOperationError,
@@ -668,6 +669,87 @@ def test_principle_bundle_import_replaces_unused_pairs_as_one_canonical_bundle()
         asyncio.run(verify())
     finally:
         asyncio.run(cleanup())
+
+
+def test_imported_builtin_principle_card_updates_survive_startup_seed() -> None:
+    """Catch startup seeding silently restoring administrator-imported built-in IDs."""
+
+    shared_keys = {
+        revision_service.REVISION_KEY,
+        PRINCIPLE_PROJECTION_KEY,
+        PRESET_PROJECTION_KEY,
+    }
+    bundle = builtin_teaching_content_seed_service.load_builtin_bundle()
+    principle_id = str(bundle.principles[0]["id"])
+    preset_id = next(
+        str(item["id"])
+        for item in bundle.synthesis_presets
+        if str(item["principleId"]) == principle_id
+    )
+    imported_name = "管理员导入的内置原则"
+    imported_content = "这是管理员导入并需要跨重启保留的归纳卡。"
+
+    async def prepare() -> tuple[dict[str, dict], dict[str, dict], dict[str, dict]]:
+        async with AsyncSessionLocal() as db:
+            await builtin_teaching_content_seed_service.sync_builtin_teaching_content(db)
+        shared_snapshot = await _snapshot_shared_rows(shared_keys)
+        principle_snapshot, preset_snapshot = await _snapshot_principle_relations()
+        return shared_snapshot, principle_snapshot, preset_snapshot
+
+    async def run_startup_seed_and_verify(import_revision: int) -> None:
+        async with AsyncSessionLocal() as db:
+            summary = await builtin_teaching_content_seed_service.sync_builtin_teaching_content(db)
+            assert summary.updated == 0
+            principle = await db.get(Principle, principle_id)
+            preset = await db.get(SynthesisPreset, preset_id)
+            assert principle is not None and principle.name == imported_name
+            assert preset is not None and preset.content == imported_content
+            assert int((await revision_service.current(db))["revision"]) == import_revision
+            principle_projection = json.loads(
+                (await db.get(SharedRuntimeState, PRINCIPLE_PROJECTION_KEY)).value
+            )
+            preset_projection = json.loads(
+                (await db.get(SharedRuntimeState, PRESET_PROJECTION_KEY)).value
+            )
+            assert next(item for item in principle_projection["items"] if item["id"] == principle_id)["name"] == imported_name
+            assert next(item for item in preset_projection["items"] if item["id"] == preset_id)["content"] == imported_content
+
+    async def cleanup(
+        shared_snapshot: dict[str, dict],
+        principle_snapshot: dict[str, dict],
+        preset_snapshot: dict[str, dict],
+    ) -> None:
+        await _restore_principle_relations(
+            principle_snapshot,
+            preset_snapshot,
+            added_principle_ids=set(),
+            added_preset_ids=set(),
+        )
+        await _restore_shared_rows(shared_keys, shared_snapshot)
+
+    shared_snapshot, principle_snapshot, preset_snapshot = asyncio.run(prepare())
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "jbgsnmm~123"},
+            ).status_code == 200
+            current = client.get("/api/v1/content-prep/principles")
+            assert current.status_code == 200, current.text
+            payload = current.json()
+            payload.pop("contentRevision", None)
+            for item in payload["principles"]["items"]:
+                if item["id"] == principle_id:
+                    item["name"] = imported_name
+            for item in payload["synthesisPresets"]["items"]:
+                if item["id"] == preset_id:
+                    item["title"] = f"原则：{imported_name}"
+                    item["content"] = imported_content
+            imported = client.post("/api/v1/content-prep/principles/import", json=payload)
+            assert imported.status_code == 200, imported.text
+        asyncio.run(run_startup_seed_and_verify(int(imported.json()["contentRevision"])))
+    finally:
+        asyncio.run(cleanup(shared_snapshot, principle_snapshot, preset_snapshot))
 
 
 def test_principle_bundle_validation_rejects_missing_card_collection() -> None:
