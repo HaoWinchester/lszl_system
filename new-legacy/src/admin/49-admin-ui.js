@@ -16,6 +16,22 @@
     if(trigger)trigger.title=user?`当前账号：${user.displayName||user.username}（${roleLabel(user.role)}）`:'当前为访客只读';
     return user;
   }
+  function renderReleaseVersion(){
+    const release=String(document.documentElement?.dataset?.release||'').trim();
+    const topbar=document.querySelector('.admin-topbar');
+    if(!release||!topbar)return null;
+    let badge=document.querySelector('.admin-release-version');
+    if(!badge){
+      badge=document.createElement('span');
+      badge.className='admin-release-version';
+      const accountMenu=byId('adminAccountMenu');
+      if(accountMenu)topbar.insertBefore(badge,accountMenu);else topbar.appendChild(badge);
+    }
+    badge.textContent=release;
+    badge.title=`当前后台版本：${release}`;
+    badge.setAttribute('aria-label',`当前后台版本 ${release}`);
+    return badge;
+  }
   function currentPage(){return document.body?.dataset?.adminPage||document.body?.dataset?.adminContext||''}
   function markNavigation(){const page=currentPage();document.querySelectorAll('[data-admin-nav]').forEach(link=>link.classList.toggle('active',link.dataset.adminNav===page))}
   function closeAccountMenu({focus=false}={}){
@@ -68,6 +84,6 @@
     global.addEventListener('kg-auth-session-change',()=>setTimeout(()=>account(),0));global.addEventListener('kg-user-profile-updated',()=>setTimeout(()=>account(),0));
     document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!byId('adminHelpDialog')?.hidden){byId('adminHelpDialog').hidden=true}});
   }
-  function init(services=global.KGAdminServices){account(services);markNavigation();bindAccountMenu()}
-  global.KGAdminUI=Object.freeze({byId,escapeHtml,formatTime,toast,account,markNavigation,openHelp,init});
+  function init(services=global.KGAdminServices){renderReleaseVersion();account(services);markNavigation();bindAccountMenu()}
+  global.KGAdminUI=Object.freeze({byId,escapeHtml,formatTime,toast,account,renderReleaseVersion,markNavigation,openHelp,init});
 })(window);
