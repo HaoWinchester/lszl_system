@@ -28,6 +28,7 @@ from app.models.user import User
 from app.services import (
     content_prep_service,
     subject_facet_service,
+    teaching_content_current_service,
     teaching_content_projection_service,
     teaching_content_revision_service,
 )
@@ -98,30 +99,6 @@ def _taxonomy_payload(row: ContentTaxonomy, nodes: list[TaxonomyNode]) -> dict[s
         "title": row.title,
         "nodes": [dict(node.record or {}) for node in nodes],
     }
-
-
-async def _latest_taxonomy(db: AsyncSession, subject_id: str) -> tuple[ContentTaxonomy, list[TaxonomyNode]] | None:
-    row = (await db.execute(
-        select(ContentTaxonomy)
-        .where(ContentTaxonomy.subject_id == subject_id)
-        .order_by(ContentTaxonomy.updated_at.desc(), ContentTaxonomy.version.desc())
-        .limit(1)
-    )).scalar_one_or_none()
-    if row is None:
-        return None
-    nodes = list((await db.execute(
-        select(TaxonomyNode).where(TaxonomyNode.taxonomy_id == row.id).order_by(TaxonomyNode.position, TaxonomyNode.node_id)
-    )).scalars())
-    return row, nodes
-
-
-async def _latest_recall(db: AsyncSession, subject_id: str) -> RecallAssociationLibrary | None:
-    return (await db.execute(
-        select(RecallAssociationLibrary)
-        .where(RecallAssociationLibrary.subject_id == subject_id)
-        .order_by((RecallAssociationLibrary.status == "published").desc(), RecallAssociationLibrary.version.desc(), RecallAssociationLibrary.updated_at.desc())
-        .limit(1)
-    )).scalar_one_or_none()
 
 
 def _normalize_tree(value: object, subject_id: str) -> dict[str, Any] | None:
@@ -208,10 +185,15 @@ async def read_shared_content(db: AsyncSession, subject_id: str) -> dict[str, An
     subject_id = _subject_id(subject_id)
     await teaching_content_revision_service.acquire_read_lock(db)
     bundle = await _principle_card_bundle(db)
-    taxonomy_result = await _latest_taxonomy(db, subject_id)
+    taxonomy_result = await teaching_content_current_service.current_taxonomy(db, subject_id)
     taxonomy = _taxonomy_payload(*taxonomy_result) if taxonomy_result else None
-    recall_row = await _latest_recall(db, subject_id)
+    recall_row = await teaching_content_current_service.current_recall_library(db, subject_id)
     recall = {
+        **dict(recall_row.content_metadata or {}),
+        "id": recall_row.id,
+        "subjectId": recall_row.subject_id,
+        "version": recall_row.version,
+        "status": recall_row.status,
         "schemaVersion": 1,
         "nodes": list(recall_row.nodes or []),
         "edges": list(recall_row.edges or []),
@@ -259,9 +241,8 @@ async def apply_auxiliary_assets(
         if row is None:
             conflicting = (await db.execute(select(ContentTaxonomy).where(ContentTaxonomy.subject_id == subject_id, ContentTaxonomy.version == requested_version).limit(1))).scalar_one_or_none()
             if conflicting is not None:
-                await db.execute(delete(TaxonomyNode).where(TaxonomyNode.taxonomy_id == conflicting.id))
-                await db.delete(conflicting)
-                await db.flush()
+                maximum = (await db.execute(select(func.max(ContentTaxonomy.version)).where(ContentTaxonomy.subject_id == subject_id))).scalar_one_or_none()
+                requested_version = int(maximum or 0) + 1
         if row is None:
             row = ContentTaxonomy(id=taxonomy_id, subject_id=subject.id, version=requested_version, status=str(tree.get("status") or "published"), title=str(tree.get("title") or tree.get("name") or ""), content_metadata={k: v for k, v in tree.items() if k != "nodes"}, updated_by=actor_username, created_by=actor_username)
             db.add(row)
@@ -279,17 +260,25 @@ async def apply_auxiliary_assets(
             node_id = str(node["id"])
             db.add(TaxonomyNode(id=f"{taxonomy_id}:{node_id}", taxonomy_id=taxonomy_id, node_id=node_id, parent_node_id=node.get("parentId"), title=str(node.get("title") or ""), record=node, position=position, status=str(node.get("status") or "active")))
         db.add(TeachingContentAudit(id=uuid4().hex, entity_type="taxonomy", entity_id=taxonomy_id, action="published" if row.status == "published" else "upserted", actor_username=actor_username, after=tree))
+        if row.status == "published":
+            teaching_content_current_service.set_current_taxonomy(subject, row.id)
         changes.append({"entityType": "taxonomy", "entityId": taxonomy_id, "action": "upserted"})
 
     recall = _normalize_recall(recall_library)
     if recall is not None:
-        await _ensure_subject(db, subject_id)
-        row = (await db.execute(select(RecallAssociationLibrary).where(RecallAssociationLibrary.subject_id == subject_id, RecallAssociationLibrary.version == int(recall.get("version") or 1)))).scalar_one_or_none()
+        subject = await _ensure_subject(db, subject_id)
+        row = await teaching_content_current_service.current_recall_library(db, subject_id)
         if row is None:
-            row = RecallAssociationLibrary(id=uuid4().hex, subject_id=subject_id, version=int(recall.get("version") or 1), status="published", nodes=recall["nodes"], edges=recall["edges"], content_metadata={k: v for k, v in recall.items() if k not in {"nodes", "edges"}}, updated_by=actor_username)
+            requested_version = int(recall.get("version") or 1)
+            conflict = (await db.execute(select(RecallAssociationLibrary.id).where(RecallAssociationLibrary.subject_id == subject_id, RecallAssociationLibrary.version == requested_version).limit(1))).scalar_one_or_none()
+            if conflict is not None:
+                maximum = (await db.execute(select(func.max(RecallAssociationLibrary.version)).where(RecallAssociationLibrary.subject_id == subject_id))).scalar_one_or_none()
+                requested_version = int(maximum or 0) + 1
+            row = RecallAssociationLibrary(id=str(recall.get("id") or uuid4().hex), subject_id=subject_id, version=requested_version, status="published", nodes=recall["nodes"], edges=recall["edges"], content_metadata={k: v for k, v in recall.items() if k not in {"nodes", "edges", "id", "subjectId", "version", "status"}}, updated_by=actor_username)
             db.add(row)
         else:
-            row.nodes, row.edges, row.content_metadata, row.updated_by = recall["nodes"], recall["edges"], {k: v for k, v in recall.items() if k not in {"nodes", "edges"}}, actor_username
+            row.nodes, row.edges, row.content_metadata, row.updated_by = recall["nodes"], recall["edges"], {k: v for k, v in recall.items() if k not in {"nodes", "edges", "id", "subjectId", "version", "status"}}, actor_username
+        teaching_content_current_service.set_current_recall_library(subject, row.id)
         db.add(TeachingContentAudit(id=uuid4().hex, entity_type="recallLibrary", entity_id=row.id, action="upserted", actor_username=actor_username, after=recall))
         changes.append({"entityType": "recallLibrary", "entityId": subject_id, "action": "upserted"})
 

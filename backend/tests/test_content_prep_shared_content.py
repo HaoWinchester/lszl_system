@@ -11,7 +11,7 @@ from app.main import app
 from app.models.content_prep import Principle, QuestionTagConfig, QuestionUploadBatch, SynthesisPreset
 from app.models.question import Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
-from app.models.teaching_content import ActivityOverride, ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode
+from app.models.teaching_content import ActivityOverride, ContentSubject, ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode
 from app.models.user import User
 from app.services import teaching_content_revision_service
 
@@ -22,6 +22,99 @@ TAG_KEY = "kg_question_tag_names_v1"
 ACTIVITY_KEY = "kg_content_activity_overrides_v1"
 RECALL_KEY = "kg_recall_association_library_v1__subject__subject-pmp"
 PROJECTION_KEYS = {"kg_principle_repository_v1", "kg_synthesis_preset_repository_v1"}
+
+
+def test_shared_content_uses_explicit_current_pointers_with_published_fallback() -> None:
+    suffix = uuid4().hex[:10]
+    pointed_subject_id = f"subject-pointed-{suffix}"
+    fallback_subject_id = f"subject-fallback-{suffix}"
+    pointed_taxonomy_ids = [f"tax-pointed-old-{suffix}", f"tax-pointed-new-{suffix}"]
+    pointed_recall_ids = [f"recall-pointed-old-{suffix}", f"recall-pointed-new-{suffix}"]
+    fallback_taxonomy_ids = [f"tax-fallback-v1-{suffix}", f"tax-fallback-v2-{suffix}"]
+    fallback_recall_ids = [f"recall-fallback-v1-{suffix}", f"recall-fallback-v2-{suffix}"]
+    all_taxonomy_ids = pointed_taxonomy_ids + fallback_taxonomy_ids
+    all_recall_ids = pointed_recall_ids + fallback_recall_ids
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add_all(
+                [
+                    ContentSubject(
+                        id=pointed_subject_id,
+                        code=f"POINTED-{suffix}",
+                        name="指针科目",
+                        content_metadata={
+                            "currentTaxonomyId": pointed_taxonomy_ids[0],
+                            "currentRecallLibraryId": pointed_recall_ids[0],
+                        },
+                    ),
+                    ContentSubject(
+                        id=fallback_subject_id,
+                        code=f"FALLBACK-{suffix}",
+                        name="兼容科目",
+                        content_metadata={},
+                    ),
+                ]
+            )
+            await db.flush()
+            db.add_all(
+                [
+                    ContentTaxonomy(id=pointed_taxonomy_ids[0], subject_id=pointed_subject_id, version=1, status="published", title="指针选中的知识树", content_metadata={}),
+                    ContentTaxonomy(id=pointed_taxonomy_ids[1], subject_id=pointed_subject_id, version=2, status="published", title="版本更新但未选中", content_metadata={}),
+                    ContentTaxonomy(id=fallback_taxonomy_ids[0], subject_id=fallback_subject_id, version=1, status="published", title="兼容旧版", content_metadata={}),
+                    ContentTaxonomy(id=fallback_taxonomy_ids[1], subject_id=fallback_subject_id, version=2, status="published", title="兼容最新已发布版", content_metadata={}),
+                    RecallAssociationLibrary(id=pointed_recall_ids[0], subject_id=pointed_subject_id, version=1, status="published", nodes=[{"id": "pointed-recall"}], edges=[], content_metadata={}),
+                    RecallAssociationLibrary(id=pointed_recall_ids[1], subject_id=pointed_subject_id, version=2, status="published", nodes=[{"id": "newer-unselected-recall"}], edges=[], content_metadata={}),
+                    RecallAssociationLibrary(id=fallback_recall_ids[0], subject_id=fallback_subject_id, version=1, status="published", nodes=[{"id": "fallback-v1"}], edges=[], content_metadata={}),
+                    RecallAssociationLibrary(id=fallback_recall_ids[1], subject_id=fallback_subject_id, version=2, status="published", nodes=[{"id": "fallback-v2"}], edges=[], content_metadata={}),
+                ]
+            )
+            await db.flush()
+            for taxonomy_id in all_taxonomy_ids:
+                db.add(
+                    TaxonomyNode(
+                        id=f"{taxonomy_id}:root",
+                        taxonomy_id=taxonomy_id,
+                        node_id="root",
+                        title=taxonomy_id,
+                        record={"id": "root", "title": taxonomy_id},
+                        position=0,
+                    )
+                )
+            await db.commit()
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(TaxonomyNode).where(TaxonomyNode.taxonomy_id.in_(all_taxonomy_ids)))
+            await db.execute(delete(ContentTaxonomy).where(ContentTaxonomy.id.in_(all_taxonomy_ids)))
+            await db.execute(delete(RecallAssociationLibrary).where(RecallAssociationLibrary.id.in_(all_recall_ids)))
+            await db.execute(delete(ContentSubject).where(ContentSubject.id.in_([pointed_subject_id, fallback_subject_id])))
+            await db.commit()
+
+    try:
+        asyncio.run(seed())
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "jbgsnmm~123"},
+            ).status_code == 200
+            pointed = client.get(
+                "/api/v1/content-prep/shared-content",
+                params={"subjectId": pointed_subject_id},
+            )
+            assert pointed.status_code == 200, pointed.text
+            assert pointed.json()["knowledgeTree"]["taxonomy"]["id"] == pointed_taxonomy_ids[0]
+            assert pointed.json()["recallLibrary"]["nodes"] == [{"id": "pointed-recall"}]
+
+            fallback = client.get(
+                "/api/v1/content-prep/shared-content",
+                params={"subjectId": fallback_subject_id},
+            )
+            assert fallback.status_code == 200, fallback.text
+            assert fallback.json()["knowledgeTree"]["taxonomy"]["id"] == fallback_taxonomy_ids[1]
+            assert fallback.json()["recallLibrary"]["nodes"] == [{"id": "fallback-v2"}]
+    finally:
+        asyncio.run(cleanup())
 
 
 def test_content_prep_assets_principles_and_activities_are_shared_server_data() -> None:
@@ -113,7 +206,7 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
                 json={
                     "subjectId": "subject-pmp",
                     "contentRevision": revision,
-                    "knowledgeTree": {"taxonomy": {"id": f"tax-{suffix}", "subjectId": "subject-pmp", "name": {"zh": "共享知识树"}, "version": 1, "status": "draft", "nodes": []}},
+                    "knowledgeTree": {"taxonomy": {"id": f"tax-{suffix}", "subjectId": "subject-pmp", "name": {"zh": "共享知识树"}, "version": 1, "status": "published", "nodes": []}},
                     "recallLibrary": {"schemaVersion": 1, "nodes": [{"id": f"recall-{suffix}", "title": "共享联想"}], "edges": []},
                     "principles": {},
                     "synthesisPresets": {},
@@ -187,7 +280,7 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
                     "workspaceVersion": "4",
                     "questions": [],
                     "subjectId": "subject-pmp",
-                    "knowledgeTree": {"taxonomy": {"id": f"empty-tax-{suffix}", "subjectId": "subject-pmp", "name": {"zh": "零题目知识树"}, "version": 1, "status": "draft", "nodes": []}},
+                    "knowledgeTree": {"taxonomy": {"id": f"empty-tax-{suffix}", "subjectId": "subject-pmp", "name": {"zh": "零题目知识树"}, "version": 1, "status": "published", "nodes": []}},
                     "recallLibrary": {"schemaVersion": 1, "nodes": [{"id": f"empty-recall-{suffix}", "title": "零题目联想"}], "edges": []},
                     "principles": {}, "synthesisPresets": {},
                     "tagConfig": {"schemaVersion": 2, "names": {"stage": "零题目阶段"}, "groupNames": {}, "categoryNames": {}, "aliases": {}},

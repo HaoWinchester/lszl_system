@@ -6,8 +6,8 @@ import asyncio
 import json
 import shutil
 from copy import deepcopy
-from dataclasses import replace
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -95,8 +95,12 @@ def test_builtin_bundle_syncs_once_and_repeated_runs_are_idempotent() -> None:
 
             taxonomy = await db.get(ContentTaxonomy, seed_service.TAXONOMY_ID)
             recall = await db.get(RecallAssociationLibrary, seed_service.RECALL_LIBRARY_ID)
+            subject = await db.get(ContentSubject, seed_service.SUBJECT_ID)
             assert taxonomy is not None and taxonomy.status == "published"
             assert recall is not None
+            assert subject is not None
+            assert subject.content_metadata["currentTaxonomyId"] == taxonomy.id
+            assert subject.content_metadata["currentRecallLibraryId"] == recall.id
             assert len(recall.nodes) == 471
             assert len(recall.edges) == 2840
             taxonomy_node_count = int(
@@ -122,7 +126,7 @@ def test_builtin_bundle_syncs_once_and_repeated_runs_are_idempotent() -> None:
     asyncio.run(exercise())
 
 
-def test_builtin_sync_restores_canonical_records_and_preserves_custom_content() -> None:
+def test_builtin_sync_preserves_admin_updates_and_current_pointers() -> None:
     bundle = seed_service.load_builtin_bundle()
     principle_item = bundle.principles[0]
     preset_item = next(
@@ -132,19 +136,73 @@ def test_builtin_sync_restores_canonical_records_and_preserves_custom_content() 
     )
     custom_principle_id = "custom-principle-outside-builtin-bundle"
     custom_preset_id = "custom-preset-outside-builtin-bundle"
+    suffix = uuid4().hex[:10]
+    custom_taxonomy_id = f"custom-current-taxonomy-{suffix}"
+    custom_recall_id = f"custom-current-recall-{suffix}"
 
     async def exercise() -> None:
         async with AsyncSessionLocal() as db:
+            await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id == custom_preset_id))
+            await db.execute(delete(Principle).where(Principle.id == custom_principle_id))
+            await db.commit()
             await seed_service.sync_builtin_teaching_content(db, bundle)
             principle = await db.get(Principle, principle_item["id"])
             preset = await db.get(SynthesisPreset, preset_item["id"])
             recall = await db.get(RecallAssociationLibrary, seed_service.RECALL_LIBRARY_ID)
+            taxonomy_node = (
+                await db.execute(
+                    select(TaxonomyNode)
+                    .where(TaxonomyNode.taxonomy_id == seed_service.TAXONOMY_ID)
+                    .order_by(TaxonomyNode.position)
+                    .limit(1)
+                )
+            ).scalar_one()
+            subject = await db.get(ContentSubject, seed_service.SUBJECT_ID)
             assert principle is not None and preset is not None and recall is not None
+            assert subject is not None
             principle.name = "被改动的内置原则"
             principle.revision = 7
             preset.content = "被改动的内置归纳卡"
             preset.revision = 11
             recall.nodes = []
+            taxonomy_node.record = {**taxonomy_node.record, "title": {"zh": "管理员更新的节点"}}
+            taxonomy_node.title = "管理员更新的节点"
+            max_taxonomy_version = int(
+                (await db.execute(select(func.max(ContentTaxonomy.version)))).scalar_one()
+                or 0
+            )
+            max_recall_version = int(
+                (
+                    await db.execute(select(func.max(RecallAssociationLibrary.version)))
+                ).scalar_one()
+                or 0
+            )
+            db.add(
+                ContentTaxonomy(
+                    id=custom_taxonomy_id,
+                    subject_id=subject.id,
+                    version=max_taxonomy_version + 1,
+                    status="published",
+                    title="管理员当前知识树",
+                    content_metadata={"custom": True},
+                )
+            )
+            db.add(
+                RecallAssociationLibrary(
+                    id=custom_recall_id,
+                    subject_id=subject.id,
+                    version=max_recall_version + 1,
+                    status="published",
+                    nodes=[{"id": "custom-current-node"}],
+                    edges=[],
+                    content_metadata={"custom": True},
+                )
+            )
+            subject.content_metadata = {
+                **dict(subject.content_metadata or {}),
+                "currentTaxonomyId": custom_taxonomy_id,
+                "currentRecallLibraryId": custom_recall_id,
+            }
             db.add(
                 Principle(
                     id=custom_principle_id,
@@ -168,17 +226,23 @@ def test_builtin_sync_restores_canonical_records_and_preserves_custom_content() 
             await db.commit()
             revision_before = int((await teaching_content_revision_service.current(db))["revision"])
 
-            restored = await seed_service.sync_builtin_teaching_content(db, bundle)
-            assert restored.updated >= 3
+            preserved = await seed_service.sync_builtin_teaching_content(db, bundle)
+            assert preserved.created == 0
+            assert preserved.updated == 0
             await db.refresh(principle)
             await db.refresh(preset)
             await db.refresh(recall)
-            assert principle.name == principle_item["name"]
-            assert principle.revision == 8
-            assert preset.content == preset_item["content"]
-            assert preset.revision == 12
-            assert len(recall.nodes) == 471
-            assert int((await teaching_content_revision_service.current(db))["revision"]) == revision_before + 1
+            await db.refresh(taxonomy_node)
+            await db.refresh(subject)
+            assert principle.name == "被改动的内置原则"
+            assert principle.revision == 7
+            assert preset.content == "被改动的内置归纳卡"
+            assert preset.revision == 11
+            assert recall.nodes == []
+            assert taxonomy_node.title == "管理员更新的节点"
+            assert subject.content_metadata["currentTaxonomyId"] == custom_taxonomy_id
+            assert subject.content_metadata["currentRecallLibraryId"] == custom_recall_id
+            assert int((await teaching_content_revision_service.current(db))["revision"]) == revision_before
 
             custom_principle = await db.get(Principle, custom_principle_id)
             custom_preset = await db.get(SynthesisPreset, custom_preset_id)
@@ -187,21 +251,26 @@ def test_builtin_sync_restores_canonical_records_and_preserves_custom_content() 
             assert custom_preset is not None and custom_preset.content == "自定义内容"
             assert custom_preset.revision == 6
 
-            upgraded_preset = {**preset_item, "content": "由新版内置文件提供的内容"}
-            upgraded_bundle = replace(
-                bundle,
-                synthesis_presets=tuple(
-                    upgraded_preset if item["id"] == preset_item["id"] else item
-                    for item in bundle.synthesis_presets
-                ),
-            )
-            upgraded = await seed_service.sync_builtin_teaching_content(db, upgraded_bundle)
-            assert upgraded.updated == 1
-            await db.refresh(preset)
-            assert preset.content == "由新版内置文件提供的内容"
-            assert preset.revision == 13
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            subject = await db.get(ContentSubject, seed_service.SUBJECT_ID)
+            if subject is not None:
+                subject.content_metadata = {
+                    **dict(subject.content_metadata or {}),
+                    "currentTaxonomyId": seed_service.TAXONOMY_ID,
+                    "currentRecallLibraryId": seed_service.RECALL_LIBRARY_ID,
+                }
+            await db.execute(delete(TaxonomyNode).where(TaxonomyNode.taxonomy_id == custom_taxonomy_id))
+            await db.execute(delete(ContentTaxonomy).where(ContentTaxonomy.id == custom_taxonomy_id))
+            await db.execute(delete(RecallAssociationLibrary).where(RecallAssociationLibrary.id == custom_recall_id))
+            await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id == custom_preset_id))
+            await db.execute(delete(Principle).where(Principle.id == custom_principle_id))
+            await db.commit()
 
-    asyncio.run(exercise())
+    try:
+        asyncio.run(exercise())
+    finally:
+        asyncio.run(cleanup())
 
 
 def test_builtin_sync_allocates_versions_without_deleting_custom_content() -> None:
@@ -480,7 +549,9 @@ def test_builtin_sync_does_not_modify_published_papers_or_questions() -> None:
             await db.commit()
 
             result = await seed_service.sync_builtin_teaching_content(db)
-            assert result.updated >= 1
+            assert result.updated == 0
+            await db.refresh(recall)
+            assert recall.nodes == []
 
             question = await db.get(Question, question_id)
             paper = await db.get(ExamPaper, paper_id)
