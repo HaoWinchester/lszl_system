@@ -9,8 +9,10 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import delete, func, select
 
+from app import main as app_main
 from app.db.session import AsyncSessionLocal
 from app.models.content_prep import Principle, SynthesisPreset
 from app.models.teaching_content import (
@@ -286,3 +288,101 @@ def test_builtin_sync_rolls_back_when_a_preset_id_belongs_to_another_principle()
             await seed_service.sync_builtin_teaching_content(db, bundle)
 
     asyncio.run(exercise())
+
+
+def test_builtin_startup_wrapper_isolates_seed_failure(monkeypatch, caplog) -> None:
+    async def fail_sync(db):
+        raise seed_service.BuiltinSeedValidationError("测试内置数据损坏")
+
+    monkeypatch.setattr(seed_service, "sync_builtin_teaching_content", fail_sync)
+    app_main.app.state.db_ok = True
+
+    result = asyncio.run(app_main._seed_builtin_teaching_content())
+
+    assert result is None
+    assert app_main.app.state.db_ok is True
+    assert "Built-in teaching content sync failed" in caplog.text
+    assert "knowledge-taxonomy-package-v1" not in caplog.text
+
+
+def test_builtin_startup_wrapper_logs_only_summary(monkeypatch, caplog) -> None:
+    expected = seed_service.BuiltinSeedSummary(
+        created=18,
+        updated=0,
+        unchanged=0,
+        changes=(
+            {
+                "entityType": "taxonomy",
+                "entityId": seed_service.TAXONOMY_ID,
+                "action": "created",
+            },
+        ),
+    )
+
+    async def successful_sync(db):
+        return expected
+
+    monkeypatch.setattr(seed_service, "sync_builtin_teaching_content", successful_sync)
+    caplog.set_level("INFO", logger="app")
+
+    result = asyncio.run(app_main._seed_builtin_teaching_content())
+
+    assert result == expected
+    assert "created=18 updated=0 unchanged=0" in caplog.text
+    assert seed_service.TAXONOMY_ID not in caplog.text
+
+
+def test_teacher_shared_content_api_restores_builtin_baseline_at_startup() -> None:
+    bundle = seed_service.load_builtin_bundle()
+    principle_ids = [row["id"] for row in bundle.principles]
+    preset_ids = [row["id"] for row in bundle.synthesis_presets]
+
+    async def remove_builtin_records() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id.in_(preset_ids)))
+            await db.execute(delete(Principle).where(Principle.id.in_(principle_ids)))
+            await db.execute(
+                delete(TaxonomyNode).where(
+                    TaxonomyNode.taxonomy_id == seed_service.TAXONOMY_ID
+                )
+            )
+            await db.execute(
+                delete(ContentTaxonomy).where(
+                    ContentTaxonomy.id == seed_service.TAXONOMY_ID
+                )
+            )
+            await db.execute(
+                delete(RecallAssociationLibrary).where(
+                    RecallAssociationLibrary.id == seed_service.RECALL_LIBRARY_ID
+                )
+            )
+            await db.commit()
+
+    async def restore_builtin_records() -> None:
+        async with AsyncSessionLocal() as db:
+            await seed_service.sync_builtin_teaching_content(db, bundle)
+
+    asyncio.run(remove_builtin_records())
+    try:
+        with TestClient(app_main.app) as client:
+            login = client.post(
+                "/api/v1/auth/login",
+                json={"username": "老师", "password": "111111"},
+            )
+            assert login.status_code == 200, login.text
+            response = client.get(
+                "/api/v1/content-prep/shared-content",
+                params={"subjectId": "PMP"},
+            )
+            assert response.status_code == 200, response.text
+            payload = response.json()
+            taxonomy = payload["knowledgeTree"]["taxonomy"]
+            assert taxonomy["id"] == seed_service.TAXONOMY_ID
+            assert len(taxonomy["nodes"]) == 317
+            assert len(payload["recallLibrary"]["nodes"]) == 471
+            assert len(payload["recallLibrary"]["edges"]) == 2840
+            assert set(principle_ids).issubset(
+                {item["id"] for item in payload["principles"]["items"]}
+            )
+    finally:
+        asyncio.run(restore_builtin_records())

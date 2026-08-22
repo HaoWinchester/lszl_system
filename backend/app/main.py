@@ -12,6 +12,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal, engine
+from app.services.builtin_teaching_content_seed_service import BuiltinSeedSummary
 from app.web.routes import router as web_router
 
 logging.basicConfig(level=logging.INFO)
@@ -76,6 +77,27 @@ async def _seed_guided_course() -> None:
         logger.info("Seeded guided course: %s %s", course.id, course.version)
 
 
+async def _seed_builtin_teaching_content() -> BuiltinSeedSummary | None:
+    """Synchronize packaged teaching data without changing DB health state on failure."""
+    from app.services import builtin_teaching_content_seed_service
+
+    try:
+        async with AsyncSessionLocal() as db:
+            summary = await builtin_teaching_content_seed_service.sync_builtin_teaching_content(
+                db
+            )
+        logger.info(
+            "Built-in teaching content synced: created=%s updated=%s unchanged=%s",
+            summary.created,
+            summary.updated,
+            summary.unchanged,
+        )
+        return summary
+    except Exception:  # noqa: BLE001
+        logger.exception("Built-in teaching content sync failed")
+        return None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """启动时探活 DB、种入默认管理员；失败不阻塞启动。"""
@@ -90,6 +112,8 @@ async def lifespan(app: FastAPI):
         app.state.db_ok = False
         app.state.db_err = str(e)
         logger.warning("DB connection failed: %s", e)
+    if app.state.db_ok:
+        await _seed_builtin_teaching_content()
     yield
     await engine.dispose()
 

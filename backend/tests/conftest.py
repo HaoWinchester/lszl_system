@@ -130,7 +130,11 @@ atexit.register(_drop_test_database)
 # and Alembic migration above.
 from app.core.config import settings  # noqa: E402
 from app.db.session import engine  # noqa: E402
-from app.main import _seed_admin, _seed_guided_course  # noqa: E402
+from app.main import (  # noqa: E402
+    _seed_admin,
+    _seed_builtin_teaching_content,
+    _seed_guided_course,
+)
 
 # 本地 .env 可能临时开启 CONTENT_PREP_VALIDATION_DISABLED(dev 提速),但测试永远跑默认校验路径;
 # 需要开关行为的测试(test_content_prep_validation_switch)自行显式设置。
@@ -138,6 +142,7 @@ settings.CONTENT_PREP_VALIDATION_DISABLED = False
 
 asyncio.run(_seed_admin())
 asyncio.run(_seed_guided_course())
+asyncio.run(_seed_builtin_teaching_content())
 
 
 def pytest_sessionfinish(session, exitstatus) -> None:
