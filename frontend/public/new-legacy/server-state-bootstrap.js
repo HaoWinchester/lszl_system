@@ -578,6 +578,23 @@
     return { claimed: result.claimed === true, key, value, revision }
   }
 
+  async function claimGuidedTour() {
+    const response = await fetch('/api/v1/runtime/guided-tour-claim', {
+      method: 'POST',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error(`新手引导状态保存失败 (${response.status})`)
+    const result = await response.json()
+    const key = typeof result.key === 'string' ? result.key : ''
+    if (!key) throw new Error('新手引导状态响应无效')
+    const value = result.value == null ? null : String(result.value)
+    if (value == null) values.delete(key)
+    else values.set(key, value)
+    const nextRevision = Number(result.revision)
+    if (Number.isSafeInteger(nextRevision) && nextRevision >= 0) revision = nextRevision
+    return { claimed: result.claimed === true, key, value, revision }
+  }
+
   function emit(operation, key, value) {
     lastMutation = { operation, key: String(key || ''), value: value == null ? null : String(value) }
     if (!REMOTE_SYNC) return
@@ -669,6 +686,7 @@
     },
   })
   storage.claimLearningEntry = claimLearningEntry
+  storage.claimGuidedTour = claimGuidedTour
   storage.flush = flush
   storage.refresh = refresh
 
