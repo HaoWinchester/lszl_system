@@ -154,6 +154,70 @@
     return state.catalog.map(clone);
   }
 
+  function normalizeManagementRow(row) {
+    const release = normalizeCatalogRow(row);
+    const questions = (Array.isArray(row?.questions) ? row.questions : []).map((item, index) => ({
+      bankId: text(item?.bankId),
+      questionId: text(item?.questionId || item?.id),
+      order: Math.max(1, number(item?.order, index + 1)),
+      score: Math.max(0, number(item?.score, 1)),
+    })).filter(item => item.bankId && item.questionId);
+    return {
+      ...release,
+      id: release.paperId || release.id,
+      status: 'published',
+      publishedVersion: number(row?.publishedVersion ?? release.version, release.version),
+      publishedReleaseId: text(row?.publishedReleaseId || release.releaseId),
+      questions,
+      manualQuestionIds: questions.map(item => item.questionId),
+      serverReleaseProjection: true,
+    };
+  }
+
+  async function managementCatalog() {
+    const rows = [];
+    let page = 1;
+    for (;;) {
+      const payload = await request(`/management-catalog?page=${page}&pageSize=${CATALOG_PAGE_SIZE}`);
+      const batch = Array.isArray(payload.papers) ? payload.papers : [];
+      rows.push(...batch.map(normalizeManagementRow));
+      const total = number(payload.total, rows.length);
+      if (!batch.length || rows.length >= total || page >= 50) break;
+      page += 1;
+    }
+    return rows.map(clone);
+  }
+
+  function mergeManagementPapers(drafts, releases) {
+    const local = (Array.isArray(drafts) ? drafts : []).map(clone);
+    const releaseRows = (Array.isArray(releases) ? releases : []).map(normalizeManagementRow);
+    const releaseByPaper = new Map(releaseRows.map(row => [text(row.paperId || row.id), row]));
+    const merged = local.map(draft => {
+      const paperId = text(draft?.id || draft?.paperId);
+      const release = releaseByPaper.get(paperId);
+      if (!release) return draft;
+      releaseByPaper.delete(paperId);
+      const draftQuestions = Array.isArray(draft?.questions) && draft.questions.length
+        ? clone(draft.questions)
+        : clone(release.questions);
+      return {
+        ...release,
+        ...draft,
+        id: paperId,
+        paperId,
+        status: 'published',
+        publishedAt: release.publishedAt,
+        publishedVersion: release.publishedVersion,
+        publishedReleaseId: release.publishedReleaseId,
+        enabledModes: clone(release.enabledModes),
+        accessPolicy: clone(release.accessPolicy),
+        questions: draftQuestions,
+        serverReleaseProjection: true,
+      };
+    });
+    return [...merged, ...releaseByPaper.values()].map(clone);
+  }
+
   function findInCatalog(releaseId) {
     return state.catalogById.get(text(releaseId)) || null;
   }
@@ -256,6 +320,8 @@
     ready,
     reload,
     catalog,
+    managementCatalog,
+    mergeManagementPapers,
     findInCatalog,
     detail,
     fetchQuestions,
