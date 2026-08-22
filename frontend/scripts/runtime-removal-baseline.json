@@ -49,6 +49,11 @@
   "consumer": [
     {
       "path": "frontend/scripts/direct-runtime.test.mjs",
+      "token": "KGServerStateBootstrap",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/direct-runtime.test.mjs",
       "token": "KGServerStateStorage",
       "ordinal": 1
     },
@@ -179,6 +184,11 @@
     },
     {
       "path": "frontend/scripts/tests/direct-system-entitlements.test.mjs",
+      "token": "KGServerStateStorage",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/40-guided-tour.js",
       "token": "KGServerStateStorage",
       "ordinal": 1
     }
@@ -998,6 +1008,11 @@
       "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_exam_papers_v1__teacher_shared",
       "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_exam_papers_v1__teacher_shared",
+      "ordinal": 2
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
@@ -4057,6 +4072,11 @@
     {
       "path": "new-legacy/src/admin/30-reference-index-service.js",
       "token": "kg_question_banks_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/admin/42-teaching-content-server-gateway.js",
+      "token": "kg_content_taxonomies_v1",
       "ordinal": 1
     },
     {
