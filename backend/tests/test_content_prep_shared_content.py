@@ -1,5 +1,6 @@
 import asyncio
 import json
+from copy import deepcopy
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -127,6 +128,8 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
     created_bank_ids: set[str] = set()
     created_batch_ids: set[str] = set()
     previous_active_tag_id: str | None = None
+    subject_metadata_snapshot: dict | None = None
+    recall_snapshot: dict | None = None
     keys = {
         TAXONOMY_KEY,
         TAG_KEY,
@@ -137,8 +140,20 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
     }
 
     async def seed() -> None:
-        nonlocal previous_active_tag_id
+        nonlocal previous_active_tag_id, subject_metadata_snapshot, recall_snapshot
         async with AsyncSessionLocal() as db:
+            subject = await db.get(ContentSubject, "subject-pmp")
+            subject_metadata_snapshot = None if subject is None else dict(subject.content_metadata or {})
+            recall_id = str((subject_metadata_snapshot or {}).get("currentRecallLibraryId") or "")
+            recall = await db.get(RecallAssociationLibrary, recall_id) if recall_id else None
+            recall_snapshot = None if recall is None else {
+                "id": recall.id,
+                "nodes": deepcopy(recall.nodes),
+                "edges": deepcopy(recall.edges),
+                "content_metadata": deepcopy(recall.content_metadata),
+                "status": recall.status,
+                "updated_by": recall.updated_by,
+            }
             for key in keys:
                 row = await db.get(SharedRuntimeState, key)
                 snapshots[key] = None if row is None else {
@@ -186,6 +201,20 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
                 previous = await db.get(QuestionTagConfig, previous_active_tag_id)
                 if previous is not None:
                     previous.active = True
+            subject = await db.get(ContentSubject, "subject-pmp")
+            if subject is not None and subject_metadata_snapshot is not None:
+                subject.content_metadata = subject_metadata_snapshot
+            taxonomy_ids = [f"tax-{suffix}", f"empty-tax-{suffix}"]
+            await db.execute(delete(TaxonomyNode).where(TaxonomyNode.taxonomy_id.in_(taxonomy_ids)))
+            await db.execute(delete(ContentTaxonomy).where(ContentTaxonomy.id.in_(taxonomy_ids)))
+            if recall_snapshot is not None:
+                recall = await db.get(RecallAssociationLibrary, recall_snapshot["id"])
+                if recall is not None:
+                    recall.nodes = recall_snapshot["nodes"]
+                    recall.edges = recall_snapshot["edges"]
+                    recall.content_metadata = recall_snapshot["content_metadata"]
+                    recall.status = recall_snapshot["status"]
+                    recall.updated_by = recall_snapshot["updated_by"]
             for key, snapshot in snapshots.items():
                 await db.execute(delete(SharedRuntimeState).where(SharedRuntimeState.key == key))
                 if snapshot is not None:
@@ -310,7 +339,8 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
             async def relational_assets():
                 async with AsyncSessionLocal() as db:
                     taxonomy = (await db.execute(select(ContentTaxonomy).where(ContentTaxonomy.id == f"empty-tax-{suffix}"))).scalar_one()
-                    recall = (await db.execute(select(RecallAssociationLibrary).where(RecallAssociationLibrary.subject_id == "subject-pmp").order_by(RecallAssociationLibrary.version.desc()).limit(1))).scalar_one()
+                    subject = await db.get(ContentSubject, "subject-pmp")
+                    recall = await db.get(RecallAssociationLibrary, subject.content_metadata["currentRecallLibraryId"])
                     activity = (await db.execute(select(ActivityOverride).where(ActivityOverride.activity_id == activity_id))).scalar_one()
                     return taxonomy, recall, activity
             taxonomy, recall, activity = asyncio.run(relational_assets())

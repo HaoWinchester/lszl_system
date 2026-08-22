@@ -244,6 +244,19 @@ test('home restores the update learning-entry dialog, automatic guided steps, an
   assert.match(modeStyles, /body\.graph-phone-reading[\s\S]*\.uc-minimap-dock/)
 })
 
+test('subject administration waits for server teaching content before rendering or reporting publication success', () => {
+  const page = source('new-legacy/admin-subjects.html')
+  const app = source('new-legacy/src/admin/51-admin-subjects-app.js')
+  const gatewayIndex = page.indexOf('src/admin/42-teaching-content-server-gateway.js')
+  const appIndex = page.indexOf('src/admin/51-admin-subjects-app.js')
+  assert.ok(gatewayIndex >= 0 && appIndex > gatewayIndex)
+  assert.match(app, /async function init\(\)/)
+  assert.match(app, /await Gateway\.hydrateSubject/)
+  assert.match(app, /await Gateway\.publishTaxonomy/)
+  assert.match(app, /当前知识树已更新/)
+  assert.match(app, /无法读取服务器知识树/)
+})
+
 test('an active paid membership hides renewal calls to action while preserving membership status', () => {
   const core = source('new-legacy/src/37-subscription-core.js')
   const center = source('new-legacy/src/33-user-center.js')

@@ -57,7 +57,7 @@
     try{const raw=global.localStorage?.getItem(key);return raw?JSON.parse(raw):clone(fallback)}catch(error){return clone(fallback)}
   }
   function writeJson(key,value){
-    try{global.localStorage?.setItem(key,JSON.stringify(value));return true}catch(error){return false}
+    try{global.localStorage?.setItem(key,JSON.stringify(value));try{if(typeof global.CustomEvent==='function')global.dispatchEvent?.(new global.CustomEvent('kg-app-storage-change',{detail:{type:'json',action:'write',key,value:clone(value)}}))}catch(_error){}return true}catch(error){return false}
   }
   function normalizedSubjects(){
     const stored=readJson(SUBJECT_KEY,DEFAULT_SUBJECTS);

@@ -74,6 +74,12 @@ def test_builtin_bundle_syncs_once_and_repeated_runs_are_idempotent() -> None:
 
     async def exercise() -> None:
         async with AsyncSessionLocal() as db:
+            subject = await db.get(ContentSubject, seed_service.SUBJECT_ID)
+            if subject is not None:
+                metadata = dict(subject.content_metadata or {})
+                metadata.pop("currentTaxonomyId", None)
+                metadata.pop("currentRecallLibraryId", None)
+                subject.content_metadata = metadata
             await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id.in_(preset_ids)))
             await db.execute(delete(Principle).where(Principle.id.in_(principle_ids)))
             await db.execute(

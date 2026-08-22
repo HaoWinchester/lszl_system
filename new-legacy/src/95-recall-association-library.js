@@ -344,14 +344,17 @@
   async function readServer(subjectId='PMP'){
     const data=await requestJson(SHARED_CONTENT_PATH+'?subjectId='+encodeURIComponent(clean(subjectId)||'PMP'));
     const library=data?.recallLibrary;
-    return library&&typeof library==='object'?normalizeLibrary(library):null;
+    return library&&typeof library==='object'?{...normalizeLibrary(library),id:clean(library.id),subjectId:clean(library.subjectId),version:Number(library.version)||1,status:clean(library.status)||'published',contentRevision:Number(data?.contentRevision)||0}:null;
   }
   async function writeServer(subjectId='PMP',library={}){
     const subject=clean(subjectId)||'PMP';
     const current=await requestJson(SHARED_CONTENT_PATH+'?subjectId='+encodeURIComponent(subject));
     const revision=Number(current?.contentRevision)||0;
-    const saved=await requestJson(SHARED_CONTENT_PATH,{method:'PUT',body:JSON.stringify({subjectId:subject,contentRevision:revision,recallLibrary:normalizeLibrary(library)})});
-    return {valid:true,revision:Number(saved?.contentRevision)||revision+1,library:normalizeLibrary(saved?.recallLibrary||library)};
+    const identity=current?.recallLibrary&&typeof current.recallLibrary==='object'?current.recallLibrary:{};
+    const recallLibrary={...normalizeLibrary(library),id:clean(identity.id),subjectId:clean(identity.subjectId)||subject,version:Number(identity.version)||1,status:clean(identity.status)||'published'};
+    const saved=await requestJson(SHARED_CONTENT_PATH,{method:'PUT',body:JSON.stringify({subjectId:subject,contentRevision:revision,recallLibrary})});
+    const savedIdentity=saved?.recallLibrary&&typeof saved.recallLibrary==='object'?saved.recallLibrary:recallLibrary;
+    return {valid:true,revision:Number(saved?.contentRevision)||revision+1,identity:{id:clean(savedIdentity.id),subjectId:clean(savedIdentity.subjectId)||subject,version:Number(savedIdentity.version)||1,status:clean(savedIdentity.status)||'published'},library:normalizeLibrary(savedIdentity)};
   }
 
   const api=Object.freeze({storageKey,legacyStorageKey,normalizeLibrary,parseText,merge,read,write,saveText,index,resolve,choices,toText,asRecallNode,nodeId,reconcileIncoming,updateNode,setChoices,saveNode,setSessionLibrary,clearSessionLibrary,sessionInfo,readServer,writeServer});
