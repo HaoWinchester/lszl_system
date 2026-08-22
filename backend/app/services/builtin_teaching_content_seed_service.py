@@ -4,8 +4,21 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.content_prep import Principle, SynthesisPreset
+from app.models.teaching_content import (
+    ContentSubject,
+    ContentTaxonomy,
+    RecallAssociationLibrary,
+    TaxonomyNode,
+)
+from app.services import teaching_content_revision_service
 
 
 SEED_DIR = Path(__file__).parents[1] / "seed" / "builtin_teaching_content"
@@ -14,6 +27,7 @@ RECALL_FILENAME = "pmp_recall_association_v9.json"
 PRINCIPLE_FILENAME = "pmp_principle_cards_v1.json"
 SUBJECT_ID = "subject-pmp"
 TAXONOMY_ID = "taxonomy-pmp-complete-v1"
+RECALL_LIBRARY_ID = "recall-subject-pmp-builtin-v1"
 EXPECTED_TAXONOMY_NODES = 317
 EXPECTED_RECALL_NODES = 471
 EXPECTED_RECALL_EDGES = 2840
@@ -31,6 +45,14 @@ class BuiltinTeachingBundle:
     recall_library: dict[str, Any]
     principles: tuple[dict[str, Any], ...]
     synthesis_presets: tuple[dict[str, Any], ...]
+
+
+@dataclass(frozen=True)
+class BuiltinSeedSummary:
+    created: int
+    updated: int
+    unchanged: int
+    changes: tuple[dict[str, str], ...]
 
 
 def _read_object(path: Path, label: str) -> dict[str, Any]:
@@ -149,3 +171,197 @@ def load_builtin_bundle(seed_dir: Path = SEED_DIR) -> BuiltinTeachingBundle:
         principles=principles,
         synthesis_presets=synthesis_presets,
     )
+
+
+def _localized_text(value: object) -> str:
+    if isinstance(value, dict):
+        return str(value.get("zh") or value.get("en") or "").strip()
+    return str(value or "").strip()
+
+
+async def _available_version(
+    db: AsyncSession,
+    model: type[ContentTaxonomy] | type[RecallAssociationLibrary],
+    subject_id: str,
+    requested: int,
+) -> int:
+    occupied = (
+        await db.execute(
+            select(model.version).where(
+                model.subject_id == subject_id,
+                model.version == requested,
+            )
+        )
+    ).scalar_one_or_none()
+    if occupied is None:
+        return requested
+    maximum = (
+        await db.execute(select(func.max(model.version)).where(model.subject_id == subject_id))
+    ).scalar_one_or_none()
+    return int(maximum or 0) + 1
+
+
+async def sync_builtin_teaching_content(
+    db: AsyncSession,
+    bundle: BuiltinTeachingBundle | None = None,
+) -> BuiltinSeedSummary:
+    """Create the packaged aggregate records once inside one transaction."""
+
+    bundle = bundle or load_builtin_bundle()
+    created = 0
+    unchanged = 0
+    changes: list[dict[str, str]] = []
+    try:
+        await teaching_content_revision_service.acquire_lock(db)
+        subject = await db.get(ContentSubject, bundle.subject_id)
+        if subject is None:
+            subject = ContentSubject(
+                id=bundle.subject_id,
+                code="PMP",
+                name="PMP",
+                status="active",
+                content_metadata={"builtin": True},
+            )
+            db.add(subject)
+            await db.flush()
+
+        taxonomy = await db.get(ContentTaxonomy, TAXONOMY_ID)
+        if taxonomy is None:
+            source_version = int(bundle.taxonomy.get("version") or 1)
+            taxonomy = ContentTaxonomy(
+                id=TAXONOMY_ID,
+                subject_id=bundle.subject_id,
+                version=await _available_version(
+                    db, ContentTaxonomy, bundle.subject_id, source_version
+                ),
+                status="published",
+                title=_localized_text(bundle.taxonomy.get("name") or bundle.taxonomy.get("title")),
+                content_metadata={
+                    key: value
+                    for key, value in bundle.taxonomy.items()
+                    if key != "nodes"
+                }
+                | {"builtin": True, "builtinSourceVersion": source_version},
+                published_at=datetime.now(timezone.utc),
+            )
+            db.add(taxonomy)
+            await db.flush()
+            for position, node in enumerate(bundle.taxonomy["nodes"]):
+                node_id = str(node["id"])
+                db.add(
+                    TaxonomyNode(
+                        id=f"{TAXONOMY_ID}:{node_id}",
+                        taxonomy_id=TAXONOMY_ID,
+                        node_id=node_id,
+                        parent_node_id=node.get("parentId"),
+                        title=_localized_text(node.get("title")),
+                        record=node,
+                        position=position,
+                        status=str(node.get("status") or "active"),
+                    )
+                )
+            created += 1
+            changes.append(
+                {"entityType": "taxonomy", "entityId": TAXONOMY_ID, "action": "created"}
+            )
+        else:
+            unchanged += 1
+
+        recall = await db.get(RecallAssociationLibrary, RECALL_LIBRARY_ID)
+        if recall is None:
+            source_version = 1
+            recall = RecallAssociationLibrary(
+                id=RECALL_LIBRARY_ID,
+                subject_id=bundle.subject_id,
+                version=await _available_version(
+                    db, RecallAssociationLibrary, bundle.subject_id, source_version
+                ),
+                status="published",
+                nodes=list(bundle.recall_library["nodes"]),
+                edges=list(bundle.recall_library["edges"]),
+                content_metadata={
+                    key: value
+                    for key, value in bundle.recall_library.items()
+                    if key not in {"nodes", "edges"}
+                }
+                | {"builtin": True, "builtinSourceVersion": source_version},
+            )
+            db.add(recall)
+            created += 1
+            changes.append(
+                {
+                    "entityType": "recallLibrary",
+                    "entityId": RECALL_LIBRARY_ID,
+                    "action": "created",
+                }
+            )
+        else:
+            unchanged += 1
+
+        for item in bundle.principles:
+            principle_id = str(item["id"])
+            principle = await db.get(Principle, principle_id)
+            if principle is None:
+                db.add(
+                    Principle(
+                        id=principle_id,
+                        name=str(item.get("name") or ""),
+                        status=str(item.get("status") or "active"),
+                        confusable_principle_ids=list(item.get("confusablePrincipleIds") or []),
+                        revision=1,
+                    )
+                )
+                created += 1
+                changes.append(
+                    {
+                        "entityType": "principle",
+                        "entityId": principle_id,
+                        "action": "created",
+                    }
+                )
+            else:
+                unchanged += 1
+        await db.flush()
+
+        for item in bundle.synthesis_presets:
+            preset_id = str(item["id"])
+            preset = await db.get(SynthesisPreset, preset_id)
+            if preset is None:
+                db.add(
+                    SynthesisPreset(
+                        id=preset_id,
+                        principle_id=str(item["principleId"]),
+                        title=str(item.get("title") or ""),
+                        content=str(item.get("content") or ""),
+                        status=str(item.get("status") or "active"),
+                        business_version=int(item.get("version") or 1),
+                        revision=1,
+                    )
+                )
+                created += 1
+                changes.append(
+                    {
+                        "entityType": "synthesisPreset",
+                        "entityId": preset_id,
+                        "action": "created",
+                    }
+                )
+            else:
+                unchanged += 1
+
+        if changes:
+            await teaching_content_revision_service.bump(
+                db,
+                "system:builtin-teaching-content",
+                changes,
+            )
+        await db.commit()
+        return BuiltinSeedSummary(
+            created=created,
+            updated=0,
+            unchanged=unchanged,
+            changes=tuple(changes),
+        )
+    except Exception:
+        await db.rollback()
+        raise
