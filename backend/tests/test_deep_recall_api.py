@@ -20,6 +20,7 @@ from app.models.training import (
     RecallQuestionSnapshot,
 )
 from app.models.user import User
+from app.services.teaching_content_current_service import set_current_recall_library
 
 
 PASSWORD = "deep-recall-pass"
@@ -69,9 +70,10 @@ def test_recall_progress_is_owner_isolated_revision_checked_and_library_read_onl
     question_id = f"recall-question-{suffix}"
     recall_library_id = f"recall-library-{suffix}"
     previous_recall: dict | None = None
+    previous_subject_metadata: dict | None = None
 
     async def seed() -> None:
-        nonlocal previous_recall
+        nonlocal previous_recall, previous_subject_metadata
         async with AsyncSessionLocal() as db:
             row = await db.get(SharedRuntimeState, RECALL_KEY)
             if row is not None:
@@ -128,8 +130,10 @@ def test_recall_progress_is_owner_isolated_revision_checked_and_library_read_onl
             }
             subject = await db.get(ContentSubject, "subject-pmp")
             if subject is None:
-                db.add(ContentSubject(id="subject-pmp", code="PMP", name="PMP", content_metadata={}))
+                subject = ContentSubject(id="subject-pmp", code="PMP", name="PMP", content_metadata={})
+                db.add(subject)
                 await db.flush()
+            previous_subject_metadata = dict(subject.content_metadata or {})
             latest_version = int(
                 (
                     await db.execute(
@@ -141,6 +145,7 @@ def test_recall_progress_is_owner_isolated_revision_checked_and_library_read_onl
                 or 0
             )
             db.add(RecallAssociationLibrary(id=recall_library_id, subject_id="subject-pmp", version=latest_version + 1, status="published", nodes=recall_payload["nodes"], edges=recall_payload["edges"], content_metadata=recall_payload, updated_by=teacher))
+            set_current_recall_library(subject, recall_library_id)
             await db.commit()
 
     async def cleanup() -> None:
@@ -155,6 +160,9 @@ def test_recall_progress_is_owner_isolated_revision_checked_and_library_read_onl
                     RecallAssociationLibrary.id == recall_library_id
                 )
             )
+            subject = await db.get(ContentSubject, "subject-pmp")
+            if subject is not None and previous_subject_metadata is not None:
+                subject.content_metadata = previous_subject_metadata
             await db.execute(delete(SharedRuntimeState).where(SharedRuntimeState.key == RECALL_KEY))
             if previous_recall is not None:
                 db.add(SharedRuntimeState(key=RECALL_KEY, **previous_recall))
