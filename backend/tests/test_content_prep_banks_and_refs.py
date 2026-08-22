@@ -27,6 +27,9 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
     suffix = uuid4().hex[:10]
     teacher_username = f"prep-bank-teacher-{suffix}"
     principle_id = f"principle-existing-{suffix}"
+    subject_id = f"subject-reference-{suffix}"
+    taxonomy_ids = [f"taxonomy-pmp-{suffix}", f"taxonomy-pmp-draft-{suffix}"]
+    recall_id = f"recall-subject-pmp-{suffix}"
     created_bank_ids: set[str] = set()
     previous_taxonomy: dict | None = None
     previous_recall: dict | None = None
@@ -61,8 +64,8 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
             taxonomy_value = json.dumps(
                 [
                     {
-                        "id": f"taxonomy-pmp-{suffix}",
-                        "subjectId": "subject-pmp",
+                        "id": taxonomy_ids[0],
+                        "subjectId": subject_id,
                         "status": "published",
                         "nodes": [
                             {"id": "kp-known", "status": "active"},
@@ -70,8 +73,8 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
                         ],
                     },
                     {
-                        "id": f"taxonomy-pmp-draft-{suffix}",
-                        "subjectId": "subject-pmp",
+                        "id": taxonomy_ids[1],
+                        "subjectId": subject_id,
                         "status": "draft",
                         "nodes": [{"id": "kp-draft-only", "status": "active"}],
                     },
@@ -117,17 +120,22 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
                     updated_by=teacher_username,
                 )
             )
-            subject = ContentSubject(id="subject-pmp", code="PMP", name="PMP", content_metadata={})
+            subject = ContentSubject(
+                id=subject_id,
+                code=f"REF-{suffix}",
+                name="引用校验测试科目",
+                content_metadata={},
+            )
             db.add(subject)
             await db.flush()
             for version, taxonomy in enumerate(json.loads(taxonomy_value), start=1):
-                row = ContentTaxonomy(id=taxonomy["id"], subject_id="subject-pmp", version=version, status=taxonomy["status"], title="", content_metadata=taxonomy, updated_by=teacher_username)
+                row = ContentTaxonomy(id=taxonomy["id"], subject_id=subject_id, version=version, status=taxonomy["status"], title="", content_metadata=taxonomy, updated_by=teacher_username)
                 db.add(row)
                 await db.flush()
                 for position, node in enumerate(taxonomy["nodes"]):
                     db.add(TaxonomyNode(id=f"{row.id}:{node['id']}", taxonomy_id=row.id, node_id=node["id"], record=node, position=position))
             recall_payload = json.loads(recall_value)
-            db.add(RecallAssociationLibrary(id=f"recall-subject-pmp-{suffix}", subject_id="subject-pmp", version=1, nodes=recall_payload["nodes"], edges=recall_payload["edges"], content_metadata=recall_payload, updated_by=teacher_username))
+            db.add(RecallAssociationLibrary(id=recall_id, subject_id=subject_id, version=1, nodes=recall_payload["nodes"], edges=recall_payload["edges"], content_metadata=recall_payload, updated_by=teacher_username))
             await db.commit()
 
     async def verify_created_banks() -> None:
@@ -174,7 +182,7 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
             issues = await validate_question_references(
                 db,
                 teacher_username,
-                "PMP",
+                subject_id,
                 invalid_payload,
                 incoming_principle_ids={"principle-incoming"},
             )
@@ -191,19 +199,19 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
             assert await validate_question_references(
                 db,
                 teacher_username,
-                "PMP",
+                subject_id,
                 valid_payload,
                 incoming_principle_ids={"principle-incoming"},
             ) == []
 
-            taxonomy = (await db.execute(select(ContentTaxonomy).where(ContentTaxonomy.subject_id == "subject-pmp", ContentTaxonomy.status == "published").order_by(ContentTaxonomy.version.desc()).limit(1))).scalar_one()
+            taxonomy = (await db.execute(select(ContentTaxonomy).where(ContentTaxonomy.subject_id == subject_id, ContentTaxonomy.status == "published").order_by(ContentTaxonomy.version.desc()).limit(1))).scalar_one()
             await db.execute(delete(TaxonomyNode).where(TaxonomyNode.taxonomy_id == taxonomy.id))
             taxonomy.status = "archived"
             await db.commit()
             unavailable = await validate_question_references(
                 db,
                 teacher_username,
-                "PMP",
+                subject_id,
                 valid_payload,
                 incoming_principle_ids={"principle-incoming"},
             )
@@ -213,6 +221,18 @@ def test_create_bank_creator_allowlist_and_reference_validation() -> None:
         async with AsyncSessionLocal() as db:
             await db.execute(delete(QuestionBank).where(QuestionBank.id.in_(created_bank_ids)))
             await db.execute(delete(Principle).where(Principle.id == principle_id))
+            await db.execute(
+                delete(TaxonomyNode).where(TaxonomyNode.taxonomy_id.in_(taxonomy_ids))
+            )
+            await db.execute(
+                delete(ContentTaxonomy).where(ContentTaxonomy.id.in_(taxonomy_ids))
+            )
+            await db.execute(
+                delete(RecallAssociationLibrary).where(
+                    RecallAssociationLibrary.id == recall_id
+                )
+            )
+            await db.execute(delete(ContentSubject).where(ContentSubject.id == subject_id))
             taxonomy = await db.get(SharedRuntimeState, TAXONOMY_KEY)
             if previous_taxonomy is None:
                 if taxonomy is not None:

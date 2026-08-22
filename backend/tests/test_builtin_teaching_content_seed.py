@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 
@@ -15,6 +16,8 @@ from sqlalchemy import delete, func, select
 from app import main as app_main
 from app.db.session import AsyncSessionLocal
 from app.models.content_prep import Principle, SynthesisPreset
+from app.models.paper_release import PaperRelease, PaperReleaseQuestion
+from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.teaching_content import (
     ContentSubject,
     ContentTaxonomy,
@@ -386,3 +389,130 @@ def test_teacher_shared_content_api_restores_builtin_baseline_at_startup() -> No
             )
     finally:
         asyncio.run(restore_builtin_records())
+
+
+def test_builtin_sync_does_not_modify_published_papers_or_questions() -> None:
+    suffix = "builtin-published-guard"
+    bank_id = f"bank-{suffix}"
+    question_id = f"question-{suffix}"
+    paper_id = f"paper-{suffix}"
+    release_id = f"release-{suffix}"
+    legacy_question_metadata = {
+        "knowledge": {"primaryNodeId": "legacy-node", "relatedNodeIds": []},
+        "principleIds": ["legacy-principle"],
+    }
+    legacy_release_snapshot = {
+        "id": question_id,
+        "title": "已发布历史题目",
+        "metadata": deepcopy(legacy_question_metadata),
+    }
+
+    async def exercise() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                QuestionBank(
+                    id=bank_id,
+                    owner_id="admin",
+                    name="已发布历史题库",
+                    subject="PMP",
+                    visibility="published",
+                )
+            )
+            await db.flush()
+            db.add(
+                Question(
+                    id=question_id,
+                    bank_id=bank_id,
+                    title="已发布历史题目",
+                    subject="PMP",
+                    scope="public",
+                    revision=7,
+                    content_hash="7" * 64,
+                    stem_parts=[{"text": "保留原题干"}],
+                    content_metadata=deepcopy(legacy_question_metadata),
+                )
+            )
+            db.add(
+                ExamPaper(
+                    id=paper_id,
+                    owner_id="admin",
+                    name="已发布历史试卷",
+                    subject="PMP",
+                    total_count=1,
+                    status="published",
+                    quotas={"legacy-principle": 1},
+                    revision=5,
+                )
+            )
+            await db.flush()
+            db.add(PaperQuestion(paper_id=paper_id, question_id=question_id, order_index=0))
+            db.add(
+                PaperRelease(
+                    id=release_id,
+                    paper_id=paper_id,
+                    version=1,
+                    status="published",
+                    name="已发布历史试卷",
+                    subject="PMP",
+                    publisher_id="admin",
+                    enabled_modes=["practice"],
+                    allowed_roles=["student"],
+                    release_metadata={"source": "legacy"},
+                    source_payload={"quotas": {"legacy-principle": 1}},
+                    question_count=1,
+                )
+            )
+            await db.flush()
+            db.add(
+                PaperReleaseQuestion(
+                    release_id=release_id,
+                    order_index=0,
+                    bank_id=bank_id,
+                    question_id=question_id,
+                    snapshot=deepcopy(legacy_release_snapshot),
+                )
+            )
+            recall = await db.get(
+                RecallAssociationLibrary, seed_service.RECALL_LIBRARY_ID
+            )
+            assert recall is not None
+            recall.nodes = []
+            await db.commit()
+
+            result = await seed_service.sync_builtin_teaching_content(db)
+            assert result.updated >= 1
+
+            question = await db.get(Question, question_id)
+            paper = await db.get(ExamPaper, paper_id)
+            release = await db.get(PaperRelease, release_id)
+            release_question = await db.get(PaperReleaseQuestion, (release_id, 0))
+            assert question is not None
+            assert question.title == "已发布历史题目"
+            assert question.revision == 7
+            assert question.stem_parts == [{"text": "保留原题干"}]
+            assert question.content_metadata == legacy_question_metadata
+            assert paper is not None
+            assert paper.name == "已发布历史试卷"
+            assert paper.status == "published"
+            assert paper.quotas == {"legacy-principle": 1}
+            assert paper.revision == 5
+            assert release is not None
+            assert release.source_payload == {"quotas": {"legacy-principle": 1}}
+            assert release_question is not None
+            assert release_question.snapshot == legacy_release_snapshot
+
+            await db.execute(
+                delete(PaperReleaseQuestion).where(
+                    PaperReleaseQuestion.release_id == release_id
+                )
+            )
+            await db.execute(delete(PaperRelease).where(PaperRelease.id == release_id))
+            await db.execute(
+                delete(PaperQuestion).where(PaperQuestion.paper_id == paper_id)
+            )
+            await db.execute(delete(ExamPaper).where(ExamPaper.id == paper_id))
+            await db.execute(delete(Question).where(Question.id == question_id))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.commit()
+
+    asyncio.run(exercise())

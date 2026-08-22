@@ -5,7 +5,7 @@ import json
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
@@ -67,6 +67,7 @@ def test_recall_progress_is_owner_isolated_revision_checked_and_library_read_onl
     student_b = f"recall-student-b-{suffix}"
     bank_id = f"recall-bank-{suffix}"
     question_id = f"recall-question-{suffix}"
+    recall_library_id = f"recall-library-{suffix}"
     previous_recall: dict | None = None
 
     async def seed() -> None:
@@ -129,11 +130,17 @@ def test_recall_progress_is_owner_isolated_revision_checked_and_library_read_onl
             if subject is None:
                 db.add(ContentSubject(id="subject-pmp", code="PMP", name="PMP", content_metadata={}))
                 await db.flush()
-            existing_library = (await db.execute(select(RecallAssociationLibrary).where(RecallAssociationLibrary.subject_id == "subject-pmp", RecallAssociationLibrary.version == 1))).scalar_one_or_none()
-            if existing_library is None:
-                db.add(RecallAssociationLibrary(id=f"recall-library-{suffix}", subject_id="subject-pmp", version=1, status="published", nodes=recall_payload["nodes"], edges=recall_payload["edges"], content_metadata=recall_payload, updated_by=teacher))
-            else:
-                existing_library.nodes, existing_library.edges, existing_library.content_metadata, existing_library.updated_by = recall_payload["nodes"], recall_payload["edges"], recall_payload, teacher
+            latest_version = int(
+                (
+                    await db.execute(
+                        select(func.max(RecallAssociationLibrary.version)).where(
+                            RecallAssociationLibrary.subject_id == "subject-pmp"
+                        )
+                    )
+                ).scalar_one_or_none()
+                or 0
+            )
+            db.add(RecallAssociationLibrary(id=recall_library_id, subject_id="subject-pmp", version=latest_version + 1, status="published", nodes=recall_payload["nodes"], edges=recall_payload["edges"], content_metadata=recall_payload, updated_by=teacher))
             await db.commit()
 
     async def cleanup() -> None:
@@ -143,6 +150,11 @@ def test_recall_progress_is_owner_isolated_revision_checked_and_library_read_onl
             await db.execute(delete(RecallLibrarySnapshot).where(RecallLibrarySnapshot.subject == "subject-pmp"))
             await db.execute(delete(Question).where(Question.id == question_id))
             await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.execute(
+                delete(RecallAssociationLibrary).where(
+                    RecallAssociationLibrary.id == recall_library_id
+                )
+            )
             await db.execute(delete(SharedRuntimeState).where(SharedRuntimeState.key == RECALL_KEY))
             if previous_recall is not None:
                 db.add(SharedRuntimeState(key=RECALL_KEY, **previous_recall))

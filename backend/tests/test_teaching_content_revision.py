@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
-from app.main import app
+from app.main import _seed_builtin_teaching_content, app
 from app.models.content_prep import (
     Principle,
     QuestionAuditLog,
@@ -756,6 +756,7 @@ def test_revision_endpoint_and_managed_bootstrap_are_role_safe() -> None:
     }
 
     async def seed() -> tuple[dict | None, int]:
+        await _seed_builtin_teaching_content()
         snapshot = await _snapshot_revision_row()
         async with AsyncSessionLocal() as db:
             password_hash = hash_password(PASSWORD)

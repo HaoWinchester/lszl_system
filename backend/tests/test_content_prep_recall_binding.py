@@ -3,7 +3,7 @@ import json
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from app.db.session import AsyncSessionLocal
 from app.main import app
@@ -224,6 +224,7 @@ def test_legacy_single_save_rejects_invalid_recall_and_allows_retry() -> None:
     bank_id = f"legacy-recall-bank-{suffix}"
     question_id = f"legacy-recall-question-{suffix}"
     previous_recall: dict | None = None
+    relational_recall_id = f"legacy-recall-library-{suffix}"
 
     async def seed() -> None:
         nonlocal previous_recall
@@ -261,6 +262,39 @@ def test_legacy_single_save_rejects_invalid_recall_and_allows_retry() -> None:
                         updated_by="admin",
                     )
                 )
+            subject = await db.get(ContentSubject, "subject-pmp")
+            if subject is None:
+                db.add(
+                    ContentSubject(
+                        id="subject-pmp",
+                        code="PMP",
+                        name="PMP",
+                        content_metadata={},
+                    )
+                )
+                await db.flush()
+            latest_version = int(
+                (
+                    await db.execute(
+                        select(func.max(RecallAssociationLibrary.version)).where(
+                            RecallAssociationLibrary.subject_id == "subject-pmp"
+                        )
+                    )
+                ).scalar_one_or_none()
+                or 0
+            )
+            db.add(
+                RecallAssociationLibrary(
+                    id=relational_recall_id,
+                    subject_id="subject-pmp",
+                    version=latest_version + 1,
+                    status="published",
+                    nodes=[{"id": "recall:overloaded", "title": "工作负荷"}],
+                    edges=[],
+                    content_metadata={"schemaVersion": 1},
+                    updated_by="admin",
+                )
+            )
             db.add(
                 QuestionBank(
                     id=bank_id,
@@ -308,6 +342,11 @@ def test_legacy_single_save_rejects_invalid_recall_and_allows_retry() -> None:
             await db.execute(delete(QuestionUploadBatch).where(QuestionUploadBatch.bank_id == bank_id))
             await db.execute(delete(Question).where(Question.bank_id == bank_id))
             await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.execute(
+                delete(RecallAssociationLibrary).where(
+                    RecallAssociationLibrary.id == relational_recall_id
+                )
+            )
             row = await db.get(SharedRuntimeState, RECALL_KEY)
             if previous_recall is None:
                 if row is not None:
