@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -12,7 +13,12 @@ from sqlalchemy import delete, func, select
 
 from app.db.session import AsyncSessionLocal
 from app.models.content_prep import Principle, SynthesisPreset
-from app.models.teaching_content import ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode
+from app.models.teaching_content import (
+    ContentSubject,
+    ContentTaxonomy,
+    RecallAssociationLibrary,
+    TaxonomyNode,
+)
 from app.services import builtin_teaching_content_seed_service as seed_service
 from app.services import teaching_content_revision_service
 
@@ -107,5 +113,176 @@ def test_builtin_bundle_syncs_once_and_repeated_runs_are_idempotent() -> None:
             assert second.created == 0
             assert second.updated == 0
             assert revision_after == revision_before
+
+    asyncio.run(exercise())
+
+
+def test_builtin_sync_restores_canonical_records_and_preserves_custom_content() -> None:
+    bundle = seed_service.load_builtin_bundle()
+    principle_item = bundle.principles[0]
+    preset_item = next(
+        item
+        for item in bundle.synthesis_presets
+        if item["principleId"] == principle_item["id"]
+    )
+    custom_principle_id = "custom-principle-outside-builtin-bundle"
+    custom_preset_id = "custom-preset-outside-builtin-bundle"
+
+    async def exercise() -> None:
+        async with AsyncSessionLocal() as db:
+            await seed_service.sync_builtin_teaching_content(db, bundle)
+            principle = await db.get(Principle, principle_item["id"])
+            preset = await db.get(SynthesisPreset, preset_item["id"])
+            recall = await db.get(RecallAssociationLibrary, seed_service.RECALL_LIBRARY_ID)
+            assert principle is not None and preset is not None and recall is not None
+            principle.name = "被改动的内置原则"
+            principle.revision = 7
+            preset.content = "被改动的内置归纳卡"
+            preset.revision = 11
+            recall.nodes = []
+            db.add(
+                Principle(
+                    id=custom_principle_id,
+                    name="自定义原则",
+                    status="active",
+                    confusable_principle_ids=[],
+                    revision=4,
+                )
+            )
+            db.add(
+                SynthesisPreset(
+                    id=custom_preset_id,
+                    principle_id=custom_principle_id,
+                    title="自定义归纳卡",
+                    content="自定义内容",
+                    status="active",
+                    business_version=3,
+                    revision=6,
+                )
+            )
+            await db.commit()
+            revision_before = int((await teaching_content_revision_service.current(db))["revision"])
+
+            restored = await seed_service.sync_builtin_teaching_content(db, bundle)
+            assert restored.updated >= 3
+            await db.refresh(principle)
+            await db.refresh(preset)
+            await db.refresh(recall)
+            assert principle.name == principle_item["name"]
+            assert principle.revision == 8
+            assert preset.content == preset_item["content"]
+            assert preset.revision == 12
+            assert len(recall.nodes) == 471
+            assert int((await teaching_content_revision_service.current(db))["revision"]) == revision_before + 1
+
+            custom_principle = await db.get(Principle, custom_principle_id)
+            custom_preset = await db.get(SynthesisPreset, custom_preset_id)
+            assert custom_principle is not None and custom_principle.name == "自定义原则"
+            assert custom_principle.revision == 4
+            assert custom_preset is not None and custom_preset.content == "自定义内容"
+            assert custom_preset.revision == 6
+
+            upgraded_preset = {**preset_item, "content": "由新版内置文件提供的内容"}
+            upgraded_bundle = replace(
+                bundle,
+                synthesis_presets=tuple(
+                    upgraded_preset if item["id"] == preset_item["id"] else item
+                    for item in bundle.synthesis_presets
+                ),
+            )
+            upgraded = await seed_service.sync_builtin_teaching_content(db, upgraded_bundle)
+            assert upgraded.updated == 1
+            await db.refresh(preset)
+            assert preset.content == "由新版内置文件提供的内容"
+            assert preset.revision == 13
+
+    asyncio.run(exercise())
+
+
+def test_builtin_sync_allocates_versions_without_deleting_custom_content() -> None:
+    bundle = seed_service.load_builtin_bundle()
+    custom_taxonomy_id = "custom-taxonomy-occupying-builtin-version"
+
+    async def exercise() -> None:
+        async with AsyncSessionLocal() as db:
+            await seed_service.sync_builtin_teaching_content(db, bundle)
+            await db.execute(
+                delete(TaxonomyNode).where(TaxonomyNode.taxonomy_id == seed_service.TAXONOMY_ID)
+            )
+            await db.execute(
+                delete(ContentTaxonomy).where(ContentTaxonomy.id == seed_service.TAXONOMY_ID)
+            )
+            subject = await db.get(ContentSubject, seed_service.SUBJECT_ID)
+            assert subject is not None
+            db.add(
+                ContentTaxonomy(
+                    id=custom_taxonomy_id,
+                    subject_id=subject.id,
+                    version=int(bundle.taxonomy["version"]),
+                    status="published",
+                    title="自定义知识树",
+                    content_metadata={"custom": True},
+                )
+            )
+            await db.commit()
+
+            await seed_service.sync_builtin_teaching_content(db, bundle)
+            builtin = await db.get(ContentTaxonomy, seed_service.TAXONOMY_ID)
+            custom = await db.get(ContentTaxonomy, custom_taxonomy_id)
+            assert builtin is not None and builtin.version > int(bundle.taxonomy["version"])
+            assert custom is not None and custom.title == "自定义知识树"
+
+    asyncio.run(exercise())
+
+
+def test_builtin_sync_rolls_back_when_a_preset_id_belongs_to_another_principle() -> None:
+    bundle = seed_service.load_builtin_bundle()
+    principle_item = bundle.principles[0]
+    preset_item = next(
+        item
+        for item in bundle.synthesis_presets
+        if item["principleId"] == principle_item["id"]
+    )
+    conflicting_principle_id = "custom-principle-with-conflicting-preset-id"
+
+    async def exercise() -> None:
+        async with AsyncSessionLocal() as db:
+            await seed_service.sync_builtin_teaching_content(db, bundle)
+            principle = await db.get(Principle, principle_item["id"])
+            assert principle is not None
+            principle.name = "事务回滚哨兵"
+            await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id == preset_item["id"]))
+            db.add(
+                Principle(
+                    id=conflicting_principle_id,
+                    name="冲突原则",
+                    status="active",
+                    confusable_principle_ids=[],
+                    revision=1,
+                )
+            )
+            await db.flush()
+            db.add(
+                SynthesisPreset(
+                    id=preset_item["id"],
+                    principle_id=conflicting_principle_id,
+                    title="冲突归纳卡",
+                    content="冲突内容",
+                    status="active",
+                    business_version=1,
+                    revision=1,
+                )
+            )
+            await db.commit()
+
+            with pytest.raises(seed_service.BuiltinSeedValidationError, match="已绑定其他原则"):
+                await seed_service.sync_builtin_teaching_content(db, bundle)
+            await db.refresh(principle)
+            assert principle.name == "事务回滚哨兵"
+
+            await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id == preset_item["id"]))
+            await db.execute(delete(Principle).where(Principle.id == conflicting_principle_id))
+            await db.commit()
+            await seed_service.sync_builtin_teaching_content(db, bundle)
 
     asyncio.run(exercise())
