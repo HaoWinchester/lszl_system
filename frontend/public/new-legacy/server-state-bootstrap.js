@@ -152,6 +152,42 @@
 
   const values = new Map()
 
+  // 首包内联快照（__KG_DIRECT_BOOTSTRAP__.storage）：登录用户按页面过滤后的
+  // 状态在体积可控时随 HTML 同步下发。defer 业务脚本执行时内存 Map 已就绪，
+  // 消除"水合完成前读到空索引 → 新建初始文件 → 覆盖服务器索引"的竞态
+  // （2026-08-23 生产事故：73 个用户图谱索引被覆盖）。快照超限未内联时，
+  // 由 firstHydrationPending 在首次水合完成前挂起保存兜底。
+  // 阈值须与后端 app/web/bootstrap.py 的 INLINE_STORAGE_MAX_BYTES 一致。
+  const INLINE_STORAGE_MAX_BYTES = 512 * 1024
+  const injectedStorage = injected && typeof injected.storage === 'object' && injected.storage !== null
+    ? injected.storage
+    : null
+  let firstHydrationPending = entry.authenticated === true && !injectedStorage
+  if (injectedStorage) {
+    let inlineTotal = 0
+    for (const [key, value] of Object.entries(injectedStorage)) {
+      const text = String(value ?? '')
+      inlineTotal += text.length
+      if (inlineTotal > INLINE_STORAGE_MAX_BYTES) {
+        values.clear()
+        firstHydrationPending = true
+        break
+      }
+      values.set(String(key), text)
+    }
+  }
+  if (firstHydrationPending) {
+    // 水合超时兜底：3 秒内未完成则放行保存（挂起的修改全部保留，回到旧行为），
+    // 避免网络异常时用户编辑永久卡死不保存。
+    global.setTimeout(() => {
+      if (!firstHydrationPending) return
+      firstHydrationPending = false
+      if (dirty && !remoteRetryStopped && entry.authenticated && !entry.readOnly) {
+        flush().catch(() => {})
+      }
+    }, 3000)
+  }
+
   // 提前暴露临时 bootstrap 对象，避免其他脚本访问 undefined
   global.KGServerStateBootstrap = Object.freeze({ ...entry, page, namespace })
 
@@ -308,6 +344,17 @@
   async function reloadServerState({ announce = false } = {}) {
     const serverValues = await fetchServerSnapshot()
     if (!serverValues) throw staleSnapshotError()
+    if (firstHydrationPending) {
+      // 首次水合完成：丢弃此前挂起的修改。页面刚加载、内存 Map 为空时业务
+      // 初始化的写入（如误建的初始图谱文件）并非用户意图，重放会覆盖服务器
+      // 已有数据；此刻服务器快照才是权威。水合通常在页面加载后数百毫秒内
+      // 完成，真实用户编辑落入该窗口的概率可忽略。
+      firstHydrationPending = false
+      for (const [pendingKey, mutation] of Array.from(pendingMutations)) {
+        if (mutation.preHydrate) pendingMutations.delete(pendingKey)
+      }
+      dirty = pendingMutations.size > 0
+    }
     const prevPublishedPapers = values.get('kg_exam_papers_published_v1')
     values.clear()
     for (const [key, value] of serverValues) {
@@ -538,7 +585,7 @@
       if (entry.authenticated && !entry.readOnly) saveEvent('saved', { page, namespace, local: true })
       return Promise.resolve(true)
     }
-    if (remoteRetryStopped || !entry.authenticated || entry.readOnly || !dirty) return Promise.resolve(true)
+    if (remoteRetryStopped || !entry.authenticated || entry.readOnly || !dirty || firstHydrationPending) return Promise.resolve(true)
     global.clearTimeout(timer)
     timer = 0
     if (!flushPromise) {
@@ -604,6 +651,12 @@
     pendingMutations.delete(lastMutation.key)
     pendingMutations.set(lastMutation.key, lastMutation)
     dirty = true
+    if (firstHydrationPending) {
+      // 首次水合未完成：只入队不上传，避免把基于空内存 Map 的业务初始化
+      // 写入（如误建的初始图谱）覆盖到服务器；水合完成后统一丢弃。
+      lastMutation.preHydrate = true
+      return
+    }
     if (remoteRetryStopped || !entry.authenticated || entry.readOnly) return
     if (flushPromise || inFlight) return
     global.clearTimeout(timer)
@@ -698,7 +751,7 @@
 
   function sendLatestBeacon() {
     if (!REMOTE_SYNC) return
-    if (!entry.authenticated || entry.readOnly || !dirty || !global.navigator?.sendBeacon) return
+    if (!entry.authenticated || entry.readOnly || !dirty || firstHydrationPending || !global.navigator?.sendBeacon) return
     const outgoing = payload()
     if (!outgoing) return
     const blob = new Blob([JSON.stringify(outgoing)], { type: 'application/json' })

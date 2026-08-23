@@ -303,3 +303,54 @@ def test_runtime_state_drain_mode_accepts_and_ignores_writes() -> None:
         assert after["revision"] == body["revision"]
         assert after["storage"].get("kg_default_entry_mode_v1") != "drain-probe"
         assert before["revision"] == after["revision"]
+
+
+def test_html_bootstrap_inlines_filtered_storage_for_files_page() -> None:
+    """登录用户打开首页时，files 域的小体积快照必须内联进首包。
+
+    回归背景（2026-08-23 生产事故）：水合异步完成后业务脚本才能读到索引，
+    竞态窗口内文件存储误建初始图谱并覆盖服务器索引。内联快照消除该窗口。
+    """
+    with TestClient(app) as client:
+        login = client.post(
+            "/api/v1/auth/login",
+            json={"username": "佩奇007", "password": "111111"},
+        )
+        assert login.status_code == 200
+        response = client.get("/index.html")
+
+    payload = _bootstrap(response.text)
+    assert payload["authenticated"] is True
+    storage = payload.get("storage")
+    assert isinstance(storage, dict)
+    # files 域白名单内的图谱文件索引必须随首包下发（这是竞态修复的核心）
+    assert "kg_graph_file_index_v2" in storage
+    # 非本页白名单的大键不得混入首包
+    assert "kg_exam_papers_published_v1" not in storage
+
+
+def test_html_bootstrap_omits_storage_entirely_when_over_limit(monkeypatch) -> None:
+    """快照超限时必须整体放弃内联（原子性），不能只内联一部分。"""
+    from app.web import bootstrap as bootstrap_module
+
+    monkeypatch.setattr(bootstrap_module, "INLINE_STORAGE_MAX_BYTES", 1)
+    with TestClient(app) as client:
+        login = client.post(
+            "/api/v1/auth/login",
+            json={"username": "佩奇007", "password": "111111"},
+        )
+        assert login.status_code == 200
+        response = client.get("/index.html")
+
+    payload = _bootstrap(response.text)
+    assert payload["authenticated"] is True
+    assert payload.get("storage") is None
+
+
+def test_guest_html_bootstrap_has_no_inline_storage() -> None:
+    """未登录没有服务器状态可内联，storage 必须为 None（不能是空 dict）。"""
+    with TestClient(app) as client:
+        payload = _bootstrap(client.get("/index.html").text)
+
+    assert payload["authenticated"] is False
+    assert payload.get("storage") is None

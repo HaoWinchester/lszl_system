@@ -61,15 +61,21 @@ async def build_bootstrap(
         auth_user["loginSessionId"] = get_login_session_id(request)
     revision = 0
     content_revision = 0
+    inline_storage: dict[str, str] | None = None
     if user:
-        # 快照配对：contentRevision 必须与页面所见状态同一时刻；storage 本身
-        # 不内联（体积可达 MB 级），由前端通过 bootstrap API 水合。
+        # 快照配对：contentRevision 必须与页面所见状态同一时刻。
         storage, revision, content_revision = await runtime_state_service.get_state(
             db, user.username, user.role
         )
-        _, revision, content_revision = await runtime_state_service.ensure_domain_seed(
+        seeded, revision, content_revision = await runtime_state_service.ensure_domain_seed(
             db, user, page, storage, revision
         )
+        # 水合（bootstrap API）是登录后异步进行的；完成前页面脚本读到的内存
+        # Map 为空，图谱文件存储会误判"无索引"而新建初始文件并覆盖服务器索引
+        # （2026-08-23 生产事故：73 个用户索引被覆盖）。把按页面过滤后的快照
+        # 在体积可控时内联进首包，消除竞态；超限时放弃内联（保持首包体积
+        # 可控），由前端"首次水合完成前挂起保存"兜底。
+        inline_storage = _inline_bootstrap_storage(seeded)
     return {
         "schemaVersion": 1,
         "releaseVersion": release_version,
@@ -80,5 +86,23 @@ async def build_bootstrap(
         "authUser": auth_user,
         "revision": revision,
         "contentRevision": content_revision,
+        "storage": inline_storage,
         "readOnly": read_only,
     }
+
+
+# 与前端 scripts/new-legacy-assets/server-state-bootstrap.js 的
+# INLINE_STORAGE_MAX_BYTES 保持一致；单方调整会造成首包超限或竞态复现。
+INLINE_STORAGE_MAX_BYTES = 512 * 1024
+
+
+def _inline_bootstrap_storage(storage: dict[str, str]) -> dict[str, str] | None:
+    """体积可控时返回可内联的快照，超限返回 None（整体放弃，保证原子性）。"""
+    if not storage:
+        return None
+    total = 0
+    for value in storage.values():
+        total += len(str(value).encode("utf-8"))
+        if total > INLINE_STORAGE_MAX_BYTES:
+            return None
+    return dict(storage)
