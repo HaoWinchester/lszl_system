@@ -998,7 +998,7 @@
     if(!built?.ok){console.warn('发布试卷失败',built?.errors||built);toast((built?.errors||['发布失败，请检查试卷内容。'])[0]);return null}
     const release=built.value;
     try{
-      const published=await global.KGPaperReleaseApi?.publishPayload?.(release);
+      const published=await window.KGPaperReleaseApi?.publishPayload?.(release);
       if(!published)throw new Error('发布服务未返回版本信息。');
       window.dispatchEvent?.(new CustomEvent('kg:paper-release-published'));
       return {...release,id:String(published.releaseId||published.id||release.id),releaseId:String(published.releaseId||published.id||release.id),version:Number(published.version||release.version)};

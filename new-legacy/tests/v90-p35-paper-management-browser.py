@@ -52,7 +52,7 @@ with sync_playwright() as p:
         }
       };
       const clone=value=>JSON.parse(JSON.stringify(value));let paperSeq=0,categorySeq=0,batchSeq=0;
-      let db={papers:[],categories:[]};window.__paperDb=db;window.__paperApiCalls=[];window.__shortageOnce=true;window.__batchFail=false;window.__importPreflightFails=1;
+      let db={papers:[],categories:[]};window.__paperDb=db;window.__paperApiCalls=[];window.__paperReleaseCalls=[];window.__shortageOnce=true;window.__batchFail=false;window.__importPreflightFails=1;
       const stamp=()=>new Date().toISOString();
       const savePaper=(input,id)=>{const now=stamp(),paper={id:id||`p-${++paperSeq}`,name:input.name||'新试卷',subject:input.subject||'PMP',description:input.description||'',categoryId:input.categoryId||'',totalCount:Number(input.totalCount||input.questions?.length||0),status:'draft',quotas:input.quotas||{},accessPolicy:input.accessPolicy||{},enabledModes:input.enabledModes||[],modeConfigVersion:input.modeConfigVersion||2,purpose:input.purpose||'learning',revision:1,publishedVersion:0,createdAt:now,updatedAt:now,questions:(input.questions||[]).map((ref,index)=>({...ref,order:index+1}))};db.papers.push(paper);return clone(paper)};
       const find=id=>db.papers.find(item=>item.id===id),cas=(paper,revision)=>{if(!paper||Number(revision)!==paper.revision)throw Object.assign(new Error('数据已发生变化，请刷新后重试。'),{status:409})};
@@ -70,6 +70,7 @@ with sync_playwright() as p:
         compositionPreflight:async body=>{window.__paperApiCalls.push(['compositionPreflight',clone(body)]);const shortage=window.__shortageOnce&&body.variants.some(item=>item.code==='C');const variants=body.variants.map(item=>({code:item.code,name:item.name,totalCount:item.totalCount,feasible:!(shortage&&item.code==='C'),hardTargets:{people:Math.round(item.totalCount*.42),process:Math.round(item.totalCount*.5),'business-environment':Math.max(0,item.totalCount-Math.round(item.totalCount*.42)-Math.round(item.totalCount*.5))},hardActual:{},hardShortages:shortage&&item.code==='C'?{people:1}:{},softTargets:{},softActual:{},questionIds:[]}));return {normalizedRequest:{...clone(body),randomSeed:'browser-seed'},candidateCount:220,unclassifiedCount:0,inventory:{},variants,feasible:variants.every(item=>item.feasible),feasibleVariantCodes:variants.filter(item=>item.feasible).map(item=>item.code),duplicateQuestionIds:[],planHash:(shortage?'b':'c').repeat(64)}},
         createCompositionBatch:async body=>{window.__paperApiCalls.push(['createCompositionBatch',clone(body)]);await new Promise(resolve=>setTimeout(resolve,80));if(window.__batchFail)throw Object.assign(new Error('数据库故障'),{status:500});const papers=body.variants.map(item=>savePaper({name:item.name,subject:body.subject,totalCount:item.totalCount,questions:[]}));return {batchId:`batch-${++batchSeq}`,papers,randomSeed:body.randomSeed,planHash:body.planHash}}
       };
+      window.KGPaperReleaseApi={publishPayload:async payload=>{window.__paperReleaseCalls.push(clone(payload));return {releaseId:`${payload.paperId}-server-v1`,paperId:payload.paperId,version:1}}};
     }""")
     add_files(page, ['styles/teacher-workbench.css', 'styles/question-bank-admin.css', 'styles/admin-context-nav.css', 'styles/paper-management.css'], 'css')
     page.add_script_tag(content=(ROOT.parent / 'frontend/scripts/new-legacy-assets/paper-management-data-loader.js').read_text(encoding='utf-8'))
@@ -88,6 +89,12 @@ with sync_playwright() as p:
     assert page.evaluate("window.__paperApiCalls.filter(row=>row[0]==='replaceQuestions').length") == 1
     page.evaluate("window.dispatchEvent(new CustomEvent('kg:paper-drafts-changed'))"); page.wait_for_timeout(160)
     assert page.locator('[data-paper-preview-check]').count() == 20
+
+    # Publishing from the real browser page reaches the release API instead of failing on an unbound Node-style global.
+    page.locator('#qbPublishPaperBtn').click(); page.wait_for_timeout(180)
+    release_calls = page.evaluate('window.__paperReleaseCalls')
+    assert len(release_calls) == 1, {'releaseCalls': release_calls, 'errors': errors, 'toast': page.locator('#qbToast').inner_text()}
+    assert release_calls[0]['paperId'] == 'p-1'
 
     # Layout and anchored question preview remain intact.
     assert page.locator('#pmQuestionPickerPane').bounding_box()['width'] > 400
