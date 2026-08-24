@@ -9,6 +9,7 @@ const ROOT = path.resolve(__dirname, '..');
 const REPO = path.resolve(ROOT, '..');
 const read = file => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const admin = read('src/65-question-bank-admin.js');
+const questionBankImportController = read('src/teacher/question-bank-import-controller.js');
 const questionPage = read('question-bank.html');
 const paperPage = read('paper-management.html');
 const directAdapter = fs.readFileSync(
@@ -48,7 +49,7 @@ for (const [name, html, shellClass] of [
 assert.match(admin, /const Catalog\s*=\s*window\.KGQuestionCatalogAdapter/);
 assert.match(admin, /const CatalogEditor\s*=\s*window\.KGQuestionCatalogEditController/);
 assert.match(admin, /async function init\(\)[\s\S]*?await Catalog\.ready[\s\S]*?state\.banks\s*=\s*loadBanks\(\)/);
-assert.match(admin, /async function initPaperManagementPage\(\)[\s\S]*?await Catalog\.ready[\s\S]*?state\.banks\s*=\s*loadBanks\(\)/);
+assert.match(admin, /async function initPaperManagementPage\(\)[\s\S]*?Promise\.all\(\[Catalog\.ready,PaperDraftApi\.ready\(\)\]\)[\s\S]*?state\.banks\s*=\s*loadBanks\(\)/);
 assert.match(admin, /function loadBanks\(\)[\s\S]*?Catalog\.snapshot\(\)/);
 assert.match(admin, /function loadLegacyBanksForMigrationPreview\(\)[\s\S]*?readString\(banksKey\(\)/);
 assert.equal((admin.match(/banksKey\(\)/g) || []).length, 2, 'banksKey may only be declared and read by migration preview');
@@ -304,6 +305,8 @@ function loadManagedAdmin() {
     requestAnimationFrame() {}, cancelAnimationFrame() {}, setTimeout, clearTimeout, alert(message) { alerts.push(String(message)); }, confirm: () => true, prompt: () => null,
     console, CSS: { escape: value => String(value) },
   });
+  vm.runInContext(questionBankImportController, context, { filename: 'question-bank-import-controller.js' });
+  window.KGTeacherDomains = context.KGTeacherDomains;
   vm.runInContext(admin, context, { filename: '65-question-bank-admin.js' });
   return {
     async init() { for (const listener of documentListeners.get('DOMContentLoaded') || []) await listener(); },

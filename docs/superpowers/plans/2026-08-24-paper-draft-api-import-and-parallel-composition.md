@@ -566,35 +566,35 @@ Push only the feature and `uat` branches, run the local/UAT page for the user, a
 - `KGTeacherDomains.QuestionBankImportController.create({api,onChange,onReload,confirm})` owns JSON parsing, conflict confirmation, duplicate cleanup confirmation, cancellation, retry, and single-submit behavior.
 - `PaperImportController.load()` rejects a recognized question-bank payload before calling `/papers/import/preflight` and reports `检测到题库 JSON，请使用“导入题库”`.
 
-- [ ] **Step 1: Write failing controller tests from the real Prep Studio shape**
+- [x] **Step 1: Write failing controller tests from the real Prep Studio shape**
 
 Add literal fixtures for a top-level bank with `id/name/subject/version/questions`, a bank array, `{banks:[...]}`, and a `kg-paper-package-v1` payload. Assert all three bank inputs normalize to one catalog request, the paper package is rejected without an API call, and the paper controller rejects the bank fixture without a paper-preflight call.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `node new-legacy/tests/paper-management-api-contract.test.js`
 
 Expected: FAIL because `QuestionBankImportController` does not exist and paper import does not classify bank JSON.
 
-- [ ] **Step 3: Implement the shared controller and paper wrong-format guard**
+- [x] **Step 3: Implement the shared controller and paper wrong-format guard**
 
 Create the shared controller with no browser persistence. It must call the existing catalog adapter, preserve the full question objects, confirm `IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED` and `QUESTION_DUPLICATES_CONFIRMATION_REQUIRED` in the same sequence as the existing question-bank page, restore usable state after cancel/error, and block repeated submits.
 
-- [ ] **Step 4: Run focused controller tests and verify GREEN**
+- [x] **Step 4: Run focused controller tests and verify GREEN**
 
 Run: `node new-legacy/tests/paper-management-api-contract.test.js`
 
 Expected: PASS with exact API payloads and no storage writes.
 
-- [ ] **Step 5: Add the two visible import entry points and bind real interactions**
+- [x] **Step 5: Add the two visible import entry points and bind real interactions**
 
 Keep `qbImportPaperBtn` labeled `导入试卷`; add `qbImportBankBtn` labeled `导入题库` and a dedicated dialog/file input/results/cancel/retry/confirm surface. Bind it to the shared controller and `KGQuestionCatalog.importBanks`. After success, reload the API catalog and repopulate composition bank choices. Update the question-bank page import path to use the same controller rather than duplicating normalization and conflict sequencing.
 
-- [ ] **Step 6: Add static and browser success/failure/recovery coverage**
+- [x] **Step 6: Add static and browser success/failure/recovery coverage**
 
 Assert both buttons and dialogs exist, upload a generated 60-question Prep Studio-shaped bank, confirm the catalog request retains 60 question IDs, refresh the catalog, reject a paper package in the bank dialog, reject a bank in the paper dialog, cancel a replacement, retry after an API failure, and verify no question/paper business payload reaches localStorage/runtime state.
 
-- [ ] **Step 7: Run source/browser tests and sync authoritative output**
+- [x] **Step 7: Run source/browser tests and sync authoritative output**
 
 Run: `node new-legacy/tests/v90-p35-paper-management.test.js && node new-legacy/tests/paper-management-api-contract.test.js && python3 new-legacy/tests/v90-p35-paper-management-browser.py`
 

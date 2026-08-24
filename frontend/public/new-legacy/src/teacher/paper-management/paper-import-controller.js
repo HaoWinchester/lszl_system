@@ -27,6 +27,10 @@
       let packageData;
       try{packageData=JSON.parse(String(jsonText||'').replace(/^\ufeff/,''))}
       catch(error){state={...state,fileName:String(fileName||''),packageData:null,preflight:null};return fail(`JSON 解析失败：${error?.message||error}`)}
+      if(root.QuestionBankImportController?.classify?.(packageData)==='question-bank'){
+        state={...state,fileName:String(fileName||''),packageData:null,preflight:null};
+        return fail('检测到题库 JSON，请使用“导入题库”。');
+      }
       state={...state,fileName:String(fileName||'paper.json'),packageData:clone(packageData),preflight:null,error:'',success:null};emit();
       return preflight();
     }

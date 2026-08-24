@@ -1,11 +1,22 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.149",
+  "fromVersion": "v9.0-p4.1.150",
   "toVersion": "v9.0-p4.1.150",
   "changes": {
-    "added": [],
+    "added": [
+      "src/teacher/question-bank-import-controller.js"
+    ],
     "changed": [
-      "VERSION"
+      "content-prep-studio/dist/content-prep.html",
+      "paper-management.html",
+      "question-bank.html",
+      "src/65-question-bank-admin.js",
+      "src/teacher/paper-management/paper-import-controller.js",
+      "tests/content-prep-question-bank-integration.test.js",
+      "tests/paper-management-api-contract.test.js",
+      "tests/question-import-persistence.test.js",
+      "tests/v90-p35-paper-management-browser.py",
+      "tests/v90-p35-paper-management.test.js"
     ],
     "removed": []
   },

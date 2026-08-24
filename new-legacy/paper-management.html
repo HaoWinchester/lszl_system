@@ -43,6 +43,7 @@
       <p>从正式题库手动选择题目组成试卷；发布版本可供学员在独立做题模式中选择。</p>
     </div>
     <div class="qb-inline-actions pm-primary-actions">
+      <button id="qbImportBankBtn" type="button"><span data-ui-icon="database" data-ui-icon-size="16" aria-hidden="true"></span>导入题库</button>
       <button id="qbImportPaperBtn" type="button"><span data-ui-icon="upload" data-ui-icon-size="16" aria-hidden="true"></span>导入试卷</button>
       <button id="qbComposePapersBtn" type="button"><span data-ui-icon="sparkles" data-ui-icon-size="16" aria-hidden="true"></span>一键组卷</button>
       <button id="qbAddPaperBtn" type="button"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新试卷</button>
@@ -180,6 +181,24 @@
     </section>
   </section>
 </main>
+<dialog class="pm-operation-dialog" id="qbBankImportDialog" aria-labelledby="qbBankImportTitle">
+  <div class="pm-operation-shell">
+    <header class="pm-operation-head">
+      <div><p class="qb-kicker">QUESTION BANK</p><h2 id="qbBankImportTitle">导入题库 JSON</h2><p>支持 Prep Studio 单题库、题库数组和包含 banks 数组的数据包。题库与题目将通过数据库 API 保存。</p></div>
+    </header>
+    <div class="pm-operation-body">
+      <label class="qb-field"><span>选择题库 JSON 文件</span><input id="qbBankImportFile" type="file" accept="application/json,.json" /></label>
+      <div class="pm-operation-note" id="qbBankImportFileName">尚未选择文件。</div>
+      <section class="pm-operation-results" id="qbBankImportResults" aria-live="polite"><div class="qb-empty">选择 JSON 后将显示题库数量和题目数量；确认后写入数据库。</div></section>
+    </div>
+    <footer class="pm-operation-actions">
+      <button id="qbBankImportCancelBtn" type="button">取消</button>
+      <button id="qbBankImportRetryBtn" type="button" hidden>重试导入</button>
+      <button id="qbBankImportConfirmBtn" class="accent" type="button" disabled>确认导入题库</button>
+    </footer>
+  </div>
+</dialog>
+
 <dialog class="pm-operation-dialog" id="qbPaperImportDialog" aria-labelledby="qbPaperImportTitle">
   <div class="pm-operation-shell">
     <header class="pm-operation-head">
@@ -284,6 +303,7 @@
 <script defer src="src/59c-active-learning-mode-policy.js"></script>
 <script defer src="src/teacher/paper-management/paper-release-service.js"></script>
 <script defer src="src/teacher/paper-management/paper-quota-service.js"></script>
+<script defer src="src/teacher/question-bank-import-controller.js"></script>
 <script defer src="src/teacher/paper-management/paper-import-controller.js"></script>
 <script defer src="src/teacher/paper-management/paper-composition-controller.js"></script>
 <script defer src="src/teacher/knowledge-tree/knowledge-tree-adapter.js"></script>
