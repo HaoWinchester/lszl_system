@@ -1560,15 +1560,15 @@
   function openPaperOperationDialog(dialog){if(!dialog)return;try{if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','')}catch(error){dialog.setAttribute('open','')}}
   function closePaperOperationDialog(dialog){if(!dialog)return;try{if(typeof dialog.close==='function')dialog.close();else dialog.removeAttribute('open')}catch(error){dialog.removeAttribute('open')}}
   function findingRows(items,type){return (items||[]).map(item=>`<li class="${type}">${escapeHTML(item?.message||String(item||''))}</li>`).join('')}
-  let questionBankImportController=null,questionBankImportFile=null;
+  let questionBankImportController=null,questionBankImportFiles=[];
   function renderQuestionBankImportState(snapshot){
     const results=$('qbBankImportResults'),fileName=$('qbBankImportFileName');
-    if(fileName)fileName.textContent=snapshot.fileName?`已选择：${snapshot.fileName}`:'尚未选择文件。';
+    if(fileName)fileName.textContent=snapshot.fileCount?`已选择 ${Number(snapshot.fileCount)} 个文件：${(snapshot.fileNames||[]).join('、')}`:'尚未选择文件。';
     if(results){
       if(snapshot.busy)results.innerHTML='<div class="qb-empty">正在通过题库 API 导入，请勿重复提交…</div>';
       else if(snapshot.error)results.innerHTML=`<ul class="pm-result-list"><li class="error">${escapeHTML(snapshot.error)}</li></ul>`;
       else if(snapshot.success){const saved=Array.isArray(snapshot.success?.banks)?snapshot.success.banks:[];results.innerHTML=`<ul class="pm-result-list"><li class="success">导入成功：已保存 ${saved.length} 个题库。</li></ul>`}
-      else if(snapshot.banks?.length)results.innerHTML=`<div class="pm-result-summary"><span class="qb-badge">${Number(snapshot.bankCount||0)} 个题库</span><span class="qb-badge">${Number(snapshot.questionCount||0)} 道题</span><span class="qb-badge current">格式识别成功</span></div><ul class="pm-result-list"><li class="success">确认后将写入数据库；同来源更新或重复题会再次请求确认。</li></ul>`;
+      else if(snapshot.banks?.length)results.innerHTML=`<div class="pm-result-summary"><span class="qb-badge">${Number(snapshot.fileCount||0)} 个文件</span><span class="qb-badge">${Number(snapshot.bankCount||0)} 个题库</span><span class="qb-badge">${Number(snapshot.questionCount||0)} 道题</span><span class="qb-badge current">格式识别成功</span></div><ul class="pm-result-list"><li class="success">确认后将整批写入数据库；同来源更新或重复题会再次请求确认。</li></ul>`;
       else results.innerHTML='<div class="qb-empty">选择 JSON 后将显示题库数量和题目数量；确认后写入数据库。</div>';
     }
     if($('qbBankImportConfirmBtn'))$('qbBankImportConfirmBtn').disabled=!snapshot.banks?.length||snapshot.busy;
@@ -1589,11 +1589,11 @@
     });
     renderQuestionBankImportState(questionBankImportController.snapshot());
     const submitQuestionBankImport=async()=>{const result=await questionBankImportController.confirm();if(result.ok){toast('题库已通过 API 导入，可用于组卷。');closePaperOperationDialog($('qbBankImportDialog'))}return result};
-    $('qbImportBankBtn')?.addEventListener('click',()=>{questionBankImportFile=null;questionBankImportController.cancel();if($('qbBankImportFile'))$('qbBankImportFile').value='';openPaperOperationDialog($('qbBankImportDialog'))});
-    $('qbBankImportFile')?.addEventListener('change',async event=>{questionBankImportFile=event.currentTarget.files?.[0]||null;if(!questionBankImportFile)return questionBankImportController.cancel();await questionBankImportController.load(questionBankImportFile.name,await questionBankImportFile.text())});
+    $('qbImportBankBtn')?.addEventListener('click',()=>{questionBankImportFiles=[];questionBankImportController.cancel();if($('qbBankImportFile'))$('qbBankImportFile').value='';openPaperOperationDialog($('qbBankImportDialog'))});
+    $('qbBankImportFile')?.addEventListener('change',async event=>{questionBankImportFiles=Array.from(event.currentTarget.files||[]);if(!questionBankImportFiles.length)return questionBankImportController.cancel();const files=await Promise.all(questionBankImportFiles.map(async file=>({name:file.name,text:await file.text()})));await questionBankImportController.loadFiles(files)});
     $('qbBankImportConfirmBtn')?.addEventListener('click',submitQuestionBankImport);
     $('qbBankImportRetryBtn')?.addEventListener('click',submitQuestionBankImport);
-    $('qbBankImportCancelBtn')?.addEventListener('click',()=>{questionBankImportFile=null;questionBankImportController.cancel();closePaperOperationDialog($('qbBankImportDialog'))});
+    $('qbBankImportCancelBtn')?.addEventListener('click',()=>{questionBankImportFiles=[];questionBankImportController.cancel();closePaperOperationDialog($('qbBankImportDialog'))});
   }
   let paperImportController=null,paperImportFile=null;
   function renderPaperImportState(snapshot){

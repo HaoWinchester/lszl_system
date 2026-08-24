@@ -18,6 +18,8 @@ assert(page.indexOf('paper-composition-controller.js')<page.indexOf('src/65-ques
 assert(page.includes('data-paper-management-page="true"'));
 assert(page.includes('>导入题库</button>'));
 assert(page.includes('>导入试卷</button>'));
+assert(/id="qbBankImportFile"[^>]*\bmultiple\b/.test(page),'question-bank import input must allow selecting multiple JSON files');
+assert(page.includes('选择一个或多个题库 JSON 文件'),'question-bank import dialog must explain multi-file selection');
 assert(page.includes('data-paper-mode="deep_recall"'));
 assert(page.includes('data-paper-mode="multi_question_canvas"'));
 assert(page.includes('data-paper-mode="practice_mode"'));

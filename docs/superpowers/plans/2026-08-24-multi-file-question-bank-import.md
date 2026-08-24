@@ -121,7 +121,7 @@ git commit -m "feat: parse multiple question bank files atomically"
 - Consumes: `QuestionBankImportController.loadFiles(files)` and snapshot fields `fileCount`, `fileNames`, `bankCount`, `questionCount`, `banks`, `busy`, `error`, and `success`.
 - Produces: `#qbBankImportFile[multiple]`, multi-file summary text, and one batch submission through the existing confirm button.
 
-- [ ] **Step 1: Write failing static and browser tests**
+- [x] **Step 1: Write failing static and browser tests**
 
 In the static test, require:
 
@@ -132,7 +132,7 @@ assert.match(html, /选择一个或多个题库 JSON 文件/)
 
 In the browser harness, set two generated bank files on `#qbBankImportFile`, then assert the visible result includes `2 个文件`, the literal summed bank/question counts, both filenames, and an enabled confirm button. Intercept `/api/v1/banks/import` and assert one request carries both banks in selection order. Add a second case with one malformed file and assert a filename-qualified error, disabled confirm, zero import requests, then replace the selection with two valid files and assert recovery.
 
-- [ ] **Step 2: Run the focused UI tests and verify RED**
+- [x] **Step 2: Run the focused UI tests and verify RED**
 
 Run:
 
@@ -143,7 +143,7 @@ python3 new-legacy/tests/v90-p35-paper-management-browser.py
 
 Expected: static test fails because `multiple` and the new label are absent; browser test fails because only `files[0]` is read.
 
-- [ ] **Step 3: Implement the multi-file UI binding**
+- [x] **Step 3: Implement the multi-file UI binding**
 
 Change the input to:
 
@@ -165,7 +165,7 @@ $('qbBankImportFile')?.addEventListener('change',async event=>{
 
 Render the summary as `已选择 N 个文件：...` and add a `N 个文件` badge before the existing bank/question badges. Reset the array on open and cancel. Do not add durable browser storage.
 
-- [ ] **Step 4: Run UI and integration tests and verify GREEN**
+- [x] **Step 4: Run UI and integration tests and verify GREEN**
 
 Run:
 
@@ -177,7 +177,7 @@ node new-legacy/tests/paper-management-api-contract.test.js
 
 Expected: all pass, including success, invalid-batch, recovery, retry, and one-request assertions.
 
-- [ ] **Step 5: Sync authoritative generated output and rerun generated contracts**
+- [x] **Step 5: Sync authoritative generated output and rerun generated contracts**
 
 Run:
 
@@ -189,7 +189,7 @@ node --test scripts/online-qa-regressions.test.mjs
 
 Expected: generated HTML and JavaScript contain the multi-file behavior and the regression contract passes.
 
-- [ ] **Step 6: Commit the UI slice**
+- [x] **Step 6: Commit the UI slice**
 
 ```bash
 git add new-legacy frontend/public/new-legacy frontend/new-legacy-manifest.json frontend/new-legacy-sync-report.json backend/app/seed/guided_course_v8_6_0.json

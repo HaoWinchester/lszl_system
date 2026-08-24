@@ -1,12 +1,16 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.151",
+  "fromVersion": "v9.0-p4.1.152",
   "toVersion": "v9.0-p4.1.152",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html"
+      "paper-management.html",
+      "src/65-question-bank-admin.js",
+      "src/teacher/question-bank-import-controller.js",
+      "tests/paper-management-api-contract.test.js",
+      "tests/v90-p35-paper-management-browser.py",
+      "tests/v90-p35-paper-management.test.js"
     ],
     "removed": []
   },
