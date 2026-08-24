@@ -6,12 +6,15 @@ from sqlalchemy import delete, func, select
 
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
-from app.models.question import Question, QuestionBank
+from app.models.paper import PaperCategory
+from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.user import User
 from app.services.question_migration_service import (
+    migrate_runtime_papers,
     migrate_runtime_questions,
+    scan_runtime_paper_sources,
     scan_runtime_question_sources,
 )
 from app.services import teaching_content_revision_service
@@ -19,6 +22,8 @@ from app.services import question_service
 
 
 PUBLISHED_KEY = "kg_question_banks_published_v1"
+PAPER_KEY = "kg_exam_papers_v1__teacher_shared"
+PAPER_CATEGORY_KEY = "kg_exam_paper_categories_v1__teacher_shared"
 
 
 def legacy_question(question_id: str, title: str = "历史题") -> dict:
@@ -311,6 +316,283 @@ def test_runtime_question_migration_dry_run_apply_and_rerun_are_safe() -> None:
                 published.value = previous_published["value"]
                 published.schema_version = previous_published["schema_version"]
                 published.updated_by = previous_published["updated_by"]
+            await db.execute(delete(User).where(User.username == owner))
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_runtime_paper_migration_preserves_categories_fields_scores_and_order() -> None:
+    """Catches the cutover migration dropping non-core paper draft state."""
+
+    suffix = uuid4().hex[:10]
+    owner = f"paper-migration-{suffix}"
+    bank_id = f"paper-migration-bank-{suffix}"
+    category_id = f"paper-category-{suffix}"
+    paper_id = f"paper-migration-paper-{suffix}"
+    question_ids = [f"paper-migration-q-{suffix}-{index}" for index in range(2)]
+    previous_shared: dict[str, dict | None] = {}
+    revision_before = 0
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            for key in (PAPER_KEY, PAPER_CATEGORY_KEY):
+                row = await db.get(SharedRuntimeState, key)
+                previous_shared[key] = (
+                    {
+                        "value": row.value,
+                        "schema_version": row.schema_version,
+                        "updated_by": row.updated_by,
+                    }
+                    if row is not None
+                    else None
+                )
+            db.add(
+                User(
+                    username=owner,
+                    password_hash=hash_password("migration-pass"),
+                    role="teacher",
+                    status="active",
+                )
+            )
+            await db.flush()
+            db.add(
+                QuestionBank(
+                    id=bank_id,
+                    owner_id=owner,
+                    source_id=f"source-{bank_id}",
+                    name="试卷迁移题库",
+                    subject="PMP",
+                    created_by=owner,
+                    updated_by=owner,
+                )
+            )
+            await db.flush()
+            db.add_all(
+                [
+                    Question(
+                        id=question_id,
+                        source_id=f"source-{question_id}",
+                        bank_id=bank_id,
+                        title=f"迁移题 {index + 1}",
+                        subject="PMP",
+                        scope="internal",
+                        lifecycle={"status": "active"},
+                        created_by=owner,
+                        updated_by=owner,
+                    )
+                    for index, question_id in enumerate(question_ids)
+                ]
+            )
+            categories = json.dumps(
+                [
+                    {
+                        "id": category_id,
+                        "name": "历史模拟卷",
+                        "description": "runtime 分类",
+                        "orderIndex": 3,
+                        "revision": 2,
+                    }
+                ],
+                ensure_ascii=False,
+            )
+            papers = json.dumps(
+                [
+                    {
+                        "id": paper_id,
+                        "name": "完整历史草稿",
+                        "subject": "PMP",
+                        "description": "保留全部草稿字段",
+                        "categoryId": category_id,
+                        "totalCount": 2,
+                        "status": "archived",
+                        "revision": 4,
+                        "quotas": {"people": 1, "process": 1},
+                        "accessPolicy": {"accessLevel": "member"},
+                        "enabledModes": ["practice_mode", "deep_recall"],
+                        "modeConfigVersion": 2,
+                        "purpose": "learning",
+                        "publishedAt": "2026-08-20T01:02:03Z",
+                        "archivedAt": "2026-08-21T01:02:03Z",
+                        "restoredAt": "2026-08-22T01:02:03Z",
+                        "withdrawnAt": "2026-08-23T01:02:03Z",
+                        "publishedVersion": 5,
+                        "publishedBy": owner,
+                        "questions": [
+                            {
+                                "bankId": bank_id,
+                                "questionId": question_ids[1],
+                                "order": 1,
+                                "score": 2.5,
+                            },
+                            {
+                                "bankId": bank_id,
+                                "questionId": question_ids[0],
+                                "order": 2,
+                                "score": 1,
+                            },
+                        ],
+                    }
+                ],
+                ensure_ascii=False,
+            )
+            for key, value in (
+                (PAPER_CATEGORY_KEY, categories),
+                (PAPER_KEY, papers),
+            ):
+                row = await db.get(SharedRuntimeState, key)
+                if row is None:
+                    db.add(
+                        SharedRuntimeState(
+                            key=key,
+                            value=value,
+                            updated_by=owner,
+                        )
+                    )
+                else:
+                    row.value = value
+                    row.updated_by = owner
+            await db.commit()
+
+    async def scenario() -> None:
+        nonlocal revision_before
+        async with AsyncSessionLocal() as db:
+            revision_before = int(
+                (await teaching_content_revision_service.current(db))["revision"]
+            )
+            dry = await scan_runtime_paper_sources(
+                db,
+                owner_ids={owner},
+                paper_ids={paper_id},
+            )
+            assert dry.applied is False
+            assert dry.paper_count == 1
+            assert dry.category_count == 1
+            assert dry.referenced_category_count == 1
+            assert dry.missing_category_count == 0
+            assert dry.referenced_question_count == 2
+            assert dry.bank_validated_reference_count == 2
+            assert dry.reference_score_count == 2
+            assert dry.field_counts == {
+                "categoryId": 1,
+                "accessPolicy": 1,
+                "enabledModes": 1,
+                "purpose": 1,
+                "archivedAt": 1,
+                "restoredAt": 1,
+                "withdrawnAt": 1,
+                "publishedVersion": 1,
+            }
+            assert dry.conflicts == []
+            assert await db.get(PaperCategory, category_id) is None
+            assert await db.get(ExamPaper, paper_id) is None
+
+            paper_state = await db.get(SharedRuntimeState, PAPER_KEY)
+            assert paper_state is not None
+            original_papers = paper_state.value
+            changed_payload = json.loads(original_papers)
+            changed_payload[0]["description"] = "预检后字段发生变化"
+            paper_state.value = json.dumps(changed_payload, ensure_ascii=False)
+            await db.commit()
+
+        async with AsyncSessionLocal() as db:
+            changed = await scan_runtime_paper_sources(
+                db,
+                owner_ids={owner},
+                paper_ids={paper_id},
+            )
+            assert changed.snapshot_hash != dry.snapshot_hash
+            paper_state = await db.get(SharedRuntimeState, PAPER_KEY)
+            assert paper_state is not None
+            paper_state.value = original_papers
+            await db.commit()
+
+        async with AsyncSessionLocal() as db:
+            actor = await db.get(User, owner)
+            assert actor is not None
+            applied = await migrate_runtime_papers(
+                db,
+                actor=actor,
+                apply=True,
+                owner_ids={owner},
+                paper_ids={paper_id},
+            )
+            assert applied.applied is True
+            assert int(
+                (await teaching_content_revision_service.current(db))["revision"]
+            ) == revision_before + 1
+
+        async with AsyncSessionLocal() as db:
+            category = await db.get(PaperCategory, category_id)
+            paper = await db.get(ExamPaper, paper_id)
+            assert category is not None
+            assert category.name == "历史模拟卷"
+            assert category.order_index == 3
+            assert category.revision == 2
+            assert paper is not None
+            assert paper.category_id == category_id
+            assert paper.access_policy == {"accessLevel": "member"}
+            assert paper.enabled_modes == ["practice_mode", "deep_recall"]
+            assert paper.mode_config_version == 2
+            assert paper.purpose == "learning"
+            assert paper.status == "archived"
+            assert paper.revision == 4
+            assert paper.archived_at is not None
+            assert paper.restored_at is not None
+            assert paper.withdrawn_at is not None
+            assert paper.published_version == 5
+            links = list(
+                (
+                    await db.execute(
+                        select(PaperQuestion)
+                        .where(PaperQuestion.paper_id == paper_id)
+                        .order_by(PaperQuestion.order_index)
+                    )
+                ).scalars().all()
+            )
+            assert [item.question_id for item in links] == [
+                question_ids[1],
+                question_ids[0],
+            ]
+            assert [float(item.score) for item in links] == [2.5, 1.0]
+
+        async with AsyncSessionLocal() as db:
+            actor = await db.get(User, owner)
+            assert actor is not None
+            rerun = await migrate_runtime_papers(
+                db,
+                actor=actor,
+                apply=True,
+                owner_ids={owner},
+                paper_ids={paper_id},
+            )
+            assert rerun.applied is True
+            assert int(
+                (await teaching_content_revision_service.current(db))["revision"]
+            ) == revision_before + 1
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                delete(PaperQuestion).where(PaperQuestion.paper_id == paper_id)
+            )
+            await db.execute(delete(ExamPaper).where(ExamPaper.id == paper_id))
+            await db.execute(delete(PaperCategory).where(PaperCategory.id == category_id))
+            await db.execute(delete(Question).where(Question.id.in_(question_ids)))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            for key, previous in previous_shared.items():
+                row = await db.get(SharedRuntimeState, key)
+                if previous is None:
+                    if row is not None:
+                        await db.delete(row)
+                elif row is not None:
+                    row.value = previous["value"]
+                    row.schema_version = previous["schema_version"]
+                    row.updated_by = previous["updated_by"]
             await db.execute(delete(User).where(User.username == owner))
             await db.commit()
 

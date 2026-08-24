@@ -355,27 +355,27 @@ git commit -m "feat: create atomic parallel paper batches"
 - Keeps `POST /api/v1/papers/migration/runtime?apply=false|true`
 - Extends `PaperMigrationReport` with category/field/reference counts and conflicts
 
-- [ ] **Step 1: Write failing migration tests for categories and full paper fields**
+- [x] **Step 1: Write failing migration tests for categories and full paper fields**
 
 Seed runtime category and paper keys with category, access policy, modes, purpose, archive/publish timestamps, scores, and ordered refs. Assert dry-run counts and zero relational writes.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_runtime_migration.py -q`
 
 Expected: new fields/categories are absent from the report and rows.
 
-- [ ] **Step 3: Extend candidate normalization, hash, report, and apply transaction**
+- [x] **Step 3: Extend candidate normalization, hash, report, and apply transaction**
 
 Preserve IDs and order, resolve category/reference conflicts explicitly, never overwrite a higher relational revision with runtime data, and keep reruns idempotent.
 
-- [ ] **Step 4: Run dry-run/apply/rerun and existing migration tests**
+- [x] **Step 4: Run dry-run/apply/rerun and existing migration tests**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_runtime_migration.py tests/test_runtime_domain_migration_ledger.py -q`
 
 Expected: all migration tests pass and the second apply changes no counts.
 
-- [ ] **Step 5: Commit migration completion**
+- [x] **Step 5: Commit migration completion**
 
 ```bash
 git add backend/app/services/question_migration_service.py backend/app/api/v1/papers.py backend/tests/test_question_runtime_migration.py
