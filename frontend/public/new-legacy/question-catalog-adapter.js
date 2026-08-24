@@ -322,7 +322,7 @@
         while (!remoteRetryStopped && remoteReloadTarget > catalog.contentRevision) {
           const previousRevision = catalog.contentRevision
           try {
-            await reload({ source: 'remote' })
+            await reload({ source: 'remote', includeQuestions: mode === 'managed' })
             if (remoteRetryStopped) return
             failures = 0
           } catch (error) {

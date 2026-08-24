@@ -1,12 +1,11 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.152",
-  "toVersion": "v9.0-p4.1.153",
+  "fromVersion": "v9.0-p4.1.153",
+  "toVersion": "v9.0-p4.1.154",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html"
+      "VERSION"
     ],
     "removed": []
   },
