@@ -212,7 +212,7 @@ async def validate_references(
 async def _reference_payloads(db: AsyncSession, paper_id: str) -> list[dict]:
     rows = (
         await db.execute(
-            select(Question.bank_id, PaperQuestion)
+            select(Question, PaperQuestion)
             .join(PaperQuestion, PaperQuestion.question_id == Question.id)
             .where(PaperQuestion.paper_id == paper_id)
             .order_by(PaperQuestion.order_index)
@@ -220,12 +220,19 @@ async def _reference_payloads(db: AsyncSession, paper_id: str) -> list[dict]:
     ).all()
     return [
         {
-            "bankId": bank_id,
+            "bankId": question.bank_id,
             "questionId": link.question_id,
             "order": link.order_index + 1,
             "score": _score(link.score),
+            "summary": {
+                "title": question.title,
+                "domain": question.domain,
+                "topic": question.topic,
+                "difficulty": question.difficulty,
+                "tags": question.tags or [],
+            },
         }
-        for bank_id, link in rows
+        for question, link in rows
     ]
 
 

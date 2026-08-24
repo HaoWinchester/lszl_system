@@ -73,6 +73,10 @@ def test_create_paper_persists_ordered_references_and_denies_students() -> None:
                         bank_id=bank_id,
                         title=f"草稿题目 {index + 1}",
                         subject="PMP",
+                        domain="人员",
+                        topic="团队",
+                        difficulty="medium",
+                        tags=["敏捷"],
                         scope="internal",
                         lifecycle={"status": "active"},
                         created_by=teacher,
@@ -136,18 +140,39 @@ def test_create_paper_persists_ordered_references_and_denies_students() -> None:
                     "questionId": question_ids[0],
                     "order": 1,
                     "score": 1.0,
+                    "summary": {
+                        "title": "草稿题目 1",
+                        "domain": "人员",
+                        "topic": "团队",
+                        "difficulty": "medium",
+                        "tags": ["敏捷"],
+                    },
                 },
                 {
                     "bankId": bank_id,
                     "questionId": question_ids[1],
                     "order": 2,
                     "score": 2.5,
+                    "summary": {
+                        "title": "草稿题目 2",
+                        "domain": "人员",
+                        "topic": "团队",
+                        "difficulty": "medium",
+                        "tags": ["敏捷"],
+                    },
                 },
             ]
 
             detail = client.get(f"/api/v1/papers/{paper_id}")
             assert detail.status_code == 200
             assert detail.json()["paper"]["questions"] == paper["questions"]
+
+            listed = client.get("/api/v1/papers")
+            assert listed.status_code == 200
+            listed_paper = next(
+                item for item in listed.json()["papers"] if item["id"] == paper_id
+            )
+            assert "questions" not in listed_paper
 
             client.post("/api/v1/auth/logout")
             login(client, student)
