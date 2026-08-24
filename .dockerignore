@@ -9,7 +9,6 @@
 **/.DS_Store
 **/._*
 .superpowers
-legacy
 new-legacy
 docs
 frontend/e2e

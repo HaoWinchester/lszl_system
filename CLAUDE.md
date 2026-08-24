@@ -2,37 +2,28 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 项目结构（重构后）
+## 项目结构（当前）
 
-本仓库已从纯前端重构为**前后端分离**，原版代码移至 `legacy/`：
+当前产品由 FastAPI 后端和原生 HTML/CSS/JavaScript 前端组成。FastAPI 同源提供 API 与 active release 静态页面；仓库中不再保留 React/Vite/iframe 前端或旧版 `legacy/` 工作副本。
 
-| 目录 | 内容 | 运行 |
+| 目录 | 内容 | 运行/用途 |
 |---|---|---|
-| `legacy/` | **原版纯前端**（HTML + 原生 JS + CSS，localStorage）；**图谱编辑器 iframe 直接承载其引擎**（见前端架构），其余页面对照还原 | `cd legacy && python3 serve.py`（占 8000） |
-| `backend/` | **新后端**：FastAPI + PostgreSQL + Alembic | `cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000` |
-| `frontend/` | **新前端**：Vite + React + TypeScript | `cd frontend && pnpm dev`（5173，proxy `/api`→8000） |
-| `docs/` | 文档，`功能基线-重构参考.md` 是重构基线与 SQL 建模依据 | — |
+| `backend/` | FastAPI + PostgreSQL + Alembic | `cd frontend && pnpm dev` 会迁移数据库并在 5173 启动 FastAPI |
+| `new-legacy/` | 当前权威前端源：HTML、CSS、原生 JavaScript 与测试 | 所有前端业务修改先落在这里 |
+| `frontend/` | 同步、适配器、契约测试与不可变 release 管理工具 | `pnpm sync:new-legacy` / `pnpm test` / `../manage-new-legacy` |
+| `frontend/public/new-legacy/` | 从源和适配器生成的同步产物 | 构建/测试产物，不是生产 active release |
+| `frontend/new-legacy-releases/` | 本地不可变 release；`current.json` 指向生产实际使用版本 | FastAPI 按 `current.json` 同源直出 |
+| `docs/` | 架构、迁移、发布与历史设计文档 | 历史设计记录只作背景，不代表当前运行链路 |
 
 默认管理员 `admin / admin123`（启动时自动 seed）。PostgreSQL 走本地 `/tmp` Unix socket，库名 `kg_graph_dev`。
 
-## ⚠️ 硬约束：UI 必须和 legacy 原版一模一样
+## 前端修改硬约束
 
-### 用户批准的学习端局部例外（2026-08-04）
-
-`practice-mode.html`、`question-training.html`、`question-workspace.html`、`knowledge-recall.html` 的非画板区域允许使用 Focus / Vega 兼容皮肤和本地 Lucide SVG；页面排版、业务行为及 `.qt-canvas-shell`、`.qw-canvas-shell`、`.kr-viewport` 全部后代仍必须保持不变。实施依据见 `docs/superpowers/specs/2026-08-04-learning-focus-vega-ui-skin-design.md`。
-
-**这是用户明确且反复强调的要求。** 每个页面都要和 `legacy/` 里对应的原版 HTML **视觉一模一样**：
-
-- **复用原版 CSS**：`legacy/styles/*.css` 已复制到 `frontend/src/styles/`，`main.tsx` 统一 import。
-- **用原版 className + DOM 结构**：还原页面时必须读 `legacy/<page>.html` 的 DOM 骨架，用**同名 className** 重建 React 组件，让原 CSS 生效。绝不要自己另写一套内联样式。
-- 各页面对应的原版类名速查：
-  - 首页图谱编辑器 → `.app/.graph-file-tabbar/.stage/.canvas-toolbar-*/.floating-toolbox/.world/.knowledge-card/.canvas-zoom-dock`（卡牌是 div 不是 svg）
-  - 文件管理 → `.fm-app/.fm-sidebar/.fm-main/.fm-file-grid/.fm-file-card`
-  - 题库 → `.qb-app/.qb-layout/.qb-workspace-card/.qb-annotation-card/.qb-inspector`
-  - 训练 → `.question-training-app/.qt-topbar/.q-tabs/.q-panel/.q-question-layout`
-  - 回忆 → `.kr-app/.kr-topbar/.kr-viewport/.kr-world/.kr-question-card/.kr-node-layer`
-  - 用户管理 → `.um-app/.um-topbar/.um-layout` ｜ 系统设置 → `.ss-app/.ss-layout/.ss-sidebar`
-- **改某页前先读 `legacy/<page>.html`**，必要时用 Playwright 截图 `legacy` vs `frontend` 对比验证。
+- `new-legacy/` 是当前前端权威源；不要把 `frontend/public/new-legacy/` 或 active release site 当作手工编辑源。
+- 正式发布必须走 `node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser`，由脚本同步、构建、验证并 promote；禁止手工复制覆盖 release site。
+- 页面已有 DOM、class、画布结构和业务行为默认保持兼容；涉及视觉或交互调整时，以当前设计规格和契约测试为准。
+- 跨页面公共行为必须落入 `new-legacy/src/` 下职责明确的共享模块或 `frontend/scripts/new-legacy-assets/` 适配层，禁止在多个页面复制变体实现。
+- `frontend/public/new-legacy/`、manifest、sync report 和 seed 版本等生成产物在正式发布时必须与源修改一起提交。
 
 ## 后端架构（backend/app）
 
@@ -48,20 +39,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - **TestClient + asyncpg 共享连接冲突** → engine 用 `poolclass=NullPool`（`db/session.py`）。
   - 跨表 FK 同事务 INSERT 顺序：先 `add` 父表 + `await db.flush()`，再 add 子表（如 `create_file` 先 flush graph_files 再写 file_contents）。
 
-## 前端架构（frontend/src）
+## 前端架构与发布链路
 
-- **路由**（`App.tsx` + `components/RequireAuth.tsx`）：`/` 图谱、`/files`、`/question-bank`、`/training`、`/recall`、`/users`(admin)、`/settings`(admin)、`/member`、`/login`。未登录跳 `/login`，`roles` 参数做角色守卫。
-- **API 层**（`api/*.ts`）：axios 实例 `baseURL='/api/v1'`，走 Vite proxy。每个域一个文件（auth/users/files/questions/training/subscriptions/system），含 TS 类型。
-- **状态**（`store/auth.ts`）：zustand 存当前用户 + `init/login/logout/register`。
-- **样式**：`main.tsx` 统一 import 全部 `styles/*.css`；页面组件用原版 className（见上方硬约束）。
-- **类型检查**：`cd frontend && pnpm exec tsc -b`（严格模式，noUnusedLocals）。
-- **图谱编辑器（`/`）= iframe 承载 legacy 原版引擎**（非 React 重写）：`GraphEditor.tsx` 只是 iframe 外壳，加载 `/legacy/workbench.html`（原版 `index.html` 派生，由 `scripts/copy-legacy.js` 生成到 `public/legacy/`），通过 `scripts/legacy-assets/bridge.js` 把原版的 `KGGraphFileStore`/认证/导航桥接到后端 `filesApi` 与 React 路由。这样连线、平滑档位缩放、选中边环形样式面板、大图模式等全部原版功能与原版完全一致（postMessage 协议见 `src/iframe/graphBridge.ts`）。**铁律：不改 `legacy/` 源文件**——只在 `public/legacy/` 派生 + 加 bridge.js。改图谱行为优先改 `bridge.js` 或 `GraphEditor.tsx`，不要动 `legacy/src/`。
+- **权威源**：`new-legacy/` 中的页面、样式、业务模块和前端测试。
+- **同步层**：`frontend/scripts/sync-new-legacy.js` 将权威源同步到 `frontend/public/new-legacy/`，并组合 `frontend/scripts/new-legacy-assets/` 中的服务端适配器。
+- **运行层**：后端读取 `frontend/new-legacy-releases/current.json`，提供对应 `<version>/site`；开发环境同样由 FastAPI 在 5173 端口同源提供页面和 `/api/v1`。
+- **认证与持久化**：页面通过同步层注入的服务端适配模块访问 FastAPI；权限和数据隔离仍必须由后端再次校验。
+- **图谱编辑器**：直接运行 active release 中的原生页面和模块，不存在 React 外壳或 iframe bridge。
 
 ## 数据模型（PostgreSQL，Alembic 管理）
 
 users / role_themes / system_settings(KV) / user_admin_logs / folders / graph_files(索引) / file_contents(正文，与 graph_files 1:1) / tags / file_tags / current_files / question_banks / questions(clues/concepts/reasoning 为 JSONB) / exam_papers / paper_questions / training_progress / recall_progress / subscriptions / subscription_orders / subscription_redeem_codes。
 
-图谱文件沿用 legacy v2 设计：**轻量索引（graph_files）+ 独立正文（file_contents）分离**，列表只读索引，打开才读正文。
+图谱文件采用**轻量索引（graph_files）+ 独立正文（file_contents）分离**，列表只读索引，打开才读正文。
 
 ## 角色与订阅边界
 
@@ -70,18 +60,10 @@ users / role_themes / system_settings(KV) / user_admin_logs / folders / graph_fi
 
 ## 验证
 
-- 后端：`cd backend && .venv/bin/python -m pytest tests/ -q`（冒烟测试：health/认证/文件/题库/试卷）。
-- 前端类型：`cd frontend && pnpm exec tsc -b`。
-- 浏览器对比 legacy：用 Playwright 同时截图 `frontend` 页面和 `legacy/*.html`，逐页比对（脚本见会话历史，或用 `mcp__4_5v_mcp__analyze_image` 确认布局）。
-
-## 已知简化项（功能层面）
-
-- **图谱编辑器（`/`）已是原版完整功能**（iframe 承载 legacy 引擎，含艾宾浩斯闪卡、学习包 ZIP 导入导出、大图模式、搜索定位、撤销/复制粘贴等全部原版功能），不再简化。
-- 其余页面（文件管理 `/files`、题库、训练、回忆、用户管理、系统设置）仍为 React 重写，UI 用原 className 对齐，部分高级功能（推理图谱自动生成、深度回忆寻宝地图等）待补全。
-
-## legacy 原版架构（仅参考，勿在新代码沿用）
-
-`legacy/` 是非 ES Module 的纯前端：`<script defer>` 按序加载 + 全局变量通信（`KGAuthCore`/`KGRolePermissions`/`KGSubscription`/`KGGraphFileStore` 挂 window），数据存 localStorage（key 见 `docs/功能基线-重构参考.md` 的迁移映射表）。新项目不要沿用这套全局变量模式，用 backend API + React 组件化。读 legacy 只为：① 还原 UI（className/DOM）；② 理解数据模型与业务规则。
+- 后端：`cd backend && .venv/bin/python -m pytest tests/ -q`。
+- 前端同步/发布契约：`cd frontend && pnpm test`。
+- 定向设计契约：`cd frontend && pnpm test:design`；涉及特定域时再运行相应专项契约和浏览器测试。
+- 发布候选：必须经过 `manage-new-legacy.js update` 内置的文件数量、关键页面、API 和视觉校验后才能 promote。
 
 ## 发布与验证纪律（事故教训，强制执行）
 
