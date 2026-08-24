@@ -602,7 +602,7 @@ Run: `cd frontend && pnpm sync:new-legacy`
 
 Expected: all focused tests pass; generated assets include the shared controller before `65-question-bank-admin.js`.
 
-- [ ] **Step 8: Commit the dual-import implementation**
+- [x] **Step 8: Commit the dual-import implementation**
 
 ```bash
 git add new-legacy frontend/public/new-legacy frontend/scripts docs/superpowers/plans/2026-08-24-paper-draft-api-import-and-parallel-composition.md
@@ -618,11 +618,11 @@ git commit -m "fix: separate question bank and paper imports"
 **Interfaces:**
 - No new interface; this task validates source, generated site, API behavior, and the user-visible local flow.
 
-- [ ] **Step 1: Validate the supplied untracked 60-question file without committing it**
+- [x] **Step 1: Validate the supplied untracked 60-question file without committing it**
 
 Run the shared normalizer against `测试数据/PMP_第二批第1套_人-相关方-01_60题_PrepStudio (1).json` and assert one bank, 60 unique question IDs, source bank ID `bank_9ee70c56-89de-433e-bf90-813b2ef17b10`, and no paper-package validation messages.
 
-- [ ] **Step 2: Run focused backend and full frontend tests**
+- [x] **Step 2: Run focused backend and full frontend tests**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_question_api_compatibility.py tests/test_paper_import_api.py -q`
 
@@ -630,14 +630,14 @@ Run: `cd frontend && pnpm test && pnpm test:design`
 
 Expected: all pass without a new warning.
 
-- [ ] **Step 3: Build/promote the local managed release after file-count checks**
+- [x] **Step 3: Build/promote the local managed release after file-count checks**
 
 Compare candidate and active release file counts, bump `new-legacy/VERSION` only if required, then run `node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser`. Verify `paper-management.html`, `admin-console.html`, the shared controller, and equal active/public counts.
 
-- [ ] **Step 4: Start the local UAT server and perform the curious-user pass**
+- [x] **Step 4: Start the local UAT server and perform the curious-user pass**
 
 As admin, open both dialogs; upload the real 60-question bank through `导入题库`; verify the result/confirmation UI, cancel before any destructive replacement if data already exists, verify `导入试卷` still accepts the 99-reference paper package, and verify wrong-entry recovery messages. Keep `main` unchanged.
 
-- [ ] **Step 5: Commit/push only the feature and UAT branches, then wait**
+- [x] **Step 5: Commit/push only the feature and UAT branches, then wait**
 
 Push through `http://127.0.0.1:7897`, verify remote `main` remains `ccb51e3`, give the user the local URL, and do not merge to `main` until the user explicitly approves.
