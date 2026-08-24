@@ -24,6 +24,7 @@
 
     const paperDetails = new Map();
     const candidatePages = new Map();
+    let catalogRevision = -1;
     let paperGeneration = 0;
     let bankGeneration = 0;
     const state = {
@@ -47,11 +48,18 @@
     function snapshot() { return clone(state); }
     function publish() { onChange(snapshot()); }
 
+    function syncCatalogBanks() {
+      const catalog = typeof catalogApi.snapshot === 'function' ? catalogApi.snapshot() : {};
+      const revision = Number(catalog?.contentRevision || 0);
+      if (catalogRevision >= 0 && revision !== catalogRevision) candidatePages.clear();
+      catalogRevision = revision;
+      state.banks = Array.isArray(catalog?.banks) ? clone(catalog.banks) : [];
+    }
+
     async function waitForCatalog() {
       const ready = typeof catalogApi.ready === 'function' ? catalogApi.ready() : catalogApi.ready;
       await ready;
-      const catalog = typeof catalogApi.snapshot === 'function' ? catalogApi.snapshot() : {};
-      state.banks = Array.isArray(catalog?.banks) ? clone(catalog.banks) : [];
+      syncCatalogBanks();
     }
 
     async function loadSelectedPaper(paperId, { publishLoading = true, forceReload = false } = {}) {
@@ -111,6 +119,7 @@
     }
 
     async function selectBank(bankId, options = {}) {
+      syncCatalogBanks();
       const id = text(bankId).trim();
       const page = Math.max(1, Math.trunc(Number(options.page || 1)));
       const pageSize = Math.max(1, Math.min(200, Math.trunc(Number(options.pageSize || 12))));

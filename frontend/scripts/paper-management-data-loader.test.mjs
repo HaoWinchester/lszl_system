@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const repoDir = resolve(scriptsDir, '..', '..')
 const loaderPath = resolve(scriptsDir, 'new-legacy-assets', 'paper-management-data-loader.js')
+const paperPageScriptPath = resolve(repoDir, 'new-legacy', 'src', '65-question-bank-admin.js')
 
 function deferred() {
   let resolvePromise
@@ -131,6 +132,24 @@ test('revisiting a loaded paper or exact bank page reuses loader caches', async 
   assert.equal(bankCalls, 1)
 })
 
+test('catalog revision changes invalidate loader-owned candidate pages', async () => {
+  let revision = 1
+  let bankCalls = 0
+  const loader = loadFactory().create({
+    paperApi: { ready: async () => ({ papers: [], categories: [] }), detail: async () => null },
+    catalogApi: catalogApi({
+      snapshot: () => ({ banks: [{ id: 'bank-1' }], questions: [], contentRevision: revision }),
+      loadBankQuestionPage: async () => ({ questions: [{ id: `q-${++bankCalls}` }], total: 1, page: 1, pageSize: 12 }),
+    }),
+  })
+  await loader.initialize()
+  await loader.selectBank('bank-1', { page: 1, pageSize: 12 })
+  await loader.selectBank('bank-1', { page: 1, pageSize: 12 })
+  revision = 2
+  await loader.selectBank('bank-1', { page: 1, pageSize: 12 })
+  assert.equal(bankCalls, 2)
+})
+
 test('sync injects the loader after both API adapters and before the paper application', () => {
   const root = mkdtempSync(resolve(tmpdir(), 'kg-paper-loader-'))
   const output = resolve(root, 'site')
@@ -151,4 +170,16 @@ test('sync injects the loader after both API adapters and before the paper appli
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+test('paper page consumes selected detail, selected-bank pages, and preview-only full questions', () => {
+  const source = readFileSync(paperPageScriptPath, 'utf8')
+  assert.match(source, /KGPaperManagementDataLoader/)
+  assert.match(source, /paperDataLoader\.selectPaper\(id,/)
+  assert.match(source, /paperDataLoader\.selectBank\(state\.paperCandidateBankId,/)
+  assert.match(source, /Catalog\.loadQuestion\(ref\.questionId\)/)
+  assert.match(source, /Catalog\.loadBankQuestions\(bank\.id/)
+  assert.doesNotMatch(source, /Promise\.all\(\(summaries\|\|\[\]\)\.map/)
+  assert.match(source, /if\(!paperDataLoader\)return renderFullCatalogPaperCandidates\(\)/)
+  assert.match(source, /<option value="" disabled>请选择题库<\/option>/)
 })

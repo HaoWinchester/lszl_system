@@ -39,7 +39,11 @@ with sync_playwright() as p:
       window.__bankImportCalls=[];window.__bankImportFailures=1;
       window.KGQuestionCatalogAdapter={
         ready:Promise.resolve(),
-        snapshot:()=>({banks:banks.map(({questions,...bank})=>bank),questions:banks.flatMap(bank=>bank.questions.map(item=>({...item,bankId:bank.id})))}),
+        snapshot:()=>({banks:banks.map(({questions,...bank})=>({...bank,questionCount:questions.length})),questions:banks.flatMap(bank=>bank.questions.map(item=>({...item,bankId:bank.id}))),contentRevision:1}),
+        question:id=>clone(banks.flatMap(bank=>bank.questions).find(question=>question.id===id)||null),
+        loadQuestion:async id=>clone(banks.flatMap(bank=>bank.questions).find(question=>question.id===id)||null),
+        loadBankQuestions:async id=>clone(banks.find(bank=>bank.id===id)?.questions||[]),
+        loadBankQuestionPage:async(id,options)=>{const keyword=String(options.search||'').toLowerCase(),all=(banks.find(bank=>bank.id===id)?.questions||[]).filter(question=>!keyword||JSON.stringify(question).toLowerCase().includes(keyword)),start=(options.page-1)*options.pageSize;return {questions:clone(all.slice(start,start+options.pageSize)),total:all.length,page:options.page,pageSize:options.pageSize}},
         importBanks:async body=>{
           window.__bankImportCalls.push(clone(body));
           if(window.__bankImportFailures>0){window.__bankImportFailures-=1;throw new Error('题库导入服务暂时不可用')}
@@ -68,6 +72,7 @@ with sync_playwright() as p:
       };
     }""")
     add_files(page, ['styles/teacher-workbench.css', 'styles/question-bank-admin.css', 'styles/admin-context-nav.css', 'styles/paper-management.css'], 'css')
+    page.add_script_tag(content=(ROOT.parent / 'frontend/scripts/new-legacy-assets/paper-management-data-loader.js').read_text(encoding='utf-8'))
     add_files(page, [
         'src/01-runtime-config.js', 'src/28-app-storage.js', 'src/29-auth-core.js', 'src/34-role-permissions.js', 'src/37-subscription-plans.js', 'src/37-subscription-orders.js', 'src/37-subscription-redeem-codes.js', 'src/37-subscription-core.js', 'src/33-user-center.js', 'src/50-question-data.js', 'src/91-learning-content-core.js', 'src/95-recall-association-library.js',
         'src/teacher/shared/domain-core.js', 'src/teacher/question-bank/bank-list-controller.js', 'src/teacher/question-bank/question-list-controller.js', 'src/teacher/paper-management/paper-list-controller.js', 'src/teacher/paper-management/paper-question-picker.js', 'src/teacher/paper-management/paper-preview.js', 'src/teacher/paper-management/paper-audit-service.js', 'src/59c-active-learning-mode-policy.js', 'src/teacher/paper-management/paper-release-service.js', 'src/teacher/paper-management/paper-quota-service.js', 'src/teacher/question-bank-import-controller.js', 'src/teacher/paper-management/paper-import-controller.js', 'src/teacher/paper-management/paper-composition-controller.js', 'src/65-question-bank-admin.js'
