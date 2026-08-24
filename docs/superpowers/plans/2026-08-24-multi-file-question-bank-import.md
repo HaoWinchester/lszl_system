@@ -208,7 +208,7 @@ git commit -m "feat: import multiple question bank files"
 - Consumes: managed release command and the local FastAPI server at `http://127.0.0.1:8000`.
 - Produces: a new active local release, updated feature branch, and updated `uat`; `main` remains unchanged.
 
-- [ ] **Step 1: Run source persistence scans and focused backend tests**
+- [x] **Step 1: Run source persistence scans and focused backend tests**
 
 Run:
 
@@ -220,7 +220,7 @@ cd backend
 
 Expected: no persistence hits in the controller and all focused backend tests pass.
 
-- [ ] **Step 2: Run the complete frontend suite**
+- [x] **Step 2: Run the complete frontend suite**
 
 Run:
 
@@ -232,7 +232,7 @@ pnpm test:design
 
 Expected: all tests pass with no new warning.
 
-- [ ] **Step 3: Build and promote a managed release**
+- [x] **Step 3: Build and promote a managed release**
 
 Increase `new-legacy/VERSION` by one patch release, run `python3 new-legacy/content-prep-studio/build.py`, then `cd frontend && pnpm sync:new-legacy`. Compare current active and candidate file counts and require both critical pages plus `src/teacher/question-bank-import-controller.js`. Promote only with:
 
@@ -242,11 +242,11 @@ node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser
 
 Expected: active/public counts match, critical files exist, and active/public critical-file hashes match.
 
-- [ ] **Step 4: Perform a local browser curious-user pass**
+- [x] **Step 4: Perform a local browser curious-user pass**
 
 As `admin`, open `/paper-management.html`; choose at least two generated valid files and confirm the UI reports exact counts and one request. Then choose a valid file plus malformed file and verify the whole batch blocks without an API call; replace with valid files and verify recovery. Do not submit the user's untracked real sample files to the database.
 
-- [ ] **Step 5: Commit, push feature/UAT only, and verify refs**
+- [x] **Step 5: Commit, push feature/UAT only, and verify refs**
 
 Commit release artifacts, push `codex/paper-draft-api-import-composition` through `http://127.0.0.1:7897`, merge it into `uat`, push `uat` through the same proxy, and verify remote refs. Assert local and remote `main` remain `ccb51e3688eb265985420d0e887b47d769fc775e`.
 
