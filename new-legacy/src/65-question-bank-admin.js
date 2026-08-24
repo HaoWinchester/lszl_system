@@ -998,23 +998,15 @@
     if(!built?.ok){console.warn('发布试卷失败',built?.errors||built);toast((built?.errors||['发布失败，请检查试卷内容。'])[0]);return null}
     const release=built.value;
     try{
-      const response=await fetch('/api/v1/paper-releases/publish-payload',{
-        method:'POST',credentials:'include',
-        headers:{'content-type':'application/json'},
-        body:JSON.stringify(release)
-      });
-      if(!response.ok){
-        const detail=await response.json().catch(()=>({}));
-        toast(detail?.detail?.message||`发布失败（${response.status}），试卷未发布。`);
-        return null;
-      }
+      const published=await global.KGPaperReleaseApi?.publishPayload?.(release);
+      if(!published)throw new Error('发布服务未返回版本信息。');
       window.dispatchEvent?.(new CustomEvent('kg:paper-release-published'));
+      return {...release,id:String(published.releaseId||published.id||release.id),releaseId:String(published.releaseId||published.id||release.id),version:Number(published.version||release.version)};
     }catch(error){
       console.warn('发布请求失败',error);
-      toast('发布请求失败，请检查网络后重试。');
+      toast(error?.message||'发布请求失败，请检查网络后重试。');
       return null;
     }
-    return release;
   }
   async function withdrawPaperRelease(paper){
     try{

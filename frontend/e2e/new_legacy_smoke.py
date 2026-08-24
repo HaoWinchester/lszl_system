@@ -211,6 +211,13 @@ with sync_playwright() as playwright:
         finally:
             student_context.close()
 
+        # learning/node can schedule a delayed route into its next activity.
+        # Use a fresh page for the final settings screenshot so that pending
+        # learning navigation cannot interrupt this independent smoke step.
+        previous_page = page
+        page = context.new_page()
+        bind_page_observers(page)
+        previous_page.close()
         screenshot = Path("/tmp/new-legacy-direct-settings.png")
         page.goto(BASE + "/settings", wait_until="domcontentloaded")
         page.locator(".ss-app").wait_for(state="visible", timeout=15_000)

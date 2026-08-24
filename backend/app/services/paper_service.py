@@ -149,6 +149,44 @@ def serialize_paper(
     return payload
 
 
+async def sync_published_projection(
+    db: AsyncSession,
+    *,
+    paper_id: str,
+    release_id: str,
+    version: int,
+    published_at,
+    updated_by: str,
+) -> bool:
+    """Keep the editable paper aggregate aligned with its active release."""
+    paper = (
+        await db.execute(
+            select(ExamPaper)
+            .where(ExamPaper.id == paper_id, ExamPaper.deleted_at.is_(None))
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if paper is None:
+        return False
+    if (
+        paper.status == "published"
+        and paper.published_release_id == release_id
+        and paper.published_version == version
+        and paper.published_at == published_at
+        and paper.withdrawn_at is None
+    ):
+        return False
+    paper.status = "published"
+    paper.published_release_id = release_id
+    paper.published_version = version
+    paper.published_at = published_at
+    paper.withdrawn_at = None
+    paper.revision += 1
+    paper.updated_by = updated_by
+    await db.flush()
+    return True
+
+
 async def validate_references(
     db: AsyncSession,
     references: list[PaperReference],

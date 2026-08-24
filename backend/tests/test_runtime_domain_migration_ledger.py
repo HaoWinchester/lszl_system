@@ -655,6 +655,11 @@ def test_paper_release_mappers_materialize_shared_catalog_and_history() -> None:
             assert {(row.id, row.status) for row in releases} == {
                 (current_id, "published"), (history_id, "superseded")
             }
+            paper = await db.get(ExamPaper, paper_id)
+            assert paper is not None
+            assert paper.status == "published"
+            assert paper.published_version == 2
+            assert paper.published_release_id == current_id
             rows = (await db.scalars(select(PaperReleaseQuestion).where(
                 PaperReleaseQuestion.release_id.in_([current_id, history_id])
             ))).all()
@@ -682,6 +687,10 @@ def test_paper_release_mappers_materialize_shared_catalog_and_history() -> None:
             current_release = await db.get(PaperRelease, current_id)
             assert current_release is not None
             current_release.name = "关系域合法改名"
+            paper.status = "draft"
+            paper.published_version = 0
+            paper.published_release_id = None
+            paper.published_at = None
             await db.commit()
             repeated = await _run(
                 "backfill",
@@ -691,6 +700,10 @@ def test_paper_release_mappers_materialize_shared_catalog_and_history() -> None:
             assert repeated["status"] == "verified", repeated
             await db.refresh(current_release)
             assert current_release.name == "关系域合法改名"
+            await db.refresh(paper)
+            assert paper.status == "published"
+            assert paper.published_version == 2
+            assert paper.published_release_id == current_id
 
             rows[0].snapshot = {**rows[0].snapshot, "title": "被污染"}
             await db.commit()

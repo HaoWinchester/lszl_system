@@ -497,9 +497,25 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
     except ValueError as exc:
         raise _error(422, "RELEASE_PAYLOAD_INVALID", str(exc)) from exc
 
+    await teaching_content_revision_service.acquire_lock(db)
     release_id = canonical["releaseId"]
     if await db.get(PaperRelease, release_id) is not None:
         raise _error(409, "RELEASE_EXISTS", "该发布版本已存在，请刷新后重试")
+
+    latest = await db.scalar(
+        select(func.max(PaperRelease.version)).where(
+            PaperRelease.paper_id == canonical["paperId"]
+        )
+    )
+    assigned_version = int(latest or 0) + 1
+    if canonical["version"] != assigned_version:
+        release_id = uid("pr_")
+    frozen_payload = dict(payload)
+    frozen_payload.update({
+        "id": release_id,
+        "releaseId": release_id,
+        "version": assigned_version,
+    })
 
     # 先 supersede 同试卷旧 active 版本，避免触发"每试卷仅一个 active"部分唯一索引
     await db.execute(
@@ -514,7 +530,7 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
     release = PaperRelease(
         id=release_id,
         paper_id=canonical["paperId"],
-        version=canonical["version"],
+        version=assigned_version,
         status=ACTIVE_STATUS,
         name=canonical["name"],
         subject=canonical["subject"],
@@ -524,12 +540,20 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
         enabled_modes=canonical["enabledModes"],
         allowed_roles=canonical["allowedRoles"],
         release_metadata=canonical["metadata"],
-        source_payload=dict(payload),
+        source_payload=frozen_payload,
         question_count=len(canonical["questions"]),
         published_at=now_utc(),
     )
     db.add(release)
     await db.flush()
+    await paper_service.sync_published_projection(
+        db,
+        paper_id=release.paper_id,
+        release_id=release.id,
+        version=release.version,
+        published_at=release.published_at,
+        updated_by=actor.username,
+    )
     for question in canonical["questions"]:
         db.add(PaperReleaseQuestion(
             release_id=release_id,
@@ -538,9 +562,35 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
             question_id=question["questionId"],
             snapshot=question["question"],
         ))
+    await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        [{"entityType": "paper", "entityId": release.paper_id, "action": "published"}],
+    )
     await db.commit()
     await db.refresh(release)
     return release
+
+
+async def reconcile_active_paper_projections(db: AsyncSession) -> int:
+    """Repair editable-paper status from the authoritative active releases."""
+    releases = list((await db.scalars(
+        select(PaperRelease)
+        .where(PaperRelease.status == ACTIVE_STATUS)
+        .order_by(PaperRelease.paper_id, PaperRelease.version.desc())
+    )).all())
+    repaired = 0
+    for release in releases:
+        repaired += int(await paper_service.sync_published_projection(
+            db,
+            paper_id=release.paper_id,
+            release_id=release.id,
+            version=release.version,
+            published_at=release.published_at,
+            updated_by=release.publisher_id,
+        ))
+    await db.commit()
+    return repaired
 
 
 async def withdraw_paper(db: AsyncSession, actor: User, paper_id: str) -> int:
