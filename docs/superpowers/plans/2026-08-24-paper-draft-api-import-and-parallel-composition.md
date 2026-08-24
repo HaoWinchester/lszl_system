@@ -50,7 +50,7 @@
 - Produces: `build_plan(request: CompositionRequest, candidates: Sequence[CompositionCandidate]) -> CompositionPlan`
 - Produces dataclasses: `CompositionCandidate`, `CompositionVariant`, `CompositionRequest`, `CompositionPlan`
 
-- [ ] **Step 1: Write failing maximum-remainder tests**
+- [x] **Step 1: Write failing maximum-remainder tests**
 
 ```python
 def test_allocate_counts_uses_largest_remainder_and_exact_total() -> None:
@@ -62,17 +62,17 @@ def test_allocate_counts_uses_largest_remainder_and_exact_total() -> None:
     assert sum(allocate_counts({"a": 1, "b": 1, "c": 1}, 5).values()) == 5
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_paper_composition_service.py -q`
 
 Expected: collection fails because `paper_composition_service` does not exist.
 
-- [ ] **Step 3: Implement weights and facet normalization**
+- [x] **Step 3: Implement weights and facet normalization**
 
 Implement exact validation: total must be positive; weights must be finite and non-negative; at least one weight must be positive. Normalize `exam-domain:environment` to `business-environment` and performance aliases `financial/resources/stakeholders` to `finance/resource/stakeholder` while reading `metadata.subjectFacets`.
 
-- [ ] **Step 4: Add failing plan tests for unequal variants and zero duplicates**
+- [x] **Step 4: Add failing plan tests for unequal variants and zero duplicates**
 
 ```python
 def test_build_plan_supports_unequal_variants_without_cross_paper_duplicates() -> None:
@@ -83,23 +83,23 @@ def test_build_plan_supports_unequal_variants_without_cross_paper_duplicates() -
     assert all(item.hard_shortages == {} for item in plan.variants)
 ```
 
-- [ ] **Step 5: Run the new tests and verify expected failures**
+- [x] **Step 5: Run the new tests and verify expected failures**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_paper_composition_service.py -q`
 
 Expected: allocation tests pass and plan tests fail because `build_plan` is not implemented.
 
-- [ ] **Step 6: Implement deterministic planning**
+- [x] **Step 6: Implement deterministic planning**
 
 Use `sha256(f"{seed}\0{bank_id}\0{question_id}")` as the stable candidate order. Process variants in request order, satisfy hard deficits first, use soft deficit as the secondary score, and remove selected IDs from the batch pool. Return per-variant targets, actual counts, shortages, exclusions, and a canonical SHA-256 plan hash.
 
-- [ ] **Step 7: Add and pass shortage, alias, unclassified, seed, and soft-target tests**
+- [x] **Step 7: Add and pass shortage, alias, unclassified, seed, and soft-target tests**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_paper_composition_service.py -q`
 
 Expected: all composition unit tests pass.
 
-- [ ] **Step 8: Commit the independently green algorithm**
+- [x] **Step 8: Commit the independently green algorithm**
 
 ```bash
 git add backend/app/services/paper_composition_service.py backend/tests/test_paper_composition_service.py
