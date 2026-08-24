@@ -24,12 +24,6 @@ from app.services.question_cleanup_reference_service import (
 )
 
 
-_PAPER_REVISION_PATTERN = re.compile(r"[0-9]+", re.ASCII)
-_POSTGRES_INTEGER_MAX = 2_147_483_647
-_MAX_MUTABLE_PAPER_REVISION = _POSTGRES_INTEGER_MAX - 1
-_MAX_PAPER_REVISION_DIGITS = len(str(_POSTGRES_INTEGER_MAX))
-
-
 def bank_to_dict(b: QuestionBank, question_count: int = 0) -> dict:
     return {
         "id": b.id,
@@ -59,23 +53,9 @@ def _import_source_identity(item) -> str:
 
 
 def paper_to_dict(p: ExamPaper, question_count: int = 0) -> dict:
-    return {
-        "id": p.id,
-        "ownerId": p.owner_id,
-        "name": p.name,
-        "subject": p.subject,
-        "description": p.description,
-        "totalCount": p.total_count,
-        "status": p.status,
-        "quotas": p.quotas or {},
-        "questionCount": question_count,
-        "revision": p.revision,
-        "createdBy": p.created_by,
-        "updatedBy": p.updated_by,
-        "publishedAt": p.published_at.isoformat() if p.published_at else None,
-        "createdAt": p.created_at.isoformat() if p.created_at else None,
-        "updatedAt": p.updated_at.isoformat() if p.updated_at else None,
-    }
+    from app.services import paper_service
+
+    return paper_service.serialize_paper(p, question_count=question_count)
 
 
 # ---------- 题库 ----------
@@ -1102,30 +1082,9 @@ async def delete_question(db: AsyncSession, owner: User | str, question_id: str)
 
 # ---------- 试卷 ----------
 def _require_paper_revision(value: object) -> int:
-    revision = 0
-    if isinstance(value, bool):
-        pass
-    elif isinstance(value, int):
-        revision = value
-    elif isinstance(value, str):
-        candidate = value.strip()
-        if (
-            0 < len(candidate) <= _MAX_PAPER_REVISION_DIGITS
-            and _PAPER_REVISION_PATTERN.fullmatch(candidate) is not None
-        ):
-            try:
-                revision = int(candidate)
-            except (OverflowError, ValueError):
-                revision = 0
-    if not 1 <= revision <= _MAX_MUTABLE_PAPER_REVISION:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "REVISION_REQUIRED",
-                "message": "修改公共试卷必须提供有效的修订号",
-            },
-        )
-    return revision
+    from app.services import paper_service
+
+    return paper_service.require_revision(value)
 
 
 async def _cas_paper_mutation(
@@ -1135,113 +1094,55 @@ async def _cas_paper_mutation(
     expected_revision: object,
     values: dict,
 ) -> str | None:
-    revision = _require_paper_revision(expected_revision)
-    mutation_values = {
-        **values,
-        "revision": ExamPaper.revision + 1,
-        "updated_by": actor.username,
-    }
-    updated_id = (
-        await db.execute(
-            update(ExamPaper)
-            .where(
-                ExamPaper.id == paper_id,
-                ExamPaper.deleted_at.is_(None),
-                ExamPaper.revision == revision,
-            )
-            .values(**mutation_values)
-            .returning(ExamPaper.id)
-        )
-    ).scalar_one_or_none()
-    if updated_id is not None:
-        return updated_id
+    from app.services import paper_service
 
-    current = (
-        await db.execute(
-            select(ExamPaper.revision, ExamPaper.deleted_at).where(
-                ExamPaper.id == paper_id
-            )
-        )
-    ).first()
-    if current is None:
-        return None
-    raise HTTPException(
-        status_code=409,
-        detail={
-            "code": "REVISION_CONFLICT",
-            "message": "试卷已被其他用户更新，请刷新后重试",
-            "currentRevision": current.revision,
-            "deleted": current.deleted_at is not None,
-        },
+    return await paper_service.cas_paper_mutation(
+        db,
+        actor,
+        paper_id,
+        expected_revision,
+        values,
     )
 
 
 async def list_papers(db: AsyncSession, actor: User, status: str | None = None) -> list[dict]:
-    q = select(ExamPaper).where(ExamPaper.deleted_at.is_(None))
-    if status:
-        q = q.where(ExamPaper.status == status)
-    papers = (await db.execute(q.order_by(ExamPaper.created_at))).scalars().all()
-    result = []
-    for p in papers:
-        cnt = int(
-            (await db.execute(select(func.count()).select_from(PaperQuestion).where(PaperQuestion.paper_id == p.id))).scalar() or 0
-        )
-        result.append(paper_to_dict(p, cnt))
-    return result
+    from app.services import paper_service
+
+    return await paper_service.list_papers(db, actor, status)
 
 
 async def create_paper(db: AsyncSession, actor: User, data: dict) -> ExamPaper:
-    await teaching_content_revision_service.acquire_lock(db)
-    p = ExamPaper(
-        id=uid("p_"),
-        owner_id=actor.username,
-        revision=1,
-        created_by=actor.username,
-        updated_by=actor.username,
-        name=data.get("name", "新试卷"),
-        subject=data.get("subject", "PMP"),
-        description=data.get("description"),
-        total_count=data.get("totalCount", 0),
-        quotas=data.get("quotas") or {},
-    )
-    db.add(p)
-    await teaching_content_revision_service.bump(
+    from app.schemas.paper import PaperCreateRequest
+    from app.services import paper_service
+
+    payload = await paper_service.create_paper(
         db,
-        actor.username,
-        [{"entityType": "paper", "entityId": p.id, "action": "created"}],
+        actor,
+        PaperCreateRequest.model_validate(data),
     )
-    await db.commit()
-    await db.refresh(p)
-    return p
+    paper = await db.get(ExamPaper, payload["id"])
+    assert paper is not None
+    await db.refresh(paper)
+    return paper
 
 
 async def update_paper(db: AsyncSession, actor: User, paper_id: str, patch: dict) -> ExamPaper | None:
-    await teaching_content_revision_service.acquire_lock(db)
-    values = {
-        k: patch[k]
-        for k in ("name", "subject", "description", "quotas")
-        if k in patch
-    }
-    updated_id = await _cas_paper_mutation(
+    from app.schemas.paper import PaperUpdateRequest
+    from app.services import paper_service
+
+    payload = await paper_service.update_paper(
         db,
         actor,
         paper_id,
-        patch.get("revision"),
-        values,
+        PaperUpdateRequest.model_validate(patch),
     )
-    if updated_id is None:
+    if payload is None:
         return None
-    await teaching_content_revision_service.bump(
-        db,
-        actor.username,
-        [{"entityType": "paper", "entityId": updated_id, "action": "updated"}],
-    )
-    await db.commit()
-    p = await db.get(ExamPaper, updated_id)
-    if p is None:
+    paper = await db.get(ExamPaper, paper_id)
+    if paper is None:
         return None
-    await db.refresh(p)
-    return p
+    await db.refresh(paper)
+    return paper
 
 
 async def delete_paper(
@@ -1251,55 +1152,15 @@ async def delete_paper(
     expected_revision: object,
     deletion_reason: str | None = None,
 ) -> dict | None:
-    await teaching_content_revision_service.acquire_lock(db)
-    revision = _require_paper_revision(expected_revision)
-    current = (
-        await db.execute(
-            select(ExamPaper.status).where(ExamPaper.id == paper_id)
-        )
-    ).scalar_one_or_none()
-    if current is None:
-        return None
-    reference_count = int(
-        (
-            await db.execute(
-                select(func.count())
-                .select_from(PaperQuestion)
-                .where(PaperQuestion.paper_id == paper_id)
-            )
-        ).scalar_one()
-    )
-    deleted_at = now_utc()
-    reason = str(deletion_reason or "").strip() or "未提供删除原因"
-    updated_id = await _cas_paper_mutation(
+    from app.services import paper_service
+
+    return await paper_service.delete_paper(
         db,
         actor,
         paper_id,
-        revision,
-        {
-            "status": "deleted",
-            "deleted_by": actor.username,
-            "deleted_at": deleted_at,
-            "deletion_reason": reason,
-        },
+        expected_revision,
+        deletion_reason,
     )
-    if updated_id is None:
-        return None
-    await teaching_content_revision_service.bump(
-        db,
-        actor.username,
-        [{"entityType": "paper", "entityId": updated_id, "action": "deleted"}],
-    )
-    await db.commit()
-    return {
-        "paperId": updated_id,
-        "revision": revision + 1,
-        "deletedBy": actor.username,
-        "deletedAt": deleted_at.isoformat(),
-        "reason": reason,
-        "previousStatus": current,
-        "references": {"paperQuestions": reference_count},
-    }
 
 
 async def compose_paper(
@@ -1395,23 +1256,6 @@ async def set_published(
 
 
 async def get_paper_with_questions(db: AsyncSession, actor: User, paper_id: str) -> dict | None:
-    p = (
-        await db.execute(
-            select(ExamPaper).where(
-                ExamPaper.id == paper_id,
-                ExamPaper.deleted_at.is_(None),
-            )
-        )
-    ).scalar_one_or_none()
-    if p is None:
-        return None
-    rows = (
-        await db.execute(
-            select(Question, PaperQuestion)
-            .join(PaperQuestion, PaperQuestion.question_id == Question.id)
-            .where(PaperQuestion.paper_id == paper_id)
-            .order_by(PaperQuestion.order_index)
-        )
-    ).all()
-    questions = [question_to_dict(q) for q, _ in rows]
-    return {**paper_to_dict(p, len(questions)), "questions": questions}
+    from app.services import paper_service
+
+    return await paper_service.get_paper(db, actor, paper_id)

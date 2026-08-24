@@ -201,7 +201,7 @@ git commit -m "feat: extend relational paper draft schema"
 - `GET/POST/PUT/DELETE /api/v1/paper-categories`
 - Pydantic types `PaperCreateRequest`, `PaperUpdateRequest`, `PaperQuestionReplaceRequest`, `PaperReference`
 
-- [ ] **Step 1: Write API tests for create, detail, ordered replacement, refresh, and role denial**
+- [x] **Step 1: Write API tests for create, detail, ordered replacement, refresh, and role denial**
 
 ```python
 created = teacher.post("/api/v1/papers", json={"name": "API 草稿", "subject": "PMP", "questions": refs})
@@ -212,31 +212,31 @@ assert [item["order"] for item in detail["questions"]] == [1, 2]
 assert student.post("/api/v1/papers", json={"name": "禁止"}).status_code == 403
 ```
 
-- [ ] **Step 2: Run and verify RED at the typed contract boundary**
+- [x] **Step 2: Run and verify RED at the typed contract boundary**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_paper_draft_api.py -q`
 
 Expected: question replacement/category endpoints are missing and create payload does not persist refs.
 
-- [ ] **Step 3: Implement Pydantic schemas and shared reference validation**
+- [x] **Step 3: Implement Pydantic schemas and shared reference validation**
 
 Validate internal bank/question IDs, lifecycle, bank ownership match, continuous public order `1..N`, unique question/order, score range, total count, access policy, and enabled modes. Return structured 400/404/409/422 errors.
 
-- [ ] **Step 4: Extract paper service without duplicate implementations**
+- [x] **Step 4: Extract paper service without duplicate implementations**
 
 Move the canonical paper mutation logic from `question_service.py` to `paper_service.py`. Keep thin compatibility imports/wrappers for existing internal callers, update `paper_release_service.py` to use paper revision helpers, and remove paper routes from `questions.py` after registering `papers.py`.
 
-- [ ] **Step 5: Implement CRUD, CAS, categories, and atomic question replacement**
+- [x] **Step 5: Implement CRUD, CAS, categories, and atomic question replacement**
 
 Each mutation acquires the teaching-content lock, checks permissions/revision, records actor fields, bumps teaching revision, commits, and refreshes before serialization. Category deletion returns 409 when referenced; archived categories remain readable for existing papers.
 
-- [ ] **Step 6: Add stale revision, invalid reference, duplicate order, shared teacher/admin, and refresh tests**
+- [x] **Step 6: Add stale revision, invalid reference, duplicate order, shared teacher/admin, and refresh tests**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_paper_draft_api.py tests/test_question_api_compatibility.py tests/test_paper_releases.py -q`
 
 Expected: all focused tests pass and release compatibility remains green.
 
-- [ ] **Step 7: Commit CRUD closure**
+- [x] **Step 7: Commit CRUD closure**
 
 ```bash
 git add backend/app/schemas/paper.py backend/app/services/paper_service.py backend/app/api/v1/papers.py backend/app/api/v1/router.py backend/app/api/v1/questions.py backend/app/services/question_service.py backend/app/services/paper_release_service.py backend/tests/test_paper_draft_api.py

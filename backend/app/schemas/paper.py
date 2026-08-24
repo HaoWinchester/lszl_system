@@ -1,0 +1,96 @@
+"""Typed paper draft API contracts."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class PaperReference(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    bank_id: str = Field(alias="bankId", min_length=1, max_length=64)
+    question_id: str = Field(alias="questionId", min_length=1, max_length=64)
+    order: int = Field(ge=1)
+    score: float = Field(default=1, ge=0, le=1_000_000)
+
+
+class PaperCreateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    name: str = Field(default="新试卷", min_length=1, max_length=200)
+    subject: str = Field(default="PMP", min_length=1, max_length=32)
+    description: str | None = None
+    category_id: str | None = Field(default=None, alias="categoryId", max_length=64)
+    total_count: int | None = Field(default=None, alias="totalCount", ge=0, le=10_000)
+    quotas: dict[str, Any] = Field(default_factory=dict)
+    access_policy: dict[str, Any] = Field(default_factory=dict, alias="accessPolicy")
+    enabled_modes: list[str] = Field(default_factory=list, alias="enabledModes")
+    mode_config_version: int = Field(default=2, alias="modeConfigVersion", ge=1)
+    purpose: str = Field(default="learning", min_length=1, max_length=32)
+    questions: list[PaperReference] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_question_sequence(self) -> "PaperCreateRequest":
+        orders = [item.order for item in self.questions]
+        question_ids = [item.question_id for item in self.questions]
+        if orders != list(range(1, len(orders) + 1)):
+            raise ValueError("questions.order 必须从 1 开始连续排列")
+        if len(question_ids) != len(set(question_ids)):
+            raise ValueError("同一试卷不能重复引用题目")
+        if self.total_count is not None and self.total_count < len(self.questions):
+            raise ValueError("totalCount 不能小于已选题目数量")
+        return self
+
+
+class PaperUpdateRequest(BaseModel):
+    # Existing paper clients may still send server-owned audit fields.  Ignore
+    # those values so they can never override the authenticated actor/owner.
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    revision: int | str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    subject: str | None = Field(default=None, min_length=1, max_length=32)
+    description: str | None = None
+    category_id: str | None = Field(default=None, alias="categoryId", max_length=64)
+    total_count: int | None = Field(default=None, alias="totalCount", ge=0, le=10_000)
+    quotas: dict[str, Any] | None = None
+    access_policy: dict[str, Any] | None = Field(default=None, alias="accessPolicy")
+    enabled_modes: list[str] | None = Field(default=None, alias="enabledModes")
+    mode_config_version: int | None = Field(default=None, alias="modeConfigVersion", ge=1)
+    purpose: str | None = Field(default=None, min_length=1, max_length=32)
+
+
+class PaperQuestionReplaceRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    revision: int = Field(ge=1)
+    questions: list[PaperReference]
+
+    @model_validator(mode="after")
+    def validate_question_sequence(self) -> "PaperQuestionReplaceRequest":
+        orders = [item.order for item in self.questions]
+        question_ids = [item.question_id for item in self.questions]
+        if orders != list(range(1, len(orders) + 1)):
+            raise ValueError("questions.order 必须从 1 开始连续排列")
+        if len(question_ids) != len(set(question_ids)):
+            raise ValueError("同一试卷不能重复引用题目")
+        return self
+
+
+class PaperCategoryCreateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+    order_index: int = Field(default=0, alias="orderIndex", ge=0)
+
+
+class PaperCategoryUpdateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    revision: int = Field(ge=1)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = None
+    order_index: int | None = Field(default=None, alias="orderIndex", ge=0)
