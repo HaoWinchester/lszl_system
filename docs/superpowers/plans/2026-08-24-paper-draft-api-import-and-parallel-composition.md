@@ -493,19 +493,19 @@ git commit -m "feat: add paper import and parallel composition UI"
 **Interfaces:**
 - No new production interfaces; this task proves the feature and promotes the source safely.
 
-- [ ] **Step 1: Run forbidden persistence and source scans**
+- [x] **Step 1: Run forbidden persistence and source scans**
 
 Run: `rg -n "PAPER_PREFIX|PAPER_CATEGORY_PREFIX|loadPapers\(|savePapers\(|loadPaperCategories\(|savePaperCategories\(" new-legacy/src/65-question-bank-admin.js new-legacy/src/teacher/paper-management frontend/scripts/new-legacy-assets/paper-draft-adapter.js`
 
 Expected: no paper/category business persistence remains; any matching function name belongs only to API methods and is reviewed explicitly.
 
-- [ ] **Step 2: Run focused backend suites**
+- [x] **Step 2: Run focused backend suites**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_paper_composition_service.py tests/test_paper_models.py tests/test_paper_draft_api.py tests/test_paper_import_api.py tests/test_paper_composition_api.py tests/test_question_runtime_migration.py tests/test_paper_releases.py tests/test_question_api_compatibility.py -q`
 
 Expected: all focused tests pass.
 
-- [ ] **Step 3: Run full backend and frontend suites**
+- [x] **Step 3: Run full backend and frontend suites**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/ -q`
 
@@ -513,25 +513,25 @@ Run: `cd frontend && pnpm test && pnpm test:design`
 
 Expected: all suites pass without warnings introduced by this feature.
 
-- [ ] **Step 4: Inspect the supplied 99-reference sample through preflight**
+- [x] **Step 4: Inspect the supplied 99-reference sample through preflight**
 
 Use `测试数据/PMP 模拟卷 05_PAPER_V9.0-P4.5.29.json` without adding it to Git. Before the user imports all banks, expected behavior is a valid package with 99 continuous unique refs plus explicit missing-reference findings; after banks are present, expected behavior is `canImport=true`.
 
-- [ ] **Step 5: Perform the browser exploratory matrix**
+- [x] **Step 5: Perform the browser exploratory matrix**
 
 As teacher/admin: open, create, edit, import, compose, cancel, retry, refresh, publish, and withdraw. As student/viewer: verify management denial. Capture console/network and assert paper drafts never call `/api/v1/runtime/state`.
 
-- [ ] **Step 6: Verify candidate versus active release file counts before promotion**
+- [x] **Step 6: Verify candidate versus active release file counts before promotion**
 
 Read `frontend/new-legacy-releases/current.json`, count current active site files, run the release tool, then count the new site and verify `paper-management.html` and `admin-console.html` exist. Abort promotion if the candidate count regresses.
 
-- [ ] **Step 7: Promote only through the managed release command**
+- [x] **Step 7: Promote only through the managed release command**
 
 Run: `node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser`
 
 Expected: sync, validation, release construction, and promote complete successfully.
 
-- [ ] **Step 8: Re-run active release smoke checks and commit generated release state**
+- [x] **Step 8: Re-run active release smoke checks and commit generated release state**
 
 Run API/browser smoke against the FastAPI-served active page, then commit source, generated artifacts, current release pointer, manifests, and completed plan checkboxes.
 

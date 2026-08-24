@@ -1,19 +1,11 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.149",
-  "toVersion": "v9.0-p4.1.149",
+  "toVersion": "v9.0-p4.1.150",
   "changes": {
-    "added": [
-      "src/teacher/paper-management/paper-composition-controller.js",
-      "src/teacher/paper-management/paper-import-controller.js",
-      "tests/paper-management-api-contract.test.js"
-    ],
+    "added": [],
     "changed": [
-      "paper-management.html",
-      "src/65-question-bank-admin.js",
-      "styles/paper-management.css",
-      "tests/v90-p35-paper-management-browser.py",
-      "tests/v90-p35-paper-management.test.js"
+      "VERSION"
     ],
     "removed": []
   },
