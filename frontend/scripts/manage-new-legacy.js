@@ -26,6 +26,7 @@ const adapterRoot = resolve(scriptsDir, 'new-legacy-assets')
 const validationScript = process.env.KG_RELEASE_VALIDATION_SCRIPT
   ? resolve(process.env.KG_RELEASE_VALIDATION_SCRIPT)
   : resolve(scriptsDir, 'validate-new-legacy-release.sh')
+const validationMaxBuffer = 64 * 1024 * 1024
 const criticalSiteFiles = [
   'landing.html',
   'styles/landing.css',
@@ -241,6 +242,7 @@ function validateCandidate(activeRoot, candidateRoot, version, skipValidation) {
   const result = spawnSync(validationScript, [candidateRoot, version], {
     cwd: repoDir,
     encoding: 'utf8',
+    maxBuffer: validationMaxBuffer,
   })
   const error = result.status === 0
     ? ''

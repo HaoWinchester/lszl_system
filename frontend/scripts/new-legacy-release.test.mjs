@@ -25,6 +25,14 @@ function run(root, ...args) {
   })
 }
 
+function runWithValidator(root, validator, sourcePath = source) {
+  return spawnSync(process.execPath, [command, 'update', sourcePath, '--root', root], {
+    cwd: repoDir,
+    encoding: 'utf8',
+    env: { ...process.env, KG_RELEASE_VALIDATION_SCRIPT: validator },
+  })
+}
+
 function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8'))
 }
@@ -204,6 +212,24 @@ test('same source version is atomically rebuilt when the adapter changes', () =>
   assert.match(readFileSync(resolve(releases, sourceVersion, 'site', 'direct-entry.js'), 'utf8'), /adapter-rebuild-probe/)
 })
 
+test('successful validation can emit logs larger than the Node default buffer', () => {
+  const root = makeRoot()
+  const validator = resolve(root, 'verbose-validation.sh')
+  writeFileSync(
+    validator,
+    "#!/bin/sh\npython3 - <<'PY'\nprint('x' * 1500000)\nPY\n",
+  )
+  chmodSync(validator, 0o755)
+
+  const result = runWithValidator(root, validator)
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(readJson(resolve(root, 'current.json')).version, sourceVersion)
+  const report = readJson(resolve(root, sourceVersion, 'validation.json'))
+  assert.equal(report.passed, true)
+  assert.equal(report.stdout.length, 40_000)
+})
+
 test('failed automatic validation never changes the active release', () => {
   const root = makeRoot()
   assert.equal(run(root, 'update', source).status, 0)
@@ -215,11 +241,7 @@ test('failed automatic validation never changes the active release', () => {
   writeFileSync(validator, '#!/bin/sh\necho candidate rejected >&2\nexit 17\n')
   chmodSync(validator, 0o755)
 
-  const result = spawnSync(process.execPath, [command, 'update', next, '--root', root], {
-    cwd: repoDir,
-    encoding: 'utf8',
-    env: { ...process.env, KG_RELEASE_VALIDATION_SCRIPT: validator },
-  })
+  const result = runWithValidator(root, validator, next)
 
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /自动验收失败.*正式版本未切换/s)
