@@ -24,27 +24,31 @@
   function duplicateMessage(plan={}){return `检测到重复题目：已有重复 ${Number(plan?.duplicateExistingCount||0)} 道，本批重复 ${Number(plan?.duplicateBatchCount||0)} 道。是否自动清除重复题目后继续导入？`}
   function create(options={}){
     const api=options.api||global.KGQuestionCatalog;
-    let state={fileName:'',packageData:null,banks:[],bankCount:0,questionCount:0,busy:false,error:'',success:null};
+    const initialState=()=>({fileName:'',fileNames:[],fileCount:0,packageData:null,banks:[],bankCount:0,questionCount:0,busy:false,error:'',success:null});
+    let state=initialState();
     let submitPromise=null;
     const emit=()=>{const snapshot=clone(state);options.onChange?.(snapshot);return snapshot};
     const fail=message=>{state={...state,busy:false,error:String(message||'导入题库失败。'),success:null};emit();return {ok:false,error:state.error}};
-    async function load(fileName,jsonText){
+    function parseFile(file){
+      const name=String(file?.name||'question-bank.json');
       let payload;
-      try{payload=JSON.parse(String(jsonText||'').replace(/^\ufeff/,''))}
-      catch(error){state={...state,fileName:String(fileName||''),packageData:null,banks:[],bankCount:0,questionCount:0};return fail(`JSON 解析失败：${error?.message||error}`)}
+      try{payload=JSON.parse(String(file?.text||'').replace(/^\ufeff/,''))}
+      catch(error){throw new Error(`${name}：JSON 解析失败：${error?.message||error}`)}
       const kind=classify(payload);
-      if(kind==='paper-package'){
-        state={...state,fileName:String(fileName||''),packageData:null,banks:[],bankCount:0,questionCount:0};
-        return fail('检测到试卷包 JSON，请使用“导入试卷”。');
-      }
-      if(kind!=='question-bank'){
-        state={...state,fileName:String(fileName||''),packageData:null,banks:[],bankCount:0,questionCount:0};
-        return fail('不支持的题库 JSON：需要单个题库、题库数组或包含 banks 数组的数据包。');
-      }
-      const banks=normalizeBanks(payload);
-      state={fileName:String(fileName||'question-bank.json'),packageData:clone(payload),banks,bankCount:banks.length,questionCount:banks.reduce((total,bank)=>total+(Array.isArray(bank.questions)?bank.questions.length:0),0),busy:false,error:'',success:null};
-      emit();return {ok:true,banks:clone(banks)};
+      if(kind==='paper-package')throw new Error(`${name}：检测到试卷包 JSON，请使用“导入试卷”。`);
+      if(kind!=='question-bank')throw new Error(`${name}：不支持的题库 JSON：需要单个题库、题库数组或包含 banks 数组的数据包。`);
+      return {name,payload,banks:normalizeBanks(payload)};
     }
+    async function loadFiles(files){
+      const entries=Array.from(files||[]),fileNames=entries.map(file=>String(file?.name||'question-bank.json'));
+      if(!entries.length){state=initialState();return fail('请至少选择一个题库 JSON 文件。')}
+      try{
+        const parsed=entries.map(parseFile),banks=parsed.flatMap(item=>item.banks);
+        state={fileName:fileNames.join('、'),fileNames,fileCount:fileNames.length,packageData:clone(parsed.map(item=>item.payload)),banks,bankCount:banks.length,questionCount:banks.reduce((total,bank)=>total+(Array.isArray(bank.questions)?bank.questions.length:0),0),busy:false,error:'',success:null};
+        emit();return {ok:true,banks:clone(banks)};
+      }catch(error){state={...initialState(),fileName:fileNames.join('、'),fileNames,fileCount:fileNames.length};return fail(error?.message||error)}
+    }
+    async function load(fileName,jsonText){return loadFiles([{name:fileName,text:jsonText}])}
     async function ask(kind,plan){
       const message=kind==='replace'?replacementMessage(plan):duplicateMessage(plan);
       const confirm=options.confirm||global.confirm;
@@ -80,8 +84,8 @@
       })();
       return submitPromise;
     }
-    function cancel(){submitPromise=null;state={fileName:'',packageData:null,banks:[],bankCount:0,questionCount:0,busy:false,error:'',success:null};emit();return clone(state)}
-    return Object.freeze({snapshot:()=>clone(state),load,confirm,retry:confirm,cancel});
+    function cancel(){submitPromise=null;state=initialState();emit();return clone(state)}
+    return Object.freeze({snapshot:()=>clone(state),load,loadFiles,confirm,retry:confirm,cancel});
   }
   root.QuestionBankImportController=Object.freeze({classify,normalizeBanks,create});
 })(globalThis);

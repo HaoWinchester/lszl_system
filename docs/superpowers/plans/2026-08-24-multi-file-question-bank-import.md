@@ -29,7 +29,7 @@
 - Consumes: existing `classify(payload)`, `normalizeBanks(payload)`, and `api.importBanks({banks,confirmReplace,confirmDuplicateCleanup})`.
 - Produces: `loadFiles(files: Array<{name: string, text: string}>): Promise<{ok: boolean, banks?: object[], error?: string}>`; controller snapshots add `fileCount: number` and `fileNames: string[]`; existing `load(fileName, jsonText)` delegates to `loadFiles`.
 
-- [ ] **Step 1: Write failing multi-file controller tests**
+- [x] **Step 1: Write failing multi-file controller tests**
 
 Add behavior tests that call the real VM-loaded controller:
 
@@ -50,7 +50,7 @@ assert.equal(requests.length, 1)
 
 Add a separate test where `bad.json` contains malformed JSON. Assert `loaded.ok === false`, the error begins with `bad.json：`, `snapshot().banks` is empty, and `api.importBanks` is never called. Add the same whole-batch assertion for a paper package mixed with a valid bank.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
@@ -60,7 +60,7 @@ node new-legacy/tests/paper-management-api-contract.test.js
 
 Expected: FAIL because `controller.loadFiles` does not exist.
 
-- [ ] **Step 3: Implement the minimal controller behavior**
+- [x] **Step 3: Implement the minimal controller behavior**
 
 Implement a named-file parser and atomic batch load:
 
@@ -90,7 +90,7 @@ async function loadFiles(files){
 
 Initialize and reset `fileNames`/`fileCount` in every state path. Implement `load(fileName,jsonText)` as `return loadFiles([{name:fileName,text:jsonText}])` and expose `loadFiles` in the frozen controller API.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 Run:
 
@@ -102,7 +102,7 @@ node new-legacy/tests/question-import-persistence.test.js
 
 Expected: all pass; the single-file compatibility path remains green.
 
-- [ ] **Step 5: Commit the controller slice**
+- [x] **Step 5: Commit the controller slice**
 
 ```bash
 git add new-legacy/src/teacher/question-bank-import-controller.js new-legacy/tests/paper-management-api-contract.test.js
