@@ -117,3 +117,79 @@ class PaperImportRequest(PaperImportPreflightRequest):
         min_length=1,
         max_length=120,
     )
+
+
+class PaperCompositionVariantRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    code: str = Field(min_length=1, max_length=16)
+    name: str = Field(min_length=1, max_length=200)
+    total_count: int = Field(alias="totalCount", ge=1, le=10_000)
+
+
+class PaperCompositionQuotaRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    dimension_id: str = Field(alias="dimensionId", min_length=1, max_length=64)
+    weights: dict[str, float]
+
+    @model_validator(mode="after")
+    def validate_weights(self) -> "PaperCompositionQuotaRequest":
+        if not self.weights or any(
+            not str(key).strip() or isinstance(value, bool) or value < 0
+            for key, value in self.weights.items()
+        ):
+            raise ValueError("weights 必须包含非负数值")
+        if not any(value > 0 for value in self.weights.values()):
+            raise ValueError("weights 至少需要一个正数")
+        return self
+
+
+class PaperCompositionPreflightRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    subject: str = Field(default="PMP", min_length=1, max_length=32)
+    bank_ids: list[str] = Field(alias="bankIds", min_length=1, max_length=200)
+    filters: dict[str, Any] = Field(default_factory=dict)
+    variants: list[PaperCompositionVariantRequest] = Field(
+        min_length=1,
+        max_length=10,
+    )
+    hard_quota: PaperCompositionQuotaRequest = Field(alias="hardQuota")
+    soft_quota: PaperCompositionQuotaRequest | None = Field(
+        default=None,
+        alias="softQuota",
+    )
+    random_seed: str | None = Field(
+        default=None,
+        alias="randomSeed",
+        max_length=128,
+    )
+
+    @model_validator(mode="after")
+    def validate_composition_contract(self) -> "PaperCompositionPreflightRequest":
+        normalized_banks = [item.strip() for item in self.bank_ids]
+        if any(not item for item in normalized_banks):
+            raise ValueError("bankIds 不能包含空值")
+        if len(normalized_banks) != len(set(normalized_banks)):
+            raise ValueError("bankIds 不能重复")
+        codes = [item.code.strip() for item in self.variants]
+        if len(codes) != len(set(codes)):
+            raise ValueError("variants.code 不能重复")
+        if self.hard_quota.dimension_id != "exam-domain":
+            raise ValueError("hardQuota.dimensionId 必须是 exam-domain")
+        if (
+            self.soft_quota is not None
+            and self.soft_quota.dimension_id != "performance-domain"
+        ):
+            raise ValueError("softQuota.dimensionId 必须是 performance-domain")
+        return self
+
+
+class PaperCompositionBatchRequest(PaperCompositionPreflightRequest):
+    plan_hash: str = Field(alias="planHash", min_length=64, max_length=64)
+    idempotency_key: str = Field(
+        alias="idempotencyKey",
+        min_length=1,
+        max_length=120,
+    )

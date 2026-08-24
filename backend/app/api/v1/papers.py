@@ -11,6 +11,8 @@ from app.models.user import User
 from app.schemas.paper import (
     PaperCategoryCreateRequest,
     PaperCategoryUpdateRequest,
+    PaperCompositionBatchRequest,
+    PaperCompositionPreflightRequest,
     PaperCreateRequest,
     PaperQuestionReplaceRequest,
     PaperImportPreflightRequest,
@@ -18,6 +20,7 @@ from app.schemas.paper import (
     PaperUpdateRequest,
 )
 from app.services import (
+    paper_composition_service,
     paper_import_service,
     paper_service,
     question_migration_service,
@@ -45,6 +48,36 @@ def _parse_id_set(ids: list[str] | None) -> set[str] | None:
         for item in ids
         for chunk in str(item).split(",")
         if (value := chunk.strip())
+    }
+
+
+@router.post("/papers/composition/preflight")
+async def preflight_paper_composition(
+    body: PaperCompositionPreflightRequest,
+    db: DB,
+    user: PaperManager,
+):
+    return {
+        "preflight": await paper_composition_service.preflight_composition(
+            db,
+            user,
+            body,
+        )
+    }
+
+
+@router.post("/papers/composition/batches")
+async def create_paper_composition_batch(
+    body: PaperCompositionBatchRequest,
+    db: DB,
+    user: PaperManager,
+):
+    return {
+        "result": await paper_composition_service.create_composition_batch(
+            db,
+            user,
+            body,
+        )
     }
 
 

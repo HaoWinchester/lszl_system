@@ -308,35 +308,35 @@ git commit -m "feat: import ordered paper reference packages"
 - `preflight_composition(db, actor, request) -> CompositionPreflightResponse`
 - `create_composition_batch(db, actor, request) -> dict`
 
-- [ ] **Step 1: Write failing API tests for A60/B50/C40 and no duplicate IDs**
+- [x] **Step 1: Write failing API tests for A60/B50/C40 and no duplicate IDs**
 
 Seed candidates across the three exam domains and seven performance domains. Assert exact per-variant counts, hard targets, shared plan hash, and zero overlap.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_paper_composition_api.py -q`
 
 Expected: composition endpoints are missing.
 
-- [ ] **Step 3: Implement database candidate loading and preflight serialization**
+- [x] **Step 3: Implement database candidate loading and preflight serialization**
 
 Load only selected managed bank IDs, exclude lifecycle-deleted questions, normalize facets from JSONB, call the pure planner, and return inventory/unclassified/target/actual/shortage details. Preflight performs no inserts or updates.
 
-- [ ] **Step 4: Add shortage and feasible-subset re-preflight tests**
+- [x] **Step 4: Add shortage and feasible-subset re-preflight tests**
 
 Assert an infeasible full request writes nothing. Remove the infeasible variant, re-preflight, and assert the resulting hash and allocation belong to the reduced request rather than the original allocation.
 
-- [ ] **Step 5: Implement transactional batch creation and idempotency**
+- [x] **Step 5: Implement transactional batch creation and idempotency**
 
 Recompute under the same seed, verify plan hash, create `PaperGenerationBatch`, flush it, create every selected `ExamPaper`, flush parents, insert all `PaperQuestion` rows, store resulting paper IDs, bump teaching revision once, and commit once.
 
-- [ ] **Step 6: Add concurrent change, double-submit, and forced rollback tests**
+- [x] **Step 6: Add concurrent change, double-submit, and forced rollback tests**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_paper_composition_api.py tests/test_paper_composition_service.py -q`
 
 Expected: same-key retries return the same batch; plan changes return 409; forced failure leaves zero batch/paper/reference rows.
 
-- [ ] **Step 7: Commit composition APIs**
+- [x] **Step 7: Commit composition APIs**
 
 ```bash
 git add backend/app/services/paper_composition_service.py backend/app/services/paper_service.py backend/app/schemas/paper.py backend/app/api/v1/papers.py backend/tests/test_paper_composition_api.py
