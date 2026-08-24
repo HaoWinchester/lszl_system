@@ -243,6 +243,11 @@ async def _paper_release_mapper(db: AsyncSession, item: RuntimeMigrationItem) ->
     for raw, source in zip(item.source_payload, canonical, strict=True):
         release_id = source["releaseId"]
         existing = await db.get(PaperRelease, release_id)
+        if existing is None:
+            existing = await db.scalar(select(PaperRelease).where(
+                PaperRelease.paper_id == source["paperId"],
+                PaperRelease.version == source["version"],
+            ))
         if existing is not None:
             # The relational domain owns an existing release.  A compatibility
             # snapshot may be stale after a legitimate rename, so only newly
