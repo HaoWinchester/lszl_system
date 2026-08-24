@@ -713,12 +713,14 @@ function injectPage(html, page, version) {
     }
     const draftAdapterAsset = 'paper-draft-adapter.js'
     generated = removeLocalScriptTags(generated, draftAdapterAsset)
+    const dataLoaderAsset = 'paper-management-data-loader.js'
+    generated = removeLocalScriptTags(generated, dataLoaderAsset)
     const quotaAsset = 'src/teacher/paper-management/paper-quota-service.js'
     const quotaTag = `<script defer src="${quotaAsset}"></script>`
     generated = removeLocalScriptTags(generated, quotaAsset)
     generated = generated.replace(
       adminTag,
-      `<script defer src="./paper-release-adapter.js"></script><!-- kg-paper-releases:generated -->\n<script defer src="./${draftAdapterAsset}"></script><!-- kg-paper-drafts:generated -->\n${quotaTag}\n${adminTag}`,
+      `<script defer src="./paper-release-adapter.js"></script><!-- kg-paper-releases:generated -->\n<script defer src="./${draftAdapterAsset}"></script><!-- kg-paper-drafts:generated -->\n${quotaTag}\n<script defer src="./${dataLoaderAsset}"></script><!-- kg-paper-management-loader:generated -->\n${adminTag}`,
     )
   }
   if (page === 'question-training.html' && !retiredSingleDeepRedirectShell && !generated.includes('kg-runtime-fixes:generated')) {
