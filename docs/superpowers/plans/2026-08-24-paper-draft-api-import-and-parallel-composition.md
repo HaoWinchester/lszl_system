@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace paper-management runtime persistence with relational APIs, add `kg-paper-package-v1` draft import, and create non-overlapping A/B/C papers with configurable counts and Paper Studio quota rules.
+**Goal:** Replace paper-management runtime persistence with relational APIs, provide separate question-bank and `kg-paper-package-v1` paper imports, and create non-overlapping A/B/C papers with configurable counts and Paper Studio quota rules.
 
-**Architecture:** Keep `exam_papers` and `paper_questions` as the paper draft aggregate, add focused relational tables for categories and idempotent operations, and move paper behavior from `question_service` into a dedicated paper domain service. `new-legacy/` remains the only frontend source; a shared injected adapter owns all API calls while page modules own import and composition interactions.
+**Architecture:** Keep `exam_papers` and `paper_questions` as the paper draft aggregate, add focused relational tables for categories and idempotent operations, and move paper behavior from `question_service` into a dedicated paper domain service. `new-legacy/` remains the only frontend source; shared injected adapters own all API calls, a shared question-bank import controller serves both management pages, and page modules own only their DOM interactions.
 
 **Tech Stack:** Python 3.11, FastAPI, Pydantic v2, SQLAlchemy async, PostgreSQL/Alembic, native HTML/CSS/JavaScript, Node test runner, pytest, Playwright.
 
@@ -13,6 +13,8 @@
 - `new-legacy/` is the only authoritative frontend source; never edit `frontend/public/new-legacy/` or an active release site by hand.
 - Paper drafts, categories, imports, and composition results must be database-backed and accessed through `/api/v1`.
 - The imported paper stores references only; it never copies question bodies.
+- The question-bank and paper JSON formats use separate visible entry points; known wrong-format uploads show a specific redirect message and never reach the wrong API.
+- Question-bank imports reuse `POST /api/v1/banks/import`, including replacement confirmation, duplicate cleanup confirmation, transaction rollback, and database refresh.
 - Package references resolve external `bankId/questionId` through `source_id`, with internal ID fallback only for legacy compatibility.
 - A/B/C counts are independently configurable and one composition batch cannot reuse a question.
 - `exam-domain` is hard quota; `performance-domain` is best-effort and cannot break the hard quota.
@@ -22,6 +24,7 @@
 - Preserve current DOM/class behavior unless this feature needs a new control or dialog.
 - Use `apply_patch` for source edits and write a failing test before each production behavior.
 - Do not add or commit files from `测试数据/`.
+- Do not merge or push this feature to `main` until the user has completed UAT and explicitly approved the merge.
 - Publish only with `node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser` after candidate/active file-count checks.
 
 ## Requirement Trace
@@ -31,6 +34,7 @@
 | Draft CRUD | teacher creates, edits, reorders, refreshes | stale revision returns 409 | reload current revision and retry |
 | Categories | create, rename, move papers | referenced category cannot be destructively removed | archive/move then retry; refresh retains data |
 | Paper import | 99 ordered refs preflight and import | missing/ambiguous ref, duplicate order, conflicting ID | show exact rows; choose copy or valid draft replacement |
+| Question-bank import | Prep Studio top-level bank, bank array, or `{banks: [...]}` imports through the catalog API | paper package or malformed bank blocks before API | use the correct entry, correct JSON, cancel, or retry; refresh shows database data |
 | Parallel compose | A/B/C with independent counts and no duplicates | hard quota or total inventory shortage | cancel all or re-preflight feasible subset |
 | Batch commit | one transaction creates selected papers | concurrent delete or plan hash change | all selected writes roll back; re-preflight |
 | Permissions | admin/teacher manage shared papers | student/viewer receive 403 | UI hides management actions and remains usable |
@@ -540,6 +544,100 @@ git add docs/superpowers/plans frontend new-legacy backend
 git commit -m "chore: verify and publish paper management APIs"
 ```
 
-- [ ] **Step 9: Finish the branch according to repository policy**
+- [x] **Step 9: Stop at the user acceptance gate instead of merging to main**
 
-Use `finishing-a-development-branch`, merge into `main`, push through `http://127.0.0.1:7897`, verify remote refs, delete the local/remote feature branch, and ensure no valid changes or user test data are discarded.
+Push only the feature and `uat` branches, run the local/UAT page for the user, and keep `main` at `ccb51e3` until explicit user approval.
+
+### Task 10: Separate question-bank and paper import entry points
+
+**Files:**
+- Create: `new-legacy/src/teacher/question-bank-import-controller.js`
+- Modify: `new-legacy/src/teacher/paper-management/paper-import-controller.js`
+- Modify: `new-legacy/paper-management.html`
+- Modify: `new-legacy/src/65-question-bank-admin.js`
+- Modify: `new-legacy/tests/paper-management-api-contract.test.js`
+- Modify: `new-legacy/tests/v90-p35-paper-management.test.js`
+- Modify: `new-legacy/tests/v90-p35-paper-management-browser.py`
+- Modify generated files only through: `frontend/scripts/sync-new-legacy.js`
+
+**Interfaces:**
+- `KGTeacherDomains.QuestionBankImportController.classify(payload)` returns `question-bank`, `paper-package`, or `unknown`.
+- `KGTeacherDomains.QuestionBankImportController.normalizeBanks(payload)` returns source-bank objects accepted by `KGQuestionCatalog.importBanks({banks, ...confirmations})`.
+- `KGTeacherDomains.QuestionBankImportController.create({api,onChange,onReload,confirm})` owns JSON parsing, conflict confirmation, duplicate cleanup confirmation, cancellation, retry, and single-submit behavior.
+- `PaperImportController.load()` rejects a recognized question-bank payload before calling `/papers/import/preflight` and reports `检测到题库 JSON，请使用“导入题库”`.
+
+- [ ] **Step 1: Write failing controller tests from the real Prep Studio shape**
+
+Add literal fixtures for a top-level bank with `id/name/subject/version/questions`, a bank array, `{banks:[...]}`, and a `kg-paper-package-v1` payload. Assert all three bank inputs normalize to one catalog request, the paper package is rejected without an API call, and the paper controller rejects the bank fixture without a paper-preflight call.
+
+- [ ] **Step 2: Run the focused test and verify RED**
+
+Run: `node new-legacy/tests/paper-management-api-contract.test.js`
+
+Expected: FAIL because `QuestionBankImportController` does not exist and paper import does not classify bank JSON.
+
+- [ ] **Step 3: Implement the shared controller and paper wrong-format guard**
+
+Create the shared controller with no browser persistence. It must call the existing catalog adapter, preserve the full question objects, confirm `IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED` and `QUESTION_DUPLICATES_CONFIRMATION_REQUIRED` in the same sequence as the existing question-bank page, restore usable state after cancel/error, and block repeated submits.
+
+- [ ] **Step 4: Run focused controller tests and verify GREEN**
+
+Run: `node new-legacy/tests/paper-management-api-contract.test.js`
+
+Expected: PASS with exact API payloads and no storage writes.
+
+- [ ] **Step 5: Add the two visible import entry points and bind real interactions**
+
+Keep `qbImportPaperBtn` labeled `导入试卷`; add `qbImportBankBtn` labeled `导入题库` and a dedicated dialog/file input/results/cancel/retry/confirm surface. Bind it to the shared controller and `KGQuestionCatalog.importBanks`. After success, reload the API catalog and repopulate composition bank choices. Update the question-bank page import path to use the same controller rather than duplicating normalization and conflict sequencing.
+
+- [ ] **Step 6: Add static and browser success/failure/recovery coverage**
+
+Assert both buttons and dialogs exist, upload a generated 60-question Prep Studio-shaped bank, confirm the catalog request retains 60 question IDs, refresh the catalog, reject a paper package in the bank dialog, reject a bank in the paper dialog, cancel a replacement, retry after an API failure, and verify no question/paper business payload reaches localStorage/runtime state.
+
+- [ ] **Step 7: Run source/browser tests and sync authoritative output**
+
+Run: `node new-legacy/tests/v90-p35-paper-management.test.js && node new-legacy/tests/paper-management-api-contract.test.js && python3 new-legacy/tests/v90-p35-paper-management-browser.py`
+
+Run: `cd frontend && pnpm sync:new-legacy`
+
+Expected: all focused tests pass; generated assets include the shared controller before `65-question-bank-admin.js`.
+
+- [ ] **Step 8: Commit the dual-import implementation**
+
+```bash
+git add new-legacy frontend/public/new-legacy frontend/scripts docs/superpowers/plans/2026-08-24-paper-draft-api-import-and-parallel-composition.md
+git commit -m "fix: separate question bank and paper imports"
+```
+
+### Task 11: Verify locally and return to user acceptance
+
+**Files:**
+- Modify: `new-legacy/VERSION` and generated manifests only if managed release requires a new version
+- Update: `docs/superpowers/plans/2026-08-24-paper-draft-api-import-and-parallel-composition.md`
+
+**Interfaces:**
+- No new interface; this task validates source, generated site, API behavior, and the user-visible local flow.
+
+- [ ] **Step 1: Validate the supplied untracked 60-question file without committing it**
+
+Run the shared normalizer against `测试数据/PMP_第二批第1套_人-相关方-01_60题_PrepStudio (1).json` and assert one bank, 60 unique question IDs, source bank ID `bank_9ee70c56-89de-433e-bf90-813b2ef17b10`, and no paper-package validation messages.
+
+- [ ] **Step 2: Run focused backend and full frontend tests**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_question_api_compatibility.py tests/test_paper_import_api.py -q`
+
+Run: `cd frontend && pnpm test && pnpm test:design`
+
+Expected: all pass without a new warning.
+
+- [ ] **Step 3: Build/promote the local managed release after file-count checks**
+
+Compare candidate and active release file counts, bump `new-legacy/VERSION` only if required, then run `node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser`. Verify `paper-management.html`, `admin-console.html`, the shared controller, and equal active/public counts.
+
+- [ ] **Step 4: Start the local UAT server and perform the curious-user pass**
+
+As admin, open both dialogs; upload the real 60-question bank through `导入题库`; verify the result/confirmation UI, cancel before any destructive replacement if data already exists, verify `导入试卷` still accepts the 99-reference paper package, and verify wrong-entry recovery messages. Keep `main` unchanged.
+
+- [ ] **Step 5: Commit/push only the feature and UAT branches, then wait**
+
+Push through `http://127.0.0.1:7897`, verify remote `main` remains `ccb51e3`, give the user the local URL, and do not merge to `main` until the user explicitly approves.
