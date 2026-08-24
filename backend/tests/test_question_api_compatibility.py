@@ -391,7 +391,9 @@ def test_admin_and_teacher_share_paper_crud_compose_publish_and_audit() -> None:
         assert composed.status_code == 200
         assert composed.json() == {"picked": 1}
         after_compose = client.get(f"/api/v1/papers/{paper_id}").json()["paper"]
-        assert [question["id"] for question in after_compose["questions"]] == [question_id]
+        assert [
+            reference["questionId"] for reference in after_compose["questions"]
+        ] == [question_id]
         assert after_compose["ownerId"] == teacher_a
         assert after_compose["createdBy"] == teacher_a
         assert after_compose["updatedBy"] == actor

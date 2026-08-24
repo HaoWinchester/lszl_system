@@ -711,12 +711,14 @@ function injectPage(html, page, version) {
     if (!adminTag) {
       throw new Error('new-legacy 试卷管理脚本顺序已变化，请复核配额服务')
     }
+    const draftAdapterAsset = 'paper-draft-adapter.js'
+    generated = removeLocalScriptTags(generated, draftAdapterAsset)
     const quotaAsset = 'src/teacher/paper-management/paper-quota-service.js'
     const quotaTag = `<script defer src="${quotaAsset}"></script>`
     generated = removeLocalScriptTags(generated, quotaAsset)
     generated = generated.replace(
       adminTag,
-      `<script defer src="./paper-release-adapter.js"></script><!-- kg-paper-releases:generated -->\n${quotaTag}\n${adminTag}`,
+      `<script defer src="./paper-release-adapter.js"></script><!-- kg-paper-releases:generated -->\n<script defer src="./${draftAdapterAsset}"></script><!-- kg-paper-drafts:generated -->\n${quotaTag}\n${adminTag}`,
     )
   }
   if (page === 'question-training.html' && !retiredSingleDeepRedirectShell && !generated.includes('kg-runtime-fixes:generated')) {
@@ -980,6 +982,11 @@ function validate(source) {
   const required = ['VERSION', ...contract.requiredPages, ...contract.requiredFiles, ...learningEntryChooserAssets]
   const missing = required.filter((path) => !existsSync(resolve(source, path)))
   if (missing.length) throw new Error(`new-legacy 缺少必需文件：${missing.join(', ')}`)
+  const missingGenerated = (contract.requiredGeneratedFiles || [])
+    .filter((path) => !existsSync(resolve(scriptsDir, 'new-legacy-assets', path)))
+  if (missingGenerated.length) {
+    throw new Error(`new-legacy 缺少必需生成适配器：${missingGenerated.join(', ')}`)
+  }
   const version = readFileSync(resolve(source, 'VERSION'), 'utf8').trim()
   if (!version) throw new Error('new-legacy/VERSION 不能为空')
   validateStorageContract(source)

@@ -37,6 +37,7 @@ from app.schemas.content_prep import (
 )
 from app.services import (
     content_reference_service,
+    idempotency_service,
     question_access_service,
     question_catalog_service,
     teaching_content_projection_service,
@@ -315,23 +316,6 @@ def _single_save_manifest_hash(
         tagConfig=request.tag_config,
     )
     return _manifest_hash(batch_request)
-
-
-def _advisory_key(actor_username: str, idempotency_key: str) -> int:
-    digest = hashlib.sha256(
-        f"{actor_username}\0{idempotency_key}".encode("utf-8")
-    ).digest()
-    return int.from_bytes(digest[:8], byteorder="big", signed=True)
-
-
-async def _lock_idempotency_key(
-    db: AsyncSession,
-    actor_username: str,
-    idempotency_key: str,
-) -> None:
-    await db.execute(
-        select(func.pg_advisory_xact_lock(_advisory_key(actor_username, idempotency_key)))
-    )
 
 
 async def _lock_configuration_inputs(
@@ -1252,7 +1236,7 @@ async def _execute_upload(
     from app.services import question_lock_service
 
     await teaching_content_revision_service.acquire_lock(db)
-    await _lock_idempotency_key(db, actor.username, request.idempotency_key)
+    await idempotency_service.lock(db, actor.username, request.idempotency_key)
     existing_batch = await _existing_batch_for_update(
         db,
         actor.username,
@@ -1516,7 +1500,7 @@ async def save_legacy_question_without_creator(
         await db.rollback()
     async with db.begin():
         await teaching_content_revision_service.acquire_lock(db)
-        await _lock_idempotency_key(
+        await idempotency_service.lock(
             db,
             actor_context.username,
             request.idempotency_key,
@@ -1721,7 +1705,7 @@ async def replay_single_question_save(
         await db.rollback()
     async with db.begin():
         await teaching_content_revision_service.acquire_lock(db)
-        await _lock_idempotency_key(
+        await idempotency_service.lock(
             db,
             actor_context.username,
             request.idempotency_key,
@@ -1779,7 +1763,7 @@ async def record_failed_batch(
         await db.rollback()
     async with db.begin():
         await teaching_content_revision_service.acquire_lock(db)
-        await _lock_idempotency_key(
+        await idempotency_service.lock(
             db,
             actor_context.username,
             request.idempotency_key,

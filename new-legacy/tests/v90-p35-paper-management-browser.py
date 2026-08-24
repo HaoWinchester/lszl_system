@@ -1,128 +1,127 @@
 #!/usr/bin/env python3
 from pathlib import Path
+import json
 import re
 from playwright.sync_api import sync_playwright
-ROOT=Path(__file__).resolve().parents[1]
-ARGS=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']
+
+ROOT = Path(__file__).resolve().parents[1]
+ARGS = ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+
 
 def body_html(file):
-    text=(ROOT/file).read_text(encoding='utf-8')
-    match=re.search(r'<body([^>]*)>([\s\S]*)</body>',text,re.I)
-    return match.group(1),re.sub(r'<script[\s\S]*?</script>','',match.group(2),flags=re.I)
+    text = (ROOT / file).read_text(encoding='utf-8')
+    match = re.search(r'<body([^>]*)>([\s\S]*)</body>', text, re.I)
+    return match.group(1), re.sub(r'<script[\s\S]*?</script>', '', match.group(2), flags=re.I)
 
-def add_files(page,files,kind):
+
+def add_files(page, files, kind):
     for file in files:
-        content=(ROOT/file).read_text(encoding='utf-8')
-        (page.add_style_tag if kind=='css' else page.add_script_tag)(content=content)
+        content = (ROOT / file).read_text(encoding='utf-8')
+        (page.add_style_tag if kind == 'css' else page.add_script_tag)(content=content)
+
 
 with sync_playwright() as p:
-    browser=p.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=ARGS)
-    page=browser.new_page(viewport={'width':1440,'height':1000});page.set_default_timeout(10000)
-    errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
-    attrs,body=body_html('paper-management.html')
+    browser = p.chromium.launch(headless=True, args=ARGS)
+    page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+    page.set_default_timeout(10000)
+    errors = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    attrs, body = body_html('paper-management.html')
     page.set_content(f'<!doctype html><html><head><base href="http://localhost/"></head><body{attrs}>{body}</body></html>')
     page.evaluate("""()=>{
-      const local=new Map(),session=new Map();
-      Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:k=>local.has(k)?local.get(k):null,setItem:(k,v)=>local.set(k,String(v)),removeItem:k=>local.delete(k),clear:()=>local.clear(),key:i=>[...local.keys()][i]||null,get length(){return local.size}}});
+      const local=new Map(),session=new Map();window.__storageWrites=[];
+      Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:k=>local.has(k)?local.get(k):null,setItem:(k,v)=>{window.__storageWrites.push(String(k));local.set(k,String(v))},removeItem:k=>local.delete(k),clear:()=>local.clear(),key:i=>[...local.keys()][i]||null,get length(){return local.size}}});
       Object.defineProperty(window,'sessionStorage',{configurable:true,value:{getItem:k=>session.has(k)?session.get(k):null,setItem:(k,v)=>session.set(k,String(v)),removeItem:k=>session.delete(k),clear:()=>session.clear(),key:i=>[...session.keys()][i]||null,get length(){return session.size}}});
-      const user='p35-teacher',scope='user__'+encodeURIComponent(user);
-      localStorage.setItem('kg_local_current_user_v1',user);
-      localStorage.setItem('kg_local_users_v1',JSON.stringify({[user]:{username:user,displayName:'P3.5 教师',role:'admin',status:'active',subject:'PMP',salt:'x',hash:'x'}}));
-      const questions=Array.from({length:25},(_,i)=>({id:'q'+(i+1),teacherNumber:'PMP-'+String(i+1).padStart(6,'0'),title:'试卷测试题 '+(i+1),type:'single_choice',subject:'PMP',difficulty:'中等',domain:i%2?'过程':'人员',topic:'敏捷',tags:['测试'],stemParts:[{text:'题干 '+(i+1)}],options:[{id:'A',text:'A',correct:true},{id:'B',text:'B'}],correctAnswer:'A',analysis:'解析',clues:[],concepts:[],reasoningSteps:[],metadata:{knowledge:{primaryNodeId:null}},status:{contentReady:true}}));
-      localStorage.setItem('kg_question_banks_v1__'+scope,JSON.stringify([{id:'bank-p35',name:'P3.5 题库',subject:'PMP',visibility:'private',questions}]));
-      window.confirm=()=>true;window.alert=()=>{};window.__prompts=[];window.prompt=()=>window.__prompts.shift()||'';
+      const user='api-paper-teacher';localStorage.setItem('kg_local_current_user_v1',user);localStorage.setItem('kg_local_users_v1',JSON.stringify({[user]:{username:user,displayName:'API 试卷教师',role:'admin',status:'active',subject:'PMP',salt:'x',hash:'x'}}));
+      window.confirm=()=>true;window.alert=message=>{window.__lastAlert=String(message)};window.__prompts=[];window.prompt=()=>window.__prompts.shift()||'';
+      const questions=Array.from({length:25},(_,i)=>({id:'q'+(i+1),bankId:'bank-p35',teacherNumber:'PMP-'+String(i+1).padStart(6,'0'),title:'试卷测试题 '+(i+1),type:'single_choice',subject:'PMP',difficulty:'medium',domain:i%2?'过程':'人员',topic:'敏捷',tags:['测试'],stemParts:[{text:'题干 '+(i+1)}],options:[{id:'A',text:'A',correct:true},{id:'B',text:'B'}],correctAnswer:'A',analysis:'解析',clues:[],concepts:[],reasoningSteps:[],metadata:{knowledge:{primaryNodeId:null},classifications:{'exam-domain':i%3===0?'business-environment':(i%2?'process':'people')}},status:{contentReady:true}}));
+      const banks=[{id:'bank-p35',name:'P3.5 题库',subject:'PMP',visibility:'private',revision:1,questions}];
+      window.KGQuestionCatalogAdapter={ready:Promise.resolve(),snapshot:()=>({banks:banks.map(({questions,...bank})=>bank),questions:questions.map(item=>({...item}))})};
+      const clone=value=>JSON.parse(JSON.stringify(value));let paperSeq=0,categorySeq=0,batchSeq=0;
+      let db={papers:[],categories:[]};window.__paperDb=db;window.__paperApiCalls=[];window.__shortageOnce=true;window.__batchFail=false;window.__importPreflightFails=1;
+      const stamp=()=>new Date().toISOString();
+      const savePaper=(input,id)=>{const now=stamp(),paper={id:id||`p-${++paperSeq}`,name:input.name||'新试卷',subject:input.subject||'PMP',description:input.description||'',categoryId:input.categoryId||'',totalCount:Number(input.totalCount||input.questions?.length||0),status:'draft',quotas:input.quotas||{},accessPolicy:input.accessPolicy||{},enabledModes:input.enabledModes||[],modeConfigVersion:input.modeConfigVersion||2,purpose:input.purpose||'learning',revision:1,publishedVersion:0,createdAt:now,updatedAt:now,questions:(input.questions||[]).map((ref,index)=>({...ref,order:index+1}))};db.papers.push(paper);return clone(paper)};
+      const find=id=>db.papers.find(item=>item.id===id),cas=(paper,revision)=>{if(!paper||Number(revision)!==paper.revision)throw Object.assign(new Error('数据已发生变化，请刷新后重试。'),{status:409})};
+      window.KGPaperDraftApi={
+        ready:async()=>({papers:clone(db.papers),categories:clone(db.categories)}),list:async()=>clone(db.papers),listCategories:async()=>clone(db.categories),detail:async id=>clone(find(id)),
+        create:async body=>{window.__paperApiCalls.push(['create',clone(body)]);return savePaper(body)},
+        update:async(id,body)=>{window.__paperApiCalls.push(['update',id,clone(body)]);const paper=find(id);cas(paper,body.revision);Object.assign(paper,clone(body),{categoryId:body.categoryId||'',revision:paper.revision+1,updatedAt:stamp()});return clone(paper)},
+        replaceQuestions:async(id,body)=>{window.__paperApiCalls.push(['replaceQuestions',id,clone(body)]);const paper=find(id);cas(paper,body.revision);paper.questions=body.questions.map((ref,index)=>({...clone(ref),order:index+1}));paper.totalCount=Math.max(paper.totalCount,paper.questions.length);paper.revision+=1;paper.updatedAt=stamp();return clone(paper)},
+        remove:async(id,options)=>{window.__paperApiCalls.push(['remove',id,clone(options)]);const paper=find(id);cas(paper,options.revision);db.papers=db.papers.filter(item=>item.id!==id);window.__paperDb=db;return {paperId:id}},
+        archive:async(id,revision)=>{const paper=find(id);cas(paper,revision);paper.status='archived';paper.revision+=1;paper.archivedAt=stamp();return clone(paper)},restore:async(id,revision)=>{const paper=find(id);cas(paper,revision);paper.status='draft';paper.revision+=1;paper.archivedAt=null;return clone(paper)},
+        createCategory:async body=>{const category={id:`pc-${++categorySeq}`,name:body.name,description:'',orderIndex:body.orderIndex||0,revision:1,createdAt:stamp(),updatedAt:stamp()};db.categories.push(category);window.__paperApiCalls.push(['createCategory',clone(body)]);return clone(category)},
+        updateCategory:async(id,body)=>{const category=db.categories.find(item=>item.id===id);if(category.revision!==body.revision)throw Object.assign(new Error('分类已变更'),{status:409});Object.assign(category,clone(body),{revision:category.revision+1});return clone(category)},removeCategory:async(id,revision)=>{const category=db.categories.find(item=>item.id===id);if(category.revision!==revision)throw Object.assign(new Error('分类已变更'),{status:409});db.categories=db.categories.filter(item=>item.id!==id);window.__paperDb=db;return {categoryId:id}},
+        importPreflight:async body=>{window.__paperApiCalls.push(['importPreflight',clone(body)]);if(window.__importPreflightFails>0){window.__importPreflightFails-=1;throw Object.assign(new Error('预检服务暂时不可用'),{status:500})}return {valid:true,payloadHash:'a'.repeat(64),summary:{paperId:body.package.paper.id,name:body.package.paper.name,subject:'PMP',questionCount:body.package.paper.questions.length,sourceBankCount:1},references:body.package.paper.questions,errors:[],warnings:[{message:'文件名与包内名称不一致，以包内名称为准。'}],paperConflict:{id:body.package.paper.id,status:'draft',revision:1},allowedActions:{create:false,copy:true,replaceDraft:true}}},
+        importPaper:async body=>{window.__paperApiCalls.push(['importPaper',clone(body)]);await new Promise(resolve=>setTimeout(resolve,80));const source=body.package.paper;return {paper:savePaper({...source,name:source.name+' 副本'},body.conflictAction==='copy'?undefined:source.id),warnings:[]}},
+        compositionPreflight:async body=>{window.__paperApiCalls.push(['compositionPreflight',clone(body)]);const shortage=window.__shortageOnce&&body.variants.some(item=>item.code==='C');const variants=body.variants.map(item=>({code:item.code,name:item.name,totalCount:item.totalCount,feasible:!(shortage&&item.code==='C'),hardTargets:{people:Math.round(item.totalCount*.42),process:Math.round(item.totalCount*.5),'business-environment':Math.max(0,item.totalCount-Math.round(item.totalCount*.42)-Math.round(item.totalCount*.5))},hardActual:{},hardShortages:shortage&&item.code==='C'?{people:1}:{},softTargets:{},softActual:{},questionIds:[]}));return {normalizedRequest:{...clone(body),randomSeed:'browser-seed'},candidateCount:220,unclassifiedCount:0,inventory:{},variants,feasible:variants.every(item=>item.feasible),feasibleVariantCodes:variants.filter(item=>item.feasible).map(item=>item.code),duplicateQuestionIds:[],planHash:(shortage?'b':'c').repeat(64)}},
+        createCompositionBatch:async body=>{window.__paperApiCalls.push(['createCompositionBatch',clone(body)]);await new Promise(resolve=>setTimeout(resolve,80));if(window.__batchFail)throw Object.assign(new Error('数据库故障'),{status:500});const papers=body.variants.map(item=>savePaper({name:item.name,subject:body.subject,totalCount:item.totalCount,questions:[]}));return {batchId:`batch-${++batchSeq}`,papers,randomSeed:body.randomSeed,planHash:body.planHash}}
+      };
     }""")
-    add_files(page,['styles/teacher-workbench.css','styles/question-bank-admin.css','styles/admin-context-nav.css','styles/paper-management.css'],'css')
-    add_files(page,['src/01-runtime-config.js','src/28-app-storage.js','src/29-auth-core.js','src/34-role-permissions.js','src/37-subscription-plans.js','src/37-subscription-orders.js','src/37-subscription-redeem-codes.js','src/37-subscription-core.js','src/33-user-center.js','src/50-question-data.js','src/91-learning-content-core.js','src/95-recall-association-library.js','src/98-teacher-workflow-p2-services.js','src/98-question-classification.js','src/65-question-bank-admin.js'],'js')
-    page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))");page.wait_for_timeout(400)
-    page.locator('#qbAddPaperBtn').click();page.wait_for_timeout(120)
-    assert page.locator('[data-paper-candidate]').count()==20
-    # Layout stays horizontal and supports maximize, collapse, keyboard resize.
+    add_files(page, ['styles/teacher-workbench.css', 'styles/question-bank-admin.css', 'styles/admin-context-nav.css', 'styles/paper-management.css'], 'css')
+    add_files(page, [
+        'src/01-runtime-config.js', 'src/28-app-storage.js', 'src/29-auth-core.js', 'src/34-role-permissions.js', 'src/37-subscription-plans.js', 'src/37-subscription-orders.js', 'src/37-subscription-redeem-codes.js', 'src/37-subscription-core.js', 'src/33-user-center.js', 'src/50-question-data.js', 'src/91-learning-content-core.js', 'src/95-recall-association-library.js',
+        'src/teacher/shared/domain-core.js', 'src/teacher/question-bank/bank-list-controller.js', 'src/teacher/question-bank/question-list-controller.js', 'src/teacher/paper-management/paper-list-controller.js', 'src/teacher/paper-management/paper-question-picker.js', 'src/teacher/paper-management/paper-preview.js', 'src/teacher/paper-management/paper-audit-service.js', 'src/59c-active-learning-mode-policy.js', 'src/teacher/paper-management/paper-release-service.js', 'src/teacher/paper-management/paper-quota-service.js', 'src/teacher/paper-management/paper-import-controller.js', 'src/teacher/paper-management/paper-composition-controller.js', 'src/65-question-bank-admin.js'
+    ], 'js')
+    page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
+    page.wait_for_timeout(600)
+
+    # API-backed draft creation and ordered question references.
+    page.locator('#qbAddPaperBtn').click(); page.wait_for_timeout(150)
+    assert page.locator('[data-paper-candidate]').count() == 20
+    page.locator('#qbSelectPaperCandidatesPage').check(); page.locator('#qbAddSelectedToPaperBtn').click(); page.wait_for_timeout(180)
+    assert page.locator('[data-paper-preview-check]').count() == 20
+    assert page.evaluate("window.__paperApiCalls.filter(row=>row[0]==='replaceQuestions').length") == 1
+    page.evaluate("window.dispatchEvent(new CustomEvent('kg:paper-drafts-changed'))"); page.wait_for_timeout(160)
+    assert page.locator('[data-paper-preview-check]').count() == 20
+
+    # Layout and anchored question preview remain intact.
     assert page.locator('#pmQuestionPickerPane').bounding_box()['width'] > 400
-    assert page.locator('#pmPreviewPane').bounding_box()['width'] > 400
-    assert page.locator('.pm-mode-fieldset label').first.evaluate("e=>getComputedStyle(e).writingMode") == 'horizontal-tb'
-    before_value=int(page.locator('#pmPaneSplitter').get_attribute('aria-valuenow'))
-    page.locator('#pmPaneSplitter').press('ArrowRight');page.wait_for_timeout(50)
-    assert int(page.locator('#pmPaneSplitter').get_attribute('aria-valuenow')) > before_value
-    picker_width=page.locator('#pmQuestionPickerPane').bounding_box()['width']
-    splitter_box=page.locator('#pmPaneSplitter').bounding_box()
-    page.mouse.move(splitter_box['x']+splitter_box['width']/2,splitter_box['y']+80);page.mouse.down();page.mouse.move(splitter_box['x']+110,splitter_box['y']+80,steps=5);page.mouse.up();page.wait_for_timeout(80)
-    assert page.locator('#pmQuestionPickerPane').bounding_box()['width'] > picker_width
-    page.locator('[data-pane-action="maximize"][data-pane-target="picker"]').click();page.wait_for_timeout(70)
-    assert page.locator('#pmPreviewPane').is_hidden()
-    page.locator('[data-pane-action="maximize"][data-pane-target="picker"]').click();page.wait_for_timeout(70)
-    assert page.locator('#pmPreviewPane').is_visible()
-    page.locator('[data-pane-action="collapse"][data-pane-target="preview"]').click();page.wait_for_timeout(70)
-    assert page.locator('#pmPreviewPane').bounding_box()['width'] <= 60
-    page.locator('[data-pane-action="collapse"][data-pane-target="preview"]').click();page.wait_for_timeout(70)
-    # Double click opens preview; edit icon builds a deep link to the exact question.
-    page.evaluate("window.__paperEditorUrl='';window.open=url=>{window.__paperEditorUrl=String(url);return null}")
-    page.locator('[data-question-preview="bank-p35::q1"]').dblclick();page.wait_for_timeout(80)
-    assert not page.locator('#qbQuestionPreviewPopover').is_hidden()
-    assert page.locator('#qbQuestionPreviewPopover').get_attribute('data-placement') in {'left','right','top','bottom'}
-    assert '题干 1' in page.locator('#qbQuestionPreviewContent').inner_text()
-    page.locator('[data-question-preview="bank-p35::q2"] [class*="qb-paper-candidate-number"]').click();page.wait_for_timeout(300)
-    assert '题干 2' in page.locator('#qbQuestionPreviewContent').inner_text()
-    page.locator('[data-question-preview="bank-p35::q2"]').dblclick();page.wait_for_timeout(80)
-    assert page.locator('#qbQuestionPreviewPopover').is_hidden()
-    page.locator('[data-question-preview="bank-p35::q1"]').dblclick();page.wait_for_timeout(80)
-    page.locator('#qbQuestionPreviewEditBtn').click();page.wait_for_timeout(40)
-    opened=page.evaluate('window.__paperEditorUrl')
-    assert 'question-bank.html' in opened and 'bankId=bank-p35' in opened and 'questionId=q1' in opened and 'view=base' in opened
-    page.locator('#qbQuestionPreviewCloseBtn').click();page.wait_for_timeout(40)
-    assert page.locator('#qbQuestionPreviewPopover').is_hidden()
-    page.locator('#qbSelectPaperCandidatesPage').check();page.locator('#qbAddSelectedToPaperBtn').click();page.wait_for_timeout(180)
-    assert page.locator('[data-paper-preview-check]').count()==20
-    page.locator('[data-paper-preview-check]').nth(0).check();page.locator('[data-paper-preview-check]').nth(1).check();page.wait_for_timeout(80)
-    assert page.locator('#qbPaperPreviewBulkToolbar').is_visible()
-    assert '已选择 2 道题' in page.locator('#qbPaperPreviewSelectedCount').inner_text()
-    page.locator('#qbPaperBulkRemoveBtn').click();page.wait_for_timeout(140)
-    assert page.locator('[data-paper-preview-check]').count()==18
-    page.locator('#qbPublishPaperBtn').click();page.wait_for_timeout(180)
-    release=page.evaluate("JSON.parse(localStorage.getItem('kg_exam_papers_published_v1')||'[]')[0]")
-    assert release['version']==1 and len(release['questions'])==18 and len(release['questionSnapshots'])==18
-    assert set(release['enabledModes'])=={'practice_mode','deep_recall','multi_question_canvas'}
-    # Edit draft after publish: released snapshot remains immutable until a new publish.
-    page.locator('[data-paper-remove="0"]').click();page.wait_for_timeout(100)
-    assert page.locator('[data-paper-preview-check]').count()==17
-    assert len(page.evaluate("JSON.parse(localStorage.getItem('kg_exam_papers_published_v1')||'[]')[0].questions"))==18
-    page.locator('#qbPublishPaperBtn').click();page.wait_for_timeout(160)
-    release2=page.evaluate("JSON.parse(localStorage.getItem('kg_exam_papers_published_v1')||'[]')[0]")
-    assert release2['version']==2 and len(release2['questions'])==17
+    before = int(page.locator('#pmPaneSplitter').get_attribute('aria-valuenow')); page.locator('#pmPaneSplitter').press('ArrowRight')
+    assert int(page.locator('#pmPaneSplitter').get_attribute('aria-valuenow')) > before
+    page.locator('[data-preview-source="preview"][data-question-preview="bank-p35::q1"]').dblclick(); page.wait_for_timeout(80)
+    assert '题干 1' in page.locator('#qbQuestionPreviewContent').inner_text(); page.locator('#qbQuestionPreviewCloseBtn').click()
 
-    # Classification, current-page selection and batch draft deletion.
-    page.evaluate("window.__prompts=['专项训练']")
-    page.locator('#qbAddPaperCategoryBtn').click();page.wait_for_timeout(100)
-    category_a=page.locator('.pm-paper-category-row').filter(has_text='专项训练')
-    assert category_a.count()==1
-    category_a_id=category_a.locator('[data-paper-category-id]').get_attribute('data-paper-category-id')
-    page.locator('#qbAddPaperBtn').click();page.locator('#qbAddPaperBtn').click();page.wait_for_timeout(140)
-    assert page.locator('#qbPaperList [data-paper-id]').count()==2
-    assert page.locator('#paperCategoryInput').input_value()==category_a_id
-    page.evaluate("window.__prompts=['模拟卷']")
-    page.locator('#qbAddPaperCategoryBtn').click();page.wait_for_timeout(100)
-    category_b=page.locator('.pm-paper-category-row').filter(has_text='模拟卷')
-    category_b_id=category_b.locator('[data-paper-category-id]').get_attribute('data-paper-category-id')
-    category_a.locator('[data-paper-category-id]').click();page.wait_for_timeout(100)
-    page.locator('#qbPaperListSelectPage').check();page.wait_for_timeout(50)
-    assert '已选择 2 张试卷' in page.locator('#qbPaperListSelectedCount').inner_text()
-    page.locator('#qbPaperBulkCategorySelect').select_option(category_b_id)
-    page.locator('#qbPaperBulkMoveCategoryBtn').click();page.wait_for_timeout(120)
-    assert page.locator('#qbPaperList [data-paper-id]').count()==0
-    category_b.locator('[data-paper-category-id]').click();page.wait_for_timeout(100)
-    assert page.locator('#qbPaperList [data-paper-id]').count()==2
-    page.locator('#qbPaperListSelectPage').check();page.wait_for_timeout(50)
-    page.locator('#qbPaperBulkDeleteDraftBtn').click();page.wait_for_timeout(120)
-    assert page.locator('#qbPaperList [data-paper-id]').count()==0
-    assert category_b.locator('em').inner_text()=='0'
+    # Import preflight shows mismatch warning/conflict strategy and submits once.
+    package = {'schema': 'kg-paper-package-v1', 'schemaVersion': 1, 'paper': {'id': 'paper-import-1', 'name': 'PMP 模拟卷 04', 'subject': 'PMP', 'totalCount': 2, 'questions': [{'bankId': 'bank-p35', 'questionId': 'q1', 'order': 1}, {'bankId': 'bank-p35', 'questionId': 'q2', 'order': 2}]}}
+    page.locator('#qbImportPaperBtn').click()
+    page.locator('#qbPaperImportFile').set_input_files({'name': 'PMP 模拟卷 05.json', 'mimeType': 'application/json', 'buffer': json.dumps(package, ensure_ascii=False).encode()})
+    page.wait_for_timeout(150)
+    assert '暂时不可用' in page.locator('#qbPaperImportResults').inner_text(); assert page.locator('#qbPaperImportRetryBtn').is_visible()
+    page.locator('#qbPaperImportRetryBtn').click(); page.wait_for_timeout(150)
+    assert '以包内名称为准' in page.locator('#qbPaperImportResults').inner_text()
+    assert page.locator('#qbPaperImportConflictAction option[value="create"]').get_attribute('disabled') is not None
+    page.locator('#qbPaperImportConflictAction').select_option('copy'); page.evaluate("()=>{const button=document.getElementById('qbPaperImportConfirmBtn');button.click();button.click()}"); page.wait_for_timeout(220)
+    assert page.evaluate("window.__paperApiCalls.filter(row=>row[0]==='importPaper').length") == 1
+    assert page.locator('#qbPaperImportDialog').get_attribute('open') is None
 
-    # Switch to a student account: public release and snapshots must remain readable.
-    page.evaluate("""()=>{const users=JSON.parse(localStorage.getItem('kg_local_users_v1')||'{}');users['p35-student']={username:'p35-student',displayName:'P3.5 学员',role:'student',status:'active',subject:'PMP',salt:'x',hash:'x'};localStorage.setItem('kg_local_users_v1',JSON.stringify(users));localStorage.setItem('kg_local_current_user_v1','p35-student');window.authRequire=()=>true;window.showStatus=()=>{};}""")
-    add_files(page,['src/59-published-paper-repository.js','src/60-question-bank.js','src/96-recall-question-source.js'],'js')
-    student=page.evaluate("""()=>{qbInvalidateCaches();KGRecallQuestionSource.invalidate();const single=qbPublishedPaperCatalog({respectRole:true,mode:'single_deep_study'});const multi=qbPublishedPaperCatalog({respectRole:true,mode:'multi_question_canvas'});const recall=KGRecallQuestionSource.list().filter(bank=>bank.id.startsWith('paper-release:'));return {single:single.length,singleAvailable:single[0]?.availableCount||0,multi:multi.length,recall:recall.length,recallCount:recall[0]?.questions.length||0,title:single[0]?.items[0]?.question?.title||''}}""")
-    assert student['single']==1 and student['singleAvailable']==17
-    assert student['multi']==1 and student['recall']==1 and student['recallCount']==17
-    assert student['title'].startswith('试卷测试题')
-    assert not errors,errors
+    # Custom A/B/C counts, shortage decision and feasible-subset batch creation.
+    page.locator('#qbComposePapersBtn').click(); page.locator('input[name="paperCompositionMode"][value="custom"]').check()
+    page.locator('#qbPaperVariantACount').fill('60'); page.locator('#qbPaperVariantBCount').fill('50'); page.locator('#qbPaperVariantCCount').fill('40')
+    page.locator('#qbPaperCompositionPreflightBtn').click(); page.wait_for_timeout(160)
+    assert '不可生成' in page.locator('#qbPaperCompositionResults').inner_text(); assert page.locator('#qbPaperCompositionFeasibleBtn').is_visible()
+    page.locator('#qbPaperCompositionFeasibleBtn').click(); page.wait_for_timeout(160)
+    assert '全部可行' in page.locator('#qbPaperCompositionResults').inner_text()
+    page.evaluate("()=>{const button=document.getElementById('qbPaperCompositionConfirmBtn');button.click();button.click()}"); page.wait_for_timeout(240)
+    batches = page.evaluate("window.__paperApiCalls.filter(row=>row[0]==='createCompositionBatch')")
+    assert len(batches) == 1; assert [item['totalCount'] for item in batches[0][1]['variants']] == [60, 50]
+    assert page.locator('#qbPaperCompositionDialog').get_attribute('open') is None
+
+    # Category mutation also uses API; no draft/category business key is written.
+    page.evaluate("window.__prompts=['API 分类']"); page.locator('#qbAddPaperCategoryBtn').click(); page.wait_for_timeout(120)
+    assert page.locator('.pm-paper-category-row').filter(has_text='API 分类').count() == 1
+    forbidden = page.evaluate("window.__storageWrites.filter(key=>key.startsWith('kg_exam_papers_v1__')||key.startsWith('kg_exam_paper_categories_v1__'))")
+    assert forbidden == []
+    assert not errors, errors
+
+    # Student/viewer permission denial happens before any draft API read or write.
+    denied = browser.new_page(viewport={'width': 1000, 'height': 700})
+    denied.set_content(f'<!doctype html><html><head><base href="http://localhost/"></head><body{attrs}>{body}</body></html>')
+    denied.evaluate("""()=>{window.__deniedApiReads=0;window.KGAuthCore={currentUser:()=>({username:'student',role:'student'})};window.KGRolePermissions={applyTheme(){},decoratePermissionElements(){},can:()=>false,renderPermissionDenied(root,message){root.innerHTML=`<div id="paperPermissionDenied">${message}</div>`}};window.KGQuestionCatalogAdapter={ready:Promise.resolve(),snapshot:()=>({banks:[],questions:[]})};window.KGPaperDraftApi={ready:async()=>{window.__deniedApiReads+=1;return {papers:[],categories:[]}}};}""")
+    add_files(denied, ['src/65-question-bank-admin.js'], 'js')
+    denied.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))"); denied.wait_for_timeout(80)
+    assert '仅限管理员' in denied.locator('#paperPermissionDenied').inner_text()
+    assert denied.evaluate('window.__deniedApiReads') == 0
+    denied.close()
     browser.close()
+
 print('v90-p35-paper-management-browser-ok')

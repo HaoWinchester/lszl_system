@@ -63,6 +63,9 @@
     "KGGuidedLearningStore",
     "KGGraphFileStore"
   ],
+  "requiredGeneratedFiles": [
+    "paper-draft-adapter.js"
+  ],
   "runtimeStorage": {
     "exactKeys": [
       "kg_default_entry_mode_v1",

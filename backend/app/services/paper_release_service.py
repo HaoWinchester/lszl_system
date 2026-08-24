@@ -14,7 +14,12 @@ from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import ExamPaper, PaperQuestion, Question
 from app.models.subscription import Subscription
 from app.models.user import User
-from app.services import question_catalog_service, question_service, subscription_service
+from app.services import (
+    paper_service,
+    question_catalog_service,
+    subscription_service,
+    teaching_content_revision_service,
+)
 
 
 ACTIVE_STATUS = "published"
@@ -180,8 +185,8 @@ async def publish(
         raise _error(422, "RELEASE_METADATA_TOO_LARGE", "发布版本 metadata 不能超过 64KB")
     if actor.role not in {"admin", "teacher"}:
         raise _error(404, "PAPER_NOT_FOUND", "试卷不存在或无权发布")
-    revision = question_service._require_paper_revision(expected_revision)
-    await question_service.teaching_content_revision_service.acquire_lock(db)
+    revision = paper_service.require_revision(expected_revision)
+    await teaching_content_revision_service.acquire_lock(db)
     paper = (
         await db.execute(
             select(ExamPaper).where(
@@ -208,7 +213,7 @@ async def publish(
     if not rows:
         raise _error(422, "EMPTY_PAPER_RELEASE", "试卷至少需要一道题目")
 
-    updated_id = await question_service._cas_paper_mutation(
+    updated_id = await paper_service.cas_paper_mutation(
         db,
         actor,
         paper_id,
@@ -250,7 +255,7 @@ async def publish(
             question_id=question.id,
             snapshot=question_catalog_service.question_to_payload(question),
         ))
-    await question_service.teaching_content_revision_service.bump(
+    await teaching_content_revision_service.bump(
         db, actor.username, [{"entityType": "paper", "entityId": paper_id, "action": "published"}]
     )
     await db.commit()
@@ -265,8 +270,8 @@ async def withdraw(
     *,
     expected_revision: object,
 ) -> PaperRelease | None:
-    revision = question_service._require_paper_revision(expected_revision)
-    await question_service.teaching_content_revision_service.acquire_lock(db)
+    revision = paper_service.require_revision(expected_revision)
+    await teaching_content_revision_service.acquire_lock(db)
     release = (
         await db.execute(
             select(PaperRelease)
@@ -286,7 +291,7 @@ async def withdraw(
     if release.status != ACTIVE_STATUS:
         raise _error(409, "RELEASE_NOT_ACTIVE", "发布版本已撤回或已被新版本替代")
     released_at = now_utc()
-    updated_id = await question_service._cas_paper_mutation(
+    updated_id = await paper_service.cas_paper_mutation(
         db,
         actor,
         release.paper_id,
@@ -298,7 +303,7 @@ async def withdraw(
     release.status = "withdrawn"
     release.withdrawn_at = released_at
     release.withdrawn_by = actor.username
-    await question_service.teaching_content_revision_service.bump(
+    await teaching_content_revision_service.bump(
         db,
         actor.username,
         [{"entityType": "paper", "entityId": release.paper_id, "action": "unpublished"}],

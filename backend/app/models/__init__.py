@@ -14,6 +14,7 @@ from app.models.content_prep import (
 from app.models.file import CurrentFile, FileContent, FileTag, Folder, GraphFile, Tag
 from app.models.engagement import Announcement, AnnouncementAudience, Feedback, FeedbackReceipt, FeedbackReply, MessageReceipt
 from app.models.guided_learning import GuidedActivity, GuidedCourse, GuidedCourseActivity, GuidedLearningProgress
+from app.models.paper import PaperCategory, PaperGenerationBatch, PaperImportOperation
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import (
     ExamPaper,
@@ -73,6 +74,9 @@ __all__ = [
     "QuestionAuditLog",
     "ExamPaper",
     "PaperQuestion",
+    "PaperCategory",
+    "PaperGenerationBatch",
+    "PaperImportOperation",
     "PaperRelease",
     "PaperReleaseQuestion",
     "QuestionCleanupAudit",
