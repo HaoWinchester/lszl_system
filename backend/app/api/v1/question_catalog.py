@@ -54,6 +54,7 @@ async def list_bank_questions(
     user: CatalogManager,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
+    search: str | None = Query(None, max_length=200),
 ):
     questions, total = await question_catalog_service.list_bank_questions(
         db,
@@ -61,6 +62,7 @@ async def list_bank_questions(
         bank_id,
         page=page,
         page_size=page_size,
+        search=search,
     )
     return {
         "questions": questions,
