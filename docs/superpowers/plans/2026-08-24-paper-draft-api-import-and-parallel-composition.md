@@ -439,43 +439,43 @@ git commit -m "feat: add paper draft API adapter"
 - Dialogs: `qbPaperImportDialog`, `qbPaperCompositionDialog`
 - Controllers consume `KGPaperDraftApi`; `65-question-bank-admin.js` consumes controller results and refreshes API data
 
-- [ ] **Step 1: Update static/control-matrix tests before HTML changes**
+- [x] **Step 1: Update static/control-matrix tests before HTML changes**
 
 Require both buttons, both dialogs, file input, conflict selector, A/B/C enable/name/count controls, bank selector, preflight results, cancel/retry/confirm controls, and controller script order. Remove stale hard-coded version assertions.
 
-- [ ] **Step 2: Run static tests and verify RED**
+- [x] **Step 2: Run static tests and verify RED**
 
 Run: `node new-legacy/tests/v90-p35-paper-management.test.js && node new-legacy/tests/paper-management-api-contract.test.js`
 
 Expected: new controls/modules are missing.
 
-- [ ] **Step 3: Add compatible HTML and CSS surfaces**
+- [x] **Step 3: Add compatible HTML and CSS surfaces**
 
 Use existing `qb-*`/`pm-*` classes and dialog/button patterns. Add specific Chinese copy for missing refs, name mismatch, ID conflict, shortage, partial choice, technical rollback, and retry; do not use generic “操作已触发”.
 
-- [ ] **Step 4: Write controller tests for success, failure, cancel, retry, and double click**
+- [x] **Step 4: Write controller tests for success, failure, cancel, retry, and double click**
 
 The import controller must parse JSON, call preflight, block invalid confirmation, select copy/replace, and reload after success. The composition controller must maintain independent A/B/C counts, re-preflight a feasible subset, disable confirm during submission, and render actual hard/soft results.
 
-- [ ] **Step 5: Implement controllers against the shared adapter**
+- [x] **Step 5: Implement controllers against the shared adapter**
 
 Keep dialog form values in memory only. Use API results as the sole paper/category state. On 409 expose reload; on 422 keep the dialog open; on 500 state that no selected paper was retained and enable retry.
 
-- [ ] **Step 6: Replace paper/category runtime load/save in the admin application**
+- [x] **Step 6: Replace paper/category runtime load/save in the admin application**
 
 Make initialization await `KGPaperDraftApi.ready()`, load list/categories from API, route create/update/question replacement/delete through API, and reload after mutation. Remove paper/category runtime key reads, writes, release-merge fallback, and synchronous fake success.
 
-- [ ] **Step 7: Rewrite browser coverage around an API stub and real durable outcomes**
+- [x] **Step 7: Rewrite browser coverage around an API stub and real durable outcomes**
 
 Cover create/save/refresh simulation, import warning and retry, A/B/C independent counts, shortage subset re-preflight, repeated submit, permission denial, and every newly visible control. Existing picker/layout/preview assertions remain.
 
-- [ ] **Step 8: Run source and browser tests**
+- [x] **Step 8: Run source and browser tests**
 
 Run: `node new-legacy/tests/v90-p35-paper-management.test.js && node new-legacy/tests/paper-management-api-contract.test.js && python3 new-legacy/tests/v90-p35-paper-management-browser.py`
 
 Expected: all pass with no page errors and no paper business writes to browser storage.
 
-- [ ] **Step 9: Sync and commit authoritative frontend plus generated artifacts**
+- [x] **Step 9: Sync and commit authoritative frontend plus generated artifacts**
 
 ```bash
 cd frontend && pnpm sync:new-legacy
