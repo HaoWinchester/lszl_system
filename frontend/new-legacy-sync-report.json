@@ -1,12 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.154",
+  "fromVersion": "v9.0-p4.1.155",
   "toVersion": "v9.0-p4.1.155",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html"
+      "src/65-question-bank-admin.js",
+      "tests/content-prep-question-bank-integration.test.js",
+      "tests/v90-p35-paper-management-browser.py"
     ],
     "removed": []
   },

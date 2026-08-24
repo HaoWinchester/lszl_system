@@ -4,6 +4,7 @@
   const $ = id => document.getElementById(id);
   const Catalog = window.KGQuestionCatalogAdapter;
   const PaperDraftApi = window.KGPaperDraftApi;
+  const PaperDataLoaderFactory = window.KGPaperManagementDataLoader;
   const CatalogEditor = window.KGQuestionCatalogEditController;
   const Store=window.KGAppStorage||{};
   const Keys=window.KGStorageKeys||{};
@@ -154,6 +155,9 @@
     papers: [],
     paperCategories: [],
     selectedPaperId: '',
+    paperDetailReady:false,
+    paperDetailLoading:false,
+    paperDetailError:'',
     selectedPaperIds:new Set(),
     currentPaperPageIds:[],
     paperCategoryFilter:'ALL',
@@ -194,8 +198,12 @@
     recallNodeDraftChoices:[],
     recallNodeDragIndex:-1,
     paperCandidateSearch:'',
-    paperCandidateBankId:'ALL',
+    paperCandidateBankId:'',
     paperCandidatePage:1,
+    paperCandidateRows:[],
+    paperCandidateTotal:0,
+    paperCandidateLoading:false,
+    paperCandidateError:'',
     currentPaperCandidateKeys:[],
     selectedPaperCandidateKeys:new Set(),
     selectedPaperQuestionKeys:new Set(),
@@ -213,6 +221,7 @@
     libraryPreviewClickTimer:0
   };
   let catalogUiReady=false;
+  let paperDataLoader=null;
   const CATALOG_EDITOR_FIELD_IDS=new Set([
     'bankSubject','bankCustomSubject','bankName','bankVersion','bankVisibility','bankDescription',
     'questionTitleInput','questionTitleEnInput','questionTypeInput','questionDifficultyInput',
@@ -675,7 +684,14 @@
       bankId:String(item.bankId || item.sourceBankId || ''),
       questionId:String(item.questionId || item.id || ''),
       order:Number(item.order || i + 1),
-      score:Number(item.score || 1)
+      score:Number(item.score || 1),
+      summary:item.summary&&typeof item.summary==='object'?{
+        title:String(item.summary.title||''),
+        domain:String(item.summary.domain||''),
+        topic:String(item.summary.topic||''),
+        difficulty:String(item.summary.difficulty||''),
+        tags:Array.isArray(item.summary.tags)?item.summary.tags.map(String):[]
+      }:null
     })).filter(item => item.bankId && item.questionId).sort((a,b) => a.order - b.order).filter(item=>{
       const key=paperRefKey(item);if(seenQuestionRefs.has(key))return false;seenQuestionRefs.add(key);return true;
     }).map((item,questionIndex)=>({...item,order:questionIndex+1}));
@@ -699,6 +715,7 @@
       description:String(paper.description || ''),
       accessPolicy:{accessLevel},
       totalCount:Number(paper.totalCount || paper.targetCount || 180),
+      questionCount:Math.max(0,Number(paper.questionCount??questions.length)),
       status,
       revision:Math.max(1,Number(paper.revision||1)),
       createdBy:String(paper.createdBy||''),
@@ -746,11 +763,36 @@
   }
   function paperQuestionPayload(paper){return {revision:paper.revision,questions:(paper.questions||[]).map((ref,index)=>({bankId:String(ref.bankId||''),questionId:String(ref.questionId||''),order:index+1,score:Number(ref.score||1)}))}}
   function replacePaperState(paper){
-    const normalized=normalizePaper(paper),index=state.papers.findIndex(item=>item.id===normalized.id);if(index>=0)state.papers[index]=normalized;else state.papers.push(normalized);state.selectedPaperId=normalized.id;return normalized;
+    const normalized=normalizePaper(paper),index=state.papers.findIndex(item=>item.id===normalized.id);if(index>=0)state.papers[index]=normalized;else state.papers.push(normalized);state.selectedPaperId=normalized.id;state.paperDetailReady=true;state.paperDetailLoading=false;state.paperDetailError='';return normalized;
   }
   function paperApiMessage(error,fallback='试卷操作失败。'){
     if(error?.status===409)return String(error?.message||'数据已变更，已为你重新加载，请重试。');
     return String(error?.message||fallback);
+  }
+  function applyPaperManagementSnapshot(snapshot={}){
+    const summaries=Array.isArray(snapshot.papers)?snapshot.papers:[];
+    const detail=snapshot.selectedPaper&&String(snapshot.selectedPaper.id||'')===String(snapshot.selectedPaperId||'')?snapshot.selectedPaper:null;
+    state.papers=summaries.map((summary,index)=>normalizePaper(detail&&String(summary.id)===String(detail.id)?{...summary,...detail}:summary,index));
+    state.paperCategories=(snapshot.categories||[]).map(normalizePaperCategory);
+    state.banks=ensureGlobalTeacherNumbers((snapshot.banks||[]).map((bank,index)=>normalizeBank({...bank,questions:[]},index)));
+    state.selectedPaperId=String(snapshot.selectedPaperId||'');
+    state.paperDetailReady=!state.selectedPaperId||!!detail;
+    state.paperDetailLoading=!!snapshot.paperLoading;
+    state.paperDetailError=String(snapshot.paperError||'');
+    state.selectedPaperIds=new Set([...state.selectedPaperIds].filter(id=>state.papers.some(item=>item.id===id)));
+    state.paperCandidateRows=(snapshot.candidateQuestions||[]).map(question=>({
+      bank:state.banks.find(bank=>String(bank.id)===String(question.bankId||snapshot.selectedBankId))||null,
+      question:normalizeQuestion(question)
+    })).filter(row=>row.bank&&row.question?.id);
+    state.paperCandidateTotal=Math.max(0,Number(snapshot.candidateTotal||0));
+    state.paperCandidateLoading=!!snapshot.candidateLoading;
+    state.paperCandidateError=String(snapshot.candidateError||'');
+    if(snapshot.selectedBankId)state.paperCandidateBankId=String(snapshot.selectedBankId);
+    state.paperCandidatePage=Math.max(1,Number(snapshot.candidatePage||state.paperCandidatePage||1));
+    if(document.body?.dataset?.paperManagementPage==='true'){
+      if(catalogUiReady)renderPaperManager();
+      else{renderPaperCategoryList();renderPaperList()}
+    }
   }
   let paperDraftReloadPromise=null;
   async function reloadPaperDrafts(options={}){
@@ -758,12 +800,11 @@
     if(paperDraftReloadPromise)return paperDraftReloadPromise;
     const preferredId=String(options.selectedId||state.selectedPaperId||'');
     paperDraftReloadPromise=(async()=>{
-      const [summaries,categories]=await Promise.all([PaperDraftApi.list(),PaperDraftApi.listCategories()]);
-      const papers=await Promise.all((summaries||[]).map(async summary=>PaperDraftApi.detail(summary.id).catch(error=>{console.warn('试卷详情加载失败',summary?.id,error);return summary})));
-      state.papers=papers.filter(Boolean).map(normalizePaper);state.paperCategories=(categories||[]).map(normalizePaperCategory);
-      state.selectedPaperId=state.papers.some(item=>item.id===preferredId)?preferredId:(state.papers[0]?.id||'');
-      state.selectedPaperIds=new Set([...state.selectedPaperIds].filter(id=>state.papers.some(item=>item.id===id)));
-      if(catalogUiReady&&document.body?.dataset?.paperManagementPage==='true')renderPaperManager();
+      if(paperDataLoader){await paperDataLoader.refreshPapers({preferredPaperId:preferredId});return paperDataLoader.snapshot()}
+      const result=await PaperDraftApi.ready({forceReload:true}),summaries=result?.papers||[],categories=result?.categories||[];
+      const selectedId=summaries.some(item=>String(item.id)===preferredId)?preferredId:String(summaries[0]?.id||'');
+      const detail=selectedId?await PaperDraftApi.detail(selectedId,{forceReload:true}):null;
+      applyPaperManagementSnapshot({papers:summaries,categories,banks:Catalog?.banks?.()||[],selectedPaperId:selectedId,selectedPaper:detail});
       return {papers:clone(state.papers),categories:clone(state.paperCategories)};
     })().finally(()=>{paperDraftReloadPromise=null});
     return paperDraftReloadPromise;
@@ -816,13 +857,17 @@
     if(!rows.some(item=>item.id===state.selectedPaperId))state.selectedPaperId=rows[0].id;
   }
   function currentPaper(){
+    if(document.body?.dataset?.paperManagementPage==='true'&&state.selectedPaperId&&!state.paperDetailReady)return null;
     const selected=state.papers.find(p=>p.id===state.selectedPaperId);if(selected)return selected;
     if(document.body?.dataset?.paperManagementPage==='true'&&!state.selectedPaperId)return null;
     return state.papers[0]||null;
   }
   function paperQuestionLookup(ref){
     const bank = state.banks.find(b => b.id === ref.bankId);
-    const question = bank && (bank.questions || []).find(q => q.id === ref.questionId);
+    const cached=Catalog?.question?.(ref.questionId);
+    const question = (bank && (bank.questions || []).find(q => q.id === ref.questionId))
+      ||cached
+      ||(ref?.summary?{id:String(ref.questionId||''),bankId:String(ref.bankId||''),...clone(ref.summary),__paperSummaryOnly:true}:null);
     return {bank, question};
   }
   function paperIntegrity(paper){
@@ -840,7 +885,7 @@
       if(!previewRows.length){const found=paperQuestionLookup(ref);if(found.bank&&found.question)validCount+=1;else missingCount+=1}
     });
     return {
-      configuredCount:refs.length,
+      configuredCount:refs.length||Math.max(0,Number(paper?.questionCount||0)),
       validCount,
       missingCount,
       duplicateCount,
@@ -864,6 +909,13 @@
       });
     });
     return rows;
+  }
+  async function loadPaperQuotaCandidates(subject){
+    const banks=state.banks.filter(bank=>!subject||bank.subject===subject);
+    if(!banks.length)return [];
+    const loaded=await Promise.all(banks.map(async bank=>({bank,questions:await Catalog.loadBankQuestions(bank.id,{pageSize:200})})));
+    loaded.forEach(({bank,questions})=>{bank.questions=ensureTeacherNumbers((questions||[]).map((question,index)=>normalizeQuestion(question,index)),bank.subject)});
+    return paperCandidates(subject);
   }
   function paperQuotaCandidate(row){
     const bankId=String(row?.bank?.id||row?.bankId||''),question=row?.question||row||{},questionId=String(question.id||row?.questionId||'');
@@ -1533,17 +1585,18 @@
     }
     if(!Catalog){alert('题目目录服务未加载，请刷新页面后重试。');return}
     if(!PaperDraftApi){alert('试卷草稿 API 未加载，请刷新页面后重试。');return}
-    try{await Promise.all([Catalog.ready,PaperDraftApi.ready()])}catch(error){alert('试卷管理数据加载失败：'+(error.message||error));return}
-    state.banks=loadBanks();try{await reloadPaperDrafts()}catch(error){alert('试卷草稿加载失败：'+(error.message||error));return}
+    if(!PaperDataLoaderFactory?.create){alert('试卷管理按需加载服务未加载，请刷新页面后重试。');return}
+    paperDataLoader=PaperDataLoaderFactory.create({paperApi:PaperDraftApi,catalogApi:Catalog,onChange:applyPaperManagementSnapshot});
+    try{await paperDataLoader.initialize({preferredPaperId:state.selectedPaperId})}catch(error){alert('试卷管理数据加载失败：'+(error.message||error));return}
     const on=(id,event,handler)=>$(id)?.addEventListener(event,handler);
     on('qbAddPaperBtn','click',addPaper);on('qbSavePaperBtn','click',savePaperForm);on('qbBuildPaperBtn','click',buildCurrentPaper);on('qbPublishPaperBtn','click',togglePublishPaper);on('qbWithdrawPaperBtn','click',withdrawCurrentPaper);on('qbArchivePaperBtn','click',archiveCurrentPaper);on('qbUnarchivePaperBtn','click',unarchiveCurrentPaper);on('qbDeletePaperBtn','click',deleteCurrentPaper);on('qbExportPaperBtn','click',exportCurrentPaper);on('qbAutoQuotaBtn','click',autoDistributeQuota);on('qbClearQuotaBtn','click',clearPaperQuota);
     on('qbAddPaperCategoryBtn','click',addPaperCategory);on('qbPaperListSearch','input',event=>applyPaperCatalogFilter({search:String(event.currentTarget.value||'')}));on('qbPaperStatusFilter','change',event=>applyPaperCatalogFilter({status:String(event.currentTarget.value||'ALL')}));on('qbPaperListSelectPage','change',toggleSelectPaperPage);on('qbPaperBulkMoveCategoryBtn','click',moveSelectedPapersToCategory);on('qbPaperBulkArchiveBtn','click',archiveSelectedPapers);on('qbPaperBulkDeleteDraftBtn','click',deleteSelectedPaperDrafts);
-    on('paperSubjectInput','change',async()=>{await savePaperForm({silent:true,skipRender:true});state.paperCandidatePage=1;state.selectedPaperCandidateKeys=new Set();renderPaperManager()});
+    on('paperSubjectInput','change',async()=>{await savePaperForm({silent:true,skipRender:true});state.paperCandidateBankId='';state.paperCandidatePage=1;state.selectedPaperCandidateKeys=new Set();renderPaperManager();loadPaperCandidatePage().catch(()=>{})});
     on('paperCategoryInput','change',()=>savePaperForm({silent:true}));
     document.querySelectorAll('[data-paper-mode]').forEach(input=>input.addEventListener('change',()=>{if(currentPaper())savePaperForm({silent:true})}));
     document.querySelectorAll('[data-paper-supplement-mode]').forEach(input=>input.addEventListener('change',handlePaperSupplementModeChange));
-    on('qbPaperCandidateSearch','input',event=>{state.paperCandidateSearch=String(event.currentTarget.value||'').trim();state.paperCandidatePage=1;state.selectedPaperCandidateKeys=new Set();renderPaperCandidateList()});
-    on('qbPaperCandidateBankFilter','change',event=>{state.paperCandidateBankId=String(event.currentTarget.value||'ALL');state.paperCandidatePage=1;state.selectedPaperCandidateKeys=new Set();renderPaperCandidateList()});
+    on('qbPaperCandidateSearch','input',event=>{state.paperCandidateSearch=String(event.currentTarget.value||'').trim();state.paperCandidatePage=1;state.selectedPaperCandidateKeys=new Set();loadPaperCandidatePage().catch(()=>{})});
+    on('qbPaperCandidateBankFilter','change',event=>{state.paperCandidateBankId=String(event.currentTarget.value||'');state.paperCandidatePage=1;state.selectedPaperCandidateKeys=new Set();loadPaperCandidatePage().catch(()=>{})});
     on('qbSelectPaperCandidatesPage','change',toggleSelectPaperCandidatePage);on('qbAddSelectedToPaperBtn','click',addSelectedCandidatesToPaper);
     on('qbPaperPreviewSelectAll','change',toggleSelectPaperPreview);on('qbPaperBulkRemoveBtn','click',removeSelectedPaperQuestions);
     on('qbQuestionPreviewCloseBtn','click',closePaperQuestionPreview);on('qbQuestionPreviewEditBtn','click',openQuestionEditorFromPreview);
@@ -1553,8 +1606,9 @@
     initQuestionBankImportControls();
     initPaperImportControls();
     initPaperCompositionControls();
-    renderPaperManager();
     catalogUiReady=true;
+    renderPaperManager();
+    loadPaperCandidatePage().catch(()=>{});
   }
 
   function openPaperOperationDialog(dialog){if(!dialog)return;try{if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','')}catch(error){dialog.setAttribute('open','')}}
@@ -1632,7 +1686,7 @@
   }
   function renderPaperCompositionBanks(mode='quick'){
     const wrap=$('qbPaperCompositionBanks');if(!wrap)return;const banks=state.banks.filter(bank=>String(bank.subject||'')==='PMP');
-    wrap.innerHTML=banks.length?banks.map(bank=>`<label><input data-paper-composition-bank type="checkbox" value="${escapeHTML(bank.id)}" checked ${mode==='quick'?'disabled':''}/><span>${escapeHTML(bank.name)} <small>${(bank.questions||[]).filter(question=>!isQuestionDeleted(question)).length} 题</small></span></label>`).join(''):'<div class="qb-empty">暂无 PMP 题库，请先导入题库数据包。</div>';
+    wrap.innerHTML=banks.length?banks.map(bank=>`<label><input data-paper-composition-bank type="checkbox" value="${escapeHTML(bank.id)}" checked ${mode==='quick'?'disabled':''}/><span>${escapeHTML(bank.name)} <small>${Math.max(0,Number(bank.questionCount??(bank.questions||[]).filter(question=>!isQuestionDeleted(question)).length))} 题</small></span></label>`).join(''):'<div class="qb-empty">暂无 PMP 题库，请先导入题库数据包。</div>';
   }
   function applyCompositionMode(mode){
     const custom=mode==='custom';for(const code of ['A','B','C'])for(const suffix of ['Enabled','Name','Count']){const input=$(`qbPaperVariant${code}${suffix}`);if(input)input.disabled=!custom}for(const id of ['qbPaperPeopleWeight','qbPaperProcessWeight','qbPaperBusinessWeight','qbPaperGovernanceWeight','qbPaperScopeWeight','qbPaperScheduleWeight','qbPaperFinanceWeight','qbPaperStakeholderWeight','qbPaperResourceWeight','qbPaperRiskWeight'])if($(id))$(id).disabled=!custom;renderPaperCompositionBanks(mode);paperCompositionController?.setMode(mode);
@@ -3055,10 +3109,14 @@
     const next=document.querySelector(selector)||document.querySelector(`[data-question-preview="${key}"]`);
     if(next){state.paperPreviewAnchor=next;markPaperPreviewAnchor();requestAnimationFrame(positionPaperQuestionPreview)}else closePaperQuestionPreview();
   }
-  function openPaperQuestionPreview(value,anchor,options={}){
+  async function openPaperQuestionPreview(value,anchor,options={}){
     const ref=typeof value==='string'?(()=>{const [bankId,questionId]=value.split('::');return {bankId,questionId}})():value;
-    const found=paperQuestionLookup(ref||{}),popover=$('qbQuestionPreviewPopover'),nextKey=paperRefKey(ref||{}),same=isPaperQuestionPreviewOpen()&&paperPreviewKey()===nextKey;
+    let found=paperQuestionLookup(ref||{});const popover=$('qbQuestionPreviewPopover'),nextKey=paperRefKey(ref||{}),same=isPaperQuestionPreviewOpen()&&paperPreviewKey()===nextKey;
     if(options.toggleSame&&same){closePaperQuestionPreview();return}
+    if((!found.question||found.question.__paperSummaryOnly)&&ref?.questionId&&Catalog?.loadQuestion){
+      try{const question=await Catalog.loadQuestion(ref.questionId);if(question)found={bank:found.bank||state.banks.find(bank=>bank.id===ref.bankId),question}}
+      catch(error){return toast(`题目详情加载失败：${error.message||error}`)}
+    }
     if(!found.bank||!found.question||!popover)return toast('题目已不存在，无法预览。');
     const {bank,question}=found;state.paperPreviewRef={bankId:bank.id,questionId:question.id};state.paperPreviewAnchor=anchor||state.paperPreviewAnchor;state.paperPreviewSource=String(anchor?.dataset?.previewSource||state.paperPreviewSource||'');
     $('qbQuestionPreviewTitle').textContent=question.title||'未命名题目';
@@ -3125,14 +3183,14 @@
     if(!rows.length){list.innerHTML='<div class="qb-empty">当前分类或筛选下没有试卷。可新建试卷，或切换到“全部试卷”。</div>';if(pager)pager.hidden=true;return}
     list.innerHTML=pageRows.map((paper,index)=>{const integrity=paperIntegrity(paper),statusLabel=paperStatusLabel(paper),statusKey=paperStatusKey(paper),checked=state.selectedPaperIds.has(paper.id);return `<article class="qb-list-item paper ${paper.id===state.selectedPaperId?'active':''} ${checked?'selected':''}" data-paper-id="${escapeHTML(paper.id)}" tabindex="0"><label class="pm-paper-list-check"><input type="checkbox" data-paper-list-check="${escapeHTML(paper.id)}" ${checked?'checked':''}/><span class="sr-only">选择试卷 ${escapeHTML(paper.name)}</span></label><span class="qb-paper-order">${start+index+1}</span><span class="qb-paper-text"><strong>${escapeHTML(paper.name)}</strong><small>${escapeHTML(paper.subject)} · ${paper.accessPolicy?.accessLevel==='member'?'VIP':'免费'} · ${escapeHTML(paperCategoryName(paper.categoryId))} · 已组 ${integrity.configuredCount}/目标 ${integrity.targetCount} 题</small></span><span class="qb-paper-state ${statusKey}">${escapeHTML(statusLabel)}</span></article>`}).join('');
     list.querySelectorAll('[data-paper-list-check]').forEach(input=>input.addEventListener('change',event=>{event.stopPropagation();const id=String(input.dataset.paperListCheck||'');if(input.checked)state.selectedPaperIds.add(id);else state.selectedPaperIds.delete(id);renderPaperList()}));
-    list.querySelectorAll('[data-paper-id]').forEach(row=>{const select=()=>{const id=String(row.dataset.paperId||'');if(id===state.selectedPaperId)return;closePaperQuestionPreview();state.selectedPaperId=id;state.selectedPaperQuestionKeys=new Set();state.selectedPaperCandidateKeys=new Set();renderPaperManager()};row.addEventListener('click',event=>{if(event.target.closest('input,label,button,select,a'))return;select()});row.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select()}})});
+    list.querySelectorAll('[data-paper-id]').forEach(row=>{const select=async()=>{const id=String(row.dataset.paperId||'');if(id===state.selectedPaperId&&state.paperDetailReady)return;closePaperQuestionPreview();state.selectedPaperQuestionKeys=new Set();state.selectedPaperCandidateKeys=new Set();try{if(paperDataLoader)await paperDataLoader.selectPaper(id,{forceReload:!!state.paperDetailError});else{const detail=await PaperDraftApi.detail(id);state.selectedPaperId=id;replacePaperState(detail);renderPaperManager()}state.paperCandidateBankId='';state.paperCandidatePage=1;loadPaperCandidatePage().catch(()=>{})}catch(error){toast(paperApiMessage(error,'试卷详情加载失败，请重试。'))}};row.addEventListener('click',event=>{if(event.target.closest('input,label,button,select,a'))return;select()});row.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select()}})});
     if(pager){pager.hidden=pages<=1;pager.innerHTML=pages<=1?'':`<button type="button" data-paper-list-page="${state.paperListPage-1}" ${state.paperListPage<=1?'disabled':''}>上一页</button><span>${state.paperListPage} / ${pages} · ${rows.length} 张</span><button type="button" data-paper-list-page="${state.paperListPage+1}" ${state.paperListPage>=pages?'disabled':''}>下一页</button>`;pager.querySelectorAll('[data-paper-list-page]').forEach(btn=>btn.addEventListener('click',()=>{state.paperListPage=Number(btn.dataset.paperListPage||1);state.selectedPaperIds=new Set();renderPaperList()}))}
   }
   function applyPaperCatalogFilter(next={}){
     if(Object.prototype.hasOwnProperty.call(next,'category'))state.paperCategoryFilter=String(next.category||'ALL');
     if(Object.prototype.hasOwnProperty.call(next,'status'))state.paperListStatus=String(next.status||'ALL');
     if(Object.prototype.hasOwnProperty.call(next,'search'))state.paperListSearch=String(next.search||'');
-    state.paperListPage=1;state.selectedPaperIds=new Set();closePaperQuestionPreview();ensureSelectedPaperVisible();renderPaperManager();
+    const previousId=state.selectedPaperId;state.paperListPage=1;state.selectedPaperIds=new Set();closePaperQuestionPreview();ensureSelectedPaperVisible();renderPaperManager();if(state.selectedPaperId&&state.selectedPaperId!==previousId)paperDataLoader?.selectPaper(state.selectedPaperId).catch(error=>toast(paperApiMessage(error,'试卷详情加载失败，请重试。')));
   }
   async function addPaperCategory(){
     const name=String(prompt('请输入试卷分类名称：','')||'').trim();if(!name)return;
@@ -3212,7 +3270,11 @@
     const meta = $('qbPaperMeta');
     if(meta){
       if(!paper){
-        meta.innerHTML = '<div class="qb-empty">新建或选择一套试卷后，可维护组卷规则并发布。</div>';
+        meta.innerHTML = state.paperDetailError
+          ? `<div class="qb-empty">试卷详情加载失败：${escapeHTML(state.paperDetailError)}。可重新选择该试卷重试。</div>`
+          :state.paperDetailLoading
+            ?'<div class="qb-empty">正在加载当前试卷详情…</div>'
+            :'<div class="qb-empty">新建或选择一套试卷后，可维护组卷规则并发布。</div>';
       }else{
         const integrity = paperIntegrity(paper),statusKey=paperStatusKey(paper),history=hasPaperReleaseHistory(paper);
         const statusText=isPaperPublished(paper)
@@ -3364,20 +3426,45 @@
   }
   async function movePaperQuestion(index,direction){const paper=currentPaper(),target=index+direction;if(!paper||index<0||target<0||target>=paper.questions.length)return;const draft=clone(paper);[draft.questions[index],draft.questions[target]]=[draft.questions[target],draft.questions[index]];draft.questions.forEach((ref,i)=>{ref.order=i+1});if(await persistPaperQuestions(draft,{silent:true}))renderPaperQuestionList()}
 
-  function renderPaperCandidateList(){
-    const wrap=$('qbPaperCandidateList');if(!wrap)return;const paper=currentPaper(),subject=$('paperSubjectInput')?.value||paper?.subject||'PMP';
-    const bankFilter=$('qbPaperCandidateBankFilter');if(bankFilter){const banks=state.banks.filter(bank=>bank.subject===subject);bankFilter.innerHTML='<option value="ALL">全部题库</option>'+banks.map(bank=>`<option value="${escapeHTML(bank.id)}">${escapeHTML(bank.name)}</option>`).join('');if(!banks.some(bank=>bank.id===state.paperCandidateBankId))state.paperCandidateBankId='ALL';bankFilter.value=state.paperCandidateBankId}
+  function renderFullCatalogPaperCandidates(){
+    const wrap=$('qbPaperCandidateList');if(!wrap)return;const paper=currentPaper(),subject=$('paperSubjectInput')?.value||paper?.subject||'PMP',bankFilter=$('qbPaperCandidateBankFilter'),banks=state.banks.filter(bank=>bank.subject===subject);
+    if(bankFilter){bankFilter.innerHTML='<option value="ALL">全部题库</option>'+banks.map(bank=>`<option value="${escapeHTML(bank.id)}">${escapeHTML(bank.name)}</option>`).join('');if(!banks.some(bank=>bank.id===state.paperCandidateBankId))state.paperCandidateBankId='ALL';bankFilter.value=state.paperCandidateBankId}
     if(!paper){wrap.innerHTML='<div class="qb-empty">请先新建或选择试卷。</div>';return}
-    const keyword=String(state.paperCandidateSearch||'').toLowerCase(),existing=new Set((paper.questions||[]).map(paperRefKey));
-    const rows=paperCandidates(subject).filter(row=>state.paperCandidateBankId==='ALL'||row.bank.id===state.paperCandidateBankId).filter(row=>{if(!keyword)return true;const text=[row.question.title,stemText(row.question),row.question.domain,row.question.topic,row.question.difficulty,...(row.question.tags||[])].join(' ').toLowerCase();return text.includes(keyword)});
+    const keyword=String(state.paperCandidateSearch||'').toLowerCase(),existing=new Set((paper.questions||[]).map(paperRefKey)),rows=paperCandidates(subject).filter(row=>state.paperCandidateBankId==='ALL'||row.bank.id===state.paperCandidateBankId).filter(row=>!keyword||[row.question.title,stemText(row.question),row.question.domain,row.question.topic,row.question.difficulty,...(row.question.tags||[])].join(' ').toLowerCase().includes(keyword));
     const pages=Math.max(1,Math.ceil(rows.length/PAPER_CANDIDATE_PAGE_SIZE));state.paperCandidatePage=Math.min(Math.max(1,state.paperCandidatePage),pages);const start=(state.paperCandidatePage-1)*PAPER_CANDIDATE_PAGE_SIZE,pageRows=rows.slice(start,start+PAPER_CANDIDATE_PAGE_SIZE);state.currentPaperCandidateKeys=pageRows.map(row=>paperRefKey({bankId:row.bank.id,questionId:row.question.id}));
     const selectAll=$('qbSelectPaperCandidatesPage');if(selectAll){selectAll.checked=pageRows.length>0&&pageRows.every(row=>state.selectedPaperCandidateKeys.has(paperRefKey({bankId:row.bank.id,questionId:row.question.id})));selectAll.indeterminate=pageRows.some(row=>state.selectedPaperCandidateKeys.has(paperRefKey({bankId:row.bank.id,questionId:row.question.id})))&&!selectAll.checked}
     const count=$('qbPaperCandidateSelectionCount');if(count)count.textContent=`已选择 ${state.selectedPaperCandidateKeys.size} 道题`;
-    if(!pageRows.length){wrap.innerHTML='<div class="qb-empty">当前筛选下没有可用题目。</div>'}else wrap.innerHTML=pageRows.map((row,index)=>{const key=paperRefKey({bankId:row.bank.id,questionId:row.question.id}),added=existing.has(key),checked=state.selectedPaperCandidateKeys.has(key);return `<article class="qb-paper-candidate-row ${added?'added':''}" data-question-preview="${escapeHTML(key)}" data-preview-source="candidate" title="双击打开或关闭预览；预览打开后单击其他题目可切换"><label class="pm-paper-candidate-check"><input type="checkbox" data-paper-candidate="${escapeHTML(key)}" ${checked?'checked':''} ${added?'disabled':''}/><span class="sr-only">选择题目 ${escapeHTML(row.question.title||'未命名题目')}</span></label><span class="qb-paper-candidate-number">${start+index+1}</span><span><strong>${escapeHTML(row.question.title||'未命名题目')}</strong><small>${escapeHTML(row.bank.name)} · ${escapeHTML(questionDomainKey(row.question))} · ${escapeHTML(difficultyDisplay(row.question.difficulty))}</small></span><em>${added?'已加入':'可加入'}</em></article>`}).join('');
+    wrap.innerHTML=pageRows.length?pageRows.map((row,index)=>{const key=paperRefKey({bankId:row.bank.id,questionId:row.question.id}),added=existing.has(key),checked=state.selectedPaperCandidateKeys.has(key);return `<article class="qb-paper-candidate-row ${added?'added':''}" data-question-preview="${escapeHTML(key)}" data-preview-source="candidate" title="双击打开或关闭预览；预览打开后单击其他题目可切换"><label class="pm-paper-candidate-check"><input type="checkbox" data-paper-candidate="${escapeHTML(key)}" ${checked?'checked':''} ${added?'disabled':''}/><span class="sr-only">选择题目 ${escapeHTML(row.question.title||'未命名题目')}</span></label><span class="qb-paper-candidate-number">${start+index+1}</span><span><strong>${escapeHTML(row.question.title||'未命名题目')}</strong><small>${escapeHTML(row.bank.name)} · ${escapeHTML(questionDomainKey(row.question))} · ${escapeHTML(difficultyDisplay(row.question.difficulty))}</small></span><em>${added?'已加入':'可加入'}</em></article>`}).join(''):'<div class="qb-empty">当前筛选下没有可用题目。</div>';
+    wrap.querySelectorAll('[data-paper-candidate]').forEach(input=>input.addEventListener('change',()=>{const key=String(input.dataset.paperCandidate||'');if(input.checked)state.selectedPaperCandidateKeys.add(key);else state.selectedPaperCandidateKeys.delete(key);renderPaperCandidateList()}));wrap.querySelectorAll('[data-question-preview]').forEach(bindPaperPreviewRow);refreshPaperPreviewAnchor();
+    const pager=$('qbPaperCandidatePager');if(pager){pager.hidden=pages<=1;pager.innerHTML=pages<=1?'':`<button type="button" data-paper-page="${state.paperCandidatePage-1}" ${state.paperCandidatePage<=1?'disabled':''}>上一页</button><span>${state.paperCandidatePage} / ${pages} · ${rows.length} 题</span><button type="button" data-paper-page="${state.paperCandidatePage+1}" ${state.paperCandidatePage>=pages?'disabled':''}>下一页</button>`;pager.querySelectorAll('[data-paper-page]').forEach(btn=>btn.addEventListener('click',()=>{state.paperCandidatePage=Number(btn.dataset.paperPage||1);state.selectedPaperCandidateKeys=new Set();renderPaperCandidateList()}))}
+  }
+  async function loadPaperCandidatePage(options={}){
+    if(!paperDataLoader)return null;
+    const paper=currentPaper(),subject=$('paperSubjectInput')?.value||paper?.subject||'PMP',banks=state.banks.filter(bank=>bank.subject===subject);
+    if(!banks.some(bank=>bank.id===state.paperCandidateBankId))state.paperCandidateBankId=banks[0]?.id||'';
+    return paperDataLoader.selectBank(state.paperCandidateBankId,{
+      page:state.paperCandidatePage,pageSize:PAPER_CANDIDATE_PAGE_SIZE,search:state.paperCandidateSearch,forceReload:options.forceReload===true
+    });
+  }
+  function renderPaperCandidateList(){
+    if(!paperDataLoader)return renderFullCatalogPaperCandidates();
+    const wrap=$('qbPaperCandidateList');if(!wrap)return;const paper=currentPaper(),subject=$('paperSubjectInput')?.value||paper?.subject||'PMP',banks=state.banks.filter(bank=>bank.subject===subject);
+    const bankFilter=$('qbPaperCandidateBankFilter');if(bankFilter){if(!banks.some(bank=>bank.id===state.paperCandidateBankId))state.paperCandidateBankId=banks[0]?.id||'';bankFilter.innerHTML='<option value="" disabled>请选择题库</option>'+banks.map(bank=>`<option value="${escapeHTML(bank.id)}">${escapeHTML(bank.name)}</option>`).join('');bankFilter.value=state.paperCandidateBankId}
+    const search=$('qbPaperCandidateSearch');if(search&&search.value!==state.paperCandidateSearch)search.value=state.paperCandidateSearch;
+    if(!paper){wrap.innerHTML='<div class="qb-empty">请先新建或选择试卷。</div>';return}
+    if(!state.paperCandidateBankId){wrap.innerHTML='<div class="qb-empty">当前科目暂无题库，请先导入题库数据包。</div>';return}
+    const rows=state.paperCandidateRows.filter(row=>row.bank?.id===state.paperCandidateBankId&&!isQuestionDeleted(row.question)),existing=new Set((paper.questions||[]).map(paperRefKey));
+    const total=state.paperCandidateTotal,pages=Math.max(1,Math.ceil(total/PAPER_CANDIDATE_PAGE_SIZE)),start=(state.paperCandidatePage-1)*PAPER_CANDIDATE_PAGE_SIZE,pageRows=rows;state.currentPaperCandidateKeys=pageRows.map(row=>paperRefKey({bankId:row.bank.id,questionId:row.question.id}));
+    const selectAll=$('qbSelectPaperCandidatesPage');if(selectAll){selectAll.checked=pageRows.length>0&&pageRows.every(row=>state.selectedPaperCandidateKeys.has(paperRefKey({bankId:row.bank.id,questionId:row.question.id})));selectAll.indeterminate=pageRows.some(row=>state.selectedPaperCandidateKeys.has(paperRefKey({bankId:row.bank.id,questionId:row.question.id})))&&!selectAll.checked;selectAll.disabled=state.paperCandidateLoading||!pageRows.length}
+    const count=$('qbPaperCandidateSelectionCount');if(count)count.textContent=`已选择 ${state.selectedPaperCandidateKeys.size} 道题`;
+    if(state.paperCandidateLoading&&!pageRows.length){wrap.innerHTML='<div class="qb-empty">正在加载当前题库题目…</div>'}
+    else if(state.paperCandidateError&&!pageRows.length){wrap.innerHTML=`<div class="qb-empty">${escapeHTML(state.paperCandidateError)}，请切换题库或重试。</div>`}
+    else if(!pageRows.length){wrap.innerHTML='<div class="qb-empty">当前筛选下没有可用题目。</div>'}
+    else wrap.innerHTML=pageRows.map((row,index)=>{const key=paperRefKey({bankId:row.bank.id,questionId:row.question.id}),added=existing.has(key),checked=state.selectedPaperCandidateKeys.has(key);return `<article class="qb-paper-candidate-row ${added?'added':''}" data-question-preview="${escapeHTML(key)}" data-preview-source="candidate" title="双击打开或关闭预览；预览打开后单击其他题目可切换"><label class="pm-paper-candidate-check"><input type="checkbox" data-paper-candidate="${escapeHTML(key)}" ${checked?'checked':''} ${added?'disabled':''}/><span class="sr-only">选择题目 ${escapeHTML(row.question.title||'未命名题目')}</span></label><span class="qb-paper-candidate-number">${start+index+1}</span><span><strong>${escapeHTML(row.question.title||'未命名题目')}</strong><small>${escapeHTML(row.bank.name)} · ${escapeHTML(questionDomainKey(row.question))} · ${escapeHTML(difficultyDisplay(row.question.difficulty))}</small></span><em>${added?'已加入':'可加入'}</em></article>`}).join('');
     wrap.querySelectorAll('[data-paper-candidate]').forEach(input=>input.addEventListener('change',()=>{const key=String(input.dataset.paperCandidate||'');if(input.checked)state.selectedPaperCandidateKeys.add(key);else state.selectedPaperCandidateKeys.delete(key);renderPaperCandidateList()}));
     wrap.querySelectorAll('[data-question-preview]').forEach(bindPaperPreviewRow);
     refreshPaperPreviewAnchor();
-    const pager=$('qbPaperCandidatePager');if(pager){pager.hidden=pages<=1;pager.innerHTML=pages<=1?'':`<button type="button" data-paper-page="${state.paperCandidatePage-1}" ${state.paperCandidatePage<=1?'disabled':''}>上一页</button><span>${state.paperCandidatePage} / ${pages} · ${rows.length} 题</span><button type="button" data-paper-page="${state.paperCandidatePage+1}" ${state.paperCandidatePage>=pages?'disabled':''}>下一页</button>`;pager.querySelectorAll('[data-paper-page]').forEach(btn=>btn.addEventListener('click',()=>{state.paperCandidatePage=Number(btn.dataset.paperPage||1);state.selectedPaperCandidateKeys=new Set();renderPaperCandidateList()}))}
+    const pager=$('qbPaperCandidatePager');if(pager){pager.hidden=pages<=1;pager.innerHTML=pages<=1?'':`<button type="button" data-paper-page="${state.paperCandidatePage-1}" ${state.paperCandidatePage<=1||state.paperCandidateLoading?'disabled':''}>上一页</button><span>${state.paperCandidatePage} / ${pages} · ${total} 题</span><button type="button" data-paper-page="${state.paperCandidatePage+1}" ${state.paperCandidatePage>=pages||state.paperCandidateLoading?'disabled':''}>下一页</button>`;pager.querySelectorAll('[data-paper-page]').forEach(btn=>btn.addEventListener('click',()=>{state.paperCandidatePage=Number(btn.dataset.paperPage||1);state.selectedPaperCandidateKeys=new Set();loadPaperCandidatePage().catch(()=>{})}))}
   }
   function toggleSelectPaperCandidatePage(event){const checked=!!event.currentTarget.checked;state.selectedPaperCandidateKeys=checked?new Set(state.currentPaperCandidateKeys.filter(key=>{const paper=currentPaper();return !(paper?.questions||[]).some(ref=>paperRefKey(ref)===key)})):new Set();renderPaperCandidateList()}
   async function addSelectedCandidatesToPaper(){
@@ -3388,6 +3475,7 @@
     let paper = currentPaper();
     if(!paper){paper=await addPaper();}
     paper=readPaperFormInto(clone(paper));if(!paper)return;
+    try{await loadPaperQuotaCandidates(paper.subject)}catch(error){return toast(`题库题目加载失败：${error.message||error}`)}
     const mode=paper.supplementMode==='principle'?'principle':'domain';
     const stats=(mode==='principle'?paperPrincipleStats(paper.subject).map(item=>({bucketId:item.id,count:item.count})):paperDomainStats(paper.subject).map(item=>({bucketId:item.domain,count:item.count}))).filter(item => item.count > 0);
     if(!stats.length) return toast('该科目暂无可组卷题目。');
@@ -3424,6 +3512,7 @@
   async function buildCurrentPaper(){
     let paper=currentPaper();if(!paper)paper=await addPaper();paper=readPaperFormInto(clone(paper));if(!paper)return false;
     try{
+      await loadPaperQuotaCandidates(paper.subject);
       const result=supplementPaperDraft(paper,paperCandidates(paper.subject),Math.random);Object.assign(paper,result.paper);
       state.paperQuotaFeedback={paperId:paper.id,mode:paper.supplementMode,shortages:result.shortages};
       const metadataSaved=await persistPaperMetadata(paper,{silent:true});if(!metadataSaved)return false;paper.revision=metadataSaved.revision;paper.questions=result.paper.questions;const questionsSaved=await persistPaperQuestions(paper,{silent:true});if(!questionsSaved)return false;renderPaperManager();

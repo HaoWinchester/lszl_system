@@ -49,7 +49,8 @@ for (const [name, html, shellClass] of [
 assert.match(admin, /const Catalog\s*=\s*window\.KGQuestionCatalogAdapter/);
 assert.match(admin, /const CatalogEditor\s*=\s*window\.KGQuestionCatalogEditController/);
 assert.match(admin, /async function init\(\)[\s\S]*?await Catalog\.ready[\s\S]*?state\.banks\s*=\s*loadBanks\(\)/);
-assert.match(admin, /async function initPaperManagementPage\(\)[\s\S]*?Promise\.all\(\[Catalog\.ready,PaperDraftApi\.ready\(\)\]\)[\s\S]*?state\.banks\s*=\s*loadBanks\(\)/);
+assert.match(admin, /async function initPaperManagementPage\(\)[\s\S]*?PaperDataLoaderFactory\.create\([^]*?paperDataLoader\.initialize\(/, 'paper management must initialize through the summary-first demand loader');
+assert.doesNotMatch(admin, /Promise\.all\(\(summaries\|\|\[\]\)\.map/, 'paper management must not prefetch every paper detail');
 assert.match(admin, /function loadBanks\(\)[\s\S]*?Catalog\.snapshot\(\)/);
 assert.match(admin, /function loadLegacyBanksForMigrationPreview\(\)[\s\S]*?readString\(banksKey\(\)/);
 assert.equal((admin.match(/banksKey\(\)/g) || []).length, 2, 'banksKey may only be declared and read by migration preview');
