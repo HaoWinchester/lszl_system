@@ -16,7 +16,7 @@ function response(status, payload) {
   return { ok: status >= 200 && status < 300, status, async json() { return payload } }
 }
 
-function loadAdapter({ mode = 'learning', fetchImpl }) {
+function loadAdapter({ mode = 'learning', fetchImpl, teachingContentSync = null }) {
   const events = []
   const document = {
     body: { dataset: { questionCatalogMode: mode } },
@@ -30,11 +30,55 @@ function loadAdapter({ mode = 'learning', fetchImpl }) {
     fetch: fetchImpl,
     crypto: { randomUUID: () => 'client-instance-1' },
     dispatchEvent(event) { events.push(event) },
+    addEventListener() {},
+    clearTimeout,
+    setTimeout,
+    KGTeachingContentSync: teachingContentSync,
   }
   const context = vm.createContext({ window, document, fetch: fetchImpl, CustomEvent, URLSearchParams, JSON, Date, console })
   vm.runInContext(readFileSync(adapterPath, 'utf8'), context, { filename: adapterPath })
   return { adapter: window.KGQuestionCatalogAdapter, events }
 }
+
+test('managed remote catalog refresh retains the full question snapshot', async () => {
+  const calls = []
+  let revision = 1
+  let receiveRemoteRevision = null
+  const { adapter } = loadAdapter({
+    mode: 'managed',
+    teachingContentSync: {
+      subscribe(handler) {
+        receiveRemoteRevision = handler
+        return () => {}
+      },
+    },
+    fetchImpl: async url => {
+      calls.push(url)
+      const includeQuestions = url.includes('include_questions=true')
+      return response(200, {
+        banks: [{ id: 'bank-1' }],
+        questions: includeQuestions
+          ? [{ id: `q-${revision}`, bankId: 'bank-1', title: `Question ${revision}` }]
+          : [],
+        catalogRevision: String(revision).repeat(64),
+        contentRevision: revision,
+      })
+    },
+  })
+
+  await adapter.ready
+  assert.equal(adapter.question('q-1').title, 'Question 1')
+
+  revision = 2
+  await receiveRemoteRevision({ revision })
+
+  assert.equal(adapter.snapshot().questions.length, 1)
+  assert.equal(adapter.question('q-2').title, 'Question 2')
+  assert.equal(
+    calls.at(-1),
+    '/api/v1/question-catalog/bootstrap?mode=managed&include_questions=true',
+  )
+})
 
 test('managed and learning pages bootstrap the right in-memory catalog with cookies', async () => {
   for (const mode of ['managed', 'learning']) {
