@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     APP_NAME: str = "KG Graph API"
     API_V1_PREFIX: str = "/api/v1"
     QUESTION_CATALOG_CUTOVER_ENABLED: bool = False
+    # 登录用户图谱完成关系化迁移后启用。开启时前端改走 Files API，
+    # runtime 中的旧图谱键只读保留用于审计与回滚。
+    GRAPH_FILES_API_CUTOVER_ENABLED: bool = False
     # runtime KV 同步开关：true 时 PUT/POST /runtime/state 接收即弃（回当前版本号，不落库）。
     # 2026-08-21 回退退役切换（原设计 §11）：教师试卷/分类草稿尚未迁入领域 API，
     # 仍依赖 runtime KV 持久化；丢弃写入会导致"保存显示成功但刷新即回退"。

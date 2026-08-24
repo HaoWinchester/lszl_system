@@ -57,16 +57,9 @@ for _ in 1 2 3; do
     bump_version || { echo "✗ 版本号递增失败" >&2; exit 1; }
     echo "      版本号冲突：$old -> $(cat "$version_file")，重新生成产物"
     node scripts/sync-new-legacy.js || exit 1
-  elif grep -q '自动验收失败' /tmp/kg-uat-release.log && [ -d "new-legacy-releases/$(cat "$version_file")" ]; then
-    # 候选包已生成，但自动验收未通过（当前 feat 分支自带 4 个失败测试，与发布内容无关）。
-    # manage 工具此时只是拒绝"自动切换"，人工 promote 是被允许的显式操作——打警示后继续。
-    grep -E '^FAILED' /tmp/kg-uat-release.log | head -10 || tail -5 /tmp/kg-uat-release.log
-    echo "⚠ 自动验收失败（见上方 FAILED 列表），候选包 $(cat "$version_file") 已生成，继续显式 promote 发布"
-    updated=1
-    break
   else
     cat /tmp/kg-uat-release.log
-    echo "✗ release 打包失败，见上方验证输出" >&2
+    echo "✗ release 打包或自动验收失败，候选包不会 promote" >&2
     exit 1
   fi
 done

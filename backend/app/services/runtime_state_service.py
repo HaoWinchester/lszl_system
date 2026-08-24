@@ -46,6 +46,20 @@ DEPRECATED_QUESTION_EXACT_KEYS = frozenset({
 })
 DEPRECATED_QUESTION_PREFIXES = ("kg_question_banks_v1__",)
 
+DEPRECATED_GRAPH_EXACT_KEYS = frozenset({
+    "kg_graph_current_file_v1",
+    "kg_graph_current_file_v2",
+    "kg_graph_file_index_v2",
+    "kg_graph_file_library_v1",
+    "kg_graph_file_migration_v2",
+    "kg_graph_file_tags_v1",
+    "kg_graph_file_tags_v2",
+    "kg_graph_folders_v1",
+    "kg_graph_recent_opened_migration_v1",
+    "kg_home_file_library_v1",
+})
+DEPRECATED_GRAPH_PREFIXES = ("kg_graph_file_content_v2__",)
+
 EXACT_KEYS = {
     "kg_default_entry_mode_v1",
     "kg_question_language_mode_v1",
@@ -541,6 +555,8 @@ def _filter_bootstrap_storage(
         return selected
 
     for key, value in storage.items():
+        if settings.GRAPH_FILES_API_CUTOVER_ENABLED and deprecated_graph_key(key):
+            continue
         if key in exact:
             selected[key] = str(value)
             continue
@@ -548,7 +564,7 @@ def _filter_bootstrap_storage(
             selected[key] = str(value)
             continue
 
-    if namespace == "files":
+    if namespace == "files" and not settings.GRAPH_FILES_API_CUTOVER_ENABLED:
         current_file_id = _select_current_graph_file_id(storage, owner)
         if current_file_id:
             key = f"kg_graph_file_content_v2__{quote(owner, safe='')}__{current_file_id}"
@@ -585,6 +601,12 @@ def key_allowed(key: str) -> bool:
 def deprecated_question_key(key: str) -> bool:
     return key in DEPRECATED_QUESTION_EXACT_KEYS or any(
         key.startswith(prefix) for prefix in DEPRECATED_QUESTION_PREFIXES
+    )
+
+
+def deprecated_graph_key(key: str) -> bool:
+    return key in DEPRECATED_GRAPH_EXACT_KEYS or any(
+        key.startswith(prefix) for prefix in DEPRECATED_GRAPH_PREFIXES
     )
 
 
@@ -1370,7 +1392,10 @@ async def ensure_domain_seed(
     changed = False
     if page in {"user-management.html", "system-settings.html"} and user.role == "admin":
         changed = await _seed_users(db, user.username, storage) or changed
-    if page in {"index.html", "file-manager.html"}:
+    if (
+        page in {"index.html", "file-manager.html"}
+        and not settings.GRAPH_FILES_API_CUTOVER_ENABLED
+    ):
         changed = await _seed_files(db, user.username, storage) or changed
     if page in {
         "learning-path.html",
@@ -1422,6 +1447,14 @@ async def apply_update(
         ]
         if deprecated_mutations:
             raise RuntimeStatePermissionError("正式题库已迁移，请使用题目目录接口")
+    if settings.GRAPH_FILES_API_CUTOVER_ENABLED:
+        deprecated_graph_mutations = [
+            mutation.key
+            for mutation in mutations
+            if deprecated_graph_key(mutation.key)
+        ]
+        if deprecated_graph_mutations:
+            raise RuntimeStatePermissionError("图谱文件已迁移，请使用文件接口")
     protected_mutations = [
         mutation.key for mutation in mutations if server_owned_key(mutation.key)
     ]
@@ -1490,6 +1523,18 @@ async def apply_update(
             key: value
             for key, value in current_storage.items()
             if deprecated_question_key(key)
+        })
+
+    if settings.GRAPH_FILES_API_CUTOVER_ENABLED:
+        # 浏览器的 full snapshot 可能仍带有切换前的图谱缓存。忽略这些旧值，
+        # 同时保留服务器副本，供迁移核验和回滚使用。
+        storage = {
+            key: value for key, value in storage.items() if not deprecated_graph_key(key)
+        }
+        storage.update({
+            key: value
+            for key, value in current_storage.items()
+            if deprecated_graph_key(key)
         })
 
     # 拆分：v9 全局共享键（published 类）→ 虚拟 SHARED_OWNER；其余 → 当前 owner。

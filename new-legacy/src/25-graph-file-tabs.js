@@ -35,7 +35,7 @@
   }
 
   function owner(){
-    const store=global.KGGraphFileStore;
+    const store=fileStore();
     return store&&store.currentOwner?store.currentOwner():'guest';
   }
   function closedSet(){
@@ -63,9 +63,15 @@
     if(typeof global.authRequire==='function')return global.authRequire('登录后才能新建图谱文件。','editGraph');
     return true;
   }
-  function currentFile(){const store=global.KGGraphFileStore;return store&&store.getCurrentFileMeta?store.getCurrentFileMeta():(store&&store.getCurrentFile?store.getCurrentFile():null)}
+  function storeBridge(){return global.KGGraphFileEditorStoreBridge||null}
+  function fileStore(){const bridge=storeBridge();return bridge&&typeof bridge.current==='function'?bridge.current():global.KGGraphFileStore}
+  async function initializeStore(){const bridge=storeBridge();return bridge&&typeof bridge.initialize==='function'?await bridge.initialize():fileStore()}
+  async function openStoredFile(id,options={}){const bridge=storeBridge();if(bridge&&typeof bridge.openFile==='function')return await bridge.openFile(id,options);const store=fileStore();return store?await Promise.resolve(store.openFile(id,options)):null}
+  async function createStoredFile(input,options={}){const bridge=storeBridge();if(bridge&&typeof bridge.createFile==='function')return await bridge.createFile(input,options);const store=fileStore();return store?await Promise.resolve(store.createFile(input,options)):null}
+  async function saveBeforeSwitch(){const autosave=global.KGGraphFileAutosave;return !autosave||typeof autosave.saveBeforeSwitch!=='function'||await Promise.resolve(autosave.saveBeforeSwitch())!==false}
+  function currentFile(){const store=fileStore();return store&&store.getCurrentFileMeta?store.getCurrentFileMeta():(store&&store.getCurrentFile?store.getCurrentFile():null)}
   function visibleFiles(){
-    const store=global.KGGraphFileStore;
+    const store=fileStore();
     if(!store)return [];
     const currentId=store.getCurrentFileId(),closed=closedSet();
     // 当前文件必须始终可见，避免外部打开文件后页签仍处于关闭状态。
@@ -109,7 +115,7 @@
     const display=$id('graphMetaDisplay');if(display)display.setAttribute('aria-label',`当前图谱：${name}。单击修改标题，双击查看文件信息`);
   }
   function renderTabs(options={}){
-    const host=$id('graphFileTabs'),store=global.KGGraphFileStore;if(!host||!store)return;
+    const host=$id('graphFileTabs'),store=fileStore();if(!host||!store)return;
     const files=visibleFiles(),currentId=store.getCurrentFileId(),previousScroll=host.scrollLeft;
     const frag=document.createDocumentFragment();
     files.forEach(file=>{
@@ -140,19 +146,18 @@
     renderTabs();
     return true;
   }
-  function openFile(id){
-    const store=global.KGGraphFileStore;if(!store||!id)return false;
+  async function openFile(id){
+    const store=fileStore();if(!store||!id)return false;
     markOpen(id);
     if(id===store.getCurrentFileId()){renderTabs();return true}
-    const autosave=global.KGGraphFileAutosave;
-    if(autosave&&autosave.saveBeforeSwitch&&!autosave.saveBeforeSwitch()){
+    if(!await saveBeforeSwitch()){
       if(typeof global.showStatus==='function')global.showStatus('当前图谱保存失败，已取消切换。');
       return false;
     }
-    const previousId=store.getCurrentFileId(),file=store.openFile(id,{emit:false});
+    const previousId=store.getCurrentFileId(),file=await openStoredFile(id,{emit:false});
     if(!file){if(typeof global.showStatus==='function')global.showStatus(store.getLastError&&store.getLastError()||'图谱文件打开失败。');return false}
     const ok=applyFile(file);
-    if(!ok){if(previousId)store.openFile(previousId,{emit:false});renderTabs();if(typeof global.showStatus==='function')global.showStatus('图谱文件内容异常，已取消切换。');return false}
+    if(!ok){if(previousId)await openStoredFile(previousId,{emit:false});renderTabs();if(typeof global.showStatus==='function')global.showStatus('图谱文件内容异常，已取消切换。');return false}
     global.dispatchEvent(new CustomEvent('kg-graph-current-file-change',{detail:{owner:store.currentOwner?store.currentOwner():'',id:file.id}}));
     if(typeof global.showStatus==='function')global.showStatus(`已切换到“${file.name}”。`);
     return ok;
@@ -205,16 +210,15 @@
     if(typeof global.showStatus==='function')global.showStatus('已调整图谱页签顺序。');
     return true;
   }
-  function closeFile(id){
-    const store=global.KGGraphFileStore;if(!store||!id)return false;
+  async function closeFile(id){
+    const store=fileStore();if(!store||!id)return false;
     const files=visibleFiles(),index=files.findIndex(file=>String(file.id)===String(id));
     if(index<0)return false;
     const target=files[index],currentId=store.getCurrentFileId(),isCurrent=String(currentId)===String(id);
     if(files.length<=1){
       // 文件管理器已经成为图谱文件的统一入口，因此允许关闭最后一个页签。
       // 最后一个可见页签必然是当前编辑文件；离开前必须先完成保存。
-      const autosave=global.KGGraphFileAutosave;
-      if(autosave&&autosave.saveBeforeSwitch&&!autosave.saveBeforeSwitch()){
+      if(!await saveBeforeSwitch()){
         if(typeof global.showStatus==='function')global.showStatus('当前图谱保存失败，已取消关闭。');
         return false;
       }
@@ -228,18 +232,17 @@
       if(typeof global.showStatus==='function')global.showStatus(`已关闭“${target.name}”页签，图谱文件未删除。`);
       return true;
     }
-    const autosave=global.KGGraphFileAutosave;
-    if(autosave&&autosave.saveBeforeSwitch&&!autosave.saveBeforeSwitch()){
+    if(!await saveBeforeSwitch()){
       if(typeof global.showStatus==='function')global.showStatus('当前图谱保存失败，已取消关闭。');
       return false;
     }
     const next=files[index+1]||files[index-1];
     if(!next)return false;
     markClosed(id);
-    const file=store.openFile(next.id,{emit:false});
+    const file=await openStoredFile(next.id,{emit:false});
     if(!file||!applyFile(file)){
       markOpen(id);
-      if(currentId)store.openFile(currentId,{emit:false});
+      if(currentId)await openStoredFile(currentId,{emit:false});
       renderTabs();
       if(typeof global.showStatus==='function')global.showStatus('关闭页签失败，已恢复原文件。');
       return false;
@@ -248,20 +251,20 @@
     if(typeof global.showStatus==='function')global.showStatus(`已关闭“${target.name}”页签，图谱文件未删除。`);
     return true;
   }
-  function createFile(){
+  async function createFile(){
     if(!canCreate())return null;
-    const store=global.KGGraphFileStore;if(!store)return null;
+    const store=fileStore();if(!store)return null;
     const input=global.prompt('请输入新图谱文件名称：','新图谱文件');
     if(input===null)return null;
     const name=(String(input||'').trim()||'新图谱文件').slice(0,100);
     const blank=typeof global.templateState==='function'?global.templateState('blank'):{meta:{title:name,subject:'自定义学科',audience:'学员',description:''},nodes:[],links:[]};
     if(blank.meta)blank.meta.title=name;
-    const autosave=global.KGGraphFileAutosave;if(autosave&&autosave.saveBeforeSwitch&&!autosave.saveBeforeSwitch())return null;
-    const previousId=store.getCurrentFileId(),file=store.createFile({name,graphData:blank},{makeCurrent:true});
+    if(!await saveBeforeSwitch())return null;
+    const previousId=store.getCurrentFileId(),file=await createStoredFile({name,graphData:blank},{makeCurrent:true});
     if(!file){if(typeof global.showStatus==='function')global.showStatus(store.getLastError&&store.getLastError()||'新建图谱失败，本地存储空间可能已满。');return null}
     markOpen(file.id);
     if(!applyFile(file)){
-      store.deleteFile(file.id,{emit:false,permanent:true});if(previousId)store.openFile(previousId,{emit:false});renderTabs();
+      await Promise.resolve(store.deleteFile(file.id,{emit:false,permanent:true}));if(previousId)await openStoredFile(previousId,{emit:false});renderTabs();
       if(typeof global.showStatus==='function')global.showStatus('新图谱初始化失败，已恢复原图谱。');return null
     }
     if(typeof global.showStatus==='function')global.showStatus(`已新建图谱“${file.name}”。`);
@@ -338,9 +341,8 @@
     }
     if(home&&!home.dataset.bound){
       home.dataset.bound='1';
-      home.addEventListener('click',()=>{
-        const autosave=global.KGGraphFileAutosave;
-        if(autosave&&typeof autosave.saveBeforeSwitch==='function'&&!autosave.saveBeforeSwitch()){
+      home.addEventListener('click',async()=>{
+        if(!await saveBeforeSwitch()){
           if(typeof global.showStatus==='function')global.showStatus('当前图谱保存失败，已取消进入文件管理。');
           return;
         }
@@ -357,8 +359,8 @@
     global.addEventListener('kg-graph-autosave-status',event=>renderSaveState(event.detail||{}));
     global.addEventListener('kg-graph-file-error',event=>{const message=event.detail&&event.detail.message;if(message&&typeof global.showStatus==='function')global.showStatus(message)});
   }
-  function init(){if(initialized)return;initialized=true;bind();renderTabs()}
-  function refresh(){renderTabs()}
+  async function init(){if(initialized)return;initialized=true;await initializeStore();bind();renderTabs()}
+  async function refresh(){await initializeStore();renderTabs()}
 
   global.KGGraphFileTabs={init,refresh,renderTabs,openFile,closeFile,createFile,manualSave,updateCurrentFileDisplay};
 })(window);

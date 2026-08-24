@@ -1,0 +1,35 @@
+'use strict';
+const assert=require('assert');
+const fs=require('fs');
+const path=require('path');
+const vm=require('vm');
+const root=path.resolve(__dirname,'..');
+const pending=[];
+const context={console,Promise,setTimeout,clearTimeout,Date,JSON,__KG_DIRECT_BOOTSTRAP__:{authenticated:true,authUser:{username:'alice'},graphFilesApiCutoverEnabled:true},fetch:async(url,options={})=>new Promise(resolve=>pending.push({url,options,resolve}))};
+context.window=context;context.globalThis=context;
+let user='alice';
+context.KGAuthCore={providerConfig:()=>({mode:'remote'}),currentUser:()=>user?({username:user}):null,currentUsername:()=>user};
+vm.createContext(context);
+vm.runInContext(fs.readFileSync(path.join(root,'src/23-graph-file-api.js'),'utf8'),context);
+vm.runInContext(fs.readFileSync(path.join(root,'src/23-graph-file-remote-adapter.js'),'utf8'),context);
+async function respond(payload){for(let i=0;i<20&&!pending.length;i++)await new Promise(resolve=>setTimeout(resolve,0));const request=pending.shift();assert(request,'expected a pending request');request.resolve({ok:true,json:async()=>payload});await Promise.resolve()}
+(async()=>{
+  const adapter=context.KGGraphFileRemoteAdapter;
+  assert.strictEqual(typeof adapter.handleSessionChange,'function');
+  const aliceInit=adapter.initialize({fallbackGraphData:{meta:{title:'访客默认'},nodes:[]}});
+  await respond({files:[{id:'alice-1',name:'Alice'}]});
+  await respond({id:'alice-1',graphData:{meta:{title:'Alice'},nodes:[]}});
+  await respond({ok:true});
+  await aliceInit;
+  assert.strictEqual(adapter.getCurrentFileMeta().id,'alice-1');
+  user='bob';
+  const bobInit=adapter.handleSessionChange({detail:{authenticated:true,username:'bob'}});
+  assert.strictEqual(adapter.getCurrentFileMeta(),null);
+  user='';
+  await adapter.handleSessionChange({detail:{authenticated:false,username:''}});
+  assert.strictEqual(adapter.getCurrentFileMeta(),null);
+  await respond({files:[{id:'bob-1',name:'Bob'}]});
+  await bobInit;
+  assert.strictEqual(adapter.getCurrentFileMeta(),null,'stale login response must not restore cache after logout');
+  console.log('graph session switch test passed');
+})().catch(error=>{console.error(error);process.exitCode=1});

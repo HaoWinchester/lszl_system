@@ -16,6 +16,11 @@
       "ordinal": 3
     },
     {
+      "path": "frontend/scripts/direct-runtime.test.mjs",
+      "token": "/api/v1/runtime/state",
+      "ordinal": 1
+    },
+    {
       "path": "frontend/scripts/new-legacy-assets/paper-release-adapter.js",
       "token": "/api/v1/runtime/state",
       "ordinal": 1
@@ -54,6 +59,11 @@
     },
     {
       "path": "frontend/scripts/direct-runtime.test.mjs",
+      "token": "KGServerStateBootstrap",
+      "ordinal": 2
+    },
+    {
+      "path": "frontend/scripts/direct-runtime.test.mjs",
       "token": "KGServerStateStorage",
       "ordinal": 1
     },
@@ -68,6 +78,16 @@
       "ordinal": 3
     },
     {
+      "path": "frontend/scripts/direct-runtime.test.mjs",
+      "token": "KGServerStateStorage",
+      "ordinal": 4
+    },
+    {
+      "path": "frontend/scripts/direct-runtime.test.mjs",
+      "token": "KGServerStateStorage",
+      "ordinal": 5
+    },
+    {
       "path": "frontend/scripts/new-legacy-assets/direct-system-adapter.js",
       "token": "KGServerStateStorage",
       "ordinal": 1
@@ -76,11 +96,6 @@
       "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
       "token": "KGServerStateBootstrap",
       "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "KGServerStateBootstrap",
-      "ordinal": 2
     },
     {
       "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
@@ -273,6 +288,31 @@
       "path": "backend/app/services/engagement_service.py",
       "token": "kg_user_message",
       "ordinal": 2
+    },
+    {
+      "path": "backend/app/services/files_runtime_migration_service.py",
+      "token": "kg_graph_current_file_v2",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/files_runtime_migration_service.py",
+      "token": "kg_graph_file_content_v2__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/files_runtime_migration_service.py",
+      "token": "kg_graph_file_index_v2",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/files_runtime_migration_service.py",
+      "token": "kg_graph_file_tags_v2",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/files_runtime_migration_service.py",
+      "token": "kg_graph_folders_v1",
+      "ordinal": 1
     },
     {
       "path": "backend/app/services/question_cleanup_reference_service.py",
@@ -1136,6 +1176,11 @@
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_graph_current_file_v1",
+      "ordinal": 3
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_graph_current_file_v2",
       "ordinal": 1
     },
@@ -1156,8 +1201,18 @@
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_graph_current_file_v2",
+      "ordinal": 5
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_graph_file_content_v2__",
       "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_graph_file_content_v2__",
+      "ordinal": 2
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
@@ -1186,6 +1241,11 @@
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_graph_file_index_v2",
+      "ordinal": 5
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_graph_file_library_v1",
       "ordinal": 1
     },
@@ -1193,6 +1253,11 @@
       "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_graph_file_library_v1",
       "ordinal": 2
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_graph_file_library_v1",
+      "ordinal": 3
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
@@ -1208,6 +1273,11 @@
       "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_graph_file_migration_v2",
       "ordinal": 3
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_graph_file_migration_v2",
+      "ordinal": 4
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
@@ -1221,6 +1291,11 @@
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_graph_file_tags_v1",
+      "ordinal": 3
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_graph_file_tags_v2",
       "ordinal": 1
     },
@@ -1236,6 +1311,11 @@
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_graph_file_tags_v2",
+      "ordinal": 4
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_graph_folders_v1",
       "ordinal": 1
     },
@@ -1248,6 +1328,11 @@
       "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_graph_folders_v1",
       "ordinal": 3
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_graph_folders_v1",
+      "ordinal": 4
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
@@ -1268,6 +1353,11 @@
       "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_graph_recent_opened_migration_v1",
       "ordinal": 2
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_graph_recent_opened_migration_v1",
+      "ordinal": 3
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
@@ -1338,6 +1428,11 @@
       "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_home_file_library_v1",
       "ordinal": 2
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_home_file_library_v1",
+      "ordinal": 3
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
@@ -2021,6 +2116,16 @@
     },
     {
       "path": "frontend/scripts/direct-runtime.test.mjs",
+      "token": "kg_default_entry_mode_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/direct-runtime.test.mjs",
+      "token": "kg_graph_file_index_v2",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/direct-runtime.test.mjs",
       "token": "kg_principle_repository_v1",
       "ordinal": 1
     },
@@ -2088,6 +2193,61 @@
       "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
       "token": "kg_exam_papers_published_v1",
       "ordinal": 3
+    },
+    {
+      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
+      "token": "kg_graph_current_file_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
+      "token": "kg_graph_current_file_v2",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
+      "token": "kg_graph_file_content_v2__",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
+      "token": "kg_graph_file_index_v2",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
+      "token": "kg_graph_file_library_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
+      "token": "kg_graph_file_migration_v2",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
+      "token": "kg_graph_file_tags_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
+      "token": "kg_graph_file_tags_v2",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
+      "token": "kg_graph_folders_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
+      "token": "kg_graph_recent_opened_migration_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
+      "token": "kg_home_file_library_v1",
+      "ordinal": 1
     },
     {
       "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
@@ -3212,6 +3372,11 @@
     {
       "path": "new-legacy/src/22-home-file-library.js",
       "token": "kg_home_file_library_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/23-graph-file-api.js",
+      "token": "kg_remote_auth_session_v1",
       "ordinal": 1
     },
     {

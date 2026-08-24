@@ -102,6 +102,151 @@ test('direct bootstrap preserves the backend namespace for paper management save
   assert.equal(window.KGServerStateBootstrap.namespace, 'papers')
 })
 
+test('direct bootstrap refreshes its public session snapshot after remote login', async () => {
+  class CustomEvent {
+    constructor(type, options = {}) {
+      this.type = type
+      this.detail = options.detail
+    }
+  }
+  const nativeStorage = {
+    values: new Map(),
+    get length() { return this.values.size },
+    getItem(key) { return this.values.get(String(key)) ?? null },
+    setItem(key, value) { this.values.set(String(key), String(value)) },
+    removeItem(key) { this.values.delete(String(key)) },
+    clear() { this.values.clear() },
+    key(index) { return [...this.values.keys()][Number(index)] ?? null },
+  }
+  const listeners = new Map()
+  let loggedIn = false
+  const runtimeWrites = []
+  const fetch = async (url, options = {}) => {
+    if (String(url).startsWith('/api/v1/auth/me')) {
+      return loggedIn
+        ? { ok: true, json: async () => ({ user: { username: 'admin-a', role: 'admin' }, loginSessionId: 'session-a' }) }
+        : { ok: false, status: 401 }
+    }
+    if (String(url).endsWith('/api/v1/runtime/state') && options.method === 'PUT') runtimeWrites.push(options.body)
+    return { ok: true, json: async () => ({ storage: {}, revision: 2, contentRevision: 3 }) }
+  }
+  const window = {
+    location: { pathname: '/practice-mode.html' },
+    localStorage: nativeStorage,
+    __PMP_PRODUCT_RELEASE__: 'v9.0-test',
+    __KG_DIRECT_BOOTSTRAP__: {
+      page: 'practice-mode.html',
+      namespace: 'page',
+      authenticated: false,
+      authUser: null,
+      graphFilesApiCutoverEnabled: true,
+      revision: 0,
+      contentRevision: 0,
+      readOnly: false,
+    },
+    crypto: { randomUUID: () => 'runtime-login-test-request' },
+    navigator: {},
+    setTimeout: () => 0,
+    clearTimeout() {},
+    queueMicrotask(callback) { callback() },
+    addEventListener(type, callback) {
+      if (!listeners.has(type)) listeners.set(type, [])
+      listeners.get(type).push(callback)
+    },
+    dispatchEvent() {},
+  }
+  window.window = window
+  vm.runInNewContext(source, { window, fetch, CustomEvent, URLSearchParams, console })
+  await new Promise(resolve => setImmediate(resolve))
+
+  loggedIn = true
+  for (const listener of listeners.get('kg:auth-session-changed') || []) {
+    listener({ detail: { authenticated: true, username: 'admin-a', loginSessionId: 'session-a' } })
+  }
+  await new Promise(resolve => setImmediate(resolve))
+  await new Promise(resolve => setImmediate(resolve))
+
+  assert.equal(window.__KG_DIRECT_BOOTSTRAP__.authenticated, true)
+  assert.equal(window.__KG_DIRECT_BOOTSTRAP__.authUser.username, 'admin-a')
+  assert.equal(window.__KG_DIRECT_BOOTSTRAP__.releaseVersion, 'v9.0-test')
+  assert.equal(window.KGServerStateBootstrap.authenticated, true)
+
+  window.localStorage.setItem('kg_graph_file_index_v2', '[]')
+  await window.KGServerStateStorage.flush()
+  assert.equal(runtimeWrites.length, 0, 'cut-over graph keys must never enter runtime-state writes')
+  window.localStorage.setItem('kg_default_entry_mode_v1', 'free')
+  await window.KGServerStateStorage.flush()
+  assert.equal(runtimeWrites.length, 1, 'unrelated runtime preferences must remain writable')
+})
+
+test('a stale anonymous hydration cannot overwrite a newer authenticated session', async () => {
+  class CustomEvent {
+    constructor(type, options = {}) {
+      this.type = type
+      this.detail = options.detail
+    }
+  }
+  const nativeStorage = {
+    values: new Map(),
+    get length() { return this.values.size },
+    getItem(key) { return this.values.get(String(key)) ?? null },
+    setItem(key, value) { this.values.set(String(key), String(value)) },
+    removeItem(key) { this.values.delete(String(key)) },
+    clear() { this.values.clear() },
+    key(index) { return [...this.values.keys()][Number(index)] ?? null },
+  }
+  const listeners = new Map()
+  const authResolvers = []
+  const fetch = async (url) => {
+    if (String(url).startsWith('/api/v1/auth/me')) {
+      return new Promise(resolve => authResolvers.push(resolve))
+    }
+    return { ok: true, json: async () => ({ storage: {}, revision: 2, contentRevision: 3 }) }
+  }
+  const window = {
+    location: { pathname: '/practice-mode.html' },
+    localStorage: nativeStorage,
+    __KG_DIRECT_BOOTSTRAP__: {
+      page: 'practice-mode.html',
+      namespace: 'page',
+      authenticated: false,
+      authUser: null,
+      revision: 0,
+      contentRevision: 0,
+      readOnly: false,
+    },
+    crypto: { randomUUID: () => 'runtime-race-test-request' },
+    navigator: {},
+    setTimeout: () => 0,
+    clearTimeout() {},
+    queueMicrotask(callback) { callback() },
+    addEventListener(type, callback) {
+      if (!listeners.has(type)) listeners.set(type, [])
+      listeners.get(type).push(callback)
+    },
+    dispatchEvent() {},
+  }
+  window.window = window
+  vm.runInNewContext(source, { window, fetch, CustomEvent, URLSearchParams, console })
+  assert.equal(authResolvers.length, 1)
+
+  for (const listener of listeners.get('kg:auth-session-changed') || []) {
+    listener({ detail: { authenticated: true, username: 'admin-a', loginSessionId: 'session-a' } })
+  }
+  assert.equal(authResolvers.length, 2)
+  authResolvers[1]({
+    ok: true,
+    json: async () => ({ user: { username: 'admin-a', role: 'admin' }, loginSessionId: 'session-a' }),
+  })
+  await new Promise(resolve => setImmediate(resolve))
+  await new Promise(resolve => setImmediate(resolve))
+  authResolvers[0]({ ok: false, status: 401 })
+  await new Promise(resolve => setImmediate(resolve))
+
+  assert.equal(window.__KG_DIRECT_BOOTSTRAP__.authenticated, true)
+  assert.equal(window.__KG_DIRECT_BOOTSTRAP__.authUser.username, 'admin-a')
+})
+
 test('direct state persistence never posts to a parent window', () => {
   assert.doesNotMatch(source, /parent\.postMessage/)
   assert.match(source, /fetch\(['"]\/api\/v1\/runtime\/state['"]/)
@@ -194,9 +339,9 @@ test('graph autosave adapter uses the domain file save result', () => {
 
 test('file manager navigates after the domain store write without runtime flush', () => {
   const manager = readFileSync(resolve(scriptsDir, '..', '..', 'new-legacy', 'src', '27-graph-file-manager.js'), 'utf8')
-  assert.match(manager, /function openFile\(id\)/)
-  assert.match(manager, /store\.openFile\(id,\{owner:currentOwner\(\)\}\)/)
-  assert.match(manager, /onSubmit:value=>\{/)
+  assert.match(manager, /async function openFile\(id\)/)
+  assert.match(manager, /await Promise\.resolve\(store\.openFile\(id,\{owner:currentOwner\(\)\}\)\)/)
+  assert.match(manager, /onSubmit:async value=>\{/)
   assert.doesNotMatch(manager, /KGServerStateStorage\.flush/)
   assert.doesNotMatch(manager, /flushServerStateBeforeNavigation/)
   assert.doesNotMatch(manager, /location\.href='index\.html\?mode=free'/)

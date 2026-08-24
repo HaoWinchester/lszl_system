@@ -104,6 +104,17 @@ pnpm test
 
 cd "$REPO_DIR"
 node new-legacy/tests/landing-page-contract.test.js
+node new-legacy/tests/shared-auth-dialog.test.js
+node --test \
+  new-legacy/tests/graph-file-api-cutover.test.js \
+  new-legacy/tests/graph-file-remote-adapter.test.js \
+  new-legacy/tests/graph-file-remote-store.test.js \
+  new-legacy/tests/graph-file-editor-store-bridge.test.js \
+  new-legacy/tests/graph-file-tabs-remote.test.js \
+  new-legacy/tests/graph-file-bootstrap-session.test.js \
+  new-legacy/tests/graph-file-autosave-remote.test.js \
+  new-legacy/tests/graph-file-session-switch.test.js \
+  new-legacy/tests/file-manager-remote-store.test.js
 python3 new-legacy/tests/landing-page-browser.py
 python3 new-legacy/content-prep-studio/tests/test_services.py
 python3 new-legacy/content-prep-studio/tests/test_build.py
@@ -142,10 +153,12 @@ cd "$REPO_DIR/backend"
 DATABASE_URL="$VALIDATION_DATABASE_URL" \
 NEW_LEGACY_RELEASE_ROOT="$VALIDATION_ROOT/releases" \
 QUESTION_CATALOG_CUTOVER_ENABLED=true \
+GRAPH_FILES_API_CUTOVER_ENABLED=true \
   .venv/bin/python -m alembic upgrade head
 DATABASE_URL="$VALIDATION_DATABASE_URL" \
 NEW_LEGACY_RELEASE_ROOT="$VALIDATION_ROOT/releases" \
 QUESTION_CATALOG_CUTOVER_ENABLED=true \
+GRAPH_FILES_API_CUTOVER_ENABLED=true \
   .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port "$INTEGRATED_PORT" \
   >"$INTEGRATED_LOG" 2>&1 &
 INTEGRATED_PID=$!

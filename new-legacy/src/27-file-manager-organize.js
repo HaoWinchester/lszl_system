@@ -1,7 +1,7 @@
 'use strict';
 /* v8.4.7 标签创建二级菜单延迟隐藏与内联管理。 */
 (function(global){
-  const store=global.KGGraphFileStore,$=id=>document.getElementById(id);
+  let store=global.KGGraphFileStore;const $=id=>document.getElementById(id);
   let api=null,pickerItems=[],editingTagId='',createCloseTimer=null;
 
   const esc=value=>String(value??'').replace(/[&<>\'\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -34,12 +34,12 @@
     const names=selected.map(item=>{const f=records.find(x=>x.id===item.id);return f&&f.tags&&f.tags[0]||''});
     return names.every(name=>name===names[0])?names[0]:null;
   }
-  function applyTag(name){
+  async function applyTag(name){
     const selected=selectedFiles();if(!selected.length)return false;let ok=true;
-    selected.forEach(item=>{if(!store.setFileTags(item.id,name?[name]:[],{owner:owner(),emit:false}))ok=false});
+    for(const item of selected){if(!await Promise.resolve(store.setFileTags(item.id,name?[name]:[],{owner:owner(),emit:false})))ok=false}
     if(!ok){notify(store.getLastError&&store.getLastError()||'标签更新失败。','error');return false}
     notify(name?`已标记为“${name}”。`:'已取消标签。');
-    closePicker();refresh();return true;
+    closePicker();await Promise.resolve(refresh());return true;
   }
 
   function editPanelHtml(tag){
@@ -90,36 +90,37 @@
     const pop=$('fmTagPicker');pop.hidden=false;positionPopover(pop,anchor);
     setTimeout(()=>search&&search.focus(),0);
   }
-  function createInlineTag(){
+  async function createInlineTag(){
     const name=$('fmInlineTagName').value.trim(),color=$('fmInlineTagColor').value;
     if(!name){$('fmInlineTagName').focus();return}
-    const created=store.createTag(name,color,{owner:owner()});
+    const created=await Promise.resolve(store.createTag(name,color,{owner:owner()}));
     if(!created){notify(store.getLastError&&store.getLastError()||'创建标签失败。','error');return}
-    $('fmInlineTagName').value='';applyTag(created.name);
+    $('fmInlineTagName').value='';await applyTag(created.name);
   }
   function beginEdit(id){
     editingTagId=id;setCreateOpen(false);renderPicker(searchTerm());
     setTimeout(()=>{const input=document.querySelector(`[data-tag-editor="${CSS.escape(id)}"] .fm-tag-inline-name`);if(input){input.focus();input.select()}},0);
   }
   function cancelEdit(){editingTagId='';renderPicker(searchTerm())}
-  function saveEdit(id){
+  async function saveEdit(id){
     const editor=document.querySelector(`[data-tag-editor="${CSS.escape(id)}"]`);if(!editor)return;
     const name=editor.querySelector('.fm-tag-inline-name').value.trim(),color=editor.querySelector('.fm-tag-inline-color').value;
     if(!name){editor.querySelector('.fm-tag-inline-name').focus();return}
-    const updated=store.updateTag(id,{name,color},{owner:owner()});
+    const updated=await Promise.resolve(store.updateTag(id,{name,color},{owner:owner()}));
     if(!updated){notify(store.getLastError&&store.getLastError()||'保存标签失败。','error');return}
-    editingTagId='';notify('标签已更新。');refresh();renderPicker(searchTerm());
+    editingTagId='';notify('标签已更新。');await Promise.resolve(refresh());renderPicker(searchTerm());
   }
-  function removeTag(id){
+  async function removeTag(id){
     const tag=tags().find(item=>item.id===id);if(!tag)return;
     if(!confirm(`删除标签“${tag.name}”？相关文件将取消该标签。`))return;
-    if(!store.deleteTag(id,{owner:owner()})){notify(store.getLastError&&store.getLastError()||'删除标签失败。','error');return}
+    if(!await Promise.resolve(store.deleteTag(id,{owner:owner()}))){notify(store.getLastError&&store.getLastError()||'删除标签失败。','error');return}
     if(editingTagId===id)editingTagId='';
-    notify('标签已删除。');refresh();renderPicker(searchTerm());
+    notify('标签已删除。');await Promise.resolve(refresh());renderPicker(searchTerm());
   }
 
   function init(options){
     api=options||{};
+    if(api.store)store=api.store;
     $('fmTagPickerList')?.addEventListener('click',event=>{
       const edit=event.target.closest('[data-tag-edit]');if(edit){event.preventDefault();event.stopPropagation();beginEdit(edit.dataset.tagEdit);return}
       const del=event.target.closest('[data-tag-delete]');if(del){event.preventDefault();event.stopPropagation();removeTag(del.dataset.tagDelete);return}

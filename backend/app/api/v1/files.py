@@ -43,7 +43,11 @@ async def create_file(body: dict, db: DB, user: CurrentUser):
         name=body.get("name", "新图谱"),
         graph_data=body.get("graphData"),
         folder_id=body.get("folderId"),
+        source=body.get("source", "created"),
+        source_file_id=body.get("sourceFileId"),
     )
+    if not f:
+        raise HTTPException(status_code=404, detail="目标文件夹不存在")
     return {"file": file_service.file_meta(f)}
 
 
@@ -55,7 +59,8 @@ async def get_current(db: DB, user: CurrentUser):
 
 @router.put("/current")
 async def set_current(body: dict, db: DB, user: CurrentUser):
-    await file_service.set_current(db, user.username, body.get("fileId"))
+    if not await file_service.set_current(db, user.username, body.get("fileId")):
+        raise _nf()
     return {"ok": True}
 
 
@@ -71,8 +76,7 @@ async def import_legacy(body: dict, db: DB, user: CurrentUser):
 
 @router.post("/trash/empty")
 async def empty_trash(db: DB, user: CurrentUser):
-    n = await file_service.empty_trash(db, user.username)
-    return {"deleted": n}
+    return await file_service.empty_trash(db, user.username)
 
 
 @router.get("/folders")
@@ -83,12 +87,19 @@ async def list_folders(db: DB, user: CurrentUser, status: str = Query("active"))
 @router.post("/folders")
 async def create_folder(body: dict, db: DB, user: CurrentUser):
     f = await file_service.create_folder(db, user.username, body.get("name", "新建文件夹"), body.get("parentId"))
+    if not f:
+        raise HTTPException(status_code=404, detail="目标文件夹不存在")
     return {"folder": file_service.folder_to_dict(f)}
 
 
 @router.patch("/folders/{folder_id}")
-async def rename_folder(folder_id: str, body: dict, db: DB, user: CurrentUser):
-    f = await file_service.rename_folder(db, user.username, folder_id, body.get("name", ""))
+async def patch_folder(folder_id: str, body: dict, db: DB, user: CurrentUser):
+    if "name" in body:
+        f = await file_service.rename_folder(db, user.username, folder_id, body["name"])
+    elif "parentId" in body:
+        f = await file_service.move_folder(db, user.username, folder_id, body.get("parentId"))
+    else:
+        raise HTTPException(status_code=400, detail="未指定操作（name 或 parentId）")
     if not f:
         raise _nf()
     return {"folder": file_service.folder_to_dict(f)}
@@ -98,6 +109,25 @@ async def rename_folder(folder_id: str, body: dict, db: DB, user: CurrentUser):
 async def delete_folder(folder_id: str, db: DB, user: CurrentUser):
     ok = await file_service.delete_folder(db, user.username, folder_id)
     if not ok:
+        raise _nf()
+    return {"ok": True}
+
+
+@router.post("/folders/{folder_id}/restore")
+async def restore_folder(folder_id: str, db: DB, user: CurrentUser):
+    folder = await file_service.restore_folder(db, user.username, folder_id)
+    if folder is None:
+        raise _nf()
+    return {"folder": file_service.folder_to_dict(folder)}
+
+
+@router.delete("/folders/{folder_id}/permanent")
+async def delete_folder_permanent(folder_id: str, db: DB, user: CurrentUser):
+    try:
+        deleted = await file_service.delete_folder_permanent(db, user.username, folder_id)
+    except file_service.FolderNotEmpty as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not deleted:
         raise _nf()
     return {"ok": True}
 
@@ -123,7 +153,8 @@ async def update_tag(tag_id: str, body: dict, db: DB, user: CurrentUser):
 
 @router.delete("/tags/{tag_id}")
 async def delete_tag(tag_id: str, db: DB, user: CurrentUser):
-    await file_service.delete_tag(db, user.username, tag_id)
+    if not await file_service.delete_tag(db, user.username, tag_id):
+        raise _nf()
     return {"ok": True}
 
 
@@ -146,9 +177,21 @@ async def open_file(file_id: str, db: DB, user: CurrentUser):
 
 @router.put("/{file_id}")
 async def save_file(file_id: str, body: dict, db: DB, user: CurrentUser):
-    f = await file_service.save_file(
-        db, user.username, file_id, body.get("graphData", {}), body.get("learningState")
-    )
+    try:
+        f = await file_service.save_file(
+            db,
+            user.username,
+            file_id,
+            body.get("graphData", {}),
+            body.get("learningState"),
+            body.get("expectedRevision"),
+        )
+    except file_service.FileRevisionConflict as exc:
+        raise HTTPException(status_code=409, detail={
+            "code": "FILE_REVISION_CONFLICT",
+            "message": str(exc),
+            "currentRevision": exc.current_revision,
+        }) from exc
     if not f:
         raise _nf()
     return {"file": file_service.file_meta(f)}
@@ -160,8 +203,12 @@ async def patch_file(file_id: str, body: dict, db: DB, user: CurrentUser):
         f = await file_service.rename_file(db, user.username, file_id, body["name"])
     elif "folderId" in body:
         f = await file_service.move_file(db, user.username, file_id, body.get("folderId"))
+    elif "favorite" in body:
+        f = await file_service.set_file_favorite(
+            db, user.username, file_id, body.get("favorite") is True
+        )
     else:
-        raise HTTPException(status_code=400, detail="未指定操作（name 或 folderId）")
+        raise HTTPException(status_code=400, detail="未指定操作（name、folderId 或 favorite）")
     if not f:
         raise _nf()
     return {"file": file_service.file_meta(f)}

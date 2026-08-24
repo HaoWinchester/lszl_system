@@ -17,7 +17,7 @@
   const FOLDER_SECTION_COLLAPSED_KEY='kg_file_manager_folder_section_collapsed_v1';
   const MAX_IMPORT_NODES=2500;
   const MAX_IMPORT_LINKS=5000;
-  const store=global.KGGraphFileStore;
+  let store=global.KGGraphFileStore;
   const packages=global.KGHomePackageService;
   const auth=global.KGAuthCore||{};
   const roles=global.KGRolePermissions||{};
@@ -311,11 +311,11 @@
     if(!force&&state.integrityResult&&state.integrityOwner===owner)return;
     if(state.integrityScheduled)return;
     state.integrityScheduled=true;
-    const run=()=>{
+    const run=async()=>{
       state.integrityScheduled=false;
       const requestOwner=currentOwner();
       try{
-        const result=store.verifyIntegrity({owner:requestOwner});
+        const result=await Promise.resolve(store.verifyIntegrity({owner:requestOwner}));
         if(requestOwner!==currentOwner())return;
         state.integrityResult=result;state.integrityOwner=requestOwner;renderIntegrity();
       }catch(err){console.warn('[KGGraphFileManager] integrity check failed',err)}
@@ -352,8 +352,11 @@
     });
     return state.view==='recent'?files.slice(0,24):files;
   }
-  function refreshData(options={}){
+  async function refreshData(options={}){
     if(!store)return;
+    if(!options.skipStoreRefresh&&store===global.KGGraphFileRemoteStore&&typeof store.refresh==='function'){
+      try{await store.refresh()}catch(err){toast(store.getLastError&&store.getLastError()||err.message||'文件列表刷新失败。','error');return}
+    }
     state.activeFiles=store.listFiles({owner:currentOwner()});
     state.trashFiles=store.listFiles({owner:currentOwner(),includeTrash:true,status:'trashed'});
     state.folders=store.listFolders?store.listFolders({owner:currentOwner()}):[];
@@ -386,11 +389,11 @@
     const files=[...state.activeFiles,...state.trashFiles],missing=files.some(file=>!file.preview||!file.preview.structureHash);
     if(!missing)return;
     state.previewBackfillRunning=true;
-    const run=()=>{
+    const run=async()=>{
       let changed=0;
       try{
-        changed=store.refreshFilePreviews({owner:currentOwner(),includeTrash:true,maxCount:8,emit:false});
-        if(changed)refreshData({previews:false});
+        changed=await Promise.resolve(store.refreshFilePreviews({owner:currentOwner(),includeTrash:true,maxCount:8,emit:false}));
+        if(changed)await refreshData({previews:false});
       }catch(err){console.warn('[KGGraphFileManager] preview backfill failed',err)}
       finally{state.previewBackfillRunning=false;if(changed)schedulePreviewBackfill()}
     };
@@ -591,10 +594,10 @@
   }
   function closeFavoriteTagsPopover(){const pop=$('fmFavoriteTagsPopover');if(pop)pop.hidden=true;const form=$('fmFavoriteTagCreateForm');if(form)form.hidden=true}
   function setFavoriteTagCreateOpen(open){const form=$('fmFavoriteTagCreateForm');if(!form)return;form.hidden=!open;if(open)setTimeout(()=>$('fmFavoriteTagName')?.focus(),0)}
-  function createFavoriteTag(){
+  async function createFavoriteTag(){
     if(!requireEdit())return;const name=$('fmFavoriteTagName').value.trim(),color=$('fmFavoriteTagColor').value;if(!name){$('fmFavoriteTagName').focus();return}
-    const created=store.createTag(name,color,{owner:currentOwner()});if(!created){toast(store.getLastError&&store.getLastError()||'创建标签失败。','error');return}
-    $('fmFavoriteTagName').value='';setFavoriteTagCreateOpen(false);state.tagFilter=created.name;refreshData({toast:'标签已创建。'});positionFavoriteTagsPopover();
+    const created=await Promise.resolve(store.createTag(name,color,{owner:currentOwner()}));if(!created){toast(store.getLastError&&store.getLastError()||'创建标签失败。','error');return}
+    $('fmFavoriteTagName').value='';setFavoriteTagCreateOpen(false);state.tagFilter=created.name;await refreshData({toast:'标签已创建。',skipStoreRefresh:true});positionFavoriteTagsPopover();
   }
   function applySidebarCollapsed(collapsed,{persist=true}={}){
     state.sidebarCollapsed=!!collapsed;const app=$('fileManagerApp'),button=$('fmSidebarCollapseBtn');if(app)app.classList.toggle('is-sidebar-collapsed',state.sidebarCollapsed);
@@ -683,17 +686,18 @@
   function selectFile(id,options){selectItem('file',id,options)}
   function selectFolder(id,options){selectItem('folder',id,options)}
   function openFolder(id){const value=String(id??'');if(state.view!=='trash'){state.view='files';state.tagFilter=''}state.showAllFiles=value==='__all__';state.currentFolderId=state.showAllFiles?null:(value||null);if(state.currentFolderId)folderAncestors(state.currentFolderId).forEach(folder=>state.expandedFolders.add(folder.id));state.selectedId='';state.selectedType='file';state.selectedItems.clear();state.selectionMode=false;state.query='';$('fmSearchInput').value='';closeFavoriteTagsPopover();render()}
-  function openFile(id){
+  async function openFile(id){
     if(state.navigating)return;
-    const file=store.openFile(id,{owner:currentOwner()});
+    let file;
+    try{file=await Promise.resolve(store.openFile(id,{owner:currentOwner()}))}catch(error){toast(store.getLastError&&store.getLastError()||error.message||'图谱文件打开失败。','error');return}
     if(!file){toast(store.getLastError&&store.getLastError()||'图谱文件打开失败。','error');return}
     state.navigating=true;location.href='index.html';
   }
   function openCreateModal(){
     if(!requireEdit('登录后才能新建图谱文件。'))return;
     const name=uniqueName('新图谱文件');
-    openModal({title:'新建图谱',description:'创建一个空白知识图谱文件，并进入编辑器。',name,submitLabel:'创建并打开',onSubmit:value=>{
-      const safe=uniqueName(value||name),file=store.createFile({name:safe,graphData:blankGraph(safe),source:'created',folderId:state.currentFolderId},{owner:currentOwner(),makeCurrent:true});
+    openModal({title:'新建图谱',description:'创建一个空白知识图谱文件，并进入编辑器。',name,submitLabel:'创建并打开',onSubmit:async value=>{
+      const safe=uniqueName(value||name),file=await Promise.resolve(store.createFile({name:safe,graphData:blankGraph(safe),source:'created',folderId:state.currentFolderId},{owner:currentOwner(),makeCurrent:true}));
       if(!file)throw new Error(store.getLastError&&store.getLastError()||'新建图谱失败。');
       location.href='index.html';
     }});
@@ -716,7 +720,7 @@
     if(state.renameSession)commitInlineRename();
     return beginInlineRename(file,card);
   }
-  function finishInlineRename(session,{cancel=false}={}){
+  async function finishInlineRename(session,{cancel=false}={}){
     if(!session||session.finishing)return false;session.finishing=true;
     const {card,input,originalName}=session;state.renameSession=null;
     const name=document.createElement('strong');name.className='fm-file-name';name.title=originalName;name.textContent=originalName;
@@ -727,7 +731,7 @@
     if(!raw){toast('文件名不能为空，已保留原名称。','error');return false}
     const isFolder=session.kind==='folder',nextName=isFolder?uniqueFolderName(raw,session.id,session.file.parentId):uniqueName(raw,session.id);
     if(nextName===originalName)return true;
-    const renamed=isFolder?store.renameFolder(session.id,nextName,{owner:currentOwner(),includeTrash:session.file.status==='trashed',emit:false}):store.renameFile(session.id,nextName,{owner:currentOwner(),includeTrash:session.file.status==='trashed',emit:false});
+    const renamed=await Promise.resolve(isFolder?store.renameFolder(session.id,nextName,{owner:currentOwner(),includeTrash:session.file.status==='trashed',emit:false}):store.renameFile(session.id,nextName,{owner:currentOwner(),includeTrash:session.file.status==='trashed',emit:false}));
     if(!renamed){toast(store.getLastError&&store.getLastError()||'重命名失败。','error');return false}
     const local=(isFolder?[...state.folders,...state.trashFolders]:[...state.activeFiles,...state.trashFiles]).find(item=>item.id===session.id);if(local)Object.assign(local,renamed,{graphData:undefined,learningState:undefined});
     name.textContent=nextName;name.title=nextName;if(card){card.setAttribute('aria-label',`${nextName}，双击打开`);card.querySelector('[data-menu-file]')?.setAttribute('aria-label',`${nextName}的更多操作`);card.querySelector('[data-select-id]')?.setAttribute('aria-label',`选择 ${nextName}`)}
@@ -738,84 +742,84 @@
 
   function openCreateFolder(){
     if(!requireEdit('登录后才能新建文件夹。'))return;
-    openModal({title:'新建文件夹',description:'在当前位置创建文件夹。',name:uniqueFolderName('新建文件夹'),nameLabel:'文件夹名称',submitLabel:'创建',onSubmit:value=>{const folder=store.createFolder({name:uniqueFolderName(value||'新建文件夹'),parentId:state.currentFolderId},{owner:currentOwner()});if(!folder)throw new Error(store.getLastError&&store.getLastError()||'新建文件夹失败。');state.selectedType='folder';state.selectedId=folder.id;refreshData({toast:'文件夹已创建。'})}});
+    openModal({title:'新建文件夹',description:'在当前位置创建文件夹。',name:uniqueFolderName('新建文件夹'),nameLabel:'文件夹名称',submitLabel:'创建',onSubmit:async value=>{const folder=await Promise.resolve(store.createFolder({name:uniqueFolderName(value||'新建文件夹'),parentId:state.currentFolderId},{owner:currentOwner()}));if(!folder)throw new Error(store.getLastError&&store.getLastError()||'新建文件夹失败。');state.selectedType='folder';state.selectedId=folder.id;await refreshData({toast:'文件夹已创建。',skipStoreRefresh:true})}});
   }
   function uniqueFolderName(base,excludeId='',parentId=state.currentFolderId){
     const names=new Set([...state.folders,...state.trashFolders].filter(folder=>folder.id!==excludeId&&(folder.parentId||null)===(parentId||null)).map(folder=>folder.name.toLowerCase()));return uniqueNameFromSet(base,names);
   }
   function renameFolder(id){
     if(!requireEdit())return false;const folder=[...state.folders,...state.trashFolders].find(item=>item.id===id);if(!folder)return false;
-    openModal({title:'重命名文件夹',description:'修改文件夹名称。',name:folder.name,nameLabel:'文件夹名称',submitLabel:'保存',onSubmit:value=>{
+    openModal({title:'重命名文件夹',description:'修改文件夹名称。',name:folder.name,nameLabel:'文件夹名称',submitLabel:'保存',onSubmit:async value=>{
       const nextName=uniqueFolderName(value||folder.name,folder.id,folder.parentId);
-      const renamed=store.renameFolder(folder.id,nextName,{owner:currentOwner(),includeTrash:folder.status==='trashed'});
+      const renamed=await Promise.resolve(store.renameFolder(folder.id,nextName,{owner:currentOwner(),includeTrash:folder.status==='trashed'}));
       if(!renamed)throw new Error(store.getLastError&&store.getLastError()||'重命名失败。');
-      refreshData({toast:nextName!==value?`文件夹已重命名为“${nextName}”。`:'文件夹已重命名。'});
+      await refreshData({toast:nextName!==value?`文件夹已重命名为“${nextName}”。`:'文件夹已重命名。',skipStoreRefresh:true});
     }});return true;
   }
   function folderOptions(excludeId=''){
     const descendants=new Set();if(excludeId){const queue=[excludeId];while(queue.length){const parent=queue.shift();state.folders.forEach(folder=>{if(folder.parentId===parent&&!descendants.has(folder.id)){descendants.add(folder.id);queue.push(folder.id)}})}}
     const items=[{id:'',name:'全部文件'}],walk=(parentId,depth)=>state.folders.filter(folder=>(folder.parentId||null)===(parentId||null)&&folder.id!==excludeId&&!descendants.has(folder.id)).forEach(folder=>{items.push({id:folder.id,name:'　'.repeat(depth)+folder.name});walk(folder.id,depth+1)});walk(null,0);return items;
   }
-  function moveItems(items,targetId,{announce=true}={}){
+  async function moveItems(items,targetId,{announce=true}={}){
     if(!requireEdit()||!Array.isArray(items)||!items.length)return false;targetId=targetId||null;
     const snapshots=items.map(item=>{const source=item.kind==='folder'?state.folders.find(x=>x.id===item.id):state.activeFiles.find(x=>x.id===item.id);return source?{...item,from:item.kind==='folder'?(source.parentId||null):(source.folderId||null),name:source.name}:null}).filter(Boolean);
     const moved=[];
-    for(const item of snapshots){const result=item.kind==='folder'?store.moveFolder(item.id,targetId,{owner:currentOwner()}):store.moveFile(item.id,targetId,{owner:currentOwner()});if(!result){for(const done of moved.reverse())done.kind==='folder'?store.moveFolder(done.id,done.from,{owner:currentOwner()}):store.moveFile(done.id,done.from,{owner:currentOwner()});toast(store.getLastError&&store.getLastError()||'移动失败。','error');return false}moved.push(item)}
-    rememberFolder(targetId);state.selectedItems.clear();state.undoMove={items:moved,targetId};refreshData();
+    for(const item of snapshots){const result=await Promise.resolve(item.kind==='folder'?store.moveFolder(item.id,targetId,{owner:currentOwner()}):store.moveFile(item.id,targetId,{owner:currentOwner()}));if(!result){for(const done of moved.reverse())await Promise.resolve(done.kind==='folder'?store.moveFolder(done.id,done.from,{owner:currentOwner()}):store.moveFile(done.id,done.from,{owner:currentOwner()}));toast(store.getLastError&&store.getLastError()||'移动失败。','error');return false}moved.push(item)}
+    rememberFolder(targetId);state.selectedItems.clear();state.undoMove={items:moved,targetId};await refreshData({skipStoreRefresh:true});
     if(announce){const target=targetId?state.folders.find(folder=>folder.id===targetId):null;toast(`已移动 ${moved.length} 个项目到${target?'“'+target.name+'”':'根目录'}。`,'success',5200,{label:'撤销',handler:()=>undoLastMove()})}
     return true;
   }
-  function undoLastMove(){const undo=state.undoMove;if(!undo)return false;state.undoMove=null;let ok=true;for(const item of undo.items){const result=item.kind==='folder'?store.moveFolder(item.id,item.from,{owner:currentOwner()}):store.moveFile(item.id,item.from,{owner:currentOwner()});if(!result)ok=false}refreshData({toast:ok?'已撤销移动。':'部分项目撤销失败。'});return ok}
+  async function undoLastMove(){const undo=state.undoMove;if(!undo)return false;state.undoMove=null;let ok=true;for(const item of undo.items){const result=await Promise.resolve(item.kind==='folder'?store.moveFolder(item.id,item.from,{owner:currentOwner()}):store.moveFile(item.id,item.from,{owner:currentOwner()}));if(!result)ok=false}await refreshData({toast:ok?'已撤销移动。':'部分项目撤销失败。',skipStoreRefresh:true});return ok}
   function openMoveDialog(kind,id){
     if(!requireEdit())return;const item=kind==='folder'?state.folders.find(folder=>folder.id===id):state.activeFiles.find(file=>file.id===id);if(!item)return;
     const items=state.selectedItems.has(itemKey(kind,id))?selectedPayload():[{kind,id}];
-    openModal({title:'选择其他位置',description:`为 ${items.length} 个项目选择目标文件夹。`,hideName:true,showMove:true,moveValue:item.parentId||item.folderId||'',moveOptions:folderOptions(items.length===1&&kind==='folder'?id:''),submitLabel:'移动',onSubmit:()=>{const target=$('fmMoveTarget').value||null;if(!moveItems(items,target))throw new Error(store.getLastError&&store.getLastError()||'移动失败。')}})
+    openModal({title:'选择其他位置',description:`为 ${items.length} 个项目选择目标文件夹。`,hideName:true,showMove:true,moveValue:item.parentId||item.folderId||'',moveOptions:folderOptions(items.length===1&&kind==='folder'?id:''),submitLabel:'移动',onSubmit:async()=>{const target=$('fmMoveTarget').value||null;if(!await moveItems(items,target))throw new Error(store.getLastError&&store.getLastError()||'移动失败。')}})
   }
-  function trashFolder(id){if(!requireEdit())return;const folder=state.folders.find(item=>item.id===id);if(!folder)return;openModal({title:'移入回收站',description:'文件夹及其中内容可在回收站恢复。',warning:`确定将“${folder.name}”及其中内容移入回收站吗？`,hideName:true,submitLabel:'移入回收站',danger:true,onSubmit:()=>{if(!store.trashFolder(id,{owner:currentOwner()}))throw new Error(store.getLastError&&store.getLastError()||'删除文件夹失败。');state.selectedId='';state.currentFolderId=null;refreshData({toast:'文件夹已移入回收站。'})}})}
-  function restoreFolder(id){if(!requireEdit())return;const previous=state.trashFolders.find(folder=>folder.id===id),expectedParent=previous&&(previous.restoreParentId||previous.parentId)||null;const result=store.restoreFolder(id,{owner:currentOwner()});if(!result){toast(store.getLastError&&store.getLastError()||'恢复文件夹失败。','error');return}const fellBackToRoot=!!expectedParent&&!result.parentId;state.view='files';state.currentFolderId=result.id;state.showAllFiles=false;state.selectedType='folder';state.selectedId=result.id;state.expandedFolders.add(result.id);folderAncestors(result.id).forEach(folder=>state.expandedFolders.add(folder.id));refreshData({toast:fellBackToRoot?'原位置不可用，文件夹已恢复到根目录。':'文件夹及其中内容已恢复。'})}
-  function permanentlyDeleteFolder(id){if(!requireEdit())return;const folder=state.trashFolders.find(item=>item.id===id);if(!folder)return;openModal({title:'永久删除文件夹',description:'仅空文件夹可以单独永久删除。',warning:`确定永久删除“${folder.name}”吗？`,hideName:true,submitLabel:'永久删除',danger:true,onSubmit:()=>{if(!store.deleteFolderPermanently(id,{owner:currentOwner()}))throw new Error(store.getLastError&&store.getLastError()||'永久删除文件夹失败。');refreshData({toast:'文件夹已永久删除。'})}})}
-  function duplicateFile(id){
+  function trashFolder(id){if(!requireEdit())return;const folder=state.folders.find(item=>item.id===id);if(!folder)return;openModal({title:'移入回收站',description:'文件夹及其中内容可在回收站恢复。',warning:`确定将“${folder.name}”及其中内容移入回收站吗？`,hideName:true,submitLabel:'移入回收站',danger:true,onSubmit:async()=>{if(!await Promise.resolve(store.trashFolder(id,{owner:currentOwner()})))throw new Error(store.getLastError&&store.getLastError()||'删除文件夹失败。');state.selectedId='';state.currentFolderId=null;await refreshData({toast:'文件夹已移入回收站。',skipStoreRefresh:true})}})}
+  async function restoreFolder(id){if(!requireEdit())return;const previous=state.trashFolders.find(folder=>folder.id===id),expectedParent=previous&&(previous.restoreParentId||previous.parentId)||null;let result;try{result=await Promise.resolve(store.restoreFolder(id,{owner:currentOwner()}))}catch(error){toast(store.getLastError&&store.getLastError()||error.message||'恢复文件夹失败。','error');return}if(!result){toast(store.getLastError&&store.getLastError()||'恢复文件夹失败。','error');return}const fellBackToRoot=!!expectedParent&&!result.parentId;state.view='files';state.currentFolderId=result.id;state.showAllFiles=false;state.selectedType='folder';state.selectedId=result.id;state.expandedFolders.add(result.id);folderAncestors(result.id).forEach(folder=>state.expandedFolders.add(folder.id));await refreshData({toast:fellBackToRoot?'原位置不可用，文件夹已恢复到根目录。':'文件夹及其中内容已恢复。',skipStoreRefresh:true})}
+  function permanentlyDeleteFolder(id){if(!requireEdit())return;const folder=state.trashFolders.find(item=>item.id===id);if(!folder)return;openModal({title:'永久删除文件夹',description:'仅空文件夹可以单独永久删除。',warning:`确定永久删除“${folder.name}”吗？`,hideName:true,submitLabel:'永久删除',danger:true,onSubmit:async()=>{if(!await Promise.resolve(store.deleteFolderPermanently(id,{owner:currentOwner()})))throw new Error(store.getLastError&&store.getLastError()||'永久删除文件夹失败。');await refreshData({toast:'文件夹已永久删除。',skipStoreRefresh:true})}})}
+  async function duplicateFile(id){
     if(!requireEdit())return;const source=state.activeFiles.find(file=>file.id===id);if(!source)return;
-    const copy=store.duplicateFile(id,{owner:currentOwner(),name:uniqueName(source.name+' 副本'),makeCurrent:false});
+    const copy=await Promise.resolve(store.duplicateFile(id,{owner:currentOwner(),name:uniqueName(source.name+' 副本'),makeCurrent:false}));
     if(!copy){toast(store.getLastError&&store.getLastError()||'创建副本失败。','error');return}
-    state.view='files';state.selectedId=copy.id;refreshData({toast:'已创建图谱副本。'});
+    state.view='files';state.selectedId=copy.id;await refreshData({toast:'已创建图谱副本。',skipStoreRefresh:true});
   }
   function trashFile(id){
     if(!requireEdit())return;const file=state.activeFiles.find(item=>item.id===id);if(!file)return;
-    openModal({title:'移入回收站',description:'文件可在回收站中恢复。',warning:`确定将“${file.name}”移入回收站吗？`,hideName:true,submitLabel:'移入回收站',danger:true,onSubmit:()=>{
-      if(!store.deleteFile(id,{owner:currentOwner()}))throw new Error(store.getLastError&&store.getLastError()||'删除失败。');
+    openModal({title:'移入回收站',description:'文件可在回收站中恢复。',warning:`确定将“${file.name}”移入回收站吗？`,hideName:true,submitLabel:'移入回收站',danger:true,onSubmit:async()=>{
+      if(!await Promise.resolve(store.deleteFile(id,{owner:currentOwner()})))throw new Error(store.getLastError&&store.getLastError()||'删除失败。');
       state.selectedId='';
-      refreshData({toast:'文件已移入回收站。'});
+      await refreshData({toast:'文件已移入回收站。',skipStoreRefresh:true});
     }});
   }
-  function restoreFile(id){
+  async function restoreFile(id){
     if(!requireEdit())return;
     const previous=state.trashFiles.find(file=>file.id===id),expectedFolder=previous&&(previous.restoreFolderId||previous.folderId)||null;
-    const restored=store.restoreFile(id,{owner:currentOwner(),makeCurrent:false});
+    let restored;try{restored=await Promise.resolve(store.restoreFile(id,{owner:currentOwner(),makeCurrent:false}))}catch(error){toast(store.getLastError&&store.getLastError()||error.message||'恢复失败。','error');return}
     if(!restored){toast(store.getLastError&&store.getLastError()||'恢复失败。','error');return}
     const fellBackToRoot=!!expectedFolder&&!restored.folderId;
     state.view='files';state.currentFolderId=restored.folderId||null;state.showAllFiles=false;state.selectedType='file';state.selectedId=restored.id;state.selectedItems=new Set([itemKey('file',restored.id)]);
     if(restored.folderId)folderAncestors(restored.folderId).forEach(folder=>state.expandedFolders.add(folder.id));
-    refreshData({toast:fellBackToRoot?'原文件夹不可用，文件已恢复到根目录。':restored.folderId?'文件已恢复到原文件夹。':'文件已恢复到根目录。'});
+    await refreshData({toast:fellBackToRoot?'原文件夹不可用，文件已恢复到根目录。':restored.folderId?'文件已恢复到原文件夹。':'文件已恢复到根目录。',skipStoreRefresh:true});
   }
   function permanentlyDelete(id){
     if(!requireEdit())return;const file=state.trashFiles.find(item=>item.id===id);if(!file)return;
-    openModal({title:'永久删除文件',description:'此操作无法撤销。',warning:`“${file.name}”及其图谱内容将被永久删除。`,hideName:true,submitLabel:'永久删除',danger:true,onSubmit:()=>{
-      if(!store.deleteFile(id,{owner:currentOwner(),permanent:true}))throw new Error(store.getLastError&&store.getLastError()||'永久删除失败。');
-      refreshData({toast:'文件已永久删除。'});
+    openModal({title:'永久删除文件',description:'此操作无法撤销。',warning:`“${file.name}”及其图谱内容将被永久删除。`,hideName:true,submitLabel:'永久删除',danger:true,onSubmit:async()=>{
+      if(!await Promise.resolve(store.deleteFile(id,{owner:currentOwner(),permanent:true})))throw new Error(store.getLastError&&store.getLastError()||'永久删除失败。');
+      await refreshData({toast:'文件已永久删除。',skipStoreRefresh:true});
     }});
   }
   function emptyTrash(){
     if(!requireEdit())return;
-    openModal({title:'清空回收站',description:'此操作无法撤销。',warning:`将永久删除回收站中的 ${state.trashFolders.length} 个文件夹和 ${state.trashFiles.length} 个文件。`,hideName:true,submitLabel:'全部永久删除',danger:true,onSubmit:()=>{
-      const count=store.emptyTrash({owner:currentOwner()});
+    openModal({title:'清空回收站',description:'此操作无法撤销。',warning:`将永久删除回收站中的 ${state.trashFolders.length} 个文件夹和 ${state.trashFiles.length} 个文件。`,hideName:true,submitLabel:'全部永久删除',danger:true,onSubmit:async()=>{
+      const count=await Promise.resolve(store.emptyTrash({owner:currentOwner()}));
       if(!count&&(state.trashFiles.length||state.trashFolders.length))throw new Error(store.getLastError&&store.getLastError()||'清空回收站失败。');
       state.selectedId='';
-      refreshData({toast:`已永久删除 ${count} 个文件。`});
+      await refreshData({toast:`已永久删除 ${count} 个项目。`,skipStoreRefresh:true});
     }});
   }
-  function exportFile(id){
-    const file=store.getFile(id,currentOwner());
+  async function exportFile(id){
+    const file=await Promise.resolve(store.getFile(id,currentOwner()));
     if(!file||!file.graphData){toast(store.getLastError&&store.getLastError()||'读取文件内容失败。','error');return}
     try{packages.downloadPackage(file.graphData,{filename:packages.safeFileBase(file.name)+'-学习包.zip'});toast('学习包已开始下载。')}catch(err){toast('导出失败：'+err.message,'error')}
   }
@@ -834,13 +838,13 @@
         try{
           const raw=await packages.parseFile(inputFile),graph=normalizeImportedGraph(raw),base=graph.meta&&graph.meta.title||String(inputFile.name||'导入的图谱').replace(/\.(zip|json)$/i,''),name=reserveUnique(base);
           graph.meta.title=name;
-          const created=store.createFile({name,graphData:graph,source:'package-import',sourceFileId:raw&&raw.id||'',folderId:state.currentFolderId},{owner:currentOwner(),makeCurrent:false,emit:false});
+          const created=await Promise.resolve(store.createFile({name,graphData:graph,source:'package-import',sourceFileId:raw&&raw.id||'',folderId:state.currentFolderId},{owner:currentOwner(),makeCurrent:false,emit:false}));
           if(!created)throw new Error(store.getLastError&&store.getLastError()||'文件库写入失败。');
           success++;
         }catch(err){errors.push(`${inputFile.name||'未命名文件'}：${err.message||err}`)}
       }
     }finally{setBusy(false);$('fmFileInput').value=''}
-    state.view='files';state.filter='all';state.query='';$('fmSearchInput').value='';refreshData();
+    state.view='files';state.filter='all';state.query='';$('fmSearchInput').value='';await refreshData({skipStoreRefresh:true});
     if(success)toast(`成功导入 ${success} 个图谱文件。`);
     if(errors.length)toast(errors.slice(0,3).join('\n')+(errors.length>3?`\n另有 ${errors.length-3} 个错误。`:''),'error',6500);
   }
@@ -854,18 +858,18 @@
   function openBatchMoveDialog(){
     const items=selectedPayload();if(!items.length)return;
     const first=items[0],source=first.kind==='folder'?state.folders.find(x=>x.id===first.id):state.activeFiles.find(x=>x.id===first.id);
-    openModal({title:'选择其他位置',description:`为 ${items.length} 个项目选择目标文件夹。`,hideName:true,showMove:true,moveValue:source&&(source.parentId||source.folderId)||'',moveOptions:folderOptions(items.length===1&&first.kind==='folder'?first.id:''),submitLabel:'移动',onSubmit:()=>{const target=$('fmMoveTarget').value||null;if(!moveItems(items,target))throw new Error(store.getLastError&&store.getLastError()||'移动失败。');setSelectionMode(false)}})
+    openModal({title:'选择其他位置',description:`为 ${items.length} 个项目选择目标文件夹。`,hideName:true,showMove:true,moveValue:source&&(source.parentId||source.folderId)||'',moveOptions:folderOptions(items.length===1&&first.kind==='folder'?first.id:''),submitLabel:'移动',onSubmit:async()=>{const target=$('fmMoveTarget').value||null;if(!await moveItems(items,target))throw new Error(store.getLastError&&store.getLastError()||'移动失败。');setSelectionMode(false)}})
   }
   function batchTrash(){
     const items=selectedPayload();if(!items.length||!requireEdit())return;
-    openModal({title:'批量移入回收站',description:`将选中的 ${items.length} 个项目移入回收站。`,warning:'文件夹会连同其中内容一起移入回收站。',hideName:true,submitLabel:'移入回收站',danger:true,onSubmit:()=>{
-      const done=[];for(const item of items){const ok=item.kind==='folder'?store.trashFolder(item.id,{owner:currentOwner()}):store.deleteFile(item.id,{owner:currentOwner()});if(!ok){for(const previous of done.reverse()){if(previous.kind==='folder')store.restoreFolder(previous.id,{owner:currentOwner()});else store.restoreFile(previous.id,{owner:currentOwner(),makeCurrent:false})}throw new Error(store.getLastError&&store.getLastError()||'批量删除失败。')}done.push(item)}
-      setSelectionMode(false);refreshData({toast:`已将 ${done.length} 个项目移入回收站。`});
+    openModal({title:'批量移入回收站',description:`将选中的 ${items.length} 个项目移入回收站。`,warning:'文件夹会连同其中内容一起移入回收站。',hideName:true,submitLabel:'移入回收站',danger:true,onSubmit:async()=>{
+      const done=[];for(const item of items){const ok=await Promise.resolve(item.kind==='folder'?store.trashFolder(item.id,{owner:currentOwner()}):store.deleteFile(item.id,{owner:currentOwner()}));if(!ok){for(const previous of done.reverse()){if(previous.kind==='folder')await Promise.resolve(store.restoreFolder(previous.id,{owner:currentOwner()}));else await Promise.resolve(store.restoreFile(previous.id,{owner:currentOwner(),makeCurrent:false}))}throw new Error(store.getLastError&&store.getLastError()||'批量删除失败。')}done.push(item)}
+      setSelectionMode(false);await refreshData({toast:`已将 ${done.length} 个项目移入回收站。`,skipStoreRefresh:true});
     }});
   }
-  function batchExport(){
+  async function batchExport(){
     const files=selectedPayload().filter(item=>item.kind==='file');if(!files.length)return;
-    let count=0;for(const item of files){const file=store.getFile(item.id,currentOwner());if(file&&file.graphData){try{packages.downloadPackage(file.graphData,{filename:packages.safeFileBase(file.name)+'-学习包.zip'});count++}catch(err){}}}
+    let count=0;for(const item of files){const file=await Promise.resolve(store.getFile(item.id,currentOwner()));if(file&&file.graphData){try{packages.downloadPackage(file.graphData,{filename:packages.safeFileBase(file.name)+'-学习包.zip'});count++}catch(err){}}}
     toast(count?`已开始导出 ${count} 个图谱文件。`:'没有可导出的图谱文件。',count?'success':'error');
   }
 
@@ -926,27 +930,27 @@
   }
 
   function closeContextMenu(){clearTimeout(state.submenuTimer);$('fmContextMenu').hidden=true;$('fmMoveSubmenu').hidden=true;$('fmContextMenu').dataset.fileId='';$('fmContextMenu').dataset.folderId='';$('fmContextMenu').dataset.itemType=''}
-  function runAction(action,id){
+  async function runAction(action,id){
     if(state.busy)return;
     const actionKind=$('fmContextMenu').dataset.itemType||state.selectedType;
     closeContextMenu();
     if(action==='details'){setDetailsOpen(true);renderInspector();}
     else if(action==='tags'){const organizer=global.KGFileManagerOrganize;if(organizer)organizer.openTagPicker(state.selectedItems.has(itemKey(actionKind,id))?selectedPayload():[{kind:actionKind,id}],$('fmDetailsBtn'));}
-    else if(action.startsWith('quick-move:')){const target=action.slice(11)||null;const kind=actionKind;moveItems(state.selectedItems.has(itemKey(kind,id))?selectedPayload():[{kind,id}],target);}
-    else if(action==='open')openFile(id);
-    else if(action==='favorite'){const file=state.activeFiles.find(item=>item.id===id),saved=file&&store.setFileFavorite?.(id,!file.favorite,{owner:currentOwner()});if(saved)refreshData({toast:saved.favorite?'已加入我的收藏。':'已取消收藏。'});else toast(store.getLastError&&store.getLastError()||'收藏状态更新失败。','error')}
+    else if(action.startsWith('quick-move:')){const target=action.slice(11)||null;const kind=actionKind;await moveItems(state.selectedItems.has(itemKey(kind,id))?selectedPayload():[{kind,id}],target);}
+    else if(action==='open')await openFile(id);
+    else if(action==='favorite'){const file=state.activeFiles.find(item=>item.id===id),saved=file&&await Promise.resolve(store.setFileFavorite?.(id,!file.favorite,{owner:currentOwner()}));if(saved)await refreshData({toast:saved.favorite?'已加入我的收藏。':'已取消收藏。',skipStoreRefresh:true});else toast(store.getLastError&&store.getLastError()||'收藏状态更新失败。','error')}
     else if(action==='rename')renameFile(id);
     else if(action==='move')openMoveDialog('file',id);
     else if(action==='folder-open')openFolder(id);
     else if(action==='folder-rename')renameFolder(id);
     else if(action==='folder-move')openMoveDialog('folder',id);
     else if(action==='folder-trash')trashFolder(id);
-    else if(action==='folder-restore')restoreFolder(id);
+    else if(action==='folder-restore')await restoreFolder(id);
     else if(action==='folder-permanent')permanentlyDeleteFolder(id);
-    else if(action==='duplicate')duplicateFile(id);
-    else if(action==='export')exportFile(id);
+    else if(action==='duplicate')await duplicateFile(id);
+    else if(action==='export')await exportFile(id);
     else if(action==='trash')trashFile(id);
-    else if(action==='restore')restoreFile(id);
+    else if(action==='restore')await restoreFile(id);
     else if(action==='permanent')permanentlyDelete(id);
   }
 
@@ -1038,7 +1042,7 @@
       if(target&&!target.contains(event.relatedTarget)){target.classList.remove('is-drop-target','is-drop-forbidden');delete target.dataset.dropHint}
       if(!event.currentTarget.contains(event.relatedTarget))document.querySelectorAll('.fm-folder-tree .is-drop-target,.fm-folder-tree .is-drop-forbidden').forEach(el=>{el.classList.remove('is-drop-target','is-drop-forbidden');delete el.dataset.dropHint});
     });
-    $('fmFolderTree')?.addEventListener('drop',event=>{
+    $('fmFolderTree')?.addEventListener('drop',async event=>{
       if(!state.dragPayload||state.view==='trash')return;
       event.preventDefault();
       const payload=state.dragPayload.slice(),target=event.target.closest('[data-folder-open]'),isUncategorized=!!(target&&target.dataset.folderOpen===''),hasFolder=payload.some(item=>item&&item.kind==='folder');
@@ -1048,7 +1052,7 @@
         if(illegal){toast(isUncategorized?'文件夹不能放入“未分类文件”。':'不能移动到自身或自己的子文件夹。','error');return}
         const dragged=payload.length===1&&payload[0].kind==='folder'?state.folders.find(folder=>folder.id===payload[0].id):null;
         if(dragged&&(dragged.parentId||null)===(id||null)){toast('文件夹已在该位置。');return}
-        if(moveItems(payload,id)&&id)state.expandedFolders.add(id);
+        if(await moveItems(payload,id)&&id)state.expandedFolders.add(id);
       }finally{
         clearFolderDragState();
       }
@@ -1093,10 +1097,10 @@
       const id=card.dataset.childFolderId,illegal=isIllegalDropTarget(state.dragPayload,id);event.preventDefault();event.dataTransfer.dropEffect=illegal?'none':'move';card.classList.toggle('is-drop-target',!illegal);card.classList.toggle('is-drop-forbidden',illegal);setFolderDropHint(card,id,{illegal});
     });
     $('fmChildFolderGrid')?.addEventListener('dragleave',event=>{const card=event.target.closest('[data-child-folder-id]');if(card&&!card.contains(event.relatedTarget)){card.classList.remove('is-drop-target','is-drop-forbidden');delete card.dataset.dropHint}});
-    $('fmChildFolderGrid')?.addEventListener('drop',event=>{
+    $('fmChildFolderGrid')?.addEventListener('drop',async event=>{
       if(!state.dragPayload||state.view==='trash')return;const card=event.target.closest('[data-child-folder-id]');if(!card)return;event.preventDefault();
       const payload=state.dragPayload.slice(),id=card.dataset.childFolderId,illegal=isIllegalDropTarget(payload,id);
-      try{if(illegal){toast('不能移动到自身或自己的子文件夹。','error');return}const dragged=payload.length===1&&payload[0].kind==='folder'?state.folders.find(folder=>folder.id===payload[0].id):null;if(dragged&&(dragged.parentId||null)===id){toast('文件夹已在该位置。');return}if(moveItems(payload,id))state.expandedFolders.add(id)}finally{clearFolderDragState()}
+      try{if(illegal){toast('不能移动到自身或自己的子文件夹。','error');return}const dragged=payload.length===1&&payload[0].kind==='folder'?state.folders.find(folder=>folder.id===payload[0].id):null;if(dragged&&(dragged.parentId||null)===id){toast('文件夹已在该位置。');return}if(await moveItems(payload,id))state.expandedFolders.add(id)}finally{clearFolderDragState()}
     });
     $('fmFileGrid').addEventListener('click',event=>{
       const tagButton=event.target.closest('[data-tag-file]');if(tagButton){event.preventDefault();event.stopPropagation();const file=state.activeFiles.find(item=>item.id===tagButton.dataset.tagFile);if(file)global.KGFileManagerOrganize&&global.KGFileManagerOrganize.openTagPicker([{kind:'file',id:file.id}],tagButton);return}
@@ -1126,7 +1130,7 @@
     $('fmBreadcrumbBar').addEventListener('click',event=>{const button=event.target.closest('[data-folder-path]');if(button&&!button.disabled)openFolder(button.dataset.folderPath)});
     $('fmBreadcrumbBar').addEventListener('dragover',event=>{const button=event.target.closest('[data-folder-path]');if(button&&state.dragPayload){const target=button.dataset.folderPath||null,illegal=isIllegalDropTarget(state.dragPayload,target);event.preventDefault();event.dataTransfer.dropEffect=illegal?'none':'move';button.classList.toggle('is-drop-target',!illegal);button.classList.toggle('is-drop-forbidden',illegal)}});
     $('fmBreadcrumbBar').addEventListener('dragleave',event=>{const button=event.target.closest('[data-folder-path]');if(button&&!button.contains(event.relatedTarget))button.classList.remove('is-drop-target','is-drop-forbidden')});
-    $('fmBreadcrumbBar').addEventListener('drop',event=>{const button=event.target.closest('[data-folder-path]');if(!button||!state.dragPayload)return;event.preventDefault();const target=button.dataset.folderPath||null,illegal=isIllegalDropTarget(state.dragPayload,target);button.classList.remove('is-drop-target','is-drop-forbidden');if(illegal){toast('不能移动到自身或自己的子文件夹。','error');return}moveItems(state.dragPayload,target)});
+    $('fmBreadcrumbBar').addEventListener('drop',async event=>{const button=event.target.closest('[data-folder-path]');if(!button||!state.dragPayload)return;event.preventDefault();const target=button.dataset.folderPath||null,illegal=isIllegalDropTarget(state.dragPayload,target);button.classList.remove('is-drop-target','is-drop-forbidden');if(illegal){toast('不能移动到自身或自己的子文件夹。','error');return}await moveItems(state.dragPayload,target)});
     $('fmInfoActions').addEventListener('click',event=>{const button=event.target.closest('[data-info-action]');if(button&&state.selectedId)runAction(button.dataset.infoAction,state.selectedId)});
     $('fmModalClose').addEventListener('click',closeModal);$('fmModalCancel').addEventListener('click',closeModal);$('fmModal').addEventListener('submit',submitModal);$('fmModalBackdrop').addEventListener('mousedown',event=>{if(event.target===$('fmModalBackdrop'))closeModal()});
     document.addEventListener('pointerdown',event=>{if(state.renameSession&&!event.target.closest('.fm-file-name-input')&&!event.target.closest('[data-menu-action="rename"],[data-info-action="rename"]'))commitInlineRename()},{capture:true});
@@ -1136,7 +1140,7 @@
       if(event.altKey&&event.key==='Enter'){event.preventDefault();toggleDetails()}
       if(event.key==='Escape'&&!state.busy){if(!$('fmModalBackdrop').hidden)closeModal();else if(state.detailsOpen)setDetailsOpen(false);else if(state.selectionMode)setSelectionMode(false);else{closeContextMenu();closeFavoriteTagsPopover();setAccountMenu(false)}}
     });
-    const refreshOwner=()=>{state.selectedId='';state.currentFolderId=null;state.showAllFiles=true;state.tagFilter='';state.selectedItems.clear();state.selectionMode=false;state.initialSelectionDone=false;state.integrityResult=null;state.integrityOwner='';setAccountMenu(false);updateIdentity();try{store.purgeExpiredTrash({owner:currentOwner()})}catch(err){}refreshData()};
+    const refreshOwner=async()=>{state.selectedId='';state.currentFolderId=null;state.showAllFiles=true;state.tagFilter='';state.selectedItems.clear();state.selectionMode=false;state.initialSelectionDone=false;state.integrityResult=null;state.integrityOwner='';setAccountMenu(false);updateIdentity();try{store=await global.KGFileManagerStoreBridge.initialize();await Promise.resolve(store.purgeExpiredTrash({owner:currentOwner()}))}catch(err){console.warn('[KGGraphFileManager] account refresh failed',err)}await refreshData({skipStoreRefresh:true})};
     global.addEventListener('kg-graph-file-change',()=>refreshData());
     global.addEventListener('kg-auth-session-change',refreshOwner);
     global.addEventListener('kg-auth-users-change',refreshOwner);
@@ -1150,12 +1154,13 @@
     const mobile=isMobileReadonly(),notice=$('fmMobileReadonlyNotice');document.body.classList.toggle('is-mobile-readonly',mobile);
     if(notice)notice.hidden=!mobile;
   }
-  function init(){
+  async function init(){
+    try{if(global.KGFileManagerStoreBridge)store=await global.KGFileManagerStoreBridge.initialize()}catch(error){document.body.innerHTML='<p style="padding:24px">文件服务初始化失败，请稍后刷新重试。</p>';console.warn('[KGGraphFileManager] store initialize failed',error);return}
     if(!store||!packages){document.body.innerHTML='<p style="padding:24px">文件管理模块加载失败，请返回编辑器重试。</p>';return}
     initTheme();readRecentFolders();syncMobileReadonly();applySidebarCollapsed(state.sidebarCollapsed,{persist:false});applyFolderSectionCollapsed(state.folderSectionCollapsed,{persist:false});updateIdentity();bind();setDetailsOpen(state.detailsOpen,{persist:false});
-    if(global.KGFileManagerOrganize)global.KGFileManagerOrganize.init({owner:currentOwner,refresh:refreshData,toast,files:()=>[...state.activeFiles,...state.trashFiles],folders:()=>[...state.folders,...state.trashFolders]});
-    try{store.purgeExpiredTrash({owner:currentOwner()})}catch(err){}
-    refreshData();
+    if(global.KGFileManagerOrganize)global.KGFileManagerOrganize.init({store,owner:currentOwner,refresh:refreshData,toast,files:()=>[...state.activeFiles,...state.trashFiles],folders:()=>[...state.folders,...state.trashFolders]});
+    try{await Promise.resolve(store.purgeExpiredTrash({owner:currentOwner()}))}catch(err){}
+    await refreshData({skipStoreRefresh:true});
   }
 
   global.KGGraphFileManager={

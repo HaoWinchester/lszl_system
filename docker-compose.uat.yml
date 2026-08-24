@@ -30,6 +30,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://kg_uat:${POSTGRES_PASSWORD}@db:5432/kg_graph_uat
       CORS_ORIGINS: '["http://uat.aihuanpu.com"]'
       QUESTION_CATALOG_CUTOVER_ENABLED: "true"
+      GRAPH_FILES_API_CUTOVER_ENABLED: ${GRAPH_FILES_API_CUTOVER_ENABLED:-false}
       CONTENT_PREP_VALIDATION_DISABLED: "false"
       WECHAT_APP_ID: ""
       WECHAT_APP_SECRET: ""

@@ -134,6 +134,7 @@ function templateState(kind='pmp'){
     makeLink(m['敏捷价值观'],m['变更控制'],'对比','敏捷更强调适应变化，但仍需透明和共识')
   ];return s;
 }
+window.KGGraphDefaultFactory=()=>templateState('pmp');
 let state=templateState('pmp');
 let saveTimer=null,lastSavedSnapshot='',hoverDetailNodeId=null,hoverDetailTimer=null,detailDrag=null,detailPanelDragged=false;
 let selectedNodeIds=new Set(),selectedLinkIds=new Set(),selectedTextElementIds=new Set(),boxSelect=null;
@@ -255,6 +256,12 @@ function readLegacyState(){
 }
 function load(){
   try{
+    const remote=window.KGGraphFileRemoteAdapter;
+    if(remote&&remote.active&&remote.active()){
+      const remoteGraph=remote.getLoadedGraph&&remote.getLoadedGraph();
+      if(remoteGraph){state=sanitizeState(remoteGraph);lastSavedSnapshot=JSON.stringify(saveableState());return true}
+      return false;
+    }
     const legacy=readLegacyState(),fileStore=window.KGGraphFileStore;
     if(fileStore&&typeof fileStore.ensureInitialized==='function'){
       const file=fileStore.ensureInitialized({legacyKey:currentStoreKey(),graphData:legacy||undefined,fallbackGraphData:legacy?undefined:state});
@@ -282,6 +289,15 @@ function persistCurrentGraphNow(options={}){
     const snapshot=saveableState(),json=JSON.stringify(snapshot);
     if(json===lastSavedSnapshot&&!options.force)return true;
     const fileStore=window.KGGraphFileStore;
+    const remote=window.KGGraphFileRemoteAdapter;
+    if(remote&&remote.active&&remote.active()){
+      if(!remote.queueSave(snapshot,options))throw new Error('远端图谱文件尚未初始化');
+      return remote.flush().then(()=>{lastSavedSnapshot=json;return true}).catch(error=>{
+        console.warn('[KGGraphFileRemoteAdapter] save failed',error);
+        if(!options.silent)showStatus('保存失败：请检查网络后重试。');
+        return false;
+      });
+    }
     if(fileStore){
       let current=fileStore.getCurrentFileMeta?fileStore.getCurrentFileMeta():(fileStore.getCurrentFile&&fileStore.getCurrentFile());
       if(!current&&fileStore.ensureInitialized)current=fileStore.ensureInitialized({legacyKey:currentStoreKey(),graphData:snapshot,fallbackGraphData:snapshot});

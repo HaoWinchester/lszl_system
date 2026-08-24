@@ -61,10 +61,13 @@ with sync_playwright() as playwright:
             detail = ""
         http_errors.append(f"{response.status} {response.url} {detail}")
 
-    page.on("dialog", handle_dialog)
-    page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
-    page.on("pageerror", lambda error: page_errors.append(error.stack or str(error)) if len(page_errors) < 12 else None)
-    page.on("response", record_response)
+    def bind_page_observers(target) -> None:
+        target.on("dialog", handle_dialog)
+        target.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
+        target.on("pageerror", lambda error: page_errors.append(error.stack or str(error)) if len(page_errors) < 12 else None)
+        target.on("response", record_response)
+
+    bind_page_observers(page)
 
     try:
         print("smoke: guest learning entry lands on practice mode", flush=True)
@@ -163,12 +166,24 @@ with sync_playwright() as playwright:
             ("/learning/placement-test", ".glp-main"),
         ]
         for route, selector in routes:
-            page.goto(BASE + route, wait_until="networkidle")
+            # 教学内容与状态同步会持续轮询；稳定页面以 DOM + 根容器
+            # 就绪为准，不把“网络永远空闲”当作页面可用的先决条件。
+            page.goto(BASE + route, wait_until="domcontentloaded")
             page.locator(selector).wait_for(state="visible", timeout=15_000)
             assert page.locator("iframe").count() == 0, route
-            assert page.evaluate("window.__KG_DIRECT_BOOTSTRAP__?.releaseVersion") == EXPECTED_RELEASE
+            page.wait_for_function(
+                "version => window.__KG_DIRECT_BOOTSTRAP__?.releaseVersion === version",
+                arg=EXPECTED_RELEASE,
+                timeout=15_000,
+            )
 
-        page.goto(BASE + "/learning/node?node=awareness-keywords", wait_until="networkidle")
+        # placement-test 在无活动流程时可以自动导航。关闭旧 page 并在同一已登录
+        # context 新建 page，隔离它尚未触发的延迟导航，避免与下一条 smoke 路由争抢 frame。
+        previous_page = page
+        page = context.new_page()
+        bind_page_observers(page)
+        previous_page.close()
+        page.goto(BASE + "/learning/node?node=awareness-keywords", wait_until="domcontentloaded")
         page.locator(".gln-main").wait_for(state="visible")
         assert page.locator("iframe").count() == 0
 
@@ -197,7 +212,8 @@ with sync_playwright() as playwright:
             student_context.close()
 
         screenshot = Path("/tmp/new-legacy-direct-settings.png")
-        page.goto(BASE + "/settings", wait_until="networkidle")
+        page.goto(BASE + "/settings", wait_until="domcontentloaded")
+        page.locator(".ss-app").wait_for(state="visible", timeout=15_000)
         page.screenshot(path=str(screenshot), full_page=False)
         assert screenshot.exists()
 

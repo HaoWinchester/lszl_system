@@ -6,6 +6,7 @@ from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services import user_service
+from app.core.config import settings
 
 PAGE_NAMESPACES = {
     "index.html": "files",
@@ -86,6 +87,7 @@ async def build_bootstrap(
         "authUser": auth_user,
         "revision": revision,
         "contentRevision": content_revision,
+        "graphFilesApiCutoverEnabled": settings.GRAPH_FILES_API_CUTOVER_ENABLED,
         "storage": inline_storage,
         "readOnly": read_only,
     }
