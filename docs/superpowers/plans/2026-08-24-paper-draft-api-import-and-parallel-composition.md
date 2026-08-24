@@ -395,27 +395,27 @@ git commit -m "feat: migrate complete paper draft state"
 - Methods: `ready`, `list`, `detail`, `create`, `update`, `replaceQuestions`, `remove`, category CRUD, `importPreflight`, `importPaper`, `compositionPreflight`, `createCompositionBatch`
 - Emits `kg:paper-drafts-changed` after successful mutations
 
-- [ ] **Step 1: Write failing Node contract and VM behavior tests**
+- [x] **Step 1: Write failing Node contract and VM behavior tests**
 
 Assert credentials, JSON headers, exact endpoints/payloads, 401/403/409/422 error normalization, mutation events, and absence of `localStorage`, `sessionStorage`, or IndexedDB writes.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `cd frontend && node --test scripts/paper-draft-adapter.test.mjs`
 
 Expected: adapter file/injection is missing.
 
-- [ ] **Step 3: Implement one request helper and all adapter methods**
+- [x] **Step 3: Implement one request helper and all adapter methods**
 
 Return cloned API data, keep only current-page in-memory request state, attach `status/code/detail/currentRevision` to errors, and never synthesize successful paper rows after a failed request.
 
-- [ ] **Step 4: Inject the adapter before paper management code and test generated output**
+- [x] **Step 4: Inject the adapter before paper management code and test generated output**
 
 Run: `cd frontend && pnpm sync:new-legacy && node --test scripts/paper-draft-adapter.test.mjs scripts/paper-release-adapter.test.mjs`
 
 Expected: generated `paper-management.html` contains exactly one adapter before `src/65-question-bank-admin.js`; tests pass.
 
-- [ ] **Step 5: Commit the shared adapter**
+- [x] **Step 5: Commit the shared adapter**
 
 ```bash
 git add frontend/scripts/new-legacy-assets/paper-draft-adapter.js frontend/scripts/paper-draft-adapter.test.mjs frontend/scripts/sync-new-legacy.js frontend/scripts/new-legacy-contract.json frontend/public/new-legacy
