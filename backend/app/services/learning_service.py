@@ -22,11 +22,22 @@ WORKSPACE_SCHEMA_VERSIONS = set(range(1, 7))
 WORKSPACE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 PRACTICE_MISTAKE_STATUSES = {"pending", "needs_remediation", "verification_due", "mastered"}
 PRACTICE_LANGUAGE_MODES = {"zh", "en", "bilingual"}
+PUBLISHED_LEARNING_MODES = {
+    "practice_mode",
+    "deep_recall",
+    "multi_question_canvas",
+    "single_deep_study",
+}
 PRACTICE_REVIEW_DELAY = timedelta(days=1)
 
 
 def _iso(value) -> str | None:
     return value.isoformat() if value else None
+
+
+def _published_learning_mode(data: dict) -> str:
+    source_mode = str(data.get("sourceMode") or "").strip().lower()
+    return source_mode if source_mode in PUBLISHED_LEARNING_MODES else "practice_mode"
 
 
 async def _owned_question(db: AsyncSession, owner: str, question_id: str) -> bool:
@@ -329,7 +340,11 @@ async def record_practice_mistake(
         raise ValueError("questionId 不能为空")
     release_id = str(data.get("releaseId") or "").strip()
     question = await _visible_learning_question(
-        db, question_id, current_user, release_id=release_id, mode="practice_mode"
+        db,
+        question_id,
+        current_user,
+        release_id=release_id,
+        mode=_published_learning_mode(data),
     )
     if question is None:
         raise LookupError("题目不存在或当前不可学习")
@@ -534,7 +549,11 @@ async def record_practice_answer(
         raise ValueError("questionId 不能为空")
     release_id = str(data.get("releaseId") or "").strip()
     question = await _visible_learning_question(
-        db, question_id, current_user, release_id=release_id, mode="practice_mode"
+        db,
+        question_id,
+        current_user,
+        release_id=release_id,
+        mode=_published_learning_mode(data),
     )
     if question is None:
         raise LookupError("题目不存在或当前不可学习")

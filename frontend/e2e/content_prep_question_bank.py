@@ -134,8 +134,8 @@ with sync_playwright() as playwright:
     draft_id = ""
     try:
         guest_response = guest.request.get(BASE + "/content-prep", max_redirects=0)
-        assert guest_response.status == 307
-        assert guest_response.headers["location"].endswith("/login?next=%2Fcontent-prep")
+        assert guest_response.status == 200
+        assert 'id="prepApp"' in guest_response.text()
 
         login(student.request, "学生", "111111")
         login(viewer.request, "乔治008", "111111")
@@ -257,13 +257,17 @@ with sync_playwright() as playwright:
         )
 
         teacher_catalog = assert_ok(
-            admin.request.get(BASE + "/api/v1/question-catalog/bootstrap?mode=managed"),
+            admin.request.get(
+                BASE + "/api/v1/question-catalog/bootstrap?mode=managed&include_questions=true"
+            ),
             "managed catalog",
         )
         managed_ids = {item["id"] for item in teacher_catalog["questions"]}
         assert {private_question_id, public_question_id, internal_question_id} <= managed_ids
         learning_catalog = assert_ok(
-            student.request.get(BASE + "/api/v1/question-catalog/bootstrap?mode=learning"),
+            student.request.get(
+                BASE + "/api/v1/question-catalog/bootstrap?mode=learning&include_questions=true"
+            ),
             "learning catalog",
         )
         learning_ids = {item["id"] for item in learning_catalog["questions"]}

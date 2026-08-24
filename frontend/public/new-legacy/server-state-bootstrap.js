@@ -14,6 +14,19 @@
     'kg_remote_auth_session_v1',  // 认证会话必须写入真实 localStorage
     'kg_practice_auto_explanation_v1',  // 做题"自动解析"开关：设备级 UI 偏好，只存本浏览器
   ])
+  const deprecatedGraphRuntimeKeys = new Set([
+    'kg_graph_current_file_v1',
+    'kg_graph_current_file_v2',
+    'kg_graph_file_index_v2',
+    'kg_graph_file_library_v1',
+    'kg_graph_file_migration_v2',
+    'kg_graph_file_tags_v1',
+    'kg_graph_file_tags_v2',
+    'kg_graph_folders_v1',
+    'kg_graph_recent_opened_migration_v1',
+    'kg_home_file_library_v1',
+  ])
+  const deprecatedGraphRuntimePrefixes = ['kg_graph_file_content_v2__']
   const path = global.location.pathname.split('/').pop() || 'learning-path.html'
   // FastAPI 注入值是页面与数据域的权威配对；发送 runtime 请求时必须
   // 与后端 PAGE_NAMESPACES 一致，否则会被 422“页面与数据域不匹配”拒绝。
@@ -51,6 +64,7 @@
   const entry = {
     page,
     namespace,
+    releaseVersion: String(injected?.releaseVersion || global.__PMP_PRODUCT_RELEASE__ || ''),
     revision: 0,
     contentRevision: 0,
     authenticated: false,
@@ -104,9 +118,19 @@
     return null
   }
 
-  async function hydrateEntryFromSession() {
-    const serverInjected = entry.authenticated === true && entry.authUser != null
+  let sessionHydrationGeneration = 0
+
+  async function hydrateEntryFromSession({
+    forceServerSession = false,
+    generation = sessionHydrationGeneration,
+  } = {}) {
+    const serverInjected = !forceServerSession && entry.authenticated === true && entry.authUser != null
     const cached = sessionUser()
+    const me = await preloadSessionFromServer()
+    // An auth event can start a newer hydration while the initial anonymous
+    // /auth/me request is still in flight. Never let that stale 401 erase the
+    // authenticated snapshot published by the newer request.
+    if (generation !== sessionHydrationGeneration) return false
     if (!serverInjected && cached?.user) {
       entry.authenticated = true
       entry.authUser = cached.user
@@ -118,7 +142,6 @@
       revision = entry.revision
       contentRevision = entry.contentRevision
     }
-    const me = await preloadSessionFromServer()
     if (me?.user) {
       entry.authenticated = true
       entry.authUser = me.user
@@ -148,6 +171,7 @@
         global.localStorage?.removeItem('kg_remote_auth_session_v1')
       } catch (_error) {}
     }
+    return true
   }
 
   const values = new Map()
@@ -188,8 +212,24 @@
     }, 3000)
   }
 
+  function publishBootstrapEntry() {
+    const publicEntry = { ...entry, page, namespace }
+    if (global.__KG_DIRECT_BOOTSTRAP__ && typeof global.__KG_DIRECT_BOOTSTRAP__ === 'object') {
+      Object.assign(global.__KG_DIRECT_BOOTSTRAP__, publicEntry)
+    } else {
+      global.__KG_DIRECT_BOOTSTRAP__ = { ...publicEntry }
+    }
+    global.KGServerStateBootstrap = Object.freeze(publicEntry)
+  }
+
+  function announceBootstrapReady() {
+    global.dispatchEvent(new CustomEvent('kg:bootstrap-ready', {
+      detail: { authenticated: entry.authenticated, username: entry.username }
+    }))
+  }
+
   // 提前暴露临时 bootstrap 对象，避免其他脚本访问 undefined
-  global.KGServerStateBootstrap = Object.freeze({ ...entry, page, namespace })
+  publishBootstrapEntry()
 
   let timer = 0
   let inFlight = false
@@ -213,7 +253,10 @@
   }
 
   function isPersistableKey(key) {
-    return !nonPersistableKeys.has(key)
+    const graphCutover = global.__KG_DIRECT_BOOTSTRAP__?.graphFilesApiCutoverEnabled === true
+    const deprecatedGraphKey = deprecatedGraphRuntimeKeys.has(key)
+      || deprecatedGraphRuntimePrefixes.some(prefix => String(key).startsWith(prefix))
+    return !nonPersistableKeys.has(key) && !(graphCutover && deprecatedGraphKey)
   }
 
   function storageForPayload(batch = pendingMutations, source = values) {
@@ -647,7 +690,7 @@
     if (!REMOTE_SYNC) return
     // 已被服务端拒绝过的键只更新本地值，不再进入保存队列：
     // 否则 flushLoop 会因 dirty 永真且无可发请求而陷入紧密死循环（页面冻结）。
-    if (nonPersistableKeys.has(lastMutation.key)) return
+    if (!isPersistableKey(lastMutation.key)) return
     pendingMutations.delete(lastMutation.key)
     pendingMutations.set(lastMutation.key, lastMutation)
     dirty = true
@@ -834,17 +877,53 @@
   // 暴露原生浏览器 localStorage，供其他模块（如 auth-core）使用
   global.__nativeLocalStorage__ = browserLocalStorage
 
-  // 异步初始化用户会话，完成后更新 bootstrap 对象并通知页面
-  ;(async () => {
-    await hydrateEntryFromSession().catch(() => {
+  let authSessionRefreshPromise = null
+  function refreshAfterAuthSessionChange() {
+    if (authSessionRefreshPromise) return authSessionRefreshPromise
+    const generation = ++sessionHydrationGeneration
+    authSessionRefreshPromise = (async () => {
+      pendingMutations.clear()
+      dirty = false
+      values.clear()
+      revision = 0
+      contentRevision = 0
+      entry.revision = 0
+      entry.contentRevision = 0
+      const applied = await hydrateEntryFromSession({ forceServerSession: true, generation })
+      if (!applied) return
+      publishBootstrapEntry()
+      announceBootstrapReady()
+      if (entry.authenticated && !entry.readOnly) {
+        await reloadServerState({ announce: true })
+        entry.revision = revision
+        entry.contentRevision = contentRevision
+        publishBootstrapEntry()
+      }
+    })().catch(() => {
       entry.authenticated = false
       entry.authUser = null
       entry.username = ''
+      publishBootstrapEntry()
+      announceBootstrapReady()
+    }).finally(() => {
+      authSessionRefreshPromise = null
     })
-    global.KGServerStateBootstrap = Object.freeze({ ...entry, page, namespace })
-    global.dispatchEvent(new CustomEvent('kg:bootstrap-ready', {
-      detail: { authenticated: entry.authenticated, username: entry.username }
-    }))
+    return authSessionRefreshPromise
+  }
+  global.addEventListener('kg:auth-session-changed', refreshAfterAuthSessionChange)
+
+  // 异步初始化用户会话，完成后更新 bootstrap 对象并通知页面
+  ;(async () => {
+    const generation = sessionHydrationGeneration
+    const applied = await hydrateEntryFromSession({ generation }).catch(() => {
+      entry.authenticated = false
+      entry.authUser = null
+      entry.username = ''
+      return true
+    })
+    if (!applied) return
+    publishBootstrapEntry()
+    announceBootstrapReady()
     if (entry.authenticated && !entry.readOnly) {
       global.setTimeout(() => {
         reloadServerState({ announce: true }).catch(() => {})

@@ -6,6 +6,7 @@ template = (ROOT / "src" / "index.template.html").read_text(encoding="utf-8")
 state_domain = (ROOT / "src" / "js" / "10-state-domain.js").read_text(encoding="utf-8")
 page_runtime = (ROOT / "src" / "js" / "20-page-runtime.js").read_text(encoding="utf-8")
 services = (ROOT / "src" / "js" / "30-service-layer.js").read_text(encoding="utf-8")
+draft_ui = (ROOT / "src" / "js" / "37-shared-draft-ui.js").read_text(encoding="utf-8")
 build = (ROOT / "build.py").read_text(encoding="utf-8")
 
 required_ui = {
@@ -47,6 +48,10 @@ if "window.__KG_DIRECT_BOOTSTRAP__" not in state_domain:
     raise SystemExit("server actor must come from the FastAPI bootstrap payload")
 if "ServerCatalogService" not in services:
     raise SystemExit("PMPPrepServices must expose ServerCatalogService")
+if "dirtyGeneration:0" not in state_domain or "prepRuntime.dirtyGeneration+=1" not in state_domain:
+    raise SystemExit("shared drafts must version edits that occur while a save is in flight")
+if "changedWhileSaving" not in draft_ui or "PMPPrepAutosave?.schedule?.()" not in draft_ui:
+    raise SystemExit("a stale save response must preserve and reschedule newer draft edits")
 
 expected_order = [
     '"00-core-bootstrap.js"',

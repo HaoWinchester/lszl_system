@@ -8,8 +8,7 @@ const p45Path = new URL('./p45-persistence-contract.json', import.meta.url)
 const migrationMatrixPath = new URL('../../docs/p45-migration-matrix.md', import.meta.url)
 const backendRoot = fileURLToPath(new URL('../../backend/', import.meta.url))
 const legacySourceCandidates = [
-  fileURLToPath(new URL('../../updata-legacy/', import.meta.url)),
-  fileURLToPath(new URL('../../../../updata-legacy/', import.meta.url)),
+  fileURLToPath(new URL('../../new-legacy/', import.meta.url)),
 ]
 const plannedP45PostgresTables = new Set([
   'practice_mistakes',
@@ -103,9 +102,9 @@ test('P4.5 persistence manifest assigns every state domain', () => {
   ])
 
   const sourceDirectory = findSourceDirectory()
-  assert.ok(sourceDirectory, 'expected an updata-legacy source directory')
+  assert.ok(sourceDirectory, 'expected the canonical new-legacy source directory')
   for (const identifier of [
-    'kg_practice_mistakes_v1__user__',
+    'KGPracticeLearningApi',
     'kg_recall_association_management_v1__subject__',
     'kg_recall_association_library_v1__subject__',
     'kg_canvas_view_preferences_v1'
@@ -114,7 +113,7 @@ test('P4.5 persistence manifest assigns every state domain', () => {
   }
 })
 
-test('P4.5 source audit locates the repository update source', () => {
+test('P4.5 source audit locates the canonical new-legacy source', () => {
   assert.equal(findSourceDirectory(), legacySourceCandidates.find(existsSync))
 })
 

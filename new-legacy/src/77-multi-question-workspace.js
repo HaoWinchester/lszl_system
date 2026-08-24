@@ -1669,6 +1669,9 @@
         const syncState=state.answerSync.get(item.nodeId);
         if(syncState?.error){state.answerSync.set(item.nodeId,{...syncState,error:''});refreshSingleCardMarkupById(item.nodeId)}
       }
+      // 批内不重复拉取；全部提交成功后统一刷新一次，让错题角标和抽屉
+      // 立即反映服务端状态。刷新失败不得把已持久化的作答标记为未保存。
+      try{await PracticeLearning.refresh?.()}catch(error){}
     }finally{state.answerFlushing=false}
   }
   function failAnswerQueue(rest,error){

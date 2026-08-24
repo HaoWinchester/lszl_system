@@ -40,7 +40,7 @@ function teachingActorFrom(user){
 }
 const prepBootstrap=window.__KG_DIRECT_BOOTSTRAP__||{};
 const prepRuntime={
-  dirty:false,saveInFlight:false,
+  dirty:false,dirtyGeneration:0,saveInFlight:false,
   draftId:'',draftRevision:0,draftTitle:'',
   creatorProfile:null,deviceProfile:null,lastBatchId:'',
   serverActor:teachingActorFrom(readCachedSessionUser())||(prepBootstrap.authenticated?(prepBootstrap.authUser||{username:prepBootstrap.username}):null),
@@ -83,7 +83,7 @@ function updateWorkspaceSaveStatus(message='',kind=''){
   if(header)header.textContent=text;
   if(local){local.textContent=text;local.className='save-status '+(kind||(prepRuntime.dirty?'warn':prepRuntime.draftId?'good':''))}
 }
-function markWorkspaceDirty(){prepRuntime.dirty=true;updateWorkspaceSaveStatus()}
+function markWorkspaceDirty(){prepRuntime.dirty=true;prepRuntime.dirtyGeneration+=1;updateWorkspaceSaveStatus()}
 function openPrepDb(){
   return new Promise((resolve,reject)=>{
     if(!('indexedDB' in window)){reject(new Error('当前浏览器不支持设备设置存储'));return}

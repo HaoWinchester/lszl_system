@@ -15,6 +15,7 @@ assert.match(controller,/async function submitPracticeAnswer\(record,key/);
 assert.match(controller,/localAnswerCorrect\(record,key\)/);
 assert.match(controller,/enqueueAnswer\(payload,nodeId\)/);
 assert.match(controller,/await PracticeLearning\.answer\(item\.payload,\{skipRefresh:true\}\)/);
+assert.match(controller,/await PracticeLearning\.refresh\?\.\(\)/);
 assert.match(controller,/function failAnswerQueue\(rest,error\)/);
 assert.match(controller,/pagehide.*flushAnswerQueue/s);
 assert.match(controller,/data-qw-option-retry/);

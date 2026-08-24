@@ -1,0 +1,24 @@
+'use strict';
+const assert=require('assert');
+const fs=require('fs');
+const path=require('path');
+const vm=require('vm');
+const source=fs.readFileSync(path.resolve(__dirname,'../src/24-graph-file-autosave.js'),'utf8');
+const listeners={};
+const context={console,Date,setInterval:()=>1,clearInterval:()=>{},document:{documentElement:{dataset:{}}},CustomEvent:function(type,init){this.type=type;this.detail=init.detail},addEventListener:(type,fn)=>(listeners[type]??=[]).push(fn),dispatchEvent:()=>{}};
+context.window=context;context.globalThis=context;
+vm.createContext(context);vm.runInContext(source,context);
+(async()=>{
+  const autosave=context.KGGraphFileAutosave;
+  autosave.markDirty();
+  let resolveSave;
+  context.persistCurrentGraphNow=()=>new Promise(resolve=>{resolveSave=resolve});
+  const result=autosave.saveNow({force:true});
+  assert.strictEqual(typeof result.then,'function','remote persistence must remain pending');
+  assert.strictEqual(autosave.status().saving,true,'autosave must remain saving until remote response');
+  assert.strictEqual(autosave.isDirty(),true,'autosave must remain dirty until remote response');
+  resolveSave(false);
+  assert.strictEqual(await result,false);
+  assert.strictEqual(autosave.isDirty(),true,'failed remote save must remain dirty');
+  console.log('graph autosave remote promise test passed');
+})().catch(error=>{console.error(error);process.exitCode=1});

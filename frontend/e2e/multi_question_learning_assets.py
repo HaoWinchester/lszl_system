@@ -46,7 +46,7 @@ def create_student(admin: APIRequestContext, username: str) -> None:
     )
 
 
-def publish_fixture(admin: APIRequestContext, stamp: str) -> tuple[dict, list[dict], list[dict]]:
+def publish_fixture(admin: APIRequestContext, stamp: str) -> tuple[dict, list[dict]]:
     bank = assert_ok(
         admin.post(
             BASE + "/api/v1/banks",
@@ -113,61 +113,19 @@ def publish_fixture(admin: APIRequestContext, stamp: str) -> tuple[dict, list[di
             for question in questions
         ],
     }
-    runtime = assert_ok(admin.get(BASE + "/api/v1/runtime/state"), "read admin runtime")
-    key = "kg_exam_papers_published_v1"
-    try:
-        original_releases = json.loads(runtime.get("storage", {}).get(key, "[]"))
-    except (TypeError, ValueError, json.JSONDecodeError):
-        original_releases = []
-    if not isinstance(original_releases, list):
-        original_releases = []
-    merged_releases = [row for row in original_releases if isinstance(row, dict) and row.get("releaseId") != release["releaseId"]]
-    merged_releases.append(release)
-    value = json.dumps(merged_releases, ensure_ascii=False, separators=(",", ":"))
-    assert_ok(
-        admin.put(
-            BASE + "/api/v1/runtime/state",
-            data={
-                "page": "paper-management.html",
-                "namespace": "papers",
-                "operation": "setItem",
-                "key": key,
-                "value": value,
-                "storage": {key: value},
-                "snapshotMode": "merge",
-                "mutations": [{"operation": "setItem", "key": key, "value": value}],
-                "requestId": f"multi-question-assets-{stamp}",
-                "revision": runtime["revision"],
-                "contentRevision": runtime["contentRevision"],
-            },
-        ),
-        "publish release snapshot",
-    )
-    return release, questions, original_releases
+    published = assert_ok(
+        admin.post(BASE + "/api/v1/paper-releases/publish-payload", data=release),
+        "publish relational paper release",
+    )["release"]
+    assert published["releaseId"] == release["releaseId"]
+    assert published["questionCount"] == len(questions)
+    return release, questions
 
 
-def restore_release_catalog(admin: APIRequestContext, releases: list[dict], stamp: str) -> None:
-    runtime = assert_ok(admin.get(BASE + "/api/v1/runtime/state"), "read runtime for release cleanup")
-    key = "kg_exam_papers_published_v1"
-    value = json.dumps(releases, ensure_ascii=False, separators=(",", ":"))
+def withdraw_fixture(admin: APIRequestContext, paper_id: str) -> None:
     assert_ok(
-        admin.put(
-            BASE + "/api/v1/runtime/state",
-            data={
-                "page": "paper-management.html",
-                "namespace": "papers",
-                "operation": "setItem",
-                "key": key,
-                "value": value,
-                "storage": {key: value},
-                "snapshotMode": "merge",
-                "mutations": [{"operation": "setItem", "key": key, "value": value}],
-                "requestId": f"multi-question-assets-cleanup-{stamp}",
-                "revision": runtime["revision"],
-                "contentRevision": runtime["contentRevision"],
-            },
-        ),
-        "restore release snapshot",
+        admin.post(BASE + f"/api/v1/paper-releases/papers/{quote(paper_id)}/withdraw-all"),
+        "withdraw relational paper release",
     )
 
 
@@ -175,7 +133,10 @@ def wait_workspace(page: Page) -> None:
     page.goto(BASE + "/question-workspace.html", wait_until="networkidle")
     page.locator(".qw-app").wait_for(state="visible")
     page.wait_for_function("window.KGMultiQuestionWorkspace?.getState?.().readonly === false")
-    page.wait_for_function("document.querySelectorAll('#qwQuestionList .qw-question-item').length >= 3", timeout=15_000)
+    page.wait_for_function(
+        "document.querySelector('#qwPaperSelect option')?.textContent?.includes('可用 3/3 题')",
+        timeout=15_000,
+    )
 
 
 def card_payload(title: str, content: str) -> dict:
@@ -217,6 +178,16 @@ def click_option(question_card, option_key: str) -> None:
     question_card.locator(f'[data-qw-option-key="{option_key}"]').evaluate("element=>element.click()")
 
 
+def answer_and_wait(page: Page, question_card, option_key: str) -> None:
+    with page.expect_response(
+        lambda response: response.url.endswith("/api/v1/learning/practice/answers")
+        and response.request.method == "POST"
+    ) as response_info:
+        click_option(question_card, option_key)
+    response = response_info.value
+    assert response.ok, (response.status, response.text())
+
+
 def test_workflow(browser, username_a: str, username_b: str, release: dict, questions: list[dict]) -> None:
     context_a: BrowserContext = browser.new_context(viewport={"width": 1440, "height": 900})
     context_b: BrowserContext = browser.new_context(viewport={"width": 1440, "height": 900})
@@ -233,6 +204,21 @@ def test_workflow(browser, username_a: str, username_b: str, release: dict, ques
     try:
         login(context_a.request, username_a, PASSWORD)
         login(context_b.request, username_b, PASSWORD)
+        learner_catalog = assert_ok(
+            context_a.request.get(BASE + "/api/v1/paper-releases/catalog"),
+            "learner release catalog",
+        )
+        assert release["releaseId"] in {
+            row["releaseId"] for row in learner_catalog["releases"]
+        }
+        learner_questions = assert_ok(
+            context_a.request.get(
+                BASE + f"/api/v1/paper-releases/{quote(release['releaseId'])}/questions?limit=10"
+            ),
+            "learner release questions",
+        )
+        assert learner_questions["total"] == 3
+        assert len(learner_questions["questions"]) == 3
         page = context_a.new_page()
         page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
         page.on("pageerror", lambda error: page_errors.append(str(error)))
@@ -241,6 +227,10 @@ def test_workflow(browser, username_a: str, username_b: str, release: dict, ques
 
         # Select three released questions, drag the selected batch once, then prove duplicate skip.
         page.locator("#qwQuestionDockBtn").click()
+        page.wait_for_function(
+            "document.querySelectorAll('#qwQuestionList .qw-question-item').length >= 3",
+            timeout=15_000,
+        )
         rows = page.locator("#qwQuestionList .qw-question-item")
         assert rows.count() == 3
         for index in range(3):
@@ -316,15 +306,13 @@ def test_workflow(browser, username_a: str, username_b: str, release: dict, ques
         )
         assert question_node_id
         question_card = page.locator(f'[data-node-id="{question_node_id}"]')
-        click_option(question_card, "B")
-        page.wait_for_timeout(500)
-        assert page.locator("#qwMistakesCount").inner_text() == "1"
+        answer_and_wait(page, question_card, "B")
+        page.wait_for_function("document.getElementById('qwMistakesCount')?.textContent === '1'")
         set_drawer_open(page, "#qwMistakesDrawer", "#qwMistakesBtn", True)
         assert page.locator(f'[data-mistake-id]:has-text("{questions[0]["title"]}")').is_visible()
         set_drawer_open(page, "#qwMistakesDrawer", "#qwMistakesBtn", False)
-        click_option(question_card, "A")
-        page.wait_for_timeout(500)
-        assert page.locator("#qwMistakesCount").inner_text() == "1"
+        answer_and_wait(page, question_card, "A")
+        page.wait_for_function("document.getElementById('qwMistakesCount')?.textContent === '1'")
         verification_overview = assert_ok(
             context_a.request.get(BASE + "/api/v1/learning/practice/overview"),
             "verification overview A",
@@ -347,9 +335,8 @@ def test_workflow(browser, username_a: str, username_b: str, release: dict, ques
             f'[data-mistake-id]:has-text("{questions[0]["title"]}")'
         ).is_visible()
         set_drawer_open(page, "#qwMistakesDrawer", "#qwMistakesBtn", False)
-        click_option(question_card, "B")
-        page.wait_for_timeout(500)
-        assert page.locator("#qwMistakesCount").inner_text() == "1"
+        answer_and_wait(page, question_card, "B")
+        page.wait_for_function("document.getElementById('qwMistakesCount')?.textContent === '1'")
         overview_a = assert_ok(context_a.request.get(BASE + "/api/v1/learning/practice/overview"), "overview A")
         mistake = next(row for row in overview_a["mistakes"] if row["questionId"] == question_id and row["releaseId"] == release["releaseId"])
         assert mistake["status"] == "pending" and mistake["wrongCount"] == 2
@@ -397,11 +384,16 @@ def test_workflow(browser, username_a: str, username_b: str, release: dict, ques
           };
         }""")
         click_option(question_card, "A")
-        page.wait_for_timeout(450)
-        assert question_card.locator('[data-qw-option-sync-error] [data-qw-option-retry]').is_visible()
-        question_card.locator('[data-qw-option-sync-error] [data-qw-option-retry]').evaluate("element=>element.click()")
-        page.wait_for_timeout(450)
-        assert question_card.locator('[data-qw-option-sync-error]').count() == 0
+        retry = question_card.locator(
+            '[data-qw-option-sync-error] [data-qw-option-retry]'
+        )
+        retry.wait_for(state="visible", timeout=10_000)
+        with page.expect_response(
+            lambda response: response.url.endswith("/api/v1/learning/practice/answers")
+            and response.status == 200
+        ):
+            retry.evaluate("element=>element.click()")
+        question_card.locator('[data-qw-option-sync-error]').wait_for(state="detached")
         assert not page_errors, page_errors
         filtered_console = [message for message in console_errors if "500 (Internal Server Error)" not in message and "409 (Conflict)" not in message and "favicon" not in message.lower()]
         assert not filtered_console, filtered_console
@@ -412,7 +404,18 @@ def test_workflow(browser, username_a: str, username_b: str, release: dict, ques
             try:
                 failure = Path("/tmp/multi-question-learning-assets-failure.png")
                 page.screenshot(path=str(failure), full_page=False, timeout=5_000)
-                print({"url": page.url, "screenshot": str(failure), "console": console_errors, "pageErrors": page_errors, "httpErrors": http_errors}, flush=True)
+                diagnostics = page.evaluate("""()=>({
+                  bootstrap: window.__KG_DIRECT_BOOTSTRAP__,
+                  workspace: window.KGMultiQuestionWorkspace?.getState?.(),
+                  releases: window.KGPaperReleaseApi?.catalog?.().map(row=>({
+                    paperId:row.paperId,releaseId:row.releaseId,totalCount:row.totalCount,
+                    enabledModes:row.enabledModes,status:row.status,availability:row.availability
+                  })),
+                  apiError: String(window.KGPaperReleaseApi?.error?.()||''),
+                  questionRows: document.querySelectorAll('#qwQuestionList .qw-question-item').length,
+                  paperOptions: [...document.querySelectorAll('#qwPaperSelect option')].map(option=>option.textContent),
+                })""")
+                print({"url": page.url, "screenshot": str(failure), "console": console_errors, "pageErrors": page_errors, "httpErrors": http_errors, "diagnostics": diagnostics}, flush=True)
             except Exception:
                 pass
         raise
@@ -428,16 +431,16 @@ def main() -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
         admin = browser.new_context()
-        original_releases: list[dict] | None = None
+        release: dict | None = None
         try:
             login(admin.request, "admin", "jbgsnmm~123")
             create_student(admin.request, username_a)
             create_student(admin.request, username_b)
-            release, questions, original_releases = publish_fixture(admin.request, stamp)
+            release, questions = publish_fixture(admin.request, stamp)
             test_workflow(browser, username_a, username_b, release, questions)
         finally:
-            if original_releases is not None:
-                restore_release_catalog(admin.request, original_releases, stamp)
+            if release is not None:
+                withdraw_fixture(admin.request, release["paperId"])
             admin.close()
             browser.close()
     print("multi-question-learning-assets-e2e-ok")

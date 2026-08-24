@@ -209,6 +209,18 @@ def test_practice_mistake_routes_require_authentication() -> None:
     assert client.post("/api/v1/learning/practice/answers", json={}).status_code == 401
 
 
+def test_published_learning_mode_uses_supported_surface_and_falls_back_safely() -> None:
+    assert learning_service._published_learning_mode(
+        {"sourceMode": "multi_question_canvas"}
+    ) == "multi_question_canvas"
+    assert learning_service._published_learning_mode(
+        {"sourceMode": "single_deep_study"}
+    ) == "single_deep_study"
+    assert learning_service._published_learning_mode(
+        {"sourceMode": "workspace"}
+    ) == "practice_mode"
+
+
 def test_practice_answer_uses_server_truth_delays_mastery_and_reactivates_mistakes() -> None:
     username = _name("practice_answer_owner")
     _create_student(username)

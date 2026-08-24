@@ -28,15 +28,20 @@
     if(saving)return true;
     if(!dirty&&!options.force)return true;
     saving=true;emit('saving');
-    let ok=false;
+    let result=false;
     try{
-      if(typeof global.persistCurrentGraphNow==='function')ok=global.persistCurrentGraphNow({...options,bypassAutosave:true});
-      else if(typeof global.saveNow==='function')ok=global.saveNow({...options,bypassAutosave:true});
-      else ok=false;
-      if(ok!==false){dirty=false;lastError='';lastSavedAt=Date.now();ok=true}
-      else{lastError='保存失败'}
-    }catch(err){console.warn('[KGGraphFileAutosave] save failed:',err);lastError=String(err&&err.message||err||'保存失败');ok=false}
-    saving=false;emit(ok?'saved':'error');return ok;
+      if(typeof global.persistCurrentGraphNow==='function')result=global.persistCurrentGraphNow({...options,bypassAutosave:true});
+      else if(typeof global.saveNow==='function')result=global.saveNow({...options,bypassAutosave:true});
+      if(result&&typeof result.then==='function'){
+        return result.then(ok=>{
+          if(ok!==false){dirty=false;lastError='';lastSavedAt=Date.now()}else lastError='保存失败';
+          saving=false;emit(ok!==false?'saved':'error');return ok!==false;
+        }).catch(err=>{console.warn('[KGGraphFileAutosave] save failed:',err);lastError=String(err&&err.message||err||'保存失败');saving=false;emit('error');return false});
+      }
+      if(result!==false){dirty=false;lastError='';lastSavedAt=Date.now();result=true}
+      else lastError='保存失败';
+    }catch(err){console.warn('[KGGraphFileAutosave] save failed:',err);lastError=String(err&&err.message||err||'保存失败');result=false}
+    saving=false;emit(result?'saved':'error');return result;
   }
   function saveBeforeSwitch(){return dirty?saveNow({force:true,silent:false,reason:'before-switch'}):true}
   function start(){

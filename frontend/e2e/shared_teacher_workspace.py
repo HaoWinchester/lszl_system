@@ -524,7 +524,7 @@ with sync_playwright() as playwright:
 
         teacher_b_catalog = assert_ok(
             teacher_b.request.get(
-                BASE + "/api/v1/question-catalog/bootstrap?mode=managed"
+                BASE + "/api/v1/question-catalog/bootstrap?mode=managed&include_questions=true"
             ),
             "teacher B reads teacher A catalog",
         )

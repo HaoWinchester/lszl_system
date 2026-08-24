@@ -59,10 +59,19 @@
     if(!active())throw new Error('请先从共享草稿列表新建或打开一个草稿。');
     const saveButton=document.getElementById('btnSaveWorkspaceLocal');const headerButton=document.getElementById('btnQuickSaveWorkspace');
     if(prepRuntime.saveInFlight)return;prepRuntime.saveInFlight=true;saveButton&&(saveButton.disabled=true);headerButton&&(headerButton.disabled=true);
+    const dirtyGeneration=Number(prepRuntime.dirtyGeneration||0),payload=workspacePayload();
     setWorkspaceStatus('正在保存共享草稿…');
     try{
-      const draft=await Drafts.save(prepRuntime.draftId,{title:prepRuntime.draftTitle,payload:workspacePayload(),revision:prepRuntime.draftRevision});
-      activate(draft);prepRuntime.dirty=false;setWorkspaceStatus(`共享草稿已保存：${prepRuntime.draftTitle}`,'good');toast('共享草稿已保存');return draft;
+      const draft=await Drafts.save(prepRuntime.draftId,{title:prepRuntime.draftTitle,payload,revision:prepRuntime.draftRevision});
+      const changedWhileSaving=Number(prepRuntime.dirtyGeneration||0)!==dirtyGeneration;
+      activate(draft,{dirty:changedWhileSaving});
+      if(changedWhileSaving){
+        setWorkspaceStatus('上一版已保存，正在继续保存新修改…','warn');
+        queueMicrotask(()=>global.PMPPrepAutosave?.schedule?.());
+      }else{
+        setWorkspaceStatus(`共享草稿已保存：${prepRuntime.draftTitle}`,'good');toast('共享草稿已保存');
+      }
+      return draft;
     }catch(error){setWorkspaceStatus(error.message||'共享草稿保存失败','bad');throw error}
     finally{prepRuntime.saveInFlight=false;saveButton&&(saveButton.disabled=false);headerButton&&(headerButton.disabled=false)}
   }

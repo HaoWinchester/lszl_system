@@ -15,3 +15,4 @@ updata-legacy/
 /enterinformation/
 /backend/var/
 /node_modules/
+.claude/

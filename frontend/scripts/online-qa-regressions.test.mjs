@@ -201,7 +201,7 @@ test('content center remains an independent direct page', () => {
 test('membership checkout relies on automatic status refresh without manual payment actions', () => {
   const center = source('new-legacy/src/33-user-center.js')
   assert.doesNotMatch(center, /确认订阅申请/)
-  assert.match(center, /handlePlanPick[\s\S]*await pay\.createNativeOrder\(plan\.id\)[\s\S]*renderNativePayment\(checkoutPlan\|\|plan,result\.order\)/)
+  assert.match(center, /handlePlanPick[\s\S]*await pay\.createNativeOrder\(plan\.id\)[\s\S]*const order=result\.order[\s\S]*renderNativePayment\(checkoutPlan\|\|plan,order\)/)
   assert.match(center, /nativePayPollTimer=setInterval\(refresh,3000\)/)
   assert.doesNotMatch(center, /nativePayRefreshBtn|nativePayCancelOrderBtn|nativePayCloseBtn/)
   assert.doesNotMatch(center, /cancelNativeOrder\(order\.id\)/)
