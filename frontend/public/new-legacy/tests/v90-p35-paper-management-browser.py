@@ -96,20 +96,39 @@ with sync_playwright() as p:
         {'id': f'q-import-{index:03d}', 'title': f'Q{index:03d}', 'type': 'single_choice', 'subject': 'PMP', 'stemParts': [{'text': f'题干 {index}'}], 'options': [{'id': 'A', 'text': '正确', 'correct': True}, {'id': 'B', 'text': '错误', 'correct': False}], 'correctAnswer': 'A'}
         for index in range(1, 61)
     ]}
+    second_bank_package = {'id': 'bank-prep-2', 'name': 'PMP 2题', 'subject': 'PMP', 'version': '2.6', 'visibility': 'private', 'questions': [
+        {'id': f'q-second-{index:03d}', 'title': f'S{index:03d}', 'type': 'single_choice', 'subject': 'PMP', 'stemParts': [{'text': f'第二批题干 {index}'}], 'options': [{'id': 'A', 'text': '正确', 'correct': True}, {'id': 'B', 'text': '错误', 'correct': False}], 'correctAnswer': 'A'}
+        for index in range(1, 3)
+    ]}
     paper_for_wrong_entry = {'schema': 'kg-paper-package-v1', 'schemaVersion': 1, 'paper': {'id': 'wrong-entry-paper', 'name': '试卷', 'totalCount': 0, 'questions': []}}
     page.locator('#qbImportBankBtn').click()
     page.locator('#qbBankImportFile').set_input_files({'name': 'paper.json', 'mimeType': 'application/json', 'buffer': json.dumps(paper_for_wrong_entry, ensure_ascii=False).encode()})
     page.wait_for_timeout(80)
     assert '检测到试卷包 JSON' in page.locator('#qbBankImportResults').inner_text()
     assert page.evaluate('window.__bankImportCalls.length') == 0
-    page.locator('#qbBankImportFile').set_input_files({'name': 'PMP_60题_PrepStudio.json', 'mimeType': 'application/json', 'buffer': json.dumps(bank_package, ensure_ascii=False).encode()})
+    page.locator('#qbBankImportFile').set_input_files([
+        {'name': 'valid.json', 'mimeType': 'application/json', 'buffer': json.dumps(bank_package, ensure_ascii=False).encode()},
+        {'name': 'bad.json', 'mimeType': 'application/json', 'buffer': b'{bad'},
+    ])
     page.wait_for_timeout(80)
-    assert '60 道题' in page.locator('#qbBankImportResults').inner_text()
+    assert 'bad.json：JSON 解析失败' in page.locator('#qbBankImportResults').inner_text()
+    assert page.locator('#qbBankImportConfirmBtn').is_disabled()
+    assert page.evaluate('window.__bankImportCalls.length') == 0
+    page.locator('#qbBankImportFile').set_input_files([
+        {'name': 'PMP_60题_PrepStudio.json', 'mimeType': 'application/json', 'buffer': json.dumps(bank_package, ensure_ascii=False).encode()},
+        {'name': 'PMP_2题_PrepStudio.json', 'mimeType': 'application/json', 'buffer': json.dumps(second_bank_package, ensure_ascii=False).encode()},
+    ])
+    page.wait_for_timeout(80)
+    import_summary = page.locator('#qbBankImportResults').inner_text()
+    assert '2 个文件' in import_summary; assert '2 个题库' in import_summary; assert '62 道题' in import_summary
+    selected_files = page.locator('#qbBankImportFileName').inner_text()
+    assert 'PMP_60题_PrepStudio.json' in selected_files; assert 'PMP_2题_PrepStudio.json' in selected_files
     page.locator('#qbBankImportConfirmBtn').click(); page.wait_for_timeout(100)
     assert '暂时不可用' in page.locator('#qbBankImportResults').inner_text(); assert page.locator('#qbBankImportRetryBtn').is_visible()
     page.locator('#qbBankImportRetryBtn').click(); page.wait_for_timeout(160)
     bank_calls = page.evaluate('window.__bankImportCalls')
-    assert len(bank_calls) == 2; assert len(bank_calls[-1]['banks']) == 1; assert len(bank_calls[-1]['banks'][0]['questions']) == 60
+    assert len(bank_calls) == 2; assert all(len(call['banks']) == 2 for call in bank_calls); assert len(bank_calls[-1]['banks'][0]['questions']) == 60
+    assert [bank['id'] for bank in bank_calls[-1]['banks']] == ['bank-prep-60', 'bank-prep-2']
     assert bank_calls[-1]['banks'][0]['questions'][0]['id'] == 'q-import-001'; assert bank_calls[-1]['banks'][0]['questions'][-1]['id'] == 'q-import-060'
     assert page.locator('#qbBankImportDialog').get_attribute('open') is None, {
         'results': page.locator('#qbBankImportResults').inner_text(),

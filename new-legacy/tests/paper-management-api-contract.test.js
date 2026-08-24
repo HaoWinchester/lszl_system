@@ -41,6 +41,45 @@ async function testQuestionBankImportController(){
   assert.deepEqual(Array.from(domain.normalizeBanks([bank]),item=>item.id),['bank-prep-60']);
   assert.deepEqual(Array.from(domain.normalizeBanks({banks:[bank]}),item=>item.id),['bank-prep-60']);
 
+  const makeBank=(id,questionIds)=>({id,name:id,subject:'PMP',questions:questionIds.map(questionId=>({id:questionId,title:questionId,type:'single_choice',subject:'PMP',stemParts:[{text:questionId}],options:[{id:'A',text:'正确',correct:true}],correctAnswer:'A'}))});
+  const batchCalls=[];
+  const batchController=domain.create({api:{importBanks:async body=>{batchCalls.push(body);return {banks:body.banks,contentRevision:4,importPlan:{create:body.banks.length,replace:0,skip:0}}}}});
+  const batchLoaded=await batchController.loadFiles([
+    {name:'a.json',text:JSON.stringify(makeBank('bank-a',['a-1','a-2']))},
+    {name:'b.json',text:JSON.stringify({banks:[makeBank('bank-b',['b-1'])]})},
+    {name:'c.json',text:JSON.stringify([makeBank('bank-c',['c-1','c-2','c-3'])])},
+  ]);
+  assert.equal(batchLoaded.ok,true);
+  assert.deepEqual(Array.from(batchController.snapshot().fileNames),['a.json','b.json','c.json']);
+  assert.equal(batchController.snapshot().fileCount,3);
+  assert.equal(batchController.snapshot().bankCount,3);
+  assert.equal(batchController.snapshot().questionCount,6);
+  assert.deepEqual(Array.from(batchController.snapshot().banks,item=>item.id),['bank-a','bank-b','bank-c']);
+  assert.equal((await batchController.confirm()).ok,true);
+  assert.equal(batchCalls.length,1,'multiple files must use one atomic import request');
+  assert.deepEqual(Array.from(batchCalls[0].banks,bankItem=>Array.from(bankItem.questions,question=>question.id)).flat(),['a-1','a-2','b-1','c-1','c-2','c-3']);
+
+  const invalidBatch=domain.create({api:{importBanks:async body=>{batchCalls.push(body);return {banks:body.banks}}}});
+  const invalidLoaded=await invalidBatch.loadFiles([
+    {name:'valid.json',text:JSON.stringify(makeBank('bank-valid',['valid-1']))},
+    {name:'bad.json',text:'{bad'},
+  ]);
+  assert.equal(invalidLoaded.ok,false);
+  assert.match(invalidBatch.snapshot().error,/^bad\.json：JSON 解析失败/);
+  assert.equal(invalidBatch.snapshot().banks.length,0);
+  assert.equal((await invalidBatch.confirm()).ok,false);
+  assert.equal(batchCalls.length,1,'one malformed file must block the whole batch before API');
+
+  const wrongEntryBatch=domain.create({api:{importBanks:async body=>{batchCalls.push(body);return {banks:body.banks}}}});
+  const wrongEntryLoaded=await wrongEntryBatch.loadFiles([
+    {name:'valid.json',text:JSON.stringify(makeBank('bank-valid',['valid-1']))},
+    {name:'paper.json',text:JSON.stringify(paperPackage)},
+  ]);
+  assert.equal(wrongEntryLoaded.ok,false);
+  assert.match(wrongEntryBatch.snapshot().error,/^paper\.json：检测到试卷包 JSON.*导入试卷/);
+  assert.equal(wrongEntryBatch.snapshot().banks.length,0);
+  assert.equal(batchCalls.length,1,'one paper package must block the whole bank batch before API');
+
   const calls=[],changes=[];
   const api={importBanks:async body=>{calls.push(body);return {banks:[{id:'db-bank-1',name:'PMP 60题',questions}],sourceBankIdMap:{'bank-prep-60':'db-bank-1'},sourceQuestionIdMap:{},contentRevision:2,importPlan:{create:1,replace:0,skip:0}}}};
   let reloads=0;
