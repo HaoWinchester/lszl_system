@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -94,3 +94,26 @@ class PaperCategoryUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = None
     order_index: int | None = Field(default=None, alias="orderIndex", ge=0)
+
+
+class PaperImportPreflightRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    file_name: str = Field(alias="fileName", min_length=1, max_length=500)
+    package_data: dict[str, Any] = Field(alias="package")
+
+
+class PaperImportRequest(PaperImportPreflightRequest):
+    preflight_hash: str = Field(alias="preflightHash", min_length=64, max_length=64)
+    conflict_action: Literal["create", "copy", "replace_draft"] = Field(
+        alias="conflictAction"
+    )
+    expected_revision: int | str | None = Field(
+        default=None,
+        alias="expectedRevision",
+    )
+    idempotency_key: str = Field(
+        alias="idempotencyKey",
+        min_length=1,
+        max_length=120,
+    )

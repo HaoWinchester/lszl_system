@@ -13,9 +13,16 @@ from app.schemas.paper import (
     PaperCategoryUpdateRequest,
     PaperCreateRequest,
     PaperQuestionReplaceRequest,
+    PaperImportPreflightRequest,
+    PaperImportRequest,
     PaperUpdateRequest,
 )
-from app.services import paper_service, question_migration_service, question_service
+from app.services import (
+    paper_import_service,
+    paper_service,
+    question_migration_service,
+    question_service,
+)
 
 router = APIRouter(tags=["papers"])
 DB = Annotated[AsyncSession, Depends(get_db)]
@@ -39,6 +46,26 @@ def _parse_id_set(ids: list[str] | None) -> set[str] | None:
         for chunk in str(item).split(",")
         if (value := chunk.strip())
     }
+
+
+@router.post("/papers/import/preflight")
+async def preflight_paper_import(
+    body: PaperImportPreflightRequest,
+    db: DB,
+    user: PaperManager,
+):
+    return {
+        "preflight": await paper_import_service.preflight_package(db, user, body)
+    }
+
+
+@router.post("/papers/import")
+async def import_paper(
+    body: PaperImportRequest,
+    db: DB,
+    user: PaperManager,
+):
+    return {"result": await paper_import_service.import_package(db, user, body)}
 
 
 @router.get("/papers")

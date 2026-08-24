@@ -258,35 +258,35 @@ git commit -m "feat: close paper drafts through typed APIs"
 - `preflight_package(db, actor, envelope) -> PaperImportPreflightResponse`
 - `import_package(db, actor, request) -> dict`
 
-- [ ] **Step 1: Create a three-reference committed fixture and failing preflight tests**
+- [x] **Step 1: Create a three-reference committed fixture and failing preflight tests**
 
 The fixture uses schema `kg-paper-package-v1`, version `1`, continuous orders, scores, and external source IDs. Tests seed corresponding internal banks/questions whose `source_id` values match the fixture.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_paper_import_api.py -q`
 
 Expected: import endpoints are missing.
 
-- [ ] **Step 3: Implement pure package validation and external identity resolution**
+- [x] **Step 3: Implement pure package validation and external identity resolution**
 
 Resolve bank by `source_id` then compatible internal ID; resolve question within that bank by `source_id` then internal ID. Report missing, ambiguous, wrong-bank, deleted, duplicate, order, total-count, filename/name, compatibility, category, and paper-ID findings without writing.
 
-- [ ] **Step 4: Add conflict-action tests**
+- [x] **Step 4: Add conflict-action tests**
 
 Cover `create`, `copy`, `replace_draft`, published replacement denial, stale revision, stale preflight hash, and an idempotency key reused with a different request hash.
 
-- [ ] **Step 5: Implement all-or-nothing import and persisted idempotency**
+- [x] **Step 5: Implement all-or-nothing import and persisted idempotency**
 
 Within one transaction lock the idempotency key, re-run preflight, insert/update the draft, flush the parent, replace ordered refs, record `PaperImportOperation`, bump teaching revision, and commit. Force imported status to `draft`; store external timestamps and missing category source value in `import_metadata`.
 
-- [ ] **Step 6: Add a forced mid-reference failure rollback test and run focused suite**
+- [x] **Step 6: Add a forced mid-reference failure rollback test and run focused suite**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_paper_import_api.py tests/test_paper_draft_api.py -q`
 
 Expected: no paper or operation row remains after forced failure; all tests pass.
 
-- [ ] **Step 7: Commit import behavior**
+- [x] **Step 7: Commit import behavior**
 
 ```bash
 git add backend/app/services/paper_import_service.py backend/app/schemas/paper.py backend/app/api/v1/papers.py backend/tests/fixtures/papers backend/tests/test_paper_import_api.py
