@@ -103,6 +103,17 @@ users / role_themes / system_settings(KV) / user_admin_logs / folders / graph_fi
 - **发布回退**：曾基于旧源（new-legacy v8.6.29，146 文件）发布 v9.0-p4.1.2，把生产 v9 内容（597 文件、含 admin-console 等新页面）回退掉。根因：没核对源 vs active release 文件数，凭"版本号体系"假设行事。
 - **漏页**：曾修 `isLoggedIn` 后只在 training/workspace/index 验证退出，漏掉 `knowledge-recall.html` 有账号菜单但缺 `authModal` DOM + `standalone-auth-dialog.js`（点登录无反应）。根因：没遍历所有做题页测登录/退出，把"跳转一致"当成了"功能一致"。
 
+## 公共模块与远程推送纪律（强制执行）
+
+### 1. Git 推送必须使用代理
+- 向远程仓库执行 `git push` 时，必须使用当前系统代理 `http://127.0.0.1:7897`，例如：`git -c http.proxy=http://127.0.0.1:7897 push origin <branch>`。
+- 代理只作用于当前命令，不修改全局 Git 配置；推送后必须用远程引用或 `git ls-remote` 核对目标分支确已更新。
+
+### 2. 通用能力必须统一放入公共模块
+- 开发过程中，只要某项能力具有跨页面、跨组件、跨路由或跨业务流程复用价值，就必须先抽取到职责明确的公共模块，再由各调用方统一调用；禁止在多个页面或文件中复制、变体粘贴同一实现。
+- 前端公共能力应放入共享组件、公共 service/store/api/utility 或对应的公共 legacy 模块；后端公共能力应放入 `services/`、`core/` 或职责明确的公共工具模块，API 路由只负责参数、权限和响应编排。
+- 修改通用能力时必须先查找现有公共实现并在原模块扩展；确需新增公共模块时，要同时迁移现有重复调用点，并为公共入口补充覆盖主要调用方的测试。
+
 ## 功能分支收尾纪律（强制执行）
 
 - 每个功能开发完成并通过相应验证后，必须合入 `main` 并推送远端；不要长期保留已完成的功能分支。
