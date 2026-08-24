@@ -124,7 +124,7 @@ git commit -m "feat: add deterministic parallel paper composition"
 - Extends `PaperQuestion` with `score`
 - Produces: `idempotency_service.lock(db, actor_username: str, key: str) -> None`
 
-- [ ] **Step 1: Write a failing common idempotency service test**
+- [x] **Step 1: Write a failing common idempotency service test**
 
 ```python
 def test_idempotency_advisory_key_is_actor_scoped_and_stable() -> None:
@@ -132,17 +132,17 @@ def test_idempotency_advisory_key_is_actor_scoped_and_stable() -> None:
     assert advisory_key("teacher-a", "submit-1") != advisory_key("teacher-b", "submit-1")
 ```
 
-- [ ] **Step 2: Run the idempotency test and verify RED**
+- [x] **Step 2: Run the idempotency test and verify RED**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_idempotency_service.py -q`
 
 Expected: `idempotency_service` does not exist.
 
-- [ ] **Step 3: Extract the existing advisory-lock implementation**
+- [x] **Step 3: Extract the existing advisory-lock implementation**
 
 Move the hash-to-signed-bigint calculation and `pg_advisory_xact_lock` call from `content_prep_service.py` into `idempotency_service.py`. Update every existing content-prep caller to use the public service and keep its current upload tests green.
 
-- [ ] **Step 4: Write failing metadata tests**
+- [x] **Step 4: Write failing metadata tests**
 
 ```python
 def test_paper_models_expose_relational_draft_and_batch_fields() -> None:
@@ -153,29 +153,29 @@ def test_paper_models_expose_relational_draft_and_batch_fields() -> None:
     assert PaperImportOperation.__tablename__ == "paper_import_operations"
 ```
 
-- [ ] **Step 5: Run and verify model RED**
+- [x] **Step 5: Run and verify model RED**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_paper_models.py -q`
 
 Expected: missing model/column assertions fail.
 
-- [ ] **Step 6: Implement model fields and constraints**
+- [x] **Step 6: Implement model fields and constraints**
 
 Add these `ExamPaper` columns: `category_id`, `access_policy`, `enabled_modes`, `mode_config_version`, `purpose`, `archived_at`, `restored_at`, `withdrawn_at`, `published_release_id`, `published_version`, `generation_batch_id`, `variant_code`, `generation_config`, and `import_metadata`. Add `score Numeric(8, 2)` plus unique `(paper_id, order_index)` to `PaperQuestion`; keep existing zero-based `order_index` internally.
 
 `PaperCategory` contains `id`, `owner_id`, name/description/order, revision, archive time, actor fields, and timestamps. `PaperGenerationBatch` contains owner/actor, idempotency key, subject, internal bank IDs, filters, quota config, seed, requested variants, created paper IDs, status, and timestamps. `PaperImportOperation` contains actor, idempotency key, request hash, conflict action, result paper ID/payload, and completion time. Use `SET NULL` for paper category/batch links and actor-scoped idempotency uniqueness.
 
-- [ ] **Step 7: Write the explicit Alembic migration**
+- [x] **Step 7: Write the explicit Alembic migration**
 
 Set `down_revision = "9a4e7c2b1d80"`. Add nullable/default-compatible columns, new tables, indexes, and constraints. Downgrade removes only the added schema in reverse FK order.
 
-- [ ] **Step 8: Run migration/model and existing idempotency checks**
+- [x] **Step 8: Run migration/model and existing idempotency checks**
 
 Run: `cd backend && .venv/bin/alembic upgrade head && .venv/bin/python -m pytest tests/test_idempotency_service.py tests/test_paper_models.py tests/test_content_prep_upload.py -q`
 
 Expected: migration succeeds and model tests pass.
 
-- [ ] **Step 9: Commit schema and shared idempotency changes**
+- [x] **Step 9: Commit schema and shared idempotency changes**
 
 ```bash
 git add backend/app/services/idempotency_service.py backend/app/services/content_prep_service.py backend/app/models backend/alembic/versions/d4f8a1b2c3e4_paper_draft_import_composition.py backend/tests/test_idempotency_service.py backend/tests/test_paper_models.py
