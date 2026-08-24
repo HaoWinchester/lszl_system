@@ -113,12 +113,13 @@ test('practice mistakes retain the exact published release identity', () => {
 test('teacher imports honor duplicate settings and reject blank bank metadata', () => {
   const workflow = source('new-legacy/src/97-teacher-question-workflow.js')
   const bank = source('new-legacy/src/65-question-bank-admin.js')
+  const bankImport = source('new-legacy/src/teacher/question-bank-import-controller.js')
   assert.match(workflow, /await api\.bulkAddQuestions\?\.\(\[question\]\)/)
   assert.match(bank, /题库名称不能为空/)
   assert.match(bank, /自定义科目不能为空/)
-  assert.match(bank, /IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED/)
-  assert.match(bank, /确认覆盖/)
-  assert.match(bank, /modifiedQuestions/)
+  assert.match(bankImport, /IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED/)
+  assert.match(bankImport, /确认覆盖/)
+  assert.match(bankImport, /modifiedQuestions/)
 })
 
 test('graph editor enters performance mode from fifty cards, keeps visible labels, and preserves reversible drag history', () => {

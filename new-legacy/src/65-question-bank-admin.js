@@ -1550,6 +1550,7 @@
     document.addEventListener('keydown',event=>{if(event.key==='Escape'&&isPaperQuestionPreviewOpen())closePaperQuestionPreview()});
     window.addEventListener('resize',positionPaperQuestionPreview,{passive:true});document.addEventListener('scroll',positionPaperQuestionPreview,true);
     initPaperWorkspaceControls();
+    initQuestionBankImportControls();
     initPaperImportControls();
     initPaperCompositionControls();
     renderPaperManager();
@@ -1559,6 +1560,41 @@
   function openPaperOperationDialog(dialog){if(!dialog)return;try{if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','')}catch(error){dialog.setAttribute('open','')}}
   function closePaperOperationDialog(dialog){if(!dialog)return;try{if(typeof dialog.close==='function')dialog.close();else dialog.removeAttribute('open')}catch(error){dialog.removeAttribute('open')}}
   function findingRows(items,type){return (items||[]).map(item=>`<li class="${type}">${escapeHTML(item?.message||String(item||''))}</li>`).join('')}
+  let questionBankImportController=null,questionBankImportFile=null;
+  function renderQuestionBankImportState(snapshot){
+    const results=$('qbBankImportResults'),fileName=$('qbBankImportFileName');
+    if(fileName)fileName.textContent=snapshot.fileName?`已选择：${snapshot.fileName}`:'尚未选择文件。';
+    if(results){
+      if(snapshot.busy)results.innerHTML='<div class="qb-empty">正在通过题库 API 导入，请勿重复提交…</div>';
+      else if(snapshot.error)results.innerHTML=`<ul class="pm-result-list"><li class="error">${escapeHTML(snapshot.error)}</li></ul>`;
+      else if(snapshot.success){const saved=Array.isArray(snapshot.success?.banks)?snapshot.success.banks:[];results.innerHTML=`<ul class="pm-result-list"><li class="success">导入成功：已保存 ${saved.length} 个题库。</li></ul>`}
+      else if(snapshot.banks?.length)results.innerHTML=`<div class="pm-result-summary"><span class="qb-badge">${Number(snapshot.bankCount||0)} 个题库</span><span class="qb-badge">${Number(snapshot.questionCount||0)} 道题</span><span class="qb-badge current">格式识别成功</span></div><ul class="pm-result-list"><li class="success">确认后将写入数据库；同来源更新或重复题会再次请求确认。</li></ul>`;
+      else results.innerHTML='<div class="qb-empty">选择 JSON 后将显示题库数量和题目数量；确认后写入数据库。</div>';
+    }
+    if($('qbBankImportConfirmBtn'))$('qbBankImportConfirmBtn').disabled=!snapshot.banks?.length||snapshot.busy;
+    if($('qbBankImportRetryBtn')){$('qbBankImportRetryBtn').hidden=!snapshot.error||!snapshot.banks?.length;$('qbBankImportRetryBtn').disabled=snapshot.busy}
+  }
+  function initQuestionBankImportControls(){
+    const factory=TeacherDomains.QuestionBankImportController;if(!factory?.create)return;
+    questionBankImportController=factory.create({
+      api:Catalog,
+      confirm:request=>window.confirm(request.message),
+      onChange:renderQuestionBankImportState,
+      onReload:async result=>{
+        state.banks=loadBanks();
+        const saved=Array.isArray(result?.banks)?result.banks:[];
+        if(saved[0]?.id)state.selectedBankId=String(saved[0].id);
+        renderPaperManager();
+      }
+    });
+    renderQuestionBankImportState(questionBankImportController.snapshot());
+    const submitQuestionBankImport=async()=>{const result=await questionBankImportController.confirm();if(result.ok){toast('题库已通过 API 导入，可用于组卷。');closePaperOperationDialog($('qbBankImportDialog'))}return result};
+    $('qbImportBankBtn')?.addEventListener('click',()=>{questionBankImportFile=null;questionBankImportController.cancel();if($('qbBankImportFile'))$('qbBankImportFile').value='';openPaperOperationDialog($('qbBankImportDialog'))});
+    $('qbBankImportFile')?.addEventListener('change',async event=>{questionBankImportFile=event.currentTarget.files?.[0]||null;if(!questionBankImportFile)return questionBankImportController.cancel();await questionBankImportController.load(questionBankImportFile.name,await questionBankImportFile.text())});
+    $('qbBankImportConfirmBtn')?.addEventListener('click',submitQuestionBankImport);
+    $('qbBankImportRetryBtn')?.addEventListener('click',submitQuestionBankImport);
+    $('qbBankImportCancelBtn')?.addEventListener('click',()=>{questionBankImportFile=null;questionBankImportController.cancel();closePaperOperationDialog($('qbBankImportDialog'))});
+  }
   let paperImportController=null,paperImportFile=null;
   function renderPaperImportState(snapshot){
     const results=$('qbPaperImportResults'),fileName=$('qbPaperImportFileName'),action=$('qbPaperImportConflictAction'),preflight=snapshot.preflight,allowed=preflight?.allowedActions||{};
@@ -4427,22 +4463,6 @@
     });
     downloadJson('项目管理类题库认知标注模板.json', template);
   }
-  function importBanksFromPayload(data){
-    const rawBanks=Array.isArray(data)?data:(Array.isArray(data?.banks)?data.banks:[data]);
-    return rawBanks.filter(bank=>bank&&typeof bank==='object').map(normalizeBank);
-  }
-  function remapImportedPaperRefs(papers,maps={}){
-    const bankMap=maps.sourceBankIdMap&&typeof maps.sourceBankIdMap==='object'?maps.sourceBankIdMap:{};
-    const questionMap=maps.sourceQuestionIdMap&&typeof maps.sourceQuestionIdMap==='object'?maps.sourceQuestionIdMap:{};
-    return (Array.isArray(papers)?papers:[]).map(rawPaper=>{
-      const paper=normalizePaper(rawPaper);
-      paper.questions=(paper.questions||[]).map(ref=>{
-        const sourceBankId=String(ref.bankId||''),sourceQuestionId=String(ref.questionId||'');
-        return {...ref,bankId:bankMap[sourceBankId]||sourceBankId,questionId:questionMap[`${sourceBankId}::${sourceQuestionId}`]||sourceQuestionId};
-      });
-      return paper;
-    });
-  }
   function questionImportStateSnapshot(){
     return {
       banks:clone(state.banks),papers:clone(state.papers),selectedBankId:state.selectedBankId,selectedQuestionId:state.selectedQuestionId,
@@ -4456,48 +4476,23 @@
     state.cluePage=snapshot.cluePage||1;state.conceptPage=snapshot.conceptPage||1;state.questionPage=snapshot.questionPage||1;
     state.dirty=!!snapshot.dirty;state.serverCatalogNewerRevision=Number(snapshot.serverCatalogNewerRevision||0);state.serverCatalogLocalDraft=clone(snapshot.serverCatalogLocalDraft);state.serverCatalogConflictReason=snapshot.serverCatalogConflictReason||'';
   }
-  function importReplacementMessage(plan={}){
-    const groupNames={content:'题干与选项',analysis:'解析与翻译',keywords:'关键词',tags:'标签',principles:'原理绑定',knowledge:'知识点',reasoning:'推理链',family:'题目家族'};
-    const rows=Array.isArray(plan?.summaries)?plan.summaries:[];
-    const lines=rows.map(summary=>{
-      const groups=Object.entries(summary?.groups||{}).filter(([,count])=>Number(count)>0).map(([key])=>groupNames[key]||key);
-      const changes=[
-        Number(summary?.addedQuestions)>0?`新增 ${summary.addedQuestions} 题`:'',
-        Number(summary?.modifiedQuestions)>0?`更新 ${summary.modifiedQuestions} 题`:'',
-        Number(summary?.removedQuestions)>0?`移除 ${summary.removedQuestions} 题`:'',
-        groups.length?`涉及：${groups.join('、')}`:''
-      ].filter(Boolean);
-      return `• ${escapeHTML(summary?.bankName||summary?.bankId||'未命名题库')}：${changes.join('；')||'题库设置更新'}`;
-    });
-    return `检测到同一来源题库的更新：\n${lines.join('\n')||'• 导入内容将覆盖同来源题库'}\n\n已完全跳过内容相同的题库。确认覆盖上述变更吗？`;
-  }
-  function importDuplicateMessage(plan={}){
-    return `检测到重复题目：已有重复 ${Number(plan?.duplicateExistingCount||0)} 道，本批重复 ${Number(plan?.duplicateBatchCount||0)} 道。\n是否自动清除重复题目后继续导入？`;
-  }
   async function importQuestionBanks(data){
-    const incoming=importBanksFromPayload(data);
-    if(!incoming.length){alert('导入未提交：未找到可导入的题库。');return {ok:false,error:'未找到可导入的题库。'};}
-    if(!Catalog?.importBanks){alert('导入未提交：题目目录服务未加载。');return {ok:false,error:'题目目录服务未加载。'};}
+    const factory=TeacherDomains.QuestionBankImportController;
+    if(!factory?.create||!Catalog?.importBanks){alert('导入未提交：题库导入服务未加载。');return {ok:false,error:'题库导入服务未加载。'};}
     const snapshot=questionImportStateSnapshot();
+    const controller=factory.create({api:Catalog,confirm:request=>window.confirm(request.message)});
     try{
-      let result;
-      try{result=await Catalog.importBanks({banks:incoming});}
-      catch(error){
-        const plan=error?.detail?.detail?.importPlan;
-        if(!['IMPORT_REPLACEMENT_CONFIRMATION_REQUIRED','QUESTION_DUPLICATES_CONFIRMATION_REQUIRED'].includes(error?.code))throw error;
-        const duplicateConfirmation=error?.code==='QUESTION_DUPLICATES_CONFIRMATION_REQUIRED';
-        if(!window.confirm(duplicateConfirmation?importDuplicateMessage(plan):importReplacementMessage(plan))){
-          restoreQuestionImportState(snapshot);render();toast('已取消覆盖导入。');
-          return {ok:false,cancelled:true,error:'已取消覆盖导入。'};
-        }
-        try{result=await Catalog.importBanks({banks:incoming,confirmReplace:!duplicateConfirmation,confirmDuplicateCleanup:duplicateConfirmation});}
-        catch(secondError){
-          const secondPlan=secondError?.detail?.detail?.importPlan;
-          if(secondError?.code!=='QUESTION_DUPLICATES_CONFIRMATION_REQUIRED'||duplicateConfirmation)throw secondError;
-          if(!window.confirm(importDuplicateMessage(secondPlan)))return {ok:false,cancelled:true,error:'已取消重复题清理。'};
-          result=await Catalog.importBanks({banks:incoming,confirmReplace:true,confirmDuplicateCleanup:true});
-        }
+      const loaded=await controller.load('question-bank.json',JSON.stringify(data));
+      if(!loaded.ok)throw new Error(loaded.error);
+      const incoming=controller.snapshot().banks;
+      const submitted=await controller.confirm();
+      if(!submitted.ok){
+        restoreQuestionImportState(snapshot);render();
+        const cancelled=/^已取消/.test(String(submitted.error||''));
+        if(cancelled)toast(submitted.error);else alert('导入未提交：'+submitted.error);
+        return {ok:false,cancelled,error:submitted.error};
       }
+      const result=submitted.result;
       const savedBanks=Array.isArray(result?.banks)?result.banks:[];
       const lastIncoming=incoming[incoming.length-1]||{};
       const sourceBankId=String(lastIncoming.sourceId||lastIncoming.id||'');

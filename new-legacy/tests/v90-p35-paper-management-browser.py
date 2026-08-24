@@ -36,7 +36,17 @@ with sync_playwright() as p:
       window.confirm=()=>true;window.alert=message=>{window.__lastAlert=String(message)};window.__prompts=[];window.prompt=()=>window.__prompts.shift()||'';
       const questions=Array.from({length:25},(_,i)=>({id:'q'+(i+1),bankId:'bank-p35',teacherNumber:'PMP-'+String(i+1).padStart(6,'0'),title:'试卷测试题 '+(i+1),type:'single_choice',subject:'PMP',difficulty:'medium',domain:i%2?'过程':'人员',topic:'敏捷',tags:['测试'],stemParts:[{text:'题干 '+(i+1)}],options:[{id:'A',text:'A',correct:true},{id:'B',text:'B'}],correctAnswer:'A',analysis:'解析',clues:[],concepts:[],reasoningSteps:[],metadata:{knowledge:{primaryNodeId:null},classifications:{'exam-domain':i%3===0?'business-environment':(i%2?'process':'people')}},status:{contentReady:true}}));
       const banks=[{id:'bank-p35',name:'P3.5 题库',subject:'PMP',visibility:'private',revision:1,questions}];
-      window.KGQuestionCatalogAdapter={ready:Promise.resolve(),snapshot:()=>({banks:banks.map(({questions,...bank})=>bank),questions:questions.map(item=>({...item}))})};
+      window.__bankImportCalls=[];window.__bankImportFailures=1;
+      window.KGQuestionCatalogAdapter={
+        ready:Promise.resolve(),
+        snapshot:()=>({banks:banks.map(({questions,...bank})=>bank),questions:banks.flatMap(bank=>bank.questions.map(item=>({...item,bankId:bank.id})))}),
+        importBanks:async body=>{
+          window.__bankImportCalls.push(clone(body));
+          if(window.__bankImportFailures>0){window.__bankImportFailures-=1;throw new Error('题库导入服务暂时不可用')}
+          const saved=body.banks.map((source,index)=>{const bank={...clone(source),id:`db-import-bank-${index+1}`,sourceId:source.id,revision:1,questions:source.questions.map(question=>({...clone(question),bankId:`db-import-bank-${index+1}`,sourceId:question.id}))};banks.push(bank);return bank});
+          return {banks:clone(saved),sourceBankIdMap:{},sourceQuestionIdMap:{},contentRevision:2,importPlan:{create:saved.length,replace:0,skip:0}};
+        }
+      };
       const clone=value=>JSON.parse(JSON.stringify(value));let paperSeq=0,categorySeq=0,batchSeq=0;
       let db={papers:[],categories:[]};window.__paperDb=db;window.__paperApiCalls=[];window.__shortageOnce=true;window.__batchFail=false;window.__importPreflightFails=1;
       const stamp=()=>new Date().toISOString();
@@ -60,7 +70,7 @@ with sync_playwright() as p:
     add_files(page, ['styles/teacher-workbench.css', 'styles/question-bank-admin.css', 'styles/admin-context-nav.css', 'styles/paper-management.css'], 'css')
     add_files(page, [
         'src/01-runtime-config.js', 'src/28-app-storage.js', 'src/29-auth-core.js', 'src/34-role-permissions.js', 'src/37-subscription-plans.js', 'src/37-subscription-orders.js', 'src/37-subscription-redeem-codes.js', 'src/37-subscription-core.js', 'src/33-user-center.js', 'src/50-question-data.js', 'src/91-learning-content-core.js', 'src/95-recall-association-library.js',
-        'src/teacher/shared/domain-core.js', 'src/teacher/question-bank/bank-list-controller.js', 'src/teacher/question-bank/question-list-controller.js', 'src/teacher/paper-management/paper-list-controller.js', 'src/teacher/paper-management/paper-question-picker.js', 'src/teacher/paper-management/paper-preview.js', 'src/teacher/paper-management/paper-audit-service.js', 'src/59c-active-learning-mode-policy.js', 'src/teacher/paper-management/paper-release-service.js', 'src/teacher/paper-management/paper-quota-service.js', 'src/teacher/paper-management/paper-import-controller.js', 'src/teacher/paper-management/paper-composition-controller.js', 'src/65-question-bank-admin.js'
+        'src/teacher/shared/domain-core.js', 'src/teacher/question-bank/bank-list-controller.js', 'src/teacher/question-bank/question-list-controller.js', 'src/teacher/paper-management/paper-list-controller.js', 'src/teacher/paper-management/paper-question-picker.js', 'src/teacher/paper-management/paper-preview.js', 'src/teacher/paper-management/paper-audit-service.js', 'src/59c-active-learning-mode-policy.js', 'src/teacher/paper-management/paper-release-service.js', 'src/teacher/paper-management/paper-quota-service.js', 'src/teacher/question-bank-import-controller.js', 'src/teacher/paper-management/paper-import-controller.js', 'src/teacher/paper-management/paper-composition-controller.js', 'src/65-question-bank-admin.js'
     ], 'js')
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(600)
@@ -81,9 +91,39 @@ with sync_playwright() as p:
     page.locator('[data-preview-source="preview"][data-question-preview="bank-p35::q1"]').dblclick(); page.wait_for_timeout(80)
     assert '题干 1' in page.locator('#qbQuestionPreviewContent').inner_text(); page.locator('#qbQuestionPreviewCloseBtn').click()
 
+    # Question-bank and paper JSON use separate entry points. A 60-question Prep Studio bank retries through the catalog API.
+    bank_package = {'id': 'bank-prep-60', 'name': 'PMP 60题', 'subject': 'PMP', 'version': '2.6', 'visibility': 'private', 'questions': [
+        {'id': f'q-import-{index:03d}', 'title': f'Q{index:03d}', 'type': 'single_choice', 'subject': 'PMP', 'stemParts': [{'text': f'题干 {index}'}], 'options': [{'id': 'A', 'text': '正确', 'correct': True}, {'id': 'B', 'text': '错误', 'correct': False}], 'correctAnswer': 'A'}
+        for index in range(1, 61)
+    ]}
+    paper_for_wrong_entry = {'schema': 'kg-paper-package-v1', 'schemaVersion': 1, 'paper': {'id': 'wrong-entry-paper', 'name': '试卷', 'totalCount': 0, 'questions': []}}
+    page.locator('#qbImportBankBtn').click()
+    page.locator('#qbBankImportFile').set_input_files({'name': 'paper.json', 'mimeType': 'application/json', 'buffer': json.dumps(paper_for_wrong_entry, ensure_ascii=False).encode()})
+    page.wait_for_timeout(80)
+    assert '检测到试卷包 JSON' in page.locator('#qbBankImportResults').inner_text()
+    assert page.evaluate('window.__bankImportCalls.length') == 0
+    page.locator('#qbBankImportFile').set_input_files({'name': 'PMP_60题_PrepStudio.json', 'mimeType': 'application/json', 'buffer': json.dumps(bank_package, ensure_ascii=False).encode()})
+    page.wait_for_timeout(80)
+    assert '60 道题' in page.locator('#qbBankImportResults').inner_text()
+    page.locator('#qbBankImportConfirmBtn').click(); page.wait_for_timeout(100)
+    assert '暂时不可用' in page.locator('#qbBankImportResults').inner_text(); assert page.locator('#qbBankImportRetryBtn').is_visible()
+    page.locator('#qbBankImportRetryBtn').click(); page.wait_for_timeout(160)
+    bank_calls = page.evaluate('window.__bankImportCalls')
+    assert len(bank_calls) == 2; assert len(bank_calls[-1]['banks']) == 1; assert len(bank_calls[-1]['banks'][0]['questions']) == 60
+    assert bank_calls[-1]['banks'][0]['questions'][0]['id'] == 'q-import-001'; assert bank_calls[-1]['banks'][0]['questions'][-1]['id'] == 'q-import-060'
+    assert page.locator('#qbBankImportDialog').get_attribute('open') is None, {
+        'results': page.locator('#qbBankImportResults').inner_text(),
+        'errors': errors,
+        'calls': bank_calls,
+    }
+
     # Import preflight shows mismatch warning/conflict strategy and submits once.
     package = {'schema': 'kg-paper-package-v1', 'schemaVersion': 1, 'paper': {'id': 'paper-import-1', 'name': 'PMP 模拟卷 04', 'subject': 'PMP', 'totalCount': 2, 'questions': [{'bankId': 'bank-p35', 'questionId': 'q1', 'order': 1}, {'bankId': 'bank-p35', 'questionId': 'q2', 'order': 2}]}}
     page.locator('#qbImportPaperBtn').click()
+    page.locator('#qbPaperImportFile').set_input_files({'name': 'PMP_60题_PrepStudio.json', 'mimeType': 'application/json', 'buffer': json.dumps(bank_package, ensure_ascii=False).encode()})
+    page.wait_for_timeout(80)
+    assert '检测到题库 JSON' in page.locator('#qbPaperImportResults').inner_text()
+    assert page.evaluate("window.__paperApiCalls.filter(row=>row[0]==='importPreflight').length") == 0
     page.locator('#qbPaperImportFile').set_input_files({'name': 'PMP 模拟卷 05.json', 'mimeType': 'application/json', 'buffer': json.dumps(package, ensure_ascii=False).encode()})
     page.wait_for_timeout(150)
     assert '暂时不可用' in page.locator('#qbPaperImportResults').inner_text(); assert page.locator('#qbPaperImportRetryBtn').is_visible()
@@ -109,7 +149,7 @@ with sync_playwright() as p:
     # Category mutation also uses API; no draft/category business key is written.
     page.evaluate("window.__prompts=['API 分类']"); page.locator('#qbAddPaperCategoryBtn').click(); page.wait_for_timeout(120)
     assert page.locator('.pm-paper-category-row').filter(has_text='API 分类').count() == 1
-    forbidden = page.evaluate("window.__storageWrites.filter(key=>key.startsWith('kg_exam_papers_v1__')||key.startsWith('kg_exam_paper_categories_v1__'))")
+    forbidden = page.evaluate("window.__storageWrites.filter(key=>key.startsWith('kg_exam_papers_v1__')||key.startsWith('kg_exam_paper_categories_v1__')||key.startsWith('kg_question_banks_v1__'))")
     assert forbidden == []
     assert not errors, errors
 
