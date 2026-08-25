@@ -98,6 +98,47 @@ test('management catalog merges server releases into local drafts without frozen
   assert.equal(merged[1].id, 'paper-local')
 })
 
+test('publish payload returns the server-assigned release version and identity', async () => {
+  const requests = []
+  const context = {
+    console,
+    URLSearchParams,
+    setTimeout,
+    clearTimeout,
+    CustomEvent: class CustomEvent { constructor(type, init = {}) { this.type = type; this.detail = init.detail } },
+    addEventListener() {},
+    dispatchEvent() {},
+    async fetch(url, options = {}) {
+      requests.push({ url: String(url), options })
+      if (options.method === 'POST') {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { release: { releaseId: 'server-release-v2', paperId: 'paper-stale', version: 2 } }
+          },
+        }
+      }
+      return { ok: true, status: 200, async json() { return { releases: [], total: 0 } } }
+    },
+  }
+  context.window = context
+  context.globalThis = context
+  vm.runInNewContext(adapter, context, { filename: 'paper-release-adapter.js' })
+  await context.KGPaperReleaseApi.ready()
+
+  const release = await context.KGPaperReleaseApi.publishPayload({
+    releaseId: 'client-release-v1', paperId: 'paper-stale', version: 1,
+  })
+
+  assert.equal(release.version, 2)
+  assert.equal(release.releaseId, 'server-release-v2')
+  const published = requests.find(item => item.options.method === 'POST')
+  assert.equal(published.url, '/api/v1/paper-releases/publish-payload')
+  assert.equal(published.options.headers['content-type'], 'application/json')
+  assert.equal(JSON.parse(published.options.body).releaseId, 'client-release-v1')
+})
+
 test('paper release adapter never persists API data to localStorage', () => {
   assert.doesNotMatch(adapter, /localStorage\.setItem/)
   assert.doesNotMatch(adapter, /localStorage\.getItem/)

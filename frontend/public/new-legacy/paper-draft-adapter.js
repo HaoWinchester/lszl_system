@@ -8,6 +8,11 @@
 (function (global) {
   const API_ROOT = '/api/v1';
   let readyPromise = null;
+  let paperListLoad = null;
+  let categoryListLoad = null;
+  const summaryState = { papers: null, categories: null };
+  const detailCache = new Map();
+  const detailLoads = new Map();
 
   function clone(value) {
     if (value === undefined) return undefined;
@@ -68,16 +73,67 @@
     } catch (error) {}
   }
 
+  function invalidatePaper(paperId) {
+    const id = text(paperId);
+    detailCache.delete(id);
+    detailLoads.delete(id);
+  }
+
+  function invalidatePaperLists() {
+    summaryState.papers = null;
+    paperListLoad = null;
+    readyPromise = null;
+  }
+
+  function invalidateCategoryLists() {
+    summaryState.categories = null;
+    categoryListLoad = null;
+    readyPromise = null;
+  }
+
+  function invalidateLists() {
+    invalidatePaperLists();
+    invalidateCategoryLists();
+  }
+
+  function cachePaper(paper) {
+    const id = text(paper?.id);
+    if (id) detailCache.set(id, clone(paper));
+  }
+
   async function list(options = {}) {
     const query = new URLSearchParams();
     if (options && options.status) query.set('status', text(options.status));
-    const payload = await request(`/papers${query.toString() ? `?${query}` : ''}`);
-    return Array.isArray(payload?.papers) ? clone(payload.papers) : [];
+    const cacheable = !query.toString();
+    if (cacheable && options.forceReload !== true && summaryState.papers) {
+      return clone(summaryState.papers);
+    }
+    if (cacheable && options.forceReload !== true && paperListLoad) return clone(await paperListLoad);
+    const task = request(`/papers${query.toString() ? `?${query}` : ''}`)
+      .then(payload => {
+        const papers = Array.isArray(payload?.papers) ? clone(payload.papers) : [];
+        if (cacheable) summaryState.papers = clone(papers);
+        return papers;
+      })
+      .finally(() => { if (cacheable) paperListLoad = null; });
+    if (cacheable) paperListLoad = task;
+    return clone(await task);
   }
 
-  async function detail(paperId) {
-    const payload = await request(`/papers/${encodeURIComponent(text(paperId))}`);
-    return payload?.paper ? clone(payload.paper) : null;
+  async function detail(paperId, options = {}) {
+    const id = text(paperId);
+    if (!id) return null;
+    if (options.forceReload !== true && detailCache.has(id)) return clone(detailCache.get(id));
+    if (options.forceReload !== true && detailLoads.has(id)) return clone(await detailLoads.get(id));
+    const task = request(`/papers/${encodeURIComponent(id)}`)
+      .then(payload => {
+        const paper = payload?.paper ? clone(payload.paper) : null;
+        if (paper) detailCache.set(id, clone(paper));
+        return paper;
+      })
+      .finally(() => detailLoads.delete(id));
+    detailLoads.set(id, task);
+    return clone(await task);
   }
 
   async function mutate(action, path, method, body) {
@@ -88,6 +144,8 @@
 
   async function create(body) {
     const payload = await mutate('create', '/papers', 'POST', body);
+    cachePaper(payload.paper);
+    invalidatePaperLists();
     return clone(payload.paper);
   }
 
@@ -98,6 +156,8 @@
       'PUT',
       body,
     );
+    cachePaper(payload.paper);
+    invalidatePaperLists();
     return clone(payload.paper);
   }
 
@@ -108,6 +168,8 @@
       'PUT',
       body,
     );
+    cachePaper(payload.paper);
+    invalidatePaperLists();
     return clone(payload.paper);
   }
 
@@ -118,11 +180,14 @@
     }
     if (options.reason) query.set('reason', text(options.reason));
     const suffix = query.toString() ? `?${query}` : '';
-    return mutate(
+    const payload = await mutate(
       'remove',
       `/papers/${encodeURIComponent(text(paperId))}${suffix}`,
       'DELETE',
     );
+    invalidatePaper(paperId);
+    invalidatePaperLists();
+    return payload;
   }
 
   async function lifecycle(paperId, action, revision) {
@@ -134,16 +199,28 @@
       `/papers/${encodeURIComponent(text(paperId))}/${action}${suffix}`,
       'POST',
     );
+    cachePaper(payload.paper);
+    invalidatePaperLists();
     return clone(payload.paper);
   }
 
-  async function listCategories() {
-    const payload = await request('/paper-categories');
-    return Array.isArray(payload?.categories) ? clone(payload.categories) : [];
+  async function listCategories(options = {}) {
+    if (options.forceReload !== true && summaryState.categories) return clone(summaryState.categories);
+    if (options.forceReload !== true && categoryListLoad) return clone(await categoryListLoad);
+    const task = request('/paper-categories')
+      .then(payload => {
+        const categories = Array.isArray(payload?.categories) ? clone(payload.categories) : [];
+        summaryState.categories = clone(categories);
+        return categories;
+      })
+      .finally(() => { categoryListLoad = null; });
+    categoryListLoad = task;
+    return clone(await task);
   }
 
   async function createCategory(body) {
     const payload = await mutate('createCategory', '/paper-categories', 'POST', body);
+    invalidateCategoryLists();
     return clone(payload.category);
   }
 
@@ -154,6 +231,7 @@
       'PUT',
       body,
     );
+    invalidateCategoryLists();
     return clone(payload.category);
   }
 
@@ -161,11 +239,13 @@
     const query = new URLSearchParams();
     if (revision !== undefined && revision !== null) query.set('revision', text(revision));
     const suffix = query.toString() ? `?${query}` : '';
-    return mutate(
+    const payload = await mutate(
       'removeCategory',
       `/paper-categories/${encodeURIComponent(text(categoryId))}${suffix}`,
       'DELETE',
     );
+    invalidateCategoryLists();
+    return payload;
   }
 
   async function importPreflight(body) {
@@ -175,6 +255,7 @@
 
   async function importPaper(body) {
     const payload = await mutate('import', '/papers/import', 'POST', body);
+    invalidatePaperLists();
     return clone(payload.result);
   }
 
@@ -190,10 +271,12 @@
       'POST',
       body,
     );
+    invalidatePaperLists();
     return clone(payload.result);
   }
 
-  function ready() {
+  function ready(options = {}) {
+    if (options.forceReload === true) invalidateLists();
     if (!readyPromise) {
       readyPromise = Promise.all([list(), listCategories()])
         .then(([papers, categories]) => clone({ papers, categories }))
@@ -209,6 +292,8 @@
     ready,
     list,
     detail,
+    invalidatePaper,
+    invalidateLists,
     create,
     update,
     replaceQuestions,

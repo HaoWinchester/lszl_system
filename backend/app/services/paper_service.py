@@ -149,6 +149,76 @@ def serialize_paper(
     return payload
 
 
+async def sync_published_projection(
+    db: AsyncSession,
+    *,
+    paper_id: str,
+    release_id: str,
+    version: int,
+    published_at,
+    updated_by: str,
+) -> bool:
+    """Keep the editable paper aggregate aligned with its active release."""
+    paper = (
+        await db.execute(
+            select(ExamPaper)
+            .where(ExamPaper.id == paper_id, ExamPaper.deleted_at.is_(None))
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if paper is None:
+        return False
+    if (
+        paper.status == "published"
+        and paper.published_release_id == release_id
+        and paper.published_version == version
+        and paper.published_at == published_at
+        and paper.withdrawn_at is None
+    ):
+        return False
+    paper.status = "published"
+    paper.published_release_id = release_id
+    paper.published_version = version
+    paper.published_at = published_at
+    paper.withdrawn_at = None
+    paper.revision += 1
+    paper.updated_by = updated_by
+    await db.flush()
+    return True
+
+
+async def sync_withdrawn_projection(
+    db: AsyncSession,
+    *,
+    paper_id: str,
+    withdrawn_at,
+    updated_by: str,
+) -> bool:
+    """撤回发布后把可编辑试卷投影回草稿；发布历史字段保持不动。"""
+    paper = (
+        await db.execute(
+            select(ExamPaper)
+            .where(ExamPaper.id == paper_id, ExamPaper.deleted_at.is_(None))
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if paper is None:
+        return False
+    if (
+        paper.status == "draft"
+        and paper.published_at is None
+        and paper.withdrawn_at is not None
+    ):
+        return False
+    paper.status = "draft"
+    paper.published_at = None
+    paper.withdrawn_at = withdrawn_at
+    paper.revision += 1
+    paper.updated_by = updated_by
+    await db.flush()
+    return True
+
+
 async def validate_references(
     db: AsyncSession,
     references: list[PaperReference],
@@ -212,7 +282,7 @@ async def validate_references(
 async def _reference_payloads(db: AsyncSession, paper_id: str) -> list[dict]:
     rows = (
         await db.execute(
-            select(Question.bank_id, PaperQuestion)
+            select(Question, PaperQuestion)
             .join(PaperQuestion, PaperQuestion.question_id == Question.id)
             .where(PaperQuestion.paper_id == paper_id)
             .order_by(PaperQuestion.order_index)
@@ -220,12 +290,19 @@ async def _reference_payloads(db: AsyncSession, paper_id: str) -> list[dict]:
     ).all()
     return [
         {
-            "bankId": bank_id,
+            "bankId": question.bank_id,
             "questionId": link.question_id,
             "order": link.order_index + 1,
             "score": _score(link.score),
+            "summary": {
+                "title": question.title,
+                "domain": question.domain,
+                "topic": question.topic,
+                "difficulty": question.difficulty,
+                "tags": question.tags or [],
+            },
         }
-        for bank_id, link in rows
+        for question, link in rows
     ]
 
 

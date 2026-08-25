@@ -72,17 +72,48 @@ def test_publish_payload_rejects_missing_snapshots() -> None:
         assert response.status_code == 422
 
 
-def test_new_version_supersedes_previous_active_release() -> None:
+def test_server_allocates_next_version_when_client_version_is_stale() -> None:
     with TestClient(app) as client:
         login(client, "admin")
         first = client.post("/api/v1/paper-releases/publish-payload", json=_payload(paper_id="paper-t3", version=1)).json()["release"]
-        second = client.post("/api/v1/paper-releases/publish-payload", json=_payload(paper_id="paper-t3", version=2)).json()["release"]
+        stale = _payload(paper_id="paper-t3", version=1)
+        stale["id"] = stale["releaseId"] = "paper-t3-stale-version-retry"
+        response = client.post("/api/v1/paper-releases/publish-payload", json=stale)
+        assert response.status_code == 200, response.text
+        second = response.json()["release"]
+        assert second["version"] == 2
+        assert second["releaseId"] != stale["releaseId"]
         statuses = client.get("/api/v1/paper-releases/catalog").json()
         active_ids = [row["releaseId"] for row in statuses["releases"] if row["paperId"] == "paper-t3"]
         assert active_ids == [second["releaseId"]]
         superseded = client.get(f"/api/v1/paper-releases/{first['releaseId']}").json()["release"]
         assert superseded["status"] == "superseded"
         client.post("/api/v1/paper-releases/papers/paper-t3/withdraw-all")
+
+
+def test_publish_payload_updates_paper_management_projection() -> None:
+    with TestClient(app) as client:
+        login(client, "admin")
+        created = client.post(
+            "/api/v1/papers",
+            json={"name": "发布投影测试卷", "subject": "PMP"},
+        )
+        assert created.status_code == 200, created.text
+        paper = created.json()["paper"]
+
+        published = client.post(
+            "/api/v1/paper-releases/publish-payload",
+            json=_payload(paper_id=paper["id"], version=1),
+        )
+        assert published.status_code == 200, published.text
+        release = published.json()["release"]
+
+        detail = client.get(f"/api/v1/papers/{paper['id']}")
+        assert detail.status_code == 200, detail.text
+        projection = detail.json()["paper"]
+        assert projection["status"] == "published"
+        assert projection["publishedVersion"] == 1
+        assert projection["publishedReleaseId"] == release["releaseId"]
 
 
 def test_experience_summary_week_and_daily() -> None:

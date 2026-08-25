@@ -40,6 +40,7 @@ function loadAdapter(fetchImpl) {
 test('adapter exposes the complete paper draft API without browser persistence', () => {
   for (const method of [
     'ready', 'list', 'detail', 'create', 'update', 'replaceQuestions', 'remove',
+    'invalidatePaper', 'invalidateLists',
     'listCategories', 'createCategory', 'updateCategory', 'removeCategory',
     'importPreflight', 'importPaper', 'compositionPreflight', 'createCompositionBatch',
   ]) {
@@ -48,6 +49,47 @@ test('adapter exposes the complete paper draft API without browser persistence',
   assert.doesNotMatch(adapter, /localStorage/)
   assert.doesNotMatch(adapter, /sessionStorage/)
   assert.doesNotMatch(adapter, /indexedDB/i)
+})
+
+test('ready and paper detail share in-flight work and support explicit invalidation', async () => {
+  const calls = []
+  const { api } = loadAdapter(async (url, options = {}) => {
+    calls.push({ url: String(url), method: options.method })
+    if (url === '/api/v1/papers') return response(200, { papers: [{ id: 'paper-1', name: '摘要' }] })
+    if (url === '/api/v1/paper-categories') return response(200, { categories: [] })
+    if (url === '/api/v1/papers/paper-1') return response(200, { paper: { id: 'paper-1', questions: [] } })
+    throw new Error(`unexpected request: ${url}`)
+  })
+
+  await Promise.all([api.ready(), api.ready()])
+  assert.equal(calls.filter(call => call.url === '/api/v1/papers').length, 1)
+  assert.equal(calls.filter(call => call.url === '/api/v1/paper-categories').length, 1)
+
+  await Promise.all([api.detail('paper-1'), api.detail('paper-1')])
+  assert.equal(calls.filter(call => call.url === '/api/v1/papers/paper-1').length, 1)
+  api.invalidatePaper('paper-1')
+  await api.detail('paper-1')
+  assert.equal(calls.filter(call => call.url === '/api/v1/papers/paper-1').length, 2)
+
+  api.invalidateLists()
+  await api.ready()
+  assert.equal(calls.filter(call => call.url === '/api/v1/papers').length, 2)
+  assert.equal(calls.filter(call => call.url === '/api/v1/paper-categories').length, 2)
+})
+
+test('failed detail loads are evicted so a later retry can recover', async () => {
+  let attempts = 0
+  const { api } = loadAdapter(async url => {
+    if (url !== '/api/v1/papers/paper-retry') throw new Error(`unexpected request: ${url}`)
+    attempts += 1
+    return attempts === 1
+      ? response(500, { detail: { message: '暂时失败' } })
+      : response(200, { paper: { id: 'paper-retry', revision: 3 } })
+  })
+
+  await assert.rejects(api.detail('paper-retry'), error => error.status === 500)
+  assert.equal((await api.detail('paper-retry')).revision, 3)
+  assert.equal(attempts, 2)
 })
 
 test('adapter sends exact endpoints, credentials, headers, and payloads', async () => {

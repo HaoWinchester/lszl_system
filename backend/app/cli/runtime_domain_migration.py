@@ -8,7 +8,15 @@ import json
 from pathlib import Path
 
 from app.db.session import AsyncSessionLocal
-from app.services.runtime_domain_migration_service import drop_check, migrate, plan, scan, verify
+from app.services import paper_release_service
+from app.services.runtime_domain_migration_service import (
+    PAPER_RELEASE_SOURCE_KEYS,
+    drop_check,
+    migrate,
+    plan,
+    scan,
+    verify,
+)
 
 
 async def _run(command: str, run_id: str, source_keys: set[str] | None = None) -> dict:
@@ -23,6 +31,9 @@ async def _run(command: str, run_id: str, source_keys: set[str] | None = None) -
             # snapshot; scan's source-hash upsert keeps unchanged reruns cheap.
             scanned = await scan(db, run_id=run_id, source_keys=source_keys)
             applied = await migrate(db, run_id)
+            repaired_projections = 0
+            if source_keys is None or PAPER_RELEASE_SOURCE_KEYS.intersection(source_keys):
+                repaired_projections = await paper_release_service.reconcile_active_paper_projections(db)
             # Backfill is incremental: previously verified ledger entries are
             # audit history and may legitimately diverge after domain writes.
             # Explicit `verify` / `drop-check` still recheck verified entries.
@@ -31,6 +42,7 @@ async def _run(command: str, run_id: str, source_keys: set[str] | None = None) -
                 **verified,
                 "scan": scanned,
                 "apply": applied,
+                "repaired_paper_projections": repaired_projections,
                 "reused_existing_scan": bool(
                     int(scanned.get("created") or 0) == 0
                     and int(scanned.get("deduplicated") or 0) > 0

@@ -5,12 +5,17 @@
   const mode = global.document?.body?.dataset?.questionCatalogMode === 'managed'
     ? 'managed'
     : 'learning'
+  const summaryOnly = global.document?.body?.dataset?.paperManagementPage === 'true'
   const clientInstanceId = global.crypto?.randomUUID?.()
     || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
   const QUESTION_PAGE_SIZE = 200
   let catalog = { banks: [], questions: [], catalogRevision: '', contentRevision: 0 }
   const bankQuestionCache = new Map()
   const bankQuestionLoad = new Map()
+  const bankQuestionPageCache = new Map()
+  const bankQuestionPageLoad = new Map()
+  const questionCache = new Map()
+  const questionLoad = new Map()
 
   class CatalogRequestError extends Error {
     constructor(message, { status = 0, code = '', detail = null } = {}) {
@@ -76,7 +81,48 @@
       return carry
     }, new Map())
     for (const [bankId, rows] of lookup.entries()) bankQuestionCache.set(bankId, clone(rows))
+    for (const item of snapshot.questions) questionCache.set(String(item.id), clone(item))
     return snapshot
+  }
+
+  function invalidateQuestionCache() {
+    bankQuestionCache.clear()
+    bankQuestionLoad.clear()
+    bankQuestionPageCache.clear()
+    bankQuestionPageLoad.clear()
+    questionCache.clear()
+    questionLoad.clear()
+  }
+
+  async function loadBankQuestionPage(bankId, options = {}) {
+    const id = String(bankId || '').trim()
+    if (!id) return { questions: [], total: 0, page: 1, pageSize: 20 }
+    const page = Math.max(1, Math.trunc(Number(options.page || 1)))
+    const pageSize = Math.max(1, Math.min(200, Math.trunc(Number(options.pageSize || 20))))
+    const search = String(options.search || '').trim()
+    const cacheKey = JSON.stringify([catalog.contentRevision, id, page, pageSize, search])
+    if (options.forceReload !== true && bankQuestionPageCache.has(cacheKey)) {
+      return clone(bankQuestionPageCache.get(cacheKey))
+    }
+    if (bankQuestionPageLoad.has(cacheKey)) return clone(await bankQuestionPageLoad.get(cacheKey))
+
+    const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (search) query.set('search', search)
+    const task = request(`/question-catalog/banks/${encodeURIComponent(id)}/questions?${query.toString()}`)
+      .then(payload => {
+        const result = {
+          questions: Array.isArray(payload?.questions) ? clone(payload.questions) : [],
+          total: Math.max(0, Number(payload?.total || 0)),
+          page: Math.max(1, Number(payload?.page || page)),
+          pageSize: Math.max(1, Number(payload?.pageSize || pageSize)),
+        }
+        for (const item of result.questions) questionCache.set(String(item.id), clone(item))
+        bankQuestionPageCache.set(cacheKey, clone(result))
+        return result
+      })
+      .finally(() => bankQuestionPageLoad.delete(cacheKey))
+    bankQuestionPageLoad.set(cacheKey, task)
+    return clone(await task)
   }
 
   async function loadBankQuestions(bankId, options = {}) {
@@ -102,6 +148,7 @@
       } while (questions.length < total && rows.length > 0 && (maxQuestions <= 0 || questions.length < maxQuestions))
       const finalRows = maxQuestions > 0 ? questions.slice(0, maxQuestions) : questions
       bankQuestionCache.set(id, clone(finalRows))
+      for (const item of finalRows) questionCache.set(String(item.id), clone(item))
       return clone(finalRows)
     })().finally(() => {
       bankQuestionLoad.delete(id)
@@ -110,11 +157,21 @@
     return task
   }
 
-  async function loadQuestion(questionId) {
-    const direct = question(questionId)
+  async function loadQuestion(questionId, options = {}) {
+    const id = String(questionId || '').trim()
+    if (!id) return null
+    const direct = options.forceReload === true ? null : question(id)
     if (direct) return direct
-    const payload = await request(`/question-catalog/questions/${encodeURIComponent(String(questionId || ''))}`)
-    return payload?.question ? clone(payload.question) : null
+    if (questionLoad.has(id)) return clone(await questionLoad.get(id))
+    const task = request(`/question-catalog/questions/${encodeURIComponent(id)}`)
+      .then(payload => {
+        const loaded = payload?.question ? clone(payload.question) : null
+        if (loaded) questionCache.set(id, clone(loaded))
+        return loaded
+      })
+      .finally(() => questionLoad.delete(id))
+    questionLoad.set(id, task)
+    return clone(await task)
   }
 
   async function reload(options = {}) {
@@ -122,7 +179,7 @@
     if (options.includeQuestions === true) query.set('include_questions', 'true')
     if (Number.isFinite(Number(options.questionPageSize))) query.set('page_size', String(Math.max(1, Number(options.questionPageSize))))
     const next = await request(`/question-catalog/bootstrap?${query.toString()}`)
-    bankQuestionCache.clear()
+    invalidateQuestionCache()
     const snapshot = normalizedSnapshot(next)
     if (snapshot.contentRevision < catalog.contentRevision) return clone(catalog)
     catalog = snapshot
@@ -141,6 +198,8 @@
   function banks() { return clone(catalog.banks) }
   function bank(id) { return clone(catalog.banks.find(item => String(item.id) === String(id)) || null) }
   function question(id) {
+    const cached = questionCache.get(String(id))
+    if (cached) return clone(cached)
     const direct = catalog.questions.find(item => String(item.id) === String(id))
     if (direct) return clone(direct)
     for (const rows of bankQuestionCache.values()) {
@@ -164,9 +223,8 @@
   async function refreshAfterCommit(payload) {
     const revision = payload?.contentRevision
     try {
-      // 提交后重建快照必须带回题目列表：题目管理页 loadBanks() 直接从
-      // snapshot.questions 读题，不带 include_questions 会把题目清成 0。
-      await reload({ source: 'local-commit', includeQuestions: true })
+      // 题库管理页仍依赖全量题目；试卷管理页通过分页接口按需加载。
+      await reload({ source: 'local-commit', includeQuestions: mode === 'managed' && !summaryOnly })
     } catch (error) {}
     if (Number.isSafeInteger(revision) && revision > catalog.contentRevision) {
       reloadRemoteRevision({ revision, source: 'local-commit-retry' })
@@ -293,7 +351,7 @@
     })
   }
 
-  const ready = reload({ source: 'bootstrap', includeQuestions: mode === 'managed' })
+  const ready = reload({ source: 'bootstrap', includeQuestions: mode === 'managed' && !summaryOnly })
   ready.catch(() => {})
   let remoteReloadTarget = 0
   let remoteReloadPromise = null
@@ -322,7 +380,7 @@
         while (!remoteRetryStopped && remoteReloadTarget > catalog.contentRevision) {
           const previousRevision = catalog.contentRevision
           try {
-            await reload({ source: 'remote', includeQuestions: mode === 'managed' })
+            await reload({ source: 'remote', includeQuestions: mode === 'managed' && !summaryOnly })
             if (remoteRetryStopped) return
             failures = 0
           } catch (error) {
@@ -357,6 +415,10 @@
     banks,
     bank,
     question,
+    loadBankQuestions,
+    loadBankQuestionPage,
+    loadQuestion,
+    invalidateQuestionCache,
     reload,
     saveBank,
     importBanks,
