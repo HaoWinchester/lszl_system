@@ -422,6 +422,14 @@ async def update_paper(
     )
     if updated_id is None:
         return None
+    if "name" in values:
+        from app.services import paper_release_service
+
+        await paper_release_service.sync_active_release_name(
+            db,
+            paper_id=paper_id,
+            name=str(values["name"]),
+        )
     await teaching_content_revision_service.bump(
         db,
         actor.username,

@@ -707,6 +707,34 @@ def test_reconcile_withdrawn_projections_repairs_legacy_unpublish_drift() -> Non
         asyncio.run(_cleanup(ids))
 
 
+def test_rename_paper_updates_active_release_name_but_not_history() -> None:
+    ids = _ids()
+    asyncio.run(_seed(ids))
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            teacher = await db.get(User, ids["teacher"])
+            release = await paper_release_service.publish(
+                db, teacher, ids["paper"], expected_revision=1,
+                access_level="free", enabled_modes=["practice_mode"],
+                allowed_roles=["student"], metadata={},
+            )
+            from app.schemas.paper import PaperUpdateRequest
+            from app.services import paper_service
+            renamed = await paper_service.update_paper(
+                db, teacher, ids["paper"],
+                PaperUpdateRequest(revision=2, name="修改后的试卷名称"),
+            )
+            active = await db.get(PaperRelease, release.id)
+            assert renamed["name"] == "修改后的试卷名称"
+            assert active.name == "修改后的试卷名称"
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(_cleanup(ids))
+
+
 def test_publish_preserves_callers_pending_transaction_work() -> None:
     ids = _ids()
     asyncio.run(_seed(ids))

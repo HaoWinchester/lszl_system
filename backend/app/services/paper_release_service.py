@@ -71,6 +71,21 @@ def _timestamp(value) -> int:
     return int(value.timestamp() * 1000) if value else 0
 
 
+async def sync_active_release_name(
+    db: AsyncSession,
+    *,
+    paper_id: str,
+    name: str,
+) -> int:
+    """同步当前 active 发布版本的展示名称，历史版本保持冻结。"""
+    result = await db.execute(
+        update(PaperRelease)
+        .where(PaperRelease.paper_id == paper_id, PaperRelease.status == ACTIVE_STATUS)
+        .values(name=name)
+    )
+    return int(result.rowcount or 0)
+
+
 async def sync_active_release_names_from_draft_payload(
     db: AsyncSession,
     raw_payload: str,
