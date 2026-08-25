@@ -187,6 +187,38 @@ async def sync_published_projection(
     return True
 
 
+async def sync_withdrawn_projection(
+    db: AsyncSession,
+    *,
+    paper_id: str,
+    withdrawn_at,
+    updated_by: str,
+) -> bool:
+    """撤回发布后把可编辑试卷投影回草稿；发布历史字段保持不动。"""
+    paper = (
+        await db.execute(
+            select(ExamPaper)
+            .where(ExamPaper.id == paper_id, ExamPaper.deleted_at.is_(None))
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if paper is None:
+        return False
+    if (
+        paper.status == "draft"
+        and paper.published_at is None
+        and paper.withdrawn_at is not None
+    ):
+        return False
+    paper.status = "draft"
+    paper.published_at = None
+    paper.withdrawn_at = withdrawn_at
+    paper.revision += 1
+    paper.updated_by = updated_by
+    await db.flush()
+    return True
+
+
 async def validate_references(
     db: AsyncSession,
     references: list[PaperReference],

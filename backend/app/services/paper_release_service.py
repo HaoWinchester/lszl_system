@@ -213,26 +213,19 @@ async def publish(
     if not rows:
         raise _error(422, "EMPTY_PAPER_RELEASE", "试卷至少需要一道题目")
 
-    updated_id = await paper_service.cas_paper_mutation(
-        db,
-        actor,
-        paper_id,
-        expected_revision,
-        {"status": "published", "published_at": now_utc()},
-    )
-    if updated_id is None:
-        raise _error(404, "PAPER_NOT_FOUND", "试卷不存在")
-
     latest = await db.scalar(select(func.max(PaperRelease.version)).where(PaperRelease.paper_id == paper_id))
+    release_id = uid("pr_")
+    release_version = int(latest or 0) + 1
+    released_at = now_utc()
     await db.execute(
         update(PaperRelease)
         .where(PaperRelease.paper_id == paper_id, PaperRelease.status == ACTIVE_STATUS)
         .values(status="superseded")
     )
     release = PaperRelease(
-        id=uid("pr_"),
+        id=release_id,
         paper_id=paper.id,
-        version=int(latest or 0) + 1,
+        version=release_version,
         status=ACTIVE_STATUS,
         name=paper.name,
         subject=paper.subject,
@@ -243,10 +236,24 @@ async def publish(
         allowed_roles=roles,
         release_metadata=metadata,
         question_count=len(rows),
-        published_at=now_utc(),
+        published_at=released_at,
     )
     db.add(release)
     await db.flush()
+    updated_id = await paper_service.cas_paper_mutation(
+        db,
+        actor,
+        paper_id,
+        expected_revision,
+        {
+            "status": "published",
+            "published_at": released_at,
+            "published_release_id": release.id,
+            "published_version": release_version,
+        },
+    )
+    if updated_id is None:
+        raise _error(404, "PAPER_NOT_FOUND", "试卷不存在")
     for question, order_index in rows:
         db.add(PaperReleaseQuestion(
             release_id=release.id,
@@ -296,7 +303,7 @@ async def withdraw(
         actor,
         release.paper_id,
         expected_revision,
-        {"status": "draft", "published_at": None},
+        {"status": "draft", "published_at": None, "withdrawn_at": released_at},
     )
     if updated_id is None:
         return None
@@ -593,15 +600,151 @@ async def reconcile_active_paper_projections(db: AsyncSession) -> int:
     return repaired
 
 
+async def _orphan_active_releases(db: AsyncSession) -> list[PaperRelease]:
+    """active 但缺少 exam_papers 行的发布版本（后台不可见的孤儿）。"""
+    paper_exists = select(ExamPaper.id).where(ExamPaper.id == PaperRelease.paper_id).exists()
+    return list((await db.scalars(
+        select(PaperRelease)
+        .where(PaperRelease.status == ACTIVE_STATUS, ~paper_exists)
+        .order_by(PaperRelease.published_at, PaperRelease.id)
+    )).all())
+
+
+async def materialize_release_papers(db: AsyncSession, *, dry_run: bool = False) -> dict:
+    """为孤儿 active 发布版本补建后台可见的题库、题目与试卷数据。
+
+    迁移期只导入了发布快照（paper_releases），部分试卷的可编辑行从未落库。
+    这里按发布快照反向物化：题库/题目从冻结快照恢复，试卷状态与 active
+    发布版本对齐。幂等：已存在的行一律跳过。
+    """
+    from app.models.question import QuestionBank
+    from app.services.published_paper_access_service import question_from_snapshot
+
+    releases = await _orphan_active_releases(db)
+    report: dict = {"releases": [], "materialized": 0, "dryRun": dry_run}
+    if dry_run:
+        report["releases"] = [
+            {"releaseId": r.id, "paperId": r.paper_id, "name": r.name, "version": r.version}
+            for r in releases
+        ]
+        return report
+
+    await teaching_content_revision_service.acquire_lock(db)
+    for release in releases:
+        rows = list((await db.execute(
+            select(PaperReleaseQuestion)
+            .where(PaperReleaseQuestion.release_id == release.id)
+            .order_by(PaperReleaseQuestion.order_index)
+        )).scalars().all())
+        owner = release.publisher_id
+        if owner is None or (await db.get(User, owner)) is None:
+            owner = "admin"
+        banks: dict[str, QuestionBank] = {}
+        for row in rows:
+            snapshot = dict(row.snapshot or {})
+            bank_id = str(snapshot.get("bankId") or row.bank_id or f"b_{release.paper_id}")
+            bank = banks.get(bank_id)
+            if bank is None:
+                bank = await db.get(QuestionBank, bank_id)
+                if bank is None:
+                    bank = QuestionBank(
+                        id=bank_id,
+                        owner_id=owner,
+                        name=f"{release.name}·题库",
+                        subject=release.subject or "PMP",
+                        version="1.0",
+                        visibility="private",
+                        created_by=owner,
+                        updated_by=owner,
+                    )
+                    db.add(bank)
+                    await db.flush()
+                banks[bank_id] = bank
+            if (await db.get(Question, row.question_id)) is not None:
+                continue
+            question = question_from_snapshot(snapshot)
+            question.id = row.question_id
+            question.bank_id = bank.id
+            question.created_by = owner
+            question.updated_by = owner
+            db.add(question)
+        paper = ExamPaper(
+            id=release.paper_id,
+            owner_id=owner,
+            revision=1,
+            created_by=owner,
+            updated_by=owner,
+            name=release.name,
+            subject=release.subject or "PMP",
+            description=release.description,
+            total_count=len(rows),
+            quotas={},
+            access_policy={
+                "accessLevel": "member"
+                if str(release.access_level or "").lower() in MEMBER_ACCESS_LEVELS
+                else "free"
+            },
+            enabled_modes=list(release.enabled_modes or []),
+            import_metadata={"materializedFromRelease": release.id},
+            status="published",
+            published_release_id=release.id,
+            published_version=release.version,
+            published_at=release.published_at,
+        )
+        db.add(paper)
+        await db.flush()
+        for row in rows:
+            db.add(PaperQuestion(
+                paper_id=paper.id,
+                question_id=row.question_id,
+                order_index=row.order_index,
+            ))
+        report["releases"].append({
+            "releaseId": release.id,
+            "paperId": paper.id,
+            "name": paper.name,
+            "version": release.version,
+            "questions": len(rows),
+        })
+        report["materialized"] += 1
+    if report["materialized"]:
+        await teaching_content_revision_service.bump(
+            db,
+            "admin",
+            [
+                {"entityType": "paper", "entityId": item["paperId"], "action": "materialized"}
+                for item in report["releases"]
+            ],
+        )
+    await db.commit()
+    return report
+
+
 async def withdraw_paper(db: AsyncSession, actor: User, paper_id: str) -> int:
     """教师撤回入口：下架该试卷全部 active 发布版本。"""
     if actor.role not in {"admin", "teacher"}:
         raise _error(403, "WITHDRAW_FORBIDDEN", "仅教师或管理员可以撤回试卷")
+    await teaching_content_revision_service.acquire_lock(db)
+    released_at = now_utc()
     result = await db.execute(
         update(PaperRelease)
         .where(PaperRelease.paper_id == paper_id, PaperRelease.status == ACTIVE_STATUS)
-        .values(status="withdrawn", withdrawn_at=now_utc(), withdrawn_by=actor.username)
+        .values(status="withdrawn", withdrawn_at=released_at, withdrawn_by=actor.username)
     )
     withdrawn = int(result.rowcount or 0)
+    if withdrawn == 0:
+        await db.commit()
+        return 0
+    await paper_service.sync_withdrawn_projection(
+        db,
+        paper_id=paper_id,
+        withdrawn_at=released_at,
+        updated_by=actor.username,
+    )
+    await teaching_content_revision_service.bump(
+        db,
+        actor.username,
+        [{"entityType": "paper", "entityId": paper_id, "action": "unpublished"}],
+    )
     await db.commit()
     return withdrawn
