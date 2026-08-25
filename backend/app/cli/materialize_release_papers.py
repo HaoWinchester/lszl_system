@@ -14,10 +14,15 @@ from app.services import paper_release_service
 async def _run(dry_run: bool, reconcile_only: bool) -> dict:
     async with AsyncSessionLocal() as db:
         report = await paper_release_service.reconcile_active_paper_projections(db)
+        report_withdrawn = await paper_release_service.reconcile_withdrawn_projections(db)
         materialized: dict = {"materialized": 0, "releases": [], "dryRun": dry_run}
         if not reconcile_only:
             materialized = await paper_release_service.materialize_release_papers(db, dry_run=dry_run)
-        return {"repaired_paper_projections": report, **materialized}
+        return {
+            "repaired_paper_projections": report,
+            "repaired_withdrawn_projections": report_withdrawn,
+            **materialized,
+        }
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -600,6 +600,41 @@ async def reconcile_active_paper_projections(db: AsyncSession) -> int:
     return repaired
 
 
+async def reconcile_withdrawn_projections(db: AsyncSession) -> int:
+    """把仍标记 published 但已无 active 发布版本的试卷投影回草稿。
+
+    旧版撤回只下架 release 不回写试卷状态，会留下"后台显示已发布、
+    学生端却看不到"的脱节；这里以 release 目录为权威反向对账。
+    """
+    active_exists = select(PaperRelease.id).where(
+        PaperRelease.paper_id == ExamPaper.id,
+        PaperRelease.status == ACTIVE_STATUS,
+    ).exists()
+    papers = list((await db.scalars(
+        select(ExamPaper).where(
+            ExamPaper.status == "published",
+            ExamPaper.deleted_at.is_(None),
+            ~active_exists,
+        )
+    )).all())
+    repaired = 0
+    for paper in papers:
+        latest = (await db.execute(
+            select(PaperRelease)
+            .where(PaperRelease.paper_id == paper.id)
+            .order_by(PaperRelease.version.desc())
+            .limit(1)
+        )).scalar_one_or_none()
+        repaired += int(await paper_service.sync_withdrawn_projection(
+            db,
+            paper_id=paper.id,
+            withdrawn_at=(latest.withdrawn_at if latest is not None else None) or now_utc(),
+            updated_by=(latest.withdrawn_by if latest is not None else "") or "system",
+        ))
+    await db.commit()
+    return repaired
+
+
 async def _orphan_active_releases(db: AsyncSession) -> list[PaperRelease]:
     """active 但缺少 exam_papers 行的发布版本（后台不可见的孤儿）。"""
     paper_exists = select(ExamPaper.id).where(ExamPaper.id == PaperRelease.paper_id).exists()
