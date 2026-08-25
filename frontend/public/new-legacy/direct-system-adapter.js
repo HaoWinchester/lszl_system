@@ -1,7 +1,6 @@
 'use strict'
 
 ;(function (global) {
-  const storage = global.KGServerStateStorage
   const roleApi = global.KGRolePermissions
   const wechatApi = global.KGWechatLogin
   const subscriptionApi = global.KGSubscription
@@ -13,7 +12,9 @@
     userProfile = injectedBootstrap.authUser
   }
   // wechatApi 仅管理端配置保存需要；部分学员页未加载 32-wechat-login.js，不应因此跳过套餐价格预载。
-  if (!storage || !roleApi || !subscriptionApi) return
+  if (!roleApi || !subscriptionApi) return
+  const originalSaveTheme = roleApi.saveTheme.bind(roleApi)
+  const originalResetTheme = roleApi.resetTheme.bind(roleApi)
 
   function errorMessage(payload, status) {
     const detail = payload?.detail ?? payload?.message ?? payload?.error
@@ -182,9 +183,9 @@
       } else {
         try {
           const themes = request('GET', '/api/v1/system/themes').themes || {}
-          storage.setItem('kg_role_themes_v1', JSON.stringify(
-            Object.fromEntries(Object.entries(themes).map(([role, theme]) => [role, toLegacyTheme(theme)])),
-          ))
+          for (const [role, theme] of Object.entries(themes)) {
+            originalSaveTheme(role, toLegacyTheme(theme))
+          }
         } catch (error) {
           console.error('[DirectSystemAdapter] role themes preload failed:', error)
         }
@@ -199,7 +200,7 @@
       if (isAdmin()) {
         try {
           const wechat = request('GET', '/api/v1/system/wechat-config').config || {}
-          storage.setItem('kg_wechat_login_config_v1', JSON.stringify(wechat))
+          wechatApi?.applyConfig?.(wechat)
           const wechatPay = request('GET', '/api/v1/system/wechat-pay-config').config || {}
           global.KGDirectSystemSettings = { wechatPayConfig: wechatPay }
         } catch (error) {
@@ -228,8 +229,6 @@
   preloadAuthenticatedContext()
   preloadPlans()
 
-  const originalSaveTheme = roleApi.saveTheme.bind(roleApi)
-  const originalResetTheme = roleApi.resetTheme.bind(roleApi)
   roleApi.saveTheme = function (role, theme) {
     const saved = request('PUT', `/api/v1/system/themes/${encodeURIComponent(role)}`, toServerTheme(theme)).theme
     return originalSaveTheme(role, toLegacyTheme(saved))

@@ -312,6 +312,9 @@
     if(!saved)console.warn('跨题工作区保存失败：浏览器存储不可用或空间不足。');
     return normalized;
   }
+  function removeWorkspaceStorage(userId,workspaceId){
+    try{if(Store.remove)Store.remove(storageKey(userId,workspaceId));else global.localStorage?.removeItem(storageKey(userId,workspaceId))}catch(e){}
+  }
   function readCatalog(userId=currentUserId()){
     try{
       const raw=Store.readJSON?Store.readJSON(catalogKey(userId),null):JSON.parse(global.localStorage?.getItem(catalogKey(userId))||'null');
@@ -326,6 +329,39 @@
     const saved=Store.writeJSON?Store.writeJSON(catalogKey(normalized.userId),normalized):(global.localStorage?.setItem(catalogKey(normalized.userId),JSON.stringify(normalized)),true);
     if(!saved)console.warn('工作区目录保存失败：浏览器存储不可用或空间不足。');
     return normalized;
+  }
+  function replaceAllFromServer(items=[],options={}){
+    const userId=String(options.userId||currentUserId());
+    const rows=(Array.isArray(items)?items:[]).map(item=>{
+      const payload=item?.payload&&typeof item.payload==='object'?clone(item.payload):{};
+      const createdAt=Date.parse(item?.createdAt||'');
+      const updatedAt=Date.parse(item?.updatedAt||'');
+      return normalizeWorkspace({
+        ...payload,
+        id:String(item?.id||payload.id||''),
+        userId,
+        title:String(item?.title||payload.title||'未命名画布'),
+        schemaVersion:Number(item?.schemaVersion||payload.schemaVersion||SCHEMA_VERSION),
+        createdAt:Number.isFinite(createdAt)?createdAt:payload.createdAt,
+        updatedAt:Number.isFinite(updatedAt)?updatedAt:payload.updatedAt
+      },{userId,workspaceId:String(item?.id||payload.id||'')});
+    }).filter(workspace=>workspace.id);
+    if(!rows.length)return {catalog:clone(ensureCatalog({userId})),workspaces:listWorkspaces({userId})};
+    const previous=readCatalog(userId);
+    const serverIds=new Set(rows.map(workspace=>workspace.id));
+    (previous?.workspaces||[]).forEach(item=>{
+      if(serverIds.has(String(item.id)))return;
+      removeWorkspaceStorage(userId,item.id);
+    });
+    rows.forEach(rawWrite);
+    let catalog=emptyCatalog(userId);
+    catalog.workspaces=rows.map(workspaceSummary);
+    const requestedActive=String(options.activeWorkspaceId||previous?.activeWorkspaceId||'');
+    catalog.activeWorkspaceId=serverIds.has(requestedActive)?requestedActive:rows[0].id;
+    catalog=writeCatalog(catalog);
+    const active=rawRead(userId,catalog.activeWorkspaceId);
+    notify('server-hydrated',active,{workspaceIds:rows.map(workspace=>workspace.id)});
+    return {catalog:clone(catalog),workspaces:rows.map(clone)};
   }
   function ensureCatalog(options={}){
     const userId=String(options.userId||currentUserId());
@@ -463,7 +499,7 @@
     let catalog=ensureCatalog({userId});
     workspaceId=String(workspaceId||catalog.activeWorkspaceId);
     if(!catalog.workspaces.some(item=>item.id===workspaceId))return null;
-    try{if(Store.remove)Store.remove(storageKey(userId,workspaceId));else global.localStorage?.removeItem(storageKey(userId,workspaceId))}catch(e){}
+    removeWorkspaceStorage(userId,workspaceId);
     catalog.workspaces=catalog.workspaces.filter(item=>item.id!==workspaceId);
     if(!catalog.workspaces.length){
       const replacement=rawWrite(emptyWorkspace({
@@ -839,6 +875,7 @@
     EDGE_TYPES,
     GROUP_COLORS,
     currentUserId,
+    replaceAllFromServer,
     ensureCatalog,
     listWorkspaces,
     reorderWorkspaces,

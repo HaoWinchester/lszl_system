@@ -40,11 +40,10 @@ if [ "$free_gb" -lt "$MIN_FREE_GB" ]; then
   exit 1
 fi
 
-echo "[1/8] 本地构建 new-legacy 产物（前端页面 + 引导课程 seed）"
+echo "[1/8] 本地构建 new-legacy 前端产物"
 build_content_prep
 cd "$REPO_DIR/frontend"
 node scripts/sync-new-legacy.js
-node scripts/export-guided-course.mjs
 cd "$REPO_DIR"
 
 echo "[2/8] 打包并发布 new-legacy release"
@@ -63,7 +62,6 @@ for _ in 1 2 3; do
     echo "      版本号冲突：$old -> $(cat "$version_file")，重新生成产物"
     build_content_prep || exit 1
     node scripts/sync-new-legacy.js || exit 1
-    node scripts/export-guided-course.mjs || exit 1
   else
     cat /tmp/kg-uat-release.log
     echo "✗ release 打包或自动验收失败，候选包不会 promote" >&2

@@ -124,7 +124,8 @@ test('update builds an isolated release and atomically selects it', () => {
   assert.ok(existsSync(resolve(root, sourceVersion, 'site', 'learning-path.html')))
   const page = readFileSync(resolve(root, sourceVersion, 'site', 'index.html'), 'utf8')
   assert.match(page, new RegExp(`styles/user-center\\.css\\?v=${sourceVersion}`))
-  assert.match(page, /<script src="\.\/server-state-bootstrap\.js"><\/script>/)
+  assert.match(page, /kg-direct-bootstrap-anchor/)
+  assert.doesNotMatch(page, /server-state-bootstrap\.js/)
   assert.match(page, new RegExp(`direct-entry\\.js\\?v=${sourceVersion}`))
   assert.match(page, new RegExp(`runtime-config\\.override\\.js\\?v=${sourceVersion}`))
   const chooserTags = page.match(/<script defer src="src\/31-learning-entry-chooser\.js\?v=[^"]+"><\/script>/g) || []
@@ -149,11 +150,8 @@ test('update builds an isolated release and atomically selects it', () => {
   assert.match(workspacePage, /personal-card-adapter\.js/)
   assert.match(workspacePage, /src\/108-multi-question-learning-assets\.js/)
   assert.ok(workspacePage.indexOf('personal-card-adapter.js') < workspacePage.indexOf('src/77-multi-question-workspace.js'))
-  assert.match(
-    practicePage,
-    /<script src="\.\/server-state-bootstrap\.js"><\/script>/,
-    'the backend bootstrap injection marker must remain unversioned',
-  )
+  assert.match(practicePage, /kg-direct-bootstrap-anchor/, 'the backend bootstrap injection anchor must remain')
+  assert.doesNotMatch(practicePage, /server-state-bootstrap\.js/)
   const retiredSingleDeep = readFileSync(resolve(root, sourceVersion, 'site', 'question-training.html'), 'utf8')
   assert.match(retiredSingleDeep, /location\.replace\(target\.toString\(\)\)/, 'the retired single-deep page must stay a redirect shell')
   assert.doesNotMatch(retiredSingleDeep, /<script\b[^>]*\bsrc=(['"])(?:\.\/)?src\//i, 'a redirect shell must contain zero src application scripts')

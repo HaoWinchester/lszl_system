@@ -156,7 +156,8 @@ test('sync copies v8.6.0 and injects the direct runtime without editing upstream
   assert.equal(hashTree(item.upstream), before)
   assert.equal(JSON.parse(readFileSync(resolve(item.output, 'manifest.json'), 'utf8')).version, 'v8.6.0')
   const page = readFileSync(resolve(item.output, 'learning-path.html'), 'utf8')
-  assert.match(page, /server-state-bootstrap\.js/)
+  assert.match(page, /kg-direct-bootstrap-anchor/)
+  assert.doesNotMatch(page, /server-state-bootstrap\.js/)
   assert.match(page, /direct-entry\.js\?v=v8\.6\.0/)
   assert.match(page, /<html[^>]*data-release="v8\.6\.0"/)
   assert.doesNotMatch(page, /new-legacy-navigation-bridge\.js/)
@@ -665,7 +666,7 @@ test('sync injects server storage before any upstream inline script', (t) => {
 
   assert.equal(result.status, 0, result.stderr)
   const generated = readFileSync(resolve(item.output, 'learning-path.html'), 'utf8')
-  assert.ok(generated.indexOf('server-state-bootstrap.js') < generated.indexOf("localStorage.getItem('kg_default_entry_mode_v1')"))
+  assert.ok(generated.indexOf('kg-direct-bootstrap-anchor') < generated.indexOf("localStorage.getItem('kg_default_entry_mode_v1')"))
 })
 
 test('sync limits the training overlay stylesheet to the training page', (t) => {

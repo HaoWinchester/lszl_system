@@ -8,6 +8,11 @@ const frontendDir = resolve(scriptsDir, '..')
 const repoDir = resolve(frontendDir, '..')
 const contract = JSON.parse(readFileSync(resolve(scriptsDir, 'new-legacy-contract.json'), 'utf8'))
 const p45PersistenceContract = JSON.parse(readFileSync(resolve(scriptsDir, 'p45-persistence-contract.json'), 'utf8'))
+const runtimePolicyPath = existsSync(resolve(repoDir, 'backend/app/web/runtime_page_policy.json'))
+  ? resolve(repoDir, 'backend/app/web/runtime_page_policy.json')
+  : resolve(scriptsDir, 'runtime-page-policy.json')
+const runtimePagePolicy = JSON.parse(readFileSync(runtimePolicyPath, 'utf8'))
+const runtimePages = new Set(runtimePagePolicy.runtimePages)
 const learningEntryChooserAssets = ['src/31-learning-entry-chooser.js']
 const learningEntryChooserStorageKeys = ['kg_learning_entry_chooser_claim_v1', 'kg_learning_entry_chooser_consumed_v1']
 const legacyUnmigratedIndexedDbModules = Object.freeze([
@@ -596,11 +601,12 @@ function injectPage(html, page, version) {
   }
   const injection = [
     '<script src="./teaching-content-sync.js"></script><!-- kg-teaching-content-sync:generated -->',
-    '<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->',
+    '<!-- kg-direct-bootstrap-anchor -->',
+    runtimePages.has(page) ? '<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->' : '',
     '<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->',
     '<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->',
     '<script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->',
-  ].join('\n')
+  ].filter(Boolean).join('\n')
   let generated = html.includes('kg-runtime:generated')
     ? html
     : /<head(?:\s[^>]*)?>/i.test(html)
@@ -666,6 +672,16 @@ function injectPage(html, page, version) {
       practiceTag,
       `<script defer src="./practice-learning-adapter.js"></script><!-- kg-practice-learning:generated -->\n${practiceTag}`,
     )
+  }
+  if (['file-manager.html', 'question-workspace.html'].includes(page)
+    && !generated.includes('kg-canvas-workspaces:generated')) {
+    const storeTag = findLocalScriptTag(generated, 'src/65-canvas-workspace-store.js')
+    if (storeTag) {
+      generated = generated.replace(
+        storeTag,
+        `${storeTag}\n<script defer src="./canvas-workspace-adapter.js"></script><!-- kg-canvas-workspaces:generated -->`,
+      )
+    }
   }
   // P4.6 第 1 轮：已发布试卷改走 /api/v1/paper-releases 细粒度 API，
   // 适配器必须先于 59-repository（其同步目录接口读它的内存缓存）注入。
@@ -1064,6 +1080,18 @@ function sync({ source, out }) {
     // user-center.css 同理：v9 仅 2 行旧值被 new-legacy 改进取代，整 cp 安全。故无需逐函数合并。
     cpSync(resolve(customSource, 'src/33-user-center.js'), resolve(out, 'src/33-user-center.js'))
     cpSync(resolve(customSource, 'styles/user-center.css'), resolve(out, 'styles/user-center.css'))
+  }
+
+  const contentPrepPath = resolve(out, 'content-prep-studio/dist/content-prep.html')
+  if (existsSync(contentPrepPath)) {
+    const contentPrepHtml = readFileSync(contentPrepPath, 'utf8')
+    const runtimeMarker = '<script src="/server-state-bootstrap.js"></script>'
+    if (!contentPrepHtml.includes('kg-direct-bootstrap-anchor') && contentPrepHtml.includes(runtimeMarker)) {
+      writeFileSync(
+        contentPrepPath,
+        contentPrepHtml.replace(runtimeMarker, `<!-- kg-direct-bootstrap-anchor -->\n${runtimeMarker}`),
+      )
+    }
   }
 
   for (const page of walk(out).filter((path) => !path.includes('/') && path.endsWith('.html'))) {

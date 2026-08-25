@@ -10,6 +10,7 @@ const readRepo = (path) => readFileSync(resolve(repo, path), 'utf8')
 const publicRelease = JSON.parse(readFrontend('public/new-legacy/manifest.json')).version
 const frozenSource = resolve(frontend, 'new-legacy-releases', publicRelease, 'source')
 const candidateSource = existsSync(frozenSource) ? frozenSource : resolve(repo, 'new-legacy')
+const runtimePages = new Set(JSON.parse(readRepo('backend/app/web/runtime_page_policy.json')).runtimePages)
 
 test('production pages do not describe account data as a local demo or local question bank', () => {
   const targets = [
@@ -45,7 +46,9 @@ test('generated pages use the exact upstream UI with only direct runtime adapter
     // public 实际携带的版本，不能把未同步的候选源当成静态包的上游。
     const upstream = readFileSync(resolve(candidateSource, upstreamPage), 'utf8')
     const generated = readFrontend(`public/new-legacy/${page}`)
-    assert.match(generated, /server-state-bootstrap\.js/)
+    assert.match(generated, /kg-direct-bootstrap-anchor/)
+    if (runtimePages.has(page)) assert.match(generated, /server-state-bootstrap\.js/)
+    else assert.doesNotMatch(generated, /server-state-bootstrap\.js/)
     assert.match(generated, /direct-entry\.js/)
     assert.doesNotMatch(generated, /new-legacy-navigation-bridge|graph-bridge|guided-learning-data-bridge|<iframe/)
     for (const stylesheet of upstream.matchAll(/<link[^>]+href="([^"]+\.css)"/g)) {

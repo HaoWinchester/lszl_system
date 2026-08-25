@@ -3,64 +3,10 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <meta name="color-scheme" content="light"/>
-  <title>节点学习</title>
-
-  <link rel="stylesheet" href="styles/main.css"/>
-  <link rel="stylesheet" href="styles/guided-learning-node.css"/>
-  <link rel="stylesheet" href="styles/focus-vega-typography.css"/>
-  <link rel="stylesheet" href="styles/focus-vega-learning.css"/>
-  <link rel="stylesheet" href="styles/close-button.css"/>
+  <title>引导学习节点已停用</title>
 </head>
-<body class="guided-node-page" data-ui-skin="focus-vega">
-  <header class="gln-topbar">
-    <div class="gln-topbar-row">
-      <button type="button" id="glnExitBtn" class="gln-exit" aria-label="退出节点"><span data-ui-icon="x" data-ui-icon-size="18" aria-hidden="true"></span></button>
-      <h1 id="glnTitle">节点练习</h1>
-      <div class="question-language-switch gln-language-switch" role="group" aria-label="题目显示方式">
-        <button type="button" data-question-language="zh" aria-pressed="true">中文</button>
-        <button type="button" data-question-language="bilingual" aria-pressed="false" title="英文仅作为中文题目的对照展示">中英对照</button>
-      </div>
-    </div>
-    <p class="question-language-note gln-language-note" data-question-language-note hidden>英文仅供对照，请使用中文作答</p>
-    <div class="gln-progress" id="glnProgressShell" role="progressbar" aria-label="节点完成进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-      <span id="glnProgressBar"></span>
-    </div>
-  </header>
-
-  <main class="gln-main" id="glnMain">
-    <section class="gln-activity" id="glnActivity" aria-live="polite"></section>
-  </main>
-
-  <footer class="gln-action-bar" id="glnActionBar">
-    <div class="gln-action-inner">
-      <div class="gln-feedback" id="glnFeedback" hidden aria-live="polite">
-        <div class="gln-feedback-copy">
-          <strong id="glnFeedbackTitle"></strong>
-          <p id="glnFeedbackMessage"></p>
-          <button type="button" id="glnDetailToggle" class="gln-detail-toggle" hidden>查看详细解析</button>
-          <div id="glnDetailContent" class="gln-detail-content" hidden></div>
-        </div>
-      </div>
-      <div class="gln-footer-actions" id="glnFooterActions">
-        <button type="button" class="ui-button ui-button--primary gln-primary-action" id="glnPrimaryAction" disabled>检查答案</button>
-      </div>
-    </div>
-  </footer>
-
-  <script defer src="src/01-runtime-config.js"></script>
-  <script defer src="src/28-app-storage.js"></script>
-  <script defer src="src/29-auth-core.js"></script>
-  <script defer src="src/63-learning-event-repository.js"></script>
-  <script defer src="src/86-activity-schema-v1.js"></script>
-  <script defer src="src/86-question-language-ui.js"></script>
-  <script defer src="src/87-guided-learning-data.js"></script>
-  <script defer src="src/88-guided-learning-store.js"></script>
-  <script defer src="src/89-guided-learning-activity-registry.js"></script>
-  <script defer src="src/89-guided-learning-deep-recall.js"></script>
-  <script defer src="src/89-guided-learning-multi-induction.js"></script>
-  <script defer src="src/89-guided-learning-knowledge-graph.js"></script>
-  <script defer src="src/90-guided-learning-node-app.js"></script>
-  <script defer src="src/109-focus-vega-ui-icons.js"></script>
+<body>
+  <main><h1>引导学习节点已停用</h1><p><a href="practice-mode.html">前往刷题</a></p></main>
+  <script>location.replace(new URL('practice-mode.html', location.origin + '/').toString())</script>
 </body>
 </html>

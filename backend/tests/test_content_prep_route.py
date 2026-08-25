@@ -74,8 +74,9 @@ def test_teaching_roles_receive_the_prep_page_with_session_hydration(
 
     assert response.status_code == 200
     assert 'id="prepApp"' in response.text
-    # 登录态不再走 window.__KG_DIRECT_BOOTSTRAP__ 内联注入，改为缓存 + /me 接口水合
-    assert "window.__KG_DIRECT_BOOTSTRAP__=" not in response.text
+    assert "window.__KG_DIRECT_BOOTSTRAP__=" in response.text
+    assert f'"role":"{role}"' in response.text
+    assert response.text.index("window.__KG_DIRECT_BOOTSTRAP__=") < response.text.index("server-state-bootstrap.js")
     assert "kg_remote_auth_session_v1" in response.text
     assert "prepRuntime.serverActorReady" in response.text
 

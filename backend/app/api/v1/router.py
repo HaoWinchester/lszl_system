@@ -8,7 +8,6 @@ from app.api.v1 import (
     content_prep,
     engagement,
     files,
-    guided_learning,
     health,
     learning,
     papers,
@@ -34,7 +33,6 @@ api_router.include_router(question_catalog.router)
 api_router.include_router(content_prep.router)
 api_router.include_router(training.router)
 api_router.include_router(learning.router)
-api_router.include_router(guided_learning.router)
 api_router.include_router(subscriptions.router)
 api_router.include_router(analytics.router)
 api_router.include_router(engagement.router)

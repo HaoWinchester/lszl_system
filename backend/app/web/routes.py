@@ -128,6 +128,16 @@ async def learning_path_alias():
     return RedirectResponse("/practice-mode.html", status_code=307)
 
 
+@router.get("/guided-learning-node.html")
+async def guided_learning_node_page_alias():
+    return RedirectResponse("/practice-mode.html", status_code=307)
+
+
+@router.get("/guided-learning-placement-test.html")
+async def guided_learning_placement_page_alias():
+    return RedirectResponse("/practice-mode.html", status_code=307)
+
+
 @router.get("/graph")
 async def graph_alias(request: Request):
     return _redirect(request, "index.html", {"mode": "free"})
@@ -144,13 +154,13 @@ async def workspace_alias(request: Request):
 
 
 @router.get("/learning/node")
-async def learning_node_alias(request: Request):
-    return _redirect(request, "guided-learning-node.html")
+async def learning_node_alias():
+    return RedirectResponse("/practice-mode.html", status_code=307)
 
 
 @router.get("/learning/placement-test")
-async def placement_test_alias(request: Request):
-    return _redirect(request, "guided-learning-placement-test.html")
+async def placement_test_alias():
+    return RedirectResponse("/practice-mode.html", status_code=307)
 
 
 @router.get("/files")

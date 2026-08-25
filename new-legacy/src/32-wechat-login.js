@@ -5,9 +5,7 @@
  * OAuth state、code 换 token、openid/unionid 与账号创建均由后端处理；浏览器只发起授权和展示结果。
  */
 (function(){
-  const WECHAT_CONFIG_KEY='kg_wechat_login_config_v1';
   const WECHAT_LOGIN_SDK_URL='https://res.wx.qq.com/connect/zh_CN/htmledition/js/wxLogin.js';
-  const Store=window.KGAppStorage||{};
 
   const DEFAULT_CONFIG={
     enableDemo:true,
@@ -20,18 +18,6 @@
     defaultSubject:'PMP'
   };
 
-  function readJSON(key,fallback){
-    try{
-      const raw=Store.readJSON?Store.readJSON(key,fallback):localStorage.getItem(key);
-      if(raw&&typeof raw==='object')return raw;
-      return raw?JSON.parse(raw):fallback;
-    }catch(error){return fallback}
-  }
-  function writeJSON(key,value){
-    if(Store.writeJSON)return Store.writeJSON(key,value);
-    localStorage.setItem(key,JSON.stringify(value));
-    return true;
-  }
   function escapeHTML(value){
     const core=window.KGAuthCore;
     if(core&&typeof core.escapeHTML==='function')return core.escapeHTML(value);
@@ -50,11 +36,25 @@
     next.defaultSubject=String(next.defaultSubject||'PMP').trim()||'PMP';
     return next;
   }
-  function getConfig(){return normalizeConfig(readJSON(WECHAT_CONFIG_KEY,DEFAULT_CONFIG))}
+  let configCache=normalizeConfig(DEFAULT_CONFIG);
+  let configLoadPromise=null;
+  function getConfig(){return normalizeConfig(configCache)}
+  function applyConfig(config){configCache=normalizeConfig(config);return getConfig()}
   function saveConfig(config){
-    const normalized=normalizeConfig(config);
-    writeJSON(WECHAT_CONFIG_KEY,normalized);
-    return normalized;
+    return applyConfig(config);
+  }
+  function loadPublicConfig(){
+    if(configLoadPromise)return configLoadPromise;
+    configLoadPromise=requestJson('/api/v1/auth/wechat/config')
+      .then(payload=>applyConfig({
+        ...configCache,
+        enableOfficial:payload?.mode==='official',
+        enableDemo:payload?.mode==='demo',
+        scope:payload?.scope||configCache.scope
+      }))
+      .catch(()=>getConfig())
+      .finally(()=>{configLoadPromise=null});
+    return configLoadPromise;
   }
   function showToast(message,ok=true){
     if(typeof window.showStatus==='function'){window.showStatus(message);return}
@@ -206,6 +206,8 @@
     DEFAULT_CONFIG,
     getConfig,
     saveConfig,
+    applyConfig,
+    loadPublicConfig,
     createOfficialAuthRequest,
     startOfficialLogin,
     renderPanel,
@@ -218,5 +220,9 @@
   document.addEventListener('DOMContentLoaded',()=>{
     ensureAuthPanel();
     handleOfficialCallback();
+    loadPublicConfig().then(config=>{
+      const entry=document.querySelector('.wechat-login-entry');
+      if(entry)entry.hidden=config.enableOfficial!==true;
+    });
   });
 })();

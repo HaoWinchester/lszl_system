@@ -251,8 +251,8 @@ def test_runtime_state_rejects_page_namespace_mismatch() -> None:
 
 def test_runtime_state_rejects_a_stale_revision_without_overwriting() -> None:
     with TestClient(app) as client:
-        login(client, "学生")
-        current = bootstrap(client.get("/guided-learning-node.html?node=awareness-keywords").text)
+        login(client, "老师")
+        current = bootstrap(client.get("/question-bank.html").text)
         first = client.put(
             "/api/v1/runtime/state",
             json=update_payload(
@@ -326,8 +326,6 @@ def test_every_upstream_page_declares_the_expected_namespace() -> None:
     expected = {
         "index.html": "files",
         "practice-mode.html": "page",
-        "guided-learning-node.html": "guided-learning",
-        "guided-learning-placement-test.html": "guided-learning",
         "question-training.html": "training",
         "question-workspace.html": "workspace",
         "question-bank.html": "questions",

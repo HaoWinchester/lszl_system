@@ -18,7 +18,7 @@ from app.models.training import (
 from app.services import question_catalog_service, question_service
 
 SESSION_SCHEMA_VERSIONS = {1, 2}
-WORKSPACE_SCHEMA_VERSIONS = set(range(1, 7))
+WORKSPACE_SCHEMA_VERSIONS = set(range(1, 11))
 WORKSPACE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 PRACTICE_MISTAKE_STATUSES = {"pending", "needs_remediation", "verification_due", "mastered"}
 PRACTICE_LANGUAGE_MODES = {"zh", "en", "bilingual"}

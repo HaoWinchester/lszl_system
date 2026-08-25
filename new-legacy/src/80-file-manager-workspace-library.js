@@ -90,7 +90,11 @@
     $('fmNewFileBtn')?.addEventListener('click',event=>{if(state.type!=='workspace')return;event.preventDefault();event.stopImmediatePropagation();create()},true);
     global.addEventListener('kg:workspace-changed',()=>{if(state.type==='workspace')render()});
   }
-  bind();
-  updateMode(new URL(location.href).searchParams.get('type')==='workspace'?'workspace':'graph',{push:false});
   global.KGFileManagerWorkspaceLibrary={render,updateMode,create,open};
+  async function init(){
+    try{await (global.KGCanvasWorkspaceAdapter?.ready||Promise.resolve())}catch(error){console.warn('画布目录服务器水合失败，暂用设备缓存',error)}
+    bind();
+    updateMode(new URL(location.href).searchParams.get('type')==='workspace'?'workspace':'graph',{push:false});
+  }
+  void init();
 })(window);

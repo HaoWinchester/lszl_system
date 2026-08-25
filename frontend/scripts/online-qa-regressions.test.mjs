@@ -357,8 +357,10 @@ for (const page of [
   'guided-learning-node.html',
   'guided-learning-placement-test.html',
 ]) {
-  test(`${page} remains a real guided-learning route`, () => {
-    assert.doesNotMatch(source(`new-legacy/${page}`), /location\.replace\(['"]practice-mode\.html/)
+  test(`${page} is a retired redirect shell`, () => {
+    const html = source(`new-legacy/${page}`)
+    assert.match(html, /location\.replace\(/)
+    assert.match(html, /practice-mode\.html/)
   })
 }
 

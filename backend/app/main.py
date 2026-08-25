@@ -68,15 +68,6 @@ async def _seed_admin() -> None:
             logger.info("Seeded role account: %s (%s)", username, role)
 
 
-async def _seed_guided_course() -> None:
-    """校验并幂等导入 new-legacy v8.6 引导学习课程。"""
-    from app.services import guided_learning_service
-
-    async with AsyncSessionLocal() as db:
-        course = await guided_learning_service.ensure_seeded(db)
-        logger.info("Seeded guided course: %s %s", course.id, course.version)
-
-
 async def _seed_builtin_teaching_content() -> BuiltinSeedSummary | None:
     """Synchronize packaged teaching data without changing DB health state on failure."""
     from app.services import builtin_teaching_content_seed_service
@@ -107,7 +98,6 @@ async def lifespan(app: FastAPI):
         app.state.db_ok = True
         logger.info("DB connected: %s", settings.DATABASE_URL.split("@")[-1])
         await _seed_admin()
-        await _seed_guided_course()
     except Exception as e:  # noqa: BLE001
         app.state.db_ok = False
         app.state.db_err = str(e)

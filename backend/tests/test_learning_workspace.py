@@ -128,13 +128,14 @@ def test_workspace_preserves_the_new_legacy_stable_id() -> None:
         json={
             "id": workspace_id,
             "title": "稳定 ID 画布",
-            "schemaVersion": 6,
+            "schemaVersion": 10,
             "payload": {"id": workspace_id, "nodes": {}, "edges": [], "groups": []},
         },
     )
 
     assert response.status_code == 200, response.text
     assert response.json()["workspace"]["id"] == workspace_id
+    assert response.json()["workspace"]["schemaVersion"] == 10
 
 
 def test_learning_persistence_requires_authentication() -> None:

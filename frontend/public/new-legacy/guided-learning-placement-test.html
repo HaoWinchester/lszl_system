@@ -1,101 +1,17 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.160" lang="zh-CN">
+<html data-release="v9.0-p4.1.162" lang="zh-CN">
 <head>
-<script src="./teaching-content-sync.js?v=v9.0-p4.1.160"></script><!-- kg-teaching-content-sync:generated -->
-<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
-<script src="./runtime-config.override.js?v=v9.0-p4.1.160"></script><!-- kg-runtime:generated -->
-<script defer src="./direct-entry.js?v=v9.0-p4.1.160"></script><!-- kg-direct-entry:generated -->
-<script defer src="./feature-analytics.js?v=v9.0-p4.1.160"></script><!-- kg-feature-analytics:generated -->
+<script src="./teaching-content-sync.js?v=v9.0-p4.1.162"></script><!-- kg-teaching-content-sync:generated -->
+<!-- kg-direct-bootstrap-anchor -->
+<script src="./runtime-config.override.js?v=v9.0-p4.1.162"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js?v=v9.0-p4.1.162"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js?v=v9.0-p4.1.162"></script><!-- kg-feature-analytics:generated -->
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <meta name="color-scheme" content="light"/>
-  <title>部分跳级测试</title>
-
-  <link rel="stylesheet" href="styles/main.css?v=v9.0-p4.1.160"/>
-  <link rel="stylesheet" href="styles/guided-learning-placement-test.css?v=v9.0-p4.1.160"/>
-  <link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.160"/>
-  <link rel="stylesheet" href="styles/focus-vega-learning.css?v=v9.0-p4.1.160"/>
-  <link rel="stylesheet" href="styles/close-button.css?v=v9.0-p4.1.160"/>
+  <title>入门测试已停用</title>
 </head>
-<body class="guided-placement-page" data-ui-skin="focus-vega">
-  <header class="glp-topbar">
-    <div class="glp-topbar-row">
-      <button type="button" id="gptExitBtn" class="glp-exit" aria-label="退出跳级测试"><span data-ui-icon="x" data-ui-icon-size="18" aria-hidden="true"></span></button>
-      <div class="glp-heading">
-        <span id="gptStageLabel">部分跳级测试</span>
-        <h1 id="gptTitle">加载中</h1>
-      </div>
-      <div class="glp-topbar-actions">
-        <div class="question-language-switch glp-language-switch" role="group" aria-label="题目显示方式">
-          <button type="button" data-question-language="zh" aria-pressed="true">中文</button>
-          <button type="button" data-question-language="bilingual" aria-pressed="false" title="英文仅作为中文题目的对照展示">中英对照</button>
-        </div>
-        <div class="glp-score-rule" id="gptScoreRule"></div>
-      </div>
-    </div>
-    <p class="question-language-note glp-language-note" data-question-language-note hidden>英文仅供对照，请使用中文作答</p>
-    <div class="glp-progress" id="gptProgressShell" role="progressbar" aria-label="跳级测试进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-      <span id="gptProgressBar"></span>
-    </div>
-  </header>
-
-  <main class="glp-main">
-    <p class="glp-integrity-note">未通过不会改变当前节点解锁状态；通过后仍可回头练习每个节点。</p>
-
-    <section class="glp-activity glp-intro" id="gptIntro">
-      <span class="glp-intro-eyebrow">部分首节点 · 可选能力</span>
-      <h2 id="gptIntroTitle">部分跳级测试</h2>
-      <p id="gptIntroDescription"></p>
-      <div class="glp-intro-facts">
-        <div><span>测试任务</span><strong id="gptTaskCount">12 项</strong></div>
-        <div><span>通过标准</span><strong id="gptPassRule">至少 10 项正确</strong></div>
-        <div><span>预计用时</span><strong id="gptEstimatedTime">10 分钟</strong></div>
-      </div>
-      <button type="button" class="ui-button ui-button--primary glp-primary-action glp-start" id="gptStartBtn">开始测试</button>
-    </section>
-
-    <section class="glp-activity" id="gptQuestion" hidden aria-live="polite"></section>
-
-    <section class="glp-activity glp-result" id="gptResult" hidden aria-live="polite">
-      <div class="glp-result-mark" id="gptResultMark">✓</div>
-      <span id="gptResultLabel"></span>
-      <h2 id="gptResultTitle"></h2>
-      <p id="gptResultMessage"></p>
-      <p id="gptAdminNote" hidden>本次为管理员预览，不写入学员进度。</p>
-      <div class="glp-score-card">
-        <div><span>测试成绩</span><strong id="gptCorrectResult"></strong></div>
-        <div><span>活跃用时</span><strong id="gptDurationResult"></strong></div>
-      </div>
-      <section class="glp-type-summary">
-        <h3>分题型结果</h3>
-        <div id="gptTypeSummary"></div>
-      </section>
-      <div class="glp-result-actions" id="gptResultActions"></div>
-    </section>
-  </main>
-
-  <footer class="glp-action-bar" id="gptActionBar" hidden>
-    <div class="glp-action-inner">
-      <div class="glp-feedback" id="gptFeedback" hidden aria-live="polite">
-        <strong id="gptFeedbackTitle"></strong>
-        <p id="gptFeedbackMessage"></p>
-      </div>
-      <div class="glp-test-actions">
-        <button type="button" class="ui-button ui-button--primary glp-primary-action" id="gptPrimaryAction" data-action="check" disabled>提交答案</button>
-      </div>
-    </div>
-  </footer>
-
-  <script defer src="src/01-runtime-config.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/29-auth-core.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/34-role-permissions.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/63-learning-event-repository.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/86-activity-schema-v1.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/86-question-language-ui.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/87-guided-learning-data.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/88-guided-learning-store.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/89-guided-learning-placement-test.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.160"></script>
+<body>
+  <main><h1>入门测试已停用</h1><p><a href="practice-mode.html">前往刷题</a></p></main>
+  <script>location.replace(new URL('practice-mode.html', location.origin + '/').toString())</script>
 </body>
 </html>

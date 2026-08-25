@@ -5519,6 +5519,10 @@
   async function init(){
     if(state.initialized||state.initializing||!document.body.classList.contains('question-workspace-page'))return;
     state.initializing=true;
+    try{await (global.KGCanvasWorkspaceAdapter?.ready||Promise.resolve())}catch(error){
+      console.warn('多题工作区服务器水合失败，暂用设备缓存',error);
+      document.body.dataset.workspaceApiUnavailable='true';
+    }
     // P4.5.38：不阻塞等待 catalog ready，先初始化 UI，catalog 完成后再填充数据（性能优化）
     const catalogPromise=global.KGQuestionCatalogAdapter?.ready||Promise.resolve();
     catalogPromise.catch(error=>{

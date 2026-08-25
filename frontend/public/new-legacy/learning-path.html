@@ -1,147 +1,17 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.160" lang="zh-CN">
+<html data-release="v9.0-p4.1.162" lang="zh-CN">
 <head>
-<script src="./teaching-content-sync.js?v=v9.0-p4.1.160"></script><!-- kg-teaching-content-sync:generated -->
-<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
-<script src="./runtime-config.override.js?v=v9.0-p4.1.160"></script><!-- kg-runtime:generated -->
-<script defer src="./direct-entry.js?v=v9.0-p4.1.160"></script><!-- kg-direct-entry:generated -->
-<script defer src="./feature-analytics.js?v=v9.0-p4.1.160"></script><!-- kg-feature-analytics:generated -->
+<script src="./teaching-content-sync.js?v=v9.0-p4.1.162"></script><!-- kg-teaching-content-sync:generated -->
+<!-- kg-direct-bootstrap-anchor -->
+<script src="./runtime-config.override.js?v=v9.0-p4.1.162"></script><!-- kg-runtime:generated -->
+<script defer src="./direct-entry.js?v=v9.0-p4.1.162"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js?v=v9.0-p4.1.162"></script><!-- kg-feature-analytics:generated -->
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-  <title>学习路径｜项目管理学习营</title>
-
-  <link rel="stylesheet" href="styles/main.css?v=v9.0-p4.1.160"/>
-  <link rel="stylesheet" href="styles/guided-learning-path.css?v=v9.0-p4.1.160"/>
-  <link rel="stylesheet" href="styles/subscription.css?v=v9.0-p4.1.160"/>
-  <link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.160"/>
-<link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.160"/>
-  <link rel="stylesheet" href="styles/account-menu.css?v=v9.0-p4.1.160"/>
-  <link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.160"/>
-  <link rel="stylesheet" href="styles/focus-vega-learning.css?v=v9.0-p4.1.160"/>
-  <link rel="stylesheet" href="styles/close-button.css?v=v9.0-p4.1.160"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>学习路径已停用</title>
 </head>
-<body class="guided-learning-page" data-ui-skin="focus-vega">
-  <div class="gl-app">
-    <header class="gl-topbar">
-      <div class="gl-topbar-left">
-        <div class="gl-subject-shell" id="glSubjectShell">
-          <button class="gl-subject-trigger" id="glSubjectBtn" type="button" aria-haspopup="menu" aria-expanded="false" title="切换科目：PMP 项目管理学习营">P</button>
-          <div class="gl-subject-menu" id="glSubjectMenu" hidden role="menu" aria-label="切换科目">
-            <button class="gl-subject-menu-item is-active" type="button" role="menuitem" data-gl-subject="pmp" title="PMP 项目管理学习营">PMP 项目管理</button>
-          </div>
-        </div>
-      </div>
-      <div class="gl-topbar-right">
-        <nav class="gl-mode-toggle-shell" aria-label="学习模式切换" title="切换学习模式">
-          <a class="gl-mode-choice is-active" href="learning-path.html" aria-current="page">学习</a>
-          <a class="gl-mode-choice" href="index.html?mode=free">自由</a>
-        </nav>
-        <div class="account-menu-shell" id="accountMenuShell" data-account-help-href="multi-question-help.html">
-          <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
-            <span class="account-menu-status-dot" aria-hidden="true"></span><span class="account-menu-trigger-label">已登录：佩奇007</span>
-            <svg aria-hidden="true" class="account-menu-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>
-          </button>
-          <div class="account-menu" hidden id="accountMenu" role="menu" aria-label="账号菜单">
-            <button class="account-menu-item" id="accountMenuUserCenterBtn" role="menuitem" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0"/></svg><span data-mobile-label="用户">用户中心</span></button>
-            <button class="account-menu-item" id="accountMenuHelpBtn" role="menuitem" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.5 2.5 0 1 1 3.8 2.1c-.9.5-1.5 1-1.5 2.2M12 17h.01"/></svg><span data-mobile-label="帮助">帮助中心</span></button>
-            <button class="account-menu-item account-menu-upgrade" hidden id="accountMenuUpgradeBtn" role="menuitem" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"/></svg><span data-mobile-label="升级">升级会员</span></button>
-            <div class="account-menu-separator" role="separator"></div>
-            <div class="account-menu-setting-row" id="glDefaultModeRow" tabindex="0">
-              <span class="account-menu-setting-label">默认进入学习模式</span>
-              <label class="account-menu-toggle" aria-label="默认进入学习模式">
-                <input id="glDefaultModeMenu" type="checkbox" checked />
-                <span class="account-menu-toggle-ui" aria-hidden="true"></span>
-              </label>
-            </div>
-            <div class="account-menu-separator" role="separator"></div>
-            <button class="account-menu-item account-menu-session" id="accountMenuSessionBtn" role="menuitem" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9"/></svg><span data-mobile-label="退出">退出登录</span></button>
-          </div>
-        </div>
-        <button class="account-hidden-trigger" hidden id="authLoginBtn" type="button">登录</button>
-        <button class="account-hidden-trigger" hidden id="authLogoutBtn" type="button">退出登录</button>
-      </div>
-    </header>
-
-    <main class="gl-main">
-      <section class="gl-stage-controls" aria-label="当前学习阶段">
-        <button type="button" class="gl-stage-switch" id="glStageSwitch" aria-haspopup="dialog" aria-controls="glStagePicker" aria-expanded="false">
-          <span class="gl-stage-switch-copy">
-            <small id="glStageIndex">第 1 阶段 · 2 个部分</small>
-            <strong id="glStageTitle">基础认知</strong>
-            <span id="glStageDescription"></span>
-          </span>
-        </button>
-      </section>
-
-      <div class="gl-path-parts" id="glPathParts" aria-live="polite"></div>
-      <button type="button" class="gl-current-node-fab" id="glCurrentNodeBtn" title="回到当前位置" aria-label="回到当前位置"><span aria-hidden="true">↑</span><small>当前位置</small></button>
-
-    </main>
-  </div>
-
-  <div class="gl-stage-picker-backdrop" id="glStagePicker" aria-hidden="true">
-    <section class="gl-stage-picker" role="dialog" aria-modal="true" aria-labelledby="glStagePickerTitle">
-      <header>
-        <div>
-          <small>课程阶段</small>
-          <h2 id="glStagePickerTitle">选择学习阶段</h2>
-        </div>
-        <button type="button" class="gl-stage-picker-close" id="glStagePickerClose" aria-label="关闭阶段列表"><span data-ui-icon="x" data-ui-icon-size="18" aria-hidden="true"></span></button>
-      </header>
-      <div class="gl-stage-list" id="glStageList"></div>
-    </section>
-  </div>
-
-
-  <div class="gl-placement-backdrop" id="glPlacementChoice" aria-hidden="true">
-    <section class="gl-placement-dialog" role="dialog" aria-modal="true" aria-labelledby="glPlacementTitle">
-      <button type="button" class="gl-placement-close" id="glPlacementClose" aria-label="关闭"><span data-ui-icon="x" data-ui-icon-size="18" aria-hidden="true"></span></button>
-      <small>部分首节点</small>
-      <h2 id="glPlacementTitle">选择学习方式</h2>
-      <h3 id="glPlacementPartTitle"></h3>
-      <p id="glPlacementPartDescription"></p>
-      <div class="gl-placement-requirements" id="glPlacementRequirements"></div>
-      <p class="gl-placement-history" id="glPlacementHistory" hidden></p>
-      <div class="gl-placement-actions">
-        <button type="button" class="ui-button ui-button--secondary" id="glPlacementNormalBtn">正常开始</button>
-        <button type="button" class="ui-button ui-button--primary" id="glPlacementTestBtn">参加跳级测试</button>
-      </div>
-      <p class="gl-placement-note">测试通过后，本部分节点将按正常完成状态显示，仍可随时返回练习。</p>
-    </section>
-  </div>
-
-  <div class="status-chip" id="status"></div>
-
-  <div class="modal-backdrop auth-backdrop" id="authModal" aria-hidden="true">
-    <div aria-labelledby="authTitle" aria-modal="true" class="modal auth-modal" role="dialog">
-      <div class="auth-head">
-        <div><h2 id="authTitle">登录并保存学习进度</h2><p id="authReason">访客也可以体验，登录后会按账号分别保存已完成节点。</p></div>
-        <button class="auth-close" id="authCloseBtn" title="关闭登录窗口">×</button>
-      </div>
-      <div class="auth-body">
-        <label>用户名<input autocomplete="username" id="authUsername" placeholder="请输入用户名"/></label>
-        <label>密码<input autocomplete="current-password" id="authPassword" placeholder="请输入密码" type="password"/></label>
-        <div class="auth-msg" id="authMsg"></div>
-        <div class="auth-actions"><button class="primary" id="authDoLoginBtn">登录</button><button id="authRegisterBtn">注册并登录</button></div>
-        <label class="auth-agreement"><input id="authLegalConsent" type="checkbox"/><span>阅读并同意 <a href="privacy-policy.html" rel="noopener" target="_blank">隐私政策</a> 和 <a href="terms-of-service.html" rel="noopener" target="_blank">使用条款</a></span></label>
-      </div>
-    </div>
-  </div>
-
-  <script defer src="src/01-runtime-config.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/28-app-storage.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/29-auth-core.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/30-standalone-auth-dialog.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/34-role-permissions.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/63-learning-event-repository.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/86-activity-schema-v1.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/87-guided-learning-data.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/94-practice-navigation.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/88-guided-learning-store.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/89-guided-learning-icon-registry.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/89-guided-learning-path-layout.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/41-account-menu.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/89-guided-learning-app.js?v=v9.0-p4.1.160"></script>
-  <script defer src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.160"></script>
+<body>
+  <main><h1>学习路径已停用</h1><p><a href="practice-mode.html">前往刷题</a></p></main>
+  <script>location.replace(new URL('practice-mode.html', location.origin + '/').toString())</script>
 </body>
 </html>

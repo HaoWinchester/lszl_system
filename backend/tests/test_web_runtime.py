@@ -100,6 +100,26 @@ def test_learning_path_redirects_to_practice_mode_without_query_context() -> Non
     assert response.headers["location"] == "/practice-mode.html"
 
 
+def test_all_retired_guided_learning_routes_redirect_without_query_context() -> None:
+    with TestClient(app) as client:
+        for route in (
+            "/guided-learning-node.html?node=legacy-node",
+            "/guided-learning-placement-test.html?part=legacy-part",
+            "/learning/node?node=legacy-node",
+            "/learning/placement-test?part=legacy-part",
+        ):
+            response = client.get(route, follow_redirects=False)
+            assert response.status_code == 307, route
+            assert response.headers["location"] == "/practice-mode.html", route
+
+
+def test_guided_learning_api_is_retired() -> None:
+    with TestClient(app) as client:
+        response = client.get("/api/v1/guided-learning/courses/default")
+
+    assert response.status_code == 404
+
+
 def test_graph_alias_preserves_free_mode() -> None:
     with TestClient(app) as client:
         response = client.get("/graph", follow_redirects=False)
@@ -169,22 +189,50 @@ def _bootstrap(response_text: str) -> dict:
     return json.loads(match.group(1))
 
 
-def test_html_injects_authenticated_user_before_state_bootstrap() -> None:
+def test_learner_html_injects_auth_without_runtime_snapshot() -> None:
     with TestClient(app) as client:
         login = client.post("/api/v1/auth/login", json={"username": "佩奇007", "password": "111111"})
         assert login.status_code == 200
         response = client.get("/practice-mode.html")
-        revision = client.get("/api/v1/question-catalog/revision")
 
     marker = "window.__KG_DIRECT_BOOTSTRAP__="
     assert marker in response.text
-    assert response.text.index(marker) < response.text.index("server-state-bootstrap.js")
+    assert response.text.index(marker) < response.text.index("kg-direct-bootstrap-anchor")
     payload = _bootstrap(response.text)
     assert payload["authUser"]["username"] == "佩奇007"
     assert payload["authUser"]["role"] == "admin"
     assert payload["authUser"]["loginSessionId"] == login.json()["loginSessionId"]
-    assert revision.status_code == 200
-    assert payload["contentRevision"] == revision.json()["revision"]
+    assert payload["revision"] == 0
+    assert payload["contentRevision"] == 0
+    assert payload["storage"] is None
+
+
+def test_learner_bootstrap_never_reads_or_seeds_runtime_state(monkeypatch) -> None:
+    async def forbidden(*_args, **_kwargs):
+        raise AssertionError("learner page attempted to read the retired runtime")
+
+    monkeypatch.setattr(runtime_state_service, "get_state", forbidden)
+    monkeypatch.setattr(runtime_state_service, "ensure_domain_seed", forbidden)
+
+    with TestClient(app) as client:
+        assert client.post(
+            "/api/v1/auth/login",
+            json={"username": "佩奇007", "password": "111111"},
+        ).status_code == 200
+        for page in (
+            "index.html",
+            "file-manager.html",
+            "practice-mode.html",
+            "knowledge-recall.html",
+            "question-workspace.html",
+            "question-training.html",
+        ):
+            response = client.get(f"/{page}")
+            assert response.status_code == 200, page
+            payload = _bootstrap(response.text)
+            assert payload["storage"] is None, page
+            assert payload["revision"] == 0, page
+            assert payload["contentRevision"] == 0, page
 
 
 def test_html_bootstrap_does_not_pair_old_state_with_a_later_content_token(
@@ -231,7 +279,7 @@ def test_html_bootstrap_does_not_pair_old_state_with_a_later_content_token(
             "/api/v1/auth/login",
             json={"username": "admin", "password": "jbgsnmm~123"},
         ).status_code == 200
-        payload = _bootstrap(client.get("/practice-mode.html").text)
+        payload = _bootstrap(client.get("/paper-management.html").text)
 
     assert payload["contentRevision"] == captured["contentRevision"]
 
@@ -306,12 +354,7 @@ def test_runtime_state_drain_mode_accepts_and_ignores_writes() -> None:
         assert before["revision"] == after["revision"]
 
 
-def test_html_bootstrap_inlines_filtered_storage_for_files_page() -> None:
-    """登录用户打开首页时，files 域的小体积快照必须内联进首包。
-
-    回归背景（2026-08-23 生产事故）：水合异步完成后业务脚本才能读到索引，
-    竞态窗口内文件存储误建初始图谱并覆盖服务器索引。内联快照消除该窗口。
-    """
+def test_learner_html_bootstrap_never_inlines_runtime_storage() -> None:
     with TestClient(app) as client:
         login = client.post(
             "/api/v1/auth/login",
@@ -322,12 +365,7 @@ def test_html_bootstrap_inlines_filtered_storage_for_files_page() -> None:
 
     payload = _bootstrap(response.text)
     assert payload["authenticated"] is True
-    storage = payload.get("storage")
-    assert isinstance(storage, dict)
-    # files 域白名单内的图谱文件索引必须随首包下发（这是竞态修复的核心）
-    assert "kg_graph_file_index_v2" in storage
-    # 非本页白名单的大键不得混入首包
-    assert "kg_exam_papers_published_v1" not in storage
+    assert payload.get("storage") is None
 
 
 def test_html_bootstrap_omits_storage_entirely_when_over_limit(monkeypatch) -> None:
@@ -341,7 +379,7 @@ def test_html_bootstrap_omits_storage_entirely_when_over_limit(monkeypatch) -> N
             json={"username": "佩奇007", "password": "111111"},
         )
         assert login.status_code == 200
-        response = client.get("/index.html")
+        response = client.get("/paper-management.html")
 
     payload = _bootstrap(response.text)
     assert payload["authenticated"] is True

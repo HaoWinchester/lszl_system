@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services import user_service
 from app.core.config import settings
+from app.web.runtime_policy import uses_runtime
 
 PAGE_NAMESPACES = {
     "index.html": "files",
@@ -63,7 +64,7 @@ async def build_bootstrap(
     revision = 0
     content_revision = 0
     inline_storage: dict[str, str] | None = None
-    if user:
+    if user and uses_runtime(page):
         # 快照配对：contentRevision 必须与页面所见状态同一时刻。
         storage, revision, content_revision = await runtime_state_service.get_state(
             db, user.username, user.role

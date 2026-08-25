@@ -32,27 +32,24 @@ html.kg-practice-guest-first-paint .practice-setup-card,
 html.kg-practice-guest-first-paint .practice-mode-grid{display:none!important}
 html.kg-practice-guest-first-paint #practiceEmpty{display:block!important}
 </style>"""
-    # 只内联轻量会话元数据；storage 体积大（含发布试卷 MB 级键），
-    # 一律走运行时状态 bootstrap 接口由前端水合。
-    # content-prep 页面例外：登录态走缓存 + /me 接口水合，不内联注入。
-    if payload.get("page") != "content-prep.html":
-        encoded = (
-            json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-            .replace("<", "\\u003c")
-            .replace(" ", "\\u2028")
-            .replace(" ", "\\u2029")
-        )
-        direct += (
-            f"\n<script>window.__KG_DIRECT_BOOTSTRAP__={encoded};</script>"
-            "<!-- kg-direct-bootstrap -->"
-        )
+    encoded = (
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        .replace("<", "\\u003c")
+        .replace(" ", "\\u2028")
+        .replace(" ", "\\u2029")
+    )
+    direct += (
+        f"\n<script>window.__KG_DIRECT_BOOTSTRAP__={encoded};</script>"
+        "<!-- kg-direct-bootstrap -->"
+    )
     markers = (
+        "<!-- kg-direct-bootstrap-anchor -->",
         '<script src="./server-state-bootstrap.js"></script>',
         '<script src="/server-state-bootstrap.js"></script>',
     )
     marker = next((candidate for candidate in markers if candidate in html), None)
     if marker is None:
-        raise RuntimeError("generated page is missing server-state-bootstrap.js")
+        raise RuntimeError("generated page is missing the direct bootstrap anchor")
     return html.replace(marker, f"{direct}\n{marker}", 1)
 
 

@@ -21,7 +21,7 @@ PATH="$FIXTURE_BIN:$PATH" \
   UAT_TEST_CALL_LOG="$CALL_LOG" \
   bash "$TEST_REPO/deploy/update-uat.sh" >"$OUTPUT_LOG" 2>&1
 
-expected=$'build v9.0-p4.1.155\nsync v9.0-p4.1.155\nexport v9.0-p4.1.155\nbuild v9.0-p4.1.156\nsync v9.0-p4.1.156\nexport v9.0-p4.1.156\nupdate v9.0-p4.1.156\npromote v9.0-p4.1.156'
+expected=$'build v9.0-p4.1.155\nsync v9.0-p4.1.155\nbuild v9.0-p4.1.156\nsync v9.0-p4.1.156\nupdate v9.0-p4.1.156\npromote v9.0-p4.1.156'
 actual="$(cat "$CALL_LOG")"
 if [[ "$actual" != "$expected" ]]; then
   echo "version bump must rebuild every versioned artifact before updating the candidate" >&2

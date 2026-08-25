@@ -15,6 +15,18 @@ test('wechat login starts OAuth at the backend and never exchanges codes in the 
   assert.doesNotMatch(source, /backendExchangeUrl/)
   assert.doesNotMatch(source, /WECHAT_PENDING_KEY/)
   assert.doesNotMatch(source, /completeLogin\s*\(/)
+  assert.match(source, /\/api\/v1\/auth\/wechat\/config/)
+  assert.doesNotMatch(source, /kg_wechat_login_config_v1/)
+  assert.doesNotMatch(source, /localStorage/)
+})
+
+test('system adapter keeps WeChat login and payment without the legacy runtime storage', () => {
+  const source = readSource('frontend/scripts/new-legacy-assets/direct-system-adapter.js')
+
+  assert.doesNotMatch(source, new RegExp(['KGServerState', 'Storage'].join('')))
+  assert.doesNotMatch(source, /kg_wechat_login_config_v1/)
+  assert.match(source, /\/api\/v1\/system\/wechat-config/)
+  assert.match(source, /KGWechatPay/)
 })
 
 test('login modal embeds the official QR code below the login button', () => {
