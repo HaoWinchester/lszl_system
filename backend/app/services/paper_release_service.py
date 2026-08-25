@@ -46,6 +46,58 @@ def _error(status: int, code: str, message: str) -> HTTPException:
     return HTTPException(status_code=status, detail={"code": code, "message": message})
 
 
+def _snapshot_is_learnable(snapshot: dict) -> bool:
+    """快照必须自带可学习内容（题干 + ≥2 选项 + 正确答案），摘要桩不算。"""
+    if not isinstance(snapshot, dict) or snapshot.get("__paperSummaryOnly"):
+        return False
+    stem = "".join(
+        str(part.get("text") or "") for part in (snapshot.get("stemParts") or [])
+        if isinstance(part, dict)
+    ) or str(snapshot.get("stem") or "")
+    options = snapshot.get("options") or []
+    has_answer = bool(snapshot.get("correctAnswer")) or any(
+        isinstance(option, dict) and option.get("correct") for option in options
+    )
+    return bool(stem and len(options) >= 2 and has_answer)
+
+
+async def _repair_release_snapshots(db: AsyncSession, canonical: dict) -> None:
+    """发布载荷中的摘要桩快照直接用题库权威内容重建（2026-08-25 生产事故加固）。
+
+    教师端发布时若浏览器未加载完整题目，前端会以 ref.summary 伪造
+    __paperSummaryOnly 桩；服务端在此用 questions 表重建，缺失/已删除/
+    本身不完整的题目才拒绝发布。
+    """
+    broken = [
+        question for question in canonical["questions"]
+        if not _snapshot_is_learnable(question["question"])
+    ]
+    if not broken:
+        return
+    issues: list[str] = []
+    for question in broken:
+        row = await db.get(Question, question["questionId"])
+        if row is None or row.bank_id != question["bankId"]:
+            issues.append(f"第 {question['order']} 题（{question['questionId']}）在题库中不存在")
+            continue
+        if (row.lifecycle or {}).get("status") == "deleted":
+            issues.append(f"第 {question['order']} 题（{question['questionId']}）已被安全删除")
+            continue
+        payload = question_catalog_service.question_to_payload(row)
+        if not _snapshot_is_learnable(payload):
+            issues.append(f"第 {question['order']} 题（{question['questionId']}）缺少题干、选项或正确答案")
+            continue
+        question["question"] = payload
+    if issues:
+        preview = "；".join(issues[:5])
+        suffix = f" 等 {len(issues)} 处问题" if len(issues) > 5 else ""
+        raise _error(
+            422,
+            "RELEASE_SNAPSHOT_INCOMPLETE",
+            f"试卷题目不完整，无法发布：{preview}{suffix}",
+        )
+
+
 def _normalize_modes(values: list[str]) -> list[str]:
     modes: list[str] = []
     for value in values:
@@ -518,6 +570,7 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
         canonical = runtime_domain_migration_service.normalize_release_payload(payload)
     except ValueError as exc:
         raise _error(422, "RELEASE_PAYLOAD_INVALID", str(exc)) from exc
+    await _repair_release_snapshots(db, canonical)
 
     await teaching_content_revision_service.acquire_lock(db)
     release_id = canonical["releaseId"]

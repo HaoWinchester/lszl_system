@@ -1,5 +1,7 @@
 """P4.6 第 2 轮：教师按载荷发布/按试卷撤回的 paper-releases 端点。"""
 
+from uuid import uuid4
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -14,7 +16,8 @@ def login(client, username="admin", password="jbgsnmm~123"):
 def _payload(paper_id="paper-t1", version=1):
     question = {
         "id": "q_test_1", "title": "测试题", "stemParts": [{"text": "题干"}],
-        "options": [{"text": "A"}], "correctAnswer": "A", "bankId": "b_test",
+        "options": [{"id": "A", "text": "方案一"}, {"id": "B", "text": "方案二"}],
+        "correctAnswer": "A", "bankId": "b_test",
     }
     return {
         "id": f"{paper_id}-v{version}-test", "releaseId": f"{paper_id}-v{version}-test",
@@ -70,6 +73,63 @@ def test_publish_payload_rejects_missing_snapshots() -> None:
         payload["questionSnapshots"] = []
         response = client.post("/api/v1/paper-releases/publish-payload", json=payload)
         assert response.status_code == 422
+
+
+def test_publish_payload_repairs_summary_only_stubs_from_bank() -> None:
+    """摘要桩快照（__paperSummaryOnly）在服务端用题库权威内容重建后放行。"""
+    with TestClient(app) as client:
+        login(client, "admin")
+        bank = client.post(
+            "/api/v1/banks",
+            json={"name": f"桩重建题库-{uuid4().hex[:8]}", "subject": "PMP"},
+        ).json()["bank"]
+        question = client.post(
+            f"/api/v1/banks/{bank['id']}/questions",
+            json={
+                "title": "权威题目",
+                "stemParts": [{"text": "题库里的完整题干"}],
+                "options": [{"id": "A", "text": "方案一"}, {"id": "B", "text": "方案二"}],
+                "correctAnswer": "A",
+            },
+        ).json()["question"]
+
+        payload = _payload(paper_id=f"paper-stub-{uuid4().hex[:6]}", version=1)
+        stub = {"id": question["id"], "bankId": bank["id"],
+                "title": question["title"], "__paperSummaryOnly": True}
+        payload["questions"] = [{"bankId": bank["id"], "questionId": question["id"], "order": 1}]
+        payload["questionSnapshots"] = [{"bankId": bank["id"], "questionId": question["id"], "question": stub}]
+
+        response = client.post("/api/v1/paper-releases/publish-payload", json=payload)
+        assert response.status_code == 200, response.text
+        release = response.json()["release"]
+        served = client.get(
+            f"/api/v1/paper-releases/{release['releaseId']}/questions?limit=10"
+        ).json()["questions"]
+        assert len(served) == 1
+        snapshot = served[0]["question"]
+        assert snapshot.get("__paperSummaryOnly") is not True
+        assert "题库里的完整题干" in "".join(
+            part.get("text", "") for part in snapshot.get("stemParts", [])
+        )
+        assert len(snapshot.get("options", [])) >= 2
+        assert snapshot.get("correctAnswer")
+
+
+def test_publish_payload_rejects_stubs_without_bank_question() -> None:
+    """摘要桩在题库中找不到权威题目时拒绝发布。"""
+    with TestClient(app) as client:
+        login(client, "admin")
+        payload = _payload(paper_id=f"paper-miss-{uuid4().hex[:6]}", version=1)
+        stub = {"id": "q_missing_1", "bankId": "b_test",
+                "title": "不存在的题", "__paperSummaryOnly": True}
+        payload["questions"] = [{"bankId": "b_test", "questionId": "q_missing_1", "order": 1}]
+        payload["questionSnapshots"] = [{"bankId": "b_test", "questionId": "q_missing_1", "question": stub}]
+
+        response = client.post("/api/v1/paper-releases/publish-payload", json=payload)
+        assert response.status_code == 422, response.text
+        detail = response.json()["detail"]
+        assert detail["code"] == "RELEASE_SNAPSHOT_INCOMPLETE"
+        assert "q_missing_1" in detail["message"]
 
 
 def test_server_allocates_next_version_when_client_version_is_stale() -> None:
