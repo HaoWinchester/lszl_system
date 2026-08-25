@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
@@ -443,6 +444,100 @@ def test_backfill_rescans_changed_sources_with_the_same_run_id() -> None:
     asyncio.run(scenario())
 
 
+def test_paper_backfill_reuses_an_existing_paper_version_with_a_different_release_id() -> None:
+    suffix = uuid4().hex[:10]
+    run_id = f"paper-version-reuse-{suffix}"
+    teacher = f"paper-version-teacher-{suffix}"
+    paper_id = f"paper-version-{suffix}"
+    existing_release_id = f"paper-version-existing-{suffix}"
+    incoming_release_id = f"paper-version-incoming-{suffix}"
+    bank_id = f"paper-version-bank-{suffix}"
+    question_id = f"paper-version-question-{suffix}"
+    payload = [{
+        "id": incoming_release_id,
+        "releaseId": incoming_release_id,
+        "paperId": paper_id,
+        "version": 1,
+        "name": "兼容快照中的重复版本",
+        "subject": "PMP",
+        "status": "published",
+        "publishedBy": teacher,
+        "questions": [{
+            "bankId": bank_id,
+            "questionId": question_id,
+            "order": 1,
+        }],
+        "questionSnapshots": [{
+            "bankId": bank_id,
+            "questionId": question_id,
+            "question": {"id": question_id, "bankId": bank_id, "title": "兼容快照题目"},
+        }],
+    }]
+
+    async def scenario() -> None:
+        previous_values = None
+        async with AsyncSessionLocal() as db:
+            previous = await db.get(SharedRuntimeState, PUBLISHED_PAPERS_KEY)
+            if previous is not None:
+                previous_values = {"value": previous.value, "updated_by": previous.updated_by}
+                await db.delete(previous)
+            db.add(User(username=teacher, password_hash="unused", role="teacher", status="active"))
+            await db.flush()
+            db.add(ExamPaper(id=paper_id, owner_id=teacher, name="关系域既有试卷", subject="PMP"))
+            db.add(PaperRelease(
+                id=existing_release_id,
+                paper_id=paper_id,
+                version=1,
+                status="published",
+                name="关系域权威版本",
+                subject="PMP",
+                publisher_id=teacher,
+                access_level="free",
+                enabled_modes=[],
+                allowed_roles=[],
+                release_metadata={},
+                source_payload={},
+                question_count=0,
+                published_at=datetime.now(timezone.utc),
+            ))
+            db.add(SharedRuntimeState(
+                key=PUBLISHED_PAPERS_KEY,
+                value=__import__("json").dumps(payload),
+                updated_by=teacher,
+            ))
+            await db.commit()
+
+        try:
+            report = await _run("backfill", run_id, {PUBLISHED_PAPERS_KEY})
+            async with AsyncSessionLocal() as db:
+                item = await db.scalar(select(RuntimeMigrationItem).where(
+                    RuntimeMigrationItem.run_id == run_id
+                ))
+                assert report["status"] == "verified", {
+                    "report": report,
+                    "item_status": item.status if item else None,
+                    "item_error": item.error if item else None,
+                }
+                existing = await db.get(PaperRelease, existing_release_id)
+                assert existing is not None
+                assert existing.name == "关系域权威版本"
+                assert await db.get(PaperRelease, incoming_release_id) is None
+        finally:
+            async with AsyncSessionLocal() as db:
+                await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
+                await db.execute(delete(PaperRelease).where(PaperRelease.paper_id == paper_id))
+                await db.execute(delete(SharedRuntimeState).where(
+                    SharedRuntimeState.key == PUBLISHED_PAPERS_KEY
+                ))
+                if previous_values is not None:
+                    db.add(SharedRuntimeState(key=PUBLISHED_PAPERS_KEY, **previous_values))
+                await db.execute(delete(ExamPaper).where(ExamPaper.id == paper_id))
+                await db.execute(delete(User).where(User.username == teacher))
+                await db.commit()
+
+    asyncio.run(scenario())
+
+
 def test_concurrent_scan_upserts_one_run_and_item() -> None:
     run_id = f"concurrent-ledger-{uuid4().hex}"
     sources = [{
@@ -560,6 +655,11 @@ def test_paper_release_mappers_materialize_shared_catalog_and_history() -> None:
             assert {(row.id, row.status) for row in releases} == {
                 (current_id, "published"), (history_id, "superseded")
             }
+            paper = await db.get(ExamPaper, paper_id)
+            assert paper is not None
+            assert paper.status == "published"
+            assert paper.published_version == 2
+            assert paper.published_release_id == current_id
             rows = (await db.scalars(select(PaperReleaseQuestion).where(
                 PaperReleaseQuestion.release_id.in_([current_id, history_id])
             ))).all()
@@ -587,6 +687,10 @@ def test_paper_release_mappers_materialize_shared_catalog_and_history() -> None:
             current_release = await db.get(PaperRelease, current_id)
             assert current_release is not None
             current_release.name = "关系域合法改名"
+            paper.status = "draft"
+            paper.published_version = 0
+            paper.published_release_id = None
+            paper.published_at = None
             await db.commit()
             repeated = await _run(
                 "backfill",
@@ -596,6 +700,10 @@ def test_paper_release_mappers_materialize_shared_catalog_and_history() -> None:
             assert repeated["status"] == "verified", repeated
             await db.refresh(current_release)
             assert current_release.name == "关系域合法改名"
+            await db.refresh(paper)
+            assert paper.status == "published"
+            assert paper.published_version == 2
+            assert paper.published_release_id == current_id
 
             rows[0].snapshot = {**rows[0].snapshot, "title": "被污染"}
             await db.commit()

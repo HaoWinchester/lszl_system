@@ -4,13 +4,22 @@ const path=require('path');
 const assert=require('assert/strict');
 const ROOT=path.resolve(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(ROOT,file),'utf8');
-assert.equal(read('VERSION').trim(),'v9.0-p4.1.1');
-assert(read('src/admin/00-admin-core.js').includes("VERSION='9.0-p4.1.1'"));
 const page=read('paper-management.html');
-for(const id of ['qbPaperCategoryList','qbAddPaperCategoryBtn','qbPaperListSearch','qbPaperStatusFilter','qbPaperListSelectPage','qbPaperListBulkToolbar','qbPaperBulkMoveCategoryBtn','qbPaperBulkArchiveBtn','qbPaperBulkDeleteDraftBtn','paperCategoryInput','qbPaperList','pmQuestionWorkbench','pmPaneSplitter','qbPaperCandidateList','qbSelectPaperCandidatesPage','qbAddSelectedToPaperBtn','qbPaperQuestionList','qbPaperPreviewSelectAll','qbPaperBulkRemoveBtn','qbQuestionPreviewPopover','qbQuestionPreviewEditBtn']){
+for(const id of ['qbImportBankBtn','qbImportPaperBtn','qbComposePapersBtn','qbBankImportDialog','qbBankImportFile','qbBankImportFileName','qbBankImportResults','qbBankImportCancelBtn','qbBankImportConfirmBtn','qbBankImportRetryBtn','qbPaperImportDialog','qbPaperImportFile','qbPaperImportConflictAction','qbPaperImportResults','qbPaperImportPreflightBtn','qbPaperImportCancelBtn','qbPaperImportConfirmBtn','qbPaperImportRetryBtn','qbPaperCompositionDialog','qbPaperCompositionBanks','qbPaperCompositionResults','qbPaperCompositionPreflightBtn','qbPaperCompositionCancelBtn','qbPaperCompositionFeasibleBtn','qbPaperCompositionConfirmBtn','qbPaperCompositionRetryBtn','qbPaperCategoryList','qbAddPaperCategoryBtn','qbPaperListSearch','qbPaperStatusFilter','qbPaperListSelectPage','qbPaperListBulkToolbar','qbPaperBulkMoveCategoryBtn','qbPaperBulkArchiveBtn','qbPaperBulkDeleteDraftBtn','paperCategoryInput','qbPaperList','pmQuestionWorkbench','pmPaneSplitter','qbPaperCandidateList','qbSelectPaperCandidatesPage','qbAddSelectedToPaperBtn','qbPaperQuestionList','qbPaperPreviewSelectAll','qbPaperBulkRemoveBtn','qbQuestionPreviewPopover','qbQuestionPreviewEditBtn']){
   assert(page.includes(`id="${id}"`),`paper-management missing ${id}`);
 }
+for(const code of ['A','B','C'])for(const suffix of ['Enabled','Name','Count'])assert(page.includes(`id="qbPaperVariant${code}${suffix}"`),`paper-management missing ${code} ${suffix}`);
+for(const id of ['qbPaperPeopleWeight','qbPaperProcessWeight','qbPaperBusinessWeight','qbPaperGovernanceWeight','qbPaperScopeWeight','qbPaperScheduleWeight','qbPaperFinanceWeight','qbPaperStakeholderWeight','qbPaperResourceWeight','qbPaperRiskWeight'])assert(page.includes(`id="${id}"`),`paper-management missing quota control ${id}`);
+for(const script of ['question-bank-import-controller.js','paper-import-controller.js','paper-composition-controller.js'])assert(page.includes(script),`paper-management missing ${script}`);
+assert(page.indexOf('question-bank-import-controller.js')<page.indexOf('paper-import-controller.js'));
+assert(page.indexOf('question-bank-import-controller.js')<page.indexOf('src/65-question-bank-admin.js'));
+assert(page.indexOf('paper-import-controller.js')<page.indexOf('src/65-question-bank-admin.js'));
+assert(page.indexOf('paper-composition-controller.js')<page.indexOf('src/65-question-bank-admin.js'));
 assert(page.includes('data-paper-management-page="true"'));
+assert(page.includes('>导入题库</button>'));
+assert(page.includes('>导入试卷</button>'));
+assert(/id="qbBankImportFile"[^>]*\bmultiple\b/.test(page),'question-bank import input must allow selecting multiple JSON files');
+assert(page.includes('选择一个或多个题库 JSON 文件'),'question-bank import dialog must explain multi-file selection');
 assert(page.includes('data-paper-mode="deep_recall"'));
 assert(page.includes('data-paper-mode="multi_question_canvas"'));
 assert(page.includes('data-paper-mode="practice_mode"'));
@@ -18,6 +27,8 @@ assert(!page.includes('data-paper-mode="single_deep_study"'));
 const qb=read('question-bank.html');
 assert(!qb.includes('id="qbPaperCard"'),'embedded paper panel must be removed');
 assert(qb.includes("location.href='paper-management.html'"));
+assert(qb.includes('src/teacher/question-bank-import-controller.js'),'question bank page must share the import controller');
+assert(qb.indexOf('question-bank-import-controller.js')<qb.indexOf('src/65-question-bank-admin.js'));
 const course=read('course-admin.html');
 assert(course.includes("location.replace('paper-management.html')"));
 assert(!course.includes('data-config-panel="papers"'),'course page must not embed legacy paper management');
@@ -25,9 +36,9 @@ assert(!course.includes('data-config-view="papers"'),'course page must not expos
 assert(page.includes('<a class="active" href="paper-management.html">试卷管理</a>'),'paper management must occupy teacher workflow tab 4');
 assert(page.includes('<b>3</b>管理试卷'),'paper management must be teacher workflow step 3');
 const admin=read('src/65-question-bank-admin.js');
-for(const token of ['PAPER_CATEGORY_PREFIX','loadPaperCategories','renderPaperCategoryList','toggleSelectPaperPage','moveSelectedPapersToCategory','archiveSelectedPapers','deleteSelectedPaperDrafts','qbQuestionPreviewPopover','bindPaperPreviewRow','positionPaperQuestionPreview','PUBLISHED_PAPERS_KEY','publishPaperRelease','questionSnapshots','removeSelectedPaperQuestions','toggleSelectPaperPreview','renderPaperCandidateList','addSelectedCandidatesToPaper','initPaperWorkspaceControls','openPaperQuestionPreview','applyQuestionEditorDeepLink'])assert(admin.includes(token),`admin script missing ${token}`);
+for(const token of ['KGPaperDraftApi','reloadPaperDrafts','renderPaperCategoryList','toggleSelectPaperPage','moveSelectedPapersToCategory','archiveSelectedPapers','deleteSelectedPaperDrafts','qbQuestionPreviewPopover','bindPaperPreviewRow','positionPaperQuestionPreview','publishPaperRelease','questionSnapshots','removeSelectedPaperQuestions','toggleSelectPaperPreview','renderPaperCandidateList','addSelectedCandidatesToPaper','initPaperWorkspaceControls','openPaperQuestionPreview','applyQuestionEditorDeepLink'])assert(admin.includes(token),`admin script missing ${token}`);
+for(const forbidden of ['PAPER_CATEGORY_PREFIX','function papersKey(','function paperCategoriesKey(','function loadPapers(','function savePapers(','function loadPaperCategories(','function savePaperCategories('])assert(!admin.includes(forbidden),`paper draft persistence must not use runtime storage: ${forbidden}`);
 const learner=read('src/60-question-bank.js');
-assert(learner.includes("QUESTION_PUBLISHED_PAPERS_KEY='kg_exam_papers_published_v1'"));
 assert(learner.includes('questionSnapshots'));
 assert(read('src/66-question-navigator.js').includes("mode:'single_deep_study'"));
 assert(read('src/77-multi-question-workspace.js').includes("mode:'multi_question_canvas'"));

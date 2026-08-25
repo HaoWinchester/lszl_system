@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -123,9 +123,37 @@ class ExamPaper(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     subject: Mapped[str] = mapped_column(String(32), default="PMP")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    category_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("paper_categories.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     total_count: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(16), default=DRAFT)  # draft/published
     quotas: Mapped[dict] = mapped_column(JSONB, default=dict)  # {domain: count}
+    access_policy: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    enabled_modes: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    mode_config_version: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False, default="learning")
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    restored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_release_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("paper_releases.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    published_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    generation_batch_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("paper_generation_batches.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    variant_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    generation_config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    import_metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -135,10 +163,14 @@ class ExamPaper(Base):
 
 class PaperQuestion(Base):
     __tablename__ = "paper_questions"
+    __table_args__ = (
+        UniqueConstraint("paper_id", "order_index", name="uq_paper_questions_paper_order"),
+    )
 
     paper_id: Mapped[str] = mapped_column(String(64), ForeignKey("exam_papers.id"), primary_key=True)
     question_id: Mapped[str] = mapped_column(String(64), ForeignKey("questions.id"), primary_key=True)
     order_index: Mapped[int] = mapped_column(Integer, default=0)
+    score: Mapped[float] = mapped_column(Numeric(8, 2), nullable=False, default=1)
 
 
 class QuestionCleanupAudit(Base):

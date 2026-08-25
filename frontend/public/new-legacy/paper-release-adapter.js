@@ -40,12 +40,14 @@
     try { return JSON.parse(JSON.stringify(value)); } catch (error) { return value; }
   }
 
-  async function request(path) {
-    const response = await global.fetch(`${API_ROOT}${path}`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: { accept: 'application/json' },
-    });
+  async function request(path, { method = 'GET', body } = {}) {
+    const headers = { accept: 'application/json' };
+    const options = { method, credentials: 'include', headers };
+    if (body !== undefined) {
+      headers['content-type'] = 'application/json';
+      options.body = JSON.stringify(body);
+    }
+    const response = await global.fetch(`${API_ROOT}${path}`, options);
     if (response.status === 401) {
       try { global.dispatchEvent(new CustomEvent('kg:auth-required')); } catch (error) {}
       const authError = new Error('登录状态已失效，请重新登录。');
@@ -57,12 +59,20 @@
       forbidden.status = 403;
       throw forbidden;
     }
+    const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const error = new Error(`发布试卷请求失败 (${response.status})`);
+      const detail = payload?.detail;
+      const error = new Error(detail?.message || `发布试卷请求失败 (${response.status})`);
       error.status = response.status;
+      error.code = detail?.code || `HTTP_${response.status}`;
       throw error;
     }
-    return response.json();
+    return payload;
+  }
+
+  async function publishPayload(payload) {
+    const response = await request('/publish-payload', { method: 'POST', body: payload });
+    return clone(response?.release || null);
   }
 
   function accessLevelOf(row) {
@@ -322,6 +332,7 @@
     catalog,
     managementCatalog,
     mergeManagementPapers,
+    publishPayload,
     findInCatalog,
     detail,
     fetchQuestions,

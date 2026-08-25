@@ -7,7 +7,7 @@ import json
 from typing import Literal
 
 from fastapi import HTTPException
-from sqlalchemy import case, cast, func, or_, select
+from sqlalchemy import String, case, cast, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -159,9 +159,21 @@ async def list_bank_questions(
     *,
     page: int,
     page_size: int,
+    search: str | None = None,
 ) -> tuple[list[dict], int]:
     await question_access_service.require_bank_access(db, user, bank_id, edit=False)
     base = select(Question).where(Question.bank_id == bank_id)
+    keyword = str(search or "").strip()
+    if keyword:
+        pattern = f"%{keyword}%"
+        base = base.where(
+            or_(
+                func.coalesce(Question.title, "").ilike(pattern),
+                func.coalesce(Question.domain, "").ilike(pattern),
+                func.coalesce(Question.topic, "").ilike(pattern),
+                cast(Question.tags, String).ilike(pattern),
+            )
+        )
     total = int(
         (await db.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
     )

@@ -43,6 +43,9 @@
       <p>从正式题库手动选择题目组成试卷；发布版本可供学员在独立做题模式中选择。</p>
     </div>
     <div class="qb-inline-actions pm-primary-actions">
+      <button id="qbImportBankBtn" type="button"><span data-ui-icon="database" data-ui-icon-size="16" aria-hidden="true"></span>导入题库</button>
+      <button id="qbImportPaperBtn" type="button"><span data-ui-icon="upload" data-ui-icon-size="16" aria-hidden="true"></span>导入试卷</button>
+      <button id="qbComposePapersBtn" type="button"><span data-ui-icon="sparkles" data-ui-icon-size="16" aria-hidden="true"></span>一键组卷</button>
       <button id="qbAddPaperBtn" type="button"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新试卷</button>
       <button id="qbSavePaperBtn" type="button">保存试卷</button>
       <button id="qbBuildPaperBtn" type="button">按配额补充</button>
@@ -178,6 +181,72 @@
     </section>
   </section>
 </main>
+<dialog class="pm-operation-dialog" id="qbBankImportDialog" aria-labelledby="qbBankImportTitle">
+  <div class="pm-operation-shell">
+    <header class="pm-operation-head">
+      <div><p class="qb-kicker">QUESTION BANK</p><h2 id="qbBankImportTitle">导入题库 JSON</h2><p>支持 Prep Studio 单题库、题库数组和包含 banks 数组的数据包。题库与题目将通过数据库 API 保存。</p></div>
+    </header>
+    <div class="pm-operation-body">
+      <label class="qb-field"><span>选择一个或多个题库 JSON 文件</span><input id="qbBankImportFile" type="file" accept="application/json,.json" multiple /></label>
+      <div class="pm-operation-note" id="qbBankImportFileName">尚未选择文件。</div>
+      <section class="pm-operation-results" id="qbBankImportResults" aria-live="polite"><div class="qb-empty">选择 JSON 后将显示题库数量和题目数量；确认后写入数据库。</div></section>
+    </div>
+    <footer class="pm-operation-actions">
+      <button id="qbBankImportCancelBtn" type="button">取消</button>
+      <button id="qbBankImportRetryBtn" type="button" hidden>重试导入</button>
+      <button id="qbBankImportConfirmBtn" class="accent" type="button" disabled>确认导入题库</button>
+    </footer>
+  </div>
+</dialog>
+
+<dialog class="pm-operation-dialog" id="qbPaperImportDialog" aria-labelledby="qbPaperImportTitle">
+  <div class="pm-operation-shell">
+    <header class="pm-operation-head">
+      <div><p class="qb-kicker">PAPER PACKAGE</p><h2 id="qbPaperImportTitle">导入试卷 JSON</h2><p>试卷包只建立题目引用，不复制题目正文。请先完成预检，再确认导入。</p></div>
+    </header>
+    <div class="pm-operation-body">
+      <label class="qb-field"><span>选择试卷 JSON 文件</span><input id="qbPaperImportFile" type="file" accept="application/json,.json" /></label>
+      <div class="pm-operation-note" id="qbPaperImportFileName">尚未选择文件。</div>
+      <label class="qb-field"><span>同 ID 冲突处理</span><select id="qbPaperImportConflictAction"><option value="create">按原 ID 新建</option><option value="copy">另存为副本</option><option value="replace_draft">覆盖现有草稿</option></select></label>
+      <section class="pm-operation-results" id="qbPaperImportResults" aria-live="polite"><div class="qb-empty">选择 JSON 后将显示包内名称、题量、题库引用、缺失项和冲突信息。</div></section>
+    </div>
+    <footer class="pm-operation-actions">
+      <button id="qbPaperImportCancelBtn" type="button">取消</button>
+      <button id="qbPaperImportRetryBtn" type="button" hidden>重试预检</button>
+      <button id="qbPaperImportPreflightBtn" type="button">开始预检</button>
+      <button id="qbPaperImportConfirmBtn" class="accent" type="button" disabled>确认导入</button>
+    </footer>
+  </div>
+</dialog>
+
+<dialog class="pm-operation-dialog pm-composition-dialog" id="qbPaperCompositionDialog" aria-labelledby="qbPaperCompositionTitle">
+  <div class="pm-operation-shell">
+    <header class="pm-operation-head">
+      <div><p class="qb-kicker">PARALLEL PAPERS</p><h2 id="qbPaperCompositionTitle">A/B/C 平行组卷</h2><p>同一批次题目不重复；考试域按硬配额满足，绩效域作为尽量一致的软目标。</p></div>
+      <div class="pm-composition-mode" role="radiogroup" aria-label="组卷方式"><label><input type="radio" name="paperCompositionMode" value="quick" checked />一键组卷</label><label><input type="radio" name="paperCompositionMode" value="custom" />自定义</label></div>
+    </header>
+    <div class="pm-operation-body">
+      <section class="pm-composition-section"><h3>候选题库</h3><div class="pm-bank-checklist" id="qbPaperCompositionBanks"><div class="qb-empty">打开窗口后加载当前可用题库。</div></div></section>
+      <section class="pm-composition-section"><h3>平行试卷</h3><div class="pm-variant-grid">
+        <div class="pm-variant-row"><label><input id="qbPaperVariantAEnabled" type="checkbox" checked />A 卷</label><input id="qbPaperVariantAName" aria-label="A 卷名称" value="PMP 模拟卷 A" /><input id="qbPaperVariantACount" aria-label="A 卷题量" type="number" min="1" max="300" value="60" /></div>
+        <div class="pm-variant-row"><label><input id="qbPaperVariantBEnabled" type="checkbox" checked />B 卷</label><input id="qbPaperVariantBName" aria-label="B 卷名称" value="PMP 模拟卷 B" /><input id="qbPaperVariantBCount" aria-label="B 卷题量" type="number" min="1" max="300" value="60" /></div>
+        <div class="pm-variant-row"><label><input id="qbPaperVariantCEnabled" type="checkbox" checked />C 卷</label><input id="qbPaperVariantCName" aria-label="C 卷名称" value="PMP 模拟卷 C" /><input id="qbPaperVariantCCount" aria-label="C 卷题量" type="number" min="1" max="300" value="60" /></div>
+      </div></section>
+      <section class="pm-composition-section pm-quota-config"><h3>考试域硬配额</h3><div class="pm-quota-weight-grid"><label>人员<input id="qbPaperPeopleWeight" type="number" min="0" value="42" /></label><label>过程<input id="qbPaperProcessWeight" type="number" min="0" value="50" /></label><label>业务环境<input id="qbPaperBusinessWeight" type="number" min="0" value="8" /></label></div><small>默认 42% / 50% / 8%。硬配额不足时不会写入任何试卷。</small></section>
+      <section class="pm-composition-section pm-quota-config"><h3>PMP 第八版绩效域软目标</h3><div class="pm-quota-weight-grid pm-soft-weight-grid"><label>治理<input id="qbPaperGovernanceWeight" type="number" min="0" value="1" /></label><label>范围<input id="qbPaperScopeWeight" type="number" min="0" value="1" /></label><label>进度<input id="qbPaperScheduleWeight" type="number" min="0" value="1" /></label><label>财务<input id="qbPaperFinanceWeight" type="number" min="0" value="1" /></label><label>利益相关方<input id="qbPaperStakeholderWeight" type="number" min="0" value="1" /></label><label>资源<input id="qbPaperResourceWeight" type="number" min="0" value="1" /></label><label>风险<input id="qbPaperRiskWeight" type="number" min="0" value="1" /></label></div><small>一键组卷默认等权；自定义可调整相对权重。该维度只用于优先级，不会破坏考试域硬配额。</small></section>
+      <section class="pm-operation-results" id="qbPaperCompositionResults" aria-live="polite"><div class="qb-empty">选择题库并预检后，将显示每套卷的题量、硬配额、软目标偏差和库存缺口。</div></section>
+      <p class="pm-rollback-note">正式创建采用单个数据库事务；任何一套发生技术或并发失败时，所选试卷全部回滚，不保留半成品。</p>
+    </div>
+    <footer class="pm-operation-actions">
+      <button id="qbPaperCompositionCancelBtn" type="button">全部取消</button>
+      <button id="qbPaperCompositionRetryBtn" type="button" hidden>重试预检</button>
+      <button id="qbPaperCompositionFeasibleBtn" type="button" hidden>只生成可行试卷并重新预检</button>
+      <button id="qbPaperCompositionPreflightBtn" type="button">开始预检</button>
+      <button id="qbPaperCompositionConfirmBtn" class="accent" type="button" disabled>确认生成</button>
+    </footer>
+  </div>
+</dialog>
+
 <aside class="pm-question-preview-popover" id="qbQuestionPreviewPopover" role="dialog" aria-modal="false" aria-labelledby="qbQuestionPreviewTitle" hidden>
   <span class="pm-question-preview-arrow" aria-hidden="true"></span>
   <div class="pm-question-preview-shell">
@@ -234,6 +303,9 @@
 <script defer src="src/59c-active-learning-mode-policy.js"></script>
 <script defer src="src/teacher/paper-management/paper-release-service.js"></script>
 <script defer src="src/teacher/paper-management/paper-quota-service.js"></script>
+<script defer src="src/teacher/question-bank-import-controller.js"></script>
+<script defer src="src/teacher/paper-management/paper-import-controller.js"></script>
+<script defer src="src/teacher/paper-management/paper-composition-controller.js"></script>
 <script defer src="src/teacher/knowledge-tree/knowledge-tree-adapter.js"></script>
 <script defer src="src/teacher/association-library/association-library-adapter.js"></script>
 <script defer src="src/teacher/teacher-domain-registry.js"></script>

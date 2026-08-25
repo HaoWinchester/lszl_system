@@ -640,6 +640,101 @@ def test_legacy_publish_endpoint_uses_release_lifecycle_and_withdraw_cas() -> No
         asyncio.run(_cleanup(ids))
 
 
+def test_withdraw_paper_returns_editable_projection_to_draft() -> None:
+    ids = _ids()
+    asyncio.run(_seed(ids))
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            teacher = await db.get(User, ids["teacher"])
+            release = await paper_release_service.publish(
+                db, teacher, ids["paper"], expected_revision=1,
+                access_level="free", enabled_modes=["practice_mode"],
+                allowed_roles=["student"], metadata={},
+            )
+            assert (await db.get(ExamPaper, ids["paper"])).status == "published"
+
+            withdrawn = await paper_release_service.withdraw_paper(db, teacher, ids["paper"])
+            paper = await db.get(ExamPaper, ids["paper"])
+            assert withdrawn == 1
+            assert (await db.get(PaperRelease, release.id)).status == "withdrawn"
+            assert paper.status == "draft"
+            assert paper.published_at is None
+            assert paper.withdrawn_at is not None
+            assert paper.published_version == release.version
+
+            # 重复撤回：没有 active 版本时不改投影
+            assert await paper_release_service.withdraw_paper(db, teacher, ids["paper"]) == 0
+            assert (await db.get(ExamPaper, ids["paper"])).revision == paper.revision
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(_cleanup(ids))
+
+
+def test_reconcile_withdrawn_projections_repairs_legacy_unpublish_drift() -> None:
+    ids = _ids()
+    asyncio.run(_seed(ids))
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            teacher = await db.get(User, ids["teacher"])
+            release = await paper_release_service.publish(
+                db, teacher, ids["paper"], expected_revision=1,
+                access_level="free", enabled_modes=["practice_mode"],
+                allowed_roles=["student"], metadata={},
+            )
+            # 模拟旧版撤回：只下架 release，不回写试卷投影
+            release.status = "withdrawn"
+            release.withdrawn_at = now_utc()
+            release.withdrawn_by = teacher.username
+            await db.commit()
+
+            repaired = await paper_release_service.reconcile_withdrawn_projections(db)
+            paper = await db.get(ExamPaper, ids["paper"])
+            assert repaired == 1
+            assert paper.status == "draft"
+            assert paper.published_at is None
+            assert paper.withdrawn_at is not None
+
+            # 已一致的试卷不会被重复改写
+            assert await paper_release_service.reconcile_withdrawn_projections(db) == 0
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(_cleanup(ids))
+
+
+def test_rename_paper_updates_active_release_name_but_not_history() -> None:
+    ids = _ids()
+    asyncio.run(_seed(ids))
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            teacher = await db.get(User, ids["teacher"])
+            release = await paper_release_service.publish(
+                db, teacher, ids["paper"], expected_revision=1,
+                access_level="free", enabled_modes=["practice_mode"],
+                allowed_roles=["student"], metadata={},
+            )
+            from app.schemas.paper import PaperUpdateRequest
+            from app.services import paper_service
+            renamed = await paper_service.update_paper(
+                db, teacher, ids["paper"],
+                PaperUpdateRequest(revision=2, name="修改后的试卷名称"),
+            )
+            active = await db.get(PaperRelease, release.id)
+            assert renamed["name"] == "修改后的试卷名称"
+            assert active.name == "修改后的试卷名称"
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(_cleanup(ids))
+
+
 def test_publish_preserves_callers_pending_transaction_work() -> None:
     ids = _ids()
     asyncio.run(_seed(ids))

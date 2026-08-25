@@ -27,6 +27,10 @@ bump_version() {
   printf '%s' "${v%.*}.$n" > "$version_file"
 }
 
+build_content_prep() {
+  python3 "$REPO_DIR/new-legacy/content-prep-studio/build.py" >/dev/null
+}
+
 echo "[0/8] 服务器磁盘预检（剩余 < ${MIN_FREE_GB}GB 则中止）"
 free_kb=$(ssh "$REMOTE" "df -P / | awk 'NR==2 {print \$4}'")
 free_gb=$((free_kb / 1024 / 1024))
@@ -37,6 +41,7 @@ if [ "$free_gb" -lt "$MIN_FREE_GB" ]; then
 fi
 
 echo "[1/8] 本地构建 new-legacy 产物（前端页面 + 引导课程 seed）"
+build_content_prep
 cd "$REPO_DIR/frontend"
 node scripts/sync-new-legacy.js
 node scripts/export-guided-course.mjs
@@ -56,7 +61,9 @@ for _ in 1 2 3; do
     old="$(cat "$version_file")"
     bump_version || { echo "✗ 版本号递增失败" >&2; exit 1; }
     echo "      版本号冲突：$old -> $(cat "$version_file")，重新生成产物"
+    build_content_prep || exit 1
     node scripts/sync-new-legacy.js || exit 1
+    node scripts/export-guided-course.mjs || exit 1
   else
     cat /tmp/kg-uat-release.log
     echo "✗ release 打包或自动验收失败，候选包不会 promote" >&2

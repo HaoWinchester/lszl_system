@@ -30,6 +30,7 @@ from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.teaching_content import ContentSubject, ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode
 from app.services.engagement_migration import MAPPERS as ENGAGEMENT_MAPPERS, expected_canonical as engagement_expected_canonical
+from app.services import paper_service
 PUBLISHED_PAPERS_KEY = "kg_exam_papers_published_v1"
 TEACHING_RECALL_PREFIX = "kg_recall_association_library_v1__subject__"
 
@@ -243,6 +244,11 @@ async def _paper_release_mapper(db: AsyncSession, item: RuntimeMigrationItem) ->
     for raw, source in zip(item.source_payload, canonical, strict=True):
         release_id = source["releaseId"]
         existing = await db.get(PaperRelease, release_id)
+        if existing is None:
+            existing = await db.scalar(select(PaperRelease).where(
+                PaperRelease.paper_id == source["paperId"],
+                PaperRelease.version == source["version"],
+            ))
         if existing is not None:
             # The relational domain owns an existing release.  A compatibility
             # snapshot may be stale after a legitimate rename, so only newly
@@ -279,6 +285,15 @@ async def _paper_release_mapper(db: AsyncSession, item: RuntimeMigrationItem) ->
                 ))
             await db.flush()
             created_sources.append(source)
+        if existing.status == "published":
+            await paper_service.sync_published_projection(
+                db,
+                paper_id=existing.paper_id,
+                release_id=existing.id,
+                version=existing.version,
+                published_at=existing.published_at,
+                updated_by=existing.publisher_id,
+            )
         result.append(await _read_one_paper_release_canonical(db, existing))
     item.expected_count = len(created_sources)
     item.expected_hash = canonical_json_hash(created_sources)

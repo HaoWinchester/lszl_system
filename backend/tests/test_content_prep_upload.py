@@ -559,7 +559,7 @@ def test_transactional_upload_create_skip_update_idempotency_and_single_save(
         global_arrival = Barrier(2)
         original_global_lock = teaching_content_revision_service.acquire_lock
         original_idempotency_lock = (
-            content_prep_api.content_prep_service._lock_idempotency_key
+            content_prep_api.content_prep_service.idempotency_service.lock
         )
 
         async def ordered_global_lock(db) -> None:
@@ -580,8 +580,8 @@ def test_transactional_upload_create_skip_update_idempotency_and_single_save(
             ordered_global_lock,
         )
         monkeypatch.setattr(
-            content_prep_api.content_prep_service,
-            "_lock_idempotency_key",
+            content_prep_api.content_prep_service.idempotency_service,
+            "lock",
             checked_idempotency_lock,
         )
 

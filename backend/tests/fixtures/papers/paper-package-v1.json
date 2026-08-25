@@ -1,0 +1,74 @@
+{
+  "schema": "kg-paper-package-v1",
+  "schemaVersion": 1,
+  "producer": {
+    "name": "Paper Studio",
+    "version": "1.2.0"
+  },
+  "programCompatibility": {
+    "targetMainVersion": "V9.0-P4.5.29",
+    "paperContract": "paper-management-normalized-v1"
+  },
+  "exportedAt": "2026-08-23T12:18:18.213Z",
+  "paper": {
+    "id": "fixture-paper-external-04",
+    "name": "PMP 模拟卷 04",
+    "subject": "PMP",
+    "description": "三题导入契约夹具",
+    "categoryId": "missing-category-source",
+    "totalCount": 3,
+    "status": "published",
+    "quotas": {
+      "people": 2,
+      "process": 1
+    },
+    "accessPolicy": {
+      "accessLevel": "member"
+    },
+    "enabledModes": [
+      "practice_mode",
+      "deep_recall"
+    ],
+    "modeConfigVersion": 2,
+    "purpose": "learning",
+    "createdAt": 1700000000000,
+    "updatedAt": 1700001000000,
+    "publishedAt": 1700002000000,
+    "questions": [
+      {
+        "bankId": "fixture-bank-source-a",
+        "questionId": "fixture-question-source-1",
+        "order": 1,
+        "score": 1
+      },
+      {
+        "bankId": "fixture-bank-source-b",
+        "questionId": "fixture-question-source-2",
+        "order": 2,
+        "score": 2.5
+      },
+      {
+        "bankId": "fixture-bank-source-a",
+        "questionId": "fixture-question-source-3",
+        "order": 3,
+        "score": 1
+      }
+    ]
+  },
+  "sourceBanks": [
+    {
+      "id": "fixture-bank-source-a",
+      "name": "夹具题库 A",
+      "subject": "PMP",
+      "version": "1.0",
+      "questionCount": 2
+    },
+    {
+      "id": "fixture-bank-source-b",
+      "name": "夹具题库 B",
+      "subject": "PMP",
+      "version": "1.0",
+      "questionCount": 1
+    }
+  ]
+}

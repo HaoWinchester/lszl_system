@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections import Counter
 import hashlib
 import json
+import math
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -14,6 +14,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.paper import PaperCategory
+from app.models.paper_release import PaperRelease
 from app.models.question import DRAFT, ExamPaper, PaperQuestion, PUBLISHED, Question, QuestionBank
 from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
@@ -30,6 +32,8 @@ PRIVATE_BANK_PREFIX = "kg_question_banks_v1__"
 PUBLISHED_BANK_KEY = "kg_question_banks_published_v1"
 PAPER_DRAFT_PREFIX = "kg_exam_papers_v1__"
 PAPER_SHARED_DRAFT_KEY = "kg_exam_papers_v1__teacher_shared"
+PAPER_CATEGORY_PREFIX = "kg_exam_paper_categories_v1__"
+PAPER_SHARED_CATEGORY_KEY = "kg_exam_paper_categories_v1__teacher_shared"
 PUBLISHED_PAPERS_KEY = "kg_exam_papers_published_v1"
 PAPER_RELEASE_HISTORY_KEY = "kg_exam_paper_release_history_v1"
 SOURCE_PRIORITY = {"relational": 0, "runtimeState": 1, "sharedPublished": 2}
@@ -59,7 +63,13 @@ class PaperMigrationReport(BaseModel):
     snapshot_hash: str = Field(alias="snapshotHash")
     source_counts: dict[str, dict[str, int]] = Field(alias="sourceCounts")
     paper_count: int = Field(alias="paperCount")
+    category_count: int = Field(alias="categoryCount")
+    referenced_category_count: int = Field(alias="referencedCategoryCount")
+    missing_category_count: int = Field(alias="missingCategoryCount")
     referenced_question_count: int = Field(alias="referencedQuestionCount")
+    bank_validated_reference_count: int = Field(alias="bankValidatedReferenceCount")
+    reference_score_count: int = Field(alias="referenceScoreCount")
+    field_counts: dict[str, int] = Field(alias="fieldCounts")
     missing_question_count: int = Field(alias="missingQuestionCount")
     questions_with_missing_refs: int = Field(alias="questionsWithMissingRefs")
     missing_question_ids: list[str] = Field(alias="missingQuestionIds")
@@ -114,11 +124,22 @@ class _PaperCandidate:
     name: str
     subject: str
     description: str | None
+    category_id: str | None
     total_count: int
     status: str
     quotas: dict
+    access_policy: dict
+    enabled_modes: list[str]
+    mode_config_version: int
+    purpose: str
     revision: int
     published_at: str | None
+    archived_at: str | None
+    restored_at: str | None
+    withdrawn_at: str | None
+    published_release_id: str | None
+    published_version: int
+    field_presence: frozenset[str]
     source: str
     source_rank: int
 
@@ -128,11 +149,28 @@ class _PaperQuestionCandidate:
     paper_id: str
     question_id: str
     order_index: int
+    bank_id: str | None
+    score: float
+    score_present: bool
+
+
+@dataclass
+class _PaperCategoryCandidate:
+    id: str
+    owner_id: str
+    name: str
+    description: str | None
+    order_index: int
+    revision: int
+    archived_at: str | None
+    source: str
+    source_rank: int
 
 
 @dataclass
 class _PaperSnapshot:
     report: PaperMigrationReport
+    categories: dict[str, _PaperCategoryCandidate]
     papers: dict[str, _PaperCandidate]
     paper_questions: dict[str, list[_PaperQuestionCandidate]]
 
@@ -597,6 +635,18 @@ def _decode_owner(value: object, *, fallback: str | None = None) -> str | None:
 
 
 def _parse_published_at(value: object) -> datetime | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        timestamp = float(value)
+        if not math.isfinite(timestamp) or timestamp <= 0:
+            return None
+        if timestamp > 10_000_000_000:
+            timestamp /= 1000
+        try:
+            return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        except (OverflowError, OSError, ValueError):
+            return None
     if isinstance(value, str):
         try:
             return datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -627,8 +677,20 @@ def _normalize_quotas(value: object) -> dict:
     return normalized
 
 
-def _paper_questions(payload: object) -> list[tuple[str, int]]:
-    questions: list[tuple[str, int]] = []
+def _paper_score(value: object) -> float:
+    if isinstance(value, bool) or value is None:
+        return 1.0
+    try:
+        score = float(value)
+    except (TypeError, ValueError):
+        return 1.0
+    if not math.isfinite(score) or score < 0 or score > 1_000_000:
+        return 1.0
+    return score
+
+
+def _paper_questions(payload: object) -> list[_PaperQuestionCandidate]:
+    questions: list[_PaperQuestionCandidate] = []
     for index, entry in enumerate(payload if isinstance(payload, list) else []):
         question_id = _canonical_question_id(entry)
         if not question_id:
@@ -641,37 +703,142 @@ def _paper_questions(payload: object) -> list[tuple[str, int]]:
             else index,
             index,
         )
-        questions.append((question_id, order))
+        questions.append(
+            _PaperQuestionCandidate(
+                paper_id="",
+                question_id=question_id,
+                order_index=order,
+                bank_id=(
+                    _first_text(
+                        str(entry.get("bankId") or ""),
+                        str(entry.get("sourceBankId") or ""),
+                    )
+                    if isinstance(entry, Mapping)
+                    else None
+                )
+                or None,
+                score=_paper_score(entry.get("score") if isinstance(entry, Mapping) else None),
+                score_present=isinstance(entry, Mapping) and "score" in entry,
+            )
+        )
     if not questions:
         for index, raw in enumerate(payload if isinstance(payload, list) else []):
             if isinstance(raw, str):
                 question_id = raw.strip()
                 if question_id and len(question_id) <= 64:
-                    questions.append((question_id, index))
+                    questions.append(
+                        _PaperQuestionCandidate("", question_id, index, None, 1.0, False)
+                    )
     return questions
 
 
 def _merge_question_refs(
     target: list[_PaperQuestionCandidate],
-    source: list[tuple[str, int]],
-) -> None:
+    source: list[_PaperQuestionCandidate],
+) -> list[_PaperQuestionCandidate]:
     seen: set[str] = {item.question_id for item in target}
-    for question_id, order in source:
-        if question_id in seen:
+    for item in source:
+        if item.question_id in seen:
             continue
-        target.append(_PaperQuestionCandidate("", question_id, order))
-        seen.add(question_id)
+        target.append(item)
+        seen.add(item.question_id)
+    return target
 
 
-def _reorder_questions(records: list[tuple[str, int]], *, by_index: bool = True) -> list[_PaperQuestionCandidate]:
+def _reorder_questions(
+    records: list[_PaperQuestionCandidate],
+    *,
+    paper_id: str = "",
+    by_index: bool = True,
+) -> list[_PaperQuestionCandidate]:
     if by_index:
-        records = sorted(records, key=lambda item: (item[1], item[0]))
+        records = sorted(records, key=lambda item: (item.order_index, item.question_id))
     else:
-        records = sorted(records, key=lambda item: item[0])
+        records = sorted(records, key=lambda item: item.question_id)
     normalized: list[_PaperQuestionCandidate] = []
-    for position, (question_id, _) in enumerate(records):
-        normalized.append(_PaperQuestionCandidate("", question_id, position))
+    for position, item in enumerate(records):
+        normalized.append(
+            _PaperQuestionCandidate(
+                paper_id,
+                item.question_id,
+                position,
+                item.bank_id,
+                item.score,
+                item.score_present,
+            )
+        )
     return normalized
+
+
+def _collect_category_payload(
+    raw_value: object,
+    *,
+    source: str,
+    owner_id: str | None,
+    key: str,
+    category_records: list[tuple[str, str | None, dict[str, Any], str]],
+    source_counts: dict[str, dict[str, int]],
+    invalid_records: list[dict[str, Any]],
+    raw_snapshot: list[dict[str, Any]],
+) -> None:
+    try:
+        decoded = _decode_json(raw_value)
+        if not isinstance(decoded, list):
+            raise ValueError("paper category payload is not a list")
+    except (TypeError, ValueError, json.JSONDecodeError) as error:
+        invalid_records.append(
+            {
+                "source": source,
+                "code": "INVALID_JSON",
+                "message": str(error),
+                "ownerId": owner_id,
+                "key": key,
+            }
+        )
+        raw_snapshot.append(
+            {
+                "source": source,
+                "ownerId": owner_id,
+                "key": key,
+                "invalidValue": str(raw_value),
+            }
+        )
+        return
+    for raw_category in decoded:
+        if not isinstance(raw_category, dict):
+            invalid_records.append(
+                {
+                    "source": source,
+                    "code": "INVALID_PAPER_CATEGORY_RECORD",
+                    "message": "试卷分类记录必须是对象",
+                    "ownerId": owner_id,
+                    "key": key,
+                }
+            )
+            continue
+        category_id = str(raw_category.get("id") or "").strip()
+        if not category_id or len(category_id) > 64:
+            invalid_records.append(
+                {
+                    "source": source,
+                    "code": "PAPER_CATEGORY_ID_INVALID",
+                    "message": "试卷分类 ID 为空或超过 64 字符",
+                    "ownerId": owner_id,
+                    "key": key,
+                }
+            )
+            continue
+        category_records.append((source, owner_id, raw_category, key))
+        source_counts[source]["categories"] += 1
+        raw_snapshot.append(
+            {
+                "source": source,
+                "ownerId": owner_id,
+                "key": key,
+                "categoryId": category_id,
+                "revision": _to_int(raw_category.get("revision"), 1),
+            }
+        )
 
 
 async def _collect_paper_sources(
@@ -681,18 +848,20 @@ async def _collect_paper_sources(
     paper_ids: set[str] | None,
 ) -> tuple[
     list[tuple[str, str | None, dict[str, Any], str]],
+    list[tuple[str, str | None, dict[str, Any], str]],
     dict[str, dict[str, int]],
     list[dict[str, Any]],
     str,
     list[dict[str, Any]],
 ]:
     records: list[tuple[str, str | None, dict[str, Any], str]] = []
+    category_records: list[tuple[str, str | None, dict[str, Any], str]] = []
     source_counts = {
-        "relational": {"papers": 0, "questions": 0},
-        "sharedDraft": {"papers": 0, "questions": 0},
-        "runtimeState": {"papers": 0, "questions": 0},
-        "sharedPublished": {"papers": 0, "questions": 0},
-        "sharedReleaseHistory": {"papers": 0, "questions": 0},
+        "relational": {"papers": 0, "categories": 0, "questions": 0},
+        "sharedDraft": {"papers": 0, "categories": 0, "questions": 0},
+        "runtimeState": {"papers": 0, "categories": 0, "questions": 0},
+        "sharedPublished": {"papers": 0, "categories": 0, "questions": 0},
+        "sharedReleaseHistory": {"papers": 0, "categories": 0, "questions": 0},
     }
     invalid_records: list[dict[str, Any]] = []
     raw_snapshot: list[dict[str, Any]] = []
@@ -704,10 +873,54 @@ async def _collect_paper_sources(
             .order_by(PaperQuestion.paper_id, PaperQuestion.order_index, PaperQuestion.question_id)
         )
     ).scalars().all()
-    links_by_paper: dict[str, list[tuple[str, int]]] = {}
+    question_bank_by_id = {
+        str(question_id): str(bank_id)
+        for question_id, bank_id in (
+            await db.execute(select(Question.id, Question.bank_id))
+        ).all()
+    }
+    links_by_paper: dict[str, list[_PaperQuestionCandidate]] = {}
     for link in all_links:
         links_by_paper.setdefault(str(link.paper_id), []).append(
-            (str(link.question_id), int(link.order_index))
+            _PaperQuestionCandidate(
+                str(link.paper_id),
+                str(link.question_id),
+                int(link.order_index),
+                question_bank_by_id.get(str(link.question_id)),
+                float(link.score),
+                True,
+            )
+        )
+
+    category_query = select(PaperCategory).order_by(PaperCategory.id)
+    if owner_ids is not None:
+        category_query = category_query.where(PaperCategory.owner_id.in_(owner_ids))
+    for category in (await db.execute(category_query)).scalars().all():
+        category_records.append(
+            (
+                "relational",
+                str(category.owner_id),
+                {
+                    "id": str(category.id),
+                    "name": category.name,
+                    "description": category.description,
+                    "orderIndex": int(category.order_index or 0),
+                    "revision": int(category.revision or 1),
+                    "archivedAt": category.archived_at.isoformat()
+                    if category.archived_at
+                    else None,
+                },
+                "relational",
+            )
+        )
+        source_counts["relational"]["categories"] += 1
+        raw_snapshot.append(
+            {
+                "source": "relational",
+                "ownerId": str(category.owner_id),
+                "categoryId": str(category.id),
+                "revision": int(category.revision or 1),
+            }
         )
 
     for paper in paper_rows:
@@ -725,14 +938,29 @@ async def _collect_paper_sources(
                     "name": paper.name,
                     "subject": paper.subject,
                     "description": paper.description,
+                    "categoryId": paper.category_id,
                     "status": paper.status,
                     "totalCount": int(paper.total_count or 0),
                     "quotas": paper.quotas or {},
+                    "accessPolicy": paper.access_policy or {},
+                    "enabledModes": paper.enabled_modes or [],
+                    "modeConfigVersion": int(paper.mode_config_version or 2),
+                    "purpose": paper.purpose,
                     "revision": int(paper.revision or 0),
                     "publishedAt": paper.published_at.isoformat() if paper.published_at else None,
+                    "archivedAt": paper.archived_at.isoformat() if paper.archived_at else None,
+                    "restoredAt": paper.restored_at.isoformat() if paper.restored_at else None,
+                    "withdrawnAt": paper.withdrawn_at.isoformat() if paper.withdrawn_at else None,
+                    "publishedReleaseId": paper.published_release_id,
+                    "publishedVersion": int(paper.published_version or 0),
                     "questions": [
-                        {"questionId": question_id, "order": order}
-                        for question_id, order in links_by_paper.get(paper_id, [])
+                        {
+                            "bankId": item.bank_id,
+                            "questionId": item.question_id,
+                            "order": item.order_index,
+                            "score": item.score,
+                        }
+                        for item in links_by_paper.get(paper_id, [])
                     ],
                 },
                 "relational",
@@ -745,6 +973,7 @@ async def _collect_paper_sources(
                 "source": "relational",
                 "ownerId": str(paper.owner_id),
                 "paperId": paper_id,
+                "revision": int(paper.revision or 1),
             }
         )
 
@@ -755,6 +984,25 @@ async def _collect_paper_sources(
     for runtime in runtime_rows:
         for key, raw_value in sorted((runtime.storage or {}).items()):
             key_text = str(key)
+            if key_text == PAPER_SHARED_CATEGORY_KEY or key_text.startswith(
+                PAPER_CATEGORY_PREFIX
+            ):
+                category_source = (
+                    "sharedDraft"
+                    if key_text == PAPER_SHARED_CATEGORY_KEY
+                    else "runtimeState"
+                )
+                _collect_category_payload(
+                    raw_value,
+                    source=category_source,
+                    owner_id=runtime.owner_id,
+                    key=key_text,
+                    category_records=category_records,
+                    source_counts=source_counts,
+                    invalid_records=invalid_records,
+                    raw_snapshot=raw_snapshot,
+                )
+                continue
             if key_text != PAPER_SHARED_DRAFT_KEY and not key_text.startswith(PAPER_DRAFT_PREFIX):
                 continue
             try:
@@ -914,6 +1162,19 @@ async def _collect_paper_sources(
                     }
                 )
 
+    category_shared = await db.get(SharedRuntimeState, PAPER_SHARED_CATEGORY_KEY)
+    if category_shared is not None:
+        _collect_category_payload(
+            category_shared.value,
+            source="sharedDraft",
+            owner_id=category_shared.updated_by,
+            key=PAPER_SHARED_CATEGORY_KEY,
+            category_records=category_records,
+            source_counts=source_counts,
+            invalid_records=invalid_records,
+            raw_snapshot=raw_snapshot,
+        )
+
     for source, key in (("sharedPublished", PUBLISHED_PAPERS_KEY), ("sharedReleaseHistory", PAPER_RELEASE_HISTORY_KEY)):
         row = await db.get(SharedRuntimeState, key)
         if row is None:
@@ -1005,7 +1266,14 @@ async def _collect_paper_sources(
     )
     snapshot_hash = hashlib.sha256(raw_json.encode("utf-8")).hexdigest()
 
-    return records, source_counts, invalid_records, snapshot_hash, raw_snapshot
+    return (
+        records,
+        category_records,
+        source_counts,
+        invalid_records,
+        snapshot_hash,
+        raw_snapshot,
+    )
 
 
 async def _build_paper_snapshot(
@@ -1016,16 +1284,83 @@ async def _build_paper_snapshot(
 ) -> _PaperSnapshot:
     started_monotonic = time.monotonic()
     started_at = _utc_iso()
-    records, source_counts, invalid_records, snapshot_hash, raw_snapshot = await _collect_paper_sources(
-        db,
-        owner_ids=owner_ids,
-        paper_ids=paper_ids,
-    )
+    (
+        records,
+        category_records,
+        source_counts,
+        invalid_records,
+        snapshot_hash,
+        _raw_snapshot,
+    ) = await _collect_paper_sources(db, owner_ids=owner_ids, paper_ids=paper_ids)
+    categories: dict[str, _PaperCategoryCandidate] = {}
     papers: dict[str, _PaperCandidate] = {}
     paper_questions: dict[str, list[_PaperQuestionCandidate]] = {}
     conflicts: list[dict[str, Any]] = []
 
     valid_usernames = set((await db.execute(select(User.username))).scalars().all())
+
+    for source, owner_id, raw, _raw_key in category_records:
+        owner = _first_text(owner_id or "")
+        category_id = str(raw.get("id") or "").strip()
+        if owner_ids is not None and owner not in owner_ids:
+            continue
+        if not owner or owner not in valid_usernames:
+            conflicts.append(
+                {
+                    "code": (
+                        "PAPER_CATEGORY_OWNER_MISSING"
+                        if not owner
+                        else "PAPER_CATEGORY_OWNER_NOT_FOUND"
+                    ),
+                    "categoryId": category_id,
+                    "ownerId": owner or None,
+                    "source": source,
+                    "message": "试卷分类 owner 无法解析或不存在",
+                }
+            )
+            continue
+        parsed_archived_at = _parse_published_at(raw.get("archivedAt"))
+        category_candidate = _PaperCategoryCandidate(
+            id=category_id,
+            owner_id=owner,
+            name=_first_text(str(raw.get("name") or ""), category_id)[:200],
+            description=str(raw.get("description")) if raw.get("description") else None,
+            order_index=_to_int(raw.get("orderIndex"), 0),
+            revision=max(1, _to_int(raw.get("revision"), 1)),
+            archived_at=parsed_archived_at.isoformat() if parsed_archived_at else None,
+            source=source,
+            source_rank=PAPER_SOURCE_PRIORITY.get(source, 99),
+        )
+        existing_category = categories.get(category_id)
+        if existing_category is None:
+            categories[category_id] = category_candidate
+            continue
+        if existing_category.owner_id != owner:
+            conflicts.append(
+                {
+                    "code": "PAPER_CATEGORY_OWNER_CONFLICT",
+                    "categoryId": category_id,
+                    "owners": sorted({existing_category.owner_id, owner}),
+                    "message": "同一试卷分类 ID 存在不同 owner",
+                }
+            )
+            continue
+        if (category_candidate.source_rank, -category_candidate.revision) < (
+            existing_category.source_rank,
+            -existing_category.revision,
+        ):
+            categories[category_id] = category_candidate
+
+    tracked_fields = {
+        "categoryId",
+        "accessPolicy",
+        "enabledModes",
+        "purpose",
+        "archivedAt",
+        "restoredAt",
+        "withdrawnAt",
+        "publishedVersion",
+    }
     for source, owner_id, raw, _raw_key in records:
         owner = _first_text(owner_id or "")
         source_rank = PAPER_SOURCE_PRIORITY.get(source, 99)
@@ -1080,9 +1415,17 @@ async def _build_paper_snapshot(
         else:
             question_refs = _paper_questions(raw.get("questions") if isinstance(raw, Mapping) else [])
 
-        if paper_ids is None:
-            if "questionCount" in raw and isinstance(raw, Mapping):
-                total_count = max(total_count, _to_int(raw.get("questionCount"), fallback=0))
+        if paper_ids is None and "questionCount" in raw:
+            total_count = max(total_count, _to_int(raw.get("questionCount"), fallback=0))
+        published_at = _parse_published_at(raw.get("publishedAt"))
+        archived_at = _parse_published_at(raw.get("archivedAt"))
+        restored_at = _parse_published_at(raw.get("restoredAt"))
+        withdrawn_at = _parse_published_at(raw.get("withdrawnAt"))
+        enabled_modes = (
+            [str(mode) for mode in raw.get("enabledModes", []) if str(mode).strip()]
+            if isinstance(raw.get("enabledModes"), list)
+            else []
+        )
         candidate = _PaperCandidate(
             id=paper_id,
             owner_id=owner,
@@ -1094,13 +1437,26 @@ async def _build_paper_snapshot(
             ),
             subject=_first_text(str(raw.get("subject") if isinstance(raw, Mapping) else ""), "PMP"),
             description=str(raw.get("description") or None) if isinstance(raw, Mapping) else None,
+            category_id=_first_text(str(raw.get("categoryId") or "")) or None,
             total_count=max(total_count, len(question_refs)),
             status=_normalize_status(raw.get("status") if isinstance(raw, Mapping) else None),
             quotas=_normalize_quotas(raw.get("quotas") if isinstance(raw, Mapping) else {}),
+            access_policy=(
+                dict(raw.get("accessPolicy"))
+                if isinstance(raw.get("accessPolicy"), Mapping)
+                else {}
+            ),
+            enabled_modes=enabled_modes,
+            mode_config_version=max(1, _to_int(raw.get("modeConfigVersion"), 2)),
+            purpose=_first_text(str(raw.get("purpose") or ""), "learning")[:32],
             revision=max(1, _to_int(raw.get("revision"), fallback=1)),
-            published_at=_parse_published_at(raw.get("publishedAt") if isinstance(raw, Mapping) else None).isoformat()
-            if isinstance(raw, Mapping) and raw.get("publishedAt")
-            else None,
+            published_at=published_at.isoformat() if published_at else None,
+            archived_at=archived_at.isoformat() if archived_at else None,
+            restored_at=restored_at.isoformat() if restored_at else None,
+            withdrawn_at=withdrawn_at.isoformat() if withdrawn_at else None,
+            published_release_id=_first_text(str(raw.get("publishedReleaseId") or "")) or None,
+            published_version=_to_int(raw.get("publishedVersion"), 0),
+            field_presence=frozenset(key for key in tracked_fields if key in raw),
             source=source,
             source_rank=source_rank,
         )
@@ -1108,10 +1464,9 @@ async def _build_paper_snapshot(
         existing = papers.get(paper_id)
         if existing is None:
             papers[paper_id] = candidate
-            paper_questions[paper_id] = _reorder_questions(question_refs)
-            if paper_questions[paper_id]:
-                for index, item in enumerate(paper_questions[paper_id]):
-                    paper_questions[paper_id][index] = _PaperQuestionCandidate(paper_id, item.question_id, index)
+            paper_questions[paper_id] = _reorder_questions(
+                question_refs, paper_id=paper_id
+            )
             continue
 
         if existing.owner_id != owner:
@@ -1125,60 +1480,191 @@ async def _build_paper_snapshot(
             )
             continue
 
-        if source_rank > existing.source_rank:
+        if (source_rank, -candidate.revision) > (
+            existing.source_rank,
+            -existing.revision,
+        ):
             continue
-        if source_rank < existing.source_rank:
+        if (source_rank, -candidate.revision) < (
+            existing.source_rank,
+            -existing.revision,
+        ):
             papers[paper_id] = candidate
-            paper_questions[paper_id] = _reorder_questions(question_refs)
-            if paper_questions[paper_id]:
-                for index, item in enumerate(paper_questions[paper_id]):
-                    paper_questions[paper_id][index] = _PaperQuestionCandidate(
-                        paper_id, item.question_id, index
-                    )
+            paper_questions[paper_id] = _reorder_questions(
+                question_refs, paper_id=paper_id
+            )
             continue
 
         existing.total_count = max(existing.total_count, candidate.total_count)
-        existing.revision = max(existing.revision, candidate.revision)
         existing.status = candidate.status if candidate.status == PUBLISHED else existing.status
         existing.description = existing.description or candidate.description
         if not existing.quotas and candidate.quotas:
             existing.quotas = candidate.quotas
         merged = _merge_question_refs(paper_questions[paper_id], question_refs)
-        paper_questions[paper_id] = merged
-        if merged:
-            for index, item in enumerate(merged):
-                paper_questions[paper_id][index] = _PaperQuestionCandidate(
-                    paper_id,
-                    item.question_id,
-                    index,
-                )
+        paper_questions[paper_id] = _reorder_questions(merged, paper_id=paper_id)
 
-    all_refs: list[str] = [
-        item.question_id
-        for items in paper_questions.values()
-        for item in items
-    ]
+    all_question_refs = [item for items in paper_questions.values() for item in items]
+    all_refs = [item.question_id for item in all_question_refs]
     distinct_refs = sorted(set(all_refs))
-    existing_questions = set(
-        await db.execute(
-            select(Question.id).where(Question.id.in_(distinct_refs))
-        )
-        .scalars()
-        .all()
-    ) if distinct_refs else set()
+    question_rows = (
+        (
+            await db.execute(
+                select(Question.id, Question.bank_id).where(Question.id.in_(distinct_refs))
+            )
+        ).all()
+        if distinct_refs
+        else []
+    )
+    existing_questions = {
+        str(question_id): str(bank_id) for question_id, bank_id in question_rows
+    }
     missing_question_ids = [question_id for question_id in distinct_refs if question_id not in existing_questions]
+    for question_id in missing_question_ids:
+        conflicts.append(
+            {
+                "code": "PAPER_QUESTION_NOT_FOUND",
+                "questionId": question_id,
+                "message": "试卷引用的题目不存在，迁移未写入",
+            }
+        )
+    bank_validated_reference_count = 0
+    for item in all_question_refs:
+        actual_bank_id = existing_questions.get(item.question_id)
+        if not actual_bank_id or not item.bank_id:
+            continue
+        if actual_bank_id == item.bank_id:
+            bank_validated_reference_count += 1
+        else:
+            conflicts.append(
+                {
+                    "code": "PAPER_QUESTION_BANK_MISMATCH",
+                    "paperId": item.paper_id,
+                    "questionId": item.question_id,
+                    "bankId": item.bank_id,
+                    "actualBankId": actual_bank_id,
+                    "message": "试卷题目引用的题库与关系表不一致",
+                }
+            )
     questions_with_missing_refs = sum(
         1
         for items in paper_questions.values()
         if any(item.question_id in set(missing_question_ids) for item in items)
     )
+    referenced_category_ids = {
+        candidate.category_id for candidate in papers.values() if candidate.category_id
+    }
+    missing_category_ids = sorted(referenced_category_ids - set(categories))
+    for category_id in missing_category_ids:
+        conflicts.append(
+            {
+                "code": "PAPER_CATEGORY_NOT_FOUND",
+                "categoryId": category_id,
+                "message": "试卷引用的分类不存在，迁移未写入",
+            }
+        )
+
+    release_ids = {
+        candidate.published_release_id
+        for candidate in papers.values()
+        if candidate.published_release_id
+    }
+    existing_release_ids = (
+        set(
+            (
+                await db.execute(
+                    select(PaperRelease.id).where(PaperRelease.id.in_(release_ids))
+                )
+            ).scalars().all()
+        )
+        if release_ids
+        else set()
+    )
+    for release_id in sorted(release_ids - existing_release_ids):
+        conflicts.append(
+            {
+                "code": "PAPER_RELEASE_NOT_FOUND",
+                "releaseId": release_id,
+                "message": "试卷引用的发布版本不存在，迁移未写入",
+            }
+        )
+
+    field_counts = {
+        field: sum(field in candidate.field_presence for candidate in papers.values())
+        for field in sorted(tracked_fields)
+    }
+    normalized_snapshot = {
+        "sourceHash": snapshot_hash,
+        "categories": [
+            {
+                "id": candidate.id,
+                "ownerId": candidate.owner_id,
+                "name": candidate.name,
+                "description": candidate.description,
+                "orderIndex": candidate.order_index,
+                "revision": candidate.revision,
+                "archivedAt": candidate.archived_at,
+                "source": candidate.source,
+            }
+            for candidate in sorted(categories.values(), key=lambda item: item.id)
+        ],
+        "papers": [
+            {
+                "id": candidate.id,
+                "ownerId": candidate.owner_id,
+                "name": candidate.name,
+                "subject": candidate.subject,
+                "description": candidate.description,
+                "categoryId": candidate.category_id,
+                "totalCount": candidate.total_count,
+                "status": candidate.status,
+                "quotas": candidate.quotas,
+                "accessPolicy": candidate.access_policy,
+                "enabledModes": candidate.enabled_modes,
+                "modeConfigVersion": candidate.mode_config_version,
+                "purpose": candidate.purpose,
+                "revision": candidate.revision,
+                "publishedAt": candidate.published_at,
+                "archivedAt": candidate.archived_at,
+                "restoredAt": candidate.restored_at,
+                "withdrawnAt": candidate.withdrawn_at,
+                "publishedReleaseId": candidate.published_release_id,
+                "publishedVersion": candidate.published_version,
+                "questions": [
+                    {
+                        "bankId": reference.bank_id,
+                        "questionId": reference.question_id,
+                        "orderIndex": reference.order_index,
+                        "score": reference.score,
+                        "scorePresent": reference.score_present,
+                    }
+                    for reference in paper_questions.get(candidate.id, [])
+                ],
+                "source": candidate.source,
+            }
+            for candidate in sorted(papers.values(), key=lambda item: item.id)
+        ],
+    }
+    snapshot_hash = hashlib.sha256(
+        json.dumps(
+            normalized_snapshot,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
 
     completed_at = _utc_iso()
     report = PaperMigrationReport(
         snapshotHash=snapshot_hash,
         sourceCounts=source_counts,
         paperCount=len(papers),
+        categoryCount=len(categories),
+        referencedCategoryCount=len(referenced_category_ids),
+        missingCategoryCount=len(missing_category_ids),
         referencedQuestionCount=len(all_refs),
+        bankValidatedReferenceCount=bank_validated_reference_count,
+        referenceScoreCount=sum(item.score_present for item in all_question_refs),
+        fieldCounts=field_counts,
         missingQuestionCount=len(missing_question_ids),
         questionsWithMissingRefs=questions_with_missing_refs,
         missingQuestionIds=missing_question_ids,
@@ -1190,7 +1676,12 @@ async def _build_paper_snapshot(
         durationMs=max(0, int((time.monotonic() - started_monotonic) * 1000)),
     )
 
-    return _PaperSnapshot(report=report, papers=papers, paper_questions=paper_questions)
+    return _PaperSnapshot(
+        report=report,
+        categories=categories,
+        papers=papers,
+        paper_questions=paper_questions,
+    )
 
 
 def _paper_mutation_state(paper: ExamPaper) -> tuple[Any, ...]:
@@ -1199,42 +1690,88 @@ def _paper_mutation_state(paper: ExamPaper) -> tuple[Any, ...]:
         paper.name,
         paper.subject,
         paper.description,
+        paper.category_id,
         paper.total_count,
         paper.status,
         paper.revision,
         paper.quotas,
+        paper.access_policy,
+        paper.enabled_modes,
+        paper.mode_config_version,
+        paper.purpose,
         paper.published_at,
+        paper.archived_at,
+        paper.restored_at,
+        paper.withdrawn_at,
+        paper.published_release_id,
+        paper.published_version,
+    )
+
+
+def _paper_category_mutation_state(category: PaperCategory) -> tuple[Any, ...]:
+    return (
+        category.owner_id,
+        category.name,
+        category.description,
+        category.order_index,
+        category.revision,
+        category.archived_at,
     )
 
 
 async def _apply_paper_snapshot(
     db: AsyncSession,
-    actor: User,
+    actor_username: str,
     snapshot: _PaperSnapshot,
 ) -> list[dict[str, str]]:
     changes: list[dict[str, str]] = []
-    all_question_ids = {
-        question.question_id
-        for questions in snapshot.paper_questions.values()
-        for question in questions
-    }
-    question_domains = {}
-    if all_question_ids:
-        question_domains = {
-            str(question_id): str(question.domain or "")
-            for question_id, question in (
-                await db.execute(
-                    select(Question.id, Question.domain).where(
-                        Question.id.in_(sorted(all_question_ids))
-                    )
+
+    for category_id, candidate in sorted(snapshot.categories.items()):
+        category = await db.get(PaperCategory, category_id)
+        archived_at = _parse_published_at(candidate.archived_at)
+        if category is None:
+            db.add(
+                PaperCategory(
+                    id=category_id,
+                    owner_id=candidate.owner_id,
+                    name=candidate.name,
+                    description=candidate.description,
+                    order_index=candidate.order_index,
+                    revision=candidate.revision,
+                    archived_at=archived_at,
+                    created_by=actor_username,
+                    updated_by=actor_username,
                 )
-            ).all()
-        }
+            )
+            changes.append(
+                {
+                    "entityType": "paperCategory",
+                    "entityId": category_id,
+                    "action": "created",
+                }
+            )
+            continue
+        previous_category = _paper_category_mutation_state(category)
+        category.owner_id = candidate.owner_id
+        category.name = candidate.name
+        category.description = candidate.description
+        category.order_index = candidate.order_index
+        category.revision = candidate.revision
+        category.archived_at = archived_at
+        if _paper_category_mutation_state(category) != previous_category:
+            category.updated_by = actor_username
+            changes.append(
+                {
+                    "entityType": "paperCategory",
+                    "entityId": category_id,
+                    "action": "updated",
+                }
+            )
+    await db.flush()
 
     for paper_id, candidate in sorted(snapshot.papers.items(), key=lambda item: item[0]):
         paper = await db.get(ExamPaper, paper_id)
         question_refs = snapshot.paper_questions.get(paper_id, [])
-        valid_question_refs = [q for q in question_refs if q.question_id in question_domains]
         if paper is None:
             paper = ExamPaper(
                 id=paper_id,
@@ -1242,40 +1779,50 @@ async def _apply_paper_snapshot(
                 name=candidate.name,
                 subject=candidate.subject,
                 description=candidate.description,
+                category_id=candidate.category_id,
                 total_count=int(candidate.total_count),
                 status=candidate.status,
                 quotas=(candidate.quotas or {}),
+                access_policy=candidate.access_policy,
+                enabled_modes=candidate.enabled_modes,
+                mode_config_version=candidate.mode_config_version,
+                purpose=candidate.purpose,
                 revision=max(1, candidate.revision),
-                published_at=(_parse_published_at(candidate.published_at) if candidate.published_at else None),
-                created_by=actor.username,
-                updated_by=actor.username,
+                published_at=_parse_published_at(candidate.published_at),
+                archived_at=_parse_published_at(candidate.archived_at),
+                restored_at=_parse_published_at(candidate.restored_at),
+                withdrawn_at=_parse_published_at(candidate.withdrawn_at),
+                published_release_id=candidate.published_release_id,
+                published_version=candidate.published_version,
+                created_by=actor_username,
+                updated_by=actor_username,
             )
             db.add(paper)
-            if valid_question_refs:
-                quotas = Counter(
-                    domain
-                    for question_id in valid_question_refs
-                    for domain in [question_domains.get(question_id, "")]
-                    if domain
-                )
-                paper.total_count = len(valid_question_refs)
-                paper.quotas = dict(sorted(quotas.items()))
             await db.flush()
             changes.append({"entityType": "paper", "entityId": paper_id, "action": "created"})
         else:
             previous = _paper_mutation_state(paper)
-            paper.owner_id = paper.owner_id or candidate.owner_id
+            paper.owner_id = candidate.owner_id
             paper.name = candidate.name
             paper.subject = candidate.subject
             paper.description = candidate.description
+            paper.category_id = candidate.category_id
             paper.total_count = candidate.total_count
-            if candidate.status in {PUBLISHED, DRAFT}:
-                paper.status = candidate.status
-            paper.quotas = candidate.quotas or paper.quotas
-            paper.revision = max(int(paper.revision or 1), candidate.revision)
-            paper.updated_by = actor.username
-            paper.published_at = _parse_published_at(candidate.published_at) if candidate.published_at else paper.published_at
+            paper.status = candidate.status
+            paper.quotas = candidate.quotas
+            paper.access_policy = candidate.access_policy
+            paper.enabled_modes = candidate.enabled_modes
+            paper.mode_config_version = candidate.mode_config_version
+            paper.purpose = candidate.purpose
+            paper.revision = candidate.revision
+            paper.published_at = _parse_published_at(candidate.published_at)
+            paper.archived_at = _parse_published_at(candidate.archived_at)
+            paper.restored_at = _parse_published_at(candidate.restored_at)
+            paper.withdrawn_at = _parse_published_at(candidate.withdrawn_at)
+            paper.published_release_id = candidate.published_release_id
+            paper.published_version = candidate.published_version
             if _paper_mutation_state(paper) != previous:
+                paper.updated_by = actor_username
                 changes.append(
                     {"entityType": "paper", "entityId": paper_id, "action": "updated"}
                 )
@@ -1287,27 +1834,25 @@ async def _apply_paper_snapshot(
                 .order_by(PaperQuestion.order_index)
             )
         ).scalars().all()
-        current_question_ids = [str(question.question_id) for question in paper_questions]
-        desired_question_ids = [ref.question_id for ref in valid_question_refs]
-        if current_question_ids != desired_question_ids:
+        current_references = [
+            (str(question.question_id), int(question.order_index), float(question.score))
+            for question in paper_questions
+        ]
+        desired_references = [
+            (reference.question_id, index, reference.score)
+            for index, reference in enumerate(question_refs)
+        ]
+        if current_references != desired_references:
             await db.execute(delete(PaperQuestion).where(PaperQuestion.paper_id == paper_id))
-            for index, question_id in enumerate(desired_question_ids):
+            for question_id, order_index, score in desired_references:
                 db.add(
                     PaperQuestion(
                         paper_id=paper_id,
                         question_id=question_id,
-                        order_index=index,
+                        order_index=order_index,
+                        score=score,
                     )
                 )
-            paper.total_count = len(desired_question_ids)
-            if not candidate.quotas:
-                quotas = Counter(
-                    domain
-                    for qid in desired_question_ids
-                    for domain in [question_domains.get(qid, "")]
-                    if domain
-                )
-                paper.quotas = dict(sorted(quotas.items()))
             changes.append(
                 {
                     "entityType": "paper",
@@ -1338,6 +1883,7 @@ async def migrate_runtime_papers(
 ) -> PaperMigrationReport:
     if not apply:
         return (await _build_paper_snapshot(db, owner_ids=owner_ids, paper_ids=paper_ids)).report
+    actor_username = actor.username
     if db.in_transaction():
         await db.rollback()
     async with db.begin():
@@ -1345,11 +1891,15 @@ async def migrate_runtime_papers(
         snapshot = await _build_paper_snapshot(db, owner_ids=owner_ids, paper_ids=paper_ids)
         if snapshot.report.conflicts or snapshot.report.invalid_records:
             return snapshot.report
-        changes = await _apply_paper_snapshot(db, actor=actor, snapshot=snapshot)
+        changes = await _apply_paper_snapshot(
+            db,
+            actor_username=actor_username,
+            snapshot=snapshot,
+        )
         if changes:
             await teaching_content_revision_service.bump(
                 db,
-                actor.username,
+                actor_username,
                 changes,
             )
         snapshot.report.applied = True

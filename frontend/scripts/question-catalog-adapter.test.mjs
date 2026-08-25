@@ -16,10 +16,13 @@ function response(status, payload) {
   return { ok: status >= 200 && status < 300, status, async json() { return payload } }
 }
 
-function loadAdapter({ mode = 'learning', fetchImpl }) {
+function loadAdapter({ mode = 'learning', paperManagement = false, fetchImpl, teachingContentSync = null }) {
   const events = []
   const document = {
-    body: { dataset: { questionCatalogMode: mode } },
+    body: { dataset: {
+      questionCatalogMode: mode,
+      paperManagementPage: paperManagement ? 'true' : 'false',
+    } },
     dispatchEvent(event) { events.push(event) },
   }
   class CustomEvent {
@@ -30,31 +33,123 @@ function loadAdapter({ mode = 'learning', fetchImpl }) {
     fetch: fetchImpl,
     crypto: { randomUUID: () => 'client-instance-1' },
     dispatchEvent(event) { events.push(event) },
+    addEventListener() {},
+    clearTimeout,
+    setTimeout,
+    KGTeachingContentSync: teachingContentSync,
   }
   const context = vm.createContext({ window, document, fetch: fetchImpl, CustomEvent, URLSearchParams, JSON, Date, console })
   vm.runInContext(readFileSync(adapterPath, 'utf8'), context, { filename: adapterPath })
   return { adapter: window.KGQuestionCatalogAdapter, events }
 }
 
-test('managed and learning pages bootstrap the right in-memory catalog with cookies', async () => {
-  for (const mode of ['managed', 'learning']) {
+test('managed remote catalog refresh stays summary-only and invalidates bank pages', async () => {
+  const calls = []
+  let revision = 1
+  let receiveRemoteRevision = null
+  const { adapter } = loadAdapter({
+    mode: 'managed',
+    paperManagement: true,
+    teachingContentSync: {
+      subscribe(handler) {
+        receiveRemoteRevision = handler
+        return () => {}
+      },
+    },
+    fetchImpl: async url => {
+      calls.push(url)
+      if (url.includes(`/banks/bank-1/questions`)) {
+        return response(200, {
+          questions: [{ id: `q-${revision}`, bankId: 'bank-1', title: `Question ${revision}` }],
+          total: 1,
+          page: 1,
+          pageSize: 12,
+        })
+      }
+      return response(200, {
+        banks: [{ id: 'bank-1' }],
+        questions: [],
+        catalogRevision: String(revision).repeat(64),
+        contentRevision: revision,
+      })
+    },
+  })
+
+  await adapter.ready
+  assert.equal(calls[0], '/api/v1/question-catalog/bootstrap?mode=managed')
+  assert.equal(typeof adapter.loadBankQuestionPage, 'function')
+  assert.equal((await adapter.loadBankQuestionPage('bank-1', { pageSize: 12 })).questions[0].id, 'q-1')
+
+  revision = 2
+  await receiveRemoteRevision({ revision })
+
+  assert.equal(adapter.snapshot().questions.length, 0)
+  assert.equal((await adapter.loadBankQuestionPage('bank-1', { pageSize: 12 })).questions[0].id, 'q-2')
+  assert.equal(calls.some(url => url.includes('include_questions=true')), false)
+})
+
+test('page mode selects summary-only or full managed bootstrap with cookies', async () => {
+  const cases = [
+    { mode: 'managed', paperManagement: true, expectedUrl: '/api/v1/question-catalog/bootstrap?mode=managed' },
+    { mode: 'managed', paperManagement: false, expectedUrl: '/api/v1/question-catalog/bootstrap?mode=managed&include_questions=true' },
+    { mode: 'learning', paperManagement: false, expectedUrl: '/api/v1/question-catalog/bootstrap?mode=learning' },
+  ]
+  for (const { mode, paperManagement, expectedUrl } of cases) {
     const calls = []
     const { adapter } = loadAdapter({
       mode,
+      paperManagement,
       fetchImpl: async (url, options = {}) => {
         calls.push({ url, options })
         return response(200, { banks: [{ id: `${mode}-bank` }], questions: [], catalogRevision: 'a'.repeat(64) })
       },
     })
     await adapter.ready
-    // managed 页面引导时顺带拉全量题目，learning 页面只拉题库索引
-    const expectedUrl = mode === 'managed'
-      ? `/api/v1/question-catalog/bootstrap?mode=managed&include_questions=true`
-      : `/api/v1/question-catalog/bootstrap?mode=learning`
     assert.equal(calls[0].url, expectedUrl)
     assert.equal(calls[0].options.credentials, 'include')
     assert.equal(adapter.banks()[0].id, `${mode}-bank`)
   }
+})
+
+test('bank question pages and single questions are cached by exact request', async () => {
+  const calls = []
+  const { adapter } = loadAdapter({
+    mode: 'managed',
+    paperManagement: true,
+    fetchImpl: async url => {
+      calls.push(url)
+      if (url.includes('/banks/bank-1/questions')) {
+        return response(200, {
+          questions: [{ id: 'q-risk', bankId: 'bank-1', title: '风险题' }],
+          total: 1,
+          page: 1,
+          pageSize: 12,
+        })
+      }
+      if (url.includes('/questions/q-detail')) {
+        return response(200, { question: { id: 'q-detail', bankId: 'bank-1', analysis: '完整解析' } })
+      }
+      return response(200, {
+        banks: [{ id: 'bank-1' }], questions: [], catalogRevision: 'f'.repeat(64), contentRevision: 4,
+      })
+    },
+  })
+
+  await adapter.ready
+  assert.equal(typeof adapter.loadBankQuestionPage, 'function')
+  const options = { page: 1, pageSize: 12, search: '风险' }
+  const [first, concurrent] = await Promise.all([
+    adapter.loadBankQuestionPage('bank-1', options),
+    adapter.loadBankQuestionPage('bank-1', options),
+  ])
+  const cached = await adapter.loadBankQuestionPage('bank-1', options)
+  assert.deepEqual(JSON.parse(JSON.stringify(concurrent)), JSON.parse(JSON.stringify(first)))
+  assert.deepEqual(JSON.parse(JSON.stringify(cached)), JSON.parse(JSON.stringify(first)))
+  assert.equal(calls.filter(url => url.includes('/banks/bank-1/questions')).length, 1)
+
+  await adapter.loadQuestion('q-detail')
+  await adapter.loadQuestion('q-detail')
+  assert.equal(calls.filter(url => url.includes('/questions/q-detail')).length, 1)
 })
 
 test('reload replaces the module snapshot and returned values cannot mutate it', async () => {

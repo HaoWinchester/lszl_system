@@ -40,7 +40,7 @@ async function loadAdapter({ importStatus = 200 } = {}) {
     setTimeout, clearTimeout,
     fetch: async (url, options = {}) => {
       calls.push({ url, options });
-      if (url === '/api/v1/question-catalog/bootstrap?mode=managed') {
+      if (url.startsWith('/api/v1/question-catalog/bootstrap?') && url.includes('mode=managed')) {
         bootstrapCount += 1;
         const afterImport = bootstrapCount > 1;
         return response(200, {
@@ -53,11 +53,11 @@ async function loadAdapter({ importStatus = 200 } = {}) {
       if (url === '/api/v1/banks/import') {
         return response(importStatus, importStatus === 200 ? imported : { detail: { message: '导入被拒绝' } });
       }
-      return response(404, { detail: { message: 'unexpected request' } });
+      return response(404, { detail: { message: `unexpected request: ${url}` } });
     },
   };
   class CustomEvent { constructor(type, options = {}) { this.type = type; this.detail = options.detail; } }
-  const context = vm.createContext({ window, CustomEvent, JSON, Date, Math, Promise, setTimeout, clearTimeout });
+  const context = vm.createContext({ window, CustomEvent, URLSearchParams, JSON, Date, Math, Promise, setTimeout, clearTimeout });
   vm.runInContext(adapterSource, context, { filename: 'question-catalog-adapter.js' });
   await window.KGQuestionCatalogAdapter.ready;
   return { adapter: window.KGQuestionCatalogAdapter, calls, events, published, imported };
@@ -75,7 +75,7 @@ test('catalog adapter posts an import and refreshes only after the server commit
   assert.deepEqual(result.sourceBankIdMap, fixture.imported.sourceBankIdMap);
   const importCall = fixture.calls.find(call => call.url === '/api/v1/banks/import');
   assert.equal(importCall.options.method, 'POST');
-  assert.deepEqual(JSON.parse(importCall.options.body), { banks: [sourceBank], confirmReplace: false });
+  assert.deepEqual(JSON.parse(importCall.options.body), { banks: [sourceBank], confirmReplace: false, confirmDuplicateCleanup: false });
   assert.equal(fixture.adapter.snapshot().banks[0].id, 'b-server-a');
   assert.equal(fixture.published.at(-1).revision, 4);
   assert.ok(fixture.events.some(event => event.type === 'kg:question-catalog-changed'));

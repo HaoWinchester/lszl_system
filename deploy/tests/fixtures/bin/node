@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ "${UAT_TEST_SCENARIO:-}" == "version-bump" ]]; then
+  repo_dir="$(cd .. && pwd)"
+  version="$(cat "$repo_dir/new-legacy/VERSION")"
+  if [[ "${1:-}" == "scripts/sync-new-legacy.js" ]]; then
+    echo "sync $version" >> "${UAT_TEST_CALL_LOG:?}"
+    exit 0
+  fi
+  if [[ "${1:-}" == "scripts/export-guided-course.mjs" ]]; then
+    echo "export $version" >> "${UAT_TEST_CALL_LOG:?}"
+    exit 0
+  fi
+  if [[ "${1:-}" == "scripts/manage-new-legacy.js" && "${2:-}" == "update" ]]; then
+    if [[ ! -e "${UAT_TEST_STATE:?}" ]]; then
+      touch "$UAT_TEST_STATE"
+      echo "相同版本号"
+      exit 1
+    fi
+    echo "update $version" >> "${UAT_TEST_CALL_LOG:?}"
+    exit 0
+  fi
+fi
 if [[ "${1:-}" == "scripts/manage-new-legacy.js" && "${2:-}" == "update" ]]; then
   echo "自动验收失败：fixture"
   exit 1

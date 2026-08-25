@@ -348,6 +348,92 @@ def test_teacher_can_manage_another_teachers_bank() -> None:
         asyncio.run(cleanup())
 
 
+def test_bank_question_search_filters_before_pagination() -> None:
+    """Catch client-side filtering that paginates the unfiltered question set."""
+
+    suffix = uuid4().hex[:10]
+    teacher_name = f"catalog-search-teacher-{suffix}"
+    bank_id = f"catalog-search-bank-{suffix}"
+    question_ids = [f"catalog-search-question-{suffix}-{index}" for index in range(3)]
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                User(
+                    username=teacher_name,
+                    password_hash=hash_password(PASSWORD),
+                    role="teacher",
+                    status="active",
+                )
+            )
+            await db.flush()
+            db.add(
+                QuestionBank(
+                    id=bank_id,
+                    owner_id=teacher_name,
+                    name="分页搜索题库",
+                    subject="PMP",
+                )
+            )
+            await db.flush()
+            db.add_all(
+                [
+                    Question(
+                        id=question_ids[0],
+                        bank_id=bank_id,
+                        title="风险应对一",
+                        domain="过程",
+                        topic="风险",
+                        tags=["规划"],
+                        scope="internal",
+                    ),
+                    Question(
+                        id=question_ids[1],
+                        bank_id=bank_id,
+                        title="风险应对二",
+                        domain="过程",
+                        topic="执行",
+                        tags=["风险"],
+                        scope="internal",
+                    ),
+                    Question(
+                        id=question_ids[2],
+                        bank_id=bank_id,
+                        title="团队建设",
+                        domain="人员",
+                        topic="团队",
+                        tags=["沟通"],
+                        scope="internal",
+                    ),
+                ]
+            )
+            await db.commit()
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(Question).where(Question.bank_id == bank_id))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.execute(delete(User).where(User.username == teacher_name))
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as client:
+            _login(client, teacher_name)
+            response = client.get(
+                f"/api/v1/question-catalog/banks/{bank_id}/questions",
+                params={"search": "风险", "page": 2, "page_size": 1},
+            )
+
+        assert response.status_code == 200
+        assert response.json()["total"] == 2
+        assert [row["title"] for row in response.json()["questions"]] == [
+            "风险应对二"
+        ]
+    finally:
+        asyncio.run(cleanup())
+
+
 def test_teacher_can_update_and_delete_another_teachers_bank_content() -> None:
     """Catch regressions where shared listing works but cross-teacher writes do not."""
 
