@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import asyncio
 import json
 import re
 
@@ -354,3 +355,63 @@ def test_guest_html_bootstrap_has_no_inline_storage() -> None:
 
     assert payload["authenticated"] is False
     assert payload.get("storage") is None
+
+
+def test_runtime_full_snapshot_excludes_published_paper_bulk_keys() -> None:
+    """发布大键不得随 full 快照下发（2026-08-25 生产 TTFB 13~20s 事故）。
+
+    两个大键（生产 2.5MB+）在每次快照读取时整包拉取 + 脱敏解析会占满
+    单 worker 事件循环；已发布内容的读取边界是 /api/v1/paper-releases
+    细粒度 API，runtime 快照（含 full 模式）一律不携带。
+    """
+    from app.services import runtime_state_service as service
+    from sqlalchemy import select
+
+    async def seed_shared_bulk_keys() -> None:
+        from app.models.shared_runtime_state import SharedRuntimeState
+
+        async with AsyncSessionLocal() as db:
+            for key in service.RUNTIME_SNAPSHOT_EXCLUDED_KEYS:
+                row = await db.get(SharedRuntimeState, key)
+                if row is None:
+                    db.add(SharedRuntimeState(
+                        key=key,
+                        value=json.dumps([{"id": "paper-bulk", "name": "bulk"}]),
+                        updated_by="admin",
+                    ))
+                else:
+                    row.value = json.dumps([{"id": "paper-bulk", "name": "bulk"}])
+            await db.commit()
+
+    asyncio.run(seed_shared_bulk_keys())
+    try:
+        with TestClient(app) as client:
+            login = client.post(
+                "/api/v1/auth/login",
+                json={
+                    "username": "admin",
+                    "password": "jbgsnmm~123",
+                    "acceptedTermsVersion": "2026-08-13-v1",
+                },
+            )
+            assert login.status_code == 200
+            snapshot = client.get("/api/v1/runtime/state?mode=full").json()
+
+        storage = snapshot["storage"]
+        for key in service.RUNTIME_SNAPSHOT_EXCLUDED_KEYS:
+            assert key not in storage
+    finally:
+        async def cleanup_shared_bulk_keys() -> None:
+            from app.models.shared_runtime_state import SharedRuntimeState
+
+            async with AsyncSessionLocal() as db:
+                rows = (await db.execute(
+                    select(SharedRuntimeState).where(
+                        SharedRuntimeState.key.in_(service.RUNTIME_SNAPSHOT_EXCLUDED_KEYS)
+                    )
+                )).scalars().all()
+                for row in rows:
+                    await db.delete(row)
+                await db.commit()
+
+        asyncio.run(cleanup_shared_bulk_keys())

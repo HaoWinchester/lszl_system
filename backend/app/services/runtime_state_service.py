@@ -232,6 +232,15 @@ SHARED_KEYS = frozenset({
     "kg_admin_settings_v1",
 })
 
+# 发布大键不再随 runtime 快照下发（含 full 模式）：P4.6 后所有页面的已发布
+# 内容读取已切换到 /api/v1/paper-releases 细粒度 API，bootstrap 亦已剔除；
+# 这两个键在生产已增长到 2.5MB+，继续在每次快照读取时整包拉取 + 脱敏解析
+# 会占满单 worker 的事件循环（2026-08-25 生产页面 13~20s TTFB 事故）。
+RUNTIME_SNAPSHOT_EXCLUDED_KEYS = frozenset({
+    "kg_exam_papers_published_v1",
+    "kg_exam_paper_release_history_v1",
+})
+
 TEACHING_MANAGER_ROLES = frozenset({"admin", "teacher"})
 TEACHER_SHARED_EXACT_KEYS = frozenset({
     "kg_course_config_drafts_v1",
@@ -1172,7 +1181,12 @@ async def _read_state_snapshot_locked(
     revision = row.revision if row else 0
     # 合并 v9 全局共享键（published 类）：所有用户读同一份，教师发布 → 学员可读。
     aliases = teacher_shared_aliases(owner, role)
-    result = await db.execute(select(SharedRuntimeState.key, SharedRuntimeState.value))
+    # 发布大键在 SQL 层排除，避免每次快照读取都从库中整包传输（见键集合注释）。
+    result = await db.execute(
+        select(SharedRuntimeState.key, SharedRuntimeState.value).where(
+            SharedRuntimeState.key.not_in(RUNTIME_SNAPSHOT_EXCLUDED_KEYS)
+        )
+    )
     for key, value in result:
         if key in SHARED_KEYS and shared_key_readable(key, role):
             storage[key] = visible_shared_value(
