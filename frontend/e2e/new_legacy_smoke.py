@@ -107,18 +107,19 @@ with sync_playwright() as playwright:
         page.locator("#authModal").wait_for(state="hidden")
         assert "佩奇007" in page.locator("#authStatus").inner_text()
 
-        print("smoke: PostgreSQL state survives a full reload", flush=True)
-        # v9 把默认入口开关从 #glDefaultMode checkbox 重构为菜单；这里直接走 server-backed
-        # localStorage 验证同一份持久化语义，避免绑定易变的开关 DOM。
-        state_key = "kg_default_entry_mode_v1"
-        original = page.evaluate("k => localStorage.getItem(k)", state_key)
-        next_value = "free" if original != "free" else "guided"
-        with page.expect_response(lambda response: response.url.endswith("/api/v1/runtime/state") and response.request.method == "PUT"):
-            page.evaluate("({k, v}) => localStorage.setItem(k, v)", {"k": state_key, "v": next_value})
+        print("smoke: learner login survives reload without runtime state", flush=True)
+        practice_runtime_requests: list[str] = []
+
+        def record_practice_runtime_request(request) -> None:
+            if "/api/v1/runtime" in request.url:
+                practice_runtime_requests.append(f"{request.method} {request.url}")
+
+        page.on("request", record_practice_runtime_request)
         page.reload(wait_until="networkidle")
-        assert page.evaluate("k => localStorage.getItem(k)", state_key) == next_value
-        with page.expect_response(lambda response: response.url.endswith("/api/v1/runtime/state") and response.request.method == "PUT"):
-            page.evaluate("({k, v}) => localStorage.setItem(k, v)", {"k": state_key, "v": original or ""})
+        page.wait_for_function("window.__KG_DIRECT_BOOTSTRAP__?.authenticated === true")
+        assert "佩奇007" in page.locator("#authStatus").inner_text()
+        page.remove_listener("request", record_practice_runtime_request)
+        assert not practice_runtime_requests, practice_runtime_requests
 
         print("smoke: admin page reads and writes real backend users", flush=True)
         page.goto(BASE + "/users", wait_until="networkidle")
@@ -163,7 +164,6 @@ with sync_playwright() as playwright:
             ("/users", ".um-app"),
             ("/settings", ".ss-app"),
             ("/content-prep", "#prepApp"),
-            ("/learning/placement-test", ".glp-main"),
         ]
         for route, selector in routes:
             # 教学内容与状态同步会持续轮询；稳定页面以 DOM + 根容器
@@ -177,15 +177,13 @@ with sync_playwright() as playwright:
                 timeout=15_000,
             )
 
-        # placement-test 在无活动流程时可以自动导航。关闭旧 page 并在同一已登录
-        # context 新建 page，隔离它尚未触发的延迟导航，避免与下一条 smoke 路由争抢 frame。
-        previous_page = page
-        page = context.new_page()
-        bind_page_observers(page)
-        previous_page.close()
-        page.goto(BASE + "/learning/node?node=awareness-keywords", wait_until="domcontentloaded")
-        page.locator(".gln-main").wait_for(state="visible")
-        assert page.locator("iframe").count() == 0
+        print("smoke: retired guided-learning aliases redirect to practice mode", flush=True)
+        for route in ["/learning/placement-test", "/learning/node?node=awareness-keywords"]:
+            page.goto(BASE + route, wait_until="networkidle")
+            assert page.url == BASE + "/practice-mode.html"
+            page.locator(".practice-app").wait_for(state="visible", timeout=15_000)
+            assert page.locator(".gln-main, .glp-main").count() == 0
+            assert page.locator("iframe").count() == 0
 
         print("smoke: non-admin receives the original permission-denied surface", flush=True)
         teacher_context = browser.new_context(viewport={"width": 1280, "height": 800})
@@ -211,9 +209,8 @@ with sync_playwright() as playwright:
         finally:
             student_context.close()
 
-        # learning/node can schedule a delayed route into its next activity.
-        # Use a fresh page for the final settings screenshot so that pending
-        # learning navigation cannot interrupt this independent smoke step.
+        # Use a fresh page for the final settings screenshot so the independent
+        # role checks above cannot leave transient UI state behind.
         previous_page = page
         page = context.new_page()
         bind_page_observers(page)

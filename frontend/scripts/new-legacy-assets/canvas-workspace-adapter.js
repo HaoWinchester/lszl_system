@@ -5,10 +5,12 @@
   if (!store) return
 
   const endpoint = '/api/v1/workspaces'
-  const knownIds = new Set()
+  const remoteIds = new Map()
+  const inFlight = new Map()
   const pending = new Map()
   const timers = new Map()
   let hydrating = true
+  let leaving = false
 
   async function request(method, path = '', body, options = {}) {
     const response = await fetch(endpoint + path, {
@@ -31,9 +33,25 @@
     return payload
   }
 
-  function bodyFor(workspace) {
+  function stableHash(value) {
+    let hash = 2166136261
+    for (const character of String(value || 'guest')) {
+      hash ^= character.charCodeAt(0)
+      hash = Math.imul(hash, 16777619)
+    }
+    return (hash >>> 0).toString(36)
+  }
+
+  function requestedRemoteId(workspace) {
+    const id = String(workspace?.id || '')
+    if (id !== 'pmp-pattern-workspace') return id
+    const username = String(global.__KG_DIRECT_BOOTSTRAP__?.username || global.KGAuthCore?.currentUsername?.() || 'guest')
+    return `${id}-${stableHash(username)}`
+  }
+
+  function bodyFor(workspace, remoteId) {
     return {
-      id: String(workspace.id),
+      id: String(remoteId || workspace.id),
       title: String(workspace.title || '未命名画布'),
       schemaVersion: Number(workspace.schemaVersion || 10),
       payload: workspace,
@@ -43,18 +61,19 @@
   async function persistWorkspace(workspace, options = {}) {
     const id = String(workspace?.id || '')
     if (!id) return null
-    const body = bodyFor(workspace)
-    if (knownIds.has(id)) {
-      return request('PUT', `/${encodeURIComponent(id)}`, body, options)
+    const remoteId = remoteIds.get(id) || requestedRemoteId(workspace)
+    const body = bodyFor(workspace, remoteId)
+    if (remoteIds.has(id)) {
+      return request('PUT', `/${encodeURIComponent(remoteId)}`, body, options)
     }
     try {
       const payload = await request('POST', '', body, options)
-      knownIds.add(id)
+      remoteIds.set(id, String(payload?.workspace?.id || remoteId))
       return payload
     } catch (error) {
-      if (error.status !== 400) throw error
-      const payload = await request('PUT', `/${encodeURIComponent(id)}`, body, options)
-      knownIds.add(id)
+      if (error.status !== 400 || !/工作区 ID 已存在/.test(String(error.message || ''))) throw error
+      const payload = await request('PUT', `/${encodeURIComponent(remoteId)}`, body, options)
+      remoteIds.set(id, remoteId)
       return payload
     }
   }
@@ -65,12 +84,17 @@
     const workspace = pending.get(id)
     pending.delete(id)
     if (!workspace) return null
+    const previous = inFlight.get(id) || Promise.resolve()
+    const operation = previous.catch(() => null).then(() => persistWorkspace(workspace, options))
+    inFlight.set(id, operation)
     try {
-      return await persistWorkspace(workspace, options)
+      return await operation
     } catch (error) {
       pending.set(id, workspace)
-      console.error('[CanvasWorkspaceAdapter] save failed:', error)
+      if (!options.silent && !leaving) console.error('[CanvasWorkspaceAdapter] save failed:', error)
       return null
+    } finally {
+      if (inFlight.get(id) === operation) inFlight.delete(id)
     }
   }
 
@@ -89,10 +113,13 @@
     clearTimeout(timers.get(id))
     timers.delete(id)
     pending.delete(id)
-    if (!knownIds.has(id)) return
+    const activeWrite = inFlight.get(id)
+    if (activeWrite) await activeWrite.catch(() => null)
+    const remoteId = remoteIds.get(id)
+    if (!remoteId) return
     try {
-      await request('DELETE', `/${encodeURIComponent(id)}`)
-      knownIds.delete(id)
+      await request('DELETE', `/${encodeURIComponent(remoteId)}`)
+      remoteIds.delete(id)
     } catch (error) {
       console.error('[CanvasWorkspaceAdapter] delete failed:', error)
     }
@@ -110,13 +137,18 @@
     try {
       const payload = await request('GET')
       const workspaces = Array.isArray(payload?.workspaces) ? payload.workspaces : []
-      workspaces.forEach(item => knownIds.add(String(item.id || '')))
-      if (workspaces.length) {
-        store.replaceAllFromServer?.(workspaces)
+      const clientWorkspaces = workspaces.map(item => {
+        const remoteId = String(item?.id || '')
+        const clientId = String(item?.payload?.id || remoteId)
+        if (clientId && remoteId) remoteIds.set(clientId, remoteId)
+        return { ...item, id: clientId }
+      })
+      if (clientWorkspaces.length) {
+        store.replaceAllFromServer?.(clientWorkspaces)
       } else {
         localBefore.forEach(workspace => enqueue(workspace, true))
       }
-      return workspaces
+      return clientWorkspaces
     } catch (error) {
       if (error.status !== 401) console.error('[CanvasWorkspaceAdapter] hydrate failed:', error)
       return []
@@ -127,8 +159,18 @@
 
   const ready = hydrate()
   async function flush(options = {}) {
-    return Promise.all([...pending.keys()].map(id => flushOne(id, options)))
+    const queuedWrites = [...pending.keys()].map(id => flushOne(id, options))
+    await Promise.all(queuedWrites)
+    return Promise.all([...inFlight.values()].map(write => write.catch(() => null)))
   }
-  global.addEventListener?.('pagehide', () => { void flush({ keepalive: true }); unsubscribe?.() })
+  // Browsers may cancel a keepalive write while the document is being discarded.
+  // The canonical store has already retained the pending workspace locally, so an
+  // unload cancellation is expected recovery state rather than a console error.
+  global.addEventListener?.('pagehide', () => {
+    leaving = true
+    void flush({ keepalive: true, silent: true })
+    unsubscribe?.()
+  })
+  global.addEventListener?.('pageshow', () => { leaving = false })
   global.KGCanvasWorkspaceAdapter = Object.freeze({ ready, flush, refresh: hydrate })
 })(window)

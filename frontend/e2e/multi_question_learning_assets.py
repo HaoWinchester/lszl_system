@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import time
 from pathlib import Path
@@ -258,7 +257,7 @@ def test_workflow(browser, username_a: str, username_b: str, release: dict, ques
         page.locator("#qwSynthesisContent").fill("工作区 A 创建的全局原则。")
         page.locator("#qwSaveSynthesisBtn").click()
         page.locator(f'.qw-synthesis-card:has-text("{title_a}")').wait_for(state="visible")
-        page.evaluate("()=>KGServerStateStorage.flush()")
+        page.evaluate("()=>KGCanvasWorkspaceAdapter.flush()")
         card = assert_ok(context_a.request.get(BASE + "/api/v1/learning/personal-cards"), "list cards A")["cards"][0]
         card_id = card["id"]
         page.reload(wait_until="networkidle")
@@ -345,9 +344,8 @@ def test_workflow(browser, username_a: str, username_b: str, release: dict, ques
         assert assert_ok(context_b.request.get(BASE + "/api/v1/learning/personal-cards"), "cards B")["cards"] == []
         assert assert_ok(context_b.request.get(BASE + "/api/v1/learning/practice/overview"), "mistakes B")["mistakes"] == []
         assert context_b.request.get(BASE + f"/api/v1/learning/personal-cards/{quote(card_id)}").status == 404
-        runtime_b = assert_ok(context_b.request.get(BASE + "/api/v1/runtime/state"), "runtime B")
-        assert workspace_a not in json.dumps(runtime_b.get("storage", {}), ensure_ascii=False)
-        assert card_id not in json.dumps(runtime_b.get("storage", {}), ensure_ascii=False)
+        workspaces_b = assert_ok(context_b.request.get(BASE + "/api/v1/workspaces"), "workspaces B")
+        assert workspace_a not in {item["id"] for item in workspaces_b["workspaces"]}
         assert context_b.request.post(BASE + f"/api/v1/learning/practice/mistakes/{quote(mistake['id'])}/revenge-answer", data={"correct": True, "selectedAnswer": "A"}).status == 404
 
         # Explicit 409 keeps edited text until reload; simulated 500 shows retry and UI remains usable.

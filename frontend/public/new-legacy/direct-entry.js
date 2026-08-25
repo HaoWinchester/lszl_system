@@ -11,28 +11,55 @@
 
   let role = cachedRoleFromAuth()
   let userLoading
+  let userRequestGeneration = 0
 
-  function requestCurrentUser() {
-    if (userLoading) return userLoading
-    userLoading = fetch('/api/v1/auth/me', {
+  function publishDirectAuth(user) {
+    const current = global.__KG_DIRECT_BOOTSTRAP__
+    if (!current || typeof current !== 'object') return
+    const authenticated = Boolean(user?.username)
+    Object.assign(current, {
+      authenticated,
+      username: authenticated ? String(user.username) : null,
+      authUser: authenticated ? user : null,
+    })
+    global.dispatchEvent(new CustomEvent('kg:bootstrap-ready', {
+      detail: { authenticated, username: authenticated ? String(user.username) : '' },
+    }))
+  }
+
+  function requestCurrentUser({ force = false } = {}) {
+    if (userLoading && !force) return userLoading
+    const generation = ++userRequestGeneration
+    const request = fetch('/api/v1/auth/me', {
       method: 'GET',
       credentials: 'include',
     })
       .then(async (response) => {
-        if (!response.ok) throw new Error('未登录')
+        if (response.status === 401) {
+          if (generation === userRequestGeneration) {
+            role = 'guest'
+            publishDirectAuth(null)
+          }
+          return {}
+        }
+        if (!response.ok) throw new Error('会话查询失败')
         const payload = await response.json().catch(() => ({}))
         const nextRole = String(payload?.user?.role || 'guest')
-        role = nextRole
+        if (generation === userRequestGeneration) {
+          role = nextRole
+          publishDirectAuth(payload?.user || null)
+        }
         return payload?.user || {}
       })
       .catch(() => {
-        role = cachedRoleFromAuth()
+        if (generation === userRequestGeneration) role = cachedRoleFromAuth()
         return {}
       })
       .finally(() => {
-        userLoading = null
+        if (userLoading === request) userLoading = null
       })
-    return userLoading
+    userLoading = request
+    return request
   }
 
   let resolveInitialLearningEntry
@@ -58,15 +85,17 @@
 
   global.addEventListener('kg:auth-session-changed', (event) => {
     if (event?.detail?.authenticated) {
-      requestCurrentUser().then(() => {
+      requestCurrentUser({ force: true }).then(() => {
         showLearningEntryChooser()
       })
+    } else {
+      requestCurrentUser({ force: true }).catch(() => {})
     }
   })
 
   global.addEventListener('kg-auth-session-change', (event) => {
     if (event?.detail?.provider !== 'remote') return
-    requestCurrentUser().catch(() => {
+    requestCurrentUser({ force: true }).catch(() => {
       role = cachedRoleFromAuth()
     })
   })

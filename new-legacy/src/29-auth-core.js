@@ -156,13 +156,25 @@
     try{
       const storage = AUTH_REMOTE_SESSION_STORAGE || globalThis.localStorage;
       const raw = storage?.getItem(AUTH_REMOTE_SESSION_KEY);
-      return raw ? JSON.parse(raw) : null;
+      if(raw)return JSON.parse(raw);
+      const bootstrap=globalThis.__KG_DIRECT_BOOTSTRAP__;
+      if(bootstrap?.authenticated===true&&bootstrap.authUser){
+        return {user:bootstrap.authUser,token:"",loginSessionId:serverLoginSessionId(bootstrap),issuedAt:Date.now()};
+      }
+      return null;
     }catch(e){return null}
   }
   function writeRemoteSession(session){
     try{
       if (session) AUTH_REMOTE_SESSION_STORAGE?.setItem(AUTH_REMOTE_SESSION_KEY, JSON.stringify(session));
       else AUTH_REMOTE_SESSION_STORAGE?.removeItem(AUTH_REMOTE_SESSION_KEY);
+      const bootstrap=globalThis.__KG_DIRECT_BOOTSTRAP__;
+      if(bootstrap&&typeof bootstrap==="object"){
+        const user=session?.user||null;
+        bootstrap.authenticated=!!user;
+        bootstrap.username=user?.username||null;
+        bootstrap.authUser=user;
+      }
       return true;
     }catch(e){return false}
   }

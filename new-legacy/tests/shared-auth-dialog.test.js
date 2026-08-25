@@ -7,7 +7,7 @@ const path=require('node:path');
 const root=path.resolve(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const targetPages=['index.html','practice-mode.html'];
-const standalonePages=['knowledge-recall.html','learning-path.html','question-workspace.html'];
+const standalonePages=['knowledge-recall.html','question-workspace.html'];
 
 for(const file of targetPages){
   const html=read(file);

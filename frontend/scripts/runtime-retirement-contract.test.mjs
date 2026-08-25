@@ -48,6 +48,10 @@ test('runtime pages are an explicit minimal allowlist', () => {
 })
 
 test('learner pages keep direct auth bootstrap without loading the legacy runtime', () => {
+  const directEntry = readRepo('frontend/scripts/new-legacy-assets/direct-entry.js')
+  assert.match(directEntry, /__KG_DIRECT_BOOTSTRAP__/)
+  assert.match(directEntry, /authenticated[,\s]/)
+  assert.match(directEntry, /authUser:/)
   for (const page of learnerPages) {
     const html = readGenerated(page)
     assert.match(html, /kg-direct-bootstrap-anchor/, `${page} must expose the direct bootstrap anchor`)
@@ -81,6 +85,13 @@ test('multi-question workspaces persist through the domain API adapter', () => {
   for (const method of ['GET', 'POST', 'PUT', 'DELETE']) assert.match(adapter, new RegExp(`['"]${method}['"]`))
   assert.match(adapter, /\/api\/v1\/workspaces/)
   assert.doesNotMatch(adapter, /\/api\/v1\/runtime/)
+  assert.match(adapter, /pmp-pattern-workspace/)
+  assert.match(adapter, /stableHash\(username\)/)
+  assert.match(adapter, /payload\?\.id\s*\|\|\s*remoteId/)
+  assert.match(adapter, /inFlight\.values\(\)/)
+  assert.match(adapter, /pagehide/)
+  assert.match(adapter, /leaving\s*=\s*true/)
+  assert.match(adapter, /keepalive:\s*true,\s*silent:\s*true/)
   assert.match(store, /replaceAllFromServer/)
   for (const page of ['file-manager.html', 'question-workspace.html']) {
     const html = readGenerated(page)
