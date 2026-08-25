@@ -82,6 +82,7 @@ echo "      当前发布版本：$VERSION"
 echo "[3/8] rsync 代码与 release 到 $REMOTE:$REMOTE_DIR"
 rsync -az --delete \
   --exclude '/.git' --exclude '/new-legacy' --exclude '/docs' \
+  --exclude '/backups' \
   --exclude '/.superpowers' --exclude '/.pytest_cache' --exclude '/.gitattributes' \
   --exclude 'node_modules' --exclude '.venv' --exclude '__pycache__' --exclude '*.pyc' \
   --exclude '.DS_Store' --exclude '._*' --exclude '/frontend/e2e' --exclude '/e2e' \
