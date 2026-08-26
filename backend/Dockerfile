@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir --index-url "$PIP_INDEX_URL" -r /app/backend/requ
 
 # 后端代码 + new-legacy 已构建产物（前端页面/静态资源）+ seed 课程数据
 COPY backend/ /app/backend/
-COPY frontend/new-legacy-releases/ /app/frontend/new-legacy-releases/
+COPY frontend/new-legacy-runtime/ /app/frontend/new-legacy-releases/
 COPY frontend/public/new-legacy/ /app/frontend/public/new-legacy/
 
 WORKDIR /app/backend

@@ -76,22 +76,22 @@ if [ "$updated" -ne 1 ]; then
 fi
 VERSION="$(cat "$version_file")"
 node scripts/manage-new-legacy.js promote "$VERSION"
+node scripts/prepare-new-legacy-runtime.js
 cd "$REPO_DIR"
 echo "      当前发布版本：$VERSION"
 
 echo "[3/9] rsync 代码与 release 到 $REMOTE:$REMOTE_DIR"
 rsync -az --delete \
   --exclude '/.git' --exclude '/new-legacy' --exclude '/docs' \
-  --exclude '/backups' \
+  --exclude '/frontend/new-legacy-releases' --exclude '/backups' \
+  --exclude '/测试数据' --exclude '/修改需求' --exclude '/转题目-json文档' --exclude '/内置数据' \
+  --exclude '/bug清单.docx' --exclude '/task-1-report.md' --exclude '/task-2-report.md' --exclude '/test-practice-mode.js' \
   --exclude '/.superpowers' --exclude '/.pytest_cache' --exclude '/.gitattributes' \
   --exclude 'node_modules' --exclude '.venv' --exclude '__pycache__' --exclude '*.pyc' \
   --exclude '.DS_Store' --exclude '._*' --exclude '/frontend/e2e' --exclude '/e2e' \
   --exclude '.env.prod' --exclude '/backend/.env' --exclude '.env.uat' \
   --exclude '/deploy' \
   "$REPO_DIR/" "$REMOTE:$REMOTE_DIR/"
-rsync -az "$REPO_DIR/frontend/new-legacy-releases/current.json" \
-  "$REPO_DIR/frontend/new-legacy-releases/$VERSION" \
-  "$REMOTE:$REMOTE_DIR/frontend/new-legacy-releases/"
 
 echo "[4/9] 重建 UAT 后端镜像并重启（alembic 迁移自动执行）"
 ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE up -d --build"

@@ -20,6 +20,10 @@ if [[ "${UAT_TEST_SCENARIO:-}" == "version-bump" ]]; then
     echo "update $version" >> "${UAT_TEST_CALL_LOG:?}"
     exit 0
   fi
+  if [[ "${1:-}" == "scripts/prepare-new-legacy-runtime.js" ]]; then
+    echo "runtime $version" >> "${UAT_TEST_CALL_LOG:?}"
+    exit 0
+  fi
 fi
 if [[ "${1:-}" == "scripts/manage-new-legacy.js" && "${2:-}" == "update" ]]; then
   echo "自动验收失败：fixture"
