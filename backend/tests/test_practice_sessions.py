@@ -1,6 +1,188 @@
 """Persistent, resumable practice session contracts."""
 
+import asyncio
+from uuid import uuid4
+
+from fastapi.testclient import TestClient
+from sqlalchemy import delete, select
+
+from app.core.security import hash_password, now_utc
+from app.db.session import AsyncSessionLocal
+from app.main import app
+from app.models.paper_release import PaperRelease, PaperReleaseQuestion
+from app.models.question import Question, QuestionBank
 from app.models.training import PracticeSession
+from app.models.user import User
+from app.services import question_catalog_service
+from app.services import practice_session_service
+
+
+PASSWORD = "practice-session-pass"
+
+
+def _practice_fixture_ids() -> dict[str, str]:
+    token = uuid4().hex[:10]
+    return {
+        "teacher": f"practice-session-teacher-{token}",
+        "student": f"practice-session-student-{token}",
+        "other_student": f"practice-session-other-{token}",
+        "bank": f"practice-session-bank-{token}",
+        "paper": f"practice-session-paper-{token}",
+        "release": f"practice-session-release-{token}",
+    }
+
+
+async def _seed_released_pmp_paper(ids: dict[str, str]) -> None:
+    async with AsyncSessionLocal() as db:
+        db.add_all(
+            [
+                User(
+                    username=ids["teacher"],
+                    password_hash=hash_password(PASSWORD),
+                    role="teacher",
+                    status="active",
+                ),
+                User(
+                    username=ids["student"],
+                    password_hash=hash_password(PASSWORD),
+                    role="student",
+                    status="active",
+                ),
+                User(
+                    username=ids["other_student"],
+                    password_hash=hash_password(PASSWORD),
+                    role="student",
+                    status="active",
+                ),
+            ]
+        )
+        await db.flush()
+        db.add(
+            QuestionBank(
+                id=ids["bank"],
+                source_id=f"source-{ids['bank']}",
+                owner_id=ids["teacher"],
+                name="PMP 会话题库",
+                subject="PMP",
+                visibility="published",
+                created_by=ids["teacher"],
+                updated_by=ids["teacher"],
+            )
+        )
+        await db.flush()
+        questions: list[Question] = []
+        domains = ["people"] * 25 + ["process"] * 30 + ["business-environment"] * 5
+        for index, domain in enumerate(domains):
+            question_id = f"practice-session-q-{ids['release'][-10:]}-{index:03d}"
+            question = Question(
+                id=question_id,
+                source_id=f"source-{question_id}",
+                bank_id=ids["bank"],
+                title=f"PMP 会话题目 {index + 1}",
+                subject="PMP",
+                scope="internal",
+                stem_parts=[{"text": f"题干 {index + 1}"}],
+                options=[
+                    {"id": "A", "text": "正确答案", "correct": True},
+                    {"id": "B", "text": "干扰项", "correct": False},
+                ],
+                correct_answer="A",
+                content_metadata={
+                    "subjectFacets": [
+                        {"dimensionId": "exam-domain", "valueId": domain}
+                    ]
+                },
+                created_by=ids["teacher"],
+                updated_by=ids["teacher"],
+            )
+            db.add(question)
+            questions.append(question)
+        await db.flush()
+        db.add(
+            PaperRelease(
+                id=ids["release"],
+                paper_id=ids["paper"],
+                version=1,
+                status="published",
+                name="PMP 会话模拟卷",
+                subject="PMP",
+                publisher_id=ids["teacher"],
+                access_level="free",
+                enabled_modes=["practice_mode"],
+                allowed_roles=["student"],
+                release_metadata={},
+                source_payload={},
+                question_count=len(questions),
+                published_at=now_utc(),
+            )
+        )
+        await db.flush()
+        for index, question in enumerate(questions):
+            db.add(
+                PaperReleaseQuestion(
+                    release_id=ids["release"],
+                    order_index=index,
+                    bank_id=ids["bank"],
+                    question_id=question.id,
+                    snapshot=question_catalog_service.question_to_payload(question),
+                )
+            )
+        await db.commit()
+
+
+async def _cleanup_released_pmp_paper(ids: dict[str, str]) -> None:
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            delete(PracticeSession).where(PracticeSession.release_id == ids["release"])
+        )
+        await db.execute(
+            delete(PaperReleaseQuestion).where(
+                PaperReleaseQuestion.release_id == ids["release"]
+            )
+        )
+        await db.execute(delete(PaperRelease).where(PaperRelease.id == ids["release"]))
+        await db.execute(delete(Question).where(Question.bank_id == ids["bank"]))
+        await db.execute(delete(QuestionBank).where(QuestionBank.id == ids["bank"]))
+        await db.execute(
+            delete(User).where(
+                User.username.in_(
+                    [ids["teacher"], ids["student"], ids["other_student"]]
+                )
+            )
+        )
+        await db.commit()
+
+
+async def _remove_business_environment_inventory(release_id: str) -> None:
+    async with AsyncSessionLocal() as db:
+        rows = (
+            await db.execute(
+                select(PaperReleaseQuestion).where(
+                    PaperReleaseQuestion.release_id == release_id
+                )
+            )
+        ).scalars().all()
+        for row in rows:
+            snapshot = dict(row.snapshot or {})
+            metadata = dict(snapshot.get("metadata") or {})
+            facets = [
+                dict(facet)
+                for facet in metadata.get("subjectFacets") or []
+                if isinstance(facet, dict)
+            ]
+            changed = False
+            for facet in facets:
+                if (
+                    facet.get("dimensionId") == "exam-domain"
+                    and facet.get("valueId") == "business-environment"
+                ):
+                    facet["valueId"] = "people"
+                    changed = True
+            if changed:
+                metadata["subjectFacets"] = facets
+                snapshot["metadata"] = metadata
+                row.snapshot = snapshot
+        await db.commit()
 
 
 def test_practice_session_model_has_resumable_and_frozen_report_fields() -> None:
@@ -35,3 +217,168 @@ def test_practice_session_model_has_resumable_and_frozen_report_fields() -> None
     assert "ck_practice_sessions_status" in constraint_names
     assert "ck_practice_sessions_revision" in constraint_names
     assert "uq_practice_sessions_one_resumable" in index_names
+
+
+def test_start_session_freezes_42_50_8_order_and_rejects_duplicate_resumable() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    start_payload = {
+        "paperId": ids["paper"],
+        "releaseId": ids["release"],
+        "mode": "challenge",
+        "count": 60,
+        "order": "paper",
+    }
+    try:
+        with TestClient(app) as client:
+            login = client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            )
+            assert login.status_code == 200
+
+            response = client.post(
+                "/api/v1/learning/practice/sessions/start", json=start_payload
+            )
+            assert response.status_code == 200, response.text
+            session = response.json()["session"]
+            assert session["domainTargets"] == {
+                "people": 25,
+                "process": 30,
+                "business-environment": 5,
+            }
+            assert session["domainWeights"] == {
+                "people": 42,
+                "process": 50,
+                "business-environment": 8,
+            }
+            assert len(session["questions"]) == 60
+            assert session["revision"] == 1
+            assert session["status"] == "active"
+
+            duplicate = client.post(
+                "/api/v1/learning/practice/sessions/start", json=start_payload
+            )
+            assert duplicate.status_code == 409
+            assert duplicate.json()["detail"]["code"] == "RESUMABLE_SESSION_EXISTS"
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_active_and_detail_sessions_are_owner_scoped() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        owner_client = TestClient(app)
+        owner_login = owner_client.post(
+            "/api/v1/auth/login",
+            json={"username": ids["student"], "password": PASSWORD},
+        )
+        assert owner_login.status_code == 200
+        created = owner_client.post(
+            "/api/v1/learning/practice/sessions/start",
+            json={
+                "paperId": ids["paper"],
+                "releaseId": ids["release"],
+                "mode": "scholar",
+                "count": 60,
+                "order": "paper",
+            },
+        )
+        assert created.status_code == 200, created.text
+        session_id = created.json()["session"]["id"]
+
+        active = owner_client.get(
+            "/api/v1/learning/practice/sessions/active",
+            params={"releaseId": ids["release"], "mode": "scholar"},
+        )
+        assert active.status_code == 200
+        assert [row["id"] for row in active.json()["sessions"]] == [session_id]
+        detail = owner_client.get(
+            f"/api/v1/learning/practice/sessions/{session_id}"
+        )
+        assert detail.status_code == 200
+        assert detail.json()["session"]["id"] == session_id
+
+        other_client = TestClient(app)
+        other_login = other_client.post(
+            "/api/v1/auth/login",
+            json={"username": ids["other_student"], "password": PASSWORD},
+        )
+        assert other_login.status_code == 200
+        assert other_client.get(
+            "/api/v1/learning/practice/sessions/active"
+        ).json()["sessions"] == []
+        assert (
+            other_client.get(
+                f"/api/v1/learning/practice/sessions/{session_id}"
+            ).status_code
+            == 404
+        )
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_start_session_rejects_domain_shortage_without_cross_domain_fill() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    asyncio.run(_remove_business_environment_inventory(ids["release"]))
+    try:
+        with TestClient(app) as client:
+            login = client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            )
+            assert login.status_code == 200
+            response = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "challenge",
+                    "count": 60,
+                    "order": "paper",
+                },
+            )
+        assert response.status_code == 422
+        detail = response.json()["detail"]
+        assert detail["code"] == "PRACTICE_DOMAIN_SHORTAGE"
+        assert detail["shortages"] == {"business-environment": 5}
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_random_order_is_seeded_and_frozen_across_modes(monkeypatch) -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    monkeypatch.setattr(practice_session_service.secrets, "token_hex", lambda _: "stable-seed")
+    try:
+        with TestClient(app) as client:
+            login = client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            )
+            assert login.status_code == 200
+            orders = []
+            for mode in ("challenge", "scholar"):
+                response = client.post(
+                    "/api/v1/learning/practice/sessions/start",
+                    json={
+                        "paperId": ids["paper"],
+                        "releaseId": ids["release"],
+                        "mode": mode,
+                        "count": 60,
+                        "order": "random",
+                    },
+                )
+                assert response.status_code == 200, response.text
+                orders.append(
+                    [
+                        item["questionId"]
+                        for item in response.json()["session"]["questionOrder"]
+                    ]
+                )
+        assert orders[0] == orders[1]
+        assert orders[0] != sorted(orders[0])
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))

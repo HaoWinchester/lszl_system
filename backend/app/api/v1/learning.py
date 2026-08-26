@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import CurrentUser
 from app.db.session import get_db
 from app.schemas.personal_card import PersonalCardCreate, PersonalCardUpdate
-from app.services import learning_service, personal_card_service
+from app.services import learning_service, personal_card_service, practice_session_service
 
 router = APIRouter(tags=["learning"])
 DB = Annotated[AsyncSession, Depends(get_db)]
@@ -168,6 +168,33 @@ async def record_practice_answer(body: dict, db: DB, user: CurrentUser):
         raise HTTPException(status_code=404, detail=str(error)) from error
 
 
+@router.post("/learning/practice/sessions/start")
+async def start_practice_session(body: dict, db: DB, user: CurrentUser):
+    try:
+        session = await practice_session_service.start_session(
+            db, user.username, user, body
+        )
+    except practice_session_service.PracticeSessionError as error:
+        raise HTTPException(
+            status_code=error.status_code, detail=error.detail()
+        ) from error
+    return {"session": session}
+
+
+@router.get("/learning/practice/sessions/active")
+async def active_practice_sessions(
+    db: DB,
+    user: CurrentUser,
+    release_id: str | None = Query(None, alias="releaseId"),
+    mode: str | None = Query(None),
+):
+    return {
+        "sessions": await practice_session_service.list_active_sessions(
+            db, user.username, release_id=release_id, mode=mode
+        )
+    }
+
+
 @router.post("/learning/practice/sessions")
 async def record_practice_session(body: dict, db: DB, user: CurrentUser):
     try:
@@ -191,6 +218,14 @@ async def practice_experience_summary(db: DB, user: CurrentUser):
 @router.delete("/learning/practice/sessions")
 async def clear_practice_sessions(db: DB, user: CurrentUser):
     return {"ok": True, "deleted": await learning_service.clear_practice_sessions(db, user.username)}
+
+
+@router.get("/learning/practice/sessions/{session_id}")
+async def get_practice_session(session_id: str, db: DB, user: CurrentUser):
+    session = await practice_session_service.get_session(db, user.username, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="练习会话不存在或无权访问")
+    return {"session": session}
 
 
 @router.post("/learning/practice/mistakes")

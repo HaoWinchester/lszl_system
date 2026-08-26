@@ -40,6 +40,13 @@ def test_publish_payload_creates_release_and_withdraw_all(client=None) -> None:
         assert release["paperId"] == "paper-t1"
         assert release["status"] == "published"
         assert release["questionCount"] == 1
+        assert release["metadata"]["domainWeights"] == {
+            "people": 42,
+            "process": 50,
+            "business-environment": 8,
+        }
+        assert release["metadata"]["simulationScoring"]["passPercent"] == 60
+        assert release["metadata"]["simulationScoring"]["official"] is False
         # 学员视角目录可见
         questions = client.get(f"/api/v1/paper-releases/{release['releaseId']}/questions?limit=10")
         assert questions.status_code == 200

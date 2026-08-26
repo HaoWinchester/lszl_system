@@ -16,6 +16,7 @@ from app.models.subscription import Subscription
 from app.models.user import User
 from app.services import (
     paper_service,
+    practice_scoring_service,
     question_catalog_service,
     subscription_service,
     teaching_content_revision_service,
@@ -248,6 +249,7 @@ async def publish(
 ) -> PaperRelease:
     modes = _normalize_modes(enabled_modes)
     roles = _normalize_roles(allowed_roles)
+    metadata = practice_scoring_service.freeze_release_metadata(metadata)
     if len(json.dumps(metadata, ensure_ascii=False, separators=(",", ":")).encode()) > MAX_RELEASE_METADATA_BYTES:
         raise _error(422, "RELEASE_METADATA_TOO_LARGE", "发布版本 metadata 不能超过 64KB")
     if actor.role not in {"admin", "teacher"}:
@@ -570,6 +572,9 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
         canonical = runtime_domain_migration_service.normalize_release_payload(payload)
     except ValueError as exc:
         raise _error(422, "RELEASE_PAYLOAD_INVALID", str(exc)) from exc
+    canonical["metadata"] = practice_scoring_service.freeze_release_metadata(
+        canonical.get("metadata")
+    )
     await _repair_release_snapshots(db, canonical)
 
     await teaching_content_revision_service.acquire_lock(db)
@@ -590,6 +595,7 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
         "id": release_id,
         "releaseId": release_id,
         "version": assigned_version,
+        "metadata": canonical["metadata"],
     })
 
     # 先 supersede 同试卷旧 active 版本，避免触发"每试卷仅一个 active"部分唯一索引

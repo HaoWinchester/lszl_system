@@ -188,6 +188,47 @@ def test_publish_and_withdraw_share_advisory_before_row_lock_order() -> None:
         asyncio.run(_cleanup(ids))
 
 
+def test_publish_freezes_default_practice_scoring_and_domain_weights() -> None:
+    ids = _ids()
+    asyncio.run(_seed(ids))
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            teacher = await db.get(User, ids["teacher"])
+            release = await paper_release_service.publish(
+                db,
+                teacher,
+                ids["paper"],
+                expected_revision=1,
+                access_level="free",
+                enabled_modes=["practice_mode"],
+                allowed_roles=["student"],
+                metadata={"source": "teacher-publish"},
+            )
+            assert release.release_metadata["source"] == "teacher-publish"
+            assert release.release_metadata["domainWeights"] == {
+                "people": 42,
+                "process": 50,
+                "business-environment": 8,
+            }
+            assert release.release_metadata["simulationScoring"] == {
+                "version": 1,
+                "label": "幻谱模拟判定",
+                "passPercent": 60,
+                "bands": {
+                    "needsImprovement": 50,
+                    "belowTarget": 60,
+                    "target": 80,
+                },
+                "official": False,
+            }
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(_cleanup(ids))
+
+
 def test_publish_increments_version_and_keeps_prior_snapshot_immutable() -> None:
     ids = _ids()
     asyncio.run(_seed(ids))
