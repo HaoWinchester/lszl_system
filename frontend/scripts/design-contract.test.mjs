@@ -86,3 +86,21 @@ test('FastAPI owns the stable direct-page aliases', () => {
     assert.match(routes, new RegExp(`['"]${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]`))
   }
 })
+
+test('practice mode ships one resumable answer sheet and a nonofficial Huanpu PMP report', () => {
+  const page = readRepo('new-legacy/practice-mode.html')
+  const style = readRepo('new-legacy/styles/practice-mode.css')
+  const report = readRepo('new-legacy/src/113-practice-result-report.js')
+  for (const id of [
+    'practiceAnswerSheet', 'practiceAnswerSheetMobileBtn', 'practiceAnswerSheetDrawer',
+    'practiceSubmitConfirm', 'practiceSaveExitBtn', 'practiceAbandonBtn',
+  ]) assert.match(page, new RegExp(`id="${id}"`))
+  assert.match(page, /src\/111-practice-session-core\.js/)
+  assert.match(page, /src\/112-practice-answer-sheet\.js/)
+  assert.match(page, /src\/113-practice-result-report\.js/)
+  assert.match(style, /@media \(min-width:1024px\)[\s\S]*\.practice-answer-sheet\{display:block\}/)
+  assert.match(report, /src="\/assets\/logo\.jpg"/)
+  assert.match(report, /幻谱 PMP 模拟成绩分析报告/)
+  assert.match(report, /不代表 PMI 官方考试成绩/)
+  for (const weight of ['people', 'process', 'business-environment']) assert.match(report, new RegExp(weight))
+})
