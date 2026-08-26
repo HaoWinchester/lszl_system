@@ -1,12 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.174",
-  "toVersion": "v9.0-p4.1.174",
+  "fromVersion": "v9.0-p4.1.175",
+  "toVersion": "v9.0-p4.1.176",
   "changes": {
-    "added": [
-      "assets/logo.jpg"
+    "added": [],
+    "changed": [
+      "VERSION",
+      "src/100-practice-mode.js"
     ],
-    "changed": [],
     "removed": []
   },
   "incompatible": []
