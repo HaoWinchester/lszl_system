@@ -55,7 +55,9 @@ with sync_playwright() as playwright:
           };
           window.KGPracticeLearningApi={
             stats:()=>({active:0,pending:0,needsRemediation:0,mastered:0}),active:()=>[],refresh:async()=>({}),
-            answer:async()=>({correct:true}),recordSession:async()=>({}),listSessions:async()=>[],clearSessions:async()=>{}
+            answer:async()=>({correct:true}),recordSession:async()=>({}),
+            listSessions:async()=>[{paperId:'paper-loading',paperName:'加载测试卷',answered:10,correct:8,endedAt:Date.now(),status:'completed'}],
+            clearSessions:async()=>{}
           };
         }"""
     )
@@ -65,9 +67,36 @@ with sync_playwright() as playwright:
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(50)
 
+    page.locator("#practiceHistoryOpenBtn").click()
+    history_row = page.locator('[data-history-paper="paper-loading"]')
+    history_row.wait_for()
+    history_row.click()
+    loading = page.locator("[data-learning-loading]")
+    assert page.locator("[data-learning-loading]").count() == 1
+    assert loading.is_visible()
+    assert loading.locator("[data-learning-loading-title]").inner_text() == "正在进入练习模式"
+    assert loading.locator("[data-learning-loading-message]").inner_text() == "正在读取试题…"
+    assert page.evaluate("window.__challengeResolveCalls") == 1
+
+    page.evaluate("window.KGPracticeMode.startPractice('practice')")
+    page.wait_for_timeout(30)
+    assert page.evaluate("window.__challengeResolveCalls") == 1
+
+    page.evaluate("window.__challengePending.shift().reject(new Error('network unavailable'))")
+    page.wait_for_function("document.querySelector('[data-learning-loading]').hidden")
+    assert page.locator("#practiceToast").inner_text() == "试题读取失败，请稍后重试。"
+
+    page.locator("#practiceHistoryOpenBtn").click()
+    page.locator('[data-history-paper="paper-loading"]').click()
+    assert loading.is_visible()
+    assert page.evaluate("window.__challengeResolveCalls") == 2
+    page.evaluate("window.__challengePending.shift().resolve(window.__challengeSuccess)")
+    page.wait_for_function("document.body.dataset.practiceView === 'game'")
+    assert loading.is_hidden()
+    page.evaluate("window.KGPracticeMode.showLobby(); window.__challengeResolveCalls=0; window.__challengePending=[]")
+
     button = page.locator('[data-practice-start="challenge"]')
     button.click()
-    loading = page.locator("[data-learning-loading]")
     assert loading.is_visible()
     assert loading.locator("[data-learning-loading-title]").inner_text() == "正在准备挑战"
     assert loading.locator("[data-learning-loading-message]").inner_text() == "正在读取试题…"

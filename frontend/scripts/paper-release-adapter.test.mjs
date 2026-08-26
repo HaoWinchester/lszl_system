@@ -33,6 +33,63 @@ test('paper release adapter pages questions with a per-request cap', () => {
   assert.match(adapter, /分页串行保序/)
 })
 
+test('identical concurrent question loads share one pagination request', async () => {
+  let releaseQuestions
+  const gate = new Promise(resolveGate => { releaseQuestions = resolveGate })
+  let questionRequests = 0
+  const context = {
+    console,
+    URLSearchParams,
+    setTimeout,
+    clearTimeout,
+    CustomEvent: class CustomEvent { constructor(type, init = {}) { this.type = type; this.detail = init.detail } },
+    addEventListener() {},
+    dispatchEvent() {},
+    async fetch(url) {
+      if (String(url).includes('/questions?')) {
+        questionRequests += 1
+        await gate
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              total: 2,
+              nextOffset: 2,
+              release: { paperId: 'paper-1', releaseId: 'release-1', version: 1, questionCount: 2 },
+              questions: [
+                { bankId: 'bank-1', questionId: 'question-1', orderIndex: 1, question: { id: 'question-1' } },
+                { bankId: 'bank-1', questionId: 'question-2', orderIndex: 2, question: { id: 'question-2' } },
+              ],
+            }
+          },
+        }
+      }
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { releases: [{ paperId: 'paper-1', releaseId: 'release-1', version: 1, questionCount: 2 }], total: 1 }
+        },
+      }
+    },
+  }
+  context.window = context
+  context.globalThis = context
+  vm.runInNewContext(adapter, context, { filename: 'paper-release-adapter.js' })
+  await context.KGPaperReleaseApi.ready()
+
+  const first = context.KGPaperReleaseApi.fetchQuestions('release-1')
+  const second = context.KGPaperReleaseApi.fetchQuestions('release-1')
+  await Promise.resolve()
+  assert.equal(questionRequests, 1)
+  releaseQuestions()
+  const [firstResult, secondResult] = await Promise.all([first, second])
+
+  assert.deepEqual(Array.from(firstResult.items, item => item.questionId), ['question-1', 'question-2'])
+  assert.deepEqual(Array.from(secondResult.items, item => item.questionId), ['question-1', 'question-2'])
+})
+
 test('paper release adapter exposes a lightweight management catalog with question references', () => {
   assert.match(adapter, /\/management-catalog/)
   assert.match(adapter, /managementCatalog/)

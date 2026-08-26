@@ -24,6 +24,7 @@
     catalogById: new Map(),
     details: new Map(),   // releaseId -> release（normalize 后，含 questions refs）
     questions: new Map(), // releaseId -> { items, fetchedAt, seed }
+    questionLoads: new Map(), // releaseId + seed + maxCount -> in-flight Promise
     loadedAt: 0,
     error: null,
   };
@@ -254,45 +255,57 @@
     if (cached && (!wanted || cached.items.length >= Math.min(wanted, cached.total))) {
       return { items: cached.items.slice(0, wanted || undefined), release: cached.release, total: cached.total };
     }
-    const items = [];
-    let offset = 0;
-    let total = 0;
-    let releaseRow = null;
-    let guard = 0;
-    // 分页串行保序；服务端按 1MB 上限截断（responseTruncated）时尽量续拉
-    for (;;) {
-      guard += 1;
-      if (guard > 100) break;
-      const query = new URLSearchParams({ limit: String(QUESTIONS_PAGE_SIZE), offset: String(offset) });
-      if (seed) query.set('seed', seed);
-      const payload = await request(`/${encodeURIComponent(id)}/questions?${query.toString()}`);
-      releaseRow = payload.release ? normalizeCatalogRow(payload.release) : releaseRow;
-      total = number(payload.total, total);
-      const batch = Array.isArray(payload.questions) ? payload.questions : [];
-      for (const row of batch) {
-        items.push({
-          bankId: text(row.bankId),
-          questionId: text(row.questionId || row.question?.id),
-          order: number(row.orderIndex, items.length),
-          snapshot: {
+    const loadKey = JSON.stringify([id, text(seed), Math.max(0, number(maxCount, 0))]);
+    const pending = state.questionLoads.get(loadKey);
+    if (pending) return pending;
+    const operation = (async () => {
+      const items = [];
+      let offset = 0;
+      let total = 0;
+      let releaseRow = null;
+      let guard = 0;
+      // 分页串行保序；服务端按 1MB 上限截断（responseTruncated）时尽量续拉
+      for (;;) {
+        guard += 1;
+        if (guard > 100) break;
+        const query = new URLSearchParams({ limit: String(QUESTIONS_PAGE_SIZE), offset: String(offset) });
+        if (seed) query.set('seed', seed);
+        const payload = await request(`/${encodeURIComponent(id)}/questions?${query.toString()}`);
+        releaseRow = payload.release ? normalizeCatalogRow(payload.release) : releaseRow;
+        total = number(payload.total, total);
+        const batch = Array.isArray(payload.questions) ? payload.questions : [];
+        for (const row of batch) {
+          items.push({
             bankId: text(row.bankId),
             questionId: text(row.questionId || row.question?.id),
-            question: row.question || null,
-          },
-        });
+            order: number(row.orderIndex, items.length),
+            snapshot: {
+              bankId: text(row.bankId),
+              questionId: text(row.questionId || row.question?.id),
+              question: row.question || null,
+            },
+          });
+        }
+        offset = number(payload.nextOffset, offset + batch.length);
+        if (!batch.length || offset >= total) break;
+        if (maxCount > 0 && items.length >= maxCount) break;
       }
-      offset = number(payload.nextOffset, offset + batch.length);
-      if (!batch.length || offset >= total) break;
-      if (maxCount > 0 && items.length >= maxCount) break;
+      const release = releaseRow || findInCatalog(id);
+      state.questions.set(id, { items, total: total || items.length, seed, release });
+      return { items: maxCount > 0 ? items.slice(0, maxCount) : items, release, total: total || items.length };
+    })();
+    state.questionLoads.set(loadKey, operation);
+    try {
+      return await operation;
+    } finally {
+      if (state.questionLoads.get(loadKey) === operation) state.questionLoads.delete(loadKey);
     }
-    const release = releaseRow || findInCatalog(id);
-    state.questions.set(id, { items, total: total || items.length, seed, release });
-    return { items: maxCount > 0 ? items.slice(0, maxCount) : items, release, total: total || items.length };
   }
 
   function invalidate({ keepCatalog = true } = {}) {
     state.details.clear();
     state.questions.clear();
+    state.questionLoads.clear();
     if (!keepCatalog) {
       state.catalog = [];
       state.catalogById = new Map();

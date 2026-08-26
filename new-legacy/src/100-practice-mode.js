@@ -19,7 +19,7 @@
     health:MAX_HEALTH,streak:0,experience:0,correct:0,answered:0,startedAt:0,endedAt:0,
     locked:false,active:false,completed:false,lastSettings:null,timerId:0,deadline:0,
     feedbackTimer:0,popTimer:0,toastTimer:0,abandonedRecorded:false,catalogAvailable:false,retiredNavigation:null,retiredNoticeShown:false,
-    remediationPending:false,verification:null,practiceAnswers:{},challengeStarting:false
+    remediationPending:false,verification:null,practiceAnswers:{},entryStartingMode:''
   };
 
   function clone(value){try{return JSON.parse(JSON.stringify(value))}catch(error){return value}}
@@ -660,12 +660,13 @@
     state.lastSettings={paperId:'',count,order:'weakness_first',mode:'revenge'};document.body.dataset.practiceMode='revenge';dom.timer.hidden=true;dom.timeRow.hidden=true;dom.health.hidden=true;
     setView('game');renderQuestion();return true;
   }
-  function setChallengeStarting(starting,{focus=false}={}){
-    state.challengeStarting=!!starting;
-    const button=dom.startButtons.find(item=>item.dataset.practiceStart==='challenge');
+  function setEntryStarting(mode,starting,{focus=false}={}){
+    const activeMode=starting?String(mode||''):String(state.entryStartingMode||mode||'');
+    state.entryStartingMode=starting?activeMode:'';
+    const button=dom.startButtons.find(item=>item.dataset.practiceStart===activeMode);
     if(!button)return;
-    button.setAttribute('aria-busy',String(state.challengeStarting));
-    if(state.challengeStarting)button.disabled=true;
+    button.setAttribute('aria-busy',String(!!starting));
+    if(starting)button.disabled=true;
     else{
       syncCountOptions();
       if(focus&&!button.disabled)button.focus();
@@ -673,16 +674,17 @@
   }
   async function startPractice(mode){
     const challenge=mode==='challenge';
-    if(challenge&&state.challengeStarting)return false;
+    const loadingEntry=challenge||mode==='practice';
+    if(loadingEntry&&state.entryStartingMode)return false;
     if(mode==='revenge')return startRevenge();
     const catalog=selectedRelease(),count=Number(state.selectedCount);
     if(!catalog){syncLobby();return false}
     const access=paperAccess(catalog);
     if(!access.allowed)return openMembership(access);
     let restoreFocus=false;
-    if(challenge){
-      setChallengeStarting(true);
-      global.KGLearningLoading?.show?.({title:'正在准备挑战',message:'正在读取试题…'});
+    if(loadingEntry){
+      setEntryStarting(mode,true);
+      global.KGLearningLoading?.show?.({title:challenge?'正在准备挑战':'正在进入练习模式',message:'正在读取试题…'});
     }
     try{
       const repo=global.KGPublishedPaperRepository;
@@ -708,14 +710,14 @@
       dom.timer.hidden=true;dom.timeRow.hidden=state.mode!=='scholar';dom.health.hidden=state.mode==='practice';
       setView('game');renderQuestion();if(state.mode==='scholar')startTimer();return true;
     }catch(error){
-      if(!challenge)throw error;
+      if(!loadingEntry)throw error;
       restoreFocus=true;
       showToast('试题读取失败，请稍后重试。');
       return false;
     }finally{
-      if(challenge){
+      if(loadingEntry){
         global.KGLearningLoading?.hide?.();
-        setChallengeStarting(false,{focus:restoreFocus});
+        setEntryStarting(mode,false,{focus:restoreFocus});
       }
     }
   }

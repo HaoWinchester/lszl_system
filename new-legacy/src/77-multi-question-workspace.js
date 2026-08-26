@@ -429,42 +429,89 @@
     const entry=state.paperCatalog.find(item=>String(item.paper?.id)===String(paper?.id||'')&&(!paper?.releaseId||String(item.paper?.releaseId)===String(paper.releaseId)));
     return entry?entry.availableCount>0:true;
   }
-  async function loadPublishedPapers(){
-    let catalog=[];
-    try{
-      const resolver=global.KGPublishedQuestionResolver;
-      if(resolver)catalog=await resolver.listPapers({respectRole:true,mode:'multi_question_canvas'})||[];
-      else if(typeof qbPublishedPaperCatalog==='function')catalog=qbPublishedPaperCatalog({respectRole:true,mode:'multi_question_canvas'})||[];
-      if(resolver&&state.releaseId&&!catalog.some(entry=>String(entry.paper?.releaseId)===String(state.releaseId))){
-        const exact=await resolver.resolvePaper({paperId:state.paperId,releaseId:state.releaseId,mode:'multi_question_canvas'},{respectRole:true,mode:'multi_question_canvas'});
-        if(exact?.ok&&exact.paper?.availability!=='withdrawn')catalog=[exact,...catalog];
-        else if(exact?.code)state.questionLoadError=resolver.message(exact,'指定发布版本不可用。');
-      }
-    }catch(error){
-      state.questionLoadError=String(error?.message||error||'发布试卷读取失败');
-      console.error('多题画布发布试卷读取失败',error);
-    }
-    const seen=new Set();
-    state.paperCatalog=(Array.isArray(catalog)?catalog:[]).filter(entry=>{
-      const paper=entry?.paper;
-      const key=String(paper?.releaseId||'');
-      if(!paper||paper.status!=='published'||paper.availability==='withdrawn'||!key||seen.has(key))return false;
-      seen.add(key);return true;
+  function lightweightPaperEntry(row={}){
+    const paperId=String(row.paperId||row.id||'');
+    const releaseId=String(row.releaseId||'');
+    const configuredCount=Math.max(0,Number(row.totalCount||row.questionCount||0));
+    return {
+      ok:true,
+      paper:{...row,id:paperId,paperId,releaseId,status:'published',availability:'published'},
+      items:[],configuredCount,targetCount:configuredCount,availableCount:configuredCount,
+      missingCount:0,damagedCount:0,blockedCount:0,issues:[]
+    };
+  }
+  async function loadPublishedPapers(target={}){
+    const repository=global.KGPublishedPaperRepository;
+    const resolver=global.KGPublishedQuestionResolver;
+    await repository?.ready?.();
+    const options={respectRole:true,mode:'multi_question_canvas'};
+    const rows=(repository?.listCatalogEntries?.(options)||[]).filter(row=>{
+      const inspected=repository?.inspectRelease?.({paperId:row.paperId||row.id,releaseId:row.releaseId},options);
+      return !inspected||inspected.ok!==false;
     });
-    state.papers=state.paperCatalog.map(entry=>entry.paper);
-    return state.papers;
+    const seen=new Set();
+    const catalog=rows.map(row=>{
+      const releaseId=String(row.releaseId||'');
+      if(!releaseId||seen.has(releaseId))return null;
+      seen.add(releaseId);
+      return repository?.peekResolved?.(releaseId)||lightweightPaperEntry(row);
+    }).filter(Boolean);
+    const saved=readPaperSelection();
+    const requestedPaperId=String(target.paperId||state.paperId||saved.paperId||'');
+    const requestedReleaseId=String(target.releaseId||state.releaseId||saved.releaseId||'');
+    let selected=catalog.find(entry=>requestedReleaseId&&String(entry.paper?.releaseId||'')===requestedReleaseId)
+      ||catalog.find(entry=>requestedPaperId&&String(entry.paper?.id||'')===requestedPaperId)
+      ||catalog[0]||null;
+    const identifier={paperId:String(selected?.paper?.id||requestedPaperId),releaseId:String(selected?.paper?.releaseId||requestedReleaseId)};
+    if((identifier.paperId||identifier.releaseId)&&typeof resolver?.resolvePaper==='function'){
+      const cached=identifier.releaseId?repository?.peekResolved?.(identifier.releaseId):null;
+      const resolved=cached||await resolver.resolvePaper({...identifier,mode:'multi_question_canvas'},options);
+      if(!resolved?.ok){
+        const message=resolver.message?.(resolved,'指定发布版本不可用。')||resolved?.message||'指定发布版本不可用。';
+        const error=new Error(message);error.result=resolved;throw error;
+      }
+      selected=resolved;
+      const releaseId=String(resolved.paper?.releaseId||identifier.releaseId);
+      const index=catalog.findIndex(entry=>String(entry.paper?.releaseId||'')===releaseId);
+      if(index>=0)catalog[index]=resolved;else catalog.unshift(resolved);
+    }
+    return {
+      catalog,
+      paperId:String(selected?.paper?.id||''),
+      releaseId:String(selected?.paper?.releaseId||'')
+    };
   }
   let questionSourcesLoading=false;
-  async function rebuildQuestionSources(){
-    // 发布试卷走细粒度 API 后是异步的：先取数、再建列表、最后补渲染
-    if(questionSourcesLoading)return;
+  async function rebuildQuestionSources(options={}){
+    // 目录仅取摘要，题目只解析当前 release；相同 release 的并发由 adapter 合并。
+    if(questionSourcesLoading)return false;
     questionSourcesLoading=true;
+    const previous={paperCatalog:state.paperCatalog,papers:state.papers,paperId:state.paperId,releaseId:state.releaseId,paperStats:state.paperStats,questions:state.questions};
+    const showLoading=options.showLoading===true;
+    if(showLoading)global.KGLearningLoading?.show?.({title:'正在加载试卷',message:'正在读取试题…'});
+    renderPaperSelector();
     try{
       invalidateQuestionSources();
-      await loadPublishedPapers();
+      const loaded=await loadPublishedPapers(options);
+      state.paperCatalog=loaded.catalog;
+      state.papers=loaded.catalog.map(entry=>entry.paper);
+      state.paperId=loaded.paperId;
+      state.releaseId=loaded.releaseId;
       buildQuestionList();
       if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
-    }finally{questionSourcesLoading=false}
+      return true;
+    }catch(error){
+      state.paperCatalog=previous.paperCatalog;state.papers=previous.papers;state.paperId=previous.paperId;state.releaseId=previous.releaseId;state.paperStats=previous.paperStats;state.questions=previous.questions;
+      state.questionLoadError=String(error?.message||error||'发布试卷读取失败');
+      console.error('多题画布发布试卷读取失败',error);
+      if(showLoading)notify('试卷读取失败，请稍后重试。');
+      if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
+      return false;
+    }finally{
+      questionSourcesLoading=false;
+      if(showLoading)global.KGLearningLoading?.hide?.();
+      renderPaperSelector();
+    }
   }
   function scopedPreferenceKey(prefix){
     const userId=global.KGLearningSessionStore?.currentUserId?.()||'guest';
@@ -562,7 +609,7 @@
       select.disabled=true;
       return;
     }
-    select.disabled=false;
+    select.disabled=questionSourcesLoading;
     select.innerHTML=state.paperCatalog.map(entry=>{
       const historical=entry.paper.availability==='superseded'?' · 历史版本':'';
       return '<option value="'+escapeHTML(entry.paper.releaseId||entry.paper.id)+'">'+escapeHTML(entry.paper.name)+' · v'+Number(entry.paper.version||0)+historical+'（可用 '+Number(entry.availableCount||0)+'/'+Number(entry.configuredCount||0)+' 题）</option>';
@@ -5181,16 +5228,12 @@
       const popover=byId('qwHelpPopover');
       if(popover)popover.hidden=!popover.hidden;
     });
-    byId('qwPaperSelect')?.addEventListener('change',event=>{
+    byId('qwPaperSelect')?.addEventListener('change',async event=>{
+      if(questionSourcesLoading){renderPaperSelector();return}
       const releaseId=String(event.target.value||'');
       const entry=state.paperCatalog.find(item=>String(item.paper?.releaseId||item.paper?.id)===releaseId)||null;
-      state.paperId=String(entry?.paper?.id||'');
-      state.releaseId=String(entry?.paper?.releaseId||'');
-      state.selectedQuestionKeys.clear();
-      clearPaperTransientState();
-      savePaperSelection();
-      void rebuildQuestionSources();
-      renderQuestionDock();
+      const changed=await rebuildQuestionSources({paperId:String(entry?.paper?.id||''),releaseId:String(entry?.paper?.releaseId||''),showLoading:true});
+      if(changed){state.selectedQuestionKeys.clear();clearPaperTransientState();savePaperSelection();renderQuestionDock()}
     });
     byId('qwQuestionSearch')?.addEventListener('input',event=>{state.query=String(event.target.value||'');renderQuestionDock()});
     byId('qwQuestionSearchBtn')?.addEventListener('click',()=>{state.query=String(byId('qwQuestionSearch')?.value||'');renderQuestionDock()});
@@ -5561,7 +5604,7 @@
     global.addEventListener('pagehide',()=>{void flushAnswerQueue()});
     global.addEventListener('beforeunload',()=>{void flushAnswerQueue()});
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')void flushAnswerQueue()});
-    void rebuildQuestionSources();
+    void rebuildQuestionSources({showLoading:true});
     const params=queryParams();
     const requested=String(params.get('workspace')||store()?.getActiveWorkspaceId?.()||'');
     const focusNodeId=String(params.get('focus')||'');
@@ -5623,6 +5666,7 @@
       readonly:state.readonly,
       paperId:state.paperId,
       releaseId:state.releaseId,
+      questionCount:state.questions.length,
       pointerMode:state.pointerMode,
       highlightColor:state.highlightColor,
       fontScale:state.fontScale,
