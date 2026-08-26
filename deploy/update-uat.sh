@@ -11,6 +11,8 @@ PROJECT="lszl-kg-uat"
 COMPOSE_FILE="docker-compose.uat.yml"
 ENV_FILE=".env.uat"
 HEALTH_URL="http://127.0.0.1:18087/api/v1/health"
+PUBLIC_HEALTH_URL="https://uat.aihuanpu.com/api/v1/health"
+NGINX_CONFIG="$REPO_DIR/deploy/nginx-uat.aihuanpu.com.conf"
 MIN_FREE_GB=5   # 部署前服务器最低剩余磁盘（GB），不足则中止
 
 version_file="$REPO_DIR/new-legacy/VERSION"
@@ -31,7 +33,7 @@ build_content_prep() {
   python3 "$REPO_DIR/new-legacy/content-prep-studio/build.py" >/dev/null
 }
 
-echo "[0/8] 服务器磁盘预检（剩余 < ${MIN_FREE_GB}GB 则中止）"
+echo "[0/9] 服务器磁盘预检（剩余 < ${MIN_FREE_GB}GB 则中止）"
 free_kb=$(ssh "$REMOTE" "df -P / | awk 'NR==2 {print \$4}'")
 free_gb=$((free_kb / 1024 / 1024))
 echo "      / 剩余 ${free_gb}GB"
@@ -40,13 +42,13 @@ if [ "$free_gb" -lt "$MIN_FREE_GB" ]; then
   exit 1
 fi
 
-echo "[1/8] 本地构建 new-legacy 前端产物"
+echo "[1/9] 本地构建 new-legacy 前端产物"
 build_content_prep
 cd "$REPO_DIR/frontend"
 node scripts/sync-new-legacy.js
 cd "$REPO_DIR"
 
-echo "[2/8] 打包并发布 new-legacy release"
+echo "[2/9] 打包并发布 new-legacy release"
 cd "$REPO_DIR/frontend"
 # 若本地已有同版本号但内容不同的 release（开发分支忘记递增 VERSION），自动递增末段重打包。
 # 只有 update 真正成功才允许继续，防止把旧包当新版本发布出去。
@@ -77,7 +79,7 @@ node scripts/manage-new-legacy.js promote "$VERSION"
 cd "$REPO_DIR"
 echo "      当前发布版本：$VERSION"
 
-echo "[3/8] rsync 代码与 release 到 $REMOTE:$REMOTE_DIR"
+echo "[3/9] rsync 代码与 release 到 $REMOTE:$REMOTE_DIR"
 rsync -az --delete \
   --exclude '/.git' --exclude '/new-legacy' --exclude '/docs' \
   --exclude '/backups' \
@@ -91,15 +93,25 @@ rsync -az "$REPO_DIR/frontend/new-legacy-releases/current.json" \
   "$REPO_DIR/frontend/new-legacy-releases/$VERSION" \
   "$REMOTE:$REMOTE_DIR/frontend/new-legacy-releases/"
 
-echo "[4/8] 重建 UAT 后端镜像并重启（alembic 迁移自动执行）"
+echo "[4/9] 重建 UAT 后端镜像并重启（alembic 迁移自动执行）"
 ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE up -d --build"
 
-echo "[5/8] 等待健康检查（18087）"
+echo "[5/9] 等待健康检查（18087）"
 ssh "$REMOTE" "healthy=0; for attempt in \$(seq 1 40); do if curl -fsS $HEALTH_URL >/dev/null; then healthy=1; break; fi; sleep 1; done; test \"\$healthy\" -eq 1" \
   || { echo "✗ 健康检查失败，查看日志：ssh $REMOTE 'cd $REMOTE_DIR && docker compose -p $PROJECT logs backend --tail 50'" >&2; exit 1; }
 echo "      HEALTH_OK"
 
-echo "[6/8] 回填历史已发布试卷到关系化目录（仅限两个试卷发布键）"
+echo "[6/9] 安装 Git 管理的 UAT HTTPS/HTTP2/gzip 配置"
+rsync -az "$NGINX_CONFIG" "$REMOTE:/tmp/nginx-uat.aihuanpu.com.conf"
+ssh "$REMOTE" "test -s /etc/letsencrypt/live/uat.aihuanpu.com/fullchain.pem \
+  && test -s /etc/letsencrypt/live/uat.aihuanpu.com/privkey.pem \
+  && sudo install -m 0644 /tmp/nginx-uat.aihuanpu.com.conf /etc/nginx/conf.d/uat.aihuanpu.com.conf \
+  && sudo nginx -t \
+  && sudo systemctl reload nginx"
+curl -fsS "$PUBLIC_HEALTH_URL" >/dev/null
+echo "      HTTPS_HEALTH_OK"
+
+echo "[7/9] 回填历史已发布试卷到关系化目录（仅限两个试卷发布键）"
 ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE exec -T backend python -m app.cli.runtime_domain_migration backfill \
   --run-id uat-paper-release-backfill-v1 \
   --source-key kg_exam_papers_published_v1 \
@@ -107,13 +119,13 @@ ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --e
   --report-json /tmp/uat-paper-release-backfill.json"
 echo "      PAPER_RELEASE_BACKFILL_OK"
 
-echo "[7/8] 清理构建缓存与悬空镜像（仅清理 dangling 资源，不动运行中容器）"
+echo "[8/9] 清理构建缓存与悬空镜像（仅清理 dangling 资源，不动运行中容器）"
 ssh "$REMOTE" 'docker image prune -f >/dev/null; docker builder prune -f --filter until=168h >/dev/null; true'
 
-echo "[8/8] 磁盘水位与 UAT 版本核对"
+echo "[9/9] 磁盘水位与 UAT 版本核对"
 ssh "$REMOTE" 'df -h / | tail -1'
-curl -fsS "http://uat.aihuanpu.com/" | grep -o 'data-release="[^"]*"' | head -1 || true
+curl -fsS "https://uat.aihuanpu.com/" | grep -o 'data-release="[^"]*"' | head -1 || true
 
 echo
-echo "✓ UAT 更新完成：http://uat.aihuanpu.com ($VERSION)"
+echo "✓ UAT 更新完成：https://uat.aihuanpu.com ($VERSION)"
 echo "  查看日志：ssh $REMOTE 'cd $REMOTE_DIR && docker compose -p $PROJECT logs backend --tail 50'"
