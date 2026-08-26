@@ -249,6 +249,63 @@ async def update_practice_session_state(
     return {"session": session}
 
 
+@router.post("/learning/practice/sessions/{session_id}/pause")
+async def pause_practice_session(
+    session_id: str, body: dict, db: DB, user: CurrentUser
+):
+    try:
+        session = await practice_session_service.pause_session(
+            db, user.username, session_id, body
+        )
+    except practice_session_service.PracticeSessionError as error:
+        raise HTTPException(
+            status_code=error.status_code, detail=error.detail()
+        ) from error
+    return {"session": session}
+
+
+@router.post("/learning/practice/sessions/{session_id}/abandon")
+async def abandon_practice_session(
+    session_id: str, body: dict, db: DB, user: CurrentUser
+):
+    try:
+        session = await practice_session_service.abandon_session(
+            db, user.username, session_id, body
+        )
+    except practice_session_service.PracticeSessionError as error:
+        raise HTTPException(
+            status_code=error.status_code, detail=error.detail()
+        ) from error
+    return {"session": session}
+
+
+@router.post("/learning/practice/sessions/{session_id}/complete")
+async def complete_practice_session(
+    session_id: str, body: dict, db: DB, user: CurrentUser
+):
+    try:
+        session, report = await practice_session_service.complete_session(
+            db, user.username, session_id, body
+        )
+    except practice_session_service.PracticeSessionError as error:
+        raise HTTPException(
+            status_code=error.status_code, detail=error.detail()
+        ) from error
+    return {"session": session, "report": report}
+
+
+@router.get("/learning/practice/sessions/{session_id}/report")
+async def get_practice_session_report(
+    session_id: str, db: DB, user: CurrentUser
+):
+    report = await practice_session_service.get_report(
+        db, user.username, session_id
+    )
+    if report is None:
+        raise HTTPException(status_code=404, detail="成绩报告不存在或无权访问")
+    return {"report": report}
+
+
 @router.get("/learning/practice/sessions/{session_id}")
 async def get_practice_session(session_id: str, db: DB, user: CurrentUser):
     session = await practice_session_service.get_session(db, user.username, session_id)

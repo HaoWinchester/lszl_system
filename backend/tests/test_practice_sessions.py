@@ -4,7 +4,7 @@ import asyncio
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from app.core.security import hash_password, now_utc
 from app.db.session import AsyncSessionLocal
@@ -201,6 +201,21 @@ async def _remove_business_environment_inventory(release_id: str) -> None:
                 snapshot["metadata"] = metadata
                 row.snapshot = snapshot
         await db.commit()
+
+
+async def _completion_event_count(owner: str, session_id: str) -> int:
+    async with AsyncSessionLocal() as db:
+        return int(
+            (
+                await db.execute(
+                    select(func.count(LearningEvent.id)).where(
+                        LearningEvent.owner_id == owner,
+                        LearningEvent.event_type == "PRACTICE_SESSION_COMPLETED",
+                        LearningEvent.payload["sessionId"].astext == session_id,
+                    )
+                )
+            ).scalar_one()
+        )
 
 
 def test_practice_session_model_has_resumable_and_frozen_report_fields() -> None:
@@ -607,6 +622,177 @@ def test_session_runtime_state_is_validated_owner_scoped_and_revisioned() -> Non
             hidden = client.patch(
                 f"/api/v1/learning/practice/sessions/{started['id']}/state",
                 json={"revision": 2, "runtimeState": {"currentIndex": 7}},
+            )
+            assert hidden.status_code == 404
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_scholar_pause_freezes_time_and_first_write_resumes_without_offline_deduction() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            started = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "scholar",
+                    "count": 60,
+                    "order": "paper",
+                },
+            ).json()["session"]
+            paused = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/pause",
+                json={
+                    "revision": 1,
+                    "runtimeState": {
+                        "currentIndex": 4,
+                        "remainingMs": 43210,
+                        "durationMs": 6789,
+                    },
+                },
+            )
+            assert paused.status_code == 200
+            paused_session = paused.json()["session"]
+            assert paused_session["status"] == "paused"
+            assert paused_session["runtimeState"]["remainingMs"] == 43210
+            assert paused_session["revision"] == 2
+
+            restored = client.get(
+                f"/api/v1/learning/practice/sessions/{started['id']}"
+            ).json()["session"]
+            assert restored["status"] == "paused"
+            assert restored["runtimeState"]["remainingMs"] == 43210
+
+            resumed = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json={
+                    "revision": 2,
+                    "questionId": restored["questionOrder"][0]["questionId"],
+                    "selectedAnswer": "A",
+                },
+            )
+            assert resumed.status_code == 200
+            resumed_session = resumed.json()["session"]
+            assert resumed_session["status"] == "active"
+            assert resumed_session["runtimeState"]["remainingMs"] == 43210
+
+            abandoned = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/abandon",
+                json={"revision": resumed_session["revision"]},
+            )
+            assert abandoned.status_code == 200
+            assert abandoned.json()["session"]["status"] == "abandoned"
+            cannot_answer = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json={
+                    "revision": abandoned.json()["session"]["revision"],
+                    "questionId": restored["questionOrder"][1]["questionId"],
+                    "selectedAnswer": "A",
+                },
+            )
+            assert cannot_answer.status_code == 409
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_complete_freezes_nonofficial_report_and_is_idempotent_and_owner_scoped() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            started = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "challenge",
+                    "count": 60,
+                    "order": "paper",
+                },
+            ).json()["session"]
+            first_id = started["questionOrder"][0]["questionId"]
+            second_id = started["questionOrder"][1]["questionId"]
+            first = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json={"revision": 1, "questionId": first_id, "selectedAnswer": "B"},
+            ).json()["session"]
+            second = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json={
+                    "revision": first["revision"],
+                    "questionId": second_id,
+                    "selectedAnswer": "A",
+                },
+            ).json()["session"]
+
+            completed = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/complete",
+                json={
+                    "revision": second["revision"],
+                    "score": 100,
+                    "passed": True,
+                },
+            )
+            assert completed.status_code == 200
+            report = completed.json()["report"]
+            assert completed.json()["session"]["status"] == "completed"
+            assert report["resultLabel"] == "模拟考试结果：FAIL"
+            assert report["official"] is False
+            assert report["scorePercent"] == 1.67
+            assert report["counts"] == {
+                "total": 60,
+                "answered": 2,
+                "correct": 1,
+                "wrong": 1,
+                "unanswered": 58,
+            }
+            assert report["domainWeights"] == {
+                "people": 42,
+                "process": 50,
+                "business-environment": 8,
+            }
+            assert report["wrongQuestionIds"] == [first_id]
+            assert report["disclaimer"] == "幻谱模拟判定，不代表 PMI 官方考试成绩"
+            assert set(report["domains"]) == {
+                "people",
+                "process",
+                "business-environment",
+            }
+
+            retry = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/complete",
+                json={"revision": second["revision"]},
+            )
+            assert retry.status_code == 200
+            assert retry.json()["report"] == report
+            assert asyncio.run(
+                _completion_event_count(ids["student"], started["id"])
+            ) == 1
+
+            fetched = client.get(
+                f"/api/v1/learning/practice/sessions/{started['id']}/report"
+            )
+            assert fetched.status_code == 200
+            assert fetched.json()["report"] == report
+
+            assert client.post("/api/v1/auth/logout").status_code == 200
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["other_student"], "password": PASSWORD},
+            ).status_code == 200
+            hidden = client.get(
+                f"/api/v1/learning/practice/sessions/{started['id']}/report"
             )
             assert hidden.status_code == 404
     finally:

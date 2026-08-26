@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
-from app.models.training import PracticeSession
+from app.models.training import LearningEvent, PracticeSession
 from app.models.user import User
 from app.services import learning_service, paper_composition_service, paper_release_service
 from app.services.practice_scoring_service import (
@@ -360,7 +360,7 @@ async def answer_session_question(
         )
 
     session = await _session_for_update(db, owner, session_id)
-    if session.status != "active":
+    if session.status not in {"active", "paused"}:
         raise _error(409, "PRACTICE_SESSION_NOT_ACTIVE", "当前会话不可继续作答")
     refs = session.question_order if isinstance(session.question_order, list) else []
     ref = next(
@@ -391,6 +391,9 @@ async def answer_session_question(
             "练习进度已在其他页面更新，请加载最新进度",
             currentRevision=session.revision,
         )
+    if session.status == "paused":
+        session.status = "active"
+        session.paused_at = None
 
     try:
         grading = await learning_service.record_practice_answer(
@@ -515,7 +518,7 @@ async def update_runtime_state(
 ) -> dict:
     requested_revision = _required_revision(data)
     session = await _session_for_update(db, owner, session_id)
-    if session.status != "active":
+    if session.status not in {"active", "paused"}:
         raise _error(409, "PRACTICE_SESSION_NOT_ACTIVE", "当前会话不可继续作答")
     if session.revision != requested_revision:
         raise _error(
@@ -535,8 +538,251 @@ async def update_runtime_state(
         stats["durationMs"] = patch["durationMs"]
     session.runtime_state = runtime_state
     session.stats = stats
+    if session.status == "paused":
+        session.status = "active"
+        session.paused_at = None
     session.revision += 1
     session.last_saved_at = now_utc()
     await db.commit()
     await db.refresh(session)
     return await _session_payload(db, session)
+
+
+def _apply_runtime_patch(session: PracticeSession, data: dict) -> None:
+    if "runtimeState" not in data:
+        return
+    refs = session.question_order if isinstance(session.question_order, list) else []
+    patch = _validated_runtime_state(data, question_count=len(refs))
+    runtime_state = dict(session.runtime_state or {})
+    runtime_state.update(patch)
+    stats = dict(session.stats or {})
+    if "experience" in patch:
+        stats["experience"] = patch["experience"]
+    if "durationMs" in patch:
+        stats["durationMs"] = patch["durationMs"]
+    session.runtime_state = runtime_state
+    session.stats = stats
+
+
+def _revision_conflict(session: PracticeSession) -> PracticeSessionError:
+    return _error(
+        409,
+        "PRACTICE_SESSION_REVISION_CONFLICT",
+        "练习进度已在其他页面更新，请加载最新进度",
+        currentRevision=session.revision,
+    )
+
+
+async def pause_session(
+    db: AsyncSession, owner: str, session_id: str, data: dict
+) -> dict:
+    requested_revision = _required_revision(data)
+    session = await _session_for_update(db, owner, session_id)
+    if session.status == "paused":
+        if requested_revision in {session.revision, session.revision - 1}:
+            return await _session_payload(db, session)
+        raise _revision_conflict(session)
+    if session.status != "active":
+        raise _error(409, "PRACTICE_SESSION_TERMINAL", "练习已结束，不能暂停")
+    if session.revision != requested_revision:
+        raise _revision_conflict(session)
+    _apply_runtime_patch(session, data)
+    saved_at = now_utc()
+    session.status = "paused"
+    session.paused_at = saved_at
+    session.last_saved_at = saved_at
+    session.revision += 1
+    await db.commit()
+    await db.refresh(session)
+    return await _session_payload(db, session)
+
+
+async def abandon_session(
+    db: AsyncSession, owner: str, session_id: str, data: dict
+) -> dict:
+    requested_revision = _required_revision(data)
+    session = await _session_for_update(db, owner, session_id)
+    if session.status == "abandoned":
+        if requested_revision in {session.revision, session.revision - 1}:
+            return await _session_payload(db, session)
+        raise _revision_conflict(session)
+    if session.status == "completed":
+        raise _error(409, "PRACTICE_SESSION_TERMINAL", "已交卷的练习不能放弃")
+    if session.revision != requested_revision:
+        raise _revision_conflict(session)
+    _apply_runtime_patch(session, data)
+    saved_at = now_utc()
+    session.status = "abandoned"
+    session.abandoned_at = saved_at
+    session.last_saved_at = saved_at
+    session.revision += 1
+    await db.commit()
+    await db.refresh(session)
+    return await _session_payload(db, session)
+
+
+def performance_band(percent: float, scoring: dict) -> str:
+    bands = scoring.get("bands") if isinstance(scoring.get("bands"), dict) else {}
+    if percent < float(bands.get("needsImprovement", 50)):
+        return "needsImprovement"
+    if percent < float(bands.get("belowTarget", 60)):
+        return "belowTarget"
+    if percent < float(bands.get("target", 80)):
+        return "target"
+    return "aboveTarget"
+
+
+async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
+    refs = session.question_order if isinstance(session.question_order, list) else []
+    answers = session.answers if isinstance(session.answers, dict) else {}
+    rows = (
+        await db.execute(
+            select(PaperReleaseQuestion).where(
+                PaperReleaseQuestion.release_id == session.release_id
+            )
+        )
+    ).scalars().all()
+    row_map = {row.question_id: row for row in rows}
+    scoring = (
+        session.scoring_snapshot
+        if isinstance(session.scoring_snapshot, dict)
+        else dict(DEFAULT_SIMULATION_SCORING)
+    )
+    weights = scoring.get("domainWeights")
+    if not isinstance(weights, dict):
+        weights = dict(DEFAULT_DOMAIN_WEIGHTS)
+    domain_counts = {
+        domain: {"total": 0, "answered": 0, "correct": 0, "wrong": 0}
+        for domain in weights
+    }
+    wrong_question_ids: list[str] = []
+    correct_count = 0
+    answered_count = 0
+    for ref in refs:
+        if not isinstance(ref, dict):
+            continue
+        question_id = str(ref.get("questionId") or "")
+        domain = str(ref.get("domain") or "")
+        if domain not in domain_counts:
+            continue
+        domain_counts[domain]["total"] += 1
+        answer = answers.get(question_id)
+        if not isinstance(answer, dict):
+            continue
+        answered_count += 1
+        domain_counts[domain]["answered"] += 1
+        row = row_map.get(question_id)
+        snapshot = row.snapshot if row is not None and isinstance(row.snapshot, dict) else {}
+        correct_answer = str(snapshot.get("correctAnswer") or "")
+        if str(answer.get("selectedAnswer") or "") == correct_answer:
+            correct_count += 1
+            domain_counts[domain]["correct"] += 1
+        else:
+            wrong_question_ids.append(question_id)
+            domain_counts[domain]["wrong"] += 1
+    total = len(refs)
+    score_percent = round((correct_count / total * 100) if total else 0, 2)
+    pass_percent = float(scoring.get("passPercent", 60))
+    passed = score_percent >= pass_percent
+    domains = {}
+    for domain, counts in domain_counts.items():
+        domain_total = counts["total"]
+        domain_percent = round(
+            (counts["correct"] / domain_total * 100) if domain_total else 0,
+            2,
+        )
+        domains[domain] = {
+            "weight": int(weights.get(domain, 0)),
+            **counts,
+            "unanswered": domain_total - counts["answered"],
+            "scorePercent": domain_percent,
+            "performanceBand": performance_band(domain_percent, scoring),
+        }
+    stats = session.stats if isinstance(session.stats, dict) else {}
+    return {
+        "sessionId": session.id,
+        "paperId": session.paper_id,
+        "releaseId": session.release_id,
+        "mode": session.mode,
+        "resultLabel": f"模拟考试结果：{'PASS' if passed else 'FAIL'}",
+        "passed": passed,
+        "scorePercent": score_percent,
+        "passPercent": pass_percent,
+        "overallBand": performance_band(score_percent, scoring),
+        "counts": {
+            "total": total,
+            "answered": answered_count,
+            "correct": correct_count,
+            "wrong": answered_count - correct_count,
+            "unanswered": total - answered_count,
+        },
+        "domainWeights": {domain: int(value) for domain, value in weights.items()},
+        "domains": domains,
+        "wrongQuestionIds": wrong_question_ids,
+        "durationMs": max(0, int(stats.get("durationMs") or 0)),
+        "official": False,
+        "disclaimer": "幻谱模拟判定，不代表 PMI 官方考试成绩",
+    }
+
+
+async def complete_session(
+    db: AsyncSession, owner: str, session_id: str, data: dict
+) -> tuple[dict, dict]:
+    requested_revision = _required_revision(data)
+    session = await _session_for_update(db, owner, session_id)
+    if session.status == "completed" and isinstance(session.report_snapshot, dict):
+        return await _session_payload(db, session), session.report_snapshot
+    if session.status == "abandoned":
+        raise _error(409, "PRACTICE_SESSION_TERMINAL", "已放弃的练习不能交卷")
+    if session.revision != requested_revision:
+        raise _revision_conflict(session)
+    _apply_runtime_patch(session, data)
+    report = await _build_report(db, session)
+    completed_at = now_utc()
+    report["completedAt"] = completed_at.isoformat()
+    session.report_snapshot = report
+    session.status = "completed"
+    session.completed_at = completed_at
+    session.last_saved_at = completed_at
+    session.revision += 1
+    counts = report["counts"]
+    db.add(
+        LearningEvent(
+            id=uid("le_"),
+            owner_id=owner,
+            event_type=learning_service.PRACTICE_SESSION_EVENT_TYPE,
+            payload={
+                "sessionId": session.id,
+                "mode": session.mode,
+                "paperId": session.paper_id,
+                "paperName": "PMP 模拟练习",
+                "answered": counts["answered"],
+                "correct": counts["correct"],
+                "experience": max(
+                    0, int((session.stats or {}).get("experience") or 0)
+                ),
+                "durationMs": report["durationMs"],
+                "status": "completed",
+            },
+        )
+    )
+    await db.commit()
+    await db.refresh(session)
+    return await _session_payload(db, session), report
+
+
+async def get_report(
+    db: AsyncSession, owner: str, session_id: str
+) -> dict | None:
+    session = (
+        await db.execute(
+            select(PracticeSession).where(
+                PracticeSession.id == session_id,
+                PracticeSession.owner_id == owner,
+                PracticeSession.status == "completed",
+            )
+        )
+    ).scalar_one_or_none()
+    if session is None or not isinstance(session.report_snapshot, dict):
+        return None
+    return session.report_snapshot
