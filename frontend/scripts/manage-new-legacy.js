@@ -16,6 +16,8 @@ import {
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { CRITICAL_SITE_FILES } from './new-legacy-release-storage.js'
+
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const frontendDir = resolve(scriptsDir, '..')
 const repoDir = resolve(frontendDir, '..')
@@ -29,15 +31,6 @@ const validationScript = process.env.KG_RELEASE_VALIDATION_SCRIPT
   ? resolve(process.env.KG_RELEASE_VALIDATION_SCRIPT)
   : resolve(scriptsDir, 'validate-new-legacy-release.sh')
 const validationMaxBuffer = 64 * 1024 * 1024
-const criticalSiteFiles = [
-  'landing.html',
-  'styles/landing.css',
-  'src/landing.js',
-  'assets/landing/graph.png',
-  'admin-console.html',
-  'question-bank.html',
-  'content-prep-studio/dist/content-prep.html',
-]
 
 function parseArgs(argv) {
   const positional = []
@@ -183,7 +176,7 @@ function candidateSiteGate(activeRoot, candidateRoot, version) {
   if (!existsSync(candidateSite) || !statSync(candidateSite).isDirectory()) {
     throw new Error('候选 site 目录不存在')
   }
-  const missing = criticalSiteFiles.filter((path) => !existsSync(resolve(candidateSite, path)))
+  const missing = CRITICAL_SITE_FILES.filter((path) => !existsSync(resolve(candidateSite, path)))
   if (missing.length) throw new Error(`候选 site 缺少关键文件：${missing.join(', ')}`)
   const candidateFiles = walk(candidateSite).length
   const current = currentManifest(activeRoot)
@@ -198,7 +191,7 @@ function candidateSiteGate(activeRoot, candidateRoot, version) {
       throw new Error(`候选 site 文件数 ${candidateFiles} 少于当前 active site ${activeFiles}`)
     }
   }
-  return { candidateFiles, activeFiles, requiredFiles: criticalSiteFiles }
+  return { candidateFiles, activeFiles, requiredFiles: CRITICAL_SITE_FILES }
 }
 
 function writeValidationReport(root, version, report) {

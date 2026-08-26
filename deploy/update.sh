@@ -42,16 +42,12 @@ echo "[1/5] 本地构建 new-legacy 产物（前端页面 + 引导课程 seed）
 cd "$REPO_DIR/frontend"
 node scripts/sync-new-legacy.js
 node scripts/export-guided-course.mjs
+node scripts/prepare-new-legacy-runtime.js
 cd "$REPO_DIR"
 
 echo "[2/5] rsync 代码到 $REMOTE:$REMOTE_DIR"
 rsync -az --delete \
-  --exclude '/.git' --exclude '/new-legacy' --exclude '/docs' \
-  --exclude '/backups' \
-  --exclude '/.superpowers' --exclude '/.pytest_cache' --exclude '/.gitattributes' \
-  --exclude 'node_modules' --exclude '.venv' --exclude '__pycache__' --exclude '*.pyc' \
-  --exclude '.DS_Store' --exclude '._*' --exclude '/frontend/e2e' --exclude '/e2e' \
-  --exclude '.env.prod' --exclude '/backend/.env' \
+  --exclude-from "$REPO_DIR/deploy/rsync-excludes.txt" \
   "$REPO_DIR/" "$REMOTE:$REMOTE_DIR/"
 
 echo "[3/5] 重建后端镜像并重启"
