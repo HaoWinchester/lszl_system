@@ -35,6 +35,7 @@ with sync_playwright() as playwright:
     assert not page_errors, page_errors
     assert any("home-shell.js" in url for url in bundle_requests), bundle_requests
     assert any("home-graph.js" in url for url in bundle_requests), bundle_requests
+    assert not any("home-graph.css" in url for url in bundle_requests), bundle_requests
 
     with page.expect_response(lambda response: "home-file-library.js" in response.url):
         page.locator("#graphFileAddBtn").click()

@@ -97,7 +97,7 @@ function replaceTags(html, matches, replacement) {
 function alreadyBuilt(html, plan, outputRoot) {
   const outputs = plan.groups.flatMap((group) => [
     ...(group.scripts.length ? [`bundles/${group.name}.js`] : []),
-    ...(group.styles.length ? [`bundles/${group.name}.css`] : []),
+    ...(group.styles.length || group.retainStyleArtifact ? [`bundles/${group.name}.css`] : []),
   ])
   return html.includes('<meta name="kg-homepage-bundle-version"')
     && outputs.length > 0
@@ -121,8 +121,11 @@ export function buildHomepageBundles({ outputRoot, version, plan }) {
     if (group.scripts.length) {
       writeFileSync(resolve(bundleDir, `${group.name}.js`), concatenateScripts(outputRoot, group.scripts))
     }
-    if (group.styles.length) {
-      writeFileSync(resolve(bundleDir, `${group.name}.css`), concatenateStyles(outputRoot, group.styles))
+    if (group.styles.length || group.retainStyleArtifact) {
+      const contents = group.styles.length
+        ? concatenateStyles(outputRoot, group.styles)
+        : `/* compatibility artifact: ${group.name} styles moved to home-shell.css */\n`
+      writeFileSync(resolve(bundleDir, `${group.name}.css`), contents)
     }
   }
 

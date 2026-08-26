@@ -4,10 +4,10 @@
   if(global.KGHomepageLoader)return;
 
   const groups=Object.freeze({
-    graph:{bundle:'home-graph',style:true},
-    fileLibrary:{bundle:'home-file-library',style:true},
+    graph:{bundle:'home-graph',style:false},
+    fileLibrary:{bundle:'home-file-library',style:false},
     question:{bundle:'home-question',style:false},
-    secondary:{bundle:'home-secondary',style:true}
+    secondary:{bundle:'home-secondary',style:false}
   });
   const records=new Map(Object.keys(groups).map(name=>[name,{state:'idle',promise:null,nodes:[]}]))
   const replaying=new WeakSet();
@@ -23,6 +23,11 @@
     document.documentElement.dataset.homeGraphState=state;
     const status=document.getElementById('status');
     if(!status)return;
+    if(state==='ready'){
+      status.textContent='';
+      status.classList?.remove?.('show');
+      return;
+    }
     status.textContent=message;
     status.classList?.add?.('show');
     if(state==='error'){

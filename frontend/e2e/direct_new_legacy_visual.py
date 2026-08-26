@@ -1,4 +1,5 @@
 import argparse
+import json
 from pathlib import Path
 
 from PIL import Image
@@ -19,6 +20,9 @@ DISABLE_MOTION = "*,*::before,*::after{animation:none!important;transition:none!
 # sync 定制层（sync-new-legacy.js）有意注入的样式表——仅样式弹窗内容（会员/用户中心），
 # 页面加载时无弹窗打开，不影响外观。比较前滤掉，避免被误判为意外视觉变化。
 CUSTOMIZATION_STYLESHEETS = {"membership-ui.css"}
+HOMEPAGE_BUNDLE_GROUPS = json.loads(
+    (Path(__file__).parents[1] / "scripts" / "homepage-bundles.json").read_text()
+)["groups"]
 
 
 def difference_ratio(left_path: Path, right_path: Path, threshold: int = 20) -> float:
@@ -81,9 +85,25 @@ with sync_playwright() as playwright:
                     paths.append(screenshot)
                     context.close()
 
-                assert [s for s in stylesheets[0] if s not in CUSTOMIZATION_STYLESHEETS] == [
-                    s for s in stylesheets[1] if s not in CUSTOMIZATION_STYLESHEETS
-                ], (case_name, viewport_name, stylesheets)
+                integrated_styles = [s for s in stylesheets[0] if s not in CUSTOMIZATION_STYLESHEETS]
+                raw_styles = [s for s in stylesheets[1] if s not in CUSTOMIZATION_STYLESHEETS]
+                if case_name == "free":
+                    expected_initial = [
+                        f"{group['name']}.css"
+                        for group in HOMEPAGE_BUNDLE_GROUPS
+                        if group["name"] in {"home-shell", "home-graph"} and group["styles"]
+                    ]
+                    expected_raw = [
+                        Path(asset).name
+                        for group in HOMEPAGE_BUNDLE_GROUPS
+                        for asset in group["styles"]
+                        if Path(asset).name not in CUSTOMIZATION_STYLESHEETS
+                    ]
+                    assert integrated_styles == expected_initial, (case_name, viewport_name, stylesheets)
+                    assert len(raw_styles) == len(set(raw_styles)), (case_name, viewport_name, stylesheets)
+                    assert set(raw_styles) == set(expected_raw), (case_name, viewport_name, stylesheets)
+                else:
+                    assert integrated_styles == raw_styles, (case_name, viewport_name, stylesheets)
                 ratio = difference_ratio(paths[0], paths[1])
                 assert ratio <= 0.01, f"{case_name}/{viewport_name} visual difference {ratio:.3%}"
                 print(f"visual: {case_name}/{viewport_name} difference={ratio:.3%}", flush=True)

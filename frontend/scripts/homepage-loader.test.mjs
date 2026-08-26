@@ -57,23 +57,22 @@ function harness() {
   return { api: window.KGHomepageLoader, appended, events, raf, status, document }
 }
 
-test('graph bundle loading is coalesced, updates state, and resolves after script and style load', async () => {
+test('graph bundle loading is coalesced, updates state, and reuses the initial stylesheet bundle', async () => {
   const item = harness()
   const first = item.api.loadGraph()
   const second = item.api.loadGraph()
 
   assert.equal(first, second)
   assert.equal(item.document.documentElement.dataset.homeGraphState, 'loading')
-  assert.equal(item.appended.filter((node) => node.tagName === 'LINK').length, 1)
+  assert.equal(item.appended.filter((node) => node.tagName === 'LINK').length, 0)
   assert.equal(item.appended.filter((node) => node.tagName === 'SCRIPT').length, 1)
-  assert.match(item.appended.find((node) => node.tagName === 'LINK').href, /bundles\/home-graph\.css\?v=v-test/)
   assert.match(item.appended.find((node) => node.tagName === 'SCRIPT').src, /bundles\/home-graph\.js\?v=v-test/)
 
-  item.appended.find((node) => node.tagName === 'LINK').onload()
   item.appended.find((node) => node.tagName === 'SCRIPT').onload()
   await first
 
   assert.equal(item.document.documentElement.dataset.homeGraphState, 'ready')
+  assert.equal(item.status.textContent, '')
   assert.equal(item.events.at(-1).type, 'kg:homepage-group-ready')
   assert.equal(item.events.at(-1).detail.group, 'graph')
 })
@@ -93,7 +92,7 @@ test('failed graph bundle can be retried without loading deferred groups', async
   const retry = item.api.loadGraph()
   assert.notEqual(retry, failed)
   assert.equal(item.appended.filter((node) => node.tagName === 'SCRIPT').length, 2)
-  assert.equal(item.appended.filter((node) => node.tagName === 'LINK').length, 2)
+  assert.equal(item.appended.filter((node) => node.tagName === 'LINK').length, 0)
 })
 
 test('automatic graph loading waits for the first animation frame', () => {

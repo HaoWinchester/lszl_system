@@ -14,7 +14,7 @@ window.KGHomepageGraphBootstrap=(async function bootstrapKnowledgeGraphApp(){
   render();
   authInstallGuards();
   authInstallQuestionReadonlyGuard();
-  if (window.KGGraphFileTabs && typeof window.KGGraphFileTabs.init === 'function') await window.KGGraphFileTabs.init();
+  if (window.KGGraphFileTabs && typeof window.KGGraphFileTabs.init === 'function') await window.KGGraphFileTabs.init({currentOnly:true});
   if (window.KGGraphFileAutosave && typeof window.KGGraphFileAutosave.start === 'function') window.KGGraphFileAutosave.start();
 
   if (typeof bindQuestionTrainer === 'function') bindQuestionTrainer();
@@ -41,7 +41,7 @@ window.KGHomepageGraphBootstrap=(async function bootstrapKnowledgeGraphApp(){
     if(!remote||!remote.handleSessionChange)return;
     try{
       const file=await remote.handleSessionChange(event);
-      if(window.KGGraphFileTabs&&typeof window.KGGraphFileTabs.refresh==='function')await window.KGGraphFileTabs.refresh();
+      if(window.KGGraphFileTabs&&typeof window.KGGraphFileTabs.refresh==='function')await window.KGGraphFileTabs.refresh({currentOnly:true});
       if(!file&&event&&event.detail&&event.detail.authenticated===true)return;
       if(event&&event.detail&&event.detail.authenticated===false){
         if(typeof baseState==='function')state=baseState();

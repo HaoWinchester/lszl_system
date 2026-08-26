@@ -125,8 +125,12 @@ test('update builds an isolated release and atomically selects it', () => {
   const page = readFileSync(resolve(root, sourceVersion, 'site', 'index.html'), 'utf8')
   assert.match(page, new RegExp(`bundles/home-shell\\.css\\?v=${sourceVersion}`))
   assert.match(
-    readFileSync(resolve(root, sourceVersion, 'site', 'bundles/home-secondary.css'), 'utf8'),
+    readFileSync(resolve(root, sourceVersion, 'site', 'bundles/home-shell.css'), 'utf8'),
     /style: styles\/user-center\.css/,
+  )
+  assert.match(
+    readFileSync(resolve(root, sourceVersion, 'site', 'bundles/home-secondary.css'), 'utf8'),
+    /compatibility artifact/,
   )
   assert.match(page, /kg-direct-bootstrap-anchor/)
   assert.doesNotMatch(page, /server-state-bootstrap\.js/)

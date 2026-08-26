@@ -16,26 +16,24 @@ function load({authenticated=true,responses=[]}={}){
 }
 (async()=>{
   const existing=load({responses:[
-    {files:[{id:'first',name:'列表首项'},{id:'second',name:'第二项'}]},
     {fileId:'second'},
-    {meta:{id:'second',name:'详情名称',revision:7},graphData:{meta:{title:'详情图谱'},nodes:[{id:'n1'}]},learningState:{flashcards:{f1:{}}}},
-    {ok:true}
+    {meta:{id:'second',name:'详情名称',revision:7},graphData:{meta:{title:'详情图谱'},nodes:[{id:'n1'}]},learningState:{flashcards:{f1:{}}}}
   ]});
   assert.strictEqual(existing.context.KGGraphFileApi.isRemote(),true,'direct bootstrap authentication must enable remote files');
-  const first=await existing.context.KGGraphFileRemoteAdapter.initialize();
+  const first=await existing.context.KGGraphFileRemoteAdapter.initializeCurrent();
   assert.strictEqual(first.id,'second','must reopen the current active file selected by file manager');
   assert.strictEqual(first.name,'详情名称','must map response meta into current file');
   assert.strictEqual(first.graphData.nodes.length,1,'must retain backend graphData');
   assert.deepStrictEqual(JSON.parse(JSON.stringify(first.learningState)),{flashcards:{f1:{}}});
-  assert.strictEqual(existing.calls.length,4,'existing file must read current state without creating a new file');
+  assert.strictEqual(existing.calls.length,2,'homepage initialization must request only current metadata and its graph body');
+  assert.deepStrictEqual(existing.calls.map(call=>call.url),['/api/v1/files/current','/api/v1/files/second']);
 
-  const empty=load({responses:[{files:[]},{fileId:null},{file:{id:'created',name:'我的知识图谱'}},{meta:{id:'created',name:'我的知识图谱'},graphData:{meta:{title:'我的知识图谱'},nodes:[]},learningState:{}},{ok:true}]});
-  const created=await empty.context.KGGraphFileRemoteAdapter.initialize();
-  assert.strictEqual(created.id,'created');
-  assert.strictEqual(empty.calls[2].url,'/api/v1/files');
-  const body=JSON.parse(empty.calls[2].options.body);
-  assert.strictEqual(body.graphData.meta.title,'我的知识图谱','empty remote account must use the explicit default graph');
-  assert.strictEqual(body.graphData.nodes.length,11,'empty remote account must create the approved 11-node default graph');
+  const empty=load({responses:[{fileId:null}]});
+  const created=await empty.context.KGGraphFileRemoteAdapter.initializeCurrent();
+  assert.strictEqual(created,null,'an account without a current graph must remain empty');
+  assert.deepStrictEqual(empty.calls.map(call=>call.url),['/api/v1/files/current'],'homepage initialization must not list or create graph files');
+
+  empty.context.KGGraphFileRemoteAdapter.adoptFile({id:'created',name:'我的知识图谱',revision:1,graphData:{meta:{title:'我的知识图谱'},nodes:[],links:[]},learningState:{}});
 
   let saveAttempts=0;
   empty.context.KGGraphFileApi.save=async()=>{saveAttempts+=1;if(saveAttempts===1)throw new Error('temporary failure');return{file:{id:'created',name:'我的知识图谱',revision:2}}};
@@ -51,10 +49,10 @@ function load({authenticated=true,responses=[]}={}){
 
   let resolveList;
   const stale=load({responses:[{promise:new Promise(resolve=>{resolveList=resolve})}]});
-  const pending=stale.context.KGGraphFileRemoteAdapter.initialize();
+  const pending=stale.context.KGGraphFileRemoteAdapter.initializeCurrent();
   await Promise.resolve();
   await stale.context.KGGraphFileRemoteAdapter.handleSessionChange({detail:{authenticated:false}});
-  resolveList({ok:true,json:async()=>({files:[{id:'old'}]})});
+  resolveList({ok:true,json:async()=>({fileId:'old'})});
   await pending;
   assert.strictEqual(stale.context.KGGraphFileRemoteAdapter.getCurrentFileMeta(),null,'old response must be discarded after logout');
   console.log('graph remote adapter contract passed');

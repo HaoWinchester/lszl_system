@@ -13,7 +13,7 @@ let sessionAuthenticated = true;
 let stateSeenByLoad = '';
 const remote = {
   active: () => sessionAuthenticated,
-  initialize: async () => ({ id: 'remote-file' }),
+  initializeCurrent: async () => ({ id: 'remote-file' }),
   handleSessionChange: async event => {
     sessionAuthenticated = event.detail.authenticated;
     return sessionAuthenticated ? { id: 'remote-file' } : null;

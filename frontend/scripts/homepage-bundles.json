@@ -28,11 +28,30 @@
         "src/30-shared-auth-dialog.js",
         "src/32-wechat-login.js",
         "direct-auth-adapter.js",
-        "src/41-account-menu.js"
+        "src/41-account-menu.js",
+        "src/39-global-shortcuts.js"
       ],
       "styles": [
         "styles/main.css",
+        "styles/global-shortcuts.css",
+        "styles/subscription.css",
+        "styles/user-center.css",
+        "styles/membership-ui.css",
         "styles/account-menu.css",
+        "styles/support-center.css",
+        "styles/home-file-library.css",
+        "styles/graph-file-tabs.css",
+        "styles/graph-user-preferences.css",
+        "styles/unified-canvas-runtime.css",
+        "styles/home-graph-components.css",
+        "styles/home-canvas-performance.css",
+        "styles/home-selection-p4326.css",
+        "styles/selection-bounds-drag-p4327.css",
+        "styles/home-selection-drag-controls-p4329.css",
+        "styles/home-interaction-modes-p4330.css",
+        "styles/home-selection-geometry-p4332.css",
+        "styles/home-learning-entry-p4515.css",
+        "styles/learning-weekly-open-gate.css",
         "styles/close-button.css"
       ]
     },
@@ -40,6 +59,7 @@
       "name": "home-graph",
       "initial": false,
       "defer": true,
+      "retainStyleArtifact": true,
       "scripts": [
         "src/graph/graph-model.js",
         "src/graph/card-style-registry.js",
@@ -86,6 +106,7 @@
         "src/26-graph-export-service.js",
         "src/24-graph-file-autosave.js",
         "direct-graph-adapter.js",
+        "src/25-graph-file-tabs.js",
         "src/20-flashcards-toolbar.js",
         "src/27-home-interaction-modes.js",
         "src/32-home-mobile-readonly-notice.js",
@@ -93,32 +114,17 @@
         "src/40-guided-tour.js",
         "src/90-bootstrap.js"
       ],
-      "styles": [
-        "styles/graph-user-preferences.css",
-        "styles/unified-canvas-runtime.css",
-        "styles/home-graph-components.css",
-        "styles/home-canvas-performance.css",
-        "styles/home-selection-p4326.css",
-        "styles/selection-bounds-drag-p4327.css",
-        "styles/home-selection-drag-controls-p4329.css",
-        "styles/home-interaction-modes-p4330.css",
-        "styles/home-selection-geometry-p4332.css",
-        "styles/home-learning-entry-p4515.css",
-        "styles/learning-weekly-open-gate.css"
-      ]
+      "styles": []
     },
     {
       "name": "home-file-library",
       "initial": false,
       "defer": true,
+      "retainStyleArtifact": true,
       "scripts": [
-        "src/22-home-file-library.js",
-        "src/25-graph-file-tabs.js"
+        "src/22-home-file-library.js"
       ],
-      "styles": [
-        "styles/home-file-library.css",
-        "styles/graph-file-tabs.css"
-      ]
+      "styles": []
     },
     {
       "name": "home-question",
@@ -138,6 +144,7 @@
       "name": "home-secondary",
       "initial": false,
       "defer": true,
+      "retainStyleArtifact": true,
       "scripts": [
         "src/37-subscription-plans.js",
         "src/37-subscription-orders.js",
@@ -145,18 +152,11 @@
         "src/37-subscription-core.js",
         "direct-system-adapter.js",
         "src/33-user-center.js",
-        "src/39-global-shortcuts.js",
         "src/101-engagement-repository.js",
         "src/102-help-content.js",
         "src/103-support-center.js"
       ],
-      "styles": [
-        "styles/global-shortcuts.css",
-        "styles/subscription.css",
-        "styles/user-center.css",
-        "styles/membership-ui.css",
-        "styles/support-center.css"
-      ]
+      "styles": []
     }
   ]
 }

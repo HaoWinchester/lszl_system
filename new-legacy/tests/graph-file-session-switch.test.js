@@ -16,10 +16,9 @@ async function respond(payload){for(let i=0;i<20&&!pending.length;i++)await new 
 (async()=>{
   const adapter=context.KGGraphFileRemoteAdapter;
   assert.strictEqual(typeof adapter.handleSessionChange,'function');
-  const aliceInit=adapter.initialize({fallbackGraphData:{meta:{title:'访客默认'},nodes:[]}});
-  await respond({files:[{id:'alice-1',name:'Alice'}]});
-  await respond({id:'alice-1',graphData:{meta:{title:'Alice'},nodes:[]}});
-  await respond({ok:true});
+  const aliceInit=adapter.initializeCurrent();
+  await respond({fileId:'alice-1'});
+  await respond({meta:{id:'alice-1',name:'Alice'},graphData:{meta:{title:'Alice'},nodes:[]},learningState:{}});
   await aliceInit;
   assert.strictEqual(adapter.getCurrentFileMeta().id,'alice-1');
   user='bob';
@@ -28,7 +27,7 @@ async function respond(payload){for(let i=0;i<20&&!pending.length;i++)await new 
   user='';
   await adapter.handleSessionChange({detail:{authenticated:false,username:''}});
   assert.strictEqual(adapter.getCurrentFileMeta(),null);
-  await respond({files:[{id:'bob-1',name:'Bob'}]});
+  await respond({fileId:'bob-1'});
   await bobInit;
   assert.strictEqual(adapter.getCurrentFileMeta(),null,'stale login response must not restore cache after logout');
   console.log('graph session switch test passed');

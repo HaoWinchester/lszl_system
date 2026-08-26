@@ -38,6 +38,8 @@ function load({ remoteActive }) {
 
 (async () => {
   const remote = load({ remoteActive: true });
+  await remote.bridge.initializeCurrent();
+  assert.deepStrictEqual(remote.calls, [], 'current-only initialization must select the seeded remote store without listing its catalog');
   await remote.bridge.initialize();
   assert.deepStrictEqual(remote.calls, [['remote-initialize']], 'remote mode must initialize only the Files API cache');
   assert.strictEqual(remote.bridge.current().listFiles()[0].id, 'remote-1');

@@ -65,7 +65,11 @@
   }
   function storeBridge(){return global.KGGraphFileEditorStoreBridge||null}
   function fileStore(){const bridge=storeBridge();return bridge&&typeof bridge.current==='function'?bridge.current():global.KGGraphFileStore}
-  async function initializeStore(){const bridge=storeBridge();return bridge&&typeof bridge.initialize==='function'?await bridge.initialize():fileStore()}
+  async function initializeStore(options={}){
+    const bridge=storeBridge();
+    if(options.currentOnly&&bridge&&typeof bridge.initializeCurrent==='function')return await bridge.initializeCurrent();
+    return bridge&&typeof bridge.initialize==='function'?await bridge.initialize():fileStore();
+  }
   async function openStoredFile(id,options={}){const bridge=storeBridge();if(bridge&&typeof bridge.openFile==='function')return await bridge.openFile(id,options);const store=fileStore();return store?await Promise.resolve(store.openFile(id,options)):null}
   async function createStoredFile(input,options={}){const bridge=storeBridge();if(bridge&&typeof bridge.createFile==='function')return await bridge.createFile(input,options);const store=fileStore();return store?await Promise.resolve(store.createFile(input,options)):null}
   async function saveBeforeSwitch(){const autosave=global.KGGraphFileAutosave;return !autosave||typeof autosave.saveBeforeSwitch!=='function'||await Promise.resolve(autosave.saveBeforeSwitch())!==false}
@@ -359,8 +363,8 @@
     global.addEventListener('kg-graph-autosave-status',event=>renderSaveState(event.detail||{}));
     global.addEventListener('kg-graph-file-error',event=>{const message=event.detail&&event.detail.message;if(message&&typeof global.showStatus==='function')global.showStatus(message)});
   }
-  async function init(){if(initialized)return;initialized=true;await initializeStore();bind();renderTabs()}
-  async function refresh(){await initializeStore();renderTabs()}
+  async function init(options={}){if(initialized)return;initialized=true;await initializeStore(options);bind();renderTabs()}
+  async function refresh(options={}){await initializeStore(options);renderTabs()}
 
   global.KGGraphFileTabs={init,refresh,renderTabs,openFile,closeFile,createFile,manualSave,updateCurrentFileDisplay};
 })(window);

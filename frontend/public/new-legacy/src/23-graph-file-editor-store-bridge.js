@@ -15,6 +15,11 @@
     }else selected=global.KGGraphFileStore||null;
     return selected;
   }
+  async function initializeCurrent(){
+    if(remoteActive())selected=global.KGGraphFileRemoteStore;
+    else selected=global.KGGraphFileStore||null;
+    return selected;
+  }
   function current(){return selected}
   function adopt(file){
     if(isRemote()&&file&&global.KGGraphFileRemoteAdapter&&typeof global.KGGraphFileRemoteAdapter.adoptFile==='function'){
@@ -35,5 +40,5 @@
     if(isRemote()&&file&&typeof store.openFile==='function')file=await Promise.resolve(store.openFile(file.id,options));
     return adopt(file);
   }
-  global.KGGraphFileEditorStoreBridge={initialize,current,isRemote,openFile,createFile,adopt};
+  global.KGGraphFileEditorStoreBridge={initialize,initializeCurrent,current,isRemote,openFile,createFile,adopt};
 })(window);

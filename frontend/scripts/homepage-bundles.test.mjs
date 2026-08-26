@@ -33,7 +33,7 @@ function fixture() {
     groups: [
       { name: 'home-prelude', initial: true, defer: false, scripts: ['prelude.js'], styles: [] },
       { name: 'home-shell', initial: true, defer: true, scripts: ['src/a.js', 'src/b.js'], styles: ['styles/shell.css'] },
-      { name: 'home-graph', initial: false, defer: true, scripts: ['src/graph.js'], styles: ['styles/graph.css'] },
+      { name: 'home-graph', initial: false, defer: true, retainStyleArtifact: true, scripts: ['src/graph.js'], styles: ['styles/graph.css'] },
     ],
   }
   return { root, plan }
@@ -56,6 +56,7 @@ test('builder emits reproducible bundles that execute classic scripts in declare
   assert.match(firstHtml, /bundles\/home-shell\.css\?v=v-test/)
   assert.match(firstHtml, /<meta name="kg-homepage-bundle-version" content="v-test">/)
   assert.doesNotMatch(firstHtml, /bundles\/home-graph\.(?:js|css)/)
+  assert.match(readFileSync(resolve(item.root, 'bundles/home-graph.css'), 'utf8'), /\.graph/)
 
   const context = vm.createContext({ window: { order: [] } })
   context.document = {
