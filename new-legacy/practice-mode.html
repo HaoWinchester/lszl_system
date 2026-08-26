@@ -160,6 +160,11 @@
         </div>
         <div class="practice-streak-pop" id="practiceStreakPop" hidden role="status"></div>
         <div class="practice-feedback" id="practiceFeedback" hidden role="status"></div>
+        <div class="practice-session-conflict" id="practiceSessionConflict" hidden role="alert">
+          <div><strong>进度已在另一页更新</strong><span>加载服务端最新进度后可继续作答。</span></div>
+          <button type="button" class="practice-primary-btn" id="practiceSessionConflictReload">加载最新进度</button>
+        </div>
+        <div class="practice-session-unsaved" id="practiceSessionUnsaved" hidden role="status">进度尚未保存，正在自动重试…</div>
         <div class="practice-verification-banner" id="practiceVerificationBanner" hidden aria-live="polite">
           <span>KNOWLEDGE CHECK</span>
           <div><strong id="practiceVerificationKnowledge">核心知识点</strong><small id="practiceVerificationMessage">这不是原错题。请用新的题干重新判断。</small></div>

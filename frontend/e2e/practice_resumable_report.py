@@ -195,7 +195,7 @@ def run_browser() -> None:
         hidden = context.request.get(f"{BASE_URL}/api/v1/learning/practice/sessions/{session_id}")
         assert hidden.status == 404
 
-        for mode in ["challenge", "scholar", "revenge"]:
+        for mode in ["challenge", "scholar"]:
             response = context.request.post(
                 f"{BASE_URL}/api/v1/learning/practice/sessions/start",
                 data={"paperId": IDS["paper"], "releaseId": IDS["release"], "mode": mode, "count": 60, "order": "paper"},
@@ -208,6 +208,27 @@ def run_browser() -> None:
                 data={"revision": created["revision"]},
             )
             assert abandoned.status == 200
+        no_revenge = context.request.post(
+            f"{BASE_URL}/api/v1/learning/practice/sessions/start",
+            data={"paperId": IDS["paper"], "releaseId": IDS["release"], "mode": "revenge", "count": 60, "order": "paper"},
+        )
+        assert no_revenge.status == 422
+        assert no_revenge.json()["detail"]["code"] == "NO_REVENGE_QUESTIONS"
+
+        context.request.post(f"{BASE_URL}/api/v1/auth/logout")
+        login(context.request, IDS["student"])
+        revenge_response = context.request.post(
+            f"{BASE_URL}/api/v1/learning/practice/sessions/start",
+            data={"paperId": IDS["paper"], "releaseId": IDS["release"], "mode": "revenge", "count": 60, "order": "paper"},
+        )
+        assert revenge_response.status == 200, revenge_response.text()
+        revenge = revenge_response.json()["session"]
+        assert revenge["mode"] == "revenge" and revenge["stats"]["total"] == 1
+        abandoned = context.request.post(
+            f"{BASE_URL}/api/v1/learning/practice/sessions/{revenge['id']}/abandon",
+            data={"revision": revenge["revision"]},
+        )
+        assert abandoned.status == 200
         assert not errors, errors
         context.close()
         browser.close()
