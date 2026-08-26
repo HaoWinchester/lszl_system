@@ -4,10 +4,10 @@
  * 应用启动入口。
  * 原单文件依靠 IIFE 内部函数提升；拆分为多文件后，启动动作必须放在最后执行。
  */
-(async function bootstrapKnowledgeGraphApp(){
+window.KGHomepageGraphBootstrap=(async function bootstrapKnowledgeGraphApp(){
   const remote=window.KGGraphFileRemoteAdapter;
   if(remote&&remote.active&&remote.active()){
-    try{await remote.initialize({fallbackGraphData:typeof baseState==='function'?baseState():undefined});}
+    try{await remote.initializeCurrent();}
     catch(error){console.warn('[KGGraphFileRemoteAdapter] initialize failed',error);}
   }
   const hadSavedState = load();
@@ -59,4 +59,5 @@
     if (!hadSavedState) fitView(true);
     authRenderStatus();
   });
+  return true;
 })();
