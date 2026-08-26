@@ -2510,11 +2510,19 @@ def test_each_bank_question_and_paper_mutation_bumps_exactly_once() -> None:
                     db,
                     actor,
                     bank.id,
-                    {
-                        "title": "revision question",
-                        "subject": "PMP",
-                        "domain": "沟通",
-                    },
+                        {
+                            "title": "revision question",
+                            "subject": "PMP",
+                            "domain": "沟通",
+                            "metadata": {
+                                "subjectFacets": [
+                                    {
+                                        "dimensionId": "exam-domain",
+                                        "valueId": "process",
+                                    }
+                                ]
+                            },
+                        },
                 )
                 assert question is not None
                 created_ids["question"] = question.id

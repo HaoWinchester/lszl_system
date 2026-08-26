@@ -16,6 +16,7 @@ from app.models.subscription import Subscription
 from app.models.user import User
 from app.services import (
     paper_service,
+    paper_composition_service,
     practice_scoring_service,
     question_catalog_service,
     subscription_service,
@@ -60,6 +61,48 @@ def _snapshot_is_learnable(snapshot: dict) -> bool:
         isinstance(option, dict) and option.get("correct") for option in options
     )
     return bool(stem and len(options) >= 2 and has_answer)
+
+
+def _validate_practice_domain_inventory(
+    *,
+    subject: str,
+    modes: list[str],
+    snapshots: list[dict],
+    metadata: dict,
+) -> None:
+    if "practice_mode" not in modes or str(subject).strip().upper() != "PMP":
+        return
+    weights = metadata.get("domainWeights") or practice_scoring_service.DEFAULT_DOMAIN_WEIGHTS
+    allowed = set(weights)
+    available = {domain: 0 for domain in weights}
+    invalid: list[int] = []
+    for index, snapshot in enumerate(snapshots, start=1):
+        raw_metadata = snapshot.get("metadata") if isinstance(snapshot.get("metadata"), dict) else {}
+        domain = paper_composition_service.facet_values(raw_metadata).get(
+            paper_composition_service.EXAM_DOMAIN, ""
+        )
+        if domain not in allowed:
+            invalid.append(index)
+        else:
+            available[domain] += 1
+    targets = paper_composition_service.allocate_counts(weights, len(snapshots))
+    shortages = {
+        domain: targets[domain] - available[domain]
+        for domain in targets
+        if available[domain] < targets[domain]
+    }
+    if invalid or shortages:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "PRACTICE_DOMAIN_PREFLIGHT_FAILED",
+                "message": "PMP 做题模式发布前需完成 42% / 50% / 8% 领域分类",
+                "domainTargets": targets,
+                "available": available,
+                "shortages": shortages,
+                "invalidQuestionNumbers": invalid,
+            },
+        )
 
 
 async def _repair_release_snapshots(db: AsyncSession, canonical: dict) -> None:
@@ -273,7 +316,7 @@ async def publish(
 
     rows = (
         await db.execute(
-            select(Question, PaperQuestion.order_index)
+            select(Question, PaperQuestion.order_index, PaperQuestion.score)
             .join(PaperQuestion, PaperQuestion.question_id == Question.id)
             .where(PaperQuestion.paper_id == paper_id)
             .order_by(PaperQuestion.order_index, Question.id)
@@ -281,6 +324,18 @@ async def publish(
     ).all()
     if not rows:
         raise _error(422, "EMPTY_PAPER_RELEASE", "试卷至少需要一道题目")
+    frozen_questions = []
+    for question, order_index, score in rows:
+        snapshot = question_catalog_service.question_to_payload(question)
+        frozen_score = float(score if score is not None else 1)
+        snapshot["releaseScore"] = frozen_score
+        frozen_questions.append((question, order_index, frozen_score, snapshot))
+    _validate_practice_domain_inventory(
+        subject=paper.subject,
+        modes=modes,
+        snapshots=[item[3] for item in frozen_questions],
+        metadata=metadata,
+    )
 
     latest = await db.scalar(select(func.max(PaperRelease.version)).where(PaperRelease.paper_id == paper_id))
     release_id = uid("pr_")
@@ -304,7 +359,18 @@ async def publish(
         enabled_modes=modes,
         allowed_roles=roles,
         release_metadata=metadata,
-        question_count=len(rows),
+        source_payload={
+            "questions": [
+                {
+                    "bankId": question.bank_id,
+                    "questionId": question.id,
+                    "order": order_index + 1,
+                    "score": score,
+                }
+                for question, order_index, score, _snapshot in frozen_questions
+            ]
+        },
+        question_count=len(frozen_questions),
         published_at=released_at,
     )
     db.add(release)
@@ -323,13 +389,13 @@ async def publish(
     )
     if updated_id is None:
         raise _error(404, "PAPER_NOT_FOUND", "试卷不存在")
-    for question, order_index in rows:
+    for question, order_index, _score, snapshot in frozen_questions:
         db.add(PaperReleaseQuestion(
             release_id=release.id,
             order_index=order_index,
             bank_id=question.bank_id,
             question_id=question.id,
-            snapshot=question_catalog_service.question_to_payload(question),
+            snapshot=snapshot,
         ))
     await teaching_content_revision_service.bump(
         db, actor.username, [{"entityType": "paper", "entityId": paper_id, "action": "published"}]
@@ -576,6 +642,17 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
         canonical.get("metadata")
     )
     await _repair_release_snapshots(db, canonical)
+    for question in canonical["questions"]:
+        snapshot = dict(question["question"])
+        raw_score = question.get("score")
+        snapshot["releaseScore"] = float(raw_score if raw_score is not None else 1)
+        question["question"] = snapshot
+    _validate_practice_domain_inventory(
+        subject=canonical["subject"],
+        modes=canonical["enabledModes"],
+        snapshots=[question["question"] for question in canonical["questions"]],
+        metadata=canonical["metadata"],
+    )
 
     await teaching_content_revision_service.acquire_lock(db)
     release_id = canonical["releaseId"]

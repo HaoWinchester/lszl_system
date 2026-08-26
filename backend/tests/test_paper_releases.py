@@ -77,7 +77,16 @@ async def _seed(ids: dict[str, str]) -> None:
                     {"id": "A", "text": "答案", "correct": True},
                     {"id": "B", "text": "干扰项", "correct": False},
                 ],
-                correct_answer="A", created_by=ids["teacher"], updated_by=ids["teacher"],
+                correct_answer="A",
+                content_metadata={
+                    "subjectFacets": [
+                        {
+                            "dimensionId": "exam-domain",
+                            "valueId": "process" if index in {0, 3, 4} else "people",
+                        }
+                    ]
+                },
+                created_by=ids["teacher"], updated_by=ids["teacher"],
             )
             db.add(question)
             questions.append(question)

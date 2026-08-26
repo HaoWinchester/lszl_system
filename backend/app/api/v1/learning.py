@@ -294,6 +294,57 @@ async def complete_practice_session(
     return {"session": session, "report": report}
 
 
+@router.post(
+    "/learning/practice/sessions/{session_id}/mistakes/{mistake_id}/remediation"
+)
+async def review_session_remediation(
+    session_id: str, mistake_id: str, body: dict, db: DB, user: CurrentUser
+):
+    try:
+        session, mistake, candidate = (
+            await practice_session_service.review_revenge_remediation(
+                db, user.username, session_id, mistake_id, body
+            )
+        )
+    except practice_session_service.PracticeSessionError as error:
+        raise HTTPException(
+            status_code=error.status_code, detail=error.detail()
+        ) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return {
+        "session": session,
+        "mistake": learning_service._practice_mistake_to_dict(mistake),
+        "candidate": candidate,
+    }
+
+
+@router.post(
+    "/learning/practice/sessions/{session_id}/mistakes/{mistake_id}/verification"
+)
+async def verify_session_remediation(
+    session_id: str, mistake_id: str, body: dict, db: DB, user: CurrentUser
+):
+    try:
+        session, mistake, verification, answer = (
+            await practice_session_service.verify_revenge_session(
+                db, user.username, session_id, mistake_id, body
+            )
+        )
+    except practice_session_service.PracticeSessionError as error:
+        raise HTTPException(
+            status_code=error.status_code, detail=error.detail()
+        ) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return {
+        "session": session,
+        "mistake": learning_service._practice_mistake_to_dict(mistake),
+        "verification": learning_service._practice_verification_to_dict(verification),
+        "answer": answer,
+    }
+
+
 @router.get("/learning/practice/sessions/{session_id}/report")
 async def get_practice_session_report(
     session_id: str, db: DB, user: CurrentUser
@@ -368,10 +419,11 @@ async def record_verification(mistake_id: str, body: dict, db: DB, user: Current
         raise HTTPException(status_code=422, detail=str(error)) from error
     if result is None:
         raise HTTPException(status_code=404, detail="错题不存在或无权访问")
-    mistake, verification = result
+    mistake, verification, answer = result
     return {
         "mistake": learning_service._practice_mistake_to_dict(mistake),
         "verification": learning_service._practice_verification_to_dict(verification),
+        "answer": answer,
     }
 
 

@@ -95,13 +95,43 @@ async def _seed_released_pmp_paper(ids: dict[str, str]) -> None:
                 content_metadata={
                     "subjectFacets": [
                         {"dimensionId": "exam-domain", "valueId": domain}
-                    ]
+                    ],
+                    "knowledge": {
+                        "taxonomyId": "taxonomy-practice-session",
+                        "primaryNodeId": "practice-session-node",
+                        "pathSnapshot": ["PMP", "会话验证"],
+                    },
                 },
                 created_by=ids["teacher"],
                 updated_by=ids["teacher"],
             )
             db.add(question)
             questions.append(question)
+        db.add(
+            Question(
+                id=f"practice-verification-{ids['release'][-10:]}",
+                source_id=f"practice-verification-{ids['release'][-10:]}",
+                bank_id=ids["bank"],
+                title="PMP 会话验证题",
+                subject="PMP",
+                scope="public",
+                stem_parts=[{"text": "这是一道同知识点验证题"}],
+                options=[
+                    {"id": "A", "text": "正确答案", "correct": True},
+                    {"id": "B", "text": "干扰项", "correct": False},
+                ],
+                correct_answer="A",
+                content_metadata={
+                    "knowledge": {
+                        "taxonomyId": "taxonomy-practice-session",
+                        "primaryNodeId": "practice-session-node",
+                        "pathSnapshot": ["PMP", "会话验证"],
+                    }
+                },
+                created_by=ids["teacher"],
+                updated_by=ids["teacher"],
+            )
+        )
         await db.flush()
         db.add(
             PaperRelease(
@@ -115,7 +145,24 @@ async def _seed_released_pmp_paper(ids: dict[str, str]) -> None:
                 access_level="free",
                 enabled_modes=["practice_mode"],
                 allowed_roles=["student"],
-                release_metadata={},
+                release_metadata={
+                    "domainWeights": {
+                        "people": 42,
+                        "process": 50,
+                        "business-environment": 8,
+                    },
+                    "simulationScoring": {
+                        "version": 7,
+                        "label": "冻结测试判定",
+                        "passPercent": 75,
+                        "bands": {
+                            "needsImprovement": 40,
+                            "belowTarget": 55,
+                            "target": 85,
+                        },
+                        "official": False,
+                    },
+                },
                 source_payload={},
                 question_count=len(questions),
                 published_at=now_utc(),
@@ -129,7 +176,11 @@ async def _seed_released_pmp_paper(ids: dict[str, str]) -> None:
                     order_index=index,
                     bank_id=ids["bank"],
                     question_id=question.id,
-                    snapshot=question_catalog_service.question_to_payload(question),
+                    snapshot={
+                        **question_catalog_service.question_to_payload(question),
+                        "analysis": f"第 {index + 1} 题解析",
+                        "releaseScore": 5 if index == 0 else 1,
+                    },
                 )
             )
         await db.commit()
@@ -288,12 +339,112 @@ def test_start_session_freezes_42_50_8_order_and_rejects_duplicate_resumable() -
             assert len(session["questions"]) == 60
             assert session["revision"] == 1
             assert session["status"] == "active"
+            assert session["scoringSnapshot"]["version"] == 7
+            assert session["scoringSnapshot"]["passPercent"] == 75
 
             duplicate = client.post(
                 "/api/v1/learning/practice/sessions/start", json=start_payload
             )
             assert duplicate.status_code == 409
             assert duplicate.json()["detail"]["code"] == "RESUMABLE_SESSION_EXISTS"
+
+            async def supersede_release() -> None:
+                async with AsyncSessionLocal() as db:
+                    release = await db.get(PaperRelease, ids["release"])
+                    release.status = "superseded"
+                    await db.commit()
+
+            asyncio.run(supersede_release())
+            old_release_start = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={**start_payload, "mode": "scholar"},
+            )
+            assert old_release_start.status_code == 404
+            assert old_release_start.json()["detail"]["code"] == "PRACTICE_RELEASE_NOT_FOUND"
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_unanswered_session_questions_never_expose_answers_or_explanations() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            started = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "challenge",
+                    "count": 10,
+                    "order": "paper",
+                },
+            ).json()["session"]
+
+            first = started["questions"][0]["question"]
+            assert "correctAnswer" not in first
+            assert "analysis" not in first
+            assert all("correct" not in option for option in first["options"])
+
+            first_id = started["questionOrder"][0]["questionId"]
+            answered = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json={
+                    "revision": started["revision"],
+                    "questionId": first_id,
+                    "selectedAnswer": "B",
+                },
+            ).json()
+            first_after = answered["session"]["questions"][0]["question"]
+            second_after = answered["session"]["questions"][1]["question"]
+            assert first_after["correctAnswer"] == "A"
+            assert first_after["analysis"] == "第 1 题解析"
+            assert any(option.get("correct") is True for option in first_after["options"])
+            assert "correctAnswer" not in second_after
+            assert "analysis" not in second_after
+            assert all("correct" not in option for option in second_after["options"])
+
+            abandoned = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/abandon",
+                json={"revision": answered["session"]["revision"]},
+            )
+            assert abandoned.status_code == 200, abandoned.text
+            abandoned_questions = abandoned.json()["session"]["questions"]
+            assert abandoned_questions[0]["question"]["correctAnswer"] == "A"
+            assert "correctAnswer" not in abandoned_questions[1]["question"]
+            detail = client.get(
+                f"/api/v1/learning/practice/sessions/{started['id']}"
+            ).json()["session"]
+            assert "correctAnswer" not in detail["questions"][1]["question"]
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_short_paper_count_is_supported_by_the_session_api() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            response = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "challenge",
+                    "count": 7,
+                    "order": "paper",
+                },
+            )
+            assert response.status_code == 200, response.text
+            assert response.json()["session"]["stats"]["total"] == 7
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
@@ -592,8 +743,12 @@ def test_session_runtime_state_is_validated_owner_scoped_and_revisioned() -> Non
             assert saved.status_code == 200
             saved_session = saved.json()["session"]
             assert saved_session["revision"] == 2
-            assert saved_session["runtimeState"] == {"order": "paper", **runtime_state}
-            assert saved_session["stats"]["experience"] == 42
+            assert saved_session["runtimeState"] == {
+                "order": "paper",
+                **runtime_state,
+                "experience": 0,
+            }
+            assert saved_session["stats"]["experience"] == 0
             assert saved_session["stats"]["durationMs"] == 12000
 
             stale = client.patch(
@@ -749,7 +904,10 @@ def test_complete_freezes_nonofficial_report_and_is_idempotent_and_owner_scoped(
             assert completed.json()["session"]["status"] == "completed"
             assert report["resultLabel"] == "模拟考试结果：FAIL"
             assert report["official"] is False
-            assert report["scorePercent"] == 1.67
+            assert report["scorePercent"] == 1.56
+            assert report["rawScore"] == 1
+            assert report["maxScore"] == 64
+            assert report["passPercent"] == 75
             assert report["counts"] == {
                 "total": 60,
                 "answered": 2,
@@ -795,5 +953,194 @@ def test_complete_freezes_nonofficial_report_and_is_idempotent_and_owner_scoped(
                 f"/api/v1/learning/practice/sessions/{started['id']}/report"
             )
             assert hidden.status_code == 404
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_report_uses_frozen_question_scores_and_history_reopens_by_session_id() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            started = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "challenge",
+                    "count": 10,
+                    "order": "paper",
+                },
+            ).json()["session"]
+            first_id = started["questionOrder"][0]["questionId"]
+            answered = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json={
+                    "revision": started["revision"],
+                    "questionId": first_id,
+                    "selectedAnswer": "A",
+                },
+            ).json()["session"]
+            completed = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/complete",
+                json={"revision": answered["revision"]},
+            ).json()
+            report = completed["report"]
+
+            assert report["rawScore"] == 5
+            assert report["maxScore"] == 14
+            assert report["scorePercent"] == 35.71
+            assert report["accuracyPercent"] == 10
+            assert report["domains"]["people"]["rawScore"] == 5
+            assert report["domains"]["people"]["maxScore"] == 8
+            assert report["domains"]["people"]["scorePercent"] == 62.5
+            assert report["passPercent"] == 75
+            assert report["paperName"] == "PMP 会话模拟卷"
+            assert report["learner"] == ids["student"]
+            assert report["reportNumber"] == started["id"]
+
+            history = client.get("/api/v1/learning/practice/sessions")
+            assert history.status_code == 200
+            row = next(
+                item
+                for item in history.json()["sessions"]
+                if item.get("sessionId") == started["id"]
+            )
+            assert row["reportAvailable"] is True
+            assert row["status"] == "completed"
+            assert row["mode"] == "challenge"
+            assert client.delete("/api/v1/learning/practice/sessions").status_code == 200
+            cleared = client.get("/api/v1/learning/practice/sessions").json()["sessions"]
+            assert not any(item.get("sessionId") == started["id"] for item in cleared)
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_revenge_mode_is_a_resumable_server_session() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            challenge = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "challenge",
+                    "count": 10,
+                    "order": "paper",
+                },
+            ).json()["session"]
+            question_id = challenge["questionOrder"][0]["questionId"]
+            answered = client.post(
+                f"/api/v1/learning/practice/sessions/{challenge['id']}/answers",
+                json={
+                    "revision": challenge["revision"],
+                    "questionId": question_id,
+                    "selectedAnswer": "B",
+                },
+            ).json()["session"]
+            assert client.post(
+                f"/api/v1/learning/practice/sessions/{challenge['id']}/complete",
+                json={"revision": answered["revision"]},
+            ).status_code == 200
+
+            revenge_response = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "revenge",
+                    "count": 10,
+                    "order": "paper",
+                },
+            )
+            assert revenge_response.status_code == 200, revenge_response.text
+            revenge = revenge_response.json()["session"]
+            assert revenge["mode"] == "revenge"
+            assert revenge["stats"]["total"] == 1
+            assert revenge["questionOrder"][0]["questionId"] == question_id
+            assert revenge["questionOrder"][0]["mistakeId"]
+            assert "correctAnswer" not in revenge["questions"][0]["question"]
+
+            revenge_answer = client.post(
+                f"/api/v1/learning/practice/sessions/{revenge['id']}/answers",
+                json={
+                    "revision": revenge["revision"],
+                    "questionId": question_id,
+                    "selectedAnswer": "B",
+                },
+            )
+            assert revenge_answer.status_code == 200, revenge_answer.text
+            body = revenge_answer.json()
+            assert body["answer"]["correct"] is False
+            assert body["answer"]["mistakeStatus"] == "needs_remediation"
+
+            remediation = client.post(
+                f"/api/v1/learning/practice/sessions/{revenge['id']}"
+                f"/mistakes/{revenge['questionOrder'][0]['mistakeId']}/remediation",
+                json={"revision": body["session"]["revision"]},
+            )
+            assert remediation.status_code == 200, remediation.text
+            remediation_body = remediation.json()
+            assert remediation_body["candidate"]["available"] is True
+            candidate = remediation_body["candidate"]["question"]
+            assert "correctAnswer" not in candidate
+            assert remediation_body["session"]["runtimeState"]["revengeState"]["phase"] == "verification"
+
+            verification_revision = remediation_body["session"]["revision"]
+            verified = client.post(
+                f"/api/v1/learning/practice/sessions/{revenge['id']}"
+                f"/mistakes/{revenge['questionOrder'][0]['mistakeId']}/verification",
+                json={
+                    "revision": verification_revision,
+                    "questionId": candidate["id"],
+                    "selectedAnswer": "A",
+                },
+            )
+            assert verified.status_code == 200, verified.text
+            verified_body = verified.json()
+            assert verified_body["verification"]["correct"] is True
+            assert verified_body["answer"]["correctAnswer"] == "A"
+            assert verified_body["session"]["runtimeState"]["revengeState"]["phase"] == "verification_due"
+
+            duplicate_verification = client.post(
+                f"/api/v1/learning/practice/sessions/{revenge['id']}"
+                f"/mistakes/{revenge['questionOrder'][0]['mistakeId']}/verification",
+                json={
+                    "revision": verification_revision,
+                    "questionId": candidate["id"],
+                    "selectedAnswer": "A",
+                },
+            )
+            assert duplicate_verification.status_code == 409
+
+            paused = client.post(
+                f"/api/v1/learning/practice/sessions/{revenge['id']}/pause",
+                json={
+                    "revision": verified_body["session"]["revision"],
+                    "runtimeState": {
+                        "currentIndex": 0,
+                        "revengeState": {
+                            "phase": "verification_due",
+                            "mistakeId": revenge["questionOrder"][0]["mistakeId"],
+                        },
+                    },
+                },
+            )
+            assert paused.status_code == 200, paused.text
+            restored = client.get(
+                f"/api/v1/learning/practice/sessions/{revenge['id']}"
+            ).json()["session"]
+            assert restored["status"] == "paused"
+            assert restored["runtimeState"]["revengeState"]["phase"] == "verification_due"
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))

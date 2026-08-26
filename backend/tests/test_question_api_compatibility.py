@@ -485,12 +485,17 @@ def test_admin_and_teacher_share_paper_crud_compose_publish_and_audit() -> None:
             bank_id = bank["id"]
             question = client.post(
                 f"/api/v1/banks/{bank_id}/questions",
-                json={
-                    "title": "跨账号组卷题",
-                    "domain": "跨账号领域",
-                    "options": [{"id": "A", "text": "正确", "correct": True}],
-                    "correctAnswer": "A",
-                },
+                    json={
+                        "title": "跨账号组卷题",
+                        "domain": "跨账号领域",
+                        "metadata": {
+                            "subjectFacets": [
+                                {"dimensionId": "exam-domain", "valueId": "process"}
+                            ]
+                        },
+                        "options": [{"id": "A", "text": "正确", "correct": True}],
+                        "correctAnswer": "A",
+                    },
             ).json()["question"]
             question_id = question["id"]
 

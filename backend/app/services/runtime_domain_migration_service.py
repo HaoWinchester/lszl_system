@@ -176,10 +176,18 @@ def _release_canonical(
         if identity in seen_questions:
             raise ValueError("paper release contains duplicate question ids")
         seen_questions.add(identity)
+        raw_score = reference.get("score")
+        try:
+            score = float(raw_score if raw_score is not None else 1)
+        except (TypeError, ValueError) as error:
+            raise ValueError("paper release question score is invalid") from error
+        if score < 0 or score > 1_000_000:
+            raise ValueError("paper release question score is invalid")
         questions.append({
             "bankId": bank_id,
             "questionId": question_id,
             "order": index + 1,
+            "score": score,
             "question": snapshot,
         })
     status = str(raw.get("status") or "published").strip().lower()
@@ -276,12 +284,14 @@ async def _paper_release_mapper(db: AsyncSession, item: RuntimeMigrationItem) ->
             db.add(existing)
             await db.flush()
             for question in source["questions"]:
+                snapshot = dict(question["question"])
+                snapshot["releaseScore"] = question["score"]
                 db.add(PaperReleaseQuestion(
                     release_id=release_id,
                     order_index=question["order"] - 1,
                     bank_id=question["bankId"],
                     question_id=question["questionId"],
-                    snapshot=question["question"],
+                    snapshot=snapshot,
                 ))
             await db.flush()
             created_sources.append(source)
@@ -731,12 +741,20 @@ async def _read_one_paper_release_canonical(
         "allowedRoles": release.allowed_roles or [],
         "metadata": release.release_metadata or {},
         "publishedAt": release.published_at.isoformat(),
-        "questions": [{
-            "bankId": question.bank_id,
-            "questionId": question.question_id,
-            "order": question.order_index + 1,
-            "question": question.snapshot,
-        } for question in questions],
+        "questions": [
+            {
+                "bankId": question.bank_id,
+                "questionId": question.question_id,
+                "order": question.order_index + 1,
+                "score": float((question.snapshot or {}).get("releaseScore", 1)),
+                "question": {
+                    key: value
+                    for key, value in (question.snapshot or {}).items()
+                    if key != "releaseScore"
+                },
+            }
+            for question in questions
+        ],
     }
 
 

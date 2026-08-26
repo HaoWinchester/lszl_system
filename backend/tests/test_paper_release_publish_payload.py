@@ -18,6 +18,11 @@ def _payload(paper_id="paper-t1", version=1):
         "id": "q_test_1", "title": "测试题", "stemParts": [{"text": "题干"}],
         "options": [{"id": "A", "text": "方案一"}, {"id": "B", "text": "方案二"}],
         "correctAnswer": "A", "bankId": "b_test",
+        "metadata": {
+            "subjectFacets": [
+                {"dimensionId": "exam-domain", "valueId": "process"}
+            ]
+        },
     }
     return {
         "id": f"{paper_id}-v{version}-test", "releaseId": f"{paper_id}-v{version}-test",
@@ -73,6 +78,33 @@ def test_publish_payload_creates_release_and_withdraw_all(client=None) -> None:
         assert detail.status_code == 404
 
 
+def test_publish_payload_rejects_unclassified_pmp_practice_questions() -> None:
+    with TestClient(app) as client:
+        login(client, "admin")
+        payload = _payload(paper_id="paper-domain-preflight")
+        payload["questionSnapshots"][0]["question"].pop("metadata")
+        response = client.post("/api/v1/paper-releases/publish-payload", json=payload)
+        assert response.status_code == 422
+        detail = response.json()["detail"]
+        assert detail["code"] == "PRACTICE_DOMAIN_PREFLIGHT_FAILED"
+        assert detail["invalidQuestionNumbers"] == [1]
+        assert detail["shortages"] == {"process": 1}
+
+
+def test_publish_payload_preserves_an_explicit_zero_question_score() -> None:
+    with TestClient(app) as client:
+        login(client, "admin")
+        payload = _payload(paper_id="paper-zero-score")
+        payload["questions"][0]["score"] = 0
+        response = client.post("/api/v1/paper-releases/publish-payload", json=payload)
+        assert response.status_code == 200, response.text
+        release_id = response.json()["release"]["releaseId"]
+        questions = client.get(
+            f"/api/v1/paper-releases/{release_id}/questions?limit=10"
+        ).json()["questions"]
+        assert questions[0]["question"]["releaseScore"] == 0
+
+
 def test_publish_payload_rejects_missing_snapshots() -> None:
     with TestClient(app) as client:
         login(client, "admin")
@@ -97,6 +129,11 @@ def test_publish_payload_repairs_summary_only_stubs_from_bank() -> None:
                 "stemParts": [{"text": "题库里的完整题干"}],
                 "options": [{"id": "A", "text": "方案一"}, {"id": "B", "text": "方案二"}],
                 "correctAnswer": "A",
+                "metadata": {
+                    "subjectFacets": [
+                        {"dimensionId": "exam-domain", "valueId": "process"}
+                    ]
+                },
             },
         ).json()["question"]
 

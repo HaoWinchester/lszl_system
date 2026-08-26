@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+from copy import deepcopy
 from typing import Any
 
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import or_, select, text as sql_text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
-from app.models.training import LearningEvent, PracticeSession
+from app.models.training import LearningEvent, PracticeMistake, PracticeSession
 from app.models.user import User
 from app.services import learning_service, paper_composition_service, paper_release_service
 from app.services.practice_scoring_service import (
@@ -21,7 +23,8 @@ from app.services.practice_scoring_service import (
 
 
 PRACTICE_SESSION_MODES = {"challenge", "scholar", "revenge"}
-PRACTICE_QUESTION_COUNTS = {10, 20, 60, 180}
+PRACTICE_QUESTION_COUNT_MIN = 1
+PRACTICE_QUESTION_COUNT_MAX = 180
 PRACTICE_ORDERS = {"paper", "random"}
 RUNTIME_INTEGER_FIELDS = {
     "currentIndex",
@@ -32,7 +35,11 @@ RUNTIME_INTEGER_FIELDS = {
     "remainingMs",
     "durationMs",
 }
-RUNTIME_FIELDS = RUNTIME_INTEGER_FIELDS | {"languageMode", "autoExplain"}
+RUNTIME_FIELDS = RUNTIME_INTEGER_FIELDS | {
+    "languageMode",
+    "autoExplain",
+    "revengeState",
+}
 
 
 class PracticeSessionError(RuntimeError):
@@ -70,16 +77,43 @@ def _stable_random_key(seed: str, row: PaperReleaseQuestion) -> str:
     ).hexdigest()
 
 
+def _score_for_snapshot(snapshot: dict) -> float:
+    raw = snapshot.get("releaseScore", 1)
+    try:
+        score = float(raw)
+    except (TypeError, ValueError):
+        return 1.0
+    return score if score >= 0 else 1.0
+
+
+def _release_scoring(release: PaperRelease) -> tuple[dict[str, int], dict]:
+    metadata = release.release_metadata if isinstance(release.release_metadata, dict) else {}
+    raw_weights = metadata.get("domainWeights")
+    weights = (
+        {domain: int(raw_weights.get(domain, 0)) for domain in DEFAULT_DOMAIN_WEIGHTS}
+        if isinstance(raw_weights, dict)
+        else dict(DEFAULT_DOMAIN_WEIGHTS)
+    )
+    if any(value <= 0 for value in weights.values()) or sum(weights.values()) != 100:
+        weights = dict(DEFAULT_DOMAIN_WEIGHTS)
+    raw_scoring = metadata.get("simulationScoring")
+    scoring = deepcopy(raw_scoring) if isinstance(raw_scoring, dict) else deepcopy(DEFAULT_SIMULATION_SCORING)
+    scoring["domainWeights"] = weights
+    scoring["official"] = False
+    return weights, scoring
+
+
 def _select_questions(
     rows: list[PaperReleaseQuestion],
     *,
     count: int,
     order: str,
     seed: str,
+    weights: dict[str, int],
 ) -> tuple[list[dict], dict[str, int]]:
-    targets = paper_composition_service.allocate_counts(DEFAULT_DOMAIN_WEIGHTS, count)
+    targets = paper_composition_service.allocate_counts(weights, count)
     buckets: dict[str, list[PaperReleaseQuestion]] = {
-        domain: [] for domain in DEFAULT_DOMAIN_WEIGHTS
+        domain: [] for domain in weights
     }
     for row in rows:
         domain = _domain_for_snapshot(row.snapshot or {})
@@ -121,11 +155,86 @@ def _select_questions(
                 "bankId": row.bank_id,
                 "orderIndex": row.order_index,
                 "domain": domain,
+                "score": _score_for_snapshot(row.snapshot or {}),
             }
             for row, domain in selected
         ],
         targets,
     )
+
+
+def _question_snapshot_for_session(
+    snapshot: dict,
+    *,
+    reveal_answer: bool,
+) -> dict:
+    return (
+        deepcopy(snapshot)
+        if reveal_answer
+        else learning_service.redact_practice_question(snapshot)
+    )
+
+
+def _public_answer(answer: dict) -> dict:
+    return {key: deepcopy(value) for key, value in answer.items() if key != "submissionIndex"}
+
+
+async def _revenge_question_order(
+    db: AsyncSession,
+    *,
+    owner: str,
+    release_id: str,
+    count: int,
+) -> list[dict]:
+    now = now_utc()
+    rows = list(
+        (
+            await db.execute(
+                select(PracticeMistake).where(
+                    PracticeMistake.owner_id == owner,
+                    PracticeMistake.release_id == release_id,
+                    or_(
+                        PracticeMistake.status.in_(["pending", "needs_remediation"]),
+                        (
+                            (PracticeMistake.status == "verification_due")
+                            & or_(
+                                PracticeMistake.next_review_at.is_(None),
+                                PracticeMistake.next_review_at <= now,
+                            )
+                        ),
+                    ),
+                )
+            )
+        ).scalars().all()
+    )
+    priority = {"needs_remediation": 0, "pending": 1, "verification_due": 2}
+    rows.sort(
+        key=lambda row: (
+            priority.get(row.status, 9),
+            -row.revenge_wrong_count,
+            -row.wrong_count,
+            row.id,
+        )
+    )
+    selected = rows[:count]
+    if not selected:
+        raise _error(
+            422,
+            "NO_REVENGE_QUESTIONS",
+            "当前试卷暂无可复仇错题",
+        )
+    return [
+        {
+            "questionId": str(row.question_id or ""),
+            "bankId": str(row.bank_id or ""),
+            "orderIndex": index,
+            "domain": _domain_for_snapshot(row.question_snapshot or {}),
+            "score": _score_for_snapshot(row.question_snapshot or {}),
+            "mistakeId": row.id,
+        }
+        for index, row in enumerate(selected)
+        if row.question_id
+    ]
 
 
 async def _session_payload(db: AsyncSession, session: PracticeSession) -> dict:
@@ -139,13 +248,24 @@ async def _session_payload(db: AsyncSession, session: PracticeSession) -> dict:
     ).scalars().all()
     row_map = {row.question_id: row for row in rows}
     questions = []
+    answers = session.answers if isinstance(session.answers, dict) else {}
+    terminal = session.status == "completed"
     for ref in refs:
         if not isinstance(ref, dict):
             continue
         row = row_map.get(str(ref.get("questionId") or ""))
         if row is None:
             continue
-        questions.append({**ref, "question": row.snapshot or {}})
+        question_id = str(ref.get("questionId") or "")
+        questions.append(
+            {
+                **ref,
+                "question": _question_snapshot_for_session(
+                    row.snapshot or {},
+                    reveal_answer=terminal or question_id in answers,
+                ),
+            }
+        )
     scoring = session.scoring_snapshot if isinstance(session.scoring_snapshot, dict) else {}
     return {
         "id": session.id,
@@ -155,7 +275,11 @@ async def _session_payload(db: AsyncSession, session: PracticeSession) -> dict:
         "status": session.status,
         "questionOrder": refs,
         "questions": questions,
-        "answers": session.answers or {},
+        "answers": {
+            question_id: _public_answer(answer)
+            for question_id, answer in answers.items()
+            if isinstance(answer, dict)
+        },
         "runtimeState": session.runtime_state or {},
         "stats": session.stats or {},
         "domainWeights": scoring.get("domainWeights", DEFAULT_DOMAIN_WEIGHTS),
@@ -189,8 +313,8 @@ async def start_session(
         raise _error(422, "PRACTICE_RELEASE_REQUIRED", "paperId 和 releaseId 不能为空")
     if mode not in PRACTICE_SESSION_MODES:
         raise _error(422, "INVALID_PRACTICE_MODE", "练习模式无效")
-    if count not in PRACTICE_QUESTION_COUNTS:
-        raise _error(422, "INVALID_PRACTICE_COUNT", "题目数量必须是 10、20、60 或 180")
+    if not PRACTICE_QUESTION_COUNT_MIN <= count <= PRACTICE_QUESTION_COUNT_MAX:
+        raise _error(422, "INVALID_PRACTICE_COUNT", "题目数量必须在 1 到 180 之间")
     if order not in PRACTICE_ORDERS:
         raise _error(422, "INVALID_PRACTICE_ORDER", "答题顺序无效")
 
@@ -198,7 +322,7 @@ async def start_session(
     if (
         release is None
         or release.paper_id != paper_id
-        or release.status not in {"published", "superseded"}
+        or release.status != "published"
         or "practice_mode" not in (release.enabled_modes or [])
         or (release.allowed_roles and user.role not in release.allowed_roles)
         or not await paper_release_service.can_access(db, user, release)
@@ -239,9 +363,27 @@ async def start_session(
         ).scalars().all()
     )
     selection_seed = secrets.token_hex(16)
-    question_order, targets = _select_questions(
-        rows, count=count, order=order, seed=selection_seed
-    )
+    weights, scoring = _release_scoring(release)
+    if mode == "revenge":
+        question_order = await _revenge_question_order(
+            db,
+            owner=owner,
+            release_id=release_id,
+            count=count,
+        )
+        targets = {
+            domain: sum(1 for item in question_order if item.get("domain") == domain)
+            for domain in weights
+        }
+    else:
+        question_order, targets = _select_questions(
+            rows,
+            count=count,
+            order=order,
+            seed=selection_seed,
+            weights=weights,
+        )
+    actual_count = len(question_order)
     session = PracticeSession(
         id=uid("ps_"),
         owner_id=owner,
@@ -253,17 +395,17 @@ async def start_session(
         answers={},
         runtime_state={"currentIndex": 0, "order": order},
         stats={
-            "total": count,
+            "total": actual_count,
             "answered": 0,
             "correct": 0,
             "wrong": 0,
-            "unanswered": count,
+            "unanswered": actual_count,
             "experience": 0,
             "durationMs": 0,
         },
         scoring_snapshot={
-            **DEFAULT_SIMULATION_SCORING,
-            "domainWeights": dict(DEFAULT_DOMAIN_WEIGHTS),
+            **scoring,
+            "domainWeights": weights,
             "domainTargets": targets,
             "selectionSeed": selection_seed,
             "order": order,
@@ -271,7 +413,30 @@ async def start_session(
         revision=1,
     )
     db.add(session)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        existing = (
+            await db.execute(
+                select(PracticeSession).where(
+                    PracticeSession.owner_id == owner,
+                    PracticeSession.paper_id == paper_id,
+                    PracticeSession.release_id == release_id,
+                    PracticeSession.mode == mode,
+                    PracticeSession.status.in_(["active", "paused"]),
+                )
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            raise _error(
+                409,
+                "RESUMABLE_SESSION_EXISTS",
+                "已有可继续的练习",
+                sessionId=existing.id,
+                status=existing.status,
+            )
+        raise
     await db.refresh(session)
     return await _session_payload(db, session)
 
@@ -380,7 +545,7 @@ async def answer_session_question(
         if str(existing.get("selectedAnswer") or "") != selected_answer:
             raise _error(409, "PRACTICE_ANSWER_LOCKED", "已提交答案不能修改")
         return {
-            "answer": existing,
+            "answer": _public_answer(existing),
             "session": await _session_payload(db, session),
             "idempotent": True,
         }
@@ -395,26 +560,6 @@ async def answer_session_question(
         session.status = "active"
         session.paused_at = None
 
-    try:
-        grading = await learning_service.record_practice_answer(
-            db,
-            owner,
-            {
-                "questionId": question_id,
-                "bankId": str(ref.get("bankId") or ""),
-                "paperId": session.paper_id,
-                "releaseId": session.release_id,
-                "sourceMode": session.mode,
-                "selectedAnswer": selected_answer,
-            },
-            current_user=user,
-            commit=False,
-        )
-    except ValueError as error:
-        raise _error(422, "PRACTICE_ANSWER_INVALID", str(error)) from error
-    except LookupError as error:
-        raise _error(404, "PRACTICE_QUESTION_NOT_FOUND", str(error)) from error
-
     row = (
         await db.execute(
             select(PaperReleaseQuestion).where(
@@ -424,34 +569,85 @@ async def answer_session_question(
         )
     ).scalar_one()
     correct_answer = str((row.snapshot or {}).get("correctAnswer") or "")
-    completion = grading.get("completion") if isinstance(grading.get("completion"), dict) else {}
+    mistake_status = ""
+    completion: dict = {}
+    try:
+        if session.mode == "revenge":
+            mistake_id = str(ref.get("mistakeId") or "")
+            mistake = await learning_service.record_revenge_answer(
+                db,
+                owner,
+                mistake_id,
+                {"selectedAnswer": selected_answer},
+                commit=False,
+            )
+            if mistake is None:
+                raise _error(404, "PRACTICE_MISTAKE_NOT_FOUND", "错题不存在或无权访问")
+            correct = selected_answer == correct_answer
+            mistake_status = mistake.status
+        else:
+            grading = await learning_service.record_practice_answer(
+                db,
+                owner,
+                {
+                    "questionId": question_id,
+                    "bankId": str(ref.get("bankId") or ""),
+                    "paperId": session.paper_id,
+                    "releaseId": session.release_id,
+                    "sourceMode": session.mode,
+                    "selectedAnswer": selected_answer,
+                },
+                current_user=user,
+                commit=False,
+            )
+            correct = bool(grading.get("correct"))
+            completion = (
+                grading.get("completion")
+                if isinstance(grading.get("completion"), dict)
+                else {}
+            )
+    except PracticeSessionError:
+        raise
+    except ValueError as error:
+        raise _error(422, "PRACTICE_ANSWER_INVALID", str(error)) from error
+    except LookupError as error:
+        raise _error(404, "PRACTICE_QUESTION_NOT_FOUND", str(error)) from error
+
     answer = {
         "questionId": question_id,
         "selectedAnswer": selected_answer,
         "correctAnswer": correct_answer,
-        "correct": bool(grading.get("correct")),
+        "correct": correct,
         "submittedAt": completion.get("completedAt") or now_utc().isoformat(),
+        "submissionIndex": len(answers) + 1,
     }
+    if session.mode == "revenge":
+        answer["mistakeId"] = str(ref.get("mistakeId") or "")
+        answer["mistakeStatus"] = mistake_status
     answers[question_id] = answer
     answered = len(answers)
     correct = sum(1 for item in answers.values() if item.get("correct") is True)
     previous_stats = session.stats if isinstance(session.stats, dict) else {}
     total = len(refs)
     session.answers = answers
+    experience = _experience_for_answers(answers)
     session.stats = {
         "total": total,
         "answered": answered,
         "correct": correct,
         "wrong": answered - correct,
         "unanswered": total - answered,
-        "experience": max(0, int(previous_stats.get("experience") or 0)),
+        "experience": experience,
         "durationMs": max(0, int(previous_stats.get("durationMs") or 0)),
     }
+    runtime_state = dict(session.runtime_state or {})
+    runtime_state["experience"] = experience
+    session.runtime_state = runtime_state
     session.revision += 1
     await db.commit()
     await db.refresh(session)
     return {
-        "answer": answer,
+        "answer": _public_answer(answer),
         "session": await _session_payload(db, session),
         "idempotent": False,
     }
@@ -507,7 +703,72 @@ def _validated_runtime_state(data: dict, *, question_count: int) -> dict:
                 field="autoExplain",
             )
         state["autoExplain"] = raw["autoExplain"]
+    if "revengeState" in raw:
+        revenge_state = raw["revengeState"]
+        if not isinstance(revenge_state, dict):
+            raise _error(
+                422,
+                "INVALID_RUNTIME_STATE_VALUE",
+                "revengeState 必须是对象",
+                field="revengeState",
+            )
+        allowed = {"phase", "mistakeId", "questionId", "verificationQuestion"}
+        unknown_revenge = sorted(set(revenge_state) - allowed)
+        phase = str(revenge_state.get("phase") or "question")
+        if unknown_revenge or phase not in {
+            "question",
+            "remediation",
+            "verification",
+            "verification_due",
+        }:
+            raise _error(
+                422,
+                "INVALID_RUNTIME_STATE_VALUE",
+                "revengeState 内容无效",
+                field="revengeState",
+            )
+        normalized_revenge = {
+            "phase": phase,
+            "mistakeId": str(revenge_state.get("mistakeId") or "")[:64],
+            "questionId": str(revenge_state.get("questionId") or "")[:64],
+        }
+        verification_question = revenge_state.get("verificationQuestion")
+        if isinstance(verification_question, dict):
+            normalized_revenge["verificationQuestion"] = learning_service.redact_practice_question(
+                verification_question
+            )
+        state["revengeState"] = normalized_revenge
     return state
+
+
+def _streak_bonus(streak: int) -> int:
+    if streak >= 8:
+        return 10
+    if streak >= 5:
+        return 5
+    if streak >= 3:
+        return 2
+    return 0
+
+
+def _experience_for_answers(answers: dict) -> int:
+    ordered = sorted(
+        (item for item in answers.values() if isinstance(item, dict)),
+        key=lambda item: (
+            int(item.get("submissionIndex") or 0),
+            str(item.get("submittedAt") or ""),
+            str(item.get("questionId") or ""),
+        ),
+    )
+    experience = 0
+    streak = 0
+    for answer in ordered:
+        if answer.get("correct") is True:
+            streak += 1
+            experience += 10 + _streak_bonus(streak)
+        else:
+            streak = 0
+    return experience
 
 
 async def update_runtime_state(
@@ -527,17 +788,7 @@ async def update_runtime_state(
             "练习进度已在其他页面更新，请加载最新进度",
             currentRevision=session.revision,
         )
-    refs = session.question_order if isinstance(session.question_order, list) else []
-    patch = _validated_runtime_state(data, question_count=len(refs))
-    runtime_state = dict(session.runtime_state or {})
-    runtime_state.update(patch)
-    stats = dict(session.stats or {})
-    if "experience" in patch:
-        stats["experience"] = patch["experience"]
-    if "durationMs" in patch:
-        stats["durationMs"] = patch["durationMs"]
-    session.runtime_state = runtime_state
-    session.stats = stats
+    _apply_runtime_patch(session, data)
     if session.status == "paused":
         session.status = "active"
         session.paused_at = None
@@ -548,6 +799,104 @@ async def update_runtime_state(
     return await _session_payload(db, session)
 
 
+def _require_revenge_mistake(session: PracticeSession, mistake_id: str) -> dict:
+    if session.mode != "revenge":
+        raise _error(409, "PRACTICE_SESSION_MODE_MISMATCH", "当前会话不是复仇模式")
+    refs = session.question_order if isinstance(session.question_order, list) else []
+    ref = next(
+        (
+            item
+            for item in refs
+            if isinstance(item, dict)
+            and str(item.get("mistakeId") or "") == mistake_id
+        ),
+        None,
+    )
+    if ref is None:
+        raise _error(422, "MISTAKE_NOT_IN_SESSION", "错题不属于当前复仇会话")
+    return ref
+
+
+async def review_revenge_remediation(
+    db: AsyncSession,
+    owner: str,
+    session_id: str,
+    mistake_id: str,
+    data: dict,
+) -> tuple[dict, Any, dict]:
+    requested_revision = _required_revision(data)
+    session = await _session_for_update(db, owner, session_id)
+    if session.status not in {"active", "paused"}:
+        raise _error(409, "PRACTICE_SESSION_NOT_ACTIVE", "当前会话不可继续作答")
+    ref = _require_revenge_mistake(session, mistake_id)
+    if session.revision != requested_revision:
+        raise _revision_conflict(session)
+    mistake = await learning_service.mark_remediation_reviewed(
+        db, owner, mistake_id, commit=False
+    )
+    if mistake is None:
+        raise _error(404, "PRACTICE_MISTAKE_NOT_FOUND", "错题不存在或无权访问")
+    candidate = await learning_service.practice_verification_candidate(
+        db, owner, mistake_id
+    )
+    revenge_state = {
+        "phase": "verification" if candidate.get("available") else "remediation",
+        "mistakeId": mistake_id,
+        "questionId": str(ref.get("questionId") or ""),
+    }
+    if candidate.get("available") and isinstance(candidate.get("question"), dict):
+        revenge_state["verificationQuestion"] = candidate["question"]
+    runtime_state = dict(session.runtime_state or {})
+    runtime_state["revengeState"] = revenge_state
+    session.runtime_state = runtime_state
+    session.status = "active"
+    session.paused_at = None
+    session.revision += 1
+    session.last_saved_at = now_utc()
+    await db.commit()
+    await db.refresh(session)
+    await db.refresh(mistake)
+    return await _session_payload(db, session), mistake, candidate
+
+
+async def verify_revenge_session(
+    db: AsyncSession,
+    owner: str,
+    session_id: str,
+    mistake_id: str,
+    data: dict,
+) -> tuple[dict, Any, Any, dict]:
+    requested_revision = _required_revision(data)
+    session = await _session_for_update(db, owner, session_id)
+    if session.status not in {"active", "paused"}:
+        raise _error(409, "PRACTICE_SESSION_NOT_ACTIVE", "当前会话不可继续作答")
+    ref = _require_revenge_mistake(session, mistake_id)
+    if session.revision != requested_revision:
+        raise _revision_conflict(session)
+    result = await learning_service.record_practice_verification(
+        db, owner, mistake_id, data, commit=False
+    )
+    if result is None:
+        raise _error(404, "PRACTICE_MISTAKE_NOT_FOUND", "错题不存在或无权访问")
+    mistake, verification, answer = result
+    runtime_state = dict(session.runtime_state or {})
+    runtime_state["revengeState"] = {
+        "phase": "verification_due" if verification.correct else "remediation",
+        "mistakeId": mistake_id,
+        "questionId": str(ref.get("questionId") or ""),
+    }
+    session.runtime_state = runtime_state
+    session.status = "active"
+    session.paused_at = None
+    session.revision += 1
+    session.last_saved_at = now_utc()
+    await db.commit()
+    await db.refresh(session)
+    await db.refresh(mistake)
+    await db.refresh(verification)
+    return await _session_payload(db, session), mistake, verification, answer
+
+
 def _apply_runtime_patch(session: PracticeSession, data: dict) -> None:
     if "runtimeState" not in data:
         return
@@ -556,8 +905,9 @@ def _apply_runtime_patch(session: PracticeSession, data: dict) -> None:
     runtime_state = dict(session.runtime_state or {})
     runtime_state.update(patch)
     stats = dict(session.stats or {})
-    if "experience" in patch:
-        stats["experience"] = patch["experience"]
+    trusted_experience = max(0, int(stats.get("experience") or 0))
+    runtime_state["experience"] = trusted_experience
+    stats["experience"] = trusted_experience
     if "durationMs" in patch:
         stats["durationMs"] = patch["durationMs"]
     session.runtime_state = runtime_state
@@ -658,14 +1008,28 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
     wrong_question_ids: list[str] = []
     correct_count = 0
     answered_count = 0
+    raw_score = 0.0
+    max_score = 0.0
     for ref in refs:
         if not isinstance(ref, dict):
             continue
         question_id = str(ref.get("questionId") or "")
         domain = str(ref.get("domain") or "")
+        try:
+            raw_question_score = ref.get("score")
+            question_score = float(
+                raw_question_score if raw_question_score is not None else 1
+            )
+        except (TypeError, ValueError):
+            question_score = 1.0
+        question_score = question_score if question_score >= 0 else 1.0
+        max_score += question_score
         if domain not in domain_counts:
             continue
         domain_counts[domain]["total"] += 1
+        domain_counts[domain]["maxScore"] = (
+            float(domain_counts[domain].get("maxScore") or 0) + question_score
+        )
         answer = answers.get(question_id)
         if not isinstance(answer, dict):
             continue
@@ -676,29 +1040,39 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
         correct_answer = str(snapshot.get("correctAnswer") or "")
         if str(answer.get("selectedAnswer") or "") == correct_answer:
             correct_count += 1
+            raw_score += question_score
             domain_counts[domain]["correct"] += 1
+            domain_counts[domain]["rawScore"] = (
+                float(domain_counts[domain].get("rawScore") or 0) + question_score
+            )
         else:
             wrong_question_ids.append(question_id)
             domain_counts[domain]["wrong"] += 1
     total = len(refs)
-    score_percent = round((correct_count / total * 100) if total else 0, 2)
+    score_percent = round((raw_score / max_score * 100) if max_score else 0, 2)
     pass_percent = float(scoring.get("passPercent", 60))
     passed = score_percent >= pass_percent
     domains = {}
     for domain, counts in domain_counts.items():
         domain_total = counts["total"]
+        domain_max_score = float(counts.get("maxScore") or 0)
+        domain_raw_score = float(counts.get("rawScore") or 0)
         domain_percent = round(
-            (counts["correct"] / domain_total * 100) if domain_total else 0,
+            (domain_raw_score / domain_max_score * 100) if domain_max_score else 0,
             2,
         )
         domains[domain] = {
             "weight": int(weights.get(domain, 0)),
             **counts,
             "unanswered": domain_total - counts["answered"],
+            "rawScore": round(domain_raw_score, 2),
+            "maxScore": round(domain_max_score, 2),
             "scorePercent": domain_percent,
             "performanceBand": performance_band(domain_percent, scoring),
         }
     stats = session.stats if isinstance(session.stats, dict) else {}
+    release = await db.get(PaperRelease, session.release_id)
+    paper_name = release.name if release is not None else "PMP 模拟练习"
     return {
         "sessionId": session.id,
         "paperId": session.paper_id,
@@ -707,7 +1081,11 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
         "resultLabel": f"模拟考试结果：{'PASS' if passed else 'FAIL'}",
         "passed": passed,
         "scorePercent": score_percent,
+        "accuracyPercent": round((correct_count / total * 100) if total else 0, 2),
+        "rawScore": round(raw_score, 2),
+        "maxScore": round(max_score, 2),
         "passPercent": pass_percent,
+        "bands": deepcopy(scoring.get("bands") or DEFAULT_SIMULATION_SCORING["bands"]),
         "overallBand": performance_band(score_percent, scoring),
         "counts": {
             "total": total,
@@ -720,6 +1098,15 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
         "domains": domains,
         "wrongQuestionIds": wrong_question_ids,
         "durationMs": max(0, int(stats.get("durationMs") or 0)),
+        "learner": session.owner_id,
+        "paperName": paper_name,
+        "examDate": now_utc().date().isoformat(),
+        "reportNumber": session.id,
+        "recommendations": [
+            "优先复盘本次错题及对应知识点",
+            "根据领域表现安排下一轮针对性练习",
+        ],
+        "pageNumber": "1 / 1",
         "official": False,
         "disclaimer": "幻谱模拟判定，不代表 PMI 官方考试成绩",
     }

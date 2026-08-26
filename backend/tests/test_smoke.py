@@ -87,7 +87,17 @@ def test_question_bank_and_paper():
     b = client.post("/api/v1/banks", json={"name": "pytest题库", "subject": "PMP"}).json()["bank"]["id"]
     question = client.post(
         f"/api/v1/banks/{b}/questions",
-        json={"title": "pytest题目", "domain": "范围", "options": [{"id": "A", "text": "x", "correct": True}], "correctAnswer": "A"},
+        json={
+            "title": "pytest题目",
+            "domain": "范围",
+            "metadata": {
+                "subjectFacets": [
+                    {"dimensionId": "exam-domain", "valueId": "process"}
+                ]
+            },
+            "options": [{"id": "A", "text": "x", "correct": True}],
+            "correctAnswer": "A",
+        },
     ).json()["question"]
     q = question["id"]
     assert question["scope"] == "internal"

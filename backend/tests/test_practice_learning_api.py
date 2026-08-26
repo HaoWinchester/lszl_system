@@ -104,6 +104,9 @@ def test_practice_mistake_remediation_and_verification_are_database_backed() -> 
     assert overview.status_code == 200, overview.text
     assert overview.json()["stats"]["pending"] == 1
     assert overview.json()["plan"]["idealAction"]["id"] == "revenge"
+    overview_question = overview.json()["mistakes"][0]["questionSnapshot"]
+    assert "correctAnswer" not in overview_question
+    assert all("correct" not in option for option in overview_question["options"])
 
     isolated = TestClient(app)
     _login(isolated, other_username)
@@ -179,6 +182,11 @@ def test_practice_mistake_remediation_and_verification_are_database_backed() -> 
     assert candidate.status_code == 200, candidate.text
     assert candidate.json()["candidate"]["question"]["id"] == verification["question"]["id"]
     assert candidate.json()["candidate"]["question"]["id"] != source["question"]["id"]
+    assert "correctAnswer" not in candidate.json()["candidate"]["question"]
+    assert all(
+        "correct" not in option
+        for option in candidate.json()["candidate"]["question"]["options"]
+    )
 
     bad_candidate = client.post(
         f"/api/v1/learning/practice/mistakes/{mistake['id']}/verification",

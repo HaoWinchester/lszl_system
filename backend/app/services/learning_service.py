@@ -1,5 +1,6 @@
 """单题深学会话、学习事件和多题工作区服务。"""
 
+from copy import deepcopy
 import re
 from datetime import timedelta
 
@@ -8,10 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
 from app.models.question import Question, QuestionBank
+from app.models.paper_release import PaperRelease
 from app.models.training import (
     CanvasWorkspace,
     LearningEvent,
     PracticeMistake,
+    PracticeSession,
     PracticeVerification,
     TrainingProgress,
 )
@@ -29,6 +32,14 @@ PUBLISHED_LEARNING_MODES = {
     "single_deep_study",
 }
 PRACTICE_REVIEW_DELAY = timedelta(days=1)
+PRACTICE_ANSWER_ONLY_FIELDS = {
+    "answer",
+    "analysis",
+    "correctanswer",
+    "explanation",
+    "reasoningsteps",
+    "solution",
+}
 
 
 def _iso(value) -> str | None:
@@ -208,7 +219,28 @@ def _practice_snapshot_knowledge(snapshot: dict) -> dict:
     }
 
 
-def _practice_mistake_to_dict(mistake: PracticeMistake) -> dict:
+def redact_practice_question(value):
+    """Return a learner-safe question payload before server grading."""
+
+    if isinstance(value, list):
+        return [redact_practice_question(item) for item in value]
+    if not isinstance(value, dict):
+        return deepcopy(value)
+    redacted = {}
+    for key, item in value.items():
+        if str(key).replace("_", "").lower() in PRACTICE_ANSWER_ONLY_FIELDS:
+            continue
+        if key == "correct":
+            continue
+        redacted[key] = redact_practice_question(item)
+    return redacted
+
+
+def _practice_mistake_to_dict(
+    mistake: PracticeMistake,
+    *,
+    reveal_answer: bool = True,
+) -> dict:
     return {
         "id": mistake.id,
         "questionId": mistake.question_id,
@@ -219,7 +251,11 @@ def _practice_mistake_to_dict(mistake: PracticeMistake) -> dict:
         "paperName": mistake.paper_name,
         "sourceMode": mistake.source_mode,
         "languageMode": mistake.language_mode,
-        "questionSnapshot": mistake.question_snapshot or {},
+        "questionSnapshot": (
+            deepcopy(mistake.question_snapshot or {})
+            if reveal_answer
+            else redact_practice_question(mistake.question_snapshot or {})
+        ),
         "knowledge": mistake.knowledge or {},
         "selectedAnswers": mistake.selected_answers or [],
         "status": mistake.status,
@@ -654,7 +690,7 @@ async def list_practice_mistakes(db: AsyncSession, owner: str) -> list[dict]:
             .order_by(PracticeMistake.updated_at.desc(), PracticeMistake.id)
         )
     ).scalars().all()
-    return [_practice_mistake_to_dict(row) for row in rows]
+    return [_practice_mistake_to_dict(row, reveal_answer=False) for row in rows]
 
 
 def _practice_stats(rows: list[PracticeMistake], now) -> dict:
@@ -723,10 +759,23 @@ async def practice_overview(db: AsyncSession, owner: str) -> dict:
         )
     ).scalars().all()
     stats = _practice_stats(rows, now_utc())
-    return {"mistakes": [_practice_mistake_to_dict(row) for row in rows], "stats": stats, "plan": _practice_plan(stats)}
+    return {
+        "mistakes": [
+            _practice_mistake_to_dict(row, reveal_answer=False) for row in rows
+        ],
+        "stats": stats,
+        "plan": _practice_plan(stats),
+    }
 
 
-async def record_revenge_answer(db: AsyncSession, owner: str, mistake_id: str, data: dict) -> PracticeMistake | None:
+async def record_revenge_answer(
+    db: AsyncSession,
+    owner: str,
+    mistake_id: str,
+    data: dict,
+    *,
+    commit: bool = True,
+) -> PracticeMistake | None:
     mistake = await _practice_mistake(db, owner, mistake_id)
     if mistake is None:
         return None
@@ -779,12 +828,19 @@ async def record_revenge_answer(db: AsyncSession, owner: str, mistake_id: str, d
         question_id=mistake.question_id,
         payload={"mistakeId": mistake.id, "correct": correct, "status": mistake.status},
     )
-    await db.commit()
-    await db.refresh(mistake)
+    if commit:
+        await db.commit()
+        await db.refresh(mistake)
     return mistake
 
 
-async def mark_remediation_reviewed(db: AsyncSession, owner: str, mistake_id: str) -> PracticeMistake | None:
+async def mark_remediation_reviewed(
+    db: AsyncSession,
+    owner: str,
+    mistake_id: str,
+    *,
+    commit: bool = True,
+) -> PracticeMistake | None:
     mistake = await _practice_mistake(db, owner, mistake_id)
     if mistake is None:
         return None
@@ -796,6 +852,8 @@ async def mark_remediation_reviewed(db: AsyncSession, owner: str, mistake_id: st
         return None
     if mistake.status != "needs_remediation":
         raise ValueError("当前错题不处于待补救状态")
+    if mistake.remediation_reviewed_at is not None:
+        return mistake
     mistake.remediation_reviewed_at = now_utc()
     await _append_practice_event(
         db,
@@ -804,12 +862,19 @@ async def mark_remediation_reviewed(db: AsyncSession, owner: str, mistake_id: st
         question_id=mistake.question_id,
         payload={"mistakeId": mistake.id, "knowledge": mistake.knowledge or {}},
     )
-    await db.commit()
-    await db.refresh(mistake)
+    if commit:
+        await db.commit()
+        await db.refresh(mistake)
     return mistake
 
 
-async def practice_verification_candidate(db: AsyncSession, owner: str, mistake_id: str) -> dict | None:
+async def practice_verification_candidate(
+    db: AsyncSession,
+    owner: str,
+    mistake_id: str,
+    *,
+    reveal_answer: bool = False,
+) -> dict | None:
     mistake = await _practice_mistake(db, owner, mistake_id)
     if mistake is None:
         return None
@@ -843,7 +908,11 @@ async def practice_verification_candidate(db: AsyncSession, owner: str, mistake_
         "available": True,
         "code": "READY",
         "message": "已找到同一核心知识点的不同验证题。",
-        "question": _question_snapshot(candidate),
+        "question": (
+            _question_snapshot(candidate)
+            if reveal_answer
+            else redact_practice_question(_question_snapshot(candidate))
+        ),
     }
 
 
@@ -852,7 +921,9 @@ async def record_practice_verification(
     owner: str,
     mistake_id: str,
     data: dict,
-) -> tuple[PracticeMistake, PracticeVerification] | None:
+    *,
+    commit: bool = True,
+) -> tuple[PracticeMistake, PracticeVerification, dict] | None:
     mistake = await _practice_mistake(db, owner, mistake_id)
     if mistake is None:
         return None
@@ -864,7 +935,9 @@ async def record_practice_verification(
         return None
     if mistake.status != "needs_remediation" or mistake.remediation_reviewed_at is None:
         raise ValueError("请先完成错题补救后再提交验证")
-    candidate = await practice_verification_candidate(db, owner, mistake_id)
+    candidate = await practice_verification_candidate(
+        db, owner, mistake_id, reveal_answer=True
+    )
     question_id = str(data.get("questionId") or "").strip()
     if not candidate or not candidate.get("available"):
         raise ValueError("当前没有可用验证题")
@@ -897,10 +970,11 @@ async def record_practice_verification(
         question_id=question_id,
         payload={"mistakeId": mistake.id, "correct": correct, "sourceQuestionId": mistake.question_id},
     )
-    await db.commit()
-    await db.refresh(mistake)
-    await db.refresh(verification)
-    return mistake, verification
+    if commit:
+        await db.commit()
+        await db.refresh(mistake)
+        await db.refresh(verification)
+    return mistake, verification, candidate_question
 
 
 async def append_event(db: AsyncSession, owner: str, data: dict) -> LearningEvent:
@@ -985,7 +1059,38 @@ async def record_practice_session(db: AsyncSession, owner: str, data: dict) -> d
 
 
 async def list_practice_sessions(db: AsyncSession, owner: str) -> list[dict]:
-    rows = (
+    modern_rows = list(
+        (
+            await db.execute(
+                select(PracticeSession, PaperRelease.name)
+                .join(PaperRelease, PaperRelease.id == PracticeSession.release_id)
+                .where(
+                    PracticeSession.owner_id == owner,
+                    PracticeSession.status.in_(["completed", "abandoned"]),
+                )
+                .order_by(PracticeSession.last_saved_at.desc())
+                .limit(100)
+            )
+        ).all()
+    )
+    modern = [
+        {
+            "sessionId": session.id,
+            "mode": session.mode,
+            "paperId": session.paper_id,
+            "paperName": paper_name,
+            "answered": max(0, int((session.stats or {}).get("answered") or 0)),
+            "correct": max(0, int((session.stats or {}).get("correct") or 0)),
+            "experience": max(0, int((session.stats or {}).get("experience") or 0)),
+            "durationMs": max(0, int((session.stats or {}).get("durationMs") or 0)),
+            "status": session.status,
+            "reportAvailable": session.status == "completed" and isinstance(session.report_snapshot, dict),
+            "createdAt": _iso(session.completed_at or session.abandoned_at or session.last_saved_at),
+        }
+        for session, paper_name in modern_rows
+    ]
+    modern_ids = {row["sessionId"] for row in modern}
+    event_rows = (
         await db.execute(
             select(LearningEvent)
             .where(
@@ -996,14 +1101,21 @@ async def list_practice_sessions(db: AsyncSession, owner: str) -> list[dict]:
             .limit(100)
         )
     ).scalars().all()
-    return [
+    legacy = [
         {
             **(row.payload if isinstance(row.payload, dict) else {}),
             "eventId": row.id,
             "createdAt": _iso(row.created_at),
+            "reportAvailable": False,
         }
-        for row in rows
+        for row in event_rows
+        if str((row.payload or {}).get("sessionId") or "") not in modern_ids
     ]
+    return sorted(
+        [*modern, *legacy],
+        key=lambda row: str(row.get("createdAt") or ""),
+        reverse=True,
+    )[:100]
 
 
 async def clear_practice_sessions(db: AsyncSession, owner: str) -> int:
@@ -1017,8 +1129,18 @@ async def clear_practice_sessions(db: AsyncSession, owner: str) -> int:
     ).scalars().all()
     for row in rows:
         await db.delete(row)
+    modern_rows = (
+        await db.execute(
+            select(PracticeSession).where(
+                PracticeSession.owner_id == owner,
+                PracticeSession.status.in_(["completed", "abandoned"]),
+            )
+        )
+    ).scalars().all()
+    for row in modern_rows:
+        await db.delete(row)
     await db.commit()
-    return len(rows)
+    return len(rows) + len(modern_rows)
 
 
 def workspace_to_dict(workspace: CanvasWorkspace) -> dict:
