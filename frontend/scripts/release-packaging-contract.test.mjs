@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -9,6 +9,9 @@ const frontendDir = resolve(scriptsDir, '..')
 const repoDir = resolve(frontendDir, '..')
 const source = (path) => readFileSync(resolve(repoDir, path), 'utf8')
 const requiredRsyncExcludes = [
+  '/.git',
+  '/new-legacy',
+  '/docs',
   '/frontend/new-legacy-releases',
   '/backups',
   '/测试数据',
@@ -19,6 +22,19 @@ const requiredRsyncExcludes = [
   '/task-1-report.md',
   '/task-2-report.md',
   '/test-practice-mode.js',
+  '/.superpowers',
+  '/.pytest_cache',
+  '/.gitattributes',
+  'node_modules',
+  '.venv',
+  '__pycache__',
+  '*.pyc',
+  '.DS_Store',
+  '._*',
+  '/frontend/e2e',
+  '/e2e',
+  '.env.prod',
+  '/backend/.env',
 ]
 
 function assertRuntimePreparedBeforeRsync(script, label) {
@@ -29,9 +45,18 @@ function assertRuntimePreparedBeforeRsync(script, label) {
   assert.ok(generator < rsync, `${label} must prepare the runtime before rsync`)
 }
 
+function sharedRsyncExcludes() {
+  const path = resolve(repoDir, 'deploy/rsync-excludes.txt')
+  assert.ok(existsSync(path), 'deployment scripts require a shared rsync exclusion file')
+  return readFileSync(path, 'utf8').split(/\r?\n/).filter(Boolean)
+}
+
 function assertDeploymentExcludes(script, label) {
+  const start = script.indexOf('rsync -az --delete')
+  const command = script.slice(start, script.indexOf('\n\n', start))
+  assert.match(command, /--exclude-from "\$REPO_DIR\/deploy\/rsync-excludes\.txt"/, `${label} must use shared rsync exclusions`)
   for (const path of requiredRsyncExcludes) {
-    assert.match(script, new RegExp(`--exclude ['\"]${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['\"]`), `${label} must exclude ${path}`)
+    assert.doesNotMatch(command, new RegExp(`--exclude ['\"]${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['\"]`), `${label} must not duplicate shared exclusion ${path}`)
   }
 }
 
@@ -51,6 +76,7 @@ test('production and UAT deploy only the prepared runtime before synchronizing',
   assertRuntimePreparedBeforeRsync(uat, 'UAT deployment')
   assertDeploymentExcludes(production, 'production deployment')
   assertDeploymentExcludes(uat, 'UAT deployment')
+  assert.deepEqual(sharedRsyncExcludes(), requiredRsyncExcludes)
 })
 
 test('UAT relies on the main sync and prepares runtime after promotion', () => {

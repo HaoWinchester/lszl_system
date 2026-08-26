@@ -69,6 +69,7 @@ restored before the handoff.
 | `cd frontend && pnpm test` | 256 passed, 0 failed; duration 20,975.810 ms |
 | main checkout `.venv`, `cd backend && python -m pytest tests/test_web_runtime.py -q` | 24 passed; 1 third-party deprecation warning; duration 4.90 s |
 | two-release disposable fixture through `prepare-new-legacy-runtime.js` | selected exactly `v-active` and `v-rollback`; 19 files, 943 bytes; no `source/` directory |
+| `cd frontend && node --test scripts/prepare-new-legacy-runtime.integration.test.mjs` | 1 passed; a temporary copied source was release-manager updated twice, the second version explicitly promoted, and the runtime contained only active + rollback `site/` trees with no `source/` directories |
 | local-only deployment-shaped `rsync -azn --delete --stats` to a temporary local destination | 1,435 listed files; 1,334 files transferred; 23,025,025-byte payload; 119,673-byte file list |
 
 The fixture contained only synthetic data and was removed after measurement.

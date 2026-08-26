@@ -47,14 +47,7 @@ cd "$REPO_DIR"
 
 echo "[2/5] rsync 代码到 $REMOTE:$REMOTE_DIR"
 rsync -az --delete \
-  --exclude '/.git' --exclude '/new-legacy' --exclude '/docs' \
-  --exclude '/frontend/new-legacy-releases' --exclude '/backups' \
-  --exclude '/测试数据' --exclude '/修改需求' --exclude '/转题目-json文档' --exclude '/内置数据' \
-  --exclude '/bug清单.docx' --exclude '/task-1-report.md' --exclude '/task-2-report.md' --exclude '/test-practice-mode.js' \
-  --exclude '/.superpowers' --exclude '/.pytest_cache' --exclude '/.gitattributes' \
-  --exclude 'node_modules' --exclude '.venv' --exclude '__pycache__' --exclude '*.pyc' \
-  --exclude '.DS_Store' --exclude '._*' --exclude '/frontend/e2e' --exclude '/e2e' \
-  --exclude '.env.prod' --exclude '/backend/.env' \
+  --exclude-from "$REPO_DIR/deploy/rsync-excludes.txt" \
   "$REPO_DIR/" "$REMOTE:$REMOTE_DIR/"
 
 echo "[3/5] 重建后端镜像并重启"

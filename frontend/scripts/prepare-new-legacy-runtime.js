@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, realpathSync, renameSync, rmSync, statSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, renameSync, rmSync, statSync } from 'node:fs'
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -47,16 +47,55 @@ function resolvePhysicalPath(path) {
   return resolve(realpathSync(existing), ...missing)
 }
 
+function assertOutputIsNotSymbolicLink(path) {
+  try {
+    if (lstatSync(path).isSymbolicLink()) throw new Error('输出目录不能是符号链接')
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+  }
+}
+
+function createStagingDirectory(runtimeOut, storageRoot) {
+  const parent = dirname(runtimeOut)
+  mkdirSync(parent, { recursive: true })
+  const staging = mkdtempSync(resolve(parent, `.${basename(runtimeOut)}.staging-`))
+  if (pathsOverlap(storageRoot, resolvePhysicalPath(staging))) {
+    rmSync(staging, { recursive: true, force: true })
+    throw new Error('staging 目录不能与 release root 重叠')
+  }
+  return staging
+}
+
+function replaceOutput(staging, runtimeOut) {
+  if (!existsSync(runtimeOut)) {
+    renameSync(staging, runtimeOut)
+    return
+  }
+  const backup = mkdtempSync(resolve(dirname(runtimeOut), `.${basename(runtimeOut)}.backup-`))
+  rmSync(backup, { recursive: true, force: true })
+  renameSync(runtimeOut, backup)
+  try {
+    renameSync(staging, runtimeOut)
+  } catch (error) {
+    try {
+      renameSync(backup, runtimeOut)
+    } catch (restoreError) {
+      throw new Error(`runtime 输出替换失败且无法恢复：${restoreError instanceof Error ? restoreError.message : String(restoreError)}`)
+    }
+    throw error
+  }
+  rmSync(backup, { recursive: true, force: true })
+}
+
 export function prepareRuntime({ root = defaultRoot, out = defaultOut } = {}) {
   const storageRoot = resolvePhysicalPath(root)
   const requestedOut = resolve(out)
+  assertOutputIsNotSymbolicLink(requestedOut)
   const runtimeOut = resolvePhysicalPath(out)
   if (pathsOverlap(storageRoot, runtimeOut)) throw new Error('输出目录不能与 release root 重叠')
-  const staging = `${runtimeOut}.staging-${process.pid}`
   const state = readProtectedReleaseState(storageRoot)
 
-  rmSync(staging, { recursive: true, force: true })
-  mkdirSync(staging, { recursive: true })
+  const staging = createStagingDirectory(runtimeOut, storageRoot)
   try {
     cpSync(resolve(storageRoot, 'current.json'), resolve(staging, 'current.json'))
     for (const version of state.protectedVersions) {
@@ -69,8 +108,7 @@ export function prepareRuntime({ root = defaultRoot, out = defaultOut } = {}) {
 
     const stagedState = readProtectedReleaseState(staging)
     const { files, bytes } = countRegularFiles(staging)
-    rmSync(runtimeOut, { recursive: true, force: true })
-    renameSync(staging, runtimeOut)
+    replaceOutput(staging, runtimeOut)
     return { versions: stagedState.protectedVersions, files, bytes, out: requestedOut }
   } catch (error) {
     rmSync(staging, { recursive: true, force: true })
