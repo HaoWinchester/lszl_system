@@ -4,7 +4,12 @@
   "toVersion": "v9.0-p4.1.168",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "assets/landing/graph.png",
+      "assets/landing/recall.png",
+      "assets/landing/workspace.png",
+      "assets/客服二维码/1.jpg"
+    ],
     "removed": []
   },
   "incompatible": []
