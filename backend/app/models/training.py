@@ -144,6 +144,74 @@ class LearningEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
+class PracticeSession(Base):
+    """Learner-owned, resumable practice progress and frozen result facts."""
+
+    __tablename__ = "practice_sessions"
+    __table_args__ = (
+        CheckConstraint(
+            "mode IN ('challenge', 'scholar', 'revenge')",
+            name="ck_practice_sessions_mode",
+        ),
+        CheckConstraint(
+            "status IN ('active', 'paused', 'completed', 'abandoned')",
+            name="ck_practice_sessions_status",
+        ),
+        CheckConstraint("revision >= 1", name="ck_practice_sessions_revision"),
+        Index(
+            "uq_practice_sessions_one_resumable",
+            "owner_id",
+            "paper_id",
+            "release_id",
+            "mode",
+            unique=True,
+            postgresql_where=text("status IN ('active', 'paused')"),
+        ),
+        Index(
+            "ix_practice_sessions_owner_saved",
+            "owner_id",
+            "last_saved_at",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("users.username", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    paper_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    release_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("paper_releases.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    mode: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active", index=True)
+    question_order: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    answers: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    runtime_state: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    stats: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    scoring_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    report_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    last_saved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+        index=True,
+    )
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    abandoned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class PracticeMistake(Base):
     """A learner-owned wrong-answer record and its remediation state machine."""
 
