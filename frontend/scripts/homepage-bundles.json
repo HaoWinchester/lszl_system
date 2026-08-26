@@ -27,7 +27,6 @@
         "src/31-learning-entry-chooser.js",
         "src/30-shared-auth-dialog.js",
         "src/32-wechat-login.js",
-        "src/30-auth-guards.js",
         "direct-auth-adapter.js",
         "src/41-account-menu.js"
       ],
@@ -90,6 +89,7 @@
         "src/20-flashcards-toolbar.js",
         "src/27-home-interaction-modes.js",
         "src/32-home-mobile-readonly-notice.js",
+        "src/30-auth-guards.js",
         "src/40-guided-tour.js",
         "src/90-bootstrap.js"
       ],
