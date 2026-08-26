@@ -187,7 +187,13 @@ with sync_playwright() as playwright:
 
         page.locator('button[data-tab="questions"]').click()
         page.locator("#btnNewQuestion").click()
-        assert page.evaluate("() => state.questionBank.questions.some(question => question.id === state.currentQuestionId)")
+        page.wait_for_function(
+            "ids => state.questionBank.questions.length === ids.length + 1 && !ids.includes(state.currentQuestionId)",
+            arg=loaded_ids,
+        )
+        assert page.evaluate(
+            "() => state.questionBank.questions.some(question => question.id === state.currentQuestionId)"
+        )
         page.locator('button[data-tab="base"]').click()
         page.once("dialog", lambda dialog: dialog.dismiss())
         page.locator("#serverSourceBankSelect").select_option(empty["id"])
