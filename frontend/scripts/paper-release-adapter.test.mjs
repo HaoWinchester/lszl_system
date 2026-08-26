@@ -53,6 +53,75 @@ test('deep recall source does not preload every paper on the multi-question page
   assert.equal(listAllRequests, 0)
 })
 
+test('deep recall demand-loads only the active paper', async () => {
+  const questionRequests = []
+  const catalog = [
+    { paperId: 'paper-1', releaseId: 'release-1', version: 1, name: '第一份试卷', status: 'published', availability: 'published', totalCount: 1, enabledModes: ['deep_recall'], allowedRoles: [], accessPolicy: { accessLevel: 'free' } },
+    { paperId: 'paper-2', releaseId: 'release-2', version: 1, name: '第二份试卷', status: 'published', availability: 'published', totalCount: 1, enabledModes: ['deep_recall'], allowedRoles: [], accessPolicy: { accessLevel: 'free' } },
+    { paperId: 'paper-3', releaseId: 'release-3', version: 1, name: '第三份试卷', status: 'published', availability: 'published', totalCount: 1, enabledModes: ['deep_recall'], allowedRoles: [], accessPolicy: { accessLevel: 'free' } },
+  ]
+  const listeners = new Map()
+  const context = {
+    console: { log: console.log, warn: console.warn, error() {} },
+    Promise,
+    document: { body: { classList: { contains: name => name === 'knowledge-recall-page' } } },
+    CustomEvent: class CustomEvent { constructor(type, init = {}) { this.type = type; this.detail = init.detail } },
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, [])
+      listeners.get(type).push(listener)
+    },
+    dispatchEvent(event) { for (const listener of listeners.get(event.type) || []) listener(event) },
+    KGQuestionCatalogAdapter: { ready: new Promise(() => {}) },
+    KGPaperReleaseApi: {
+      catalog: () => catalog,
+      ready: async () => catalog,
+      detail: async releaseId => catalog.find(row => row.releaseId === releaseId) || null,
+      async fetchQuestions(releaseId) {
+        questionRequests.push(releaseId)
+        if (releaseId === 'release-3') throw new Error('network unavailable')
+        const release = catalog.find(row => row.releaseId === releaseId)
+        return {
+          release,
+          items: [{
+            bankId: `bank-${releaseId}`,
+            questionId: `question-${releaseId}`,
+            order: 1,
+            snapshot: { question: { id: `question-${releaseId}`, title: `${release.name}题目`, stemParts: [], options: [] } },
+          }],
+        }
+      },
+      invalidate() {},
+    },
+    KGRolePermissions: { currentRole: () => 'student', canAccessPublishedPaper: () => true, canOperateQuestion: () => true },
+    KGPaperAccessService: { inspect: () => ({ allowed: true, accessLevel: 'free' }) },
+  }
+  context.window = context
+  context.globalThis = context
+  vm.runInNewContext(repository, context, { filename: '59-published-paper-repository.js' })
+  vm.runInNewContext(resolver, context, { filename: '59a-published-question-resolver.js' })
+  vm.runInNewContext(recallQuestionSource, context, { filename: '96-recall-question-source.js' })
+
+  const collections = await context.KGRecallQuestionSource.rebuild({ paperId: 'paper-1', releaseId: 'release-1' })
+
+  assert.deepEqual(questionRequests, ['release-1'])
+  assert.equal(collections.length, 3)
+  assert.equal(collections[0].questions.length, 1)
+  assert.equal(collections[1].questions.length, 0)
+
+  const switched = await context.KGRecallQuestionSource.loadCollection('paper-release:release-2')
+  assert.deepEqual(questionRequests, ['release-1', 'release-2'])
+  assert.equal(switched.questions.length, 1)
+
+  await context.KGRecallQuestionSource.loadCollection('paper-release:release-1')
+  assert.deepEqual(questionRequests, ['release-1', 'release-2'])
+
+  await assert.rejects(
+    context.KGRecallQuestionSource.loadCollection('paper-release:release-3'),
+    /network unavailable/,
+  )
+  assert.deepEqual(questionRequests, ['release-1', 'release-2', 'release-3'])
+})
+
 test('paper release adapter fetches a paginated lightweight catalog', () => {
   assert.match(adapter, /\/api\/v1\/paper-releases/)
   assert.match(adapter, /\/catalog\?page=\$\{page\}&pageSize=\$\{CATALOG_PAGE_SIZE\}/)

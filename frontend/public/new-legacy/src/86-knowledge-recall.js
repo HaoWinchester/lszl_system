@@ -23,7 +23,7 @@
   let nodeDrag=null,suppressNodeClickUntil=0;
   let recallAdapter=null,recallSession=null,keywordsRevealed=false;
   const destroyingNodeIds=new Set();
-  let questionBrowser={bankId:'',filter:'all'};
+  let questionBrowser={bankId:'',filter:'all',loading:false};
   let guideDragging=false,guideDragStart=null,guideStart=null;
   const THEMES=new Set(['platform','parchment','aurora','neon','sakura','ocean','latte']);
   const BUTTON_ZOOM_LEVELS=[.01,.02,.03,.05,.10,.15,.20,.33,.50,.75,1,1.25,1.50,2,2.50,3,4];
@@ -318,6 +318,7 @@
     if(!recallAdapter)throw new Error('深度回忆服务器适配器加载失败。');
     recallAdapter.subscribe(renderSaveState);renderSaveState({saveState:'loading'});
     const session=await recallAdapter.loadSession();
+    if(session.versionState==='mismatch')window.KGLearningLoading?.hide?.();
     const choice=session.versionState==='mismatch'?await chooseVersion(session):'current';
     const latest=recallAdapter.getState().session||session;
     applyServerSession(latest,{history:choice==='history'});
@@ -1342,7 +1343,7 @@
     const listEl=$('krQuestionList');if(!listEl)return;
     const source=window.KGRecallQuestionSource,banks=source?.list?.()||[],bankSelect=$('krBankSelect');
     if(!questionBrowser.bankId||!banks.some(bank=>bank.id===questionBrowser.bankId))questionBrowser.bankId=String(question.sourceCollectionId||banks[0]?.id||'');
-    if(bankSelect){bankSelect.innerHTML=banks.map(bank=>{const configured=Number(bank.configuredCount||bank.questions.length||0),available=Number(bank.availableCount||bank.questions.length||0);return `<option value="${escapeHTML(bank.id)}">${escapeHTML(bank.name)}（可用 ${available}/${configured} 题）</option>`}).join('');bankSelect.value=questionBrowser.bankId;bankSelect.disabled=!banks.length}
+    if(bankSelect){bankSelect.innerHTML=banks.map(bank=>{const configured=Number(bank.configuredCount||bank.questions.length||0),available=Number(bank.availableCount||bank.questions.length||0);return `<option value="${escapeHTML(bank.id)}">${escapeHTML(bank.name)}（可用 ${available}/${configured} 题）</option>`}).join('');bankSelect.value=questionBrowser.bankId;bankSelect.disabled=!banks.length||questionBrowser.loading}
     const bank=banks.find(item=>item.id===questionBrowser.bankId)||banks[0]||null;
     const term=String($('krQuestionSearch')?.value||'').trim().toLowerCase(),filter=questionBrowser.filter||'all';
     const exploredIds=RecallStorage.exploredSet?.(bank?.id||'')||new Set();
@@ -1362,6 +1363,27 @@
   function questionDrawerOpen(){return Boolean($('krQuestionDrawer')?.classList.contains('open'))}
   function openQuestionDrawer(){const drawer=$('krQuestionDrawer'),backdrop=$('krDrawerBackdrop');if(!drawer)return;renderQuestionList();drawer.classList.add('open');drawer.setAttribute('aria-hidden','false');if(backdrop){backdrop.hidden=false;requestAnimationFrame(()=>backdrop.classList.add('show'))}}
   function closeQuestionDrawer(){const drawer=$('krQuestionDrawer'),backdrop=$('krDrawerBackdrop');if(!drawer)return;drawer.classList.remove('open');drawer.setAttribute('aria-hidden','true');if(backdrop){backdrop.classList.remove('show');setTimeout(()=>backdrop.hidden=true,180)}}
+  async function switchQuestionCollection(collectionId){
+    if(questionBrowser.loading)return false;
+    const previous=questionBrowser.bankId;
+    questionBrowser.bankId=String(collectionId||'');questionBrowser.loading=true;
+    window.KGLearningLoading?.show?.({title:'正在加载试卷',message:'正在读取试题…'});
+    renderQuestionList();
+    try{
+      const collection=await window.KGRecallQuestionSource?.loadCollection?.(questionBrowser.bankId);
+      if(!collection)throw new Error('试卷题目载入失败。');
+      renderQuestionList();
+      return true;
+    }catch(error){
+      questionBrowser.bankId=previous;
+      notifyRecallLimit(error?.message||'试卷读取失败，请稍后重试。');
+      return false;
+    }finally{
+      questionBrowser.loading=false;
+      window.KGLearningLoading?.hide?.();
+      renderQuestionList();
+    }
+  }
   async function switchQuestion(bankId,questionId){
     await flushProgress();questionSessionToken+=1;cancelProgressSave();
     const result=await window.KGRecallQuestionSource?.activate?.(bankId,questionId);if(!result?.valid){notifyRecallLimit((result?.errors||['题目切换失败。']).join('；'));return false}
@@ -1381,7 +1403,7 @@
     $('krDrawerBackdrop')?.addEventListener('click',()=>closeQuestionDrawer());
     $('krQuestionSearch')?.addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(renderQuestionList,130)});
     $('krQuestionSearchBtn')?.addEventListener('click',()=>{clearTimeout(searchTimer);renderQuestionList()});
-    $('krBankSelect')?.addEventListener('change',event=>{questionBrowser.bankId=String(event.target.value||'');renderQuestionList()});
+    $('krBankSelect')?.addEventListener('change',event=>{void switchQuestionCollection(event.target.value)});
     $('krQuestionList')?.addEventListener('click',event=>{
       const button=event.target.closest('[data-question-id]');if(!button)return;
       switchQuestion(button.dataset.bankId,button.dataset.questionId);
@@ -1529,6 +1551,7 @@
       notifyRecallLimit('深度回忆图模型加载失败，请刷新页面后重试。');
       return;
     }
+    window.KGLearningLoading?.show?.({title:'正在加载试卷',message:'正在读取试题…'});
     try{
       const params=new URLSearchParams(location.search||'');
       const route=window.KGLearningRouteContext?.parse?.({mode:'deep_recall',returnUrl:'question-bank.html'})||{};
@@ -1542,7 +1565,7 @@
     catch(error){
       question=cloneValue({...fallbackQuestion,stemParts:[{text:error?.message||'深度回忆数据载入失败，请稍后重试。'}]});
       rootMap={};keywordMatchers=[];setRecallReadonly(true);renderSaveState({saveState:'failed'});notifyRecallLimit(error?.message||'深度回忆数据载入失败，请稍后重试。');
-    }
+    }finally{window.KGLearningLoading?.hide?.()}
     if(!enforceRecallPermission())return;
     if(isTeacherDraftPreview()){
       const back=$('krBackBtn');if(back){back.title='退出深度回忆预览';back.setAttribute('aria-label','退出深度回忆预览');back.addEventListener('click',event=>{event.preventDefault();cleanupTeacherDraftPreview();try{window.close()}catch(error){};if(!window.closed)location.href='training-config.html?section=recall'},{once:true})}

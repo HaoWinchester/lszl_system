@@ -35,22 +35,66 @@
       })
     };
   }
+  function lightweightCollection(row={}){
+    const paperId=text(row.paperId||row.id),releaseId=text(row.releaseId);
+    const configuredCount=Math.max(0,Number(row.totalCount||row.questionCount||0));
+    return {
+      id:collectionId(releaseId),paperId,releaseId,version:Number(row.version||0),
+      name:text(row.name||row.title||'未命名试卷')+(Number(row.version||0)>0?' · v'+Number(row.version):''),subject:text(row.subject||'PMP'),
+      configuredCount,availableCount:configuredCount,missingCount:0,damagedCount:0,blockedCount:0,issues:[],questions:[]
+    };
+  }
+  function requestedRelease(target={},rows=[]){
+    const route=global.KGLearningRouteContext?.parse?.({mode:MODE})||{};
+    const saved=global.KGRecallStorage?.readCurrent?.()||{};
+    const collectionRelease=text(target.collectionId).replace(/^paper-release:/,'');
+    const releaseId=text(target.releaseId||collectionRelease||route.releaseId||saved.sourceReleaseId||saved.question?.sourceReleaseId);
+    const paperId=text(target.paperId||route.paperId||saved.sourcePaperId||saved.question?.sourcePaperId);
+    return rows.find(row=>releaseId&&text(row.releaseId)===releaseId)
+      ||rows.find(row=>paperId&&text(row.paperId||row.id)===paperId)
+      ||rows[0]||null;
+  }
   let rebuildPromise=null;
-  async function rebuild(){
-    // 并发调用复用同一次重建 Promise，避免"正在重建"时返回空缓存
-    if(rebuildPromise)return rebuildPromise;
+  let rebuildKey='';
+  async function rebuild(target={},options={}){
+    const key=[text(target.paperId),text(target.releaseId)].join('::');
+    // 同一目标的并发调用复用一次解析；切换 release 时允许启动新的按需载入。
+    if(rebuildPromise&&rebuildKey===key)return rebuildPromise;
+    const previous=cache;
+    rebuildKey=key;
     rebuildPromise=(async()=>{
       try{
         await repository()?.ready?.();
-        const entries=await (resolver()?.listPapers?.({mode:MODE,respectRole:true})||repository()?.listPublishedPapers?.({mode:MODE,respectRole:true})||[]);
-        const list=(Array.isArray(entries)?entries:[]).map(collectionFromEntry).filter(item=>item.id&&item.questions.length);
+        const options={mode:MODE,respectRole:true};
+        const rows=(repository()?.listCatalogEntries?.(options)||[]).filter(row=>{
+          const inspected=repository()?.inspectRelease?.({paperId:row.paperId||row.id,releaseId:row.releaseId},options);
+          return !inspected||inspected.ok!==false;
+        });
+        const list=rows.map(row=>{
+          const resolved=repository()?.peekResolved?.(row.releaseId);
+          return resolved?collectionFromEntry(resolved):lightweightCollection(row);
+        }).filter(item=>item.id);
+        const selected=requestedRelease(target,rows);
+        if(selected&&typeof resolver()?.resolvePaper==='function'){
+          const resolved=repository()?.peekResolved?.(selected.releaseId)
+            ||await resolver().resolvePaper({paperId:selected.paperId||selected.id,releaseId:selected.releaseId,mode:MODE},options);
+          if(!resolved?.ok)throw new Error(resolver()?.message?.(resolved,'指定发布版本不可用。')||resolved?.message||'指定发布版本不可用。');
+          const collection=collectionFromEntry(resolved);
+          const index=list.findIndex(item=>item.releaseId===collection.releaseId);
+          if(index>=0)list[index]=collection;else list.unshift(collection);
+        }
         cache={generation:cache.generation+1,list};
         try{global.dispatchEvent?.(new CustomEvent('kg:recall-source-updated',{detail:{generation:cache.generation}}))}catch(error){}
         return list;
       }catch(error){
         console.error('深度回忆发布题目载入失败',error);
-        return cache.list;
-      }finally{rebuilding=false}
+        cache=previous;
+        if(options.throwOnError)throw error;
+        return previous.list;
+      }finally{
+        rebuilding=false;
+        if(rebuildKey===key){rebuildPromise=null;rebuildKey=''}
+      }
     })();
     rebuilding=true;
     return rebuildPromise;
@@ -62,6 +106,13 @@
   function banks(){return list()}
   function invalidate(){cache={generation:cache.generation+1,list:[]};void rebuild()}
   function resolveCollection(identifier){const id=text(identifier);return cache.list.find(item=>item.id===id||item.paperId===id||item.releaseId===id)||null}
+  async function loadCollection(identifier){
+    const input=identifier&&typeof identifier==='object'?identifier:{collectionId:text(identifier)};
+    const current=resolveCollection(input.collectionId||input.releaseId||input.paperId);
+    if(current?.questions?.length)return current;
+    await rebuild({collectionId:text(input.collectionId||current?.id),paperId:text(input.paperId||current?.paperId),releaseId:text(input.releaseId||current?.releaseId)},{throwOnError:true});
+    return resolveCollection(input.collectionId||input.releaseId||input.paperId||current?.id);
+  }
   function find(collectionIdentifier,questionId){const collection=resolveCollection(collectionIdentifier);if(!collection)return null;const item=collection.questions.find(row=>row.id===text(questionId));return item?{bank:collection,collection,question:clone(item.question),item:clone(item)}:null}
   async function foundFromResolution(result){
     if(!result?.ok)return null;
@@ -113,7 +164,7 @@
     }catch(error){}
   }
 
-  const api=Object.freeze({ready:catalogReady,banks,list,find,findPublished,findAny,activate,invalidate,rebuild,emptyQuestion});
+  const api=Object.freeze({ready:catalogReady,banks,list,find,findPublished,findAny,activate,invalidate,rebuild,loadCollection,emptyQuestion});
   global.KGRecallQuestionSource=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
