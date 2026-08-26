@@ -35,3 +35,28 @@ test('the release synchronizer injects the practice database adapter before the 
   assert.match(sync, /practice-learning-adapter\.js/)
   assert.match(sync, /kg-practice-learning:generated/)
 })
+
+test('practice adapter exposes the complete resumable session lifecycle', () => {
+  const adapter = source('frontend/scripts/new-legacy-assets/practice-learning-adapter.js')
+  for (const method of [
+    'startSession', 'getActiveSessions', 'getSession', 'updateState',
+    'answerSession', 'pauseSession', 'completeSession', 'abandonSession', 'getReport',
+  ]) {
+    assert.match(adapter, new RegExp(`async function ${method}\\(`), method)
+  }
+  for (const route of [
+    "request('/sessions/start'",
+    "request('/sessions/active'",
+    "request(`/sessions/${encodeURIComponent(sessionId)}`",
+    "request(`/sessions/${encodeURIComponent(sessionId)}/state`",
+    "request(`/sessions/${encodeURIComponent(sessionId)}/answers`",
+    "request(`/sessions/${encodeURIComponent(sessionId)}/pause`",
+    "request(`/sessions/${encodeURIComponent(sessionId)}/complete`",
+    "request(`/sessions/${encodeURIComponent(sessionId)}/abandon`",
+    "request(`/sessions/${encodeURIComponent(sessionId)}/report`",
+  ]) assert.ok(adapter.includes(route), route)
+  assert.match(adapter, /credentials: 'include'/)
+  assert.match(adapter, /error\.status = response\.status/)
+  assert.match(adapter, /error\.detail = payload\?\.detail \|\| payload/)
+  assert.match(adapter, /kg:auth-required/)
+})

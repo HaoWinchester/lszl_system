@@ -26,9 +26,11 @@
     let payload = {}
     try { payload = await response.json() } catch (error) {}
     if (!response.ok) {
-      const error = new Error(text(payload?.detail || `学习记录请求失败 (${response.status})`))
+      const detail = payload?.detail || payload
+      const message = typeof detail === 'object' ? detail?.message : detail
+      const error = new Error(text(message || `学习记录请求失败 (${response.status})`))
       error.status = response.status
-      error.detail = payload
+      error.detail = payload?.detail || payload
       if (response.status === 401) emit('kg:auth-required', { source: 'practice-learning' })
       throw error
     }
@@ -117,7 +119,52 @@
   async function clearSessions() {
     await request('/sessions', { method: 'DELETE' })
   }
-  const api = Object.freeze({ refresh, snapshot, list, active, stats, plan, answer, upsertWrong, answerRevenge, remediationReviewed, verificationCandidate, verify, recordSession, listSessions, clearSessions })
+  async function startSession(input) {
+    const payload = await request('/sessions/start', { method: 'POST', body: JSON.stringify(input || {}) })
+    return clone(payload.session || null)
+  }
+  async function getActiveSessions(filters = {}) {
+    const params = new URLSearchParams()
+    if (filters.releaseId) params.set('releaseId', text(filters.releaseId))
+    if (filters.mode) params.set('mode', text(filters.mode))
+    const query = params.toString() ? `?${params}` : ''
+    const payload = await request('/sessions/active' + query)
+    return Array.isArray(payload.sessions) ? clone(payload.sessions) : []
+  }
+  async function getSession(sessionId) {
+    const payload = await request(`/sessions/${encodeURIComponent(sessionId)}`)
+    return clone(payload.session || null)
+  }
+  async function updateState(sessionId, input) {
+    const payload = await request(`/sessions/${encodeURIComponent(sessionId)}/state`, { method: 'PATCH', body: JSON.stringify(input || {}) })
+    return clone(payload.session || null)
+  }
+  async function answerSession(sessionId, input) {
+    const payload = await request(`/sessions/${encodeURIComponent(sessionId)}/answers`, { method: 'POST', body: JSON.stringify(input || {}) })
+    return clone(payload)
+  }
+  async function pauseSession(sessionId, input) {
+    const payload = await request(`/sessions/${encodeURIComponent(sessionId)}/pause`, { method: 'POST', body: JSON.stringify(input || {}) })
+    return clone(payload.session || null)
+  }
+  async function completeSession(sessionId, input) {
+    return clone(await request(`/sessions/${encodeURIComponent(sessionId)}/complete`, { method: 'POST', body: JSON.stringify(input || {}) }))
+  }
+  async function abandonSession(sessionId, input) {
+    const payload = await request(`/sessions/${encodeURIComponent(sessionId)}/abandon`, { method: 'POST', body: JSON.stringify(input || {}) })
+    return clone(payload.session || null)
+  }
+  async function getReport(sessionId) {
+    const payload = await request(`/sessions/${encodeURIComponent(sessionId)}/report`)
+    return clone(payload.report || null)
+  }
+  const api = Object.freeze({
+    refresh, snapshot, list, active, stats, plan, answer, upsertWrong,
+    answerRevenge, remediationReviewed, verificationCandidate, verify,
+    recordSession, listSessions, clearSessions, startSession, getActiveSessions,
+    getSession, updateState, answerSession, pauseSession, completeSession,
+    abandonSession, getReport,
+  })
   global.KGPracticeLearningApi = api
   global.addEventListener('kg-auth-session-change', () => { refresh().catch(() => setOverview({})) })
   if (authenticated()) refresh().catch(() => setOverview({}))
