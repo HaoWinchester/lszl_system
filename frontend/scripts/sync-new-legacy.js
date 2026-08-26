@@ -3,10 +3,13 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statS
 import { dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { buildHomepageBundles } from './homepage-bundles.mjs'
+
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const frontendDir = resolve(scriptsDir, '..')
 const repoDir = resolve(frontendDir, '..')
 const contract = JSON.parse(readFileSync(resolve(scriptsDir, 'new-legacy-contract.json'), 'utf8'))
+const homepageBundlePlan = JSON.parse(readFileSync(resolve(scriptsDir, 'homepage-bundles.json'), 'utf8'))
 const p45PersistenceContract = JSON.parse(readFileSync(resolve(scriptsDir, 'p45-persistence-contract.json'), 'utf8'))
 const runtimePolicyPath = existsSync(resolve(repoDir, 'backend/app/web/runtime_page_policy.json'))
   ? resolve(repoDir, 'backend/app/web/runtime_page_policy.json')
@@ -1101,6 +1104,10 @@ function sync({ source, out }) {
     if (page === 'system-settings.html') pageHtml = patchSystemSettingsAnalyticsHtml(pageHtml)
     if (existsSync(resolve(out, 'styles/membership-ui.css'))) pageHtml = patchMembershipUiLink(pageHtml)
     writeFileSync(path, injectPage(pageHtml, page, version))
+  }
+
+  if (existsSync(resolve(source, 'styles/main.css'))) {
+    buildHomepageBundles({ outputRoot: out, version, plan: homepageBundlePlan })
   }
 
   const indexPath = resolve(out, 'index.html')

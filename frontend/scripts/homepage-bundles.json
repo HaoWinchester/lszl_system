@@ -1,0 +1,162 @@
+{
+  "groups": [
+    {
+      "name": "home-prelude",
+      "defer": false,
+      "scripts": [
+        "teaching-content-sync.js",
+        "runtime-config.override.js",
+        "auth-session-bootstrap.js"
+      ],
+      "styles": []
+    },
+    {
+      "name": "home-shell",
+      "defer": true,
+      "scripts": [
+        "direct-entry.js",
+        "feature-analytics.js",
+        "src/01-runtime-config.js",
+        "src/28-app-storage.js",
+        "src/29-auth-core.js",
+        "src/34-role-permissions.js",
+        "src/31a-learning-weekly-open-schedule.js",
+        "src/31-learning-entry-chooser.js",
+        "src/30-shared-auth-dialog.js",
+        "src/32-wechat-login.js",
+        "src/30-auth-guards.js",
+        "direct-auth-adapter.js",
+        "src/41-account-menu.js"
+      ],
+      "styles": [
+        "styles/main.css",
+        "styles/account-menu.css",
+        "styles/close-button.css"
+      ]
+    },
+    {
+      "name": "home-graph",
+      "defer": true,
+      "scripts": [
+        "src/graph/graph-model.js",
+        "src/graph/card-style-registry.js",
+        "src/graph/graph-persistence.js",
+        "src/graph/history-controller.js",
+        "src/graph/selection-controller.js",
+        "src/graph/drag-controller.js",
+        "src/graph/element-resize-controller.js",
+        "src/graph/connection-controller.js",
+        "src/graph/clipboard-controller.js",
+        "src/graph/style-controller.js",
+        "src/graph/node-alignment-controller.js",
+        "src/graph/layer-controller.js",
+        "src/graph/context-menu-controller.js",
+        "src/graph/style-popover-controller.js",
+        "src/graph/color-picker-controller.js",
+        "src/graph/floating-color-window-controller.js",
+        "src/graph/shared-color-picker-v2.js",
+        "src/graph/inline-text-editor-controller.js",
+        "src/graph/node-toolbar-controller.js",
+        "src/graph/viewport-controller.js",
+        "src/graph/graph-renderer.js",
+        "src/23-graph-file-store.js",
+        "src/23-graph-file-api.js",
+        "src/23-graph-file-remote-adapter.js",
+        "src/23-graph-file-remote-store.js",
+        "src/23-graph-file-editor-store-bridge.js",
+        "src/00-config-state.js",
+        "src/18-graph-user-preferences.js",
+        "src/09-graph-connector-drag-controller.js",
+        "src/canvas/84-canvas-edge-selection-geometry.js",
+        "src/canvas/85-canvas-appearance-controller.js",
+        "src/canvas/86-canvas-zoom-dock-controller.js",
+        "src/canvas/87-canvas-minimap-controller.js",
+        "src/canvas/88-canvas-settings-controller.js",
+        "src/canvas/90-canvas-selection-filter-controller.js",
+        "src/canvas/91-canvas-alignment-controller.js",
+        "src/canvas/92-canvas-edge-toolbar-controller.js",
+        "src/canvas/93-canvas-drag-performance-controller.js",
+        "src/canvas/89-canvas-runtime.js",
+        "src/10-graph-editor.js",
+        "src/19-home-toolbar-registry.js",
+        "src/21-home-package-service.js",
+        "src/26-graph-export-service.js",
+        "src/24-graph-file-autosave.js",
+        "direct-graph-adapter.js",
+        "src/27-home-interaction-modes.js",
+        "src/32-home-mobile-readonly-notice.js",
+        "src/40-guided-tour.js"
+      ],
+      "styles": [
+        "styles/graph-user-preferences.css",
+        "styles/unified-canvas-runtime.css",
+        "styles/home-graph-components.css",
+        "styles/home-canvas-performance.css",
+        "styles/home-selection-p4326.css",
+        "styles/selection-bounds-drag-p4327.css",
+        "styles/home-selection-drag-controls-p4329.css",
+        "styles/home-interaction-modes-p4330.css",
+        "styles/home-selection-geometry-p4332.css",
+        "styles/home-learning-entry-p4515.css",
+        "styles/learning-weekly-open-gate.css"
+      ]
+    },
+    {
+      "name": "home-file-library",
+      "defer": true,
+      "scripts": [
+        "src/22-home-file-library.js",
+        "src/25-graph-file-tabs.js"
+      ],
+      "styles": [
+        "styles/home-file-library.css",
+        "styles/graph-file-tabs.css"
+      ]
+    },
+    {
+      "name": "home-question",
+      "defer": true,
+      "scripts": [
+        "src/20-flashcards-toolbar.js",
+        "src/50-question-data.js",
+        "question-catalog-adapter.js",
+        "paper-release-adapter.js",
+        "src/60-question-bank.js",
+        "src/70-question-trainer.js",
+        "src/80-question-font-scale.js"
+      ],
+      "styles": []
+    },
+    {
+      "name": "home-secondary",
+      "defer": true,
+      "scripts": [
+        "src/37-subscription-plans.js",
+        "src/37-subscription-orders.js",
+        "src/37-subscription-redeem-codes.js",
+        "src/37-subscription-core.js",
+        "direct-system-adapter.js",
+        "src/33-user-center.js",
+        "src/39-global-shortcuts.js",
+        "src/101-engagement-repository.js",
+        "src/102-help-content.js",
+        "src/103-support-center.js"
+      ],
+      "styles": [
+        "styles/global-shortcuts.css",
+        "styles/subscription.css",
+        "styles/user-center.css",
+        "styles/membership-ui.css",
+        "styles/support-center.css"
+      ]
+    },
+    {
+      "name": "home-bootstrap",
+      "defer": true,
+      "scripts": [
+        "src/90-bootstrap.js"
+      ],
+      "styles": []
+    }
+  ]
+}
