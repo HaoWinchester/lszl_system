@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -200,7 +200,7 @@ test('CLI rejects an existing output symlink without touching its unrelated targ
   symlinkSync(backup, out)
   t.after(() => {
     rmSync(root, { recursive: true, force: true })
-    rmSync(out, { force: true })
+    unlinkSync(out)
     rmSync(backup, { recursive: true, force: true })
   })
 

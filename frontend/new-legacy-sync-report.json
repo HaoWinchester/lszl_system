@@ -1,16 +1,12 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.168",
-  "toVersion": "v9.0-p4.1.168",
+  "toVersion": "v9.0-p4.1.169",
   "changes": {
-    "added": [
-      "src/110-learning-loading.js",
-      "styles/learning-loading.css",
-      "tests/practice-challenge-loading-browser.py"
-    ],
+    "added": [],
     "changed": [
-      "practice-mode.html",
-      "src/100-practice-mode.js"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
