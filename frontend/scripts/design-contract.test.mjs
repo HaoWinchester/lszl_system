@@ -12,6 +12,20 @@ const frozenSource = resolve(frontend, 'new-legacy-releases', publicRelease, 'so
 const candidateSource = existsSync(frozenSource) ? frozenSource : resolve(repo, 'new-legacy')
 const runtimePages = new Set(JSON.parse(readRepo('backend/app/web/runtime_page_policy.json')).runtimePages)
 
+function readGeneratedPageAssets(page, generated) {
+  if (!generated.includes('kg-homepage-bundle-version')) return generated
+  const bundles = Array.from(generated.matchAll(/(?:src|href)=["'](bundles\/[^"'?]+)[^"']*["']/g), (match) => match[1])
+  const deferredBundles = JSON.parse(readFrontend('scripts/homepage-bundles.json')).groups
+    .filter((group) => !group.initial)
+    .flatMap((group) => [
+      ...(group.scripts.length ? [`bundles/${group.name}.js`] : []),
+      ...(group.styles.length ? [`bundles/${group.name}.css`] : []),
+    ])
+  return [generated, ...new Set([...bundles, ...deferredBundles])].map((asset) => (
+    asset === generated ? generated : readFrontend(`public/new-legacy/${asset}`)
+  )).join('\n')
+}
+
 test('production pages do not describe account data as a local demo or local question bank', () => {
   const targets = [
     'new-legacy/help-center.html',
@@ -46,13 +60,14 @@ test('generated pages use the exact upstream UI with only direct runtime adapter
     // public 实际携带的版本，不能把未同步的候选源当成静态包的上游。
     const upstream = readFileSync(resolve(candidateSource, upstreamPage), 'utf8')
     const generated = readFrontend(`public/new-legacy/${page}`)
+    const generatedAssets = readGeneratedPageAssets(page, generated)
     assert.match(generated, /kg-direct-bootstrap-anchor/)
     if (runtimePages.has(page)) assert.match(generated, /server-state-bootstrap\.js/)
     else assert.doesNotMatch(generated, /server-state-bootstrap\.js/)
-    assert.match(generated, /direct-entry\.js/)
+    assert.match(generatedAssets, /direct-entry\.js/)
     assert.doesNotMatch(generated, /new-legacy-navigation-bridge|graph-bridge|guided-learning-data-bridge|<iframe/)
     for (const stylesheet of upstream.matchAll(/<link[^>]+href="([^"]+\.css)"/g)) {
-      assert.match(generated, new RegExp(stylesheet[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+      assert.match(generatedAssets, new RegExp(stylesheet[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
     }
   }
 })

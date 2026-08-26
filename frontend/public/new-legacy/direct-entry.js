@@ -10,8 +10,6 @@
   }
 
   let role = cachedRoleFromAuth()
-  let userLoading
-  let userRequestGeneration = 0
 
   function publishDirectAuth(user) {
     const current = global.__KG_DIRECT_BOOTSTRAP__
@@ -28,38 +26,20 @@
   }
 
   function requestCurrentUser({ force = false } = {}) {
-    if (userLoading && !force) return userLoading
-    const generation = ++userRequestGeneration
-    const request = fetch('/api/v1/auth/me', {
-      method: 'GET',
-      credentials: 'include',
-    })
-      .then(async (response) => {
-        if (response.status === 401) {
-          if (generation === userRequestGeneration) {
-            role = 'guest'
-            publishDirectAuth(null)
-          }
-          return {}
-        }
-        if (!response.ok) throw new Error('会话查询失败')
-        const payload = await response.json().catch(() => ({}))
-        const nextRole = String(payload?.user?.role || 'guest')
-        if (generation === userRequestGeneration) {
-          role = nextRole
-          publishDirectAuth(payload?.user || null)
-        }
-        return payload?.user || {}
+    const session = global.KGAuthSessionBootstrap
+    if (!session) return Promise.resolve({})
+    const request = force ? session.refresh() : session.load()
+    return request
+      .then((snapshot) => {
+        const user = snapshot?.user || null
+        role = String(user?.role || 'guest')
+        publishDirectAuth(user)
+        return user || {}
       })
       .catch(() => {
-        if (generation === userRequestGeneration) role = cachedRoleFromAuth()
+        role = cachedRoleFromAuth()
         return {}
       })
-      .finally(() => {
-        if (userLoading === request) userLoading = null
-      })
-    userLoading = request
-    return request
   }
 
   let resolveInitialLearningEntry

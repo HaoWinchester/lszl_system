@@ -30,11 +30,11 @@
   function ensureRole() {
     if (role !== 'guest') return Promise.resolve(role)
     if (rolePromise) return rolePromise
-    rolePromise = fetch('/api/v1/auth/me', { credentials: 'include' })
-      .then(async (response) => {
-        if (!response.ok) return 'guest'
-        const meBody = await response.json().catch(() => ({}))
-        role = String(meBody?.user?.role || 'guest')
+    const session = global.KGAuthSessionBootstrap
+    if (!session) return Promise.resolve('guest')
+    rolePromise = session.load()
+      .then((snapshot) => {
+        role = String(snapshot?.user?.role || 'guest')
         return role
       })
       .catch(() => 'guest')

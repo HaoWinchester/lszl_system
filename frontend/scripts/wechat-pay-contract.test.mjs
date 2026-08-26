@@ -11,7 +11,9 @@ const repoDir = resolve(frontendDir, '..')
 test('member purchase uses the server Native order flow and polls its status', () => {
   const adapter = readFileSync(resolve(scriptsDir, 'new-legacy-assets', 'direct-system-adapter.js'), 'utf8')
   const userCenter = readFileSync(resolve(repoDir, 'new-legacy/src/33-user-center.js'), 'utf8')
-  const homePage = readFileSync(resolve(frontendDir, 'public/new-legacy/index.html'), 'utf8')
+  const homeShell = readFileSync(resolve(frontendDir, 'public/new-legacy/bundles/home-shell.js'), 'utf8')
+  const homeSecondary = readFileSync(resolve(frontendDir, 'public/new-legacy/bundles/home-secondary.js'), 'utf8')
+  const bundlePlan = JSON.parse(readFileSync(resolve(scriptsDir, 'homepage-bundles.json'), 'utf8'))
 
   assert.match(adapter, /\/api\/v1\/subscriptions\/orders/)
   assert.match(adapter, /createNativeOrder/)
@@ -29,8 +31,9 @@ test('member purchase uses the server Native order flow and polls its status', (
   assert.match(userCenter, /pay\.syncSubscription\(latest\.subscription\)/)
   assert.match(userCenter, /renderOrderSubmitted\(plan,\s*\{order\}\)/)
   assert.match(userCenter, /window\.location\.href\s*=\s*['"]index\.html\?mode=free['"]/) 
-  assert.ok(homePage.indexOf('src/32-wechat-login.js') < homePage.indexOf('direct-system-adapter.js'))
-  assert.ok(homePage.indexOf('direct-system-adapter.js') < homePage.indexOf('src/33-user-center.js'))
+  assert.match(homeShell, /src\/32-wechat-login\.js/)
+  assert.ok(bundlePlan.groups.findIndex(group => group.name === 'home-shell') < bundlePlan.groups.findIndex(group => group.name === 'home-secondary'))
+  assert.ok(homeSecondary.indexOf('direct-system-adapter.js') < homeSecondary.indexOf('src/33-user-center.js'))
 })
 
 test('practice mode loads the system adapter between wechat login and user center scripts', () => {

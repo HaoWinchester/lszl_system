@@ -303,8 +303,8 @@ test('graph and training login use remote authentication then reload account sta
   assert.match(adapter, /core\.logout/)
   assert.match(adapter, /requireLegalConsent/)
   assert.match(adapter, /acceptedTermsVersion/)
-  const graphPage = readFileSync(resolve(frontendDir, 'public/new-legacy/index.html'), 'utf8')
-  assert.match(graphPage, /direct-auth-adapter\.js/)
+  const graphShellBundle = readFileSync(resolve(frontendDir, 'public/new-legacy/bundles/home-shell.js'), 'utf8')
+  assert.match(graphShellBundle, /direct-auth-adapter\.js/)
   const retiredTrainingPage = readFileSync(resolve(frontendDir, 'public/new-legacy/question-training.html'), 'utf8')
   assert.match(retiredTrainingPage, /location\.replace\(target\.toString\(\)\)/)
   assert.doesNotMatch(retiredTrainingPage, /direct-auth-adapter\.js/)
@@ -333,8 +333,8 @@ test('graph autosave adapter uses the domain file save result', () => {
   assert.match(adapter, /KGGraphFileAutosave/)
   assert.match(adapter, /saveNow/)
   assert.doesNotMatch(adapter, /KGServerStateStorage|runtime\/state/)
-  const graphPage = readFileSync(resolve(frontendDir, 'public/new-legacy/index.html'), 'utf8')
-  assert.ok(graphPage.indexOf('src/24-graph-file-autosave.js') < graphPage.indexOf('direct-graph-adapter.js'))
+  const graphBundle = readFileSync(resolve(frontendDir, 'public/new-legacy/bundles/home-graph.js'), 'utf8')
+  assert.ok(graphBundle.indexOf('src/24-graph-file-autosave.js') < graphBundle.indexOf('direct-graph-adapter.js'))
 })
 
 test('file manager navigates after the domain store write without runtime flush', () => {

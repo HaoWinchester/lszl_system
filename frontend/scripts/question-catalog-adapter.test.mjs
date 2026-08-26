@@ -297,7 +297,10 @@ test('sync injects the adapter before each page question repository and marks it
     for (const [page, [mode, marker]] of pages) {
       const html = readFileSync(resolve(output, page), 'utf8')
       assert.match(html, new RegExp(`data-question-catalog-mode="${mode}"`))
-      assert.ok(html.indexOf('question-catalog-adapter.js') < html.indexOf(marker), `${page} adapter order`)
+      const executable = page === 'index.html'
+        ? readFileSync(resolve(output, 'bundles/home-question.js'), 'utf8')
+        : html
+      assert.ok(executable.indexOf('question-catalog-adapter.js') < executable.indexOf(marker), `${page} adapter order`)
     }
   } finally {
     rmSync(root, { recursive: true, force: true })

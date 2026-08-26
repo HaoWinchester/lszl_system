@@ -186,8 +186,14 @@ test('sync injects the paper release adapter ahead of the repository', () => {
 
 test('generated learner pages carry the adapter exactly once', () => {
   for (const page of ['practice-mode.html', 'question-workspace.html', 'knowledge-recall.html', 'index.html']) {
-    const html = read(resolve(frontendRoot, `public/new-legacy/${page}`))
-    assert.equal((html.match(/paper-release-adapter\.js/g) || []).length, 1, page)
+    if (page === 'index.html') {
+      const plan = JSON.parse(read(resolve(frontendRoot, 'scripts/homepage-bundles.json')))
+      assert.equal(plan.groups.flatMap(group => group.scripts).filter(asset => asset === 'paper-release-adapter.js').length, 1, page)
+      assert.match(read(resolve(frontendRoot, 'public/new-legacy/bundles/home-question.js')), /paper-release-adapter\.js/)
+    } else {
+      const html = read(resolve(frontendRoot, `public/new-legacy/${page}`))
+      assert.equal((html.match(/paper-release-adapter\.js/g) || []).length, 1, page)
+    }
     assert.ok(existsSync(resolve(frontendRoot, 'public/new-legacy/paper-release-adapter.js')))
   }
 })

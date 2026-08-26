@@ -22,6 +22,8 @@ const repoDir = resolve(frontendDir, '..')
 const defaultRoot = resolve(frontendDir, 'new-legacy-releases')
 const syncScript = resolve(scriptsDir, 'sync-new-legacy.js')
 const contractPath = resolve(scriptsDir, 'new-legacy-contract.json')
+const homepageBundleBuilderPath = resolve(scriptsDir, 'homepage-bundles.mjs')
+const homepageBundlePlanPath = resolve(scriptsDir, 'homepage-bundles.json')
 const adapterRoot = resolve(scriptsDir, 'new-legacy-assets')
 const validationScript = process.env.KG_RELEASE_VALIDATION_SCRIPT
   ? resolve(process.env.KG_RELEASE_VALIDATION_SCRIPT)
@@ -79,7 +81,7 @@ function sourceHash(source) {
 
 function adapterHash() {
   const hash = createHash('sha256')
-  for (const path of [syncScript, contractPath]) {
+  for (const path of [syncScript, contractPath, homepageBundleBuilderPath, homepageBundlePlanPath]) {
     hash.update(relative(frontendDir, path))
     hash.update('\0')
     hash.update(readFileSync(path))

@@ -140,6 +140,7 @@ export function buildHomepageBundles({ outputRoot, version, plan }) {
 
   html = replaceTags(html, scriptMatches, scriptTags)
   html = replaceTags(html, styleMatches, styleTags)
+  html = html.replace(/^[ \t]+$/gm, '')
   writeFileSync(indexPath, html)
   return { indexPath, groups: plan.groups.map((group) => group.name) }
 }

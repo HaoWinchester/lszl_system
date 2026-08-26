@@ -123,16 +123,25 @@ test('update builds an isolated release and atomically selects it', () => {
   assert.ok(existsSync(resolve(root, sourceVersion, 'source', 'learning-path.html')))
   assert.ok(existsSync(resolve(root, sourceVersion, 'site', 'learning-path.html')))
   const page = readFileSync(resolve(root, sourceVersion, 'site', 'index.html'), 'utf8')
-  assert.match(page, new RegExp(`styles/user-center\\.css\\?v=${sourceVersion}`))
+  assert.match(page, new RegExp(`bundles/home-shell\\.css\\?v=${sourceVersion}`))
+  assert.match(
+    readFileSync(resolve(root, sourceVersion, 'site', 'bundles/home-secondary.css'), 'utf8'),
+    /style: styles\/user-center\.css/,
+  )
   assert.match(page, /kg-direct-bootstrap-anchor/)
   assert.doesNotMatch(page, /server-state-bootstrap\.js/)
-  assert.match(page, new RegExp(`direct-entry\\.js\\?v=${sourceVersion}`))
-  assert.match(page, new RegExp(`runtime-config\\.override\\.js\\?v=${sourceVersion}`))
-  const chooserTags = page.match(/<script defer src="src\/31-learning-entry-chooser\.js\?v=[^"]+"><\/script>/g) || []
-  assert.equal(chooserTags.length, 1, 'release index must contain exactly one learning-entry chooser script')
+  assert.match(page, new RegExp(`bundles/home-prelude\\.js\\?v=${sourceVersion}`))
+  assert.match(page, new RegExp(`bundles/home-shell\\.js\\?v=${sourceVersion}`))
+  const preludeBundle = readFileSync(resolve(root, sourceVersion, 'site', 'bundles/home-prelude.js'), 'utf8')
+  const shellBundle = readFileSync(resolve(root, sourceVersion, 'site', 'bundles/home-shell.js'), 'utf8')
+  const graphBundle = readFileSync(resolve(root, sourceVersion, 'site', 'bundles/home-graph.js'), 'utf8')
+  assert.match(preludeBundle, /sourceURL=runtime-config\.override\.js/)
+  assert.match(shellBundle, /sourceURL=direct-entry\.js/)
+  const chooserSources = shellBundle.match(/sourceURL=src\/31-learning-entry-chooser\.js/g) || []
+  assert.equal(chooserSources.length, 1, 'release shell bundle must contain exactly one learning-entry chooser source')
   assert.ok(
-    page.indexOf('src/29-auth-core.js') < page.indexOf('src/31-learning-entry-chooser.js')
-      && page.indexOf('src/31-learning-entry-chooser.js') < page.indexOf('src/10-graph-editor.js'),
+    shellBundle.indexOf('src/29-auth-core.js') < shellBundle.indexOf('src/31-learning-entry-chooser.js')
+      && graphBundle.includes('src/10-graph-editor.js'),
     'release chooser must run after auth core and before graph initialization',
   )
   const landingPage = readFileSync(resolve(root, sourceVersion, 'site', 'landing.html'), 'utf8')
@@ -182,7 +191,7 @@ test('same version with a different source hash fails without changing current',
   assert.equal(readFileSync(resolve(root, 'current.json'), 'utf8'), before)
 })
 
-test('same source version is atomically rebuilt when the adapter changes', () => {
+test('same source version is atomically rebuilt when a bundle build input changes', () => {
   const root = makeRoot()
   const harness = resolve(root, 'harness', 'frontend')
   const releases = resolve(root, 'releases')
@@ -196,8 +205,8 @@ test('same source version is atomically rebuilt when the adapter changes', () =>
   )
   assert.equal(runHarness().status, 0)
   const before = readJson(resolve(releases, 'current.json'))
-  const adapterPath = resolve(harness, 'scripts', 'new-legacy-assets', 'direct-entry.js')
-  writeFileSync(adapterPath, `${readFileSync(adapterPath, 'utf8')}\n/* adapter-rebuild-probe */\n`)
+  const builderPath = resolve(harness, 'scripts', 'homepage-bundles.mjs')
+  writeFileSync(builderPath, `${readFileSync(builderPath, 'utf8')}\n/* bundle-builder-rebuild-probe */\n`)
 
   const result = runHarness()
 
@@ -207,7 +216,7 @@ test('same source version is atomically rebuilt when the adapter changes', () =>
   assert.equal(after.sourceHash, before.sourceHash)
   assert.notEqual(after.adapterHash, before.adapterHash)
   assert.equal(readJson(resolve(releases, sourceVersion, 'release.json')).adapterHash, after.adapterHash)
-  assert.match(readFileSync(resolve(releases, sourceVersion, 'site', 'direct-entry.js'), 'utf8'), /adapter-rebuild-probe/)
+  assert.ok(existsSync(resolve(releases, sourceVersion, 'site', 'bundles', 'home-shell.js')))
 })
 
 test('successful validation can emit logs larger than the Node default buffer', () => {

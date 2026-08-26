@@ -1,6 +1,6 @@
 'use strict';
 (function(global){
-  let current=null,loadedGraph=null,pendingSave=Promise.resolve(),sessionEpoch=0;
+  let current=null,loadedGraph=null,pendingSave=Promise.resolve(),sessionEpoch=0,initializedEpoch=-1,currentInitializer=null;
   function clone(value){return value==null?value:JSON.parse(JSON.stringify(value))}
   function active(){return !!(global.KGGraphFileApi&&global.KGGraphFileApi.isRemote())}
   function normalize(file){return file&&typeof file==='object'?file:null}
@@ -17,28 +17,35 @@
     if(!next||!next.id||!next.graphData)return null;
     current=clone(next);loadedGraph=clone(next.graphData);return clone(current);
   }
-  function clearSession(){sessionEpoch+=1;current=null;loadedGraph=null;pendingSave=Promise.resolve()}
-  async function initialize(){
-    if(!active())return null;
-    const epoch=sessionEpoch,api=global.KGGraphFileApi,listing=await api.listActive();
-    if(epoch!==sessionEpoch||!active())return null;
-    const files=Array.isArray(listing.files)?listing.files:[];
-    const currentPayload=await api.getCurrent();
-    if(epoch!==sessionEpoch||!active())return null;
-    const requestedId=String(currentPayload&&currentPayload.fileId||'');
-    let meta=normalize(files.find(file=>String(file&&file.id||'')===requestedId)||files[0]);
-    if(!meta){
-      const graphData=defaultGraph(),created=await api.create({name:graphData.meta.title,graphData});
+  function clearSession(){sessionEpoch+=1;initializedEpoch=-1;currentInitializer=null;current=null;loadedGraph=null;pendingSave=Promise.resolve()}
+  function initializeCurrent(){
+    if(!active())return Promise.resolve(null);
+    const epoch=sessionEpoch;
+    if(initializedEpoch===epoch)return Promise.resolve(clone(current));
+    if(currentInitializer)return currentInitializer;
+    const api=global.KGGraphFileApi;
+    currentInitializer=(async()=>{
+      const currentPayload=await api.getCurrent();
       if(epoch!==sessionEpoch||!active())return null;
-      meta=normalize(created.file);
-    }
-    if(!meta)throw new Error('远端图谱文件初始化失败。');
-    const opened=await api.get(meta.id);
-    if(epoch!==sessionEpoch||!active())return null;
-    adoptFile(openFile(opened,meta));
-    await api.setCurrent(current.id);
-    return epoch===sessionEpoch&&active()?clone(current):null;
+      const requestedId=String(currentPayload&&currentPayload.fileId||'');
+      if(!requestedId){
+        current=null;loadedGraph=null;initializedEpoch=epoch;
+        global.KGGraphFileRemoteStore?.seedCurrent?.(null);
+        return null;
+      }
+      const opened=await api.get(requestedId);
+      if(epoch!==sessionEpoch||!active())return null;
+      const adopted=adoptFile(openFile(opened,normalize(opened&&opened.meta)||{id:requestedId}));
+      if(!adopted)throw new Error('远端当前图谱初始化失败。');
+      global.KGGraphFileRemoteStore?.seedCurrent?.(adopted);
+      initializedEpoch=epoch;
+      return clone(adopted);
+    })();
+    const pending=currentInitializer;
+    pending.catch(()=>null).finally(()=>{if(currentInitializer===pending)currentInitializer=null});
+    return pending;
   }
+  function initialize(){return initializeCurrent()}
   function getLoadedGraph(){return clone(loadedGraph)}
   function getCurrentFileMeta(){return clone(current)}
   function queueSave(graphData,options={}){
@@ -58,7 +65,7 @@
   async function handleSessionChange(event){
     clearSession();
     if(!event?.detail?.authenticated||!active())return null;
-    return initialize();
+    return initializeCurrent();
   }
-  global.KGGraphFileRemoteAdapter={active,initialize,adoptFile,getLoadedGraph,getCurrentFileMeta,queueSave,flush,clearSession,handleSessionChange};
+  global.KGGraphFileRemoteAdapter={active,initialize,initializeCurrent,adoptFile,getLoadedGraph,getCurrentFileMeta,queueSave,flush,clearSession,handleSessionChange};
 })(window);

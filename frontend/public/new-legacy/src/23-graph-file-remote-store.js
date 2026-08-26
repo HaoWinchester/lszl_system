@@ -1,7 +1,7 @@
 'use strict';
 
 (function(global){
-  let activeFiles=[],trashFiles=[],activeFolders=[],trashFolders=[],tags=[],currentId='',sessionEpoch=0,refreshSerial=0,lastError='';
+  let activeFiles=[],trashFiles=[],activeFolders=[],trashFolders=[],tags=[],currentId='',sessionEpoch=0,refreshSerial=0,lastError='',catalogLoaded=false,catalogPromise=null;
   const contentCache=new Map();
   function clone(value){return value==null?value:JSON.parse(JSON.stringify(value))}
   function api(){return global.KGGraphFileApi||null}
@@ -28,7 +28,18 @@
   }
   function rememberError(error){lastError=String(error&&error.message||error||'图谱文件服务请求失败');return false}
   function getLastError(){return lastError}
-  function clearSession(){sessionEpoch+=1;refreshSerial+=1;activeFiles=[];trashFiles=[];activeFolders=[];trashFolders=[];tags=[];currentId='';lastError='';contentCache.clear()}
+  function clearSession(){sessionEpoch+=1;refreshSerial+=1;activeFiles=[];trashFiles=[];activeFolders=[];trashFolders=[];tags=[];currentId='';lastError='';catalogLoaded=false;catalogPromise=null;contentCache.clear()}
+  function seedCurrent(file){
+    if(!file){currentId='';return null}
+    const normalized=normalizeFile(file);
+    if(!normalized||!normalized.id)return null;
+    currentId=String(normalized.id);
+    const hydrated={...normalized,graphData:clone(file.graphData),learningState:clone(file.learningState)||{}};
+    contentCache.set(currentId,hydrated);
+    const meta={...normalized};delete meta.graphData;delete meta.learningState;
+    activeFiles=[meta,...activeFiles.filter(item=>String(item.id)!==currentId)];
+    return clone(hydrated);
+  }
   async function refresh(){
     if(!active()){clearSession();return false}
     const epoch=sessionEpoch,serial=++refreshSerial,transport=api();
@@ -42,10 +53,16 @@
       activeFolders=(Array.isArray(folderPayload.folders)?folderPayload.folders:[]).map(normalizeFolder).filter(Boolean);
       trashFolders=(Array.isArray(trashFolderPayload.folders)?trashFolderPayload.folders:[]).map(normalizeFolder).filter(Boolean);
       tags=(Array.isArray(tagPayload.tags)?tagPayload.tags:[]).map(clone);
-      currentId=String(currentPayload.fileId||'');lastError='';return true;
+      currentId=String(currentPayload.fileId||'');lastError='';catalogLoaded=true;return true;
     }catch(error){rememberError(error);throw error}
   }
-  async function initialize(){return refresh()}
+  function ensureCatalog(){
+    if(catalogLoaded)return Promise.resolve(true);
+    if(catalogPromise)return catalogPromise;
+    catalogPromise=refresh().finally(()=>{catalogPromise=null});
+    return catalogPromise;
+  }
+  function initialize(){return ensureCatalog()}
   function listFiles(options={}){const status=options.status||'active';return clone(status==='trashed'?trashFiles:status==='all'||(options.includeTrash&&!options.status)?[...activeFiles,...trashFiles]:activeFiles)}
   function listFolders(options={}){const status=options.status||'active';return clone(status==='trashed'?trashFolders:status==='all'||(options.includeTrash&&!options.status)?[...activeFolders,...trashFolders]:activeFolders)}
   function listTags(){return clone(tags)}
@@ -82,5 +99,5 @@
   function verifyIntegrity(){return{ok:true,checked:activeFiles.length+trashFiles.length,missing:[]}}
   function refreshFilePreviews(){return 0}
   function purgeExpiredTrash(){return 0}
-  global.KGGraphFileRemoteStore={active,currentOwner,initialize,refresh,clearSession,listFiles,getFileMeta,getFile,getCurrentFileMeta,createFile,openFile,saveFile,renameFile,deleteFile,restoreFile,emptyTrash,purgeExpiredTrash,duplicateFile,setFileTags,getFileTags,setFileFavorite,listTags,createTag,updateTag,deleteTag,listFolders,getFolder,createFolder,renameFolder,moveFile,moveFolder,trashFolder,restoreFolder,deleteFolderPermanently,setCurrentFileId,getCurrentFileId,getLastError,estimateStorage,verifyIntegrity,refreshFilePreviews};
+  global.KGGraphFileRemoteStore={active,currentOwner,initialize,ensureCatalog,seedCurrent,refresh,clearSession,listFiles,getFileMeta,getFile,getCurrentFileMeta,createFile,openFile,saveFile,renameFile,deleteFile,restoreFile,emptyTrash,purgeExpiredTrash,duplicateFile,setFileTags,getFileTags,setFileFavorite,listTags,createTag,updateTag,deleteTag,listFolders,getFolder,createFolder,renameFolder,moveFile,moveFolder,trashFolder,restoreFolder,deleteFolderPermanently,setCurrentFileId,getCurrentFileId,getLastError,estimateStorage,verifyIntegrity,refreshFilePreviews};
 })(window);

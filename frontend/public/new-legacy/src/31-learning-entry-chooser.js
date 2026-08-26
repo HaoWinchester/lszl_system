@@ -43,18 +43,13 @@
   }
 
   async function currentServerSession(auth) {
+    if (global.KGAuthSessionBootstrap && typeof global.KGAuthSessionBootstrap.load === "function") {
+      try { return await global.KGAuthSessionBootstrap.load(); } catch (_error) { return null; }
+    }
     if (auth && typeof auth.getCurrentSession === "function") {
       try { const result = await auth.getCurrentSession(); if (result && typeof result === "object") return result; } catch (_error) {}
     }
-    try {
-      const response = await fetch('/api/v1/auth/me', { method: 'GET', credentials: 'include' })
-      if (!response.ok) return null
-      const me = await response.json()
-      if (me && me.user && typeof me.user === 'object') return { authenticated: true, user: me.user, loginSessionId: me.loginSessionId }
-      return null
-    } catch (_error) {
-      return null
-    }
+    return null;
   }
 
   function authenticatedSession(session) {

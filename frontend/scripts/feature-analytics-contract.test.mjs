@@ -15,7 +15,9 @@ const readSource = (path) => readFileSync(path.endsWith('.js') && path.startsWit
 
 test('every generated page loads feature telemetry after direct bootstrap', () => {
   for (const pageName of ['index.html', 'file-manager.html', 'question-bank.html', 'question-training.html', 'knowledge-recall.html', 'learning-path.html']) {
-    const page = readFileSync(resolve(generatedDir, pageName), 'utf8')
+    const page = pageName === 'index.html'
+      ? readFileSync(resolve(generatedDir, 'bundles/home-shell.js'), 'utf8')
+      : readFileSync(resolve(generatedDir, pageName), 'utf8')
     assert.ok(
       page.indexOf('direct-entry.js') < page.indexOf('feature-analytics.js'),
       `${pageName} 应在 direct-entry.js 之后加载 feature-analytics.js`,
