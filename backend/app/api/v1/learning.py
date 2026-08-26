@@ -220,6 +220,35 @@ async def clear_practice_sessions(db: DB, user: CurrentUser):
     return {"ok": True, "deleted": await learning_service.clear_practice_sessions(db, user.username)}
 
 
+@router.post("/learning/practice/sessions/{session_id}/answers")
+async def answer_practice_session(
+    session_id: str, body: dict, db: DB, user: CurrentUser
+):
+    try:
+        return await practice_session_service.answer_session_question(
+            db, user.username, user, session_id, body
+        )
+    except practice_session_service.PracticeSessionError as error:
+        raise HTTPException(
+            status_code=error.status_code, detail=error.detail()
+        ) from error
+
+
+@router.patch("/learning/practice/sessions/{session_id}/state")
+async def update_practice_session_state(
+    session_id: str, body: dict, db: DB, user: CurrentUser
+):
+    try:
+        session = await practice_session_service.update_runtime_state(
+            db, user.username, session_id, body
+        )
+    except practice_session_service.PracticeSessionError as error:
+        raise HTTPException(
+            status_code=error.status_code, detail=error.detail()
+        ) from error
+    return {"session": session}
+
+
 @router.get("/learning/practice/sessions/{session_id}")
 async def get_practice_session(session_id: str, db: DB, user: CurrentUser):
     session = await practice_session_service.get_session(db, user.username, session_id)

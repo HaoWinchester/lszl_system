@@ -540,7 +540,12 @@ def _advance_mistake_after_correct(mistake: PracticeMistake, now) -> str:
 
 
 async def record_practice_answer(
-    db: AsyncSession, owner: str, data: dict, current_user: "object | None" = None
+    db: AsyncSession,
+    owner: str,
+    data: dict,
+    current_user: "object | None" = None,
+    *,
+    commit: bool = True,
 ) -> dict:
     """Grade a canvas answer from server-owned question content and update its mistake."""
 
@@ -634,9 +639,10 @@ async def record_practice_answer(
         db, owner, event_type="PRACTICE_ANSWER_COMPLETED", question_id=question.id,
         payload={**completion, "mistakeId": mistake.id if mistake else None},
     )
-    await db.commit()
-    if mistake is not None:
-        await db.refresh(mistake)
+    if commit:
+        await db.commit()
+        if mistake is not None:
+            await db.refresh(mistake)
     return {"correct": correct, "mistake": _practice_mistake_to_dict(mistake) if mistake else None, "completion": completion}
 
 

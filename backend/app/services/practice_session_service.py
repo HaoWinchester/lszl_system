@@ -9,11 +9,11 @@ from typing import Any
 from sqlalchemy import select, text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import uid
+from app.core.security import now_utc, uid
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.training import PracticeSession
 from app.models.user import User
-from app.services import paper_composition_service, paper_release_service
+from app.services import learning_service, paper_composition_service, paper_release_service
 from app.services.practice_scoring_service import (
     DEFAULT_DOMAIN_WEIGHTS,
     DEFAULT_SIMULATION_SCORING,
@@ -23,6 +23,16 @@ from app.services.practice_scoring_service import (
 PRACTICE_SESSION_MODES = {"challenge", "scholar", "revenge"}
 PRACTICE_QUESTION_COUNTS = {10, 20, 60, 180}
 PRACTICE_ORDERS = {"paper", "random"}
+RUNTIME_INTEGER_FIELDS = {
+    "currentIndex",
+    "health",
+    "streak",
+    "maxStreak",
+    "experience",
+    "remainingMs",
+    "durationMs",
+}
+RUNTIME_FIELDS = RUNTIME_INTEGER_FIELDS | {"languageMode", "autoExplain"}
 
 
 class PracticeSessionError(RuntimeError):
@@ -299,3 +309,234 @@ async def list_active_sessions(
         await db.execute(query.order_by(PracticeSession.last_saved_at.desc()))
     ).scalars().all()
     return [await _session_payload(db, session) for session in sessions]
+
+
+def _required_revision(data: dict) -> int:
+    raw = data.get("revision")
+    if isinstance(raw, bool):
+        raise _error(422, "INVALID_SESSION_REVISION", "revision 必须是正整数")
+    try:
+        revision = int(raw)
+    except (TypeError, ValueError) as error:
+        raise _error(422, "INVALID_SESSION_REVISION", "revision 必须是正整数") from error
+    if revision < 1:
+        raise _error(422, "INVALID_SESSION_REVISION", "revision 必须是正整数")
+    return revision
+
+
+async def _session_for_update(
+    db: AsyncSession, owner: str, session_id: str
+) -> PracticeSession:
+    session = (
+        await db.execute(
+            select(PracticeSession)
+            .where(
+                PracticeSession.id == session_id,
+                PracticeSession.owner_id == owner,
+            )
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if session is None:
+        raise _error(404, "PRACTICE_SESSION_NOT_FOUND", "练习会话不存在或无权访问")
+    return session
+
+
+async def answer_session_question(
+    db: AsyncSession,
+    owner: str,
+    user: User,
+    session_id: str,
+    data: dict,
+) -> dict:
+    requested_revision = _required_revision(data)
+    question_id = str(data.get("questionId") or "").strip()
+    selected_answer = str(data.get("selectedAnswer") or "").strip()
+    if not question_id or not selected_answer:
+        raise _error(
+            422,
+            "PRACTICE_ANSWER_REQUIRED",
+            "questionId 和 selectedAnswer 不能为空",
+        )
+
+    session = await _session_for_update(db, owner, session_id)
+    if session.status != "active":
+        raise _error(409, "PRACTICE_SESSION_NOT_ACTIVE", "当前会话不可继续作答")
+    refs = session.question_order if isinstance(session.question_order, list) else []
+    ref = next(
+        (
+            item
+            for item in refs
+            if isinstance(item, dict) and item.get("questionId") == question_id
+        ),
+        None,
+    )
+    if ref is None:
+        raise _error(422, "QUESTION_NOT_IN_SESSION", "题目不属于当前练习会话")
+
+    answers = dict(session.answers or {})
+    existing = answers.get(question_id)
+    if isinstance(existing, dict):
+        if str(existing.get("selectedAnswer") or "") != selected_answer:
+            raise _error(409, "PRACTICE_ANSWER_LOCKED", "已提交答案不能修改")
+        return {
+            "answer": existing,
+            "session": await _session_payload(db, session),
+            "idempotent": True,
+        }
+    if session.revision != requested_revision:
+        raise _error(
+            409,
+            "PRACTICE_SESSION_REVISION_CONFLICT",
+            "练习进度已在其他页面更新，请加载最新进度",
+            currentRevision=session.revision,
+        )
+
+    try:
+        grading = await learning_service.record_practice_answer(
+            db,
+            owner,
+            {
+                "questionId": question_id,
+                "bankId": str(ref.get("bankId") or ""),
+                "paperId": session.paper_id,
+                "releaseId": session.release_id,
+                "sourceMode": session.mode,
+                "selectedAnswer": selected_answer,
+            },
+            current_user=user,
+            commit=False,
+        )
+    except ValueError as error:
+        raise _error(422, "PRACTICE_ANSWER_INVALID", str(error)) from error
+    except LookupError as error:
+        raise _error(404, "PRACTICE_QUESTION_NOT_FOUND", str(error)) from error
+
+    row = (
+        await db.execute(
+            select(PaperReleaseQuestion).where(
+                PaperReleaseQuestion.release_id == session.release_id,
+                PaperReleaseQuestion.question_id == question_id,
+            )
+        )
+    ).scalar_one()
+    correct_answer = str((row.snapshot or {}).get("correctAnswer") or "")
+    completion = grading.get("completion") if isinstance(grading.get("completion"), dict) else {}
+    answer = {
+        "questionId": question_id,
+        "selectedAnswer": selected_answer,
+        "correctAnswer": correct_answer,
+        "correct": bool(grading.get("correct")),
+        "submittedAt": completion.get("completedAt") or now_utc().isoformat(),
+    }
+    answers[question_id] = answer
+    answered = len(answers)
+    correct = sum(1 for item in answers.values() if item.get("correct") is True)
+    previous_stats = session.stats if isinstance(session.stats, dict) else {}
+    total = len(refs)
+    session.answers = answers
+    session.stats = {
+        "total": total,
+        "answered": answered,
+        "correct": correct,
+        "wrong": answered - correct,
+        "unanswered": total - answered,
+        "experience": max(0, int(previous_stats.get("experience") or 0)),
+        "durationMs": max(0, int(previous_stats.get("durationMs") or 0)),
+    }
+    session.revision += 1
+    await db.commit()
+    await db.refresh(session)
+    return {
+        "answer": answer,
+        "session": await _session_payload(db, session),
+        "idempotent": False,
+    }
+
+
+def _validated_runtime_state(data: dict, *, question_count: int) -> dict:
+    raw = data.get("runtimeState")
+    if not isinstance(raw, dict):
+        raise _error(422, "INVALID_RUNTIME_STATE", "runtimeState 必须是对象")
+    unknown = sorted(set(raw) - RUNTIME_FIELDS)
+    if unknown:
+        raise _error(
+            422,
+            "INVALID_RUNTIME_STATE_FIELD",
+            "runtimeState 包含不可写字段",
+            fields=unknown,
+        )
+    state: dict[str, Any] = {}
+    for field in RUNTIME_INTEGER_FIELDS:
+        if field not in raw:
+            continue
+        value = raw[field]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise _error(
+                422,
+                "INVALID_RUNTIME_STATE_VALUE",
+                f"{field} 必须是非负整数",
+                field=field,
+            )
+        if field == "currentIndex" and value >= question_count:
+            raise _error(
+                422,
+                "INVALID_RUNTIME_STATE_VALUE",
+                "currentIndex 超出题目范围",
+                field=field,
+            )
+        state[field] = value
+    if "languageMode" in raw:
+        if raw["languageMode"] not in {"zh", "en", "bilingual"}:
+            raise _error(
+                422,
+                "INVALID_RUNTIME_STATE_VALUE",
+                "languageMode 无效",
+                field="languageMode",
+            )
+        state["languageMode"] = raw["languageMode"]
+    if "autoExplain" in raw:
+        if not isinstance(raw["autoExplain"], bool):
+            raise _error(
+                422,
+                "INVALID_RUNTIME_STATE_VALUE",
+                "autoExplain 必须是布尔值",
+                field="autoExplain",
+            )
+        state["autoExplain"] = raw["autoExplain"]
+    return state
+
+
+async def update_runtime_state(
+    db: AsyncSession,
+    owner: str,
+    session_id: str,
+    data: dict,
+) -> dict:
+    requested_revision = _required_revision(data)
+    session = await _session_for_update(db, owner, session_id)
+    if session.status != "active":
+        raise _error(409, "PRACTICE_SESSION_NOT_ACTIVE", "当前会话不可继续作答")
+    if session.revision != requested_revision:
+        raise _error(
+            409,
+            "PRACTICE_SESSION_REVISION_CONFLICT",
+            "练习进度已在其他页面更新，请加载最新进度",
+            currentRevision=session.revision,
+        )
+    refs = session.question_order if isinstance(session.question_order, list) else []
+    patch = _validated_runtime_state(data, question_count=len(refs))
+    runtime_state = dict(session.runtime_state or {})
+    runtime_state.update(patch)
+    stats = dict(session.stats or {})
+    if "experience" in patch:
+        stats["experience"] = patch["experience"]
+    if "durationMs" in patch:
+        stats["durationMs"] = patch["durationMs"]
+    session.runtime_state = runtime_state
+    session.stats = stats
+    session.revision += 1
+    session.last_saved_at = now_utc()
+    await db.commit()
+    await db.refresh(session)
+    return await _session_payload(db, session)

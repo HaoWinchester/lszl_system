@@ -11,7 +11,12 @@ from app.db.session import AsyncSessionLocal
 from app.main import app
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import Question, QuestionBank
-from app.models.training import PracticeSession
+from app.models.training import (
+    LearningEvent,
+    PracticeMistake,
+    PracticeSession,
+    TrainingProgress,
+)
 from app.models.user import User
 from app.services import question_catalog_service
 from app.services import practice_session_service
@@ -132,6 +137,19 @@ async def _seed_released_pmp_paper(ids: dict[str, str]) -> None:
 
 async def _cleanup_released_pmp_paper(ids: dict[str, str]) -> None:
     async with AsyncSessionLocal() as db:
+        await db.execute(
+            delete(LearningEvent).where(
+                LearningEvent.owner_id.in_([ids["student"], ids["other_student"]])
+            )
+        )
+        await db.execute(
+            delete(PracticeMistake).where(PracticeMistake.release_id == ids["release"])
+        )
+        await db.execute(
+            delete(TrainingProgress).where(
+                TrainingProgress.release_id == ids["release"]
+            )
+        )
         await db.execute(
             delete(PracticeSession).where(PracticeSession.release_id == ids["release"])
         )
@@ -380,5 +398,216 @@ def test_random_order_is_seeded_and_frozen_across_modes(monkeypatch) -> None:
                 )
         assert orders[0] == orders[1]
         assert orders[0] != sorted(orders[0])
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_session_answer_uses_server_truth_locks_answer_and_increments_revision() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            login = client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            )
+            assert login.status_code == 200
+            started = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "challenge",
+                    "count": 60,
+                    "order": "paper",
+                },
+            ).json()["session"]
+            question_id = started["questionOrder"][0]["questionId"]
+
+            response = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json={
+                    "revision": 1,
+                    "questionId": question_id,
+                    "selectedAnswer": "B",
+                    "correct": True,
+                    "score": 999,
+                },
+            )
+            assert response.status_code == 200, response.text
+            body = response.json()
+            assert body["answer"] == {
+                "questionId": question_id,
+                "selectedAnswer": "B",
+                "correctAnswer": "A",
+                "correct": False,
+                "submittedAt": body["answer"]["submittedAt"],
+            }
+            assert body["session"]["revision"] == 2
+            assert body["session"]["answers"][question_id]["correct"] is False
+            assert body["session"]["stats"] == {
+                "total": 60,
+                "answered": 1,
+                "correct": 0,
+                "wrong": 1,
+                "unanswered": 59,
+                "experience": 0,
+                "durationMs": 0,
+            }
+
+            persisted = client.get(
+                f"/api/v1/learning/practice/sessions/{started['id']}"
+            ).json()["session"]
+            assert persisted["revision"] == 2
+            assert persisted["answers"][question_id]["selectedAnswer"] == "B"
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_session_answer_retry_is_idempotent_but_changes_and_stale_writes_conflict() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            login = client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            )
+            assert login.status_code == 200
+            started = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "challenge",
+                    "count": 60,
+                    "order": "paper",
+                },
+            ).json()["session"]
+            first_question = started["questionOrder"][0]["questionId"]
+            second_question = started["questionOrder"][1]["questionId"]
+            first_payload = {
+                "revision": 1,
+                "questionId": first_question,
+                "selectedAnswer": "B",
+            }
+            accepted = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json=first_payload,
+            )
+            assert accepted.status_code == 200
+
+            retry = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json=first_payload,
+            )
+            assert retry.status_code == 200
+            assert retry.json()["idempotent"] is True
+            assert retry.json()["session"]["revision"] == 2
+
+            changed = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json={
+                    "revision": 2,
+                    "questionId": first_question,
+                    "selectedAnswer": "A",
+                },
+            )
+            assert changed.status_code == 409
+            assert changed.json()["detail"]["code"] == "PRACTICE_ANSWER_LOCKED"
+
+            stale = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json={
+                    "revision": 1,
+                    "questionId": second_question,
+                    "selectedAnswer": "A",
+                },
+            )
+            assert stale.status_code == 409
+            assert stale.json()["detail"] == {
+                "code": "PRACTICE_SESSION_REVISION_CONFLICT",
+                "message": "练习进度已在其他页面更新，请加载最新进度",
+                "currentRevision": 2,
+            }
+
+            overview = client.get("/api/v1/learning/practice/overview").json()
+            mistake = next(
+                row for row in overview["mistakes"] if row["questionId"] == first_question
+            )
+            assert mistake["wrongCount"] == 1
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_session_runtime_state_is_validated_owner_scoped_and_revisioned() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            started = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "scholar",
+                    "count": 60,
+                    "order": "paper",
+                },
+            ).json()["session"]
+            runtime_state = {
+                "currentIndex": 6,
+                "health": 2,
+                "streak": 3,
+                "maxStreak": 4,
+                "experience": 42,
+                "remainingMs": 48321,
+                "durationMs": 12000,
+                "languageMode": "bilingual",
+                "autoExplain": False,
+            }
+            saved = client.patch(
+                f"/api/v1/learning/practice/sessions/{started['id']}/state",
+                json={"revision": 1, "runtimeState": runtime_state},
+            )
+            assert saved.status_code == 200
+            saved_session = saved.json()["session"]
+            assert saved_session["revision"] == 2
+            assert saved_session["runtimeState"] == {"order": "paper", **runtime_state}
+            assert saved_session["stats"]["experience"] == 42
+            assert saved_session["stats"]["durationMs"] == 12000
+
+            stale = client.patch(
+                f"/api/v1/learning/practice/sessions/{started['id']}/state",
+                json={"revision": 1, "runtimeState": {"currentIndex": 7}},
+            )
+            assert stale.status_code == 409
+            assert stale.json()["detail"] == {
+                "code": "PRACTICE_SESSION_REVISION_CONFLICT",
+                "message": "练习进度已在其他页面更新，请加载最新进度",
+                "currentRevision": 2,
+            }
+
+            forbidden = client.patch(
+                f"/api/v1/learning/practice/sessions/{started['id']}/state",
+                json={"revision": 2, "runtimeState": {"answers": {"fake": True}}},
+            )
+            assert forbidden.status_code == 422
+            assert forbidden.json()["detail"]["code"] == "INVALID_RUNTIME_STATE_FIELD"
+
+            assert client.post("/api/v1/auth/logout").status_code == 200
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["other_student"], "password": PASSWORD},
+            ).status_code == 200
+            hidden = client.patch(
+                f"/api/v1/learning/practice/sessions/{started['id']}/state",
+                json={"revision": 2, "runtimeState": {"currentIndex": 7}},
+            )
+            assert hidden.status_code == 404
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))
