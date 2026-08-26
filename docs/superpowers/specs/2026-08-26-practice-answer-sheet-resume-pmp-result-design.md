@@ -42,7 +42,7 @@ PMI 不公开固定合格分数，系统不得声称使用“PMI 官方及格线
 - 现有 `/api/v1/learning/practice/sessions` 只追加保存完成或放弃后的展示摘要，不能保存可恢复的题目顺序、逐题答案和运行状态。
 - 现有统一判题接口已经能够由服务器判定正误，并联动 `practice_mistakes`；该事实边界应继续复用。
 - 题目正式数据已经具备 `subjectFacets`，组卷服务已经识别 `exam-domain` 的 `people`、`process`、`business-environment` 分类。
-- 当前快捷组卷默认权重仍是旧版 `42/50/8`，新建 2026 PMP 模拟卷应改为 `33/41/26`。
+- 当前快捷组卷默认权重是 `42/50/8`；本轮继续沿用该产品配比，不随本功能切换到后续新版考试大纲配比。
 - 当前结果页只显示正确率、耗时和经验值，没有领域诊断、错题入口或可再次打开的报告快照。
 
 ## 4. 做题页交互设计
@@ -137,17 +137,19 @@ PMI 不公开固定合格分数，系统不得声称使用“PMI 官方及格线
 
 ## 6. PMP 模拟卷领域配比
 
-### 6.1 统一默认配比
+### 6.1 当前统一默认配比
 
-新建 2026 PMP 模拟卷统一使用：
+本轮新建 PMP 模拟卷继续统一使用当前产品默认配比：
 
 ```text
-人员 people                         33%
-过程 process                       41%
-商业环境 business-environment      26%
+人员 people                         42%
+过程 process                       50%
+商业环境 business-environment       8%
 ```
 
-教师不需要逐卷配置领域配比。系统用最大余数法把比例转换为精确整数题数，保证各领域题数之和等于用户选择的总题数；余数相同时按稳定的领域顺序分配，保证同一输入结果可复现。
+教师不需要逐卷配置领域配比。系统用最大余数法把比例转换为精确整数题数，保证各领域题数之和等于用户选择的总题数；余数相同时按稳定的领域顺序分配，保证同一输入结果可复现。实际采用的整数题数和 `42/50/8` 配比标识进入试卷发布快照，历史成绩不受未来配比切换影响。
+
+PMI 2026 年 7 月版考试内容大纲中的 `33/41/26` 属于后续产品迁移事项，不在本轮范围内。未来切换时应单独评估生效时间、存量试卷兼容和报告标识，不能直接覆盖已发布试卷。
 
 试卷顺序模式先按领域配额选出题目，再按发布快照中的试卷顺序排列；随机顺序模式在选题完成后使用本次会话种子打乱，并冻结结果。
 
@@ -199,7 +201,7 @@ PMI 官方未公开固定及格分数，因此系统采用每份试卷发布快�
 
 ### 8.2 领域饼图语义
 
-- 扇区大小表示本卷领域目标占比；新 2026 模拟卷为 `33/41/26`。
+- 扇区大小表示本卷发布快照中的领域目标占比；本轮新建模拟卷默认为 `42/50/8`。
 - 扇区颜色表示用户在该领域的模拟等级。
 - 外侧引导线显示领域名称和比例。
 - 上方图例固定为需提升、低于目标、达到目标、高于目标。
@@ -327,7 +329,8 @@ GET    /api/v1/learning/practice/sessions/{session_id}/report
 
 - 现有完成/放弃摘要继续可在学习记录中显示，但没有完整报告快照时只展示旧版摘要，不伪造领域报告。
 - 新版会话上线后，学习记录优先读取 `practice_sessions`，并兼容历史 `PRACTICE_SESSION_COMPLETED` 事件。
-- 现有发布版本保持不可变；只更新新建 2026 模拟卷的默认组卷权重。
+- 现有发布版本保持不可变；本轮新建模拟卷继续使用当前 `42/50/8` 默认组卷权重。
+- `33/41/26` 的后续切换不包含在本轮迁移中，不能借本功能发布隐式改变组卷业务规则。
 - 正式 Logo 源为 `new-legacy/assets/logo.jpg`；实现和发布时必须通过权威源同步链路进入 release。
 
 ## 14. 验收与测试
@@ -340,7 +343,7 @@ GET    /api/v1/learning/practice/sessions/{session_id}/report
 - revision 冲突、重复请求和并发答案幂等。
 - 判题、会话答案、错题状态和学习事件同事务一致。
 - 交卷以服务器答案重算，客户端伪造 correct、score、PASS 无效。
-- 默认 `33/41/26` 最大余数分配总数准确且稳定。
+- 默认 `42/50/8` 最大余数分配总数准确且稳定，配比和整数题数写入发布快照。
 - 领域不足、未分类题、缺失模拟判定规则的失败响应。
 - completed report snapshot 在题目或规则后续变化后保持不变。
 
@@ -381,19 +384,21 @@ GET    /api/v1/learning/practice/sessions/{session_id}/report
 - 未完成练习可以保存退出并继续；学霸模式暂停时间池。
 - 成绩报告使用幻谱 Logo 和 PMP 风格信息结构。
 - 领域饼图按官方信息逻辑展示领域占比和目标等级，而非正确/错误占比。
-- 新 2026 模拟卷统一使用 `33/41/26` 默认配比，教师不逐卷配置配比。
+- 本轮新建模拟卷继续统一使用 `42/50/8` 默认配比，教师不逐卷配置配比。
+- `33/41/26` 仅记录为后续迁移事项，不进入本轮实现或当前报告数据。
 - PASS/FAIL 明确为模拟判定，不声称采用未公开的 PMI 官方及格分数。
 
 ## 17. 参考依据
 
 - [PMI® Certification Handbook（2026 年 3 月版）](https://www.pmi.org/-/media/pmi/documents/public/pdf/certifications/generic-certification-handbook.pdf?rev=b7958bcb32b8495e888147502a61249f)：PMI 考试及格判定由心理测量分析建立，并非公开固定百分比。
-- [Project Management Professional (PMP)® Examination Content Outline（2026 年 7 月版）](https://www.pmi.org/-/media/pmi/documents/public/pdf/certifications/new-pmp-examination-content-outline-2026.pdf?rev=eb2fb918d0f94ccebb8bc1587021f60c)：人员 33%、过程 41%、商业环境 26%。
+- [Project Management Professional (PMP)® Examination Content Outline（2026 年 7 月版）](https://www.pmi.org/-/media/pmi/documents/public/pdf/certifications/new-pmp-examination-content-outline-2026.pdf?rev=eb2fb918d0f94ccebb8bc1587021f60c)：人员 33%、过程 41%、商业环境 26%；该新版配比仅作为后续迁移依据，本轮按用户确认保留产品现行 `42/50/8`。
 - [PMI Trademark Usage Guidelines](https://www.pmi.org/-/media/pmi/documents/public/pdf/about/press-media/trademark-usage-guidelines-new.pdf)：报告不得使用未授权 PMI Logo 或制造 PMI 赞助、认证或隶属关系的混淆。
 
 ## 18. 自检结论
 
 - 文档没有 TBD、TODO、占位规则或未决产品选择。
 - “统一默认领域配比”和“逐卷冻结模拟判定规则”职责不同，文档已分别定义，没有混用。
+- 当前 `42/50/8` 与后续 `33/41/26` 已明确分期，报告只读取试卷发布快照，不把当前产品配比误标为 2026 年 7 月版官方配比。
 - 可恢复会话由 `practice_sessions` 管理，完成摘要事件只用于兼容统计，事实所有者清晰。
 - 做题页、保存恢复、成绩报告和错题复盘属于同一练习会话闭环，可以由一份实施计划覆盖，不需要拆成互不相关的项目。
 - 视觉原型中的报告结构、领域饼图语义和正式数据计算规则一致；正式实现不得从原型目录读取资产或业务数据。
