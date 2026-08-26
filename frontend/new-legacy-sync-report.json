@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.175",
-  "toVersion": "v9.0-p4.1.176",
+  "fromVersion": "v9.0-p4.1.177",
+  "toVersion": "v9.0-p4.1.178",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "src/100-practice-mode.js"
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },

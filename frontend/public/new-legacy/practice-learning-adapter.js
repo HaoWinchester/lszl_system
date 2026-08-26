@@ -102,7 +102,7 @@
   async function verify(mistakeId, input) {
     const payload = await request(`/mistakes/${encodeURIComponent(mistakeId)}/verification`, { method: 'POST', body: JSON.stringify(input || {}) })
     await refresh()
-    return { mistake: clone(payload.mistake || null), verification: clone(payload.verification || null) }
+    return { mistake: clone(payload.mistake || null), verification: clone(payload.verification || null), answer: clone(payload.answer || null) }
   }
   async function recordSession(session) {
     const payload = await request('/sessions', {
@@ -143,6 +143,12 @@
     const payload = await request(`/sessions/${encodeURIComponent(sessionId)}/answers`, { method: 'POST', body: JSON.stringify(input || {}) })
     return clone(payload)
   }
+  async function remediationSession(sessionId, mistakeId, input) {
+    return clone(await request(`/sessions/${encodeURIComponent(sessionId)}/mistakes/${encodeURIComponent(mistakeId)}/remediation`, { method: 'POST', body: JSON.stringify(input || {}) }))
+  }
+  async function verifySession(sessionId, mistakeId, input) {
+    return clone(await request(`/sessions/${encodeURIComponent(sessionId)}/mistakes/${encodeURIComponent(mistakeId)}/verification`, { method: 'POST', body: JSON.stringify(input || {}) }))
+  }
   async function pauseSession(sessionId, input) {
     const payload = await request(`/sessions/${encodeURIComponent(sessionId)}/pause`, { method: 'POST', body: JSON.stringify(input || {}) })
     return clone(payload.session || null)
@@ -162,7 +168,7 @@
     refresh, snapshot, list, active, stats, plan, answer, upsertWrong,
     answerRevenge, remediationReviewed, verificationCandidate, verify,
     recordSession, listSessions, clearSessions, startSession, getActiveSessions,
-    getSession, updateState, answerSession, pauseSession, completeSession,
+    getSession, updateState, answerSession, remediationSession, verifySession, pauseSession, completeSession,
     abandonSession, getReport,
   })
   global.KGPracticeLearningApi = api
