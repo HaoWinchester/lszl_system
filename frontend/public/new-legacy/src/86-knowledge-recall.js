@@ -24,6 +24,7 @@
   let recallAdapter=null,recallSession=null,keywordsRevealed=false;
   const destroyingNodeIds=new Set();
   let questionBrowser={bankId:'',filter:'all',loading:false};
+  let authRecoveryPromise=null;
   let guideDragging=false,guideDragStart=null,guideStart=null;
   const THEMES=new Set(['platform','parchment','aurora','neon','sakura','ocean','latte']);
   const BUTTON_ZOOM_LEVELS=[.01,.02,.03,.05,.10,.15,.20,.33,.50,.75,1,1.25,1.50,2,2.50,3,4];
@@ -304,10 +305,16 @@
   }
   async function loadDatabaseSession(questionId=''){
     let id=String(questionId||requestedQuestionId()).trim();
-    if(!id){
-      // P4.5.38：不阻塞等待 catalog（题目数据独立加载，性能优化）
+    const hasResolvedContext=id&&String(question?.id||question?.sourceQuestionId||'')===id&&String(question?.sourceReleaseId||'');
+    if(!id||!hasResolvedContext){
+      // 进入页时先按当前题目解析所属 release；不能只拿 questionId 直连会话，
+      // 否则按需加载尚未填充缓存时 releaseId 为空，服务端会判定题目不可学习。
       window.KGQuestionCatalogAdapter?.ready?.catch(()=>{});
-      const candidate=await loadQuestion();id=String(candidate?.id||candidate?.sourceQuestionId||'').trim();
+      const requestedId=id;
+      const candidate=await loadQuestion();
+      const candidateId=String(candidate?.id||candidate?.sourceQuestionId||'').trim();
+      if(requestedId&&candidateId!==requestedId)throw new Error('这道题不在当前可用的已发布试卷中。');
+      question=sessionQuestion(candidate);id=candidateId;
     }
     if(!id||id==='unavailable')throw new Error('当前没有可用于深度回忆的已发布题目。');
     // 会话与进度保存绑定发布版本（releaseId），服务端按冻结快照鉴权
@@ -1596,6 +1603,30 @@
       }
     }catch(error){}
   }
+  function recoverQuestionAfterLogin(event){
+    if(isTeacherDraftPreview())return Promise.resolve(false);
+    const authenticated=event?.detail?.authenticated===true||Boolean(event?.detail?.username)||Boolean(window.KGAuthCore?.currentUsername?.());
+    if(!authenticated)return Promise.resolve(false);
+    if(recallSession&&String(question?.id||'')&&String(question.id)!=='unavailable')return Promise.resolve(true);
+    if(authRecoveryPromise)return authRecoveryPromise;
+    authRecoveryPromise=(async()=>{
+      window.KGLearningLoading?.show?.({title:'正在加载试卷',message:'正在读取试题…'});
+      try{
+        await loadDatabaseSession();
+        if(!enforceRecallPermission())return false;
+        renderAll();setTimeout(()=>{centerOn(0,0,true);playQuestionCardEntry()},30);
+        return true;
+      }catch(error){
+        notifyRecallLimit(error?.message||'题目载入失败，请稍后重试。');
+        return false;
+      }finally{
+        window.KGLearningLoading?.hide?.();authRecoveryPromise=null;
+      }
+    })();
+    return authRecoveryPromise;
+  }
+  window.addEventListener('kg:auth-session-changed',event=>{void recoverQuestionAfterLogin(event)});
+  window.addEventListener('kg-auth-session-change',event=>{void recoverQuestionAfterLogin(event)});
   window.addEventListener('storage',event=>{
     const prefix=window.KGStorageKeys?.PREFIXES?.RECALL_ASSOCIATION||'kg_recall_association_library_v1__';
     if(String(event?.key||'').startsWith(prefix))resetAssociationRuntime();

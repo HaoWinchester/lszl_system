@@ -1,17 +1,14 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.172",
-  "toVersion": "v9.0-p4.1.173",
+  "fromVersion": "v9.0-p4.1.173",
+  "toVersion": "v9.0-p4.1.174",
   "changes": {
-    "added": [
-      "tests/deep-recall-demand-loading-browser.py"
-    ],
+    "added": [],
     "changed": [
       "VERSION",
       "content-prep-studio/dist/content-prep.html",
-      "knowledge-recall.html",
       "src/86-knowledge-recall.js",
-      "src/96-recall-question-source.js"
+      "tests/deep-recall-demand-loading-browser.py"
     ],
     "removed": []
   },

@@ -111,6 +111,147 @@ with sync_playwright() as playwright:
     assert page.locator("#krBankSelect").input_value() == "paper-release:release-2"
     assert page.locator("#krBankSelect").is_enabled()
 
+    entry = browser.new_page(viewport={"width": 1366, "height": 860})
+    entry.set_default_timeout(10_000)
+    entry.set_content(f'<!doctype html><html><body{attrs}>{body}</body></html>')
+    entry.add_style_tag(content=source("styles/knowledge-recall.css"))
+    entry.add_style_tag(content=source("styles/learning-loading.css"))
+    for script in (
+        "src/28-app-storage.js",
+        "src/50-question-data.js",
+        "src/86-activity-schema-v1.js",
+        "src/86-free-mode-language.js",
+        "src/85-knowledge-recall-data.js",
+        "src/95-recall-association-library.js",
+        "src/97-recall-storage.js",
+        "src/98-recall-graph-model.js",
+        "src/110-learning-loading.js",
+    ):
+        entry.add_script_tag(content=source(script))
+    entry.evaluate(
+        """() => {
+          const question={
+            id:'question-entry',title:'直接进入题目',sourceCollectionId:'paper-release:release-entry',
+            sourcePaperId:'paper-entry',sourceReleaseId:'release-entry',sourceBankId:'bank-entry',
+            stemParts:[{text:'直接进入时也应显示这段题干'}],options:[],clues:[],concepts:[]
+          };
+          const item={id:question.id,title:question.title,bankId:'bank-entry',paperId:'paper-entry',releaseId:'release-entry',question};
+          const collection={id:'paper-release:release-entry',paperId:'paper-entry',releaseId:'release-entry',name:'直接进入试卷',configuredCount:1,availableCount:1,questions:[item]};
+          window.__entryCollections=[];
+          window.__entryAdapterCreates=[];
+          window.KGLearningRouteContext={
+            parse:()=>({paperId:'',releaseId:'',questionId:'question-entry',bankId:'bank-entry',returnUrl:'index.html'}),
+            normalize:value=>({...value}),replace:()=>{},remember:()=>{}
+          };
+          window.KGRecallQuestionSource={
+            list:()=>window.__entryCollections,
+            findPublished:async input=>{
+              window.__entryCollections=[collection];
+              return {collection,bank:collection,item,question};
+            },
+            emptyQuestion:()=>({id:'unavailable',title:'暂无题目',stemParts:[],options:[],clues:[],concepts:[]})
+          };
+          window.KGDeepRecallServerAdapter={create:options=>{
+            window.__entryAdapterCreates.push({...options});
+            const session={
+              versionState:'current',currentQuestion:question,progress:{},
+              currentLibrary:{payload:{},contentHash:''},library:{payload:{},contentHash:''},
+              permissions:{canWrite:true,canReveal:true,readOnly:false}
+            };
+            return {
+              subscribe:()=>{},
+              loadSession:async()=>{
+                if(!options.releaseId)throw new Error('题目不存在或当前不可学习');
+                return session;
+              },
+              getState:()=>({session,saveState:'idle',graph:{}}),
+              saveGraph:async()=>true
+            };
+          }};
+        }"""
+    )
+    entry.add_script_tag(content=source("src/86-knowledge-recall.js"))
+    entry.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
+    entry.wait_for_function("document.querySelector('[data-learning-loading]').hidden")
+
+    assert entry.locator("#krQuestionCard").inner_text().find("直接进入时也应显示这段题干") >= 0
+    assert entry.evaluate("window.__entryAdapterCreates") == [
+        {"questionId": "question-entry", "releaseId": "release-entry"}
+    ]
+
+    auth = browser.new_page(viewport={"width": 1366, "height": 860})
+    auth.set_default_timeout(10_000)
+    auth.set_content(f'<!doctype html><html><body{attrs}>{body}</body></html>')
+    auth.add_style_tag(content=source("styles/knowledge-recall.css"))
+    auth.add_style_tag(content=source("styles/learning-loading.css"))
+    for script in (
+        "src/28-app-storage.js",
+        "src/50-question-data.js",
+        "src/86-activity-schema-v1.js",
+        "src/86-free-mode-language.js",
+        "src/85-knowledge-recall-data.js",
+        "src/95-recall-association-library.js",
+        "src/97-recall-storage.js",
+        "src/98-recall-graph-model.js",
+        "src/110-learning-loading.js",
+    ):
+        auth.add_script_tag(content=source(script))
+    auth.evaluate(
+        """() => {
+          const question={
+            id:'question-auth',title:'登录恢复题目',sourceCollectionId:'paper-release:release-auth',
+            sourcePaperId:'paper-auth',sourceReleaseId:'release-auth',sourceBankId:'bank-auth',
+            stemParts:[{text:'登录成功后无需刷新即可显示题目'}],options:[],clues:[],concepts:[]
+          };
+          const item={id:question.id,title:question.title,bankId:'bank-auth',paperId:'paper-auth',releaseId:'release-auth',question};
+          const collection={id:'paper-release:release-auth',paperId:'paper-auth',releaseId:'release-auth',name:'登录恢复试卷',configuredCount:1,availableCount:1,questions:[item]};
+          window.__authReady=false;
+          window.__authLoadCount=0;
+          window.KGLearningRouteContext={
+            parse:()=>({paperId:'paper-auth',releaseId:'release-auth',questionId:'question-auth',bankId:'bank-auth',returnUrl:'index.html'}),
+            normalize:value=>({...value}),replace:()=>{},remember:()=>{}
+          };
+          window.KGRecallQuestionSource={
+            list:()=>[collection],
+            findPublished:async()=>({collection,bank:collection,item,question}),
+            emptyQuestion:()=>({id:'unavailable',title:'暂无题目',stemParts:[],options:[],clues:[],concepts:[]})
+          };
+          window.KGAuthCore={currentUsername:()=>window.__authReady?'student-auth':''};
+          window.KGDeepRecallServerAdapter={create:()=>{
+            const session={
+              versionState:'current',currentQuestion:question,progress:{},
+              currentLibrary:{payload:{},contentHash:''},library:{payload:{},contentHash:''},
+              permissions:{canWrite:true,canReveal:true,readOnly:false}
+            };
+            return {
+              subscribe:()=>{},
+              loadSession:async()=>{
+                window.__authLoadCount+=1;
+                if(!window.__authReady)throw new Error('请先登录');
+                return session;
+              },
+              getState:()=>({session,saveState:'idle',graph:{}}),
+              saveGraph:async()=>true
+            };
+          }};
+        }"""
+    )
+    auth.add_script_tag(content=source("src/86-knowledge-recall.js"))
+    auth.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
+    auth.wait_for_function("document.querySelector('[data-learning-loading]').hidden")
+    assert "请先登录" in auth.locator("#krQuestionCard").inner_text()
+
+    auth.evaluate(
+        """() => {
+          window.__authReady=true;
+          window.dispatchEvent(new CustomEvent('kg:auth-session-changed',{detail:{authenticated:true,username:'student-auth'}}));
+        }"""
+    )
+    auth.wait_for_function(
+        "document.querySelector('#krQuestionCard').innerText.includes('登录成功后无需刷新即可显示题目')"
+    )
+    assert auth.evaluate("window.__authLoadCount") == 2
+
     browser.close()
 
 print("deep-recall-demand-loading-browser-ok")
