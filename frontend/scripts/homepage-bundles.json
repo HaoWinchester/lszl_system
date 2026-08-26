@@ -2,6 +2,7 @@
   "groups": [
     {
       "name": "home-prelude",
+      "initial": true,
       "defer": false,
       "scripts": [
         "teaching-content-sync.js",
@@ -12,10 +13,12 @@
     },
     {
       "name": "home-shell",
+      "initial": true,
       "defer": true,
       "scripts": [
         "direct-entry.js",
         "feature-analytics.js",
+        "homepage-loader.js",
         "src/01-runtime-config.js",
         "src/28-app-storage.js",
         "src/29-auth-core.js",
@@ -36,6 +39,7 @@
     },
     {
       "name": "home-graph",
+      "initial": false,
       "defer": true,
       "scripts": [
         "src/graph/graph-model.js",
@@ -83,9 +87,11 @@
         "src/26-graph-export-service.js",
         "src/24-graph-file-autosave.js",
         "direct-graph-adapter.js",
+        "src/20-flashcards-toolbar.js",
         "src/27-home-interaction-modes.js",
         "src/32-home-mobile-readonly-notice.js",
-        "src/40-guided-tour.js"
+        "src/40-guided-tour.js",
+        "src/90-bootstrap.js"
       ],
       "styles": [
         "styles/graph-user-preferences.css",
@@ -103,6 +109,7 @@
     },
     {
       "name": "home-file-library",
+      "initial": false,
       "defer": true,
       "scripts": [
         "src/22-home-file-library.js",
@@ -115,9 +122,9 @@
     },
     {
       "name": "home-question",
+      "initial": false,
       "defer": true,
       "scripts": [
-        "src/20-flashcards-toolbar.js",
         "src/50-question-data.js",
         "question-catalog-adapter.js",
         "paper-release-adapter.js",
@@ -129,6 +136,7 @@
     },
     {
       "name": "home-secondary",
+      "initial": false,
       "defer": true,
       "scripts": [
         "src/37-subscription-plans.js",
@@ -149,14 +157,6 @@
         "styles/membership-ui.css",
         "styles/support-center.css"
       ]
-    },
-    {
-      "name": "home-bootstrap",
-      "defer": true,
-      "scripts": [
-        "src/90-bootstrap.js"
-      ],
-      "styles": []
     }
   ]
 }

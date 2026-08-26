@@ -56,21 +56,37 @@ function validateCoverage(outputRoot, matches, groups, kind) {
   }
 }
 
-function concatenate(outputRoot, assets, commentPrefix) {
+function concatenateScripts(outputRoot, assets) {
+  const sources = assets.map(normalizeAsset).map((asset) => [
+    asset,
+    `${readFileSync(resolve(outputRoot, asset), 'utf8').trimEnd()}\n//# sourceURL=${asset}`,
+  ])
+  return `'use strict';\n(function executeClassicHomepageBundle(sources){\n`
+    + `  const host=document.head||document.documentElement;\n`
+    + `  for(const [asset,source] of sources){\n`
+    + `    const script=document.createElement('script');\n`
+    + `    script.dataset.kgBundleSource=asset;\n`
+    + `    script.textContent=source;\n`
+    + `    host.appendChild(script);\n`
+    + `    script.remove();\n`
+    + `  }\n`
+    + `})(${JSON.stringify(sources)});\n`
+}
+
+function concatenateStyles(outputRoot, assets) {
   return assets
     .map(normalizeAsset)
-    .map((asset) => `/* ${commentPrefix}: ${asset} */\n${readFileSync(resolve(outputRoot, asset), 'utf8').trimEnd()}\n;`)
+    .map((asset) => `/* style: ${asset} */\n${readFileSync(resolve(outputRoot, asset), 'utf8').trimEnd()}`)
     .join('\n') + '\n'
 }
 
 function replaceTags(html, matches, replacement) {
   if (!matches.length) return html
-  const firstIndex = matches[0].index
   const remove = new Set(matches.map((match) => match.tag))
   let inserted = false
-  return html.replace(/<script\b[^>]*\bsrc=["'][^"']+["'][^>]*>\s*<\/script>|<link\b(?=[^>]*\brel=["']stylesheet["'])(?=[^>]*\bhref=["'][^"']+["'])[^>]*>/gi, (tag, offset) => {
+  return html.replace(/<script\b[^>]*\bsrc=["'][^"']+["'][^>]*>\s*<\/script>|<link\b(?=[^>]*\brel=["']stylesheet["'])(?=[^>]*\bhref=["'][^"']+["'])[^>]*>/gi, (tag) => {
     if (!remove.has(tag)) return tag
-    if (!inserted && offset === firstIndex) {
+    if (!inserted) {
       inserted = true
       return replacement
     }
@@ -83,8 +99,9 @@ function alreadyBuilt(html, plan, outputRoot) {
     ...(group.scripts.length ? [`bundles/${group.name}.js`] : []),
     ...(group.styles.length ? [`bundles/${group.name}.css`] : []),
   ])
-  return outputs.length > 0
-    && outputs.every((asset) => html.includes(asset) && existsSync(resolve(outputRoot, asset)))
+  return html.includes('<meta name="kg-homepage-bundle-version"')
+    && outputs.length > 0
+    && outputs.every((asset) => existsSync(resolve(outputRoot, asset)))
 }
 
 export function buildHomepageBundles({ outputRoot, version, plan }) {
@@ -102,19 +119,22 @@ export function buildHomepageBundles({ outputRoot, version, plan }) {
   mkdirSync(bundleDir, { recursive: true })
   for (const group of plan.groups) {
     if (group.scripts.length) {
-      writeFileSync(resolve(bundleDir, `${group.name}.js`), concatenate(outputRoot, group.scripts, 'source'))
+      writeFileSync(resolve(bundleDir, `${group.name}.js`), concatenateScripts(outputRoot, group.scripts))
     }
     if (group.styles.length) {
-      writeFileSync(resolve(bundleDir, `${group.name}.css`), concatenate(outputRoot, group.styles, 'style'))
+      writeFileSync(resolve(bundleDir, `${group.name}.css`), concatenateStyles(outputRoot, group.styles))
     }
   }
 
-  const scriptTags = plan.groups
-    .filter((group) => group.scripts.length)
+  const safeVersion = String(version).replace(/[&"<>]/g, (character) => ({ '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' })[character])
+  const scriptTags = [
+    `<meta name="kg-homepage-bundle-version" content="${safeVersion}">`,
+    ...plan.groups
+    .filter((group) => group.initial && group.scripts.length)
     .map((group) => `<script${group.defer ? ' defer' : ''} src="bundles/${group.name}.js?v=${version}"></script>`)
-    .join('\n')
+  ].join('\n')
   const styleTags = plan.groups
-    .filter((group) => group.styles.length)
+    .filter((group) => group.initial && group.styles.length)
     .map((group) => `<link rel="stylesheet" href="bundles/${group.name}.css?v=${version}">`)
     .join('\n')
 

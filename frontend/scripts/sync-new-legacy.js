@@ -610,6 +610,7 @@ function injectPage(html, page, version) {
     '<script src="./auth-session-bootstrap.js"></script><!-- kg-auth-session:generated -->',
     '<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->',
     '<script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->',
+    page === 'index.html' ? '<script defer src="./homepage-loader.js"></script><!-- kg-homepage-loader:generated -->' : '',
   ].filter(Boolean).join('\n')
   let generated = html.includes('kg-runtime:generated')
     ? html

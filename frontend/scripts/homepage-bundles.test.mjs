@@ -15,10 +15,10 @@ function write(path, contents) {
 function fixture() {
   const root = mkdtempSync(resolve(tmpdir(), 'kg-homepage-bundles-'))
   write(resolve(root, 'index.html'), `<!doctype html><html><head>
+    <script src="./prelude.js?v=old"></script>
     <link rel="stylesheet" href="styles/shell.css?v=old">
     <link rel="stylesheet" href="styles/graph.css?v=old">
     </head><body>
-    <script src="./prelude.js?v=old"></script>
     <script defer src="src/a.js?v=old"></script>
     <script defer src="src/b.js?v=old"></script>
     <script defer src="src/graph.js?v=old"></script>
@@ -31,9 +31,9 @@ function fixture() {
   write(resolve(root, 'styles/graph.css'), '.graph { color: blue; }')
   const plan = {
     groups: [
-      { name: 'home-prelude', defer: false, scripts: ['prelude.js'], styles: [] },
-      { name: 'home-shell', defer: true, scripts: ['src/a.js', 'src/b.js'], styles: ['styles/shell.css'] },
-      { name: 'home-graph', defer: true, scripts: ['src/graph.js'], styles: ['styles/graph.css'] },
+      { name: 'home-prelude', initial: true, defer: false, scripts: ['prelude.js'], styles: [] },
+      { name: 'home-shell', initial: true, defer: true, scripts: ['src/a.js', 'src/b.js'], styles: ['styles/shell.css'] },
+      { name: 'home-graph', initial: false, defer: true, scripts: ['src/graph.js'], styles: ['styles/graph.css'] },
     ],
   }
   return { root, plan }
@@ -54,8 +54,18 @@ test('builder emits reproducible bundles that execute classic scripts in declare
   assert.match(firstHtml, /bundles\/home-prelude\.js\?v=v-test/)
   assert.match(firstHtml, /<script defer src="bundles\/home-shell\.js\?v=v-test"><\/script>/)
   assert.match(firstHtml, /bundles\/home-shell\.css\?v=v-test/)
+  assert.match(firstHtml, /<meta name="kg-homepage-bundle-version" content="v-test">/)
+  assert.doesNotMatch(firstHtml, /bundles\/home-graph\.(?:js|css)/)
 
   const context = vm.createContext({ window: { order: [] } })
+  context.document = {
+    head: {
+      appendChild(script) { vm.runInContext(script.textContent, context) },
+    },
+    createElement() {
+      return { dataset: {}, textContent: '', remove() {} }
+    },
+  }
   vm.runInContext(readFileSync(resolve(item.root, 'bundles/home-prelude.js'), 'utf8'), context)
   vm.runInContext(firstShell, context)
   vm.runInContext(readFileSync(resolve(item.root, 'bundles/home-graph.js'), 'utf8'), context)
