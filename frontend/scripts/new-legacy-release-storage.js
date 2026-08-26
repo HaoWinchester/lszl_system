@@ -19,7 +19,11 @@ function isObject(value) {
 }
 
 function assertNotSymbolicLink(path, label) {
-  if (lstatSync(path).isSymbolicLink()) throw new Error(`${label} 不能是符号链接`)
+  try {
+    if (lstatSync(path).isSymbolicLink()) throw new Error(`${label} 不能是符号链接`)
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+  }
 }
 
 function readJson(path, label) {
@@ -56,6 +60,7 @@ function assertSafeVersion(version, label) {
 
 function readProtectedRelease(root, version, role) {
   const releaseDir = resolve(root, version)
+  assertNotSymbolicLink(releaseDir, role)
   if (!existsSync(releaseDir) || !statSync(releaseDir).isDirectory()) {
     throw new Error(`${role}不存在：${version}`)
   }

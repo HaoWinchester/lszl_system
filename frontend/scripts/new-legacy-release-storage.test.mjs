@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import test from 'node:test'
@@ -75,4 +75,30 @@ test('selected site payload symlinks fail closed', (t) => {
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   assert.throws(() => readProtectedReleaseState(root), /当前版本 site 包含符号链接/)
+})
+
+test('active release directory symlink fails closed', (t) => {
+  const root = makeStore({ active: 'v2', previous: null })
+  const outside = `${root}-active-release`
+  renameSync(resolve(root, 'v2'), outside)
+  symlinkSync(outside, resolve(root, 'v2'))
+  t.after(() => {
+    rmSync(root, { recursive: true, force: true })
+    rmSync(outside, { recursive: true, force: true })
+  })
+
+  assert.throws(() => readProtectedReleaseState(root), /当前版本 不能是符号链接/)
+})
+
+test('rollback release directory symlink fails closed', (t) => {
+  const root = makeStore({ active: 'v2', previous: 'v1' })
+  const outside = `${root}-rollback-release`
+  renameSync(resolve(root, 'v1'), outside)
+  symlinkSync(outside, resolve(root, 'v1'))
+  t.after(() => {
+    rmSync(root, { recursive: true, force: true })
+    rmSync(outside, { recursive: true, force: true })
+  })
+
+  assert.throws(() => readProtectedReleaseState(root), /回滚版本 不能是符号链接/)
 })

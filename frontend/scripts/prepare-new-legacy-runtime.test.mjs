@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -152,6 +152,27 @@ test('CLI rejects a selected site symlink and preserves the previous output', (t
 
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /当前版本 site 包含符号链接/)
+  assert.equal(readFileSync(resolve(out, 'keep.txt'), 'utf8'), 'existing runtime\n')
+})
+
+test('CLI rejects a selected rollback release directory symlink and preserves the previous output', (t) => {
+  const root = makeStore({ active: 'v2', previous: 'v1' })
+  const out = `${root}-runtime`
+  const outside = `${root}-rollback-release`
+  renameSync(resolve(root, 'v1'), outside)
+  symlinkSync(outside, resolve(root, 'v1'))
+  mkdirSync(out, { recursive: true })
+  writeFileSync(resolve(out, 'keep.txt'), 'existing runtime\n')
+  t.after(() => {
+    rmSync(root, { recursive: true, force: true })
+    rmSync(out, { recursive: true, force: true })
+    rmSync(outside, { recursive: true, force: true })
+  })
+
+  const result = run(root, out)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /回滚版本 不能是符号链接/)
   assert.equal(readFileSync(resolve(out, 'keep.txt'), 'utf8'), 'existing runtime\n')
 })
 
