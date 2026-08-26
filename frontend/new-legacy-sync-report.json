@@ -3,12 +3,14 @@
   "fromVersion": "v9.0-p4.1.168",
   "toVersion": "v9.0-p4.1.168",
   "changes": {
-    "added": [],
+    "added": [
+      "src/110-learning-loading.js",
+      "styles/learning-loading.css",
+      "tests/practice-challenge-loading-browser.py"
+    ],
     "changed": [
-      "assets/landing/graph.png",
-      "assets/landing/recall.png",
-      "assets/landing/workspace.png",
-      "assets/客服二维码/1.jpg"
+      "practice-mode.html",
+      "src/100-practice-mode.js"
     ],
     "removed": []
   },

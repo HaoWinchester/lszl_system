@@ -19,7 +19,7 @@
     health:MAX_HEALTH,streak:0,experience:0,correct:0,answered:0,startedAt:0,endedAt:0,
     locked:false,active:false,completed:false,lastSettings:null,timerId:0,deadline:0,
     feedbackTimer:0,popTimer:0,toastTimer:0,abandonedRecorded:false,catalogAvailable:false,retiredNavigation:null,retiredNoticeShown:false,
-    remediationPending:false,verification:null,practiceAnswers:{}
+    remediationPending:false,verification:null,practiceAnswers:{},challengeStarting:false
   };
 
   function clone(value){try{return JSON.parse(JSON.stringify(value))}catch(error){return value}}
@@ -660,33 +660,64 @@
     state.lastSettings={paperId:'',count,order:'weakness_first',mode:'revenge'};document.body.dataset.practiceMode='revenge';dom.timer.hidden=true;dom.timeRow.hidden=true;dom.health.hidden=true;
     setView('game');renderQuestion();return true;
   }
+  function setChallengeStarting(starting,{focus=false}={}){
+    state.challengeStarting=!!starting;
+    const button=dom.startButtons.find(item=>item.dataset.practiceStart==='challenge');
+    if(!button)return;
+    button.setAttribute('aria-busy',String(state.challengeStarting));
+    if(state.challengeStarting)button.disabled=true;
+    else{
+      syncCountOptions();
+      if(focus&&!button.disabled)button.focus();
+    }
+  }
   async function startPractice(mode){
+    const challenge=mode==='challenge';
+    if(challenge&&state.challengeStarting)return false;
     if(mode==='revenge')return startRevenge();
     const catalog=selectedRelease(),count=Number(state.selectedCount);
     if(!catalog){syncLobby();return false}
     const access=paperAccess(catalog);
     if(!access.allowed)return openMembership(access);
-    const repo=global.KGPublishedPaperRepository;
-    let questions=[];
-    if(typeof repo?.resolvePublishedPaper==='function'){
-      const resolved=await repo.resolvePublishedPaper({paperId:catalog.paperId||catalog.id,releaseId:catalog.releaseId},{mode:'practice_mode',respectRole:false});
-      if(!resolved?.ok){
-        if(['LOGIN_REQUIRED','MEMBERSHIP_REQUIRED'].includes(resolved?.code))return openMembership(resolved.access||access);
-        showToast(resolved?.message||'试卷暂时无法打开。');
-        return false;
+    let restoreFocus=false;
+    if(challenge){
+      setChallengeStarting(true);
+      global.KGLearningLoading?.show?.({title:'正在准备挑战',message:'正在读取试题…'});
+    }
+    try{
+      const repo=global.KGPublishedPaperRepository;
+      let questions=[];
+      if(typeof repo?.resolvePublishedPaper==='function'){
+        const resolved=await repo.resolvePublishedPaper({paperId:catalog.paperId||catalog.id,releaseId:catalog.releaseId},{mode:'practice_mode',respectRole:false});
+        if(!resolved?.ok){
+          if(['LOGIN_REQUIRED','MEMBERSHIP_REQUIRED'].includes(resolved?.code))return openMembership(resolved.access||access);
+          restoreFocus=true;
+          showToast(resolved?.message||'试卷暂时无法打开。');
+          return false;
+        }
+        questions=(resolved.items||[]).map((item,index)=>normalizeQuestion(item.question,item.ref,index)).filter(question=>question.stem&&question.options.length>=2&&question.correctAnswer);
+      }else questions=(catalog.questions||[]).slice();
+      if(questions.length<count){restoreFocus=true;showToast(`当前试卷可用题目不足 ${count} 道。`);syncLobby();return false}
+      clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);
+      state.mode=mode==='scholar'?'scholar':mode==='practice'?'practice':'challenge';document.body.dataset.practiceMode=state.mode;state.order=dom.orderInputs.find(input=>input.checked)?.value||'paper';
+      if(state.order==='random')questions=shuffle(questions);
+      if(state.retiredNavigation)questions=prioritizeRetiredQuestion(questions,state.retiredNavigation.questionId);
+      state.questions=questions.slice(0,count);
+      state.index=0;state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;state.health=state.maxHealth;state.challengeFailedShown=false;state.practiceAnswers={};state.streak=0;state.maxStreak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
+      state.lastSettings={paperId:catalog.id,count,order:state.order,mode:state.mode};
+      dom.timer.hidden=true;dom.timeRow.hidden=state.mode!=='scholar';dom.health.hidden=state.mode==='practice';
+      setView('game');renderQuestion();if(state.mode==='scholar')startTimer();return true;
+    }catch(error){
+      if(!challenge)throw error;
+      restoreFocus=true;
+      showToast('试题读取失败，请稍后重试。');
+      return false;
+    }finally{
+      if(challenge){
+        global.KGLearningLoading?.hide?.();
+        setChallengeStarting(false,{focus:restoreFocus});
       }
-      questions=(resolved.items||[]).map((item,index)=>normalizeQuestion(item.question,item.ref,index)).filter(question=>question.stem&&question.options.length>=2&&question.correctAnswer);
-    }else questions=(catalog.questions||[]).slice();
-    if(questions.length<count){showToast(`当前试卷可用题目不足 ${count} 道。`);syncLobby();return false}
-    clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);
-    state.mode=mode==='scholar'?'scholar':mode==='practice'?'practice':'challenge';document.body.dataset.practiceMode=state.mode;state.order=dom.orderInputs.find(input=>input.checked)?.value||'paper';
-    if(state.order==='random')questions=shuffle(questions);
-    if(state.retiredNavigation)questions=prioritizeRetiredQuestion(questions,state.retiredNavigation.questionId);
-    state.questions=questions.slice(0,count);
-    state.index=0;state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;state.health=state.maxHealth;state.challengeFailedShown=false;state.practiceAnswers={};state.streak=0;state.maxStreak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
-    state.lastSettings={paperId:catalog.id,count,order:state.order,mode:state.mode};
-    dom.timer.hidden=true;dom.timeRow.hidden=state.mode!=='scholar';dom.health.hidden=state.mode==='practice';
-    setView('game');renderQuestion();if(state.mode==='scholar')startTimer();return true;
+    }
   }
   function startAgain(){
     const settings=state.lastSettings;if(!settings){showLobby();return}
