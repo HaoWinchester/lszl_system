@@ -35,6 +35,14 @@ function assertDeploymentExcludes(script, label) {
   }
 }
 
+function assertUatHasNoReleaseSourceRsync(script) {
+  assert.doesNotMatch(
+    script,
+    /^\s*rsync\b(?:[^\n]|\\\n)*?\$REPO_DIR\/frontend\/new-legacy-releases(?:\/|(?=["'\s]))/m,
+    'UAT must not use release storage as an rsync source',
+  )
+}
+
 test('production and UAT deploy only the prepared runtime before synchronizing', () => {
   const production = source('deploy/update.sh')
   const uat = source('deploy/update-uat.sh')
@@ -52,7 +60,14 @@ test('UAT relies on the main sync and prepares runtime after promotion', () => {
 
   assert.ok(promote >= 0, 'UAT must promote the validated release')
   assert.ok(generator > promote, 'UAT must prepare runtime after promotion')
-  assert.doesNotMatch(uat, /rsync -az "\$REPO_DIR\/frontend\/new-legacy-releases\/current\.json"/)
+  assertUatHasNoReleaseSourceRsync(uat)
+})
+
+test('UAT contract rejects every release-storage rsync source', () => {
+  const uat = source('deploy/update-uat.sh')
+  const forbiddenSecondSync = `${uat}\nrsync -az "$REPO_DIR/frontend/new-legacy-releases/$VERSION" "$REMOTE:$REMOTE_DIR/frontend/new-legacy-releases/"\n`
+
+  assert.throws(() => assertUatHasNoReleaseSourceRsync(forbiddenSecondSync), /rsync source/)
 })
 
 test('Docker ships the prepared runtime and keeps the public frontend assets', () => {
