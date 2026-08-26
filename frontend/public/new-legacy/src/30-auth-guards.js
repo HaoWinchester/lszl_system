@@ -145,7 +145,7 @@ function authLoadCurrentSpace(copyCurrentIfEmpty=false){
   requestAnimationFrame(()=>{if(!had)fitView(true)});
   authRenderStatus();
 }
-function authLogin(username,password){
+function authLocalLogin(username,password){
   username=authCleanUsername(username);
   if(!username||!password){authMsg('请输入用户名和密码。');return false}
   const users=authUsers(),user=users[username];
@@ -168,7 +168,7 @@ function authLogin(username,password){
   showStatus(`已登录：${username}`);
   return true;
 }
-function authRegister(username,password){
+function authLocalRegister(username,password){
   username=authCleanUsername(username);
   if(username.length<2){authMsg('用户名至少 2 个字符。');return false}
   if(String(password||'').length<4){authMsg('密码至少 4 个字符。');return false}
