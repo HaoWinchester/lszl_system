@@ -1,5 +1,5 @@
-import { cpSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs'
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { cpSync, existsSync, mkdirSync, readdirSync, realpathSync, renameSync, rmSync, statSync } from 'node:fs'
+import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { readProtectedReleaseState } from './new-legacy-release-storage.js'
@@ -35,9 +35,22 @@ function pathsOverlap(left, right) {
   return isSameOrDescendant(left, right) || isSameOrDescendant(right, left)
 }
 
+function resolvePhysicalPath(path) {
+  let existing = resolve(path)
+  const missing = []
+  while (!existsSync(existing)) {
+    const parent = dirname(existing)
+    if (parent === existing) throw new Error(`找不到路径的现有父目录：${path}`)
+    missing.unshift(basename(existing))
+    existing = parent
+  }
+  return resolve(realpathSync(existing), ...missing)
+}
+
 export function prepareRuntime({ root = defaultRoot, out = defaultOut } = {}) {
-  const storageRoot = resolve(root)
-  const runtimeOut = resolve(out)
+  const storageRoot = resolvePhysicalPath(root)
+  const requestedOut = resolve(out)
+  const runtimeOut = resolvePhysicalPath(out)
   if (pathsOverlap(storageRoot, runtimeOut)) throw new Error('输出目录不能与 release root 重叠')
   const staging = `${runtimeOut}.staging-${process.pid}`
   const state = readProtectedReleaseState(storageRoot)
@@ -58,7 +71,7 @@ export function prepareRuntime({ root = defaultRoot, out = defaultOut } = {}) {
     const { files, bytes } = countRegularFiles(staging)
     rmSync(runtimeOut, { recursive: true, force: true })
     renameSync(staging, runtimeOut)
-    return { versions: stagedState.protectedVersions, files, bytes, out: runtimeOut }
+    return { versions: stagedState.protectedVersions, files, bytes, out: requestedOut }
   } catch (error) {
     rmSync(staging, { recursive: true, force: true })
     throw error

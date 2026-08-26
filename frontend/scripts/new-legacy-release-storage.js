@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { relative, resolve } from 'node:path'
 
 export const VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 export const CRITICAL_SITE_FILES = [
@@ -18,7 +18,12 @@ function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
+function assertNotSymbolicLink(path, label) {
+  if (lstatSync(path).isSymbolicLink()) throw new Error(`${label} 不能是符号链接`)
+}
+
 function readJson(path, label) {
+  assertNotSymbolicLink(path, label)
   let value
   try {
     value = JSON.parse(readFileSync(path, 'utf8'))
@@ -27,6 +32,20 @@ function readJson(path, label) {
   }
   if (!isObject(value)) throw new Error(`${label} 必须是对象`)
   return value
+}
+
+function assertSiteHasNoSymbolicLinks(site, role) {
+  assertNotSymbolicLink(site, `${role} site`)
+  function visit(directory) {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = resolve(directory, entry.name)
+      if (entry.isSymbolicLink()) {
+        throw new Error(`${role} site 包含符号链接：${relative(site, path)}`)
+      }
+      if (entry.isDirectory()) visit(path)
+    }
+  }
+  visit(site)
 }
 
 function assertSafeVersion(version, label) {
@@ -55,6 +74,7 @@ function readProtectedRelease(root, version, role) {
 
   const site = resolve(releaseDir, 'site')
   if (!existsSync(site) || !statSync(site).isDirectory()) throw new Error(`${role} site 目录不存在：${version}`)
+  assertSiteHasNoSymbolicLinks(site, role)
   for (const file of CRITICAL_SITE_FILES) {
     const path = resolve(site, file)
     if (!existsSync(path) || !statSync(path).isFile()) throw new Error(`${role} site 缺少关键文件：${file}`)
@@ -65,6 +85,7 @@ function readProtectedRelease(root, version, role) {
 export function readProtectedReleaseState(root) {
   const storageRoot = resolve(root)
   const pointerPath = resolve(storageRoot, 'current.json')
+  assertNotSymbolicLink(pointerPath, 'current.json')
   let pointerBytes
   try {
     pointerBytes = readFileSync(pointerPath)

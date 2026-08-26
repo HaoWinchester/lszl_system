@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import test from 'node:test'
@@ -65,4 +65,14 @@ test('missing rollback release fails closed', (t) => {
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   assert.throws(() => readProtectedReleaseState(root), /回滚版本.*不存在/)
+})
+
+test('selected site payload symlinks fail closed', (t) => {
+  const root = makeStore({ active: 'v2', previous: null })
+  const outside = resolve(root, 'outside.txt')
+  writeFileSync(outside, 'outside release payload\n')
+  symlinkSync(outside, resolve(root, 'v2', 'site', 'outside-link.txt'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  assert.throws(() => readProtectedReleaseState(root), /当前版本 site 包含符号链接/)
 })

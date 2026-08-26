@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -116,6 +116,43 @@ test('CLI rejects an output path that overlaps the input release root', (t) => {
   assert.match(result.stderr, /输出目录不能与 release root 重叠/)
   assert.equal(readFileSync(resolve(root, 'current.json'), 'utf8').includes('"v2"'), true)
   assert.ok(existsSync(resolve(root, 'v2', 'source', 'private-source.txt')))
+})
+
+test('CLI rejects an output path through a symlinked alias of the release root', (t) => {
+  const root = makeStore({ active: 'v2', previous: 'v1' })
+  const alias = `${root}-alias`
+  symlinkSync(root, alias)
+  t.after(() => {
+    rmSync(alias, { recursive: true, force: true })
+    rmSync(root, { recursive: true, force: true })
+  })
+
+  const result = run(root, resolve(alias, 'new-runtime'))
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /输出目录不能与 release root 重叠/)
+  assert.ok(existsSync(resolve(root, 'v2', 'source', 'private-source.txt')))
+})
+
+test('CLI rejects a selected site symlink and preserves the previous output', (t) => {
+  const root = makeStore({ active: 'v2', previous: null })
+  const out = `${root}-runtime`
+  const outside = `${root}-outside.txt`
+  writeFileSync(outside, 'outside release payload\n')
+  symlinkSync(outside, resolve(root, 'v2', 'site', 'outside-link.txt'))
+  mkdirSync(out, { recursive: true })
+  writeFileSync(resolve(out, 'keep.txt'), 'existing runtime\n')
+  t.after(() => {
+    rmSync(root, { recursive: true, force: true })
+    rmSync(out, { recursive: true, force: true })
+    rmSync(outside, { force: true })
+  })
+
+  const result = run(root, out)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /当前版本 site 包含符号链接/)
+  assert.equal(readFileSync(resolve(out, 'keep.txt'), 'utf8'), 'existing runtime\n')
 })
 
 test('module import exposes prepareRuntime without running the CLI', () => {
