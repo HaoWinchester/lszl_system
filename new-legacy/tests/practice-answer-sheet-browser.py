@@ -41,7 +41,7 @@ with sync_playwright() as playwright:
             answerSession:async(id,input)=>{const correct=input.selectedAnswer==='A';session.answers[input.questionId]={questionId:input.questionId,selectedAnswer:input.selectedAnswer,correctAnswer:'A',correct};const values=Object.values(session.answers);session.stats={...session.stats,answered:values.length,correct:values.filter(item=>item.correct).length,wrong:values.filter(item=>!item.correct).length,unanswered:10-values.length};session.revision+=1;return {answer:session.answers[input.questionId],session:normalize()}},
             pauseSession:async(id,input)=>{session.runtimeState={...session.runtimeState,...input.runtimeState};session.status='paused';session.revision+=1;return normalize()},
             abandonSession:async()=>{session.status='abandoned';session.revision+=1;return normalize()},
-            completeSession:async()=>{session.status='completed';session.revision+=1;return {session:normalize(),report:{scorePercent:10,durationMs:1000}}},
+            completeSession:async()=>{session.status='completed';session.revision+=1;return {session:normalize(),report:{sessionId:'ps-1',resultLabel:'模拟考试结果：FAIL',passed:false,scorePercent:0,passPercent:60,overallBand:'needsImprovement',counts:{total:10,answered:1,correct:0,wrong:1,unanswered:9},domainWeights:{people:42,process:50,'business-environment':8},domains:{people:{weight:42,total:4,answered:1,correct:0,wrong:1,unanswered:3,scorePercent:0,performanceBand:'needsImprovement'},process:{weight:50,total:5,answered:0,correct:0,wrong:0,unanswered:5,scorePercent:0,performanceBand:'needsImprovement'},'business-environment':{weight:8,total:1,answered:0,correct:0,wrong:0,unanswered:1,scorePercent:0,performanceBand:'needsImprovement'}},wrongQuestionIds:['q7'],durationMs:1000,official:false,disclaimer:'幻谱模拟判定，不代表 PMI 官方考试成绩'}}},
           };
           window.KGPublishedPaperRepository={listCatalogEntries:()=>[{id:'paper-1',paperId:'paper-1',releaseId:'release-1',version:1,name:'PMP 模拟卷',subject:'PMP',status:'published',questionCount:10,totalCount:10,accessPolicy:{accessLevel:'free'}}]};
           window.KGPaperAccessService={inspect:()=>({allowed:true,accessLevel:'free'})};
@@ -54,7 +54,7 @@ with sync_playwright() as playwright:
     )
     for stylesheet in ["styles/main.css", "styles/practice-mode.css"]:
         page.add_style_tag(content=(ROOT / stylesheet).read_text(encoding="utf-8"))
-    for script in ["src/111-practice-session-core.js", "src/112-practice-answer-sheet.js", "src/100-practice-mode.js"]:
+    for script in ["src/111-practice-session-core.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/100-practice-mode.js"]:
         page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(120)
@@ -100,6 +100,23 @@ with sync_playwright() as playwright:
     assert page.locator("#practiceAnswerSheetMobile [data-question-id]").count() == 10
     page.locator("#practiceAnswerSheetDrawerClose").click()
     assert page.locator("#practiceAnswerSheetDrawer").is_hidden()
+    page.locator("#practiceAnswerSheetMobileBtn").click()
+    page.locator("#practiceAnswerSheetMobile [data-answer-submit]").click()
+    assert page.locator("#practiceSubmitConfirm").is_visible()
+    page.locator("#practiceSubmitAnywayBtn").click()
+    page.wait_for_timeout(140)
+    assert page.locator("#practiceResult").is_visible()
+    assert "幻谱 PMP 模拟成绩分析报告" in page.locator("#practiceResult").inner_text()
+    page.locator('[data-review-question="q7"]').click()
+    page.wait_for_timeout(80)
+    assert page.locator("#practiceGame").is_visible()
+    assert page.locator("#practiceReviewBackBtn").is_visible()
+    assert page.locator('[data-option-id="B"]').is_disabled()
+    assert "第 7 题解析" in page.locator("#practiceExplanationPanel").inner_text()
+    assert page.locator("#practiceAnswerSheet [data-question-id]").count() == 1
+    assert page.locator("#practiceAnswerSheet [data-answer-submit]").count() == 0
+    page.locator("#practiceReviewBackBtn").click()
+    assert page.locator("#practiceResult").is_visible()
     assert not errors, errors
     browser.close()
 

@@ -31,7 +31,8 @@
     function render(session, currentQuestionId, filter) {
       snapshot = session || { questions: [], answers: {} }
       currentId = text(currentQuestionId)
-      if (['all', 'unanswered', 'wrong'].includes(filter)) activeFilter = filter
+      if (snapshot.reviewOnly) activeFilter = 'wrong'
+      else if (['all', 'unanswered', 'wrong'].includes(filter)) activeFilter = filter
       const core = global.KGPracticeSessionCore
       const stats = core?.answerSheetStats?.(snapshot) || { total: 0, answered: 0, correct: 0, wrong: 0, unanswered: 0 }
       const questions = visibleQuestions()
@@ -45,14 +46,14 @@
       }).join('')
       root.innerHTML = `<div class="practice-answer-sheet-head"><div><span>ANSWER SHEET</span><h2>答题概览</h2></div><strong>${stats.answered}/${stats.total}</strong></div>
         <div class="practice-answer-sheet-summary"><span>正确 <b>${stats.correct}</b></span><span>错误 <b>${stats.wrong}</b></span><span>未答 <b>${stats.unanswered}</b></span></div>
-        <div class="practice-answer-sheet-filters" role="group" aria-label="答题卡筛选">
+        ${snapshot.reviewOnly ? '<div class="practice-answer-sheet-filters"><button type="button" class="is-active">本次错题·只读</button></div>' : `<div class="practice-answer-sheet-filters" role="group" aria-label="答题卡筛选">
           <button type="button" data-answer-filter="all" class="${activeFilter === 'all' ? 'is-active' : ''}">全部</button>
           <button type="button" data-answer-filter="unanswered" class="${activeFilter === 'unanswered' ? 'is-active' : ''}">未答</button>
           <button type="button" data-answer-filter="wrong" class="${activeFilter === 'wrong' ? 'is-active' : ''}">错题</button>
-        </div>
+        </div>`}
         <div class="practice-answer-number-grid">${numbers || '<p class="practice-answer-filter-empty">该筛选下暂无题目</p>'}</div>
         <div class="practice-answer-sheet-legend"><span><i class="is-correct"></i>正确</span><span><i class="is-wrong"></i>错误</span><span><i class="is-unanswered"></i>未答</span></div>
-        <button type="button" class="practice-answer-submit" data-answer-submit="true">交卷并查看成绩</button>`
+        ${snapshot.reviewOnly || snapshot.status === 'completed' ? '' : '<button type="button" class="practice-answer-submit" data-answer-submit="true">交卷并查看成绩</button>'}`
       return stats
     }
 
