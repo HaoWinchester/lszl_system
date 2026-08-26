@@ -110,7 +110,7 @@ def _select_questions(
     order: str,
     seed: str,
     weights: dict[str, int],
-) -> tuple[list[dict], dict[str, int]]:
+) -> tuple[list[dict], dict[str, int], bool]:
     targets = paper_composition_service.allocate_counts(weights, count)
     buckets: dict[str, list[PaperReleaseQuestion]] = {
         domain: [] for domain in weights
@@ -119,6 +119,40 @@ def _select_questions(
         domain = _domain_for_snapshot(row.snapshot or {})
         if domain in buckets:
             buckets[domain].append(row)
+
+    domain_data_complete = all(
+        _domain_for_snapshot(row.snapshot or {}) in buckets for row in rows
+    )
+    if not domain_data_complete:
+        candidates = list(rows)
+        if order == "random":
+            candidates.sort(key=lambda row: _stable_random_key(seed, row))
+        else:
+            candidates.sort(key=lambda row: row.order_index)
+        selected_rows = candidates[:count]
+        if len(selected_rows) < count:
+            raise _error(
+                422,
+                "PRACTICE_QUESTION_SHORTAGE",
+                "试卷题量不足，无法开始本次练习",
+                available=len(selected_rows),
+                requested=count,
+            )
+        legacy_order = [
+            {
+                "questionId": row.question_id,
+                "bankId": row.bank_id,
+                "orderIndex": row.order_index,
+                "domain": _domain_for_snapshot(row.snapshot or {}),
+                "score": _score_for_snapshot(row.snapshot or {}),
+            }
+            for row in selected_rows
+        ]
+        legacy_targets = {
+            domain: sum(1 for item in legacy_order if item.get("domain") == domain)
+            for domain in weights
+        }
+        return legacy_order, legacy_targets, False
 
     shortages = {
         domain: target - len(buckets[domain])
@@ -160,6 +194,7 @@ def _select_questions(
             for row, domain in selected
         ],
         targets,
+        True,
     )
 
 
@@ -331,14 +366,13 @@ async def start_session(
 
     await db.execute(
         sql_text("SELECT pg_advisory_xact_lock(hashtext(:owner), hashtext(:scope))"),
-        {"owner": owner, "scope": f"practice-session:{paper_id}:{release_id}:{mode}"},
+        {"owner": owner, "scope": f"practice-session:{paper_id}:{mode}"},
     )
     existing = (
         await db.execute(
             select(PracticeSession).where(
                 PracticeSession.owner_id == owner,
                 PracticeSession.paper_id == paper_id,
-                PracticeSession.release_id == release_id,
                 PracticeSession.mode == mode,
                 PracticeSession.status.in_(["active", "paused"]),
             )
@@ -375,8 +409,11 @@ async def start_session(
             domain: sum(1 for item in question_order if item.get("domain") == domain)
             for domain in weights
         }
+        domain_data_complete = all(
+            str(item.get("domain") or "") in weights for item in question_order
+        )
     else:
-        question_order, targets = _select_questions(
+        question_order, targets, domain_data_complete = _select_questions(
             rows,
             count=count,
             order=order,
@@ -407,6 +444,7 @@ async def start_session(
             **scoring,
             "domainWeights": weights,
             "domainTargets": targets,
+            "domainDataComplete": domain_data_complete,
             "selectionSeed": selection_seed,
             "order": order,
         },
@@ -422,7 +460,6 @@ async def start_session(
                 select(PracticeSession).where(
                     PracticeSession.owner_id == owner,
                     PracticeSession.paper_id == paper_id,
-                    PracticeSession.release_id == release_id,
                     PracticeSession.mode == mode,
                     PracticeSession.status.in_(["active", "paused"]),
                 )
@@ -516,17 +553,22 @@ async def answer_session_question(
 ) -> dict:
     requested_revision = _required_revision(data)
     question_id = str(data.get("questionId") or "").strip()
+    timed_out = data.get("timedOut") is True
     selected_answer = str(data.get("selectedAnswer") or "").strip()
-    if not question_id or not selected_answer:
+    if not question_id or (not selected_answer and not timed_out):
         raise _error(
             422,
             "PRACTICE_ANSWER_REQUIRED",
             "questionId 和 selectedAnswer 不能为空",
         )
+    if timed_out:
+        selected_answer = "__timeout__"
 
     session = await _session_for_update(db, owner, session_id)
     if session.status not in {"active", "paused"}:
         raise _error(409, "PRACTICE_SESSION_NOT_ACTIVE", "当前会话不可继续作答")
+    if timed_out and session.mode != "scholar":
+        raise _error(422, "PRACTICE_TIMEOUT_MODE_INVALID", "只有学霸模式可以提交超时")
     refs = session.question_order if isinstance(session.question_order, list) else []
     ref = next(
         (
@@ -596,6 +638,7 @@ async def answer_session_question(
                     "releaseId": session.release_id,
                     "sourceMode": session.mode,
                     "selectedAnswer": selected_answer,
+                    "timedOut": timed_out,
                 },
                 current_user=user,
                 commit=False,
@@ -621,6 +664,8 @@ async def answer_session_question(
         "submittedAt": completion.get("completedAt") or now_utc().isoformat(),
         "submissionIndex": len(answers) + 1,
     }
+    if timed_out:
+        answer["timedOut"] = True
     if session.mode == "revenge":
         answer["mistakeId"] = str(ref.get("mistakeId") or "")
         answer["mistakeStatus"] = mistake_status
@@ -642,6 +687,16 @@ async def answer_session_question(
     }
     runtime_state = dict(session.runtime_state or {})
     runtime_state["experience"] = experience
+    if session.mode == "revenge":
+        runtime_state["revengeState"] = {
+            "phase": (
+                "remediation"
+                if mistake_status == "needs_remediation"
+                else "verification_due"
+            ),
+            "mistakeId": str(ref.get("mistakeId") or ""),
+            "questionId": question_id,
+        }
     session.runtime_state = runtime_state
     session.revision += 1
     await db.commit()
@@ -985,14 +1040,6 @@ def performance_band(percent: float, scoring: dict) -> str:
 async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
     refs = session.question_order if isinstance(session.question_order, list) else []
     answers = session.answers if isinstance(session.answers, dict) else {}
-    rows = (
-        await db.execute(
-            select(PaperReleaseQuestion).where(
-                PaperReleaseQuestion.release_id == session.release_id
-            )
-        )
-    ).scalars().all()
-    row_map = {row.question_id: row for row in rows}
     scoring = (
         session.scoring_snapshot
         if isinstance(session.scoring_snapshot, dict)
@@ -1010,6 +1057,7 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
     answered_count = 0
     raw_score = 0.0
     max_score = 0.0
+    domain_data_complete = scoring.get("domainDataComplete") is not False
     for ref in refs:
         if not isinstance(ref, dict):
             continue
@@ -1024,29 +1072,33 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
             question_score = 1.0
         question_score = question_score if question_score >= 0 else 1.0
         max_score += question_score
+        answer = answers.get(question_id)
+        answered = isinstance(answer, dict)
+        answer_correct = answered and answer.get("correct") is True
+        if answered:
+            answered_count += 1
+        if answer_correct:
+            correct_count += 1
+            raw_score += question_score
+        elif answered:
+            wrong_question_ids.append(question_id)
+
         if domain not in domain_counts:
+            domain_data_complete = False
             continue
         domain_counts[domain]["total"] += 1
         domain_counts[domain]["maxScore"] = (
             float(domain_counts[domain].get("maxScore") or 0) + question_score
         )
-        answer = answers.get(question_id)
-        if not isinstance(answer, dict):
+        if not answered:
             continue
-        answered_count += 1
         domain_counts[domain]["answered"] += 1
-        row = row_map.get(question_id)
-        snapshot = row.snapshot if row is not None and isinstance(row.snapshot, dict) else {}
-        correct_answer = str(snapshot.get("correctAnswer") or "")
-        if str(answer.get("selectedAnswer") or "") == correct_answer:
-            correct_count += 1
-            raw_score += question_score
+        if answer_correct:
             domain_counts[domain]["correct"] += 1
             domain_counts[domain]["rawScore"] = (
                 float(domain_counts[domain].get("rawScore") or 0) + question_score
             )
         else:
-            wrong_question_ids.append(question_id)
             domain_counts[domain]["wrong"] += 1
     total = len(refs)
     score_percent = round((raw_score / max_score * 100) if max_score else 0, 2)
@@ -1095,6 +1147,7 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
             "unanswered": total - answered_count,
         },
         "domainWeights": {domain: int(value) for domain, value in weights.items()},
+        "domainDataComplete": domain_data_complete,
         "domains": domains,
         "wrongQuestionIds": wrong_question_ids,
         "durationMs": max(0, int(stats.get("durationMs") or 0)),

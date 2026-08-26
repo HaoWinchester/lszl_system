@@ -96,6 +96,7 @@
     const resultClass = report.passed ? 'is-pass' : 'is-fail'
     const questionNumbers = options.questionNumbers || {}
     const wrongIds = Array.isArray(report.wrongQuestionIds) ? report.wrongQuestionIds : []
+    const domainDataComplete = report.domainDataComplete !== false
     const wrongButtons = wrongIds.map((id) => {
       const label = questionNumbers[id] ? `第 ${questionNumbers[id]} 题` : text(id)
       return `<button type="button" data-review-question="${escapeHTML(id)}" aria-label="回看${escapeHTML(label)}">${escapeHTML(label)}</button>`
@@ -106,8 +107,10 @@
       <section class="practice-report-overall ${resultClass}"><div><span>OVERALL PERFORMANCE</span><h2>${escapeHTML(report.resultLabel || `模拟考试结果：${report.passed ? 'PASS' : 'FAIL'}`)}</h2><p>本结果按本次会话的冻结规则生成。</p></div><div class="practice-report-score"><strong>${score.toFixed(2).replace(/\.00$/, '')}</strong><span>模拟分 / 100${report.maxScore ? ` · ${number(report.rawScore)} / ${number(report.maxScore)} 原始分` : ''}</span></div></section>
       <section class="practice-report-band-scale" aria-label="总体表现区间"><div class="practice-report-band-track">${bandScaleMarkup(report)}<i style="left:${Math.max(0, Math.min(100, score))}%" aria-label="你的模拟分 ${score}"></i></div></section>
       <section class="practice-report-counts"><div><span>总题数</span><strong>${number(counts.total)}</strong></div><div><span>答对</span><strong>${number(counts.correct)}</strong></div><div><span>答错</span><strong>${number(counts.wrong)}</strong></div><div><span>未答</span><strong>${number(counts.unanswered)}</strong></div><div><span>正确率</span><strong>${number(report.accuracyPercent ?? score).toFixed(2).replace(/\.00$/, '')}%</strong></div><div><span>累计用时</span><strong>${durationLabel(report.durationMs)}</strong></div></section>
-      <section class="practice-report-breakdown"><header><span>EXAM BREAKDOWN</span><h2>考试领域分析</h2><p>扇区大小代表领域占比，颜色代表本领域的模拟表现等级。</p>${legendMarkup()}</header>${pieMarkup(report)}</section>
-      <section class="practice-report-domains"><h2>各领域成绩</h2><div class="practice-report-table-scroll"><table class="practice-report-domain-table"><thead><tr><th>领域</th><th>占比</th><th>答对 / 总数</th><th>得分率</th><th>表现</th></tr></thead><tbody>${domainRows(report)}</tbody></table></div></section>
+      ${domainDataComplete
+        ? `<section class="practice-report-breakdown"><header><span>EXAM BREAKDOWN</span><h2>考试领域分析</h2><p>扇区大小代表领域占比，颜色代表本领域的模拟表现等级。</p>${legendMarkup()}</header>${pieMarkup(report)}</section>
+      <section class="practice-report-domains"><h2>各领域成绩</h2><div class="practice-report-table-scroll"><table class="practice-report-domain-table"><thead><tr><th>领域</th><th>占比</th><th>答对 / 总数</th><th>得分率</th><th>表现</th></tr></thead><tbody>${domainRows(report)}</tbody></table></div></section>`
+        : '<section class="practice-report-domain-unavailable" role="status"><h2>领域分析暂不可用</h2><p>本试卷包含未标注 PMP 领域的历史题目；总体成绩仍按全部题目计算，为避免误导，本次不展示领域饼图与领域等级。</p></section>'}
       <section class="practice-report-wrong"><div><h2>本次错题</h2><p>${wrongIds.length ? `共 ${wrongIds.length} 道，点击题号只读回看答案与解析。` : '本次作答没有错题。'}</p></div><div class="practice-report-wrong-list">${wrongButtons}</div></section>
       <section class="practice-report-next"><h2>下一步建议</h2><ul>${(Array.isArray(report.recommendations) ? report.recommendations : []).map(item => `<li>${escapeHTML(item)}</li>`).join('')}</ul></section>
       <p class="practice-report-disclaimer">${escapeHTML(report.disclaimer || '幻谱模拟判定，不代表 PMI 官方考试成绩')}</p>

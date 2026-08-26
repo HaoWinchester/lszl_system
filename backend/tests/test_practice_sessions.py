@@ -254,6 +254,31 @@ async def _remove_business_environment_inventory(release_id: str) -> None:
         await db.commit()
 
 
+async def _remove_first_question_domain(release_id: str) -> None:
+    async with AsyncSessionLocal() as db:
+        row = (
+            await db.execute(
+                select(PaperReleaseQuestion)
+                .where(PaperReleaseQuestion.release_id == release_id)
+                .order_by(PaperReleaseQuestion.order_index)
+                .limit(1)
+            )
+        ).scalar_one()
+        snapshot = dict(row.snapshot or {})
+        metadata = dict(snapshot.get("metadata") or {})
+        metadata["subjectFacets"] = [
+            facet
+            for facet in metadata.get("subjectFacets") or []
+            if not (
+                isinstance(facet, dict)
+                and facet.get("dimensionId") == "exam-domain"
+            )
+        ]
+        snapshot["metadata"] = metadata
+        row.snapshot = snapshot
+        await db.commit()
+
+
 async def _completion_event_count(owner: str, session_id: str) -> int:
     async with AsyncSessionLocal() as db:
         return int(
@@ -626,6 +651,62 @@ def test_session_answer_uses_server_truth_locks_answer_and_increments_revision()
             ).json()["session"]
             assert persisted["revision"] == 2
             assert persisted["answers"][question_id]["selectedAnswer"] == "B"
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_scholar_timeout_is_an_immutable_server_answer_and_reported_as_wrong() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            started = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "scholar",
+                    "count": 10,
+                    "order": "paper",
+                },
+            ).json()["session"]
+            question_id = started["questionOrder"][0]["questionId"]
+            timed_out = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json={
+                    "revision": started["revision"],
+                    "questionId": question_id,
+                    "timedOut": True,
+                },
+            )
+            assert timed_out.status_code == 200, timed_out.text
+            body = timed_out.json()
+            assert body["answer"]["selectedAnswer"] == "__timeout__"
+            assert body["answer"]["timedOut"] is True
+            assert body["answer"]["correct"] is False
+            assert body["session"]["stats"]["answered"] == 1
+            assert body["session"]["stats"]["wrong"] == 1
+
+            restored = client.get(
+                f"/api/v1/learning/practice/sessions/{started['id']}"
+            ).json()["session"]
+            assert restored["answers"][question_id]["timedOut"] is True
+            completed = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/complete",
+                json={"revision": restored["revision"]},
+            ).json()["report"]
+            assert completed["counts"] == {
+                "total": 10,
+                "answered": 1,
+                "correct": 0,
+                "wrong": 1,
+                "unanswered": 9,
+            }
+            assert completed["wrongQuestionIds"] == [question_id]
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
@@ -1083,6 +1164,11 @@ def test_revenge_mode_is_a_resumable_server_session() -> None:
             body = revenge_answer.json()
             assert body["answer"]["correct"] is False
             assert body["answer"]["mistakeStatus"] == "needs_remediation"
+            assert body["session"]["runtimeState"]["revengeState"] == {
+                "phase": "remediation",
+                "mistakeId": revenge["questionOrder"][0]["mistakeId"],
+                "questionId": question_id,
+            }
 
             remediation = client.post(
                 f"/api/v1/learning/practice/sessions/{revenge['id']}"
@@ -1142,5 +1228,90 @@ def test_revenge_mode_is_a_resumable_server_session() -> None:
             ).json()["session"]
             assert restored["status"] == "paused"
             assert restored["runtimeState"]["revengeState"]["phase"] == "verification_due"
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_legacy_domain_gaps_keep_overall_report_truthful_and_disable_breakdown() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    asyncio.run(_remove_first_question_domain(ids["release"]))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            started_response = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "challenge",
+                    "count": 10,
+                    "order": "paper",
+                },
+            )
+            assert started_response.status_code == 200, started_response.text
+            started = started_response.json()["session"]
+            assert started["scoringSnapshot"]["domainDataComplete"] is False
+            question_id = started["questionOrder"][0]["questionId"]
+            answered = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json={
+                    "revision": started["revision"],
+                    "questionId": question_id,
+                    "selectedAnswer": "A",
+                },
+            ).json()["session"]
+            report = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/complete",
+                json={"revision": answered["revision"]},
+            ).json()["report"]
+            assert report["domainDataComplete"] is False
+            assert report["counts"] == {
+                "total": 10,
+                "answered": 1,
+                "correct": 1,
+                "wrong": 0,
+                "unanswered": 9,
+            }
+            assert report["rawScore"] == 5
+            assert report["maxScore"] == 14
+            assert report["scorePercent"] == 35.71
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_legacy_completion_payload_cannot_inflate_experience_summary() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            before = client.get(
+                "/api/v1/learning/practice/experience-summary"
+            ).json()["totalExperience"]
+            legacy = client.post(
+                "/api/v1/learning/practice/sessions",
+                json={
+                    "mode": "challenge",
+                    "paperId": ids["paper"],
+                    "paperName": "伪造摘要",
+                    "answered": 180,
+                    "correct": 180,
+                    "experience": 99999999,
+                    "status": "completed",
+                },
+            )
+            assert legacy.status_code == 200, legacy.text
+            assert legacy.json()["session"]["experience"] == 0
+            after = client.get(
+                "/api/v1/learning/practice/experience-summary"
+            ).json()["totalExperience"]
+            assert after == before
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))

@@ -1,12 +1,18 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.177",
-  "toVersion": "v9.0-p4.1.178",
+  "fromVersion": "v9.0-p4.1.178",
+  "toVersion": "v9.0-p4.1.179",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "content-prep-studio/dist/content-prep.html"
+      "content-prep-studio/dist/content-prep.html",
+      "src/100-practice-mode.js",
+      "src/113-practice-result-report.js",
+      "styles/practice-mode.css",
+      "tests/practice-answer-sheet-browser.py",
+      "tests/practice-result-report-browser.py",
+      "tests/v90-p40-practice-mode.test.js"
     ],
     "removed": []
   },

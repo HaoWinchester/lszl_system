@@ -35,6 +35,7 @@ with sync_playwright() as playwright:
           let report=null;
           let sequence=0;
           const normalize=()=>JSON.parse(JSON.stringify(session));
+          window.__supersedeSession=()=>{if(session)session.releaseId='release-v1-superseded'};
           window.__updates=[];
           window.__conflictNext=false;
           window.__saveFailNext=false;
@@ -42,11 +43,11 @@ with sync_playwright() as playwright:
           window.KGAuthCore={currentUser:()=>({username:'student-1',role:'student'})};
           window.KGPracticeLearningApi={
             stats:()=>({active:3,pending:2,needsRemediation:1,mastered:0}),active:()=>[],refresh:async()=>({}),
-            getActiveSessions:async filters=>session&&['active','paused'].includes(session.status)&&(!filters?.mode||filters.mode===session.mode)?[normalize()]:[],
+            getActiveSessions:async filters=>session&&['active','paused'].includes(session.status)&&(!filters?.mode||filters.mode===session.mode)&&(!filters?.releaseId||filters.releaseId===session.releaseId)?[normalize()]:[],
             getSession:async()=>normalize(),
             startSession:async input=>{session={id:'ps-'+(++sequence),paperId:input.paperId,releaseId:input.releaseId,mode:input.mode,status:'active',revision:1,questions:sessionRefs(),questionOrder:fullRefs.map(({question,...ref})=>ref),answers:{},runtimeState:{currentIndex:0,order:input.order,...(input.mode==='scholar'?{remainingMs:0}:{})},stats:{total:10,answered:0,correct:0,wrong:0,unanswered:10,experience:0,durationMs:0}};if(window.__startConflictNext){window.__startConflictNext=false;throw Object.assign(new Error('existing session'),{status:409,detail:{code:'RESUMABLE_SESSION_EXISTS',sessionId:session.id}})}return normalize()},
             updateState:async(id,input)=>{await new Promise(resolve=>setTimeout(resolve,20));window.__updates.push(input.revision);if(window.__saveFailNext){window.__saveFailNext=false;throw Object.assign(new Error('offline'),{status:503})}if(window.__conflictNext){window.__conflictNext=false;throw Object.assign(new Error('conflict'),{status:409})}if(input.revision!==session.revision)throw Object.assign(new Error('stale revision'),{status:409});session.runtimeState={...session.runtimeState,...input.runtimeState};session.status='active';session.revision+=1;return normalize()},
-            answerSession:async(id,input)=>{const correct=input.selectedAnswer==='A';session.answers[input.questionId]={questionId:input.questionId,selectedAnswer:input.selectedAnswer,correctAnswer:'A',correct,mistakeStatus:session.mode==='revenge'?'needs_remediation':undefined};const ref=session.questions.find(item=>item.questionId===input.questionId);if(ref)ref.question=fullRefs.find(item=>item.questionId===input.questionId).question;const values=Object.values(session.answers);session.stats={...session.stats,answered:values.length,correct:values.filter(item=>item.correct).length,wrong:values.filter(item=>!item.correct).length,unanswered:10-values.length};session.revision+=1;return {answer:session.answers[input.questionId],session:normalize()}},
+            answerSession:async(id,input)=>{const selected=input.timedOut?'__timeout__':input.selectedAnswer,correct=selected==='A';session.answers[input.questionId]={questionId:input.questionId,selectedAnswer:selected,correctAnswer:'A',correct,timedOut:input.timedOut===true,mistakeStatus:session.mode==='revenge'?'needs_remediation':undefined};const ref=session.questions.find(item=>item.questionId===input.questionId);if(ref)ref.question=fullRefs.find(item=>item.questionId===input.questionId).question;const values=Object.values(session.answers);session.stats={...session.stats,answered:values.length,correct:values.filter(item=>item.correct).length,wrong:values.filter(item=>!item.correct).length,unanswered:10-values.length};session.revision+=1;return {answer:session.answers[input.questionId],session:normalize()}},
             pauseSession:async(id,input)=>{session.runtimeState={...session.runtimeState,...input.runtimeState};session.status='paused';session.revision+=1;return normalize()},
             abandonSession:async()=>{session.status='abandoned';session.revision+=1;return normalize()},
             completeSession:async()=>{session.status='completed';session.revision+=1;report={sessionId:session.id,resultLabel:'模拟考试结果：FAIL',passed:false,scorePercent:0,passPercent:60,overallBand:'needsImprovement',counts:{total:10,answered:1,correct:0,wrong:1,unanswered:9},domainWeights:{people:42,process:50,'business-environment':8},domains:{people:{weight:42,total:4,answered:1,correct:0,wrong:1,unanswered:3,scorePercent:0,performanceBand:'needsImprovement'},process:{weight:50,total:5,answered:0,correct:0,wrong:0,unanswered:5,scorePercent:0,performanceBand:'needsImprovement'},'business-environment':{weight:8,total:1,answered:0,correct:0,wrong:0,unanswered:1,scorePercent:0,performanceBand:'needsImprovement'}},wrongQuestionIds:['q7'],durationMs:1000,official:false,disclaimer:'幻谱模拟判定，不代表 PMI 官方考试成绩'};return {session:normalize(),report}},
@@ -123,8 +124,11 @@ with sync_playwright() as playwright:
     page.locator("#practiceSaveExitBtn").click()
     page.wait_for_timeout(120)
     assert page.locator("#practiceLobby").is_visible()
+    original_session = page.evaluate("window.KGPracticeMode.snapshot().sessionId")
+    page.evaluate("window.__supersedeSession()")
     page.locator('[data-practice-start="challenge"]').click()
     page.wait_for_timeout(160)
+    assert page.evaluate("window.KGPracticeMode.snapshot().sessionId") == original_session
     assert "第 1 道题" in page.locator("#practiceQuestionStem").inner_text()
     assert "错误" in (page.locator('#practiceAnswerSheet [data-question-id="q7"]').get_attribute("aria-label") or "")
 
@@ -167,6 +171,9 @@ with sync_playwright() as playwright:
     page.evaluate("window.__startConflictNext=true")
     scholar = page.evaluate("window.KGPracticeMode.startPractice('scholar').then(()=>window.KGPracticeMode.snapshot())")
     assert scholar["mode"] == "scholar" and scholar["remainingSeconds"] == 0, scholar
+    page.wait_for_timeout(120)
+    timed_out = page.evaluate("window.KGPracticeLearningApi.getSession().then(s=>Object.values(s.answers)[0])")
+    assert timed_out and timed_out["timedOut"] is True and timed_out["selectedAnswer"] == "__timeout__", timed_out
     page.locator("#practiceExitBtn").click()
     page.locator("#practiceSaveExitBtn").click()
     page.wait_for_timeout(80)

@@ -910,7 +910,7 @@ def test_concurrent_compose_and_publish_share_one_atomic_revision(monkeypatch) -
             _login(client, teacher_b)
             bank = client.post(
                 "/api/v1/banks",
-                json={"name": "并发组卷题库", "subject": "PMP"},
+                json={"name": "并发组卷题库", "subject": "ACP"},
             ).json()["bank"]
             bank_id = bank["id"]
             question = client.post(
@@ -928,7 +928,7 @@ def test_concurrent_compose_and_publish_share_one_atomic_revision(monkeypatch) -
             _login(client, teacher_a)
             paper = client.post(
                 "/api/v1/papers",
-                json={"name": "并发互斥试卷", "subject": "PMP"},
+                json={"name": "并发互斥试卷", "subject": "ACP"},
             ).json()["paper"]
             paper_id = paper["id"]
             seeded = client.post(

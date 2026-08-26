@@ -678,6 +678,7 @@
     if(state.mode==='revenge'){
       const applyRevengeResult=async(updated)=>{
         question.mistakeStatus=text(updated?.status||question.mistakeStatus);
+        if(state.session)state.revengeState=clone(state.session.runtimeState?.revengeState||null);
         // 复仇交互原则：答错才触发解析与补救；答对只给成功反馈并继续。
         // 是否真正掌握交给后续不同题目的验证机制判断，不在答对时强弹解析。
         if(correct){
@@ -687,18 +688,18 @@
           if(question.mistakeStatus==='needs_remediation'){
             // 已处 needs_remediation 的题重新答对：后台保留"仍需新题验证"状态，直接进入验证题
             showFeedback('原错题已答对 · 直接进入新题验证','success');
-            state.remediationPending=true;state.revengeState={phase:'remediation',mistakeId:question.mistakeId,questionId:question.id};await persistCurrentIndex({quiet:true});
+            state.remediationPending=true;if(!state.session){state.revengeState={phase:'remediation',mistakeId:question.mistakeId,questionId:question.id};await persistCurrentIndex({quiet:true})}
             state.feedbackTimer=global.setTimeout(()=>{startRemediationVerification()},FEEDBACK_DELAY+400);
           }else{
             showFeedback(question.mistakeStatus==='mastered'?'彻底掌握 · 复仇成功':'复仇成功 · 将安排再次验证','success');
-            state.revengeState={phase:'verification_due',mistakeId:question.mistakeId,questionId:question.id};await persistCurrentIndex({quiet:true});
+            if(!state.session){state.revengeState={phase:'verification_due',mistakeId:question.mistakeId,questionId:question.id};await persistCurrentIndex({quiet:true})}
             state.feedbackTimer=global.setTimeout(advanceAfterAnswer,FEEDBACK_DELAY);
           }
         }else{
           state.streak=0;hideStreakPop();
           const correctButton=dom.options.querySelector('[data-option-id="'+CSS.escape(text(question.correctAnswer))+'"]');if(correctButton)correctButton.classList.add('is-correct');
           showFeedback('再次答错 · 需要知识补救','danger');
-          state.revengeState={phase:'remediation',mistakeId:question.mistakeId,questionId:question.id};showRemediation(question);await persistCurrentIndex({quiet:true});
+          if(!state.session){state.revengeState={phase:'remediation',mistakeId:question.mistakeId,questionId:question.id};await persistCurrentIndex({quiet:true})}showRemediation(question);
         }
       };
       try{
@@ -758,15 +759,25 @@
     const allAnswered=state.session&&Number(state.session.stats?.unanswered||0)===0;
     state.feedbackTimer=global.setTimeout(allAnswered?finishPractice:advanceAfterAnswer,FEEDBACK_DELAY);return correct;
   }
-  function handleTimeout(){
+  async function handleTimeout(){
     if(!state.active||state.mode!=='scholar'||state.locked||remainingSeconds()>0)return;
-    state.locked=true;lockOptions();state.answered+=1;recordMistake(state.questions[state.index],{reason:'timeout'});state.streak=0;hideStreakPop();state.health=Math.max(0,state.health-1);dom.questionCard.classList.add('is-timeout');
+    const question=state.questions[state.index];if(!question)return;
+    state.locked=true;lockOptions();
+    if(state.session){
+      try{
+        const result=await runSessionMutation(session=>practiceApi().answerSession(session.id,{revision:session.revision,questionId:question.id,timedOut:true}));
+        if(result?.answer?.correctAnswer)question.correctAnswer=text(result.answer.correctAnswer);
+        state.answered=Number(state.session.stats?.answered||0);state.correct=Number(state.session.stats?.correct||0);
+        revealOptionResult('',question.correctAnswer);renderPracticeExplanation(question,false);renderAnswerSheet();
+      }catch(error){setUnsavedVisible(Number(error?.status)!==409);return handleSessionError(error,{allowRetry:Number(error?.status)!==409})}
+    }else{state.answered+=1;await recordMistake(question,{reason:'timeout'})}
+    state.streak=0;hideStreakPop();state.health=Math.max(0,state.health-1);dom.questionCard.classList.add('is-timeout');
     showFeedback('超时 · -1 ♥','danger');renderHealth();
     if(state.health>0)setScholarSeconds(40);
-    if(state.session)persistCurrentIndex({quiet:true});
-    state.feedbackTimer=global.setTimeout(advanceAfterAnswer,FEEDBACK_DELAY);
+    const allAnswered=state.session&&Number(state.session.stats?.unanswered||0)===0;
+    state.feedbackTimer=global.setTimeout(allAnswered?finishPractice:advanceAfterAnswer,FEEDBACK_DELAY);
   }
-  function timerTick(){renderTimer();handleTimeout()}
+  function timerTick(){renderTimer();void handleTimeout()}
   function startTimer({resume=false}={}){
     if(state.mode!=='scholar')return;if(!resume)setScholarSeconds(SCHOLAR_MAX_SECONDS);state.timerId=global.setInterval(timerTick,50);
   }
@@ -879,8 +890,9 @@
       const api=practiceApi();
       if(hasAuthenticatedUser()&&typeof api?.startSession==='function'){
         const releaseId=text(catalog.releaseId),paperId=text(catalog.paperId||catalog.id),order=mode==='revenge'?'paper':(dom.orderInputs.find(input=>input.checked)?.value||'paper');
-        const active=await api.getActiveSessions({releaseId,mode});
-        const session=active[0]?await api.getSession(active[0].id):await api.startSession({paperId,releaseId,mode,count,order});
+        const active=await api.getActiveSessions({mode});
+        const resumable=active.find(item=>text(item.paperId)===paperId);
+        const session=resumable?await api.getSession(resumable.id):await api.startSession({paperId,releaseId,mode,count,order});
         state.order=order;
         return restoreServerSession(session,catalog);
       }
@@ -989,10 +1001,10 @@
     const release=selectedRelease(),api=practiceApi(),token=++state.resumeLookupToken;
     if(!release||!hasAuthenticatedUser()||typeof api?.getActiveSessions!=='function')return;
     try{
-      const rows=(await Promise.all(['challenge','scholar','revenge'].map(async mode=>({mode,sessions:await api.getActiveSessions({releaseId:release.releaseId,mode})}))));
+      const paperId=text(release.paperId||release.id),sessions=await api.getActiveSessions({});
       if(token!==state.resumeLookupToken||release.id!==selectedRelease()?.id)return;
-      rows.forEach(({mode,sessions})=>{
-        const button=dom.startButtons.find(item=>item.dataset.practiceStart===mode),session=sessions[0];if(!button||!session)return;
+      ['challenge','scholar','revenge'].forEach(mode=>{
+        const button=dom.startButtons.find(item=>item.dataset.practiceStart===mode),session=sessions.find(item=>text(item.paperId)===paperId&&item.mode===mode);if(!button||!session)return;
         const stats=session.stats||{};button.disabled=false;button.textContent='继续上次练习 '+Number(stats.answered||0)+'/'+Number(stats.total||0);
       });
     }catch(error){}

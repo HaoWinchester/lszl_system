@@ -601,13 +601,16 @@ async def record_practice_answer(
     requested_bank_id = str(data.get("bankId") or "").strip()
     if requested_bank_id and requested_bank_id != question.bank_id:
         raise ValueError("bankId 与题目不一致")
+    timed_out = data.get("timedOut") is True
     selected_answer = str(data.get("selectedAnswer") or "").strip()
     option_ids = {
         str(option.get("id") or "").strip()
         for option in (question.options or [])
         if isinstance(option, dict) and str(option.get("id") or "").strip()
     }
-    if not selected_answer or selected_answer not in option_ids:
+    if timed_out:
+        selected_answer = "__timeout__"
+    elif not selected_answer or selected_answer not in option_ids:
         raise ValueError("selectedAnswer 不是该题的有效选项")
     canonical_answer = _canonical_practice_answer(question)
     if not canonical_answer:
@@ -945,6 +948,13 @@ async def record_practice_verification(
     if question_id != str(candidate_question.get("id") or ""):
         raise ValueError("验证题必须是同一知识点的不同已发布题")
     selected_answer = str(data.get("selectedAnswer") or "").strip()
+    option_ids = {
+        str(option.get("id") or "").strip()
+        for option in candidate_question.get("options") or []
+        if isinstance(option, dict) and str(option.get("id") or "").strip()
+    }
+    if not selected_answer or selected_answer not in option_ids:
+        raise ValueError("selectedAnswer 不是验证题的有效选项")
     correct = selected_answer == str(candidate_question.get("correctAnswer") or "")
     verification = PracticeVerification(
         id=uid("pv_"),
@@ -1046,6 +1056,9 @@ def _practice_session_payload(data: dict) -> dict:
 
 async def record_practice_session(db: AsyncSession, owner: str, data: dict) -> dict:
     payload = _practice_session_payload(data)
+    # 兼容入口只保留旧版历史展示，不接受客户端声明的经验值。
+    payload["experience"] = 0
+    payload["trustedExperience"] = False
     event = LearningEvent(
         id=uid("le_"),
         owner_id=owner,
@@ -1252,16 +1265,16 @@ def _learning_week_start(now_local):
 async def practice_experience_summary(db: AsyncSession, owner: str) -> dict:
     """做题经验聚合：累计 / 本学习周（周日19:00 起）/ 最近 7 个自然日。
 
-    经验数据来自已结构化保存的 practice.session 事件（每次练习会话携带
-    experience 字段），未来可在此之上扩展周排行榜。
+    经验只来自已完成 PracticeSession 的服务端派生统计；旧版客户端摘要事件
+    不参与累计，避免客户端伪造 experience。
     """
     from datetime import datetime, timezone
 
     rows = (
         await db.execute(
-            select(LearningEvent).where(
-                LearningEvent.owner_id == owner,
-                LearningEvent.event_type == PRACTICE_SESSION_EVENT_TYPE,
+            select(PracticeSession).where(
+                PracticeSession.owner_id == owner,
+                PracticeSession.status == "completed",
             )
         )
     ).scalars().all()
@@ -1275,14 +1288,14 @@ async def practice_experience_summary(db: AsyncSession, owner: str) -> dict:
     total = 0
     weekly = 0
     for row in rows:
-        experience = 0
-        payload = row.payload if isinstance(row.payload, dict) else {}
+        stats = row.stats if isinstance(row.stats, dict) else {}
         try:
-            experience = int(payload.get("experience") or 0)
+            experience = max(0, int(stats.get("experience") or 0))
         except (TypeError, ValueError):
             experience = 0
         total += experience
-        created_local = row.created_at.astimezone(now_local.tzinfo) if row.created_at else None
+        completed_at = row.completed_at or row.last_saved_at
+        created_local = completed_at.astimezone(now_local.tzinfo) if completed_at else None
         if created_local and created_local >= week_start:
             weekly += experience
         if created_local:

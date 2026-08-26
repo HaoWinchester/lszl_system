@@ -58,6 +58,16 @@ with sync_playwright() as playwright:
     page.locator('[data-review-question="q7"]').click()
     assert page.evaluate("window.reviewed") == "q7"
 
+    incomplete = {**report, "domainDataComplete": False}
+    page.evaluate(
+        """report=>KGPracticeResultReport.render(document.querySelector('#report'),report)""",
+        incomplete,
+    )
+    assert page.locator(".practice-report-domain-unavailable").count() == 1
+    assert page.locator(".practice-report-pie").count() == 0
+    assert page.locator(".practice-report-domain-table").count() == 0
+    assert "总体成绩仍按全部题目计算" in page.locator(".practice-report-domain-unavailable").inner_text()
+
     source = (ROOT / "src/100-practice-mode.js").read_text(encoding="utf-8")
     html = (ROOT / "practice-mode.html").read_text(encoding="utf-8")
     assert "function reviewWrongQuestion(" in source
