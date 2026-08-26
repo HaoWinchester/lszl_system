@@ -1,15 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.173",
+  "fromVersion": "v9.0-p4.1.174",
   "toVersion": "v9.0-p4.1.174",
   "changes": {
-    "added": [],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/86-knowledge-recall.js",
-      "tests/deep-recall-demand-loading-browser.py"
+    "added": [
+      "assets/logo.jpg"
     ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
