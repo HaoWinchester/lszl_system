@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import test from 'node:test'
 
 import {
   CRITICAL_SITE_FILES,
-  inventoryTree,
   readProtectedReleaseState,
 } from './new-legacy-release-storage.js'
 
@@ -66,13 +65,4 @@ test('missing rollback release fails closed', (t) => {
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   assert.throws(() => readProtectedReleaseState(root), /回滚版本.*不存在/)
-})
-
-test('inventory is deterministic and rejects symlinks', (t) => {
-  const root = makeStore({ active: 'v2', previous: null })
-  t.after(() => rmSync(root, { recursive: true, force: true }))
-
-  assert.deepEqual(inventoryTree(root), inventoryTree(root))
-  symlinkSync(resolve(root, 'v2', 'site'), resolve(root, 'unsafe-link'))
-  assert.throws(() => inventoryTree(root), /符号链接/)
 })

@@ -1,9 +1,7 @@
-import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { relative, resolve, sep } from 'node:path'
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 export const VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
-export const RUNTIME_LIMIT_BYTES = 50 * 1024 * 1024
 export const CRITICAL_SITE_FILES = [
   'landing.html',
   'styles/landing.css',
@@ -35,40 +33,6 @@ function assertSafeVersion(version, label) {
   if (typeof version !== 'string' || !VERSION_PATTERN.test(version)) {
     throw new Error(`${label} 不合法：${String(version)}`)
   }
-}
-
-function relativePath(root, path) {
-  return relative(root, path).split(sep).join('/')
-}
-
-export function inventoryTree(root) {
-  const treeRoot = resolve(root)
-  const hash = createHash('sha256')
-  const files = []
-  let bytes = 0
-
-  function visit(directory) {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      const path = resolve(directory, entry.name)
-      if (entry.isSymbolicLink()) throw new Error(`库存目录包含符号链接：${relativePath(treeRoot, path)}`)
-      if (entry.isDirectory()) {
-        visit(path)
-        continue
-      }
-      files.push({ path: relativePath(treeRoot, path), absolutePath: path })
-    }
-  }
-
-  visit(treeRoot)
-  files.sort((left, right) => left.path.localeCompare(right.path))
-  for (const file of files) {
-    bytes += statSync(file.absolutePath).size
-    hash.update(file.path)
-    hash.update('\0')
-    hash.update(readFileSync(file.absolutePath))
-    hash.update('\0')
-  }
-  return { files: files.length, bytes, hash: hash.digest('hex'), paths: files.map((file) => file.path) }
 }
 
 function readProtectedRelease(root, version, role) {
@@ -132,7 +96,6 @@ export function readProtectedReleaseState(root) {
   }
   return {
     pointer,
-    pointerHash: createHash('sha256').update(pointerBytes).digest('hex'),
     protectedVersions,
     releases,
   }
