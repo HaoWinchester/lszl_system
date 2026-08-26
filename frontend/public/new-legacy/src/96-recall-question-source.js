@@ -15,6 +15,7 @@
 
   function clone(value){try{return JSON.parse(JSON.stringify(value))}catch(error){return value}}
   function text(value){return String(value==null?'':value)}
+  function isRecallPage(){return !!global.document?.body?.classList?.contains?.('knowledge-recall-page')}
   function repository(){return global.KGPublishedPaperRepository||null}
   function resolver(){return global.KGPublishedQuestionResolver||null}
   function collectionId(releaseId){return 'paper-release:'+text(releaseId)}
@@ -104,12 +105,13 @@
     }catch(error){return {valid:false,code:'ACTIVATION_FAILED',errors:['切换题目失败：'+error.message]}}
   }
 
-  catalogReady.then(()=>{catalogLoaded=true;invalidate()},()=>{catalogLoaded=false;invalidate()});
-
-  try{
-    global.addEventListener?.('kg:published-papers-changed',invalidate);
-    global.addEventListener?.('kg-app-storage-change',event=>{if([repository()?.storageKey||'kg_exam_papers_published_v1',repository()?.historyKey||'kg_exam_paper_release_history_v1'].includes(text(event?.detail?.key)))invalidate()});
-  }catch(error){}
+  if(isRecallPage()){
+    catalogReady.then(()=>{catalogLoaded=true;invalidate()},()=>{catalogLoaded=false;invalidate()});
+    try{
+      global.addEventListener?.('kg:published-papers-changed',invalidate);
+      global.addEventListener?.('kg-app-storage-change',event=>{if([repository()?.storageKey||'kg_exam_papers_published_v1',repository()?.historyKey||'kg_exam_paper_release_history_v1'].includes(text(event?.detail?.key)))invalidate()});
+    }catch(error){}
+  }
 
   const api=Object.freeze({ready:catalogReady,banks,list,find,findPublished,findAny,activate,invalidate,rebuild,emptyQuestion});
   global.KGRecallQuestionSource=api;

@@ -1,12 +1,14 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.170",
-  "toVersion": "v9.0-p4.1.171",
+  "fromVersion": "v9.0-p4.1.171",
+  "toVersion": "v9.0-p4.1.172",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "content-prep-studio/dist/content-prep.html"
+      "content-prep-studio/dist/content-prep.html",
+      "src/96-recall-question-source.js",
+      "tests/multi-question-demand-loading-browser.py"
     ],
     "removed": []
   },

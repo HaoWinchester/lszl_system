@@ -16,7 +16,42 @@ const read = (path) => readFileSync(path, 'utf8')
 const adapter = read(resolve(frontendRoot, 'scripts/new-legacy-assets/paper-release-adapter.js'))
 const repository = read(resolve(root, 'new-legacy/src/59-published-paper-repository.js'))
 const resolver = read(resolve(root, 'new-legacy/src/59a-published-question-resolver.js'))
+const recallQuestionSource = read(resolve(root, 'new-legacy/src/96-recall-question-source.js'))
 const syncScript = read(resolve(frontendRoot, 'scripts/sync-new-legacy.js'))
+
+test('deep recall source does not preload every paper on the multi-question page', async () => {
+  let listAllRequests = 0
+  const listeners = new Map()
+  const publishedKey = ['kg', 'exam', 'papers', 'published', 'v1'].join('_')
+  const historyKey = ['kg', 'exam', 'paper', 'release', 'history', 'v1'].join('_')
+  const context = {
+    console,
+    Promise,
+    CustomEvent: class CustomEvent { constructor(type, init = {}) { this.type = type; this.detail = init.detail } },
+    document: { body: { classList: { contains: name => name === 'question-workspace-page' } } },
+    addEventListener(type, listener) { listeners.set(type, listener) },
+    dispatchEvent(event) { listeners.get(event.type)?.(event) },
+    KGQuestionCatalogAdapter: { ready: Promise.resolve() },
+    KGPublishedPaperRepository: {
+      storageKey: publishedKey,
+      historyKey,
+      async ready() {},
+      async listPublishedPapers() { listAllRequests += 1; return [] },
+    },
+  }
+  context.window = context
+  context.globalThis = context
+  vm.runInNewContext(recallQuestionSource, context, { filename: '96-recall-question-source.js' })
+
+  await new Promise(resolveTurn => setImmediate(resolveTurn))
+  context.dispatchEvent(new context.CustomEvent('kg:published-papers-changed'))
+  context.dispatchEvent(new context.CustomEvent('kg-app-storage-change', {
+    detail: { key: publishedKey },
+  }))
+  await new Promise(resolveTurn => setImmediate(resolveTurn))
+
+  assert.equal(listAllRequests, 0)
+})
 
 test('paper release adapter fetches a paginated lightweight catalog', () => {
   assert.match(adapter, /\/api\/v1\/paper-releases/)

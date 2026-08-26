@@ -79,6 +79,7 @@ with sync_playwright() as playwright:
           window.__resolverCalls=[];
           window.__resolverPending=[];
           window.__listPapersCalls=0;
+          window.__listPublishedPapersCalls=0;
           window.__entry=entry;
           window.KGAuthCore={currentUser:()=>({username:'student',role:'student'}),currentUsername:()=> 'student'};
           window.KGRolePermissions={currentRole:()=> 'student',canAccessPublishedPaper:()=>true,canOperateQuestion:()=>true};
@@ -87,7 +88,8 @@ with sync_playwright() as playwright:
             ready:async()=>rows,
             listCatalogEntries:()=>rows.map(item=>({...item})),
             inspectRelease:()=>({ok:true}),
-            peekResolved:releaseId=>window.__resolvedEntries[releaseId]||null
+            peekResolved:releaseId=>window.__resolvedEntries[releaseId]||null,
+            listPublishedPapers:async()=>{window.__listPublishedPapersCalls+=1;return rows.map(item=>entry(item.releaseId))}
           };
           window.KGPublishedQuestionResolver={
             listPapers:async()=>{window.__listPapersCalls+=1;return rows.map(item=>entry(item.releaseId));},
@@ -100,11 +102,13 @@ with sync_playwright() as playwright:
           };
         }"""
     )
+    page.add_script_tag(content=source("src/96-recall-question-source.js"))
     page.add_script_tag(content=source("src/77-multi-question-workspace.js"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(150)
 
     assert page.evaluate("window.__listPapersCalls") == 0
+    assert page.evaluate("window.__listPublishedPapersCalls") == 0
     assert page.evaluate("window.__resolverCalls") == ["release-1"]
     loading = page.locator("[data-learning-loading]")
     assert page.locator("[data-learning-loading]").count() == 1
