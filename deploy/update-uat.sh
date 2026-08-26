@@ -97,8 +97,8 @@ echo "      HEALTH_OK"
 
 echo "[6/9] 安装 Git 管理的 UAT HTTPS/HTTP2/gzip 配置"
 rsync -az "$NGINX_CONFIG" "$REMOTE:/tmp/nginx-uat.aihuanpu.com.conf"
-ssh "$REMOTE" "test -s /etc/letsencrypt/live/uat.aihuanpu.com/fullchain.pem \
-  && test -s /etc/letsencrypt/live/uat.aihuanpu.com/privkey.pem \
+ssh "$REMOTE" "sudo test -s /etc/letsencrypt/live/uat.aihuanpu.com/fullchain.pem \
+  && sudo test -s /etc/letsencrypt/live/uat.aihuanpu.com/privkey.pem \
   && sudo install -m 0644 /tmp/nginx-uat.aihuanpu.com.conf /etc/nginx/conf.d/uat.aihuanpu.com.conf \
   && sudo nginx -t \
   && sudo systemctl reload nginx"
