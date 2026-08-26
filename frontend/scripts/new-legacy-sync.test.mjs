@@ -158,6 +158,15 @@ test('sync copies v8.6.0 and injects the direct runtime without editing upstream
   const page = readFileSync(resolve(item.output, 'learning-path.html'), 'utf8')
   assert.match(page, /kg-direct-bootstrap-anchor/)
   assert.doesNotMatch(page, /server-state-bootstrap\.js/)
+  const authSessionPosition = page.indexOf('auth-session-bootstrap.js')
+  const directEntryPosition = page.indexOf('direct-entry.js')
+  const featureAnalyticsPosition = page.indexOf('feature-analytics.js')
+  assert.ok(
+    authSessionPosition >= 0
+      && authSessionPosition < directEntryPosition
+      && directEntryPosition < featureAnalyticsPosition,
+    'shared auth session bootstrap must load before every direct auth consumer',
+  )
   assert.match(page, /direct-entry\.js\?v=v8\.6\.0/)
   assert.match(page, /<html[^>]*data-release="v8\.6\.0"/)
   assert.doesNotMatch(page, /new-legacy-navigation-bridge\.js/)

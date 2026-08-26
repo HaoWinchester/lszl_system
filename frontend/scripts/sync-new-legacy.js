@@ -604,6 +604,7 @@ function injectPage(html, page, version) {
     '<!-- kg-direct-bootstrap-anchor -->',
     runtimePages.has(page) ? '<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->' : '',
     '<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->',
+    '<script src="./auth-session-bootstrap.js"></script><!-- kg-auth-session:generated -->',
     '<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->',
     '<script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->',
   ].filter(Boolean).join('\n')
