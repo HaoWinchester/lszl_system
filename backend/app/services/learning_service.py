@@ -605,8 +605,14 @@ async def record_practice_answer(
     *,
     commit: bool = True,
     allow_concurrent: bool = False,
+    record: bool = True,
 ) -> dict:
-    """Grade a canvas answer from server-owned question content and update its mistake."""
+    """Grade a canvas answer from server-owned question content and update its mistake.
+
+    record=False 只做权威判定、完全不动长期状态：整卷交卷重算时用于
+    升级前已被旧 /answers 记过账的答案，避免同一事务内二次累计
+    wrongCount 或撞 (owner, question, release) 唯一索引。
+    """
 
     question_id = str(data.get("questionId") or "").strip()
     if not question_id:
@@ -653,6 +659,12 @@ async def record_practice_answer(
         )
     ).scalar_one_or_none()
     now = now_utc()
+    if not record:
+        # 只判定：长期错题状态保持原样（锁内的 FOR UPDATE 读取不产生写入）。
+        completion = await _record_answer_completion(
+            db, owner, question, data, selected_answer=selected_answer, correct=correct
+        )
+        return {"correct": correct, "mistake": None, "completion": completion}
     if not correct:
         if mistake is None:
             mistake = PracticeMistake(
@@ -910,6 +922,7 @@ async def record_revenge_answer(
     *,
     commit: bool = True,
     allow_concurrent: bool = False,
+    record: bool = True,
 ) -> PracticeMistake | None:
     mistake = await _practice_mistake(db, owner, mistake_id)
     if mistake is None:
@@ -922,6 +935,9 @@ async def record_revenge_answer(
     mistake = await _practice_mistake(db, owner, mistake_id, for_update=True)
     if mistake is None:
         return None
+    if not record:
+        # 只判定：升级链路对已记账的复仇答案不重放长期状态推进。
+        return mistake
     selected_answer = str(data.get("selectedAnswer") or "").strip()
     snapshot = mistake.question_snapshot if isinstance(mistake.question_snapshot, dict) else {}
     option_ids = {

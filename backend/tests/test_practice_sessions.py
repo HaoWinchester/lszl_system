@@ -2312,6 +2312,67 @@ def test_whole_paper_grading_helper_is_the_single_mistake_record_path(
     assert report["wrongQuestionIds"] == [first_id]
 
 
+def test_complete_with_whole_answers_never_double_counts_legacy_graded_mistakes(
+    client, active_session
+):
+    """升级链路重交已判题答案：旧 wrong 记账不得重复累计。
+
+    （owner/question/release 唯一索引下，同一事务对同一题二次 create
+    会直接 IntegrityError → 交卷 500。）
+    """
+
+    session_id = active_session["id"]
+    owner = _session_owner(session_id)
+    first_id = active_session["questions"][0]["questionId"]
+    second_id = active_session["questions"][1]["questionId"]
+
+    # 旧版链路：first 已由 /answers 判题并记账一次错题。
+    answered = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/answers",
+        json={"revision": 1, "questionId": first_id, "selectedAnswer": "B"},
+    )
+    assert answered.status_code == 200, answered.text
+
+    # 升级后显式保存再交卷：整卷载荷包含同一条已判题答案（正常前端形态）。
+    whole_paper = {
+        first_id: {"selectedAnswer": "B", "selectionIndex": 1},
+        second_id: {"selectedAnswer": "B", "selectionIndex": 2},
+    }
+    paused = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={
+            "revision": answered.json()["session"]["revision"],
+            "answers": whole_paper,
+            "runtimeState": {"currentIndex": 1, "durationMs": 1500},
+        },
+    )
+    assert paused.status_code == 200, paused.text
+
+    completed = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/complete",
+        json={
+            "revision": paused.json()["session"]["revision"],
+            "answers": whole_paper,
+            "runtimeState": {"durationMs": 1500},
+        },
+    )
+    assert completed.status_code == 200, completed.text
+    body = completed.json()
+    assert body["report"]["counts"]["answered"] == 2
+    assert body["report"]["counts"]["correct"] == 0
+    # 交卷后 first 的错题仍只有一条记录，且 wrongCount 不被二次累计。
+    overview = client.get("/api/v1/learning/practice/overview").json()
+    first_mistake = next(
+        row for row in overview["mistakes"] if row["questionId"] == first_id
+    )
+    assert first_mistake["wrongCount"] == 1
+    second_mistake = next(
+        row for row in overview["mistakes"] if row["questionId"] == second_id
+    )
+    assert second_mistake["wrongCount"] == 1
+    assert asyncio.run(_completion_event_count(owner, session_id)) == 1
+
+
 def test_pause_continues_legacy_graded_answers_without_recounting_mistakes(
     client, active_session
 ):

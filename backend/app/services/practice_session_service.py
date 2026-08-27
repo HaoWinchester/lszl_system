@@ -745,14 +745,25 @@ async def answer_session_question(
             submission_index,
         )
     except PracticeSessionError as error:
-        # 旧接口错误语义保持不变。
+        # 旧接口错误语义保持：ValueError→422 PRACTICE_ANSWER_INVALID；
+        # LookupError（题目不再可用）沿用既有 404 PRACTICE_QUESTION_NOT_FOUND。
         if error.code == "PRACTICE_GRADE_FAILED":
-            raise _error(error.status_code, "PRACTICE_ANSWER_INVALID", error.message) from error
+            code = (
+                "PRACTICE_QUESTION_NOT_FOUND"
+                if error.status_code == 409
+                else "PRACTICE_ANSWER_INVALID"
+            )
+            raise _error(error.status_code, code, error.message) from error
         raise
+    except IntegrityError:
+        # 并发兜底：理论上外层会话行锁已串行化，唯一索引冲突意味着状态异常，
+        # 结构化返回而不是 500。
+        raise _error(409, "PRACTICE_MISTAKE_ALREADY_RECORDED", "该题错题已记录，请刷新后重试")
     mistake_status = str(answer.get("mistakeStatus") or "")
 
     answers[question_id] = answer
     session.answers = answers
+    _record_runtime_ledger(session, question_id)
     previous_stats = session.stats if isinstance(session.stats, dict) else {}
     session.stats = _draft_stats(refs, release_rows, answers, previous_stats)
     experience = session.stats["experience"]
@@ -1310,11 +1321,14 @@ async def _grade_session_selection(
     row: PaperReleaseQuestion,
     draft: dict,
     submission_index: int,
+    *,
+    record: bool = True,
 ) -> dict:
     """Judge one selection against the frozen release snapshot.
 
     整卷交卷与旧逐题接口共用这一个入口：错题/进度副作用全部在当前事务内
-    commit=False 记录，由调用方决定提交或整体回滚。
+    commit=False 记录，由调用方决定提交或整体回滚。record=False 只判定、
+    不动长期状态（升级链路里已被旧 /answers 记过账的答案）。
     """
 
     selected = str(draft.get("selectedAnswer") or "")
@@ -1334,6 +1348,7 @@ async def _grade_session_selection(
                 {"selectedAnswer": selected},
                 commit=False,
                 allow_concurrent=True,
+                record=record,
             )
             if mistake is None:
                 raise _error(404, "PRACTICE_MISTAKE_NOT_FOUND", "错题不存在或无权访问")
@@ -1354,6 +1369,7 @@ async def _grade_session_selection(
                 current_user=user,
                 commit=False,
                 allow_concurrent=True,
+                record=record,
             )
             correct = bool(grading.get("correct"))
             completion = (
@@ -1386,6 +1402,34 @@ async def _grade_session_selection(
     return answer
 
 
+def _already_graded_selections(runtime_state: dict) -> set[str]:
+    """Question ids whose mistakes were already recorded before this submit.
+
+    runtime_state.gradedQuestionIds 是服务端维护的记账账本：旧 /answers 判题
+    成功时追加；整卷草稿/重算路径只读不写。客户端无法伪造——
+    _validated_runtime_state 白名单会直接拒绝未知字段。
+    """
+
+    raw = (runtime_state or {}).get("gradedQuestionIds")
+    if not isinstance(raw, list):
+        return set()
+    return {str(item) for item in raw if isinstance(item, str) and item}
+
+
+def _record_runtime_ledger(session: PracticeSession, question_id: str) -> None:
+    """Append one graded question to the server-owned runtime ledger."""
+
+    state = dict(session.runtime_state or {})
+    ledger = {
+        str(item)
+        for item in state.get("gradedQuestionIds") or []
+        if isinstance(item, str) and item
+    }
+    ledger.add(str(question_id))
+    state["gradedQuestionIds"] = sorted(ledger)
+    session.runtime_state = state
+
+
 async def complete_session(
     db: AsyncSession,
     owner: str,
@@ -1395,6 +1439,8 @@ async def complete_session(
 ) -> tuple[dict, dict]:
     # 终态幂等：重复交卷（网络重试等）先于解析新 body 返回冻结报告，
     # 不重放判题、不重复产生经验/错题/完成事件。
+    # 门槛只看 status=='completed'：snapshot 损坏的存量行同样返回终态
+    # （get_report 对缺 snapshot 返回 404 由读取端兜底），不再重放判题副作用。
     existing = (
         await db.execute(
             select(PracticeSession).where(
@@ -1404,13 +1450,19 @@ async def complete_session(
             )
         )
     ).scalar_one_or_none()
-    if existing is not None and isinstance(existing.report_snapshot, dict):
-        return await _session_payload(db, existing), existing.report_snapshot
+    if existing is not None:
+        return (
+            await _session_payload(db, existing),
+            existing.report_snapshot if isinstance(existing.report_snapshot, dict) else {},
+        )
 
     requested_revision = _required_revision(data)
     session = await _session_for_update(db, owner, session_id)
-    if session.status == "completed" and isinstance(session.report_snapshot, dict):
-        return await _session_payload(db, session), session.report_snapshot
+    if session.status == "completed":
+        return (
+            await _session_payload(db, session),
+            session.report_snapshot if isinstance(session.report_snapshot, dict) else {},
+        )
     if session.status == "abandoned":
         raise _error(409, "PRACTICE_SESSION_TERMINAL", "已放弃的练习不能交卷")
     if session.revision != requested_revision:
@@ -1436,13 +1488,42 @@ async def complete_session(
                 )
             selections.append((question_id, selection))
 
+    # 升级兼容：账本内的题升级前已被旧 /answers 记过账。整卷重算对这些题只做
+    # 权威判定（record=False），不重放错题记账——否则同一事务内对
+    # (owner, question, release) 二次累计会重复 wrongCount 甚至撞唯一索引。
+    already_graded = _already_graded_selections(session.runtime_state or {})
     if whole_paper:
         # 一次锁定后开始逐题权威重算；任何一题失败都会在路由层整体回滚。
         answers: dict[str, dict] = {}
-        for submission_index, (question_id, selection) in enumerate(selections, start=1):
-            ref = next(item for item in refs if item.get("questionId") == question_id)
-            answers[question_id] = await _grade_session_selection(
-                db, owner, user, session, ref, rows[question_id], selection, submission_index
+        try:
+            for submission_index, (question_id, selection) in enumerate(selections, start=1):
+                ref = next(item for item in refs if item.get("questionId") == question_id)
+                if question_id in already_graded:
+                    previous_answer = (session.answers or {}).get(question_id)
+                    carried = (
+                        dict(previous_answer)
+                        if isinstance(previous_answer, dict)
+                        else {}
+                    )
+                    graded = await _grade_session_selection(
+                        db, owner, user, session, ref, rows[question_id],
+                        selection, submission_index,
+                        record=False,
+                    )
+                    if "submittedAt" in carried:
+                        graded["submittedAt"] = carried["submittedAt"]
+                    answers[question_id] = graded
+                    continue
+                answers[question_id] = await _grade_session_selection(
+                    db, owner, user, session, ref, rows[question_id], selection, submission_index
+                )
+        except IntegrityError:
+            # 防御性兜底：账本识别失守时唯一索引冲突按结构化错误整笔回滚，
+            # 不产生 500 或半份完成态。
+            raise _error(
+                409,
+                "PRACTICE_MISTAKE_ALREADY_RECORDED",
+                "该题错题已记录，请刷新进度后重试",
             )
         session.answers = answers
 
