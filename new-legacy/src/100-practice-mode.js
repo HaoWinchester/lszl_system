@@ -20,7 +20,7 @@
     locked:false,active:false,completed:false,lastSettings:null,timerId:0,deadline:0,
     feedbackTimer:0,popTimer:0,toastTimer:0,abandonedRecorded:false,catalogAvailable:false,retiredNavigation:null,retiredNoticeShown:false,
     remediationPending:false,verification:null,entryStartingMode:'',
-    session:null,report:null,reviewing:false,answerSheet:null,pendingSelection:'',submitting:false,resumeLookupToken:0,
+    session:null,report:null,reviewing:false,answerSheet:null,pendingSelection:'',submitting:false,pendingRequestKey:'',resumeLookupToken:0,
     draft:null,revengeState:null
   };
 
@@ -168,6 +168,21 @@
     if(allowRetry){state.locked=false;dom.options.querySelectorAll('button').forEach(item=>item.disabled=false)}
     showFeedback('保存未完成，答案仍保留在页面中，请重试。','danger');return false;
   }
+  // 点击触发的公共请求包装器：统一加载框 + 按钮禁用 + 防重入。
+  // 业务函数只负责成功后的页面切换和失败文案；异常路径也在 finally 里收尾。
+  // begin/end 可选：开始/继续入口需要额外维护 aria-busy 与焦点恢复。
+  async function runClickedRequest({key,button,title,message},operation,begin,end){
+    if(state.pendingRequestKey)return {skipped:true};
+    state.pendingRequestKey=key;
+    if(button&&!begin)button.disabled=true;
+    if(begin)begin();else global.KGLearningLoading?.show?.({title,message});
+    try{return await operation()}
+    finally{
+      global.KGLearningLoading?.hide?.();
+      if(end)end();else if(button)button.disabled=false;
+      state.pendingRequestKey='';
+    }
+  }
   // 本地草稿控制器：会话与非会话作答统一入口，判题/真值全部内存持有，
   // 只有显式保存（pause）与交卷（complete）才整卷提交。
   function draftQuestions(){
@@ -190,18 +205,21 @@
     return run();
   }
   async function reloadLatestSession(){
-    if(!state.session)return false;
-    const button=dom.sessionConflictReload;button?.setAttribute('aria-busy','true');if(button)button.disabled=true;
-    try{
-      const api=practiceApi(),latest=await api.getSession(state.session.id),catalog=state.releases.find(row=>row.releaseId===latest.releaseId)||selectedRelease();
-      setConflictVisible(false);
-      if(latest.status==='completed'){
-        state.session=normalizedSession(latest);state.questions=sessionQuestions(state.session);state.report=await api.getReport(latest.id);state.active=false;state.reviewing=false;renderFrozenReport();setView('result');return true;
-      }
-      if(latest.status==='abandoned'){state.active=false;setConflictVisible(false);showLobby();showToast('该练习已放弃，未恢复到答题界面。');return true}
-      restoreServerSession(latest,catalog||{id:latest.paperId});showToast('已加载最新进度。');return true;
-    }catch(error){showToast('最新进度加载失败，请稍后重试。');return false}
-    finally{button?.removeAttribute('aria-busy');if(button)button.disabled=false}
+    if(!state.session||state.pendingRequestKey)return false;
+    const button=dom.sessionConflictReload;
+    return runClickedRequest({key:'reload',button,title:'正在加载最新进度',message:'正在同步服务器上的最新做题记录…'},async()=>{
+      button?.setAttribute('aria-busy','true');
+      try{
+        const api=practiceApi(),latest=await api.getSession(state.session.id),catalog=state.releases.find(row=>row.releaseId===latest.releaseId)||selectedRelease();
+        setConflictVisible(false);
+        if(latest.status==='completed'){
+          state.session=normalizedSession(latest);state.questions=sessionQuestions(state.session);state.report=await api.getReport(latest.id);state.active=false;state.reviewing=false;renderFrozenReport();setView('result');return true;
+        }
+        if(latest.status==='abandoned'){state.active=false;setConflictVisible(false);showLobby();showToast('该练习已放弃，未恢复到答题界面。');return true}
+        restoreServerSession(latest,catalog||{id:latest.paperId});showToast('已加载最新进度。');return true;
+      }catch(error){showToast('最新进度加载失败，请稍后重试。');return false}
+      finally{button?.removeAttribute('aria-busy')}
+    });
   }
   function navigateToQuestionId(questionId){
     const index=state.questions.findIndex(question=>question.id===text(questionId));if(index<0||(!state.active&&!state.reviewing))return false;
@@ -429,12 +447,14 @@
     startPractice(['challenge','scholar','revenge'].includes(mode)?mode:'challenge');
   }
   async function openReportFromHistory(sessionId){
-    if(!sessionId)return false;
-    try{
-      const api=practiceApi(),session=await api.getSession(sessionId),report=await api.getReport(sessionId);
-      state.session=normalizedSession(session);state.questions=sessionQuestions(state.session);state.report=clone(report);state.mode=session.mode;state.active=false;state.reviewing=false;state.lastSettings={paperId:session.paperId,count:state.questions.length,order:text(session.runtimeState?.order||'paper'),mode:session.mode};
-      closeHistoryDrawer();renderFrozenReport();setView('result');return true;
-    }catch(error){showToast('成绩报告暂时无法打开，请稍后重试。');return false}
+    if(!sessionId||state.pendingRequestKey)return false;
+    return runClickedRequest({key:'report',title:'正在打开成绩报告',message:'正在读取历史成绩…'},async()=>{
+      try{
+        const api=practiceApi(),session=await api.getSession(sessionId),report=await api.getReport(sessionId);
+        state.session=normalizedSession(session);state.questions=sessionQuestions(state.session);state.report=clone(report);state.mode=session.mode;state.active=false;state.reviewing=false;state.lastSettings={paperId:session.paperId,count:state.questions.length,order:text(session.runtimeState?.order||'paper'),mode:session.mode};
+        closeHistoryDrawer();renderFrozenReport();setView('result');return true;
+      }catch(error){showToast('成绩报告暂时无法打开，请稍后重试。');return false}
+    });
   }
   function formatHistoryTime(value){
     const date=new Date(value);if(Number.isNaN(date.getTime()))return '刚刚';
@@ -734,32 +754,45 @@
 
   async function saveAndExit(){
     if(!state.active||!state.session){showToast('当前练习无法保存，请继续作答或放弃。');return false}
-    if(state.submitting)return false;
+    if(state.submitting||state.pendingRequestKey)return false;
     state.submitting=true;
+    const button=dom.saveExitBtn;
     try{
-      const api=practiceApi(),payload=submissionPayload();
-      const saved=await api.pauseSession(state.session.id,{revision:state.session.revision,...payload});
-      state.session=normalizedSession(saved);
-      createDraft(state.session);
-      state.draft.markSaved();
-    }catch(error){state.submitting=false;handleSessionError(error,{allowRetry:true});return false}
-    state.submitting=false;
-    state.active=false;clearTimers();closeExitConfirm();showLobby();return true;
+      return await runClickedRequest({key:'save',button,title:'正在保存进度',message:'正在保存做题进度…'},async()=>{
+        const api=practiceApi(),payload=submissionPayload();
+        const saved=await api.pauseSession(state.session.id,{revision:state.session.revision,...payload});
+        state.session=normalizedSession(saved);
+        createDraft(state.session);
+        state.draft.markSaved();
+        state.submitting=false;
+        state.active=false;clearTimers();closeExitConfirm();showLobby();return true;
+      });
+    }catch(error){
+      handleSessionError(error,{allowRetry:true});return false;
+    }finally{state.submitting=false}
   }
 
   async function finishPractice(){
-    if(!state.active||state.submitting)return false;
+    if(!state.active||state.submitting||state.pendingRequestKey)return false;
     if(state.session){
       state.submitting=true;
       try{
-        const api=practiceApi(),payload=submissionPayload();
-        const completed=await runSessionMutation(session=>api.completeSession(session.id,{revision:session.revision,...payload}));
-        state.report=clone(completed?.report||null);
-        if(completed?.session)state.session=normalizedSession(completed.session);
-        state.draft?.markSaved?.();
-      }catch(error){state.submitting=false;handleSessionError(error);return false}
-      state.submitting=false;
+        return await runClickedRequest({key:'complete',button:dom.submitAnywayBtn,title:'正在提交练习',message:'正在生成成绩报告…'},async()=>{
+          const api=practiceApi(),payload=submissionPayload();
+          const completed=await runSessionMutation(session=>api.completeSession(session.id,{revision:session.revision,...payload}));
+          state.report=clone(completed?.report||null);
+          if(completed?.session)state.session=normalizedSession(completed.session);
+          state.draft?.markSaved?.();
+          state.submitting=false;
+          return concludePractice();
+        });
+      }catch(error){handleSessionError(error);return false}
+      finally{state.submitting=false}
     }
+    return concludePractice();
+  }
+
+  function concludePractice(){
     state.active=false;state.reviewing=false;state.completed=true;state.endedAt=Date.now();clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);renderProgress();closeChallengeFailDialog();
     if(!state.session)recordCompletedSession('completed');dom.resultAccuracy.textContent=(state.report?.scorePercent??accuracy())+'%';dom.resultDuration.textContent=formatDuration(state.report?.durationMs??elapsed());dom.resultExperience.textContent=String(state.experience);
     // 挑战 V2 结果页双展示：试卷完成结果 + 挑战模式结果（独立判定：生命值 > 0 为成功）
@@ -786,11 +819,21 @@
     return true;
   }
   async function abandonPractice(){
-    if(!state.active)return false;
-    if(state.session){
-      try{const api=practiceApi(),payload=submissionPayload();await runSessionMutation(session=>api.abandonSession(session.id,{revision:session.revision,...payload}))}
-      catch(error){handleSessionError(error,{allowRetry:true});return false}
-    }
+    if(!state.active||state.pendingRequestKey)return false;
+    const button=dom.abandonBtn;
+    try{
+      return await runClickedRequest({key:'abandon',button,title:'正在放弃练习',message:'正在结束本次练习…'},async()=>{
+        if(!state.active)return false;
+        if(state.session){
+          const api=practiceApi(),payload=submissionPayload();
+          await runSessionMutation(session=>api.abandonSession(session.id,{revision:session.revision,...payload}));
+        }
+        return concludeAbandon();
+      });
+    }catch(error){handleSessionError(error,{allowRetry:true});return false}
+  }
+
+  function concludeAbandon(){
     // 明确放弃后清除 dirty：不再触发离开提醒。
     state.draft?.markSaved?.();
     state.active=false;state.endedAt=Date.now();clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);state.abandonedRecorded=true;if(!state.session)recordCompletedSession('abandoned');closeExitConfirm();closeChallengeFailDialog();showLobby();return true;
@@ -834,70 +877,66 @@
   }
   async function startPractice(mode){
     const challenge=mode==='challenge';
-    const loadingEntry=true;
-    if(loadingEntry&&state.entryStartingMode)return false;
+    if(state.entryStartingMode)return false;
     if(mode==='revenge'&&!hasAuthenticatedUser())return startRevenge();
     const catalog=selectedRelease(),count=Number(state.selectedCount);
     if(!catalog){syncLobby();return false}
     const access=paperAccess(catalog);
     if(!access.allowed)return openMembership(access);
     let restoreFocus=false;
-    if(loadingEntry){
+    const beginEntry=()=>{
       setEntryStarting(mode,true);
       global.KGLearningLoading?.show?.({title:challenge?'正在准备挑战':'正在进入练习模式',message:'正在读取试题…'});
-    }
-    try{
-      const api=practiceApi();
-      if(hasAuthenticatedUser()&&typeof api?.startSession==='function'){
-        const releaseId=text(catalog.releaseId),paperId=text(catalog.paperId||catalog.id),order=mode==='revenge'?'paper':(dom.orderInputs.find(input=>input.checked)?.value||'paper');
-        const active=await api.getActiveSessions({mode});
-        const resumable=active.find(item=>text(item.paperId)===paperId);
-        const session=resumable?await api.getSession(resumable.id):await api.startSession({paperId,releaseId,mode,count,order});
-        state.order=order;
-        return restoreServerSession(session,catalog);
-      }
-      const repo=global.KGPublishedPaperRepository;
-      let questions=[];
-      if(typeof repo?.resolvePublishedPaper==='function'){
-        const resolved=await repo.resolvePublishedPaper({paperId:catalog.paperId||catalog.id,releaseId:catalog.releaseId},{mode:'practice_mode',respectRole:false});
-        if(!resolved?.ok){
-          if(['LOGIN_REQUIRED','MEMBERSHIP_REQUIRED'].includes(resolved?.code))return openMembership(resolved.access||access);
-          restoreFocus=true;
-          showToast(resolved?.message||'试卷暂时无法打开。');
-          return false;
+    };
+    const endEntry=()=>setEntryStarting(mode,false,{focus:restoreFocus});
+    return runClickedRequest({key:'start',button:dom.startButtons.find(item=>item.dataset.practiceStart===String(mode)),title:challenge?'正在准备挑战':'正在进入练习模式',message:'正在读取试题…'},async()=>{
+      try{
+        const api=practiceApi();
+        if(hasAuthenticatedUser()&&typeof api?.startSession==='function'){
+          const releaseId=text(catalog.releaseId),paperId=text(catalog.paperId||catalog.id),order=mode==='revenge'?'paper':(dom.orderInputs.find(input=>input.checked)?.value||'paper');
+          const active=await api.getActiveSessions({mode});
+          const resumable=active.find(item=>text(item.paperId)===paperId);
+          const session=resumable?await api.getSession(resumable.id):await api.startSession({paperId,releaseId,mode,count,order});
+          state.order=order;
+          return restoreServerSession(session,catalog);
         }
-        questions=(resolved.items||[]).map((item,index)=>normalizeQuestion(item.question,item.ref,index)).filter(question=>question.stem&&question.options.length>=2&&question.correctAnswer);
-      }else questions=(catalog.questions||[]).slice();
-      if(questions.length<count){restoreFocus=true;showToast(`当前试卷可用题目不足 ${count} 道。`);syncLobby();return false}
-      clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);
-      state.session=null;state.report=null;
-      state.mode=mode==='scholar'?'scholar':mode==='practice'?'practice':'challenge';document.body.dataset.practiceMode=state.mode;state.order=dom.orderInputs.find(input=>input.checked)?.value||'paper';
-      if(state.order==='random')questions=shuffle(questions);
-      if(state.retiredNavigation)questions=prioritizeRetiredQuestion(questions,state.retiredNavigation.questionId);
-      state.questions=questions.slice(0,count);
-      state.index=0;state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;state.health=state.maxHealth;state.challengeFailedShown=false;state.streak=0;state.maxStreak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
-      createDraft(null);
-      state.lastSettings={paperId:catalog.id,count,order:state.order,mode:state.mode};
-      dom.timer.hidden=true;dom.timeRow.hidden=state.mode!=='scholar';dom.health.hidden=state.mode==='practice';
-      setView('game');renderQuestion();if(state.mode==='scholar')startTimer();return true;
-    }catch(error){
-      if(hasAuthenticatedUser()&&error?.detail?.code==='RESUMABLE_SESSION_EXISTS'){
-        try{
-          const api=practiceApi(),releaseId=text(catalog.releaseId),sessionId=text(error.detail.sessionId);
-          const resumable=sessionId?await api.getSession(sessionId):(await api.getActiveSessions({releaseId,mode}))[0];
-          if(resumable)return restoreServerSession(resumable,catalog);
-        }catch(resumeError){}
+        const repo=global.KGPublishedPaperRepository;
+        let questions=[];
+        if(typeof repo?.resolvePublishedPaper==='function'){
+          const resolved=await repo.resolvePublishedPaper({paperId:catalog.paperId||catalog.id,releaseId:catalog.releaseId},{mode:'practice_mode',respectRole:false});
+          if(!resolved?.ok){
+            if(['LOGIN_REQUIRED','MEMBERSHIP_REQUIRED'].includes(resolved?.code))return openMembership(resolved.access||access);
+            restoreFocus=true;
+            showToast(resolved?.message||'试卷暂时无法打开。');
+            return false;
+          }
+          questions=(resolved.items||[]).map((item,index)=>normalizeQuestion(item.question,item.ref,index)).filter(question=>question.stem&&question.options.length>=2&&question.correctAnswer);
+        }else questions=(catalog.questions||[]).slice();
+        if(questions.length<count){restoreFocus=true;showToast(`当前试卷可用题目不足 ${count} 道。`);syncLobby();return false}
+        clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);
+        state.session=null;state.report=null;
+        state.mode=mode==='scholar'?'scholar':mode==='practice'?'practice':'challenge';document.body.dataset.practiceMode=state.mode;state.order=dom.orderInputs.find(input=>input.checked)?.value||'paper';
+        if(state.order==='random')questions=shuffle(questions);
+        if(state.retiredNavigation)questions=prioritizeRetiredQuestion(questions,state.retiredNavigation.questionId);
+        state.questions=questions.slice(0,count);
+        state.index=0;state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;state.health=state.maxHealth;state.challengeFailedShown=false;state.streak=0;state.maxStreak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
+        createDraft(null);
+        state.lastSettings={paperId:catalog.id,count,order:state.order,mode:state.mode};
+        dom.timer.hidden=true;dom.timeRow.hidden=state.mode!=='scholar';dom.health.hidden=state.mode==='practice';
+        setView('game');renderQuestion();if(state.mode==='scholar')startTimer();return true;
+      }catch(error){
+        restoreFocus=true;
+        if(hasAuthenticatedUser()&&error?.detail?.code==='RESUMABLE_SESSION_EXISTS'){
+          try{
+            const api=practiceApi(),releaseId=text(catalog.releaseId),sessionId=text(error.detail.sessionId);
+            const resumable=sessionId?await api.getSession(sessionId):(await api.getActiveSessions({releaseId,mode}))[0];
+            if(resumable)return restoreServerSession(resumable,catalog);
+          }catch(resumeError){}
+        }
+        showToast(error?.detail?.code==='NO_REVENGE_QUESTIONS'?'当前试卷暂无可复仇错题。':'试题读取失败，请稍后重试。');
+        return false;
       }
-      if(!loadingEntry)throw error;
-      restoreFocus=true;
-      showToast(error?.detail?.code==='NO_REVENGE_QUESTIONS'?'当前试卷暂无可复仇错题。':'试题读取失败，请稍后重试。');
-      return false;
-    }finally{
-      if(loadingEntry){
-        global.KGLearningLoading?.hide?.();
-        setEntryStarting(mode,false,{focus:restoreFocus});
-      }
-    }
+    },beginEntry,endEntry);
   }
   function startAgain(){
     const settings=state.lastSettings;if(!settings){showLobby();return}
