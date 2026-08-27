@@ -1086,38 +1086,82 @@ def _revision_conflict(session: PracticeSession) -> PracticeSessionError:
     )
 
 
+_DRAFT_LOCK_FIELDS = ("selectedAnswer", "timedOut", "selectionIndex")
+
+
+def _assert_existing_selections_unchanged(existing: dict, draft: dict) -> None:
+    """整卷草稿不允许减少或改写已保存的锁定答案。
+
+    旧版已判题答案（带 correct 等字段）只比较 selectedAnswer/timedOut/selectionIndex，
+    保证升级前保留下来的进行中草稿可以继续。
+    """
+    for question_id, answer in (existing or {}).items():
+        if not isinstance(answer, dict) or answer.get("draft") is True:
+            # 旧版未锁定草稿不参与锁定比较。
+            continue
+        replacement = draft.get(question_id)
+        if not isinstance(replacement, dict):
+            raise _error(
+                409,
+                "PRACTICE_ANSWER_LOCKED",
+                "已保存答案不能减少",
+                questionId=question_id,
+            )
+        for field in _DRAFT_LOCK_FIELDS:
+            if field not in answer or answer.get(field) == replacement.get(field):
+                continue
+            if (
+                field == "selectedAnswer"
+                and answer.get("timedOut") is True
+                and replacement.get("timedOut") is True
+            ):
+                # 旧版超时答案以 "__timeout__" 占位 selectedAnswer，仍标记超时不算改写。
+                continue
+            raise _error(
+                409,
+                "PRACTICE_ANSWER_LOCKED",
+                "已保存答案不能修改",
+                questionId=question_id,
+            )
+
+
 async def pause_session(
     db: AsyncSession, owner: str, session_id: str, data: dict
 ) -> dict:
     requested_revision = _required_revision(data)
     session = await _session_for_update(db, owner, session_id)
     if session.status == "paused":
-        if requested_revision in {session.revision, session.revision - 1}:
+        if requested_revision == session.revision:
+            return await _session_payload(db, session)
+        if requested_revision == session.revision - 1:
+            # 相同请求重试幂等：草稿与已保存答案一致时直接返回当前状态，
+            # 不同载荷不属于重试，按冲突处理。
+            if "answers" in data:
+                draft = await _validated_draft_answers(db, session, data)
+                saved = session.answers if isinstance(session.answers, dict) else {}
+                if draft != saved:
+                    raise _revision_conflict(session)
             return await _session_payload(db, session)
         raise _revision_conflict(session)
     if session.status != "active":
         raise _error(409, "PRACTICE_SESSION_TERMINAL", "练习已结束，不能暂停")
     if session.revision != requested_revision:
         raise _revision_conflict(session)
-    # 草稿先整体校验（白名单/选项/顺序），任何非法值都不落库。
-    drafts = (
+    # 整卷草稿先整体校验（白名单/选项/顺序）并确认不触碰已锁定答案，
+    # 任何非法值或锁定冲突都不落库，保证显式保存整笔回滚。
+    draft = (
         await _validated_draft_answers(db, session, data)
         if "answers" in data
         else None
     )
+    if draft is not None:
+        _assert_existing_selections_unchanged(session.answers or {}, draft)
     _apply_runtime_patch(session, data)
-    if drafts is not None:
+    if draft is not None:
         refs = session.question_order if isinstance(session.question_order, list) else []
-        answers = dict(session.answers or {})
-        for question_id, draft in drafts.items():
-            existing = answers.get(question_id)
-            if isinstance(existing, dict) and existing.get("draft") is not True:
-                # 已显式提交的答案不可被草稿覆盖。
-                continue
-            answers[question_id] = {"questionId": question_id, **draft, "draft": True}
-        session.answers = answers
         rows = await _release_question_rows(db, session.release_id)
-        session.stats = _draft_stats(refs, rows, answers, dict(session.stats or {}))
+        session.answers = draft
+        session.stats = _draft_stats(refs, rows, draft, dict(session.stats or {}))
         runtime_state = dict(session.runtime_state or {})
         runtime_state["experience"] = session.stats["experience"]
         session.runtime_state = runtime_state

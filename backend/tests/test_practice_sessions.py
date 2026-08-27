@@ -1514,18 +1514,9 @@ def test_pause_persists_whitelisted_drafts_and_derives_stats(client, active_sess
     body = paused.json()["session"]
     assert body["status"] == "paused"
     assert body["revision"] == active_session["revision"] + 1
-    assert body["answers"][first_id] == {
-        "questionId": first_id,
-        "selectedAnswer": "A",
-        "selectionIndex": 1,
-        "draft": True,
-    }
-    assert body["answers"][second_id] == {
-        "questionId": second_id,
-        "selectedAnswer": "B",
-        "selectionIndex": 2,
-        "draft": True,
-    }
+    # 整卷草稿只保留白名单字段：correct/correctAnswer/score 等注入值被剥离。
+    assert body["answers"][first_id] == {"selectedAnswer": "A", "selectionIndex": 1}
+    assert body["answers"][second_id] == {"selectedAnswer": "B", "selectionIndex": 2}
     assert body["stats"] == {
         "total": 10,
         "answered": 2,
@@ -1540,11 +1531,11 @@ def test_pause_persists_whitelisted_drafts_and_derives_stats(client, active_sess
     restored = client.get(
         f"/api/v1/learning/practice/sessions/{session_id}"
     ).json()["session"]
-    assert restored["answers"][first_id]["selectedAnswer"] == "A"
+    assert restored["answers"][first_id] == {"selectedAnswer": "A", "selectionIndex": 1}
     assert "correct" not in restored["answers"][first_id]
 
-    # 草稿不锁题：显式提交可以覆盖草稿并转为服务端权威判题
-    submitted = client.post(
+    # pause 保存的整卷草稿即锁定答案：显式提交不能改写。
+    locked = client.post(
         f"/api/v1/learning/practice/sessions/{session_id}/answers",
         json={
             "revision": body["revision"],
@@ -1552,12 +1543,368 @@ def test_pause_persists_whitelisted_drafts_and_derives_stats(client, active_sess
             "selectedAnswer": "B",
         },
     )
-    assert submitted.status_code == 200, submitted.text
-    assert submitted.json()["answer"]["correct"] is False
-    submitted_session = submitted.json()["session"]
-    assert submitted_session["answers"][first_id]["correct"] is False
-    assert "draft" not in submitted_session["answers"][first_id]
-    assert submitted_session["stats"]["answered"] == 2
-    assert submitted_session["stats"]["correct"] == 0
-    assert submitted_session["stats"]["wrong"] == 2
-    assert submitted_session["stats"]["experience"] == 0
+    assert locked.status_code == 409, locked.text
+    assert locked.json()["detail"]["code"] == "PRACTICE_ANSWER_LOCKED"
+
+
+# ---------------------------------------------------------------------------
+# 显式保存：pause 在一次事务中原子保存整卷未判题草稿 + runtime state + stats
+# ---------------------------------------------------------------------------
+
+
+def _mistake_count(session_id: str) -> int:
+    async def count() -> int:
+        async with AsyncSessionLocal() as db:
+            session = await db.get(PracticeSession, session_id)
+            assert session is not None
+            return int(
+                (
+                    await db.execute(
+                        select(func.count(PracticeMistake.id)).where(
+                            PracticeMistake.owner_id == session.owner_id,
+                            PracticeMistake.release_id == session.release_id,
+                        )
+                    )
+                ).scalar_one()
+            )
+
+    return asyncio.run(count())
+
+
+def _side_effect_counts(owner: str, session_id: str) -> tuple[int, int]:
+    async def counts() -> tuple[int, int]:
+        async with AsyncSessionLocal() as db:
+            events = int(
+                (
+                    await db.execute(
+                        select(func.count(LearningEvent.id)).where(
+                            LearningEvent.owner_id == owner,
+                            LearningEvent.event_type == "PRACTICE_SESSION_COMPLETED",
+                            LearningEvent.payload["sessionId"].astext == session_id,
+                        )
+                    )
+                ).scalar_one()
+            )
+            progress = int(
+                (
+                    await db.execute(
+                        select(func.count(TrainingProgress.id)).where(
+                            TrainingProgress.owner_id == owner
+                        )
+                    )
+                ).scalar_one()
+            )
+            return events, progress
+
+    return asyncio.run(counts())
+
+
+def test_pause_saves_whole_ungraded_draft_once_without_mistakes(client, active_session):
+    first_id = active_session["questions"][0]["questionId"]
+    response = client.post(
+        f"/api/v1/learning/practice/sessions/{active_session['id']}/pause",
+        json={
+            "revision": active_session["revision"],
+            "answers": {first_id: {"selectedAnswer": "B", "selectionIndex": 1}},
+            "runtimeState": {"currentIndex": 0, "health": 2, "durationMs": 1200},
+        },
+    )
+    assert response.status_code == 200
+    saved = response.json()["session"]
+    assert saved["status"] == "paused"
+    assert saved["answers"][first_id] == {"selectedAnswer": "B", "selectionIndex": 1}
+    assert saved["stats"]["answered"] == 1
+    assert _mistake_count(active_session["id"]) == 0
+
+    # pause 只保存运行状态：不写完成事件、不推进长期训练进度。
+    owner = active_session["id"]
+    assert owner
+    events, _progress = _side_effect_counts(
+        _session_owner(active_session["id"]), active_session["id"]
+    )
+    assert events == 0
+    persisted = client.get(
+        f"/api/v1/learning/practice/sessions/{active_session['id']}"
+    ).json()["session"]
+    assert persisted["status"] == "paused"
+    assert persisted["revision"] == active_session["revision"] + 1
+    assert persisted["answers"][first_id] == {"selectedAnswer": "B", "selectionIndex": 1}
+    assert persisted["stats"]["answered"] == 1
+    assert persisted["runtimeState"]["health"] == 2
+    assert persisted["runtimeState"]["durationMs"] == 1200
+
+
+def _session_owner(session_id: str) -> str:
+    async def fetch() -> str:
+        async with AsyncSessionLocal() as db:
+            session = await db.get(PracticeSession, session_id)
+            assert session is not None
+            return str(session.owner_id)
+
+    return asyncio.run(fetch())
+
+
+def test_pause_save_failure_rolls_back_the_whole_draft(client, active_session):
+    session_id = active_session["id"]
+    first_id = active_session["questions"][0]["questionId"]
+    second_id = active_session["questions"][1]["questionId"]
+    failed = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={
+            "revision": active_session["revision"],
+            "answers": {
+                first_id: {"selectedAnswer": "A", "selectionIndex": 1},
+                # C 不在冻结选项白名单内：整卷草稿校验失败必须整笔回滚。
+                second_id: {"selectedAnswer": "C", "selectionIndex": 2},
+            },
+            "runtimeState": {"currentIndex": 1, "durationMs": 900},
+        },
+    )
+    assert failed.status_code == 422
+    assert failed.json()["detail"]["code"] == "PRACTICE_DRAFT_ANSWER_INVALID"
+
+    unchanged = client.get(
+        f"/api/v1/learning/practice/sessions/{session_id}"
+    ).json()["session"]
+    assert unchanged["status"] == "active"
+    assert unchanged["revision"] == active_session["revision"]
+    assert unchanged["answers"] == {}
+    assert unchanged["runtimeState"] == {"currentIndex": 0, "order": "paper"}
+    assert _mistake_count(session_id) == 0
+
+
+def test_pause_conflict_rejects_stale_revision_and_locked_answer_rewrites(
+    client, active_session
+):
+    session_id = active_session["id"]
+    first_id = active_session["questions"][0]["questionId"]
+    second_id = active_session["questions"][1]["questionId"]
+    paused = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={
+            "revision": active_session["revision"],
+            "answers": {first_id: {"selectedAnswer": "B", "selectionIndex": 1}},
+            "runtimeState": {"currentIndex": 0, "durationMs": 400},
+        },
+    )
+    assert paused.status_code == 200, paused.text
+    locked_revision = paused.json()["session"]["revision"]
+
+    # 恢复 active 后才允许再次显式保存；旧 revision 一律 409。
+    resumed = client.patch(
+        f"/api/v1/learning/practice/sessions/{session_id}/state",
+        json={"revision": locked_revision, "runtimeState": {"currentIndex": 0}},
+    )
+    assert resumed.status_code == 200, resumed.text
+    current_revision = resumed.json()["session"]["revision"]
+
+    stale = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={
+            "revision": active_session["revision"],
+            "answers": {first_id: {"selectedAnswer": "A", "selectionIndex": 1}},
+            "runtimeState": {"currentIndex": 0, "durationMs": 400},
+        },
+    )
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["code"] == "PRACTICE_SESSION_REVISION_CONFLICT"
+    assert stale.json()["detail"]["currentRevision"] == current_revision
+
+    # 不允许改写已保存锁定答案
+    rewrite = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={
+            "revision": current_revision,
+            "answers": {first_id: {"selectedAnswer": "A", "selectionIndex": 1}},
+            "runtimeState": {"currentIndex": 0, "durationMs": 400},
+        },
+    )
+    assert rewrite.status_code == 409
+    assert rewrite.json()["detail"]["code"] == "PRACTICE_ANSWER_LOCKED"
+
+    # 不允许减少已保存锁定答案（整卷草稿必须覆盖全部已保存选择）
+    reduced = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={
+            "revision": current_revision,
+            "answers": {second_id: {"selectedAnswer": "A", "selectionIndex": 1}},
+            "runtimeState": {"currentIndex": 1, "durationMs": 400},
+        },
+    )
+    assert reduced.status_code == 409
+    assert reduced.json()["detail"]["code"] == "PRACTICE_ANSWER_LOCKED"
+
+    intact = client.get(
+        f"/api/v1/learning/practice/sessions/{session_id}"
+    ).json()["session"]
+    assert intact["status"] == "active"
+    assert intact["revision"] == current_revision
+    assert intact["answers"] == {first_id: {"selectedAnswer": "B", "selectionIndex": 1}}
+
+
+def test_pause_idempotent_for_same_request_retry_but_conflicts_on_changed_payload(
+    client, active_session
+):
+    session_id = active_session["id"]
+    first_id = active_session["questions"][0]["questionId"]
+    payload = {
+        "revision": active_session["revision"],
+        "answers": {first_id: {"selectedAnswer": "B", "selectionIndex": 1}},
+        "runtimeState": {"currentIndex": 0, "health": 2, "durationMs": 1200},
+    }
+    first = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause", json=payload
+    )
+    assert first.status_code == 200, first.text
+    saved = first.json()["session"]
+    assert saved["status"] == "paused"
+
+    # 相同请求重试幂等：revision 回退窗口内重复 pause 不产生第二次写入。
+    retry = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause", json=payload
+    )
+    assert retry.status_code == 200
+    retried = retry.json()["session"]
+    assert retried["revision"] == saved["revision"]
+    assert retried["pausedAt"] == saved["pausedAt"]
+    assert retried["answers"] == saved["answers"]
+
+    latest = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={**payload, "revision": saved["revision"]},
+    )
+    assert latest.status_code == 200
+    assert latest.json()["session"]["revision"] == saved["revision"]
+
+    # 不同载荷不是重试：不允许借幂等窗口改写已保存草稿。
+    changed = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={
+            **payload,
+            "answers": {first_id: {"selectedAnswer": "A", "selectionIndex": 1}},
+        },
+    )
+    assert changed.status_code == 409
+    assert changed.json()["detail"]["code"] == "PRACTICE_SESSION_REVISION_CONFLICT"
+
+    persisted = client.get(
+        f"/api/v1/learning/practice/sessions/{session_id}"
+    ).json()["session"]
+    assert persisted["revision"] == saved["revision"]
+    assert persisted["answers"] == {first_id: {"selectedAnswer": "B", "selectionIndex": 1}}
+
+
+def test_pause_saved_session_is_invisible_to_other_owners(
+    client, active_session, practice_ids
+):
+    session_id = active_session["id"]
+    first_id = active_session["questions"][0]["questionId"]
+    paused = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={
+            "revision": active_session["revision"],
+            "answers": {first_id: {"selectedAnswer": "B", "selectionIndex": 1}},
+            "runtimeState": {"currentIndex": 0, "durationMs": 300},
+        },
+    )
+    assert paused.status_code == 200, paused.text
+
+    assert client.post("/api/v1/auth/logout").status_code == 200
+    assert client.post(
+        "/api/v1/auth/login",
+        json={"username": practice_ids["other_student"], "password": PASSWORD},
+    ).status_code == 200
+    hidden = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={"revision": paused.json()["session"]["revision"]},
+    )
+    assert hidden.status_code == 404
+    assert hidden.json()["detail"]["code"] == "PRACTICE_SESSION_NOT_FOUND"
+
+
+def test_scholar_pause_with_draft_restores_remaining_ms_without_offline_deduction(
+    client, practice_ids
+):
+    started = client.post(
+        "/api/v1/learning/practice/sessions/start",
+        json={
+            "paperId": practice_ids["paper"],
+            "releaseId": practice_ids["release"],
+            "mode": "scholar",
+            "count": 10,
+            "order": "paper",
+        },
+    )
+    assert started.status_code == 200, started.text
+    session = started.json()["session"]
+    first_id = session["questions"][0]["questionId"]
+    paused = client.post(
+        f"/api/v1/learning/practice/sessions/{session['id']}/pause",
+        json={
+            "revision": session["revision"],
+            "answers": {
+                first_id: {"selectedAnswer": "A", "selectionIndex": 1, "timedOut": True}
+            },
+            "runtimeState": {
+                "currentIndex": 0,
+                "remainingMs": 43210,
+                "durationMs": 6789,
+            },
+        },
+    )
+    assert paused.status_code == 200, paused.text
+    saved = paused.json()["session"]
+    assert saved["status"] == "paused"
+    assert saved["runtimeState"]["remainingMs"] == 43210
+    assert saved["answers"][first_id] == {
+        "selectedAnswer": "A",
+        "selectionIndex": 1,
+        "timedOut": True,
+    }
+
+    # 恢复会话不扣离线时间：remainingMs 原样恢复。
+    restored = client.get(
+        f"/api/v1/learning/practice/sessions/{session['id']}"
+    ).json()["session"]
+    assert restored["status"] == "paused"
+    assert restored["runtimeState"]["remainingMs"] == 43210
+    assert restored["runtimeState"]["durationMs"] == 6789
+
+
+def test_pause_continues_legacy_graded_answers_without_recounting_mistakes(
+    client, active_session
+):
+    session_id = active_session["id"]
+    first_id = active_session["questions"][0]["questionId"]
+    second_id = active_session["questions"][1]["questionId"]
+
+    # 旧版链路：先经 /answers 服务端判题并记录一次错题。
+    answered = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/answers",
+        json={"revision": 1, "questionId": first_id, "selectedAnswer": "B"},
+    )
+    assert answered.status_code == 200, answered.text
+    assert answered.json()["answer"]["correct"] is False
+    assert _mistake_count(session_id) == 1
+
+    # 升级后整卷草稿继续：旧已判题答案只比较 selectedAnswer 等字段即可原样带入。
+    paused = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={
+            "revision": answered.json()["session"]["revision"],
+            "answers": {
+                first_id: {"selectedAnswer": "B", "selectionIndex": 1},
+                second_id: {"selectedAnswer": "A", "selectionIndex": 2},
+            },
+            "runtimeState": {"currentIndex": 1, "durationMs": 1000},
+        },
+    )
+    assert paused.status_code == 200, paused.text
+    saved = paused.json()["session"]
+    assert saved["answers"][first_id] == {"selectedAnswer": "B", "selectionIndex": 1}
+    assert saved["stats"]["answered"] == 2
+    assert saved["stats"]["correct"] == 1
+    assert saved["stats"]["wrong"] == 1
+
+    # pause 不写错题：不重复累计长期错题。
+    assert _mistake_count(session_id) == 1
