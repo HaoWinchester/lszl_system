@@ -226,6 +226,18 @@ with sync_playwright() as playwright:
     sheet_gutter = (game_box["x"] + game_box["width"]) - (question_card_box["x"] + question_card_box["width"])
     assert abs(sheet_gutter) < 1.0, (sheet_gutter, question_card_box, game_box)
 
+    # 桌面 1280px：开关与语言切换同一行（topbar 单行、无换行）且位于最右
+    # topbar 为 align-items:center 的单行 grid，按钮高度不同（34/26），用垂直中心判断是否同排
+    toggle_box = page.locator("#practiceAnswerSheetMobileBtn").bounding_box()
+    language_box = page.locator("#practiceLanguageCycle").bounding_box()
+    toggle_center_y = toggle_box["y"] + toggle_box["height"] / 2
+    language_center_y = language_box["y"] + language_box["height"] / 2
+    assert abs(toggle_center_y - language_center_y) <= 2.0, (toggle_box, language_box)
+    assert toggle_box["x"] >= language_box["x"], (toggle_box, language_box)
+    assert toggle_box["x"] + toggle_box["width"] >= language_box["x"] + language_box["width"] - 1.0, (
+        toggle_box, language_box,
+    )
+
     # 桌面右上入口打开右侧抽屉；反复开关不出现第二实例
     open_sheet(page)
     assert sheet_roots(page) == 1
