@@ -344,8 +344,6 @@ body.practice-mode-page:not([data-practice-view="lobby"]) .practice-exp-fab{disp
 .practice-explanation-body .practice-bilingual-en{font-size:.9em}
 .practice-explanation-actions{margin-top:10px}
 .practice-explanation-actions button{height:32px;padding:0 14px;border:1px solid #cfe3d8;border-radius:10px;background:#fff;color:#335; font-size:12px;font-weight:750}
-.practice-explanation-toggle{display:inline-flex;align-items:center;gap:6px;color:#536075;font-size:12px;font-weight:750;cursor:pointer}
-.practice-explanation-toggle input{accent-color:#0f8a4d;width:15px;height:15px;cursor:pointer}
 /* 学习记录按试卷聚合：可点击行 */
 .practice-history-row.is-paper{cursor:pointer;transition:border-color .15s ease,transform .15s ease}
 .practice-history-row.is-paper:hover{border-color:#9aa5b5;transform:translateY(-1px)}

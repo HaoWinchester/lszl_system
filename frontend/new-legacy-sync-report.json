@@ -1,25 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.179",
-  "toVersion": "v9.0-p4.1.180",
+  "fromVersion": "v9.0-p4.1.181",
+  "toVersion": "v9.0-p4.1.182",
   "changes": {
-    "added": [
-      ".DS_Store",
-      "assets/.DS_Store",
-      "src/114-practice-draft-state.js",
-      "tests/practice-draft-state.test.js"
-    ],
+    "added": [],
     "changed": [
       "VERSION",
-      "practice-mode.html",
-      "src/100-practice-mode.js",
-      "styles/practice-mode.css",
-      "tests/learning-entry-answer-feedback-browser.py",
-      "tests/practice-answer-sheet-browser.py",
-      "tests/practice-challenge-loading-browser.py",
-      "tests/practice-mode-close-buttons.test.js",
-      "tests/practice-server-answer-browser.py",
-      "tests/v90-p40-practice-mode.test.js"
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },

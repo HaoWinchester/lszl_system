@@ -289,6 +289,14 @@ with sync_playwright() as playwright:
     page.locator("#practicePrevBtn").click()
     page.wait_for_timeout(120)
     assert writes(page) == [], writes(page)
+    # 上一题切回已答题：面板保持收起，给"查看解析"按钮，点击后才展开
+    reveal_btn = page.locator("#practiceExplanationReveal button", has_text="查看解析")
+    assert reveal_btn.is_visible()
+    assert page.locator("#practiceExplanationPanel").is_hidden()
+    reveal_btn.click()
+    page.wait_for_timeout(80)
+    assert page.locator("#practiceExplanationPanel").is_visible()
+    assert "正确答案：A" in page.locator("#practiceExplanationPanel").inner_text()
     for question_id in ["q4", "q7"]:
         jump_via_sheet(page, f'[data-question-id="{question_id}"]')
         assert_sheet_closed(page)
@@ -296,15 +304,26 @@ with sync_playwright() as playwright:
     assert "第 7 道题" in page.locator("#practiceQuestionStem").inner_text()
     assert writes(page) == [], writes(page)
     assert "错误" in (page.locator('#practiceAnswerSheet [data-question-id="q1"]').get_attribute("aria-label") or "")
+    # 答题卡跳到已答题 q7 会自动展开解析；跳到未答题 q4 后面板收起
+    assert page.locator("#practiceExplanationPanel").is_hidden()
 
-    # q7 本地判错：立即锁定选项、展示解析与答题卡错误标记（反馈推进期间仍可见）
+    # q7 本地判错：立即锁定选项与答题卡错误标记（反馈推进期间仍可见）；
+    # 挑战模式不再自动弹解析（面板保持 hidden，仅答题卡跳回该题才展开）
     page.locator('[data-option-id="B"]').click()
     page.wait_for_timeout(100)
     assert "is-wrong" in (page.locator('[data-option-id="B"]').get_attribute("class") or "")
-    assert "正确答案：A" in page.locator("#practiceExplanationPanel").inner_text()
+    assert page.locator("#practiceExplanationPanel").is_hidden(), page.locator("#practiceExplanationPanel").inner_text()
     assert "错误" in (page.locator('#practiceAnswerSheet [data-question-id="q7"]').get_attribute("aria-label") or "")
     page.wait_for_timeout(600)
-    assert page.locator("#practiceOptions button[disabled]").count() > 0 or "第 8 道题" in page.locator("#practiceQuestionStem").inner_text()
+
+    # 答题卡跳回已答题 q7：自动展开该题解析
+    jump_via_sheet(page, '[data-question-id="q7"]')
+    assert page.locator("#practiceExplanationPanel").is_visible()
+    assert "正确答案：A" in page.locator("#practiceExplanationPanel").inner_text()
+    # 答题卡跳到未答题：面板收起（不留旧题内容），选项可作答
+    jump_via_sheet(page, '[data-question-id="q2"]')
+    assert page.locator("#practiceExplanationPanel").is_hidden()
+    assert page.locator("#practiceOptions button[disabled]").count() == 0
 
     # 未答确认弹窗路径：交卷按钮 -> 提示还有未答 -> 返回第一道未答题
     open_sheet(page)
@@ -389,6 +408,14 @@ with sync_playwright() as playwright:
     q1_class = page.locator('#practiceAnswerSheet [data-question-id="q1"]').get_attribute("class") or ""
     assert "is-wrong" in q1_class, q1_class
     assert "错误" in (page.locator('#practiceAnswerSheet [data-question-id="q1"]').get_attribute("aria-label") or "")
+    # 恢复回放打开的是已答题：面板保持 hidden，给"查看解析"按钮，点击后才展开
+    assert page.locator("#practiceExplanationPanel").is_hidden()
+    reveal_btn = page.locator("#practiceExplanationReveal button", has_text="查看解析")
+    assert reveal_btn.is_visible()
+    reveal_btn.click()
+    page.wait_for_timeout(80)
+    assert page.locator("#practiceExplanationPanel").is_visible()
+    assert "正确答案：A" in page.locator("#practiceExplanationPanel").inner_text()
 
     # ---------- scholar：本地超时不调用 /answers，剩余时间进入 runtimeState ----------
     page.evaluate("window.__writes=[]")
@@ -407,6 +434,12 @@ with sync_playwright() as playwright:
     assert timeout_states["view"] == "game"
     deadline_snapshot = page.evaluate("window.KGPracticeMode.snapshot()")
     assert deadline_snapshot["mode"] == "scholar"
+
+    # 学霸计时器到期后推进到下一题：解析面板不出现（无遗留内容/按钮）
+    page.evaluate("window.__writes=[]")
+    page.wait_for_timeout(200)
+    assert page.locator("#practiceExplanationPanel").is_hidden()
+    assert not page.locator("#practiceExplanationReveal").count()
 
     page.locator("#practiceExitBtn").click()
     page.locator("#practiceSaveExitBtn").click()
