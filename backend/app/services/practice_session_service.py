@@ -26,6 +26,9 @@ PRACTICE_SESSION_MODES = {"challenge", "scholar", "revenge"}
 PRACTICE_QUESTION_COUNT_MIN = 1
 PRACTICE_QUESTION_COUNT_MAX = 180
 PRACTICE_ORDERS = {"paper", "random"}
+# 与前端 KGPracticeDraftState.submission() / 后端 _judge 同构的超时占位符：
+# timedOut:true 条目的 selectedAnswer 统一为该值，判 false。
+TIMEOUT_ANSWER_PLACEHOLDER = "__timeout__"
 RUNTIME_INTEGER_FIELDS = {
     "currentIndex",
     "health",
@@ -267,21 +270,38 @@ async def _validated_draft_answers(
             raise _error(422, "PRACTICE_DRAFT_ANSWER_INVALID", "草稿选择顺序重复")
         seen_indexes.add(selection_index)
         # 选项合法性从 PaperReleaseQuestion.snapshot.options 校验（白名单），
-        # 不接受 A/B/C/D 之外的任何注入值。
+        # 不接受 A/B/C/D 之外的任何注入值。唯一例外与 _judge 同构：
+        # timedOut:true 条目的 selectedAnswer 允许超时占位符
+        # （前端 submission() 统一发 '__timeout__'）或真实选项值；
+        # 裸 '__timeout__' 不带 timedOut:true 仍被拒绝，防伪造超时。
+        timed_out = value.get("timedOut") is True
+        allowed_values = {TIMEOUT_ANSWER_PLACEHOLDER} if timed_out else set()
         row = rows.get(question_id)
-        if row is None or selected not in _snapshot_option_ids(row.snapshot or {}):
+        option_ids = (
+            _snapshot_option_ids(row.snapshot or {}) if row is not None else set()
+        )
+        if selected not in (allowed_values | option_ids) or (
+            timed_out and session.mode != "scholar"
+        ):
+            if timed_out:
+                raise _error(
+                    422, "PRACTICE_TIMEOUT_MODE_INVALID", "只有学霸模式可以提交超时"
+                )
             raise _error(
                 422, "PRACTICE_DRAFT_ANSWER_INVALID", "草稿答案不在题目选项内"
             )
-        if value.get("timedOut") is True and session.mode != "scholar":
-            raise _error(
-                422, "PRACTICE_TIMEOUT_MODE_INVALID", "只有学霸模式可以提交超时"
-            )
         # 只保留白名单字段：correct/correctAnswer/score 等客户端注入一律剥离。
+        # timedOut 条目存储归一化为超时占位符（镜像前端 gradeLocal 与后端 _judge），
+        # 使旧格式（真实值+timedOut）与新载荷（占位符+timedOut）落库形状一致，
+        # 幂等深比较与锁定比较不再出现口径分裂。
         normalized[question_id] = {
-            "selectedAnswer": selected,
+            "selectedAnswer": (
+                TIMEOUT_ANSWER_PLACEHOLDER
+                if timed_out
+                else selected
+            ),
             "selectionIndex": selection_index,
-            **({"timedOut": True} if value.get("timedOut") is True else {}),
+            **({"timedOut": True} if timed_out else {}),
         }
     return normalized
 

@@ -1856,8 +1856,9 @@ def test_scholar_pause_with_draft_restores_remaining_ms_without_offline_deductio
     saved = paused.json()["session"]
     assert saved["status"] == "paused"
     assert saved["runtimeState"]["remainingMs"] == 43210
+    # timedOut 条目存储归一化为超时占位符（与前端 gradeLocal/_judge 同构）。
     assert saved["answers"][first_id] == {
-        "selectedAnswer": "A",
+        "selectedAnswer": "__timeout__",
         "selectionIndex": 1,
         "timedOut": True,
     }
@@ -2410,3 +2411,150 @@ def test_pause_continues_legacy_graded_answers_without_recounting_mistakes(
 
     # pause 不写错题：不重复累计长期错题。
     assert _mistake_count(session_id) == 1
+
+
+# ---------------------------------------------------------------------------
+# Bridge O-1：前端 submission() 对超时条目统一发 '__timeout__' + timedOut:true
+# ---------------------------------------------------------------------------
+
+
+def test_scholar_pause_and_complete_accept_timeout_placeholder_from_client_grading(
+    client, practice_ids
+):
+    """O-1 桥接：pause 必须保存占位符草稿，complete 重算按 timedOut 判 false；
+    裸 '__timeout__'（不带 timedOut:true）仍被拒绝以伪造超时。"""
+
+    started = client.post(
+        "/api/v1/learning/practice/sessions/start",
+        json={
+            "paperId": practice_ids["paper"],
+            "releaseId": practice_ids["release"],
+            "mode": "scholar",
+            "count": 10,
+            "order": "paper",
+        },
+    )
+    assert started.status_code == 200, started.text
+    session = started.json()["session"]
+    first_id = session["questions"][0]["questionId"]
+    second_id = session["questions"][1]["questionId"]
+
+    # 裸 '__timeout__'（不带 timedOut:true）依旧拒绝。
+    bare = client.post(
+        f"/api/v1/learning/practice/sessions/{session['id']}/pause",
+        json={
+            "revision": session["revision"],
+            "answers": {
+                first_id: {"selectedAnswer": "__timeout__", "selectionIndex": 1}
+            },
+            "runtimeState": {"currentIndex": 0},
+        },
+    )
+    assert bare.status_code == 422
+    assert bare.json()["detail"]["code"] == "PRACTICE_DRAFT_ANSWER_INVALID"
+    intact = client.get(
+        f"/api/v1/learning/practice/sessions/{session['id']}"
+    ).json()["session"]
+    assert intact["answers"] == {}
+
+    # 前端归一化形态：'__timeout__' + timedOut:true 必须通过白名单并落库。
+    whole_paper = {
+        first_id: {"selectedAnswer": "__timeout__", "selectionIndex": 1, "timedOut": True},
+        second_id: {"selectedAnswer": "A", "selectionIndex": 2},
+    }
+    paused = client.post(
+        f"/api/v1/learning/practice/sessions/{session['id']}/pause",
+        json={
+            "revision": session["revision"],
+            "answers": whole_paper,
+            "runtimeState": {"currentIndex": 1, "durationMs": 3000},
+        },
+    )
+    assert paused.status_code == 200, paused.text
+    saved = paused.json()["session"]
+    assert saved["status"] == "paused"
+    assert saved["answers"][first_id] == {
+        "selectedAnswer": "__timeout__",
+        "selectionIndex": 1,
+        "timedOut": True,
+    }
+    assert saved["stats"]["answered"] == 2
+
+    # 同一载荷重试：pause 幂等窗口不因占位符深比较误判冲突。
+    retry = client.post(
+        f"/api/v1/learning/practice/sessions/{session['id']}/pause",
+        json={
+            "revision": saved["revision"] - 1,
+            "answers": whole_paper,
+            "runtimeState": {"currentIndex": 1, "durationMs": 3000},
+        },
+    )
+    assert retry.status_code == 200, retry.text
+    assert retry.json()["session"]["revision"] == saved["revision"]
+
+    # 交卷：timedOut 条目整卷重算判 false，真实选项条目正常判分。
+    completed = client.post(
+        f"/api/v1/learning/practice/sessions/{session['id']}/complete",
+        json={"revision": saved["revision"], "answers": whole_paper,
+              "runtimeState": {"durationMs": 3000}},
+    )
+    assert completed.status_code == 200, completed.text
+    body = completed.json()
+    assert body["report"]["counts"]["answered"] == 2
+    assert body["report"]["counts"]["wrong"] == 1
+    assert body["report"]["counts"]["correct"] == 1
+    assert body["report"]["wrongQuestionIds"] == [first_id]
+    assert body["session"]["answers"][first_id]["correct"] is False
+
+
+def test_legacy_real_option_with_timed_out_draft_resaves_as_placeholder(
+    client, practice_ids
+):
+    """联动 3a：服务器存有旧格式超时草稿（真实选项值）时，
+    新前端重发归一化占位符不得被误判为改写或冲突。"""
+
+    started = client.post(
+        "/api/v1/learning/practice/sessions/start",
+        json={
+            "paperId": practice_ids["paper"],
+            "releaseId": practice_ids["release"],
+            "mode": "scholar",
+            "count": 10,
+            "order": "paper",
+        },
+    )
+    assert started.status_code == 200, started.text
+    session = started.json()["session"]
+    first_id = session["questions"][0]["questionId"]
+
+    # 旧格式：真实值 + timedOut:true 落库。
+    first_save = client.post(
+        f"/api/v1/learning/practice/sessions/{session['id']}/pause",
+        json={
+            "revision": session["revision"],
+            "answers": {
+                first_id: {"selectedAnswer": "A", "selectionIndex": 1, "timedOut": True}
+            },
+            "runtimeState": {"currentIndex": 0, "durationMs": 1000},
+        },
+    )
+    assert first_save.status_code == 200, first_save.text
+    revision = first_save.json()["session"]["revision"]
+
+    # 新前端 resume 后在幂等窗口内重发归一化占位符（同 selectionIndex/timedOut）：
+    # 不允许 PRACTICE_ANSWER_LOCKED 或 revision 冲突。
+    resave = client.post(
+        f"/api/v1/learning/practice/sessions/{session['id']}/pause",
+        json={
+            "revision": revision - 1,
+            "answers": {
+                first_id: {
+                    "selectedAnswer": "__timeout__",
+                    "selectionIndex": 1,
+                    "timedOut": True,
+                }
+            },
+            "runtimeState": {"currentIndex": 0, "durationMs": 1000},
+        },
+    )
+    assert resave.status_code == 200, resave.text
