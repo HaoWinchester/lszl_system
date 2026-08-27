@@ -3,6 +3,7 @@
 import asyncio
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, func, select
 
@@ -390,7 +391,7 @@ def test_start_session_freezes_42_50_8_order_and_rejects_duplicate_resumable() -
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
 
-def test_unanswered_session_questions_never_expose_answers_or_explanations() -> None:
+def test_session_payload_reveals_frozen_answer_key_for_every_question() -> None:
     ids = _practice_fixture_ids()
     asyncio.run(_seed_released_pmp_paper(ids))
     try:
@@ -410,10 +411,11 @@ def test_unanswered_session_questions_never_expose_answers_or_explanations() -> 
                 },
             ).json()["session"]
 
-            first = started["questions"][0]["question"]
-            assert "correctAnswer" not in first
-            assert "analysis" not in first
-            assert all("correct" not in option for option in first["options"])
+            for entry in started["questions"]:
+                question = entry["question"]
+                assert question["correctAnswer"] == "A"
+                assert question["analysis"]
+                assert any(option.get("correct") is True for option in question["options"])
 
             first_id = started["questionOrder"][0]["questionId"]
             answered = client.post(
@@ -429,9 +431,8 @@ def test_unanswered_session_questions_never_expose_answers_or_explanations() -> 
             assert first_after["correctAnswer"] == "A"
             assert first_after["analysis"] == "第 1 题解析"
             assert any(option.get("correct") is True for option in first_after["options"])
-            assert "correctAnswer" not in second_after
-            assert "analysis" not in second_after
-            assert all("correct" not in option for option in second_after["options"])
+            assert second_after["correctAnswer"] == "A"
+            assert second_after["analysis"]
 
             abandoned = client.post(
                 f"/api/v1/learning/practice/sessions/{started['id']}/abandon",
@@ -440,11 +441,11 @@ def test_unanswered_session_questions_never_expose_answers_or_explanations() -> 
             assert abandoned.status_code == 200, abandoned.text
             abandoned_questions = abandoned.json()["session"]["questions"]
             assert abandoned_questions[0]["question"]["correctAnswer"] == "A"
-            assert "correctAnswer" not in abandoned_questions[1]["question"]
+            assert abandoned_questions[1]["question"]["correctAnswer"] == "A"
             detail = client.get(
                 f"/api/v1/learning/practice/sessions/{started['id']}"
             ).json()["session"]
-            assert "correctAnswer" not in detail["questions"][1]["question"]
+            assert detail["questions"][1]["question"]["correctAnswer"] == "A"
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
@@ -1150,7 +1151,7 @@ def test_revenge_mode_is_a_resumable_server_session() -> None:
             assert revenge["stats"]["total"] == 1
             assert revenge["questionOrder"][0]["questionId"] == question_id
             assert revenge["questionOrder"][0]["mistakeId"]
-            assert "correctAnswer" not in revenge["questions"][0]["question"]
+            assert revenge["questions"][0]["question"]["correctAnswer"] == "A"
 
             revenge_answer = client.post(
                 f"/api/v1/learning/practice/sessions/{revenge['id']}/answers",
@@ -1315,3 +1316,248 @@ def test_legacy_completion_payload_cannot_inflate_experience_summary() -> None:
             assert after == before
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+# ---------------------------------------------------------------------------
+# 客户端即时判题：会话载荷下发冻结答案 + 整卷草稿白名单校验
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def practice_ids():
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        yield ids
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+@pytest.fixture
+def client(practice_ids):
+    with TestClient(app) as test_client:
+        login = test_client.post(
+            "/api/v1/auth/login",
+            json={"username": practice_ids["student"], "password": PASSWORD},
+        )
+        assert login.status_code == 200
+        yield test_client
+
+
+@pytest.fixture
+def active_session(client, practice_ids):
+    started = client.post(
+        "/api/v1/learning/practice/sessions/start",
+        json={
+            "paperId": practice_ids["paper"],
+            "releaseId": practice_ids["release"],
+            "mode": "challenge",
+            "count": 10,
+            "order": "paper",
+        },
+    )
+    assert started.status_code == 200, started.text
+    return started.json()["session"]
+
+
+def test_active_session_reveals_frozen_answer_key_for_client_grading(
+    client, active_session
+):
+    session = client.get(
+        f"/api/v1/learning/practice/sessions/{active_session['id']}"
+    ).json()["session"]
+    first = session["questions"][0]["question"]
+    assert first["correctAnswer"] == "A"
+    assert first["analysis"]
+
+
+def test_pause_rejects_answer_outside_frozen_question_options(client, active_session):
+    first_id = active_session["questions"][0]["questionId"]
+    response = client.post(
+        f"/api/v1/learning/practice/sessions/{active_session['id']}/pause",
+        json={
+            "revision": active_session["revision"],
+            "answers": {first_id: {"selectedAnswer": "Z", "selectionIndex": 1}},
+            "runtimeState": {"currentIndex": 0, "durationMs": 1000},
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "PRACTICE_DRAFT_ANSWER_INVALID"
+
+
+def test_pause_rejects_draft_answer_invalid_payloads(client, active_session):
+    session_id = active_session["id"]
+    revision = active_session["revision"]
+    first_id = active_session["questions"][0]["questionId"]
+    second_id = active_session["questions"][1]["questionId"]
+    base_runtime = {"currentIndex": 0, "durationMs": 500}
+    invalid_cases = [
+        # 非会话题号
+        {
+            "revision": revision,
+            "answers": {"not-in-session": {"selectedAnswer": "A", "selectionIndex": 1}},
+            "runtimeState": base_runtime,
+        },
+        # 重复 selectionIndex
+        {
+            "revision": revision,
+            "answers": {
+                first_id: {"selectedAnswer": "A", "selectionIndex": 1},
+                second_id: {"selectedAnswer": "A", "selectionIndex": 1},
+            },
+            "runtimeState": base_runtime,
+        },
+        # 负数 selectionIndex
+        {
+            "revision": revision,
+            "answers": {first_id: {"selectedAnswer": "A", "selectionIndex": -1}},
+            "runtimeState": base_runtime,
+        },
+        # 布尔 selectionIndex
+        {
+            "revision": revision,
+            "answers": {first_id: {"selectedAnswer": "A", "selectionIndex": True}},
+            "runtimeState": base_runtime,
+        },
+        # selectionIndex 超过题目总数
+        {
+            "revision": revision,
+            "answers": {first_id: {"selectedAnswer": "A", "selectionIndex": 99}},
+            "runtimeState": base_runtime,
+        },
+        # 答案值为非对象
+        {
+            "revision": revision,
+            "answers": {first_id: "A"},
+            "runtimeState": base_runtime,
+        },
+        # 冻结选项之外的答案
+        {
+            "revision": revision,
+            "answers": {first_id: {"selectedAnswer": "C", "selectionIndex": 1}},
+            "runtimeState": base_runtime,
+        },
+    ]
+    for payload in invalid_cases:
+        response = client.post(
+            f"/api/v1/learning/practice/sessions/{session_id}/pause", json=payload
+        )
+        assert response.status_code == 422, response.text
+        assert (
+            response.json()["detail"]["code"] == "PRACTICE_DRAFT_ANSWER_INVALID"
+        ), payload
+
+    # 非学霸模式不允许 timedOut
+    timeout = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={
+            "revision": revision,
+            "answers": {
+                first_id: {"selectedAnswer": "A", "selectionIndex": 1, "timedOut": True}
+            },
+            "runtimeState": base_runtime,
+        },
+    )
+    assert timeout.status_code == 422
+    assert timeout.json()["detail"]["code"] == "PRACTICE_TIMEOUT_MODE_INVALID"
+
+    # answers 必须是对象
+    not_object = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={"revision": revision, "answers": ["nope"], "runtimeState": base_runtime},
+    )
+    assert not_object.status_code == 422
+    assert not_object.json()["detail"]["code"] == "INVALID_PRACTICE_DRAFT"
+
+    # currentIndex 超过题目总数（超过题目总数）
+    index_overflow = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={
+            "revision": revision,
+            "runtimeState": {"currentIndex": 10, "durationMs": 500},
+        },
+    )
+    assert index_overflow.status_code == 422
+    assert index_overflow.json()["detail"]["code"] == "INVALID_RUNTIME_STATE_VALUE"
+
+    unchanged = client.get(
+        f"/api/v1/learning/practice/sessions/{session_id}"
+    ).json()["session"]
+    assert unchanged["revision"] == revision
+    assert unchanged["status"] == "active"
+    assert unchanged["answers"] == {}
+
+
+def test_pause_persists_whitelisted_drafts_and_derives_stats(client, active_session):
+    session_id = active_session["id"]
+    first_id = active_session["questions"][0]["questionId"]
+    second_id = active_session["questions"][1]["questionId"]
+    paused = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={
+            "revision": active_session["revision"],
+            "answers": {
+                # 客户端注入 correct/correctAnswer/score 必须被剥离
+                first_id: {
+                    "selectedAnswer": "A",
+                    "selectionIndex": 1,
+                    "correct": True,
+                    "correctAnswer": "A",
+                    "score": 999,
+                },
+                second_id: {"selectedAnswer": "B", "selectionIndex": 2},
+            },
+            "runtimeState": {"currentIndex": 1, "durationMs": 6000},
+        },
+    )
+    assert paused.status_code == 200, paused.text
+    body = paused.json()["session"]
+    assert body["status"] == "paused"
+    assert body["revision"] == active_session["revision"] + 1
+    assert body["answers"][first_id] == {
+        "questionId": first_id,
+        "selectedAnswer": "A",
+        "selectionIndex": 1,
+        "draft": True,
+    }
+    assert body["answers"][second_id] == {
+        "questionId": second_id,
+        "selectedAnswer": "B",
+        "selectionIndex": 2,
+        "draft": True,
+    }
+    assert body["stats"] == {
+        "total": 10,
+        "answered": 2,
+        "correct": 1,
+        "wrong": 1,
+        "unanswered": 8,
+        "experience": 10,
+        "durationMs": 6000,
+    }
+    assert body["runtimeState"]["experience"] == 10
+
+    restored = client.get(
+        f"/api/v1/learning/practice/sessions/{session_id}"
+    ).json()["session"]
+    assert restored["answers"][first_id]["selectedAnswer"] == "A"
+    assert "correct" not in restored["answers"][first_id]
+
+    # 草稿不锁题：显式提交可以覆盖草稿并转为服务端权威判题
+    submitted = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/answers",
+        json={
+            "revision": body["revision"],
+            "questionId": first_id,
+            "selectedAnswer": "B",
+        },
+    )
+    assert submitted.status_code == 200, submitted.text
+    assert submitted.json()["answer"]["correct"] is False
+    submitted_session = submitted.json()["session"]
+    assert submitted_session["answers"][first_id]["correct"] is False
+    assert "draft" not in submitted_session["answers"][first_id]
+    assert submitted_session["stats"]["answered"] == 2
+    assert submitted_session["stats"]["correct"] == 0
+    assert submitted_session["stats"]["wrong"] == 2
+    assert submitted_session["stats"]["experience"] == 0

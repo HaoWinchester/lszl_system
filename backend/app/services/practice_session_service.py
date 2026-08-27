@@ -203,15 +203,140 @@ def _question_snapshot_for_session(
     *,
     reveal_answer: bool,
 ) -> dict:
-    return (
-        deepcopy(snapshot)
-        if reveal_answer
-        else learning_service.redact_practice_question(snapshot)
-    )
+    # 本产品不以隐藏答案为防作弊边界：会话载荷固定下发冻结 correctAnswer/analysis/reasoningSteps。
+    _ = reveal_answer
+    return deepcopy(snapshot)
 
 
 def _public_answer(answer: dict) -> dict:
     return {key: deepcopy(value) for key, value in answer.items() if key != "submissionIndex"}
+
+
+def _snapshot_option_ids(snapshot: dict) -> set[str]:
+    options = snapshot.get("options") if isinstance(snapshot, dict) else None
+    if not isinstance(options, list):
+        return set()
+    return {
+        str(option.get("id"))
+        for option in options
+        if isinstance(option, dict) and option.get("id") is not None
+    }
+
+
+async def _release_question_rows(
+    db: AsyncSession, release_id: str
+) -> dict[str, PaperReleaseQuestion]:
+    rows = (
+        await db.execute(
+            select(PaperReleaseQuestion).where(
+                PaperReleaseQuestion.release_id == release_id
+            )
+        )
+    ).scalars().all()
+    return {row.question_id: row for row in rows}
+
+
+async def _validated_draft_answers(
+    db: AsyncSession, session: PracticeSession, data: dict
+) -> dict[str, dict]:
+    raw = data.get("answers")
+    if not isinstance(raw, dict):
+        raise _error(422, "INVALID_PRACTICE_DRAFT", "answers 必须是对象")
+    refs = {
+        str(item.get("questionId") or ""): item
+        for item in session.question_order
+        if isinstance(item, dict)
+    }
+    rows = await _release_question_rows(db, session.release_id)
+    normalized = {}
+    seen_indexes = set()
+    for question_id, value in raw.items():
+        if question_id not in refs or not isinstance(value, dict):
+            raise _error(422, "PRACTICE_DRAFT_ANSWER_INVALID", "草稿包含非法题目")
+        selected = str(value.get("selectedAnswer") or "").strip()
+        selection_index = value.get("selectionIndex")
+        if (
+            not selected
+            or isinstance(selection_index, bool)
+            or not isinstance(selection_index, int)
+            or selection_index < 1
+            or selection_index > len(refs)
+        ):
+            raise _error(422, "PRACTICE_DRAFT_ANSWER_INVALID", "草稿答案或顺序无效")
+        if selection_index in seen_indexes:
+            raise _error(422, "PRACTICE_DRAFT_ANSWER_INVALID", "草稿选择顺序重复")
+        seen_indexes.add(selection_index)
+        # 选项合法性从 PaperReleaseQuestion.snapshot.options 校验（白名单），
+        # 不接受 A/B/C/D 之外的任何注入值。
+        row = rows.get(question_id)
+        if row is None or selected not in _snapshot_option_ids(row.snapshot or {}):
+            raise _error(
+                422, "PRACTICE_DRAFT_ANSWER_INVALID", "草稿答案不在题目选项内"
+            )
+        if value.get("timedOut") is True and session.mode != "scholar":
+            raise _error(
+                422, "PRACTICE_TIMEOUT_MODE_INVALID", "只有学霸模式可以提交超时"
+            )
+        # 只保留白名单字段：correct/correctAnswer/score 等客户端注入一律剥离。
+        normalized[question_id] = {
+            "selectedAnswer": selected,
+            "selectionIndex": selection_index,
+            **({"timedOut": True} if value.get("timedOut") is True else {}),
+        }
+    return normalized
+
+
+def _draft_stats(
+    refs: list[dict],
+    rows: dict[str, PaperReleaseQuestion],
+    answers: dict[str, dict],
+    previous: dict,
+) -> dict:
+    """从冻结快照临时重算未完成会话统计；不落任何长期错题/进度/完成事件。"""
+
+    ref_items = [item for item in refs if isinstance(item, dict)]
+    total = len(ref_items)
+    answered = 0
+    correct = 0
+    scoring_answers: dict[str, dict] = {}
+    for position, ref in enumerate(ref_items):
+        question_id = str(ref.get("questionId") or "")
+        answer = answers.get(question_id)
+        if not isinstance(answer, dict):
+            continue
+        row = rows.get(question_id)
+        snapshot = row.snapshot if row is not None and isinstance(row.snapshot, dict) else {}
+        selected = str(answer.get("selectedAnswer") or "")
+        is_correct = (
+            bool(str(snapshot.get("correctAnswer") or ""))
+            and selected == str(snapshot.get("correctAnswer") or "")
+        )
+        answered += 1
+        if is_correct:
+            correct += 1
+        try:
+            submission_index = int(
+                answer.get("submissionIndex") or answer.get("selectionIndex") or position + 1
+            )
+        except (TypeError, ValueError):
+            submission_index = position + 1
+        scoring_answers[question_id] = {
+            "questionId": question_id,
+            "selectedAnswer": selected,
+            "correct": is_correct,
+            "submissionIndex": submission_index,
+            "submittedAt": str(answer.get("submittedAt") or ""),
+        }
+    experience = _experience_for_answers(scoring_answers)
+    return {
+        "total": total,
+        "answered": answered,
+        "correct": correct,
+        "wrong": answered - correct,
+        "unanswered": total - answered,
+        "experience": experience,
+        "durationMs": max(0, int(previous.get("durationMs") or 0)),
+    }
 
 
 async def _revenge_question_order(
@@ -284,20 +409,18 @@ async def _session_payload(db: AsyncSession, session: PracticeSession) -> dict:
     row_map = {row.question_id: row for row in rows}
     questions = []
     answers = session.answers if isinstance(session.answers, dict) else {}
-    terminal = session.status == "completed"
     for ref in refs:
         if not isinstance(ref, dict):
             continue
         row = row_map.get(str(ref.get("questionId") or ""))
         if row is None:
             continue
-        question_id = str(ref.get("questionId") or "")
         questions.append(
             {
                 **ref,
                 "question": _question_snapshot_for_session(
                     row.snapshot or {},
-                    reveal_answer=terminal or question_id in answers,
+                    reveal_answer=True,
                 ),
             }
         )
@@ -583,7 +706,7 @@ async def answer_session_question(
 
     answers = dict(session.answers or {})
     existing = answers.get(question_id)
-    if isinstance(existing, dict):
+    if isinstance(existing, dict) and existing.get("draft") is not True:
         if str(existing.get("selectedAnswer") or "") != selected_answer:
             raise _error(409, "PRACTICE_ANSWER_LOCKED", "已提交答案不能修改")
         return {
@@ -602,14 +725,10 @@ async def answer_session_question(
         session.status = "active"
         session.paused_at = None
 
-    row = (
-        await db.execute(
-            select(PaperReleaseQuestion).where(
-                PaperReleaseQuestion.release_id == session.release_id,
-                PaperReleaseQuestion.question_id == question_id,
-            )
-        )
-    ).scalar_one()
+    release_rows = await _release_question_rows(db, session.release_id)
+    row = release_rows.get(question_id)
+    if row is None:
+        raise _error(404, "PRACTICE_QUESTION_NOT_FOUND", "题目不存在于当前发布")
     correct_answer = str((row.snapshot or {}).get("correctAnswer") or "")
     mistake_status = ""
     completion: dict = {}
@@ -670,21 +789,10 @@ async def answer_session_question(
         answer["mistakeId"] = str(ref.get("mistakeId") or "")
         answer["mistakeStatus"] = mistake_status
     answers[question_id] = answer
-    answered = len(answers)
-    correct = sum(1 for item in answers.values() if item.get("correct") is True)
-    previous_stats = session.stats if isinstance(session.stats, dict) else {}
-    total = len(refs)
     session.answers = answers
-    experience = _experience_for_answers(answers)
-    session.stats = {
-        "total": total,
-        "answered": answered,
-        "correct": correct,
-        "wrong": answered - correct,
-        "unanswered": total - answered,
-        "experience": experience,
-        "durationMs": max(0, int(previous_stats.get("durationMs") or 0)),
-    }
+    previous_stats = session.stats if isinstance(session.stats, dict) else {}
+    session.stats = _draft_stats(refs, release_rows, answers, previous_stats)
+    experience = session.stats["experience"]
     runtime_state = dict(session.runtime_state or {})
     runtime_state["experience"] = experience
     if session.mode == "revenge":
@@ -991,7 +1099,28 @@ async def pause_session(
         raise _error(409, "PRACTICE_SESSION_TERMINAL", "练习已结束，不能暂停")
     if session.revision != requested_revision:
         raise _revision_conflict(session)
+    # 草稿先整体校验（白名单/选项/顺序），任何非法值都不落库。
+    drafts = (
+        await _validated_draft_answers(db, session, data)
+        if "answers" in data
+        else None
+    )
     _apply_runtime_patch(session, data)
+    if drafts is not None:
+        refs = session.question_order if isinstance(session.question_order, list) else []
+        answers = dict(session.answers or {})
+        for question_id, draft in drafts.items():
+            existing = answers.get(question_id)
+            if isinstance(existing, dict) and existing.get("draft") is not True:
+                # 已显式提交的答案不可被草稿覆盖。
+                continue
+            answers[question_id] = {"questionId": question_id, **draft, "draft": True}
+        session.answers = answers
+        rows = await _release_question_rows(db, session.release_id)
+        session.stats = _draft_stats(refs, rows, answers, dict(session.stats or {}))
+        runtime_state = dict(session.runtime_state or {})
+        runtime_state["experience"] = session.stats["experience"]
+        session.runtime_state = runtime_state
     saved_at = now_utc()
     session.status = "paused"
     session.paused_at = saved_at
