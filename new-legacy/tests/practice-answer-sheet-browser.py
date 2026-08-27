@@ -15,6 +15,85 @@ def body_html():
 
 
 # ---------------------------------------------------------------------------
+# Task 6：折叠单实例答题卡与退出弹窗纵向等宽布局。
+#   * 答题卡默认关闭；唯一入口 #practiceAnswerSheetMobileBtn 全宽度可见；
+#   * 桌面（>=1024px）右上入口开右侧抽屉；窄屏开底部圆角抽屉；
+#   * 题号切题 / 关闭按钮 / 遮罩 / Escape 后抽屉关闭且焦点回到入口；
+#   * 反复开关不产生第二实例；
+#   * 1280/1024/768/390px 下 #practiceExitConfirm 三按钮纵向等宽、不越界、不重叠。
+# ---------------------------------------------------------------------------
+
+
+def sheet_roots(page):
+    return page.evaluate("()=>document.querySelectorAll('[aria-label=\"答题概览\"]').length")
+
+
+def assert_sheet_closed(page):
+    assert page.locator("#practiceAnswerSheetDrawer").is_hidden()
+    assert not page.locator("#practiceAnswerSheet").is_visible()
+
+
+def open_sheet(page):
+    page.locator("#practiceAnswerSheetMobileBtn").click()
+    # 等待抽屉滑入动画（0.22s）结束，避免测量到中间态位置
+    page.wait_for_timeout(320)
+    assert page.locator("#practiceAnswerSheetDrawer").is_visible()
+
+
+def jump_via_sheet(page, selector_suffix):
+    """答题卡已折叠进抽屉：先开抽屉再点击题号/交卷；跳题路径自身会关闭抽屉。"""
+    open_sheet(page)
+    page.locator(f"#practiceAnswerSheet {selector_suffix}").first.click()
+    page.wait_for_timeout(80)
+
+
+def close_via(page, how):
+    if how == "close":
+        page.locator("#practiceAnswerSheetDrawerClose").click()
+    elif how == "backdrop":
+        page.evaluate(
+            "()=>document.getElementById('practiceAnswerSheetDrawer').dispatchEvent(new MouseEvent('click',{bubbles:true}))"
+        )
+    elif how == "escape":
+        page.keyboard.press("Escape")
+    else:
+        raise ValueError(how)
+    page.wait_for_timeout(80)
+    assert_sheet_closed(page)
+    focused = page.evaluate("()=>document.activeElement?.id||''")
+    assert focused == "practiceAnswerSheetMobileBtn", focused
+    assert page.locator("#practiceAnswerSheetMobileBtn").get_attribute("aria-expanded") == "false"
+
+
+def exit_dialog_rows(page):
+    return page.evaluate(
+        """()=>{
+          const dialog=document.querySelector('#practiceExitConfirm .practice-exit-dialog');
+          const content=dialog.getBoundingClientRect();
+          const buttons=Array.from(dialog.querySelectorAll(':scope > div > button:not([hidden])')).map(button=>{
+            const rect=button.getBoundingClientRect();
+            return {x:rect.x,y:rect.y,width:rect.width,right:rect.right,height:rect.height};
+          });
+          return {contentX:content.x,contentRight:content.right,buttons};
+        }"""
+    )
+
+
+def assert_exit_dialog_geometry(rows):
+    buttons = rows["buttons"]
+    assert len(buttons) == 3, buttons
+    for button in buttons:
+        assert button["x"] >= rows["contentX"] - 0.5, (button, rows["contentX"])
+        assert button["right"] <= rows["contentRight"] + 0.5, (button, rows["contentRight"])
+    widths = [round(button["width"], 3) for button in buttons]
+    assert max(widths) - min(widths) < 1.0, widths
+    ordered = sorted(buttons, key=lambda item: item["y"])
+    assert [round(item["y"]) for item in ordered] == sorted(round(item["y"]) for item in buttons)
+    for first, second in zip(ordered, ordered[1:]):
+        assert second["y"] >= first["y"] + first["height"] - 0.5, (first, second)
+
+
+# ---------------------------------------------------------------------------
 # 全部走同一个 mock 后端：window.__writes 记录所有生命周期写请求。
 # 新契约（本地即时判题）：
 #   * 作答 / 导航 / 答题卡跳题 / 学霸超时 => __writes 保持不变；
@@ -135,6 +214,56 @@ with sync_playwright() as playwright:
     page.wait_for_timeout(200)
     assert page.locator("#practiceGame").is_visible(), page.evaluate("document.body.dataset.practiceView")
 
+    # ---------- Task 6：答题卡单实例默认关闭，桌面 1280px 无常驻预留 ----------
+    assert sheet_roots(page) == 1
+    assert not page.locator("#practiceAnswerSheetMobile").count()
+    assert page.locator("#practiceAnswerSheetMobileBtn").is_visible()
+    assert page.locator("#practiceAnswerSheetMobileBtn").get_attribute("aria-expanded") == "false"
+    assert_sheet_closed(page)
+    question_card_box = page.locator("#practiceQuestionCard").bounding_box()
+    game_box = page.locator("#practiceGame").bounding_box()
+    assert question_card_box["width"] <= game_box["width"] + 0.5, (question_card_box, game_box)
+    sheet_gutter = (game_box["x"] + game_box["width"]) - (question_card_box["x"] + question_card_box["width"])
+    assert abs(sheet_gutter) < 1.0, (sheet_gutter, question_card_box, game_box)
+
+    # 桌面右上入口打开右侧抽屉；反复开关不出现第二实例
+    open_sheet(page)
+    assert sheet_roots(page) == 1
+    drawer_box = page.locator("#practiceAnswerSheetDrawer .practice-drawer").bounding_box()
+    viewport_width = page.evaluate("()=>window.innerWidth")
+    viewport_height = page.evaluate("()=>window.innerHeight")
+    drawer_right = drawer_box["x"] + drawer_box["width"]
+    assert drawer_right >= viewport_width - 1.5, (drawer_box, viewport_width)
+    assert drawer_box["y"] <= 1.5 and drawer_box["height"] >= viewport_height * 0.6, drawer_box
+    sheet_in_drawer = page.evaluate(
+        "()=>document.querySelector('#practiceAnswerSheet').closest('#practiceAnswerSheetDrawer')!==null"
+    )
+    assert sheet_in_drawer
+    assert page.locator("#practiceAnswerSheet [data-question-id]").count() == 10
+
+    # 点击题号切题并统一关闭抽屉
+    page.locator('#practiceAnswerSheet [data-question-id="q4"]').click()
+    page.wait_for_timeout(100)
+    assert "第 4 道题" in page.locator("#practiceQuestionStem").inner_text()
+    assert_sheet_closed(page)
+    assert page.locator("#practiceAnswerSheetMobileBtn").get_attribute("aria-expanded") == "false"
+    # 切题后焦点策略：题号点击后焦点自然留在入口按钮（关闭路径不强制，但抽屉必须关）
+    open_sheet(page)
+    close_via(page, "close")
+    open_sheet(page)
+    close_via(page, "escape")
+    open_sheet(page)
+    close_via(page, "backdrop")
+    # 反复开关仍只有一个实例
+    assert sheet_roots(page) == 1
+
+    # 回到第 1 题，保持既有流程假设（未答题从 q2 继续）
+    open_sheet(page)
+    page.locator('#practiceAnswerSheet [data-question-id="q1"]').click()
+    page.wait_for_timeout(100)
+    assert_sheet_closed(page)
+    assert "第 1 道题" in page.locator("#practiceQuestionStem").inner_text()
+
     page.evaluate("window.__writes=[]")
     page.locator('[data-option-id="B"]').click()
     page.wait_for_timeout(150)
@@ -149,7 +278,8 @@ with sync_playwright() as playwright:
     page.wait_for_timeout(120)
     assert writes(page) == [], writes(page)
     for question_id in ["q4", "q7"]:
-        page.locator(f'#practiceAnswerSheet [data-question-id="{question_id}"]').click()
+        jump_via_sheet(page, f'[data-question-id="{question_id}"]')
+        assert_sheet_closed(page)
     page.wait_for_timeout(150)
     assert "第 7 道题" in page.locator("#practiceQuestionStem").inner_text()
     assert writes(page) == [], writes(page)
@@ -165,6 +295,7 @@ with sync_playwright() as playwright:
     assert page.locator("#practiceOptions button[disabled]").count() > 0 or "第 8 道题" in page.locator("#practiceQuestionStem").inner_text()
 
     # 未答确认弹窗路径：交卷按钮 -> 提示还有未答 -> 返回第一道未答题
+    open_sheet(page)
     page.locator('#practiceAnswerSheet [data-answer-submit]').click()
     page.wait_for_timeout(80)
     assert page.locator("#practiceSubmitConfirm").is_visible()
@@ -192,7 +323,7 @@ with sync_playwright() as playwright:
             view = page.evaluate("document.body.dataset.practiceView")
         current_id = page.evaluate("()=>{const el=document.querySelector('#practiceAnswerSheet [aria-current=step]');return el?el.dataset.questionId:null}")
         if current_id != jump_target:
-            page.locator(f'#practiceAnswerSheet [data-question-id="{jump_target}"]').click()
+            jump_via_sheet(page, f'[data-question-id="{jump_target}"]')
             page.wait_for_timeout(100)
         page.locator("#practiceOptions button:not([disabled])").first.click()
         page.wait_for_timeout(620)
@@ -321,13 +452,32 @@ with sync_playwright() as playwright:
     page.wait_for_timeout(120)
     assert page.locator("#practiceGame").is_visible(), page.evaluate("document.body.dataset.practiceView")
     assert page.locator("#practiceAnswerSheetMobileBtn").is_visible()
-    page.locator("#practiceAnswerSheetMobileBtn").click()
-    page.wait_for_timeout(80)
-    assert page.locator("#practiceAnswerSheetDrawer").is_visible()
-    assert page.locator("#practiceAnswerSheetMobile [data-question-id]").count() == 10
-    page.locator("#practiceAnswerSheetDrawerClose").click()
-    page.wait_for_timeout(60)
-    assert page.locator("#practiceAnswerSheetDrawer").is_hidden()
+    open_sheet(page)
+    assert sheet_roots(page) == 1
+    assert page.locator("#practiceAnswerSheet [data-question-id]").count() == 10
+    # 底部圆角抽屉：贴住视口左右，底缘接近视口底部（圆角渲染允许少量偏差）
+    mobile_drawer = page.locator("#practiceAnswerSheetDrawer .practice-drawer").bounding_box()
+    assert abs(mobile_drawer["x"]) <= 1.5, mobile_drawer
+    # max-height:760px 的布局断点会把抽屉高度压到 min(76vh) 以下，这里只断言底缘贴近视口底部区域
+    assert (mobile_drawer["y"] + mobile_drawer["height"]) >= 700, (mobile_drawer, 844)
+    assert mobile_drawer["width"] >= 389, mobile_drawer
+    close_via(page, "close")
+    page.set_viewport_size({"width": 1440, "height": 960})
+    page.wait_for_timeout(100)
+
+    # ---------- Task 6：退出弹窗三按钮纵向等宽几何断言（1280/1024/768/390px） ----------
+    for viewport_width, viewport_height in [(1280, 900), (1024, 768), (768, 900), (390, 844)]:
+        page.set_viewport_size({"width": viewport_width, "height": viewport_height})
+        page.wait_for_timeout(80)
+        assert page.locator("#practiceGame").is_visible(), page.evaluate("document.body.dataset.practiceView")
+        page.locator("#practiceExitBtn").click()
+        page.wait_for_timeout(60)
+        assert not page.locator("#practiceExitConfirm").get_attribute("hidden")
+        try:
+            assert_exit_dialog_geometry(exit_dialog_rows(page))
+        finally:
+            page.locator("#practiceExitCancel").click()
+            page.wait_for_timeout(40)
     page.set_viewport_size({"width": 1440, "height": 960})
     page.wait_for_timeout(100)
 
@@ -369,6 +519,7 @@ with sync_playwright() as playwright:
     assert resume_challenge["answered"] == 10, resume_challenge
     page.evaluate("window.__writes=[]")
     # 整卷已答：答题卡交卷按钮直接提交（无未答确认框）
+    open_sheet(page)
     page.locator('#practiceAnswerSheet [data-answer-submit]').click()
     page.wait_for_timeout(400)
     complete_writes = [write for write in writes(page) if write["name"] == "complete"]

@@ -98,7 +98,11 @@ test('practice mode ships one resumable answer sheet and a nonofficial Huanpu PM
   assert.match(page, /src\/111-practice-session-core\.js/)
   assert.match(page, /src\/112-practice-answer-sheet\.js/)
   assert.match(page, /src\/113-practice-result-report\.js/)
-  assert.match(style, /@media \(min-width:1024px\)[\s\S]*\.practice-answer-sheet\{display:block\}/)
+  // Task 6：答题卡折叠为单实例抽屉，桌面不再常驻侧栏；入口按钮保留既有 ID 且全宽度可见
+  assert.doesNotMatch(page, /id="practiceAnswerSheetMobile"/)
+  assert.equal((page.match(/aria-label="答题概览"/g) || []).length, 1)
+  assert.doesNotMatch(style, /padding-right:324px/)
+  assert.match(style, /\.practice-answer-sheet-mobile-btn\{display:inline-flex/)
   assert.match(report, /src="\/assets\/logo\.jpg"/)
   assert.match(report, /幻谱 PMP 模拟成绩分析报告/)
   assert.match(report, /不代表 PMI 官方考试成绩/)

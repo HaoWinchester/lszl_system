@@ -196,7 +196,6 @@
           </div>
           <div class="practice-remediation-explanation" id="practiceRemediationExplanation" hidden></div>
         </aside>
-        <aside id="practiceAnswerSheet" class="practice-answer-sheet" aria-label="答题概览"></aside>
       </section>
 
       <section class="practice-checkpoint" id="practiceCheckpoint" hidden aria-labelledby="practiceCheckpointTitle">
@@ -269,12 +268,14 @@
   </div>
 
   <div class="practice-drawer-backdrop practice-answer-sheet-drawer" id="practiceAnswerSheetDrawer" hidden aria-hidden="true">
-    <section class="practice-drawer" role="dialog" aria-modal="true" aria-labelledby="practiceAnswerSheetDrawerTitle">
+    <section class="practice-drawer practice-answer-sheet-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="practiceAnswerSheetDrawerTitle">
       <header class="practice-drawer-head">
         <div><span>ANSWER SHEET</span><h2 id="practiceAnswerSheetDrawerTitle">答题卡</h2><p>查看整体进度、错题位置并自由跳题</p></div>
         <button type="button" class="practice-drawer-close" id="practiceAnswerSheetDrawerClose" aria-label="关闭答题卡">×</button>
       </header>
-      <div class="practice-drawer-body"><div id="practiceAnswerSheetMobile" aria-label="移动端答题概览"></div></div>
+      <div class="practice-drawer-body">
+        <aside id="practiceAnswerSheet" class="practice-answer-sheet" aria-label="答题概览"></aside>
+      </div>
     </section>
   </div>
 

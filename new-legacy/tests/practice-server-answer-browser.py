@@ -93,7 +93,7 @@ with sync_playwright() as playwright:
     )
     assert prevented_dirty is True
 
-    # 只有明确点击答题卡“交卷”才产生唯一一次整卷写请求
+    # 只有明确点击答题卡“交卷”才产生唯一一次整卷写请求（答题卡折叠在抽屉内：先开抽屉）
     page.evaluate("""() => {
       const api=window.KGPracticeLearningApi;
       const original=api.recordSession;
@@ -103,6 +103,8 @@ with sync_playwright() as playwright:
         return {};
       };
     }""")
+    page.locator('#practiceAnswerSheetMobileBtn').click()
+    page.wait_for_timeout(320)
     page.locator('#practiceAnswerSheet [data-answer-submit]').first.click()
     page.wait_for_timeout(200)
     assert page.locator("#practiceResult").is_visible()

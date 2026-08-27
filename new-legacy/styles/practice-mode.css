@@ -258,21 +258,36 @@ body.practice-mode-page.is-practice-drawer-open{overflow:hidden}
 /* 大生命值试卷的紧凑计数显示 */
 .practice-health-count{font-size:12px;font-weight:850;color:#526071;font-variant-numeric:tabular-nums;margin-left:3px}
 
-/* 可恢复做题会话：桌面常驻答题卡 + 移动端底部抽屉 */
-.practice-answer-sheet-mobile-btn{display:none;height:34px;padding:0 10px;border:1px solid var(--practice-border);border-radius:10px;background:#fff;color:#526071;font-size:11px;font-weight:850;white-space:nowrap}.practice-answer-sheet-mobile-btn span{margin-left:3px;color:var(--practice-accent);font-variant-numeric:tabular-nums}
-.practice-answer-sheet{display:none;position:absolute;top:0;right:0;width:300px;max-height:calc(100vh - 92px);overflow:auto;padding:18px;border:1px solid var(--practice-border);border-radius:20px;background:rgba(255,255,255,.96);box-shadow:var(--practice-shadow);overscroll-behavior:contain}
+/* 可恢复做题会话：答题卡折叠为单实例抽屉，topbar 右上角唯一开关全宽度可见 */
+.practice-answer-sheet-mobile-btn{display:inline-flex;align-items:center;height:34px;padding:0 10px;border:1px solid var(--practice-border);border-radius:10px;background:#fff;color:#526071;font-size:11px;font-weight:850;white-space:nowrap}.practice-answer-sheet-mobile-btn span{margin-left:3px;color:var(--practice-accent);font-variant-numeric:tabular-nums}
+.practice-answer-sheet-mobile-btn[aria-expanded="true"]{border-color:#c4b5fd;background:#f5f3ff;color:#5b21b6}
+.practice-answer-sheet{min-width:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;overscroll-behavior:contain}
 .practice-answer-sheet-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}.practice-answer-sheet-head span{display:block;color:var(--practice-accent);font-size:9px;font-weight:900;letter-spacing:.15em}.practice-answer-sheet-head h2{margin:4px 0 0;font-size:18px}.practice-answer-sheet-head>strong{font-size:20px;font-variant-numeric:tabular-nums}
 .practice-answer-sheet-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:14px 0 10px}.practice-answer-sheet-summary span{padding:7px 4px;border-radius:9px;background:#f5f7fa;color:#667085;text-align:center;font-size:10px}.practice-answer-sheet-summary b{display:block;margin-top:2px;color:#172033;font-size:13px}
 .practice-answer-sheet-filters{display:flex;gap:4px;margin-bottom:12px;padding:3px;border-radius:10px;background:#eef1f6}.practice-answer-sheet-filters button{flex:1;height:28px;border:0;border-radius:8px;background:transparent;color:#667085;font-size:11px;font-weight:800}.practice-answer-sheet-filters button.is-active{background:#fff;color:#172033;box-shadow:0 1px 5px rgba(15,23,42,.08)}
 .practice-answer-number-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}.practice-answer-number{aspect-ratio:1;border:1px solid #d9e0ea;border-radius:10px;background:#fff;color:#526071;display:grid;place-items:center;align-content:center;gap:1px;padding:2px;font-weight:850}.practice-answer-number span{font-size:12px}.practice-answer-number small{font-size:7px;font-weight:800}.practice-answer-number.is-correct{border-color:#86d7a0;background:#ecfdf3;color:#137333}.practice-answer-number.is-wrong{border-color:#f3a3b3;background:#fff1f3;color:#b42346}.practice-answer-number.is-current{outline:2px solid var(--practice-accent);outline-offset:1px}.practice-answer-number:focus-visible{outline:3px solid rgba(109,40,217,.35);outline-offset:1px}.practice-answer-filter-empty{grid-column:1/-1;margin:8px 0;padding:18px;text-align:center;color:var(--practice-muted);font-size:11px}
 .practice-answer-sheet-legend{display:flex;flex-wrap:wrap;gap:9px;margin:13px 0;color:#667085;font-size:9px}.practice-answer-sheet-legend span{display:flex;align-items:center;gap:4px}.practice-answer-sheet-legend i{width:8px;height:8px;border-radius:3px;border:1px solid #d9e0ea;background:#fff}.practice-answer-sheet-legend i.is-correct{border-color:#55b979;background:#dcfce7}.practice-answer-sheet-legend i.is-wrong{border-color:#e67d92;background:#ffe4e6}
 .practice-answer-submit{width:100%;height:40px;border:0;border-radius:11px;background:#172033;color:#fff;font-size:12px;font-weight:850}.practice-answer-submit:hover{background:#0f172a}
-.practice-answer-sheet-drawer{align-items:flex-end;justify-content:center}.practice-answer-sheet-drawer .practice-drawer{width:100%;height:min(72vh,620px);border:0;border-radius:22px 22px 0 0;animation:practiceAnswerSheetUp .22s cubic-bezier(.2,.8,.2,1)}.practice-answer-sheet-drawer .practice-drawer-body{padding-bottom:max(22px,env(safe-area-inset-bottom))}.practice-answer-sheet-drawer .practice-answer-number-grid{grid-template-columns:repeat(6,minmax(0,1fr))}
+.practice-answer-sheet-drawer{align-items:stretch}.practice-answer-sheet-drawer .practice-drawer{width:min(420px,calc(100vw - 42px));border-left:1px solid rgba(148,163,184,.28);animation:practiceDrawerIn .22s cubic-bezier(.2,.8,.2,1)}
+.practice-answer-sheet-drawer .practice-drawer-body{padding-bottom:max(22px,env(safe-area-inset-bottom))}.practice-answer-sheet-drawer .practice-answer-number-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+/* 底部圆角抽屉：窄屏（<=760px）答题卡从视口底部滑入，宽度撑满 */
+@media (max-width:760px){.practice-answer-sheet-drawer{justify-content:center;align-items:flex-end}.practice-answer-sheet-drawer .practice-drawer{width:100%;height:min(76vh,640px);border-left:0;border-radius:22px 22px 0 0;animation:practiceAnswerSheetUp .22s cubic-bezier(.2,.8,.2,1)}}
 @keyframes practiceAnswerSheetUp{from{transform:translateY(28px);opacity:.45}to{transform:none;opacity:1}}
 .practice-option.is-pending{border-color:#7c3aed;background:#f5f0ff;box-shadow:0 0 0 2px rgba(124,58,237,.12)}
-@media (min-width:1024px){.practice-game{width:min(1200px,100%);padding-right:324px}.practice-game>:not(.practice-answer-sheet){width:100%}.practice-answer-sheet{display:block}body[data-practice-view="game"] .practice-main{width:min(1240px,calc(100% - 32px))}}
-@media (max-width:1023px){.practice-answer-sheet-mobile-btn{display:inline-flex;align-items:center}.practice-game-topbar{grid-template-columns:40px auto minmax(80px,1fr) auto auto auto auto}.practice-answer-sheet{display:none}.practice-exit-dialog>div{flex-wrap:wrap}.practice-exit-dialog>div button{flex:1 1 140px}}
-@media (max-width:560px){.practice-game-topbar{grid-template-columns:36px auto minmax(48px,1fr) auto auto}.practice-answer-sheet-mobile-btn{padding:0 7px}.practice-answer-sheet-drawer .practice-answer-number-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media (min-width:1024px){body[data-practice-view="game"] .practice-main{width:min(1240px,calc(100% - 32px))}}
+@media (max-width:1023px){.practice-game-topbar{grid-template-columns:40px auto minmax(80px,1fr) auto auto auto auto}}
+@media (max-width:560px){.practice-game-topbar{grid-template-columns:36px auto minmax(48px,1fr) auto auto}.practice-answer-sheet-mobile-btn{padding:0 7px}.practice-answer-sheet-drawer .practice-answer-number-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* 退出弹窗：三个动作按钮纵向等宽铺满弹窗内容区（1280–390px 一致） */
+#practiceExitConfirm .practice-exit-dialog>div{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:9px;
+}
+#practiceExitConfirm .practice-exit-dialog>div>button:not([hidden]){
+  width:100%;
+  min-width:0;
+}
 
 /* 幻谱 PMP 模拟成绩单 */
 .practice-result.has-practice-report{width:min(980px,100%);margin:0 auto;padding:0;text-align:left;border:0;background:transparent;box-shadow:none}.practice-result-report{display:grid;gap:16px}.practice-report-header,.practice-report-meta,.practice-report-overall,.practice-report-band-scale,.practice-report-counts,.practice-report-breakdown,.practice-report-domains,.practice-report-domain-unavailable,.practice-report-wrong,.practice-report-next,.practice-report-disclaimer,.practice-report-actions{border:1px solid var(--practice-border);border-radius:18px;background:#fff}.practice-report-header{display:flex;align-items:center;gap:18px;padding:20px 24px}.practice-report-logo{width:70px;height:70px;object-fit:contain;border-radius:12px}.practice-report-header span,.practice-report-breakdown header>span{color:#178aa5;font-size:9px;font-weight:900;letter-spacing:.16em}.practice-report-header h1{margin:5px 0 0;font-size:clamp(20px,3vw,30px);letter-spacing:-.03em}.practice-report-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:15px 20px}.practice-report-meta div{display:grid;gap:4px;min-width:0}.practice-report-meta span{font-size:9px;color:#667085}.practice-report-meta strong{overflow:hidden;text-overflow:ellipsis;font-size:12px;white-space:nowrap}
