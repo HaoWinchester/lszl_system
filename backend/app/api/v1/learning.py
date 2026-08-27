@@ -285,7 +285,7 @@ async def complete_practice_session(
 ):
     try:
         session, report = await practice_session_service.complete_session(
-            db, user.username, session_id, body
+            db, user.username, user, session_id, body
         )
     except practice_session_service.PracticeSessionError as error:
         raise HTTPException(

@@ -1871,6 +1871,447 @@ def test_scholar_pause_with_draft_restores_remaining_ms_without_offline_deductio
     assert restored["runtimeState"]["durationMs"] == 6789
 
 
+# ---------------------------------------------------------------------------
+# 整卷交卷：complete 一次锁定、权威重算、一次提交、终态幂等
+# ---------------------------------------------------------------------------
+
+
+def test_complete_regrades_whole_submission_and_ignores_client_truth(client, active_session):
+    first_id = active_session["questions"][0]["questionId"]
+    response = client.post(
+        f"/api/v1/learning/practice/sessions/{active_session['id']}/complete",
+        json={
+            "revision": active_session["revision"],
+            "answers": {
+                first_id: {
+                    "selectedAnswer": "B",
+                    "selectionIndex": 1,
+                    "correct": True,
+                    "correctAnswer": "B",
+                    "score": 999,
+                }
+            },
+            "runtimeState": {"currentIndex": 0, "durationMs": 1800},
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["session"]["answers"][first_id]["correct"] is False
+    assert body["report"]["counts"]["wrong"] == 1
+    assert body["report"]["passed"] is False
+
+
+def test_pause_never_records_mistakes_until_complete_does(client, active_session):
+    session_id = active_session["id"]
+    first_id = active_session["questions"][0]["questionId"]
+    second_id = active_session["questions"][1]["questionId"]
+    paused = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={
+            "revision": active_session["revision"],
+            "answers": {
+                first_id: {"selectedAnswer": "B", "selectionIndex": 1},
+                second_id: {"selectedAnswer": "B", "selectionIndex": 2},
+            },
+            "runtimeState": {"currentIndex": 1, "durationMs": 2000},
+        },
+    )
+    assert paused.status_code == 200, paused.text
+    saved = paused.json()["session"]
+    assert saved["status"] == "paused"
+    # pause 只保存草稿统计：不产生任何长期错题。
+    assert saved["stats"]["wrong"] == 2
+    assert _mistake_count(session_id) == 0
+
+    completed = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/complete",
+        json={"revision": saved["revision"], "answers": saved["answers"]},
+    )
+    assert completed.status_code == 200, completed.text
+    body = completed.json()
+    assert body["session"]["status"] == "completed"
+    assert body["report"]["counts"]["wrong"] == 2
+    assert set(body["report"]["wrongQuestionIds"]) == {first_id, second_id}
+    assert _mistake_count(session_id) == 2
+
+
+def test_complete_counts_unanswered_as_zero_and_orders_experience_by_selection_index(
+    client, active_session
+):
+    session_id = active_session["id"]
+    questions = active_session["questions"]
+    ids = [entry["questionId"] for entry in questions[:4]]
+    answers = {
+        # 顺序由 selectionIndex 决定：第 3 题最先答对，随后第 1 题连击。
+        ids[2]: {"selectedAnswer": "A", "selectionIndex": 1},
+        ids[0]: {"selectedAnswer": "A", "selectionIndex": 2},
+        ids[3]: {"selectedAnswer": "B", "selectionIndex": 3},
+        # ids[1] 未答计 0，不计入连胜也不产生错题。
+    }
+    completed = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/complete",
+        json={
+            "revision": active_session["revision"],
+            "answers": answers,
+            "runtimeState": {"currentIndex": 3, "durationMs": 5000},
+        },
+    )
+    assert completed.status_code == 200, completed.text
+    report = completed.json()["report"]
+    session = completed.json()["session"]
+    assert report["counts"] == {
+        "total": 10,
+        "answered": 3,
+        "correct": 2,
+        "wrong": 1,
+        "unanswered": 7,
+    }
+    # 连胜经验按 selectionIndex：第 1 笔 +10；第 2 笔连胜 2 无加成 +10 = 20。
+    assert session["stats"]["experience"] == 20
+    assert session["runtimeState"]["experience"] == 20
+
+
+def test_duplicate_complete_returns_same_frozen_report_without_new_side_effects(
+    client, active_session
+):
+    session_id = active_session["id"]
+    owner = _session_owner(session_id)
+    first_id = active_session["questions"][0]["questionId"]
+    answers = {
+        first_id: {"selectedAnswer": "B", "selectionIndex": 1},
+    }
+    first = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/complete",
+        json={
+            "revision": active_session["revision"],
+            "answers": answers,
+            "runtimeState": {"currentIndex": 0, "durationMs": 700},
+        },
+    )
+    assert first.status_code == 200, first.text
+    body = first.json()
+    report = body["report"]
+    assert report["counts"]["answered"] == 1
+    experience_before = client.get(
+        "/api/v1/learning/practice/experience-summary"
+    ).json()["totalExperience"]
+
+    # 终态幂等：重复 complete（即便带不同载荷）返回同一冻结报告，不重放判题副作用。
+    retry = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/complete",
+        json={
+            "revision": 999999,
+            "answers": {},
+            "score": 100,
+            "passed": True,
+        },
+    )
+    assert retry.status_code == 200, retry.text
+    assert retry.json()["report"] == report
+    assert retry.json()["session"]["status"] == "completed"
+    assert asyncio.run(_completion_event_count(owner, session_id)) == 1
+    assert _mistake_count(session_id) == 1
+    assert (
+        client.get("/api/v1/learning/practice/experience-summary").json()[
+            "totalExperience"
+        ]
+        == experience_before
+    )
+
+
+def test_grade_failure_mid_submission_rolls_back_everything(client, practice_ids):
+    """复仇卷第二题的错题在整卷重算中途消失：PRACTICE_GRADE_FAILED 且全量回滚。
+
+    （challenge 卷逐题判题读取冻结发布快照，删除源 Question 不影响判题，
+    因此用 revenge 卷制造可稳定复现的中途判题失败。）
+    """
+
+    # 先造一道长期错题，才能开复仇卷。
+    seed = client.post(
+        "/api/v1/learning/practice/sessions/start",
+        json={
+            "paperId": practice_ids["paper"],
+            "releaseId": practice_ids["release"],
+            "mode": "challenge",
+            "count": 10,
+            "order": "paper",
+        },
+    ).json()["session"]
+    challenge_question = seed["questionOrder"][0]["questionId"]
+    answered = client.post(
+        f"/api/v1/learning/practice/sessions/{seed['id']}/answers",
+        json={
+            "revision": seed["revision"],
+            "questionId": challenge_question,
+            "selectedAnswer": "B",
+        },
+    )
+    assert answered.status_code == 200, answered.text
+    client.post(
+        f"/api/v1/learning/practice/sessions/{seed['id']}/complete",
+        json={"revision": answered.json()["session"]["revision"]},
+    )
+
+    revenge_response = client.post(
+        "/api/v1/learning/practice/sessions/start",
+        json={
+            "paperId": practice_ids["paper"],
+            "releaseId": practice_ids["release"],
+            "mode": "revenge",
+            "count": 10,
+            "order": "paper",
+        },
+    )
+    assert revenge_response.status_code == 200, revenge_response.text
+    revenge = revenge_response.json()["session"]
+
+    async def delete_mistake() -> None:
+        async with AsyncSessionLocal() as db:
+            row = await db.get(
+                PracticeMistake, revenge["questionOrder"][0]["mistakeId"]
+            )
+            assert row is not None
+            await db.delete(row)
+            await db.commit()
+
+    asyncio.run(delete_mistake())
+    # 删除后确认错题确已消失，防止误删导致的假通过。
+    assert _mistake_count(revenge["id"]) == 0
+    question_ids = [entry["questionId"] for entry in revenge["questionOrder"]]
+    owner = _session_owner(revenge["id"])
+    revision_before = revenge["revision"]
+    response = client.post(
+        f"/api/v1/learning/practice/sessions/{revenge['id']}/complete",
+        json={
+            "revision": revenge["revision"],
+            "answers": {
+                # 第一题的错题已删：整卷重算在第一笔就失败，事务应整体回滚。
+                question_ids[0]: {"selectedAnswer": "A", "selectionIndex": 1},
+            },
+            "runtimeState": {"currentIndex": 0, "durationMs": 2500},
+        },
+    )
+    assert response.status_code == 404, response.text
+    assert (
+        response.json()["detail"]["code"] == "PRACTICE_MISTAKE_NOT_FOUND"
+    )
+
+    persisted = client.get(
+        f"/api/v1/learning/practice/sessions/{revenge['id']}"
+    ).json()["session"]
+    # 判题失败不落任何终态：会话、草稿与统计全部保持交卷前原样。
+    assert persisted["status"] == "active"
+    assert persisted["revision"] == revision_before
+    assert persisted["answers"] == {}
+    assert persisted["stats"]["answered"] == 0
+    assert persisted["stats"]["experience"] == 0
+    assert asyncio.run(_completion_event_count(owner, revenge["id"])) == 0
+    # 判题失败即使发生在任何记账之前，也不得留下半份错题或完成事件。
+    assert _mistake_count(revenge["id"]) == 0
+
+
+def test_complete_whole_paper_advances_revenge_state_once(client, practice_ids):
+    # 先造一道长期错题。
+    seed = client.post(
+        "/api/v1/learning/practice/sessions/start",
+        json={
+            "paperId": practice_ids["paper"],
+            "releaseId": practice_ids["release"],
+            "mode": "challenge",
+            "count": 10,
+            "order": "paper",
+        },
+    ).json()["session"]
+    challenge_question = seed["questionOrder"][0]["questionId"]
+    answered = client.post(
+        f"/api/v1/learning/practice/sessions/{seed['id']}/answers",
+        json={
+            "revision": seed["revision"],
+            "questionId": challenge_question,
+            "selectedAnswer": "B",
+        },
+    )
+    assert answered.status_code == 200, answered.text
+    assert client.post(
+        f"/api/v1/learning/practice/sessions/{seed['id']}/complete",
+        json={"revision": answered.json()["session"]["revision"]},
+    ).status_code == 200
+
+    revenge = client.post(
+        "/api/v1/learning/practice/sessions/start",
+        json={
+            "paperId": practice_ids["paper"],
+            "releaseId": practice_ids["release"],
+            "mode": "revenge",
+            "count": 10,
+            "order": "paper",
+        },
+    ).json()["session"]
+    mistake_id = revenge["questionOrder"][0]["mistakeId"]
+
+    async def mistake_snapshot() -> dict:
+        async with AsyncSessionLocal() as db:
+            row = await db.get(PracticeMistake, mistake_id)
+            assert row is not None
+            return {
+                "status": row.status,
+                "revenge_attempt_count": row.revenge_attempt_count,
+                "revenge_correct_count": row.revenge_correct_count,
+                "revenge_wrong_count": row.revenge_wrong_count,
+            }
+
+    before = asyncio.run(mistake_snapshot())
+    # 复仇整卷答对后先显式保存：只有 complete 才推进长期错题状态。
+    paused = client.post(
+        f"/api/v1/learning/practice/sessions/{revenge['id']}/pause",
+        json={
+            "revision": revenge["revision"],
+            "answers": {
+                challenge_question: {"selectedAnswer": "A", "selectionIndex": 1}
+            },
+            "runtimeState": {"currentIndex": 0, "durationMs": 500},
+        },
+    )
+    assert paused.status_code == 200, paused.text
+    saved = paused.json()["session"]
+    during = asyncio.run(mistake_snapshot())
+    assert during == before
+    assert saved["answers"][challenge_question]["selectedAnswer"] == "A"
+
+    completed = client.post(
+        f"/api/v1/learning/practice/sessions/{revenge['id']}/complete",
+        json={"revision": saved["revision"], "answers": saved["answers"]},
+    )
+    assert completed.status_code == 200, completed.text
+    assert completed.json()["report"]["counts"]["correct"] == 1
+    after = asyncio.run(mistake_snapshot())
+    assert after["revenge_attempt_count"] == before["revenge_attempt_count"] + 1
+    assert after["revenge_correct_count"] == before["revenge_correct_count"] + 1
+    assert after["status"] == "verification_due"
+
+
+def test_duplicate_selection_index_is_rejected_without_locking_answers(
+    client, active_session
+):
+    session_id = active_session["id"]
+    first_id = active_session["questions"][0]["questionId"]
+    second_id = active_session["questions"][1]["questionId"]
+    response = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/complete",
+        json={
+            "revision": active_session["revision"],
+            "answers": {
+                first_id: {"selectedAnswer": "A", "selectionIndex": 2},
+                second_id: {"selectedAnswer": "A", "selectionIndex": 2},
+            },
+        },
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"]["code"] == "PRACTICE_DRAFT_ANSWER_INVALID"
+    persisted = client.get(
+        f"/api/v1/learning/practice/sessions/{session_id}"
+    ).json()["session"]
+    assert persisted["status"] == "active"
+    assert persisted["revision"] == active_session["revision"]
+    assert persisted["answers"] == {}
+
+
+def test_legacy_paused_session_completes_without_resubmitting_answers(
+    client, active_session
+):
+    session_id = active_session["id"]
+    first_id = active_session["questions"][0]["questionId"]
+    second_id = active_session["questions"][1]["questionId"]
+    first = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/answers",
+        json={"revision": 1, "questionId": first_id, "selectedAnswer": "B"},
+    ).json()["session"]
+    second = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/pause",
+        json={
+            "revision": first["revision"],
+            "answers": {
+                first_id: {"selectedAnswer": "B", "selectionIndex": 1},
+                second_id: {"selectedAnswer": "B", "selectionIndex": 2},
+            },
+            "runtimeState": {"currentIndex": 1, "durationMs": 800},
+        },
+    ).json()["session"]
+    assert second["status"] == "paused"
+    assert _mistake_count(session_id) == 1
+
+    completed = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/complete",
+        json={
+            "revision": second["revision"],
+            "answers": {
+                first_id: {"selectedAnswer": "B", "selectionIndex": 1},
+                second_id: {"selectedAnswer": "B", "selectionIndex": 2},
+            },
+            "runtimeState": {"durationMs": 800},
+        },
+    )
+    assert completed.status_code == 200, completed.text
+    body = completed.json()
+    assert body["report"]["counts"]["answered"] == 2
+    assert body["report"]["counts"]["correct"] == 0
+    # 升级链路只补第二题的错题：旧判题不重算、不错记第二次错误。
+    assert _mistake_count(session_id) == 2
+    overview = client.get("/api/v1/learning/practice/overview").json()
+    second_mistake = next(
+        row
+        for row in overview["mistakes"]
+        if row["questionId"] == second_id
+    )
+    assert second_mistake["wrongCount"] == 1
+
+
+def test_whole_paper_grading_helper_is_the_single_mistake_record_path(
+    client, active_session, monkeypatch
+):
+    session_id = active_session["id"]
+    owner = _session_owner(session_id)
+    first_id = active_session["questions"][0]["questionId"]
+    answers = {first_id: {"selectedAnswer": "B", "selectionIndex": 1}}
+    response = client.post(
+        f"/api/v1/learning/practice/sessions/{session_id}/complete",
+        json={
+            "revision": active_session["revision"],
+            "answers": answers,
+            "runtimeState": {"currentIndex": 0, "durationMs": 600},
+        },
+    )
+    assert response.status_code == 200, response.text
+    report = response.json()["report"]
+
+    # 单题 helper 是唯一判题入口：直接调用必须与整卷交卷结果一致。
+    async def grade_directly() -> dict:
+        async with AsyncSessionLocal() as db:
+            session = await db.get(PracticeSession, session_id)
+            refs = [item for item in session.question_order if isinstance(item, dict)]
+            ref = next(item for item in refs if item.get("questionId") == first_id)
+            rows = await practice_session_service._release_question_rows(
+                db, session.release_id
+            )
+            row = rows[first_id]
+            student = await db.get(User, owner)
+            draft = {"selectedAnswer": "B"}
+            graded = await practice_session_service._grade_session_selection(
+                db, owner, student, session, ref, row, draft, 1
+            )
+            await db.rollback()
+            return graded
+
+    graded = asyncio.run(grade_directly())
+    assert graded["questionId"] == first_id
+    assert graded["selectedAnswer"] == "B"
+    assert graded["correctAnswer"] == "A"
+    assert graded["correct"] is False
+    assert graded["submissionIndex"] == 1
+    assert graded["submittedAt"]
+    assert report["wrongQuestionIds"] == [first_id]
+
+
 def test_pause_continues_legacy_graded_answers_without_recounting_mistakes(
     client, active_session
 ):

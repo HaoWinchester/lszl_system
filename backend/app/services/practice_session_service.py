@@ -729,65 +729,28 @@ async def answer_session_question(
     row = release_rows.get(question_id)
     if row is None:
         raise _error(404, "PRACTICE_QUESTION_NOT_FOUND", "题目不存在于当前发布")
-    correct_answer = str((row.snapshot or {}).get("correctAnswer") or "")
-    mistake_status = ""
-    completion: dict = {}
+    # 旧逐题接口与整卷交卷共用同一个单题判题入口：不复制第二套错题逻辑。
+    submission_index = len(
+        [key for key, value in answers.items() if isinstance(value, dict)]
+    ) + 1
     try:
-        if session.mode == "revenge":
-            mistake_id = str(ref.get("mistakeId") or "")
-            mistake = await learning_service.record_revenge_answer(
-                db,
-                owner,
-                mistake_id,
-                {"selectedAnswer": selected_answer},
-                commit=False,
-            )
-            if mistake is None:
-                raise _error(404, "PRACTICE_MISTAKE_NOT_FOUND", "错题不存在或无权访问")
-            correct = selected_answer == correct_answer
-            mistake_status = mistake.status
-        else:
-            grading = await learning_service.record_practice_answer(
-                db,
-                owner,
-                {
-                    "questionId": question_id,
-                    "bankId": str(ref.get("bankId") or ""),
-                    "paperId": session.paper_id,
-                    "releaseId": session.release_id,
-                    "sourceMode": session.mode,
-                    "selectedAnswer": selected_answer,
-                    "timedOut": timed_out,
-                },
-                current_user=user,
-                commit=False,
-            )
-            correct = bool(grading.get("correct"))
-            completion = (
-                grading.get("completion")
-                if isinstance(grading.get("completion"), dict)
-                else {}
-            )
-    except PracticeSessionError:
+        answer = await _grade_session_selection(
+            db,
+            owner,
+            user,
+            session,
+            ref,
+            row,
+            {"selectedAnswer": selected_answer} | ({"timedOut": True} if timed_out else {}),
+            submission_index,
+        )
+    except PracticeSessionError as error:
+        # 旧接口错误语义保持不变。
+        if error.code == "PRACTICE_GRADE_FAILED":
+            raise _error(error.status_code, "PRACTICE_ANSWER_INVALID", error.message) from error
         raise
-    except ValueError as error:
-        raise _error(422, "PRACTICE_ANSWER_INVALID", str(error)) from error
-    except LookupError as error:
-        raise _error(404, "PRACTICE_QUESTION_NOT_FOUND", str(error)) from error
+    mistake_status = str(answer.get("mistakeStatus") or "")
 
-    answer = {
-        "questionId": question_id,
-        "selectedAnswer": selected_answer,
-        "correctAnswer": correct_answer,
-        "correct": correct,
-        "submittedAt": completion.get("completedAt") or now_utc().isoformat(),
-        "submissionIndex": len(answers) + 1,
-    }
-    if timed_out:
-        answer["timedOut"] = True
-    if session.mode == "revenge":
-        answer["mistakeId"] = str(ref.get("mistakeId") or "")
-        answer["mistakeStatus"] = mistake_status
     answers[question_id] = answer
     session.answers = answers
     previous_stats = session.stats if isinstance(session.stats, dict) else {}
@@ -1338,9 +1301,112 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
     }
 
 
+async def _grade_session_selection(
+    db: AsyncSession,
+    owner: str,
+    user: User,
+    session: PracticeSession,
+    ref: dict,
+    row: PaperReleaseQuestion,
+    draft: dict,
+    submission_index: int,
+) -> dict:
+    """Judge one selection against the frozen release snapshot.
+
+    整卷交卷与旧逐题接口共用这一个入口：错题/进度副作用全部在当前事务内
+    commit=False 记录，由调用方决定提交或整体回滚。
+    """
+
+    selected = str(draft.get("selectedAnswer") or "")
+    timed_out = draft.get("timedOut") is True
+    if timed_out:
+        selected = "__timeout__"
+    correct_answer = str((row.snapshot or {}).get("correctAnswer") or "")
+
+    mistake = None
+    completion: dict = {}
+    try:
+        if session.mode == "revenge":
+            mistake = await learning_service.record_revenge_answer(
+                db,
+                owner,
+                str(ref.get("mistakeId") or ""),
+                {"selectedAnswer": selected},
+                commit=False,
+                allow_concurrent=True,
+            )
+            if mistake is None:
+                raise _error(404, "PRACTICE_MISTAKE_NOT_FOUND", "错题不存在或无权访问")
+            correct = selected == correct_answer
+        else:
+            grading = await learning_service.record_practice_answer(
+                db,
+                owner,
+                {
+                    "questionId": ref["questionId"],
+                    "bankId": ref.get("bankId", ""),
+                    "paperId": session.paper_id,
+                    "releaseId": session.release_id,
+                    "sourceMode": session.mode,
+                    "selectedAnswer": selected,
+                    "timedOut": timed_out,
+                },
+                current_user=user,
+                commit=False,
+                allow_concurrent=True,
+            )
+            correct = bool(grading.get("correct"))
+            completion = (
+                grading.get("completion")
+                if isinstance(grading.get("completion"), dict)
+                else {}
+            )
+    except PracticeSessionError:
+        raise
+    except ValueError as error:
+        raise _error(422, "PRACTICE_GRADE_FAILED", str(error)) from error
+    except LookupError as error:
+        raise _error(
+            409, "PRACTICE_GRADE_FAILED", "判题失败：题目不再可用"
+        ) from error
+
+    answer = {
+        "questionId": ref["questionId"],
+        "selectedAnswer": selected,
+        "correctAnswer": correct_answer,
+        "correct": correct,
+        "submittedAt": completion.get("completedAt") or now_utc().isoformat(),
+        "submissionIndex": submission_index,
+    }
+    if timed_out:
+        answer["timedOut"] = True
+    if session.mode == "revenge":
+        answer["mistakeId"] = str(ref.get("mistakeId") or "")
+        answer["mistakeStatus"] = mistake.status
+    return answer
+
+
 async def complete_session(
-    db: AsyncSession, owner: str, session_id: str, data: dict
+    db: AsyncSession,
+    owner: str,
+    user: User,
+    session_id: str,
+    data: dict,
 ) -> tuple[dict, dict]:
+    # 终态幂等：重复交卷（网络重试等）先于解析新 body 返回冻结报告，
+    # 不重放判题、不重复产生经验/错题/完成事件。
+    existing = (
+        await db.execute(
+            select(PracticeSession).where(
+                PracticeSession.id == session_id,
+                PracticeSession.owner_id == owner,
+                PracticeSession.status == "completed",
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None and isinstance(existing.report_snapshot, dict):
+        return await _session_payload(db, existing), existing.report_snapshot
+
     requested_revision = _required_revision(data)
     session = await _session_for_update(db, owner, session_id)
     if session.status == "completed" and isinstance(session.report_snapshot, dict):
@@ -1349,7 +1415,52 @@ async def complete_session(
         raise _error(409, "PRACTICE_SESSION_TERMINAL", "已放弃的练习不能交卷")
     if session.revision != requested_revision:
         raise _revision_conflict(session)
+
+    refs = [item for item in session.question_order if isinstance(item, dict)]
+    rows = await _release_question_rows(db, session.release_id)
+
+    whole_paper = isinstance(data.get("answers"), dict)
+    if whole_paper:
+        # 整卷载荷：白名单校验后按 selectionIndex 排序，形成权威提交顺序。
+        draft = await _validated_draft_answers(db, session, data)
+        ordered = sorted(draft.items(), key=lambda pair: int(pair[1]["selectionIndex"]))
+        selections: list[tuple[str, dict]] = []
+        for question_id, selection in ordered:
+            row = rows.get(question_id)
+            if row is None:
+                raise _error(
+                    409,
+                    "PRACTICE_GRADE_FAILED",
+                    "判题失败：题目不存在于当前发布",
+                    questionId=question_id,
+                )
+            selections.append((question_id, selection))
+
+    if whole_paper:
+        # 一次锁定后开始逐题权威重算；任何一题失败都会在路由层整体回滚。
+        answers: dict[str, dict] = {}
+        for submission_index, (question_id, selection) in enumerate(selections, start=1):
+            ref = next(item for item in refs if item.get("questionId") == question_id)
+            answers[question_id] = await _grade_session_selection(
+                db, owner, user, session, ref, rows[question_id], selection, submission_index
+            )
+        session.answers = answers
+
+    runtime_state = dict(session.runtime_state or {})
     _apply_runtime_patch(session, data)
+    runtime_state.update(session.runtime_state or {})
+    current_answers = session.answers if isinstance(session.answers, dict) else {}
+    previous_stats = session.stats if isinstance(session.stats, dict) else {}
+    stats = _draft_stats(refs, rows, current_answers, previous_stats)
+    # 单一来源：完成态经验只由服务端按 submissionIndex 权威连击值决定。
+    stats["experience"] = _experience_for_answers(current_answers)
+    stats["durationMs"] = stats.get(
+        "durationMs", max(0, int(previous_stats.get("durationMs") or 0))
+    )
+    runtime_state["experience"] = stats["experience"]
+    session.stats = stats
+    session.runtime_state = runtime_state
+
     report = await _build_report(db, session)
     completed_at = now_utc()
     report["completedAt"] = completed_at.isoformat()
@@ -1371,9 +1482,7 @@ async def complete_session(
                 "paperName": "PMP 模拟练习",
                 "answered": counts["answered"],
                 "correct": counts["correct"],
-                "experience": max(
-                    0, int((session.stats or {}).get("experience") or 0)
-                ),
+                "experience": max(0, int(stats["experience"])),
                 "durationMs": report["durationMs"],
                 "status": "completed",
             },

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
 from app.models.question import Question, QuestionBank
-from app.models.paper_release import PaperRelease
+from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.training import (
     CanvasWorkspace,
     LearningEvent,
@@ -74,15 +74,23 @@ async def _progress(
     return result.scalar_one_or_none()
 
 
-async def _practice_write_lock(db: AsyncSession, owner: str, question_id: str) -> None:
+async def _practice_write_lock(
+    db: AsyncSession, owner: str, question_id: str, *, allow_concurrent: bool = False
+) -> None:
     """Serialize every state mutation for one learner/question pair.
 
     PostgreSQL transaction advisory locks also cover the first insert, where a
     row lock cannot exist yet.  Using the question (not the release) in the
     scope protects both the release-specific mistake row and the
     owner/question-unique training progress row.
+
+    整卷交卷已通过 PracticeSession 行级 FOR UPDATE 锁把同一学习者的交卷请求
+    串行化；此时按题重新排队可能形成跨题锁序，因此以 allow_concurrent 跳过
+    单题 advisory 锁，交给外层会话锁保证一次锁定、一次提交。
     """
 
+    if allow_concurrent:
+        return
     await db.execute(
         sql_text(
             "SELECT pg_advisory_xact_lock(hashtext(:owner), hashtext(:scope))"
@@ -216,6 +224,20 @@ def _practice_snapshot_knowledge(snapshot: dict) -> dict:
         "nodeId": node_id,
         "title": title or str(raw.get("title") or snapshot.get("topic") or "").strip(),
         "path": path,
+    }
+
+
+def _question_snapshot_from_payload(snapshot: dict) -> dict:
+    """Durable practice-snapshot projection of a frozen release question.
+
+    correctAnswer/metadata(答案元数据)/analysis 是判题内部数据，不进入长期错题快照；
+    options.correct 标记会被 redact_practice_question 在读取时统一剥离。
+    """
+
+    return {
+        key: deepcopy(value)
+        for key, value in (snapshot or {}).items()
+        if key not in {"correctAnswer", "analysis", "releaseScore", "metadata"}
     }
 
 
@@ -582,6 +604,7 @@ async def record_practice_answer(
     current_user: "object | None" = None,
     *,
     commit: bool = True,
+    allow_concurrent: bool = False,
 ) -> dict:
     """Grade a canvas answer from server-owned question content and update its mistake."""
 
@@ -616,7 +639,9 @@ async def record_practice_answer(
     if not canonical_answer:
         raise ValueError("题目尚未配置可判定的正确答案")
     correct = selected_answer == canonical_answer
-    await _practice_write_lock(db, owner, f"{release_id}:{question.id}")
+    await _practice_write_lock(
+        db, owner, f"{release_id}:{question.id}", allow_concurrent=allow_concurrent
+    )
     mistake = (
         await db.execute(
             select(PracticeMistake).where(
@@ -682,7 +707,32 @@ async def record_practice_answer(
         await db.commit()
         if mistake is not None:
             await db.refresh(mistake)
-    return {"correct": correct, "mistake": _practice_mistake_to_dict(mistake) if mistake else None, "completion": completion}
+        return {
+            "correct": correct,
+            "mistake": _practice_mistake_to_dict(mistake) if mistake else None,
+            "completion": completion,
+        }
+    # 外层事务（整卷交卷）还要继续写库：不做 refresh。新插入的 mistake 已有
+    # Python 侧默认值可读；既有行的 server_default/onupdate 时间戳列在提交后
+    # 才会过期加载，这里读取会触发同步 IO（MissingGreenlet），因此只返回判题
+    # 相关的权威事实（id/status/wrong_count 由调用方在需要时按 id 再查）。
+    if mistake is not None and mistake in db.new:
+        return {
+            "correct": correct,
+            "mistake": _practice_mistake_to_dict(mistake),
+            "completion": completion,
+        }
+    return {
+        "correct": correct,
+        "mistake": {
+            "id": mistake.id,
+            "status": mistake.status,
+            "wrongCount": mistake.wrong_count,
+        }
+        if mistake is not None
+        else None,
+        "completion": completion,
+    }
 
 
 async def list_practice_mistakes(db: AsyncSession, owner: str) -> list[dict]:
@@ -694,6 +744,87 @@ async def list_practice_mistakes(db: AsyncSession, owner: str) -> list[dict]:
         )
     ).scalars().all()
     return [_practice_mistake_to_dict(row, reveal_answer=False) for row in rows]
+
+
+async def record_mistake_from_release(
+    db: AsyncSession,
+    owner: str,
+    release_question: "PaperReleaseQuestion",
+    *,
+    paper_id: str,
+    source_mode: str,
+    selected_answer: str,
+    language_mode: str = "zh",
+    commit: bool = True,
+) -> PracticeMistake:
+    """Record a wrong answer for a question that only exists in a frozen release.
+
+    复用 PracticeMistake 长期错题模型：题干/解析来自 PaperReleaseQuestion 的
+    冻结快照，保证即使源 Question 被删除，错题本身仍然可复盘。
+    """
+
+    question_id = release_question.question_id
+    await _practice_write_lock(db, owner, question_id)
+    mistake = (
+        await db.execute(
+            select(PracticeMistake).where(
+                PracticeMistake.owner_id == owner,
+                PracticeMistake.question_id == question_id,
+                (
+                    PracticeMistake.release_id == release_question.release_id
+                    if release_question.release_id
+                    else PracticeMistake.release_id.is_(None)
+                ),
+            ).with_for_update()
+        )
+    ).scalar_one_or_none()
+    now = now_utc()
+    snapshot = release_question.snapshot or {}
+    knowledge = _practice_snapshot_knowledge(snapshot)
+    practice_snapshot = _question_snapshot_from_payload(snapshot)
+    if mistake is None:
+        mistake = PracticeMistake(
+            id=uid("pm_"),
+            owner_id=owner,
+            question_id=question_id,
+            bank_id=release_question.bank_id,
+            paper_id=paper_id or None,
+            release_id=release_question.release_id,
+            paper_version=0,
+            paper_name="发布试卷练习",
+            source_mode=source_mode[:32] or "challenge",
+            language_mode=language_mode.lower(),
+            question_snapshot=practice_snapshot,
+            knowledge=knowledge,
+            selected_answers=[selected_answer],
+            status="pending",
+            wrong_count=1,
+            first_wrong_at=now,
+            last_wrong_at=now,
+        )
+        db.add(mistake)
+    else:
+        mistake.question_snapshot = practice_snapshot
+        mistake.knowledge = knowledge
+        mistake.selected_answers = [*(mistake.selected_answers or []), selected_answer][-20:]
+        if mistake.status != "needs_remediation":
+            mistake.status = "pending"
+        mistake.wrong_count += 1
+        mistake.revenge_correct_count = 0
+        mistake.last_wrong_at = now
+        mistake.next_review_at = None
+        mistake.mastered_at = None
+    await _append_practice_event(
+        db,
+        owner,
+        event_type="PRACTICE_MISTAKE_RECORDED",
+        question_id=question_id,
+        payload={"mistakeId": mistake.id, "status": mistake.status, "knowledge": knowledge},
+    )
+    if commit:
+        await db.commit()
+        await db.refresh(mistake)
+    return mistake
 
 
 def _practice_stats(rows: list[PracticeMistake], now) -> dict:
@@ -778,13 +909,16 @@ async def record_revenge_answer(
     data: dict,
     *,
     commit: bool = True,
+    allow_concurrent: bool = False,
 ) -> PracticeMistake | None:
     mistake = await _practice_mistake(db, owner, mistake_id)
     if mistake is None:
         return None
     if not mistake.question_id:
         raise ValueError("错题已缺少可判定的原题")
-    await _practice_write_lock(db, owner, mistake.question_id)
+    await _practice_write_lock(
+        db, owner, mistake.question_id, allow_concurrent=allow_concurrent
+    )
     mistake = await _practice_mistake(db, owner, mistake_id, for_update=True)
     if mistake is None:
         return None
