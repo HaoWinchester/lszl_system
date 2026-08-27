@@ -72,4 +72,15 @@ assert(script.includes('KGPracticeAnswerSheet.mount'));
 assert(style.includes('.practice-answer-sheet'));
 assert(style.includes('.practice-answer-sheet-drawer'));
 assert(style.includes('@media (min-width:1024px)'));
+
+// ---- 解析入口收口契约：挑战/学霸不再自动弹解析，看解析走答题卡 ----
+// 挑战/学霸作答与超时后不得无条件自动渲染解析（autoExplain 旧开关路径已移除）
+assert(!script.includes('autoExplainEnabled()renderPracticeExplanation')&&!script.includes('if(autoExplainEnabled())renderPracticeExplanation'), 'answering must not auto-render explanation via autoExplain switch');
+assert(!script.includes('renderPracticeExplanation(question,false);renderAnswerSheet()'), 'scholar timeout must not auto-render explanation');
+// 导航行不再保留"自动解析"开关 DOM
+assert(!practice.includes('practiceAutoExplain'), 'auto-explain toggle must be removed from nav row');
+assert(!style.includes('.practice-explanation-toggle'), 'auto-explain toggle styles must be removed');
+// 解析入口收口：答题卡跳已答题展开；其他切题路径给"查看解析"按钮
+assert(script.includes('explanationRevealRequested'), 'answer-sheet navigation must set explanation reveal marker');
+assert(script.includes('查看解析'), 'manual reveal button required for answered questions');
 console.log('v90-p40-practice-mode-static-ok');

@@ -21,7 +21,7 @@
     feedbackTimer:0,popTimer:0,toastTimer:0,abandonedRecorded:false,catalogAvailable:false,retiredNavigation:null,retiredNoticeShown:false,
     remediationPending:false,verification:null,entryStartingMode:'',
     session:null,report:null,reviewing:false,answerSheet:null,pendingSelection:'',submitting:false,pendingRequestKey:'',resumeLookupToken:0,
-    draft:null,revengeState:null
+    draft:null,revengeState:null,explanationRevealRequested:false
   };
 
   function clone(value){try{return JSON.parse(JSON.stringify(value))}catch(error){return value}}
@@ -223,6 +223,9 @@
   }
   function navigateToQuestionId(questionId){
     const index=state.questions.findIndex(question=>question.id===text(questionId));if(index<0||(!state.active&&!state.reviewing))return false;
+    // 解析入口收口：挑战/学霸在游戏中通过答题卡跳到已答题时展开该题解析；
+    // 复仇模式与复盘阶段维持既有自动展开语义，不依赖该标记。
+    state.explanationRevealRequested=state.active&&!state.reviewing&&state.mode!=='revenge'&&state.index!==index;
     state.index=index;state.locked=false;dom.feedback.hidden=true;hideRemediation();clearVerification();renderQuestion();
     // 题号切题后统一关闭抽屉（无论来自答题卡跳题还是其他入口）
     if(dom.answerSheetDrawer&&!dom.answerSheetDrawer.hidden)closeAnswerSheetDrawer(true);
@@ -529,6 +532,8 @@
     const helpers=global.KGFreeModeLanguage;
     return helpers?.questionView?.(question.raw||question,languageMode())||null;
   }
+  // runtimeState.autoExplain 按旧契约继续上报（后端白名单仍接受该字段），
+  // 但挑战/学霸的解析展示已收口到答题卡，不再读取该开关驱动 UI。
   function autoExplainEnabled(){
     try{return global.KGActivitySchemaV1?.getPracticeAutoExplain?.()!==false}catch(error){return true}
   }
@@ -540,10 +545,35 @@
     const explanationMarkup=view?escapeHTML(languageText(view.explanation))+englishLine(view.explanation):escapeHTML(text(question?.raw?.analysis||question?.raw?.explanation||'暂无解析'));
     if(head){head.textContent=(correct?'回答正确':'回答错误')+' · '+correctText;head.className='practice-explanation-head '+(correct?'is-correct':'is-wrong')}
     if(body)body.innerHTML='<p class="practice-answer-line">'+escapeHTML(correctText)+'</p>'+explanationMarkup;
+    const actions=$('practiceExplanationActions');
+    if(actions)actions.innerHTML='';
+    clearExplanationReveal();
     panel.hidden=false;
     panel.scrollIntoView({behavior:'smooth',block:'nearest'});
   }
+  function clearExplanationReveal(){
+    document.getElementById('practiceExplanationReveal')?.remove();
+  }
+  // 挑战/学霸：解析面板在游戏中默认保持 hidden，"查看解析"按钮挂在面板后的独立容器，
+  // 点击后才展开面板（答题卡跳已答题时由 renderQuestion 置标记直接展开，不经过此按钮）。
+  function renderExplanationRevealButton(question,correct){
+    const panel=$('practiceExplanationPanel');if(!panel)return;
+    clearExplanationReveal();
+    panel.hidden=true;
+    const holder=document.createElement('div');
+    holder.className='practice-explanation-actions';
+    holder.id='practiceExplanationReveal';
+    const btn=document.createElement('button');
+    btn.type='button';btn.textContent='查看解析';
+    btn.addEventListener('click',()=>renderPracticeExplanation(question,correct));
+    holder.appendChild(btn);
+    panel.after(holder);
+  }
   function renderQuestion(){
+    // 挑战/学霸：非答题卡路径（上一题/下一题/滑动/恢复回放）消费一次标记后回到"按钮展开"；
+    // 答题卡跳已答题（navigateToQuestionId 置标记）与复仇/复盘自动展开路径都保留。
+    const revealRequested=state.explanationRevealRequested;
+    state.explanationRevealRequested=false;
     if(state.mode==='revenge'&&!state.verification?.active&&state.revengeState?.phase==='verification'&&state.revengeState?.verificationQuestion){
       const source=state.questions.find(item=>item.id===text(state.revengeState.questionId));
       const verificationQuestion=normalizeQuestion(state.revengeState.verificationQuestion,{questionId:state.revengeState.verificationQuestion.id,bankId:state.revengeState.verificationQuestion.bankId},0);
@@ -556,6 +586,7 @@
     const practiceAnswered=savedAnswer?{selected:text(savedAnswer.selectedAnswer),correct:savedAnswer.correct===true}:null;
     state.locked=false;dom.feedback.hidden=true;hideRemediation();dom.questionCard.classList.remove('is-timeout');
     if($('practiceExplanationPanel'))$('practiceExplanationPanel').hidden=true;
+    clearExplanationReveal();
     const view=questionLanguageView(question);
     if(view){
       dom.questionStem.innerHTML=escapeHTML(languageText(view.stem))+englishLine(view.stem);
@@ -571,7 +602,10 @@
     if(practiceAnswered){
       state.locked=true;lockOptions();
       revealOptionResult(practiceAnswered.selected,question.correctAnswer);
-      renderPracticeExplanation(question,practiceAnswered.correct);
+      // 解析可见性分流：复仇与复盘保持自动展开；挑战/学霸游戏中仅答题卡跳题
+      // 直接展开，其余（切题/恢复回放）显示"查看解析"按钮。
+      if(state.mode==='revenge'||state.reviewing||revealRequested)renderPracticeExplanation(question,practiceAnswered.correct);
+      else renderExplanationRevealButton(question,practiceAnswered.correct);
     }
     renderProgress();renderHealth();renderVerificationBanner();
     updateQuestionNav();
@@ -584,9 +618,6 @@
     if(!dom.questionNav)return;
     const navMode=state.active;
     dom.questionNav.hidden=!navMode;
-    // 自动解析开关仅练习模式可用（复仇模式解析由"答错才触发"规则驱动，不受开关控制）
-    const autoToggle=document.querySelector('.practice-explanation-toggle');
-    if(autoToggle)autoToggle.hidden=state.mode!=='practice';
     if(!navMode)return;
     dom.questionPos.textContent=(state.index+1)+' / '+state.questions.length;
     if(dom.prevBtn)dom.prevBtn.disabled=state.index<=0;
@@ -658,21 +689,10 @@
     state.answered=stats.answered;state.correct=Math.max(state.correct,stats.correct);
     state.locked=true;lockOptions();
     revealOptionResult(optionId,question.correctAnswer);
-    if(autoExplainEnabled())renderPracticeExplanation(question,correct);
-    else{
-      // 自动解析关闭时提供手动查看入口
-      const panel=$('practiceExplanationPanel'),actions=$('practiceExplanationActions');
-      if(panel&&actions){
-        panel.hidden=false;
-        $('practiceExplanationHead').textContent=(correct?'回答正确':'回答错误')+' · 正确答案：'+text(question.correctAnswer);
-        $('practiceExplanationHead').className='practice-explanation-head '+(correct?'is-correct':'is-wrong');
-        $('practiceExplanationBody').textContent='';
-        actions.innerHTML='';
-        const btn=document.createElement('button');btn.type='button';btn.textContent='查看解析';
-        btn.addEventListener('click',()=>renderPracticeExplanation(question,correct));
-        actions.appendChild(btn);
-      }
-    }
+    // 挑战/学霸：选中答案不再自动弹解析（看解析入口=答题卡跳回该题）；
+    // 复仇模式保留"答错即见解析与补救"的既有交互。
+    if(state.mode!=='revenge')renderExplanationRevealButton(question,correct);
+    else renderPracticeExplanation(question,correct);
     renderAnswerSheet();
     // 游戏反馈分支：挑战/学霸用生命与时间驱动，复仇用错题状态推进（全部本地）。
     if(state.mode==='revenge'){
@@ -721,7 +741,7 @@
     question.correctAnswer=text(selection?.answer?.correctAnswer||question.correctAnswer);
     const stats=state.draft.stats();
     state.answered=stats.answered;state.correct=Math.max(state.correct,stats.correct);
-    revealOptionResult('',question.correctAnswer);renderPracticeExplanation(question,false);renderAnswerSheet();
+    revealOptionResult('',question.correctAnswer);renderAnswerSheet();
     state.streak=0;hideStreakPop();state.health=Math.max(0,state.health-1);dom.questionCard.classList.add('is-timeout');
     showFeedback('超时 · -1 ♥','danger');renderHealth();
     if(state.health>0)setScholarSeconds(40);
@@ -1178,13 +1198,6 @@
     });
     global.addEventListener('kg:question-language-mode',syncLanguageCycle);
     syncLanguageCycle();
-    const autoExplain=$('practiceAutoExplain');
-    if(autoExplain){
-      autoExplain.checked=autoExplainEnabled();
-      autoExplain.addEventListener('change',()=>{
-        try{global.KGActivitySchemaV1?.setPracticeAutoExplain?.(autoExplain.checked)}catch(error){}
-      });
-    }
     if(dom.questionCard){
       let swipeStartX=0,swipeStartY=0;
       dom.questionCard.addEventListener('touchstart',event=>{const t=event.touches[0];swipeStartX=t.clientX;swipeStartY=t.clientY},{passive:true});
