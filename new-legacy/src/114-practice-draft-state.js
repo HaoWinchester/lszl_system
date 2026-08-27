@@ -27,13 +27,16 @@
       const value = answers[questionId]
       if (!question || !value || typeof value !== 'object') return
       if (!Object.prototype.hasOwnProperty.call(value, 'selectedAnswer')) return
+      const timedOut = value.timedOut === true
       const entry = {
-        selectedAnswer: text(value.selectedAnswer),
+        // 与后端 _judge 同构：timedOut 草稿一律按 '__timeout__' 判 false，
+        // 即使旧数据保留真实选项值，也不产生 correct:true 的口径分裂。
+        selectedAnswer: timedOut ? TIMEOUT_PLACEHOLDER : text(value.selectedAnswer),
         selectionIndex: Number.isInteger(Number(value.selectionIndex)) && value.selectionIndex != null
           ? Number(value.selectionIndex)
           : Object.keys(draft).length + 1,
       }
-      if (value.timedOut === true) entry.timedOut = true
+      if (timedOut) entry.timedOut = true
       draft[text(questionId)] = gradeLocal(question, entry.selectedAnswer, entry)
     })
     return draft

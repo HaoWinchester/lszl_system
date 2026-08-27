@@ -65,6 +65,27 @@ test('rehydrated server drafts rederive local correctness without trusting clien
   })
 })
 
+test('rehydrated legacy timedOut draft with a real option value normalizes to the backend placeholder', () => {
+  // 后端保存草稿只做白名单剥离（保留真实选项值 + timedOut），但终局判分把
+  // timedOut 一律按 '__timeout__' 判 false；前端恢复时必须与判分口径同构。
+  const answers = { q1: { selectedAnswer: 'A', selectionIndex: 1, timedOut: true } }
+  const draft = Core.create({ questions: buildQuestions(), answers })
+  assert.equal(draft.select('q1', 'A').accepted, false)
+  assert.deepEqual(plain(draft.viewAnswers()), {
+    q1: { selectedAnswer: '__timeout__', selectionIndex: 1, timedOut: true, correct: false, correctAnswer: 'A' },
+  })
+  assert.deepEqual(plain(draft.submission()), {
+    q1: { selectedAnswer: '__timeout__', selectionIndex: 1, timedOut: true },
+  })
+  assert.deepEqual(plain(draft.stats()), {
+    total: 2,
+    answered: 1,
+    correct: 0,
+    wrong: 1,
+    unanswered: 1,
+  })
+})
+
 test('timeout accepts an answer without a legal option and keeps the submission shape', () => {
   const draft = Core.create({ questions: buildQuestions(), answers: {} })
   const result = draft.select('q2', '', { timedOut: true })
