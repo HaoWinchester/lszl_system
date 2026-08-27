@@ -22,8 +22,9 @@ test('P4.5 practice workflow uses a database API adapter instead of a local mist
   assert.match(adapter, /request\('\/answers'/)
   assert.match(adapter, /async function verify\(mistakeId, input\)/)
   assert.match(practice, /KGPracticeLearningApi/)
-  assert.match(practice, /await api\.answer\(standardAnswerPayload\(question,optionId\)\)/)
-  assert.doesNotMatch(practice, /recordMistake\(question,\{selectedAnswer:optionId\}\)/)
+  // Task 5：正常作答一律走本地草稿判题，不再逐题调用数据库答案路由
+  assert.doesNotMatch(practice, /api\.answerSession\(/)
+  assert.doesNotMatch(practice, /await api\.answer\(standardAnswerPayload\(question,optionId\)\)/)
   assert.doesNotMatch(practice, /kg_practice_mistakes_v1/)
   assert.doesNotMatch(practice, /kg_practice_history_v1/)
   assert.doesNotMatch(practice, /sessionStorage/)
@@ -59,4 +60,27 @@ test('practice adapter exposes the complete resumable session lifecycle', () => 
   assert.match(adapter, /error\.status = response\.status/)
   assert.match(adapter, /error\.detail = payload\?\.detail \|\| payload/)
   assert.match(adapter, /kg:auth-required/)
+})
+
+test('practice mode grades locally and only writes whole-paper payloads on explicit save or submit', () => {
+  const practice = source('new-legacy/src/100-practice-mode.js')
+  // 统一草稿控制器
+  assert.match(practice, /KGPracticeDraftState\?\.create\(|KGPracticeDraftState\.create\(/)
+  assert.match(practice, /state\.draft\.select\(/)
+  // 正常作答/导航零写请求：删除逐题与索引写路由、autosave 与导航持久化
+  assert.doesNotMatch(practice, /answerSession\(/)
+  assert.doesNotMatch(practice, /persistCurrentIndex/)
+  assert.doesNotMatch(practice, /startAutosave/)
+  assert.doesNotMatch(practice, /\.updateState\(/)
+  assert.doesNotMatch(practice, /recordMistake\(/)
+  assert.doesNotMatch(practice, /\.answerRevenge\(/)
+  // 显式保存与交卷都带整卷 answers + runtimeState
+  assert.match(practice, /function submissionPayload\(\)/)
+  assert.match(practice, /submissionPayload\(\)/)
+  assert.match(practice, /submissionPayload\(\)[\s\S]{0,400}\.pauseSession\(/)
+  assert.match(practice, /\.\.\.payload/)
+  // dirty 才提醒离开；成功保存/交卷 markSaved 清除
+  assert.match(practice, /beforeunload/)
+  assert.match(practice, /isDirty\?\.?\(\)/)
+  assert.match(practice, /markSaved\(\)/)
 })

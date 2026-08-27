@@ -103,11 +103,13 @@ test('practice mode supports short published papers, truthful scholar rewards, a
   assert.doesNotMatch(practice, /showFeedback\('正确'\+\(state\.mode==='scholar'\?' · \+20 秒'/)
 })
 
-test('practice mistakes retain the exact published release identity', () => {
+test('practice mistakes keep release identity through local drafts and whole-paper submission', () => {
   const practice = source('new-legacy/src/100-practice-mode.js')
-  assert.match(practice, /await api\.answer\(standardAnswerPayload\(question,optionId\)\)/)
-  assert.match(practice, /async function recordMistake[\s\S]{0,900}releaseId:text\(release\?\.releaseId\)/)
-  assert.match(practice, /async function recordMistake[\s\S]{0,900}paperVersion:Number\(release\?\.version\|\|0\)/)
+  // Task 5：作答零写请求，release 身份由草稿题目引用携带，交卷时随整卷载荷服务端权威重算
+  assert.doesNotMatch(practice, /await api\.answer\(standardAnswerPayload\(question,optionId\)\)/)
+  assert.match(practice, /state\.draft\.select\(/)
+  assert.match(practice, /function submissionPayload\(\)/)
+  assert.match(practice, /bankId:text\(ref\?\.bankId/, 'draft questions must carry bank identity')
 })
 
 test('teacher imports honor duplicate settings and reject blank bank metadata', () => {

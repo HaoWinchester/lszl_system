@@ -33,16 +33,35 @@ assert.strictEqual(release.questions.length,1);assert.strictEqual(release.questi
 for(const id of ['practiceAnswerSheet','practiceAnswerSheetMobileBtn','practiceAnswerSheetDrawer','practiceSubmitConfirm','practiceSaveExitBtn','practiceAbandonBtn'])assert(practice.includes(`id="${id}"`),`missing ${id}`);
 assert(practice.includes('src/111-practice-session-core.js'));
 assert(practice.includes('src/112-practice-answer-sheet.js'));
+assert(practice.includes('src/114-practice-draft-state.js'));
+
+// ---- 本地即时判题与显式持久化契约（Task 5） ----
+// 开始/恢复会话必须创建内存草稿控制器
+assert(script.includes('KGPracticeDraftState?.create(')||script.includes('KGPracticeDraftState.create('), 'draft controller must be created');
+assert(script.includes('state.draft=')||script.includes('createDraft('), 'draft controller helper must exist');
+// 作答只走本地 draft.select，不再逐题请求
+assert(script.includes('state.draft.select('), 'answering must go through draft.select');
+assert(!script.includes('api.answerSession(')&&!script.includes('.answerSession('), 'per-question /answers route must be removed from answering flow');
+assert(!script.includes('.updateState(')&&!script.includes('persistCurrentIndex'), 'navigation must not persist index/state writes');
+assert(!script.includes('startAutosave')&&!script.includes('autosaveId'), 'short-interval autosave must be removed');
+// 正常作答不写长期错题账本
+assert(!script.includes('.answerRevenge('), 'revenge answers must stay local until submission');
+assert(!script.includes('.upsertWrong('), 'mistake upserts must not fire during practice');
+assert(!script.includes('recordMistake('), 'local timeout must not record mistakes over network');
+// 显式保存与交卷载荷
+assert(script.includes('function submissionPayload()'), 'explicit submission payload helper required');
+assert(script.includes('api.pauseSession(')||script.includes('.pauseSession('), 'save-and-exit uses pauseSession');
+assert(script.includes('.completeSession('), 'submit uses completeSession');
+assert(script.includes('markSaved()'), 'successful save/submit clears dirty state');
+assert(script.includes("event.returnValue=''"), 'beforeunload must expose native leave reminder');
+// 最后一题答完不自动交卷
+assert(!script.includes('finishPractice:advanceAfterAnswer'), 'last question must not auto-submit via finish timer choice');
+assert(script.includes('viewAnswers?.()')||script.includes('.viewAnswers()'), 'answer sheet renders from draft viewAnswers');
+
 assert(script.includes('api.startSession('));
 assert(script.includes('api.getActiveSessions('));
-assert(script.includes('api.answerSession('));
 assert(script.includes('timedOut:true'));
-assert(script.includes('api.getActiveSessions({mode})'));
-assert(script.includes('state.session.runtimeState?.revengeState'));
-assert(script.includes('api.updateState('));
-assert(script.includes('api.pauseSession('));
-assert(script.includes('api.completeSession('));
-assert(script.includes('api.abandonSession('));
+assert(script.includes('state.session.runtimeState?.revengeState')||script.includes('state.revengeState'));
 assert(script.includes('KGPracticeAnswerSheet.mount'));
 assert(style.includes('.practice-answer-sheet'));
 assert(style.includes('.practice-answer-sheet-drawer'));

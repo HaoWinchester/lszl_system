@@ -112,9 +112,16 @@ with sync_playwright() as playwright:
               window.confirm=()=>true;window.alert=()=>{};
             }"""
         )
-        practice_page.add_script_tag(
-            content=(ROOT / "src" / "100-practice-mode.js").read_text(encoding="utf-8")
-        )
+        for script_name in (
+            "src/111-practice-session-core.js",
+            "src/112-practice-answer-sheet.js",
+            "src/113-practice-result-report.js",
+            "src/114-practice-draft-state.js",
+            "src/100-practice-mode.js",
+        ):
+            practice_page.add_script_tag(
+                content=(ROOT / script_name).read_text(encoding="utf-8")
+            )
         practice_page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
         practice_page.locator("[data-practice-start='challenge']").click()
         wrong = practice_page.locator(".practice-option[data-option-id='A']")
