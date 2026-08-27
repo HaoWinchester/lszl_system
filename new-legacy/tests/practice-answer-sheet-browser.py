@@ -455,11 +455,10 @@ with sync_playwright() as playwright:
     open_sheet(page)
     assert sheet_roots(page) == 1
     assert page.locator("#practiceAnswerSheet [data-question-id]").count() == 10
-    # 底部圆角抽屉：贴住视口左右，底缘接近视口底部（圆角渲染允许少量偏差）
+    # 底部圆角抽屉：贴住视口左右；backdrop 的 align-items:flex-end 把面板锚定在视口底缘
     mobile_drawer = page.locator("#practiceAnswerSheetDrawer .practice-drawer").bounding_box()
     assert abs(mobile_drawer["x"]) <= 1.5, mobile_drawer
-    # max-height:760px 的布局断点会把抽屉高度压到 min(76vh) 以下，这里只断言底缘贴近视口底部区域
-    assert (mobile_drawer["y"] + mobile_drawer["height"]) >= 700, (mobile_drawer, 844)
+    assert abs((mobile_drawer["y"] + mobile_drawer["height"]) - 844) <= 2.0, (mobile_drawer, 844)
     assert mobile_drawer["width"] >= 389, mobile_drawer
     close_via(page, "close")
     page.set_viewport_size({"width": 1440, "height": 960})

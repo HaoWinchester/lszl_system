@@ -49,6 +49,28 @@ test('toggle entry stays visible at every viewport width', () => {
   assert.doesNotMatch(css, /\.practice-answer-sheet-mobile-btn\{display:none/);
 });
 
+// brief Step 3：答题卡入口必须是 topbar 最右侧元素（最后一个可见子元素）
+test('answer sheet toggle sits at the far right end of the game topbar', () => {
+  const topbarMatch = html.match(/<header class="practice-game-topbar">([\s\S]*?)<\/header>/);
+  assert.ok(topbarMatch, 'game topbar markup missing');
+  const topbar = topbarMatch[1];
+  const toggleIndex = topbar.indexOf('id="practiceAnswerSheetMobileBtn"');
+  assert.ok(toggleIndex >= 0, 'toggle missing from topbar');
+  // 开关按钮所在 <button> 元素闭合之后，不允许再出现任何可见兄弟元素（仅允许带 hidden 属性的占位节点）
+  const buttonEnd = topbar.slice(toggleIndex).indexOf('</button>') + '</button>'.length;
+  const tail = topbar.slice(toggleIndex + buttonEnd);
+  const trailingTags = tail.match(/<(?:button|div|span|aside|nav)\b[^>]*>/g) || [];
+  const visibleTrailing = trailingTags.filter(tag => !/\shidden[\s=>]/.test(tag));
+  assert.equal(
+    visibleTrailing.length, 0,
+    `answer sheet toggle must be the last visible topbar child; found after it: ${visibleTrailing.join(', ')}`
+  );
+  for (const siblingId of ['practiceProgressShell', 'practiceHealth', 'practiceLanguageCycle', 'practiceTimer']) {
+    const index = topbar.indexOf(`id="${siblingId}"`);
+    assert.ok(index >= 0 && index < toggleIndex, `${siblingId} must precede the answer sheet toggle`);
+  }
+});
+
 test('drawer keeps a side-sheet form factor above the bottom-sheet breakpoint', () => {
   // 基础样式：右侧进入的窄抽屉，不带底部圆角弹层形态
   const drawer = css.match(/\.practice-answer-sheet-drawer \.practice-drawer\{[^}]*\}/);
