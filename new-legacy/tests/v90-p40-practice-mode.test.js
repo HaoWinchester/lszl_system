@@ -54,6 +54,12 @@ assert(script.includes('api.pauseSession(')||script.includes('.pauseSession('), 
 assert(script.includes('.completeSession('), 'submit uses completeSession');
 assert(script.includes('markSaved()'), 'successful save/submit clears dirty state');
 assert(script.includes("event.returnValue=''"), 'beforeunload must expose native leave reminder');
+// 复仇验证题派生不承诺"同知识点"
+assert(!script.includes('同知识点验证题'), 'verification toast must not promise same-knowledge items');
+assert(script.includes('当前没有可用的验证题'), 'neutral verification unavailable toast required');
+// 无死代码：sessionAnswer 孤儿与 sessionWrite 残留必须清除
+assert(!script.includes('function sessionAnswer('), 'unused sessionAnswer helper must be removed');
+assert(!script.includes('state.sessionWrite'), 'orphaned sessionWrite queue references must be removed');
 // 最后一题答完不自动交卷
 assert(!script.includes('finishPractice:advanceAfterAnswer'), 'last question must not auto-submit via finish timer choice');
 assert(script.includes('viewAnswers?.()')||script.includes('.viewAnswers()'), 'answer sheet renders from draft viewAnswers');

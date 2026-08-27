@@ -291,6 +291,31 @@ with sync_playwright() as playwright:
     revenge_writes_before = writes(page)
     assert revenge_writes_before == [], revenge_writes_before
 
+    # ---------- 复仇作答交互：真实点击选项，零写请求 + 本地反馈 ----------
+    # mock 复仇题目正确答案 A；故意答错（选 B）触发补救分支
+    page.evaluate("window.__writes=[]")
+    page.locator('[data-option-id="B"]').click()
+    page.wait_for_timeout(100)
+    assert writes(page) == [], writes(page)
+    assert "is-wrong" in (page.locator('[data-option-id="B"]').get_attribute("class") or "")
+    assert "is-correct" in (page.locator('[data-option-id="A"]').get_attribute("class") or "")
+    # 答错触发补救面板
+    page.wait_for_timeout(600)
+    remediation_visible = page.locator("#practiceRemediationPanel").is_visible()
+    assert remediation_visible, page.evaluate("document.body.dataset.practiceView")
+
+    # 本地验证题派生：点击"开始验证"后可作答另一道题，仍然零写请求
+    page.locator("#practiceRemediationContinueBtn").click()
+    page.wait_for_timeout(200)
+    verification_active = page.evaluate("()=>document.body.dataset.practicePhase==='verification'")
+    if verification_active:
+        page.evaluate("window.__writes=[]")
+        page.locator('[data-option-id="B"]').click()
+        page.wait_for_timeout(100)
+        assert writes(page) == [], writes(page)
+        assert "is-wrong" in (page.locator('[data-option-id="B"]').get_attribute("class") or "")
+        page.wait_for_timeout(800)
+
     # ---------- 移动端答题卡抽屉回归（复仇会话保持 active） ----------
     page.set_viewport_size({"width": 390, "height": 844})
     page.wait_for_timeout(120)
@@ -314,7 +339,18 @@ with sync_playwright() as playwright:
     revenge_pauses = [write for write in writes(page) if write["name"] == "pause"]
     assert len(revenge_pauses) == 1, writes(page)
     assert all(write["name"] not in ("answers", "state", "revengeAnswer", "upsertWrong", "remediation", "verification") for write in writes(page)), writes(page)
-    assert "runtimeState" in revenge_pauses[-1]["body"]
+    pause_body = revenge_pauses[-1]["body"]
+    assert "runtimeState" in pause_body
+    # 本地选择进入整卷载荷：包含刚才答错的那道题，且带合法 selectionIndex、无客户端真值
+    revenge_answers = pause_body["answers"]
+    assert len(revenge_answers) >= 1, revenge_answers
+    assert all("correct" not in entry and entry.get("selectionIndex") >= 1 for entry in revenge_answers.values()), revenge_answers
+    wrong_entries = [entry for entry in revenge_answers.values() if entry.get("selectedAnswer") == "B"]
+    assert wrong_entries, revenge_answers
+    # 若进入了补救/验证阶段，runtimeState 带上对应 phase 快照供恢复
+    revenge_runtime = pause_body["runtimeState"]
+    if verification_active:
+        assert revenge_runtime.get("revengeState", {}).get("phase") in ("remediation", "verification"), revenge_runtime
     assert page.locator("#practiceLobby").is_visible(), page.evaluate("document.body.dataset.practiceView")
 
     page.set_viewport_size({"width": 1440, "height": 960})

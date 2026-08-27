@@ -135,7 +135,6 @@
   function sessionQuestions(session){
     return (Array.isArray(session?.questions)?session.questions:[]).map((item,index)=>normalizeQuestion(item?.question||{},item,index)).filter(question=>question.stem&&question.options.length>=2);
   }
-  function sessionAnswer(question){return state.session?.answers?.[question?.id]||null}
   function runtimeState(){
     const remainingMs=state.mode==='scholar'?Math.max(0,state.deadline-Date.now()):undefined;
     const runtime={currentIndex:Math.max(0,state.index),health:Math.max(0,Number(state.health)||0),streak:Math.max(0,Number(state.streak)||0),maxStreak:Math.max(0,Number(state.maxStreak)||0),experience:Math.max(0,Number(state.experience)||0),durationMs:elapsed(),languageMode:languageMode(),autoExplain:autoExplainEnabled()};
@@ -196,7 +195,7 @@
     const button=dom.sessionConflictReload;button?.setAttribute('aria-busy','true');if(button)button.disabled=true;
     try{
       const api=practiceApi(),latest=await api.getSession(state.session.id),catalog=state.releases.find(row=>row.releaseId===latest.releaseId)||selectedRelease();
-      state.sessionWrite=Promise.resolve();setConflictVisible(false);
+      setConflictVisible(false);
       if(latest.status==='completed'){
         state.session=normalizedSession(latest);state.questions=sessionQuestions(state.session);state.report=await api.getReport(latest.id);state.active=false;state.reviewing=false;renderFrozenReport();setView('result');return true;
       }
@@ -359,8 +358,8 @@
     dom.remediationMessage.textContent=verificationFailed
       ? '验证题未通过，说明这个知识点还不稳定。请再次查看题目解析后继续补救。'
       : recoveredCorrect
-        ? '原错题已经答对。请再做一道同知识点的不同题，确认不是只记住了答案。'
-        : '这道题在复仇模式中再次答错。先看解析并重新建立判断规则，再做同知识点验证题。';
+        ? '原错题已经答对。请再做一道不同的验证题，确认不是只记住了答案。'
+        : '这道题在复仇模式中再次答错。先看解析并重新建立判断规则，再做验证题。';
     const explanation=remediationExplanation(question);
     // 复仇新规则：补救面板出现时自动展开题目解析（答错即见正确答案与解析）
     if(dom.remediationExplanation){
@@ -387,12 +386,12 @@
   }
   async function startRemediationVerification(){
     // 复仇补救验证只存在于本地草稿：未交卷不调用服务端推进长期错题状态，
-    // 验证题从复仇队列的下一道错题派生（冻结快照同知识点），保存/恢复时随 revengeState 走。
+    // 验证题从复仇卷中的另一道冻结快照题派生，保存/恢复时随 revengeState 走。
     if(!state.active||state.mode!=='revenge'||!state.remediationPending)return false;
     const sourceQuestion=state.questions[state.index];
     if(!sourceQuestion?.mistakeId)return false;
     const fallback=(state.questions.find(question=>question.id!==sourceQuestion.id&&question.stem&&question.options.length>=2))||null;
-    if(!fallback){showToast('当前没有可用的同知识点验证题。');return false}
+    if(!fallback){showToast('当前没有可用的验证题。');return false}
     state.verification={active:true,sourceQuestion,question:fallback};
     state.revengeState={phase:'verification',mistakeId:sourceQuestion.mistakeId,questionId:sourceQuestion.id,verificationQuestion:clone(fallback.raw)};
     hideRemediation();document.body.dataset.practicePhase='verification';renderQuestion();return true;
@@ -613,7 +612,12 @@
     }
     showFeedback(correct?'验证通过 · 明日再验证':'验证未通过 · 继续补救',correct?'success':'danger');
     verification.sourceQuestion.mistakeStatus=correct?verification.sourceQuestion.mistakeStatus:'needs_remediation';
-    state.revengeState=null;
+    // 保留最近复仇阶段供保存/恢复：验证通过回到待再验证；未通过回到补救面板
+    state.revengeState={
+      phase:correct?'verification_due':'remediation',
+      mistakeId:verification.sourceQuestion.mistakeId,
+      questionId:verification.sourceQuestion.id,
+    };
     state.feedbackTimer=global.setTimeout(()=>finishRemediationVerification(correct),correct?900:620);
     renderHealth();
     return Promise.resolve(correct);
