@@ -1,5 +1,7 @@
 # 正式环境 v186 部署与备份验证
 
+后续修复：17:54 已部署后端 start 422 修复，前端仍为 v186。本文记录首次部署，当前后端与验证补充见 [已发布试卷选题修复](2026-08-28-practice-start-inventory-hotfix.md)。
+
 用户明确要求部署到正式环境，并在部署前备份。目标为 `https://lszl.aihuanpu.com`，目录 `/home/ubuntu/lszl-kg`，Compose 项目 `lszl-kg`；UAT 未更新或重启。
 
 ## 版本与切换
