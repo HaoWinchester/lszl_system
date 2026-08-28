@@ -2,7 +2,7 @@
 
 日期：2026-08-28
 
-状态：设计已获用户确认，功能已实施；正在执行最终发布验收。
+状态：已实施并通过验收，测试环境已发布 v9.0-p4.1.186。详见 docs/verification/2026-08-28-practice-modes-explanations-experience.md。
 
 ## 1. 已确认范围
 

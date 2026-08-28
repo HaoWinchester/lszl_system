@@ -3,11 +3,11 @@
   "fromVersion": "v9.0-p4.1.186",
   "toVersion": "v9.0-p4.1.186",
   "changes": {
-    "added": [],
-    "changed": [
-      "src/100-practice-mode.js",
-      "tests/practice-answer-sheet-browser.py"
+    "added": [
+      ".DS_Store",
+      "assets/.DS_Store"
     ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []

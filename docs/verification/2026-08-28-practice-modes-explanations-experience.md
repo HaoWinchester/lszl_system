@@ -36,11 +36,16 @@
 
 ## 发布检查
 
-- 隔离候选 973 个文件；原 active 972 个文件。业务路径无丢失。
+- 主目录预发布候选 975 个文件；原 active 972 个文件。逐项核对路径集合，零文件丢失。独立工作树候选为 973 个文件，差异为下面的两个 Finder 元数据。
 - 新增且仅新增：`src/115-practice-mode-policy.js`、`src/116-practice-session-save.js`、`tests/practice-session-save.test.js`。
-- 差额含原 active 独有的 `.DS_Store`、`assets/.DS_Store` 两个 Finder 元数据；不属于业务内容。没有将本地 Python 编译缓存发布。
+- 工作树不含 `.DS_Store`、`assets/.DS_Store` 两个 Finder 元数据；主目录正式候选保留原有两文件。没有将本地 Python 编译缓存发布。
 - `admin-console.html`、做题页及共享模块存在；正式 promote 继续使用项目发布工具，不手工覆盖 release site。
-- 正式发布、HTTP 内容核对及远端 SHA：待收尾记录。
+- 测试数据库已备份至 `/tmp/lszl-before-practice-v186-20260828.dump`（600 权限，已验证归档可读）；停旧后端后执行迁移，新后端健康检查通过。原有 4 份已完成会话均已建立经验基线。
+- 已通过 `node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser` 正式 promote；`current.json` 指向 `v9.0-p4.1.186/site`，时间 2026-08-28 16:18:30（北京时间）。该命令执行文件门禁；API、浏览器与视觉回归由上列独立测试完成，不将 skip 标记当作浏览器测试通过。
+- 正式 active 与预发布候选的 975 个文件逐个 SHA-256 完全一致。HTTP 的 8 个关键静态资源与 active 一致，6 个 JS 业务模块同时与权威源一致。HTML 版本正确，差异仅为已核对的服务端游客首屏与 direct-bootstrap 注入。
+- 实际 5173 做题页面加载新策略和保存模块，无 JavaScript 页面错误；没有在共享库创建试答会话。完整业务回归使用独立数据库和相同候选内容。
+- 主分支合并后再次验证：后端 614 passed（241.43 秒）；前端 268 passed；设计契约 5 passed；真实 API 浏览器矩阵 15 组通过。
+- 业务提交：`bd0b80c`（后端）、`dcb054a`（前端与回归）；已快进合入 main。远端引用在任务收尾时按仓库规则通过代理推送并核对。
 
 ## 已知边界
 
