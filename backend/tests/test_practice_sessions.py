@@ -38,7 +38,9 @@ def _practice_fixture_ids() -> dict[str, str]:
     }
 
 
-async def _seed_released_pmp_paper(ids: dict[str, str]) -> None:
+async def _seed_released_pmp_paper(
+    ids: dict[str, str], *, domains: list[str] | None = None
+) -> None:
     async with AsyncSessionLocal() as db:
         db.add_all(
             [
@@ -77,7 +79,8 @@ async def _seed_released_pmp_paper(ids: dict[str, str]) -> None:
         )
         await db.flush()
         questions: list[Question] = []
-        domains = ["people"] * 25 + ["process"] * 30 + ["business-environment"] * 5
+        if domains is None:
+            domains = ["people"] * 25 + ["process"] * 30 + ["business-environment"] * 5
         for index, domain in enumerate(domains):
             question_id = f"practice-session-q-{ids['release'][-10:]}-{index:03d}"
             question = Question(
@@ -529,7 +532,8 @@ def test_active_and_detail_sessions_are_owner_scoped() -> None:
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
 
-def test_start_session_rejects_domain_shortage_without_cross_domain_fill() -> None:
+@pytest.mark.parametrize("mode", ["challenge", "scholar", "practice"])
+def test_start_session_accepts_published_inventory_without_domain_recomposition(mode) -> None:
     ids = _practice_fixture_ids()
     asyncio.run(_seed_released_pmp_paper(ids))
     asyncio.run(_remove_business_environment_inventory(ids["release"]))
@@ -545,15 +549,59 @@ def test_start_session_rejects_domain_shortage_without_cross_domain_fill() -> No
                 json={
                     "paperId": ids["paper"],
                     "releaseId": ids["release"],
-                    "mode": "challenge",
+                    "mode": mode,
                     "count": 60,
                     "order": "paper",
                 },
             )
-        assert response.status_code == 422
-        detail = response.json()["detail"]
-        assert detail["code"] == "PRACTICE_DOMAIN_SHORTAGE"
-        assert detail["shortages"] == {"business-environment": 5}
+        assert response.status_code == 200, response.text
+        session = response.json()["session"]
+        assert len(session["questions"]) == 60
+        assert session["domainTargets"] == {
+            "people": 30, "process": 30, "business-environment": 0,
+        }
+        assert [ref["orderIndex"] for ref in session["questionOrder"]] == list(range(60))
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+@pytest.mark.parametrize("domains, expected_targets", [
+    (["people"] * 83 + ["process"] * 92 + ["business-environment"] * 10,
+     {"people": 83, "process": 92, "business-environment": 5}),
+    (["process"] * 101 + ["people"] * 84,
+     {"people": 79, "process": 101, "business-environment": 0}),
+], ids=["production-paper-03-distribution", "production-paper-04-distribution"])
+def test_180_question_published_papers_start_save_and_restore_in_all_modes(domains, expected_targets):
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids, domains=domains))
+    try:
+        with TestClient(app) as client:
+            assert client.post("/api/v1/auth/login", json={
+                "username": ids["student"], "password": PASSWORD,
+            }).status_code == 200
+            for mode in ("challenge", "scholar", "practice"):
+                response = client.post("/api/v1/learning/practice/sessions/start", json={
+                    "paperId": ids["paper"], "releaseId": ids["release"],
+                    "mode": mode, "count": 180, "order": "paper",
+                })
+                assert response.status_code == 200, response.text
+                session = response.json()["session"]
+                assert len(session["questions"]) == 180
+                assert session["domainTargets"] == expected_targets
+                assert [ref["orderIndex"] for ref in session["questionOrder"]] == list(range(180))
+                first_id = session["questions"][0]["questionId"]
+                assert session["questions"][0]["question"]["correctAnswer"] == "A"
+                saved = client.post(f"/api/v1/learning/practice/sessions/{session['id']}/pause", json={
+                    "revision": session["revision"],
+                    "answers": {first_id: {"selectedAnswer": "A", "selectionIndex": 1}},
+                    "runtimeState": {"currentIndex": 1},
+                })
+                assert saved.status_code == 200, saved.text
+                restored = client.get(f"/api/v1/learning/practice/sessions/{session['id']}")
+                assert restored.status_code == 200
+                assert restored.json()["session"]["questionOrder"] == session["questionOrder"]
+                assert restored.json()["session"]["stats"]["correct"] == 1
+                assert restored.json()["session"]["answers"][first_id]["selectedAnswer"] == "A"
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
@@ -1041,7 +1089,12 @@ def test_complete_freezes_nonofficial_report_and_is_idempotent_and_owner_scoped(
 
 def test_report_uses_frozen_question_scores_and_history_reopens_by_session_id() -> None:
     ids = _practice_fixture_ids()
-    asyncio.run(_seed_released_pmp_paper(ids))
+    # 练习现在保留发布顺序；报告夹具显式安排前 10 题的 4/5/1 分布，
+    # 不再依赖开始会话时重新按配比抽题来构造报告测试数据。
+    asyncio.run(_seed_released_pmp_paper(ids, domains=(
+        ["people"] * 4 + ["process"] * 5 + ["business-environment"]
+        + ["people"] * 21 + ["process"] * 25 + ["business-environment"] * 4
+    )))
     try:
         with TestClient(app) as client:
             assert client.post(

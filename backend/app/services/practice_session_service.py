@@ -114,91 +114,35 @@ def _select_questions(
     seed: str,
     weights: dict[str, int],
 ) -> tuple[list[dict], dict[str, int], bool]:
-    targets = paper_composition_service.allocate_counts(weights, count)
-    buckets: dict[str, list[PaperReleaseQuestion]] = {
-        domain: [] for domain in weights
-    }
-    for row in rows:
-        domain = _domain_for_snapshot(row.snapshot or {})
-        if domain in buckets:
-            buckets[domain].append(row)
-
-    domain_data_complete = all(
-        _domain_for_snapshot(row.snapshot or {}) in buckets for row in rows
-    )
-    if not domain_data_complete:
-        candidates = list(rows)
-        if order == "random":
-            candidates.sort(key=lambda row: _stable_random_key(seed, row))
-        else:
-            candidates.sort(key=lambda row: row.order_index)
-        selected_rows = candidates[:count]
-        if len(selected_rows) < count:
-            raise _error(
-                422,
-                "PRACTICE_QUESTION_SHORTAGE",
-                "试卷题量不足，无法开始本次练习",
-                available=len(selected_rows),
-                requested=count,
-            )
-        legacy_order = [
-            {
-                "questionId": row.question_id,
-                "bankId": row.bank_id,
-                "orderIndex": row.order_index,
-                "domain": _domain_for_snapshot(row.snapshot or {}),
-                "score": _score_for_snapshot(row.snapshot or {}),
-            }
-            for row in selected_rows
-        ]
-        legacy_targets = {
-            domain: sum(1 for item in legacy_order if item.get("domain") == domain)
-            for domain in weights
-        }
-        return legacy_order, legacy_targets, False
-
-    shortages = {
-        domain: target - len(buckets[domain])
-        for domain, target in targets.items()
-        if len(buckets[domain]) < target
-    }
-    if shortages:
+    # 已发布试卷直接使用冻结题目；领域配比由新组卷/发布预检负责，
+    # 不能在学习入口重新组卷而拦住题量充足的历史试卷。
+    if len(rows) < count:
         raise _error(
             422,
-            "PRACTICE_DOMAIN_SHORTAGE",
-            "试卷领域题量不足，无法按当前配比开始练习",
-            domainTargets=targets,
-            shortages=shortages,
+            "PRACTICE_QUESTION_SHORTAGE",
+            "试卷题量不足，无法开始本次练习",
+            available=len(rows),
+            requested=count,
         )
-
-    selected: list[tuple[PaperReleaseQuestion, str]] = []
-    for domain, target in targets.items():
-        candidates = buckets[domain]
-        if order == "random":
-            candidates = sorted(candidates, key=lambda row: _stable_random_key(seed, row))
-        else:
-            candidates = sorted(candidates, key=lambda row: row.order_index)
-        selected.extend((row, domain) for row in candidates[:target])
-
     if order == "random":
-        selected.sort(key=lambda item: _stable_random_key(seed, item[0]))
+        candidates = sorted(rows, key=lambda row: _stable_random_key(seed, row))
     else:
-        selected.sort(key=lambda item: item[0].order_index)
-
-    return (
-        [
-            {
-                "questionId": row.question_id,
-                "bankId": row.bank_id,
-                "orderIndex": row.order_index,
-                "domain": domain,
-                "score": _score_for_snapshot(row.snapshot or {}),
-            }
-            for row, domain in selected
-        ],
-        targets,
-        True,
-    )
+        candidates = sorted(rows, key=lambda row: row.order_index)
+    selected = [
+        {
+            "questionId": row.question_id,
+            "bankId": row.bank_id,
+            "orderIndex": row.order_index,
+            "domain": _domain_for_snapshot(row.snapshot or {}),
+            "score": _score_for_snapshot(row.snapshot or {}),
+        }
+        for row in candidates[:count]
+    ]
+    targets = {
+        domain: sum(1 for ref in selected if ref["domain"] == domain)
+        for domain in weights
+    }
+    return selected, targets, all(ref["domain"] in weights for ref in selected)
 
 
 def _question_snapshot_for_session(
