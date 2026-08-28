@@ -84,3 +84,19 @@ assert.deepEqual(JSON.parse(JSON.stringify(Core.answerSheetStats(invalid))), {
 });
 
 console.log('practice-session-core-ok');
+
+// The same policy protects question rendering and answer-sheet actions.
+const policyPath=path.join(root,'src/115-practice-mode-policy.js');
+if(fs.existsSync(policyPath))vm.runInContext(fs.readFileSync(policyPath,'utf8'),context);
+const policy=context.window.KGPracticeModePolicy;
+assert(policy, 'a shared mode policy must control question and answer-sheet actions');
+for(const mode of ['challenge','scholar']){
+  assert.equal(policy.forMode(mode).canExplain,false);
+  assert.equal(policy.forMode(mode).canSubmit,false);
+  assert.equal(policy.forMode(mode).autoComplete,true);
+}
+assert.equal(policy.forMode('practice').showHealth,false);
+assert.equal(policy.forMode('practice').showTimer,false);
+assert.equal(policy.forMode('practice').canExplain,true);
+assert.equal(policy.forMode('practice',{reviewOnly:true}).canAnswer,false);
+assert.equal(policy.forMode('revenge').canSubmit,true);

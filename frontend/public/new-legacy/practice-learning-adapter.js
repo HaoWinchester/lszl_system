@@ -149,15 +149,15 @@
   async function verifySession(sessionId, mistakeId, input) {
     return clone(await request(`/sessions/${encodeURIComponent(sessionId)}/mistakes/${encodeURIComponent(mistakeId)}/verification`, { method: 'POST', body: JSON.stringify(input || {}) }))
   }
-  async function pauseSession(sessionId, input) {
-    const payload = await request(`/sessions/${encodeURIComponent(sessionId)}/pause`, { method: 'POST', body: JSON.stringify(input || {}) })
+  async function pauseSession(sessionId, input, options = {}) {
+    const payload = await request(`/sessions/${encodeURIComponent(sessionId)}/pause`, { method: 'POST', body: JSON.stringify(input || {}), keepalive: options.keepalive === true })
     return clone(payload.session || null)
   }
-  async function completeSession(sessionId, input) {
-    return clone(await request(`/sessions/${encodeURIComponent(sessionId)}/complete`, { method: 'POST', body: JSON.stringify(input || {}) }))
+  async function completeSession(sessionId, input, options = {}) {
+    return clone(await request(`/sessions/${encodeURIComponent(sessionId)}/complete`, { method: 'POST', body: JSON.stringify(input || {}), keepalive: options.keepalive === true }))
   }
-  async function abandonSession(sessionId, input) {
-    const payload = await request(`/sessions/${encodeURIComponent(sessionId)}/abandon`, { method: 'POST', body: JSON.stringify(input || {}) })
+  async function abandonSession(sessionId, input, options = {}) {
+    const payload = await request(`/sessions/${encodeURIComponent(sessionId)}/abandon`, { method: 'POST', body: JSON.stringify(input || {}), keepalive: options.keepalive === true })
     return clone(payload.session || null)
   }
   async function getReport(sessionId) {

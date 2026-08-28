@@ -62,7 +62,7 @@ with sync_playwright() as playwright:
     )
     for stylesheet in ["styles/main.css", "styles/practice-mode.css"]:
         page.add_style_tag(content=(ROOT / stylesheet).read_text(encoding="utf-8"))
-    for script in ["src/111-practice-session-core.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/114-practice-draft-state.js", "src/100-practice-mode.js"]:
+    for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/114-practice-draft-state.js", "src/100-practice-mode.js"]:
         page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(100)
@@ -81,32 +81,9 @@ with sync_playwright() as playwright:
     snapshot = page.evaluate("window.KGPracticeMode.snapshot()")
     assert snapshot["answered"] == 1 and snapshot["correct"] == 0 and snapshot["health"] == 2
 
-    # 全部答完也不自动交卷：超过原 1.2s 自动交卷窗口仍停留 game 且零写请求
+    assert page.locator("#practiceExplanationPanel").is_hidden()
+    assert page.locator("#practiceExplanationReveal").count() == 0
     page.wait_for_timeout(1400)
-    assert page.locator("#practiceGame").is_visible()
-    assert not page.locator("#practiceResult").is_visible()
-    assert page.evaluate("window.__practiceWrites") == []
-
-    # dirty 时原生离开提醒；不发起任何网络请求
-    prevented_dirty = page.evaluate(
-        "()=>{const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented}"
-    )
-    assert prevented_dirty is True
-
-    # 只有明确点击答题卡“交卷”才产生唯一一次整卷写请求（答题卡折叠在抽屉内：先开抽屉）
-    page.evaluate("""() => {
-      const api=window.KGPracticeLearningApi;
-      const original=api.recordSession;
-      api.recordSession=async input=>{
-        const started=window.__practiceWrites.length;
-        await original(input);
-        return {};
-      };
-    }""")
-    page.locator('#practiceAnswerSheetMobileBtn').click()
-    page.wait_for_timeout(320)
-    page.locator('#practiceAnswerSheet [data-answer-submit]').first.click()
-    page.wait_for_timeout(200)
     assert page.locator("#practiceResult").is_visible()
     writes = page.evaluate("window.__practiceWrites")
     assert [write[0] for write in writes].count("recordSession") == 1, writes

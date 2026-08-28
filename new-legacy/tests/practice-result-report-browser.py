@@ -58,6 +58,14 @@ with sync_playwright() as playwright:
     page.locator('[data-review-question="q7"]').click()
     assert page.evaluate("window.reviewed") == "q7"
 
+    assert page.locator('[data-report-review-all]').count() == 0
+    page.evaluate("""report=>KGPracticeResultReport.render(document.querySelector('#report'),report,
+      {experience:42,onReviewAll:()=>window.reviewed='all'})""", report)
+    assert "本次经验" in page.locator('.practice-report-counts').inner_text()
+    assert "42" in page.locator('.practice-report-counts').inner_text()
+    page.locator('[data-report-review-all]').click()
+    assert page.evaluate("window.reviewed") == "all"
+
     incomplete = {**report, "domainDataComplete": False}
     page.evaluate(
         """report=>KGPracticeResultReport.render(document.querySelector('#report'),report)""",

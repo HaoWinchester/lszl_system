@@ -1,17 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.184",
-  "toVersion": "v9.0-p4.1.185",
+  "fromVersion": "v9.0-p4.1.186",
+  "toVersion": "v9.0-p4.1.186",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
       "src/100-practice-mode.js",
-      "tests/practice-answer-sheet-browser.py",
-      "tests/practice-challenge-health-browser.py",
-      "tests/v90-p40-practice-mode-browser.py",
-      "tests/v90-p40-practice-mode.test.js"
+      "tests/practice-answer-sheet-browser.py"
     ],
     "removed": []
   },

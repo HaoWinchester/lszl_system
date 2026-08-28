@@ -29,7 +29,7 @@
       questions,
       answers,
       runtimeState,
-      stats: answerSheetStats({ questions, answers }),
+      stats: { ...clone(source.stats, {}), ...answerSheetStats({ questions, answers }) },
     }
   }
 

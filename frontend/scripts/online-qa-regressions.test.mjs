@@ -98,7 +98,7 @@ test('practice mode supports short published papers, truthful scholar rewards, a
   assert.match(adapter, /request\('\/sessions'/)
   assert.match(routes, /@router\.post\("\/learning\/practice\/sessions"\)/)
   assert.doesNotMatch(practice, /(?:session|local)Storage/)
-  assert.match(practice, /if\(!state\.active\|\|state\.locked\)return false/)
+  assert.match(practice, /if\(!state\.active\|\|state\.locked\|\|state\.submitting\|\|state\.pendingRequestKey\|\|state\.conflict\|\|state\.reconciling\)return false/)
   assert.doesNotMatch(practice, /pagehide[^\n]*saveRecord\('abandoned'/)
   assert.doesNotMatch(practice, /showFeedback\('正确'\+\(state\.mode==='scholar'\?' · \+20 秒'/)
 })

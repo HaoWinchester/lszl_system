@@ -66,7 +66,7 @@ MOCK_BACKEND = r"""()=>{
       return clone(session);
     },
     pauseSession:async(id,input)=>{record('pause');Object.assign(session.runtimeState,input.runtimeState||{});Object.assign(session.answers||{},input.answers||{});session.stats=stats(session);session.revision+=1;session.status='paused';return clone(session)},
-    completeSession:async(id,input)=>{record('complete');session.status='completed';session.revision+=1;return {session:clone(session),report:{sessionId:id,resultLabel:'模拟考试结果：FAIL',passed:false,scorePercent:0,passPercent:60,overallBand:'needsImprovement',counts:{total:TOTAL,answered:0,correct:0,wrong:0,unanswered:TOTAL},domainWeights:{},domains:{},wrongQuestionIds:[],durationMs:1000,official:false,disclaimer:'mock'}}},
+    completeSession:async(id,input)=>{record('complete');Object.assign(session.runtimeState,input.runtimeState||{});Object.assign(session.answers,input.answers||{});session.stats=stats(session);session.status='completed';session.revision+=1;return {session:clone(session),report:{sessionId:id,resultLabel:'模拟考试结果：FAIL',passed:false,scorePercent:0,passPercent:60,overallBand:'needsImprovement',counts:{total:TOTAL,answered:0,correct:0,wrong:0,unanswered:TOTAL},domainWeights:{},domains:{},wrongQuestionIds:[],durationMs:1000,official:false,disclaimer:'mock'}}},
     abandonSession:async(id,input)=>{record('abandon');session.status='abandoned';session.revision+=1;return clone(session)},
     getReport:async id=>({sessionId:id,resultLabel:'模拟考试结果：FAIL',passed:false,scorePercent:0,passPercent:60,overallBand:'needsImprovement',counts:{total:TOTAL,answered:0,correct:0,wrong:0,unanswered:TOTAL},domainWeights:{},domains:{},wrongQuestionIds:[],durationMs:1000,official:false,disclaimer:'mock'}),
     listSessions:async()=>[],clearSessions:async()=>{},
@@ -110,7 +110,7 @@ with sync_playwright() as playwright:
     page.evaluate(MOCK_BACKEND)
     for stylesheet in ["styles/main.css", "styles/practice-mode.css"]:
         page.add_style_tag(content=(ROOT / stylesheet).read_text(encoding="utf-8"))
-    for script in ["src/111-practice-session-core.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/114-practice-draft-state.js", "src/100-practice-mode.js"]:
+    for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/114-practice-draft-state.js", "src/100-practice-mode.js"]:
         page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(150)
@@ -195,14 +195,15 @@ with sync_playwright() as playwright:
     assert health_count(page) == "51/54"
     abandon()
 
-    # 最后一题才用尽生命也必须弹窗（不能被末题提前 return 跳过）。
+    # 最后一题用尽生命：自动结算并保留失败事实，不让旧弹窗挡住结果页。
     page.evaluate("window.__seedProgress({wrong:53,correct:126,health:1});window.KGPracticeMode.showLobby()")
     start()
     answer_wrong(page)
+    page.locator("#practiceResult").wait_for(state="visible")
     assert health_count(page) == "0/54"
-    assert not fail_hidden(page)
-    page.locator("#practiceFailContinueBtn").click()
-    abandon()
+    assert fail_hidden(page)
+    assert page.locator("#practiceChallengeResult").inner_text() == "挑战失败"
+    page.evaluate("window.KGPracticeMode.showLobby()")
 
     # 选 180 题不能静默恢复旧 10 题；取消必须保留旧会话，确认后才放弃并新建。
     page.evaluate("window.__seedProgress({count:10});window.KGPracticeMode.showLobby();window.__calls=[]")
@@ -234,7 +235,20 @@ with sync_playwright() as playwright:
     page.locator('[data-practice-start="scholar"]').click()
     page.wait_for_function("document.body.dataset.practiceView === 'game'")
     assert health_label(page) == "剩余血量 7 / 18"
-    abandon()
+    # 保存响应在途时冻结超时判题，避免请求已捕获草稿后又新增答案。
+    page.evaluate("""() => {
+      window.__originalPause=KGPracticeLearningApi.pauseSession;
+      KGPracticeLearningApi.pauseSession=()=>new Promise((resolve,reject)=>{window.__rejectPause=reject});
+    }""")
+    before_save = page.evaluate("KGPracticeMode.snapshot().answered")
+    page.locator("#practiceExitBtn").click()
+    page.locator("#practiceSaveExitBtn").click()
+    page.clock.fast_forward(65000)
+    assert page.evaluate("KGPracticeMode.snapshot().answered") == before_save
+    page.evaluate("() => { window.__rejectPause(new Error('retry')); KGPracticeLearningApi.pauseSession=window.__originalPause; }")
+    page.wait_for_timeout(30)
+    page.locator("#practiceAbandonBtn").click()
+    page.wait_for_function("document.body.dataset.practiceView === 'lobby'")
 
     # 放弃旧练习失败时不新建、不吞掉旧进度；下一次操作可以重试。
     page.evaluate("""()=>{

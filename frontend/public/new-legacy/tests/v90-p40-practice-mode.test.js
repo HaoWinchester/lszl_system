@@ -51,8 +51,8 @@ assert(!script.includes('.upsertWrong('), 'mistake upserts must not fire during 
 assert(!script.includes('recordMistake('), 'local timeout must not record mistakes over network');
 // 显式保存与交卷载荷
 assert(script.includes('function submissionPayload()'), 'explicit submission payload helper required');
-assert(script.includes('api.pauseSession(')||script.includes('.pauseSession('), 'save-and-exit uses pauseSession');
-assert(script.includes('.completeSession('), 'submit uses completeSession');
+assert(script.includes("saveCoordinator().save('pause'"), 'save-and-exit uses shared coordinator');
+assert(script.includes("saveCoordinator().save('complete'"), 'completion uses shared coordinator');
 assert(script.includes('markSaved()'), 'successful save/submit clears dirty state');
 assert(script.includes("event.returnValue=''"), 'beforeunload must expose native leave reminder');
 // 复仇验证题派生不承诺"同知识点"
@@ -61,7 +61,7 @@ assert(script.includes('当前没有可用的验证题'), 'neutral verification 
 // 无死代码：sessionAnswer 孤儿与 sessionWrite 残留必须清除
 assert(!script.includes('function sessionAnswer('), 'unused sessionAnswer helper must be removed');
 assert(!script.includes('state.sessionWrite'), 'orphaned sessionWrite queue references must be removed');
-// 最后一题答完不自动交卷
+// 自动结束由全卷已答数量判断，不按当前游标位置判断
 assert(!script.includes('finishPractice:advanceAfterAnswer'), 'last question must not auto-submit via finish timer choice');
 assert(script.includes('viewAnswers?.()')||script.includes('.viewAnswers()'), 'answer sheet renders from draft viewAnswers');
 
@@ -74,14 +74,12 @@ assert(style.includes('.practice-answer-sheet'));
 assert(style.includes('.practice-answer-sheet-drawer'));
 assert(style.includes('@media (min-width:1024px)'));
 
-// ---- 解析入口收口契约：挑战/学霸不再自动弹解析，看解析走答题卡 ----
-// 挑战/学霸作答与超时后不得无条件自动渲染解析（autoExplain 旧开关路径已移除）
-assert(!script.includes('autoExplainEnabled()renderPracticeExplanation')&&!script.includes('if(autoExplainEnabled())renderPracticeExplanation'), 'answering must not auto-render explanation via autoExplain switch');
-assert(!script.includes('renderPracticeExplanation(question,false);renderAnswerSheet()'), 'scholar timeout must not auto-render explanation');
-// 导航行不再保留"自动解析"开关 DOM
-assert(!practice.includes('practiceAutoExplain'), 'auto-explain toggle must be removed from nav row');
-assert(!style.includes('.practice-explanation-toggle'), 'auto-explain toggle styles must be removed');
-// 解析入口收口：答题卡跳已答题展开；其他切题路径给"查看解析"按钮
-assert(script.includes('explanationRevealRequested'), 'answer-sheet navigation must set explanation reveal marker');
-assert(script.includes('查看解析'), 'manual reveal button required for answered questions');
+// 普通练习统一解析开关；挑战与学霸由共享策略禁止展示解析和手动交卷。
+assert(practice.includes('practiceAutoExplain'));
+assert(style.includes('.practice-explanation-toggle'));
+assert(script.includes('shouldShowExplanation()'));
+assert(!script.includes('explanationRevealRequested'));
+assert(!script.includes('renderExplanationRevealButton'));
+assert(practice.includes('src/115-practice-mode-policy.js'));
+assert(practice.includes('src/116-practice-session-save.js'));
 console.log('v90-p40-practice-mode-static-ok');

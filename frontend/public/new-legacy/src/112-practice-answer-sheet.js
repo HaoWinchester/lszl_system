@@ -53,7 +53,7 @@
         </div>`}
         <div class="practice-answer-number-grid">${numbers || '<p class="practice-answer-filter-empty">该筛选下暂无题目</p>'}</div>
         <div class="practice-answer-sheet-legend"><span><i class="is-correct"></i>正确</span><span><i class="is-wrong"></i>错误</span><span><i class="is-unanswered"></i>未答</span></div>
-        ${snapshot.reviewOnly || snapshot.status === 'completed' ? '' : '<button type="button" class="practice-answer-submit" data-answer-submit="true">交卷并查看成绩</button>'}`
+        ${!global.KGPracticeModePolicy.forMode(snapshot.mode,{reviewOnly:snapshot.reviewOnly}).canSubmit || snapshot.status === 'completed' ? '' : '<button type="button" class="practice-answer-submit" data-answer-submit="true">交卷并查看成绩</button>'}`
       return stats
     }
 
@@ -69,7 +69,7 @@
         options.onNavigate?.(numberButton.dataset.questionId)
         return
       }
-      if (event.target.closest?.('[data-answer-submit]')) options.onSubmit?.()
+      if (event.target.closest?.('[data-answer-submit]') && snapshot?.status !== 'completed' && global.KGPracticeModePolicy.forMode(snapshot?.mode,{reviewOnly:snapshot?.reviewOnly}).canSubmit) options.onSubmit?.()
     })
 
     return Object.freeze({ render, filter: () => activeFilter })

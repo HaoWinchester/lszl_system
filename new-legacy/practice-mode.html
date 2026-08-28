@@ -179,8 +179,10 @@
             <div class="practice-explanation-body" id="practiceExplanationBody"></div>
             <div class="practice-explanation-actions" id="practiceExplanationActions"></div>
           </div>
+          <button type="button" class="practice-primary-btn" id="practiceSettlementRetry" hidden>重试结算</button>
           <div class="practice-question-nav" id="practiceQuestionNav" hidden>
             <button type="button" class="practice-nav-btn" id="practicePrevBtn" aria-label="上一题"><span data-kg-icon="chevron-left" data-kg-icon-size="16" aria-hidden="true"></span>上一题</button>
+            <label id="practiceExplanationToggle" class="practice-explanation-toggle" hidden><input type="checkbox" id="practiceAutoExplain" checked/><span>显示解析</span></label>
             <span class="practice-question-pos" id="practiceQuestionPos">1 / 10</span>
             <button type="button" class="practice-nav-btn" id="practiceNextBtn" aria-label="下一题">下一题<span data-kg-icon="chevron-right" data-kg-icon-size="16" aria-hidden="true"></span></button>
           </div>
@@ -259,11 +261,11 @@
   <div class="practice-drawer-backdrop" id="practiceHistoryDrawer" hidden aria-hidden="true">
     <aside class="practice-drawer practice-history-drawer" role="dialog" aria-modal="true" aria-labelledby="practiceHistoryTitle">
       <header class="practice-drawer-head">
-        <div><span>LEARNING RECORDS</span><h2 id="practiceHistoryTitle">学习记录</h2><p>查看当前账号最近完成的练习</p></div>
+        <div><span>LEARNING RECORDS</span><h2 id="practiceHistoryTitle">学习记录</h2><p>查看当前账号已保存和已完成的练习</p></div>
         <button type="button" class="practice-drawer-close" id="practiceHistoryCloseBtn" aria-label="关闭学习记录">×</button>
       </header>
       <div class="practice-drawer-toolbar practice-history-toolbar"><span id="practiceHistorySummary">暂无练习记录</span><button type="button" id="practiceClearHistoryBtn">清空记录</button></div>
-      <div class="practice-drawer-body"><div id="practiceHistoryList" class="practice-history-list"></div><div class="practice-history-empty" id="practiceHistoryEmpty">完成一次练习后，记录会显示在这里。</div></div>
+      <div class="practice-drawer-body"><div id="practiceHistoryList" class="practice-history-list"></div><div class="practice-history-empty" id="practiceHistoryEmpty">保存或完成一次练习后，记录会显示在这里。</div></div>
     </aside>
   </div>
 
@@ -293,8 +295,8 @@
   <div class="practice-exit-backdrop" id="practiceExitConfirm" hidden aria-hidden="true">
     <section class="practice-exit-dialog" role="dialog" aria-modal="true" aria-labelledby="practiceExitTitle">
       <h2 id="practiceExitTitle">退出本次练习？</h2>
-      <p>你可以保存并退出，下次从当前进度继续；放弃后则无法恢复。</p>
-      <div><button type="button" class="practice-secondary-btn" id="practiceExitCancel">继续做题</button><button type="button" class="practice-primary-btn" id="practiceSaveExitBtn">保存并退出</button><button type="button" class="practice-danger-btn" id="practiceAbandonBtn">放弃本次练习</button><button type="button" id="practiceExitConfirmBtn" hidden>退出练习</button></div>
+      <p>保存并退出可下次继续；结束本次后无法恢复。两种退出方式都会结算本次已获得的经验。</p>
+      <div><button type="button" class="practice-secondary-btn" id="practiceExitCancel">继续做题</button><button type="button" class="practice-primary-btn" id="practiceSaveExitBtn">保存并退出</button><button type="button" class="practice-danger-btn" id="practiceAbandonBtn">结束本次并退出</button><button type="button" id="practiceExitConfirmBtn" hidden>退出练习</button></div>
     </section>
   </div>
 
@@ -324,9 +326,11 @@
   <script defer src="src/59-published-paper-repository.js"></script>
   <script defer src="src/110-learning-loading.js"></script>
   <script defer src="src/111-practice-session-core.js"></script>
+  <script defer src="src/115-practice-mode-policy.js"></script>
   <script defer src="src/112-practice-answer-sheet.js"></script>
   <script defer src="src/113-practice-result-report.js"></script>
   <script defer src="src/114-practice-draft-state.js"></script>
+  <script defer src="src/116-practice-session-save.js"></script>
   <script defer src="src/100-practice-mode.js"></script>
 </body>
 </html>

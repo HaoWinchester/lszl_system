@@ -77,10 +77,25 @@ test('practice mode grades locally and only writes whole-paper payloads on expli
   // 显式保存与交卷都带整卷 answers + runtimeState
   assert.match(practice, /function submissionPayload\(\)/)
   assert.match(practice, /submissionPayload\(\)/)
-  assert.match(practice, /submissionPayload\(\)[\s\S]{0,400}\.pauseSession\(/)
   assert.match(practice, /\.\.\.payload/)
   // dirty 才提醒离开；成功保存/交卷 markSaved 清除
   assert.match(practice, /beforeunload/)
   assert.match(practice, /isDirty\?\.?\(\)/)
   assert.match(practice, /markSaved\(\)/)
+})
+
+test('session lifecycle sends keepalive only when explicitly requested', async () => {
+  const { runInNewContext } = await import('node:vm')
+  const calls=[]
+  const window={addEventListener(){},fetch:async(url,options)=>{
+    calls.push({url,options})
+    return {ok:true,json:async()=>({session:{id:'s1'},report:{}})}
+  }}
+  runInNewContext(source('frontend/scripts/new-legacy-assets/practice-learning-adapter.js'),{window,URLSearchParams})
+  for(const name of ['pauseSession','abandonSession','completeSession']){
+    await window.KGPracticeLearningApi[name]('s1',{revision:1})
+    await window.KGPracticeLearningApi[name]('s1',{revision:1},{keepalive:true})
+  }
+  assert.deepEqual(calls.map(call=>call.options.keepalive===true),[false,true,false,true,false,true])
+  assert(calls.every(call=>call.options.credentials==='include'))
 })

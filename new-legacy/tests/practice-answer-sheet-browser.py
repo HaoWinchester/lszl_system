@@ -166,6 +166,7 @@ with sync_playwright() as playwright:
             abandonSession:async(id,input)=>{record('abandon',input);session.status='abandoned';session.revision+=1;return normalize()},
             completeSession:async(id,input)=>{
               record('complete',input);
+              if(window.__completeFailNext){window.__completeFailNext=false;throw new Error('temporary completion failure')}
               if(window.__completeCalls.length)return {session:normalize(),report};
               window.__completeCalls.push(input);
               if(input.revision!==session.revision)throw Object.assign(new Error('stale revision'),{status:409});
@@ -194,7 +195,7 @@ with sync_playwright() as playwright:
           window.KGPaperAccessService={inspect:()=>({allowed:true,accessLevel:'free'})};
           window.KGQuestionCatalogAdapter={ready:Promise.resolve()};
           window.KGLearningLoading={show:()=>{},hide:()=>{}};
-          window.KGActivitySchemaV1={getPracticeAutoExplain:()=>true,getLanguageMode:()=> 'zh',setPracticeAutoExplain:()=>{}};
+          window.KGActivitySchemaV1={getPracticeAutoExplain:()=>window.__autoExplain!==false,getLanguageMode:()=>window.__lang||'zh',setPracticeAutoExplain:value=>{window.__autoExplain=value},setLanguageMode:value=>{window.__lang=value;window.dispatchEvent(new CustomEvent('kg:question-language-mode'))}};
           window.KGFreeModeLanguage={};
           window.fetch=async(url,options={})=>{
             record('fetch',{url:String(url)});
@@ -204,15 +205,59 @@ with sync_playwright() as playwright:
     )
     for stylesheet in ["styles/main.css", "styles/practice-mode.css"]:
         page.add_style_tag(content=(ROOT / stylesheet).read_text(encoding="utf-8"))
-    for script in ["src/111-practice-session-core.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/114-practice-draft-state.js", "src/100-practice-mode.js"]:
+    for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/114-practice-draft-state.js", "src/100-practice-mode.js"]:
         page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(120)
+
+    # 普通练习从历史进入；可重做，无生命/时间，解析由统一开关控制。
+    page.evaluate("KGPracticeLearningApi.listSessions=async()=>[{sessionId:'old-round',paperId:'paper-1',paperName:'PMP 模拟卷',mode:'challenge',answered:10,correct:8,status:'completed',createdAt:new Date().toISOString(),reportAvailable:false}]")
+    page.locator('#practiceHistoryOpenBtn').click()
+    for width in (1280, 390):
+        page.set_viewport_size({"width": width, "height": 900})
+        page.wait_for_timeout(200)
+        progress = page.locator('.practice-history-row.is-paper > div:first-child > span')
+        assert progress.is_visible()
+        assert "已答 10 题" in progress.inner_text()
+        assert page.locator('.practice-history-row').evaluate("el => el.scrollWidth <= el.clientWidth + 1")
+        page.screenshot(path=f"/tmp/practice-history-{width}.png")
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.locator('[data-history-practice]').first.click()
+    assert page.evaluate('KGPracticeMode.snapshot().mode') == 'practice'
+    assert page.locator('#practiceHealth').is_hidden()
+    assert page.locator('#practiceTimeRow').is_hidden()
+    assert page.locator('#practiceExplanationPanel').is_hidden()
+    page.evaluate('window.__writes=[]')
+    page.locator('[data-option-id="B"]').click()
+    page.wait_for_timeout(700)
+    assert page.evaluate('KGPracticeMode.snapshot().index') == 0
+    assert page.locator('#practiceExplanationPanel').is_visible()
+    assert page.locator('#practiceExplanationReveal').count() == 0
+    page.locator('#practiceAutoExplain').uncheck()
+    assert page.locator('#practiceExplanationPanel').is_hidden()
+    page.locator('#practiceAutoExplain').check()
+    assert page.locator('#practiceExplanationPanel').is_visible()
+    page.locator('#practiceNextBtn').click()
+    assert page.locator('#practiceExplanationPanel').is_hidden()
+    page.locator('#practicePrevBtn').click()
+    assert page.locator('[data-option-id="B"]').is_disabled()
+    assert page.locator('#practiceExplanationPanel').is_visible()
+    assert writes(page) == []
+    page.locator('#practiceExitBtn').click()
+    page.locator('#practiceSaveExitBtn').click()
+    page.wait_for_timeout(200)
+    page.evaluate('KGPracticeLearningApi.listSessions=async()=>[]')
 
     # ---------- challenge：作答与导航零写请求 ----------
     page.locator('[data-practice-start="challenge"]').click()
     page.wait_for_timeout(200)
     assert page.locator("#practiceGame").is_visible(), page.evaluate("document.body.dataset.practiceView")
+
+    # 隐藏的兼容 DOM 也必须遵守模式策略，不能绕过入口提前交卷。
+    before_complete = names(page).count('complete')
+    page.evaluate("document.getElementById('practiceSubmitAnywayBtn').click()")
+    page.wait_for_timeout(100)
+    assert names(page).count('complete') == before_complete
 
     # ---------- Task 6：答题卡单实例默认关闭，桌面 1280px 无常驻预留 ----------
     assert sheet_roots(page) == 1
@@ -289,14 +334,9 @@ with sync_playwright() as playwright:
     page.locator("#practicePrevBtn").click()
     page.wait_for_timeout(120)
     assert writes(page) == [], writes(page)
-    # 上一题切回已答题：面板保持收起，给"查看解析"按钮，点击后才展开
-    reveal_btn = page.locator("#practiceExplanationReveal button", has_text="查看解析")
-    assert reveal_btn.is_visible()
+    # 挑战回看也不展示解析或单独按钮。
+    assert page.locator("#practiceExplanationReveal").count() == 0
     assert page.locator("#practiceExplanationPanel").is_hidden()
-    reveal_btn.click()
-    page.wait_for_timeout(80)
-    assert page.locator("#practiceExplanationPanel").is_visible()
-    assert "正确答案：A" in page.locator("#practiceExplanationPanel").inner_text()
     for question_id in ["q4", "q7"]:
         jump_via_sheet(page, f'[data-question-id="{question_id}"]')
         assert_sheet_closed(page)
@@ -318,49 +358,17 @@ with sync_playwright() as playwright:
 
     # 答题卡跳回已答题 q7：自动展开该题解析
     jump_via_sheet(page, '[data-question-id="q7"]')
-    assert page.locator("#practiceExplanationPanel").is_visible()
-    assert "正确答案：A" in page.locator("#practiceExplanationPanel").inner_text()
+    assert page.locator("#practiceExplanationPanel").is_hidden()
     # 答题卡跳到未答题：面板收起（不留旧题内容），选项可作答
     jump_via_sheet(page, '[data-question-id="q2"]')
     assert page.locator("#practiceExplanationPanel").is_hidden()
     assert page.locator("#practiceOptions button[disabled]").count() == 0
 
-    # 未答确认弹窗路径：交卷按钮 -> 提示还有未答 -> 返回第一道未答题
+    # 挑战无交卷入口；不能打开旧确认框。
     open_sheet(page)
-    page.locator('#practiceAnswerSheet [data-answer-submit]').click()
-    page.wait_for_timeout(80)
-    assert page.locator("#practiceSubmitConfirm").is_visible()
-    assert "未作答" in page.locator("#practiceSubmitMessage").inner_text()
-    page.locator("#practiceSubmitReturnBtn").click()
-    page.wait_for_timeout(150)
-    assert "第 2 道题" in page.locator("#practiceQuestionStem").inner_text(), page.locator("#practiceQuestionStem").inner_text()
-    assert names(page).count("complete") == 0, writes(page)
-
-    # 把剩余 8 题答完（复习路径只经本地判题）：答完最后一题仍停留 game
-    while True:
-        answered_ids = page.evaluate(
-            "()=>Array.from(document.querySelectorAll('#practiceAnswerSheet [data-question-id]')).filter(b=>b.className.includes('is-correct')||b.className.includes('is-wrong')).map(b=>b.dataset.questionId)"
-        )
-        if len(answered_ids) >= 10:
-            break
-        jump_target = page.evaluate(
-            "()=>{const b=Array.from(document.querySelectorAll('#practiceAnswerSheet [data-question-id]')).find(el=>!el.className.includes('is-correct')&&!el.className.includes('is-wrong'));return b?b.dataset.questionId:null}"
-        )
-        assert jump_target, answered_ids
-        view = page.evaluate("document.body.dataset.practiceView")
-        assert view == "game", "answer-sheet navigation must not be interrupted by a checkpoint"
-        current_id = page.evaluate("()=>{const el=document.querySelector('#practiceAnswerSheet [aria-current=step]');return el?el.dataset.questionId:null}")
-        if current_id != jump_target:
-            jump_via_sheet(page, f'[data-question-id="{jump_target}"]')
-            page.wait_for_timeout(100)
-        page.locator("#practiceOptions button:not([disabled])").first.click()
-        page.wait_for_timeout(620)
-
-    # 全部答完仍停留在 game（不自动交卷），且没有新的写请求
-    page.wait_for_timeout(1200)
-    assert page.locator("#practiceGame").is_visible(), page.evaluate("document.body.dataset.practiceView")
-    assert not page.locator("#practiceResult").is_visible()
-    assert names(page) == [], writes(page)
+    assert page.locator('#practiceAnswerSheet [data-answer-submit]').count() == 0
+    close_via(page, "close")
+    assert names(page).count("complete") == 0
 
     # dirty 时原生离开提醒
     prevented_dirty = page.evaluate("()=>{const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented}")
@@ -386,7 +394,7 @@ with sync_playwright() as playwright:
     pause_writes = [write for write in writes(page) if write["name"] == "pause"]
     assert len(pause_writes) == 2, writes(page)
     pause_body = pause_writes[-1]["body"]
-    assert set(pause_body["answers"].keys()) == {'q%d' % i for i in range(1, 11)}, sorted(pause_body["answers"].keys())
+    assert set(pause_body["answers"].keys()) == {'q1', 'q7'}, sorted(pause_body["answers"].keys())
     assert all(answer.get("selectionIndex") >= 1 for answer in pause_body["answers"].values())
     assert set(pause_body.keys()) >= {"revision", "answers", "runtimeState"}
     q1_entry = pause_body["answers"]["q1"]
@@ -405,14 +413,8 @@ with sync_playwright() as playwright:
     q1_class = page.locator('#practiceAnswerSheet [data-question-id="q1"]').get_attribute("class") or ""
     assert "is-wrong" in q1_class, q1_class
     assert "错误" in (page.locator('#practiceAnswerSheet [data-question-id="q1"]').get_attribute("aria-label") or "")
-    # 恢复回放打开的是已答题：面板保持 hidden，给"查看解析"按钮，点击后才展开
     assert page.locator("#practiceExplanationPanel").is_hidden()
-    reveal_btn = page.locator("#practiceExplanationReveal button", has_text="查看解析")
-    assert reveal_btn.is_visible()
-    reveal_btn.click()
-    page.wait_for_timeout(80)
-    assert page.locator("#practiceExplanationPanel").is_visible()
-    assert "正确答案：A" in page.locator("#practiceExplanationPanel").inner_text()
+    assert page.locator("#practiceExplanationReveal").count() == 0
 
     # ---------- scholar：本地超时不调用 /answers，剩余时间进入 runtimeState ----------
     page.evaluate("window.__writes=[]")
@@ -557,15 +559,37 @@ with sync_playwright() as playwright:
     )
     page.wait_for_timeout(200)
     assert resume_challenge["sessionId"] == saved_session_id, resume_challenge
-    assert resume_challenge["answered"] == 10, resume_challenge
+    assert resume_challenge["answered"] == 2, resume_challenge
     page.evaluate("window.__writes=[]")
-    # 整卷已答：答题卡交卷按钮直接提交（无未答确认框）
-    open_sheet(page)
-    page.locator('#practiceAnswerSheet [data-answer-submit]').click()
-    page.wait_for_timeout(400)
+    page.evaluate('window.__completeFailNext=true')
+    # 把剩余 8 题答完（复习路径只经本地判题）：答完最后一题仍停留 game
+    while True:
+        answered_ids = page.evaluate(
+            "()=>Array.from(document.querySelectorAll('#practiceAnswerSheet [data-question-id]')).filter(b=>b.className.includes('is-correct')||b.className.includes('is-wrong')).map(b=>b.dataset.questionId)"
+        )
+        if len(answered_ids) >= 10:
+            break
+        jump_target = page.evaluate(
+            "()=>{const b=Array.from(document.querySelectorAll('#practiceAnswerSheet [data-question-id]')).find(el=>!el.className.includes('is-correct')&&!el.className.includes('is-wrong'));return b?b.dataset.questionId:null}"
+        )
+        assert jump_target, answered_ids
+        view = page.evaluate("document.body.dataset.practiceView")
+        assert view == "game", "answer-sheet navigation must not be interrupted by a checkpoint"
+        current_id = page.evaluate("()=>{const el=document.querySelector('#practiceAnswerSheet [aria-current=step]');return el?el.dataset.questionId:null}")
+        if current_id != jump_target:
+            jump_via_sheet(page, f'[data-question-id="{jump_target}"]')
+            page.wait_for_timeout(100)
+        page.locator("#practiceOptions button:not([disabled])").first.click()
+        page.wait_for_timeout(620)
+
+    page.wait_for_timeout(700)
+    assert page.locator('#practiceSettlementRetry').is_visible()
+    assert page.locator('#practiceGame').is_visible()
+    page.locator('#practiceSettlementRetry').click()
+    page.wait_for_timeout(200)
     complete_writes = [write for write in writes(page) if write["name"] == "complete"]
-    assert len(complete_writes) == 1, writes(page)
-    complete_body = complete_writes[0]["body"]
+    assert len(complete_writes) == 2, writes(page)
+    complete_body = complete_writes[-1]["body"]
     assert set(complete_body["answers"].keys()) == {'q%d' % i for i in range(1, 11)}, sorted(complete_body["answers"].keys())
     assert page.locator("#practiceResult").is_visible(), page.evaluate("document.body.dataset.practiceView")
     assert names(page).count("pause") + names(page).count("state") + names(page).count("answers") == 0, writes(page)

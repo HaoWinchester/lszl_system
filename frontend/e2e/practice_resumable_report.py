@@ -6,7 +6,7 @@ Task 8 brief contract, executed against an isolated server:
 1. challenge start + 3 answers + sheet jumps -> zero answers/state write requests;
 2. save-and-exit -> exactly one pause, whole-paper body with the 3 answers;
 3. re-login + resume -> selection, index, health, correctness all consistent;
-4. one more answer + explicit submit -> exactly one complete request;
+4. last-index answer does not finish early; all answers -> exactly one complete;
 5. report mistakes == server authoritative regrade (DB recomputation);
 6. scholar local timeout (zero write) then save/resume keeps the timeout draft;
 7. revenge un-submitted never advances long-term mistakes; submit advances them;
@@ -137,7 +137,12 @@ class IsolatedPracticeHarness:
             active_pointer = json.loads((ACTIVE_RELEASE_ROOT / "current.json").read_text(encoding="utf-8"))
             active_files = file_count(ACTIVE_RELEASE_ROOT / active_pointer["site"])
             assert candidate_files >= active_files, (candidate_files, active_files)
-            for relative in ("admin-console.html", "src/114-practice-draft-state.js", "src/110-learning-loading.js"):
+            candidate_site = self.release_root / pointer["site"]
+            active_site = ACTIVE_RELEASE_ROOT / active_pointer["site"]
+            paths = lambda root: {str(p.relative_to(root)) for p in root.rglob("*") if p.is_file() and p.name != ".DS_Store"}
+            assert not paths(active_site) - paths(candidate_site), sorted(paths(active_site) - paths(candidate_site))
+            print("candidate additions:", sorted(paths(candidate_site) - paths(active_site)), flush=True)
+            for relative in ("admin-console.html", "src/114-practice-draft-state.js", "src/110-learning-loading.js", "src/115-practice-mode-policy.js", "src/116-practice-session-save.js"):
                 assert (self.release_root / pointer["site"] / relative).is_file(), relative
 
             port = self._free_port()
@@ -515,34 +520,33 @@ def run_matrix() -> None:
             writes = answer_state_writes(log)
             check_matrix(3, "resumed selection still zero write", not writes, f"writes={writes}")
 
-            # ---- matrix 4: explicit submit -> exactly one complete ----
-            # 恢复会话若仍带着挑战失败弹窗（runtimeState 复放），先关掉再操作答题卡。
-            fail_dialog_resumed = page.locator("#practiceFailBackdrop")
-            if fail_dialog_resumed.get_attribute("hidden") is None:
+            # ---- matrix 4: no submit; answer last index first, then all remaining ----
+            if page.locator("#practiceFailBackdrop").get_attribute("hidden") is None:
                 page.locator("#practiceFailContinueBtn").click()
-                page.wait_for_timeout(200)
-            page.locator("#practiceAnswerSheetMobileBtn").click()
-            page.wait_for_timeout(150)
-            page.locator("#practiceAnswerSheet [data-answer-submit]").click()
-            page.locator("#practiceSubmitConfirm").wait_for(state="visible")
-            message = page.locator("#practiceSubmitMessage").inner_text()
-            check_matrix(4, "unanswered submit dialog blocks direct submit", "未作答" in message, f"message={message!r}")
-            page.locator("#practiceSubmitAnywayBtn").click()
+            assert page.locator('[data-answer-submit]').count() == 0
+            remaining = [9, 3, 4, 5, 6, 8]
+            for index in remaining:
+                page.locator("#practiceAnswerSheetMobileBtn").click()
+                page.locator(f'#practiceAnswerSheet [data-question-id="{ids["paper"]}-q-{index:02d}"]').click()
+                page.locator('[data-option-id="A"]').first.click()
+                page.wait_for_timeout(750)
+                if index == 9:
+                    check_matrix(4, "last-index answer alone does not complete", not practice_requests(log, "/complete", "POST"))
             page.locator(".practice-result-report").wait_for(state="visible")
-            page.wait_for_timeout(200)
             completes = practice_requests(log, "/complete", "POST")
-            check_matrix(4, "exactly one complete request", len(completes) == 1, f"completes={len(completes)}")
-            complete_answers = body_answers(completes[0]) if completes else {}
-            check_matrix(4, "complete body has 4 whole-paper answers", len(complete_answers) == 4, f"n={len(complete_answers)}")
+            check_matrix(4, "all answers auto-complete exactly once", len(completes) == 1, f"completes={len(completes)}")
+            complete_answers = body_answers(completes[0])
+            check_matrix(4, "complete body includes all answers", len(complete_answers) == PAPER_COUNT)
 
             # ---- matrix 5: report mistakes == server authoritative regrade ----
             result_text = page.locator(".practice-result-report").inner_text()
             check_matrix(5, "report header present", "幻谱 PMP 模拟成绩分析报告" in result_text, "")
-            check_matrix(5, "report verdict FAIL", "模拟考试结果：FAIL" in result_text, "")
+            assert page.locator("#practiceChallengeResult").inner_text() == "挑战失败"
+            check_matrix(5, "report verdict PASS", "模拟考试结果：PASS" in result_text, "")
             row = run_async(fetch_session_row(session_id))
             check_matrix(
-                5, "DB answers hold 4 authoritative gradings (server truth only)",
-                len(row["answers"]) == 4 and all(
+                5, "DB answers hold 10 authoritative gradings (server truth only)",
+                len(row["answers"]) == PAPER_COUNT and all(
                     entry.get("correct") == (entry.get("selectedAnswer") == "A")
                     and entry.get("correctAnswer") == "A"
                     and isinstance(entry.get("submissionIndex"), int)
@@ -551,8 +555,8 @@ def run_matrix() -> None:
                 f"answers={json.dumps(row['answers'], ensure_ascii=False)}",
             )
             check_matrix(
-                5, "server stats recomputed (wrong=3 correct=1 answered=4)",
-                row["stats"].get("wrong") == 3 and row["stats"].get("correct") == 1 and row["stats"].get("answered") == 4,
+                5, "server stats recomputed (wrong=3 correct=7 answered=10)",
+                row["stats"].get("wrong") == 3 and row["stats"].get("correct") == 7 and row["stats"].get("answered") == PAPER_COUNT,
                 f"stats={row['stats']}",
             )
             check_matrix(
@@ -578,10 +582,12 @@ def run_matrix() -> None:
             page.wait_for_timeout(200)
             page.locator('[data-practice-start="scholar"]').click()
             page.locator("#practiceGame").wait_for(state="visible")
-            page.wait_for_timeout(72_000)  # 60s budget + margin, timer expires locally
+            page.clock.install()
+            page.clock.fast_forward(61_000)
+            page.wait_for_timeout(700)
             timeout_snapshot = page.evaluate("KGPracticeMode.snapshot()")
             check_matrix(
-                6, "scholar timeout graded locally (wrong, health 9)",
+                6, "scholar timeout graded locally (wrong, health 2)",
                 timeout_snapshot["answered"] == 1 and timeout_snapshot["health"] == 2,
                 f"snap={timeout_snapshot}",
             )
@@ -827,6 +833,175 @@ def run_matrix() -> None:
                 page.set_viewport_size({"width": viewport, "height": 900 if viewport != 390 else 844})
                 page.wait_for_timeout(200)
                 page.screenshot(path=f"/tmp/task8-viewport-{viewport}.png")
+            # ---- matrix 11: ordinary practice, zero background save, incremental XP ----
+            page.locator("#practiceExitBtn").click()
+            page.locator("#practiceAbandonBtn").click()
+            page.locator("#practiceLobby").wait_for(state="visible")
+            page.locator("#practiceHistoryOpenBtn").click()
+            page.locator(f'[data-history-practice="{ids["paper"]}"]').click()
+            page.locator("#practiceGame").wait_for(state="visible")
+            ordinary_id = page.evaluate("KGPracticeMode.snapshot().sessionId")
+            xp_before = context.request.get(f"{base}/api/v1/learning/practice/experience-summary").json()["totalExperience"]
+            assert page.evaluate("KGPracticeMode.snapshot().mode") == "practice"
+            assert page.locator("#practiceHealth").is_hidden()
+            assert page.locator("#practiceTimeRow").is_hidden()
+            assert page.locator('[data-answer-submit]').count() == 0
+            log["rows"].clear()
+            page.locator('[data-option-id="A"]').first.click()
+            page.wait_for_timeout(750)
+            assert page.locator("#practiceExplanationPanel").is_visible()
+            page.locator("#practiceAutoExplain").uncheck()
+            assert page.locator("#practiceExplanationPanel").is_hidden()
+            page.locator("#practiceAutoExplain").check()
+            assert page.locator("#practiceExplanationPanel").is_visible()
+            assert page.locator("#practiceExplanationReveal").count() == 0
+            page.locator("#practiceNextBtn").click()
+            assert page.locator("#practiceExplanationPanel").is_hidden()
+            page.locator('[data-option-id="B"]').first.click()
+            page.wait_for_timeout(750)
+            page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
+            background_page = context.new_page()
+            background_page.goto("about:blank")
+            background_page.bring_to_front()
+            page.wait_for_timeout(300)
+            background_page.close()
+            page.bring_to_front()
+            def cancel_leave(dialog):
+                dialog.dismiss()
+            page.on("dialog", cancel_leave)
+            page.close(run_before_unload=True)
+            page.wait_for_timeout(300)
+            assert not page.is_closed()
+            page.remove_listener("dialog", cancel_leave)
+            saves = [r for r in log["rows"] if r["method"] == "POST"]
+            check_matrix(11, "ordinary answers, tab hidden and cancelled close send no saves", not saves, str(saves))
+            page.locator("#practiceExitBtn").click()
+            page.locator("#practiceSaveExitBtn").click()
+            page.locator("#practiceLobby").wait_for(state="visible")
+            ordinary = run_async(fetch_session_row(ordinary_id))
+            check_matrix(11, "ordinary exit settles first 10 XP", ordinary["stats"]["creditedExperience"] == 10, str(ordinary["stats"]))
+
+            # ---- matrix 12: REAL tab close persists latest answer + XP delta ----
+            page.locator("#practiceHistoryOpenBtn").click()
+            page.locator(f'[data-history-practice="{ids["paper"]}"]').click()
+            page.locator("#practiceGame").wait_for(state="visible")
+            assert page.evaluate("KGPracticeMode.snapshot().sessionId") == ordinary_id
+            page.locator("#practiceNextBtn").click()
+            page.locator('[data-option-id="A"]').first.click()
+            page.wait_for_timeout(750)
+            page.on("dialog", lambda dialog: dialog.accept())
+            page.close(run_before_unload=True)
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                saved = context.request.get(f"{base}/api/v1/learning/practice/sessions/{ordinary_id}").json()["session"]
+                if saved["status"] == "paused" and saved["stats"]["answered"] == 3:
+                    break
+                time.sleep(0.1)
+            check_matrix(12, "real tab close saves third answer and only new 10 XP", saved["status"] == "paused" and saved["stats"]["answered"] == 3 and saved["stats"]["creditedExperience"] == 20, str(saved["stats"]))
+
+            # ---- matrix 13: refresh saves and duplicate lifecycle is idempotent ----
+            page = context.new_page()
+            page.on("pageerror", lambda error: page_errors.append(str(error)))
+            page.on("dialog", lambda dialog: dialog.accept())
+            page.goto(f"{base}/practice-mode.html", wait_until="networkidle")
+            page.locator("#practiceHistoryOpenBtn").click()
+            page.locator(f'[data-history-practice="{ids["paper"]}"]').click()
+            page.locator("#practiceGame").wait_for(state="visible")
+            page.locator("#practiceNextBtn").click()
+            page.locator('[data-option-id="A"]').first.click()
+            page.wait_for_timeout(750)
+            page.reload(wait_until="networkidle")
+            saved = context.request.get(f"{base}/api/v1/learning/practice/sessions/{ordinary_id}").json()["session"]
+            check_matrix(13, "refresh saves fourth answer", saved["stats"]["answered"] == 4 and saved["stats"]["creditedExperience"] == 30, str(saved["stats"]))
+            page.locator("#practiceHistoryOpenBtn").click()
+            page.locator(f'[data-history-practice="{ids["paper"]}"]').click()
+            page.locator("#practiceGame").wait_for(state="visible")
+            page.locator("#practiceNextBtn").click()
+            page.locator('[data-option-id="A"]').first.click()
+            page.wait_for_timeout(750)
+            lifecycle_log = install_recorder(page)
+            page.evaluate("() => { window.dispatchEvent(new PageTransitionEvent('pagehide')); window.dispatchEvent(new PageTransitionEvent('pagehide')); }")
+            page.wait_for_timeout(500)
+            check_matrix(13, "duplicate pagehide sends exactly one pause", len(practice_requests(lifecycle_log, "/pause", "POST")) == 1)
+            page.evaluate("""() => {
+              const original=window.fetch;
+              const sessionId=KGPracticeMode.snapshot().sessionId;
+              window.fetch=async(...args)=>{
+                const saved=await original(...args);
+                if(!String(args[0]).endsWith('/sessions/'+sessionId))return saved;
+                return new Promise(resolve=>{window.__restoreRead=()=>{window.fetch=original;resolve(saved)}});
+              };
+              window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));
+            }""")
+            page.wait_for_function("typeof window.__restoreRead === 'function'")
+            before_index = page.evaluate("KGPracticeMode.snapshot().index")
+            page.locator("#practiceNextBtn").click()
+            check_matrix(13, "bfcache keeps navigation frozen until revision is reconciled", page.evaluate("KGPracticeMode.snapshot().index") == before_index)
+            page.evaluate("window.__restoreRead()")
+            page.wait_for_function("KGPracticeMode.snapshot().answered === 5")
+            page.wait_for_timeout(500)
+            saved = context.request.get(f"{base}/api/v1/learning/practice/sessions/{ordinary_id}").json()["session"]
+            check_matrix(13, "restored page keeps answers and settled total 42 XP", saved["stats"]["answered"] == 5 and saved["stats"]["creditedExperience"] == 42, str(saved["stats"]))
+            page.locator("#practiceNextBtn").click()
+            page.locator('[data-option-id="A"]').first.click()
+            page.wait_for_timeout(750)
+            page.locator("#practiceExitBtn").click()
+            page.locator("#practiceAbandonBtn").click()
+            page.locator("#practiceLobby").wait_for(state="visible")
+            saved = context.request.get(f"{base}/api/v1/learning/practice/sessions/{ordinary_id}").json()["session"]
+            check_matrix(13, "bfcache reconciliation adopts revision; abandon includes newest answer", saved["status"] == "abandoned" and saved["stats"]["answered"] == 6 and saved["stats"]["creditedExperience"] == 54, str(saved["stats"]))
+
+            xp_after = context.request.get(f"{base}/api/v1/learning/practice/experience-summary").json()["totalExperience"]
+            check_matrix(13, "account experience increased by exactly 54 across exit/close/refresh", xp_after - xp_before == 54, str(xp_after - xp_before))
+
+            # ---- matrix 14: restore a full draft saved by closing before auto-finish ----
+            started = context.request.post(f"{base}/api/v1/learning/practice/sessions/start", data={"paperId": ids["paper"], "releaseId": ids["release"], "mode": "practice", "count": PAPER_COUNT, "order": "paper"}).json()["session"]
+            answers = {ref["questionId"]: {"selectedAnswer": "A", "selectionIndex": i + 1} for i, ref in enumerate(started["questionOrder"])}
+            paused = context.request.post(f"{base}/api/v1/learning/practice/sessions/{started['id']}/pause", data={"revision": started["revision"], "answers": answers})
+            assert paused.status == 200, paused.text()
+            page.reload(wait_until="networkidle")
+            page.locator("#practiceHistoryOpenBtn").click()
+            page.locator(f'[data-history-practice="{ids["paper"]}"]').click()
+            page.locator(".practice-result-report").wait_for(state="visible", timeout=5000)
+            check_matrix(14, "restoring fully answered draft automatically finishes", True)
+            page.locator('[data-report-review-all]').click()
+            assert page.locator("#practiceExplanationPanel").is_visible()
+            assert page.locator('[data-option-id="A"]').is_disabled()
+            page.locator("#practiceReviewBackBtn").click()
+            page.locator(".practice-result-report").wait_for(state="visible")
+
+            # ---- matrix 15: closing while complete response is pending never pauses ----
+            started = context.request.post(f"{base}/api/v1/learning/practice/sessions/start", data={"paperId": ids["paper"], "releaseId": ids["release"], "mode": "practice", "count": PAPER_COUNT, "order": "paper"}).json()["session"]
+            answers = {ref["questionId"]: {"selectedAnswer": "A", "selectionIndex": i + 1} for i, ref in enumerate(started["questionOrder"][:-1])}
+            paused = context.request.post(f"{base}/api/v1/learning/practice/sessions/{started['id']}/pause", data={"revision": started["revision"], "answers": answers, "runtimeState": {"currentIndex": 9}})
+            assert paused.status == 200, paused.text()
+            page.reload(wait_until="networkidle")
+            page.locator("#practiceHistoryOpenBtn").click()
+            page.locator(f'[data-history-practice="{ids["paper"]}"]').click()
+            page.locator("#practiceGame").wait_for(state="visible")
+            page.evaluate("""() => {
+              const original=window.fetch;
+              window.fetch=async(input, init)=>{
+                const response=await original(input, init);
+                if(String(input).endsWith('/complete') && !init?.keepalive){
+                  window.__completeResponseHeld=true;
+                  return new Promise(resolve=>{window.__releaseComplete=()=>resolve(response)});
+                }
+                return response;
+              };
+            }""")
+            race_log = install_recorder(page)
+            page.locator('[data-option-id="A"]').first.click()
+            page.wait_for_function("window.__completeResponseHeld === true")
+            page.evaluate("() => { window.dispatchEvent(new PageTransitionEvent('pagehide')); window.dispatchEvent(new PageTransitionEvent('pagehide')); }")
+            page.wait_for_timeout(500)
+            complete_calls = practice_requests(race_log, "/complete", "POST")
+            check_matrix(15, "pending complete is repeated with identical body, never converted to pause", len(complete_calls) == 2 and complete_calls[0]["post_data"] == complete_calls[1]["post_data"] and not practice_requests(race_log, "/pause", "POST"))
+            saved = context.request.get(f"{base}/api/v1/learning/practice/sessions/{started['id']}").json()["session"]
+            check_matrix(15, "duplicate complete stays completed and XP credited once", saved["status"] == "completed" and saved["stats"]["creditedExperience"] == saved["stats"]["experience"])
+            page.evaluate("window.__releaseComplete()")
+            page.locator(".practice-result-report").wait_for(state="visible")
+
             check_matrix(9, "no page errors across matrix", not page_errors, f"errors={page_errors[:3]}")
             evidence["requestLogSample"] = log["rows"][-12:]
             context.close()

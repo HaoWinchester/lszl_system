@@ -138,8 +138,8 @@ with sync_playwright() as playwright:
     page.add_style_tag(content=(ROOT / "styles/learning-loading.css").read_text(encoding="utf-8"))
     page.add_script_tag(content=(ROOT / "src/110-learning-loading.js").read_text(encoding="utf-8"))
     # 阶段二走会话 API：需要 session-core / answer-sheet / draft-state 模块
-    for script in ["src/111-practice-session-core.js", "src/112-practice-answer-sheet.js",
-                   "src/113-practice-result-report.js", "src/114-practice-draft-state.js"]:
+    for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js",
+                   "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/114-practice-draft-state.js"]:
         page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
     page.add_script_tag(content=(ROOT / "src/100-practice-mode.js").read_text(encoding="utf-8"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
@@ -161,13 +161,13 @@ with sync_playwright() as playwright:
     # ---------- key=start（目录读取路径）：从学习记录点击"再练一次"进入练习 ----------
     # 该行 data-history-mode 为 challenge，加载标题与大厅挑战入口一致（复用同一 startPractice）
     page.locator("#practiceHistoryOpenBtn").click()
-    history_row = page.locator('[data-history-paper="paper-loading"]')
+    history_row = page.locator('[data-history-practice="paper-loading"]')
     history_row.wait_for()
     history_row.click()
     loading = page.locator("[data-learning-loading]")
     assert page.locator("[data-learning-loading]").count() == 1
     assert loading.is_visible()
-    assert loading.locator("[data-learning-loading-title]").inner_text() == "正在准备挑战"
+    assert loading.locator("[data-learning-loading-title]").inner_text() == "正在进入练习模式"
     assert loading.locator("[data-learning-loading-message]").inner_text() == "正在读取试题…"
     assert page.evaluate("window.__challengeResolveCalls") == 1
 
@@ -181,7 +181,7 @@ with sync_playwright() as playwright:
     assert page.locator("#practiceToast").inner_text() == "试题读取失败，请稍后重试。"
 
     page.locator("#practiceHistoryOpenBtn").click()
-    page.locator('[data-history-paper="paper-loading"]').click()
+    page.locator('[data-history-practice="paper-loading"]').click()
     assert loading.is_visible()
     assert page.evaluate("window.__challengeResolveCalls") == 2
     page.evaluate("window.__challengePending.shift().resolve(window.__challengeSuccess)")
@@ -389,17 +389,17 @@ with sync_playwright() as playwright:
     page.evaluate(
         """()=>{
           window.KGPracticeLearningApi.getActiveSessions=async filters=>{const s=window.__getActiveSession();return s&&(!filters?.mode||filters.mode===s.mode)?[s]:[]};
-          window.__setActiveSession(window.__baseSession());
+          window.__setActiveSession(window.__baseSession({mode:'revenge'}));
         }"""
     )
-    page.locator('[data-practice-start="challenge"]').click()
+    page.evaluate("window.KGPracticeMode.startPractice('revenge')")
     page.wait_for_function("document.body.dataset.practiceView === 'game'")
-    open_submit_confirm = """()=>{document.getElementById('practiceSubmitConfirm').hidden=false}"""
-    page.evaluate(open_submit_confirm)
+    page.locator("#practiceAnswerSheetMobileBtn").click()
+    page.locator("[data-answer-submit]").click()
     submit_anyway = page.locator("#practiceSubmitAnywayBtn")
     submit_anyway.click()
     info = page.evaluate("window.__watchLearningLoading()")
-    assert info["visible"] and info["title"] == "正在提交练习", info
+    assert info["visible"] and info["title"] == "正在结算练习", info
     assert "正在生成成绩报告…" in page.locator("[data-learning-loading-message]").inner_text()
     assert submit_anyway.is_disabled()
     assert page.evaluate("window.__completeCalls") == 1
@@ -412,8 +412,7 @@ with sync_playwright() as playwright:
     assert page.evaluate("document.body.dataset.practiceView") == "game"
 
     # 成功分支：resolve 已完成 session + 完整 report，落 result 视图
-    page.evaluate(open_submit_confirm)
-    submit_anyway.click()
+    page.locator("#practiceSettlementRetry").click()
     assert page.evaluate("window.__completeCalls") == 2
     page.evaluate(
         """()=>{window.__resolveComplete({
