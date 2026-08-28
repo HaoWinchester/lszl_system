@@ -888,6 +888,9 @@
     state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;
     state.health=Number.isInteger(runtime.health)?runtime.health:state.maxHealth;state.streak=Math.max(0,Number(runtime.streak)||0);state.maxStreak=Math.max(0,Number(runtime.maxStreak)||0);state.experience=Math.max(0,Number(runtime.experience??stats.experience)||0);state.correct=Math.max(0,Number(stats.correct)||0);state.answered=Math.max(0,Number(stats.answered)||0);
     state.startedAt=Date.now()-Math.max(0,Number(stats.durationMs)||0);state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;state.challengeFailedShown=false;state.revengeState=runtime.revengeState?clone(runtime.revengeState):null;state.verification=null;state.conflict=false;setConflictVisible(false);
+    // 挑战/学霸恢复时血量可能与满血差距很大；顶栏虽然按剩余血量渲染，
+    // 但"开始挑战"按钮静默恢复会让人误以为是满血新开局，必须明确告知剩余血量。
+    if((state.mode==='challenge'||state.mode==='scholar')&&state.health<state.maxHealth)showToast('已恢复上次进度 · 剩余血量 '+state.health+' / '+state.maxHealth);
     createDraft(state.session);
     state.lastSettings={paperId:catalog?.id||state.session.paperId,count:state.questions.length,order:text(runtime.order||state.order||'paper'),mode:state.mode};document.body.dataset.practiceMode=state.mode;
     if(state.mode==='scholar')state.deadline=Date.now()+Math.max(0,Number(runtime.remainingMs??SCHOLAR_MAX_SECONDS*1000));
