@@ -18,7 +18,7 @@ from app.models.training import (
     PracticeVerification,
     TrainingProgress,
 )
-from app.services import question_catalog_service, question_service
+from app.services import question_catalog_service, question_service, practice_experience_service
 
 SESSION_SCHEMA_VERSIONS = {1, 2}
 WORKSPACE_SCHEMA_VERSIONS = set(range(1, 11))
@@ -1145,6 +1145,8 @@ async def append_event(db: AsyncSession, owner: str, data: dict) -> LearningEven
     event_type = str(data.get("eventType") or "").strip()
     if not event_type:
         raise ValueError("eventType 不能为空")
+    if event_type == practice_experience_service.EXPERIENCE_EVENT_TYPE:
+        raise ValueError("该学习事件只能由服务器结算生成")
     payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
     payload = dict(payload)
     if source_question_id and question_id is None:
@@ -1229,7 +1231,9 @@ async def list_practice_sessions(db: AsyncSession, owner: str) -> list[dict]:
                 .join(PaperRelease, PaperRelease.id == PracticeSession.release_id)
                 .where(
                     PracticeSession.owner_id == owner,
-                    PracticeSession.status.in_(["completed", "abandoned"]),
+                    or_(PracticeSession.status.in_(["completed", "abandoned"]),
+                        (PracticeSession.status == "paused") & (PracticeSession.stats["answered"].as_integer() > 0)),
+                    PracticeSession.stats["historyHidden"].as_boolean().isnot(True),
                 )
                 .order_by(PracticeSession.last_saved_at.desc())
                 .limit(100)
@@ -1302,8 +1306,14 @@ async def clear_practice_sessions(db: AsyncSession, owner: str) -> int:
     ).scalars().all()
     for row in modern_rows:
         await db.delete(row)
+    resumable = (await db.execute(select(PracticeSession).where(
+        PracticeSession.owner_id == owner,
+        PracticeSession.status.in_(["active", "paused"]),
+    ))).scalars().all()
+    for session in resumable:
+        session.stats = {**(session.stats or {}), "historyHidden": True}
     await db.commit()
-    return len(rows) + len(modern_rows)
+    return len(rows) + len(modern_rows) + len(resumable)
 
 
 def workspace_to_dict(workspace: CanvasWorkspace) -> dict:
@@ -1415,22 +1425,21 @@ def _learning_week_start(now_local):
 async def practice_experience_summary(db: AsyncSession, owner: str) -> dict:
     """做题经验聚合：累计 / 本学习周（周日19:00 起）/ 最近 7 个自然日。
 
-    经验只来自已完成 PracticeSession 的服务端派生统计；旧版客户端摘要事件
-    不参与累计，避免客户端伪造 experience。
+    经验只来自服务器创建的差额事件；旧版客户端摘要及同名伪造事件不参与累计。
     """
     from datetime import datetime, timezone
 
     rows = (
         await db.execute(
-            select(PracticeSession).where(
-                PracticeSession.owner_id == owner,
-                PracticeSession.status == "completed",
+            select(LearningEvent).where(
+                LearningEvent.owner_id == owner,
+                LearningEvent.event_type == practice_experience_service.EXPERIENCE_EVENT_TYPE,
+                LearningEvent.id.startswith(practice_experience_service.EXPERIENCE_ID_PREFIX, autoescape=True),
             )
         )
     ).scalars().all()
     now_local = datetime.now(timezone.utc).astimezone()
     week_start = _learning_week_start(now_local)
-    week_start_utc = week_start.astimezone(timezone.utc)
     daily: dict[str, int] = {}
     for offset in range(6, -1, -1):
         day = (now_local - timedelta(days=offset)).date()
@@ -1438,13 +1447,13 @@ async def practice_experience_summary(db: AsyncSession, owner: str) -> dict:
     total = 0
     weekly = 0
     for row in rows:
-        stats = row.stats if isinstance(row.stats, dict) else {}
+        stats = row.payload if isinstance(row.payload, dict) else {}
         try:
-            experience = max(0, int(stats.get("experience") or 0))
+            experience = max(0, int(stats.get("delta") or 0))
         except (TypeError, ValueError):
             experience = 0
         total += experience
-        completed_at = row.completed_at or row.last_saved_at
+        completed_at = row.created_at
         created_local = completed_at.astimezone(now_local.tzinfo) if completed_at else None
         if created_local and created_local >= week_start:
             weekly += experience

@@ -15,14 +15,14 @@ from app.core.security import now_utc, uid
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.training import LearningEvent, PracticeMistake, PracticeSession
 from app.models.user import User
-from app.services import learning_service, paper_composition_service, paper_release_service
+from app.services import learning_service, practice_experience_service, paper_composition_service, paper_release_service
 from app.services.practice_scoring_service import (
     DEFAULT_DOMAIN_WEIGHTS,
     DEFAULT_SIMULATION_SCORING,
 )
 
 
-PRACTICE_SESSION_MODES = {"challenge", "scholar", "revenge"}
+PRACTICE_SESSION_MODES = {"challenge", "scholar", "revenge", "practice"}
 PRACTICE_QUESTION_COUNT_MIN = 1
 PRACTICE_QUESTION_COUNT_MAX = 180
 PRACTICE_ORDERS = {"paper", "random"}
@@ -329,6 +329,7 @@ def _draft_stats(
         selected = str(answer.get("selectedAnswer") or "")
         is_correct = (
             bool(str(snapshot.get("correctAnswer") or ""))
+            and not answer.get("timedOut")
             and selected == str(snapshot.get("correctAnswer") or "")
         )
         answered += 1
@@ -356,6 +357,7 @@ def _draft_stats(
         "unanswered": total - answered,
         "experience": experience,
         "durationMs": max(0, int(previous.get("durationMs") or 0)),
+        **{key: previous[key] for key in ("creditedExperience", "experienceAccountingVersion", "historyHidden") if key in previous},
     }
 
 
@@ -1119,47 +1121,64 @@ def _assert_existing_selections_unchanged(existing: dict, draft: dict) -> None:
             )
 
 
-async def pause_session(
-    db: AsyncSession, owner: str, session_id: str, data: dict
-) -> dict:
-    requested_revision = _required_revision(data)
-    session = await _session_for_update(db, owner, session_id)
-    if session.status == "paused":
-        if requested_revision == session.revision:
-            return await _session_payload(db, session)
-        if requested_revision == session.revision - 1:
-            # 相同请求重试幂等：草稿与已保存答案一致时直接返回当前状态，
-            # 不同载荷不属于重试，按冲突处理。
-            if "answers" in data:
-                draft = await _validated_draft_answers(db, session, data)
-                saved = session.answers if isinstance(session.answers, dict) else {}
-                if draft != saved:
-                    raise _revision_conflict(session)
-            return await _session_payload(db, session)
-        raise _revision_conflict(session)
-    if session.status != "active":
-        raise _error(409, "PRACTICE_SESSION_TERMINAL", "练习已结束，不能暂停")
-    if session.revision != requested_revision:
-        raise _revision_conflict(session)
-    # 整卷草稿先整体校验（白名单/选项/顺序）并确认不触碰已锁定答案，
-    # 任何非法值或锁定冲突都不落库，保证显式保存整笔回滚。
-    draft = (
-        await _validated_draft_answers(db, session, data)
-        if "answers" in data
-        else None
-    )
+async def _apply_saved_draft(db: AsyncSession, session: PracticeSession, data: dict) -> None:
+    draft = await _validated_draft_answers(db, session, data) if "answers" in data else None
     if draft is not None:
         _assert_existing_selections_unchanged(session.answers or {}, draft)
     _apply_runtime_patch(session, data)
     if draft is not None:
-        refs = session.question_order if isinstance(session.question_order, list) else []
-        rows = await _release_question_rows(db, session.release_id)
         session.answers = draft
-        session.stats = _draft_stats(refs, rows, draft, dict(session.stats or {}))
-        runtime_state = dict(session.runtime_state or {})
-        runtime_state["experience"] = session.stats["experience"]
-        session.runtime_state = runtime_state
+    refs = session.question_order if isinstance(session.question_order, list) else []
+    rows = await _release_question_rows(db, session.release_id)
+    session.stats = _draft_stats(refs, rows, session.answers or {}, dict(session.stats or {}))
+    session.runtime_state = {**(session.runtime_state or {}), "experience": session.stats["experience"]}
+
+
+async def _same_saved_payload(db: AsyncSession, session: PracticeSession, data: dict) -> bool:
+    if "answers" in data:
+        draft = await _validated_draft_answers(db, session, data)
+        saved = {
+            qid: {key: answer[key] for key in _DRAFT_LOCK_FIELDS if key in answer}
+            for qid, answer in (session.answers or {}).items()
+        }
+        if draft != saved:
+            return False
+    if "runtimeState" in data:
+        patch = _validated_runtime_state(data, question_count=len(session.question_order or []))
+        if any(key != "experience" and value != (session.runtime_state or {}).get(key)
+               for key, value in patch.items()):
+            return False
+    return True
+
+
+async def _settle_saved_experience(db: AsyncSession, session: PracticeSession, saved_at) -> None:
+    try:
+        await practice_experience_service.settle_experience_delta(
+            db, session, int((session.stats or {}).get("experience") or 0), saved_at
+        )
+    except ValueError as error:
+        raise _error(409, "PRACTICE_EXPERIENCE_CONFLICT", str(error)) from error
+    session.stats = {key: value for key, value in session.stats.items() if key != "historyHidden"}
+
+
+async def pause_session(db: AsyncSession, owner: str, session_id: str, data: dict) -> dict:
+    requested_revision = _required_revision(data)
+    session = await _session_for_update(db, owner, session_id)
+    if session.status == "paused":
+        if requested_revision not in {session.revision, session.revision - 1}:
+            raise _revision_conflict(session)
+        if await _same_saved_payload(db, session, data):
+            return await _session_payload(db, session)
+        if requested_revision != session.revision:
+            raise _revision_conflict(session)
+        # A restored paused session may accumulate new local answers without a resume write.
+    elif session.status != "active":
+        raise _error(409, "PRACTICE_SESSION_TERMINAL", "练习已结束，不能暂停")
+    if session.revision != requested_revision:
+        raise _revision_conflict(session)
+    await _apply_saved_draft(db, session, data)
     saved_at = now_utc()
+    await _settle_saved_experience(db, session, saved_at)
     session.status = "paused"
     session.paused_at = saved_at
     session.last_saved_at = saved_at
@@ -1169,21 +1188,20 @@ async def pause_session(
     return await _session_payload(db, session)
 
 
-async def abandon_session(
-    db: AsyncSession, owner: str, session_id: str, data: dict
-) -> dict:
+async def abandon_session(db: AsyncSession, owner: str, session_id: str, data: dict) -> dict:
     requested_revision = _required_revision(data)
     session = await _session_for_update(db, owner, session_id)
     if session.status == "abandoned":
-        if requested_revision in {session.revision, session.revision - 1}:
+        if requested_revision in {session.revision, session.revision - 1} and await _same_saved_payload(db, session, data):
             return await _session_payload(db, session)
         raise _revision_conflict(session)
     if session.status == "completed":
-        raise _error(409, "PRACTICE_SESSION_TERMINAL", "已交卷的练习不能放弃")
+        raise _error(409, "PRACTICE_SESSION_TERMINAL", "已完成的练习不能放弃")
     if session.revision != requested_revision:
         raise _revision_conflict(session)
-    _apply_runtime_patch(session, data)
+    await _apply_saved_draft(db, session, data)
     saved_at = now_utc()
+    await _settle_saved_experience(db, session, saved_at)
     session.status = "abandoned"
     session.abandoned_at = saved_at
     session.last_saved_at = saved_at
@@ -1495,6 +1513,7 @@ async def complete_session(
     if whole_paper:
         # 整卷载荷：白名单校验后按 selectionIndex 排序，形成权威提交顺序。
         draft = await _validated_draft_answers(db, session, data)
+        _assert_existing_selections_unchanged(session.answers or {}, draft)
         ordered = sorted(draft.items(), key=lambda pair: int(pair[1]["selectionIndex"]))
         selections: list[tuple[str, dict]] = []
         for question_id, selection in ordered:
@@ -1564,6 +1583,7 @@ async def complete_session(
 
     report = await _build_report(db, session)
     completed_at = now_utc()
+    await _settle_saved_experience(db, session, completed_at)
     report["completedAt"] = completed_at.isoformat()
     session.report_snapshot = report
     session.status = "completed"

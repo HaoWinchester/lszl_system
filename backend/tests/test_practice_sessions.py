@@ -1524,6 +1524,8 @@ def test_pause_persists_whitelisted_drafts_and_derives_stats(client, active_sess
         "wrong": 1,
         "unanswered": 8,
         "experience": 10,
+        "creditedExperience": 10,
+        "experienceAccountingVersion": 1,
         "durationMs": 6000,
     }
     assert body["runtimeState"]["experience"] == 10
@@ -2558,3 +2560,178 @@ def test_legacy_real_option_with_timed_out_draft_resaves_as_placeholder(
         },
     )
     assert resave.status_code == 200, resave.text
+
+
+# Exit settlement: only server-created delta events can credit account experience.
+def test_experience_delta_is_monotonic_and_retry_safe(client, active_session):
+    from app.services import practice_experience_service as ledger
+
+    async def verify():
+        async with AsyncSessionLocal() as db:
+            session = await db.get(PracticeSession, active_session['id'])
+            assert await ledger.settle_experience_delta(db, session, 100, now_utc()) == 100
+            assert await ledger.settle_experience_delta(db, session, 100, now_utc()) == 0
+            assert await ledger.settle_experience_delta(db, session, 140, now_utc()) == 40
+            with pytest.raises(ValueError, match='不能倒退'):
+                await ledger.settle_experience_delta(db, session, 139, now_utc())
+            await db.flush()
+            events = (await db.execute(select(LearningEvent).where(
+                LearningEvent.owner_id == session.owner_id,
+                LearningEvent.event_type == 'PRACTICE_EXPERIENCE_SETTLED',
+            ))).scalars().all()
+            assert sorted(event.payload['delta'] for event in events) == [40, 100]
+            assert session.stats['creditedExperience'] == 140
+            assert all(event.id.startswith('pxp_') and len(event.id) <= 64 for event in events)
+            await db.rollback()
+    asyncio.run(verify())
+
+
+def test_public_learning_events_cannot_mint_experience(client):
+    response = client.post('/api/v1/learning/events', json={
+        'eventType': 'PRACTICE_EXPERIENCE_SETTLED',
+        'payload': {'delta': 999999, 'trusted': True},
+    })
+    assert response.status_code == 400, response.text
+    assert client.get('/api/v1/learning/practice/experience-summary').json()['totalExperience'] == 0
+    assert client.post('/api/v1/learning/events', json={
+        'eventType': 'PRACTICE_REVIEW_OPENED', 'payload': {},
+    }).status_code == 200
+
+
+def test_experience_baseline_preserves_date_and_replays_once(client, active_session):
+    import importlib.util
+    from pathlib import Path
+    from datetime import timedelta
+    migration_path = Path(__file__).parents[1] / 'alembic/versions/a8c1d4e7f920_practice_mode_experience_ledger.py'
+    assert migration_path.exists(), 'experience baseline migration is required'
+    spec = importlib.util.spec_from_file_location('experience_baseline_migration', migration_path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    original_time = now_utc() - timedelta(days=2)
+
+    async def verify():
+        async with AsyncSessionLocal() as db:
+            session = await db.get(PracticeSession, active_session['id'])
+            session.status = 'completed'
+            session.completed_at = original_time
+            session.stats = {'experience': 106}
+            await db.flush()
+            for _ in range(2):
+                await db.run_sync(lambda sync: migration.backfill_experience(sync.connection()))
+            await db.refresh(session)
+            events = (await db.execute(select(LearningEvent).where(
+                LearningEvent.owner_id == session.owner_id,
+                LearningEvent.event_type == 'PRACTICE_EXPERIENCE_SETTLED',
+            ))).scalars().all()
+            assert len(events) == 1
+            assert events[0].payload['delta'] == 106
+            assert events[0].created_at == original_time
+            assert session.stats['creditedExperience'] == 106
+            await db.rollback()
+    asyncio.run(verify())
+
+
+def test_pause_credits_once_and_resumed_completion_only_credits_delta(client, active_session):
+    sid = active_session['id']
+    ids = [ref['questionId'] for ref in active_session['questions']]
+    payload = {'revision': active_session['revision'],
+               'answers': {ids[0]: {'selectedAnswer': 'A', 'selectionIndex': 1}}}
+    for _ in range(2):
+        paused = client.post(f'/api/v1/learning/practice/sessions/{sid}/pause', json=payload)
+        assert paused.status_code == 200, paused.text
+    assert client.get('/api/v1/learning/practice/experience-summary').json()['totalExperience'] == 10
+    assert paused.json()['session']['status'] == 'paused'
+    payload['revision'] = paused.json()['session']['revision']
+    payload['answers'][ids[1]] = {'selectedAnswer': 'A', 'selectionIndex': 2}
+    second = client.post(f'/api/v1/learning/practice/sessions/{sid}/pause', json=payload)
+    assert second.status_code == 200, second.text
+    assert second.json()['session']['stats']['answered'] == 2
+    assert client.get('/api/v1/learning/practice/experience-summary').json()['totalExperience'] == 20
+    payload['revision'] = second.json()['session']['revision']
+    payload['answers'][ids[2]] = {'selectedAnswer': 'A', 'selectionIndex': 3}
+    for _ in range(2):
+        completed = client.post(f'/api/v1/learning/practice/sessions/{sid}/complete', json=payload)
+        assert completed.status_code == 200, completed.text
+    assert completed.json()['session']['stats']['creditedExperience'] == 32
+    assert client.get('/api/v1/learning/practice/experience-summary').json()['totalExperience'] == 32
+
+
+def test_abandon_saves_latest_answers_and_credits_without_report(client, active_session):
+    sid = active_session['id']
+    qid = active_session['questions'][0]['questionId']
+    payload = {'revision': active_session['revision'],
+               'answers': {qid: {'selectedAnswer': 'A', 'selectionIndex': 1}},
+               'runtimeState': {'experience': 999999}}
+    for _ in range(2):
+        saved = client.post(f'/api/v1/learning/practice/sessions/{sid}/abandon', json=payload)
+        assert saved.status_code == 200, saved.text
+    session = saved.json()['session']
+    assert session['answers'][qid]['selectedAnswer'] == 'A'
+    assert session['stats']['experience'] == 10
+    assert session['status'] == 'abandoned'
+    assert client.get('/api/v1/learning/practice/experience-summary').json()['totalExperience'] == 10
+    assert client.get(f'/api/v1/learning/practice/sessions/{sid}/report').status_code == 404
+    payload['answers'][qid]['selectedAnswer'] = 'B'
+    changed = client.post(f'/api/v1/learning/practice/sessions/{sid}/abandon', json=payload)
+    assert changed.status_code == 409
+
+
+def test_practice_mode_is_distinct_and_clearing_history_preserves_progress_and_xp(client, practice_ids):
+    started = client.post('/api/v1/learning/practice/sessions/start', json={
+        'paperId': practice_ids['paper'], 'releaseId': practice_ids['release'],
+        'mode': 'practice', 'count': 10, 'order': 'paper',
+    })
+    assert started.status_code == 200, started.text
+    session = started.json()['session']
+    assert session['mode'] == 'practice'
+    sid = session['id']
+    qids = [ref['questionId'] for ref in session['questions']]
+    payload = {'revision': session['revision'],
+               'answers': {qids[0]: {'selectedAnswer': 'A', 'selectionIndex': 1}}}
+    paused = client.post(f'/api/v1/learning/practice/sessions/{sid}/pause', json=payload)
+    assert paused.status_code == 200, paused.text
+    history = client.get('/api/v1/learning/practice/sessions').json()['sessions']
+    assert [item['sessionId'] for item in history] == [sid]
+    assert history[0]['reportAvailable'] is False
+    assert client.delete('/api/v1/learning/practice/sessions').status_code == 200
+    assert client.get('/api/v1/learning/practice/sessions').json()['sessions'] == []
+    assert client.get('/api/v1/learning/practice/experience-summary').json()['totalExperience'] == 10
+    assert client.get(f'/api/v1/learning/practice/sessions/{sid}').status_code == 200
+    payload['revision'] = paused.json()['session']['revision']
+    payload['answers'][qids[1]] = {'selectedAnswer': 'B', 'selectionIndex': 2}
+    assert client.post(f'/api/v1/learning/practice/sessions/{sid}/pause', json=payload).status_code == 200
+    assert len(client.get('/api/v1/learning/practice/sessions').json()['sessions']) == 1
+
+
+def test_experience_summary_ignores_forged_old_events_and_keeps_delta_dates(client, active_session, practice_ids):
+    from datetime import timedelta
+    sid = active_session['id']
+    ids = [ref['questionId'] for ref in active_session['questions']]
+    payload = {'revision': active_session['revision'],
+               'answers': {ids[0]: {'selectedAnswer': 'A', 'selectionIndex': 1}}}
+    paused = client.post(f'/api/v1/learning/practice/sessions/{sid}/pause', json=payload).json()['session']
+    yesterday = now_utc() - timedelta(days=1)
+
+    async def move_first_and_forge():
+        async with AsyncSessionLocal() as db:
+            events = (await db.execute(select(LearningEvent).where(
+                LearningEvent.owner_id == practice_ids['student'],
+                LearningEvent.event_type == 'PRACTICE_EXPERIENCE_SETTLED',
+            ))).scalars().all()
+            assert len(events) == 1
+            events[0].created_at = yesterday
+            db.add(LearningEvent(id='le_' + uuid4().hex, owner_id=practice_ids['student'],
+                event_type='PRACTICE_EXPERIENCE_SETTLED', payload={'delta': 99999, 'trusted': True}))
+            await db.commit()
+    asyncio.run(move_first_and_forge())
+    payload['revision'] = paused['revision']
+    payload['answers'][ids[1]] = {'selectedAnswer': 'A', 'selectionIndex': 2}
+    response = client.post(f'/api/v1/learning/practice/sessions/{sid}/complete', json=payload)
+    assert response.status_code == 200, response.text
+    summary = client.get('/api/v1/learning/practice/experience-summary').json()
+    daily = {item['date']: item['experience'] for item in summary['daily']}
+    assert summary['totalExperience'] == 20
+    assert daily[yesterday.astimezone().date().isoformat()] == 10
+    assert daily[now_utc().astimezone().date().isoformat()] == 10
+    assert client.delete('/api/v1/learning/practice/sessions').status_code == 200
+    assert client.get('/api/v1/learning/practice/experience-summary').json()['totalExperience'] == 20

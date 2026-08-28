@@ -150,7 +150,7 @@ class PracticeSession(Base):
     __tablename__ = "practice_sessions"
     __table_args__ = (
         CheckConstraint(
-            "mode IN ('challenge', 'scholar', 'revenge')",
+            "mode IN ('challenge', 'scholar', 'revenge', 'practice')",
             name="ck_practice_sessions_mode",
         ),
         CheckConstraint(
