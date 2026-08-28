@@ -67,12 +67,9 @@ with sync_playwright() as p:
         assert not page.locator('#practiceStreakPop').is_hidden()
         assert '连胜 ×3' in page.locator('#practiceStreakPop').inner_text()
       page.wait_for_timeout(570)
-    assert page.locator('#practiceCheckpoint').is_visible()
-    assert page.locator('.practice-checkpoint-stats>div').count()==3
-    assert page.locator('#practiceCheckpointStreak').inner_text()=='1'
-    assert page.locator('#practiceCheckpointExperience').inner_text()=='42'
-    assert page.locator('#practiceCheckpointContinue').inner_text()=='继续'
-    page.locator('#practiceCheckpointContinue').click();page.wait_for_timeout(60)
+    assert page.locator('#practiceCheckpoint').is_hidden()
+    assert page.locator('#practiceGame').is_visible()
+    assert page.evaluate('KGPracticeMode.snapshot().experience')==42
     for _ in range(5):
       page.locator('[data-option-id="A"]').click();page.wait_for_timeout(570)
     assert page.locator('#practiceResult').is_visible()

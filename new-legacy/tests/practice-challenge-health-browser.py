@@ -77,8 +77,7 @@ MOCK_BACKEND = r"""()=>{
 def answer_wrong(page):
     page.locator('[data-option-id="B"]').click()
     page.clock.fast_forward(600)
-    if page.locator("#practiceCheckpoint").is_visible():
-        page.locator("#practiceCheckpointContinue").click()
+    assert page.locator("#practiceCheckpoint").is_hidden(), "challenge must not interrupt for a five-question checkpoint"
 
 
 def health_label(page):
@@ -128,6 +127,31 @@ with sync_playwright() as playwright:
         page.locator("#practiceAbandonBtn").click()
         page.wait_for_function("document.body.dataset.practiceView === 'lobby'")
 
+    # 用户复现：全新 180 题，先答对 1 题再答错 4 题；不能自动弹阶段小结。
+    start()
+    assert page.evaluate("window.__calls.filter(name=>name==='startSession').length") == 1
+    page.locator('[data-option-id="A"]').click()
+    page.clock.fast_forward(600)
+    for wrong in range(1, 5):
+        page.locator('[data-option-id="B"]').click()
+        page.clock.fast_forward(600)
+        assert health_count(page) == f"{54-wrong}/54"
+        assert fail_hidden(page)
+        if page.locator("#practiceCheckpoint").is_visible():
+            page.screenshot(path="/tmp/lszl-fresh-challenge-early-checkpoint.png")
+        assert page.locator("#practiceCheckpoint").is_hidden(), f"new 180-question session interrupted after only {wrong} wrong answers"
+        assert page.locator("#practiceGame").is_visible()
+    assert page.evaluate("window.KGPracticeMode.snapshot().answered") == 5
+    for wrong in range(5, 55):
+        answer_wrong(page)
+        assert health_count(page) == f"{54-wrong}/54"
+        assert fail_hidden(page) == (wrong < 54), f"fresh session: wrong={wrong}"
+        assert page.locator("#practiceGame").is_visible()
+    page.locator("#practiceFailContinueBtn").click()
+    answer_wrong(page)
+    assert fail_hidden(page), "failure dialog must not reopen on every subsequent wrong answer"
+    abandon()
+
     # 真正通过题量单选框启动，mock 和服务端一样按请求 count 返回题目。
     for count, maximum in [(10, 3), (20, 6), (60, 18), (180, 54)]:
         start(count)
@@ -140,14 +164,10 @@ with sync_playwright() as playwright:
     page.evaluate("window.__seedProgress({health:3});window.KGPracticeMode.showLobby()")
     start()
     assert health_count(page) == "54/54", health_count(page)
-    for wrong in range(1, 55):
+    for wrong in range(1, 4):
         answer_wrong(page)
         assert health_count(page) == f"{54-wrong}/54", (wrong, health_count(page))
-        assert fail_hidden(page) == (wrong < 54), f"wrong={wrong}: fail dialog threshold must be 54"
-    page.locator("#practiceFailContinueBtn").click()
-    assert fail_hidden(page)
-    answer_wrong(page)
-    assert fail_hidden(page), "failure dialog must not reopen on every subsequent wrong answer"
+        assert fail_hidden(page)
     abandon()
 
     # 正常恢复以实际已答错题为准；不能因为修复而把已消耗血量补满。

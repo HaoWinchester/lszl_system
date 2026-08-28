@@ -8,7 +8,6 @@
   const COUNTS=[10,20,60,180];
   const MAX_HEALTH=3;
   const SCHOLAR_MAX_SECONDS=60;
-  const CHECKPOINT_INTERVAL=5;
   const FEEDBACK_DELAY=520;
   const RETIRED_SINGLE_DEEP_NOTICE='单题深学已停用，已为你切换到刷题';
 
@@ -650,7 +649,7 @@
     if(state.index>=state.questions.length-1){updateQuestionNav();renderAnswerSheet();return}
     state.index+=1;
     if(state.health<=0&&state.mode!=='challenge'){finishPractice();return}
-    if(state.mode==='challenge'&&state.index%CHECKPOINT_INTERVAL===0){showCheckpoint();return}
+    // 挑战连续作答，不再每 5 题切换阶段小结；只有血量归零才提示挑战失败。
     renderQuestion();
   }
   function answerVerificationQuestion(optionId){
@@ -752,10 +751,6 @@
   function startTimer({resume=false}={}){
     if(state.mode!=='scholar')return;if(!resume)setScholarSeconds(SCHOLAR_MAX_SECONDS);state.timerId=global.setInterval(timerTick,50);
   }
-  function showCheckpoint(){
-    state.locked=true;setView('checkpoint');dom.checkpointStreak.textContent=String(state.streak);dom.checkpointExperience.textContent=String(state.experience);dom.checkpointDuration.textContent=formatDuration(elapsed());
-  }
-  function continueCheckpoint(){if(!state.active)return;setView('game');renderQuestion()}
   function showChallengeFailDialog(){
     if(!dom.failBackdrop)return;
     dom.failBackdrop.hidden=false;
@@ -1197,7 +1192,7 @@
     dom.answerSheetDrawer?.addEventListener('click',event=>{if(event.target===dom.answerSheetDrawer)closeAnswerSheetDrawer(true)});
     dom.reviewBackBtn?.addEventListener('click',returnToFrozenReport);
     dom.submitReturnBtn?.addEventListener('click',returnToFirstUnanswered);dom.submitAnywayBtn?.addEventListener('click',()=>{closeSubmitConfirm();finishPractice()});dom.submitConfirm?.addEventListener('click',event=>{if(event.target===dom.submitConfirm)closeSubmitConfirm()});
-    dom.checkpointContinue.addEventListener('click',continueCheckpoint);dom.againBtn.addEventListener('click',startAgain);dom.lobbyBtn.addEventListener('click',showLobby);dom.remediationContinueBtn?.addEventListener('click',startRemediationVerification);dom.remediationReviewBtn?.addEventListener('click',toggleRemediationExplanation);
+    dom.againBtn.addEventListener('click',startAgain);dom.lobbyBtn.addEventListener('click',showLobby);dom.remediationContinueBtn?.addEventListener('click',startRemediationVerification);dom.remediationReviewBtn?.addEventListener('click',toggleRemediationExplanation);
     // 挑战 V2：生命归零失败弹窗（退回大厅 / 继续作答）
     dom.failLobbyBtn?.addEventListener('click',()=>{closeChallengeFailDialog();abandonPractice()});
     dom.failContinueBtn?.addEventListener('click',closeChallengeFailDialog);
@@ -1273,7 +1268,7 @@
     setView('lobby');
   }
 
-  const api=Object.freeze({init,startPractice,answerById:id=>answer(id,dom.options.querySelector('[data-option-id="'+CSS.escape(text(id))+'"]')),finishPractice,showLobby,loadReleases,snapshot,constants:Object.freeze({COUNTS:[...COUNTS],MAX_HEALTH,SCHOLAR_MAX_SECONDS,CHECKPOINT_INTERVAL})});
+  const api=Object.freeze({init,startPractice,answerById:id=>answer(id,dom.options.querySelector('[data-option-id="'+CSS.escape(text(id))+'"]')),finishPractice,showLobby,loadReleases,snapshot,constants:Object.freeze({COUNTS:[...COUNTS],MAX_HEALTH,SCHOLAR_MAX_SECONDS})});
   global.KGPracticeMode=api;
   if(typeof module!=='undefined'&&module.exports)module.exports={streakBonus,formatDuration,resolveRelease,practiceModeEnabled,renderHeartIcon,readRetiredModeNavigation,prioritizeRetiredQuestion,constants:api.constants};
   if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',init,{once:true});

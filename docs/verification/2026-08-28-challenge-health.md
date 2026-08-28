@@ -47,3 +47,36 @@ real-api-180 wrong=54 health=0 dialog=True
 - 从 v9.0-p4.1.183 升至 v9.0-p4.1.184。
 - 发布前原 active 与同步候选均为 972 文件，文件路径集合一致，关键页面 admin-console.html / practice-mode.html 及公共草稿模块存在。
 - `--skip-browser` 仅执行发布器文件门禁；API、浏览器、设计与全量测试由以上命令单独执行，不将跳过验证标记当作测试通过证据。
+
+## 后续复测：全新试卷四次答错后的提前提示
+
+用户再次反馈是全新试卷。按“新建 180 题 → 答对 1 题 → 答错 4 题”新增测试，在修复前稳定失败：
+
+```text
+AssertionError: new 180-question session interrupted after only 4 wrong answers
+```
+
+此时血量为 50/54，失败弹窗隐藏，但整页被切换为标题“继续保持”的阶段小结。原代码的 `CHECKPOINT_INTERVAL=5` 按题目位置触发，与错题数无关。
+
+此前测试的缺陷：`answer_wrong` 和答题卡测试在遇到小结时自动点击“继续”，因此只能证明失败弹窗阈值，不能证明答题过程不会提前中断。此前把旧会话恢复作为用户问题的解释并不完整。用户尚未提供弹窗截图；此次修复针对已复现、与新反馈吻合的提前提示路径。
+
+本轮删除自动阶段小结触发及其失去调用方的控制函数；保留现有隐藏 DOM 以保持页面结构兼容。挑战过程连续作答，血量归零仍提示挑战失败且可以继续。测试不再自动点击任何阶段小结，而是在其出现时立即失败。
+
+- 持久化回归从全新 180 题开始，混合正确/错误作答，连续检查至第 54 次答错；保留旧血量、保存恢复、末题、题量冲突等已有覆盖。
+- `pnpm --dir frontend test`：267 passed。
+- `pnpm --dir frontend test:design`：5 passed。
+- `node --test new-legacy/tests/practice-draft-state.test.js new-legacy/tests/practice-session-core.test.js new-legacy/tests/v90-p40-practice-mode.test.js`：11 passed。
+- 答题卡、加载、服务端作答的三个相关浏览器脚本通过。
+- 未重跑后端全量测试：本轮未修改后端业务逻辑，仅同步 release seed 版本。上一轮 607 passed 不能当作本轮重跑结果。
+- `v90-p40-practice-mode-browser.py` 的旧小结断言已随需求更新；该历史脚本其余夹具仍依赖旧目录/自动交卷行为，本轮未将它计为通过。实际覆盖由上述当前草稿/会话浏览器脚本承担。
+
+本轮最终验证：`python3 new-legacy/tests/practice-challenge-health-browser.py` 全部通过。真实 API 的独立数据库场景（`/tmp/lszl-fresh-challenge-180-api-e2e.py`）全程新建、不保存、不恢复，且禁止自动跳过阶段小结，输出：
+
+```text
+fresh-real-api-180 wrong=3 health=51 dialog=False
+fresh-real-api-180 wrong=4 health=50 dialog=False
+fresh-real-api-180 wrong=53 health=1 dialog=False
+fresh-real-api-180 wrong=54 health=0 dialog=True
+```
+
+通过正式脚本发布 v9.0-p4.1.185；原 active、候选各 972 文件，路径集合一致、关键页面完整。未改动用户已存练习数据。

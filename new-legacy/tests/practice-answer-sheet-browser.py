@@ -348,10 +348,7 @@ with sync_playwright() as playwright:
         )
         assert jump_target, answered_ids
         view = page.evaluate("document.body.dataset.practiceView")
-        if view == "checkpoint":
-            page.locator("#practiceCheckpointContinue").click()
-            page.wait_for_timeout(120)
-            view = page.evaluate("document.body.dataset.practiceView")
+        assert view == "game", "answer-sheet navigation must not be interrupted by a checkpoint"
         current_id = page.evaluate("()=>{const el=document.querySelector('#practiceAnswerSheet [aria-current=step]');return el?el.dataset.questionId:null}")
         if current_id != jump_target:
             jump_via_sheet(page, f'[data-question-id="{jump_target}"]')
