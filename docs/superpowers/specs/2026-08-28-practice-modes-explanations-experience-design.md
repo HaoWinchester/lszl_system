@@ -2,7 +2,7 @@
 
 日期：2026-08-28
 
-状态：已实施并通过验收，测试环境已发布 v9.0-p4.1.186。详见 docs/verification/2026-08-28-practice-modes-explanations-experience.md。
+状态：已实施并通过隔离环境业务验收。2026-08-28 16:18 为本机发布，17:18 已部署至公网 UAT（https://uat.aihuanpu.com），版本 v9.0-p4.1.186，公网资源及健康状态已核验；本次公网登录作答回归因浏览器连接超时未执行。详见 docs/verification/2026-08-28-practice-modes-explanations-experience.md。
 
 ## 1. 已确认范围
 

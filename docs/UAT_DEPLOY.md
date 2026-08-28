@@ -29,6 +29,8 @@ bash deploy/update-uat.sh
 
 脚本会构建并 promote 不可变前端 release、更新 UAT 容器、安装 Git 中的最终 Nginx 配置，然后验证公网 HTTPS 健康检查。发布前必须确认 active release 文件数和关键页面完整，禁止手工覆盖 release site。
 
+本机 `manage-new-legacy.js update` / promote 成功只代表本机 release 更新，不代表公网已部署。宣布 UAT 发布完成前，必须同时核对公网页面 `data-release`、公网关键 JS/CSS 与候选的 SHA-256、UAT 容器 active 指针和迁移版本；不能用 `127.0.0.1:5173` 的验收替代 `https://uat.aihuanpu.com`。同步记录正式站容器 ID 与公网版本，更新后确认正式站未变。浏览器登录业务回归和 HTTP 文件核验须分别描述。
+
 ## 验证
 
 ```bash
