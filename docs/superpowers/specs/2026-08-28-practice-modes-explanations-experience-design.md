@@ -4,6 +4,8 @@
 
 状态：已实施并通过隔离环境业务验收。2026-08-28 16:18 为本机发布，17:18 已部署至公网 UAT（https://uat.aihuanpu.com），版本 v9.0-p4.1.186，公网资源及健康状态已核验；本次公网登录作答回归因浏览器连接超时未执行。详见 docs/verification/2026-08-28-practice-modes-explanations-experience.md。
 
+正式发布：用户确认先备份再部署后，2026-08-28 17:35 已将同一版本发布至 https://lszl.aihuanpu.com。生产备份、隔离恢复/迁移演练与公网部署核验见 docs/verification/2026-08-28-production-v186-deployment.md。
+
 ## 1. 已确认范围
 
 1. 挑战、学霸模式在做题期间不展示解析，不提供手动交卷功能。
