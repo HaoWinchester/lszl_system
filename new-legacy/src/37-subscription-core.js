@@ -107,7 +107,9 @@
   }
   function saveSubscriptions(map){
     subscriptionState=Object.freeze(Object.fromEntries(
-      Object.entries(map&&typeof map==="object"?map:{}).map(([username,subscription])=>[username,Object.freeze({...subscription})])
+      Object.entries(map&&typeof map==="object"?map:{}).map(([username,subscription])=>[
+        username,Object.freeze(normalizeSubscription(subscription,username))
+      ])
     ));
     return readSubscriptions();
   }
@@ -134,11 +136,16 @@
       note:""
     };
   }
+  function subscriptionTime(value,fallback=0){
+    if(typeof value==="number"&&Number.isFinite(value))return value;
+    const parsed=Date.parse(String(value||""));
+    return Number.isFinite(parsed)?parsed:fallback;
+  }
   function normalizeSubscription(sub,username=currentUsername()){
     sub=sub && typeof sub === "object" ? sub : {};
     const planId=normalizePlanId(sub.planId);
-    const startedAt=Number(sub.startedAt)||Date.now();
-    let expiresAt=Number(sub.expiresAt)||0;
+    const startedAt=subscriptionTime(sub.startedAt,Date.now());
+    let expiresAt=subscriptionTime(sub.expiresAt,0);
     const plan=planById(planId);
     if(plan.durationDays === -1) expiresAt=0;
     return {
@@ -149,7 +156,7 @@
       status:normalizeStatus(sub.status),
       startedAt,
       expiresAt,
-      updatedAt:Number(sub.updatedAt)||0,
+      updatedAt:subscriptionTime(sub.updatedAt,0),
       source:sub.source || "manual",
       orderId:sub.orderId || "",
       note:sub.note || ""

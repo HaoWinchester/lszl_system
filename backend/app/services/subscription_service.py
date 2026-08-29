@@ -1,7 +1,7 @@
 """订阅业务逻辑：当前订阅、卡密兑换、订单申请/审批/支付、管理员开通、卡密生成。"""
 
 import secrets
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -159,7 +159,17 @@ async def _subscription_for_update(db: AsyncSession, username: str) -> Subscript
 
 
 async def admin_set(
-    db: AsyncSession, username: str, plan_id: str, status: str | None, note: str | None, actor: str
+    db: AsyncSession,
+    username: str,
+    plan_id: str,
+    status: str | None,
+    note: str | None,
+    actor: str,
+    *,
+    started_at: datetime | None = None,
+    expires_at: datetime | None = None,
+    update_started_at: bool = False,
+    update_expires_at: bool = False,
 ) -> Subscription:
     plan_id = validate_plan_id(plan_id)
     s = await get_subscription(db, username)
@@ -169,6 +179,14 @@ async def admin_set(
     s.source = "manual"
     if note is not None:
         s.note = note
+    if update_started_at:
+        if started_at is None:
+            raise ValueError("startedAt 不能为空")
+        s.started_at = started_at
+    if update_expires_at:
+        s.expires_at = expires_at
+    if s.expires_at is not None and s.expires_at <= s.started_at:
+        raise ValueError("expiresAt 必须晚于 startedAt")
     await db.commit()
     await db.refresh(s)
     return s

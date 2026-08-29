@@ -11,6 +11,9 @@
   let userProfile = global.__KG_DIRECT_BOOTSTRAP__?.authenticated
     ? global.__KG_DIRECT_BOOTSTRAP__.authUser || null
     : null
+  let orderState = Object.freeze([])
+  let redeemCodeState = Object.freeze([])
+  let initialization = Object.freeze({ status: 'loading', error: null })
 
   function request(method, path, body) {
     return api.request({ method, path, body })
@@ -57,6 +60,39 @@
       expiresAt: subscriptionTimestamp(subscription.expiresAt || subscription.expires_at),
       updatedAt: subscriptionTimestamp(subscription.updatedAt || subscription.updated_at),
     })
+  }
+
+  function normalizeOrder(order = {}) {
+    const amount = Number(order.amount)
+    return Object.freeze({
+      ...order,
+      id: String(order.id || ''),
+      username: String(order.username || ''),
+      planId: String(order.planId || order.plan_id || ''),
+      planName: String(order.planName || order.plan_name || ''),
+      createdAt: subscriptionTimestamp(order.createdAt || order.created_at),
+      updatedAt: subscriptionTimestamp(order.updatedAt || order.updated_at),
+      approvedAt: subscriptionTimestamp(order.approvedAt || order.approved_at),
+      amountText: Number.isFinite(amount) ? `￥${(amount / 100).toFixed(2)}` : '',
+    })
+  }
+
+  function normalizeRedeemCode(code = {}) {
+    return Object.freeze({
+      ...code,
+      id: String(code.id || ''),
+      code: String(code.code || '').trim().toUpperCase(),
+      planId: String(code.planId || code.plan_id || ''),
+      planName: String(code.planName || code.plan_name || ''),
+      createdAt: subscriptionTimestamp(code.createdAt || code.created_at),
+      usedAt: subscriptionTimestamp(code.usedAt || code.used_at),
+    })
+  }
+
+  function filteredRecords(records, options = {}) {
+    return records.filter(record => Object.entries(options).every(([key, value]) => (
+      value == null || value === '' || String(record[key] || '') === String(value)
+    )))
   }
 
   async function refreshUserProfile() {
@@ -115,6 +151,20 @@
     return payload.logs || []
   }
 
+  async function refreshOrders() {
+    const payload = await request('GET', '/api/v1/subscriptions/orders')
+    orderState = Object.freeze((payload.orders || []).map(normalizeOrder))
+    global.dispatchEvent?.(new CustomEvent('kg-subscription-order-change', { detail: { orders: orderState } }))
+    return orderState
+  }
+
+  async function refreshRedeemCodes() {
+    const payload = await request('GET', '/api/v1/subscriptions/redeem-codes')
+    redeemCodeState = Object.freeze((payload.codes || []).map(normalizeRedeemCode))
+    global.dispatchEvent?.(new CustomEvent('kg-subscription-redeem-code-change', { detail: { codes: redeemCodeState } }))
+    return redeemCodeState
+  }
+
   async function clearAdminLogs() {
     await request('DELETE', '/api/v1/system/logs')
     auth?.replaceAdminLogs?.([])
@@ -129,7 +179,9 @@
       return null
     }
     await Promise.all([refreshRoleThemes(), refreshSubscription()])
-    if (userProfile.role === 'admin') await Promise.all([refreshAdminSettings(), refreshAdminLogs()])
+    if (userProfile.role === 'admin') {
+      await Promise.all([refreshAdminSettings(), refreshAdminLogs(), refreshOrders(), refreshRedeemCodes()])
+    }
     return userProfile
   }
 
@@ -164,10 +216,61 @@
   }
 
   async function setStudentSubscription(username, patch = {}) {
-    const payload = await request('PUT', `/api/v1/subscriptions/admin/${encodeURIComponent(username)}`, patch)
+    const body = {}
+    for (const key of ['planId', 'status', 'note']) {
+      if (Object.prototype.hasOwnProperty.call(patch, key)) body[key] = patch[key]
+    }
+    for (const key of ['startedAt', 'expiresAt']) {
+      if (!Object.prototype.hasOwnProperty.call(patch, key)) continue
+      const timestamp = Number(patch[key]) || 0
+      body[key] = timestamp ? new Date(timestamp).toISOString() : null
+    }
+    const payload = await request('PUT', `/api/v1/subscriptions/admin/${encodeURIComponent(username)}`, body)
     const subscription = normalizeSubscription(payload.subscription || { ...patch, username })
     subscriptionApi.hydrateSubscriptions?.({ [username]: subscription }, { merge: true })
     return subscription
+  }
+
+  async function approveOrder(orderId) {
+    await request('POST', `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/approve`)
+    await refreshOrders()
+    return { ok: true, order: orderState.find(order => order.id === String(orderId)) || null, message: '订阅申请已确认开通。' }
+  }
+
+  async function cancelOrder(orderId) {
+    await request('POST', `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/cancel`)
+    await refreshOrders()
+    return { ok: true, order: orderState.find(order => order.id === String(orderId)) || null, message: '订阅申请已取消。' }
+  }
+
+  async function generateRedeemCodes(options = {}) {
+    const payload = await request('POST', '/api/v1/subscriptions/redeem-codes/generate', {
+      planId: options.planId || 'monthly',
+      count: Math.max(1, Math.min(500, Number(options.count) || 1)),
+    })
+    const generated = new Set((payload.codes || []).map(code => String(code).toUpperCase()))
+    await refreshRedeemCodes()
+    const codes = redeemCodeState.filter(code => generated.has(code.code))
+    return { ok: true, codes, message: `已生成 ${codes.length} 张卡密。` }
+  }
+
+  async function redeemCode(input) {
+    const payload = await request('POST', '/api/v1/subscriptions/redeem', { code: String(input || '').trim() })
+    const subscription = normalizeSubscription(payload.subscription || {})
+    if (subscription.username) subscriptionApi.hydrateSubscriptions?.({ [subscription.username]: subscription }, { merge: true })
+    return { ok: true, subscription, message: '卡密兑换成功，会员权益已更新。' }
+  }
+
+  async function retryInitialization() {
+    initialization = Object.freeze({ status: 'loading', error: null })
+    try {
+      const result = await refreshAuthenticatedContext()
+      initialization = Object.freeze({ status: 'ready', error: null })
+      return result
+    } catch (error) {
+      initialization = Object.freeze({ status: 'failed', error })
+      throw error
+    }
   }
 
   const domain = {
@@ -176,6 +279,8 @@
     refreshSubscription,
     refreshAdminSettings,
     refreshAdminLogs,
+    refreshOrders,
+    refreshRedeemCodes,
     clearAdminLogs,
     refreshAuthenticatedContext,
     saveTheme,
@@ -184,11 +289,10 @@
     savePlan,
     saveAllPlans,
     setStudentSubscription,
+    retryInitialization,
+    initializationState: () => initialization,
   }
-  domain.ready = refreshAuthenticatedContext().catch(error => {
-    console.error('[DirectSystemAdapter] initial hydration failed:', error)
-    return null
-  })
+  domain.ready = retryInitialization()
   global.KGSystemDomain = Object.freeze(domain)
 
   global.KGWechatPay = Object.freeze({
@@ -215,6 +319,17 @@
   })
   subscriptionApi.pauseStudentSubscription = (username, note = '') => setStudentSubscription(username, { status: 'paused', note })
   subscriptionApi.activateFreeSubscription = (username, note = '') => setStudentSubscription(username, { planId: 'free', status: 'active', note })
+  subscriptionApi.orderList = options => filteredRecords(orderState, options)
+    .slice().sort((left, right) => right.createdAt - left.createdAt)
+  subscriptionApi.pendingOrders = () => subscriptionApi.orderList({ status: 'pending' })
+  subscriptionApi.currentUserOrders = () => subscriptionApi.orderList({ username: userProfile?.username || '' })
+  subscriptionApi.hasPendingOrder = (username, planId) => subscriptionApi.orderList({ username, planId, status: 'pending' }).length > 0
+  subscriptionApi.approveOrder = approveOrder
+  subscriptionApi.cancelOrder = cancelOrder
+  subscriptionApi.redeemCodeList = options => filteredRecords(redeemCodeState, options)
+    .slice().sort((left, right) => right.createdAt - left.createdAt)
+  subscriptionApi.generateRedeemCodes = generateRedeemCodes
+  subscriptionApi.redeemCode = redeemCode
 
   if (typeof global.addEventListener === 'function') {
     global.addEventListener('kg-auth-session-change', event => {

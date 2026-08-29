@@ -37,14 +37,15 @@ test('account, role, and subscription modules never persist business records in 
   }
 })
 
-test('account and system pages are absent from identical backend and frontend runtime policies', () => {
+test('only the completed account and system pages are absent from identical runtime policies', () => {
   const backend = readRepo('backend/app/web/runtime_page_policy.json')
   const frontend = readRepo('frontend/scripts/runtime-page-policy.json')
   assert.equal(frontend, backend)
   const policy = JSON.parse(backend)
-  for (const page of ['user-management.html', 'system-settings.html', 'admin-settings.html']) {
+  for (const page of ['user-management.html', 'system-settings.html']) {
     assert.equal(policy.runtimePages.includes(page), false, page)
   }
+  assert.equal(policy.runtimePages.includes('admin-settings.html'), true)
 })
 
 function runAdapter(relative, context) {
@@ -131,6 +132,8 @@ test('system adapter hydrates immutable UI stores from domain APIs and keeps pri
         if (options.path === '/api/v1/system/wechat-config') return { config: { enableOfficial: true } }
         if (options.path === '/api/v1/system/wechat-pay-config') return { config: { enableNativePay: true } }
         if (options.path === '/api/v1/system/logs?limit=100') return { logs: [{ id: 'log-1', action: '登录' }] }
+        if (options.path === '/api/v1/subscriptions/orders') return { orders: [] }
+        if (options.path === '/api/v1/subscriptions/redeem-codes') return { codes: [] }
         throw new Error(`unexpected ${options.path}`)
       },
     },
@@ -166,4 +169,123 @@ test('system adapter hydrates immutable UI stores from domain APIs and keeps pri
   failThemes = true
   await assert.rejects(context.KGSystemDomain.refreshRoleThemes(), /主题服务不可用/)
   assert.equal(themes, before)
+})
+
+test('subscription order and redeem-code mutations reload authoritative API state', async () => {
+  const calls = []
+  let orderStatus = 'pending'
+  let codes = [{ id: 'code-1', code: 'VIP-ONE', planId: 'monthly', planName: '月度会员', status: 'unused', createdAt: '2026-08-29T00:00:00Z' }]
+  const subscriptions = {
+    orderList: () => [{ id: 'memory-order', status: 'pending' }],
+    redeemCodeList: () => [{ id: 'memory-code', code: 'MEMORY' }],
+    approveOrder: () => ({ ok: true, order: { id: 'memory-order' } }),
+    cancelOrder: () => ({ ok: true, order: { id: 'memory-order' } }),
+    generateRedeemCodes: () => ({ ok: true, codes: [{ code: 'MEMORY' }] }),
+    redeemCode: () => ({ ok: true, code: { code: 'MEMORY' } }),
+    hydratePlanSettings() {},
+    hydrateSubscriptions() {},
+    PLAN_ORDER: [],
+    PLANS: {},
+  }
+  const context = {
+    console,
+    Object,
+    Array,
+    String,
+    Number,
+    Date,
+    Promise,
+    URLSearchParams,
+    __KG_DIRECT_BOOTSTRAP__: { authenticated: true, authUser: { username: 'admin', role: 'admin' } },
+    KGDomainApi: {
+      async request(options) {
+        calls.push(options)
+        if (options.path === '/api/v1/subscriptions/plans') return { plans: [] }
+        if (options.path === '/api/v1/system/themes') return { themes: {} }
+        if (options.path === '/api/v1/subscriptions/me') return { subscription: null, entitlements: {} }
+        if (options.path === '/api/v1/system/wechat-config') return { config: {} }
+        if (options.path === '/api/v1/system/wechat-pay-config') return { config: {} }
+        if (options.path === '/api/v1/system/logs?limit=100') return { logs: [] }
+        if (options.path === '/api/v1/subscriptions/orders' && (!options.method || options.method === 'GET')) {
+          return { orders: [{ id: 'db-order', username: 'learner', planId: 'monthly', planName: '月度会员', status: orderStatus, createdAt: '2026-08-29T00:00:00Z' }] }
+        }
+        if (options.path === '/api/v1/subscriptions/orders/db-order/approve') {
+          orderStatus = 'approved'
+          return { order: { id: 'db-order', status: orderStatus } }
+        }
+        if (options.path === '/api/v1/subscriptions/redeem-codes') return { codes }
+        if (options.path === '/api/v1/subscriptions/redeem-codes/generate') {
+          codes = [{ id: 'code-2', code: 'VIP-TWO', planId: 'monthly', planName: '月度会员', status: 'unused', createdAt: '2026-08-29T01:00:00Z' }, ...codes]
+          return { codes: ['VIP-TWO'] }
+        }
+        throw new Error(`unexpected ${options.method || 'GET'} ${options.path}`)
+      },
+    },
+    KGAuthCore: { replaceAdminLogs() {} },
+    KGRolePermissions: { hydrateThemes() {}, DEFAULT_THEMES: {} },
+    KGSubscription: subscriptions,
+    KGWechatLogin: { applyConfig() {} },
+  }
+  runAdapter('frontend/scripts/new-legacy-assets/direct-system-adapter.js', context)
+
+  await context.KGSystemDomain.ready
+  assert.equal(subscriptions.orderList({})[0].id, 'db-order')
+  assert.equal(subscriptions.redeemCodeList({})[0].code, 'VIP-ONE')
+
+  const approved = await subscriptions.approveOrder('db-order')
+  assert.equal(approved.ok, true)
+  assert.equal(subscriptions.orderList({})[0].status, 'approved')
+
+  const generated = await subscriptions.generateRedeemCodes({ planId: 'monthly', count: 1 })
+  assert.equal(generated.ok, true)
+  assert.equal(subscriptions.redeemCodeList({})[0].code, 'VIP-TWO')
+  assert.equal(calls.some(call => call.path.includes('/api/v1/runtime/')), false)
+})
+
+test('initial system hydration rejects with a retry that replaces failed defaults', async () => {
+  let failPlans = true
+  let hydratedPlans = null
+  const context = {
+    console,
+    Object,
+    Array,
+    String,
+    Number,
+    Date,
+    Promise,
+    __KG_DIRECT_BOOTSTRAP__: { authenticated: true, authUser: { username: 'admin', role: 'admin' } },
+    KGDomainApi: {
+      async request({ path }) {
+        if (path === '/api/v1/subscriptions/plans') {
+          if (failPlans) throw new Error('套餐初始化失败')
+          return { plans: [{ planId: 'monthly', name: '数据库月度会员' }] }
+        }
+        if (path === '/api/v1/system/themes') return { themes: {} }
+        if (path === '/api/v1/subscriptions/me') return { subscription: null, entitlements: {} }
+        if (path === '/api/v1/system/wechat-config' || path === '/api/v1/system/wechat-pay-config') return { config: {} }
+        if (path === '/api/v1/system/logs?limit=100') return { logs: [] }
+        if (path === '/api/v1/subscriptions/orders' || path === '/api/v1/subscriptions/redeem-codes') return path.endsWith('orders') ? { orders: [] } : { codes: [] }
+        throw new Error(`unexpected ${path}`)
+      },
+    },
+    KGAuthCore: { replaceAdminLogs() {} },
+    KGRolePermissions: { hydrateThemes() {}, DEFAULT_THEMES: {} },
+    KGSubscription: {
+      hydratePlanSettings(value) { hydratedPlans = value },
+      hydrateSubscriptions() {},
+      PLAN_ORDER: [],
+      PLANS: {},
+    },
+    KGWechatLogin: { applyConfig() {} },
+  }
+  runAdapter('frontend/scripts/new-legacy-assets/direct-system-adapter.js', context)
+
+  await assert.rejects(context.KGSystemDomain.ready, /套餐初始化失败/)
+  assert.equal(context.KGSystemDomain.initializationState().status, 'failed')
+  assert.equal(hydratedPlans, null)
+
+  failPlans = false
+  await context.KGSystemDomain.retryInitialization()
+  assert.equal(context.KGSystemDomain.initializationState().status, 'ready')
+  assert.equal(hydratedPlans.monthly.name, '数据库月度会员')
 })

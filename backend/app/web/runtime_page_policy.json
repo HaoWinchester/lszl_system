@@ -2,6 +2,7 @@
   "runtimePages": [
     "admin-console.html",
     "admin-operations.html",
+    "admin-settings.html",
     "admin-subjects.html",
     "content-center.html",
     "content-prep.html",

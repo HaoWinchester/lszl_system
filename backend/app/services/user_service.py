@@ -144,8 +144,11 @@ async def subscription_summaries(db: AsyncSession, usernames: list[str]) -> dict
             "planId": s.plan_id,
             "planName": plan_names.get(s.plan_id, s.plan_id),
             "status": s.status,
+            "startedAt": s.started_at.isoformat() if s.started_at else None,
             "expiresAt": s.expires_at.isoformat() if s.expires_at else None,
             "source": s.source or "default",
+            "note": s.note or "",
+            "updatedAt": s.updated_at.isoformat() if s.updated_at else None,
             # 真实付款：存在已支付订单，或订阅由微信支付开通。
             "paid": s.username in paid_set or s.source == "wechat_pay",
         }
@@ -155,8 +158,11 @@ async def subscription_summaries(db: AsyncSession, usernames: list[str]) -> dict
                 "planId": "free",
                 "planName": plan_names.get("free", "免费学员"),
                 "status": "none",
+                "startedAt": None,
                 "expiresAt": None,
                 "source": "default",
+                "note": "",
+                "updatedAt": None,
                 "paid": name in paid_set,
             }
     return out

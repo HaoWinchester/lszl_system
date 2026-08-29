@@ -27,6 +27,7 @@ const learnerPages = [
 const runtimePages = [
   'admin-console.html',
   'admin-operations.html',
+  'admin-settings.html',
   'admin-subjects.html',
   'content-center.html',
   'content-prep.html',
@@ -36,7 +37,7 @@ const runtimePages = [
   'teacher-workbench.html',
 ]
 
-const directAccountPages = ['user-management.html', 'system-settings.html', 'admin-settings.html']
+const directAccountPages = ['user-management.html', 'system-settings.html']
 
 test('runtime pages are an explicit minimal allowlist', () => {
   const policy = JSON.parse(readRepo('backend/app/web/runtime_page_policy.json'))

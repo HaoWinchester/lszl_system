@@ -345,17 +345,22 @@
       redeemMsg.classList.toggle("ok",!!ok);
     }
     if(redeemBtn&&redeemInput){
-      const submitRedeem=()=>{
+      const submitRedeem=async()=>{
         const api=subscriptionApi();
         if(!api||typeof api.redeemCode!=="function"){setRedeemMsg("卡密模块未加载，请刷新页面后重试。",false);return}
-        const result=api.redeemCode(redeemInput.value);
-        setRedeemMsg(result&&result.message||"卡密兑换失败。",!!(result&&result.ok));
-        showStatus(result&&result.message||"卡密兑换失败。");
-        if(result&&result.ok){
-          redeemInput.value="";
-          refreshAuthUI();
-          setTimeout(renderSubscriptionDetailPlans,600);
-        }
+        redeemBtn.disabled=true;
+        try{const result=await api.redeemCode(redeemInput.value);
+          setRedeemMsg(result&&result.message||"卡密兑换失败。",!!(result&&result.ok));
+          showStatus(result&&result.message||"卡密兑换失败。");
+          if(result&&result.ok){
+            redeemInput.value="";
+            refreshAuthUI();
+            setTimeout(renderSubscriptionDetailPlans,600);
+          }
+        }catch(error){
+          const message=String(error&&error.message||"卡密兑换失败，请重试。");
+          setRedeemMsg(message,false);showStatus(message);
+        }finally{redeemBtn.disabled=false}
       };
       redeemBtn.addEventListener("click",submitRedeem);
       redeemInput.addEventListener("keydown",event=>{

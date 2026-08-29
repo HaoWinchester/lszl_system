@@ -13,6 +13,7 @@ from app.core.security import uid
 from app.db.session import get_db
 from app.models.subscription import SubscriptionOrder
 from app.models.user import User
+from app.schemas.subscription import AdminSubscriptionUpdate
 from app.services import subscription_service, system_service, wechat_pay_service
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
@@ -135,15 +136,19 @@ async def wechat_pay_demo_notify(body: dict, db: DB):
 
 # ---------- 管理员 ----------
 @router.put("/admin/{username}")
-async def admin_set(username: str, body: dict, db: DB, _: AdminUser):
+async def admin_set(username: str, body: AdminSubscriptionUpdate, db: DB, _: AdminUser):
     try:
         s = await subscription_service.admin_set(
             db,
             username,
-            body.get("planId", "free"),
-            body.get("status"),
-            body.get("note"),
+            body.plan_id,
+            body.status,
+            body.note,
             "admin",
+            started_at=body.started_at,
+            expires_at=body.expires_at,
+            update_started_at="started_at" in body.model_fields_set,
+            update_expires_at="expires_at" in body.model_fields_set,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

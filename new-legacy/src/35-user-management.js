@@ -36,6 +36,23 @@
     if(!state.selected || !state.users[state.selected]) state.selected=Object.keys(state.users)[0]||'';
     return true;
   }
+  function renderInitialLoadFailure(error){
+    const list=$('umUserList');if(!list)return;
+    list.innerHTML=`<div class="um-empty" role="alert"><strong>用户列表加载失败，未显示本地默认数据。</strong><p>${escapeHTML(error?.message||'请检查网络后重试。')}</p><button type="button" id="umRetryInitialLoadBtn">重新加载用户</button></div>`;
+    $('umRetryInitialLoadBtn')?.addEventListener('click',initializeUserManagement,{once:true});
+  }
+  async function initializeUserManagement(){
+    try{
+      const domain=window.KGSystemDomain;
+      if(domain?.initializationState?.().status==='failed')await domain.retryInitialization();
+      else await domain?.ready;
+      if(!await loadUsers()){renderInitialLoadFailure(new Error('用户 API 请求失败'));return false}
+      render();return true;
+    }catch(error){
+      console.error('[UserManagement] initial load failed',error);
+      renderInitialLoadFailure(error);toast(error?.message||'用户管理加载失败');return false;
+    }
+  }
   function saveUsers(renderAfter=true,options={}){
     const result=UserService.persist(state.users,{
       silent:!!options.silent,
@@ -615,5 +632,5 @@
   window.addEventListener('kg-subscription-change',()=>{if(state.selected)renderForm()});
   window.addEventListener('kg-subscription-plan-change',()=>{if(state.selected)renderForm()});
   bindEvents();
-  (async()=>{await window.KGSystemDomain?.ready;await loadUsers();render()})().catch(error=>{console.error('[UserManagement] initial load failed',error);toast(error?.message||'用户管理加载失败')});
+  initializeUserManagement();
 })();

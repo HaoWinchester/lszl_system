@@ -234,8 +234,6 @@
       <div class="subscription-code-create">
         <label>会员方案<select id="ssRedeemPlanSelect">${planOptions}</select></label>
         <label>生成数量<input id="ssRedeemCountInput" type="number" min="1" max="200" value="10"></label>
-        <label>卡密前缀<input id="ssRedeemPrefixInput" value="VIP" maxlength="8" placeholder="VIP"></label>
-        <label class="full">备注<input id="ssRedeemNoteInput" placeholder="例如：线下活动 / 管理员发放"></label>
         <button type="button" class="primary" id="ssGenerateRedeemCodesBtn">生成卡密</button>
       </div>
       ${all.length?`<div class="subscription-code-list">
@@ -252,12 +250,7 @@
             ${code.usedAt?`<span>使用：${escapeHTML(fmtTime(code.usedAt))} · ${escapeHTML(code.usedBy||'')}</span>`:''}
             ${code.note?`<span>备注：${escapeHTML(code.note)}</span>`:''}
           </div>
-          <div class="subscription-code-actions">
-            <button type="button" data-code-action="copy">复制</button>
-            <button type="button" data-code-action="disable" ${code.status==='unused'?'':'disabled'}>停用</button>
-            <button type="button" data-code-action="enable" ${code.status==='disabled'?'':'disabled'}>启用</button>
-            <button type="button" data-code-action="remove">删除</button>
-          </div>
+          <div class="subscription-code-actions"><button type="button" data-code-action="copy">复制</button></div>
         </article>`).join('')}
       </div>
       <div class="subscription-code-pagination" aria-label="卡密列表分页">
@@ -269,17 +262,16 @@
       </div>`:`<div class="um-empty">暂无卡密。填写上方信息后可批量生成，列表会按每页 ${REDEEM_CODE_PAGE_SIZE} 条分页显示。</div>`}
     </section>`;
   }
-  function handleRedeemCodeGenerate(){
+  async function handleRedeemCodeGenerate(){
     const sub=window.KGSubscription;if(!sub||typeof sub.generateRedeemCodes!=='function')return;
     const planId=$('ssRedeemPlanSelect')?.value||'monthly';
     const count=$('ssRedeemCountInput')?.value||1;
-    const prefix=$('ssRedeemPrefixInput')?.value||'VIP';
-    const note=$('ssRedeemNoteInput')?.value||'';
-    const result=sub.generateRedeemCodes({planId,count,prefix,note});
-    if(!result||!result.ok){toast(result&&result.message||'卡密生成失败');return}
-    redeemCodePage=1;
-    toast(result.message||'卡密已生成');
-    renderSubscriptionPlans();
+    try{const result=await sub.generateRedeemCodes({planId,count});
+      if(!result||!result.ok){toast(result&&result.message||'卡密生成失败');return}
+      redeemCodePage=1;
+      toast(result.message||'卡密已生成');
+      renderSubscriptionPlans();
+    }catch(error){toast(error?.message||'卡密生成失败，请重试')}
   }
   function handleRedeemCodeAction(btn){
     const sub=window.KGSubscription;if(!sub)return;
@@ -293,16 +285,6 @@
       else prompt('复制卡密：',text);
       return;
     }
-    let ok=false;
-    if(action==='disable')ok=!!(sub.disableRedeemCode&&sub.disableRedeemCode(id));
-    else if(action==='enable')ok=!!(sub.enableRedeemCode&&sub.enableRedeemCode(id));
-    else if(action==='remove'){
-      if(!confirm('确认删除这条卡密？删除后不可恢复。'))return;
-      ok=!!(sub.removeRedeemCode&&sub.removeRedeemCode(id));
-    }
-    if(!ok){toast('卡密操作失败');return}
-    toast('卡密已更新');
-    renderSubscriptionPlans();
   }
   function handleRedeemCodePage(action){
     const sub=window.KGSubscription;if(!sub||typeof sub.redeemCodeList!=='function')return;
@@ -314,25 +296,27 @@
     renderSubscriptionPlans();
   }
 
-  function handleSubscriptionOrderAction(btn){
+  async function handleSubscriptionOrderAction(btn){
     const sub=window.KGSubscription;if(!sub)return;
     const item=btn.closest('[data-order-id]');
     const id=item&&item.dataset.orderId;
     if(!id)return;
-    let result=null;
-    if(btn.dataset.orderAction==='approve'){
-      if(!confirm('确认开通该学员的订阅申请？'))return;
-      result=typeof sub.approveOrder==='function'?sub.approveOrder(id,{note:'管理员在系统设置中确认开通'}):null;
-    }else if(btn.dataset.orderAction==='cancel'){
-      const note=prompt('请输入取消原因（可选）：','')||'';
-      result=typeof sub.cancelOrder==='function'?sub.cancelOrder(id,{note}):null;
-    }
-    if(!result||!result.ok){toast(result&&result.message||'订阅申请处理失败');return}
-    toast(result.message||'订阅申请已处理');
-    renderSubscriptionPlans();
-    renderLogs();
-    if(window.KGSubscription&&typeof window.KGSubscription.decorateSubscriptionElements==='function')window.KGSubscription.decorateSubscriptionElements();
-    if(window.KGUserCenter&&typeof window.KGUserCenter.refresh==='function')window.KGUserCenter.refresh();
+    try{
+      let result=null;
+      if(btn.dataset.orderAction==='approve'){
+        if(!confirm('确认开通该学员的订阅申请？'))return;
+        result=typeof sub.approveOrder==='function'?await sub.approveOrder(id,{note:'管理员在系统设置中确认开通'}):null;
+      }else if(btn.dataset.orderAction==='cancel'){
+        const note=prompt('请输入取消原因（可选）：','')||'';
+        result=typeof sub.cancelOrder==='function'?await sub.cancelOrder(id,{note}):null;
+      }
+      if(!result||!result.ok){toast(result&&result.message||'订阅申请处理失败');return}
+      toast(result.message||'订阅申请已处理');
+      renderSubscriptionPlans();
+      renderLogs();
+      if(window.KGSubscription&&typeof window.KGSubscription.decorateSubscriptionElements==='function')window.KGSubscription.decorateSubscriptionElements();
+      if(window.KGUserCenter&&typeof window.KGUserCenter.refresh==='function')window.KGUserCenter.refresh();
+    }catch(error){toast(error?.message||'订阅申请处理失败，请重试')}
   }
 
   function renderSubscriptionPlans(){
@@ -555,13 +539,43 @@
     const analyticsEnd=$('ssAnalyticsEnd');if(analyticsEnd&&!analyticsEnd.value)analyticsEnd.value=analyticsDate();
   }
 
+  function showInitializationFailure(error){
+    const content=document.querySelector('.ss-content');if(!content)return;
+    content.querySelectorAll('.ss-pane').forEach(panel=>{panel.hidden=true});
+    document.querySelectorAll('[data-ss-tab]').forEach(button=>{button.disabled=true});
+    let alert=$('ssInitializationError');
+    if(!alert){alert=document.createElement('section');alert.id='ssInitializationError';alert.className='um-panel um-empty';alert.setAttribute('role','alert');content.prepend(alert)}
+    alert.innerHTML=`<strong>系统配置加载失败，未显示默认配置。</strong><p>${escapeHTML(error?.message||'请检查网络后重试。')}</p><button type="button" id="ssRetryInitializationBtn">重新加载配置</button>`;
+    $('ssRetryInitializationBtn')?.addEventListener('click',initializeSystemSettings,{once:true});
+  }
+
+  function clearInitializationFailure(){
+    $('ssInitializationError')?.remove();
+    document.querySelectorAll('.ss-pane').forEach(panel=>{panel.hidden=false});
+    document.querySelectorAll('[data-ss-tab]').forEach(button=>{button.disabled=false});
+  }
+
+  let eventsBound=false;
+  async function initializeSystemSettings(){
+    const domain=window.KGSystemDomain;
+    try{
+      const state=domain?.initializationState?.();
+      if(state?.status==='failed')await domain.retryInitialization();
+      else await domain?.ready;
+    }catch(error){showInitializationFailure(error);return false}
+    clearInitializationFailure();
+    if(!eventsBound){
+      bindEvents();eventsBound=true;
+      window.addEventListener('kg-subscription-plan-change',()=>renderSubscriptionPlans());
+      window.addEventListener('kg-subscription-order-change',()=>renderSubscriptionPlans());
+      window.addEventListener('kg-subscription-redeem-code-change',()=>renderSubscriptionPlans());
+    }
+    render();
+    return true;
+  }
+
   document.addEventListener('DOMContentLoaded',async()=>{
     if(!ensureAccess())return;
-    try{await window.KGSystemDomain?.ready}catch(error){toast(error?.message||'系统配置加载失败，请刷新重试')}
-    bindEvents();
-    render();
-    window.addEventListener('kg-subscription-plan-change',()=>renderSubscriptionPlans());
-    window.addEventListener('kg-subscription-order-change',()=>renderSubscriptionPlans());
-    window.addEventListener('kg-subscription-redeem-code-change',()=>renderSubscriptionPlans());
+    await initializeSystemSettings();
   });
 })();
