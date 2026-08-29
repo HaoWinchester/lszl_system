@@ -752,21 +752,49 @@
     }
   }
   function createPaperReloadCoordinator(runReload){
-    let active=null,queuedReload=null,generation=0;
-    const drain=async()=>{let result=null;while(queuedReload!==null){const request=queuedReload;queuedReload=null;result=await runReload(request.preferredId,{isCurrent:()=>request.generation===generation})}return result};
+    let active=null,activeReload=null,queuedReload=null,generation=0,selectionIntent='';
+    const settlesSelectionIntent=(result,preferredId)=>{
+      if(!preferredId)return true;
+      if(String(result?.selectedPaperId||'')===preferredId)return true;
+      return Array.isArray(result?.papers)&&!result.papers.some(item=>String(item?.id||'')===preferredId);
+    };
+    const drain=async()=>{let result=null;while(queuedReload!==null){const request=queuedReload;queuedReload=null;activeReload=request;try{result=await runReload(request.preferredId,{isCurrent:()=>request.generation===generation});if(request.generation===generation&&selectionIntent===request.selectionIntent&&settlesSelectionIntent(result,request.selectionIntent))selectionIntent=''}finally{if(activeReload===request)activeReload=null}}return result};
     const start=()=>{active=drain().finally(()=>{active=null;if(queuedReload!==null)return start()});return active};
-    const request=(preferredId='',options={})=>{const normalized=String(preferredId||'');if(!active||queuedReload===null||options.replaceQueuedPreferred!==false)queuedReload={preferredId:normalized,generation:++generation};return active||start()};
+    const request=(preferredId='',options={})=>{
+      const normalized=String(preferredId||''),intentional=options.replaceQueuedPreferred===true&&!!normalized;
+      if(intentional){selectionIntent=normalized;queuedReload={preferredId:normalized,selectionIntent:normalized,generation:++generation}}
+      else if(selectionIntent){
+        if(!active){queuedReload={preferredId:selectionIntent,selectionIntent,generation:++generation}}
+        else if(!queuedReload){const keepsActiveIntent=activeReload?.selectionIntent===selectionIntent&&activeReload?.generation===generation;queuedReload={preferredId:selectionIntent,selectionIntent,generation:keepsActiveIntent?generation:++generation}}
+      }else if(!active||queuedReload===null||options.replaceQueuedPreferred!==false)queuedReload={preferredId:normalized,selectionIntent:'',generation:++generation};
+      return active||start();
+    };
     return Object.freeze({request});
   }
-  const paperReloadCoordinator=createPaperReloadCoordinator(async (preferredId,control)=>{
-      if(paperDataLoader){await paperDataLoader.refreshPapers({preferredPaperId:preferredId,shouldApply:control.isCurrent});return paperDataLoader.snapshot()}
-      const result=await PaperDraftApi.ready({forceReload:true}),summaries=result?.papers||[],categories=result?.categories||[];
-      if(!control.isCurrent())return {papers:clone(state.papers),categories:clone(state.paperCategories)};
+  function createPaperReloadRunner(options={}){
+    const getLoader=typeof options.getPaperDataLoader==='function'?options.getPaperDataLoader:()=>options.paperDataLoader;
+    const api=options.paperApi,catalog=options.catalog;
+    const readCurrentSnapshot=options.readCurrentSnapshot||(()=>({papers:[],categories:[],selectedPaperId:'',selectedPaper:null}));
+    const applySnapshot=options.applySnapshot||(()=>{});
+    return async (preferredId,control={isCurrent:()=>true})=>{
+      const loader=getLoader();
+      if(loader){await loader.refreshPapers({preferredPaperId:preferredId,shouldApply:control.isCurrent});return loader.snapshot()}
+      const result=await api.ready({forceReload:true}),summaries=result?.papers||[],categories=result?.categories||[];
+      if(!control.isCurrent())return clone(readCurrentSnapshot());
       const selectedId=summaries.some(item=>String(item.id)===preferredId)?preferredId:String(summaries[0]?.id||'');
-      const detail=selectedId?await PaperDraftApi.detail(selectedId,{forceReload:true}):null;
-      applyPaperManagementSnapshot({papers:summaries,categories,banks:Catalog?.banks?.()||[],selectedPaperId:selectedId,selectedPaper:detail});
-      return {papers:clone(state.papers),categories:clone(state.paperCategories)};
-  });
+      const detail=selectedId?await api.detail(selectedId,{forceReload:true}):null;
+      if(!control.isCurrent())return clone(readCurrentSnapshot());
+      applySnapshot({papers:summaries,categories,banks:catalog?.banks?.()||[],selectedPaperId:selectedId,selectedPaper:detail});
+      return clone(readCurrentSnapshot());
+    };
+  }
+  const paperReloadCoordinator=createPaperReloadCoordinator(createPaperReloadRunner({
+    getPaperDataLoader:()=>paperDataLoader,
+    paperApi:PaperDraftApi,
+    catalog:Catalog,
+    readCurrentSnapshot:()=>({papers:state.papers,categories:state.paperCategories,selectedPaperId:state.selectedPaperId,selectedPaper:state.papers.find(item=>item.id===state.selectedPaperId)||null}),
+    applySnapshot:applyPaperManagementSnapshot,
+  }));
   async function reloadPaperDrafts(options={}){
     if(!PaperDraftApi)throw new Error('试卷草稿 API 未加载。');
     return paperReloadCoordinator.request(String(options.selectedId||state.selectedPaperId||''),{replaceQueuedPreferred:options.replaceQueuedPreferred});
@@ -4712,7 +4740,8 @@
     applyServerCatalogRefresh,
     paperChangePreferredId:(event,currentId='')=>paperChangePreferredId(event,currentId),
     paperChangeReloadOptions:(event,currentId='')=>paperChangeReloadOptions(event,currentId),
-    createPaperReloadCoordinator
+    createPaperReloadCoordinator,
+    createPaperReloadRunner
   });
 
   document.addEventListener('input',markCatalogEditorDirty,true);

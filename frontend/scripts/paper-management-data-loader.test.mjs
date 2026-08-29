@@ -117,6 +117,46 @@ test('an invalidated pending paper refresh cannot publish stale summaries or sel
   assert.equal(loader.snapshot().selectedPaperId, 'paper-new')
 })
 
+test('invalidation while old detail is pending blocks every later old publish even when the replacement fails', async () => {
+  const oldDetail = deferred()
+  let readyCalls = 0
+  let oldIsCurrent = true
+  const changes = []
+  const loader = loadFactory().create({
+    paperApi: {
+      ready: async () => {
+        readyCalls += 1
+        if (readyCalls === 1) return { papers: [{ id: 'paper-old' }], categories: [] }
+        throw new Error('新一代刷新失败')
+      },
+      detail: id => id === 'paper-old' ? oldDetail.promise : Promise.resolve(null),
+    },
+    catalogApi: catalogApi(),
+    onChange: snapshot => changes.push(snapshot),
+  })
+
+  const staleRefresh = loader.refreshPapers({
+    preferredPaperId: 'paper-old',
+    shouldApply: () => oldIsCurrent,
+  })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(changes.at(-1).selectedPaperId, 'paper-old')
+  assert.equal(changes.at(-1).selectedPaper, null)
+
+  oldIsCurrent = false
+  const publicationsAtInvalidation = changes.length
+  const replacement = loader.refreshPapers({
+    preferredPaperId: 'paper-new',
+    shouldApply: () => true,
+  })
+  await assert.rejects(replacement, /新一代刷新失败/)
+
+  oldDetail.resolve({ id: 'paper-old', revision: 1, questions: [] })
+  await staleRefresh
+  assert.equal(changes.length, publicationsAtInvalidation)
+  assert.equal(loader.snapshot().selectedPaper, null)
+})
+
 test('bank page failure is isolated from paper summaries and selected detail', async () => {
   const loader = loadFactory().create({
     paperApi: {

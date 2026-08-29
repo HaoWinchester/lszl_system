@@ -1,8 +1,10 @@
 'use strict';
 
 (function(global){
-  const Services=global.KGAdminServices;
-  if(!Services)return;
+  function createAdminTeachingContentGateway(options={}){
+  const Services=options.services;
+  const reconcileServerProjection=options.reconcileServerProjection;
+  if(!Services||typeof reconcileServerProjection!=='function')throw new Error('教学内容服务端投影能力未就绪。');
 
   const SHARED_CONTENT_PATH='/api/v1/content-prep/shared-content';
   const TAXONOMY_STORAGE_KEY='kg_content_taxonomies_v1';
@@ -83,7 +85,7 @@
   function applyCurrentTaxonomy(subjectId,taxonomy){
     applyingServerState=true;
     try{
-      const saved=Services.taxonomies.reconcileServerProjection(subjectId,taxonomy);
+      const saved=reconcileServerProjection(subjectId,taxonomy);
       if(saved?.valid===false)throw new Error((saved.errors||['知识树本地投影保存失败']).join('；'));
     }finally{applyingServerState=false}
   }
@@ -170,10 +172,14 @@
     if(clean(event?.detail?.key)===TAXONOMY_STORAGE_KEY)scheduleCurrentPublication();
   });
 
-  global.KGAdminTeachingContentGateway=Object.freeze({
+  const gateway=Object.freeze({
     hydrateSubject,
     publishTaxonomy,
     publishCurrentTaxonomyFromStore,
     getSnapshot:subjectId=>clone(snapshots.get(subjectId)||null),
   });
+  global.KGAdminTeachingContentGateway=gateway;
+  return gateway;
+  }
+  global.KGCreateAdminTeachingContentGateway=createAdminTeachingContentGateway;
 })(window);

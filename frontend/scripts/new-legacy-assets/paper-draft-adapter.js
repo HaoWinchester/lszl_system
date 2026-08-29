@@ -12,9 +12,12 @@
   let paperListLoad = null;
   let categoryListLoad = null;
   let paperListGeneration = 0;
+  let categoryListGeneration = 0;
+  let readyGeneration = 0;
   const summaryState = { papers: null, categories: null };
   const detailCache = new Map();
   const detailLoads = new Map();
+  const detailGenerations = new Map();
 
   function clone(value) {
     if (value === undefined) return undefined;
@@ -45,6 +48,7 @@
 
   function invalidatePaper(paperId) {
     const id = text(paperId);
+    detailGenerations.set(id, (detailGenerations.get(id) || 0) + 1);
     detailCache.delete(id);
     detailLoads.delete(id);
   }
@@ -53,12 +57,15 @@
     paperListGeneration += 1;
     summaryState.papers = null;
     paperListLoad = null;
+    readyGeneration += 1;
     readyPromise = null;
   }
 
   function invalidateCategoryLists() {
+    categoryListGeneration += 1;
     summaryState.categories = null;
     categoryListLoad = null;
+    readyGeneration += 1;
     readyPromise = null;
   }
 
@@ -69,7 +76,11 @@
 
   function cachePaper(paper) {
     const id = text(paper?.id);
-    if (id) detailCache.set(id, clone(paper));
+    if (id) {
+      detailGenerations.set(id, (detailGenerations.get(id) || 0) + 1);
+      detailLoads.delete(id);
+      detailCache.set(id, clone(paper));
+    }
   }
 
   async function list(options = {}) {
@@ -96,15 +107,18 @@
   async function detail(paperId, options = {}) {
     const id = text(paperId);
     if (!id) return null;
+    if (options.forceReload === true) invalidatePaper(id);
     if (options.forceReload !== true && detailCache.has(id)) return clone(detailCache.get(id));
     if (options.forceReload !== true && detailLoads.has(id)) return clone(await detailLoads.get(id));
+    const generation = (detailGenerations.get(id) || 0) + 1;
+    detailGenerations.set(id, generation);
     const task = request(`/papers/${encodeURIComponent(id)}`)
       .then(payload => {
         const paper = payload?.paper ? clone(payload.paper) : null;
-        if (paper) detailCache.set(id, clone(paper));
+        if (paper && detailGenerations.get(id) === generation) detailCache.set(id, clone(paper));
         return paper;
       })
-      .finally(() => detailLoads.delete(id));
+      .finally(() => { if (detailGenerations.get(id) === generation && detailLoads.get(id) === task) detailLoads.delete(id); });
     detailLoads.set(id, task);
     return clone(await task);
   }
@@ -178,15 +192,17 @@
   }
 
   async function listCategories(options = {}) {
+    if (options.forceReload === true) invalidateCategoryLists();
     if (options.forceReload !== true && summaryState.categories) return clone(summaryState.categories);
     if (options.forceReload !== true && categoryListLoad) return clone(await categoryListLoad);
+    const generation = categoryListGeneration;
     const task = request('/paper-categories')
       .then(payload => {
         const categories = Array.isArray(payload?.categories) ? clone(payload.categories) : [];
-        summaryState.categories = clone(categories);
+        if (generation === categoryListGeneration) summaryState.categories = clone(categories);
         return categories;
       })
-      .finally(() => { categoryListLoad = null; });
+      .finally(() => { if (generation === categoryListGeneration && categoryListLoad === task) categoryListLoad = null; });
     categoryListLoad = task;
     return clone(await task);
   }
@@ -250,12 +266,14 @@
   function ready(options = {}) {
     if (options.forceReload === true) invalidateLists();
     if (!readyPromise) {
-      readyPromise = Promise.all([list(), listCategories()])
+      const generation = readyGeneration;
+      const task = Promise.all([list(), listCategories()])
         .then(([papers, categories]) => clone({ papers, categories }))
         .catch((error) => {
-          readyPromise = null;
+          if (generation === readyGeneration && readyPromise === task) readyPromise = null;
           throw error;
         });
+      readyPromise = task;
     }
     return readyPromise.then(clone);
   }

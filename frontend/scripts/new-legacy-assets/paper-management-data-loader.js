@@ -62,9 +62,10 @@
       syncCatalogBanks();
     }
 
-    async function loadSelectedPaper(paperId, { publishLoading = true, forceReload = false } = {}) {
+    async function loadSelectedPaper(paperId, { publishLoading = true, forceReload = false, shouldApply = () => true } = {}) {
       const id = text(paperId).trim();
       const generation = ++paperGeneration;
+      if (!shouldApply()) return null;
       state.selectedPaperId = id;
       state.paperError = '';
       state.paperLoading = Boolean(id);
@@ -82,14 +83,14 @@
       }
       try {
         const paper = await paperApi.detail(id, { forceReload });
-        if (generation !== paperGeneration || state.selectedPaperId !== id) return clone(paper);
+        if (!shouldApply() || generation !== paperGeneration || state.selectedPaperId !== id) return clone(paper);
         if (paper) paperDetails.set(id, clone(paper));
         state.selectedPaper = paper ? clone(paper) : null;
         state.paperLoading = false;
         publish();
         return clone(paper);
       } catch (error) {
-        if (generation === paperGeneration && state.selectedPaperId === id) {
+        if (shouldApply() && generation === paperGeneration && state.selectedPaperId === id) {
           state.paperLoading = false;
           state.paperError = message(error);
           publish();
@@ -178,7 +179,7 @@
       state.paperLoading = Boolean(selected);
       state.paperError = '';
       publish();
-      return loadSelectedPaper(selected, { publishLoading: false, forceReload: true });
+      return loadSelectedPaper(selected, { publishLoading: false, forceReload: true, shouldApply });
     }
 
     return Object.freeze({ initialize, selectPaper, selectBank, refreshPapers, snapshot });

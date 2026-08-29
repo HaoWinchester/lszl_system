@@ -2,19 +2,26 @@
 (function(global){
   const legacy=global.KGLearningContent;
   if(!legacy)throw new Error('V9.0-P3.3 需要先加载 91-learning-content-core.js');
+  const publicService=(instance,omitted=[])=>{
+    const blocked=new Set(omitted),facade={};let prototype=Object.getPrototypeOf(instance);
+    while(prototype&&prototype!==Object.prototype){for(const name of Object.getOwnPropertyNames(prototype)){if(name==='constructor'||blocked.has(name)||Object.prototype.hasOwnProperty.call(facade,name))continue;const value=instance[name];if(typeof value==='function')facade[name]=value.bind(instance)}prototype=Object.getPrototypeOf(prototype)}
+    return Object.freeze(facade);
+  };
   const repository=new global.KGLocalContentRepository({keys:{...(legacy.storageKeys||{}),...(global.KGContentOrganization?.storageKeys||{})}});
   const permissions=new global.KGAdminPermissionService({auth:global.KGAuthCore});
   const audit=new global.KGAdminAuditService(repository);
   const transactions=new global.KGAdminTransactionService(repository,audit,permissions);
-  const references=new global.KGReferenceIndexService({content:legacy,organization:global.KGContentOrganization,referenceSnapshotPending:true,requiresServerTransactionalDelete:true});
+  const referenceService=new global.KGReferenceIndexService({content:legacy,organization:global.KGContentOrganization,referenceSnapshotPending:true,requiresServerTransactionalDelete:true});
   const referenceSnapshotReady=global.KGReferenceIndexService.loadReferenceSnapshot()
-    .then(snapshot=>{references.updateReferenceSnapshot(snapshot);return snapshot})
+    .then(snapshot=>{referenceService.updateReferenceSnapshot(snapshot);return snapshot})
     .catch(error=>{global.console?.warn?.('内容引用索引加载失败',error);return null});
-  const subjects=new global.KGSubjectService({legacy,transactions,permissions,references});
-  const taxonomies=new global.KGTaxonomyService({legacy,repository,transactions,permissions,audit,references});
-  const activities=new global.KGActivityService({legacy,transactions,references});
-  const courses=new global.KGCourseService({legacy,transactions,references});
-  const releases=new global.KGReleaseService({content:legacy,organization:global.KGContentOrganization});
+  const subjectService=new global.KGSubjectService({legacy,transactions,permissions,references:referenceService});
+  const taxonomyService=new global.KGTaxonomyService({legacy,repository,transactions,permissions,audit,references:referenceService});
+  const activityService=new global.KGActivityService({legacy,transactions,references:referenceService});
+  const courseService=new global.KGCourseService({legacy,transactions,references:referenceService});
+  const releaseService=new global.KGReleaseService({content:legacy,organization:global.KGContentOrganization});
+  const publicPermissions=publicService(permissions),publicAudit=publicService(audit,['clear']),publicTransactions=publicService(transactions,['execute','restoreSnapshot']);
+  const references=publicService(referenceService),subjects=publicService(subjectService),taxonomies=publicService(taxonomyService,['reconcileAuthenticatedServerProjection']),activities=publicService(activityService),courses=publicService(courseService),releases=publicService(releaseService);
   const legacyContent=Object.freeze({
     getSubjects:(...args)=>legacy.getSubjects(...args),
     getTaxonomies:(...args)=>legacy.getTaxonomies(...args),
@@ -23,5 +30,10 @@
     getCourseDrafts:(...args)=>legacy.getCourseDrafts?.(...args)||[],
     getCourseReleases:(...args)=>legacy.getCourseReleases?.(...args)||[],
   });
-  global.KGAdminServices=Object.freeze({version:global.KGAdminCore.VERSION,repository,permissions,audit,transactions,references,referenceSnapshotReady,subjects,taxonomies,activities,courses,releases,legacyContent});
+  const services=Object.freeze({version:global.KGAdminCore.VERSION,repositoryMode:repository.mode,permissions:publicPermissions,audit:publicAudit,transactions:publicTransactions,references,referenceSnapshotReady,subjects,taxonomies,activities,courses,releases,legacyContent});
+  global.KGAdminServices=services;
+  if(typeof global.KGCreateAdminTeachingContentGateway==='function'){
+    global.KGCreateAdminTeachingContentGateway({services,reconcileServerProjection:(subjectId,taxonomy)=>taxonomyService.reconcileAuthenticatedServerProjection(subjectId,taxonomy)});
+    try{delete global.KGCreateAdminTeachingContentGateway}catch(error){}
+  }
 })(window);

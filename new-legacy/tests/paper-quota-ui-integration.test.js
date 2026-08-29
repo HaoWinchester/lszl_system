@@ -139,6 +139,116 @@ test('paper page queues the newest preferred id when a reload is already pending
   assert.deepEqual(applied, ['paper-new']);
 });
 
+test('non-create refresh during an active create reload keeps the create selection intent', async () => {
+  const api = loadAdminApi();
+  let releaseCreate;
+  const createDetailPending = new Promise(resolve => { releaseCreate = resolve; });
+  const calls = [];
+  const applied = [];
+  const coordinator = api.createPaperReloadCoordinator(async (preferredId, control) => {
+    calls.push(preferredId);
+    if (calls.length === 1) await createDetailPending;
+    if (control.isCurrent()) applied.push(preferredId);
+    return { papers: [{ id: preferredId }], selectedPaperId: preferredId };
+  });
+
+  const createReload = coordinator.request('paper-created', { replaceQueuedPreferred: true });
+  await Promise.resolve();
+  const lifecycleRefresh = coordinator.request('paper-old', { replaceQueuedPreferred: false });
+  releaseCreate();
+  await Promise.all([createReload, lifecycleRefresh]);
+
+  assert.deepEqual(calls, ['paper-created', 'paper-created']);
+  assert.deepEqual(applied, ['paper-created', 'paper-created']);
+});
+
+test('failed create reload keeps its preferred id for a later non-create retry', async () => {
+  const api = loadAdminApi();
+  const calls = [];
+  let fail = true;
+  const coordinator = api.createPaperReloadCoordinator(async preferredId => {
+    calls.push(preferredId);
+    if (fail) throw new Error('新建后刷新失败');
+    return { papers: [{ id: preferredId }], selectedPaperId: preferredId };
+  });
+
+  await assert.rejects(
+    coordinator.request('paper-created', { replaceQueuedPreferred: true }),
+    /新建后刷新失败/,
+  );
+  fail = false;
+  const retried = await coordinator.request('paper-old', { replaceQueuedPreferred: false });
+
+  assert.equal(retried.selectedPaperId, 'paper-created');
+  assert.deepEqual(calls, ['paper-created', 'paper-created']);
+});
+
+test('fallback paper reload cannot apply old detail after create invalidation when the queued reload fails', async () => {
+  const api = loadAdminApi();
+  let resolveOldDetail;
+  let markDetailStarted;
+  const oldDetail = new Promise(resolve => { resolveOldDetail = resolve; });
+  const detailStarted = new Promise(resolve => { markDetailStarted = resolve; });
+  let readyCalls = 0;
+  const applied = [];
+  const runner = api.createPaperReloadRunner({
+    paperDataLoader: null,
+    paperApi: {
+      async ready() {
+        readyCalls += 1;
+        if (readyCalls === 1) return { papers: [{ id: 'paper-old' }], categories: [] };
+        throw new Error('排队的新一代刷新失败');
+      },
+      detail() { markDetailStarted(); return oldDetail; },
+    },
+    catalog: { banks: () => [] },
+    readCurrentSnapshot: () => ({ papers: [], categories: [], selectedPaperId: '', selectedPaper: null }),
+    applySnapshot: snapshot => applied.push(snapshot),
+  });
+  const coordinator = api.createPaperReloadCoordinator(runner);
+
+  const first = coordinator.request('paper-old');
+  await detailStarted;
+  coordinator.request('paper-created', { replaceQueuedPreferred: true });
+  resolveOldDetail({ id: 'paper-old', revision: 1, questions: [] });
+
+  await assert.rejects(first, /排队的新一代刷新失败/);
+  assert.equal(applied.length, 0);
+});
+
+test('paper reload runner resolves the page loader after page initialization', async () => {
+  const api = loadAdminApi();
+  let loader = null;
+  let fallbackCalls = 0;
+  const refreshed = [];
+  const runner = api.createPaperReloadRunner({
+    getPaperDataLoader: () => loader,
+    paperApi: {
+      async ready() { fallbackCalls += 1; return { papers: [], categories: [] }; },
+      async detail() { throw new Error('fallback detail must not run'); },
+    },
+    catalog: { banks: () => [] },
+    readCurrentSnapshot: () => ({ papers: [], categories: [], selectedPaperId: '', selectedPaper: null }),
+    applySnapshot: () => { throw new Error('fallback apply must not run'); },
+  });
+  loader = {
+    async refreshPapers(options) { refreshed.push(options.preferredPaperId); },
+    snapshot: () => ({
+      papers: [{ id: 'paper-created' }],
+      categories: [],
+      selectedPaperId: 'paper-created',
+      selectedPaper: { id: 'paper-created' },
+      candidateQuestions: [{ id: 'question-still-visible' }],
+    }),
+  };
+
+  const result = await runner('paper-created');
+
+  assert.deepEqual(refreshed, ['paper-created']);
+  assert.equal(fallbackCalls, 0);
+  assert.equal(result.candidateQuestions[0].id, 'question-still-visible');
+});
+
 test('paper editor offers one accessible domain-or-principle supplement strategy', () => {
   const html = fs.readFileSync(path.join(ROOT, 'paper-management.html'), 'utf8');
   const controls = Array.from(html.matchAll(

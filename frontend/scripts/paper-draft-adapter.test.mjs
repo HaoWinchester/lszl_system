@@ -291,6 +291,127 @@ test('an older pending paper list cannot overwrite or detach the post-create gen
   assert.equal(listLoads, 2)
 })
 
+test('an old paper detail cannot overwrite a mutation-cached detail', async () => {
+  const oldDetail = deferred()
+  let detailLoads = 0
+  const { api } = loadAdapter(async (url, options = {}) => {
+    if (url === '/api/v1/papers/paper-1' && options.method === 'GET') {
+      detailLoads += 1
+      return oldDetail.promise
+    }
+    if (url === '/api/v1/papers/paper-1' && options.method === 'PUT') {
+      return response(200, { paper: { id: 'paper-1', revision: 2, name: '新修订' } })
+    }
+    throw new Error(`unexpected request: ${options.method} ${url}`)
+  })
+
+  const stale = api.detail('paper-1')
+  await Promise.resolve()
+  await api.update('paper-1', { revision: 1, name: '新修订' })
+  oldDetail.resolve(response(200, { paper: { id: 'paper-1', revision: 1, name: '旧详情' } }))
+  assert.equal((await stale).revision, 1)
+
+  assert.equal((await api.detail('paper-1')).revision, 2)
+  assert.equal(detailLoads, 1)
+})
+
+test('an old paper detail cannot detach or overwrite a newer detail load for the same id', async () => {
+  const oldDetail = deferred()
+  const newDetail = deferred()
+  let detailLoads = 0
+  const { api } = loadAdapter(async (url, options = {}) => {
+    if (url !== '/api/v1/papers/paper-1' || options.method !== 'GET') throw new Error(`unexpected request: ${options.method} ${url}`)
+    detailLoads += 1
+    return detailLoads === 1 ? oldDetail.promise : newDetail.promise
+  })
+
+  const stale = api.detail('paper-1')
+  await Promise.resolve()
+  api.invalidatePaper('paper-1')
+  const current = api.detail('paper-1')
+  oldDetail.resolve(response(200, { paper: { id: 'paper-1', revision: 1 } }))
+  await stale
+  const coalesced = api.detail('paper-1')
+  assert.equal(detailLoads, 2)
+
+  newDetail.resolve(response(200, { paper: { id: 'paper-1', revision: 2 } }))
+  assert.equal((await current).revision, 2)
+  assert.equal((await coalesced).revision, 2)
+  assert.equal((await api.detail('paper-1')).revision, 2)
+})
+
+test('an old category list cannot overwrite post-create categories or detach newer work', async () => {
+  const oldCategories = deferred()
+  const newCategories = deferred()
+  let categoryLoads = 0
+  const { api } = loadAdapter(async (url, options = {}) => {
+    if (url === '/api/v1/paper-categories' && options.method === 'GET') {
+      categoryLoads += 1
+      return categoryLoads === 1 ? oldCategories.promise : newCategories.promise
+    }
+    if (url === '/api/v1/paper-categories' && options.method === 'POST') {
+      return response(200, { category: { id: 'category-new', name: '新分类', revision: 1 } })
+    }
+    throw new Error(`unexpected request: ${options.method} ${url}`)
+  })
+
+  const stale = api.listCategories()
+  await Promise.resolve()
+  await api.createCategory({ name: '新分类' })
+  const current = api.listCategories()
+  oldCategories.resolve(response(200, { categories: [{ id: 'category-old', name: '旧分类' }] }))
+  await stale
+  const coalesced = api.listCategories()
+  assert.equal(categoryLoads, 2)
+
+  newCategories.resolve(response(200, { categories: [{ id: 'category-new', name: '新分类' }] }))
+  assert.equal((await current)[0].id, 'category-new')
+  assert.equal((await coalesced)[0].id, 'category-new')
+  assert.equal((await api.listCategories())[0].id, 'category-new')
+})
+
+test('an old rejected ready cannot clear a newer ready promise', async () => {
+  const oldPapers = deferred()
+  const oldCategories = deferred()
+  const newPapers = deferred()
+  const newCategories = deferred()
+  let paperLoads = 0
+  let categoryLoads = 0
+  const { api } = loadAdapter(async (url, options = {}) => {
+    if (options.method !== 'GET') throw new Error(`unexpected request: ${options.method} ${url}`)
+    if (url === '/api/v1/papers') {
+      paperLoads += 1
+      if (paperLoads === 1) return oldPapers.promise
+      if (paperLoads === 2) return newPapers.promise
+      return response(200, { papers: [{ id: 'paper-unexpected' }] })
+    }
+    if (url === '/api/v1/paper-categories') {
+      categoryLoads += 1
+      if (categoryLoads === 1) return oldCategories.promise
+      if (categoryLoads === 2) return newCategories.promise
+      return response(200, { categories: [{ id: 'category-unexpected' }] })
+    }
+    throw new Error(`unexpected request: ${options.method} ${url}`)
+  })
+
+  const stale = api.ready()
+  await Promise.resolve()
+  const current = api.ready({ forceReload: true })
+  newPapers.resolve(response(200, { papers: [{ id: 'paper-new' }] }))
+  newCategories.resolve(response(200, { categories: [{ id: 'category-new' }] }))
+  assert.equal((await current).papers[0].id, 'paper-new')
+
+  oldPapers.resolve(response(500, { detail: { message: '旧 ready 失败' } }))
+  oldCategories.resolve(response(200, { categories: [{ id: 'category-old' }] }))
+  await assert.rejects(stale, /old|HTTP 500|ready|\u65e7/)
+
+  const cached = await api.ready()
+  assert.equal(cached.papers[0].id, 'paper-new')
+  assert.equal(cached.categories[0].id, 'category-new')
+  assert.equal(paperLoads, 2)
+  assert.equal(categoryLoads, 2)
+})
+
 test('sync injects the adapter exactly once before paper management application code', () => {
   assert.match(syncScript, /paper-draft-adapter\.js/)
   assert.match(syncScript, /kg-paper-drafts:generated/)

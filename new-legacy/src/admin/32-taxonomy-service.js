@@ -99,7 +99,29 @@
       },commit:()=>this.legacy.saveTaxonomies(incoming),metadata:{count:incoming.length,editableCurrentIds:current.filter(item=>this.editMode(item)==='current').map(item=>item.id)}});
       if(tx.valid)this.references?.invalidate();return tx.valid?{...tx.value,transactionId:tx.transactionId,snapshotId:tx.snapshotId}:{valid:false,errors:tx.errors||[]}
     }
-    reconcileServerProjection(subjectId,taxonomy){const subject=this.legacy.subjectById(subjectId);if(!subject)return {valid:false,errors:['服务器知识树对应的科目不存在。']};const current=this.currentForSubject(subjectId),defaultProjectionId=`taxonomy-${Core.clean(subject.code).toLowerCase()}-main`,next=this.list().filter(item=>item.id!==taxonomy.id).filter(item=>!(item.subjectId===subjectId&&item.id===current?.id&&item.id===defaultProjectionId)).map(item=>item.subjectId===subjectId?{...item,isDefault:false}:item);next.push(taxonomy);const saved=this.legacy.saveTaxonomies(next);if(saved?.valid===false)return saved;const subjects=this.legacy.getSubjects().map(item=>item.id===subjectId?{...item,defaultTaxonomyId:taxonomy.id}:item);if(!this.legacy.saveSubjects(subjects))return {valid:false,errors:['服务器科目投影保存失败。']};this.references?.invalidate();return {valid:true,taxonomy:this.get(taxonomy.id),errors:[]}}
+    reconcileAuthenticatedServerProjection(subjectId,taxonomy){
+      const subject=this.legacy.subjectById(subjectId);if(!subject)return {valid:false,errors:['服务器知识树对应的科目不存在。']};
+      const candidate=Core.clone(taxonomy||{});candidate.subjectId=Core.clean(candidate.subjectId);candidate.id=Core.clean(candidate.id);
+      if(candidate.subjectId!==subject.id)return {valid:false,errors:['服务器知识树的科目身份与请求不一致。']};
+      const validation=this.validate(candidate);if(!validation.valid)return {valid:false,errors:validation.errors||['服务器知识树校验失败。']};
+      const beforeTaxonomies=this.list(),beforeSubjects=this.legacy.getSubjects(),current=this.currentForSubject(subject.id),defaultProjectionId=`taxonomy-${Core.clean(subject.code).toLowerCase()}-main`,existing=this.get(candidate.id);
+      if(existing&&existing.id!==current?.id&&(existing.status!=='published'||existing.isDefault!==true))return {valid:false,errors:['服务器知识树 ID 与本地草稿或历史版本冲突，未替换本地内容。']};
+      const removableProjectionId=current?.id===defaultProjectionId&&current.id!==candidate.id?current.id:'';
+      const next=beforeTaxonomies
+        .filter(item=>item.id!==candidate.id&&item.id!==removableProjectionId)
+        .map(item=>item.subjectId===subject.id?{...item,isDefault:false}:item);
+      next.push({...candidate,status:'published',isDefault:true});
+      const nextSubjects=beforeSubjects.map(item=>item.id===subject.id?{...item,defaultTaxonomyId:candidate.id}:item);
+      const rollback=()=>{
+        const taxonomyRollback=this.legacy.saveTaxonomies(beforeTaxonomies),subjectRollback=this.legacy.saveSubjects(beforeSubjects);
+        return taxonomyRollback?.valid!==false&&!!subjectRollback;
+      };
+      try{
+        const saved=this.legacy.saveTaxonomies(next);if(saved?.valid===false)return saved;
+        if(!this.legacy.saveSubjects(nextSubjects)){const rolledBack=rollback();return {valid:false,errors:[rolledBack?'服务器科目投影保存失败，本地投影已回滚。':'服务器科目投影保存失败，且本地投影回滚失败。']}}
+      }catch(error){const rolledBack=rollback();return {valid:false,errors:[`服务器知识树投影保存失败：${error?.message||'未知错误'}${rolledBack?'；本地投影已回滚。':'；本地投影回滚失败。'}`]}}
+      this.references?.invalidate();return {valid:true,taxonomy:this.get(candidate.id),errors:[]};
+    }
     saveNode(taxonomyId,node){
       const editable=this.editableCheck(taxonomyId);if(!editable.valid)return editable;const taxonomy=editable.taxonomy,existing=node?.id?this.legacy.nodeById?.(taxonomyId,node.id):null,parentId=node?.parentId?Core.clean(node.parentId):null,parent=parentId?this.legacy.nodeById?.(taxonomyId,parentId):null;
       if(parent&&parent.status==='deprecated')return {valid:false,errors:['不能将知识点移动到已停用节点下。请先恢复父节点。']};
