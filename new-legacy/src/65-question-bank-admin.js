@@ -751,20 +751,25 @@
       else{renderPaperCategoryList();renderPaperList()}
     }
   }
-  let paperDraftReloadPromise=null;
-  async function reloadPaperDrafts(options={}){
-    if(!PaperDraftApi)throw new Error('试卷草稿 API 未加载。');
-    if(paperDraftReloadPromise)return paperDraftReloadPromise;
-    const preferredId=String(options.selectedId||state.selectedPaperId||'');
-    paperDraftReloadPromise=(async()=>{
-      if(paperDataLoader){await paperDataLoader.refreshPapers({preferredPaperId:preferredId});return paperDataLoader.snapshot()}
+  function createPaperReloadCoordinator(runReload){
+    let active=null,queuedReload=null,generation=0;
+    const drain=async()=>{let result=null;while(queuedReload!==null){const request=queuedReload;queuedReload=null;result=await runReload(request.preferredId,{isCurrent:()=>request.generation===generation})}return result};
+    const start=()=>{active=drain().finally(()=>{active=null;if(queuedReload!==null)return start()});return active};
+    const request=(preferredId='',options={})=>{const normalized=String(preferredId||'');if(!active||queuedReload===null||options.replaceQueuedPreferred!==false)queuedReload={preferredId:normalized,generation:++generation};return active||start()};
+    return Object.freeze({request});
+  }
+  const paperReloadCoordinator=createPaperReloadCoordinator(async (preferredId,control)=>{
+      if(paperDataLoader){await paperDataLoader.refreshPapers({preferredPaperId:preferredId,shouldApply:control.isCurrent});return paperDataLoader.snapshot()}
       const result=await PaperDraftApi.ready({forceReload:true}),summaries=result?.papers||[],categories=result?.categories||[];
+      if(!control.isCurrent())return {papers:clone(state.papers),categories:clone(state.paperCategories)};
       const selectedId=summaries.some(item=>String(item.id)===preferredId)?preferredId:String(summaries[0]?.id||'');
       const detail=selectedId?await PaperDraftApi.detail(selectedId,{forceReload:true}):null;
       applyPaperManagementSnapshot({papers:summaries,categories,banks:Catalog?.banks?.()||[],selectedPaperId:selectedId,selectedPaper:detail});
       return {papers:clone(state.papers),categories:clone(state.paperCategories)};
-    })().finally(()=>{paperDraftReloadPromise=null});
-    return paperDraftReloadPromise;
+  });
+  async function reloadPaperDrafts(options={}){
+    if(!PaperDraftApi)throw new Error('试卷草稿 API 未加载。');
+    return paperReloadCoordinator.request(String(options.selectedId||state.selectedPaperId||''),{replaceQueuedPreferred:options.replaceQueuedPreferred});
   }
   async function persistPaperMetadata(paper,options={}){
     try{
@@ -4705,14 +4710,22 @@
     exportServerCatalogLocalDraft:()=>clone(state.serverCatalogLocalDraft),
     copyServerCatalogLocalDraft,
     applyServerCatalogRefresh,
-    paperChangePreferredId:(event,currentId='')=>paperChangePreferredId(event,currentId)
+    paperChangePreferredId:(event,currentId='')=>paperChangePreferredId(event,currentId),
+    paperChangeReloadOptions:(event,currentId='')=>paperChangeReloadOptions(event,currentId),
+    createPaperReloadCoordinator
   });
 
   document.addEventListener('input',markCatalogEditorDirty,true);
   document.addEventListener('change',markCatalogEditorDirty,true);
   window.addEventListener('kg:question-catalog-changed',handleQuestionCatalogChanged);
-  function paperChangePreferredId(event,currentId=''){return String(event?.detail?.payload?.paper?.id||currentId||'')}
-  const refreshPapersFromApi=event=>{if(!catalogUiReady||!PaperDraftApi)return;reloadPaperDrafts({selectedId:paperChangePreferredId(event,state.selectedPaperId)}).catch(error=>toast(paperApiMessage(error,'试卷草稿刷新失败。')))};
+  function paperChangeReloadOptions(event,currentId=''){
+    const action=String(event?.detail?.action||''),payload=event?.detail?.payload||{};
+    if(action==='create')return {selectedId:String(payload?.paper?.id||currentId||''),replaceQueuedPreferred:true};
+    if(action==='import')return {selectedId:String(payload?.result?.paperId||payload?.paper?.id||currentId||''),replaceQueuedPreferred:true};
+    return {selectedId:String(currentId||''),replaceQueuedPreferred:false};
+  }
+  function paperChangePreferredId(event,currentId=''){return paperChangeReloadOptions(event,currentId).selectedId}
+  const refreshPapersFromApi=event=>{if(!catalogUiReady||!PaperDraftApi)return;reloadPaperDrafts(paperChangeReloadOptions(event,state.selectedPaperId)).catch(error=>toast(paperApiMessage(error,'试卷草稿刷新失败。')))};
   window.addEventListener('kg:paper-drafts-changed',refreshPapersFromApi);
   window.addEventListener('pagehide',()=>window.removeEventListener?.('kg:question-catalog-changed',handleQuestionCatalogChanged));
   window.addEventListener('beforeunload',()=>{if(CatalogEditor)CatalogEditor.release({keepalive:true})});

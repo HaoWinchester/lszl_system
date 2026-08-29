@@ -513,11 +513,10 @@ def run_question_paper_e2e(*, assert_no_runtime: bool) -> None:
             # cache or Runtime fallback is allowed to make it appear successful.
             bank_update = f"**/api/v1/banks/{bank_id}"
             question_page.route(bank_update, lambda route: route.abort())
+            question_page.once("dialog", lambda dialog: dialog.accept())
             with question_page.expect_event("dialog") as failure_dialog_info:
                 question_page.locator("#qbSaveBankBtn").click()
-            failure_dialog = failure_dialog_info.value
-            assert "题库保存失败" in failure_dialog.message
-            failure_dialog.accept()
+            assert "题库保存失败" in failure_dialog_info.value.message
             question_page.unroute(bank_update)
             with question_page.expect_response(
                 lambda response: response.url.endswith(f"/api/v1/banks/{bank_id}")

@@ -19,6 +19,12 @@ function response(status, payload) {
   }
 }
 
+function deferred() {
+  let resolve
+  const promise = new Promise(done => { resolve = done })
+  return { promise, resolve }
+}
+
 function domainApi(fetchImpl) {
   return {
     async request({ method = 'GET', path, body }) {
@@ -251,6 +257,37 @@ test('paper mutation caches settle before change observers reload the selected p
   assert.equal((await detailSeenByObserver).id, 'paper-new')
   assert.equal((await listSeenByObserver)[0].id, 'paper-new')
   assert.equal(detailLoads, 0)
+  assert.equal(listLoads, 2)
+})
+
+test('an older pending paper list cannot overwrite or detach the post-create generation', async () => {
+  const oldList = deferred()
+  const newList = deferred()
+  let listLoads = 0
+  const { api } = loadAdapter(async (url, options = {}) => {
+    if (url === '/api/v1/papers' && options.method === 'GET') {
+      listLoads += 1
+      return listLoads === 1 ? oldList.promise : newList.promise
+    }
+    if (url === '/api/v1/papers' && options.method === 'POST') {
+      return response(200, { paper: { id: 'paper-new', name: '新试卷', revision: 1 } })
+    }
+    throw new Error(`unexpected request: ${options.method} ${url}`)
+  })
+
+  const staleRequest = api.list()
+  await Promise.resolve()
+  await api.create({ name: '新试卷' })
+  const currentRequest = api.list()
+  oldList.resolve(response(200, { papers: [{ id: 'paper-old', name: '旧试卷' }] }))
+  assert.equal((await staleRequest)[0].id, 'paper-old')
+
+  const coalescedRequest = api.list()
+  assert.equal(listLoads, 2)
+  newList.resolve(response(200, { papers: [{ id: 'paper-new', name: '新试卷' }] }))
+  assert.equal((await currentRequest)[0].id, 'paper-new')
+  assert.equal((await coalescedRequest)[0].id, 'paper-new')
+  assert.equal((await api.list())[0].id, 'paper-new')
   assert.equal(listLoads, 2)
 })
 

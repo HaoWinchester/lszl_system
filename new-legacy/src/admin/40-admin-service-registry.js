@@ -15,5 +15,13 @@
   const activities=new global.KGActivityService({legacy,transactions,references});
   const courses=new global.KGCourseService({legacy,transactions,references});
   const releases=new global.KGReleaseService({content:legacy,organization:global.KGContentOrganization});
-  global.KGAdminServices=Object.freeze({version:global.KGAdminCore.VERSION,repository,permissions,audit,transactions,references,referenceSnapshotReady,subjects,taxonomies,activities,courses,releases,legacyContent:legacy});
+  const legacyContent=Object.freeze({
+    getSubjects:(...args)=>legacy.getSubjects(...args),
+    getTaxonomies:(...args)=>legacy.getTaxonomies(...args),
+    getActivities:(...args)=>legacy.getActivities?.(...args)||[],
+    getActivityLibrary:(...args)=>legacy.getActivityLibrary?.(...args)||{},
+    getCourseDrafts:(...args)=>legacy.getCourseDrafts?.(...args)||[],
+    getCourseReleases:(...args)=>legacy.getCourseReleases?.(...args)||[],
+  });
+  global.KGAdminServices=Object.freeze({version:global.KGAdminCore.VERSION,repository,permissions,audit,transactions,references,referenceSnapshotReady,subjects,taxonomies,activities,courses,releases,legacyContent});
 })(window);

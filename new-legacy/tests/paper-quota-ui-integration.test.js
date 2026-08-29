@@ -86,11 +86,57 @@ function loadAdminApi({ principles = [], principlePayload = null, principlePaylo
   return sandbox.KGQuestionBankAdminAPI;
 }
 
-test('paper page prefers the changed paper id when a create event races the prior selection', () => {
+test('paper page changes preferred selection only for create and import events', () => {
   const api = loadAdminApi();
-  const event = { detail: { action: 'create', payload: { paper: { id: 'paper-new' } } } };
-  assert.equal(api.paperChangePreferredId(event, 'paper-old'), 'paper-new');
+  assert.deepEqual(JSON.parse(JSON.stringify(api.paperChangeReloadOptions(
+    { detail: { action: 'create', payload: { paper: { id: 'paper-new' } } } },
+    'paper-old',
+  ))), { selectedId: 'paper-new', replaceQueuedPreferred: true });
+  assert.deepEqual(JSON.parse(JSON.stringify(api.paperChangeReloadOptions(
+    { detail: { action: 'update', payload: { paper: { id: 'paper-other' } } } },
+    'paper-old',
+  ))), { selectedId: 'paper-old', replaceQueuedPreferred: false });
+  assert.equal(api.paperChangePreferredId(
+    { detail: { action: 'create', payload: { paper: { id: 'paper-new' } } } },
+    'paper-old',
+  ), 'paper-new');
+  assert.equal(api.paperChangePreferredId(
+    { detail: { action: 'import', payload: { result: { paperId: 'paper-imported' } } } },
+    'paper-old',
+  ), 'paper-imported');
+  assert.equal(api.paperChangePreferredId(
+    { detail: { action: 'update', payload: { paper: { id: 'paper-other' } } } },
+    'paper-old',
+  ), 'paper-old');
+  assert.equal(api.paperChangePreferredId(
+    { detail: { action: 'archive', payload: { paper: { id: 'paper-other' } } } },
+    'paper-old',
+  ), 'paper-old');
   assert.equal(api.paperChangePreferredId({ detail: { action: 'remove', payload: {} } }, 'paper-old'), 'paper-old');
+});
+
+test('paper page queues the newest preferred id when a reload is already pending', async () => {
+  const api = loadAdminApi();
+  let releaseFirst;
+  const firstPending = new Promise(resolve => { releaseFirst = resolve; });
+  const calls = [];
+  const applied = [];
+  const coordinator = api.createPaperReloadCoordinator(async (preferredId, control = { isCurrent: () => true }) => {
+    calls.push(preferredId);
+    if (calls.length === 1) await firstPending;
+    if (control.isCurrent()) applied.push(preferredId);
+    return { selectedPaperId: preferredId };
+  });
+
+  const first = coordinator.request('paper-old');
+  await Promise.resolve();
+  const follow = coordinator.request('paper-new');
+  const nonCreateRefresh = coordinator.request('paper-old', { replaceQueuedPreferred: false });
+  assert.deepEqual(calls, ['paper-old']);
+  releaseFirst();
+  await Promise.all([first, follow, nonCreateRefresh]);
+  assert.deepEqual(calls, ['paper-old', 'paper-new']);
+  assert.deepEqual(applied, ['paper-new']);
 });
 
 test('paper editor offers one accessible domain-or-principle supplement strategy', () => {

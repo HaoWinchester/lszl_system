@@ -1,7 +1,7 @@
 'use strict';
 (function(global){
   const Services=global.KGAdminServices,UI=global.KGAdminUI,Gateway=global.KGAdminTeachingContentGateway;if(!Services||!UI||!Gateway)return;
-  const {byId,escapeHtml,toast}=UI;let selectedSubjectId='',dialogMode='create',readyPromise=Promise.resolve();
+  const {byId,escapeHtml,toast}=UI;let selectedSubjectId='',dialogMode='create',readyPromise=Promise.resolve(),referenceOperationsReady=false;
   const inactive=item=>Services.subjects.isInactive(item);
   function subjectName(item){return item?.name?.zh||item?.code||item?.id||'未命名科目'}
   function subjectDescription(item){const value=item?.description;return value?.zh||value?.en||(typeof value==='string'?value:'')||'当前科目的知识树与题目分类工作区。'}
@@ -16,6 +16,7 @@
   }
   function activityRows(){return selectedSubjectId?(Services.legacyContent.getActivities?.({subjectId:selectedSubjectId})||[]):[]}
   function renderUsage(subjectId){
+    if(!referenceOperationsReady){['adminUsageTaxonomyCount','adminUsageQuestionCount','adminUsagePaperCount','adminUsageOtherCount'].forEach(id=>byId(id).textContent='—');const hint=byId('adminSubjectDeletionHint');hint.textContent='正式内容引用校验尚未就绪；永久删除已暂停，停用等非破坏性操作仍可使用。';hint.classList.toggle('safe',false);byId('adminDeleteSubjectBtn').disabled=true;return}
     const usage=Services.subjects.usage(subjectId),counts=usage.counts||{};
     byId('adminUsageTaxonomyCount').textContent=String(counts.taxonomy||0);byId('adminUsageQuestionCount').textContent=String(counts.activity||0);byId('adminUsagePaperCount').textContent=String(counts.paper||0);byId('adminUsageOtherCount').textContent=String((counts.course_draft||0)+(counts.course_release||0)+(counts.learning_task||0));
     const deletion=Services.subjects.deletionCheck(subjectId),hint=byId('adminSubjectDeletionHint');hint.textContent=deletion.valid?'该科目当前为空，可以永久删除。':(deletion.errors||['该科目不能永久删除。'])[0];hint.classList.toggle('safe',deletion.valid);byId('adminDeleteSubjectBtn').disabled=!deletion.valid;
@@ -39,7 +40,7 @@
     renderUsage(selectedSubjectId);renderTaxonomies();document.dispatchEvent(new CustomEvent('kg-admin-subject-change',{detail:{subjectId:selectedSubjectId,subjectCode:subject.code||''}}));
   }
   function taxonomyActions(item,currentId){
-    const canPublish=Services.permissions.can('publishTaxonomies'),canEdit=Services.permissions.can('editTaxonomies'),canDelete=Services.permissions.can('deleteTaxonomies'),deleteAllowed=canDelete&&Services.taxonomies.deletionCheck(item.id).valid,isCurrent=item.id===currentId;
+    const canPublish=Services.permissions.can('publishTaxonomies'),canEdit=Services.permissions.can('editTaxonomies'),canDelete=Services.permissions.can('deleteTaxonomies'),deleteAllowed=referenceOperationsReady&&canDelete&&Services.taxonomies.deletionCheck(item.id).valid,isCurrent=item.id===currentId;
     const viewLabel=isCurrent?'查看 / 维护':item.status==='draft'?'查看 / 编辑':'查看';const view=`<a class="admin-action-link" href="admin-subjects.html?subjectId=${encodeURIComponent(item.subjectId)}&tab=current&taxonomyId=${encodeURIComponent(item.id)}">${viewLabel}</a>`;
     let primary=isCurrent?'<span class="admin-current-label">当前使用</span>':'';
     if(!isCurrent&&(item.status==='draft'||item.status==='published'))primary=`<button type="button" class="small primary" data-publish-taxonomy="${escapeHtml(item.id)}" ${canPublish?'':'disabled'}>${item.status==='draft'?'设为当前':'恢复为当前'}</button>`;
@@ -80,7 +81,7 @@
     byId('adminRefreshCurrentTree').addEventListener('click',async()=>{try{await hydrateSelectedSubject();rerender()}catch(error){renderServerError(error)}});byId('adminReloadCurrentTreeFrame').addEventListener('click',()=>{const frame=byId('adminCurrentTreeFrame');if(frame.src)frame.contentWindow.location.reload()});byId('adminRefreshTaxonomyBtn').addEventListener('click',renderTaxonomies);byId('adminImportTaxonomyBtn').addEventListener('click',importTaxonomy);
     byId('adminTaxonomyRows').addEventListener('click',event=>{const actions=[['publishTaxonomy',publishTaxonomy],['copyTaxonomy',copyTaxonomy],['archiveTaxonomy',archiveTaxonomy],['restoreTaxonomy',restoreTaxonomy],['deleteTaxonomy',deleteTaxonomy]];for(const [key,handler] of actions){const target=event.target.closest(`[data-${key.replace(/[A-Z]/g,m=>'-'+m.toLowerCase())}]`);if(target){handler(target.dataset[key]);return}}});
   }
-  async function init(){UI.init(Services);const snapshot=await Services.referenceSnapshotReady;if(!snapshot){renderServerError(new Error('内容引用索引加载失败；为避免遗漏正式题目或试卷引用，相关管理操作已暂停。'));return}const subjects=Services.subjects.list();selectedSubjectId=selectInitialSubject(subjects);const canEdit=Services.permissions.can('editSubjects');byId('adminAddSubjectBtn').disabled=!canEdit;byId('adminImportTaxonomyBtn').disabled=!Services.permissions.can('importTaxonomies');setTab(query().get('tab')||'current');bind();try{await Gateway.hydrateSubject(selectedSubjectId);renderSubjectList();renderSubjectDetail()}catch(error){renderServerError(error)}}
+  async function init(){UI.init(Services);const subjects=Services.subjects.list();selectedSubjectId=selectInitialSubject(subjects);const canEdit=Services.permissions.can('editSubjects');byId('adminAddSubjectBtn').disabled=!canEdit;byId('adminImportTaxonomyBtn').disabled=!Services.permissions.can('importTaxonomies');byId('adminDeleteSubjectBtn').disabled=true;setTab(query().get('tab')||'current');bind();try{await Gateway.hydrateSubject(selectedSubjectId);renderSubjectList();renderSubjectDetail()}catch(error){renderServerError(error)}const snapshot=await Services.referenceSnapshotReady;referenceOperationsReady=!!snapshot;if(snapshot){rerender();return}byId('adminDeleteSubjectBtn').disabled=true;byId('adminSubjectDeletionHint').textContent='内容引用索引加载失败；永久删除已暂停。可继续新增、编辑、停用、排序、导入、归档或恢复。';renderTaxonomies();toast('内容引用索引加载失败；永久删除已暂停，其他安全管理操作仍可使用。',true)}
   global.KGAdminSubjectsApp=Object.freeze({getSelectedSubjectId:()=>selectedSubjectId,getSelectedSubject:()=>Services.subjects.get(selectedSubjectId),rerender,setTab,ready:()=>readyPromise});
   const start=()=>{readyPromise=init();return readyPromise};
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',()=>{void start()}):void start();

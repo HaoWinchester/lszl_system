@@ -10,6 +10,7 @@
       releases:Array.isArray(snapshot?.releases)?snapshot.releases:[],
     };
   }
+  function permanentDeleteAuthority(references){return references?.permanentDeleteCheck?.()||{valid:false,errors:['内容引用权威校验不可用，永久删除已暂停。']}}
   class ReferenceIndexService{
     constructor(options={}){this.content=options.content;this.organization=options.organization||global.KGContentOrganization||null;this.referenceSnapshot=options.referenceSnapshot||{banks:[],papers:[],releases:[]};this.referenceSnapshotReady=options.referenceSnapshotPending!==true;this.requiresServerTransactionalDelete=options.requiresServerTransactionalDelete===true;this.cache=null;this.builtAt=''}
     questionBanks(){return Array.isArray(this.referenceSnapshot?.banks)?this.referenceSnapshot.banks:[]}
@@ -67,5 +68,6 @@
     summary(){const data=this.ensure();return {builtAt:data.builtAt,subjects:data.subjects.length,taxonomies:data.taxonomies.length,nodes:data.taxonomies.reduce((sum,item)=>sum+(item.nodes||[]).length,0),activities:data.activities.length,questionBanks:data.questionBanks.length,formalQuestions:data.questionBanks.reduce((sum,item)=>sum+(item.questions||[]).length,0),courseDrafts:data.drafts.length,courseReleases:data.releases.length,papers:data.papers.length,tasks:data.tasks.length,collections:data.collections.length,subjectReferenceCount:Object.values(data.subjectRefs).reduce((sum,rows)=>sum+rows.length,0),nodeReferenceCount:Object.values(data.nodeRefs).reduce((sum,rows)=>sum+rows.length,0),activityReferenceCount:Object.values(data.activityRefs).reduce((sum,rows)=>sum+rows.length,0),taxonomyReferenceCount:Object.values(data.taxonomyRefs).reduce((sum,rows)=>sum+rows.length,0)}}
   }
   ReferenceIndexService.loadReferenceSnapshot=loadReferenceSnapshot;
+  ReferenceIndexService.permanentDeleteAuthority=permanentDeleteAuthority;
   global.KGReferenceIndexService=ReferenceIndexService;
 })(window);

@@ -163,9 +163,10 @@
       }
     }
 
-    async function refreshPapers({ preferredPaperId = state.selectedPaperId } = {}) {
+    async function refreshPapers({ preferredPaperId = state.selectedPaperId, shouldApply = () => true } = {}) {
       paperDetails.clear();
       const paperState = await paperApi.ready({ forceReload: true });
+      if (!shouldApply()) return snapshot();
       state.papers = Array.isArray(paperState?.papers) ? clone(paperState.papers) : [];
       state.categories = Array.isArray(paperState?.categories) ? clone(paperState.categories) : [];
       const preferred = text(preferredPaperId).trim();

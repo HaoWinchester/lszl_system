@@ -89,6 +89,34 @@ test('late paper detail responses cannot overwrite the latest selection', async 
   assert.equal(loader.snapshot().selectedPaper.id, 'B')
 })
 
+test('an invalidated pending paper refresh cannot publish stale summaries or selection', async () => {
+  const oldList = deferred()
+  const newList = deferred()
+  let listCalls = 0
+  let oldIsCurrent = true
+  const changes = []
+  const loader = loadFactory().create({
+    paperApi: {
+      ready: async () => (++listCalls === 1 ? oldList.promise : newList.promise),
+      detail: async id => ({ id, questions: [] }),
+    },
+    catalogApi: catalogApi(),
+    onChange: snapshot => changes.push(snapshot),
+  })
+
+  const staleRefresh = loader.refreshPapers({ preferredPaperId: 'paper-old', shouldApply: () => oldIsCurrent })
+  await Promise.resolve()
+  oldIsCurrent = false
+  oldList.resolve({ papers: [{ id: 'paper-old' }], categories: [] })
+  await staleRefresh
+  assert.equal(changes.some(snapshot => snapshot.selectedPaperId === 'paper-old'), false)
+
+  const currentRefresh = loader.refreshPapers({ preferredPaperId: 'paper-new', shouldApply: () => true })
+  newList.resolve({ papers: [{ id: 'paper-new' }], categories: [] })
+  await currentRefresh
+  assert.equal(loader.snapshot().selectedPaperId, 'paper-new')
+})
+
 test('bank page failure is isolated from paper summaries and selected detail', async () => {
   const loader = loadFactory().create({
     paperApi: {

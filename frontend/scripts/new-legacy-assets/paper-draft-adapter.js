@@ -11,6 +11,7 @@
   let readyPromise = null;
   let paperListLoad = null;
   let categoryListLoad = null;
+  let paperListGeneration = 0;
   const summaryState = { papers: null, categories: null };
   const detailCache = new Map();
   const detailLoads = new Map();
@@ -49,6 +50,7 @@
   }
 
   function invalidatePaperLists() {
+    paperListGeneration += 1;
     summaryState.papers = null;
     paperListLoad = null;
     readyPromise = null;
@@ -74,17 +76,19 @@
     const query = new URLSearchParams();
     if (options && options.status) query.set('status', text(options.status));
     const cacheable = !query.toString();
+    if (cacheable && options.forceReload === true) invalidatePaperLists();
     if (cacheable && options.forceReload !== true && summaryState.papers) {
       return clone(summaryState.papers);
     }
     if (cacheable && options.forceReload !== true && paperListLoad) return clone(await paperListLoad);
+    const generation = paperListGeneration;
     const task = request(`/papers${query.toString() ? `?${query}` : ''}`)
       .then(payload => {
         const papers = Array.isArray(payload?.papers) ? clone(payload.papers) : [];
-        if (cacheable) summaryState.papers = clone(papers);
+        if (cacheable && generation === paperListGeneration) summaryState.papers = clone(papers);
         return papers;
       })
-      .finally(() => { if (cacheable) paperListLoad = null; });
+      .finally(() => { if (cacheable && paperListLoad === task) paperListLoad = null; });
     if (cacheable) paperListLoad = task;
     return clone(await task);
   }

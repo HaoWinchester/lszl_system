@@ -64,6 +64,18 @@ function createRuntime() {
         const subject = subjects.find(item => item.id === subjectId);
         return structuredClone(taxonomies.find(item => item.subjectId === subjectId && item.id === subject?.defaultTaxonomyId) || null);
       },
+      reconcileServerProjection(subjectId, taxonomy) {
+        const subject = subjects.find(item => item.id === subjectId);
+        const current = taxonomies.find(item => item.id === subject?.defaultTaxonomyId);
+        const defaultProjectionId = `taxonomy-${String(subject?.code || '').toLowerCase()}-main`;
+        taxonomies = taxonomies
+          .filter(item => item.id !== taxonomy.id)
+          .filter(item => !(item.subjectId === subjectId && item.id === current?.id && item.id === defaultProjectionId))
+          .map(item => item.subjectId === subjectId ? { ...item, isDefault: false } : item);
+        taxonomies.push(structuredClone(taxonomy));
+        subjects = subjects.map(item => item.id === subjectId ? { ...item, defaultTaxonomyId: taxonomy.id } : item);
+        return { valid: true, taxonomy: structuredClone(taxonomy), errors: [] };
+      },
     },
   };
   const context = {

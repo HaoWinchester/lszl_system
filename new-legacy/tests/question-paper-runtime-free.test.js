@@ -16,6 +16,7 @@ const referenceIndex = source('new-legacy/src/admin/30-reference-index-service.j
 const referenceRegistry = source('new-legacy/src/admin/40-admin-service-registry.js');
 const subjectService = source('new-legacy/src/admin/31-subject-service.js');
 const taxonomyService = source('new-legacy/src/admin/32-taxonomy-service.js');
+const learningContentCompat = source('new-legacy/src/admin/41-learning-content-compat.js');
 const adminShell = source('new-legacy/src/admin/50-admin-shell-app.js');
 const adminSubjects = source('new-legacy/src/admin/51-admin-subjects-app.js');
 const adminSettings = source('new-legacy/src/admin/53-admin-settings-app.js');
@@ -75,6 +76,7 @@ test('reference index loads one complete typed snapshot without Runtime paginati
   };
   runtime.window = runtime;
   vm.runInNewContext(referenceIndex, runtime, { filename: '30-reference-index-service.js' });
+  assert.equal(runtime.KGReferenceIndexService.permanentDeleteAuthority(null).valid, false);
   const snapshot = await runtime.KGReferenceIndexService.loadReferenceSnapshot();
   assert.deepEqual(calls, ['/api/v1/questions/reference-snapshot']);
   assert.equal(snapshot.banks[0].questions[0].id, 'question-unselected');
@@ -118,6 +120,10 @@ test('production admin registry hydrates unselected draft and release references
   vm.runInNewContext(referenceIndex, runtime, { filename: '30-reference-index-service.js' });
   vm.runInNewContext(referenceRegistry, runtime, { filename: '40-admin-service-registry.js' });
 
+  for (const method of ['saveSubjects', 'saveTaxonomies', 'deleteKnowledgeNode', 'resetTaxonomies']) {
+    assert.equal(runtime.KGAdminServices.legacyContent[method], undefined, `public legacyContent exposes ${method}`);
+  }
+
   assert.throws(
     () => runtime.KGAdminServices.references.ensure(),
     /引用索引.*(?:加载|就绪)/,
@@ -137,18 +143,29 @@ test('production admin registry hydrates unselected draft and release references
 test('production subject and taxonomy permanent deletes fail closed after snapshot hydration', async () => {
   let subjectSaves = 0;
   let taxonomySaves = 0;
+  let nodeDeletes = 0;
+  let taxonomyResets = 0;
   let serverSnapshot = { banks: [], papers: [], releases: [] };
   const subject = { id: 'subject-empty', code: 'EMPTY', name: { zh: '空科目' }, status: 'active' };
   const taxonomy = {
     id: 'taxonomy-draft', subjectId: subject.id, name: { zh: '草稿知识树' },
-    version: 2, versionLabel: 'v2', status: 'draft', isDefault: false, nodes: [],
+    version: 2, versionLabel: 'v2', status: 'draft', isDefault: false,
+    nodes: [{ id: 'node-empty', taxonomyId: 'taxonomy-draft', parentId: null, level: 1, title: { zh: '空知识点' }, status: 'active' }],
+  };
+  const taxonomyOther = {
+    id: 'taxonomy-other', subjectId: subject.id, name: { zh: '历史知识树' },
+    version: 1, versionLabel: 'v1', status: 'archived', isDefault: false, nodes: [],
   };
   class Repository { constructor() {} read() { return []; } write() { return true; } }
   class Permissions { can() { return true; } require() { return { valid: true }; } }
   class Audit { constructor() {} }
   class Transactions {
     constructor() {}
-    execute({ commit }) { return { valid: true, value: commit(), transactionId: 'tx-1' }; }
+    execute({ commit, validate }) {
+      const checked = validate?.() || { valid: true, errors: [] };
+      if (!checked.valid) return checked;
+      return { valid: true, value: commit(), transactionId: 'tx-1' };
+    }
   }
   class EmptyService { constructor() {} }
   const legacy = {
@@ -156,10 +173,15 @@ test('production subject and taxonomy permanent deletes fail closed after snapsh
     getSubjects: () => [subject],
     subjectById: id => id === subject.id ? subject : null,
     saveSubjects: () => { subjectSaves += 1; return true; },
-    getTaxonomies: () => [taxonomy],
-    taxonomyById: id => id === taxonomy.id ? taxonomy : null,
+    getTaxonomies: () => [taxonomy, taxonomyOther],
+    taxonomyById: id => [taxonomy, taxonomyOther].find(row => row.id === id) || null,
     defaultTaxonomyForSubject: () => null,
+    nodesForTaxonomy: id => id === taxonomy.id ? taxonomy.nodes : [],
+    nodeById: (taxonomyId, nodeId) => taxonomyId === taxonomy.id ? taxonomy.nodes.find(row => row.id === nodeId) : null,
+    validateTaxonomy: () => ({ valid: true, errors: [], warnings: [] }),
     saveTaxonomies: () => { taxonomySaves += 1; return { valid: true }; },
+    deleteKnowledgeNode: () => { nodeDeletes += 1; return { valid: true, deletedIds: ['node-empty'] }; },
+    resetTaxonomies: () => { taxonomyResets += 1; return { subjects: [], taxonomies: [] }; },
     getActivityLibrary: () => ({}), getCourseDrafts: () => [], getCourseReleases: () => [],
   };
   const runtime = {
@@ -182,6 +204,9 @@ test('production subject and taxonomy permanent deletes fail closed after snapsh
   vm.runInNewContext(subjectService, runtime, { filename: '31-subject-service.js' });
   vm.runInNewContext(taxonomyService, runtime, { filename: '32-taxonomy-service.js' });
   vm.runInNewContext(referenceRegistry, runtime, { filename: '40-admin-service-registry.js' });
+  for (const method of ['saveSubjects', 'saveTaxonomies', 'deleteKnowledgeNode', 'resetTaxonomies']) {
+    assert.equal(runtime.KGAdminServices.legacyContent[method], undefined, `public legacyContent exposes ${method}`);
+  }
   await runtime.KGAdminServices.referenceSnapshotReady;
 
   // Simulate another teacher creating a formal reference after this tab's
@@ -200,9 +225,37 @@ test('production subject and taxonomy permanent deletes fail closed after snapsh
   assert.match(taxonomyResult.errors.join(' '), /服务器.*事务|永久删除.*暂停/);
   assert.equal(subjectSaves, 0);
   assert.equal(taxonomySaves, 0);
+
+  const subjectBulkResult = runtime.KGAdminServices.subjects.saveAll([]);
+  const taxonomyBulkResult = runtime.KGAdminServices.taxonomies.saveAll([{ ...taxonomy, nodes: [] }, taxonomyOther]);
+  const duplicateTaxonomyBulkResult = runtime.KGAdminServices.taxonomies.saveAll([taxonomy, taxonomy]);
+  const nodeCheck = runtime.KGAdminServices.taxonomies.nodeDeletionCheck(taxonomy.id, 'node-empty');
+  const nodeDelete = runtime.KGAdminServices.taxonomies.deleteNode(taxonomy.id, 'node-empty');
+  assert.equal(subjectBulkResult.valid, false);
+  assert.equal(taxonomyBulkResult.valid, false);
+  assert.equal(duplicateTaxonomyBulkResult.valid, false);
+  assert.equal(nodeCheck.valid, false);
+  assert.equal(nodeDelete.valid, false);
+  assert.equal(subjectSaves, 0);
+  assert.equal(taxonomySaves, 0);
+  assert.equal(nodeDeletes, 0);
+
+  vm.runInNewContext(learningContentCompat, runtime, { filename: '41-learning-content-compat.js' });
+  const compatSubjects = runtime.KGLearningContent.saveSubjects([]);
+  const compatTaxonomies = runtime.KGLearningContent.saveTaxonomies([{ ...taxonomy, nodes: [] }, taxonomyOther]);
+  const compatNodeDelete = runtime.KGLearningContent.deleteKnowledgeNode(taxonomy.id, 'node-empty');
+  const compatReset = runtime.KGLearningContent.resetTaxonomies();
+  assert.equal(compatSubjects.length, 1);
+  assert.equal(compatTaxonomies.valid, false);
+  assert.equal(compatNodeDelete.valid, false);
+  assert.equal(compatReset.valid, false);
+  assert.equal(subjectSaves, 0);
+  assert.equal(taxonomySaves, 0);
+  assert.equal(nodeDeletes, 0);
+  assert.equal(taxonomyResets, 0);
 });
 
-test('admin shell, subjects, and settings stay non-destructive while hydration is pending or failed', async () => {
+test('reference failure blocks destructive index actions but keeps safe subjects and settings controls usable', async () => {
   const deferred = () => {
     let resolve;
     const promise = new Promise(done => { resolve = done; });
@@ -215,6 +268,7 @@ test('admin shell, subjects, and settings stay non-destructive while hydration i
         id, textContent: '', innerHTML: '', value: '', disabled: false, hidden: false, dataset: {}, listeners: {},
         classList: { toggle() {}, add() {}, remove() {} },
         addEventListener(type, handler) { (this.listeners[type] ||= []).push(handler); },
+        async trigger(type, event = {}) { for (const handler of this.listeners[type] || []) await handler({ currentTarget: this, target: this, preventDefault() {}, ...event }); },
         removeAttribute(name) { delete this[name]; }, setAttribute(name, value) { this[name] = value; },
         querySelectorAll() { return []; }, focus() {},
       });
@@ -227,17 +281,23 @@ test('admin shell, subjects, and settings stay non-destructive while hydration i
     };
   };
   const makeRuntime = (document, ready, overrides = {}) => {
+    let fetchCalls = 0;
     const services = {
       referenceSnapshotReady: ready.promise,
-      permissions: { can: () => true },
-      subjects: { list: () => { throw new Error('subjects accessed before reference hydration'); } },
+      permissions: { can: () => true, summary: () => ({ role: 'admin', allowed: ['manageSnapshots'], labels: { manageSnapshots: '快照' } }) },
+      subjects: { list: () => [], get: () => null, isInactive: () => false },
+      taxonomies: { list: () => [], currentForSubject: () => null, get: () => null, versionLabel: value => `v${value}` },
+      legacyContent: { getActivities: () => [] },
+      references: { build: () => { throw new Error('index built before hydration'); }, invalidate() {} },
+      transactions: { snapshots: () => [], createSnapshot: () => ({ id: 'snapshot-1' }) },
+      audit: { list: () => [], record() {} },
       ...overrides,
     };
     const runtime = {
-      document, console, setTimeout, clearTimeout, URLSearchParams,
-      location: { search: '', pathname: '/admin-subjects.html' }, history: { replaceState() {} },
+      document, console, setTimeout, clearTimeout, URL, URLSearchParams,
+      location: { search: '', pathname: '/admin-subjects.html', href: 'http://test/admin-subjects.html' }, history: { replaceState() {} },
       CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
-      fetch: async () => ({ ok: true, json: async () => ({ status: 'ok' }) }),
+      fetch: async () => { fetchCalls += 1; return { ok: true, json: async () => ({ status: 'ok' }) }; },
       KGAdminServices: services,
       KGAdminUI: {
         init() {}, byId: id => document.element(id), escapeHtml: value => String(value || ''),
@@ -246,6 +306,7 @@ test('admin shell, subjects, and settings stay non-destructive while hydration i
       KGAdminTeachingContentGateway: { hydrateSubject: async () => null, publishTaxonomy: async () => null },
     };
     runtime.window = runtime;
+    runtime.fetchCalls = () => fetchCalls;
     return runtime;
   };
 
@@ -261,13 +322,21 @@ test('admin shell, subjects, and settings stay non-destructive while hydration i
 
   const settingsReady = deferred();
   const settingsDocument = fakeDocument();
+  let snapshotsCreated = 0;
   const settingsRuntime = makeRuntime(settingsDocument, settingsReady, {
-    references: { build: () => { throw new Error('index built before hydration'); } },
+    transactions: { snapshots: () => [], createSnapshot: () => { snapshotsCreated += 1; return { id: 'snapshot-1' }; } },
   });
   vm.runInNewContext(adminSettings, settingsRuntime, { filename: '53-admin-settings-app.js' });
 
   await Promise.resolve();
-  assert.equal((subjectsDocument.element('adminDeleteSubjectBtn').listeners.click || []).length, 0);
+  assert.equal((subjectsDocument.element('adminAddSubjectBtn').listeners.click || []).length, 1);
+  await subjectsDocument.element('adminAddSubjectBtn').trigger('click');
+  assert.equal(subjectsDocument.element('adminSubjectDialog').open, '');
+  assert.equal(subjectsDocument.element('adminDeleteSubjectBtn').disabled, true);
+  assert.equal((settingsDocument.element('adminHealthBtn').listeners.click || []).length, 1);
+  assert.equal((settingsDocument.element('adminSnapshotBtn').listeners.click || []).length, 1);
+  await settingsDocument.element('adminSnapshotBtn').trigger('click');
+  assert.equal(snapshotsCreated, 1);
   assert.equal((settingsDocument.element('adminRebuildIndexBtn').listeners.click || []).length, 0);
 
   shellReady.resolve(null);
@@ -277,7 +346,12 @@ test('admin shell, subjects, and settings stay non-destructive while hydration i
 
   assert.match(shellDocument.element('.admin-main').innerHTML, /引用索引加载失败/);
   assert.equal(subjectsDocument.element('adminDeleteSubjectBtn').disabled, true);
-  assert.equal((subjectsDocument.element('adminDeleteSubjectBtn').listeners.click || []).length, 0);
+  assert.equal((subjectsDocument.element('adminAddSubjectBtn').listeners.click || []).length, 1);
+  await subjectsDocument.element('adminAddSubjectBtn').trigger('click');
   assert.equal(settingsDocument.element('adminRebuildIndexBtn').disabled, true);
   assert.equal((settingsDocument.element('adminRebuildIndexBtn').listeners.click || []).length, 0);
+  await settingsDocument.element('adminHealthBtn').trigger('click');
+  await settingsDocument.element('adminSnapshotBtn').trigger('click');
+  assert.equal(settingsRuntime.fetchCalls() >= 2, true);
+  assert.equal(snapshotsCreated, 2);
 });

@@ -81,22 +81,10 @@
   }
 
   function applyCurrentTaxonomy(subjectId,taxonomy){
-    const subject=Services.subjects.get(subjectId);
-    if(!subject)throw new Error('服务器知识树对应的科目不存在');
-    const current=Services.taxonomies.currentForSubject(subjectId);
-    const defaultProjectionId=`taxonomy-${clean(subject.code).toLowerCase()}-main`;
-    const all=Services.taxonomies.list();
-    const next=all
-      .filter(item=>item.id!==taxonomy.id)
-      .filter(item=>!(item.subjectId===subjectId&&item.id===current?.id&&item.id===defaultProjectionId))
-      .map(item=>item.subjectId===subjectId?{...item,isDefault:false}:item);
-    next.push(taxonomy);
     applyingServerState=true;
     try{
-      const saved=Services.legacyContent.saveTaxonomies(next);
+      const saved=Services.taxonomies.reconcileServerProjection(subjectId,taxonomy);
       if(saved?.valid===false)throw new Error((saved.errors||['知识树本地投影保存失败']).join('；'));
-      const subjects=Services.legacyContent.getSubjects().map(item=>item.id===subjectId?{...item,defaultTaxonomyId:taxonomy.id}:item);
-      Services.legacyContent.saveSubjects(subjects);
     }finally{applyingServerState=false}
   }
 
