@@ -9,6 +9,7 @@ on exit. It never serves or mutates the active release or shared dev database.
 
 from __future__ import annotations
 
+import argparse
 import atexit
 import getpass
 import json
@@ -215,7 +216,11 @@ def login(context: BrowserContext, username: str, password: str) -> None:
     assert_ok(
         context.request.post(
             BASE + "/api/v1/auth/login",
-            data={"username": username, "password": password},
+            data={
+                "username": username,
+                "password": password,
+                "acceptedTermsVersion": "2026-08-13-v1",
+            },
         ),
         f"login {username}",
     )
@@ -411,6 +416,386 @@ def click_prep_sync(page: Page):
     ) as response_info:
         page.locator("#btnSyncToCatalog").click()
     return response_info.value
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--question-paper-only",
+        action="store_true",
+        help="run the isolated question/paper CRUD, persistence, and cleanup matrix",
+    )
+    parser.add_argument(
+        "--assert-no-runtime",
+        action="store_true",
+        help="fail if question or paper management requests Runtime state/bootstrap",
+    )
+    return parser.parse_args()
+
+
+def run_question_paper_e2e(*, assert_no_runtime: bool) -> None:
+    global BASE
+    isolated = IsolatedE2EHarness()
+    BASE = isolated.start()
+    bank_id = ""
+    question_id = ""
+    category_id = ""
+    paper_id = ""
+    paper_revision: int | None = None
+    release_id = ""
+    playwright = None
+    browser = None
+    admin = None
+    teacher = None
+    student = None
+    runtime_requests: list[str] = []
+
+    def watch_management_request(request) -> None:
+        url = request.url
+        if "/api/v1/runtime/state" in url or "server-state-bootstrap.js" in url:
+            runtime_requests.append(url)
+
+    try:
+        playwright = sync_playwright().start()
+        if playwright is not None:
+            browser = playwright.chromium.launch(headless=True)
+            admin = browser.new_context(viewport={"width": 1440, "height": 1000})
+            login(admin, ADMIN_USERNAME, ADMIN_PASSWORD)
+            stamp = f"{int(time.time() * 1000)}-{uuid4().hex[:8]}"
+            # The database and release are disposable, so seeded identities give
+            # us stable allow/deny roles without leaving user/subscription rows.
+            teacher_username = "老师"
+            student_username = "学生"
+            teacher = create_context(browser, teacher_username, "111111")
+            student = create_context(browser, student_username, "111111")
+            teacher.on("request", watch_management_request)
+
+            denied_bank = student.request.post(
+                BASE + "/api/v1/banks", data={"name": f"denied-{stamp}", "subject": "PMP"}
+            )
+            assert denied_bank.status == 403, (denied_bank.status, denied_bank.text())
+            denied_publish = student.request.post(
+                BASE + "/api/v1/paper-releases/papers/not-owned/publish",
+                data={"revision": 1, "enabledModes": ["practice_mode"]},
+            )
+            assert denied_publish.status == 403, (denied_publish.status, denied_publish.text())
+
+            invalid_bank = teacher.request.post(
+                BASE + "/api/v1/papers", data={"name": ""}
+            )
+            assert invalid_bank.status == 422, (invalid_bank.status, invalid_bank.text())
+            bank = assert_ok(
+                teacher.request.post(
+                    BASE + "/api/v1/banks",
+                    data={
+                        "name": f"Task3 题库 {stamp}",
+                        "subject": "PMP",
+                        "description": "Runtime retirement browser matrix",
+                        "visibility": "private",
+                    },
+                ),
+                "create bank after validation failure",
+            )["bank"]
+            bank_id = bank["id"]
+
+            question = assert_ok(
+                teacher.request.post(
+                    BASE + f"/api/v1/banks/{bank_id}/questions",
+                    data=question_payload(f"Task3 题目 {stamp}", configured=True),
+                ),
+                "create question",
+            )["question"]
+            question_id = question["id"]
+            edited_question_title = f"Task3 已编辑题目 {stamp}"
+            question = assert_ok(
+                teacher.request.put(
+                    BASE + f"/api/v1/questions/{question_id}",
+                    data={"title": edited_question_title},
+                ),
+                "edit question",
+            )["question"]
+            assert question["title"] == edited_question_title
+
+            category = assert_ok(
+                admin.request.post(
+                    BASE + "/api/v1/paper-categories",
+                    data={"name": f"Task3 分类 {stamp}", "description": "browser matrix"},
+                ),
+                "create paper category",
+            )["category"]
+            category_id = category["id"]
+            category = assert_ok(
+                admin.request.put(
+                    BASE + f"/api/v1/paper-categories/{category_id}",
+                    data={"revision": category["revision"], "name": f"Task3 已编辑分类 {stamp}"},
+                ),
+                "edit paper category",
+            )["category"]
+
+            paper = assert_ok(
+                admin.request.post(
+                    BASE + "/api/v1/papers",
+                    data={
+                        "name": f"Task3 试卷 {stamp}",
+                        "subject": "PMP",
+                        "categoryId": category_id,
+                        "questions": [
+                            {"bankId": bank_id, "questionId": question_id, "order": 1, "score": 1}
+                        ],
+                    },
+                ),
+                "create paper",
+            )["paper"]
+            paper_id = paper["id"]
+            paper_revision = paper["revision"]
+            paper = assert_ok(
+                teacher.request.put(
+                    BASE + f"/api/v1/papers/{paper_id}",
+                    data={"revision": paper_revision, "name": f"Task3 已编辑试卷 {stamp}"},
+                ),
+                "edit paper",
+            )["paper"]
+            paper_revision = paper["revision"]
+
+            stale = teacher.request.put(
+                BASE + f"/api/v1/papers/{paper_id}/questions",
+                data={"revision": paper_revision - 1, "questions": []},
+            )
+            assert stale.status == 409, (stale.status, stale.text())
+            paper = assert_ok(
+                teacher.request.get(BASE + f"/api/v1/papers/{paper_id}"),
+                "reload paper after conflict",
+            )["paper"]
+            recovered = assert_ok(
+                teacher.request.put(
+                    BASE + f"/api/v1/papers/{paper_id}/questions",
+                    data={
+                        "revision": paper["revision"],
+                        "questions": [
+                            {"bankId": bank_id, "questionId": question_id, "order": 1, "score": 2}
+                        ],
+                    },
+                ),
+                "recover paper save after conflict",
+            )["paper"]
+            paper_revision = recovered["revision"]
+
+            release = assert_ok(
+                admin.request.post(
+                    BASE + f"/api/v1/paper-releases/papers/{paper_id}/publish",
+                    data={
+                        "revision": paper_revision,
+                        "accessLevel": "free",
+                        "enabledModes": ["deep_recall"],
+                        "allowedRoles": ["student"],
+                        "metadata": {"source": "task3-question-paper-e2e"},
+                    },
+                ),
+                "publish paper",
+            )["release"]
+            release_id = release["id"]
+            assert release["status"] == "published"
+            history = assert_ok(
+                teacher.request.get(BASE + f"/api/v1/paper-releases/papers/{paper_id}/history"),
+                "published release history",
+            )["releases"]
+            assert history and history[0]["id"] == release_id
+
+            question_page = teacher.new_page()
+            question_page.goto(BASE + "/question-bank.html", wait_until="networkidle")
+            question_page.wait_for_function(
+                "([bankId,questionId]) => { const s=window.KGQuestionCatalogAdapter?.snapshot?.(); "
+                "return s?.banks?.some(row=>row.id===bankId) && s?.questions?.some(row=>row.id===questionId); }",
+                arg=[bank_id, question_id],
+            )
+            assert question_page.locator("body").inner_text().find(edited_question_title) >= 0
+            question_page.reload(wait_until="networkidle")
+            question_page.wait_for_function(
+                "id => window.KGQuestionCatalogAdapter?.snapshot?.().questions?.some(row=>row.id===id)",
+                arg=question_id,
+            )
+
+            paper_page = teacher.new_page()
+            paper_page.goto(BASE + "/paper-management.html", wait_until="networkidle")
+            paper_page.wait_for_function(
+                "id => window.KGPaperDraftApi?.detail?.(id).then(row=>row?.id===id)", arg=paper_id
+            )
+            paper_page.wait_for_function(
+                "name => document.getElementById('qbPaperList')?.textContent?.includes(name)",
+                arg=paper["name"],
+            )
+            paper_page.reload(wait_until="networkidle")
+            paper_page.wait_for_function(
+                "id => window.KGPaperDraftApi?.detail?.(id).then(row=>row?.id===id)", arg=paper_id
+            )
+
+            failure_page = teacher.new_page()
+            failure_page.route("**/api/v1/question-catalog/bootstrap*", lambda route: route.abort())
+            failure_page.goto(BASE + "/question-bank.html", wait_until="networkidle")
+            failure_page.locator("#qbApiStartupError").wait_for(state="visible")
+            assert "不会使用本地数据回退" in failure_page.locator("#qbApiStartupError").inner_text()
+            failure_page.unroute("**/api/v1/question-catalog/bootstrap*")
+            with failure_page.expect_navigation(wait_until="networkidle"):
+                failure_page.locator("#qbApiStartupError [data-api-retry]").click()
+            failure_page.wait_for_function(
+                "id => window.KGQuestionCatalogAdapter?.snapshot?.().banks?.some(row=>row.id===id)",
+                arg=bank_id,
+            )
+
+            teacher.close()
+            teacher = create_context(browser, teacher_username, "111111")
+            teacher.on("request", watch_management_request)
+            assert assert_ok(
+                teacher.request.get(BASE + f"/api/v1/questions/{question_id}"),
+                "question persists after relogin",
+            )["question"]["title"] == edited_question_title
+            assert assert_ok(
+                teacher.request.get(BASE + f"/api/v1/papers/{paper_id}"),
+                "paper persists after relogin",
+            )["paper"]["id"] == paper_id
+            relogin_page = teacher.new_page()
+            relogin_page.goto(BASE + "/paper-management.html", wait_until="networkidle")
+            relogin_page.wait_for_function(
+                "id => window.KGPaperDraftApi?.detail?.(id).then(row=>row?.id===id)", arg=paper_id
+            )
+
+            withdrawn = assert_ok(
+                admin.request.post(
+                    BASE + f"/api/v1/paper-releases/papers/{paper_id}/withdraw-all", data={}
+                ),
+                "withdraw paper",
+            )["withdrawn"]
+            assert withdrawn >= 1
+            history = assert_ok(
+                teacher.request.get(BASE + f"/api/v1/paper-releases/papers/{paper_id}/history"),
+                "withdrawn release history",
+            )["releases"]
+            assert next(row for row in history if row["id"] == release_id)["status"] == "withdrawn"
+
+            if assert_no_runtime:
+                assert runtime_requests == [], runtime_requests
+
+            paper_revision = assert_ok(
+                teacher.request.get(BASE + f"/api/v1/papers/{paper_id}"),
+                "reload paper before cleanup",
+            )["paper"]["revision"]
+            cleanup_ok(
+                teacher.request.delete(
+                    BASE + f"/api/v1/papers/{paper_id}?revision={paper_revision}&reason=task3_e2e_cleanup"
+                ),
+                "delete paper",
+            )
+            paper_id = ""
+            cleanup_ok(
+                teacher.request.delete(
+                    BASE + f"/api/v1/paper-categories/{category_id}?revision={category['revision']}"
+                ),
+                "delete paper category",
+            )
+            category_id = ""
+            cleanup_ok(teacher.request.delete(BASE + f"/api/v1/questions/{question_id}"), "delete question")
+            question_id = ""
+            cleanup_ok(teacher.request.delete(BASE + f"/api/v1/banks/{bank_id}"), "delete bank")
+            bank_id = ""
+            print(
+                "question-paper-e2e-ok "
+                "crud=bank,question,category,paper publish=1 withdraw=1 "
+                f"runtimeRequests={len(runtime_requests)} refresh=2 relogin=1 cleanup=verified",
+                flush=True,
+            )
+    finally:
+        cleanup_errors: list[str] = []
+        cleanup_request = admin.request if admin is not None else None
+        if cleanup_request is not None:
+            if paper_id:
+                try:
+                    cleanup_request.post(
+                        BASE + f"/api/v1/paper-releases/papers/{paper_id}/withdraw-all", data={}
+                    )
+                    current_paper_response = cleanup_request.get(BASE + f"/api/v1/papers/{paper_id}")
+                    current_paper_revision = (
+                        current_paper_response.json().get("paper", {}).get("revision")
+                        if current_paper_response.ok
+                        else paper_revision
+                    )
+                    cleanup_ok(
+                        cleanup_request.delete(
+                            BASE + f"/api/v1/papers/{paper_id}?revision={current_paper_revision}&reason=task3_e2e_cleanup"
+                        ),
+                        f"delete paper {paper_id}",
+                        allow_not_found=True,
+                    )
+                except Exception as error:
+                    cleanup_errors.append(f"paper {paper_id}: {error}")
+            if category_id:
+                try:
+                    categories_response = cleanup_request.get(BASE + "/api/v1/paper-categories")
+                    current_category_revision = next(
+                        (
+                            row.get("revision")
+                            for row in categories_response.json().get("categories", [])
+                            if row.get("id") == category_id
+                        ),
+                        None,
+                    )
+                    cleanup_ok(
+                        cleanup_request.delete(
+                            BASE
+                            + f"/api/v1/paper-categories/{category_id}?revision={current_category_revision}"
+                        ),
+                        f"delete category {category_id}",
+                        allow_not_found=True,
+                    )
+                except Exception as error:
+                    cleanup_errors.append(f"category {category_id}: {error}")
+            if question_id:
+                try:
+                    cleanup_ok(
+                        cleanup_request.delete(BASE + f"/api/v1/questions/{question_id}"),
+                        f"delete question {question_id}",
+                        allow_not_found=True,
+                    )
+                except Exception as error:
+                    cleanup_errors.append(f"question {question_id}: {error}")
+            if bank_id:
+                try:
+                    cleanup_ok(
+                        cleanup_request.delete(BASE + f"/api/v1/banks/{bank_id}"),
+                        f"delete bank {bank_id}",
+                        allow_not_found=True,
+                    )
+                except Exception as error:
+                    cleanup_errors.append(f"bank {bank_id}: {error}")
+        for context in (student, teacher, admin):
+            if context is not None:
+                try:
+                    context.close()
+                except Exception:
+                    pass
+        if browser is not None:
+            try:
+                browser.close()
+            except Exception:
+                pass
+        if playwright is not None:
+            try:
+                playwright.stop()
+            except Exception:
+                pass
+        try:
+            isolated.close()
+        except Exception as error:
+            cleanup_errors.append(f"isolated harness: {error}")
+        if cleanup_errors:
+            raise AssertionError("; ".join(cleanup_errors))
+
+
+ARGS = parse_args()
+if ARGS.assert_no_runtime and not ARGS.question_paper_only:
+    raise SystemExit("--assert-no-runtime currently requires --question-paper-only")
+if ARGS.question_paper_only:
+    run_question_paper_e2e(assert_no_runtime=ARGS.assert_no_runtime)
+    raise SystemExit(0)
 
 
 harness = IsolatedE2EHarness()

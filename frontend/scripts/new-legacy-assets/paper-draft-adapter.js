@@ -7,6 +7,7 @@
  */
 (function (global) {
   const API_ROOT = '/api/v1';
+  const DomainApi = global.KGDomainApi;
   let readyPromise = null;
   let paperListLoad = null;
   let categoryListLoad = null;
@@ -21,48 +22,16 @@
 
   function text(value) { return String(value == null ? '' : value); }
 
-  function errorMessage(status, detail) {
-    if (detail && !Array.isArray(detail) && detail.message) return text(detail.message);
-    if (status === 401) return '登录状态已失效，请重新登录。';
-    if (status === 403) return '当前账号没有试卷管理权限。';
-    if (status === 409) return '数据已发生变化，请刷新后重试。';
-    if (status === 422) return '提交内容未通过校验，请检查后重试。';
-    return `试卷请求失败 (${status})`;
-  }
-
-  function normalizedError(status, payload) {
-    const detail = payload && Object.prototype.hasOwnProperty.call(payload, 'detail')
-      ? payload.detail
-      : payload;
-    const error = new Error(errorMessage(status, detail));
-    error.status = status;
-    error.code = !Array.isArray(detail) && detail && detail.code
-      ? text(detail.code)
-      : (status === 422 ? 'VALIDATION_ERROR' : `HTTP_${status}`);
-    error.detail = clone(detail);
-    if (!Array.isArray(detail) && detail && detail.currentRevision !== undefined) {
-      error.currentRevision = detail.currentRevision;
-    }
-    return error;
-  }
-
   async function request(path, { method = 'GET', body } = {}) {
-    const headers = { accept: 'application/json' };
-    const options = { method, credentials: 'include', headers };
-    if (body !== undefined) {
-      headers['content-type'] = 'application/json';
-      options.body = JSON.stringify(body);
-    }
-    const response = await global.fetch(`${API_ROOT}${path}`, options);
-    let payload = null;
-    try { payload = await response.json(); } catch (error) {}
-    if (!response.ok) {
-      if (response.status === 401) {
+    if (!DomainApi?.request) throw new Error('试卷草稿 API 未加载，请刷新页面后重试。');
+    try {
+      return clone(await DomainApi.request({ method, path: `${API_ROOT}${path}`, body }));
+    } catch (error) {
+      if (error?.status === 401) {
         try { global.dispatchEvent(new CustomEvent('kg:auth-required')); } catch (error) {}
       }
-      throw normalizedError(response.status, payload);
+      throw error;
     }
-    return clone(payload);
   }
 
   function announce(action, payload) {

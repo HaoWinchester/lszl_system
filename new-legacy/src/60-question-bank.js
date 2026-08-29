@@ -6,18 +6,7 @@
  */
 
 /* 题库管理 MVP 核心 */
-const QB_STORE=window.KGAppStorage||{};
-const QB_KEYS=window.KGStorageKeys||{};
 const QB_CATALOG=window.KGQuestionCatalogAdapter;
-const QUESTION_BANKS_STORAGE_PREFIX=QB_KEYS.PREFIXES?.QUESTION_BANK||'kg_question_banks_v1__';
-const QUESTION_CURRENT_STORAGE_PREFIX=QB_KEYS.PREFIXES?.QUESTION_CURRENT||'kg_question_current_v1__';
-const QUESTION_PAPERS_STORAGE_PREFIX=QB_KEYS.PREFIXES?.EXAM_PAPER||'kg_exam_papers_v1__';
-const QUESTION_CURRENT_PAPER_STORAGE_PREFIX=QB_KEYS.PREFIXES?.EXAM_CURRENT||'kg_exam_current_v1__';
-const QUESTION_PUBLISHED_PAPERS_KEY=QB_KEYS.PUBLISHED_PAPERS||'kg_exam_papers_published_v1';
-function qbReadJSON(key,fallback=null){try{return QB_STORE.readJSON?QB_STORE.readJSON(key,fallback):JSON.parse(window.localStorage?.getItem(key)||'null')??fallback}catch(e){return fallback}}
-function qbWriteJSON(key,value){try{return QB_STORE.writeJSON?QB_STORE.writeJSON(key,value):(window.localStorage?.setItem(key,JSON.stringify(value)),true)}catch(e){return false}}
-function qbReadString(key,fallback=''){try{return QB_STORE.readString?QB_STORE.readString(key,fallback):(window.localStorage?.getItem(key)??fallback)}catch(e){return fallback}}
-function qbRemoveKey(key){try{return QB_STORE.remove?QB_STORE.remove(key):(window.localStorage?.removeItem(key),true)}catch(e){return false}}
 let qBankState={banks:null,papers:null,scope:null,selectedBankId:null,selectedQuestionId:null,currentBankId:null,currentQuestionIndex:0,currentPaperId:null,currentReleaseId:null,currentPaperIndex:0};
 function qbCurrentUsername(){
   try{
@@ -27,14 +16,10 @@ function qbCurrentUsername(){
   try{
     if(typeof authCurrentUser!=='undefined'&&authCurrentUser?.username)return String(authCurrentUser.username);
   }catch(e){}
-  try{return String(qbReadString(QB_KEYS.AUTH_CURRENT_USER||'kg_local_current_user_v1','')||'')}catch(e){return ''}
+  return '';
 }
 function qbIsLoggedIn(){return !!qbCurrentUsername()}
 function qbScopeKey(){const username=qbCurrentUsername();return username?('user__'+encodeURIComponent(username)):'public'}
-function qbBanksKey(){return QUESTION_BANKS_STORAGE_PREFIX+qbScopeKey()}
-function qbCurrentKey(){return QUESTION_CURRENT_STORAGE_PREFIX+qbScopeKey()}
-function qbPapersKey(){return QUESTION_PAPERS_STORAGE_PREFIX+qbScopeKey()}
-function qbCurrentPaperKey(){return QUESTION_CURRENT_PAPER_STORAGE_PREFIX+qbScopeKey()}
 function qbEnsureScopeState(){
   const scope=qbScopeKey();
   if(qBankState.scope!==scope)qBankState={banks:null,papers:null,scope,selectedBankId:null,selectedQuestionId:null,currentBankId:null,currentQuestionIndex:0,currentPaperId:null,currentReleaseId:null,currentPaperIndex:0};
@@ -89,30 +74,20 @@ function qbNormalizePaper(paper,i=0){
     availability:String(paper.availability||'published'),
     current:paper.current!==false,
     source:String(paper.source||''),
-    questionSnapshots:Array.isArray(paper.questionSnapshots)?paper.questionSnapshots.map(qbClone):[],
     questions:questions.map((ref,idx)=>({bankId:String(ref.bankId||ref.sourceBankId||''),questionId:String(ref.questionId||ref.id||''),order:Number(ref.order||idx+1),score:Number(ref.score||1)})).filter(ref=>ref.bankId&&ref.questionId).sort((a,b)=>a.order-b.order)
   };
 }
 function qbInvalidateCaches(){qBankState.banks=null;qBankState.papers=null}
-try{window.addEventListener('storage',event=>{if([QUESTION_PUBLISHED_PAPERS_KEY,qbPapersKey()].includes(String(event.key||'')))qbInvalidateCaches()});window.addEventListener('kg:published-papers-changed',qbInvalidateCaches);window.addEventListener('kg:question-catalog-changed',qbInvalidateCaches)}catch(e){}
+try{window.addEventListener('kg:published-papers-changed',qbInvalidateCaches);window.addEventListener('kg:question-catalog-changed',qbInvalidateCaches)}catch(e){}
 function qbLoadPapers(){
   qbEnsureScopeState();
   if(qBankState.papers)return qBankState.papers;
-  let own=[],published=[];
-  try{own=qbReadJSON(qbPapersKey(),[])}catch(e){own=[]}
+  let published=[];
   try{
     const repository=window.KGPublishedPaperRepository;
-    published=repository?.listReleases?.({includeHistory:true})||qbReadJSON(QUESTION_PUBLISHED_PAPERS_KEY,[]);
+    published=repository?.listReleases?.({includeHistory:true})||[];
   }catch(e){published=[]}
-  const publicRows=(Array.isArray(published)?published:[]).map(qbNormalizePaper).filter(p=>p.status==='published'&&p.availability!=='withdrawn');
-  const ids=new Set(publicRows.map(p=>p.id+'::'+p.releaseId));
-  const ownRows=(Array.isArray(own)?own:[]).map(qbNormalizePaper).filter(p=>!ids.has(p.id+'::'+p.releaseId));
-  qBankState.papers=[...publicRows,...ownRows];
-  try{
-    const cur=qbReadJSON(qbCurrentPaperKey(),null);
-    const matched=cur&&qBankState.papers.find(p=>p.id===cur.paperId&&p.status==='published'&&(!cur.releaseId||p.releaseId===cur.releaseId));
-    if(matched){qBankState.currentPaperId=matched.id;qBankState.currentReleaseId=matched.releaseId;qBankState.currentPaperIndex=Number(cur.index||0)}
-  }catch(e){}
+  qBankState.papers=(Array.isArray(published)?published:[]).map(qbNormalizePaper).filter(p=>p.status==='published'&&p.availability!=='withdrawn');
   return qBankState.papers;
 }
 function qbPublishedPapers(){return qbLoadPapers().filter(p=>p.status==='published'&&p.availability!=='withdrawn')}
@@ -134,8 +109,7 @@ function qbPaperQuestionByRef(ref,paper=null){
     }
     return {bank:null,question:null};
   }
-  const banks=qbLoadBanks();let bank=banks.find(b=>b.id===ref.bankId);let question=bank&&(bank.questions||[]).find(q=>q.id===ref.questionId);
-  if(!question&&paper){const snapshot=(paper.questionSnapshots||[]).find(item=>String(item.bankId)===String(ref.bankId)&&String(item.questionId)===String(ref.questionId));if(snapshot?.question){question=qbNormalizeQuestion(qbClone(snapshot.question));bank=bank||qbNormalizeBank({id:snapshot.bankId,name:snapshot.bankName,subject:snapshot.bankSubject||paper.subject,visibility:'published-paper',questions:[question]})}}
+  const banks=qbLoadBanks();const bank=banks.find(b=>b.id===ref.bankId);const question=bank&&(bank.questions||[]).find(q=>q.id===ref.questionId);
   return {bank,question};
 }
 function qbQuestionAllowedForRole(question,bankId=''){
@@ -173,7 +147,7 @@ function qbPublishedPaperCatalog(options={}){
     const entries=(repository.listCatalogEntries(options)||[]).map(catalog=>{
       const cached=repository.peekResolved?.(catalog.releaseId);
       if(cached)return cached;
-      return {ok:true,paper:{...catalog,id:catalog.paperId,availability:'published',questionSnapshots:[]},items:[],configuredCount:catalog.totalCount,targetCount:catalog.totalCount,availableCount:0,missingCount:0,damagedCount:0,blockedCount:0,issues:[]};
+      return {ok:true,paper:{...catalog,id:catalog.paperId,availability:'published'},items:[],configuredCount:catalog.totalCount,targetCount:catalog.totalCount,availableCount:0,missingCount:0,damagedCount:0,blockedCount:0,issues:[]};
     });
     // 有未解析的 release 时后台预取，落地后经 kg:published-papers-changed 重渲染
     void repository.prefetchMissing?.();
@@ -207,12 +181,7 @@ function qbEnsurePublishedPaperSelection(options={}){
   if(!papers.length)return null;
   return qbSelectPublishedPaper(papers[0].id,0,options);
 }
-function qbSaveCurrentPaper(){
-  try{
-    if(qBankState.currentPaperId){const paper=qbCurrentPaper();qbWriteJSON(qbCurrentPaperKey(),{paperId:qBankState.currentPaperId,releaseId:String(qBankState.currentReleaseId||paper?.releaseId||''),index:qBankState.currentPaperIndex||0,savedAt:Date.now()});}
-    else qbRemoveKey(qbCurrentPaperKey());
-  }catch(e){}
-}
+function qbSaveCurrentPaper(){return true}
 function qbPaperCurrentRef(){
   const paper=qbCurrentPaper();
   if(!paper||!paper.questions.length)return null;
@@ -250,29 +219,24 @@ function qbValidateBank(bank){
   (bank.questions||[]).forEach((q,i)=>{if(!q.title)errors.push(`第 ${i+1} 题缺少 title。`);if(!Array.isArray(q.options)||q.options.length<2)errors.push(`第 ${i+1} 题选项不足。`);const hasCorrect=(q.options||[]).some(o=>o.correct)||q.correctAnswer;if(!hasCorrect)errors.push(`第 ${i+1} 题缺少正确答案。`);});
   return errors;
 }
-function qbLoadLegacyBanksForMigrationPreview(){
-  if(typeof document==='undefined'||document.body?.dataset?.questionCatalogMigrationPreview!=='true')return [];
-  const rows=qbReadJSON(qbBanksKey(),[]);
-  return Array.isArray(rows)?rows.map(qbNormalizeBank):[];
-}
 function qbCatalogQuestionAllowed(question){return String(question?.scope||'')==='public'&&!qbIsQuestionDeleted(question)}
 function qbCatalogBankAllowed(bank){return String(bank?.visibility||'')==='published'&&String(bank?.accessMode||'')!=='private'}
 function qbLoadBanks(){
   qbEnsureScopeState();if(qBankState.banks)return qBankState.banks;
+  if(!QB_CATALOG?.snapshot){showStatus('题目目录 API 未加载，请刷新后重试。');qBankState.banks=[];return qBankState.banks}
   const snapshot=QB_CATALOG.snapshot();
   const allowedQuestions=(Array.isArray(snapshot?.questions)?snapshot.questions:[]).filter(qbCatalogQuestionAllowed);
   const questionsByBank=new Map();
   allowedQuestions.forEach(question=>{const bankId=String(question?.bankId||'');if(!bankId)return;if(!questionsByBank.has(bankId))questionsByBank.set(bankId,[]);questionsByBank.get(bankId).push(question)});
   qBankState.banks=(Array.isArray(snapshot?.banks)?snapshot.banks:[]).filter(qbCatalogBankAllowed).map(bank=>qbNormalizeBank({...bank,questions:questionsByBank.get(String(bank.id))||[]})).filter(bank=>bank.questions.length);
-  try{const cur=qbReadJSON(qbCurrentKey(),null);if(cur){qBankState.currentBankId=cur.bankId;qBankState.currentQuestionIndex=Number(cur.index||0)}}catch(e){}
   qbLoadPapers();qbApplyPaperContext();
   const firstBank=qBankState.banks[0]||null;
   if(!firstBank){qBankState.currentBankId=null;qBankState.selectedBankId=null;qBankState.selectedQuestionId=null;qBankState.currentQuestionIndex=0;return qBankState.banks}
   if(!qBankState.banks.some(bank=>bank.id===qBankState.currentBankId))qBankState.currentBankId=firstBank.id;
   const bank=qbCurrentBank()||firstBank;qBankState.currentBankId=bank.id;const pointed=bank.questions?.[Math.max(0,Math.min(qBankState.currentQuestionIndex,(bank.questions||[]).length-1))];const fallback=qbActiveQuestions(bank)[0]||null;const selected=!qBankState.currentPaperId&&qbIsQuestionDeleted(pointed)?fallback:pointed||fallback;qBankState.currentQuestionIndex=selected?Math.max(0,bank.questions.findIndex(item=>item.id===selected.id)):0;qBankState.selectedBankId=qBankState.selectedBankId&&qBankState.banks.some(item=>item.id===qBankState.selectedBankId)?qBankState.selectedBankId:qBankState.currentBankId;qBankState.selectedQuestionId=qBankState.selectedQuestionId||selected?.id||fallback?.id||null;qbEnsureAllowedCurrentForRole();return qBankState.banks;
 }
-function qbSaveBanks(){void qbBanksKey();showStatus('正式题库由服务器统一管理，请在题库管理页完成修改。');return false}
-function qbSaveCurrent(){try{qbWriteJSON(qbCurrentKey(),{bankId:qBankState.currentBankId,index:qBankState.currentQuestionIndex})}catch(e){}}
+function qbSaveBanks(){showStatus('正式题库由服务器统一管理，请在题库管理页完成修改。');return false}
+function qbSaveCurrent(){return true}
 function qbCurrentBank(){const banks=qbLoadBanks();return banks.find(b=>b.id===qBankState.currentBankId)||banks[0]||null}
 function qbSelectedBank(){return qbLoadBanks().find(b=>b.id===qBankState.selectedBankId)||qbCurrentBank()}
 function qbCurrentQuestion(){const paperQuestion=qbApplyPaperContext();if(paperQuestion)return paperQuestion;const b=qbCurrentBank();const pointed=b?.questions?.[qBankState.currentQuestionIndex];if(pointed&&!qbIsQuestionDeleted(pointed))return pointed;const fallback=qbActiveQuestions(b)[0]||null;if(b&&fallback){qBankState.currentQuestionIndex=Math.max(0,b.questions.findIndex(item=>item.id===fallback.id))}return fallback}
@@ -382,7 +346,7 @@ function qbImportJsonFile(file){
   if(!authRequire('登录后才能导入题库。'))return;
   if(!file)return;
   const reader=new FileReader();
-  reader.onload=()=>{try{const raw=String(reader.result||'').replace(/^\ufeff/,'');const data=JSON.parse(raw);const bankData=Array.isArray(data.questions)?data:(data.bankName||data.name?data:null);if(!bankData)throw new Error('JSON 中未找到 questions 数组。');const errors=qbValidateBank(bankData);if(errors.length)throw new Error(errors.slice(0,5).join('\n'));const bank=qbNormalizeBank(bankData);const banks=qbLoadBanks();const oldIndex=banks.findIndex(b=>b.id===bank.id);if(oldIndex>=0)bank.id=bank.id+'-'+Date.now().toString(36);banks.push(bank);qBankState.selectedBankId=bank.id;qBankState.selectedQuestionId=qbActiveQuestions(bank)[0]?.id||null;qbSaveBanks();renderQuestionBankManager();showStatus(`已导入题库：${bank.name}，共 ${bank.questions.length} 题。`)}catch(err){alert('导入失败：\n'+(err.message||err))}};
+  reader.onload=async()=>{try{const raw=String(reader.result||'').replace(/^\ufeff/,'');const data=JSON.parse(raw);const bankData=Array.isArray(data.questions)?data:(data.bankName||data.name?data:null);if(!bankData)throw new Error('JSON 中未找到 questions 数组。');const errors=qbValidateBank(bankData);if(errors.length)throw new Error(errors.slice(0,5).join('\n'));if(!QB_CATALOG?.importBanks)throw new Error('题库 API 未加载，请刷新后重试。');const result=await QB_CATALOG.importBanks({banks:[bankData],confirmReplace:false,confirmDuplicateCleanup:false});await QB_CATALOG.reload?.({source:'question-import',includeQuestions:true});qbInvalidateCaches();qbLoadBanks();const bank=result?.banks?.[0];if(bank){qBankState.selectedBankId=bank.id;qBankState.selectedQuestionId=bank.questions?.[0]?.id||null}renderQuestionBankManager();showStatus(`已导入题库：${bank?.name||bankData.name}，共 ${bank?.questions?.length||bankData.questions.length} 题。`)}catch(err){alert('导入失败：\n'+(err.message||err))}};
   reader.readAsText(file,'utf-8');
 }
 function qbDownloadJson(filename,obj){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},100)}
@@ -1137,15 +1101,6 @@ function addQuestionFlashcards(){
 
 function qOpenDeepRecallPage(){
   if(!qCanUseDeepRecallCurrentQuestion())return;
-  try{
-    const question=qbClone(PMP_QUESTION_MVP);
-    question.sourceBankId=qCurrentQuestionBankId();
-    question.sourceQuestionId=String(PMP_QUESTION_MVP.sourceQuestionId||PMP_QUESTION_MVP.id||'');
-    const userId=window.KGAuthCore?.currentUsername?.()||qbReadString(QB_KEYS.AUTH_CURRENT_USER||'kg_local_current_user_v1','')||'guest';
-    const paper=qbCurrentPaper();
-    const payload={question,savedAt:Date.now(),source:'question-trainer',sourceBankId:qCurrentQuestionBankId(),sourceQuestionId:question.sourceQuestionId,sourcePaperId:String(paper?.id||question.sourcePaperId||''),sourceReleaseId:String(paper?.releaseId||question.sourceReleaseId||''),userId};
-    qbWriteJSON(QB_KEYS.DEEP_RECALL_CURRENT||'kg_deep_recall_current_question_v1',payload);
-  }catch(e){}
   const qid=encodeURIComponent(String(PMP_QUESTION_MVP.id||'current'));
   const bankId=encodeURIComponent(String(qCurrentQuestionBankId()||''));
   const paper=qbCurrentPaper();

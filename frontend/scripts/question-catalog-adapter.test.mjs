@@ -16,6 +16,29 @@ function response(status, payload) {
   return { ok: status >= 200 && status < 300, status, async json() { return payload } }
 }
 
+function domainApi(fetchImpl) {
+  return {
+    async request({ method = 'GET', path, body }) {
+      const response = await fetchImpl(path, {
+        method,
+        credentials: 'include',
+        headers: body === undefined ? {} : { 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        const detail = payload?.detail
+        const error = new Error(typeof detail === 'string' ? detail : detail?.message || `HTTP ${response.status}`)
+        error.status = response.status
+        error.code = detail?.code || `HTTP_${response.status}`
+        error.detail = payload
+        throw error
+      }
+      return payload
+    },
+  }
+}
+
 function loadAdapter({ mode = 'learning', paperManagement = false, fetchImpl, teachingContentSync = null }) {
   const events = []
   const document = {
@@ -30,7 +53,7 @@ function loadAdapter({ mode = 'learning', paperManagement = false, fetchImpl, te
   }
   const window = {
     document,
-    fetch: fetchImpl,
+    KGDomainApi: domainApi(fetchImpl),
     crypto: { randomUUID: () => 'client-instance-1' },
     dispatchEvent(event) { events.push(event) },
     addEventListener() {},
@@ -38,7 +61,7 @@ function loadAdapter({ mode = 'learning', paperManagement = false, fetchImpl, te
     setTimeout,
     KGTeachingContentSync: teachingContentSync,
   }
-  const context = vm.createContext({ window, document, fetch: fetchImpl, CustomEvent, URLSearchParams, JSON, Date, console })
+  const context = vm.createContext({ window, document, CustomEvent, URLSearchParams, JSON, Date, console })
   vm.runInContext(readFileSync(adapterPath, 'utf8'), context, { filename: adapterPath })
   return { adapter: window.KGQuestionCatalogAdapter, events }
 }
@@ -221,6 +244,7 @@ test('save methods use the canonical bank routes and reload the snapshot', async
       calls.push({ url, options })
       if (url.includes('/bootstrap')) return response(200, { banks: [{ id: 'bank-1' }], questions: [], catalogRevision: 'd'.repeat(64) })
       if (options.method === 'DELETE') return response(200, { ok: true })
+      if (url === '/api/v1/banks/bank-1/test-learning-records/clear') return response(200, { ok: true, cleared: 3 })
       if (url === '/api/v1/banks') return response(200, { bank: { id: 'bank-2' } })
       if (url === '/api/v1/banks/bank-1') return response(200, { bank: { id: 'bank-1' } })
       if (url === '/api/v1/banks/bank-1/questions') return response(200, { question: { id: 'q-new' } })
@@ -236,12 +260,14 @@ test('save methods use the canonical bank routes and reload the snapshot', async
   })
   await adapter.deleteQuestion('q-existing')
   await adapter.deleteBank('bank-1')
+  assert.equal((await adapter.clearBankTestRecords('bank-1')).cleared, 3)
   assert.ok(calls.some(call => call.url === '/api/v1/banks' && call.options.method === 'POST'))
   assert.ok(calls.some(call => call.url === '/api/v1/banks/bank-1' && call.options.method === 'PUT'))
   assert.ok(calls.some(call => call.url === '/api/v1/banks/bank-1/questions' && call.options.method === 'POST'))
   assert.ok(calls.some(call => call.url === '/api/v1/content-prep/questions/q-existing' && call.options.method === 'PUT'))
   assert.ok(calls.some(call => call.url === '/api/v1/questions/q-existing' && call.options.method === 'DELETE'))
   assert.ok(calls.some(call => call.url === '/api/v1/banks/bank-1' && call.options.method === 'DELETE'))
+  assert.ok(calls.some(call => call.url === '/api/v1/banks/bank-1/test-learning-records/clear' && call.options.method === 'POST'))
 })
 
 test('question-bank imports forward explicit replacement confirmation and preserve diff details', async () => {

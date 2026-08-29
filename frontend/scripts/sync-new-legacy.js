@@ -729,6 +729,18 @@ function injectPage(html, page, version) {
       )
     }
   }
+  if (page === 'question-bank.html') {
+    const adminTag = findLocalScriptTag(generated, 'src/65-question-bank-admin.js')
+    if (!adminTag) {
+      throw new Error('new-legacy 题库管理脚本顺序已变化，请复核试卷引用 API')
+    }
+    const draftAdapterAsset = 'paper-draft-adapter.js'
+    generated = removeLocalScriptTags(generated, draftAdapterAsset)
+    generated = generated.replace(
+      adminTag,
+      `<script defer src="./${draftAdapterAsset}"></script><!-- kg-paper-drafts:generated -->\n${adminTag}`,
+    )
+  }
   if (page === 'paper-management.html') {
     const adminTag = findLocalScriptTag(generated, 'src/65-question-bank-admin.js')
     if (!adminTag) {

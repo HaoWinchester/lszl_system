@@ -19,6 +19,30 @@ function response(status, payload) {
   }
 }
 
+function domainApi(fetchImpl) {
+  return {
+    async request({ method = 'GET', path, body }) {
+      const response = await fetchImpl(path, {
+        method,
+        credentials: 'include',
+        headers: body === undefined ? { accept: 'application/json' } : { accept: 'application/json', 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        const detail = payload?.detail
+        const error = new Error(!Array.isArray(detail) && detail?.message ? detail.message : `HTTP ${response.status}`)
+        error.status = response.status
+        error.code = !Array.isArray(detail) && detail?.code ? detail.code : (response.status === 422 ? 'VALIDATION_ERROR' : `HTTP_${response.status}`)
+        error.detail = detail
+        if (!Array.isArray(detail) && detail?.currentRevision !== undefined) error.currentRevision = detail.currentRevision
+        throw error
+      }
+      return payload
+    },
+  }
+}
+
 function loadAdapter(fetchImpl) {
   const events = []
   const context = {
@@ -29,7 +53,7 @@ function loadAdapter(fetchImpl) {
     },
     dispatchEvent(event) { events.push(event) },
     addEventListener() {},
-    fetch: fetchImpl,
+    KGDomainApi: domainApi(fetchImpl),
   }
   context.window = context
   context.globalThis = context
@@ -199,4 +223,7 @@ test('sync injects the adapter exactly once before paper management application 
   const generated = readFileSync(resolve(frontendRoot, 'public/new-legacy/paper-management.html'), 'utf8')
   assert.equal((generated.match(/paper-draft-adapter\.js/g) || []).length, 1)
   assert.ok(generated.indexOf('paper-draft-adapter.js') < generated.indexOf('src/65-question-bank-admin.js'))
+  const questionBank = readFileSync(resolve(frontendRoot, 'public/new-legacy/question-bank.html'), 'utf8')
+  assert.equal((questionBank.match(/paper-draft-adapter\.js/g) || []).length, 1)
+  assert.ok(questionBank.indexOf('paper-draft-adapter.js') < questionBank.indexOf('src/65-question-bank-admin.js'))
 })

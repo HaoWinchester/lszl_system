@@ -1,14 +1,26 @@
 'use strict';
 (function(global){
   const Core=global.KGAdminCore;
+  async function loadReferenceSnapshot(){
+    const api=global.KGDomainApi;if(!api?.request)throw new Error('内容引用 API 未加载，请刷新后重试。');
+    const [bankPayload,paperPayload,releasePayload]=await Promise.all([
+      api.request({path:'/api/v1/banks'}),
+      api.request({path:'/api/v1/papers'}),
+      api.request({path:'/api/v1/paper-releases/management-catalog?page=1&pageSize=100'}),
+    ]);
+    return {
+      banks:Array.isArray(bankPayload?.banks)?bankPayload.banks:[],
+      papers:Array.isArray(paperPayload?.papers)?paperPayload.papers:[],
+      releases:Array.isArray(releasePayload?.papers)?releasePayload.papers:[],
+    };
+  }
   class ReferenceIndexService{
-    constructor(options={}){this.content=options.content;this.organization=options.organization||global.KGContentOrganization||null;this.cache=null;this.builtAt=''}
-    questionBanks(){
-      const rows=[];try{for(let index=0;index<(global.localStorage?.length||0);index++){const key=global.localStorage.key(index);if(!String(key||'').startsWith('kg_question_banks_v1__'))continue;const parsed=JSON.parse(global.localStorage.getItem(key)||'[]');if(Array.isArray(parsed))parsed.forEach(bank=>rows.push({...bank,_storageKey:key}))}}catch(error){}return rows;
-    }
+    constructor(options={}){this.content=options.content;this.organization=options.organization||global.KGContentOrganization||null;this.referenceSnapshot=options.referenceSnapshot||{banks:[],papers:[],releases:[]};this.cache=null;this.builtAt=''}
+    questionBanks(){return Array.isArray(this.referenceSnapshot?.banks)?this.referenceSnapshot.banks:[]}
+    updateReferenceSnapshot(snapshot={}){this.referenceSnapshot={banks:[],papers:[],releases:[],...snapshot};this.invalidate();return this.referenceSnapshot}
     build(){
       const content=this.content,organization=this.organization;
-      const subjects=content?.getSubjects?.()||[],taxonomies=content?.getTaxonomies?.()||[],activities=Object.values(content?.getActivityLibrary?.()||{}),questionBanks=this.questionBanks(),drafts=content?.getCourseDrafts?.()||[],releases=content?.getCourseReleases?.()||[],papers=organization?.getPapers?.()||[],tasks=organization?.getLearningTasks?.()||[],collections=organization?.getCollections?.()||[];
+      const subjects=content?.getSubjects?.()||[],taxonomies=content?.getTaxonomies?.()||[],activities=Object.values(content?.getActivityLibrary?.()||{}),questionBanks=this.questionBanks(),drafts=content?.getCourseDrafts?.()||[],releases=content?.getCourseReleases?.()||[],papers=[...(organization?.getPapers?.()||[]),...(this.referenceSnapshot?.papers||[]),...(this.referenceSnapshot?.releases||[])],tasks=organization?.getLearningTasks?.()||[],collections=organization?.getCollections?.()||[];
       const nodeRefs={},activityRefs={},taxonomyRefs={},subjectRefs={};
       const ensure=(map,id)=>map[id]||(map[id]=[]);
       const pushUnique=(map,id,row)=>{if(!id)return;const rows=ensure(map,id),key=[row.kind,row.id,row.detail||'',row.source||'',row.version||''].join('|');if(!rows.some(item=>[item.kind,item.id,item.detail||'',item.source||'',item.version||''].join('|')===key))rows.push(row)};
@@ -56,5 +68,6 @@
     subjectUsage(subjectId){const references=this.referencesForSubject(subjectId),counts={};references.forEach(item=>{counts[item.kind]=(counts[item.kind]||0)+1});return {total:references.length,counts,references}}
     summary(){const data=this.ensure();return {builtAt:data.builtAt,subjects:data.subjects.length,taxonomies:data.taxonomies.length,nodes:data.taxonomies.reduce((sum,item)=>sum+(item.nodes||[]).length,0),activities:data.activities.length,questionBanks:data.questionBanks.length,formalQuestions:data.questionBanks.reduce((sum,item)=>sum+(item.questions||[]).length,0),courseDrafts:data.drafts.length,courseReleases:data.releases.length,papers:data.papers.length,tasks:data.tasks.length,collections:data.collections.length,subjectReferenceCount:Object.values(data.subjectRefs).reduce((sum,rows)=>sum+rows.length,0),nodeReferenceCount:Object.values(data.nodeRefs).reduce((sum,rows)=>sum+rows.length,0),activityReferenceCount:Object.values(data.activityRefs).reduce((sum,rows)=>sum+rows.length,0),taxonomyReferenceCount:Object.values(data.taxonomyRefs).reduce((sum,rows)=>sum+rows.length,0)}}
   }
+  ReferenceIndexService.loadReferenceSnapshot=loadReferenceSnapshot;
   global.KGReferenceIndexService=ReferenceIndexService;
 })(window);

@@ -32,12 +32,15 @@ const runtimePages = [
   'content-center.html',
   'content-prep.html',
   'course-admin.html',
-  'paper-management.html',
-  'question-bank.html',
   'teacher-workbench.html',
 ]
 
-const directAccountPages = ['user-management.html', 'system-settings.html']
+const directAccountPages = [
+  'user-management.html',
+  'system-settings.html',
+  'question-bank.html',
+  'paper-management.html',
+]
 
 test('runtime pages are an explicit minimal allowlist', () => {
   const policy = JSON.parse(readRepo('backend/app/web/runtime_page_policy.json'))

@@ -3,18 +3,17 @@
 /*
  * KGPaperReleaseApi —— 已发布试卷细粒度 API 适配器（P4.6 性能优化第 1 轮）。
  *
- * 取代通过 /api/v1/runtime/state 整包拉取 kg_exam_papers_published_v1（约 7.65MB）
- * 的旧链路：目录走 GET /api/v1/paper-releases/catalog 分页摘要（KB 级），
+ * 目录走 GET /api/v1/paper-releases/catalog 分页摘要（KB 级），
  * 题目按 release 走 GET /api/v1/paper-releases/{id}/questions 分页冻结快照，
  * 单响应受服务端 1MB 上限约束。
  *
- * - 目录在注入后立即预取，载入完成后广播 kg:published-papers-changed 与
- *   kg-app-storage-change（旧键名），让既有页面监听器失效缓存并重渲染。
+ * - 目录在注入后立即预取，载入完成后广播 kg:published-papers-changed。
  * - 题目按需拉取：同一 release 的题目分页串行（保序），不同 release 由调用方并发。
  * - 所有数据只进内存缓存，不写回 localStorage。
  */
 (function (global) {
   const API_ROOT = '/api/v1/paper-releases';
+  const DomainApi = global.KGDomainApi;
   const CATALOG_PAGE_SIZE = 100;
   const QUESTIONS_PAGE_SIZE = 50;
   const MODES = Object.freeze(['practice_mode', 'deep_recall', 'multi_question_canvas', 'single_deep_study']);
@@ -42,38 +41,29 @@
   }
 
   async function request(path, { method = 'GET', body } = {}) {
-    const headers = { accept: 'application/json' };
-    const options = { method, credentials: 'include', headers };
-    if (body !== undefined) {
-      headers['content-type'] = 'application/json';
-      options.body = JSON.stringify(body);
-    }
-    const response = await global.fetch(`${API_ROOT}${path}`, options);
-    if (response.status === 401) {
-      try { global.dispatchEvent(new CustomEvent('kg:auth-required')); } catch (error) {}
-      const authError = new Error('登录状态已失效，请重新登录。');
-      authError.status = 401;
-      throw authError;
-    }
-    if (response.status === 403) {
-      const forbidden = new Error('当前账号没有权限访问这份发布内容。');
-      forbidden.status = 403;
-      throw forbidden;
-    }
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const detail = payload?.detail;
-      const error = new Error(detail?.message || `发布试卷请求失败 (${response.status})`);
-      error.status = response.status;
-      error.code = detail?.code || `HTTP_${response.status}`;
+    if (!DomainApi?.request) throw new Error('试卷发布 API 未加载，请刷新页面后重试。');
+    try {
+      return await DomainApi.request({ method, path: `${API_ROOT}${path}`, body });
+    } catch (error) {
+      if (error?.status === 401) {
+        try { global.dispatchEvent(new CustomEvent('kg:auth-required')); } catch (dispatchError) {}
+      }
       throw error;
     }
-    return payload;
   }
 
-  async function publishPayload(payload) {
-    const response = await request('/publish-payload', { method: 'POST', body: payload });
+  async function publish(paperId, body) {
+    const id = text(paperId);
+    if (!id) throw new Error('请先选择试卷。');
+    const response = await request(`/papers/${encodeURIComponent(id)}/publish`, { method: 'POST', body });
     return clone(response?.release || null);
+  }
+
+  async function withdrawPaper(paperId) {
+    const id = text(paperId);
+    if (!id) throw new Error('请先选择试卷。');
+    const response = await request(`/papers/${encodeURIComponent(id)}/withdraw-all`, { method: 'POST' });
+    return Math.max(0, number(response?.withdrawn, 0));
   }
 
   function accessLevelOf(row) {
@@ -113,7 +103,6 @@
       accessPolicy: { accessLevel: accessLevelOf(row) },
       // 目录层没有题目引用与快照——按需通过 /questions 获取
       questions: [],
-      questionSnapshots: [],
       source: 'paper-release-api',
       current: true,
       availability: 'published',
@@ -135,12 +124,8 @@
   }
 
   function announceChange() {
-    // 与旧 runtime 键失效协议保持一致：59-repo / 60 / 77 / 86 监听这些事件重渲染
     try {
       global.dispatchEvent(new CustomEvent('kg:published-papers-changed', { detail: { source: 'paper-release-api' } }));
-      for (const key of ['kg_exam_papers_published_v1', 'kg_exam_paper_release_history_v1']) {
-        global.dispatchEvent(new CustomEvent('kg-app-storage-change', { detail: { key, value: null } }));
-      }
     } catch (error) {}
   }
 
@@ -345,7 +330,8 @@
     catalog,
     managementCatalog,
     mergeManagementPapers,
-    publishPayload,
+    publish,
+    withdrawPaper,
     findInCatalog,
     detail,
     fetchQuestions,

@@ -6,17 +6,7 @@
   const PaperDraftApi = window.KGPaperDraftApi;
   const PaperDataLoaderFactory = window.KGPaperManagementDataLoader;
   const CatalogEditor = window.KGQuestionCatalogEditController;
-  const Store=window.KGAppStorage||{};
-  const Keys=window.KGStorageKeys||{};
-  const STORAGE_PREFIX = Keys.PREFIXES?.QUESTION_BANK||'kg_question_banks_v1__';
-  const CURRENT_PREFIX = Keys.PREFIXES?.QUESTION_CURRENT||'kg_question_current_v1__';
-  const PAPER_CURRENT_PREFIX = Keys.PREFIXES?.EXAM_CURRENT||'kg_exam_current_v1__';
-  const PRINCIPLE_REPOSITORY_KEY = 'kg_principle_repository_v1';
-  const AUTH_SESSION_KEY = Keys.AUTH_CURRENT_USER||'kg_local_current_user_v1';
-  const DEEP_RECALL_KEY = Keys.DEEP_RECALL_CURRENT||'kg_deep_recall_current_question_v1';
-  const DEMO_SUPPRESSED_PREFIX = 'kg_question_bank_demo_suppressed_v1__';
-  const TAG_CONFIG_KEY = Keys.QUESTION_TAG_NAMES||'kg_question_tag_names_v1';
-  const ADMIN_AUDIT_KEY = Keys.ADMIN_AUDIT_LOG||'kg_admin_audit_log_v1';
+  const Preferences=window.KGDevicePreferences;
   const PAPER_WORKSPACE_LAYOUT_KEY = 'kg_paper_workspace_layout_v1';
   const QUESTION_LIBRARY_WORKSPACE_LAYOUT_KEY = 'kg_question_library_workspace_layout_v1';
   const DEMO_BANK_ID = 'bank-pmp-demo';
@@ -33,34 +23,21 @@
   const PAPER_MODE_IDS=PaperModePolicy.IDS||Object.freeze(['practice_mode','deep_recall','multi_question_canvas']);
   const PAPER_MODE_LABELS=PaperModePolicy.LABELS||Object.freeze({practice_mode:'刷题',deep_recall:'深度回忆',multi_question_canvas:'归纳'});
   const PAPER_MODE_CONFIG_VERSION=Number(PaperModePolicy.CONFIG_VERSION||2);
-  function readJSON(key,fallback=null){try{return Store.readJSON?Store.readJSON(key,fallback):JSON.parse(window.localStorage?.getItem(key)||'null')??fallback}catch(error){return fallback}}
-  function writeJSON(key,value){try{return Store.writeJSON?Store.writeJSON(key,value):(window.localStorage?.setItem(key,JSON.stringify(value)),true)}catch(error){return false}}
-  function readString(key,fallback=''){try{return Store.readString?Store.readString(key,fallback):(window.localStorage?.getItem(key)??fallback)}catch(error){return fallback}}
-  function writeString(key,value){try{return Store.writeString?Store.writeString(key,value):(window.localStorage?.setItem(key,String(value)),true)}catch(error){return false}}
-  function removeKey(key){try{return Store.remove?Store.remove(key):(window.localStorage?.removeItem(key),true)}catch(error){return false}}
+  function readPreference(key,fallback=null){try{return Preferences?.getJSON?.(key,fallback)??fallback}catch(error){return fallback}}
+  function writePreference(key,value){try{Preferences?.setJSON?.(key,value);return true}catch(error){return false}}
 
   const TeacherDomains=window.KGTeacherDomains||{};
   const Difficulty=window.KGDifficultyService||TeacherDomains.DifficultyService||{};
-  // Legacy/static compatibility contracts delegated to src/teacher modules:
-  // lifecycle status:'deleted'; audit actions question.safe_delete.bulk, question.restore.bulk,
-  // question.permanent_delete, question.knowledge.bulk_update, question.tags.bulk_set;
-  // permanent-delete guard reason business_reference_protected; published releases contain questionSnapshots.
+  // Lifecycle and audit compatibility contracts delegated to src/teacher modules.
   let domainServices=null;
   function teacherDomainServices(){
     if(domainServices)return domainServices;
     const Core=TeacherDomains.Core;
-    const audit=Core?.createAuditService?.({read:readJSON,write:writeJSON,key:ADMIN_AUDIT_KEY,actor:currentActor,limit:500})||null;
+    const audit=null;
     const transaction=Core?.createTransactionService?.({audit})||null;
     const batch=TeacherDomains.QuestionBank?.BatchOperationService?.create?.({audit,transaction})||null;
     const safeDelete=TeacherDomains.QuestionBank?.SafeDeleteService?.create?.({
-      storage:Store,read:key=>readJSON(key,null),
-      keys:()=>Store.keys?Store.keys():Array.from({length:window.localStorage?.length||0},(_,index)=>window.localStorage?.key(index)).filter(Boolean),
-      audit,actor:currentActor,prefixes:{}
-    })||null;
-    const paperAudit=TeacherDomains.PaperManagement?.PaperAuditService?.create?.({audit})||null;
-    const paperRelease=TeacherDomains.PaperManagement?.PaperReleaseService?.create?.({
-      questionLookup:paperQuestionLookup,categoryName:paperCategoryName,actor:currentActor,
-      readCatalog:()=>[],writeCatalog:()=>false,readHistory:()=>[],writeHistory:()=>false,audit:paperAudit
+      references:()=>({papers:state.papers,releases:window.KGPaperReleaseApi?.catalog?.()||[]}),audit,actor:currentActor
     })||null;
     const bankList=TeacherDomains.QuestionBank?.BankListController?.create?.({getBanks:()=>state.banks,pageSize:BANK_PAGE_SIZE})||null;
     const questionList=TeacherDomains.QuestionBank?.QuestionListController?.create?.({getQuestions:()=>currentBank()?.questions||[],pageSize:QUESTION_PAGE_SIZE,lifecycleMatch:(question,filter)=>questionMatchesLifecycle(question,filter),searchText:questionSearchText})||null;
@@ -72,7 +49,7 @@
     const classification=TeacherDomains.QuestionClassification||null;
     const questionEditorFactory=TeacherDomains.QuestionEditor||null;
     const paperEditorFactory=TeacherDomains.PaperManagement?.PaperEditorController||null;
-    domainServices={Core,audit,transaction,batch,safeDelete,paperAudit,paperRelease,bankList,questionList,paperList,paperPicker,training,questionPreview,paperPreview,classification,questionEditorFactory,paperEditorFactory};
+    domainServices={Core,audit,transaction,batch,safeDelete,bankList,questionList,paperList,paperPicker,training,questionPreview,paperPreview,classification,questionEditorFactory,paperEditorFactory};
     return domainServices;
   }
 
@@ -289,9 +266,8 @@
     return String(value || '').split(/[,，、;；|]/).map(x => x.trim()).filter(Boolean);
   }
   function canonicalTagName(value){
-    let current=String(value||'').trim();if(!current)return '';
-    try{const config=readJSON(TAG_CONFIG_KEY,{});const aliases=config?.aliases&&typeof config.aliases==='object'?config.aliases:{};const visited=new Set();while(aliases[current]&&!visited.has(current)){visited.add(current);current=String(aliases[current]||current).trim()||current}}catch(e){}
-    return current;
+    const current=String(value||'').trim();
+    return window.KGQuestionClassification?.canonicalTagName?.(current)||current;
   }
   function canonicalTags(value){return [...new Set(cleanList(value).map(canonicalTagName).filter(Boolean))]}
   function subjectMeta(id){
@@ -317,44 +293,23 @@
     };
   }
   function sessionScope(){
-    try{
-      const username = window.KGAuthCore?.currentUsername?.() || readString(AUTH_SESSION_KEY,'');
-      return username ? 'user__' + encodeURIComponent(username) : 'public';
-    }catch(e){
-      return 'public';
-    }
-  }
-  function banksKey(){
-    return STORAGE_PREFIX + sessionScope();
+    const username=window.KGAuthCore?.currentUsername?.();
+    return username?'user__'+encodeURIComponent(username):'public';
   }
   function currentUsername(){
-    try{return String(window.KGAuthCore?.currentUsername?.() || readString(AUTH_SESSION_KEY,'') || 'local-teacher')}catch(e){return 'local-teacher'}
+    try{return String(window.KGAuthCore?.currentUsername?.()||'')}catch(e){return ''}
   }
-  function currentKey(){
-    return CURRENT_PREFIX + sessionScope();
-  }
-  function currentPaperKey(){
-    return PAPER_CURRENT_PREFIX + sessionScope();
-  }
-  function demoSuppressedKey(){
-    return DEMO_SUPPRESSED_PREFIX + sessionScope();
-  }
+  let demoSuppressed=false;
   function isDemoSuppressed(){
-    try{
-      return readString(demoSuppressedKey(),'') === '1';
-    }catch(e){
-      return false;
-    }
+    return demoSuppressed;
   }
   function suppressDemoExample(){
-    try{
-      writeString(demoSuppressedKey(), '1');
-    }catch(e){}
+    demoSuppressed=true;
   }
   function scopeLabel(){
     const scope = sessionScope();
-    if(scope === 'public') return '当前空间：公共/未登录本地数据';
-    return '当前空间：' + decodeURIComponent(scope.replace(/^user__/, '')) + ' 的本地题库';
+    if(scope === 'public') return '当前空间：未登录';
+    return '当前空间：' + decodeURIComponent(scope.replace(/^user__/, '')) + ' 的服务器题库';
   }
 
   function difficultyValue(value){return Difficulty.normalize?.(value)||String(value||'')}
@@ -774,7 +729,9 @@
     const detail=snapshot.selectedPaper&&String(snapshot.selectedPaper.id||'')===String(snapshot.selectedPaperId||'')?snapshot.selectedPaper:null;
     state.papers=summaries.map((summary,index)=>normalizePaper(detail&&String(summary.id)===String(detail.id)?{...summary,...detail}:summary,index));
     state.paperCategories=(snapshot.categories||[]).map(normalizePaperCategory);
-    state.banks=ensureGlobalTeacherNumbers((snapshot.banks||[]).map((bank,index)=>normalizeBank({...bank,questions:[]},index)));
+    if(document.body?.dataset?.paperManagementPage==='true'){
+      state.banks=ensureGlobalTeacherNumbers((snapshot.banks||[]).map((bank,index)=>normalizeBank({...bank,questions:[]},index)));
+    }
     state.selectedPaperId=String(snapshot.selectedPaperId||'');
     state.paperDetailReady=!state.selectedPaperId||!!detail;
     state.paperDetailLoading=!!snapshot.paperLoading;
@@ -960,10 +917,7 @@
   }
   function paperPrincipleStats(subject,candidateRows=paperCandidates(subject)){
     const runtimeItems=PrincipleRepository.list?.({includeInactive:true});
-    const payload=readJSON(PRINCIPLE_REPOSITORY_KEY,{});
-    const storedItems=Array.isArray(runtimeItems)&&runtimeItems.length
-      ?runtimeItems
-      :(Array.isArray(payload?.items)?payload.items:[]);
+    const storedItems=Array.isArray(runtimeItems)?runtimeItems:[];
     const records=new Map();
     storedItems.forEach(item=>{const id=String(item?.id||'').trim();if(id)records.set(id,{id,name:String(item?.name||id),status:item?.status==='inactive'?'inactive':'active'})});
     (Array.isArray(candidateRows)?candidateRows:[]).forEach(row=>{
@@ -980,28 +934,25 @@
     });
     return active.map(item=>({id:String(item.id),name:String(item.name||item.id),count:linked.get(String(item.id))?.size||0}));
   }
-  function setCurrentPaper(paper){
-    try{
-      if(paper && paper.status === 'published') writeJSON(currentPaperKey(), {paperId:paper.id, index:0, savedAt:Date.now()});
-      else removeKey(currentPaperKey());
-    }catch(e){}
-  }
+  function setCurrentPaper(paper){return paper||null}
 
   function paperRefKey(ref){return String(ref?.bankId||'')+'::'+String(ref?.questionId||'')}
-  function buildPaperRelease(paper){
-    const response=teacherDomainServices().paperRelease?.build?.(paper);return response?.ok?response.value:null;
-  }
   // 发布/撤回以 /api/v1/paper-releases 为唯一权威源；草稿状态由 PaperDraftApi 重新加载。
   async function publishPaperRelease(paper){
-    const services=teacherDomainServices();
-    const built=services.paperRelease?.build?.(paper);
-    if(!built?.ok){console.warn('发布试卷失败',built?.errors||built);toast((built?.errors||['发布失败，请检查试卷内容。'])[0]);return null}
-    const release=built.value;
+    if(!window.KGPaperReleaseApi?.publish){toast('试卷发布 API 未加载，请刷新页面后重试。');return null}
+    if(!(paper?.questions||[]).length){toast('试卷至少需要一道题目。');return null}
+    if(!(paper?.enabledModes||[]).length){toast('请至少选择一种学习模式后再发布。');return null}
     try{
-      const published=await window.KGPaperReleaseApi?.publishPayload?.(release);
+      const published=await window.KGPaperReleaseApi.publish(paper.id,{
+        revision:Number(paper.revision),
+        accessLevel:paper.accessPolicy?.accessLevel==='member'?'member':'free',
+        enabledModes:[...paper.enabledModes],
+        allowedRoles:Array.isArray(paper.allowedRoles)&&paper.allowedRoles.length?[...paper.allowedRoles]:['student','viewer'],
+        metadata:{},
+      });
       if(!published)throw new Error('发布服务未返回版本信息。');
       window.dispatchEvent?.(new CustomEvent('kg:paper-release-published'));
-      return {...release,id:String(published.releaseId||published.id||release.id),releaseId:String(published.releaseId||published.id||release.id),version:Number(published.version||release.version)};
+      return published;
     }catch(error){
       console.warn('发布请求失败',error);
       toast(error?.message||'发布请求失败，请检查网络后重试。');
@@ -1009,15 +960,9 @@
     }
   }
   async function withdrawPaperRelease(paper){
+    if(!window.KGPaperReleaseApi?.withdrawPaper){toast('试卷发布 API 未加载，请刷新页面后重试。');return false}
     try{
-      const response=await fetch(`/api/v1/paper-releases/papers/${encodeURIComponent(String(paper?.id||''))}/withdraw-all`,{
-        method:'POST',credentials:'include'
-      });
-      if(!response.ok){
-        const detail=await response.json().catch(()=>({}));
-        toast(detail?.detail?.message||`取消发布失败（${response.status}）。`);
-        return false;
-      }
+      await window.KGPaperReleaseApi.withdrawPaper(paper?.id);
       window.dispatchEvent?.(new CustomEvent('kg:paper-release-published'));
     }catch(error){
       console.warn('撤回请求失败',error);
@@ -1265,18 +1210,6 @@
     return {banks:next, changed};
   }
 
-  function loadLegacyBanksForMigrationPreview(){
-    try{
-      const raw = readString(banksKey(),'');
-      const parsed = JSON.parse(raw || 'null');
-      if(Array.isArray(parsed) && parsed.length){
-        return ensureGlobalTeacherNumbers(parsed.map(normalizeBank));
-      }
-    }catch(e){
-      console.warn(e);
-    }
-    return [];
-  }
   function loadBanks(){
     if(Catalog){
       const snapshot=Catalog.snapshot();
@@ -1286,8 +1219,7 @@
         questions:questions.filter(question=>String(question.bankId)===String(bank.id))
       },index)));
     }
-    if(document.body?.dataset?.questionCatalogMigrationPreview==='true')return loadLegacyBanksForMigrationPreview();
-    console.warn('题目目录适配器未加载，正式题库不会读取 Runtime State 回退数据。');
+    console.warn('题目目录 API 未加载，请刷新页面后重试。');
     return [];
   }
   function saveBanks(nextBanks=state.banks, options={}){
@@ -1534,16 +1466,14 @@
         return;
       }
     }
-    if(!Catalog){
-      alert('题目目录服务未加载，请刷新页面后重试。');
-      return;
-    }
-    try{await Catalog.ready}catch(error){alert('题目目录加载失败：'+(error.message||error));return}
+    if(!Catalog){showApiStartupError('题目目录 API 未加载。');return}
+    if(!PaperDraftApi){showApiStartupError('试卷草稿 API 未加载。');return}
+    try{await Catalog.ready}catch(error){showApiStartupError('题目目录加载失败：'+(error.message||error));return}
     initStaticControls();
     initLibraryWorkspaceControls();
     state.banks = loadBanks();
     state.papers = [];
-    if(PaperDraftApi){try{await reloadPaperDrafts()}catch(error){console.warn('试卷引用目录加载失败',error)}}
+    try{await reloadPaperDrafts()}catch(error){showApiStartupError('试卷引用目录加载失败：'+(error.message||error));return}
     state.selectedBankId = state.banks[0]?.id || '';
     state.selectedQuestionId = state.banks[0]?.questions.find(question=>!isQuestionDeleted(question))?.id || '';
     if(isTrainingConfigurationStep()&&state.banks[0]?.subject)state.subjectFilter=state.banks[0].subject;
@@ -1575,11 +1505,12 @@
         return;
       }
     }
-    if(!Catalog){alert('题目目录服务未加载，请刷新页面后重试。');return}
-    if(!PaperDraftApi){alert('试卷草稿 API 未加载，请刷新页面后重试。');return}
-    if(!PaperDataLoaderFactory?.create){alert('试卷管理按需加载服务未加载，请刷新页面后重试。');return}
+    if(!Catalog){showApiStartupError('题目目录 API 未加载。');return}
+    if(!PaperDraftApi){showApiStartupError('试卷草稿 API 未加载。');return}
+    if(!window.KGPaperReleaseApi){showApiStartupError('试卷发布 API 未加载。');return}
+    if(!PaperDataLoaderFactory?.create){showApiStartupError('试卷管理按需加载服务未加载。');return}
     paperDataLoader=PaperDataLoaderFactory.create({paperApi:PaperDraftApi,catalogApi:Catalog,onChange:applyPaperManagementSnapshot});
-    try{await paperDataLoader.initialize({preferredPaperId:state.selectedPaperId})}catch(error){alert('试卷管理数据加载失败：'+(error.message||error));return}
+    try{await paperDataLoader.initialize({preferredPaperId:state.selectedPaperId})}catch(error){showApiStartupError('试卷管理数据加载失败：'+(error.message||error));return}
     const on=(id,event,handler)=>$(id)?.addEventListener(event,handler);
     on('qbAddPaperBtn','click',addPaper);on('qbSavePaperBtn','click',savePaperForm);on('qbBuildPaperBtn','click',buildCurrentPaper);on('qbPublishPaperBtn','click',togglePublishPaper);on('qbWithdrawPaperBtn','click',withdrawCurrentPaper);on('qbArchivePaperBtn','click',archiveCurrentPaper);on('qbUnarchivePaperBtn','click',unarchiveCurrentPaper);on('qbDeletePaperBtn','click',deleteCurrentPaper);on('qbExportPaperBtn','click',exportCurrentPaper);on('qbAutoQuotaBtn','click',autoDistributeQuota);on('qbClearQuotaBtn','click',clearPaperQuota);
     on('qbAddPaperCategoryBtn','click',addPaperCategory);on('qbPaperListSearch','input',event=>applyPaperCatalogFilter({search:String(event.currentTarget.value||'')}));on('qbPaperStatusFilter','change',event=>applyPaperCatalogFilter({status:String(event.currentTarget.value||'ALL')}));on('qbPaperListSelectPage','change',toggleSelectPaperPage);on('qbPaperBulkMoveCategoryBtn','click',moveSelectedPapersToCategory);on('qbPaperBulkArchiveBtn','click',archiveSelectedPapers);on('qbPaperBulkDeleteDraftBtn','click',deleteSelectedPaperDrafts);
@@ -2915,7 +2846,7 @@
     return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>';
   }
   function persistLibraryWorkspaceLayout(){
-    try{writeJSON(QUESTION_LIBRARY_WORKSPACE_LAYOUT_KEY,{ratio:state.libraryPaneRatio})}catch(error){}
+    writePreference(QUESTION_LIBRARY_WORKSPACE_LAYOUT_KEY,{ratio:state.libraryPaneRatio});
   }
   function applyLibraryPaneRatio(){
     const workbench=$('qbLibraryWorkbench'),banks=$('qbBankTabPanel'),questions=$('qbQuestionTabPanel'),splitter=$('qbLibrarySplitter');if(!workbench||!banks||!questions)return;
@@ -2935,7 +2866,7 @@
     requestAnimationFrame(applyLibraryPaneRatio);
   }
   function initLibraryWorkspaceControls(){
-    try{const saved=readJSON(QUESTION_LIBRARY_WORKSPACE_LAYOUT_KEY,{});if(Number(saved.ratio)>0)state.libraryPaneRatio=Math.min(.75,Math.max(.25,Number(saved.ratio)))}catch(error){}
+    try{const saved=readPreference(QUESTION_LIBRARY_WORKSPACE_LAYOUT_KEY,{});if(Number(saved.ratio)>0)state.libraryPaneRatio=Math.min(.75,Math.max(.25,Number(saved.ratio)))}catch(error){}
     document.querySelectorAll('[data-library-pane-action]').forEach(btn=>btn.addEventListener('click',()=>{const target=String(btn.dataset.libraryPaneTarget||''),action=String(btn.dataset.libraryPaneAction||'');if(action==='maximize')setLibraryWorkspaceMode(state.libraryWorkspaceMode===target+'-max'?'split':target+'-max');if(action==='collapse')setLibraryWorkspaceMode(state.libraryWorkspaceMode===target+'-collapsed'?'split':target+'-collapsed')}));
     const workbench=$('qbLibraryWorkbench'),splitter=$('qbLibrarySplitter');
     if(splitter&&workbench){
@@ -2991,7 +2922,7 @@
     return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>';
   }
   function persistPaperWorkspaceLayout(){
-    try{writeJSON(PAPER_WORKSPACE_LAYOUT_KEY,{ratio:state.paperPaneRatio})}catch(error){}
+    writePreference(PAPER_WORKSPACE_LAYOUT_KEY,{ratio:state.paperPaneRatio});
   }
   function applyPaperPaneRatio(){
     const workbench=$('pmQuestionWorkbench'),picker=$('pmQuestionPickerPane'),preview=$('pmPreviewPane'),splitter=$('pmPaneSplitter');if(!workbench||!picker||!preview)return;
@@ -3026,7 +2957,7 @@
   }
   function initPaperWorkspaceControls(){
     try{
-      const saved=readJSON(PAPER_WORKSPACE_LAYOUT_KEY,{});
+      const saved=readPreference(PAPER_WORKSPACE_LAYOUT_KEY,{});
       if(Number(saved.ratio)>0)state.paperPaneRatio=Math.min(.72,Math.max(.28,Number(saved.ratio)));
     }catch(error){}
     document.querySelectorAll('[data-pane-action]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -3223,8 +3154,7 @@
   function paperQuotaBucketLabel(mode,bucketId){
     if(mode==='principle'){
       const runtime=PrincipleRepository.get?.(bucketId);if(runtime?.name)return runtime.name;
-      const payload=readJSON(PRINCIPLE_REPOSITORY_KEY,{}),stored=Array.isArray(payload?.items)?payload.items.find(item=>String(item?.id||'')===String(bucketId)):null;
-      return stored?.name||bucketId;
+      return bucketId;
     }
     return bucketId;
   }
@@ -4014,9 +3944,8 @@
     const confirmed=confirm(`确定清除题库“${bank.name}”的测试答题记录吗？\n\n只会清除本题库题目的训练进度、深度回忆和答题事件，其他题库不会受影响。`);
     if(!confirmed)return;
     try{
-      const response=await fetch(`/api/v1/banks/${encodeURIComponent(bank.id)}/test-learning-records/clear`,{method:'POST',credentials:'include'});
-      let payload={};try{payload=await response.json()}catch(error){}
-      if(!response.ok)throw new Error(payload?.detail?.message||payload?.detail||'清除测试答题记录失败。');
+      if(!Catalog?.clearBankTestRecords)throw new Error('题库 API 未加载。');
+      const payload=await Catalog.clearBankTestRecords(bank.id);
       const cleared=payload?.cleared||{};
       const total=Number(cleared.trainingProgress||0)+Number(cleared.recallProgress||0)+Number(cleared.learningEvents||0);
       state.clearedTestRecordBankIds.add(bank.id);
@@ -4500,8 +4429,9 @@
       payloadQuestion.subject=payloadQuestion.subject||bank.subject||'PMP';
       // P4.5.32：教师预览无题库目录上下文，把本试卷内题序随 payload 带给深度回忆。
       payloadQuestion.questionOrder={index:(bank.questions||[]).findIndex(item=>String(item.id)===String(q.id||'')),total:(bank.questions||[]).length};
-      const payload={question:payloadQuestion,savedAt:Date.now(),source:'question-bank-admin-preview',previewMode:'teacher-draft',previewToken,sourceBankId:bank?.id||'',sourceQuestionId:q.id||'',userId:window.KGAuthCore?.currentUsername?.()||readString(AUTH_SESSION_KEY,'')||'guest'};
-      const saved=window.KGRecallStorage?.writeCurrent?window.KGRecallStorage.writeCurrent(payload):writeJSON(DEEP_RECALL_KEY,payload);
+      const payload={question:payloadQuestion,savedAt:Date.now(),source:'question-bank-admin-preview',previewMode:'teacher-draft',previewToken,sourceBankId:bank?.id||'',sourceQuestionId:q.id||'',userId:window.KGAuthCore?.currentUsername?.()||'guest'};
+      if(!window.KGRecallStorage?.writeCurrent)throw new Error('回忆预览 API 未加载');
+      const saved=window.KGRecallStorage.writeCurrent(payload);
       if(saved===false)throw new Error('预览数据写入失败');
       setRecallConfigSaveState('saved','已保存');
     }catch(e){alert('预览失败：'+(e.message||e));return}
@@ -4626,6 +4556,14 @@
     el.classList.add('show');
     clearTimeout(toast._timer);
     toast._timer = setTimeout(() => el.classList.remove('show'), 2200);
+  }
+  function showApiStartupError(message){
+    const host=document.querySelector('.qb-app')||document.body;
+    let panel=$('qbApiStartupError');
+    if(!panel){panel=document.createElement('section');panel.id='qbApiStartupError';panel.className='qb-empty';panel.setAttribute('role','alert');host.prepend(panel)}
+    panel.innerHTML=`<strong>${escapeHTML(message)}</strong><p>可以检查网络或重新登录后再试，当前页面不会使用本地数据回退。</p><button type="button" data-api-retry>重新加载</button>`;
+    panel.querySelector('[data-api-retry]')?.addEventListener('click',()=>window.location.reload());
+    return panel;
   }
   function clueTypeLabel(type){
     return ({
