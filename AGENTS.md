@@ -2,6 +2,14 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
+## 任务执行铁律（强制执行）
+
+- 接到任务先判断真正要解决的问题和最短可靠路径。
+- 优先复用现有文件，能局部修改就不要整套重写。
+- 修改前先检查相关文件，不要猜目录结构。
+- 只在当前工作区内写入，不安装无关依赖。
+- 完成后运行现有检查，并说明已验证和未验证的部分。
+
 ## 项目结构（当前）
 
 当前产品由 FastAPI 后端和原生 HTML/CSS/JavaScript 前端组成。FastAPI 同源提供 API 与 active release 静态页面；仓库中不再保留 React/Vite/iframe 前端或旧版 `legacy/` 工作副本。
