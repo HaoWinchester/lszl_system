@@ -281,7 +281,8 @@ test('a revision conflict reloads server state before retrying', () => {
 
 test('the original user-management service writes real backend accounts', () => {
   const adapter = readFileSync(resolve(frontendDir, 'scripts/new-legacy-assets/direct-admin-adapter.js'), 'utf8')
-  assert.match(adapter, /XMLHttpRequest/)
+  assert.match(adapter, /KGDomainApi/)
+  assert.doesNotMatch(adapter, /XMLHttpRequest/)
   assert.match(adapter, /\/api\/v1\/users/)
   assert.match(adapter, /canEnterUserManagement/)
   for (const action of ['createUser', 'updateUser', 'resetPassword', 'setStatus', 'duplicateUser', 'deleteUsers', 'batchUpdate', 'importUsers']) {

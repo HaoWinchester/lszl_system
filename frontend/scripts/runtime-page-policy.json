@@ -2,15 +2,12 @@
   "runtimePages": [
     "admin-console.html",
     "admin-operations.html",
-    "admin-settings.html",
     "admin-subjects.html",
     "content-center.html",
     "content-prep.html",
     "course-admin.html",
     "paper-management.html",
     "question-bank.html",
-    "system-settings.html",
-    "teacher-workbench.html",
-    "user-management.html"
+    "teacher-workbench.html"
   ]
 }

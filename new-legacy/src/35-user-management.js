@@ -8,18 +8,12 @@
     return;
   }
 
-  const USER_LOG_KEY=Auth.USER_LOG_KEY;
-  const STORE_KEY='通用知识点关系图谱工具_多科目重点聚焦版_v2';
-  const QUESTION_BANKS_PREFIX='kg_question_banks_v1__';
-  const QUESTION_PAPERS_PREFIX='kg_exam_papers_v1__';
   const $=id=>document.getElementById(id);
   const state={users:{},selected:'',query:'',roleFilter:'ALL',statusFilter:'ALL',selectedUsers:new Set(),visibleUsernames:[],activeRightTab:'actions',rightCollapsed:false,userToolsExpanded:false,userPage:1,userPageSize:20};
 
   const cleanUsername=value=>Auth.cleanUsername(value);
   const escapeHTML=value=>Auth.escapeHTML(value);
   const fmtTime=value=>Auth.fmtTime(value);
-  const readJSON=(key,fallback)=>Auth.readJSON(key,fallback);
-  const writeJSON=(key,value)=>Auth.writeJSON(key,value);
   const logAction=(action,username,detail='')=>Auth.logAction(action,username,detail);
 
   function refreshAuthDependentUi(){
@@ -34,10 +28,13 @@
     if(window.KGGlobalShortcuts&&typeof window.KGGlobalShortcuts.render==='function')window.KGGlobalShortcuts.render();
     if(window.KGUserCenter&&typeof window.KGUserCenter.refresh==='function')window.KGUserCenter.refresh();
   }
-  function loadUsers(){
-    state.users=UserService.loadUsers();
+  async function loadUsers(){
+    const result=await UserService.loadUsers(state.users);
+    if(!result?.ok){toast(result?.message||'用户列表加载失败，已保留当前显示');return false}
+    state.users=result.users;
     UserService.persist(state.users,{silent:true});
     if(!state.selected || !state.users[state.selected]) state.selected=Object.keys(state.users)[0]||'';
+    return true;
   }
   function saveUsers(renderAfter=true,options={}){
     const result=UserService.persist(state.users,{
@@ -53,20 +50,12 @@
     if(renderAfter)render();
     return true;
   }
-  function userQuestionScope(username){return 'user__'+encodeURIComponent(username)}
-  function graphKey(username){return STORE_KEY+'__user__'+encodeURIComponent(String(username||'').trim().toLowerCase())}
   function userDataStats(username){
-    const graph=readJSON(graphKey(username),null);
-    const banks=readJSON(QUESTION_BANKS_PREFIX+userQuestionScope(username),[]);
-    const papers=readJSON(QUESTION_PAPERS_PREFIX+userQuestionScope(username),[]);
-    const questionCount=Array.isArray(banks)?banks.reduce((sum,b)=>sum+(Array.isArray(b.questions)?b.questions.length:0),0):0;
+    const user=state.users[username]||{};
     return {
-      graphNodes: graph&&Array.isArray(graph.nodes)?graph.nodes.length:0,
-      graphLinks: graph&&Array.isArray(graph.links)?graph.links.length:0,
-      banks: Array.isArray(banks)?banks.length:0,
-      questions: questionCount,
-      papers: Array.isArray(papers)?papers.length:0,
-      hasGraph: !!graph
+      graphNodes:Number(user.graphNodes||0),graphLinks:Number(user.graphLinks||0),
+      banks:Number(user.questionBanks||0),questions:Number(user.questionCount||0),
+      papers:Number(user.questionPapers||0),hasGraph:Number(user.graphNodes||0)>0
     };
   }
   function roleLabel(role){return window.KGRolePermissions?window.KGRolePermissions.roleLabel(role):({admin:'管理员',teacher:'教师/教研',student:'学员',viewer:'游客'}[role]||role||'学员')}
@@ -262,7 +251,7 @@
       </div>`;
   }
   function renderLogs(){
-    const logs=readJSON(USER_LOG_KEY,[]).slice(0,60);
+    const logs=(Auth.adminLogs?.()||[]).slice(0,60);
     if(!logs.length){$('umLogList').innerHTML='<div class="um-empty">暂无操作日志。</div>';return}
     $('umLogList').innerHTML=logs.map(log=>`<div class="um-log-item"><strong>${escapeHTML(log.action)} · ${escapeHTML(log.username||'系统')}</strong><span>${fmtTime(log.at)} · 操作者：${escapeHTML(log.actor||'local-admin')}</span>${log.detail?`<span>${escapeHTML(log.detail)}</span>`:''}</div>`).join('');
   }
@@ -308,14 +297,14 @@
       <button type="button" class="danger" data-sub-action="pause">停用订阅</button>
     </div>`;
   }
-  function saveSubscriptionExact(){
+  async function saveSubscriptionExact(){
     const username=state.selected;if(!username||!state.users[username])return;
     const sub=subApi();if(!sub||typeof sub.setStudentSubscription!=='function'){toast('订阅模块未加载');return}
     if((state.users[username].role||'student')!=='student'){toast('仅学员角色需要订阅');return}
     const planId=$('umSubPlan')?.value||'free';
     const startedAt=dateInputToTime($('umSubStart')?.value,false)||Date.now();
     const expiresAt=dateInputToTime($('umSubExpires')?.value,true);
-    const record=sub.setStudentSubscription(username,{
+    try{const record=await sub.setStudentSubscription(username,{
       planId,
       status:$('umSubStatus')?.value||'active',
       startedAt,
@@ -324,33 +313,33 @@
       note:$('umSubNote')?.value.trim()||''
     });
     logAction('保存学员订阅',username,`${sub.planById(record.planId).name} · ${sub.statusLabel(record.status)}`);
-    refreshAuthDependentUi();renderForm();toast('学员订阅已保存');
+    refreshAuthDependentUi();renderForm();toast('学员订阅已保存');}catch(error){toast(error?.message||'订阅保存失败，请重试')}
   }
-  function renewSubscription(){
+  async function renewSubscription(){
     const username=state.selected;if(!username||!state.users[username])return;
     const sub=subApi();if(!sub||typeof sub.renewStudentSubscription!=='function'){toast('订阅模块未加载');return}
     if((state.users[username].role||'student')!=='student'){toast('仅学员角色需要订阅');return}
     const planId=$('umSubPlan')?.value||'monthly';
     const note=$('umSubNote')?.value.trim()||'管理员手动开通/续期';
-    const record=sub.renewStudentSubscription(username,planId,{extend:true,note,source:'manual'});
+    try{const record=await sub.renewStudentSubscription(username,planId,{extend:true,note,source:'manual'});
     logAction('开通/续期学员订阅',username,`${sub.planById(record.planId).name} · 到期 ${record.expiresAt?fmtTime(record.expiresAt):'永久有效'}`);
-    refreshAuthDependentUi();renderForm();toast('已按套餐开通/续期');
+    refreshAuthDependentUi();renderForm();toast('已按套餐开通/续期');}catch(error){toast(error?.message||'订阅开通失败，请重试')}
   }
-  function pauseSubscription(){
+  async function pauseSubscription(){
     const username=state.selected;if(!username||!state.users[username])return;
     const sub=subApi();if(!sub||typeof sub.pauseStudentSubscription!=='function'){toast('订阅模块未加载');return}
     const note=$('umSubNote')?.value.trim()||'管理员手动停用';
-    sub.pauseStudentSubscription(username,note);
+    try{await sub.pauseStudentSubscription(username,note);
     logAction('停用学员订阅',username,note);
-    refreshAuthDependentUi();renderForm();toast('订阅已停用');
+    refreshAuthDependentUi();renderForm();toast('订阅已停用');}catch(error){toast(error?.message||'订阅停用失败，请重试')}
   }
-  function freeSubscription(){
+  async function freeSubscription(){
     const username=state.selected;if(!username||!state.users[username])return;
     const sub=subApi();if(!sub||typeof sub.activateFreeSubscription!=='function'){toast('订阅模块未加载');return}
     const note=$('umSubNote')?.value.trim()||'管理员设置为免费学员';
-    sub.activateFreeSubscription(username,note);
+    try{await sub.activateFreeSubscription(username,note);
     logAction('设置免费学员订阅',username,note);
-    refreshAuthDependentUi();renderForm();toast('已设为免费学员');
+    refreshAuthDependentUi();renderForm();toast('已设为免费学员');}catch(error){toast(error?.message||'订阅设置失败，请重试')}
   }
 
   function renderPermissionMatrix(){
@@ -389,12 +378,12 @@
     if(options.toast)toast(options.toast);
     return true;
   }
-  function addUser(){
+  async function addUser(){
     const username=cleanUsername(prompt('请输入新用户名（至少 2 个字符）：')||'');
     if(username.length<2){toast('用户名至少 2 个字符');return}
     if(state.users[username]){toast('该用户名已存在');return}
     const password=prompt('请输入初始密码（至少 4 个字符）：')||'';
-    const result=UserService.createUser(state.users,{username,password,user:{role:'student',status:'active',subject:'PMP',source:'user-management'}});
+    const result=await UserService.createUser(state.users,{username,password,user:{role:'student',status:'active',subject:'PMP',source:'user-management'}});
     applyServiceResult(result,{
       selected:result&&result.username?result.username:state.selected,
       detail:{action:'create',username},
@@ -402,11 +391,11 @@
       toast:'已创建用户'
     });
   }
-  function saveSelected(e){
+  async function saveSelected(e){
     if(e)e.preventDefault();
     const username=state.selected;if(!username)return;
     const patch=collectForm();if(!patch)return;
-    const result=UserService.updateUser(state.users,username,patch);
+    const result=await UserService.updateUser(state.users,username,patch);
     applyServiceResult(result,{
       selected:username,
       detail:{action:'update',username},
@@ -414,11 +403,11 @@
       toast:'已保存用户资料'
     });
   }
-  function resetPassword(){
+  async function resetPassword(){
     const username=state.selected;if(!username)return;
     const password=prompt(`请输入 ${username} 的新密码（至少 4 个字符）：`);
     if(password===null)return;
-    const result=UserService.resetPassword(state.users,username,password);
+    const result=await UserService.resetPassword(state.users,username,password);
     applyServiceResult(result,{
       selected:username,
       detail:{action:'reset-password',username},
@@ -426,9 +415,9 @@
       toast:'密码已重置'
     });
   }
-  function setStatus(status){
+  async function setStatus(status){
     const username=state.selected;if(!username)return;
-    const result=UserService.setStatus(state.users,username,status);
+    const result=await UserService.setStatus(state.users,username,status);
     applyServiceResult(result,{
       selected:username,
       detail:{action:'set-status',username,status},
@@ -436,12 +425,12 @@
       toast:`已设置为：${statusLabel(status)}`
     });
   }
-  function deleteUser(){
+  async function deleteUser(){
     const username=state.selected;if(!username)return;
     if(!confirm(`确认删除账号“${username}”？
 
 这会移除账号资料，但不会主动清除该用户的本地图谱/题库数据。`))return;
-    const result=UserService.deleteUsers(state.users,[username]);
+    const result=await UserService.deleteUsers(state.users,[username]);
     const nextSelected=result&&result.ok?Object.keys(result.users)[0]||'':state.selected;
     applyServiceResult(result,{
       selected:nextSelected,
@@ -450,12 +439,12 @@
       toast:'账号已删除'
     });
   }
-  function duplicateUser(){
+  async function duplicateUser(){
     const username=state.selected;if(!username)return;
     const next=cleanUsername(prompt('请输入复制后的新用户名：',username+'_copy')||'');
     if(next.length<2||state.users[next]){toast('用户名无效或已存在');return}
     const password=prompt('请输入新用户初始密码（至少 4 个字符）：')||'';
-    const result=UserService.duplicateUser(state.users,username,{username:next,password});
+    const result=await UserService.duplicateUser(state.users,username,{username:next,password});
     applyServiceResult(result,{
       selected:result&&result.username?result.username:state.selected,
       detail:{action:'duplicate',username:next,sourceUsername:username},
@@ -475,7 +464,7 @@
     logAction(action,target||'ALL',`导出 ${Object.keys(payload.users||{}).length} 个用户`);
     toast('已导出 JSON');
   }
-  function batchApply(){
+  async function batchApply(){
     const names=selectedUsernames();
     if(!names.length){toast('请先勾选用户');return}
     const role=$('umBatchRoleSelect')?$('umBatchRoleSelect').value:'KEEP';
@@ -483,7 +472,7 @@
     const subject=$('umBatchSubjectSelect')?$('umBatchSubjectSelect').value:'KEEP';
     if(role==='KEEP'&&status==='KEEP'&&subject==='KEEP'){toast('请选择要批量调整的字段');return}
     if(!confirm(`确认批量调整 ${names.length} 个用户？`))return;
-    const result=UserService.batchUpdate(state.users,names,{role,status,subject});
+    const result=await UserService.batchUpdate(state.users,names,{role,status,subject});
     applyServiceResult(result,{
       detail:{action:'batch-update',usernames:names,role,status,subject},
       log:{action:'批量调整用户',username:'MULTI',detail:`影响 ${names.length} 人；角色=${role}；状态=${status}；科目=${subject}`},
@@ -501,13 +490,13 @@
     renderUserList();
     toast('已清除批量选择');
   }
-  function deleteBatchUsers(){
+  async function deleteBatchUsers(){
     const names=selectedUsernames();
     if(!names.length){toast('请先勾选用户');return}
     if(!confirm(`确认删除所选 ${names.length} 个账号？
 
 这会移除账号资料，但不会主动清除这些用户的本地图谱/题库数据。`))return;
-    const result=UserService.deleteUsers(state.users,names);
+    const result=await UserService.deleteUsers(state.users,names);
     const nextSelected=result&&result.ok&&result.users[state.selected]?state.selected:(result&&result.ok?Object.keys(result.users)[0]||'':state.selected);
     state.selectedUsers.clear();
     applyServiceResult(result,{
@@ -551,7 +540,7 @@
     if(!file)return;
     try{
       const payload=JSON.parse(await file.text());
-      const result=UserService.importUsers(state.users,payload,{overwrite:true});
+      const result=await UserService.importUsers(state.users,payload,{overwrite:true});
       const selected=result&&result.ok&&result.users[state.selected]?state.selected:(result&&result.ok?Object.keys(result.users)[0]||'':state.selected);
       applyServiceResult(result,{
         selected,
@@ -567,7 +556,7 @@
     }
   }
   function bindEvents(){
-    $('umAddUserBtn').onclick=addUser;$('umRefreshBtn').onclick=()=>{loadUsers();render();toast('已刷新')};$('umUserForm').addEventListener('submit',saveSelected);$('umResetPasswordBtn').onclick=resetPassword;$('umArchiveUserBtn').onclick=()=>setStatus('archived');$('umRestoreUserBtn').onclick=()=>setStatus('active');$('umDeleteUserBtn').onclick=deleteUser;$('umSetActiveBtn').onclick=()=>setStatus('active');$('umSetPausedBtn').onclick=()=>setStatus('paused');$('umDuplicateUserBtn').onclick=duplicateUser;$('umExportBtn').onclick=()=>exportData(false);$('umExportSelectedBtn').onclick=()=>exportData(true);$('umImportBtn').onclick=()=>$('umImportFile').click();$('umImportFile').onchange=e=>importUsers(e.target.files&&e.target.files[0]);$('umClearLogsBtn').onclick=()=>{if(confirm('确认清空操作日志？')){writeJSON(USER_LOG_KEY,[]);renderLogs();toast('日志已清空')}};
+    $('umAddUserBtn').onclick=addUser;$('umRefreshBtn').onclick=async()=>{if(await loadUsers()){render();toast('已刷新')}};$('umUserForm').addEventListener('submit',saveSelected);$('umResetPasswordBtn').onclick=resetPassword;$('umArchiveUserBtn').onclick=()=>setStatus('archived');$('umRestoreUserBtn').onclick=()=>setStatus('active');$('umDeleteUserBtn').onclick=deleteUser;$('umSetActiveBtn').onclick=()=>setStatus('active');$('umSetPausedBtn').onclick=()=>setStatus('paused');$('umDuplicateUserBtn').onclick=duplicateUser;$('umExportBtn').onclick=()=>exportData(false);$('umExportSelectedBtn').onclick=()=>exportData(true);$('umImportBtn').onclick=()=>$('umImportFile').click();$('umImportFile').onchange=e=>importUsers(e.target.files&&e.target.files[0]);$('umClearLogsBtn').onclick=async()=>{if(confirm('确认清空操作日志？')){try{await window.KGSystemDomain?.clearAdminLogs?.();renderLogs();toast('日志已清空')}catch(error){toast(error?.message||'日志清空失败')}}};
     const listToolsToggle=$('umListToolsToggle');if(listToolsToggle)listToolsToggle.onclick=()=>{state.userToolsExpanded=!state.userToolsExpanded;renderUserToolsState(filteredUsers().length)};
     $('umSearchInput').oninput=e=>{state.query=e.target.value;state.userPage=1;renderUserList()};$('umRoleFilter').onchange=e=>{state.roleFilter=e.target.value;state.userPage=1;renderUserList()};$('umStatusFilter').onchange=e=>{state.statusFilter=e.target.value;state.userPage=1;renderUserList()};
     const selectAll=$('umSelectAllUsers');if(selectAll)selectAll.onchange=e=>toggleSelectAllVisible(e.target.checked);
@@ -625,5 +614,6 @@
   }
   window.addEventListener('kg-subscription-change',()=>{if(state.selected)renderForm()});
   window.addEventListener('kg-subscription-plan-change',()=>{if(state.selected)renderForm()});
-  bindEvents();loadUsers();render();
+  bindEvents();
+  (async()=>{await window.KGSystemDomain?.ready;await loadUsers();render()})().catch(error=>{console.error('[UserManagement] initial load failed',error);toast(error?.message||'用户管理加载失败')});
 })();

@@ -27,17 +27,16 @@ const learnerPages = [
 const runtimePages = [
   'admin-console.html',
   'admin-operations.html',
-  'admin-settings.html',
   'admin-subjects.html',
   'content-center.html',
   'content-prep.html',
   'course-admin.html',
   'paper-management.html',
   'question-bank.html',
-  'system-settings.html',
   'teacher-workbench.html',
-  'user-management.html',
 ]
+
+const directAccountPages = ['user-management.html', 'system-settings.html', 'admin-settings.html']
 
 test('runtime pages are an explicit minimal allowlist', () => {
   const policy = JSON.parse(readRepo('backend/app/web/runtime_page_policy.json'))
@@ -47,12 +46,12 @@ test('runtime pages are an explicit minimal allowlist', () => {
   for (const page of learnerPages) assert.equal(policy.runtimePages.includes(page), false, page)
 })
 
-test('learner pages keep direct auth bootstrap without loading the legacy runtime', () => {
+test('direct pages keep auth bootstrap without loading the legacy runtime', () => {
   const directEntry = readRepo('frontend/scripts/new-legacy-assets/direct-entry.js')
   assert.match(directEntry, /__KG_DIRECT_BOOTSTRAP__/)
   assert.match(directEntry, /authenticated[,\s]/)
   assert.match(directEntry, /authUser:/)
-  for (const page of learnerPages) {
+  for (const page of [...learnerPages, ...directAccountPages]) {
     const html = readGenerated(page)
     assert.match(html, /kg-direct-bootstrap-anchor/, `${page} must expose the direct bootstrap anchor`)
     assert.doesNotMatch(html, /server-state-bootstrap\.js/, `${page} must not load legacy runtime`)

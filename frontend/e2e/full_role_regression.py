@@ -31,7 +31,7 @@ ACCOUNT_ROLES = {
 def login(context: BrowserContext, username: str, password: str = PASSWORD) -> None:
     response = context.request.post(
         f"{BASE}/api/v1/auth/login",
-        data={"username": username, "password": password},
+        data={"username": username, "password": password, "acceptedTermsVersion": "2026-08-13-v1"},
     )
     assert response.ok, (username, response.status, response.text())
 
@@ -50,11 +50,12 @@ def ensure_test_accounts(browser: Browser) -> None:
         for username, password in (
             (ACCOUNTS["admin"], PASSWORD),
             ("佩奇007", PASSWORD),
+            ("admin", "admin123"),
             ("admin", "jbgsnmm~123"),
         ):
             login_response = context.request.post(
                 f"{BASE}/api/v1/auth/login",
-                data={"username": username, "password": password},
+                data={"username": username, "password": password, "acceptedTermsVersion": "2026-08-13-v1"},
             )
             if not login_response.ok:
                 continue
@@ -493,6 +494,148 @@ def user_admin_regression(browser: Browser) -> None:
         context.close()
 
 
+def _record_requests(page: Page, requested: list[str]) -> None:
+    page.on("request", lambda request: requested.append(request.url))
+
+
+def _assert_no_runtime_requests(requested: list[str]) -> None:
+    offenders = [url for url in requested if "/api/v1/runtime/" in url]
+    assert offenders == [], offenders
+
+
+def account_system_cutover_regression(
+    browser: Browser,
+    pages: list[str],
+    *,
+    assert_no_runtime: bool,
+) -> None:
+    selectors = {
+        "user-management.html": "#umUserList",
+        "system-settings.html": "#ssRoleThemePanel",
+        "admin-settings.html": "#adminRepositoryHealth",
+    }
+    assert set(pages).issubset(selectors), pages
+
+    # Admin success plus persisted save/reload behavior.
+    admin = context_for(browser, ACCOUNTS["admin"])
+    try:
+        for filename in pages:
+            requested: list[str] = []
+            page = admin.new_page()
+            _record_requests(page, requested)
+            try:
+                page.goto(f"{BASE}/{filename}", wait_until="networkidle")
+                page.locator(selectors[filename]).wait_for(state="visible")
+                if filename == "user-management.html":
+                    page.locator(".um-user-item").first.wait_for(state="visible")
+                elif filename == "system-settings.html":
+                    card = page.locator('[data-theme-role="admin"]')
+                    card.wait_for(state="visible")
+                    expected = card.locator('[data-theme-field="primary"]').input_value()
+                    with page.expect_response(
+                        lambda response: "/api/v1/system/themes/admin" in response.url
+                        and response.request.method == "PUT"
+                    ) as saved:
+                        card.locator('[data-save-theme="admin"]').click()
+                    assert saved.value.ok, saved.value.text()
+                    page.reload(wait_until="networkidle")
+                    assert page.locator('[data-theme-role="admin"] [data-theme-field="primary"]').input_value() == expected
+                else:
+                    page.locator("#adminHealthBtn").click()
+                    page.locator("#adminRepositoryHealth").filter(has_text="正常").wait_for(state="visible")
+                if assert_no_runtime:
+                    _assert_no_runtime_requests(requested)
+            finally:
+                page.close()
+    finally:
+        admin.close()
+
+    # Every non-admin role is denied before protected controls can be used.
+    for account_key in ("teacher", "student_basic", "viewer"):
+        context = context_for(browser, ACCOUNTS[account_key])
+        try:
+            for filename in pages:
+                requested: list[str] = []
+                page_errors: list[str] = []
+                page = context.new_page()
+                _record_requests(page, requested)
+                page.on("pageerror", lambda error: page_errors.append(str(error)))
+                try:
+                    print(f"full-role: denial {account_key} {filename}", flush=True)
+                    page.goto(f"{BASE}/{filename}", wait_until="networkidle")
+                    body = page.locator("body")
+                    body.get_by_text("无权访问", exact=False).first.wait_for(state="visible", timeout=8_000)
+                    denied_text = body.inner_text()
+                    assert "无权访问" in denied_text or "暂无访问权限" in denied_text, (
+                        account_key, filename, page_errors, denied_text[:1000]
+                    )
+                    if assert_no_runtime:
+                        _assert_no_runtime_requests(requested)
+                finally:
+                    page.close()
+        finally:
+            context.close()
+
+    # A failed request leaves a recoverable page; retry/reload succeeds once the API returns.
+    failure_targets = {
+        "user-management.html": "**/api/v1/users?*",
+        "system-settings.html": "**/api/v1/system/themes",
+        "admin-settings.html": "**/api/v1/health",
+    }
+    for filename in pages:
+        context = context_for(browser, ACCOUNTS["admin"])
+        requested: list[str] = []
+        page = context.new_page()
+        _record_requests(page, requested)
+        route_pattern = failure_targets[filename]
+        failed_once = {"value": False}
+
+        def fail_first(route):
+            if not failed_once["value"]:
+                failed_once["value"] = True
+                route.fulfill(status=503, content_type="application/json", body='{"detail":"E2E forced failure"}')
+            else:
+                route.continue_()
+
+        page.route(route_pattern, fail_first)
+        try:
+            page.goto(f"{BASE}/{filename}", wait_until="networkidle")
+            assert failed_once["value"], (filename, requested)
+            if filename == "admin-settings.html":
+                assert "失败" in page.locator("#adminRepositoryHealth").inner_text()
+            page.unroute(route_pattern, fail_first)
+            page.reload(wait_until="networkidle")
+            page.locator(selectors[filename]).wait_for(state="visible")
+            if filename == "user-management.html":
+                page.locator(".um-user-item").first.wait_for(state="visible")
+            if assert_no_runtime:
+                _assert_no_runtime_requests(requested)
+        finally:
+            page.close()
+            context.close()
+
+    # Login establishes access and the visible account menu performs a real backend logout.
+    if "admin-settings.html" in pages:
+        context = browser.new_context(viewport={"width": 1440, "height": 1000})
+        requested: list[str] = []
+        page = context.new_page()
+        _record_requests(page, requested)
+        try:
+            page.goto(f"{BASE}/admin-settings.html", wait_until="networkidle")
+            page.get_by_text("无权访问", exact=False).first.wait_for(state="visible")
+            login(context, ACCOUNTS["admin"])
+            page.reload(wait_until="networkidle")
+            page.locator("#adminAccountTrigger").click()
+            with page.expect_response(lambda response: "/api/v1/auth/logout" in response.url) as logout_response:
+                page.locator("#adminAccountLogoutBtn").click()
+            assert logout_response.value.ok
+            page.wait_for_url("**/index.html")
+            if assert_no_runtime:
+                _assert_no_runtime_requests(requested)
+        finally:
+            context.close()
+
+
 GROUPS = {
     "graph": graph_regression,
     "questions": question_regression,
@@ -504,11 +647,18 @@ GROUPS = {
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--group", choices=["all", *GROUPS], default="all")
+    parser.add_argument("--pages", help="comma-separated account/system page filenames")
+    parser.add_argument("--assert-no-runtime", action="store_true")
     args = parser.parse_args()
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
         try:
             ensure_test_accounts(browser)
+            if args.pages:
+                pages = [item.strip() for item in args.pages.split(",") if item.strip()]
+                account_system_cutover_regression(browser, pages, assert_no_runtime=args.assert_no_runtime)
+                print("full-role: account-system-cutover PASS", flush=True)
+                return
             selected = GROUPS.items() if args.group == "all" else [(args.group, GROUPS[args.group])]
             for name, regression in selected:
                 print(f"full-role: {name} start", flush=True)

@@ -2,38 +2,16 @@
 
 /*
  * 用户中心：当前登录用户自助维护个人资料。
- * 说明：仍然基于 localStorage；正式网络版接入后端后，应改为服务端接口保存。
+ * 资料保存通过认证 API 完成，页面只使用认证核心的内存副本。
  */
 (function(){
-  const AUTH_USERS_KEY="kg_local_users_v1";
-  const AUTH_SESSION_KEY="kg_local_current_user_v1";
-  const USER_LOG_KEY="kg_user_admin_logs_v1";
   const ACTIVE_PAID_MEMBERSHIP_STATUSES=new Set(["active","trial","manual"]);
-  const Store=window.KGAppStorage||{};
 
   const $=id=>document.getElementById(id);
   function escapeHTML(value){
     return String(value == null ? "" : value).replace(/[&<>\'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\'":"&#39;",'"':"&quot;"}[c]));
   }
   const authCore=()=>window.KGAuthCore||null;
-  function readJSON(key,fallback){
-    const core=authCore();
-    if(core&&typeof core.readJSON==="function")return core.readJSON(key,fallback);
-    if(Store.readJSON)return Store.readJSON(key,fallback);
-    try{
-      const raw=localStorage.getItem(key);
-      if(!raw)return fallback;
-      const parsed=JSON.parse(raw);
-      return parsed==null?fallback:parsed;
-    }catch(e){return fallback}
-  }
-  function writeJSON(key,value){
-    const core=authCore();
-    if(core&&typeof core.writeJSON==="function")return core.writeJSON(key,value);
-    if(Store.writeJSON)return Store.writeJSON(key,value);
-    localStorage.setItem(key,JSON.stringify(value));
-    return true;
-  }
   function makeSalt(){
     const core=authCore();
     return core&&typeof core.makeSalt==="function"?core.makeSalt():Math.random().toString(36).slice(2)+Date.now().toString(36);
@@ -402,22 +380,16 @@
 
   function currentUsername(){
     const core=authCore();
-    if(core&&typeof core.currentUsername==="function")return core.currentUsername();
-    try{return cleanUsername(Store.readString?Store.readString(AUTH_SESSION_KEY,""):localStorage.getItem(AUTH_SESSION_KEY)||"")}catch(e){return ""}
+    return core&&typeof core.currentUsername==="function"?core.currentUsername():"";
   }
   function users(){
     const core=authCore();
-    if(core&&typeof core.users==="function")return core.users();
-    return readJSON(AUTH_USERS_KEY,{}) || {};
+    return core&&typeof core.users==="function"?core.users():{};
   }
   function saveUser(username,patch){
     const core=authCore();
     if(core&&typeof core.upsertUser==="function")return core.upsertUser(username,patch);
-    const map=users();
-    map[username]={...(map[username]||{}),...patch,username,updatedAt:Date.now()};
-    writeJSON(AUTH_USERS_KEY,map);
-    window.dispatchEvent(new CustomEvent("kg-auth-users-change",{detail:{username,user:map[username]}}));
-    return map[username];
+    return null;
   }
   function currentRecord(){
     const username=currentUsername();
@@ -433,11 +405,7 @@
   function logAction(action,username,detail=""){
     const core=authCore();
     if(core&&typeof core.logAction==="function")return core.logAction(action,username,detail);
-    try{
-      const logs=readJSON(USER_LOG_KEY,[]);
-      logs.unshift({id:Math.random().toString(36).slice(2),action,username,detail:String(detail||""),actor:username||"self",at:Date.now()});
-      writeJSON(USER_LOG_KEY,logs.slice(0,300));
-    }catch(e){}
+    return null;
   }
   function showStatus(message){
     if(typeof window.showStatus==="function")window.showStatus(message);
@@ -665,11 +633,6 @@
     window.addEventListener("kg-subscription-change",()=>{if($("userCenterModal")&&$("userCenterModal").classList.contains("show"))fillForm()});
     window.addEventListener("kg-subscription-plan-change",()=>{if($("userCenterModal")&&$("userCenterModal").classList.contains("show"))fillForm()});
     window.addEventListener("kg-wechat-binding-change",()=>{if($("userCenterModal")&&$("userCenterModal").classList.contains("show"))fillForm()});
-    window.addEventListener("storage",event=>{
-      if(!event.key || event.key===AUTH_USERS_KEY || event.key===AUTH_SESSION_KEY){
-        setTimeout(()=>{bindEntry();refreshAuthUI()},0);
-      }
-    });
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);
   else init();
