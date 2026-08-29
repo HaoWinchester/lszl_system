@@ -7,7 +7,9 @@
       "scripts": [
         "teaching-content-sync.js",
         "runtime-config.override.js",
-        "auth-session-bootstrap.js"
+        "auth-session-bootstrap.js",
+        "domain-api-client.js",
+        "src/28-device-preferences.js"
       ],
       "styles": []
     },

@@ -602,12 +602,17 @@ function injectPage(html, page, version) {
   if (page === 'landing.html') {
     return versionPageAssets(versionPageRelease(html, version), version)
   }
+  const retiredSingleDeepRedirectShell = page === 'question-training.html'
+    && /location\.replace\(target\.toString\(\)\)/.test(html)
+    && /id="practiceRedirectFallback"/.test(html)
   const injection = [
     '<script src="./teaching-content-sync.js"></script><!-- kg-teaching-content-sync:generated -->',
     '<!-- kg-direct-bootstrap-anchor -->',
     runtimePages.has(page) ? '<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->' : '',
     '<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->',
     '<script src="./auth-session-bootstrap.js"></script><!-- kg-auth-session:generated -->',
+    retiredSingleDeepRedirectShell ? '' : '<script src="./domain-api-client.js"></script><!-- kg-domain-api:generated -->',
+    retiredSingleDeepRedirectShell ? '' : '<script src="src/28-device-preferences.js"></script><!-- kg-device-preferences:generated -->',
     '<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->',
     '<script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->',
     page === 'index.html' ? '<script defer src="./homepage-loader.js"></script><!-- kg-homepage-loader:generated -->' : '',
@@ -625,9 +630,6 @@ function injectPage(html, page, version) {
   const removeLocalScriptTags = (source, asset) => source
     .replace(new RegExp(`^[ \\t]*${localScriptPattern(asset)}[ \\t]*(?:\\r?\\n)?`, 'gim'), '')
     .replace(new RegExp(localScriptPattern(asset), 'gi'), '')
-  const retiredSingleDeepRedirectShell = page === 'question-training.html'
-    && /location\.replace\(target\.toString\(\)\)/.test(generated)
-    && /id="practiceRedirectFallback"/.test(generated)
   const learningModeConsumers = {
     'paper-management.html': 'src/65-question-bank-admin.js',
     'question-workspace.html': 'src/77-multi-question-workspace.js',
@@ -957,10 +959,14 @@ function validateStorageContract(source) {
   const candidates = new Set()
   const sessionOnlyKeys = new Set()
   const readOnlyWrites = new Set()
+  const devicePreferenceSource = 'src/28-device-preferences.js'
   const literalPattern = /(['"])(kg_[A-Za-z0-9_]+|pmp_question_font_size_v\d+|通用知识点关系图谱工具_[^'"\\\r\n]+)\1/g
   const writePattern = /(?:localStorage|sessionStorage)\s*(?:\?\.|\.)\s*(?:setItem|removeItem)\s*\(\s*(['"])(kg_[A-Za-z0-9_]+)\1/g
   const sessionTokenPattern = /sessionStorage\s*(?:\?\.|\.)\s*(?:getItem|setItem|removeItem)\s*\(\s*(['"])(kg_[A-Za-z0-9_]+)\1/g
   for (const path of walk(source).filter((item) => item.endsWith('.js') || item.endsWith('.html'))) {
+    // This facade owns its own immutable device-only allowlist. Its key declarations
+    // are not business-storage candidates; all other sources remain fail-closed.
+    if (path === devicePreferenceSource) continue
     const contents = readFileSync(resolve(source, path), 'utf8')
     for (const match of contents.matchAll(literalPattern)) candidates.add(match[2])
     for (const match of contents.matchAll(sessionTokenPattern)) {
@@ -1002,10 +1008,10 @@ function validateStorageContract(source) {
 
 function validate(source) {
   if (!existsSync(source) || !statSync(source).isDirectory()) throw new Error(`找不到 new-legacy 目录：${source}`)
-  const required = ['VERSION', ...contract.requiredPages, ...contract.requiredFiles, ...learningEntryChooserAssets]
+  const required = ['VERSION', ...contract.requiredPages, ...contract.requiredFiles, ...learningEntryChooserAssets, 'src/28-device-preferences.js']
   const missing = required.filter((path) => !existsSync(resolve(source, path)))
   if (missing.length) throw new Error(`new-legacy 缺少必需文件：${missing.join(', ')}`)
-  const missingGenerated = (contract.requiredGeneratedFiles || [])
+  const missingGenerated = [...(contract.requiredGeneratedFiles || []), 'domain-api-client.js']
     .filter((path) => !existsSync(resolve(scriptsDir, 'new-legacy-assets', path)))
   if (missingGenerated.length) {
     throw new Error(`new-legacy 缺少必需生成适配器：${missingGenerated.join(', ')}`)

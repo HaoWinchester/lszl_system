@@ -8,6 +8,7 @@ const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const repoDir = resolve(scriptsDir, '../..')
 
 const ROOTS = ['new-legacy', 'frontend/scripts', 'backend/app']
+const DEVICE_PREFERENCE_SOURCE = 'new-legacy/src/28-device-preferences.js'
 const IGNORED = [
   'new-legacy/tests/',
   'frontend/public/',
@@ -48,6 +49,7 @@ function occurrenceInventory(overrides = new Map()) {
     if (!/\.(?:js|mjs|py|html|json)$/.test(path)) continue
     const source = normalizedOverrides.get(path) ?? readFileSync(absolute, 'utf8')
     for (const [kind, pattern] of Object.entries(TOKENS)) {
+      if (kind === 'runtimeKey' && path === DEVICE_PREFERENCE_SOURCE) continue
       for (const match of source.matchAll(pattern)) {
         const token = kind === 'runtimeKey'
           ? (match.groups?.quoted ?? match.groups?.bare ?? match[0])
@@ -55,9 +57,11 @@ function occurrenceInventory(overrides = new Map()) {
         result[kind].push(`${path}:${token}`)
       }
     }
-    for (const match of source.matchAll(DYNAMIC_KEY)) {
-      const token = match[1]
-      if (!/^kg_[a-z0-9_]+(?:__[^'"`]*)?$/i.test(token)) result.dynamicRuntimeKey.push(`${path}:${token}`)
+    if (path !== DEVICE_PREFERENCE_SOURCE) {
+      for (const match of source.matchAll(DYNAMIC_KEY)) {
+        const token = match[1]
+        if (!/^kg_[a-z0-9_]+(?:__[^'"`]*)?$/i.test(token)) result.dynamicRuntimeKey.push(`${path}:${token}`)
+      }
     }
   }
   for (const values of Object.values(result)) values.sort()
@@ -117,6 +121,18 @@ test('runtime removal contract detects a newly added key, endpoint, and consumer
   assert.equal(actual.endpoint.length, BASELINE.endpoint.length + 2)
   assert.equal(actual.consumer.length, BASELINE.consumer.length + 2)
   assert.ok(actual.runtimeKey.length >= BASELINE.runtimeKey.length + 2)
+})
+
+test('runtime removal contract scans the shared domain client boundary', () => {
+  const path = 'frontend/scripts/new-legacy-assets/domain-api-client.js'
+  const report = contractReport(new Map([[path, "fetch('/api/v1/runtime/state')\n"]]))
+
+  assert.equal(report.blocked, true)
+  assert.deepEqual(report.unreviewed.endpoint, [{
+    path,
+    token: '/api/v1/runtime/state',
+    ordinal: 1,
+  }])
 })
 
 test('runtime inventory includes legacy implementation occurrences instead of ignoring whole files', () => {

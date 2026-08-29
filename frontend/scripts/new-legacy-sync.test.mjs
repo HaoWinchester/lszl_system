@@ -29,6 +29,7 @@ const requiredFiles = [
   'assets/landing/recall.png',
   'assets/landing/SOURCES.md',
   'src/01-runtime-config.js',
+  'src/28-device-preferences.js',
   'src/31-learning-entry-chooser.js',
   'src/23-graph-file-store.js',
   'src/64-flow-orchestrator.js',
@@ -181,6 +182,24 @@ test('sync copies v8.6.0 and injects the direct runtime without editing upstream
   assert.ok(existsSync(resolve(item.output, 'personal-card-adapter.js')))
 })
 
+test('sync loads shared domain and device boundaries before adapters and business scripts', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+  const page = readFileSync(resolve(item.output, 'index.html'), 'utf8')
+  assert.ok(
+    page.indexOf('domain-api-client.js') < page.indexOf('direct-graph-adapter.js'),
+    'shared domain client must initialize before generated domain adapters',
+  )
+  assert.ok(
+    page.indexOf('src/28-device-preferences.js') < page.indexOf('src/24-graph-file-autosave.js'),
+    'device preference facade must initialize before page business modules',
+  )
+})
+
 test('sync reports a database-backed deep recall save only after persistence succeeds', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))
@@ -243,6 +262,19 @@ test('sync reports the P4.5 contract diagnostic for an unregistered persistent k
 
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /P4\.5 persistent state is not registered: kg_p45_unregistered_payload_v1/)
+})
+
+test('sync permits the dedicated device-preference allowlist boundary', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/28-device-preferences.js'), [
+    "const prefix = ['kg_', 'resizable_'].join('')",
+    "global.localStorage." + 'setItem(assertAllowed(key), value)',
+  ].join('\n'))
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
 })
 
 test('sync rejects IndexedDB persistence in every non-debt P4.5 module', (t) => {
