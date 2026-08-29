@@ -30,7 +30,7 @@ from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.teaching_content import ContentSubject, ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode
 from app.services.engagement_migration import MAPPERS as ENGAGEMENT_MAPPERS, expected_canonical as engagement_expected_canonical
-from app.services import paper_service
+from app.services import paper_service, teaching_content_revision_service
 PUBLISHED_PAPERS_KEY = "kg_exam_papers_published_v1"
 TEACHING_RECALL_PREFIX = "kg_recall_association_library_v1__subject__"
 
@@ -656,6 +656,7 @@ async def migrate(
             .order_by(
                 (RuntimeMigrationItem.source_key != PUBLISHED_PAPERS_KEY),
                 RuntimeMigrationItem.created_at,
+                RuntimeMigrationItem.id,
             )
         )).all()
     )
@@ -670,6 +671,12 @@ async def migrate(
         if mapper is None:
             continue
         try:
+            if item.source_key in {PUBLISHED_PAPERS_KEY, PAPER_RELEASE_HISTORY_KEY}:
+                # Permanent question deletion takes the same transaction-level
+                # advisory lock. Acquire it on every release mapper attempt
+                # because rollback releases transaction locks before the loop
+                # continues.
+                await teaching_content_revision_service.acquire_lock(db)
             result = mapper(db, item)
             if inspect.isawaitable(result):
                 result = await result
@@ -689,6 +696,7 @@ async def migrate(
                 .order_by(
                     (RuntimeMigrationItem.source_key != PUBLISHED_PAPERS_KEY),
                     RuntimeMigrationItem.created_at,
+                    RuntimeMigrationItem.id,
                 )
             )).all())
             items[index:] = remaining[index:] if len(remaining) > index else []

@@ -58,7 +58,7 @@ function loadAdapter(fetchImpl) {
   context.window = context
   context.globalThis = context
   vm.runInNewContext(adapter, context, { filename: 'paper-draft-adapter.js' })
-  return { api: context.KGPaperDraftApi, events }
+  return { api: context.KGPaperDraftApi, events, context }
 }
 
 test('adapter exposes the complete paper draft API without browser persistence', () => {
@@ -215,6 +215,43 @@ test('failed mutations reject and never synthesize successful paper rows', async
   }))
   await assert.rejects(api.create({ name: '不会成功' }), error => error.status === 500)
   assert.equal(events.filter(event => event.type === 'kg:paper-drafts-changed').length, 0)
+})
+
+test('paper mutation caches settle before change observers reload the selected paper', async () => {
+  let listLoads = 0
+  let detailLoads = 0
+  const loaded = loadAdapter(async (url, options = {}) => {
+    if (url === '/api/v1/papers' && options.method === 'GET') {
+      listLoads += 1
+      return response(200, { papers: listLoads === 1
+        ? [{ id: 'paper-old', name: '旧试卷' }]
+        : [{ id: 'paper-new', name: '新试卷' }, { id: 'paper-old', name: '旧试卷' }] })
+    }
+    if (url === '/api/v1/papers' && options.method === 'POST') {
+      return response(200, { paper: { id: 'paper-new', name: '新试卷', revision: 1 } })
+    }
+    if (url === '/api/v1/papers/paper-new' && options.method === 'GET') {
+      detailLoads += 1
+      return response(200, { paper: { id: 'paper-new', name: '新试卷', revision: 1 } })
+    }
+    throw new Error(`unexpected request: ${options.method} ${url}`)
+  })
+  const { api, context } = loaded
+  await api.list()
+  let detailSeenByObserver
+  let listSeenByObserver
+  context.dispatchEvent = event => {
+    if (event.type !== 'kg:paper-drafts-changed' || event.detail.action !== 'create') return
+    detailSeenByObserver = api.detail(event.detail.payload.paper.id)
+    listSeenByObserver = api.list()
+  }
+
+  const created = await api.create({ name: '新试卷' })
+  assert.equal(created.id, 'paper-new')
+  assert.equal((await detailSeenByObserver).id, 'paper-new')
+  assert.equal((await listSeenByObserver)[0].id, 'paper-new')
+  assert.equal(detailLoads, 0)
+  assert.equal(listLoads, 2)
 })
 
 test('sync injects the adapter exactly once before paper management application code', () => {

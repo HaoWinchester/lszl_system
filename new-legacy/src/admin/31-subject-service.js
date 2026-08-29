@@ -29,6 +29,7 @@
     }
     deletionCheck(subjectId){
       const subject=this.get(subjectId);if(!subject)return {valid:false,errors:['科目不存在。']};
+      const authority=this.references?.permanentDeleteCheck?.()||{valid:true,errors:[]};if(!authority.valid)return {...authority,subject,usage:{total:0,counts:{},references:[]}};
       const usage=this.usage(subjectId);if(!usage.valid)return usage;
       if(usage.total){
         const labels={taxonomy:'知识树',activity:'题目',course_draft:'课程草稿',course_release:'已发布课程',paper:'试卷',learning_task:'学习任务',collection:'题集',question_bank:'题库',question:'正式题目'};

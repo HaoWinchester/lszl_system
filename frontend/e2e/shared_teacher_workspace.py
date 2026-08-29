@@ -527,6 +527,28 @@ def run_question_paper_e2e(*, assert_no_runtime: bool) -> None:
             assert bank_save_info.value.ok, bank_save_info.value.text()
             question_page.locator("#qbToast").filter(has_text="题库已保存").wait_for()
 
+            # Complete native bank CRUD with a disposable empty bank. API
+            # request context remains verification/setup only; both create and
+            # delete are driven by visible page controls.
+            with question_page.expect_response(
+                lambda response: response.url.endswith("/api/v1/banks")
+                and response.request.method == "POST"
+            ) as disposable_bank_info:
+                question_page.locator("#qbAddBankBtn").click()
+            disposable_bank_id = disposable_bank_info.value.json()["bank"]["id"]
+            question_page.locator(f'[data-bank-delete="{disposable_bank_id}"]').wait_for()
+            question_page.once("dialog", lambda dialog: dialog.accept())
+            with question_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/banks/{disposable_bank_id}")
+                and response.request.method == "DELETE"
+            ) as disposable_bank_delete_info:
+                question_page.locator(f'[data-bank-delete="{disposable_bank_id}"]').click()
+            assert disposable_bank_delete_info.value.ok, disposable_bank_delete_info.value.text()
+            question_page.locator(f'[data-bank-delete="{disposable_bank_id}"]').wait_for(state="detached")
+            main_bank_control = question_page.locator(f'.qb-bank-select[data-bank-id="{bank_id}"]')
+            main_bank_control.wait_for(state="visible")
+            main_bank_control.click()
+
             with question_page.expect_response(
                 lambda response: f"/api/v1/banks/{bank_id}/questions" in response.url
                 and response.request.method == "POST"
@@ -697,26 +719,22 @@ def run_question_paper_e2e(*, assert_no_runtime: bool) -> None:
             paper_page.locator("#qbPaperCandidateBankFilter").select_option(publish_bank_id)
             paper_page.locator(f'[data-paper-candidate*="{publish_question_id}"]').wait_for()
             paper_name = f"Task3 已编辑试卷 {stamp}"
-            saved_paper = None
-            for _attempt in range(3):
-                paper_page.locator("#qbToast").evaluate(
-                    "element => { element.textContent=''; element.classList.remove('show'); }"
-                )
-                paper_page.locator("#paperTotalInput").fill("1")
-                paper_page.locator("#paperNameInput").fill(paper_name)
+            paper_page.locator("#qbToast").evaluate(
+                "element => { element.textContent=''; element.classList.remove('show'); }"
+            )
+            paper_page.locator("#paperTotalInput").fill("1")
+            paper_page.locator("#paperNameInput").fill(paper_name)
+            with paper_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/papers/{paper_id}")
+                and response.request.method == "PUT"
+            ) as paper_save_info:
                 paper_page.locator("#qbSavePaperBtn").click()
-                paper_page.wait_for_function(
-                    "() => document.getElementById('qbToast')?.classList.contains('show') "
-                    "&& !!document.getElementById('qbToast')?.textContent"
-                )
-                assert "试卷已保存" in paper_page.locator("#qbToast").inner_text()
-                saved_paper = assert_ok(
-                    teacher.request.get(BASE + f"/api/v1/papers/{paper_id}"),
-                    "independently verify native paper edit",
-                )["paper"]
-                if saved_paper["name"] == paper_name and saved_paper["totalCount"] == 1:
-                    break
-            assert saved_paper is not None
+            assert paper_save_info.value.ok, paper_save_info.value.text()
+            paper_page.locator("#qbToast").filter(has_text="试卷已保存").wait_for()
+            saved_paper = assert_ok(
+                teacher.request.get(BASE + f"/api/v1/papers/{paper_id}"),
+                "independently verify native paper edit",
+            )["paper"]
             assert saved_paper["name"] == paper_name, (
                 saved_paper["name"], paper_name, paper_page.locator("#paperNameInput").input_value()
             )
@@ -819,33 +837,16 @@ def run_question_paper_e2e(*, assert_no_runtime: bool) -> None:
 
             # A never-published draft covers the native paper delete control.
             with relogin_page.expect_response(
-                lambda response: response.url.endswith(f"/api/v1/papers/{paper_id}")
-                and response.request.method == "GET"
-            ) as post_create_refresh_info:
-                with relogin_page.expect_response(
-                    lambda response: response.url.endswith("/api/v1/papers")
-                    and response.request.method == "POST"
-                ) as disposable_paper_info:
-                    relogin_page.locator("#qbAddPaperBtn").click()
+                lambda response: response.url.endswith("/api/v1/papers")
+                and response.request.method == "POST"
+            ) as disposable_paper_info:
+                relogin_page.locator("#qbAddPaperBtn").click()
             disposable_paper_id = disposable_paper_info.value.json()["paper"]["id"]
-            assert post_create_refresh_info.value.ok, post_create_refresh_info.value.text()
-            relogin_page.wait_for_function(
-                """ids => {
-                    const selected = document.querySelector(`[data-paper-id="${ids.selected}"]`);
-                    const created = document.querySelector(`[data-paper-id="${ids.created}"]`);
-                    const deleteButton = document.getElementById("qbDeletePaperBtn");
-                    return Boolean(selected?.classList.contains("active") && created && deleteButton?.disabled);
-                }""",
-                arg={"selected": paper_id, "created": disposable_paper_id},
-            )
-            disposable_row = relogin_page.locator(f'[data-paper-id="{disposable_paper_id}"]')
-            disposable_row.wait_for(state="visible")
-            disposable_row.click()
             relogin_page.wait_for_function(
                 """paperId => {
-                    const row = document.querySelector(`[data-paper-id="${paperId}"]`);
+                    const created = document.querySelector(`[data-paper-id="${paperId}"]`);
                     const deleteButton = document.getElementById("qbDeletePaperBtn");
-                    return Boolean(row?.classList.contains("active") && deleteButton && !deleteButton.disabled);
+                    return Boolean(created?.classList.contains("active") && deleteButton && !deleteButton.disabled);
                 }""",
                 arg=disposable_paper_id,
             )

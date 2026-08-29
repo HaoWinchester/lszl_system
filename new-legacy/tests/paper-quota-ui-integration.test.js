@@ -86,6 +86,13 @@ function loadAdminApi({ principles = [], principlePayload = null, principlePaylo
   return sandbox.KGQuestionBankAdminAPI;
 }
 
+test('paper page prefers the changed paper id when a create event races the prior selection', () => {
+  const api = loadAdminApi();
+  const event = { detail: { action: 'create', payload: { paper: { id: 'paper-new' } } } };
+  assert.equal(api.paperChangePreferredId(event, 'paper-old'), 'paper-new');
+  assert.equal(api.paperChangePreferredId({ detail: { action: 'remove', payload: {} } }, 'paper-old'), 'paper-old');
+});
+
 test('paper editor offers one accessible domain-or-principle supplement strategy', () => {
   const html = fs.readFileSync(path.join(ROOT, 'paper-management.html'), 'utf8');
   const controls = Array.from(html.matchAll(

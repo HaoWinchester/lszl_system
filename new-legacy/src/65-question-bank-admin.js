@@ -4704,13 +4704,15 @@
     getServerCatalogRefreshState:()=>({dirty:state.dirty,revision:state.serverCatalogNewerRevision,conflictReason:state.serverCatalogConflictReason,requiresExplicitReload:state.serverCatalogNewerRevision>0}),
     exportServerCatalogLocalDraft:()=>clone(state.serverCatalogLocalDraft),
     copyServerCatalogLocalDraft,
-    applyServerCatalogRefresh
+    applyServerCatalogRefresh,
+    paperChangePreferredId:(event,currentId='')=>paperChangePreferredId(event,currentId)
   });
 
   document.addEventListener('input',markCatalogEditorDirty,true);
   document.addEventListener('change',markCatalogEditorDirty,true);
   window.addEventListener('kg:question-catalog-changed',handleQuestionCatalogChanged);
-  const refreshPapersFromApi=()=>{if(!catalogUiReady||!PaperDraftApi)return;reloadPaperDrafts({selectedId:state.selectedPaperId}).catch(error=>toast(paperApiMessage(error,'试卷草稿刷新失败。')))};
+  function paperChangePreferredId(event,currentId=''){return String(event?.detail?.payload?.paper?.id||currentId||'')}
+  const refreshPapersFromApi=event=>{if(!catalogUiReady||!PaperDraftApi)return;reloadPaperDrafts({selectedId:paperChangePreferredId(event,state.selectedPaperId)}).catch(error=>toast(paperApiMessage(error,'试卷草稿刷新失败。')))};
   window.addEventListener('kg:paper-drafts-changed',refreshPapersFromApi);
   window.addEventListener('pagehide',()=>window.removeEventListener?.('kg:question-catalog-changed',handleQuestionCatalogChanged));
   window.addEventListener('beforeunload',()=>{if(CatalogEditor)CatalogEditor.release({keepalive:true})});

@@ -11,9 +11,10 @@
     };
   }
   class ReferenceIndexService{
-    constructor(options={}){this.content=options.content;this.organization=options.organization||global.KGContentOrganization||null;this.referenceSnapshot=options.referenceSnapshot||{banks:[],papers:[],releases:[]};this.referenceSnapshotReady=options.referenceSnapshotPending!==true;this.cache=null;this.builtAt=''}
+    constructor(options={}){this.content=options.content;this.organization=options.organization||global.KGContentOrganization||null;this.referenceSnapshot=options.referenceSnapshot||{banks:[],papers:[],releases:[]};this.referenceSnapshotReady=options.referenceSnapshotPending!==true;this.requiresServerTransactionalDelete=options.requiresServerTransactionalDelete===true;this.cache=null;this.builtAt=''}
     questionBanks(){return Array.isArray(this.referenceSnapshot?.banks)?this.referenceSnapshot.banks:[]}
     updateReferenceSnapshot(snapshot={}){this.referenceSnapshot={banks:[],papers:[],releases:[],...snapshot};this.referenceSnapshotReady=true;this.invalidate();return this.referenceSnapshot}
+    permanentDeleteCheck(){if(!this.referenceSnapshotReady)return {valid:false,errors:['内容引用索引尚未加载完成，永久删除已暂停。']};if(this.requiresServerTransactionalDelete)return {valid:false,errors:['科目与知识树仍由本地管理事务保存，无法和服务器正式题目、试卷引用校验合并为同一事务；永久删除已暂停，请改用停用或归档。']};return {valid:true,errors:[]}}
     build(){
       if(!this.referenceSnapshotReady)throw new Error('内容引用索引尚未加载完成，请稍后重试。');
       const content=this.content,organization=this.organization;

@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
+from fastapi import HTTPException
 from sqlalchemy import delete, func, select
 
 from app.cli.runtime_domain_migration import _run, build_parser, report_exit_code
@@ -24,6 +25,11 @@ from app.services.runtime_domain_migration_service import (
     plan,
     scan,
     verify,
+)
+from app.services import (
+    question_service,
+    runtime_domain_migration_service,
+    teaching_content_revision_service,
 )
 
 
@@ -726,6 +732,152 @@ def test_paper_release_mappers_materialize_shared_catalog_and_history() -> None:
             await db.execute(delete(ExamPaper).where(ExamPaper.id == paper_id))
             await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
             await db.execute(delete(User).where(User.username == teacher))
+            await db.commit()
+
+    asyncio.run(scenario())
+
+
+def test_release_migration_serializes_against_permanent_question_delete() -> None:
+    suffix = uuid4().hex[:10]
+    run_id = f"release-delete-lock-{suffix}"
+    teacher = f"release-delete-teacher-{suffix}"
+    bank_id = f"release-delete-bank-{suffix}"
+    paper_id = f"release-delete-paper-{suffix}"
+    question_id = f"release-delete-question-{suffix}"
+    release_id = f"release-delete-history-{suffix}"
+    mapper_flushed = asyncio.Event()
+    permit_migration_commit = asyncio.Event()
+
+    source = [{
+        "id": release_id,
+        "releaseId": release_id,
+        "paperId": paper_id,
+        "version": 1,
+        "name": "迁移删除互斥试卷",
+        "subject": "PMP",
+        "status": "withdrawn",
+        "publishedBy": teacher,
+        "enabledModes": ["practice_mode"],
+        "allowedRoles": ["student"],
+        "questions": [{
+            "bankId": bank_id,
+            "questionId": question_id,
+            "order": 1,
+        }],
+        "questionSnapshots": [{
+            "bankId": bank_id,
+            "questionId": question_id,
+            "question": {"id": question_id, "bankId": bank_id, "title": "迁移冻结题"},
+        }],
+    }]
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as setup_db:
+            setup_db.add(User(username=teacher, password_hash="unused", role="teacher", status="active"))
+            await setup_db.flush()
+            setup_db.add(QuestionBank(id=bank_id, owner_id=teacher, name="迁移删除题库", subject="PMP"))
+            setup_db.add(ExamPaper(id=paper_id, owner_id=teacher, name="迁移删除试卷", subject="PMP"))
+            await setup_db.flush()
+            setup_db.add(Question(id=question_id, bank_id=bank_id, title="迁移删除题", scope="internal"))
+            await setup_db.commit()
+            await scan(setup_db, run_id=run_id, sources=[{
+                "source_type": "shared_runtime",
+                "source_key": PAPER_RELEASE_HISTORY_KEY,
+                "owner_scope": "shared",
+                "payload": source,
+            }])
+
+        real_mapper = runtime_domain_migration_service._paper_release_mapper
+
+        async def paused_mapper(db, item):
+            result = await real_mapper(db, item)
+            mapper_flushed.set()
+            await permit_migration_commit.wait()
+            return result
+
+        async with AsyncSessionLocal() as migration_db, AsyncSessionLocal() as delete_db:
+            migration_task = asyncio.create_task(migrate(
+                migration_db,
+                run_id,
+                target_mappers={PAPER_RELEASE_HISTORY_KEY: paused_mapper},
+            ))
+            await mapper_flushed.wait()
+            actor = await delete_db.get(User, teacher)
+
+            async def attempt_delete() -> int:
+                try:
+                    await question_service.delete_question(delete_db, actor, question_id)
+                except HTTPException as error:
+                    return error.status_code
+                return 200
+
+            delete_task = asyncio.create_task(attempt_delete())
+            with pytest.raises(asyncio.TimeoutError):
+                await asyncio.wait_for(asyncio.shield(delete_task), timeout=0.1)
+            permit_migration_commit.set()
+            assert (await migration_task)["migrated"] == 1
+            assert await delete_task == 409
+
+        async with AsyncSessionLocal() as cleanup_db:
+            assert await cleanup_db.get(Question, question_id) is not None
+            release_reference = await cleanup_db.get(PaperReleaseQuestion, (release_id, 0))
+            assert release_reference is not None
+            assert release_reference.question_id == question_id
+            await cleanup_db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
+            await cleanup_db.execute(delete(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == release_id))
+            await cleanup_db.execute(delete(PaperRelease).where(PaperRelease.id == release_id))
+            await cleanup_db.execute(delete(Question).where(Question.id == question_id))
+            await cleanup_db.execute(delete(ExamPaper).where(ExamPaper.id == paper_id))
+            await cleanup_db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await cleanup_db.execute(delete(User).where(User.username == teacher))
+            await cleanup_db.commit()
+
+    asyncio.run(scenario())
+
+
+def test_migration_reacquires_teaching_lock_after_mapper_rollback(monkeypatch) -> None:
+    suffix = uuid4().hex[:10]
+    run_id = f"migration-reacquire-{suffix}"
+    first_key = PUBLISHED_PAPERS_KEY
+    second_key = PAPER_RELEASE_HISTORY_KEY
+    lock_calls: list[bool] = []
+    original_acquire = teaching_content_revision_service.acquire_lock
+
+    async def recording_acquire(db) -> None:
+        lock_calls.append(True)
+        await original_acquire(db)
+
+    monkeypatch.setattr(teaching_content_revision_service, "acquire_lock", recording_acquire)
+
+    mapper_attempt = 0
+
+    async def rollback_then_succeed_mapper(db, item):
+        nonlocal mapper_attempt
+        mapper_attempt += 1
+        if mapper_attempt == 1:
+            raise ValueError("expected mapper rollback")
+        return {"canonical_payload": [{"id": item.id}]}
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            await scan(db, run_id=run_id, sources=[
+                {"source_type": "runtime", "source_key": first_key, "owner_scope": "shared", "payload": []},
+                {"source_type": "runtime", "source_key": second_key, "owner_scope": "shared", "payload": []},
+            ])
+            result = await migrate(db, run_id, target_mappers={
+                first_key: rollback_then_succeed_mapper,
+                second_key: rollback_then_succeed_mapper,
+            })
+            items = list((await db.scalars(
+                select(RuntimeMigrationItem)
+                .where(RuntimeMigrationItem.run_id == run_id)
+                .order_by(RuntimeMigrationItem.source_key)
+            )).all())
+            evidence = (result, lock_calls, mapper_attempt, [(item.source_key, item.status) for item in items])
+            assert result["migrated"] == 1, evidence
+            assert lock_calls == [True, True], evidence
+            assert sorted(item.status for item in items) == ["failed", "migrated"]
+            await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
             await db.commit()
 
     asyncio.run(scenario())

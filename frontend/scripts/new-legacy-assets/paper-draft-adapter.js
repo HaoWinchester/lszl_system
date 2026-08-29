@@ -105,16 +105,18 @@
     return clone(await task);
   }
 
-  async function mutate(action, path, method, body) {
+  async function mutate(action, path, method, body, settle = () => {}) {
     const payload = await request(path, { method, body });
+    settle(payload);
     announce(action, payload);
     return payload;
   }
 
   async function create(body) {
-    const payload = await mutate('create', '/papers', 'POST', body);
-    cachePaper(payload.paper);
-    invalidatePaperLists();
+    const payload = await mutate('create', '/papers', 'POST', body, result => {
+      cachePaper(result.paper);
+      invalidatePaperLists();
+    });
     return clone(payload.paper);
   }
 
@@ -124,9 +126,8 @@
       `/papers/${encodeURIComponent(text(paperId))}`,
       'PUT',
       body,
+      result => { cachePaper(result.paper); invalidatePaperLists(); },
     );
-    cachePaper(payload.paper);
-    invalidatePaperLists();
     return clone(payload.paper);
   }
 
@@ -136,9 +137,8 @@
       `/papers/${encodeURIComponent(text(paperId))}/questions`,
       'PUT',
       body,
+      result => { cachePaper(result.paper); invalidatePaperLists(); },
     );
-    cachePaper(payload.paper);
-    invalidatePaperLists();
     return clone(payload.paper);
   }
 
@@ -153,9 +153,9 @@
       'remove',
       `/papers/${encodeURIComponent(text(paperId))}${suffix}`,
       'DELETE',
+      undefined,
+      () => { invalidatePaper(paperId); invalidatePaperLists(); },
     );
-    invalidatePaper(paperId);
-    invalidatePaperLists();
     return payload;
   }
 
@@ -167,9 +167,9 @@
       action,
       `/papers/${encodeURIComponent(text(paperId))}/${action}${suffix}`,
       'POST',
+      undefined,
+      result => { cachePaper(result.paper); invalidatePaperLists(); },
     );
-    cachePaper(payload.paper);
-    invalidatePaperLists();
     return clone(payload.paper);
   }
 
@@ -188,8 +188,7 @@
   }
 
   async function createCategory(body) {
-    const payload = await mutate('createCategory', '/paper-categories', 'POST', body);
-    invalidateCategoryLists();
+    const payload = await mutate('createCategory', '/paper-categories', 'POST', body, invalidateCategoryLists);
     return clone(payload.category);
   }
 
@@ -199,8 +198,8 @@
       `/paper-categories/${encodeURIComponent(text(categoryId))}`,
       'PUT',
       body,
+      invalidateCategoryLists,
     );
-    invalidateCategoryLists();
     return clone(payload.category);
   }
 
@@ -212,8 +211,9 @@
       'removeCategory',
       `/paper-categories/${encodeURIComponent(text(categoryId))}${suffix}`,
       'DELETE',
+      undefined,
+      invalidateCategoryLists,
     );
-    invalidateCategoryLists();
     return payload;
   }
 
@@ -223,8 +223,7 @@
   }
 
   async function importPaper(body) {
-    const payload = await mutate('import', '/papers/import', 'POST', body);
-    invalidatePaperLists();
+    const payload = await mutate('import', '/papers/import', 'POST', body, invalidatePaperLists);
     return clone(payload.result);
   }
 
@@ -239,8 +238,8 @@
       '/papers/composition/batches',
       'POST',
       body,
+      invalidatePaperLists,
     );
-    invalidatePaperLists();
     return clone(payload.result);
   }
 

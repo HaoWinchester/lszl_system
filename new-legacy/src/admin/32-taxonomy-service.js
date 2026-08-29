@@ -47,6 +47,7 @@
     deletionCheck(taxonomyId){
       const permission=this.permissions?.require?.('deleteTaxonomies')||{valid:true};if(!permission.valid)return {...permission,references:[],referenceCount:0};
       const taxonomy=this.get(taxonomyId);if(!taxonomy)return {valid:false,errors:['知识树不存在。'],references:[],referenceCount:0};
+      const authority=this.references?.permanentDeleteCheck?.()||{valid:true,errors:[]};if(!authority.valid)return {...authority,taxonomy,references:[],referenceCount:0};
       const references=this.usage(taxonomyId),errors=[];
       if(this.isCurrent(taxonomy))errors.push('当前使用的知识树不能删除。请先将其他版本设为当前。');
       if(taxonomy.status==='published')errors.push('历史已发布版本需要先归档，再执行永久删除。');

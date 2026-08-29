@@ -6,7 +6,7 @@
   const permissions=new global.KGAdminPermissionService({auth:global.KGAuthCore});
   const audit=new global.KGAdminAuditService(repository);
   const transactions=new global.KGAdminTransactionService(repository,audit,permissions);
-  const references=new global.KGReferenceIndexService({content:legacy,organization:global.KGContentOrganization,referenceSnapshotPending:true});
+  const references=new global.KGReferenceIndexService({content:legacy,organization:global.KGContentOrganization,referenceSnapshotPending:true,requiresServerTransactionalDelete:true});
   const referenceSnapshotReady=global.KGReferenceIndexService.loadReferenceSnapshot()
     .then(snapshot=>{references.updateReferenceSnapshot(snapshot);return snapshot})
     .catch(error=>{global.console?.warn?.('内容引用索引加载失败',error);return null});
