@@ -70,6 +70,8 @@
       username: String(order.username || ''),
       planId: String(order.planId || order.plan_id || ''),
       planName: String(order.planName || order.plan_name || ''),
+      note: String(order.note || ''),
+      adminNote: String(order.adminNote || order.admin_note || ''),
       createdAt: subscriptionTimestamp(order.createdAt || order.created_at),
       updatedAt: subscriptionTimestamp(order.updatedAt || order.updated_at),
       approvedAt: subscriptionTimestamp(order.approvedAt || order.approved_at),

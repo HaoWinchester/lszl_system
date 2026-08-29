@@ -196,7 +196,8 @@
               ${order.cancelledAt?`<span>取消：${escapeHTML(fmtTime(order.cancelledAt))} · ${escapeHTML(order.cancelledBy||'')}</span>`:''}
               <span>订单：${escapeHTML(order.id)}</span>
             </div>
-            ${order.note?`<p>备注：${escapeHTML(order.note)}</p>`:''}
+            ${order.note?`<p>申请备注：${escapeHTML(order.note)}</p>`:''}
+            ${order.adminNote?`<p>管理员备注：${escapeHTML(order.adminNote)}</p>`:''}
             ${order.snapshot&&order.snapshot.usageText?`<p>${escapeHTML(order.snapshot.usageText)}</p>`:''}
             <div class="subscription-order-actions">
               <button type="button" class="primary" data-order-action="approve" ${pendingOrder?'':'disabled'}>确认开通</button>

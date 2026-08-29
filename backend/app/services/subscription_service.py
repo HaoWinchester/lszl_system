@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.permissions import DEFAULT_PLANS
 from app.core.security import now_utc, uid
 from app.models.subscription import RedeemCode, Subscription, SubscriptionOrder
-from app.services import system_service, wechat_pay_service
+from app.services import system_service, user_service, wechat_pay_service
 
 FINITE_PAID_PLAN_IDS = frozenset({"monthly", "quarterly", "half_year"})
 PAID_PLAN_IDS = FINITE_PAID_PLAN_IDS | {"lifetime"}
@@ -102,6 +102,7 @@ def order_to_dict(o: SubscriptionOrder) -> dict:
         "planName": o.plan_name,
         "status": o.status,
         "note": o.note,
+        "adminNote": o.admin_note,
         "createdAt": o.created_at.isoformat() if o.created_at else None,
         "approvedAt": o.approved_at.isoformat() if o.approved_at else None,
         "approvedBy": o.approved_by,
@@ -363,7 +364,14 @@ async def cancel_order(
     if not o or o.status != "pending" or o.pay_status not in {None, "pending"}:
         raise ValueError("订单不存在或已处理")
     o.status = "cancelled"
-    o.note = note
+    o.admin_note = note
+    await user_service.log_action(
+        db,
+        "cancel_subscription_order",
+        o.username,
+        actor,
+        f"取消订阅订单 {o.id}；管理员备注：{note or '无'}",
+    )
     await db.commit()
     await db.refresh(o)
     return o
@@ -430,6 +438,13 @@ async def generate_codes(
             )
         )
         codes.append(code)
+    await user_service.log_action(
+        db,
+        "generate_redeem_codes",
+        codes[0],
+        actor,
+        f"生成 {count} 个 {plan_id} 卡密；备注：{note or '无'}",
+    )
     await db.commit()
     return codes
 
@@ -440,7 +455,7 @@ async def list_codes(db: AsyncSession) -> list[RedeemCode]:
 
 
 async def update_redeem_code_status(
-    db: AsyncSession, code_id: str, status: str
+    db: AsyncSession, code_id: str, status: str, actor: str
 ) -> RedeemCode:
     if status not in {"unused", "disabled"}:
         raise ValueError("卡密状态无效")
@@ -460,12 +475,16 @@ async def update_redeem_code_status(
     if status == "unused":
         code.used_at = None
         code.used_by = None
+    action = "disable_redeem_code" if status == "disabled" else "enable_redeem_code"
+    await user_service.log_action(
+        db, action, code.code, actor, f"卡密状态改为 {status}"
+    )
     await db.commit()
     await db.refresh(code)
     return code
 
 
-async def delete_redeem_code(db: AsyncSession, code_id: str) -> dict:
+async def delete_redeem_code(db: AsyncSession, code_id: str, actor: str) -> dict:
     result = await db.execute(
         select(RedeemCode).where(RedeemCode.id == code_id).with_for_update()
     )
@@ -473,6 +492,9 @@ async def delete_redeem_code(db: AsyncSession, code_id: str) -> dict:
     if code is None:
         raise LookupError("卡密不存在")
     payload = code_to_dict(code)
+    await user_service.log_action(
+        db, "delete_redeem_code", code.code, actor, "删除订阅卡密"
+    )
     await db.delete(code)
     await db.commit()
     return payload

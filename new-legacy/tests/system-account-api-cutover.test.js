@@ -174,7 +174,7 @@ test('system adapter hydrates immutable UI stores from domain APIs and keeps pri
 test('subscription order and redeem-code mutations reload authoritative API state', async () => {
   const calls = []
   let failOrderRefresh = false
-  let order = { id: 'db-order', username: 'learner', planId: 'monthly', planName: '月度会员', status: 'pending', note: '', createdAt: '2026-08-29T00:00:00Z' }
+  let order = { id: 'db-order', username: 'learner', planId: 'monthly', planName: '月度会员', status: 'pending', note: '学员原始申请', adminNote: '', createdAt: '2026-08-29T00:00:00Z' }
   let codes = [{ id: 'code-1', code: 'VIP-ONE', planId: 'monthly', planName: '月度会员', status: 'unused', note: '首批', createdAt: '2026-08-29T00:00:00Z' }]
   const subscriptions = {
     orderList: () => [{ id: 'memory-order', status: 'pending' }],
@@ -216,7 +216,7 @@ test('subscription order and redeem-code mutations reload authoritative API stat
           return { order }
         }
         if (options.path === '/api/v1/subscriptions/orders/db-order/cancel') {
-          order = { ...order, status: 'cancelled', note: options.body?.note || '' }
+          order = { ...order, status: 'cancelled', adminNote: options.body?.note || '' }
           return { order }
         }
         if (options.path === '/api/v1/subscriptions/redeem-codes' && (!options.method || options.method === 'GET')) return { codes }
@@ -263,14 +263,15 @@ test('subscription order and redeem-code mutations reload authoritative API stat
   await subscriptions.removeRedeemCode('code-2')
   assert.equal(subscriptions.redeemCodeList({}).some(code => code.id === 'code-2'), false)
 
-  order = { ...order, status: 'pending', note: '' }
+  order = { ...order, status: 'pending', adminNote: '' }
   await context.KGSystemDomain.refreshOrders()
   const cancelled = await subscriptions.cancelOrder('db-order', { note: '资料不完整' })
   assert.equal(cancelled.ok, true)
   assert.equal(subscriptions.orderList({})[0].status, 'cancelled')
-  assert.equal(subscriptions.orderList({})[0].note, '资料不完整')
+  assert.equal(subscriptions.orderList({})[0].note, '学员原始申请')
+  assert.equal(subscriptions.orderList({})[0].adminNote, '资料不完整')
 
-  order = { ...order, status: 'pending', note: '' }
+  order = { ...order, status: 'pending', adminNote: '' }
   await context.KGSystemDomain.refreshOrders()
   failOrderRefresh = true
   await assert.rejects(
@@ -281,7 +282,8 @@ test('subscription order and redeem-code mutations reload authoritative API stat
   failOrderRefresh = false
   await context.KGSystemDomain.refreshOrders()
   assert.equal(subscriptions.orderList({})[0].status, 'cancelled')
-  assert.equal(subscriptions.orderList({})[0].note, '刷新失败也不能谎报成功')
+  assert.equal(subscriptions.orderList({})[0].note, '学员原始申请')
+  assert.equal(subscriptions.orderList({})[0].adminNote, '刷新失败也不能谎报成功')
 
   const generatedCall = calls.find(call => call.path.endsWith('/redeem-codes/generate'))
   assert.equal(generatedCall.body.planId, 'monthly')

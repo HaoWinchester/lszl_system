@@ -210,11 +210,11 @@ async def generate_codes(body: RedeemCodeGenerationRequest, db: DB, admin: Admin
 
 @router.patch("/redeem-codes/{code_id}")
 async def update_code_status(
-    code_id: str, body: RedeemCodeStatusUpdate, db: DB, _: AdminUser
+    code_id: str, body: RedeemCodeStatusUpdate, db: DB, admin: AdminUser
 ):
     try:
         code = await subscription_service.update_redeem_code_status(
-            db, code_id, body.status
+            db, code_id, body.status, admin.username
         )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
@@ -224,9 +224,9 @@ async def update_code_status(
 
 
 @router.delete("/redeem-codes/{code_id}")
-async def delete_code(code_id: str, db: DB, _: AdminUser):
+async def delete_code(code_id: str, db: DB, admin: AdminUser):
     try:
-        code = await subscription_service.delete_redeem_code(db, code_id)
+        code = await subscription_service.delete_redeem_code(db, code_id, admin.username)
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     return {"code": code}

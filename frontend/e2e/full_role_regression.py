@@ -703,7 +703,8 @@ def account_system_cutover_regression(
                         "planId": "monthly",
                         "planName": "月度会员",
                         "status": "pending",
-                        "note": "",
+                        "note": "学员原始申请",
+                        "adminNote": "",
                         "createdAt": "2026-08-29T00:00:00Z",
                     }
                     cancel_reason = f"浏览器取消-{uuid4().hex[:8]}"
@@ -719,7 +720,7 @@ def account_system_cutover_regression(
                             fake_order = {
                                 **fake_order,
                                 "status": "cancelled",
-                                "note": captured_cancel_body.get("note", ""),
+                                "adminNote": captured_cancel_body.get("note", ""),
                             }
                             route.fulfill(
                                 status=200,
@@ -756,6 +757,9 @@ def account_system_cutover_regression(
                             f'.subscription-order-item[data-order-id="{fake_order["id"]}"]'
                         )
                         cancelled_card.get_by_text(cancel_reason, exact=False).wait_for(
+                            state="visible"
+                        )
+                        cancelled_card.get_by_text("学员原始申请", exact=False).wait_for(
                             state="visible"
                         )
                         assert captured_cancel_body == {"note": cancel_reason}
