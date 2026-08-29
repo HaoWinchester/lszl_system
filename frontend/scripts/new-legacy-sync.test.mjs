@@ -289,6 +289,18 @@ test('sync rejects an unguarded business storage write inside the device-prefere
   assert.match(result.stderr, /device preference storage call must use assertAllowed\(key\)/i)
 })
 
+test('sync rejects an unguarded session business storage write inside the device-preference facade', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  const forbiddenKey = ['kg_', 'exam_papers_v1__admin'].join('')
+  write(resolve(item.upstream, 'src/28-device-preferences.js'), `sessionStorage.setItem('${forbiddenKey}', '[]')\n`)
+
+  const result = runSync(item)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /device preference storage call must use assertAllowed\(key\)/i)
+})
+
 test('sync rejects IndexedDB persistence in every non-debt P4.5 module', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))

@@ -22,7 +22,7 @@ const TOKENS = {
   runtimeKey: /(?:(['"`])(?<quoted>kg_[a-z0-9_]+(?:__[^'"`]*)?)\1|(?<bare>\bkg_[a-z0-9_]+(?:__\w+)?)(?=\s*:))/gi,
 }
 const DYNAMIC_KEY = /(?:(?:global|window)\s*(?:\?\.|\.)\s*)?(?:localStorage|sessionStorage)\s*(?:\?\.|\.)\s*(?:getItem|setItem|removeItem)\s*(?:\?\.)?\s*\(\s*([A-Za-z_$][\w$]*(?:\([^\n)]*\))?)/g
-const DEVICE_PREFERENCE_STORAGE_CALL = /(?:(?:global|window)\s*(?:\?\.\s*|\.\s*))?localStorage\s*(?:\?\.\s*|\.\s*)(?:getItem|setItem|removeItem)\s*(?:\?\.\s*)?\(\s*(assertAllowed\s*\(\s*key\s*\)|[^,\n)]+)[^\n]*\)/g
+const DEVICE_PREFERENCE_STORAGE_CALL = /(?:(?:global|window)\s*(?:\?\.\s*|\.\s*))?(?:localStorage|sessionStorage)\s*(?:\?\.\s*|\.\s*)(?:getItem|setItem|removeItem)\s*(?:\?\.\s*)?\(\s*(assertAllowed\s*\(\s*key\s*\)|[^,\n)]+)[^\n]*\)/g
 
 function repoRelative(path) {
   return relative(repoDir, path).replaceAll('\\', '/')
@@ -151,6 +151,20 @@ test('runtime removal contract rejects an unguarded device-preference storage wr
   assert.deepEqual(report.unreviewed.devicePreferenceStorage, [{
     path: DEVICE_PREFERENCE_SOURCE,
     token: "localStorage.setItem('kg_exam_papers_v1__admin', '[]')",
+    ordinal: 1,
+  }])
+})
+
+test('runtime removal contract rejects an unguarded device-preference session write', () => {
+  const report = contractReport(new Map([[
+    DEVICE_PREFERENCE_SOURCE,
+    "sessionStorage.setItem('kg_exam_papers_v1__admin', '[]')\n",
+  ]]))
+
+  assert.equal(report.blocked, true)
+  assert.deepEqual(report.unreviewed.devicePreferenceStorage, [{
+    path: DEVICE_PREFERENCE_SOURCE,
+    token: "sessionStorage.setItem('kg_exam_papers_v1__admin', '[]')",
     ordinal: 1,
   }])
 })
