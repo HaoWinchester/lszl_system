@@ -441,9 +441,9 @@ async def generate_codes(
     await user_service.log_action(
         db,
         "generate_redeem_codes",
-        codes[0],
+        None,
         actor,
-        f"生成 {count} 个 {plan_id} 卡密；备注：{note or '无'}",
+        f"生成 {count} 个 {plan_id} 卡密；前缀：{prefix}；备注：{note or '无'}",
     )
     await db.commit()
     return codes
@@ -477,7 +477,7 @@ async def update_redeem_code_status(
         code.used_by = None
     action = "disable_redeem_code" if status == "disabled" else "enable_redeem_code"
     await user_service.log_action(
-        db, action, code.code, actor, f"卡密状态改为 {status}"
+        db, action, None, actor, f"卡密 {code.code} 状态改为 {status}"
     )
     await db.commit()
     await db.refresh(code)
@@ -493,7 +493,7 @@ async def delete_redeem_code(db: AsyncSession, code_id: str, actor: str) -> dict
         raise LookupError("卡密不存在")
     payload = code_to_dict(code)
     await user_service.log_action(
-        db, "delete_redeem_code", code.code, actor, "删除订阅卡密"
+        db, "delete_redeem_code", None, actor, f"删除订阅卡密 {code.code}"
     )
     await db.delete(code)
     await db.commit()
