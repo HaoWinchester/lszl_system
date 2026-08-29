@@ -2,6 +2,7 @@ import asyncio
 import json
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+from datetime import datetime
 from threading import Barrier, Event, Lock
 from uuid import uuid4
 
@@ -24,6 +25,7 @@ from app.models.runtime_state import RuntimeState
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.teaching_content import TeachingContentRevision
 from app.models.user import User
 from app.schemas.content_prep import ContentPrepBatchResult, ContentPrepBatchRequest
 from app.services import teaching_content_revision_service as revision_service
@@ -45,33 +47,27 @@ PRESET_PROJECTION_KEY = "kg_synthesis_preset_repository_v1"
 
 async def _snapshot_revision_row() -> dict | None:
     async with AsyncSessionLocal() as db:
-        row = await db.get(SharedRuntimeState, revision_service.REVISION_KEY)
+        row = await db.get(TeachingContentRevision, 1)
         if row is None:
             return None
         return {
-            "value": row.value,
-            "schema_version": row.schema_version,
+            "revision": row.revision,
+            "changes": deepcopy(row.changes),
             "updated_by": row.updated_by,
-            "created_at": row.created_at,
             "updated_at": row.updated_at,
         }
 
 
 async def _restore_revision_row(snapshot: dict | None) -> None:
     async with AsyncSessionLocal() as db:
-        await db.execute(
-            delete(SharedRuntimeState).where(
-                SharedRuntimeState.key == revision_service.REVISION_KEY
-            )
-        )
+        await db.execute(delete(TeachingContentRevision))
         if snapshot is not None:
             db.add(
-                SharedRuntimeState(
-                    key=revision_service.REVISION_KEY,
-                    value=str(snapshot["value"]),
-                    schema_version=int(snapshot["schema_version"]),
+                TeachingContentRevision(
+                    id=1,
+                    revision=int(snapshot["revision"]),
+                    changes=deepcopy(snapshot["changes"]),
                     updated_by=snapshot["updated_by"],
-                    created_at=snapshot["created_at"],
                     updated_at=snapshot["updated_at"],
                 )
             )
@@ -178,11 +174,7 @@ def test_missing_revision_row_starts_at_zero_and_first_bump_is_one() -> None:
         snapshot = await _snapshot_revision_row()
         try:
             async with AsyncSessionLocal() as db:
-                await db.execute(
-                    delete(SharedRuntimeState).where(
-                        SharedRuntimeState.key == revision_service.REVISION_KEY
-                    )
-                )
+                await db.execute(delete(TeachingContentRevision))
                 await db.commit()
 
             async with AsyncSessionLocal() as db:
@@ -260,31 +252,22 @@ def test_revision_endpoint_filters_non_object_changes_from_a_damaged_row() -> No
     async def seed() -> dict | None:
         snapshot = await _snapshot_revision_row()
         async with AsyncSessionLocal() as db:
-            await db.execute(
-                delete(SharedRuntimeState).where(
-                    SharedRuntimeState.key == revision_service.REVISION_KEY
-                )
-            )
+            await db.execute(delete(TeachingContentRevision))
             db.add(
-                SharedRuntimeState(
-                    key=revision_service.REVISION_KEY,
-                    value=json.dumps(
+                TeachingContentRevision(
+                    id=1,
+                    revision=7,
+                    changes=[
+                        None,
+                        "not-an-object",
                         {
-                            "revision": 7,
-                            "changes": [
-                                None,
-                                "not-an-object",
-                                {
-                                    "entityType": "question",
-                                    "entityId": "q-valid",
-                                    "action": "updated",
-                                },
-                            ],
-                            "updatedAt": "2026-08-10T10:00:00+00:00",
-                            "updatedBy": "admin",
-                        }
-                    ),
+                            "entityType": "question",
+                            "entityId": "q-valid",
+                            "action": "updated",
+                        },
+                    ],
                     updated_by="admin",
+                    updated_at=datetime.fromisoformat("2026-08-10T10:00:00+00:00"),
                 )
             )
             await db.commit()
@@ -1391,12 +1374,15 @@ def test_single_question_save_returns_current_content_revision(
 
 async def _snapshot_shared_rows(keys: set[str]) -> dict[str, dict]:
     async with AsyncSessionLocal() as db:
+        runtime_keys = keys - {revision_service.REVISION_KEY}
         rows = (
             await db.execute(
-                select(SharedRuntimeState).where(SharedRuntimeState.key.in_(keys))
+                select(SharedRuntimeState).where(
+                    SharedRuntimeState.key.in_(runtime_keys)
+                )
             )
         ).scalars().all()
-        return {
+        snapshot = {
             row.key: {
                 "value": row.value,
                 "schema_version": row.schema_version,
@@ -1406,11 +1392,25 @@ async def _snapshot_shared_rows(keys: set[str]) -> dict[str, dict]:
             }
             for row in rows
         }
+        if revision_service.REVISION_KEY in keys:
+            revision = await db.get(TeachingContentRevision, 1)
+            if revision is not None:
+                snapshot[revision_service.REVISION_KEY] = {
+                    "relational": True,
+                    "revision": revision.revision,
+                    "changes": deepcopy(revision.changes),
+                    "updated_by": revision.updated_by,
+                    "updated_at": revision.updated_at,
+                }
+        return snapshot
 
 
 async def _restore_shared_rows(keys: set[str], snapshot: dict[str, dict]) -> None:
     async with AsyncSessionLocal() as db:
-        await db.execute(delete(SharedRuntimeState).where(SharedRuntimeState.key.in_(keys)))
+        runtime_keys = keys - {revision_service.REVISION_KEY}
+        await db.execute(
+            delete(SharedRuntimeState).where(SharedRuntimeState.key.in_(runtime_keys))
+        )
         db.add_all(
             [
                 SharedRuntimeState(
@@ -1422,8 +1422,22 @@ async def _restore_shared_rows(keys: set[str], snapshot: dict[str, dict]) -> Non
                     updated_at=row["updated_at"],
                 )
                 for key, row in snapshot.items()
+                if key != revision_service.REVISION_KEY
             ]
         )
+        if revision_service.REVISION_KEY in keys:
+            await db.execute(delete(TeachingContentRevision))
+            revision = snapshot.get(revision_service.REVISION_KEY)
+            if revision is not None:
+                db.add(
+                    TeachingContentRevision(
+                        id=1,
+                        revision=int(revision["revision"]),
+                        changes=deepcopy(revision["changes"]),
+                        updated_by=revision["updated_by"],
+                        updated_at=revision["updated_at"],
+                    )
+                )
         await db.commit()
 
 
@@ -2596,6 +2610,21 @@ def test_each_bank_question_and_paper_mutation_bumps_exactly_once() -> None:
                 assert deletion is not None
                 await assert_bump("paper", paper.id, "deleted")
 
+                release_ids = select(PaperRelease.id).where(
+                    PaperRelease.paper_id == paper.id
+                )
+                await db.execute(
+                    delete(PaperReleaseQuestion).where(
+                        PaperReleaseQuestion.release_id.in_(release_ids)
+                    )
+                )
+                await db.execute(
+                    delete(PaperRelease).where(PaperRelease.paper_id == paper.id)
+                )
+                await db.execute(
+                    delete(PaperQuestion).where(PaperQuestion.paper_id == paper.id)
+                )
+                await db.commit()
                 assert await question_service.delete_question(db, actor, question.id)
                 await assert_bump("question", question.id, "deleted")
 

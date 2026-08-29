@@ -1,15 +1,14 @@
-"""Monotonic revision protocol for shared teaching content."""
+"""Relational monotonic revision protocol for shared teaching content."""
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.teaching_content import TeachingContentRevision
 
 
 REVISION_KEY = "kg_teaching_content_revision_v1"
@@ -56,31 +55,20 @@ def _normalize_changes(changes: list[Any]) -> list[dict[str, str]]:
     return normalized
 
 
-def _parse_payload(value: str) -> dict[str, Any]:
-    try:
-        raw = json.loads(value)
-    except (TypeError, ValueError):
-        return _empty_payload()
-    if not isinstance(raw, dict):
-        return _empty_payload()
-    revision = raw.get("revision")
-    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 0:
-        revision = 0
-    raw_changes = raw.get("changes")
-    changes = _normalize_changes(raw_changes if isinstance(raw_changes, list) else [])
-    updated_at = raw.get("updatedAt")
-    updated_by = raw.get("updatedBy")
+def _serialize_revision(row: TeachingContentRevision) -> dict[str, Any]:
     return {
-        "revision": revision,
-        "changes": changes,
-        "updatedAt": updated_at if isinstance(updated_at, str) else None,
-        "updatedBy": updated_by if isinstance(updated_by, str) else None,
+        "revision": int(row.revision),
+        "changes": _normalize_changes(
+            row.changes if isinstance(row.changes, list) else []
+        ),
+        "updatedAt": row.updated_at.isoformat() if row.updated_at else None,
+        "updatedBy": row.updated_by if isinstance(row.updated_by, str) else None,
     }
 
 
 async def current(db: AsyncSession) -> dict[str, Any]:
-    row = await db.get(SharedRuntimeState, REVISION_KEY)
-    return _parse_payload(row.value) if row is not None else _empty_payload()
+    row = await db.get(TeachingContentRevision, 1)
+    return _serialize_revision(row) if row is not None else _empty_payload()
 
 
 async def acquire_lock(db: AsyncSession) -> None:
@@ -122,34 +110,22 @@ async def bump(
     changes: list[dict[str, str]],
 ) -> dict[str, Any]:
     await acquire_lock(db)
-    row = (
-        await db.execute(
-            select(SharedRuntimeState)
-            .where(SharedRuntimeState.key == REVISION_KEY)
-            .with_for_update()
-        )
-    ).scalar_one_or_none()
-    previous = _parse_payload(row.value) if row is not None else _empty_payload()
-    payload = {
-        "revision": int(previous["revision"]) + 1,
-        "changes": _normalize_changes(changes),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "updatedBy": actor_username,
-    }
-    value = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    row = await db.scalar(
+        select(TeachingContentRevision)
+        .where(TeachingContentRevision.id == 1)
+        .with_for_update()
+    )
     if row is None:
-        db.add(
-            SharedRuntimeState(
-                key=REVISION_KEY,
-                value=value,
-                updated_by=actor_username,
-            )
-        )
-    else:
-        row.value = value
-        row.updated_by = actor_username
+        row = TeachingContentRevision(id=1, revision=0, changes=[])
+        db.add(row)
+        await db.flush()
+    row.revision += 1
+    row.changes = _normalize_changes(changes)
+    row.updated_by = actor_username
+    row.updated_at = datetime.now(timezone.utc)
     await db.flush()
-    return payload
+    await db.refresh(row)
+    return _serialize_revision(row)
 
 
 async def bump_cleanup(

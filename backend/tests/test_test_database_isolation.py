@@ -21,12 +21,10 @@ from app.db.session import AsyncSessionLocal
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.services import (
     teaching_content_projection_service,
-    teaching_content_revision_service,
 )
 
 
 PROTOCOL_KEYS = (
-    teaching_content_revision_service.REVISION_KEY,
     teaching_content_projection_service.PRINCIPLE_KEY,
     teaching_content_projection_service.PRESET_KEY,
 )
@@ -57,10 +55,34 @@ async def _database_name_and_protocol_fingerprint(database_url: str) -> tuple[st
                     .order_by(SharedRuntimeState.key)
                 )
             ).all()
+            revision_table = (
+                await connection.execute(
+                    text("SELECT to_regclass('public.teaching_content_revisions')")
+                )
+            ).scalar_one()
+            revision_rows = []
+            if revision_table is not None:
+                revision_rows = (
+                    await connection.execute(
+                        text(
+                            """
+                            SELECT id, revision, changes, updated_by, updated_at
+                            FROM teaching_content_revisions
+                            ORDER BY id
+                            """
+                        )
+                    )
+                ).all()
         encoded = json.dumps(
-            [tuple(str(value) for value in row) for row in rows],
+            {
+                "runtime": [tuple(str(value) for value in row) for row in rows],
+                "revision": [
+                    tuple(str(value) for value in row) for row in revision_rows
+                ],
+            },
             ensure_ascii=False,
             separators=(",", ":"),
+            sort_keys=True,
         ).encode("utf-8")
         return database_name, hashlib.sha256(encoded).hexdigest()
     finally:

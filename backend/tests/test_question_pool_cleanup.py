@@ -31,6 +31,7 @@ from app.models.question import (
     QuestionCleanupAudit,
 )
 from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.teaching_content import TeachingContentRevision
 from app.models.training import LearningEvent, RecallProgress, TrainingProgress
 from app.schemas.question_cleanup import (
     QuestionCleanupDecision,
@@ -3062,7 +3063,7 @@ def test_cleanup_apply_and_verify_cli_secure_receipt_and_detect_all_drift(
     )
     test_bank_id = f"cleanup-verify-test-bank-{fixture['suffix']}"
     test_question_id = f"__test__cleanup-verify-{fixture['suffix']}"
-    original_revision_value: str | None = None
+    original_revision_value: dict | None = None
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text('{"stale":true}\n', encoding="utf-8")
 
@@ -3219,7 +3220,7 @@ def test_cleanup_apply_and_verify_cli_secure_receipt_and_detect_all_drift(
         assert restored_test.returncode != 0
         assert "delete set" in restored_test.stderr.lower()
 
-        async def remove_test_and_bump_revision() -> str:
+        async def remove_test_and_bump_revision() -> dict:
             async with AsyncSessionLocal() as db:
                 await db.execute(
                     delete(Question).where(Question.id == test_question_id)
@@ -3228,14 +3229,17 @@ def test_cleanup_apply_and_verify_cli_secure_receipt_and_detect_all_drift(
                     delete(QuestionBank).where(QuestionBank.id == test_bank_id)
                 )
                 revision_row = await db.get(
-                    SharedRuntimeState,
-                    teaching_content_revision_service.REVISION_KEY,
+                    TeachingContentRevision,
+                    1,
                 )
                 assert revision_row is not None
-                original_value = revision_row.value
-                payload = json.loads(original_value)
-                payload["revision"] += 1
-                revision_row.value = json.dumps(payload, separators=(",", ":"))
+                original_value = {
+                    "revision": revision_row.revision,
+                    "changes": list(revision_row.changes),
+                    "updated_by": revision_row.updated_by,
+                    "updated_at": revision_row.updated_at,
+                }
+                revision_row.revision += 1
                 await db.commit()
                 return original_value
 
@@ -3247,11 +3251,14 @@ def test_cleanup_apply_and_verify_cli_secure_receipt_and_detect_all_drift(
         async def restore_revision_and_remove_retained_import() -> None:
             async with AsyncSessionLocal() as db:
                 revision_row = await db.get(
-                    SharedRuntimeState,
-                    teaching_content_revision_service.REVISION_KEY,
+                    TeachingContentRevision,
+                    1,
                 )
                 assert revision_row is not None
-                revision_row.value = original_revision_value
+                revision_row.revision = original_revision_value["revision"]
+                revision_row.changes = original_revision_value["changes"]
+                revision_row.updated_by = original_revision_value["updated_by"]
+                revision_row.updated_at = original_revision_value["updated_at"]
                 await db.execute(
                     delete(QuestionAuditLog).where(
                         QuestionAuditLog.question_id == bound_keep_id
@@ -3355,11 +3362,14 @@ def test_cleanup_apply_and_verify_cli_secure_receipt_and_detect_all_drift(
                 )
                 if original_revision_value is not None:
                     revision_row = await db.get(
-                        SharedRuntimeState,
-                        teaching_content_revision_service.REVISION_KEY,
+                        TeachingContentRevision,
+                        1,
                     )
                     if revision_row is not None:
-                        revision_row.value = original_revision_value
+                        revision_row.revision = original_revision_value["revision"]
+                        revision_row.changes = original_revision_value["changes"]
+                        revision_row.updated_by = original_revision_value["updated_by"]
+                        revision_row.updated_at = original_revision_value["updated_at"]
                 await db.commit()
 
         asyncio.run(cleanup_verification_drift())

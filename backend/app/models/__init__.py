@@ -38,6 +38,7 @@ from app.models.teaching_content import (
     RecallAssociationLibrary,
     TaxonomyNode,
     TeachingContentAudit,
+    TeachingContentRevision,
 )
 from app.models.training import (
     CanvasWorkspace,
@@ -106,4 +107,5 @@ __all__ = [
     "ActivityOverride",
     "RecallAssociationLibrary",
     "TeachingContentAudit",
+    "TeachingContentRevision",
 ]

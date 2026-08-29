@@ -252,7 +252,7 @@ def test_runtime_state_rejects_page_namespace_mismatch() -> None:
 def test_runtime_state_rejects_a_stale_revision_without_overwriting() -> None:
     with TestClient(app) as client:
         login(client, "老师")
-        current = bootstrap(client.get("/question-bank.html").text)
+        current = bootstrap(client.get("/teacher-workbench.html").text)
         first = client.put(
             "/api/v1/runtime/state",
             json=update_payload(
