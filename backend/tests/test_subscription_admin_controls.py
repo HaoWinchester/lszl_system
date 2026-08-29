@@ -333,8 +333,18 @@ def test_subscription_admin_mutations_roll_back_when_audit_flush_fails(
     username = f"audit-rollback-{uuid4().hex[:10]}"
     order_id = f"audit_rollback_{uuid4().hex}"
     collision_log_id = f"log_collision_{uuid4().hex}"
+    disable_code_id = f"rc_disable_{uuid4().hex}"
+    enable_code_id = f"rc_enable_{uuid4().hex}"
+    delete_code_id = f"rc_delete_{uuid4().hex}"
+    rollback_code_ids = [disable_code_id, enable_code_id, delete_code_id]
+    original_code_statuses = {
+        disable_code_id: "unused",
+        enable_code_id: "disabled",
+        delete_code_id: "unused",
+    }
+    real_log_action = subscription_service.user_service.log_action
 
-    async def insert_collision_log() -> None:
+    async def insert_rollback_fixtures() -> None:
         async with AsyncSessionLocal() as db:
             db.add(
                 UserAdminLog(
@@ -345,9 +355,28 @@ def test_subscription_admin_mutations_roll_back_when_audit_flush_fails(
                     detail="forces an audit flush failure",
                 )
             )
+            db.add_all(
+                [
+                    RedeemCode(
+                        id=code_id,
+                        code=f"ROLLBACK-{suffix}-{marker}",
+                        plan_id="monthly",
+                        plan_name="月度会员",
+                        status=original_code_statuses[code_id],
+                        created_by="admin",
+                        note=f"rollback fixture {marker}",
+                    )
+                    for code_id, suffix in (
+                        (disable_code_id, "DIS"),
+                        (enable_code_id, "ENA"),
+                        (delete_code_id, "DEL"),
+                    )
+                ]
+            )
             await db.commit()
 
     async def fail_audit_during_flush(db, *args, **kwargs) -> None:
+        await real_log_action(db, *args, **kwargs)
         db.add(
             UserAdminLog(
                 id=collision_log_id,
@@ -359,7 +388,7 @@ def test_subscription_admin_mutations_roll_back_when_audit_flush_fails(
         )
         await db.flush()
 
-    async def persisted_state() -> tuple[str, str | None, int]:
+    async def persisted_state() -> tuple[str, str | None, int, dict[str, str]]:
         async with AsyncSessionLocal() as db:
             order = await db.get(SubscriptionOrder, order_id)
             assert order is not None
@@ -368,13 +397,23 @@ def test_subscription_admin_mutations_roll_back_when_audit_flush_fails(
                 .select_from(RedeemCode)
                 .where(RedeemCode.note == marker)
             )
-            return order.status, order.admin_note, int(generated_count or 0)
+            rollback_codes = (
+                await db.execute(
+                    select(RedeemCode).where(RedeemCode.id.in_(rollback_code_ids))
+                )
+            ).scalars()
+            return (
+                order.status,
+                order.admin_note,
+                int(generated_count or 0),
+                {code.id: code.status for code in rollback_codes},
+            )
 
     with TestClient(app, raise_server_exceptions=False) as admin:
         login_admin(admin)
         create_student(admin, username)
         insert_pending_order(username, order_id)
-        asyncio.run(insert_collision_log())
+        asyncio.run(insert_rollback_fixtures())
         try:
             with monkeypatch.context() as audit_failure:
                 audit_failure.setattr(
@@ -395,11 +434,34 @@ def test_subscription_admin_mutations_roll_back_when_audit_flush_fails(
                         "note": marker,
                     },
                 )
+                disabled = admin.patch(
+                    f"/api/v1/subscriptions/redeem-codes/{disable_code_id}",
+                    json={"status": "disabled"},
+                )
+                enabled = admin.patch(
+                    f"/api/v1/subscriptions/redeem-codes/{enable_code_id}",
+                    json={"status": "unused"},
+                )
+                deleted = admin.delete(
+                    f"/api/v1/subscriptions/redeem-codes/{delete_code_id}"
+                )
             assert cancelled.status_code == 500, cancelled.text
             assert generated.status_code == 500, generated.text
-            assert asyncio.run(persisted_state()) == ("pending", None, 0)
+            assert disabled.status_code == 500, disabled.text
+            assert enabled.status_code == 500, enabled.text
+            assert deleted.status_code == 500, deleted.text
+            assert asyncio.run(persisted_state()) == (
+                "pending",
+                None,
+                0,
+                original_code_statuses,
+            )
         finally:
-            cleanup_records(username, log_ids=[collision_log_id])
+            cleanup_records(
+                username,
+                code_ids=rollback_code_ids,
+                log_ids=[collision_log_id],
+            )
             admin.request("DELETE", "/api/v1/users/batch", json={"usernames": [username]})
 
 
