@@ -62,6 +62,36 @@ test('device preference facade permits only approved UI prefixes and returns fal
   )
 })
 
+test('device preference facade accepts approved scoped UI keys for admin and guest only', () => {
+  const runtime = bootPreferences()
+
+  runtime.KGDevicePreferences.setJSON('kg_multi_question_analysis_sections_v1__admin', ['stem', 'analysis'])
+  runtime.KGDevicePreferences.setString('kg_canvas_workspace_catalog_v2__guest', 'collapsed')
+
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(runtime.KGDevicePreferences.getJSON('kg_multi_question_analysis_sections_v1__admin', []))),
+    ['stem', 'analysis'],
+  )
+  assert.equal(runtime.KGDevicePreferences.getString('kg_canvas_workspace_catalog_v2__guest', ''), 'collapsed')
+  assert.throws(
+    () => runtime.KGDevicePreferences.setJSON('kg_exam_papers_v1__admin', []),
+    error => error.code === 'DEVICE_PREFERENCE_KEY_FORBIDDEN',
+  )
+  assert.throws(
+    () => runtime.KGDevicePreferences.setString('kg_multi_question_analysis_sections_v1__', 'forbidden'),
+    error => error.code === 'DEVICE_PREFERENCE_KEY_FORBIDDEN',
+  )
+})
+
+test('device preference facade rejects retired migration markers', () => {
+  const runtime = bootPreferences()
+
+  assert.throws(
+    () => runtime.KGDevicePreferences.setString('kg_deep_recall_theme_platform_migrated_v1', '1'),
+    error => error.code === 'DEVICE_PREFERENCE_KEY_FORBIDDEN',
+  )
+})
+
 test('device preference allowlists are immutable and cannot be extended to store business data', () => {
   const runtime = bootPreferences()
   const { EXACT_KEYS, PREFIXES } = runtime.KGDevicePreferences

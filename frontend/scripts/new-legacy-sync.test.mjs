@@ -277,6 +277,18 @@ test('sync permits the dedicated device-preference allowlist boundary', (t) => {
   assert.equal(result.status, 0, result.stderr)
 })
 
+test('sync rejects an unguarded business storage write inside the device-preference facade', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  const forbiddenKey = ['kg_', 'exam_papers_v1__admin'].join('')
+  write(resolve(item.upstream, 'src/28-device-preferences.js'), `localStorage.setItem('${forbiddenKey}', '[]')\n`)
+
+  const result = runSync(item)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /device preference storage call must use assertAllowed\(key\)/i)
+})
+
 test('sync rejects IndexedDB persistence in every non-debt P4.5 module', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))

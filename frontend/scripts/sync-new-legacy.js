@@ -963,11 +963,18 @@ function validateStorageContract(source) {
   const literalPattern = /(['"])(kg_[A-Za-z0-9_]+|pmp_question_font_size_v\d+|通用知识点关系图谱工具_[^'"\\\r\n]+)\1/g
   const writePattern = /(?:localStorage|sessionStorage)\s*(?:\?\.|\.)\s*(?:setItem|removeItem)\s*\(\s*(['"])(kg_[A-Za-z0-9_]+)\1/g
   const sessionTokenPattern = /sessionStorage\s*(?:\?\.|\.)\s*(?:getItem|setItem|removeItem)\s*\(\s*(['"])(kg_[A-Za-z0-9_]+)\1/g
+  const devicePreferenceStorageCall = /(?:(?:global|window)\s*(?:\?\.\s*|\.\s*))?localStorage\s*(?:\?\.\s*|\.\s*)(?:getItem|setItem|removeItem)\s*(?:\?\.\s*)?\(\s*(assertAllowed\s*\(\s*key\s*\)|[^,\n)]+)/g
   for (const path of walk(source).filter((item) => item.endsWith('.js') || item.endsWith('.html'))) {
+    const contents = readFileSync(resolve(source, path), 'utf8')
     // This facade owns its own immutable device-only allowlist. Its key declarations
     // are not business-storage candidates; all other sources remain fail-closed.
-    if (path === devicePreferenceSource) continue
-    const contents = readFileSync(resolve(source, path), 'utf8')
+    if (path === devicePreferenceSource) {
+      for (const match of contents.matchAll(devicePreferenceStorageCall)) {
+        if (/^assertAllowed\s*\(\s*key\s*\)$/.test(match[1])) continue
+        throw new Error('device preference storage call must use assertAllowed(key)')
+      }
+      continue
+    }
     for (const match of contents.matchAll(literalPattern)) candidates.add(match[2])
     for (const match of contents.matchAll(sessionTokenPattern)) {
       if (sessionOnlyPrefixes.some((prefix) => match[2].startsWith(prefix))) sessionOnlyKeys.add(match[2])

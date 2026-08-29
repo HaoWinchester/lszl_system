@@ -22,6 +22,7 @@ const TOKENS = {
   runtimeKey: /(?:(['"`])(?<quoted>kg_[a-z0-9_]+(?:__[^'"`]*)?)\1|(?<bare>\bkg_[a-z0-9_]+(?:__\w+)?)(?=\s*:))/gi,
 }
 const DYNAMIC_KEY = /(?:(?:global|window)\s*(?:\?\.|\.)\s*)?(?:localStorage|sessionStorage)\s*(?:\?\.|\.)\s*(?:getItem|setItem|removeItem)\s*(?:\?\.)?\s*\(\s*([A-Za-z_$][\w$]*(?:\([^\n)]*\))?)/g
+const DEVICE_PREFERENCE_STORAGE_CALL = /(?:(?:global|window)\s*(?:\?\.\s*|\.\s*))?localStorage\s*(?:\?\.\s*|\.\s*)(?:getItem|setItem|removeItem)\s*(?:\?\.\s*)?\(\s*(assertAllowed\s*\(\s*key\s*\)|[^,\n)]+)[^\n]*\)/g
 
 function repoRelative(path) {
   return relative(repoDir, path).replaceAll('\\', '/')
@@ -37,7 +38,7 @@ function filesUnder(path) {
 }
 
 function occurrenceInventory(overrides = new Map()) {
-  const result = { endpoint: [], consumer: [], runtimeKey: [], dynamicRuntimeKey: [] }
+  const result = { endpoint: [], consumer: [], runtimeKey: [], dynamicRuntimeKey: [], devicePreferenceStorage: [] }
   const normalizedOverrides = new Map(
     [...overrides].map(([path, source]) => [path.replaceAll('\\', '/'), source]),
   )
@@ -61,6 +62,11 @@ function occurrenceInventory(overrides = new Map()) {
       for (const match of source.matchAll(DYNAMIC_KEY)) {
         const token = match[1]
         if (!/^kg_[a-z0-9_]+(?:__[^'"`]*)?$/i.test(token)) result.dynamicRuntimeKey.push(`${path}:${token}`)
+      }
+    } else {
+      for (const match of source.matchAll(DEVICE_PREFERENCE_STORAGE_CALL)) {
+        if (/^assertAllowed\s*\(\s*key\s*\)$/.test(match[1])) continue
+        result.devicePreferenceStorage.push(`${path}:${match[0].trim()}`)
       }
     }
   }
@@ -131,6 +137,20 @@ test('runtime removal contract scans the shared domain client boundary', () => {
   assert.deepEqual(report.unreviewed.endpoint, [{
     path,
     token: '/api/v1/runtime/state',
+    ordinal: 1,
+  }])
+})
+
+test('runtime removal contract rejects an unguarded device-preference storage write', () => {
+  const report = contractReport(new Map([[
+    DEVICE_PREFERENCE_SOURCE,
+    "localStorage.setItem('kg_exam_papers_v1__admin', '[]')\n",
+  ]]))
+
+  assert.equal(report.blocked, true)
+  assert.deepEqual(report.unreviewed.devicePreferenceStorage, [{
+    path: DEVICE_PREFERENCE_SOURCE,
+    token: "localStorage.setItem('kg_exam_papers_v1__admin', '[]')",
     ordinal: 1,
   }])
 })
@@ -217,5 +237,5 @@ test('adding an occurrence in the same file fails the baseline', () => {
 
 test('runtime dependency inventory has no unreviewed additions', () => {
   const approved = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'))
-  assert.deepEqual(additions(inventory(), approved), { endpoint: [], consumer: [], runtimeKey: [], dynamicRuntimeKey: [] })
+  assert.deepEqual(additions(inventory(), approved), { endpoint: [], consumer: [], runtimeKey: [], dynamicRuntimeKey: [], devicePreferenceStorage: [] })
 })

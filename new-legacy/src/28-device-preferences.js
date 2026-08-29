@@ -19,7 +19,6 @@
     'kg_file_manager_sidebar_collapsed_v1',
     'kg_file_manager_sort_v1',
     'kg_file_manager_theme_v1',
-    'kg_deep_recall_theme_platform_migrated_v1',
     'kg_deep_recall_theme_v1',
     'kg_multi_question_analysis_sections_v1',
     'kg_multi_question_font_scale_v1',
@@ -36,6 +35,13 @@
     'pmp_question_font_size_v1',
     'pmp_question_font_size_v2',
   ])
+  const SCOPED_UI_BASE_KEYS = Object.freeze([
+    'kg_multi_question_highlight_color_v1',
+    'kg_multi_question_analysis_sections_v1',
+    'kg_multi_question_paper_selection_v1',
+    'kg_multi_question_release_selection_v1',
+    'kg_canvas_workspace_catalog_v2',
+  ])
   const PREFIXES = Object.freeze([
     'kg_resizable_',
     'kg_ui_resizable_region_',
@@ -46,9 +52,21 @@
     'kg_theme_',
   ])
 
+  function isApprovedScope(scope) {
+    if (!scope) return false
+    try { return encodeURIComponent(decodeURIComponent(scope)) === scope } catch (_) { return false }
+  }
+
+  function isAllowedScopedUiKey(key) {
+    return SCOPED_UI_BASE_KEYS.some(base => {
+      const marker = `${base}__`
+      return key.startsWith(marker) && isApprovedScope(key.slice(marker.length))
+    })
+  }
+
   function assertAllowed(key) {
     const normalized = String(key)
-    if (EXACT_KEYS.includes(normalized) || PREFIXES.some(prefix => normalized.startsWith(prefix))) return normalized
+    if (EXACT_KEYS.includes(normalized) || PREFIXES.some(prefix => normalized.startsWith(prefix)) || isAllowedScopedUiKey(normalized)) return normalized
     const error = new Error(`Device preference key is forbidden: ${normalized}`)
     error.code = 'DEVICE_PREFERENCE_KEY_FORBIDDEN'
     throw error
@@ -82,6 +100,7 @@
 
   global.KGDevicePreferences = Object.freeze({
     EXACT_KEYS,
+    SCOPED_UI_BASE_KEYS,
     PREFIXES,
     getJSON,
     setJSON,
