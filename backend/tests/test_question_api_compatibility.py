@@ -217,6 +217,219 @@ def test_legacy_question_endpoints_delegate_access_and_preserve_new_fields() -> 
         asyncio.run(cleanup())
 
 
+def test_permanent_question_delete_rejects_every_draft_and_release_reference() -> None:
+    """Deleting a question must never rewrite drafts or immutable releases."""
+
+    suffix = uuid4().hex[:10]
+    username = f"question-delete-guard-{suffix}"
+    bank_id = f"bank-delete-guard-{suffix}"
+    draft_question_id = f"question-draft-ref-{suffix}"
+    release_question_id = f"question-release-ref-{suffix}"
+    paper_ids = [f"paper-selected-{suffix}", f"paper-unselected-{suffix}"]
+    release_id = f"release-unselected-{suffix}"
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(User(username=username, password_hash=hash_password(PASSWORD), role="teacher", status="active"))
+            await db.flush()
+            db.add(QuestionBank(id=bank_id, owner_id=username, source_id=bank_id, name="删除保护题库", subject="PMP"))
+            await db.flush()
+            db.add_all([
+                Question(id=draft_question_id, bank_id=bank_id, source_id=draft_question_id, title="草稿引用题", subject="PMP"),
+                Question(id=release_question_id, bank_id=bank_id, source_id=release_question_id, title="发布引用题", subject="PMP"),
+            ])
+            db.add_all([
+                ExamPaper(id=paper_id, owner_id=username, name=paper_id, subject="PMP", status="draft")
+                for paper_id in paper_ids
+            ])
+            await db.flush()
+            db.add_all([
+                PaperQuestion(paper_id=paper_id, question_id=draft_question_id, order_index=0)
+                for paper_id in paper_ids
+            ])
+            db.add(PaperRelease(
+                id=release_id,
+                paper_id=f"historical-paper-{suffix}",
+                version=1,
+                status="withdrawn",
+                name="未选中的历史发布",
+                subject="PMP",
+                publisher_id=username,
+                access_level="free",
+                enabled_modes=["deep_recall"],
+                allowed_roles=["student"],
+                question_count=1,
+            ))
+            await db.flush()
+            db.add(PaperReleaseQuestion(
+                release_id=release_id,
+                order_index=0,
+                bank_id=bank_id,
+                question_id=release_question_id,
+                snapshot={"id": release_question_id, "bankId": bank_id, "title": "冻结题"},
+            ))
+            await db.commit()
+
+    async def state() -> dict:
+        async with AsyncSessionLocal() as db:
+            return {
+                "draftQuestion": await db.get(Question, draft_question_id) is not None,
+                "releaseQuestion": await db.get(Question, release_question_id) is not None,
+                "draftLinks": int(await db.scalar(select(func.count()).select_from(PaperQuestion).where(PaperQuestion.question_id == draft_question_id)) or 0),
+                "releaseLinks": int(await db.scalar(select(func.count()).select_from(PaperReleaseQuestion).where(PaperReleaseQuestion.question_id == release_question_id)) or 0),
+                "paperQuestionIds": list((await db.scalars(select(PaperQuestion.question_id).where(PaperQuestion.paper_id.in_(paper_ids)).order_by(PaperQuestion.paper_id))).all()),
+                "releaseSnapshot": (await db.scalar(select(PaperReleaseQuestion.snapshot).where(PaperReleaseQuestion.release_id == release_id))),
+            }
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == release_id))
+            await db.execute(delete(PaperRelease).where(PaperRelease.id == release_id))
+            await db.execute(delete(PaperQuestion).where(PaperQuestion.paper_id.in_(paper_ids)))
+            await db.execute(delete(ExamPaper).where(ExamPaper.id.in_(paper_ids)))
+            await db.execute(delete(Question).where(Question.bank_id == bank_id))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.execute(delete(User).where(User.username == username))
+            await db.commit()
+
+    asyncio.run(seed())
+    before = asyncio.run(state())
+    try:
+        with TestClient(app) as client:
+            _login(client, username)
+            draft_delete = client.delete(f"/api/v1/questions/{draft_question_id}")
+            assert draft_delete.status_code == 409, draft_delete.text
+            assert draft_delete.json()["detail"] == {
+                "code": "QUESTION_REFERENCED",
+                "message": "题目仍被试卷引用，不能永久删除",
+                "draftReferenceCount": 2,
+                "releaseReferenceCount": 0,
+            }
+            assert asyncio.run(state()) == before
+
+            release_delete = client.delete(f"/api/v1/questions/{release_question_id}")
+            assert release_delete.status_code == 409, release_delete.text
+            assert release_delete.json()["detail"] == {
+                "code": "QUESTION_REFERENCED",
+                "message": "题目仍被试卷引用，不能永久删除",
+                "draftReferenceCount": 0,
+                "releaseReferenceCount": 1,
+            }
+            assert asyncio.run(state()) == before
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_question_reference_snapshot_includes_unselected_drafts_and_releases(monkeypatch) -> None:
+    """The admin snapshot is complete relational data, not a selected-page summary."""
+
+    suffix = uuid4().hex[:10]
+    username = f"reference-snapshot-{suffix}"
+    bank_id = f"reference-bank-{suffix}"
+    question_id = f"reference-question-{suffix}"
+    paper_ids = [f"reference-paper-a-{suffix}", f"reference-paper-b-{suffix}"]
+    release_id = f"reference-release-{suffix}"
+
+    async def seed() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(User(username=username, password_hash=hash_password(PASSWORD), role="teacher", status="active"))
+            await db.flush()
+            db.add(QuestionBank(id=bank_id, owner_id=username, source_id=bank_id, name="完整引用题库", subject="PMP"))
+            await db.flush()
+            db.add(Question(
+                id=question_id,
+                bank_id=bank_id,
+                source_id=question_id,
+                title="完整引用题",
+                subject="PMP",
+                content_metadata={"knowledge": {"primaryNodeId": "node-complete"}},
+            ))
+            db.add_all([
+                ExamPaper(id=paper_id, owner_id=username, name=paper_id, subject="PMP", status="draft")
+                for paper_id in paper_ids
+            ])
+            await db.flush()
+            db.add_all([
+                PaperQuestion(paper_id=paper_id, question_id=question_id, order_index=0)
+                for paper_id in paper_ids
+            ])
+            db.add(PaperRelease(
+                id=release_id,
+                paper_id=f"historical-{suffix}",
+                version=4,
+                status="withdrawn",
+                name="未选中历史发布",
+                subject="PMP",
+                publisher_id=username,
+                access_level="free",
+                enabled_modes=["deep_recall"],
+                allowed_roles=["student"],
+                question_count=1,
+            ))
+            await db.flush()
+            db.add(PaperReleaseQuestion(
+                release_id=release_id,
+                order_index=0,
+                bank_id=bank_id,
+                question_id=question_id,
+                snapshot={"id": question_id, "bankId": bank_id, "title": "冻结引用题"},
+            ))
+            await db.commit()
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == release_id))
+            await db.execute(delete(PaperRelease).where(PaperRelease.id == release_id))
+            await db.execute(delete(PaperQuestion).where(PaperQuestion.paper_id.in_(paper_ids)))
+            await db.execute(delete(ExamPaper).where(ExamPaper.id.in_(paper_ids)))
+            await db.execute(delete(Question).where(Question.id == question_id))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+            await db.execute(delete(User).where(User.username == username))
+            await db.commit()
+
+    asyncio.run(seed())
+    read_lock_calls: list[bool] = []
+    original_read_lock = teaching_content_revision_service.acquire_read_lock
+
+    async def recording_read_lock(db: AsyncSession) -> None:
+        read_lock_calls.append(True)
+        await original_read_lock(db)
+
+    monkeypatch.setattr(
+        teaching_content_revision_service,
+        "acquire_read_lock",
+        recording_read_lock,
+    )
+    try:
+        with TestClient(app) as client:
+            _login(client, username)
+            response = client.get("/api/v1/questions/reference-snapshot")
+            assert response.status_code == 200, response.text
+            snapshot = response.json()
+            bank = next(row for row in snapshot["banks"] if row["id"] == bank_id)
+            assert [row["id"] for row in bank["questions"]] == [question_id]
+            assert bank["questions"][0]["metadata"]["knowledge"]["primaryNodeId"] == "node-complete"
+            drafts = [row for row in snapshot["papers"] if row["id"] in paper_ids]
+            assert {row["id"] for row in drafts} == set(paper_ids)
+            assert {
+                row["sections"][0]["items"][0]["questionId"] for row in drafts
+            } == {question_id}
+            release = next(row for row in snapshot["releases"] if row["id"] == release_id)
+            assert release["status"] == "withdrawn"
+            assert release["sections"][0]["items"] == [{
+                "bankId": bank_id,
+                "questionId": question_id,
+                "order": 1,
+                "score": 1,
+            }]
+            serialized = response.text
+            assert "/api/v1/runtime/state" not in serialized
+            assert "SharedRuntime" not in serialized
+            assert read_lock_calls == [True]
+    finally:
+        asyncio.run(cleanup())
+
+
 def test_admin_and_teacher_share_paper_crud_compose_publish_and_audit() -> None:
     """Catches restoring owner filters or losing creator/updater/revision audit data."""
 

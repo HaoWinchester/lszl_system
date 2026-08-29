@@ -6,11 +6,14 @@
   const permissions=new global.KGAdminPermissionService({auth:global.KGAuthCore});
   const audit=new global.KGAdminAuditService(repository);
   const transactions=new global.KGAdminTransactionService(repository,audit,permissions);
-  const references=new global.KGReferenceIndexService({content:legacy,organization:global.KGContentOrganization});
+  const references=new global.KGReferenceIndexService({content:legacy,organization:global.KGContentOrganization,referenceSnapshotPending:true});
+  const referenceSnapshotReady=global.KGReferenceIndexService.loadReferenceSnapshot()
+    .then(snapshot=>{references.updateReferenceSnapshot(snapshot);return snapshot})
+    .catch(error=>{global.console?.warn?.('内容引用索引加载失败',error);return null});
   const subjects=new global.KGSubjectService({legacy,transactions,permissions,references});
   const taxonomies=new global.KGTaxonomyService({legacy,repository,transactions,permissions,audit,references});
   const activities=new global.KGActivityService({legacy,transactions,references});
   const courses=new global.KGCourseService({legacy,transactions,references});
   const releases=new global.KGReleaseService({content:legacy,organization:global.KGContentOrganization});
-  global.KGAdminServices=Object.freeze({version:global.KGAdminCore.VERSION,repository,permissions,audit,transactions,references,subjects,taxonomies,activities,courses,releases,legacyContent:legacy});
+  global.KGAdminServices=Object.freeze({version:global.KGAdminCore.VERSION,repository,permissions,audit,transactions,references,referenceSnapshotReady,subjects,taxonomies,activities,courses,releases,legacyContent:legacy});
 })(window);

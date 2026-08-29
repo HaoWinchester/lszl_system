@@ -3,22 +3,19 @@
   const Core=global.KGAdminCore;
   async function loadReferenceSnapshot(){
     const api=global.KGDomainApi;if(!api?.request)throw new Error('内容引用 API 未加载，请刷新后重试。');
-    const [bankPayload,paperPayload,releasePayload]=await Promise.all([
-      api.request({path:'/api/v1/banks'}),
-      api.request({path:'/api/v1/papers'}),
-      api.request({path:'/api/v1/paper-releases/management-catalog?page=1&pageSize=100'}),
-    ]);
+    const snapshot=await api.request({path:'/api/v1/questions/reference-snapshot'});
     return {
-      banks:Array.isArray(bankPayload?.banks)?bankPayload.banks:[],
-      papers:Array.isArray(paperPayload?.papers)?paperPayload.papers:[],
-      releases:Array.isArray(releasePayload?.papers)?releasePayload.papers:[],
+      banks:Array.isArray(snapshot?.banks)?snapshot.banks:[],
+      papers:Array.isArray(snapshot?.papers)?snapshot.papers:[],
+      releases:Array.isArray(snapshot?.releases)?snapshot.releases:[],
     };
   }
   class ReferenceIndexService{
-    constructor(options={}){this.content=options.content;this.organization=options.organization||global.KGContentOrganization||null;this.referenceSnapshot=options.referenceSnapshot||{banks:[],papers:[],releases:[]};this.cache=null;this.builtAt=''}
+    constructor(options={}){this.content=options.content;this.organization=options.organization||global.KGContentOrganization||null;this.referenceSnapshot=options.referenceSnapshot||{banks:[],papers:[],releases:[]};this.referenceSnapshotReady=options.referenceSnapshotPending!==true;this.cache=null;this.builtAt=''}
     questionBanks(){return Array.isArray(this.referenceSnapshot?.banks)?this.referenceSnapshot.banks:[]}
-    updateReferenceSnapshot(snapshot={}){this.referenceSnapshot={banks:[],papers:[],releases:[],...snapshot};this.invalidate();return this.referenceSnapshot}
+    updateReferenceSnapshot(snapshot={}){this.referenceSnapshot={banks:[],papers:[],releases:[],...snapshot};this.referenceSnapshotReady=true;this.invalidate();return this.referenceSnapshot}
     build(){
+      if(!this.referenceSnapshotReady)throw new Error('内容引用索引尚未加载完成，请稍后重试。');
       const content=this.content,organization=this.organization;
       const subjects=content?.getSubjects?.()||[],taxonomies=content?.getTaxonomies?.()||[],activities=Object.values(content?.getActivityLibrary?.()||{}),questionBanks=this.questionBanks(),drafts=content?.getCourseDrafts?.()||[],releases=content?.getCourseReleases?.()||[],papers=[...(organization?.getPapers?.()||[]),...(this.referenceSnapshot?.papers||[]),...(this.referenceSnapshot?.releases||[])],tasks=organization?.getLearningTasks?.()||[],collections=organization?.getCollections?.()||[];
       const nodeRefs={},activityRefs={},taxonomyRefs={},subjectRefs={};
@@ -51,7 +48,7 @@
       };
       drafts.forEach(course=>indexCourse(course,'draft'));
       releases.forEach(release=>indexCourse(release.course||{},'release',release.version));
-      papers.forEach(paper=>{pushUnique(subjectRefs,paper.subjectId,{kind:'paper',id:paper.id,title:paper.title,detail:paper.status,source:'assessment'});(paper.sections||[]).forEach(section=>(section.items||[]).forEach(item=>pushUnique(activityRefs,item.activityId,{kind:'paper',id:paper.id,title:paper.title,detail:section.title,source:paper.status}))) });
+      papers.forEach(paper=>{const subjectId=content?.subjectById?.(paper.subjectId)?.id||'';pushUnique(subjectRefs,subjectId,{kind:'paper',id:paper.id,title:paper.title,detail:paper.status,source:'assessment'});(paper.sections||[]).forEach(section=>(section.items||[]).forEach(item=>pushUnique(activityRefs,item.activityId,{kind:'paper',id:paper.id,title:paper.title,detail:section.title,source:paper.status}))) });
       tasks.forEach(task=>{pushUnique(subjectRefs,task.subjectId,{kind:'learning_task',id:task.id,title:task.title,detail:task.type,source:task.status});(task.sourceActivityIds||[]).forEach(activityId=>pushUnique(activityRefs,activityId,{kind:'learning_task',id:task.id,title:task.title,detail:task.type,source:task.status}))});
       collections.forEach(collection=>(collection.activityIds||[]).forEach(activityId=>pushUnique(activityRefs,activityId,{kind:collection.type==='favorites'?'favorite':'collection',id:collection.id,title:collection.title,detail:collection.type,source:'organization'})));
       Object.entries(nodeRefs).forEach(([nodeId,refs])=>refs.filter(ref=>ref.kind==='activity').forEach(ref=>(activityRefs[ref.id]||[]).forEach(downstream=>pushUnique(nodeRefs,nodeId,{...downstream,viaActivityId:ref.id}))));

@@ -13,12 +13,14 @@ import hashlib
 import json
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.question import ExamPaper, PaperQuestion
+from app.models.paper_release import PaperRelease, PaperReleaseQuestion
+from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.schemas.question_cleanup import QuestionCleanupReference
+from app.services import teaching_content_revision_service
 
 
 CURRENT_RUNTIME_KEY_TYPES: dict[str, str] = {
@@ -66,6 +68,133 @@ _QUESTION_COLLECTION_FIELDS = frozenset(
 
 class QuestionCleanupReferenceRepairError(ValueError):
     """A locked managed payload is unsafe to inspect or repair."""
+
+
+async def relational_question_reference_counts(
+    db: AsyncSession,
+    question_id: str,
+) -> dict[str, int]:
+    """Count every authoritative draft and immutable-release reference."""
+
+    draft_count = int(
+        await db.scalar(
+            select(func.count())
+            .select_from(PaperQuestion)
+            .where(PaperQuestion.question_id == question_id)
+        )
+        or 0
+    )
+    release_count = int(
+        await db.scalar(
+            select(func.count())
+            .select_from(PaperReleaseQuestion)
+            .where(PaperReleaseQuestion.question_id == question_id)
+        )
+        or 0
+    )
+    return {
+        "draftReferenceCount": draft_count,
+        "releaseReferenceCount": release_count,
+    }
+
+
+async def complete_relational_reference_snapshot(db: AsyncSession) -> dict[str, list[dict]]:
+    """Return every relational question, draft-paper, and release reference.
+
+    This intentionally has no selection or pagination inputs: admin reference
+    checks must see unselected containers and immutable historical releases.
+    """
+
+    await teaching_content_revision_service.acquire_read_lock(db)
+    banks = list((await db.scalars(select(QuestionBank).order_by(QuestionBank.id))).all())
+    questions = list((await db.scalars(select(Question).order_by(Question.bank_id, Question.id))).all())
+    questions_by_bank: dict[str, list[dict]] = {}
+    for question in questions:
+        questions_by_bank.setdefault(question.bank_id, []).append(
+            {
+                "id": question.id,
+                "bankId": question.bank_id,
+                "title": question.title,
+                "teacherNumber": question.teacher_number,
+                "metadata": question.content_metadata or {},
+            }
+        )
+
+    bank_payloads = [
+        {
+            "id": bank.id,
+            "name": bank.name,
+            "subject": bank.subject,
+            "questions": questions_by_bank.get(bank.id, []),
+        }
+        for bank in banks
+    ]
+
+    paper_rows = (
+        await db.execute(
+            select(ExamPaper, PaperQuestion)
+            .outerjoin(PaperQuestion, PaperQuestion.paper_id == ExamPaper.id)
+            .order_by(ExamPaper.id, PaperQuestion.order_index)
+        )
+    ).all()
+    paper_payloads: list[dict] = []
+    paper_by_id: dict[str, dict] = {}
+    for paper, reference in paper_rows:
+        payload = paper_by_id.get(paper.id)
+        if payload is None:
+            payload = {
+                "id": paper.id,
+                "title": paper.name,
+                "subjectId": paper.subject,
+                "status": paper.status,
+                "sections": [{"id": "questions", "title": "试卷题目", "items": []}],
+            }
+            paper_by_id[paper.id] = payload
+            paper_payloads.append(payload)
+        if reference is not None:
+            payload["sections"][0]["items"].append(
+                {
+                    "questionId": reference.question_id,
+                    "order": reference.order_index + 1,
+                    "score": float(reference.score),
+                }
+            )
+
+    release_rows = (
+        await db.execute(
+            select(PaperRelease, PaperReleaseQuestion)
+            .outerjoin(PaperReleaseQuestion, PaperReleaseQuestion.release_id == PaperRelease.id)
+            .order_by(PaperRelease.id, PaperReleaseQuestion.order_index)
+        )
+    ).all()
+    release_payloads: list[dict] = []
+    release_by_id: dict[str, dict] = {}
+    for release, reference in release_rows:
+        payload = release_by_id.get(release.id)
+        if payload is None:
+            payload = {
+                "id": release.id,
+                "releaseId": release.id,
+                "paperId": release.paper_id,
+                "version": release.version,
+                "title": release.name,
+                "subjectId": release.subject,
+                "status": release.status,
+                "sections": [{"id": "questions", "title": "试卷题目", "items": []}],
+            }
+            release_by_id[release.id] = payload
+            release_payloads.append(payload)
+        if reference is not None:
+            payload["sections"][0]["items"].append(
+                {
+                    "bankId": reference.bank_id,
+                    "questionId": reference.question_id,
+                    "order": reference.order_index + 1,
+                    "score": 1,
+                }
+            )
+
+    return {"banks": bank_payloads, "papers": paper_payloads, "releases": release_payloads}
 
 
 def _canonical_json(value: object) -> str:

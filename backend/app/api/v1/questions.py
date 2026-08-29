@@ -11,6 +11,9 @@ from app.models.user import User
 from app.schemas.question_catalog import QuestionBankImportRequest, QuestionBankImportResponse
 from app.services import question_service
 from app.services import question_migration_service
+from app.services.question_cleanup_reference_service import (
+    complete_relational_reference_snapshot,
+)
 
 router = APIRouter(tags=["question-bank"])
 DB = Annotated[AsyncSession, Depends(get_db)]
@@ -93,6 +96,11 @@ async def clear_bank_test_learning_records(
 
 
 # ---------- 题目 ----------
+@router.get("/questions/reference-snapshot")
+async def question_reference_snapshot(db: DB, user: QuestionBankManager):
+    return await complete_relational_reference_snapshot(db)
+
+
 @router.get("/banks/{bank_id}/questions")
 async def list_questions(
     db: DB,

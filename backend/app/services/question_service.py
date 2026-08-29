@@ -20,6 +20,7 @@ from app.services import (
     teaching_content_revision_service,
 )
 from app.services.question_cleanup_reference_service import (
+    relational_question_reference_counts,
     repair_current_question_references,
 )
 
@@ -1067,9 +1068,16 @@ async def delete_question(db: AsyncSession, owner: User | str, question_id: str)
         await question_access_service.require_bank_access(db, actor, q.bank_id, edit=True)
     except HTTPException:
         return False
-    links = (await db.execute(select(PaperQuestion).where(PaperQuestion.question_id == question_id))).scalars().all()
-    for l in links:
-        await db.delete(l)
+    references = await relational_question_reference_counts(db, question_id)
+    if references["draftReferenceCount"] or references["releaseReferenceCount"]:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "QUESTION_REFERENCED",
+                "message": "题目仍被试卷引用，不能永久删除",
+                **references,
+            },
+        )
     await db.delete(q)
     await teaching_content_revision_service.bump(
         db,

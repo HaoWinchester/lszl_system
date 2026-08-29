@@ -13,6 +13,10 @@ const questionBank = source('new-legacy/src/60-question-bank.js');
 const questionAdmin = source('new-legacy/src/65-question-bank-admin.js');
 const safeDelete = source('new-legacy/src/teacher/question-bank/safe-delete-service.js');
 const referenceIndex = source('new-legacy/src/admin/30-reference-index-service.js');
+const referenceRegistry = source('new-legacy/src/admin/40-admin-service-registry.js');
+const adminShell = source('new-legacy/src/admin/50-admin-shell-app.js');
+const adminSubjects = source('new-legacy/src/admin/51-admin-subjects-app.js');
+const adminSettings = source('new-legacy/src/admin/53-admin-settings-app.js');
 const backendPolicySource = source('backend/app/web/runtime_page_policy.json');
 const frontendPolicySource = source('frontend/scripts/runtime-page-policy.json');
 const backendPolicy = JSON.parse(backendPolicySource);
@@ -52,23 +56,81 @@ test('safe delete counts only caller-supplied API reference snapshots', () => {
   assert.deepEqual(Array.from(refs.locations, row => row.id), ['paper-1', 'release-1']);
 });
 
-test('reference index loads formal data through typed domain endpoints', async () => {
+test('reference index loads one complete typed snapshot without Runtime pagination gaps', async () => {
   const calls = [];
+  const completeSnapshot = {
+    banks: [{ id: 'bank-unselected', subject: 'PMP', questions: [{ id: 'question-unselected', metadata: { knowledge: { primaryNodeId: 'node-1' } } }] }],
+    papers: [{ id: 'paper-unselected', subjectId: 'PMP', sections: [{ id: 'questions', items: [{ questionId: 'question-unselected' }] }] }],
+    releases: [{ id: 'release-unselected', paperId: 'paper-unselected', sections: [{ id: 'questions', items: [{ questionId: 'question-unselected' }] }] }],
+  };
   const runtime = {
     KGAdminCore: { nowIso: () => '2026-08-29T00:00:00Z', clone: value => JSON.parse(JSON.stringify(value)) },
     KGDomainApi: { request: async request => {
       calls.push(request.path);
-      if (request.path === '/api/v1/banks') return { banks: [{ id: 'bank-1', subject: 'PMP', questions: [] }] };
-      if (request.path === '/api/v1/papers') return { papers: [{ id: 'paper-1', subjectId: 'PMP', sections: [] }] };
-      if (request.path === '/api/v1/paper-releases/management-catalog?page=1&pageSize=100') return { papers: [{ releaseId: 'release-1', paperId: 'paper-1' }] };
+      if (request.path === '/api/v1/questions/reference-snapshot') return completeSnapshot;
       throw new Error(`unexpected path ${request.path}`);
     } },
   };
   runtime.window = runtime;
   vm.runInNewContext(referenceIndex, runtime, { filename: '30-reference-index-service.js' });
   const snapshot = await runtime.KGReferenceIndexService.loadReferenceSnapshot();
-  assert.deepEqual(calls, ['/api/v1/banks', '/api/v1/papers', '/api/v1/paper-releases/management-catalog?page=1&pageSize=100']);
-  assert.equal(snapshot.banks[0].id, 'bank-1');
-  assert.equal(snapshot.papers[0].id, 'paper-1');
-  assert.equal(snapshot.releases[0].releaseId, 'release-1');
+  assert.deepEqual(calls, ['/api/v1/questions/reference-snapshot']);
+  assert.equal(snapshot.banks[0].questions[0].id, 'question-unselected');
+  assert.equal(snapshot.papers[0].sections[0].items[0].questionId, 'question-unselected');
+  assert.equal(snapshot.releases[0].sections[0].items[0].questionId, 'question-unselected');
+  assert.equal(calls.some(path => /runtime|SharedRuntime/i.test(path)), false);
+});
+
+test('production admin registry hydrates unselected draft and release references', async () => {
+  const calls = [];
+  const snapshot = {
+    banks: [{ id: 'bank-complete', subject: 'PMP', questions: [{ id: 'question-complete', title: '完整题目' }] }],
+    papers: [{ id: 'paper-unselected', title: '未选中草稿', subjectId: 'PMP', status: 'draft', sections: [{ items: [{ questionId: 'question-complete' }] }] }],
+    releases: [{ id: 'release-unselected', title: '历史发布', subjectId: 'PMP', status: 'withdrawn', sections: [{ items: [{ questionId: 'question-complete' }] }] }],
+  };
+  class EmptyService { constructor() {} }
+  const runtime = {
+    KGAdminCore: { VERSION: 'test', nowIso: () => '2026-08-29T00:00:00Z', clone: value => JSON.parse(JSON.stringify(value)) },
+    KGDomainApi: { request: async request => {
+      calls.push(request.path);
+      if (request.path === '/api/v1/questions/reference-snapshot') return snapshot;
+      throw new Error(`unexpected path ${request.path}`);
+    } },
+    KGLearningContent: {
+      storageKeys: {}, getSubjects: () => [], getTaxonomies: () => [], getActivityLibrary: () => ({}),
+      getCourseDrafts: () => [], getCourseReleases: () => [],
+      subjectById: id => id === 'PMP' ? { id: 'subject-pmp', code: 'PMP' } : null,
+    },
+    KGContentOrganization: { storageKeys: {}, getPapers: () => [], getLearningTasks: () => [], getCollections: () => [] },
+    KGLocalContentRepository: EmptyService,
+    KGAdminPermissionService: EmptyService,
+    KGAdminAuditService: EmptyService,
+    KGAdminTransactionService: EmptyService,
+    KGSubjectService: EmptyService,
+    KGTaxonomyService: EmptyService,
+    KGActivityService: EmptyService,
+    KGCourseService: EmptyService,
+    KGReleaseService: EmptyService,
+  };
+  runtime.window = runtime;
+  vm.runInNewContext(referenceIndex, runtime, { filename: '30-reference-index-service.js' });
+  vm.runInNewContext(referenceRegistry, runtime, { filename: '40-admin-service-registry.js' });
+
+  assert.throws(
+    () => runtime.KGAdminServices.references.ensure(),
+    /引用索引.*(?:加载|就绪)/,
+  );
+  await runtime.KGAdminServices.referenceSnapshotReady;
+  assert.deepEqual(calls, ['/api/v1/questions/reference-snapshot']);
+  assert.equal(runtime.KGAdminServices.references.questionBanks()[0].questions[0].id, 'question-complete');
+  assert.equal(runtime.KGAdminServices.references.ensure().papers.some(row => row.id === 'paper-unselected'), true);
+  assert.equal(runtime.KGAdminServices.references.ensure().papers.some(row => row.id === 'release-unselected'), true);
+  const subjectPaperRefs = runtime.KGAdminServices.references
+    .referencesForSubject('subject-pmp')
+    .filter(row => row.kind === 'paper');
+  assert.deepEqual(Array.from(subjectPaperRefs, row => row.id).sort(), ['paper-unselected', 'release-unselected']);
+  assert.equal(calls.some(path => /runtime|SharedRuntime/i.test(path)), false);
+  for (const productionConsumer of [adminShell, adminSubjects, adminSettings]) {
+    assert.match(productionConsumer, /await Services\.referenceSnapshotReady/);
+  }
 });
