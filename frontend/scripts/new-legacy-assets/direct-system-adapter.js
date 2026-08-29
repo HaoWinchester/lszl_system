@@ -237,21 +237,44 @@
     return { ok: true, order: orderState.find(order => order.id === String(orderId)) || null, message: '订阅申请已确认开通。' }
   }
 
-  async function cancelOrder(orderId) {
-    await request('POST', `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/cancel`)
+  async function cancelOrder(orderId, options = {}) {
+    await request('POST', `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/cancel`, {
+      note: String(options.note || '').trim(),
+    })
     await refreshOrders()
-    return { ok: true, order: orderState.find(order => order.id === String(orderId)) || null, message: '订阅申请已取消。' }
+    const order = orderState.find(item => item.id === String(orderId)) || null
+    if (!order || order.status !== 'cancelled') throw new Error('订单取消后未能读取权威状态，请重试。')
+    return { ok: true, order, message: '订阅申请已取消。' }
   }
 
   async function generateRedeemCodes(options = {}) {
     const payload = await request('POST', '/api/v1/subscriptions/redeem-codes/generate', {
       planId: options.planId || 'monthly',
-      count: Math.max(1, Math.min(500, Number(options.count) || 1)),
+      count: Math.max(1, Math.min(200, Number(options.count) || 1)),
+      prefix: String(options.prefix || 'VIP').trim(),
+      note: String(options.note || '').trim(),
     })
     const generated = new Set((payload.codes || []).map(code => String(code).toUpperCase()))
     await refreshRedeemCodes()
     const codes = redeemCodeState.filter(code => generated.has(code.code))
     return { ok: true, codes, message: `已生成 ${codes.length} 张卡密。` }
+  }
+
+  async function updateRedeemCodeStatus(codeId, status) {
+    await request('PATCH', `/api/v1/subscriptions/redeem-codes/${encodeURIComponent(codeId)}`, { status })
+    await refreshRedeemCodes()
+    const code = redeemCodeState.find(item => item.id === String(codeId)) || null
+    if (!code || code.status !== status) throw new Error('卡密更新后未能读取权威状态，请重试。')
+    return { ok: true, code, message: status === 'disabled' ? '卡密已停用。' : '卡密已启用。' }
+  }
+
+  async function removeRedeemCode(codeId) {
+    await request('DELETE', `/api/v1/subscriptions/redeem-codes/${encodeURIComponent(codeId)}`)
+    await refreshRedeemCodes()
+    if (redeemCodeState.some(item => item.id === String(codeId))) {
+      throw new Error('卡密删除后仍存在，请重试。')
+    }
+    return { ok: true, message: '卡密已删除。' }
   }
 
   async function redeemCode(input) {
@@ -329,6 +352,9 @@
   subscriptionApi.redeemCodeList = options => filteredRecords(redeemCodeState, options)
     .slice().sort((left, right) => right.createdAt - left.createdAt)
   subscriptionApi.generateRedeemCodes = generateRedeemCodes
+  subscriptionApi.disableRedeemCode = codeId => updateRedeemCodeStatus(codeId, 'disabled')
+  subscriptionApi.enableRedeemCode = codeId => updateRedeemCodeStatus(codeId, 'unused')
+  subscriptionApi.removeRedeemCode = removeRedeemCode
   subscriptionApi.redeemCode = redeemCode
 
   if (typeof global.addEventListener === 'function') {

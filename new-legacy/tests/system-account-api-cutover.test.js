@@ -173,8 +173,9 @@ test('system adapter hydrates immutable UI stores from domain APIs and keeps pri
 
 test('subscription order and redeem-code mutations reload authoritative API state', async () => {
   const calls = []
-  let orderStatus = 'pending'
-  let codes = [{ id: 'code-1', code: 'VIP-ONE', planId: 'monthly', planName: '月度会员', status: 'unused', createdAt: '2026-08-29T00:00:00Z' }]
+  let failOrderRefresh = false
+  let order = { id: 'db-order', username: 'learner', planId: 'monthly', planName: '月度会员', status: 'pending', note: '', createdAt: '2026-08-29T00:00:00Z' }
+  let codes = [{ id: 'code-1', code: 'VIP-ONE', planId: 'monthly', planName: '月度会员', status: 'unused', note: '首批', createdAt: '2026-08-29T00:00:00Z' }]
   const subscriptions = {
     orderList: () => [{ id: 'memory-order', status: 'pending' }],
     redeemCodeList: () => [{ id: 'memory-code', code: 'MEMORY' }],
@@ -207,16 +208,30 @@ test('subscription order and redeem-code mutations reload authoritative API stat
         if (options.path === '/api/v1/system/wechat-pay-config') return { config: {} }
         if (options.path === '/api/v1/system/logs?limit=100') return { logs: [] }
         if (options.path === '/api/v1/subscriptions/orders' && (!options.method || options.method === 'GET')) {
-          return { orders: [{ id: 'db-order', username: 'learner', planId: 'monthly', planName: '月度会员', status: orderStatus, createdAt: '2026-08-29T00:00:00Z' }] }
+          if (failOrderRefresh) throw new Error('订单刷新失败')
+          return { orders: [order] }
         }
         if (options.path === '/api/v1/subscriptions/orders/db-order/approve') {
-          orderStatus = 'approved'
-          return { order: { id: 'db-order', status: orderStatus } }
+          order = { ...order, status: 'approved' }
+          return { order }
         }
-        if (options.path === '/api/v1/subscriptions/redeem-codes') return { codes }
+        if (options.path === '/api/v1/subscriptions/orders/db-order/cancel') {
+          order = { ...order, status: 'cancelled', note: options.body?.note || '' }
+          return { order }
+        }
+        if (options.path === '/api/v1/subscriptions/redeem-codes' && (!options.method || options.method === 'GET')) return { codes }
         if (options.path === '/api/v1/subscriptions/redeem-codes/generate') {
-          codes = [{ id: 'code-2', code: 'VIP-TWO', planId: 'monthly', planName: '月度会员', status: 'unused', createdAt: '2026-08-29T01:00:00Z' }, ...codes]
-          return { codes: ['VIP-TWO'] }
+          codes = [{ id: 'code-2', code: `${options.body.prefix}-TWO`, planId: 'monthly', planName: '月度会员', status: 'unused', note: options.body.note, createdAt: '2026-08-29T01:00:00Z' }, ...codes]
+          return { codes: [codes[0].code] }
+        }
+        if (options.path === '/api/v1/subscriptions/redeem-codes/code-2' && options.method === 'PATCH') {
+          codes = codes.map(code => code.id === 'code-2' ? { ...code, status: options.body.status } : code)
+          return { code: codes[0] }
+        }
+        if (options.path === '/api/v1/subscriptions/redeem-codes/code-2' && options.method === 'DELETE') {
+          const removed = codes.find(code => code.id === 'code-2')
+          codes = codes.filter(code => code.id !== 'code-2')
+          return { code: removed }
         }
         throw new Error(`unexpected ${options.method || 'GET'} ${options.path}`)
       },
@@ -236,9 +251,47 @@ test('subscription order and redeem-code mutations reload authoritative API stat
   assert.equal(approved.ok, true)
   assert.equal(subscriptions.orderList({})[0].status, 'approved')
 
-  const generated = await subscriptions.generateRedeemCodes({ planId: 'monthly', count: 1 })
+  const generated = await subscriptions.generateRedeemCodes({ planId: 'monthly', count: 1, prefix: 'EVENT', note: '线下活动' })
   assert.equal(generated.ok, true)
-  assert.equal(subscriptions.redeemCodeList({})[0].code, 'VIP-TWO')
+  assert.equal(subscriptions.redeemCodeList({})[0].code, 'EVENT-TWO')
+  assert.equal(subscriptions.redeemCodeList({})[0].note, '线下活动')
+
+  await subscriptions.disableRedeemCode('code-2')
+  assert.equal(subscriptions.redeemCodeList({})[0].status, 'disabled')
+  await subscriptions.enableRedeemCode('code-2')
+  assert.equal(subscriptions.redeemCodeList({})[0].status, 'unused')
+  await subscriptions.removeRedeemCode('code-2')
+  assert.equal(subscriptions.redeemCodeList({}).some(code => code.id === 'code-2'), false)
+
+  order = { ...order, status: 'pending', note: '' }
+  await context.KGSystemDomain.refreshOrders()
+  const cancelled = await subscriptions.cancelOrder('db-order', { note: '资料不完整' })
+  assert.equal(cancelled.ok, true)
+  assert.equal(subscriptions.orderList({})[0].status, 'cancelled')
+  assert.equal(subscriptions.orderList({})[0].note, '资料不完整')
+
+  order = { ...order, status: 'pending', note: '' }
+  await context.KGSystemDomain.refreshOrders()
+  failOrderRefresh = true
+  await assert.rejects(
+    subscriptions.cancelOrder('db-order', { note: '刷新失败也不能谎报成功' }),
+    /订单刷新失败/,
+  )
+  assert.equal(subscriptions.orderList({})[0].status, 'pending')
+  failOrderRefresh = false
+  await context.KGSystemDomain.refreshOrders()
+  assert.equal(subscriptions.orderList({})[0].status, 'cancelled')
+  assert.equal(subscriptions.orderList({})[0].note, '刷新失败也不能谎报成功')
+
+  const generatedCall = calls.find(call => call.path.endsWith('/redeem-codes/generate'))
+  assert.equal(generatedCall.body.planId, 'monthly')
+  assert.equal(generatedCall.body.count, 1)
+  assert.equal(generatedCall.body.prefix, 'EVENT')
+  assert.equal(generatedCall.body.note, '线下活动')
+  const cancelCalls = calls.filter(call => call.path.endsWith('/orders/db-order/cancel'))
+  assert.equal(cancelCalls.length, 2)
+  assert.equal(cancelCalls[0].body.note, '资料不完整')
+  assert.equal(cancelCalls[1].body.note, '刷新失败也不能谎报成功')
   assert.equal(calls.some(call => call.path.includes('/api/v1/runtime/')), false)
 })
 

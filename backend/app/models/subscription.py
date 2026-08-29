@@ -67,3 +67,4 @@ class RedeemCode(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     used_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_by: Mapped[str] = mapped_column(String(64), default="admin")
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)

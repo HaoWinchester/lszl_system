@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import time
 from uuid import uuid4
@@ -620,6 +621,147 @@ def account_system_cutover_regression(
                         restored_card.locator('[data-theme-field="primary"]').fill(original)
                         with page.expect_response(lambda response: "/api/v1/system/themes/admin" in response.url and response.request.method == "PUT"):
                             restored_card.locator('[data-save-theme="admin"]').click()
+
+                    prefix = f"E2E{uuid4().hex[:5]}".upper()
+                    code_note = f"浏览器卡密-{uuid4().hex[:8]}"
+                    generated_code_id = ""
+                    try:
+                        page.locator('[data-ss-tab="subscriptions"]').click()
+                        page.locator("#ssRedeemCountInput").fill("1")
+                        page.locator("#ssRedeemPrefixInput").fill(prefix)
+                        page.locator("#ssRedeemNoteInput").fill(code_note)
+                        with page.expect_response(
+                            lambda response: response.url.endswith(
+                                "/api/v1/subscriptions/redeem-codes/generate"
+                            )
+                            and response.request.method == "POST"
+                        ) as generated:
+                            page.locator("#ssGenerateRedeemCodesBtn").click()
+                        assert generated.value.ok, generated.value.text()
+                        generated_body = generated.value.request.post_data_json
+                        assert generated_body["prefix"] == prefix
+                        assert generated_body["note"] == code_note
+                        generated_code = generated.value.json()["codes"][0]
+                        code_card = page.locator(".subscription-code-item").filter(
+                            has_text=generated_code
+                        )
+                        code_card.wait_for(state="visible")
+                        assert code_note in code_card.inner_text()
+                        generated_code_id = code_card.get_attribute("data-code-id") or ""
+                        assert generated_code_id
+
+                        with page.expect_response(
+                            lambda response: response.url.endswith(
+                                f"/api/v1/subscriptions/redeem-codes/{generated_code_id}"
+                            )
+                            and response.request.method == "PATCH"
+                        ) as disabled:
+                            code_card.locator('[data-code-action="disable"]').click()
+                        assert disabled.value.ok, disabled.value.text()
+                        disabled_card = page.locator(
+                            f'.subscription-code-item[data-code-id="{generated_code_id}"]'
+                        )
+                        disabled_card.locator('[data-code-action="enable"]:not([disabled])').wait_for(
+                            state="visible"
+                        )
+
+                        with page.expect_response(
+                            lambda response: response.url.endswith(
+                                f"/api/v1/subscriptions/redeem-codes/{generated_code_id}"
+                            )
+                            and response.request.method == "PATCH"
+                        ) as enabled:
+                            disabled_card.locator('[data-code-action="enable"]').click()
+                        assert enabled.value.ok, enabled.value.text()
+                        enabled_card = page.locator(
+                            f'.subscription-code-item[data-code-id="{generated_code_id}"]'
+                        )
+                        enabled_card.locator('[data-code-action="disable"]:not([disabled])').wait_for(
+                            state="visible"
+                        )
+
+                        page.once("dialog", lambda dialog: dialog.accept())
+                        with page.expect_response(
+                            lambda response: response.url.endswith(
+                                f"/api/v1/subscriptions/redeem-codes/{generated_code_id}"
+                            )
+                            and response.request.method == "DELETE"
+                        ) as removed:
+                            enabled_card.locator('[data-code-action="remove"]').click()
+                        assert removed.value.ok, removed.value.text()
+                        enabled_card.wait_for(state="detached")
+                        generated_code_id = ""
+                    finally:
+                        if generated_code_id:
+                            admin.request.delete(
+                                f"{BASE}/api/v1/subscriptions/redeem-codes/{generated_code_id}"
+                            )
+
+                    fake_order = {
+                        "id": f"e2e-cancel-{uuid4().hex}",
+                        "username": "e2e-student",
+                        "planId": "monthly",
+                        "planName": "月度会员",
+                        "status": "pending",
+                        "note": "",
+                        "createdAt": "2026-08-29T00:00:00Z",
+                    }
+                    cancel_reason = f"浏览器取消-{uuid4().hex[:8]}"
+                    captured_cancel_body: dict = {}
+                    order_route_pattern = "**/api/v1/subscriptions/orders**"
+
+                    def route_order_controls(route):
+                        nonlocal fake_order, captured_cancel_body
+                        if route.request.method == "POST" and route.request.url.endswith(
+                            f"/{fake_order['id']}/cancel"
+                        ):
+                            captured_cancel_body = route.request.post_data_json or {}
+                            fake_order = {
+                                **fake_order,
+                                "status": "cancelled",
+                                "note": captured_cancel_body.get("note", ""),
+                            }
+                            route.fulfill(
+                                status=200,
+                                content_type="application/json",
+                                body=json.dumps({"order": fake_order}, ensure_ascii=False),
+                            )
+                        elif route.request.method == "GET" and route.request.url.endswith(
+                            "/api/v1/subscriptions/orders"
+                        ):
+                            route.fulfill(
+                                status=200,
+                                content_type="application/json",
+                                body=json.dumps({"orders": [fake_order]}, ensure_ascii=False),
+                            )
+                        else:
+                            route.continue_()
+
+                    page.route(order_route_pattern, route_order_controls)
+                    try:
+                        page.evaluate("() => window.KGSystemDomain.refreshOrders()")
+                        order_card = page.locator(
+                            f'.subscription-order-item[data-order-id="{fake_order["id"]}"]'
+                        )
+                        order_card.wait_for(state="visible")
+                        page.once("dialog", lambda dialog: dialog.accept(cancel_reason))
+                        with page.expect_response(
+                            lambda response: response.url.endswith(
+                                f"/{fake_order['id']}/cancel"
+                            )
+                            and response.request.method == "POST"
+                        ):
+                            order_card.locator('[data-order-action="cancel"]').click()
+                        cancelled_card = page.locator(
+                            f'.subscription-order-item[data-order-id="{fake_order["id"]}"]'
+                        )
+                        cancelled_card.get_by_text(cancel_reason, exact=False).wait_for(
+                            state="visible"
+                        )
+                        assert captured_cancel_body == {"note": cancel_reason}
+                    finally:
+                        page.unroute(order_route_pattern, route_order_controls)
+                        page.evaluate("() => window.KGSystemDomain.refreshOrders()")
                 else:
                     page.locator("#adminHealthBtn").click()
                     page.locator("#adminRepositoryHealth").filter(has_text="正常").wait_for(state="visible")

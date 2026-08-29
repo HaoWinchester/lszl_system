@@ -13,7 +13,12 @@ from app.core.security import uid
 from app.db.session import get_db
 from app.models.subscription import SubscriptionOrder
 from app.models.user import User
-from app.schemas.subscription import AdminSubscriptionUpdate
+from app.schemas.subscription import (
+    AdminOrderCancellationRequest,
+    AdminSubscriptionUpdate,
+    RedeemCodeGenerationRequest,
+    RedeemCodeStatusUpdate,
+)
 from app.services import subscription_service, system_service, wechat_pay_service
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
@@ -170,9 +175,13 @@ async def approve(order_id: str, db: DB, admin: AdminUser):
 
 
 @router.post("/orders/{order_id}/cancel")
-async def cancel(order_id: str, db: DB, admin: AdminUser):
+async def cancel(
+    order_id: str, body: AdminOrderCancellationRequest, db: DB, admin: AdminUser
+):
     try:
-        o = await subscription_service.cancel_order(db, order_id, admin.username)
+        o = await subscription_service.cancel_order(
+            db, order_id, admin.username, body.note
+        )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return {"order": subscription_service.order_to_dict(o)}
@@ -184,14 +193,40 @@ async def list_codes(db: DB, _: AdminUser):
 
 
 @router.post("/redeem-codes/generate")
-async def generate_codes(body: dict, db: DB, admin: AdminUser):
+async def generate_codes(body: RedeemCodeGenerationRequest, db: DB, admin: AdminUser):
     try:
         codes = await subscription_service.generate_codes(
             db,
-            body.get("planId", "monthly"),
-            int(body.get("count", 1)),
+            body.plan_id,
+            body.count,
             admin.username,
+            prefix=body.prefix,
+            note=body.note,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return {"codes": codes}
+
+
+@router.patch("/redeem-codes/{code_id}")
+async def update_code_status(
+    code_id: str, body: RedeemCodeStatusUpdate, db: DB, _: AdminUser
+):
+    try:
+        code = await subscription_service.update_redeem_code_status(
+            db, code_id, body.status
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return {"code": subscription_service.code_to_dict(code)}
+
+
+@router.delete("/redeem-codes/{code_id}")
+async def delete_code(code_id: str, db: DB, _: AdminUser):
+    try:
+        code = await subscription_service.delete_redeem_code(db, code_id)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return {"code": code}

@@ -196,6 +196,7 @@
               ${order.cancelledAt?`<span>取消：${escapeHTML(fmtTime(order.cancelledAt))} · ${escapeHTML(order.cancelledBy||'')}</span>`:''}
               <span>订单：${escapeHTML(order.id)}</span>
             </div>
+            ${order.note?`<p>备注：${escapeHTML(order.note)}</p>`:''}
             ${order.snapshot&&order.snapshot.usageText?`<p>${escapeHTML(order.snapshot.usageText)}</p>`:''}
             <div class="subscription-order-actions">
               <button type="button" class="primary" data-order-action="approve" ${pendingOrder?'':'disabled'}>确认开通</button>
@@ -234,6 +235,8 @@
       <div class="subscription-code-create">
         <label>会员方案<select id="ssRedeemPlanSelect">${planOptions}</select></label>
         <label>生成数量<input id="ssRedeemCountInput" type="number" min="1" max="200" value="10"></label>
+        <label>卡密前缀<input id="ssRedeemPrefixInput" value="VIP" maxlength="8" placeholder="VIP"></label>
+        <label class="full">备注<input id="ssRedeemNoteInput" maxlength="500" placeholder="例如：线下活动 / 管理员发放"></label>
         <button type="button" class="primary" id="ssGenerateRedeemCodesBtn">生成卡密</button>
       </div>
       ${all.length?`<div class="subscription-code-list">
@@ -250,7 +253,12 @@
             ${code.usedAt?`<span>使用：${escapeHTML(fmtTime(code.usedAt))} · ${escapeHTML(code.usedBy||'')}</span>`:''}
             ${code.note?`<span>备注：${escapeHTML(code.note)}</span>`:''}
           </div>
-          <div class="subscription-code-actions"><button type="button" data-code-action="copy">复制</button></div>
+          <div class="subscription-code-actions">
+            <button type="button" data-code-action="copy">复制</button>
+            <button type="button" data-code-action="disable" ${code.status==='unused'?'':'disabled'}>停用</button>
+            <button type="button" data-code-action="enable" ${code.status==='disabled'?'':'disabled'}>启用</button>
+            <button type="button" data-code-action="remove">删除</button>
+          </div>
         </article>`).join('')}
       </div>
       <div class="subscription-code-pagination" aria-label="卡密列表分页">
@@ -266,14 +274,16 @@
     const sub=window.KGSubscription;if(!sub||typeof sub.generateRedeemCodes!=='function')return;
     const planId=$('ssRedeemPlanSelect')?.value||'monthly';
     const count=$('ssRedeemCountInput')?.value||1;
-    try{const result=await sub.generateRedeemCodes({planId,count});
+    const prefix=$('ssRedeemPrefixInput')?.value||'VIP';
+    const note=$('ssRedeemNoteInput')?.value||'';
+    try{const result=await sub.generateRedeemCodes({planId,count,prefix,note});
       if(!result||!result.ok){toast(result&&result.message||'卡密生成失败');return}
       redeemCodePage=1;
       toast(result.message||'卡密已生成');
       renderSubscriptionPlans();
     }catch(error){toast(error?.message||'卡密生成失败，请重试')}
   }
-  function handleRedeemCodeAction(btn){
+  async function handleRedeemCodeAction(btn){
     const sub=window.KGSubscription;if(!sub)return;
     const item=btn.closest('[data-code-id]');
     const id=item&&item.dataset.codeId;
@@ -285,6 +295,18 @@
       else prompt('复制卡密：',text);
       return;
     }
+    try{
+      let result=null;
+      if(action==='disable')result=typeof sub.disableRedeemCode==='function'?await sub.disableRedeemCode(id):null;
+      else if(action==='enable')result=typeof sub.enableRedeemCode==='function'?await sub.enableRedeemCode(id):null;
+      else if(action==='remove'){
+        if(!confirm('确认删除这条卡密？删除后不可恢复。'))return;
+        result=typeof sub.removeRedeemCode==='function'?await sub.removeRedeemCode(id):null;
+      }
+      if(!result||!result.ok){toast(result&&result.message||'卡密操作失败');return}
+      toast(result.message||'卡密已更新');
+      renderSubscriptionPlans();
+    }catch(error){toast(error?.message||'卡密操作失败，请重试')}
   }
   function handleRedeemCodePage(action){
     const sub=window.KGSubscription;if(!sub||typeof sub.redeemCodeList!=='function')return;
