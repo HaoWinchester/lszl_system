@@ -81,10 +81,11 @@
     }catch(error){report('导入失败',error.message||String(error),'error')}
     finally{if(input)input.value=''}
   }
-  function handleSubjectChange(){
+  async function handleSubjectChange(){
     const next=currentSubject();
     if(next.code===loadedSubjectCode)return;
-    loadCurrent();
+    try{await global.KGTeachingContentApi?.ready?.(next.id||next.code);loadCurrent()}
+    catch(error){report('联想库切换失败',error?.message||'请检查网络后重试。','error')}
   }
   function bind(){
     $('ccRecallLibraryLoadBtn')?.addEventListener('click',()=>loadCurrent({announce:true}));
@@ -92,10 +93,16 @@
     $('ccRecallLibrarySaveBtn')?.addEventListener('click',saveCurrent);
     $('ccRecallLibraryImportBtn')?.addEventListener('click',()=>$('ccRecallLibraryFile')?.click());
     $('ccRecallLibraryFile')?.addEventListener('change',event=>importFile(event.target.files?.[0]));
-    document.addEventListener('kg-content-center-subject-change',handleSubjectChange);
+    document.addEventListener('kg-content-center-subject-change',()=>{void handleSubjectChange()});
   }
-  function init(){if(!$('ccRecallLibraryPanel'))return;bind();loadCurrent()}
+  async function init(){
+    if(!$('ccRecallLibraryPanel'))return;
+    const subject=currentSubject();
+    try{await global.KGTeachingContentApi?.ready?.(subject.id||subject.code)}
+    catch(error){report('联想库加载失败',error?.message||'请检查网络后重试。','error');toast('联想库加载失败，未使用本地数据回退。');return}
+    bind();loadCurrent();
+  }
 
   global.KGRecallAssociationAdmin=Object.freeze({loadCurrent,parseCurrent,saveCurrent,currentSubject,getPreview:()=>parsedPreview});
-  document.addEventListener('DOMContentLoaded',init);
+  document.addEventListener('DOMContentLoaded',()=>{void init()});
 })(typeof window!=='undefined'?window:globalThis);

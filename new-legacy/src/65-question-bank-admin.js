@@ -1504,9 +1504,11 @@
     if(!Catalog){showApiStartupError('题目目录 API 未加载。');return}
     if(!PaperDraftApi){showApiStartupError('试卷草稿 API 未加载。');return}
     try{await Catalog.ready}catch(error){showApiStartupError('题目目录加载失败：'+(error.message||error));return}
+    try{await window.KGTeachingContentApi?.ready?.()}catch(error){showApiStartupError('原则与联想库加载失败：'+(error.message||error));return}
     initStaticControls();
     initLibraryWorkspaceControls();
     state.banks = loadBanks();
+    try{await window.KGTeachingContentApi?.ready?.(state.banks[0]?.subject||'PMP')}catch(error){showApiStartupError('当前科目教学内容加载失败：'+(error.message||error));return}
     state.papers = [];
     try{await reloadPaperDrafts()}catch(error){showApiStartupError('试卷引用目录加载失败：'+(error.message||error));return}
     state.selectedBankId = state.banks[0]?.id || '';
@@ -1544,6 +1546,7 @@
     if(!PaperDraftApi){showApiStartupError('试卷草稿 API 未加载。');return}
     if(!window.KGPaperReleaseApi){showApiStartupError('试卷发布 API 未加载。');return}
     if(!PaperDataLoaderFactory?.create){showApiStartupError('试卷管理按需加载服务未加载。');return}
+    try{await window.KGTeachingContentApi?.ready?.()}catch(error){showApiStartupError('原则与归纳卡加载失败：'+(error.message||error));return}
     paperDataLoader=PaperDataLoaderFactory.create({paperApi:PaperDraftApi,catalogApi:Catalog,onChange:applyPaperManagementSnapshot});
     try{await paperDataLoader.initialize({preferredPaperId:state.selectedPaperId})}catch(error){showApiStartupError('试卷管理数据加载失败：'+(error.message||error));return}
     const on=(id,event,handler)=>$(id)?.addEventListener(event,handler);

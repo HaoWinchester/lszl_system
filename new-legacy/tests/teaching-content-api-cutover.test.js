@@ -126,6 +126,182 @@ test('teaching adapter bootstraps relational snapshots and retries one stale tax
   assert.equal(window.KGTeachingContentApi.snapshot().contentRevision, 6);
 });
 
+test('teaching adapter keeps late subject bootstrap from replacing the active subject', async () => {
+  const deferred = () => {
+    let resolve;
+    const promise = new Promise(done => { resolve = done; });
+    return { promise, resolve };
+  };
+  const requests = new Map();
+  const window = {
+    KGDomainApi: {
+      request(input) {
+        const subject = new URL(input.path, 'http://local').searchParams.get('subjectId');
+        const pending = deferred();
+        requests.set(subject, pending);
+        return pending.promise;
+      },
+    },
+    location: { search: '' },
+    dispatchEvent() {},
+    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
+  };
+  vm.runInContext(
+    readRepo('frontend/scripts/new-legacy-assets/teaching-content-adapter.js'),
+    vm.createContext({ window, URL, URLSearchParams, structuredClone, Promise, console }),
+  );
+
+  const subjectA = window.KGTeachingContentApi.bootstrap('subject-a');
+  const subjectB = window.KGTeachingContentApi.bootstrap('subject-b');
+  requests.get('subject-b').resolve({ subjectId: 'subject-b', contentRevision: 2, principles: { items: [{ id: 'b' }] } });
+  await subjectB;
+  requests.get('subject-a').resolve({ subjectId: 'subject-a', contentRevision: 1, principles: { items: [{ id: 'a' }] } });
+  await subjectA;
+
+  assert.equal(window.KGTeachingContentApi.snapshot().subjectId, 'subject-b');
+  assert.equal(window.KGTeachingContentApi.readResource('principles').items[0].id, 'b');
+  assert.equal(window.KGTeachingContentApi.snapshot('subject-a').subjectId, 'subject-a');
+});
+
+test('a delayed explicit subject write cannot replace a newer active subject', async () => {
+  let resolveWrite;
+  const calls = [];
+  const payload = subjectId => ({
+    subjectId, contentRevision: subjectId === 'subject-a' ? 1 : 7,
+    recallLibrary: { subjectId, nodes: [{ id: subjectId }], edges: [] },
+    principles: { schemaVersion: 1, items: [] },
+    synthesisPresets: { schemaVersion: 1, items: [] },
+  });
+  const window = {
+    KGDomainApi: {
+      request(input) {
+        calls.push(structuredClone(input));
+        if (input.method === 'PUT') {
+          return new Promise(resolve => { resolveWrite = () => resolve({ ...payload('subject-a'), contentRevision: 2, recallLibrary: input.body.recallLibrary }); });
+        }
+        const subject = new URL(input.path, 'http://local').searchParams.get('subjectId');
+        return Promise.resolve(payload(subject));
+      },
+    },
+    location: { search: '' }, dispatchEvent() {},
+    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
+  };
+  vm.runInContext(
+    readRepo('frontend/scripts/new-legacy-assets/teaching-content-adapter.js'),
+    vm.createContext({ window, URL, URLSearchParams, structuredClone, Promise, console }),
+  );
+
+  await window.KGTeachingContentApi.bootstrap('subject-a');
+  const writingA = window.KGTeachingContentApi.saveRecallLibrary('subject-a', { nodes: [{ id: 'saved-a' }], edges: [] });
+  await new Promise(resolve => setImmediate(resolve));
+  await window.KGTeachingContentApi.bootstrap('subject-b');
+  resolveWrite();
+  await writingA;
+
+  const put = calls.find(call => call.method === 'PUT');
+  assert.equal(put.body.subjectId, 'subject-a');
+  assert.equal(window.KGTeachingContentApi.snapshot().subjectId, 'subject-b');
+  assert.equal(window.KGTeachingContentApi.snapshot('subject-a').recallLibrary.nodes[0].id, 'saved-a');
+});
+
+test('recall save binds PMP alias to canonical subject and never retries a stale write', async () => {
+  const calls = [];
+  let rejectWrite = false;
+  const canonical = {
+    subjectId: 'subject-pmp', contentRevision: 12,
+    recallLibrary: { id: 'recall-pmp', subjectId: 'subject-pmp', version: 1, nodes: [], edges: [] },
+    principles: { schemaVersion: 1, items: [] }, synthesisPresets: { schemaVersion: 1, items: [] },
+  };
+  const window = {
+    KGDomainApi: {
+      async request(input) {
+        calls.push(structuredClone(input));
+        if (input.method === 'PUT') {
+          if (rejectWrite) throw Object.assign(new Error('stale'), { status: 409, detail: { currentContentRevision: 13 } });
+          return { ...canonical, contentRevision: 13, recallLibrary: input.body.recallLibrary };
+        }
+        return canonical;
+      },
+    },
+    location: { search: '' }, dispatchEvent() {},
+    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
+  };
+  vm.runInContext(
+    readRepo('frontend/scripts/new-legacy-assets/teaching-content-adapter.js'),
+    vm.createContext({ window, URLSearchParams, structuredClone, Promise, console }),
+  );
+  await window.KGTeachingContentApi.bootstrap('PMP');
+  await window.KGTeachingContentApi.saveRecallLibrary('PMP', { nodes: [{ id: 'saved' }], edges: [] });
+  const saved = calls.find(call => call.method === 'PUT');
+  assert.equal(saved.path, '/api/v1/content-prep/shared-content');
+  assert.equal(saved.body.subjectId, 'subject-pmp');
+  assert.equal(saved.body.contentRevision, 12);
+  assert.equal(saved.body.recallLibrary.nodes[0].id, 'saved');
+
+  rejectWrite = true;
+  const putsBefore = calls.filter(call => call.method === 'PUT').length;
+  await assert.rejects(
+    window.KGTeachingContentApi.saveRecallLibrary('subject-pmp', { nodes: [{ id: 'stale' }], edges: [] }),
+    error => error.status === 409,
+  );
+  assert.equal(calls.filter(call => call.method === 'PUT').length, putsBefore + 1);
+});
+
+test('principle controller waits for teaching readiness before first render and never seeds labels', async () => {
+  let resolveReady;
+  const ready = new Promise(resolve => { resolveReady = resolve; });
+  let seeded = 0;
+  const listeners = {};
+  const list = { innerHTML: 'loading', addEventListener() {} };
+  const elements = { tqPrincipleList: list };
+  const document = {
+    getElementById: id => elements[id] || null,
+    querySelectorAll: () => [], querySelector: () => null,
+    addEventListener(type, handler) { listeners[type] = handler; },
+  };
+  const context = vm.createContext({
+    document,
+    location: { search: '' }, URLSearchParams, Promise, console,
+    setTimeout: (handler, delay) => { if (!delay) queueMicrotask(handler); return 1; },
+    clearTimeout() {},
+    addEventListener() {},
+    KGTeachingContentApi: { ready: () => ready },
+    KGQuestionBankAdminAPI: { getAllQuestions: () => [{ tags: ['原则：不应种子化'] }] },
+    KGPrincipleRepository: {
+      ensureFromLabels() { seeded += 1; },
+      list: () => [{ id: 'remote-principle', name: '服务器原则', status: 'active', confusablePrincipleIds: [] }],
+      get: id => id === 'remote-principle' ? { id, name: '服务器原则', status: 'active' } : null,
+      findByName: () => null,
+    },
+    KGSynthesisPresetRepository: { list: () => [], getByPrincipleId: () => null },
+  });
+  vm.runInContext(readSource('src/teacher/training-config/principle-preset-controller.js'), context);
+  listeners.DOMContentLoaded();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(list.innerHTML, 'loading');
+  assert.equal(seeded, 0);
+  resolveReady();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(list.innerHTML, /服务器原则/);
+  assert.equal(seeded, 0);
+});
+
+test('teaching consumers await readiness and bulk principle mutations use the shared adapter', () => {
+  const controller = readSource('src/teacher/training-config/principle-preset-controller.js');
+  assert.doesNotMatch(controller, /global\.fetch\(/);
+  for (const operation of ['updatePrincipleStatuses', 'importPrinciples', 'deletePrinciples']) {
+    assert.match(controller, new RegExp(`await global\\.KGTeachingContentApi\\.${operation}`));
+  }
+  const boundaries = [
+    ['src/96-recall-association-admin.js', /await global\.KGTeachingContentApi\?\.ready/],
+    ['src/admin/53-recall-association-management.js', /await global\.KGTeachingContentApi\?\.ready/],
+    ['src/65-question-bank-admin.js', /await window\.KGTeachingContentApi\?\.ready/],
+    ['src/77-multi-question-workspace.js', /await global\.KGTeachingContentApi\?\.ready/],
+    ['content-prep-studio/src/js/45-server-events.js', /await window\.KGTeachingContentApi\?\.ready/],
+  ];
+  for (const [relative, pattern] of boundaries) assert.match(readSource(relative), pattern, relative);
+});
+
 test('admin teaching gateway keeps ordered writes moving after one API failure', async () => {
   const attempts = [];
   let rejectFirst = true;

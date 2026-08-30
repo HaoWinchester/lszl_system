@@ -181,12 +181,12 @@
   }
   function read(subjectId='PMP'){
     if(sessionBinding)return sessionBinding.library;
-    return normalizeLibrary(global.KGTeachingContentApi?.readResource?.('recallLibrary',{})||{});
+    return normalizeLibrary(global.KGTeachingContentApi?.readResource?.('recallLibrary',{},subjectId)||{});
   }
   function write(subjectId='PMP',library={}){
     if(sessionBinding)return {valid:false,errors:['当前为学员只读联想库快照，不能修改正式 Recall 数据。'],library:sessionBinding.library};
     const normalized=normalizeLibrary(library);
-    global.KGTeachingContentApi?.stageResource?.('recallLibrary',normalized);
+    global.KGTeachingContentApi?.stageResource?.('recallLibrary',normalized,subjectId);
     return {valid:true,library:normalized};
   }
   function saveText(subjectId,text,{mode='merge'}={}){
@@ -326,7 +326,7 @@
     const identity=current?.recallLibrary&&typeof current.recallLibrary==='object'?current.recallLibrary:{};
     const recallLibrary={...normalizeLibrary(library),id:clean(identity.id),subjectId:clean(identity.subjectId)||subject,version:Number(identity.version)||1,status:clean(identity.status)||'published'};
     const savedIdentity=await global.KGTeachingContentApi.saveRecallLibrary(subject,recallLibrary)||recallLibrary;
-    const saved=global.KGTeachingContentApi.snapshot();
+    const saved=global.KGTeachingContentApi.snapshot(savedIdentity.subjectId||subject);
     return {valid:true,revision:Number(saved?.contentRevision)||revision+1,identity:{id:clean(savedIdentity.id),subjectId:clean(savedIdentity.subjectId)||subject,version:Number(savedIdentity.version)||1,status:clean(savedIdentity.status)||'published'},library:normalizeLibrary(savedIdentity)};
   }
 

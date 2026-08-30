@@ -38,10 +38,7 @@ MAX_SHARED_BYTES = 2 * 1024 * 1024
 MAX_ACTIVITIES = 5000
 
 
-class ContentRevisionConflict(RuntimeError):
-    def __init__(self, current_revision: int):
-        super().__init__("服务器内容已更新，请重新载入后再保存")
-        self.current_revision = current_revision
+ContentRevisionConflict = teaching_content_revision_service.ContentRevisionConflict
 
 
 class PrincipleMergeValidationError(ValueError):
@@ -160,11 +157,9 @@ async def _active_tag_config(db: AsyncSession) -> QuestionTagConfig | None:
 
 
 async def _assert_revision(db: AsyncSession, expected_revision: int) -> int:
-    await teaching_content_revision_service.acquire_lock(db)
-    current = int((await teaching_content_revision_service.current(db))["revision"])
-    if expected_revision != current:
-        raise ContentRevisionConflict(current)
-    return current
+    return await teaching_content_revision_service.assert_expected(
+        db, expected_revision
+    )
 
 
 async def _principle_card_bundle(db: AsyncSession) -> dict[str, Any]:

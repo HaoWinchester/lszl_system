@@ -25,7 +25,12 @@ from app.models.runtime_state import RuntimeState
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
-from app.models.teaching_content import TeachingContentRevision
+from app.models.teaching_content import (
+    ContentSubject,
+    RecallAssociationLibrary,
+    TeachingContentAudit,
+    TeachingContentRevision,
+)
 from app.models.user import User
 from app.schemas.content_prep import ContentPrepBatchResult, ContentPrepBatchRequest
 from app.services import teaching_content_revision_service as revision_service
@@ -370,16 +375,20 @@ def test_principle_archive_rejects_bound_questions_then_archives_the_pair() -> N
                 "/api/v1/auth/login",
                 json={"username": username, "password": PASSWORD},
             ).status_code == 200
+            content_revision = client.get(
+                "/api/v1/content-prep/principles"
+            ).json()["contentRevision"]
             drafted = client.post(
                 "/api/v1/content-prep/principles/status",
-                json={"ids": [principle_id], "presetStatus": "draft"},
+                json={"ids": [principle_id], "presetStatus": "draft", "contentRevision": content_revision},
             )
             assert drafted.status_code == 200
             assert drafted.json()["updatedPresetIds"] == [preset_id]
+            content_revision = drafted.json()["contentRevision"]
             asyncio.run(assert_preset_draft())
             blocked = client.post(
                 "/api/v1/content-prep/principles/archive",
-                json={"ids": [principle_id]},
+                json={"ids": [principle_id], "contentRevision": content_revision},
             )
             assert blocked.status_code == 409
             assert blocked.json()["detail"] == {
@@ -400,14 +409,14 @@ def test_principle_archive_rejects_bound_questions_then_archives_the_pair() -> N
             }
             blocked_delete = client.post(
                 "/api/v1/content-prep/principles/delete",
-                json={"ids": [principle_id]},
+                json={"ids": [principle_id], "contentRevision": content_revision},
             )
             assert blocked_delete.status_code == 409
             assert blocked_delete.json()["detail"] == blocked.json()["detail"]
             asyncio.run(remove_question())
             archived = client.post(
                 "/api/v1/content-prep/principles/archive",
-                json={"ids": [principle_id]},
+                json={"ids": [principle_id], "contentRevision": content_revision},
             )
             assert archived.status_code == 200
             assert archived.json()["archivedIds"] == [principle_id]
@@ -485,15 +494,160 @@ def test_principle_delete_removes_an_unreferenced_principle_and_its_card() -> No
                 "/api/v1/auth/login",
                 json={"username": username, "password": PASSWORD},
             ).status_code == 200
+            content_revision = client.get(
+                "/api/v1/content-prep/principles"
+            ).json()["contentRevision"]
             response = client.post(
                 "/api/v1/content-prep/principles/delete",
-                json={"ids": [principle_id]},
+                json={"ids": [principle_id], "contentRevision": content_revision},
             )
         assert response.status_code == 200, response.text
         assert response.json()["deletedIds"] == [principle_id]
         asyncio.run(verify_deleted())
     finally:
         asyncio.run(cleanup(snapshot))
+
+
+def test_bulk_principle_mutations_reject_stale_content_revision_atomically() -> None:
+    """Archive/delete/import/status must share the optimistic revision contract."""
+
+    suffix = uuid4().hex[:10]
+    username = f"teacher-bulk-stale-{suffix}"
+    principle_ids = [f"principle-bulk-stale-{index}-{suffix}" for index in range(4)]
+    preset_ids = [f"preset-bulk-stale-{index}-{suffix}" for index in range(4)]
+    revision_snapshot: dict | None = None
+
+    async def seed() -> None:
+        nonlocal revision_snapshot
+        async with AsyncSessionLocal() as db:
+            revision_snapshot = await snapshot_teaching_content_revision(db)
+            db.add(
+                User(
+                    username=username,
+                    password_hash=hash_password(PASSWORD),
+                    role="teacher",
+                    status="active",
+                    subject="PMP",
+                )
+            )
+            await db.flush()
+            for index, principle_id in enumerate(principle_ids):
+                db.add(
+                    Principle(
+                        id=principle_id,
+                        name=f"并发原则 {index}",
+                        status="active",
+                        created_by=username,
+                        updated_by=username,
+                    )
+                )
+            await db.flush()
+            for index, preset_id in enumerate(preset_ids):
+                db.add(
+                    SynthesisPreset(
+                        id=preset_id,
+                        principle_id=principle_ids[index],
+                        title=f"原则：并发原则 {index}",
+                        content=f"并发归纳卡 {index}",
+                        status="active",
+                        created_by=username,
+                        updated_by=username,
+                    )
+                )
+            await db.commit()
+
+    async def advance_revision() -> int:
+        async with AsyncSessionLocal() as db:
+            bumped = await revision_service.bump(
+                db,
+                username,
+                [{"entityType": "testBarrier", "entityId": suffix, "action": "advanced"}],
+            )
+            await db.commit()
+            return int(bumped["revision"])
+
+    async def relation_state() -> tuple[list[tuple], list[tuple], int]:
+        async with AsyncSessionLocal() as db:
+            principles = list(
+                (
+                    await db.execute(
+                        select(Principle)
+                        .where(Principle.id.in_(principle_ids))
+                        .order_by(Principle.id)
+                    )
+                ).scalars()
+            )
+            presets = list(
+                (
+                    await db.execute(
+                        select(SynthesisPreset)
+                        .where(SynthesisPreset.id.in_(preset_ids))
+                        .order_by(SynthesisPreset.id)
+                    )
+                ).scalars()
+            )
+            return (
+                [(row.id, row.name, row.status, row.revision) for row in principles],
+                [(row.id, row.status, row.revision) for row in presets],
+                int((await revision_service.current(db))["revision"]),
+            )
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id.in_(preset_ids)))
+            await db.execute(delete(Principle).where(Principle.id.in_(principle_ids)))
+            await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
+            await db.execute(delete(User).where(User.username == username))
+            await db.commit()
+            await restore_teaching_content_revision(db, revision_snapshot)
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": username, "password": PASSWORD},
+            ).status_code == 200
+            snapshot = client.get("/api/v1/content-prep/principles")
+            assert snapshot.status_code == 200, snapshot.text
+            stale_revision = snapshot.json()["contentRevision"]
+            bundle = {
+                "principleCardBundleVersion": 1,
+                "format": "kg-principle-card-bundle-v1",
+                "principles": deepcopy(snapshot.json()["principles"]),
+                "synthesisPresets": deepcopy(snapshot.json()["synthesisPresets"]),
+            }
+            for item in bundle["principles"]["items"]:
+                if item["id"] == principle_ids[3]:
+                    item["name"] = "stale import must not win"
+            current_revision = asyncio.run(advance_revision())
+            before = asyncio.run(relation_state())
+            assert before[2] == current_revision
+
+            requests = [
+                ("/api/v1/content-prep/principles/archive", {"ids": [principle_ids[0]]}),
+                (
+                    "/api/v1/content-prep/principles/status",
+                    {"ids": [principle_ids[1]], "presetStatus": "draft"},
+                ),
+                ("/api/v1/content-prep/principles/delete", {"ids": [principle_ids[2]]}),
+                ("/api/v1/content-prep/principles/import", bundle),
+            ]
+            for path, body in requests:
+                response = client.post(
+                    path,
+                    json={**body, "contentRevision": stale_revision},
+                )
+                assert response.status_code == 409, (path, response.text)
+                assert response.json()["detail"] == {
+                    "code": "CONTENT_REVISION_CONFLICT",
+                    "message": "服务器内容已更新，请重新载入后再保存",
+                    "currentContentRevision": current_revision,
+                }
+                assert asyncio.run(relation_state()) == before
+    finally:
+        asyncio.run(cleanup())
 
 
 def test_principle_bundle_import_replaces_unused_pairs_as_one_canonical_bundle() -> None:
@@ -598,6 +752,9 @@ def test_principle_bundle_import_replaces_unused_pairs_as_one_canonical_bundle()
                 "/api/v1/auth/login",
                 json={"username": username, "password": PASSWORD},
             ).status_code == 200
+            payload["contentRevision"] = client.get(
+                "/api/v1/content-prep/principles"
+            ).json()["contentRevision"]
             response = client.post("/api/v1/content-prep/principles/import", json=payload)
         assert response.status_code == 200, response.text
         assert response.json()["importedPrincipleCount"] == 1
@@ -675,7 +832,6 @@ def test_imported_builtin_principle_card_updates_survive_startup_seed() -> None:
             current = client.get("/api/v1/content-prep/principles")
             assert current.status_code == 200, current.text
             payload = current.json()
-            payload.pop("contentRevision", None)
             for item in payload["principles"]["items"]:
                 if item["id"] == principle_id:
                     item["name"] = imported_name
@@ -2043,6 +2199,138 @@ def test_runtime_preset_projection_rejects_missing_principle_as_server_owned() -
         )
 
     assert response.status_code == 403, response.text
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "kg_recall_association_library_v1__subject__PMP",
+        "kg_recall_association_library_v1__user__admin",
+        "kg_recall_association_management_v1__subject__PMP",
+        "kg_recall_association_management_v1__user__admin",
+    ],
+)
+def test_runtime_recall_prefix_is_server_owned_without_relational_side_effects(
+    key: str,
+) -> None:
+    """Every retired subject/user recall key must be rollback-readable but immutable."""
+
+    runtime_snapshot: dict | None = None
+    shared_snapshot: dict[str, dict] = {}
+    relation_snapshot: tuple[list[tuple], int] | None = None
+
+    async def snapshot() -> None:
+        nonlocal runtime_snapshot, shared_snapshot, relation_snapshot
+        shared_snapshot = await _snapshot_shared_rows({key})
+        async with AsyncSessionLocal() as db:
+            runtime = await db.get(RuntimeState, "admin")
+            runtime_snapshot = None if runtime is None else {
+                "storage": deepcopy(runtime.storage),
+                "revision": runtime.revision,
+                "last_request_id": runtime.last_request_id,
+            }
+            rows = list(
+                (
+                    await db.execute(
+                        select(RecallAssociationLibrary).order_by(
+                            RecallAssociationLibrary.id
+                        )
+                    )
+                ).scalars()
+            )
+            relation_snapshot = (
+                [
+                    (
+                        row.id,
+                        row.subject_id,
+                        row.version,
+                        deepcopy(row.nodes),
+                        deepcopy(row.edges),
+                    )
+                    for row in rows
+                ],
+                int((await revision_service.current(db))["revision"]),
+            )
+
+    async def verify_relations() -> None:
+        async with AsyncSessionLocal() as db:
+            rows = list(
+                (
+                    await db.execute(
+                        select(RecallAssociationLibrary).order_by(
+                            RecallAssociationLibrary.id
+                        )
+                    )
+                ).scalars()
+            )
+            assert relation_snapshot == (
+                [
+                    (
+                        row.id,
+                        row.subject_id,
+                        row.version,
+                        deepcopy(row.nodes),
+                        deepcopy(row.edges),
+                    )
+                    for row in rows
+                ],
+                int((await revision_service.current(db))["revision"]),
+            )
+
+    async def restore() -> None:
+        async with AsyncSessionLocal() as db:
+            row = await db.get(RuntimeState, "admin")
+            if runtime_snapshot is None:
+                if row is not None:
+                    await db.delete(row)
+            elif row is None:
+                db.add(
+                    RuntimeState(
+                        owner_id="admin",
+                        storage=runtime_snapshot["storage"],
+                        revision=runtime_snapshot["revision"],
+                        last_request_id=runtime_snapshot["last_request_id"],
+                    )
+                )
+            else:
+                row.storage = runtime_snapshot["storage"]
+                row.revision = runtime_snapshot["revision"]
+                row.last_request_id = runtime_snapshot["last_request_id"]
+            await db.commit()
+        await _restore_shared_rows({key}, shared_snapshot)
+
+    asyncio.run(snapshot())
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "jbgsnmm~123"},
+            ).status_code == 200
+            state = client.get("/api/v1/runtime/state").json()
+            value = json.dumps(
+                {"schemaVersion": 1, "nodes": [{"id": "forbidden"}], "edges": []}
+            )
+            response = client.put(
+                "/api/v1/runtime/state",
+                json={
+                    "page": "question-bank.html",
+                    "namespace": "questions",
+                    "operation": "setItem",
+                    "key": key,
+                    "value": value,
+                    "storage": {},
+                    "mutations": [
+                        {"operation": "setItem", "key": key, "value": value}
+                    ],
+                    "requestId": f"runtime-recall-owned-{uuid4().hex}",
+                    "revision": state["revision"],
+                    "contentRevision": state["contentRevision"],
+                },
+            )
+            assert response.status_code == 403, response.text
+            asyncio.run(verify_relations())
+    finally:
+        asyncio.run(restore())
 
 
 @pytest.mark.parametrize("invalid_revision", [True, "1"])

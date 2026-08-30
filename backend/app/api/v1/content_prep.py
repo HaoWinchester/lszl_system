@@ -31,24 +31,6 @@ from app.schemas.teaching_content import (
     SubjectWriteRequest,
     TaxonomyReleaseRequest,
 )
-from app.schemas.teaching_content import (
-    ActivityOverrideWriteRequest,
-    RecallLibraryWriteRequest,
-    SubjectWriteRequest,
-    TaxonomyReleaseRequest,
-)
-from app.schemas.teaching_content import (
-    ActivityOverrideWriteRequest,
-    RecallLibraryWriteRequest,
-    SubjectWriteRequest,
-    TaxonomyReleaseRequest,
-)
-from app.schemas.teaching_content import (
-    ActivityOverrideWriteRequest,
-    RecallLibraryWriteRequest,
-    SubjectWriteRequest,
-    TaxonomyReleaseRequest,
-)
 from app.services import (
     content_prep_shared_service,
     content_prep_draft_service,
@@ -177,6 +159,15 @@ def _raise_subject_facet_error(error: Exception) -> None:
         status_code=422,
         detail={"code": "INVALID_SUBJECT_FACET_SCHEMA", "message": str(error)},
     ) from error
+
+
+def _bulk_content_revision(body: object) -> int:
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=422, detail={"code": "INVALID_SHARED_CONTENT", "message": "请求必须是 JSON 对象"})
+    value = body.get("contentRevision")
+    if type(value) is not int or value < 0:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_CONTENT_REVISION", "message": "contentRevision 必须是非负整数"})
+    return value
 
 
 @router.post("/subjects", status_code=201)
@@ -524,12 +515,12 @@ async def archive_principles(body: dict, db: DB, actor: PrepEditor):
             db,
             actor.username,
             body.get("ids"),
+            content_revision=_bulk_content_revision(body),
         )
+    except teaching_content_revision_service.ContentRevisionConflict as error:
+        _raise_shared_error(error)
     except teaching_content_projection_service.PrincipleArchiveConflict as error:
-        raise HTTPException(
-            status_code=409,
-            detail=_principle_conflict_detail(error),
-        ) from error
+        raise HTTPException(status_code=409, detail=_principle_conflict_detail(error)) from error
     except ValueError as error:
         raise HTTPException(
             status_code=422,
@@ -544,12 +535,12 @@ async def delete_principles(body: dict, db: DB, actor: PrepEditor):
             db,
             actor.username,
             body.get("ids"),
+            content_revision=_bulk_content_revision(body),
         )
+    except teaching_content_revision_service.ContentRevisionConflict as error:
+        _raise_shared_error(error)
     except teaching_content_projection_service.PrincipleArchiveConflict as error:
-        raise HTTPException(
-            status_code=409,
-            detail=_principle_conflict_detail(error),
-        ) from error
+        raise HTTPException(status_code=409, detail=_principle_conflict_detail(error)) from error
     except ValueError as error:
         raise HTTPException(
             status_code=422,
@@ -564,12 +555,12 @@ async def import_principle_card_bundle(body: dict, db: DB, actor: PrepEditor):
             db,
             actor.username,
             body,
+            content_revision=_bulk_content_revision(body),
         )
+    except teaching_content_revision_service.ContentRevisionConflict as error:
+        _raise_shared_error(error)
     except teaching_content_projection_service.PrincipleArchiveConflict as error:
-        raise HTTPException(
-            status_code=409,
-            detail=_principle_conflict_detail(error),
-        ) from error
+        raise HTTPException(status_code=409, detail=_principle_conflict_detail(error)) from error
     except ValueError as error:
         raise HTTPException(
             status_code=422,
@@ -584,9 +575,12 @@ async def update_principle_statuses(body: dict, db: DB, actor: PrepEditor):
             db,
             actor.username,
             body.get("ids"),
+            content_revision=_bulk_content_revision(body),
             principle_status=body.get("principleStatus"),
             preset_status=body.get("presetStatus"),
         )
+    except teaching_content_revision_service.ContentRevisionConflict as error:
+        _raise_shared_error(error)
     except ValueError as error:
         raise HTTPException(
             status_code=422,

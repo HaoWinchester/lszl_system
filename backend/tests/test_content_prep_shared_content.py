@@ -12,7 +12,7 @@ from app.main import app
 from app.models.content_prep import Principle, QuestionTagConfig, QuestionUploadBatch, SynthesisPreset
 from app.models.question import Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
-from app.models.teaching_content import ActivityOverride, ContentSubject, ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode
+from app.models.teaching_content import ActivityOverride, ContentSubject, ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode, TeachingContentAudit
 from app.models.user import User
 from app.services import teaching_content_revision_service
 from tests.teaching_content_revision_support import (
@@ -27,6 +27,108 @@ TAG_KEY = "kg_question_tag_names_v1"
 ACTIVITY_KEY = "kg_content_activity_overrides_v1"
 RECALL_KEY = "kg_recall_association_library_v1__subject__subject-pmp"
 PROJECTION_KEYS = {"kg_principle_repository_v1", "kg_synthesis_preset_repository_v1"}
+
+
+def test_two_teachers_cannot_overwrite_a_stale_recall_library_snapshot() -> None:
+    """A second editor must refetch after the first editor advances contentRevision."""
+
+    suffix = uuid4().hex[:10]
+    subject_id = f"subject-recall-race-{suffix}"
+    teachers = [f"recall-race-a-{suffix}", f"recall-race-b-{suffix}"]
+    revision_snapshot: dict | None = None
+
+    async def seed() -> None:
+        nonlocal revision_snapshot
+        async with AsyncSessionLocal() as db:
+            revision_snapshot = await snapshot_teaching_content_revision(db)
+            db.add(
+                ContentSubject(
+                    id=subject_id,
+                    code=f"RACE-{suffix}",
+                    name="联想库并发测试",
+                    content_metadata={},
+                )
+            )
+            db.add_all(
+                User(
+                    username=username,
+                    password_hash=hash_password(PASSWORD),
+                    role="teacher",
+                    status="active",
+                    subject="PMP",
+                )
+                for username in teachers
+            )
+            await db.commit()
+
+    async def persisted() -> tuple[list[dict], int]:
+        async with AsyncSessionLocal() as db:
+            subject = await db.get(ContentSubject, subject_id)
+            recall_id = str((subject.content_metadata or {}).get("currentRecallLibraryId") or "")
+            recall = await db.get(RecallAssociationLibrary, recall_id)
+            revision = int((await teaching_content_revision_service.current(db))["revision"])
+            return list(recall.nodes or []), revision
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                delete(TeachingContentAudit).where(
+                    TeachingContentAudit.actor_username.in_(teachers)
+                )
+            )
+            await db.execute(
+                delete(RecallAssociationLibrary).where(
+                    RecallAssociationLibrary.subject_id == subject_id
+                )
+            )
+            await db.execute(delete(ContentSubject).where(ContentSubject.id == subject_id))
+            await db.execute(delete(User).where(User.username.in_(teachers)))
+            await db.commit()
+            await restore_teaching_content_revision(db, revision_snapshot)
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as first, TestClient(app) as second:
+            for client, username in ((first, teachers[0]), (second, teachers[1])):
+                assert client.post(
+                    "/api/v1/auth/login",
+                    json={"username": username, "password": PASSWORD},
+                ).status_code == 200
+            first_snapshot = first.get(
+                "/api/v1/content-prep/shared-content",
+                params={"subjectId": subject_id},
+            ).json()
+            second_snapshot = second.get(
+                "/api/v1/content-prep/shared-content",
+                params={"subjectId": subject_id},
+            ).json()
+            assert first_snapshot["contentRevision"] == second_snapshot["contentRevision"]
+
+            first_save = first.put(
+                "/api/v1/content-prep/shared-content",
+                json={
+                    "subjectId": subject_id,
+                    "contentRevision": first_snapshot["contentRevision"],
+                    "recallLibrary": {"nodes": [{"id": "teacher-a"}], "edges": []},
+                },
+            )
+            assert first_save.status_code == 200, first_save.text
+            nodes_after_first, revision_after_first = asyncio.run(persisted())
+
+            stale_save = second.put(
+                "/api/v1/content-prep/shared-content",
+                json={
+                    "subjectId": subject_id,
+                    "contentRevision": second_snapshot["contentRevision"],
+                    "recallLibrary": {"nodes": [{"id": "teacher-b"}], "edges": []},
+                },
+            )
+            assert stale_save.status_code == 409, stale_save.text
+            assert stale_save.json()["detail"]["currentContentRevision"] == revision_after_first
+            assert asyncio.run(persisted()) == (nodes_after_first, revision_after_first)
+    finally:
+        asyncio.run(cleanup())
 
 
 def test_shared_content_uses_explicit_current_pointers_with_published_fallback() -> None:
@@ -521,9 +623,12 @@ def test_principle_delete_conflict_lists_exact_referencing_questions() -> None:
                 "/api/v1/auth/login",
                 json={"username": teacher, "password": PASSWORD},
             ).status_code == 200
+            content_revision = client.get(
+                "/api/v1/content-prep/principles"
+            ).json()["contentRevision"]
             response = client.post(
                 "/api/v1/content-prep/principles/delete",
-                json={"ids": [principle_id]},
+                json={"ids": [principle_id], "contentRevision": content_revision},
             )
             assert response.status_code == 409, response.text
             assert response.json()["detail"] == {

@@ -584,6 +584,8 @@ async def archive_principles(
     db: AsyncSession,
     actor_username: str,
     principle_ids: object,
+    *,
+    content_revision: int,
 ) -> dict[str, Any]:
     """Archive unreferenced principles and their paired synthesis presets atomically."""
 
@@ -592,6 +594,9 @@ async def archive_principles(
         raise ValueError("至少选择一条原则")
 
     await teaching_content_revision_service.acquire_lock(db)
+    await teaching_content_revision_service.assert_expected(
+        db, content_revision, lock_acquired=True
+    )
     principles = (
         await db.execute(
             select(Principle)
@@ -658,6 +663,8 @@ async def delete_principles(
     db: AsyncSession,
     actor_username: str,
     principle_ids: object,
+    *,
+    content_revision: int,
 ) -> dict[str, Any]:
     """Hard-delete unused principle/card pairs and refresh the browser projection."""
 
@@ -666,6 +673,9 @@ async def delete_principles(
         raise ValueError("至少选择一条原则")
 
     await teaching_content_revision_service.acquire_lock(db)
+    await teaching_content_revision_service.assert_expected(
+        db, content_revision, lock_acquired=True
+    )
     principles = (
         await db.execute(
             select(Principle)
@@ -749,6 +759,8 @@ async def import_principle_card_bundle(
     db: AsyncSession,
     actor_username: str,
     payload: object,
+    *,
+    content_revision: int,
 ) -> dict[str, Any]:
     """Replace the global principle/card configuration as one safe transaction."""
 
@@ -758,6 +770,9 @@ async def import_principle_card_bundle(
     incoming_principle_ids = {str(item["id"]) for item in incoming_principles}
 
     await teaching_content_revision_service.acquire_lock(db)
+    await teaching_content_revision_service.assert_expected(
+        db, content_revision, lock_acquired=True
+    )
     existing_principles = (
         await db.execute(select(Principle).with_for_update())
     ).scalars().all()
@@ -914,6 +929,7 @@ async def update_principle_statuses(
     actor_username: str,
     principle_ids: object,
     *,
+    content_revision: int,
     principle_status: object = None,
     preset_status: object = None,
 ) -> dict[str, Any]:
@@ -936,6 +952,9 @@ async def update_principle_statuses(
         raise ValueError("至少提供一种状态修改")
 
     await teaching_content_revision_service.acquire_lock(db)
+    await teaching_content_revision_service.assert_expected(
+        db, content_revision, lock_acquired=True
+    )
     principles = (
         await db.execute(
             select(Principle)

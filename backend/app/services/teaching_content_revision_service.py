@@ -16,6 +16,12 @@ CLEANUP_LOCK_KEY = "question-pool-cleanup-v1"
 MAX_CHANGES = 100
 
 
+class ContentRevisionConflict(RuntimeError):
+    def __init__(self, current_revision: int):
+        super().__init__("服务器内容已更新，请重新载入后再保存")
+        self.current_revision = current_revision
+
+
 def _empty_payload() -> dict[str, Any]:
     return {
         "revision": 0,
@@ -69,6 +75,24 @@ def _serialize_revision(row: TeachingContentRevision) -> dict[str, Any]:
 async def current(db: AsyncSession) -> dict[str, Any]:
     row = await db.get(TeachingContentRevision, 1)
     return _serialize_revision(row) if row is not None else _empty_payload()
+
+
+async def assert_expected(
+    db: AsyncSession,
+    expected_revision: int,
+    *,
+    lock_acquired: bool = False,
+) -> int:
+    """Validate an optimistic writer while holding the global writer lock."""
+
+    if type(expected_revision) is not int or expected_revision < 0:
+        raise ValueError("contentRevision 必须是非负整数")
+    if not lock_acquired:
+        await acquire_lock(db)
+    revision = int((await current(db))["revision"])
+    if expected_revision != revision:
+        raise ContentRevisionConflict(revision)
+    return revision
 
 
 async def acquire_lock(db: AsyncSession) -> None:

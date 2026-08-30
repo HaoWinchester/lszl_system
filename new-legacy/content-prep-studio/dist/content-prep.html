@@ -5671,9 +5671,10 @@ window.PMPPrepDraftUi?.open?.();
     }
   });
   window.addEventListener('pagehide',()=>{remoteRetryStopped=true;clearTimeout(remoteRetryTimer);unsubscribeTeachingSync?.();window.removeEventListener?.('kg:server-state-reloaded',handleServerStateReload)});
-  function initServerSession(){
+  async function initServerSession(){
+    try{await window.KGTeachingContentApi?.ready?.(state.questionBank.subject||'PMP')}
+    catch(error){setStatus('原则与归纳卡加载失败：'+(error?.message||error),'bad');setIssues(error);return}
     renderActor();refreshButtons();refreshBanks();
-    window.KGTeachingContentApi?.bootstrap?.(state.questionBank.subject||'PMP').catch?.(()=>{});
     refreshSharedContent().catch(error=>{setStatus(error.message||'共享内容读取失败','bad');setIssues(error)});
     if(actor()&&window.PMPPrepP45Server){
       window.PMPPrepP45Server.loadSubjectFacetSchemas().catch(error=>{if(error.code!=='AUTH_REQUIRED')console.warn('[p45] facet schema load failed:',error.message)});
@@ -5686,9 +5687,9 @@ window.PMPPrepDraftUi?.open?.();
   const initial=currentQuestion();if(initial?.serverRevision)QuestionLocks.switchTo(initial).then(()=>renderQuestionLockState());
   /* serverActor 先用缓存值初始化；/api/v1/auth/me 异步校验拿到不同结果后再刷新一次会话 UI */
   const initialActor=actor();
-  initServerSession();
-  Promise.resolve(prepRuntime.serverActorReady||null).then(()=>{
-    if(actor()&&actor()!==initialActor)initServerSession();
+  void initServerSession();
+  Promise.resolve(prepRuntime.serverActorReady||null).then(async()=>{
+    if(actor()&&actor()!==initialActor)await initServerSession();
   }).catch(()=>{});
 })();
 

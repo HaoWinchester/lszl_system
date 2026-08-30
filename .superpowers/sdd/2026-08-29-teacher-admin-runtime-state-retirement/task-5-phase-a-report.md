@@ -53,3 +53,30 @@ Backend RED initially failed three source boundaries because the two projection 
 3. Remove `admin-subjects.html`, `content-prep.html` and `content-center.html` from both Runtime policies only after all their data paths are typed.
 4. Add the native zero-Runtime request/reload/conflict E2E in Phase B. It is intentionally not asserted in Phase A.
 5. Regenerate and stage `frontend/public/new-legacy`, manifest and sync report only in the formal release task.
+
+## Independent review follow-up
+
+Review base: `77d8522aa9ec27d0325e80500ded76170eb18de3`
+
+The Phase-A review found six P1 cutover gaps. This follow-up closes them without widening Phase A into the deferred Task 5B/Task 6 scope:
+
+- Recall authoring now writes through the revision-checked shared-content PUT. Two authenticated teachers starting from the same revision are covered: the second stale write returns 409 with `currentContentRevision`, and neither the relational recall library nor the global teaching revision changes.
+- The browser adapter now owns snapshots and in-flight requests per canonical subject. An activation generation prevents a late response or delayed explicit write for subject A from replacing a newer active subject B. The `PMP` alias is learned from bootstrap and every save is explicitly bound to canonical `subject-pmp`.
+- Principle, recall-admin, recall-management, question-bank, multi-question workspace, and Content Prep initializers await the teaching snapshot before their first domain render. Failure produces visible UI feedback and never seeds temporary principles from question labels.
+- Principle archive/delete/import/status mutations carry `contentRevision`. The projection service validates it atomically after taking the existing teaching-content advisory lock. All four stale mutations return the shared 409 contract without relation changes or a revision bump; the controller uses the shared adapter, refetches after a conflict, and asks the user to retry.
+- The complete retired recall Runtime prefixes (`kg_recall_association_library_v1__*` and `kg_recall_association_management_v1__*`) are server-owned. Subject and user variants return 403 while historical bootstrap remains readable for rollback only. The new exact prefix occurrence is recorded in the Runtime inventory baseline.
+- The existing `PRINCIPLE_IN_USE` response shape remains byte-compatible; only revision conflicts use the shared revision mapper.
+
+Follow-up verification:
+
+- Backend teaching revision: 48 passed.
+- Backend shared-content concurrency: 4 passed.
+- Backend Phase-A boundary + cleanup: 73 passed.
+- Backend banks/reference integration: 1 passed; upload: 11 passed; reset: 4 passed.
+- Frontend cutover + existing gateway/recall sync: 21 passed (14 cutover, 6 gateway, 1 recall sync).
+- Runtime inventory contract: 13 passed.
+- Formal sync completed; generated `pnpm test`: 283 passed; generated `pnpm test:design`: 5 passed.
+- Content Prep build and reproducibility/server UI/principle bundle/catalog contracts passed.
+- Python/JavaScript syntax checks, focused static scans, and `git diff --check` passed.
+
+As in the initial Phase A, the formal sync was verification-only. The broad `frontend/public/new-legacy` and sync manifest drift was removed after the generated suites passed; release staging remains Task 9 work.

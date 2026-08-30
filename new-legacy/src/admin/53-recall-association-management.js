@@ -88,17 +88,26 @@
     byId('adminRecallNewBtn').addEventListener('click',newNode);byId('adminRecallEditorSave').addEventListener('click',saveNode);byId('adminRecallEditorDelete').addEventListener('click',()=>deleteNodes([state.selectedNodeId]));byId('adminRecallSaveDraftBtn').addEventListener('click',()=>saveDraft());byId('adminRecallPublishBtn').addEventListener('click',publish);byId('adminRecallExportBtn').addEventListener('click',exportLibrary);
     byId('adminRecallBatchLink').addEventListener('click',()=>batchUpdate('link'));byId('adminRecallBatchEnable').addEventListener('click',()=>batchUpdate('enable'));byId('adminRecallBatchDisable').addEventListener('click',()=>batchUpdate('disable'));byId('adminRecallBatchDelete').addEventListener('click',()=>deleteNodes([...state.selectedIds]));
     byId('adminRecallImportBtn').addEventListener('click',()=>byId('adminRecallImportFile').click());byId('adminRecallImportFile').addEventListener('change',event=>importFile(event.target.files?.[0]));byId('adminRecallApplyImportBtn').addEventListener('click',applyImport);byId('adminRecallGraphSearch').addEventListener('input',renderGraph);byId('adminRecallGraph').addEventListener('click',event=>{const node=event.target.closest('[data-recall-graph-node]');if(node){state.selectedNodeId=node.dataset.recallGraphNode;state.view='list';render()}});
-    document.addEventListener('kg-admin-subject-change',()=>loadSubject());window.addEventListener('beforeunload',()=>{if(state.dirty)writeRecord()});
+    document.addEventListener('kg-admin-subject-change',()=>{void switchSubject()});window.addEventListener('beforeunload',()=>{if(state.dirty)writeRecord()});
   }
+  async function switchSubject(){const subject=currentSubject();try{await global.KGTeachingContentApi?.ready?.(subject?.id||subject?.code||'PMP');loadSubject()}catch(error){toast('联想库切换失败：'+(error?.message||error),true)}}
   // P4.5.31 本浏览器库为空而服务器已有正式库时，以服务器库为基线载入（避免在空草稿上编辑）。
   async function hydrateFromServer(){
     try{
       if(state.dirty)return;
       const server=await Library.readServer(state.subjectCode);
       if(server&&(server.nodes||[]).length){Library.write(state.subjectCode,server);loadSubject({preserveView:true})}
-    }catch(error){}
+    }catch(error){throw error}
   }
-  async function init(){if(!byId('adminRecallPanel'))return;bind();await global.KGAdminSubjectsApp?.ready?.();loadSubject({preserveView:false});await hydrateFromServer()}
+  async function init(){
+    if(!byId('adminRecallPanel'))return;
+    try{
+      await global.KGAdminSubjectsApp?.ready?.();
+      const subject=currentSubject(),subjectId=subject?.id||subject?.code||'PMP';
+      await global.KGTeachingContentApi?.ready?.(subjectId);
+      bind();loadSubject({preserveView:false});await hydrateFromServer();
+    }catch(error){byId('adminRecallStatus').innerHTML=`<strong>联想库加载失败</strong><span>${escapeHtml(error?.message||'请检查网络后重试，未使用本地数据回退。')}</span>`;toast('联想库加载失败，请重新载入。',true)}
+  }
   global.KGRecallAssociationManagement=Object.freeze({loadSubject,saveDraft,publish,getState:()=>clone(state)});
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',()=>{void init()}):void init();
 })(window);

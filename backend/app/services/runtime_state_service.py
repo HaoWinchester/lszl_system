@@ -255,6 +255,10 @@ TEACHER_SHARED_RESTRICTED_PREFIXES = (
     "kg_exam_paper_categories_v1__",
 )
 RECALL_ASSOCIATION_PREFIX = "kg_recall_association_library_v1__"
+RETIRED_RECALL_RUNTIME_PREFIXES = (
+    RECALL_ASSOCIATION_PREFIX,
+    "kg_recall_association_management_v1__",
+)
 TEACHER_SHARED_GLOBAL_PREFIXES = (
     f"{RECALL_ASSOCIATION_PREFIX}subject__",
 )
@@ -726,6 +730,7 @@ def server_owned_key(key: str) -> bool:
         key in SERVER_OWNED_KEYS
         or key in LOGIN_ENTRY_SERVER_OWNED_KEYS
         or key.startswith(LOGIN_ENTRY_CONSUMED_PREFIX)
+        or key.startswith(RETIRED_RECALL_RUNTIME_PREFIXES)
     )
 
 

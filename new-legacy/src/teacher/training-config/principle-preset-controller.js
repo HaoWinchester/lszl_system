@@ -30,12 +30,6 @@
     });
     return unique([...explicit,...tagged].filter(Boolean));
   }
-  function seedPrinciples(){
-    const questions=api().getAllQuestions?.({includeDeleted:true})||[];
-    const names=questions.flatMap(legacyPrincipleNames);
-    Principles?.ensureFromLabels?.(names);
-    return questions;
-  }
   function ensurePairedPresets(){
     const created=[];
     (Principles?.list?.({includeInactive:true})||[]).forEach(principle=>{
@@ -181,7 +175,7 @@
   function questionCountByPrinciple(id,questions){const item=Principles?.get?.(id);return questions.filter(question=>questionMatchesPrinciple(question,item)).length}
   function renderPrincipleList(){
     const list=byId('tqPrincipleList');if(!list)return;
-    const questions=seedPrinciples(),items=Principles?.list?.({includeInactive:true})||[];
+    const questions=api().getAllQuestions?.({includeDeleted:true})||[],items=Principles?.list?.({includeInactive:true})||[];
     const availableIds=new Set(items.map(item=>item.id));
     selectedPrincipleIds=new Set([...selectedPrincipleIds].filter(id=>availableIds.has(id)));
     if(activePrincipleId!==draftPrincipleId&&!availableIds.has(activePrincipleId))activePrincipleId='';
@@ -230,20 +224,11 @@
   }
   function newPrinciple(){draftPrincipleId='principle-draft-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);activePrincipleId=draftPrincipleId;fillPrincipleEditor(draftPrincipleId);byId('tqPrincipleName')?.focus()}
   function selectedPrinciples(){return [...selectedPrincipleIds]}
-  async function postPrincipleOperation(path,body){
-    const response=await global.fetch(path,{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
-    let payload={};try{payload=await response.json()}catch(error){}
-    if(!response.ok){const detail=payload?.detail||payload;const error=new Error(detail?.message||'操作失败');error.detail=detail;throw error}
-    return payload;
-  }
-  function reloadPrincipleProjection(){
-    if(typeof global.location?.reload==='function')return global.location.reload();
-    return undefined;
-  }
+  function revisionConflictMessage(error,fallback){return error?.status===409||error?.detail?.code==='CONTENT_REVISION_CONFLICT'?'服务器内容已被其他教师更新，已重新载入，请确认后再试。':error?.message||fallback}
   async function applySelectedPresetStatus(){
     const ids=selectedPrinciples(),status=String(byId('tqBulkPresetStatus')?.value||'draft');
     if(!ids.length)return toast('请先勾选要修改的原则。');
-    try{await postPrincipleOperation('/api/v1/content-prep/principles/status',{ids,presetStatus:status});reloadPrincipleProjection();toast(`已更新 ${ids.length} 条原则的预设状态。`)}catch(error){toast(error?.message||'批量修改预设状态失败。')}
+    try{const result=await global.KGTeachingContentApi.updatePrincipleStatuses({ids,presetStatus:status});applyPrincipleCardBundle(result);renderPrincipleList();toast(`已更新 ${ids.length} 条原则的预设状态。`)}catch(error){toast(revisionConflictMessage(error,'批量修改预设状态失败。'))}
   }
   async function exportPrincipleCardBundle(){
     try{ensurePairedPresets();downloadPrincipleCardBundle(currentPrincipleCardBundle());toast('原则与归纳卡组合已导出。')}catch(error){toast('组合导出失败：'+(error?.message||error))}
@@ -253,18 +238,17 @@
     try{
       const bundle=normalizePrincipleCardBundle(await readJsonFile(file));
       const payload={principleCardBundleVersion:1,format:'kg-principle-card-bundle-v1',...bundle};
-      const result=await postPrincipleOperation('/api/v1/content-prep/principles/import',payload);
+      const result=await global.KGTeachingContentApi.importPrinciples(payload);
       applyPrincipleCardBundle(result.principles&&result.synthesisPresets?result:payload);
       selectedPrincipleIds.clear();activePrincipleId=(result.principles?.items||payload.principles.items)[0]?.id||'';draftPrincipleId='';renderPrincipleList();toast(`已导入 ${payload.principles.items.length} 条原则与归纳卡。`);
-    }catch(error){const counts=error?.detail?.referenceCounts||{},total=Object.values(counts).reduce((sum,value)=>sum+Number(value||0),0);toast(total?`导入会删除仍被 ${total} 道题引用的原则，请先重新绑定题目。`:error?.message||'组合导入失败。')}
+    }catch(error){const counts=error?.detail?.referenceCounts||{},total=Object.values(counts).reduce((sum,value)=>sum+Number(value||0),0);toast(total?`导入会删除仍被 ${total} 道题引用的原则，请先重新绑定题目。`:revisionConflictMessage(error,'组合导入失败。'))}
   }
   async function deleteSelectedPrinciples(){
     const ids=selectedPrinciples();if(!ids.length)return toast('请先勾选要删除的原则。');
     if(!global.confirm?.(`确定删除所选 ${ids.length} 条原则及其系统归纳卡吗？仍被题目引用的原则不会被删除。`))return;
-    try{ensurePairedPresets();const result=await postPrincipleOperation('/api/v1/content-prep/principles/delete',{ids});applyPrincipleCardBundle(result);selectedPrincipleIds.clear();activePrincipleId='';draftPrincipleId='';renderPrincipleList();toast(`已删除 ${ids.length} 条原则及其系统归纳卡。`)}catch(error){const counts=error?.detail?.referenceCounts||{},total=Object.values(counts).reduce((sum,value)=>sum+Number(value||0),0);if(total&&openPrincipleReferenceConflict(error?.detail))return;toast(total?`所选原则仍被 ${total} 道题引用，请先解除或重新绑定。`:error?.message||'删除失败。')}
+    try{const result=await global.KGTeachingContentApi.deletePrinciples(ids);applyPrincipleCardBundle(result);selectedPrincipleIds.clear();activePrincipleId='';draftPrincipleId='';renderPrincipleList();toast(`已删除 ${ids.length} 条原则及其系统归纳卡。`)}catch(error){const counts=error?.detail?.referenceCounts||{},total=Object.values(counts).reduce((sum,value)=>sum+Number(value||0),0);if(total&&openPrincipleReferenceConflict(error?.detail))return;toast(total?`所选原则仍被 ${total} 道题引用，请先解除或重新绑定。`:revisionConflictMessage(error,'删除失败。'))}
   }
   function bind(){
-    seedPrinciples();
     byId('questionDifficultyStars')?.addEventListener('click',event=>{const button=event.target.closest('[data-difficulty]');if(button)setDifficulty(button.dataset.difficulty)});
     byId('qbPrinciplePickerBtn')?.addEventListener('click',openPicker);
     byId('qbSelectedPrincipleChips')?.addEventListener('click',event=>{const button=event.target.closest('[data-remove-principle]');if(button)setCurrentPrincipleIds(currentPrincipleIds().filter(id=>id!==button.dataset.removePrinciple))});
@@ -289,10 +273,15 @@
     byId('tqPrincipleQuestionList')?.addEventListener('dblclick',event=>{const row=event.target.closest('[data-principle-question-id]');if(!row)return;event.preventDefault();openPrincipleQuestionPreview(row.dataset.principleQuestionId,row.dataset.principleQuestionBankId)});
     byId('tqNewPrincipleBtn')?.addEventListener('click',newPrinciple);byId('tqSavePrincipleBtn')?.addEventListener('click',savePrinciple);
     byId('tqPrincipleName')?.addEventListener('input',()=>{if(byId('tqPresetTitle'))byId('tqPresetTitle').value='原则：'+String(byId('tqPrincipleName').value||'').trim()});
-    document.addEventListener('kg-question-form-filled',event=>{const question=event.detail?.question||{};const normalized=PrincipleBinding.normalize?.(question.metadata||{},(question.options||[]).map(option=>option.id))||{};let ids=unique(normalized.stemPrincipleIds||question.metadata?.stemPrincipleIds||question.metadata?.principleIds||question.principleIds||[]);if(!ids.length){const created=legacyPrincipleNames(question).map(name=>Principles?.findByName?.(name)||Principles?.upsert?.({name})).filter(Boolean);ids=created.map(item=>item.id)}setCurrentPrincipleIds(ids);if(byId('questionDifficultyInput'))byId('questionDifficultyInput').value=Difficulty.normalize?.(question.difficulty)||'';renderStarRating();renderPrincipleList()});
+    document.addEventListener('kg-question-form-filled',event=>{const question=event.detail?.question||{};const normalized=PrincipleBinding.normalize?.(question.metadata||{},(question.options||[]).map(option=>option.id))||{};const ids=unique(normalized.stemPrincipleIds||question.metadata?.stemPrincipleIds||question.metadata?.principleIds||question.principleIds||[]);setCurrentPrincipleIds(ids);if(byId('questionDifficultyInput'))byId('questionDifficultyInput').value=Difficulty.normalize?.(question.difficulty)||'';renderStarRating();renderPrincipleList()});
     global.addEventListener('kg:principles-changed',()=>{renderCurrentPrinciples();renderPrincipleList()});
     renderStarRating();renderCurrentPrinciples();renderPrincipleList();
     const requested=new URLSearchParams(location.search).get('section');if(requested==='principles')setTimeout(()=>document.querySelector('[data-annotation-tab="principles"]')?.click(),80);
   }
-  document.addEventListener('DOMContentLoaded',()=>setTimeout(bind,0));
+  async function init(){
+    try{await global.KGTeachingContentApi?.ready?.()}
+    catch(error){toast('原则与归纳卡加载失败：'+(error?.message||error));return}
+    bind();
+  }
+  document.addEventListener('DOMContentLoaded',()=>{void init()});
 })(globalThis);
