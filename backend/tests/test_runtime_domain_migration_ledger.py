@@ -506,6 +506,13 @@ def test_paper_backfill_reuses_an_existing_paper_version_with_a_different_releas
                 question_count=0,
                 published_at=datetime.now(timezone.utc),
             ))
+            db.add(PaperReleaseQuestion(
+                release_id=existing_release_id,
+                order_index=0,
+                bank_id=bank_id,
+                question_id=question_id,
+                snapshot={"id": question_id, "title": "关系域权威题目", "releaseScore": 3.0},
+            ))
             db.add(SharedRuntimeState(
                 key=PUBLISHED_PAPERS_KEY,
                 value=__import__("json").dumps(payload),
@@ -519,18 +526,29 @@ def test_paper_backfill_reuses_an_existing_paper_version_with_a_different_releas
                 item = await db.scalar(select(RuntimeMigrationItem).where(
                     RuntimeMigrationItem.run_id == run_id
                 ))
-                assert report["status"] == "verified", {
+                assert report["status"] == "verification_failed", {
                     "report": report,
                     "item_status": item.status if item else None,
                     "item_error": item.error if item else None,
                 }
+                assert item is not None
+                assert item.error == "source and target hashes differ"
+                assert (item.verification_metadata or {}).get("unresolved_conflicts") == 1
                 existing = await db.get(PaperRelease, existing_release_id)
                 assert existing is not None
                 assert existing.name == "关系域权威版本"
+                reference = await db.get(PaperReleaseQuestion, (existing_release_id, 0))
+                assert reference is not None
+                assert reference.snapshot == {
+                    "id": question_id,
+                    "title": "关系域权威题目",
+                    "releaseScore": 3.0,
+                }
                 assert await db.get(PaperRelease, incoming_release_id) is None
         finally:
             async with AsyncSessionLocal() as db:
                 await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
+                await db.execute(delete(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == existing_release_id))
                 await db.execute(delete(PaperRelease).where(PaperRelease.paper_id == paper_id))
                 await db.execute(delete(SharedRuntimeState).where(
                     SharedRuntimeState.key == PUBLISHED_PAPERS_KEY

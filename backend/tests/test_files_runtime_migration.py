@@ -2,6 +2,7 @@ import asyncio
 import json
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import delete, select
 
 from app.db.session import AsyncSessionLocal
@@ -15,6 +16,57 @@ from app.services.files_runtime_migration_service import (
     scan_runtime_graph_storage,
     verify_all_graph_files,
 )
+
+
+def test_duplicate_folder_ids_and_casefold_tag_aliases_are_blockers() -> None:
+    suffix = uuid4().hex[:10]
+    owner = f"graph-migration-bijection-{suffix}"
+    folder_id = f"folder-bijection-{suffix}"
+    storage = {
+        "kg_graph_folders_v1": [
+            {"id": folder_id, "owner": owner, "name": "First"},
+            {"id": folder_id, "owner": owner, "name": "Second"},
+        ],
+        "kg_graph_file_tags_v2": {
+            owner: [
+                {"id": f"tag-a-{suffix}", "name": "Focus"},
+                {"id": f"tag-b-{suffix}", "name": "focus"},
+            ]
+        },
+    }
+    scan = scan_runtime_graph_storage(owner, storage)
+    assert {warning["code"] for warning in scan["warnings"]} >= {
+        "duplicate-folder-id",
+        "tag-name-alias-collision",
+    }
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                User(
+                    username=owner,
+                    password_hash="test-only",
+                    role="teacher",
+                    status="active",
+                )
+            )
+            await db.flush()
+            db.add(RuntimeState(owner_id=owner, storage=storage, revision=1))
+            await db.commit()
+            try:
+                with pytest.raises(ValueError, match="one-to-one"):
+                    await migrate_owner_graph_files(db, owner)
+                assert await db.scalar(
+                    select(Folder).where(Folder.owner_id == owner)
+                ) is None
+                assert await db.scalar(select(Tag).where(Tag.owner_id == owner)) is None
+            finally:
+                await db.rollback()
+                await db.execute(delete(RuntimeState).where(RuntimeState.owner_id == owner))
+                await db.execute(delete(User).where(User.username == owner))
+                await db.commit()
+
+    asyncio.run(scenario())
 
 
 def test_migrate_owner_graph_files_recovers_orphan_content_and_uses_smallest_order_as_current() -> None:

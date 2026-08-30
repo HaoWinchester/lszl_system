@@ -11,10 +11,12 @@ from app.db.session import AsyncSessionLocal
 from app.services import runtime_retirement_service
 
 
-async def _run(command: str, run_id: str) -> dict:
+async def _run(command: str, run_id: str | None) -> dict:
     async with AsyncSessionLocal() as db:
         if command == "scan":
-            return await runtime_retirement_service.scan(db, run_id=run_id)
+            return await runtime_retirement_service.scan(
+                db, run_id=run_id or "runtime-retirement-scan"
+            )
         if command == "migrate":
             return await runtime_retirement_service.migrate(db, run_id=run_id)
         if command == "verify":
@@ -23,18 +25,40 @@ async def _run(command: str, run_id: str) -> dict:
 
 
 def report_exit_code(command: str, report: dict) -> int:
+    blocker_fields = (
+        "unknown",
+        "parseErrors",
+        "hashMismatches",
+        "unresolvedConflicts",
+        "inventoryDrift",
+        "requiredFailures",
+        "pending",
+    )
+    if any(int(report.get(field) or 0) > 0 for field in blocker_fields):
+        return 2
     if command == "drop-check" and not bool(report.get("ready")):
         return 2
-    if command == "verify" and report.get("status") != "verified":
+    clean_statuses = {
+        "scan": {"planned"},
+        "migrate": {"applied"},
+        "verify": {"verified"},
+        "drop-check": {"ready"},
+    }
+    if report.get("status") not in clean_statuses[command]:
         return 2
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Runtime State retirement gate")
-    parser.add_argument("command", choices=("scan", "migrate", "verify", "drop-check"))
-    parser.add_argument("--run-id", default="runtime-retirement")
-    parser.add_argument("--report-json", required=True)
+    commands = parser.add_subparsers(dest="command", required=True)
+    scan_parser = commands.add_parser("scan")
+    scan_parser.add_argument("--run-id")
+    scan_parser.add_argument("--report-json", required=True)
+    for command in ("migrate", "verify", "drop-check"):
+        command_parser = commands.add_parser(command)
+        command_parser.add_argument("--run-id", required=True)
+        command_parser.add_argument("--report-json", required=True)
     return parser
 
 

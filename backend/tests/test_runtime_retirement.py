@@ -1,18 +1,29 @@
 import asyncio
+from copy import deepcopy
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import delete, select, text
 
 from app.db.session import AsyncSessionLocal
 from app.cli import runtime_retirement as runtime_retirement_cli
 from app.models.course_management import CourseDraft, CourseRelease, LearningTask
+from app.models.engagement import (
+    Announcement,
+    AnnouncementAudience,
+    Feedback,
+    FeedbackReceipt,
+    FeedbackReply,
+    MessageReceipt,
+)
 from app.models.file import CurrentFile, FileContent, FileTag, Folder, GraphFile, Tag
-from app.models.runtime_migration import RuntimeMigrationRun
+from app.models.runtime_migration import RuntimeMigrationItem, RuntimeMigrationRun
 from app.models.runtime_state import RuntimeState
+from app.models.teaching_content import ContentSubject, RecallAssociationLibrary
 from app.models.user import User
 from app.services import files_runtime_migration_service, runtime_retirement_service as service
 
@@ -93,14 +104,52 @@ def test_drop_gate_requires_zero_blockers_and_both_empty_runtime_policies() -> N
 
 
 def test_cli_exit_codes_and_external_integrity_blockers() -> None:
-    assert runtime_retirement_cli.report_exit_code("scan", {"status": "planned"}) == 0
+    assert runtime_retirement_cli.report_exit_code(
+        "scan", {"status": "planned", "unknown": 1}
+    ) == 2
+    assert runtime_retirement_cli.report_exit_code(
+        "scan",
+        {
+            "status": "planned",
+            "unknown": 0,
+            "parseErrors": 0,
+            "hashMismatches": 0,
+            "unresolvedConflicts": 0,
+        },
+    ) == 0
+    assert runtime_retirement_cli.report_exit_code(
+        "migrate", {"status": "applied", "pending": 1}
+    ) == 2
+    assert runtime_retirement_cli.report_exit_code(
+        "migrate",
+        {
+            "status": "applied",
+            "pending": 0,
+            "unknown": 0,
+            "parseErrors": 0,
+            "hashMismatches": 0,
+            "unresolvedConflicts": 0,
+        },
+    ) == 0
     assert runtime_retirement_cli.report_exit_code("verify", {"status": "blocked"}) == 2
     assert runtime_retirement_cli.report_exit_code("verify", {"status": "verified"}) == 0
     assert runtime_retirement_cli.report_exit_code("drop-check", {"ready": False}) == 2
-    assert runtime_retirement_cli.report_exit_code("drop-check", {"ready": True}) == 0
-    assert runtime_retirement_cli.build_parser().parse_args(
+    assert runtime_retirement_cli.report_exit_code(
+        "drop-check", {"status": "ready", "ready": True}
+    ) == 0
+    scan_args = runtime_retirement_cli.build_parser().parse_args(
         ["scan", "--report-json", "report.json"]
-    ).command == "scan"
+    )
+    assert scan_args.command == "scan"
+    assert scan_args.run_id is None
+    with pytest.raises(SystemExit):
+        runtime_retirement_cli.build_parser().parse_args(
+            ["migrate", "--report-json", "report.json"]
+        )
+    migrate_args = runtime_retirement_cli.build_parser().parse_args(
+        ["migrate", "--run-id", "required-run", "--report-json", "report.json"]
+    )
+    assert migrate_args.run_id == "required-run"
     with TemporaryDirectory(prefix="runtime-retirement-cli-report-") as directory:
         report_path = Path(directory) / "nested" / "report.json"
         runtime_retirement_cli.write_report(
@@ -141,6 +190,436 @@ def test_cli_exit_codes_and_external_integrity_blockers() -> None:
     )
     assert summary["hashMismatches"] == 2
     assert summary["unresolvedConflicts"] == 5
+
+
+def test_cli_main_exits_two_for_a_blocked_scan_and_writes_safe_report() -> None:
+    async def blocked_scan(_command: str, _run_id: str | None) -> dict:
+        return {
+            "status": "planned",
+            "unknown": 1,
+            "parseErrors": 0,
+            "hashMismatches": 0,
+            "unresolvedConflicts": 0,
+            "source_payload": {"secret": "must-not-leak"},
+        }
+
+    with TemporaryDirectory(prefix="runtime-retirement-main-") as directory:
+        report_path = Path(directory) / "scan.json"
+        with patch.object(runtime_retirement_cli, "_run", blocked_scan), patch(
+            "sys.argv",
+            [
+                "runtime-retirement",
+                "scan",
+                "--report-json",
+                str(report_path),
+            ],
+        ):
+            with pytest.raises(SystemExit) as raised:
+                runtime_retirement_cli.main()
+        assert raised.value.code == 2
+        rendered = report_path.read_text(encoding="utf-8")
+        assert "must-not-leak" not in rendered
+        assert json.loads(rendered)["unknown"] == 1
+
+
+def test_drop_check_requires_existing_run_and_never_mutates_ledger() -> None:
+    suffix = uuid4().hex[:10]
+    missing_run_id = f"runtime-retirement-missing-{suffix}"
+    run_id = f"runtime-retirement-read-only-{suffix}"
+    sources = [
+        {
+            "source_type": "runtime",
+            "source_key": "kg_default_entry_mode_v1",
+            "owner_id": f"owner-{suffix}",
+            "payload": "graph",
+            "required": True,
+        }
+    ]
+
+    async def controlled_sources(_db):
+        return list(sources)
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            with TemporaryDirectory(prefix="runtime-retirement-read-only-") as directory:
+                policy_paths = (Path(directory) / "backend.json", Path(directory) / "frontend.json")
+                for path in policy_paths:
+                    path.write_text('{"runtimePages": []}\n', encoding="utf-8")
+                with patch.object(
+                    service.domain_migration, "_runtime_sources", controlled_sources
+                ):
+                    missing = await service.drop_check(
+                        db, run_id=missing_run_id, policy_paths=policy_paths
+                    )
+                    assert missing["ready"] is False
+                    assert "missingRun" in missing["blockers"]
+                    assert await db.get(RuntimeMigrationRun, missing_run_id) is None
+
+                    await service.migrate(db, run_id=run_id, sources=sources)
+                    await service.verify(db, run_id=run_id)
+                    run = await db.get(RuntimeMigrationRun, run_id)
+                    item = await db.scalar(
+                        select(RuntimeMigrationItem).where(
+                            RuntimeMigrationItem.run_id == run_id
+                        )
+                    )
+                    before = {
+                        "run": (
+                            run.status,
+                            deepcopy(run.report),
+                            run.source_snapshot_hash,
+                            run.updated_at,
+                        ),
+                        "item": (
+                            item.status,
+                            item.expected_hash,
+                            item.target_hash,
+                            deepcopy(item.verification_metadata),
+                            item.error,
+                            item.updated_at,
+                        ),
+                    }
+                    ready = await service.drop_check(
+                        db, run_id=run_id, policy_paths=policy_paths
+                    )
+                    assert ready["ready"] is True
+                    db.expire_all()
+                    run = await db.get(RuntimeMigrationRun, run_id)
+                    item = await db.scalar(
+                        select(RuntimeMigrationItem).where(
+                            RuntimeMigrationItem.run_id == run_id
+                        )
+                    )
+                    after = {
+                        "run": (
+                            run.status,
+                            deepcopy(run.report),
+                            run.source_snapshot_hash,
+                            run.updated_at,
+                        ),
+                        "item": (
+                            item.status,
+                            item.expected_hash,
+                            item.target_hash,
+                            deepcopy(item.verification_metadata),
+                            item.error,
+                            item.updated_at,
+                        ),
+                    }
+                    assert after == before
+            await db.execute(
+                delete(RuntimeMigrationRun).where(
+                    RuntimeMigrationRun.id.in_([missing_run_id, run_id])
+                )
+            )
+            await db.commit()
+
+    asyncio.run(scenario())
+
+
+def test_drop_check_blocks_a_new_runtime_identity_after_verification() -> None:
+    suffix = uuid4().hex[:10]
+    run_id = f"runtime-retirement-inventory-drift-{suffix}"
+    sources = [
+        {
+            "source_type": "runtime",
+            "source_key": "kg_default_entry_mode_v1",
+            "owner_id": f"owner-{suffix}",
+            "payload": "graph",
+            "required": True,
+        }
+    ]
+    live_sources = list(sources)
+
+    async def controlled_sources(_db):
+        return list(live_sources)
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            try:
+                with patch.object(
+                    service.domain_migration, "_runtime_sources", controlled_sources
+                ):
+                    await service.migrate(db, run_id=run_id, sources=sources)
+                    run = await db.get(RuntimeMigrationRun, run_id)
+                    run.report = {**(run.report or {}), "source_inventory_scope": "live"}
+                    await db.commit()
+                    verified = await service.verify(db, run_id=run_id)
+                    assert verified["status"] == "verified"
+                    live_sources.append(
+                        {
+                            "source_type": "runtime",
+                            "source_key": f"kg_unclassified_after_verify_{suffix}",
+                            "owner_id": f"new-owner-{suffix}",
+                            "payload": {"must": "remain-private"},
+                            "required": True,
+                        }
+                    )
+                    with TemporaryDirectory(prefix="runtime-retirement-drift-") as directory:
+                        policy_paths = (
+                            Path(directory) / "backend.json",
+                            Path(directory) / "frontend.json",
+                        )
+                        for path in policy_paths:
+                            path.write_text('{"runtimePages": []}\n', encoding="utf-8")
+                        blocked = await service.drop_check(
+                            db, run_id=run_id, policy_paths=policy_paths
+                        )
+                    assert blocked["ready"] is False
+                    assert blocked["inventoryDrift"] == 1
+                    assert blocked["unknown"] >= 1
+                    assert runtime_retirement_cli.report_exit_code(
+                        "drop-check", blocked
+                    ) == 2
+                    assert "must" not in json.dumps(blocked)
+            finally:
+                await db.execute(
+                    delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id)
+                )
+                await db.commit()
+
+    asyncio.run(scenario())
+
+
+def test_shared_file_runtime_identity_is_never_aggregate_verified() -> None:
+    run_id = f"runtime-retirement-shared-files-{uuid4().hex[:10]}"
+    sources = [
+        {
+            "source_type": "shared_runtime",
+            "source_key": files_runtime_migration_service.INDEX_KEY,
+            "owner_scope": "shared",
+            "payload": [],
+            "required": True,
+        }
+    ]
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            try:
+                report = await service.migrate(db, run_id=run_id, sources=sources)
+                item = await db.scalar(
+                    select(RuntimeMigrationItem).where(
+                        RuntimeMigrationItem.run_id == run_id
+                    )
+                )
+                assert item is not None
+                assert item.status == "failed"
+                assert item.target_hash is None
+                assert report["verifiedCount"] == 0
+                assert report["unresolvedConflicts"] >= 1
+            finally:
+                await db.execute(
+                    delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id)
+                )
+                await db.commit()
+
+    asyncio.run(scenario())
+
+
+def test_composed_domain_mappers_never_overwrite_existing_relational_aggregates() -> None:
+    suffix = uuid4().hex[:10]
+    run_id = f"runtime-retirement-domain-wins-{suffix}"
+    owner = f"runtime-retirement-domain-owner-{suffix}"
+    announcement_id = f"announcement-domain-{suffix}"
+    feedback_id = f"feedback-domain-{suffix}"
+    reply_id = f"reply-domain-{suffix}"
+    subject_id = f"subject-domain-{suffix}"
+    recall_id = f"recall-domain-{suffix}"
+    recall_key = f"kg_recall_association_library_v1__subject__{subject_id}"
+    sources = [
+        {
+            "source_type": "runtime",
+            "source_key": "kg_announcements_v1",
+            "owner_id": owner,
+            "payload": [
+                {
+                    "id": announcement_id,
+                    "title": "runtime title",
+                    "body": "runtime body",
+                    "createdBy": owner,
+                    "audience": {"type": "all"},
+                }
+            ],
+        },
+        {
+            "source_type": "runtime",
+            "source_key": "kg_user_feedback_v1",
+            "owner_id": owner,
+            "payload": [
+                {
+                    "id": feedback_id,
+                    "title": "runtime feedback",
+                    "detail": "runtime detail",
+                    "submittedBy": {"username": owner},
+                    "replies": [],
+                }
+            ],
+        },
+        {
+            "source_type": "shared_runtime",
+            "source_key": recall_key,
+            "owner_scope": "shared",
+            "payload": {"nodes": [{"id": "runtime-node"}], "edges": []},
+        },
+        {
+            "source_type": "runtime",
+            "source_key": f"kg_user_message_reads_v1__{owner}",
+            "owner_id": owner,
+            "payload": {announcement_id: 999},
+        },
+        {
+            "source_type": "runtime",
+            "source_key": f"kg_user_feedback_reply_reads_v1__{owner}",
+            "owner_id": owner,
+            "payload": {feedback_id: 999},
+        },
+    ]
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(User(username=owner, password_hash="test-only", role="admin", status="active"))
+            await db.flush()
+            db.add(
+                Announcement(
+                    id=announcement_id,
+                    title="domain title",
+                    body="domain body",
+                    link="",
+                    status="published",
+                    publish_at=0,
+                    expires_at=0,
+                    published_at=1,
+                    withdrawn_at=0,
+                    created_by=owner,
+                    created_at=1,
+                    updated_at=2,
+                )
+            )
+            db.add(
+                Feedback(
+                    id=feedback_id,
+                    type="suggestion",
+                    title="domain feedback",
+                    detail="domain detail",
+                    page="",
+                    app_version="",
+                    contact="",
+                    attachment=None,
+                    status="pending",
+                    submitted_by=owner,
+                    created_at=1,
+                    updated_at=2,
+                )
+            )
+            db.add(ContentSubject(id=subject_id, code=subject_id, name="Domain", content_metadata={}))
+            await db.flush()
+            db.add_all(
+                [
+                    AnnouncementAudience(
+                        id=f"aud-domain-{suffix}",
+                        announcement_id=announcement_id,
+                        audience_type="roles",
+                        audience_value="teacher",
+                    ),
+                    FeedbackReply(
+                        id=reply_id,
+                        feedback_id=feedback_id,
+                        message="domain reply",
+                        actor="admin",
+                        actor_username=owner,
+                        created_at=3,
+                    ),
+                    RecallAssociationLibrary(
+                        id=recall_id,
+                        subject_id=subject_id,
+                        version=1,
+                        nodes=[{"id": "domain-node"}],
+                        edges=[],
+                        content_metadata={"nodes": [{"id": "domain-node"}], "edges": []},
+                        updated_by=owner,
+                    ),
+                    MessageReceipt(
+                        id=f"message-receipt-domain-{suffix}",
+                        announcement_id=announcement_id,
+                        username=owner,
+                        read_at=11,
+                    ),
+                    FeedbackReceipt(
+                        id=f"feedback-receipt-domain-{suffix}",
+                        feedback_id=feedback_id,
+                        username=owner,
+                        read_at=22,
+                    ),
+                ]
+            )
+            await db.commit()
+            try:
+                report = await service.migrate(db, run_id=run_id, sources=sources)
+                announcement = await db.get(Announcement, announcement_id)
+                audiences = list(
+                    (
+                        await db.scalars(
+                            select(AnnouncementAudience).where(
+                                AnnouncementAudience.announcement_id == announcement_id
+                            )
+                        )
+                    ).all()
+                )
+                feedback = await db.get(Feedback, feedback_id)
+                replies = list(
+                    (
+                        await db.scalars(
+                            select(FeedbackReply).where(
+                                FeedbackReply.feedback_id == feedback_id
+                            )
+                        )
+                    ).all()
+                )
+                recall = await db.get(RecallAssociationLibrary, recall_id)
+                message_receipt = await db.scalar(
+                    select(MessageReceipt).where(
+                        MessageReceipt.announcement_id == announcement_id,
+                        MessageReceipt.username == owner,
+                    )
+                )
+                feedback_receipt = await db.scalar(
+                    select(FeedbackReceipt).where(
+                        FeedbackReceipt.feedback_id == feedback_id,
+                        FeedbackReceipt.username == owner,
+                    )
+                )
+                assert (announcement.title, announcement.body) == (
+                    "domain title",
+                    "domain body",
+                )
+                assert [(row.audience_type, row.audience_value) for row in audiences] == [
+                    ("roles", "teacher")
+                ]
+                assert (feedback.title, feedback.detail) == (
+                    "domain feedback",
+                    "domain detail",
+                )
+                assert [(row.id, row.message) for row in replies] == [
+                    (reply_id, "domain reply")
+                ]
+                assert recall.nodes == [{"id": "domain-node"}]
+                assert message_receipt.read_at == 11
+                assert feedback_receipt.read_at == 22
+                assert report["unresolvedConflicts"] == 5
+            finally:
+                await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
+                await db.execute(delete(RecallAssociationLibrary).where(RecallAssociationLibrary.id == recall_id))
+                await db.execute(delete(ContentSubject).where(ContentSubject.id == subject_id))
+                await db.execute(delete(MessageReceipt).where(MessageReceipt.announcement_id == announcement_id))
+                await db.execute(delete(FeedbackReceipt).where(FeedbackReceipt.feedback_id == feedback_id))
+                await db.execute(delete(FeedbackReply).where(FeedbackReply.id == reply_id))
+                await db.execute(delete(Feedback).where(Feedback.id == feedback_id))
+                await db.execute(delete(AnnouncementAudience).where(AnnouncementAudience.announcement_id == announcement_id))
+                await db.execute(delete(Announcement).where(Announcement.id == announcement_id))
+                await db.execute(delete(User).where(User.username == owner))
+                await db.commit()
+
+    asyncio.run(scenario())
 
 
 def test_course_domain_wins_and_runtime_only_fills_missing_idempotently() -> None:
@@ -450,6 +929,15 @@ def test_files_proof_detects_relational_tampering_in_drop_check() -> None:
                 assert migrated["hashMismatches"] == 0
                 assert migrated["domains"]["files"]["verificationHash"]
                 assert migrated["domains"]["files"]["sourceHash"] == migrated["domains"]["files"]["targetHash"]
+                proof_items = {item["sourceKey"]: item for item in migrated["items"]}
+                assert proof_items[files_runtime_migration_service.INDEX_KEY]["expectedHash"] != proof_items[content_key]["expectedHash"]
+                assert all(
+                    item["expectedCount"] == item["targetCount"]
+                    and item["expectedHash"] == item["targetHash"]
+                    for item in proof_items.values()
+                )
+                verified = await service.verify(db, run_id=run_id)
+                assert verified["status"] == "verified"
 
                 with TemporaryDirectory(prefix="runtime-retirement-files-policy-") as directory:
                     policy_paths = (
@@ -458,9 +946,10 @@ def test_files_proof_detects_relational_tampering_in_drop_check() -> None:
                     )
                     for path in policy_paths:
                         path.write_text('{"runtimePages": []}\n', encoding="utf-8")
-                    assert (
-                        await service.drop_check(db, run_id=run_id, policy_paths=policy_paths)
-                    )["ready"] is True
+                    initial_drop = await service.drop_check(
+                        db, run_id=run_id, policy_paths=policy_paths
+                    )
+                    assert initial_drop["ready"] is True, json.dumps(initial_drop)
 
                     graph_file = await db.scalar(
                         select(GraphFile).where(

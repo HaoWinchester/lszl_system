@@ -4,7 +4,7 @@ import hashlib
 import json
 import re
 from typing import Any, Mapping
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
 from app.models.engagement import Announcement, AnnouncementAudience, Feedback, FeedbackReply, FeedbackReceipt, MessageReceipt
@@ -79,17 +79,16 @@ async def _announcement_mapper(db: AsyncSession, item: Any) -> Mapping[str, Any]
         row = await db.get(Announcement, identifier)
         actor = await _trusted_owner(db, _clean(raw.get("createdBy")), _clean(item.owner_scope))
         now = int(raw.get("updatedAt") or raw.get("createdAt") or 0)
+        created = row is None
         if row is None:
             row = Announcement(id=identifier, title=_clean(raw.get("title")), body=_clean(raw.get("body")), link=_clean(raw.get("link")), status=_clean(raw.get("status")) or "draft", publish_at=int(raw.get("publishAt") or 0), expires_at=int(raw.get("expiresAt") or 0), published_at=int(raw.get("publishedAt") or 0), withdrawn_at=int(raw.get("withdrawnAt") or 0), created_by=actor, created_at=int(raw.get("createdAt") or now), updated_at=now)
             db.add(row)
-        else:
-            row.title=_clean(raw.get("title")); row.body=_clean(raw.get("body")); row.link=_clean(raw.get("link")); row.status=_clean(raw.get("status")) or "draft"; row.publish_at=int(raw.get("publishAt") or 0); row.expires_at=int(raw.get("expiresAt") or 0); row.published_at=int(raw.get("publishedAt") or 0); row.withdrawn_at=int(raw.get("withdrawnAt") or 0); row.created_by=actor; row.updated_at=now
         audience = raw.get("audience") if isinstance(raw.get("audience"), Mapping) else {"type": "all"}
         typ = _clean(audience.get("type")) or "all"
         values = [""] if typ == "all" else [_clean(x) for x in audience.get("roles" if typ == "roles" else "users", []) if _clean(x)]
-        await db.execute(delete(AnnouncementAudience).where(AnnouncementAudience.announcement_id == identifier))
-        for value in values:
-            await db.execute(insert(AnnouncementAudience).values(id=f"aud-{identifier}-{typ}-{value or 'all'}"[:64], announcement_id=identifier, audience_type=typ, audience_value=value).on_conflict_do_nothing(constraint="uq_announcement_audience"))
+        if created:
+            for value in values:
+                await db.execute(insert(AnnouncementAudience).values(id=f"aud-{identifier}-{typ}-{value or 'all'}"[:64], announcement_id=identifier, audience_type=typ, audience_value=value).on_conflict_do_nothing(constraint="uq_announcement_audience"))
     await db.flush()
     canonical = []
     for raw in rows:
@@ -107,24 +106,22 @@ async def _feedback_mapper(db: AsyncSession, item: Any) -> Mapping[str, Any]:
         owner = await _trusted_owner(db, _clean(actor.get("username")), _clean(item.owner_scope))
         if not identifier or not owner: continue
         row = await db.get(Feedback, identifier)
+        created = row is None
         if row is None:
             row = Feedback(id=identifier, type=_clean(raw.get("type")) or "suggestion", title=_clean(raw.get("title")), detail=_clean(raw.get("detail")), page=_clean(raw.get("page")), app_version=_clean(raw.get("appVersion")), contact=_clean(raw.get("contact")), attachment=raw.get("attachment"), status=_clean(raw.get("status")) or "pending", submitted_by=owner, created_at=int(raw.get("createdAt") or 0), updated_at=int(raw.get("updatedAt") or raw.get("createdAt") or 0)); db.add(row)
-        else:
-            row.type=_clean(raw.get("type")) or "suggestion"; row.title=_clean(raw.get("title")); row.detail=_clean(raw.get("detail")); row.page=_clean(raw.get("page")); row.app_version=_clean(raw.get("appVersion")); row.contact=_clean(raw.get("contact")); row.attachment=raw.get("attachment"); row.status=_clean(raw.get("status")) or "pending"; row.submitted_by=owner; row.updated_at=int(raw.get("updatedAt") or raw.get("createdAt") or 0)
         source_reply_ids={_clean(reply.get("id")) for reply in raw.get("replies",[]) if isinstance(reply,Mapping) and _clean(reply.get("id"))}
-        if source_reply_ids:
-            await db.execute(delete(FeedbackReply).where(FeedbackReply.feedback_id==identifier, FeedbackReply.id.not_in(source_reply_ids)))
-        else:
-            await db.execute(delete(FeedbackReply).where(FeedbackReply.feedback_id==identifier))
-        for reply in raw.get("replies", []) if isinstance(raw.get("replies"), list) else []:
-            reply_id = _clean(reply.get("id"))
-            if reply_id:
-                reply_actor=await _trusted_owner(db, _clean(reply.get("actorUsername")), owner)
-                await db.execute(insert(FeedbackReply).values(id=reply_id,feedback_id=identifier,message=_clean(reply.get("message")),actor=_clean(reply.get("actor")) or reply_actor,actor_username=reply_actor,created_at=int(reply.get("createdAt") or 0)).on_conflict_do_nothing(index_elements=[FeedbackReply.id]))
+        if created:
+            for reply in raw.get("replies", []) if isinstance(raw.get("replies"), list) else []:
+                reply_id = _clean(reply.get("id"))
+                if reply_id:
+                    reply_actor=await _trusted_owner(db, _clean(reply.get("actorUsername")), owner)
+                    await db.execute(insert(FeedbackReply).values(id=reply_id,feedback_id=identifier,message=_clean(reply.get("message")),actor=_clean(reply.get("actor")) or reply_actor,actor_username=reply_actor,created_at=int(reply.get("createdAt") or 0)).on_conflict_do_nothing(index_elements=[FeedbackReply.id]))
     await db.flush(); canonical=[]
     for raw in rows:
         row=await db.get(Feedback,_clean(raw.get("id")))
-        if row is not None: canonical.append({"id":row.id,"title":row.title,"detail":row.detail,"status":row.status,"submittedBy":{"username":row.submitted_by}})
+        if row is not None:
+            replies=list((await db.scalars(select(FeedbackReply).where(FeedbackReply.feedback_id==row.id))).all())
+            canonical.append(_canonical_feedback(raw,row,replies))
     return {"canonical_payload":canonical}
 
 async def _receipt_mapper(db: AsyncSession, item: Any) -> Mapping[str, Any]:
@@ -133,16 +130,34 @@ async def _receipt_mapper(db: AsyncSession, item: Any) -> Mapping[str, Any]:
         try: payload=json.loads(payload)
         except (TypeError,ValueError,json.JSONDecodeError): payload={}
     payload=payload if isinstance(payload,Mapping) else {}; is_message=str(item.source_key).startswith("kg_user_message_reads_v1__")
-    model=MessageReceipt if is_message else FeedbackReceipt; id_field="announcement_id" if is_message else "feedback_id"; constraint="uq_message_receipt" if is_message else "uq_feedback_receipt"
+    model=MessageReceipt if is_message else FeedbackReceipt; id_field="announcement_id" if is_message else "feedback_id"
     valid=set((await db.scalars(select(Announcement.id if is_message else Feedback.id))).all()); rows=[]
     for identifier,timestamp in payload.items():
         identifier=_clean(identifier)
         if identifier and identifier in valid: rows.append({"id":f"receipt-{owner}-{identifier}"[:64],id_field:identifier,"username":owner,"read_at":int(timestamp or 0)})
-    if rows:
-        await db.execute(insert(model).values(rows).on_conflict_do_update(constraint=constraint,set_={"read_at":insert(model).excluded.read_at})); await db.flush()
-    canonical_rows=sorted(rows,key=lambda x:(x[id_field],x["username"]))
-    item.expected_count=len(canonical_rows)
-    item.expected_hash=_canonical_hash(canonical_rows)
+    expected_rows=sorted(rows,key=lambda x:(x[id_field],x["username"]))
+    for values in expected_rows:
+        existing = await db.scalar(
+            select(model).where(
+                getattr(model, id_field) == values[id_field],
+                model.username == owner,
+            )
+        )
+        if existing is None:
+            db.add(model(**values))
+    await db.flush()
+    actual = list((await db.scalars(
+        select(model).where(
+            model.username == owner,
+            getattr(model, id_field).in_([row[id_field] for row in expected_rows]),
+        )
+    )).all()) if expected_rows else []
+    canonical_rows=sorted([
+        {"id": row.id, id_field: getattr(row, id_field), "username": row.username, "read_at": row.read_at}
+        for row in actual
+    ],key=lambda x:(x[id_field],x["username"]))
+    item.expected_count=len(expected_rows)
+    item.expected_hash=_canonical_hash(expected_rows)
     return {"canonical_payload":canonical_rows}
 
 MAPPERS = {FEEDBACK_KEY: _feedback_mapper, ANNOUNCEMENT_KEY: _announcement_mapper, "kg_user_message_reads_v1__": _receipt_mapper, "kg_user_feedback_reply_reads_v1__": _receipt_mapper}

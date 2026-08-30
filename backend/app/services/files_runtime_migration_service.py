@@ -136,8 +136,54 @@ def _collect_runtime_graphs(
     return indexed, contents, warnings
 
 
+def _relation_source_warnings(
+    owner: str, storage: dict[str, object]
+) -> list[dict[str, str]]:
+    """Reject source relations that cannot map one-to-one into relational IDs."""
+
+    warnings: list[dict[str, str]] = []
+    raw_folders = _json(storage.get(FOLDERS_KEY), [])
+    folder_ids: set[str] = set()
+    for row in raw_folders if isinstance(raw_folders, list) else []:
+        if not isinstance(row, dict) or str(row.get("owner") or owner) != owner:
+            continue
+        source_id = str(row.get("id") or "").strip()
+        if not source_id:
+            continue
+        if source_id in folder_ids:
+            warnings.append({"code": "duplicate-folder-id", "sourceId": source_id})
+        folder_ids.add(source_id)
+
+    raw_tags = _json(storage.get(TAGS_KEY), {})
+    tag_rows = raw_tags.get(owner, []) if isinstance(raw_tags, dict) else []
+    tag_ids: set[str] = set()
+    names: dict[str, str] = {}
+    for row in tag_rows if isinstance(tag_rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        source_id = str(row.get("id") or "").strip()
+        name = str(row.get("name") or "").strip()
+        if source_id:
+            if source_id in tag_ids:
+                warnings.append({"code": "duplicate-tag-id", "sourceId": source_id})
+            tag_ids.add(source_id)
+        folded = name.casefold()
+        prior = names.get(folded)
+        if folded and prior is not None and prior != source_id:
+            warnings.append(
+                {
+                    "code": "tag-name-alias-collision",
+                    "sourceId": source_id,
+                }
+            )
+        elif folded:
+            names[folded] = source_id
+    return warnings
+
+
 def scan_runtime_graph_storage(owner: str, storage: dict[str, object]) -> dict:
     indexed, contents, warnings = _collect_runtime_graphs(owner, storage)
+    warnings.extend(_relation_source_warnings(owner, storage))
     return {
         "owner": owner,
         "indexed": len(indexed),
@@ -173,6 +219,10 @@ async def migrate_owner_graph_files(db: AsyncSession, owner: str) -> dict[str, i
 
     storage = dict(runtime.storage or {})
     indexed, contents, warnings = _collect_runtime_graphs(owner, storage)
+    relation_warnings = _relation_source_warnings(owner, storage)
+    warnings.extend(relation_warnings)
+    if relation_warnings:
+        raise ValueError("legacy folder/tag relations are not one-to-one")
 
     raw_folders = _json(storage.get(FOLDERS_KEY), [])
     folder_rows = [item for item in raw_folders if isinstance(item, dict) and str(item.get("owner") or owner) == owner] if isinstance(raw_folders, list) else []
@@ -404,12 +454,19 @@ def _canonical_hash(value: object) -> str:
 
 async def _graph_verification_proof(
     db: AsyncSession, owners: list[str]
-) -> tuple[str, str, str, list[dict[str, str]]]:
+) -> tuple[
+    str,
+    str,
+    str,
+    list[dict[str, str]],
+    dict[str, dict[str, object]],
+]:
     """Build payload-free aggregate proof over files, folders, tags and current."""
 
     source_entities: list[dict[str, str]] = []
     target_entities: list[dict[str, str]] = []
     failures: list[dict[str, str]] = []
+    item_proofs: dict[str, dict[str, object]] = {}
     for owner in owners:
         runtime = await db.get(RuntimeState, owner)
         if runtime is None:
@@ -520,11 +577,13 @@ async def _graph_verification_proof(
                 title = f"{title}（自动恢复）"[:200]
             graph_data = _graph_data(raw_graph, title)
             source_revision = _positive_revision(content.get("revision"), index_row.get("revision"))
-            expected = {
+            expected_content = {
                 "revision": source_revision,
-                "name": title,
                 "graphHash": _canonical_hash(graph_data),
                 "learningHash": _canonical_hash(content.get("learningState") if isinstance(content.get("learningState"), dict) else {}),
+            }
+            expected_index = {
+                "name": title,
                 "folderId": str(index_row.get("folderId") or ""),
                 "restoreFolderId": str(index_row.get("restoreFolderId") or ""),
                 "favorite": index_row.get("favorite") is True,
@@ -541,16 +600,19 @@ async def _graph_verification_proof(
             }
             target = by_source.get(source_id)
             target_content = await db.get(FileContent, target.id) if target else None
-            actual = None
+            actual_index = None
+            actual_content = None
             if target is not None and target_content is not None:
                 links = list((await db.scalars(
                     select(FileTag).where(FileTag.file_id == target.id)
                 )).all())
-                actual = {
+                actual_content = {
                     "revision": target.revision,
-                    "name": target.name,
                     "graphHash": _canonical_hash(target_content.graph_data or {}),
                     "learningHash": _canonical_hash(target_content.learning_state or {}),
+                }
+                actual_index = {
+                    "name": target.name,
                     "folderId": folder_source_by_target.get(target.folder_id or "", ""),
                     "restoreFolderId": folder_source_by_target.get(target.restore_folder_id or "", ""),
                     "favorite": target.favorite,
@@ -561,8 +623,11 @@ async def _graph_verification_proof(
                         for link in links
                     }),
                 }
-            source_entities.append({"owner": owner, "kind": "file", "id": source_id, "hash": _canonical_hash(expected)})
-            target_entities.append({"owner": owner, "kind": "file", "id": source_id, "hash": _canonical_hash(actual)})
+            if not orphan:
+                source_entities.append({"owner": owner, "kind": "file-index", "id": source_id, "hash": _canonical_hash(expected_index)})
+                target_entities.append({"owner": owner, "kind": "file-index", "id": source_id, "hash": _canonical_hash(actual_index)})
+            source_entities.append({"owner": owner, "kind": "file-content", "id": source_id, "hash": _canonical_hash(expected_content)})
+            target_entities.append({"owner": owner, "kind": "file-content", "id": source_id, "hash": _canonical_hash(actual_content)})
 
         current_map = _json(storage.get(CURRENT_KEY), {})
         requested_source_id = str(current_map.get(owner) or "") if isinstance(current_map, dict) else ""
@@ -585,6 +650,42 @@ async def _graph_verification_proof(
         source_entities.append({"owner": owner, "kind": "current", "id": owner, "hash": _canonical_hash(expected_current)})
         target_entities.append({"owner": owner, "kind": "current", "id": owner, "hash": _canonical_hash(actual_current)})
 
+        owner_source = [row for row in source_entities if row["owner"] == owner]
+        owner_target = [row for row in target_entities if row["owner"] == owner]
+
+        def record_item(source_key: str, kinds: set[str], identifier: str | None = None) -> None:
+            source_rows = [
+                row for row in owner_source
+                if row["kind"] in kinds and (identifier is None or row["id"] == identifier)
+            ]
+            target_rows = [
+                row for row in owner_target
+                if row["kind"] in kinds and (identifier is None or row["id"] == identifier)
+            ]
+            source_rows.sort(key=lambda row: (row["kind"], row["id"]))
+            target_rows.sort(key=lambda row: (row["kind"], row["id"]))
+            source_item_hash = _canonical_hash(source_rows)
+            target_item_hash = _canonical_hash(target_rows)
+            item_proofs[f"{owner}\0{source_key}"] = {
+                "sourceCount": len(source_rows),
+                "targetCount": len(target_rows),
+                "sourceHash": source_item_hash,
+                "targetHash": target_item_hash,
+                "verificationHash": _canonical_hash(
+                    {"sourceHash": source_item_hash, "targetHash": target_item_hash}
+                ),
+                "verified": source_item_hash == target_item_hash,
+            }
+
+        record_item(INDEX_KEY, {"file-index"})
+        record_item(FOLDERS_KEY, {"folder"})
+        record_item(TAGS_KEY, {"tag"})
+        record_item(CURRENT_KEY, {"current"})
+        for source_key in storage:
+            source_id = _source_file_id(str(source_key), owner)
+            if source_id:
+                record_item(str(source_key), {"file-content"}, source_id)
+
     source_entities.sort(key=lambda row: (row["owner"], row["kind"], row["id"]))
     target_entities.sort(key=lambda row: (row["owner"], row["kind"], row["id"]))
     source_hash = _canonical_hash(source_entities)
@@ -592,7 +693,7 @@ async def _graph_verification_proof(
     if source_hash != target_hash:
         failures.append({"owner": "", "sourceFileId": "", "reason": "canonical-proof-mismatch"})
     verification_hash = _canonical_hash({"sourceHash": source_hash, "targetHash": target_hash})
-    return source_hash, target_hash, verification_hash, failures
+    return source_hash, target_hash, verification_hash, failures, item_proofs
 
 
 async def verify_all_graph_files(
@@ -675,7 +776,7 @@ async def verify_all_graph_files(
         expected_current_id = expected_current.id if expected_current else None
         if actual_current_id != expected_current_id:
             failures.append({"owner": owner, "sourceFileId": requested_source_id, "reason": "current-file-mismatch"})
-    source_hash, target_hash, verification_hash, proof_failures = await _graph_verification_proof(db, owners)
+    source_hash, target_hash, verification_hash, proof_failures, item_proofs = await _graph_verification_proof(db, owners)
     failures.extend(proof_failures)
     return {
         "owners": len(owners),
@@ -685,6 +786,7 @@ async def verify_all_graph_files(
         "sourceHash": source_hash,
         "targetHash": target_hash,
         "verificationHash": verification_hash,
+        "itemProofs": item_proofs,
     }
 
 

@@ -18,7 +18,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.course_management import CourseDraft, CourseRelease, LearningTask
-from app.models.runtime_migration import RuntimeMigrationItem
+from app.models.runtime_migration import RuntimeMigrationItem, RuntimeMigrationRun
 from app.models.user import User
 from app.services import (
     files_runtime_migration_service as files_migration,
@@ -584,6 +584,7 @@ def _external_summary(
             "sourceHash": files.get("sourceHash"),
             "targetHash": files.get("targetHash"),
             "verificationHash": files.get("verificationHash"),
+            "itemProofs": files.get("itemProofs") or {},
         },
         "questions": {
             "inventoryHash": questions.get("snapshotHash"),
@@ -638,6 +639,66 @@ def _external_owner_ids(
     return None if not item_rows or has_shared else scoped_owners
 
 
+def _payload_entity_ids(payload: Any, *keys: str) -> set[str]:
+    decoded = _decoded_payload(payload)
+    rows = decoded if isinstance(decoded, list) else [decoded]
+    identifiers: set[str] = set()
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        for key in keys:
+            value = str(row.get(key) or "").strip()
+            if value:
+                identifiers.add(value)
+                break
+    return identifiers
+
+
+async def _external_item_proofs(
+    db: AsyncSession, items: Iterable[RuntimeMigrationItem]
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    question_proofs: dict[str, dict[str, Any]] = {}
+    paper_proofs: dict[str, dict[str, Any]] = {}
+    for item in items:
+        identity = f"{item.owner_scope}\0{item.source_key}"
+        owner_ids = None if item.owner_scope == "shared" else {item.owner_scope}
+        if item.source_key == question_migration.PUBLISHED_BANK_KEY or item.source_key.startswith(
+            question_migration.PRIVATE_BANK_PREFIX
+        ):
+            bank_ids = _payload_entity_ids(item.source_payload, "id", "bankId")
+            proof = await question_migration.verify_runtime_question_targets(
+                db, owner_ids=owner_ids, bank_ids=bank_ids
+            )
+            question_proofs[identity] = proof
+            continue
+        if (
+            item.source_key.startswith(question_migration.PAPER_DRAFT_PREFIX)
+            or item.source_key == question_migration.PAPER_SHARED_DRAFT_KEY
+        ):
+            paper_ids = _payload_entity_ids(item.source_payload, "id", "paperId")
+            proof = await question_migration.verify_runtime_paper_targets(
+                db,
+                owner_ids=owner_ids,
+                paper_ids=paper_ids,
+                category_ids=set(),
+            )
+            paper_proofs[identity] = proof
+            continue
+        if (
+            item.source_key.startswith(question_migration.PAPER_CATEGORY_PREFIX)
+            or item.source_key == question_migration.PAPER_SHARED_CATEGORY_KEY
+        ):
+            category_ids = _payload_entity_ids(item.source_payload, "id", "categoryId")
+            proof = await question_migration.verify_runtime_paper_targets(
+                db,
+                owner_ids=owner_ids,
+                paper_ids=set(),
+                category_ids=category_ids,
+            )
+            paper_proofs[identity] = proof
+    return question_proofs, paper_proofs
+
+
 async def _scan_external_domains(
     db: AsyncSession, items: Iterable[RuntimeMigrationItem] | None = None
 ) -> dict[str, Any]:
@@ -674,10 +735,16 @@ async def _verify_external_domains(
     papers.update(
         await question_migration.verify_runtime_paper_targets(db, owner_ids=owner_ids)
     )
-    return _external_summary(files, questions, papers)
+    summary = _external_summary(files, questions, papers)
+    question_proofs, paper_proofs = await _external_item_proofs(db, item_rows)
+    summary["questions"]["itemProofs"] = question_proofs
+    summary["papers"]["itemProofs"] = paper_proofs
+    return summary
 
 
-async def _migrate_external_domains(db: AsyncSession) -> dict[str, Any]:
+async def _migrate_external_domains(
+    db: AsyncSession, run_id: str
+) -> dict[str, Any]:
     files = await files_migration.migrate_all_graph_files(db)
     question_apply = _model_report(
         await question_migration.migrate_runtime_questions(db, apply=True)
@@ -703,7 +770,15 @@ async def _migrate_external_domains(db: AsyncSession) -> dict[str, Any]:
     papers.update(await question_migration.verify_runtime_paper_targets(db))
     verification = await files_migration.verify_all_graph_files(db)
     files = {**files, **verification}
-    return _external_summary(files, questions, papers)
+    summary = _external_summary(files, questions, papers)
+    # The composed migrators commit independently, expiring ORM instances.
+    # Re-read ledger items instead of touching pre-commit objects.
+    question_proofs, paper_proofs = await _external_item_proofs(
+        db, await _items(db, run_id)
+    )
+    summary["questions"]["itemProofs"] = question_proofs
+    summary["papers"]["itemProofs"] = paper_proofs
+    return summary
 
 
 async def _mark_external_items(
@@ -721,20 +796,61 @@ async def _mark_external_items(
         disposition = _managed_disposition(item.source_key)
         if not disposition or disposition[0] != domain_migration.DISPOSITION_ALREADY_RELATIONAL_VERIFY:
             continue
+        if item.target_domain == "files" and item.owner_scope in {"", "shared"}:
+            item.status = "failed"
+            item.target_count = 0
+            item.target_hash = None
+            metadata = dict(item.verification_metadata or {})
+            metadata["unresolved_conflicts"] = max(
+                1, int(metadata.get("unresolved_conflicts") or 0)
+            )
+            metadata["coverage_error"] = "file source has no explicit runtime owner"
+            item.verification_metadata = metadata
+            item.error = "external file identity is not owner scoped"
+            continue
         if item.target_domain == "files":
-            ok = file_ok
-            proof_hash = summary.get("files", {}).get("verificationHash")
+            proof = (summary.get("files", {}).get("itemProofs") or {}).get(
+                f"{item.owner_scope}\0{item.source_key}"
+            )
+            if not isinstance(proof, Mapping):
+                item.status = "failed"
+                item.target_count = 0
+                item.target_hash = None
+                metadata = dict(item.verification_metadata or {})
+                metadata["unresolved_conflicts"] = max(
+                    1, int(metadata.get("unresolved_conflicts") or 0)
+                )
+                metadata["coverage_error"] = "no exact external proof"
+                item.verification_metadata = metadata
+                item.error = "external file identity is not covered"
+                continue
+            ok = bool(proof.get("verified"))
+            proof_hash = proof.get("verificationHash")
+            item.expected_count = int(proof.get("sourceCount") or 0)
+            item.target_count = int(proof.get("targetCount") or 0)
+            item.expected_hash = str(proof.get("sourceHash") or "") or None
+            item.target_hash = str(proof.get("targetHash") or "") or None
         elif item.source_key.startswith(question_migration.PAPER_DRAFT_PREFIX) or item.source_key.startswith(question_migration.PAPER_CATEGORY_PREFIX) or item.source_key in {question_migration.PAPER_SHARED_DRAFT_KEY, question_migration.PAPER_SHARED_CATEGORY_KEY}:
-            ok = paper_ok
-            proof_hash = summary.get("papers", {}).get("verificationHash")
+            proof = (summary.get("papers", {}).get("itemProofs") or {}).get(
+                f"{item.owner_scope}\0{item.source_key}"
+            )
+            ok = bool(isinstance(proof, Mapping) and proof.get("verified"))
+            proof_hash = proof.get("verificationHash") if isinstance(proof, Mapping) else None
         else:
-            ok = question_ok
-            proof_hash = summary.get("questions", {}).get("verificationHash")
+            proof = (summary.get("questions", {}).get("itemProofs") or {}).get(
+                f"{item.owner_scope}\0{item.source_key}"
+            )
+            ok = bool(isinstance(proof, Mapping) and proof.get("verified"))
+            proof_hash = proof.get("verificationHash") if isinstance(proof, Mapping) else None
+        if item.target_domain != "files" and isinstance(proof, Mapping):
+            item.expected_count = int(proof.get("sourceCount") or 0)
+            item.target_count = int(proof.get("targetCount") or 0)
+            item.expected_hash = str(proof.get("sourceHash") or "") or None
+            item.target_hash = str(proof.get("targetHash") or "") or None
         if ok and proof_hash:
             item.status = "verified"
-            item.target_count = item.expected_count
-            item.expected_hash = str(proof_hash)
-            item.target_hash = str(proof_hash)
+            if item.target_domain != "files":
+                item.target_count = int(proof.get("targetCount") or 0)
             metadata = dict(item.verification_metadata or {})
             metadata["external_proof_hash"] = str(proof_hash)
             item.verification_metadata = metadata
@@ -1090,7 +1206,7 @@ async def migrate(
     applied = await domain_migration.migrate(db, run_id, target_mappers=registry)
     external = None
     if sources is None:
-        external = await _migrate_external_domains(db)
+        external = await _migrate_external_domains(db, run_id)
         await _mark_external_items(db, run_id, external)
     else:
         current_items = await _items(db, run_id)
@@ -1207,6 +1323,115 @@ async def _refresh_course_target_hashes(
         await db.flush()
 
 
+async def _read_course_target(
+    db: AsyncSession, item: RuntimeMigrationItem
+) -> Any:
+    source = _normalize_course_source(item)
+    if item.source_key == COURSE_DRAFTS_KEY:
+        return [
+            _course_draft_row(row)
+            for entry in source
+            if (row := await db.get(CourseDraft, entry["id"])) is not None
+        ]
+    if item.source_key == COURSE_RELEASES_KEY:
+        return [
+            _course_release_row(row)
+            for entry in source
+            if (row := await db.get(CourseRelease, entry["id"])) is not None
+        ]
+    if item.source_key == LEARNING_TASKS_KEY:
+        return [
+            _learning_task_row(row)
+            for entry in source
+            if (row := await db.get(LearningTask, entry["id"])) is not None
+        ]
+    if source is None:
+        return None
+    release = await db.get(CourseRelease, source["releaseId"])
+    if (
+        release is not None
+        and (item.owner_scope == "shared" or release.owner_id == item.owner_scope)
+        and release.status == "published"
+    ):
+        return {"releaseId": release.id}
+    return None
+
+
+def _source_identity(row: Mapping[str, Any]) -> tuple[str, str, str]:
+    return (
+        str(row.get("source_type") or "runtime"),
+        str(row.get("source_key") or ""),
+        str(row.get("owner_id") or row.get("owner_scope") or ""),
+    )
+
+
+def _classify_inventory_source(row: Mapping[str, Any]) -> tuple[str, bool]:
+    source_key = str(row.get("source_key") or "")
+    mapper = domain_migration._mapper_for_key(
+        domain_migration.TARGET_MAPPER_REGISTRY, source_key
+    )
+    disposition, _target, _reason = domain_migration._disposition_for_key(
+        source_key, mapper
+    )
+    managed = _managed_disposition(source_key)
+    if managed is not None:
+        disposition = managed[0]
+    if source_key in COURSE_SOURCE_KEYS:
+        disposition = domain_migration.DISPOSITION_MIGRATE
+    return disposition, bool(row.get("parse_error"))
+
+
+async def _inventory_evidence(
+    db: AsyncSession, run: RuntimeMigrationRun
+) -> dict[str, Any]:
+    stored = (run.report or {}).get("source_snapshot_payload")
+    if not isinstance(stored, list):
+        return {"inventoryDrift": 1, "unknown": 0, "parseErrors": 0, "items": []}
+    if (run.report or {}).get("source_inventory_scope") != "live":
+        return {"inventoryDrift": 0, "unknown": 0, "parseErrors": 0, "items": []}
+    live = list(await domain_migration._runtime_sources(db))
+    frozen_by_identity = {
+        _source_identity(row): canonical_hash(row.get("payload"))
+        for row in stored
+        if isinstance(row, Mapping)
+    }
+    live_by_identity = {
+        _source_identity(row): canonical_hash(row.get("payload")) for row in live
+    }
+    drift_identities = sorted(
+        identity
+        for identity in set(frozen_by_identity) | set(live_by_identity)
+        if frozen_by_identity.get(identity) != live_by_identity.get(identity)
+    )
+    new_identities = set(live_by_identity) - set(frozen_by_identity)
+    unknown = 0
+    parse_errors = 0
+    public_items: list[dict[str, Any]] = []
+    for row in live:
+        identity = _source_identity(row)
+        if identity not in new_identities:
+            continue
+        disposition, parse_error = _classify_inventory_source(row)
+        unknown += disposition == domain_migration.DISPOSITION_UNKNOWN
+        parse_errors += parse_error
+        public_items.append(
+            {
+                "sourceType": identity[0],
+                "sourceKey": identity[1],
+                "ownerScope": identity[2],
+                "disposition": disposition,
+                "sourceCount": domain_migration._payload_count(row.get("payload")),
+                "sourceHash": live_by_identity[identity],
+            }
+        )
+    return {
+        "inventoryDrift": len(drift_identities),
+        "unknown": unknown,
+        "parseErrors": parse_errors,
+        "items": public_items,
+    }
+
+
 async def verify(
     db: AsyncSession,
     *,
@@ -1273,23 +1498,120 @@ async def drop_check(
 ) -> dict[str, Any]:
     """Return the final read-only retirement gate; never execute DDL."""
 
+    if db.in_transaction():
+        await db.rollback()
+    await db.execute(text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"))
     try:
-        verification = await verify(db, run_id=run_id, _commit=False)
-        # Source snapshot, target proofs, and ledger gate are observed in the
-        # same REPEATABLE READ transaction.  No second ordinary verify occurs.
-        ledger_allowed = await domain_migration.can_drop_runtime(db, run_id)
+        run = await db.get(RuntimeMigrationRun, run_id)
+        if run is None:
+            verification = {
+                "run_id": run_id,
+                "status": "blocked",
+                "sourceCount": 0,
+                "verifiedCount": 0,
+                "unknown": 0,
+                "parseErrors": 0,
+                "hashMismatches": 0,
+                "unresolvedConflicts": 0,
+                "inventoryDrift": 0,
+                "requiredFailures": 1,
+                "items": [],
+            }
+            gate = evaluate_drop_gate(verification, policy_paths=policy_paths)
+            gate["blockers"].append("missingRun")
+            gate["ready"] = False
+            report = {**verification, **gate, "ddlExecuted": False}
+            await db.rollback()
+            return report
+
+        items = await _items(db, run_id)
+        metrics = _item_metrics(items)
+        hash_mismatches = 0
+        current_conflicts = 0
+        external = None
+        if any(_is_external_domain_key(item.source_key) for item in items):
+            external = await _verify_external_domains(db, items)
+        for item in items:
+            if not item.required:
+                continue
+            target = None
+            if item.source_key in COURSE_SOURCE_KEYS:
+                try:
+                    target = await _read_course_target(db, item)
+                except (TypeError, ValueError):
+                    metrics["parseErrors"] += 1
+                    continue
+            elif (
+                domain_migration._mapper_for_key(
+                    domain_migration.TARGET_MAPPER_REGISTRY, item.source_key
+                )
+                is not None
+            ):
+                target = await domain_migration.read_item_target_canonical(db, item)
+            if target is not None or item.source_key in COURSE_SOURCE_KEYS:
+                target_count = domain_migration._payload_count(target)
+                target_hash = canonical_hash(target)
+                expected_count = (
+                    item.expected_count
+                    if item.expected_count is not None
+                    else item.source_count
+                )
+                expected_hash = item.expected_hash or item.source_hash
+                mismatch = target_count != expected_count or target_hash != expected_hash
+                hash_mismatches += mismatch
+                current_conflicts += mismatch
+        if external is not None:
+            metrics["parseErrors"] += external["parseErrors"]
+            metrics["unresolvedConflicts"] += external["unresolvedConflicts"]
+            hash_mismatches += external["hashMismatches"]
+        inventory = await _inventory_evidence(db, run)
+        metrics["unknown"] += inventory["unknown"]
+        metrics["parseErrors"] += inventory["parseErrors"]
+        metrics["hashMismatches"] = hash_mismatches
+        metrics["unresolvedConflicts"] += current_conflicts
+        required_failures = sum(
+            item.required and item.status != "verified" for item in items
+        )
+        frozen_snapshot = (run.report or {}).get("source_snapshot_payload")
+        frozen_snapshot_valid = bool(
+            isinstance(frozen_snapshot, list)
+            and len(frozen_snapshot) == run.source_snapshot_count
+            and canonical_hash(frozen_snapshot) == run.source_snapshot_hash
+        )
+        ledger_allowed = bool(
+            items
+            and run.status == "verified"
+            and run.source_snapshot_hash
+            and run.source_snapshot_count > 0
+            and run.backup_reference
+            and frozen_snapshot_valid
+            and required_failures == 0
+        )
+        verification = {
+            "run_id": run_id,
+            "status": "verified" if ledger_allowed else "verification_failed",
+            "requiredFailures": required_failures,
+            "sourceSnapshotHash": run.source_snapshot_hash,
+            "backupReference": run.backup_reference,
+            "items": _public_item_summaries(items),
+            "inventoryItems": inventory["items"],
+            "inventoryDrift": inventory["inventoryDrift"],
+            **metrics,
+        }
         gate = evaluate_drop_gate(verification, policy_paths=policy_paths)
-        if not ledger_allowed and not gate["blockers"]:
+        if inventory["inventoryDrift"]:
+            gate["blockers"].append("inventoryDrift")
+            gate["ready"] = False
+        if not ledger_allowed and "ledgerVerification" not in gate["blockers"]:
             gate["blockers"].append("ledgerVerification")
             gate["ready"] = False
         report = {
             **verification,
             **gate,
-            "run_id": run_id,
             "status": "ready" if gate["ready"] else "blocked",
             "ddlExecuted": False,
         }
-        await db.commit()
+        await db.rollback()
         return report
     except Exception:
         await db.rollback()

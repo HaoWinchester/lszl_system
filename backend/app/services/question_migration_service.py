@@ -1890,6 +1890,7 @@ async def verify_runtime_paper_targets(
     *,
     owner_ids: set[str] | None = None,
     paper_ids: set[str] | None = None,
+    category_ids: set[str] | None = None,
 ) -> dict[str, Any]:
     """Hash chosen paper candidates against freshly read relational targets."""
 
@@ -1897,6 +1898,8 @@ async def verify_runtime_paper_targets(
     source_categories = []
     target_categories = []
     for identifier, candidate in sorted(snapshot.categories.items()):
+        if category_ids is not None and identifier not in category_ids:
+            continue
         source_categories.append({
             "id": identifier, "ownerId": candidate.owner_id, "name": candidate.name,
             "description": candidate.description, "order": candidate.order_index,
@@ -1972,6 +1975,8 @@ async def verify_runtime_paper_targets(
         "scoreGaps": score_gap,
     }
     return {
+        "sourceCount": len(source_categories) + len(source_papers),
+        "targetCount": len(target_categories) + len(target_papers),
         "sourceHash": source_hash,
         "targetHash": target_hash,
         "verificationHash": _migration_proof_hash({"sourceHash": source_hash, "targetHash": target_hash}),
@@ -2450,6 +2455,8 @@ async def verify_runtime_question_targets(
         "nullContentHashes": snapshot.report.null_content_hashes,
     }
     return {
+        "sourceCount": len(source_banks) + len(source_questions),
+        "targetCount": len(target_banks) + len(target_questions),
         "sourceHash": source_hash,
         "targetHash": target_hash,
         "verificationHash": _migration_proof_hash({"sourceHash": source_hash, "targetHash": target_hash}),
