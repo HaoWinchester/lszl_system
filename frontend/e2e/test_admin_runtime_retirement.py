@@ -1,10 +1,30 @@
 from __future__ import annotations
 
+import argparse
+from contextlib import nullcontext
 import importlib.util
 from pathlib import Path
 import sys
+from types import ModuleType
 import unittest
 from unittest.mock import patch
+
+
+try:
+    import playwright.sync_api  # noqa: F401
+except ModuleNotFoundError:
+    playwright_module = ModuleType("playwright")
+    sync_api_module = ModuleType("playwright.sync_api")
+    sync_api_module.BrowserContext = object
+    sync_api_module.Page = object
+
+    def unavailable_sync_playwright():
+        raise AssertionError("main orchestration tests must replace the Playwright runtime")
+
+    sync_api_module.sync_playwright = unavailable_sync_playwright
+    playwright_module.sync_api = sync_api_module
+    sys.modules["playwright"] = playwright_module
+    sys.modules["playwright.sync_api"] = sync_api_module
 
 
 MODULE_PATH = Path(__file__).with_name("admin_runtime_retirement.py")
@@ -47,24 +67,87 @@ class DraftSelectionPage:
         self.waited_for_name = arg
 
 
-class AdminRuntimeRetirementTest(unittest.TestCase):
-    def test_storage_audit_rejects_nonzero_direct_bootstrap_state(self) -> None:
-        page = EvaluatePage(
-            {
-                "keys": [],
-                "nativeSet": True,
-                "nativeGet": True,
-                "legacyStorage": "undefined",
-                "directBootstrap": {
-                    "storage": {"legacy": True},
-                    "revision": 9,
-                    "contentRevision": 4,
-                },
-            }
-        )
+class MainContext:
+    def close(self) -> None:
+        pass
 
-        with self.assertRaises(AssertionError):
-            MODULE.storage_audit(page, "admin-console.html")
+
+class MainBrowser:
+    def __init__(self) -> None:
+        self.contexts: list[MainContext] = []
+
+    def new_context(self, **_kwargs) -> MainContext:
+        context = MainContext()
+        self.contexts.append(context)
+        return context
+
+    def close(self) -> None:
+        pass
+
+
+class MainChromium:
+    def __init__(self, browser: MainBrowser) -> None:
+        self.browser = browser
+
+    def launch(self, **_kwargs) -> MainBrowser:
+        return self.browser
+
+
+class MainPlaywright:
+    def __init__(self, browser: MainBrowser) -> None:
+        self.chromium = MainChromium(browser)
+
+    def stop(self) -> None:
+        pass
+
+
+class MainPlaywrightStarter:
+    def __init__(self, browser: MainBrowser) -> None:
+        self.playwright = MainPlaywright(browser)
+
+    def start(self) -> MainPlaywright:
+        return self.playwright
+
+
+class MainHarness:
+    def start(self) -> str:
+        return "http://127.0.0.1:59999"
+
+    def close(self) -> None:
+        pass
+
+
+class AdminRuntimeRetirementTest(unittest.TestCase):
+    def test_storage_audit_rejects_each_nonzero_direct_bootstrap_field(self) -> None:
+        valid = {
+            "keys": [],
+            "nativeSet": True,
+            "nativeGet": True,
+            "legacyStorage": "undefined",
+            "directBootstrap": {
+                "present": True,
+                "storage": None,
+                "revision": 0,
+                "contentRevision": 0,
+            },
+        }
+        MODULE.storage_audit(EvaluatePage(valid), "admin-console.html")
+
+        for field, invalid_value in (
+            ("storage", {"legacy": True}),
+            ("revision", 9),
+            ("contentRevision", 4),
+        ):
+            with self.subTest(field=field):
+                invalid = {
+                    **valid,
+                    "directBootstrap": {
+                        **valid["directBootstrap"],
+                        field: invalid_value,
+                    },
+                }
+                with self.assertRaises(AssertionError):
+                    MODULE.storage_audit(EvaluatePage(invalid), "admin-console.html")
 
     def test_storage_audit_allows_absent_bootstrap_only_for_server_denial_page(self) -> None:
         page = EvaluatePage(
@@ -132,6 +215,54 @@ class AdminRuntimeRetirementTest(unittest.TestCase):
                     self.fail("fixture scope yielded after creation failed")
 
         self.assertEqual(cleaned, [{"draft": {"id": "random-draft"}}])
+
+    def test_main_wires_existing_subject_write_only_for_isolated_mode(self) -> None:
+        observed: list[tuple[bool, bool]] = []
+
+        for isolated in (False, True):
+            with self.subTest(isolated=isolated):
+                browser = MainBrowser()
+                args = argparse.Namespace(
+                    isolated=isolated,
+                    base_url=None if isolated else "https://uat.example.invalid",
+                    all_pages=True,
+                )
+
+                def fixture_scope(_admin, _teacher, _base, *, disposable_environment):
+                    self.assertEqual(disposable_environment, isolated)
+                    return nullcontext({})
+
+                def verify_admin_pages(_context, _base, _fixture, _all_pages, *, allow_existing_subject_write):
+                    observed.append((isolated, allow_existing_subject_write))
+
+                with (
+                    patch.dict(
+                        MODULE.os.environ,
+                        {
+                            "E2E_ADMIN_PASSWORD": "admin-password",
+                            "E2E_TEACHER_USERNAME": "task7-teacher",
+                            "E2E_TEACHER_PASSWORD": "teacher-password",
+                            "E2E_STUDENT_USERNAME": "task7-student",
+                            "E2E_STUDENT_PASSWORD": "student-password",
+                        },
+                        clear=False,
+                    ),
+                    patch.object(MODULE, "parse_args", return_value=args),
+                    patch.object(MODULE, "IsolatedE2EHarness", MainHarness),
+                    patch.object(MODULE, "sync_playwright", return_value=MainPlaywrightStarter(browser)),
+                    patch.object(MODULE, "bind"),
+                    patch.object(MODULE, "admin_login", return_value="admin-password"),
+                    patch.object(MODULE, "create_user"),
+                    patch.object(MODULE, "exercise_login_logout"),
+                    patch.object(MODULE, "exercise_native_login_logout"),
+                    patch.object(MODULE, "domain_fixture_scope", fixture_scope),
+                    patch.object(MODULE, "verify_admin_pages", verify_admin_pages),
+                    patch.object(MODULE, "verify_failure_recovery"),
+                    patch.object(MODULE, "verify_teacher_and_student"),
+                ):
+                    MODULE.main()
+
+        self.assertEqual(observed, [(False, False), (True, True)])
 
 
 if __name__ == "__main__":
