@@ -35,6 +35,21 @@ from tests.teaching_content_revision_support import (
 PASSWORD = "teaching-review-pass"
 
 
+def test_direct_knowledge_tree_without_version_preserves_update_semantics() -> None:
+    normalized = content_prep_shared_service._normalize_tree(
+        {
+            "taxonomy": {
+                "id": "taxonomy-version-preserved",
+                "subjectId": "subject-pmp",
+                "nodes": [],
+            }
+        },
+        "subject-pmp",
+    )
+    assert normalized is not None
+    assert "version" not in normalized
+
+
 def _login(client: TestClient, username: str, password: str = PASSWORD) -> None:
     response = client.post(
         "/api/v1/auth/login", json={"username": username, "password": password}
@@ -404,6 +419,91 @@ def test_taxonomy_graph_and_recursive_fields_are_rejected_before_any_write() -> 
                 assert asyncio.run(persisted()) == initial
     finally:
         asyncio.run(cleanup())
+
+
+def test_nested_catalog_coercions_return_typed_422_without_mutation() -> None:
+    suffix = uuid4().hex[:10]
+    taxonomy_id = f"taxonomy-bad-coercion-{suffix}"
+    collection_id = f"collection-bad-coercion-{suffix}"
+    tag_id = f"tag-bad-coercion-{suffix}"
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        _login(client, "admin", "jbgsnmm~123")
+        before = _shared(client)
+        revision = before["contentRevision"]
+        invalid_payloads = [
+            {
+                "taxonomies": [
+                    *before["taxonomies"],
+                    {
+                        "id": taxonomy_id,
+                        "subjectId": "subject-pmp",
+                        "version": 910001,
+                        "nodes": [
+                            {
+                                "id": "root",
+                                "level": 1,
+                                "sortOrder": {"bad": 1},
+                            }
+                        ],
+                    },
+                ]
+            },
+            {
+                "activityCollections": [
+                    *before["activityCollections"],
+                    {
+                        "id": collection_id,
+                        "subjectId": "subject-pmp",
+                        "title": "bad authorship",
+                        "activityIds": [],
+                        "authorship": 3,
+                    },
+                ]
+            },
+            {
+                "activityTags": [
+                    *before["activityTags"],
+                    {
+                        "id": tag_id,
+                        "subjectId": "subject-pmp",
+                        "name": "bad authorship",
+                        "authorship": 3,
+                    },
+                ]
+            },
+            {
+                "knowledgeTree": {
+                    "taxonomy": {
+                        "id": taxonomy_id,
+                        "subjectId": "subject-pmp",
+                        "version": {"bad": 1},
+                        "nodes": [{"id": "root", "level": 1}],
+                    }
+                }
+            },
+            {
+                "recallLibrary": {
+                    "id": f"recall-bad-coercion-{suffix}",
+                    "version": {"bad": 1},
+                    "nodes": [],
+                    "edges": [],
+                }
+            },
+        ]
+        for partial in invalid_payloads:
+            response = client.put(
+                "/api/v1/content-prep/shared-content",
+                json={
+                    "subjectId": "subject-pmp",
+                    "contentRevision": revision,
+                    **partial,
+                },
+            )
+            assert response.status_code == 422, (partial, response.text)
+            assert response.json()["detail"]["code"] == "INVALID_SHARED_CONTENT"
+            assert "Traceback" not in response.text
+            assert _shared(client)["contentRevision"] == revision
 
 
 def test_catalog_preflights_unique_business_keys_without_sql_details_or_revision_bump() -> None:

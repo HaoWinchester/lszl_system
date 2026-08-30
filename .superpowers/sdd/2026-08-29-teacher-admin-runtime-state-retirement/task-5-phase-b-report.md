@@ -32,6 +32,13 @@ Course/release/task reference reads on Content Center remain available through t
 - Recursive activity/tag/collection arrays are strictly typed; business-key uniqueness is preflighted; database integrity failures are rolled back and generalized. Subject deletion now detects recall libraries, and cross-owner reference conflicts reveal only an entity category.
 - Catalog responses are built under the same writer transaction before commit, and actor-aware identical snapshots do not bump revision. Old retired mutation routes accept their real legacy payload shapes and return documented 410 without requiring the new revision field.
 
+## Fresh-review closeout
+
+- The ownership migration now labels only the hidden namespaces it creates. Downgrade restores each migrated tag/override to its original collection when that collection still exists, then removes only migration-owned empty namespaces. The PostgreSQL test covers the complete pre-upgrade data shape through upgrade and downgrade.
+- The intentionally wide shared-content DTO now validates nested integer/object fields before persistence. Invalid taxonomy `sortOrder`/`position`, collection or tag `authorship`, and knowledge-tree/recall `version` values return the typed `INVALID_SHARED_CONTENT` 422 response without changing data or the global content revision.
+- Admin Subjects edit is native-pointer safe during subject bootstrap races: the edit action waits for the selected subject snapshot, and initial page loading hydrates a URL-selected subject before falling back to the cached default. The browser gate now creates, edits, reloads, and verifies the subject through native controls.
+- The legacy learning-content compatibility facade now awaits asynchronous subject mutations instead of inspecting Promise truthiness.
+
 ## TDD and verification
 
 - Independent-review backend focused suite: 132 passed; final ownership migration/model checks: 1 + 6 passed.
@@ -41,8 +48,11 @@ Course/release/task reference reads on Content Center remain available through t
 - Detached clean-checkout reproduction at the review commit: `pnpm test` 284/284 and `pnpm test:design` 5/5. The first audit exposed the ignored generated Content Prep dist page; the formal-sync output was then explicitly committed and the clean run passed.
 - Native isolated Playwright teaching flow: admin subject create, taxonomy-node create, tag create, collection create, principle save, recall save, two reload persistence checks, teacher close/re-login persistence, a real two-page stale UI save that returns visible 409 without overwriting the winner, and zero Runtime/bootstrap requests across the three retired pages.
 - JavaScript/Python compilation, focused five-key scans, policy/bootstrap scans, and `git diff --check`: clean.
+- Fresh-review backend teaching suite: 84/84; a final shared-content/review rerun after preserving version-omission semantics passed 19/19. Ownership migration upgrade/downgrade/offline SQL is included. `alembic check` reported no upgrade operations, and content model checks passed 9/9.
+- Fresh-review frontend source regression: 7/7; formal synced `pnpm test`: 284/284; `pnpm test:design`: 5/5.
+- Fresh-review candidate audit: 991 files versus 975 in the untouched active release, with Admin Subjects, Content Center, and the Content Prep dist page present.
 
-## Browser evidence and remaining UI debt
+## Browser evidence
 
 The stable browser gate is GREEN:
 
@@ -50,7 +60,7 @@ The stable browser gate is GREEN:
 teaching-content-e2e-ok native=subject-create,taxonomy-node,tag,collection principle=control-plus-api recall=typed-api reload=2 relogin=1 uiConflict=409 runtimeRequests=0
 ```
 
-The existing Admin Subjects edit button has a separate pointer-interaction defect: a Playwright pointer click leaves the dialog closed even though the selected subject is present, the button is enabled, and there is no page error; programmatic activation opens it. A fixed-point comparison against `fea8491` shows the dialog open/bind DOM and CSS path were not changed by Task 5B (only awaited mutation handlers changed). This follow-up does claim native teacher re-login and a UI-rendered 409 check; native subject edit remains the evidenced baseline debt.
+The fresh-review gate also performs native Admin Subjects create and edit, verifies the server response, reloads the page on the edited subject URL, and confirms the edited value survives. No programmatic activation is used.
 
 ## Scope boundary
 

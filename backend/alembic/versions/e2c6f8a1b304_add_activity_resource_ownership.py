@@ -86,7 +86,8 @@ def upgrade() -> None:
             'active',
             jsonb_build_object(
                 'systemNamespace', 'tags',
-                'legacySourceCollectionId', tag.collection_id
+                'legacySourceCollectionId', tag.collection_id,
+                'ownershipMigration', 'e2c6f8a1b304'
             ),
             NULL
         FROM activity_tags AS tag
@@ -122,7 +123,8 @@ def upgrade() -> None:
             'active',
             jsonb_build_object(
                 'systemNamespace', 'activities',
-                'legacySourceCollectionId', activity.collection_id
+                'legacySourceCollectionId', activity.collection_id,
+                'ownershipMigration', 'e2c6f8a1b304'
             ),
             NULL
         FROM activity_overrides AS activity
@@ -167,6 +169,50 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute(
+        """
+        UPDATE activity_tags AS tag
+        SET collection_id = namespace.content_metadata ->> 'legacySourceCollectionId'
+        FROM activity_collections AS namespace
+        JOIN activity_collections AS original
+          ON original.id = namespace.content_metadata ->> 'legacySourceCollectionId'
+        WHERE namespace.id = tag.collection_id
+          AND namespace.content_metadata ->> 'systemNamespace' = 'tags'
+          AND coalesce(
+              namespace.content_metadata ->> 'legacySourceCollectionId', ''
+          ) <> ''
+        """
+    )
+    op.execute(
+        """
+        UPDATE activity_overrides AS activity
+        SET collection_id = namespace.content_metadata ->> 'legacySourceCollectionId'
+        FROM activity_collections AS namespace
+        JOIN activity_collections AS original
+          ON original.id = namespace.content_metadata ->> 'legacySourceCollectionId'
+        WHERE namespace.id = activity.collection_id
+          AND namespace.content_metadata ->> 'systemNamespace' = 'activities'
+          AND coalesce(
+              namespace.content_metadata ->> 'legacySourceCollectionId', ''
+          ) <> ''
+        """
+    )
+    op.execute(
+        """
+        DELETE FROM activity_collections AS namespace
+        WHERE namespace.content_metadata ->> 'ownershipMigration' = 'e2c6f8a1b304'
+          AND namespace.content_metadata ->> 'systemNamespace'
+              IN ('tags', 'activities')
+          AND NOT EXISTS (
+              SELECT 1 FROM activity_tags AS tag
+              WHERE tag.collection_id = namespace.id
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM activity_overrides AS activity
+              WHERE activity.collection_id = namespace.id
+          )
+        """
+    )
     for table in reversed(TABLES):
         op.drop_index(f"ix_{table}_owner_username", table_name=table)
         op.drop_constraint(

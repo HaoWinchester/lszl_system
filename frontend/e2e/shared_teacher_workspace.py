@@ -25,7 +25,13 @@ from urllib.parse import quote
 from urllib.request import urlopen
 from uuid import uuid4
 
-from playwright.sync_api import APIRequestContext, BrowserContext, Page, sync_playwright
+from playwright.sync_api import (
+    APIRequestContext,
+    BrowserContext,
+    Page,
+    TimeoutError as PlaywrightTimeoutError,
+    sync_playwright,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -494,6 +500,62 @@ def run_teaching_content_e2e() -> None:
             "name => document.getElementById('adminSelectedSubjectName')?.textContent === name",
             arg=subject_name,
         )
+        edited_subject_name = f"{subject_name} 已编辑"
+        admin_page.locator("#adminEditSubjectBtn").click()
+        admin_page.locator("#adminSubjectDialog").wait_for(
+            state="visible", timeout=10000
+        )
+        admin_page.locator("#adminSubjectNameZh").fill(edited_subject_name)
+        with admin_page.expect_response(
+            lambda response: response.url.endswith("/api/v1/content-prep/shared-content")
+            and response.request.method == "PUT"
+        ) as edit_info:
+            admin_page.locator("#adminSubjectDialogSubmit").click()
+        assert edit_info.value.ok, edit_info.value.text()
+        edit_payload = edit_info.value.json()
+        assert any(
+            row.get("id") == f"subject-{code.lower()}"
+            and row.get("name", {}).get("zh") == edited_subject_name
+            for row in edit_payload.get("subjects", [])
+        ), edit_payload.get("subjects", [])
+        admin_page.wait_for_function(
+            "name => document.getElementById('adminSelectedSubjectName')?.textContent === name",
+            arg=edited_subject_name,
+        )
+        persisted_edit = assert_ok(
+            context.request.get(
+                BASE + "/api/v1/content-prep/shared-content",
+                params={"subjectId": f"subject-{code.lower()}"},
+            ),
+            "read edited task5 subject",
+        )
+        assert any(
+            row.get("id") == f"subject-{code.lower()}"
+            and row.get("name", {}).get("zh") == edited_subject_name
+            for row in persisted_edit.get("subjects", [])
+        ), persisted_edit.get("subjects", [])
+        admin_page.reload(wait_until="networkidle")
+        try:
+            admin_page.wait_for_function(
+                "name => document.getElementById('adminSelectedSubjectName')?.textContent === name",
+                arg=edited_subject_name,
+                timeout=10000,
+            )
+        except PlaywrightTimeoutError as error:
+            raise AssertionError(
+                {
+                    "url": admin_page.url,
+                    "selected": admin_page.evaluate(
+                        "() => window.KGAdminSubjectsApp?.getSelectedSubjectId?.()"
+                    ),
+                    "subject": admin_page.evaluate(
+                        "() => window.KGAdminSubjectsApp?.getSelectedSubject?.() || null"
+                    ),
+                    "names": admin_page.evaluate(
+                        "() => window.KGAdminServices?.subjects?.list?.().map(row => [row.id, row.name?.zh]) || []"
+                    ),
+                }
+            ) from error
         center_page = context.new_page()
         center_errors: list[str] = []
         center_page.on("pageerror", lambda error: center_errors.append(str(error)))

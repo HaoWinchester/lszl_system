@@ -217,6 +217,32 @@ def test_activity_resource_owner_migration_backfills_and_repairs_non_pmp_namespa
             await db.execute(text("DELETE FROM content_subjects WHERE id=:id"), {"id": subject_id})
             await db.commit()
 
+    async def verify_downgrade_restores_collection_shape() -> None:
+        async with AsyncSessionLocal() as db:
+            tag_collection = await db.scalar(
+                text("SELECT collection_id FROM activity_tags WHERE id=:id"),
+                {"id": tag_id},
+            )
+            activity_collection = await db.scalar(
+                text(
+                    "SELECT collection_id FROM activity_overrides WHERE activity_id=:id"
+                ),
+                {"id": activity_id},
+            )
+            namespace_count = await db.scalar(
+                text(
+                    "SELECT count(*) FROM activity_collections "
+                    "WHERE id LIKE :tag_ns OR id LIKE :activity_ns"
+                ),
+                {
+                    "tag_ns": f"__tags__:{subject_id}:%",
+                    "activity_ns": f"__activities__:{subject_id}:%",
+                },
+            )
+            assert tag_collection == collection_id
+            assert activity_collection == collection_id
+            assert int(namespace_count or 0) == 0
+
     try:
         _alembic("upgrade", "head")
         _alembic("downgrade", PREVIOUS_REVISION)
@@ -228,6 +254,8 @@ def test_activity_resource_owner_migration_backfills_and_repairs_non_pmp_namespa
             ("activity_overrides", "owner_username"),
         }
         asyncio.run(verify())
+        _alembic("downgrade", PREVIOUS_REVISION)
+        asyncio.run(verify_downgrade_restores_collection_shape())
         offline = _alembic("upgrade", f"{PREVIOUS_REVISION}:head", "--sql").stdout
         assert offline.count("ADD COLUMN owner_username") == 3
         assert "FOREIGN KEY(owner_username) REFERENCES users (username)" in offline

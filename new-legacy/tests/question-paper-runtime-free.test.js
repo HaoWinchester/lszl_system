@@ -166,6 +166,11 @@ test('production subject and taxonomy permanent deletes fail closed after snapsh
       if (!checked.valid) return checked;
       return { valid: true, value: commit(), transactionId: 'tx-1' };
     }
+    async executeAsync({ commit, validate }) {
+      const checked = await validate?.() || { valid: true, errors: [] };
+      if (!checked.valid) return checked;
+      return { valid: true, value: await commit(), transactionId: 'tx-1' };
+    }
   }
   class EmptyService { constructor() {} }
   const legacy = {
@@ -217,8 +222,8 @@ test('production subject and taxonomy permanent deletes fail closed after snapsh
     papers: [{ id: 'paper-created-later', subjectId: subject.code, sections: [] }],
     releases: [],
   };
-  const subjectResult = runtime.KGAdminServices.subjects.delete(subject.id);
-  const taxonomyResult = runtime.KGAdminServices.taxonomies.deleteVersion(taxonomy.id);
+  const subjectResult = await runtime.KGAdminServices.subjects.delete(subject.id);
+  const taxonomyResult = await runtime.KGAdminServices.taxonomies.deleteVersion(taxonomy.id);
   assert.equal(subjectResult.valid, false);
   assert.equal(taxonomyResult.valid, false);
   assert.match(subjectResult.errors.join(' '), /服务器.*事务|永久删除.*暂停/);
@@ -226,11 +231,11 @@ test('production subject and taxonomy permanent deletes fail closed after snapsh
   assert.equal(subjectSaves, 0);
   assert.equal(taxonomySaves, 0);
 
-  const subjectBulkResult = runtime.KGAdminServices.subjects.saveAll([]);
-  const taxonomyBulkResult = runtime.KGAdminServices.taxonomies.saveAll([{ ...taxonomy, nodes: [] }, taxonomyOther]);
-  const duplicateTaxonomyBulkResult = runtime.KGAdminServices.taxonomies.saveAll([taxonomy, taxonomy]);
+  const subjectBulkResult = await runtime.KGAdminServices.subjects.saveAll([]);
+  const taxonomyBulkResult = await runtime.KGAdminServices.taxonomies.saveAll([{ ...taxonomy, nodes: [] }, taxonomyOther]);
+  const duplicateTaxonomyBulkResult = await runtime.KGAdminServices.taxonomies.saveAll([taxonomy, taxonomy]);
   const nodeCheck = runtime.KGAdminServices.taxonomies.nodeDeletionCheck(taxonomy.id, 'node-empty');
-  const nodeDelete = runtime.KGAdminServices.taxonomies.deleteNode(taxonomy.id, 'node-empty');
+  const nodeDelete = await runtime.KGAdminServices.taxonomies.deleteNode(taxonomy.id, 'node-empty');
   assert.equal(subjectBulkResult.valid, false);
   assert.equal(taxonomyBulkResult.valid, false);
   assert.equal(duplicateTaxonomyBulkResult.valid, false);
@@ -241,10 +246,10 @@ test('production subject and taxonomy permanent deletes fail closed after snapsh
   assert.equal(nodeDeletes, 0);
 
   vm.runInNewContext(learningContentCompat, runtime, { filename: '41-learning-content-compat.js' });
-  const compatSubjects = runtime.KGLearningContent.saveSubjects([]);
-  const compatTaxonomies = runtime.KGLearningContent.saveTaxonomies([{ ...taxonomy, nodes: [] }, taxonomyOther]);
-  const compatNodeDelete = runtime.KGLearningContent.deleteKnowledgeNode(taxonomy.id, 'node-empty');
-  const compatReset = runtime.KGLearningContent.resetTaxonomies();
+  const compatSubjects = await runtime.KGLearningContent.saveSubjects([]);
+  const compatTaxonomies = await runtime.KGLearningContent.saveTaxonomies([{ ...taxonomy, nodes: [] }, taxonomyOther]);
+  const compatNodeDelete = await runtime.KGLearningContent.deleteKnowledgeNode(taxonomy.id, 'node-empty');
+  const compatReset = await runtime.KGLearningContent.resetTaxonomies();
   assert.equal(compatSubjects.length, 1);
   assert.equal(compatTaxonomies.valid, false);
   assert.equal(compatNodeDelete.valid, false);
@@ -280,7 +285,7 @@ test('reference failure blocks destructive index actions but keeps safe subjects
       addEventListener() {}, dispatchEvent() {},
     };
   };
-  const makeRuntime = (document, ready, overrides = {}) => {
+  const makeRuntime = (document, ready, overrides = {}, gatewayOverrides = {}) => {
     let fetchCalls = 0;
     const services = {
       referenceSnapshotReady: ready.promise,
@@ -303,7 +308,7 @@ test('reference failure blocks destructive index actions but keeps safe subjects
         init() {}, byId: id => document.element(id), escapeHtml: value => String(value || ''),
         formatTime: value => String(value || ''), toast() {},
       },
-      KGAdminTeachingContentGateway: { hydrateSubject: async () => null, publishTaxonomy: async () => null },
+      KGAdminTeachingContentGateway: { hydrateSubject: async () => null, publishTaxonomy: async () => null, ...gatewayOverrides },
     };
     runtime.window = runtime;
     runtime.fetchCalls = () => fetchCalls;
@@ -354,4 +359,62 @@ test('reference failure blocks destructive index actions but keeps safe subjects
   await settingsDocument.element('adminSnapshotBtn').trigger('click');
   assert.equal(settingsRuntime.fetchCalls() >= 2, true);
   assert.equal(snapshotsCreated, 2);
+
+  const editReady = deferred();
+  editReady.resolve({});
+  const editHydration = deferred();
+  const editDocument = fakeDocument();
+  const subject = { id: 'subject-native-edit', code: 'EDIT', name: { zh: '原生编辑科目' }, description: { zh: '' }, status: 'active', sortOrder: 10 };
+  let subjectReadable = true;
+  const editRuntime = makeRuntime(editDocument, editReady, {
+    subjects: {
+      list: () => [subject], get: () => subjectReadable ? subject : null,
+      isInactive: () => false,
+      usage: () => ({ valid: true, total: 0, counts: {}, references: [] }),
+      deletionCheck: () => ({ valid: true, errors: [] }),
+    },
+  }, {
+    hydrateSubject: async () => {
+      if (!subjectReadable) {
+        await editHydration.promise;
+        subjectReadable = true;
+      }
+      return null;
+    },
+  });
+  vm.runInNewContext(adminSubjects, editRuntime, { filename: '51-admin-subjects-app.js' });
+  await new Promise(resolve => setImmediate(resolve));
+  subjectReadable = false;
+  const nativeEdit = editDocument.element('adminEditSubjectBtn').trigger('click');
+  await Promise.resolve();
+  assert.equal(editDocument.element('adminSubjectDialog').open, undefined);
+  editHydration.resolve(null);
+  await nativeEdit;
+  assert.equal(editDocument.element('adminSubjectDialog').open, '', 'native edit waits for the selected subject snapshot before opening');
+
+  const reloadReady = deferred();
+  reloadReady.resolve({});
+  const reloadDocument = fakeDocument();
+  const pmpSubject = { id: 'subject-pmp', code: 'PMP', name: { zh: 'PMP' }, status: 'active', sortOrder: 1 };
+  const reloadedSubject = { id: 'subject-reloaded', code: 'RELOADED', name: { zh: '重载后科目' }, status: 'active', sortOrder: 10 };
+  let requestedHydrated = false;
+  const reloadRuntime = makeRuntime(reloadDocument, reloadReady, {
+    subjects: {
+      list: () => requestedHydrated ? [pmpSubject, reloadedSubject] : [pmpSubject],
+      get: id => (requestedHydrated ? [pmpSubject, reloadedSubject] : [pmpSubject]).find(row => row.id === id) || null,
+      isInactive: () => false,
+      usage: () => ({ valid: true, total: 0, counts: {}, references: [] }),
+      deletionCheck: () => ({ valid: true, errors: [] }),
+    },
+  }, {
+    hydrateSubject: async id => {
+      if (id === reloadedSubject.id) requestedHydrated = true;
+      return null;
+    },
+  });
+  reloadRuntime.location.search = `?subjectId=${reloadedSubject.id}`;
+  reloadRuntime.location.href = `http://test/admin-subjects.html?subjectId=${reloadedSubject.id}`;
+  vm.runInNewContext(adminSubjects, reloadRuntime, { filename: '51-admin-subjects-app.js' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(reloadRuntime.KGAdminSubjectsApp.getSelectedSubjectId(), reloadedSubject.id, 'reload hydrates the URL subject before falling back to the cached default');
 });

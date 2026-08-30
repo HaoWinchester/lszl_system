@@ -79,6 +79,30 @@ def _subject_id(value: object) -> str:
     return "subject-pmp" if subject_id.upper() == "PMP" else subject_id
 
 
+def _strict_integer(
+    value: object,
+    label: str,
+    *,
+    minimum: int,
+    default: int,
+) -> int:
+    """Validate numeric fields carried by the intentionally-wide shared DTO."""
+
+    if value is None:
+        return default
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise ValueError(f"{label}必须是不小于 {minimum} 的整数")
+    return value
+
+
+def _strict_authorship(value: object, label: str = "authorship") -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError(f"{label}必须是对象")
+    return deepcopy(value)
+
+
 async def _ensure_subject(db: AsyncSession, subject_id: str) -> ContentSubject:
     row = await db.get(ContentSubject, subject_id)
     if row is None:
@@ -114,12 +138,17 @@ def _normalize_tree(value: object, subject_id: str) -> dict[str, Any] | None:
         raise ValueError("知识树 ID 格式不正确")
     nodes = taxonomy.get("nodes", [])
     nodes = _validate_taxonomy_nodes(taxonomy_id, nodes)
-    return {
+    normalized = {
         **taxonomy,
         "id": taxonomy_id,
         "subjectId": _subject_id(taxonomy.get("subjectId") or subject_id),
         "nodes": nodes,
     }
+    if "version" in taxonomy:
+        normalized["version"] = _strict_integer(
+            taxonomy.get("version"), "知识树 version", minimum=1, default=1
+        )
+    return normalized
 
 
 def _normalize_recall(value: object) -> dict[str, Any] | None:
@@ -130,9 +159,13 @@ def _normalize_recall(value: object) -> dict[str, Any] | None:
     nodes, edges = value.get("nodes", []), value.get("edges", [])
     if not isinstance(nodes, list) or not isinstance(edges, list):
         raise ValueError("联想库 nodes/edges 必须是数组")
+    version = _strict_integer(
+        value.get("version"), "联想库 version", minimum=1, default=1
+    )
     return {
         **value,
         "schemaVersion": 1,
+        "version": version,
         "nodes": nodes,
         "edges": edges,
         "updatedAt": str(value.get("updatedAt") or ""),
@@ -196,7 +229,8 @@ def _collection_visible(row: ActivityCollection, viewer_username: str | None) ->
 
 def _collection_payload(row: ActivityCollection) -> dict[str, Any]:
     metadata = dict(row.content_metadata or {})
-    authorship = dict(metadata.get("authorship") or {})
+    authorship_value = metadata.get("authorship")
+    authorship = dict(authorship_value) if isinstance(authorship_value, dict) else {}
     if row.owner_username:
         authorship["createdByUserId"] = row.owner_username
         metadata["authorship"] = authorship
@@ -406,6 +440,14 @@ def _validate_taxonomy_nodes(
             isinstance(level, bool) or not isinstance(level, int) or not 1 <= level <= 9
         ):
             raise ValueError("知识点 level 必须是 1 到 9 的整数")
+        if "sortOrder" in node:
+            node["sortOrder"] = _strict_integer(
+                node.get("sortOrder"), "知识点 sortOrder", minimum=0, default=0
+            )
+        if "position" in node:
+            node["position"] = _strict_integer(
+                node.get("position"), "知识点 position", minimum=0, default=0
+            )
         nodes[node_id] = node
         parents[node_id] = parent_id
 
@@ -603,6 +645,10 @@ async def apply_catalog_snapshot(
             merged_collections[identifier] = item
         incoming_collections = merged_collections
 
+    for item in (incoming_collections or {}).values():
+        if "authorship" in item:
+            item["authorship"] = _strict_authorship(item.get("authorship"))
+
     all_collection_by_id = {row.id: row for row in current_collection_rows}
     current_tag_rows = list((await db.scalars(select(ActivityTag))).all())
     if incoming_tags is not None:
@@ -624,6 +670,10 @@ async def apply_catalog_snapshot(
                 continue
             merged_tags[identifier] = item
         incoming_tags = merged_tags
+
+    for item in (incoming_tags or {}).values():
+        if "authorship" in item:
+            item["authorship"] = _strict_authorship(item.get("authorship"))
 
     current_activity_rows = list((await db.scalars(select(ActivityOverride))).all())
     if incoming_activities is not None:
@@ -805,10 +855,9 @@ async def apply_catalog_snapshot(
     taxonomy_versions: set[tuple[str, int]] = set()
     for item in effective_taxonomies.values():
         subject_id = _subject_id(item.get("subjectId"))
-        try:
-            version = int(item.get("version") or 1)
-        except (TypeError, ValueError) as exc:
-            raise ValueError("知识树 version 必须是正整数") from exc
+        version = _strict_integer(
+            item.get("version"), "知识树 version", minimum=1, default=1
+        )
         if version < 1 or (subject_id, version) in taxonomy_versions:
             raise ValueError("同一科目的知识树 version 必须唯一")
         taxonomy_versions.add((subject_id, version))
@@ -910,7 +959,9 @@ async def apply_catalog_snapshot(
         )
         for identifier, item in incoming_taxonomies.items():
             subject_id = _subject_id(item.get("subjectId"))
-            version = max(1, int(item.get("version") or 1))
+            version = _strict_integer(
+                item.get("version"), "知识树 version", minimum=1, default=1
+            )
             status = str(item.get("status") or "draft")
             if status not in {"draft", "published", "archived"}:
                 raise ValueError("知识树状态不正确")
@@ -927,7 +978,10 @@ async def apply_catalog_snapshot(
             await db.execute(delete(TaxonomyNode).where(TaxonomyNode.taxonomy_id == identifier))
             for position, node in enumerate(item.get("nodes") or []):
                 node_id = _required_id(node.get("id"), "知识点")
-                db.add(TaxonomyNode(id=f"{identifier}:{node_id}", taxonomy_id=identifier, node_id=node_id, parent_node_id=node.get("parentId"), title=_localized_text(node.get("title")), record=deepcopy(node), position=int(node.get("sortOrder") or node.get("position") or position), status=str(node.get("status") or "active")))
+                node_position = node.get("sortOrder")
+                if node_position is None:
+                    node_position = node.get("position")
+                db.add(TaxonomyNode(id=f"{identifier}:{node_id}", taxonomy_id=identifier, node_id=node_id, parent_node_id=node.get("parentId"), title=_localized_text(node.get("title")), record=deepcopy(node), position=position if node_position is None else node_position, status=str(node.get("status") or "active")))
         removed = current_ids - set(incoming_taxonomies)
         if removed:
             await _assert_unreferenced(
@@ -948,7 +1002,7 @@ async def apply_catalog_snapshot(
             metadata = {k: deepcopy(v) for k, v in item.items() if k not in {"id", "subjectId", "title", "status"}}
             row = await db.get(ActivityCollection, identifier)
             if row is None:
-                authorship = dict(metadata.get("authorship") or {})
+                authorship = _strict_authorship(metadata.get("authorship"))
                 authorship["createdByUserId"] = actor_username
                 metadata["authorship"] = authorship
                 row = ActivityCollection(id=identifier, subject_id=subject_id, title=str(item.get("title") or ""), status=str(item.get("status") or "active"), content_metadata=metadata, owner_username=actor_username)
@@ -956,7 +1010,7 @@ async def apply_catalog_snapshot(
             else:
                 if row.owner_username != actor_username:
                     continue
-                authorship = dict(metadata.get("authorship") or {})
+                authorship = _strict_authorship(metadata.get("authorship"))
                 authorship["createdByUserId"] = row.owner_username
                 metadata["authorship"] = authorship
                 row.subject_id, row.title, row.status, row.content_metadata = subject_id, str(item.get("title") or ""), str(item.get("status") or "active"), metadata
@@ -1170,7 +1224,7 @@ async def apply_auxiliary_assets(
         subject = await _ensure_subject(db, subject_id)
         taxonomy_id = tree["id"]
         row = await db.get(ContentTaxonomy, taxonomy_id)
-        requested_version = int(tree.get("version") or 1)
+        requested_version = tree.get("version", 1)
         if row is None:
             conflicting = (await db.execute(select(ContentTaxonomy).where(ContentTaxonomy.subject_id == subject_id, ContentTaxonomy.version == requested_version).limit(1))).scalar_one_or_none()
             if conflicting is not None:
@@ -1180,7 +1234,7 @@ async def apply_auxiliary_assets(
             row = ContentTaxonomy(id=taxonomy_id, subject_id=subject.id, version=requested_version, status=str(tree.get("status") or "published"), title=str(tree.get("title") or tree.get("name") or ""), content_metadata={k: v for k, v in tree.items() if k != "nodes"}, updated_by=actor_username, created_by=actor_username)
             db.add(row)
         else:
-            row.version = int(tree.get("version") or row.version)
+            row.version = tree.get("version", row.version)
             row.status = str(tree.get("status") or row.status)
             row.title = str(tree.get("title") or row.title)
             row.content_metadata = {k: v for k, v in tree.items() if k != "nodes"}
@@ -1202,7 +1256,7 @@ async def apply_auxiliary_assets(
         subject = await _ensure_subject(db, subject_id)
         row = await teaching_content_current_service.current_recall_library(db, subject_id)
         if row is None:
-            requested_version = int(recall.get("version") or 1)
+            requested_version = recall["version"]
             conflict = (await db.execute(select(RecallAssociationLibrary.id).where(RecallAssociationLibrary.subject_id == subject_id, RecallAssociationLibrary.version == requested_version).limit(1))).scalar_one_or_none()
             if conflict is not None:
                 maximum = (await db.execute(select(func.max(RecallAssociationLibrary.version)).where(RecallAssociationLibrary.subject_id == subject_id))).scalar_one_or_none()
