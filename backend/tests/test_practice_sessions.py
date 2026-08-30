@@ -1,6 +1,7 @@
 """Persistent, resumable practice session contracts."""
 
 import asyncio
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -330,6 +331,20 @@ def test_practice_session_model_has_resumable_and_frozen_report_fields() -> None
     assert "ck_practice_sessions_status" in constraint_names
     assert "ck_practice_sessions_revision" in constraint_names
     assert "uq_practice_sessions_one_resumable" in index_names
+
+
+def test_practice_session_model_allows_global_revenge_scope() -> None:
+    columns = PracticeSession.__table__.columns
+
+    assert columns["paper_id"].nullable is True
+    assert columns["release_id"].nullable is True
+
+    migration = (
+        Path(__file__).parents[1]
+        / "alembic/versions/c9f2e6a1b430_global_revenge_sessions.py"
+    ).read_text(encoding="utf-8")
+    assert 'op.alter_column("practice_sessions", "paper_id", nullable=True)' in migration
+    assert 'op.alter_column("practice_sessions", "release_id", nullable=True)' in migration
 
 
 def test_start_session_freezes_42_50_8_order_and_rejects_duplicate_resumable() -> None:

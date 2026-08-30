@@ -181,11 +181,11 @@ class PracticeSession(Base):
         nullable=False,
         index=True,
     )
-    paper_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    release_id: Mapped[str] = mapped_column(
+    paper_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    release_id: Mapped[str | None] = mapped_column(
         String(64),
         ForeignKey("paper_releases.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     mode: Mapped[str] = mapped_column(String(16), nullable=False)
