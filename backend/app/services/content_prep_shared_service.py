@@ -1603,14 +1603,35 @@ async def import_activities(
     if not activities or len(activities) > MAX_ACTIVITIES:
         raise ValueError("活动数量必须在 1 到 5000 之间")
     await _assert_revision(db, content_revision)
-    row = (await db.execute(select(ActivityOverride).where(ActivityOverride.collection_id == collection_id))).scalars().all()
-    current = {item.activity_id: item for item in row}
-    collection = await db.get(ActivityCollection, collection_id)
+    requested_collection_id = str(collection_id).strip()
+    resolved_collection_id = (
+        f"default__owner__{actor.username}"
+        if requested_collection_id == "default"
+        else requested_collection_id
+    )
+    collection = await db.get(ActivityCollection, resolved_collection_id)
     if collection is None:
         await _ensure_subject(db, subject_id)
-        collection = ActivityCollection(id=collection_id, subject_id=subject_id, title="默认活动库", content_metadata={})
+        collection = ActivityCollection(
+            id=resolved_collection_id,
+            subject_id=subject_id,
+            title="默认活动库",
+            content_metadata={},
+            owner_username=actor.username,
+        )
         db.add(collection)
         await db.flush()
+    elif not _collection_writable(collection, actor.username):
+        raise CatalogResourceNotModifiable("活动库不属于当前账号，不能导入")
+    row = (
+        await db.execute(
+            select(ActivityOverride).where(
+                ActivityOverride.collection_id == resolved_collection_id
+            )
+        )
+    ).scalars().all()
+    current = {item.activity_id: item for item in row}
+    resource_owner = None if _system_collection(collection) else actor.username
     created = updated = unchanged = 0
     changes: list[dict[str, str]] = []
     now = datetime.now(timezone.utc).isoformat()
@@ -1643,11 +1664,19 @@ async def import_activities(
         }
         activity["metadata"] = metadata
         if existing_row is None:
-            db.add(ActivityOverride(id=uuid4().hex, collection_id=collection_id, activity_id=activity_id, record=activity, updated_by=actor.username))
+            db.add(ActivityOverride(
+                id=uuid4().hex,
+                collection_id=resolved_collection_id,
+                activity_id=activity_id,
+                record=activity,
+                updated_by=actor.username,
+                owner_username=resource_owner,
+            ))
         else:
             existing_row.record = activity
             existing_row.revision += 1
             existing_row.updated_by = actor.username
+            existing_row.owner_username = resource_owner
         action = "created" if existing is None else "updated"
         created += existing is None
         updated += existing is not None

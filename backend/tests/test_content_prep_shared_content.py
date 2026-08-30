@@ -1052,6 +1052,88 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
         asyncio.run(cleanup())
 
 
+def test_activity_import_default_collection_is_isolated_per_teacher() -> None:
+    suffix = uuid4().hex[:10]
+    teacher_a = f"activity-owner-a-{suffix}"
+    teacher_b = f"activity-owner-b-{suffix}"
+    activity_id = f"owned-activity-{suffix}"
+    revision_snapshot: dict | None = None
+
+    async def seed() -> None:
+        nonlocal revision_snapshot
+        async with AsyncSessionLocal() as db:
+            revision_snapshot = await snapshot_teaching_content_revision(db)
+            db.add_all([
+                User(username=teacher_a, password_hash=hash_password(PASSWORD), role="teacher", status="active", subject="PMP"),
+                User(username=teacher_b, password_hash=hash_password(PASSWORD), role="teacher", status="active", subject="PMP"),
+            ])
+            await db.commit()
+
+    async def rows() -> list[tuple[str | None, str | None, str]]:
+        async with AsyncSessionLocal() as db:
+            result = (
+                await db.execute(
+                    select(
+                        ActivityCollection.owner_username,
+                        ActivityOverride.owner_username,
+                        ActivityOverride.record,
+                    )
+                    .join(ActivityOverride, ActivityOverride.collection_id == ActivityCollection.id)
+                    .where(ActivityOverride.activity_id == activity_id)
+                    .order_by(ActivityCollection.owner_username)
+                )
+            ).all()
+            return [
+                (collection_owner, activity_owner, record["title"])
+                for collection_owner, activity_owner, record in result
+            ]
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            collection_ids = select(ActivityCollection.id).where(
+                ActivityCollection.owner_username.in_([teacher_a, teacher_b])
+            )
+            await db.execute(
+                delete(ActivityOverride).where(
+                    ActivityOverride.collection_id.in_(collection_ids)
+                )
+            )
+            await db.execute(
+                delete(ActivityCollection).where(
+                    ActivityCollection.owner_username.in_([teacher_a, teacher_b])
+                )
+            )
+            await db.execute(delete(User).where(User.username.in_([teacher_a, teacher_b])))
+            await db.commit()
+            await restore_teaching_content_revision(db, revision_snapshot)
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        for username, title in ((teacher_a, "教师 A 活动"), (teacher_b, "教师 B 活动")):
+            with TestClient(app) as client:
+                assert client.post(
+                    "/api/v1/auth/login",
+                    json={"username": username, "password": PASSWORD},
+                ).status_code == 200
+                revision = client.get("/api/v1/question-catalog/revision").json()["revision"]
+                imported = client.post(
+                    "/api/v1/content-prep/activities/import",
+                    json={
+                        "contentRevision": revision,
+                        "activities": [{"id": activity_id, "title": title, "metadata": {}}],
+                    },
+                )
+                assert imported.status_code == 200, imported.text
+
+        assert asyncio.run(rows()) == [
+            (teacher_a, teacher_a, "教师 A 活动"),
+            (teacher_b, teacher_b, "教师 B 活动"),
+        ]
+    finally:
+        asyncio.run(cleanup())
+
+
 def test_principle_delete_conflict_lists_exact_referencing_questions() -> None:
     suffix = uuid4().hex[:10]
     teacher = f"ref-teacher-{suffix}"
