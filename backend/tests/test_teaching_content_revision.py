@@ -49,6 +49,7 @@ from tests.teaching_content_revision_support import (
 PASSWORD = "revision-pass"
 PRINCIPLE_PROJECTION_KEY = "kg_principle_repository_v1"
 PRESET_PROJECTION_KEY = "kg_synthesis_preset_repository_v1"
+RELATIONAL_REVISION_SNAPSHOT_KEY = "__relational_teaching_content_revision__"
 
 
 def test_bump_is_monotonic_deduplicated_and_capped() -> None:
@@ -423,7 +424,7 @@ def test_principle_delete_removes_an_unreferenced_principle_and_its_card() -> No
     principle_id = f"principle-delete-{suffix}"
     preset_id = f"preset-delete-{suffix}"
     shared_keys = {
-        revision_service.REVISION_KEY,
+        RELATIONAL_REVISION_SNAPSHOT_KEY,
         PRINCIPLE_PROJECTION_KEY,
         PRESET_PROJECTION_KEY,
     }
@@ -635,7 +636,7 @@ def test_imported_builtin_principle_card_updates_survive_startup_seed() -> None:
     """Catch startup seeding silently restoring administrator-imported built-in IDs."""
 
     shared_keys = {
-        revision_service.REVISION_KEY,
+        RELATIONAL_REVISION_SNAPSHOT_KEY,
         PRINCIPLE_PROJECTION_KEY,
         PRESET_PROJECTION_KEY,
     }
@@ -1063,7 +1064,7 @@ def test_runtime_read_and_personal_snapshot_share_the_revision_lock(
     from app.web.schemas import RuntimeStateUpdate
 
     key = "kg_content_subjects_v1"
-    shared_keys = {key, revision_service.REVISION_KEY}
+    shared_keys = {key, RELATIONAL_REVISION_SNAPSHOT_KEY}
     snapshot = asyncio.run(_snapshot_shared_rows(shared_keys))
     snapshots_arrived = Event()
     release_snapshots = Event()
@@ -1351,7 +1352,7 @@ def test_single_question_save_returns_current_content_revision(
 
 async def _snapshot_shared_rows(keys: set[str]) -> dict[str, dict]:
     async with AsyncSessionLocal() as db:
-        runtime_keys = keys - {revision_service.REVISION_KEY}
+        runtime_keys = keys - {RELATIONAL_REVISION_SNAPSHOT_KEY}
         rows = (
             await db.execute(
                 select(SharedRuntimeState).where(
@@ -1369,10 +1370,10 @@ async def _snapshot_shared_rows(keys: set[str]) -> dict[str, dict]:
             }
             for row in rows
         }
-        if revision_service.REVISION_KEY in keys:
+        if RELATIONAL_REVISION_SNAPSHOT_KEY in keys:
             revision = await snapshot_teaching_content_revision(db)
             if revision is not None:
-                snapshot[revision_service.REVISION_KEY] = {
+                snapshot[RELATIONAL_REVISION_SNAPSHOT_KEY] = {
                     **revision,
                 }
         return snapshot
@@ -1380,7 +1381,7 @@ async def _snapshot_shared_rows(keys: set[str]) -> dict[str, dict]:
 
 async def _restore_shared_rows(keys: set[str], snapshot: dict[str, dict]) -> None:
     async with AsyncSessionLocal() as db:
-        runtime_keys = keys - {revision_service.REVISION_KEY}
+        runtime_keys = keys - {RELATIONAL_REVISION_SNAPSHOT_KEY}
         await db.execute(
             delete(SharedRuntimeState).where(SharedRuntimeState.key.in_(runtime_keys))
         )
@@ -1395,11 +1396,11 @@ async def _restore_shared_rows(keys: set[str], snapshot: dict[str, dict]) -> Non
                     updated_at=row["updated_at"],
                 )
                 for key, row in snapshot.items()
-                if key != revision_service.REVISION_KEY
+                if key != RELATIONAL_REVISION_SNAPSHOT_KEY
             ]
         )
-        if revision_service.REVISION_KEY in keys:
-            revision = snapshot.get(revision_service.REVISION_KEY)
+        if RELATIONAL_REVISION_SNAPSHOT_KEY in keys:
+            revision = snapshot.get(RELATIONAL_REVISION_SNAPSHOT_KEY)
             await restore_teaching_content_revision(db, revision)
         await db.commit()
 
@@ -1414,7 +1415,7 @@ def test_content_prep_batch_projects_canonical_relations_and_bumps_once() -> Non
     principle_id = f"principle-projection-{suffix}"
     preset_id = f"preset-projection-{suffix}"
     shared_keys = {
-        revision_service.REVISION_KEY,
+        RELATIONAL_REVISION_SNAPSHOT_KEY,
         PRINCIPLE_PROJECTION_KEY,
         PRESET_PROJECTION_KEY,
     }
@@ -1585,7 +1586,7 @@ def test_rejected_content_prep_batch_keeps_projection_and_revision_unchanged() -
     principle_id = f"principle-rejected-{suffix}"
     preset_id = f"preset-rejected-{suffix}"
     shared_keys = {
-        revision_service.REVISION_KEY,
+        RELATIONAL_REVISION_SNAPSHOT_KEY,
         PRINCIPLE_PROJECTION_KEY,
         PRESET_PROJECTION_KEY,
     }
@@ -1730,7 +1731,7 @@ def test_runtime_principle_projection_upserts_present_marks_missing_inactive_and
     present_preset = f"preset-runtime-present-{suffix}"
     missing_preset = f"preset-runtime-missing-{suffix}"
     shared_keys = {
-        revision_service.REVISION_KEY,
+        RELATIONAL_REVISION_SNAPSHOT_KEY,
         PRINCIPLE_PROJECTION_KEY,
         PRESET_PROJECTION_KEY,
         "kg_teacher_shared_runtime_promotion_v1",
@@ -2157,7 +2158,7 @@ def test_teaching_shared_runtime_cas_allows_exactly_one_writer(
     suffix = uuid4().hex[:10]
     usernames = [f"runtime-cas-a-{suffix}", f"runtime-cas-b-{suffix}"]
     marker_key = "kg_teacher_shared_runtime_promotion_v1"
-    shared_keys = {revision_service.REVISION_KEY, marker_key, *keys}
+    shared_keys = {RELATIONAL_REVISION_SNAPSHOT_KEY, marker_key, *keys}
 
     async def seed() -> dict[str, dict]:
         snapshot = await _snapshot_shared_rows(shared_keys)
@@ -2296,7 +2297,7 @@ def test_runtime_request_id_replay_skips_content_cas_and_second_bump() -> None:
     username = f"runtime-replay-{suffix}"
     key = "kg_course_config_drafts_v1"
     marker_key = "kg_teacher_shared_runtime_promotion_v1"
-    shared_keys = {revision_service.REVISION_KEY, marker_key, key}
+    shared_keys = {RELATIONAL_REVISION_SNAPSHOT_KEY, marker_key, key}
 
     async def seed() -> dict[str, dict]:
         snapshot = await _snapshot_shared_rows(shared_keys)
@@ -2368,7 +2369,7 @@ def test_admin_settings_runtime_write_neither_requires_nor_bumps_content_revisio
     suffix = uuid4().hex[:10]
     username = f"runtime-admin-{suffix}"
     key = "kg_admin_settings_v1"
-    shared_keys = {revision_service.REVISION_KEY, key}
+    shared_keys = {RELATIONAL_REVISION_SNAPSHOT_KEY, key}
 
     async def seed() -> dict[str, dict]:
         snapshot = await _snapshot_shared_rows(shared_keys)
@@ -2429,7 +2430,7 @@ def test_each_bank_question_and_paper_mutation_bumps_exactly_once() -> None:
 
     suffix = uuid4().hex[:10]
     username = f"revision-crud-{suffix}"
-    shared_keys = {revision_service.REVISION_KEY}
+    shared_keys = {RELATIONAL_REVISION_SNAPSHOT_KEY}
     created_ids: dict[str, str] = {}
 
     async def scenario() -> None:
@@ -2642,7 +2643,9 @@ def test_content_prep_bank_creation_bumps_once() -> None:
 
     suffix = uuid4().hex[:10]
     username = f"revision-prep-bank-{suffix}"
-    snapshot = asyncio.run(_snapshot_shared_rows({revision_service.REVISION_KEY}))
+    snapshot = asyncio.run(
+        _snapshot_shared_rows({RELATIONAL_REVISION_SNAPSHOT_KEY})
+    )
     bank_id = ""
 
     async def scenario() -> None:
@@ -2683,7 +2686,7 @@ def test_content_prep_bank_creation_bumps_once() -> None:
             await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
             await db.execute(delete(User).where(User.username == username))
             await db.commit()
-        await _restore_shared_rows({revision_service.REVISION_KEY}, snapshot)
+        await _restore_shared_rows({RELATIONAL_REVISION_SNAPSHOT_KEY}, snapshot)
 
     try:
         asyncio.run(scenario())

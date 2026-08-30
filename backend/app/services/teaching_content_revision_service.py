@@ -12,8 +12,6 @@ from app.models.teaching_content import TeachingContentRevision
 
 
 REVISION_LOCK_KEY = "kg_teaching_content_revision_v1"
-# Compatibility alias for callers that imported the former storage-key name.
-REVISION_KEY = REVISION_LOCK_KEY
 CLEANUP_LOCK_KEY = "question-pool-cleanup-v1"
 MAX_CHANGES = 100
 
