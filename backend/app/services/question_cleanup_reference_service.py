@@ -16,32 +16,15 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.course_management import CourseDraft, CourseRelease, LearningTask
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
-from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.teaching_content import RecallAssociationLibrary
 from app.schemas.question_cleanup import QuestionCleanupReference
 from app.services import teaching_content_revision_service
 
 
-CURRENT_RUNTIME_KEY_TYPES: dict[str, str] = {
-    # allowed_until_task6: these exact keys lose their Runtime compatibility as
-    # soon as Task 6 introduces the relational course/task owner.
-    "kg_course_config_drafts_v1": "course_draft",
-    "kg_course_config_active_release_v1": "active_course",
-    "kg_learning_tasks_v1": "learning_task",
-}
-
-PUBLISHED_RUNTIME_KEY_TYPES: dict[str, str] = {
-    # allowed_until_task6
-    "kg_course_config_releases_v1": "published_course_snapshot",
-}
-
 RECALL_ASSOCIATION_PREFIX = None
-
-REPORT_RUNTIME_EXACT_KEYS = frozenset(
-    {*CURRENT_RUNTIME_KEY_TYPES, *PUBLISHED_RUNTIME_KEY_TYPES}
-)
 
 _DIRECT_QUESTION_FIELDS = (
     "questionId",
@@ -95,7 +78,11 @@ async def relational_question_reference_counts(
     }
 
 
-async def complete_relational_reference_snapshot(db: AsyncSession) -> dict[str, list[dict]]:
+async def complete_relational_reference_snapshot(
+    db: AsyncSession,
+    *,
+    owner_id: str | None = None,
+) -> dict[str, list[dict]]:
     """Return every relational question, draft-paper, and release reference.
 
     This intentionally has no selection or pagination inputs: admin reference
@@ -103,8 +90,17 @@ async def complete_relational_reference_snapshot(db: AsyncSession) -> dict[str, 
     """
 
     await teaching_content_revision_service.acquire_read_lock(db)
-    banks = list((await db.scalars(select(QuestionBank).order_by(QuestionBank.id))).all())
-    questions = list((await db.scalars(select(Question).order_by(Question.bank_id, Question.id))).all())
+    bank_query = select(QuestionBank)
+    if owner_id is not None:
+        bank_query = bank_query.where(QuestionBank.owner_id == owner_id)
+    banks = list((await db.scalars(bank_query.order_by(QuestionBank.id))).all())
+    bank_ids = {bank.id for bank in banks}
+    question_query = select(Question)
+    if owner_id is not None:
+        question_query = question_query.where(Question.bank_id.in_(bank_ids))
+    questions = list(
+        (await db.scalars(question_query.order_by(Question.bank_id, Question.id))).all()
+    )
     questions_by_bank: dict[str, list[dict]] = {}
     for question in questions:
         questions_by_bank.setdefault(question.bank_id, []).append(
@@ -127,11 +123,14 @@ async def complete_relational_reference_snapshot(db: AsyncSession) -> dict[str, 
         for bank in banks
     ]
 
+    paper_query = select(ExamPaper, PaperQuestion).outerjoin(
+        PaperQuestion, PaperQuestion.paper_id == ExamPaper.id
+    )
+    if owner_id is not None:
+        paper_query = paper_query.where(ExamPaper.owner_id == owner_id)
     paper_rows = (
         await db.execute(
-            select(ExamPaper, PaperQuestion)
-            .outerjoin(PaperQuestion, PaperQuestion.paper_id == ExamPaper.id)
-            .order_by(ExamPaper.id, PaperQuestion.order_index)
+            paper_query.order_by(ExamPaper.id, PaperQuestion.order_index)
         )
     ).all()
     paper_payloads: list[dict] = []
@@ -157,11 +156,14 @@ async def complete_relational_reference_snapshot(db: AsyncSession) -> dict[str, 
                 }
             )
 
+    release_query = select(PaperRelease, PaperReleaseQuestion).outerjoin(
+        PaperReleaseQuestion, PaperReleaseQuestion.release_id == PaperRelease.id
+    )
+    if owner_id is not None:
+        release_query = release_query.where(PaperRelease.publisher_id == owner_id)
     release_rows = (
         await db.execute(
-            select(PaperRelease, PaperReleaseQuestion)
-            .outerjoin(PaperReleaseQuestion, PaperReleaseQuestion.release_id == PaperRelease.id)
-            .order_by(PaperRelease.id, PaperReleaseQuestion.order_index)
+            release_query.order_by(PaperRelease.id, PaperReleaseQuestion.order_index)
         )
     ).all()
     release_payloads: list[dict] = []
@@ -273,40 +275,6 @@ def _walk_question_references(
             yield from _walk_question_references(item, path=f"{path}/{index}")
 
 
-def _container_id(row: object, *, key: str, index: int) -> str:
-    if isinstance(row, Mapping):
-        for field in (
-            "releaseId",
-            "paperId",
-            "courseId",
-            "taskId",
-            "id",
-        ):
-            value = str(row.get(field) or "").strip()
-            if value:
-                return value[:256]
-    return f"{key}#{index}"
-
-
-def _runtime_containers(key: str, payload: object) -> list[tuple[str, object, str]]:
-    if isinstance(payload, list):
-        rows = list(payload)
-        if all(isinstance(row, Mapping) for row in rows):
-            rows.sort(
-                key=lambda row: (
-                    _container_id(row, key=key, index=0),
-                    _canonical_json(row),
-                )
-            )
-        return [
-            (_container_id(row, key=key, index=index), row, f"/{index}")
-            for index, row in enumerate(rows)
-        ]
-    if isinstance(payload, Mapping):
-        return [(_container_id(payload, key=key, index=0), payload, "")]
-    return []
-
-
 def _reference(
     *,
     container_type: str,
@@ -328,45 +296,6 @@ def _reference(
         referenceId=_sha256(identity),
         **identity,
     )
-
-
-def _canonical_runtime_payload(key: str, payload: object) -> object:
-    """Remove collection insertion order without erasing semantic inner order."""
-
-    if isinstance(payload, list) and all(isinstance(row, Mapping) for row in payload):
-        return sorted(
-            payload,
-            key=lambda row: (
-                _container_id(row, key=key, index=0),
-                _canonical_json(row),
-            ),
-        )
-    return payload
-
-
-def _runtime_key_type(key: str) -> tuple[str, str] | None:
-    if key in CURRENT_RUNTIME_KEY_TYPES:
-        return CURRENT_RUNTIME_KEY_TYPES[key], "remove_question_and_recalculate"
-    if key in PUBLISHED_RUNTIME_KEY_TYPES:
-        return PUBLISHED_RUNTIME_KEY_TYPES[key], "preserve_historical_snapshot"
-    return None
-
-
-def _container_repair_action(
-    key: str,
-    container: object,
-    default: str,
-) -> str:
-    if (
-        key == "kg_learning_tasks_v1"
-        and isinstance(container, Mapping)
-        and (
-            str(container.get("status") or "").strip().casefold() == "published"
-            or bool(str(container.get("publishedAt") or "").strip())
-        )
-    ):
-        return "preserve_historical_snapshot"
-    return default
 
 
 async def inventory_question_references(
@@ -479,54 +408,95 @@ async def inventory_question_references(
                 )
             )
 
-    runtime_query = (
-        select(SharedRuntimeState)
-        .where(SharedRuntimeState.key.in_(REPORT_RUNTIME_EXACT_KEYS))
-        .order_by(SharedRuntimeState.key)
+    course_snapshot: list[dict[str, object]] = []
+    course_drafts = list(
+        (await db.scalars(select(CourseDraft).order_by(CourseDraft.id))).all()
     )
-    runtime_rows = (await db.execute(runtime_query)).scalars().all()
-    runtime_snapshot: list[dict[str, object]] = []
-    for row in runtime_rows:
-        key = str(row.key)
-        classification = _runtime_key_type(key)
-        if classification is None:
-            continue
-        container_type, repair_action = classification
-        try:
-            payload = json.loads(row.value)
-        except (TypeError, ValueError, json.JSONDecodeError):
-            payload = {"invalidJsonSha256": hashlib.sha256(row.value.encode()).hexdigest()}
-        canonical_payload = _canonical_runtime_payload(key, payload)
-        runtime_snapshot.append(
+    for draft in course_drafts:
+        payload = dict(draft.structure or {})
+        course_snapshot.append(
             {
-                "key": key,
-                "schemaVersion": int(row.schema_version),
-                "valueHash": _sha256(canonical_payload),
+                "kind": "relationalCourseDraft",
+                "id": str(draft.id),
+                "ownerId": str(draft.owner_id),
+                "revision": int(draft.revision),
+                "status": str(draft.status),
+                "valueHash": _sha256(payload),
             }
         )
-        for container_id, container, base_path in _runtime_containers(
-            key,
-            canonical_payload,
-        ):
-            container_repair_action = _container_repair_action(
-                key,
-                container,
-                repair_action,
-            )
-            for question_id, relative_path in _walk_question_references(
-                container,
-                path=base_path,
-            ):
-                references.append(
-                    _reference(
-                        container_type=container_type,
-                        container_id=container_id,
-                        question_id=question_id,
-                        repair_action=container_repair_action,
-                        storage_key=key,
-                        reference_path=relative_path or "/",
-                    )
+        for question_id, relative_path in _walk_question_references(payload):
+            references.append(
+                _reference(
+                    container_type="course_draft",
+                    container_id=str(draft.id),
+                    question_id=question_id,
+                    repair_action="remove_question_and_recalculate",
+                    storage_key=None,
+                    reference_path=relative_path or "/",
                 )
+            )
+
+    course_releases = list(
+        (await db.scalars(select(CourseRelease).order_by(CourseRelease.id))).all()
+    )
+    for release in course_releases:
+        payload = dict(release.course_snapshot or {})
+        course_snapshot.append(
+            {
+                "kind": "relationalCourseRelease",
+                "id": str(release.id),
+                "ownerId": str(release.owner_id),
+                "courseId": str(release.course_id),
+                "revision": int(release.revision),
+                "status": str(release.status),
+                "contentHash": str(release.content_hash),
+                "valueHash": _sha256(payload),
+            }
+        )
+        for question_id, relative_path in _walk_question_references(payload):
+            references.append(
+                _reference(
+                    container_type="published_course_snapshot",
+                    container_id=str(release.id),
+                    question_id=question_id,
+                    repair_action="preserve_historical_snapshot",
+                    storage_key=None,
+                    reference_path=relative_path or "/",
+                )
+            )
+
+    learning_tasks = list(
+        (await db.scalars(select(LearningTask).order_by(LearningTask.id))).all()
+    )
+    for task in learning_tasks:
+        payload = dict(task.content or {})
+        repair_action = (
+            "preserve_historical_snapshot"
+            if str(task.status) == "published"
+            else "remove_question_and_recalculate"
+        )
+        course_snapshot.append(
+            {
+                "kind": "relationalLearningTask",
+                "id": str(task.id),
+                "ownerId": str(task.owner_id),
+                "releaseId": str(task.release_id),
+                "revision": int(task.revision),
+                "status": str(task.status),
+                "valueHash": _sha256(payload),
+            }
+        )
+        for question_id, relative_path in _walk_question_references(payload):
+            references.append(
+                _reference(
+                    container_type="learning_task",
+                    container_id=str(task.id),
+                    question_id=question_id,
+                    repair_action=repair_action,
+                    storage_key=None,
+                    reference_path=relative_path or "/",
+                )
+            )
 
     deduplicated = {reference.reference_id: reference for reference in references}
     sorted_references = sorted(
@@ -549,10 +519,7 @@ async def inventory_question_references(
     ] + [
         {"kind": "relationalRecallAssociationLibrary", **item}
         for item in recall_snapshot
-    ] + [
-        {"kind": "sharedRuntime", **item}
-        for item in runtime_snapshot
-    ]
+    ] + course_snapshot
     snapshot.sort(key=_canonical_json)
     return sorted_references, snapshot
 
@@ -650,95 +617,6 @@ def _walk_bank_ids(value: object) -> Iterator[str]:
             yield from _walk_bank_ids(child)
 
 
-def _raw_top_level_array_items(value: str) -> list[str] | None:
-    """Return exact JSON bytes for top-level array elements when parseable."""
-
-    decoder = json.JSONDecoder()
-    length = len(value)
-    index = 0
-    while index < length and value[index].isspace():
-        index += 1
-    if index >= length or value[index] != "[":
-        return None
-    index += 1
-    items: list[str] = []
-    while True:
-        while index < length and value[index].isspace():
-            index += 1
-        if index < length and value[index] == "]":
-            index += 1
-            break
-        start = index
-        try:
-            _, end = decoder.raw_decode(value, index)
-        except (TypeError, ValueError, json.JSONDecodeError):
-            return None
-        items.append(value[start:end])
-        index = end
-        while index < length and value[index].isspace():
-            index += 1
-        if index < length and value[index] == ",":
-            index += 1
-            continue
-        if index < length and value[index] == "]":
-            index += 1
-            break
-        return None
-    if value[index:].strip():
-        return None
-    return items
-
-
-def _recalculate_runtime_papers(
-    payload: object,
-    question_domains: Mapping[str, str | None],
-) -> object:
-    rows = payload if isinstance(payload, list) else [payload]
-    for paper in rows:
-        if not isinstance(paper, dict):
-            continue
-        questions = paper.get("questions")
-        if not isinstance(questions, list):
-            continue
-        question_ids: list[str] = []
-        for question in questions:
-            if not isinstance(question, Mapping):
-                continue
-            question_id = next(
-                (
-                    _clean_question_id(question.get(field))
-                    for field in _DIRECT_QUESTION_FIELDS
-                    if _clean_question_id(question.get(field))
-                ),
-                "",
-            )
-            if question_id:
-                question_ids.append(question_id)
-        total = len(questions)
-        if "totalCount" in paper:
-            paper["totalCount"] = total
-        if "questionCount" in paper:
-            paper["questionCount"] = total
-        if isinstance(paper.get("quotas"), Mapping):
-            quotas = Counter(
-                str(question_domains.get(question_id) or "").strip()
-                for question_id in question_ids
-            )
-            quotas.pop("", None)
-            paper["quotas"] = dict(sorted(quotas.items()))
-    return payload
-
-
-async def _lock_runtime_rows(db: AsyncSession) -> list[SharedRuntimeState]:
-    query = (
-        select(SharedRuntimeState)
-        .where(SharedRuntimeState.key.in_(REPORT_RUNTIME_EXACT_KEYS))
-        .order_by(SharedRuntimeState.key)
-        .with_for_update()
-    )
-    return list((await db.execute(query)).scalars().all())
-
-
 async def repair_current_question_references(
     db: AsyncSession,
     deleted_question_ids: set[str],
@@ -746,15 +624,19 @@ async def repair_current_question_references(
     actor_username: str,
     question_domains: Mapping[str, str | None],
 ) -> dict[str, object]:
-    """Lock and repair relational/current-runtime references in this transaction."""
+    """Lock and repair mutable relational references in this transaction."""
 
     if not deleted_question_ids:
         return {
             "relationalPaperIds": [],
             "relationalRecallLibraryIds": [],
             "removedRelationalRecallReferences": 0,
+            "relationalCourseDraftIds": [],
+            "relationalLearningTaskIds": [],
+            "removedRelationalCourseReferences": 0,
             "runtimeKeys": [],
             "removedRuntimeReferences": 0,
+            "publishedBankIds": [],
         }
 
     targeted_links = list(
@@ -857,97 +739,82 @@ async def repair_current_question_references(
         changed_recall_library_ids.append(str(library.id))
         removed_recall_references += removed
 
-    changed_runtime_keys: list[str] = []
-    removed_runtime_references = 0
+    changed_course_draft_ids: list[str] = []
+    changed_learning_task_ids: list[str] = []
+    removed_course_references = 0
     published_bank_ids: set[str] = set()
-    for row in await _lock_runtime_rows(db):
-        key = str(row.key)
-        try:
-            payload = json.loads(row.value)
-        except (TypeError, ValueError, json.JSONDecodeError) as exc:
-            raise QuestionCleanupReferenceRepairError(
-                f"malformed managed runtime JSON prevents cleanup: {key}"
-            ) from exc
-        if key in PUBLISHED_RUNTIME_KEY_TYPES:
+
+    course_drafts = list(
+        (
+            await db.scalars(
+                select(CourseDraft).order_by(CourseDraft.id).with_for_update()
+            )
+        ).all()
+    )
+    for draft in course_drafts:
+        repaired_payload, removed, _ = _repair_json_value(
+            dict(draft.structure or {}),
+            deleted_question_ids,
+        )
+        if removed <= 0 or not isinstance(repaired_payload, Mapping):
+            continue
+        draft.structure = dict(repaired_payload)
+        draft.revision = int(draft.revision) + 1
+        draft.updated_by = actor_username
+        changed_course_draft_ids.append(str(draft.id))
+        removed_course_references += removed
+
+    course_releases = list(
+        (
+            await db.scalars(
+                select(CourseRelease).order_by(CourseRelease.id).with_for_update()
+            )
+        ).all()
+    )
+    for release in course_releases:
+        published_bank_ids.update(_walk_bank_ids(release.course_snapshot or {}))
+
+    learning_tasks = list(
+        (
+            await db.scalars(
+                select(LearningTask).order_by(LearningTask.id).with_for_update()
+            )
+        ).all()
+    )
+    for task in learning_tasks:
+        payload = dict(task.content or {})
+        if str(task.status) == "published":
             published_bank_ids.update(_walk_bank_ids(payload))
             continue
-
-        serialized_override: str | None = None
-        if key == "kg_learning_tasks_v1" and isinstance(payload, list):
-            repaired_tasks: list[object] = []
-            serialized_tasks: list[str] = []
-            raw_tasks = _raw_top_level_array_items(row.value)
-            removed = 0
-            for index, task in enumerate(payload):
-                if _container_repair_action(
-                    key,
-                    task,
-                    "remove_question_and_recalculate",
-                ) == "preserve_historical_snapshot":
-                    repaired_tasks.append(task)
-                    published_bank_ids.update(_walk_bank_ids(task))
-                    if raw_tasks is not None and len(raw_tasks) == len(payload):
-                        serialized_tasks.append(raw_tasks[index])
-                    else:
-                        serialized_tasks.append(
-                            json.dumps(
-                                task,
-                                ensure_ascii=False,
-                                separators=(",", ":"),
-                            )
-                        )
-                    continue
-                repaired_task, task_removed, _ = _repair_json_value(
-                    task,
-                    deleted_question_ids,
-                )
-                repaired_tasks.append(repaired_task)
-                serialized_tasks.append(
-                    json.dumps(
-                        repaired_task,
-                        ensure_ascii=False,
-                        separators=(",", ":"),
-                    )
-                )
-                removed += task_removed
-            repaired_payload: object = repaired_tasks
-            serialized_override = f"[{','.join(serialized_tasks)}]"
-        else:
-            repaired_payload, removed, _ = _repair_json_value(
-                payload,
-                deleted_question_ids,
-            )
-        if key == "kg_exam_papers_v1__teacher_shared":
-            repaired_payload = _recalculate_runtime_papers(
-                repaired_payload,
-                question_domains,
-            )
+        repaired_payload, removed, _ = _repair_json_value(
+            payload,
+            deleted_question_ids,
+        )
         if removed <= 0:
             continue
-        row.value = serialized_override or json.dumps(
-            repaired_payload,
-            ensure_ascii=False,
-            separators=(",", ":"),
-        )
-        row.updated_by = actor_username
-        changed_runtime_keys.append(key)
-        removed_runtime_references += removed
+        if not isinstance(repaired_payload, Mapping):
+            continue
+        task.content = dict(repaired_payload)
+        task.revision = int(task.revision) + 1
+        task.updated_by = actor_username
+        changed_learning_task_ids.append(str(task.id))
+        removed_course_references += removed
 
     return {
         "relationalPaperIds": paper_ids,
         "relationalRecallLibraryIds": sorted(changed_recall_library_ids),
         "removedRelationalRecallReferences": removed_recall_references,
-        "runtimeKeys": sorted(changed_runtime_keys),
-        "removedRuntimeReferences": removed_runtime_references,
+        "relationalCourseDraftIds": sorted(changed_course_draft_ids),
+        "relationalLearningTaskIds": sorted(changed_learning_task_ids),
+        "removedRelationalCourseReferences": removed_course_references,
+        "runtimeKeys": [],
+        "removedRuntimeReferences": 0,
         "publishedBankIds": sorted(published_bank_ids),
     }
 
 
 __all__ = [
-    "CURRENT_RUNTIME_KEY_TYPES",
-    "PUBLISHED_RUNTIME_KEY_TYPES",
     "RECALL_ASSOCIATION_PREFIX",
-    "REPORT_RUNTIME_EXACT_KEYS",
     "QuestionCleanupReferenceRepairError",
     "inventory_question_references",
     "repair_current_question_references",

@@ -132,6 +132,21 @@ async def _seed_reset_fixture() -> dict[str, object]:
         ensure_ascii=False,
         indent=2,
     )
+    mutable_value = json.dumps(
+        [
+            {
+                "id": f"reset-course-{suffix}",
+                "nodes": [
+                    {
+                        "id": f"reset-node-{suffix}",
+                        "questionIds": [question_ids[0], question_ids[2]],
+                    }
+                ],
+            }
+        ],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
     now = datetime.now(timezone.utc)
 
     async with AsyncSessionLocal() as db:
@@ -312,21 +327,7 @@ async def _seed_reset_fixture() -> dict[str, object]:
                 ),
                 SharedRuntimeState(
                     key=MUTABLE_RUNTIME_KEY,
-                    value=json.dumps(
-                        [
-                            {
-                                "id": f"reset-course-{suffix}",
-                                "nodes": [
-                                    {
-                                        "id": f"reset-node-{suffix}",
-                                        "questionIds": [question_ids[0], question_ids[2]],
-                                    }
-                                ],
-                            }
-                        ],
-                        ensure_ascii=False,
-                        separators=(",", ":"),
-                    ),
+                    value=mutable_value,
                     schema_version=1,
                     updated_by="admin",
                 ),
@@ -385,6 +386,7 @@ async def _seed_reset_fixture() -> dict[str, object]:
         "paperId": paper_id,
         "auditId": audit_id,
         "immutableValue": immutable_value,
+        "mutableValue": mutable_value,
         "beforeRevision": before_revision,
         "beforeAuditCount": before_audit_count,
     }
@@ -440,7 +442,7 @@ def test_reset_current_content_deletes_current_rows_and_preserves_history_and_au
 
             mutable_row = await verify_db.get(SharedRuntimeState, MUTABLE_RUNTIME_KEY)
             assert mutable_row is not None
-            assert json.loads(mutable_row.value)[0]["nodes"][0]["questionIds"] == []
+            assert mutable_row.value == fixture["mutableValue"]
             immutable_row = await verify_db.get(SharedRuntimeState, IMMUTABLE_RUNTIME_KEY)
             assert immutable_row is not None
             assert immutable_row.value == fixture["immutableValue"]
