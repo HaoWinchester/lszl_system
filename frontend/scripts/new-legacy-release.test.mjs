@@ -91,7 +91,8 @@ test('content prep studio ships reproducible modular source and backend bootstra
     assert.match(built, new RegExp(`creator_00${index}`))
   }
   assert.match(built, /indexedDB\.open/)
-  assert.match(built, /<script src="\/server-state-bootstrap\.js"><\/script>/)
+  assert.match(built, /kg-direct-bootstrap-anchor/)
+  assert.doesNotMatch(built, /<script src="\/server-state-bootstrap\.js"><\/script>/)
 
   const enterinformation = resolve(repoDir, 'enterinformation')
   const existedBeforeBuild = existsSync(enterinformation)

@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 
 
 class SubjectWriteRequest(BaseModel):
+    content_revision: int = Field(alias="contentRevision", ge=0)
     id: str = Field(min_length=1, max_length=128)
     code: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=160)
@@ -9,6 +10,7 @@ class SubjectWriteRequest(BaseModel):
 
 
 class TaxonomyReleaseRequest(BaseModel):
+    content_revision: int = Field(alias="contentRevision", ge=0)
     subject_id: str = Field(alias="subjectId", min_length=1, max_length=128)
     version: int = Field(ge=1)
     title: str = Field(default="", max_length=240)
@@ -24,4 +26,5 @@ class RecallLibraryWriteRequest(BaseModel):
 
 
 class ActivityOverrideWriteRequest(BaseModel):
+    content_revision: int = Field(alias="contentRevision", ge=0)
     record: dict = Field(default_factory=dict)

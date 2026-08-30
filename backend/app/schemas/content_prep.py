@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import json
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
@@ -93,6 +94,30 @@ class ContentPrepSharedContentRequest(BaseModel):
     principles: dict[str, Any] = Field(default_factory=dict)
     synthesis_presets: dict[str, Any] = Field(default_factory=dict, alias="synthesisPresets")
     tag_config: dict[str, Any] = Field(default_factory=dict, alias="tagConfig")
+    subjects: list[dict[str, Any]] | None = None
+    taxonomies: list[dict[str, Any]] | None = None
+    activity_overrides: list[dict[str, Any]] | None = Field(default=None, alias="activityOverrides")
+    activity_tags: list[dict[str, Any]] | None = Field(default=None, alias="activityTags")
+    activity_collections: list[dict[str, Any]] | None = Field(default=None, alias="activityCollections")
+
+    @field_validator(
+        "subjects", "taxonomies", "activity_overrides", "activity_tags", "activity_collections"
+    )
+    @classmethod
+    def bound_catalog_resource(cls, value: list[dict[str, Any]] | None, info):
+        if value is None:
+            return None
+        if len(value) > 5000:
+            raise ValueError(f"{info.field_name} 不能超过 5000 项")
+        try:
+            encoded = json.dumps(
+                value, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+            ).encode()
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"{info.field_name} 必须是标准 JSON") from error
+        if len(encoded) > 2_000_000:
+            raise ValueError(f"{info.field_name} 不能超过 2MB")
+        return value
 
 
 class SubjectFacetSchemaWriteRequest(BaseModel):

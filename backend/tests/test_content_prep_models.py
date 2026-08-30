@@ -18,6 +18,13 @@ def test_content_prep_tables_are_registered_for_migrations() -> None:
     assert expected <= set(Base.metadata.tables)
 
 
+def test_activity_tags_preserve_full_catalog_metadata() -> None:
+    columns = Base.metadata.tables["activity_tags"].columns
+
+    assert "content_metadata" in columns
+    assert columns["content_metadata"].nullable is False
+
+
 def test_question_bank_tracks_revision_and_server_actors() -> None:
     columns = Base.metadata.tables["question_banks"].columns
 

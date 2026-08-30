@@ -264,6 +264,17 @@ test('sync reports the P4.5 contract diagnostic for an unregistered persistent k
   assert.match(result.stderr, /P4\.5 persistent state is not registered: kg_p45_unregistered_payload_v1/)
 })
 
+test('sync ignores storage-key literals in tests while production remains fail-closed', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  const testOnlyKey = ['kg', 'retired_test_only_v1'].join('_')
+  write(resolve(item.upstream, 'tests/retired-storage-contract.test.js'), `assert.equal(key, '${testOnlyKey}')\n`)
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+})
+
 test('sync permits the dedicated device-preference allowlist boundary', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))

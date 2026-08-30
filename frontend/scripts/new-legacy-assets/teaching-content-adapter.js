@@ -13,6 +13,8 @@
   const snapshots = new Map()
   const inflight = new Map()
   const aliases = new Map([['PMP', 'subject-pmp'], ['pmp', 'subject-pmp'], ['subject-pmp', 'subject-pmp']])
+  let relationshipSnapshot = null
+  let relationshipInflight = null
   let activeSubjectId = ''
   let activeGeneration = 0
 
@@ -60,6 +62,38 @@
     return API.request({ path: `/api/v1/content-prep/shared-content?subjectId=${encodeURIComponent(subject)}` })
   }
 
+  async function fetchRelationships(force = false) {
+    if (relationshipSnapshot && !force) return clone(relationshipSnapshot)
+    if (!relationshipInflight || force) {
+      relationshipInflight = Promise.all([
+        API.request({ path: '/api/v1/course-management/drafts' }),
+        API.request({ path: '/api/v1/course-management/releases' }),
+        API.request({ path: '/api/v1/course-management/tasks' }),
+        API.request({ path: '/api/v1/questions/reference-snapshot' }),
+      ]).then(([draftResult, releaseResult, taskResult, referenceResult]) => {
+        const courseDrafts = (draftResult?.drafts || []).map(row => ({
+          ...clone(row.structure || {}), id: row.id, name: row.name,
+          status: row.status, revision: row.revision,
+          createdAt: row.createdAt, updatedAt: row.updatedAt,
+        }))
+        const courseReleases = clone(releaseResult?.releases || [])
+        const tasks = (taskResult?.tasks || []).map(row => ({
+          ...clone(row.content || {}), id: row.id, title: row.title,
+          description: row.description, releaseId: row.releaseId,
+          status: row.status, revision: row.revision,
+          createdAt: row.createdAt, updatedAt: row.updatedAt,
+        }))
+        relationshipSnapshot = {
+          courseDrafts, courseReleases, tasks,
+          papers: clone(referenceResult?.papers || []),
+          paperReleases: clone(referenceResult?.releases || []),
+        }
+        return clone(relationshipSnapshot)
+      }).finally(() => { relationshipInflight = null })
+    }
+    return relationshipInflight
+  }
+
   async function bootstrap(nextSubjectId, options = {}) {
     const requested = selectedSubject(nextSubjectId)
     const activate = options.activate !== false
@@ -67,7 +101,11 @@
     const requestedKey = snapshotKey(requested)
     if (activate) activeSubjectId = requestedKey
     if (!options.force && snapshots.has(requestedKey)) {
-      return storeSnapshot(snapshots.get(requestedKey), requested, generation)
+      const cached = storeSnapshot(snapshots.get(requestedKey), requested, generation)
+      const relationships = options.relationships === true
+        ? await fetchRelationships(options.force === true)
+        : clone(relationshipSnapshot || {})
+      return storeSnapshot({ ...cached, ...relationships }, requested, generation)
     }
     let pending = inflight.get(requested)
     if (!pending || options.force) {
@@ -76,7 +114,13 @@
       pending.finally(() => { if (inflight.get(requested) === pending) inflight.delete(requested) }).catch(() => {})
     }
     try {
-      return storeSnapshot(await pending, requested, generation)
+      const [payload, relationships] = await Promise.all([
+        pending,
+        options.relationships === true
+          ? fetchRelationships(options.force === true)
+          : Promise.resolve(clone(relationshipSnapshot || {})),
+      ])
+      return storeSnapshot({ ...payload, ...relationships }, requested, generation)
     } catch (error) {
       if (generation === activeGeneration) publish('kg:teaching-content-error', { subjectId: requested, message: error?.message || String(error) })
       throw error
@@ -96,6 +140,8 @@
     subjects: 'subjects', taxonomies: 'taxonomies', activityOverrides: 'activityOverrides',
     collections: 'activityCollections', tags: 'activityTags', principles: 'principles',
     synthesisPresets: 'synthesisPresets', recallLibrary: 'recallLibrary',
+    courseDrafts: 'courseDrafts', courseReleases: 'courseReleases', tasks: 'tasks',
+    papers: 'papers', paperReleases: 'paperReleases',
   })
 
   function readResource(name, fallback = null, nextSubjectId = '') {
@@ -121,7 +167,7 @@
     return { subjectId: data.subjectId, snapshot: data }
   }
 
-  async function writeShared(context, overrides, { retryConflict = false } = {}) {
+  async function writeShared(context, overrides, { refreshConflict = false } = {}) {
     const request = current => API.request({
       method: 'PUT', path: '/api/v1/content-prep/shared-content',
       body: {
@@ -135,28 +181,32 @@
       const generation = snapshotKey(context.subjectId) === snapshotKey(activeSubjectId) ? activeGeneration : null
       return storeSnapshot(saved, context.subjectId, generation)
     } catch (error) {
-      if (!retryConflict || error?.status !== 409) throw error
-      const refreshed = await subjectContext(context.subjectId, { force: true })
-      const saved = await request(refreshed)
-      const generation = snapshotKey(refreshed.subjectId) === snapshotKey(activeSubjectId) ? activeGeneration : null
-      return storeSnapshot(saved, refreshed.subjectId, generation)
+      if (error?.status === 409 && refreshConflict) {
+        await subjectContext(context.subjectId, { force: true })
+      }
+      throw error
     }
   }
 
-  async function saveTaxonomy(input) {
-    const taxonomy = clone(input || {})
-    const context = await subjectContext(taxonomy.subjectId || activeSubjectId)
-    const saved = await writeShared(context, { knowledgeTree: { taxonomy: { ...taxonomy, subjectId: context.subjectId } } }, { retryConflict: true })
-    return clone(saved.knowledgeTree?.taxonomy || taxonomy)
+  async function saveCatalogResource(name, value, nextSubjectId = '') {
+    const field = resourceField[name] || name
+    if (!['subjects', 'taxonomies', 'activityOverrides', 'activityTags', 'activityCollections'].includes(field)) {
+      throw new Error(`不支持保存教学目录资源：${name}`)
+    }
+    const context = await subjectContext(nextSubjectId || activeSubjectId)
+    const saved = await writeShared(context, { [field]: clone(value || []) }, { refreshConflict: true })
+    return clone(saved[field] || [])
   }
 
-  async function releaseTaxonomy(id, revision) {
-    const taxonomy = (readResource('taxonomies', []) || []).find(row => clean(row.id) === clean(id))
-    if (!taxonomy) throw new Error('知识树不存在')
-    const context = await subjectContext(taxonomy.subjectId || activeSubjectId)
-    if (revision !== undefined) context.snapshot.contentRevision = Number(revision)
-    const saved = await writeShared(context, { knowledgeTree: { taxonomy: { ...taxonomy, subjectId: context.subjectId, status: 'published', isDefault: true } } }, { retryConflict: true })
-    return clone(saved.knowledgeTree?.taxonomy || taxonomy)
+  async function saveCatalog(resources, nextSubjectId = '') {
+    const overrides = {}
+    for (const [name, value] of Object.entries(resources || {})) {
+      const field = resourceField[name] || name
+      if (!['subjects', 'taxonomies', 'activityOverrides', 'activityTags', 'activityCollections'].includes(field)) throw new Error(`不支持保存教学目录资源：${name}`)
+      overrides[field] = clone(value || [])
+    }
+    const context = await subjectContext(nextSubjectId || activeSubjectId)
+    return writeShared(context, overrides, { refreshConflict: true })
   }
 
   async function saveRecallLibrary(nextSubjectId, input) {
@@ -231,8 +281,14 @@
 
   global.KGTeachingContentApi = Object.freeze({
     bootstrap, ready: bootstrap, snapshot, readResource, stageResource,
-    saveTaxonomy, releaseTaxonomy, saveRecallLibrary, listPrinciples,
+    saveRecallLibrary, listPrinciples,
     savePrinciple, deletePrinciple, importActivities,
+    saveSubjects: value => saveCatalogResource('subjects', value),
+    saveTaxonomies: value => saveCatalogResource('taxonomies', value),
+    saveActivityOverrides: value => saveCatalogResource('activityOverrides', value),
+    saveActivityTags: value => saveCatalogResource('activityTags', value),
+    saveActivityCollections: value => saveCatalogResource('activityCollections', value),
+    saveCatalogResource, saveCatalog,
     archivePrinciples: ids => mutatePrinciples('/api/v1/content-prep/principles/archive', { ids }),
     deletePrinciples: ids => mutatePrinciples('/api/v1/content-prep/principles/delete', { ids }),
     importPrinciples: bundle => mutatePrinciples('/api/v1/content-prep/principles/import', bundle),

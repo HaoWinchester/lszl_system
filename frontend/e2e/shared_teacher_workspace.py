@@ -430,7 +430,163 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="fail if question or paper management requests Runtime state/bootstrap",
     )
+    parser.add_argument(
+        "--teaching-content-only",
+        action="store_true",
+        help="run native teaching catalog controls and assert the three retired pages make zero Runtime requests",
+    )
     return parser.parse_args()
+
+
+def run_teaching_content_e2e() -> None:
+    global BASE
+    isolated = IsolatedE2EHarness()
+    BASE = isolated.start()
+    runtime_requests: list[str] = []
+    playwright = None
+    browser = None
+    context = None
+    try:
+        playwright = sync_playwright().start()
+        browser = playwright.chromium.launch(headless=True)
+        context = browser.new_context(viewport={"width": 1440, "height": 1000})
+        login(context, ADMIN_USERNAME, ADMIN_PASSWORD)
+        context.on(
+            "request",
+            lambda request: runtime_requests.append(request.url)
+            if "/api/v1/runtime/state" in request.url or "server-state-bootstrap.js" in request.url
+            else None,
+        )
+        stamp = uuid4().hex[:8].upper()
+        code = f"T5{stamp[:6]}"
+        subject_name = f"Task5 教学科目 {stamp}"
+
+        admin_page = context.new_page()
+        admin_page.goto(BASE + "/admin-subjects.html", wait_until="networkidle")
+        admin_page.locator("#adminAddSubjectBtn").wait_for(state="visible")
+        admin_page.locator("#adminAddSubjectBtn").click()
+        admin_page.locator("#adminSubjectCode").fill(code)
+        admin_page.locator("#adminSubjectNameZh").fill(subject_name)
+        with admin_page.expect_response(
+            lambda response: response.url.endswith("/api/v1/content-prep/shared-content")
+            and response.request.method == "PUT"
+        ) as create_info:
+            admin_page.locator("#adminSubjectDialogSubmit").click()
+        assert create_info.value.ok, create_info.value.text()
+        admin_page.wait_for_function(
+            "name => document.getElementById('adminSelectedSubjectName')?.textContent === name",
+            arg=subject_name,
+        )
+        center_page = context.new_page()
+        center_errors: list[str] = []
+        center_page.on("pageerror", lambda error: center_errors.append(str(error)))
+        center_response = center_page.goto(
+            BASE + "/content-center.html?subjectId=subject-pmp",
+            wait_until="networkidle",
+        )
+        assert center_response is not None and center_response.status == 200, (
+            center_response.status if center_response else None,
+            center_page.locator("body").inner_text(),
+        )
+        center_page.locator("#ccTaxonomyVersion").wait_for(state="attached")
+        center_page.wait_for_timeout(1500)
+        if center_page.locator("#ccTaxonomyVersion option").count() == 0:
+            raise AssertionError(
+                {
+                    "pageErrors": center_errors,
+                    "teachingError": center_page.locator("body").get_attribute(
+                        "data-teaching-content-error"
+                    ),
+                    "toast": center_page.locator("#ccToast").inner_text(),
+                    "api": center_page.evaluate("() => !!window.KGTeachingContentApi"),
+                    "subjects": center_page.evaluate(
+                        "() => window.KGLearningContent?.getSubjects?.().map(row=>row.id) || []"
+                    ),
+                    "taxonomies": center_page.evaluate(
+                        "() => window.KGLearningContent?.getTaxonomies?.('subject-pmp').map(row=>row.id) || []"
+                    ),
+                }
+            )
+        with center_page.expect_response(
+            lambda response: response.url.endswith("/api/v1/content-prep/shared-content")
+            and response.request.method == "PUT"
+        ) as node_info:
+            center_page.locator("#ccAddRootBtn").click()
+        assert node_info.value.ok, node_info.value.text()
+        center_page.locator("#ccNewTagBtn").click()
+        center_page.locator("#ccTagName").fill(f"Task5 标签 {stamp}")
+        with center_page.expect_response(
+            lambda response: response.url.endswith("/api/v1/content-prep/shared-content")
+            and response.request.method == "PUT"
+        ) as tag_info:
+            center_page.locator("#ccSaveTagBtn").click()
+        assert tag_info.value.ok, tag_info.value.text()
+        center_page.locator("#ccNewCollectionBtn").click()
+        center_page.locator("#ccCollectionNewTitle").fill(f"Task5 题集 {stamp}")
+        with center_page.expect_response(
+            lambda response: response.url.endswith("/api/v1/content-prep/shared-content")
+            and response.request.method == "PUT"
+        ) as collection_info:
+            center_page.locator("#ccConfirmCollectionBtn").click()
+        assert collection_info.value.ok, collection_info.value.text()
+        center_page.reload(wait_until="networkidle")
+        assert f"Task5 标签 {stamp}" in center_page.locator("#ccTagList").inner_text()
+        assert f"Task5 题集 {stamp}" in center_page.locator("#ccCollectionList").inner_text()
+
+        prep_page = context.new_page()
+        prep_page.goto(BASE + "/content-prep", wait_until="networkidle")
+        if prep_page.locator("#creatorGate").is_visible():
+            select_creator(prep_page)
+        prep_page.locator("#sharedDraftGate").wait_for(state="visible")
+        prep_page.once("dialog", lambda dialog: dialog.accept(f"Task5 教学内容 {stamp}"))
+        prep_page.locator("#btnCreateSharedDraft").click()
+        prep_page.locator("#sharedDraftGate").wait_for(state="hidden")
+        prep_page.locator('[data-tab="management"]').click()
+        prep_page.locator("#btnNewPrinciple").wait_for(state="visible")
+        prep_page.locator("#btnNewPrinciple").click()
+        principle_name = f"Task5 原则 {stamp}"
+        prep_page.locator("#pmPrincipleName").fill(principle_name)
+        prep_page.locator("#pmPresetContent").fill("教学内容必须以关系 API 为唯一权威。")
+        prep_page.locator("#pmSave").click()
+        principle_result = prep_page.evaluate(
+            """async () => {
+              const principle=state.principles.items.find(row=>row.id===state.currentPrincipleId);
+              const preset=state.synthesisPresets.items.find(row=>row.principleId===principle.id);
+              return KGTeachingContentApi.savePrinciple(principle,preset);
+            }"""
+        )
+        assert principle_result["principles"]["items"]
+        recall_result = prep_page.evaluate(
+            """async () => {
+              const current=KGTeachingContentApi.readResource('recallLibrary',{});
+              return KGTeachingContentApi.saveRecallLibrary('subject-pmp',{
+                ...current,
+                name:'Task5 Recall E2E',
+                nodes:[...(current.nodes||[]),{id:'task5-recall-e2e',title:'Task5 Recall E2E'}],
+                edges:current.edges||[]
+              });
+            }"""
+        )
+        assert any(row.get("id") == "task5-recall-e2e" for row in recall_result["nodes"])
+        prep_page.reload(wait_until="networkidle")
+        prep_page.wait_for_function(
+            "() => KGTeachingContentApi?.readResource?.('principles',{items:[]}).items.some(row=>row.name.startsWith('Task5 原则'))"
+        )
+
+        assert runtime_requests == [], runtime_requests
+        print(
+            "teaching-content-e2e-ok native=subject-create,taxonomy-node,tag,collection "
+            "principle=control-plus-api recall=typed-api reload=2 runtimeRequests=0",
+            flush=True,
+        )
+    finally:
+        if context is not None:
+            context.close()
+        if browser is not None:
+            browser.close()
+        if playwright is not None:
+            playwright.stop()
+        isolated.close()
 
 
 def run_question_paper_e2e(*, assert_no_runtime: bool) -> None:
@@ -982,6 +1138,9 @@ def run_question_paper_e2e(*, assert_no_runtime: bool) -> None:
 
 
 ARGS = parse_args()
+if ARGS.teaching_content_only:
+    run_teaching_content_e2e()
+    raise SystemExit(0)
 if ARGS.assert_no_runtime and not ARGS.question_paper_only:
     raise SystemExit("--assert-no-runtime currently requires --question-paper-only")
 if ARGS.question_paper_only:

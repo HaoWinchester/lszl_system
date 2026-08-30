@@ -67,6 +67,7 @@ class ActivityTag(Base):
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
     collection_id: Mapped[str] = mapped_column(String(128), ForeignKey("activity_collections.id", ondelete="CASCADE"), nullable=False, index=True)
     tag: Mapped[str] = mapped_column(String(128), nullable=False)
+    content_metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
 class ActivityOverride(Base):

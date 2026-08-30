@@ -1312,10 +1312,9 @@ def test_runtime_read_and_personal_snapshot_share_the_revision_lock(
             personal_result = personal_future.result(timeout=10)
             writer_revision = writer_future.result(timeout=10)
 
-        expected_value = json.dumps({"value": "before"})
-        assert read_result[0][key] == expected_value
+        assert key not in read_result[0]
         assert read_result[2] == base_revision
-        assert personal_result[0][key] == expected_value
+        assert key not in personal_result[0]
         assert personal_result[2] == base_revision
         assert writer_revision == base_revision + 1
     finally:

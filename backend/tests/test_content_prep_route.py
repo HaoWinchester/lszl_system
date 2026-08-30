@@ -76,7 +76,7 @@ def test_teaching_roles_receive_the_prep_page_with_session_hydration(
     assert 'id="prepApp"' in response.text
     assert "window.__KG_DIRECT_BOOTSTRAP__=" in response.text
     assert f'"role":"{role}"' in response.text
-    assert response.text.index("window.__KG_DIRECT_BOOTSTRAP__=") < response.text.index("server-state-bootstrap.js")
+    assert "server-state-bootstrap.js" not in response.text
     assert "kg_remote_auth_session_v1" in response.text
     assert "prepRuntime.serverActorReady" in response.text
 

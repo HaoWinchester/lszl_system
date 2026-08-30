@@ -23,12 +23,16 @@
   const publicPermissions=publicService(permissions),publicAudit=publicService(audit,['clear']),publicTransactions=publicService(transactions,['execute','restoreSnapshot']);
   const references=publicService(referenceService),subjects=publicService(subjectService),taxonomies=publicService(taxonomyService,['reconcileAuthenticatedServerProjection']),activities=publicService(activityService),courses=publicService(courseService),releases=publicService(releaseService);
   const legacyContent=Object.freeze({
+    currentUser:(...args)=>legacy.currentUser(...args),
     getSubjects:(...args)=>legacy.getSubjects(...args),
     getTaxonomies:(...args)=>legacy.getTaxonomies(...args),
+    pathLabel:(...args)=>legacy.pathLabel(...args),
+    searchNodes:(...args)=>legacy.searchNodes(...args),
     getActivities:(...args)=>legacy.getActivities?.(...args)||[],
     getActivityLibrary:(...args)=>legacy.getActivityLibrary?.(...args)||{},
     getCourseDrafts:(...args)=>legacy.getCourseDrafts?.(...args)||[],
     getCourseReleases:(...args)=>legacy.getCourseReleases?.(...args)||[],
+    normalizeCourse:(...args)=>legacy.normalizeCourse(...args),
   });
   const services=Object.freeze({version:global.KGAdminCore.VERSION,repositoryMode:repository.mode,permissions:publicPermissions,audit:publicAudit,transactions:publicTransactions,references,referenceSnapshotReady,subjects,taxonomies,activities,courses,releases,legacyContent});
   global.KGAdminServices=services;

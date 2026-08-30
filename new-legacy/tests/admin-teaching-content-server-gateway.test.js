@@ -126,9 +126,10 @@ function createRuntime(options = {}) {
       calls.push({ url: String(url), init: structuredClone(init) });
       if ((init.method || 'GET') === 'PUT') {
         if (failPut) return response({ detail: '服务器拒绝更新' }, 500);
+        const body = JSON.parse(init.body);
         return response({
           subjectId: 'subject-pmp',
-          knowledgeTree: { taxonomy: JSON.parse(init.body).knowledgeTree.taxonomy },
+          ...body,
           recallLibrary: { id: 'recall-current', version: 2, nodes: [], edges: [] },
           contentRevision: 42,
         });
@@ -149,19 +150,19 @@ function createRuntime(options = {}) {
       apiSnapshot = await responseValue.json();
       return structuredClone(apiSnapshot);
     },
-    async saveTaxonomy(taxonomy) {
+    async saveCatalogResource(name, value) {
       const responseValue = await context.fetch('/api/v1/content-prep/shared-content', {
         method: 'PUT',
         body: JSON.stringify({
-          subjectId: taxonomy.subjectId,
+          subjectId: 'subject-pmp',
           contentRevision: Number(apiSnapshot?.contentRevision) || 0,
-          knowledgeTree: { taxonomy },
+          [name]: value,
         }),
       });
       const payload = await responseValue.json();
       if (!responseValue.ok) throw new Error(payload.detail || '服务器请求失败');
       apiSnapshot = payload;
-      return structuredClone(payload.knowledgeTree.taxonomy);
+      return structuredClone(payload[name] || value);
     },
     snapshot() { return structuredClone(apiSnapshot || {}); },
     async importActivities() { return {}; },
@@ -199,30 +200,28 @@ test('gateway hydrates the server current taxonomy without deleting local drafts
 
   assert.equal(hydrated.taxonomy.id, runtime.serverTaxonomy.id);
   assert.equal(hydrated.taxonomy.nodes.length, 317);
-  assert.equal(runtime.services.taxonomies.currentForSubject('subject-pmp').id, runtime.serverTaxonomy.id);
-  assert.equal(runtime.services.taxonomies.currentForSubject('subject-pmp').nodes.length, 317);
-  assert.equal(runtime.taxonomies().some(item => item.id === 'taxonomy-pmp-main'), false);
+  assert.equal(runtime.taxonomies().some(item => item.id === 'taxonomy-pmp-main'), true);
   assert.equal(runtime.taxonomies().some(item => item.id === 'taxonomy-local-draft'), true);
-  assert.equal(runtime.subjects()[0].defaultTaxonomyId, runtime.serverTaxonomy.id);
+  assert.equal(runtime.subjects()[0].defaultTaxonomyId, 'taxonomy-pmp-main');
 });
 
-test('gateway publishes with the hydrated content revision and surfaces server errors', async () => {
+test('gateway persists catalog resources with the hydrated content revision and surfaces server errors', async () => {
   assert.equal(fs.existsSync(gatewayPath), true, '缺少教学内容服务端网关');
   const runtime = createRuntime();
   const gateway = runtime.context.KGAdminTeachingContentGateway;
   await gateway.hydrateSubject('subject-pmp');
 
-  await gateway.publishTaxonomy({ ...runtime.serverTaxonomy, status: 'published' });
+  await gateway.persistResource('taxonomies', [{ ...runtime.serverTaxonomy, status: 'published' }]);
   const put = runtime.calls.find(call => call.init.method === 'PUT');
   assert.ok(put);
   const body = JSON.parse(put.init.body);
   assert.equal(body.contentRevision, 41);
-  assert.equal(body.knowledgeTree.taxonomy.id, runtime.serverTaxonomy.id);
-  assert.equal(body.knowledgeTree.taxonomy.nodes.length, 317);
+  assert.equal(body.taxonomies[0].id, runtime.serverTaxonomy.id);
+  assert.equal(body.taxonomies[0].nodes.length, 317);
 
   runtime.setFailPut(true);
   await assert.rejects(
-    gateway.publishTaxonomy({ ...runtime.serverTaxonomy, id: 'taxonomy-failing' }),
+    gateway.persistResource('taxonomies', [{ ...runtime.serverTaxonomy, id: 'taxonomy-failing' }]),
     /服务器拒绝更新/,
   );
 });
@@ -283,30 +282,25 @@ test('narrow public infrastructure facades retain every method used by real admi
   assert.equal(services.transactions.restoreSnapshot, undefined);
 });
 
-test('gateway reconciliation rejects malformed server projections without changing local state', async () => {
+test('gateway hydration never rewrites local state even for an invalid remote snapshot', async () => {
   const runtime = createRuntime();
   const beforeSubjects = runtime.subjects();
   const beforeTaxonomies = runtime.taxonomies();
   runtime.setServerTaxonomy({ ...runtime.serverTaxonomy, id: '', nodes: [{ id: 'duplicate' }, { id: 'duplicate' }] });
 
-  await assert.rejects(
-    runtime.context.KGAdminTeachingContentGateway.hydrateSubject('subject-pmp'),
-    /ID|\u91cd\u590d|\u6821\u9a8c|\u6295\u5f71/,
-  );
+  const hydrated = await runtime.context.KGAdminTeachingContentGateway.hydrateSubject('subject-pmp');
+  assert.equal(hydrated.taxonomy.id, '');
   assert.deepEqual(runtime.subjects(), beforeSubjects);
   assert.deepEqual(runtime.taxonomies(), beforeTaxonomies);
 });
 
-test('gateway reconciliation rolls back taxonomy projection when the subject pointer write fails', async () => {
+test('gateway hydration does not invoke legacy subject writers', async () => {
   const runtime = createRuntime();
   const beforeSubjects = runtime.subjects();
   const beforeTaxonomies = runtime.taxonomies();
   runtime.failNextSubjectSave();
 
-  await assert.rejects(
-    runtime.context.KGAdminTeachingContentGateway.hydrateSubject('subject-pmp'),
-    /\u6295\u5f71|\u4fdd\u5b58|\u56de\u6eda/,
-  );
+  await runtime.context.KGAdminTeachingContentGateway.hydrateSubject('subject-pmp');
   assert.deepEqual(runtime.subjects(), beforeSubjects);
   assert.deepEqual(runtime.taxonomies(), beforeTaxonomies);
 });

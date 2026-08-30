@@ -25,11 +25,11 @@ with sync_playwright() as p:
       const user='v90-teacher';
       localStorage.setItem('kg_local_current_user_v1',user);
       localStorage.setItem('kg_local_users_v1',JSON.stringify({[user]:{username:user,displayName:'V9 测试教师',role:'teacher',status:'active',subject:'PMP',salt:'x',hash:'x'}}));
-      localStorage.setItem('kg_content_subjects_v1',JSON.stringify([{id:'subject-pmp',code:'PMP',name:{zh:'PMP 项目管理',en:''},defaultTaxonomyId:'taxonomy-pmp-main',status:'active',sortOrder:10}]));
-      localStorage.setItem('kg_content_taxonomies_v1',JSON.stringify([
+      const teaching={subjects:[{id:'subject-pmp',code:'PMP',name:{zh:'PMP 项目管理',en:''},defaultTaxonomyId:'taxonomy-pmp-main',status:'active',sortOrder:10}],taxonomies:[
         {id:'taxonomy-pmp-main',subjectId:'subject-pmp',name:{zh:'PMP 主知识树'},version:1,versionLabel:'v1.0',maxDepth:9,status:'published',isDefault:true,nodes:[{id:'root-v1',taxonomyId:'taxonomy-pmp-main',parentId:null,level:1,title:{zh:'当前根节点'},status:'active',sortOrder:1}]},
         {id:'taxonomy-pmp-main-v2',subjectId:'subject-pmp',name:{zh:'PMP 导入草稿'},version:2,versionLabel:'v2.0',maxDepth:9,status:'draft',isDefault:false,nodes:[{id:'root-v2',taxonomyId:'taxonomy-pmp-main-v2',parentId:null,level:1,title:{zh:'草稿根节点'},status:'active',sortOrder:1}]}
-      ]));
+      ]};
+      window.KGTeachingContentApi={readResource:(name,fallback)=>structuredClone(teaching[name]??fallback),saveSubjects:async rows=>(teaching.subjects=structuredClone(rows)),saveTaxonomies:async rows=>(teaching.taxonomies=structuredClone(rows)),saveActivityOverrides:async()=>[],saveCatalogResource:async(name,rows)=>(teaching[name]=structuredClone(rows)),saveCatalog:async patch=>{Object.entries(patch).forEach(([name,rows])=>teaching[name]=structuredClone(rows));return structuredClone(teaching)},ready:async()=>structuredClone(teaching)};
       if(!window.CSS)window.CSS={};if(!CSS.escape)CSS.escape=value=>String(value).replace(/[^a-zA-Z0-9_-]/g,'\\$&');
       if(!window.ResizeObserver)window.ResizeObserver=class{observe(){}disconnect(){}};
       if(!window.matchMedia)window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});

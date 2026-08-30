@@ -170,21 +170,29 @@ def _bulk_content_revision(body: object) -> int:
     return value
 
 
-@router.post("/subjects", status_code=201)
+def _retired_catalog_mutation() -> None:
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "code": "LEGACY_TEACHING_MUTATION_RETIRED",
+            "message": "该教学目录写入入口已退役，请使用 shared-content API",
+        },
+    )
+
+
+@router.post("/subjects", status_code=410, deprecated=True, responses={410: {"description": "Legacy teaching mutation retired"}})
 async def create_teaching_subject(request: SubjectWriteRequest, db: DB, actor: PrepEditor):
-    return {"subject": (await teaching_content_service.upsert_subject(db, subject_id=request.id, code=request.code, name=request.name, actor=actor.username, metadata=request.metadata)).id}
+    _retired_catalog_mutation()
 
 
-@router.post("/taxonomies/{taxonomy_id}/release")
+@router.post("/taxonomies/{taxonomy_id}/release", status_code=410, deprecated=True, responses={410: {"description": "Legacy teaching mutation retired"}})
 async def release_teaching_taxonomy(taxonomy_id: str, request: TaxonomyReleaseRequest, db: DB, actor: PrepEditor):
-    row = await teaching_content_service.release_taxonomy(db, subject_id=request.subject_id, taxonomy_id=taxonomy_id, version=request.version, title=request.title, nodes=request.nodes, actor=actor.username)
-    return {"taxonomy": {"id": row.id, "subjectId": row.subject_id, "version": row.version, "status": row.status}}
+    _retired_catalog_mutation()
 
 
-@router.put("/activity-overrides/{collection_id}/{activity_id}")
+@router.put("/activity-overrides/{collection_id}/{activity_id}", status_code=410, deprecated=True, responses={410: {"description": "Legacy teaching mutation retired"}})
 async def write_activity_override(collection_id: str, activity_id: str, request: ActivityOverrideWriteRequest, db: DB, actor: PrepEditor):
-    row = await teaching_content_service.apply_activity_override(db, collection_id=collection_id, activity_id=activity_id, record=request.record, actor=actor.username)
-    return {"override": {"id": row.id, "collectionId": row.collection_id, "activityId": row.activity_id, "record": row.record, "revision": row.revision}}
+    _retired_catalog_mutation()
 
 
 
@@ -198,20 +206,14 @@ async def write_recall_library(subject_id: str, request: RecallLibraryWriteReque
         raise HTTPException(status_code=422, detail={"code": "INVALID_RECALL_LIBRARY", "message": str(error)}) from error
 
 
-@router.delete("/taxonomies/{taxonomy_id}")
-async def remove_teaching_taxonomy(taxonomy_id: str, subjectId: str, db: DB, actor: PrepEditor):
-    try:
-        return await teaching_content_service.delete_taxonomy(db, taxonomy_id=taxonomy_id, subject_id=subjectId, actor=actor.username)
-    except ValueError as error:
-        raise HTTPException(status_code=422, detail={"code": "INVALID_TAXONOMY", "message": str(error)}) from error
+@router.delete("/taxonomies/{taxonomy_id}", status_code=410, deprecated=True, responses={410: {"description": "Legacy teaching mutation retired"}})
+async def remove_teaching_taxonomy(taxonomy_id: str, subjectId: str, contentRevision: int, db: DB, actor: PrepEditor):
+    _retired_catalog_mutation()
 
 
-@router.delete("/activity-overrides/{collection_id}/{activity_id}")
-async def remove_activity_override(collection_id: str, activity_id: str, db: DB, actor: PrepEditor):
-    try:
-        return await teaching_content_service.delete_activity_override(db, collection_id=collection_id, activity_id=activity_id, actor=actor.username)
-    except ValueError as error:
-        raise HTTPException(status_code=422, detail={"code": "INVALID_ACTIVITY_OVERRIDE", "message": str(error)}) from error
+@router.delete("/activity-overrides/{collection_id}/{activity_id}", status_code=410, deprecated=True, responses={410: {"description": "Legacy teaching mutation retired"}})
+async def remove_activity_override(collection_id: str, activity_id: str, contentRevision: int, db: DB, actor: PrepEditor):
+    _retired_catalog_mutation()
 
 
 
@@ -356,6 +358,11 @@ async def save_shared_content(
             principles=request.principles,
             synthesis_presets=request.synthesis_presets,
             tag_config=request.tag_config,
+            subjects=request.subjects,
+            taxonomies=request.taxonomies,
+            activity_overrides=request.activity_overrides,
+            activity_tags=request.activity_tags,
+            activity_collections=request.activity_collections,
         )
     except (
         ValueError,

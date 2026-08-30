@@ -139,29 +139,13 @@ def test_publisher_remove_preserves_other_teachers() -> None:
     assert [row["id"] for row in remaining] == ["b"]
 
 
-def test_private_activity_collections_are_only_visible_to_their_owner() -> None:
-    source = json.dumps([
-        {
-            "id": "admin-private",
-            "visibility": "private",
-            "authorship": {"createdByUserId": "admin-a"},
-        },
-        {
-            "id": "teacher-shared",
-            "visibility": "shared",
-            "authorship": {"createdByUserId": "teacher-a"},
-        },
-    ])
+def test_activity_collections_are_no_longer_projected_through_runtime() -> None:
+    key = "kg_activity_collections_v1"
 
-    student_rows = json.loads(service.visible_shared_value(
-        "kg_activity_collections_v1", source, "student-a"
-    ))
-    owner_rows = json.loads(service.visible_shared_value(
-        "kg_activity_collections_v1", source, "admin-a"
-    ))
-
-    assert [row["id"] for row in student_rows] == ["teacher-shared"]
-    assert [row["id"] for row in owner_rows] == ["admin-private", "teacher-shared"]
+    assert key in service.RETIRED_CATALOG_RUNTIME_KEYS
+    assert key in service.SERVER_OWNED_KEYS
+    assert key not in service.SHARED_KEYS
+    assert key not in service.TEACHING_SHARED_KEYS
 
 
 @pytest.mark.parametrize(
@@ -204,9 +188,6 @@ def test_catalog_cutover_keeps_learning_progress_and_preferences_writable(key: s
 
 
 TEACHER_WORKSPACE_SHARED_KEYS = (
-    "kg_content_subjects_v1",
-    "kg_content_taxonomies_v1",
-    "kg_content_activity_overrides_v1",
     "kg_taxonomy_release_records_v1",
     "kg_taxonomy_deletion_records_v1",
     "kg_taxonomy_import_records_v1",
@@ -217,9 +198,7 @@ TEACHER_WORKSPACE_SHARED_KEYS = (
     "kg_course_config_releases_v1",
     "kg_course_config_active_release_v1",
     "kg_learning_tasks_v1",
-    "kg_activity_tags_v1",
     "kg_question_tag_names_v1",
-    "kg_activity_collections_v1",
 )
 
 PERSONAL_RUNTIME_KEYS = (
@@ -240,6 +219,15 @@ def test_existing_teacher_workspace_keys_have_the_same_manager_boundary(key: str
     assert service.shared_key_readable(key, "teacher")
     assert not service.shared_key_writable(key, "student")
     assert not service.shared_key_writable(key, "viewer")
+
+
+@pytest.mark.parametrize("key", sorted(service.RETIRED_CATALOG_RUNTIME_KEYS))
+def test_retired_teaching_catalog_keys_are_not_runtime_readable_or_writable(key: str) -> None:
+    assert key in service.SERVER_OWNED_KEYS
+    assert key not in service.SHARED_KEYS
+    assert key not in service.TEACHING_SHARED_KEYS
+    assert not service.shared_key_writable(key, "admin")
+    assert not service.shared_key_writable(key, "teacher")
 
 
 @pytest.mark.parametrize("key", PERSONAL_RUNTIME_KEYS)

@@ -12,12 +12,16 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_prep import Principle, QuestionTagConfig, SynthesisPreset
+from app.models.course_management import CourseDraft, CourseRelease, LearningTask
+from app.models.paper_release import PaperRelease, PaperReleaseQuestion
+from app.models.question import ExamPaper, Question, QuestionBank
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from app.models.teaching_content import (
     ActivityCollection,
     ActivityOverride,
+    ActivityTag,
     ContentSubject,
     ContentTaxonomy,
     RecallAssociationLibrary,
@@ -49,7 +53,9 @@ class PrincipleMergeValidationError(ValueError):
 
 def _json_text(value: object, label: str) -> str:
     try:
-        encoded = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        encoded = json.dumps(
+            value, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+        )
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{label}必须是可序列化 JSON") from exc
     if len(encoded.encode("utf-8")) > MAX_SHARED_BYTES:
@@ -227,13 +233,25 @@ async def _relational_repository_snapshot(db: AsyncSession) -> dict[str, Any]:
         .scalars()
         .all()
     )
+    tags = list(
+        (await db.execute(select(ActivityTag).order_by(ActivityTag.id)))
+        .scalars()
+        .all()
+    )
     return {
         "subjects": [
             {
-                **dict(row.content_metadata or {}),
+                **{
+                    key: value
+                    for key, value in dict(row.content_metadata or {}).items()
+                    if key != "nameEn"
+                },
                 "id": row.id,
                 "code": row.code,
-                "name": {"zh": row.name, "en": ""},
+                "name": {
+                    "zh": row.name,
+                    "en": str((row.content_metadata or {}).get("nameEn") or ""),
+                },
                 "status": row.status,
             }
             for row in subjects
@@ -248,11 +266,560 @@ async def _relational_repository_snapshot(db: AsyncSession) -> dict[str, Any]:
                 "id": row.id,
                 "subjectId": row.subject_id,
                 "title": row.title,
+                "status": row.status,
             }
             for row in collections
+            if not bool((row.content_metadata or {}).get("systemNamespace"))
         ],
         "activityOverrides": [dict(row.record or {}) for row in activities],
+        "activityTags": [
+            {
+                **dict(row.content_metadata or {}),
+                "id": row.id,
+                "name": row.tag,
+                "collectionId": row.collection_id,
+            }
+            for row in tags
+        ],
     }
+
+
+def _required_id(value: object, label: str) -> str:
+    identifier = str(value or "").strip()
+    if not identifier or len(identifier) > 128:
+        raise ValueError(f"{label} ID 格式不正确")
+    return identifier
+
+
+def _unique_rows(rows: list[dict[str, Any]], label: str) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    for item in rows:
+        if not isinstance(item, dict):
+            raise ValueError(f"{label}必须是对象列表")
+        identifier = _required_id(item.get("id"), label)
+        if identifier in result:
+            raise ValueError(f"{label} ID 不能重复：{identifier}")
+        _json_text(item, label)
+        result[identifier] = deepcopy(item)
+    return result
+
+
+def _localized_text(value: object) -> str:
+    if isinstance(value, dict):
+        return str(value.get("zh") or value.get("en") or "").strip()
+    return str(value or "").strip()
+
+
+def _payload_references(
+    value: object,
+    targets: set[str],
+    *,
+    scalar_keys: frozenset[str],
+    array_keys: frozenset[str],
+) -> bool:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key in scalar_keys and str(child or "").strip() in targets:
+                return True
+            if key in array_keys and isinstance(child, list) and any(
+                str(item or "").strip() in targets for item in child
+            ):
+                return True
+            if _payload_references(
+                child, targets, scalar_keys=scalar_keys, array_keys=array_keys
+            ):
+                return True
+    elif isinstance(value, list):
+        return any(
+            _payload_references(
+                child, targets, scalar_keys=scalar_keys, array_keys=array_keys
+            )
+            for child in value
+        )
+    return False
+
+
+async def _external_payloads(db: AsyncSession) -> list[tuple[str, object]]:
+    payloads: list[tuple[str, object]] = []
+    for row in (await db.scalars(select(CourseDraft))).all():
+        payloads.append((f"课程草稿 {row.id}", row.structure or {}))
+    for row in (await db.scalars(select(CourseRelease))).all():
+        payloads.append((f"课程发布 {row.id}", row.course_snapshot or {}))
+    for row in (await db.scalars(select(LearningTask))).all():
+        payloads.append((f"学习任务 {row.id}", {**(row.content or {}), "audience": row.audience or {}}))
+    for row in (await db.scalars(select(Question))).all():
+        payloads.append((f"题目 {row.id}", {"metadata": row.content_metadata or {}, "keyPath": row.key_path or {}, "status": row.status or {}}))
+    for row in (await db.scalars(select(PaperRelease))).all():
+        payloads.append((f"试卷发布 {row.id}", {"metadata": row.release_metadata or {}, "source": row.source_payload or {}}))
+    for row in (await db.scalars(select(PaperReleaseQuestion))).all():
+        payloads.append((f"试卷发布题目 {row.release_id}", row.snapshot or {}))
+    return payloads
+
+
+async def _assert_unreferenced(
+    db: AsyncSession,
+    targets: set[str],
+    *,
+    label: str,
+    scalar_keys: frozenset[str],
+    array_keys: frozenset[str] = frozenset(),
+) -> None:
+    if not targets:
+        return
+    for owner, payload in await _external_payloads(db):
+        if _payload_references(
+            payload, targets, scalar_keys=scalar_keys, array_keys=array_keys
+        ):
+            raise ValueError(f"{label}仍被{owner}引用，不能删除")
+
+
+async def _tag_namespace(
+    db: AsyncSession,
+    subject_id: str,
+    collections: dict[str, dict[str, Any]],
+) -> str:
+    identifier = f"__tags__:{subject_id}"
+    row = await db.get(ActivityCollection, identifier)
+    if row is None:
+        row = ActivityCollection(
+            id=identifier,
+            subject_id=subject_id,
+            title="标签命名空间",
+            status="active",
+            content_metadata={"systemNamespace": "tags"},
+        )
+        db.add(row)
+        await db.flush()
+    return identifier
+
+
+async def _activity_namespace(db: AsyncSession, subject_id: str) -> str:
+    identifier = f"__activities__:{subject_id}"
+    row = await db.get(ActivityCollection, identifier)
+    if row is None:
+        row = ActivityCollection(
+            id=identifier,
+            subject_id=subject_id,
+            title="活动覆盖命名空间",
+            status="active",
+            content_metadata={"systemNamespace": "activities"},
+        )
+        db.add(row)
+        await db.flush()
+    return identifier
+
+
+async def apply_catalog_snapshot(
+    db: AsyncSession,
+    *,
+    actor_username: str,
+    subjects: list[dict[str, Any]] | None,
+    taxonomies: list[dict[str, Any]] | None,
+    activity_overrides: list[dict[str, Any]] | None,
+    activity_tags: list[dict[str, Any]] | None,
+    activity_collections: list[dict[str, Any]] | None,
+) -> list[dict[str, str]]:
+    """Replace requested teaching catalog resources in one locked transaction."""
+
+    if all(
+        value is None
+        for value in (
+            subjects,
+            taxonomies,
+            activity_overrides,
+            activity_tags,
+            activity_collections,
+        )
+    ):
+        return []
+
+    before_snapshot = await _relational_repository_snapshot(db)
+    requested_values = {
+        "subjects": subjects,
+        "taxonomies": taxonomies,
+        "activityOverrides": activity_overrides,
+        "activityTags": activity_tags,
+        "activityCollections": activity_collections,
+    }
+    if all(
+        value is None or value == before_snapshot[name]
+        for name, value in requested_values.items()
+    ):
+        return []
+
+    incoming_subjects = None if subjects is None else _unique_rows(subjects, "科目")
+    incoming_taxonomies = None if taxonomies is None else _unique_rows(taxonomies, "知识树")
+    incoming_collections = None if activity_collections is None else _unique_rows(activity_collections, "题集")
+    incoming_tags = None if activity_tags is None else _unique_rows(activity_tags, "活动标签")
+    incoming_activities = None if activity_overrides is None else _unique_rows(activity_overrides, "活动覆盖")
+    pending_removed_subject_ids: set[str] = set()
+    pending_removed_collection_ids: set[str] = set()
+
+    known_subject_ids = set(
+        incoming_subjects
+        if incoming_subjects is not None
+        else (await db.scalars(select(ContentSubject.id))).all()
+    )
+    known_taxonomy_ids = set(
+        incoming_taxonomies
+        if incoming_taxonomies is not None
+        else (await db.scalars(select(ContentTaxonomy.id))).all()
+    )
+    collection_records = incoming_collections if incoming_collections is not None else {
+        row.id: {"id": row.id, "subjectId": row.subject_id}
+        for row in (await db.scalars(select(ActivityCollection))).all()
+        if not bool((row.content_metadata or {}).get("systemNamespace"))
+    }
+    effective_taxonomies = incoming_taxonomies if incoming_taxonomies is not None else {
+        str(item["id"]): item for item in before_snapshot["taxonomies"]
+    }
+    effective_tags = incoming_tags if incoming_tags is not None else {
+        str(item["id"]): item for item in before_snapshot["activityTags"]
+    }
+    effective_activities = incoming_activities if incoming_activities is not None else {
+        str(item["id"]): item for item in before_snapshot["activityOverrides"]
+    }
+    taxonomy_subjects = {
+        identifier: _subject_id(item.get("subjectId"))
+        for identifier, item in effective_taxonomies.items()
+    }
+    taxonomy_nodes = {
+        identifier: {
+            _required_id(node.get("id"), "知识点")
+            for node in (item.get("nodes") or [])
+            if isinstance(node, dict)
+        }
+        for identifier, item in effective_taxonomies.items()
+    }
+    system_collection_subjects = {
+        row.id: row.subject_id
+        for row in (await db.scalars(select(ActivityCollection))).all()
+        if bool((row.content_metadata or {}).get("systemNamespace"))
+    }
+    collection_subjects = {
+        **system_collection_subjects,
+        **{
+            identifier: _subject_id(item.get("subjectId"))
+            for identifier, item in collection_records.items()
+        },
+    }
+    for item in (incoming_taxonomies or {}).values():
+        subject_id = _subject_id(item.get("subjectId"))
+        if subject_id not in known_subject_ids:
+            raise ValueError(f"知识树引用了不存在的科目：{subject_id}")
+        nodes = item.get("nodes") if isinstance(item.get("nodes"), list) else []
+        node_ids = {_required_id(node.get("id"), "知识点") for node in nodes if isinstance(node, dict)}
+        if len(node_ids) != len(nodes):
+            raise ValueError("知识点 ID 不能重复")
+        for node in nodes:
+            parent_id = str(node.get("parentId") or "").strip()
+            if parent_id and parent_id not in node_ids:
+                raise ValueError(f"知识点引用了不存在的父节点：{parent_id}")
+    for item in collection_records.values():
+        subject_id = _subject_id(item.get("subjectId"))
+        if subject_id not in known_subject_ids:
+            raise ValueError(f"题集引用了不存在的科目：{subject_id}")
+    tag_subjects: dict[str, str] = {}
+    for identifier, item in effective_tags.items():
+        subject_id = _subject_id(item.get("subjectId") or "subject-pmp")
+        if subject_id not in known_subject_ids:
+            raise ValueError(f"活动标签引用了不存在的科目：{subject_id}")
+        collection_id = str(item.get("collectionId") or "").strip()
+        if collection_id:
+            collection_subject = collection_subjects.get(collection_id)
+            if collection_subject is None:
+                raise ValueError(f"活动标签引用了不存在的题集：{collection_id}")
+            if collection_subject != subject_id:
+                raise ValueError("活动标签不能挂载到其他科目的题集")
+        tag_subjects[identifier] = subject_id
+    activity_subjects: dict[str, str] = {}
+    for identifier, item in effective_activities.items():
+        metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+        subject_id = _subject_id(metadata.get("subjectId") or "subject-pmp")
+        if subject_id not in known_subject_ids:
+            raise ValueError(f"活动引用了不存在的科目：{subject_id}")
+        knowledge = metadata.get("knowledge") if isinstance(metadata.get("knowledge"), dict) else {}
+        taxonomy_id = str(knowledge.get("taxonomyId") or "").strip()
+        if taxonomy_id and taxonomy_id not in known_taxonomy_ids:
+            raise ValueError(f"活动引用了不存在的知识树：{taxonomy_id}")
+        if taxonomy_id and taxonomy_subjects.get(taxonomy_id) != subject_id:
+            raise ValueError("活动不能引用其他科目的知识树")
+        referenced_nodes = {
+            str(knowledge.get("primaryNodeId") or "").strip(),
+            *{
+                str(node_id or "").strip()
+                for node_id in (knowledge.get("relatedNodeIds") or [])
+            },
+        } - {""}
+        if referenced_nodes and (
+            not taxonomy_id
+            or not referenced_nodes.issubset(taxonomy_nodes.get(taxonomy_id, set()))
+        ):
+            raise ValueError("活动引用了不存在的知识点")
+        collection_id = str(metadata.get("collectionId") or "").strip()
+        if collection_id:
+            collection_subject = collection_subjects.get(collection_id)
+            if collection_subject is None:
+                raise ValueError(f"活动引用了不存在的题集：{collection_id}")
+            if collection_subject != subject_id:
+                raise ValueError("活动不能挂载到其他科目的题集")
+        organization = metadata.get("organization") if isinstance(metadata.get("organization"), dict) else {}
+        tag_ids = {
+            str(tag_id or "").strip()
+            for tag_id in (organization.get("tagIds") or [])
+            if str(tag_id or "").strip()
+        }
+        missing_tags = tag_ids - set(effective_tags)
+        if missing_tags:
+            raise ValueError(f"活动引用了不存在的标签：{sorted(missing_tags)[0]}")
+        if any(tag_subjects[tag_id] != subject_id for tag_id in tag_ids):
+            raise ValueError("活动不能引用其他科目的标签")
+        activity_subjects[identifier] = subject_id
+    for identifier, item in collection_records.items():
+        subject_id = collection_subjects[identifier]
+        activity_ids = {
+            str(activity_id or "").strip()
+            for activity_id in (item.get("activityIds") or [])
+            if str(activity_id or "").strip()
+        }
+        missing_activities = activity_ids - set(effective_activities)
+        if missing_activities:
+            raise ValueError(f"题集引用了不存在的活动：{sorted(missing_activities)[0]}")
+        if any(activity_subjects[activity_id] != subject_id for activity_id in activity_ids):
+            raise ValueError("题集不能引用其他科目的活动")
+
+    changes: list[dict[str, str]] = []
+    if incoming_subjects is not None:
+        current_subject_rows = (await db.scalars(select(ContentSubject))).all()
+        current_ids = {row.id for row in current_subject_rows}
+        for identifier, item in incoming_subjects.items():
+            code = str(item.get("code") or identifier.removeprefix("subject-")).strip().upper()
+            name = _localized_text(item.get("name")) or code
+            status = str(item.get("status") or "active").strip()
+            if status not in {"active", "inactive", "archived"}:
+                raise ValueError("科目状态不正确")
+            metadata = {k: deepcopy(v) for k, v in item.items() if k not in {"id", "code", "name", "status"}}
+            if isinstance(item.get("name"), dict) and str(item["name"].get("en") or "").strip():
+                metadata["nameEn"] = str(item["name"]["en"]).strip()
+            row = await db.get(ContentSubject, identifier)
+            if row is None:
+                row = ContentSubject(id=identifier, code=code, name=name, status=status, content_metadata=metadata)
+                db.add(row)
+            else:
+                row.code, row.name, row.status, row.content_metadata = code, name, status, metadata
+        removed = current_ids - set(incoming_subjects)
+        if removed:
+            removed_codes = {
+                row.code
+                for row in current_subject_rows
+                if row.id in removed
+            }
+            direct_subject_values = removed | removed_codes
+            for model in (QuestionBank, Question, ExamPaper, PaperRelease):
+                if await db.scalar(select(model).where(model.subject.in_(direct_subject_values)).limit(1)):
+                    raise ValueError("科目仍被题目或试卷引用，不能删除")
+            await _assert_unreferenced(
+                db,
+                direct_subject_values,
+                label="科目",
+                scalar_keys=frozenset({"subjectId", "subject"}),
+            )
+            pending_removed_subject_ids = removed
+        changes.append({"entityType": "subjectCatalog", "entityId": "all", "action": "replaced"})
+        await db.flush()
+
+    if incoming_taxonomies is not None:
+        current_taxonomy_rows = (await db.scalars(select(ContentTaxonomy))).all()
+        current_ids = {row.id for row in current_taxonomy_rows}
+        current_node_rows = (await db.scalars(select(TaxonomyNode))).all()
+        incoming_node_ids = {
+            identifier: {str(node.get("id")) for node in item.get("nodes") or []}
+            for identifier, item in incoming_taxonomies.items()
+        }
+        removed_nodes = {
+            row.node_id
+            for row in current_node_rows
+            if row.taxonomy_id not in incoming_taxonomies
+            or row.node_id not in incoming_node_ids.get(row.taxonomy_id, set())
+        }
+        await _assert_unreferenced(
+            db,
+            removed_nodes,
+            label="知识点",
+            scalar_keys=frozenset({"primaryNodeId", "nodeId"}),
+            array_keys=frozenset({"relatedNodeIds", "nodeIds"}),
+        )
+        for identifier, item in incoming_taxonomies.items():
+            subject_id = _subject_id(item.get("subjectId"))
+            version = max(1, int(item.get("version") or 1))
+            status = str(item.get("status") or "draft")
+            if status not in {"draft", "published", "archived"}:
+                raise ValueError("知识树状态不正确")
+            metadata = {k: deepcopy(v) for k, v in item.items() if k not in {"id", "subjectId", "version", "status", "title", "nodes"}}
+            row = await db.get(ContentTaxonomy, identifier)
+            title = _localized_text(item.get("title") or item.get("name"))
+            if row is None:
+                row = ContentTaxonomy(id=identifier, subject_id=subject_id, version=version, status=status, title=title, content_metadata=metadata, created_by=actor_username, updated_by=actor_username)
+                db.add(row)
+                await db.flush()
+            else:
+                row.subject_id, row.version, row.status, row.title = subject_id, version, status, title
+                row.content_metadata, row.updated_by = metadata, actor_username
+            await db.execute(delete(TaxonomyNode).where(TaxonomyNode.taxonomy_id == identifier))
+            for position, node in enumerate(item.get("nodes") or []):
+                node_id = _required_id(node.get("id"), "知识点")
+                db.add(TaxonomyNode(id=f"{identifier}:{node_id}", taxonomy_id=identifier, node_id=node_id, parent_node_id=node.get("parentId"), title=_localized_text(node.get("title")), record=deepcopy(node), position=int(node.get("sortOrder") or node.get("position") or position), status=str(node.get("status") or "active")))
+        removed = current_ids - set(incoming_taxonomies)
+        if removed:
+            await _assert_unreferenced(
+                db,
+                removed,
+                label="知识树",
+                scalar_keys=frozenset({"taxonomyId"}),
+            )
+            await db.execute(delete(ContentTaxonomy).where(ContentTaxonomy.id.in_(removed)))
+        changes.append({"entityType": "taxonomyCatalog", "entityId": "all", "action": "replaced"})
+        await db.flush()
+
+    if incoming_collections is not None:
+        current_rows = (await db.scalars(select(ActivityCollection))).all()
+        current_ids = {row.id for row in current_rows if not bool((row.content_metadata or {}).get("systemNamespace"))}
+        for identifier, item in incoming_collections.items():
+            subject_id = _subject_id(item.get("subjectId"))
+            metadata = {k: deepcopy(v) for k, v in item.items() if k not in {"id", "subjectId", "title", "status"}}
+            row = await db.get(ActivityCollection, identifier)
+            if row is None:
+                row = ActivityCollection(id=identifier, subject_id=subject_id, title=str(item.get("title") or ""), status=str(item.get("status") or "active"), content_metadata=metadata)
+                db.add(row)
+            else:
+                row.subject_id, row.title, row.status, row.content_metadata = subject_id, str(item.get("title") or ""), str(item.get("status") or "active"), metadata
+        removed = current_ids - set(incoming_collections)
+        if removed:
+            if incoming_tags is None and await db.scalar(select(ActivityTag.id).where(ActivityTag.collection_id.in_(removed)).limit(1)):
+                raise ValueError("题集仍有活动标签引用，不能删除")
+            if incoming_activities is None and await db.scalar(select(ActivityOverride.id).where(ActivityOverride.collection_id.in_(removed)).limit(1)):
+                raise ValueError("题集仍有活动覆盖引用，不能删除")
+            await _assert_unreferenced(
+                db,
+                removed,
+                label="题集",
+                scalar_keys=frozenset({"collectionId"}),
+                array_keys=frozenset({"collectionIds"}),
+            )
+            pending_removed_collection_ids = removed
+        changes.append({"entityType": "activityCollectionCatalog", "entityId": "all", "action": "replaced"})
+        await db.flush()
+
+    if incoming_tags is not None:
+        current_ids = set((await db.scalars(select(ActivityTag.id))).all())
+        for identifier, item in incoming_tags.items():
+            subject_id = _subject_id(item.get("subjectId") or "subject-pmp")
+            collection_id = str(item.get("collectionId") or "").strip()
+            if not collection_id or await db.get(ActivityCollection, collection_id) is None:
+                collection_id = await _tag_namespace(db, subject_id, collection_records)
+            name = str(item.get("name") or item.get("tag") or "").strip()
+            if not name:
+                raise ValueError("活动标签名称不能为空")
+            metadata = {k: deepcopy(v) for k, v in item.items() if k not in {"id", "name", "tag", "collectionId"}}
+            row = await db.get(ActivityTag, identifier)
+            if row is None:
+                row = ActivityTag(id=identifier, collection_id=collection_id, tag=name, content_metadata=metadata)
+                db.add(row)
+            else:
+                row.collection_id, row.tag, row.content_metadata = collection_id, name, metadata
+        removed = current_ids - set(incoming_tags)
+        if removed:
+            activity_payloads = list((incoming_activities or {}).values()) if incoming_activities is not None else [row.record or {} for row in (await db.scalars(select(ActivityOverride))).all()]
+            if any(_payload_references(payload, removed, scalar_keys=frozenset({"tagId"}), array_keys=frozenset({"tagIds"})) for payload in activity_payloads):
+                raise ValueError("活动标签仍被活动引用，不能删除")
+            await db.execute(delete(ActivityTag).where(ActivityTag.id.in_(removed)))
+        changes.append({"entityType": "activityTagCatalog", "entityId": "all", "action": "replaced"})
+        await db.flush()
+
+    if incoming_activities is not None:
+        current_rows = (await db.scalars(select(ActivityOverride))).all()
+        current_by_activity: dict[str, ActivityOverride] = {}
+        for row in current_rows:
+            if row.activity_id in current_by_activity:
+                raise ValueError(f"活动 ID 在多个题集中重复：{row.activity_id}")
+            current_by_activity[row.activity_id] = row
+        for identifier, item in incoming_activities.items():
+            metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+            subject_id = _subject_id(metadata.get("subjectId") or "subject-pmp")
+            collection_id = str(metadata.get("collectionId") or "").strip()
+            if not collection_id or await db.get(ActivityCollection, collection_id) is None:
+                collection_id = await _activity_namespace(db, subject_id)
+            row = current_by_activity.get(identifier)
+            if row is None:
+                row = ActivityOverride(id=uuid4().hex, collection_id=collection_id, activity_id=identifier, record=deepcopy(item), revision=1, updated_by=actor_username)
+                db.add(row)
+            elif row.collection_id != collection_id or row.record != item:
+                row.collection_id, row.record, row.revision, row.updated_by = collection_id, deepcopy(item), row.revision + 1, actor_username
+        removed = set(current_by_activity) - set(incoming_activities)
+        if removed:
+            collection_payloads = list((incoming_collections or {}).values()) if incoming_collections is not None else [row.content_metadata or {} for row in (await db.scalars(select(ActivityCollection))).all()]
+            if any(_payload_references(payload, removed, scalar_keys=frozenset({"activityId"}), array_keys=frozenset({"activityIds", "sourceActivityIds"})) for payload in collection_payloads):
+                raise ValueError("活动仍被题集引用，不能删除")
+            await _assert_unreferenced(
+                db,
+                removed,
+                label="活动",
+                scalar_keys=frozenset({"activityId"}),
+                array_keys=frozenset({"activityIds", "sourceActivityIds"}),
+            )
+            await db.execute(delete(ActivityOverride).where(ActivityOverride.activity_id.in_(removed)))
+        changes.append({"entityType": "activityOverrideCatalog", "entityId": "all", "action": "replaced"})
+
+    if pending_removed_collection_ids:
+        await db.execute(
+            delete(ActivityCollection).where(
+                ActivityCollection.id.in_(pending_removed_collection_ids)
+            )
+        )
+    system_rows = list(
+        (
+            await db.scalars(
+                select(ActivityCollection).where(
+                    ActivityCollection.content_metadata["systemNamespace"].astext.in_(
+                        ("tags", "activities")
+                    )
+                )
+            )
+        ).all()
+    )
+    for row in system_rows:
+        has_tag = await db.scalar(
+            select(ActivityTag.id).where(ActivityTag.collection_id == row.id).limit(1)
+        )
+        has_activity = await db.scalar(
+            select(ActivityOverride.id)
+            .where(ActivityOverride.collection_id == row.id)
+            .limit(1)
+        )
+        if not has_tag and not has_activity:
+            await db.delete(row)
+    await db.flush()
+    if pending_removed_subject_ids:
+        child_taxonomy = await db.scalar(
+            select(ContentTaxonomy.id)
+            .where(ContentTaxonomy.subject_id.in_(pending_removed_subject_ids))
+            .limit(1)
+        )
+        child_collection = await db.scalar(
+            select(ActivityCollection.id)
+            .where(ActivityCollection.subject_id.in_(pending_removed_subject_ids))
+            .limit(1)
+        )
+        if child_taxonomy or child_collection:
+            raise ValueError("科目仍有知识树或题集引用，不能删除")
+        await db.execute(
+            delete(ContentSubject).where(
+                ContentSubject.id.in_(pending_removed_subject_ids)
+            )
+        )
+
+    db.add(TeachingContentAudit(id=uuid4().hex, entity_type="teachingCatalog", entity_id="all", action="replaced", actor_username=actor_username, after={"resources": [item["entityType"] for item in changes]}))
+    return changes
 
 
 async def read_shared_content(db: AsyncSession, subject_id: str) -> dict[str, Any]:
@@ -371,10 +938,27 @@ async def save_shared_content(
     principles: dict[str, Any],
     synthesis_presets: dict[str, Any],
     tag_config: dict[str, Any],
+    subjects: list[dict[str, Any]] | None = None,
+    taxonomies: list[dict[str, Any]] | None = None,
+    activity_overrides: list[dict[str, Any]] | None = None,
+    activity_tags: list[dict[str, Any]] | None = None,
+    activity_collections: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     subject_id = _subject_id(subject_id)
     await _assert_revision(db, content_revision)
     changes: list[dict[str, str]] = []
+
+    changes.extend(
+        await apply_catalog_snapshot(
+            db,
+            actor_username=actor.username,
+            subjects=subjects,
+            taxonomies=taxonomies,
+            activity_overrides=activity_overrides,
+            activity_tags=activity_tags,
+            activity_collections=activity_collections,
+        )
+    )
 
     if principles or synthesis_presets:
         bundle = teaching_content_projection_service.validate_principle_card_bundle(

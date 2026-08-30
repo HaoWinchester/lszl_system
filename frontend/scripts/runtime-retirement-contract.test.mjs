@@ -28,12 +28,11 @@ const runtimePages = [
   'admin-console.html',
   'admin-operations.html',
   'admin-settings.html',
-  'admin-subjects.html',
-  'content-center.html',
-  'content-prep.html',
   'course-admin.html',
   'teacher-workbench.html',
 ]
+
+const directTeachingPages = ['admin-subjects.html', 'content-center.html', 'content-prep.html']
 
 const directAccountPages = [
   'user-management.html',
@@ -55,7 +54,7 @@ test('direct pages keep auth bootstrap without loading the legacy runtime', () =
   assert.match(directEntry, /__KG_DIRECT_BOOTSTRAP__/)
   assert.match(directEntry, /authenticated[,\s]/)
   assert.match(directEntry, /authUser:/)
-  for (const page of [...learnerPages, ...directAccountPages]) {
+  for (const page of [...learnerPages, ...directAccountPages, ...directTeachingPages]) {
     const html = readGenerated(page)
     assert.match(html, /kg-direct-bootstrap-anchor/, `${page} must expose the direct bootstrap anchor`)
     assert.doesNotMatch(html, /server-state-bootstrap\.js/, `${page} must not load legacy runtime`)

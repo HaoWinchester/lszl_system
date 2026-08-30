@@ -4,7 +4,6 @@
   const MAX_DEPTH=9;
   const clone=value=>{try{return JSON.parse(JSON.stringify(value))}catch(error){return value}};
   const clean=value=>String(value??'').trim();
-  function readLocal(key){try{const raw=global.localStorage?.getItem(key);return raw?JSON.parse(raw):null}catch(error){return null}}
   const SUBJECTS=[
     {id:'subject-pmp',code:'PMP',name:'PMP 项目管理',defaultTaxonomyId:'taxonomy-pmp-main'},
     {id:'subject-cspm',code:'CSPM',name:'CSPM 项目管理能力',defaultTaxonomyId:'taxonomy-cspm-main'},
@@ -35,12 +34,10 @@
   ];
   function subjects(){
     if(global.KGLearningContent?.getSubjects)return global.KGLearningContent.getSubjects().map(item=>({id:item.id,code:item.code,name:item.name.zh,defaultTaxonomyId:item.defaultTaxonomyId}));
-    const stored=readLocal('kg_content_subjects_v1');if(Array.isArray(stored)&&stored.length)return stored.map(item=>({id:clean(item.id),code:clean(item.code),name:clean(item.name?.zh||item.name||item.code),defaultTaxonomyId:clean(item.defaultTaxonomyId)}));
     return clone(SUBJECTS);
   }
   function taxonomies(subjectId){
     if(global.KGLearningContent?.getTaxonomies)return global.KGLearningContent.getTaxonomies(subjectId).map(item=>({id:item.id,subjectId:item.subjectId,name:item.name.zh,version:item.version,maxDepth:item.maxDepth,nodes:item.nodes.map(node=>({...node,title:node.title.zh}))}));
-    const stored=readLocal('kg_content_taxonomies_v1');if(Array.isArray(stored)&&stored.length)return stored.filter(item=>!subjectId||item.subjectId===String(subjectId)).map(item=>({id:clean(item.id),subjectId:clean(item.subjectId),name:clean(item.name?.zh||item.name),version:Number(item.version)||1,maxDepth:Number(item.maxDepth)||9,nodes:(item.nodes||[]).map(node=>({...node,title:clean(node.title?.zh||node.title),titleEn:clean(node.title?.en),aliases:Array.isArray(node.aliases)?node.aliases:[],code:clean(node.code)}))}));
     return clone(TAXONOMIES.filter(item=>!subjectId||item.subjectId===String(subjectId)));
   }
   function taxonomy(taxonomyId){return taxonomies().find(item=>item.id===String(taxonomyId||''))||null}

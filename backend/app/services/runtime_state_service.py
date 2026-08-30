@@ -59,6 +59,13 @@ DEPRECATED_GRAPH_EXACT_KEYS = frozenset({
     "kg_home_file_library_v1",
 })
 DEPRECATED_GRAPH_PREFIXES = ("kg_graph_file_content_v2__",)
+RETIRED_CATALOG_RUNTIME_KEYS = frozenset({
+    "kg_content_subjects_v1",
+    "kg_content_taxonomies_v1",
+    "kg_content_activity_overrides_v1",
+    "kg_activity_tags_v1",
+    "kg_activity_collections_v1",
+})
 
 EXACT_KEYS = {
     "kg_default_entry_mode_v1",
@@ -111,16 +118,12 @@ EXACT_KEYS = {
     "通用知识点关系图谱工具_多科目重点聚焦版_v2",
     "通用知识点关系图谱工具_悬浮菜单位置_v1",
     "通用知识点关系图谱工具_新手引导已看_v1",
-    "kg_activity_collections_v1",
-    "kg_activity_tags_v1",
     "kg_admin_audit_log_v1",
     "kg_admin_settings_v1",
     "kg_admin_transaction_snapshots_v1",
     "kg_assessment_papers_v1",
-    "kg_content_activity_overrides_v1",
     "kg_content_organization_migration_v1",
-    "kg_content_subjects_v1",
-    "kg_content_taxonomies_v1",
+    *RETIRED_CATALOG_RUNTIME_KEYS,
     "kg_course_admin_recent_v862_p2",
     "kg_course_admin_workspace_v862_p1",
     "kg_course_config_active_release_v1",
@@ -214,13 +217,8 @@ SHARED_KEYS = frozenset({
     "kg_course_config_releases_v1",
     "kg_course_config_active_release_v1",
     "kg_learning_tasks_v1",
-    # 全局教学内容（管理员/教师配一份，所有用户看；扫 updata-legacy 确认无 scope 拼接）
-    "kg_content_subjects_v1",
-    "kg_content_taxonomies_v1",
-    "kg_content_activity_overrides_v1",
+    # 迁移标记仍供 rollback 审计使用；五个教学目录大键已不再由 Runtime GET 投影。
     "kg_content_organization_migration_v1",
-    "kg_activity_collections_v1",
-    "kg_activity_tags_v1",
     "kg_question_tag_names_v1",
     "kg_taxonomy_release_records_v1",
     "kg_taxonomy_deletion_records_v1",
@@ -272,7 +270,6 @@ PUBLISHER_COLLECTION_KEYS = frozenset({
     "kg_exam_papers_published_v1",
     "kg_course_config_releases_v1",
     "kg_learning_tasks_v1",
-    "kg_activity_collections_v1",
 })
 SERVER_OWNED_KEYS = frozenset({
     "kg_announcements_v1",
@@ -280,6 +277,10 @@ SERVER_OWNED_KEYS = frozenset({
     # Principles and synthesis cards have dedicated relational Content Prep APIs.
     # Runtime may retain historical rows for staged rollback, but cannot mutate them.
     *teaching_content_projection_service.PROJECTION_KEYS,
+    # Teaching catalog lifecycle is relational and writable only through the
+    # optimistic shared-content API. Historical rows are migration-only and are
+    # excluded from every online Runtime snapshot.
+    *RETIRED_CATALOG_RUNTIME_KEYS,
 })
 
 
@@ -777,11 +778,6 @@ def _publisher_id(item: object, key: str) -> str:
         if isinstance(authorship, dict):
             return str(authorship.get("createdByUserId") or "")
         return ""
-    if key == "kg_activity_collections_v1":
-        authorship = item.get("authorship")
-        if isinstance(authorship, dict):
-            return str(authorship.get("createdByUserId") or "")
-        return ""
     publisher = item.get("publishedBy")
     if isinstance(publisher, dict):
         return str(publisher.get("id") or publisher.get("username") or "")
@@ -832,21 +828,7 @@ def visible_shared_value(
         "kg_exam_paper_release_history_v1",
     }:
         return visible_published_papers(value, can_access_member=can_access_member)
-    if key != "kg_activity_collections_v1":
-        return value
-    try:
-        rows = json.loads(value or "[]")
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return "[]"
-    if not isinstance(rows, list):
-        return "[]"
-    visible = []
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        if str(row.get("visibility") or "private") == "shared" or _publisher_id(row, key) == owner:
-            visible.append(row)
-    return _json(visible)
+    return value
 
 
 def merge_shared_value(key: str, existing: str, incoming: str, owner: str) -> str:
@@ -1442,8 +1424,18 @@ async def apply_update(
     role: str,
     update: RuntimeStateUpdate,
 ) -> tuple[dict[str, str], int, int]:
-    validate_update(update)
     mutations = update_mutations(update)
+    # Dedicated-API data is categorically read-only through Runtime.  Check it
+    # before page/namespace validation so a retired page cannot turn this hard
+    # authorization boundary into an ambiguous validation error.
+    protected_mutations = [
+        mutation.key for mutation in mutations if server_owned_key(mutation.key)
+    ]
+    if protected_mutations:
+        raise RuntimeStatePermissionError(
+            f"该数据只能通过专用接口修改：{protected_mutations[0]}"
+        )
+    validate_update(update)
     if settings.QUESTION_CATALOG_CUTOVER_ENABLED:
         deprecated_mutations = [
             mutation.key
@@ -1460,13 +1452,6 @@ async def apply_update(
         ]
         if deprecated_graph_mutations:
             raise RuntimeStatePermissionError("图谱文件已迁移，请使用文件接口")
-    protected_mutations = [
-        mutation.key for mutation in mutations if server_owned_key(mutation.key)
-    ]
-    if protected_mutations:
-        raise RuntimeStatePermissionError(
-            f"该数据只能通过专用接口修改：{protected_mutations[0]}"
-        )
     shared_mutations = explicit_shared_mutations(update)
     teaching_mutations = teaching_shared_mutations(update)
     forbidden = [

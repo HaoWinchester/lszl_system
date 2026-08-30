@@ -10,11 +10,12 @@ from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
 from app.main import app
 from app.models.content_prep import Principle, QuestionTagConfig, QuestionUploadBatch, SynthesisPreset
+from app.models.course_management import CourseDraft
 from app.models.question import Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
-from app.models.teaching_content import ActivityOverride, ContentSubject, ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode, TeachingContentAudit
+from app.models.teaching_content import ActivityCollection, ActivityOverride, ActivityTag, ContentSubject, ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode, TeachingContentAudit
 from app.models.user import User
-from app.services import teaching_content_revision_service
+from app.services import teaching_content_revision_service, teaching_content_service
 from tests.teaching_content_revision_support import (
     restore_teaching_content_revision,
     snapshot_teaching_content_revision,
@@ -27,6 +28,558 @@ TAG_KEY = "kg_question_tag_names_v1"
 ACTIVITY_KEY = "kg_content_activity_overrides_v1"
 RECALL_KEY = "kg_recall_association_library_v1__subject__subject-pmp"
 PROJECTION_KEYS = {"kg_principle_repository_v1", "kg_synthesis_preset_repository_v1"}
+RETIRED_CATALOG_RUNTIME_KEYS = (
+    "kg_content_subjects_v1",
+    "kg_content_taxonomies_v1",
+    "kg_content_activity_overrides_v1",
+    "kg_activity_tags_v1",
+    "kg_activity_collections_v1",
+)
+
+
+def test_catalog_snapshot_round_trips_all_five_lifecycle_resources_with_one_revision() -> None:
+    suffix = uuid4().hex[:10]
+    subject_id = f"subject-catalog-{suffix}"
+    taxonomy_id = f"taxonomy-catalog-{suffix}"
+    collection_id = f"collection-catalog-{suffix}"
+    tag_id = f"tag-catalog-{suffix}"
+    activity_id = f"activity-catalog-{suffix}"
+    revision_snapshot: dict | None = None
+
+    async def snapshot_revision() -> None:
+        nonlocal revision_snapshot
+        async with AsyncSessionLocal() as db:
+            revision_snapshot = await snapshot_teaching_content_revision(db)
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(ActivityOverride).where(ActivityOverride.activity_id == activity_id))
+            await db.execute(delete(ActivityTag).where(ActivityTag.id == tag_id))
+            await db.execute(delete(ActivityCollection).where(ActivityCollection.subject_id == subject_id))
+            await db.execute(delete(TaxonomyNode).where(TaxonomyNode.taxonomy_id == taxonomy_id))
+            await db.execute(delete(ContentTaxonomy).where(ContentTaxonomy.id == taxonomy_id))
+            await db.execute(delete(ContentSubject).where(ContentSubject.id == subject_id))
+            await db.commit()
+            await restore_teaching_content_revision(db, revision_snapshot)
+            await db.commit()
+
+    async def write_markers() -> tuple[int, int]:
+        async with AsyncSessionLocal() as db:
+            override = (
+                await db.execute(
+                    select(ActivityOverride).where(ActivityOverride.activity_id == activity_id)
+                )
+            ).scalar_one()
+            audits = len(
+                list(
+                    (
+                        await db.scalars(
+                            select(TeachingContentAudit).where(
+                                TeachingContentAudit.entity_type == "teachingCatalog"
+                            )
+                        )
+                    ).all()
+                )
+            )
+            return override.revision, audits
+
+    asyncio.run(snapshot_revision())
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "jbgsnmm~123"},
+            ).status_code == 200
+            before = client.get(
+                "/api/v1/content-prep/shared-content",
+                params={"subjectId": "subject-pmp"},
+            ).json()
+            body = {
+                "subjectId": "subject-pmp",
+                "contentRevision": before["contentRevision"],
+                "subjects": [
+                    *before["subjects"],
+                    {
+                        "id": subject_id,
+                        "code": f"CAT-{suffix}",
+                        "name": {"zh": "目录科目", "en": "Catalog"},
+                        "status": "active",
+                        "sortOrder": 91,
+                    },
+                ],
+                "taxonomies": [
+                    *before["taxonomies"],
+                    {
+                        "id": taxonomy_id,
+                        "subjectId": subject_id,
+                        "version": 1,
+                        "status": "draft",
+                        "name": {"zh": "目录知识树"},
+                        "nodes": [
+                            {
+                                "id": "root",
+                                "title": {"zh": "根节点"},
+                                "parentId": None,
+                                "status": "active",
+                                "sortOrder": 10,
+                            }
+                        ],
+                    },
+                ],
+                "activityCollections": [
+                    *before["activityCollections"],
+                    {
+                        "id": collection_id,
+                        "subjectId": subject_id,
+                        "title": "目录题集",
+                        "description": "完整元数据",
+                        "type": "collection",
+                        "visibility": "shared",
+                        "status": "archived",
+                        "activityIds": [activity_id],
+                        "sortOrder": 7,
+                        "authorship": {"createdByUserId": "admin"},
+                    },
+                ],
+                "activityTags": [
+                    *before["activityTags"],
+                    {
+                        "id": tag_id,
+                        "name": "红色标签",
+                        "subjectId": subject_id,
+                        "description": "标签描述",
+                        "color": "#f00",
+                        "status": "archived",
+                        "sortOrder": 3,
+                        "authorship": {"createdByUserId": "admin"},
+                    },
+                ],
+                "activityOverrides": [
+                    *before["activityOverrides"],
+                    {
+                        "id": activity_id,
+                        "metadata": {
+                            "subjectId": subject_id,
+                            "collectionId": collection_id,
+                            "knowledge": {
+                                "taxonomyId": taxonomy_id,
+                                "primaryNodeId": "root",
+                            },
+                        },
+                    },
+                ],
+            }
+            saved = client.put("/api/v1/content-prep/shared-content", json=body)
+            assert saved.status_code == 200, saved.text
+            payload = saved.json()
+            assert payload["contentRevision"] == before["contentRevision"] + 1
+            assert next(row for row in payload["subjects"] if row["id"] == subject_id)["sortOrder"] == 91
+            assert next(row for row in payload["taxonomies"] if row["id"] == taxonomy_id)["nodes"][0]["title"] == {"zh": "根节点"}
+            assert next(row for row in payload["activityCollections"] if row["id"] == collection_id)["activityIds"] == [activity_id]
+            assert next(row for row in payload["activityTags"] if row["id"] == tag_id)["description"] == "标签描述"
+            assert next(row for row in payload["activityOverrides"] if row["id"] == activity_id)["metadata"]["collectionId"] == collection_id
+
+            before_noop = asyncio.run(write_markers())
+            identical = client.put(
+                "/api/v1/content-prep/shared-content",
+                json={
+                    "subjectId": subject_id,
+                    "contentRevision": payload["contentRevision"],
+                    "subjects": payload["subjects"],
+                    "taxonomies": payload["taxonomies"],
+                    "activityCollections": payload["activityCollections"],
+                    "activityTags": payload["activityTags"],
+                    "activityOverrides": payload["activityOverrides"],
+                },
+            )
+            assert identical.status_code == 200, identical.text
+            assert identical.json()["contentRevision"] == payload["contentRevision"]
+            assert asyncio.run(write_markers()) == before_noop
+
+            stale = client.put("/api/v1/content-prep/shared-content", json=body)
+            assert stale.status_code == 409, stale.text
+            current = client.get(
+                "/api/v1/content-prep/shared-content",
+                params={"subjectId": subject_id},
+            ).json()
+            assert current["contentRevision"] == payload["contentRevision"]
+            assert len([row for row in current["activityTags"] if row["id"] == tag_id]) == 1
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_runtime_cannot_mutate_any_retired_catalog_resource_or_bump_content_revision() -> None:
+    previous: dict[str, tuple[str, str] | None] = {}
+
+    async def seed_historical_rows() -> None:
+        async with AsyncSessionLocal() as db:
+            for key in RETIRED_CATALOG_RUNTIME_KEYS:
+                row = await db.get(SharedRuntimeState, key)
+                previous[key] = (row.value, row.updated_by) if row else None
+                if row is None:
+                    db.add(SharedRuntimeState(key=key, value='[{"legacy":true}]', updated_by="pytest"))
+                else:
+                    row.value, row.updated_by = '[{"legacy":true}]', "pytest"
+            await db.commit()
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            for key, value in previous.items():
+                row = await db.get(SharedRuntimeState, key)
+                if value is None:
+                    if row is not None:
+                        await db.delete(row)
+                elif row is not None:
+                    row.value, row.updated_by = value
+            await db.commit()
+
+    asyncio.run(seed_historical_rows())
+    try:
+        with TestClient(app) as client:
+            assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "jbgsnmm~123"}).status_code == 200
+            before = client.get("/api/v1/content-prep/shared-content", params={"subjectId": "subject-pmp"}).json()
+            runtime = client.get("/api/v1/runtime/state").json()
+            for key in RETIRED_CATALOG_RUNTIME_KEYS:
+                assert key not in runtime["storage"]
+            mutations = [
+                {"operation": "setItem", "key": key, "value": "[]"}
+                for key in RETIRED_CATALOG_RUNTIME_KEYS
+            ]
+            response = client.put(
+                "/api/v1/runtime/state",
+                json={
+                    "page": "admin-subjects.html",
+                    "namespace": "teaching-catalog",
+                    "operation": "setItem",
+                    "key": RETIRED_CATALOG_RUNTIME_KEYS[0],
+                    "value": "[]",
+                    "storage": {},
+                    "mutations": mutations,
+                    "requestId": f"retired-catalog-{uuid4().hex}",
+                    "revision": runtime["revision"],
+                    "contentRevision": runtime["contentRevision"],
+                },
+            )
+            assert response.status_code == 403, response.text
+            after = client.get("/api/v1/content-prep/shared-content", params={"subjectId": "subject-pmp"}).json()
+            assert after["contentRevision"] == before["contentRevision"]
+            for field in ("subjects", "taxonomies", "activityOverrides", "activityTags", "activityCollections"):
+                assert after[field] == before[field]
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_catalog_subject_delete_fails_closed_when_relational_course_still_references_it() -> None:
+    suffix = uuid4().hex[:10]
+    subject_id = f"subject-delete-ref-{suffix}"
+    course_id = f"course-delete-ref-{suffix}"
+    revision_snapshot: dict | None = None
+
+    async def seed() -> None:
+        nonlocal revision_snapshot
+        async with AsyncSessionLocal() as db:
+            revision_snapshot = await snapshot_teaching_content_revision(db)
+            db.add(ContentSubject(id=subject_id, code=f"DEL-{suffix}", name="待删科目", content_metadata={}))
+            db.add(CourseDraft(id=course_id, owner_id="admin", name="引用课程", structure={"id": course_id, "subjectId": subject_id}, revision=1, status="draft", created_by="admin", updated_by="admin"))
+            await db.commit()
+
+    async def persisted() -> bool:
+        async with AsyncSessionLocal() as db:
+            return await db.get(ContentSubject, subject_id) is not None
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(CourseDraft).where(CourseDraft.id == course_id))
+            await db.execute(delete(ContentSubject).where(ContentSubject.id == subject_id))
+            await db.commit()
+            await restore_teaching_content_revision(db, revision_snapshot)
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as client:
+            assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "jbgsnmm~123"}).status_code == 200
+            before = client.get("/api/v1/content-prep/shared-content", params={"subjectId": "subject-pmp"}).json()
+            response = client.put(
+                "/api/v1/content-prep/shared-content",
+                json={
+                    "subjectId": "subject-pmp",
+                    "contentRevision": before["contentRevision"],
+                    "subjects": [row for row in before["subjects"] if row["id"] != subject_id],
+                },
+            )
+            assert response.status_code == 422, response.text
+            assert "引用" in response.json()["detail"]["message"]
+            assert asyncio.run(persisted())
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_legacy_catalog_mutation_routes_are_retired_without_side_effects() -> None:
+    suffix = uuid4().hex[:10]
+    subject_id = f"subject-retired-route-{suffix}"
+
+    async def state() -> tuple[bool, int]:
+        async with AsyncSessionLocal() as db:
+            return (
+                await db.get(ContentSubject, subject_id) is None,
+                int((await teaching_content_revision_service.current(db))["revision"]),
+            )
+
+    with TestClient(app) as client:
+        assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "jbgsnmm~123"}).status_code == 200
+        revision = client.get("/api/v1/content-prep/shared-content", params={"subjectId": "subject-pmp"}).json()["contentRevision"]
+        requests = [
+            client.post("/api/v1/content-prep/subjects", json={"id": subject_id, "code": "RETIRED", "name": "不应创建", "contentRevision": revision}),
+            client.post(f"/api/v1/content-prep/taxonomies/taxonomy-{suffix}/release", json={"subjectId": "subject-pmp", "version": 1, "title": "不应发布", "nodes": [], "contentRevision": revision}),
+            client.put(f"/api/v1/content-prep/activity-overrides/collection-{suffix}/activity-{suffix}", json={"record": {"title": "不应保存"}, "contentRevision": revision}),
+            client.delete(f"/api/v1/content-prep/taxonomies/taxonomy-{suffix}", params={"subjectId": "subject-pmp", "contentRevision": revision}),
+            client.delete(f"/api/v1/content-prep/activity-overrides/collection-{suffix}/activity-{suffix}", params={"contentRevision": revision}),
+        ]
+        for response in requests:
+            assert response.status_code == 410, response.text
+            assert response.json()["detail"]["code"] == "LEGACY_TEACHING_MUTATION_RETIRED"
+        assert asyncio.run(state()) == (True, revision)
+    paths = app.openapi()["paths"]
+    for path, method in (
+        ("/api/v1/content-prep/subjects", "post"),
+        ("/api/v1/content-prep/taxonomies/{taxonomy_id}/release", "post"),
+        ("/api/v1/content-prep/activity-overrides/{collection_id}/{activity_id}", "put"),
+        ("/api/v1/content-prep/taxonomies/{taxonomy_id}", "delete"),
+        ("/api/v1/content-prep/activity-overrides/{collection_id}/{activity_id}", "delete"),
+    ):
+        operation = paths[path][method]
+        assert operation["deprecated"] is True
+        assert "410" in operation["responses"]
+        assert "200" not in operation["responses"]
+        assert "201" not in operation["responses"]
+    for symbol in (
+        "upsert_subject",
+        "release_taxonomy",
+        "delete_taxonomy",
+        "apply_activity_override",
+        "delete_activity_override",
+    ):
+        assert not hasattr(teaching_content_service, symbol)
+
+
+def test_catalog_rejects_dangling_or_cross_subject_relationships_without_side_effects() -> None:
+    suffix = uuid4().hex[:10]
+    collection_id = f"collection-invalid-{suffix}"
+    tag_id = f"tag-invalid-{suffix}"
+    activity_id = f"activity-invalid-{suffix}"
+    revision_snapshot: dict | None = None
+
+    async def snapshot_revision() -> None:
+        nonlocal revision_snapshot
+        async with AsyncSessionLocal() as db:
+            revision_snapshot = await snapshot_teaching_content_revision(db)
+
+    async def absent_and_revision() -> tuple[bool, int]:
+        async with AsyncSessionLocal() as db:
+            absent = all(
+                row is None
+                for row in (
+                    await db.get(ActivityCollection, collection_id),
+                    await db.get(ActivityTag, tag_id),
+                    (
+                        await db.execute(
+                            select(ActivityOverride).where(ActivityOverride.activity_id == activity_id)
+                        )
+                    ).scalar_one_or_none(),
+                )
+            )
+            return absent, int((await teaching_content_revision_service.current(db))["revision"])
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(ActivityOverride).where(ActivityOverride.activity_id == activity_id))
+            await db.execute(delete(ActivityTag).where(ActivityTag.id == tag_id))
+            await db.execute(delete(ActivityCollection).where(ActivityCollection.id == collection_id))
+            await db.commit()
+            await restore_teaching_content_revision(db, revision_snapshot)
+            await db.commit()
+
+    asyncio.run(snapshot_revision())
+    try:
+        with TestClient(app) as client:
+            assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "jbgsnmm~123"}).status_code == 200
+            before = client.get("/api/v1/content-prep/shared-content", params={"subjectId": "subject-pmp"}).json()
+            revision = before["contentRevision"]
+            invalid_payloads = [
+                {
+                    "activityCollections": [
+                        *before["activityCollections"],
+                        {"id": collection_id, "subjectId": "subject-pmp", "title": "悬空活动", "activityIds": [activity_id]},
+                    ]
+                },
+                {
+                    "activityTags": [
+                        *before["activityTags"],
+                        {"id": tag_id, "name": "悬空题集", "subjectId": "subject-pmp", "collectionId": collection_id},
+                    ]
+                },
+                {
+                    "activityOverrides": [
+                        *before["activityOverrides"],
+                        {
+                            "id": activity_id,
+                            "metadata": {
+                                "subjectId": "subject-pmp",
+                                "knowledge": {"taxonomyId": "taxonomy-pmp-complete-v1", "primaryNodeId": "missing-node"},
+                                "organization": {"tagIds": [tag_id]},
+                            },
+                        },
+                    ]
+                },
+            ]
+            for partial in invalid_payloads:
+                response = client.put(
+                    "/api/v1/content-prep/shared-content",
+                    json={"subjectId": "subject-pmp", "contentRevision": revision, **partial},
+                )
+                assert response.status_code == 422, response.text
+                assert asyncio.run(absent_and_revision()) == (True, revision)
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_catalog_cleans_empty_system_namespaces_before_deleting_subject() -> None:
+    suffix = uuid4().hex[:10]
+    subject_id = f"subject-system-namespace-{suffix}"
+    tag_id = f"tag-system-namespace-{suffix}"
+    activity_id = f"activity-system-namespace-{suffix}"
+    revision_snapshot: dict | None = None
+
+    async def snapshot_revision() -> None:
+        nonlocal revision_snapshot
+        async with AsyncSessionLocal() as db:
+            revision_snapshot = await snapshot_teaching_content_revision(db)
+
+    async def deleted() -> bool:
+        async with AsyncSessionLocal() as db:
+            return all(
+                row is None
+                for row in (
+                    await db.get(ContentSubject, subject_id),
+                    await db.get(ActivityCollection, f"__tags__:{subject_id}"),
+                    await db.get(ActivityCollection, f"__activities__:{subject_id}"),
+                )
+            )
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(ActivityOverride).where(ActivityOverride.activity_id == activity_id))
+            await db.execute(delete(ActivityTag).where(ActivityTag.id == tag_id))
+            await db.execute(delete(ActivityCollection).where(ActivityCollection.subject_id == subject_id))
+            await db.execute(delete(ContentSubject).where(ContentSubject.id == subject_id))
+            await db.commit()
+            await restore_teaching_content_revision(db, revision_snapshot)
+            await db.commit()
+
+    asyncio.run(snapshot_revision())
+    try:
+        with TestClient(app) as client:
+            assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "jbgsnmm~123"}).status_code == 200
+            before = client.get("/api/v1/content-prep/shared-content", params={"subjectId": "subject-pmp"}).json()
+            created = client.put(
+                "/api/v1/content-prep/shared-content",
+                json={
+                    "subjectId": "subject-pmp",
+                    "contentRevision": before["contentRevision"],
+                    "subjects": [*before["subjects"], {"id": subject_id, "code": f"SYS-{suffix}", "name": {"zh": "系统命名空间科目"}}],
+                    "activityTags": [*before["activityTags"], {"id": tag_id, "name": "临时标签", "subjectId": subject_id}],
+                    "activityOverrides": [*before["activityOverrides"], {"id": activity_id, "metadata": {"subjectId": subject_id}}],
+                },
+            )
+            assert created.status_code == 200, created.text
+            snapshot = created.json()
+            removed = client.put(
+                "/api/v1/content-prep/shared-content",
+                json={
+                    "subjectId": "subject-pmp",
+                    "contentRevision": snapshot["contentRevision"],
+                    "subjects": [row for row in snapshot["subjects"] if row["id"] != subject_id],
+                    "activityTags": [row for row in snapshot["activityTags"] if row["id"] != tag_id],
+                    "activityOverrides": [row for row in snapshot["activityOverrides"] if row["id"] != activity_id],
+                    "activityCollections": snapshot["activityCollections"],
+                },
+            )
+            assert removed.status_code == 200, removed.text
+            assert removed.json()["contentRevision"] == snapshot["contentRevision"] + 1
+            assert asyncio.run(deleted())
+    finally:
+        asyncio.run(cleanup())
+
+
+def test_catalog_only_increments_revision_for_the_changed_activity_override() -> None:
+    suffix = uuid4().hex[:10]
+    activity_ids = [f"activity-row-revision-a-{suffix}", f"activity-row-revision-b-{suffix}"]
+    revision_snapshot: dict | None = None
+
+    async def snapshot_revision() -> None:
+        nonlocal revision_snapshot
+        async with AsyncSessionLocal() as db:
+            revision_snapshot = await snapshot_teaching_content_revision(db)
+
+    async def row_revisions() -> dict[str, int]:
+        async with AsyncSessionLocal() as db:
+            rows = list(
+                (
+                    await db.scalars(
+                        select(ActivityOverride).where(
+                            ActivityOverride.activity_id.in_(activity_ids)
+                        )
+                    )
+                ).all()
+            )
+            return {row.activity_id: row.revision for row in rows}
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(ActivityOverride).where(ActivityOverride.activity_id.in_(activity_ids)))
+            await db.commit()
+            await restore_teaching_content_revision(db, revision_snapshot)
+            await db.commit()
+
+    asyncio.run(snapshot_revision())
+    try:
+        with TestClient(app) as client:
+            assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "jbgsnmm~123"}).status_code == 200
+            before = client.get("/api/v1/content-prep/shared-content", params={"subjectId": "subject-pmp"}).json()
+            created = client.put(
+                "/api/v1/content-prep/shared-content",
+                json={
+                    "subjectId": "subject-pmp",
+                    "contentRevision": before["contentRevision"],
+                    "activityOverrides": [
+                        *before["activityOverrides"],
+                        {"id": activity_ids[0], "title": "A", "metadata": {"subjectId": "subject-pmp"}},
+                        {"id": activity_ids[1], "title": "B", "metadata": {"subjectId": "subject-pmp"}},
+                    ],
+                },
+            )
+            assert created.status_code == 200, created.text
+            initial_rows = row_revisions()
+            initial = asyncio.run(initial_rows)
+            changed_rows = [
+                {**row, "title": "A2"} if row["id"] == activity_ids[0] else row
+                for row in created.json()["activityOverrides"]
+            ]
+            changed = client.put(
+                "/api/v1/content-prep/shared-content",
+                json={
+                    "subjectId": "subject-pmp",
+                    "contentRevision": created.json()["contentRevision"],
+                    "activityOverrides": changed_rows,
+                },
+            )
+            assert changed.status_code == 200, changed.text
+            after = asyncio.run(row_revisions())
+            assert after[activity_ids[0]] == initial[activity_ids[0]] + 1
+            assert after[activity_ids[1]] == initial[activity_ids[1]]
+    finally:
+        asyncio.run(cleanup())
 
 
 def test_two_teachers_cannot_overwrite_a_stale_recall_library_snapshot() -> None:

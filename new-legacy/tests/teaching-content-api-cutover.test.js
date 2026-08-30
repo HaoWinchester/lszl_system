@@ -22,6 +22,7 @@ const completeTeachingBoundary = [
   'src/admin/33-activity-service.js',
   'src/principles/principle-repository.js',
   'src/principles/synthesis-preset-repository.js',
+  'question-studio/knowledge-taxonomy-v1.js',
 ];
 const retiredTeachingKeys = /kg_(?:content_subjects|content_taxonomies|content_activity_overrides|principle_repository|synthesis_preset|recall_association_library)_v1/;
 
@@ -40,31 +41,156 @@ test('teaching repositories no longer read or write browser Runtime projections'
   ]) assert.doesNotMatch(readSource(relative), /localStorage/, relative);
 });
 
-test('Task 6 compatibility is limited to exact course and task repository resources', () => {
+test('Task 7 compatibility is limited to exact course and task repository resources', () => {
   const repository = readSource('src/admin/11-local-content-repository.js');
-  const allowedUntilTask6 = [
+  const allowedUntilTask7 = [
     'kg_course_config_drafts_v1',
     'kg_course_config_releases_v1',
     'kg_course_config_active_release_v1',
     'kg_learning_tasks_v1',
   ];
-  for (const key of allowedUntilTask6) assert.match(repository, new RegExp(key));
-  assert.match(repository, /allowedUntilTask6/);
+  for (const key of allowedUntilTask7) assert.match(repository, new RegExp(key));
+  assert.match(repository, /allowedUntilTask7/);
 });
 
-test('Task 5B compatibility lists only the exact synchronous teaching lifecycle keys', () => {
+test('Task 5B retires all five synchronous teaching lifecycle keys', () => {
   const repository = readSource('src/admin/11-local-content-repository.js');
   const learning = readSource('src/91-learning-content-core.js');
   const organization = readSource('src/93-content-organization-core.js');
+  const questionStudio = readSource('question-studio/knowledge-taxonomy-v1.js');
   const allowedUntilTask5B = [
     'kg_content_subjects_v1', 'kg_content_taxonomies_v1',
     'kg_content_activity_overrides_v1', 'kg_activity_tags_v1',
     'kg_activity_collections_v1',
   ];
-  assert.match(repository, /allowedUntilTask5B/);
-  for (const key of allowedUntilTask5B) assert.match(repository, new RegExp(key));
-  for (const key of allowedUntilTask5B.slice(0, 3)) assert.match(learning, new RegExp(key));
-  for (const key of allowedUntilTask5B.slice(3)) assert.match(organization, new RegExp(key));
+  assert.doesNotMatch(repository, /allowedUntilTask5B/);
+  for (const key of allowedUntilTask5B) {
+    assert.doesNotMatch(repository, new RegExp(key));
+    assert.doesNotMatch(learning, new RegExp(key));
+    assert.doesNotMatch(organization, new RegExp(key));
+    assert.doesNotMatch(questionStudio, new RegExp(key));
+  }
+});
+
+test('content center never creates a misleading local paper from activity ids', () => {
+  const source = readSource('src/93-content-organization-app.js');
+  assert.doesNotMatch(source, /Org\.savePaper/);
+  assert.doesNotMatch(source, /paper-management\.html&paper=/);
+  assert.match(source, /当前不支持从活动直接生成试卷/);
+});
+
+test('content organization waits for rejected catalog saves and shows the API error', async () => {
+  let rejectSave;
+  let domReady;
+  const handlers = new Map();
+  const elements = new Map();
+  const element = id => {
+    if (!elements.has(id)) elements.set(id, {
+      id, value: '', checked: false, dataset: {}, innerHTML: '', textContent: '',
+      addEventListener(type, handler) { handlers.set(`${id}:${type}`, handler); },
+      close() {}, showModal() {}, focus() {}, dispatchEvent() {},
+    });
+    return elements.get(id);
+  };
+  const messages = [];
+  const window = {
+    KGLearningContent: {},
+    KGContentCenterApp: { getSubjectId: () => 'subject-pmp', toast: message => messages.push(message), rerender() {}, clearSelection() {} },
+    KGContentOrganization: {
+      summary: () => ({ tags: 0, collections: 0, favorites: 0, papers: 0, tasks: 0 }),
+      getTags: () => [], getCollections: () => [],
+      saveTag: () => new Promise((_resolve, reject) => { rejectSave = reject; }),
+    },
+  };
+  const document = {
+    getElementById: element,
+    querySelectorAll: () => [],
+    addEventListener(type, handler) { if (type === 'DOMContentLoaded') domReady = handler; },
+  };
+  vm.runInContext(readSource('src/93-content-organization-app.js'), vm.createContext({ window, document, Promise, console, requestAnimationFrame: callback => callback(), Event: class {}, confirm: () => true, prompt: () => null }));
+  domReady();
+  element('ccTagName').value = '待保存标签';
+  handlers.get('ccSaveTagBtn:click')();
+  await Promise.resolve();
+  assert.deepEqual(messages, []);
+  rejectSave(new Error('服务器暂时不可用'));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(messages.at(-1), /标签保存失败：服务器暂时不可用/);
+});
+
+test('teaching adapter hydrates course relationships and awaits catalog persistence', async () => {
+  const calls = [];
+  let resolvePut;
+  const shared = {
+    subjectId: 'subject-pmp', contentRevision: 8,
+    subjects: [{ id: 'subject-pmp', code: 'PMP', name: { zh: 'PMP' } }],
+    taxonomies: [], activityOverrides: [], activityTags: [], activityCollections: [],
+    principles: { items: [] }, synthesisPresets: { items: [] }, recallLibrary: { nodes: [], edges: [] },
+  };
+  const window = {
+    KGDomainApi: {
+      request(input) {
+        calls.push(structuredClone(input));
+        if (input.method === 'PUT') return new Promise(resolve => { resolvePut = () => resolve({ ...shared, contentRevision: 9, subjects: input.body.subjects }); });
+        if (input.path.includes('/course-management/drafts')) return Promise.resolve({ drafts: [{ id: 'draft-1', name: '课程', status: 'draft', revision: 3, structure: { subjectId: 'subject-pmp', nodes: [{ id: 'n', activityIds: ['a-1'] }] } }] });
+        if (input.path.includes('/course-management/releases')) return Promise.resolve({ releases: [{ id: 'release-1', version: 1, course: { id: 'course-1', subjectId: 'subject-pmp', nodes: [] } }] });
+        if (input.path.includes('/course-management/tasks')) return Promise.resolve({ tasks: [{ id: 'task-1', title: '任务', status: 'published', revision: 2, content: { subjectId: 'subject-pmp', sourceActivityIds: ['a-1'] } }] });
+        if (input.path.includes('/questions/reference-snapshot')) return Promise.resolve({ papers: [{ id: 'paper-1', subjectId: 'subject-pmp', sections: [] }], releases: [] });
+        return Promise.resolve(shared);
+      },
+    },
+    location: { search: '' }, dispatchEvent() {},
+    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
+  };
+  vm.runInContext(
+    readRepo('frontend/scripts/new-legacy-assets/teaching-content-adapter.js'),
+    vm.createContext({ window, URL, URLSearchParams, structuredClone, Promise, console }),
+  );
+  await window.KGTeachingContentApi.bootstrap('subject-pmp', { relationships: true });
+  assert.equal(window.KGTeachingContentApi.readResource('courseDrafts')[0].id, 'draft-1');
+  assert.equal(window.KGTeachingContentApi.readResource('tasks')[0].sourceActivityIds[0], 'a-1');
+  assert.equal(window.KGTeachingContentApi.readResource('papers')[0].id, 'paper-1');
+
+  let settled = false;
+  const saving = window.KGTeachingContentApi.saveSubjects([{ id: 'subject-pmp', code: 'PMP', name: { zh: '新名称' } }]).then(() => { settled = true; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(settled, false);
+  const put = calls.find(call => call.method === 'PUT');
+  assert.equal(put.body.contentRevision, 8);
+  assert.equal(put.body.subjects[0].name.zh, '新名称');
+  resolvePut();
+  await saving;
+  assert.equal(settled, true);
+  assert.equal(window.KGTeachingContentApi.readResource('subjects')[0].name.zh, '新名称');
+});
+
+test('catalog replacement refreshes after conflict without blindly overwriting the winner', async () => {
+  let gets = 0;
+  let puts = 0;
+  const initial = { subjectId: 'subject-pmp', contentRevision: 3, subjects: [{ id: 'subject-pmp', name: { zh: '初始' } }], taxonomies: [], activityOverrides: [], activityTags: [], activityCollections: [] };
+  const winner = { ...initial, contentRevision: 4, subjects: [{ id: 'subject-pmp', name: { zh: '其他教师已保存' } }] };
+  const window = {
+    KGDomainApi: {
+      async request(input) {
+        if (input.method === 'PUT') {
+          puts += 1;
+          const error = new Error('内容已更新');
+          error.status = 409;
+          throw error;
+        }
+        gets += 1;
+        return structuredClone(gets === 1 ? initial : winner);
+      },
+    },
+    addEventListener() {}, dispatchEvent() {},
+    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
+  };
+  vm.runInContext(readRepo('frontend/scripts/new-legacy-assets/teaching-content-adapter.js'), vm.createContext({ window, structuredClone, Promise, console, setTimeout, clearTimeout }));
+  await window.KGTeachingContentApi.bootstrap('subject-pmp');
+  await assert.rejects(window.KGTeachingContentApi.saveSubjects([{ id: 'subject-pmp', name: { zh: '陈旧覆盖' } }]), /内容已更新/);
+  assert.equal(puts, 1);
+  assert.equal(gets, 2);
+  assert.equal(window.KGTeachingContentApi.readResource('subjects')[0].name.zh, '其他教师已保存');
 });
 
 test('all recall authoring entry points await the relational save before success feedback', () => {
@@ -90,47 +216,12 @@ test('principle editor awaits typed API persistence before rendering success', (
   assert.match(source, /await global\.KGTeachingContentApi\.savePrinciple/);
 });
 
-test('teaching adapter bootstraps relational snapshots and retries one stale taxonomy save', async () => {
-  const calls = [];
-  let putCount = 0;
-  const initial = {
-    subjectId: 'subject-pmp', contentRevision: 4,
-    subjects: [{ id: 'subject-pmp', code: 'PMP', name: { zh: 'PMP' } }],
-    taxonomies: [{ id: 'tax-v1', subjectId: 'subject-pmp', version: 1, status: 'published', nodes: [] }],
-    knowledgeTree: { taxonomy: { id: 'tax-v1', subjectId: 'subject-pmp', version: 1, status: 'published', nodes: [] } },
-    activityOverrides: [{ id: 'q-1' }], activityCollections: [],
-    recallLibrary: { schemaVersion: 1, nodes: [], edges: [] },
-    principles: { schemaVersion: 1, items: [{ id: 'p-1', name: '原则' }] },
-    synthesisPresets: { schemaVersion: 1, items: [] }, tagConfig: {},
-  };
-  const window = {
-    KGDomainApi: {
-      async request(input) {
-        calls.push(input);
-        if (input.method === 'PUT') {
-          putCount += 1;
-          if (putCount === 1) throw Object.assign(new Error('stale'), { status: 409 });
-          return { ...initial, contentRevision: 6, knowledgeTree: input.body.knowledgeTree };
-        }
-        return { ...initial, contentRevision: calls.length === 2 ? 5 : initial.contentRevision };
-      },
-    },
-    location: { search: '?subjectId=subject-pmp' },
-    dispatchEvent() {},
-    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
-  };
-  const context = vm.createContext({ window, URLSearchParams, structuredClone, Promise, console });
-  vm.runInContext(readRepo('frontend/scripts/new-legacy-assets/teaching-content-adapter.js'), context);
-  await window.KGTeachingContentApi.bootstrap('subject-pmp');
-  assert.equal(JSON.stringify(window.KGTeachingContentApi.readResource('subjects')), JSON.stringify(initial.subjects));
-
-  const saved = await window.KGTeachingContentApi.saveTaxonomy({
-    id: 'tax-v2', subjectId: 'subject-pmp', version: 2, nodes: [],
-  });
-  assert.equal(saved.id, 'tax-v2');
-  assert.equal(putCount, 2);
-  assert.equal(calls.filter(call => call.method === 'PUT').length, 2);
-  assert.equal(window.KGTeachingContentApi.snapshot().contentRevision, 6);
+test('taxonomy lifecycle has one catalog writer and no blind-retry gateway', () => {
+  const adapter = readRepo('frontend/scripts/new-legacy-assets/teaching-content-adapter.js');
+  const gateway = readSource('src/admin/42-teaching-content-server-gateway.js');
+  assert.doesNotMatch(adapter, /function saveTaxonomy|function releaseTaxonomy|retryConflict/);
+  assert.doesNotMatch(gateway, /publishTaxonomy|publishCurrentTaxonomyFromStore|Api\.saveTaxonomy/);
+  assert.match(adapter, /saveTaxonomies: value => saveCatalogResource\('taxonomies', value\)/);
 });
 
 test('teaching adapter keeps late subject bootstrap from replacing the active subject', async () => {
@@ -353,6 +444,9 @@ test('admin teaching gateway keeps ordered writes moving after one API failure',
   let rejectFirst = true;
   const window = {
     KGTeachingContentApi: {
+      async saveCatalogResource(_name, rows) {
+        return this.importActivities(rows);
+      },
       async importActivities(rows) {
         attempts.push(rows.map(row => row.id).join(','));
         if (rejectFirst) {
@@ -386,28 +480,49 @@ test('admin teaching gateway keeps ordered writes moving after one API failure',
   assert.deepEqual(attempts, ['first', 'second']);
 });
 
-test('Task 5B repository writes remain synchronous for transaction rollback safety', () => {
+test('Task 5B repository writes await authoritative catalog persistence', async () => {
+  let resolveSave;
   const window = {
     KGAdminCore: { clone: structuredClone, nowIso: () => '2026-08-30T00:00:00Z' },
     KGAppStorage: { writeJSON() { return true; }, readJSON(_key, fallback) { return fallback; } },
     KGContentRepository: { assertRepository() {} },
+    KGTeachingContentApi: {
+      saveCatalogResource() {
+        return new Promise(resolve => { resolveSave = resolve; });
+      },
+    },
   };
   const context = vm.createContext({ window, structuredClone, Promise });
   vm.runInContext(readSource('src/admin/11-local-content-repository.js'), context);
   const repository = new window.KGLocalContentRepository();
   const result = repository.write('taxonomies', [{ id: 'tax-v2' }]);
-  assert.equal(result, true);
-  assert.equal(typeof result?.then, 'undefined');
+  assert.equal(typeof result?.then, 'function');
+  let settled = false;
+  result.then(() => { settled = true; });
+  await Promise.resolve();
+  assert.equal(settled, false);
+  resolveSave({ taxonomies: [{ id: 'tax-v2' }] });
+  assert.equal(await result, true);
 });
 
-test('phase A keeps the three pages on Runtime policy until Task 6', () => {
+test('Task 5B removes all three teaching pages from Runtime policy', () => {
   for (const relative of [
     'frontend/scripts/runtime-page-policy.json',
     'backend/app/web/runtime_page_policy.json',
   ]) {
     const policy = JSON.parse(readRepo(relative));
     for (const page of ['admin-subjects.html', 'content-prep.html', 'content-center.html']) {
-      assert.equal(policy.runtimePages.includes(page), true, `${relative}:${page}`);
+      assert.equal(policy.runtimePages.includes(page), false, `${relative}:${page}`);
     }
+  }
+  const template = readSource('content-prep-studio/src/index.template.html');
+  assert.doesNotMatch(template, /server-state-bootstrap\.js/);
+  assert.match(template, /kg-direct-bootstrap-anchor/);
+});
+
+test('content center retains required read helpers after the admin facade replaces its core', () => {
+  const registry = readSource('src/admin/40-admin-service-registry.js');
+  for (const method of ['currentUser', 'pathLabel', 'searchNodes', 'normalizeCourse']) {
+    assert.match(registry, new RegExp(`${method}:\\(\\.\\.\\.args\\)=>legacy\\.${method}`));
   }
 });
