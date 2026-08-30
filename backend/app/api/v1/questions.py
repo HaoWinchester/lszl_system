@@ -98,7 +98,10 @@ async def clear_bank_test_learning_records(
 # ---------- 题目 ----------
 @router.get("/questions/reference-snapshot")
 async def question_reference_snapshot(db: DB, user: QuestionBankManager):
-    return await complete_relational_reference_snapshot(db)
+    return await complete_relational_reference_snapshot(
+        db,
+        owner_id=None if user.role == "admin" else user.username,
+    )
 
 
 @router.get("/banks/{bank_id}/questions")
