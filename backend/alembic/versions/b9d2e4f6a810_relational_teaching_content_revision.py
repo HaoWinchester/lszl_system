@@ -6,10 +6,6 @@ Revises: c8e4f1a2b930
 
 from __future__ import annotations
 
-import json
-from datetime import datetime, timezone
-from typing import Any
-
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -20,95 +16,125 @@ down_revision = "c8e4f1a2b930"
 branch_labels = None
 depends_on = None
 
-REVISION_KEY = "kg_teaching_content_revision_v1"
-MAX_CHANGES = 100
+LEGACY_REVISION_KEY = "kg_teaching_content_revision_v1"
 
 
-def _normalize_changes(changes: Any) -> list[dict[str, str]]:
-    if not isinstance(changes, list):
-        return []
-    normalized: list[dict[str, str]] = []
-    seen: set[tuple[str, str, str]] = set()
-    for change in changes:
-        if not isinstance(change, dict):
-            continue
-        identity = (
-            change.get("entityType"),
-            change.get("entityId"),
-            change.get("action"),
+DEFAULT_INSERT_SQL = """
+INSERT INTO public.teaching_content_revisions (id, revision, changes, updated_by)
+VALUES (1, 0, '[]'::jsonb, NULL)
+"""
+
+BACKFILL_SQL = f"""
+DO $teaching_revision_backfill$
+DECLARE
+    legacy_table regclass := to_regclass('public.shared_runtime_states');
+    legacy_value text;
+    legacy_updated_by varchar(64);
+    legacy_updated_at timestamptz;
+    payload jsonb;
+    parsed_revision integer := 0;
+    parsed_changes jsonb := '[]'::jsonb;
+    parsed_updated_by varchar(64);
+    parsed_updated_at timestamptz;
+BEGIN
+    IF legacy_table IS NULL THEN
+        RETURN;
+    END IF;
+
+    BEGIN
+        EXECUTE format(
+            'SELECT value, updated_by, updated_at FROM %s WHERE key = $1',
+            legacy_table
         )
-        if not all(isinstance(value, str) and value for value in identity):
-            continue
-        if identity in seen:
-            continue
-        seen.add(identity)
-        normalized.append(
-            {
-                "entityType": identity[0],
-                "entityId": identity[1],
-                "action": identity[2],
-            }
+        INTO legacy_value, legacy_updated_by, legacy_updated_at
+        USING '{LEGACY_REVISION_KEY}';
+    EXCEPTION WHEN OTHERS THEN
+        RETURN;
+    END;
+
+    IF legacy_value IS NULL THEN
+        RETURN;
+    END IF;
+
+    BEGIN
+        payload := legacy_value::jsonb;
+    EXCEPTION WHEN OTHERS THEN
+        RETURN;
+    END;
+
+    IF jsonb_typeof(payload) <> 'object' THEN
+        RETURN;
+    END IF;
+
+    IF jsonb_typeof(payload -> 'revision') = 'number'
+       AND payload ->> 'revision' ~ '^[0-9]+$' THEN
+        BEGIN
+            parsed_revision := (payload ->> 'revision')::integer;
+        EXCEPTION WHEN OTHERS THEN
+            parsed_revision := 0;
+        END;
+    END IF;
+
+    IF jsonb_typeof(payload -> 'changes') = 'array' THEN
+        SELECT COALESCE(
+            jsonb_agg(normalized ORDER BY first_ordinal),
+            '[]'::jsonb
         )
-        if len(normalized) == MAX_CHANGES:
-            break
-    return normalized
+        INTO parsed_changes
+        FROM (
+            SELECT
+                jsonb_build_object(
+                    'entityType', item ->> 'entityType',
+                    'entityId', item ->> 'entityId',
+                    'action', item ->> 'action'
+                ) AS normalized,
+                min(ordinality) AS first_ordinal
+            FROM jsonb_array_elements(payload -> 'changes')
+                WITH ORDINALITY AS entries(item, ordinality)
+            WHERE jsonb_typeof(item) = 'object'
+              AND jsonb_typeof(item -> 'entityType') = 'string'
+              AND jsonb_typeof(item -> 'entityId') = 'string'
+              AND jsonb_typeof(item -> 'action') = 'string'
+              AND item ->> 'entityType' <> ''
+              AND item ->> 'entityId' <> ''
+              AND item ->> 'action' <> ''
+            GROUP BY
+                item ->> 'entityType',
+                item ->> 'entityId',
+                item ->> 'action'
+            ORDER BY min(ordinality)
+            LIMIT 100
+        ) AS normalized_changes;
+    END IF;
 
+    parsed_updated_by := CASE
+        WHEN jsonb_typeof(payload -> 'updatedBy') = 'string'
+         AND char_length(payload ->> 'updatedBy') <= 64
+        THEN payload ->> 'updatedBy'
+        ELSE legacy_updated_by
+    END;
+    parsed_updated_at := legacy_updated_at;
+    IF jsonb_typeof(payload -> 'updatedAt') = 'string' THEN
+        BEGIN
+            parsed_updated_at := (payload ->> 'updatedAt')::timestamptz;
+        EXCEPTION WHEN OTHERS THEN
+            parsed_updated_at := legacy_updated_at;
+        END;
+    END IF;
 
-def _parse_updated_at(value: Any, fallback: datetime | None) -> datetime | None:
-    if not isinstance(value, str):
-        return fallback
-    try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return fallback
-    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
-
-
-def _legacy_values(bind: sa.Connection) -> dict[str, Any]:
-    legacy = bind.execute(
-        sa.text(
-            """
-            SELECT value, updated_by, updated_at
-            FROM shared_runtime_states
-            WHERE key = :key
-            """
-        ),
-        {"key": REVISION_KEY},
-    ).mappings().first()
-    if legacy is None:
-        return {"id": 1, "revision": 0, "changes": [], "updated_by": None}
-    try:
-        payload = json.loads(legacy["value"])
-    except (TypeError, ValueError):
-        payload = None
-    if not isinstance(payload, dict):
-        return {"id": 1, "revision": 0, "changes": [], "updated_by": None}
-
-    legacy_revision = payload.get("revision")
-    parsed_revision = (
-        legacy_revision
-        if isinstance(legacy_revision, int)
-        and not isinstance(legacy_revision, bool)
-        and legacy_revision >= 0
-        else 0
-    )
-    updated_by = payload.get("updatedBy")
-    values: dict[str, Any] = {
-        "id": 1,
-        "revision": parsed_revision,
-        "changes": _normalize_changes(payload.get("changes")),
-        "updated_by": (
-            updated_by if isinstance(updated_by, str) else legacy["updated_by"]
-        ),
-    }
-    updated_at = _parse_updated_at(payload.get("updatedAt"), legacy["updated_at"])
-    if updated_at is not None:
-        values["updated_at"] = updated_at
-    return values
+    UPDATE public.teaching_content_revisions
+    SET revision = parsed_revision,
+        changes = parsed_changes,
+        updated_by = parsed_updated_by,
+        updated_at = COALESCE(parsed_updated_at, now())
+    WHERE id = 1;
+END
+$teaching_revision_backfill$;
+"""
 
 
 def upgrade() -> None:
-    revisions = op.create_table(
+    op.create_table(
         "teaching_content_revisions",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("revision", sa.Integer(), nullable=False, server_default="0"),
@@ -129,9 +155,11 @@ def upgrade() -> None:
             "id = 1",
             name="ck_teaching_content_revision_singleton",
         ),
+        schema="public",
     )
-    op.bulk_insert(revisions, [_legacy_values(op.get_bind())])
+    op.execute(DEFAULT_INSERT_SQL)
+    op.execute(BACKFILL_SQL)
 
 
 def downgrade() -> None:
-    op.drop_table("teaching_content_revisions")
+    op.drop_table("teaching_content_revisions", schema="public")

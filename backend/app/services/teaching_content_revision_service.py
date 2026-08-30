@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.teaching_content import TeachingContentRevision
 
 
-REVISION_KEY = "kg_teaching_content_revision_v1"
+REVISION_LOCK_KEY = "kg_teaching_content_revision_v1"
+# Compatibility alias for callers that imported the former storage-key name.
+REVISION_KEY = REVISION_LOCK_KEY
 CLEANUP_LOCK_KEY = "question-pool-cleanup-v1"
 MAX_CHANGES = 100
 
@@ -76,7 +78,7 @@ async def acquire_lock(db: AsyncSession) -> None:
 
     await db.execute(
         text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
-        {"key": REVISION_KEY},
+        {"key": REVISION_LOCK_KEY},
     )
 
 
@@ -85,14 +87,14 @@ async def acquire_read_lock(db: AsyncSession) -> None:
 
     await db.execute(
         text("SELECT pg_advisory_xact_lock_shared(hashtextextended(:key, 0))"),
-        {"key": REVISION_KEY},
+        {"key": REVISION_LOCK_KEY},
     )
 
 
 async def acquire_cleanup_lock(db: AsyncSession) -> None:
     """Serialize cleanup after the global teaching-content writer lock.
 
-    Every supported teaching writer takes ``REVISION_KEY`` first.  Keeping
+    Every supported teaching writer takes ``REVISION_LOCK_KEY`` first. Keeping
     that shared lock order prevents writers from entering between cleanup's
     snapshot recheck and its destructive mutations.
     """

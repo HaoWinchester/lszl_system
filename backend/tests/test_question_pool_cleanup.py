@@ -54,6 +54,10 @@ from app.services import (
     teaching_content_revision_service,
 )
 from scripts import question_pool_maintenance
+from tests.teaching_content_revision_support import (
+    apply_revision_snapshot,
+    snapshot_revision_row,
+)
 
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "question_cleanup"
@@ -3233,12 +3237,8 @@ def test_cleanup_apply_and_verify_cli_secure_receipt_and_detect_all_drift(
                     1,
                 )
                 assert revision_row is not None
-                original_value = {
-                    "revision": revision_row.revision,
-                    "changes": list(revision_row.changes),
-                    "updated_by": revision_row.updated_by,
-                    "updated_at": revision_row.updated_at,
-                }
+                original_value = snapshot_revision_row(revision_row)
+                assert original_value is not None
                 revision_row.revision += 1
                 await db.commit()
                 return original_value
@@ -3255,10 +3255,7 @@ def test_cleanup_apply_and_verify_cli_secure_receipt_and_detect_all_drift(
                     1,
                 )
                 assert revision_row is not None
-                revision_row.revision = original_revision_value["revision"]
-                revision_row.changes = original_revision_value["changes"]
-                revision_row.updated_by = original_revision_value["updated_by"]
-                revision_row.updated_at = original_revision_value["updated_at"]
+                apply_revision_snapshot(revision_row, original_revision_value)
                 await db.execute(
                     delete(QuestionAuditLog).where(
                         QuestionAuditLog.question_id == bound_keep_id
@@ -3366,10 +3363,7 @@ def test_cleanup_apply_and_verify_cli_secure_receipt_and_detect_all_drift(
                         1,
                     )
                     if revision_row is not None:
-                        revision_row.revision = original_revision_value["revision"]
-                        revision_row.changes = original_revision_value["changes"]
-                        revision_row.updated_by = original_revision_value["updated_by"]
-                        revision_row.updated_at = original_revision_value["updated_at"]
+                        apply_revision_snapshot(revision_row, original_revision_value)
                 await db.commit()
 
         asyncio.run(cleanup_verification_drift())

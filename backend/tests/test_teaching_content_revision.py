@@ -38,40 +38,17 @@ from app.services.content_prep_service import (
     upload_bundle,
 )
 from tests.test_content_prep_upload import question_payload, request_payload
+from tests.teaching_content_revision_support import (
+    restore_teaching_content_revision,
+    restore_teaching_content_revision_state as _restore_revision_row,
+    snapshot_teaching_content_revision,
+    snapshot_teaching_content_revision_state as _snapshot_revision_row,
+)
 
 
 PASSWORD = "revision-pass"
 PRINCIPLE_PROJECTION_KEY = "kg_principle_repository_v1"
 PRESET_PROJECTION_KEY = "kg_synthesis_preset_repository_v1"
-
-
-async def _snapshot_revision_row() -> dict | None:
-    async with AsyncSessionLocal() as db:
-        row = await db.get(TeachingContentRevision, 1)
-        if row is None:
-            return None
-        return {
-            "revision": row.revision,
-            "changes": deepcopy(row.changes),
-            "updated_by": row.updated_by,
-            "updated_at": row.updated_at,
-        }
-
-
-async def _restore_revision_row(snapshot: dict | None) -> None:
-    async with AsyncSessionLocal() as db:
-        await db.execute(delete(TeachingContentRevision))
-        if snapshot is not None:
-            db.add(
-                TeachingContentRevision(
-                    id=1,
-                    revision=int(snapshot["revision"]),
-                    changes=deepcopy(snapshot["changes"]),
-                    updated_by=snapshot["updated_by"],
-                    updated_at=snapshot["updated_at"],
-                )
-            )
-        await db.commit()
 
 
 def test_bump_is_monotonic_deduplicated_and_capped() -> None:
@@ -1393,14 +1370,10 @@ async def _snapshot_shared_rows(keys: set[str]) -> dict[str, dict]:
             for row in rows
         }
         if revision_service.REVISION_KEY in keys:
-            revision = await db.get(TeachingContentRevision, 1)
+            revision = await snapshot_teaching_content_revision(db)
             if revision is not None:
                 snapshot[revision_service.REVISION_KEY] = {
-                    "relational": True,
-                    "revision": revision.revision,
-                    "changes": deepcopy(revision.changes),
-                    "updated_by": revision.updated_by,
-                    "updated_at": revision.updated_at,
+                    **revision,
                 }
         return snapshot
 
@@ -1426,18 +1399,8 @@ async def _restore_shared_rows(keys: set[str], snapshot: dict[str, dict]) -> Non
             ]
         )
         if revision_service.REVISION_KEY in keys:
-            await db.execute(delete(TeachingContentRevision))
             revision = snapshot.get(revision_service.REVISION_KEY)
-            if revision is not None:
-                db.add(
-                    TeachingContentRevision(
-                        id=1,
-                        revision=int(revision["revision"]),
-                        changes=deepcopy(revision["changes"]),
-                        updated_by=revision["updated_by"],
-                        updated_at=revision["updated_at"],
-                    )
-                )
+            await restore_teaching_content_revision(db, revision)
         await db.commit()
 
 

@@ -12,9 +12,13 @@ from app.main import app
 from app.models.content_prep import Principle, QuestionTagConfig, QuestionUploadBatch, SynthesisPreset
 from app.models.question import Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
-from app.models.teaching_content import ActivityOverride, ContentSubject, ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode, TeachingContentRevision
+from app.models.teaching_content import ActivityOverride, ContentSubject, ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode
 from app.models.user import User
 from app.services import teaching_content_revision_service
+from tests.teaching_content_revision_support import (
+    restore_teaching_content_revision,
+    snapshot_teaching_content_revision,
+)
 
 
 PASSWORD = "shared-prep-pass"
@@ -142,13 +146,7 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
     async def seed() -> None:
         nonlocal previous_active_tag_id, subject_metadata_snapshot, recall_snapshot, revision_snapshot
         async with AsyncSessionLocal() as db:
-            revision = await db.get(TeachingContentRevision, 1)
-            revision_snapshot = None if revision is None else {
-                "revision": revision.revision,
-                "changes": deepcopy(revision.changes),
-                "updated_by": revision.updated_by,
-                "updated_at": revision.updated_at,
-            }
+            revision_snapshot = await snapshot_teaching_content_revision(db)
             subject = await db.get(ContentSubject, "subject-pmp")
             subject_metadata_snapshot = None if subject is None else dict(subject.content_metadata or {})
             recall_id = str((subject_metadata_snapshot or {}).get("currentRecallLibraryId") or "")
@@ -226,9 +224,7 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
                 await db.execute(delete(SharedRuntimeState).where(SharedRuntimeState.key == key))
                 if snapshot is not None:
                     db.add(SharedRuntimeState(key=key, **snapshot))
-            await db.execute(delete(TeachingContentRevision))
-            if revision_snapshot is not None:
-                db.add(TeachingContentRevision(id=1, **revision_snapshot))
+            await restore_teaching_content_revision(db, revision_snapshot)
             await db.execute(delete(User).where(User.username.in_([teacher_a, teacher_b, student, viewer])))
             await db.commit()
 
