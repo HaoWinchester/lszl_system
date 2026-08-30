@@ -69,6 +69,25 @@ def test_duplicate_folder_ids_and_casefold_tag_aliases_are_blockers() -> None:
     asyncio.run(scenario())
 
 
+def test_tag_names_that_only_diverge_after_database_truncation_are_blockers() -> None:
+    prefix = "x" * 40
+    owner = f"graph-tag-truncation-{uuid4().hex[:10]}"
+    storage = {
+        "kg_graph_file_tags_v2": {
+            owner: [
+                {"id": "tag-long-a", "name": f"{prefix}A"},
+                {"id": "tag-long-b", "name": f"{prefix}B"},
+            ]
+        }
+    }
+
+    scan = scan_runtime_graph_storage(owner, storage)
+
+    assert [warning["code"] for warning in scan["warnings"]] == [
+        "tag-name-alias-collision"
+    ]
+
+
 def test_migrate_owner_graph_files_recovers_orphan_content_and_uses_smallest_order_as_current() -> None:
     suffix = uuid4().hex[:10]
     owner = f"graph-migration-{suffix}"

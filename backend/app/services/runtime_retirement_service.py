@@ -660,14 +660,16 @@ async def _external_item_proofs(
     question_proofs: dict[str, dict[str, Any]] = {}
     paper_proofs: dict[str, dict[str, Any]] = {}
     for item in items:
-        identity = f"{item.owner_scope}\0{item.source_key}"
-        owner_ids = None if item.owner_scope == "shared" else {item.owner_scope}
+        identity = f"{item.source_type}\0{item.source_key}\0{item.owner_scope}"
         if item.source_key == question_migration.PUBLISHED_BANK_KEY or item.source_key.startswith(
             question_migration.PRIVATE_BANK_PREFIX
         ):
-            bank_ids = _payload_entity_ids(item.source_payload, "id", "bankId")
-            proof = await question_migration.verify_runtime_question_targets(
-                db, owner_ids=owner_ids, bank_ids=bank_ids
+            proof = await question_migration.verify_runtime_question_item(
+                db,
+                source_type=item.source_type,
+                source_key=item.source_key,
+                owner_scope=item.owner_scope,
+                payload=item.source_payload,
             )
             question_proofs[identity] = proof
             continue
@@ -675,12 +677,12 @@ async def _external_item_proofs(
             item.source_key.startswith(question_migration.PAPER_DRAFT_PREFIX)
             or item.source_key == question_migration.PAPER_SHARED_DRAFT_KEY
         ):
-            paper_ids = _payload_entity_ids(item.source_payload, "id", "paperId")
-            proof = await question_migration.verify_runtime_paper_targets(
+            proof = await question_migration.verify_runtime_paper_item(
                 db,
-                owner_ids=owner_ids,
-                paper_ids=paper_ids,
-                category_ids=set(),
+                source_type=item.source_type,
+                source_key=item.source_key,
+                owner_scope=item.owner_scope,
+                payload=item.source_payload,
             )
             paper_proofs[identity] = proof
             continue
@@ -688,12 +690,12 @@ async def _external_item_proofs(
             item.source_key.startswith(question_migration.PAPER_CATEGORY_PREFIX)
             or item.source_key == question_migration.PAPER_SHARED_CATEGORY_KEY
         ):
-            category_ids = _payload_entity_ids(item.source_payload, "id", "categoryId")
-            proof = await question_migration.verify_runtime_paper_targets(
+            proof = await question_migration.verify_runtime_paper_item(
                 db,
-                owner_ids=owner_ids,
-                paper_ids=set(),
-                category_ids=category_ids,
+                source_type=item.source_type,
+                source_key=item.source_key,
+                owner_scope=item.owner_scope,
+                payload=item.source_payload,
             )
             paper_proofs[identity] = proof
     return question_proofs, paper_proofs
@@ -796,7 +798,9 @@ async def _mark_external_items(
         disposition = _managed_disposition(item.source_key)
         if not disposition or disposition[0] != domain_migration.DISPOSITION_ALREADY_RELATIONAL_VERIFY:
             continue
-        if item.target_domain == "files" and item.owner_scope in {"", "shared"}:
+        if item.target_domain == "files" and (
+            item.source_type != "runtime" or item.owner_scope in {"", "shared"}
+        ):
             item.status = "failed"
             item.target_count = 0
             item.target_hash = None
@@ -804,9 +808,9 @@ async def _mark_external_items(
             metadata["unresolved_conflicts"] = max(
                 1, int(metadata.get("unresolved_conflicts") or 0)
             )
-            metadata["coverage_error"] = "file source has no explicit runtime owner"
+            metadata["coverage_error"] = "file source is not an owner-scoped runtime row"
             item.verification_metadata = metadata
-            item.error = "external file identity is not owner scoped"
+            item.error = "external file identity is not an owner-scoped runtime row"
             continue
         if item.target_domain == "files":
             proof = (summary.get("files", {}).get("itemProofs") or {}).get(
@@ -832,13 +836,13 @@ async def _mark_external_items(
             item.target_hash = str(proof.get("targetHash") or "") or None
         elif item.source_key.startswith(question_migration.PAPER_DRAFT_PREFIX) or item.source_key.startswith(question_migration.PAPER_CATEGORY_PREFIX) or item.source_key in {question_migration.PAPER_SHARED_DRAFT_KEY, question_migration.PAPER_SHARED_CATEGORY_KEY}:
             proof = (summary.get("papers", {}).get("itemProofs") or {}).get(
-                f"{item.owner_scope}\0{item.source_key}"
+                f"{item.source_type}\0{item.source_key}\0{item.owner_scope}"
             )
             ok = bool(isinstance(proof, Mapping) and proof.get("verified"))
             proof_hash = proof.get("verificationHash") if isinstance(proof, Mapping) else None
         else:
             proof = (summary.get("questions", {}).get("itemProofs") or {}).get(
-                f"{item.owner_scope}\0{item.source_key}"
+                f"{item.source_type}\0{item.source_key}\0{item.owner_scope}"
             )
             ok = bool(isinstance(proof, Mapping) and proof.get("verified"))
             proof_hash = proof.get("verificationHash") if isinstance(proof, Mapping) else None
@@ -876,6 +880,9 @@ def _item_metrics(items: list[RuntimeMigrationItem]) -> dict[str, int]:
         "parseErrors": sum(bool((item.verification_metadata or {}).get("parse_error")) for item in items),
         "hashMismatches": sum(bool(item.error and "hash" in item.error.lower()) for item in items),
         "unresolvedConflicts": unresolved,
+        "requiredFailures": sum(
+            bool(item.required and item.status == "failed") for item in items
+        ),
     }
 
 
@@ -1386,9 +1393,9 @@ async def _inventory_evidence(
 ) -> dict[str, Any]:
     stored = (run.report or {}).get("source_snapshot_payload")
     if not isinstance(stored, list):
-        return {"inventoryDrift": 1, "unknown": 0, "parseErrors": 0, "items": []}
+        return {"inventoryDrift": 1, "inventoryScopeInvalid": 0, "unknown": 0, "parseErrors": 0, "items": []}
     if (run.report or {}).get("source_inventory_scope") != "live":
-        return {"inventoryDrift": 0, "unknown": 0, "parseErrors": 0, "items": []}
+        return {"inventoryDrift": 0, "inventoryScopeInvalid": 1, "unknown": 0, "parseErrors": 0, "items": []}
     live = list(await domain_migration._runtime_sources(db))
     frozen_by_identity = {
         _source_identity(row): canonical_hash(row.get("payload"))
@@ -1426,6 +1433,7 @@ async def _inventory_evidence(
         )
     return {
         "inventoryDrift": len(drift_identities),
+        "inventoryScopeInvalid": 0,
         "unknown": unknown,
         "parseErrors": parse_errors,
         "items": public_items,
@@ -1581,6 +1589,7 @@ async def drop_check(
         ledger_allowed = bool(
             items
             and run.status == "verified"
+            and (run.report or {}).get("source_inventory_scope") == "live"
             and run.source_snapshot_hash
             and run.source_snapshot_count > 0
             and run.backup_reference
@@ -1596,11 +1605,15 @@ async def drop_check(
             "items": _public_item_summaries(items),
             "inventoryItems": inventory["items"],
             "inventoryDrift": inventory["inventoryDrift"],
+            "inventoryScopeInvalid": inventory["inventoryScopeInvalid"],
             **metrics,
         }
         gate = evaluate_drop_gate(verification, policy_paths=policy_paths)
         if inventory["inventoryDrift"]:
             gate["blockers"].append("inventoryDrift")
+            gate["ready"] = False
+        if inventory["inventoryScopeInvalid"]:
+            gate["blockers"].append("inventoryScope")
             gate["ready"] = False
         if not ledger_allowed and "ledgerVerification" not in gate["blockers"]:
             gate["blockers"].append("ledgerVerification")

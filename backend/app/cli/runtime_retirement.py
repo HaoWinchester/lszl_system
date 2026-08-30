@@ -31,6 +31,7 @@ def report_exit_code(command: str, report: dict) -> int:
         "hashMismatches",
         "unresolvedConflicts",
         "inventoryDrift",
+        "inventoryScopeInvalid",
         "requiredFailures",
         "pending",
     )

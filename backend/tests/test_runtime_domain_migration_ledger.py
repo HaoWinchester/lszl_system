@@ -307,12 +307,12 @@ def test_scan_deduplicates_identical_source_hashes_and_required_failure_blocks_d
             item.discard_reason = None
             await db.commit()
             assert (await verify(db, run_id))["required_failures"] == 0
-            assert await can_drop_runtime(db, run_id) is True
+            assert await can_drop_runtime(db, run_id) is False
 
             drop_report = await drop_check(db, run_id)
-            assert drop_report["can_drop"] is True
+            assert drop_report["can_drop"] is False
             assert drop_report["ddl_executed"] is False
-            assert drop_report["status"] == "drop_allowed"
+            assert drop_report["status"] == "drop_blocked"
             run.source_snapshot_hash = "0" * 64
             await db.commit()
             assert await can_drop_runtime(db, run_id) is False
@@ -325,7 +325,7 @@ def test_scan_deduplicates_identical_source_hashes_and_required_failure_blocks_d
             assert blocked_backup["ddl_executed"] is False
             run.backup_reference = f"backup:{run_id}"
             await db.commit()
-            assert await can_drop_runtime(db, run_id) is True
+            assert await can_drop_runtime(db, run_id) is False
             # verify 以账本计数为准重算状态；制造真实计数不匹配而不是只写 error。
             item.target_count = item.source_count + 1
             item.error = "target count mismatch"
@@ -343,7 +343,7 @@ def test_scan_deduplicates_identical_source_hashes_and_required_failure_blocks_d
             item.target_count = 1
             await db.commit()
             assert (await verify(db, run_id))["required_failures"] == 0
-            assert await can_drop_runtime(db, run_id) is True
+            assert await can_drop_runtime(db, run_id) is False
 
             item.required = False
             item.status = "failed"
@@ -356,6 +356,35 @@ def test_scan_deduplicates_identical_source_hashes_and_required_failure_blocks_d
 
             await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
             await db.commit()
+
+    asyncio.run(scenario())
+
+
+def test_required_mapper_failure_makes_migrate_fail_and_never_allows_drop() -> None:
+    run_id = f"mapper-failure-{uuid4().hex}"
+    source_key = "kg_mapper_failure_v1"
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            try:
+                await scan(db, run_id=run_id, sources=[{
+                    "source_type": "runtime",
+                    "source_key": source_key,
+                    "owner_id": "teacher-a",
+                    "payload": {"id": "source-a"},
+                    "required": True,
+                }])
+
+                async def broken_mapper(_db, _item):
+                    raise ValueError("deterministic mapper failure")
+
+                report = await migrate(db, run_id, target_mappers={source_key: broken_mapper})
+                assert report["status"] == "verification_failed"
+                assert report["required_failures"] == 1
+                assert await can_drop_runtime(db, run_id) is False
+            finally:
+                await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
+                await db.commit()
 
     asyncio.run(scenario())
 
@@ -691,7 +720,7 @@ def test_paper_release_mappers_materialize_shared_catalog_and_history() -> None:
             assert all(row.snapshot["title"] == "冻结题目" for row in rows)
             verified = await verify(db, run_id)
             assert verified["status"] == "verified"
-            assert await can_drop_runtime(db, run_id) is True
+            assert await can_drop_runtime(db, run_id) is False
 
             overlap_run_id = f"paper-release-overlap-{suffix}"
             await scan(db, run_id=overlap_run_id, sources=[

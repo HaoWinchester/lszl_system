@@ -733,13 +733,19 @@ async def migrate(
             item.verification_metadata = metadata
         migrated += 1
     pending = sum(1 for item in items if item.required and item.status == "pending")
-    run.status = "applied" if pending == 0 else "verification_failed"
+    required_failures = sum(
+        1 for item in items if item.required and item.status == "failed"
+    )
+    run.status = (
+        "applied" if pending == 0 and required_failures == 0 else "verification_failed"
+    )
     report = {
         "run_id": run_id,
         "status": run.status,
         "items": len(items),
         "migrated": migrated,
         "pending": pending,
+        "required_failures": required_failures,
         # Carry the frozen scan snapshot forward; every stage must keep it so
         # the drop gate can re-verify after the live tables are emptied.
         "source_snapshot_payload": (run.report or {}).get("source_snapshot_payload"),
@@ -1050,14 +1056,15 @@ async def can_drop_runtime(db: AsyncSession, run_id: str) -> bool:
         return False
     if canonical_json_hash(stored_snapshot) != run.source_snapshot_hash:
         return False
-    if (run.report or {}).get("source_inventory_scope") == "live":
-        # Compare the complete live inventory.  Filtering by the frozen
-        # identities would hide a key or owner created after verification.
-        current_snapshot = _source_snapshot_payload(await _runtime_sources(db))
-        if len(current_snapshot) != run.source_snapshot_count:
-            return False
-        if canonical_json_hash(current_snapshot) != run.source_snapshot_hash:
-            return False
+    if (run.report or {}).get("source_inventory_scope") != "live":
+        return False
+    # Compare the complete live inventory.  Filtering by the frozen identities
+    # would hide a key or owner created after verification.
+    current_snapshot = _source_snapshot_payload(await _runtime_sources(db))
+    if len(current_snapshot) != run.source_snapshot_count:
+        return False
+    if canonical_json_hash(current_snapshot) != run.source_snapshot_hash:
+        return False
     required_items = list(
         (
             await db.scalars(

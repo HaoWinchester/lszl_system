@@ -160,6 +160,30 @@ def test_cli_exit_codes_and_external_integrity_blockers() -> None:
         assert "must-not-leak" not in rendered
         assert json.loads(rendered) == {"status": "blocked"}
 
+
+def test_external_proof_identity_includes_source_type() -> None:
+    owner = f"proof-source-type-{uuid4().hex[:10]}"
+    key = f"kg_question_banks_v1__user__{owner}"
+    items = [
+        RuntimeMigrationItem(
+            run_id="proof-run", source_type=source_type, source_key=key,
+            owner_scope=owner, source_hash=source_type * 8, source_payload=[],
+        )
+        for source_type in ("runtime", "shared_runtime")
+    ]
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            question_proofs, _ = await service._external_item_proofs(db, items)
+            assert set(question_proofs) == {
+                f"runtime\0{key}\0{owner}",
+                f"shared_runtime\0{key}\0{owner}",
+            }
+
+    asyncio.run(scenario())
+
+
+def test_external_integrity_blocker_counts_are_exact() -> None:
     summary = service._external_summary(
         {
             "owners": 1,
@@ -282,7 +306,8 @@ def test_drop_check_requires_existing_run_and_never_mutates_ledger() -> None:
                     ready = await service.drop_check(
                         db, run_id=run_id, policy_paths=policy_paths
                     )
-                    assert ready["ready"] is True
+                    assert ready["ready"] is False
+                    assert "inventoryScope" in ready["blockers"]
                     db.expire_all()
                     run = await db.get(RuntimeMigrationRun, run_id)
                     item = await db.scalar(
@@ -381,6 +406,68 @@ def test_drop_check_blocks_a_new_runtime_identity_after_verification() -> None:
     asyncio.run(scenario())
 
 
+def test_drop_check_rejects_a_provided_source_inventory_even_when_verified() -> None:
+    suffix = uuid4().hex[:10]
+    run_id = f"runtime-retirement-provided-scope-{suffix}"
+    sources = [{
+        "source_type": "runtime",
+        "source_key": "kg_default_entry_mode_v1",
+        "owner_id": f"owner-{suffix}",
+        "payload": "graph",
+        "required": True,
+    }]
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            try:
+                await service.migrate(db, run_id=run_id, sources=sources)
+                verified = await service.verify(db, run_id=run_id)
+                assert verified["status"] == "verified"
+                with TemporaryDirectory(prefix="runtime-retirement-provided-") as directory:
+                    policy_paths = (Path(directory) / "backend.json", Path(directory) / "frontend.json")
+                    for path in policy_paths:
+                        path.write_text('{"runtimePages": []}\n', encoding="utf-8")
+                    blocked = await service.drop_check(db, run_id=run_id, policy_paths=policy_paths)
+                assert blocked["ready"] is False
+                assert blocked["inventoryScopeInvalid"] == 1
+                assert "inventoryScope" in blocked["blockers"]
+                assert runtime_retirement_cli.report_exit_code("drop-check", blocked) == 2
+            finally:
+                await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
+                await db.commit()
+
+    asyncio.run(scenario())
+
+
+def test_composed_migrate_surfaces_required_mapper_failures_and_cli_blocks() -> None:
+    run_id = f"runtime-retirement-mapper-failure-{uuid4().hex[:10]}"
+    source_key = "kg_runtime_retirement_broken_mapper_v1"
+
+    async def broken_mapper(_db, _item):
+        raise ValueError("mapper rejected canonical source")
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            try:
+                with patch.dict(
+                    service.domain_migration.TARGET_MAPPER_REGISTRY,
+                    {source_key: broken_mapper},
+                ):
+                    report = await service.migrate(db, run_id=run_id, sources=[{
+                        "source_type": "runtime", "source_key": source_key,
+                        "owner_id": "teacher-a", "payload": {"id": "broken"},
+                        "required": True,
+                    }])
+                assert report["status"] == "verification_failed"
+                assert report["requiredFailures"] == 1
+                assert runtime_retirement_cli.report_exit_code("migrate", report) == 2
+            finally:
+                await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
+                await db.commit()
+
+    asyncio.run(scenario())
+
+
 def test_shared_file_runtime_identity_is_never_aggregate_verified() -> None:
     run_id = f"runtime-retirement-shared-files-{uuid4().hex[:10]}"
     sources = [
@@ -411,6 +498,37 @@ def test_shared_file_runtime_identity_is_never_aggregate_verified() -> None:
                 await db.execute(
                     delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id)
                 )
+                await db.commit()
+
+    asyncio.run(scenario())
+
+
+def test_owner_named_shared_file_source_type_cannot_borrow_runtime_proof() -> None:
+    suffix = uuid4().hex[:10]
+    run_id = f"runtime-retirement-shared-file-owner-{suffix}"
+    owner = f"shared-file-owner-{suffix}"
+    key = files_runtime_migration_service.INDEX_KEY
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(User(username=owner, password_hash="test-only", role="teacher", status="active"))
+            await db.flush()
+            db.add(RuntimeState(owner_id=owner, revision=1, storage={key: []}))
+            await db.commit()
+            try:
+                report = await service.migrate(db, run_id=run_id, sources=[{
+                    "source_type": "shared_runtime", "source_key": key,
+                    "owner_id": owner, "payload": [], "required": True,
+                }])
+                item = await db.scalar(select(RuntimeMigrationItem).where(RuntimeMigrationItem.run_id == run_id))
+                assert item.status == "failed"
+                assert item.target_hash is None
+                assert report["requiredFailures"] == 1
+                assert report["unresolvedConflicts"] >= 1
+            finally:
+                await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
+                await db.execute(delete(RuntimeState).where(RuntimeState.owner_id == owner))
+                await db.execute(delete(User).where(User.username == owner))
                 await db.commit()
 
     asyncio.run(scenario())
@@ -820,8 +938,9 @@ def test_course_sources_run_in_dependency_order_and_verify_from_domain() -> None
                     ready = await service.drop_check(
                         db, run_id=run_id, policy_paths=policy_paths
                     )
-                    assert ready["ready"] is True
-                    assert ready["status"] == "ready"
+                    assert ready["ready"] is False
+                    assert ready["status"] == "blocked"
+                    assert "inventoryScope" in ready["blockers"]
 
                     draft = await db.get(CourseDraft, draft_id)
                     draft.structure = {**draft.structure, "domainChanged": True}
@@ -949,7 +1068,8 @@ def test_files_proof_detects_relational_tampering_in_drop_check() -> None:
                     initial_drop = await service.drop_check(
                         db, run_id=run_id, policy_paths=policy_paths
                     )
-                    assert initial_drop["ready"] is True, json.dumps(initial_drop)
+                    assert initial_drop["ready"] is False, json.dumps(initial_drop)
+                    assert "inventoryScope" in initial_drop["blockers"]
 
                     graph_file = await db.scalar(
                         select(GraphFile).where(

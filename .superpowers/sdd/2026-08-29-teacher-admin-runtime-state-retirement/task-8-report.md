@@ -134,3 +134,61 @@ Final focused regression:
   `drop-check` all exited 0 with source 1, verified 1 where applicable, every
   blocker count 0, `inventoryDrift=0`, and final `ready=true`. All reports were
   payload-token-free and the database was removed by trap.
+
+## Review Fix Round 2
+
+The second review closed five remaining proof and domain-authority gaps:
+
+- A run created from caller-provided fixtures may exercise migration and
+  verification, but it can never authorize Runtime deletion. Both ledger and
+  unified drop gates now require a frozen `live` inventory scope; non-live
+  scope is an explicit `inventoryScope` blocker and CLI exit 2.
+- Question banks, questions, paper categories, papers, and paper composition
+  are missing-only migrations. Canonical variants are compared before source
+  priority is applied. Existing relational metadata/content/references remain
+  byte-for-byte authoritative, while divergent Runtime variants add
+  identifier/source/hash-only conflicts.
+- Question/paper evidence is computed per exact
+  `(source_type, source_key, owner_scope)` from that ledger item's frozen
+  Runtime payload, not from the domain-priority merged snapshot. Targets are
+  freshly read relational rows; missing rows are omitted rather than counted
+  as `None` placeholders. Shared paper/category owner fallback uses the exact
+  `SharedRuntimeState.updated_by` rule used by migration. File proofs reject
+  every non-`runtime` source even when it carries an owner-shaped scope.
+- Required mapper exceptions now make the domain stage
+  `verification_failed`; unified reports expose `requiredFailures`, so all CLI
+  stages exit 2 rather than returning a false successful `applied` result.
+- Tag collision preflight uses the same `strip()[:40].casefold()` identity as
+  persistence and rejects long-name aliases before any write.
+
+### Round 2 TDD evidence
+
+- First RED batch: `3 failed` for a provided inventory incorrectly reaching
+  ready, a required mapper exception returning `applied`, and two 41-character
+  tag names collapsing silently. Focused GREEN: `3 passed`.
+- Domain authority RED: `2 failed` because bank and paper/category variants
+  were silently source-prioritized. Focused GREEN: `2 passed`, preserving
+  existing question content, paper metadata, category metadata, and reference
+  score.
+- Exact-proof RED: `4 failed` because exact helpers were absent and source type
+  was missing from proof identity. Follow-up REDs observed aggregate
+  `targetCount=2` for zero target rows, a shared owner fallback producing one
+  invalid record, a shared file item being verified from a Runtime proof, and
+  unified `requiredFailures` being absent. Every focused case is GREEN.
+
+Final Round 2 focused regression:
+
+- `.venv/bin/python -m pytest tests/test_runtime_retirement.py tests/test_files_runtime_migration.py tests/test_question_runtime_migration.py tests/test_runtime_domain_migration_ledger.py -q`
+  completed with `52 passed, 1 pre-existing dependency warning`.
+- `py_compile` succeeded for the CLI, unified/domain/files/question/engagement
+  migration services; `git diff --check` is clean.
+- A new disposable PostgreSQL database was migrated to head and seeded with
+  one live device-preference Runtime item. All four CLI commands exited 0:
+  `scan=planned`, `migrate=applied`, `verify=verified`, and
+  `drop-check=ready`; source/verified counts were `1/1`, every blocker was 0,
+  `inventoryScopeInvalid=0`, and final `ready=true`. All four reports contained
+  none of `source_payload`, `canonical_payload`, or `target_payload`; the
+  disposable database was removed by trap.
+
+No existing database, UAT environment, active release, `main`, or remote branch
+was mutated.

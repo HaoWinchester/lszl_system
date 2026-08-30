@@ -167,7 +167,9 @@ def _relation_source_warnings(
             if source_id in tag_ids:
                 warnings.append({"code": "duplicate-tag-id", "sourceId": source_id})
             tag_ids.add(source_id)
-        folded = name.casefold()
+        # Tag persistence uses the database's 40-character name contract.
+        # Detect aliases against that exact normalized value before any write.
+        folded = name[:40].casefold()
         prior = names.get(folded)
         if folded and prior is not None and prior != source_id:
             warnings.append(
