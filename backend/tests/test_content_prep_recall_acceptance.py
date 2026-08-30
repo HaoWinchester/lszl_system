@@ -8,6 +8,7 @@ from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
 from app.main import app
 from app.models.user import User
+from app.services import recall_acceptance_service, runtime_state_service
 
 
 PASSWORD = "recall-acceptance-pass"
@@ -167,3 +168,25 @@ def test_recall_acceptance_records_are_revision_safe_bounded_and_cleared_by_api(
             assert stale_clear.status_code == 409
     finally:
         asyncio.run(_cleanup_users(teacher))
+
+
+def test_recall_acceptance_runtime_key_is_migration_only() -> None:
+    key = recall_acceptance_service.RUNTIME_SOURCE_KEY
+
+    assert key in runtime_state_service.EXACT_KEYS
+    assert key not in runtime_state_service.ONLINE_RUNTIME_EXACT_KEYS
+    assert key in runtime_state_service.RUNTIME_SNAPSHOT_EXCLUDED_KEYS
+    assert runtime_state_service.server_owned_key(key)
+    for page in (
+        "content-prep.html",
+        "question-bank.html",
+        "question-training.html",
+        "question-workspace.html",
+        "knowledge-recall.html",
+    ):
+        exact, _prefixes = runtime_state_service._bootstrap_selector_tokens(
+            "teacher",
+            "teacher",
+            page,
+        )
+        assert key not in exact, page

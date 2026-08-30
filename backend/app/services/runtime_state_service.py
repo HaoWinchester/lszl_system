@@ -20,6 +20,7 @@ from app.services import (
     file_service,
     guided_learning_service,
     paper_release_service,
+    recall_acceptance_service,
     subscription_service,
     teaching_content_projection_service,
     teaching_content_revision_service,
@@ -94,6 +95,9 @@ RETIRED_COURSE_RUNTIME_KEYS = frozenset({
     "kg_course_config_active_release_v1",
     "kg_course_config_releases_v1",
     "kg_learning_tasks_v1",
+})
+RETIRED_CONTENT_PREP_RUNTIME_KEYS = frozenset({
+    recall_acceptance_service.RUNTIME_SOURCE_KEY,
 })
 
 EXACT_KEYS = {
@@ -190,7 +194,11 @@ EXACT_KEYS = {
 # Browser-facing Runtime compatibility excludes the catalog records that are
 # now owned by relational APIs.  Keep their historical entries in EXACT_KEYS
 # solely for offline rollback/migration validation.
-ONLINE_RUNTIME_EXACT_KEYS = frozenset(EXACT_KEYS - RETIRED_CATALOG_RUNTIME_KEYS)
+ONLINE_RUNTIME_EXACT_KEYS = frozenset(
+    EXACT_KEYS
+    - RETIRED_CATALOG_RUNTIME_KEYS
+    - RETIRED_CONTENT_PREP_RUNTIME_KEYS
+)
 
 PREFIXES = (
     "kg_graph_file_content_v2__",
@@ -265,6 +273,7 @@ RUNTIME_SNAPSHOT_EXCLUDED_KEYS = frozenset({
     "kg_exam_papers_published_v1",
     "kg_exam_paper_release_history_v1",
     *RETIRED_COURSE_RUNTIME_KEYS,
+    *RETIRED_CONTENT_PREP_RUNTIME_KEYS,
 })
 
 TEACHING_MANAGER_ROLES = frozenset({"admin", "teacher"})
@@ -310,6 +319,10 @@ SERVER_OWNED_KEYS = frozenset({
     # live exclusively in the relational course-management API. Legacy rows
     # remain available only to the offline retirement migration.
     *RETIRED_COURSE_RUNTIME_KEYS,
+    # Recall acceptance history is now owner-isolated behind its typed API.
+    # The Runtime key remains registered only so the offline retirement mapper
+    # can validate and drain historical rows without exposing or mutating it.
+    *RETIRED_CONTENT_PREP_RUNTIME_KEYS,
 })
 
 
@@ -401,7 +414,6 @@ BOOTSTRAP_QUESTION_EXACT_KEYS = frozenset({
     "kg_user_feedback_v1",
     "kg_teacher_workbench_subject_v1",
     "kg_multi_workspace_closed_tabs_v1",
-    "pmp_recall_acceptance_records_v1",
     "question_studio_draft_v010",
     "question_studio_draft_v020",
     "question_studio_draft_v021",
@@ -481,7 +493,6 @@ BOOTSTRAP_NAMESPACE_EXACT_KEYS: dict[str, frozenset[str]] = {
         "kg_user_feedback_v1",
         "kg_learning_entry_chooser_claim_v1",
         "kg_learning_entry_chooser_consumed_v1",
-        "pmp_recall_acceptance_records_v1",
     }),
     "users": frozenset({"kg_local_users_v1", "kg_user_admin_logs_v1"}),
     "system": frozenset({"kg_wechat_login_config_v1", "kg_student_subscription_orders_v1", "kg_student_subscription_redeem_codes_v1", "kg_student_subscriptions_v1", "kg_subscription_plan_model_v2_migrated", "kg_subscription_plan_settings_v1"}),
@@ -490,7 +501,7 @@ BOOTSTRAP_NAMESPACE_EXACT_KEYS: dict[str, frozenset[str]] = {
     "admin": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
     "operations": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
     "subjects": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
-    "content": BOOTSTRAP_MANAGEMENT_EXACT_KEYS | frozenset({"pmp_recall_acceptance_records_v1"}),
+    "content": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
     "courses": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
 }
 
