@@ -31,6 +31,8 @@
     'kg_question_training_filters_collapsed_v1',
     'kg_question_training_workspace_layout_v1',
     'kg_teacher_workbench_subject_v1',
+    'kg_course_admin_workspace_v862_p1',
+    'kg_course_admin_recent_v862_p2',
     'kg_training_workspace_layout_v1',
     'pmp_question_font_size_v1',
     'pmp_question_font_size_v2',

@@ -4,9 +4,6 @@
   const SUBJECT_RESOURCE='subjects';
   const TAXONOMY_RESOURCE='taxonomies';
   const ACTIVITY_OVERRIDE_RESOURCE='activityOverrides';
-  const COURSE_DRAFT_KEY='kg_course_config_drafts_v1';
-  const COURSE_RELEASE_KEY='kg_course_config_releases_v1';
-  const ACTIVE_COURSE_KEY='kg_course_config_active_release_v1';
   const SCHEMA_VERSION=1;
   const MAX_DEPTH=9;
 
@@ -15,7 +12,6 @@
   const unique=values=>[...new Set((values||[]).map(value=>String(value||'')).filter(Boolean))];
   const nowIso=()=>new Date().toISOString();
   const safeId=(prefix='id')=>prefix+'-'+(global.crypto?.randomUUID?.()||Math.random().toString(36).slice(2)+Date.now().toString(36));
-  function hashString(value){let hash=0x811c9dc5;for(const char of String(value||'')){hash^=char.charCodeAt(0);hash=Math.imul(hash,0x01000193)>>>0}return 'fnv1a32:'+hash.toString(16).padStart(8,'0')}
 
   const DEFAULT_SUBJECTS=[
     {id:'subject-pmp',code:'PMP',name:{zh:'PMP 项目管理',en:'PMP Project Management'},defaultTaxonomyId:'taxonomy-pmp-main',status:'active',sortOrder:10},
@@ -55,12 +51,7 @@
 
   function readJson(key,fallback){
     if([SUBJECT_RESOURCE,TAXONOMY_RESOURCE,ACTIVITY_OVERRIDE_RESOURCE].includes(key))return clone(global.KGTeachingContentApi?.readResource?.(key,fallback)??fallback);
-    if(key===COURSE_DRAFT_KEY){const rows=global.KGTeachingContentApi?.readResource?.('courseDrafts',null);if(Array.isArray(rows))return clone(rows)}
-    if(key===COURSE_RELEASE_KEY){const rows=global.KGTeachingContentApi?.readResource?.('courseReleases',null);if(Array.isArray(rows))return clone(rows)}
-    try{const raw=global.localStorage?.getItem(key);return raw?JSON.parse(raw):clone(fallback)}catch(error){return clone(fallback)}
-  }
-  function writeJson(key,value){
-    try{global.localStorage?.setItem(key,JSON.stringify(value));try{if(typeof global.CustomEvent==='function')global.dispatchEvent?.(new global.CustomEvent('kg-app-storage-change',{detail:{type:'json',action:'write',key,value:clone(value)}}))}catch(_error){}return true}catch(error){return false}
+    return clone(fallback);
   }
   function normalizedSubjects(){
     const stored=readJson(SUBJECT_RESOURCE,DEFAULT_SUBJECTS);
@@ -165,7 +156,7 @@
   }
 
   function currentUser(){
-    const user=global.KGAuthCore?.currentUser?.({includeInactive:true})||null;const username=global.KGAuthCore?.currentUsername?.()||clean(global.localStorage?.getItem('kg_local_current_user_v1'));
+    const user=global.KGAuthCore?.currentUser?.({includeInactive:true})||null;const username=global.KGAuthCore?.currentUsername?.()||'';
     if(user)return {id:clean(user.id||user.username||username)||'local-user',name:clean(user.displayName||user.name||user.username||username)||'本地用户',role:clean(user.role)||'teacher'};
     if(username)return {id:username,name:username,role:'teacher'};
     return {id:'local-anonymous',name:'未登录本地用户',role:'guest'};
@@ -226,31 +217,28 @@
   }
 
   function normalizeCourse(course,index=0){
-    const source=clone(course)||{};return {id:clean(source.id)||safeId('course'),name:clean(source.name||source.title)||'未命名课程',subjectId:clean(source.subjectId)||'subject-pmp',taxonomyId:clean(source.taxonomyId)||defaultTaxonomyForSubject(clean(source.subjectId)||'subject-pmp')?.id||'',status:clean(source.status)||'draft',description:clean(source.description),version:Math.max(1,Number(source.version)||1),updatedAt:clean(source.updatedAt)||nowIso(),stages:Array.isArray(source.stages)?source.stages.map((item,i)=>({id:clean(item.id)||safeId('stage'),title:clean(item.title||item.name)||`阶段 ${i+1}`,order:Number(item.order||i+1)})):[],parts:Array.isArray(source.parts)?source.parts.map((item,i)=>({id:clean(item.id)||safeId('part'),stageId:clean(item.stageId),title:clean(item.title||item.name)||`部分 ${i+1}`,order:Number(item.order||i+1)})):[],nodes:Array.isArray(source.nodes)?source.nodes.map((item,i)=>({id:clean(item.id)||safeId('node'),partId:clean(item.partId),title:clean(item.title||item.name)||`节点 ${i+1}`,order:Number(item.order||i+1),nodeType:clean(item.nodeType)||'standard',activityIds:unique(item.activityIds),description:clean(item.description),settings:clone(item.settings||{})})):[]};
+    const source=clone(course)||{};return {id:clean(source.id)||safeId('course'),name:clean(source.name||source.title)||'未命名课程',subjectId:clean(source.subjectId)||'subject-pmp',taxonomyId:clean(source.taxonomyId)||defaultTaxonomyForSubject(clean(source.subjectId)||'subject-pmp')?.id||'',status:clean(source.status)||'draft',revision:Math.max(1,Number(source.revision)||1),description:clean(source.description),version:Math.max(1,Number(source.version)||1),createdAt:clean(source.createdAt),updatedAt:clean(source.updatedAt)||nowIso(),stages:Array.isArray(source.stages)?source.stages.map((item,i)=>({id:clean(item.id)||safeId('stage'),title:clean(item.title||item.name)||`阶段 ${i+1}`,order:Number(item.order||i+1)})):[],parts:Array.isArray(source.parts)?source.parts.map((item,i)=>({id:clean(item.id)||safeId('part'),stageId:clean(item.stageId),title:clean(item.title||item.name)||`部分 ${i+1}`,order:Number(item.order||i+1)})):[],nodes:Array.isArray(source.nodes)?source.nodes.map((item,i)=>({id:clean(item.id)||safeId('node'),partId:clean(item.partId),title:clean(item.title||item.name)||`节点 ${i+1}`,order:Number(item.order||i+1),nodeType:clean(item.nodeType)||'standard',activityIds:unique(item.activityIds),description:clean(item.description),settings:clone(item.settings||{})})):[]};
   }
-  function builtInCourseDraft(){
-    const course=global.KGGuidedLearningData?.getCourse?.();if(!course)return null;return normalizeCourse({...course,id:'course-guided-pmp',name:course.title||'PMP 引导学习课程',subjectId:'subject-pmp',taxonomyId:'taxonomy-pmp-main',status:'draft',version:Number(course.version||13)});
-  }
-  function getCourseDrafts(){const stored=readJson(COURSE_DRAFT_KEY,[]);if(Array.isArray(stored)&&stored.length)return stored.map(normalizeCourse);const seed=builtInCourseDraft();return seed?[seed]:[]}
-  function saveCourseDraft(course){const normalized=normalizeCourse({...course,status:'draft',updatedAt:nowIso()});const drafts=getCourseDrafts();const index=drafts.findIndex(item=>item.id===normalized.id);if(index>=0)drafts[index]=normalized;else drafts.push(normalized);writeJson(COURSE_DRAFT_KEY,drafts);return clone(normalized)}
-  function deleteCourseDraft(courseId){const drafts=getCourseDrafts().filter(item=>item.id!==String(courseId));writeJson(COURSE_DRAFT_KEY,drafts);return drafts}
-  function getCourseReleases(){const stored=readJson(COURSE_RELEASE_KEY,[]);return Array.isArray(stored)?clone(stored):[]}
+  function getCourseDrafts(){return clone(global.KGCourseManagementApi?.listDrafts?.()||[]).map(normalizeCourse)}
+  async function saveCourseDraft(course){return clone(await global.KGCourseManagementApi.saveDraft(normalizeCourse(course)))}
+  async function deleteCourseDraft(courseId){const current=getCourseDrafts().find(item=>item.id===String(courseId));if(!current)return getCourseDrafts();await global.KGCourseManagementApi.deleteDraft(current.id,current.revision);return getCourseDrafts()}
+  function getCourseReleases(){return clone(global.KGCourseManagementApi?.listReleases?.()||[])}
   function validateCourse(course){
     const errors=[];const warnings=[];const c=normalizeCourse(course);const stageIds=new Set(c.stages.map(item=>item.id)),partIds=new Set(c.parts.map(item=>item.id)),nodeIds=new Set(),library=getActivityLibrary();
     if(!c.name)errors.push('课程名称不能为空。');if(!subjectById(c.subjectId))errors.push('课程 subjectId 不存在。');if(!taxonomyById(c.taxonomyId))errors.push('课程 taxonomyId 不存在。');
     c.parts.forEach(part=>{if(!stageIds.has(part.stageId))errors.push(`部分 ${part.title} 引用了不存在的阶段。`)});c.nodes.forEach(node=>{if(nodeIds.has(node.id))errors.push(`节点 ID 重复：${node.id}`);nodeIds.add(node.id);if(!partIds.has(node.partId))errors.push(`节点 ${node.title} 引用了不存在的部分。`);(node.activityIds||[]).forEach(id=>{if(!library[id])errors.push(`节点 ${node.title} 引用了不存在的活动：${id}`);else if(library[id].metadata?.subjectId!==c.subjectId)warnings.push(`活动 ${id} 与课程科目不一致。`)})});
     if(!c.nodes.length)warnings.push('课程还没有节点。');return {valid:errors.length===0,errors,warnings,course:c};
   }
-  function publishCourse(courseId,notes=''){
-    const course=getCourseDrafts().find(item=>item.id===String(courseId));if(!course)return {valid:false,errors:['没有找到课程草稿。']};const validation=validateCourse(course);if(!validation.valid)return validation;const releases=getCourseReleases();const previous=releases.filter(item=>item.course?.id===course.id).sort((a,b)=>b.version-a.version)[0];const release={id:safeId('release'),version:Number(previous?.version||0)+1,publishedAt:nowIso(),publishedBy:currentUser(),notes:clean(notes),contentHash:hashString(JSON.stringify(validation.course)),course:{...validation.course,status:'published',version:Number(previous?.version||0)+1}};releases.push(release);writeJson(COURSE_RELEASE_KEY,releases);writeJson(ACTIVE_COURSE_KEY,{courseId:course.id,releaseId:release.id});return {valid:true,release,warnings:validation.warnings,errors:[]}
+  async function publishCourse(courseId,notes=''){
+    const course=getCourseDrafts().find(item=>item.id===String(courseId));if(!course)return {valid:false,errors:['没有找到课程草稿。']};const validation=validateCourse(course);if(!validation.valid)return validation;const saved=await global.KGCourseManagementApi.publishDraft(course.id,notes,course.revision);return {valid:true,release:clone(saved.release),course:clone(saved.draft),warnings:validation.warnings,errors:[]}
   }
-  function activeCourseRelease(){const pointer=readJson(ACTIVE_COURSE_KEY,null);return clone(getCourseReleases().find(item=>item.id===pointer?.releaseId)||null)}
+  function activeCourseRelease(){return clone(getCourseReleases().filter(item=>item.status==='published').sort((a,b)=>String(b.publishedAt||'').localeCompare(String(a.publishedAt||'')))[0]||null)}
   function courseKnowledgeCoverage(course){
     const library=getActivityLibrary();const coverage=new Map();(course?.nodes||[]).forEach(node=>(node.activityIds||[]).forEach(id=>{const knowledge=library[id]?.metadata?.knowledge;if(!knowledge?.primaryNodeId)return;const key=knowledge.primaryNodeId;if(!coverage.has(key))coverage.set(key,{nodeId:key,taxonomyId:knowledge.taxonomyId,path:pathLabel(knowledge.taxonomyId,key),activityIds:[]});coverage.get(key).activityIds.push(id)}));return [...coverage.values()].map(item=>({...item,activityIds:unique(item.activityIds),activityCount:unique(item.activityIds).length}))
   }
 
   global.KGLearningContent=Object.freeze({
-    SCHEMA_VERSION,MAX_DEPTH,storageKeys:Object.freeze({COURSE_DRAFT_KEY,COURSE_RELEASE_KEY,ACTIVE_COURSE_KEY}),
+    SCHEMA_VERSION,MAX_DEPTH,storageKeys:Object.freeze({}),
     getSubjects,subjectById,getTaxonomies,taxonomyById,defaultTaxonomyForSubject,nodesForTaxonomy,nodeById,childrenOf,pathForNode,pathLabel,descendantIds,searchNodes,validateTaxonomy,saveSubjects,saveTaxonomies,resetTaxonomies,saveKnowledgeNode,deprecateKnowledgeNode,deleteKnowledgeNode,
     currentUser,ensureActivityMetadata,getActivityLibrary,getActivities,activityTitle,saveActivity,saveActivities,mapActivities,importActivityPackage,exportActivityPackage,activityUsage,
     getCourseDrafts,saveCourseDraft,deleteCourseDraft,getCourseReleases,validateCourse,publishCourse,activeCourseRelease,courseKnowledgeCoverage,normalizeCourse,safeId,clone

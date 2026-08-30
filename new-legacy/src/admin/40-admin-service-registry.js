@@ -18,8 +18,8 @@
   const subjectService=new global.KGSubjectService({legacy,transactions,permissions,references:referenceService});
   const taxonomyService=new global.KGTaxonomyService({legacy,repository,transactions,permissions,audit,references:referenceService});
   const activityService=new global.KGActivityService({legacy,transactions,references:referenceService});
-  const courseService=new global.KGCourseService({legacy,transactions,references:referenceService});
-  const releaseService=new global.KGReleaseService({content:legacy,organization:global.KGContentOrganization});
+  const courseService=new global.KGCourseService({legacy,api:global.KGCourseManagementApi,permissions,references:referenceService});
+  const releaseService=new global.KGReleaseService({api:global.KGCourseManagementApi,organization:global.KGContentOrganization});
   const publicPermissions=publicService(permissions),publicAudit=publicService(audit,['clear']),publicTransactions=publicService(transactions,['execute','restoreSnapshot']);
   const references=publicService(referenceService),subjects=publicService(subjectService),taxonomies=publicService(taxonomyService,['reconcileAuthenticatedServerProjection']),activities=publicService(activityService),courses=publicService(courseService),releases=publicService(releaseService);
   const legacyContent=Object.freeze({
@@ -34,7 +34,8 @@
     getCourseReleases:(...args)=>legacy.getCourseReleases?.(...args)||[],
     normalizeCourse:(...args)=>legacy.normalizeCourse(...args),
   });
-  const services=Object.freeze({version:global.KGAdminCore.VERSION,repositoryMode:repository.mode,permissions:publicPermissions,audit:publicAudit,transactions:publicTransactions,references,referenceSnapshotReady,subjects,taxonomies,activities,courses,releases,legacyContent});
+  const domainReady=Promise.all([global.KGTeachingContentApi?.bootstrap?.(),global.KGCourseManagementApi?.ready?.()]);
+  const services=Object.freeze({version:global.KGAdminCore.VERSION,repositoryMode:repository.mode,domainReady,permissions:publicPermissions,audit:publicAudit,transactions:publicTransactions,references,referenceSnapshotReady,subjects,taxonomies,activities,courses,releases,legacyContent});
   global.KGAdminServices=services;
   if(typeof global.KGCreateAdminTeachingContentGateway==='function'){
     global.KGCreateAdminTeachingContentGateway({services,reconcileServerProjection:(subjectId,taxonomy)=>taxonomyService.reconcileAuthenticatedServerProjection(subjectId,taxonomy)});

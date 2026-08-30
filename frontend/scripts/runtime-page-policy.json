@@ -1,9 +1,3 @@
 {
-  "runtimePages": [
-    "admin-console.html",
-    "admin-operations.html",
-    "admin-settings.html",
-    "course-admin.html",
-    "teacher-workbench.html"
-  ]
+  "runtimePages": []
 }
