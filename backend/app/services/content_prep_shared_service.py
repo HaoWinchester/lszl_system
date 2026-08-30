@@ -35,12 +35,12 @@ from app.services import (
     teaching_content_current_service,
     teaching_content_projection_service,
     teaching_content_revision_service,
+    teaching_content_version_service,
 )
 
 
 MAX_SHARED_BYTES = 2 * 1024 * 1024
 MAX_ACTIVITIES = 5000
-PG_INTEGER_MAX = 2_147_483_647
 
 
 ContentRevisionConflict = teaching_content_revision_service.ContentRevisionConflict
@@ -91,16 +91,9 @@ def _strict_integer(
 
     if value is None:
         return default
-    if (
-        isinstance(value, bool)
-        or not isinstance(value, int)
-        or value < minimum
-        or value > PG_INTEGER_MAX
-    ):
-        raise ValueError(
-            f"{label}必须是 {minimum} 到 {PG_INTEGER_MAX} 之间的整数"
-        )
-    return value
+    return teaching_content_version_service.validate_database_integer(
+        value, label, minimum=minimum
+    )
 
 
 def _strict_authorship(value: object, label: str = "authorship") -> dict[str, Any]:
@@ -1237,7 +1230,9 @@ async def apply_auxiliary_assets(
             conflicting = (await db.execute(select(ContentTaxonomy).where(ContentTaxonomy.subject_id == subject_id, ContentTaxonomy.version == requested_version).limit(1))).scalar_one_or_none()
             if conflicting is not None:
                 maximum = (await db.execute(select(func.max(ContentTaxonomy.version)).where(ContentTaxonomy.subject_id == subject_id))).scalar_one_or_none()
-                requested_version = int(maximum or 0) + 1
+                requested_version = teaching_content_version_service.next_database_version(
+                    maximum or 0, "知识树版本号"
+                )
         if row is None:
             row = ContentTaxonomy(id=taxonomy_id, subject_id=subject.id, version=requested_version, status=str(tree.get("status") or "published"), title=str(tree.get("title") or tree.get("name") or ""), content_metadata={k: v for k, v in tree.items() if k != "nodes"}, updated_by=actor_username, created_by=actor_username)
             db.add(row)
@@ -1268,7 +1263,9 @@ async def apply_auxiliary_assets(
             conflict = (await db.execute(select(RecallAssociationLibrary.id).where(RecallAssociationLibrary.subject_id == subject_id, RecallAssociationLibrary.version == requested_version).limit(1))).scalar_one_or_none()
             if conflict is not None:
                 maximum = (await db.execute(select(func.max(RecallAssociationLibrary.version)).where(RecallAssociationLibrary.subject_id == subject_id))).scalar_one_or_none()
-                requested_version = int(maximum or 0) + 1
+                requested_version = teaching_content_version_service.next_database_version(
+                    maximum or 0, "联想库版本号"
+                )
             row = RecallAssociationLibrary(id=str(recall.get("id") or uuid4().hex), subject_id=subject_id, version=requested_version, status="published", nodes=recall["nodes"], edges=recall["edges"], content_metadata={k: v for k, v in recall.items() if k not in {"nodes", "edges", "id", "subjectId", "version", "status"}}, updated_by=actor_username)
             db.add(row)
         else:

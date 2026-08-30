@@ -67,6 +67,54 @@ def test_builtin_bundle_rejects_broken_recall_cross_references(tmp_path: Path) -
         seed_service.load_builtin_bundle(tmp_path)
 
 
+def test_builtin_available_version_fails_closed_when_integer_space_is_exhausted() -> None:
+    suffix = uuid4().hex[:10]
+    subject_id = f"subject-builtin-version-max-{suffix}"
+    taxonomy_id = f"taxonomy-builtin-version-max-{suffix}"
+
+    async def exercise() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                ContentSubject(
+                    id=subject_id,
+                    code=f"BMAX-{suffix}",
+                    name="内置版本耗尽",
+                    content_metadata={},
+                )
+            )
+            await db.flush()
+            db.add(
+                ContentTaxonomy(
+                    id=taxonomy_id,
+                    subject_id=subject_id,
+                    version=2_147_483_647,
+                    status="draft",
+                    title="最大版本",
+                    content_metadata={},
+                )
+            )
+            await db.commit()
+            try:
+                with pytest.raises(
+                    seed_service.BuiltinSeedValidationError, match="版本号.*上限"
+                ):
+                    await seed_service._available_version(
+                        db, ContentTaxonomy, subject_id, 2_147_483_647
+                    )
+                row = await db.get(ContentTaxonomy, taxonomy_id)
+                assert row is not None and row.version == 2_147_483_647
+            finally:
+                await db.execute(
+                    delete(ContentTaxonomy).where(ContentTaxonomy.id == taxonomy_id)
+                )
+                await db.execute(
+                    delete(ContentSubject).where(ContentSubject.id == subject_id)
+                )
+                await db.commit()
+
+    asyncio.run(exercise())
+
+
 def test_builtin_bundle_syncs_once_and_repeated_runs_are_idempotent() -> None:
     bundle = seed_service.load_builtin_bundle()
     principle_ids = [row["id"] for row in bundle.principles]

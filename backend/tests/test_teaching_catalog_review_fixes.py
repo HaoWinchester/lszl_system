@@ -604,6 +604,145 @@ def test_catalog_integer_boundaries_reject_huge_bool_and_negative_without_mutati
             assert _shared(client)["contentRevision"] == revision
 
 
+def test_auxiliary_version_conflicts_at_int32_max_fail_before_database_mutation() -> None:
+    suffix = uuid4().hex[:10]
+    subject_id = f"subject-version-exhausted-{suffix}"
+    existing_taxonomy_id = f"taxonomy-version-max-{suffix}"
+    new_taxonomy_id = f"taxonomy-version-overflow-{suffix}"
+    existing_recall_id = f"recall-version-max-{suffix}"
+    new_recall_id = f"recall-version-overflow-{suffix}"
+    revision_snapshot: dict | None = None
+
+    async def seed() -> None:
+        nonlocal revision_snapshot
+        async with AsyncSessionLocal() as db:
+            revision_snapshot = await snapshot_teaching_content_revision(db)
+            db.add(
+                ContentSubject(
+                    id=subject_id,
+                    code=f"MAX-{suffix}",
+                    name="版本耗尽测试",
+                    content_metadata={},
+                )
+            )
+            await db.flush()
+            db.add_all(
+                [
+                    ContentTaxonomy(
+                        id=existing_taxonomy_id,
+                        subject_id=subject_id,
+                        version=2_147_483_647,
+                        status="draft",
+                        title="最大版本知识树",
+                        content_metadata={},
+                    ),
+                    RecallAssociationLibrary(
+                        id=existing_recall_id,
+                        subject_id=subject_id,
+                        version=2_147_483_647,
+                        status="draft",
+                        nodes=[],
+                        edges=[],
+                        content_metadata={},
+                    ),
+                ]
+            )
+            await db.commit()
+
+    async def persisted_shape() -> tuple[int, int, int, int]:
+        async with AsyncSessionLocal() as db:
+            return (
+                int(
+                    await db.scalar(
+                        select(func.count())
+                        .select_from(ContentTaxonomy)
+                        .where(ContentTaxonomy.id == new_taxonomy_id)
+                    )
+                    or 0
+                ),
+                int(
+                    await db.scalar(
+                        select(func.count())
+                        .select_from(RecallAssociationLibrary)
+                        .where(RecallAssociationLibrary.id == new_recall_id)
+                    )
+                    or 0
+                ),
+                int((await db.get(ContentTaxonomy, existing_taxonomy_id)).version),
+                int(
+                    (await db.get(RecallAssociationLibrary, existing_recall_id)).version
+                ),
+            )
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                delete(RecallAssociationLibrary).where(
+                    RecallAssociationLibrary.id.in_([existing_recall_id, new_recall_id])
+                )
+            )
+            await db.execute(
+                delete(ContentTaxonomy).where(
+                    ContentTaxonomy.id.in_([existing_taxonomy_id, new_taxonomy_id])
+                )
+            )
+            await db.execute(delete(ContentSubject).where(ContentSubject.id == subject_id))
+            await db.commit()
+            await restore_teaching_content_revision(db, revision_snapshot)
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app, raise_server_exceptions=False) as client:
+            _login(client, "admin", "jbgsnmm~123")
+            revision = _shared(client, subject_id)["contentRevision"]
+            payloads = [
+                {
+                    "knowledgeTree": {
+                        "taxonomy": {
+                            "id": new_taxonomy_id,
+                            "subjectId": subject_id,
+                            "version": 2_147_483_647,
+                            "nodes": [],
+                        }
+                    }
+                },
+                {
+                    "recallLibrary": {
+                        "id": new_recall_id,
+                        "subjectId": subject_id,
+                        "version": 2_147_483_647,
+                        "nodes": [],
+                        "edges": [],
+                    }
+                },
+            ]
+            for partial in payloads:
+                response = client.put(
+                    "/api/v1/content-prep/shared-content",
+                    json={
+                        "subjectId": subject_id,
+                        "contentRevision": revision,
+                        **partial,
+                    },
+                )
+                assert response.status_code == 422, (partial, response.text)
+                assert response.json()["detail"]["code"] == "INVALID_SHARED_CONTENT"
+                assert not any(
+                    token in response.text.lower()
+                    for token in ("asyncpg", "sqlalchemy", "traceback", "integer out of range")
+                )
+                assert _shared(client, subject_id)["contentRevision"] == revision
+                assert asyncio.run(persisted_shape()) == (
+                    0,
+                    0,
+                    2_147_483_647,
+                    2_147_483_647,
+                )
+    finally:
+        asyncio.run(cleanup())
+
+
 def test_catalog_preflights_unique_business_keys_without_sql_details_or_revision_bump() -> None:
     suffix = uuid4().hex[:10]
     subject_a = f"subject-unique-a-{suffix}"

@@ -54,6 +54,7 @@ Course/release/task reference reads on Content Center remain available through t
 - Fresh-review frontend source regression: 7/7; formal synced `pnpm test`: 284/284; `pnpm test:design`: 5/5.
 - Fresh-review candidate audit: 991 files versus 975 in the untouched active release, with Admin Subjects, Content Center, and the Content Prep dist page present.
 - Final backend-only review follow-up: the two new RED cases reproduced a PostgreSQL int32 500 and preexisting-namespace mutation, then passed after the boundary fixes. Focused shared/catalog/migration/model verification passed 30/30; `alembic check` reported no new operations and Python compilation was clean. No frontend source changed, so formal sync/E2E were intentionally not repeated.
+- Final version-exhaustion review follow-up: direct knowledge-tree taxonomy and recall conflict allocation now use one shared signed-int32-safe version helper and fail before ORM mutation when `2147483647` is exhausted. The adjacent built-in teaching seed allocator uses the same boundary and converts exhaustion into `BuiltinSeedValidationError`. Real PostgreSQL/API RED cases reproduced the former 500/driver-detail leak, then passed with typed 422, unchanged rows, and unchanged global revision. Focused shared/catalog/seed/model verification passed 41/41; `alembic check`, Python compilation, and diff checks were clean. This was backend-only, so frontend sync/E2E were not repeated.
 
 ## Browser evidence
 
