@@ -24,6 +24,7 @@ from app.models.question import (
     QuestionBank,
     QuestionCleanupAudit,
 )
+from app.models.recall_acceptance import ContentPrepRecallAcceptance
 from app.models.runtime_migration import RuntimeMigrationItem, RuntimeMigrationRun
 from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
@@ -86,6 +87,7 @@ __all__ = [
     "PaperRelease",
     "PaperReleaseQuestion",
     "QuestionCleanupAudit",
+    "ContentPrepRecallAcceptance",
     "TrainingProgress",
     "RecallProgress",
     "LearningEvent",

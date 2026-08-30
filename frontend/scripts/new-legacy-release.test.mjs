@@ -75,6 +75,7 @@ test('content prep studio ships reproducible modular source and backend bootstra
     'content-prep-studio/tests/test_server_catalog.js',
     'content-prep-studio/tests/test_edit_lock_client.js',
     'content-prep-studio/tests/test_shared_draft_service.js',
+    'content-prep-studio/tests/test_recall_acceptance_api.js',
     'content-prep-studio/tests/test_server_ui_contract.py',
     'content-prep-studio/dist/content-prep.html',
   ]

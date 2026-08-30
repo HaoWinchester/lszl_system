@@ -32,11 +32,17 @@ from app.schemas.teaching_content import (
     SubjectWriteRequest,
     TaxonomyReleaseRequest,
 )
+from app.schemas.recall_acceptance import (
+    RecallAcceptanceClearRequest,
+    RecallAcceptanceResponse,
+    RecallAcceptanceWriteRequest,
+)
 from app.services import (
     content_prep_shared_service,
     content_prep_draft_service,
     content_prep_service,
     question_lock_service,
+    recall_acceptance_service,
     subject_facet_service,
     teaching_content_projection_service,
     teaching_content_revision_service,
@@ -108,6 +114,19 @@ def _raise_draft_error(error: content_prep_draft_service.ContentPrepDraftError) 
     if error.current_revision is not None:
         detail["currentRevision"] = error.current_revision
     raise HTTPException(status_code=error.status_code, detail=detail) from error
+
+
+def _raise_recall_acceptance_conflict(
+    error: recall_acceptance_service.RecallAcceptanceRevisionConflict,
+) -> None:
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": "RECALL_ACCEPTANCE_REVISION_CONFLICT",
+            "message": str(error),
+            "currentRevision": error.current_revision,
+        },
+    ) from error
 
 
 def _raise_shared_error(error: Exception) -> None:
@@ -261,6 +280,59 @@ async def get_build_metadata(db: DB, actor: PrepEditor):
         "policies": AUTHORING_POLICIES,
         "contentRevision": int(revision["revision"]),
     }
+
+
+@router.get(
+    "/recall-acceptance-records",
+    response_model=RecallAcceptanceResponse,
+    response_model_by_alias=True,
+    response_model_exclude_none=True,
+)
+async def get_recall_acceptance_records(db: DB, actor: PrepEditor):
+    return await recall_acceptance_service.get_records(db, actor)
+
+
+@router.put(
+    "/recall-acceptance-records",
+    response_model=RecallAcceptanceResponse,
+    response_model_by_alias=True,
+    response_model_exclude_none=True,
+)
+async def replace_recall_acceptance_records(
+    request: RecallAcceptanceWriteRequest,
+    db: DB,
+    actor: PrepEditor,
+):
+    try:
+        return await recall_acceptance_service.replace_records(
+            db,
+            actor,
+            revision=request.revision,
+            records=request.records,
+        )
+    except recall_acceptance_service.RecallAcceptanceRevisionConflict as error:
+        _raise_recall_acceptance_conflict(error)
+
+
+@router.delete(
+    "/recall-acceptance-records",
+    response_model=RecallAcceptanceResponse,
+    response_model_by_alias=True,
+    response_model_exclude_none=True,
+)
+async def clear_recall_acceptance_records(
+    request: RecallAcceptanceClearRequest,
+    db: DB,
+    actor: PrepEditor,
+):
+    try:
+        return await recall_acceptance_service.clear_records(
+            db,
+            actor,
+            revision=request.revision,
+        )
+    except recall_acceptance_service.RecallAcceptanceRevisionConflict as error:
+        _raise_recall_acceptance_conflict(error)
 
 
 @router.get("/shared-content")
@@ -522,6 +594,8 @@ async def import_activities(
             db,
             actor,
             content_revision=request.content_revision,
+            subject_id=request.subject_id,
+            collection_id=request.collection_id,
             activities=request.activities,
         )
     except (ValueError, content_prep_shared_service.ContentRevisionConflict) as error:

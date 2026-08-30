@@ -18,11 +18,14 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.course_management import CourseDraft, CourseRelease, LearningTask
+from app.models.recall_acceptance import ContentPrepRecallAcceptance
 from app.models.runtime_migration import RuntimeMigrationItem, RuntimeMigrationRun
 from app.models.user import User
+from app.schemas.recall_acceptance import RecallAcceptanceRecord
 from app.services import (
     files_runtime_migration_service as files_migration,
     question_migration_service as question_migration,
+    recall_acceptance_service,
     runtime_domain_migration_service as domain_migration,
 )
 
@@ -37,6 +40,7 @@ COURSE_SOURCE_KEYS = {
     ACTIVE_COURSE_RELEASE_KEY,
     LEARNING_TASKS_KEY,
 }
+RECALL_ACCEPTANCE_KEY = recall_acceptance_service.RUNTIME_SOURCE_KEY
 
 FILE_EXACT_KEYS = {
     files_migration.INDEX_KEY,
@@ -209,6 +213,12 @@ def _decoded_payload(payload: Any) -> Any:
 
 
 def _managed_disposition(source_key: str) -> tuple[str, str | None, str | None] | None:
+    if source_key == RECALL_ACCEPTANCE_KEY:
+        return (
+            domain_migration.DISPOSITION_MIGRATE,
+            "content-prep-recall-acceptance",
+            None,
+        )
     if source_key in FILE_EXACT_KEYS or source_key.startswith(files_migration.CONTENT_PREFIX):
         return (
             domain_migration.DISPOSITION_ALREADY_RELATIONAL_VERIFY,
@@ -236,6 +246,76 @@ def _managed_disposition(source_key: str) -> tuple[str, str | None, str | None] 
             "one-time compatibility marker is retired",
         )
     return None
+
+
+def _normalize_recall_acceptance(payload: Any, owner_scope: str) -> list[dict[str, Any]]:
+    if not owner_scope or owner_scope == "shared":
+        raise ValueError("shared recall acceptance source is missing a real owner")
+    decoded = _decoded_payload(payload)
+    if not isinstance(decoded, list):
+        raise ValueError("recall acceptance source must be a list")
+    if len(decoded) > recall_acceptance_service.MAX_RECORDS:
+        raise ValueError("recall acceptance source exceeds the 2000-record retention limit")
+    try:
+        return [
+            RecallAcceptanceRecord.model_validate(record).model_dump(
+                by_alias=True,
+                exclude_none=True,
+            )
+            for record in decoded
+        ]
+    except (TypeError, ValueError) as error:
+        raise ValueError("recall acceptance source failed typed validation") from error
+
+
+async def _prepare_recall_acceptance_items(db: AsyncSession, run_id: str) -> None:
+    items = list(
+        (
+            await db.scalars(
+                select(RuntimeMigrationItem).where(
+                    RuntimeMigrationItem.run_id == run_id,
+                    RuntimeMigrationItem.source_key == RECALL_ACCEPTANCE_KEY,
+                )
+            )
+        ).all()
+    )
+    for item in items:
+        item.disposition = domain_migration.DISPOSITION_MIGRATE
+        item.target_domain = "content-prep-recall-acceptance"
+        item.discard_reason = None
+        owner_exists = bool(
+            item.owner_scope
+            and item.owner_scope != "shared"
+            and await db.scalar(
+                select(User.username).where(User.username == item.owner_scope)
+            )
+        )
+        try:
+            if not owner_exists:
+                raise ValueError("shared recall acceptance owner is not a real user")
+            canonical = _normalize_recall_acceptance(
+                item.source_payload,
+                item.owner_scope,
+            )
+        except (TypeError, ValueError) as error:
+            item.status = "failed"
+            item.error = str(error)
+            metadata = dict(item.verification_metadata or {})
+            metadata["parse_error"] = True
+            item.verification_metadata = metadata
+            continue
+        item.expected_count = len(canonical)
+        item.expected_hash = canonical_hash(canonical)
+        metadata = dict(item.verification_metadata or {})
+        metadata.update(
+            {
+                "expected_count": item.expected_count,
+                "expected_hash": item.expected_hash,
+                "parse_error": False,
+            }
+        )
+        item.verification_metadata = metadata
+    await db.commit()
 
 
 def _is_external_domain_key(source_key: str) -> bool:
@@ -568,6 +648,8 @@ async def _prepare_course_items(db: AsyncSession, run_id: str) -> None:
 async def _prepare_managed_items(db: AsyncSession, run_id: str) -> None:
     items = await _items(db, run_id)
     for item in items:
+        if item.source_key == RECALL_ACCEPTANCE_KEY:
+            continue
         disposition = _managed_disposition(item.source_key)
         if disposition is None:
             continue
@@ -1010,6 +1092,23 @@ async def scan(
                 _normalize_course_source(probe)
             except (TypeError, ValueError) as error:
                 parse_error = str(error)
+        if source_key == RECALL_ACCEPTANCE_KEY:
+            disposition = domain_migration.DISPOSITION_MIGRATE
+            target_domain = "content-prep-recall-acceptance"
+            discard_reason = None
+            try:
+                owner_exists = bool(
+                    owner_scope
+                    and owner_scope != "shared"
+                    and await db.scalar(
+                        select(User.username).where(User.username == owner_scope)
+                    )
+                )
+                if not owner_exists:
+                    raise ValueError("shared recall acceptance owner is not a real user")
+                _normalize_recall_acceptance(payload, owner_scope)
+            except (TypeError, ValueError) as error:
+                parse_error = str(error)
         if parse_error:
             parse_errors += 1
             # Validation exceptions can interpolate arbitrary source values.
@@ -1062,6 +1161,7 @@ async def _ledger_scan(
 ) -> dict[str, Any]:
     raw = await domain_migration.scan(db, run_id, sources=sources)
     await _prepare_course_items(db, run_id)
+    await _prepare_recall_acceptance_items(db, run_id)
     await _prepare_managed_items(db, run_id)
     items = await _items(db, run_id)
     return {
@@ -1251,11 +1351,47 @@ async def migrate(
         item.verification_metadata = metadata
         return {"canonical_payload": target}
 
+    async def recall_acceptance_mapper(
+        session: AsyncSession, item: RuntimeMigrationItem
+    ) -> Mapping[str, Any]:
+        source = _normalize_recall_acceptance(item.source_payload, item.owner_scope)
+        owner_exists = await session.scalar(
+            select(User.username).where(User.username == item.owner_scope)
+        )
+        if not owner_exists:
+            raise ValueError("shared recall acceptance owner is not a real user")
+        row = await session.get(ContentPrepRecallAcceptance, item.owner_scope)
+        if row is None:
+            row = ContentPrepRecallAcceptance(
+                owner_id=item.owner_scope,
+                records=source,
+                revision=1,
+            )
+            session.add(row)
+            await session.flush()
+            counters["created"] += 1
+        target = list(row.records or [])
+        conflicts = [] if source == target else [
+            {
+                "id": item.owner_scope,
+                "disposition": "domain-wins",
+                "sourceHash": canonical_hash(source),
+                "targetHash": canonical_hash(target),
+            }
+        ]
+        metadata = dict(item.verification_metadata or {})
+        metadata.update(
+            {"unresolved_conflicts": len(conflicts), "conflicts": conflicts}
+        )
+        item.verification_metadata = metadata
+        return {"canonical_payload": target}
+
     registry = dict(domain_migration.TARGET_MAPPER_REGISTRY)
     registry[COURSE_DRAFTS_KEY] = course_draft_mapper
     registry[COURSE_RELEASES_KEY] = course_release_mapper
     registry[LEARNING_TASKS_KEY] = learning_task_mapper
     registry[ACTIVE_COURSE_RELEASE_KEY] = active_release_mapper
+    registry[RECALL_ACCEPTANCE_KEY] = recall_acceptance_mapper
     applied = await domain_migration.migrate(db, run_id, target_mappers=registry)
     external = None
     if sources is None:
@@ -1295,7 +1431,38 @@ async def _refresh_course_target_hashes(
 ) -> None:
     items = await _items(db, run_id)
     for item in items:
-        if item.source_key not in COURSE_SOURCE_KEYS:
+        if (
+            item.source_key not in COURSE_SOURCE_KEYS
+            and item.source_key != RECALL_ACCEPTANCE_KEY
+        ):
+            continue
+        if item.source_key == RECALL_ACCEPTANCE_KEY:
+            try:
+                source = _normalize_recall_acceptance(
+                    item.source_payload,
+                    item.owner_scope,
+                )
+            except (TypeError, ValueError):
+                continue
+            row = await db.get(ContentPrepRecallAcceptance, item.owner_scope)
+            target = list(row.records or []) if row is not None else []
+            item.target_count = len(target)
+            item.target_hash = canonical_hash(target)
+            conflicts = [] if source == target else [
+                {
+                    "id": item.owner_scope,
+                    "disposition": "domain-wins",
+                    "sourceHash": canonical_hash(source),
+                    "targetHash": canonical_hash(target),
+                }
+            ]
+            metadata = dict(item.verification_metadata or {})
+            metadata.update(
+                {"unresolved_conflicts": len(conflicts), "conflicts": conflicts}
+            )
+            item.verification_metadata = metadata
+            item.status = "migrated"
+            item.error = None
             continue
         try:
             source = _normalize_course_source(item)
@@ -1408,6 +1575,15 @@ async def _read_course_target(
     ):
         return {"releaseId": release.id}
     return None
+
+
+async def _read_recall_acceptance_target(
+    db: AsyncSession,
+    item: RuntimeMigrationItem,
+) -> list[dict[str, Any]]:
+    _normalize_recall_acceptance(item.source_payload, item.owner_scope)
+    row = await db.get(ContentPrepRecallAcceptance, item.owner_scope)
+    return list(row.records or []) if row is not None else []
 
 
 def _source_identity(row: Mapping[str, Any]) -> tuple[str, str, str]:
@@ -1601,6 +1777,12 @@ async def drop_check(
                 except (TypeError, ValueError):
                     metrics["parseErrors"] += 1
                     continue
+            elif item.source_key == RECALL_ACCEPTANCE_KEY:
+                try:
+                    target = await _read_recall_acceptance_target(db, item)
+                except (TypeError, ValueError):
+                    metrics["parseErrors"] += 1
+                    continue
             elif (
                 domain_migration._mapper_for_key(
                     domain_migration.TARGET_MAPPER_REGISTRY, item.source_key
@@ -1608,7 +1790,11 @@ async def drop_check(
                 is not None
             ):
                 target = await domain_migration.read_item_target_canonical(db, item)
-            if target is not None or item.source_key in COURSE_SOURCE_KEYS:
+            if (
+                target is not None
+                or item.source_key in COURSE_SOURCE_KEYS
+                or item.source_key == RECALL_ACCEPTANCE_KEY
+            ):
                 target_count = domain_migration._payload_count(target)
                 target_hash = canonical_hash(target)
                 expected_count = (

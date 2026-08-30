@@ -105,6 +105,23 @@ test('recursive generated and source application scan has no Runtime route or as
   }
 })
 
+test('content prep recall acceptance keeps zero browser business storage', () => {
+  const sourcePath = 'new-legacy/content-prep-studio/src/js/16-recall-acceptance.js'
+  const distPath = 'new-legacy/content-prep-studio/dist/content-prep.html'
+  const dist = readRepo(distPath)
+  const start = dist.indexOf('* P4.5.29 联想库验收器（页签④）')
+  const end = dist.indexOf('/* 同批题目补录', start)
+  assert.ok(start >= 0 && end > start, 'built acceptance module must be traceable')
+  for (const [path, source] of [
+    [sourcePath, readRepo(sourcePath)],
+    [distPath, dist.slice(start, end)],
+  ]) {
+    assert.match(source, /\/api\/v1\/content-prep\/recall-acceptance-records/, path)
+    assert.doesNotMatch(source, /pmp_recall_acceptance_records_v1/, path)
+    assert.doesNotMatch(source, /(?:localStorage|sessionStorage|indexedDB)/, path)
+  }
+})
+
 test('retired admin runtime pages use direct bootstrap and never load runtime', () => {
   for (const page of retiredRuntimePages) {
     const html = readGenerated(page)

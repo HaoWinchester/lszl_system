@@ -29,8 +29,9 @@ from app.models.runtime_migration import RuntimeMigrationItem, RuntimeMigrationR
 from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.teaching_content import ContentSubject, ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode
+from app.models.user import User
 from app.services.engagement_migration import MAPPERS as ENGAGEMENT_MAPPERS, expected_canonical as engagement_expected_canonical
-from app.services import paper_service, teaching_content_revision_service
+from app.services import paper_service, recall_acceptance_service, teaching_content_revision_service
 PUBLISHED_PAPERS_KEY = "kg_exam_papers_published_v1"
 TEACHING_RECALL_PREFIX = "kg_recall_association_library_v1__subject__"
 
@@ -416,21 +417,33 @@ async def _runtime_sources(db: AsyncSession) -> list[Mapping[str, Any]]:
                 "required": True,
             })
     shared_rows = (
-        await db.execute(select(SharedRuntimeState.key, SharedRuntimeState.value))
+        await db.execute(
+            select(
+                SharedRuntimeState.key,
+                SharedRuntimeState.value,
+                SharedRuntimeState.updated_by,
+            )
+        )
     ).all()
-    for key, raw_value in shared_rows:
+    valid_usernames = set((await db.scalars(select(User.username))).all())
+    for key, raw_value, updated_by in shared_rows:
+        errors: list[str] = []
         try:
             payload = json.loads(str(raw_value))
-            parse_error = None
         except (TypeError, ValueError, json.JSONDecodeError) as error:
             payload = str(raw_value)
-            parse_error = f"shared runtime JSON parse failed: {error}"
+            errors.append(f"shared runtime JSON parse failed: {error}")
+        owner_scope = "shared"
+        if str(key) == recall_acceptance_service.RUNTIME_SOURCE_KEY:
+            owner_scope = str(updated_by or "").strip() or "shared"
+            if owner_scope == "shared" or owner_scope not in valid_usernames:
+                errors.append("shared recall acceptance owner is not a real user")
         sources.append({
             "source_type": "shared_runtime",
             "source_key": str(key),
-            "owner_scope": "shared",
+            "owner_scope": owner_scope,
             "payload": payload,
-            "parse_error": parse_error,
+            "parse_error": "; ".join(errors) if errors else None,
             "required": True,
         })
     return sources

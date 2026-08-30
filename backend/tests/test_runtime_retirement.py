@@ -23,11 +23,36 @@ from app.models.engagement import (
     MessageReceipt,
 )
 from app.models.file import CurrentFile, FileContent, FileTag, Folder, GraphFile, Tag
+from app.models.recall_acceptance import ContentPrepRecallAcceptance
 from app.models.runtime_migration import RuntimeMigrationItem, RuntimeMigrationRun
 from app.models.runtime_state import RuntimeState
+from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.teaching_content import ContentSubject, RecallAssociationLibrary
 from app.models.user import User
-from app.services import files_runtime_migration_service, runtime_retirement_service as service
+from app.services import (
+    files_runtime_migration_service,
+    runtime_domain_migration_service,
+    runtime_retirement_service as service,
+)
+
+
+def _recall_acceptance_record(identifier: str) -> dict:
+    return {
+        "id": identifier,
+        "at": "2026-08-30T09:00:00.000Z",
+        "type": "input",
+        "source": "input",
+        "query": identifier,
+        "matchMode": "未命中",
+        "nodeId": "",
+        "nodeTitle": "",
+        "autoStatus": "未命中",
+        "candidateCount": 0,
+        "firstChoices": [],
+        "path": [],
+        "manualVerdict": "",
+        "note": "",
+    }
 
 
 def test_canonical_hash_is_stable_and_uses_compact_utf8_json() -> None:
@@ -89,6 +114,126 @@ def test_retirement_device_preferences_match_frontend_registry() -> None:
     assert set(service.DEVICE_PREFERENCE_PREFIXES) == prefixes | {
         f"{base}__" for base in scoped_bases
     }
+
+
+def test_shared_recall_acceptance_source_uses_real_updated_by_owner_or_fails_closed() -> None:
+    suffix = uuid4().hex[:10]
+    teacher = f"recall-migration-owner-{suffix}"
+    invalid_owner = f"missing-recall-owner-{suffix}"
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                User(
+                    username=teacher,
+                    password_hash="not-used",
+                    role="teacher",
+                    status="active",
+                    subject="PMP",
+                )
+            )
+            db.add(
+                SharedRuntimeState(
+                    key=service.RECALL_ACCEPTANCE_KEY,
+                    value=json.dumps([_recall_acceptance_record("owned")]),
+                    updated_by=teacher,
+                )
+            )
+            await db.commit()
+
+            sources = await runtime_domain_migration_service._runtime_sources(db)
+            source = next(
+                row for row in sources if row["source_key"] == service.RECALL_ACCEPTANCE_KEY
+            )
+            assert source["owner_scope"] == teacher
+            assert source.get("parse_error") is None
+
+            shared = await db.get(SharedRuntimeState, service.RECALL_ACCEPTANCE_KEY)
+            shared.updated_by = invalid_owner
+            await db.commit()
+            sources = await runtime_domain_migration_service._runtime_sources(db)
+            source = next(
+                row for row in sources if row["source_key"] == service.RECALL_ACCEPTANCE_KEY
+            )
+            assert source["owner_scope"] == invalid_owner
+            assert source["parse_error"] == "shared recall acceptance owner is not a real user"
+
+            await db.delete(shared)
+            await db.execute(delete(User).where(User.username == teacher))
+            await db.commit()
+
+    asyncio.run(scenario())
+
+
+def test_recall_acceptance_runtime_source_migrates_and_verifies_without_loss() -> None:
+    suffix = uuid4().hex[:10]
+    teacher = f"recall-migration-{suffix}"
+    run_id = f"recall-migration-run-{suffix}"
+    records = [_recall_acceptance_record("first"), _recall_acceptance_record("second")]
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                User(
+                    username=teacher,
+                    password_hash="not-used",
+                    role="teacher",
+                    status="active",
+                    subject="PMP",
+                )
+            )
+            await db.commit()
+            report = await service.migrate(
+                db,
+                run_id=run_id,
+                sources=[
+                    {
+                        "source_type": "shared_runtime",
+                        "source_key": service.RECALL_ACCEPTANCE_KEY,
+                        "owner_scope": teacher,
+                        "payload": records,
+                        "required": True,
+                    }
+                ],
+            )
+            assert report["unknown"] == 0
+            item = next(
+                row for row in report["items"] if row["sourceKey"] == service.RECALL_ACCEPTANCE_KEY
+            )
+            assert item["disposition"] == "migrate"
+            assert item["targetDomain"] == "content-prep-recall-acceptance"
+
+            target = await db.get(ContentPrepRecallAcceptance, teacher)
+            assert target is not None
+            assert target.records == records
+            verified = await service.verify(db, run_id=run_id)
+            assert verified["requiredFailures"] == 0
+            assert verified["hashMismatches"] == 0
+            assert verified["verifiedCount"] == 1
+
+            target = await db.get(ContentPrepRecallAcceptance, teacher)
+            target.records = [
+                _recall_acceptance_record("tampered"),
+                _recall_acceptance_record("second"),
+            ]
+            await db.commit()
+            failed = await service.verify(db, run_id=run_id)
+            assert failed["requiredFailures"] == 1
+            assert failed["hashMismatches"] == 1
+
+            await db.execute(
+                delete(RuntimeMigrationItem).where(RuntimeMigrationItem.run_id == run_id)
+            )
+            await db.execute(delete(RuntimeMigrationRun).where(RuntimeMigrationRun.id == run_id))
+            await db.execute(
+                delete(ContentPrepRecallAcceptance).where(
+                    ContentPrepRecallAcceptance.owner_id == teacher
+                )
+            )
+            await db.execute(delete(User).where(User.username == teacher))
+            await db.commit()
+
+    asyncio.run(scenario())
 
 
 def test_scan_never_exposes_invalid_payload_values_in_discard_reason() -> None:

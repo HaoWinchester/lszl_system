@@ -123,6 +123,7 @@ node new-legacy/content-prep-studio/tests/test_tag_migration.js
 node new-legacy/content-prep-studio/tests/test_server_catalog.js
 node new-legacy/content-prep-studio/tests/test_edit_lock_client.js
 node new-legacy/content-prep-studio/tests/test_shared_draft_service.js
+node new-legacy/content-prep-studio/tests/test_recall_acceptance_api.js
 
 mkdir -p "$VALIDATION_ROOT/releases/$RELEASE_VERSION"
 cp -R "$RELEASE_ROOT/$RELEASE_VERSION/." "$VALIDATION_ROOT/releases/$RELEASE_VERSION/"
