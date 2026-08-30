@@ -1,12 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.191",
+  "fromVersion": "v9.0-p4.1.192",
   "toVersion": "v9.0-p4.1.192",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html"
+      "practice-mode.html",
+      "styles/practice-mode.css",
+      "tests/practice-answer-sheet-browser.py"
     ],
     "removed": []
   },

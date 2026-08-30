@@ -176,10 +176,9 @@ body.practice-mode-page.is-practice-drawer-open{overflow:hidden}
 /* P4.5 database-backed revenge/remediation workflow */
 .practice-main{width:min(1280px,calc(100% - 32px))}
 .practice-mode-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(340px,1fr);gap:18px;align-items:stretch}
-.practice-standard-column,.practice-revenge-column{min-width:0;display:grid;grid-template-rows:auto 1fr;gap:14px}
-.practice-setup-card,.practice-order-card{min-height:102px}
-.practice-setup-card{grid-template-columns:minmax(260px,1.35fr) minmax(360px,1fr);margin:0}
-.practice-order-card{padding:16px 18px;border:1px solid var(--practice-border);border-radius:18px;background:var(--practice-card);box-shadow:0 8px 24px rgba(31,41,55,.045);display:grid;align-items:center}
+.practice-standard-column{min-width:0;display:grid;grid-template-rows:auto 1fr;gap:14px}
+.practice-revenge-column{min-width:0}
+.practice-setup-card{min-height:102px;grid-template-columns:minmax(190px,1.1fr) minmax(280px,1.2fr) minmax(210px,.9fr);gap:14px;margin:0}
 .practice-standard-modes{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:0}
 .practice-standard-modes .practice-mode-card,.practice-revenge-column>.practice-mode-card{height:100%;min-height:300px}
 .practice-revenge-column>.practice-mode-card{margin:0}
@@ -221,9 +220,9 @@ body[data-practice-mode="revenge"] .practice-progress-shell span{background:line
 .practice-verification-banner>span{flex:0 0 auto;padding:4px 7px;border-radius:999px;background:#dff4ee;color:#08745f;font-size:8px;font-weight:950;letter-spacing:.12em}
 .practice-verification-banner>div{min-width:0}.practice-verification-banner strong,.practice-verification-banner small{display:block}.practice-verification-banner strong{font-size:11px}.practice-verification-banner small{margin-top:2px;color:#5e756f;font-size:9px;line-height:1.45}
 body[data-practice-phase="verification"] .practice-question-card{border-color:#a8d9cd;box-shadow:0 12px 34px rgba(8,116,95,.08)}
-@media(max-width:1080px){.practice-mode-layout{grid-template-columns:1fr}.practice-revenge-column{grid-template-columns:minmax(0,1fr) minmax(0,2fr);grid-template-rows:1fr}.practice-standard-modes .practice-mode-card,.practice-revenge-column>.practice-mode-card{min-height:240px}}
+@media(max-width:1080px){.practice-mode-layout{grid-template-columns:1fr}.practice-standard-modes .practice-mode-card,.practice-revenge-column>.practice-mode-card{min-height:240px}}
 @media(max-width:1020px) and (min-width:801px){.practice-mode-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.practice-mode-card.revenge{grid-column:auto}}
-@media(max-width:800px){.practice-mode-layout,.practice-standard-column,.practice-revenge-column{grid-template-columns:1fr;grid-template-rows:auto}.practice-setup-card{grid-template-columns:1fr}.practice-mode-grid{grid-template-columns:1fr}.practice-mode-card.revenge{grid-column:auto}.practice-standard-modes .practice-mode-card,.practice-revenge-column>.practice-mode-card{min-height:0}.practice-remediation-panel{padding:17px 16px}.practice-remediation-actions{align-items:stretch;flex-direction:column}.practice-remediation-actions button{width:100%}}
+@media(max-width:800px){.practice-mode-layout,.practice-standard-column{grid-template-columns:1fr;grid-template-rows:auto}.practice-setup-card{grid-template-columns:1fr}.practice-mode-grid{grid-template-columns:1fr}.practice-mode-card.revenge{grid-column:auto}.practice-standard-modes .practice-mode-card,.practice-revenge-column>.practice-mode-card{min-height:0}.practice-remediation-panel{padding:17px 16px}.practice-remediation-actions{align-items:stretch;flex-direction:column}.practice-remediation-actions button{width:100%}}
 @media(max-width:480px){.practice-revenge-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.practice-revenge-rule-tooltip{position:fixed;top:78px;left:14px;right:14px;width:auto;max-height:calc(100vh - 100px);overflow:auto}}
 
 

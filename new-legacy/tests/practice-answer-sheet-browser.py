@@ -464,19 +464,22 @@ with sync_playwright() as playwright:
       window.KGPracticeMode.showLobby();
     }""")
     page.wait_for_timeout(100)
-    # 大屏布局：挑战/学霸位于左栏，复仇位于独立右栏；两栏设置区顶部对齐。
+    # 大屏布局：试卷、题量、顺序和挑战/学霸都在左栏，右栏只保留复仇。
     lobby_geometry = page.evaluate("""()=>{
       const rect=selector=>{const value=document.querySelector(selector).getBoundingClientRect();return {x:value.x,y:value.y,width:value.width,height:value.height,right:value.right}};
       return {
-        setup:rect('.practice-setup-card'),order:rect('.practice-order-card'),
+        setup:rect('.practice-setup-card'),order:rect('.practice-order-options'),
         challenge:rect('.practice-mode-card.challenge'),scholar:rect('.practice-mode-card.scholar'),
-        revenge:rect('.practice-mode-card.revenge')
+        revenge:rect('.practice-mode-card.revenge'),
+        orderInsideSetup:document.querySelector('.practice-setup-card').contains(document.querySelector('[name="practiceOrder"]'))
       };
     }""")
-    assert abs(lobby_geometry["setup"]["y"] - lobby_geometry["order"]["y"]) < 2, lobby_geometry
+    assert lobby_geometry["orderInsideSetup"], lobby_geometry
+    assert lobby_geometry["order"]["right"] < lobby_geometry["revenge"]["x"], lobby_geometry
     assert lobby_geometry["challenge"]["x"] < lobby_geometry["scholar"]["x"], lobby_geometry
     assert lobby_geometry["scholar"]["right"] < lobby_geometry["revenge"]["x"], lobby_geometry
-    assert abs(lobby_geometry["challenge"]["y"] - lobby_geometry["revenge"]["y"]) < 2, lobby_geometry
+    assert abs(lobby_geometry["setup"]["y"] - lobby_geometry["revenge"]["y"]) < 2, lobby_geometry
+    assert lobby_geometry["challenge"]["y"] > lobby_geometry["setup"]["y"] + lobby_geometry["setup"]["height"], lobby_geometry
     # 普通练习选择 60 题，复仇只有 1 题时仍自动发送 count=1。
     page.locator('label:has([name="practiceCount"][value="60"])').click()
     assert page.locator('#practiceRevengeActiveCount').inner_text() == '1'

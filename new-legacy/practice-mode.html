@@ -108,6 +108,13 @@
                   <label><input type="radio" name="practiceCount" value="180"/><span>180</span></label>
                 </div>
               </fieldset>
+              <fieldset class="practice-choice-group">
+                <legend>答题顺序</legend>
+                <div class="practice-order-options">
+                  <label><input type="radio" name="practiceOrder" value="paper" checked/><span>试卷顺序</span></label>
+                  <label><input type="radio" name="practiceOrder" value="random"/><span>随机顺序</span></label>
+                </div>
+              </fieldset>
             </section>
             <section class="practice-mode-grid practice-standard-modes" aria-label="挑战和学霸模式">
               <article class="practice-mode-card challenge">
@@ -123,15 +130,6 @@
             </section>
           </div>
           <aside class="practice-revenge-column">
-            <section class="practice-order-card" aria-label="答题顺序设置">
-              <fieldset class="practice-choice-group">
-                <legend>答题顺序</legend>
-                <div class="practice-order-options">
-                  <label><input type="radio" name="practiceOrder" value="paper" checked/><span>试卷顺序</span></label>
-                  <label><input type="radio" name="practiceOrder" value="random"/><span>随机顺序</span></label>
-                </div>
-              </fieldset>
-            </section>
             <article class="practice-mode-card revenge">
               <span class="practice-mode-icon" data-kg-icon="rotate-ccw" data-kg-icon-size="20" aria-hidden="true"></span>
               <div><small>REVENGE</small><div class="practice-revenge-title" id="practiceRevengeRuleShell"><h2>复仇模式</h2><button type="button" class="practice-revenge-rule-trigger" id="practiceRevengeRuleTrigger" aria-label="查看复仇模式规则" aria-controls="practiceRevengeRuleTooltip" aria-expanded="false"><span data-kg-icon="circle-help" data-kg-icon-size="16" aria-hidden="true"></span></button><div class="practice-revenge-rule-tooltip" id="practiceRevengeRuleTooltip" role="tooltip" hidden><strong>复仇模式规则</strong><ul><li>按当前账号全局统计，支持跨试卷、跨版本和历史无版本错题。</li><li>相同 question_id 只出一道题，重复历史仍会保留并关联。</li><li>新错题、需补救和已到期待验证的题会进入本次题池。</li><li>优先顺序：需补救 → 新错题 → 已到期待验证。</li><li>10 题以内自动全部进入；超过 10 题可选择本次题量。</li></ul></div></div><p>集中处理真实错题；再次答错先补知识点，再用不同题目验证是否真正掌握。</p></div>

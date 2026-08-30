@@ -13,7 +13,7 @@ test('P4.5 practice workflow renders revenge, remediation and verification contr
   assert.match(page, /id="practiceVerificationBanner"/)
 })
 
-test('desktop lobby separates standard modes from the revenge lane', () => {
+test('desktop lobby keeps standard settings separate from the revenge-only lane', () => {
   const page = source('new-legacy/practice-mode.html')
   const styles = source('new-legacy/styles/practice-mode.css')
 
@@ -21,8 +21,8 @@ test('desktop lobby separates standard modes from the revenge lane', () => {
     'practice-mode-layout',
     'practice-standard-column',
     'practice-revenge-column',
-    'practice-order-card',
   ]) assert.match(page, new RegExp(`class="[^"]*${className}`), className)
+  assert.doesNotMatch(page, /practice-order-card/)
   assert.match(styles, /\.practice-mode-layout\{[^}]*grid-template-columns:/)
   assert.match(styles, /\.practice-standard-modes\{[^}]*grid-template-columns:repeat\(2/)
 })
