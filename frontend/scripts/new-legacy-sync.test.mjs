@@ -65,6 +65,7 @@ const requiredFiles = [
   'content-prep-studio/tests/test_server_catalog.js',
   'content-prep-studio/tests/test_edit_lock_client.js',
   'content-prep-studio/tests/test_shared_draft_service.js',
+  'content-prep-studio/tests/test_recall_acceptance_api.js',
   'content-prep-studio/tests/test_server_ui_contract.py',
   'content-prep-studio/dist/content-prep.html',
 ]
@@ -251,6 +252,43 @@ test('sync rejects an unregistered future business-storage key', (t) => {
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /kg_future_business_state_v1/)
   assert.match(result.stderr, /P4\.5 persistent state is not registered/)
+})
+
+test('sync rejects an unregistered pmp business-storage key', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/p45-fixture.js'), "localStorage.setItem('pmp_future_business_payload_v1', '{}')\n")
+
+  const result = runSync(item)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /pmp_future_business_payload_v1/)
+  assert.match(result.stderr, /P4\.5 persistent state is not registered/)
+})
+
+test('sync limits the registered Prep Studio IndexedDB name to its declared debt modules', (t) => {
+  const allowed = fixture()
+  const rejected = fixture()
+  t.after(() => rmSync(allowed.root, { recursive: true, force: true }))
+  t.after(() => rmSync(rejected.root, { recursive: true, force: true }))
+
+  write(
+    resolve(allowed.upstream, 'content-prep-studio/src/js/10-state-domain.js'),
+    "indexedDB.open('pmp_content_prep_studio_v1')\n",
+  )
+  write(
+    resolve(allowed.upstream, 'content-prep-studio/dist/content-prep.html'),
+    "<script>indexedDB.open('pmp_content_prep_studio_v1')</script>\n",
+  )
+  assert.equal(runSync(allowed).status, 0)
+
+  write(
+    resolve(rejected.upstream, 'src/p45-fixture.js'),
+    "localStorage.setItem('pmp_content_prep_studio_v1', '{}')\n",
+  )
+  const result = runSync(rejected)
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /P4\.5 persistent state is not registered: pmp_content_prep_studio_v1/)
 })
 
 test('sync reports the P4.5 contract diagnostic for an unregistered persistent key', (t) => {

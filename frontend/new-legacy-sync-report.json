@@ -3,9 +3,18 @@
   "fromVersion": "v9.0-p4.1.186",
   "toVersion": "v9.0-p4.1.186",
   "changes": {
-    "added": [],
+    "added": [
+      "content-prep-studio/tests/test_recall_acceptance_api.js"
+    ],
     "changed": [
-      "src/91-course-admin-app.js"
+      "content-prep-studio/dist/content-prep.html",
+      "content-prep-studio/src/index.template.html",
+      "content-prep-studio/src/js/16-recall-acceptance.js",
+      "src/77-multi-question-workspace.js",
+      "src/80-question-font-scale.js",
+      "src/91-content-center-app.js",
+      "tests/device-preferences.test.js",
+      "tests/teaching-content-api-cutover.test.js"
     ],
     "removed": []
   },

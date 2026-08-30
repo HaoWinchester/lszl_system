@@ -105,3 +105,16 @@ test('device preference allowlists are immutable and cannot be extended to store
     error => error.code === 'DEVICE_PREFERENCE_KEY_FORBIDDEN',
   )
 })
+
+test('registered content-center and multi-question preferences use the shared facade', () => {
+  const root = path.resolve(__dirname, '..')
+  for (const relative of [
+    'src/91-content-center-app.js',
+    'src/77-multi-question-workspace.js',
+    'src/80-question-font-scale.js',
+  ]) {
+    const source = fs.readFileSync(path.join(root, relative), 'utf8')
+    assert.doesNotMatch(source, /\blocalStorage\b/, relative)
+    assert.match(source, /KGDevicePreferences/, relative)
+  }
+})

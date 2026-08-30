@@ -5,12 +5,13 @@
   const TreeIndex=window.KGKnowledgeTreeIndex;
   const Org=window.KGContentOrganization;
   const QuestionStats=window.KGKnowledgeQuestionStats;
+  const Preferences=window.KGDevicePreferences;
   const $=id=>document.getElementById(id);
   const clean=value=>String(value??'').trim();
   const escapeHTML=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const SUBJECT_PREF_KEY='kg_teacher_workbench_subject_v1';
   const TYPE_LABELS={single_choice:'单项选择',keyword_recognition:'关键词识别',open_response:'开放表达',ordering:'排序',matching:'连线配对',memory_match:'翻牌记忆',deep_recall:'深度回忆',multi_question_induction:'多题归纳',knowledge_graph:'知识图谱'};
-  const storedSubject=clean(localStorage.getItem(SUBJECT_PREF_KEY));
+  const storedSubject=clean(Preferences?.getString(SUBJECT_PREF_KEY,''));
   const initialParams=new URLSearchParams(location.search);const requestedTaxonomy=Core.taxonomyById(initialParams.get('taxonomyId'));const requestedSubject=Core.subjectById(initialParams.get('subjectId'));
   const state={subjectId:requestedTaxonomy?.subjectId||requestedSubject?.id||Core.subjectById(storedSubject)?.id||'subject-pmp',taxonomyId:requestedTaxonomy?.id||'',knowledgeNodeId:'',expanded:new Set(),selected:new Set(),query:'',knowledgeQuery:'',mappingStatus:'',lifecycleStatus:'',authorScope:'',difficultyFilter:'',tagFilter:'',collectionFilter:'',favoriteOnly:false,mapTargets:[],treeView:'list',graphScale:1,undo:[],redo:[],dragNodeId:'',mapQuery:'',showQuestionCounts:true,questionCoverage:'all',questionLowThreshold:5,questionDrawerNodeId:'',questionDrawerScope:'direct',questionDrawerQuery:''};
   let toastTimer,knowledgeRenderTimer,knowledgeIndex=null,questionStatsCache=null;
@@ -45,7 +46,7 @@
   function coverageBranchMatches(nodeId){const index=getKnowledgeIndex();return coverageMatches(nodeId)||(index?.descendants(nodeId)||[]).some(id=>coverageMatches(id))}
   function visibleBranch(nodeId){return branchMatches(nodeId)&&coverageBranchMatches(nodeId)}
   function countBadge(node){if(!state.showQuestionCounts)return '';const index=getKnowledgeIndex(),direct=directQuestionCount(node.id),children=index?.children(node.id)||[],total=totalQuestionCount(node.id),label=children.length?`本 ${direct} · 含 ${total}`:`${direct}`;return `<button type="button" class="cc-question-count-badge ${direct===0?'zero':direct<state.questionLowThreshold?'low':''}" data-question-count-node="${escapeHTML(node.id)}" data-question-count-scope="${children.length?'branch':'direct'}" title="查看该知识点${children.length?'及下级':''}题目">${label}</button>`}
-  function saveSubjectPreference(){localStorage.setItem(SUBJECT_PREF_KEY,state.subjectId)}
+  function saveSubjectPreference(){Preferences?.setString(SUBJECT_PREF_KEY,state.subjectId)}
   function snapshot(){return Core.getTaxonomies()}
   function commitHistory(before){state.undo.push(before);if(state.undo.length>30)state.undo.shift();state.redo=[];renderHistoryButtons()}
   function renderHistoryButtons(){const editable=isTaxonomyEditable();$('ccUndoBtn').disabled=!editable||!state.undo.length;$('ccRedoBtn').disabled=!editable||!state.redo.length}

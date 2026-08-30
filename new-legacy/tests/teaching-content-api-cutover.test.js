@@ -41,16 +41,16 @@ test('teaching repositories no longer read or write browser Runtime projections'
   ]) assert.doesNotMatch(readSource(relative), /localStorage/, relative);
 });
 
-test('Task 7 compatibility is limited to exact course and task repository resources', () => {
+test('final retirement removes course and task Runtime compatibility resources', () => {
   const repository = readSource('src/admin/11-local-content-repository.js');
-  const allowedUntilTask7 = [
+  const retiredCourseKeys = [
     'kg_course_config_drafts_v1',
     'kg_course_config_releases_v1',
     'kg_course_config_active_release_v1',
     'kg_learning_tasks_v1',
   ];
-  for (const key of allowedUntilTask7) assert.match(repository, new RegExp(key));
-  assert.match(repository, /allowedUntilTask7/);
+  for (const key of retiredCourseKeys) assert.doesNotMatch(repository, new RegExp(key));
+  assert.doesNotMatch(repository, /allowedUntilTask7/);
 });
 
 test('Task 5B retires all five synchronous teaching lifecycle keys', () => {
@@ -512,16 +512,17 @@ test('Task 5B repository writes await authoritative catalog persistence', async 
   assert.equal(await result, true);
 });
 
-test('Task 5B removes all three teaching pages from Runtime policy', () => {
+test('final retirement removes Runtime policies and publishes the exact marker', () => {
   for (const relative of [
     'frontend/scripts/runtime-page-policy.json',
     'backend/app/web/runtime_page_policy.json',
   ]) {
-    const policy = JSON.parse(readRepo(relative));
-    for (const page of ['admin-subjects.html', 'content-prep.html', 'content-center.html']) {
-      assert.equal(policy.runtimePages.includes(page), false, `${relative}:${page}`);
-    }
+    assert.equal(fs.existsSync(path.join(REPO, relative)), false, relative);
   }
+  assert.deepEqual(
+    JSON.parse(readRepo('frontend/scripts/new-legacy-assets/runtime-retirement.json')),
+    { schemaVersion: 1, status: 'retired', runtimeRequests: 0 },
+  );
   const template = readSource('content-prep-studio/src/index.template.html');
   assert.doesNotMatch(template, /server-state-bootstrap\.js/);
   assert.match(template, /kg-direct-bootstrap-anchor/);

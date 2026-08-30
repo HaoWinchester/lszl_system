@@ -19,7 +19,7 @@ const IGNORED = [
 const TOKENS = {
   endpoint: /\/api\/v1\/runtime\/state/g,
   consumer: /\b(?:KGServerStateStorage|KGServerStateBootstrap)\b/g,
-  runtimeKey: /(?:(['"`])(?<quoted>kg_[a-z0-9_]+(?:__[^'"`]*)?)\1|(?<bare>\bkg_[a-z0-9_]+(?:__\w+)?)(?=\s*:))/gi,
+  runtimeKey: /(?:(['"`])(?<quoted>(?:kg|pmp)_[a-z0-9_]+(?:__[^'"`]*)?)\1|(?<bare>\b(?:kg|pmp)_[a-z0-9_]+(?:__\w+)?)(?=\s*:))/gi,
 }
 const DYNAMIC_KEY = /(?:(?:global|window)\s*(?:\?\.|\.)\s*)?(?:localStorage|sessionStorage)\s*(?:\?\.|\.)\s*(?:getItem|setItem|removeItem)\s*(?:\?\.)?\s*\(\s*([A-Za-z_$][\w$]*(?:\([^\n)]*\))?)/g
 const DEVICE_PREFERENCE_STORAGE_CALL = /(?:(?:global|window)\s*(?:\?\.\s*|\.\s*))?(?:localStorage|sessionStorage)\s*(?:\?\.\s*|\.\s*)(?:getItem|setItem|removeItem)\s*(?:\?\.\s*)?\(\s*(assertAllowed\s*\(\s*key\s*\)|[^,\n)]+)[^\n]*\)/g
@@ -127,6 +127,21 @@ test('runtime removal contract detects a newly added key, endpoint, and consumer
   assert.equal(actual.endpoint.length, BASELINE.endpoint.length + 2)
   assert.equal(actual.consumer.length, BASELINE.consumer.length + 2)
   assert.ok(actual.runtimeKey.length >= BASELINE.runtimeKey.length + 2)
+})
+
+test('runtime removal contract rejects a non-kg business-storage prefix', () => {
+  const path = 'new-legacy/src/__runtime-removal-contract-fixture.js'
+  const report = contractReport(new Map([[
+    path,
+    "localStorage.setItem('pmp_future_business_payload_v1', '{}')\n",
+  ]]))
+
+  assert.equal(report.blocked, true)
+  assert.deepEqual(report.unreviewed.runtimeKey, [{
+    path,
+    token: 'pmp_future_business_payload_v1',
+    ordinal: 1,
+  }])
 })
 
 test('runtime removal contract scans the shared domain client boundary', () => {

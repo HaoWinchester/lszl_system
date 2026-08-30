@@ -519,19 +519,19 @@
   }
   function readAnalysisSections(){
     try{
-      const raw=JSON.parse(localStorage.getItem(scopedPreferenceKey(ANALYSIS_SECTION_KEY))||'null');
+      const raw=global.KGDevicePreferences?.getJSON(scopedPreferenceKey(ANALYSIS_SECTION_KEY),null);
       const selected=Array.isArray(raw)?raw.map(String).filter(key=>ANALYSIS_SECTION_ORDER.includes(key)):[];
       return new Set(selected.length?selected:ANALYSIS_SECTION_DEFAULTS);
     }catch(error){return new Set(ANALYSIS_SECTION_DEFAULTS)}
   }
   function saveAnalysisSections(){
-    try{localStorage.setItem(scopedPreferenceKey(ANALYSIS_SECTION_KEY),JSON.stringify([...state.analysisSections]))}catch(error){}
+    try{global.KGDevicePreferences?.setJSON(scopedPreferenceKey(ANALYSIS_SECTION_KEY),[...state.analysisSections])}catch(error){}
     return state.analysisSections;
   }
   function analysisSectionEnabled(key){return state.analysisSections.has(String(key||''))}
   function readFontScale(){
     try{
-      const stored=String(localStorage.getItem(scopedPreferenceKey(FONT_SCALE_KEY))||'large');
+      const stored=String(global.KGDevicePreferences?.getString(scopedPreferenceKey(FONT_SCALE_KEY),'large')||'large');
       return FONT_SCALE_LEVELS.includes(stored)?stored:'large';
     }catch(error){return 'large'}
   }
@@ -547,7 +547,7 @@
       button.setAttribute('aria-label',button.title);
     }
     if(persist){
-      try{localStorage.setItem(scopedPreferenceKey(FONT_SCALE_KEY),resolved)}catch(error){}
+      try{global.KGDevicePreferences?.setString(scopedPreferenceKey(FONT_SCALE_KEY),resolved)}catch(error){}
     }
     if(state.initialized&&state.cards.size){
       const schedule=global.requestAnimationFrame||((callback)=>global.setTimeout(callback,0));
@@ -568,17 +568,17 @@
       const shared=typeof qbCurrentPaper==='function'?qbCurrentPaper():null;
       if(shared?.id)return {paperId:String(shared.id),releaseId:String(shared.releaseId||'')};
       return {
-        paperId:String(localStorage.getItem(scopedPreferenceKey(PAPER_SELECTION_KEY))||''),
-        releaseId:String(localStorage.getItem(scopedPreferenceKey(RELEASE_SELECTION_KEY))||'')
+        paperId:String(global.KGDevicePreferences?.getString(scopedPreferenceKey(PAPER_SELECTION_KEY),'')||''),
+        releaseId:String(global.KGDevicePreferences?.getString(scopedPreferenceKey(RELEASE_SELECTION_KEY),'')||'')
       };
     }catch(error){return {paperId:'',releaseId:''}}
   }
   function savePaperSelection(){
     try{
-      if(state.paperId)localStorage.setItem(scopedPreferenceKey(PAPER_SELECTION_KEY),state.paperId);
-      else localStorage.removeItem(scopedPreferenceKey(PAPER_SELECTION_KEY));
-      if(state.releaseId)localStorage.setItem(scopedPreferenceKey(RELEASE_SELECTION_KEY),state.releaseId);
-      else localStorage.removeItem(scopedPreferenceKey(RELEASE_SELECTION_KEY));
+      if(state.paperId)global.KGDevicePreferences?.setString(scopedPreferenceKey(PAPER_SELECTION_KEY),state.paperId);
+      else global.KGDevicePreferences?.remove(scopedPreferenceKey(PAPER_SELECTION_KEY));
+      if(state.releaseId)global.KGDevicePreferences?.setString(scopedPreferenceKey(RELEASE_SELECTION_KEY),state.releaseId);
+      else global.KGDevicePreferences?.remove(scopedPreferenceKey(RELEASE_SELECTION_KEY));
     }catch(error){}
     try{
       const current=typeof qbCurrentPaper==='function'?qbCurrentPaper():null;
@@ -4180,7 +4180,7 @@
 
   function readHighlightColor(){
     try{
-      const value=String(localStorage.getItem(scopedPreferenceKey(HIGHLIGHT_COLOR_KEY))||'');
+      const value=String(global.KGDevicePreferences?.getString(scopedPreferenceKey(HIGHLIGHT_COLOR_KEY),'')||'');
       return HIGHLIGHT_COLORS.includes(value)?value:'#fde68a';
     }catch(error){return '#fde68a'}
   }
@@ -4200,7 +4200,7 @@
     state.highlightColor=resolved;
     setPrimaryHighlightColor(resolved);
     if(persist){
-      try{localStorage.setItem(scopedPreferenceKey(HIGHLIGHT_COLOR_KEY),resolved)}catch(error){}
+      try{global.KGDevicePreferences?.setString(scopedPreferenceKey(HIGHLIGHT_COLOR_KEY),resolved)}catch(error){}
     }
     return resolved;
   }

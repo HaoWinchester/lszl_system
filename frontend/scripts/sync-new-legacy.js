@@ -17,6 +17,9 @@ const legacyUnmigratedIndexedDbModules = Object.freeze([
   'content-prep-studio/src/js/10-state-domain.js',
   'content-prep-studio/dist/content-prep.html',
 ])
+const legacyIndexedDbLiteralOwners = Object.freeze({
+  pmp_content_prep_studio_v1: new Set(legacyUnmigratedIndexedDbModules),
+})
 
 function parseArgs(argv) {
   const args = { source: resolve(repoDir, 'new-legacy'), out: resolve(frontendDir, 'public', 'new-legacy') }
@@ -967,7 +970,7 @@ function validateStorageContract(source) {
   const sessionOnlyKeys = new Set()
   const readOnlyWrites = new Set()
   const devicePreferenceSource = 'src/28-device-preferences.js'
-  const literalPattern = /(['"])(kg_[A-Za-z0-9_]+|pmp_question_font_size_v\d+|通用知识点关系图谱工具_[^'"\\\r\n]+)\1/g
+  const literalPattern = /(['"])((?:kg|pmp)_[A-Za-z0-9_]+|通用知识点关系图谱工具_[^'"\\\r\n]+)\1/g
   const writePattern = /(?:localStorage|sessionStorage)\s*(?:\?\.|\.)\s*(?:setItem|removeItem)\s*\(\s*(['"])(kg_[A-Za-z0-9_]+)\1/g
   const sessionTokenPattern = /sessionStorage\s*(?:\?\.|\.)\s*(?:getItem|setItem|removeItem)\s*\(\s*(['"])(kg_[A-Za-z0-9_]+)\1/g
   const devicePreferenceStorageCall = /(?:(?:global|window)\s*(?:\?\.\s*|\.\s*))?(?:localStorage|sessionStorage)\s*(?:\?\.\s*|\.\s*)(?:getItem|setItem|removeItem)\s*(?:\?\.\s*)?\(\s*(assertAllowed\s*\(\s*key\s*\)|[^,\n)]+)/g
@@ -977,6 +980,7 @@ function validateStorageContract(source) {
   })
   for (const path of productionSources) {
     const contents = readFileSync(resolve(source, path), 'utf8')
+    const normalizedPath = path.split(sep).join('/')
     // This facade owns its own immutable device-only allowlist. Its key declarations
     // are not business-storage candidates; all other sources remain fail-closed.
     if (path === devicePreferenceSource) {
@@ -986,7 +990,11 @@ function validateStorageContract(source) {
       }
       continue
     }
-    for (const match of contents.matchAll(literalPattern)) candidates.add(match[2])
+    for (const match of contents.matchAll(literalPattern)) {
+      const owners = legacyIndexedDbLiteralOwners[match[2]]
+      if (owners?.has(normalizedPath)) continue
+      candidates.add(match[2])
+    }
     for (const match of contents.matchAll(sessionTokenPattern)) {
       if (sessionOnlyPrefixes.some((prefix) => match[2].startsWith(prefix))) sessionOnlyKeys.add(match[2])
     }
