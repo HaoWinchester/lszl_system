@@ -51,7 +51,8 @@ assert(published.valid,JSON.stringify(published));
 assert.equal(published.taxonomy.status,'published');
 assert.equal(service.currentForSubject('subject-pmp').id,imported.taxonomy.id);
 assert.equal(W.KGLearningContent.subjectById('subject-pmp').defaultTaxonomyId,imported.taxonomy.id);
-assert.equal(service.releaseRecords('subject-pmp')[0].action,'publish');
+assert(service.releaseRecords('subject-pmp').some(item=>item.action==='publish'&&item.taxonomyId===imported.taxonomy.id),'publish history must be derived from the persisted taxonomy');
+assert(service.releaseRecords('subject-pmp').every(item=>item.derivedFromTaxonomy===true));
 assert.equal(service.list('subject-pmp').filter(item=>item.isDefault).length,1,'one subject must have exactly one current taxonomy');
 
 const currentSave=await service.saveNode(imported.taxonomy.id,{...imported.taxonomy.nodes[0],title:{zh:'当前版本可日常维护'}});
@@ -69,7 +70,7 @@ const old=service.list('subject-pmp').find(item=>item.version===1);
 const activated=await service.publish(old.id,{notes:'回切历史版本'});
 assert(activated.valid,JSON.stringify(activated));
 assert.equal(service.currentForSubject('subject-pmp').id,old.id);
-assert.equal(service.releaseRecords('subject-pmp')[0].action,'activate');
+assert(service.releaseRecords('subject-pmp').some(item=>item.action==='activate'&&item.taxonomyId===old.id),'activation history must not depend on insertion order');
 assert.equal(service.list('subject-pmp').filter(item=>item.isDefault).length,1);
 const historicalSave=await service.saveNode(imported.taxonomy.id,{...service.get(imported.taxonomy.id).nodes[0],title:{zh:'历史版本不可修改'}});
 assert(!historicalSave.valid,'historical published taxonomy must remain read-only');

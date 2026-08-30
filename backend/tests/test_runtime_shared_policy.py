@@ -195,10 +195,14 @@ TEACHER_WORKSPACE_SHARED_KEYS = (
     "kg_synthesis_preset_repository_v1",
     "kg_exam_papers_published_v1",
     "kg_exam_paper_release_history_v1",
+    "kg_question_tag_names_v1",
+)
+
+RETIRED_COURSE_RUNTIME_KEYS = (
+    "kg_course_config_drafts_v1",
     "kg_course_config_releases_v1",
     "kg_course_config_active_release_v1",
     "kg_learning_tasks_v1",
-    "kg_question_tag_names_v1",
 )
 
 PERSONAL_RUNTIME_KEYS = (
@@ -219,6 +223,16 @@ def test_existing_teacher_workspace_keys_have_the_same_manager_boundary(key: str
     assert service.shared_key_readable(key, "teacher")
     assert not service.shared_key_writable(key, "student")
     assert not service.shared_key_writable(key, "viewer")
+
+
+@pytest.mark.parametrize("key", RETIRED_COURSE_RUNTIME_KEYS)
+def test_course_and_task_keys_are_server_owned_and_absent_from_runtime(key: str) -> None:
+    assert service.server_owned_key(key)
+    assert key not in service.SHARED_KEYS
+    assert key not in service.TEACHING_SHARED_KEYS
+    assert key in service.RUNTIME_SNAPSHOT_EXCLUDED_KEYS
+    assert not service.shared_key_writable(key, "admin")
+    assert not service.shared_key_writable(key, "teacher")
 
 
 @pytest.mark.parametrize("key", sorted(service.RETIRED_CATALOG_RUNTIME_KEYS))
@@ -254,7 +268,7 @@ def test_teacher_draft_canonical_keys_and_account_aliases_are_role_aware() -> No
         "kg_recall_association_library_v1__subject__PMP", "teacher"
     ) == "kg_recall_association_library_v1__subject__PMP"
     assert service.canonical_teacher_shared_key(
-        "kg_course_config_drafts_v1", "student"
+        "kg_exam_paper_release_history_v1", "student"
     ) is None
     assert service.canonical_teacher_shared_key(
         "kg_assessment_papers_v1", "viewer"
@@ -361,7 +375,7 @@ def _promotion_row_key(key: str) -> bool:
     return (
         key in {
             "kg_teacher_shared_runtime_promotion_v1",
-            "kg_course_config_drafts_v1",
+            "kg_exam_paper_release_history_v1",
             "kg_assessment_papers_v1",
             "kg_exam_papers_v1__teacher_shared",
             "kg_exam_paper_categories_v1__teacher_shared",
@@ -452,7 +466,7 @@ async def _runtime_storage_for(owner: str) -> dict[str, str]:
 @pytest.mark.parametrize(
     "key",
     [
-        "kg_course_config_drafts_v1",
+        "kg_exam_paper_release_history_v1",
         "kg_assessment_papers_v1",
         "kg_exam_papers_v1__teacher_shared",
         "kg_exam_paper_categories_v1__teacher_shared",
@@ -557,7 +571,6 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
     association_key = "kg_recall_association_library_v1__subject__PMP"
     canonical_keys = {
         marker_key,
-        "kg_course_config_drafts_v1",
         "kg_assessment_papers_v1",
         "kg_exam_papers_v1__teacher_shared",
         "kg_exam_paper_categories_v1__teacher_shared",
@@ -608,7 +621,7 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
         storages = {
             usernames["admin_a"]: (
                 {
-                    "kg_course_config_drafts_v1": json.dumps([
+                    "kg_exam_paper_release_history_v1": json.dumps([
                         {"id": "course-a", "owner": "admin-a"},
                         {"id": "course-later", "winner": "older"},
                     ]),
@@ -629,7 +642,7 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
             ),
             usernames["teacher_b"]: (
                 {
-                    "kg_course_config_drafts_v1": json.dumps([
+                    "kg_exam_paper_release_history_v1": json.dumps([
                         {"id": "course-b"},
                         {"id": "course-later", "winner": "newer"},
                         {"id": "course-tie", "winner": "teacher-b"},
@@ -657,7 +670,7 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
             ),
             usernames["teacher_c"]: (
                 {
-                    "kg_course_config_drafts_v1": json.dumps([
+                    "kg_exam_paper_release_history_v1": json.dumps([
                         {"id": "course-c"},
                         {"id": "course-tie", "winner": "teacher-c"},
                     ]),
@@ -704,14 +717,7 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
         assert asyncio.run(_content_revision()) == before_promotion_revision + 1
         for account in ("admin_a", "teacher_b", "teacher_c"):
             storage = first if account == "teacher_b" else _runtime_storage(clients[account])
-            courses = {row["id"]: row for row in json.loads(
-                storage["kg_course_config_drafts_v1"]
-            )}
-            assert set(courses) >= {
-                "course-a", "course-b", "course-c", "course-later", "course-tie"
-            }
-            assert courses["course-later"]["winner"] == "newer"
-            assert courses["course-tie"]["winner"] == "teacher-c"
+            assert "kg_exam_paper_release_history_v1" not in storage
             assert {row["id"] for row in json.loads(
                 storage["kg_assessment_papers_v1"]
             )} >= {"assessment-a", "assessment-b", "assessment-c"}
@@ -745,12 +751,6 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
         assert marker["status"] == "complete"
         assert set(marker["sourceOwners"]) >= set(usernames.values())
         conflicts = {(row["key"], row["entityId"]): row for row in marker["conflicts"]}
-        assert conflicts[("kg_course_config_drafts_v1", "course-later")][
-            "winnerOwner"
-        ] == usernames["teacher_b"]
-        assert conflicts[("kg_course_config_drafts_v1", "course-tie")][
-            "winnerOwner"
-        ] == usernames["teacher_c"]
         assert conflicts[(association_key, "node-tie")]["winnerOwner"] == usernames[
             "teacher_c"
         ]
@@ -767,12 +767,15 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
             f"pytest-promotion-unrelated-{token}",
         )
         assert unrelated.status_code == 200, unrelated.text
-        assert _runtime_storage(clients["teacher_b"])[
-            "kg_course_config_drafts_v1"
-        ] == promoted["kg_course_config_drafts_v1"]
+        assert "kg_exam_paper_release_history_v1" not in _runtime_storage(
+            clients["teacher_b"]
+        )
         legacy_after_put = asyncio.run(_runtime_storage_for(usernames["admin_a"]))
         for key in storages[usernames["admin_a"]][0]:
-            assert legacy_after_put[key] == storages[usernames["admin_a"]][0][key]
+            if key == "kg_exam_paper_release_history_v1":
+                assert key not in legacy_after_put
+            else:
+                assert legacy_after_put[key] == storages[usernames["admin_a"]][0][key]
     finally:
         for client in clients.values():
             client.close()
@@ -803,7 +806,7 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
     [
         (
             "setItem",
-            "kg_course_config_drafts_v1",
+            "kg_assessment_papers_v1",
             json.dumps([{"id": "replacement-only"}]),
         ),
         ("removeItem", "kg_assessment_papers_v1", None),
@@ -893,7 +896,7 @@ def test_promotion_cas_exemption_rejects_a_competitor_in_the_commit_window(
 ) -> None:
     token = uuid4().hex[:10]
     username = f"promotion_window_{token}"
-    key = "kg_course_config_drafts_v1"
+    key = "kg_assessment_papers_v1"
     marker_key = "kg_teacher_shared_runtime_promotion_v1"
     snapshot = asyncio.run(_snapshot_teacher_promotion_rows())
     asyncio.run(_delete_shared_rows(set(snapshot) | {marker_key, key}))
@@ -1011,7 +1014,7 @@ def test_promotion_with_identical_shared_content_does_not_bump_revision() -> Non
 
     token = uuid4().hex[:10]
     username = f"promotion_noop_{token}"
-    key = "kg_course_config_drafts_v1"
+    key = "kg_assessment_papers_v1"
     marker_key = "kg_teacher_shared_runtime_promotion_v1"
     snapshot = asyncio.run(_snapshot_teacher_promotion_rows())
     value = json.dumps([{"id": f"same-{token}"}])
@@ -1112,7 +1115,7 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
             f"{quote(usernames['teacher_a'], safe='')}"
         )
         written = {
-            "kg_course_config_drafts_v1": json.dumps({"draft": token}),
+            "kg_exam_paper_release_history_v1": json.dumps({"draft": token}),
             "kg_assessment_papers_v1": json.dumps([{"id": f"assessment-{token}"}]),
             teacher_a_paper_key: json.dumps([{"id": f"paper-{token}"}]),
             teacher_a_category_key: json.dumps([{"id": f"category-{token}"}]),
@@ -1133,9 +1136,7 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
                 "kg_exam_paper_categories_v1__user__"
                 f"{quote(usernames[account], safe='')}"
             )
-            assert storage["kg_course_config_drafts_v1"] == written[
-                "kg_course_config_drafts_v1"
-            ]
+            assert "kg_exam_paper_release_history_v1" not in storage
             assert storage["kg_assessment_papers_v1"] == written[
                 "kg_assessment_papers_v1"
             ]
@@ -1155,7 +1156,7 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
                 f"{quote(usernames[account], safe='')}"
             )
             for key in (
-                "kg_course_config_drafts_v1",
+                "kg_exam_paper_release_history_v1",
                 "kg_assessment_papers_v1",
                 scoped_paper,
                 scoped_category,
@@ -1165,7 +1166,7 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
                 assert key not in storage
 
             denied_keys = (
-                "kg_course_config_drafts_v1",
+                "kg_exam_paper_release_history_v1",
                 "kg_assessment_papers_v1",
                 scoped_paper,
                 scoped_category,

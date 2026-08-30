@@ -57,8 +57,11 @@ test('the compatibility facade awaits course service mutations and returns serve
       coverage: () => ({}),
     },
   };
-  const window = { KGAdminServices: services };
+  const clone = value => structuredClone(value);
+  const window = { KGAdminServices: services, KGLearningContent: { clone, safeId: prefix => `${prefix}-retained` } };
   vm.runInContext(readSource('src/admin/41-learning-content-compat.js'), vm.createContext({ window, Promise }));
+  assert.equal(window.KGLearningContent.clone, clone, 'compatibility facade must retain core helpers used by the loaded course page');
+  assert.equal(window.KGLearningContent.safeId('course'), 'course-retained');
 
   let saveSettled = false;
   const saving = window.KGLearningContent.saveCourseDraft({ id: 'client-course' }).then(value => { saveSettled = true; return value; });
@@ -108,9 +111,12 @@ test('admin summaries come from relational domain APIs and unsupported repositor
     if (input.path === '/api/v1/papers') return { papers: [] };
     throw Object.assign(new Error('forbidden'), { status: 403 });
   };
+  window.KGAuthCore = { currentUser: () => ({ role: 'teacher' }) };
   const teacherSummary = await window.KGAdminDomainSummary.refresh();
   assert.equal(teacherSummary.audit.length, 0);
   assert.equal(teacherSummary.drafts.length, 1);
+  window.KGAuthCore = { currentUser: () => ({ role: 'admin' }) };
+  await assert.rejects(window.KGAdminDomainSummary.refresh(), /forbidden/);
 
   const repositorySource = readSource('src/admin/11-local-content-repository.js');
   assert.doesNotMatch(repositorySource, /new Map\(/);
@@ -125,6 +131,11 @@ test('admin summaries come from relational domain APIs and unsupported repositor
   assert.doesNotMatch(settingsSource, /createSnapshot|snapshot\.create|全量快照已创建/);
   assert.match(settingsSource, /adminSnapshotBtn['"]\)\.disabled=true/);
   assert.match(readSource('admin-settings.html'), /通用快照已退役/);
+  assert.match(readSource('src/admin/21-admin-audit-service.js'), /persistenceStatus/);
+  const transactionSource = readSource('src/admin/22-admin-transaction-service.js');
+  assert.match(transactionSource, /createSnapshot\(\).*valid:false/);
+  assert.doesNotMatch(transactionSource, /repository\.write\(['"]snapshots/);
+  assert.doesNotMatch(readSource('src/admin/51-admin-subjects-app.js'), /会创建恢复快照/);
 });
 
 test('both Runtime page policies are byte-identical and empty', () => {

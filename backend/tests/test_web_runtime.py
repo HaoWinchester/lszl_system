@@ -235,45 +235,12 @@ def test_learner_bootstrap_never_reads_or_seeds_runtime_state(monkeypatch) -> No
             assert payload["contentRevision"] == 0, page
 
 
-def test_html_bootstrap_does_not_pair_old_state_with_a_later_content_token(
-    monkeypatch,
-) -> None:
-    original_ensure = runtime_state_service.ensure_domain_seed
-    captured: dict[str, int] = {}
+def test_admin_settings_bootstrap_never_reads_or_seeds_runtime_state(monkeypatch) -> None:
+    async def forbidden(*_args, **_kwargs):
+        raise AssertionError("admin-settings attempted to read the retired runtime")
 
-    async def competing_bump() -> None:
-        async with AsyncSessionLocal() as db:
-            async with db.begin():
-                await revision_service.bump(
-                    db,
-                    "bootstrap-competitor",
-                    [
-                        {
-                            "entityType": "runtimeShared",
-                            "entityId": "bootstrap-competitor",
-                            "action": "updated",
-                        }
-                    ],
-                )
-
-    async def writer_after_snapshot(*args, **kwargs):
-        result = await original_ensure(*args, **kwargs)
-        if not captured:
-            if len(result) == 3:
-                captured["contentRevision"] = int(result[2])
-            else:
-                async with AsyncSessionLocal() as db:
-                    captured["contentRevision"] = int(
-                        (await revision_service.current(db))["revision"]
-                    )
-            await competing_bump()
-        return result
-
-    monkeypatch.setattr(
-        runtime_state_service,
-        "ensure_domain_seed",
-        writer_after_snapshot,
-    )
+    monkeypatch.setattr(runtime_state_service, "get_state", forbidden)
+    monkeypatch.setattr(runtime_state_service, "ensure_domain_seed", forbidden)
     with TestClient(app) as client:
         assert client.post(
             "/api/v1/auth/login",
@@ -281,7 +248,9 @@ def test_html_bootstrap_does_not_pair_old_state_with_a_later_content_token(
         ).status_code == 200
         payload = _bootstrap(client.get("/admin-settings.html").text)
 
-    assert payload["contentRevision"] == captured["contentRevision"]
+    assert payload["storage"] is None
+    assert payload["revision"] == 0
+    assert payload["contentRevision"] == 0
 
 
 def test_guest_html_injects_anonymous_bootstrap() -> None:

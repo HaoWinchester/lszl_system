@@ -34,7 +34,7 @@
     getCourseReleases:(...args)=>legacy.getCourseReleases?.(...args)||[],
     normalizeCourse:(...args)=>legacy.normalizeCourse(...args),
   });
-  const domainReady=Promise.all([global.KGTeachingContentApi?.bootstrap?.(),global.KGCourseManagementApi?.ready?.()]);
+  const domainReady=Promise.all([global.KGTeachingContentApi?.bootstrap?.(),global.KGCourseManagementApi?.ready?.()]).then(value=>({valid:true,value}),error=>({valid:false,error}));
   const services=Object.freeze({version:global.KGAdminCore.VERSION,repositoryMode:repository.mode,domainReady,permissions:publicPermissions,audit:publicAudit,transactions:publicTransactions,references,referenceSnapshotReady,subjects,taxonomies,activities,courses,releases,legacyContent});
   global.KGAdminServices=services;
   if(typeof global.KGCreateAdminTeachingContentGateway==='function'){

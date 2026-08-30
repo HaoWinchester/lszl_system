@@ -1,7 +1,7 @@
 'use strict';
 (function(global){
-  const services=global.KGAdminServices;if(!services)return;const legacy=services.legacyContent;
-  const facade={...legacy,
+  const services=global.KGAdminServices;if(!services)return;const legacy=services.legacyContent,core=global.KGLearningContent||legacy;
+  const facade={...core,...legacy,
     getSubjects:()=>services.subjects.list(),subjectById:id=>services.subjects.get(id),
     getTaxonomies:(subjectId='')=>services.taxonomies.list(subjectId),taxonomyById:id=>services.taxonomies.get(id),defaultTaxonomyForSubject:id=>services.taxonomies.defaultForSubject(id),nodesForTaxonomy:(id,options={})=>services.taxonomies.nodes(id,options),validateTaxonomy:taxonomy=>services.taxonomies.validate(taxonomy),canEditTaxonomy:id=>services.taxonomies.canEdit(id),taxonomyEditMode:id=>services.taxonomies.editMode(id),
     saveSubjects:async subjects=>{const result=await services.subjects.saveAll(subjects);return result.valid?result.subjects:legacy.getSubjects()},

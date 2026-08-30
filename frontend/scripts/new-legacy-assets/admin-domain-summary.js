@@ -39,7 +39,12 @@
       API.request({ path: '/api/v1/engagement/admin/feedback?limit=100&offset=0' }),
       API.request({ path: '/api/v1/engagement/admin/messages?limit=100&offset=0' }),
     ]);
-    const [logsResult, feedbackResult, messagesResult] = restricted.map(result => result.status === 'fulfilled' ? result.value : {});
+    const role = text(global.KGAuthCore?.currentUser?.({ includeInactive: true })?.role || global.__KG_DIRECT_BOOTSTRAP__?.authUser?.role || global.__KG_DIRECT_BOOTSTRAP__?.user?.role);
+    const [logsResult, feedbackResult, messagesResult] = restricted.map(result => {
+      if (result.status === 'fulfilled') return result.value;
+      if (role === 'teacher' && result.reason?.status === 403) return {};
+      throw result.reason;
+    });
     const courseState = courses?.snapshot?.() || { drafts: [], releases: [], tasks: [] };
     const logs = clone(logsResult?.logs || []);
     const banks = clone(banksResult?.banks || []);
