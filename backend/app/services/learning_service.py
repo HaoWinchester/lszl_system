@@ -904,16 +904,34 @@ def build_global_revenge_pool(
     grouped: dict[str, list[PracticeMistake]] = {}
     for row in rows:
         question_id = str(row.question_id or "").strip()
-        if not question_id or not _revenge_snapshot_usable(row.question_snapshot or {}):
+        if not question_id:
             continue
         grouped.setdefault(question_id, []).append(row)
 
     representatives: list[tuple[PracticeMistake, list[PracticeMistake]]] = []
+    unavailable_count = 0
     for group_rows in grouped.values():
-        ordered = sorted(group_rows, key=lambda row: _revenge_row_key(row, current_time))
+        usable_rows = [
+            row
+            for row in group_rows
+            if _revenge_snapshot_usable(row.question_snapshot or {})
+        ]
+        if not usable_rows:
+            if any(_revenge_status_rank(row, current_time) <= 2 for row in group_rows):
+                unavailable_count += 1
+            continue
+        ordered = sorted(usable_rows, key=lambda row: _revenge_row_key(row, current_time))
         if _revenge_status_rank(ordered[0], current_time) > 4:
             continue
-        representatives.append((ordered[0], ordered))
+        representative = ordered[0]
+        grouped_order = [
+            representative,
+            *sorted(
+                (row for row in group_rows if row.id != representative.id),
+                key=lambda row: _revenge_row_key(row, current_time),
+            ),
+        ]
+        representatives.append((representative, grouped_order))
     representatives.sort(key=lambda item: _revenge_row_key(item[0], current_time))
 
     stats = {
@@ -944,10 +962,18 @@ def build_global_revenge_pool(
         candidate["mistakeId"] = representative.id
         candidate["mistakeIds"] = [row.id for row in group_rows]
         candidates.append(candidate)
-    return {"candidates": candidates, "stats": stats}
+    return {
+        "candidates": candidates,
+        "stats": stats,
+        "unavailableCount": unavailable_count,
+    }
 
 
 async def global_revenge_candidates(db: AsyncSession, owner: str) -> list[dict]:
+    return (await global_revenge_pool(db, owner))["candidates"]
+
+
+async def global_revenge_pool(db: AsyncSession, owner: str) -> dict:
     rows = (
         await db.execute(
             select(PracticeMistake)
@@ -955,7 +981,7 @@ async def global_revenge_candidates(db: AsyncSession, owner: str) -> list[dict]:
             .order_by(PracticeMistake.updated_at.desc(), PracticeMistake.id)
         )
     ).scalars().all()
-    return build_global_revenge_pool(list(rows))["candidates"]
+    return build_global_revenge_pool(list(rows))
 
 
 def _practice_plan(stats: dict) -> dict:
@@ -1022,7 +1048,10 @@ async def practice_overview(db: AsyncSession, owner: str) -> dict:
             _practice_mistake_to_dict(row, reveal_answer=False) for row in rows
         ],
         "stats": stats,
-        "revengeStats": revenge_pool["stats"],
+        "revengeStats": {
+            **revenge_pool["stats"],
+            "unavailable": revenge_pool["unavailableCount"],
+        },
         "revengeCandidates": public_candidates,
         "plan": _practice_plan(revenge_pool["stats"]),
     }
@@ -1037,6 +1066,7 @@ async def record_revenge_answer(
     commit: bool = True,
     allow_concurrent: bool = False,
     record: bool = True,
+    authoritative_snapshot: dict | None = None,
 ) -> PracticeMistake | None:
     mistake = await _practice_mistake(db, owner, mistake_id)
     if mistake is None:
@@ -1053,7 +1083,13 @@ async def record_revenge_answer(
         # 只判定：升级链路对已记账的复仇答案不重放长期状态推进。
         return mistake
     selected_answer = str(data.get("selectedAnswer") or "").strip()
-    snapshot = mistake.question_snapshot if isinstance(mistake.question_snapshot, dict) else {}
+    snapshot = (
+        authoritative_snapshot
+        if isinstance(authoritative_snapshot, dict)
+        else mistake.question_snapshot
+        if isinstance(mistake.question_snapshot, dict)
+        else {}
+    )
     option_ids = {
         str(option.get("id") or "").strip()
         for option in snapshot.get("options") or []

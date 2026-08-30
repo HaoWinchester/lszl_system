@@ -471,7 +471,8 @@ async def start_session(
 
     selection_seed = secrets.token_hex(16)
     if mode == "revenge":
-        candidates = await learning_service.global_revenge_candidates(db, owner)
+        revenge_pool = await learning_service.global_revenge_pool(db, owner)
+        candidates = revenge_pool["candidates"]
         question_order = []
         for index, candidate in enumerate(candidates[:count]):
             snapshot = deepcopy(candidate.get("questionSnapshot") or {})
@@ -492,6 +493,14 @@ async def start_session(
                 }
             )
         if not question_order:
+            unavailable_count = int(revenge_pool.get("unavailableCount") or 0)
+            if unavailable_count:
+                raise _error(
+                    422,
+                    "REVENGE_SNAPSHOT_UNAVAILABLE",
+                    "历史错题内容暂不可用，请先使用其他练习模式",
+                    unavailableCount=unavailable_count,
+                )
             raise _error(
                 422,
                 "NO_REVENGE_QUESTIONS",
@@ -1346,12 +1355,27 @@ async def _grade_session_selection(
     timed_out = draft.get("timedOut") is True
     if timed_out:
         selected = "__timeout__"
-    correct_answer = str((row.snapshot or {}).get("correctAnswer") or "")
+    frozen_snapshot = row.snapshot if isinstance(row.snapshot, dict) else {}
+    correct_answer = str(frozen_snapshot.get("correctAnswer") or "").strip()
 
     mistake = None
     completion: dict = {}
     try:
         if session.mode == "revenge":
+            option_ids = _snapshot_option_ids(frozen_snapshot)
+            if not correct_answer or correct_answer not in option_ids:
+                raise _error(
+                    409,
+                    "PRACTICE_SNAPSHOT_INVALID",
+                    "判题失败：冻结错题快照缺少有效正确答案",
+                    questionId=str(ref.get("questionId") or ""),
+                )
+            if selected not in option_ids:
+                raise _error(
+                    422,
+                    "PRACTICE_GRADE_FAILED",
+                    "selectedAnswer 不是冻结题目快照的有效选项",
+                )
             mistake = await learning_service.record_revenge_answer(
                 db,
                 owner,
@@ -1360,6 +1384,7 @@ async def _grade_session_selection(
                 commit=False,
                 allow_concurrent=True,
                 record=record,
+                authoritative_snapshot=frozen_snapshot,
             )
             if mistake is None or str(mistake.question_id or "") != str(
                 ref.get("questionId") or ""

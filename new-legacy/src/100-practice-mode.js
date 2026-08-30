@@ -976,7 +976,8 @@
             }
           }catch(resumeError){}
         }
-        showToast(error?.detail?.code==='NO_REVENGE_QUESTIONS'?'当前没有可用的全局复仇错题。':'试题读取失败，请稍后重试。');
+        const errorCode=error?.detail?.code;
+        showToast(errorCode==='NO_REVENGE_QUESTIONS'?'当前没有可用的全局复仇错题。':errorCode==='REVENGE_SNAPSHOT_UNAVAILABLE'?'历史错题内容暂不可用，可先使用其他练习模式。':'试题读取失败，请稍后重试。');
         return false;
       }
     },beginEntry,endEntry);
@@ -1033,10 +1034,10 @@
     if(!currentEnabled)state.selectedCount=firstEnabled||10;
     dom.countInputs.forEach(input=>input.checked=Number(input.value)===state.selectedCount);
     dom.startButtons.forEach(button=>{
-      const revenge=button.dataset.practiceStart==='revenge',revengeAvailable=getMistakeStats().active>0;
-      button.disabled=revenge?!revengeAvailable:(!release||!firstEnabled);
+      const revenge=button.dataset.practiceStart==='revenge',revengeStats=getMistakeStats(),revengeAvailable=revengeStats.active>0,revengeUnavailable=Number(revengeStats.unavailable||0)>0;
+      button.disabled=revenge?!revengeAvailable&&!revengeUnavailable:(!release||!firstEnabled);
       button.classList.toggle('is-upgrade',!revenge&&!!release&&!access.allowed);
-      button.textContent=revenge?(revengeAvailable?(button.dataset.defaultLabel||'开始复仇'):'暂无错题'):( !release?(button.dataset.defaultLabel||button.textContent):(!access.allowed?'开通会员':button.dataset.defaultLabel||button.textContent));
+      button.textContent=revenge?(revengeAvailable?(button.dataset.defaultLabel||'开始复仇'):revengeUnavailable?'检查错题内容':'暂无错题'):( !release?(button.dataset.defaultLabel||button.textContent):(!access.allowed?'开通会员':button.dataset.defaultLabel||button.textContent));
     });
     dom.setupCard?.classList.toggle('is-vip-locked',!!release&&!access.allowed);
   }
@@ -1104,7 +1105,7 @@
     if(retiredSelection)state.selectedPaperId=retiredSelection.id;
     else if(!releases.some(row=>row.id===state.selectedPaperId))state.selectedPaperId=releases.find(row=>paperAccess(row).allowed)?.id||releases[0]?.id||'';
     if(dom.paperSelect){dom.paperSelect.innerHTML=releases.map(row=>'<option value="'+escapeHTML(row.id)+'">'+escapeHTML(row.name)+'</option>').join('');dom.paperSelect.value=state.selectedPaperId}
-    const revengeAvailable=getMistakeStats().active>0;
+    const revengeStats=getMistakeStats(),revengeAvailable=revengeStats.active>0||Number(revengeStats.unavailable||0)>0;
     dom.empty.hidden=!!releases.length||revengeAvailable;dom.setupCard.hidden=!releases.length;dom.modeGrid.hidden=!releases.length&&!revengeAvailable;
     const library=dom.paperLibrary?.closest('.practice-library');if(library)library.hidden=!releases.length;
     renderPaperLibrary();syncCountOptions();syncPaperMeta();syncRevengeStats();syncResumableButtons();

@@ -459,6 +459,24 @@ with sync_playwright() as playwright:
       window.KGPracticeMode.showLobby();
     }""")
     page.wait_for_timeout(100)
+    page.evaluate("""()=>{
+      window.__workingStartSession=window.KGPracticeLearningApi.startSession;
+      window.KGPracticeLearningApi.startSession=async input=>{
+        window.__writes.push({name:'start',body:JSON.parse(JSON.stringify(input))});
+        throw Object.assign(new Error('damaged history'),{detail:{code:'REVENGE_SNAPSHOT_UNAVAILABLE',unavailableCount:2}});
+      };
+      window.__writes=[];
+    }""")
+    page.locator('[data-practice-start="revenge"]').click()
+    page.wait_for_timeout(250)
+    assert "历史错题内容暂不可用" in page.locator("#practiceToast").inner_text()
+    assert page.locator('[data-practice-start="revenge"]').get_attribute("aria-busy") == "false"
+    assert not page.locator('[data-practice-start="revenge"]').is_disabled()
+    assert page.locator("#practiceLobby").is_visible()
+    page.evaluate("""()=>{
+      window.KGPracticeLearningApi.startSession=window.__workingStartSession;
+      window.__writes=[];
+    }""")
     page.evaluate("window.__writes=[]")
     page.locator('[data-practice-start="revenge"]').click()
     page.wait_for_timeout(300)

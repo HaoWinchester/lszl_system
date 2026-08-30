@@ -376,6 +376,32 @@ async def _seed_global_revenge_mistakes(
         }
 
 
+async def _set_mistake_correct_answer(mistake_id: str, correct_answer: str) -> None:
+    async with AsyncSessionLocal() as db:
+        mistake = await db.get(PracticeMistake, mistake_id)
+        snapshot = dict(mistake.question_snapshot or {})
+        snapshot["correctAnswer"] = correct_answer
+        mistake.question_snapshot = snapshot
+        await db.commit()
+
+
+async def _corrupt_frozen_session_answer(
+    session_id: str, question_id: str
+) -> None:
+    async with AsyncSessionLocal() as db:
+        session = await db.get(PracticeSession, session_id)
+        question_order = []
+        for raw in session.question_order or []:
+            ref = dict(raw)
+            if ref.get("questionId") == question_id:
+                snapshot = dict(ref.get("questionSnapshot") or {})
+                snapshot["correctAnswer"] = ""
+                ref["questionSnapshot"] = snapshot
+            question_order.append(ref)
+        session.question_order = question_order
+        await db.commit()
+
+
 async def _completion_event_count(owner: str, session_id: str) -> int:
     async with AsyncSessionLocal() as db:
         return int(
@@ -1438,6 +1464,13 @@ def test_global_revenge_session_crosses_papers_and_deduplicates_versionless_hist
                 row["sourcePaperId"] for row in session["questionOrder"]
             } == {first_ids["paper"], second_ids["paper"]}
 
+            # 会话开始后即使长期错题快照发生变化，判题与状态推进仍以冻结快照为准。
+            asyncio.run(
+                _set_mistake_correct_answer(
+                    mistake_ids["versionlessMistake"], "B"
+                )
+            )
+
             answers = {
                 mistake_ids["firstQuestion"]: {
                     "selectedAnswer": "B",
@@ -1507,6 +1540,112 @@ def test_global_revenge_session_crosses_papers_and_deduplicates_versionless_hist
             assert persisted[mistake_ids["releaseMistake"]].wrong_count == 4
             assert persisted[mistake_ids["secondMistake"]].status == "verification_due"
             assert persisted[mistake_ids["secondMistake"]].revenge_correct_count == 1
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(second_ids))
+        asyncio.run(_cleanup_released_pmp_paper(first_ids))
+
+
+def test_global_revenge_reports_damaged_history_separately_from_an_empty_pool() -> None:
+    first_ids = _practice_fixture_ids()
+    second_ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(first_ids, domains=["people"]))
+    asyncio.run(_seed_released_pmp_paper(second_ids, domains=["process"]))
+    mistake_ids = asyncio.run(
+        _seed_global_revenge_mistakes(first_ids["student"], first_ids, second_ids)
+    )
+    try:
+        for mistake_id in (
+            mistake_ids["releaseMistake"],
+            mistake_ids["versionlessMistake"],
+            mistake_ids["secondMistake"],
+        ):
+            asyncio.run(_set_mistake_correct_answer(mistake_id, ""))
+
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": first_ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            response = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={"mode": "revenge", "count": 10, "order": "paper"},
+            )
+
+            assert response.status_code == 422, response.text
+            assert response.json()["detail"]["code"] == "REVENGE_SNAPSHOT_UNAVAILABLE"
+            assert response.json()["detail"]["unavailableCount"] == 2
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(second_ids))
+        asyncio.run(_cleanup_released_pmp_paper(first_ids))
+
+
+def test_global_revenge_invalid_frozen_snapshot_rolls_back_the_whole_completion() -> None:
+    first_ids = _practice_fixture_ids()
+    second_ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(first_ids, domains=["people"]))
+    asyncio.run(_seed_released_pmp_paper(second_ids, domains=["process"]))
+    mistake_ids = asyncio.run(
+        _seed_global_revenge_mistakes(first_ids["student"], first_ids, second_ids)
+    )
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": first_ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            started = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={"mode": "revenge", "count": 10, "order": "paper"},
+            ).json()["session"]
+            asyncio.run(
+                _corrupt_frozen_session_answer(
+                    started["id"], mistake_ids["secondQuestion"]
+                )
+            )
+
+            response = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/complete",
+                json={
+                    "revision": started["revision"],
+                    "answers": {
+                        mistake_ids["firstQuestion"]: {
+                            "selectedAnswer": "B",
+                            "selectionIndex": 1,
+                        },
+                        mistake_ids["secondQuestion"]: {
+                            "selectedAnswer": "A",
+                            "selectionIndex": 2,
+                        },
+                    },
+                    "runtimeState": {"currentIndex": 1},
+                },
+            )
+            assert response.status_code == 409, response.text
+            assert response.json()["detail"]["code"] == "PRACTICE_SNAPSHOT_INVALID"
+
+            async def load_state() -> tuple[PracticeSession, list[PracticeMistake]]:
+                async with AsyncSessionLocal() as db:
+                    session = await db.get(PracticeSession, started["id"])
+                    mistakes = list(
+                        (
+                            await db.execute(
+                                select(PracticeMistake).where(
+                                    PracticeMistake.id.in_(
+                                        [
+                                            mistake_ids["versionlessMistake"],
+                                            mistake_ids["secondMistake"],
+                                        ]
+                                    )
+                                )
+                            )
+                        ).scalars().all()
+                    )
+                    return session, mistakes
+
+            persisted_session, persisted_mistakes = asyncio.run(load_state())
+            assert persisted_session.status == "active"
+            assert persisted_session.revision == started["revision"]
+            assert all(row.revenge_attempt_count == 0 for row in persisted_mistakes)
     finally:
         asyncio.run(_cleanup_released_pmp_paper(second_ids))
         asyncio.run(_cleanup_released_pmp_paper(first_ids))

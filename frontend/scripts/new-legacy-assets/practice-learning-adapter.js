@@ -8,7 +8,7 @@
   function text(value) { return String(value == null ? '' : value) }
   function clone(value) { return JSON.parse(JSON.stringify(value)) }
   function emptyStats() {
-    return { total: 0, active: 0, pending: 0, needsRemediation: 0, verificationDue: 0, verificationWaiting: 0, mastered: 0 }
+    return { total: 0, active: 0, pending: 0, needsRemediation: 0, verificationDue: 0, verificationWaiting: 0, mastered: 0, unavailable: 0 }
   }
   function currentUser() {
     try { return global.KGAuthCore?.currentUser?.() || null } catch (error) { return null }

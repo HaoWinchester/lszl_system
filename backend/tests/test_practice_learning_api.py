@@ -178,6 +178,7 @@ def test_global_revenge_pool_deduplicates_questions_and_uses_urgent_representati
         "verificationWaiting": 1,
         "mastered": 1,
     }
+    assert pool["unavailableCount"] == 1
     assert [row["questionId"] for row in pool["candidates"]] == [
         "q-duplicate",
         "q-versionless",
@@ -189,6 +190,37 @@ def test_global_revenge_pool_deduplicates_questions_and_uses_urgent_representati
         "pm_pending_old_release",
     ]
     assert duplicate["releaseId"] == "release-new"
+
+
+def test_global_revenge_pool_skips_an_unusable_urgent_copy_when_a_usable_copy_exists() -> None:
+    now = now_utc()
+    pool = learning_service.build_global_revenge_pool(
+        [
+            _mistake_row(
+                mistake_id="pm_broken_remediation",
+                owner="owner-a",
+                question_id="q-shared",
+                status="needs_remediation",
+                usable_snapshot=False,
+            ),
+            _mistake_row(
+                mistake_id="pm_usable_pending",
+                owner="owner-a",
+                question_id="q-shared",
+                status="pending",
+            ),
+        ],
+        now=now,
+    )
+
+    assert pool["unavailableCount"] == 0
+    assert [row["mistakeId"] for row in pool["candidates"]] == [
+        "pm_usable_pending"
+    ]
+    assert pool["candidates"][0]["mistakeIds"] == [
+        "pm_usable_pending",
+        "pm_broken_remediation",
+    ]
 
 
 def test_practice_mistake_remediation_and_verification_are_database_backed() -> None:
