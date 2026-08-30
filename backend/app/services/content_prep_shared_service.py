@@ -40,6 +40,7 @@ from app.services import (
 
 MAX_SHARED_BYTES = 2 * 1024 * 1024
 MAX_ACTIVITIES = 5000
+PG_INTEGER_MAX = 2_147_483_647
 
 
 ContentRevisionConflict = teaching_content_revision_service.ContentRevisionConflict
@@ -90,8 +91,15 @@ def _strict_integer(
 
     if value is None:
         return default
-    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
-        raise ValueError(f"{label}必须是不小于 {minimum} 的整数")
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < minimum
+        or value > PG_INTEGER_MAX
+    ):
+        raise ValueError(
+            f"{label}必须是 {minimum} 到 {PG_INTEGER_MAX} 之间的整数"
+        )
     return value
 
 

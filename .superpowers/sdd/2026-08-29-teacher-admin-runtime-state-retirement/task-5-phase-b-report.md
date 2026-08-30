@@ -38,6 +38,8 @@ Course/release/task reference reads on Content Center remain available through t
 - The intentionally wide shared-content DTO now validates nested integer/object fields before persistence. Invalid taxonomy `sortOrder`/`position`, collection or tag `authorship`, and knowledge-tree/recall `version` values return the typed `INVALID_SHARED_CONTENT` 422 response without changing data or the global content revision.
 - Admin Subjects edit is native-pointer safe during subject bootstrap races: the edit action waits for the selected subject snapshot, and initial page loading hydrates a URL-selected subject before falling back to the cached default. The browser gate now creates, edits, reloads, and verifies the subject through native controls.
 - The legacy learning-content compatibility facade now awaits asynchronous subject mutations instead of inspecting Promise truthiness.
+- PostgreSQL-backed integer fields now share an explicit signed-int32 upper bound. Catalog taxonomy versions, node `sortOrder`/`position`, direct knowledge-tree versions, and recall versions reject huge, boolean, and negative values as typed 422 responses before ORM flush; neither SQL/driver details nor partial data/revision changes escape.
+- Ownership downgrade restoration now requires the exact `ownershipMigration=e2c6f8a1b304` marker for UPDATE as well as DELETE. Real pre-upgrade system namespaces carrying a legacy-source hint remain untouched, while namespaces created by this migration are restored and removed as before.
 
 ## TDD and verification
 
@@ -51,6 +53,7 @@ Course/release/task reference reads on Content Center remain available through t
 - Fresh-review backend teaching suite: 84/84; a final shared-content/review rerun after preserving version-omission semantics passed 19/19. Ownership migration upgrade/downgrade/offline SQL is included. `alembic check` reported no upgrade operations, and content model checks passed 9/9.
 - Fresh-review frontend source regression: 7/7; formal synced `pnpm test`: 284/284; `pnpm test:design`: 5/5.
 - Fresh-review candidate audit: 991 files versus 975 in the untouched active release, with Admin Subjects, Content Center, and the Content Prep dist page present.
+- Final backend-only review follow-up: the two new RED cases reproduced a PostgreSQL int32 500 and preexisting-namespace mutation, then passed after the boundary fixes. Focused shared/catalog/migration/model verification passed 30/30; `alembic check` reported no new operations and Python compilation was clean. No frontend source changed, so formal sync/E2E were intentionally not repeated.
 
 ## Browser evidence
 

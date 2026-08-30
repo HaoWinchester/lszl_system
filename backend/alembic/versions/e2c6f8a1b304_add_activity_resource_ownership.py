@@ -178,6 +178,8 @@ def downgrade() -> None:
           ON original.id = namespace.content_metadata ->> 'legacySourceCollectionId'
         WHERE namespace.id = tag.collection_id
           AND namespace.content_metadata ->> 'systemNamespace' = 'tags'
+          AND namespace.content_metadata ->> 'ownershipMigration'
+              = 'e2c6f8a1b304'
           AND coalesce(
               namespace.content_metadata ->> 'legacySourceCollectionId', ''
           ) <> ''
@@ -192,6 +194,8 @@ def downgrade() -> None:
           ON original.id = namespace.content_metadata ->> 'legacySourceCollectionId'
         WHERE namespace.id = activity.collection_id
           AND namespace.content_metadata ->> 'systemNamespace' = 'activities'
+          AND namespace.content_metadata ->> 'ownershipMigration'
+              = 'e2c6f8a1b304'
           AND coalesce(
               namespace.content_metadata ->> 'legacySourceCollectionId', ''
           ) <> ''

@@ -506,6 +506,104 @@ def test_nested_catalog_coercions_return_typed_422_without_mutation() -> None:
             assert _shared(client)["contentRevision"] == revision
 
 
+def test_catalog_integer_boundaries_reject_huge_bool_and_negative_without_mutation() -> None:
+    suffix = uuid4().hex[:10]
+    taxonomy_id = f"taxonomy-integer-boundary-{suffix}"
+    invalid_numbers = [10**30, True, -1]
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        _login(client, "admin", "jbgsnmm~123")
+        before = _shared(client)
+        revision = before["contentRevision"]
+        invalid_payloads: list[dict] = []
+        for index, value in enumerate(invalid_numbers):
+            invalid_payloads.extend(
+                [
+                    {
+                        "taxonomies": [
+                            *before["taxonomies"],
+                            {
+                                "id": f"{taxonomy_id}-version-{index}",
+                                "subjectId": "subject-pmp",
+                                "version": value,
+                                "nodes": [],
+                            },
+                        ]
+                    },
+                    {
+                        "taxonomies": [
+                            *before["taxonomies"],
+                            {
+                                "id": f"{taxonomy_id}-sort-{index}",
+                                "subjectId": "subject-pmp",
+                                "version": 920100 + index,
+                                "nodes": [
+                                    {
+                                        "id": "root",
+                                        "level": 1,
+                                        "sortOrder": value,
+                                    }
+                                ],
+                            },
+                        ]
+                    },
+                    {
+                        "taxonomies": [
+                            *before["taxonomies"],
+                            {
+                                "id": f"{taxonomy_id}-position-{index}",
+                                "subjectId": "subject-pmp",
+                                "version": 920200 + index,
+                                "nodes": [
+                                    {
+                                        "id": "root",
+                                        "level": 1,
+                                        "position": value,
+                                    }
+                                ],
+                            },
+                        ]
+                    },
+                    {
+                        "knowledgeTree": {
+                            "taxonomy": {
+                                "id": f"{taxonomy_id}-direct-{index}",
+                                "subjectId": "subject-pmp",
+                                "version": value,
+                                "nodes": [],
+                            }
+                        }
+                    },
+                    {
+                        "recallLibrary": {
+                            "id": f"recall-integer-boundary-{suffix}-{index}",
+                            "version": value,
+                            "nodes": [],
+                            "edges": [],
+                        }
+                    },
+                ]
+            )
+
+        for partial in invalid_payloads:
+            response = client.put(
+                "/api/v1/content-prep/shared-content",
+                json={
+                    "subjectId": "subject-pmp",
+                    "contentRevision": revision,
+                    **partial,
+                },
+            )
+            assert response.status_code == 422, (partial, response.text)
+            detail = response.json()["detail"]
+            assert detail["code"] == "INVALID_SHARED_CONTENT"
+            assert not any(
+                token in response.text.lower()
+                for token in ("asyncpg", "traceback", "sqlalchemy", "integer out of range")
+            )
+            assert _shared(client)["contentRevision"] == revision
+
+
 def test_catalog_preflights_unique_business_keys_without_sql_details_or_revision_bump() -> None:
     suffix = uuid4().hex[:10]
     subject_a = f"subject-unique-a-{suffix}"
