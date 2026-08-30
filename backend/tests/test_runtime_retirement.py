@@ -1,7 +1,9 @@
 import asyncio
+import ast
 from copy import deepcopy
 import json
 from pathlib import Path
+import re
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from uuid import uuid4
@@ -62,6 +64,62 @@ def test_public_report_contains_no_business_payload() -> None:
         "source_hash": "a" * 64,
         "nested": {"target_hash": "b" * 64, "target_count": 1},
     }
+
+
+def _javascript_string_array(source: str, name: str) -> set[str]:
+    match = re.search(
+        rf"const {name} = Object\.freeze\(\[(.*?)\]\)",
+        source,
+        flags=re.DOTALL,
+    )
+    assert match is not None, f"missing JavaScript registry {name}"
+    return set(ast.literal_eval(f"[{match.group(1)}]"))
+
+
+def test_retirement_device_preferences_match_frontend_registry() -> None:
+    source = (
+        Path(__file__).resolve().parents[2]
+        / "new-legacy/src/28-device-preferences.js"
+    ).read_text(encoding="utf-8")
+    exact = _javascript_string_array(source, "EXACT_KEYS")
+    prefixes = _javascript_string_array(source, "PREFIXES")
+    scoped_bases = _javascript_string_array(source, "SCOPED_UI_BASE_KEYS")
+
+    assert service.DEVICE_PREFERENCE_EXACT_KEYS == exact
+    assert set(service.DEVICE_PREFERENCE_PREFIXES) == prefixes | {
+        f"{base}__" for base in scoped_bases
+    }
+
+
+def test_scan_never_exposes_invalid_payload_values_in_discard_reason() -> None:
+    sentinel = "SENTINEL-INVALID-STATUS-MUST-NOT-LEAK"
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            report = await service.scan(
+                db,
+                sources=[
+                    {
+                        "source_type": "runtime",
+                        "source_key": service.COURSE_DRAFTS_KEY,
+                        "owner_id": "owner",
+                        "payload": [
+                            {
+                                "id": "draft",
+                                "name": "draft",
+                                "status": sentinel,
+                            }
+                        ],
+                    }
+                ],
+            )
+            rendered = json.dumps(report, ensure_ascii=False)
+            assert sentinel not in rendered
+            assert report["items"][0]["discardReason"] == (
+                "source payload failed validation"
+            )
+
+    asyncio.run(scenario())
 
 
 def test_drop_gate_accepts_only_matching_empty_policies_or_a_retirement_marker() -> None:

@@ -72,10 +72,16 @@ DEVICE_PREFERENCE_EXACT_KEYS = {
     "kg_teacher_workbench_subject_v1", "kg_course_admin_workspace_v862_p1",
     "kg_course_admin_recent_v862_p2", "kg_training_workspace_layout_v1",
     "pmp_question_font_size_v1", "pmp_question_font_size_v2",
+    "通用知识点关系图谱工具_新手引导已看_v1",
 }
 DEVICE_PREFERENCE_PREFIXES = (
     "kg_resizable_", "kg_ui_resizable_region_", "kg_workspace_layout_",
     "kg_recent_selection_", "kg_font_", "kg_language_", "kg_theme_",
+    "kg_multi_question_highlight_color_v1__",
+    "kg_multi_question_analysis_sections_v1__",
+    "kg_multi_question_paper_selection_v1__",
+    "kg_multi_question_release_selection_v1__",
+    "kg_canvas_workspace_catalog_v2__",
 )
 DISPOSABLE_MARKERS = {
     "kg_graph_file_migration_v2", "kg_graph_recent_opened_migration_v1",
@@ -1006,7 +1012,10 @@ async def scan(
                 parse_error = str(error)
         if parse_error:
             parse_errors += 1
-            discard_reason = str(parse_error)
+            # Validation exceptions can interpolate arbitrary source values.
+            # Public/CLI reports must remain payload-free even for malformed
+            # records, so expose only a stable classification.
+            discard_reason = "source payload failed validation"
         if disposition == domain_migration.DISPOSITION_UNKNOWN:
             unknown += 1
         public_items.append(
@@ -1501,6 +1510,14 @@ async def verify(
             await _mark_external_items(db, run_id, external, commit=False)
         raw = await domain_migration.verify(db, run_id, commit=False)
         items = await _items(db, run_id)
+        metrics = _item_metrics(items)
+        # Domain verification uses precise per-item errors.  Expose them as
+        # aggregate blockers, without serializing source or target values.
+        metrics["hashMismatches"] = sum(
+            bool(item.required and item.error and "hash" in item.error.lower())
+            for item in items
+        )
+        public_items = _public_item_summaries(items)
         if _commit:
             await db.commit()
         else:
@@ -1508,13 +1525,6 @@ async def verify(
     except Exception:
         await db.rollback()
         raise
-    metrics = _item_metrics(items)
-    # Domain verification uses precise per-item errors.  Expose them as
-    # aggregate blockers, without serializing source or target values.
-    metrics["hashMismatches"] = sum(
-        bool(item.required and item.error and "hash" in item.error.lower())
-        for item in items
-    )
     if external is not None:
         metrics["parseErrors"] += external["parseErrors"]
         metrics["unresolvedConflicts"] += external["unresolvedConflicts"]
@@ -1525,7 +1535,7 @@ async def verify(
         "requiredFailures": int(raw["required_failures"]),
         "sourceSnapshotHash": raw.get("source_snapshot_hash"),
         "backupReference": raw.get("backup_reference"),
-        "items": _public_item_summaries(items),
+        "items": public_items,
         **metrics,
     }
     if external is not None:
