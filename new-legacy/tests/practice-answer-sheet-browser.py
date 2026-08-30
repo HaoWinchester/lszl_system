@@ -146,7 +146,7 @@ with sync_playwright() as playwright:
             stats:()=>({active:3,pending:2,needsRemediation:1,mastered:0}),active:()=>[],refresh:async()=>({}),
             getActiveSessions:async filters=>session&&['active','paused'].includes(session.status)&&(!filters?.mode||filters.mode===session.mode)&&(!filters?.releaseId||filters.releaseId===session.releaseId)?[normalize()]:[],
             getSession:async id=>window.__pausedSnapshots[id]?JSON.parse(JSON.stringify(window.__pausedSnapshots[id])):(session?normalize():null),
-            startSession:async input=>{session={id:'ps-'+(++sequence),paperId:input.paperId,releaseId:input.releaseId,mode:input.mode,status:'active',revision:1,questions:sessionRefs(),questionOrder:fullRefs.map(({question,...ref})=>ref),answers:{},runtimeState:{currentIndex:0,order:input.order,health:input.mode==='challenge'?3:3,streak:0,experience:0,durationMs:0},stats:{total:10,answered:0,correct:0,wrong:0,unanswered:10,experience:0,durationMs:0}};return normalize()},
+            startSession:async input=>{record('start',input);session={id:'ps-'+(++sequence),paperId:input.mode==='revenge'?null:input.paperId,releaseId:input.mode==='revenge'?null:input.releaseId,mode:input.mode,status:'active',revision:1,questions:sessionRefs(),questionOrder:fullRefs.map(({question,...ref})=>ref),answers:{},runtimeState:{currentIndex:0,order:input.order,health:input.mode==='challenge'?3:3,streak:0,experience:0,durationMs:0},stats:{total:10,answered:0,correct:0,wrong:0,unanswered:10,experience:0,durationMs:0}};return normalize()},
             updateState:async(id,input)=>{record('state',input);if(input.revision!==session.revision)throw Object.assign(new Error('stale revision'),{status:409});session.runtimeState={...session.runtimeState,...input.runtimeState};session.revision+=1;return normalize()},
             answerSession:async(id,input)=>{record('answers',input);throw Object.assign(new Error('legacy per-question route must not be called'),{status:500})},
             pauseSession:async(id,input)=>{
@@ -191,7 +191,8 @@ with sync_playwright() as playwright:
           window.__defaultActiveSessions=window.KGPracticeLearningApi.getActiveSessions;
           window.KGPracticeLearningApi.upsertWrong=async input=>{record('upsertWrong',input);throw new Error('/mistakes must not be called during practice')};
           window.KGPracticeLearningApi.answerRevenge=async input=>{record('revengeAnswer',input);throw new Error('revenge answer must stay local until submission')};
-          window.KGPublishedPaperRepository={listCatalogEntries:()=>[{id:'paper-1',paperId:'paper-1',releaseId:'release-1',version:1,name:'PMP 模拟卷',subject:'PMP',status:'published',questionCount:10,totalCount:10,accessPolicy:{accessLevel:'free'}}]};
+          window.__catalog=[{id:'paper-1',paperId:'paper-1',releaseId:'release-1',version:1,name:'PMP 模拟卷',subject:'PMP',status:'published',questionCount:10,totalCount:10,accessPolicy:{accessLevel:'free'}}];
+          window.KGPublishedPaperRepository={listCatalogEntries:()=>window.__catalog};
           window.KGPaperAccessService={inspect:()=>({allowed:true,accessLevel:'free'})};
           window.KGQuestionCatalogAdapter={ready:Promise.resolve()};
           window.KGLearningLoading={show:()=>{},hide:()=>{}};
@@ -453,6 +454,7 @@ with sync_playwright() as playwright:
 
     # ---------- revenge：本地推进补救/验证，不调用长期错题写路由 ----------
     page.evaluate("""()=>{
+      window.__catalog=[];
       window.KGPracticeLearningApi.getActiveSessions=async()=>[];
       window.KGPracticeMode.showLobby();
     }""")
@@ -464,7 +466,9 @@ with sync_playwright() as playwright:
     assert revenge["mode"] == "revenge" and revenge["sessionId"], revenge
     assert revenge["view"] == "game"
     revenge_writes_before = writes(page)
-    assert revenge_writes_before == [], revenge_writes_before
+    assert revenge_writes_before == [
+        {"name": "start", "body": {"mode": "revenge", "count": 10, "order": "paper"}}
+    ], revenge_writes_before
 
     # ---------- 复仇作答交互：真实点击选项，零写请求 + 本地反馈 ----------
     # mock 复仇题目正确答案 A；故意答错（选 B）触发补救分支
@@ -546,6 +550,18 @@ with sync_playwright() as playwright:
         assert revenge_runtime.get("revengeState", {}).get("phase") in ("remediation", "verification"), revenge_runtime
     assert page.locator("#practiceLobby").is_visible(), page.evaluate("document.body.dataset.practiceView")
 
+    # 全局复仇会话不绑定试卷：换成另一份当前试卷后，仍应恢复同一会话。
+    resumed_revenge = page.evaluate(
+        """()=>{
+          window.__catalog=[{id:'paper-2',paperId:'paper-2',releaseId:'release-2',version:1,name:'另一份试卷',subject:'PMP',status:'published',questionCount:10,totalCount:10,accessPolicy:{accessLevel:'free'}}];
+          window.KGPracticeLearningApi.getActiveSessions=async filters=>window.__findResumable(filters);
+          window.KGPracticeMode.showLobby();
+          window.__writes=[];
+          return window.KGPracticeMode.startPractice('revenge').then(()=>window.KGPracticeMode.snapshot());
+        }"""
+    )
+    assert resumed_revenge["sessionId"] == revenge["sessionId"], resumed_revenge
+
     page.set_viewport_size({"width": 1440, "height": 960})
     page.wait_for_timeout(100)
     page.evaluate("window.__writes=[]")
@@ -553,6 +569,8 @@ with sync_playwright() as playwright:
     resume_challenge = page.evaluate(
         """()=>{
           const api=window.KGPracticeLearningApi;
+          window.__catalog=[{id:'paper-1',paperId:'paper-1',releaseId:'release-1',version:1,name:'PMP 模拟卷',subject:'PMP',status:'published',questionCount:10,totalCount:10,accessPolicy:{accessLevel:'free'}}];
+          window.KGPracticeMode.showLobby();
           api.getActiveSessions=async filters=>window.__findResumable(filters).filter(s=>s.mode==='challenge');
           return window.KGPracticeMode.startPractice('challenge').then(()=>window.KGPracticeMode.snapshot());
         }"""

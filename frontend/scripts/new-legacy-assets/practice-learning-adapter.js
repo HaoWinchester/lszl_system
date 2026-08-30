@@ -2,7 +2,7 @@
 
 ;(function (global) {
   const API_ROOT = '/api/v1/learning/practice'
-  let overview = { mistakes: [], stats: emptyStats(), plan: null }
+  let overview = { mistakes: [], stats: emptyStats(), revengeStats: emptyStats(), revengeCandidates: [], plan: null }
   let loading = null
 
   function text(value) { return String(value == null ? '' : value) }
@@ -40,6 +40,8 @@
     overview = {
       mistakes: Array.isArray(next?.mistakes) ? clone(next.mistakes) : [],
       stats: { ...emptyStats(), ...(next?.stats || {}) },
+      revengeStats: { ...emptyStats(), ...(next?.revengeStats || next?.stats || {}) },
+      revengeCandidates: Array.isArray(next?.revengeCandidates) ? clone(next.revengeCandidates) : [],
       plan: next?.plan ? clone(next.plan) : null,
     }
     emit('kg-practice-mistakes-change', overview)
@@ -57,22 +59,8 @@
     const includeMastered = options.includeMastered !== false
     return overview.mistakes.filter(row => includeMastered || row.status !== 'mastered').map(clone)
   }
-  function active() {
-    const priority = { needs_remediation: 0, pending: 1, verification_due: 2 }
-    const now = Date.now()
-    const reviewDue = (row) => {
-      if (row.status !== 'verification_due') return true
-      const next = Date.parse(text(row.nextReviewAt || ''))
-      return Number.isNaN(next) || next <= now
-    }
-    return overview.mistakes
-      .filter(row => ['pending', 'needs_remediation', 'verification_due'].includes(row.status) && reviewDue(row))
-      .sort((left, right) => (priority[left.status] ?? 9) - (priority[right.status] ?? 9)
-        || Number(right.revengeWrongCount || 0) - Number(left.revengeWrongCount || 0)
-        || Number(right.wrongCount || 0) - Number(left.wrongCount || 0))
-      .map(clone)
-  }
-  function stats() { return clone(overview.stats) }
+  function active() { return overview.revengeCandidates.map(clone) }
+  function stats() { return clone(overview.revengeStats) }
   function plan() { return clone(overview.plan) }
   async function answer(input, options = {}) {
     // P4.5.37：keepalive 让 pagehide 时的批量同步请求可在页面卸载后存活

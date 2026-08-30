@@ -99,3 +99,35 @@ test('session lifecycle sends keepalive only when explicitly requested', async (
   assert.deepEqual(calls.map(call=>call.options.keepalive===true),[false,true,false,true,false,true])
   assert(calls.every(call=>call.options.credentials==='include'))
 })
+
+test('practice adapter exposes the server-deduplicated global revenge pool', async () => {
+  const { runInNewContext } = await import('node:vm')
+  const overview = {
+    mistakes: [
+      { id: 'release-copy', questionId: 'q1', status: 'pending', wrongCount: 4 },
+      { id: 'history-copy', questionId: 'q1', status: 'needs_remediation', wrongCount: 2 },
+    ],
+    stats: { active: 2, pending: 1, needsRemediation: 1 },
+    revengeStats: { active: 1, pending: 0, needsRemediation: 1, mastered: 0 },
+    revengeCandidates: [
+      { id: 'history-copy', mistakeId: 'history-copy', mistakeIds: ['history-copy', 'release-copy'], questionId: 'q1', status: 'needs_remediation' },
+    ],
+  }
+  const window = {
+    addEventListener() {},
+    dispatchEvent() {},
+    KGAuthCore: { currentUser: () => ({ username: 'student-1' }) },
+    fetch: async () => ({ ok: true, json: async () => overview }),
+  }
+  runInNewContext(
+    source('frontend/scripts/new-legacy-assets/practice-learning-adapter.js'),
+    { window, URLSearchParams, CustomEvent: class CustomEvent {} },
+  )
+  await window.KGPracticeLearningApi.refresh()
+
+  assert.equal(window.KGPracticeLearningApi.stats().active, 1)
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(window.KGPracticeLearningApi.active())),
+    overview.revengeCandidates,
+  )
+})
