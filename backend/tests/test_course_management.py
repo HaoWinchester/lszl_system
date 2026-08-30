@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import delete, text
 from sqlalchemy.exc import IntegrityError
 
@@ -13,6 +14,10 @@ from app.db.session import AsyncSessionLocal
 from app.main import app
 from app.models.course_management import LearningTask
 from app.models.user import User
+from app.schemas.course_management import (
+    MAX_JSON_BYTES,
+    CourseDraftCreate,
+)
 from app.services import course_management_service
 
 
@@ -570,6 +575,373 @@ def test_mutable_course_json_fields_reject_explicit_null() -> None:
         asyncio.run(_cleanup_users(teacher))
 
 
+def test_public_create_rejects_client_ids_without_leaking_global_occupancy() -> None:
+    suffix = uuid4().hex[:10]
+    teacher = f"course-server-id-{suffix}"
+    bad_id = f"bad/id-{suffix}"
+    asyncio.run(_seed_users((teacher, "teacher")))
+    try:
+        with TestClient(app) as client:
+            _login(client, teacher)
+
+            revision_before_draft = client.get(
+                "/api/v1/question-catalog/revision"
+            ).json()["revision"]
+            rejected_draft = client.post(
+                "/api/v1/course-management/drafts",
+                json={"id": bad_id, "name": "不允许指定 ID", "structure": {}},
+            )
+            assert rejected_draft.status_code == 422, rejected_draft.text
+            assert rejected_draft.json()["detail"] == [
+                {
+                    "type": "extra_forbidden",
+                    "loc": ["body", "id"],
+                    "msg": "Extra inputs are not permitted",
+                    "input": bad_id,
+                }
+            ]
+            assert client.get(
+                "/api/v1/question-catalog/revision"
+            ).json()["revision"] == revision_before_draft
+
+            draft = _create_draft(client)
+            release = client.post(
+                f"/api/v1/course-management/drafts/{draft['id']}/publish",
+                json={"revision": draft["revision"]},
+            ).json()["release"]
+            revision_before_task = client.get(
+                "/api/v1/question-catalog/revision"
+            ).json()["revision"]
+            rejected_task = client.post(
+                "/api/v1/course-management/tasks",
+                json={
+                    "id": bad_id,
+                    "title": "不允许指定 ID",
+                    "releaseId": release["id"],
+                    "audience": {},
+                },
+            )
+            assert rejected_task.status_code == 422, rejected_task.text
+            assert client.get(
+                "/api/v1/question-catalog/revision"
+            ).json()["revision"] == revision_before_task
+
+        async def assert_bad_id_absent() -> None:
+            async with AsyncSessionLocal() as db:
+                assert await db.scalar(
+                    text("SELECT count(*) FROM course_drafts WHERE id = :id"),
+                    {"id": bad_id},
+                ) == 0
+                assert await db.scalar(
+                    text("SELECT count(*) FROM learning_tasks WHERE id = :id"),
+                    {"id": bad_id},
+                ) == 0
+
+        asyncio.run(assert_bad_id_absent())
+    finally:
+        asyncio.run(_cleanup_users(teacher))
+
+
+def test_non_finite_course_json_returns_safe_422_without_mutation() -> None:
+    suffix = uuid4().hex[:10]
+    teacher = f"course-finite-{suffix}"
+    asyncio.run(_seed_users((teacher, "teacher")))
+    try:
+        with TestClient(app, raise_server_exceptions=False) as client:
+            _login(client, teacher)
+
+            initial_revision = client.get(
+                "/api/v1/question-catalog/revision"
+            ).json()["revision"]
+            rejected_create = client.post(
+                "/api/v1/course-management/drafts",
+                content='{"name":"NaN draft","structure":{"score":NaN}}',
+                headers={"content-type": "application/json"},
+            )
+            assert rejected_create.status_code == 422, rejected_create.text
+            assert "INSERT INTO" not in rejected_create.text
+            assert "parameters" not in rejected_create.text
+            finite_error = rejected_create.json()["detail"][0]
+            assert finite_error["loc"] == ["body", "structure"]
+            assert finite_error["type"] == "value_error"
+            assert finite_error["input"]["score"] == "non-finite number"
+            assert client.get(
+                "/api/v1/question-catalog/revision"
+            ).json()["revision"] == initial_revision
+            assert client.get(
+                "/api/v1/course-management/drafts"
+            ).json()["drafts"] == []
+
+            draft = _create_draft(client)
+            release = client.post(
+                f"/api/v1/course-management/drafts/{draft['id']}/publish",
+                json={"revision": draft["revision"]},
+            ).json()["release"]
+            revision_before_task_create = client.get(
+                "/api/v1/question-catalog/revision"
+            ).json()["revision"]
+            rejected_task_create = client.post(
+                "/api/v1/course-management/tasks",
+                content=(
+                    '{"title":"Infinity task","releaseId":"'
+                    + release["id"]
+                    + '","audience":{"score":Infinity},"content":{}}'
+                ),
+                headers={"content-type": "application/json"},
+            )
+            assert rejected_task_create.status_code == 422, rejected_task_create.text
+            assert "INSERT INTO" not in rejected_task_create.text
+            assert "parameters" not in rejected_task_create.text
+            assert client.get(
+                "/api/v1/question-catalog/revision"
+            ).json()["revision"] == revision_before_task_create
+            assert client.get(
+                "/api/v1/course-management/tasks"
+            ).json()["tasks"] == []
+
+            task = client.post(
+                "/api/v1/course-management/tasks",
+                json={
+                    "title": "finite task",
+                    "releaseId": release["id"],
+                    "audience": {},
+                    "content": {},
+                },
+            ).json()["task"]
+            revision_before_updates = client.get(
+                "/api/v1/question-catalog/revision"
+            ).json()["revision"]
+            rejected_draft_update = client.put(
+                f"/api/v1/course-management/drafts/{draft['id']}",
+                content=(
+                    '{"revision":'
+                    + str(draft["revision"] + 1)
+                    + ',"structure":{"score":-Infinity}}'
+                ),
+                headers={"content-type": "application/json"},
+            )
+            rejected_task_update = client.put(
+                f"/api/v1/course-management/tasks/{task['id']}",
+                content=(
+                    '{"revision":'
+                    + str(task["revision"])
+                    + ',"content":{"score":NaN}}'
+                ),
+                headers={"content-type": "application/json"},
+            )
+            assert rejected_draft_update.status_code == 422, rejected_draft_update.text
+            assert rejected_task_update.status_code == 422, rejected_task_update.text
+            for rejected_update in (rejected_draft_update, rejected_task_update):
+                assert "UPDATE " not in rejected_update.text
+                assert "parameters" not in rejected_update.text
+            assert client.get(
+                "/api/v1/question-catalog/revision"
+            ).json()["revision"] == revision_before_updates
+            assert client.get(
+                f"/api/v1/course-management/drafts/{draft['id']}"
+            ).json()["draft"]["structure"] == draft["structure"]
+            assert client.get(
+                f"/api/v1/course-management/tasks/{task['id']}"
+            ).json()["task"]["content"] == {}
+    finally:
+        asyncio.run(_cleanup_users(teacher))
+
+
+def test_course_json_size_limit_accepts_boundary_and_rejects_one_byte_over() -> None:
+    exact_payload = {"blob": "x" * (MAX_JSON_BYTES - 11)}
+    assert CourseDraftCreate(name="boundary", structure=exact_payload).structure == exact_payload
+    with pytest.raises(ValidationError):
+        CourseDraftCreate(
+            name="over",
+            structure={"blob": "x" * (MAX_JSON_BYTES - 10)},
+        )
+
+
+def test_admin_mutations_succeed_while_viewer_mutations_are_denied() -> None:
+    suffix = uuid4().hex[:10]
+    admin = f"course-admin-{suffix}"
+    viewer = f"course-viewer-{suffix}"
+    asyncio.run(_seed_users((admin, "admin"), (viewer, "viewer")))
+    try:
+        with TestClient(app) as admin_client:
+            _login(admin_client, admin)
+            draft = _create_draft(admin_client, name="管理员课程")
+            updated_draft_response = admin_client.put(
+                f"/api/v1/course-management/drafts/{draft['id']}",
+                json={"revision": draft["revision"], "name": "管理员课程 v2"},
+            )
+            assert updated_draft_response.status_code == 200
+            draft = updated_draft_response.json()["draft"]
+            publish_response = admin_client.post(
+                f"/api/v1/course-management/drafts/{draft['id']}/publish",
+                json={"revision": draft["revision"]},
+            )
+            assert publish_response.status_code == 200
+            draft = publish_response.json()["draft"]
+            release = publish_response.json()["release"]
+            task_response = admin_client.post(
+                "/api/v1/course-management/tasks",
+                json={
+                    "title": "管理员任务",
+                    "releaseId": release["id"],
+                    "audience": {},
+                },
+            )
+            assert task_response.status_code == 200
+            task = task_response.json()["task"]
+            updated_task_response = admin_client.put(
+                f"/api/v1/course-management/tasks/{task['id']}",
+                json={"revision": task["revision"], "status": "published"},
+            )
+            assert updated_task_response.status_code == 200
+            task = updated_task_response.json()["task"]
+
+        with TestClient(app) as viewer_client:
+            _login(viewer_client, viewer)
+            denied_mutations = (
+                (
+                    "POST",
+                    "/api/v1/course-management/drafts",
+                    {"name": "越权", "structure": {}},
+                ),
+                (
+                    "PUT",
+                    f"/api/v1/course-management/drafts/{draft['id']}",
+                    {"revision": draft["revision"], "name": "越权"},
+                ),
+                (
+                    "DELETE",
+                    f"/api/v1/course-management/drafts/{draft['id']}",
+                    {"revision": draft["revision"]},
+                ),
+                (
+                    "POST",
+                    f"/api/v1/course-management/drafts/{draft['id']}/publish",
+                    {"revision": draft["revision"]},
+                ),
+                (
+                    "POST",
+                    "/api/v1/course-management/tasks",
+                    {"title": "越权", "releaseId": release["id"]},
+                ),
+                (
+                    "PUT",
+                    f"/api/v1/course-management/tasks/{task['id']}",
+                    {"revision": task["revision"], "title": "越权"},
+                ),
+                (
+                    "DELETE",
+                    f"/api/v1/course-management/tasks/{task['id']}",
+                    {"revision": task["revision"]},
+                ),
+                (
+                    "POST",
+                    f"/api/v1/course-management/releases/{release['id']}/withdraw",
+                    {"revision": release["revision"]},
+                ),
+            )
+            for method, path, payload in denied_mutations:
+                response = viewer_client.request(method, path, json=payload)
+                assert response.status_code == 403, (method, path, response.text)
+
+        with TestClient(app) as admin_client:
+            _login(admin_client, admin)
+            deleted_task = admin_client.request(
+                "DELETE",
+                f"/api/v1/course-management/tasks/{task['id']}",
+                json={"revision": task["revision"]},
+            )
+            assert deleted_task.status_code == 200
+            withdrawn = admin_client.post(
+                f"/api/v1/course-management/releases/{release['id']}/withdraw",
+                json={"revision": release["revision"]},
+            )
+            assert withdrawn.status_code == 200
+            deleted_draft = admin_client.request(
+                "DELETE",
+                f"/api/v1/course-management/drafts/{draft['id']}",
+                json={"revision": draft["revision"]},
+            )
+            assert deleted_draft.status_code == 200
+    finally:
+        asyncio.run(_cleanup_users(admin, viewer))
+
+
+def test_stale_course_mutations_preserve_rows_and_shared_revision() -> None:
+    suffix = uuid4().hex[:10]
+    teacher = f"course-stale-effects-{suffix}"
+    asyncio.run(_seed_users((teacher, "teacher")))
+    try:
+        with TestClient(app) as client:
+            _login(client, teacher)
+
+            def shared_revision() -> int:
+                return client.get("/api/v1/question-catalog/revision").json()["revision"]
+
+            draft = _create_draft(client)
+            updated = client.put(
+                f"/api/v1/course-management/drafts/{draft['id']}",
+                json={"revision": draft["revision"], "name": "当前版本"},
+            ).json()["draft"]
+            before_stale_draft = shared_revision()
+            for method, suffix_path in (("POST", "/publish"), ("DELETE", "")):
+                response = client.request(
+                    method,
+                    f"/api/v1/course-management/drafts/{updated['id']}{suffix_path}",
+                    json={"revision": draft["revision"]},
+                )
+                assert response.status_code == 409, response.text
+            assert shared_revision() == before_stale_draft
+            assert client.get(
+                f"/api/v1/course-management/drafts/{updated['id']}"
+            ).json()["draft"] == updated
+            assert client.get(
+                "/api/v1/course-management/releases"
+            ).json()["releases"] == []
+
+            published = client.post(
+                f"/api/v1/course-management/drafts/{updated['id']}/publish",
+                json={"revision": updated["revision"]},
+            ).json()
+            release = published["release"]
+            task = client.post(
+                "/api/v1/course-management/tasks",
+                json={"title": "并发删除任务", "releaseId": release["id"]},
+            ).json()["task"]
+            current_task = client.put(
+                f"/api/v1/course-management/tasks/{task['id']}",
+                json={"revision": task["revision"], "description": "当前描述"},
+            ).json()["task"]
+            before_stale_task = shared_revision()
+            stale_task_delete = client.request(
+                "DELETE",
+                f"/api/v1/course-management/tasks/{task['id']}",
+                json={"revision": task["revision"]},
+            )
+            assert stale_task_delete.status_code == 409
+            assert shared_revision() == before_stale_task
+            assert client.get(
+                f"/api/v1/course-management/tasks/{task['id']}"
+            ).json()["task"] == current_task
+
+            current_release = client.post(
+                f"/api/v1/course-management/releases/{release['id']}/withdraw",
+                json={"revision": release["revision"]},
+            ).json()["release"]
+            before_stale_withdraw = shared_revision()
+            stale_withdraw = client.post(
+                f"/api/v1/course-management/releases/{release['id']}/withdraw",
+                json={"revision": release["revision"]},
+            )
+            assert stale_withdraw.status_code == 409
+            assert shared_revision() == before_stale_withdraw
+            assert client.get(
+                f"/api/v1/course-management/releases/{release['id']}"
+            ).json()["release"] == current_release
+    finally:
+        asyncio.run(_cleanup_users(teacher))
+
+
 def test_successful_course_writes_bump_the_shared_content_revision_once() -> None:
     suffix = uuid4().hex[:10]
     teacher = f"course-content-revision-{suffix}"
@@ -678,17 +1050,18 @@ def test_failed_course_transaction_rolls_back_the_shared_content_revision() -> N
                 "/api/v1/question-catalog/revision"
             ).json()["revision"]
 
-        invalid_task_id = f"rollback-task-{suffix}"
-
         async def fail_transaction() -> None:
             async with AsyncSessionLocal() as db:
                 actor = await db.get(User, teacher)
                 assert actor is not None
+                task_count_before = await db.scalar(
+                    text("SELECT count(*) FROM learning_tasks WHERE owner_id = :owner_id"),
+                    {"owner_id": teacher},
+                )
                 with pytest.raises(IntegrityError):
                     await course_management_service.create_task(
                         db,
                         actor,
-                        task_id=invalid_task_id,
                         release_id=release["id"],
                         title="不能提交的任务",
                         description="",
@@ -705,11 +1078,11 @@ def test_failed_course_transaction_rolls_back_the_shared_content_revision() -> N
                     )
                 )
                 task_count = await verify_db.scalar(
-                    text("SELECT count(*) FROM learning_tasks WHERE id = :task_id"),
-                    {"task_id": invalid_task_id},
+                    text("SELECT count(*) FROM learning_tasks WHERE owner_id = :owner_id"),
+                    {"owner_id": teacher},
                 )
                 assert revision_after == revision_before
-                assert task_count == 0
+                assert task_count == task_count_before
 
         asyncio.run(fail_transaction())
     finally:

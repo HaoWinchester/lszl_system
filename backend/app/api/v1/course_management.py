@@ -46,7 +46,6 @@ async def create_draft(body: CourseDraftCreate, db: DB, user: Manager):
         draft = await course_management_service.create_draft(
             db,
             user,
-            draft_id=body.id,
             name=body.name,
             structure=body.structure,
         )
@@ -155,7 +154,6 @@ async def create_task(body: LearningTaskCreate, db: DB, user: Manager):
         task = await course_management_service.create_task(
             db,
             user,
-            task_id=body.id,
             release_id=body.release_id,
             title=body.title,
             description=body.description,

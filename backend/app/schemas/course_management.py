@@ -12,7 +12,16 @@ MAX_JSON_BYTES = 2_000_000
 
 
 def _bounded_json(value: dict[str, Any], *, label: str) -> dict[str, Any]:
-    if len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode()) > MAX_JSON_BYTES:
+    try:
+        encoded = json.dumps(
+            value,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode()
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{label} 必须是标准 JSON，且数字必须为有限值") from error
+    if len(encoded) > MAX_JSON_BYTES:
         raise ValueError(f"{label} 不能超过 2MB")
     return value
 
@@ -20,7 +29,6 @@ def _bounded_json(value: dict[str, Any], *, label: str) -> dict[str, Any]:
 class CourseDraftCreate(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    id: str | None = Field(default=None, min_length=1, max_length=128)
     name: str = Field(min_length=1, max_length=255)
     structure: dict[str, Any] = Field(default_factory=dict)
 
@@ -66,7 +74,6 @@ class CoursePublishRequest(RevisionRequest):
 class LearningTaskCreate(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    id: str | None = Field(default=None, min_length=1, max_length=128)
     title: str = Field(min_length=1, max_length=255)
     description: str = Field(default="", max_length=100_000)
     release_id: str = Field(alias="releaseId", min_length=1, max_length=128)

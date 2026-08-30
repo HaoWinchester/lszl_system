@@ -135,14 +135,11 @@ async def create_draft(
     db: AsyncSession,
     actor: User,
     *,
-    draft_id: str | None,
     name: str,
     structure: dict[str, Any],
 ) -> CourseDraft:
-    identifier = draft_id or uid("course_")
+    identifier = uid("course_")
     await _begin_write(db)
-    if await db.get(CourseDraft, identifier) is not None:
-        raise CourseManagementError(409, "DRAFT_ID_CONFLICT", "课程草稿 ID 已存在")
     draft = CourseDraft(
         id=identifier,
         owner_id=actor.username,
@@ -441,7 +438,6 @@ async def create_task(
     db: AsyncSession,
     actor: User,
     *,
-    task_id: str | None,
     release_id: str,
     title: str,
     description: str,
@@ -451,9 +447,7 @@ async def create_task(
 ) -> LearningTask:
     await _begin_write(db)
     await _require_owned_release(db, actor, release_id)
-    identifier = task_id or uid("learning_task_")
-    if await db.get(LearningTask, identifier) is not None:
-        raise CourseManagementError(409, "TASK_ID_CONFLICT", "学习任务 ID 已存在")
+    identifier = uid("learning_task_")
     task = LearningTask(
         id=identifier,
         owner_id=actor.username,
