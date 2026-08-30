@@ -192,3 +192,32 @@ Final Round 2 focused regression:
 
 No existing database, UAT environment, active release, `main`, or remote branch
 was mutated.
+
+## Review Fix Round 3
+
+Exact question and paper proof ownership now preserves the full Runtime
+identity namespace. A normal `runtime` item always uses its own non-empty
+`owner_scope`, including the valid username `shared`; it never consults a
+same-key `SharedRuntimeState` row. Only the exact combination
+`shared_runtime` plus owner scope `shared` may use that shared row's
+`updated_by` actor. Empty Runtime owners, mismatched shared scopes, unknown
+source types, and missing shared actors fail closed as invalid proof records.
+
+### Round 3 TDD evidence
+
+- RED: three focused tests failed. Both colliding Runtime/SharedRuntime
+  question and paper identities produced different source/target hashes, and
+  invalid source-type/scope shapes reported zero invalid records.
+- GREEN: the same three tests passed after routing both exact verifiers through
+  one source-type-aware owner resolver.
+- Focused question/runtime regression:
+  `.venv/bin/python -m pytest tests/test_question_runtime_migration.py tests/test_runtime_retirement.py -q`
+  completed with `32 passed, 1 pre-existing dependency warning`.
+- Full Task 8 focused regression:
+  `.venv/bin/python -m pytest tests/test_runtime_retirement.py tests/test_files_runtime_migration.py tests/test_question_runtime_migration.py tests/test_runtime_domain_migration_ledger.py -q`
+  completed with `55 passed, 1 pre-existing dependency warning`.
+- `py_compile` for the question migrator, retirement orchestrator/CLI, and the
+  two focused test modules succeeded; `git diff --check` is clean.
+
+No live database, UAT environment, deployment, push, `main`, or active release
+was changed.

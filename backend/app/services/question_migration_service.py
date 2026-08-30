@@ -2049,6 +2049,25 @@ async def verify_runtime_paper_targets(
     }
 
 
+async def _exact_runtime_source_owner(
+    db: AsyncSession,
+    *,
+    source_type: str,
+    source_key: str,
+    owner_scope: str,
+) -> tuple[str | None, int]:
+    """Resolve an exact Runtime identity without crossing source namespaces."""
+
+    if source_type == "runtime":
+        return (owner_scope, 0) if owner_scope else (None, 1)
+    if source_type != "shared_runtime" or owner_scope != "shared":
+        return None, 1
+    shared_row = await db.get(SharedRuntimeState, source_key)
+    if shared_row is None or not shared_row.updated_by:
+        return None, 1
+    return shared_row.updated_by, 0
+
+
 async def verify_runtime_paper_item(
     db: AsyncSession,
     *,
@@ -2063,22 +2082,24 @@ async def verify_runtime_paper_item(
         decoded = _decode_json(payload)
     except (TypeError, ValueError, json.JSONDecodeError):
         decoded = None
-    invalid = int(not isinstance(decoded, list))
+    resolved_owner, identity_invalid = await _exact_runtime_source_owner(
+        db,
+        source_type=source_type,
+        source_key=source_key,
+        owner_scope=owner_scope,
+    )
+    invalid = int(not isinstance(decoded, list)) + identity_invalid
     rows = decoded if isinstance(decoded, list) else []
     source_rows: list[dict[str, Any]] = []
     target_rows: list[dict[str, Any]] = []
     is_category = source_key.startswith(PAPER_CATEGORY_PREFIX) or source_key == PAPER_SHARED_CATEGORY_KEY
-    shared_row = await db.get(SharedRuntimeState, source_key) if owner_scope == "shared" else None
-    shared_owner = shared_row.updated_by if shared_row is not None else None
     for raw in rows:
         if not isinstance(raw, Mapping):
             invalid += 1
             continue
-        owner_id = (
-            _decode_owner(raw.get("publishedBy"), fallback=shared_owner)
-            if owner_scope == "shared"
-            else owner_scope
-        )
+        owner_id = _decode_owner(raw.get("publishedBy"), fallback=resolved_owner) if (
+            source_type == "shared_runtime" and owner_scope == "shared"
+        ) else resolved_owner
         identifier = str(raw.get("id") or raw.get("paperId") or raw.get("categoryId") or "").strip()
         if not identifier or not owner_id:
             invalid += 1
@@ -2678,24 +2699,26 @@ async def verify_runtime_question_item(
         decoded = _decode_json(payload)
     except (TypeError, ValueError, json.JSONDecodeError):
         decoded = None
-    invalid = int(not isinstance(decoded, list))
+    resolved_owner, identity_invalid = await _exact_runtime_source_owner(
+        db,
+        source_type=source_type,
+        source_key=source_key,
+        owner_scope=owner_scope,
+    )
+    invalid = int(not isinstance(decoded, list)) + identity_invalid
     rows = decoded if isinstance(decoded, list) else []
     source_banks: list[dict[str, Any]] = []
     source_questions: list[dict[str, Any]] = []
     target_banks: list[dict[str, Any]] = []
     target_questions: list[dict[str, Any]] = []
-    shared_row = await db.get(SharedRuntimeState, source_key) if owner_scope == "shared" else None
-    shared_owner = shared_row.updated_by if shared_row is not None else None
     for raw in rows:
         if not isinstance(raw, Mapping):
             invalid += 1
             continue
         bank_id = str(raw.get("id") or raw.get("bankId") or "").strip()
-        owner_id = (
-            _decode_owner(raw.get("publishedBy"), fallback=shared_owner)
-            if owner_scope == "shared"
-            else owner_scope
-        )
+        owner_id = _decode_owner(raw.get("publishedBy"), fallback=resolved_owner) if (
+            source_type == "shared_runtime" and owner_scope == "shared"
+        ) else resolved_owner
         if not bank_id or not owner_id:
             invalid += 1
             continue
