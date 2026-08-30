@@ -18,7 +18,7 @@
     health:MAX_HEALTH,streak:0,experience:0,correct:0,answered:0,startedAt:0,endedAt:0,
     locked:false,active:false,completed:false,lastSettings:null,timerId:0,deadline:0,
     feedbackTimer:0,popTimer:0,toastTimer:0,abandonedRecorded:false,catalogAvailable:false,retiredNavigation:null,retiredNoticeShown:false,
-    remediationPending:false,verification:null,entryStartingMode:'',
+    remediationPending:false,verification:null,entryStartingMode:'',revengeRulePinned:false,
     session:null,report:null,reviewing:false,answerSheet:null,pendingSelection:'',submitting:false,pendingRequestKey:'',resumeLookupToken:0,
     draft:null,revengeState:null,saves:null,reconciling:false
   };
@@ -1207,11 +1207,11 @@
     dom.countInputs.forEach(input=>input.addEventListener('change',()=>{if(input.checked){state.selectedCount=Number(input.value);syncCountOptions();syncResumableButtons()}}));
     dom.revengeCountOptions?.addEventListener('change',event=>{const input=event.target.closest?.('[name="practiceRevengeCount"]');if(!input?.checked||input.disabled)return;state.revengeSelectedCount=Number(input.value);syncRevengeStats();syncCountOptions();syncResumableButtons()});
     dom.revengeRuleShell?.addEventListener('mouseenter',()=>setRevengeRuleOpen(true));
-    dom.revengeRuleShell?.addEventListener('mouseleave',()=>{if(document.activeElement!==dom.revengeRuleTrigger)setRevengeRuleOpen(false)});
+    dom.revengeRuleShell?.addEventListener('mouseleave',()=>{if(!state.revengeRulePinned&&document.activeElement!==dom.revengeRuleTrigger)setRevengeRuleOpen(false)});
     dom.revengeRuleTrigger?.addEventListener('focus',()=>setRevengeRuleOpen(true));
-    dom.revengeRuleTrigger?.addEventListener('blur',()=>global.setTimeout(()=>{if(!dom.revengeRuleShell?.contains(document.activeElement))setRevengeRuleOpen(false)},0));
-    dom.revengeRuleTrigger?.addEventListener('click',event=>{event.stopPropagation();setRevengeRuleOpen(dom.revengeRuleTrigger.getAttribute('aria-expanded')!=='true')});
-    document.addEventListener('click',event=>{if(!dom.revengeRuleShell?.contains(event.target))setRevengeRuleOpen(false)});
+    dom.revengeRuleTrigger?.addEventListener('blur',()=>global.setTimeout(()=>{if(!state.revengeRulePinned&&!dom.revengeRuleShell?.contains(document.activeElement))setRevengeRuleOpen(false)},0));
+    dom.revengeRuleTrigger?.addEventListener('click',event=>{event.stopPropagation();state.revengeRulePinned=!state.revengeRulePinned;setRevengeRuleOpen(state.revengeRulePinned)});
+    document.addEventListener('click',event=>{if(!dom.revengeRuleShell?.contains(event.target)){state.revengeRulePinned=false;setRevengeRuleOpen(false)}});
     dom.startButtons.forEach(button=>button.addEventListener('click',()=>startPractice(button.dataset.practiceStart)));
     $('practiceSettlementRetry')?.addEventListener('click',finishPractice);
     dom.exitBtn.addEventListener('click',openExitConfirm);dom.exitCancel.addEventListener('click',closeExitConfirm);dom.saveExitBtn?.addEventListener('click',saveAndExit);dom.abandonBtn?.addEventListener('click',abandonPractice);
@@ -1260,7 +1260,7 @@
         if(Math.abs(dx)>48&&Math.abs(dx)>Math.abs(dy)*1.4)switchQuestion(dx<0?1:-1);
       },{passive:true});
     }
-    document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(dom.revengeRuleTrigger?.getAttribute('aria-expanded')==='true')setRevengeRuleOpen(false);else if(!dom.submitConfirm.hidden)closeSubmitConfirm();else if(!dom.exitConfirm.hidden)closeExitConfirm();else if(dom.answerSheetDrawer&&!dom.answerSheetDrawer.hidden)closeAnswerSheetDrawer(true);else if(dom.paperDrawer&&!dom.paperDrawer.hidden)closePaperDrawer();else if(dom.historyDrawer&&!dom.historyDrawer.hidden)closeHistoryDrawer()});
+    document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(dom.revengeRuleTrigger?.getAttribute('aria-expanded')==='true'){state.revengeRulePinned=false;setRevengeRuleOpen(false)}else if(!dom.submitConfirm.hidden)closeSubmitConfirm();else if(!dom.exitConfirm.hidden)closeExitConfirm();else if(dom.answerSheetDrawer&&!dom.answerSheetDrawer.hidden)closeAnswerSheetDrawer(true);else if(dom.paperDrawer&&!dom.paperDrawer.hidden)closePaperDrawer();else if(dom.historyDrawer&&!dom.historyDrawer.hidden)closeHistoryDrawer()});
     global.addEventListener('kg-auth-session-change',()=>{if(!state.active)syncLobby();if(!state.active)refreshExperiencePanel()});
     global.addEventListener('kg-subscription-change',()=>{if(!state.active)syncLobby()});
     global.addEventListener('kg-subscription-plan-change',()=>{if(!state.active)syncLobby()});
