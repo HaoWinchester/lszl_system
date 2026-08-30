@@ -904,14 +904,23 @@
     }
     return session;
   }
+  function practiceEntryInput(mode,catalog,count){
+    const order=mode==='revenge'?'paper':(dom.orderInputs.find(input=>input.checked)?.value||'paper');
+    if(mode==='revenge')return {mode,count,order};
+    return {paperId:text(catalog?.paperId||catalog?.id),releaseId:text(catalog?.releaseId),mode,count,order};
+  }
+  function resumableEntry(sessions,mode,paperId){
+    const rows=Array.isArray(sessions)?sessions:[];
+    return mode==='revenge'?rows.find(item=>item.mode==='revenge'):rows.find(item=>text(item.paperId)===paperId&&item.mode===mode);
+  }
   async function startPractice(mode){
     const challenge=mode==='challenge';
     if(state.entryStartingMode)return false;
     if(mode==='revenge'&&!hasAuthenticatedUser())return startRevenge();
     const catalog=selectedRelease(),count=Number(state.selectedCount);
-    if(!catalog){syncLobby();return false}
-    const access=paperAccess(catalog);
-    if(!access.allowed)return openMembership(access);
+    if(mode!=='revenge'&&!catalog){syncLobby();return false}
+    const access=catalog?paperAccess(catalog):{allowed:true,accessLevel:'free'};
+    if(mode!=='revenge'&&!access.allowed)return openMembership(access);
     let restoreFocus=false;
     const beginEntry=()=>{
       setEntryStarting(mode,true);
@@ -922,13 +931,13 @@
       try{
         const api=practiceApi();
         if(hasAuthenticatedUser()&&typeof api?.startSession==='function'){
-          const releaseId=text(catalog.releaseId),paperId=text(catalog.paperId||catalog.id),order=mode==='revenge'?'paper':(dom.orderInputs.find(input=>input.checked)?.value||'paper');
+          const input=practiceEntryInput(mode,catalog,count),paperId=text(input.paperId);
           const active=await api.getActiveSessions({mode});
-          const resumable=active.find(item=>text(item.paperId)===paperId);
-          const session=await resolvePracticeEntrySession(resumable?await api.getSession(resumable.id):null,{paperId,releaseId,mode,count,order});
+          const resumable=resumableEntry(active,mode,paperId);
+          const session=await resolvePracticeEntrySession(resumable?await api.getSession(resumable.id):null,input);
           if(!session){restoreFocus=true;return false}
-          state.order=order;
-          return restoreServerSession(session,catalog);
+          state.order=input.order;
+          return restoreServerSession(session,mode==='revenge'?null:catalog);
         }
         const repo=global.KGPublishedPaperRepository;
         let questions=[];
@@ -958,15 +967,17 @@
         restoreFocus=true;
         if(hasAuthenticatedUser()&&error?.detail?.code==='RESUMABLE_SESSION_EXISTS'){
           try{
-            const api=practiceApi(),releaseId=text(catalog.releaseId),sessionId=text(error.detail.sessionId);
-            const resumable=sessionId?await api.getSession(sessionId):(await api.getActiveSessions({releaseId,mode}))[0];
+            const api=practiceApi(),input=practiceEntryInput(mode,catalog,count),sessionId=text(error.detail.sessionId);
+            const active=sessionId?[]:await api.getActiveSessions({mode});
+            const resumable=sessionId?await api.getSession(sessionId):resumableEntry(active,mode,text(input.paperId));
             if(resumable){
-              const session=await resolvePracticeEntrySession(resumable,{paperId:text(catalog.paperId||catalog.id),releaseId,mode,count,order:dom.orderInputs.find(input=>input.checked)?.value||'paper'});
-              return session?restoreServerSession(session,catalog):false;
+              const session=await resolvePracticeEntrySession(resumable,input);
+              return session?restoreServerSession(session,mode==='revenge'?null:catalog):false;
             }
           }catch(resumeError){}
         }
-        showToast(error?.detail?.code==='NO_REVENGE_QUESTIONS'?'当前试卷暂无可复仇错题。':'试题读取失败，请稍后重试。');
+        const errorCode=error?.detail?.code;
+        showToast(errorCode==='NO_REVENGE_QUESTIONS'?'当前没有可用的全局复仇错题。':errorCode==='REVENGE_SNAPSHOT_UNAVAILABLE'?'历史错题内容暂不可用，可先使用其他练习模式。':'试题读取失败，请稍后重试。');
         return false;
       }
     },beginEntry,endEntry);
@@ -1023,21 +1034,21 @@
     if(!currentEnabled)state.selectedCount=firstEnabled||10;
     dom.countInputs.forEach(input=>input.checked=Number(input.value)===state.selectedCount);
     dom.startButtons.forEach(button=>{
-      const revenge=button.dataset.practiceStart==='revenge',revengeAvailable=getMistakeStats().active>0;
-      button.disabled=revenge?!revengeAvailable:(!release||!firstEnabled);
-      button.classList.toggle('is-upgrade',!!release&&!access.allowed);
-      button.textContent=revenge?(revengeAvailable?(button.dataset.defaultLabel||'开始复仇'):'暂无错题'):( !release?(button.dataset.defaultLabel||button.textContent):(!access.allowed?'开通会员':button.dataset.defaultLabel||button.textContent));
+      const revenge=button.dataset.practiceStart==='revenge',revengeStats=getMistakeStats(),revengeAvailable=revengeStats.active>0,revengeUnavailable=Number(revengeStats.unavailable||0)>0;
+      button.disabled=revenge?!revengeAvailable&&!revengeUnavailable:(!release||!firstEnabled);
+      button.classList.toggle('is-upgrade',!revenge&&!!release&&!access.allowed);
+      button.textContent=revenge?(revengeAvailable?(button.dataset.defaultLabel||'开始复仇'):revengeUnavailable?'检查错题内容':'暂无错题'):( !release?(button.dataset.defaultLabel||button.textContent):(!access.allowed?'开通会员':button.dataset.defaultLabel||button.textContent));
     });
     dom.setupCard?.classList.toggle('is-vip-locked',!!release&&!access.allowed);
   }
   async function syncResumableButtons(){
     const release=selectedRelease(),api=practiceApi(),token=++state.resumeLookupToken;
-    if(!release||!hasAuthenticatedUser()||typeof api?.getActiveSessions!=='function')return;
+    if(!hasAuthenticatedUser()||typeof api?.getActiveSessions!=='function')return;
     try{
-      const paperId=text(release.paperId||release.id),sessions=await api.getActiveSessions({});
-      if(token!==state.resumeLookupToken||release.id!==selectedRelease()?.id)return;
+      const paperId=text(release?.paperId||release?.id),releaseKey=text(release?.id),sessions=await api.getActiveSessions({});
+      if(token!==state.resumeLookupToken||releaseKey!==text(selectedRelease()?.id))return;
       ['challenge','scholar','revenge'].forEach(mode=>{
-        const button=dom.startButtons.find(item=>item.dataset.practiceStart===mode),session=sessions.find(item=>text(item.paperId)===paperId&&item.mode===mode);if(!button||!session)return;
+        const button=dom.startButtons.find(item=>item.dataset.practiceStart===mode),session=resumableEntry(sessions,mode,paperId);if(!button||!session)return;
         const stats=session.stats||{},total=Number(stats.total||session.questions?.length||0);button.disabled=false;
         button.textContent=mode!=='revenge'&&total!==state.selectedCount?'开始新的 '+state.selectedCount+' 题练习':'继续上次练习 '+Number(stats.answered||0)+'/'+total;
       });
@@ -1094,7 +1105,7 @@
     if(retiredSelection)state.selectedPaperId=retiredSelection.id;
     else if(!releases.some(row=>row.id===state.selectedPaperId))state.selectedPaperId=releases.find(row=>paperAccess(row).allowed)?.id||releases[0]?.id||'';
     if(dom.paperSelect){dom.paperSelect.innerHTML=releases.map(row=>'<option value="'+escapeHTML(row.id)+'">'+escapeHTML(row.name)+'</option>').join('');dom.paperSelect.value=state.selectedPaperId}
-    const revengeAvailable=getMistakeStats().active>0;
+    const revengeStats=getMistakeStats(),revengeAvailable=revengeStats.active>0||Number(revengeStats.unavailable||0)>0;
     dom.empty.hidden=!!releases.length||revengeAvailable;dom.setupCard.hidden=!releases.length;dom.modeGrid.hidden=!releases.length&&!revengeAvailable;
     const library=dom.paperLibrary?.closest('.practice-library');if(library)library.hidden=!releases.length;
     renderPaperLibrary();syncCountOptions();syncPaperMeta();syncRevengeStats();syncResumableButtons();

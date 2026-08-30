@@ -1,13 +1,15 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.186",
-  "toVersion": "v9.0-p4.1.186",
+  "toVersion": "v9.0-p4.1.187",
   "changes": {
-    "added": [
-      ".DS_Store",
-      "assets/.DS_Store"
+    "added": [],
+    "changed": [
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html",
+      "src/100-practice-mode.js",
+      "tests/practice-answer-sheet-browser.py"
     ],
-    "changed": [],
     "removed": []
   },
   "incompatible": []
