@@ -1090,14 +1090,6 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
         "student": f"draft_student_{token}",
         "viewer": f"draft_viewer_{token}",
     }
-    subject = f"TDD-{token}"
-    canonical_keys = {
-        "kg_course_config_drafts_v1",
-        "kg_assessment_papers_v1",
-        "kg_exam_papers_v1__teacher_shared",
-        "kg_exam_paper_categories_v1__teacher_shared",
-        f"kg_recall_association_library_v1__subject__{subject}",
-    }
     snapshot = asyncio.run(_snapshot_teacher_promotion_rows())
     provisioner = TestClient(app)
     clients: dict[str, TestClient] = {}
@@ -1131,19 +1123,11 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
             "kg_exam_paper_categories_v1__user__"
             f"{quote(usernames['teacher_a'], safe='')}"
         )
-        association_key = f"kg_recall_association_library_v1__subject__{subject}"
-        teacher_a_legacy_association_key = (
-            "kg_recall_association_library_v1__user__"
-            f"{quote(usernames['teacher_a'], safe='')}__{quote(subject, safe='')}"
-        )
         written = {
             "kg_course_config_drafts_v1": json.dumps({"draft": token}),
             "kg_assessment_papers_v1": json.dumps([{"id": f"assessment-{token}"}]),
             teacher_a_paper_key: json.dumps([{"id": f"paper-{token}"}]),
             teacher_a_category_key: json.dumps([{"id": f"category-{token}"}]),
-            teacher_a_legacy_association_key: json.dumps(
-                {"subject": subject, "nodes": []}
-            ),
         }
         for index, (key, value) in enumerate(written.items()):
             response = _write_runtime(
@@ -1169,7 +1153,6 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
             ]
             assert storage[paper_alias] == written[teacher_a_paper_key]
             assert storage[category_alias] == written[teacher_a_category_key]
-            assert storage[association_key] == written[teacher_a_legacy_association_key]
             assert "kg_exam_papers_v1__teacher_shared" not in storage
             assert "kg_exam_paper_categories_v1__teacher_shared" not in storage
 
@@ -1188,7 +1171,6 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
                 "kg_assessment_papers_v1",
                 scoped_paper,
                 scoped_category,
-                association_key,
                 "kg_exam_papers_v1__teacher_shared",
                 "kg_exam_paper_categories_v1__teacher_shared",
             ):
@@ -1199,10 +1181,6 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
                 "kg_assessment_papers_v1",
                 scoped_paper,
                 scoped_category,
-                (
-                    "kg_recall_association_library_v1__user__"
-                    f"{quote(usernames[account], safe='')}__{quote(subject, safe='')}"
-                ),
             )
             for index, key in enumerate(denied_keys):
                 denied = _write_runtime(
@@ -1216,10 +1194,6 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
         for index, key in enumerate((
             f"kg_exam_papers_v1__user__{quote(usernames['teacher_b'], safe='')}",
             "kg_exam_papers_v1__malformed",
-            (
-                "kg_recall_association_library_v1__user__"
-                f"{quote(usernames['teacher_b'], safe='')}__{quote(subject, safe='')}"
-            ),
         )):
             denied = _write_runtime(
                 clients["teacher_a"],

@@ -11,6 +11,7 @@ from app.models.content_prep import (
     QuestionUploadBatch,
     SynthesisPreset,
 )
+from app.models.course_management import CourseDraft, CourseRelease, LearningTask
 from app.models.file import CurrentFile, FileContent, FileTag, Folder, GraphFile, Tag
 from app.models.engagement import Announcement, AnnouncementAudience, Feedback, FeedbackReceipt, FeedbackReply, MessageReceipt
 from app.models.guided_learning import GuidedActivity, GuidedCourse, GuidedCourseActivity, GuidedLearningProgress
@@ -74,6 +75,9 @@ __all__ = [
     "QuestionEditLock",
     "QuestionUploadBatch",
     "QuestionAuditLog",
+    "CourseDraft",
+    "CourseRelease",
+    "LearningTask",
     "ExamPaper",
     "PaperQuestion",
     "PaperCategory",
