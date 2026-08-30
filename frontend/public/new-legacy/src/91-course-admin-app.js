@@ -17,6 +17,7 @@
     expandedStages:new Set(),expandedParts:new Set(),currentStageId:'',structureQuery:'',structureFilter:'all',treeScrollTop:0,validationFilter:'all',outlinePreview:null
   };
   let toastTimer,scrollSaveTimer,recentEditTimer;
+  const persistEpochs=new Map();
 
   function toast(message){const el=$('caToast');if(!el)return;el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2500)}
   function course(){return state.courses.find(item=>item.id===state.courseId)||null}
@@ -396,7 +397,7 @@
   function openValidation(){state.validationFilter='all';renderValidationDialog();$('caValidationDialog')?.showModal()}
 
   function renderAll(){renderCourseBar();renderStructure();renderEditor();renderKnowledgeFilter();renderPicker();renderPreview();renderNavigationState()}
-  async function persist(silent=true){const c=course();if(!c||!DraftSaver)return null;const selectedId=c.id,payload=Core.clone(c);try{const saved=await DraftSaver.save(payload);if(!saved)return null;state.courses=Core.getCourseDrafts();if(state.courseId===selectedId)state.courseId=saved.id;saveWorkspaceState();if(!silent)toast('课程草稿已保存。');renderPreview();return saved}catch(error){toast(error?.status===409?'课程已被其他人更新，已刷新最新内容，请确认后重试。':`课程保存失败：${error?.message||error}`);state.courses=Core.getCourseDrafts();renderAll();return null}}
+  async function persist(silent=true){const c=course();if(!c||!DraftSaver)return null;const selectedId=c.id,payload=Core.clone(c),epoch=(persistEpochs.get(selectedId)||0)+1;persistEpochs.set(selectedId,epoch);try{const saved=await DraftSaver.save(payload);if(!saved)return null;if(persistEpochs.get(selectedId)===epoch){state.courses=Core.getCourseDrafts();if(state.courseId===selectedId)state.courseId=saved.id;saveWorkspaceState();if(!silent)toast('课程草稿已保存。');renderPreview()}return saved}catch(error){toast(error?.status===409?'课程已被其他人更新，已刷新最新内容，请确认后重试。':`课程保存失败：${error?.message||error}`);state.courses=Core.getCourseDrafts();renderAll();return null}}
   async function addStage(){const c=course();if(!c)return;const item={id:Core.safeId('stage'),title:`新阶段 ${c.stages.length+1}`,order:c.stages.length+1};c.stages.push(item);state.selection={kind:'stage',id:item.id};state.currentStageId=item.id;state.expandedStages.add(item.id);if(!await persist())return;recordRecent('新增阶段',state.selection);renderAll()}
   async function addPart(){const c=course(),s=stage(state.selection.id)||stage(state.currentStageId);if(!c||!s)return;const count=c.parts.filter(item=>item.stageId===s.id).length;const item={id:Core.safeId('part'),stageId:s.id,title:`新章节 ${count+1}`,order:count+1};c.parts.push(item);state.selection={kind:'part',id:item.id};state.currentStageId=s.id;state.expandedParts.clear();state.expandedParts.add(item.id);if(!await persist())return;recordRecent('新增章节',state.selection);renderAll()}
   async function addNode(){const c=course(),p=part(state.selection.id);if(!c||!p)return;const count=c.nodes.filter(item=>item.partId===p.id).length;const item={id:Core.safeId('node'),partId:p.id,title:`新学习步骤 ${count+1}`,order:count+1,nodeType:'standard',activityIds:[],description:'',settings:{}};c.nodes.push(item);state.selection={kind:'node',id:item.id};state.expandedParts.clear();ensureSelectionVisible();if(!await persist())return;recordRecent('新增学习步骤',state.selection);renderAll()}

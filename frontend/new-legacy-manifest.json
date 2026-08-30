@@ -404,7 +404,7 @@
     "src/90-bootstrap.js": "d022797d5a2d3ebeabba093f5f1a46ad61c78aea92013e3567d5cc5335a30194",
     "src/90-guided-learning-node-app.js": "4e31fcdb6b448b14ea1b15d57a8a055e5d068eb97a55931d117cbb1a6501d540",
     "src/91-content-center-app.js": "eb7a4a7137092b9ac7fdd93b6f509439d06f16dd0fd2385f05858e28b8d70101",
-    "src/91-course-admin-app.js": "11d44337414487c063c7472bf235e492ac18ea08edbde4f76b4558b6f177925f",
+    "src/91-course-admin-app.js": "b59cdb749134d6a2d326325f919b52b60ff40813c2551b7b36ad9e07faa86727",
     "src/91-knowledge-tree-index.js": "513e1032d395c9d2e080ec8b41a2846d8c0c1478e7cb716c2e9c856e653834ff",
     "src/91-learning-content-core.js": "2a6c2fe2efa57b4bee89539d66c3cc2c33f74b172e2b2ed77c0866756aa6be4b",
     "src/91-teacher-workbench-app.js": "e2627c5e0654f7e72e783c3c728f73781ac5fff6835a70f4d92d2130d4c97821",

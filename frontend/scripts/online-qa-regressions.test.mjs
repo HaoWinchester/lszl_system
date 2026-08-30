@@ -24,6 +24,12 @@ test('course admin tolerates the optional account label', () => {
   assert.match(course, /const account=\$\('caAccount'\);if\(account\)account\.textContent=/)
 })
 
+test('course admin ignores stale successful saves after a newer edit starts', () => {
+  const course = source('new-legacy/src/91-course-admin-app.js')
+  assert.match(course, /const persistEpochs=new Map\(\)/)
+  assert.match(course, /persistEpochs\.get\(selectedId\)===epoch/)
+})
+
 test('system settings no longer calls the removed synchronous WeChat URL builder', () => {
   const settings = source('new-legacy/src/36-system-settings.js')
   assert.doesNotMatch(settings, /buildOfficialAuthUrl/)

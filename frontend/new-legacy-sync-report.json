@@ -5,8 +5,7 @@
   "changes": {
     "added": [],
     "changed": [
-      "src/28-device-preferences.js",
-      "src/40-guided-tour.js"
+      "src/91-course-admin-app.js"
     ],
     "removed": []
   },

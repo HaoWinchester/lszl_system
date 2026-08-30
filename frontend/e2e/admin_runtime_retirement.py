@@ -413,7 +413,14 @@ def create_domain_fixtures(
     return fixture
 
 
-def wait_for_draft_name(context: BrowserContext, base: str, draft_id: str, expected_name: str) -> dict:
+def wait_for_draft_name(
+    context: BrowserContext,
+    base: str,
+    draft_id: str,
+    expected_name: str,
+    *,
+    diagnostics: list[dict] | None = None,
+) -> dict:
     deadline = time.monotonic() + 20
     last: dict = {}
     while time.monotonic() < deadline:
@@ -423,7 +430,10 @@ def wait_for_draft_name(context: BrowserContext, base: str, draft_id: str, expec
             if last.get("name") == expected_name:
                 return last
         time.sleep(0.2)
-    raise AssertionError(f"draft {draft_id} did not persist DOM name {expected_name!r}; last={last!r}")
+    raise AssertionError(
+        f"draft {draft_id} did not persist DOM name {expected_name!r}; "
+        f"last={last!r}; exchanges={diagnostics or []!r}"
+    )
 
 
 def select_course_fixture(page: Page, draft: dict) -> None:
@@ -488,8 +498,30 @@ def verify_admin_pages(
             )
         if page_name == "course-admin.html":
             course_requests: list[str] = []
+            course_exchanges: list[dict] = []
             interaction_errors: list[str] = []
-            page.on("request", lambda request: course_requests.append(f"{request.method} {request.url}") if "/api/v1/course-management/" in request.url else None)
+            def record_course_request(request) -> None:
+                if "/api/v1/course-management/" not in request.url:
+                    return
+                course_requests.append(f"{request.method} {request.url}")
+                course_exchanges.append({
+                    "phase": "request",
+                    "method": request.method,
+                    "url": request.url,
+                    "body": request.post_data,
+                })
+
+            def record_course_response(response) -> None:
+                if "/api/v1/course-management/" not in response.url:
+                    return
+                course_exchanges.append({
+                    "phase": "response",
+                    "status": response.status,
+                    "url": response.url,
+                })
+
+            page.on("request", record_course_request)
+            page.on("response", record_course_response)
             page.on("pageerror", lambda error: interaction_errors.append(str(error)))
             api_state = page.evaluate("""() => ({
                 hasApi: typeof window.KGCourseManagementApi?.saveDraft === 'function',
@@ -498,10 +530,17 @@ def verify_admin_pages(
             })""")
             assert api_state["hasApi"] and api_state["hasQueue"], api_state
             select_course_fixture(page, fixture["draft"])
+            # Re-selecting the current draft starts an older save. Editing and
+            # explicitly saving immediately afterwards proves that a late
+            # successful response cannot overwrite the newer in-memory name.
+            page.locator("#caCourseSelect").select_option(fixture["draft"]["id"])
             next_name = fixture["courseName"] + " DOM"
             page.locator("#caCourseName").fill(next_name)
             page.locator("#caSaveBtn").click()
-            page.wait_for_timeout(1_000)
+            page.wait_for_function(
+                "() => document.getElementById('caToast')?.textContent.includes('课程草稿已保存')",
+                timeout=20_000,
+            )
             assert any(item.startswith("PUT ") and fixture["draft"]["id"] in item for item in course_requests), {
                 "api": api_state,
                 "requests": course_requests,
@@ -510,7 +549,13 @@ def verify_admin_pages(
                 "input": page.locator("#caCourseName").input_value(),
                 "pageErrors": interaction_errors,
             }
-            fixture["draft"] = wait_for_draft_name(context, base, fixture["draft"]["id"], next_name)
+            fixture["draft"] = wait_for_draft_name(
+                context,
+                base,
+                fixture["draft"]["id"],
+                next_name,
+                diagnostics=course_exchanges,
+            )
             fixture["courseName"] = next_name
             page.reload(wait_until="domcontentloaded")
             page.wait_for_function(

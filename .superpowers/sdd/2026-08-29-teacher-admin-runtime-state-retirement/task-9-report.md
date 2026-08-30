@@ -159,3 +159,36 @@ Production routing and the assertion strength are unchanged.
 The stale test was RED with an uncaptured snapshot; the updated individual test
 was GREEN (`1 passed`) and its full module regression was GREEN (`48 passed, 1
 dependency warning`). No active/UAT/deploy/main/push/shared-DB action occurred.
+
+## Final isolated-browser save-race correction
+
+A fresh isolated 12-page run exposed an intermittent course rename rollback.
+Boundary diagnostics made the race deterministic: re-selecting the current
+draft queued an old-name save, then an immediate input edit and explicit save
+queued the new name. All three requests returned 200, but completion of the
+older request unconditionally replaced the page's newer in-memory course, so a
+later save wrote the old name back.
+
+Course-admin persistence now assigns each course a monotonically increasing
+persist epoch. A successful response updates visible page state only when its
+epoch is still current; the ordered API save queue continues to own server
+revision progression. Errors still refresh the authoritative server snapshot.
+The browser matrix intentionally re-selects the same fixture before immediate
+edit/save, waits on the actual saved-status condition rather than a fixed
+timeout, and records request/response diagnostics on failure.
+
+Evidence after the fix:
+
+- Same-server deterministic overlap stress: `8/8` latest names persisted,
+  every PUT returned 200, and each iteration settled at revision 6.
+- Isolated native 12-page matrix: `runtimeRequests=0`, `pageErrors=0`,
+  `consoleErrors=0`; disposable candidate `984 >= 976` active files.
+- Frontend full suite after formal sync: `261 passed`; E2E contracts `6/6`;
+  design contracts `5/5`.
+- The immediately preceding fresh backend full suite was `727 passed, 1
+  dependency warning`; this follow-up changes only browser source, generated
+  artifacts, and the isolated E2E harness.
+
+The real active pointer/site were not used as a write target. No UAT,
+deployment, main merge, push, active promotion, or shared database action was
+performed.
