@@ -806,6 +806,7 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
     teacher_a, teacher_b = f"prep-a-{suffix}", f"prep-b-{suffix}"
     student, viewer = f"prep-student-{suffix}", f"prep-viewer-{suffix}"
     principle_id, preset_id = f"principle-{suffix}", f"preset-{suffix}"
+    activity_id = f"activity-{suffix}"
     tag_sentinel = json.dumps({"legacyTagProjection": suffix}, ensure_ascii=False, separators=(",", ":"))
     snapshots: dict[str, dict | None] = {}
     created_bank_ids: set[str] = set()
@@ -876,6 +877,16 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
                 await db.execute(delete(QuestionBank).where(QuestionBank.id.in_(created_bank_ids)))
             await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id == preset_id))
             await db.execute(delete(Principle).where(Principle.id == principle_id))
+            await db.execute(
+                delete(ActivityOverride).where(
+                    ActivityOverride.activity_id == activity_id
+                )
+            )
+            await db.execute(
+                delete(ActivityCollection).where(
+                    ActivityCollection.owner_username.in_([teacher_a, teacher_b])
+                )
+            )
             await db.execute(
                 delete(QuestionTagConfig).where(
                     QuestionTagConfig.created_by.in_([teacher_a, teacher_b])
@@ -1005,7 +1016,6 @@ def test_content_prep_assets_principles_and_activities_are_shared_server_data() 
             created_batch_ids.add(batch.json()["batchId"])
 
             current_revision = second.get("/api/v1/question-catalog/revision").json()["revision"]
-            activity_id = f"activity-{suffix}"
             imported = second.post(
                 "/api/v1/content-prep/activities/import",
                 json={"contentRevision": current_revision, "activities": [{"id": activity_id, "title": "共享活动", "type": "practice", "metadata": {}}]},
