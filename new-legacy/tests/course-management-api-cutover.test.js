@@ -18,6 +18,7 @@ const courseSources = [
   'src/93-content-organization-core.js',
   'src/admin/34-course-service.js',
   'src/admin/35-release-service.js',
+  'src/admin/41-learning-content-compat.js',
   'src/admin/11-local-content-repository.js',
   'src/admin/50-admin-shell-app.js',
   'src/admin/52-admin-operations-app.js',
@@ -31,6 +32,53 @@ test('course and task consumers have no browser business-state fallback', () => 
     assert.doesNotMatch(source, retiredKeys, relative);
     assert.doesNotMatch(source, /KGServerStateStorage/, relative);
   }
+});
+
+test('the compatibility facade awaits course service mutations and returns server results', async () => {
+  let resolveSave;
+  let resolveDelete;
+  const legacy = {
+    normalizeCourse: course => ({ ...course, legacyFallback: true }),
+    getSubjects: () => [],
+  };
+  const services = {
+    legacyContent: legacy,
+    subjects: { list: () => [], get: () => null },
+    taxonomies: { list: () => [], get: () => null },
+    activities: {},
+    courses: {
+      saveDraft: () => new Promise(resolve => { resolveSave = resolve; }),
+      deleteDraft: () => new Promise(resolve => { resolveDelete = resolve; }),
+      drafts: () => [{ id: 'server-course' }],
+      releases: () => [],
+      validate: () => ({ valid: true }),
+      publish: async () => ({ valid: true }),
+      activeRelease: () => null,
+      coverage: () => ({}),
+    },
+  };
+  const window = { KGAdminServices: services };
+  vm.runInContext(readSource('src/admin/41-learning-content-compat.js'), vm.createContext({ window, Promise }));
+
+  let saveSettled = false;
+  const saving = window.KGLearningContent.saveCourseDraft({ id: 'client-course' }).then(value => { saveSettled = true; return value; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(saveSettled, false);
+  resolveSave({ valid: true, course: { id: 'server-course', revision: 1 } });
+  assert.deepEqual(await saving, { id: 'server-course', revision: 1 });
+
+  const deleting = window.KGLearningContent.deleteCourseDraft('server-course');
+  resolveDelete({ valid: true, courses: [] });
+  assert.deepEqual(await deleting, []);
+});
+
+test('assessment tasks require a real published release and await every mutation', () => {
+  const source = readSource('src/93-assessment-config-app.js');
+  assert.match(source, /id="caTaskRelease"/);
+  assert.match(source, /status===['"]published['"]/);
+  assert.match(source, /releaseId:/);
+  assert.doesNotMatch(source, /const result=Org\.(?:saveLearningTask|deleteLearningTask|publishLearningTask|archiveLearningTask|savePaper|deletePaper|publishPaper|archivePaper)\(/);
+  assert.doesNotMatch(source, /(?<!await )Org\.(?:saveLearningTask|deleteLearningTask|publishLearningTask|archiveLearningTask|savePaper|deletePaper|publishPaper|archivePaper)\(/);
 });
 
 test('both Runtime page policies are byte-identical and empty', () => {
