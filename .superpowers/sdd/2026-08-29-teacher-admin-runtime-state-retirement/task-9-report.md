@@ -131,3 +131,17 @@ The real active hashes were re-read after synchronization and remain exactly
 the values in the safety table above. No release manager command, actual active
 release mutation, UAT, deployment, main merge, push, or shared database action
 was performed.
+
+## Post-review migration-test correction
+
+One historic shared-policy promotion regression still used HTTP Runtime GET as
+the first manager read. That route is deliberately read-only after retirement,
+so its old assertion correctly failed without a promotion. The test now invokes
+the legacy `runtime_state_service.get_state` directly under its existing
+explicit legacy-sync fixture, retaining its concurrent promotion and
+per-owner-draft preservation assertions while keeping production GET unchanged.
+
+TDD evidence: the unchanged test was RED (`contentRevision` remained at the
+pre-promotion value); the corrected individual test was GREEN (`1 passed`),
+then the review's four Runtime test modules were GREEN (`111 passed, 1
+dependency warning`). No active/UAT/deploy/main/push/shared-DB action occurred.

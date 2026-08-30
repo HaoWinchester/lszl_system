@@ -705,22 +705,35 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
 
         before_promotion_revision = asyncio.run(_content_revision())
         arrival = Barrier(2)
+        roles = {"admin_a": "admin", "teacher_b": "teacher", "teacher_c": "teacher"}
 
         def first_read(account: str):
+            """Exercise the historical promotion service under this test's opt-in.
+
+            Runtime HTTP GET is intentionally read-only in retirement mode, so
+            migration coverage must not depend on it to promote teacher drafts.
+            """
             arrival.wait(timeout=10)
-            return clients[account].get("/api/v1/runtime/state")
+
+            async def promote_legacy_state():
+                async with AsyncSessionLocal() as db:
+                    return await service.get_state(
+                        db,
+                        usernames[account],
+                        roles[account],
+                    )
+
+            return asyncio.run(promote_legacy_state())
 
         with ThreadPoolExecutor(max_workers=2) as pool:
-            first_responses = list(
+            first_snapshots = list(
                 pool.map(first_read, ("teacher_b", "admin_a"))
             )
-        assert all(response.status_code == 200 for response in first_responses)
         assert {
-            response.json()["contentRevision"] for response in first_responses
+            content_revision for _, _, content_revision in first_snapshots
         } == {before_promotion_revision + 1}
-        first_response = first_responses[0]
-        first = first_response.json()["storage"]
-        assert first_response.json()["contentRevision"] == before_promotion_revision + 1
+        first, _, first_content_revision = first_snapshots[0]
+        assert first_content_revision == before_promotion_revision + 1
         assert asyncio.run(_content_revision()) == before_promotion_revision + 1
         for account in ("admin_a", "teacher_b", "teacher_c"):
             storage = first if account == "teacher_b" else _runtime_storage(clients[account])
