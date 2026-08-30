@@ -192,3 +192,50 @@ Evidence after the fix:
 The real active pointer/site were not used as a write target. No UAT,
 deployment, main merge, push, active promotion, or shared database action was
 performed.
+
+## Whole-branch review closeout
+
+The final fixed-range review found and closed the remaining cross-domain gaps:
+
+- admin reference snapshots and Content Prep activity imports are owner-scoped;
+- online question cleanup uses relational course drafts/releases/tasks and does
+  not read or mutate SharedRuntimeState;
+- all registered content-center, question-workspace, and question-font device
+  preferences use the immutable `KGDevicePreferences` facade;
+- the browser persistence gates cover both `kg_*` and `pmp_*` literals. The
+  existing Prep Studio IndexedDB database name is allowed only in the two exact
+  files already declared as transitional IndexedDB debt; the same name or any
+  new `pmp_*` business key elsewhere fails closed;
+- recall acceptance records now use an owner-isolated PostgreSQL row behind
+  typed GET/PUT/DELETE APIs with role checks, optimistic revision, bounded
+  history, visible frontend failure handling, and slow-load/clear race guards;
+- the historical recall acceptance Runtime key has a fail-closed no-loss
+  migration mapper whose owner comes only from a real `users.username`. It is
+  retained in Runtime metadata only as an offline migration input and is
+  excluded from the browser compatibility allowlist, every bootstrap selector,
+  full Runtime snapshots, and Runtime mutations.
+
+Fresh verification on the final committed HEAD:
+
+- backend focused owner/migration/cleanup/Runtime regression: `117 passed`;
+- backend Runtime follow-up after the migration-only key correction:
+  `67 passed`;
+- backend full suite: `737 passed, 1 dependency warning` in `314.79s`;
+- frontend full suite: `265 passed`; E2E contract unit suite: `8 passed`;
+- source API/device/teacher-content contracts: `28 passed`;
+- sync/release/retirement contracts: `70 passed`;
+- design contract: `5 passed`;
+- Alembic: one head `a8f2c7d9e104`; `alembic check` reported no upgrade
+  operations;
+- isolated native browser matrix: `12` pages, disposable candidate
+  `991 >= 976` active files, `runtimeRequests=0`, `pageErrors=0`, and
+  `consoleErrors=0`.
+
+The first fresh backend full run exposed the stale online allowlist entry
+(`735 passed, 1 failed`); the migration-only boundary above was added with a
+RED-to-GREEN regression, and the entire backend suite was then rerun to the
+`737/737` result. The real active `current.json` SHA-256 remained
+`db8f64ad21de59a32b07bd039de8acd00ecd94bc5052a16ba0db7dd9963eada0`,
+and the branch range contains no path under `frontend/new-legacy-releases/`.
+No UAT, deployment, push, main merge, active promotion, or shared/live database
+mutation was performed.
