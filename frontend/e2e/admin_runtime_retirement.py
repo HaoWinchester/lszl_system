@@ -1,14 +1,18 @@
 """12-page teacher/admin Runtime retirement matrix on disposable infrastructure.
 
 Use ``--isolated`` to build a candidate under a temporary ``--root`` with a
-unique PostgreSQL database.  ``--base-url`` instead tests that deployed target
-with explicit E2E admin credentials and removes only randomly named fixtures.
+unique PostgreSQL database.  Only this disposable mode edits an existing
+subject through the DOM.  ``--base-url`` instead tests a deployed target with
+explicit, dedicated E2E credentials; it creates only randomly named,
+hard-deletable fixtures and cleans partial fixtures in ``finally`` without
+mutating existing subjects, papers, banks, or system settings.
 """
 
 from __future__ import annotations
 
 import argparse
 import atexit
+from contextlib import contextmanager
 from dataclasses import dataclass
 import getpass
 import json
@@ -255,18 +259,38 @@ def bind(context: BrowserContext, audit: Audit) -> None:
     context.on("page", observe)
 
 
-def storage_audit(page: Page, page_name: str) -> None:
+def storage_audit(
+    page: Page,
+    page_name: str,
+    *,
+    allow_absent_direct_bootstrap: bool = False,
+) -> None:
     result = page.evaluate(
         """() => ({
           keys:Array.from({length:localStorage.length},(_,index)=>localStorage.key(index)).filter(Boolean),
           nativeSet:/\\[native code\\]/.test(String(Storage.prototype.setItem)),
           nativeGet:/\\[native code\\]/.test(String(Storage.prototype.getItem)),
           legacyStorage:typeof window.KGServerStateStorage,
+          directBootstrap:{
+            present:typeof window.__KG_DIRECT_BOOTSTRAP__==='object'&&window.__KG_DIRECT_BOOTSTRAP__!==null,
+            storage:window.__KG_DIRECT_BOOTSTRAP__?.storage,
+            revision:window.__KG_DIRECT_BOOTSTRAP__?.revision,
+            contentRevision:window.__KG_DIRECT_BOOTSTRAP__?.contentRevision,
+          },
         })"""
     )
     assert result["nativeSet"] and result["nativeGet"], (page_name, result)
     assert result["legacyStorage"] == "undefined", (page_name, result)
     assert RETIRED_KEYS.isdisjoint(result["keys"]), (page_name, result["keys"])
+    direct_bootstrap = result["directBootstrap"]
+    if allow_absent_direct_bootstrap and not direct_bootstrap["present"]:
+        return
+    assert direct_bootstrap == {
+        "present": True,
+        "storage": None,
+        "revision": 0,
+        "contentRevision": 0,
+    }, (page_name, result)
 
 
 def expected_http_error(status: int, url: str) -> bool:
@@ -300,7 +324,11 @@ def exercise_native_login_logout(context: BrowserContext, base: str, username: s
     page.locator("#adminAccountTrigger").click()
     page.locator("#adminAccountLogoutBtn").click()
     page.wait_for_url("**/index.html")
+    page.wait_for_function("() => typeof window.__KG_DIRECT_BOOTSTRAP__ === 'object'", timeout=20_000)
+    storage_audit(page, "native logout redirect")
     page.goto(base + "/practice-mode.html?auth=login", wait_until="domcontentloaded")
+    page.wait_for_function("() => typeof window.__KG_DIRECT_BOOTSTRAP__ === 'object'", timeout=20_000)
+    storage_audit(page, "native login page")
     page.locator("#authModal.show").wait_for(state="visible", timeout=20_000)
     page.locator("#authUsername").fill(username)
     page.locator("#authPassword").fill(password)
@@ -319,7 +347,14 @@ def exercise_native_login_logout(context: BrowserContext, base: str, username: s
     login(context, base, username, password)
 
 
-def create_domain_fixtures(admin: BrowserContext, teacher: BrowserContext, base: str, *, create_feedback: bool) -> dict:
+def create_domain_fixtures(
+    admin: BrowserContext,
+    teacher: BrowserContext,
+    base: str,
+    fixture: dict,
+    *,
+    disposable_environment: bool,
+) -> dict:
     token = uuid4().hex[:8]
     course_name = f"Task7 API 课程 {token}"
     draft = ok(
@@ -329,6 +364,7 @@ def create_domain_fixtures(admin: BrowserContext, teacher: BrowserContext, base:
         ),
         "create course draft",
     )["draft"]
+    fixture.update({"draft": draft, "courseName": course_name})
     teacher_draft = ok(
         teacher.request.post(
             base + "/api/v1/course-management/drafts",
@@ -336,6 +372,7 @@ def create_domain_fixtures(admin: BrowserContext, teacher: BrowserContext, base:
         ),
         "create teacher course draft",
     )["draft"]
+    fixture["teacherDraft"] = teacher_draft
     course_name += " 已保存"
     draft = ok(
         admin.request.put(
@@ -344,40 +381,40 @@ def create_domain_fixtures(admin: BrowserContext, teacher: BrowserContext, base:
         ),
         "update course draft",
     )["draft"]
+    fixture.update({"draft": draft, "courseName": course_name})
 
-    bank = ok(
-        teacher.request.post(
-            base + "/api/v1/banks",
-            data={"name": f"Task7 题库 {token}", "subject": "PMP", "description": "Runtime retirement E2E"},
-        ),
-        "create bank",
-    )["bank"]
-    paper = ok(
-        teacher.request.post(
-            base + "/api/v1/papers",
-            data={"name": f"Task7 试卷 {token}", "subject": "PMP", "questions": []},
-        ),
-        "create paper",
-    )["paper"]
-    feedback = {"id": ""}
-    if create_feedback:
-        feedback = ok(
+    if disposable_environment:
+        fixture["bank"] = ok(
+            teacher.request.post(
+                base + "/api/v1/banks",
+                data={"name": f"Task7 题库 {token}", "subject": "PMP", "description": "Runtime retirement E2E"},
+            ),
+            "create bank",
+        )["bank"]
+        fixture["paper"] = ok(
+            teacher.request.post(
+                base + "/api/v1/papers",
+                data={"name": f"Task7 试卷 {token}", "subject": "PMP", "questions": []},
+            ),
+            "create paper",
+        )["paper"]
+        fixture["feedback"] = ok(
             teacher.request.post(
                 base + "/api/v1/engagement/feedback",
                 data={"type": "suggestion", "title": f"Task7 反馈 {token}", "detail": "验证关系型反馈摘要", "page": "admin-console.html"},
             ),
             "create feedback",
         )
-    message = ok(
+        settings = ok(admin.request.get(base + "/api/v1/system/wechat-config"), "read system config")["config"]
+        ok(admin.request.put(base + "/api/v1/system/wechat-config", data=settings), "write system config")
+    fixture["message"] = ok(
         admin.request.post(
             base + "/api/v1/engagement/admin/messages",
             data={"title": f"Task7 消息 {token}", "body": "验证关系型消息摘要", "audience": {"type": "all"}},
         ),
         "create message",
     )
-    settings = ok(admin.request.get(base + "/api/v1/system/wechat-config"), "read system config")["config"]
-    ok(admin.request.put(base + "/api/v1/system/wechat-config", data=settings), "write system config")
-    return {"draft": draft, "teacherDraft": teacher_draft, "courseName": course_name, "bank": bank, "paper": paper, "feedback": feedback, "message": message}
+    return fixture
 
 
 def wait_for_draft_name(context: BrowserContext, base: str, draft_id: str, expected_name: str) -> dict:
@@ -393,7 +430,49 @@ def wait_for_draft_name(context: BrowserContext, base: str, draft_id: str, expec
     raise AssertionError(f"draft {draft_id} did not persist DOM name {expected_name!r}; last={last!r}")
 
 
-def verify_admin_pages(context: BrowserContext, base: str, fixture: dict, all_pages: bool) -> None:
+def select_course_fixture(page: Page, draft: dict) -> None:
+    page.wait_for_function(
+        "id => [...document.querySelectorAll('#caCourseSelect option')].some(option => option.value === id)",
+        arg=draft["id"],
+    )
+    page.locator("#caCourseSelect").select_option(draft["id"])
+    page.wait_for_function(
+        "name => document.getElementById('caCourseName')?.value === name",
+        arg=draft["name"],
+    )
+
+
+def verify_existing_subject_dom_persistence(page: Page, *, allow_existing_subject_write: bool) -> None:
+    if not allow_existing_subject_write:
+        return
+    page.locator("#adminEditSubjectBtn").click()
+    original_name = page.locator("#adminSubjectNameZh").input_value()
+    name = original_name + " Task7 DOM"
+    page.locator("#adminSubjectNameZh").fill(name)
+    with page.expect_response(lambda response: response.url.endswith("/api/v1/content-prep/shared-content") and response.request.method == "PUT") as saved:
+        page.locator("#adminSubjectDialogSubmit").click()
+    assert saved.value.ok, saved.value.text()
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function("name => document.body.innerText.includes(name)", arg=name)
+    storage_audit(page, "admin-subjects.html edited reload")
+    page.locator("#adminEditSubjectBtn").click()
+    page.locator("#adminSubjectNameZh").fill(original_name)
+    with page.expect_response(lambda response: response.url.endswith("/api/v1/content-prep/shared-content") and response.request.method == "PUT") as restored:
+        page.locator("#adminSubjectDialogSubmit").click()
+    assert restored.value.ok, restored.value.text()
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function("name => document.body.innerText.includes(name)", arg=original_name)
+    storage_audit(page, "admin-subjects.html restored reload")
+
+
+def verify_admin_pages(
+    context: BrowserContext,
+    base: str,
+    fixture: dict,
+    all_pages: bool,
+    *,
+    allow_existing_subject_write: bool,
+) -> None:
     pages = PAGES if all_pages else PAGES[:7]
     for page_name in pages:
         page = open_page(context, base, page_name)
@@ -406,23 +485,11 @@ def verify_admin_pages(context: BrowserContext, base: str, fixture: dict, all_pa
             assert "已退役" in page.locator("#adminSnapshotCount").inner_text()
         if page_name == "admin-subjects.html":
             page.wait_for_function("() => !document.getElementById('adminEditSubjectBtn')?.disabled")
-            page.locator("#adminEditSubjectBtn").click()
-            original_name = page.locator("#adminSubjectNameZh").input_value()
-            name = original_name + " Task7 DOM"
-            page.locator("#adminSubjectNameZh").fill(name)
-            with page.expect_response(lambda response: response.url.endswith("/api/v1/content-prep/shared-content") and response.request.method == "PUT") as saved:
-                page.locator("#adminSubjectDialogSubmit").click()
-            assert saved.value.ok, saved.value.text()
-            page.reload(wait_until="domcontentloaded")
-            page.wait_for_function("name => document.body.innerText.includes(name)", arg=name)
             assert page.locator("#adminDeleteSubjectBtn").is_disabled(), "permanent subject deletion must stay blocked without a transactional typed API"
-            page.locator("#adminEditSubjectBtn").click()
-            page.locator("#adminSubjectNameZh").fill(original_name)
-            with page.expect_response(lambda response: response.url.endswith("/api/v1/content-prep/shared-content") and response.request.method == "PUT") as restored:
-                page.locator("#adminSubjectDialogSubmit").click()
-            assert restored.value.ok, restored.value.text()
-            page.reload(wait_until="domcontentloaded")
-            page.wait_for_function("name => document.body.innerText.includes(name)", arg=original_name)
+            verify_existing_subject_dom_persistence(
+                page,
+                allow_existing_subject_write=allow_existing_subject_write,
+            )
         if page_name == "course-admin.html":
             course_requests: list[str] = []
             interaction_errors: list[str] = []
@@ -434,15 +501,7 @@ def verify_admin_pages(context: BrowserContext, base: str, fixture: dict, all_pa
                 drafts: window.KGCourseManagementApi?.listDrafts?.().map(item => ({id:item.id,name:item.name,revision:item.revision})) || []
             })""")
             assert api_state["hasApi"] and api_state["hasQueue"], api_state
-            page.wait_for_function(
-                "name => [...document.querySelectorAll('#caCourseSelect option')].some(option => option.textContent.includes(name))",
-                arg=fixture["courseName"],
-            )
-            page.locator("#caCourseSelect").select_option(fixture["draft"]["id"])
-            page.wait_for_function(
-                "name => document.getElementById('caCourseName')?.value === name",
-                arg=fixture["courseName"],
-            )
+            select_course_fixture(page, fixture["draft"])
             next_name = fixture["courseName"] + " DOM"
             page.locator("#caCourseName").fill(next_name)
             page.locator("#caSaveBtn").click()
@@ -482,7 +541,11 @@ def verify_teacher_and_student(browser, base: str, teacher_name: str, teacher_pa
         assert "无权查看操作记录" in operations.locator("body").inner_text()
     else:
         assert response.status == 403 and "无权访问" in operations.locator("body").inner_text()
-    storage_audit(operations, "teacher admin-operations")
+    storage_audit(
+        operations,
+        "teacher admin-operations",
+        allow_absent_direct_bootstrap=response.status == 403,
+    )
     operations.close()
     for page_name in ("admin-subjects.html", "content-center.html", "course-admin.html", "question-bank.html", "paper-management.html"):
         page = open_page(teacher, base, page_name)
@@ -491,7 +554,8 @@ def verify_teacher_and_student(browser, base: str, teacher_name: str, teacher_pa
     workbench = open_page(teacher, base, "teacher-workbench.html")
     workbench.locator('a[href="course-admin.html"]').first.click()
     workbench.wait_for_url("**/course-admin.html")
-    workbench.wait_for_function("() => document.querySelectorAll('#caCourseSelect option').length > 0", timeout=20_000)
+    storage_audit(workbench, "teacher-workbench to course-admin navigation")
+    select_course_fixture(workbench, fixture["teacherDraft"])
     next_name = f"Task7 教师 DOM {uuid4().hex[:6]}"
     workbench.locator("#caCourseName").fill(next_name)
     workbench.locator("#caSaveBtn").click()
@@ -513,7 +577,11 @@ def verify_teacher_and_student(browser, base: str, teacher_name: str, teacher_pa
         assert "无权访问管理后台" in denied.locator("body").inner_text()
     else:
         assert response.status == 403 and "无权访问" in denied.locator("body").inner_text()
-    storage_audit(denied, "student admin-console")
+    storage_audit(
+        denied,
+        "student admin-console",
+        allow_absent_direct_bootstrap=response.status == 403,
+    )
     denied.close()
     student.close()
 
@@ -532,6 +600,7 @@ def verify_failure_recovery(context: BrowserContext, base: str) -> None:
     page.route("**/api/v1/course-management/drafts", fail_once)
     page.goto(base + "/course-admin.html", wait_until="domcontentloaded")
     page.wait_for_function("() => document.getElementById('caToast')?.textContent.includes('加载失败')", timeout=20_000)
+    storage_audit(page, "course-admin planned API failure")
     page.unroute("**/api/v1/course-management/drafts", fail_once)
     page.reload(wait_until="domcontentloaded")
     page.wait_for_function("() => document.querySelectorAll('#caCourseSelect option').length > 0", timeout=20_000)
@@ -540,29 +609,59 @@ def verify_failure_recovery(context: BrowserContext, base: str) -> None:
 
 
 def cleanup(admin: BrowserContext, teacher: BrowserContext, base: str, fixture: dict) -> None:
-    fixture["draft"] = ok(admin.request.get(base + f"/api/v1/course-management/drafts/{fixture['draft']['id']}"), "refresh admin draft")["draft"]
-    response = admin.request.delete(
-        base + f"/api/v1/course-management/drafts/{fixture['draft']['id']}",
-        data={"revision": fixture["draft"]["revision"]},
-    )
-    assert response.ok, (response.status, response.text())
-    fixture["teacherDraft"] = ok(teacher.request.get(base + f"/api/v1/course-management/drafts/{fixture['teacherDraft']['id']}"), "refresh teacher draft")["draft"]
-    response = teacher.request.delete(
-        base + f"/api/v1/course-management/drafts/{fixture['teacherDraft']['id']}",
-        data={"revision": fixture["teacherDraft"]["revision"]},
-    )
-    assert response.ok, (response.status, response.text())
-    response = teacher.request.delete(base + f"/api/v1/banks/{fixture['bank']['id']}")
-    assert response.ok, (response.status, response.text())
-    response = teacher.request.delete(base + f"/api/v1/papers/{fixture['paper']['id']}?revision={fixture['paper']['revision']}")
-    assert response.ok, (response.status, response.text())
-    response = admin.request.delete(base + f"/api/v1/engagement/admin/messages/{fixture['message']['id']}")
-    assert response.status == 204, (response.status, response.text())
+    if draft := fixture.get("draft"):
+        draft = ok(admin.request.get(base + f"/api/v1/course-management/drafts/{draft['id']}"), "refresh admin draft")["draft"]
+        response = admin.request.delete(
+            base + f"/api/v1/course-management/drafts/{draft['id']}",
+            data={"revision": draft["revision"]},
+        )
+        assert response.ok, (response.status, response.text())
+    if teacher_draft := fixture.get("teacherDraft"):
+        teacher_draft = ok(teacher.request.get(base + f"/api/v1/course-management/drafts/{teacher_draft['id']}"), "refresh teacher draft")["draft"]
+        response = teacher.request.delete(
+            base + f"/api/v1/course-management/drafts/{teacher_draft['id']}",
+            data={"revision": teacher_draft["revision"]},
+        )
+        assert response.ok, (response.status, response.text())
+    if bank := fixture.get("bank"):
+        response = teacher.request.delete(base + f"/api/v1/banks/{bank['id']}")
+        assert response.ok, (response.status, response.text())
+    if paper := fixture.get("paper"):
+        response = teacher.request.delete(base + f"/api/v1/papers/{paper['id']}?revision={paper['revision']}")
+        assert response.ok, (response.status, response.text())
+    if message := fixture.get("message"):
+        response = admin.request.delete(base + f"/api/v1/engagement/admin/messages/{message['id']}")
+        assert response.status == 204, (response.status, response.text())
+
+
+@contextmanager
+def domain_fixture_scope(
+    admin: BrowserContext,
+    teacher: BrowserContext,
+    base: str,
+    *,
+    disposable_environment: bool,
+):
+    fixture: dict = {}
+    try:
+        create_domain_fixtures(
+            admin,
+            teacher,
+            base,
+            fixture,
+            disposable_environment=disposable_environment,
+        )
+        yield fixture
+    finally:
+        cleanup(admin, teacher, base, fixture)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base-url", help="test an already deployed target (requires E2E_ADMIN_USERNAME/PASSWORD)")
+    parser.add_argument(
+        "--base-url",
+        help="test a deployed target read-only except for randomly named hard-deletable E2E fixtures (requires dedicated admin/teacher/student credentials)",
+    )
     parser.add_argument("--isolated", action="store_true", help="build a disposable release root, database, and local server")
     parser.add_argument("--all-pages", action="store_true", help="run all 12 pages")
     return parser.parse_args()
@@ -601,11 +700,21 @@ def main() -> None:
         exercise_login_logout(admin, base, admin_username, admin_password)
         exercise_login_logout(teacher, base, teacher_name, teacher_password)
         exercise_native_login_logout(admin, base, admin_username, admin_password)
-        fixture = create_domain_fixtures(admin, teacher, base, create_feedback=bool(harness))
-        verify_admin_pages(admin, base, fixture, args.all_pages)
-        verify_failure_recovery(admin, base)
-        verify_teacher_and_student(browser, base, teacher_name, teacher_password, student_name, student_password, fixture, audit)
-        cleanup(admin, teacher, base, fixture)
+        with domain_fixture_scope(
+            admin,
+            teacher,
+            base,
+            disposable_environment=bool(harness),
+        ) as fixture:
+            verify_admin_pages(
+                admin,
+                base,
+                fixture,
+                args.all_pages,
+                allow_existing_subject_write=bool(harness),
+            )
+            verify_failure_recovery(admin, base)
+            verify_teacher_and_student(browser, base, teacher_name, teacher_password, student_name, student_password, fixture, audit)
         assert not audit.runtime_requests, audit.runtime_requests
         assert not audit.page_errors, audit.page_errors
         assert not audit.console_errors, audit.console_errors
