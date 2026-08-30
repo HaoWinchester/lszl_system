@@ -121,3 +121,41 @@ test('409 refreshes the course snapshot once and never retries the stale mutatio
   assert.equal(window.KGCourseManagementApi.snapshot().drafts[0].name, '其他教师已保存');
 });
 
+test('a failed queued save discards later stale snapshots until a new user edit', async () => {
+  let current = { id: 'course-1', name: '初始', revision: 1, structure: {} };
+  let rejectFirst;
+  let updateCalls = 0;
+  const window = {
+    KGDomainApi: {
+      request(input) {
+        if (input.path === '/api/v1/course-management/drafts' && (!input.method || input.method === 'GET')) return Promise.resolve({ drafts: [current] });
+        if (input.path === '/api/v1/course-management/releases') return Promise.resolve({ releases: [] });
+        if (input.path === '/api/v1/course-management/tasks') return Promise.resolve({ tasks: [] });
+        if (input.method === 'PUT') {
+          updateCalls += 1;
+          if (updateCalls === 1) return new Promise((_resolve, reject) => { rejectFirst = () => { current = { ...current, name: '服务端胜出', revision: 2 }; reject(Object.assign(new Error('冲突'), { status: 409 })); }; });
+          current = { ...current, name: input.body.name, revision: current.revision + 1 };
+          return Promise.resolve({ draft: current });
+        }
+        throw new Error(`unexpected ${input.method || 'GET'} ${input.path}`);
+      },
+    },
+    dispatchEvent() {},
+    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
+  };
+  vm.runInContext(readRepo('frontend/scripts/new-legacy-assets/course-management-adapter.js'), vm.createContext({ window, structuredClone, Promise, console }));
+  await window.KGCourseManagementApi.ready();
+  const saver = window.KGCourseManagementApi.createDraftSaveQueue();
+  const first = saver.save({ id: 'course-1', name: '旧编辑 1', revision: 1 });
+  const queued = saver.save({ id: 'course-1', name: '旧编辑 2', revision: 1 });
+  await new Promise(resolve => setImmediate(resolve));
+  rejectFirst();
+  await assert.rejects(first, /冲突/);
+  assert.equal(await queued, null);
+  assert.equal(updateCalls, 1);
+  assert.equal(window.KGCourseManagementApi.snapshot().drafts[0].name, '服务端胜出');
+
+  const confirmed = await saver.save({ id: 'course-1', name: '用户确认后重试' });
+  assert.equal(updateCalls, 2);
+  assert.equal(confirmed.name, '用户确认后重试');
+});

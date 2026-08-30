@@ -66,6 +66,12 @@ RETIRED_CATALOG_RUNTIME_KEYS = frozenset({
     "kg_activity_tags_v1",
     "kg_activity_collections_v1",
 })
+RETIRED_COURSE_RUNTIME_KEYS = frozenset({
+    "kg_course_config_drafts_v1",
+    "kg_course_config_active_release_v1",
+    "kg_course_config_releases_v1",
+    "kg_learning_tasks_v1",
+})
 
 EXACT_KEYS = {
     "kg_default_entry_mode_v1",
@@ -126,16 +132,12 @@ EXACT_KEYS = {
     *RETIRED_CATALOG_RUNTIME_KEYS,
     "kg_course_admin_recent_v862_p2",
     "kg_course_admin_workspace_v862_p1",
-    "kg_course_config_active_release_v1",
-    "kg_course_config_drafts_v1",
-    "kg_course_config_releases_v1",
     "kg_deep_recall_legacy_owner_v1",
     "kg_exam_paper_release_history_v1",
     "kg_exam_papers_published_v1",
     "kg_guided_practice_return_v1",
     "kg_learning_entry_chooser_claim_v1",
     "kg_learning_entry_chooser_consumed_v1",
-    "kg_learning_tasks_v1",
     "kg_paper_workspace_layout_v1",
     "kg_question_classification_collapsed_v1",
     "kg_question_library_workspace_layout_v1",
@@ -214,9 +216,6 @@ SHARED_KEYS = frozenset({
     # 发布类（教师发布 → 学员读取）
     "kg_question_banks_published_v1",
     "kg_exam_papers_published_v1",
-    "kg_course_config_releases_v1",
-    "kg_course_config_active_release_v1",
-    "kg_learning_tasks_v1",
     # 迁移标记仍供 rollback 审计使用；五个教学目录大键已不再由 Runtime GET 投影。
     "kg_content_organization_migration_v1",
     "kg_question_tag_names_v1",
@@ -237,11 +236,11 @@ SHARED_KEYS = frozenset({
 RUNTIME_SNAPSHOT_EXCLUDED_KEYS = frozenset({
     "kg_exam_papers_published_v1",
     "kg_exam_paper_release_history_v1",
+    *RETIRED_COURSE_RUNTIME_KEYS,
 })
 
 TEACHING_MANAGER_ROLES = frozenset({"admin", "teacher"})
 TEACHER_SHARED_EXACT_KEYS = frozenset({
-    "kg_course_config_drafts_v1",
     "kg_assessment_papers_v1",
 })
 TEACHER_SHARED_SCOPED_PREFIXES = {
@@ -268,8 +267,6 @@ TEACHING_SHARED_KEYS = SHARED_KEYS - {"kg_admin_settings_v1"}
 PUBLISHER_COLLECTION_KEYS = frozenset({
     "kg_question_banks_published_v1",
     "kg_exam_papers_published_v1",
-    "kg_course_config_releases_v1",
-    "kg_learning_tasks_v1",
 })
 SERVER_OWNED_KEYS = frozenset({
     "kg_announcements_v1",
@@ -281,6 +278,10 @@ SERVER_OWNED_KEYS = frozenset({
     # optimistic shared-content API. Historical rows are migration-only and are
     # excluded from every online Runtime snapshot.
     *RETIRED_CATALOG_RUNTIME_KEYS,
+    # Course drafts, immutable releases, active status and learning tasks now
+    # live exclusively in the relational course-management API. Legacy rows
+    # remain available only to the offline retirement migration.
+    *RETIRED_COURSE_RUNTIME_KEYS,
 })
 
 
@@ -425,14 +426,10 @@ BOOTSTRAP_MANAGEMENT_EXACT_KEYS = frozenset({
     "kg_student_subscription_redeem_codes_v1",
     "kg_subscription_plan_model_v2_migrated",
     "kg_subscription_plan_settings_v1",
-    "kg_course_config_active_release_v1",
-    "kg_course_config_releases_v1",
-    "kg_course_config_drafts_v1",
     "kg_course_admin_recent_v862_p2",
     "kg_course_admin_workspace_v862_p1",
     "kg_teacher_workbench_subject_v1",
     "kg_assessment_papers_v1",
-    "kg_learning_tasks_v1",
 })
 
 BOOTSTRAP_MANAGEMENT_PREFIXES = frozenset({
@@ -772,11 +769,6 @@ def teaching_shared_mutations(update: RuntimeStateUpdate) -> list[RuntimeMutatio
 
 def _publisher_id(item: object, key: str) -> str:
     if not isinstance(item, dict):
-        return ""
-    if key == "kg_learning_tasks_v1":
-        authorship = item.get("authorship")
-        if isinstance(authorship, dict):
-            return str(authorship.get("createdByUserId") or "")
         return ""
     publisher = item.get("publishedBy")
     if isinstance(publisher, dict):

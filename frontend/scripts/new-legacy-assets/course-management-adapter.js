@@ -130,6 +130,22 @@
       : createDraft(course);
   }
 
+  function createDraftSaveQueue() {
+    let epoch = 0;
+    let tail = Promise.resolve();
+    return Object.freeze({
+      save(course) {
+        const queuedEpoch = epoch;
+        const task = tail.catch(() => {}).then(async () => {
+          if (queuedEpoch !== epoch) return null;
+          try { return await saveDraft(course); } catch (error) { epoch += 1; throw error; }
+        });
+        tail = task;
+        return task;
+      },
+    });
+  }
+
   async function deleteDraft(id, revision) {
     const result = await mutation('draft.delete', {
       method: 'DELETE', path: `/api/v1/course-management/drafts/${encodeURIComponent(text(id))}`,
@@ -206,7 +222,7 @@
   global.KGCourseManagementApi = Object.freeze({
     ready, refresh, snapshot,
     listDrafts: () => clone(state.drafts), listReleases: () => clone(state.releases), listTasks: () => clone(state.tasks),
-    createDraft, updateDraft, saveDraft, deleteDraft, publishDraft, withdrawRelease,
+    createDraft, updateDraft, saveDraft, createDraftSaveQueue, deleteDraft, publishDraft, withdrawRelease,
     createTask, updateTask, saveTask, deleteTask,
   });
 })(window);
