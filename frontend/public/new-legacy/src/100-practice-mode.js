@@ -706,9 +706,8 @@
         renderHealth();return correct;
       }
       state.streak+=1;state.experience+=10+streakBonus(state.streak);
-      showFeedback('复仇成功 · 将安排再次验证','success');
+      showFeedback('复仇成功 · 查看解析后进入下一题','success');
       state.revengeState={phase:'verification_due',mistakeId:question.mistakeId,questionId:question.id};
-      state.feedbackTimer=global.setTimeout(advanceAfterAnswer,FEEDBACK_DELAY);
       renderHealth();return correct;
     }
     if(correct){

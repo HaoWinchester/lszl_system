@@ -556,8 +556,33 @@ with sync_playwright() as playwright:
         {"name": "start", "body": {"mode": "revenge", "count": 10, "order": "paper"}}
     ], revenge_writes_before
 
-    # ---------- 复仇作答交互：真实点击选项，零写请求 + 本地反馈 ----------
-    # mock 复仇题目正确答案 A；故意答错（选 B）触发补救分支
+    # ---------- 复仇作答交互：答对停留看解析，手动下一题后再验证答错补救 ----------
+    # mock 复仇题目正确答案 A；答对后超过旧 520ms 延迟仍停留当前题。
+    page.evaluate("window.__writes=[]")
+    page.locator('[data-option-id="A"]').click()
+    page.wait_for_timeout(700)
+    assert writes(page) == [], writes(page)
+    assert page.evaluate("window.KGPracticeMode.snapshot().index") == 0
+    assert page.locator("#practiceExplanationPanel").is_visible()
+    assert "回答正确" in page.locator("#practiceExplanationHead").inner_text()
+    assert "第 1 题解析" in page.locator("#practiceExplanationBody").inner_text()
+
+    # 只有点击既有“下一题”按钮后才进入第二题，新题不提前显示解析。
+    page.locator("#practiceNextBtn").click()
+    assert page.evaluate("window.KGPracticeMode.snapshot().index") == 1
+    assert page.locator("#practiceExplanationPanel").is_hidden()
+
+    # 结束本轮后重新开始，避免已答对题进入后续验证题夹具。
+    page.locator("#practiceExitBtn").click()
+    page.locator("#practiceAbandonBtn").click()
+    page.wait_for_timeout(120)
+    page.evaluate("window.__writes=[]")
+    page.locator('[data-practice-start="revenge"]').click()
+    page.wait_for_timeout(180)
+    revenge = page.evaluate("window.KGPracticeMode.snapshot()")
+    assert revenge["index"] == 0
+
+    # 第一题故意答错（选 B）触发既有补救分支。
     page.evaluate("window.__writes=[]")
     page.locator('[data-option-id="B"]').click()
     page.wait_for_timeout(100)

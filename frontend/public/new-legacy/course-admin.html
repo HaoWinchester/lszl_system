@@ -1,27 +1,27 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.189" lang="zh-CN">
+<html data-release="v9.0-p4.1.190" lang="zh-CN">
 <head>
-<script src="./teaching-content-sync.js?v=v9.0-p4.1.189"></script><!-- kg-teaching-content-sync:generated -->
+<script src="./teaching-content-sync.js?v=v9.0-p4.1.190"></script><!-- kg-teaching-content-sync:generated -->
 <!-- kg-direct-bootstrap-anchor -->
 <script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
-<script src="./runtime-config.override.js?v=v9.0-p4.1.189"></script><!-- kg-runtime:generated -->
-<script src="./auth-session-bootstrap.js?v=v9.0-p4.1.189"></script><!-- kg-auth-session:generated -->
-<script defer src="./direct-entry.js?v=v9.0-p4.1.189"></script><!-- kg-direct-entry:generated -->
-<script defer src="./feature-analytics.js?v=v9.0-p4.1.189"></script><!-- kg-feature-analytics:generated -->
+<script src="./runtime-config.override.js?v=v9.0-p4.1.190"></script><!-- kg-runtime:generated -->
+<script src="./auth-session-bootstrap.js?v=v9.0-p4.1.190"></script><!-- kg-auth-session:generated -->
+<script defer src="./direct-entry.js?v=v9.0-p4.1.190"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js?v=v9.0-p4.1.190"></script><!-- kg-feature-analytics:generated -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>课程与任务｜管理后台</title>
-  <link rel="stylesheet" href="styles/teacher-workbench.css?v=v9.0-p4.1.189" />
-  <link rel="stylesheet" href="styles/course-admin.css?v=v9.0-p4.1.189" />
-  <link rel="stylesheet" href="styles/workspace-panels.css?v=v9.0-p4.1.189" />
-  <link rel="stylesheet" href="styles/config-organization.css?v=v9.0-p4.1.189" />
-  <link rel="stylesheet" href="styles/teacher-course-workflow.css?v=v9.0-p4.1.189" />
-<link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.189"/>
-<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.189"/>
-<link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.189"/>
-<link rel="stylesheet" href="styles/focus-vega-teacher.css?v=v9.0-p4.1.189"/>
+  <link rel="stylesheet" href="styles/teacher-workbench.css?v=v9.0-p4.1.190" />
+  <link rel="stylesheet" href="styles/course-admin.css?v=v9.0-p4.1.190" />
+  <link rel="stylesheet" href="styles/workspace-panels.css?v=v9.0-p4.1.190" />
+  <link rel="stylesheet" href="styles/config-organization.css?v=v9.0-p4.1.190" />
+  <link rel="stylesheet" href="styles/teacher-course-workflow.css?v=v9.0-p4.1.190" />
+<link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.190"/>
+<link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.190"/>
+<link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.190"/>
+<link rel="stylesheet" href="styles/focus-vega-teacher.css?v=v9.0-p4.1.190"/>
 <script>if(new URLSearchParams(location.search).get('view')==='papers')location.replace('paper-management.html');</script>
-  <link rel="stylesheet" href="styles/close-button.css?v=v9.0-p4.1.189"/>
+  <link rel="stylesheet" href="styles/close-button.css?v=v9.0-p4.1.190"/>
 </head>
 <body class="teacher-admin-shell" data-admin-context="courses" data-ui-skin="focus-vega">
 <nav class="admin-context-nav" aria-label="管理后台一级导航">
@@ -147,23 +147,23 @@
   </dialog>
   <dialog id="caPublishDialog" class="ca-dialog"><form method="dialog"><header><div><p>Publish Course</p><h2>发布课程版本</h2></div><button value="cancel">×</button></header><label><span>发布说明</span><textarea id="caPublishNotes" rows="4" placeholder="例如：完成知识树映射和第一版课程结构。"></textarea></label><div id="caPublishWarnings"></div><footer><button value="cancel">取消</button><button type="button" class="primary" id="caConfirmPublishBtn">确认发布</button></footer></form></dialog>
   <div class="ca-toast" id="caToast" role="status" aria-live="polite"></div>
-  <script src="src/28-app-storage.js?v=v9.0-p4.1.189"></script>
-  <script src="src/29-auth-core.js?v=v9.0-p4.1.189"></script>
-  <script src="src/34-role-permissions.js?v=v9.0-p4.1.189"></script>
-  <script src="src/86-activity-schema-v1.js?v=v9.0-p4.1.189"></script>
-  <script src="src/87-guided-learning-data.js?v=v9.0-p4.1.189"></script>
-  <script src="src/91-learning-content-core.js?v=v9.0-p4.1.189"></script>
-  <script src="src/65-canvas-workspace-store.js?v=v9.0-p4.1.189"></script>
-  <script src="src/59c-active-learning-mode-policy.js?v=v9.0-p4.1.189"></script><!-- kg-learning-mode-policy:generated -->
-  <script src="src/93-content-organization-core.js?v=v9.0-p4.1.189"></script>
-  <script src="src/admin/00-admin-core.js?v=v9.0-p4.1.189"></script><script src="src/admin/10-content-repository.js?v=v9.0-p4.1.189"></script><script src="src/admin/11-local-content-repository.js?v=v9.0-p4.1.189"></script><script src="src/admin/20-admin-permission-service.js?v=v9.0-p4.1.189"></script><script src="src/admin/21-admin-audit-service.js?v=v9.0-p4.1.189"></script><script src="src/admin/22-admin-transaction-service.js?v=v9.0-p4.1.189"></script><script src="src/admin/30-reference-index-service.js?v=v9.0-p4.1.189"></script><script src="src/admin/31-subject-service.js?v=v9.0-p4.1.189"></script><script src="src/admin/32-taxonomy-service.js?v=v9.0-p4.1.189"></script><script src="src/admin/33-activity-service.js?v=v9.0-p4.1.189"></script><script src="src/admin/34-course-service.js?v=v9.0-p4.1.189"></script><script src="src/admin/35-release-service.js?v=v9.0-p4.1.189"></script><script src="src/admin/40-admin-service-registry.js?v=v9.0-p4.1.189"></script><script src="src/admin/41-learning-content-compat.js?v=v9.0-p4.1.189"></script>
-  <script src="src/98-teacher-workflow-p2-services.js?v=v9.0-p4.1.189"></script>
-  <script src="src/91-course-admin-app.js?v=v9.0-p4.1.189"></script>
-  <script src="src/93-assessment-config-app.js?v=v9.0-p4.1.189"></script>
-  <script src="src/92-workspace-panel-manager.js?v=v9.0-p4.1.189"></script>
-  <script src="src/97-teacher-course-workflow.js?v=v9.0-p4.1.189"></script>
-<script src="src/admin/48-admin-context-nav.js?v=v9.0-p4.1.189"></script>
-<script src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.189"></script>
-<script defer src="src/39-global-shortcuts.js?v=v9.0-p4.1.189"></script>
+  <script src="src/28-app-storage.js?v=v9.0-p4.1.190"></script>
+  <script src="src/29-auth-core.js?v=v9.0-p4.1.190"></script>
+  <script src="src/34-role-permissions.js?v=v9.0-p4.1.190"></script>
+  <script src="src/86-activity-schema-v1.js?v=v9.0-p4.1.190"></script>
+  <script src="src/87-guided-learning-data.js?v=v9.0-p4.1.190"></script>
+  <script src="src/91-learning-content-core.js?v=v9.0-p4.1.190"></script>
+  <script src="src/65-canvas-workspace-store.js?v=v9.0-p4.1.190"></script>
+  <script src="src/59c-active-learning-mode-policy.js?v=v9.0-p4.1.190"></script><!-- kg-learning-mode-policy:generated -->
+  <script src="src/93-content-organization-core.js?v=v9.0-p4.1.190"></script>
+  <script src="src/admin/00-admin-core.js?v=v9.0-p4.1.190"></script><script src="src/admin/10-content-repository.js?v=v9.0-p4.1.190"></script><script src="src/admin/11-local-content-repository.js?v=v9.0-p4.1.190"></script><script src="src/admin/20-admin-permission-service.js?v=v9.0-p4.1.190"></script><script src="src/admin/21-admin-audit-service.js?v=v9.0-p4.1.190"></script><script src="src/admin/22-admin-transaction-service.js?v=v9.0-p4.1.190"></script><script src="src/admin/30-reference-index-service.js?v=v9.0-p4.1.190"></script><script src="src/admin/31-subject-service.js?v=v9.0-p4.1.190"></script><script src="src/admin/32-taxonomy-service.js?v=v9.0-p4.1.190"></script><script src="src/admin/33-activity-service.js?v=v9.0-p4.1.190"></script><script src="src/admin/34-course-service.js?v=v9.0-p4.1.190"></script><script src="src/admin/35-release-service.js?v=v9.0-p4.1.190"></script><script src="src/admin/40-admin-service-registry.js?v=v9.0-p4.1.190"></script><script src="src/admin/41-learning-content-compat.js?v=v9.0-p4.1.190"></script>
+  <script src="src/98-teacher-workflow-p2-services.js?v=v9.0-p4.1.190"></script>
+  <script src="src/91-course-admin-app.js?v=v9.0-p4.1.190"></script>
+  <script src="src/93-assessment-config-app.js?v=v9.0-p4.1.190"></script>
+  <script src="src/92-workspace-panel-manager.js?v=v9.0-p4.1.190"></script>
+  <script src="src/97-teacher-course-workflow.js?v=v9.0-p4.1.190"></script>
+<script src="src/admin/48-admin-context-nav.js?v=v9.0-p4.1.190"></script>
+<script src="src/109-focus-vega-ui-icons.js?v=v9.0-p4.1.190"></script>
+<script defer src="src/39-global-shortcuts.js?v=v9.0-p4.1.190"></script>
 </body>
 </html>
