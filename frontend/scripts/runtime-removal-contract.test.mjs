@@ -169,11 +169,11 @@ test('runtime removal contract rejects an unguarded device-preference session wr
   }])
 })
 
-test('runtime inventory includes legacy implementation occurrences instead of ignoring whole files', () => {
+test('runtime inventory keeps only backend rollback implementation occurrences', () => {
   const actual = inventory()
   assert.ok(actual.endpoint.some(item => item.path === 'backend/app/web/routes.py'))
   assert.ok(actual.runtimeKey.some(item => item.path === 'backend/app/services/runtime_state_service.py'))
-  assert.ok(actual.consumer.some(item => item.path === 'frontend/scripts/new-legacy-assets/server-state-bootstrap.js'))
+  assert.equal(actual.consumer.some(item => item.path === 'frontend/scripts/new-legacy-assets/server-state-bootstrap.js'), false)
 })
 
 test('inserting unrelated lines does not change occurrence baseline', () => {

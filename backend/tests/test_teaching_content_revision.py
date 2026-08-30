@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 
+from app.core.config import settings
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
 from app.main import _seed_builtin_teaching_content, app
@@ -55,6 +56,13 @@ PASSWORD = "revision-pass"
 PRINCIPLE_PROJECTION_KEY = "kg_principle_repository_v1"
 PRESET_PROJECTION_KEY = "kg_synthesis_preset_repository_v1"
 RELATIONAL_REVISION_SNAPSHOT_KEY = "__relational_teaching_content_revision__"
+
+
+@pytest.fixture(autouse=True)
+def legacy_runtime_api_is_explicitly_enabled_for_migration_tests(monkeypatch):
+    """Historical Runtime migration tests opt in; the application default stays retired."""
+    monkeypatch.setattr(settings, "RUNTIME_SYNC_DISABLED", False)
+    monkeypatch.setattr(settings, "RUNTIME_ROLLBACK_READ_ENABLED", True)
 
 
 def test_bump_is_monotonic_deduplicated_and_capped() -> None:
@@ -1022,7 +1030,7 @@ def test_revision_endpoint_and_managed_bootstrap_are_role_safe() -> None:
 def test_runtime_get_returns_storage_and_content_revision_from_one_snapshot(
     monkeypatch,
 ) -> None:
-    key = "kg_course_config_drafts_v1"
+    key = "kg_assessment_papers_v1"
     marker_key = "kg_teacher_shared_runtime_promotion_v1"
     shared_keys = {key, marker_key}
     snapshot = asyncio.run(_snapshot_shared_rows(shared_keys))
@@ -2361,8 +2369,8 @@ def test_runtime_content_revision_is_a_strict_integer(invalid_revision) -> None:
 @pytest.mark.parametrize(
     "keys",
     [
-        ("kg_course_config_drafts_v1", "kg_course_config_drafts_v1"),
-        ("kg_course_config_drafts_v1", "kg_assessment_papers_v1"),
+        ("kg_assessment_papers_v1", "kg_assessment_papers_v1"),
+        ("kg_assessment_papers_v1", "kg_question_tag_names_v1"),
     ],
     ids=["same-key", "different-keys"],
 )
@@ -2512,7 +2520,7 @@ def test_runtime_request_id_replay_skips_content_cas_and_second_bump() -> None:
 
     suffix = uuid4().hex[:10]
     username = f"runtime-replay-{suffix}"
-    key = "kg_course_config_drafts_v1"
+    key = "kg_assessment_papers_v1"
     marker_key = "kg_teacher_shared_runtime_promotion_v1"
     shared_keys = {RELATIONAL_REVISION_SNAPSHOT_KEY, marker_key, key}
 

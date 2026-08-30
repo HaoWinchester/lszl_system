@@ -14,7 +14,7 @@
   let adminLogState = Object.freeze([]);
   const AUTH_REMOTE_SESSION_STORAGE = (() => {
     try {
-      // 优先使用 server-state-bootstrap 暴露的原生 localStorage
+      // 使用浏览器原生 localStorage 保存同页认证摘要。
       if (globalThis.__nativeLocalStorage__) {
         return globalThis.__nativeLocalStorage__;
       }

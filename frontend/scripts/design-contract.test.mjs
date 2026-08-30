@@ -10,7 +10,6 @@ const readRepo = (path) => readFileSync(resolve(repo, path), 'utf8')
 const publicRelease = JSON.parse(readFrontend('public/new-legacy/manifest.json')).version
 const frozenSource = resolve(frontend, 'new-legacy-releases', publicRelease, 'source')
 const candidateSource = existsSync(frozenSource) ? frozenSource : resolve(repo, 'new-legacy')
-const runtimePages = new Set(JSON.parse(readRepo('backend/app/web/runtime_page_policy.json')).runtimePages)
 
 function readGeneratedPageAssets(page, generated) {
   if (!generated.includes('kg-homepage-bundle-version')) return generated
@@ -62,8 +61,7 @@ test('generated pages use the exact upstream UI with only direct runtime adapter
     const generated = readFrontend(`public/new-legacy/${page}`)
     const generatedAssets = readGeneratedPageAssets(page, generated)
     assert.match(generated, /kg-direct-bootstrap-anchor/)
-    if (runtimePages.has(page)) assert.match(generated, /server-state-bootstrap\.js/)
-    else assert.doesNotMatch(generated, /server-state-bootstrap\.js/)
+    assert.doesNotMatch(generated, /server-state-bootstrap\.js/)
     assert.match(generatedAssets, /direct-entry\.js/)
     assert.doesNotMatch(generated, /new-legacy-navigation-bridge|graph-bridge|guided-learning-data-bridge|<iframe/)
     for (const stylesheet of upstream.matchAll(/<link[^>]+href="([^"]+\.css)"/g)) {
@@ -72,12 +70,16 @@ test('generated pages use the exact upstream UI with only direct runtime adapter
   }
 })
 
-test('the active frontend package has one direct runtime and no React host', () => {
+test('the active frontend package has a retired Runtime marker and no React host', () => {
   const packageJson = JSON.parse(readFrontend('package.json'))
   assert.deepEqual(packageJson.dependencies, {})
   assert.doesNotMatch(JSON.stringify(packageJson), /react-router|vite|zustand/)
-  assert.match(readFrontend('scripts/new-legacy-assets/server-state-bootstrap.js'), /__KG_DIRECT_BOOTSTRAP__/)
-  assert.doesNotMatch(readFrontend('scripts/new-legacy-assets/server-state-bootstrap.js'), /postMessage|frameToken/)
+  assert.equal(existsSync(resolve(frontend, 'scripts/new-legacy-assets/server-state-bootstrap.js')), false)
+  assert.deepEqual(JSON.parse(readFrontend('scripts/new-legacy-assets/runtime-retirement.json')), {
+    schemaVersion: 1,
+    status: 'retired',
+    runtimeRequests: 0,
+  })
 })
 
 test('FastAPI owns the stable direct-page aliases', () => {

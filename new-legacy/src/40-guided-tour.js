@@ -192,7 +192,6 @@ window.addEventListener('resize',()=>{if(guidedTourState)placeGuidedTour()});
 window.addEventListener('scroll',()=>{if(guidedTourState)placeGuidedTour()},true);
 document.getElementById('guidedTourStartBtn')?.addEventListener('click',()=>startGuidedTour(true));
 let guidedTourAutostartTimer=0;
-let guidedTourClaimInFlight=null;
 function hasAuthenticatedGuidedTourSession(){
   const user = window.KGAuthCore?.currentUser?.()
   return Boolean(user && user.username && user.username !== 'guest');
@@ -207,17 +206,9 @@ async function scheduleAutoGuidedTour(){
     guidedTourAutostartTimer=window.setTimeout(scheduleAutoGuidedTour,160);
     return;
   }
-  const store=window.KGServerStateStorage;
-  if(typeof store?.claimGuidedTour!=='function'||guidedTourClaimInFlight)return;
-  guidedTourClaimInFlight=true;
-  try{
-    const claim=await store.claimGuidedTour();
-    if(claim?.claimed)startGuidedTour(true);
-  }catch(error){
-    console.warn('[guided-tour] 无法保存首次引导状态',error);
-  }finally{
-    guidedTourClaimInFlight=null;
-  }
+  const store=window.KGAppStorage;
+  const completed=store?.readString?store.readString(TOUR_STORAGE_KEY,''):localStorage.getItem(TOUR_STORAGE_KEY);
+  if(completed!=='1')startGuidedTour(true);
 }
 function startGuidedTourAfterLearningEntry(){
   const waiter=window.KGDirectEntry?.waitForInitialLearningEntry;

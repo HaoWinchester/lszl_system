@@ -1422,8 +1422,8 @@ const FIXED_CREATORS={
   tiancai:{creatorId:'creator_005',name:'天才'},
   nvdi:{creatorId:'creator_006',name:'女帝'}
 };
-/* 登录态判定：进入本页不要求登录。优先同步读跨页共享缓存（其他页面的
-   server-state-bootstrap / auth-core 写入 localStorage 的 kg_remote_auth_session_v1），
+/* 登录态判定：进入本页不要求登录。优先同步读跨页共享缓存（auth-core 写入
+   localStorage 的 kg_remote_auth_session_v1），
    再异步调 /api/v1/auth/me 校验补齐（缓存为空但会话 cookie 有效时也能恢复）。 */
 function readCachedSessionUser(){
   try{

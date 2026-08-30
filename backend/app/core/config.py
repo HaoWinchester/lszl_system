@@ -21,11 +21,10 @@ class Settings(BaseSettings):
     # 登录用户图谱完成关系化迁移后启用。开启时前端改走 Files API，
     # runtime 中的旧图谱键只读保留用于审计与回滚。
     GRAPH_FILES_API_CUTOVER_ENABLED: bool = False
-    # runtime KV 同步开关：true 时 PUT/POST /runtime/state 接收即弃（回当前版本号，不落库）。
-    # 2026-08-21 回退退役切换（原设计 §11）：教师试卷/分类草稿尚未迁入领域 API，
-    # 仍依赖 runtime KV 持久化；丢弃写入会导致"保存显示成功但刷新即回退"。
-    # 待业务数据全部迁入领域 API 后再置回 true。
-    RUNTIME_SYNC_DISABLED: bool = False
+    # Phase-one runtime 退役：兼容旧缓存页的 PUT/POST 只 drain，不再写 Runtime KV。
+    RUNTIME_SYNC_DISABLED: bool = True
+    # 仅用于受控回滚诊断；新页面不得使用 Runtime GET。
+    RUNTIME_ROLLBACK_READ_ENABLED: bool = False
     # Content Prep 题目级校验临时关闭（2026-08 录入提速需求）：
     # true 时共享草稿同步/批量上传/单题保存跳过题目校验阻断（仅记录 warning 日志，批次内重复 ID 仍拦截）。
     # 恢复校验：删掉环境变量并重启即可，无需改代码。

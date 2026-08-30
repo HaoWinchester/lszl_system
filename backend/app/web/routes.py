@@ -338,6 +338,8 @@ async def read_runtime_state(
     mode: Literal["full", "bootstrap"] | None = None,
     page: str | None = None,
 ):
+    if not settings.RUNTIME_ROLLBACK_READ_ENABLED:
+        raise HTTPException(status_code=410, detail="Runtime state 已退役")
     if mode is None:
         mode = "full"
     storage, revision, content_revision = await runtime_state_service.get_state(

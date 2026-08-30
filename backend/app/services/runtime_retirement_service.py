@@ -90,6 +90,14 @@ DEFAULT_POLICY_PATHS = (
     REPOSITORY_ROOT / "backend/app/web/runtime_page_policy.json",
     REPOSITORY_ROOT / "frontend/scripts/runtime-page-policy.json",
 )
+DEFAULT_RETIREMENT_MARKER_PATH = (
+    REPOSITORY_ROOT / "frontend/scripts/new-legacy-assets/runtime-retirement.json"
+)
+RETIREMENT_MARKER = {
+    "schemaVersion": 1,
+    "status": "retired",
+    "runtimeRequests": 0,
+}
 
 _PAYLOAD_KEYS = {
     "payload",
@@ -127,10 +135,19 @@ def _policy_is_empty(path: Path) -> bool:
     return isinstance(payload, Mapping) and payload.get("runtimePages") == []
 
 
+def _retirement_marker_is_exact(path: Path) -> bool:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
+    return payload == RETIREMENT_MARKER
+
+
 def evaluate_drop_gate(
     verification: Mapping[str, Any],
     *,
     policy_paths: Iterable[Path] = DEFAULT_POLICY_PATHS,
+    retirement_marker_path: Path = DEFAULT_RETIREMENT_MARKER_PATH,
 ) -> dict[str, Any]:
     """Apply the final no-loss/no-policy gate without executing any DDL."""
 
@@ -144,15 +161,23 @@ def evaluate_drop_gate(
         if int(verification.get(metric) or 0) > 0:
             blockers.append(blocker)
     paths = tuple(Path(path) for path in policy_paths)
-    policies_empty = len(paths) == 2 and all(_policy_is_empty(path) for path in paths)
-    if not policies_empty:
+    legacy_policies_empty = len(paths) == 2 and all(
+        path.exists() and _policy_is_empty(path) for path in paths
+    )
+    final_retirement = len(paths) == 2 and not any(path.exists() for path in paths)
+    retirement_marker_valid = final_retirement and _retirement_marker_is_exact(
+        Path(retirement_marker_path)
+    )
+    policies_accepted = legacy_policies_empty or retirement_marker_valid
+    if not policies_accepted:
         blockers.append("runtimePolicies")
     return {
         "ready": not blockers,
         "blockers": blockers,
         "sourceCount": int(verification.get("sourceCount") or 0),
         "verifiedCount": int(verification.get("verifiedCount") or 0),
-        "policiesEmpty": policies_empty,
+        "policiesEmpty": legacy_policies_empty,
+        "retirementMarkerValid": retirement_marker_valid,
     }
 
 
@@ -1503,6 +1528,7 @@ async def drop_check(
     *,
     run_id: str = "runtime-retirement",
     policy_paths: Iterable[Path] = DEFAULT_POLICY_PATHS,
+    retirement_marker_path: Path = DEFAULT_RETIREMENT_MARKER_PATH,
 ) -> dict[str, Any]:
     """Return the final read-only retirement gate; never execute DDL."""
 
@@ -1525,7 +1551,11 @@ async def drop_check(
                 "requiredFailures": 1,
                 "items": [],
             }
-            gate = evaluate_drop_gate(verification, policy_paths=policy_paths)
+            gate = evaluate_drop_gate(
+                verification,
+                policy_paths=policy_paths,
+                retirement_marker_path=retirement_marker_path,
+            )
             gate["blockers"].append("missingRun")
             gate["ready"] = False
             report = {**verification, **gate, "ddlExecuted": False}
@@ -1608,7 +1638,11 @@ async def drop_check(
             "inventoryScopeInvalid": inventory["inventoryScopeInvalid"],
             **metrics,
         }
-        gate = evaluate_drop_gate(verification, policy_paths=policy_paths)
+        gate = evaluate_drop_gate(
+            verification,
+            policy_paths=policy_paths,
+            retirement_marker_path=retirement_marker_path,
+        )
         if inventory["inventoryDrift"]:
             gate["blockers"].append("inventoryDrift")
             gate["ready"] = False

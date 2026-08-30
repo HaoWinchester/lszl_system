@@ -3,9 +3,11 @@ import json
 from copy import deepcopy
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
+from app.core.config import settings
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
 from app.main import app
@@ -35,6 +37,13 @@ RETIRED_CATALOG_RUNTIME_KEYS = (
     "kg_activity_tags_v1",
     "kg_activity_collections_v1",
 )
+
+
+@pytest.fixture(autouse=True)
+def legacy_runtime_api_is_explicitly_enabled_for_migration_tests(monkeypatch):
+    """Historical Runtime migration tests opt in; the application default stays retired."""
+    monkeypatch.setattr(settings, "RUNTIME_SYNC_DISABLED", False)
+    monkeypatch.setattr(settings, "RUNTIME_ROLLBACK_READ_ENABLED", True)
 
 
 def test_catalog_snapshot_round_trips_all_five_lifecycle_resources_with_one_revision() -> None:

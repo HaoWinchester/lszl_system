@@ -273,9 +273,7 @@ def storage_audit(
           legacyStorage:typeof window.KGServerStateStorage,
           directBootstrap:{
             present:typeof window.__KG_DIRECT_BOOTSTRAP__==='object'&&window.__KG_DIRECT_BOOTSTRAP__!==null,
-            storage:window.__KG_DIRECT_BOOTSTRAP__?.storage,
-            revision:window.__KG_DIRECT_BOOTSTRAP__?.revision,
-            contentRevision:window.__KG_DIRECT_BOOTSTRAP__?.contentRevision,
+            runtimeFields:['storage','revision','contentRevision','namespace'].filter(key=>Object.hasOwn(window.__KG_DIRECT_BOOTSTRAP__||{},key)),
           },
         })"""
     )
@@ -287,9 +285,7 @@ def storage_audit(
         return
     assert direct_bootstrap == {
         "present": True,
-        "storage": None,
-        "revision": 0,
-        "contentRevision": 0,
+        "runtimeFields": [],
     }, (page_name, result)
 
 

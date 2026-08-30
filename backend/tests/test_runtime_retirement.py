@@ -64,7 +64,7 @@ def test_public_report_contains_no_business_payload() -> None:
     }
 
 
-def test_drop_gate_requires_zero_blockers_and_both_empty_runtime_policies() -> None:
+def test_drop_gate_accepts_only_matching_empty_policies_or_a_retirement_marker() -> None:
     with TemporaryDirectory(prefix="runtime-retirement-policy-") as directory:
         root = Path(directory)
         backend_policy = root / "backend-policy.json"
@@ -101,6 +101,37 @@ def test_drop_gate_requires_zero_blockers_and_both_empty_runtime_policies() -> N
         )
         assert policy_blocked["ready"] is False
         assert policy_blocked["blockers"] == ["runtimePolicies"]
+
+        frontend_policy.unlink()
+        marker = root / "runtime-retirement.json"
+        marker.write_text(
+            '{"schemaVersion":1,"status":"retired","runtimeRequests":0}\n',
+            encoding="utf-8",
+        )
+        mixed = service.evaluate_drop_gate(
+            clean,
+            policy_paths=(backend_policy, frontend_policy),
+            retirement_marker_path=marker,
+        )
+        assert mixed["ready"] is False
+        assert mixed["blockers"] == ["runtimePolicies"]
+
+        backend_policy.unlink()
+        retired = service.evaluate_drop_gate(
+            clean,
+            policy_paths=(backend_policy, frontend_policy),
+            retirement_marker_path=marker,
+        )
+        assert retired["ready"] is True
+
+        marker.write_text('{"schemaVersion":1,"status":"retired"}\n', encoding="utf-8")
+        malformed = service.evaluate_drop_gate(
+            clean,
+            policy_paths=(backend_policy, frontend_policy),
+            retirement_marker_path=marker,
+        )
+        assert malformed["ready"] is False
+        assert malformed["blockers"] == ["runtimePolicies"]
 
 
 def test_cli_exit_codes_and_external_integrity_blockers() -> None:

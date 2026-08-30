@@ -25,8 +25,31 @@ from app.services import (
     teaching_content_revision_service,
     user_service,
 )
-from app.web.bootstrap import PAGE_NAMESPACES
 from app.web.schemas import RuntimeMutation, RuntimeStateUpdate
+
+# Legacy rollback-only validation metadata. No release bootstrap imports or reads this map.
+PAGE_NAMESPACES = {
+    "index.html": "files",
+    "learning-path.html": "guided-learning",
+    "guided-learning-node.html": "guided-learning",
+    "guided-learning-placement-test.html": "guided-learning",
+    "question-training.html": "training",
+    "question-workspace.html": "workspace",
+    "question-bank.html": "questions",
+    "knowledge-recall.html": "recall",
+    "file-manager.html": "files",
+    "user-management.html": "users",
+    "system-settings.html": "system",
+    "paper-management.html": "papers",
+    "content-prep.html": "content",
+    "course-admin.html": "courses",
+    "content-center.html": "content",
+    "teacher-workbench.html": "teacher",
+    "admin-console.html": "admin",
+    "admin-operations.html": "operations",
+    "admin-settings.html": "admin",
+    "admin-subjects.html": "subjects",
+}
 
 MAX_VALUE_BYTES = 8 * 1024 * 1024
 MAX_TOTAL_BYTES = 48 * 1024 * 1024
@@ -163,6 +186,11 @@ EXACT_KEYS = {
     "question_studio_recent_knowledge_v1",
     "question_studio_favorite_knowledge_v1",
 }
+
+# Browser-facing Runtime compatibility excludes the catalog records that are
+# now owned by relational APIs.  Keep their historical entries in EXACT_KEYS
+# solely for offline rollback/migration validation.
+ONLINE_RUNTIME_EXACT_KEYS = frozenset(EXACT_KEYS - RETIRED_CATALOG_RUNTIME_KEYS)
 
 PREFIXES = (
     "kg_graph_file_content_v2__",

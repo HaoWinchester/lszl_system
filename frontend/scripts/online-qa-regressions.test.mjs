@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -9,29 +9,8 @@ const frontendDir = resolve(scriptsDir, '..')
 const repoDir = resolve(frontendDir, '..')
 const source = (path) => readFileSync(resolve(repoDir, path), 'utf8')
 
-test('coalesced runtime saves identify every mutated key', () => {
-  const bootstrap = source('frontend/scripts/new-legacy-assets/server-state-bootstrap.js')
-  // merge 协议：批量合并后仍以 mutations 列表标识每个被改动的键，后端按键校验。
-  assert.match(bootstrap, /function mutationsForPayload\(/)
-  assert.match(bootstrap, /Array\.from\(source\.values\(\)\)\.filter\(\(mutation\)\s*=>\s*isPersistableKey\(mutation\.key\)\)/)
-  assert.match(bootstrap, /snapshotMode:\s*'merge',[\s\S]*mutations,[\s\S]*requestId[\s\S]*revision/)
-})
-
-test('non-retryable runtime mutations are discarded and server state is restored', () => {
-  const bootstrap = source('frontend/scripts/new-legacy-assets/server-state-bootstrap.js')
-  assert.match(bootstrap, /function discardBatch\(batch\)/)
-  assert.match(bootstrap, /response\.status===403\|\|response\.status===422/)
-  assert.match(bootstrap, /await reloadServerState\(\)/)
-  assert.match(bootstrap, /discardBatch\(batch\)/)
-})
-
-test('a rejected runtime mutation is isolated without discarding legal siblings', () => {
-  const bootstrap = source('frontend/scripts/new-legacy-assets/server-state-bootstrap.js')
-  assert.match(bootstrap, /async function submitIsolatedBatch\(batch\)/)
-  assert.match(bootstrap, /function splitBatch\(batch\)/)
-  assert.match(bootstrap, /part\.size\s*===\s*1/)
-  assert.match(bootstrap, /await submitPart\(left\)/)
-  assert.match(bootstrap, /await submitPart\(right\)/)
+test('online pages no longer ship a Runtime synchronization bootstrap', () => {
+  assert.equal(existsSync(resolve(repoDir, 'frontend/scripts/new-legacy-assets/server-state-bootstrap.js')), false)
 })
 
 test('analytics injection uses a browser global that exists at runtime', () => {
@@ -215,7 +194,6 @@ test('home restores the update learning-entry dialog, automatic guided steps, an
   const chooser = source('new-legacy/src/31-learning-entry-chooser.js')
   const tour = source('new-legacy/src/40-guided-tour.js')
   const directEntry = source('frontend/scripts/new-legacy-assets/direct-entry.js')
-  const serverState = source('frontend/scripts/new-legacy-assets/server-state-bootstrap.js')
   const modes = source('new-legacy/src/27-home-interaction-modes.js')
   const modeStyles = source('new-legacy/styles/home-interaction-modes-p4330.css')
 
@@ -236,10 +214,7 @@ test('home restores the update learning-entry dialog, automatic guided steps, an
   assert.match(directEntry, /waitForInitialLearningEntry/)
   assert.match(tour, /waitForInitialLearningEntry/)
   assert.match(tour, /result\?\.shown/)
-  assert.match(serverState, /claimGuidedTour/)
-  assert.match(serverState, /\/api\/v1\/runtime\/guided-tour-claim/)
-  assert.match(tour, /await store\.claimGuidedTour\(\)/)
-  assert.match(tour, /claim\?\.claimed/)
+  assert.match(tour, /if\(completed!==['"]1['"]\)startGuidedTour\(true\)/)
   assert.match(tour, /startGuidedTour\(true\)/)
   assert.match(tour, /guidedTourStartBtn[^\n]*startGuidedTour\(true\)/)
   assert.match(tour, /function hasAuthenticatedGuidedTourSession\(\)/)

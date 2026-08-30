@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import test from 'node:test'
 
@@ -32,8 +32,6 @@ const retiredRuntimePages = [
   'teacher-workbench.html',
 ]
 
-const runtimePages = []
-
 const directTeachingPages = ['admin-subjects.html', 'content-center.html', 'content-prep.html', ...retiredRuntimePages]
 
 const directAccountPages = [
@@ -43,12 +41,16 @@ const directAccountPages = [
   'paper-management.html',
 ]
 
-test('runtime pages are an explicit minimal allowlist', () => {
-  const policy = JSON.parse(readRepo('backend/app/web/runtime_page_policy.json'))
-  const syncPolicy = JSON.parse(readRepo('frontend/scripts/runtime-page-policy.json'))
-  assert.deepEqual(syncPolicy, policy, 'release harness policy mirror must match the backend source of truth')
-  assert.deepEqual([...policy.runtimePages].sort(), runtimePages)
-  for (const page of learnerPages) assert.equal(policy.runtimePages.includes(page), false, page)
+test('runtime retirement removes policy and executable bootstrap assets', () => {
+  const asset = (path) => resolve(frontend, 'scripts/new-legacy-assets', path)
+  assert.equal(existsSync(resolve(repo, 'backend/app/web/runtime_page_policy.json')), false)
+  assert.equal(existsSync(resolve(frontend, 'scripts/runtime-page-policy.json')), false)
+  assert.equal(existsSync(asset('server-state-bootstrap.js')), false)
+  assert.deepEqual(JSON.parse(readFileSync(asset('runtime-retirement.json'), 'utf8')), {
+    schemaVersion: 1,
+    status: 'retired',
+    runtimeRequests: 0,
+  })
 })
 
 test('direct pages keep auth bootstrap without loading the legacy runtime', () => {
@@ -60,6 +62,12 @@ test('direct pages keep auth bootstrap without loading the legacy runtime', () =
     const html = readGenerated(page)
     assert.match(html, /kg-direct-bootstrap-anchor/, `${page} must expose the direct bootstrap anchor`)
     assert.doesNotMatch(html, /server-state-bootstrap\.js/, `${page} must not load legacy runtime`)
+  }
+})
+
+test('all generated application pages are free of the retired Runtime bootstrap', () => {
+  for (const page of [...learnerPages, ...directAccountPages, ...directTeachingPages]) {
+    assert.doesNotMatch(readGenerated(page), /server-state-bootstrap\.js/, page)
   }
 })
 

@@ -202,9 +202,8 @@ def test_learner_html_injects_auth_without_runtime_snapshot() -> None:
     assert payload["authUser"]["username"] == "佩奇007"
     assert payload["authUser"]["role"] == "admin"
     assert payload["authUser"]["loginSessionId"] == login.json()["loginSessionId"]
-    assert payload["revision"] == 0
-    assert payload["contentRevision"] == 0
-    assert payload["storage"] is None
+    for key in ("namespace", "revision", "contentRevision", "storage"):
+        assert key not in payload
 
 
 def test_learner_bootstrap_never_reads_or_seeds_runtime_state(monkeypatch) -> None:
@@ -230,9 +229,8 @@ def test_learner_bootstrap_never_reads_or_seeds_runtime_state(monkeypatch) -> No
             response = client.get(f"/{page}")
             assert response.status_code == 200, page
             payload = _bootstrap(response.text)
-            assert payload["storage"] is None, page
-            assert payload["revision"] == 0, page
-            assert payload["contentRevision"] == 0, page
+            for key in ("namespace", "revision", "contentRevision", "storage"):
+                assert key not in payload, page
 
 
 def test_admin_settings_bootstrap_never_reads_or_seeds_runtime_state(monkeypatch) -> None:
@@ -248,9 +246,8 @@ def test_admin_settings_bootstrap_never_reads_or_seeds_runtime_state(monkeypatch
         ).status_code == 200
         payload = _bootstrap(client.get("/admin-settings.html").text)
 
-    assert payload["storage"] is None
-    assert payload["revision"] == 0
-    assert payload["contentRevision"] == 0
+    for key in ("namespace", "revision", "contentRevision", "storage"):
+        assert key not in payload
 
 
 def test_guest_html_injects_anonymous_bootstrap() -> None:
@@ -279,8 +276,7 @@ def test_runtime_state_requires_a_login() -> None:
     assert response.status_code == 401
 
 
-def test_runtime_state_drain_mode_accepts_and_ignores_writes() -> None:
-    """退役 drain（设计 §11）：RUNTIME_SYNC_DISABLED 时 PUT 返回成功与当前版本号，不落库。"""
+def test_runtime_state_read_is_gone_by_default_and_only_configuration_can_restore_it() -> None:
     from app.core.config import settings as app_settings
 
     with TestClient(app) as client:
@@ -293,12 +289,34 @@ def test_runtime_state_drain_mode_accepts_and_ignores_writes() -> None:
             },
         )
         assert login.status_code == 200
-        before = client.get("/api/v1/runtime/state?mode=full").json()
+        assert client.get("/api/v1/runtime/state?mode=full").status_code == 410
 
-        original = app_settings.RUNTIME_SYNC_DISABLED
-        app_settings.RUNTIME_SYNC_DISABLED = True
+        original = app_settings.RUNTIME_ROLLBACK_READ_ENABLED
+        app_settings.RUNTIME_ROLLBACK_READ_ENABLED = True
         try:
-            response = client.put(
+            response = client.get("/api/v1/runtime/state?mode=full")
+        finally:
+            app_settings.RUNTIME_ROLLBACK_READ_ENABLED = original
+
+        assert response.status_code == 200
+
+
+def test_runtime_state_default_drain_never_calls_mutation_service(monkeypatch) -> None:
+    async def mutation_forbidden(*_args, **_kwargs):
+        raise AssertionError("frozen route must not mutate Runtime state")
+
+    async def current_revision(*_args, **_kwargs):
+        return {}, 7, 8
+
+    monkeypatch.setattr(runtime_state_service, "apply_update", mutation_forbidden)
+    monkeypatch.setattr(runtime_state_service, "get_state", current_revision)
+    with TestClient(app) as client:
+        assert client.post(
+            "/api/v1/auth/login",
+            json={"username": "admin", "password": "jbgsnmm~123"},
+        ).status_code == 200
+        for method in (client.put, client.post):
+            response = method(
                 "/api/v1/runtime/state",
                 json={
                     "page": "learning-path.html",
@@ -307,20 +325,11 @@ def test_runtime_state_drain_mode_accepts_and_ignores_writes() -> None:
                     "key": "kg_default_entry_mode_v1",
                     "value": "drain-probe",
                     "storage": {"kg_default_entry_mode_v1": "drain-probe"},
-                    "requestId": "pytest-drain",
+                    "requestId": f"pytest-drain-{method.__name__}",
                 },
             )
-        finally:
-            app_settings.RUNTIME_SYNC_DISABLED = original
-
-        assert response.status_code == 200
-        body = response.json()
-        assert body["ok"] is True
-        assert body["requestId"] == "pytest-drain"
-        after = client.get("/api/v1/runtime/state?mode=full").json()
-        assert after["revision"] == body["revision"]
-        assert after["storage"].get("kg_default_entry_mode_v1") != "drain-probe"
-        assert before["revision"] == after["revision"]
+            assert response.status_code == 200
+            assert response.json()["revision"] == 7
 
 
 def test_learner_html_bootstrap_never_inlines_runtime_storage() -> None:
@@ -337,11 +346,7 @@ def test_learner_html_bootstrap_never_inlines_runtime_storage() -> None:
     assert payload.get("storage") is None
 
 
-def test_html_bootstrap_omits_storage_entirely_when_over_limit(monkeypatch) -> None:
-    """快照超限时必须整体放弃内联（原子性），不能只内联一部分。"""
-    from app.web import bootstrap as bootstrap_module
-
-    monkeypatch.setattr(bootstrap_module, "INLINE_STORAGE_MAX_BYTES", 1)
+def test_html_bootstrap_contains_no_runtime_snapshot_fields() -> None:
     with TestClient(app) as client:
         login = client.post(
             "/api/v1/auth/login",
@@ -352,19 +357,20 @@ def test_html_bootstrap_omits_storage_entirely_when_over_limit(monkeypatch) -> N
 
     payload = _bootstrap(response.text)
     assert payload["authenticated"] is True
-    assert payload.get("storage") is None
+    for key in ("namespace", "revision", "contentRevision", "storage"):
+        assert key not in payload
 
 
-def test_guest_html_bootstrap_has_no_inline_storage() -> None:
-    """未登录没有服务器状态可内联，storage 必须为 None（不能是空 dict）。"""
+def test_guest_html_bootstrap_has_no_runtime_snapshot() -> None:
     with TestClient(app) as client:
         payload = _bootstrap(client.get("/index.html").text)
 
     assert payload["authenticated"] is False
-    assert payload.get("storage") is None
+    for key in ("namespace", "revision", "contentRevision", "storage"):
+        assert key not in payload
 
 
-def test_runtime_full_snapshot_excludes_published_paper_bulk_keys() -> None:
+def test_runtime_full_snapshot_excludes_published_paper_bulk_keys(monkeypatch) -> None:
     """发布大键不得随 full 快照下发（2026-08-25 生产 TTFB 13~20s 事故）。
 
     两个大键（生产 2.5MB+）在每次快照读取时整包拉取 + 脱敏解析会占满
@@ -372,6 +378,7 @@ def test_runtime_full_snapshot_excludes_published_paper_bulk_keys() -> None:
     细粒度 API，runtime 快照（含 full 模式）一律不携带。
     """
     from app.services import runtime_state_service as service
+    from app.core.config import settings as app_settings
     from sqlalchemy import select
 
     async def seed_shared_bulk_keys() -> None:
@@ -390,6 +397,7 @@ def test_runtime_full_snapshot_excludes_published_paper_bulk_keys() -> None:
                     row.value = json.dumps([{"id": "paper-bulk", "name": "bulk"}])
             await db.commit()
 
+    monkeypatch.setattr(app_settings, "RUNTIME_ROLLBACK_READ_ENABLED", True)
     asyncio.run(seed_shared_bulk_keys())
     try:
         with TestClient(app) as client:

@@ -16,82 +16,12 @@
       "ordinal": 3
     },
     {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "/api/v1/runtime/state",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "/api/v1/runtime/state",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "/api/v1/runtime/state",
-      "ordinal": 2
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "/api/v1/runtime/state",
-      "ordinal": 3
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "/api/v1/runtime/state",
-      "ordinal": 4
-    },
-    {
       "path": "frontend/scripts/paper-release-adapter.test.mjs",
       "token": "/api/v1/runtime/state",
       "ordinal": 1
     }
   ],
   "consumer": [
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "KGServerStateBootstrap",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "KGServerStateBootstrap",
-      "ordinal": 2
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "KGServerStateStorage",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "KGServerStateStorage",
-      "ordinal": 2
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "KGServerStateStorage",
-      "ordinal": 3
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "KGServerStateStorage",
-      "ordinal": 4
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "KGServerStateStorage",
-      "ordinal": 5
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "KGServerStateBootstrap",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "KGServerStateStorage",
-      "ordinal": 1
-    },
     {
       "path": "frontend/scripts/new-legacy-sync.test.mjs",
       "token": "KGServerStateStorage",
@@ -189,11 +119,6 @@
     },
     {
       "path": "frontend/scripts/tests/direct-system-entitlements.test.mjs",
-      "token": "KGServerStateStorage",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/40-guided-tour.js",
       "token": "KGServerStateStorage",
       "ordinal": 1
     }
@@ -406,6 +331,26 @@
     },
     {
       "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_content_taxonomies_v1",
+      "ordinal": 9
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_course_config_active_release_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_course_config_drafts_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_course_config_releases_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
       "token": "kg_exam_paper_release_history_v1",
       "ordinal": 1
     },
@@ -418,6 +363,11 @@
       "path": "backend/app/services/runtime_domain_migration_service.py",
       "token": "kg_exam_papers_published_v1",
       "ordinal": 2
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_learning_tasks_v1",
+      "ordinal": 1
     },
     {
       "path": "backend/app/services/runtime_domain_migration_service.py",
@@ -451,6 +401,11 @@
     },
     {
       "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_user_feedback_reply_reads_v1__",
+      "ordinal": 4
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
       "token": "kg_user_feedback_v1",
       "ordinal": 1
     },
@@ -473,6 +428,271 @@
       "path": "backend/app/services/runtime_domain_migration_service.py",
       "token": "kg_user_message_reads_v1__",
       "ordinal": 3
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_user_message_reads_v1__",
+      "ordinal": 4
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_canvas_view_preferences_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_content_organization_migration_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_course_admin_recent_v862_p2",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_course_admin_workspace_v862_p1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_course_config_active_release_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_course_config_drafts_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_course_config_releases_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_deep_recall_legacy_owner_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_deep_recall_theme_platform_migrated_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_deep_recall_theme_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_default_entry_mode_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_file_manager_details_open_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_file_manager_folder_section_collapsed_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_file_manager_layout_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_file_manager_recent_folders_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_file_manager_sidebar_collapsed_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_file_manager_sort_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_file_manager_theme_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_font_",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_global_shortcuts_layout_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_global_shortcuts_position_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_graph_closed_tabs_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_graph_file_migration_v2",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_graph_recent_colors_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_graph_recent_opened_migration_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_graph_user_preferences_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_guided_practice_return_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_home_interaction_mode_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_home_professional_flow_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_language_",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_learning_tasks_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_analysis_sections_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_font_scale_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_highlight_color_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_paper_selection_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_release_selection_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_paper_workspace_layout_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_question_classification_collapsed_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_question_language_mode_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_question_library_workspace_layout_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_question_training_filters_collapsed_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_question_training_workspace_layout_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_recent_selection_",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_resizable_",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_subscription_plan_model_v2_migrated",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_teacher_shared_runtime_promotion_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_teacher_workbench_subject_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_theme_",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_training_workspace_layout_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_ui_resizable_region_",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_wechat_login_pending_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_workspace_layout_",
+      "ordinal": 1
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
@@ -666,48 +886,13 @@
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_course_config_active_release_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_course_config_active_release_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_course_config_drafts_v1",
       "ordinal": 1
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_course_config_drafts_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_course_config_drafts_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_course_config_releases_v1",
       "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_course_config_releases_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_course_config_releases_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_course_config_releases_v1",
-      "ordinal": 4
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
@@ -1426,26 +1611,6 @@
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 4
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 5
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_local_current_user_v1",
       "ordinal": 1
     },
@@ -2015,151 +2180,6 @@
       "ordinal": 1
     },
     {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_default_entry_mode_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_graph_file_index_v2",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_principle_repository_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_question_banks_published_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_question_banks_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_question_banks_v1__",
-      "ordinal": 2
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_question_tag_names_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_synthesis_preset_repository_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_exam_paper_release_history_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_exam_papers_published_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_exam_papers_published_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_exam_papers_published_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_current_file_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_current_file_v2",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_file_content_v2__",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_file_index_v2",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_file_library_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_file_migration_v2",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_file_tags_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_file_tags_v2",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_folders_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_recent_opened_migration_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_home_file_library_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_practice_auto_explanation_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_remote_auth_session_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_remote_auth_session_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_remote_auth_session_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_remote_auth_session_v1",
-      "ordinal": 4
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_synthesis_preset_repository_v1",
-      "ordinal": 1
-    },
-    {
       "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_admin_audit_log_v1",
       "ordinal": 1
@@ -2212,21 +2232,6 @@
     {
       "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_course_admin_workspace_v862_p1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_course_config_active_release_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_course_config_drafts_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_course_config_releases_v1",
       "ordinal": 1
     },
     {
@@ -2492,11 +2497,6 @@
     {
       "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_learning_sessions_v2__",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_learning_tasks_v1",
       "ordinal": 1
     },
     {
@@ -3555,66 +3555,6 @@
       "ordinal": 1
     },
     {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "kg_course_config_active_release_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "kg_course_config_drafts_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "kg_course_config_releases_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "kg_local_current_user_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-teacher-workbench-app.js",
-      "token": "kg_assessment_papers_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-teacher-workbench-app.js",
-      "token": "kg_course_config_drafts_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-teacher-workbench-app.js",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "kg_assessment_papers_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "kg_content_organization_migration_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "kg_exam_papers_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "kg_local_current_user_v1",
-      "ordinal": 1
-    },
-    {
       "path": "new-legacy/src/94-practice-navigation.js",
       "token": "kg_guided_practice_return_v1",
       "ordinal": 1
@@ -3687,61 +3627,6 @@
     {
       "path": "new-legacy/src/98-question-classification.js",
       "token": "kg_question_classification_collapsed_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_admin_audit_log_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_admin_settings_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_admin_transaction_snapshots_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_assessment_papers_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_course_config_active_release_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_course_config_drafts_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_course_config_releases_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_taxonomy_deletion_records_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_taxonomy_import_records_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_taxonomy_release_records_v1",
       "ordinal": 1
     },
     {
@@ -4107,6 +3992,11 @@
       "ordinal": 2
     },
     {
+      "path": "new-legacy/src/40-guided-tour.js",
+      "token": "TOUR_STORAGE_KEY",
+      "ordinal": 3
+    },
+    {
       "path": "new-legacy/src/59b-learning-route-context.js",
       "token": "sessionKey(mode)",
       "ordinal": 1
@@ -4412,66 +4302,6 @@
       "ordinal": 2
     },
     {
-      "path": "new-legacy/src/91-course-admin-app.js",
-      "token": "RECENT_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-course-admin-app.js",
-      "token": "RECENT_KEY",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/91-course-admin-app.js",
-      "token": "SUBJECT_PREF_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-course-admin-app.js",
-      "token": "SUBJECT_PREF_KEY",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/91-course-admin-app.js",
-      "token": "SUBJECT_PREF_KEY",
-      "ordinal": 3
-    },
-    {
-      "path": "new-legacy/src/91-course-admin-app.js",
-      "token": "WORKSPACE_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-course-admin-app.js",
-      "token": "WORKSPACE_KEY",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "key",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/91-teacher-workbench-app.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "key",
-      "ordinal": 2
-    },
-    {
       "path": "new-legacy/src/94-practice-navigation.js",
       "token": "CONTEXT_KEY",
       "ordinal": 1
@@ -4525,41 +4355,6 @@
       "path": "new-legacy/src/97-teacher-question-workflow.js",
       "token": "TRAINING_WORKSPACE_LAYOUT_KEY",
       "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "key",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "key",
-      "ordinal": 3
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "key",
-      "ordinal": 4
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "storageKey",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "storageKey",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "storageKey",
-      "ordinal": 3
     },
     {
       "path": "new-legacy/src/admin/resizable-region.js",

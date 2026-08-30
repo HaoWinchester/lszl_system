@@ -11,11 +11,6 @@ const repoDir = resolve(frontendDir, '..')
 const contract = JSON.parse(readFileSync(resolve(scriptsDir, 'new-legacy-contract.json'), 'utf8'))
 const homepageBundlePlan = JSON.parse(readFileSync(resolve(scriptsDir, 'homepage-bundles.json'), 'utf8'))
 const p45PersistenceContract = JSON.parse(readFileSync(resolve(scriptsDir, 'p45-persistence-contract.json'), 'utf8'))
-const runtimePolicyPath = existsSync(resolve(repoDir, 'backend/app/web/runtime_page_policy.json'))
-  ? resolve(repoDir, 'backend/app/web/runtime_page_policy.json')
-  : resolve(scriptsDir, 'runtime-page-policy.json')
-const runtimePagePolicy = JSON.parse(readFileSync(runtimePolicyPath, 'utf8'))
-const runtimePages = new Set(runtimePagePolicy.runtimePages)
 const learningEntryChooserAssets = ['src/31-learning-entry-chooser.js']
 const learningEntryChooserStorageKeys = ['kg_learning_entry_chooser_claim_v1', 'kg_learning_entry_chooser_consumed_v1']
 const legacyUnmigratedIndexedDbModules = Object.freeze([
@@ -585,9 +580,7 @@ function versionPageAssets(html, version) {
   )
   return withStyles.replace(
     /(<script\b[^>]*\bsrc=(['"]))((?!https?:|\/\/|data:)[^'"?#]+\.js)\2/gi,
-    (_, prefix, quote, asset) => asset.replace(/^\.\//, '') === 'server-state-bootstrap.js'
-      ? `${prefix}${asset}${quote}`
-      : `${prefix}${asset}${query}${quote}`,
+    (_, prefix, quote, asset) => `${prefix}${asset}${query}${quote}`,
   )
 }
 
@@ -608,7 +601,6 @@ function injectPage(html, page, version) {
   const injection = [
     '<script src="./teaching-content-sync.js"></script><!-- kg-teaching-content-sync:generated -->',
     '<!-- kg-direct-bootstrap-anchor -->',
-    runtimePages.has(page) ? '<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->' : '',
     '<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->',
     '<script src="./auth-session-bootstrap.js"></script><!-- kg-auth-session:generated -->',
     retiredSingleDeepRedirectShell ? '' : '<script src="./domain-api-client.js"></script><!-- kg-domain-api:generated -->',
@@ -1037,7 +1029,7 @@ function validate(source) {
   const required = ['VERSION', ...contract.requiredPages, ...contract.requiredFiles, ...learningEntryChooserAssets, 'src/28-device-preferences.js']
   const missing = required.filter((path) => !existsSync(resolve(source, path)))
   if (missing.length) throw new Error(`new-legacy 缺少必需文件：${missing.join(', ')}`)
-  const missingGenerated = [...(contract.requiredGeneratedFiles || []), 'domain-api-client.js', 'teaching-content-adapter.js', 'course-management-adapter.js', 'admin-domain-summary.js']
+  const missingGenerated = [...(contract.requiredGeneratedFiles || []), 'domain-api-client.js', 'teaching-content-adapter.js', 'course-management-adapter.js', 'admin-domain-summary.js', 'runtime-retirement.json']
     .filter((path) => !existsSync(resolve(scriptsDir, 'new-legacy-assets', path)))
   if (missingGenerated.length) {
     throw new Error(`new-legacy 缺少必需生成适配器：${missingGenerated.join(', ')}`)
@@ -1119,17 +1111,6 @@ function sync({ source, out }) {
     cpSync(resolve(customSource, 'styles/user-center.css'), resolve(out, 'styles/user-center.css'))
   }
 
-  const contentPrepPath = resolve(out, 'content-prep-studio/dist/content-prep.html')
-  if (existsSync(contentPrepPath)) {
-    const contentPrepHtml = readFileSync(contentPrepPath, 'utf8')
-    const runtimeMarker = '<script src="/server-state-bootstrap.js"></script>'
-    if (!contentPrepHtml.includes('kg-direct-bootstrap-anchor') && contentPrepHtml.includes(runtimeMarker)) {
-      writeFileSync(
-        contentPrepPath,
-        contentPrepHtml.replace(runtimeMarker, `<!-- kg-direct-bootstrap-anchor -->\n${runtimeMarker}`),
-      )
-    }
-  }
 
   for (const page of walk(out).filter((path) => !path.includes('/') && path.endsWith('.html'))) {
     const path = resolve(out, page)

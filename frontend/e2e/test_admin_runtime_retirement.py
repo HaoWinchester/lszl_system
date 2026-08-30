@@ -118,7 +118,7 @@ class MainHarness:
 
 
 class AdminRuntimeRetirementTest(unittest.TestCase):
-    def test_storage_audit_rejects_each_nonzero_direct_bootstrap_field(self) -> None:
+    def test_storage_audit_rejects_each_retired_direct_bootstrap_field(self) -> None:
         valid = {
             "keys": [],
             "nativeSet": True,
@@ -126,24 +126,18 @@ class AdminRuntimeRetirementTest(unittest.TestCase):
             "legacyStorage": "undefined",
             "directBootstrap": {
                 "present": True,
-                "storage": None,
-                "revision": 0,
-                "contentRevision": 0,
+                "runtimeFields": [],
             },
         }
         MODULE.storage_audit(EvaluatePage(valid), "admin-console.html")
 
-        for field, invalid_value in (
-            ("storage", {"legacy": True}),
-            ("revision", 9),
-            ("contentRevision", 4),
-        ):
+        for field in ("storage", "revision", "contentRevision", "namespace"):
             with self.subTest(field=field):
                 invalid = {
                     **valid,
                     "directBootstrap": {
                         **valid["directBootstrap"],
-                        field: invalid_value,
+                        "runtimeFields": [field],
                     },
                 }
                 with self.assertRaises(AssertionError):
@@ -158,9 +152,7 @@ class AdminRuntimeRetirementTest(unittest.TestCase):
                 "legacyStorage": "undefined",
                 "directBootstrap": {
                     "present": False,
-                    "storage": None,
-                    "revision": None,
-                    "contentRevision": None,
+                    "runtimeFields": [],
                 },
             }
         )

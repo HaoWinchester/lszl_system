@@ -4,7 +4,12 @@
   "toVersion": "v9.0-p4.1.186",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "content-prep-studio/dist/content-prep.html",
+      "content-prep-studio/src/js/10-state-domain.js",
+      "src/29-auth-core.js",
+      "src/40-guided-tour.js"
+    ],
     "removed": []
   },
   "incompatible": []

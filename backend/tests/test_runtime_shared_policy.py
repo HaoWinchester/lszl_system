@@ -22,6 +22,13 @@ from app.services import teaching_content_revision_service as revision_service
 from app.web.schemas import RuntimeMutation, RuntimeStateUpdate
 
 
+@pytest.fixture(autouse=True)
+def legacy_runtime_api_is_explicitly_enabled_for_migration_tests(monkeypatch):
+    """Historical Runtime migration tests opt in; the application default stays retired."""
+    monkeypatch.setattr(settings, "RUNTIME_SYNC_DISABLED", False)
+    monkeypatch.setattr(settings, "RUNTIME_ROLLBACK_READ_ENABLED", True)
+
+
 def update(*, storage: dict[str, str], mutations: list[RuntimeMutation]) -> RuntimeStateUpdate:
     last = mutations[-1]
     return RuntimeStateUpdate(

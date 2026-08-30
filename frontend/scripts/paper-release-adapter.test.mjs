@@ -400,9 +400,6 @@ test('generated paper management loads the release adapter before the admin appl
   assert.ok(html.indexOf('paper-release-adapter.js') < html.indexOf('src/65-question-bank-admin.js'))
 })
 
-test('learner pages no longer receive the published paper blob via runtime bootstrap', () => {
-  // 后端侧由 backend/tests/test_paper_release_perf_gate.py 保证；
-  // 这里保证 server-state-bootstrap 不再把发布键当作需要广播的数据变更依赖。
-  const bootstrap = read(resolve(frontendRoot, 'scripts/new-legacy-assets/server-state-bootstrap.js'))
-  assert.match(bootstrap, /PUBLISHED_PAPER_KEYS/)
+test('learner pages have no legacy Runtime bootstrap asset', () => {
+  assert.equal(existsSync(resolve(frontendRoot, 'scripts/new-legacy-assets/server-state-bootstrap.js')), false)
 })
