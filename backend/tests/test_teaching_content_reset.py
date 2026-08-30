@@ -449,16 +449,8 @@ def test_reset_current_content_deletes_current_rows_and_preserves_history_and_au
 
             principle_projection = await verify_db.get(SharedRuntimeState, PRINCIPLE_KEY)
             preset_projection = await verify_db.get(SharedRuntimeState, PRESET_KEY)
-            assert json.loads(principle_projection.value) == {
-                "schemaVersion": 1,
-                "items": [],
-                "updatedAt": 0,
-            }
-            assert json.loads(preset_projection.value) == {
-                "schemaVersion": 1,
-                "items": [],
-                "updatedAt": 0,
-            }
+            assert json.loads(principle_projection.value)["items"][0]["id"] == fixture["principleId"]
+            assert json.loads(preset_projection.value)["items"][0]["id"] == fixture["presetId"]
             after_revision = await teaching_content_revision_service.current(verify_db)
             assert after_revision["revision"] == fixture["beforeRevision"] + 1
 
@@ -503,21 +495,21 @@ def test_reset_current_content_rejects_stale_snapshot_before_any_mutation():
         asyncio.run(_restore_reset_state(snapshot))
 
 
-def test_reset_current_content_rolls_back_all_rows_when_projection_write_fails(monkeypatch):
+def test_reset_current_content_rolls_back_all_rows_when_revision_write_fails(monkeypatch):
     snapshot = asyncio.run(_snapshot_reset_state())
 
     async def scenario() -> None:
         fixture = await _seed_reset_fixture()
-        original_write = teaching_content_reset_service.write_principle_projection
+        original_write = teaching_content_reset_service.teaching_content_revision_service.bump
 
-        async def fail_projection_write(db, actor_username):
+        async def fail_revision_write(db, actor_username, changes):
             await db.flush()
-            raise RuntimeError("injected projection failure")
+            raise RuntimeError("injected revision failure")
 
         monkeypatch.setattr(
-            teaching_content_reset_service,
-            "write_principle_projection",
-            fail_projection_write,
+            teaching_content_reset_service.teaching_content_revision_service,
+            "bump",
+            fail_revision_write,
         )
         async with AsyncSessionLocal() as db:
             preview = await preview_reset(db)
@@ -529,7 +521,7 @@ def test_reset_current_content_rolls_back_all_rows_when_projection_write_fails(m
                     expected_snapshot_hash=str(preview["snapshotHash"]),
                 )
             except RuntimeError as error:
-                assert str(error) == "injected projection failure"
+                assert str(error) == "injected revision failure"
             else:
                 raise AssertionError("injected failure must abort reset")
 
@@ -554,8 +546,8 @@ def test_reset_current_content_rolls_back_all_rows_when_projection_write_fails(m
             assert await _count(verify_db, QuestionAuditLog) == fixture["beforeAuditCount"]
 
         monkeypatch.setattr(
-            teaching_content_reset_service,
-            "write_principle_projection",
+            teaching_content_reset_service.teaching_content_revision_service,
+            "bump",
             original_write,
         )
 

@@ -270,7 +270,13 @@ PUBLISHER_COLLECTION_KEYS = frozenset({
     "kg_learning_tasks_v1",
     "kg_activity_collections_v1",
 })
-SERVER_OWNED_KEYS = frozenset({"kg_announcements_v1", "kg_user_feedback_v1"})
+SERVER_OWNED_KEYS = frozenset({
+    "kg_announcements_v1",
+    "kg_user_feedback_v1",
+    # Principles and synthesis cards have dedicated relational Content Prep APIs.
+    # Runtime may retain historical rows for staged rollback, but cannot mutate them.
+    *teaching_content_projection_service.PROJECTION_KEYS,
+})
 
 
 BOOTSTRAP_COMMON_EXACT_KEYS = frozenset({
@@ -629,14 +635,6 @@ def validate_update(update: RuntimeStateUpdate) -> None:
         raise RuntimeStateValidationError(f"存储键未登记：{update.key}")
     if update.value is not None and len(update.value.encode("utf-8")) > MAX_VALUE_BYTES:
         raise RuntimeStateValidationError("单项数据超过大小限制")
-    if update.key in teaching_content_projection_service.PROJECTION_KEYS:
-        try:
-            teaching_content_projection_service.validate_projection_value(
-                update.key,
-                str(update.value or '{"schemaVersion":1,"items":[]}'),
-            )
-        except (TypeError, ValueError) as exc:
-            raise RuntimeStateValidationError(str(exc)) from exc
     for key, value in update.storage.items():
         if not key_allowed(key):
             raise RuntimeStateValidationError(f"存储键未登记：{key}")
@@ -649,17 +647,6 @@ def validate_update(update: RuntimeStateUpdate) -> None:
             raise RuntimeStateValidationError(f"setItem 缺少 value：{mutation.key}")
         if mutation.value is not None and len(mutation.value.encode("utf-8")) > MAX_VALUE_BYTES:
             raise RuntimeStateValidationError(f"存储项超过大小限制：{mutation.key}")
-        if mutation.key in teaching_content_projection_service.PROJECTION_KEYS:
-            try:
-                teaching_content_projection_service.validate_projection_value(
-                    mutation.key,
-                    str(
-                        mutation.value
-                        or '{"schemaVersion":1,"items":[]}'
-                    ),
-                )
-            except (TypeError, ValueError) as exc:
-                raise RuntimeStateValidationError(str(exc)) from exc
     total = sum(
         len(key.encode("utf-8")) + len(value.encode("utf-8"))
         for key, value in update.storage.items()
@@ -1457,7 +1444,6 @@ async def apply_update(
             mutation.key
             for mutation in mutations
             if deprecated_question_key(mutation.key)
-            and mutation.key not in teaching_content_projection_service.PROJECTION_KEYS
         ]
         if deprecated_mutations:
             raise RuntimeStatePermissionError("正式题库已迁移，请使用题目目录接口")
@@ -1588,36 +1574,8 @@ async def apply_update(
 
     # 共享区只接受本批次显式 mutation，避免完整账号快照把其他发布者的新内容覆盖掉。
     content_changes: list[dict[str, str]] = []
-    projection_mutations = [
-        mutation
-        for mutation in teaching_mutations
-        if mutation.key in teaching_content_projection_service.PROJECTION_KEYS
-    ]
-    projection_mutations.sort(
-        key=lambda mutation: (
-            mutation.key != teaching_content_projection_service.PRINCIPLE_KEY,
-            mutation.key,
-        )
-    )
-    for mutation in projection_mutations:
-        try:
-            content_changes.extend(
-                await teaching_content_projection_service.apply_principle_projection(
-                    db,
-                    owner,
-                    mutation.key,
-                    str(mutation.value or '{"schemaVersion":1,"items":[]}'),
-                )
-            )
-        except (TypeError, ValueError) as exc:
-            raise RuntimeStateValidationError(str(exc)) from exc
-    if projection_mutations:
-        await teaching_content_projection_service.write_principle_projection(db, owner)
-
     for mutation in shared_mutations:
         key = canonical_teacher_shared_key(mutation.key, role, owner) or mutation.key
-        if key in teaching_content_projection_service.PROJECTION_KEYS:
-            continue
         if mutation not in teaching_mutations:
             await _lock_owner(db, f"shared:{key}")
         shared_row = await db.get(SharedRuntimeState, key)

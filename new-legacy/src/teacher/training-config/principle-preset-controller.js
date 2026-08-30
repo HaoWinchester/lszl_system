@@ -211,7 +211,7 @@
       confusable.innerHTML=item&&others.length?others.map(candidate=>`<label><input type="checkbox" value="${escapeHTML(candidate.id)}" ${selected.has(candidate.id)?'checked':''}/><span>${escapeHTML(candidate.name)}</span></label>`).join(''):'<small>创建多个原则后可选择易混淆原则。</small>';
     }
   }
-  function savePrinciple(){
+  async function savePrinciple(){
     const name=String(byId('tqPrincipleName')?.value||'').trim();if(!name)return toast('请输入原则名称。');
     const id=String(byId('tqPrincipleId')?.value||'');
     const principleStatus=byId('tqPrincipleStatus')?.value||'active';
@@ -220,9 +220,13 @@
     const presetId=String(byId('tqPresetId')?.value||'');
     const presetContent=String(byId('tqPresetContent')?.value||'').trim();
     const presetStatus=byId('tqPresetStatus')?.value||'draft';
-    const item=Principles?.upsert?.({id,name,status:principleStatus,confusablePrincipleIds:confusable});if(!item)return toast('原则保存失败。');
-    Presets?.upsert?.({id:presetId,principleId:item.id,title:'原则：'+item.name,content:presetContent,status:presetStatus});
-    draftPrincipleId='';activePrincipleId=item.id;renderPrincipleList();toast('原则与系统预设归纳卡已保存。');
+    const principle={id,name,status:principleStatus,confusablePrincipleIds:confusable};
+    const preset={id:presetId,principleId:id,title:'原则：'+name,content:presetContent,status:presetStatus};
+    try{
+      const result=await global.KGTeachingContentApi.savePrinciple(principle,preset);
+      applyPrincipleCardBundle(result);const item=Principles?.get?.(id)||Principles?.findByName?.(name);if(!item)throw new Error('服务器未返回保存后的原则');
+      draftPrincipleId='';activePrincipleId=item.id;renderPrincipleList();toast('原则与系统预设归纳卡已保存。');
+    }catch(error){toast(error?.message||'原则保存失败。')}
   }
   function newPrinciple(){draftPrincipleId='principle-draft-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);activePrincipleId=draftPrincipleId;fillPrincipleEditor(draftPrincipleId);byId('tqPrincipleName')?.focus()}
   function selectedPrinciples(){return [...selectedPrincipleIds]}

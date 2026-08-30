@@ -13,34 +13,31 @@ import hashlib
 import json
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.teaching_content import RecallAssociationLibrary
 from app.schemas.question_cleanup import QuestionCleanupReference
 from app.services import teaching_content_revision_service
 
 
 CURRENT_RUNTIME_KEY_TYPES: dict[str, str] = {
-    "kg_exam_papers_v1__teacher_shared": "paper_draft",
-    "kg_exam_paper_categories_v1__teacher_shared": "paper_category",
+    # allowed_until_task6: these exact keys lose their Runtime compatibility as
+    # soon as Task 6 introduces the relational course/task owner.
     "kg_course_config_drafts_v1": "course_draft",
     "kg_course_config_active_release_v1": "active_course",
     "kg_learning_tasks_v1": "learning_task",
-    "kg_principle_repository_v1": "principle_repository",
-    "kg_synthesis_preset_repository_v1": "synthesis_preset_repository",
-    "kg_assessment_papers_v1": "workbench_aggregate",
 }
 
 PUBLISHED_RUNTIME_KEY_TYPES: dict[str, str] = {
-    "kg_exam_papers_published_v1": "published_paper_snapshot",
-    "kg_exam_paper_release_history_v1": "published_paper_snapshot",
+    # allowed_until_task6
     "kg_course_config_releases_v1": "published_course_snapshot",
 }
 
-RECALL_ASSOCIATION_PREFIX = "kg_recall_association_library_v1__subject__"
+RECALL_ASSOCIATION_PREFIX = None
 
 REPORT_RUNTIME_EXACT_KEYS = frozenset(
     {*CURRENT_RUNTIME_KEY_TYPES, *PUBLISHED_RUNTIME_KEY_TYPES}
@@ -344,31 +341,6 @@ def _canonical_runtime_payload(key: str, payload: object) -> object:
                 _canonical_json(row),
             ),
         )
-    if isinstance(payload, Mapping) and key in {
-        "kg_principle_repository_v1",
-        "kg_synthesis_preset_repository_v1",
-    }:
-        normalized = dict(payload)
-        items = normalized.get("items")
-        if isinstance(items, list) and all(isinstance(row, Mapping) for row in items):
-            normalized["items"] = sorted(
-                items,
-                key=lambda row: (str(row.get("id") or ""), _canonical_json(row)),
-            )
-        return normalized
-    if isinstance(payload, Mapping) and key.startswith(RECALL_ASSOCIATION_PREFIX):
-        normalized = dict(payload)
-        for field in ("nodes", "edges"):
-            rows = normalized.get(field)
-            if isinstance(rows, list) and all(isinstance(row, Mapping) for row in rows):
-                normalized[field] = sorted(
-                    rows,
-                    key=lambda row: (
-                        str(row.get("id") or ""),
-                        _canonical_json(row),
-                    ),
-                )
-        return normalized
     return payload
 
 
@@ -377,10 +349,6 @@ def _runtime_key_type(key: str) -> tuple[str, str] | None:
         return CURRENT_RUNTIME_KEY_TYPES[key], "remove_question_and_recalculate"
     if key in PUBLISHED_RUNTIME_KEY_TYPES:
         return PUBLISHED_RUNTIME_KEY_TYPES[key], "preserve_historical_snapshot"
-    if key.startswith(RECALL_ASSOCIATION_PREFIX) and len(key) > len(
-        RECALL_ASSOCIATION_PREFIX
-    ):
-        return "recall_association_library", "remove_question_and_recalculate"
     return None
 
 
@@ -437,14 +405,83 @@ async def inventory_question_references(
             }
         )
 
-    runtime_query = (
-        select(SharedRuntimeState)
-        .where(
-            or_(
-                SharedRuntimeState.key.in_(REPORT_RUNTIME_EXACT_KEYS),
-                SharedRuntimeState.key.startswith(RECALL_ASSOCIATION_PREFIX),
+    release_snapshot: list[dict[str, object]] = []
+    releases = await db.execute(
+        select(PaperReleaseQuestion, PaperRelease)
+        .join(PaperRelease, PaperRelease.id == PaperReleaseQuestion.release_id)
+        .order_by(
+            PaperReleaseQuestion.release_id,
+            PaperReleaseQuestion.order_index,
+            PaperReleaseQuestion.question_id,
+        )
+    )
+    for link, release in releases:
+        references.append(
+            _reference(
+                container_type="relational_paper_release",
+                container_id=str(link.release_id),
+                question_id=str(link.question_id),
+                repair_action="preserve_historical_snapshot",
+                storage_key=None,
+                reference_path=(
+                    f"paper_release_questions/{link.release_id}/{link.order_index}"
+                ),
             )
         )
+        release_snapshot.append(
+            {
+                "releaseId": str(link.release_id),
+                "releaseStatus": str(release.status),
+                "questionId": str(link.question_id),
+                "orderIndex": int(link.order_index),
+                "snapshotHash": _sha256(link.snapshot),
+            }
+        )
+
+    recall_snapshot: list[dict[str, object]] = []
+    recall_rows = list(
+        (
+            await db.execute(
+                select(RecallAssociationLibrary).order_by(
+                    RecallAssociationLibrary.subject_id,
+                    RecallAssociationLibrary.version,
+                    RecallAssociationLibrary.id,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for library in recall_rows:
+        payload = {
+            "nodes": list(library.nodes or []),
+            "edges": list(library.edges or []),
+            "metadata": dict(library.content_metadata or {}),
+        }
+        recall_snapshot.append(
+            {
+                "libraryId": str(library.id),
+                "subjectId": str(library.subject_id),
+                "version": int(library.version),
+                "status": str(library.status),
+                "valueHash": _sha256(payload),
+            }
+        )
+        for question_id, relative_path in _walk_question_references(payload):
+            references.append(
+                _reference(
+                    container_type="relational_recall_association_library",
+                    container_id=str(library.id),
+                    question_id=question_id,
+                    repair_action="remove_question_and_recalculate",
+                    storage_key=None,
+                    reference_path=relative_path or "/",
+                )
+            )
+
+    runtime_query = (
+        select(SharedRuntimeState)
+        .where(SharedRuntimeState.key.in_(REPORT_RUNTIME_EXACT_KEYS))
         .order_by(SharedRuntimeState.key)
     )
     runtime_rows = (await db.execute(runtime_query)).scalars().all()
@@ -506,6 +543,12 @@ async def inventory_question_references(
     snapshot = [
         {"kind": "relationalPaperQuestion", **item}
         for item in relational_snapshot
+    ] + [
+        {"kind": "relationalPaperReleaseQuestion", **item}
+        for item in release_snapshot
+    ] + [
+        {"kind": "relationalRecallAssociationLibrary", **item}
+        for item in recall_snapshot
     ] + [
         {"kind": "sharedRuntime", **item}
         for item in runtime_snapshot
@@ -689,12 +732,7 @@ def _recalculate_runtime_papers(
 async def _lock_runtime_rows(db: AsyncSession) -> list[SharedRuntimeState]:
     query = (
         select(SharedRuntimeState)
-        .where(
-            or_(
-                SharedRuntimeState.key.in_(REPORT_RUNTIME_EXACT_KEYS),
-                SharedRuntimeState.key.startswith(RECALL_ASSOCIATION_PREFIX),
-            )
-        )
+        .where(SharedRuntimeState.key.in_(REPORT_RUNTIME_EXACT_KEYS))
         .order_by(SharedRuntimeState.key)
         .with_for_update()
     )
@@ -713,6 +751,8 @@ async def repair_current_question_references(
     if not deleted_question_ids:
         return {
             "relationalPaperIds": [],
+            "relationalRecallLibraryIds": [],
+            "removedRelationalRecallReferences": 0,
             "runtimeKeys": [],
             "removedRuntimeReferences": 0,
         }
@@ -787,6 +827,35 @@ async def repair_current_question_references(
         paper.quotas = dict(sorted(quotas.items()))
         paper.revision = int(paper.revision) + 1
         paper.updated_by = actor_username
+
+    changed_recall_library_ids: list[str] = []
+    removed_recall_references = 0
+    recall_rows = list(
+        (
+            await db.execute(
+                select(RecallAssociationLibrary)
+                .order_by(RecallAssociationLibrary.id)
+                .with_for_update()
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for library in recall_rows:
+        payload = {
+            "nodes": list(library.nodes or []),
+            "edges": list(library.edges or []),
+            "metadata": dict(library.content_metadata or {}),
+        }
+        repaired, removed, _ = _repair_json_value(payload, deleted_question_ids)
+        if removed <= 0 or not isinstance(repaired, Mapping):
+            continue
+        library.nodes = list(repaired.get("nodes") or [])
+        library.edges = list(repaired.get("edges") or [])
+        library.content_metadata = dict(repaired.get("metadata") or {})
+        library.updated_by = actor_username
+        changed_recall_library_ids.append(str(library.id))
+        removed_recall_references += removed
 
     changed_runtime_keys: list[str] = []
     removed_runtime_references = 0
@@ -866,6 +935,8 @@ async def repair_current_question_references(
 
     return {
         "relationalPaperIds": paper_ids,
+        "relationalRecallLibraryIds": sorted(changed_recall_library_ids),
+        "removedRelationalRecallReferences": removed_recall_references,
         "runtimeKeys": sorted(changed_runtime_keys),
         "removedRuntimeReferences": removed_runtime_references,
         "publishedBankIds": sorted(published_bank_ids),

@@ -151,19 +151,17 @@
     finally{refreshButtons()}
   }
   window.PMPPrepSyncWorkspace=syncWorkspaceToServer;
-  function readServerProjection(key,normalizer){
-    try{
-      const raw=window.localStorage?.getItem?.(key);if(!raw)return null;
-      const parsed=JSON.parse(raw);return normalizer(parsed);
-    }catch(_error){return null}
+  function readTeachingResource(name,normalizer){
+    const value=window.KGTeachingContentApi?.readResource?.(name,null);
+    return value==null?null:normalizer(value);
   }
   function remoteContentSnapshot(){
     const catalog=prepRuntime.serverCatalogSnapshot||null;
     if(!catalog)return null;
     return {
       catalog,
-      principles:readServerProjection('kg_principle_repository_v1',normalizePrinciples)||prepRuntime.serverPrinciples||null,
-      presets:readServerProjection('kg_synthesis_preset_repository_v1',normalizePresets)||prepRuntime.serverSynthesisPresets||null
+      principles:readTeachingResource('principles',normalizePrinciples)||prepRuntime.serverPrinciples||null,
+      presets:readTeachingResource('synthesisPresets',normalizePresets)||prepRuntime.serverSynthesisPresets||null
     };
   }
   function selectedRemoteBank(snapshot){
@@ -255,8 +253,8 @@
   window.PMPPrepServerContentRefresh=Object.freeze({apply:applyRemoteContent,snapshot:remoteContentSnapshot});
   function handleServerStateReload(){
     if(prepRuntime.draftId)return;
-    prepRuntime.serverPrinciples=readServerProjection('kg_principle_repository_v1',normalizePrinciples)||prepRuntime.serverPrinciples||null;
-    prepRuntime.serverSynthesisPresets=readServerProjection('kg_synthesis_preset_repository_v1',normalizePresets)||prepRuntime.serverSynthesisPresets||null;
+    prepRuntime.serverPrinciples=readTeachingResource('principles',normalizePrinciples)||prepRuntime.serverPrinciples||null;
+    prepRuntime.serverSynthesisPresets=readTeachingResource('synthesisPresets',normalizePresets)||prepRuntime.serverSynthesisPresets||null;
     if(!prepRuntime.serverCatalogSnapshot)return;
     if(prepRuntime.dirty)renderRemoteReadOnlyViews();
     else applyRemoteContent({mode:'reload'});
@@ -287,8 +285,9 @@
             const fetchedRevision=Number(catalogSnapshot?.contentRevision);
             if(!Number.isSafeInteger(fetchedRevision)||fetchedRevision<applyingRevision)throw new Error('服务器目录快照仍在同步，请稍后重试。');
             prepRuntime.serverCatalogSnapshot=catalogSnapshot;
-            prepRuntime.serverPrinciples=readServerProjection('kg_principle_repository_v1',normalizePrinciples)||prepRuntime.serverPrinciples||null;
-            prepRuntime.serverSynthesisPresets=readServerProjection('kg_synthesis_preset_repository_v1',normalizePresets)||prepRuntime.serverSynthesisPresets||null;
+            await window.KGTeachingContentApi?.bootstrap?.(state.questionBank.subject||'PMP');
+            prepRuntime.serverPrinciples=readTeachingResource('principles',normalizePrinciples)||prepRuntime.serverPrinciples||null;
+            prepRuntime.serverSynthesisPresets=readTeachingResource('synthesisPresets',normalizePresets)||prepRuntime.serverSynthesisPresets||null;
             failures=0;
           }catch(error){
             failures+=1;if(failures>2)throw error;
@@ -404,6 +403,7 @@
   window.addEventListener('pagehide',()=>{remoteRetryStopped=true;clearTimeout(remoteRetryTimer);unsubscribeTeachingSync?.();window.removeEventListener?.('kg:server-state-reloaded',handleServerStateReload)});
   function initServerSession(){
     renderActor();refreshButtons();refreshBanks();
+    window.KGTeachingContentApi?.bootstrap?.(state.questionBank.subject||'PMP').catch?.(()=>{});
     refreshSharedContent().catch(error=>{setStatus(error.message||'共享内容读取失败','bad');setIssues(error)});
     if(actor()&&window.PMPPrepP45Server){
       window.PMPPrepP45Server.loadSubjectFacetSchemas().catch(error=>{if(error.code!=='AUTH_REQUIRED')console.warn('[p45] facet schema load failed:',error.message)});

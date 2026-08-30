@@ -1153,17 +1153,19 @@
     if(!options.silent)toast(message);
     return {ok:true,missing,saved:quick.length,message};
   }
-  function parseRecallLibrary(save){
+  async function parseRecallLibrary(save){
     const api=recallLibraryApi(),bank=currentBank(),text=$('qbRecallLibraryText')?.value||'';if(!api||!bank)return;
     const parsed=api.parseText(text);state.recallLibraryPreview=parsed;
     const report=$('qbRecallLibraryReport');
     if(!parsed.valid){if(report)report.innerHTML='<strong>解析失败</strong><span>'+escapeHTML((parsed.errors||[]).join('；'))+'</span>';return}
     if(save){
       const mode=$('qbRecallLibraryMode')?.value||'merge';
-      const result=api.saveText(bank.subject,text,{mode});state.recallLibraryPreview=result;
-      if(!result.valid){if(report)report.innerHTML='<strong>保存失败</strong><span>'+escapeHTML((result.errors||[]).join('；'))+'</span>';return}
-      if(report)report.innerHTML=`<strong>已保存 ${escapeHTML(bank.subject)} 联想库</strong><span>${result.library.nodes.length} 个知识点 · ${result.library.edges.length} 条关系 · ${mode==='replace'?'替换':'合并'}模式</span>`;
-      refreshRecallNodeSelector();toast('知识联想库已保存。');return;
+      const current=api.read(bank.subject),incoming=api.reconcileIncoming(current,parsed.library),candidate=mode==='replace'?incoming:api.merge(current,incoming);
+      try{
+        const synced=await api.writeServer(bank.subject,candidate);api.write(bank.subject,synced.library);state.recallLibraryPreview={valid:true,library:synced.library};
+        if(report)report.innerHTML=`<strong>已保存 ${escapeHTML(bank.subject)} 联想库</strong><span>${synced.library.nodes.length} 个知识点 · ${synced.library.edges.length} 条关系 · ${mode==='replace'?'替换':'合并'}模式</span>`;
+        refreshRecallNodeSelector();toast('知识联想库已保存。');return;
+      }catch(error){if(report)report.innerHTML=`<strong>保存失败</strong><span>${escapeHTML(error?.message||'服务器请求失败')}</span>`;toast('知识联想库保存失败。');return}
     }
     if(report)report.innerHTML=`<strong>解析通过</strong><span>${parsed.report.nodeCount} 个知识点 · ${parsed.report.edgeCount} 条关系 · ${parsed.report.lineCount} 行 · 尚未保存</span>`;
   }

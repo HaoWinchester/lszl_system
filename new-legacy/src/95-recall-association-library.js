@@ -6,8 +6,6 @@
  * 该数据独立于知识树导入导出，不修改知识点稳定 ID 或课程数据。
  */
 (function(global){
-  const STORAGE_PREFIX='kg_recall_association_library_v1__';
-  const AUTH_SESSION_KEY='kg_local_current_user_v1';
   const indexCache=new WeakMap();
   let sessionBinding=null;
 
@@ -28,14 +26,8 @@
     return ascii||('n-'+hash(value));
   }
   function nodeId(value){return clean(value).startsWith('recall-')?clean(value):'recall-'+slug(value)}
-  function sessionScope(){
-    try{
-      const username=global.KGAuthCore?.currentUsername?.()||global.localStorage?.getItem(AUTH_SESSION_KEY);
-      return username?'user__'+encodeURIComponent(username):'public';
-    }catch(error){return 'public'}
-  }
-  function storageKey(subjectId='PMP'){return STORAGE_PREFIX+'subject__'+encodeURIComponent(clean(subjectId)||'PMP')}
-  function legacyStorageKey(subjectId='PMP'){return STORAGE_PREFIX+sessionScope()+'__'+encodeURIComponent(clean(subjectId)||'PMP')}
+  function storageKey(subjectId='PMP'){return 'teaching-content-api:recall:'+encodeURIComponent(clean(subjectId)||'PMP')}
+  function legacyStorageKey(subjectId='PMP'){return storageKey(subjectId)}
   function normalizeNode(node,index=0){
     node=node&&typeof node==='object'?node:{title:node};
     const title=clean(node.title||node.name||node.label||node.id||('知识点 '+(index+1)));
@@ -189,18 +181,13 @@
   }
   function read(subjectId='PMP'){
     if(sessionBinding)return sessionBinding.library;
-    try{
-      const primary=global.localStorage?.getItem(storageKey(subjectId));
-      if(primary)return normalizeLibrary(JSON.parse(primary)||{});
-      const legacy=global.localStorage?.getItem(legacyStorageKey(subjectId));
-      if(legacy){const migrated=normalizeLibrary(JSON.parse(legacy)||{});try{global.localStorage?.setItem(storageKey(subjectId),JSON.stringify(migrated))}catch(_){}return migrated}
-      return normalizeLibrary({});
-    }catch(error){return normalizeLibrary({})}
+    return normalizeLibrary(global.KGTeachingContentApi?.readResource?.('recallLibrary',{})||{});
   }
   function write(subjectId='PMP',library={}){
     if(sessionBinding)return {valid:false,errors:['当前为学员只读联想库快照，不能修改正式 Recall 数据。'],library:sessionBinding.library};
     const normalized=normalizeLibrary(library);
-    try{global.localStorage?.setItem(storageKey(subjectId),JSON.stringify(normalized));return {valid:true,library:normalized}}catch(error){return {valid:false,errors:['保存失败：'+error.message],library:normalized}}
+    global.KGTeachingContentApi?.stageResource?.('recallLibrary',normalized);
+    return {valid:true,library:normalized};
   }
   function saveText(subjectId,text,{mode='merge'}={}){
     const parsed=parseText(text);if(!parsed.valid)return parsed;
@@ -326,34 +313,20 @@
   function clearSessionLibrary(){sessionBinding=null}
   function sessionInfo(){return sessionBinding?{contentHash:sessionBinding.contentHash,library:sessionBinding.library}:null}
 
-  /* P4.5.31 服务器权威联想库读写：深度回忆会话由 GET /recall/session 下发快照，
-     而管理端导入/发布必须落到服务器 SharedRuntimeState 才能到达学员端。 */
-  const SHARED_CONTENT_PATH='/api/v1/content-prep/shared-content';
-  async function requestJson(url,init={}){
-    const request=global.fetch;
-    if(typeof request!=='function')throw new Error('当前环境缺少 fetch');
-    const response=await request(url,{credentials:'include',headers:{Accept:'application/json',...(init.body?{'Content-Type':'application/json'}:{}),...(init.headers||{})},...init});
-    let payload=null;try{payload=await response.json()}catch(_){}
-    if(!response.ok){
-      const error=new Error(String(payload?.detail||('HTTP '+response.status)));
-      error.status=response.status;error.payload=payload;
-      throw error;
-    }
-    return payload;
-  }
+  /* 深度回忆会话使用服务端快照；管理端发布统一走关系型联想库 API。 */
   async function readServer(subjectId='PMP'){
-    const data=await requestJson(SHARED_CONTENT_PATH+'?subjectId='+encodeURIComponent(clean(subjectId)||'PMP'));
+    const data=await global.KGTeachingContentApi.bootstrap(clean(subjectId)||'PMP');
     const library=data?.recallLibrary;
     return library&&typeof library==='object'?{...normalizeLibrary(library),id:clean(library.id),subjectId:clean(library.subjectId),version:Number(library.version)||1,status:clean(library.status)||'published',contentRevision:Number(data?.contentRevision)||0}:null;
   }
   async function writeServer(subjectId='PMP',library={}){
     const subject=clean(subjectId)||'PMP';
-    const current=await requestJson(SHARED_CONTENT_PATH+'?subjectId='+encodeURIComponent(subject));
+    const current=await global.KGTeachingContentApi.bootstrap(subject);
     const revision=Number(current?.contentRevision)||0;
     const identity=current?.recallLibrary&&typeof current.recallLibrary==='object'?current.recallLibrary:{};
     const recallLibrary={...normalizeLibrary(library),id:clean(identity.id),subjectId:clean(identity.subjectId)||subject,version:Number(identity.version)||1,status:clean(identity.status)||'published'};
-    const saved=await requestJson(SHARED_CONTENT_PATH,{method:'PUT',body:JSON.stringify({subjectId:subject,contentRevision:revision,recallLibrary})});
-    const savedIdentity=saved?.recallLibrary&&typeof saved.recallLibrary==='object'?saved.recallLibrary:recallLibrary;
+    const savedIdentity=await global.KGTeachingContentApi.saveRecallLibrary(subject,recallLibrary)||recallLibrary;
+    const saved=global.KGTeachingContentApi.snapshot();
     return {valid:true,revision:Number(saved?.contentRevision)||revision+1,identity:{id:clean(savedIdentity.id),subjectId:clean(savedIdentity.subjectId)||subject,version:Number(savedIdentity.version)||1,status:clean(savedIdentity.status)||'published'},library:normalizeLibrary(savedIdentity)};
   }
 

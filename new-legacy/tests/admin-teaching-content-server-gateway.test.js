@@ -142,6 +142,30 @@ function createRuntime(options = {}) {
     },
   };
   context.window = context;
+  let apiSnapshot = null;
+  context.KGTeachingContentApi = {
+    async bootstrap(subjectId) {
+      const responseValue = await context.fetch(`/api/v1/content-prep/shared-content?subjectId=${encodeURIComponent(subjectId)}`);
+      apiSnapshot = await responseValue.json();
+      return structuredClone(apiSnapshot);
+    },
+    async saveTaxonomy(taxonomy) {
+      const responseValue = await context.fetch('/api/v1/content-prep/shared-content', {
+        method: 'PUT',
+        body: JSON.stringify({
+          subjectId: taxonomy.subjectId,
+          contentRevision: Number(apiSnapshot?.contentRevision) || 0,
+          knowledgeTree: { taxonomy },
+        }),
+      });
+      const payload = await responseValue.json();
+      if (!responseValue.ok) throw new Error(payload.detail || '服务器请求失败');
+      apiSnapshot = payload;
+      return structuredClone(payload.knowledgeTree.taxonomy);
+    },
+    snapshot() { return structuredClone(apiSnapshot || {}); },
+    async importActivities() { return {}; },
+  };
   vm.runInNewContext(fs.readFileSync(gatewayPath, 'utf8'), context, { filename: gatewayPath });
   if (options.realInfrastructure) {
     for (const name of [

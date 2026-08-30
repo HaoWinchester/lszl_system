@@ -425,8 +425,6 @@ def test_principle_delete_removes_an_unreferenced_principle_and_its_card() -> No
     preset_id = f"preset-delete-{suffix}"
     shared_keys = {
         RELATIONAL_REVISION_SNAPSHOT_KEY,
-        PRINCIPLE_PROJECTION_KEY,
-        PRESET_PROJECTION_KEY,
     }
 
     async def seed() -> dict[str, dict]:
@@ -463,9 +461,6 @@ def test_principle_delete_removes_an_unreferenced_principle_and_its_card() -> No
                     updated_by=username,
                 )
             )
-            await teaching_content_projection_service.write_principle_projection(
-                db, username
-            )
             await db.commit()
         return shared_snapshot
 
@@ -473,14 +468,6 @@ def test_principle_delete_removes_an_unreferenced_principle_and_its_card() -> No
         async with AsyncSessionLocal() as db:
             assert await db.get(Principle, principle_id) is None
             assert await db.get(SynthesisPreset, preset_id) is None
-            principles = json.loads(
-                (await db.get(SharedRuntimeState, PRINCIPLE_PROJECTION_KEY)).value
-            )
-            presets = json.loads(
-                (await db.get(SharedRuntimeState, PRESET_PROJECTION_KEY)).value
-            )
-            assert principle_id not in {item["id"] for item in principles["items"]}
-            assert preset_id not in {item["id"] for item in presets["items"]}
 
     async def cleanup(shared_snapshot: dict[str, dict]) -> None:
         async with AsyncSessionLocal() as db:
@@ -637,8 +624,6 @@ def test_imported_builtin_principle_card_updates_survive_startup_seed() -> None:
 
     shared_keys = {
         RELATIONAL_REVISION_SNAPSHOT_KEY,
-        PRINCIPLE_PROJECTION_KEY,
-        PRESET_PROJECTION_KEY,
     }
     bundle = builtin_teaching_content_seed_service.load_builtin_bundle()
     principle_id = str(bundle.principles[0]["id"])
@@ -666,14 +651,6 @@ def test_imported_builtin_principle_card_updates_survive_startup_seed() -> None:
             assert principle is not None and principle.name == imported_name
             assert preset is not None and preset.content == imported_content
             assert int((await revision_service.current(db))["revision"]) == import_revision
-            principle_projection = json.loads(
-                (await db.get(SharedRuntimeState, PRINCIPLE_PROJECTION_KEY)).value
-            )
-            preset_projection = json.loads(
-                (await db.get(SharedRuntimeState, PRESET_PROJECTION_KEY)).value
-            )
-            assert next(item for item in principle_projection["items"] if item["id"] == principle_id)["name"] == imported_name
-            assert next(item for item in preset_projection["items"] if item["id"] == preset_id)["content"] == imported_content
 
     async def cleanup(
         shared_snapshot: dict[str, dict],
@@ -1405,8 +1382,8 @@ async def _restore_shared_rows(keys: set[str], snapshot: dict[str, dict]) -> Non
         await db.commit()
 
 
-def test_content_prep_batch_projects_canonical_relations_and_bumps_once() -> None:
-    """Catch a committed batch publishing stale projections or multiple revisions."""
+def test_content_prep_batch_writes_canonical_relations_and_bumps_once() -> None:
+    """Catch a committed batch writing non-canonical relations or multiple revisions."""
 
     suffix = uuid4().hex[:10]
     username = f"revision-projection-{suffix}"
@@ -1416,8 +1393,6 @@ def test_content_prep_batch_projects_canonical_relations_and_bumps_once() -> Non
     preset_id = f"preset-projection-{suffix}"
     shared_keys = {
         RELATIONAL_REVISION_SNAPSHOT_KEY,
-        PRINCIPLE_PROJECTION_KEY,
-        PRESET_PROJECTION_KEY,
     }
 
     async def scenario() -> None:
@@ -1492,12 +1467,8 @@ def test_content_prep_batch_projects_canonical_relations_and_bumps_once() -> Non
 
             async with AsyncSessionLocal() as db:
                 revision = await revision_service.current(db)
-                principle_projection = json.loads(
-                    (await db.get(SharedRuntimeState, PRINCIPLE_PROJECTION_KEY)).value
-                )
-                preset_projection = json.loads(
-                    (await db.get(SharedRuntimeState, PRESET_PROJECTION_KEY)).value
-                )
+                projected_principle = await db.get(Principle, principle_id)
+                projected_preset = await db.get(SynthesisPreset, preset_id)
 
             assert result.content_revision == before + 1
             assert revision["revision"] == before + 1
@@ -1510,47 +1481,16 @@ def test_content_prep_batch_projects_canonical_relations_and_bumps_once() -> Non
                 ("principle", principle_id, "created"),
                 ("synthesisPreset", preset_id, "created"),
             }
-            assert principle_projection["schemaVersion"] == 1
-            assert isinstance(principle_projection["updatedAt"], int)
-            assert [item["id"] for item in principle_projection["items"]] == sorted(
-                item["id"] for item in principle_projection["items"]
-            )
-            projected_principle = next(
-                item for item in principle_projection["items"] if item["id"] == principle_id
-            )
-            assert {
-                key: value
-                for key, value in projected_principle.items()
-                if key not in {"createdAt", "updatedAt"}
-            } == {
-                "id": principle_id,
-                "name": "先确认理解",
-                "status": "active",
-                "confusablePrincipleIds": ["p-confusable"],
-            }
-            assert isinstance(projected_principle["createdAt"], int)
-            assert projected_principle["createdAt"] > 0
-            assert isinstance(projected_principle["updatedAt"], int)
-            assert projected_principle["updatedAt"] > 0
-            projected_preset = next(
-                item for item in preset_projection["items"] if item["id"] == preset_id
-            )
-            assert {
-                key: value
-                for key, value in projected_preset.items()
-                if key not in {"createdAt", "updatedAt"}
-            } == {
-                "id": preset_id,
-                "principleId": principle_id,
-                "title": "确认理解归纳",
-                "content": "发送之后确认接收和理解。",
-                "status": "active",
-                "version": 3,
-            }
-            assert isinstance(projected_preset["createdAt"], int)
-            assert projected_preset["createdAt"] > 0
-            assert isinstance(projected_preset["updatedAt"], int)
-            assert projected_preset["updatedAt"] > 0
+            assert projected_principle is not None
+            assert projected_principle.name == "先确认理解"
+            assert projected_principle.status == "active"
+            assert projected_principle.confusable_principle_ids == ["p-confusable"]
+            assert projected_preset is not None
+            assert projected_preset.principle_id == principle_id
+            assert projected_preset.title == "确认理解归纳"
+            assert projected_preset.content == "发送之后确认接收和理解。"
+            assert projected_preset.status == "active"
+            assert projected_preset.business_version == 3
         finally:
             async with AsyncSessionLocal() as db:
                 await db.execute(
@@ -1721,8 +1661,8 @@ async def _restore_principle_relations(
         await db.commit()
 
 
-def test_runtime_principle_projection_upserts_present_marks_missing_inactive_and_bumps_once() -> None:
-    """Catch cutover rejection, hard deletion, or one revision per projection key."""
+def test_runtime_principle_projection_is_server_owned_and_relations_stay_unchanged() -> None:
+    """Retired Runtime projection keys cannot mutate authoritative relations."""
 
     suffix = uuid4().hex[:10]
     username = f"runtime-projection-{suffix}"
@@ -1893,8 +1833,7 @@ def test_runtime_principle_projection_upserts_present_marks_missing_inactive_and
                     "contentRevision": before,
                 },
             )
-        assert response.status_code == 200, response.text
-        assert response.json()["contentRevision"] == before + 1
+        assert response.status_code == 403, response.text
 
         async def verify() -> None:
             async with AsyncSessionLocal() as db:
@@ -1903,23 +1842,14 @@ def test_runtime_principle_projection_upserts_present_marks_missing_inactive_and
                 missing = await db.get(Principle, missing_principle)
                 present_card = await db.get(SynthesisPreset, present_preset)
                 missing_card = await db.get(SynthesisPreset, missing_preset)
-                assert present is not None and present.name == "更新后原则"
-                assert present.confusable_principle_ids == [missing_principle]
-                assert missing is not None and missing.status == "inactive"
-                assert present_card is not None and present_card.title == "更新后归纳"
-                assert present_card.content == "新内容"
-                assert present_card.business_version == 2
-                assert missing_card is not None and missing_card.status == "inactive"
-                assert current["revision"] == before + 1
-                assert {
-                    (item["entityType"], item["entityId"], item["action"])
-                    for item in current["changes"]
-                } >= {
-                    ("principle", present_principle, "updated"),
-                    ("principle", missing_principle, "inactivated"),
-                    ("synthesisPreset", present_preset, "updated"),
-                    ("synthesisPreset", missing_preset, "inactivated"),
-                }
+                assert present is not None and present.name == "更新前原则"
+                assert present.confusable_principle_ids == []
+                assert missing is not None and missing.status == "active"
+                assert present_card is not None and present_card.title == "更新前归纳"
+                assert present_card.content == "旧内容"
+                assert present_card.business_version == 1
+                assert missing_card is not None and missing_card.status == "active"
+                assert current["revision"] == before
 
         asyncio.run(verify())
     finally:
@@ -1941,7 +1871,7 @@ def test_runtime_principle_projection_upserts_present_marks_missing_inactive_and
         (PRESET_PROJECTION_KEY, {"id": "preset-1", "principleId": "missing", "title": "归纳", "version": 2147483648}),
     ],
 )
-def test_runtime_projection_rejects_invalid_bounds_before_revision_lock(
+def test_runtime_projection_is_server_owned_before_validation_or_revision_lock(
     key: str,
     item: dict,
     monkeypatch,
@@ -1978,11 +1908,11 @@ def test_runtime_projection_rejects_invalid_bounds_before_revision_lock(
             },
         )
 
-    assert response.status_code == 422, response.text
+    assert response.status_code == 403, response.text
     assert lock_calls == 0
 
 
-def test_runtime_projection_rejects_large_item_count_before_revision_lock(
+def test_runtime_projection_rejects_large_item_count_as_server_owned(
     monkeypatch,
 ) -> None:
     lock_calls = 0
@@ -2027,7 +1957,7 @@ def test_runtime_projection_rejects_large_item_count_before_revision_lock(
             },
         )
 
-    assert response.status_code == 422, response.text
+    assert response.status_code == 403, response.text
     assert lock_calls == 0
 
 
@@ -2035,7 +1965,7 @@ def test_runtime_projection_rejects_large_item_count_before_revision_lock(
     "key",
     [PRINCIPLE_PROJECTION_KEY, PRESET_PROJECTION_KEY],
 )
-def test_runtime_projection_rejects_content_prep_omission_sentinel(
+def test_runtime_projection_rejects_content_prep_omission_sentinel_as_server_owned(
     key: str,
     monkeypatch,
 ) -> None:
@@ -2070,11 +2000,11 @@ def test_runtime_projection_rejects_content_prep_omission_sentinel(
             },
         )
 
-    assert response.status_code == 422, response.text
+    assert response.status_code == 403, response.text
     assert lock_calls == 0
 
 
-def test_runtime_preset_projection_rejects_missing_principle_as_422() -> None:
+def test_runtime_preset_projection_rejects_missing_principle_as_server_owned() -> None:
     with TestClient(app) as client:
         assert client.post(
             "/api/v1/auth/login",
@@ -2112,7 +2042,7 @@ def test_runtime_preset_projection_rejects_missing_principle_as_422() -> None:
             },
         )
 
-    assert response.status_code == 422, response.text
+    assert response.status_code == 403, response.text
 
 
 @pytest.mark.parametrize("invalid_revision", [True, "1"])

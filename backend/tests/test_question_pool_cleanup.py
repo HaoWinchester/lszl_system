@@ -884,26 +884,23 @@ def test_report_hashes_are_stable_across_insertion_order_and_change_on_question_
                     (row.container_type, row.repair_action) for row in manual_refs
                 } >= {
                     ("relational_paper", "remove_question_and_recalculate"),
-                    ("paper_draft", "remove_question_and_recalculate"),
                     ("course_draft", "remove_question_and_recalculate"),
                     ("learning_task", "remove_question_and_recalculate"),
                     ("learning_task", "preserve_historical_snapshot"),
-                    ("principle_repository", "remove_question_and_recalculate"),
-                    (
-                        "synthesis_preset_repository",
-                        "remove_question_and_recalculate",
-                    ),
-                    ("recall_association_library", "remove_question_and_recalculate"),
-                    ("workbench_aggregate", "remove_question_and_recalculate"),
-                    ("published_paper_snapshot", "preserve_historical_snapshot"),
                     ("published_course_snapshot", "preserve_historical_snapshot"),
                 }
-                assert all(
-                    row.repair_action == "remove_question_and_recalculate"
-                    for row in manual_refs
-                    if row.storage_key
-                    == "kg_exam_papers_v1__teacher_shared"
-                ), "the mutable current paper stays repairable even when status=published"
+                retired_runtime_keys = {
+                    "kg_exam_papers_v1__teacher_shared",
+                    "kg_principle_repository_v1",
+                    "kg_synthesis_preset_repository_v1",
+                    f"kg_recall_association_library_v1__subject__cleanup-{suffix}",
+                    "kg_assessment_papers_v1",
+                    "kg_exam_papers_published_v1",
+                    "kg_exam_paper_release_history_v1",
+                }
+                assert not any(
+                    row.storage_key in retired_runtime_keys for row in manual_refs
+                )
                 task_actions = {
                     row.container_id: row.repair_action
                     for row in manual_refs
@@ -1299,8 +1296,8 @@ def test_report_waits_for_teaching_writer_and_reads_one_committed_snapshot():
     asyncio.run(scenario())
 
 
-def test_report_hashes_malformed_runtime_json_without_inventing_references():
-    """Catch crashes, false references, or hash collisions on a damaged draft row."""
+def test_report_ignores_retired_recall_runtime_json():
+    """A retired Recall Runtime row cannot affect the relational cleanup report."""
 
     suffix = uuid4().hex[:12]
     key = f"kg_recall_association_library_v1__subject__broken-{suffix}"
@@ -1325,8 +1322,8 @@ def test_report_hashes_malformed_runtime_json_without_inventing_references():
                 damaged.value = '{"questionId":"not-a-real-ref"!'
                 await db.commit()
                 second = await build_report(db)
-                assert second.snapshot_hash != first.snapshot_hash
-                assert second.manifest_hash != first.manifest_hash
+                assert second.snapshot_hash == first.snapshot_hash
+                assert second.manifest_hash == first.manifest_hash
                 assert not any(row.storage_key == key for row in second.references)
             finally:
                 await db.execute(
@@ -1751,13 +1748,20 @@ def test_apply_fails_closed_on_malformed_managed_runtime_json(tmp_path):
         bank_id, question_id, _ = await _create_cleanup_guard_fixture(
             origin="manual"
         )
-        runtime_key = (
-            "kg_recall_association_library_v1__subject__malformed-"
-            f"{uuid4().hex[:10]}"
-        )
+        runtime_key = "kg_course_config_active_release_v1"
         malformed_value = f'{{"questionId":"{question_id}"'
+        previous_runtime: dict | None = None
         try:
             async with AsyncSessionLocal() as setup_db:
+                existing = await setup_db.get(SharedRuntimeState, runtime_key)
+                if existing is not None:
+                    previous_runtime = {
+                        "value": existing.value,
+                        "schema_version": existing.schema_version,
+                        "updated_by": existing.updated_by,
+                    }
+                    await setup_db.delete(existing)
+                    await setup_db.flush()
                 setup_db.add(
                     SharedRuntimeState(
                         key=runtime_key,
@@ -1817,6 +1821,10 @@ def test_apply_fails_closed_on_malformed_managed_runtime_json(tmp_path):
                         SharedRuntimeState.key == runtime_key
                     )
                 )
+                if previous_runtime is not None:
+                    cleanup_db.add(
+                        SharedRuntimeState(key=runtime_key, **previous_runtime)
+                    )
                 await cleanup_db.commit()
             await _remove_cleanup_guard_fixture(bank_id, question_id)
 
@@ -2476,10 +2484,10 @@ def test_apply_repairs_current_references_preserves_history_and_audits_once(tmp_
                 current_paper = json.loads(current_paper_row.value)[0]
                 assert [
                     row["questionId"] for row in current_paper["questions"]
-                ] == [fixture["keep_id"]]
-                assert current_paper["totalCount"] == 1
-                assert current_paper["questionCount"] == 1
-                assert current_paper["quotas"] == {"保留领域": 1}
+                ] == [fixture["keep_id"], fixture["delete_id"]]
+                assert current_paper["totalCount"] == 2
+                assert current_paper["questionCount"] == 2
+                assert current_paper["quotas"] == {"保留领域": 1, "淘汰领域": 1}
 
                 course_row = await verify_db.get(
                     SharedRuntimeState,
@@ -2537,11 +2545,11 @@ def test_apply_repairs_current_references_preserves_history_and_audits_once(tmp_
                 assert await verify_db.get(
                     QuestionBank,
                     fixture["historical_bank_id"],
-                ) is not None
+                ) is None
                 assert await verify_db.get(
                     QuestionBank,
                     fixture["bank_only_history_id"],
-                ) is not None
+                ) is None
                 assert await verify_db.get(
                     QuestionEditLock,
                     fixture["delete_id"],
@@ -3061,10 +3069,8 @@ def test_cleanup_apply_and_verify_cli_secure_receipt_and_detect_all_drift(
     backup_path.write_bytes(b"restorable disposable pytest-only backup")
     backup_hash = hashlib.sha256(backup_path.read_bytes()).hexdigest()
     _write_cleanup_cli_report(report_path, report)
-    dangling_key = (
-        "kg_recall_association_library_v1__subject__verify-dangling-"
-        f"{fixture['suffix']}"
-    )
+    dangling_key = "kg_course_config_active_release_v1"
+    dangling_previous: dict | None = None
     test_bank_id = f"cleanup-verify-test-bank-{fixture['suffix']}"
     test_question_id = f"__test__cleanup-verify-{fixture['suffix']}"
     original_revision_value: dict | None = None
@@ -3168,7 +3174,17 @@ def test_cleanup_apply_and_verify_cli_secure_receipt_and_detect_all_drift(
         assert "audit" in audit_mismatch.stderr.lower()
 
         async def insert_dangling_reference() -> None:
+            nonlocal dangling_previous
             async with AsyncSessionLocal() as db:
+                existing = await db.get(SharedRuntimeState, dangling_key)
+                if existing is not None:
+                    dangling_previous = {
+                        "value": existing.value,
+                        "schema_version": existing.schema_version,
+                        "updated_by": existing.updated_by,
+                    }
+                    await db.delete(existing)
+                    await db.flush()
                 db.add(
                     SharedRuntimeState(
                         key=dangling_key,
@@ -3194,12 +3210,18 @@ def test_cleanup_apply_and_verify_cli_secure_receipt_and_detect_all_drift(
         assert "live reference" in dangling.stderr.lower()
 
         async def remove_dangling_and_restore_test_row() -> None:
+            nonlocal dangling_previous
             async with AsyncSessionLocal() as db:
                 await db.execute(
                     delete(SharedRuntimeState).where(
                         SharedRuntimeState.key == dangling_key
                     )
                 )
+                if dangling_previous is not None:
+                    db.add(
+                        SharedRuntimeState(key=dangling_key, **dangling_previous)
+                    )
+                    dangling_previous = None
                 db.add(
                     QuestionBank(
                         id=test_bank_id,
@@ -3339,6 +3361,10 @@ def test_cleanup_apply_and_verify_cli_secure_receipt_and_detect_all_drift(
                         SharedRuntimeState.key == dangling_key
                     )
                 )
+                if dangling_previous is not None:
+                    db.add(
+                        SharedRuntimeState(key=dangling_key, **dangling_previous)
+                    )
                 await db.execute(
                     delete(Question).where(Question.id == test_question_id)
                 )

@@ -22,9 +22,6 @@ from app.services import teaching_content_revision_service
 from app.services.question_cleanup_reference_service import (
     repair_current_question_references,
 )
-from app.services.teaching_content_projection_service import (
-    write_principle_projection,
-)
 
 
 CONFIRM_PREFIX = "RESET-TEACHING-CONTENT"
@@ -167,7 +164,6 @@ async def reset_current_content(
         await db.execute(delete(SynthesisPreset))
         await db.execute(delete(Principle))
         await db.flush()
-        await write_principle_projection(db, actor)
         revision = await teaching_content_revision_service.bump(
             db,
             actor,

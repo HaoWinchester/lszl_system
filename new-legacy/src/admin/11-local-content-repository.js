@@ -1,11 +1,11 @@
 'use strict';
 (function(global){
   const Core=global.KGAdminCore;
-  const DEFAULT_KEYS=Object.freeze({
-    subjects:'kg_content_subjects_v1',taxonomies:'kg_content_taxonomies_v1',activityOverrides:'kg_content_activity_overrides_v1',courseDrafts:'kg_course_config_drafts_v1',courseReleases:'kg_course_config_releases_v1',activeCourse:'kg_course_config_active_release_v1',
-    tags:'kg_activity_tags_v1',collections:'kg_activity_collections_v1',papers:'kg_assessment_papers_v1',tasks:'kg_learning_tasks_v1',
-    audit:'kg_admin_audit_log_v1',snapshots:'kg_admin_transaction_snapshots_v1',taxonomyImports:'kg_taxonomy_import_records_v1',taxonomyReleases:'kg_taxonomy_release_records_v1',taxonomyDeletions:'kg_taxonomy_deletion_records_v1',adminSettings:'kg_admin_settings_v1'
-  });
+  // allowedUntilTask5B: synchronous admin lifecycles still lack complete typed APIs.
+  const allowedUntilTask5B=Object.freeze({subjects:'kg_content_subjects_v1',taxonomies:'kg_content_taxonomies_v1',activityOverrides:'kg_content_activity_overrides_v1',tags:'kg_activity_tags_v1',collections:'kg_activity_collections_v1'});
+  // allowedUntilTask6: course/task relationship APIs arrive in the next task.
+  const allowedUntilTask6=Object.freeze({courseDrafts:'kg_course_config_drafts_v1',courseReleases:'kg_course_config_releases_v1',activeCourse:'kg_course_config_active_release_v1',tasks:'kg_learning_tasks_v1'});
+  const DEFAULT_KEYS=Object.freeze({...allowedUntilTask5B,...allowedUntilTask6,papers:'kg_assessment_papers_v1',audit:'kg_admin_audit_log_v1',snapshots:'kg_admin_transaction_snapshots_v1',taxonomyImports:'kg_taxonomy_import_records_v1',taxonomyReleases:'kg_taxonomy_release_records_v1',taxonomyDeletions:'kg_taxonomy_deletion_records_v1',adminSettings:'kg_admin_settings_v1'});
   class LocalContentRepository{
     constructor(options={}){this.storage=options.storage||global.KGAppStorage||null;this.keysMap=Object.freeze({...DEFAULT_KEYS,...(options.keys||{})});this.mode='local';global.KGContentRepository?.assertRepository?.(this)}
     key(name){return this.keysMap[name]||String(name||'')}
@@ -18,6 +18,5 @@
     restore(snapshot){if(!snapshot?.values||typeof snapshot.values!=='object')return {valid:false,errors:['快照格式无效。']};const failed=[];Object.entries(snapshot.values).forEach(([name,entry])=>{const ok=entry?.exists?this.write(name,entry.value):this.remove(name);if(!ok)failed.push(name)});return {valid:failed.length===0,errors:failed.length?[`以下资源恢复失败：${failed.join(', ')}`]:[],restored:Object.keys(snapshot.values).length-failed.length}}
     health(){const probe='__kg_admin_repository_probe__';let writable=false;try{const storageKey=this.key(probe);global.localStorage?.setItem(storageKey,'1');writable=global.localStorage?.getItem(storageKey)==='1';global.localStorage?.removeItem(storageKey)}catch(error){}return {valid:!!global.localStorage,mode:this.mode,writable,keyCount:this.keys().length,keys:Core.clone(this.keysMap)}}
   }
-  global.KGLocalContentRepository=LocalContentRepository;
-  global.KG_LOCAL_CONTENT_KEYS=DEFAULT_KEYS;
+  global.KGLocalContentRepository=LocalContentRepository;global.KG_LOCAL_CONTENT_KEYS=DEFAULT_KEYS;
 })(window);

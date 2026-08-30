@@ -34,9 +34,6 @@ from app.services import (
 )
 
 
-TAXONOMY_KEY = "kg_content_taxonomies_v1"
-ACTIVITY_KEY = "kg_content_activity_overrides_v1"
-RECALL_PREFIX = "kg_recall_association_library_v1__subject__"
 MAX_SHARED_BYTES = 2 * 1024 * 1024
 MAX_ACTIVITIES = 5000
 
@@ -181,6 +178,88 @@ async def _principle_card_bundle(db: AsyncSession) -> dict[str, Any]:
     }
 
 
+async def _relational_repository_snapshot(db: AsyncSession) -> dict[str, Any]:
+    """Return the teaching repository shapes consumed by the legacy facades."""
+
+    subjects = list(
+        (await db.execute(select(ContentSubject).order_by(ContentSubject.id)))
+        .scalars()
+        .all()
+    )
+    taxonomies = list(
+        (
+            await db.execute(
+                select(ContentTaxonomy).order_by(
+                    ContentTaxonomy.subject_id,
+                    ContentTaxonomy.version,
+                    ContentTaxonomy.id,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    node_rows = list(
+        (
+            await db.execute(
+                select(TaxonomyNode).order_by(
+                    TaxonomyNode.taxonomy_id,
+                    TaxonomyNode.position,
+                    TaxonomyNode.node_id,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    nodes_by_taxonomy: dict[str, list[TaxonomyNode]] = {}
+    for node in node_rows:
+        nodes_by_taxonomy.setdefault(node.taxonomy_id, []).append(node)
+    collections = list(
+        (await db.execute(select(ActivityCollection).order_by(ActivityCollection.id)))
+        .scalars()
+        .all()
+    )
+    activities = list(
+        (
+            await db.execute(
+                select(ActivityOverride).order_by(
+                    ActivityOverride.collection_id,
+                    ActivityOverride.activity_id,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return {
+        "subjects": [
+            {
+                **dict(row.content_metadata or {}),
+                "id": row.id,
+                "code": row.code,
+                "name": {"zh": row.name, "en": ""},
+                "status": row.status,
+            }
+            for row in subjects
+        ],
+        "taxonomies": [
+            _taxonomy_payload(row, nodes_by_taxonomy.get(row.id, []))
+            for row in taxonomies
+        ],
+        "activityCollections": [
+            {
+                **dict(row.content_metadata or {}),
+                "id": row.id,
+                "subjectId": row.subject_id,
+                "title": row.title,
+            }
+            for row in collections
+        ],
+        "activityOverrides": [dict(row.record or {}) for row in activities],
+    }
+
+
 async def read_shared_content(db: AsyncSession, subject_id: str) -> dict[str, Any]:
     subject_id = _subject_id(subject_id)
     await teaching_content_revision_service.acquire_read_lock(db)
@@ -208,6 +287,7 @@ async def read_shared_content(db: AsyncSession, subject_id: str) -> dict[str, An
     ]
     revision = int((await teaching_content_revision_service.current(db))["revision"])
     return {
+        **(await _relational_repository_snapshot(db)),
         "subjectId": subject_id,
         "knowledgeTree": {"taxonomy": taxonomy} if taxonomy else None,
         "recallLibrary": recall,
