@@ -183,6 +183,21 @@ test('sync copies v8.6.0 and injects the direct runtime without editing upstream
   assert.ok(existsSync(resolve(item.output, 'personal-card-adapter.js')))
 })
 
+test('sync excludes Python and pytest caches from copied output and source hashes', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, '.pytest_cache/v/cache/nodeids'), '[]')
+  write(resolve(item.upstream, 'content-prep-studio/tests/__pycache__/test_build.cpython-311.pyc'), 'cache')
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(existsSync(resolve(item.output, '.pytest_cache')), false)
+  assert.equal(existsSync(resolve(item.output, 'content-prep-studio/tests/__pycache__')), false)
+  const sourcePaths = Object.keys(JSON.parse(readFileSync(resolve(item.output, 'manifest.json'), 'utf8')).sourceFiles)
+  assert.equal(sourcePaths.some((path) => path.includes('.pytest_cache') || path.includes('__pycache__') || path.endsWith('.pyc')), false)
+})
+
 test('sync loads shared domain and device boundaries before adapters and business scripts', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))
@@ -264,6 +279,58 @@ test('sync rejects an unregistered pmp business-storage key', (t) => {
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /pmp_future_business_payload_v1/)
   assert.match(result.stderr, /P4\.5 persistent state is not registered/)
+})
+
+test('sync permits only path-scoped deletion of the retired browser auth session', (t) => {
+  const allowed = fixture()
+  const readBack = fixture()
+  const literalRead = fixture()
+  const literalWrite = fixture()
+  const aliasRead = fixture()
+  const wrongPath = fixture()
+  for (const item of [allowed, readBack, literalRead, literalWrite, aliasRead, wrongPath]) {
+    t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  }
+
+  write(
+    resolve(allowed.upstream, 'src/29-auth-core.js'),
+    "const AUTH_REMOTE_SESSION_KEY='kg_remote_auth_session_v1';localStorage.removeItem(AUTH_REMOTE_SESSION_KEY)\n",
+  )
+  assert.equal(runSync(allowed).status, 0)
+
+  write(
+    resolve(readBack.upstream, 'src/29-auth-core.js'),
+    "const AUTH_REMOTE_SESSION_KEY='kg_remote_auth_session_v1';localStorage.getItem(AUTH_REMOTE_SESSION_KEY)\n",
+  )
+  const readResult = runSync(readBack)
+  assert.notEqual(readResult.status, 0)
+  assert.match(readResult.stderr, /cleanup must (?:remove|contain only)|must never read or write/)
+
+  write(
+    resolve(literalRead.upstream, 'src/29-auth-core.js'),
+    "const AUTH_REMOTE_SESSION_KEY='kg_remote_auth_session_v1';localStorage.removeItem(AUTH_REMOTE_SESSION_KEY);localStorage.getItem('kg_remote_auth_session_v1')\n",
+  )
+  assert.notEqual(runSync(literalRead).status, 0)
+
+  write(
+    resolve(literalWrite.upstream, 'src/29-auth-core.js'),
+    "const AUTH_REMOTE_SESSION_KEY='kg_remote_auth_session_v1';localStorage.removeItem(AUTH_REMOTE_SESSION_KEY);localStorage.setItem('kg_remote_auth_session_v1','secret')\n",
+  )
+  assert.notEqual(runSync(literalWrite).status, 0)
+
+  write(
+    resolve(aliasRead.upstream, 'src/29-auth-core.js'),
+    "const AUTH_REMOTE_SESSION_KEY='kg_remote_auth_session_v1';const legacyKey=AUTH_REMOTE_SESSION_KEY;localStorage.removeItem(AUTH_REMOTE_SESSION_KEY);localStorage.getItem(legacyKey)\n",
+  )
+  assert.notEqual(runSync(aliasRead).status, 0)
+
+  write(
+    resolve(wrongPath.upstream, 'src/p45-fixture.js'),
+    "localStorage.removeItem('kg_remote_auth_session_v1')\n",
+  )
+  const wrongPathResult = runSync(wrongPath)
+  assert.notEqual(wrongPathResult.status, 0)
+  assert.match(wrongPathResult.stderr, /P4\.5 persistent state is not registered: kg_remote_auth_session_v1/)
 })
 
 test('sync limits the registered Prep Studio IndexedDB name to its declared debt modules', (t) => {

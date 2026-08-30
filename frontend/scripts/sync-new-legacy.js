@@ -20,6 +20,10 @@ const legacyUnmigratedIndexedDbModules = Object.freeze([
 const legacyIndexedDbLiteralOwners = Object.freeze({
   pmp_content_prep_studio_v1: new Set(legacyUnmigratedIndexedDbModules),
 })
+const legacyCleanupLiteralOwners = Object.freeze({
+  kg_remote_auth_session_v1: new Set(['src/29-auth-core.js']),
+})
+const transientSourceDirectories = new Set(['.pytest_cache', '__pycache__'])
 
 function parseArgs(argv) {
   const args = { source: resolve(repoDir, 'new-legacy'), out: resolve(frontendDir, 'public', 'new-legacy') }
@@ -37,11 +41,18 @@ function parseArgs(argv) {
   return args
 }
 
+function isTransientSourceArtifact(path) {
+  const normalized = String(path || '').split(sep).join('/')
+  const parts = normalized.split('/').filter(Boolean)
+  return parts.some((part) => transientSourceDirectories.has(part)) || normalized.endsWith('.pyc')
+}
+
 function walk(root, base = root) {
   if (!existsSync(root)) return []
   return readdirSync(root, { withFileTypes: true })
     .flatMap((entry) => {
       const path = resolve(root, entry.name)
+      if (isTransientSourceArtifact(relative(base, path))) return []
       return entry.isDirectory() ? walk(path, base) : [relative(base, path)]
     })
     .sort()
@@ -250,6 +261,17 @@ function patchArchitectureCopy(path, source) {
 
 function sourceFiles(source) {
   return Object.fromEntries(walk(source).map((path) => [path, hashFile(resolve(source, path))]))
+}
+
+function validateLegacyAuthSessionCleanup(contents) {
+  const literalCount = (contents.match(/['"]kg_remote_auth_session_v1['"]/g) || []).length
+  const declarationCount = (contents.match(/\bconst\s+AUTH_REMOTE_SESSION_KEY\s*=\s*['"]kg_remote_auth_session_v1['"]/g) || []).length
+  const identifierCount = (contents.match(/\bAUTH_REMOTE_SESSION_KEY\b/g) || []).length
+  const approvedRemovePattern = /(?:globalThis\s*\.\s*)?(?:__nativeLocalStorage__|localStorage)\s*(?:\?\.\s*|\.\s*)removeItem\s*(?:\?\.\s*)?\(\s*AUTH_REMOTE_SESSION_KEY\s*\)/g
+  const approvedRemoveCount = (contents.match(approvedRemovePattern) || []).length
+  if (literalCount !== 1 || declarationCount !== 1 || approvedRemoveCount < 1 || identifierCount !== approvedRemoveCount + 1) {
+    throw new Error('legacy auth session cleanup must contain only direct remove calls for the retired key')
+  }
 }
 
 function patchTrainingSessionReentrancy(source) {
@@ -993,6 +1015,11 @@ function validateStorageContract(source) {
     for (const match of contents.matchAll(literalPattern)) {
       const owners = legacyIndexedDbLiteralOwners[match[2]]
       if (owners?.has(normalizedPath)) continue
+      const cleanupOwners = legacyCleanupLiteralOwners[match[2]]
+      if (cleanupOwners?.has(normalizedPath)) {
+        validateLegacyAuthSessionCleanup(contents)
+        continue
+      }
       candidates.add(match[2])
     }
     for (const match of contents.matchAll(sessionTokenPattern)) {
@@ -1072,7 +1099,10 @@ function sync({ source, out }) {
 
   rmSync(out, { recursive: true, force: true })
   mkdirSync(out, { recursive: true })
-  cpSync(source, out, { recursive: true })
+  cpSync(source, out, {
+    recursive: true,
+    filter: (sourcePath) => !isTransientSourceArtifact(relative(source, sourcePath)),
+  })
 
   const bridgeDir = resolve(scriptsDir, 'new-legacy-assets')
   for (const asset of walk(bridgeDir)) cpSync(resolve(bridgeDir, asset), resolve(out, asset))

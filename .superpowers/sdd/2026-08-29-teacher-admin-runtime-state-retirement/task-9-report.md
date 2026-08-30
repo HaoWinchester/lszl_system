@@ -239,3 +239,55 @@ RED-to-GREEN regression, and the entire backend suite was then rerun to the
 and the branch range contains no path under `frontend/new-legacy-releases/`.
 No UAT, deployment, push, main merge, active promotion, or shared/live database
 mutation was performed.
+
+## Final browser-storage review closeout
+
+The final Spec review found that remote authentication still copied the
+authenticated user, token, and login-session ID into
+`kg_remote_auth_session_v1`. Remote auth now relies on the signed server cookie
+and page memory initialized from the direct bootstrap. The retired browser key
+is never read or written; its literal remains only in the auth core's
+path-scoped destructive cleanup, and the sync guard rejects reads, writes, or
+cleanup from any other production file. Graph, recall, knowledge-statistics,
+and Content Prep consumers use the auth core or direct bootstrap instead of a
+browser session fallback.
+
+The 12-page browser matrix now audits the whole persistence surface rather
+than five named Runtime keys. Local storage must match the registered
+`KGDevicePreferences` exact/prefix/scoped allowlists, session storage must be
+empty, and IndexedDB is limited to the exact Content Prep Studio transitional
+database already declared by the migration manifest. This stronger audit
+found the logged-out graph fallback creating guest graph records in
+localStorage. The legacy graph store now selects a page-memory backend whenever
+the auth provider is remote, including logged-out state, while `local-demo`
+retains its original persistent behavior. The Files API remains authoritative
+for authenticated users.
+
+The final Standards review then caught two release-boundary gaps. The sync
+walker and source copy now exclude `.pytest_cache`, `__pycache__`, and `.pyc`
+artifacts before hashing or copying, and both generated manifests/public output
+were rebuilt cache-free. The auth cleanup validator now permits only one
+literal declaration plus direct `removeItem(AUTH_REMOTE_SESSION_KEY)` calls;
+literal reads/writes and alias-based access all fail closed. Release-manager
+tests also remove every disposable release root after the suite, preventing
+their validation copies from filling the system temporary volume.
+
+TDD first reproduced both browser persistence defects, then the final GREEN
+verification was:
+
+- auth/system source tests plus graph API/session/autosave/store regressions:
+  `18 passed`;
+- backend full suite: `737 passed, 1 dependency warning` in `301.97s`;
+- frontend full suite: `268 passed`; E2E contract unit suite: `9 passed`;
+- design contract: `5 passed`;
+- Alembic: single head `a8f2c7d9e104`; no upgrade operations detected;
+- isolated native browser matrix: `12` pages, disposable candidate
+  `986 >= 976` active files, `runtimeRequests=0`, `pageErrors=0`, and
+  `consoleErrors=0`.
+
+The active pointer SHA-256 remains
+`db8f64ad21de59a32b07bd039de8acd00ecd94bc5052a16ba0db7dd9963eada0`
+and the active site-tree SHA-256 remains
+`04e28df6813700d6edf4043fa81db1efe4e0326a8ed6739d8224e2cc422e3450`.
+No UAT, deployment, push, main merge, active promotion, or shared/live database
+mutation was performed.

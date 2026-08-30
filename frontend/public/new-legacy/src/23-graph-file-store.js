@@ -31,8 +31,17 @@
   const PREVIEW_MAX_LINKS=30;
   let lastError='',openedTouchTimer=null;
   const openedTouchQueue=new Map();
+  const memoryStorage=new Map();
 
-  function storage(){return global.KGAppStorage||null}
+  function browserPersistenceAllowed(){
+    try{
+      const auth=global.KGAuthCore;
+      if(auth&&typeof auth.providerConfig==='function')return auth.providerConfig().mode!=='remote';
+      const raw=global.KG_AUTH_CONFIG||global.KG_APP_CONFIG&&global.KG_APP_CONFIG.auth||{};
+      return String(raw.mode||'local-demo').toLowerCase()!=='remote';
+    }catch(err){return false}
+  }
+  function storage(){return browserPersistenceAllowed()?(global.KGAppStorage||null):null}
   function emitError(message,error){
     lastError=String(message||'图谱文件操作失败');
     if(error)console.warn('[KGGraphFileStore] '+lastError,error);
@@ -42,11 +51,18 @@
   function clearError(){lastError=''}
   function getLastError(){return lastError}
   function readJSON(key,fallback){
+    if(!browserPersistenceAllowed()){
+      if(!memoryStorage.has(key))return clone(fallback);
+      try{return JSON.parse(memoryStorage.get(key))}catch(err){return clone(fallback)}
+    }
     const appStore=storage();
     if(appStore&&typeof appStore.readJSON==='function')return appStore.readJSON(key,fallback);
     try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(err){console.warn('[KGGraphFileStore] read failed:',key,err);return fallback}
   }
   function writeJSON(key,value){
+    if(!browserPersistenceAllowed()){
+      try{memoryStorage.set(key,JSON.stringify(value));return true}catch(err){return false}
+    }
     const appStore=storage();
     try{
       if(appStore&&typeof appStore.writeJSON==='function')return appStore.writeJSON(key,value)===true;
@@ -54,6 +70,7 @@
     }catch(err){console.warn('[KGGraphFileStore] write failed:',key,err);return false}
   }
   function removeKey(key){
+    if(!browserPersistenceAllowed()){memoryStorage.delete(key);return true}
     const appStore=storage();
     try{
       if(appStore&&typeof appStore.remove==='function')return appStore.remove(key)!==false;
@@ -587,7 +604,7 @@
 
   function legacyKey(){try{if(typeof global.currentStoreKey==='function')return global.currentStoreKey()}catch(err){}return ''}
   function readLegacyGraph(key=legacyKey()){
-    if(!key)return null;try{const appStore=storage(),data=appStore&&typeof appStore.readJSON==='function'?appStore.readJSON(key,null):JSON.parse(localStorage.getItem(key)||'null');return data&&typeof data==='object'?safeGraphData(data):null}catch(err){return null}
+    if(!key)return null;try{const data=readJSON(key,null);return data&&typeof data==='object'?safeGraphData(data):null}catch(err){return null}
   }
   function migrateLegacyGraph(options={}){
     const owner=options.owner||currentOwner(),existing=listFiles({owner});if(existing.length)return getCurrentFile(owner)||existing[0];const graphData=options.graphData||readLegacyGraph(options.legacyKey);if(!graphData)return null;

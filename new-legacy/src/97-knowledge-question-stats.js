@@ -4,11 +4,10 @@
 (function(global){
   const BANK_PREFIX='kg_question_banks_v1__';
   const PUBLISHED_BANKS_KEY='kg_question_banks_published_v1';
-  const AUTH_SESSION_KEY='kg_local_current_user_v1';
   const clean=value=>String(value??'').trim();
   const clone=value=>{try{return JSON.parse(JSON.stringify(value))}catch(error){return value}};
   function readJson(key,fallback){try{const value=global.localStorage?.getItem(key);return value?JSON.parse(value):fallback}catch(error){return fallback}}
-  function sessionScope(){try{const username=global.KGAuthCore?.currentUsername?.()||global.localStorage?.getItem(AUTH_SESSION_KEY);return username?'user__'+encodeURIComponent(username):'public'}catch(error){return 'public'}}
+  function sessionScope(){try{const username=global.KGAuthCore?.currentUsername?.()||global.__KG_DIRECT_BOOTSTRAP__?.username;return username?'user__'+encodeURIComponent(username):'public'}catch(error){return 'public'}}
   function userBanksKey(){return BANK_PREFIX+sessionScope()}
   function isDeleted(question){return question?.lifecycle?.status==='deleted'||!!question?.deletedAt||!!question?.lifecycle?.deletedAt}
   function questionTitle(question){return clean(question?.title||question?.stem||question?.content?.zh?.stem||question?.content?.zh?.prompt||question?.teacherNumber||question?.id)||'未命名题目'}

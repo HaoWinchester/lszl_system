@@ -107,6 +107,7 @@ node new-legacy/tests/landing-page-contract.test.js
 node new-legacy/tests/shared-auth-dialog.test.js
 node --test \
   new-legacy/tests/graph-file-api-cutover.test.js \
+  new-legacy/tests/graph-file-browser-storage-cutover.test.js \
   new-legacy/tests/graph-file-remote-adapter.test.js \
   new-legacy/tests/graph-file-remote-store.test.js \
   new-legacy/tests/graph-file-editor-store-bridge.test.js \

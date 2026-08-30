@@ -2185,21 +2185,6 @@
       "ordinal": 1
     },
     {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "pmp_recall_acceptance_records_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "pmp_recall_acceptance_records_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "pmp_recall_acceptance_records_v1",
-      "ordinal": 4
-    },
-    {
       "path": "backend/app/services/teaching_content_projection_service.py",
       "token": "kg_principle_repository_v1",
       "ordinal": 1
@@ -2721,11 +2706,6 @@
     },
     {
       "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_remote_auth_session_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_role_themes_v1",
       "ordinal": 1
     },
@@ -2886,6 +2866,46 @@
     },
     {
       "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 2
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 3
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 4
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 5
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 6
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 7
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 8
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
       "token": "kg_teacher_preview_123",
       "ordinal": 1
     },
@@ -3002,6 +3022,11 @@
     {
       "path": "frontend/scripts/sync-new-legacy.js",
       "token": "kg_learning_entry_chooser_consumed_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/sync-new-legacy.js",
+      "token": "kg_remote_auth_session_v1",
       "ordinal": 1
     },
     {
@@ -3166,17 +3191,7 @@
     },
     {
       "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "kg_remote_auth_session_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/content-prep-studio/dist/content-prep.html",
       "token": "pmp_content_prep_studio_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/content-prep-studio/src/js/10-state-domain.js",
-      "token": "kg_remote_auth_session_v1",
       "ordinal": 1
     },
     {
@@ -3232,11 +3247,6 @@
     {
       "path": "new-legacy/src/22-home-file-library.js",
       "token": "kg_home_file_library_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/23-graph-file-api.js",
-      "token": "kg_remote_auth_session_v1",
       "ordinal": 1
     },
     {
@@ -3670,16 +3680,6 @@
       "ordinal": 1
     },
     {
-      "path": "new-legacy/src/96-recall-question-source.js",
-      "token": "kg_local_current_user_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/97-knowledge-question-stats.js",
-      "token": "kg_local_current_user_v1",
-      "ordinal": 1
-    },
-    {
       "path": "new-legacy/src/97-knowledge-question-stats.js",
       "token": "kg_question_banks_published_v1",
       "ordinal": 1
@@ -3761,6 +3761,36 @@
     }
   ],
   "dynamicRuntimeKey": [
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "AUTH_REMOTE_SESSION_KEY",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "AUTH_REMOTE_SESSION_KEY",
+      "ordinal": 2
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "AUTH_REMOTE_SESSION_KEY",
+      "ordinal": 3
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "AUTH_REMOTE_SESSION_KEY",
+      "ordinal": 4
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "AUTH_REMOTE_SESSION_KEY",
+      "ordinal": 5
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "legacyKey",
+      "ordinal": 1
+    },
     {
       "path": "new-legacy/content-prep-studio/dist/content-prep.html",
       "token": "LAST_DRAFT_KEY",
@@ -3922,11 +3952,6 @@
       "ordinal": 3
     },
     {
-      "path": "new-legacy/src/23-graph-file-store.js",
-      "token": "key",
-      "ordinal": 4
-    },
-    {
       "path": "new-legacy/src/27-graph-file-manager.js",
       "token": "key",
       "ordinal": 1
@@ -3945,6 +3970,11 @@
       "path": "new-legacy/src/27-home-interaction-modes.js",
       "token": "key",
       "ordinal": 2
+    },
+    {
+      "path": "new-legacy/src/29-auth-core.js",
+      "token": "AUTH_REMOTE_SESSION_KEY",
+      "ordinal": 1
     },
     {
       "path": "new-legacy/src/29-auth-core.js",
@@ -4298,17 +4328,7 @@
     },
     {
       "path": "new-legacy/src/96-recall-question-source.js",
-      "token": "AUTH_SESSION_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/96-recall-question-source.js",
       "token": "LEGACY_CURRENT_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/97-knowledge-question-stats.js",
-      "token": "AUTH_SESSION_KEY",
       "ordinal": 1
     },
     {

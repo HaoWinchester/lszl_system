@@ -3,20 +3,16 @@
   "fromVersion": "v9.0-p4.1.186",
   "toVersion": "v9.0-p4.1.186",
   "changes": {
-    "added": [
-      "content-prep-studio/tests/test_recall_acceptance_api.js"
-    ],
-    "changed": [
-      "content-prep-studio/dist/content-prep.html",
-      "content-prep-studio/src/index.template.html",
-      "content-prep-studio/src/js/16-recall-acceptance.js",
-      "src/77-multi-question-workspace.js",
-      "src/80-question-font-scale.js",
-      "src/91-content-center-app.js",
-      "tests/device-preferences.test.js",
-      "tests/teaching-content-api-cutover.test.js"
-    ],
-    "removed": []
+    "added": [],
+    "changed": [],
+    "removed": [
+      ".pytest_cache/.gitignore",
+      ".pytest_cache/CACHEDIR.TAG",
+      ".pytest_cache/README.md",
+      ".pytest_cache/v/cache/nodeids",
+      ".pytest_cache/v/cache/stepwise",
+      "content-prep-studio/tests/__pycache__/test_server_ui_contract.cpython-311-pytest-8.3.4.pyc"
+    ]
   },
   "incompatible": []
 }

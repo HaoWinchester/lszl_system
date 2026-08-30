@@ -39,9 +39,9 @@ def test_anonymous_content_prep_opens_without_login(
 
     assert response.status_code == 200
     assert 'id="prepApp"' in response.text
-    # 匿名进入不弹登录框；登录态由页面读取缓存 + 调 /api/v1/auth/me 判定
+    # 匿名进入不弹登录框；登录态由 direct bootstrap + cookie API 判定。
     assert "kg-content-prep-login-overlay" not in response.text
-    assert "kg_remote_auth_session_v1" in response.text
+    assert "kg_remote_auth_session_v1" not in response.text
     assert "/api/v1/auth/me" in response.text
 
 
@@ -77,7 +77,7 @@ def test_teaching_roles_receive_the_prep_page_with_session_hydration(
     assert "window.__KG_DIRECT_BOOTSTRAP__=" in response.text
     assert f'"role":"{role}"' in response.text
     assert "server-state-bootstrap.js" not in response.text
-    assert "kg_remote_auth_session_v1" in response.text
+    assert "kg_remote_auth_session_v1" not in response.text
     assert "prepRuntime.serverActorReady" in response.text
 
 

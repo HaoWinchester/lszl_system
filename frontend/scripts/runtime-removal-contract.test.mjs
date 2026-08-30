@@ -9,6 +9,7 @@ const repoDir = resolve(scriptsDir, '../..')
 
 const ROOTS = ['new-legacy', 'frontend/scripts', 'backend/app']
 const DEVICE_PREFERENCE_SOURCE = 'new-legacy/src/28-device-preferences.js'
+const AUTH_SESSION_CLEANUP_SOURCE = 'new-legacy/src/29-auth-core.js'
 const IGNORED = [
   'new-legacy/tests/',
   'frontend/public/',
@@ -142,6 +143,15 @@ test('runtime removal contract rejects a non-kg business-storage prefix', () => 
     token: 'pmp_future_business_payload_v1',
     ordinal: 1,
   }])
+})
+
+test('retired browser auth session remains only as path-scoped destructive cleanup', () => {
+  const source = readFileSync(resolve(repoDir, AUTH_SESSION_CLEANUP_SOURCE), 'utf8')
+  assert.match(source, /const AUTH_REMOTE_SESSION_KEY = ["']kg_remote_auth_session_v1["']/)
+  assert.equal((source.match(/removeItem\?\.\(AUTH_REMOTE_SESSION_KEY\)/g) || []).length, 2)
+  assert.doesNotMatch(source, /(?:getItem|setItem)\?\.\(AUTH_REMOTE_SESSION_KEY\)|(?:getItem|setItem)\(AUTH_REMOTE_SESSION_KEY\)/)
+  assert.doesNotMatch(source, /AUTH_REMOTE_SESSION_STORAGE/)
+  assert.doesNotMatch(source, /\n\s+AUTH_REMOTE_SESSION_KEY,\n/)
 })
 
 test('runtime removal contract scans the shared domain client boundary', () => {

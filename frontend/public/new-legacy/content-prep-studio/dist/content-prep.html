@@ -1422,15 +1422,11 @@ const FIXED_CREATORS={
   tiancai:{creatorId:'creator_005',name:'天才'},
   nvdi:{creatorId:'creator_006',name:'女帝'}
 };
-/* 登录态判定：进入本页不要求登录。优先同步读跨页共享缓存（auth-core 写入
-   localStorage 的 kg_remote_auth_session_v1），
-   再异步调 /api/v1/auth/me 校验补齐（缓存为空但会话 cookie 有效时也能恢复）。 */
+/* 登录态判定：进入本页不要求登录。同步使用 auth-core/direct bootstrap，
+   再异步调 /api/v1/auth/me 用服务端 cookie 校验补齐。 */
 function readCachedSessionUser(){
   try{
-    const raw=window.localStorage?.getItem?.('kg_remote_auth_session_v1');
-    if(!raw)return null;
-    const parsed=JSON.parse(raw);
-    const user=parsed&&typeof parsed==='object'?parsed.user:null;
+    const user=window.KGAuthCore?.currentUser?.({includeInactive:true})||window.__KG_DIRECT_BOOTSTRAP__?.authUser||null;
     return user&&user.username?user:null;
   }catch(_error){return null}
 }

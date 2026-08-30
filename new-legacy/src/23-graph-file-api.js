@@ -5,7 +5,7 @@
   function bootstrap(){return global.__KG_DIRECT_BOOTSTRAP__||{}}
   function isRemote(){const direct=bootstrap(),authenticated=sessionAuthenticated===null?!!((global.KGAuthCore&&global.KGAuthCore.currentUser&&global.KGAuthCore.currentUser())||(direct.authenticated&&direct.authUser)):sessionAuthenticated;return direct.graphFilesApiCutoverEnabled===true&&authConfig().mode==='remote'&&authenticated}
   function baseUrl(){const config=authConfig(),base=String(config.baseUrl||'').replace(/\/$/,'');return /\/api\/v1$/.test(base)?base:base+'/api/v1'}
-  function headers(){const stored=(function(){try{return JSON.parse((global.localStorage||{}).getItem('kg_remote_auth_session_v1')||'null')}catch(error){return null}})();return {'Content-Type':'application/json',...(stored&&stored.token?{Authorization:'Bearer '+stored.token}:{})}}
+  function headers(){return {'Content-Type':'application/json',...(global.KGAuthCore?.authHeaders?.()||{})}}
   async function request(path,options={}){
     const response=await global.fetch(baseUrl()+path,{credentials:authConfig().credentials||'include',headers:{...headers(),...(options.headers||{})},method:options.method||'GET',body:options.body===undefined?undefined:JSON.stringify(options.body)});
     let payload={};try{payload=await response.json()}catch(error){}

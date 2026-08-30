@@ -37,15 +37,99 @@ test('account, role, and subscription modules never persist business records in 
   }
 })
 
-test('only the completed account and system pages are absent from identical runtime policies', () => {
-  const backend = readRepo('backend/app/web/runtime_page_policy.json')
-  const frontend = readRepo('frontend/scripts/runtime-page-policy.json')
-  assert.equal(frontend, backend)
-  const policy = JSON.parse(backend)
-  for (const page of ['user-management.html', 'system-settings.html']) {
-    assert.equal(policy.runtimePages.includes(page), false, page)
+test('remote authentication uses the server cookie plus page memory and removes the legacy browser session', async () => {
+  const source = readRepo('new-legacy/src/29-auth-core.js')
+  assert.doesNotMatch(source, /AUTH_REMOTE_SESSION_STORAGE/)
+  assert.doesNotMatch(source, /getItem\(AUTH_REMOTE_SESSION_KEY\)|setItem\(AUTH_REMOTE_SESSION_KEY/)
+
+  const values = new Map([
+    ['kg_remote_auth_session_v1', JSON.stringify({ user: { username: 'stale-user' }, token: 'stale-secret' })],
+  ])
+  const storageOps = []
+  const context = {
+    console,
+    Object,
+    Array,
+    String,
+    Number,
+    Date,
+    Promise,
+    Math,
+    setTimeout,
+    clearTimeout,
+    crypto: { randomUUID: () => 'uuid' },
+    location: { protocol: 'http:' },
+    CustomEvent: class CustomEvent {
+      constructor(type, options = {}) { this.type = type; this.detail = options.detail }
+    },
+    dispatchEvent() {},
+    localStorage: {
+      getItem(key) { storageOps.push(['get', key]); return values.get(key) ?? null },
+      setItem(key, value) { storageOps.push(['set', key]); values.set(key, String(value)) },
+      removeItem(key) { storageOps.push(['remove', key]); values.delete(key) },
+    },
+    KGAppStorage: {},
+    KG_APP_CONFIG: {
+      auth: {
+        mode: 'remote',
+        endpoints: { login: '/api/v1/auth/login', session: '/api/v1/auth/me' },
+      },
+    },
+    __KG_DIRECT_BOOTSTRAP__: {
+      authenticated: true,
+      username: 'cookie-user',
+      authUser: { username: 'cookie-user', role: 'teacher', status: 'active' },
+      loginSessionId: 'cookie-session',
+    },
+    async fetch() {
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            user: { username: 'login-user', role: 'teacher', status: 'active' },
+            token: 'memory-only-token',
+            loginSessionId: 'login-session',
+          }
+        },
+      }
+    },
   }
-  assert.equal(policy.runtimePages.includes('admin-settings.html'), true)
+  runAdapter('new-legacy/src/29-auth-core.js', context)
+
+  assert.equal(context.KGAuthCore.currentUsername(), 'cookie-user')
+  assert.equal(values.has('kg_remote_auth_session_v1'), false)
+  assert.deepEqual(storageOps, [['remove', 'kg_remote_auth_session_v1']])
+
+  const loggedIn = await context.KGAuthCore.login('login-user', 'password')
+  assert.equal(loggedIn.ok, true)
+  assert.equal(context.KGAuthCore.currentUsername(), 'login-user')
+  assert.equal(storageOps.some(([operation]) => operation === 'set' || operation === 'get'), false)
+  assert.equal(values.has('kg_remote_auth_session_v1'), false)
+})
+
+test('remote auth consumers never fall back to the retired browser session key', () => {
+  for (const relative of [
+    'new-legacy/src/23-graph-file-api.js',
+    'new-legacy/src/96-recall-question-source.js',
+    'new-legacy/src/97-knowledge-question-stats.js',
+    'new-legacy/content-prep-studio/src/js/10-state-domain.js',
+  ]) {
+    assert.doesNotMatch(readRepo(relative), /kg_remote_auth_session_v1/, relative)
+  }
+})
+
+test('final retirement removes account/system Runtime policies and publishes the exact marker', () => {
+  for (const relative of [
+    'backend/app/web/runtime_page_policy.json',
+    'frontend/scripts/runtime-page-policy.json',
+  ]) {
+    assert.equal(fs.existsSync(path.join(repoRoot, relative)), false, relative)
+  }
+  assert.deepEqual(
+    JSON.parse(readRepo('frontend/scripts/new-legacy-assets/runtime-retirement.json')),
+    { schemaVersion: 1, status: 'retired', runtimeRequests: 0 },
+  )
 })
 
 function runAdapter(relative, context) {

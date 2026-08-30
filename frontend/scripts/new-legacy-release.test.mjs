@@ -4,7 +4,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, re
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import test from 'node:test'
+import test, { after } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
@@ -13,10 +13,17 @@ const repoDir = resolve(frontendDir, '..')
 const command = resolve(scriptsDir, 'manage-new-legacy.js')
 const source = resolve(repoDir, 'new-legacy')
 const sourceVersion = readFileSync(resolve(source, 'VERSION'), 'utf8').trim()
+const disposableReleaseRoots = new Set()
 
 function makeRoot() {
-  return mkdtempSync(resolve(tmpdir(), 'kg-new-legacy-releases-'))
+  const root = mkdtempSync(resolve(tmpdir(), 'kg-new-legacy-releases-'))
+  disposableReleaseRoots.add(root)
+  return root
 }
+
+after(() => {
+  for (const root of disposableReleaseRoots) rmSync(root, { recursive: true, force: true })
+})
 
 function run(root, ...args) {
   return spawnSync(process.execPath, [command, ...args, '--root', root, '--skip-browser'], {
@@ -313,12 +320,17 @@ test('candidate missing the public landing page is rejected before promotion', (
   mkdirSync(harness, { recursive: true })
   cpSync(resolve(frontendDir, 'scripts'), resolve(harness, 'scripts'), { recursive: true })
   const harnessSync = resolve(harness, 'scripts', 'sync-new-legacy.js')
+  const copyBlock = [
+    '  cpSync(source, out, {',
+    '    recursive: true,',
+    '    filter: (sourcePath) => !isTransientSourceArtifact(relative(source, sourcePath)),',
+    '  })',
+  ].join('\n')
+  const harnessSyncSource = readFileSync(harnessSync, 'utf8')
+  assert.ok(harnessSyncSource.includes(copyBlock), 'sync source-copy boundary changed')
   writeFileSync(
     harnessSync,
-    readFileSync(harnessSync, 'utf8').replace(
-      "  cpSync(source, out, { recursive: true })",
-      "  cpSync(source, out, { recursive: true })\n  rmSync(resolve(out, 'landing.html'), { force: true })",
-    ),
+    harnessSyncSource.replace(copyBlock, `${copyBlock}\n  rmSync(resolve(out, 'landing.html'), { force: true })`),
   )
   const harnessCommand = resolve(harness, 'scripts', 'manage-new-legacy.js')
   const next = resolve(root, 'missing-landing-source')

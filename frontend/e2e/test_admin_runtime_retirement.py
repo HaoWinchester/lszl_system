@@ -144,6 +144,10 @@ class AdminRuntimeRetirementTest(unittest.TestCase):
     def test_storage_audit_rejects_each_retired_direct_bootstrap_field(self) -> None:
         valid = {
             "keys": [],
+            "forbiddenKeys": [],
+            "sessionKeys": [],
+            "indexedDbAuditSupported": True,
+            "indexedDbNames": [],
             "nativeSet": True,
             "nativeGet": True,
             "legacyStorage": "undefined",
@@ -166,10 +170,40 @@ class AdminRuntimeRetirementTest(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     MODULE.storage_audit(EvaluatePage(invalid), "admin-console.html")
 
+    def test_storage_audit_rejects_non_device_local_session_and_indexeddb_state(self) -> None:
+        valid = {
+            "keys": [],
+            "forbiddenKeys": [],
+            "sessionKeys": [],
+            "indexedDbAuditSupported": True,
+            "indexedDbNames": [],
+            "nativeSet": True,
+            "nativeGet": True,
+            "legacyStorage": "undefined",
+            "directBootstrap": {"present": True, "runtimeFields": []},
+        }
+        invalid_results = [
+            {**valid, "keys": ["kg_remote_auth_session_v1"], "forbiddenKeys": ["kg_remote_auth_session_v1"]},
+            {**valid, "sessionKeys": ["kg_remote_auth_session_v1"]},
+            {**valid, "indexedDbNames": ["future-business-cache"]},
+        ]
+        for result in invalid_results:
+            with self.subTest(result=result), self.assertRaises(AssertionError):
+                MODULE.storage_audit(EvaluatePage(result), "admin-console.html")
+
+        MODULE.storage_audit(
+            EvaluatePage({**valid, "indexedDbNames": ["pmp_content_prep_studio_v1"]}),
+            "content-prep.html",
+        )
+
     def test_storage_audit_allows_absent_bootstrap_only_for_server_denial_page(self) -> None:
         page = EvaluatePage(
             {
                 "keys": [],
+                "forbiddenKeys": [],
+                "sessionKeys": [],
+                "indexedDbAuditSupported": True,
+                "indexedDbNames": [],
                 "nativeSet": True,
                 "nativeGet": True,
                 "legacyStorage": "undefined",

@@ -6,7 +6,6 @@
  * kg:recall-source-updated 让页面重渲染。 */
 (function(global){
   const LEGACY_CURRENT_KEY='kg_deep_recall_current_question_v1';
-  const AUTH_SESSION_KEY='kg_local_current_user_v1';
   const MODE='deep_recall';
   const catalogReady=Promise.resolve(global.KGQuestionCatalogAdapter?.ready);
   let catalogLoaded=false;
@@ -146,7 +145,7 @@
     if(!found)return {valid:false,code:result?.code||'QUESTION_NOT_FOUND',errors:[resolver()?.message?.(result,'这道题不在当前可用的已发布试卷中。')||'这道题不在当前可用的已发布试卷中。'],resolution:result||null};
     const question=clone(found.question),context=global.KGLearningRouteContext?.normalize?.({paperId:found.collection.paperId,releaseId:found.collection.releaseId,questionId:question.id,bankId:question.sourceBankId,mode:MODE,source:options.source||'published-paper-deep-recall',returnUrl:options.returnUrl||''})||{};
     question.sourceCollectionId=found.collection.id;question.sourcePaperId=found.collection.paperId;question.sourceReleaseId=found.collection.releaseId;question.sourceQuestionId=text(question.id);
-    const userId=global.KGRecallStorage?.currentUserId?.()||global.KGAuthCore?.currentUsername?.()||global.localStorage?.getItem(AUTH_SESSION_KEY)||'guest';
+    const userId=global.KGRecallStorage?.currentUserId?.()||global.KGAuthCore?.currentUsername?.()||global.__KG_DIRECT_BOOTSTRAP__?.username||'guest';
     const payload={question,savedAt:Date.now(),source:'published-paper-deep-recall',sourceCollectionId:found.collection.id,sourcePaperId:found.collection.paperId,sourceReleaseId:found.collection.releaseId,sourceBankId:text(question.sourceBankId),sourceQuestionId:text(question.id),learningContext:clone(context),userId};
     try{
       const storage=global.KGRecallStorage;if(storage?.writeCurrent){if(!storage.writeCurrent(payload))throw new Error('本地存储写入失败')}else global.localStorage?.setItem(LEGACY_CURRENT_KEY,JSON.stringify(payload));

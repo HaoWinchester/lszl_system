@@ -210,7 +210,6 @@
     "ignoredLiterals": [
       "kg_graph_",
       "kg_local_",
-      "kg_remote_auth_session_v1",
       "kg_learning_route_context_v1__",
       "kg_multi_question_release_selection_v1",
       "kg_training_workspace_layout_v1",

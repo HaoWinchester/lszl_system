@@ -174,6 +174,7 @@ RETIRED_KEYS = {
     "kg_learning_tasks_v1",
     "kg_assessment_papers_v1",
 }
+ALLOWED_INDEXED_DB_NAMES = {"pmp_content_prep_studio_v1"}
 PASSWORD = "Task7-111111"
 
 
@@ -266,20 +267,47 @@ def storage_audit(
     allow_absent_direct_bootstrap: bool = False,
 ) -> None:
     result = page.evaluate(
-        """() => ({
-          keys:Array.from({length:localStorage.length},(_,index)=>localStorage.key(index)).filter(Boolean),
-          nativeSet:/\\[native code\\]/.test(String(Storage.prototype.setItem)),
-          nativeGet:/\\[native code\\]/.test(String(Storage.prototype.getItem)),
-          legacyStorage:typeof window.KGServerStateStorage,
-          directBootstrap:{
-            present:typeof window.__KG_DIRECT_BOOTSTRAP__==='object'&&window.__KG_DIRECT_BOOTSTRAP__!==null,
-            runtimeFields:['storage','revision','contentRevision','namespace'].filter(key=>Object.hasOwn(window.__KG_DIRECT_BOOTSTRAP__||{},key)),
-          },
-        })"""
+        """async () => {
+          const keys=Array.from({length:localStorage.length},(_,index)=>localStorage.key(index)).filter(Boolean);
+          const preferences=window.KGDevicePreferences||{};
+          const exact=new Set(preferences.EXACT_KEYS||[]);
+          const prefixes=Array.from(preferences.PREFIXES||[]);
+          const scopedBases=Array.from(preferences.SCOPED_UI_BASE_KEYS||[]);
+          const allowedScope=scope=>{
+            if(!scope)return false;
+            try{return encodeURIComponent(decodeURIComponent(scope))===scope}catch(_error){return false}
+          };
+          const allowedLocal=key=>exact.has(key)||prefixes.some(prefix=>key.startsWith(prefix))||scopedBases.some(base=>{
+            const marker=base+'__';
+            return key.startsWith(marker)&&allowedScope(key.slice(marker.length));
+          });
+          const indexedDbAuditSupported=typeof indexedDB?.databases==='function';
+          const indexedDbNames=indexedDbAuditSupported
+            ? (await indexedDB.databases()).map(item=>item.name).filter(Boolean)
+            : [];
+          return {
+            keys,
+            forbiddenKeys:keys.filter(key=>!allowedLocal(key)),
+            sessionKeys:Array.from({length:sessionStorage.length},(_,index)=>sessionStorage.key(index)).filter(Boolean),
+            indexedDbAuditSupported,
+            indexedDbNames,
+            nativeSet:/\\[native code\\]/.test(String(Storage.prototype.setItem)),
+            nativeGet:/\\[native code\\]/.test(String(Storage.prototype.getItem)),
+            legacyStorage:typeof window.KGServerStateStorage,
+            directBootstrap:{
+              present:typeof window.__KG_DIRECT_BOOTSTRAP__==='object'&&window.__KG_DIRECT_BOOTSTRAP__!==null,
+              runtimeFields:['storage','revision','contentRevision','namespace'].filter(key=>Object.hasOwn(window.__KG_DIRECT_BOOTSTRAP__||{},key)),
+            },
+          };
+        }"""
     )
     assert result["nativeSet"] and result["nativeGet"], (page_name, result)
     assert result["legacyStorage"] == "undefined", (page_name, result)
     assert RETIRED_KEYS.isdisjoint(result["keys"]), (page_name, result["keys"])
+    assert result["forbiddenKeys"] == [], (page_name, result)
+    assert result["sessionKeys"] == [], (page_name, result)
+    assert result["indexedDbAuditSupported"], (page_name, result)
+    assert set(result["indexedDbNames"]).issubset(ALLOWED_INDEXED_DB_NAMES), (page_name, result)
     direct_bootstrap = result["directBootstrap"]
     if allow_absent_direct_bootstrap and not direct_bootstrap["present"]:
         return

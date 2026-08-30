@@ -4,7 +4,7 @@
  * 认证与用户数据核心模块。
  *
  * 账号与审计数据仅保留页面内存副本，由 FastAPI 接口刷新。
- * 认证会话仍由服务端 cookie 校验，远程会话摘要只用于同页 UI 恢复。
+ * 认证会话由服务端 cookie 校验，同页 UI 摘要只保留在内存。
  */
 (function(){
   const Store = window.KGAppStorage || {};
@@ -12,17 +12,8 @@
   const AUTH_REMOTE_SESSION_KEY = "kg_remote_auth_session_v1";
   let userState = Object.freeze({});
   let adminLogState = Object.freeze([]);
-  const AUTH_REMOTE_SESSION_STORAGE = (() => {
-    try {
-      // 使用浏览器原生 localStorage 保存同页认证摘要。
-      if (globalThis.__nativeLocalStorage__) {
-        return globalThis.__nativeLocalStorage__;
-      }
-      return globalThis.localStorage;
-    } catch (_error) {
-      return null;
-    }
-  })();
+  let remoteSessionState = null;
+  let remoteSessionInitialized = false;
 
   const ROLES = ["admin","teacher","student","viewer"];
   const STATUSES = ["active","paused","archived"];
@@ -144,21 +135,21 @@
     };
   }
   function readRemoteSession(){
-    try{
-      const storage = AUTH_REMOTE_SESSION_STORAGE || globalThis.localStorage;
-      const raw = storage?.getItem(AUTH_REMOTE_SESSION_KEY);
-      if(raw)return JSON.parse(raw);
-      const bootstrap=globalThis.__KG_DIRECT_BOOTSTRAP__;
-      if(bootstrap?.authenticated===true&&bootstrap.authUser){
-        return {user:bootstrap.authUser,token:"",loginSessionId:serverLoginSessionId(bootstrap),issuedAt:Date.now()};
-      }
-      return null;
-    }catch(e){return null}
+    if(remoteSessionInitialized)return remoteSessionState;
+    remoteSessionInitialized=true;
+    // 仅删除旧版敏感会话摘要，从不读取或恢复它。
+    try{globalThis.__nativeLocalStorage__?.removeItem?.(AUTH_REMOTE_SESSION_KEY)}catch(e){}
+    try{globalThis.localStorage?.removeItem?.(AUTH_REMOTE_SESSION_KEY)}catch(e){}
+    const bootstrap=globalThis.__KG_DIRECT_BOOTSTRAP__;
+    remoteSessionState=bootstrap?.authenticated===true&&bootstrap.authUser
+      ? {user:bootstrap.authUser,token:"",loginSessionId:serverLoginSessionId(bootstrap),issuedAt:Date.now()}
+      : null;
+    return remoteSessionState;
   }
   function writeRemoteSession(session){
     try{
-      if (session) AUTH_REMOTE_SESSION_STORAGE?.setItem(AUTH_REMOTE_SESSION_KEY, JSON.stringify(session));
-      else AUTH_REMOTE_SESSION_STORAGE?.removeItem(AUTH_REMOTE_SESSION_KEY);
+      remoteSessionInitialized=true;
+      remoteSessionState=session||null;
       const bootstrap=globalThis.__KG_DIRECT_BOOTSTRAP__;
       if(bootstrap&&typeof bootstrap==="object"){
         const user=session?.user||null;
@@ -215,6 +206,10 @@
       throw failure;
     }
     return payload;
+  }
+  function authHeaders(){
+    const token=String(readRemoteSession()?.token||"");
+    return token?{Authorization:"Bearer "+token}:{};
   }
   function currentUsername(){
     try{
@@ -431,7 +426,6 @@
 
   window.KGAuthCore = {
     AUTH_SESSION_KEY,
-    AUTH_REMOTE_SESSION_KEY,
     ROLES,
     STATUSES,
     storage: Store,
@@ -465,6 +459,7 @@
     logAction,
     providerConfig,
     providerStatus,
+    authHeaders,
     login,
     register,
     logout,
