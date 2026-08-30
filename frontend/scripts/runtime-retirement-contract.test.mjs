@@ -24,7 +24,7 @@ const learnerPages = [
   'guided-learning-placement-test.html',
 ]
 
-const runtimePages = [
+const retiredRuntimePages = [
   'admin-console.html',
   'admin-operations.html',
   'admin-settings.html',
@@ -32,7 +32,9 @@ const runtimePages = [
   'teacher-workbench.html',
 ]
 
-const directTeachingPages = ['admin-subjects.html', 'content-center.html', 'content-prep.html']
+const runtimePages = []
+
+const directTeachingPages = ['admin-subjects.html', 'content-center.html', 'content-prep.html', ...retiredRuntimePages]
 
 const directAccountPages = [
   'user-management.html',
@@ -61,12 +63,11 @@ test('direct pages keep auth bootstrap without loading the legacy runtime', () =
   }
 })
 
-test('allowlisted admin pages still load runtime after the direct bootstrap anchor', () => {
-  for (const page of runtimePages) {
+test('retired admin runtime pages use direct bootstrap and never load runtime', () => {
+  for (const page of retiredRuntimePages) {
     const html = readGenerated(page)
     assert.match(html, /kg-direct-bootstrap-anchor/, `${page} must expose the direct bootstrap anchor`)
-    assert.match(html, /server-state-bootstrap\.js/, `${page} still needs legacy runtime during migration`)
-    assert.ok(html.indexOf('kg-direct-bootstrap-anchor') < html.indexOf('server-state-bootstrap.js'), page)
+    assert.doesNotMatch(html, /server-state-bootstrap\.js/, `${page} must not load retired runtime`)
   }
 })
 

@@ -614,6 +614,7 @@ function injectPage(html, page, version) {
     retiredSingleDeepRedirectShell ? '' : '<script src="./domain-api-client.js"></script><!-- kg-domain-api:generated -->',
     retiredSingleDeepRedirectShell || !['admin-console.html', 'admin-operations.html', 'admin-settings.html', 'admin-subjects.html', 'content-center.html', 'course-admin.html', 'knowledge-recall.html', 'paper-management.html', 'question-bank.html', 'question-workspace.html', 'teacher-workbench.html'].includes(page) ? '' : '<script src="./teaching-content-adapter.js"></script><!-- kg-teaching-content-api:generated -->',
     retiredSingleDeepRedirectShell || !['admin-console.html', 'admin-operations.html', 'admin-settings.html', 'admin-subjects.html', 'content-center.html', 'course-admin.html', 'teacher-workbench.html'].includes(page) ? '' : '<script src="./course-management-adapter.js"></script><!-- kg-course-management-api:generated -->',
+    retiredSingleDeepRedirectShell || !['admin-console.html', 'admin-operations.html'].includes(page) ? '' : '<script src="./admin-domain-summary.js"></script><!-- kg-admin-domain-summary:generated -->',
     retiredSingleDeepRedirectShell ? '' : '<script src="src/28-device-preferences.js"></script><!-- kg-device-preferences:generated -->',
     '<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->',
     '<script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->',
@@ -1036,7 +1037,7 @@ function validate(source) {
   const required = ['VERSION', ...contract.requiredPages, ...contract.requiredFiles, ...learningEntryChooserAssets, 'src/28-device-preferences.js']
   const missing = required.filter((path) => !existsSync(resolve(source, path)))
   if (missing.length) throw new Error(`new-legacy 缺少必需文件：${missing.join(', ')}`)
-  const missingGenerated = [...(contract.requiredGeneratedFiles || []), 'domain-api-client.js', 'teaching-content-adapter.js', 'course-management-adapter.js']
+  const missingGenerated = [...(contract.requiredGeneratedFiles || []), 'domain-api-client.js', 'teaching-content-adapter.js', 'course-management-adapter.js', 'admin-domain-summary.js']
     .filter((path) => !existsSync(resolve(scriptsDir, 'new-legacy-assets', path)))
   if (missingGenerated.length) {
     throw new Error(`new-legacy 缺少必需生成适配器：${missingGenerated.join(', ')}`)

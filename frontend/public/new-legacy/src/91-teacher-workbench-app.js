@@ -3,15 +3,7 @@
 (function(){
   const byId=id=>document.getElementById(id);
   let catalogState='pending';
-  const readJson=(key,fallback)=>{
-    try{
-      const value=window.KGAppStorage?.readJSON?.(key,fallback);
-      if(value!==undefined&&value!==null)return value;
-      const parsed=JSON.parse(window.localStorage?.getItem?.(key)||'null');
-      return parsed??fallback;
-    }catch(error){return fallback}
-  };
-  const readList=key=>{const value=readJson(key,[]);return Array.isArray(value)?value:[]};
+  let paperRows=[];
 
   function managedQuestions(snapshot){
     const banks=Array.isArray(snapshot?.banks)?snapshot.banks:[];
@@ -45,9 +37,10 @@
     const banks=Array.isArray(catalog.banks)?catalog.banks:[];
     const questions=managedQuestions(catalog);
     const pending=questions.filter(question=>!questionConfigured(question)).length;
-    const papers=readList('kg_assessment_papers_v1');
-    const courseDrafts=readList('kg_course_config_drafts_v1');
-    const learningTasks=readList('kg_learning_tasks_v1');
+    const papers=paperRows;
+    const courseSnapshot=window.KGCourseManagementApi?.snapshot?.()||{drafts:[],tasks:[]};
+    const courseDrafts=courseSnapshot.drafts||[];
+    const learningTasks=courseSnapshot.tasks||[];
     const activePapers=papers.filter(paper=>paper?.status!=='archived'&&!paper?.deletedAt);
     const paperDrafts=activePapers.filter(paper=>!paperPublished(paper));
     const publishedPapers=activePapers.filter(paper=>paperPublished(paper));
@@ -77,9 +70,9 @@
     }
   }
   async function init(){
-    const adapter=window.KGQuestionCatalogAdapter;
-    if(!adapter){catalogState='failed';renderUnavailable();return}
-    try{await adapter.ready}catch(error){catalogState='failed';renderUnavailable();return}
+    const adapter=window.KGQuestionCatalogAdapter,courseApi=window.KGCourseManagementApi,domainApi=window.KGDomainApi;
+    if(!adapter||!courseApi||!domainApi){catalogState='failed';renderUnavailable();return}
+    try{const [,courseState,paperResult]=await Promise.all([adapter.ready,courseApi.ready(),domainApi.request({path:'/api/v1/papers'})]);paperRows=Array.isArray(paperResult?.papers)?paperResult.papers:[];if(!courseState)throw new Error('课程数据未就绪')}catch(error){catalogState='failed';renderUnavailable();return}
     catalogState='ready';
     render();
   }
@@ -88,6 +81,6 @@
     else if(catalogState==='failed')renderUnavailable();
   }
   window.addEventListener('kg:question-catalog-changed',renderAfterReady);
-  window.addEventListener('kg:server-state-reloaded',renderAfterReady);
-  document.addEventListener('DOMContentLoaded',init);
+  window.addEventListener('kg:course-management-changed',renderAfterReady);
+  document.addEventListener('DOMContentLoaded',()=>{void init()});
 })();

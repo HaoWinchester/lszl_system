@@ -3,10 +3,27 @@
   "fromVersion": "v9.0-p4.1.186",
   "toVersion": "v9.0-p4.1.186",
   "changes": {
-    "added": [],
+    "added": [
+      "tests/course-management-api-cutover.test.js"
+    ],
     "changed": [
-      "src/admin/51-admin-subjects-app.js",
-      "tests/question-paper-runtime-free.test.js"
+      "admin-operations.html",
+      "admin-settings.html",
+      "src/28-device-preferences.js",
+      "src/91-course-admin-app.js",
+      "src/91-learning-content-core.js",
+      "src/91-teacher-workbench-app.js",
+      "src/93-assessment-config-app.js",
+      "src/93-content-organization-core.js",
+      "src/admin/11-local-content-repository.js",
+      "src/admin/32-taxonomy-service.js",
+      "src/admin/34-course-service.js",
+      "src/admin/35-release-service.js",
+      "src/admin/40-admin-service-registry.js",
+      "src/admin/41-learning-content-compat.js",
+      "src/admin/50-admin-shell-app.js",
+      "src/admin/52-admin-operations-app.js",
+      "src/admin/53-admin-settings-app.js"
     ],
     "removed": []
   },
