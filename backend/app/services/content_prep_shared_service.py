@@ -113,8 +113,7 @@ def _normalize_tree(value: object, subject_id: str) -> dict[str, Any] | None:
     if not taxonomy_id or len(taxonomy_id) > 128:
         raise ValueError("知识树 ID 格式不正确")
     nodes = taxonomy.get("nodes", [])
-    if not isinstance(nodes, list):
-        raise ValueError("知识树 nodes 必须是数组")
+    nodes = _validate_taxonomy_nodes(taxonomy_id, nodes)
     return {
         **taxonomy,
         "id": taxonomy_id,
@@ -179,7 +178,59 @@ async def _principle_card_bundle(db: AsyncSession) -> dict[str, Any]:
     }
 
 
-async def _relational_repository_snapshot(db: AsyncSession) -> dict[str, Any]:
+class CatalogResourceNotModifiable(ValueError):
+    code = "RESOURCE_NOT_MODIFIABLE"
+
+
+def _system_collection(row: ActivityCollection) -> bool:
+    return bool((row.content_metadata or {}).get("systemNamespace"))
+
+
+def _collection_visible(row: ActivityCollection, viewer_username: str | None) -> bool:
+    if _system_collection(row):
+        return False
+    if viewer_username is None or row.owner_username == viewer_username:
+        return True
+    return str((row.content_metadata or {}).get("visibility") or "private") == "shared"
+
+
+def _collection_payload(row: ActivityCollection) -> dict[str, Any]:
+    metadata = dict(row.content_metadata or {})
+    authorship = dict(metadata.get("authorship") or {})
+    if row.owner_username:
+        authorship["createdByUserId"] = row.owner_username
+        metadata["authorship"] = authorship
+    return {
+        **metadata,
+        "id": row.id,
+        "subjectId": row.subject_id,
+        "title": row.title,
+        "status": row.status,
+    }
+
+
+def _activity_tag_payload(row: ActivityTag) -> dict[str, Any]:
+    return {
+        **dict(row.content_metadata or {}),
+        "id": row.id,
+        "name": row.tag,
+        "collectionId": row.collection_id,
+    }
+
+
+def _activity_override_payload(row: ActivityOverride) -> dict[str, Any]:
+    return dict(row.record or {})
+
+
+def _collection_writable(
+    row: ActivityCollection | None, actor_username: str
+) -> bool:
+    return row is None or _system_collection(row) or row.owner_username == actor_username
+
+
+async def _relational_repository_snapshot(
+    db: AsyncSession, viewer_username: str | None = None
+) -> dict[str, Any]:
     """Return the teaching repository shapes consumed by the legacy facades."""
 
     subjects = list(
@@ -238,6 +289,22 @@ async def _relational_repository_snapshot(db: AsyncSession) -> dict[str, Any]:
         .scalars()
         .all()
     )
+    collection_by_id = {row.id: row for row in collections}
+    visible_collection_ids = {
+        row.id for row in collections if _collection_visible(row, viewer_username)
+    }
+    visible_tag_rows = [
+        row
+        for row in tags
+        if _system_collection(collection_by_id[row.collection_id])
+        or row.collection_id in visible_collection_ids
+    ]
+    visible_activity_rows = [
+        row
+        for row in activities
+        if _system_collection(collection_by_id[row.collection_id])
+        or row.collection_id in visible_collection_ids
+    ]
     return {
         "subjects": [
             {
@@ -261,25 +328,14 @@ async def _relational_repository_snapshot(db: AsyncSession) -> dict[str, Any]:
             for row in taxonomies
         ],
         "activityCollections": [
-            {
-                **dict(row.content_metadata or {}),
-                "id": row.id,
-                "subjectId": row.subject_id,
-                "title": row.title,
-                "status": row.status,
-            }
+            _collection_payload(row)
             for row in collections
-            if not bool((row.content_metadata or {}).get("systemNamespace"))
+            if row.id in visible_collection_ids
         ],
-        "activityOverrides": [dict(row.record or {}) for row in activities],
+        "activityOverrides": [_activity_override_payload(row) for row in visible_activity_rows],
         "activityTags": [
-            {
-                **dict(row.content_metadata or {}),
-                "id": row.id,
-                "name": row.tag,
-                "collectionId": row.collection_id,
-            }
-            for row in tags
+            _activity_tag_payload(row)
+            for row in visible_tag_rows
         ],
     }
 
@@ -302,6 +358,77 @@ def _unique_rows(rows: list[dict[str, Any]], label: str) -> dict[str, dict[str, 
         _json_text(item, label)
         result[identifier] = deepcopy(item)
     return result
+
+
+def _strict_id_list(value: object, label: str) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError(f"{label}必须是数组")
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError(f"{label}必须是字符串数组")
+        identifier = item.strip()
+        if not identifier or len(identifier) > 128:
+            raise ValueError(f"{label}包含格式不正确的 ID")
+        result.append(identifier)
+    if len(result) != len(set(result)):
+        raise ValueError(f"{label}不能包含重复 ID")
+    return result
+
+
+def _validate_taxonomy_nodes(
+    taxonomy_id: str, value: object
+) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        raise ValueError("知识树 nodes 必须是对象数组")
+    nodes: dict[str, dict[str, Any]] = {}
+    parents: dict[str, str | None] = {}
+    for raw in value:
+        if not isinstance(raw, dict):
+            raise ValueError("知识点必须是对象")
+        node = deepcopy(raw)
+        node_id = _required_id(node.get("id"), "知识点")
+        if node_id in nodes:
+            raise ValueError("知识点 ID 不能重复")
+        declared_taxonomy = str(node.get("taxonomyId") or "").strip()
+        if declared_taxonomy and declared_taxonomy != taxonomy_id:
+            raise ValueError("知识点 taxonomyId 与知识树不一致")
+        parent_value = node.get("parentId")
+        if parent_value is not None and not isinstance(parent_value, str):
+            raise ValueError("知识点 parentId 必须是字符串")
+        parent_id = str(parent_value or "").strip() or None
+        if parent_id == node_id:
+            raise ValueError("知识点不能以自身为父节点")
+        level = node.get("level")
+        if level is not None and (
+            isinstance(level, bool) or not isinstance(level, int) or not 1 <= level <= 9
+        ):
+            raise ValueError("知识点 level 必须是 1 到 9 的整数")
+        nodes[node_id] = node
+        parents[node_id] = parent_id
+
+    for node_id, parent_id in parents.items():
+        if parent_id and parent_id not in nodes:
+            raise ValueError("知识点引用了不存在的父节点")
+        seen = {node_id}
+        cursor = parent_id
+        depth = 1
+        while cursor is not None:
+            if cursor in seen:
+                raise ValueError("知识点层级不能形成循环")
+            seen.add(cursor)
+            depth += 1
+            if depth > 9:
+                raise ValueError("知识树深度不能超过 9 层")
+            cursor = parents[cursor]
+        declared_level = nodes[node_id].get("level")
+        if declared_level is not None and declared_level != depth:
+            raise ValueError("知识点 level 必须与父子层级连续")
+        nodes[node_id]["level"] = depth
+        nodes[node_id]["taxonomyId"] = taxonomy_id
+    return list(nodes.values())
 
 
 def _localized_text(value: object) -> str:
@@ -342,17 +469,17 @@ def _payload_references(
 async def _external_payloads(db: AsyncSession) -> list[tuple[str, object]]:
     payloads: list[tuple[str, object]] = []
     for row in (await db.scalars(select(CourseDraft))).all():
-        payloads.append((f"课程草稿 {row.id}", row.structure or {}))
+        payloads.append(("课程草稿", row.structure or {}))
     for row in (await db.scalars(select(CourseRelease))).all():
-        payloads.append((f"课程发布 {row.id}", row.course_snapshot or {}))
+        payloads.append(("课程发布", row.course_snapshot or {}))
     for row in (await db.scalars(select(LearningTask))).all():
-        payloads.append((f"学习任务 {row.id}", {**(row.content or {}), "audience": row.audience or {}}))
+        payloads.append(("学习任务", {**(row.content or {}), "audience": row.audience or {}}))
     for row in (await db.scalars(select(Question))).all():
-        payloads.append((f"题目 {row.id}", {"metadata": row.content_metadata or {}, "keyPath": row.key_path or {}, "status": row.status or {}}))
+        payloads.append(("题目", {"metadata": row.content_metadata or {}, "keyPath": row.key_path or {}, "status": row.status or {}}))
     for row in (await db.scalars(select(PaperRelease))).all():
-        payloads.append((f"试卷发布 {row.id}", {"metadata": row.release_metadata or {}, "source": row.source_payload or {}}))
+        payloads.append(("试卷发布", {"metadata": row.release_metadata or {}, "source": row.source_payload or {}}))
     for row in (await db.scalars(select(PaperReleaseQuestion))).all():
-        payloads.append((f"试卷发布题目 {row.release_id}", row.snapshot or {}))
+        payloads.append(("试卷发布题目", row.snapshot or {}))
     return payloads
 
 
@@ -455,6 +582,70 @@ async def apply_catalog_snapshot(
     pending_removed_subject_ids: set[str] = set()
     pending_removed_collection_ids: set[str] = set()
 
+    current_collection_rows = list(
+        (await db.scalars(select(ActivityCollection))).all()
+    )
+    current_collection_by_id = {
+        row.id: row for row in current_collection_rows if not _system_collection(row)
+    }
+    if incoming_collections is not None:
+        merged_collections: dict[str, dict[str, Any]] = {
+            identifier: _collection_payload(row)
+            for identifier, row in current_collection_by_id.items()
+            if row.owner_username != actor_username
+        }
+        for identifier, item in incoming_collections.items():
+            existing = current_collection_by_id.get(identifier)
+            if existing is not None and existing.owner_username != actor_username:
+                if item != _collection_payload(existing):
+                    raise CatalogResourceNotModifiable("资源不可修改或不存在")
+                continue
+            merged_collections[identifier] = item
+        incoming_collections = merged_collections
+
+    all_collection_by_id = {row.id: row for row in current_collection_rows}
+    current_tag_rows = list((await db.scalars(select(ActivityTag))).all())
+    if incoming_tags is not None:
+        merged_tags: dict[str, dict[str, Any]] = {
+            row.id: _activity_tag_payload(row)
+            for row in current_tag_rows
+            if not _collection_writable(
+                all_collection_by_id.get(row.collection_id), actor_username
+            )
+        }
+        current_tag_by_id = {row.id: row for row in current_tag_rows}
+        for identifier, item in incoming_tags.items():
+            existing = current_tag_by_id.get(identifier)
+            if existing is not None and not _collection_writable(
+                all_collection_by_id.get(existing.collection_id), actor_username
+            ):
+                if item != _activity_tag_payload(existing):
+                    raise CatalogResourceNotModifiable("资源不可修改或不存在")
+                continue
+            merged_tags[identifier] = item
+        incoming_tags = merged_tags
+
+    current_activity_rows = list((await db.scalars(select(ActivityOverride))).all())
+    if incoming_activities is not None:
+        merged_activities: dict[str, dict[str, Any]] = {
+            row.activity_id: _activity_override_payload(row)
+            for row in current_activity_rows
+            if not _collection_writable(
+                all_collection_by_id.get(row.collection_id), actor_username
+            )
+        }
+        current_activity_by_id = {row.activity_id: row for row in current_activity_rows}
+        for identifier, item in incoming_activities.items():
+            existing = current_activity_by_id.get(identifier)
+            if existing is not None and not _collection_writable(
+                all_collection_by_id.get(existing.collection_id), actor_username
+            ):
+                if item != _activity_override_payload(existing):
+                    raise CatalogResourceNotModifiable("资源不可修改或不存在")
+                continue
+            merged_activities[identifier] = item
+        incoming_activities = merged_activities
+
     known_subject_ids = set(
         incoming_subjects
         if incoming_subjects is not None
@@ -483,13 +674,13 @@ async def apply_catalog_snapshot(
         identifier: _subject_id(item.get("subjectId"))
         for identifier, item in effective_taxonomies.items()
     }
-    taxonomy_nodes = {
-        identifier: {
-            _required_id(node.get("id"), "知识点")
-            for node in (item.get("nodes") or [])
-            if isinstance(node, dict)
-        }
+    normalized_taxonomy_nodes = {
+        identifier: _validate_taxonomy_nodes(identifier, item.get("nodes"))
         for identifier, item in effective_taxonomies.items()
+    }
+    taxonomy_nodes = {
+        identifier: {str(node["id"]) for node in nodes}
+        for identifier, nodes in normalized_taxonomy_nodes.items()
     }
     system_collection_subjects = {
         row.id: row.subject_id
@@ -507,14 +698,7 @@ async def apply_catalog_snapshot(
         subject_id = _subject_id(item.get("subjectId"))
         if subject_id not in known_subject_ids:
             raise ValueError(f"知识树引用了不存在的科目：{subject_id}")
-        nodes = item.get("nodes") if isinstance(item.get("nodes"), list) else []
-        node_ids = {_required_id(node.get("id"), "知识点") for node in nodes if isinstance(node, dict)}
-        if len(node_ids) != len(nodes):
-            raise ValueError("知识点 ID 不能重复")
-        for node in nodes:
-            parent_id = str(node.get("parentId") or "").strip()
-            if parent_id and parent_id not in node_ids:
-                raise ValueError(f"知识点引用了不存在的父节点：{parent_id}")
+        item["nodes"] = normalized_taxonomy_nodes[str(item["id"])]
     for item in collection_records.values():
         subject_id = _subject_id(item.get("subjectId"))
         if subject_id not in known_subject_ids:
@@ -531,25 +715,42 @@ async def apply_catalog_snapshot(
                 raise ValueError(f"活动标签引用了不存在的题集：{collection_id}")
             if collection_subject != subject_id:
                 raise ValueError("活动标签不能挂载到其他科目的题集")
+            target_collection = all_collection_by_id.get(collection_id)
+            existing_tag = current_tag_by_id.get(identifier) if incoming_tags is not None else None
+            if (
+                target_collection is not None
+                and not _collection_writable(target_collection, actor_username)
+                and (existing_tag is None or existing_tag.collection_id != collection_id)
+            ):
+                raise CatalogResourceNotModifiable("资源不可修改或不存在")
         tag_subjects[identifier] = subject_id
     activity_subjects: dict[str, str] = {}
     for identifier, item in effective_activities.items():
-        metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+        metadata_value = item.get("metadata")
+        if metadata_value is not None and not isinstance(metadata_value, dict):
+            raise ValueError("活动 metadata 必须是对象")
+        metadata = metadata_value or {}
         subject_id = _subject_id(metadata.get("subjectId") or "subject-pmp")
         if subject_id not in known_subject_ids:
             raise ValueError(f"活动引用了不存在的科目：{subject_id}")
-        knowledge = metadata.get("knowledge") if isinstance(metadata.get("knowledge"), dict) else {}
+        knowledge_value = metadata.get("knowledge")
+        if knowledge_value is not None and not isinstance(knowledge_value, dict):
+            raise ValueError("活动 knowledge 必须是对象")
+        knowledge = knowledge_value or {}
         taxonomy_id = str(knowledge.get("taxonomyId") or "").strip()
         if taxonomy_id and taxonomy_id not in known_taxonomy_ids:
             raise ValueError(f"活动引用了不存在的知识树：{taxonomy_id}")
         if taxonomy_id and taxonomy_subjects.get(taxonomy_id) != subject_id:
             raise ValueError("活动不能引用其他科目的知识树")
+        related_node_ids = _strict_id_list(
+            knowledge.get("relatedNodeIds"), "relatedNodeIds"
+        )
+        primary_node_id = knowledge.get("primaryNodeId")
+        if primary_node_id is not None and not isinstance(primary_node_id, str):
+            raise ValueError("primaryNodeId 必须是字符串")
         referenced_nodes = {
-            str(knowledge.get("primaryNodeId") or "").strip(),
-            *{
-                str(node_id or "").strip()
-                for node_id in (knowledge.get("relatedNodeIds") or [])
-            },
+            str(primary_node_id or "").strip(),
+            *related_node_ids,
         } - {""}
         if referenced_nodes and (
             not taxonomy_id
@@ -563,12 +764,22 @@ async def apply_catalog_snapshot(
                 raise ValueError(f"活动引用了不存在的题集：{collection_id}")
             if collection_subject != subject_id:
                 raise ValueError("活动不能挂载到其他科目的题集")
-        organization = metadata.get("organization") if isinstance(metadata.get("organization"), dict) else {}
-        tag_ids = {
-            str(tag_id or "").strip()
-            for tag_id in (organization.get("tagIds") or [])
-            if str(tag_id or "").strip()
-        }
+            target_collection = all_collection_by_id.get(collection_id)
+            existing_activity = current_activity_by_id.get(identifier) if incoming_activities is not None else None
+            if (
+                target_collection is not None
+                and not _collection_writable(target_collection, actor_username)
+                and (
+                    existing_activity is None
+                    or existing_activity.collection_id != collection_id
+                )
+            ):
+                raise CatalogResourceNotModifiable("资源不可修改或不存在")
+        organization_value = metadata.get("organization")
+        if organization_value is not None and not isinstance(organization_value, dict):
+            raise ValueError("活动 organization 必须是对象")
+        organization = organization_value or {}
+        tag_ids = set(_strict_id_list(organization.get("tagIds"), "tagIds"))
         missing_tags = tag_ids - set(effective_tags)
         if missing_tags:
             raise ValueError(f"活动引用了不存在的标签：{sorted(missing_tags)[0]}")
@@ -577,16 +788,58 @@ async def apply_catalog_snapshot(
         activity_subjects[identifier] = subject_id
     for identifier, item in collection_records.items():
         subject_id = collection_subjects[identifier]
-        activity_ids = {
-            str(activity_id or "").strip()
-            for activity_id in (item.get("activityIds") or [])
-            if str(activity_id or "").strip()
-        }
+        activity_ids = set(_strict_id_list(item.get("activityIds"), "activityIds"))
         missing_activities = activity_ids - set(effective_activities)
         if missing_activities:
             raise ValueError(f"题集引用了不存在的活动：{sorted(missing_activities)[0]}")
         if any(activity_subjects[activity_id] != subject_id for activity_id in activity_ids):
             raise ValueError("题集不能引用其他科目的活动")
+
+    if incoming_subjects is not None:
+        subject_codes: set[str] = set()
+        for identifier, item in incoming_subjects.items():
+            code = str(item.get("code") or identifier.removeprefix("subject-")).strip().upper()
+            if not code or code in subject_codes:
+                raise ValueError("科目 code 必须唯一且非空")
+            subject_codes.add(code)
+    taxonomy_versions: set[tuple[str, int]] = set()
+    for item in effective_taxonomies.values():
+        subject_id = _subject_id(item.get("subjectId"))
+        try:
+            version = int(item.get("version") or 1)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("知识树 version 必须是正整数") from exc
+        if version < 1 or (subject_id, version) in taxonomy_versions:
+            raise ValueError("同一科目的知识树 version 必须唯一")
+        taxonomy_versions.add((subject_id, version))
+    tag_names: set[tuple[str, str]] = set()
+    for identifier, item in effective_tags.items():
+        subject_id = tag_subjects[identifier]
+        collection_id = str(item.get("collectionId") or "").strip()
+        namespace = collection_id or f"__tags__:{subject_id}"
+        name = str(item.get("name") or item.get("tag") or "").strip()
+        key = (namespace, name.casefold())
+        if not name or key in tag_names:
+            raise ValueError("同一题集的活动标签名称必须唯一")
+        tag_names.add(key)
+
+    normalized_requested = {
+        "subjects": incoming_subjects,
+        "taxonomies": incoming_taxonomies,
+        "activityOverrides": incoming_activities,
+        "activityTags": incoming_tags,
+        "activityCollections": incoming_collections,
+    }
+    if all(
+        rows is None
+        or rows
+        == {
+            _required_id(item.get("id"), name): item
+            for item in before_snapshot[name]
+        }
+        for name, rows in normalized_requested.items()
+    ):
+        return []
 
     changes: list[dict[str, str]] = []
     if incoming_subjects is not None:
@@ -618,6 +871,12 @@ async def apply_catalog_snapshot(
             for model in (QuestionBank, Question, ExamPaper, PaperRelease):
                 if await db.scalar(select(model).where(model.subject.in_(direct_subject_values)).limit(1)):
                     raise ValueError("科目仍被题目或试卷引用，不能删除")
+            if await db.scalar(
+                select(RecallAssociationLibrary.id)
+                .where(RecallAssociationLibrary.subject_id.in_(removed))
+                .limit(1)
+            ):
+                raise ValueError("科目仍被联想库引用，不能删除")
             await _assert_unreferenced(
                 db,
                 direct_subject_values,
@@ -689,9 +948,17 @@ async def apply_catalog_snapshot(
             metadata = {k: deepcopy(v) for k, v in item.items() if k not in {"id", "subjectId", "title", "status"}}
             row = await db.get(ActivityCollection, identifier)
             if row is None:
-                row = ActivityCollection(id=identifier, subject_id=subject_id, title=str(item.get("title") or ""), status=str(item.get("status") or "active"), content_metadata=metadata)
+                authorship = dict(metadata.get("authorship") or {})
+                authorship["createdByUserId"] = actor_username
+                metadata["authorship"] = authorship
+                row = ActivityCollection(id=identifier, subject_id=subject_id, title=str(item.get("title") or ""), status=str(item.get("status") or "active"), content_metadata=metadata, owner_username=actor_username)
                 db.add(row)
             else:
+                if row.owner_username != actor_username:
+                    continue
+                authorship = dict(metadata.get("authorship") or {})
+                authorship["createdByUserId"] = row.owner_username
+                metadata["authorship"] = authorship
                 row.subject_id, row.title, row.status, row.content_metadata = subject_id, str(item.get("title") or ""), str(item.get("status") or "active"), metadata
         removed = current_ids - set(incoming_collections)
         if removed:
@@ -722,11 +989,20 @@ async def apply_catalog_snapshot(
                 raise ValueError("活动标签名称不能为空")
             metadata = {k: deepcopy(v) for k, v in item.items() if k not in {"id", "name", "tag", "collectionId"}}
             row = await db.get(ActivityTag, identifier)
+            collection_row = await db.get(ActivityCollection, collection_id)
+            owner_username = (
+                None if collection_row is None or _system_collection(collection_row)
+                else collection_row.owner_username
+            )
             if row is None:
-                row = ActivityTag(id=identifier, collection_id=collection_id, tag=name, content_metadata=metadata)
+                row = ActivityTag(id=identifier, collection_id=collection_id, tag=name, content_metadata=metadata, owner_username=owner_username)
                 db.add(row)
             else:
-                row.collection_id, row.tag, row.content_metadata = collection_id, name, metadata
+                if not _collection_writable(
+                    all_collection_by_id.get(row.collection_id), actor_username
+                ):
+                    continue
+                row.collection_id, row.tag, row.content_metadata, row.owner_username = collection_id, name, metadata, owner_username
         removed = current_ids - set(incoming_tags)
         if removed:
             activity_payloads = list((incoming_activities or {}).values()) if incoming_activities is not None else [row.record or {} for row in (await db.scalars(select(ActivityOverride))).all()]
@@ -750,11 +1026,18 @@ async def apply_catalog_snapshot(
             if not collection_id or await db.get(ActivityCollection, collection_id) is None:
                 collection_id = await _activity_namespace(db, subject_id)
             row = current_by_activity.get(identifier)
+            collection_row = await db.get(ActivityCollection, collection_id)
+            owner_username = (
+                None if collection_row is None or _system_collection(collection_row)
+                else collection_row.owner_username
+            )
             if row is None:
-                row = ActivityOverride(id=uuid4().hex, collection_id=collection_id, activity_id=identifier, record=deepcopy(item), revision=1, updated_by=actor_username)
+                row = ActivityOverride(id=uuid4().hex, collection_id=collection_id, activity_id=identifier, record=deepcopy(item), revision=1, updated_by=actor_username, owner_username=owner_username)
                 db.add(row)
-            elif row.collection_id != collection_id or row.record != item:
-                row.collection_id, row.record, row.revision, row.updated_by = collection_id, deepcopy(item), row.revision + 1, actor_username
+            elif _collection_writable(
+                all_collection_by_id.get(row.collection_id), actor_username
+            ) and (row.collection_id != collection_id or row.record != item):
+                row.collection_id, row.record, row.revision, row.updated_by, row.owner_username = collection_id, deepcopy(item), row.revision + 1, actor_username, owner_username
         removed = set(current_by_activity) - set(incoming_activities)
         if removed:
             collection_payloads = list((incoming_collections or {}).values()) if incoming_collections is not None else [row.content_metadata or {} for row in (await db.scalars(select(ActivityCollection))).all()]
@@ -822,9 +1105,10 @@ async def apply_catalog_snapshot(
     return changes
 
 
-async def read_shared_content(db: AsyncSession, subject_id: str) -> dict[str, Any]:
+async def _shared_content_snapshot(
+    db: AsyncSession, subject_id: str, viewer_username: str | None = None
+) -> dict[str, Any]:
     subject_id = _subject_id(subject_id)
-    await teaching_content_revision_service.acquire_read_lock(db)
     bundle = await _principle_card_bundle(db)
     taxonomy_result = await teaching_content_current_service.current_taxonomy(db, subject_id)
     taxonomy = _taxonomy_payload(*taxonomy_result) if taxonomy_result else None
@@ -849,7 +1133,7 @@ async def read_shared_content(db: AsyncSession, subject_id: str) -> dict[str, An
     ]
     revision = int((await teaching_content_revision_service.current(db))["revision"])
     return {
-        **(await _relational_repository_snapshot(db)),
+        **(await _relational_repository_snapshot(db, viewer_username)),
         "subjectId": subject_id,
         "knowledgeTree": {"taxonomy": taxonomy} if taxonomy else None,
         "recallLibrary": recall,
@@ -859,6 +1143,13 @@ async def read_shared_content(db: AsyncSession, subject_id: str) -> dict[str, An
         "subjectFacetSchemas": subject_facet_schemas,
         "contentRevision": revision,
     }
+
+
+async def read_shared_content(
+    db: AsyncSession, subject_id: str, viewer_username: str | None = None
+) -> dict[str, Any]:
+    await teaching_content_revision_service.acquire_read_lock(db)
+    return await _shared_content_snapshot(db, subject_id, viewer_username)
 
 
 async def apply_auxiliary_assets(
@@ -995,11 +1286,12 @@ async def save_shared_content(
         )
     else:
         revision = await teaching_content_revision_service.current(db)
-    await db.commit()
-    return {
-        **(await read_shared_content(db, subject_id)),
+    response = {
+        **(await _shared_content_snapshot(db, subject_id, actor.username)),
         "contentRevision": int(revision["revision"]),
     }
+    await db.commit()
+    return response
 
 
 async def upsert_principle(

@@ -10,16 +10,15 @@
  * - viewer 游客：体验/只读角色，不进入订阅体系，只能使用公开示例能力。
  * - guest 未登录访客：不进入订阅体系。
  *
- * 当前版本仍基于 localStorage，正式商业化时应改为后端校验。
+ * 订阅与套餐数据由 FastAPI 注入页面内存，权益以服务端校验为准。
  *
  * 基线重构 A：套餐、订单、卡密已拆到独立模块；本文件保留统一入口、
  * 订阅状态、权益校验、页面装饰和 window.KGSubscription 对外 API。
  */
 (function(){
   const Auth = window.KGAuthCore || {};
-  const Store = window.KGAppStorage || Auth.storage || {};
-  const STORAGE_KEY = "kg_student_subscriptions_v1";
-  const MIGRATION_KEY = "kg_subscription_plan_model_v2_migrated";
+  const memoryRecords = new Map();
+  let subscriptionState = Object.freeze({});
   const ACTIVE_STATUSES = new Set(["active","trial","manual"]);
 
   const STATUS_LABELS = {
@@ -31,16 +30,8 @@
     manual:"手动开通"
   };
 
-  function readJSON(key,fallback){
-    if(Auth.readJSON) return Auth.readJSON(key,fallback);
-    if(Store.readJSON) return Store.readJSON(key,fallback);
-    return (()=>{try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}})();
-  }
-  function writeJSON(key,value){
-    if(Auth.writeJSON) return Auth.writeJSON(key,value);
-    if(Store.writeJSON) return Store.writeJSON(key,value);
-    return (()=>{try{localStorage.setItem(key,JSON.stringify(value));return true}catch(e){return false}})();
-  }
+  function readMemory(key,fallback){return memoryRecords.has(key)?memoryRecords.get(key):fallback}
+  function writeMemory(key,value){memoryRecords.set(key,value);return true}
   function roleApi(){
     return window.KGRolePermissions || null;
   }
@@ -78,7 +69,7 @@
     return;
   }
 
-  const Plans = PlansFactory({readJSON,writeJSON,decorateSubscriptionElements});
+  const Plans = PlansFactory({readJSON:readMemory,writeJSON:writeMemory,decorateSubscriptionElements});
 
   function normalizePlanId(planId){ return Plans.normalizePlanId(planId); }
   function basePlanById(planId){ return Plans.basePlanById(planId); }
@@ -112,11 +103,24 @@
     return STATUS_LABELS[next] ? next : "active";
   }
   function readSubscriptions(){
-    const map=readJSON(STORAGE_KEY,{});
-    return map && typeof map === "object" ? map : {};
+    return {...subscriptionState};
   }
   function saveSubscriptions(map){
-    writeJSON(STORAGE_KEY,map && typeof map === "object" ? map : {});
+    subscriptionState=Object.freeze(Object.fromEntries(
+      Object.entries(map&&typeof map==="object"?map:{}).map(([username,subscription])=>[
+        username,Object.freeze(normalizeSubscription(subscription,username))
+      ])
+    ));
+    return readSubscriptions();
+  }
+  function hydrateSubscriptions(map,options={}){
+    const incoming=map&&typeof map==="object"?map:{};
+    return saveSubscriptions(options.merge?{...subscriptionState,...incoming}:incoming);
+  }
+  function hydratePlanSettings(settings,options={}){
+    const next=options.merge?{...Plans.readPlanSettings(),...(settings||{})}:(settings||{});
+    Plans.savePlanSettings(next);
+    return Plans.readPlanSettings();
   }
   function defaultSubscription(username=currentUsername()){
     const now=Date.now();
@@ -132,11 +136,16 @@
       note:""
     };
   }
+  function subscriptionTime(value,fallback=0){
+    if(typeof value==="number"&&Number.isFinite(value))return value;
+    const parsed=Date.parse(String(value||""));
+    return Number.isFinite(parsed)?parsed:fallback;
+  }
   function normalizeSubscription(sub,username=currentUsername()){
     sub=sub && typeof sub === "object" ? sub : {};
     const planId=normalizePlanId(sub.planId);
-    const startedAt=Number(sub.startedAt)||Date.now();
-    let expiresAt=Number(sub.expiresAt)||0;
+    const startedAt=subscriptionTime(sub.startedAt,Date.now());
+    let expiresAt=subscriptionTime(sub.expiresAt,0);
     const plan=planById(planId);
     if(plan.durationDays === -1) expiresAt=0;
     return {
@@ -147,7 +156,7 @@
       status:normalizeStatus(sub.status),
       startedAt,
       expiresAt,
-      updatedAt:Number(sub.updatedAt)||0,
+      updatedAt:subscriptionTime(sub.updatedAt,0),
       source:sub.source || "manual",
       orderId:sub.orderId || "",
       note:sub.note || ""
@@ -389,23 +398,6 @@
       countdownText:unlimited ? (plan.durationDays === -1 ? "永久有效" : "长期有效") : countdownDaysText(sub.expiresAt)
     };
   }
-  function migrateLegacySubscriptions(){
-    if(readJSON(MIGRATION_KEY,false)) return false;
-    const map=readSubscriptions();
-    let changed=false;
-    Object.keys(map).forEach(username=>{
-      const before=map[username];
-      if(!before || typeof before !== "object") return;
-      const next=normalizeSubscription(before,username);
-      if(next.planId !== before.planId || next.status !== before.status){
-        map[username]=next;
-        changed=true;
-      }
-    });
-    if(changed) saveSubscriptions(map);
-    writeJSON(MIGRATION_KEY,true);
-    return changed;
-  }
   function decorateSubscriptionElements(root=document){
     const scope=root||document;
     scope.querySelectorAll("[data-subscription-feature]").forEach(el=>{
@@ -437,8 +429,8 @@
   }
 
   const Orders = OrdersFactory({
-    readJSON,
-    writeJSON,
+    readJSON:readMemory,
+    writeJSON:writeMemory,
     currentUser,
     currentRole,
     currentUsername,
@@ -455,8 +447,8 @@
   });
 
   const RedeemCodes = RedeemCodesFactory({
-    readJSON,
-    writeJSON,
+    readJSON:readMemory,
+    writeJSON:writeMemory,
     currentUser,
     currentRole,
     currentUsername,
@@ -489,22 +481,16 @@
   function removeRedeemCode(id){ return RedeemCodes.removeRedeemCode(id); }
   function redeemCodeStatusLabel(status){ return RedeemCodes.redeemCodeStatusLabel(status); }
 
-  migrateLegacySubscriptions();
   document.addEventListener("DOMContentLoaded",()=>decorateSubscriptionElements());
   window.addEventListener("kg-role-theme-change",()=>setTimeout(decorateSubscriptionElements,0));
   window.addEventListener("kg-auth-session-change",()=>setTimeout(decorateSubscriptionElements,0));
   window.addEventListener("kg-auth-users-change",()=>setTimeout(decorateSubscriptionElements,0));
   window.addEventListener("kg-subscription-change",()=>setTimeout(decorateSubscriptionElements,0));
   window.addEventListener("kg-subscription-plan-change",()=>setTimeout(decorateSubscriptionElements,0));
-  window.addEventListener("storage",event=>{
-    if(!event.key || event.key===STORAGE_KEY || event.key===Orders.ORDER_KEY || event.key===RedeemCodes.REDEEM_CODE_KEY || event.key.indexOf("kg_local_")===0) setTimeout(decorateSubscriptionElements,0);
-  });
 
   window.KGSubscription={
-    STORAGE_KEY,
     ORDER_KEY:Orders.ORDER_KEY,
     REDEEM_CODE_KEY:RedeemCodes.REDEEM_CODE_KEY,
-    MIGRATION_KEY,
     PLANS:Plans.PLANS,
     PLAN_ORDER:Plans.PLAN_ORDER,
     PLAN_ALIASES:Plans.PLAN_ALIASES,
@@ -515,6 +501,8 @@
     REDEEM_CODE_STATUS_LABELS:RedeemCodes.REDEEM_CODE_STATUS_LABELS,
     readSubscriptions,
     saveSubscriptions,
+    hydrateSubscriptions,
+    hydratePlanSettings,
     readOrders,
     saveOrders,
     readRedeemCodes,
@@ -581,7 +569,6 @@
     defaultPlanBenefitItems,
     defaultPlanUsageText,
     statusLabel,
-    normalizeSubscription,
-    migrateLegacySubscriptions
+    normalizeSubscription
   };
 })();

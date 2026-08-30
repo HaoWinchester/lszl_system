@@ -1,81 +1,31 @@
 'use strict'
 
 ;(function (global) {
+  const api = global.KGDomainApi
   const roleApi = global.KGRolePermissions
-  const wechatApi = global.KGWechatLogin
   const subscriptionApi = global.KGSubscription
-  let userProfile = null
-  let userLoadPromise
-  // FastAPI 内联注入的会话元数据可同步提供登录态；/me 仍在后台校正。
-  const injectedBootstrap = global.__KG_DIRECT_BOOTSTRAP__
-  if (injectedBootstrap?.authenticated && injectedBootstrap.authUser) {
-    userProfile = injectedBootstrap.authUser
-  }
-  // wechatApi 仅管理端配置保存需要；部分学员页未加载 32-wechat-login.js，不应因此跳过套餐价格预载。
-  if (!roleApi || !subscriptionApi) return
-  const originalSaveTheme = roleApi.saveTheme.bind(roleApi)
-  const originalResetTheme = roleApi.resetTheme.bind(roleApi)
+  const auth = global.KGAuthCore
+  const wechatApi = global.KGWechatLogin
+  if (!api || !roleApi || !subscriptionApi) return
 
-  function errorMessage(payload, status) {
-    const detail = payload?.detail ?? payload?.message ?? payload?.error
-    if (Array.isArray(detail)) return detail.map((item) => item?.msg || String(item)).join('；')
-    return String(detail || `服务器请求失败（${status || 0}）`)
-  }
+  let userProfile = global.__KG_DIRECT_BOOTSTRAP__?.authenticated
+    ? global.__KG_DIRECT_BOOTSTRAP__.authUser || null
+    : null
+  let orderState = Object.freeze([])
+  let redeemCodeState = Object.freeze([])
+  let initialization = Object.freeze({ status: 'loading', error: null })
 
   function request(method, path, body) {
-    const xhr = new XMLHttpRequest()
-    xhr.open(method, path, false)
-    xhr.withCredentials = true
-    xhr.setRequestHeader('Accept', 'application/json')
-    if (body !== undefined) xhr.setRequestHeader('Content-Type', 'application/json')
-    xhr.send(body === undefined ? null : JSON.stringify(body))
-    let payload = {}
-    try { payload = xhr.responseText ? JSON.parse(xhr.responseText) : {} } catch (_) {}
-    if (xhr.status < 200 || xhr.status >= 300) {
-      throw new Error(errorMessage(payload, xhr.status))
-    }
-    return payload
-  }
-
-  async function requestJson(method, path, body) {
-    const response = await fetch(path, {
-      method,
-      credentials: 'include',
-      headers: body === undefined ? { Accept: 'application/json' } : {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    })
-    let payload = {}
-    try { payload = await response.json() } catch (_) {}
-    if (!response.ok) throw new Error(errorMessage(payload, response.status))
-    return payload
-  }
-
-  global.KGWechatPay = {
-    async createNativeOrder(planId) {
-      return requestJson('POST', '/api/v1/subscriptions/orders', { planId })
-    },
-    async getNativeOrderStatus(orderId) {
-      return requestJson('GET', `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/status`)
-    },
-    async cancelNativeOrder(orderId) {
-      return requestJson('POST', `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/self-cancel`)
-    },
-    syncSubscription,
-    nativeOrderQrCodeUrl(orderId) {
-      return `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/qrcode`
-    },
+    return api.request({ method, path, body })
   }
 
   function toLegacyTheme(theme = {}) {
-    return {
+    return Object.freeze({
       primary: theme.primary_color || theme.primary,
       accent: theme.accent_color || theme.accent,
       soft: theme.soft_color || theme.soft,
       text: theme.text_color || theme.text,
-    }
+    })
   }
 
   function toServerTheme(theme = {}) {
@@ -88,183 +38,337 @@
   }
 
   function planSettings(plans = []) {
-    return Object.fromEntries(
-      plans
-        .filter((plan) => plan && plan.planId)
-        .map((plan) => [plan.planId, { ...plan, id: undefined, planId: undefined }]),
-    )
-  }
-
-  function cachedRole() {
-    return String(userProfile?.role || 'guest')
-  }
-
-  function isAuthenticated() {
-    return userProfile != null
-  }
-
-  function isAdmin() {
-    return cachedRole() === 'admin'
-  }
-
-  function preloadUserProfile() {
-    if (userProfile || userLoadPromise) return userLoadPromise || Promise.resolve(userProfile)
-    userLoadPromise = requestJson('GET', '/api/v1/auth/me')
-      .then((payload) => {
-        userProfile = payload?.user || null
-        return userProfile
-      })
-      .catch(() => {
-        userProfile = null
-        return null
-      })
-      .finally(() => {
-        userLoadPromise = null
-      })
-    return userLoadPromise
-  }
-
-  function preloadPlans() {
-    const plans = request('GET', '/api/v1/subscriptions/plans').plans || []
-    // 套餐配置以 PostgreSQL 为唯一来源；仅在当前页面内存中提供给旧 UI 模块，
-    // 不把展示配置写回浏览器缓存或运行时状态表。
-    global.KGSubscriptionRemotePlanSettings = Object.freeze(planSettings(plans))
-    global.dispatchEvent(new CustomEvent('kg-subscription-plan-change', {
-      detail: { settings: global.KGSubscriptionRemotePlanSettings },
-    }))
+    return Object.freeze(Object.fromEntries(
+      plans.filter(plan => plan && (plan.planId || plan.id)).map(plan => {
+        const planId = plan.planId || plan.id
+        return [planId, Object.freeze({ ...plan, id: undefined, planId: undefined })]
+      }),
+    ))
   }
 
   function subscriptionTimestamp(value) {
+    if (typeof value === 'number') return value
     const timestamp = Date.parse(value || '')
     return Number.isFinite(timestamp) ? timestamp : 0
   }
 
-  function syncSubscription(subscription) {
-    if (!subscription?.username || typeof subscriptionApi.setStudentSubscription !== 'function') return null
-    return subscriptionApi.setStudentSubscription(subscription.username, {
-      planId: subscription.planId,
-      status: subscription.status,
-      startedAt: subscriptionTimestamp(subscription.startedAt),
-      expiresAt: subscriptionTimestamp(subscription.expiresAt),
-      source: subscription.source,
-      note: subscription.note || '',
+  function normalizeSubscription(subscription = {}) {
+    return Object.freeze({
+      ...subscription,
+      username: subscription.username || userProfile?.username || '',
+      startedAt: subscriptionTimestamp(subscription.startedAt || subscription.started_at),
+      expiresAt: subscriptionTimestamp(subscription.expiresAt || subscription.expires_at),
+      updatedAt: subscriptionTimestamp(subscription.updatedAt || subscription.updated_at),
     })
   }
 
-  function preloadSubscription() {
-    const payload = request('GET', '/api/v1/subscriptions/me')
+  function normalizeOrder(order = {}) {
+    const amount = Number(order.amount)
+    return Object.freeze({
+      ...order,
+      id: String(order.id || ''),
+      username: String(order.username || ''),
+      planId: String(order.planId || order.plan_id || ''),
+      planName: String(order.planName || order.plan_name || ''),
+      note: String(order.note || ''),
+      adminNote: String(order.adminNote || order.admin_note || ''),
+      createdAt: subscriptionTimestamp(order.createdAt || order.created_at),
+      updatedAt: subscriptionTimestamp(order.updatedAt || order.updated_at),
+      approvedAt: subscriptionTimestamp(order.approvedAt || order.approved_at),
+      amountText: Number.isFinite(amount) ? `￥${(amount / 100).toFixed(2)}` : '',
+    })
+  }
+
+  function normalizeRedeemCode(code = {}) {
+    return Object.freeze({
+      ...code,
+      id: String(code.id || ''),
+      code: String(code.code || '').trim().toUpperCase(),
+      planId: String(code.planId || code.plan_id || ''),
+      planName: String(code.planName || code.plan_name || ''),
+      createdAt: subscriptionTimestamp(code.createdAt || code.created_at),
+      usedAt: subscriptionTimestamp(code.usedAt || code.used_at),
+    })
+  }
+
+  function filteredRecords(records, options = {}) {
+    return records.filter(record => Object.entries(options).every(([key, value]) => (
+      value == null || value === '' || String(record[key] || '') === String(value)
+    )))
+  }
+
+  async function refreshUserProfile() {
+    if (userProfile) return userProfile
+    const payload = await request('GET', '/api/v1/auth/me')
+    userProfile = payload?.user || null
+    return userProfile
+  }
+
+  async function refreshRoleThemes() {
+    const payload = await request('GET', '/api/v1/system/themes')
+    const next = Object.freeze(Object.fromEntries(
+      Object.entries(payload.themes || {}).map(([role, theme]) => [role, toLegacyTheme(theme)]),
+    ))
+    roleApi.hydrateThemes?.(next)
+    return next
+  }
+
+  async function refreshPlans() {
+    const payload = await request('GET', '/api/v1/subscriptions/plans')
+    const next = planSettings(payload.plans || [])
+    subscriptionApi.hydratePlanSettings?.(next)
+    global.KGSubscriptionRemotePlanSettings = next
+    global.dispatchEvent?.(new CustomEvent('kg-subscription-plan-change', { detail: { settings: next } }))
+    return next
+  }
+
+  async function refreshSubscription() {
+    const payload = await request('GET', '/api/v1/subscriptions/me')
+    const subscription = payload.subscription ? normalizeSubscription(payload.subscription) : null
+    subscriptionApi.hydrateSubscriptions?.(
+      subscription?.username ? { [subscription.username]: subscription } : {},
+      { merge: true },
+    )
     global.KGServerEntitlements = Object.freeze({
       allExamPapers: payload.entitlements?.allExamPapers === true,
     })
-    return syncSubscription(payload.subscription)
+    return subscription
   }
 
-  function clearEntitlements() {
-    global.KGServerEntitlements = Object.freeze({ allExamPapers: false })
+  async function refreshAdminSettings() {
+    const [wechat, wechatPay] = await Promise.all([
+      request('GET', '/api/v1/system/wechat-config'),
+      request('GET', '/api/v1/system/wechat-pay-config'),
+    ])
+    wechatApi?.applyConfig?.(wechat.config || {})
+    global.KGDirectSystemSettings = Object.freeze({
+      wechatPayConfig: Object.freeze({ ...(wechatPay.config || {}) }),
+    })
+    return global.KGDirectSystemSettings
   }
 
-  // 页面内切换/退出账号时，服务端权益必须跟随当前账号重新拉取；
-  // 否则上一个账号（如会员）的 KGServerEntitlements 会残留，普通账号也被误判为有 VIP 权益。
-  function refreshEntitlementsForCurrentUser(detail = {}) {
-    const username = String(detail.username || global.KGAuthCore?.currentUser?.()?.username || '').trim()
+  async function refreshAdminLogs() {
+    const payload = await request('GET', '/api/v1/system/logs?limit=100')
+    auth?.replaceAdminLogs?.(payload.logs || [])
+    return payload.logs || []
+  }
+
+  async function refreshOrders() {
+    const payload = await request('GET', '/api/v1/subscriptions/orders')
+    orderState = Object.freeze((payload.orders || []).map(normalizeOrder))
+    global.dispatchEvent?.(new CustomEvent('kg-subscription-order-change', { detail: { orders: orderState } }))
+    return orderState
+  }
+
+  async function refreshRedeemCodes() {
+    const payload = await request('GET', '/api/v1/subscriptions/redeem-codes')
+    redeemCodeState = Object.freeze((payload.codes || []).map(normalizeRedeemCode))
+    global.dispatchEvent?.(new CustomEvent('kg-subscription-redeem-code-change', { detail: { codes: redeemCodeState } }))
+    return redeemCodeState
+  }
+
+  async function clearAdminLogs() {
+    await request('DELETE', '/api/v1/system/logs')
+    auth?.replaceAdminLogs?.([])
+    return []
+  }
+
+  async function refreshAuthenticatedContext() {
+    await refreshPlans()
+    try { await refreshUserProfile() } catch (_) { userProfile = null }
+    if (!userProfile) {
+      global.KGServerEntitlements = Object.freeze({ allExamPapers: false })
+      return null
+    }
+    await Promise.all([refreshRoleThemes(), refreshSubscription()])
+    if (userProfile.role === 'admin') {
+      await Promise.all([refreshAdminSettings(), refreshAdminLogs(), refreshOrders(), refreshRedeemCodes()])
+    }
+    return userProfile
+  }
+
+  async function saveTheme(role, theme) {
+    const payload = await request('PUT', `/api/v1/system/themes/${encodeURIComponent(role)}`, toServerTheme(theme))
+    return roleApi.hydrateTheme?.(role, toLegacyTheme(payload.theme))
+      || roleApi.saveTheme(role, toLegacyTheme(payload.theme))
+  }
+
+  async function resetTheme(role) {
+    const fallback = roleApi.DEFAULT_THEMES?.[role] || {}
+    return saveTheme(role, fallback)
+  }
+
+  async function saveWechatConfig(config) {
+    const payload = await request('PUT', '/api/v1/system/wechat-config', config)
+    wechatApi?.applyConfig?.(payload.config || {})
+    return payload.config || {}
+  }
+
+  async function savePlan(planId, patch) {
+    const payload = await request('PUT', `/api/v1/system/subscription-plans/${encodeURIComponent(planId)}`, patch)
+    subscriptionApi.hydratePlanSettings?.({ [planId]: payload.plan || patch }, { merge: true })
+    return subscriptionApi.planById?.(planId) || payload.plan || patch
+  }
+
+  async function saveAllPlans(settings = {}) {
+    for (const planId of subscriptionApi.PLAN_ORDER || []) {
+      await savePlan(planId, settings[planId] || subscriptionApi.PLANS?.[planId] || {})
+    }
+    return subscriptionApi.readPlanSettings?.() || settings
+  }
+
+  async function setStudentSubscription(username, patch = {}) {
+    const body = {}
+    for (const key of ['planId', 'status', 'note']) {
+      if (Object.prototype.hasOwnProperty.call(patch, key)) body[key] = patch[key]
+    }
+    for (const key of ['startedAt', 'expiresAt']) {
+      if (!Object.prototype.hasOwnProperty.call(patch, key)) continue
+      const timestamp = Number(patch[key]) || 0
+      body[key] = timestamp ? new Date(timestamp).toISOString() : null
+    }
+    const payload = await request('PUT', `/api/v1/subscriptions/admin/${encodeURIComponent(username)}`, body)
+    const subscription = normalizeSubscription(payload.subscription || { ...patch, username })
+    subscriptionApi.hydrateSubscriptions?.({ [username]: subscription }, { merge: true })
+    return subscription
+  }
+
+  async function approveOrder(orderId) {
+    await request('POST', `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/approve`)
+    await refreshOrders()
+    return { ok: true, order: orderState.find(order => order.id === String(orderId)) || null, message: '订阅申请已确认开通。' }
+  }
+
+  async function cancelOrder(orderId, options = {}) {
+    await request('POST', `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/cancel`, {
+      note: String(options.note || '').trim(),
+    })
+    await refreshOrders()
+    const order = orderState.find(item => item.id === String(orderId)) || null
+    if (!order || order.status !== 'cancelled') throw new Error('订单取消后未能读取权威状态，请重试。')
+    return { ok: true, order, message: '订阅申请已取消。' }
+  }
+
+  async function generateRedeemCodes(options = {}) {
+    const payload = await request('POST', '/api/v1/subscriptions/redeem-codes/generate', {
+      planId: options.planId || 'monthly',
+      count: Math.max(1, Math.min(200, Number(options.count) || 1)),
+      prefix: String(options.prefix || 'VIP').trim(),
+      note: String(options.note || '').trim(),
+    })
+    const generated = new Set((payload.codes || []).map(code => String(code).toUpperCase()))
+    await refreshRedeemCodes()
+    const codes = redeemCodeState.filter(code => generated.has(code.code))
+    return { ok: true, codes, message: `已生成 ${codes.length} 张卡密。` }
+  }
+
+  async function updateRedeemCodeStatus(codeId, status) {
+    await request('PATCH', `/api/v1/subscriptions/redeem-codes/${encodeURIComponent(codeId)}`, { status })
+    await refreshRedeemCodes()
+    const code = redeemCodeState.find(item => item.id === String(codeId)) || null
+    if (!code || code.status !== status) throw new Error('卡密更新后未能读取权威状态，请重试。')
+    return { ok: true, code, message: status === 'disabled' ? '卡密已停用。' : '卡密已启用。' }
+  }
+
+  async function removeRedeemCode(codeId) {
+    await request('DELETE', `/api/v1/subscriptions/redeem-codes/${encodeURIComponent(codeId)}`)
+    await refreshRedeemCodes()
+    if (redeemCodeState.some(item => item.id === String(codeId))) {
+      throw new Error('卡密删除后仍存在，请重试。')
+    }
+    return { ok: true, message: '卡密已删除。' }
+  }
+
+  async function redeemCode(input) {
+    const payload = await request('POST', '/api/v1/subscriptions/redeem', { code: String(input || '').trim() })
+    const subscription = normalizeSubscription(payload.subscription || {})
+    if (subscription.username) subscriptionApi.hydrateSubscriptions?.({ [subscription.username]: subscription }, { merge: true })
+    return { ok: true, subscription, message: '卡密兑换成功，会员权益已更新。' }
+  }
+
+  async function retryInitialization() {
+    initialization = Object.freeze({ status: 'loading', error: null })
     try {
-      if (username) preloadSubscription()
-      else clearEntitlements()
+      const result = await refreshAuthenticatedContext()
+      initialization = Object.freeze({ status: 'ready', error: null })
+      return result
     } catch (error) {
-      console.error('[DirectSystemAdapter] refresh entitlements after auth change failed:', error)
-      clearEntitlements()
+      initialization = Object.freeze({ status: 'failed', error })
+      throw error
     }
   }
 
-  function preloadAuthenticatedContext() {
-    preloadUserProfile().then(() => {
-      if (!userProfile) {
-        clearEntitlements()
-      } else {
-        try {
-          const themes = request('GET', '/api/v1/system/themes').themes || {}
-          for (const [role, theme] of Object.entries(themes)) {
-            originalSaveTheme(role, toLegacyTheme(theme))
-          }
-        } catch (error) {
-          console.error('[DirectSystemAdapter] role themes preload failed:', error)
-        }
-
-        try {
-          preloadSubscription()
-        } catch (error) {
-          console.error('[DirectSystemAdapter] subscription preload failed:', error)
-        }
-      }
-
-      if (isAdmin()) {
-        try {
-          const wechat = request('GET', '/api/v1/system/wechat-config').config || {}
-          wechatApi?.applyConfig?.(wechat)
-          const wechatPay = request('GET', '/api/v1/system/wechat-pay-config').config || {}
-          global.KGDirectSystemSettings = { wechatPayConfig: wechatPay }
-        } catch (error) {
-          console.error('[DirectSystemAdapter] admin settings preload failed:', error)
-        }
-      }
-    }).catch((error) => {
-      console.error('[DirectSystemAdapter] preloadAuthenticatedContext failed:', error)
-    })
+  const domain = {
+    refreshRoleThemes,
+    refreshPlans,
+    refreshSubscription,
+    refreshAdminSettings,
+    refreshAdminLogs,
+    refreshOrders,
+    refreshRedeemCodes,
+    clearAdminLogs,
+    refreshAuthenticatedContext,
+    saveTheme,
+    resetTheme,
+    saveWechatConfig,
+    savePlan,
+    saveAllPlans,
+    setStudentSubscription,
+    retryInitialization,
+    initializationState: () => initialization,
   }
+  domain.ready = retryInitialization()
+  global.KGSystemDomain = Object.freeze(domain)
+
+  global.KGWechatPay = Object.freeze({
+    createNativeOrder: planId => request('POST', '/api/v1/subscriptions/orders', { planId }),
+    getNativeOrderStatus: orderId => request('GET', `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/status`),
+    cancelNativeOrder: orderId => request('POST', `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/self-cancel`),
+    syncSubscription(subscription) {
+      const normalized = normalizeSubscription(subscription)
+      if (normalized.username) subscriptionApi.hydrateSubscriptions?.({ [normalized.username]: normalized }, { merge: true })
+      return normalized
+    },
+    nativeOrderQrCodeUrl: orderId => `/api/v1/subscriptions/orders/${encodeURIComponent(orderId)}/qrcode`,
+  })
+
+  roleApi.saveTheme = saveTheme
+  roleApi.resetTheme = resetTheme
+  if (wechatApi) wechatApi.saveConfig = saveWechatConfig
+  subscriptionApi.setPlanSettings = savePlan
+  subscriptionApi.resetPlanSettings = planId => savePlan(planId, subscriptionApi.PLANS?.[planId] || {})
+  subscriptionApi.savePlanSettings = saveAllPlans
+  subscriptionApi.setStudentSubscription = setStudentSubscription
+  subscriptionApi.renewStudentSubscription = (username, planId, options = {}) => setStudentSubscription(username, {
+    planId, status: options.status || 'active', note: options.note || '',
+  })
+  subscriptionApi.pauseStudentSubscription = (username, note = '') => setStudentSubscription(username, { status: 'paused', note })
+  subscriptionApi.activateFreeSubscription = (username, note = '') => setStudentSubscription(username, { planId: 'free', status: 'active', note })
+  subscriptionApi.orderList = options => filteredRecords(orderState, options)
+    .slice().sort((left, right) => right.createdAt - left.createdAt)
+  subscriptionApi.pendingOrders = () => subscriptionApi.orderList({ status: 'pending' })
+  subscriptionApi.currentUserOrders = () => subscriptionApi.orderList({ username: userProfile?.username || '' })
+  subscriptionApi.hasPendingOrder = (username, planId) => subscriptionApi.orderList({ username, planId, status: 'pending' }).length > 0
+  subscriptionApi.approveOrder = approveOrder
+  subscriptionApi.cancelOrder = cancelOrder
+  subscriptionApi.redeemCodeList = options => filteredRecords(redeemCodeState, options)
+    .slice().sort((left, right) => right.createdAt - left.createdAt)
+  subscriptionApi.generateRedeemCodes = generateRedeemCodes
+  subscriptionApi.disableRedeemCode = codeId => updateRedeemCodeStatus(codeId, 'disabled')
+  subscriptionApi.enableRedeemCode = codeId => updateRedeemCodeStatus(codeId, 'unused')
+  subscriptionApi.removeRedeemCode = removeRedeemCode
+  subscriptionApi.redeemCode = redeemCode
 
   if (typeof global.addEventListener === 'function') {
-    global.addEventListener('kg-auth-session-change', (event) => {
-      const detail = event?.detail || {}
-      const username = String(detail.username || '').trim()
-      const authenticated = detail.authenticated === true
-        || (detail.authenticated !== false && Boolean(username))
+    global.addEventListener('kg-auth-session-change', event => {
+      const username = String(event?.detail?.username || '').trim()
       userProfile = null
-      userLoadPromise = null
-      refreshEntitlementsForCurrentUser(detail)
-      if (authenticated) preloadAuthenticatedContext()
-      else clearEntitlements()
+      if (!username) {
+        global.KGServerEntitlements = Object.freeze({ allExamPapers: false })
+        subscriptionApi.hydrateSubscriptions?.({})
+        return
+      }
+      refreshAuthenticatedContext().catch(error => console.error('[DirectSystemAdapter] auth refresh failed:', error))
     })
-  }
-
-  preloadAuthenticatedContext()
-  preloadPlans()
-
-  roleApi.saveTheme = function (role, theme) {
-    const saved = request('PUT', `/api/v1/system/themes/${encodeURIComponent(role)}`, toServerTheme(theme)).theme
-    return originalSaveTheme(role, toLegacyTheme(saved))
-  }
-  roleApi.resetTheme = function (role) {
-    const fallback = roleApi.DEFAULT_THEMES?.[role] || {}
-    const saved = request('PUT', `/api/v1/system/themes/${encodeURIComponent(role)}`, toServerTheme(fallback)).theme
-    originalResetTheme(role)
-    return originalSaveTheme(role, toLegacyTheme(saved))
-  }
-
-  if (wechatApi) {
-    const originalSaveConfig = wechatApi.saveConfig.bind(wechatApi)
-    wechatApi.saveConfig = function (config) {
-      const saved = request('PUT', '/api/v1/system/wechat-config', config).config
-      return originalSaveConfig(saved)
-    }
-  }
-
-  const originalSetPlanSettings = subscriptionApi.setPlanSettings.bind(subscriptionApi)
-  const originalResetPlanSettings = subscriptionApi.resetPlanSettings.bind(subscriptionApi)
-  const originalSavePlanSettings = subscriptionApi.savePlanSettings.bind(subscriptionApi)
-  subscriptionApi.setPlanSettings = function (planId, patch = {}) {
-    const saved = request('PUT', `/api/v1/system/subscription-plans/${encodeURIComponent(planId)}`, patch).plan
-    return originalSetPlanSettings(planId, saved || patch)
-  }
-  subscriptionApi.resetPlanSettings = function (planId) {
-    const base = subscriptionApi.PLANS?.[planId] || {}
-    request('PUT', `/api/v1/system/subscription-plans/${encodeURIComponent(planId)}`, base)
-    return originalResetPlanSettings(planId)
-  }
-  subscriptionApi.savePlanSettings = function (settings = {}) {
-    for (const planId of subscriptionApi.PLAN_ORDER || []) {
-      const patch = settings[planId] || subscriptionApi.PLANS?.[planId] || {}
-      request('PUT', `/api/v1/system/subscription-plans/${encodeURIComponent(planId)}`, patch)
-    }
-    return originalSavePlanSettings(settings)
   }
 })(window)

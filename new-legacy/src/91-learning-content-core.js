@@ -110,7 +110,7 @@
   function pathLabel(taxonomyId,nodeId,separator=' > '){return pathForNode(taxonomyId,nodeId).map(node=>node.title.zh).join(separator)}
   function descendantIds(taxonomyId,nodeId){
     const nodes=nodesForTaxonomy(taxonomyId,{includeDeprecated:true});const byParent=new Map();nodes.forEach(node=>{const key=node.parentId||'';if(!byParent.has(key))byParent.set(key,[]);byParent.get(key).push(node.id)});
-    const result=[];const queue=[String(nodeId||'')];while(queue.length){const current=queue.shift();(byParent.get(current)||[]).forEach(id=>{result.push(id);queue.push(id)})}return result;
+    const result=[];const queue=[String(nodeId||'')];const visited=new Set(queue);while(queue.length){const current=queue.shift();(byParent.get(current)||[]).forEach(id=>{if(visited.has(id))return;visited.add(id);result.push(id);queue.push(id)})}return result;
   }
   function searchNodes(taxonomyId,query=''){
     const keyword=clean(query).toLowerCase();const nodes=nodesForTaxonomy(taxonomyId);

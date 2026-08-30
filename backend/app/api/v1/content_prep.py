@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_permissions, require_role
@@ -110,6 +111,11 @@ def _raise_draft_error(error: content_prep_draft_service.ContentPrepDraftError) 
 
 
 def _raise_shared_error(error: Exception) -> None:
+    if isinstance(error, content_prep_shared_service.CatalogResourceNotModifiable):
+        raise HTTPException(
+            status_code=422,
+            detail={"code": error.code, "message": str(error)},
+        ) from error
     if isinstance(error, content_prep_shared_service.ContentRevisionConflict):
         raise HTTPException(
             status_code=409,
@@ -207,12 +213,12 @@ async def write_recall_library(subject_id: str, request: RecallLibraryWriteReque
 
 
 @router.delete("/taxonomies/{taxonomy_id}", status_code=410, deprecated=True, responses={410: {"description": "Legacy teaching mutation retired"}})
-async def remove_teaching_taxonomy(taxonomy_id: str, subjectId: str, contentRevision: int, db: DB, actor: PrepEditor):
+async def remove_teaching_taxonomy(taxonomy_id: str, subjectId: str, db: DB, actor: PrepEditor):
     _retired_catalog_mutation()
 
 
 @router.delete("/activity-overrides/{collection_id}/{activity_id}", status_code=410, deprecated=True, responses={410: {"description": "Legacy teaching mutation retired"}})
-async def remove_activity_override(collection_id: str, activity_id: str, contentRevision: int, db: DB, actor: PrepEditor):
+async def remove_activity_override(collection_id: str, activity_id: str, db: DB, actor: PrepEditor):
     _retired_catalog_mutation()
 
 
@@ -260,7 +266,9 @@ async def get_build_metadata(db: DB, actor: PrepEditor):
 @router.get("/shared-content")
 async def get_shared_content(subjectId: str, db: DB, actor: PrepEditor):
     try:
-        return await content_prep_shared_service.read_shared_content(db, subjectId)
+        return await content_prep_shared_service.read_shared_content(
+            db, subjectId, actor.username
+        )
     except ValueError as error:
         _raise_shared_error(error)
 
@@ -370,6 +378,9 @@ async def save_shared_content(
         teaching_content_projection_service.PrincipleArchiveConflict,
     ) as error:
         _raise_shared_error(error)
+    except IntegrityError as error:
+        await db.rollback()
+        _raise_shared_error(ValueError("教学内容唯一性或引用约束不满足"))
 
 
 @router.get("/subject-facets")

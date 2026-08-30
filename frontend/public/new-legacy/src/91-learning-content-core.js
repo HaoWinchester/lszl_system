@@ -1,9 +1,9 @@
 'use strict';
 
 (function(global){
-  const SUBJECT_KEY='kg_content_subjects_v1';
-  const TAXONOMY_KEY='kg_content_taxonomies_v1';
-  const ACTIVITY_OVERRIDE_KEY='kg_content_activity_overrides_v1';
+  const SUBJECT_RESOURCE='subjects';
+  const TAXONOMY_RESOURCE='taxonomies';
+  const ACTIVITY_OVERRIDE_RESOURCE='activityOverrides';
   const COURSE_DRAFT_KEY='kg_course_config_drafts_v1';
   const COURSE_RELEASE_KEY='kg_course_config_releases_v1';
   const ACTIVE_COURSE_KEY='kg_course_config_active_release_v1';
@@ -54,13 +54,16 @@
   ];
 
   function readJson(key,fallback){
+    if([SUBJECT_RESOURCE,TAXONOMY_RESOURCE,ACTIVITY_OVERRIDE_RESOURCE].includes(key))return clone(global.KGTeachingContentApi?.readResource?.(key,fallback)??fallback);
+    if(key===COURSE_DRAFT_KEY){const rows=global.KGTeachingContentApi?.readResource?.('courseDrafts',null);if(Array.isArray(rows))return clone(rows)}
+    if(key===COURSE_RELEASE_KEY){const rows=global.KGTeachingContentApi?.readResource?.('courseReleases',null);if(Array.isArray(rows))return clone(rows)}
     try{const raw=global.localStorage?.getItem(key);return raw?JSON.parse(raw):clone(fallback)}catch(error){return clone(fallback)}
   }
   function writeJson(key,value){
     try{global.localStorage?.setItem(key,JSON.stringify(value));try{if(typeof global.CustomEvent==='function')global.dispatchEvent?.(new global.CustomEvent('kg-app-storage-change',{detail:{type:'json',action:'write',key,value:clone(value)}}))}catch(_error){}return true}catch(error){return false}
   }
   function normalizedSubjects(){
-    const stored=readJson(SUBJECT_KEY,DEFAULT_SUBJECTS);
+    const stored=readJson(SUBJECT_RESOURCE,DEFAULT_SUBJECTS);
     return (Array.isArray(stored)?stored:DEFAULT_SUBJECTS).map((item,index)=>{
       const rawStatus=clean(item.status).toLowerCase();
       return {
@@ -73,7 +76,7 @@
     }).sort((a,b)=>a.sortOrder-b.sortOrder);
   }
   function normalizedTaxonomies(){
-    const stored=readJson(TAXONOMY_KEY,DEFAULT_TAXONOMIES);
+    const stored=readJson(TAXONOMY_RESOURCE,DEFAULT_TAXONOMIES);
     return (Array.isArray(stored)?stored:DEFAULT_TAXONOMIES).map((taxonomy,index)=>{
       const nodes=(Array.isArray(taxonomy.nodes)?taxonomy.nodes:[]).map((node,nodeIndex)=>({
         id:clean(node.id)||safeId('knowledge'),taxonomyId:clean(node.taxonomyId)||clean(taxonomy.id),parentId:node.parentId?clean(node.parentId):null,
@@ -107,7 +110,7 @@
   function pathLabel(taxonomyId,nodeId,separator=' > '){return pathForNode(taxonomyId,nodeId).map(node=>node.title.zh).join(separator)}
   function descendantIds(taxonomyId,nodeId){
     const nodes=nodesForTaxonomy(taxonomyId,{includeDeprecated:true});const byParent=new Map();nodes.forEach(node=>{const key=node.parentId||'';if(!byParent.has(key))byParent.set(key,[]);byParent.get(key).push(node.id)});
-    const result=[];const queue=[String(nodeId||'')];while(queue.length){const current=queue.shift();(byParent.get(current)||[]).forEach(id=>{result.push(id);queue.push(id)})}return result;
+    const result=[];const queue=[String(nodeId||'')];const visited=new Set(queue);while(queue.length){const current=queue.shift();(byParent.get(current)||[]).forEach(id=>{if(visited.has(id))return;visited.add(id);result.push(id);queue.push(id)})}return result;
   }
   function searchNodes(taxonomyId,query=''){
     const keyword=clean(query).toLowerCase();const nodes=nodesForTaxonomy(taxonomyId);
@@ -126,10 +129,10 @@
     });
     if(!nodes.length)warnings.push('知识树还没有节点。');return {valid:errors.length===0,errors:[...new Set(errors)],warnings};
   }
-  function saveSubjects(subjects){const normalized=clone(subjects||[]);writeJson(SUBJECT_KEY,normalized);return getSubjects()}
-  function saveTaxonomies(taxonomies){const normalized=clone(taxonomies||[]);const errors=[];normalized.forEach(taxonomy=>{const result=validateTaxonomy(taxonomy);result.errors.forEach(message=>errors.push(`${taxonomy.id||'未命名知识树'}：${message}`))});if(errors.length)return {valid:false,errors};writeJson(TAXONOMY_KEY,normalized);return {valid:true,errors:[],taxonomies:getTaxonomies()}}
-  function resetTaxonomies(){writeJson(SUBJECT_KEY,DEFAULT_SUBJECTS);writeJson(TAXONOMY_KEY,DEFAULT_TAXONOMIES);return {subjects:getSubjects(),taxonomies:getTaxonomies()}}
-  function saveKnowledgeNode(taxonomyId,node){
+  async function saveSubjects(subjects){const normalized=clone(subjects||[]);await global.KGTeachingContentApi.saveSubjects(normalized);return getSubjects()}
+  async function saveTaxonomies(taxonomies){const normalized=clone(taxonomies||[]);const errors=[];normalized.forEach(taxonomy=>{const result=validateTaxonomy(taxonomy);result.errors.forEach(message=>errors.push(`${taxonomy.id||'未命名知识树'}：${message}`))});if(errors.length)return {valid:false,errors};await global.KGTeachingContentApi.saveTaxonomies(normalized);return {valid:true,errors:[],taxonomies:getTaxonomies()}}
+  async function resetTaxonomies(){await global.KGTeachingContentApi.saveCatalog({subjects:DEFAULT_SUBJECTS,taxonomies:DEFAULT_TAXONOMIES});return {subjects:getSubjects(),taxonomies:getTaxonomies()}}
+  async function saveKnowledgeNode(taxonomyId,node){
     const taxonomies=normalizedTaxonomies();const taxonomy=taxonomies.find(item=>item.id===String(taxonomyId||''));if(!taxonomy)return {valid:false,errors:['知识树不存在。']};
     const record=clone(node)||{};record.id=clean(record.id)||safeId('knowledge');record.taxonomyId=taxonomy.id;record.parentId=record.parentId?clean(record.parentId):null;
     const existingIndex=taxonomy.nodes.findIndex(item=>item.id===record.id);const existing=existingIndex>=0?taxonomy.nodes[existingIndex]:null;const sameParent=(existing?.parentId||null)===(record.parentId||null);
@@ -147,10 +150,10 @@
     const computeLevel=item=>{if(levelMemo.has(item.id))return levelMemo.get(item.id);if(resolving.has(item.id))throw new Error('知识树存在循环引用。');resolving.add(item.id);let level=1;if(item.parentId){const parentNode=byId.get(item.parentId);if(!parentNode)throw new Error(`父知识点不存在：${item.parentId}`);level=computeLevel(parentNode)+1}resolving.delete(item.id);levelMemo.set(item.id,level);return level};
     try{taxonomy.nodes.forEach(item=>{item.level=computeLevel(item);if(item.level>taxonomy.maxDepth||item.level>MAX_DEPTH)throw new Error(`知识点最多支持 ${Math.min(taxonomy.maxDepth,MAX_DEPTH)} 层。`)})}catch(error){return {valid:false,errors:[error.message]}}
     const actor=currentUser(),now=nowIso();taxonomy.updatedAt=now;taxonomy.updatedBy=clone(actor);taxonomy.lastMaintainedAt=now;taxonomy.lastMaintainedBy=clone(actor);taxonomy.maintenanceRevision=Math.max(0,Number(taxonomy.maintenanceRevision)||0)+1;
-    const validation=validateTaxonomy(taxonomy);if(!validation.valid)return validation;writeJson(TAXONOMY_KEY,taxonomies);return {valid:true,node:clone(taxonomy.nodes.find(item=>item.id===record.id)),taxonomy:clone(taxonomy),errors:[],warnings:validation.warnings}
+    const validation=validateTaxonomy(taxonomy);if(!validation.valid)return validation;await saveTaxonomies(taxonomies);return {valid:true,node:clone(taxonomy.nodes.find(item=>item.id===record.id)),taxonomy:clone(taxonomy),errors:[],warnings:validation.warnings}
   }
-  function deprecateKnowledgeNode(taxonomyId,nodeId,replacedByNodeIds=[]){const node=nodeById(taxonomyId,nodeId);if(!node)return {valid:false,errors:['知识点不存在。']};const actor=currentUser(),now=nowIso();return saveKnowledgeNode(taxonomyId,{...node,status:'deprecated',replacedByNodeIds:unique(replacedByNodeIds),deactivatedAt:now,deactivatedBy:actor,updatedAt:now,updatedBy:actor})}
-  function deleteKnowledgeNode(taxonomyId,nodeId,options={}){
+  async function deprecateKnowledgeNode(taxonomyId,nodeId,replacedByNodeIds=[]){const node=nodeById(taxonomyId,nodeId);if(!node)return {valid:false,errors:['知识点不存在。']};const actor=currentUser(),now=nowIso();return saveKnowledgeNode(taxonomyId,{...node,status:'deprecated',replacedByNodeIds:unique(replacedByNodeIds),deactivatedAt:now,deactivatedBy:actor,updatedAt:now,updatedBy:actor})}
+  async function deleteKnowledgeNode(taxonomyId,nodeId,options={}){
     const taxonomies=normalizedTaxonomies();const taxonomy=taxonomies.find(item=>item.id===String(taxonomyId||''));if(!taxonomy)return {valid:false,errors:['知识树不存在。']};
     const target=taxonomy.nodes.find(item=>item.id===String(nodeId||''));if(!target)return {valid:false,errors:['知识点不存在。']};
     const byParent=new Map();taxonomy.nodes.forEach(item=>{const key=item.parentId||'';if(!byParent.has(key))byParent.set(key,[]);byParent.get(key).push(item)});
@@ -158,7 +161,7 @@
     const branchIds=new Set([target.id,...descendants]);const references=[];Object.values(getActivityLibrary()).forEach(activity=>{const knowledge=activity.metadata?.knowledge||{};const related=Array.isArray(knowledge.relatedNodeIds)?knowledge.relatedNodeIds:[];if(branchIds.has(knowledge.primaryNodeId)||related.some(id=>branchIds.has(id)))references.push(activity.id)});
     if(references.length)return {valid:false,errors:[`该知识点分支仍被 ${references.length} 个活动引用，不能物理删除。请先重新归类活动，或将知识点设为停用。`],referencedActivityIds:unique(references),descendantIds:descendants};
     if(descendants.length&&!options.cascade)return {valid:false,errors:[`该知识点包含 ${descendants.length} 个下级节点。`],requiresCascade:true,descendantIds:descendants};
-    const deletedIds=options.cascade?[target.id,...descendants]:[target.id];taxonomy.nodes=taxonomy.nodes.filter(item=>!deletedIds.includes(item.id));const validation=validateTaxonomy(taxonomy);if(!validation.valid)return validation;writeJson(TAXONOMY_KEY,taxonomies);return {valid:true,errors:[],warnings:validation.warnings,deletedIds,parentId:target.parentId||null};
+    const deletedIds=options.cascade?[target.id,...descendants]:[target.id];taxonomy.nodes=taxonomy.nodes.filter(item=>!deletedIds.includes(item.id));const validation=validateTaxonomy(taxonomy);if(!validation.valid)return validation;await saveTaxonomies(taxonomies);return {valid:true,errors:[],warnings:validation.warnings,deletedIds,parentId:target.parentId||null};
   }
 
   function currentUser(){
@@ -191,7 +194,7 @@
   function baseLibrary(){
     const source=global.KGGuidedLearningData?.getActivityLibrary?.()||{};const result={};Object.entries(source).forEach(([id,activity])=>{result[id]=ensureActivityMetadata(activity)});return result;
   }
-  function activityOverrides(){return readJson(ACTIVITY_OVERRIDE_KEY,{})||{}}
+  function activityOverrides(){const stored=readJson(ACTIVITY_OVERRIDE_RESOURCE,[]);if(Array.isArray(stored))return Object.fromEntries(stored.filter(item=>item?.id).map(item=>[item.id,item]));return stored&&typeof stored==='object'?stored:{}}
   function getActivityLibrary(){const result=baseLibrary();Object.entries(activityOverrides()).forEach(([id,activity])=>{result[id]=ensureActivityMetadata(activity)});return clone(result)}
   function getActivities(filters={}){
     let list=Object.values(getActivityLibrary());const subjectId=clean(filters.subjectId),taxonomyId=clean(filters.taxonomyId),nodeId=clean(filters.nodeId),status=clean(filters.status),mappingStatus=clean(filters.mappingStatus),authorId=clean(filters.authorId),query=clean(filters.query).toLowerCase();
@@ -202,19 +205,19 @@
     return clone(list.sort((a,b)=>String(a.id).localeCompare(String(b.id))));
   }
   function activityTitle(activity){const zh=activity?.content?.zh||{};return clean(zh.stem||zh.prompt||zh.instruction||activity?.metadata?.topic||activity?.id)||'未命名活动'}
-  function saveActivity(activity,options={}){
+  async function saveActivity(activity,options={}){
     const schema=global.KGActivitySchemaV1;const record=ensureActivityMetadata(activity,{touch:options.touch!==false,status:options.status});const validation=schema?.validate?.(record)||{valid:true,errors:[],warnings:[]};
     if(!validation.valid)return {valid:false,errors:validation.errors,warnings:validation.warnings};
-    const overrides=activityOverrides();overrides[record.id]=record;writeJson(ACTIVITY_OVERRIDE_KEY,overrides);return {valid:true,activity:clone(record),errors:[],warnings:validation.warnings};
+    const overrides=activityOverrides();overrides[record.id]=record;await global.KGTeachingContentApi.saveActivityOverrides(Object.values(overrides));return {valid:true,activity:clone(record),errors:[],warnings:validation.warnings};
   }
-  function saveActivities(activities,options={}){const results=[];(activities||[]).forEach(activity=>results.push(saveActivity(activity,options)));return {valid:results.every(item=>item.valid),results}}
-  function mapActivities(activityIds,mapping){
-    const library=getActivityLibrary();const results=[];(activityIds||[]).forEach(id=>{const activity=library[id];if(!activity){results.push({valid:false,activityId:id,errors:['活动不存在。']});return}activity.metadata.knowledge={...activity.metadata.knowledge,...clone(mapping),relatedNodeIds:unique(mapping.relatedNodeIds||activity.metadata.knowledge.relatedNodeIds)};const taxonomy=taxonomyById(activity.metadata.knowledge.taxonomyId);activity.metadata.knowledge.taxonomyVersion=taxonomy?.version||activity.metadata.knowledge.taxonomyVersion||1;activity.metadata.knowledge.mappingStatus=activity.metadata.knowledge.primaryNodeId?'confirmed':'unmapped';activity.metadata.knowledge.pathSnapshot=activity.metadata.knowledge.primaryNodeId?pathForNode(activity.metadata.knowledge.taxonomyId,activity.metadata.knowledge.primaryNodeId).map(node=>node.title.zh):[];results.push({...saveActivity(activity,{touch:true}),activityId:id})});return {valid:results.every(item=>item.valid),results}
+  async function saveActivities(activities,options={}){const records=[],results=[];for(const activity of activities||[]){const schema=global.KGActivitySchemaV1,record=ensureActivityMetadata(activity,{touch:options.touch!==false,status:options.status}),validation=schema?.validate?.(record)||{valid:true,errors:[],warnings:[]};results.push(validation.valid?{valid:true,activity:clone(record),errors:[],warnings:validation.warnings}:{valid:false,errors:validation.errors,warnings:validation.warnings});if(validation.valid)records.push(record)}if(results.every(item=>item.valid)){const overrides=activityOverrides();records.forEach(record=>{overrides[record.id]=record});await global.KGTeachingContentApi.saveActivityOverrides(Object.values(overrides))}return {valid:results.every(item=>item.valid),results}}
+  async function mapActivities(activityIds,mapping){
+    const library=getActivityLibrary();const records=[],results=[];for(const id of activityIds||[]){const activity=library[id];if(!activity){results.push({valid:false,activityId:id,errors:['活动不存在。']});continue}activity.metadata.knowledge={...activity.metadata.knowledge,...clone(mapping),relatedNodeIds:unique(mapping.relatedNodeIds||activity.metadata.knowledge.relatedNodeIds)};const taxonomy=taxonomyById(activity.metadata.knowledge.taxonomyId);activity.metadata.knowledge.taxonomyVersion=taxonomy?.version||activity.metadata.knowledge.taxonomyVersion||1;activity.metadata.knowledge.mappingStatus=activity.metadata.knowledge.primaryNodeId?'confirmed':'unmapped';activity.metadata.knowledge.pathSnapshot=activity.metadata.knowledge.primaryNodeId?pathForNode(activity.metadata.knowledge.taxonomyId,activity.metadata.knowledge.primaryNodeId).map(node=>node.title.zh):[];records.push(ensureActivityMetadata(activity,{touch:true}));results.push({valid:true,activityId:id})}if(results.every(item=>item.valid)){const overrides=activityOverrides();records.forEach(record=>{overrides[record.id]=record});await global.KGTeachingContentApi.saveActivityOverrides(Object.values(overrides))}return {valid:results.every(item=>item.valid),results}
   }
-  function importActivityPackage(payload,options={}){
+  async function importActivityPackage(payload,options={}){
     const schema=global.KGActivitySchemaV1;if(!schema)return {valid:false,errors:['Activity Schema v1 未加载。']};const existing=getActivityLibrary();const analysis=schema.analyzePackageMerge(existing,payload);if(!analysis.package)return analysis;
     const policy=clean(options.conflictPolicy)||'reject';const merged=schema.mergePackage(existing,payload,{conflictPolicy:policy});if(!merged.valid)return merged;
-    const incomingIds=new Set(Object.keys(analysis.library||{}));const overrides=activityOverrides();Object.entries(merged.library).forEach(([id,activity])=>{if(incomingIds.has(id))overrides[id]=ensureActivityMetadata(activity,{touch:true,status:options.status||'submitted'})});writeJson(ACTIVITY_OVERRIDE_KEY,overrides);return {...merged,importedCount:incomingIds.size}
+    const incomingIds=new Set(Object.keys(analysis.library||{}));const overrides=activityOverrides();Object.entries(merged.library).forEach(([id,activity])=>{if(incomingIds.has(id))overrides[id]=ensureActivityMetadata(activity,{touch:true,status:options.status||'submitted'})});await global.KGTeachingContentApi.saveActivityOverrides(Object.values(overrides));return {...merged,importedCount:incomingIds.size}
   }
   function exportActivityPackage(filters={},metadata={}){const library={};getActivities(filters).forEach(activity=>{library[activity.id]=activity});return global.KGActivitySchemaV1?.createPackage?.(library,{...metadata,author:metadata.author||currentUser().name})||null}
   function activityUsage(activityId){
@@ -247,7 +250,7 @@
   }
 
   global.KGLearningContent=Object.freeze({
-    SCHEMA_VERSION,MAX_DEPTH,storageKeys:Object.freeze({SUBJECT_KEY,TAXONOMY_KEY,ACTIVITY_OVERRIDE_KEY,COURSE_DRAFT_KEY,COURSE_RELEASE_KEY,ACTIVE_COURSE_KEY}),
+    SCHEMA_VERSION,MAX_DEPTH,storageKeys:Object.freeze({COURSE_DRAFT_KEY,COURSE_RELEASE_KEY,ACTIVE_COURSE_KEY}),
     getSubjects,subjectById,getTaxonomies,taxonomyById,defaultTaxonomyForSubject,nodesForTaxonomy,nodeById,childrenOf,pathForNode,pathLabel,descendantIds,searchNodes,validateTaxonomy,saveSubjects,saveTaxonomies,resetTaxonomies,saveKnowledgeNode,deprecateKnowledgeNode,deleteKnowledgeNode,
     currentUser,ensureActivityMetadata,getActivityLibrary,getActivities,activityTitle,saveActivity,saveActivities,mapActivities,importActivityPackage,exportActivityPackage,activityUsage,
     getCourseDrafts,saveCourseDraft,deleteCourseDraft,getCourseReleases,validateCourse,publishCourse,activeCourseRelease,courseKnowledgeCoverage,normalizeCourse,safeId,clone

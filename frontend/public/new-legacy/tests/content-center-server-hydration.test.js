@@ -22,8 +22,15 @@ class FakeElement {
     this.textContent = '';
     this.scrollLeft = 0;
     this.scrollTop = 0;
+    this.listeners = new Map();
   }
-  addEventListener() {}
+  addEventListener(type, handler) {
+    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    this.listeners.get(type).push(handler);
+  }
+  async trigger(type, event = {}) {
+    for (const handler of this.listeners.get(type) || []) await handler({ target: this, currentTarget: this, preventDefault() {}, ...event });
+  }
   querySelectorAll() { return []; }
   querySelector() { return null; }
   focus() {}
@@ -52,9 +59,10 @@ function treeIndex(taxonomy) {
   };
 }
 
-function createRuntime() {
+function createRuntime({ resetResult = { valid: true, errors: [] } } = {}) {
   const elements = new Map();
   const listeners = new Map();
+  const dispatched = [];
   const oldTaxonomy = {
     id: 'taxonomy-pmp-main', subjectId: 'subject-pmp', version: 1, versionLabel: 'v1.0',
     status: 'published', isDefault: true, maxDepth: 9, name: { zh: '旧版知识树' },
@@ -83,7 +91,7 @@ function createRuntime() {
     },
     querySelectorAll() { return []; },
     querySelector() { return null; },
-    dispatchEvent() {},
+    dispatchEvent(event) { dispatched.push(event); },
   };
   const core = {
     taxonomyById: id => id === taxonomy.id ? taxonomy : null,
@@ -96,6 +104,7 @@ function createRuntime() {
     activityTitle: activity => activity.title || '',
     taxonomyEditMode: () => 'current',
     canEditTaxonomy: () => true,
+    resetTaxonomies: () => structuredClone(resetResult),
     adminServices: {
       taxonomies: { currentForSubject: id => id === subject.id ? taxonomy : null },
       permissions: { can: () => true },
@@ -135,6 +144,7 @@ function createRuntime() {
     context,
     listeners,
     elements,
+    dispatched,
     hydrateCalls: () => hydrateCalls,
   };
 }
@@ -149,4 +159,19 @@ test('embedded content center hydrates the selected subject before its first tre
 
   assert.equal(runtime.hydrateCalls(), 1);
   assert.match(runtime.elements.get('ccTreeSummary').innerHTML, /317 个知识节点/);
+});
+
+test('blocked taxonomy reset shows recovery failure without recording history or success', async () => {
+  const runtime = createRuntime({ resetResult: { valid: false, errors: ['永久删除已暂停，请到管理端创建新草稿。'] } });
+  vm.runInNewContext(fs.readFileSync(appPath, 'utf8'), runtime.context, { filename: appPath });
+  await Promise.all((runtime.listeners.get('DOMContentLoaded') || []).map(handler => handler()));
+
+  const before = runtime.context.KGContentCenterApp.getState();
+  await runtime.elements.get('ccResetTaxonomyBtn').trigger('click');
+  const after = runtime.context.KGContentCenterApp.getState();
+
+  assert.equal(after.undo.length, before.undo.length);
+  assert.equal(runtime.dispatched.some(event => event.type === 'kg-content-center-subject-change'), false);
+  assert.match(runtime.elements.get('ccToast').textContent, /失败|暂停|新草稿/);
+  assert.doesNotMatch(runtime.elements.get('ccToast').textContent, /已恢复为内置示例/);
 });

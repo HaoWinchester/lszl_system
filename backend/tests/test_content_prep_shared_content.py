@@ -330,15 +330,16 @@ def test_legacy_catalog_mutation_routes_are_retired_without_side_effects() -> No
         assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "jbgsnmm~123"}).status_code == 200
         revision = client.get("/api/v1/content-prep/shared-content", params={"subjectId": "subject-pmp"}).json()["contentRevision"]
         requests = [
-            client.post("/api/v1/content-prep/subjects", json={"id": subject_id, "code": "RETIRED", "name": "不应创建", "contentRevision": revision}),
-            client.post(f"/api/v1/content-prep/taxonomies/taxonomy-{suffix}/release", json={"subjectId": "subject-pmp", "version": 1, "title": "不应发布", "nodes": [], "contentRevision": revision}),
-            client.put(f"/api/v1/content-prep/activity-overrides/collection-{suffix}/activity-{suffix}", json={"record": {"title": "不应保存"}, "contentRevision": revision}),
-            client.delete(f"/api/v1/content-prep/taxonomies/taxonomy-{suffix}", params={"subjectId": "subject-pmp", "contentRevision": revision}),
-            client.delete(f"/api/v1/content-prep/activity-overrides/collection-{suffix}/activity-{suffix}", params={"contentRevision": revision}),
+            client.post("/api/v1/content-prep/subjects", json={"id": subject_id, "code": "RETIRED", "name": "不应创建"}),
+            client.post(f"/api/v1/content-prep/taxonomies/taxonomy-{suffix}/release", json={"subjectId": "subject-pmp", "version": 1, "title": "不应发布", "nodes": []}),
+            client.put(f"/api/v1/content-prep/activity-overrides/collection-{suffix}/activity-{suffix}", json={"record": {"title": "不应保存"}}),
+            client.delete(f"/api/v1/content-prep/taxonomies/taxonomy-{suffix}", params={"subjectId": "subject-pmp"}),
+            client.delete(f"/api/v1/content-prep/activity-overrides/collection-{suffix}/activity-{suffix}"),
         ]
         for response in requests:
             assert response.status_code == 410, response.text
             assert response.json()["detail"]["code"] == "LEGACY_TEACHING_MUTATION_RETIRED"
+        assert client.post("/api/v1/content-prep/subjects", json={"id": subject_id}).status_code == 422
         assert asyncio.run(state()) == (True, revision)
     paths = app.openapi()["paths"]
     for path, method in (

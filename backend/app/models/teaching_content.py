@@ -59,6 +59,9 @@ class ActivityCollection(Base):
     title: Mapped[str] = mapped_column(String(240), nullable=False, default="")
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
     content_metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    owner_username: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("users.username", ondelete="SET NULL"), nullable=True, index=True
+    )
 
 
 class ActivityTag(Base):
@@ -68,6 +71,9 @@ class ActivityTag(Base):
     collection_id: Mapped[str] = mapped_column(String(128), ForeignKey("activity_collections.id", ondelete="CASCADE"), nullable=False, index=True)
     tag: Mapped[str] = mapped_column(String(128), nullable=False)
     content_metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    owner_username: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("users.username", ondelete="SET NULL"), nullable=True, index=True
+    )
 
 
 class ActivityOverride(Base):
@@ -79,6 +85,9 @@ class ActivityOverride(Base):
     record: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     updated_by: Mapped[str | None] = mapped_column(String(64), ForeignKey("users.username", ondelete="SET NULL"), nullable=True)
+    owner_username: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("users.username", ondelete="SET NULL"), nullable=True, index=True
+    )
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 

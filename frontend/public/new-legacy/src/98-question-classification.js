@@ -8,7 +8,8 @@
   const byId=id=>document.getElementById(id);
   const escapeHTML=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const COLLAPSE_KEY='kg_question_classification_collapsed_v1';
-  const TAG_CONFIG_KEY='kg_question_tag_names_v1';
+  const Preferences=global.KGDevicePreferences;
+  let tagConfigState={names:{},groupNames:{},categoryNames:{},aliases:{}};
 
   const TAG_GROUPS=Object.freeze([
     {id:'usage',label:'用途标签',categories:[
@@ -29,17 +30,9 @@
   function tagGroupKey(group){return group.id}
   function tagCategoryKey(group,category){return `${group.id}/${category.id}`}
   function readTagConfig(){
-    try{
-      const parsed=JSON.parse(localStorage.getItem(TAG_CONFIG_KEY)||'{}');
-      return parsed&&typeof parsed==='object'?{
-        names:parsed.names&&typeof parsed.names==='object'?parsed.names:{},
-        groupNames:parsed.groupNames&&typeof parsed.groupNames==='object'?parsed.groupNames:{},
-        categoryNames:parsed.categoryNames&&typeof parsed.categoryNames==='object'?parsed.categoryNames:{},
-        aliases:parsed.aliases&&typeof parsed.aliases==='object'?parsed.aliases:{}
-      }:{names:{},groupNames:{},categoryNames:{},aliases:{}}
-    }catch(error){return {names:{},groupNames:{},categoryNames:{},aliases:{}}}
+    return clone(tagConfigState);
   }
-  function writeTagConfig(config){try{localStorage.setItem(TAG_CONFIG_KEY,JSON.stringify(config))}catch(error){console.warn('标签名称保存失败',error)}}
+  function writeTagConfig(config){tagConfigState=clone(config)}
   function loadTagConfig(){
     const config=readTagConfig();
     TAG_GROUPS.forEach(group=>{
@@ -300,8 +293,8 @@
   }
   function openTagManager(){state.tagManagerMessage='';renderTagManager();const dialog=byId('qbTagManagerDialog');dialog?.showModal?dialog.showModal():dialog?.setAttribute('open','')}
 
-  function toggleCollapse(){const fields=byId('qbClassificationFields'),button=byId('qbClassificationCollapseBtn');if(!fields||!button)return;const collapsed=!fields.hidden;fields.hidden=collapsed;button.textContent=collapsed?'展开':'收起';button.setAttribute('aria-expanded',String(!collapsed));try{localStorage.setItem(COLLAPSE_KEY,collapsed?'1':'0')}catch(error){}}
-  function restoreCollapse(){let collapsed=false;try{collapsed=localStorage.getItem(COLLAPSE_KEY)==='1'}catch(error){}const fields=byId('qbClassificationFields'),button=byId('qbClassificationCollapseBtn');if(fields)fields.hidden=collapsed;if(button){button.textContent=collapsed?'展开':'收起';button.setAttribute('aria-expanded',String(!collapsed))}}
+  function toggleCollapse(){const fields=byId('qbClassificationFields'),button=byId('qbClassificationCollapseBtn');if(!fields||!button)return;const collapsed=!fields.hidden;fields.hidden=collapsed;button.textContent=collapsed?'展开':'收起';button.setAttribute('aria-expanded',String(!collapsed));try{Preferences?.setString?.(COLLAPSE_KEY,collapsed?'1':'0')}catch(error){}}
+  function restoreCollapse(){let collapsed=false;try{collapsed=Preferences?.getString?.(COLLAPSE_KEY,'0')==='1'}catch(error){}const fields=byId('qbClassificationFields'),button=byId('qbClassificationCollapseBtn');if(fields)fields.hidden=collapsed;if(button){button.textContent=collapsed?'展开':'收起';button.setAttribute('aria-expanded',String(!collapsed))}}
 
   function init(){
     if(!byId('qbClassificationBar')||!Core)return;

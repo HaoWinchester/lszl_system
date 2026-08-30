@@ -4,8 +4,8 @@
   const Core=global.KGLearningContent;
   if(!Core)return;
 
-  const TAG_KEY='kg_activity_tags_v1';
-  const COLLECTION_KEY='kg_activity_collections_v1';
+  const TAG_RESOURCE='tags';
+  const COLLECTION_RESOURCE='collections';
   const PAPER_KEY='kg_assessment_papers_v1';
   const TASK_KEY='kg_learning_tasks_v1';
   const MIGRATION_KEY='kg_content_organization_migration_v1';
@@ -27,7 +27,7 @@
   const unique=values=>[...new Set((values||[]).map(value=>clean(value)).filter(Boolean))];
   const nowIso=()=>new Date().toISOString();
   const safeId=prefix=>Core.safeId(prefix);
-  const read=(key,fallback)=>{try{const value=JSON.parse(global.localStorage.getItem(key)||'null');return value??clone(fallback)}catch(error){return clone(fallback)}};
+  const read=(key,fallback)=>{if(key===TAG_RESOURCE||key===COLLECTION_RESOURCE)return clone(global.KGTeachingContentApi?.readResource?.(key,fallback)??fallback);if(key===TASK_KEY){const rows=global.KGTeachingContentApi?.readResource?.('tasks',null);if(Array.isArray(rows))return clone(rows)}if(key===PAPER_KEY){const rows=global.KGTeachingContentApi?.readResource?.('papers',null);if(Array.isArray(rows))return clone(rows)}try{const value=JSON.parse(global.localStorage.getItem(key)||'null');return value??clone(fallback)}catch(error){return clone(fallback)}};
   const write=(key,value)=>{global.localStorage.setItem(key,JSON.stringify(value));return clone(value)};
 
   function authorRecord(source={}){
@@ -52,19 +52,19 @@
     return {id:clean(source.id)||safeId('tag'),schemaVersion:SCHEMA_VERSION,name:clean(source.name)||`标签 ${index+1}`,subjectId:clean(source.subjectId),description:clean(source.description),color:clean(source.color)||'',status:['active','archived'].includes(source.status)?source.status:'active',sortOrder:Number(source.sortOrder)||index+1,authorship:authorRecord(source.authorship)};
   }
   function getTags(filters={}){
-    let list=(read(TAG_KEY,[])||[]).map(normalizeTag);
+    let list=(read(TAG_RESOURCE,[])||[]).map(normalizeTag);
     if(filters.subjectId)list=list.filter(item=>!item.subjectId||item.subjectId===filters.subjectId);
     if(filters.status)list=list.filter(item=>item.status===filters.status);
     return clone(list.sort((a,b)=>a.sortOrder-b.sortOrder||a.name.localeCompare(b.name,'zh-CN')));
   }
-  function saveTag(tag){
+  async function saveTag(tag){
     const list=getTags();let record=normalizeTag(tag,list.length);record=touch(record);
-    const index=list.findIndex(item=>item.id===record.id);if(index>=0)list[index]=record;else list.push(record);write(TAG_KEY,list);return {valid:true,tag:clone(record)};
+    const index=list.findIndex(item=>item.id===record.id);if(index>=0)list[index]=record;else list.push(record);await global.KGTeachingContentApi.saveActivityTags(list);return {valid:true,tag:clone(record)};
   }
-  function deleteTag(tagId){
+  async function deleteTag(tagId){
     const id=clean(tagId);const used=Core.getActivities().filter(activity=>activityOrganization(activity).tagIds.includes(id)).map(activity=>activity.id);
     if(used.length)return {valid:false,errors:[`该标签仍被 ${used.length} 个活动使用。请先移除标签，或将标签归档。`],activityIds:used};
-    write(TAG_KEY,getTags().filter(item=>item.id!==id));return {valid:true,deletedId:id};
+    await global.KGTeachingContentApi.saveActivityTags(getTags().filter(item=>item.id!==id));return {valid:true,deletedId:id};
   }
 
   function normalizeCollection(collection,index=0){
@@ -72,38 +72,38 @@
     return {id:clean(source.id)||safeId('collection'),schemaVersion:SCHEMA_VERSION,title:clean(source.title)||`题集 ${index+1}`,subjectId:clean(source.subjectId)||'subject-pmp',description:clean(source.description),type:['collection','favorites'].includes(source.type)?source.type:'collection',visibility:['private','shared'].includes(source.visibility)?source.visibility:'private',status:['active','archived'].includes(source.status)?source.status:'active',activityIds:unique(source.activityIds),sortOrder:Number(source.sortOrder)||index+1,authorship:authorRecord(source.authorship)};
   }
   function ensureFavoritesCollection(){
-    const user=Core.currentUser();const list=(read(COLLECTION_KEY,[])||[]).map(normalizeCollection);let item=list.find(collection=>collection.type==='favorites'&&collection.authorship.createdByUserId===user.id);
-    if(!item){item=normalizeCollection({title:'我的收藏',subjectId:'',type:'favorites',visibility:'private',authorship:{createdByUserId:user.id,createdByName:user.name}},list.length);list.push(item);write(COLLECTION_KEY,list)}
+    const user=Core.currentUser();const list=(read(COLLECTION_RESOURCE,[])||[]).map(normalizeCollection);let item=list.find(collection=>collection.type==='favorites'&&collection.authorship.createdByUserId===user.id);
+    if(!item)item=normalizeCollection({id:`favorites-${user.id}`,title:'我的收藏',subjectId:'subject-pmp',type:'favorites',visibility:'private',authorship:{createdByUserId:user.id,createdByName:user.name}},list.length);
     return clone(item);
   }
   function getCollections(filters={}){
-    ensureFavoritesCollection();let list=(read(COLLECTION_KEY,[])||[]).map(normalizeCollection);
+    const favorite=ensureFavoritesCollection();let list=(read(COLLECTION_RESOURCE,[])||[]).map(normalizeCollection);if(!list.some(item=>item.id===favorite.id))list.push(favorite);
     if(filters.subjectId)list=list.filter(item=>!item.subjectId||item.subjectId===filters.subjectId);
     if(filters.type)list=list.filter(item=>item.type===filters.type);
     if(filters.status)list=list.filter(item=>item.status===filters.status);
     if(filters.ownerId)list=list.filter(item=>item.authorship.createdByUserId===filters.ownerId);
     return clone(list.sort((a,b)=>a.sortOrder-b.sortOrder||a.title.localeCompare(b.title,'zh-CN')));
   }
-  function saveCollection(collection){
+  async function saveCollection(collection){
     const list=getCollections();let record=normalizeCollection(collection,list.length);record=touch(record);
     const library=Core.getActivityLibrary();record.activityIds=record.activityIds.filter(id=>library[id]);
-    const index=list.findIndex(item=>item.id===record.id);if(index>=0)list[index]=record;else list.push(record);write(COLLECTION_KEY,list);return {valid:true,collection:clone(record)};
+    const index=list.findIndex(item=>item.id===record.id);if(index>=0)list[index]=record;else list.push(record);await global.KGTeachingContentApi.saveActivityCollections(list);return {valid:true,collection:clone(record)};
   }
-  function deleteCollection(collectionId){
+  async function deleteCollection(collectionId){
     const item=getCollections().find(collection=>collection.id===clean(collectionId));if(!item)return {valid:false,errors:['题集不存在。']};
     if(item.type==='favorites')return {valid:false,errors:['系统收藏夹不能删除。']};
-    write(COLLECTION_KEY,getCollections().filter(collection=>collection.id!==item.id));return {valid:true,deletedId:item.id};
+    await global.KGTeachingContentApi.saveActivityCollections(getCollections().filter(collection=>collection.id!==item.id));return {valid:true,deletedId:item.id};
   }
-  function addActivitiesToCollection(collectionId,activityIds){
+  async function addActivitiesToCollection(collectionId,activityIds){
     const item=getCollections().find(collection=>collection.id===clean(collectionId));if(!item)return {valid:false,errors:['题集不存在。']};
-    item.activityIds=unique([...(item.activityIds||[]),...activityIds]);return saveCollection(item);
+    item.activityIds=unique([...(item.activityIds||[]),...activityIds]);return await saveCollection(item);
   }
-  function removeActivitiesFromCollection(collectionId,activityIds){
+  async function removeActivitiesFromCollection(collectionId,activityIds){
     const remove=new Set(activityIds||[]);const item=getCollections().find(collection=>collection.id===clean(collectionId));if(!item)return {valid:false,errors:['题集不存在。']};
-    item.activityIds=item.activityIds.filter(id=>!remove.has(id));return saveCollection(item);
+    item.activityIds=item.activityIds.filter(id=>!remove.has(id));return await saveCollection(item);
   }
-  function toggleFavorite(activityId){
-    const item=ensureFavoritesCollection();const exists=item.activityIds.includes(activityId);item.activityIds=exists?item.activityIds.filter(id=>id!==activityId):[...item.activityIds,activityId];saveCollection(item);return {valid:true,favorite:!exists,collection:item};
+  async function toggleFavorite(activityId){
+    const item=ensureFavoritesCollection();const exists=item.activityIds.includes(activityId);item.activityIds=exists?item.activityIds.filter(id=>id!==activityId):[...item.activityIds,activityId];await saveCollection(item);return {valid:true,favorite:!exists,collection:item};
   }
   function favoriteActivityIds(){return new Set(ensureFavoritesCollection().activityIds)}
 
@@ -111,7 +111,7 @@
     const source=activity?.metadata?.organization&&typeof activity.metadata.organization==='object'?activity.metadata.organization:{};
     return {difficulty:ACTIVITY_DIFFICULTIES.includes(source.difficulty)?source.difficulty:'unset',estimatedTimeSeconds:Math.max(0,Number(source.estimatedTimeSeconds)||0),usagePurposes:unique(source.usagePurposes).filter(item=>ACTIVITY_PURPOSES.includes(item)),tagIds:unique(source.tagIds),reviewStatus:['unreviewed','reviewed'].includes(source.reviewStatus)?source.reviewStatus:'unreviewed',sourceType:['original','adapted','imported','legacy'].includes(source.sourceType)?source.sourceType:'legacy'};
   }
-  function updateActivityOrganization(activityIds,patch={}){
+  async function updateActivityOrganization(activityIds,patch={}){
     const library=Core.getActivityLibrary();const results=[];
     (activityIds||[]).forEach(id=>{
       const activity=library[id];if(!activity){results.push({valid:false,activityId:id,errors:['活动不存在。']});return}
@@ -121,9 +121,9 @@
       if(patch.removeTagIds){const remove=new Set(patch.removeTagIds);next.tagIds=current.tagIds.filter(id=>!remove.has(id))}
       if(patch.usagePurposes)next.usagePurposes=unique(patch.usagePurposes).filter(item=>ACTIVITY_PURPOSES.includes(item));
       delete next.addTagIds;delete next.removeTagIds;
-      activity.metadata.organization=next;results.push({...Core.saveActivity(activity,{touch:true}),activityId:id});
+      activity.metadata.organization=next;results.push({activity,activityId:id});
     });
-    return {valid:results.every(item=>item.valid),results};
+    const saved=await Core.saveActivities(results.filter(item=>item.activity).map(item=>item.activity),{touch:true});return {valid:saved.valid,results:saved.results.map((item,index)=>({...item,activityId:results[index]?.activityId}))};
   }
 
   function normalizePaper(paper,index=0){
@@ -214,7 +214,7 @@
   function summary(){return {tags:getTags().length,collections:getCollections().filter(item=>item.type==='collection').length,favorites:favoriteActivityIds().size,papers:getPapers().length,publishedPapers:getPapers({status:'published'}).length,tasks:getLearningTasks().length,publishedTasks:getLearningTasks({status:'published'}).length}}
 
   global.KGContentOrganization=Object.freeze({
-    SCHEMA_VERSION,storageKeys:Object.freeze({TAG_KEY,COLLECTION_KEY,PAPER_KEY,TASK_KEY,MIGRATION_KEY}),TASK_TYPES,RETIRED_TASK_ERROR,ACTIVITY_DIFFICULTIES,ACTIVITY_PURPOSES,
+    SCHEMA_VERSION,storageKeys:Object.freeze({PAPER_KEY,TASK_KEY,MIGRATION_KEY}),TASK_TYPES,RETIRED_TASK_ERROR,ACTIVITY_DIFFICULTIES,ACTIVITY_PURPOSES,
     getTags,saveTag,deleteTag,getCollections,saveCollection,deleteCollection,addActivitiesToCollection,removeActivitiesFromCollection,toggleFavorite,favoriteActivityIds,
     activityOrganization,updateActivityOrganization,getPapers,savePaper,deletePaper,publishPaper,archivePaper,validatePaper,getLearningTasks,saveLearningTask,deleteLearningTask,publishLearningTask,archiveLearningTask,validateTask,migrateLegacyLearningSources,activityReferences,collectionUsage,summary,normalizePaper,normalizeTask
   });

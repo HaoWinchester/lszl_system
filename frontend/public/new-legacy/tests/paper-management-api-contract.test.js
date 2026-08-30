@@ -153,6 +153,17 @@ async function testImportController(){
   assert.equal((await blocked.confirm()).ok,false);
   assert.match(blocked.snapshot().error,/缺少题目|不能导入/);
   blocked.cancel();assert.equal(blocked.snapshot().packageData,null);
+
+  let recoveryAttempts=0;
+  const recoverable=create({api:{importPreflight:async()=>{
+    recoveryAttempts+=1;
+    if(recoveryAttempts===1)throw Object.assign(new Error('试卷 API 暂时不可用'),{status:503});
+    return {valid:true,payloadHash:'e'.repeat(64),summary:{paperId:'paper-recovered',name:'恢复后试卷',questionCount:1},errors:[],warnings:[],paperConflict:null,allowedActions:{create:true,copy:true,replaceDraft:false}};
+  }}});
+  const failedLoad=await recoverable.load('recover.json',JSON.stringify({schema:'kg-paper-package-v1',schemaVersion:1,paper:{id:'paper-recovered'}}));
+  assert.equal(failedLoad.ok,false);assert.match(recoverable.snapshot().error,/API 暂时不可用/);
+  const recoveredLoad=await recoverable.load('recover.json',JSON.stringify({schema:'kg-paper-package-v1',schemaVersion:1,paper:{id:'paper-recovered'}}));
+  assert.equal(recoveredLoad.ok,true);assert.equal(recoveredLoad.preflight.summary.paperId,'paper-recovered');assert.equal(recoveryAttempts,2);
 }
 
 async function testCompositionController(){

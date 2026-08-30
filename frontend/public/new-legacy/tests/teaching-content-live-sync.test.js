@@ -293,9 +293,10 @@ async function run() {
   const prepTemplate = fs.readFileSync(path.join(ROOT, 'content-prep-studio/src/index.template.html'), 'utf8');
   assert.ok(
     prepTemplate.indexOf('/teaching-content-sync.js') >= 0
-      && prepTemplate.indexOf('/teaching-content-sync.js') < prepTemplate.indexOf('/server-state-bootstrap.js'),
-    'Content Prep must load the optional application sync asset before Runtime State bootstrap',
+      && prepTemplate.indexOf('/teaching-content-sync.js') < prepTemplate.indexOf('kg-direct-bootstrap-anchor'),
+    'Content Prep must load the optional application sync asset before direct bootstrap injection',
   );
+  assert.equal(prepTemplate.includes('/server-state-bootstrap.js'), false);
 
   const receivedBeforeClose = [...received];
   first.dispatch('pagehide');

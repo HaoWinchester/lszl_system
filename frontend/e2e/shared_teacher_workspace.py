@@ -446,11 +446,28 @@ def run_teaching_content_e2e() -> None:
     playwright = None
     browser = None
     context = None
+    teacher_context = None
+    teacher_username = f"t5-teacher-{uuid4().hex[:10]}"
     try:
         playwright = sync_playwright().start()
         browser = playwright.chromium.launch(headless=True)
         context = browser.new_context(viewport={"width": 1440, "height": 1000})
         login(context, ADMIN_USERNAME, ADMIN_PASSWORD)
+        assert_ok(
+            context.request.post(
+                BASE + "/api/v1/users",
+                data={
+                    "username": teacher_username,
+                    "password": TEST_PASSWORD,
+                    "role": "teacher",
+                    "status": "active",
+                    "display_name": teacher_username,
+                    "subject": "PMP",
+                    "source": "task5-e2e",
+                },
+            ),
+            "create task5 teacher",
+        )
         context.on(
             "request",
             lambda request: runtime_requests.append(request.url)
@@ -507,6 +524,14 @@ def run_teaching_content_e2e() -> None:
                     ),
                 }
             )
+        conflict_page = context.new_page()
+        conflict_page.goto(
+            BASE + "/content-center.html?subjectId=subject-pmp",
+            wait_until="networkidle",
+        )
+        conflict_page.locator("#ccTaxonomyVersion option").first.wait_for(
+            state="attached"
+        )
         with center_page.expect_response(
             lambda response: response.url.endswith("/api/v1/content-prep/shared-content")
             and response.request.method == "PUT"
@@ -521,6 +546,22 @@ def run_teaching_content_e2e() -> None:
         ) as tag_info:
             center_page.locator("#ccSaveTagBtn").click()
         assert tag_info.value.ok, tag_info.value.text()
+        conflict_page.locator("#ccNewTagBtn").click()
+        conflict_page.locator("#ccTagName").fill(f"Task5 stale tag {stamp}")
+        with conflict_page.expect_response(
+            lambda response: response.url.endswith(
+                "/api/v1/content-prep/shared-content"
+            )
+            and response.request.method == "PUT"
+        ) as conflict_info:
+            conflict_page.locator("#ccSaveTagBtn").click()
+        assert conflict_info.value.status == 409, (
+            conflict_info.value.status,
+            conflict_info.value.text(),
+        )
+        conflict_page.wait_for_function(
+            "() => document.getElementById('ccToast')?.textContent.includes('标签保存失败')"
+        )
         center_page.locator("#ccNewCollectionBtn").click()
         center_page.locator("#ccCollectionNewTitle").fill(f"Task5 题集 {stamp}")
         with center_page.expect_response(
@@ -532,6 +573,47 @@ def run_teaching_content_e2e() -> None:
         center_page.reload(wait_until="networkidle")
         assert f"Task5 标签 {stamp}" in center_page.locator("#ccTagList").inner_text()
         assert f"Task5 题集 {stamp}" in center_page.locator("#ccCollectionList").inner_text()
+        assert f"Task5 stale tag {stamp}" not in center_page.locator(
+            "#ccTagList"
+        ).inner_text()
+
+        teacher_context = create_context(
+            browser, teacher_username, TEST_PASSWORD
+        )
+        teacher_context.on(
+            "request",
+            lambda request: runtime_requests.append(request.url)
+            if "/api/v1/runtime/state" in request.url
+            or "server-state-bootstrap.js" in request.url
+            else None,
+        )
+        teacher_page = teacher_context.new_page()
+        teacher_page.goto(
+            BASE + "/content-center.html?subjectId=subject-pmp",
+            wait_until="networkidle",
+        )
+        assert f"Task5 标签 {stamp}" in teacher_page.locator(
+            "#ccTagList"
+        ).inner_text()
+        teacher_context.close()
+        teacher_context = create_context(
+            browser, teacher_username, TEST_PASSWORD
+        )
+        teacher_context.on(
+            "request",
+            lambda request: runtime_requests.append(request.url)
+            if "/api/v1/runtime/state" in request.url
+            or "server-state-bootstrap.js" in request.url
+            else None,
+        )
+        relogin_page = teacher_context.new_page()
+        relogin_page.goto(
+            BASE + "/content-center.html?subjectId=subject-pmp",
+            wait_until="networkidle",
+        )
+        assert f"Task5 标签 {stamp}" in relogin_page.locator(
+            "#ccTagList"
+        ).inner_text()
 
         prep_page = context.new_page()
         prep_page.goto(BASE + "/content-prep", wait_until="networkidle")
@@ -576,10 +658,18 @@ def run_teaching_content_e2e() -> None:
         assert runtime_requests == [], runtime_requests
         print(
             "teaching-content-e2e-ok native=subject-create,taxonomy-node,tag,collection "
-            "principle=control-plus-api recall=typed-api reload=2 runtimeRequests=0",
+            "principle=control-plus-api recall=typed-api reload=2 relogin=1 uiConflict=409 runtimeRequests=0",
             flush=True,
         )
     finally:
+        if teacher_context is not None:
+            teacher_context.close()
+        if context is not None:
+            cleanup_ok(
+                context.request.delete(BASE + f"/api/v1/users/{teacher_username}"),
+                "delete task5 teacher",
+                allow_not_found=True,
+            )
         if context is not None:
             context.close()
         if browser is not None:

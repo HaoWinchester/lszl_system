@@ -6,10 +6,6 @@
  */
 (function(){
   const Auth = window.KGAuthCore || {};
-  const Store = window.KGAppStorage || Auth.storage || {};
-  const AUTH_USERS_KEY = Auth.AUTH_USERS_KEY || "kg_local_users_v1";
-  const AUTH_SESSION_KEY = Auth.AUTH_SESSION_KEY || "kg_local_current_user_v1";
-  const USER_LOG_KEY = Auth.USER_LOG_KEY || "kg_user_admin_logs_v1";
 
   function escapeHTML(value){
     if(Auth.escapeHTML) return Auth.escapeHTML(value);
@@ -20,24 +16,6 @@
       "'":"&#39;",
       '"':"&quot;"
     }[c]));
-  }
-  function readJSON(key, fallback){
-    if(Auth.readJSON) return Auth.readJSON(key, fallback);
-    if(Store.readJSON) return Store.readJSON(key, fallback);
-    try{
-      const raw = localStorage.getItem(key);
-      if(!raw) return fallback;
-      const parsed = JSON.parse(raw);
-      return parsed == null ? fallback : parsed;
-    }catch(e){
-      return fallback;
-    }
-  }
-  function writeJSON(key, value){
-    if(Auth.writeJSON) return Auth.writeJSON(key, value);
-    if(Store.writeJSON) return Store.writeJSON(key, value);
-    localStorage.setItem(key, JSON.stringify(value));
-    return true;
   }
   function uid(prefix="log"){
     if(Auth.uid) return Auth.uid(prefix);
@@ -57,25 +35,11 @@
   }
   function currentActor(){
     if(Auth.currentActor) return Auth.currentActor();
-    try{
-      return (Store.readString ? Store.readString(AUTH_SESSION_KEY, "") : localStorage.getItem(AUTH_SESSION_KEY)) || "system-admin";
-    }catch(e){
-      return "system-admin";
-    }
+    return "system-admin";
   }
   function logAction(action, username="SYSTEM", detail=""){
     if(Auth.logAction) return Auth.logAction(action, username, detail);
-    const logs = readJSON(USER_LOG_KEY, []);
-    logs.unshift({
-      id: uid("log"),
-      action,
-      username: username || "SYSTEM",
-      detail: String(detail || ""),
-      actor: currentActor(),
-      at: Date.now()
-    });
-    writeJSON(USER_LOG_KEY, logs.slice(0, 300));
-    return logs[0];
+    return {id:uid("log"),action,username:username||"SYSTEM",detail:String(detail||""),actor:currentActor(),at:Date.now()};
   }
   function roleLabel(role){
     const api = window.KGRolePermissions;
@@ -104,12 +68,7 @@
   }
 
   window.KGAdminUtils = {
-    AUTH_USERS_KEY,
-    AUTH_SESSION_KEY,
-    USER_LOG_KEY,
     escapeHTML,
-    readJSON,
-    writeJSON,
     uid,
     fmtTime,
     currentActor,

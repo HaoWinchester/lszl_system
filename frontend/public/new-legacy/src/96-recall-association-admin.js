@@ -51,17 +51,17 @@
     const subject=currentSubject(),mode=$('ccRecallLibraryMode')?.value||'merge';
     const parsed=parseCurrent();if(!parsed?.valid)return;
     if(mode==='replace'&&!global.confirm(`将替换 ${subject.code} 当前科目级知识联想库。确定继续吗？`))return;
-    const result=libraryApi.saveText(subject.code,text.value,{mode});
-    if(!result.valid){report('保存失败',(result.errors||['未知错误']).join('；'),'error');return}
-    text.value=libraryApi.toText(result.library);loadedSubjectCode=subject.code;parsedPreview=null;updateMeta(result.library,subject);
-    // P4.5.31 同步服务器：深度回忆会话只读服务器快照，仅存 localStorage 到不了学员端。
+    const current=libraryApi.read(subject.code),incoming=libraryApi.reconcileIncoming(current,parsed.library);
+    const candidate=mode==='replace'?incoming:libraryApi.merge(current,incoming);
     try{
-      const synced=await libraryApi.writeServer(subject.code,result.library);
-      report('联想库已保存',`${result.library.nodes.length} 个知识点 · ${result.library.edges.length} 条关系 · ${mode==='replace'?'替换':'合并'}模式 · 学员端同步完成（r${synced.revision}）`,'success');
+      const synced=await libraryApi.writeServer(subject.code,candidate);
+      libraryApi.write(subject.code,synced.library);
+      text.value=libraryApi.toText(synced.library);loadedSubjectCode=subject.code;parsedPreview=null;updateMeta(synced.library,subject);
+      report('联想库已保存',`${synced.library.nodes.length} 个知识点 · ${synced.library.edges.length} 条关系 · ${mode==='replace'?'替换':'合并'}模式 · 学员端同步完成（r${synced.revision}）`,'success');
       toast(`${subject.code} 科目级知识联想库已保存。`);
     }catch(error){
       const conflict=error?.status===409;
-      report(conflict?'保存冲突':'已保存本浏览器',conflict?'服务器内容已被其他人更新，请重新载入后再保存。':`${result.library.nodes.length} 个知识点 · ${result.library.edges.length} 条关系 · 服务器同步失败：${escapeHTML(error?.message||'未知错误')}（学员端尚未同步）`,'error');
+      report(conflict?'保存冲突':'保存失败',conflict?'服务器内容已被其他人更新，请重新载入后再保存。':`${candidate.nodes.length} 个知识点 · ${candidate.edges.length} 条关系 · 服务器保存失败：${escapeHTML(error?.message||'未知错误')}`,'error');
       toast('服务器同步失败，学员端尚未生效。');
     }
   }
@@ -81,10 +81,11 @@
     }catch(error){report('导入失败',error.message||String(error),'error')}
     finally{if(input)input.value=''}
   }
-  function handleSubjectChange(){
+  async function handleSubjectChange(){
     const next=currentSubject();
     if(next.code===loadedSubjectCode)return;
-    loadCurrent();
+    try{await global.KGTeachingContentApi?.ready?.(next.id||next.code);loadCurrent()}
+    catch(error){report('联想库切换失败',error?.message||'请检查网络后重试。','error')}
   }
   function bind(){
     $('ccRecallLibraryLoadBtn')?.addEventListener('click',()=>loadCurrent({announce:true}));
@@ -92,10 +93,16 @@
     $('ccRecallLibrarySaveBtn')?.addEventListener('click',saveCurrent);
     $('ccRecallLibraryImportBtn')?.addEventListener('click',()=>$('ccRecallLibraryFile')?.click());
     $('ccRecallLibraryFile')?.addEventListener('change',event=>importFile(event.target.files?.[0]));
-    document.addEventListener('kg-content-center-subject-change',handleSubjectChange);
+    document.addEventListener('kg-content-center-subject-change',()=>{void handleSubjectChange()});
   }
-  function init(){if(!$('ccRecallLibraryPanel'))return;bind();loadCurrent()}
+  async function init(){
+    if(!$('ccRecallLibraryPanel'))return;
+    const subject=currentSubject();
+    try{await global.KGTeachingContentApi?.ready?.(subject.id||subject.code)}
+    catch(error){report('联想库加载失败',error?.message||'请检查网络后重试。','error');toast('联想库加载失败，未使用本地数据回退。');return}
+    bind();loadCurrent();
+  }
 
   global.KGRecallAssociationAdmin=Object.freeze({loadCurrent,parseCurrent,saveCurrent,currentSubject,getPreview:()=>parsedPreview});
-  document.addEventListener('DOMContentLoaded',init);
+  document.addEventListener('DOMContentLoaded',()=>{void init()});
 })(typeof window!=='undefined'?window:globalThis);

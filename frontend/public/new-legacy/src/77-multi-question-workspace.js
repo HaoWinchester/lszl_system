@@ -5562,6 +5562,8 @@
   async function init(){
     if(state.initialized||state.initializing||!document.body.classList.contains('question-workspace-page'))return;
     state.initializing=true;
+    try{await global.KGTeachingContentApi?.ready?.()}
+    catch(error){state.initializing=false;document.body.dataset.teachingContentUnavailable='true';notify('原则与归纳卡加载失败，请检查网络后重新载入。');return}
     try{await (global.KGCanvasWorkspaceAdapter?.ready||Promise.resolve())}catch(error){
       console.warn('多题工作区服务器水合失败，暂用设备缓存',error);
       document.body.dataset.workspaceApiUnavailable='true';

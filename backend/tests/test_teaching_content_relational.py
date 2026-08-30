@@ -17,6 +17,21 @@ def test_taxonomy_has_subject_fk_and_lifecycle_constraint():
     assert any("status IN" in str(c.sqltext) for c in table.constraints if hasattr(c, "sqltext"))
 
 
+def test_activity_resources_have_nullable_server_owner_foreign_keys():
+    for table_name in (
+        "activity_collections",
+        "activity_tags",
+        "activity_overrides",
+    ):
+        table = Base.metadata.tables[table_name]
+        assert table.columns["owner_username"].nullable is True
+        assert any(
+            foreign_key.target_fullname == "users.username"
+            and foreign_key.ondelete == "SET NULL"
+            for foreign_key in table.columns["owner_username"].foreign_keys
+        )
+
+
 def test_content_services_do_not_import_shared_runtime_state():
     from app.services import content_prep_shared_service, content_reference_service
 

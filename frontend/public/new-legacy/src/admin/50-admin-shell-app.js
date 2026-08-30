@@ -45,6 +45,6 @@
     const rows=Services.audit.list().slice(0,6);
     el.innerHTML=rows.length?rows.map(item=>`<article class="${item.status==='failed'?'failed':''}"><i></i><div><strong>${escapeHtml(item.summary||item.action)}</strong><span>${escapeHtml(item.actor?.name||'未知用户')} · ${escapeHtml(item.entityType)}</span></div><time>${formatTime(item.at)}</time></article>`).join(''):'<div class="admin-empty">还没有操作记录。</div>';
   }
-  function init(){UI.init(Services);if(!ensureAccess())return;renderMetrics();renderAttention();renderAudit()}
-  document.readyState==='loading'?document.addEventListener('DOMContentLoaded',init):init();
+  async function init(){UI.init(Services);if(!ensureAccess())return;const snapshot=await Services.referenceSnapshotReady;if(!snapshot){const main=document.querySelector('.admin-main');if(main)main.innerHTML='<section class="admin-panel admin-empty"><h1>内容引用索引加载失败</h1><p>为避免遗漏正式题目或试卷引用，管理指标与引用操作已暂停。请刷新页面重试。</p></section>';return}renderMetrics();renderAttention();renderAudit()}
+  document.readyState==='loading'?document.addEventListener('DOMContentLoaded',()=>{void init()}):void init();
 })(window);
