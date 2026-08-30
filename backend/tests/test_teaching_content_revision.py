@@ -1076,23 +1076,21 @@ def test_runtime_get_returns_storage_and_content_revision_from_one_snapshot(
     asyncio.run(seed())
     from app.services import runtime_state_service
 
-    original_get_state = runtime_state_service.get_state
+    original_rollback_read = runtime_state_service.get_rollback_read_state
 
     async def writer_after_snapshot(*args, **kwargs):
-        result = await original_get_state(*args, **kwargs)
+        result = await original_rollback_read(*args, **kwargs)
         if not captured:
             captured["storage"] = result[0][key]
-            if len(result) == 3:
-                captured["contentRevision"] = result[2]
-            else:
-                async with AsyncSessionLocal() as db:
-                    captured["contentRevision"] = int(
-                        (await revision_service.current(db))["revision"]
-                    )
+            captured["contentRevision"] = result[2]
             await competing_write()
         return result
 
-    monkeypatch.setattr(runtime_state_service, "get_state", writer_after_snapshot)
+    monkeypatch.setattr(
+        runtime_state_service,
+        "get_rollback_read_state",
+        writer_after_snapshot,
+    )
     try:
         with TestClient(app) as client:
             assert client.post(
@@ -1104,6 +1102,17 @@ def test_runtime_get_returns_storage_and_content_revision_from_one_snapshot(
         assert response.status_code == 200, response.text
         assert response.json()["storage"][key] == captured["storage"]
         assert response.json()["contentRevision"] == captured["contentRevision"]
+
+        async def committed_after_snapshot() -> tuple[str, int]:
+            async with AsyncSessionLocal() as db:
+                row = await db.get(SharedRuntimeState, key)
+                assert row is not None
+                revision = int((await revision_service.current(db))["revision"])
+                return str(row.value), revision
+
+        value_after, revision_after = asyncio.run(committed_after_snapshot())
+        assert value_after == json.dumps([{"id": "snapshot-new"}])
+        assert revision_after == int(captured["contentRevision"]) + 1
     finally:
         asyncio.run(_restore_shared_rows(shared_keys, snapshot))
 

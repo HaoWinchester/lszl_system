@@ -145,3 +145,17 @@ TDD evidence: the unchanged test was RED (`contentRevision` remained at the
 pre-promotion value); the corrected individual test was GREEN (`1 passed`),
 then the review's four Runtime test modules were GREEN (`111 passed, 1
 dependency warning`). No active/UAT/deploy/main/push/shared-DB action occurred.
+
+## Post-review snapshot-test correction
+
+The teaching-content revision snapshot regression was still wrapping
+`runtime_state_service.get_state`, while retired HTTP GET correctly calls the
+dedicated `get_rollback_read_state` seam. The test now wraps that read-only
+snapshot, captures the storage and content revision, then commits a competing
+write. It strictly proves the HTTP response retains the captured snapshot while
+the database afterwards contains the new shared value and revision increment.
+Production routing and the assertion strength are unchanged.
+
+The stale test was RED with an uncaptured snapshot; the updated individual test
+was GREEN (`1 passed`) and its full module regression was GREEN (`48 passed, 1
+dependency warning`). No active/UAT/deploy/main/push/shared-DB action occurred.
