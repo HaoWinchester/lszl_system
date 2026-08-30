@@ -124,8 +124,11 @@ async def list_recall_libraries(db: AsyncSession, *, subject_id: str, offset: in
     return {"items": [_recall_payload(r) for r in rows], "offset": offset, "limit": limit, "total": total}
 
 
-async def upsert_recall_library(db: AsyncSession, *, subject_id: str, version: int, nodes: list[dict], edges: list[dict], metadata: dict, actor: str) -> dict:
+async def upsert_recall_library(db: AsyncSession, *, subject_id: str, content_revision: int, version: int, nodes: list[dict], edges: list[dict], metadata: dict, actor: str) -> dict:
     await teaching_content_revision_service.acquire_lock(db)
+    await teaching_content_revision_service.assert_expected(
+        db, content_revision, lock_acquired=True
+    )
     if await db.get(ContentSubject, subject_id) is None:
         raise ValueError("subject not found")
     row = (await db.execute(select(RecallAssociationLibrary).where(RecallAssociationLibrary.subject_id == subject_id, RecallAssociationLibrary.version == version))).scalar_one_or_none()

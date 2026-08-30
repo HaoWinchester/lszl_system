@@ -70,6 +70,13 @@ test('Task 5B compatibility lists only the exact synchronous teaching lifecycle 
 test('all recall authoring entry points await the relational save before success feedback', () => {
   const library = readSource('src/95-recall-association-library.js');
   assert.doesNotMatch(library, /SharedRuntimeState|localStorage|kg_recall_association_library_v1/);
+  for (const source of [
+    library,
+    readSource('src/96-recall-association-admin.js'),
+    readSource('src/admin/53-recall-association-management.js'),
+    readSource('src/65-question-bank-admin.js'),
+    readRepo('frontend/scripts/new-legacy-assets/teaching-content-adapter.js'),
+  ]) assert.doesNotMatch(source, /\/api\/v1\/content-prep\/recall-libraries\//);
   for (const relative of ['src/96-recall-association-admin.js', 'src/65-question-bank-admin.js']) {
     const source = readSource(relative);
     assert.match(source, /await (?:libraryApi|api)\.writeServer/);
@@ -200,6 +207,45 @@ test('a delayed explicit subject write cannot replace a newer active subject', a
 
   const put = calls.find(call => call.method === 'PUT');
   assert.equal(put.body.subjectId, 'subject-a');
+  assert.equal(window.KGTeachingContentApi.snapshot().subjectId, 'subject-b');
+  assert.equal(window.KGTeachingContentApi.snapshot('subject-a').recallLibrary.nodes[0].id, 'saved-a');
+});
+
+test('an explicit save uses its cached subject instead of the active cached subject', async () => {
+  const calls = [];
+  const payload = subjectId => ({
+    subjectId, contentRevision: subjectId === 'subject-a' ? 3 : 9,
+    recallLibrary: { subjectId, nodes: [{ id: subjectId }], edges: [] },
+    principles: { schemaVersion: 1, items: [] },
+    synthesisPresets: { schemaVersion: 1, items: [] },
+  });
+  const window = {
+    KGDomainApi: {
+      async request(input) {
+        calls.push(structuredClone(input));
+        if (input.method === 'PUT') {
+          return { ...payload(input.body.subjectId), contentRevision: input.body.contentRevision + 1, recallLibrary: input.body.recallLibrary };
+        }
+        const subject = new URL(input.path, 'http://local').searchParams.get('subjectId');
+        return payload(subject);
+      },
+    },
+    location: { search: '' }, dispatchEvent() {},
+    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
+  };
+  vm.runInContext(
+    readRepo('frontend/scripts/new-legacy-assets/teaching-content-adapter.js'),
+    vm.createContext({ window, URL, URLSearchParams, structuredClone, Promise, console }),
+  );
+
+  await window.KGTeachingContentApi.bootstrap('subject-a');
+  await window.KGTeachingContentApi.bootstrap('subject-b');
+  await window.KGTeachingContentApi.saveRecallLibrary('subject-a', { nodes: [{ id: 'saved-a' }], edges: [] });
+
+  const put = calls.find(call => call.method === 'PUT');
+  assert.equal(put.path, '/api/v1/content-prep/shared-content');
+  assert.equal(put.body.subjectId, 'subject-a');
+  assert.equal(put.body.contentRevision, 3);
   assert.equal(window.KGTeachingContentApi.snapshot().subjectId, 'subject-b');
   assert.equal(window.KGTeachingContentApi.snapshot('subject-a').recallLibrary.nodes[0].id, 'saved-a');
 });

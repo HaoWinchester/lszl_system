@@ -64,9 +64,10 @@
     const requested = selectedSubject(nextSubjectId)
     const activate = options.activate !== false
     const generation = activate ? ++activeGeneration : null
-    if (activate) activeSubjectId = snapshotKey(requested)
-    if (!options.force && snapshots.has(activeSubjectId)) {
-      return storeSnapshot(snapshots.get(activeSubjectId), requested, generation)
+    const requestedKey = snapshotKey(requested)
+    if (activate) activeSubjectId = requestedKey
+    if (!options.force && snapshots.has(requestedKey)) {
+      return storeSnapshot(snapshots.get(requestedKey), requested, generation)
     }
     let pending = inflight.get(requested)
     if (!pending || options.force) {

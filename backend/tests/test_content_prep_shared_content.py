@@ -127,6 +127,20 @@ def test_two_teachers_cannot_overwrite_a_stale_recall_library_snapshot() -> None
             assert stale_save.status_code == 409, stale_save.text
             assert stale_save.json()["detail"]["currentContentRevision"] == revision_after_first
             assert asyncio.run(persisted()) == (nodes_after_first, revision_after_first)
+
+            legacy_stale_save = second.put(
+                f"/api/v1/content-prep/recall-libraries/{subject_id}",
+                json={
+                    "contentRevision": second_snapshot["contentRevision"],
+                    "version": 1,
+                    "nodes": [{"id": "teacher-b-legacy-route"}],
+                    "edges": [],
+                    "metadata": {},
+                },
+            )
+            assert legacy_stale_save.status_code == 409, legacy_stale_save.text
+            assert legacy_stale_save.json()["detail"] == stale_save.json()["detail"]
+            assert asyncio.run(persisted()) == (nodes_after_first, revision_after_first)
     finally:
         asyncio.run(cleanup())
 

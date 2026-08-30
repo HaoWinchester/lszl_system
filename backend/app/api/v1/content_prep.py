@@ -191,7 +191,9 @@ async def write_activity_override(collection_id: str, activity_id: str, request:
 @router.put("/recall-libraries/{subject_id}")
 async def write_recall_library(subject_id: str, request: RecallLibraryWriteRequest, db: DB, actor: PrepEditor):
     try:
-        return await teaching_content_service.upsert_recall_library(db, subject_id=subject_id, version=request.version, nodes=request.nodes, edges=request.edges, metadata=request.metadata, actor=actor.username)
+        return await teaching_content_service.upsert_recall_library(db, subject_id=subject_id, content_revision=request.content_revision, version=request.version, nodes=request.nodes, edges=request.edges, metadata=request.metadata, actor=actor.username)
+    except teaching_content_revision_service.ContentRevisionConflict as error:
+        _raise_shared_error(error)
     except ValueError as error:
         raise HTTPException(status_code=422, detail={"code": "INVALID_RECALL_LIBRARY", "message": str(error)}) from error
 

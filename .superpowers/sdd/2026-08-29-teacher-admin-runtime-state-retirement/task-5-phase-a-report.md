@@ -80,3 +80,13 @@ Follow-up verification:
 - Python/JavaScript syntax checks, focused static scans, and `git diff --check` passed.
 
 As in the initial Phase A, the formal sync was verification-only. The broad `frontend/public/new-legacy` and sync manifest drift was removed after the generated suites passed; release staging remains Task 9 work.
+
+### Second review follow-up
+
+Review base: `a2c1471ce8c537d7f43f3d80fe4f230065c1b36e`
+
+- Fixed the non-activating bootstrap cache lookup to use the requested canonical subject key rather than `activeSubjectId`. With A and B both cached and B active, an explicit A recall save now sends A's subject and revision, updates only A's snapshot, and leaves B active; it cannot rewrite the A alias to B.
+- Kept the legacy direct recall PUT for compatibility but closed its revision bypass. `RecallLibraryWriteRequest` now requires `contentRevision`, and `upsert_recall_library` validates it after acquiring the same teaching-content advisory lock and before reading or mutating relation rows. Stale writes use the common 409 payload and do not change the recall relation or global revision.
+- Added a browser-source boundary assertion preventing recall authoring code from calling the legacy direct PUT; the shared adapter remains the only browser mutation path.
+
+Second follow-up verification: backend shared-content + revision 52 passed, backend boundary + cleanup 73 passed, frontend focused 22 passed, formal synced frontend 283/283 and design 5/5. Syntax/static/diff checks passed, and generated public/manifest drift was removed after verification.
