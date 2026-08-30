@@ -284,6 +284,98 @@ async def _remove_first_question_domain(release_id: str) -> None:
         await db.commit()
 
 
+async def _seed_global_revenge_mistakes(
+    owner: str, first_ids: dict[str, str], second_ids: dict[str, str]
+) -> dict[str, str]:
+    async with AsyncSessionLocal() as db:
+        first_question = (
+            await db.execute(
+                select(PaperReleaseQuestion)
+                .where(PaperReleaseQuestion.release_id == first_ids["release"])
+                .order_by(PaperReleaseQuestion.order_index)
+                .limit(1)
+            )
+        ).scalar_one()
+        second_question = (
+            await db.execute(
+                select(PaperReleaseQuestion)
+                .where(PaperReleaseQuestion.release_id == second_ids["release"])
+                .order_by(PaperReleaseQuestion.order_index)
+                .limit(1)
+            )
+        ).scalar_one()
+        now = now_utc()
+        rows = [
+            PracticeMistake(
+                id=f"pm-release-{uuid4().hex[:12]}",
+                owner_id=owner,
+                question_id=first_question.question_id,
+                bank_id=first_question.bank_id,
+                paper_id=first_ids["paper"],
+                release_id=first_ids["release"],
+                paper_version=1,
+                paper_name="第一份来源试卷",
+                source_mode="challenge",
+                language_mode="zh",
+                question_snapshot=first_question.snapshot,
+                knowledge={},
+                selected_answers=["B"],
+                status="pending",
+                wrong_count=4,
+                first_wrong_at=now,
+                last_wrong_at=now,
+            ),
+            PracticeMistake(
+                id=f"pm-versionless-{uuid4().hex[:12]}",
+                owner_id=owner,
+                question_id=first_question.question_id,
+                bank_id=first_question.bank_id,
+                paper_id=first_ids["paper"],
+                release_id=None,
+                paper_version=0,
+                paper_name="历史无版本错题",
+                source_mode="challenge",
+                language_mode="zh",
+                question_snapshot=first_question.snapshot,
+                knowledge={},
+                selected_answers=["B"],
+                status="needs_remediation",
+                wrong_count=2,
+                revenge_wrong_count=1,
+                first_wrong_at=now,
+                last_wrong_at=now,
+            ),
+            PracticeMistake(
+                id=f"pm-second-{uuid4().hex[:12]}",
+                owner_id=owner,
+                question_id=second_question.question_id,
+                bank_id=second_question.bank_id,
+                paper_id=second_ids["paper"],
+                release_id=second_ids["release"],
+                paper_version=1,
+                paper_name="第二份来源试卷",
+                source_mode="challenge",
+                language_mode="zh",
+                question_snapshot=second_question.snapshot,
+                knowledge={},
+                selected_answers=["B"],
+                status="pending",
+                wrong_count=1,
+                first_wrong_at=now,
+                last_wrong_at=now,
+            ),
+        ]
+        db.add_all(rows)
+        await db.commit()
+        return {
+            "firstQuestion": first_question.question_id,
+            "secondQuestion": second_question.question_id,
+            "releaseMistake": rows[0].id,
+            "versionlessMistake": rows[1].id,
+            "secondMistake": rows[2].id,
+        }
+
+
 async def _completion_event_count(owner: str, session_id: str) -> int:
     async with AsyncSessionLocal() as db:
         return int(
@@ -1299,6 +1391,125 @@ def test_revenge_mode_is_a_resumable_server_session() -> None:
             assert restored["runtimeState"]["revengeState"]["phase"] == "verification_due"
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_global_revenge_session_crosses_papers_and_deduplicates_versionless_history() -> None:
+    first_ids = _practice_fixture_ids()
+    second_ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(first_ids, domains=["people", "process"]))
+    asyncio.run(_seed_released_pmp_paper(second_ids, domains=["business-environment"]))
+    mistake_ids = asyncio.run(
+        _seed_global_revenge_mistakes(first_ids["student"], first_ids, second_ids)
+    )
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": first_ids["student"], "password": PASSWORD},
+            ).status_code == 200
+
+            response = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={"mode": "revenge", "count": 10, "order": "paper"},
+            )
+
+            assert response.status_code == 200, response.text
+            session = response.json()["session"]
+            assert session["paperId"] is None
+            assert session["releaseId"] is None
+            assert session["stats"]["total"] == 2
+            assert len(session["questions"]) == 2
+            assert {row["questionId"] for row in session["questionOrder"]} == {
+                mistake_ids["firstQuestion"],
+                mistake_ids["secondQuestion"],
+            }
+            duplicate = next(
+                row
+                for row in session["questionOrder"]
+                if row["questionId"] == mistake_ids["firstQuestion"]
+            )
+            assert duplicate["mistakeId"] == mistake_ids["versionlessMistake"]
+            assert duplicate["mistakeIds"] == [
+                mistake_ids["versionlessMistake"],
+                mistake_ids["releaseMistake"],
+            ]
+            assert duplicate["sourceReleaseId"] == ""
+            assert {
+                row["sourcePaperId"] for row in session["questionOrder"]
+            } == {first_ids["paper"], second_ids["paper"]}
+
+            answers = {
+                mistake_ids["firstQuestion"]: {
+                    "selectedAnswer": "B",
+                    "selectionIndex": 1,
+                },
+                mistake_ids["secondQuestion"]: {
+                    "selectedAnswer": "A",
+                    "selectionIndex": 2,
+                },
+            }
+            paused_response = client.post(
+                f"/api/v1/learning/practice/sessions/{session['id']}/pause",
+                json={
+                    "revision": session["revision"],
+                    "answers": answers,
+                    "runtimeState": {"currentIndex": 1},
+                },
+            )
+            assert paused_response.status_code == 200, paused_response.text
+            paused = paused_response.json()["session"]
+            assert paused["status"] == "paused"
+            assert paused["stats"]["answered"] == 2
+
+            restored = client.get(
+                f"/api/v1/learning/practice/sessions/{session['id']}"
+            ).json()["session"]
+            assert restored["status"] == "paused"
+            assert len(restored["questions"]) == 2
+            assert all(
+                item["question"]["correctAnswer"] == "A"
+                for item in restored["questions"]
+            )
+
+            completed_response = client.post(
+                f"/api/v1/learning/practice/sessions/{session['id']}/complete",
+                json={
+                    "revision": paused["revision"],
+                    "answers": answers,
+                    "runtimeState": {"currentIndex": 1},
+                },
+            )
+            assert completed_response.status_code == 200, completed_response.text
+            completed = completed_response.json()
+            assert completed["session"]["status"] == "completed"
+            assert completed["report"]["paperName"] == "全局复仇错题"
+
+            async def load_mistakes() -> dict[str, PracticeMistake]:
+                async with AsyncSessionLocal() as db:
+                    rows = (
+                        await db.execute(
+                            select(PracticeMistake).where(
+                                PracticeMistake.id.in_(
+                                    [
+                                        mistake_ids["releaseMistake"],
+                                        mistake_ids["versionlessMistake"],
+                                        mistake_ids["secondMistake"],
+                                    ]
+                                )
+                            )
+                        )
+                    ).scalars().all()
+                    return {row.id: row for row in rows}
+
+            persisted = asyncio.run(load_mistakes())
+            assert persisted[mistake_ids["versionlessMistake"]].revenge_wrong_count == 2
+            assert persisted[mistake_ids["releaseMistake"]].revenge_attempt_count == 0
+            assert persisted[mistake_ids["releaseMistake"]].wrong_count == 4
+            assert persisted[mistake_ids["secondMistake"]].status == "verification_due"
+            assert persisted[mistake_ids["secondMistake"]].revenge_correct_count == 1
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(second_ids))
+        asyncio.run(_cleanup_released_pmp_paper(first_ids))
 
 
 def test_legacy_domain_gaps_keep_overall_report_truthful_and_disable_breakdown() -> None:

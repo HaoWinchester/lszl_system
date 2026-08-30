@@ -5,15 +5,16 @@ from __future__ import annotations
 import hashlib
 import secrets
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import or_, select, text as sql_text
+from sqlalchemy import select, text as sql_text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
-from app.models.training import LearningEvent, PracticeMistake, PracticeSession
+from app.models.training import LearningEvent, PracticeSession
 from app.models.user import User
 from app.services import learning_service, practice_experience_service, paper_composition_service, paper_release_service
 from app.services.practice_scoring_service import (
@@ -43,6 +44,15 @@ RUNTIME_FIELDS = RUNTIME_INTEGER_FIELDS | {
     "autoExplain",
     "revengeState",
 }
+
+
+@dataclass(frozen=True)
+class SessionQuestion:
+    question_id: str
+    bank_id: str
+    snapshot: dict
+    order_index: int
+    release_id: str
 
 
 class PracticeSessionError(RuntimeError):
@@ -183,6 +193,41 @@ async def _release_question_rows(
     return {row.question_id: row for row in rows}
 
 
+async def _session_question_rows(
+    db: AsyncSession, session: PracticeSession
+) -> dict[str, SessionQuestion]:
+    refs = session.question_order if isinstance(session.question_order, list) else []
+    embedded = {}
+    for ref in refs:
+        if not isinstance(ref, dict) or not isinstance(ref.get("questionSnapshot"), dict):
+            continue
+        question_id = str(ref.get("questionId") or "")
+        if not question_id:
+            continue
+        embedded[question_id] = SessionQuestion(
+            question_id=question_id,
+            bank_id=str(ref.get("bankId") or ""),
+            snapshot=deepcopy(ref["questionSnapshot"]),
+            order_index=int(ref.get("orderIndex") or 0),
+            release_id=str(ref.get("sourceReleaseId") or ""),
+        )
+    if embedded:
+        return embedded
+    if not session.release_id:
+        return {}
+    release_rows = await _release_question_rows(db, session.release_id)
+    return {
+        question_id: SessionQuestion(
+            question_id=row.question_id,
+            bank_id=row.bank_id,
+            snapshot=deepcopy(row.snapshot or {}),
+            order_index=row.order_index,
+            release_id=row.release_id,
+        )
+        for question_id, row in release_rows.items()
+    }
+
+
 async def _validated_draft_answers(
     db: AsyncSession, session: PracticeSession, data: dict
 ) -> dict[str, dict]:
@@ -194,7 +239,7 @@ async def _validated_draft_answers(
         for item in session.question_order
         if isinstance(item, dict)
     }
-    rows = await _release_question_rows(db, session.release_id)
+    rows = await _session_question_rows(db, session)
     normalized = {}
     seen_indexes = set()
     for question_id, value in raw.items():
@@ -213,7 +258,7 @@ async def _validated_draft_answers(
         if selection_index in seen_indexes:
             raise _error(422, "PRACTICE_DRAFT_ANSWER_INVALID", "草稿选择顺序重复")
         seen_indexes.add(selection_index)
-        # 选项合法性从 PaperReleaseQuestion.snapshot.options 校验（白名单），
+        # 选项合法性从会话冻结的题目快照校验（白名单），
         # 不接受 A/B/C/D 之外的任何注入值。唯一例外与 _judge 同构：
         # timedOut:true 条目的 selectedAnswer 允许超时占位符
         # （前端 submission() 统一发 '__timeout__'）或真实选项值；
@@ -252,7 +297,7 @@ async def _validated_draft_answers(
 
 def _draft_stats(
     refs: list[dict],
-    rows: dict[str, PaperReleaseQuestion],
+    rows: dict[str, SessionQuestion],
     answers: dict[str, dict],
     previous: dict,
 ) -> dict:
@@ -305,74 +350,9 @@ def _draft_stats(
     }
 
 
-async def _revenge_question_order(
-    db: AsyncSession,
-    *,
-    owner: str,
-    release_id: str,
-    count: int,
-) -> list[dict]:
-    now = now_utc()
-    rows = list(
-        (
-            await db.execute(
-                select(PracticeMistake).where(
-                    PracticeMistake.owner_id == owner,
-                    PracticeMistake.release_id == release_id,
-                    or_(
-                        PracticeMistake.status.in_(["pending", "needs_remediation"]),
-                        (
-                            (PracticeMistake.status == "verification_due")
-                            & or_(
-                                PracticeMistake.next_review_at.is_(None),
-                                PracticeMistake.next_review_at <= now,
-                            )
-                        ),
-                    ),
-                )
-            )
-        ).scalars().all()
-    )
-    priority = {"needs_remediation": 0, "pending": 1, "verification_due": 2}
-    rows.sort(
-        key=lambda row: (
-            priority.get(row.status, 9),
-            -row.revenge_wrong_count,
-            -row.wrong_count,
-            row.id,
-        )
-    )
-    selected = rows[:count]
-    if not selected:
-        raise _error(
-            422,
-            "NO_REVENGE_QUESTIONS",
-            "当前试卷暂无可复仇错题",
-        )
-    return [
-        {
-            "questionId": str(row.question_id or ""),
-            "bankId": str(row.bank_id or ""),
-            "orderIndex": index,
-            "domain": _domain_for_snapshot(row.question_snapshot or {}),
-            "score": _score_for_snapshot(row.question_snapshot or {}),
-            "mistakeId": row.id,
-        }
-        for index, row in enumerate(selected)
-        if row.question_id
-    ]
-
-
 async def _session_payload(db: AsyncSession, session: PracticeSession) -> dict:
     refs = session.question_order if isinstance(session.question_order, list) else []
-    rows = (
-        await db.execute(
-            select(PaperReleaseQuestion)
-            .where(PaperReleaseQuestion.release_id == session.release_id)
-            .order_by(PaperReleaseQuestion.order_index)
-        )
-    ).scalars().all()
-    row_map = {row.question_id: row for row in rows}
+    row_map = await _session_question_rows(db, session)
     questions = []
     answers = session.answers if isinstance(session.answers, dict) else {}
     for ref in refs:
@@ -433,8 +413,6 @@ async def start_session(
         count = int(data.get("count") or 0)
     except (TypeError, ValueError) as error:
         raise _error(422, "INVALID_PRACTICE_COUNT", "题目数量无效") from error
-    if not paper_id or not release_id:
-        raise _error(422, "PRACTICE_RELEASE_REQUIRED", "paperId 和 releaseId 不能为空")
     if mode not in PRACTICE_SESSION_MODES:
         raise _error(422, "INVALID_PRACTICE_MODE", "练习模式无效")
     if not PRACTICE_QUESTION_COUNT_MIN <= count <= PRACTICE_QUESTION_COUNT_MAX:
@@ -442,29 +420,44 @@ async def start_session(
     if order not in PRACTICE_ORDERS:
         raise _error(422, "INVALID_PRACTICE_ORDER", "答题顺序无效")
 
-    release = await db.get(PaperRelease, release_id)
-    if (
-        release is None
-        or release.paper_id != paper_id
-        or release.status != "published"
-        or "practice_mode" not in (release.enabled_modes or [])
-        or (release.allowed_roles and user.role not in release.allowed_roles)
-        or not await paper_release_service.can_access(db, user, release)
-    ):
-        raise _error(404, "PRACTICE_RELEASE_NOT_FOUND", "试卷不存在或当前不可练习")
+    release = None
+    if mode != "revenge":
+        if not paper_id or not release_id:
+            raise _error(422, "PRACTICE_RELEASE_REQUIRED", "paperId 和 releaseId 不能为空")
+        release = await db.get(PaperRelease, release_id)
+        if (
+            release is None
+            or release.paper_id != paper_id
+            or release.status != "published"
+            or "practice_mode" not in (release.enabled_modes or [])
+            or (release.allowed_roles and user.role not in release.allowed_roles)
+            or not await paper_release_service.can_access(db, user, release)
+        ):
+            raise _error(404, "PRACTICE_RELEASE_NOT_FOUND", "试卷不存在或当前不可练习")
 
     await db.execute(
         sql_text("SELECT pg_advisory_xact_lock(hashtext(:owner), hashtext(:scope))"),
-        {"owner": owner, "scope": f"practice-session:{paper_id}:{mode}"},
+        {
+            "owner": owner,
+            "scope": (
+                "practice-session:global:revenge"
+                if mode == "revenge"
+                else f"practice-session:{paper_id}:{mode}"
+            ),
+        },
     )
+    existing_query = select(PracticeSession).where(
+        PracticeSession.owner_id == owner,
+        PracticeSession.mode == mode,
+        PracticeSession.status.in_(["active", "paused"]),
+    )
+    if mode != "revenge":
+        existing_query = existing_query.where(PracticeSession.paper_id == paper_id)
     existing = (
         await db.execute(
-            select(PracticeSession).where(
-                PracticeSession.owner_id == owner,
-                PracticeSession.paper_id == paper_id,
-                PracticeSession.mode == mode,
-                PracticeSession.status.in_(["active", "paused"]),
-            )
+            existing_query.order_by(
+                PracticeSession.last_saved_at.desc(), PracticeSession.id
+            ).limit(1)
         )
     ).scalar_one_or_none()
     if existing is not None:
@@ -476,24 +469,38 @@ async def start_session(
             status=existing.status,
         )
 
-    rows = list(
-        (
-            await db.execute(
-                select(PaperReleaseQuestion)
-                .where(PaperReleaseQuestion.release_id == release_id)
-                .order_by(PaperReleaseQuestion.order_index)
-            )
-        ).scalars().all()
-    )
     selection_seed = secrets.token_hex(16)
-    weights, scoring = _release_scoring(release)
     if mode == "revenge":
-        question_order = await _revenge_question_order(
-            db,
-            owner=owner,
-            release_id=release_id,
-            count=count,
-        )
+        candidates = await learning_service.global_revenge_candidates(db, owner)
+        question_order = []
+        for index, candidate in enumerate(candidates[:count]):
+            snapshot = deepcopy(candidate.get("questionSnapshot") or {})
+            question_order.append(
+                {
+                    "questionId": str(candidate.get("questionId") or ""),
+                    "bankId": str(candidate.get("bankId") or ""),
+                    "orderIndex": index,
+                    "domain": _domain_for_snapshot(snapshot),
+                    "score": _score_for_snapshot(snapshot),
+                    "mistakeId": str(candidate.get("mistakeId") or ""),
+                    "mistakeIds": list(candidate.get("mistakeIds") or []),
+                    "sourcePaperId": str(candidate.get("paperId") or ""),
+                    "sourcePaperName": str(candidate.get("paperName") or ""),
+                    "sourceReleaseId": str(candidate.get("releaseId") or ""),
+                    "sourcePaperVersion": int(candidate.get("paperVersion") or 0),
+                    "questionSnapshot": snapshot,
+                }
+            )
+        if not question_order:
+            raise _error(
+                422,
+                "NO_REVENGE_QUESTIONS",
+                "当前没有可用的全局复仇错题",
+            )
+        paper_id = ""
+        release_id = ""
+        weights = dict(DEFAULT_DOMAIN_WEIGHTS)
+        scoring = deepcopy(DEFAULT_SIMULATION_SCORING)
         targets = {
             domain: sum(1 for item in question_order if item.get("domain") == domain)
             for domain in weights
@@ -502,6 +509,16 @@ async def start_session(
             str(item.get("domain") or "") in weights for item in question_order
         )
     else:
+        rows = list(
+            (
+                await db.execute(
+                    select(PaperReleaseQuestion)
+                    .where(PaperReleaseQuestion.release_id == release_id)
+                    .order_by(PaperReleaseQuestion.order_index)
+                )
+            ).scalars().all()
+        )
+        weights, scoring = _release_scoring(release)
         question_order, targets, domain_data_complete = _select_questions(
             rows,
             count=count,
@@ -513,8 +530,8 @@ async def start_session(
     session = PracticeSession(
         id=uid("ps_"),
         owner_id=owner,
-        paper_id=paper_id,
-        release_id=release_id,
+        paper_id=paper_id or None,
+        release_id=release_id or None,
         mode=mode,
         status="active",
         question_order=question_order,
@@ -544,14 +561,18 @@ async def start_session(
         await db.commit()
     except IntegrityError:
         await db.rollback()
+        existing_query = select(PracticeSession).where(
+            PracticeSession.owner_id == owner,
+            PracticeSession.mode == mode,
+            PracticeSession.status.in_(["active", "paused"]),
+        )
+        if mode != "revenge":
+            existing_query = existing_query.where(PracticeSession.paper_id == paper_id)
         existing = (
             await db.execute(
-                select(PracticeSession).where(
-                    PracticeSession.owner_id == owner,
-                    PracticeSession.paper_id == paper_id,
-                    PracticeSession.mode == mode,
-                    PracticeSession.status.in_(["active", "paused"]),
-                )
+                existing_query.order_by(
+                    PracticeSession.last_saved_at.desc(), PracticeSession.id
+                ).limit(1)
             )
         ).scalar_one_or_none()
         if existing is not None:
@@ -691,10 +712,10 @@ async def answer_session_question(
         session.status = "active"
         session.paused_at = None
 
-    release_rows = await _release_question_rows(db, session.release_id)
-    row = release_rows.get(question_id)
+    session_rows = await _session_question_rows(db, session)
+    row = session_rows.get(question_id)
     if row is None:
-        raise _error(404, "PRACTICE_QUESTION_NOT_FOUND", "题目不存在于当前发布")
+        raise _error(404, "PRACTICE_QUESTION_NOT_FOUND", "题目不存在于当前练习快照")
     # 旧逐题接口与整卷交卷共用同一个单题判题入口：不复制第二套错题逻辑。
     submission_index = len(
         [key for key, value in answers.items() if isinstance(value, dict)]
@@ -731,7 +752,7 @@ async def answer_session_question(
     session.answers = answers
     _record_runtime_ledger(session, question_id)
     previous_stats = session.stats if isinstance(session.stats, dict) else {}
-    session.stats = _draft_stats(refs, release_rows, answers, previous_stats)
+    session.stats = _draft_stats(refs, session_rows, answers, previous_stats)
     experience = session.stats["experience"]
     runtime_state = dict(session.runtime_state or {})
     runtime_state["experience"] = experience
@@ -1073,7 +1094,7 @@ async def _apply_saved_draft(db: AsyncSession, session: PracticeSession, data: d
     if draft is not None:
         session.answers = draft
     refs = session.question_order if isinstance(session.question_order, list) else []
-    rows = await _release_question_rows(db, session.release_id)
+    rows = await _session_question_rows(db, session)
     session.stats = _draft_stats(refs, rows, session.answers or {}, dict(session.stats or {}))
     session.runtime_state = {**(session.runtime_state or {}), "experience": session.stats["experience"]}
 
@@ -1252,8 +1273,16 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
             "performanceBand": performance_band(domain_percent, scoring),
         }
     stats = session.stats if isinstance(session.stats, dict) else {}
-    release = await db.get(PaperRelease, session.release_id)
-    paper_name = release.name if release is not None else "PMP 模拟练习"
+    release = (
+        await db.get(PaperRelease, session.release_id)
+        if session.release_id
+        else None
+    )
+    paper_name = (
+        "全局复仇错题"
+        if session.mode == "revenge" and session.release_id is None
+        else release.name if release is not None else "PMP 模拟练习"
+    )
     return {
         "sessionId": session.id,
         "paperId": session.paper_id,
@@ -1300,13 +1329,13 @@ async def _grade_session_selection(
     user: User,
     session: PracticeSession,
     ref: dict,
-    row: PaperReleaseQuestion,
+    row: SessionQuestion,
     draft: dict,
     submission_index: int,
     *,
     record: bool = True,
 ) -> dict:
-    """Judge one selection against the frozen release snapshot.
+    """Judge one selection against the frozen session snapshot.
 
     整卷交卷与旧逐题接口共用这一个入口：错题/进度副作用全部在当前事务内
     commit=False 记录，由调用方决定提交或整体回滚。record=False 只判定、
@@ -1332,7 +1361,9 @@ async def _grade_session_selection(
                 allow_concurrent=True,
                 record=record,
             )
-            if mistake is None:
+            if mistake is None or str(mistake.question_id or "") != str(
+                ref.get("questionId") or ""
+            ):
                 raise _error(404, "PRACTICE_MISTAKE_NOT_FOUND", "错题不存在或无权访问")
             correct = selected == correct_answer
         else:
@@ -1451,7 +1482,7 @@ async def complete_session(
         raise _revision_conflict(session)
 
     refs = [item for item in session.question_order if isinstance(item, dict)]
-    rows = await _release_question_rows(db, session.release_id)
+    rows = await _session_question_rows(db, session)
 
     whole_paper = isinstance(data.get("answers"), dict)
     if whole_paper:
@@ -1466,7 +1497,7 @@ async def complete_session(
                 raise _error(
                     409,
                     "PRACTICE_GRADE_FAILED",
-                    "判题失败：题目不存在于当前发布",
+                    "判题失败：题目不存在于当前练习快照",
                     questionId=question_id,
                 )
             selections.append((question_id, selection))
