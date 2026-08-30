@@ -13,6 +13,37 @@ test('P4.5 practice workflow renders revenge, remediation and verification contr
   assert.match(page, /id="practiceVerificationBanner"/)
 })
 
+test('revenge card exposes the real pool, independent batch controls and accessible rules', () => {
+  const page = source('new-legacy/practice-mode.html')
+  const practice = source('new-legacy/src/100-practice-mode.js')
+  const policyScript = 'src/118-revenge-entry-policy.js'
+  const controllerScript = 'src/100-practice-mode.js'
+
+  assert.ok(page.indexOf(policyScript) >= 0, 'revenge entry policy script is loaded')
+  assert.ok(page.indexOf(policyScript) < page.indexOf(controllerScript), 'policy loads before controller')
+  for (const id of [
+    'practiceRevengeActiveCount',
+    'practiceRevengePendingCount',
+    'practiceRevengeRemediationCount',
+    'practiceRevengeVerificationCount',
+    'practiceRevengeMasteredCount',
+    'practiceRevengeCountOptions',
+    'practiceRevengeRuleTrigger',
+    'practiceRevengeRuleTooltip',
+  ]) assert.match(page, new RegExp(`id="${id}"`), id)
+  assert.match(page, /aria-controls="practiceRevengeRuleTooltip"/)
+  assert.match(page, /aria-expanded="false"/)
+  assert.match(page, /role="tooltip"/)
+  assert.match(page, /跨试卷、跨版本和历史无版本/)
+  assert.match(page, /相同 question_id 只出一道题/)
+  assert.match(page, /已到期待验证/)
+
+  assert.match(practice, /KGRevengeEntryPolicy\.derive\(/)
+  assert.match(practice, /revengeSelectedCount/)
+  assert.match(practice, /revengePolicy\(\)\.requestCount/)
+  assert.match(practice, /继续上次复仇/)
+})
+
 test('P4.5 practice workflow uses a database API adapter instead of a local mistake/history store', () => {
   const adapter = source('frontend/scripts/new-legacy-assets/practice-learning-adapter.js')
   const practice = source('new-legacy/src/100-practice-mode.js')
