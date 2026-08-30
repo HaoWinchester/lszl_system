@@ -125,8 +125,9 @@ with sync_playwright() as playwright:
     page.evaluate(
         """()=>{
           const question=(index)=>({id:'q'+index,title:'题目 '+index,type:'single_choice',stemParts:[{text:'这是第 '+index+' 道题'}],options:[{id:'A',text:'正确选项',correct:true},{id:'B',text:'错误选项'}],correctAnswer:'A',analysis:'第 '+index+' 题解析'});
-          const fullRefs=Array.from({length:10},(_,offset)=>({questionId:'q'+(offset+1),bankId:'bank-1',mistakeId:'mistake-'+(offset+1),orderIndex:offset,domain:offset<4?'people':offset<9?'process':'business-environment',question:question(offset+1)}));
-          const sessionRefs=()=>fullRefs.map(ref=>({...ref,question:JSON.parse(JSON.stringify(ref.question))}));
+          const allRefs=Array.from({length:30},(_,offset)=>({questionId:'q'+(offset+1),bankId:'bank-1',mistakeId:'mistake-'+(offset+1),orderIndex:offset,domain:offset<12?'people':offset<27?'process':'business-environment',question:question(offset+1)}));
+          const fullRefs=allRefs.slice(0,10);
+          const sessionRefs=(count=10)=>allRefs.slice(0,count).map(ref=>({...ref,question:JSON.parse(JSON.stringify(ref.question))}));
           let session=null;
           let report=null;
           let sequence=0;
@@ -136,6 +137,7 @@ with sync_playwright() as playwright:
           window.__conflictNext=false;
           window.__pauseFailNext=false;
           window.__completeCalls=[];
+          window.__revengeStats={active:10,pending:9,needsRemediation:1,verificationDue:0,mastered:0};
           const record=(name,body)=>{window.__writes.push({name,body:JSON.parse(JSON.stringify(body||{}))})};
           // 记录每个已被显式保存过的会话，供后续按模式恢复
           window.__pausedSnapshots={};
@@ -143,10 +145,10 @@ with sync_playwright() as playwright:
           const refFor=qid=>session.questions.find(item=>item.questionId===qid);
           window.KGAuthCore={currentUser:()=>({username:'student-1',role:'student'})};
           window.KGPracticeLearningApi={
-            stats:()=>({active:3,pending:2,needsRemediation:1,mastered:0}),active:()=>[],refresh:async()=>({}),
+            stats:()=>JSON.parse(JSON.stringify(window.__revengeStats)),active:()=>[],refresh:async()=>({}),
             getActiveSessions:async filters=>session&&['active','paused'].includes(session.status)&&(!filters?.mode||filters.mode===session.mode)&&(!filters?.releaseId||filters.releaseId===session.releaseId)?[normalize()]:[],
             getSession:async id=>window.__pausedSnapshots[id]?JSON.parse(JSON.stringify(window.__pausedSnapshots[id])):(session?normalize():null),
-            startSession:async input=>{record('start',input);session={id:'ps-'+(++sequence),paperId:input.mode==='revenge'?null:input.paperId,releaseId:input.mode==='revenge'?null:input.releaseId,mode:input.mode,status:'active',revision:1,questions:sessionRefs(),questionOrder:fullRefs.map(({question,...ref})=>ref),answers:{},runtimeState:{currentIndex:0,order:input.order,health:input.mode==='challenge'?3:3,streak:0,experience:0,durationMs:0},stats:{total:10,answered:0,correct:0,wrong:0,unanswered:10,experience:0,durationMs:0}};return normalize()},
+            startSession:async input=>{record('start',input);const refs=sessionRefs(input.mode==='revenge'?input.count:10);const total=refs.length;session={id:'ps-'+(++sequence),paperId:input.mode==='revenge'?null:input.paperId,releaseId:input.mode==='revenge'?null:input.releaseId,mode:input.mode,status:'active',revision:1,questions:refs,questionOrder:refs.map(({question,...ref})=>ref),answers:{},runtimeState:{currentIndex:0,order:input.order,health:input.mode==='challenge'?3:3,streak:0,experience:0,durationMs:0},stats:{total,answered:0,correct:0,wrong:0,unanswered:total,experience:0,durationMs:0}};return normalize()},
             updateState:async(id,input)=>{record('state',input);if(input.revision!==session.revision)throw Object.assign(new Error('stale revision'),{status:409});session.runtimeState={...session.runtimeState,...input.runtimeState};session.revision+=1;return normalize()},
             answerSession:async(id,input)=>{record('answers',input);throw Object.assign(new Error('legacy per-question route must not be called'),{status:500})},
             pauseSession:async(id,input)=>{
@@ -206,7 +208,7 @@ with sync_playwright() as playwright:
     )
     for stylesheet in ["styles/main.css", "styles/practice-mode.css"]:
         page.add_style_tag(content=(ROOT / stylesheet).read_text(encoding="utf-8"))
-    for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/114-practice-draft-state.js", "src/100-practice-mode.js"]:
+    for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/114-practice-draft-state.js", "src/118-revenge-entry-policy.js", "src/100-practice-mode.js"]:
         page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(120)
@@ -452,13 +454,79 @@ with sync_playwright() as playwright:
     if timed_out_entries:
         assert all(entry["selectedAnswer"] == "__timeout__" for entry in timed_out_entries), scholar_answers
 
-    # ---------- revenge：本地推进补救/验证，不调用长期错题写路由 ----------
+    # ---------- revenge 入口：题量独立、完整统计、规则浮层 ----------
     page.evaluate("""()=>{
-      window.__catalog=[];
+      window.__catalog=[{id:'paper-large',paperId:'paper-large',releaseId:'release-large',version:1,name:'大题量试卷',subject:'PMP',status:'published',questionCount:180,totalCount:180,accessPolicy:{accessLevel:'free'}}];
       window.KGPracticeLearningApi.getActiveSessions=async()=>[];
+      window.__revengeStats={active:1,pending:1,needsRemediation:0,verificationDue:0,mastered:0};
       window.KGPracticeMode.showLobby();
     }""")
     page.wait_for_timeout(100)
+    # 普通练习选择 60 题，复仇只有 1 题时仍自动发送 count=1。
+    page.locator('label:has([name="practiceCount"][value="60"])').click()
+    assert page.locator('#practiceRevengeActiveCount').inner_text() == '1'
+    assert '全部 1 题' in page.locator('#practiceRevengeCountSummary').inner_text()
+    assert page.locator('#practiceRevengeCountOptions').is_hidden()
+
+    rule_trigger = page.locator('#practiceRevengeRuleTrigger')
+    rule_tooltip = page.locator('#practiceRevengeRuleTooltip')
+    rule_trigger.hover()
+    assert rule_tooltip.is_visible()
+    assert '跨试卷、跨版本和历史无版本' in rule_tooltip.inner_text()
+    page.mouse.move(5, 5)
+    page.wait_for_timeout(50)
+    assert rule_tooltip.is_hidden()
+    rule_trigger.focus()
+    assert rule_tooltip.is_visible()
+    page.keyboard.press('Escape')
+    assert rule_tooltip.is_hidden()
+    page.locator('body').click(position={"x": 6, "y": 6})
+    rule_trigger.click()
+    assert rule_tooltip.is_visible()
+    page.locator('body').click(position={"x": 6, "y": 6})
+    assert rule_tooltip.is_hidden()
+
+    page.evaluate('window.__writes=[]')
+    page.locator('[data-practice-start="revenge"]').click()
+    page.wait_for_timeout(180)
+    assert writes(page)[0] == {"name": "start", "body": {"mode": "revenge", "count": 1, "order": "paper"}}, writes(page)
+    assert page.evaluate('KGPracticeMode.snapshot().questionCount') == 1
+    page.locator('#practiceExitBtn').click()
+    page.locator('#practiceAbandonBtn').click()
+    page.wait_for_timeout(120)
+
+    # 14 题默认 10，20 禁用，可切换为全部 14 题。
+    page.evaluate("""()=>{window.__revengeStats={active:14,pending:1,needsRemediation:1,verificationDue:12,mastered:3};window.KGPracticeMode.showLobby();window.__writes=[]}""")
+    page.wait_for_timeout(100)
+    assert page.locator('#practiceRevengeActiveCount').inner_text() == '14'
+    assert page.locator('#practiceRevengeVerificationCount').inner_text() == '12'
+    assert page.locator('[name="practiceRevengeCount"][value="10"]').is_checked()
+    assert page.locator('[name="practiceRevengeCount"][value="20"]').is_disabled()
+    page.locator('label:has([name="practiceRevengeCount"][value="14"])').click()
+    page.locator('[data-practice-start="revenge"]').click()
+    page.wait_for_timeout(180)
+    assert writes(page)[0]["body"]["count"] == 14, writes(page)
+    assert page.evaluate('KGPracticeMode.snapshot().questionCount') == 14
+    page.locator('#practiceExitBtn').click()
+    page.locator('#practiceAbandonBtn').click()
+    page.wait_for_timeout(120)
+
+    # 29 题可以选择本次 20 题。
+    page.evaluate("""()=>{window.__revengeStats={active:29,pending:10,needsRemediation:4,verificationDue:15,mastered:0};window.KGPracticeMode.showLobby();window.__writes=[]}""")
+    page.wait_for_timeout(100)
+    page.locator('label:has([name="practiceRevengeCount"][value="20"])').click()
+    page.locator('[data-practice-start="revenge"]').click()
+    page.wait_for_timeout(180)
+    assert writes(page)[0]["body"]["count"] == 20, writes(page)
+    page.locator('#practiceExitBtn').click()
+    page.locator('#practiceAbandonBtn').click()
+    page.wait_for_timeout(120)
+
+    # 后续复仇整卷交互沿用 10 题固定夹具。
+    page.evaluate("""()=>{window.__catalog=[];window.__revengeStats={active:10,pending:9,needsRemediation:1,verificationDue:0,mastered:0};window.KGPracticeMode.showLobby()}""")
+    page.wait_for_timeout(100)
+
+    # ---------- revenge：本地推进补救/验证，不调用长期错题写路由 ----------
     page.evaluate("""()=>{
       window.__workingStartSession=window.KGPracticeLearningApi.startSession;
       window.KGPracticeLearningApi.startSession=async input=>{
@@ -569,11 +637,18 @@ with sync_playwright() as playwright:
     assert page.locator("#practiceLobby").is_visible(), page.evaluate("document.body.dataset.practiceView")
 
     # 全局复仇会话不绑定试卷：换成另一份当前试卷后，仍应恢复同一会话。
-    resumed_revenge = page.evaluate(
+    page.evaluate(
         """()=>{
           window.__catalog=[{id:'paper-2',paperId:'paper-2',releaseId:'release-2',version:1,name:'另一份试卷',subject:'PMP',status:'published',questionCount:10,totalCount:10,accessPolicy:{accessLevel:'free'}}];
           window.KGPracticeLearningApi.getActiveSessions=async filters=>window.__findResumable(filters);
           window.KGPracticeMode.showLobby();
+        }"""
+    )
+    page.wait_for_timeout(120)
+    revenge_start_button = page.locator('[data-practice-start="revenge"]')
+    assert revenge_start_button.inner_text() == f'继续上次复仇 {len(revenge_answers)}/10'
+    resumed_revenge = page.evaluate(
+        """()=>{
           window.__writes=[];
           return window.KGPracticeMode.startPractice('revenge').then(()=>window.KGPracticeMode.snapshot());
         }"""
