@@ -36,6 +36,7 @@
     'kg_training_workspace_layout_v1',
     'pmp_question_font_size_v1',
     'pmp_question_font_size_v2',
+    '通用知识点关系图谱工具_新手引导已看_v1',
   ])
   const SCOPED_UI_BASE_KEYS = Object.freeze([
     'kg_multi_question_highlight_color_v1',

@@ -20,6 +20,7 @@ from app.services.runtime_state_service import (
     EXACT_KEYS,
     ONLINE_RUNTIME_EXACT_KEYS,
     PREFIXES,
+    get_state as get_legacy_state,
     key_allowed,
 )
 
@@ -41,10 +42,32 @@ def bootstrap(html: str) -> dict:
 
 
 def bootstrap_api(client: TestClient, page: str) -> dict:
-    """页面预载等价路径：与 HTML 渲染走同一 ensure_domain_seed。"""
-    response = client.get(f"/api/v1/runtime/state?mode=bootstrap&page={page}")
-    assert response.status_code == 200, response.text
-    return response.json()
+    """Exercise historical migration seeding only under this test's explicit opt-in.
+
+    The retired HTTP GET route is deliberately read-only, even when rollback
+    reads are enabled.  These migration-service regressions therefore invoke
+    the legacy seeding service directly instead of treating GET as a writer.
+    """
+    me = client.get("/api/v1/auth/me")
+    assert me.status_code == 200, me.text
+    identity = me.json()["user"]
+
+    async def seed_legacy_state() -> dict:
+        async with AsyncSessionLocal() as db:
+            storage, revision, content_revision = await get_legacy_state(
+                db,
+                identity["username"],
+                identity["role"],
+                mode="bootstrap",
+                page=page,
+            )
+        return {
+            "storage": storage,
+            "revision": revision,
+            "contentRevision": content_revision,
+        }
+
+    return asyncio.run(seed_legacy_state())
 
 
 def login(client: TestClient, username: str) -> None:

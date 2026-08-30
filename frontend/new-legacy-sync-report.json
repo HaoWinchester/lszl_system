@@ -5,9 +5,7 @@
   "changes": {
     "added": [],
     "changed": [
-      "content-prep-studio/dist/content-prep.html",
-      "content-prep-studio/src/js/10-state-domain.js",
-      "src/29-auth-core.js",
+      "src/28-device-preferences.js",
       "src/40-guided-tour.js"
     ],
     "removed": []

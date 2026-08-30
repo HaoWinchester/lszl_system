@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { relative, resolve } from 'node:path'
 import test from 'node:test'
 
 const frontend = resolve(import.meta.dirname, '..')
@@ -10,6 +10,23 @@ const generatedPath = (page) => page === 'content-prep.html'
   ? 'content-prep-studio/dist/content-prep.html'
   : page
 const readGenerated = (page) => readFileSync(resolve(frontend, 'public/new-legacy', generatedPath(page)), 'utf8')
+
+function walkFiles(root) {
+  const files = []
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    const path = resolve(root, entry.name)
+    if (entry.isDirectory()) files.push(...walkFiles(path))
+    else if (entry.isFile()) files.push(path)
+  }
+  return files
+}
+
+function applicationFiles(root) {
+  return walkFiles(root).filter(path => {
+    const pathFromRoot = relative(root, path)
+    return /\.(?:html|js)$/.test(path) && !/(^|[/\\])tests?([/\\]|$)/.test(pathFromRoot)
+  })
+}
 
 const learnerPages = [
   'index.html',
@@ -68,6 +85,23 @@ test('direct pages keep auth bootstrap without loading the legacy runtime', () =
 test('all generated application pages are free of the retired Runtime bootstrap', () => {
   for (const page of [...learnerPages, ...directAccountPages, ...directTeachingPages]) {
     assert.doesNotMatch(readGenerated(page), /server-state-bootstrap\.js/, page)
+  }
+})
+
+test('recursive generated and source application scan has no Runtime route or asset', () => {
+  const generatedRoot = resolve(frontend, 'public/new-legacy')
+  const generatedHtml = applicationFiles(generatedRoot).filter(path => path.endsWith('.html'))
+  assert.ok(generatedHtml.length > 0)
+  assert.ok(
+    generatedHtml.some(path => relative(generatedRoot, path) === 'content-prep-studio/dist/content-prep.html'),
+    'nested generated HTML must be included',
+  )
+  for (const root of [generatedRoot, resolve(repo, 'new-legacy'), resolve(frontend, 'scripts/new-legacy-assets')]) {
+    for (const path of applicationFiles(root)) {
+      const source = readFileSync(path, 'utf8')
+      assert.doesNotMatch(source, /\/api\/v1\/runtime\//, path)
+      assert.doesNotMatch(source, /server-state-bootstrap\.js/, path)
+    }
   }
 })
 

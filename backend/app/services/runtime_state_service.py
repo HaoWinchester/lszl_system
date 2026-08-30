@@ -1226,6 +1226,22 @@ async def get_state(
     return snapshot
 
 
+async def get_rollback_read_state(
+    db: AsyncSession,
+    owner: str,
+    role: str,
+    mode: str = "full",
+    page: str | None = None,
+) -> tuple[dict[str, str], int, int]:
+    """Read a legacy snapshot without promotion, bootstrap seeding, or commit."""
+
+    snapshot = await _read_state_snapshot_locked(db, owner, role, mode=mode, page=page)
+    # Close the read transaction explicitly so rollback diagnostics cannot
+    # accidentally leave a transaction available for a later write.
+    await db.rollback()
+    return snapshot
+
+
 def _json(value) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 

@@ -66,3 +66,68 @@ identical:
 
 No UAT, deployment, push, merge to `main`, real active-release promotion, or
 shared/live database mutation was performed.
+
+## Review fix: side-effect-free drain and exact transition policy
+
+The frozen PUT/POST drain no longer calls `runtime_state_service.get_state`.
+It now returns the fixed compatibility values `revision=0` and
+`contentRevision=0`, so a teacher/admin drain cannot trigger legacy Runtime
+promotion, marker writes, or teaching-revision bumps. Its route docstring now
+states the no-read/no-mutation guarantee.
+
+The pre-deletion policy gate is also strict: each of the two present legacy
+policy files must equal the historical canonical object
+`{"runtimePages":[]}` exactly. Missing or extra fields, a non-empty page
+array, a non-object value, or any difference between the two files blocks.
+The existing final state remains both policies absent plus the exact inert
+retirement marker.
+
+TDD RED reproduced both defects. GREEN evidence:
+
+- New drain test monkeypatches both `get_state` and `apply_update` to fail on
+  any call, exercises real authenticated PUT/POST, asserts fixed zero
+  revisions, and proves Runtime, shared Runtime, and teaching-revision row
+  counts plus hashes are unchanged in the disposable test database.
+- New gate negatives cover extra fields, version metadata, non-empty arrays,
+  non-object JSON, and unequal policy pairs.
+- Focused backend regression:
+  `tests/test_web_runtime.py tests/test_runtime_retirement.py
+  tests/test_runtime_state.py` — `58 passed, 1 dependency warning`.
+
+## Final review fix: read-only rollback, claim drains, and device preference ownership
+
+Rollback `GET /api/v1/runtime/state` now uses the dedicated
+`get_rollback_read_state` snapshot path. It never calls legacy promotion,
+bootstrap seeding, or commit; it closes its read transaction with rollback.
+For both `mode=full` and `mode=bootstrap`, an authenticated admin test removes
+the promotion marker, forbids `get_state` and `ensure_domain_seed`, and proves
+the disposable database's Runtime, shared Runtime, and teaching-revision row
+counts plus hashes remain unchanged.
+
+The two remaining Runtime claim routes now use the same default retirement
+drain (`claimed=false`, `revision=0`, `retired=true`) and never call their
+Runtime service. The explicit legacy-sync migration test fixture remains the
+only scope that exercises their historic write semantics. The retirement marker
+validator also checks its exact key set and exact primitive types, rejecting
+boolean or float values even where Python equality would otherwise equate them
+to integers.
+
+The guided-tour completion key is registered in `KGDevicePreferences.EXACT_KEYS`.
+The tour now uses only that facade and has no `KGAppStorage` or direct
+`localStorage` fallback. Source was synchronized into generated public assets.
+The Runtime retirement contract recursively enumerates production HTML and
+JavaScript (excluding test directories), including nested generated pages, for
+both Runtime API paths and the retired bootstrap asset.
+
+TDD RED reproduced rollback promotion/seed calls, claim-service calls, malformed
+boolean/float/extra-field markers, and generic tour storage. Final GREEN:
+
+- Review-specific backend tests: `3 passed, 1 dependency warning`.
+- Focused backend Runtime/retirement/migration regression:
+  `60 passed, 1 dependency warning`.
+- Frontend source/generated/design contracts after sync: `50 passed`.
+
+The real active hashes were re-read after synchronization and remain exactly
+the values in the safety table above. No release manager command, actual active
+release mutation, UAT, deployment, main merge, push, or shared database action
+was performed.

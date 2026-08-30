@@ -98,6 +98,9 @@ RETIREMENT_MARKER = {
     "status": "retired",
     "runtimeRequests": 0,
 }
+# Task 8's pre-deletion transition accepts only the two historic policy files
+# exactly as they existed: no pages and no unrelated release metadata.
+EMPTY_RUNTIME_POLICY = {"runtimePages": []}
 
 _PAYLOAD_KEYS = {
     "payload",
@@ -132,7 +135,7 @@ def _policy_is_empty(path: Path) -> bool:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError, json.JSONDecodeError):
         return False
-    return isinstance(payload, Mapping) and payload.get("runtimePages") == []
+    return payload == EMPTY_RUNTIME_POLICY
 
 
 def _retirement_marker_is_exact(path: Path) -> bool:
@@ -140,7 +143,16 @@ def _retirement_marker_is_exact(path: Path) -> bool:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError, json.JSONDecodeError):
         return False
-    return payload == RETIREMENT_MARKER
+    return (
+        isinstance(payload, Mapping)
+        and set(payload) == set(RETIREMENT_MARKER)
+        and type(payload.get("schemaVersion")) is int
+        and payload.get("schemaVersion") == 1
+        and type(payload.get("status")) is str
+        and payload.get("status") == "retired"
+        and type(payload.get("runtimeRequests")) is int
+        and payload.get("runtimeRequests") == 0
+    )
 
 
 def evaluate_drop_gate(

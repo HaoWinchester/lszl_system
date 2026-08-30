@@ -69,8 +69,9 @@ def test_drop_gate_accepts_only_matching_empty_policies_or_a_retirement_marker()
         root = Path(directory)
         backend_policy = root / "backend-policy.json"
         frontend_policy = root / "frontend-policy.json"
-        backend_policy.write_text('{"runtimePages": []}\n', encoding="utf-8")
-        frontend_policy.write_text('{"runtimePages": []}\n', encoding="utf-8")
+        canonical_policy = {"runtimePages": []}
+        backend_policy.write_text(json.dumps(canonical_policy), encoding="utf-8")
+        frontend_policy.write_text(json.dumps(canonical_policy), encoding="utf-8")
         clean = {
             "unknown": 0,
             "parseErrors": 0,
@@ -84,6 +85,24 @@ def test_drop_gate_accepts_only_matching_empty_policies_or_a_retirement_marker()
             clean,
             policy_paths=(backend_policy, frontend_policy),
         )["ready"] is True
+
+        for invalid_backend, invalid_frontend in (
+            ({}, canonical_policy),
+            ({"schemaVersion": 2, "runtimePages": []}, canonical_policy),
+            ({"runtimePages": [], "extra": True}, canonical_policy),
+            (canonical_policy, {"runtimePages": [], "extra": True}),
+            (canonical_policy, {"runtimePages": ["admin-console.html"]}),
+            (canonical_policy, []),
+        ):
+            backend_policy.write_text(json.dumps(invalid_backend), encoding="utf-8")
+            frontend_policy.write_text(json.dumps(invalid_frontend), encoding="utf-8")
+            assert service.evaluate_drop_gate(
+                clean,
+                policy_paths=(backend_policy, frontend_policy),
+            )["blockers"] == ["runtimePolicies"]
+
+        backend_policy.write_text(json.dumps(canonical_policy), encoding="utf-8")
+        frontend_policy.write_text(json.dumps(canonical_policy), encoding="utf-8")
 
         blocked = service.evaluate_drop_gate(
             {**clean, "unknown": 1, "hashMismatches": 1},
@@ -123,6 +142,20 @@ def test_drop_gate_accepts_only_matching_empty_policies_or_a_retirement_marker()
             retirement_marker_path=marker,
         )
         assert retired["ready"] is True
+
+        for invalid_marker in (
+            {"schemaVersion": True, "status": "retired", "runtimeRequests": 0},
+            {"schemaVersion": 1.0, "status": "retired", "runtimeRequests": 0},
+            {"schemaVersion": 1, "status": "retired", "runtimeRequests": True},
+            {"schemaVersion": 1, "status": "retired", "runtimeRequests": 0.0},
+            {"schemaVersion": 1, "status": "retired", "runtimeRequests": 0, "extra": True},
+        ):
+            marker.write_text(json.dumps(invalid_marker), encoding="utf-8")
+            assert service.evaluate_drop_gate(
+                clean,
+                policy_paths=(backend_policy, frontend_policy),
+                retirement_marker_path=marker,
+            )["blockers"] == ["runtimePolicies"]
 
         marker.write_text('{"schemaVersion":1,"status":"retired"}\n', encoding="utf-8")
         malformed = service.evaluate_drop_gate(

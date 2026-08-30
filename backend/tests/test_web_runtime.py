@@ -5,10 +5,53 @@ import re
 
 from app.main import app
 from app.db.session import AsyncSessionLocal
+from app.models.runtime_state import RuntimeState
+from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.teaching_content import TeachingContentRevision
 from app.services import runtime_state_service
 from app.services import teaching_content_revision_service as revision_service
 from app.web import routes
 from app.web.releases import WebRelease, active_release
+
+
+async def _runtime_database_fingerprint() -> dict[str, object]:
+    """Count and hash every Runtime row without exposing its payload in failures."""
+    from hashlib import sha256
+    from sqlalchemy import select
+
+    async with AsyncSessionLocal() as db:
+        runtime_rows = list(
+            (await db.scalars(select(RuntimeState).order_by(RuntimeState.owner_id))).all()
+        )
+        shared_rows = list(
+            (await db.scalars(select(SharedRuntimeState).order_by(SharedRuntimeState.key))).all()
+        )
+        revision_rows = list(
+            (await db.scalars(select(TeachingContentRevision).order_by(TeachingContentRevision.id))).all()
+        )
+    return {
+        "runtime": (
+            len(runtime_rows),
+            sha256(repr([
+                (row.owner_id, row.schema_version, row.storage, row.revision, row.last_request_id)
+                for row in runtime_rows
+            ]).encode()).hexdigest(),
+        ),
+        "shared": (
+            len(shared_rows),
+            sha256(repr([
+                (row.key, row.value, row.schema_version, row.updated_by)
+                for row in shared_rows
+            ]).encode()).hexdigest(),
+        ),
+        "teachingRevision": (
+            len(revision_rows),
+            sha256(repr([
+                (row.id, row.revision, row.changes, row.updated_by)
+                for row in revision_rows
+            ]).encode()).hexdigest(),
+        ),
+    }
 
 
 def test_root_serves_public_landing_page_without_business_bootstrap(monkeypatch, tmp_path) -> None:
@@ -301,20 +344,18 @@ def test_runtime_state_read_is_gone_by_default_and_only_configuration_can_restor
         assert response.status_code == 200
 
 
-def test_runtime_state_default_drain_never_calls_mutation_service(monkeypatch) -> None:
-    async def mutation_forbidden(*_args, **_kwargs):
-        raise AssertionError("frozen route must not mutate Runtime state")
+def test_runtime_state_default_drain_never_reads_or_mutates_runtime(monkeypatch) -> None:
+    async def runtime_service_forbidden(*_args, **_kwargs):
+        raise AssertionError("frozen drain must not touch Runtime service")
 
-    async def current_revision(*_args, **_kwargs):
-        return {}, 7, 8
-
-    monkeypatch.setattr(runtime_state_service, "apply_update", mutation_forbidden)
-    monkeypatch.setattr(runtime_state_service, "get_state", current_revision)
+    monkeypatch.setattr(runtime_state_service, "apply_update", runtime_service_forbidden)
+    monkeypatch.setattr(runtime_state_service, "get_state", runtime_service_forbidden)
     with TestClient(app) as client:
         assert client.post(
             "/api/v1/auth/login",
             json={"username": "admin", "password": "jbgsnmm~123"},
         ).status_code == 200
+        before = asyncio.run(_runtime_database_fingerprint())
         for method in (client.put, client.post):
             response = method(
                 "/api/v1/runtime/state",
@@ -329,7 +370,89 @@ def test_runtime_state_default_drain_never_calls_mutation_service(monkeypatch) -
                 },
             )
             assert response.status_code == 200
-            assert response.json()["revision"] == 7
+            assert response.json()["revision"] == 0
+            assert response.json()["contentRevision"] == 0
+        after = asyncio.run(_runtime_database_fingerprint())
+
+    assert after == before
+
+
+def test_runtime_rollback_read_is_snapshot_only_without_promotion_or_seed(monkeypatch) -> None:
+    from app.core.config import settings as app_settings
+
+    marker_key = "kg_teacher_shared_runtime_promotion_v1"
+
+    async def remove_marker() -> tuple[str, int, str | None] | None:
+        async with AsyncSessionLocal() as db:
+            row = await db.get(SharedRuntimeState, marker_key)
+            saved = None if row is None else (row.value, row.schema_version, row.updated_by)
+            if row is not None:
+                await db.delete(row)
+                await db.commit()
+            return saved
+
+    async def restore_marker(saved: tuple[str, int, str | None] | None) -> None:
+        if saved is None:
+            return
+        async with AsyncSessionLocal() as db:
+            db.add(SharedRuntimeState(
+                key=marker_key,
+                value=saved[0],
+                schema_version=saved[1],
+                updated_by=saved[2],
+            ))
+            await db.commit()
+
+    async def runtime_service_forbidden(*_args, **_kwargs):
+        raise AssertionError("rollback read must not use mutating Runtime paths")
+
+    saved_marker = asyncio.run(remove_marker())
+    monkeypatch.setattr(app_settings, "RUNTIME_ROLLBACK_READ_ENABLED", True)
+    monkeypatch.setattr(runtime_state_service, "get_state", runtime_service_forbidden)
+    monkeypatch.setattr(runtime_state_service, "ensure_domain_seed", runtime_service_forbidden)
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "jbgsnmm~123"},
+            ).status_code == 200
+            before = asyncio.run(_runtime_database_fingerprint())
+            for path in (
+                "/api/v1/runtime/state?mode=full",
+                "/api/v1/runtime/state?mode=bootstrap&page=admin-settings.html",
+            ):
+                response = client.get(path)
+                assert response.status_code == 200, response.text
+            after = asyncio.run(_runtime_database_fingerprint())
+
+        assert after == before
+    finally:
+        asyncio.run(restore_marker(saved_marker))
+
+
+def test_runtime_claims_default_drain_never_mutate_runtime(monkeypatch) -> None:
+    async def runtime_service_forbidden(*_args, **_kwargs):
+        raise AssertionError("frozen claim must not touch Runtime service")
+
+    monkeypatch.setattr(runtime_state_service, "claim_learning_entry", runtime_service_forbidden)
+    monkeypatch.setattr(runtime_state_service, "claim_guided_tour", runtime_service_forbidden)
+    with TestClient(app) as client:
+        assert client.post(
+            "/api/v1/auth/login",
+            json={"username": "admin", "password": "jbgsnmm~123"},
+        ).status_code == 200
+        before = asyncio.run(_runtime_database_fingerprint())
+        for path in (
+            "/api/v1/runtime/learning-entry-claim",
+            "/api/v1/runtime/guided-tour-claim",
+        ):
+            response = client.post(path)
+            assert response.status_code == 200, response.text
+            assert response.json()["claimed"] is False
+            assert response.json()["revision"] == 0
+        after = asyncio.run(_runtime_database_fingerprint())
+
+    assert after == before
 
 
 def test_learner_html_bootstrap_never_inlines_runtime_storage() -> None:
