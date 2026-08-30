@@ -125,7 +125,7 @@ with sync_playwright() as playwright:
     page.evaluate(
         """()=>{
           const question=(index)=>({id:'q'+index,title:'题目 '+index,type:'single_choice',stemParts:[{text:'这是第 '+index+' 道题'}],options:[{id:'A',text:'正确选项',correct:true},{id:'B',text:'错误选项'}],correctAnswer:'A',analysis:'第 '+index+' 题解析'});
-          const allRefs=Array.from({length:30},(_,offset)=>({questionId:'q'+(offset+1),bankId:'bank-1',mistakeId:'mistake-'+(offset+1),orderIndex:offset,domain:offset<12?'people':offset<27?'process':'business-environment',question:question(offset+1)}));
+          const allRefs=Array.from({length:30},(_,offset)=>({questionId:'q'+(offset+1),bankId:'bank-1',mistakeId:'mistake-'+(offset+1),previousWrongAnswer:'B',orderIndex:offset,domain:offset<12?'people':offset<27?'process':'business-environment',question:question(offset+1)}));
           const fullRefs=allRefs.slice(0,10);
           const sessionRefs=(count=10)=>allRefs.slice(0,count).map(ref=>({...ref,question:JSON.parse(JSON.stringify(ref.question))}));
           let session=null;
@@ -255,6 +255,8 @@ with sync_playwright() as playwright:
     page.locator('[data-practice-start="challenge"]').click()
     page.wait_for_timeout(200)
     assert page.locator("#practiceGame").is_visible(), page.evaluate("document.body.dataset.practiceView")
+    assert page.locator("#practicePreviousWrongToggle").is_hidden()
+    assert page.locator("#practicePreviousWrongAnswer").is_hidden()
 
     # 隐藏的兼容 DOM 也必须遵守模式策略，不能绕过入口提前交卷。
     before_complete = names(page).count('complete')
@@ -462,6 +464,19 @@ with sync_playwright() as playwright:
       window.KGPracticeMode.showLobby();
     }""")
     page.wait_for_timeout(100)
+    # 大屏布局：挑战/学霸位于左栏，复仇位于独立右栏；两栏设置区顶部对齐。
+    lobby_geometry = page.evaluate("""()=>{
+      const rect=selector=>{const value=document.querySelector(selector).getBoundingClientRect();return {x:value.x,y:value.y,width:value.width,height:value.height,right:value.right}};
+      return {
+        setup:rect('.practice-setup-card'),order:rect('.practice-order-card'),
+        challenge:rect('.practice-mode-card.challenge'),scholar:rect('.practice-mode-card.scholar'),
+        revenge:rect('.practice-mode-card.revenge')
+      };
+    }""")
+    assert abs(lobby_geometry["setup"]["y"] - lobby_geometry["order"]["y"]) < 2, lobby_geometry
+    assert lobby_geometry["challenge"]["x"] < lobby_geometry["scholar"]["x"], lobby_geometry
+    assert lobby_geometry["scholar"]["right"] < lobby_geometry["revenge"]["x"], lobby_geometry
+    assert abs(lobby_geometry["challenge"]["y"] - lobby_geometry["revenge"]["y"]) < 2, lobby_geometry
     # 普通练习选择 60 题，复仇只有 1 题时仍自动发送 count=1。
     page.locator('label:has([name="practiceCount"][value="60"])').click()
     assert page.locator('#practiceRevengeActiveCount').inner_text() == '1'
@@ -556,6 +571,21 @@ with sync_playwright() as playwright:
         {"name": "start", "body": {"mode": "revenge", "count": 10, "order": "paper"}}
     ], revenge_writes_before
 
+    # 默认展示上次真正错选；本轮可关闭和再次开启。
+    previous_wrong_toggle = page.locator("#practicePreviousWrongToggle")
+    previous_wrong_input = page.locator("#practiceShowPreviousWrong")
+    previous_wrong_answer = page.locator("#practicePreviousWrongAnswer")
+    assert previous_wrong_toggle.is_visible()
+    assert previous_wrong_input.is_checked()
+    assert previous_wrong_answer.is_visible()
+    assert "上次选错：B. 错误选项" in previous_wrong_answer.inner_text()
+    previous_wrong_toggle.click()
+    assert not previous_wrong_input.is_checked()
+    assert previous_wrong_answer.is_hidden()
+    previous_wrong_toggle.click()
+    assert previous_wrong_input.is_checked()
+    assert previous_wrong_answer.is_visible()
+
     # ---------- 复仇作答交互：答对停留看解析，手动下一题后再验证答错补救 ----------
     # mock 复仇题目正确答案 A；答对后超过旧 520ms 延迟仍停留当前题。
     page.evaluate("window.__writes=[]")
@@ -581,6 +611,8 @@ with sync_playwright() as playwright:
     page.wait_for_timeout(180)
     revenge = page.evaluate("window.KGPracticeMode.snapshot()")
     assert revenge["index"] == 0
+    assert previous_wrong_input.is_checked()
+    assert previous_wrong_answer.is_visible()
 
     # 第一题故意答错（选 B）触发既有补救分支。
     page.evaluate("window.__writes=[]")

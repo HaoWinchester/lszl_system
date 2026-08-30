@@ -42,6 +42,18 @@ PRACTICE_ANSWER_ONLY_FIELDS = {
 }
 
 
+def _latest_actual_wrong_answers(selected_answer: str, snapshot: dict) -> list[str]:
+    """Keep one real option choice and discard timeout sentinels."""
+
+    answer = str(selected_answer or "").strip()
+    option_ids = {
+        str(option.get("id") or "").strip()
+        for option in (snapshot or {}).get("options") or []
+        if isinstance(option, dict) and str(option.get("id") or "").strip()
+    }
+    return [answer] if answer in option_ids else []
+
+
 def _iso(value) -> str | None:
     return value.isoformat() if value else None
 
@@ -450,7 +462,9 @@ async def record_practice_mistake(
             language_mode=language_mode,
             question_snapshot=_question_snapshot(question),
             knowledge=_practice_knowledge(question),
-            selected_answers=[selected_answer] if selected_answer else [],
+            selected_answers=_latest_actual_wrong_answers(
+                selected_answer, _question_snapshot(question)
+            ),
             status="pending",
             wrong_count=1,
             first_wrong_at=now,
@@ -460,7 +474,11 @@ async def record_practice_mistake(
     else:
         existing.question_snapshot = _question_snapshot(question)
         existing.knowledge = _practice_knowledge(question)
-        existing.selected_answers = [*(existing.selected_answers or []), *([selected_answer] if selected_answer else [])][-20:]
+        latest_actual_answers = _latest_actual_wrong_answers(
+            selected_answer, existing.question_snapshot
+        )
+        if latest_actual_answers:
+            existing.selected_answers = latest_actual_answers
         # A fresh wrong answer always reactivates a previously mastered or
         # waiting item.  Remediation is the one exception: answering the
         # original option again cannot bypass the required repair activity.
@@ -675,14 +693,18 @@ async def record_practice_answer(
                 source_mode=str(data.get("sourceMode") or "challenge").strip()[:32] or "challenge",
                 language_mode=str(data.get("languageMode") or "zh").strip().lower(),
                 question_snapshot=_question_snapshot(question), knowledge=_practice_knowledge(question),
-                selected_answers=[selected_answer], status="pending", wrong_count=1,
+                selected_answers=_latest_actual_wrong_answers(
+                    selected_answer, _question_snapshot(question)
+                ), status="pending", wrong_count=1,
                 first_wrong_at=now, last_wrong_at=now,
             )
             db.add(mistake)
         else:
             mistake.question_snapshot = _question_snapshot(question)
             mistake.knowledge = _practice_knowledge(question)
-            mistake.selected_answers = [*(mistake.selected_answers or []), selected_answer][-20:]
+            mistake.selected_answers = _latest_actual_wrong_answers(
+                selected_answer, mistake.question_snapshot
+            )
             if mistake.status != "needs_remediation":
                 mistake.status = "pending"
             mistake.wrong_count += 1
@@ -808,7 +830,9 @@ async def record_mistake_from_release(
             language_mode=language_mode.lower(),
             question_snapshot=practice_snapshot,
             knowledge=knowledge,
-            selected_answers=[selected_answer],
+            selected_answers=_latest_actual_wrong_answers(
+                selected_answer, practice_snapshot
+            ),
             status="pending",
             wrong_count=1,
             first_wrong_at=now,
@@ -818,7 +842,9 @@ async def record_mistake_from_release(
     else:
         mistake.question_snapshot = practice_snapshot
         mistake.knowledge = knowledge
-        mistake.selected_answers = [*(mistake.selected_answers or []), selected_answer][-20:]
+        mistake.selected_answers = _latest_actual_wrong_answers(
+            selected_answer, practice_snapshot
+        )
         if mistake.status != "needs_remediation":
             mistake.status = "pending"
         mistake.wrong_count += 1
@@ -894,6 +920,30 @@ def _revenge_snapshot_usable(snapshot: dict) -> bool:
     correct_answer = canonical_practice_snapshot_answer(snapshot)
     stem = str(snapshot.get("stem") or snapshot.get("title") or "").strip()
     return bool(stem and len(option_ids) >= 2 and correct_answer in option_ids)
+
+
+def _latest_previous_wrong_answer(
+    rows: list[PracticeMistake], snapshot: dict
+) -> str:
+    """Resolve the newest valid wrong choice across deduplicated mistake rows."""
+
+    option_ids = {
+        str(option.get("id") or "").strip()
+        for option in (snapshot or {}).get("options") or []
+        if isinstance(option, dict) and str(option.get("id") or "").strip()
+    }
+    correct_answer = canonical_practice_snapshot_answer(snapshot)
+
+    def wrong_at(row: PracticeMistake) -> float:
+        value = row.last_wrong_at or row.updated_at or row.created_at
+        return value.timestamp() if value else 0.0
+
+    for row in sorted(rows, key=wrong_at, reverse=True):
+        for answer in reversed(row.selected_answers or []):
+            normalized = str(answer or "").strip()
+            if normalized in option_ids and normalized != correct_answer:
+                return normalized
+    return ""
 
 
 def _revenge_status_rank(row: PracticeMistake, now) -> int:
@@ -992,6 +1042,9 @@ def build_global_revenge_pool(
         candidate["questionSnapshot"] = snapshot
         candidate["mistakeId"] = representative.id
         candidate["mistakeIds"] = [row.id for row in group_rows]
+        candidate["previousWrongAnswer"] = _latest_previous_wrong_answer(
+            group_rows, snapshot
+        )
         candidates.append(candidate)
     return {
         "candidates": candidates,
@@ -1144,8 +1197,9 @@ async def record_revenge_answer(
         mistake.status = "needs_remediation"
         mistake.next_review_at = None
         mistake.mastered_at = None
-        if selected_answer:
-            mistake.selected_answers = [*(mistake.selected_answers or []), selected_answer][-20:]
+        mistake.selected_answers = _latest_actual_wrong_answers(
+            selected_answer, snapshot
+        )
     await _append_practice_event(
         db,
         owner,

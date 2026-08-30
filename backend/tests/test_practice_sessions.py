@@ -1355,6 +1355,8 @@ def test_revenge_mode_is_a_resumable_server_session() -> None:
             assert revenge["stats"]["total"] == 1
             assert revenge["questionOrder"][0]["questionId"] == question_id
             assert revenge["questionOrder"][0]["mistakeId"]
+            assert revenge["questionOrder"][0]["previousWrongAnswer"] == "B"
+            assert revenge["questions"][0]["previousWrongAnswer"] == "B"
             assert revenge["questions"][0]["question"]["correctAnswer"] == "A"
 
             revenge_answer = client.post(

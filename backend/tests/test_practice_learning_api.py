@@ -192,6 +192,37 @@ def test_global_revenge_pool_deduplicates_questions_and_uses_urgent_representati
     assert duplicate["releaseId"] == "release-new"
 
 
+def test_global_revenge_pool_exposes_the_latest_actual_wrong_option_across_duplicates() -> None:
+    now = now_utc()
+    urgent = _mistake_row(
+        mistake_id="pm_urgent_old_wrong",
+        owner="owner-a",
+        question_id="q-duplicate-wrong-answer",
+        status="needs_remediation",
+        updated_at=now - timedelta(days=2),
+    )
+    latest = _mistake_row(
+        mistake_id="pm_latest_wrong",
+        owner="owner-a",
+        question_id="q-duplicate-wrong-answer",
+        status="pending",
+        updated_at=now - timedelta(days=1),
+    )
+    for row in (urgent, latest):
+        row.question_snapshot["options"].append(
+            {"id": "C", "text": "最近错选", "correct": False}
+        )
+    urgent.selected_answers = ["B"]
+    urgent.last_wrong_at = now - timedelta(days=2)
+    latest.selected_answers = ["B", "C"]
+    latest.last_wrong_at = now - timedelta(days=1)
+
+    pool = learning_service.build_global_revenge_pool([urgent, latest], now=now)
+
+    assert pool["candidates"][0]["mistakeId"] == urgent.id
+    assert pool["candidates"][0]["previousWrongAnswer"] == "C"
+
+
 def test_global_revenge_pool_skips_an_unusable_urgent_copy_when_a_usable_copy_exists() -> None:
     now = now_utc()
     pool = learning_service.build_global_revenge_pool(
@@ -342,6 +373,19 @@ def test_practice_mistake_remediation_and_verification_are_database_backed() -> 
     )
     assert direct_wrong_cannot_reset_remediation.status_code == 200
     assert direct_wrong_cannot_reset_remediation.json()["mistake"]["status"] == "needs_remediation"
+    assert direct_wrong_cannot_reset_remediation.json()["mistake"]["selectedAnswers"] == ["B"]
+
+    timeout_keeps_latest_actual_choice = client.post(
+        "/api/v1/learning/practice/mistakes",
+        json={
+            "questionId": source["question"]["id"],
+            "bankId": source["bankId"],
+            "releaseId": "",
+            "selectedAnswer": "timeout",
+        },
+    )
+    assert timeout_keeps_latest_actual_choice.status_code == 200
+    assert timeout_keeps_latest_actual_choice.json()["mistake"]["selectedAnswers"] == ["B"]
 
     ordinary_wrong_cannot_reset_remediation = client.post(
         "/api/v1/learning/practice/answers",

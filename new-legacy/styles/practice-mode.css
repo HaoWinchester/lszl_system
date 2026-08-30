@@ -174,7 +174,15 @@ body.practice-mode-page.is-practice-drawer-open{overflow:hidden}
 @media(prefers-reduced-motion:reduce){.practice-drawer-backdrop,.practice-drawer{animation:none}}
 
 /* P4.5 database-backed revenge/remediation workflow */
-.practice-mode-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.practice-main{width:min(1280px,calc(100% - 32px))}
+.practice-mode-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(340px,1fr);gap:18px;align-items:stretch}
+.practice-standard-column,.practice-revenge-column{min-width:0;display:grid;grid-template-rows:auto 1fr;gap:14px}
+.practice-setup-card,.practice-order-card{min-height:102px}
+.practice-setup-card{grid-template-columns:minmax(260px,1.35fr) minmax(360px,1fr);margin:0}
+.practice-order-card{padding:16px 18px;border:1px solid var(--practice-border);border-radius:18px;background:var(--practice-card);box-shadow:0 8px 24px rgba(31,41,55,.045);display:grid;align-items:center}
+.practice-standard-modes{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:0}
+.practice-standard-modes .practice-mode-card,.practice-revenge-column>.practice-mode-card{height:100%;min-height:300px}
+.practice-revenge-column>.practice-mode-card{margin:0}
 .practice-mode-card.revenge .practice-mode-icon{background:#fff0f1;color:#be123c}
 .practice-mode-card.revenge .practice-start-btn{background:#9f1239}
 .practice-mode-card.revenge .practice-start-btn:hover:not(:disabled){background:#881337}
@@ -185,12 +193,12 @@ body.practice-mode-page.is-practice-drawer-open{overflow:hidden}
 .practice-revenge-rule-tooltip{position:absolute;z-index:12;top:calc(100% + 8px);left:0;width:min(390px,calc(100vw - 44px));padding:14px 15px;border:1px solid #ecc7cf;border-radius:13px;background:#fff;color:#5e2935;box-shadow:0 18px 44px rgba(89,18,36,.18);font-size:12px;line-height:1.6}
 .practice-revenge-rule-tooltip strong{display:block;margin-bottom:5px;color:#881337;font-size:13px}
 .practice-revenge-rule-tooltip ul{margin:0;padding-left:18px}.practice-revenge-rule-tooltip li+li{margin-top:3px}
-.practice-revenge-total{grid-column:1/-1;padding:10px 12px;border-radius:12px;background:#fff3f5;color:#7f1d37;font-size:13px;font-weight:760}
-.practice-revenge-total strong{font-size:20px;color:#9f1239}
+.practice-revenge-total{grid-column:1/-1;padding:10px 12px;border-radius:12px;background:#fff3f5;color:#7f1d37;font-size:13px;font-weight:700}
+.practice-revenge-total strong{font-size:20px;font-weight:700;color:#9f1239}
 .practice-revenge-stats{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
-.practice-revenge-stats span{min-width:0;padding:7px 6px;border:1px solid #f1d7dc;border-radius:10px;background:#fff8f8;color:#8b5560;text-align:center;font-size:10px;font-weight:760;white-space:nowrap}
-.practice-revenge-stats strong{margin-left:2px;color:#9f1239;font-size:12px}
-.practice-revenge-count-shell{grid-column:1/-1;display:grid;gap:7px;color:#8b5560;font-size:11px;font-weight:720}
+.practice-revenge-stats span{min-width:0;padding:7px 6px;border:1px solid #f1d7dc;border-radius:10px;background:#fff8f8;color:#8b5560;text-align:center;font-size:12px;font-weight:700;white-space:nowrap}
+.practice-revenge-stats strong{margin-left:2px;color:#9f1239;font-size:12px;font-weight:700}
+.practice-revenge-count-shell{grid-column:1/-1;display:grid;gap:7px;color:#8b5560;font-size:12px;font-weight:700}
 .practice-revenge-count-shell fieldset{margin:0;padding:0;border:0}.practice-revenge-count-shell legend{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 #practiceRevengeCountOptionList{display:flex;flex-wrap:wrap;gap:7px}
 #practiceRevengeCountOptionList label{position:relative;display:inline-flex;align-items:center;cursor:pointer}
@@ -213,8 +221,9 @@ body[data-practice-mode="revenge"] .practice-progress-shell span{background:line
 .practice-verification-banner>span{flex:0 0 auto;padding:4px 7px;border-radius:999px;background:#dff4ee;color:#08745f;font-size:8px;font-weight:950;letter-spacing:.12em}
 .practice-verification-banner>div{min-width:0}.practice-verification-banner strong,.practice-verification-banner small{display:block}.practice-verification-banner strong{font-size:11px}.practice-verification-banner small{margin-top:2px;color:#5e756f;font-size:9px;line-height:1.45}
 body[data-practice-phase="verification"] .practice-question-card{border-color:#a8d9cd;box-shadow:0 12px 34px rgba(8,116,95,.08)}
-@media(max-width:1020px) and (min-width:801px){.practice-mode-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.practice-mode-card.revenge{grid-column:1/-1}}
-@media(max-width:800px){.practice-mode-grid{grid-template-columns:1fr}.practice-mode-card.revenge{grid-column:auto}.practice-remediation-panel{padding:17px 16px}.practice-remediation-actions{align-items:stretch;flex-direction:column}.practice-remediation-actions button{width:100%}}
+@media(max-width:1080px){.practice-mode-layout{grid-template-columns:1fr}.practice-revenge-column{grid-template-columns:minmax(0,1fr) minmax(0,2fr);grid-template-rows:1fr}.practice-standard-modes .practice-mode-card,.practice-revenge-column>.practice-mode-card{min-height:240px}}
+@media(max-width:1020px) and (min-width:801px){.practice-mode-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.practice-mode-card.revenge{grid-column:auto}}
+@media(max-width:800px){.practice-mode-layout,.practice-standard-column,.practice-revenge-column{grid-template-columns:1fr;grid-template-rows:auto}.practice-setup-card{grid-template-columns:1fr}.practice-mode-grid{grid-template-columns:1fr}.practice-mode-card.revenge{grid-column:auto}.practice-standard-modes .practice-mode-card,.practice-revenge-column>.practice-mode-card{min-height:0}.practice-remediation-panel{padding:17px 16px}.practice-remediation-actions{align-items:stretch;flex-direction:column}.practice-remediation-actions button{width:100%}}
 @media(max-width:480px){.practice-revenge-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.practice-revenge-rule-tooltip{position:fixed;top:78px;left:14px;right:14px;width:auto;max-height:calc(100vh - 100px);overflow:auto}}
 
 
@@ -379,6 +388,8 @@ body.practice-mode-page:not([data-practice-view="lobby"]) .practice-exp-fab{disp
 .practice-explanation-toggle{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--practice-muted);cursor:pointer;white-space:nowrap}
 .practice-explanation-toggle[hidden]{display:none!important}
 .practice-explanation-toggle input{accent-color:var(--practice-accent,#6d28d9)}
+.practice-previous-wrong-answer{margin:-12px 0 18px;padding:10px 13px;border:1px solid #f0cbd2;border-radius:11px;background:#fff6f7;color:#8f2340;font-size:12px;font-weight:760;line-height:1.55}
+.practice-previous-wrong-toggle input{accent-color:#9f1239}
 .practice-history-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .practice-history-actions button{border:1px solid var(--practice-border);border-radius:9px;background:#fff;color:var(--practice-accent,#6d28d9);padding:7px 10px;cursor:pointer;font-size:12px}
 @media(max-width:480px){.practice-question-nav{gap:8px;flex-wrap:wrap}.practice-explanation-toggle{order:2;width:100%;justify-content:center}}

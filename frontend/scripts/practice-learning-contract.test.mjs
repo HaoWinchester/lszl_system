@@ -13,6 +13,20 @@ test('P4.5 practice workflow renders revenge, remediation and verification contr
   assert.match(page, /id="practiceVerificationBanner"/)
 })
 
+test('desktop lobby separates standard modes from the revenge lane', () => {
+  const page = source('new-legacy/practice-mode.html')
+  const styles = source('new-legacy/styles/practice-mode.css')
+
+  for (const className of [
+    'practice-mode-layout',
+    'practice-standard-column',
+    'practice-revenge-column',
+    'practice-order-card',
+  ]) assert.match(page, new RegExp(`class="[^"]*${className}`), className)
+  assert.match(styles, /\.practice-mode-layout\{[^}]*grid-template-columns:/)
+  assert.match(styles, /\.practice-standard-modes\{[^}]*grid-template-columns:repeat\(2/)
+})
+
 test('revenge card exposes the real pool, independent batch controls and accessible rules', () => {
   const page = source('new-legacy/practice-mode.html')
   const practice = source('new-legacy/src/100-practice-mode.js')

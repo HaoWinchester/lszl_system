@@ -485,6 +485,9 @@ async def start_session(
                     "score": _score_for_snapshot(snapshot),
                     "mistakeId": str(candidate.get("mistakeId") or ""),
                     "mistakeIds": list(candidate.get("mistakeIds") or []),
+                    "previousWrongAnswer": str(
+                        candidate.get("previousWrongAnswer") or ""
+                    ),
                     "sourcePaperId": str(candidate.get("paperId") or ""),
                     "sourcePaperName": str(candidate.get("paperName") or ""),
                     "sourceReleaseId": str(candidate.get("releaseId") or ""),
