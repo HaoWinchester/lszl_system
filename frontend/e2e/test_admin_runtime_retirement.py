@@ -118,6 +118,29 @@ class MainHarness:
 
 
 class AdminRuntimeRetirementTest(unittest.TestCase):
+    def test_native_management_write_matrix_is_present(self) -> None:
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        contracts = {
+            "question-bank.html": ("#bankName", "#qbSaveBankBtn", "/api/v1/banks/"),
+            "paper-management.html": ("#paperNameInput", "#qbSavePaperBtn", "/api/v1/papers/"),
+            "feedback-management.html": ("#feedbackDetailStatus", "#feedbackSaveStatusBtn", "/api/v1/engagement/admin/feedback/"),
+            "message-management.html": ("#messageTitle", "#messageEditorForm", "/api/v1/engagement/admin/messages/"),
+            "system-settings.html": ('data-theme-field=\\"primary\\"', '[data-save-theme="admin"]', "/api/v1/system/themes/admin"),
+        }
+
+        for page_name, markers in contracts.items():
+            with self.subTest(page_name=page_name):
+                for marker in markers:
+                    self.assertIn(marker, source)
+                self.assertIn(page_name + " edited reload", source)
+
+    def test_external_mode_skips_non_fixture_management_writes(self) -> None:
+        forbidden = ForbiddenSubjectPage()
+        MODULE.verify_question_bank_dom_persistence(forbidden, object(), "https://example.invalid", {})
+        MODULE.verify_paper_dom_persistence(forbidden, object(), "https://example.invalid", {})
+        MODULE.verify_feedback_dom_persistence(forbidden, object(), "https://example.invalid", {})
+        MODULE.verify_system_settings_dom_persistence(forbidden, object(), "https://example.invalid", {})
+
     def test_storage_audit_rejects_each_retired_direct_bootstrap_field(self) -> None:
         valid = {
             "keys": [],

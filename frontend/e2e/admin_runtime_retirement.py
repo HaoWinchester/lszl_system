@@ -2,8 +2,8 @@
 
 Use ``--isolated`` to build a candidate under a temporary ``--root`` with a
 unique PostgreSQL database.  Only this disposable mode edits an existing
-subject through the DOM.  ``--base-url`` instead tests a deployed target with
-explicit, dedicated E2E credentials; it creates only randomly named,
+subject or system setting through the DOM.  ``--base-url`` instead tests a
+deployed target with explicit, dedicated E2E credentials; it creates only randomly named,
 hard-deletable fixtures and cleans partial fixtures in ``finally`` without
 mutating existing subjects, papers, banks, or system settings.
 """
@@ -410,6 +410,7 @@ def create_domain_fixtures(
         ),
         "create message",
     )
+    fixture["systemSettingsWritable"] = disposable_environment
     return fixture
 
 
@@ -434,6 +435,165 @@ def wait_for_draft_name(
         f"draft {draft_id} did not persist DOM name {expected_name!r}; "
         f"last={last!r}; exchanges={diagnostics or []!r}"
     )
+
+
+def paged_items(payload: dict) -> list[dict]:
+    items = payload.get("items", [])
+    return items if isinstance(items, list) else []
+
+
+def verify_question_bank_dom_persistence(page: Page, context: BrowserContext, base: str, fixture: dict) -> None:
+    bank = fixture.get("bank")
+    if not bank:
+        return
+    bank_id = bank["id"]
+    row = page.locator(f'[data-bank-id="{bank_id}"]')
+    row.wait_for(state="visible", timeout=20_000)
+    row.click()
+    page.wait_for_function(
+        "name => document.getElementById('bankName')?.value === name",
+        arg=bank["name"],
+    )
+    next_name = bank["name"] + " DOM"
+    page.locator("#bankName").fill(next_name)
+    with page.expect_response(
+        lambda response: response.url.endswith(f"/api/v1/banks/{bank_id}")
+        and response.request.method == "PUT"
+    ) as saved:
+        page.locator("#qbSaveBankBtn").click()
+    assert saved.value.ok, saved.value.text()
+    banks = ok(context.request.get(base + "/api/v1/banks"), "verify DOM bank update")["banks"]
+    persisted = next(item for item in banks if item["id"] == bank_id)
+    assert persisted["name"] == next_name, persisted
+    fixture["bank"] = persisted
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function(
+        "args => [...document.querySelectorAll('[data-bank-id]')].some(row => row.dataset.bankId === args.id && row.innerText.includes(args.name))",
+        arg={"id": bank_id, "name": next_name},
+        timeout=20_000,
+    )
+    storage_audit(page, "question-bank.html edited reload")
+
+
+def verify_paper_dom_persistence(page: Page, context: BrowserContext, base: str, fixture: dict) -> None:
+    paper = fixture.get("paper")
+    if not paper:
+        return
+    paper_id = paper["id"]
+    row = page.locator(f'[data-paper-id="{paper_id}"]')
+    row.wait_for(state="visible", timeout=20_000)
+    row.click()
+    page.wait_for_function(
+        "name => document.getElementById('paperNameInput')?.value === name",
+        arg=paper["name"],
+        timeout=20_000,
+    )
+    next_name = paper["name"] + " DOM"
+    page.locator("#paperNameInput").fill(next_name)
+    with page.expect_response(
+        lambda response: response.url.endswith(f"/api/v1/papers/{paper_id}")
+        and response.request.method == "PUT"
+    ) as saved:
+        page.locator("#qbSavePaperBtn").click()
+    assert saved.value.ok, saved.value.text()
+    persisted = ok(context.request.get(base + f"/api/v1/papers/{paper_id}"), "verify DOM paper update")["paper"]
+    assert persisted["name"] == next_name, persisted
+    fixture["paper"] = persisted
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function(
+        "args => [...document.querySelectorAll('[data-paper-id]')].some(row => row.dataset.paperId === args.id && row.innerText.includes(args.name))",
+        arg={"id": paper_id, "name": next_name},
+        timeout=20_000,
+    )
+    storage_audit(page, "paper-management.html edited reload")
+
+
+def verify_feedback_dom_persistence(page: Page, context: BrowserContext, base: str, fixture: dict) -> None:
+    feedback = fixture.get("feedback")
+    if not feedback:
+        return
+    feedback_id = feedback["id"]
+    row = page.locator(f'[data-feedback-id="{feedback_id}"]')
+    row.wait_for(state="visible", timeout=20_000)
+    row.click()
+    page.locator("#feedbackDetailStatus").select_option("resolved")
+    with page.expect_response(
+        lambda response: response.url.endswith(f"/api/v1/engagement/admin/feedback/{feedback_id}")
+        and response.request.method == "PATCH"
+    ) as saved:
+        page.locator("#feedbackSaveStatusBtn").click()
+    assert saved.value.ok, saved.value.text()
+    payload = ok(context.request.get(base + "/api/v1/engagement/admin/feedback"), "verify DOM feedback update")
+    persisted = next(item for item in paged_items(payload) if item["id"] == feedback_id)
+    assert persisted["status"] == "resolved", persisted
+    fixture["feedback"] = persisted
+    page.reload(wait_until="domcontentloaded")
+    row = page.locator(f'[data-feedback-id="{feedback_id}"]')
+    row.wait_for(state="visible", timeout=20_000)
+    row.click()
+    page.wait_for_function(
+        "() => document.getElementById('feedbackDetailStatus')?.value === 'resolved'",
+        timeout=20_000,
+    )
+    storage_audit(page, "feedback-management.html edited reload")
+
+
+def verify_message_dom_persistence(page: Page, context: BrowserContext, base: str, fixture: dict) -> None:
+    message = fixture.get("message")
+    if not message:
+        return
+    message_id = message["id"]
+    row = page.locator(f'[data-message-id="{message_id}"]')
+    row.wait_for(state="visible", timeout=20_000)
+    row.click()
+    next_title = message["title"] + " DOM"
+    page.locator("#messageTitle").fill(next_title)
+    with page.expect_response(
+        lambda response: response.url.endswith(f"/api/v1/engagement/admin/messages/{message_id}")
+        and response.request.method == "PATCH"
+    ) as saved:
+        page.locator('#messageEditorForm button[type="submit"]').click()
+    assert saved.value.ok, saved.value.text()
+    payload = ok(context.request.get(base + "/api/v1/engagement/admin/messages"), "verify DOM message update")
+    persisted = next(item for item in paged_items(payload) if item["id"] == message_id)
+    assert persisted["title"] == next_title, persisted
+    fixture["message"] = persisted
+    page.reload(wait_until="domcontentloaded")
+    row = page.locator(f'[data-message-id="{message_id}"]')
+    row.wait_for(state="visible", timeout=20_000)
+    row.click()
+    page.wait_for_function(
+        "title => document.getElementById('messageTitle')?.value === title",
+        arg=next_title,
+        timeout=20_000,
+    )
+    storage_audit(page, "message-management.html edited reload")
+
+
+def verify_system_settings_dom_persistence(page: Page, context: BrowserContext, base: str, fixture: dict) -> None:
+    if not fixture.get("systemSettingsWritable"):
+        return
+    card = page.locator('[data-theme-role="admin"]')
+    card.wait_for(state="visible", timeout=20_000)
+    primary = card.locator('[data-theme-field="primary"]')
+    original = primary.input_value().lower()
+    next_primary = "#123456" if original != "#123456" else "#234567"
+    primary.fill(next_primary)
+    with page.expect_response(
+        lambda response: response.url.endswith("/api/v1/system/themes/admin")
+        and response.request.method == "PUT"
+    ) as saved:
+        card.locator('[data-save-theme="admin"]').click()
+    assert saved.value.ok, saved.value.text()
+    themes = ok(context.request.get(base + "/api/v1/system/themes"), "verify DOM theme update")["themes"]
+    assert themes["admin"]["primary_color"].lower() == next_primary, themes["admin"]
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function(
+        "value => document.querySelector('[data-theme-role=\"admin\"] [data-theme-field=\"primary\"]')?.value.toLowerCase() === value",
+        arg=next_primary,
+        timeout=20_000,
+    )
+    storage_audit(page, "system-settings.html edited reload")
 
 
 def select_course_fixture(page: Page, draft: dict) -> None:
@@ -563,6 +723,12 @@ def verify_admin_pages(
                 arg=fixture["courseName"],
             )
             storage_audit(page, page_name + " reload")
+        if page_name == "feedback-management.html":
+            verify_feedback_dom_persistence(page, context, base, fixture)
+        if page_name == "message-management.html":
+            verify_message_dom_persistence(page, context, base, fixture)
+        if page_name == "system-settings.html":
+            verify_system_settings_dom_persistence(page, context, base, fixture)
         page.close()
 
 
@@ -588,10 +754,18 @@ def verify_teacher_and_student(browser, base: str, teacher_name: str, teacher_pa
         allow_absent_direct_bootstrap=response.status == 403,
     )
     operations.close()
-    for page_name in ("admin-subjects.html", "content-center.html", "course-admin.html", "question-bank.html", "paper-management.html"):
+    for page_name in ("admin-subjects.html", "content-center.html", "course-admin.html"):
         page = open_page(teacher, base, page_name)
         assert "无权访问" not in page.locator("body").inner_text(), page_name
         page.close()
+    question_bank = open_page(teacher, base, "question-bank.html?mode=advanced")
+    assert "无权访问" not in question_bank.locator("body").inner_text()
+    verify_question_bank_dom_persistence(question_bank, teacher, base, fixture)
+    question_bank.close()
+    paper_management = open_page(teacher, base, "paper-management.html")
+    assert "无权访问" not in paper_management.locator("body").inner_text()
+    verify_paper_dom_persistence(paper_management, teacher, base, fixture)
+    paper_management.close()
     workbench = open_page(teacher, base, "teacher-workbench.html")
     workbench.locator('a[href="course-admin.html"]').first.click()
     workbench.wait_for_url("**/course-admin.html")
