@@ -67,6 +67,130 @@ def _create_public_question(*, title: str, taxonomy_id: str, node_id: str) -> di
     return {"bankId": bank_id, "question": published.json()["question"]}
 
 
+def _mistake_row(
+    *,
+    mistake_id: str,
+    owner: str,
+    question_id: str,
+    status: str,
+    wrong_count: int = 1,
+    revenge_wrong_count: int = 0,
+    release_id: str | None = None,
+    next_review_at=None,
+    updated_at=None,
+    usable_snapshot: bool = True,
+) -> PracticeMistake:
+    snapshot = {
+        "id": question_id,
+        "title": f"题目 {question_id}",
+        "stem": f"题干 {question_id}",
+        "options": [
+            {"id": "A", "text": "正确项", "correct": True},
+            {"id": "B", "text": "错误项", "correct": False},
+        ],
+        "correctAnswer": "A",
+    }
+    if not usable_snapshot:
+        snapshot = {"id": question_id, "title": "损坏快照", "options": []}
+    now = now_utc()
+    return PracticeMistake(
+        id=mistake_id,
+        owner_id=owner,
+        question_id=question_id,
+        bank_id=None,
+        paper_id=None,
+        release_id=release_id,
+        paper_version=0,
+        paper_name="测试错题来源",
+        source_mode="challenge",
+        language_mode="zh",
+        question_snapshot=snapshot,
+        knowledge={},
+        selected_answers=["B"],
+        status=status,
+        wrong_count=wrong_count,
+        revenge_wrong_count=revenge_wrong_count,
+        next_review_at=next_review_at,
+        first_wrong_at=now,
+        last_wrong_at=now,
+        updated_at=updated_at or now,
+    )
+
+
+def test_global_revenge_pool_deduplicates_questions_and_uses_urgent_representative() -> None:
+    now = now_utc()
+    rows = [
+        _mistake_row(
+            mistake_id="pm_pending_old_release",
+            owner="owner-a",
+            question_id="q-duplicate",
+            status="pending",
+            wrong_count=5,
+            release_id="release-old",
+            updated_at=now - timedelta(days=2),
+        ),
+        _mistake_row(
+            mistake_id="pm_remediation_new_release",
+            owner="owner-a",
+            question_id="q-duplicate",
+            status="needs_remediation",
+            wrong_count=2,
+            revenge_wrong_count=1,
+            release_id="release-new",
+            updated_at=now - timedelta(days=1),
+        ),
+        _mistake_row(
+            mistake_id="pm_legacy_versionless",
+            owner="owner-a",
+            question_id="q-versionless",
+            status="pending",
+            release_id=None,
+        ),
+        _mistake_row(
+            mistake_id="pm_waiting",
+            owner="owner-a",
+            question_id="q-waiting",
+            status="verification_due",
+            next_review_at=now + timedelta(hours=2),
+        ),
+        _mistake_row(
+            mistake_id="pm_mastered",
+            owner="owner-a",
+            question_id="q-mastered",
+            status="mastered",
+        ),
+        _mistake_row(
+            mistake_id="pm_broken",
+            owner="owner-a",
+            question_id="q-broken",
+            status="pending",
+            usable_snapshot=False,
+        ),
+    ]
+
+    pool = learning_service.build_global_revenge_pool(rows, now=now)
+
+    assert pool["stats"] == {
+        "active": 2,
+        "pending": 1,
+        "needsRemediation": 1,
+        "verificationDue": 0,
+        "verificationWaiting": 1,
+        "mastered": 1,
+    }
+    assert [row["questionId"] for row in pool["candidates"]] == [
+        "q-duplicate",
+        "q-versionless",
+    ]
+    duplicate = pool["candidates"][0]
+    assert duplicate["mistakeId"] == "pm_remediation_new_release"
+    assert duplicate["mistakeIds"] == [
+        "pm_remediation_new_release",
+        "pm_pending_old_release",
+    ]
+    assert duplicate["releaseId"] == "release-new"
+
+
 def test_practice_mistake_remediation_and_verification_are_database_backed() -> None:
     username = _name("practice_owner")
     other_username = _name("practice_other")
@@ -103,6 +227,12 @@ def test_practice_mistake_remediation_and_verification_are_database_backed() -> 
     overview = persisted.get("/api/v1/learning/practice/overview")
     assert overview.status_code == 200, overview.text
     assert overview.json()["stats"]["pending"] == 1
+    assert overview.json()["revengeStats"]["active"] == 1
+    assert overview.json()["revengeStats"]["pending"] == 1
+    assert [row["mistakeId"] for row in overview.json()["revengeCandidates"]] == [
+        mistake["id"]
+    ]
+    assert "correctAnswer" not in overview.json()["revengeCandidates"][0]["questionSnapshot"]
     assert overview.json()["plan"]["idealAction"]["id"] == "revenge"
     overview_question = overview.json()["mistakes"][0]["questionSnapshot"]
     assert "correctAnswer" not in overview_question

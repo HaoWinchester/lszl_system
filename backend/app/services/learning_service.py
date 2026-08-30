@@ -856,6 +856,108 @@ def _practice_stats(rows: list[PracticeMistake], now) -> dict:
     }
 
 
+def _revenge_snapshot_usable(snapshot: dict) -> bool:
+    if not isinstance(snapshot, dict):
+        return False
+    options = snapshot.get("options")
+    if not isinstance(options, list):
+        return False
+    option_ids = {
+        str(option.get("id") or "").strip()
+        for option in options
+        if isinstance(option, dict) and str(option.get("id") or "").strip()
+    }
+    correct_answer = str(snapshot.get("correctAnswer") or "").strip()
+    stem = str(snapshot.get("stem") or snapshot.get("title") or "").strip()
+    return bool(stem and len(option_ids) >= 2 and correct_answer in option_ids)
+
+
+def _revenge_status_rank(row: PracticeMistake, now) -> int:
+    if row.status == "needs_remediation":
+        return 0
+    if row.status == "pending":
+        return 1
+    if row.status == "verification_due":
+        if row.next_review_at is None or row.next_review_at <= now:
+            return 2
+        return 3
+    if row.status == "mastered":
+        return 4
+    return 9
+
+
+def _revenge_row_key(row: PracticeMistake, now) -> tuple:
+    updated_at = row.updated_at.timestamp() if row.updated_at else 0.0
+    return (
+        _revenge_status_rank(row, now),
+        -int(row.revenge_wrong_count or 0),
+        -int(row.wrong_count or 0),
+        -updated_at,
+        str(row.id),
+    )
+
+
+def build_global_revenge_pool(
+    rows: list[PracticeMistake], *, now=None
+) -> dict:
+    current_time = now or now_utc()
+    grouped: dict[str, list[PracticeMistake]] = {}
+    for row in rows:
+        question_id = str(row.question_id or "").strip()
+        if not question_id or not _revenge_snapshot_usable(row.question_snapshot or {}):
+            continue
+        grouped.setdefault(question_id, []).append(row)
+
+    representatives: list[tuple[PracticeMistake, list[PracticeMistake]]] = []
+    for group_rows in grouped.values():
+        ordered = sorted(group_rows, key=lambda row: _revenge_row_key(row, current_time))
+        if _revenge_status_rank(ordered[0], current_time) > 4:
+            continue
+        representatives.append((ordered[0], ordered))
+    representatives.sort(key=lambda item: _revenge_row_key(item[0], current_time))
+
+    stats = {
+        "active": 0,
+        "pending": 0,
+        "needsRemediation": 0,
+        "verificationDue": 0,
+        "verificationWaiting": 0,
+        "mastered": 0,
+    }
+    candidates = []
+    for representative, group_rows in representatives:
+        rank = _revenge_status_rank(representative, current_time)
+        if rank == 0:
+            stats["needsRemediation"] += 1
+        elif rank == 1:
+            stats["pending"] += 1
+        elif rank == 2:
+            stats["verificationDue"] += 1
+        elif rank == 3:
+            stats["verificationWaiting"] += 1
+        elif rank == 4:
+            stats["mastered"] += 1
+        if rank > 2:
+            continue
+        stats["active"] += 1
+        candidate = _practice_mistake_to_dict(representative, reveal_answer=True)
+        candidate["mistakeId"] = representative.id
+        candidate["mistakeIds"] = [row.id for row in group_rows]
+        candidates.append(candidate)
+    return {"candidates": candidates, "stats": stats}
+
+
+async def global_revenge_candidates(db: AsyncSession, owner: str) -> list[dict]:
+    rows = (
+        await db.execute(
+            select(PracticeMistake)
+            .where(PracticeMistake.owner_id == owner)
+            .order_by(PracticeMistake.updated_at.desc(), PracticeMistake.id)
+        )
+    ).scalars().all()
+    return build_global_revenge_pool(list(rows))["candidates"]
+
+
 def _practice_plan(stats: dict) -> dict:
     if stats["verificationDue"]:
         action = {
@@ -905,12 +1007,24 @@ async def practice_overview(db: AsyncSession, owner: str) -> dict:
         )
     ).scalars().all()
     stats = _practice_stats(rows, now_utc())
+    revenge_pool = build_global_revenge_pool(list(rows))
+    public_candidates = [
+        {
+            **candidate,
+            "questionSnapshot": redact_practice_question(
+                candidate.get("questionSnapshot") or {}
+            ),
+        }
+        for candidate in revenge_pool["candidates"]
+    ]
     return {
         "mistakes": [
             _practice_mistake_to_dict(row, reveal_answer=False) for row in rows
         ],
         "stats": stats,
-        "plan": _practice_plan(stats),
+        "revengeStats": revenge_pool["stats"],
+        "revengeCandidates": public_candidates,
+        "plan": _practice_plan(revenge_pool["stats"]),
     }
 
 
