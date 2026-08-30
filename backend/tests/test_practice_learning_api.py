@@ -223,6 +223,52 @@ def test_global_revenge_pool_skips_an_unusable_urgent_copy_when_a_usable_copy_ex
     ]
 
 
+def test_global_revenge_pool_normalizes_the_unique_correct_option_from_release_history() -> None:
+    row = _mistake_row(
+        mistake_id="pm_release_projection",
+        owner="owner-a",
+        question_id="q-release-projection",
+        status="pending",
+    )
+    snapshot = dict(row.question_snapshot)
+    snapshot.pop("correctAnswer", None)
+    snapshot["options"] = [
+        {**option, "correct": option.get("id") == "A"}
+        for option in snapshot["options"]
+    ]
+    row.question_snapshot = snapshot
+
+    pool = learning_service.build_global_revenge_pool([row], now=now_utc())
+
+    assert pool["unavailableCount"] == 0
+    assert pool["candidates"][0]["questionSnapshot"]["correctAnswer"] == "A"
+
+
+def test_global_revenge_pool_does_not_let_mastered_copy_hide_damaged_active_history() -> None:
+    pool = learning_service.build_global_revenge_pool(
+        [
+            _mistake_row(
+                mistake_id="pm_broken_pending",
+                owner="owner-a",
+                question_id="q-shared-damaged",
+                status="pending",
+                usable_snapshot=False,
+            ),
+            _mistake_row(
+                mistake_id="pm_usable_mastered",
+                owner="owner-a",
+                question_id="q-shared-damaged",
+                status="mastered",
+            ),
+        ],
+        now=now_utc(),
+    )
+
+    assert pool["candidates"] == []
+    assert pool["unavailableCount"] == 1
+    assert pool["stats"]["mastered"] == 0
+
+
 def test_practice_mistake_remediation_and_verification_are_database_backed() -> None:
     username = _name("practice_owner")
     other_username = _name("practice_other")

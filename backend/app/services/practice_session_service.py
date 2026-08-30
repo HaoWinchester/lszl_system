@@ -1356,7 +1356,9 @@ async def _grade_session_selection(
     if timed_out:
         selected = "__timeout__"
     frozen_snapshot = row.snapshot if isinstance(row.snapshot, dict) else {}
-    correct_answer = str(frozen_snapshot.get("correctAnswer") or "").strip()
+    correct_answer = learning_service.canonical_practice_snapshot_answer(
+        frozen_snapshot
+    )
 
     mistake = None
     completion: dict = {}

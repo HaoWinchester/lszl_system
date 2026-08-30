@@ -381,7 +381,20 @@ async def _set_mistake_correct_answer(mistake_id: str, correct_answer: str) -> N
         mistake = await db.get(PracticeMistake, mistake_id)
         snapshot = dict(mistake.question_snapshot or {})
         snapshot["correctAnswer"] = correct_answer
+        if not correct_answer:
+            snapshot["options"] = [
+                {**option, "correct": False}
+                for option in snapshot.get("options") or []
+                if isinstance(option, dict)
+            ]
         mistake.question_snapshot = snapshot
+        await db.commit()
+
+
+async def _set_mistake_status(mistake_id: str, status: str) -> None:
+    async with AsyncSessionLocal() as db:
+        mistake = await db.get(PracticeMistake, mistake_id)
+        mistake.status = status
         await db.commit()
 
 
@@ -396,6 +409,11 @@ async def _corrupt_frozen_session_answer(
             if ref.get("questionId") == question_id:
                 snapshot = dict(ref.get("questionSnapshot") or {})
                 snapshot["correctAnswer"] = ""
+                snapshot["options"] = [
+                    {**option, "correct": False}
+                    for option in snapshot.get("options") or []
+                    if isinstance(option, dict)
+                ]
                 ref["questionSnapshot"] = snapshot
             question_order.append(ref)
         session.question_order = question_order
@@ -1554,9 +1572,12 @@ def test_global_revenge_reports_damaged_history_separately_from_an_empty_pool() 
         _seed_global_revenge_mistakes(first_ids["student"], first_ids, second_ids)
     )
     try:
+        # 同题的可用 mastered 历史不能掩盖损坏的 active 记录。
+        asyncio.run(
+            _set_mistake_status(mistake_ids["versionlessMistake"], "mastered")
+        )
         for mistake_id in (
             mistake_ids["releaseMistake"],
-            mistake_ids["versionlessMistake"],
             mistake_ids["secondMistake"],
         ):
             asyncio.run(_set_mistake_correct_answer(mistake_id, ""))

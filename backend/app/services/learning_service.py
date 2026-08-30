@@ -856,6 +856,30 @@ def _practice_stats(rows: list[PracticeMistake], now) -> dict:
     }
 
 
+def canonical_practice_snapshot_answer(snapshot: dict) -> str:
+    if not isinstance(snapshot, dict):
+        return ""
+    options = snapshot.get("options")
+    if not isinstance(options, list):
+        return ""
+    option_ids = {
+        str(option.get("id") or "").strip()
+        for option in options
+        if isinstance(option, dict) and str(option.get("id") or "").strip()
+    }
+    explicit = str(snapshot.get("correctAnswer") or "").strip()
+    if explicit in option_ids:
+        return explicit
+    correct_options = [
+        str(option.get("id") or "").strip()
+        for option in options
+        if isinstance(option, dict)
+        and option.get("correct") is True
+        and str(option.get("id") or "").strip()
+    ]
+    return correct_options[0] if len(correct_options) == 1 else ""
+
+
 def _revenge_snapshot_usable(snapshot: dict) -> bool:
     if not isinstance(snapshot, dict):
         return False
@@ -867,7 +891,7 @@ def _revenge_snapshot_usable(snapshot: dict) -> bool:
         for option in options
         if isinstance(option, dict) and str(option.get("id") or "").strip()
     }
-    correct_answer = str(snapshot.get("correctAnswer") or "").strip()
+    correct_answer = canonical_practice_snapshot_answer(snapshot)
     stem = str(snapshot.get("stem") or snapshot.get("title") or "").strip()
     return bool(stem and len(option_ids) >= 2 and correct_answer in option_ids)
 
@@ -911,13 +935,17 @@ def build_global_revenge_pool(
     representatives: list[tuple[PracticeMistake, list[PracticeMistake]]] = []
     unavailable_count = 0
     for group_rows in grouped.values():
+        active_rows = [
+            row for row in group_rows if _revenge_status_rank(row, current_time) <= 2
+        ]
+        eligible_rows = active_rows or group_rows
         usable_rows = [
             row
-            for row in group_rows
+            for row in eligible_rows
             if _revenge_snapshot_usable(row.question_snapshot or {})
         ]
         if not usable_rows:
-            if any(_revenge_status_rank(row, current_time) <= 2 for row in group_rows):
+            if active_rows:
                 unavailable_count += 1
             continue
         ordered = sorted(usable_rows, key=lambda row: _revenge_row_key(row, current_time))
@@ -959,6 +987,9 @@ def build_global_revenge_pool(
             continue
         stats["active"] += 1
         candidate = _practice_mistake_to_dict(representative, reveal_answer=True)
+        snapshot = deepcopy(candidate.get("questionSnapshot") or {})
+        snapshot["correctAnswer"] = canonical_practice_snapshot_answer(snapshot)
+        candidate["questionSnapshot"] = snapshot
         candidate["mistakeId"] = representative.id
         candidate["mistakeIds"] = [row.id for row in group_rows]
         candidates.append(candidate)
@@ -1097,16 +1128,7 @@ async def record_revenge_answer(
     }
     if not selected_answer or selected_answer not in option_ids:
         raise ValueError("selectedAnswer 不是该题的有效选项")
-    canonical_answer = str(snapshot.get("correctAnswer") or "").strip()
-    if not canonical_answer:
-        canonical_answer = next(
-            (
-                str(option.get("id") or "").strip()
-                for option in snapshot.get("options") or []
-                if isinstance(option, dict) and option.get("correct") is True
-            ),
-            "",
-        )
+    canonical_answer = canonical_practice_snapshot_answer(snapshot)
     if not canonical_answer:
         raise ValueError("错题快照尚未配置可判定的正确答案")
     correct = selected_answer == canonical_answer
