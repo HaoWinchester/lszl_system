@@ -1351,14 +1351,6 @@ async def _execute_upload(
         content_changes.append(
             {"entityType": "tagConfig", "entityId": "active", "action": "upserted"}
         )
-    if content_changes or not await (
-        teaching_content_projection_service.projection_rows_present(db)
-    ):
-        await teaching_content_projection_service.write_principle_projection(
-            db,
-            actor.username,
-        )
-
     question_results: list[ContentPrepQuestionResult] = []
     created_count = 0
     updated_count = 0

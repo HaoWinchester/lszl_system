@@ -11,6 +11,7 @@ from app.models.content_prep import (
     QuestionUploadBatch,
     SynthesisPreset,
 )
+from app.models.course_management import CourseDraft, CourseRelease, LearningTask
 from app.models.file import CurrentFile, FileContent, FileTag, Folder, GraphFile, Tag
 from app.models.engagement import Announcement, AnnouncementAudience, Feedback, FeedbackReceipt, FeedbackReply, MessageReceipt
 from app.models.guided_learning import GuidedActivity, GuidedCourse, GuidedCourseActivity, GuidedLearningProgress
@@ -23,6 +24,7 @@ from app.models.question import (
     QuestionBank,
     QuestionCleanupAudit,
 )
+from app.models.recall_acceptance import ContentPrepRecallAcceptance
 from app.models.runtime_migration import RuntimeMigrationItem, RuntimeMigrationRun
 from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
@@ -38,6 +40,7 @@ from app.models.teaching_content import (
     RecallAssociationLibrary,
     TaxonomyNode,
     TeachingContentAudit,
+    TeachingContentRevision,
 )
 from app.models.training import (
     CanvasWorkspace,
@@ -73,6 +76,9 @@ __all__ = [
     "QuestionEditLock",
     "QuestionUploadBatch",
     "QuestionAuditLog",
+    "CourseDraft",
+    "CourseRelease",
+    "LearningTask",
     "ExamPaper",
     "PaperQuestion",
     "PaperCategory",
@@ -81,6 +87,7 @@ __all__ = [
     "PaperRelease",
     "PaperReleaseQuestion",
     "QuestionCleanupAudit",
+    "ContentPrepRecallAcceptance",
     "TrainingProgress",
     "RecallProgress",
     "LearningEvent",
@@ -106,4 +113,5 @@ __all__ = [
     "ActivityOverride",
     "RecallAssociationLibrary",
     "TeachingContentAudit",
+    "TeachingContentRevision",
 ]

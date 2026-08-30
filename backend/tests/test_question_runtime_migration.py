@@ -16,8 +16,10 @@ from app.services.question_migration_service import (
     migrate_runtime_questions,
     scan_runtime_paper_sources,
     scan_runtime_question_sources,
+    verify_runtime_paper_targets,
+    verify_runtime_question_targets,
 )
-from app.services import teaching_content_revision_service
+from app.services import question_migration_service, teaching_content_revision_service
 from app.services import question_service
 
 
@@ -45,6 +47,400 @@ def legacy_question(question_id: str, title: str = "历史题") -> dict:
         "keyPath": {"answerId": "B"},
         "lifecycle": {"status": "active"},
     }
+
+
+def test_question_migration_reports_domain_divergence_and_never_updates_existing_rows() -> None:
+    suffix = uuid4().hex[:10]
+    owner = f"question-domain-wins-{suffix}"
+    bank_id = f"bank-domain-wins-{suffix}"
+    question_id = f"question-domain-wins-{suffix}"
+    key = f"kg_question_banks_v1__user__{owner}"
+    runtime_question = legacy_question(question_id, "Runtime title")
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(User(username=owner, password_hash="test-only", role="teacher", status="active"))
+            await db.flush()
+            db.add(QuestionBank(
+                id=bank_id, owner_id=owner, name="Domain bank", subject="PMP",
+                description="domain description", visibility="private", revision=9,
+                created_by=owner, updated_by=owner,
+            ))
+            await db.flush()
+            db.add(Question(
+                id=question_id, bank_id=bank_id, title="Domain title", type="single_choice",
+                subject="PMP", scope="internal", revision=7, tags=[], stem_parts=[], options=[],
+                lifecycle={"status": "active"}, created_by=owner, updated_by=owner,
+            ))
+            db.add(RuntimeState(owner_id=owner, revision=1, storage={key: [{
+                "id": bank_id, "name": "Runtime bank", "subject": "PMP",
+                "description": "runtime description", "visibility": "published", "revision": 99,
+                "questions": [runtime_question],
+            }]}))
+            await db.commit()
+            try:
+                report = await migrate_runtime_questions(db, apply=True, owner_ids={owner}, bank_ids={bank_id})
+                bank = await db.get(QuestionBank, bank_id)
+                question = await db.get(Question, question_id)
+                codes = {row["code"] for row in report.conflicts}
+                assert {"BANK_VARIANT_CONFLICT", "QUESTION_CONTENT_CONFLICT"} <= codes
+                assert report.applied is False
+                assert (bank.name, bank.description, bank.visibility, bank.revision) == (
+                    "Domain bank", "domain description", "private", 9
+                )
+                assert (question.title, question.revision) == ("Domain title", 7)
+                proof = await question_migration_service.verify_runtime_question_item(
+                    db,
+                    source_type="runtime",
+                    source_key=key,
+                    owner_scope=owner,
+                    payload=[{
+                        "id": bank_id, "name": "Runtime bank", "subject": "PMP",
+                        "description": "runtime description", "visibility": "published", "revision": 99,
+                        "questions": [runtime_question],
+                    }],
+                )
+                assert proof["sourceCount"] == 2
+                assert proof["targetCount"] == 2
+                assert proof["sourceHash"] != proof["targetHash"]
+                assert proof["verified"] is False
+            finally:
+                await db.execute(delete(RuntimeState).where(RuntimeState.owner_id == owner))
+                await db.execute(delete(Question).where(Question.id == question_id))
+                await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+                await db.execute(delete(User).where(User.username == owner))
+                await db.commit()
+
+    asyncio.run(scenario())
+
+
+def test_paper_migration_reports_domain_divergence_and_preserves_existing_composition() -> None:
+    suffix = uuid4().hex[:10]
+    owner = f"paper-domain-wins-{suffix}"
+    bank_id = f"paper-bank-{suffix}"
+    question_id = f"paper-question-{suffix}"
+    category_id = f"paper-category-{suffix}"
+    paper_id = f"paper-domain-wins-{suffix}"
+    category_key = f"kg_exam_paper_categories_v1__{owner}"
+    paper_key = f"kg_exam_papers_v1__{owner}"
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            actor = User(username=owner, password_hash="test-only", role="teacher", status="active")
+            db.add(actor)
+            await db.flush()
+            db.add(QuestionBank(id=bank_id, owner_id=owner, name="Bank", subject="PMP"))
+            await db.flush()
+            db.add(Question(id=question_id, bank_id=bank_id, title="Question", subject="PMP", scope="internal"))
+            db.add(PaperCategory(id=category_id, owner_id=owner, name="Domain category", description="domain", order_index=1, revision=4))
+            await db.flush()
+            db.add(ExamPaper(
+                id=paper_id, owner_id=owner, name="Domain paper", subject="PMP",
+                description="domain", category_id=category_id, total_count=1, status="draft",
+                quotas={}, access_policy={}, enabled_modes=[], mode_config_version=2,
+                purpose="learning", revision=6, created_by=owner, updated_by=owner,
+            ))
+            await db.flush()
+            db.add(PaperQuestion(paper_id=paper_id, question_id=question_id, order_index=0, score=3))
+            db.add(RuntimeState(owner_id=owner, revision=1, storage={
+                category_key: [{"id": category_id, "name": "Runtime category", "description": "runtime", "orderIndex": 9, "revision": 20}],
+                paper_key: [{
+                    "id": paper_id, "name": "Runtime paper", "subject": "PMP",
+                    "description": "runtime", "categoryId": category_id, "totalCount": 1,
+                    "status": "published", "revision": 30,
+                    "questions": [{"bankId": bank_id, "questionId": question_id, "order": 1, "score": 9}],
+                }],
+            }))
+            await db.commit()
+            try:
+                report = await migrate_runtime_papers(db, actor=actor, apply=True, owner_ids={owner}, paper_ids={paper_id})
+                category = await db.get(PaperCategory, category_id)
+                paper = await db.get(ExamPaper, paper_id)
+                reference = await db.scalar(
+                    select(PaperQuestion).where(PaperQuestion.paper_id == paper_id)
+                )
+                codes = {row["code"] for row in report.conflicts}
+                assert {"PAPER_CATEGORY_VARIANT_CONFLICT", "PAPER_VARIANT_CONFLICT"} <= codes
+                assert report.applied is False
+                assert (category.name, category.description, category.order_index, category.revision) == (
+                    "Domain category", "domain", 1, 4
+                )
+                assert (paper.name, paper.description, paper.status, paper.revision) == (
+                    "Domain paper", "domain", "draft", 6
+                )
+                assert float(reference.score) == 3.0
+                proof = await question_migration_service.verify_runtime_paper_item(
+                    db,
+                    source_type="runtime",
+                    source_key=paper_key,
+                    owner_scope=owner,
+                    payload=[{
+                        "id": paper_id, "name": "Runtime paper", "subject": "PMP",
+                        "description": "runtime", "categoryId": category_id, "totalCount": 1,
+                        "status": "published", "revision": 30,
+                        "questions": [{"bankId": bank_id, "questionId": question_id, "order": 1, "score": 9}],
+                    }],
+                )
+                assert proof["sourceCount"] == 1
+                assert proof["targetCount"] == 1
+                assert proof["sourceHash"] != proof["targetHash"]
+                assert proof["verified"] is False
+            finally:
+                await db.execute(delete(RuntimeState).where(RuntimeState.owner_id == owner))
+                await db.execute(delete(PaperQuestion).where(PaperQuestion.paper_id == paper_id))
+                await db.execute(delete(ExamPaper).where(ExamPaper.id == paper_id))
+                await db.execute(delete(PaperCategory).where(PaperCategory.id == category_id))
+                await db.execute(delete(Question).where(Question.id == question_id))
+                await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
+                await db.execute(delete(User).where(User.username == owner))
+                await db.commit()
+
+    asyncio.run(scenario())
+
+
+def test_exact_question_proof_does_not_count_missing_target_placeholders() -> None:
+    suffix = uuid4().hex[:10]
+    owner = f"question-proof-missing-{suffix}"
+    key = f"kg_question_banks_v1__user__{owner}"
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            bank_id = f"missing-bank-{suffix}"
+            question_id = f"missing-question-{suffix}"
+            source_payload = [{
+                "id": bank_id, "name": "Missing", "subject": "PMP",
+                "questions": [legacy_question(question_id)],
+            }]
+            db.add(User(username=owner, password_hash="test-only", role="teacher", status="active"))
+            await db.flush()
+            db.add(RuntimeState(owner_id=owner, revision=1, storage={key: source_payload}))
+            await db.commit()
+            try:
+                proof = await question_migration_service.verify_runtime_question_item(
+                    db,
+                    source_type="runtime",
+                    source_key=key,
+                    owner_scope=owner,
+                    payload=source_payload,
+                )
+                assert proof["sourceCount"] == 2
+                assert proof["targetCount"] == 0
+                assert proof["verified"] is False
+                aggregate = await verify_runtime_question_targets(
+                    db, owner_ids={owner}, bank_ids={bank_id}
+                )
+                assert aggregate["sourceCount"] == 2
+                assert aggregate["targetCount"] == 0
+            finally:
+                await db.execute(delete(RuntimeState).where(RuntimeState.owner_id == owner))
+                await db.execute(delete(User).where(User.username == owner))
+                await db.commit()
+
+    asyncio.run(scenario())
+
+
+def test_exact_shared_paper_proof_uses_shared_row_actor_when_payload_has_no_publisher() -> None:
+    suffix = uuid4().hex[:10]
+    owner = f"paper-proof-owner-{suffix}"
+    prior: dict[str, dict | None] = {}
+    fixtures = {
+        question_migration_service.PAPER_SHARED_DRAFT_KEY: [{
+            "id": f"paper-proof-{suffix}", "name": "Shared draft", "subject": "PMP", "questions": []
+        }],
+        question_migration_service.PAPER_SHARED_CATEGORY_KEY: [{
+            "id": f"category-proof-{suffix}", "name": "Shared category"
+        }],
+    }
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            for key in fixtures:
+                row = await db.get(SharedRuntimeState, key)
+                prior[key] = None if row is None else {
+                    "value": row.value, "schema_version": row.schema_version, "updated_by": row.updated_by
+                }
+            db.add(User(username=owner, password_hash="test-only", role="teacher", status="active"))
+            await db.flush()
+            for key, value in fixtures.items():
+                row = await db.get(SharedRuntimeState, key)
+                if row is None:
+                    db.add(SharedRuntimeState(key=key, value=json.dumps(value), updated_by=owner))
+                else:
+                    row.value = json.dumps(value)
+                    row.updated_by = owner
+            await db.commit()
+            try:
+                for key, value in fixtures.items():
+                    proof = await question_migration_service.verify_runtime_paper_item(
+                        db, source_type="shared_runtime", source_key=key,
+                        owner_scope="shared", payload=value,
+                    )
+                    assert proof["invalidRecords"] == 0
+                    assert proof["sourceCount"] == 1
+                    assert proof["targetCount"] == 0
+            finally:
+                for key, old in prior.items():
+                    await db.execute(delete(SharedRuntimeState).where(SharedRuntimeState.key == key))
+                    if old is not None:
+                        db.add(SharedRuntimeState(key=key, **old))
+                await db.execute(delete(User).where(User.username == owner))
+                await db.commit()
+
+    asyncio.run(scenario())
+
+
+def test_exact_runtime_question_proof_does_not_borrow_colliding_shared_row_actor() -> None:
+    suffix = uuid4().hex[:10]
+    runtime_owner = "shared"
+    shared_actor = f"question-shared-actor-{suffix}"
+    key = f"kg_question_banks_v1__user__shared_{suffix}"
+    bank_id = f"question-owner-proof-{suffix}"
+    payload = [{
+        "id": bank_id,
+        "name": "Runtime-owned bank",
+        "subject": "PMP",
+        "description": None,
+        "version": "1.0",
+        "visibility": "private",
+        "revision": 1,
+        "questions": [],
+    }]
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            try:
+                if await db.get(User, runtime_owner) is None:
+                    db.add(User(
+                        username=runtime_owner, password_hash="test-only",
+                        role="teacher", status="active",
+                    ))
+                db.add(User(
+                    username=shared_actor, password_hash="test-only",
+                    role="teacher", status="active",
+                ))
+                await db.flush()
+                runtime = await db.get(RuntimeState, runtime_owner)
+                if runtime is None:
+                    runtime = RuntimeState(owner_id=runtime_owner, revision=1, storage={key: payload})
+                    db.add(runtime)
+                else:
+                    runtime.storage = {**(runtime.storage or {}), key: payload}
+                db.add(SharedRuntimeState(
+                    key=key, value=json.dumps(payload), updated_by=shared_actor,
+                ))
+                db.add(QuestionBank(
+                    id=bank_id, owner_id=runtime_owner, name="Runtime-owned bank",
+                    subject="PMP", description=None, version="1.0",
+                    visibility="private", revision=1,
+                ))
+                await db.flush()
+
+                proof = await question_migration_service.verify_runtime_question_item(
+                    db, source_type="runtime", source_key=key,
+                    owner_scope=runtime_owner, payload=runtime.storage[key],
+                )
+
+                assert proof["sourceCount"] == 1
+                assert proof["targetCount"] == 1
+                assert proof["invalidRecords"] == 0
+                assert proof["sourceHash"] == proof["targetHash"]
+                assert proof["verified"] is True
+            finally:
+                await db.rollback()
+
+    asyncio.run(scenario())
+
+
+def test_exact_runtime_paper_proof_does_not_borrow_colliding_shared_row_actor() -> None:
+    suffix = uuid4().hex[:10]
+    runtime_owner = "shared"
+    shared_actor = f"paper-shared-actor-{suffix}"
+    key = f"kg_exam_papers_v1__shared_{suffix}"
+    paper_id = f"paper-owner-proof-{suffix}"
+    payload = [{
+        "id": paper_id,
+        "name": "Runtime-owned paper",
+        "subject": "PMP",
+        "description": None,
+        "categoryId": None,
+        "totalCount": 0,
+        "status": "draft",
+        "quotas": {},
+        "accessPolicy": {},
+        "enabledModes": [],
+        "modeConfigVersion": 2,
+        "purpose": "learning",
+        "revision": 1,
+        "publishedVersion": 0,
+        "questions": [],
+    }]
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            try:
+                if await db.get(User, runtime_owner) is None:
+                    db.add(User(
+                        username=runtime_owner, password_hash="test-only",
+                        role="teacher", status="active",
+                    ))
+                db.add(User(
+                    username=shared_actor, password_hash="test-only",
+                    role="teacher", status="active",
+                ))
+                await db.flush()
+                runtime = await db.get(RuntimeState, runtime_owner)
+                if runtime is None:
+                    runtime = RuntimeState(owner_id=runtime_owner, revision=1, storage={key: payload})
+                    db.add(runtime)
+                else:
+                    runtime.storage = {**(runtime.storage or {}), key: payload}
+                db.add(SharedRuntimeState(
+                    key=key, value=json.dumps(payload), updated_by=shared_actor,
+                ))
+                db.add(ExamPaper(
+                    id=paper_id, owner_id=runtime_owner, name="Runtime-owned paper",
+                    subject="PMP", description=None, category_id=None, total_count=0,
+                    status="draft", quotas={}, access_policy={}, enabled_modes=[],
+                    mode_config_version=2, purpose="learning", revision=1,
+                    published_version=0,
+                ))
+                await db.flush()
+
+                proof = await question_migration_service.verify_runtime_paper_item(
+                    db, source_type="runtime", source_key=key,
+                    owner_scope=runtime_owner, payload=runtime.storage[key],
+                )
+
+                assert proof["sourceCount"] == 1
+                assert proof["targetCount"] == 1
+                assert proof["invalidRecords"] == 0
+                assert proof["sourceHash"] == proof["targetHash"]
+                assert proof["verified"] is True
+            finally:
+                await db.rollback()
+
+    asyncio.run(scenario())
+
+
+def test_exact_question_and_paper_proofs_reject_invalid_source_identity_shapes() -> None:
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            for verifier, key in (
+                (question_migration_service.verify_runtime_question_item, "kg_question_banks_v1__invalid"),
+                (question_migration_service.verify_runtime_paper_item, "kg_exam_papers_v1__invalid"),
+            ):
+                for source_type, owner_scope in (
+                    ("shared_runtime", "teacher-not-shared"),
+                    ("runtime", ""),
+                ):
+                    proof = await verifier(
+                        db, source_type=source_type, source_key=key,
+                        owner_scope=owner_scope, payload=[],
+                    )
+                    assert proof["invalidRecords"] == 1
+                    assert proof["verified"] is False
+
+    asyncio.run(scenario())
 
 
 def test_runtime_question_migration_dry_run_apply_and_rerun_are_safe() -> None:
@@ -221,16 +617,21 @@ def test_runtime_question_migration_dry_run_apply_and_rerun_are_safe() -> None:
             )
             assert applied.applied is True
             assert applied.conflicts == []
+            proof = await verify_runtime_question_targets(
+                db, owner_ids={owner}, bank_ids=bank_ids
+            )
+            assert proof["verified"] is False
+            assert proof["nullContentHashes"] == 1
+            assert proof["sourceHash"] == proof["targetHash"]
+            assert proof["verificationHash"]
             revision = await teaching_content_revision_service.current(db)
             assert revision["revision"] == revision_before_apply + 1
             assert {
                 (change["entityType"], change["entityId"], change["action"])
                 for change in revision["changes"]
             } == {
-                ("questionBank", relational_bank_id, "updated"),
                 ("questionBank", private_bank_id, "created"),
                 ("questionBank", published_bank_id, "created"),
-                ("question", relational_question_id, "updated"),
                 ("question", private_question_id, "created"),
                 ("question", published_question_id, "created"),
             }
@@ -241,7 +642,7 @@ def test_runtime_question_migration_dry_run_apply_and_rerun_are_safe() -> None:
             private_question = await db.get(Question, private_question_id)
             published_bank = await db.get(QuestionBank, published_bank_id)
             published_question = await db.get(Question, published_question_id)
-            assert relational is not None and relational.content_hash
+            assert relational is not None and relational.content_hash is None
             assert private_bank is not None and private_bank.owner_id == owner
             assert private_question is not None and private_question.id == private_question_id
             assert published_bank is not None and published_bank.visibility == "published"
@@ -522,6 +923,12 @@ def test_runtime_paper_migration_preserves_categories_fields_scores_and_order() 
                 paper_ids={paper_id},
             )
             assert applied.applied is True
+            proof = await verify_runtime_paper_targets(
+                db, owner_ids={owner}, paper_ids={paper_id}
+            )
+            assert proof["verified"] is True, proof
+            assert proof["sourceHash"] == proof["targetHash"]
+            assert proof["verificationHash"]
             assert int(
                 (await teaching_content_revision_service.current(db))["revision"]
             ) == revision_before + 1

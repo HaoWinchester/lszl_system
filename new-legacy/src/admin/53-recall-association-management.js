@@ -4,22 +4,21 @@
 (function(global){
   const Services=global.KGAdminServices,UI=global.KGAdminUI,Library=global.KGRecallAssociationLibrary;if(!Services||!UI||!Library)return;
   const {byId,escapeHtml,toast}=UI;
-  const STORE_PREFIX='kg_recall_association_management_v1__subject__';
   const PAGE_SIZE=30;
   const clean=value=>String(value??'').trim();
   const clone=value=>{try{return JSON.parse(JSON.stringify(value))}catch(error){return value}};
   const now=()=>new Date().toISOString();
+  const records=new Map();
   const state={subjectId:'',subjectCode:'',draft:null,record:null,selectedNodeId:'',selectedIds:new Set(),query:'',status:'all',link:'all',page:1,view:'list',pendingImport:null,dirty:false};
-  function storageKey(code){return STORE_PREFIX+encodeURIComponent(clean(code)||'PMP')}
   function currentSubject(){const id=global.KGAdminSubjectsApp?.getSelectedSubjectId?.()||new URLSearchParams(location.search).get('subjectId')||'';return Services.subjects.get(id)||Services.subjects.list()[0]||null}
   function currentTaxonomy(){return state.subjectId?Services.taxonomies.currentForSubject(state.subjectId):null}
   function actor(){const user=global.KGAdminCore?.actor?.()||{};return {id:clean(user.id||user.username)||'local-admin',name:clean(user.name||user.displayName)||'本地管理员',role:clean(user.role)||'admin'}}
   function readRecord(code,live){
-    let raw={};try{raw=JSON.parse(localStorage.getItem(storageKey(code))||'{}')||{}}catch(error){}
+    const raw=clone(records.get(clean(code))||{});
     const publishedVersion=Math.max(0,Number(raw.publishedVersion)||((live.nodes||[]).length?1:0));
     return {schemaVersion:1,draftLibrary:Library.normalizeLibrary(raw.draftLibrary||live),draftUpdatedAt:clean(raw.draftUpdatedAt)||clean(live.updatedAt),publishedVersion,publishedAt:clean(raw.publishedAt)||clean(live.updatedAt),imports:Array.isArray(raw.imports)?raw.imports.slice(0,100):[],releases:Array.isArray(raw.releases)?raw.releases.slice(0,30):[]};
   }
-  function writeRecord(){if(!state.subjectCode||!state.record)return;state.record.draftLibrary=Library.normalizeLibrary(state.draft);state.record.draftUpdatedAt=now();localStorage.setItem(storageKey(state.subjectCode),JSON.stringify(state.record));state.dirty=false}
+  function writeRecord(){if(!state.subjectCode||!state.record)return;state.record.draftLibrary=Library.normalizeLibrary(state.draft);state.record.draftUpdatedAt=now();records.set(state.subjectCode,clone(state.record));state.dirty=false}
   function audit(action,summary,metadata={}){try{Services.audit.record({action,entityType:'recall_association_library',entityId:state.subjectCode,summary,metadata:{subjectId:state.subjectId,subjectCode:state.subjectCode,...clone(metadata)}})}catch(error){console.warn(error)}}
   function liveLibrary(){return Library.read(state.subjectCode||'PMP')}
   function sameLibrary(a,b){const x=Library.normalizeLibrary(a),y=Library.normalizeLibrary(b);return JSON.stringify({nodes:x.nodes,edges:x.edges})===JSON.stringify({nodes:y.nodes,edges:y.edges})}
@@ -63,8 +62,7 @@
   function batchUpdate(kind){const ids=[...state.selectedIds],nodes=state.draft.nodes.map(node=>{if(!state.selectedIds.has(node.id))return node;const metadata={...(node.metadata||{})};if(kind==='enable')metadata.status='active';if(kind==='disable')metadata.status='disabled';if(kind==='link')metadata.taxonomyNodeId=byId('adminRecallBatchKnowledge').value||'';return {...node,metadata}});state.draft=Library.normalizeLibrary({nodes,edges:state.draft.edges});markDirty();render();toast(`已更新 ${ids.length} 个节点。`)}
   function saveDraft({announce=true}={}){writeRecord();audit('recall_library.draft.save',`保存 ${state.subjectCode} 联想库草稿`,{nodes:state.draft.nodes.length,edges:state.draft.edges.length});renderHeader();if(announce)toast('联想库草稿已保存。')}
   async function publish(){if(!state.draft?.nodes?.length)return toast('空联想库不能发布。',true);if(!confirm(`发布 ${state.subjectCode} 科目级联想库？\n\n学习端将开始使用当前草稿内容。`))return;const candidate=Library.normalizeLibrary(state.draft);
-    // P4.5.31 发布必须同步服务器：深度回忆会话只读取服务器 SharedRuntimeState 快照，
-    // 仅写 localStorage 的"发布"到不了学员端。
+    // 发布必须等待关系型联想库 API 成功，之后才更新页面内存和反馈。
     let synced;
     try{synced=await Library.writeServer(state.subjectCode,candidate);audit('recall_library.publish.server',`同步 ${state.subjectCode} 联想库到服务器 r${synced.revision}`,{revision:synced.revision,nodes:synced.library.nodes.length,edges:synced.library.edges.length})}
     catch(error){return toast(error?.status===409?'服务器内容已被其他人更新，请重新载入后再发布。':'服务器同步失败：'+(error?.message||'未知错误'),true)}
@@ -90,17 +88,26 @@
     byId('adminRecallNewBtn').addEventListener('click',newNode);byId('adminRecallEditorSave').addEventListener('click',saveNode);byId('adminRecallEditorDelete').addEventListener('click',()=>deleteNodes([state.selectedNodeId]));byId('adminRecallSaveDraftBtn').addEventListener('click',()=>saveDraft());byId('adminRecallPublishBtn').addEventListener('click',publish);byId('adminRecallExportBtn').addEventListener('click',exportLibrary);
     byId('adminRecallBatchLink').addEventListener('click',()=>batchUpdate('link'));byId('adminRecallBatchEnable').addEventListener('click',()=>batchUpdate('enable'));byId('adminRecallBatchDisable').addEventListener('click',()=>batchUpdate('disable'));byId('adminRecallBatchDelete').addEventListener('click',()=>deleteNodes([...state.selectedIds]));
     byId('adminRecallImportBtn').addEventListener('click',()=>byId('adminRecallImportFile').click());byId('adminRecallImportFile').addEventListener('change',event=>importFile(event.target.files?.[0]));byId('adminRecallApplyImportBtn').addEventListener('click',applyImport);byId('adminRecallGraphSearch').addEventListener('input',renderGraph);byId('adminRecallGraph').addEventListener('click',event=>{const node=event.target.closest('[data-recall-graph-node]');if(node){state.selectedNodeId=node.dataset.recallGraphNode;state.view='list';render()}});
-    document.addEventListener('kg-admin-subject-change',()=>loadSubject());window.addEventListener('beforeunload',()=>{if(state.dirty)writeRecord()});
+    document.addEventListener('kg-admin-subject-change',()=>{void switchSubject()});window.addEventListener('beforeunload',()=>{if(state.dirty)writeRecord()});
   }
+  async function switchSubject(){const subject=currentSubject();try{await global.KGTeachingContentApi?.ready?.(subject?.id||subject?.code||'PMP');loadSubject()}catch(error){toast('联想库切换失败：'+(error?.message||error),true)}}
   // P4.5.31 本浏览器库为空而服务器已有正式库时，以服务器库为基线载入（避免在空草稿上编辑）。
   async function hydrateFromServer(){
     try{
       if(state.dirty)return;
       const server=await Library.readServer(state.subjectCode);
       if(server&&(server.nodes||[]).length){Library.write(state.subjectCode,server);loadSubject({preserveView:true})}
-    }catch(error){}
+    }catch(error){throw error}
   }
-  async function init(){if(!byId('adminRecallPanel'))return;bind();await global.KGAdminSubjectsApp?.ready?.();loadSubject({preserveView:false});await hydrateFromServer()}
+  async function init(){
+    if(!byId('adminRecallPanel'))return;
+    try{
+      await global.KGAdminSubjectsApp?.ready?.();
+      const subject=currentSubject(),subjectId=subject?.id||subject?.code||'PMP';
+      await global.KGTeachingContentApi?.ready?.(subjectId);
+      bind();loadSubject({preserveView:false});await hydrateFromServer();
+    }catch(error){byId('adminRecallStatus').innerHTML=`<strong>联想库加载失败</strong><span>${escapeHtml(error?.message||'请检查网络后重试，未使用本地数据回退。')}</span>`;toast('联想库加载失败，请重新载入。',true)}
+  }
   global.KGRecallAssociationManagement=Object.freeze({loadSubject,saveDraft,publish,getState:()=>clone(state)});
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',()=>{void init()}):void init();
 })(window);

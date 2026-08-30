@@ -19,6 +19,36 @@ function response(status, payload) {
   }
 }
 
+function deferred() {
+  let resolve
+  const promise = new Promise(done => { resolve = done })
+  return { promise, resolve }
+}
+
+function domainApi(fetchImpl) {
+  return {
+    async request({ method = 'GET', path, body }) {
+      const response = await fetchImpl(path, {
+        method,
+        credentials: 'include',
+        headers: body === undefined ? { accept: 'application/json' } : { accept: 'application/json', 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        const detail = payload?.detail
+        const error = new Error(!Array.isArray(detail) && detail?.message ? detail.message : `HTTP ${response.status}`)
+        error.status = response.status
+        error.code = !Array.isArray(detail) && detail?.code ? detail.code : (response.status === 422 ? 'VALIDATION_ERROR' : `HTTP_${response.status}`)
+        error.detail = detail
+        if (!Array.isArray(detail) && detail?.currentRevision !== undefined) error.currentRevision = detail.currentRevision
+        throw error
+      }
+      return payload
+    },
+  }
+}
+
 function loadAdapter(fetchImpl) {
   const events = []
   const context = {
@@ -29,12 +59,12 @@ function loadAdapter(fetchImpl) {
     },
     dispatchEvent(event) { events.push(event) },
     addEventListener() {},
-    fetch: fetchImpl,
+    KGDomainApi: domainApi(fetchImpl),
   }
   context.window = context
   context.globalThis = context
   vm.runInNewContext(adapter, context, { filename: 'paper-draft-adapter.js' })
-  return { api: context.KGPaperDraftApi, events }
+  return { api: context.KGPaperDraftApi, events, context }
 }
 
 test('adapter exposes the complete paper draft API without browser persistence', () => {
@@ -193,10 +223,202 @@ test('failed mutations reject and never synthesize successful paper rows', async
   assert.equal(events.filter(event => event.type === 'kg:paper-drafts-changed').length, 0)
 })
 
+test('paper mutation caches settle before change observers reload the selected paper', async () => {
+  let listLoads = 0
+  let detailLoads = 0
+  const loaded = loadAdapter(async (url, options = {}) => {
+    if (url === '/api/v1/papers' && options.method === 'GET') {
+      listLoads += 1
+      return response(200, { papers: listLoads === 1
+        ? [{ id: 'paper-old', name: '旧试卷' }]
+        : [{ id: 'paper-new', name: '新试卷' }, { id: 'paper-old', name: '旧试卷' }] })
+    }
+    if (url === '/api/v1/papers' && options.method === 'POST') {
+      return response(200, { paper: { id: 'paper-new', name: '新试卷', revision: 1 } })
+    }
+    if (url === '/api/v1/papers/paper-new' && options.method === 'GET') {
+      detailLoads += 1
+      return response(200, { paper: { id: 'paper-new', name: '新试卷', revision: 1 } })
+    }
+    throw new Error(`unexpected request: ${options.method} ${url}`)
+  })
+  const { api, context } = loaded
+  await api.list()
+  let detailSeenByObserver
+  let listSeenByObserver
+  context.dispatchEvent = event => {
+    if (event.type !== 'kg:paper-drafts-changed' || event.detail.action !== 'create') return
+    detailSeenByObserver = api.detail(event.detail.payload.paper.id)
+    listSeenByObserver = api.list()
+  }
+
+  const created = await api.create({ name: '新试卷' })
+  assert.equal(created.id, 'paper-new')
+  assert.equal((await detailSeenByObserver).id, 'paper-new')
+  assert.equal((await listSeenByObserver)[0].id, 'paper-new')
+  assert.equal(detailLoads, 0)
+  assert.equal(listLoads, 2)
+})
+
+test('an older pending paper list cannot overwrite or detach the post-create generation', async () => {
+  const oldList = deferred()
+  const newList = deferred()
+  let listLoads = 0
+  const { api } = loadAdapter(async (url, options = {}) => {
+    if (url === '/api/v1/papers' && options.method === 'GET') {
+      listLoads += 1
+      return listLoads === 1 ? oldList.promise : newList.promise
+    }
+    if (url === '/api/v1/papers' && options.method === 'POST') {
+      return response(200, { paper: { id: 'paper-new', name: '新试卷', revision: 1 } })
+    }
+    throw new Error(`unexpected request: ${options.method} ${url}`)
+  })
+
+  const staleRequest = api.list()
+  await Promise.resolve()
+  await api.create({ name: '新试卷' })
+  const currentRequest = api.list()
+  oldList.resolve(response(200, { papers: [{ id: 'paper-old', name: '旧试卷' }] }))
+  assert.equal((await staleRequest)[0].id, 'paper-old')
+
+  const coalescedRequest = api.list()
+  assert.equal(listLoads, 2)
+  newList.resolve(response(200, { papers: [{ id: 'paper-new', name: '新试卷' }] }))
+  assert.equal((await currentRequest)[0].id, 'paper-new')
+  assert.equal((await coalescedRequest)[0].id, 'paper-new')
+  assert.equal((await api.list())[0].id, 'paper-new')
+  assert.equal(listLoads, 2)
+})
+
+test('an old paper detail cannot overwrite a mutation-cached detail', async () => {
+  const oldDetail = deferred()
+  let detailLoads = 0
+  const { api } = loadAdapter(async (url, options = {}) => {
+    if (url === '/api/v1/papers/paper-1' && options.method === 'GET') {
+      detailLoads += 1
+      return oldDetail.promise
+    }
+    if (url === '/api/v1/papers/paper-1' && options.method === 'PUT') {
+      return response(200, { paper: { id: 'paper-1', revision: 2, name: '新修订' } })
+    }
+    throw new Error(`unexpected request: ${options.method} ${url}`)
+  })
+
+  const stale = api.detail('paper-1')
+  await Promise.resolve()
+  await api.update('paper-1', { revision: 1, name: '新修订' })
+  oldDetail.resolve(response(200, { paper: { id: 'paper-1', revision: 1, name: '旧详情' } }))
+  assert.equal((await stale).revision, 1)
+
+  assert.equal((await api.detail('paper-1')).revision, 2)
+  assert.equal(detailLoads, 1)
+})
+
+test('an old paper detail cannot detach or overwrite a newer detail load for the same id', async () => {
+  const oldDetail = deferred()
+  const newDetail = deferred()
+  let detailLoads = 0
+  const { api } = loadAdapter(async (url, options = {}) => {
+    if (url !== '/api/v1/papers/paper-1' || options.method !== 'GET') throw new Error(`unexpected request: ${options.method} ${url}`)
+    detailLoads += 1
+    return detailLoads === 1 ? oldDetail.promise : newDetail.promise
+  })
+
+  const stale = api.detail('paper-1')
+  await Promise.resolve()
+  api.invalidatePaper('paper-1')
+  const current = api.detail('paper-1')
+  oldDetail.resolve(response(200, { paper: { id: 'paper-1', revision: 1 } }))
+  await stale
+  const coalesced = api.detail('paper-1')
+  assert.equal(detailLoads, 2)
+
+  newDetail.resolve(response(200, { paper: { id: 'paper-1', revision: 2 } }))
+  assert.equal((await current).revision, 2)
+  assert.equal((await coalesced).revision, 2)
+  assert.equal((await api.detail('paper-1')).revision, 2)
+})
+
+test('an old category list cannot overwrite post-create categories or detach newer work', async () => {
+  const oldCategories = deferred()
+  const newCategories = deferred()
+  let categoryLoads = 0
+  const { api } = loadAdapter(async (url, options = {}) => {
+    if (url === '/api/v1/paper-categories' && options.method === 'GET') {
+      categoryLoads += 1
+      return categoryLoads === 1 ? oldCategories.promise : newCategories.promise
+    }
+    if (url === '/api/v1/paper-categories' && options.method === 'POST') {
+      return response(200, { category: { id: 'category-new', name: '新分类', revision: 1 } })
+    }
+    throw new Error(`unexpected request: ${options.method} ${url}`)
+  })
+
+  const stale = api.listCategories()
+  await Promise.resolve()
+  await api.createCategory({ name: '新分类' })
+  const current = api.listCategories()
+  oldCategories.resolve(response(200, { categories: [{ id: 'category-old', name: '旧分类' }] }))
+  await stale
+  const coalesced = api.listCategories()
+  assert.equal(categoryLoads, 2)
+
+  newCategories.resolve(response(200, { categories: [{ id: 'category-new', name: '新分类' }] }))
+  assert.equal((await current)[0].id, 'category-new')
+  assert.equal((await coalesced)[0].id, 'category-new')
+  assert.equal((await api.listCategories())[0].id, 'category-new')
+})
+
+test('an old rejected ready cannot clear a newer ready promise', async () => {
+  const oldPapers = deferred()
+  const oldCategories = deferred()
+  const newPapers = deferred()
+  const newCategories = deferred()
+  let paperLoads = 0
+  let categoryLoads = 0
+  const { api } = loadAdapter(async (url, options = {}) => {
+    if (options.method !== 'GET') throw new Error(`unexpected request: ${options.method} ${url}`)
+    if (url === '/api/v1/papers') {
+      paperLoads += 1
+      if (paperLoads === 1) return oldPapers.promise
+      if (paperLoads === 2) return newPapers.promise
+      return response(200, { papers: [{ id: 'paper-unexpected' }] })
+    }
+    if (url === '/api/v1/paper-categories') {
+      categoryLoads += 1
+      if (categoryLoads === 1) return oldCategories.promise
+      if (categoryLoads === 2) return newCategories.promise
+      return response(200, { categories: [{ id: 'category-unexpected' }] })
+    }
+    throw new Error(`unexpected request: ${options.method} ${url}`)
+  })
+
+  const stale = api.ready()
+  await Promise.resolve()
+  const current = api.ready({ forceReload: true })
+  newPapers.resolve(response(200, { papers: [{ id: 'paper-new' }] }))
+  newCategories.resolve(response(200, { categories: [{ id: 'category-new' }] }))
+  assert.equal((await current).papers[0].id, 'paper-new')
+
+  oldPapers.resolve(response(500, { detail: { message: '旧 ready 失败' } }))
+  oldCategories.resolve(response(200, { categories: [{ id: 'category-old' }] }))
+  await assert.rejects(stale, /old|HTTP 500|ready|\u65e7/)
+
+  const cached = await api.ready()
+  assert.equal(cached.papers[0].id, 'paper-new')
+  assert.equal(cached.categories[0].id, 'category-new')
+  assert.equal(paperLoads, 2)
+  assert.equal(categoryLoads, 2)
+})
+
 test('sync injects the adapter exactly once before paper management application code', () => {
   assert.match(syncScript, /paper-draft-adapter\.js/)
   assert.match(syncScript, /kg-paper-drafts:generated/)
   const generated = readFileSync(resolve(frontendRoot, 'public/new-legacy/paper-management.html'), 'utf8')
   assert.equal((generated.match(/paper-draft-adapter\.js/g) || []).length, 1)
   assert.ok(generated.indexOf('paper-draft-adapter.js') < generated.indexOf('src/65-question-bank-admin.js'))
+  const questionBank = readFileSync(resolve(frontendRoot, 'public/new-legacy/question-bank.html'), 'utf8')
+  assert.equal((questionBank.match(/paper-draft-adapter\.js/g) || []).length, 1)
+  assert.ok(questionBank.indexOf('paper-draft-adapter.js') < questionBank.indexOf('src/65-question-bank-admin.js'))
 })

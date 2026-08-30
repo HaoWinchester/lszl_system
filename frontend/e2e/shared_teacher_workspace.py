@@ -9,6 +9,7 @@ on exit. It never serves or mutates the active release or shared dev database.
 
 from __future__ import annotations
 
+import argparse
 import atexit
 import getpass
 import json
@@ -24,7 +25,13 @@ from urllib.parse import quote
 from urllib.request import urlopen
 from uuid import uuid4
 
-from playwright.sync_api import APIRequestContext, BrowserContext, Page, sync_playwright
+from playwright.sync_api import (
+    APIRequestContext,
+    BrowserContext,
+    Page,
+    TimeoutError as PlaywrightTimeoutError,
+    sync_playwright,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -215,7 +222,11 @@ def login(context: BrowserContext, username: str, password: str) -> None:
     assert_ok(
         context.request.post(
             BASE + "/api/v1/auth/login",
-            data={"username": username, "password": password},
+            data={
+                "username": username,
+                "password": password,
+                "acceptedTermsVersion": "2026-08-13-v1",
+            },
         ),
         f"login {username}",
     )
@@ -411,6 +422,882 @@ def click_prep_sync(page: Page):
     ) as response_info:
         page.locator("#btnSyncToCatalog").click()
     return response_info.value
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--question-paper-only",
+        action="store_true",
+        help="run the isolated question/paper CRUD, persistence, and cleanup matrix",
+    )
+    parser.add_argument(
+        "--assert-no-runtime",
+        action="store_true",
+        help="fail if question or paper management requests Runtime state/bootstrap",
+    )
+    parser.add_argument(
+        "--teaching-content-only",
+        action="store_true",
+        help="run native teaching catalog controls and assert the three retired pages make zero Runtime requests",
+    )
+    return parser.parse_args()
+
+
+def run_teaching_content_e2e() -> None:
+    global BASE
+    isolated = IsolatedE2EHarness()
+    BASE = isolated.start()
+    runtime_requests: list[str] = []
+    playwright = None
+    browser = None
+    context = None
+    teacher_context = None
+    teacher_username = f"t5-teacher-{uuid4().hex[:10]}"
+    try:
+        playwright = sync_playwright().start()
+        browser = playwright.chromium.launch(headless=True)
+        context = browser.new_context(viewport={"width": 1440, "height": 1000})
+        login(context, ADMIN_USERNAME, ADMIN_PASSWORD)
+        assert_ok(
+            context.request.post(
+                BASE + "/api/v1/users",
+                data={
+                    "username": teacher_username,
+                    "password": TEST_PASSWORD,
+                    "role": "teacher",
+                    "status": "active",
+                    "display_name": teacher_username,
+                    "subject": "PMP",
+                    "source": "task5-e2e",
+                },
+            ),
+            "create task5 teacher",
+        )
+        context.on(
+            "request",
+            lambda request: runtime_requests.append(request.url)
+            if "/api/v1/runtime/state" in request.url or "server-state-bootstrap.js" in request.url
+            else None,
+        )
+        stamp = uuid4().hex[:8].upper()
+        code = f"T5{stamp[:6]}"
+        subject_name = f"Task5 教学科目 {stamp}"
+
+        admin_page = context.new_page()
+        admin_page.goto(BASE + "/admin-subjects.html", wait_until="networkidle")
+        admin_page.locator("#adminAddSubjectBtn").wait_for(state="visible")
+        admin_page.locator("#adminAddSubjectBtn").click()
+        admin_page.locator("#adminSubjectCode").fill(code)
+        admin_page.locator("#adminSubjectNameZh").fill(subject_name)
+        with admin_page.expect_response(
+            lambda response: response.url.endswith("/api/v1/content-prep/shared-content")
+            and response.request.method == "PUT"
+        ) as create_info:
+            admin_page.locator("#adminSubjectDialogSubmit").click()
+        assert create_info.value.ok, create_info.value.text()
+        admin_page.wait_for_function(
+            "name => document.getElementById('adminSelectedSubjectName')?.textContent === name",
+            arg=subject_name,
+        )
+        edited_subject_name = f"{subject_name} 已编辑"
+        admin_page.locator("#adminEditSubjectBtn").click()
+        admin_page.locator("#adminSubjectDialog").wait_for(
+            state="visible", timeout=10000
+        )
+        admin_page.locator("#adminSubjectNameZh").fill(edited_subject_name)
+        with admin_page.expect_response(
+            lambda response: response.url.endswith("/api/v1/content-prep/shared-content")
+            and response.request.method == "PUT"
+        ) as edit_info:
+            admin_page.locator("#adminSubjectDialogSubmit").click()
+        assert edit_info.value.ok, edit_info.value.text()
+        edit_payload = edit_info.value.json()
+        assert any(
+            row.get("id") == f"subject-{code.lower()}"
+            and row.get("name", {}).get("zh") == edited_subject_name
+            for row in edit_payload.get("subjects", [])
+        ), edit_payload.get("subjects", [])
+        admin_page.wait_for_function(
+            "name => document.getElementById('adminSelectedSubjectName')?.textContent === name",
+            arg=edited_subject_name,
+        )
+        persisted_edit = assert_ok(
+            context.request.get(
+                BASE + "/api/v1/content-prep/shared-content",
+                params={"subjectId": f"subject-{code.lower()}"},
+            ),
+            "read edited task5 subject",
+        )
+        assert any(
+            row.get("id") == f"subject-{code.lower()}"
+            and row.get("name", {}).get("zh") == edited_subject_name
+            for row in persisted_edit.get("subjects", [])
+        ), persisted_edit.get("subjects", [])
+        admin_page.reload(wait_until="networkidle")
+        try:
+            admin_page.wait_for_function(
+                "name => document.getElementById('adminSelectedSubjectName')?.textContent === name",
+                arg=edited_subject_name,
+                timeout=10000,
+            )
+        except PlaywrightTimeoutError as error:
+            raise AssertionError(
+                {
+                    "url": admin_page.url,
+                    "selected": admin_page.evaluate(
+                        "() => window.KGAdminSubjectsApp?.getSelectedSubjectId?.()"
+                    ),
+                    "subject": admin_page.evaluate(
+                        "() => window.KGAdminSubjectsApp?.getSelectedSubject?.() || null"
+                    ),
+                    "names": admin_page.evaluate(
+                        "() => window.KGAdminServices?.subjects?.list?.().map(row => [row.id, row.name?.zh]) || []"
+                    ),
+                }
+            ) from error
+        center_page = context.new_page()
+        center_errors: list[str] = []
+        center_page.on("pageerror", lambda error: center_errors.append(str(error)))
+        center_response = center_page.goto(
+            BASE + "/content-center.html?subjectId=subject-pmp",
+            wait_until="networkidle",
+        )
+        assert center_response is not None and center_response.status == 200, (
+            center_response.status if center_response else None,
+            center_page.locator("body").inner_text(),
+        )
+        center_page.locator("#ccTaxonomyVersion").wait_for(state="attached")
+        center_page.wait_for_timeout(1500)
+        if center_page.locator("#ccTaxonomyVersion option").count() == 0:
+            raise AssertionError(
+                {
+                    "pageErrors": center_errors,
+                    "teachingError": center_page.locator("body").get_attribute(
+                        "data-teaching-content-error"
+                    ),
+                    "toast": center_page.locator("#ccToast").inner_text(),
+                    "api": center_page.evaluate("() => !!window.KGTeachingContentApi"),
+                    "subjects": center_page.evaluate(
+                        "() => window.KGLearningContent?.getSubjects?.().map(row=>row.id) || []"
+                    ),
+                    "taxonomies": center_page.evaluate(
+                        "() => window.KGLearningContent?.getTaxonomies?.('subject-pmp').map(row=>row.id) || []"
+                    ),
+                }
+            )
+        conflict_page = context.new_page()
+        conflict_page.goto(
+            BASE + "/content-center.html?subjectId=subject-pmp",
+            wait_until="networkidle",
+        )
+        conflict_page.locator("#ccTaxonomyVersion option").first.wait_for(
+            state="attached"
+        )
+        with center_page.expect_response(
+            lambda response: response.url.endswith("/api/v1/content-prep/shared-content")
+            and response.request.method == "PUT"
+        ) as node_info:
+            center_page.locator("#ccAddRootBtn").click()
+        assert node_info.value.ok, node_info.value.text()
+        center_page.locator("#ccNewTagBtn").click()
+        center_page.locator("#ccTagName").fill(f"Task5 标签 {stamp}")
+        with center_page.expect_response(
+            lambda response: response.url.endswith("/api/v1/content-prep/shared-content")
+            and response.request.method == "PUT"
+        ) as tag_info:
+            center_page.locator("#ccSaveTagBtn").click()
+        assert tag_info.value.ok, tag_info.value.text()
+        conflict_page.locator("#ccNewTagBtn").click()
+        conflict_page.locator("#ccTagName").fill(f"Task5 stale tag {stamp}")
+        with conflict_page.expect_response(
+            lambda response: response.url.endswith(
+                "/api/v1/content-prep/shared-content"
+            )
+            and response.request.method == "PUT"
+        ) as conflict_info:
+            conflict_page.locator("#ccSaveTagBtn").click()
+        assert conflict_info.value.status == 409, (
+            conflict_info.value.status,
+            conflict_info.value.text(),
+        )
+        conflict_page.wait_for_function(
+            "() => document.getElementById('ccToast')?.textContent.includes('标签保存失败')"
+        )
+        center_page.locator("#ccNewCollectionBtn").click()
+        center_page.locator("#ccCollectionNewTitle").fill(f"Task5 题集 {stamp}")
+        with center_page.expect_response(
+            lambda response: response.url.endswith("/api/v1/content-prep/shared-content")
+            and response.request.method == "PUT"
+        ) as collection_info:
+            center_page.locator("#ccConfirmCollectionBtn").click()
+        assert collection_info.value.ok, collection_info.value.text()
+        center_page.reload(wait_until="networkidle")
+        assert f"Task5 标签 {stamp}" in center_page.locator("#ccTagList").inner_text()
+        assert f"Task5 题集 {stamp}" in center_page.locator("#ccCollectionList").inner_text()
+        assert f"Task5 stale tag {stamp}" not in center_page.locator(
+            "#ccTagList"
+        ).inner_text()
+
+        teacher_context = create_context(
+            browser, teacher_username, TEST_PASSWORD
+        )
+        teacher_context.on(
+            "request",
+            lambda request: runtime_requests.append(request.url)
+            if "/api/v1/runtime/state" in request.url
+            or "server-state-bootstrap.js" in request.url
+            else None,
+        )
+        teacher_page = teacher_context.new_page()
+        teacher_page.goto(
+            BASE + "/content-center.html?subjectId=subject-pmp",
+            wait_until="networkidle",
+        )
+        assert f"Task5 标签 {stamp}" in teacher_page.locator(
+            "#ccTagList"
+        ).inner_text()
+        teacher_context.close()
+        teacher_context = create_context(
+            browser, teacher_username, TEST_PASSWORD
+        )
+        teacher_context.on(
+            "request",
+            lambda request: runtime_requests.append(request.url)
+            if "/api/v1/runtime/state" in request.url
+            or "server-state-bootstrap.js" in request.url
+            else None,
+        )
+        relogin_page = teacher_context.new_page()
+        relogin_page.goto(
+            BASE + "/content-center.html?subjectId=subject-pmp",
+            wait_until="networkidle",
+        )
+        assert f"Task5 标签 {stamp}" in relogin_page.locator(
+            "#ccTagList"
+        ).inner_text()
+
+        prep_page = context.new_page()
+        prep_page.goto(BASE + "/content-prep", wait_until="networkidle")
+        if prep_page.locator("#creatorGate").is_visible():
+            select_creator(prep_page)
+        prep_page.locator("#sharedDraftGate").wait_for(state="visible")
+        prep_page.once("dialog", lambda dialog: dialog.accept(f"Task5 教学内容 {stamp}"))
+        prep_page.locator("#btnCreateSharedDraft").click()
+        prep_page.locator("#sharedDraftGate").wait_for(state="hidden")
+        prep_page.locator('[data-tab="management"]').click()
+        prep_page.locator("#btnNewPrinciple").wait_for(state="visible")
+        prep_page.locator("#btnNewPrinciple").click()
+        principle_name = f"Task5 原则 {stamp}"
+        prep_page.locator("#pmPrincipleName").fill(principle_name)
+        prep_page.locator("#pmPresetContent").fill("教学内容必须以关系 API 为唯一权威。")
+        prep_page.locator("#pmSave").click()
+        principle_result = prep_page.evaluate(
+            """async () => {
+              const principle=state.principles.items.find(row=>row.id===state.currentPrincipleId);
+              const preset=state.synthesisPresets.items.find(row=>row.principleId===principle.id);
+              return KGTeachingContentApi.savePrinciple(principle,preset);
+            }"""
+        )
+        assert principle_result["principles"]["items"]
+        recall_result = prep_page.evaluate(
+            """async () => {
+              const current=KGTeachingContentApi.readResource('recallLibrary',{});
+              return KGTeachingContentApi.saveRecallLibrary('subject-pmp',{
+                ...current,
+                name:'Task5 Recall E2E',
+                nodes:[...(current.nodes||[]),{id:'task5-recall-e2e',title:'Task5 Recall E2E'}],
+                edges:current.edges||[]
+              });
+            }"""
+        )
+        assert any(row.get("id") == "task5-recall-e2e" for row in recall_result["nodes"])
+        prep_page.reload(wait_until="networkidle")
+        prep_page.wait_for_function(
+            "() => KGTeachingContentApi?.readResource?.('principles',{items:[]}).items.some(row=>row.name.startsWith('Task5 原则'))"
+        )
+
+        assert runtime_requests == [], runtime_requests
+        print(
+            "teaching-content-e2e-ok native=subject-create,taxonomy-node,tag,collection "
+            "principle=control-plus-api recall=typed-api reload=2 relogin=1 uiConflict=409 runtimeRequests=0",
+            flush=True,
+        )
+    finally:
+        if teacher_context is not None:
+            teacher_context.close()
+        if context is not None:
+            cleanup_ok(
+                context.request.delete(BASE + f"/api/v1/users/{teacher_username}"),
+                "delete task5 teacher",
+                allow_not_found=True,
+            )
+        if context is not None:
+            context.close()
+        if browser is not None:
+            browser.close()
+        if playwright is not None:
+            playwright.stop()
+        isolated.close()
+
+
+def run_question_paper_e2e(*, assert_no_runtime: bool) -> None:
+    global BASE
+    isolated = IsolatedE2EHarness()
+    BASE = isolated.start()
+    bank_id = ""
+    question_id = ""
+    category_id = ""
+    paper_id = ""
+    paper_revision: int | None = None
+    release_id = ""
+    playwright = None
+    browser = None
+    admin = None
+    teacher = None
+    student = None
+    runtime_requests: list[str] = []
+
+    def watch_management_request(request) -> None:
+        url = request.url
+        if "/api/v1/runtime/state" in url or "server-state-bootstrap.js" in url:
+            runtime_requests.append(url)
+
+    try:
+        playwright = sync_playwright().start()
+        if playwright is not None:
+            browser = playwright.chromium.launch(headless=True)
+            admin = browser.new_context(viewport={"width": 1440, "height": 1000})
+            login(admin, ADMIN_USERNAME, ADMIN_PASSWORD)
+            stamp = f"{int(time.time() * 1000)}-{uuid4().hex[:8]}"
+            # The database and release are disposable, so seeded identities give
+            # us stable allow/deny roles without leaving user/subscription rows.
+            teacher_username = "老师"
+            student_username = "学生"
+            teacher = create_context(browser, teacher_username, "111111")
+            student = create_context(browser, student_username, "111111")
+            teacher.on("request", watch_management_request)
+
+            # Request context is used only to seed a complete publish fixture;
+            # all behavior under test below is performed with visible controls.
+            publish_bank = assert_ok(
+                teacher.request.post(
+                    BASE + "/api/v1/banks",
+                    data={"name": f"Task3 发布夹具 {stamp}", "subject": "PMP"},
+                ),
+                "seed publish bank",
+            )["bank"]
+            publish_question_payload = question_payload(
+                f"Task3 发布夹具题 {stamp}", configured=True
+            )
+            publish_question_payload["domain"] = "process"
+            publish_question_payload["metadata"] = {
+                "subjectFacets": [{"dimensionId": "exam-domain", "valueId": "process"}]
+            }
+            publish_question = assert_ok(
+                teacher.request.post(
+                    BASE + f"/api/v1/banks/{publish_bank['id']}/questions",
+                    data=publish_question_payload,
+                ),
+                "seed configured publish question",
+            )["question"]
+            publish_bank_id = publish_bank["id"]
+            publish_question_id = publish_question["id"]
+            question_page = teacher.new_page()
+            question_page.goto(BASE + "/question-bank.html", wait_until="networkidle")
+            question_page.locator("#qbAddBankBtn").wait_for(state="visible")
+            with question_page.expect_response(
+                lambda response: response.url.endswith("/api/v1/banks")
+                and response.request.method == "POST"
+            ) as bank_response_info:
+                question_page.locator("#qbAddBankBtn").click()
+            bank_response = bank_response_info.value
+            assert bank_response.ok, (bank_response.status, bank_response.text())
+            bank_id = bank_response.json()["bank"]["id"]
+            bank_name = f"Task3 题库 {stamp}"
+            question_page.locator("#bankName").fill(bank_name)
+
+            # The failed native save must be visible and retryable; no client
+            # cache or Runtime fallback is allowed to make it appear successful.
+            bank_update = f"**/api/v1/banks/{bank_id}"
+            question_page.route(bank_update, lambda route: route.abort())
+            question_page.once("dialog", lambda dialog: dialog.accept())
+            with question_page.expect_event("dialog") as failure_dialog_info:
+                question_page.locator("#qbSaveBankBtn").click()
+            assert "题库保存失败" in failure_dialog_info.value.message
+            question_page.unroute(bank_update)
+            with question_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/banks/{bank_id}")
+                and response.request.method == "PUT"
+            ) as bank_save_info:
+                question_page.locator("#qbSaveBankBtn").click()
+            assert bank_save_info.value.ok, bank_save_info.value.text()
+            question_page.locator("#qbToast").filter(has_text="题库已保存").wait_for()
+
+            # Complete native bank CRUD with a disposable empty bank. API
+            # request context remains verification/setup only; both create and
+            # delete are driven by visible page controls.
+            with question_page.expect_response(
+                lambda response: response.url.endswith("/api/v1/banks")
+                and response.request.method == "POST"
+            ) as disposable_bank_info:
+                question_page.locator("#qbAddBankBtn").click()
+            disposable_bank_id = disposable_bank_info.value.json()["bank"]["id"]
+            question_page.locator(f'[data-bank-delete="{disposable_bank_id}"]').wait_for()
+            question_page.once("dialog", lambda dialog: dialog.accept())
+            with question_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/banks/{disposable_bank_id}")
+                and response.request.method == "DELETE"
+            ) as disposable_bank_delete_info:
+                question_page.locator(f'[data-bank-delete="{disposable_bank_id}"]').click()
+            assert disposable_bank_delete_info.value.ok, disposable_bank_delete_info.value.text()
+            question_page.locator(f'[data-bank-delete="{disposable_bank_id}"]').wait_for(state="detached")
+            main_bank_control = question_page.locator(f'.qb-bank-select[data-bank-id="{bank_id}"]')
+            main_bank_control.wait_for(state="visible")
+            main_bank_control.click()
+
+            with question_page.expect_response(
+                lambda response: f"/api/v1/banks/{bank_id}/questions" in response.url
+                and response.request.method == "POST"
+            ) as question_create_info:
+                question_page.locator("#qbAddQuestionBtn").click()
+            question_create = question_create_info.value
+            assert question_create.ok, question_create.text()
+            question_id = question_create.json()["question"]["id"]
+            question_page.wait_for_function(
+                "id => { const state=window.KGQuestionCatalogEditController.status(); "
+                "return state.questionId === id && !!state.lockToken && !state.readonly; }",
+                arg=question_id,
+            )
+            question_title = f"Task3 题目 {stamp}"
+            edited_question_title = f"Task3 已编辑题目 {stamp}"
+            question_page.locator("#questionTitleInput").fill(question_title)
+            question_page.locator("#questionStemInput").fill(f"{question_title} 应选择哪一项？")
+            question_page.locator("#questionAnalysisInput").fill("应使用服务器公共题池。")
+            question_page.locator("details.tq-more-info > summary").click()
+            question_page.locator("#questionDomainInput").fill("process")
+            option_texts = question_page.locator("#qbOptionsEditor .option-text")
+            option_texts.nth(0).fill("账号本地副本")
+            option_texts.nth(1).fill("服务器公共题池")
+            question_page.locator('input[name="correctOption"][value="B"]').check()
+            first_lock_token = question_page.evaluate(
+                "() => window.KGQuestionCatalogEditController.status().lockToken"
+            )
+            with question_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/content-prep/questions/{question_id}")
+                and response.request.method == "PUT"
+            ) as question_save_info:
+                question_page.locator("#qbSaveQuestionBtn").click()
+            assert question_save_info.value.ok, question_save_info.value.text()
+            question_page.wait_for_function(
+                "oldToken => { const state=window.KGQuestionCatalogEditController.status(); "
+                "return !state.readonly && state.lockToken && state.lockToken !== oldToken; }",
+                arg=first_lock_token,
+            )
+            question_page.locator("#questionTitleInput").fill(edited_question_title)
+            edit_lock_token = question_page.evaluate(
+                "() => window.KGQuestionCatalogEditController.status().lockToken"
+            )
+            with question_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/content-prep/questions/{question_id}")
+                and response.request.method == "PUT"
+            ) as question_edit_info:
+                question_page.locator("#qbSaveQuestionBtn").click()
+            assert question_edit_info.value.ok, question_edit_info.value.text()
+            question_page.wait_for_function(
+                "oldToken => window.KGQuestionCatalogEditController.status().lockToken !== oldToken",
+                arg=edit_lock_token,
+            )
+
+            # A second question proves the native delete flow, including the
+            # recoverable soft-delete dialog and final relational API delete.
+            question_page.locator('[data-main-tab="banks"]').click()
+            with question_page.expect_response(
+                lambda response: f"/api/v1/banks/{bank_id}/questions" in response.url
+                and response.request.method == "POST"
+            ) as spare_create_info:
+                question_page.locator("#qbAddQuestionBtn").click()
+            spare_id = spare_create_info.value.json()["question"]["id"]
+            question_page.wait_for_function(
+                "id => { const state=window.KGQuestionCatalogEditController.status(); "
+                "return state.questionId === id && !!state.lockToken && !state.readonly; }",
+                arg=spare_id,
+            )
+            question_page.locator("#questionTitleInput").fill(f"Task3 待删除题目 {stamp}")
+            question_page.locator("#questionStemInput").fill("这是待删除题目。")
+            spare_options = question_page.locator("#qbOptionsEditor .option-text")
+            spare_options.nth(0).fill("是")
+            spare_options.nth(1).fill("否")
+            question_page.locator('input[name="correctOption"][value="A"]').check()
+            spare_lock_token = question_page.evaluate(
+                "() => window.KGQuestionCatalogEditController.status().lockToken"
+            )
+            with question_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/content-prep/questions/{spare_id}")
+                and response.request.method == "PUT"
+            ):
+                question_page.locator("#qbSaveQuestionBtn").click()
+            question_page.wait_for_function(
+                "oldToken => window.KGQuestionCatalogEditController.status().lockToken !== oldToken",
+                arg=spare_lock_token,
+            )
+            question_page.locator("#qbDeleteQuestionBtn").click()
+            question_page.locator("#qbSafeDeleteDialog").wait_for(state="visible")
+            with question_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/content-prep/questions/{spare_id}")
+                and response.request.method == "PUT"
+            ):
+                question_page.locator("#qbSafeDeleteConfirmBtn").click()
+            question_page.locator('[data-main-tab="banks"]').click()
+            question_page.locator("#qbQuestionLifecycleFilter").select_option("deleted")
+            question_page.locator(f'[data-question-permanent="{spare_id}"]').click()
+            question_page.locator("#qbPermanentDeleteAcknowledge").check()
+            with question_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/questions/{spare_id}")
+                and response.request.method == "DELETE"
+            ) as permanent_delete_info:
+                question_page.locator("#qbPermanentDeleteConfirmBtn").click()
+            assert permanent_delete_info.value.ok, permanent_delete_info.value.text()
+            question_page.locator("#qbQuestionLifecycleFilter").select_option("active")
+            question_page.locator(f'[data-question-id="{question_id}"]').click()
+
+            question_page.reload(wait_until="networkidle")
+            question_page.wait_for_function(
+                "id => window.KGQuestionCatalogAdapter?.snapshot?.().questions?.some(row=>row.id===id)",
+                arg=question_id,
+            )
+            assert edited_question_title in question_page.locator("body").inner_text()
+
+            paper_page = teacher.new_page()
+            paper_page.goto(BASE + "/paper-management.html", wait_until="networkidle")
+            paper_page.locator("#qbAddPaperCategoryBtn").wait_for(state="visible")
+            category_name = f"Task3 分类 {stamp}"
+            paper_page.once("dialog", lambda dialog: dialog.accept(category_name))
+            with paper_page.expect_response(
+                lambda response: response.url.endswith("/api/v1/paper-categories")
+                and response.request.method == "POST"
+            ) as category_create_info:
+                paper_page.locator("#qbAddPaperCategoryBtn").click()
+            category_id = category_create_info.value.json()["category"]["id"]
+            edited_category_name = f"Task3 已编辑分类 {stamp}"
+            paper_page.once("dialog", lambda dialog: dialog.accept(edited_category_name))
+            with paper_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/paper-categories/{category_id}")
+                and response.request.method == "PUT"
+            ):
+                paper_page.locator(f'[data-paper-category-rename="{category_id}"]').click()
+
+            # Create and delete an empty category through its native controls.
+            disposable_category_name = f"Task3 空分类 {stamp}"
+            paper_page.once("dialog", lambda dialog: dialog.accept(disposable_category_name))
+            with paper_page.expect_response(
+                lambda response: response.url.endswith("/api/v1/paper-categories")
+                and response.request.method == "POST"
+            ) as disposable_category_info:
+                paper_page.locator("#qbAddPaperCategoryBtn").click()
+            disposable_category_id = disposable_category_info.value.json()["category"]["id"]
+            paper_page.once("dialog", lambda dialog: dialog.accept())
+            with paper_page.expect_response(
+                lambda response: response.url.startswith(BASE + f"/api/v1/paper-categories/{disposable_category_id}")
+                and response.request.method == "DELETE"
+            ):
+                paper_page.locator(f'[data-paper-category-delete="{disposable_category_id}"]').click()
+            paper_page.locator(
+                f'[data-paper-category-delete="{disposable_category_id}"]'
+            ).wait_for(state="detached")
+
+            with paper_page.expect_response(
+                lambda response: response.url.endswith("/api/v1/papers")
+                and response.request.method == "POST"
+            ) as paper_create_info:
+                paper_page.locator("#qbAddPaperBtn").click()
+            paper = paper_create_info.value.json()["paper"]
+            paper_id = paper["id"]
+            paper_revision = paper["revision"]
+            # A paper soft-delete retains its category relationship; the
+            # isolated database drop is the authoritative cleanup from here.
+            category_id = ""
+            paper_page.wait_for_function(
+                "([id,name]) => document.querySelector(`[data-paper-id=\"${id}\"]`)?.classList.contains('active') "
+                "&& document.getElementById('paperNameInput')?.value === name "
+                "&& !document.getElementById('qbDeletePaperBtn')?.disabled",
+                arg=[paper_id, paper["name"]],
+            )
+            paper_page.locator("#qbPaperCandidateBankFilter").select_option(publish_bank_id)
+            paper_page.locator(f'[data-paper-candidate*="{publish_question_id}"]').wait_for()
+            paper_name = f"Task3 已编辑试卷 {stamp}"
+            paper_page.locator("#qbToast").evaluate(
+                "element => { element.textContent=''; element.classList.remove('show'); }"
+            )
+            paper_page.locator("#paperTotalInput").fill("1")
+            paper_page.locator("#paperNameInput").fill(paper_name)
+            with paper_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/papers/{paper_id}")
+                and response.request.method == "PUT"
+            ) as paper_save_info:
+                paper_page.locator("#qbSavePaperBtn").click()
+            assert paper_save_info.value.ok, paper_save_info.value.text()
+            paper_page.locator("#qbToast").filter(has_text="试卷已保存").wait_for()
+            saved_paper = assert_ok(
+                teacher.request.get(BASE + f"/api/v1/papers/{paper_id}"),
+                "independently verify native paper edit",
+            )["paper"]
+            assert saved_paper["name"] == paper_name, (
+                saved_paper["name"], paper_name, paper_page.locator("#paperNameInput").input_value()
+            )
+            assert saved_paper["totalCount"] == 1
+
+            # Native publish validation must remain visible and recoverable.
+            paper_page.locator("#qbToast").evaluate(
+                "element => { element.textContent=''; element.classList.remove('show'); }"
+            )
+            with paper_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/papers/{paper_id}")
+                and response.request.method == "PUT"
+            ):
+                paper_page.locator("#qbPublishPaperBtn").click()
+            paper_page.locator("#qbToast").filter(
+                has_text="请先从题库选择题目后再发布"
+            ).wait_for()
+
+            paper_page.locator(f'[data-paper-candidate*="{publish_question_id}"]').wait_for()
+            paper_page.locator(f'[data-paper-candidate*="{publish_question_id}"]').check()
+            with paper_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/papers/{paper_id}/questions")
+                and response.request.method == "PUT"
+            ) as compose_info:
+                paper_page.locator("#qbAddSelectedToPaperBtn").click()
+            assert compose_info.value.ok, compose_info.value.text()
+            verify_bank_id = bank_id
+            verify_question_id = question_id
+            question_id = ""
+            bank_id = ""
+
+            publish_url = f"**/api/v1/paper-releases/papers/{paper_id}/publish"
+            paper_page.route(publish_url, lambda route: route.abort())
+            paper_page.locator("#qbToast").evaluate(
+                "element => { element.textContent=''; element.classList.remove('show'); }"
+            )
+            paper_page.locator("#qbPublishPaperBtn").click()
+            paper_page.wait_for_function(
+                "() => document.getElementById('qbToast')?.classList.contains('show') "
+                "&& !!document.getElementById('qbToast')?.textContent"
+            )
+            publish_failure = paper_page.locator("#qbToast").inner_text()
+            assert any(token in publish_failure.lower() for token in ("失败", "fetch", "网络")), publish_failure
+            paper_page.unroute(publish_url)
+            with paper_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/paper-releases/papers/{paper_id}/publish")
+                and response.request.method == "POST"
+            ) as publish_info:
+                paper_page.locator("#qbPublishPaperBtn").click()
+            publish_response = publish_info.value
+            assert publish_response.ok, (publish_response.status, publish_response.text())
+            release_id = publish_response.json()["release"]["id"]
+            paper_page.locator("#qbWithdrawPaperBtn").wait_for(state="visible")
+            assert paper_name in paper_page.locator("#qbPaperList").inner_text()
+            history = assert_ok(
+                teacher.request.get(BASE + f"/api/v1/paper-releases/papers/{paper_id}/history"),
+                "independently verify native publish",
+            )["releases"]
+            assert any(row["id"] == release_id and row["status"] == "published" for row in history)
+
+            paper_page.reload(wait_until="networkidle")
+            paper_page.wait_for_function(
+                "name => document.getElementById('qbPaperList')?.textContent?.includes(name)",
+                arg=paper_name,
+            )
+
+            teacher.close()
+            teacher = create_context(browser, teacher_username, "111111")
+            teacher.on("request", watch_management_request)
+            relogin_question_page = teacher.new_page()
+            relogin_question_page.goto(BASE + "/question-bank.html", wait_until="networkidle")
+            relogin_question_page.locator(
+                f'.qb-bank-select[data-bank-id="{verify_bank_id}"]'
+            ).click()
+            relogin_question_page.wait_for_function(
+                "title => document.getElementById('qbQuestionList')?.textContent?.includes(title)",
+                arg=edited_question_title,
+            )
+            relogin_page = teacher.new_page()
+            relogin_page.goto(BASE + "/paper-management.html", wait_until="networkidle")
+            relogin_page.wait_for_function(
+                "name => document.getElementById('qbPaperList')?.textContent?.includes(name)",
+                arg=paper_name,
+            )
+            relogin_page.locator(f'[data-paper-id="{paper_id}"]').click()
+            relogin_page.locator("#qbWithdrawPaperBtn").wait_for(state="visible")
+            relogin_page.once("dialog", lambda dialog: dialog.accept())
+            with relogin_page.expect_response(
+                lambda response: response.url.endswith(f"/api/v1/paper-releases/papers/{paper_id}/withdraw-all")
+                and response.request.method == "POST"
+            ) as withdraw_info:
+                relogin_page.locator("#qbWithdrawPaperBtn").click()
+            assert withdraw_info.value.ok, withdraw_info.value.text()
+            relogin_page.locator("#qbToast").filter(has_text="已取消发布").wait_for()
+            history = assert_ok(
+                teacher.request.get(BASE + f"/api/v1/paper-releases/papers/{paper_id}/history"),
+                "independently verify native withdraw",
+            )["releases"]
+            assert next(row for row in history if row["id"] == release_id)["status"] == "withdrawn"
+
+            # A never-published draft covers the native paper delete control.
+            with relogin_page.expect_response(
+                lambda response: response.url.endswith("/api/v1/papers")
+                and response.request.method == "POST"
+            ) as disposable_paper_info:
+                relogin_page.locator("#qbAddPaperBtn").click()
+            disposable_paper_id = disposable_paper_info.value.json()["paper"]["id"]
+            relogin_page.wait_for_function(
+                """paperId => {
+                    const created = document.querySelector(`[data-paper-id="${paperId}"]`);
+                    const deleteButton = document.getElementById("qbDeletePaperBtn");
+                    return Boolean(created?.classList.contains("active") && deleteButton && !deleteButton.disabled);
+                }""",
+                arg=disposable_paper_id,
+            )
+            relogin_page.once("dialog", lambda dialog: dialog.accept())
+            with relogin_page.expect_response(
+                lambda response: response.url.startswith(BASE + f"/api/v1/papers/{disposable_paper_id}")
+                and response.request.method == "DELETE"
+            ) as disposable_paper_delete_info:
+                relogin_page.locator("#qbDeletePaperBtn").click()
+            assert disposable_paper_delete_info.value.ok, disposable_paper_delete_info.value.text()
+
+            verify_question = assert_ok(
+                teacher.request.get(BASE + f"/api/v1/questions/{verify_question_id}"),
+                "independently verify question persistence after relogin",
+            )["question"]
+            assert verify_question["title"] == edited_question_title
+            verify_paper = assert_ok(
+                teacher.request.get(BASE + f"/api/v1/papers/{paper_id}"),
+                "independently verify paper persistence after relogin",
+            )["paper"]
+            assert verify_paper["name"] == paper_name
+
+            # Denial is asserted on both actual pages, not through API-only 403s.
+            student.on("request", watch_management_request)
+            for page_name in ("question-bank.html", "paper-management.html"):
+                denied_page = student.new_page()
+                denied_response = denied_page.goto(
+                    BASE + "/" + page_name, wait_until="networkidle"
+                )
+                assert denied_response is not None and denied_response.status == 403
+                denied_page.get_by_role("heading", name="无权访问", exact=True).wait_for()
+
+            if assert_no_runtime:
+                assert runtime_requests == [], runtime_requests
+
+            # The whole PostgreSQL database is dropped by the isolated harness;
+            # published history intentionally prevents destructive API cleanup.
+            paper_id = ""
+            category_id = ""
+            question_id = ""
+            bank_id = ""
+            print(
+                "question-paper-e2e-ok "
+                "nativeCrud=bank,question,category,paper publish=1 withdraw=1 "
+                "validationRecovery=1 apiFailureRecovery=2 roleDenial=2 "
+                f"runtimeRequests={len(runtime_requests)} refresh=2 relogin=1 cleanup=isolated-db-drop",
+                flush=True,
+            )
+    finally:
+        cleanup_errors: list[str] = []
+        cleanup_request = admin.request if admin is not None else None
+        if cleanup_request is not None:
+            if paper_id:
+                try:
+                    cleanup_request.post(
+                        BASE + f"/api/v1/paper-releases/papers/{paper_id}/withdraw-all", data={}
+                    )
+                    current_paper_response = cleanup_request.get(BASE + f"/api/v1/papers/{paper_id}")
+                    current_paper_revision = (
+                        current_paper_response.json().get("paper", {}).get("revision")
+                        if current_paper_response.ok
+                        else paper_revision
+                    )
+                    cleanup_ok(
+                        cleanup_request.delete(
+                            BASE + f"/api/v1/papers/{paper_id}?revision={current_paper_revision}&reason=task3_e2e_cleanup"
+                        ),
+                        f"delete paper {paper_id}",
+                        allow_not_found=True,
+                    )
+                except Exception as error:
+                    cleanup_errors.append(f"paper {paper_id}: {error}")
+            if category_id:
+                try:
+                    categories_response = cleanup_request.get(BASE + "/api/v1/paper-categories")
+                    current_category_revision = next(
+                        (
+                            row.get("revision")
+                            for row in categories_response.json().get("categories", [])
+                            if row.get("id") == category_id
+                        ),
+                        None,
+                    )
+                    cleanup_ok(
+                        cleanup_request.delete(
+                            BASE
+                            + f"/api/v1/paper-categories/{category_id}?revision={current_category_revision}"
+                        ),
+                        f"delete category {category_id}",
+                        allow_not_found=True,
+                    )
+                except Exception as error:
+                    cleanup_errors.append(f"category {category_id}: {error}")
+            if question_id:
+                try:
+                    cleanup_ok(
+                        cleanup_request.delete(BASE + f"/api/v1/questions/{question_id}"),
+                        f"delete question {question_id}",
+                        allow_not_found=True,
+                    )
+                except Exception as error:
+                    cleanup_errors.append(f"question {question_id}: {error}")
+            if bank_id:
+                try:
+                    cleanup_ok(
+                        cleanup_request.delete(BASE + f"/api/v1/banks/{bank_id}"),
+                        f"delete bank {bank_id}",
+                        allow_not_found=True,
+                    )
+                except Exception as error:
+                    cleanup_errors.append(f"bank {bank_id}: {error}")
+        for context in (student, teacher, admin):
+            if context is not None:
+                try:
+                    context.close()
+                except Exception:
+                    pass
+        if browser is not None:
+            try:
+                browser.close()
+            except Exception:
+                pass
+        if playwright is not None:
+            try:
+                playwright.stop()
+            except Exception:
+                pass
+        try:
+            isolated.close()
+        except Exception as error:
+            cleanup_errors.append(f"isolated harness: {error}")
+        if cleanup_errors:
+            raise AssertionError("; ".join(cleanup_errors))
+
+
+ARGS = parse_args()
+if ARGS.teaching_content_only:
+    run_teaching_content_e2e()
+    raise SystemExit(0)
+if ARGS.assert_no_runtime and not ARGS.question_paper_only:
+    raise SystemExit("--assert-no-runtime currently requires --question-paper-only")
+if ARGS.question_paper_only:
+    run_question_paper_e2e(assert_no_runtime=ARGS.assert_no_runtime)
+    raise SystemExit(0)
 
 
 harness = IsolatedE2EHarness()

@@ -289,19 +289,21 @@ async def preview_asset(version: str, asset_path: str, request: Request, db: DB)
 @router.put("/api/v1/runtime/state")
 @router.post("/api/v1/runtime/state")
 async def save_runtime_state(update: RuntimeStateUpdate, user: CurrentUser, db: DB):
-    """Persist one validated mutation in the user's PostgreSQL runtime state."""
+    """Persist legacy Runtime only when rollback sync is explicitly enabled.
+
+    The default retirement drain validates/authenticates the compatibility
+    request, but does not read Runtime, touch its database rows, or mutate
+    shared teaching revisions.
+    """
     if settings.RUNTIME_SYNC_DISABLED:
-        # 退役 drain：领域 API 已承接全部业务数据，通用 KV 不再落库；
-        # 对旧缓存页返回成功与当前版本号，避免保存失败提示。
-        _, revision, content_revision = await runtime_state_service.get_state(
-            db, user.username, user.role, mode="full"
-        )
+        # 退役 drain：领域 API 已承接全部业务数据，通用 KV 不再落库。固定
+        # 兼容版本避免对 Runtime 状态的读取触发历史迁移/修订副作用。
         return {
             "ok": True,
             "username": user.username,
             "namespace": update.namespace,
-            "revision": revision,
-            "contentRevision": content_revision,
+            "revision": 0,
+            "contentRevision": 0,
             "requestId": update.requestId,
         }
     try:
@@ -338,9 +340,11 @@ async def read_runtime_state(
     mode: Literal["full", "bootstrap"] | None = None,
     page: str | None = None,
 ):
+    if not settings.RUNTIME_ROLLBACK_READ_ENABLED:
+        raise HTTPException(status_code=410, detail="Runtime state 已退役")
     if mode is None:
         mode = "full"
-    storage, revision, content_revision = await runtime_state_service.get_state(
+    storage, revision, content_revision = await runtime_state_service.get_rollback_read_state(
         db, user.username, user.role, mode=mode, page=page
     )
     return {
@@ -352,6 +356,8 @@ async def read_runtime_state(
 
 @router.post("/api/v1/runtime/learning-entry-claim")
 async def claim_learning_entry(request: Request, user: CurrentUser, db: DB):
+    if settings.RUNTIME_SYNC_DISABLED:
+        return {"claimed": False, "revision": 0, "retired": True}
     return await runtime_state_service.claim_learning_entry(
         db,
         user.username,
@@ -361,6 +367,8 @@ async def claim_learning_entry(request: Request, user: CurrentUser, db: DB):
 
 @router.post("/api/v1/runtime/guided-tour-claim")
 async def claim_guided_tour(user: CurrentUser, db: DB):
+    if settings.RUNTIME_SYNC_DISABLED:
+        return {"claimed": False, "revision": 0, "retired": True}
     return await runtime_state_service.claim_guided_tour(db, user.username)
 
 

@@ -1,15 +1,15 @@
 'use strict';
 (function(global){
   class CourseService{
-    constructor(options={}){this.legacy=options.legacy;this.transactions=options.transactions;this.references=options.references}
-    drafts(){return this.legacy.getCourseDrafts()}
-    releases(){return this.legacy.getCourseReleases()}
+    constructor(options={}){this.legacy=options.legacy;this.api=options.api||global.KGCourseManagementApi;this.permissions=options.permissions;this.references=options.references}
+    drafts(){return this.api?.listDrafts?.()||[]}
+    releases(){return this.api?.listReleases?.()||[]}
     validate(course){return this.legacy.validateCourse(course)}
     normalize(course,index=0){return this.legacy.normalizeCourse(course,index)}
-    saveDraft(course){const tx=this.transactions.execute({name:'保存课程草稿',action:'course.draft.save',entityType:'course',entityId:course?.id,permission:'editCourses',keys:['courseDrafts'],validate:()=>this.validate(course),commit:()=>({valid:true,course:this.legacy.saveCourseDraft(course)})});if(tx.valid)this.references?.invalidate();return tx.valid?{valid:true,course:tx.value.course,transactionId:tx.transactionId,errors:[],warnings:tx.warnings||[]}:{valid:false,errors:tx.errors||[]}}
-    deleteDraft(courseId){const tx=this.transactions.execute({name:'删除课程草稿',action:'course.draft.delete',entityType:'course',entityId:courseId,permission:'editCourses',keys:['courseDrafts'],commit:()=>({valid:true,courses:this.legacy.deleteCourseDraft(courseId)})});if(tx.valid)this.references?.invalidate();return tx.valid?{valid:true,courses:tx.value.courses,transactionId:tx.transactionId,errors:[]}:{valid:false,errors:tx.errors||[]}}
-    publish(courseId,notes=''){const tx=this.transactions.execute({name:'发布课程',action:'course.publish',entityType:'course',entityId:courseId,permission:'publishCourses',keys:['courseDrafts','courseReleases','activeCourse'],commit:()=>this.legacy.publishCourse(courseId,notes)});if(tx.valid)this.references?.invalidate();return tx.valid?{...tx.value,transactionId:tx.transactionId}:{valid:false,errors:tx.errors||[]}}
-    activeRelease(){return this.legacy.activeCourseRelease()}
+    async saveDraft(course){const permission=this.permissions?.require?.('editCourses')||{valid:true};if(!permission.valid)return permission;const validation=this.validate(course);if(!validation.valid)return validation;const saved=await this.api.saveDraft(validation.course);this.references?.invalidate();return {valid:true,course:saved,errors:[],warnings:validation.warnings||[]}}
+    async deleteDraft(courseId){const permission=this.permissions?.require?.('editCourses')||{valid:true};if(!permission.valid)return permission;const current=this.drafts().find(item=>item.id===courseId);if(!current)return {valid:false,errors:['课程草稿不存在。']};await this.api.deleteDraft(courseId,current.revision);this.references?.invalidate();return {valid:true,courses:this.drafts(),errors:[]}}
+    async publish(courseId,notes=''){const permission=this.permissions?.require?.('publishCourses')||{valid:true};if(!permission.valid)return permission;const current=this.drafts().find(item=>item.id===courseId);if(!current)return {valid:false,errors:['课程草稿不存在。']};const validation=this.validate(current);if(!validation.valid)return validation;const saved=await this.api.publishDraft(courseId,notes,current.revision);this.references?.invalidate();return {valid:true,...saved,errors:[],warnings:validation.warnings||[]}}
+    activeRelease(){return this.releases().filter(item=>item.status==='published').sort((a,b)=>String(b.publishedAt||'').localeCompare(String(a.publishedAt||'')))[0]||null}
     coverage(course){return this.legacy.courseKnowledgeCoverage(course)}
   }
   global.KGCourseService=CourseService;

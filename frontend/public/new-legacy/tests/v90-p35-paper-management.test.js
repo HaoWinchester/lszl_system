@@ -36,10 +36,12 @@ assert(!course.includes('data-config-view="papers"'),'course page must not expos
 assert(page.includes('<a class="active" href="paper-management.html">试卷管理</a>'),'paper management must occupy teacher workflow tab 4');
 assert(page.includes('<b>3</b>管理试卷'),'paper management must be teacher workflow step 3');
 const admin=read('src/65-question-bank-admin.js');
-for(const token of ['KGPaperDraftApi','reloadPaperDrafts','renderPaperCategoryList','toggleSelectPaperPage','moveSelectedPapersToCategory','archiveSelectedPapers','deleteSelectedPaperDrafts','qbQuestionPreviewPopover','bindPaperPreviewRow','positionPaperQuestionPreview','publishPaperRelease','questionSnapshots','removeSelectedPaperQuestions','toggleSelectPaperPreview','renderPaperCandidateList','addSelectedCandidatesToPaper','initPaperWorkspaceControls','openPaperQuestionPreview','applyQuestionEditorDeepLink'])assert(admin.includes(token),`admin script missing ${token}`);
+for(const token of ['KGPaperDraftApi','KGPaperReleaseApi','reloadPaperDrafts','renderPaperCategoryList','toggleSelectPaperPage','moveSelectedPapersToCategory','archiveSelectedPapers','deleteSelectedPaperDrafts','qbQuestionPreviewPopover','bindPaperPreviewRow','positionPaperQuestionPreview','publishPaperRelease','removeSelectedPaperQuestions','toggleSelectPaperPreview','renderPaperCandidateList','addSelectedCandidatesToPaper','initPaperWorkspaceControls','openPaperQuestionPreview','applyQuestionEditorDeepLink'])assert(admin.includes(token),`admin script missing ${token}`);
+assert(!admin.includes('questionSnapshots'),'teacher publish must let the server freeze question snapshots');
 for(const forbidden of ['PAPER_CATEGORY_PREFIX','function papersKey(','function paperCategoriesKey(','function loadPapers(','function savePapers(','function loadPaperCategories(','function savePaperCategories('])assert(!admin.includes(forbidden),`paper draft persistence must not use runtime storage: ${forbidden}`);
 const learner=read('src/60-question-bank.js');
-assert(learner.includes('questionSnapshots'));
+assert(learner.includes('KGPublishedPaperRepository'));
+assert(!learner.includes('questionSnapshots'),'learner must resolve immutable release questions through the typed release repository');
 assert(read('src/66-question-navigator.js').includes("mode:'single_deep_study'"));
 assert(read('src/77-multi-question-workspace.js').includes("mode:'multi_question_canvas'"));
 assert(read('src/96-recall-question-source.js').includes("mode") || read('src/96-recall-question-source.js').includes("includes('deep_recall')"));

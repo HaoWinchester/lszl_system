@@ -41,3 +41,25 @@ curl --compressed https://uat.aihuanpu.com/api/v1/health
 ```
 
 预期 HTTP 返回 301，HTTPS 能协商 HTTP/2，JS/CSS/JSON 可压缩响应包含 `Content-Encoding: gzip`。
+
+## Runtime State 退役门禁
+
+部署前先执行只读 `scan`；其他三步只能在已完成数据库备份、明确
+run ID 且已处理 scan blocker 的目标环境执行。报告目录必须是本次专用
+临时目录，禁止使用共享固定 `/tmp/*.json`。
+
+```bash
+runtime_report_dir=$(mktemp -d "${TMPDIR:-/tmp}/runtime-retirement.XXXXXX")
+runtime_run_id="uat-runtime-retirement-$(date -u +%Y%m%dT%H%M%SZ)"
+cd backend
+.venv/bin/python -m app.cli.runtime_retirement scan --report-json "$runtime_report_dir/scan.json"
+.venv/bin/python -m app.cli.runtime_retirement migrate --run-id "$runtime_run_id" --report-json "$runtime_report_dir/migrate.json"
+.venv/bin/python -m app.cli.runtime_retirement verify --run-id "$runtime_run_id" --report-json "$runtime_report_dir/verify.json"
+.venv/bin/python -m app.cli.runtime_retirement drop-check --run-id "$runtime_run_id" --report-json "$runtime_report_dir/drop-check.json"
+```
+
+`drop-check` 只有在 unknown / parse error / hash mismatch / unresolved conflict 全部为
+0、files/question/paper/course 目标 proof 全部一致、且前后端两份 Runtime
+page policy 都是 `{"runtimePages": []}` 时返回 0。有任何 blocker 时返回
+2，不得执行 drop/DDL；工具本身也不执行 DDL。四份对外报告只包含
+标识、disposition、数量和 SHA-256，禁止携带业务 payload。

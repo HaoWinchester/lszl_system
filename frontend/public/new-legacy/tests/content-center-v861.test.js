@@ -3,11 +3,13 @@ const fs=require('fs');
 const vm=require('vm');
 const storage=new Map();
 const context={console,Date,URLSearchParams,CustomEvent:function(type,init){this.type=type;this.detail=init?.detail},localStorage:{getItem:key=>storage.has(key)?storage.get(key):null,setItem:(key,value)=>storage.set(key,String(value)),removeItem:key=>storage.delete(key)},dispatchEvent(){},KGAuthCore:{currentUsername:()=> 'teacher-zhao',currentUser:()=>({username:'teacher-zhao',displayName:'赵老师',role:'teacher'})}};
+const catalog={};const clone=value=>JSON.parse(JSON.stringify(value));context.KGTeachingContentApi={readResource:(name,fallback)=>clone(catalog[name]??fallback),saveTaxonomies:async rows=>(catalog.taxonomies=clone(rows)),saveActivityOverrides:async rows=>(catalog.activityOverrides=clone(rows)),saveCatalog:async patch=>{Object.entries(patch).forEach(([name,rows])=>catalog[name]=clone(rows));return clone(catalog)}};
 context.window=context;
 vm.createContext(context);
 for(const file of ['src/86-activity-schema-v1.js','src/87-guided-learning-data.js','src/91-learning-content-core.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});
 const core=context.KGLearningContent;
 function assert(condition,message){if(!condition)throw new Error(message)}
+(async()=>{
 assert(core.getSubjects().length>=5,'应内置至少 5 个科目');
 assert(core.getSubjects().every(subject=>core.defaultTaxonomyForSubject(subject.id)),'每个科目应拥有默认知识树');
 const path=core.pathForNode('taxonomy-pmp-main','kp-pmp-rtm-bidirectional');
@@ -19,14 +21,14 @@ assert(Object.keys(library).length===82,'现有 82 个活动应进入统一活�
 assert(Object.values(library).every(activity=>activity.metadata.subjectId==='subject-pmp'),'历史活动应迁移到 PMP 科目');
 assert(Object.values(library).every(activity=>activity.metadata.knowledge.mappingStatus==='unmapped'),'历史活动应安全标记为待归类');
 const firstId=Object.keys(library)[0];
-const mapped=core.mapActivities([firstId],{taxonomyId:'taxonomy-pmp-main',primaryNodeId:'kp-pmp-agile',relatedNodeIds:[]});
+const mapped=await core.mapActivities([firstId],{taxonomyId:'taxonomy-pmp-main',primaryNodeId:'kp-pmp-agile',relatedNodeIds:[]});
 assert(mapped.valid,'活动知识点映射应可保存');
 const mappedActivity=core.getActivityLibrary()[firstId];
 assert(mappedActivity.metadata.knowledge.mappingStatus==='confirmed','映射后状态应为 confirmed');
 assert(mappedActivity.metadata.authorship.updatedByUserId==='teacher-zhao','最后修改人应来自当前账号');
 let parentId='kp-pmp-rtm-bidirectional';
-for(let level=7;level<=9;level++){const saved=core.saveKnowledgeNode('taxonomy-pmp-main',{parentId,title:{zh:`第${level}层`,en:''}});assert(saved.valid,`知识树应支持第 ${level} 层`);parentId=saved.node.id}
-const tooDeep=core.saveKnowledgeNode('taxonomy-pmp-main',{parentId,title:{zh:'第十层',en:''}});
+for(let level=7;level<=9;level++){const saved=await core.saveKnowledgeNode('taxonomy-pmp-main',{parentId,title:{zh:`第${level}层`,en:''}});assert(saved.valid,`知识树应支持第 ${level} 层`);parentId=saved.node.id}
+const tooDeep=await core.saveKnowledgeNode('taxonomy-pmp-main',{parentId,title:{zh:'第十层',en:''}});
 assert(!tooDeep.valid,'知识树应阻止第 10 层');
 const courses=core.getCourseDrafts();
 assert(courses.length>=1&&courses[0].nodes.length===108,'课程配置后台应迁移现有 108 个节点为草稿');
@@ -35,3 +37,4 @@ assert(validation.valid,'内置课程草稿应通过引用完整性校验');
 const release=core.publishCourse(courses[0].id,'v8.6.1 自动测试');
 assert(release.valid&&release.release.version===1,'课程草稿应可发布为版本 1');
 console.log('content-center-v861-ok',{subjects:core.getSubjects().length,taxonomies:core.getTaxonomies().length,knowledgeDepth:path.length,activities:Object.keys(library).length,courses:courses.length});
+})().catch(error=>{console.error(error);process.exitCode=1});

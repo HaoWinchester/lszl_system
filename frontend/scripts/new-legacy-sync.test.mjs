@@ -29,6 +29,7 @@ const requiredFiles = [
   'assets/landing/recall.png',
   'assets/landing/SOURCES.md',
   'src/01-runtime-config.js',
+  'src/28-device-preferences.js',
   'src/31-learning-entry-chooser.js',
   'src/23-graph-file-store.js',
   'src/64-flow-orchestrator.js',
@@ -64,6 +65,7 @@ const requiredFiles = [
   'content-prep-studio/tests/test_server_catalog.js',
   'content-prep-studio/tests/test_edit_lock_client.js',
   'content-prep-studio/tests/test_shared_draft_service.js',
+  'content-prep-studio/tests/test_recall_acceptance_api.js',
   'content-prep-studio/tests/test_server_ui_contract.py',
   'content-prep-studio/dist/content-prep.html',
 ]
@@ -181,6 +183,39 @@ test('sync copies v8.6.0 and injects the direct runtime without editing upstream
   assert.ok(existsSync(resolve(item.output, 'personal-card-adapter.js')))
 })
 
+test('sync excludes Python and pytest caches from copied output and source hashes', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, '.pytest_cache/v/cache/nodeids'), '[]')
+  write(resolve(item.upstream, 'content-prep-studio/tests/__pycache__/test_build.cpython-311.pyc'), 'cache')
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(existsSync(resolve(item.output, '.pytest_cache')), false)
+  assert.equal(existsSync(resolve(item.output, 'content-prep-studio/tests/__pycache__')), false)
+  const sourcePaths = Object.keys(JSON.parse(readFileSync(resolve(item.output, 'manifest.json'), 'utf8')).sourceFiles)
+  assert.equal(sourcePaths.some((path) => path.includes('.pytest_cache') || path.includes('__pycache__') || path.endsWith('.pyc')), false)
+})
+
+test('sync loads shared domain and device boundaries before adapters and business scripts', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+  const page = readFileSync(resolve(item.output, 'index.html'), 'utf8')
+  assert.ok(
+    page.indexOf('domain-api-client.js') < page.indexOf('direct-graph-adapter.js'),
+    'shared domain client must initialize before generated domain adapters',
+  )
+  assert.ok(
+    page.indexOf('src/28-device-preferences.js') < page.indexOf('src/24-graph-file-autosave.js'),
+    'device preference facade must initialize before page business modules',
+  )
+})
+
 test('sync reports a database-backed deep recall save only after persistence succeeds', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))
@@ -234,6 +269,95 @@ test('sync rejects an unregistered future business-storage key', (t) => {
   assert.match(result.stderr, /P4\.5 persistent state is not registered/)
 })
 
+test('sync rejects an unregistered pmp business-storage key', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/p45-fixture.js'), "localStorage.setItem('pmp_future_business_payload_v1', '{}')\n")
+
+  const result = runSync(item)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /pmp_future_business_payload_v1/)
+  assert.match(result.stderr, /P4\.5 persistent state is not registered/)
+})
+
+test('sync permits only path-scoped deletion of the retired browser auth session', (t) => {
+  const allowed = fixture()
+  const readBack = fixture()
+  const literalRead = fixture()
+  const literalWrite = fixture()
+  const aliasRead = fixture()
+  const wrongPath = fixture()
+  for (const item of [allowed, readBack, literalRead, literalWrite, aliasRead, wrongPath]) {
+    t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  }
+
+  write(
+    resolve(allowed.upstream, 'src/29-auth-core.js'),
+    "const AUTH_REMOTE_SESSION_KEY='kg_remote_auth_session_v1';localStorage.removeItem(AUTH_REMOTE_SESSION_KEY)\n",
+  )
+  assert.equal(runSync(allowed).status, 0)
+
+  write(
+    resolve(readBack.upstream, 'src/29-auth-core.js'),
+    "const AUTH_REMOTE_SESSION_KEY='kg_remote_auth_session_v1';localStorage.getItem(AUTH_REMOTE_SESSION_KEY)\n",
+  )
+  const readResult = runSync(readBack)
+  assert.notEqual(readResult.status, 0)
+  assert.match(readResult.stderr, /cleanup must (?:remove|contain only)|must never read or write/)
+
+  write(
+    resolve(literalRead.upstream, 'src/29-auth-core.js'),
+    "const AUTH_REMOTE_SESSION_KEY='kg_remote_auth_session_v1';localStorage.removeItem(AUTH_REMOTE_SESSION_KEY);localStorage.getItem('kg_remote_auth_session_v1')\n",
+  )
+  assert.notEqual(runSync(literalRead).status, 0)
+
+  write(
+    resolve(literalWrite.upstream, 'src/29-auth-core.js'),
+    "const AUTH_REMOTE_SESSION_KEY='kg_remote_auth_session_v1';localStorage.removeItem(AUTH_REMOTE_SESSION_KEY);localStorage.setItem('kg_remote_auth_session_v1','secret')\n",
+  )
+  assert.notEqual(runSync(literalWrite).status, 0)
+
+  write(
+    resolve(aliasRead.upstream, 'src/29-auth-core.js'),
+    "const AUTH_REMOTE_SESSION_KEY='kg_remote_auth_session_v1';const legacyKey=AUTH_REMOTE_SESSION_KEY;localStorage.removeItem(AUTH_REMOTE_SESSION_KEY);localStorage.getItem(legacyKey)\n",
+  )
+  assert.notEqual(runSync(aliasRead).status, 0)
+
+  write(
+    resolve(wrongPath.upstream, 'src/p45-fixture.js'),
+    "localStorage.removeItem('kg_remote_auth_session_v1')\n",
+  )
+  const wrongPathResult = runSync(wrongPath)
+  assert.notEqual(wrongPathResult.status, 0)
+  assert.match(wrongPathResult.stderr, /P4\.5 persistent state is not registered: kg_remote_auth_session_v1/)
+})
+
+test('sync limits the registered Prep Studio IndexedDB name to its declared debt modules', (t) => {
+  const allowed = fixture()
+  const rejected = fixture()
+  t.after(() => rmSync(allowed.root, { recursive: true, force: true }))
+  t.after(() => rmSync(rejected.root, { recursive: true, force: true }))
+
+  write(
+    resolve(allowed.upstream, 'content-prep-studio/src/js/10-state-domain.js'),
+    "indexedDB.open('pmp_content_prep_studio_v1')\n",
+  )
+  write(
+    resolve(allowed.upstream, 'content-prep-studio/dist/content-prep.html'),
+    "<script>indexedDB.open('pmp_content_prep_studio_v1')</script>\n",
+  )
+  assert.equal(runSync(allowed).status, 0)
+
+  write(
+    resolve(rejected.upstream, 'src/p45-fixture.js'),
+    "localStorage.setItem('pmp_content_prep_studio_v1', '{}')\n",
+  )
+  const result = runSync(rejected)
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /P4\.5 persistent state is not registered: pmp_content_prep_studio_v1/)
+})
+
 test('sync reports the P4.5 contract diagnostic for an unregistered persistent key', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))
@@ -243,6 +367,54 @@ test('sync reports the P4.5 contract diagnostic for an unregistered persistent k
 
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /P4\.5 persistent state is not registered: kg_p45_unregistered_payload_v1/)
+})
+
+test('sync ignores storage-key literals in tests while production remains fail-closed', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  const testOnlyKey = ['kg', 'retired_test_only_v1'].join('_')
+  write(resolve(item.upstream, 'tests/retired-storage-contract.test.js'), `assert.equal(key, '${testOnlyKey}')\n`)
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+})
+
+test('sync permits the dedicated device-preference allowlist boundary', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  write(resolve(item.upstream, 'src/28-device-preferences.js'), [
+    "const prefix = ['kg_', 'resizable_'].join('')",
+    "global.localStorage." + 'setItem(assertAllowed(key), value)',
+  ].join('\n'))
+
+  const result = runSync(item)
+
+  assert.equal(result.status, 0, result.stderr)
+})
+
+test('sync rejects an unguarded business storage write inside the device-preference facade', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  const forbiddenKey = ['kg_', 'exam_papers_v1__admin'].join('')
+  write(resolve(item.upstream, 'src/28-device-preferences.js'), `localStorage.setItem('${forbiddenKey}', '[]')\n`)
+
+  const result = runSync(item)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /device preference storage call must use assertAllowed\(key\)/i)
+})
+
+test('sync rejects an unguarded session business storage write inside the device-preference facade', (t) => {
+  const item = fixture()
+  t.after(() => rmSync(item.root, { recursive: true, force: true }))
+  const forbiddenKey = ['kg_', 'exam_papers_v1__admin'].join('')
+  write(resolve(item.upstream, 'src/28-device-preferences.js'), `sessionStorage.setItem('${forbiddenKey}', '[]')\n`)
+
+  const result = runSync(item)
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /device preference storage call must use assertAllowed\(key\)/i)
 })
 
 test('sync rejects IndexedDB persistence in every non-debt P4.5 module', (t) => {

@@ -1,12 +1,11 @@
 'use strict';
 (function(global){
-  const Store=global.KGAppStorage||{};
-  const KEY='kg_principle_repository_v1';
+  const KEY='principles';
   const listeners=new Set();
   const clone=value=>{try{return JSON.parse(JSON.stringify(value))}catch(error){return value}};
   const now=()=>Date.now();
-  function readRaw(){try{return Store.readJSON?Store.readJSON(KEY,null):JSON.parse(localStorage.getItem(KEY)||'null')}catch(error){return null}}
-  function writeRaw(value){try{return Store.writeJSON?Store.writeJSON(KEY,value):(localStorage.setItem(KEY,JSON.stringify(value)),true)}catch(error){return false}}
+  function readRaw(){return global.KGTeachingContentApi?.readResource?.(KEY,null)||null}
+  function writeRaw(value){return global.KGTeachingContentApi?.stageResource?.(KEY,clone(value))===true}
   function slug(value){const text=String(value||'principle').trim().toLowerCase().replace(/^原则\s*[:：-]?\s*/,'').replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-+|-+$/g,'').slice(0,56);return text||('principle-'+now().toString(36))}
   function normalize(item={},index=0){
     const name=String(item.name||item.title||'未命名原则').trim()||'未命名原则';

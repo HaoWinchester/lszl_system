@@ -22,6 +22,13 @@ from app.services import teaching_content_revision_service as revision_service
 from app.web.schemas import RuntimeMutation, RuntimeStateUpdate
 
 
+@pytest.fixture(autouse=True)
+def legacy_runtime_api_is_explicitly_enabled_for_migration_tests(monkeypatch):
+    """Historical Runtime migration tests opt in; the application default stays retired."""
+    monkeypatch.setattr(settings, "RUNTIME_SYNC_DISABLED", False)
+    monkeypatch.setattr(settings, "RUNTIME_ROLLBACK_READ_ENABLED", True)
+
+
 def update(*, storage: dict[str, str], mutations: list[RuntimeMutation]) -> RuntimeStateUpdate:
     last = mutations[-1]
     return RuntimeStateUpdate(
@@ -139,29 +146,13 @@ def test_publisher_remove_preserves_other_teachers() -> None:
     assert [row["id"] for row in remaining] == ["b"]
 
 
-def test_private_activity_collections_are_only_visible_to_their_owner() -> None:
-    source = json.dumps([
-        {
-            "id": "admin-private",
-            "visibility": "private",
-            "authorship": {"createdByUserId": "admin-a"},
-        },
-        {
-            "id": "teacher-shared",
-            "visibility": "shared",
-            "authorship": {"createdByUserId": "teacher-a"},
-        },
-    ])
+def test_activity_collections_are_no_longer_projected_through_runtime() -> None:
+    key = "kg_activity_collections_v1"
 
-    student_rows = json.loads(service.visible_shared_value(
-        "kg_activity_collections_v1", source, "student-a"
-    ))
-    owner_rows = json.loads(service.visible_shared_value(
-        "kg_activity_collections_v1", source, "admin-a"
-    ))
-
-    assert [row["id"] for row in student_rows] == ["teacher-shared"]
-    assert [row["id"] for row in owner_rows] == ["admin-private", "teacher-shared"]
+    assert key in service.RETIRED_CATALOG_RUNTIME_KEYS
+    assert key in service.SERVER_OWNED_KEYS
+    assert key not in service.SHARED_KEYS
+    assert key not in service.TEACHING_SHARED_KEYS
 
 
 @pytest.mark.parametrize(
@@ -204,9 +195,6 @@ def test_catalog_cutover_keeps_learning_progress_and_preferences_writable(key: s
 
 
 TEACHER_WORKSPACE_SHARED_KEYS = (
-    "kg_content_subjects_v1",
-    "kg_content_taxonomies_v1",
-    "kg_content_activity_overrides_v1",
     "kg_taxonomy_release_records_v1",
     "kg_taxonomy_deletion_records_v1",
     "kg_taxonomy_import_records_v1",
@@ -214,12 +202,14 @@ TEACHER_WORKSPACE_SHARED_KEYS = (
     "kg_synthesis_preset_repository_v1",
     "kg_exam_papers_published_v1",
     "kg_exam_paper_release_history_v1",
+    "kg_question_tag_names_v1",
+)
+
+RETIRED_COURSE_RUNTIME_KEYS = (
+    "kg_course_config_drafts_v1",
     "kg_course_config_releases_v1",
     "kg_course_config_active_release_v1",
     "kg_learning_tasks_v1",
-    "kg_activity_tags_v1",
-    "kg_question_tag_names_v1",
-    "kg_activity_collections_v1",
 )
 
 PERSONAL_RUNTIME_KEYS = (
@@ -240,6 +230,25 @@ def test_existing_teacher_workspace_keys_have_the_same_manager_boundary(key: str
     assert service.shared_key_readable(key, "teacher")
     assert not service.shared_key_writable(key, "student")
     assert not service.shared_key_writable(key, "viewer")
+
+
+@pytest.mark.parametrize("key", RETIRED_COURSE_RUNTIME_KEYS)
+def test_course_and_task_keys_are_server_owned_and_absent_from_runtime(key: str) -> None:
+    assert service.server_owned_key(key)
+    assert key not in service.SHARED_KEYS
+    assert key not in service.TEACHING_SHARED_KEYS
+    assert key in service.RUNTIME_SNAPSHOT_EXCLUDED_KEYS
+    assert not service.shared_key_writable(key, "admin")
+    assert not service.shared_key_writable(key, "teacher")
+
+
+@pytest.mark.parametrize("key", sorted(service.RETIRED_CATALOG_RUNTIME_KEYS))
+def test_retired_teaching_catalog_keys_are_not_runtime_readable_or_writable(key: str) -> None:
+    assert key in service.SERVER_OWNED_KEYS
+    assert key not in service.SHARED_KEYS
+    assert key not in service.TEACHING_SHARED_KEYS
+    assert not service.shared_key_writable(key, "admin")
+    assert not service.shared_key_writable(key, "teacher")
 
 
 @pytest.mark.parametrize("key", PERSONAL_RUNTIME_KEYS)
@@ -266,7 +275,7 @@ def test_teacher_draft_canonical_keys_and_account_aliases_are_role_aware() -> No
         "kg_recall_association_library_v1__subject__PMP", "teacher"
     ) == "kg_recall_association_library_v1__subject__PMP"
     assert service.canonical_teacher_shared_key(
-        "kg_course_config_drafts_v1", "student"
+        "kg_exam_paper_release_history_v1", "student"
     ) is None
     assert service.canonical_teacher_shared_key(
         "kg_assessment_papers_v1", "viewer"
@@ -373,7 +382,7 @@ def _promotion_row_key(key: str) -> bool:
     return (
         key in {
             "kg_teacher_shared_runtime_promotion_v1",
-            "kg_course_config_drafts_v1",
+            "kg_exam_paper_release_history_v1",
             "kg_assessment_papers_v1",
             "kg_exam_papers_v1__teacher_shared",
             "kg_exam_paper_categories_v1__teacher_shared",
@@ -464,7 +473,7 @@ async def _runtime_storage_for(owner: str) -> dict[str, str]:
 @pytest.mark.parametrize(
     "key",
     [
-        "kg_course_config_drafts_v1",
+        "kg_exam_paper_release_history_v1",
         "kg_assessment_papers_v1",
         "kg_exam_papers_v1__teacher_shared",
         "kg_exam_paper_categories_v1__teacher_shared",
@@ -569,7 +578,6 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
     association_key = "kg_recall_association_library_v1__subject__PMP"
     canonical_keys = {
         marker_key,
-        "kg_course_config_drafts_v1",
         "kg_assessment_papers_v1",
         "kg_exam_papers_v1__teacher_shared",
         "kg_exam_paper_categories_v1__teacher_shared",
@@ -620,7 +628,7 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
         storages = {
             usernames["admin_a"]: (
                 {
-                    "kg_course_config_drafts_v1": json.dumps([
+                    "kg_exam_paper_release_history_v1": json.dumps([
                         {"id": "course-a", "owner": "admin-a"},
                         {"id": "course-later", "winner": "older"},
                     ]),
@@ -641,7 +649,7 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
             ),
             usernames["teacher_b"]: (
                 {
-                    "kg_course_config_drafts_v1": json.dumps([
+                    "kg_exam_paper_release_history_v1": json.dumps([
                         {"id": "course-b"},
                         {"id": "course-later", "winner": "newer"},
                         {"id": "course-tie", "winner": "teacher-b"},
@@ -669,7 +677,7 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
             ),
             usernames["teacher_c"]: (
                 {
-                    "kg_course_config_drafts_v1": json.dumps([
+                    "kg_exam_paper_release_history_v1": json.dumps([
                         {"id": "course-c"},
                         {"id": "course-tie", "winner": "teacher-c"},
                     ]),
@@ -697,33 +705,39 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
 
         before_promotion_revision = asyncio.run(_content_revision())
         arrival = Barrier(2)
+        roles = {"admin_a": "admin", "teacher_b": "teacher", "teacher_c": "teacher"}
 
         def first_read(account: str):
+            """Exercise the historical promotion service under this test's opt-in.
+
+            Runtime HTTP GET is intentionally read-only in retirement mode, so
+            migration coverage must not depend on it to promote teacher drafts.
+            """
             arrival.wait(timeout=10)
-            return clients[account].get("/api/v1/runtime/state")
+
+            async def promote_legacy_state():
+                async with AsyncSessionLocal() as db:
+                    return await service.get_state(
+                        db,
+                        usernames[account],
+                        roles[account],
+                    )
+
+            return asyncio.run(promote_legacy_state())
 
         with ThreadPoolExecutor(max_workers=2) as pool:
-            first_responses = list(
+            first_snapshots = list(
                 pool.map(first_read, ("teacher_b", "admin_a"))
             )
-        assert all(response.status_code == 200 for response in first_responses)
         assert {
-            response.json()["contentRevision"] for response in first_responses
+            content_revision for _, _, content_revision in first_snapshots
         } == {before_promotion_revision + 1}
-        first_response = first_responses[0]
-        first = first_response.json()["storage"]
-        assert first_response.json()["contentRevision"] == before_promotion_revision + 1
+        first, _, first_content_revision = first_snapshots[0]
+        assert first_content_revision == before_promotion_revision + 1
         assert asyncio.run(_content_revision()) == before_promotion_revision + 1
         for account in ("admin_a", "teacher_b", "teacher_c"):
             storage = first if account == "teacher_b" else _runtime_storage(clients[account])
-            courses = {row["id"]: row for row in json.loads(
-                storage["kg_course_config_drafts_v1"]
-            )}
-            assert set(courses) >= {
-                "course-a", "course-b", "course-c", "course-later", "course-tie"
-            }
-            assert courses["course-later"]["winner"] == "newer"
-            assert courses["course-tie"]["winner"] == "teacher-c"
+            assert "kg_exam_paper_release_history_v1" not in storage
             assert {row["id"] for row in json.loads(
                 storage["kg_assessment_papers_v1"]
             )} >= {"assessment-a", "assessment-b", "assessment-c"}
@@ -757,12 +771,6 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
         assert marker["status"] == "complete"
         assert set(marker["sourceOwners"]) >= set(usernames.values())
         conflicts = {(row["key"], row["entityId"]): row for row in marker["conflicts"]}
-        assert conflicts[("kg_course_config_drafts_v1", "course-later")][
-            "winnerOwner"
-        ] == usernames["teacher_b"]
-        assert conflicts[("kg_course_config_drafts_v1", "course-tie")][
-            "winnerOwner"
-        ] == usernames["teacher_c"]
         assert conflicts[(association_key, "node-tie")]["winnerOwner"] == usernames[
             "teacher_c"
         ]
@@ -779,12 +787,15 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
             f"pytest-promotion-unrelated-{token}",
         )
         assert unrelated.status_code == 200, unrelated.text
-        assert _runtime_storage(clients["teacher_b"])[
-            "kg_course_config_drafts_v1"
-        ] == promoted["kg_course_config_drafts_v1"]
+        assert "kg_exam_paper_release_history_v1" not in _runtime_storage(
+            clients["teacher_b"]
+        )
         legacy_after_put = asyncio.run(_runtime_storage_for(usernames["admin_a"]))
         for key in storages[usernames["admin_a"]][0]:
-            assert legacy_after_put[key] == storages[usernames["admin_a"]][0][key]
+            if key == "kg_exam_paper_release_history_v1":
+                assert key not in legacy_after_put
+            else:
+                assert legacy_after_put[key] == storages[usernames["admin_a"]][0][key]
     finally:
         for client in clients.values():
             client.close()
@@ -815,7 +826,7 @@ def test_pre_upgrade_teacher_drafts_are_promoted_without_losing_either_owner() -
     [
         (
             "setItem",
-            "kg_course_config_drafts_v1",
+            "kg_assessment_papers_v1",
             json.dumps([{"id": "replacement-only"}]),
         ),
         ("removeItem", "kg_assessment_papers_v1", None),
@@ -905,7 +916,7 @@ def test_promotion_cas_exemption_rejects_a_competitor_in_the_commit_window(
 ) -> None:
     token = uuid4().hex[:10]
     username = f"promotion_window_{token}"
-    key = "kg_course_config_drafts_v1"
+    key = "kg_assessment_papers_v1"
     marker_key = "kg_teacher_shared_runtime_promotion_v1"
     snapshot = asyncio.run(_snapshot_teacher_promotion_rows())
     asyncio.run(_delete_shared_rows(set(snapshot) | {marker_key, key}))
@@ -1023,7 +1034,7 @@ def test_promotion_with_identical_shared_content_does_not_bump_revision() -> Non
 
     token = uuid4().hex[:10]
     username = f"promotion_noop_{token}"
-    key = "kg_course_config_drafts_v1"
+    key = "kg_assessment_papers_v1"
     marker_key = "kg_teacher_shared_runtime_promotion_v1"
     snapshot = asyncio.run(_snapshot_teacher_promotion_rows())
     value = json.dumps([{"id": f"same-{token}"}])
@@ -1090,14 +1101,6 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
         "student": f"draft_student_{token}",
         "viewer": f"draft_viewer_{token}",
     }
-    subject = f"TDD-{token}"
-    canonical_keys = {
-        "kg_course_config_drafts_v1",
-        "kg_assessment_papers_v1",
-        "kg_exam_papers_v1__teacher_shared",
-        "kg_exam_paper_categories_v1__teacher_shared",
-        f"kg_recall_association_library_v1__subject__{subject}",
-    }
     snapshot = asyncio.run(_snapshot_teacher_promotion_rows())
     provisioner = TestClient(app)
     clients: dict[str, TestClient] = {}
@@ -1131,19 +1134,11 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
             "kg_exam_paper_categories_v1__user__"
             f"{quote(usernames['teacher_a'], safe='')}"
         )
-        association_key = f"kg_recall_association_library_v1__subject__{subject}"
-        teacher_a_legacy_association_key = (
-            "kg_recall_association_library_v1__user__"
-            f"{quote(usernames['teacher_a'], safe='')}__{quote(subject, safe='')}"
-        )
         written = {
-            "kg_course_config_drafts_v1": json.dumps({"draft": token}),
+            "kg_exam_paper_release_history_v1": json.dumps({"draft": token}),
             "kg_assessment_papers_v1": json.dumps([{"id": f"assessment-{token}"}]),
             teacher_a_paper_key: json.dumps([{"id": f"paper-{token}"}]),
             teacher_a_category_key: json.dumps([{"id": f"category-{token}"}]),
-            teacher_a_legacy_association_key: json.dumps(
-                {"subject": subject, "nodes": []}
-            ),
         }
         for index, (key, value) in enumerate(written.items()):
             response = _write_runtime(
@@ -1161,15 +1156,12 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
                 "kg_exam_paper_categories_v1__user__"
                 f"{quote(usernames[account], safe='')}"
             )
-            assert storage["kg_course_config_drafts_v1"] == written[
-                "kg_course_config_drafts_v1"
-            ]
+            assert "kg_exam_paper_release_history_v1" not in storage
             assert storage["kg_assessment_papers_v1"] == written[
                 "kg_assessment_papers_v1"
             ]
             assert storage[paper_alias] == written[teacher_a_paper_key]
             assert storage[category_alias] == written[teacher_a_category_key]
-            assert storage[association_key] == written[teacher_a_legacy_association_key]
             assert "kg_exam_papers_v1__teacher_shared" not in storage
             assert "kg_exam_paper_categories_v1__teacher_shared" not in storage
 
@@ -1184,25 +1176,20 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
                 f"{quote(usernames[account], safe='')}"
             )
             for key in (
-                "kg_course_config_drafts_v1",
+                "kg_exam_paper_release_history_v1",
                 "kg_assessment_papers_v1",
                 scoped_paper,
                 scoped_category,
-                association_key,
                 "kg_exam_papers_v1__teacher_shared",
                 "kg_exam_paper_categories_v1__teacher_shared",
             ):
                 assert key not in storage
 
             denied_keys = (
-                "kg_course_config_drafts_v1",
+                "kg_exam_paper_release_history_v1",
                 "kg_assessment_papers_v1",
                 scoped_paper,
                 scoped_category,
-                (
-                    "kg_recall_association_library_v1__user__"
-                    f"{quote(usernames[account], safe='')}__{quote(subject, safe='')}"
-                ),
             )
             for index, key in enumerate(denied_keys):
                 denied = _write_runtime(
@@ -1216,10 +1203,6 @@ def test_teacher_drafts_round_trip_across_managers_but_not_students_or_viewers()
         for index, key in enumerate((
             f"kg_exam_papers_v1__user__{quote(usernames['teacher_b'], safe='')}",
             "kg_exam_papers_v1__malformed",
-            (
-                "kg_recall_association_library_v1__user__"
-                f"{quote(usernames['teacher_b'], safe='')}__{quote(subject, safe='')}"
-            ),
         )):
             denied = _write_runtime(
                 clients["teacher_a"],

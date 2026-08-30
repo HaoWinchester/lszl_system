@@ -4,10 +4,12 @@ import re
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import delete
 
 from app.core.security import hash_password
+from app.core.config import settings
 from app.db.session import AsyncSessionLocal
 from app.main import app
 from app.models.runtime_state import RuntimeState
@@ -16,12 +18,21 @@ from app.services.runtime_state_service import (
     DEPRECATED_QUESTION_EXACT_KEYS,
     DEPRECATED_QUESTION_PREFIXES,
     EXACT_KEYS,
+    ONLINE_RUNTIME_EXACT_KEYS,
     PREFIXES,
+    get_state as get_legacy_state,
     key_allowed,
 )
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture(autouse=True)
+def legacy_runtime_api_is_explicitly_enabled_for_migration_tests(monkeypatch):
+    """Legacy service tests opt in explicitly; production defaults remain retired."""
+    monkeypatch.setattr(settings, "RUNTIME_SYNC_DISABLED", False)
+    monkeypatch.setattr(settings, "RUNTIME_ROLLBACK_READ_ENABLED", True)
 
 
 def bootstrap(html: str) -> dict:
@@ -31,10 +42,32 @@ def bootstrap(html: str) -> dict:
 
 
 def bootstrap_api(client: TestClient, page: str) -> dict:
-    """页面预载等价路径：与 HTML 渲染走同一 ensure_domain_seed。"""
-    response = client.get(f"/api/v1/runtime/state?mode=bootstrap&page={page}")
-    assert response.status_code == 200, response.text
-    return response.json()
+    """Exercise historical migration seeding only under this test's explicit opt-in.
+
+    The retired HTTP GET route is deliberately read-only, even when rollback
+    reads are enabled.  These migration-service regressions therefore invoke
+    the legacy seeding service directly instead of treating GET as a writer.
+    """
+    me = client.get("/api/v1/auth/me")
+    assert me.status_code == 200, me.text
+    identity = me.json()["user"]
+
+    async def seed_legacy_state() -> dict:
+        async with AsyncSessionLocal() as db:
+            storage, revision, content_revision = await get_legacy_state(
+                db,
+                identity["username"],
+                identity["role"],
+                mode="bootstrap",
+                page=page,
+            )
+        return {
+            "storage": storage,
+            "revision": revision,
+            "contentRevision": content_revision,
+        }
+
+    return asyncio.run(seed_legacy_state())
 
 
 def login(client: TestClient, username: str) -> None:
@@ -88,7 +121,18 @@ def test_frontend_compatibility_contract_matches_backend_storage_allowlist() -> 
         (ROOT / "frontend/scripts/new-legacy-contract.json").read_text(encoding="utf-8")
     )["runtimeStorage"]
 
-    assert set(contract["exactKeys"]) == EXACT_KEYS
+    assert set(contract["exactKeys"]) == ONLINE_RUNTIME_EXACT_KEYS
+    assert not set(contract["exactKeys"]) & {
+        "kg_content_subjects_v1",
+        "kg_content_taxonomies_v1",
+        "kg_content_activity_overrides_v1",
+        "kg_activity_tags_v1",
+        "kg_activity_collections_v1",
+        "kg_course_config_drafts_v1",
+        "kg_course_config_active_release_v1",
+        "kg_course_config_releases_v1",
+        "kg_learning_tasks_v1",
+    }
     assert tuple(contract["prefixes"]) == PREFIXES
     assert set(contract["legacyReadOnlyKeys"]["exactKeys"]) == DEPRECATED_QUESTION_EXACT_KEYS
     assert tuple(contract["legacyReadOnlyKeys"]["prefixes"]) == DEPRECATED_QUESTION_PREFIXES
@@ -252,7 +296,7 @@ def test_runtime_state_rejects_page_namespace_mismatch() -> None:
 def test_runtime_state_rejects_a_stale_revision_without_overwriting() -> None:
     with TestClient(app) as client:
         login(client, "老师")
-        current = bootstrap(client.get("/question-bank.html").text)
+        current = client.get("/api/v1/runtime/state").json()
         first = client.put(
             "/api/v1/runtime/state",
             json=update_payload(
@@ -322,23 +366,17 @@ def test_runtime_state_is_isolated_between_accounts() -> None:
     assert teacher_state["storage"].get("kg_question_language_mode_v1") != "bilingual"
 
 
-def test_every_upstream_page_declares_the_expected_namespace() -> None:
-    expected = {
-        "index.html": "files",
-        "practice-mode.html": "page",
-        "question-training.html": "training",
-        "question-workspace.html": "workspace",
-        "question-bank.html": "questions",
-        "knowledge-recall.html": "recall",
-        "file-manager.html": "files",
-        "user-management.html": "users",
-        "system-settings.html": "system",
-    }
+def test_every_upstream_page_omits_retired_runtime_namespace() -> None:
+    pages = (
+        "index.html", "practice-mode.html", "question-training.html",
+        "question-workspace.html", "question-bank.html", "knowledge-recall.html",
+        "file-manager.html", "user-management.html", "system-settings.html",
+    )
     with TestClient(app) as client:
         login(client, "佩奇007")
-        for page, namespace in expected.items():
+        for page in pages:
             payload = bootstrap(client.get(f"/{page}").text)
-            assert payload["namespace"] == namespace
+            assert "namespace" not in payload
 
 
 def test_admin_page_preloads_live_backend_accounts() -> None:

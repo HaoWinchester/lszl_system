@@ -7,19 +7,11 @@
  */
 (function(){
   const A=window.KGAdminUtils||{};
-  const Store=window.KGAppStorage||{};
-  const USER_LOG_KEY=A.USER_LOG_KEY||'kg_user_admin_logs_v1';
   const $=id=>document.getElementById(id);
-  const readJSON=A.readJSON||((key,fallback)=>Store.readJSON?Store.readJSON(key,fallback):(()=>{try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}})());
-  const writeJSON=A.writeJSON||((key,value)=>Store.writeJSON?Store.writeJSON(key,value):localStorage.setItem(key,JSON.stringify(value)));
   const escapeHTML=A.escapeHTML||(value=>String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])));
   const fmtTime=A.fmtTime||(ts=>ts?new Date(Number(ts)).toLocaleString('zh-CN',{hour12:false}):'—');
   const roleLabel=A.roleLabel||(role=>({admin:'管理员',teacher:'教师/教研',student:'学员',viewer:'游客'}[role]||role||'学员'));
-  const logAction=A.logAction||((action,username='SYSTEM',detail='')=>{
-    const logs=readJSON(USER_LOG_KEY,[]);
-    logs.unshift({id:'log-'+Date.now().toString(36),action,username,detail:String(detail||''),actor:'system-admin',at:Date.now()});
-    writeJSON(USER_LOG_KEY,logs.slice(0,300));
-  });
+  const logAction=A.logAction||(()=>null);
   const refreshRoleUi=A.refreshRoleUi||(()=>{});
   function toast(text){(A.toast?A.toast('ssToast',text):(()=>{const el=$('ssToast');if(el){el.textContent=text;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1800)}})())}
   const REDEEM_CODE_PAGE_SIZE=10;
@@ -80,23 +72,23 @@
     return theme;
   }
 
-  function saveRoleTheme(role){
+  async function saveRoleTheme(role){
     const api=window.KGRolePermissions;if(!api)return;
     const card=themeCardByRole(role);if(!card){toast('没有找到对应角色主题卡片');return}
     const theme=collectRoleTheme(card);
-    api.saveTheme(role,theme);
+    try{await api.saveTheme(role,theme);
     refreshRoleUi();
     logAction('修改角色主题',role,`${roleLabel(role)} 主题色已更新`);
     renderRoleThemes();
-    toast('角色主题已保存');
+    toast('角色主题已保存');}catch(error){toast(error?.message||'角色主题保存失败')}
   }
-  function resetRoleTheme(role){
+  async function resetRoleTheme(role){
     const api=window.KGRolePermissions;if(!api)return;
-    api.resetTheme(role);
+    try{await api.resetTheme(role);
     refreshRoleUi();
     logAction('恢复角色主题',role,`${roleLabel(role)} 主题恢复默认`);
     renderRoleThemes();
-    toast('已恢复默认主题');
+    toast('已恢复默认主题');}catch(error){toast(error?.message||'默认主题恢复失败')}
   }
 
   function renderWechatConfig(){
@@ -137,16 +129,16 @@
       defaultSubject:$('wxDefaultSubject')?.value.trim()||'PMP'
     };
   }
-  function saveWechatConfig(){
+  async function saveWechatConfig(){
     const api=window.KGWechatLogin;if(!api)return;
-    const cfg=api.saveConfig(collectWechatConfig());
+    try{const cfg=await api.saveConfig(collectWechatConfig());
     logAction('保存微信登录配置','SYSTEM',cfg.enableOfficial?'正式微信模式已启用':'保存扫码演练配置');
     renderWechatConfig();
-    toast('微信登录配置已保存');
+    toast('微信登录配置已保存');}catch(error){toast(error?.message||'微信登录配置保存失败')}
   }
   async function previewWechatAuthUrl(){
     const api=window.KGWechatLogin;if(!api)return;
-    const cfg=api.saveConfig(collectWechatConfig());
+    const cfg=await api.saveConfig(collectWechatConfig());
     if(!cfg.appId){toast('请先填写 AppID');renderWechatConfig();return}
     try{
       const result=await api.createOfficialAuthRequest('login',location.pathname+location.search+location.hash,window.KGAuthRuntime?.legalConsentVersion||'2026-08-13-v1');
@@ -204,6 +196,8 @@
               ${order.cancelledAt?`<span>取消：${escapeHTML(fmtTime(order.cancelledAt))} · ${escapeHTML(order.cancelledBy||'')}</span>`:''}
               <span>订单：${escapeHTML(order.id)}</span>
             </div>
+            ${order.note?`<p>申请备注：${escapeHTML(order.note)}</p>`:''}
+            ${order.adminNote?`<p>管理员备注：${escapeHTML(order.adminNote)}</p>`:''}
             ${order.snapshot&&order.snapshot.usageText?`<p>${escapeHTML(order.snapshot.usageText)}</p>`:''}
             <div class="subscription-order-actions">
               <button type="button" class="primary" data-order-action="approve" ${pendingOrder?'':'disabled'}>确认开通</button>
@@ -243,7 +237,7 @@
         <label>会员方案<select id="ssRedeemPlanSelect">${planOptions}</select></label>
         <label>生成数量<input id="ssRedeemCountInput" type="number" min="1" max="200" value="10"></label>
         <label>卡密前缀<input id="ssRedeemPrefixInput" value="VIP" maxlength="8" placeholder="VIP"></label>
-        <label class="full">备注<input id="ssRedeemNoteInput" placeholder="例如：线下活动 / 管理员发放"></label>
+        <label class="full">备注<input id="ssRedeemNoteInput" maxlength="500" placeholder="例如：线下活动 / 管理员发放"></label>
         <button type="button" class="primary" id="ssGenerateRedeemCodesBtn">生成卡密</button>
       </div>
       ${all.length?`<div class="subscription-code-list">
@@ -277,19 +271,20 @@
       </div>`:`<div class="um-empty">暂无卡密。填写上方信息后可批量生成，列表会按每页 ${REDEEM_CODE_PAGE_SIZE} 条分页显示。</div>`}
     </section>`;
   }
-  function handleRedeemCodeGenerate(){
+  async function handleRedeemCodeGenerate(){
     const sub=window.KGSubscription;if(!sub||typeof sub.generateRedeemCodes!=='function')return;
     const planId=$('ssRedeemPlanSelect')?.value||'monthly';
     const count=$('ssRedeemCountInput')?.value||1;
     const prefix=$('ssRedeemPrefixInput')?.value||'VIP';
     const note=$('ssRedeemNoteInput')?.value||'';
-    const result=sub.generateRedeemCodes({planId,count,prefix,note});
-    if(!result||!result.ok){toast(result&&result.message||'卡密生成失败');return}
-    redeemCodePage=1;
-    toast(result.message||'卡密已生成');
-    renderSubscriptionPlans();
+    try{const result=await sub.generateRedeemCodes({planId,count,prefix,note});
+      if(!result||!result.ok){toast(result&&result.message||'卡密生成失败');return}
+      redeemCodePage=1;
+      toast(result.message||'卡密已生成');
+      renderSubscriptionPlans();
+    }catch(error){toast(error?.message||'卡密生成失败，请重试')}
   }
-  function handleRedeemCodeAction(btn){
+  async function handleRedeemCodeAction(btn){
     const sub=window.KGSubscription;if(!sub)return;
     const item=btn.closest('[data-code-id]');
     const id=item&&item.dataset.codeId;
@@ -301,16 +296,18 @@
       else prompt('复制卡密：',text);
       return;
     }
-    let ok=false;
-    if(action==='disable')ok=!!(sub.disableRedeemCode&&sub.disableRedeemCode(id));
-    else if(action==='enable')ok=!!(sub.enableRedeemCode&&sub.enableRedeemCode(id));
-    else if(action==='remove'){
-      if(!confirm('确认删除这条卡密？删除后不可恢复。'))return;
-      ok=!!(sub.removeRedeemCode&&sub.removeRedeemCode(id));
-    }
-    if(!ok){toast('卡密操作失败');return}
-    toast('卡密已更新');
-    renderSubscriptionPlans();
+    try{
+      let result=null;
+      if(action==='disable')result=typeof sub.disableRedeemCode==='function'?await sub.disableRedeemCode(id):null;
+      else if(action==='enable')result=typeof sub.enableRedeemCode==='function'?await sub.enableRedeemCode(id):null;
+      else if(action==='remove'){
+        if(!confirm('确认删除这条卡密？删除后不可恢复。'))return;
+        result=typeof sub.removeRedeemCode==='function'?await sub.removeRedeemCode(id):null;
+      }
+      if(!result||!result.ok){toast(result&&result.message||'卡密操作失败');return}
+      toast(result.message||'卡密已更新');
+      renderSubscriptionPlans();
+    }catch(error){toast(error?.message||'卡密操作失败，请重试')}
   }
   function handleRedeemCodePage(action){
     const sub=window.KGSubscription;if(!sub||typeof sub.redeemCodeList!=='function')return;
@@ -322,25 +319,27 @@
     renderSubscriptionPlans();
   }
 
-  function handleSubscriptionOrderAction(btn){
+  async function handleSubscriptionOrderAction(btn){
     const sub=window.KGSubscription;if(!sub)return;
     const item=btn.closest('[data-order-id]');
     const id=item&&item.dataset.orderId;
     if(!id)return;
-    let result=null;
-    if(btn.dataset.orderAction==='approve'){
-      if(!confirm('确认开通该学员的订阅申请？'))return;
-      result=typeof sub.approveOrder==='function'?sub.approveOrder(id,{note:'管理员在系统设置中确认开通'}):null;
-    }else if(btn.dataset.orderAction==='cancel'){
-      const note=prompt('请输入取消原因（可选）：','')||'';
-      result=typeof sub.cancelOrder==='function'?sub.cancelOrder(id,{note}):null;
-    }
-    if(!result||!result.ok){toast(result&&result.message||'订阅申请处理失败');return}
-    toast(result.message||'订阅申请已处理');
-    renderSubscriptionPlans();
-    renderLogs();
-    if(window.KGSubscription&&typeof window.KGSubscription.decorateSubscriptionElements==='function')window.KGSubscription.decorateSubscriptionElements();
-    if(window.KGUserCenter&&typeof window.KGUserCenter.refresh==='function')window.KGUserCenter.refresh();
+    try{
+      let result=null;
+      if(btn.dataset.orderAction==='approve'){
+        if(!confirm('确认开通该学员的订阅申请？'))return;
+        result=typeof sub.approveOrder==='function'?await sub.approveOrder(id,{note:'管理员在系统设置中确认开通'}):null;
+      }else if(btn.dataset.orderAction==='cancel'){
+        const note=prompt('请输入取消原因（可选）：','')||'';
+        result=typeof sub.cancelOrder==='function'?await sub.cancelOrder(id,{note}):null;
+      }
+      if(!result||!result.ok){toast(result&&result.message||'订阅申请处理失败');return}
+      toast(result.message||'订阅申请已处理');
+      renderSubscriptionPlans();
+      renderLogs();
+      if(window.KGSubscription&&typeof window.KGSubscription.decorateSubscriptionElements==='function')window.KGSubscription.decorateSubscriptionElements();
+      if(window.KGUserCenter&&typeof window.KGUserCenter.refresh==='function')window.KGUserCenter.refresh();
+    }catch(error){toast(error?.message||'订阅申请处理失败，请重试')}
   }
 
   function renderSubscriptionPlans(){
@@ -426,44 +425,42 @@
     });
     return patch;
   }
-  function savePlanSettingsFromCard(card){
+  async function savePlanSettingsFromCard(card){
     const sub=window.KGSubscription;if(!sub||typeof sub.setPlanSettings!=='function')return;
     const id=card&&card.dataset.planId;if(!id)return;
     const patch=collectPlanSettings(card);
-    sub.setPlanSettings(id,patch);
+    try{await sub.setPlanSettings(id,patch);
     logAction('保存订阅套餐配置','SYSTEM',`${id} 套餐配置已更新`);
     renderSubscriptionPlans();
-    toast('订阅套餐已保存');
+    toast('订阅套餐已保存');}catch(error){toast(error?.message||'订阅套餐保存失败')}
   }
-  function resetPlanSettingsFromCard(card){
+  async function resetPlanSettingsFromCard(card){
     const sub=window.KGSubscription;if(!sub||typeof sub.resetPlanSettings!=='function')return;
     const id=card&&card.dataset.planId;if(!id)return;
-    sub.resetPlanSettings(id);
+    try{await sub.resetPlanSettings(id);
     logAction('恢复订阅套餐默认','SYSTEM',`${id} 套餐恢复默认配置`);
     renderSubscriptionPlans();
-    toast('已恢复该套餐默认配置');
+    toast('已恢复该套餐默认配置');}catch(error){toast(error?.message||'套餐默认配置恢复失败')}
   }
-  function resetAllPlanSettings(){
+  async function resetAllPlanSettings(){
     const sub=window.KGSubscription;if(!sub||typeof sub.savePlanSettings!=='function')return;
     if(!confirm('确认恢复全部订阅套餐默认配置？'))return;
-    sub.savePlanSettings({});
+    try{await sub.savePlanSettings({});
     logAction('恢复全部订阅套餐默认','SYSTEM','全部套餐恢复默认配置');
     renderSubscriptionPlans();
-    toast('全部套餐已恢复默认');
+    toast('全部套餐已恢复默认');}catch(error){toast(error?.message||'全部套餐恢复失败')}
   }
 
   function renderLogs(){
     const panel=$('ssLogList');
     if(!panel)return;
-    const logs=readJSON(USER_LOG_KEY,[]).slice(0,80);
+    const logs=(window.KGAuthCore?.adminLogs?.()||[]).slice(0,80);
     if(!logs.length){panel.innerHTML='<div class="um-empty">暂无系统操作日志。</div>';return}
     panel.innerHTML=logs.map(log=>`<div class="um-log-item"><strong>${escapeHTML(log.action)} · ${escapeHTML(log.username||'系统')}</strong><span>${fmtTime(log.at)} · 操作者：${escapeHTML(log.actor||'system-admin')}</span>${log.detail?`<span>${escapeHTML(log.detail)}</span>`:''}</div>`).join('');
   }
-  function clearLogs(){
+  async function clearLogs(){
     if(!confirm('确认清空系统操作日志？'))return;
-    writeJSON(USER_LOG_KEY,[]);
-    renderLogs();
-    toast('日志已清空');
+    try{await window.KGSystemDomain?.clearAdminLogs?.();renderLogs();toast('日志已清空')}catch(error){toast(error?.message||'日志清空失败')}
   }
 
   const ANALYTICS_FEATURE_LABELS={graph:'图谱编辑',files:'文件管理',question_bank:'题库',training:'训练',recall:'回忆',learning_path:'学习路径'};
@@ -565,12 +562,43 @@
     const analyticsEnd=$('ssAnalyticsEnd');if(analyticsEnd&&!analyticsEnd.value)analyticsEnd.value=analyticsDate();
   }
 
-  document.addEventListener('DOMContentLoaded',()=>{
-    if(!ensureAccess())return;
-    bindEvents();
+  function showInitializationFailure(error){
+    const content=document.querySelector('.ss-content');if(!content)return;
+    content.querySelectorAll('.ss-pane').forEach(panel=>{panel.hidden=true});
+    document.querySelectorAll('[data-ss-tab]').forEach(button=>{button.disabled=true});
+    let alert=$('ssInitializationError');
+    if(!alert){alert=document.createElement('section');alert.id='ssInitializationError';alert.className='um-panel um-empty';alert.setAttribute('role','alert');content.prepend(alert)}
+    alert.innerHTML=`<strong>系统配置加载失败，未显示默认配置。</strong><p>${escapeHTML(error?.message||'请检查网络后重试。')}</p><button type="button" id="ssRetryInitializationBtn">重新加载配置</button>`;
+    $('ssRetryInitializationBtn')?.addEventListener('click',initializeSystemSettings,{once:true});
+  }
+
+  function clearInitializationFailure(){
+    $('ssInitializationError')?.remove();
+    document.querySelectorAll('.ss-pane').forEach(panel=>{panel.hidden=false});
+    document.querySelectorAll('[data-ss-tab]').forEach(button=>{button.disabled=false});
+  }
+
+  let eventsBound=false;
+  async function initializeSystemSettings(){
+    const domain=window.KGSystemDomain;
+    try{
+      const state=domain?.initializationState?.();
+      if(state?.status==='failed')await domain.retryInitialization();
+      else await domain?.ready;
+    }catch(error){showInitializationFailure(error);return false}
+    clearInitializationFailure();
+    if(!eventsBound){
+      bindEvents();eventsBound=true;
+      window.addEventListener('kg-subscription-plan-change',()=>renderSubscriptionPlans());
+      window.addEventListener('kg-subscription-order-change',()=>renderSubscriptionPlans());
+      window.addEventListener('kg-subscription-redeem-code-change',()=>renderSubscriptionPlans());
+    }
     render();
-    window.addEventListener('kg-subscription-plan-change',()=>renderSubscriptionPlans());
-    window.addEventListener('kg-subscription-order-change',()=>renderSubscriptionPlans());
-    window.addEventListener('kg-subscription-redeem-code-change',()=>renderSubscriptionPlans());
+    return true;
+  }
+
+  document.addEventListener('DOMContentLoaded',async()=>{
+    if(!ensureAccess())return;
+    await initializeSystemSettings();
   });
 })();

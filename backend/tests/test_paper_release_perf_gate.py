@@ -5,6 +5,9 @@ kg_exam_papers_published_v1（约 7.65MB）与发布历史键；
 题库管理页（questions namespace）在第二轮切换前暂保留。
 """
 
+import json
+import re
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -12,7 +15,7 @@ from app.services.runtime_state_service import (
     BOOTSTRAP_NAMESPACE_EXACT_KEYS,
 )
 
-from tests.test_runtime_state import bootstrap_api, login
+from tests.test_runtime_state import login
 
 PUBLISHED_KEY = "kg_exam_papers_published_v1"
 HISTORY_KEY = "kg_exam_paper_release_history_v1"
@@ -35,10 +38,14 @@ def test_learner_bootstrap_payload_has_no_published_paper_blob() -> None:
     with TestClient(app) as client:
         login(client, "学生")
         for page in LEARNER_PAGES:
-            payload = bootstrap_api(client, page)
-            storage = payload.get("storage") or {}
-            assert PUBLISHED_KEY not in storage, page
-            assert HISTORY_KEY not in storage, page
+            response = client.get(f"/{page}")
+            assert response.status_code == 200, page
+            match = re.search(r"window\.__KG_DIRECT_BOOTSTRAP__=(.*?);</script>", response.text)
+            assert match, page
+            payload = json.loads(match.group(1))
+            assert "storage" not in payload, page
+            assert PUBLISHED_KEY not in response.text, page
+            assert HISTORY_KEY not in response.text, page
 
 
 def test_question_bank_management_page_no_longer_ships_published_keys() -> None:

@@ -25,18 +25,19 @@ with sync_playwright() as p:
       const user='p33-admin';
       localStorage.setItem('kg_local_current_user_v1',user);
       localStorage.setItem('kg_local_users_v1',JSON.stringify({[user]:{username:user,displayName:'P3.3 管理员',role:'admin',status:'active',subject:'PMP',salt:'x',hash:'x'}}));
-      localStorage.setItem('kg_content_subjects_v1',JSON.stringify([{id:'subject-pmp',code:'PMP',name:{zh:'PMP 项目管理',en:''},defaultTaxonomyId:'taxonomy-current',status:'active',sortOrder:10}]));
+      const teaching={subjects:[{id:'subject-pmp',code:'PMP',name:{zh:'PMP 项目管理',en:''},defaultTaxonomyId:'taxonomy-current',status:'active',sortOrder:10}],taxonomies:[]};
       const nodes=[
         {id:'root',taxonomyId:'taxonomy-current',parentId:null,level:1,title:{zh:'当前根节点',en:''},description:{zh:''},status:'active',sortOrder:10},
         {id:'child-a',taxonomyId:'taxonomy-current',parentId:'root',level:2,title:{zh:'子节点 A',en:''},description:{zh:''},status:'active',sortOrder:10},
         {id:'child-b',taxonomyId:'taxonomy-current',parentId:'root',level:2,title:{zh:'子节点 B',en:''},description:{zh:''},status:'active',sortOrder:20}
       ];
       let parent='child-a';for(let level=3;level<=9;level++){const id='deep-'+level;nodes.push({id,taxonomyId:'taxonomy-current',parentId:parent,level,title:{zh:'第 '+level+' 层',en:''},description:{zh:''},status:'active',sortOrder:10});parent=id}
-      localStorage.setItem('kg_content_taxonomies_v1',JSON.stringify([
+      teaching.taxonomies=[
         {id:'taxonomy-history',subjectId:'subject-pmp',name:{zh:'历史知识树'},version:1,versionLabel:'v1.0',maxDepth:9,status:'published',isDefault:false,nodes:[{id:'history-root',taxonomyId:'taxonomy-history',parentId:null,level:1,title:{zh:'历史根节点'},status:'active',sortOrder:10}]},
         {id:'taxonomy-current',subjectId:'subject-pmp',name:{zh:'当前知识树'},version:2,versionLabel:'v2.0',maxDepth:9,status:'published',isDefault:true,nodes},
         {id:'taxonomy-draft',subjectId:'subject-pmp',name:{zh:'重大调整草稿'},version:3,versionLabel:'v3.0',maxDepth:9,status:'draft',isDefault:false,nodes:[{id:'draft-root',taxonomyId:'taxonomy-draft',parentId:null,level:1,title:{zh:'草稿根节点'},status:'active',sortOrder:10}]}
-      ]));
+      ];
+      window.KGTeachingContentApi={readResource:(name,fallback)=>structuredClone(teaching[name]??fallback),saveSubjects:async rows=>(teaching.subjects=structuredClone(rows)),saveTaxonomies:async rows=>(teaching.taxonomies=structuredClone(rows)),saveActivityOverrides:async()=>[],saveCatalogResource:async(name,rows)=>(teaching[name]=structuredClone(rows)),saveCatalog:async patch=>{Object.entries(patch).forEach(([name,rows])=>teaching[name]=structuredClone(rows));return structuredClone(teaching)},ready:async()=>structuredClone(teaching)};
       if(!window.CSS)window.CSS={};if(!CSS.escape)CSS.escape=value=>String(value).replace(/[^a-zA-Z0-9_-]/g,'\\$&');
       if(!window.ResizeObserver)window.ResizeObserver=class{observe(){}disconnect(){}};
       if(!window.matchMedia)window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});

@@ -18,7 +18,11 @@ from app.models.teaching_content import (
     RecallAssociationLibrary,
     TaxonomyNode,
 )
-from app.services import teaching_content_current_service, teaching_content_revision_service
+from app.services import (
+    teaching_content_current_service,
+    teaching_content_revision_service,
+    teaching_content_version_service,
+)
 
 
 SEED_DIR = Path(__file__).parents[1] / "seed" / "builtin_teaching_content"
@@ -185,6 +189,12 @@ async def _available_version(
     subject_id: str,
     requested: int,
 ) -> int:
+    try:
+        requested = teaching_content_version_service.validate_database_integer(
+            requested, "内置教学内容版本号", minimum=1
+        )
+    except ValueError as exc:
+        raise BuiltinSeedValidationError(str(exc)) from exc
     occupied = (
         await db.execute(
             select(model.version).where(
@@ -198,7 +208,12 @@ async def _available_version(
     maximum = (
         await db.execute(select(func.max(model.version)).where(model.subject_id == subject_id))
     ).scalar_one_or_none()
-    return int(maximum or 0) + 1
+    try:
+        return teaching_content_version_service.next_database_version(
+            maximum or 0, "内置教学内容版本号"
+        )
+    except ValueError as exc:
+        raise BuiltinSeedValidationError(str(exc)) from exc
 
 
 async def sync_builtin_teaching_content(

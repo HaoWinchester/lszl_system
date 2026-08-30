@@ -16,6 +16,7 @@ class TaxonomyReleaseRequest(BaseModel):
 
 
 class RecallLibraryWriteRequest(BaseModel):
+    content_revision: int = Field(alias="contentRevision", ge=0)
     version: int = Field(default=1, ge=1)
     nodes: list[dict] = Field(default_factory=list)
     edges: list[dict] = Field(default_factory=list)

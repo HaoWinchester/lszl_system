@@ -1,7 +1,8 @@
 """订阅业务逻辑：当前订阅、卡密兑换、订单申请/审批/支付、管理员开通、卡密生成。"""
 
+import re
 import secrets
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,12 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.permissions import DEFAULT_PLANS
 from app.core.security import now_utc, uid
 from app.models.subscription import RedeemCode, Subscription, SubscriptionOrder
-from app.services import system_service, wechat_pay_service
+from app.services import system_service, user_service, wechat_pay_service
 
 FINITE_PAID_PLAN_IDS = frozenset({"monthly", "quarterly", "half_year"})
 PAID_PLAN_IDS = FINITE_PAID_PLAN_IDS | {"lifetime"}
 VALID_PLAN_IDS = PAID_PLAN_IDS | {"free"}
 WECHAT_NATIVE_OUT_TRADE_NO_MAX_LENGTH = 32
+REDEEM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
 def native_out_trade_no() -> str:
@@ -100,6 +102,7 @@ def order_to_dict(o: SubscriptionOrder) -> dict:
         "planName": o.plan_name,
         "status": o.status,
         "note": o.note,
+        "adminNote": o.admin_note,
         "createdAt": o.created_at.isoformat() if o.created_at else None,
         "approvedAt": o.approved_at.isoformat() if o.approved_at else None,
         "approvedBy": o.approved_by,
@@ -119,7 +122,10 @@ def code_to_dict(c: RedeemCode) -> dict:
         "planName": c.plan_name,
         "status": c.status,
         "usedBy": c.used_by,
+        "usedAt": c.used_at.isoformat() if c.used_at else None,
         "createdAt": c.created_at.isoformat() if c.created_at else None,
+        "createdBy": c.created_by,
+        "note": c.note,
     }
 
 
@@ -159,7 +165,17 @@ async def _subscription_for_update(db: AsyncSession, username: str) -> Subscript
 
 
 async def admin_set(
-    db: AsyncSession, username: str, plan_id: str, status: str | None, note: str | None, actor: str
+    db: AsyncSession,
+    username: str,
+    plan_id: str,
+    status: str | None,
+    note: str | None,
+    actor: str,
+    *,
+    started_at: datetime | None = None,
+    expires_at: datetime | None = None,
+    update_started_at: bool = False,
+    update_expires_at: bool = False,
 ) -> Subscription:
     plan_id = validate_plan_id(plan_id)
     s = await get_subscription(db, username)
@@ -169,6 +185,14 @@ async def admin_set(
     s.source = "manual"
     if note is not None:
         s.note = note
+    if update_started_at:
+        if started_at is None:
+            raise ValueError("startedAt 不能为空")
+        s.started_at = started_at
+    if update_expires_at:
+        s.expires_at = expires_at
+    if s.expires_at is not None and s.expires_at <= s.started_at:
+        raise ValueError("expiresAt 必须晚于 startedAt")
     await db.commit()
     await db.refresh(s)
     return s
@@ -325,7 +349,12 @@ async def approve_order(db: AsyncSession, order_id: str, actor: str) -> Subscrip
     return o
 
 
-async def cancel_order(db: AsyncSession, order_id: str, actor: str) -> SubscriptionOrder:
+async def cancel_order(
+    db: AsyncSession, order_id: str, actor: str, note: str = ""
+) -> SubscriptionOrder:
+    note = str(note or "").strip()
+    if len(note) > 500:
+        raise ValueError("取消原因不能超过 500 个字符")
     result = await db.execute(
         select(SubscriptionOrder)
         .where(SubscriptionOrder.id == order_id)
@@ -335,6 +364,14 @@ async def cancel_order(db: AsyncSession, order_id: str, actor: str) -> Subscript
     if not o or o.status != "pending" or o.pay_status not in {None, "pending"}:
         raise ValueError("订单不存在或已处理")
     o.status = "cancelled"
+    o.admin_note = note
+    await user_service.log_action(
+        db,
+        "cancel_subscription_order",
+        o.username,
+        actor,
+        f"取消订阅订单 {o.id}；管理员备注：{note or '无'}",
+    )
     await db.commit()
     await db.refresh(o)
     return o
@@ -359,16 +396,55 @@ async def cancel_own_order(
     return order
 
 
-async def generate_codes(db: AsyncSession, plan_id: str, count: int, actor: str) -> list[str]:
+def validate_redeem_code_prefix(prefix: str) -> str:
+    normalized = str(prefix or "").strip().upper()
+    if not re.fullmatch(r"[A-Z0-9]{1,8}", normalized):
+        raise ValueError("卡密前缀必须为 1 到 8 位字母或数字")
+    return normalized
+
+
+def _random_redeem_group(length: int = 4) -> str:
+    return "".join(secrets.choice(REDEEM_CODE_ALPHABET) for _ in range(length))
+
+
+async def generate_codes(
+    db: AsyncSession,
+    plan_id: str,
+    count: int,
+    actor: str,
+    *,
+    prefix: str = "VIP",
+    note: str = "",
+) -> list[str]:
     plan_id = validate_plan_id(plan_id, allow_free=False)
+    if count < 1 or count > 200:
+        raise ValueError("卡密数量必须在 1 到 200 之间")
+    prefix = validate_redeem_code_prefix(prefix)
+    note = str(note or "").strip()
+    if len(note) > 500:
+        raise ValueError("卡密备注不能超过 500 个字符")
     p = _plan(plan_id)
     codes: list[str] = []
-    for _ in range(max(1, min(count, 500))):
-        code = secrets.token_hex(6).upper()
+    for _ in range(count):
+        code = f"{prefix}-{_random_redeem_group()}-{_random_redeem_group()}-{_random_redeem_group()}"
         db.add(
-            RedeemCode(id=uid("rc_"), code=code, plan_id=plan_id, plan_name=p["name"], created_by=actor)
+            RedeemCode(
+                id=uid("rc_"),
+                code=code,
+                plan_id=plan_id,
+                plan_name=p["name"],
+                created_by=actor,
+                note=note,
+            )
         )
         codes.append(code)
+    await user_service.log_action(
+        db,
+        "generate_redeem_codes",
+        None,
+        actor,
+        f"生成 {count} 个 {plan_id} 卡密；前缀：{prefix}；备注：{note or '无'}",
+    )
     await db.commit()
     return codes
 
@@ -376,3 +452,49 @@ async def generate_codes(db: AsyncSession, plan_id: str, count: int, actor: str)
 async def list_codes(db: AsyncSession) -> list[RedeemCode]:
     r = await db.execute(select(RedeemCode).order_by(RedeemCode.created_at.desc()))
     return list(r.scalars().all())
+
+
+async def update_redeem_code_status(
+    db: AsyncSession, code_id: str, status: str, actor: str
+) -> RedeemCode:
+    if status not in {"unused", "disabled"}:
+        raise ValueError("卡密状态无效")
+    result = await db.execute(
+        select(RedeemCode).where(RedeemCode.id == code_id).with_for_update()
+    )
+    code = result.scalar_one_or_none()
+    if code is None:
+        raise LookupError("卡密不存在")
+    if code.status == status:
+        return code
+    if status == "disabled" and code.status != "unused":
+        raise ValueError("只有未使用卡密可以停用")
+    if status == "unused" and code.status != "disabled":
+        raise ValueError("只有已停用卡密可以启用")
+    code.status = status
+    if status == "unused":
+        code.used_at = None
+        code.used_by = None
+    action = "disable_redeem_code" if status == "disabled" else "enable_redeem_code"
+    await user_service.log_action(
+        db, action, None, actor, f"卡密 {code.code} 状态改为 {status}"
+    )
+    await db.commit()
+    await db.refresh(code)
+    return code
+
+
+async def delete_redeem_code(db: AsyncSession, code_id: str, actor: str) -> dict:
+    result = await db.execute(
+        select(RedeemCode).where(RedeemCode.id == code_id).with_for_update()
+    )
+    code = result.scalar_one_or_none()
+    if code is None:
+        raise LookupError("卡密不存在")
+    payload = code_to_dict(code)
+    await user_service.log_action(
+        db, "delete_redeem_code", None, actor, f"删除订阅卡密 {code.code}"
+    )
+    await db.delete(code)
+    await db.commit()
+    return payload

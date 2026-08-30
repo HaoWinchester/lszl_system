@@ -19,6 +19,29 @@ const resolver = read(resolve(root, 'new-legacy/src/59a-published-question-resol
 const recallQuestionSource = read(resolve(root, 'new-legacy/src/96-recall-question-source.js'))
 const syncScript = read(resolve(frontendRoot, 'scripts/sync-new-legacy.js'))
 
+function attachDomainApi(context) {
+  context.KGDomainApi = {
+    async request({ method = 'GET', path, body }) {
+      const headers = { accept: 'application/json' }
+      const options = { method, credentials: 'include', headers }
+      if (body !== undefined) {
+        headers['content-type'] = 'application/json'
+        options.body = JSON.stringify(body)
+      }
+      const response = await context.fetch(path, options)
+      const payload = await response.json()
+      if (!response.ok) {
+        const error = new Error(payload?.detail?.message || `HTTP ${response.status}`)
+        error.status = response.status
+        error.code = payload?.detail?.code || `HTTP_${response.status}`
+        error.detail = payload?.detail
+        throw error
+      }
+      return payload
+    },
+  }
+}
+
 test('deep recall source does not preload every paper on the multi-question page', async () => {
   let listAllRequests = 0
   const listeners = new Map()
@@ -180,6 +203,7 @@ test('identical concurrent question loads share one pagination request', async (
   }
   context.window = context
   context.globalThis = context
+  attachDomainApi(context)
   vm.runInNewContext(adapter, context, { filename: 'paper-release-adapter.js' })
   await context.KGPaperReleaseApi.ready()
 
@@ -236,6 +260,7 @@ test('management catalog merges server releases into local drafts without frozen
   }
   context.window = context
   context.globalThis = context
+  attachDomainApi(context)
   vm.runInNewContext(adapter, context, { filename: 'paper-release-adapter.js' })
   await context.KGPaperReleaseApi.ready()
 
@@ -259,7 +284,7 @@ test('management catalog merges server releases into local drafts without frozen
   assert.equal(merged[1].id, 'paper-local')
 })
 
-test('publish payload returns the server-assigned release version and identity', async () => {
+test('publish and withdraw use authoritative typed paper release endpoints', async () => {
   const requests = []
   const context = {
     console,
@@ -276,6 +301,7 @@ test('publish payload returns the server-assigned release version and identity',
           ok: true,
           status: 200,
           async json() {
+            if (String(url).endsWith('/withdraw-all')) return { withdrawn: 1 }
             return { release: { releaseId: 'server-release-v2', paperId: 'paper-stale', version: 2 } }
           },
         }
@@ -285,19 +311,27 @@ test('publish payload returns the server-assigned release version and identity',
   }
   context.window = context
   context.globalThis = context
+  attachDomainApi(context)
   vm.runInNewContext(adapter, context, { filename: 'paper-release-adapter.js' })
   await context.KGPaperReleaseApi.ready()
 
-  const release = await context.KGPaperReleaseApi.publishPayload({
-    releaseId: 'client-release-v1', paperId: 'paper-stale', version: 1,
+  const release = await context.KGPaperReleaseApi.publish('paper-stale', {
+    revision: 7,
+    accessLevel: 'member',
+    enabledModes: ['practice_mode'],
+    allowedRoles: ['student'],
+    metadata: {},
   })
+  const withdrawn = await context.KGPaperReleaseApi.withdrawPaper('paper-stale')
 
   assert.equal(release.version, 2)
   assert.equal(release.releaseId, 'server-release-v2')
-  const published = requests.find(item => item.options.method === 'POST')
-  assert.equal(published.url, '/api/v1/paper-releases/publish-payload')
+  assert.equal(withdrawn, 1)
+  const published = requests.find(item => item.url.endsWith('/publish'))
+  assert.equal(published.url, '/api/v1/paper-releases/papers/paper-stale/publish')
   assert.equal(published.options.headers['content-type'], 'application/json')
-  assert.equal(JSON.parse(published.options.body).releaseId, 'client-release-v1')
+  assert.equal(JSON.parse(published.options.body).revision, 7)
+  assert.ok(requests.some(item => item.url === '/api/v1/paper-releases/papers/paper-stale/withdraw-all'))
 })
 
 test('paper release adapter never persists API data to localStorage', () => {
@@ -305,9 +339,10 @@ test('paper release adapter never persists API data to localStorage', () => {
   assert.doesNotMatch(adapter, /localStorage\.getItem/)
 })
 
-test('paper release adapter announces loads through legacy invalidation events', () => {
+test('paper release adapter announces typed changes without legacy storage compatibility keys', () => {
   assert.match(adapter, /kg:published-papers-changed/)
-  assert.match(adapter, /kg-app-storage-change/)
+  assert.doesNotMatch(adapter, /kg-app-storage-change/)
+  assert.doesNotMatch(adapter, /kg_exam_papers|questionSnapshots/)
 })
 
 test('repository reads the domain adapter instead of runtime storage keys', () => {
@@ -365,9 +400,6 @@ test('generated paper management loads the release adapter before the admin appl
   assert.ok(html.indexOf('paper-release-adapter.js') < html.indexOf('src/65-question-bank-admin.js'))
 })
 
-test('learner pages no longer receive the published paper blob via runtime bootstrap', () => {
-  // 后端侧由 backend/tests/test_paper_release_perf_gate.py 保证；
-  // 这里保证 server-state-bootstrap 不再把发布键当作需要广播的数据变更依赖。
-  const bootstrap = read(resolve(frontendRoot, 'scripts/new-legacy-assets/server-state-bootstrap.js'))
-  assert.match(bootstrap, /PUBLISHED_PAPER_KEYS/)
+test('learner pages have no legacy Runtime bootstrap asset', () => {
+  assert.equal(existsSync(resolve(frontendRoot, 'scripts/new-legacy-assets/server-state-bootstrap.js')), false)
 })

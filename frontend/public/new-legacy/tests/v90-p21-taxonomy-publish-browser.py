@@ -22,11 +22,11 @@ with sync_playwright() as p:
       Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:k=>local.has(k)?local.get(k):null,setItem:(k,v)=>local.set(k,String(v)),removeItem:k=>local.delete(k),clear:()=>local.clear(),key:i=>[...local.keys()][i]||null,get length(){return local.size}}});
       Object.defineProperty(window,'sessionStorage',{configurable:true,value:{getItem:k=>session.has(k)?session.get(k):null,setItem:(k,v)=>session.set(k,String(v)),removeItem:k=>session.delete(k),clear:()=>session.clear()}});
       const user='v90-admin';localStorage.setItem('kg_local_current_user_v1',user);localStorage.setItem('kg_local_users_v1',JSON.stringify({[user]:{username:user,displayName:'V9 管理员',role:'admin',status:'active',subject:'PMP',salt:'x',hash:'x'}}));
-      localStorage.setItem('kg_content_subjects_v1',JSON.stringify([{id:'subject-pmp',code:'PMP',name:{zh:'PMP 项目管理'},defaultTaxonomyId:'taxonomy-pmp-main',status:'active',sortOrder:10}]));
-      localStorage.setItem('kg_content_taxonomies_v1',JSON.stringify([
+      const teaching={subjects:[{id:'subject-pmp',code:'PMP',name:{zh:'PMP 项目管理'},defaultTaxonomyId:'taxonomy-pmp-main',status:'active',sortOrder:10}],taxonomies:[
         {id:'taxonomy-pmp-main',subjectId:'subject-pmp',name:{zh:'PMP 主知识树'},version:1,versionLabel:'v1.0',maxDepth:9,status:'published',isDefault:true,nodes:[{id:'root-v1',taxonomyId:'taxonomy-pmp-main',parentId:null,level:1,title:{zh:'当前根节点'},status:'active',sortOrder:1}]},
         {id:'taxonomy-pmp-main-v2',subjectId:'subject-pmp',name:{zh:'PMP 新草稿'},version:2,versionLabel:'v2.0',maxDepth:9,status:'draft',isDefault:false,nodes:[{id:'root-v2',taxonomyId:'taxonomy-pmp-main-v2',parentId:null,level:1,title:{zh:'新根节点'},status:'active',sortOrder:1}]}
-      ]));
+      ]};
+      window.KGTeachingContentApi={readResource:(name,fallback)=>structuredClone(teaching[name]??fallback),saveSubjects:async rows=>(teaching.subjects=structuredClone(rows)),saveTaxonomies:async rows=>(teaching.taxonomies=structuredClone(rows)),saveActivityOverrides:async()=>[],saveCatalogResource:async(name,rows)=>(teaching[name]=structuredClone(rows)),saveCatalog:async patch=>{Object.entries(patch).forEach(([name,rows])=>teaching[name]=structuredClone(rows));return structuredClone(teaching)},ready:async()=>structuredClone(teaching)};
     }""")
     for script in SCRIPTS:page.add_script_tag(content=(ROOT/script).read_text(encoding='utf-8'))
     page.wait_for_timeout(250)

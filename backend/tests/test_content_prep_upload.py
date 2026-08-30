@@ -503,29 +503,12 @@ def test_transactional_upload_create_skip_update_idempotency_and_single_save(
             bank_id=target_bank_id,
             question=raw,
         )
-        projection_writes = 0
-        original_projection_write = (
-            content_prep_api.content_prep_service
-            .teaching_content_projection_service.write_principle_projection
-        )
-
-        async def counted_projection_write(*args, **kwargs):
-            nonlocal projection_writes
-            projection_writes += 1
-            return await original_projection_write(*args, **kwargs)
-
-        monkeypatch.setattr(
-            content_prep_api.content_prep_service.teaching_content_projection_service,
-            "write_principle_projection",
-            counted_projection_write,
-        )
         async with AsyncSessionLocal() as db:
             actor = await db.get(User, username)
             assert actor is not None
             skipped = await upload_bundle(db, actor, skip_request)
             assert skipped.questions[0].status == "skipped"
             assert skipped.questions[0].revision == 1
-            assert projection_writes == 0
             batch_ids.add(skipped.batch_id)
 
         changed = question_payload(new_question_id, analysis="更新后的解析")

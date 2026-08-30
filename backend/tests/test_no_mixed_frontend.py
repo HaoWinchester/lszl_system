@@ -32,6 +32,10 @@ def test_generated_runtime_contains_no_frame_navigation_bridge() -> None:
 
 
 def test_direct_runtime_source_has_no_parent_message_protocol() -> None:
-    source = (ROOT / "frontend/scripts/new-legacy-assets/server-state-bootstrap.js").read_text(encoding="utf-8")
-    assert "parent.postMessage" not in source
-    assert "__KG_NEW_LEGACY_BOOTSTRAP__" not in source
+    assets = ROOT / "frontend/scripts/new-legacy-assets"
+    assert not (assets / "server-state-bootstrap.js").exists()
+    assert json.loads((assets / "runtime-retirement.json").read_text(encoding="utf-8")) == {
+        "schemaVersion": 1,
+        "status": "retired",
+        "runtimeRequests": 0,
+    }

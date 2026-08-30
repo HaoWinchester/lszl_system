@@ -16,92 +16,12 @@
       "ordinal": 3
     },
     {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "/api/v1/runtime/state",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/paper-release-adapter.js",
-      "token": "/api/v1/runtime/state",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "/api/v1/runtime/state",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "/api/v1/runtime/state",
-      "ordinal": 2
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "/api/v1/runtime/state",
-      "ordinal": 3
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "/api/v1/runtime/state",
-      "ordinal": 4
-    },
-    {
       "path": "frontend/scripts/paper-release-adapter.test.mjs",
       "token": "/api/v1/runtime/state",
       "ordinal": 1
     }
   ],
   "consumer": [
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "KGServerStateBootstrap",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "KGServerStateBootstrap",
-      "ordinal": 2
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "KGServerStateStorage",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "KGServerStateStorage",
-      "ordinal": 2
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "KGServerStateStorage",
-      "ordinal": 3
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "KGServerStateStorage",
-      "ordinal": 4
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "KGServerStateStorage",
-      "ordinal": 5
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/direct-system-adapter.js",
-      "token": "KGServerStateStorage",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "KGServerStateBootstrap",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "KGServerStateStorage",
-      "ordinal": 1
-    },
     {
       "path": "frontend/scripts/new-legacy-sync.test.mjs",
       "token": "KGServerStateStorage",
@@ -201,42 +121,12 @@
       "path": "frontend/scripts/tests/direct-system-entitlements.test.mjs",
       "token": "KGServerStateStorage",
       "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/40-guided-tour.js",
-      "token": "KGServerStateStorage",
-      "ordinal": 1
     }
   ],
   "runtimeKey": [
     {
       "path": "backend/app/core/config.py",
       "token": "kg_session",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/content_prep_shared_service.py",
-      "token": "kg_content_activity_overrides_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/content_prep_shared_service.py",
-      "token": "kg_content_taxonomies_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/content_prep_shared_service.py",
-      "token": "kg_recall_association_library_v1__subject__",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/content_reference_service.py",
-      "token": "kg_content_taxonomies_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/content_reference_service.py",
-      "token": "kg_recall_association_library_v1__subject__",
       "ordinal": 1
     },
     {
@@ -315,91 +205,6 @@
       "ordinal": 1
     },
     {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_assessment_papers_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_course_config_active_release_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_course_config_drafts_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_course_config_releases_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_exam_paper_categories_v1__teacher_shared",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_exam_paper_release_history_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_exam_papers_published_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_exam_papers_v1__teacher_shared",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_exam_papers_v1__teacher_shared",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_principle_repository_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_principle_repository_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_recall_association_library_v1__subject__",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_synthesis_preset_repository_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/question_cleanup_reference_service.py",
-      "token": "kg_synthesis_preset_repository_v1",
-      "ordinal": 2
-    },
-    {
       "path": "backend/app/services/question_migration_service.py",
       "token": "kg_exam_paper_categories_v1__",
       "ordinal": 1
@@ -437,6 +242,11 @@
     {
       "path": "backend/app/services/question_migration_service.py",
       "token": "kg_question_banks_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/recall_acceptance_service.py",
+      "token": "pmp_recall_acceptance_records_v1",
       "ordinal": 1
     },
     {
@@ -491,6 +301,26 @@
     },
     {
       "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_content_taxonomies_v1",
+      "ordinal": 9
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_course_config_active_release_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_course_config_drafts_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_course_config_releases_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
       "token": "kg_exam_paper_release_history_v1",
       "ordinal": 1
     },
@@ -503,6 +333,11 @@
       "path": "backend/app/services/runtime_domain_migration_service.py",
       "token": "kg_exam_papers_published_v1",
       "ordinal": 2
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_learning_tasks_v1",
+      "ordinal": 1
     },
     {
       "path": "backend/app/services/runtime_domain_migration_service.py",
@@ -536,63 +371,343 @@
     },
     {
       "path": "backend/app/services/runtime_domain_migration_service.py",
-      "token": "kg_user_feedback_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/runtime_domain_migration_service.py",
-      "token": "kg_user_feedback_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/runtime_domain_migration_service.py",
-      "token": "kg_user_message_reads_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/runtime_domain_migration_service.py",
-      "token": "kg_user_message_reads_v1__",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/runtime_domain_migration_service.py",
-      "token": "kg_user_message_reads_v1__",
-      "ordinal": 3
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_activity_collections_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_activity_collections_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_activity_collections_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_activity_collections_v1",
+      "token": "kg_user_feedback_reply_reads_v1__",
       "ordinal": 4
     },
     {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_activity_collections_v1",
-      "ordinal": 5
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_user_feedback_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_user_feedback_v1",
+      "ordinal": 2
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_user_message_reads_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_user_message_reads_v1__",
+      "ordinal": 2
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_user_message_reads_v1__",
+      "ordinal": 3
+    },
+    {
+      "path": "backend/app/services/runtime_domain_migration_service.py",
+      "token": "kg_user_message_reads_v1__",
+      "ordinal": 4
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_canvas_view_preferences_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_canvas_workspace_catalog_v2__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_content_organization_migration_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_course_admin_recent_v862_p2",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_course_admin_workspace_v862_p1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_course_config_active_release_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_course_config_drafts_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_course_config_releases_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_deep_recall_legacy_owner_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_deep_recall_theme_platform_migrated_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_deep_recall_theme_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_default_entry_mode_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_file_manager_details_open_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_file_manager_folder_section_collapsed_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_file_manager_layout_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_file_manager_recent_folders_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_file_manager_sidebar_collapsed_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_file_manager_sort_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_file_manager_theme_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_font_",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_global_shortcuts_layout_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_global_shortcuts_position_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_graph_closed_tabs_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_graph_file_migration_v2",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_graph_recent_colors_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_graph_recent_opened_migration_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_graph_user_preferences_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_guided_practice_return_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_home_interaction_mode_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_home_professional_flow_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_language_",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_learning_tasks_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_analysis_sections_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_analysis_sections_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_font_scale_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_highlight_color_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_highlight_color_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_paper_selection_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_paper_selection_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_release_selection_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_release_selection_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_paper_workspace_layout_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_question_classification_collapsed_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_question_language_mode_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_question_library_workspace_layout_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_question_training_filters_collapsed_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_question_training_workspace_layout_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_recent_selection_",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_resizable_",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_subscription_plan_model_v2_migrated",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_teacher_shared_runtime_promotion_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_teacher_workbench_subject_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_theme_",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_training_workspace_layout_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_ui_resizable_region_",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_wechat_login_pending_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_workspace_layout_",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "pmp_question_font_size_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "pmp_question_font_size_v2",
+      "ordinal": 1
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_activity_tags_v1",
+      "token": "kg_activity_collections_v1",
       "ordinal": 1
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_activity_tags_v1",
-      "ordinal": 2
+      "ordinal": 1
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
@@ -731,11 +846,6 @@
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_content_activity_overrides_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_content_organization_migration_v1",
       "ordinal": 1
     },
@@ -751,18 +861,8 @@
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_content_subjects_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_content_taxonomies_v1",
       "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_content_taxonomies_v1",
-      "ordinal": 2
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
@@ -791,48 +891,13 @@
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_course_config_active_release_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_course_config_active_release_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_course_config_drafts_v1",
       "ordinal": 1
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_course_config_drafts_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_course_config_drafts_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_course_config_releases_v1",
       "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_course_config_releases_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_course_config_releases_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_course_config_releases_v1",
-      "ordinal": 4
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
@@ -1551,26 +1616,6 @@
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 4
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 5
-    },
-    {
-      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_local_current_user_v1",
       "ordinal": 1
     },
@@ -1891,6 +1936,11 @@
     },
     {
       "path": "backend/app/services/runtime_state_service.py",
+      "token": "kg_recall_association_management_v1__",
+      "ordinal": 2
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
       "token": "kg_recall_association_management_v1__subject__",
       "ordinal": 1
     },
@@ -2120,6 +2170,21 @@
       "ordinal": 1
     },
     {
+      "path": "backend/app/services/runtime_state_service.py",
+      "token": "pmp_question_font_size_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
+      "token": "pmp_question_font_size_v2",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_state_service.py",
+      "token": "pmp_recall_acceptance_records_v1",
+      "ordinal": 1
+    },
+    {
       "path": "backend/app/services/teaching_content_projection_service.py",
       "token": "kg_principle_repository_v1",
       "ordinal": 1
@@ -2132,181 +2197,6 @@
     {
       "path": "backend/app/services/teaching_content_revision_service.py",
       "token": "kg_teaching_content_revision_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_default_entry_mode_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_graph_file_index_v2",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_principle_repository_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_question_banks_published_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_question_banks_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_question_banks_v1__",
-      "ordinal": 2
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_question_tag_names_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/direct-runtime.test.mjs",
-      "token": "kg_synthesis_preset_repository_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/direct-system-adapter.js",
-      "token": "kg_role_themes_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/direct-system-adapter.js",
-      "token": "kg_wechat_login_config_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/paper-release-adapter.js",
-      "token": "kg_exam_paper_release_history_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/paper-release-adapter.js",
-      "token": "kg_exam_papers_published_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_exam_paper_release_history_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_exam_papers_published_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_exam_papers_published_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_exam_papers_published_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_current_file_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_current_file_v2",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_file_content_v2__",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_file_index_v2",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_file_library_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_file_migration_v2",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_file_tags_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_file_tags_v2",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_folders_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_graph_recent_opened_migration_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_home_file_library_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_practice_auto_explanation_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_remote_auth_session_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_remote_auth_session_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_remote_auth_session_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_remote_auth_session_v1",
-      "ordinal": 4
-    },
-    {
-      "path": "frontend/scripts/new-legacy-assets/server-state-bootstrap.js",
-      "token": "kg_synthesis_preset_repository_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_activity_collections_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_activity_tags_v1",
       "ordinal": 1
     },
     {
@@ -2351,22 +2241,7 @@
     },
     {
       "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_content_activity_overrides_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_content_organization_migration_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_content_subjects_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_content_taxonomies_v1",
       "ordinal": 1
     },
     {
@@ -2377,21 +2252,6 @@
     {
       "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_course_admin_workspace_v862_p1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_course_config_active_release_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_course_config_drafts_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_course_config_releases_v1",
       "ordinal": 1
     },
     {
@@ -2661,11 +2521,6 @@
     },
     {
       "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_local_",
       "ordinal": 1
     },
@@ -2851,11 +2706,6 @@
     },
     {
       "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_remote_auth_session_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_role_themes_v1",
       "ordinal": 1
     },
@@ -2955,6 +2805,16 @@
       "ordinal": 1
     },
     {
+      "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "pmp_question_font_size_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "pmp_question_font_size_v2",
+      "ordinal": 1
+    },
+    {
       "path": "frontend/scripts/new-legacy-release.test.mjs",
       "token": "KG_RELEASE_VALIDATION_SCRIPT",
       "ordinal": 1
@@ -3006,7 +2866,67 @@
     },
     {
       "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 2
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 3
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 4
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 5
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 6
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 7
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 8
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
       "token": "kg_teacher_preview_123",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "pmp_content_prep_studio_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "pmp_content_prep_studio_v1",
+      "ordinal": 2
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "pmp_content_prep_studio_v1",
+      "ordinal": 3
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "pmp_future_business_payload_v1",
       "ordinal": 1
     },
     {
@@ -3102,6 +3022,16 @@
     {
       "path": "frontend/scripts/sync-new-legacy.js",
       "token": "kg_learning_entry_chooser_consumed_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/sync-new-legacy.js",
+      "token": "kg_remote_auth_session_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/sync-new-legacy.js",
+      "token": "pmp_content_prep_studio_v1",
       "ordinal": 1
     },
     {
@@ -3261,73 +3191,13 @@
     },
     {
       "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "kg_principle_repository_v1",
+      "token": "pmp_content_prep_studio_v1",
       "ordinal": 1
-    },
-    {
-      "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "kg_principle_repository_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "kg_principle_repository_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "kg_remote_auth_session_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "kg_synthesis_preset_repository_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "kg_synthesis_preset_repository_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "kg_synthesis_preset_repository_v1",
-      "ordinal": 3
     },
     {
       "path": "new-legacy/content-prep-studio/src/js/10-state-domain.js",
-      "token": "kg_remote_auth_session_v1",
+      "token": "pmp_content_prep_studio_v1",
       "ordinal": 1
-    },
-    {
-      "path": "new-legacy/content-prep-studio/src/js/45-server-events.js",
-      "token": "kg_principle_repository_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/content-prep-studio/src/js/45-server-events.js",
-      "token": "kg_principle_repository_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/content-prep-studio/src/js/45-server-events.js",
-      "token": "kg_principle_repository_v1",
-      "ordinal": 3
-    },
-    {
-      "path": "new-legacy/content-prep-studio/src/js/45-server-events.js",
-      "token": "kg_synthesis_preset_repository_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/content-prep-studio/src/js/45-server-events.js",
-      "token": "kg_synthesis_preset_repository_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/content-prep-studio/src/js/45-server-events.js",
-      "token": "kg_synthesis_preset_repository_v1",
-      "ordinal": 3
     },
     {
       "path": "new-legacy/file-manager.html",
@@ -3337,16 +3207,6 @@
     {
       "path": "new-legacy/question-studio/activity-schema-v1.js",
       "token": "kg_question_language_mode_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/question-studio/knowledge-taxonomy-v1.js",
-      "token": "kg_content_subjects_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/question-studio/knowledge-taxonomy-v1.js",
-      "token": "kg_content_taxonomies_v1",
       "ordinal": 1
     },
     {
@@ -3387,11 +3247,6 @@
     {
       "path": "new-legacy/src/22-home-file-library.js",
       "token": "kg_home_file_library_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/23-graph-file-api.js",
-      "token": "kg_remote_auth_session_v1",
       "ordinal": 1
     },
     {
@@ -3526,20 +3381,10 @@
     },
     {
       "path": "new-legacy/src/29-auth-core.js",
-      "token": "kg_local_users_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/29-auth-core.js",
       "token": "kg_remote_auth_session_v1",
       "ordinal": 1
     },
     {
-      "path": "new-legacy/src/29-auth-core.js",
-      "token": "kg_user_admin_logs_v1",
-      "ordinal": 1
-    },
-    {
       "path": "new-legacy/src/30-auth-guards.js",
       "token": "kg_local_current_user_v1",
       "ordinal": 1
@@ -3551,21 +3396,6 @@
     },
     {
       "path": "new-legacy/src/30-auth-guards.js",
-      "token": "kg_user_admin_logs_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/31-admin-utils.js",
-      "token": "kg_local_current_user_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/31-admin-utils.js",
-      "token": "kg_local_users_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/31-admin-utils.js",
       "token": "kg_user_admin_logs_v1",
       "ordinal": 1
     },
@@ -3577,71 +3407,6 @@
     {
       "path": "new-legacy/src/31-learning-entry-chooser.js",
       "token": "kg_learning_entry_chooser_consumed_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/32-wechat-login.js",
-      "token": "kg_wechat_login_config_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/33-user-center.js",
-      "token": "kg_local_current_user_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/33-user-center.js",
-      "token": "kg_local_users_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/33-user-center.js",
-      "token": "kg_user_admin_logs_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/34-role-permissions.js",
-      "token": "kg_local_current_user_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/34-role-permissions.js",
-      "token": "kg_local_users_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/34-role-permissions.js",
-      "token": "kg_role_themes_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/35-user-management.js",
-      "token": "kg_exam_papers_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/35-user-management.js",
-      "token": "kg_question_banks_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/36-system-settings.js",
-      "token": "kg_user_admin_logs_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/37-subscription-core.js",
-      "token": "kg_local_",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/37-subscription-core.js",
-      "token": "kg_student_subscriptions_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/37-subscription-core.js",
-      "token": "kg_subscription_plan_model_v2_migrated",
       "ordinal": 1
     },
     {
@@ -3695,46 +3460,6 @@
       "ordinal": 1
     },
     {
-      "path": "new-legacy/src/60-question-bank.js",
-      "token": "kg_deep_recall_current_question_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/60-question-bank.js",
-      "token": "kg_exam_current_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/60-question-bank.js",
-      "token": "kg_exam_papers_published_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/60-question-bank.js",
-      "token": "kg_exam_papers_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/60-question-bank.js",
-      "token": "kg_local_current_user_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/60-question-bank.js",
-      "token": "kg_local_current_user_v1",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/60-question-bank.js",
-      "token": "kg_question_banks_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/60-question-bank.js",
-      "token": "kg_question_current_v1__",
-      "ordinal": 1
-    },
-    {
       "path": "new-legacy/src/62-learning-session-store.js",
       "token": "kg_learning_active_context_v1__",
       "ordinal": 1
@@ -3766,57 +3491,12 @@
     },
     {
       "path": "new-legacy/src/65-question-bank-admin.js",
-      "token": "kg_admin_audit_log_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/65-question-bank-admin.js",
-      "token": "kg_deep_recall_current_question_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/65-question-bank-admin.js",
-      "token": "kg_exam_current_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/65-question-bank-admin.js",
-      "token": "kg_local_current_user_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/65-question-bank-admin.js",
       "token": "kg_paper_workspace_layout_v1",
       "ordinal": 1
     },
     {
       "path": "new-legacy/src/65-question-bank-admin.js",
-      "token": "kg_principle_repository_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/65-question-bank-admin.js",
-      "token": "kg_question_bank_demo_suppressed_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/65-question-bank-admin.js",
-      "token": "kg_question_banks_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/65-question-bank-admin.js",
-      "token": "kg_question_current_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/65-question-bank-admin.js",
       "token": "kg_question_library_workspace_layout_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/65-question-bank-admin.js",
-      "token": "kg_question_tag_names_v1",
       "ordinal": 1
     },
     {
@@ -3878,6 +3558,21 @@
       "path": "new-legacy/src/78-multi-question-workspace-tabs.js",
       "token": "kg_multi_workspace_closed_tabs_v1__",
       "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/80-question-font-scale.js",
+      "token": "pmp_question_font_size_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/80-question-font-scale.js",
+      "token": "pmp_question_font_size_v2",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/80-question-font-scale.js",
+      "token": "pmp_question_font_size_v2",
+      "ordinal": 2
     },
     {
       "path": "new-legacy/src/86-activity-schema-v1.js",
@@ -3965,103 +3660,8 @@
       "ordinal": 1
     },
     {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "kg_content_activity_overrides_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "kg_content_subjects_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "kg_content_taxonomies_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "kg_course_config_active_release_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "kg_course_config_drafts_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "kg_course_config_releases_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "kg_local_current_user_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-teacher-workbench-app.js",
-      "token": "kg_assessment_papers_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-teacher-workbench-app.js",
-      "token": "kg_course_config_drafts_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-teacher-workbench-app.js",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "kg_activity_collections_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "kg_activity_tags_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "kg_assessment_papers_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "kg_content_organization_migration_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "kg_exam_papers_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "kg_local_current_user_v1",
-      "ordinal": 1
-    },
-    {
       "path": "new-legacy/src/94-practice-navigation.js",
       "token": "kg_guided_practice_return_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/95-recall-association-library.js",
-      "token": "kg_local_current_user_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/95-recall-association-library.js",
-      "token": "kg_recall_association_library_v1__",
       "ordinal": 1
     },
     {
@@ -4077,16 +3677,6 @@
     {
       "path": "new-legacy/src/96-recall-question-source.js",
       "token": "kg_exam_papers_published_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/96-recall-question-source.js",
-      "token": "kg_local_current_user_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/97-knowledge-question-stats.js",
-      "token": "kg_local_current_user_v1",
       "ordinal": 1
     },
     {
@@ -4135,106 +3725,6 @@
       "ordinal": 1
     },
     {
-      "path": "new-legacy/src/98-question-classification.js",
-      "token": "kg_question_tag_names_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_activity_collections_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_activity_tags_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_admin_audit_log_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_admin_settings_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_admin_transaction_snapshots_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_assessment_papers_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_content_activity_overrides_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_content_subjects_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_content_taxonomies_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_course_config_active_release_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_course_config_drafts_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_course_config_releases_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_learning_tasks_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_taxonomy_deletion_records_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_taxonomy_import_records_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "kg_taxonomy_release_records_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/30-reference-index-service.js",
-      "token": "kg_question_banks_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/42-teaching-content-server-gateway.js",
-      "token": "kg_content_taxonomies_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/53-recall-association-management.js",
-      "token": "kg_recall_association_management_v1__subject__",
-      "ordinal": 1
-    },
-    {
       "path": "new-legacy/src/admin/resizable-region.js",
       "token": "kg_ui_resizable_region_v1__",
       "ordinal": 1
@@ -4255,31 +3745,6 @@
       "ordinal": 1
     },
     {
-      "path": "new-legacy/src/principles/principle-repository.js",
-      "token": "kg_principle_repository_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/principles/synthesis-preset-repository.js",
-      "token": "kg_synthesis_preset_repository_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/teacher/question-bank/safe-delete-service.js",
-      "token": "kg_exam_paper_release_history_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/teacher/question-bank/safe-delete-service.js",
-      "token": "kg_exam_papers_published_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/teacher/question-bank/safe-delete-service.js",
-      "token": "kg_exam_papers_v1__",
-      "ordinal": 1
-    },
-    {
       "path": "new-legacy/src/teacher/question-bank/workspace-layout.js",
       "token": "kg_question_library_workspace_layout_v1",
       "ordinal": 1
@@ -4297,53 +3762,48 @@
   ],
   "dynamicRuntimeKey": [
     {
-      "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "LAST_DRAFT_KEY",
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "AUTH_REMOTE_SESSION_KEY",
       "ordinal": 1
     },
     {
-      "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "LAST_DRAFT_KEY",
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "AUTH_REMOTE_SESSION_KEY",
       "ordinal": 2
     },
     {
-      "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "LAST_DRAFT_KEY",
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "AUTH_REMOTE_SESSION_KEY",
       "ordinal": 3
     },
     {
-      "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "RA_STORAGE_KEY",
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "AUTH_REMOTE_SESSION_KEY",
+      "ordinal": 4
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "AUTH_REMOTE_SESSION_KEY",
+      "ordinal": 5
+    },
+    {
+      "path": "frontend/scripts/new-legacy-sync.test.mjs",
+      "token": "legacyKey",
       "ordinal": 1
     },
     {
       "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "RA_STORAGE_KEY",
+      "token": "LAST_DRAFT_KEY",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/content-prep-studio/dist/content-prep.html",
+      "token": "LAST_DRAFT_KEY",
       "ordinal": 2
     },
     {
       "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "RA_STORAGE_KEY",
-      "ordinal": 3
-    },
-    {
-      "path": "new-legacy/content-prep-studio/dist/content-prep.html",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/content-prep-studio/src/js/16-recall-acceptance.js",
-      "token": "RA_STORAGE_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/content-prep-studio/src/js/16-recall-acceptance.js",
-      "token": "RA_STORAGE_KEY",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/content-prep-studio/src/js/16-recall-acceptance.js",
-      "token": "RA_STORAGE_KEY",
+      "token": "LAST_DRAFT_KEY",
       "ordinal": 3
     },
     {
@@ -4360,11 +3820,6 @@
       "path": "new-legacy/content-prep-studio/src/js/38-shared-draft-autosave.js",
       "token": "LAST_DRAFT_KEY",
       "ordinal": 3
-    },
-    {
-      "path": "new-legacy/content-prep-studio/src/js/45-server-events.js",
-      "token": "key",
-      "ordinal": 1
     },
     {
       "path": "new-legacy/question-studio/activity-schema-v1.js",
@@ -4375,11 +3830,6 @@
       "path": "new-legacy/question-studio/activity-schema-v1.js",
       "token": "LANGUAGE_STORAGE_KEY",
       "ordinal": 2
-    },
-    {
-      "path": "new-legacy/question-studio/knowledge-taxonomy-v1.js",
-      "token": "key",
-      "ordinal": 1
     },
     {
       "path": "new-legacy/question-studio/question-studio.js",
@@ -4502,11 +3952,6 @@
       "ordinal": 3
     },
     {
-      "path": "new-legacy/src/23-graph-file-store.js",
-      "token": "key",
-      "ordinal": 4
-    },
-    {
       "path": "new-legacy/src/27-graph-file-manager.js",
       "token": "key",
       "ordinal": 1
@@ -4525,6 +3970,11 @@
       "path": "new-legacy/src/27-home-interaction-modes.js",
       "token": "key",
       "ordinal": 2
+    },
+    {
+      "path": "new-legacy/src/29-auth-core.js",
+      "token": "AUTH_REMOTE_SESSION_KEY",
+      "ordinal": 1
     },
     {
       "path": "new-legacy/src/29-auth-core.js",
@@ -4555,16 +4005,6 @@
       "path": "new-legacy/src/29-auth-core.js",
       "token": "AUTH_SESSION_KEY",
       "ordinal": 6
-    },
-    {
-      "path": "new-legacy/src/29-auth-core.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/29-auth-core.js",
-      "token": "key",
-      "ordinal": 2
     },
     {
       "path": "new-legacy/src/30-auth-guards.js",
@@ -4627,81 +4067,6 @@
       "ordinal": 2
     },
     {
-      "path": "new-legacy/src/31-admin-utils.js",
-      "token": "AUTH_SESSION_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/31-admin-utils.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/31-admin-utils.js",
-      "token": "key",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/32-wechat-login.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/32-wechat-login.js",
-      "token": "key",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/33-user-center.js",
-      "token": "AUTH_SESSION_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/33-user-center.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/33-user-center.js",
-      "token": "key",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/34-role-permissions.js",
-      "token": "AUTH_SESSION_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/34-role-permissions.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/34-role-permissions.js",
-      "token": "key",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/36-system-settings.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/36-system-settings.js",
-      "token": "key",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/37-subscription-core.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/37-subscription-core.js",
-      "token": "key",
-      "ordinal": 2
-    },
-    {
       "path": "new-legacy/src/39-global-shortcuts.js",
       "token": "key",
       "ordinal": 1
@@ -4709,16 +4074,6 @@
     {
       "path": "new-legacy/src/39-global-shortcuts.js",
       "token": "key",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/40-guided-tour.js",
-      "token": "TOUR_STORAGE_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/40-guided-tour.js",
-      "token": "TOUR_STORAGE_KEY",
       "ordinal": 2
     },
     {
@@ -4735,26 +4090,6 @@
       "path": "new-legacy/src/59b-learning-route-context.js",
       "token": "sessionKey(normalized.mode)",
       "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/60-question-bank.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/60-question-bank.js",
-      "token": "key",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/60-question-bank.js",
-      "token": "key",
-      "ordinal": 3
-    },
-    {
-      "path": "new-legacy/src/60-question-bank.js",
-      "token": "key",
-      "ordinal": 4
     },
     {
       "path": "new-legacy/src/62-learning-session-store.js",
@@ -4827,31 +4162,6 @@
       "ordinal": 2
     },
     {
-      "path": "new-legacy/src/65-question-bank-admin.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/65-question-bank-admin.js",
-      "token": "key",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/65-question-bank-admin.js",
-      "token": "key",
-      "ordinal": 3
-    },
-    {
-      "path": "new-legacy/src/65-question-bank-admin.js",
-      "token": "key",
-      "ordinal": 4
-    },
-    {
-      "path": "new-legacy/src/65-question-bank-admin.js",
-      "token": "key",
-      "ordinal": 5
-    },
-    {
       "path": "new-legacy/src/72-question-training-page.js",
       "token": "AUTH_SESSION_KEY",
       "ordinal": 1
@@ -4900,66 +4210,6 @@
       "path": "new-legacy/src/72-question-training-page.js",
       "token": "USER_ADMIN_LOG_KEY",
       "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/77-multi-question-workspace.js",
-      "token": "scopedPreferenceKey(ANALYSIS_SECTION_KEY)",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/77-multi-question-workspace.js",
-      "token": "scopedPreferenceKey(ANALYSIS_SECTION_KEY)",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/77-multi-question-workspace.js",
-      "token": "scopedPreferenceKey(FONT_SCALE_KEY)",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/77-multi-question-workspace.js",
-      "token": "scopedPreferenceKey(FONT_SCALE_KEY)",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/77-multi-question-workspace.js",
-      "token": "scopedPreferenceKey(HIGHLIGHT_COLOR_KEY)",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/77-multi-question-workspace.js",
-      "token": "scopedPreferenceKey(HIGHLIGHT_COLOR_KEY)",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/77-multi-question-workspace.js",
-      "token": "scopedPreferenceKey(PAPER_SELECTION_KEY)",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/77-multi-question-workspace.js",
-      "token": "scopedPreferenceKey(PAPER_SELECTION_KEY)",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/77-multi-question-workspace.js",
-      "token": "scopedPreferenceKey(PAPER_SELECTION_KEY)",
-      "ordinal": 3
-    },
-    {
-      "path": "new-legacy/src/77-multi-question-workspace.js",
-      "token": "scopedPreferenceKey(RELEASE_SELECTION_KEY)",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/77-multi-question-workspace.js",
-      "token": "scopedPreferenceKey(RELEASE_SELECTION_KEY)",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/77-multi-question-workspace.js",
-      "token": "scopedPreferenceKey(RELEASE_SELECTION_KEY)",
-      "ordinal": 3
     },
     {
       "path": "new-legacy/src/78-multi-question-workspace-tabs.js",
@@ -5062,76 +4312,6 @@
       "ordinal": 2
     },
     {
-      "path": "new-legacy/src/91-content-center-app.js",
-      "token": "SUBJECT_PREF_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-content-center-app.js",
-      "token": "SUBJECT_PREF_KEY",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/91-course-admin-app.js",
-      "token": "RECENT_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-course-admin-app.js",
-      "token": "RECENT_KEY",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/91-course-admin-app.js",
-      "token": "SUBJECT_PREF_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-course-admin-app.js",
-      "token": "SUBJECT_PREF_KEY",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/91-course-admin-app.js",
-      "token": "SUBJECT_PREF_KEY",
-      "ordinal": 3
-    },
-    {
-      "path": "new-legacy/src/91-course-admin-app.js",
-      "token": "WORKSPACE_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-course-admin-app.js",
-      "token": "WORKSPACE_KEY",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/91-learning-content-core.js",
-      "token": "key",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/91-teacher-workbench-app.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/93-content-organization-core.js",
-      "token": "key",
-      "ordinal": 2
-    },
-    {
       "path": "new-legacy/src/94-practice-navigation.js",
       "token": "CONTEXT_KEY",
       "ordinal": 1
@@ -5145,36 +4325,6 @@
       "path": "new-legacy/src/94-practice-navigation.js",
       "token": "CONTEXT_KEY",
       "ordinal": 3
-    },
-    {
-      "path": "new-legacy/src/95-recall-association-library.js",
-      "token": "AUTH_SESSION_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/95-recall-association-library.js",
-      "token": "legacyStorageKey(subjectId)",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/95-recall-association-library.js",
-      "token": "storageKey(subjectId)",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/95-recall-association-library.js",
-      "token": "storageKey(subjectId)",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/95-recall-association-library.js",
-      "token": "storageKey(subjectId)",
-      "ordinal": 3
-    },
-    {
-      "path": "new-legacy/src/96-recall-question-source.js",
-      "token": "AUTH_SESSION_KEY",
-      "ordinal": 1
     },
     {
       "path": "new-legacy/src/96-recall-question-source.js",
@@ -5183,11 +4333,6 @@
     },
     {
       "path": "new-legacy/src/97-knowledge-question-stats.js",
-      "token": "AUTH_SESSION_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/97-knowledge-question-stats.js",
       "token": "key",
       "ordinal": 1
     },
@@ -5210,76 +4355,6 @@
       "path": "new-legacy/src/97-teacher-question-workflow.js",
       "token": "TRAINING_WORKSPACE_LAYOUT_KEY",
       "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/98-question-classification.js",
-      "token": "COLLAPSE_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/98-question-classification.js",
-      "token": "COLLAPSE_KEY",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/98-question-classification.js",
-      "token": "TAG_CONFIG_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/98-question-classification.js",
-      "token": "TAG_CONFIG_KEY",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "key",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "key",
-      "ordinal": 3
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "key",
-      "ordinal": 4
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "storageKey",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "storageKey",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/admin/11-local-content-repository.js",
-      "token": "storageKey",
-      "ordinal": 3
-    },
-    {
-      "path": "new-legacy/src/admin/30-reference-index-service.js",
-      "token": "key",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/53-recall-association-management.js",
-      "token": "storageKey(code)",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/admin/53-recall-association-management.js",
-      "token": "storageKey(state.subjectCode)",
-      "ordinal": 1
     },
     {
       "path": "new-legacy/src/admin/resizable-region.js",
@@ -5324,27 +4399,8 @@
     {
       "path": "new-legacy/src/practice/practice-attempt-repository.js",
       "token": "key()",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/principles/principle-repository.js",
-      "token": "KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/principles/principle-repository.js",
-      "token": "KEY",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/principles/synthesis-preset-repository.js",
-      "token": "KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/principles/synthesis-preset-repository.js",
-      "token": "KEY",
       "ordinal": 2
     }
-  ]
+  ],
+  "devicePreferenceStorage": []
 }

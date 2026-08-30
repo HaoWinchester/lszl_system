@@ -3,9 +3,13 @@
 <head>
 <script src="./teaching-content-sync.js?v=v9.0-p4.1.193"></script><!-- kg-teaching-content-sync:generated -->
 <!-- kg-direct-bootstrap-anchor -->
-<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->
 <script src="./runtime-config.override.js?v=v9.0-p4.1.193"></script><!-- kg-runtime:generated -->
 <script src="./auth-session-bootstrap.js?v=v9.0-p4.1.193"></script><!-- kg-auth-session:generated -->
+<script src="./domain-api-client.js?v=v9.0-p4.1.193"></script><!-- kg-domain-api:generated -->
+<script src="./teaching-content-adapter.js?v=v9.0-p4.1.193"></script><!-- kg-teaching-content-api:generated -->
+<script src="./course-management-adapter.js?v=v9.0-p4.1.193"></script><!-- kg-course-management-api:generated -->
+<script src="./admin-domain-summary.js?v=v9.0-p4.1.193"></script><!-- kg-admin-domain-summary:generated -->
+<script src="src/28-device-preferences.js?v=v9.0-p4.1.193"></script><!-- kg-device-preferences:generated -->
 <script defer src="./direct-entry.js?v=v9.0-p4.1.193"></script><!-- kg-direct-entry:generated -->
 <script defer src="./feature-analytics.js?v=v9.0-p4.1.193"></script><!-- kg-feature-analytics:generated --><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>操作记录｜管理后台</title><link rel="stylesheet" href="styles/admin-console.css?v=v9.0-p4.1.193"/><link rel="stylesheet" href="styles/admin-context-nav.css?v=v9.0-p4.1.193"/><link rel="stylesheet" href="styles/global-shortcuts.css?v=v9.0-p4.1.193"/><link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.193"/>
 <link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.193"/><link rel="stylesheet" href="styles/resizable-region.css?v=v9.0-p4.1.193"/><link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.193"/><link rel="stylesheet" href="styles/admin-focus-vega.css?v=v9.0-p4.1.193"/><link rel="stylesheet" href="styles/admin-focus-vega-common.css?v=v9.0-p4.1.193"/>  <link rel="stylesheet" href="styles/close-button.css?v=v9.0-p4.1.193"/>
@@ -33,13 +37,13 @@
     </div></header>
 <div class="admin-app-shell">
 <main class="admin-main">
-<section class="admin-page-head"><div><p>OPERATION RECORDS</p><h1>操作记录</h1><span>集中查看知识树切换、归档、恢复、删除以及其他管理端事务。</span></div><div class="admin-head-actions"><button type="button" id="adminRefreshOperations"><span data-admin-icon="refresh-cw" data-admin-icon-size="16" aria-hidden="true"></span><span>刷新记录</span></button></div></section>
-<section class="admin-kpi-grid three"><article><span>审计记录</span><strong id="adminAuditCount">—</strong><small id="adminAuditSummary">等待读取</small></article><article><span>知识树生命周期</span><strong id="adminReleaseCount">—</strong><small>发布、切换、归档与恢复</small></article><article><span>安全删除记录</span><strong id="adminDeletionCount">—</strong><small>仅记录已完成删除</small></article></section>
+<section class="admin-page-head"><div><p>OPERATION RECORDS</p><h1>操作记录</h1><span>集中查看服务端审计、课程发布版本与已完成删除操作。</span></div><div class="admin-head-actions"><button type="button" id="adminRefreshOperations"><span data-admin-icon="refresh-cw" data-admin-icon-size="16" aria-hidden="true"></span><span>刷新记录</span></button></div></section>
+<section class="admin-kpi-grid three"><article><span>审计记录</span><strong id="adminAuditCount">—</strong><small id="adminAuditSummary">等待读取</small></article><article><span>课程发布版本</span><strong id="adminReleaseCount">—</strong><small>发布与撤回状态</small></article><article><span>删除审计记录</span><strong id="adminDeletionCount">—</strong><small>来自服务端操作日志</small></article></section>
 <section class="admin-two-column">
 <section class="admin-panel"><header><div><p>AUDIT TRAIL</p><h2>管理端审计</h2><span>按时间倒序显示最近 100 条记录。</span></div></header><div id="adminAuditList" class="admin-audit-list tall" data-kg-resizable-region data-kg-resizable-key="admin-audit-list" data-kg-resizable-default="560" data-kg-resizable-min="280" data-kg-resizable-max="1200" data-kg-resizable-breakpoint="820"></div></section>
-<section class="admin-panel"><header><div><p>TAXONOMY LIFECYCLE</p><h2>知识树生命周期</h2><span>历史版本入口中的重大操作会记录在这里。</span></div></header><div id="adminReleaseList" class="admin-release-list tall" data-kg-resizable-region data-kg-resizable-key="taxonomy-lifecycle-list" data-kg-resizable-default="560" data-kg-resizable-min="280" data-kg-resizable-max="1200" data-kg-resizable-breakpoint="820"></div></section>
+<section class="admin-panel"><header><div><p>COURSE RELEASES</p><h2>课程发布版本</h2><span>直接读取课程管理 API 的发布与撤回状态。</span></div></header><div id="adminReleaseList" class="admin-release-list tall" data-kg-resizable-region data-kg-resizable-key="taxonomy-lifecycle-list" data-kg-resizable-default="560" data-kg-resizable-min="280" data-kg-resizable-max="1200" data-kg-resizable-breakpoint="820"></div></section>
 </section>
-<section class="admin-panel"><header><div><p>SAFE DELETION</p><h2>知识树删除记录</h2><span>包含原状态、节点数量、内容哈希和删除操作者。</span></div></header><div class="admin-table-wrap"><table><thead><tr><th>科目</th><th>知识树</th><th>版本</th><th>原状态</th><th>节点</th><th>操作者</th><th>时间</th></tr></thead><tbody id="adminDeletionRows"></tbody></table></div></section>
+<section class="admin-panel"><header><div><p>SERVER DELETIONS</p><h2>删除审计记录</h2><span>从服务端操作日志筛选已记录的删除操作。</span></div></header><div class="admin-table-wrap"><table><thead><tr><th>对象类型</th><th>操作</th><th>版本</th><th>状态</th><th>数量</th><th>操作者</th><th>时间</th></tr></thead><tbody id="adminDeletionRows"></tbody></table></div></section>
 </main></div><div id="adminToast" class="admin-toast" role="status" aria-live="polite"></div>
 <script src="src/28-app-storage.js?v=v9.0-p4.1.193"></script><script src="src/29-auth-core.js?v=v9.0-p4.1.193"></script><script defer src="./direct-system-adapter.js?v=v9.0-p4.1.193"></script><!-- kg-system:generated -->
 <script src="src/33-user-center.js?v=v9.0-p4.1.193"></script><script src="src/86-activity-schema-v1.js?v=v9.0-p4.1.193"></script><script src="src/87-guided-learning-data.js?v=v9.0-p4.1.193"></script><script src="src/91-learning-content-core.js?v=v9.0-p4.1.193"></script>

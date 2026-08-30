@@ -8,6 +8,8 @@ const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const repoDir = resolve(scriptsDir, '../..')
 
 const ROOTS = ['new-legacy', 'frontend/scripts', 'backend/app']
+const DEVICE_PREFERENCE_SOURCE = 'new-legacy/src/28-device-preferences.js'
+const AUTH_SESSION_CLEANUP_SOURCE = 'new-legacy/src/29-auth-core.js'
 const IGNORED = [
   'new-legacy/tests/',
   'frontend/public/',
@@ -18,9 +20,10 @@ const IGNORED = [
 const TOKENS = {
   endpoint: /\/api\/v1\/runtime\/state/g,
   consumer: /\b(?:KGServerStateStorage|KGServerStateBootstrap)\b/g,
-  runtimeKey: /(?:(['"`])(?<quoted>kg_[a-z0-9_]+(?:__[^'"`]*)?)\1|(?<bare>\bkg_[a-z0-9_]+(?:__\w+)?)(?=\s*:))/gi,
+  runtimeKey: /(?:(['"`])(?<quoted>(?:kg|pmp)_[a-z0-9_]+(?:__[^'"`]*)?)\1|(?<bare>\b(?:kg|pmp)_[a-z0-9_]+(?:__\w+)?)(?=\s*:))/gi,
 }
 const DYNAMIC_KEY = /(?:(?:global|window)\s*(?:\?\.|\.)\s*)?(?:localStorage|sessionStorage)\s*(?:\?\.|\.)\s*(?:getItem|setItem|removeItem)\s*(?:\?\.)?\s*\(\s*([A-Za-z_$][\w$]*(?:\([^\n)]*\))?)/g
+const DEVICE_PREFERENCE_STORAGE_CALL = /(?:(?:global|window)\s*(?:\?\.\s*|\.\s*))?(?:localStorage|sessionStorage)\s*(?:\?\.\s*|\.\s*)(?:getItem|setItem|removeItem)\s*(?:\?\.\s*)?\(\s*(assertAllowed\s*\(\s*key\s*\)|[^,\n)]+)[^\n]*\)/g
 
 function repoRelative(path) {
   return relative(repoDir, path).replaceAll('\\', '/')
@@ -36,7 +39,7 @@ function filesUnder(path) {
 }
 
 function occurrenceInventory(overrides = new Map()) {
-  const result = { endpoint: [], consumer: [], runtimeKey: [], dynamicRuntimeKey: [] }
+  const result = { endpoint: [], consumer: [], runtimeKey: [], dynamicRuntimeKey: [], devicePreferenceStorage: [] }
   const normalizedOverrides = new Map(
     [...overrides].map(([path, source]) => [path.replaceAll('\\', '/'), source]),
   )
@@ -48,6 +51,7 @@ function occurrenceInventory(overrides = new Map()) {
     if (!/\.(?:js|mjs|py|html|json)$/.test(path)) continue
     const source = normalizedOverrides.get(path) ?? readFileSync(absolute, 'utf8')
     for (const [kind, pattern] of Object.entries(TOKENS)) {
+      if (kind === 'runtimeKey' && path === DEVICE_PREFERENCE_SOURCE) continue
       for (const match of source.matchAll(pattern)) {
         const token = kind === 'runtimeKey'
           ? (match.groups?.quoted ?? match.groups?.bare ?? match[0])
@@ -55,9 +59,16 @@ function occurrenceInventory(overrides = new Map()) {
         result[kind].push(`${path}:${token}`)
       }
     }
-    for (const match of source.matchAll(DYNAMIC_KEY)) {
-      const token = match[1]
-      if (!/^kg_[a-z0-9_]+(?:__[^'"`]*)?$/i.test(token)) result.dynamicRuntimeKey.push(`${path}:${token}`)
+    if (path !== DEVICE_PREFERENCE_SOURCE) {
+      for (const match of source.matchAll(DYNAMIC_KEY)) {
+        const token = match[1]
+        if (!/^kg_[a-z0-9_]+(?:__[^'"`]*)?$/i.test(token)) result.dynamicRuntimeKey.push(`${path}:${token}`)
+      }
+    } else {
+      for (const match of source.matchAll(DEVICE_PREFERENCE_STORAGE_CALL)) {
+        if (/^assertAllowed\s*\(\s*key\s*\)$/.test(match[1])) continue
+        result.devicePreferenceStorage.push(`${path}:${match[0].trim()}`)
+      }
     }
   }
   for (const values of Object.values(result)) values.sort()
@@ -119,11 +130,75 @@ test('runtime removal contract detects a newly added key, endpoint, and consumer
   assert.ok(actual.runtimeKey.length >= BASELINE.runtimeKey.length + 2)
 })
 
-test('runtime inventory includes legacy implementation occurrences instead of ignoring whole files', () => {
+test('runtime removal contract rejects a non-kg business-storage prefix', () => {
+  const path = 'new-legacy/src/__runtime-removal-contract-fixture.js'
+  const report = contractReport(new Map([[
+    path,
+    "localStorage.setItem('pmp_future_business_payload_v1', '{}')\n",
+  ]]))
+
+  assert.equal(report.blocked, true)
+  assert.deepEqual(report.unreviewed.runtimeKey, [{
+    path,
+    token: 'pmp_future_business_payload_v1',
+    ordinal: 1,
+  }])
+})
+
+test('retired browser auth session remains only as path-scoped destructive cleanup', () => {
+  const source = readFileSync(resolve(repoDir, AUTH_SESSION_CLEANUP_SOURCE), 'utf8')
+  assert.match(source, /const AUTH_REMOTE_SESSION_KEY = ["']kg_remote_auth_session_v1["']/)
+  assert.equal((source.match(/removeItem\?\.\(AUTH_REMOTE_SESSION_KEY\)/g) || []).length, 2)
+  assert.doesNotMatch(source, /(?:getItem|setItem)\?\.\(AUTH_REMOTE_SESSION_KEY\)|(?:getItem|setItem)\(AUTH_REMOTE_SESSION_KEY\)/)
+  assert.doesNotMatch(source, /AUTH_REMOTE_SESSION_STORAGE/)
+  assert.doesNotMatch(source, /\n\s+AUTH_REMOTE_SESSION_KEY,\n/)
+})
+
+test('runtime removal contract scans the shared domain client boundary', () => {
+  const path = 'frontend/scripts/new-legacy-assets/domain-api-client.js'
+  const report = contractReport(new Map([[path, "fetch('/api/v1/runtime/state')\n"]]))
+
+  assert.equal(report.blocked, true)
+  assert.deepEqual(report.unreviewed.endpoint, [{
+    path,
+    token: '/api/v1/runtime/state',
+    ordinal: 1,
+  }])
+})
+
+test('runtime removal contract rejects an unguarded device-preference storage write', () => {
+  const report = contractReport(new Map([[
+    DEVICE_PREFERENCE_SOURCE,
+    "localStorage.setItem('kg_exam_papers_v1__admin', '[]')\n",
+  ]]))
+
+  assert.equal(report.blocked, true)
+  assert.deepEqual(report.unreviewed.devicePreferenceStorage, [{
+    path: DEVICE_PREFERENCE_SOURCE,
+    token: "localStorage.setItem('kg_exam_papers_v1__admin', '[]')",
+    ordinal: 1,
+  }])
+})
+
+test('runtime removal contract rejects an unguarded device-preference session write', () => {
+  const report = contractReport(new Map([[
+    DEVICE_PREFERENCE_SOURCE,
+    "sessionStorage.setItem('kg_exam_papers_v1__admin', '[]')\n",
+  ]]))
+
+  assert.equal(report.blocked, true)
+  assert.deepEqual(report.unreviewed.devicePreferenceStorage, [{
+    path: DEVICE_PREFERENCE_SOURCE,
+    token: "sessionStorage.setItem('kg_exam_papers_v1__admin', '[]')",
+    ordinal: 1,
+  }])
+})
+
+test('runtime inventory keeps only backend rollback implementation occurrences', () => {
   const actual = inventory()
   assert.ok(actual.endpoint.some(item => item.path === 'backend/app/web/routes.py'))
   assert.ok(actual.runtimeKey.some(item => item.path === 'backend/app/services/runtime_state_service.py'))
-  assert.ok(actual.consumer.some(item => item.path === 'frontend/scripts/new-legacy-assets/server-state-bootstrap.js'))
+  assert.equal(actual.consumer.some(item => item.path === 'frontend/scripts/new-legacy-assets/server-state-bootstrap.js'), false)
 })
 
 test('inserting unrelated lines does not change occurrence baseline', () => {
@@ -201,5 +276,5 @@ test('adding an occurrence in the same file fails the baseline', () => {
 
 test('runtime dependency inventory has no unreviewed additions', () => {
   const approved = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'))
-  assert.deepEqual(additions(inventory(), approved), { endpoint: [], consumer: [], runtimeKey: [], dynamicRuntimeKey: [] })
+  assert.deepEqual(additions(inventory(), approved), { endpoint: [], consumer: [], runtimeKey: [], dynamicRuntimeKey: [], devicePreferenceStorage: [] })
 })

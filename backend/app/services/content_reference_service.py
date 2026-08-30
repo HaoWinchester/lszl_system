@@ -12,10 +12,6 @@ from app.models.subject_facet import SubjectFacetSchema
 from app.models.teaching_content import ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode
 from app.schemas.content_prep import CatalogIssue
 
-TAXONOMY_KEY = "kg_content_taxonomies_v1"
-RECALL_LIBRARY_KEY_PREFIX = "kg_recall_association_library_v1__subject__"
-
-
 def _issue(field: str, code: str, message: str, question_id: str | None) -> CatalogIssue:
     return CatalogIssue(
         questionId=question_id,
@@ -23,52 +19,6 @@ def _issue(field: str, code: str, message: str, question_id: str | None) -> Cata
         code=code,
         message=message,
     )
-
-
-def _decode_json(value: Any) -> Any:
-    if isinstance(value, str):
-        return json.loads(value)
-    return value
-
-
-def _taxonomy_matches_subject(taxonomy: dict, subject: str) -> bool:
-    normalized = subject.strip().casefold()
-    candidates = {
-        str(taxonomy.get("subjectId") or "").strip().casefold(),
-        str(taxonomy.get("subjectCode") or "").strip().casefold(),
-        str(taxonomy.get("subject") or "").strip().casefold(),
-    }
-    return normalized in candidates or f"subject-{normalized}" in candidates
-
-
-def _current_taxonomy(
-    raw_value: str,
-    subject: str,
-) -> dict:
-    parsed = _decode_json(raw_value)
-    if not isinstance(parsed, list):
-        raise ValueError("taxonomy catalog is not a list")
-    published = [
-        item
-        for item in parsed
-        if isinstance(item, dict)
-        and str(item.get("status") or "").casefold() == "published"
-        and _taxonomy_matches_subject(item, subject)
-    ]
-    if not published:
-        raise ValueError("published taxonomy is unavailable")
-    defaults = [item for item in published if item.get("isDefault") is True]
-    candidates = defaults or published
-    selected = max(
-        candidates,
-        key=lambda item: (
-            int(item.get("version") or 0),
-            str(item.get("updatedAt") or item.get("publishedAt") or ""),
-        ),
-    )
-    if not isinstance(selected.get("nodes"), list):
-        raise ValueError("taxonomy nodes are unavailable")
-    return selected
 
 
 def _active_node_ids(nodes: list[Any]) -> set[str]:

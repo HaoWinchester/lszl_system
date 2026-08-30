@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import time
 from uuid import uuid4
@@ -31,7 +32,7 @@ ACCOUNT_ROLES = {
 def login(context: BrowserContext, username: str, password: str = PASSWORD) -> None:
     response = context.request.post(
         f"{BASE}/api/v1/auth/login",
-        data={"username": username, "password": password},
+        data={"username": username, "password": password, "acceptedTermsVersion": "2026-08-13-v1"},
     )
     assert response.ok, (username, response.status, response.text())
 
@@ -50,11 +51,12 @@ def ensure_test_accounts(browser: Browser) -> None:
         for username, password in (
             (ACCOUNTS["admin"], PASSWORD),
             ("佩奇007", PASSWORD),
+            ("admin", "admin123"),
             ("admin", "jbgsnmm~123"),
         ):
             login_response = context.request.post(
                 f"{BASE}/api/v1/auth/login",
-                data={"username": username, "password": password},
+                data={"username": username, "password": password, "acceptedTermsVersion": "2026-08-13-v1"},
             )
             if not login_response.ok:
                 continue
@@ -493,6 +495,379 @@ def user_admin_regression(browser: Browser) -> None:
         context.close()
 
 
+def _record_requests(page: Page, requested: list[str]) -> None:
+    page.on("request", lambda request: requested.append(request.url))
+
+
+def _assert_no_runtime_requests(requested: list[str]) -> None:
+    offenders = [url for url in requested if "/api/v1/runtime/" in url]
+    assert offenders == [], offenders
+
+
+def account_system_cutover_regression(
+    browser: Browser,
+    pages: list[str],
+    *,
+    assert_no_runtime: bool,
+) -> None:
+    selectors = {
+        "user-management.html": "#umUserList",
+        "system-settings.html": "#ssRoleThemePanel",
+        "admin-settings.html": "#adminRepositoryHealth",
+    }
+    assert set(pages).issubset(selectors), pages
+
+    direct_pages = {"user-management.html", "system-settings.html"}
+
+    def assert_runtime_policy(filename: str, requested: list[str]) -> None:
+        runtime = [url for url in requested if "/api/v1/runtime/" in url]
+        if assert_no_runtime and filename in direct_pages:
+            assert runtime == [], (filename, runtime)
+        if filename == "admin-settings.html":
+            assert runtime, "admin-settings.html remains Runtime-backed until its content index/snapshot migration"
+
+    # Admin success plus real persisted edits and reloads on the two cut-over pages.
+    admin = context_for(browser, ACCOUNTS["admin"])
+    try:
+        for filename in pages:
+            requested: list[str] = []
+            page = admin.new_page()
+            _record_requests(page, requested)
+            try:
+                page.goto(f"{BASE}/{filename}", wait_until="networkidle")
+                page.locator(selectors[filename]).wait_for(state="visible")
+                if filename == "user-management.html":
+                    listed = admin.request.get(f"{BASE}/api/v1/users?page=1&page_size=200")
+                    assert listed.ok, listed.text()
+                    username = next(item["username"] for item in listed.json()["users"] if item["role"] == "student")
+                    row = page.locator(f'.um-user-item[data-user="{username}"]')
+                    row.wait_for(state="visible")
+                    row.click()
+                    original_note = page.locator("#umNote").input_value()
+                    original_plan = page.locator("#umSubPlan").input_value()
+                    original_status = page.locator("#umSubStatus").input_value()
+                    original_start = page.locator("#umSubStart").input_value()
+                    original_expires = page.locator("#umSubExpires").input_value()
+                    original_sub_note = page.locator("#umSubNote").input_value()
+                    marker = f"E2E用户保存-{uuid4().hex[:8]}"
+                    try:
+                        page.locator("#umNote").fill(marker)
+                        with page.expect_response(
+                            lambda response: "/api/v1/users/" in response.url
+                            and response.request.method == "PUT"
+                        ) as user_saved:
+                            page.locator("#umSaveUserBtn").click()
+                        assert user_saved.value.ok, user_saved.value.text()
+                        page.locator("#umToast").filter(has_text="已保存用户资料").wait_for(state="visible")
+
+                        page.locator("#umSubPlan").select_option("monthly")
+                        page.locator("#umSubStatus").select_option("active")
+                        page.locator("#umSubStart").fill("2026-08-02")
+                        page.locator("#umSubExpires").fill("2026-09-02")
+                        page.locator("#umSubNote").fill(marker)
+                        assert page.locator("#umSubPlan").input_value() == "monthly"
+                        assert page.locator("#umSubStart").input_value() == "2026-08-02"
+                        assert page.locator("#umSubExpires").input_value() == "2026-09-02"
+                        with page.expect_response(
+                            lambda response: "/api/v1/subscriptions/admin/" in response.url
+                            and response.request.method == "PUT"
+                        ) as subscription_saved:
+                            page.locator('[data-sub-action="save"]').click()
+                        assert subscription_saved.value.ok, subscription_saved.value.text()
+                        page.locator("#umToast").filter(has_text="学员订阅已保存").wait_for(state="visible")
+                        saved_subscription = subscription_saved.value.json()["subscription"]
+                        saved_request = subscription_saved.value.request.post_data_json
+
+                        page.reload(wait_until="networkidle")
+                        page.locator(f'.um-user-item[data-user="{username}"]').click()
+                        assert page.locator("#umNote").input_value() == marker
+                        actual_start = page.locator("#umSubStart").input_value()
+                        actual_expires = page.locator("#umSubExpires").input_value()
+                        live_users = admin.request.get(f"{BASE}/api/v1/users?query={username}&page_size=10").json()["users"]
+                        live_subscription = next(item["subscription"] for item in live_users if item["username"] == username)
+                        assert actual_start == "2026-08-02", (username, actual_start, actual_expires, saved_request, saved_subscription, live_subscription)
+                        assert actual_expires == "2026-09-02", (username, actual_start, actual_expires)
+                    finally:
+                        page.locator(f'.um-user-item[data-user="{username}"]').click()
+                        page.locator("#umNote").fill(original_note)
+                        with page.expect_response(lambda response: "/api/v1/users/" in response.url and response.request.method == "PUT"):
+                            page.locator("#umSaveUserBtn").click()
+                        page.locator("#umToast").filter(has_text="已保存用户资料").wait_for(state="visible")
+                        page.locator("#umSubPlan").select_option(original_plan)
+                        page.locator("#umSubStatus").select_option(original_status)
+                        page.locator("#umSubStart").fill(original_start)
+                        page.locator("#umSubExpires").fill(original_expires)
+                        page.locator("#umSubNote").fill(original_sub_note)
+                        with page.expect_response(lambda response: "/api/v1/subscriptions/admin/" in response.url and response.request.method == "PUT"):
+                            page.locator('[data-sub-action="save"]').click()
+                elif filename == "system-settings.html":
+                    card = page.locator('[data-theme-role="admin"]')
+                    card.wait_for(state="visible")
+                    primary = card.locator('[data-theme-field="primary"]')
+                    original = primary.input_value()
+                    changed = "#13579b" if original.lower() != "#13579b" else "#2468ac"
+                    try:
+                        primary.fill(changed)
+                        with page.expect_response(
+                            lambda response: "/api/v1/system/themes/admin" in response.url
+                            and response.request.method == "PUT"
+                        ) as saved:
+                            card.locator('[data-save-theme="admin"]').click()
+                        assert saved.value.ok, saved.value.text()
+                        page.reload(wait_until="networkidle")
+                        assert page.locator('[data-theme-role="admin"] [data-theme-field="primary"]').input_value().lower() == changed
+                    finally:
+                        restored_card = page.locator('[data-theme-role="admin"]')
+                        restored_card.locator('[data-theme-field="primary"]').fill(original)
+                        with page.expect_response(lambda response: "/api/v1/system/themes/admin" in response.url and response.request.method == "PUT"):
+                            restored_card.locator('[data-save-theme="admin"]').click()
+
+                    prefix = f"E2E{uuid4().hex[:5]}".upper()
+                    code_note = f"浏览器卡密-{uuid4().hex[:8]}"
+                    generated_code_id = ""
+                    try:
+                        page.locator('[data-ss-tab="subscriptions"]').click()
+                        page.locator("#ssRedeemCountInput").fill("1")
+                        page.locator("#ssRedeemPrefixInput").fill(prefix)
+                        page.locator("#ssRedeemNoteInput").fill(code_note)
+                        with page.expect_response(
+                            lambda response: response.url.endswith(
+                                "/api/v1/subscriptions/redeem-codes/generate"
+                            )
+                            and response.request.method == "POST"
+                        ) as generated:
+                            page.locator("#ssGenerateRedeemCodesBtn").click()
+                        assert generated.value.ok, generated.value.text()
+                        generated_body = generated.value.request.post_data_json
+                        assert generated_body["prefix"] == prefix
+                        assert generated_body["note"] == code_note
+                        generated_code = generated.value.json()["codes"][0]
+                        code_card = page.locator(".subscription-code-item").filter(
+                            has_text=generated_code
+                        )
+                        code_card.wait_for(state="visible")
+                        assert code_note in code_card.inner_text()
+                        generated_code_id = code_card.get_attribute("data-code-id") or ""
+                        assert generated_code_id
+
+                        with page.expect_response(
+                            lambda response: response.url.endswith(
+                                f"/api/v1/subscriptions/redeem-codes/{generated_code_id}"
+                            )
+                            and response.request.method == "PATCH"
+                        ) as disabled:
+                            code_card.locator('[data-code-action="disable"]').click()
+                        assert disabled.value.ok, disabled.value.text()
+                        disabled_card = page.locator(
+                            f'.subscription-code-item[data-code-id="{generated_code_id}"]'
+                        )
+                        disabled_card.locator('[data-code-action="enable"]:not([disabled])').wait_for(
+                            state="visible"
+                        )
+
+                        with page.expect_response(
+                            lambda response: response.url.endswith(
+                                f"/api/v1/subscriptions/redeem-codes/{generated_code_id}"
+                            )
+                            and response.request.method == "PATCH"
+                        ) as enabled:
+                            disabled_card.locator('[data-code-action="enable"]').click()
+                        assert enabled.value.ok, enabled.value.text()
+                        enabled_card = page.locator(
+                            f'.subscription-code-item[data-code-id="{generated_code_id}"]'
+                        )
+                        enabled_card.locator('[data-code-action="disable"]:not([disabled])').wait_for(
+                            state="visible"
+                        )
+
+                        page.once("dialog", lambda dialog: dialog.accept())
+                        with page.expect_response(
+                            lambda response: response.url.endswith(
+                                f"/api/v1/subscriptions/redeem-codes/{generated_code_id}"
+                            )
+                            and response.request.method == "DELETE"
+                        ) as removed:
+                            enabled_card.locator('[data-code-action="remove"]').click()
+                        assert removed.value.ok, removed.value.text()
+                        enabled_card.wait_for(state="detached")
+                        generated_code_id = ""
+                    finally:
+                        if generated_code_id:
+                            admin.request.delete(
+                                f"{BASE}/api/v1/subscriptions/redeem-codes/{generated_code_id}"
+                            )
+
+                    fake_order = {
+                        "id": f"e2e-cancel-{uuid4().hex}",
+                        "username": "e2e-student",
+                        "planId": "monthly",
+                        "planName": "月度会员",
+                        "status": "pending",
+                        "note": "学员原始申请",
+                        "adminNote": "",
+                        "createdAt": "2026-08-29T00:00:00Z",
+                    }
+                    cancel_reason = f"浏览器取消-{uuid4().hex[:8]}"
+                    captured_cancel_body: dict = {}
+                    order_route_pattern = "**/api/v1/subscriptions/orders**"
+
+                    def route_order_controls(route):
+                        nonlocal fake_order, captured_cancel_body
+                        if route.request.method == "POST" and route.request.url.endswith(
+                            f"/{fake_order['id']}/cancel"
+                        ):
+                            captured_cancel_body = route.request.post_data_json or {}
+                            fake_order = {
+                                **fake_order,
+                                "status": "cancelled",
+                                "adminNote": captured_cancel_body.get("note", ""),
+                            }
+                            route.fulfill(
+                                status=200,
+                                content_type="application/json",
+                                body=json.dumps({"order": fake_order}, ensure_ascii=False),
+                            )
+                        elif route.request.method == "GET" and route.request.url.endswith(
+                            "/api/v1/subscriptions/orders"
+                        ):
+                            route.fulfill(
+                                status=200,
+                                content_type="application/json",
+                                body=json.dumps({"orders": [fake_order]}, ensure_ascii=False),
+                            )
+                        else:
+                            route.continue_()
+
+                    page.route(order_route_pattern, route_order_controls)
+                    try:
+                        page.evaluate("() => window.KGSystemDomain.refreshOrders()")
+                        order_card = page.locator(
+                            f'.subscription-order-item[data-order-id="{fake_order["id"]}"]'
+                        )
+                        order_card.wait_for(state="visible")
+                        page.once("dialog", lambda dialog: dialog.accept(cancel_reason))
+                        with page.expect_response(
+                            lambda response: response.url.endswith(
+                                f"/{fake_order['id']}/cancel"
+                            )
+                            and response.request.method == "POST"
+                        ):
+                            order_card.locator('[data-order-action="cancel"]').click()
+                        cancelled_card = page.locator(
+                            f'.subscription-order-item[data-order-id="{fake_order["id"]}"]'
+                        )
+                        cancelled_card.get_by_text(cancel_reason, exact=False).wait_for(
+                            state="visible"
+                        )
+                        cancelled_card.get_by_text("学员原始申请", exact=False).wait_for(
+                            state="visible"
+                        )
+                        assert captured_cancel_body == {"note": cancel_reason}
+                    finally:
+                        page.unroute(order_route_pattern, route_order_controls)
+                        page.evaluate("() => window.KGSystemDomain.refreshOrders()")
+                else:
+                    page.locator("#adminHealthBtn").click()
+                    page.locator("#adminRepositoryHealth").filter(has_text="正常").wait_for(state="visible")
+                assert_runtime_policy(filename, requested)
+            finally:
+                page.close()
+    finally:
+        admin.close()
+
+    # Every non-admin role is denied on the two pages retired from Runtime.
+    for account_key in ("teacher", "student_basic", "viewer"):
+        context = context_for(browser, ACCOUNTS[account_key])
+        try:
+            for filename in [item for item in pages if item in direct_pages]:
+                requested: list[str] = []
+                page_errors: list[str] = []
+                page = context.new_page()
+                _record_requests(page, requested)
+                page.on("pageerror", lambda error: page_errors.append(str(error)))
+                try:
+                    print(f"full-role: denial {account_key} {filename}", flush=True)
+                    page.goto(f"{BASE}/{filename}", wait_until="networkidle")
+                    body = page.locator("body")
+                    body.get_by_text("无权访问", exact=False).first.wait_for(state="visible", timeout=8_000)
+                    denied_text = body.inner_text()
+                    assert "无权访问" in denied_text or "暂无访问权限" in denied_text, (
+                        account_key, filename, page_errors, denied_text[:1000]
+                    )
+                    assert_runtime_policy(filename, requested)
+                finally:
+                    page.close()
+        finally:
+            context.close()
+
+    # A failed request leaves a recoverable page; retry/reload succeeds once the API returns.
+    failure_targets = {
+        "user-management.html": "**/api/v1/users?*",
+        "system-settings.html": "**/api/v1/system/themes",
+        "admin-settings.html": "**/api/v1/health",
+    }
+    for filename in pages:
+        context = context_for(browser, ACCOUNTS["admin"])
+        requested: list[str] = []
+        page = context.new_page()
+        _record_requests(page, requested)
+        route_pattern = failure_targets[filename]
+        failed_once = {"value": False}
+
+        def fail_first(route):
+            if not failed_once["value"]:
+                failed_once["value"] = True
+                route.fulfill(status=503, content_type="application/json", body='{"detail":"E2E forced failure"}')
+            else:
+                route.continue_()
+
+        page.route(route_pattern, fail_first)
+        try:
+            page.goto(f"{BASE}/{filename}", wait_until="networkidle")
+            assert failed_once["value"], (filename, requested)
+            if filename == "user-management.html":
+                error = page.locator("#umUserList").get_by_text("用户列表加载失败", exact=False)
+                error.wait_for(state="visible")
+                page.unroute(route_pattern, fail_first)
+                page.locator("#umRetryInitialLoadBtn").click()
+                page.locator(".um-user-item").first.wait_for(state="visible")
+            elif filename == "system-settings.html":
+                page.locator("#ssInitializationError").get_by_text("系统配置加载失败", exact=False).wait_for(state="visible")
+                assert page.locator('[data-theme-role="admin"]').count() == 0
+                page.unroute(route_pattern, fail_first)
+                page.locator("#ssRetryInitializationBtn").click()
+                page.locator('[data-theme-role="admin"]').wait_for(state="visible")
+            else:
+                page.locator("#adminRepositoryHealth").filter(has_text="失败").wait_for(state="visible")
+                page.unroute(route_pattern, fail_first)
+                page.locator("#adminHealthBtn").click()
+                page.locator("#adminRepositoryHealth").filter(has_text="正常").wait_for(state="visible")
+            assert_runtime_policy(filename, requested)
+        finally:
+            page.close()
+            context.close()
+
+    # Each cut-over page is inaccessible anonymously, opens after a real login, and closes after a real logout.
+    for filename in [item for item in pages if item in direct_pages]:
+        context = browser.new_context(viewport={"width": 1440, "height": 1000})
+        requested: list[str] = []
+        page = context.new_page()
+        _record_requests(page, requested)
+        try:
+            page.goto(f"{BASE}/{filename}", wait_until="networkidle")
+            page.get_by_text("无权访问", exact=False).first.wait_for(state="visible")
+            login(context, ACCOUNTS["admin"])
+            page.goto(f"{BASE}/{filename}", wait_until="networkidle")
+            page.locator(selectors[filename]).wait_for(state="visible")
+            logout_response = context.request.post(f"{BASE}/api/v1/auth/logout")
+            assert logout_response.ok, (filename, logout_response.status, logout_response.text())
+            page.reload(wait_until="networkidle")
+            page.get_by_text("无权访问", exact=False).first.wait_for(state="visible")
+            assert_runtime_policy(filename, requested)
+        finally:
+            context.close()
+
+
 GROUPS = {
     "graph": graph_regression,
     "questions": question_regression,
@@ -504,11 +879,18 @@ GROUPS = {
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--group", choices=["all", *GROUPS], default="all")
+    parser.add_argument("--pages", help="comma-separated account/system page filenames")
+    parser.add_argument("--assert-no-runtime", action="store_true")
     args = parser.parse_args()
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
         try:
             ensure_test_accounts(browser)
+            if args.pages:
+                pages = [item.strip() for item in args.pages.split(",") if item.strip()]
+                account_system_cutover_regression(browser, pages, assert_no_runtime=args.assert_no_runtime)
+                print("full-role: account-system-cutover PASS", flush=True)
+                return
             selected = GROUPS.items() if args.group == "all" else [(args.group, GROUPS[args.group])]
             for name, regression in selected:
                 print(f"full-role: {name} start", flush=True)

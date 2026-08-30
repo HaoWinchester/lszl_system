@@ -6,6 +6,7 @@ from app.api.v1 import (
     analytics,
     auth,
     content_prep,
+    course_management,
     engagement,
     files,
     health,
@@ -31,6 +32,7 @@ api_router.include_router(papers.router)
 api_router.include_router(paper_releases.router)
 api_router.include_router(question_catalog.router)
 api_router.include_router(content_prep.router)
+api_router.include_router(course_management.router)
 api_router.include_router(training.router)
 api_router.include_router(learning.router)
 api_router.include_router(subscriptions.router)

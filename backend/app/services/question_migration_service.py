@@ -208,6 +208,67 @@ class _Snapshot:
     questions: dict[str, _QuestionCandidate]
 
 
+def _bank_candidate_proof(candidate: _BankCandidate) -> dict[str, Any]:
+    return {
+        "id": candidate.id,
+        "ownerId": candidate.owner_id,
+        "name": candidate.name,
+        "subject": candidate.subject,
+        "description": candidate.description,
+        "version": candidate.version,
+        "visibility": candidate.visibility,
+        "revision": candidate.revision,
+    }
+
+
+def _paper_category_candidate_proof(candidate: _PaperCategoryCandidate) -> dict[str, Any]:
+    return {
+        "id": candidate.id,
+        "ownerId": candidate.owner_id,
+        "name": candidate.name,
+        "description": candidate.description,
+        "order": candidate.order_index,
+        "revision": candidate.revision,
+        "archivedAt": _proof_timestamp(candidate.archived_at),
+    }
+
+
+def _paper_candidate_proof(
+    candidate: _PaperCandidate, references: list[_PaperQuestionCandidate]
+) -> dict[str, Any]:
+    return {
+        "id": candidate.id,
+        "ownerId": candidate.owner_id,
+        "name": candidate.name,
+        "subject": candidate.subject,
+        "description": candidate.description,
+        "categoryId": candidate.category_id,
+        "totalCount": candidate.total_count,
+        "status": candidate.status,
+        "quotas": candidate.quotas,
+        "accessPolicy": candidate.access_policy,
+        "enabledModes": candidate.enabled_modes,
+        "modeConfigVersion": candidate.mode_config_version,
+        "purpose": candidate.purpose,
+        "revision": candidate.revision,
+        "publishedAt": _proof_timestamp(candidate.published_at),
+        "archivedAt": _proof_timestamp(candidate.archived_at),
+        "restoredAt": _proof_timestamp(candidate.restored_at),
+        "withdrawnAt": _proof_timestamp(candidate.withdrawn_at),
+        "publishedReleaseId": candidate.published_release_id,
+        "publishedVersion": candidate.published_version,
+        "questions": [
+            {
+                "bankId": ref.bank_id,
+                "questionId": ref.question_id,
+                "order": index,
+                "score": float(ref.score),
+            }
+            for index, ref in enumerate(references)
+        ],
+    }
+
+
 def _utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -1345,6 +1406,15 @@ async def _build_paper_snapshot(
                 }
             )
             continue
+        if _paper_category_candidate_proof(existing_category) != _paper_category_candidate_proof(category_candidate):
+            conflicts.append({
+                "code": "PAPER_CATEGORY_VARIANT_CONFLICT",
+                "categoryId": category_id,
+                "sources": [existing_category.source, category_candidate.source],
+                "sourceHash": _migration_proof_hash(_paper_category_candidate_proof(category_candidate)),
+                "targetHash": _migration_proof_hash(_paper_category_candidate_proof(existing_category)),
+                "message": "同一试卷分类存在不同关系域变体",
+            })
         if (category_candidate.source_rank, -category_candidate.revision) < (
             existing_category.source_rank,
             -existing_category.revision,
@@ -1479,6 +1549,17 @@ async def _build_paper_snapshot(
                 }
             )
             continue
+
+        candidate_questions = _reorder_questions(question_refs, paper_id=paper_id)
+        if _paper_candidate_proof(existing, paper_questions[paper_id]) != _paper_candidate_proof(candidate, candidate_questions):
+            conflicts.append({
+                "code": "PAPER_VARIANT_CONFLICT",
+                "paperId": paper_id,
+                "sources": [existing.source, candidate.source],
+                "sourceHash": _migration_proof_hash(_paper_candidate_proof(candidate, candidate_questions)),
+                "targetHash": _migration_proof_hash(_paper_candidate_proof(existing, paper_questions[paper_id])),
+                "message": "同一试卷存在不同关系域变体",
+            })
 
         if (source_rank, -candidate.revision) > (
             existing.source_rank,
@@ -1751,22 +1832,8 @@ async def _apply_paper_snapshot(
                 }
             )
             continue
-        previous_category = _paper_category_mutation_state(category)
-        category.owner_id = candidate.owner_id
-        category.name = candidate.name
-        category.description = candidate.description
-        category.order_index = candidate.order_index
-        category.revision = candidate.revision
-        category.archived_at = archived_at
-        if _paper_category_mutation_state(category) != previous_category:
-            category.updated_by = actor_username
-            changes.append(
-                {
-                    "entityType": "paperCategory",
-                    "entityId": category_id,
-                    "action": "updated",
-                }
-            )
+        # Existing relational categories are authoritative.
+        continue
     await db.flush()
 
     for paper_id, candidate in sorted(snapshot.papers.items(), key=lambda item: item[0]):
@@ -1801,31 +1868,8 @@ async def _apply_paper_snapshot(
             await db.flush()
             changes.append({"entityType": "paper", "entityId": paper_id, "action": "created"})
         else:
-            previous = _paper_mutation_state(paper)
-            paper.owner_id = candidate.owner_id
-            paper.name = candidate.name
-            paper.subject = candidate.subject
-            paper.description = candidate.description
-            paper.category_id = candidate.category_id
-            paper.total_count = candidate.total_count
-            paper.status = candidate.status
-            paper.quotas = candidate.quotas
-            paper.access_policy = candidate.access_policy
-            paper.enabled_modes = candidate.enabled_modes
-            paper.mode_config_version = candidate.mode_config_version
-            paper.purpose = candidate.purpose
-            paper.revision = candidate.revision
-            paper.published_at = _parse_published_at(candidate.published_at)
-            paper.archived_at = _parse_published_at(candidate.archived_at)
-            paper.restored_at = _parse_published_at(candidate.restored_at)
-            paper.withdrawn_at = _parse_published_at(candidate.withdrawn_at)
-            paper.published_release_id = candidate.published_release_id
-            paper.published_version = candidate.published_version
-            if _paper_mutation_state(paper) != previous:
-                paper.updated_by = actor_username
-                changes.append(
-                    {"entityType": "paper", "entityId": paper_id, "action": "updated"}
-                )
+            # Existing relational paper metadata and composition are authoritative.
+            continue
 
         paper_questions = (
             await db.execute(
@@ -1871,6 +1915,302 @@ async def scan_runtime_paper_sources(
     paper_ids: set[str] | None = None,
 ) -> PaperMigrationReport:
     return (await _build_paper_snapshot(db, owner_ids=owner_ids, paper_ids=paper_ids)).report
+
+
+def _migration_proof_hash(value: Any) -> str:
+    rendered = json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+    ).encode("utf-8")
+    return hashlib.sha256(rendered).hexdigest()
+
+
+def _proof_timestamp(value: Any) -> str | None:
+    parsed = _parse_published_at(value)
+    return parsed.isoformat() if parsed else None
+
+
+async def verify_runtime_paper_targets(
+    db: AsyncSession,
+    *,
+    owner_ids: set[str] | None = None,
+    paper_ids: set[str] | None = None,
+    category_ids: set[str] | None = None,
+) -> dict[str, Any]:
+    """Hash chosen paper candidates against freshly read relational targets."""
+
+    snapshot = await _build_paper_snapshot(db, owner_ids=owner_ids, paper_ids=paper_ids)
+    source_categories = []
+    target_categories = []
+    for identifier, candidate in sorted(snapshot.categories.items()):
+        if category_ids is not None and identifier not in category_ids:
+            continue
+        source_categories.append({
+            "id": identifier, "ownerId": candidate.owner_id, "name": candidate.name,
+            "description": candidate.description, "order": candidate.order_index,
+            "revision": candidate.revision, "archivedAt": _proof_timestamp(candidate.archived_at),
+        })
+        row = await db.get(PaperCategory, identifier)
+        if row is not None:
+            target_categories.append({
+                "id": row.id, "ownerId": row.owner_id, "name": row.name,
+                "description": row.description, "order": row.order_index,
+                "revision": row.revision,
+                "archivedAt": row.archived_at.isoformat() if row.archived_at else None,
+            })
+    source_papers = []
+    target_papers = []
+    for identifier, candidate in sorted(snapshot.papers.items()):
+        references = snapshot.paper_questions.get(identifier, [])
+        source_papers.append({
+            "id": identifier, "ownerId": candidate.owner_id, "name": candidate.name,
+            "subject": candidate.subject, "description": candidate.description,
+            "categoryId": candidate.category_id, "totalCount": candidate.total_count,
+            "status": candidate.status, "quotas": candidate.quotas,
+            "accessPolicy": candidate.access_policy, "enabledModes": candidate.enabled_modes,
+            "modeConfigVersion": candidate.mode_config_version, "purpose": candidate.purpose,
+            "revision": candidate.revision, "publishedAt": _proof_timestamp(candidate.published_at),
+            "archivedAt": _proof_timestamp(candidate.archived_at),
+            "restoredAt": _proof_timestamp(candidate.restored_at),
+            "withdrawnAt": _proof_timestamp(candidate.withdrawn_at),
+            "publishedReleaseId": candidate.published_release_id,
+            "publishedVersion": candidate.published_version,
+            "questions": [
+                {
+                    "bankId": ref.bank_id,
+                    "questionId": ref.question_id,
+                    "order": index,
+                    "score": float(ref.score),
+                }
+                for index, ref in enumerate(references)
+            ],
+        })
+        row = await db.get(ExamPaper, identifier)
+        if row is None:
+            continue
+        target_refs = list((await db.scalars(
+            select(PaperQuestion).where(PaperQuestion.paper_id == identifier).order_by(PaperQuestion.order_index)
+        )).all())
+        target_bank_by_question = {
+            str(question_id): str(bank_id)
+            for question_id, bank_id in (
+                await db.execute(
+                    select(Question.id, Question.bank_id).where(
+                        Question.id.in_([ref.question_id for ref in target_refs])
+                    )
+                )
+            ).all()
+        }
+        target_papers.append({
+            "id": row.id, "ownerId": row.owner_id, "name": row.name,
+            "subject": row.subject, "description": row.description,
+            "categoryId": row.category_id, "totalCount": row.total_count,
+            "status": row.status, "quotas": row.quotas or {},
+            "accessPolicy": row.access_policy or {}, "enabledModes": row.enabled_modes or [],
+            "modeConfigVersion": row.mode_config_version, "purpose": row.purpose,
+            "revision": row.revision,
+            "publishedAt": row.published_at.isoformat() if row.published_at else None,
+            "archivedAt": row.archived_at.isoformat() if row.archived_at else None,
+            "restoredAt": row.restored_at.isoformat() if row.restored_at else None,
+            "withdrawnAt": row.withdrawn_at.isoformat() if row.withdrawn_at else None,
+            "publishedReleaseId": row.published_release_id,
+            "publishedVersion": row.published_version,
+            "questions": [
+                {
+                    "bankId": target_bank_by_question.get(str(ref.question_id)),
+                    "questionId": ref.question_id,
+                    "order": ref.order_index,
+                    "score": float(ref.score),
+                }
+                for ref in target_refs
+            ],
+        })
+    source_hash = _migration_proof_hash({"categories": source_categories, "papers": source_papers})
+    target_hash = _migration_proof_hash({"categories": target_categories, "papers": target_papers})
+    report = snapshot.report
+    reference_gap = max(0, report.referenced_question_count - report.bank_validated_reference_count)
+    score_gap = max(0, report.referenced_question_count - report.reference_score_count)
+    blockers = {
+        "conflicts": len(report.conflicts),
+        "invalidRecords": len(report.invalid_records),
+        "missingQuestions": report.missing_question_count,
+        "questionsWithMissingRefs": report.questions_with_missing_refs,
+        "missingCategories": report.missing_category_count,
+        "referenceGaps": reference_gap,
+        "scoreGaps": score_gap,
+    }
+    return {
+        "sourceCount": len(source_categories) + len(source_papers),
+        "targetCount": len(target_categories) + len(target_papers),
+        "sourceHash": source_hash,
+        "targetHash": target_hash,
+        "verificationHash": _migration_proof_hash({"sourceHash": source_hash, "targetHash": target_hash}),
+        "verified": source_hash == target_hash and not any(blockers.values()),
+        **blockers,
+    }
+
+
+async def _exact_runtime_source_owner(
+    db: AsyncSession,
+    *,
+    source_type: str,
+    source_key: str,
+    owner_scope: str,
+) -> tuple[str | None, int]:
+    """Resolve an exact Runtime identity without crossing source namespaces."""
+
+    if source_type == "runtime":
+        return (owner_scope, 0) if owner_scope else (None, 1)
+    if source_type != "shared_runtime" or owner_scope != "shared":
+        return None, 1
+    shared_row = await db.get(SharedRuntimeState, source_key)
+    if shared_row is None or not shared_row.updated_by:
+        return None, 1
+    return shared_row.updated_by, 0
+
+
+async def verify_runtime_paper_item(
+    db: AsyncSession,
+    *,
+    source_type: str,
+    source_key: str,
+    owner_scope: str,
+    payload: Any,
+) -> dict[str, Any]:
+    """Prove an exact paper/category Runtime item against actual target rows."""
+
+    try:
+        decoded = _decode_json(payload)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        decoded = None
+    resolved_owner, identity_invalid = await _exact_runtime_source_owner(
+        db,
+        source_type=source_type,
+        source_key=source_key,
+        owner_scope=owner_scope,
+    )
+    invalid = int(not isinstance(decoded, list)) + identity_invalid
+    rows = decoded if isinstance(decoded, list) else []
+    source_rows: list[dict[str, Any]] = []
+    target_rows: list[dict[str, Any]] = []
+    is_category = source_key.startswith(PAPER_CATEGORY_PREFIX) or source_key == PAPER_SHARED_CATEGORY_KEY
+    for raw in rows:
+        if not isinstance(raw, Mapping):
+            invalid += 1
+            continue
+        owner_id = _decode_owner(raw.get("publishedBy"), fallback=resolved_owner) if (
+            source_type == "shared_runtime" and owner_scope == "shared"
+        ) else resolved_owner
+        identifier = str(raw.get("id") or raw.get("paperId") or raw.get("categoryId") or "").strip()
+        if not identifier or not owner_id:
+            invalid += 1
+            continue
+        if is_category:
+            archived_at = _parse_published_at(raw.get("archivedAt"))
+            source_rows.append({
+                "id": identifier, "ownerId": owner_id,
+                "name": _first_text(str(raw.get("name") or ""), identifier)[:200],
+                "description": str(raw.get("description")) if raw.get("description") else None,
+                "order": _to_int(raw.get("orderIndex"), 0),
+                "revision": max(1, _to_int(raw.get("revision"), 1)),
+                "archivedAt": archived_at.isoformat() if archived_at else None,
+            })
+            target = await db.get(PaperCategory, identifier)
+            if target is not None:
+                target_rows.append({
+                    "id": target.id, "ownerId": target.owner_id, "name": target.name,
+                    "description": target.description, "order": target.order_index,
+                    "revision": target.revision,
+                    "archivedAt": target.archived_at.isoformat() if target.archived_at else None,
+                })
+            continue
+
+        refs = _reorder_questions(
+            _paper_questions(raw.get("questionRefs") or raw.get("questions") or []),
+            paper_id=identifier,
+        )
+        total_count = _to_int(raw.get("totalCount"), 0)
+        if total_count <= 0:
+            total_count = _to_int(
+                raw.get("questionCount")
+                if "questionCount" in raw
+                else raw.get("configuredCount"),
+                0,
+            )
+        candidate = _PaperCandidate(
+            id=identifier,
+            owner_id=owner_id,
+            name=_first_text(str(raw.get("name") or ""), str(raw.get("title") or ""), str(raw.get("paperName") or ""), identifier),
+            subject=_first_text(str(raw.get("subject") or ""), "PMP"),
+            description=str(raw.get("description")) if raw.get("description") else None,
+            category_id=_first_text(str(raw.get("categoryId") or "")) or None,
+            total_count=max(total_count, len(refs)),
+            status=_normalize_status(raw.get("status") or raw.get("releaseStatus")),
+            quotas=_normalize_quotas(raw.get("quotas") or {}),
+            access_policy=dict(raw.get("accessPolicy")) if isinstance(raw.get("accessPolicy"), Mapping) else {},
+            enabled_modes=[str(mode) for mode in raw.get("enabledModes", [])] if isinstance(raw.get("enabledModes"), list) else [],
+            mode_config_version=max(1, _to_int(raw.get("modeConfigVersion"), 2)),
+            purpose=_first_text(str(raw.get("purpose") or ""), "learning")[:32],
+            revision=max(1, _to_int(raw.get("revision"), 1)),
+            published_at=(_parse_published_at(raw.get("publishedAt")).isoformat() if _parse_published_at(raw.get("publishedAt")) else None),
+            archived_at=(_parse_published_at(raw.get("archivedAt")).isoformat() if _parse_published_at(raw.get("archivedAt")) else None),
+            restored_at=(_parse_published_at(raw.get("restoredAt")).isoformat() if _parse_published_at(raw.get("restoredAt")) else None),
+            withdrawn_at=(_parse_published_at(raw.get("withdrawnAt")).isoformat() if _parse_published_at(raw.get("withdrawnAt")) else None),
+            published_release_id=_first_text(str(raw.get("publishedReleaseId") or "")) or None,
+            published_version=_to_int(raw.get("publishedVersion"), 0),
+            field_presence=frozenset(),
+            source=source_type,
+            source_rank=99,
+        )
+        source_rows.append(_paper_candidate_proof(candidate, refs))
+        target = await db.get(ExamPaper, identifier)
+        if target is not None:
+            target_refs = list((await db.scalars(
+                select(PaperQuestion).where(PaperQuestion.paper_id == identifier).order_by(PaperQuestion.order_index)
+            )).all())
+            target_bank_by_question = {
+                str(question_id): str(bank_id)
+                for question_id, bank_id in (
+                    await db.execute(
+                        select(Question.id, Question.bank_id).where(
+                            Question.id.in_([ref.question_id for ref in target_refs])
+                        )
+                    )
+                ).all()
+            }
+            target_rows.append({
+                "id": target.id, "ownerId": target.owner_id, "name": target.name,
+                "subject": target.subject, "description": target.description,
+                "categoryId": target.category_id, "totalCount": target.total_count,
+                "status": target.status, "quotas": target.quotas or {},
+                "accessPolicy": target.access_policy or {}, "enabledModes": target.enabled_modes or [],
+                "modeConfigVersion": target.mode_config_version, "purpose": target.purpose,
+                "revision": target.revision,
+                "publishedAt": target.published_at.isoformat() if target.published_at else None,
+                "archivedAt": target.archived_at.isoformat() if target.archived_at else None,
+                "restoredAt": target.restored_at.isoformat() if target.restored_at else None,
+                "withdrawnAt": target.withdrawn_at.isoformat() if target.withdrawn_at else None,
+                "publishedReleaseId": target.published_release_id,
+                "publishedVersion": target.published_version,
+                "questions": [
+                    {
+                        "bankId": target_bank_by_question.get(str(ref.question_id)),
+                        "questionId": ref.question_id,
+                        "order": ref.order_index,
+                        "score": float(ref.score),
+                    }
+                    for ref in target_refs
+                ],
+            })
+    source_hash = _migration_proof_hash(source_rows)
+    target_hash = _migration_proof_hash(target_rows)
+    return {
+        "sourceType": source_type, "sourceKey": source_key, "ownerScope": owner_scope,
+        "sourceCount": len(source_rows), "targetCount": len(target_rows),
+        "sourceHash": source_hash, "targetHash": target_hash,
+        "verificationHash": _migration_proof_hash({"sourceHash": source_hash, "targetHash": target_hash}),
+        "invalidRecords": invalid,
+        "verified": not invalid and len(source_rows) == len(target_rows) and source_hash == target_hash,
+    }
 
 
 async def migrate_runtime_papers(
@@ -2016,9 +2356,15 @@ async def _build_snapshot(
             continue
         else:
             deduplicated += 1
-            if candidate.visibility == "published":
-                existing_bank.visibility = "published"
-            existing_bank.revision = max(existing_bank.revision, candidate.revision)
+            if _bank_candidate_proof(existing_bank) != _bank_candidate_proof(candidate):
+                conflicts.append({
+                    "code": "BANK_VARIANT_CONFLICT",
+                    "bankId": bank_id,
+                    "sources": [existing_bank.source, candidate.source],
+                    "sourceHash": _migration_proof_hash(_bank_candidate_proof(candidate)),
+                    "targetHash": _migration_proof_hash(_bank_candidate_proof(existing_bank)),
+                    "message": "同一题库存在不同关系域变体",
+                })
 
         raw_questions = raw_bank.get("questions")
         if not isinstance(raw_questions, list):
@@ -2104,10 +2450,6 @@ async def _build_snapshot(
                 )
             else:
                 deduplicated += 1
-                existing_question.revision = max(
-                    existing_question.revision,
-                    question_candidate.revision,
-                )
 
     public_count = sum(
         candidate.payload.get("scope") == "public" for candidate in questions.values()
@@ -2249,19 +2591,8 @@ async def _apply_snapshot(
         else:
             if bank.owner_id != candidate.owner_id:
                 raise ValueError(f"题库 {candidate.id} 的 owner 与迁移映射不一致")
-            previous = _bank_mutation_state(bank)
-            bank.name = candidate.name
-            bank.subject = candidate.subject
-            bank.description = candidate.description
-            bank.version = candidate.version
-            bank.visibility = candidate.visibility
-            bank.revision = max(bank.revision, candidate.revision)
-            bank.updated_by = bank.updated_by or candidate.owner_id
-            bank.created_by = bank.created_by or candidate.owner_id
-            if _bank_mutation_state(bank) != previous:
-                changes.append(
-                    {"entityType": "questionBank", "entityId": candidate.id, "action": "updated"}
-                )
+            # Domain rows are authoritative.  Migration only fills missing rows.
+            continue
     await db.flush()
     for candidate in sorted(snapshot.questions.values(), key=lambda question: question.id):
         question = await db.get(Question, candidate.id)
@@ -2274,9 +2605,8 @@ async def _apply_snapshot(
                 revision=candidate.revision,
             )
             db.add(question)
-        previous = None if is_new else _question_mutation_state(question)
-        _assign_migrated_question(question, candidate, is_new=is_new)
-        if is_new or _question_mutation_state(question) != previous:
+            _assign_migrated_question(question, candidate, is_new=True)
+        if is_new:
             changes.append(
                 {
                     "entityType": "question",
@@ -2297,6 +2627,172 @@ async def scan_runtime_question_sources(
     return (
         await _build_snapshot(db, owner_ids=owner_ids, bank_ids=bank_ids)
     ).report
+
+
+async def verify_runtime_question_targets(
+    db: AsyncSession,
+    *,
+    owner_ids: set[str] | None = None,
+    bank_ids: set[str] | None = None,
+) -> dict[str, Any]:
+    """Hash chosen bank/question candidates against relational target rows."""
+
+    snapshot = await _build_snapshot(db, owner_ids=owner_ids, bank_ids=bank_ids)
+    source_banks = []
+    target_banks = []
+    for identifier, candidate in sorted(snapshot.banks.items()):
+        source_banks.append({
+            "id": identifier, "ownerId": candidate.owner_id, "name": candidate.name,
+            "subject": candidate.subject, "description": candidate.description,
+            "version": candidate.version, "visibility": candidate.visibility,
+            "revision": candidate.revision,
+        })
+        row = await db.get(QuestionBank, identifier)
+        if row is not None:
+            target_banks.append({
+                "id": row.id, "ownerId": row.owner_id, "name": row.name,
+                "subject": row.subject, "description": row.description,
+                "version": row.version, "visibility": row.visibility, "revision": row.revision,
+            })
+    source_questions = []
+    target_questions = []
+    for identifier, candidate in sorted(snapshot.questions.items()):
+        source_questions.append({
+            "id": identifier, "bankId": candidate.bank_id,
+            "revision": candidate.revision, "contentHash": candidate.content_hash,
+        })
+        row = await db.get(Question, identifier)
+        if row is not None:
+            target_questions.append({
+                "id": row.id, "bankId": row.bank_id, "revision": row.revision,
+                "contentHash": canonical_question_hash(question_to_payload(row)),
+            })
+    source_hash = _migration_proof_hash({"banks": source_banks, "questions": source_questions})
+    target_hash = _migration_proof_hash({"banks": target_banks, "questions": target_questions})
+    blockers = {
+        "conflicts": len(snapshot.report.conflicts),
+        "invalidRecords": len(snapshot.report.invalid_records),
+        "nullContentHashes": snapshot.report.null_content_hashes,
+    }
+    return {
+        "sourceCount": len(source_banks) + len(source_questions),
+        "targetCount": len(target_banks) + len(target_questions),
+        "sourceHash": source_hash,
+        "targetHash": target_hash,
+        "verificationHash": _migration_proof_hash({"sourceHash": source_hash, "targetHash": target_hash}),
+        "verified": source_hash == target_hash and not any(blockers.values()),
+        **blockers,
+    }
+
+
+async def verify_runtime_question_item(
+    db: AsyncSession,
+    *,
+    source_type: str,
+    source_key: str,
+    owner_scope: str,
+    payload: Any,
+) -> dict[str, Any]:
+    """Prove one exact Runtime ledger item without domain-priority merging."""
+
+    try:
+        decoded = _decode_json(payload)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        decoded = None
+    resolved_owner, identity_invalid = await _exact_runtime_source_owner(
+        db,
+        source_type=source_type,
+        source_key=source_key,
+        owner_scope=owner_scope,
+    )
+    invalid = int(not isinstance(decoded, list)) + identity_invalid
+    rows = decoded if isinstance(decoded, list) else []
+    source_banks: list[dict[str, Any]] = []
+    source_questions: list[dict[str, Any]] = []
+    target_banks: list[dict[str, Any]] = []
+    target_questions: list[dict[str, Any]] = []
+    for raw in rows:
+        if not isinstance(raw, Mapping):
+            invalid += 1
+            continue
+        bank_id = str(raw.get("id") or raw.get("bankId") or "").strip()
+        owner_id = _decode_owner(raw.get("publishedBy"), fallback=resolved_owner) if (
+            source_type == "shared_runtime" and owner_scope == "shared"
+        ) else resolved_owner
+        if not bank_id or not owner_id:
+            invalid += 1
+            continue
+        published = source_key == PUBLISHED_BANK_KEY
+        bank = {
+            "id": bank_id,
+            "ownerId": owner_id,
+            "name": _bank_name(dict(raw)),
+            "subject": str(raw.get("subject") or "PMP")[:32],
+            "description": str(raw.get("description")) if raw.get("description") else None,
+            "version": str(raw.get("version") or "1.0")[:32],
+            "visibility": "published" if published else str(raw.get("visibility") or "private"),
+            "revision": max(1, _to_int(raw.get("revision"), 1)),
+        }
+        source_banks.append(bank)
+        target_bank = await db.get(QuestionBank, bank_id)
+        if target_bank is not None:
+            target_banks.append({
+                "id": target_bank.id, "ownerId": target_bank.owner_id,
+                "name": target_bank.name, "subject": target_bank.subject,
+                "description": target_bank.description, "version": target_bank.version,
+                "visibility": target_bank.visibility, "revision": target_bank.revision,
+            })
+        raw_questions = raw.get("questions")
+        if not isinstance(raw_questions, list):
+            invalid += 1
+            continue
+        for raw_question in raw_questions:
+            if not isinstance(raw_question, dict):
+                invalid += 1
+                continue
+            question_id = str(raw_question.get("id") or raw_question.get("questionId") or "").strip()
+            if not question_id:
+                invalid += 1
+                continue
+            try:
+                canonical = _canonical_payload(
+                    _migration_question_payload(raw_question),
+                    subject=bank["subject"],
+                    force_public=published and not _has_internal_marker(raw_question),
+                )
+            except Exception:
+                invalid += 1
+                continue
+            source_questions.append({
+                "id": question_id, "bankId": bank_id,
+                "revision": max(1, _to_int(raw_question.get("revision"), 1)),
+                "contentHash": canonical_question_hash(canonical),
+            })
+            target_question = await db.get(Question, question_id)
+            if target_question is not None:
+                target_questions.append({
+                    "id": target_question.id, "bankId": target_question.bank_id,
+                    "revision": target_question.revision,
+                    "contentHash": canonical_question_hash(question_to_payload(target_question)),
+                })
+    source = {"banks": source_banks, "questions": source_questions}
+    target = {"banks": target_banks, "questions": target_questions}
+    source_hash = _migration_proof_hash(source)
+    target_hash = _migration_proof_hash(target)
+    source_count = len(source_banks) + len(source_questions)
+    target_count = len(target_banks) + len(target_questions)
+    return {
+        "sourceType": source_type,
+        "sourceKey": source_key,
+        "ownerScope": owner_scope,
+        "sourceCount": source_count,
+        "targetCount": target_count,
+        "sourceHash": source_hash,
+        "targetHash": target_hash,
+        "verificationHash": _migration_proof_hash({"sourceHash": source_hash, "targetHash": target_hash}),
+        "invalidRecords": invalid,
+        "verified": not invalid and source_count == target_count and source_hash == target_hash,
+    }
 
 
 async def migrate_runtime_questions(

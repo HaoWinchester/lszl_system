@@ -11,17 +11,19 @@ const repoDir = resolve(frontendDir, '..')
 const contract = JSON.parse(readFileSync(resolve(scriptsDir, 'new-legacy-contract.json'), 'utf8'))
 const homepageBundlePlan = JSON.parse(readFileSync(resolve(scriptsDir, 'homepage-bundles.json'), 'utf8'))
 const p45PersistenceContract = JSON.parse(readFileSync(resolve(scriptsDir, 'p45-persistence-contract.json'), 'utf8'))
-const runtimePolicyPath = existsSync(resolve(repoDir, 'backend/app/web/runtime_page_policy.json'))
-  ? resolve(repoDir, 'backend/app/web/runtime_page_policy.json')
-  : resolve(scriptsDir, 'runtime-page-policy.json')
-const runtimePagePolicy = JSON.parse(readFileSync(runtimePolicyPath, 'utf8'))
-const runtimePages = new Set(runtimePagePolicy.runtimePages)
 const learningEntryChooserAssets = ['src/31-learning-entry-chooser.js']
 const learningEntryChooserStorageKeys = ['kg_learning_entry_chooser_claim_v1', 'kg_learning_entry_chooser_consumed_v1']
 const legacyUnmigratedIndexedDbModules = Object.freeze([
   'content-prep-studio/src/js/10-state-domain.js',
   'content-prep-studio/dist/content-prep.html',
 ])
+const legacyIndexedDbLiteralOwners = Object.freeze({
+  pmp_content_prep_studio_v1: new Set(legacyUnmigratedIndexedDbModules),
+})
+const legacyCleanupLiteralOwners = Object.freeze({
+  kg_remote_auth_session_v1: new Set(['src/29-auth-core.js']),
+})
+const transientSourceDirectories = new Set(['.pytest_cache', '__pycache__'])
 
 function parseArgs(argv) {
   const args = { source: resolve(repoDir, 'new-legacy'), out: resolve(frontendDir, 'public', 'new-legacy') }
@@ -39,11 +41,18 @@ function parseArgs(argv) {
   return args
 }
 
+function isTransientSourceArtifact(path) {
+  const normalized = String(path || '').split(sep).join('/')
+  const parts = normalized.split('/').filter(Boolean)
+  return parts.some((part) => transientSourceDirectories.has(part)) || normalized.endsWith('.pyc')
+}
+
 function walk(root, base = root) {
   if (!existsSync(root)) return []
   return readdirSync(root, { withFileTypes: true })
     .flatMap((entry) => {
       const path = resolve(root, entry.name)
+      if (isTransientSourceArtifact(relative(base, path))) return []
       return entry.isDirectory() ? walk(path, base) : [relative(base, path)]
     })
     .sort()
@@ -252,6 +261,17 @@ function patchArchitectureCopy(path, source) {
 
 function sourceFiles(source) {
   return Object.fromEntries(walk(source).map((path) => [path, hashFile(resolve(source, path))]))
+}
+
+function validateLegacyAuthSessionCleanup(contents) {
+  const literalCount = (contents.match(/['"]kg_remote_auth_session_v1['"]/g) || []).length
+  const declarationCount = (contents.match(/\bconst\s+AUTH_REMOTE_SESSION_KEY\s*=\s*['"]kg_remote_auth_session_v1['"]/g) || []).length
+  const identifierCount = (contents.match(/\bAUTH_REMOTE_SESSION_KEY\b/g) || []).length
+  const approvedRemovePattern = /(?:globalThis\s*\.\s*)?(?:__nativeLocalStorage__|localStorage)\s*(?:\?\.\s*|\.\s*)removeItem\s*(?:\?\.\s*)?\(\s*AUTH_REMOTE_SESSION_KEY\s*\)/g
+  const approvedRemoveCount = (contents.match(approvedRemovePattern) || []).length
+  if (literalCount !== 1 || declarationCount !== 1 || approvedRemoveCount < 1 || identifierCount !== approvedRemoveCount + 1) {
+    throw new Error('legacy auth session cleanup must contain only direct remove calls for the retired key')
+  }
 }
 
 function patchTrainingSessionReentrancy(source) {
@@ -585,9 +605,7 @@ function versionPageAssets(html, version) {
   )
   return withStyles.replace(
     /(<script\b[^>]*\bsrc=(['"]))((?!https?:|\/\/|data:)[^'"?#]+\.js)\2/gi,
-    (_, prefix, quote, asset) => asset.replace(/^\.\//, '') === 'server-state-bootstrap.js'
-      ? `${prefix}${asset}${quote}`
-      : `${prefix}${asset}${query}${quote}`,
+    (_, prefix, quote, asset) => `${prefix}${asset}${query}${quote}`,
   )
 }
 
@@ -602,12 +620,19 @@ function injectPage(html, page, version) {
   if (page === 'landing.html') {
     return versionPageAssets(versionPageRelease(html, version), version)
   }
+  const retiredSingleDeepRedirectShell = page === 'question-training.html'
+    && /location\.replace\(target\.toString\(\)\)/.test(html)
+    && /id="practiceRedirectFallback"/.test(html)
   const injection = [
     '<script src="./teaching-content-sync.js"></script><!-- kg-teaching-content-sync:generated -->',
     '<!-- kg-direct-bootstrap-anchor -->',
-    runtimePages.has(page) ? '<script src="./server-state-bootstrap.js"></script><!-- kg-state:generated -->' : '',
     '<script src="./runtime-config.override.js"></script><!-- kg-runtime:generated -->',
     '<script src="./auth-session-bootstrap.js"></script><!-- kg-auth-session:generated -->',
+    retiredSingleDeepRedirectShell ? '' : '<script src="./domain-api-client.js"></script><!-- kg-domain-api:generated -->',
+    retiredSingleDeepRedirectShell || !['admin-console.html', 'admin-operations.html', 'admin-settings.html', 'admin-subjects.html', 'content-center.html', 'course-admin.html', 'knowledge-recall.html', 'paper-management.html', 'question-bank.html', 'question-workspace.html', 'teacher-workbench.html'].includes(page) ? '' : '<script src="./teaching-content-adapter.js"></script><!-- kg-teaching-content-api:generated -->',
+    retiredSingleDeepRedirectShell || !['admin-console.html', 'admin-operations.html', 'admin-settings.html', 'admin-subjects.html', 'content-center.html', 'course-admin.html', 'teacher-workbench.html'].includes(page) ? '' : '<script src="./course-management-adapter.js"></script><!-- kg-course-management-api:generated -->',
+    retiredSingleDeepRedirectShell || !['admin-console.html', 'admin-operations.html'].includes(page) ? '' : '<script src="./admin-domain-summary.js"></script><!-- kg-admin-domain-summary:generated -->',
+    retiredSingleDeepRedirectShell ? '' : '<script src="src/28-device-preferences.js"></script><!-- kg-device-preferences:generated -->',
     '<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->',
     '<script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->',
     page === 'index.html' ? '<script defer src="./homepage-loader.js"></script><!-- kg-homepage-loader:generated -->' : '',
@@ -625,9 +650,6 @@ function injectPage(html, page, version) {
   const removeLocalScriptTags = (source, asset) => source
     .replace(new RegExp(`^[ \\t]*${localScriptPattern(asset)}[ \\t]*(?:\\r?\\n)?`, 'gim'), '')
     .replace(new RegExp(localScriptPattern(asset), 'gi'), '')
-  const retiredSingleDeepRedirectShell = page === 'question-training.html'
-    && /location\.replace\(target\.toString\(\)\)/.test(generated)
-    && /id="practiceRedirectFallback"/.test(generated)
   const learningModeConsumers = {
     'paper-management.html': 'src/65-question-bank-admin.js',
     'question-workspace.html': 'src/77-multi-question-workspace.js',
@@ -726,6 +748,18 @@ function injectPage(html, page, version) {
         `<script defer src="./recall-progress-adapter.js"></script><!-- kg-recall-progress:generated -->\n${recallTag}`,
       )
     }
+  }
+  if (page === 'question-bank.html') {
+    const adminTag = findLocalScriptTag(generated, 'src/65-question-bank-admin.js')
+    if (!adminTag) {
+      throw new Error('new-legacy 题库管理脚本顺序已变化，请复核试卷引用 API')
+    }
+    const draftAdapterAsset = 'paper-draft-adapter.js'
+    generated = removeLocalScriptTags(generated, draftAdapterAsset)
+    generated = generated.replace(
+      adminTag,
+      `<script defer src="./${draftAdapterAsset}"></script><!-- kg-paper-drafts:generated -->\n${adminTag}`,
+    )
   }
   if (page === 'paper-management.html') {
     const adminTag = findLocalScriptTag(generated, 'src/65-question-bank-admin.js')
@@ -957,12 +991,37 @@ function validateStorageContract(source) {
   const candidates = new Set()
   const sessionOnlyKeys = new Set()
   const readOnlyWrites = new Set()
-  const literalPattern = /(['"])(kg_[A-Za-z0-9_]+|pmp_question_font_size_v\d+|通用知识点关系图谱工具_[^'"\\\r\n]+)\1/g
+  const devicePreferenceSource = 'src/28-device-preferences.js'
+  const literalPattern = /(['"])((?:kg|pmp)_[A-Za-z0-9_]+|通用知识点关系图谱工具_[^'"\\\r\n]+)\1/g
   const writePattern = /(?:localStorage|sessionStorage)\s*(?:\?\.|\.)\s*(?:setItem|removeItem)\s*\(\s*(['"])(kg_[A-Za-z0-9_]+)\1/g
   const sessionTokenPattern = /sessionStorage\s*(?:\?\.|\.)\s*(?:getItem|setItem|removeItem)\s*\(\s*(['"])(kg_[A-Za-z0-9_]+)\1/g
-  for (const path of walk(source).filter((item) => item.endsWith('.js') || item.endsWith('.html'))) {
+  const devicePreferenceStorageCall = /(?:(?:global|window)\s*(?:\?\.\s*|\.\s*))?(?:localStorage|sessionStorage)\s*(?:\?\.\s*|\.\s*)(?:getItem|setItem|removeItem)\s*(?:\?\.\s*)?\(\s*(assertAllowed\s*\(\s*key\s*\)|[^,\n)]+)/g
+  const productionSources = walk(source).filter((item) => {
+    const normalized = item.split(sep).join('/')
+    return !normalized.startsWith('tests/') && (item.endsWith('.js') || item.endsWith('.html'))
+  })
+  for (const path of productionSources) {
     const contents = readFileSync(resolve(source, path), 'utf8')
-    for (const match of contents.matchAll(literalPattern)) candidates.add(match[2])
+    const normalizedPath = path.split(sep).join('/')
+    // This facade owns its own immutable device-only allowlist. Its key declarations
+    // are not business-storage candidates; all other sources remain fail-closed.
+    if (path === devicePreferenceSource) {
+      for (const match of contents.matchAll(devicePreferenceStorageCall)) {
+        if (/^assertAllowed\s*\(\s*key\s*\)$/.test(match[1])) continue
+        throw new Error('device preference storage call must use assertAllowed(key)')
+      }
+      continue
+    }
+    for (const match of contents.matchAll(literalPattern)) {
+      const owners = legacyIndexedDbLiteralOwners[match[2]]
+      if (owners?.has(normalizedPath)) continue
+      const cleanupOwners = legacyCleanupLiteralOwners[match[2]]
+      if (cleanupOwners?.has(normalizedPath)) {
+        validateLegacyAuthSessionCleanup(contents)
+        continue
+      }
+      candidates.add(match[2])
+    }
     for (const match of contents.matchAll(sessionTokenPattern)) {
       if (sessionOnlyPrefixes.some((prefix) => match[2].startsWith(prefix))) sessionOnlyKeys.add(match[2])
     }
@@ -990,7 +1049,7 @@ function validateStorageContract(source) {
     throw new Error(`new-legacy 只读旧键禁止新增写调用：${Array.from(readOnlyWrites).sort().join(', ')}`)
   }
 
-  for (const path of walk(source).filter((item) => item.endsWith('.js') || item.endsWith('.html'))) {
+  for (const path of productionSources) {
     const contents = readFileSync(resolve(source, path), 'utf8')
     if (!hasIndexedDbBusinessPersistence(contents)) continue
     /* walk() 在 Windows 返回反斜杠路径，豁免清单统一为正斜杠，比较前先归一 */
@@ -1002,10 +1061,10 @@ function validateStorageContract(source) {
 
 function validate(source) {
   if (!existsSync(source) || !statSync(source).isDirectory()) throw new Error(`找不到 new-legacy 目录：${source}`)
-  const required = ['VERSION', ...contract.requiredPages, ...contract.requiredFiles, ...learningEntryChooserAssets]
+  const required = ['VERSION', ...contract.requiredPages, ...contract.requiredFiles, ...learningEntryChooserAssets, 'src/28-device-preferences.js']
   const missing = required.filter((path) => !existsSync(resolve(source, path)))
   if (missing.length) throw new Error(`new-legacy 缺少必需文件：${missing.join(', ')}`)
-  const missingGenerated = (contract.requiredGeneratedFiles || [])
+  const missingGenerated = [...(contract.requiredGeneratedFiles || []), 'domain-api-client.js', 'teaching-content-adapter.js', 'course-management-adapter.js', 'admin-domain-summary.js', 'runtime-retirement.json']
     .filter((path) => !existsSync(resolve(scriptsDir, 'new-legacy-assets', path)))
   if (missingGenerated.length) {
     throw new Error(`new-legacy 缺少必需生成适配器：${missingGenerated.join(', ')}`)
@@ -1040,7 +1099,10 @@ function sync({ source, out }) {
 
   rmSync(out, { recursive: true, force: true })
   mkdirSync(out, { recursive: true })
-  cpSync(source, out, { recursive: true })
+  cpSync(source, out, {
+    recursive: true,
+    filter: (sourcePath) => !isTransientSourceArtifact(relative(source, sourcePath)),
+  })
 
   const bridgeDir = resolve(scriptsDir, 'new-legacy-assets')
   for (const asset of walk(bridgeDir)) cpSync(resolve(bridgeDir, asset), resolve(out, asset))
@@ -1087,17 +1149,6 @@ function sync({ source, out }) {
     cpSync(resolve(customSource, 'styles/user-center.css'), resolve(out, 'styles/user-center.css'))
   }
 
-  const contentPrepPath = resolve(out, 'content-prep-studio/dist/content-prep.html')
-  if (existsSync(contentPrepPath)) {
-    const contentPrepHtml = readFileSync(contentPrepPath, 'utf8')
-    const runtimeMarker = '<script src="/server-state-bootstrap.js"></script>'
-    if (!contentPrepHtml.includes('kg-direct-bootstrap-anchor') && contentPrepHtml.includes(runtimeMarker)) {
-      writeFileSync(
-        contentPrepPath,
-        contentPrepHtml.replace(runtimeMarker, `<!-- kg-direct-bootstrap-anchor -->\n${runtimeMarker}`),
-      )
-    }
-  }
 
   for (const page of walk(out).filter((path) => !path.includes('/') && path.endsWith('.html'))) {
     const path = resolve(out, page)

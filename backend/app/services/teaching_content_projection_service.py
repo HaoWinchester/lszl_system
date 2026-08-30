@@ -1,4 +1,4 @@
-"""Bidirectional projections for browser principle and synthesis repositories."""
+"""Validation and relational operations for principles and synthesis cards."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_prep import Principle, SynthesisPreset
 from app.models.question import Question, QuestionBank
-from app.models.shared_runtime_state import SharedRuntimeState
 from app.services import teaching_content_revision_service
 
 
@@ -308,55 +307,6 @@ async def principle_reference_questions(
     }
 
 
-async def _write_row(
-    db: AsyncSession,
-    key: str,
-    payload: dict[str, Any],
-    actor_username: str,
-) -> None:
-    value = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-    row = await db.get(SharedRuntimeState, key)
-    if row is None:
-        db.add(
-            SharedRuntimeState(
-                key=key,
-                value=value,
-                updated_by=actor_username,
-            )
-        )
-    else:
-        row.value = value
-        row.updated_by = actor_username
-
-
-async def write_principle_projection(
-    db: AsyncSession,
-    actor_username: str,
-) -> None:
-    """Rewrite both shared browser repositories from canonical relational rows."""
-
-    await db.flush()
-    principles = (
-        await db.execute(select(Principle).order_by(Principle.id))
-    ).scalars().all()
-    presets = (
-        await db.execute(select(SynthesisPreset).order_by(SynthesisPreset.id))
-    ).scalars().all()
-    await _write_row(
-        db,
-        PRINCIPLE_KEY,
-        _payload([_principle_item(row) for row in principles]),
-        actor_username,
-    )
-    await _write_row(
-        db,
-        PRESET_KEY,
-        _payload([_preset_item(row) for row in presets]),
-        actor_username,
-    )
-    await db.flush()
-
-
 async def principle_card_bundle(db: AsyncSession) -> dict[str, Any]:
     """Read the canonical pair in the same envelope used by both UIs."""
 
@@ -372,19 +322,6 @@ async def principle_card_bundle(db: AsyncSession) -> dict[str, Any]:
         "principles": _payload([_principle_item(row) for row in principles]),
         "synthesisPresets": _payload([_preset_item(row) for row in presets]),
     }
-
-
-async def projection_rows_present(db: AsyncSession) -> bool:
-    keys = set(
-        (
-            await db.execute(
-                select(SharedRuntimeState.key).where(
-                    SharedRuntimeState.key.in_(PROJECTION_KEYS)
-                )
-            )
-        ).scalars().all()
-    )
-    return keys == PROJECTION_KEYS
 
 
 def validate_projection_container(
@@ -493,20 +430,6 @@ def validate_projection_container(
             }
         items.append(normalized)
     return {**payload, "schemaVersion": 1, "items": items}
-
-
-def validate_projection_value(key: str, value: str) -> list[dict[str, Any]]:
-    if len(value.encode("utf-8")) > MAX_PROJECTION_BYTES:
-        raise ValueError("原则投影超过大小限制")
-    try:
-        payload = json.loads(value or "")
-    except (TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise ValueError("原则投影必须是有效 JSON") from exc
-    if not isinstance(payload, dict):
-        raise ValueError("原则投影必须是 JSON 对象")
-    if not payload:
-        raise ValueError("运行时原则投影不能使用省略占位符 {}")
-    return validate_projection_container(key, payload).get("items", [])
 
 
 async def _apply_principles(
@@ -657,29 +580,12 @@ async def _apply_presets(
     return changes
 
 
-async def apply_principle_projection(
-    db: AsyncSession,
-    actor_username: str,
-    key: str,
-    value: str,
-) -> list[dict[str, str]]:
-    """Apply one browser projection to canonical rows without hard deletion."""
-
-    items = validate_projection_value(key, value)
-    if key == PRINCIPLE_KEY:
-        changes = await _apply_principles(db, actor_username, items)
-    elif key == PRESET_KEY:
-        changes = await _apply_presets(db, actor_username, items)
-    else:
-        raise ValueError(f"不是原则投影键：{key}")
-    await db.flush()
-    return changes
-
-
 async def archive_principles(
     db: AsyncSession,
     actor_username: str,
     principle_ids: object,
+    *,
+    content_revision: int,
 ) -> dict[str, Any]:
     """Archive unreferenced principles and their paired synthesis presets atomically."""
 
@@ -688,6 +594,9 @@ async def archive_principles(
         raise ValueError("至少选择一条原则")
 
     await teaching_content_revision_service.acquire_lock(db)
+    await teaching_content_revision_service.assert_expected(
+        db, content_revision, lock_acquired=True
+    )
     principles = (
         await db.execute(
             select(Principle)
@@ -738,7 +647,6 @@ async def archive_principles(
                 }
             )
 
-    await write_principle_projection(db, actor_username)
     revision = await teaching_content_revision_service.bump(
         db,
         actor_username,
@@ -755,6 +663,8 @@ async def delete_principles(
     db: AsyncSession,
     actor_username: str,
     principle_ids: object,
+    *,
+    content_revision: int,
 ) -> dict[str, Any]:
     """Hard-delete unused principle/card pairs and refresh the browser projection."""
 
@@ -763,6 +673,9 @@ async def delete_principles(
         raise ValueError("至少选择一条原则")
 
     await teaching_content_revision_service.acquire_lock(db)
+    await teaching_content_revision_service.assert_expected(
+        db, content_revision, lock_acquired=True
+    )
     principles = (
         await db.execute(
             select(Principle)
@@ -832,7 +745,6 @@ async def delete_principles(
     await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id.in_([item.id for item in presets])))
     await db.execute(delete(Principle).where(Principle.id.in_(ids)))
 
-    await write_principle_projection(db, actor_username)
     bundle = await principle_card_bundle(db)
     revision = await teaching_content_revision_service.bump(db, actor_username, changes)
     await db.commit()
@@ -847,6 +759,8 @@ async def import_principle_card_bundle(
     db: AsyncSession,
     actor_username: str,
     payload: object,
+    *,
+    content_revision: int,
 ) -> dict[str, Any]:
     """Replace the global principle/card configuration as one safe transaction."""
 
@@ -856,6 +770,9 @@ async def import_principle_card_bundle(
     incoming_principle_ids = {str(item["id"]) for item in incoming_principles}
 
     await teaching_content_revision_service.acquire_lock(db)
+    await teaching_content_revision_service.assert_expected(
+        db, content_revision, lock_acquired=True
+    )
     existing_principles = (
         await db.execute(select(Principle).with_for_update())
     ).scalars().all()
@@ -996,7 +913,6 @@ async def import_principle_card_bundle(
             delete(Principle).where(Principle.id.in_(principle_ids_to_delete))
         )
 
-    await write_principle_projection(db, actor_username)
     canonical_bundle = await principle_card_bundle(db)
     revision = await teaching_content_revision_service.bump(db, actor_username, changes)
     await db.commit()
@@ -1013,6 +929,7 @@ async def update_principle_statuses(
     actor_username: str,
     principle_ids: object,
     *,
+    content_revision: int,
     principle_status: object = None,
     preset_status: object = None,
 ) -> dict[str, Any]:
@@ -1035,6 +952,9 @@ async def update_principle_statuses(
         raise ValueError("至少提供一种状态修改")
 
     await teaching_content_revision_service.acquire_lock(db)
+    await teaching_content_revision_service.assert_expected(
+        db, content_revision, lock_acquired=True
+    )
     principles = (
         await db.execute(
             select(Principle)
@@ -1089,7 +1009,6 @@ async def update_principle_statuses(
                 )
                 updated_preset_ids.append(preset.id)
 
-    await write_principle_projection(db, actor_username)
     revision = await teaching_content_revision_service.bump(
         db,
         actor_username,

@@ -17,7 +17,7 @@ function applyQuestionFontScale(size){
   modal.style.setProperty('--q-font-scale',String(scale));
   modal.classList.remove('q-font-small','q-font-normal','q-font-large','q-font-xlarge');
   modal.classList.add('q-font-'+value);
-  try{const store=window.KGAppStorage;if(store&&store.writeString)store.writeString('pmp_question_font_size_v2',value);else localStorage.setItem('pmp_question_font_size_v2',value)}catch(e){}
+  try{window.KGDevicePreferences?.setString('pmp_question_font_size_v2',value)}catch(e){}
   document.querySelectorAll('#questionModal .question-font-tools button').forEach(btn=>{btn.classList.toggle('active',btn.dataset.qFont===value);});
   const cycle=document.getElementById('qtFontScaleBtn');
   if(cycle){
@@ -28,7 +28,7 @@ function applyQuestionFontScale(size){
   }
 }
 function getSavedQuestionFontScale(){
-  try{const store=window.KGAppStorage;if(store&&store.readString)return store.readString('pmp_question_font_size_v2','')||store.readString('pmp_question_font_size_v1','')||'normal';return localStorage.getItem('pmp_question_font_size_v2')||localStorage.getItem('pmp_question_font_size_v1')||'normal'}catch(e){return'normal'}
+  try{const store=window.KGDevicePreferences;return store?.getString('pmp_question_font_size_v2','')||store?.getString('pmp_question_font_size_v1','')||'normal'}catch(e){return'normal'}
 }
 function ensureQuestionFontScale(){
   applyQuestionFontScale(getSavedQuestionFontScale());

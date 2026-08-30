@@ -2,6 +2,7 @@ import asyncio
 import json
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import delete, select
 
 from app.db.session import AsyncSessionLocal
@@ -15,6 +16,76 @@ from app.services.files_runtime_migration_service import (
     scan_runtime_graph_storage,
     verify_all_graph_files,
 )
+
+
+def test_duplicate_folder_ids_and_casefold_tag_aliases_are_blockers() -> None:
+    suffix = uuid4().hex[:10]
+    owner = f"graph-migration-bijection-{suffix}"
+    folder_id = f"folder-bijection-{suffix}"
+    storage = {
+        "kg_graph_folders_v1": [
+            {"id": folder_id, "owner": owner, "name": "First"},
+            {"id": folder_id, "owner": owner, "name": "Second"},
+        ],
+        "kg_graph_file_tags_v2": {
+            owner: [
+                {"id": f"tag-a-{suffix}", "name": "Focus"},
+                {"id": f"tag-b-{suffix}", "name": "focus"},
+            ]
+        },
+    }
+    scan = scan_runtime_graph_storage(owner, storage)
+    assert {warning["code"] for warning in scan["warnings"]} >= {
+        "duplicate-folder-id",
+        "tag-name-alias-collision",
+    }
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                User(
+                    username=owner,
+                    password_hash="test-only",
+                    role="teacher",
+                    status="active",
+                )
+            )
+            await db.flush()
+            db.add(RuntimeState(owner_id=owner, storage=storage, revision=1))
+            await db.commit()
+            try:
+                with pytest.raises(ValueError, match="one-to-one"):
+                    await migrate_owner_graph_files(db, owner)
+                assert await db.scalar(
+                    select(Folder).where(Folder.owner_id == owner)
+                ) is None
+                assert await db.scalar(select(Tag).where(Tag.owner_id == owner)) is None
+            finally:
+                await db.rollback()
+                await db.execute(delete(RuntimeState).where(RuntimeState.owner_id == owner))
+                await db.execute(delete(User).where(User.username == owner))
+                await db.commit()
+
+    asyncio.run(scenario())
+
+
+def test_tag_names_that_only_diverge_after_database_truncation_are_blockers() -> None:
+    prefix = "x" * 40
+    owner = f"graph-tag-truncation-{uuid4().hex[:10]}"
+    storage = {
+        "kg_graph_file_tags_v2": {
+            owner: [
+                {"id": "tag-long-a", "name": f"{prefix}A"},
+                {"id": "tag-long-b", "name": f"{prefix}B"},
+            ]
+        }
+    }
+
+    scan = scan_runtime_graph_storage(owner, storage)
+
+    assert [warning["code"] for warning in scan["warnings"]] == [
+        "tag-name-alias-collision"
+    ]
 
 
 def test_migrate_owner_graph_files_recovers_orphan_content_and_uses_smallest_order_as_current() -> None:
@@ -86,6 +157,9 @@ def test_migrate_owner_graph_files_recovers_orphan_content_and_uses_smallest_ord
                 current = await db.get(CurrentFile, owner)
                 assert current is not None
                 assert current.file_id == orphan_id
+                fallback_proof = await verify_all_graph_files(db, owners=[owner])
+                assert fallback_proof["verified"] is True
+                assert fallback_proof["sourceHash"] == fallback_proof["targetHash"]
                 source = await db.get(RuntimeState, owner)
                 assert source.storage == storage
             finally:
@@ -105,10 +179,11 @@ def test_migration_preserves_folder_tag_current_and_is_idempotent() -> None:
     folder_id = f"folder-{suffix}"
     file_id = f"file-{suffix}"
     tag_id = f"tag-{suffix}"
+    second_tag_id = f"tag-second-{suffix}"
     storage = {
         "kg_graph_file_index_v2": json.dumps([{
             "id": file_id, "owner": owner, "name": "带关系图谱", "folderId": folder_id,
-            "tags": ["重点"], "status": "active", "order": 1000,
+            "tags": ["重点", "次要"], "status": "active", "order": 1000,
         }]),
         f"kg_graph_file_content_v2__{owner}__{file_id}": json.dumps({
             "graphData": {"meta": {"title": "带关系图谱"}, "nodes": [], "links": []}
@@ -116,7 +191,10 @@ def test_migration_preserves_folder_tag_current_and_is_idempotent() -> None:
         "kg_graph_folders_v1": json.dumps([{
             "id": folder_id, "owner": owner, "name": "章节一", "status": "active", "order": 1000,
         }]),
-        "kg_graph_file_tags_v2": json.dumps({owner: [{"id": tag_id, "name": "重点", "color": "#ff0000"}]}),
+        "kg_graph_file_tags_v2": json.dumps({owner: [
+            {"id": tag_id, "name": "重点", "color": "#ff0000"},
+            {"id": second_tag_id, "name": "次要", "color": "#00ff00"},
+        ]}),
         "kg_graph_current_file_v2": json.dumps({owner: file_id}),
     }
 
@@ -130,11 +208,23 @@ def test_migration_preserves_folder_tag_current_and_is_idempotent() -> None:
                 report = await migrate_owner_graph_files(db, owner)
                 assert report["files"] == 1
                 assert report["folders"] == 1
-                assert report["tags"] == 1
+                assert report["tags"] == 2
                 assert (await db.get(CurrentFile, owner)).file_id == file_id
                 assert (await db.get(GraphFile, file_id)).folder_id == folder_id
                 assert (await db.get(FileTag, (file_id, tag_id))) is not None
+                assert (await db.get(FileTag, (file_id, second_tag_id))) is not None
                 assert (await db.get(Tag, tag_id)).name == "重点"
+                assert (await verify_all_graph_files(db, owners=[owner]))["verified"] is True
+                await db.execute(
+                    delete(FileTag).where(
+                        FileTag.file_id == file_id,
+                        FileTag.tag_id == second_tag_id,
+                    )
+                )
+                await db.commit()
+                tampered = await verify_all_graph_files(db, owners=[owner])
+                assert tampered["verified"] is False
+                assert tampered["sourceHash"] != tampered["targetHash"]
                 second = await migrate_owner_graph_files(db, owner)
                 assert second["created"] == 0
                 assert second["foldersCreated"] == 0

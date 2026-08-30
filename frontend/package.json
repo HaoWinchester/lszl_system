@@ -7,7 +7,8 @@
     "dev": "../scripts/dev.sh",
     "build": "pnpm sync:new-legacy",
     "sync:new-legacy": "node scripts/sync-new-legacy.js && node scripts/export-guided-course.mjs",
-    "test": "node --test scripts/*.test.mjs",
+    "test": "node --test scripts/*.test.mjs && pnpm test:e2e-contracts",
+    "test:e2e-contracts": "python3 -m unittest e2e/test_admin_runtime_retirement.py -v",
     "test:design": "node --test scripts/design-contract.test.mjs",
     "test:p45-persistence": "node --test scripts/p45-persistence-contract.test.mjs"
   },

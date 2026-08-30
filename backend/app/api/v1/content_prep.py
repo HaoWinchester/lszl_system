@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_permissions, require_role
@@ -31,29 +32,17 @@ from app.schemas.teaching_content import (
     SubjectWriteRequest,
     TaxonomyReleaseRequest,
 )
-from app.schemas.teaching_content import (
-    ActivityOverrideWriteRequest,
-    RecallLibraryWriteRequest,
-    SubjectWriteRequest,
-    TaxonomyReleaseRequest,
-)
-from app.schemas.teaching_content import (
-    ActivityOverrideWriteRequest,
-    RecallLibraryWriteRequest,
-    SubjectWriteRequest,
-    TaxonomyReleaseRequest,
-)
-from app.schemas.teaching_content import (
-    ActivityOverrideWriteRequest,
-    RecallLibraryWriteRequest,
-    SubjectWriteRequest,
-    TaxonomyReleaseRequest,
+from app.schemas.recall_acceptance import (
+    RecallAcceptanceClearRequest,
+    RecallAcceptanceResponse,
+    RecallAcceptanceWriteRequest,
 )
 from app.services import (
     content_prep_shared_service,
     content_prep_draft_service,
     content_prep_service,
     question_lock_service,
+    recall_acceptance_service,
     subject_facet_service,
     teaching_content_projection_service,
     teaching_content_revision_service,
@@ -127,7 +116,25 @@ def _raise_draft_error(error: content_prep_draft_service.ContentPrepDraftError) 
     raise HTTPException(status_code=error.status_code, detail=detail) from error
 
 
+def _raise_recall_acceptance_conflict(
+    error: recall_acceptance_service.RecallAcceptanceRevisionConflict,
+) -> None:
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": "RECALL_ACCEPTANCE_REVISION_CONFLICT",
+            "message": str(error),
+            "currentRevision": error.current_revision,
+        },
+    ) from error
+
+
 def _raise_shared_error(error: Exception) -> None:
+    if isinstance(error, content_prep_shared_service.CatalogResourceNotModifiable):
+        raise HTTPException(
+            status_code=422,
+            detail={"code": error.code, "message": str(error)},
+        ) from error
     if isinstance(error, content_prep_shared_service.ContentRevisionConflict):
         raise HTTPException(
             status_code=409,
@@ -179,46 +186,59 @@ def _raise_subject_facet_error(error: Exception) -> None:
     ) from error
 
 
-@router.post("/subjects", status_code=201)
+def _bulk_content_revision(body: object) -> int:
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=422, detail={"code": "INVALID_SHARED_CONTENT", "message": "请求必须是 JSON 对象"})
+    value = body.get("contentRevision")
+    if type(value) is not int or value < 0:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_CONTENT_REVISION", "message": "contentRevision 必须是非负整数"})
+    return value
+
+
+def _retired_catalog_mutation() -> None:
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "code": "LEGACY_TEACHING_MUTATION_RETIRED",
+            "message": "该教学目录写入入口已退役，请使用 shared-content API",
+        },
+    )
+
+
+@router.post("/subjects", status_code=410, deprecated=True, responses={410: {"description": "Legacy teaching mutation retired"}})
 async def create_teaching_subject(request: SubjectWriteRequest, db: DB, actor: PrepEditor):
-    return {"subject": (await teaching_content_service.upsert_subject(db, subject_id=request.id, code=request.code, name=request.name, actor=actor.username, metadata=request.metadata)).id}
+    _retired_catalog_mutation()
 
 
-@router.post("/taxonomies/{taxonomy_id}/release")
+@router.post("/taxonomies/{taxonomy_id}/release", status_code=410, deprecated=True, responses={410: {"description": "Legacy teaching mutation retired"}})
 async def release_teaching_taxonomy(taxonomy_id: str, request: TaxonomyReleaseRequest, db: DB, actor: PrepEditor):
-    row = await teaching_content_service.release_taxonomy(db, subject_id=request.subject_id, taxonomy_id=taxonomy_id, version=request.version, title=request.title, nodes=request.nodes, actor=actor.username)
-    return {"taxonomy": {"id": row.id, "subjectId": row.subject_id, "version": row.version, "status": row.status}}
+    _retired_catalog_mutation()
 
 
-@router.put("/activity-overrides/{collection_id}/{activity_id}")
+@router.put("/activity-overrides/{collection_id}/{activity_id}", status_code=410, deprecated=True, responses={410: {"description": "Legacy teaching mutation retired"}})
 async def write_activity_override(collection_id: str, activity_id: str, request: ActivityOverrideWriteRequest, db: DB, actor: PrepEditor):
-    row = await teaching_content_service.apply_activity_override(db, collection_id=collection_id, activity_id=activity_id, record=request.record, actor=actor.username)
-    return {"override": {"id": row.id, "collectionId": row.collection_id, "activityId": row.activity_id, "record": row.record, "revision": row.revision}}
+    _retired_catalog_mutation()
 
 
 
 @router.put("/recall-libraries/{subject_id}")
 async def write_recall_library(subject_id: str, request: RecallLibraryWriteRequest, db: DB, actor: PrepEditor):
     try:
-        return await teaching_content_service.upsert_recall_library(db, subject_id=subject_id, version=request.version, nodes=request.nodes, edges=request.edges, metadata=request.metadata, actor=actor.username)
+        return await teaching_content_service.upsert_recall_library(db, subject_id=subject_id, content_revision=request.content_revision, version=request.version, nodes=request.nodes, edges=request.edges, metadata=request.metadata, actor=actor.username)
+    except teaching_content_revision_service.ContentRevisionConflict as error:
+        _raise_shared_error(error)
     except ValueError as error:
         raise HTTPException(status_code=422, detail={"code": "INVALID_RECALL_LIBRARY", "message": str(error)}) from error
 
 
-@router.delete("/taxonomies/{taxonomy_id}")
+@router.delete("/taxonomies/{taxonomy_id}", status_code=410, deprecated=True, responses={410: {"description": "Legacy teaching mutation retired"}})
 async def remove_teaching_taxonomy(taxonomy_id: str, subjectId: str, db: DB, actor: PrepEditor):
-    try:
-        return await teaching_content_service.delete_taxonomy(db, taxonomy_id=taxonomy_id, subject_id=subjectId, actor=actor.username)
-    except ValueError as error:
-        raise HTTPException(status_code=422, detail={"code": "INVALID_TAXONOMY", "message": str(error)}) from error
+    _retired_catalog_mutation()
 
 
-@router.delete("/activity-overrides/{collection_id}/{activity_id}")
+@router.delete("/activity-overrides/{collection_id}/{activity_id}", status_code=410, deprecated=True, responses={410: {"description": "Legacy teaching mutation retired"}})
 async def remove_activity_override(collection_id: str, activity_id: str, db: DB, actor: PrepEditor):
-    try:
-        return await teaching_content_service.delete_activity_override(db, collection_id=collection_id, activity_id=activity_id, actor=actor.username)
-    except ValueError as error:
-        raise HTTPException(status_code=422, detail={"code": "INVALID_ACTIVITY_OVERRIDE", "message": str(error)}) from error
+    _retired_catalog_mutation()
 
 
 
@@ -262,10 +282,65 @@ async def get_build_metadata(db: DB, actor: PrepEditor):
     }
 
 
+@router.get(
+    "/recall-acceptance-records",
+    response_model=RecallAcceptanceResponse,
+    response_model_by_alias=True,
+    response_model_exclude_none=True,
+)
+async def get_recall_acceptance_records(db: DB, actor: PrepEditor):
+    return await recall_acceptance_service.get_records(db, actor)
+
+
+@router.put(
+    "/recall-acceptance-records",
+    response_model=RecallAcceptanceResponse,
+    response_model_by_alias=True,
+    response_model_exclude_none=True,
+)
+async def replace_recall_acceptance_records(
+    request: RecallAcceptanceWriteRequest,
+    db: DB,
+    actor: PrepEditor,
+):
+    try:
+        return await recall_acceptance_service.replace_records(
+            db,
+            actor,
+            revision=request.revision,
+            records=request.records,
+        )
+    except recall_acceptance_service.RecallAcceptanceRevisionConflict as error:
+        _raise_recall_acceptance_conflict(error)
+
+
+@router.delete(
+    "/recall-acceptance-records",
+    response_model=RecallAcceptanceResponse,
+    response_model_by_alias=True,
+    response_model_exclude_none=True,
+)
+async def clear_recall_acceptance_records(
+    request: RecallAcceptanceClearRequest,
+    db: DB,
+    actor: PrepEditor,
+):
+    try:
+        return await recall_acceptance_service.clear_records(
+            db,
+            actor,
+            revision=request.revision,
+        )
+    except recall_acceptance_service.RecallAcceptanceRevisionConflict as error:
+        _raise_recall_acceptance_conflict(error)
+
+
 @router.get("/shared-content")
 async def get_shared_content(subjectId: str, db: DB, actor: PrepEditor):
     try:
-        return await content_prep_shared_service.read_shared_content(db, subjectId)
+        return await content_prep_shared_service.read_shared_content(
+            db, subjectId, actor.username
+        )
     except ValueError as error:
         _raise_shared_error(error)
 
@@ -363,6 +438,11 @@ async def save_shared_content(
             principles=request.principles,
             synthesis_presets=request.synthesis_presets,
             tag_config=request.tag_config,
+            subjects=request.subjects,
+            taxonomies=request.taxonomies,
+            activity_overrides=request.activity_overrides,
+            activity_tags=request.activity_tags,
+            activity_collections=request.activity_collections,
         )
     except (
         ValueError,
@@ -370,6 +450,9 @@ async def save_shared_content(
         teaching_content_projection_service.PrincipleArchiveConflict,
     ) as error:
         _raise_shared_error(error)
+    except IntegrityError as error:
+        await db.rollback()
+        _raise_shared_error(ValueError("教学内容唯一性或引用约束不满足"))
 
 
 @router.get("/subject-facets")
@@ -511,6 +594,8 @@ async def import_activities(
             db,
             actor,
             content_revision=request.content_revision,
+            subject_id=request.subject_id,
+            collection_id=request.collection_id,
             activities=request.activities,
         )
     except (ValueError, content_prep_shared_service.ContentRevisionConflict) as error:
@@ -524,12 +609,12 @@ async def archive_principles(body: dict, db: DB, actor: PrepEditor):
             db,
             actor.username,
             body.get("ids"),
+            content_revision=_bulk_content_revision(body),
         )
+    except teaching_content_revision_service.ContentRevisionConflict as error:
+        _raise_shared_error(error)
     except teaching_content_projection_service.PrincipleArchiveConflict as error:
-        raise HTTPException(
-            status_code=409,
-            detail=_principle_conflict_detail(error),
-        ) from error
+        raise HTTPException(status_code=409, detail=_principle_conflict_detail(error)) from error
     except ValueError as error:
         raise HTTPException(
             status_code=422,
@@ -544,12 +629,12 @@ async def delete_principles(body: dict, db: DB, actor: PrepEditor):
             db,
             actor.username,
             body.get("ids"),
+            content_revision=_bulk_content_revision(body),
         )
+    except teaching_content_revision_service.ContentRevisionConflict as error:
+        _raise_shared_error(error)
     except teaching_content_projection_service.PrincipleArchiveConflict as error:
-        raise HTTPException(
-            status_code=409,
-            detail=_principle_conflict_detail(error),
-        ) from error
+        raise HTTPException(status_code=409, detail=_principle_conflict_detail(error)) from error
     except ValueError as error:
         raise HTTPException(
             status_code=422,
@@ -564,12 +649,12 @@ async def import_principle_card_bundle(body: dict, db: DB, actor: PrepEditor):
             db,
             actor.username,
             body,
+            content_revision=_bulk_content_revision(body),
         )
+    except teaching_content_revision_service.ContentRevisionConflict as error:
+        _raise_shared_error(error)
     except teaching_content_projection_service.PrincipleArchiveConflict as error:
-        raise HTTPException(
-            status_code=409,
-            detail=_principle_conflict_detail(error),
-        ) from error
+        raise HTTPException(status_code=409, detail=_principle_conflict_detail(error)) from error
     except ValueError as error:
         raise HTTPException(
             status_code=422,
@@ -584,9 +669,12 @@ async def update_principle_statuses(body: dict, db: DB, actor: PrepEditor):
             db,
             actor.username,
             body.get("ids"),
+            content_revision=_bulk_content_revision(body),
             principle_status=body.get("principleStatus"),
             preset_status=body.get("presetStatus"),
         )
+    except teaching_content_revision_service.ContentRevisionConflict as error:
+        _raise_shared_error(error)
     except ValueError as error:
         raise HTTPException(
             status_code=422,

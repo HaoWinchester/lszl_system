@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -59,6 +59,9 @@ class ActivityCollection(Base):
     title: Mapped[str] = mapped_column(String(240), nullable=False, default="")
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
     content_metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    owner_username: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("users.username", ondelete="SET NULL"), nullable=True, index=True
+    )
 
 
 class ActivityTag(Base):
@@ -67,6 +70,10 @@ class ActivityTag(Base):
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
     collection_id: Mapped[str] = mapped_column(String(128), ForeignKey("activity_collections.id", ondelete="CASCADE"), nullable=False, index=True)
     tag: Mapped[str] = mapped_column(String(128), nullable=False)
+    content_metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    owner_username: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("users.username", ondelete="SET NULL"), nullable=True, index=True
+    )
 
 
 class ActivityOverride(Base):
@@ -78,6 +85,9 @@ class ActivityOverride(Base):
     record: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     updated_by: Mapped[str | None] = mapped_column(String(64), ForeignKey("users.username", ondelete="SET NULL"), nullable=True)
+    owner_username: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("users.username", ondelete="SET NULL"), nullable=True, index=True
+    )
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
@@ -106,3 +116,33 @@ class TeachingContentAudit(Base):
     after: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class TeachingContentRevision(Base):
+    """Singleton monotonic revision for all shared teaching-content writes."""
+
+    __tablename__ = "teaching_content_revisions"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_teaching_content_revision_singleton"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    revision: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    changes: Mapped[list] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+        server_default=text("'[]'::jsonb"),
+    )
+    updated_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )

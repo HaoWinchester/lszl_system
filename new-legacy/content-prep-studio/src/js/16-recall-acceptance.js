@@ -3,11 +3,11 @@
  * 参照《联想库快速验收器 V8 · 智能记录版》移植：模拟深度回忆走库、
  * 自动记录未命中/过宽词/多义/断链/单候选，支持人工判定与备注，
  * 可导出 JSON / Markdown 验收报告。默认验收当前工作区联想库。
- * 记录持久化键：pmp_recall_acceptance_records_v1（会话外仍保留，最近 2000 条）。
+ * 验收记录由 FastAPI 按登录账号隔离保存（最近 2000 条）。
  */
-const RA_STORAGE_KEY='pmp_recall_acceptance_records_v1';
+const RA_API='/api/v1/content-prep/recall-acceptance-records';
 const RA_PAGE_SIZE=4;
-const RA={L:null,LSource:'',byId:new Map(),titles:new Map(),aliases:new Map(),outs:new Map(),path:[],page:0,records:[],lastRecordId:null};
+const RA={L:null,LSource:'',byId:new Map(),titles:new Map(),aliases:new Map(),outs:new Map(),path:[],page:0,records:[],lastRecordId:null,revision:0,loading:true,loaded:false,clearing:false,persistChain:Promise.resolve()};
 
 function raEsc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function raN(s){return String(s??'').trim().replace(/\s+/g,' ').toLocaleLowerCase()}
@@ -72,10 +72,69 @@ function raEligibleFor(id,pth=RA.path){
 }
 function raPathTitles(pth=RA.path){return pth.map(id=>RA.byId.get(id)?.title||id)}
 function raAutoStatusFor(count){return count===0?'断链':count===1?'单候选':'可继续'}
-function raPersist(){try{localStorage.setItem(RA_STORAGE_KEY,JSON.stringify(RA.records.slice(-2000)))}catch(e){}}
-function raRestore(){try{const raw=localStorage.getItem(RA_STORAGE_KEY);if(raw){const a=JSON.parse(raw);if(Array.isArray(a))RA.records=a}}catch(e){}}
+async function raRequest(method='GET',body=null){
+  let response;
+  try{
+    response=await window.fetch(RA_API,{
+      method,credentials:'include',
+      headers:body?{'content-type':'application/json'}:{},
+      ...(body?{body:JSON.stringify(body)}:{})
+    });
+  }catch(error){throw new Error('无法连接服务器')}
+  let payload={};try{payload=await response.json()}catch(_error){}
+  if(!response.ok){
+    const detail=payload?.detail,message=typeof detail==='string'?detail:(detail?.message||payload?.message||`服务器请求失败 (${response.status})`);
+    const error=new Error(message);error.status=response.status;error.code=detail?.code||'';throw error;
+  }
+  return payload;
+}
+async function raRestore(){
+  RA.loading=true;RA.loaded=false;
+  try{
+    const payload=await raRequest();
+    RA.revision=Number.isSafeInteger(payload?.revision)&&payload.revision>=0?payload.revision:0;
+    RA.records=Array.isArray(payload?.records)?payload.records.slice(-2000):[];
+    RA.lastRecordId=RA.records.at(-1)?.id||null;
+    RA.loaded=true;
+    raRenderRecords();
+  }catch(error){
+    raSetStatus(`验收记录加载失败：${raEsc(error.message)}。请确认已登录并刷新重试。`,'bad');
+  }finally{RA.loading=false}
+}
+function raCanMutate(){
+  if(RA.clearing){raSetStatus('正在清空服务器验收记录，请等待操作完成。','warn');return false}
+  if(RA.loaded&&!RA.loading)return true;
+  raSetStatus('正在从服务器加载验收记录，请稍后再操作；加载失败时请先刷新页面。','warn');
+  return false;
+}
+function raPersist(){
+  RA.persistChain=RA.persistChain.then(async()=>{
+    const payload=await raRequest('PUT',{revision:RA.revision,records:RA.records.slice(-2000)});
+    RA.revision=Number(payload.revision);
+  }).catch(error=>{
+    const hint=error.status===409?'请刷新页面获取其他会话的最新记录。':'当前记录仍保留在页面中，请恢复连接后再次操作。';
+    raSetStatus(`验收记录保存失败：${raEsc(error.message)}。${hint}`,'bad');
+  });
+  return RA.persistChain;
+}
+async function raClearRecords(){
+  if(!raCanMutate())return null;
+  RA.clearing=true;
+  const previous=RA.records.slice(),previousLast=RA.lastRecordId,prior=RA.persistChain;
+  RA.records=[];RA.lastRecordId=null;raRenderRecords();
+  RA.persistChain=prior.then(async()=>{
+    const payload=await raRequest('DELETE',{revision:RA.revision});
+    RA.revision=Number(payload.revision);
+    const ns=document.getElementById('raNoteStatus');if(ns)ns.textContent='';
+  }).catch(error=>{
+    RA.records=previous;RA.lastRecordId=previousLast;raRenderRecords();
+    raSetStatus(`验收记录清空失败：${raEsc(error.message)}。服务器记录未清空，请刷新页面核对。`,'bad');
+  }).finally(()=>{RA.clearing=false});
+  return RA.persistChain;
+}
 function raLatest(){return [...RA.records].reverse().find(r=>r.id===RA.lastRecordId)}
 function raAddRecord(rec){
+  if(!raCanMutate())return null;
   rec.id=raRid();rec.at=raIso();rec.manualVerdict='';rec.note='';
   RA.records.push(rec);RA.lastRecordId=rec.id;raPersist();raRenderRecords();
   return rec;
@@ -115,6 +174,7 @@ function raRenderPath(){
   if(!RA.path.length){b.innerHTML='<span class="muted tiny">暂无</span>';return}
   b.innerHTML=RA.path.map((id,i)=>`<button class="btn small ra-crumb" data-ra-i="${i}">${raEsc(RA.byId.get(id)?.title||id)}</button>`).join('');
   b.querySelectorAll('[data-ra-i]').forEach(x=>x.onclick=()=>{
+    if(!raCanMutate())return;
     RA.path=RA.path.slice(0,Number(x.dataset.raI)+1);RA.page=0;raRenderAll();
     raRecordNodeEntry(raCurrent(),'path-jump','','路径回跳');
   });
@@ -130,6 +190,7 @@ function raRenderChoices(){
     <div class="ra-cl">${raEsc(e.label||'关联')}</div></button>`).join(''):
     '<div class="ra-empty">没有更多系统推荐。此状态会自动记录为"断链"；也可以继续手动输入词测试能否重新接库。</div>';
   box.querySelectorAll('[data-ra-to]').forEach(x=>x.onclick=()=>{
+    if(!raCanMutate())return;
     RA.path.push(x.dataset.raTo);RA.page=0;raRenderAll();raRecordNodeEntry(x.dataset.raTo,'click','','候选点击');
   });
   const next=document.getElementById('raNext'),back=document.getElementById('raBack');
@@ -168,6 +229,7 @@ function raRenderAcceptance(){
   raRenderAll();raRenderRecords();
 }
 function raSubmit(q){
+  if(!raCanMutate())return;
   q=String(q||'').trim();if(!q)return;
   raSyncFromWorkspace();
   if(!(RA.L?.nodes||[]).length){raSetStatus('联想库为空：请先在“① 基础数据与导入”导入联想库，或在此载入 JSON。','bad');return}
@@ -191,12 +253,14 @@ function raSubmit(q){
   const input=document.getElementById('raQuery');if(input)input.select();
 }
 function raFocusNode(nodeId){
+  if(!raCanMutate())return false;
   raSyncFromWorkspace();
   if(!RA.byId.has(nodeId))return false;
   RA.path.push(nodeId);RA.page=0;raRenderAll('演示跳转');raRecordNodeEntry(nodeId,'demo-jump','','演示跳转');
   return true;
 }
 function raUpdateLatest(verdict,noteOnly=false){
+  if(!raCanMutate())return;
   const r=raLatest(),status=document.getElementById('raNoteStatus');
   if(!r){if(status)status.textContent='还没有记录。';return}
   if(!noteOnly)r.manualVerdict=verdict;
@@ -240,7 +304,7 @@ function raBindEvents(){
   document.querySelectorAll('[data-raq]').forEach(x=>x.onclick=()=>{input.value=x.dataset.raq;raSubmit(x.dataset.raq)});
   const next=document.getElementById('raNext'),back=document.getElementById('raBack');
   if(next)next.onclick=()=>{const a=raEligibleFor(raCurrent());if(a.length>RA_PAGE_SIZE){RA.page=(RA.page+1)%Math.ceil(a.length/RA_PAGE_SIZE);raRenderChoices()}};
-  if(back)back.onclick=()=>{if(RA.path.length>1){RA.path.pop();RA.page=0;raRenderAll();raRecordNodeEntry(raCurrent(),'back','','回退一步')}};
+  if(back)back.onclick=()=>{if(!raCanMutate())return;if(RA.path.length>1){RA.path.pop();RA.page=0;raRenderAll();raRecordNodeEntry(raCurrent(),'back','','回退一步')}};
   const reset=document.getElementById('raResetPath');
   if(reset)reset.onclick=()=>{RA.path=[];RA.page=0;input.value='';raRenderAll();raSetStatus('路径已重置；验收记录不会被清空。')};
   document.querySelectorAll('[data-rav]').forEach(b=>b.onclick=()=>raUpdateLatest(b.dataset.rav,false));
@@ -265,12 +329,11 @@ function raBindEvents(){
     raDownload(`PMP联想库验收报告_${new Date().toISOString().slice(0,10)}.md`,md,'text/markdown;charset=utf-8');
   };
   const clearLog=document.getElementById('raClearLog');
-  if(clearLog)clearLog.onclick=()=>{
+  if(clearLog)clearLog.onclick=async()=>{
     if(!confirm('确认清空本验收器保存的测试记录？')){
       return;
     }
-    RA.records=[];RA.lastRecordId=null;try{localStorage.removeItem(RA_STORAGE_KEY)}catch(e){}
-    raRenderRecords();const ns=document.getElementById('raNoteStatus');if(ns)ns.textContent='';
+    await raClearRecords();
   };
   const file=document.getElementById('raFile');
   if(file)file.onchange=async e=>{
@@ -290,5 +353,5 @@ function raBindEvents(){
   };
 }
 raBindEvents();
-raRestore();
 raRenderRecords();
+window.PMPRecallAcceptanceReady=raRestore();

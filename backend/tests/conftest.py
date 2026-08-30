@@ -87,9 +87,6 @@ os.environ["DATABASE_URL"] = _TEST_DATABASE_URL
 # Existing test fixtures deliberately exercise permissions rather than the
 # consent prompt. Consent-specific tests enable the production guard directly.
 os.environ["LEGAL_CONSENT_REQUIRED"] = "false"
-# 既有 runtime 持久化测试走原语义；退役 drain 行为由专门测试覆盖
-# （test_web_runtime 中通过 monkeypatch settings.RUNTIME_SYNC_DISABLED=True）。
-os.environ["RUNTIME_SYNC_DISABLED"] = "false"
 
 _database_created = False
 _database_dropped = False

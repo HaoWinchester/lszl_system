@@ -2,17 +2,14 @@
 
 /*
  * 角色权限与角色主题模块。
- * 当前版本仍基于浏览器 localStorage，适合前端原型 / 本地多用户验证。
- * 后续接入后端时，所有权限判断都应在服务器端再次校验。
+ * 权限判断的用户上下文来自认证核心，角色主题由系统 API 注入内存。
+ * 服务器仍对每个受保护操作再次执行权限校验。
  */
 (function(){
-  const AUTH_USERS_KEY='kg_local_users_v1';
-  const AUTH_SESSION_KEY='kg_local_current_user_v1';
-  const ROLE_THEME_KEY='kg_role_themes_v1';
   const DEMO_BANK_ID='bank-pmp-demo';
   const DEMO_QUESTION_ID='pmp-agile-change-001';
   const Auth=window.KGAuthCore||{};
-  const Store=window.KGAppStorage||Auth.storage||{};
+  let roleThemes=Object.freeze({});
 
   const ROLE_LABELS={
     admin:'管理员',
@@ -59,17 +56,6 @@
     guest:{primary:'#0f172a',accent:'#64748b',soft:'#f8fafc',text:'#334155'}
   };
 
-  function readJSON(key,fallback){
-    if(Auth.readJSON)return Auth.readJSON(key,fallback);
-    if(Store.readJSON)return Store.readJSON(key,fallback);
-    return (()=>{try{const raw=localStorage.getItem(key);if(!raw)return fallback;const parsed=JSON.parse(raw);return parsed==null?fallback:parsed}catch(e){return fallback}})();
-  }
-  function writeJSON(key,value){
-    if(Auth.writeJSON)return Auth.writeJSON(key,value);
-    if(Store.writeJSON)return Store.writeJSON(key,value);
-    localStorage.setItem(key,JSON.stringify(value));
-    return true;
-  }
   function escapeHTML(value){
     return Auth.escapeHTML ? Auth.escapeHTML(value) : String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   }
@@ -91,14 +77,11 @@
   }
   function users(){
     if(Auth.users)return Auth.users();
-    const raw=readJSON(AUTH_USERS_KEY,{});
-    const out={};
-    Object.keys(raw||{}).forEach(username=>{out[username]=normalizeUser(username,raw[username])});
-    return out;
+    return {};
   }
   function currentUsername(){
     if(Auth.currentUsername)return Auth.currentUsername();
-    try{return Store.readString?Store.readString(AUTH_SESSION_KEY,''):(localStorage.getItem(AUTH_SESSION_KEY)||'')}catch(e){return ''}
+    return '';
   }
   function currentUser(){
     if(Auth.currentUser)return Auth.currentUser();
@@ -138,12 +121,22 @@
     return can('accessUserManagement') || !hasAdmin();
   }
   function getThemes(){
-    const saved=readJSON(ROLE_THEME_KEY,{});
     const themes={};
     Object.keys(DEFAULT_THEMES).forEach(role=>{
-      themes[role]={...DEFAULT_THEMES[role], ...(saved&&saved[role]||{})};
+      themes[role]={...DEFAULT_THEMES[role], ...(roleThemes[role]||{})};
     });
     return themes;
+  }
+  function hydrateThemes(nextThemes={}){
+    roleThemes=Object.freeze(Object.fromEntries(
+      Object.entries(nextThemes||{}).map(([role,theme])=>[role,Object.freeze({...cleanThemePatch(theme)})])
+    ));
+    applyTheme();
+    return getThemes();
+  }
+  function hydrateTheme(role,theme={}){
+    role=normalizeRole(role);
+    return hydrateThemes({...roleThemes,[role]:{...DEFAULT_THEMES[role],...cleanThemePatch(theme)}})[role];
   }
   function getTheme(role=currentRole()){
     const themes=getThemes();
@@ -161,7 +154,7 @@
     role=normalizeRole(role);
     const themes=getThemes();
     themes[role]={...DEFAULT_THEMES[role],...themes[role],...cleanThemePatch(theme)};
-    writeJSON(ROLE_THEME_KEY,themes);
+    roleThemes=Object.freeze(Object.fromEntries(Object.entries(themes).map(([name,value])=>[name,Object.freeze({...value})])));
     applyTheme();
     window.dispatchEvent(new CustomEvent('kg-role-theme-change',{detail:{role,theme:themes[role]}}));
     return themes[role];
@@ -170,7 +163,7 @@
     role=normalizeRole(role);
     const themes=getThemes();
     themes[role]={...DEFAULT_THEMES[role]};
-    writeJSON(ROLE_THEME_KEY,themes);
+    roleThemes=Object.freeze(Object.fromEntries(Object.entries(themes).map(([name,value])=>[name,Object.freeze({...value})])));
     applyTheme();
     window.dispatchEvent(new CustomEvent('kg-role-theme-change',{detail:{role,theme:themes[role]}}));
     return themes[role];
@@ -329,6 +322,8 @@
     canEnterUserManagement,
     getThemes,
     getTheme,
+    hydrateThemes,
+    hydrateTheme,
     saveTheme,
     resetTheme,
     applyTheme,
@@ -345,6 +340,11 @@
   };
 
   document.addEventListener('DOMContentLoaded',()=>{
+    const page=String(location.pathname||'').split('/').pop();
+    if(page==='admin-settings.html'&&!can('accessSystemSettings')){
+      renderPermissionDenied(document.querySelector('.admin-app')||document.body,'系统设置仅限管理员访问。请使用管理员账号登录。');
+      return;
+    }
     applyTheme();
     decoratePermissionElements();
     const status=document.getElementById('authStatus');

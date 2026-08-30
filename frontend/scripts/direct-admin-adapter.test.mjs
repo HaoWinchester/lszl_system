@@ -7,7 +7,7 @@ import vm from 'node:vm'
 const frontend = resolve(import.meta.dirname, '..')
 const adapter = readFileSync(resolve(frontend, 'scripts/new-legacy-assets/direct-admin-adapter.js'), 'utf8')
 
-test('creating a user retains the POST result when the first list page is already full', () => {
+test('creating a user retains the POST result when the first list page is already full', async () => {
   const existing = Object.fromEntries(Array.from({ length: 200 }, (_, index) => [
     `existing_${index}`,
     { username: `existing_${index}`, role: 'student', status: 'active' },
@@ -28,16 +28,6 @@ test('creating a user retains the POST result when the first list page is alread
     normalizeUsers: (users = {}) => ({ ...users }),
     createUser: (users, input) => ({ ok: true, users: { ...users, [input.username]: input.user }, username: input.username }),
   }
-  class FakeXMLHttpRequest {
-    open(method, path) { this.method = method; this.path = path }
-    setRequestHeader() {}
-    send() {
-      this.status = this.method === 'POST' ? 201 : 200
-      this.responseText = JSON.stringify(this.method === 'POST'
-        ? { user: created }
-        : { users: Object.values(existing) })
-    }
-  }
   const context = {
     JSON,
     Object,
@@ -45,14 +35,18 @@ test('creating a user retains the POST result when the first list page is alread
     String,
     Number,
     URLSearchParams,
-    XMLHttpRequest: FakeXMLHttpRequest,
+    KGDomainApi: {
+      request: async ({ method }) => method === 'POST'
+        ? { user: created }
+        : { users: Object.values(existing) },
+    },
     KGUserAdminService: service,
     KGAuthCore: { normalizeUser: (username, user) => ({ ...user, username }) },
   }
   context.window = context
   vm.runInNewContext(adapter, context)
 
-  const result = service.createUser(existing, {
+  const result = await service.createUser(existing, {
     username: created.username,
     password: '111111',
     user: { role: 'student', status: 'active', subject: 'PMP' },

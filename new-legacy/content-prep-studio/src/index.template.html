@@ -7,7 +7,9 @@
 <script>window.__PMP_PRODUCT_RELEASE__="__PRODUCT_RELEASE__";</script>
 <script>window.__PMP_PREP_BASELINE__=/*__BUILD_BASELINE__*/null;</script>
 <script src="/teaching-content-sync.js"></script>
-<script src="/server-state-bootstrap.js"></script>
+<!-- kg-direct-bootstrap-anchor -->
+<script src="/domain-api-client.js"></script>
+<script src="/teaching-content-adapter.js"></script>
 <style>
 /*__BUILD_CSS__*/
 </style>
@@ -423,7 +425,7 @@ D原则：principle-role-accountability</pre>
   </div>
 
   <div class="card">
-    <div class="card-hd"><span>验收记录</span><span class="muted tiny">记录自动保存在浏览器本地（最近 2000 条）</span></div>
+    <div class="card-hd"><span>验收记录</span><span class="muted tiny">记录按登录账号保存在服务器（最近 2000 条）</span></div>
     <div class="card-bd">
       <div class="toolbar">
         <div></div>
@@ -646,7 +648,7 @@ B原则：principle-effective-communication</pre>
           <h3>怎么用</h3>
           <p>1. 输入知识点、简称、英文或口语（如 PM / ST / 燃烧图），或点快速入口；命中后点击候选继续走库。祖先节点会被过滤，模拟主程序防回跳。</p>
           <p>2. 对"能走但质量不好"的情况，用当前节点验收区的按钮标记：正常 / 缺失断链 / 联想不自然 / 需补入口 Alias，可附备注。</p>
-          <p>3. 验收记录自动保存在浏览器本地（最近 2000 条），可导出 JSON / Markdown 报告发给联想库维护方。</p>
+          <p>3. 验收记录按登录账号自动保存在服务器（最近 2000 条），可导出 JSON / Markdown 报告发给联想库维护方；加载或保存失败会在页面中明确提示。</p>
           <h3>数据来源</h3>
           <p>默认验收<b>当前工作区联想库</b>（在"① 基础数据与导入"导入完整内容包或联想库 JSON 后生效）；也可临时载入其他 JSON 验收，并在确认后设为工作区联想库。</p>
         </article>

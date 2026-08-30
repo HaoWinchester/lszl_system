@@ -3,54 +3,21 @@
 /*
  * 认证与用户数据核心模块。
  *
- * 第一步重构目标：
- * - 统一 localStorage key、用户读取/保存、当前登录用户、用户规范化、密码 hash、日志写入。
- * - 权限、订阅、系统设置等模块优先通过本模块获取用户上下文。
- * - 保留旧登录/用户管理逻辑的原有函数名和行为，避免一次性大改造成回归。
- * - 当前仍是纯前端 localStorage 原型；正式网络版必须迁移到后端校验。
+ * 账号与审计数据仅保留页面内存副本，由 FastAPI 接口刷新。
+ * 认证会话由服务端 cookie 校验，同页 UI 摘要只保留在内存。
  */
 (function(){
   const Store = window.KGAppStorage || {};
-  const AUTH_USERS_KEY = "kg_local_users_v1";
   const AUTH_SESSION_KEY = "kg_local_current_user_v1";
-  const USER_LOG_KEY = "kg_user_admin_logs_v1";
   const AUTH_REMOTE_SESSION_KEY = "kg_remote_auth_session_v1";
-  const AUTH_REMOTE_SESSION_STORAGE = (() => {
-    try {
-      // 优先使用 server-state-bootstrap 暴露的原生 localStorage
-      if (globalThis.__nativeLocalStorage__) {
-        return globalThis.__nativeLocalStorage__;
-      }
-      return globalThis.localStorage;
-    } catch (_error) {
-      return null;
-    }
-  })();
+  let userState = Object.freeze({});
+  let adminLogState = Object.freeze([]);
+  let remoteSessionState = null;
+  let remoteSessionInitialized = false;
 
   const ROLES = ["admin","teacher","student","viewer"];
   const STATUSES = ["active","paused","archived"];
 
-  function readJSON(key, fallback){
-    if(Store.readJSON) return Store.readJSON(key, fallback);
-    try{
-      const raw = localStorage.getItem(key);
-      if(!raw) return fallback;
-      const parsed = JSON.parse(raw);
-      return parsed == null ? fallback : parsed;
-    }catch(e){
-      return fallback;
-    }
-  }
-  function writeJSON(key, value){
-    if(Store.writeJSON) return Store.writeJSON(key, value);
-    try{
-      localStorage.setItem(key, JSON.stringify(value));
-      return true;
-    }catch(e){
-      console.warn("[KGAuthCore] writeJSON failed", key, e);
-      return false;
-    }
-  }
   function escapeHTML(value){
     return String(value ?? "").replace(/[&<>'"]/g, c => ({
       "&":"&amp;",
@@ -119,7 +86,7 @@
     };
   }
   function users(){
-    const raw = readJSON(AUTH_USERS_KEY, {});
+    const raw = userState;
     const out = {};
     Object.keys(raw || {}).forEach(username => {
       const clean = cleanUsername(username);
@@ -133,7 +100,22 @@
       const clean = cleanUsername(username || (user && user.username));
       if(clean) out[clean] = normalizeUser(clean, user);
     });
-    return writeJSON(AUTH_USERS_KEY, out);
+    userState = Object.freeze(Object.fromEntries(
+      Object.entries(out).map(([username,user])=>[username,Object.freeze({...user})])
+    ));
+    return true;
+  }
+  function replaceUsers(nextUsers){
+    saveUsers(nextUsers);
+    return users();
+  }
+  function adminLogs(){
+    return adminLogState.slice();
+  }
+  function replaceAdminLogs(logs){
+    adminLogState=Object.freeze((Array.isArray(logs)?logs:[]).map(entry=>Object.freeze({...entry})));
+    window.dispatchEvent(new CustomEvent("kg-user-log-change",{detail:{refreshed:true}}));
+    return adminLogs();
   }
   function providerConfig(){
     const raw = globalThis.KG_AUTH_CONFIG || globalThis.KG_APP_CONFIG?.auth || {};
@@ -153,21 +135,21 @@
     };
   }
   function readRemoteSession(){
-    try{
-      const storage = AUTH_REMOTE_SESSION_STORAGE || globalThis.localStorage;
-      const raw = storage?.getItem(AUTH_REMOTE_SESSION_KEY);
-      if(raw)return JSON.parse(raw);
-      const bootstrap=globalThis.__KG_DIRECT_BOOTSTRAP__;
-      if(bootstrap?.authenticated===true&&bootstrap.authUser){
-        return {user:bootstrap.authUser,token:"",loginSessionId:serverLoginSessionId(bootstrap),issuedAt:Date.now()};
-      }
-      return null;
-    }catch(e){return null}
+    if(remoteSessionInitialized)return remoteSessionState;
+    remoteSessionInitialized=true;
+    // 仅删除旧版敏感会话摘要，从不读取或恢复它。
+    try{globalThis.__nativeLocalStorage__?.removeItem?.(AUTH_REMOTE_SESSION_KEY)}catch(e){}
+    try{globalThis.localStorage?.removeItem?.(AUTH_REMOTE_SESSION_KEY)}catch(e){}
+    const bootstrap=globalThis.__KG_DIRECT_BOOTSTRAP__;
+    remoteSessionState=bootstrap?.authenticated===true&&bootstrap.authUser
+      ? {user:bootstrap.authUser,token:"",loginSessionId:serverLoginSessionId(bootstrap),issuedAt:Date.now()}
+      : null;
+    return remoteSessionState;
   }
   function writeRemoteSession(session){
     try{
-      if (session) AUTH_REMOTE_SESSION_STORAGE?.setItem(AUTH_REMOTE_SESSION_KEY, JSON.stringify(session));
-      else AUTH_REMOTE_SESSION_STORAGE?.removeItem(AUTH_REMOTE_SESSION_KEY);
+      remoteSessionInitialized=true;
+      remoteSessionState=session||null;
       const bootstrap=globalThis.__KG_DIRECT_BOOTSTRAP__;
       if(bootstrap&&typeof bootstrap==="object"){
         const user=session?.user||null;
@@ -224,6 +206,10 @@
       throw failure;
     }
     return payload;
+  }
+  function authHeaders(){
+    const token=String(readRemoteSession()?.token||"");
+    return token?{Authorization:"Bearer "+token}:{};
   }
   function currentUsername(){
     try{
@@ -302,7 +288,6 @@
     return currentUsername() || "system-admin";
   }
   function logAction(action, username="SYSTEM", detail=""){
-    const logs = readJSON(USER_LOG_KEY, []);
     const entry = {
       id: uid("log"),
       action: String(action || ""),
@@ -311,8 +296,7 @@
       actor: currentActor(),
       at: Date.now()
     };
-    logs.unshift(entry);
-    writeJSON(USER_LOG_KEY, logs.slice(0, 300));
+    adminLogState=Object.freeze([Object.freeze(entry),...adminLogState].slice(0,300));
     window.dispatchEvent(new CustomEvent("kg-user-log-change", {detail:entry}));
     return entry;
   }
@@ -441,14 +425,9 @@
   }
 
   window.KGAuthCore = {
-    AUTH_USERS_KEY,
     AUTH_SESSION_KEY,
-    USER_LOG_KEY,
-    AUTH_REMOTE_SESSION_KEY,
     ROLES,
     STATUSES,
-    readJSON,
-    writeJSON,
     storage: Store,
     readString: Store.readString,
     writeString: Store.writeString,
@@ -463,6 +442,9 @@
     normalizeUser,
     users,
     saveUsers,
+    replaceUsers,
+    adminLogs,
+    replaceAdminLogs,
     currentUsername,
     setCurrentUsername,
     clearSession,
@@ -477,6 +459,7 @@
     logAction,
     providerConfig,
     providerStatus,
+    authHeaders,
     login,
     register,
     logout,

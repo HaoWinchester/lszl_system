@@ -1,11 +1,10 @@
 'use strict';
 (function(global){
-  const Store=global.KGAppStorage||{};
-  const KEY='kg_synthesis_preset_repository_v1';
+  const KEY='synthesisPresets';
   const clone=value=>{try{return JSON.parse(JSON.stringify(value))}catch(error){return value}};
   const now=()=>Date.now();
-  function readRaw(){try{return Store.readJSON?Store.readJSON(KEY,null):JSON.parse(localStorage.getItem(KEY)||'null')}catch(error){return null}}
-  function writeRaw(value){try{return Store.writeJSON?Store.writeJSON(KEY,value):(localStorage.setItem(KEY,JSON.stringify(value)),true)}catch(error){return false}}
+  function readRaw(){return global.KGTeachingContentApi?.readResource?.(KEY,null)||null}
+  function writeRaw(value){return global.KGTeachingContentApi?.stageResource?.(KEY,clone(value))===true}
   function normalize(item={},index=0){return {id:String(item.id||('preset-'+now().toString(36)+'-'+index)),principleId:String(item.principleId||''),title:String(item.title||'').trim(),content:String(item.content||item.description||'').trim(),status:['draft','active','inactive'].includes(String(item.status||''))?String(item.status):'draft',version:Math.max(1,Number(item.version||1)),createdAt:Number(item.createdAt||now()),updatedAt:Number(item.updatedAt||now())}}
   function read(){return {schemaVersion:1,items:(Array.isArray(readRaw()?.items)?readRaw().items:[]).map(normalize)}}
   function save(items){writeRaw({schemaVersion:1,items,updatedAt:now()});return items}

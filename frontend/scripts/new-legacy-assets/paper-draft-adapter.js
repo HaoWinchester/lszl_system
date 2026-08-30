@@ -7,12 +7,17 @@
  */
 (function (global) {
   const API_ROOT = '/api/v1';
+  const DomainApi = global.KGDomainApi;
   let readyPromise = null;
   let paperListLoad = null;
   let categoryListLoad = null;
+  let paperListGeneration = 0;
+  let categoryListGeneration = 0;
+  let readyGeneration = 0;
   const summaryState = { papers: null, categories: null };
   const detailCache = new Map();
   const detailLoads = new Map();
+  const detailGenerations = new Map();
 
   function clone(value) {
     if (value === undefined) return undefined;
@@ -21,48 +26,16 @@
 
   function text(value) { return String(value == null ? '' : value); }
 
-  function errorMessage(status, detail) {
-    if (detail && !Array.isArray(detail) && detail.message) return text(detail.message);
-    if (status === 401) return '登录状态已失效，请重新登录。';
-    if (status === 403) return '当前账号没有试卷管理权限。';
-    if (status === 409) return '数据已发生变化，请刷新后重试。';
-    if (status === 422) return '提交内容未通过校验，请检查后重试。';
-    return `试卷请求失败 (${status})`;
-  }
-
-  function normalizedError(status, payload) {
-    const detail = payload && Object.prototype.hasOwnProperty.call(payload, 'detail')
-      ? payload.detail
-      : payload;
-    const error = new Error(errorMessage(status, detail));
-    error.status = status;
-    error.code = !Array.isArray(detail) && detail && detail.code
-      ? text(detail.code)
-      : (status === 422 ? 'VALIDATION_ERROR' : `HTTP_${status}`);
-    error.detail = clone(detail);
-    if (!Array.isArray(detail) && detail && detail.currentRevision !== undefined) {
-      error.currentRevision = detail.currentRevision;
-    }
-    return error;
-  }
-
   async function request(path, { method = 'GET', body } = {}) {
-    const headers = { accept: 'application/json' };
-    const options = { method, credentials: 'include', headers };
-    if (body !== undefined) {
-      headers['content-type'] = 'application/json';
-      options.body = JSON.stringify(body);
-    }
-    const response = await global.fetch(`${API_ROOT}${path}`, options);
-    let payload = null;
-    try { payload = await response.json(); } catch (error) {}
-    if (!response.ok) {
-      if (response.status === 401) {
+    if (!DomainApi?.request) throw new Error('试卷草稿 API 未加载，请刷新页面后重试。');
+    try {
+      return clone(await DomainApi.request({ method, path: `${API_ROOT}${path}`, body }));
+    } catch (error) {
+      if (error?.status === 401) {
         try { global.dispatchEvent(new CustomEvent('kg:auth-required')); } catch (error) {}
       }
-      throw normalizedError(response.status, payload);
+      throw error;
     }
-    return clone(payload);
   }
 
   function announce(action, payload) {
@@ -75,19 +48,24 @@
 
   function invalidatePaper(paperId) {
     const id = text(paperId);
+    detailGenerations.set(id, (detailGenerations.get(id) || 0) + 1);
     detailCache.delete(id);
     detailLoads.delete(id);
   }
 
   function invalidatePaperLists() {
+    paperListGeneration += 1;
     summaryState.papers = null;
     paperListLoad = null;
+    readyGeneration += 1;
     readyPromise = null;
   }
 
   function invalidateCategoryLists() {
+    categoryListGeneration += 1;
     summaryState.categories = null;
     categoryListLoad = null;
+    readyGeneration += 1;
     readyPromise = null;
   }
 
@@ -98,24 +76,30 @@
 
   function cachePaper(paper) {
     const id = text(paper?.id);
-    if (id) detailCache.set(id, clone(paper));
+    if (id) {
+      detailGenerations.set(id, (detailGenerations.get(id) || 0) + 1);
+      detailLoads.delete(id);
+      detailCache.set(id, clone(paper));
+    }
   }
 
   async function list(options = {}) {
     const query = new URLSearchParams();
     if (options && options.status) query.set('status', text(options.status));
     const cacheable = !query.toString();
+    if (cacheable && options.forceReload === true) invalidatePaperLists();
     if (cacheable && options.forceReload !== true && summaryState.papers) {
       return clone(summaryState.papers);
     }
     if (cacheable && options.forceReload !== true && paperListLoad) return clone(await paperListLoad);
+    const generation = paperListGeneration;
     const task = request(`/papers${query.toString() ? `?${query}` : ''}`)
       .then(payload => {
         const papers = Array.isArray(payload?.papers) ? clone(payload.papers) : [];
-        if (cacheable) summaryState.papers = clone(papers);
+        if (cacheable && generation === paperListGeneration) summaryState.papers = clone(papers);
         return papers;
       })
-      .finally(() => { if (cacheable) paperListLoad = null; });
+      .finally(() => { if (cacheable && paperListLoad === task) paperListLoad = null; });
     if (cacheable) paperListLoad = task;
     return clone(await task);
   }
@@ -123,29 +107,34 @@
   async function detail(paperId, options = {}) {
     const id = text(paperId);
     if (!id) return null;
+    if (options.forceReload === true) invalidatePaper(id);
     if (options.forceReload !== true && detailCache.has(id)) return clone(detailCache.get(id));
     if (options.forceReload !== true && detailLoads.has(id)) return clone(await detailLoads.get(id));
+    const generation = (detailGenerations.get(id) || 0) + 1;
+    detailGenerations.set(id, generation);
     const task = request(`/papers/${encodeURIComponent(id)}`)
       .then(payload => {
         const paper = payload?.paper ? clone(payload.paper) : null;
-        if (paper) detailCache.set(id, clone(paper));
+        if (paper && detailGenerations.get(id) === generation) detailCache.set(id, clone(paper));
         return paper;
       })
-      .finally(() => detailLoads.delete(id));
+      .finally(() => { if (detailGenerations.get(id) === generation && detailLoads.get(id) === task) detailLoads.delete(id); });
     detailLoads.set(id, task);
     return clone(await task);
   }
 
-  async function mutate(action, path, method, body) {
+  async function mutate(action, path, method, body, settle = () => {}) {
     const payload = await request(path, { method, body });
+    settle(payload);
     announce(action, payload);
     return payload;
   }
 
   async function create(body) {
-    const payload = await mutate('create', '/papers', 'POST', body);
-    cachePaper(payload.paper);
-    invalidatePaperLists();
+    const payload = await mutate('create', '/papers', 'POST', body, result => {
+      cachePaper(result.paper);
+      invalidatePaperLists();
+    });
     return clone(payload.paper);
   }
 
@@ -155,9 +144,8 @@
       `/papers/${encodeURIComponent(text(paperId))}`,
       'PUT',
       body,
+      result => { cachePaper(result.paper); invalidatePaperLists(); },
     );
-    cachePaper(payload.paper);
-    invalidatePaperLists();
     return clone(payload.paper);
   }
 
@@ -167,9 +155,8 @@
       `/papers/${encodeURIComponent(text(paperId))}/questions`,
       'PUT',
       body,
+      result => { cachePaper(result.paper); invalidatePaperLists(); },
     );
-    cachePaper(payload.paper);
-    invalidatePaperLists();
     return clone(payload.paper);
   }
 
@@ -184,9 +171,9 @@
       'remove',
       `/papers/${encodeURIComponent(text(paperId))}${suffix}`,
       'DELETE',
+      undefined,
+      () => { invalidatePaper(paperId); invalidatePaperLists(); },
     );
-    invalidatePaper(paperId);
-    invalidatePaperLists();
     return payload;
   }
 
@@ -198,29 +185,30 @@
       action,
       `/papers/${encodeURIComponent(text(paperId))}/${action}${suffix}`,
       'POST',
+      undefined,
+      result => { cachePaper(result.paper); invalidatePaperLists(); },
     );
-    cachePaper(payload.paper);
-    invalidatePaperLists();
     return clone(payload.paper);
   }
 
   async function listCategories(options = {}) {
+    if (options.forceReload === true) invalidateCategoryLists();
     if (options.forceReload !== true && summaryState.categories) return clone(summaryState.categories);
     if (options.forceReload !== true && categoryListLoad) return clone(await categoryListLoad);
+    const generation = categoryListGeneration;
     const task = request('/paper-categories')
       .then(payload => {
         const categories = Array.isArray(payload?.categories) ? clone(payload.categories) : [];
-        summaryState.categories = clone(categories);
+        if (generation === categoryListGeneration) summaryState.categories = clone(categories);
         return categories;
       })
-      .finally(() => { categoryListLoad = null; });
+      .finally(() => { if (generation === categoryListGeneration && categoryListLoad === task) categoryListLoad = null; });
     categoryListLoad = task;
     return clone(await task);
   }
 
   async function createCategory(body) {
-    const payload = await mutate('createCategory', '/paper-categories', 'POST', body);
-    invalidateCategoryLists();
+    const payload = await mutate('createCategory', '/paper-categories', 'POST', body, invalidateCategoryLists);
     return clone(payload.category);
   }
 
@@ -230,8 +218,8 @@
       `/paper-categories/${encodeURIComponent(text(categoryId))}`,
       'PUT',
       body,
+      invalidateCategoryLists,
     );
-    invalidateCategoryLists();
     return clone(payload.category);
   }
 
@@ -243,8 +231,9 @@
       'removeCategory',
       `/paper-categories/${encodeURIComponent(text(categoryId))}${suffix}`,
       'DELETE',
+      undefined,
+      invalidateCategoryLists,
     );
-    invalidateCategoryLists();
     return payload;
   }
 
@@ -254,8 +243,7 @@
   }
 
   async function importPaper(body) {
-    const payload = await mutate('import', '/papers/import', 'POST', body);
-    invalidatePaperLists();
+    const payload = await mutate('import', '/papers/import', 'POST', body, invalidatePaperLists);
     return clone(payload.result);
   }
 
@@ -270,20 +258,22 @@
       '/papers/composition/batches',
       'POST',
       body,
+      invalidatePaperLists,
     );
-    invalidatePaperLists();
     return clone(payload.result);
   }
 
   function ready(options = {}) {
     if (options.forceReload === true) invalidateLists();
     if (!readyPromise) {
-      readyPromise = Promise.all([list(), listCategories()])
+      const generation = readyGeneration;
+      const task = Promise.all([list(), listCategories()])
         .then(([papers, categories]) => clone({ papers, categories }))
         .catch((error) => {
-          readyPromise = null;
+          if (generation === readyGeneration && readyPromise === task) readyPromise = null;
           throw error;
         });
+      readyPromise = task;
     }
     return readyPromise.then(clone);
   }

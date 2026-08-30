@@ -1,9 +1,13 @@
 """FastAPI 应用入口。"""
 
 import logging
+import math
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import text
@@ -109,6 +113,25 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
+
+
+def _validation_error_json(value: Any) -> Any:
+    """Keep invalid non-finite numbers from breaking the validation response itself."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return "non-finite number"
+    if isinstance(value, dict):
+        return {key: _validation_error_json(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_validation_error_json(item) for item in value]
+    return value
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(
+    _request: Request, exc: RequestValidationError
+):
+    errors = _validation_error_json(jsonable_encoder(exc.errors()))
+    return JSONResponse(status_code=422, content={"detail": errors})
 
 
 def _normalize_localhost_request(request: Request):

@@ -2,6 +2,7 @@
 
 ;(function (global) {
   const API_ROOT = '/api/v1'
+  const DomainApi = global.KGDomainApi
   const mode = global.document?.body?.dataset?.questionCatalogMode === 'managed'
     ? 'managed'
     : 'learning'
@@ -17,16 +18,6 @@
   const questionCache = new Map()
   const questionLoad = new Map()
 
-  class CatalogRequestError extends Error {
-    constructor(message, { status = 0, code = '', detail = null } = {}) {
-      super(message)
-      this.name = 'CatalogRequestError'
-      this.status = status
-      this.code = code
-      this.detail = detail
-    }
-  }
-
   function clone(value) {
     return JSON.parse(JSON.stringify(value))
   }
@@ -36,31 +27,19 @@
   }
 
   async function request(path, options = {}) {
-    const response = await global.fetch(`${API_ROOT}${path}`, {
-      ...options,
-      credentials: 'include',
-      headers: {
-        ...(options.body ? { 'content-type': 'application/json' } : {}),
-        ...(options.headers || {}),
-      },
-    })
-    let payload = {}
-    try { payload = await response.json() } catch (error) {}
-    if (!response.ok) {
-      const detail = payload?.detail
-      const body = detail && typeof detail === 'object' ? detail : {}
-      const message = typeof detail === 'string'
-        ? detail
-        : String(body.message || payload?.message || `题目目录请求失败 (${response.status})`)
-      const error = new CatalogRequestError(message, {
-        status: response.status,
-        code: String(body.code || payload?.code || ''),
-        detail: payload,
+    if (!DomainApi?.request) throw new Error('题目目录 API 未加载，请刷新页面后重试。')
+    let body = options.body
+    if (typeof body === 'string') body = JSON.parse(body)
+    try {
+      return await DomainApi.request({
+        method: options.method || 'GET',
+        path: `${API_ROOT}${path}`,
+        body,
       })
-      if (response.status === 401) emit('kg:auth-required', { source: 'question-catalog', mode })
+    } catch (error) {
+      if (error?.status === 401) emit('kg:auth-required', { source: 'question-catalog', mode })
       throw error
     }
-    return payload
   }
 
   function normalizedSnapshot(payload) {
@@ -267,6 +246,10 @@
     return Boolean(payload.ok)
   }
 
+  async function clearBankTestRecords(bankId) {
+    return clone(await request(`/banks/${encodeURIComponent(bankId)}/test-learning-records/clear`, { method: 'POST' }))
+  }
+
   async function saveQuestion(input, options = {}) {
     const questionId = String(input?.id || '')
     const existing = Number(options.baseRevision || input?.revision || 0) > 0
@@ -424,6 +407,7 @@
     importBanks,
     importQuestions,
     deleteBank,
+    clearBankTestRecords,
     saveQuestion,
     deleteQuestion,
     acquireQuestionLock,

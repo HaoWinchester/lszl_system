@@ -20,13 +20,37 @@ from app.services import (
     file_service,
     guided_learning_service,
     paper_release_service,
+    recall_acceptance_service,
     subscription_service,
     teaching_content_projection_service,
     teaching_content_revision_service,
     user_service,
 )
-from app.web.bootstrap import PAGE_NAMESPACES
 from app.web.schemas import RuntimeMutation, RuntimeStateUpdate
+
+# Legacy rollback-only validation metadata. No release bootstrap imports or reads this map.
+PAGE_NAMESPACES = {
+    "index.html": "files",
+    "learning-path.html": "guided-learning",
+    "guided-learning-node.html": "guided-learning",
+    "guided-learning-placement-test.html": "guided-learning",
+    "question-training.html": "training",
+    "question-workspace.html": "workspace",
+    "question-bank.html": "questions",
+    "knowledge-recall.html": "recall",
+    "file-manager.html": "files",
+    "user-management.html": "users",
+    "system-settings.html": "system",
+    "paper-management.html": "papers",
+    "content-prep.html": "content",
+    "course-admin.html": "courses",
+    "content-center.html": "content",
+    "teacher-workbench.html": "teacher",
+    "admin-console.html": "admin",
+    "admin-operations.html": "operations",
+    "admin-settings.html": "admin",
+    "admin-subjects.html": "subjects",
+}
 
 MAX_VALUE_BYTES = 8 * 1024 * 1024
 MAX_TOTAL_BYTES = 48 * 1024 * 1024
@@ -59,6 +83,22 @@ DEPRECATED_GRAPH_EXACT_KEYS = frozenset({
     "kg_home_file_library_v1",
 })
 DEPRECATED_GRAPH_PREFIXES = ("kg_graph_file_content_v2__",)
+RETIRED_CATALOG_RUNTIME_KEYS = frozenset({
+    "kg_content_subjects_v1",
+    "kg_content_taxonomies_v1",
+    "kg_content_activity_overrides_v1",
+    "kg_activity_tags_v1",
+    "kg_activity_collections_v1",
+})
+RETIRED_COURSE_RUNTIME_KEYS = frozenset({
+    "kg_course_config_drafts_v1",
+    "kg_course_config_active_release_v1",
+    "kg_course_config_releases_v1",
+    "kg_learning_tasks_v1",
+})
+RETIRED_CONTENT_PREP_RUNTIME_KEYS = frozenset({
+    recall_acceptance_service.RUNTIME_SOURCE_KEY,
+})
 
 EXACT_KEYS = {
     "kg_default_entry_mode_v1",
@@ -111,28 +151,20 @@ EXACT_KEYS = {
     "通用知识点关系图谱工具_多科目重点聚焦版_v2",
     "通用知识点关系图谱工具_悬浮菜单位置_v1",
     "通用知识点关系图谱工具_新手引导已看_v1",
-    "kg_activity_collections_v1",
-    "kg_activity_tags_v1",
     "kg_admin_audit_log_v1",
     "kg_admin_settings_v1",
     "kg_admin_transaction_snapshots_v1",
     "kg_assessment_papers_v1",
-    "kg_content_activity_overrides_v1",
     "kg_content_organization_migration_v1",
-    "kg_content_subjects_v1",
-    "kg_content_taxonomies_v1",
+    *RETIRED_CATALOG_RUNTIME_KEYS,
     "kg_course_admin_recent_v862_p2",
     "kg_course_admin_workspace_v862_p1",
-    "kg_course_config_active_release_v1",
-    "kg_course_config_drafts_v1",
-    "kg_course_config_releases_v1",
     "kg_deep_recall_legacy_owner_v1",
     "kg_exam_paper_release_history_v1",
     "kg_exam_papers_published_v1",
     "kg_guided_practice_return_v1",
     "kg_learning_entry_chooser_claim_v1",
     "kg_learning_entry_chooser_consumed_v1",
-    "kg_learning_tasks_v1",
     "kg_paper_workspace_layout_v1",
     "kg_question_classification_collapsed_v1",
     "kg_question_library_workspace_layout_v1",
@@ -158,6 +190,15 @@ EXACT_KEYS = {
     "question_studio_recent_knowledge_v1",
     "question_studio_favorite_knowledge_v1",
 }
+
+# Browser-facing Runtime compatibility excludes the catalog records that are
+# now owned by relational APIs.  Keep their historical entries in EXACT_KEYS
+# solely for offline rollback/migration validation.
+ONLINE_RUNTIME_EXACT_KEYS = frozenset(
+    EXACT_KEYS
+    - RETIRED_CATALOG_RUNTIME_KEYS
+    - RETIRED_CONTENT_PREP_RUNTIME_KEYS
+)
 
 PREFIXES = (
     "kg_graph_file_content_v2__",
@@ -211,16 +252,8 @@ SHARED_KEYS = frozenset({
     # 发布类（教师发布 → 学员读取）
     "kg_question_banks_published_v1",
     "kg_exam_papers_published_v1",
-    "kg_course_config_releases_v1",
-    "kg_course_config_active_release_v1",
-    "kg_learning_tasks_v1",
-    # 全局教学内容（管理员/教师配一份，所有用户看；扫 updata-legacy 确认无 scope 拼接）
-    "kg_content_subjects_v1",
-    "kg_content_taxonomies_v1",
-    "kg_content_activity_overrides_v1",
+    # 迁移标记仍供 rollback 审计使用；五个教学目录大键已不再由 Runtime GET 投影。
     "kg_content_organization_migration_v1",
-    "kg_activity_collections_v1",
-    "kg_activity_tags_v1",
     "kg_question_tag_names_v1",
     "kg_taxonomy_release_records_v1",
     "kg_taxonomy_deletion_records_v1",
@@ -239,11 +272,12 @@ SHARED_KEYS = frozenset({
 RUNTIME_SNAPSHOT_EXCLUDED_KEYS = frozenset({
     "kg_exam_papers_published_v1",
     "kg_exam_paper_release_history_v1",
+    *RETIRED_COURSE_RUNTIME_KEYS,
+    *RETIRED_CONTENT_PREP_RUNTIME_KEYS,
 })
 
 TEACHING_MANAGER_ROLES = frozenset({"admin", "teacher"})
 TEACHER_SHARED_EXACT_KEYS = frozenset({
-    "kg_course_config_drafts_v1",
     "kg_assessment_papers_v1",
 })
 TEACHER_SHARED_SCOPED_PREFIXES = {
@@ -255,6 +289,10 @@ TEACHER_SHARED_RESTRICTED_PREFIXES = (
     "kg_exam_paper_categories_v1__",
 )
 RECALL_ASSOCIATION_PREFIX = "kg_recall_association_library_v1__"
+RETIRED_RECALL_RUNTIME_PREFIXES = (
+    RECALL_ASSOCIATION_PREFIX,
+    "kg_recall_association_management_v1__",
+)
 TEACHER_SHARED_GLOBAL_PREFIXES = (
     f"{RECALL_ASSOCIATION_PREFIX}subject__",
 )
@@ -266,11 +304,26 @@ TEACHING_SHARED_KEYS = SHARED_KEYS - {"kg_admin_settings_v1"}
 PUBLISHER_COLLECTION_KEYS = frozenset({
     "kg_question_banks_published_v1",
     "kg_exam_papers_published_v1",
-    "kg_course_config_releases_v1",
-    "kg_learning_tasks_v1",
-    "kg_activity_collections_v1",
 })
-SERVER_OWNED_KEYS = frozenset({"kg_announcements_v1", "kg_user_feedback_v1"})
+SERVER_OWNED_KEYS = frozenset({
+    "kg_announcements_v1",
+    "kg_user_feedback_v1",
+    # Principles and synthesis cards have dedicated relational Content Prep APIs.
+    # Runtime may retain historical rows for staged rollback, but cannot mutate them.
+    *teaching_content_projection_service.PROJECTION_KEYS,
+    # Teaching catalog lifecycle is relational and writable only through the
+    # optimistic shared-content API. Historical rows are migration-only and are
+    # excluded from every online Runtime snapshot.
+    *RETIRED_CATALOG_RUNTIME_KEYS,
+    # Course drafts, immutable releases, active status and learning tasks now
+    # live exclusively in the relational course-management API. Legacy rows
+    # remain available only to the offline retirement migration.
+    *RETIRED_COURSE_RUNTIME_KEYS,
+    # Recall acceptance history is now owner-isolated behind its typed API.
+    # The Runtime key remains registered only so the offline retirement mapper
+    # can validate and drain historical rows without exposing or mutating it.
+    *RETIRED_CONTENT_PREP_RUNTIME_KEYS,
+})
 
 
 BOOTSTRAP_COMMON_EXACT_KEYS = frozenset({
@@ -361,7 +414,6 @@ BOOTSTRAP_QUESTION_EXACT_KEYS = frozenset({
     "kg_user_feedback_v1",
     "kg_teacher_workbench_subject_v1",
     "kg_multi_workspace_closed_tabs_v1",
-    "pmp_recall_acceptance_records_v1",
     "question_studio_draft_v010",
     "question_studio_draft_v020",
     "question_studio_draft_v021",
@@ -414,14 +466,10 @@ BOOTSTRAP_MANAGEMENT_EXACT_KEYS = frozenset({
     "kg_student_subscription_redeem_codes_v1",
     "kg_subscription_plan_model_v2_migrated",
     "kg_subscription_plan_settings_v1",
-    "kg_course_config_active_release_v1",
-    "kg_course_config_releases_v1",
-    "kg_course_config_drafts_v1",
     "kg_course_admin_recent_v862_p2",
     "kg_course_admin_workspace_v862_p1",
     "kg_teacher_workbench_subject_v1",
     "kg_assessment_papers_v1",
-    "kg_learning_tasks_v1",
 })
 
 BOOTSTRAP_MANAGEMENT_PREFIXES = frozenset({
@@ -445,7 +493,6 @@ BOOTSTRAP_NAMESPACE_EXACT_KEYS: dict[str, frozenset[str]] = {
         "kg_user_feedback_v1",
         "kg_learning_entry_chooser_claim_v1",
         "kg_learning_entry_chooser_consumed_v1",
-        "pmp_recall_acceptance_records_v1",
     }),
     "users": frozenset({"kg_local_users_v1", "kg_user_admin_logs_v1"}),
     "system": frozenset({"kg_wechat_login_config_v1", "kg_student_subscription_orders_v1", "kg_student_subscription_redeem_codes_v1", "kg_student_subscriptions_v1", "kg_subscription_plan_model_v2_migrated", "kg_subscription_plan_settings_v1"}),
@@ -454,7 +501,7 @@ BOOTSTRAP_NAMESPACE_EXACT_KEYS: dict[str, frozenset[str]] = {
     "admin": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
     "operations": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
     "subjects": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
-    "content": BOOTSTRAP_MANAGEMENT_EXACT_KEYS | frozenset({"pmp_recall_acceptance_records_v1"}),
+    "content": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
     "courses": BOOTSTRAP_MANAGEMENT_EXACT_KEYS,
 }
 
@@ -629,14 +676,6 @@ def validate_update(update: RuntimeStateUpdate) -> None:
         raise RuntimeStateValidationError(f"存储键未登记：{update.key}")
     if update.value is not None and len(update.value.encode("utf-8")) > MAX_VALUE_BYTES:
         raise RuntimeStateValidationError("单项数据超过大小限制")
-    if update.key in teaching_content_projection_service.PROJECTION_KEYS:
-        try:
-            teaching_content_projection_service.validate_projection_value(
-                update.key,
-                str(update.value or '{"schemaVersion":1,"items":[]}'),
-            )
-        except (TypeError, ValueError) as exc:
-            raise RuntimeStateValidationError(str(exc)) from exc
     for key, value in update.storage.items():
         if not key_allowed(key):
             raise RuntimeStateValidationError(f"存储键未登记：{key}")
@@ -649,17 +688,6 @@ def validate_update(update: RuntimeStateUpdate) -> None:
             raise RuntimeStateValidationError(f"setItem 缺少 value：{mutation.key}")
         if mutation.value is not None and len(mutation.value.encode("utf-8")) > MAX_VALUE_BYTES:
             raise RuntimeStateValidationError(f"存储项超过大小限制：{mutation.key}")
-        if mutation.key in teaching_content_projection_service.PROJECTION_KEYS:
-            try:
-                teaching_content_projection_service.validate_projection_value(
-                    mutation.key,
-                    str(
-                        mutation.value
-                        or '{"schemaVersion":1,"items":[]}'
-                    ),
-                )
-            except (TypeError, ValueError) as exc:
-                raise RuntimeStateValidationError(str(exc)) from exc
     total = sum(
         len(key.encode("utf-8")) + len(value.encode("utf-8"))
         for key, value in update.storage.items()
@@ -739,6 +767,7 @@ def server_owned_key(key: str) -> bool:
         key in SERVER_OWNED_KEYS
         or key in LOGIN_ENTRY_SERVER_OWNED_KEYS
         or key.startswith(LOGIN_ENTRY_CONSUMED_PREFIX)
+        or key.startswith(RETIRED_RECALL_RUNTIME_PREFIXES)
     )
 
 
@@ -779,16 +808,6 @@ def teaching_shared_mutations(update: RuntimeStateUpdate) -> list[RuntimeMutatio
 
 def _publisher_id(item: object, key: str) -> str:
     if not isinstance(item, dict):
-        return ""
-    if key == "kg_learning_tasks_v1":
-        authorship = item.get("authorship")
-        if isinstance(authorship, dict):
-            return str(authorship.get("createdByUserId") or "")
-        return ""
-    if key == "kg_activity_collections_v1":
-        authorship = item.get("authorship")
-        if isinstance(authorship, dict):
-            return str(authorship.get("createdByUserId") or "")
         return ""
     publisher = item.get("publishedBy")
     if isinstance(publisher, dict):
@@ -840,21 +859,7 @@ def visible_shared_value(
         "kg_exam_paper_release_history_v1",
     }:
         return visible_published_papers(value, can_access_member=can_access_member)
-    if key != "kg_activity_collections_v1":
-        return value
-    try:
-        rows = json.loads(value or "[]")
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return "[]"
-    if not isinstance(rows, list):
-        return "[]"
-    visible = []
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        if str(row.get("visibility") or "private") == "shared" or _publisher_id(row, key) == owner:
-            visible.append(row)
-    return _json(visible)
+    return value
 
 
 def merge_shared_value(key: str, existing: str, incoming: str, owner: str) -> str:
@@ -1232,6 +1237,22 @@ async def get_state(
     return snapshot
 
 
+async def get_rollback_read_state(
+    db: AsyncSession,
+    owner: str,
+    role: str,
+    mode: str = "full",
+    page: str | None = None,
+) -> tuple[dict[str, str], int, int]:
+    """Read a legacy snapshot without promotion, bootstrap seeding, or commit."""
+
+    snapshot = await _read_state_snapshot_locked(db, owner, role, mode=mode, page=page)
+    # Close the read transaction explicitly so rollback diagnostics cannot
+    # accidentally leave a transaction available for a later write.
+    await db.rollback()
+    return snapshot
+
+
 def _json(value) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
@@ -1450,14 +1471,23 @@ async def apply_update(
     role: str,
     update: RuntimeStateUpdate,
 ) -> tuple[dict[str, str], int, int]:
-    validate_update(update)
     mutations = update_mutations(update)
+    # Dedicated-API data is categorically read-only through Runtime.  Check it
+    # before page/namespace validation so a retired page cannot turn this hard
+    # authorization boundary into an ambiguous validation error.
+    protected_mutations = [
+        mutation.key for mutation in mutations if server_owned_key(mutation.key)
+    ]
+    if protected_mutations:
+        raise RuntimeStatePermissionError(
+            f"该数据只能通过专用接口修改：{protected_mutations[0]}"
+        )
+    validate_update(update)
     if settings.QUESTION_CATALOG_CUTOVER_ENABLED:
         deprecated_mutations = [
             mutation.key
             for mutation in mutations
             if deprecated_question_key(mutation.key)
-            and mutation.key not in teaching_content_projection_service.PROJECTION_KEYS
         ]
         if deprecated_mutations:
             raise RuntimeStatePermissionError("正式题库已迁移，请使用题目目录接口")
@@ -1469,13 +1499,6 @@ async def apply_update(
         ]
         if deprecated_graph_mutations:
             raise RuntimeStatePermissionError("图谱文件已迁移，请使用文件接口")
-    protected_mutations = [
-        mutation.key for mutation in mutations if server_owned_key(mutation.key)
-    ]
-    if protected_mutations:
-        raise RuntimeStatePermissionError(
-            f"该数据只能通过专用接口修改：{protected_mutations[0]}"
-        )
     shared_mutations = explicit_shared_mutations(update)
     teaching_mutations = teaching_shared_mutations(update)
     forbidden = [
@@ -1588,36 +1611,8 @@ async def apply_update(
 
     # 共享区只接受本批次显式 mutation，避免完整账号快照把其他发布者的新内容覆盖掉。
     content_changes: list[dict[str, str]] = []
-    projection_mutations = [
-        mutation
-        for mutation in teaching_mutations
-        if mutation.key in teaching_content_projection_service.PROJECTION_KEYS
-    ]
-    projection_mutations.sort(
-        key=lambda mutation: (
-            mutation.key != teaching_content_projection_service.PRINCIPLE_KEY,
-            mutation.key,
-        )
-    )
-    for mutation in projection_mutations:
-        try:
-            content_changes.extend(
-                await teaching_content_projection_service.apply_principle_projection(
-                    db,
-                    owner,
-                    mutation.key,
-                    str(mutation.value or '{"schemaVersion":1,"items":[]}'),
-                )
-            )
-        except (TypeError, ValueError) as exc:
-            raise RuntimeStateValidationError(str(exc)) from exc
-    if projection_mutations:
-        await teaching_content_projection_service.write_principle_projection(db, owner)
-
     for mutation in shared_mutations:
         key = canonical_teacher_shared_key(mutation.key, role, owner) or mutation.key
-        if key in teaching_content_projection_service.PROJECTION_KEYS:
-            continue
         if mutation not in teaching_mutations:
             await _lock_owner(db, f"shared:{key}")
         shared_row = await db.get(SharedRuntimeState, key)

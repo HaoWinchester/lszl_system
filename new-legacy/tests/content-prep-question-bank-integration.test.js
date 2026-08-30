@@ -52,9 +52,7 @@ assert.match(admin, /async function init\(\)[\s\S]*?await Catalog\.ready[\s\S]*?
 assert.match(admin, /async function initPaperManagementPage\(\)[\s\S]*?PaperDataLoaderFactory\.create\([^]*?paperDataLoader\.initialize\(/, 'paper management must initialize through the summary-first demand loader');
 assert.doesNotMatch(admin, /Promise\.all\(\(summaries\|\|\[\]\)\.map/, 'paper management must not prefetch every paper detail');
 assert.match(admin, /function loadBanks\(\)[\s\S]*?Catalog\.snapshot\(\)/);
-assert.match(admin, /function loadLegacyBanksForMigrationPreview\(\)[\s\S]*?readString\(banksKey\(\)/);
-assert.equal((admin.match(/banksKey\(\)/g) || []).length, 2, 'banksKey may only be declared and read by migration preview');
-assert.doesNotMatch(admin, /writeJSON\(banksKey\(|kg_question_banks_published_v1/, 'teacher pages must not write a formal Runtime State catalog');
+assert.doesNotMatch(admin, /loadLegacyBanksForMigrationPreview|banksKey\(\)|localStorage/, 'teacher pages must not enumerate or persist a local formal catalog');
 
 const saveBanksBody = admin.match(/function saveBanks\([^]*?\n  \}/)?.[0] || '';
 assert(saveBanksBody, 'saveBanks compatibility function is missing');
@@ -68,7 +66,8 @@ assert.match(admin, /async function deleteBankById\([^]*?await Catalog\.deleteBa
 assert.match(admin, /async function saveQuestionForm\([^]*?await CatalogEditor\.save\(/);
 assert.match(admin, /async function selectQuestion\([^]*?await CatalogEditor\.open\(/);
 assert.match(admin, /beforeunload[^\n]*CatalogEditor\.release/);
-assert(admin.includes('questionSnapshots'), 'published paper releases must retain immutable questionSnapshots');
+assert.doesNotMatch(admin, /questionSnapshots|publishPayload/, 'teacher publish must not send browser-built frozen snapshots');
+assert.match(admin, /KGPaperReleaseApi\.publish\(paper\.id/, 'teacher publish must use the typed authoritative release endpoint');
 assert.match(admin, /addEventListener\('kg:question-catalog-changed',\s*handleQuestionCatalogChanged\)/, 'managed question UI must consume catalog refresh events');
 assert.match(admin, /function handleQuestionCatalogChanged\([^]*?state\.dirty[^]*?renderBankList\(\)[^]*?renderQuestionList\(\)[^]*?renderServerCatalogNewerNotice\(\)/, 'dirty managed UI must refresh read-only lists without a full form render');
 assert.match(admin, /服务器有新版本[^]*?重新载入\/合并/, 'dirty managed UI must show a server-newer marker with an explicit action');
@@ -267,7 +266,9 @@ function loadManagedAdmin() {
     dispatchEvent() {},
   };
   const Catalog = {
-    ready: Promise.resolve(), snapshot: () => JSON.parse(JSON.stringify(catalogSnapshot)),
+    ready: Promise.resolve(),
+    snapshot: () => JSON.parse(JSON.stringify(catalogSnapshot)),
+    banks: () => JSON.parse(JSON.stringify(catalogSnapshot.banks)),
     saveBank: async value => value, saveQuestion: async value => value, deleteBank: async () => true, deleteQuestion: async () => true,
     async importBanks({ banks }) {
       const source = banks[0];
@@ -292,6 +293,8 @@ function loadManagedAdmin() {
   const CatalogEditor = { open: async () => true, save: async (value, options) => { savedQuestions.push({ value, options }); return value; }, release() {}, applyReadonlyState() {}, status: () => ({ readonly: false }) };
   const window = {
     KGQuestionCatalogAdapter: Catalog, KGQuestionCatalogEditController: CatalogEditor,
+    KGPaperDraftApi: { ready: async () => ({ papers: [], categories: [] }), detail: async () => null },
+    KGDevicePreferences: { getJSON: (_key, fallback) => fallback, setJSON: () => true },
     localStorage: { getItem: () => null, setItem() {}, removeItem() {}, length: 0, key: () => null },
     addEventListener(type, listener) { const rows = windowListeners.get(type) || []; rows.push(listener); windowListeners.set(type, rows); },
     removeEventListener(type, listener) { const rows = windowListeners.get(type) || []; windowListeners.set(type, rows.filter(item => item !== listener)); },

@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.web import routes
+from app.web.releases import WebRelease
 from app.web.routes import TEACHING_PAGES
 
 
@@ -25,13 +27,16 @@ def test_student_cannot_download_privileged_page_html() -> None:
             assert "无权访问" in response.text
 
 
-def test_student_cannot_download_privileged_preview_html() -> None:
-    from app.web.releases import active_release
+def test_student_cannot_download_privileged_preview_html(monkeypatch, tmp_path) -> None:
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "admin-console.html").write_text("<h1>private admin console</h1>", encoding="utf-8")
+    release = WebRelease(version="access-test", site=site, source_hash="test-hash")
+    monkeypatch.setattr(routes, "preview_release", lambda version: release)
 
     with TestClient(app) as client:
         _login(client, "学生")
-        version = active_release().version
-        response = client.get(f"/__preview/{version}/admin-console.html")
+        response = client.get("/__preview/access-test/admin-console.html")
     assert response.status_code == 403
     assert "无权访问" in response.text
 

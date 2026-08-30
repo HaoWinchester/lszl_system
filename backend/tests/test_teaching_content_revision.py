@@ -2,6 +2,7 @@ import asyncio
 import json
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+from datetime import datetime
 from threading import Barrier, Event, Lock
 from uuid import uuid4
 
@@ -10,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 
+from app.core.config import settings
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
 from app.main import _seed_builtin_teaching_content, app
@@ -24,6 +26,12 @@ from app.models.runtime_state import RuntimeState
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.shared_runtime_state import SharedRuntimeState
+from app.models.teaching_content import (
+    ContentSubject,
+    RecallAssociationLibrary,
+    TeachingContentAudit,
+    TeachingContentRevision,
+)
 from app.models.user import User
 from app.schemas.content_prep import ContentPrepBatchResult, ContentPrepBatchRequest
 from app.services import teaching_content_revision_service as revision_service
@@ -36,46 +44,25 @@ from app.services.content_prep_service import (
     upload_bundle,
 )
 from tests.test_content_prep_upload import question_payload, request_payload
+from tests.teaching_content_revision_support import (
+    restore_teaching_content_revision,
+    restore_teaching_content_revision_state as _restore_revision_row,
+    snapshot_teaching_content_revision,
+    snapshot_teaching_content_revision_state as _snapshot_revision_row,
+)
 
 
 PASSWORD = "revision-pass"
 PRINCIPLE_PROJECTION_KEY = "kg_principle_repository_v1"
 PRESET_PROJECTION_KEY = "kg_synthesis_preset_repository_v1"
+RELATIONAL_REVISION_SNAPSHOT_KEY = "__relational_teaching_content_revision__"
 
 
-async def _snapshot_revision_row() -> dict | None:
-    async with AsyncSessionLocal() as db:
-        row = await db.get(SharedRuntimeState, revision_service.REVISION_KEY)
-        if row is None:
-            return None
-        return {
-            "value": row.value,
-            "schema_version": row.schema_version,
-            "updated_by": row.updated_by,
-            "created_at": row.created_at,
-            "updated_at": row.updated_at,
-        }
-
-
-async def _restore_revision_row(snapshot: dict | None) -> None:
-    async with AsyncSessionLocal() as db:
-        await db.execute(
-            delete(SharedRuntimeState).where(
-                SharedRuntimeState.key == revision_service.REVISION_KEY
-            )
-        )
-        if snapshot is not None:
-            db.add(
-                SharedRuntimeState(
-                    key=revision_service.REVISION_KEY,
-                    value=str(snapshot["value"]),
-                    schema_version=int(snapshot["schema_version"]),
-                    updated_by=snapshot["updated_by"],
-                    created_at=snapshot["created_at"],
-                    updated_at=snapshot["updated_at"],
-                )
-            )
-        await db.commit()
+@pytest.fixture(autouse=True)
+def legacy_runtime_api_is_explicitly_enabled_for_migration_tests(monkeypatch):
+    """Historical Runtime migration tests opt in; the application default stays retired."""
+    monkeypatch.setattr(settings, "RUNTIME_SYNC_DISABLED", False)
+    monkeypatch.setattr(settings, "RUNTIME_ROLLBACK_READ_ENABLED", True)
 
 
 def test_bump_is_monotonic_deduplicated_and_capped() -> None:
@@ -178,11 +165,7 @@ def test_missing_revision_row_starts_at_zero_and_first_bump_is_one() -> None:
         snapshot = await _snapshot_revision_row()
         try:
             async with AsyncSessionLocal() as db:
-                await db.execute(
-                    delete(SharedRuntimeState).where(
-                        SharedRuntimeState.key == revision_service.REVISION_KEY
-                    )
-                )
+                await db.execute(delete(TeachingContentRevision))
                 await db.commit()
 
             async with AsyncSessionLocal() as db:
@@ -260,31 +243,22 @@ def test_revision_endpoint_filters_non_object_changes_from_a_damaged_row() -> No
     async def seed() -> dict | None:
         snapshot = await _snapshot_revision_row()
         async with AsyncSessionLocal() as db:
-            await db.execute(
-                delete(SharedRuntimeState).where(
-                    SharedRuntimeState.key == revision_service.REVISION_KEY
-                )
-            )
+            await db.execute(delete(TeachingContentRevision))
             db.add(
-                SharedRuntimeState(
-                    key=revision_service.REVISION_KEY,
-                    value=json.dumps(
+                TeachingContentRevision(
+                    id=1,
+                    revision=7,
+                    changes=[
+                        None,
+                        "not-an-object",
                         {
-                            "revision": 7,
-                            "changes": [
-                                None,
-                                "not-an-object",
-                                {
-                                    "entityType": "question",
-                                    "entityId": "q-valid",
-                                    "action": "updated",
-                                },
-                            ],
-                            "updatedAt": "2026-08-10T10:00:00+00:00",
-                            "updatedBy": "admin",
-                        }
-                    ),
+                            "entityType": "question",
+                            "entityId": "q-valid",
+                            "action": "updated",
+                        },
+                    ],
                     updated_by="admin",
+                    updated_at=datetime.fromisoformat("2026-08-10T10:00:00+00:00"),
                 )
             )
             await db.commit()
@@ -409,16 +383,20 @@ def test_principle_archive_rejects_bound_questions_then_archives_the_pair() -> N
                 "/api/v1/auth/login",
                 json={"username": username, "password": PASSWORD},
             ).status_code == 200
+            content_revision = client.get(
+                "/api/v1/content-prep/principles"
+            ).json()["contentRevision"]
             drafted = client.post(
                 "/api/v1/content-prep/principles/status",
-                json={"ids": [principle_id], "presetStatus": "draft"},
+                json={"ids": [principle_id], "presetStatus": "draft", "contentRevision": content_revision},
             )
             assert drafted.status_code == 200
             assert drafted.json()["updatedPresetIds"] == [preset_id]
+            content_revision = drafted.json()["contentRevision"]
             asyncio.run(assert_preset_draft())
             blocked = client.post(
                 "/api/v1/content-prep/principles/archive",
-                json={"ids": [principle_id]},
+                json={"ids": [principle_id], "contentRevision": content_revision},
             )
             assert blocked.status_code == 409
             assert blocked.json()["detail"] == {
@@ -439,14 +417,14 @@ def test_principle_archive_rejects_bound_questions_then_archives_the_pair() -> N
             }
             blocked_delete = client.post(
                 "/api/v1/content-prep/principles/delete",
-                json={"ids": [principle_id]},
+                json={"ids": [principle_id], "contentRevision": content_revision},
             )
             assert blocked_delete.status_code == 409
             assert blocked_delete.json()["detail"] == blocked.json()["detail"]
             asyncio.run(remove_question())
             archived = client.post(
                 "/api/v1/content-prep/principles/archive",
-                json={"ids": [principle_id]},
+                json={"ids": [principle_id], "contentRevision": content_revision},
             )
             assert archived.status_code == 200
             assert archived.json()["archivedIds"] == [principle_id]
@@ -463,9 +441,7 @@ def test_principle_delete_removes_an_unreferenced_principle_and_its_card() -> No
     principle_id = f"principle-delete-{suffix}"
     preset_id = f"preset-delete-{suffix}"
     shared_keys = {
-        revision_service.REVISION_KEY,
-        PRINCIPLE_PROJECTION_KEY,
-        PRESET_PROJECTION_KEY,
+        RELATIONAL_REVISION_SNAPSHOT_KEY,
     }
 
     async def seed() -> dict[str, dict]:
@@ -502,9 +478,6 @@ def test_principle_delete_removes_an_unreferenced_principle_and_its_card() -> No
                     updated_by=username,
                 )
             )
-            await teaching_content_projection_service.write_principle_projection(
-                db, username
-            )
             await db.commit()
         return shared_snapshot
 
@@ -512,14 +485,6 @@ def test_principle_delete_removes_an_unreferenced_principle_and_its_card() -> No
         async with AsyncSessionLocal() as db:
             assert await db.get(Principle, principle_id) is None
             assert await db.get(SynthesisPreset, preset_id) is None
-            principles = json.loads(
-                (await db.get(SharedRuntimeState, PRINCIPLE_PROJECTION_KEY)).value
-            )
-            presets = json.loads(
-                (await db.get(SharedRuntimeState, PRESET_PROJECTION_KEY)).value
-            )
-            assert principle_id not in {item["id"] for item in principles["items"]}
-            assert preset_id not in {item["id"] for item in presets["items"]}
 
     async def cleanup(shared_snapshot: dict[str, dict]) -> None:
         async with AsyncSessionLocal() as db:
@@ -537,15 +502,160 @@ def test_principle_delete_removes_an_unreferenced_principle_and_its_card() -> No
                 "/api/v1/auth/login",
                 json={"username": username, "password": PASSWORD},
             ).status_code == 200
+            content_revision = client.get(
+                "/api/v1/content-prep/principles"
+            ).json()["contentRevision"]
             response = client.post(
                 "/api/v1/content-prep/principles/delete",
-                json={"ids": [principle_id]},
+                json={"ids": [principle_id], "contentRevision": content_revision},
             )
         assert response.status_code == 200, response.text
         assert response.json()["deletedIds"] == [principle_id]
         asyncio.run(verify_deleted())
     finally:
         asyncio.run(cleanup(snapshot))
+
+
+def test_bulk_principle_mutations_reject_stale_content_revision_atomically() -> None:
+    """Archive/delete/import/status must share the optimistic revision contract."""
+
+    suffix = uuid4().hex[:10]
+    username = f"teacher-bulk-stale-{suffix}"
+    principle_ids = [f"principle-bulk-stale-{index}-{suffix}" for index in range(4)]
+    preset_ids = [f"preset-bulk-stale-{index}-{suffix}" for index in range(4)]
+    revision_snapshot: dict | None = None
+
+    async def seed() -> None:
+        nonlocal revision_snapshot
+        async with AsyncSessionLocal() as db:
+            revision_snapshot = await snapshot_teaching_content_revision(db)
+            db.add(
+                User(
+                    username=username,
+                    password_hash=hash_password(PASSWORD),
+                    role="teacher",
+                    status="active",
+                    subject="PMP",
+                )
+            )
+            await db.flush()
+            for index, principle_id in enumerate(principle_ids):
+                db.add(
+                    Principle(
+                        id=principle_id,
+                        name=f"并发原则 {index}",
+                        status="active",
+                        created_by=username,
+                        updated_by=username,
+                    )
+                )
+            await db.flush()
+            for index, preset_id in enumerate(preset_ids):
+                db.add(
+                    SynthesisPreset(
+                        id=preset_id,
+                        principle_id=principle_ids[index],
+                        title=f"原则：并发原则 {index}",
+                        content=f"并发归纳卡 {index}",
+                        status="active",
+                        created_by=username,
+                        updated_by=username,
+                    )
+                )
+            await db.commit()
+
+    async def advance_revision() -> int:
+        async with AsyncSessionLocal() as db:
+            bumped = await revision_service.bump(
+                db,
+                username,
+                [{"entityType": "testBarrier", "entityId": suffix, "action": "advanced"}],
+            )
+            await db.commit()
+            return int(bumped["revision"])
+
+    async def relation_state() -> tuple[list[tuple], list[tuple], int]:
+        async with AsyncSessionLocal() as db:
+            principles = list(
+                (
+                    await db.execute(
+                        select(Principle)
+                        .where(Principle.id.in_(principle_ids))
+                        .order_by(Principle.id)
+                    )
+                ).scalars()
+            )
+            presets = list(
+                (
+                    await db.execute(
+                        select(SynthesisPreset)
+                        .where(SynthesisPreset.id.in_(preset_ids))
+                        .order_by(SynthesisPreset.id)
+                    )
+                ).scalars()
+            )
+            return (
+                [(row.id, row.name, row.status, row.revision) for row in principles],
+                [(row.id, row.status, row.revision) for row in presets],
+                int((await revision_service.current(db))["revision"]),
+            )
+
+    async def cleanup() -> None:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(SynthesisPreset).where(SynthesisPreset.id.in_(preset_ids)))
+            await db.execute(delete(Principle).where(Principle.id.in_(principle_ids)))
+            await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
+            await db.execute(delete(User).where(User.username == username))
+            await db.commit()
+            await restore_teaching_content_revision(db, revision_snapshot)
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": username, "password": PASSWORD},
+            ).status_code == 200
+            snapshot = client.get("/api/v1/content-prep/principles")
+            assert snapshot.status_code == 200, snapshot.text
+            stale_revision = snapshot.json()["contentRevision"]
+            bundle = {
+                "principleCardBundleVersion": 1,
+                "format": "kg-principle-card-bundle-v1",
+                "principles": deepcopy(snapshot.json()["principles"]),
+                "synthesisPresets": deepcopy(snapshot.json()["synthesisPresets"]),
+            }
+            for item in bundle["principles"]["items"]:
+                if item["id"] == principle_ids[3]:
+                    item["name"] = "stale import must not win"
+            current_revision = asyncio.run(advance_revision())
+            before = asyncio.run(relation_state())
+            assert before[2] == current_revision
+
+            requests = [
+                ("/api/v1/content-prep/principles/archive", {"ids": [principle_ids[0]]}),
+                (
+                    "/api/v1/content-prep/principles/status",
+                    {"ids": [principle_ids[1]], "presetStatus": "draft"},
+                ),
+                ("/api/v1/content-prep/principles/delete", {"ids": [principle_ids[2]]}),
+                ("/api/v1/content-prep/principles/import", bundle),
+            ]
+            for path, body in requests:
+                response = client.post(
+                    path,
+                    json={**body, "contentRevision": stale_revision},
+                )
+                assert response.status_code == 409, (path, response.text)
+                assert response.json()["detail"] == {
+                    "code": "CONTENT_REVISION_CONFLICT",
+                    "message": "服务器内容已更新，请重新载入后再保存",
+                    "currentContentRevision": current_revision,
+                }
+                assert asyncio.run(relation_state()) == before
+    finally:
+        asyncio.run(cleanup())
 
 
 def test_principle_bundle_import_replaces_unused_pairs_as_one_canonical_bundle() -> None:
@@ -650,6 +760,9 @@ def test_principle_bundle_import_replaces_unused_pairs_as_one_canonical_bundle()
                 "/api/v1/auth/login",
                 json={"username": username, "password": PASSWORD},
             ).status_code == 200
+            payload["contentRevision"] = client.get(
+                "/api/v1/content-prep/principles"
+            ).json()["contentRevision"]
             response = client.post("/api/v1/content-prep/principles/import", json=payload)
         assert response.status_code == 200, response.text
         assert response.json()["importedPrincipleCount"] == 1
@@ -675,9 +788,7 @@ def test_imported_builtin_principle_card_updates_survive_startup_seed() -> None:
     """Catch startup seeding silently restoring administrator-imported built-in IDs."""
 
     shared_keys = {
-        revision_service.REVISION_KEY,
-        PRINCIPLE_PROJECTION_KEY,
-        PRESET_PROJECTION_KEY,
+        RELATIONAL_REVISION_SNAPSHOT_KEY,
     }
     bundle = builtin_teaching_content_seed_service.load_builtin_bundle()
     principle_id = str(bundle.principles[0]["id"])
@@ -705,14 +816,6 @@ def test_imported_builtin_principle_card_updates_survive_startup_seed() -> None:
             assert principle is not None and principle.name == imported_name
             assert preset is not None and preset.content == imported_content
             assert int((await revision_service.current(db))["revision"]) == import_revision
-            principle_projection = json.loads(
-                (await db.get(SharedRuntimeState, PRINCIPLE_PROJECTION_KEY)).value
-            )
-            preset_projection = json.loads(
-                (await db.get(SharedRuntimeState, PRESET_PROJECTION_KEY)).value
-            )
-            assert next(item for item in principle_projection["items"] if item["id"] == principle_id)["name"] == imported_name
-            assert next(item for item in preset_projection["items"] if item["id"] == preset_id)["content"] == imported_content
 
     async def cleanup(
         shared_snapshot: dict[str, dict],
@@ -737,7 +840,6 @@ def test_imported_builtin_principle_card_updates_survive_startup_seed() -> None:
             current = client.get("/api/v1/content-prep/principles")
             assert current.status_code == 200, current.text
             payload = current.json()
-            payload.pop("contentRevision", None)
             for item in payload["principles"]["items"]:
                 if item["id"] == principle_id:
                     item["name"] = imported_name
@@ -928,7 +1030,7 @@ def test_revision_endpoint_and_managed_bootstrap_are_role_safe() -> None:
 def test_runtime_get_returns_storage_and_content_revision_from_one_snapshot(
     monkeypatch,
 ) -> None:
-    key = "kg_course_config_drafts_v1"
+    key = "kg_assessment_papers_v1"
     marker_key = "kg_teacher_shared_runtime_promotion_v1"
     shared_keys = {key, marker_key}
     snapshot = asyncio.run(_snapshot_shared_rows(shared_keys))
@@ -974,23 +1076,21 @@ def test_runtime_get_returns_storage_and_content_revision_from_one_snapshot(
     asyncio.run(seed())
     from app.services import runtime_state_service
 
-    original_get_state = runtime_state_service.get_state
+    original_rollback_read = runtime_state_service.get_rollback_read_state
 
     async def writer_after_snapshot(*args, **kwargs):
-        result = await original_get_state(*args, **kwargs)
+        result = await original_rollback_read(*args, **kwargs)
         if not captured:
             captured["storage"] = result[0][key]
-            if len(result) == 3:
-                captured["contentRevision"] = result[2]
-            else:
-                async with AsyncSessionLocal() as db:
-                    captured["contentRevision"] = int(
-                        (await revision_service.current(db))["revision"]
-                    )
+            captured["contentRevision"] = result[2]
             await competing_write()
         return result
 
-    monkeypatch.setattr(runtime_state_service, "get_state", writer_after_snapshot)
+    monkeypatch.setattr(
+        runtime_state_service,
+        "get_rollback_read_state",
+        writer_after_snapshot,
+    )
     try:
         with TestClient(app) as client:
             assert client.post(
@@ -1002,6 +1102,17 @@ def test_runtime_get_returns_storage_and_content_revision_from_one_snapshot(
         assert response.status_code == 200, response.text
         assert response.json()["storage"][key] == captured["storage"]
         assert response.json()["contentRevision"] == captured["contentRevision"]
+
+        async def committed_after_snapshot() -> tuple[str, int]:
+            async with AsyncSessionLocal() as db:
+                row = await db.get(SharedRuntimeState, key)
+                assert row is not None
+                revision = int((await revision_service.current(db))["revision"])
+                return str(row.value), revision
+
+        value_after, revision_after = asyncio.run(committed_after_snapshot())
+        assert value_after == json.dumps([{"id": "snapshot-new"}])
+        assert revision_after == int(captured["contentRevision"]) + 1
     finally:
         asyncio.run(_restore_shared_rows(shared_keys, snapshot))
 
@@ -1103,7 +1214,7 @@ def test_runtime_read_and_personal_snapshot_share_the_revision_lock(
     from app.web.schemas import RuntimeStateUpdate
 
     key = "kg_content_subjects_v1"
-    shared_keys = {key, revision_service.REVISION_KEY}
+    shared_keys = {key, RELATIONAL_REVISION_SNAPSHOT_KEY}
     snapshot = asyncio.run(_snapshot_shared_rows(shared_keys))
     snapshots_arrived = Event()
     release_snapshots = Event()
@@ -1218,10 +1329,9 @@ def test_runtime_read_and_personal_snapshot_share_the_revision_lock(
             personal_result = personal_future.result(timeout=10)
             writer_revision = writer_future.result(timeout=10)
 
-        expected_value = json.dumps({"value": "before"})
-        assert read_result[0][key] == expected_value
+        assert key not in read_result[0]
         assert read_result[2] == base_revision
-        assert personal_result[0][key] == expected_value
+        assert key not in personal_result[0]
         assert personal_result[2] == base_revision
         assert writer_revision == base_revision + 1
     finally:
@@ -1391,12 +1501,15 @@ def test_single_question_save_returns_current_content_revision(
 
 async def _snapshot_shared_rows(keys: set[str]) -> dict[str, dict]:
     async with AsyncSessionLocal() as db:
+        runtime_keys = keys - {RELATIONAL_REVISION_SNAPSHOT_KEY}
         rows = (
             await db.execute(
-                select(SharedRuntimeState).where(SharedRuntimeState.key.in_(keys))
+                select(SharedRuntimeState).where(
+                    SharedRuntimeState.key.in_(runtime_keys)
+                )
             )
         ).scalars().all()
-        return {
+        snapshot = {
             row.key: {
                 "value": row.value,
                 "schema_version": row.schema_version,
@@ -1406,11 +1519,21 @@ async def _snapshot_shared_rows(keys: set[str]) -> dict[str, dict]:
             }
             for row in rows
         }
+        if RELATIONAL_REVISION_SNAPSHOT_KEY in keys:
+            revision = await snapshot_teaching_content_revision(db)
+            if revision is not None:
+                snapshot[RELATIONAL_REVISION_SNAPSHOT_KEY] = {
+                    **revision,
+                }
+        return snapshot
 
 
 async def _restore_shared_rows(keys: set[str], snapshot: dict[str, dict]) -> None:
     async with AsyncSessionLocal() as db:
-        await db.execute(delete(SharedRuntimeState).where(SharedRuntimeState.key.in_(keys)))
+        runtime_keys = keys - {RELATIONAL_REVISION_SNAPSHOT_KEY}
+        await db.execute(
+            delete(SharedRuntimeState).where(SharedRuntimeState.key.in_(runtime_keys))
+        )
         db.add_all(
             [
                 SharedRuntimeState(
@@ -1422,13 +1545,17 @@ async def _restore_shared_rows(keys: set[str], snapshot: dict[str, dict]) -> Non
                     updated_at=row["updated_at"],
                 )
                 for key, row in snapshot.items()
+                if key != RELATIONAL_REVISION_SNAPSHOT_KEY
             ]
         )
+        if RELATIONAL_REVISION_SNAPSHOT_KEY in keys:
+            revision = snapshot.get(RELATIONAL_REVISION_SNAPSHOT_KEY)
+            await restore_teaching_content_revision(db, revision)
         await db.commit()
 
 
-def test_content_prep_batch_projects_canonical_relations_and_bumps_once() -> None:
-    """Catch a committed batch publishing stale projections or multiple revisions."""
+def test_content_prep_batch_writes_canonical_relations_and_bumps_once() -> None:
+    """Catch a committed batch writing non-canonical relations or multiple revisions."""
 
     suffix = uuid4().hex[:10]
     username = f"revision-projection-{suffix}"
@@ -1437,9 +1564,7 @@ def test_content_prep_batch_projects_canonical_relations_and_bumps_once() -> Non
     principle_id = f"principle-projection-{suffix}"
     preset_id = f"preset-projection-{suffix}"
     shared_keys = {
-        revision_service.REVISION_KEY,
-        PRINCIPLE_PROJECTION_KEY,
-        PRESET_PROJECTION_KEY,
+        RELATIONAL_REVISION_SNAPSHOT_KEY,
     }
 
     async def scenario() -> None:
@@ -1514,12 +1639,8 @@ def test_content_prep_batch_projects_canonical_relations_and_bumps_once() -> Non
 
             async with AsyncSessionLocal() as db:
                 revision = await revision_service.current(db)
-                principle_projection = json.loads(
-                    (await db.get(SharedRuntimeState, PRINCIPLE_PROJECTION_KEY)).value
-                )
-                preset_projection = json.loads(
-                    (await db.get(SharedRuntimeState, PRESET_PROJECTION_KEY)).value
-                )
+                projected_principle = await db.get(Principle, principle_id)
+                projected_preset = await db.get(SynthesisPreset, preset_id)
 
             assert result.content_revision == before + 1
             assert revision["revision"] == before + 1
@@ -1532,47 +1653,16 @@ def test_content_prep_batch_projects_canonical_relations_and_bumps_once() -> Non
                 ("principle", principle_id, "created"),
                 ("synthesisPreset", preset_id, "created"),
             }
-            assert principle_projection["schemaVersion"] == 1
-            assert isinstance(principle_projection["updatedAt"], int)
-            assert [item["id"] for item in principle_projection["items"]] == sorted(
-                item["id"] for item in principle_projection["items"]
-            )
-            projected_principle = next(
-                item for item in principle_projection["items"] if item["id"] == principle_id
-            )
-            assert {
-                key: value
-                for key, value in projected_principle.items()
-                if key not in {"createdAt", "updatedAt"}
-            } == {
-                "id": principle_id,
-                "name": "先确认理解",
-                "status": "active",
-                "confusablePrincipleIds": ["p-confusable"],
-            }
-            assert isinstance(projected_principle["createdAt"], int)
-            assert projected_principle["createdAt"] > 0
-            assert isinstance(projected_principle["updatedAt"], int)
-            assert projected_principle["updatedAt"] > 0
-            projected_preset = next(
-                item for item in preset_projection["items"] if item["id"] == preset_id
-            )
-            assert {
-                key: value
-                for key, value in projected_preset.items()
-                if key not in {"createdAt", "updatedAt"}
-            } == {
-                "id": preset_id,
-                "principleId": principle_id,
-                "title": "确认理解归纳",
-                "content": "发送之后确认接收和理解。",
-                "status": "active",
-                "version": 3,
-            }
-            assert isinstance(projected_preset["createdAt"], int)
-            assert projected_preset["createdAt"] > 0
-            assert isinstance(projected_preset["updatedAt"], int)
-            assert projected_preset["updatedAt"] > 0
+            assert projected_principle is not None
+            assert projected_principle.name == "先确认理解"
+            assert projected_principle.status == "active"
+            assert projected_principle.confusable_principle_ids == ["p-confusable"]
+            assert projected_preset is not None
+            assert projected_preset.principle_id == principle_id
+            assert projected_preset.title == "确认理解归纳"
+            assert projected_preset.content == "发送之后确认接收和理解。"
+            assert projected_preset.status == "active"
+            assert projected_preset.business_version == 3
         finally:
             async with AsyncSessionLocal() as db:
                 await db.execute(
@@ -1608,7 +1698,7 @@ def test_rejected_content_prep_batch_keeps_projection_and_revision_unchanged() -
     principle_id = f"principle-rejected-{suffix}"
     preset_id = f"preset-rejected-{suffix}"
     shared_keys = {
-        revision_service.REVISION_KEY,
+        RELATIONAL_REVISION_SNAPSHOT_KEY,
         PRINCIPLE_PROJECTION_KEY,
         PRESET_PROJECTION_KEY,
     }
@@ -1743,8 +1833,8 @@ async def _restore_principle_relations(
         await db.commit()
 
 
-def test_runtime_principle_projection_upserts_present_marks_missing_inactive_and_bumps_once() -> None:
-    """Catch cutover rejection, hard deletion, or one revision per projection key."""
+def test_runtime_principle_projection_is_server_owned_and_relations_stay_unchanged() -> None:
+    """Retired Runtime projection keys cannot mutate authoritative relations."""
 
     suffix = uuid4().hex[:10]
     username = f"runtime-projection-{suffix}"
@@ -1753,7 +1843,7 @@ def test_runtime_principle_projection_upserts_present_marks_missing_inactive_and
     present_preset = f"preset-runtime-present-{suffix}"
     missing_preset = f"preset-runtime-missing-{suffix}"
     shared_keys = {
-        revision_service.REVISION_KEY,
+        RELATIONAL_REVISION_SNAPSHOT_KEY,
         PRINCIPLE_PROJECTION_KEY,
         PRESET_PROJECTION_KEY,
         "kg_teacher_shared_runtime_promotion_v1",
@@ -1915,8 +2005,7 @@ def test_runtime_principle_projection_upserts_present_marks_missing_inactive_and
                     "contentRevision": before,
                 },
             )
-        assert response.status_code == 200, response.text
-        assert response.json()["contentRevision"] == before + 1
+        assert response.status_code == 403, response.text
 
         async def verify() -> None:
             async with AsyncSessionLocal() as db:
@@ -1925,23 +2014,14 @@ def test_runtime_principle_projection_upserts_present_marks_missing_inactive_and
                 missing = await db.get(Principle, missing_principle)
                 present_card = await db.get(SynthesisPreset, present_preset)
                 missing_card = await db.get(SynthesisPreset, missing_preset)
-                assert present is not None and present.name == "更新后原则"
-                assert present.confusable_principle_ids == [missing_principle]
-                assert missing is not None and missing.status == "inactive"
-                assert present_card is not None and present_card.title == "更新后归纳"
-                assert present_card.content == "新内容"
-                assert present_card.business_version == 2
-                assert missing_card is not None and missing_card.status == "inactive"
-                assert current["revision"] == before + 1
-                assert {
-                    (item["entityType"], item["entityId"], item["action"])
-                    for item in current["changes"]
-                } >= {
-                    ("principle", present_principle, "updated"),
-                    ("principle", missing_principle, "inactivated"),
-                    ("synthesisPreset", present_preset, "updated"),
-                    ("synthesisPreset", missing_preset, "inactivated"),
-                }
+                assert present is not None and present.name == "更新前原则"
+                assert present.confusable_principle_ids == []
+                assert missing is not None and missing.status == "active"
+                assert present_card is not None and present_card.title == "更新前归纳"
+                assert present_card.content == "旧内容"
+                assert present_card.business_version == 1
+                assert missing_card is not None and missing_card.status == "active"
+                assert current["revision"] == before
 
         asyncio.run(verify())
     finally:
@@ -1963,7 +2043,7 @@ def test_runtime_principle_projection_upserts_present_marks_missing_inactive_and
         (PRESET_PROJECTION_KEY, {"id": "preset-1", "principleId": "missing", "title": "归纳", "version": 2147483648}),
     ],
 )
-def test_runtime_projection_rejects_invalid_bounds_before_revision_lock(
+def test_runtime_projection_is_server_owned_before_validation_or_revision_lock(
     key: str,
     item: dict,
     monkeypatch,
@@ -2000,11 +2080,11 @@ def test_runtime_projection_rejects_invalid_bounds_before_revision_lock(
             },
         )
 
-    assert response.status_code == 422, response.text
+    assert response.status_code == 403, response.text
     assert lock_calls == 0
 
 
-def test_runtime_projection_rejects_large_item_count_before_revision_lock(
+def test_runtime_projection_rejects_large_item_count_as_server_owned(
     monkeypatch,
 ) -> None:
     lock_calls = 0
@@ -2049,7 +2129,7 @@ def test_runtime_projection_rejects_large_item_count_before_revision_lock(
             },
         )
 
-    assert response.status_code == 422, response.text
+    assert response.status_code == 403, response.text
     assert lock_calls == 0
 
 
@@ -2057,7 +2137,7 @@ def test_runtime_projection_rejects_large_item_count_before_revision_lock(
     "key",
     [PRINCIPLE_PROJECTION_KEY, PRESET_PROJECTION_KEY],
 )
-def test_runtime_projection_rejects_content_prep_omission_sentinel(
+def test_runtime_projection_rejects_content_prep_omission_sentinel_as_server_owned(
     key: str,
     monkeypatch,
 ) -> None:
@@ -2092,11 +2172,11 @@ def test_runtime_projection_rejects_content_prep_omission_sentinel(
             },
         )
 
-    assert response.status_code == 422, response.text
+    assert response.status_code == 403, response.text
     assert lock_calls == 0
 
 
-def test_runtime_preset_projection_rejects_missing_principle_as_422() -> None:
+def test_runtime_preset_projection_rejects_missing_principle_as_server_owned() -> None:
     with TestClient(app) as client:
         assert client.post(
             "/api/v1/auth/login",
@@ -2134,7 +2214,139 @@ def test_runtime_preset_projection_rejects_missing_principle_as_422() -> None:
             },
         )
 
-    assert response.status_code == 422, response.text
+    assert response.status_code == 403, response.text
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "kg_recall_association_library_v1__subject__PMP",
+        "kg_recall_association_library_v1__user__admin",
+        "kg_recall_association_management_v1__subject__PMP",
+        "kg_recall_association_management_v1__user__admin",
+    ],
+)
+def test_runtime_recall_prefix_is_server_owned_without_relational_side_effects(
+    key: str,
+) -> None:
+    """Every retired subject/user recall key must be rollback-readable but immutable."""
+
+    runtime_snapshot: dict | None = None
+    shared_snapshot: dict[str, dict] = {}
+    relation_snapshot: tuple[list[tuple], int] | None = None
+
+    async def snapshot() -> None:
+        nonlocal runtime_snapshot, shared_snapshot, relation_snapshot
+        shared_snapshot = await _snapshot_shared_rows({key})
+        async with AsyncSessionLocal() as db:
+            runtime = await db.get(RuntimeState, "admin")
+            runtime_snapshot = None if runtime is None else {
+                "storage": deepcopy(runtime.storage),
+                "revision": runtime.revision,
+                "last_request_id": runtime.last_request_id,
+            }
+            rows = list(
+                (
+                    await db.execute(
+                        select(RecallAssociationLibrary).order_by(
+                            RecallAssociationLibrary.id
+                        )
+                    )
+                ).scalars()
+            )
+            relation_snapshot = (
+                [
+                    (
+                        row.id,
+                        row.subject_id,
+                        row.version,
+                        deepcopy(row.nodes),
+                        deepcopy(row.edges),
+                    )
+                    for row in rows
+                ],
+                int((await revision_service.current(db))["revision"]),
+            )
+
+    async def verify_relations() -> None:
+        async with AsyncSessionLocal() as db:
+            rows = list(
+                (
+                    await db.execute(
+                        select(RecallAssociationLibrary).order_by(
+                            RecallAssociationLibrary.id
+                        )
+                    )
+                ).scalars()
+            )
+            assert relation_snapshot == (
+                [
+                    (
+                        row.id,
+                        row.subject_id,
+                        row.version,
+                        deepcopy(row.nodes),
+                        deepcopy(row.edges),
+                    )
+                    for row in rows
+                ],
+                int((await revision_service.current(db))["revision"]),
+            )
+
+    async def restore() -> None:
+        async with AsyncSessionLocal() as db:
+            row = await db.get(RuntimeState, "admin")
+            if runtime_snapshot is None:
+                if row is not None:
+                    await db.delete(row)
+            elif row is None:
+                db.add(
+                    RuntimeState(
+                        owner_id="admin",
+                        storage=runtime_snapshot["storage"],
+                        revision=runtime_snapshot["revision"],
+                        last_request_id=runtime_snapshot["last_request_id"],
+                    )
+                )
+            else:
+                row.storage = runtime_snapshot["storage"]
+                row.revision = runtime_snapshot["revision"]
+                row.last_request_id = runtime_snapshot["last_request_id"]
+            await db.commit()
+        await _restore_shared_rows({key}, shared_snapshot)
+
+    asyncio.run(snapshot())
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "jbgsnmm~123"},
+            ).status_code == 200
+            state = client.get("/api/v1/runtime/state").json()
+            value = json.dumps(
+                {"schemaVersion": 1, "nodes": [{"id": "forbidden"}], "edges": []}
+            )
+            response = client.put(
+                "/api/v1/runtime/state",
+                json={
+                    "page": "question-bank.html",
+                    "namespace": "questions",
+                    "operation": "setItem",
+                    "key": key,
+                    "value": value,
+                    "storage": {},
+                    "mutations": [
+                        {"operation": "setItem", "key": key, "value": value}
+                    ],
+                    "requestId": f"runtime-recall-owned-{uuid4().hex}",
+                    "revision": state["revision"],
+                    "contentRevision": state["contentRevision"],
+                },
+            )
+            assert response.status_code == 403, response.text
+            asyncio.run(verify_relations())
+    finally:
+        asyncio.run(restore())
 
 
 @pytest.mark.parametrize("invalid_revision", [True, "1"])
@@ -2166,8 +2378,8 @@ def test_runtime_content_revision_is_a_strict_integer(invalid_revision) -> None:
 @pytest.mark.parametrize(
     "keys",
     [
-        ("kg_course_config_drafts_v1", "kg_course_config_drafts_v1"),
-        ("kg_course_config_drafts_v1", "kg_assessment_papers_v1"),
+        ("kg_assessment_papers_v1", "kg_assessment_papers_v1"),
+        ("kg_assessment_papers_v1", "kg_question_tag_names_v1"),
     ],
     ids=["same-key", "different-keys"],
 )
@@ -2180,7 +2392,7 @@ def test_teaching_shared_runtime_cas_allows_exactly_one_writer(
     suffix = uuid4().hex[:10]
     usernames = [f"runtime-cas-a-{suffix}", f"runtime-cas-b-{suffix}"]
     marker_key = "kg_teacher_shared_runtime_promotion_v1"
-    shared_keys = {revision_service.REVISION_KEY, marker_key, *keys}
+    shared_keys = {RELATIONAL_REVISION_SNAPSHOT_KEY, marker_key, *keys}
 
     async def seed() -> dict[str, dict]:
         snapshot = await _snapshot_shared_rows(shared_keys)
@@ -2317,9 +2529,9 @@ def test_runtime_request_id_replay_skips_content_cas_and_second_bump() -> None:
 
     suffix = uuid4().hex[:10]
     username = f"runtime-replay-{suffix}"
-    key = "kg_course_config_drafts_v1"
+    key = "kg_assessment_papers_v1"
     marker_key = "kg_teacher_shared_runtime_promotion_v1"
-    shared_keys = {revision_service.REVISION_KEY, marker_key, key}
+    shared_keys = {RELATIONAL_REVISION_SNAPSHOT_KEY, marker_key, key}
 
     async def seed() -> dict[str, dict]:
         snapshot = await _snapshot_shared_rows(shared_keys)
@@ -2391,7 +2603,7 @@ def test_admin_settings_runtime_write_neither_requires_nor_bumps_content_revisio
     suffix = uuid4().hex[:10]
     username = f"runtime-admin-{suffix}"
     key = "kg_admin_settings_v1"
-    shared_keys = {revision_service.REVISION_KEY, key}
+    shared_keys = {RELATIONAL_REVISION_SNAPSHOT_KEY, key}
 
     async def seed() -> dict[str, dict]:
         snapshot = await _snapshot_shared_rows(shared_keys)
@@ -2452,7 +2664,7 @@ def test_each_bank_question_and_paper_mutation_bumps_exactly_once() -> None:
 
     suffix = uuid4().hex[:10]
     username = f"revision-crud-{suffix}"
-    shared_keys = {revision_service.REVISION_KEY}
+    shared_keys = {RELATIONAL_REVISION_SNAPSHOT_KEY}
     created_ids: dict[str, str] = {}
 
     async def scenario() -> None:
@@ -2596,6 +2808,21 @@ def test_each_bank_question_and_paper_mutation_bumps_exactly_once() -> None:
                 assert deletion is not None
                 await assert_bump("paper", paper.id, "deleted")
 
+                release_ids = select(PaperRelease.id).where(
+                    PaperRelease.paper_id == paper.id
+                )
+                await db.execute(
+                    delete(PaperReleaseQuestion).where(
+                        PaperReleaseQuestion.release_id.in_(release_ids)
+                    )
+                )
+                await db.execute(
+                    delete(PaperRelease).where(PaperRelease.paper_id == paper.id)
+                )
+                await db.execute(
+                    delete(PaperQuestion).where(PaperQuestion.paper_id == paper.id)
+                )
+                await db.commit()
                 assert await question_service.delete_question(db, actor, question.id)
                 await assert_bump("question", question.id, "deleted")
 
@@ -2650,7 +2877,9 @@ def test_content_prep_bank_creation_bumps_once() -> None:
 
     suffix = uuid4().hex[:10]
     username = f"revision-prep-bank-{suffix}"
-    snapshot = asyncio.run(_snapshot_shared_rows({revision_service.REVISION_KEY}))
+    snapshot = asyncio.run(
+        _snapshot_shared_rows({RELATIONAL_REVISION_SNAPSHOT_KEY})
+    )
     bank_id = ""
 
     async def scenario() -> None:
@@ -2691,7 +2920,7 @@ def test_content_prep_bank_creation_bumps_once() -> None:
             await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == username))
             await db.execute(delete(User).where(User.username == username))
             await db.commit()
-        await _restore_shared_rows({revision_service.REVISION_KEY}, snapshot)
+        await _restore_shared_rows({RELATIONAL_REVISION_SNAPSHOT_KEY}, snapshot)
 
     try:
         asyncio.run(scenario())

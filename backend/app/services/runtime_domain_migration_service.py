@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import unquote
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,8 +29,9 @@ from app.models.runtime_migration import RuntimeMigrationItem, RuntimeMigrationR
 from app.models.runtime_state import RuntimeState
 from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.teaching_content import ContentSubject, ContentTaxonomy, RecallAssociationLibrary, TaxonomyNode
+from app.models.user import User
 from app.services.engagement_migration import MAPPERS as ENGAGEMENT_MAPPERS, expected_canonical as engagement_expected_canonical
-from app.services import paper_service
+from app.services import paper_service, recall_acceptance_service, teaching_content_revision_service
 PUBLISHED_PAPERS_KEY = "kg_exam_papers_published_v1"
 TEACHING_RECALL_PREFIX = "kg_recall_association_library_v1__subject__"
 
@@ -248,7 +249,7 @@ async def _paper_release_mapper(db: AsyncSession, item: RuntimeMigrationItem) ->
         raise ValueError("frozen migration source hash mismatch")
     canonical = _normalize_release_source(item.source_payload, item.source_key)
     result: list[dict[str, Any]] = []
-    created_sources: list[dict[str, Any]] = []
+    target_release_ids: list[str] = []
     for raw, source in zip(item.source_payload, canonical, strict=True):
         release_id = source["releaseId"]
         existing = await db.get(PaperRelease, release_id)
@@ -257,12 +258,8 @@ async def _paper_release_mapper(db: AsyncSession, item: RuntimeMigrationItem) ->
                 PaperRelease.paper_id == source["paperId"],
                 PaperRelease.version == source["version"],
             ))
-        if existing is not None:
-            # The relational domain owns an existing release.  A compatibility
-            # snapshot may be stale after a legitimate rename, so only newly
-            # materialized releases belong to this migration item's proof.
-            continue
-        else:
+        created = existing is None
+        if existing is None:
             published_at = datetime.fromisoformat(source["publishedAt"].replace("Z", "+00:00"))
             existing = PaperRelease(
                 id=release_id,
@@ -294,8 +291,7 @@ async def _paper_release_mapper(db: AsyncSession, item: RuntimeMigrationItem) ->
                     snapshot=snapshot,
                 ))
             await db.flush()
-            created_sources.append(source)
-        if existing.status == "published":
+        if created and existing.status == "published":
             await paper_service.sync_published_projection(
                 db,
                 paper_id=existing.paper_id,
@@ -304,12 +300,13 @@ async def _paper_release_mapper(db: AsyncSession, item: RuntimeMigrationItem) ->
                 published_at=existing.published_at,
                 updated_by=existing.publisher_id,
             )
+        target_release_ids.append(existing.id)
         result.append(await _read_one_paper_release_canonical(db, existing))
-    item.expected_count = len(created_sources)
-    item.expected_hash = canonical_json_hash(created_sources)
+    item.expected_count = len(canonical)
+    item.expected_hash = canonical_json_hash(canonical)
     item.verification_metadata = {
         **dict(item.verification_metadata or {}),
-        "migrated_release_ids": [source["releaseId"] for source in created_sources],
+        "target_release_ids": target_release_ids,
     }
     return {"canonical_payload": result}
 
@@ -333,11 +330,12 @@ async def _teaching_content_mapper(db: AsyncSession, item: RuntimeMigrationItem)
                 if not taxonomy_id:
                     continue
                 row = await db.get(ContentTaxonomy, taxonomy_id)
+                created = row is None
                 if row is None:
                     row = ContentTaxonomy(id=taxonomy_id, subject_id=str(raw.get("subjectId") or group_subject_id), version=int(raw.get("version") or 1), status=str(raw.get("status") or "draft"), title=str(raw.get("title") or raw.get("name") or ""), content_metadata=dict(raw), updated_by=None if item.owner_scope in {"shared", ""} else item.owner_scope)
                     db.add(row)
                     await db.flush()
-                for position, node in enumerate(raw.get("nodes") or []):
+                for position, node in enumerate(raw.get("nodes") or [] if created else []):
                     if not isinstance(node, Mapping) or not node.get("id"):
                         continue
                     node_id = str(node["id"])
@@ -345,7 +343,8 @@ async def _teaching_content_mapper(db: AsyncSession, item: RuntimeMigrationItem)
                     if existing is None:
                         db.add(TaxonomyNode(id=f"{taxonomy_id}:{node_id}", taxonomy_id=taxonomy_id, node_id=node_id, parent_node_id=node.get("parentId"), title=str(node.get("title") or ""), record=dict(node), position=position))
                         count += 1
-        return {"canonical_payload": canonical}
+        await db.flush()
+        return {"canonical_payload": await _read_teaching_canonical(db, item)}
     subject_id = str(canonical["subjectId"])
     subject = await db.get(ContentSubject, subject_id)
     if subject is None:
@@ -357,9 +356,8 @@ async def _teaching_content_mapper(db: AsyncSession, item: RuntimeMigrationItem)
         row = (await db.execute(select(RecallAssociationLibrary).where(RecallAssociationLibrary.subject_id == subject_id, RecallAssociationLibrary.version == 1))).scalar_one_or_none()
         if row is None:
             db.add(RecallAssociationLibrary(id=f"recall-{subject_id}", subject_id=subject_id, version=1, nodes=list(raw.get("nodes") or []), edges=list(raw.get("edges") or []), content_metadata=dict(raw), updated_by=None if item.owner_scope in {"shared", ""} else item.owner_scope))
-        else:
-            row.nodes, row.edges, row.content_metadata = list(raw.get("nodes") or []), list(raw.get("edges") or []), dict(raw)
-        return {"canonical_payload": _teaching_canonical(item.source_payload, item.source_key)}
+        await db.flush()
+        return {"canonical_payload": await _read_teaching_canonical(db, item)}
     raise ValueError("unsupported teaching content source")
 
 
@@ -367,6 +365,7 @@ TEACHING_CONTENT_SOURCE_KEYS = {"kg_content_taxonomies_v1"}
 TARGET_MAPPER_REGISTRY.update({
     "kg_content_taxonomies_v1": _teaching_content_mapper,
     "kg_recall_association_library_v1__subject__subject-pmp": _teaching_content_mapper,
+    TEACHING_RECALL_PREFIX: _teaching_content_mapper,
     PUBLISHED_PAPERS_KEY: _paper_release_mapper,
     PAPER_RELEASE_HISTORY_KEY: _paper_release_mapper,
     **ENGAGEMENT_MAPPERS,
@@ -418,21 +417,33 @@ async def _runtime_sources(db: AsyncSession) -> list[Mapping[str, Any]]:
                 "required": True,
             })
     shared_rows = (
-        await db.execute(select(SharedRuntimeState.key, SharedRuntimeState.value))
+        await db.execute(
+            select(
+                SharedRuntimeState.key,
+                SharedRuntimeState.value,
+                SharedRuntimeState.updated_by,
+            )
+        )
     ).all()
-    for key, raw_value in shared_rows:
+    valid_usernames = set((await db.scalars(select(User.username))).all())
+    for key, raw_value, updated_by in shared_rows:
+        errors: list[str] = []
         try:
             payload = json.loads(str(raw_value))
-            parse_error = None
         except (TypeError, ValueError, json.JSONDecodeError) as error:
             payload = str(raw_value)
-            parse_error = f"shared runtime JSON parse failed: {error}"
+            errors.append(f"shared runtime JSON parse failed: {error}")
+        owner_scope = "shared"
+        if str(key) == recall_acceptance_service.RUNTIME_SOURCE_KEY:
+            owner_scope = str(updated_by or "").strip() or "shared"
+            if owner_scope == "shared" or owner_scope not in valid_usernames:
+                errors.append("shared recall acceptance owner is not a real user")
         sources.append({
             "source_type": "shared_runtime",
             "source_key": str(key),
-            "owner_scope": "shared",
+            "owner_scope": owner_scope,
             "payload": payload,
-            "parse_error": parse_error,
+            "parse_error": "; ".join(errors) if errors else None,
             "required": True,
         })
     return sources
@@ -631,6 +642,7 @@ async def scan(
         "items": int(total_items or 0),
         "source_snapshot_hash": snapshot_hash,
         "source_snapshot_payload": snapshot_payload,
+        "source_inventory_scope": "live" if sources is None else "provided",
     }
     run.report = report
     await db.commit()
@@ -649,13 +661,22 @@ async def migrate(
     registry = TARGET_MAPPER_REGISTRY if target_mappers is None else target_mappers
     run = await _require_run(db, run_id)
     run.status = "applying"
+    migration_order = case(
+        (RuntimeMigrationItem.source_key == PUBLISHED_PAPERS_KEY, 0),
+        (RuntimeMigrationItem.source_key == "kg_course_config_drafts_v1", 1),
+        (RuntimeMigrationItem.source_key == "kg_course_config_releases_v1", 2),
+        (RuntimeMigrationItem.source_key == "kg_learning_tasks_v1", 3),
+        (RuntimeMigrationItem.source_key == "kg_course_config_active_release_v1", 4),
+        else_=5,
+    )
     items = list(
         (await db.scalars(
             select(RuntimeMigrationItem)
             .where(RuntimeMigrationItem.run_id == run_id)
             .order_by(
-                (RuntimeMigrationItem.source_key != PUBLISHED_PAPERS_KEY),
+                migration_order,
                 RuntimeMigrationItem.created_at,
+                RuntimeMigrationItem.id,
             )
         )).all()
     )
@@ -670,6 +691,12 @@ async def migrate(
         if mapper is None:
             continue
         try:
+            if item.source_key in {PUBLISHED_PAPERS_KEY, PAPER_RELEASE_HISTORY_KEY}:
+                # Permanent question deletion takes the same transaction-level
+                # advisory lock. Acquire it on every release mapper attempt
+                # because rollback releases transaction locks before the loop
+                # continues.
+                await teaching_content_revision_service.acquire_lock(db)
             result = mapper(db, item)
             if inspect.isawaitable(result):
                 result = await result
@@ -687,8 +714,9 @@ async def migrate(
                 select(RuntimeMigrationItem)
                 .where(RuntimeMigrationItem.run_id == run_id)
                 .order_by(
-                    (RuntimeMigrationItem.source_key != PUBLISHED_PAPERS_KEY),
+                    migration_order,
                     RuntimeMigrationItem.created_at,
+                    RuntimeMigrationItem.id,
                 )
             )).all())
             items[index:] = remaining[index:] if len(remaining) > index else []
@@ -701,18 +729,40 @@ async def migrate(
         item.target_count = _payload_count(canonical_payload)
         item.target_hash = canonical_json_hash(canonical_payload)
         item.error = None
+        expected_count = item.expected_count if item.expected_count is not None else item.source_count
+        expected_hash = item.expected_hash or item.source_hash
+        if item.target_count != expected_count or item.target_hash != expected_hash:
+            metadata = dict(item.verification_metadata or {})
+            if not int(metadata.get("unresolved_conflicts") or 0):
+                metadata["unresolved_conflicts"] = 1
+                metadata["conflicts"] = [
+                    {
+                        "id": f"{item.source_type}:{item.source_key}:{item.owner_scope}",
+                        "disposition": "domain-wins",
+                        "sourceHash": expected_hash,
+                        "targetHash": item.target_hash,
+                    }
+                ]
+            item.verification_metadata = metadata
         migrated += 1
     pending = sum(1 for item in items if item.required and item.status == "pending")
-    run.status = "applied" if pending == 0 else "verification_failed"
+    required_failures = sum(
+        1 for item in items if item.required and item.status == "failed"
+    )
+    run.status = (
+        "applied" if pending == 0 and required_failures == 0 else "verification_failed"
+    )
     report = {
         "run_id": run_id,
         "status": run.status,
         "items": len(items),
         "migrated": migrated,
         "pending": pending,
+        "required_failures": required_failures,
         # Carry the frozen scan snapshot forward; every stage must keep it so
         # the drop gate can re-verify after the live tables are emptied.
         "source_snapshot_payload": (run.report or {}).get("source_snapshot_payload"),
+        "source_inventory_scope": (run.report or {}).get("source_inventory_scope"),
     }
     run.report = report
     await db.commit()
@@ -763,8 +813,11 @@ async def _read_paper_release_canonical(
 ) -> list[dict[str, Any]]:
     expected = _domain_verification_payload(item.source_payload, item.source_key)
     canonical: list[dict[str, Any]] = []
-    for source in expected:
-        release = await db.get(PaperRelease, source["releaseId"])
+    target_ids = (item.verification_metadata or {}).get("target_release_ids")
+    if not isinstance(target_ids, list) or len(target_ids) != len(expected):
+        target_ids = [source["releaseId"] for source in expected]
+    for source, target_id in zip(expected, target_ids, strict=True):
+        release = await db.get(PaperRelease, str(target_id))
         if release is not None:
             canonical.append(await _read_one_paper_release_canonical(db, release))
     return canonical
@@ -868,11 +921,32 @@ async def _read_teaching_canonical(db: AsyncSession, item: RuntimeMigrationItem)
     return {"subjectId": subject_id, "library": dict(row.content_metadata or {}) if row else {}}
 
 
+async def read_item_target_canonical(
+    db: AsyncSession, item: RuntimeMigrationItem
+) -> Any:
+    """Read a migration item's relational target without changing the ledger."""
+
+    if (
+        item.source_key in ENGAGEMENT_SOURCE_KEYS
+        or item.source_key.startswith("kg_user_message_reads_v1__")
+        or item.source_key.startswith("kg_user_feedback_reply_reads_v1__")
+    ):
+        return await _read_engagement_canonical(db, item)
+    if item.source_key == "kg_content_taxonomies_v1" or item.source_key.startswith(
+        TEACHING_RECALL_PREFIX
+    ):
+        return await _read_teaching_canonical(db, item)
+    if item.source_key in PAPER_RELEASE_SOURCE_KEYS:
+        return await _read_paper_release_canonical(db, item)
+    return None
+
+
 async def verify(
     db: AsyncSession,
     run_id: str,
     *,
     recheck_verified: bool = True,
+    commit: bool = True,
 ) -> dict[str, Any]:
     run = await _require_run(db, run_id)
     items = list(
@@ -971,9 +1045,13 @@ async def verify(
         # Preserve the frozen scan snapshot so drop gates can re-verify even
         # after the live runtime tables have been emptied.
         "source_snapshot_payload": (run.report or {}).get("source_snapshot_payload"),
+        "source_inventory_scope": (run.report or {}).get("source_inventory_scope"),
     }
     run.report = report
-    await db.commit()
+    if commit:
+        await db.commit()
+    else:
+        await db.flush()
     return report
 
 
@@ -987,26 +1065,15 @@ async def can_drop_runtime(db: AsyncSession, run_id: str) -> bool:
     stored_snapshot = (run.report or {}).get("source_snapshot_payload")
     if not isinstance(stored_snapshot, list):
         return False
-    stored_identities = {
-        (
-            str(row.get("source_type") or "runtime"),
-            str(row.get("source_key") or ""),
-            str(row.get("owner_scope") or ""),
-        )
-        for row in stored_snapshot
-        if isinstance(row, Mapping)
-    }
-    current_sources = [
-        source for source in await _runtime_sources(db)
-        if (
-            str(source.get("source_type") or "runtime"),
-            str(source.get("source_key") or ""),
-            str(source.get("owner_id") or source.get("owner_scope") or ""),
-        ) in stored_identities
-    ]
-    current_snapshot = _source_snapshot_payload(current_sources)
-    if not current_snapshot:
-        current_snapshot = stored_snapshot
+    if len(stored_snapshot) != run.source_snapshot_count:
+        return False
+    if canonical_json_hash(stored_snapshot) != run.source_snapshot_hash:
+        return False
+    if (run.report or {}).get("source_inventory_scope") != "live":
+        return False
+    # Compare the complete live inventory.  Filtering by the frozen identities
+    # would hide a key or owner created after verification.
+    current_snapshot = _source_snapshot_payload(await _runtime_sources(db))
     if len(current_snapshot) != run.source_snapshot_count:
         return False
     if canonical_json_hash(current_snapshot) != run.source_snapshot_hash:
@@ -1027,6 +1094,35 @@ async def can_drop_runtime(db: AsyncSession, run_id: str) -> bool:
         return False
     if any(item.status != "verified" for item in required_items):
         return False
+    published_release_ids: set[str] = set()
+    for item in required_items:
+        if item.source_key != PUBLISHED_PAPERS_KEY:
+            continue
+        try:
+            published_release_ids.update(
+                source["releaseId"]
+                for source in _normalize_release_source(
+                    item.source_payload, item.source_key
+                )
+            )
+        except ValueError:
+            return False
+    for item in required_items:
+        mapper = _mapper_for_key(TARGET_MAPPER_REGISTRY, item.source_key)
+        if mapper is None:
+            continue
+        target_payload = await read_item_target_canonical(db, item)
+        if item.source_key == PAPER_RELEASE_HISTORY_KEY:
+            target_payload = [
+                row
+                for row in target_payload
+                if str(row.get("releaseId")) not in published_release_ids
+            ]
+        if (
+            _payload_count(target_payload) != item.target_count
+            or canonical_json_hash(target_payload) != item.target_hash
+        ):
+            return False
     source_keys = {item.source_key for item in required_items}
     paper_items_present = bool(source_keys & PAPER_RELEASE_SOURCE_KEYS)
     if paper_items_present and not PAPER_RELEASE_SOURCE_KEYS.issubset(source_keys):
@@ -1042,8 +1138,6 @@ async def can_drop_runtime(db: AsyncSession, run_id: str) -> bool:
 async def drop_check(db: AsyncSession, run_id: str) -> dict[str, Any]:
     """Read-only drop gate report; this function never executes DDL."""
     run = await db.get(RuntimeMigrationRun, run_id)
-    if run is not None:
-        await verify(db, run_id)
     allowed = await can_drop_runtime(db, run_id)
     items = list((await db.scalars(select(RuntimeMigrationItem).where(RuntimeMigrationItem.run_id == run_id))).all()) if run else []
     return {
