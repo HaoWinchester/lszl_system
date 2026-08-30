@@ -1873,6 +1873,113 @@ async def scan_runtime_paper_sources(
     return (await _build_paper_snapshot(db, owner_ids=owner_ids, paper_ids=paper_ids)).report
 
 
+def _migration_proof_hash(value: Any) -> str:
+    rendered = json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+    ).encode("utf-8")
+    return hashlib.sha256(rendered).hexdigest()
+
+
+def _proof_timestamp(value: Any) -> str | None:
+    parsed = _parse_published_at(value)
+    return parsed.isoformat() if parsed else None
+
+
+async def verify_runtime_paper_targets(
+    db: AsyncSession,
+    *,
+    owner_ids: set[str] | None = None,
+    paper_ids: set[str] | None = None,
+) -> dict[str, Any]:
+    """Hash chosen paper candidates against freshly read relational targets."""
+
+    snapshot = await _build_paper_snapshot(db, owner_ids=owner_ids, paper_ids=paper_ids)
+    source_categories = []
+    target_categories = []
+    for identifier, candidate in sorted(snapshot.categories.items()):
+        source_categories.append({
+            "id": identifier, "ownerId": candidate.owner_id, "name": candidate.name,
+            "description": candidate.description, "order": candidate.order_index,
+            "revision": candidate.revision, "archivedAt": _proof_timestamp(candidate.archived_at),
+        })
+        row = await db.get(PaperCategory, identifier)
+        target_categories.append(None if row is None else {
+            "id": row.id, "ownerId": row.owner_id, "name": row.name,
+            "description": row.description, "order": row.order_index,
+            "revision": row.revision,
+            "archivedAt": row.archived_at.isoformat() if row.archived_at else None,
+        })
+    source_papers = []
+    target_papers = []
+    for identifier, candidate in sorted(snapshot.papers.items()):
+        references = snapshot.paper_questions.get(identifier, [])
+        source_papers.append({
+            "id": identifier, "ownerId": candidate.owner_id, "name": candidate.name,
+            "subject": candidate.subject, "description": candidate.description,
+            "categoryId": candidate.category_id, "totalCount": candidate.total_count,
+            "status": candidate.status, "quotas": candidate.quotas,
+            "accessPolicy": candidate.access_policy, "enabledModes": candidate.enabled_modes,
+            "modeConfigVersion": candidate.mode_config_version, "purpose": candidate.purpose,
+            "revision": candidate.revision, "publishedAt": _proof_timestamp(candidate.published_at),
+            "archivedAt": _proof_timestamp(candidate.archived_at),
+            "restoredAt": _proof_timestamp(candidate.restored_at),
+            "withdrawnAt": _proof_timestamp(candidate.withdrawn_at),
+            "publishedReleaseId": candidate.published_release_id,
+            "publishedVersion": candidate.published_version,
+            "questions": [
+                {"questionId": ref.question_id, "order": index, "score": float(ref.score)}
+                for index, ref in enumerate(references)
+            ],
+        })
+        row = await db.get(ExamPaper, identifier)
+        if row is None:
+            target_papers.append(None)
+            continue
+        target_refs = list((await db.scalars(
+            select(PaperQuestion).where(PaperQuestion.paper_id == identifier).order_by(PaperQuestion.order_index)
+        )).all())
+        target_papers.append({
+            "id": row.id, "ownerId": row.owner_id, "name": row.name,
+            "subject": row.subject, "description": row.description,
+            "categoryId": row.category_id, "totalCount": row.total_count,
+            "status": row.status, "quotas": row.quotas or {},
+            "accessPolicy": row.access_policy or {}, "enabledModes": row.enabled_modes or [],
+            "modeConfigVersion": row.mode_config_version, "purpose": row.purpose,
+            "revision": row.revision,
+            "publishedAt": row.published_at.isoformat() if row.published_at else None,
+            "archivedAt": row.archived_at.isoformat() if row.archived_at else None,
+            "restoredAt": row.restored_at.isoformat() if row.restored_at else None,
+            "withdrawnAt": row.withdrawn_at.isoformat() if row.withdrawn_at else None,
+            "publishedReleaseId": row.published_release_id,
+            "publishedVersion": row.published_version,
+            "questions": [
+                {"questionId": ref.question_id, "order": ref.order_index, "score": float(ref.score)}
+                for ref in target_refs
+            ],
+        })
+    source_hash = _migration_proof_hash({"categories": source_categories, "papers": source_papers})
+    target_hash = _migration_proof_hash({"categories": target_categories, "papers": target_papers})
+    report = snapshot.report
+    reference_gap = max(0, report.referenced_question_count - report.bank_validated_reference_count)
+    score_gap = max(0, report.referenced_question_count - report.reference_score_count)
+    blockers = {
+        "conflicts": len(report.conflicts),
+        "invalidRecords": len(report.invalid_records),
+        "missingQuestions": report.missing_question_count,
+        "questionsWithMissingRefs": report.questions_with_missing_refs,
+        "missingCategories": report.missing_category_count,
+        "referenceGaps": reference_gap,
+        "scoreGaps": score_gap,
+    }
+    return {
+        "sourceHash": source_hash,
+        "targetHash": target_hash,
+        "verificationHash": _migration_proof_hash({"sourceHash": source_hash, "targetHash": target_hash}),
+        "verified": source_hash == target_hash and not any(blockers.values()),
+        **blockers,
+    }
+
+
 async def migrate_runtime_papers(
     db: AsyncSession,
     *,
@@ -2297,6 +2404,58 @@ async def scan_runtime_question_sources(
     return (
         await _build_snapshot(db, owner_ids=owner_ids, bank_ids=bank_ids)
     ).report
+
+
+async def verify_runtime_question_targets(
+    db: AsyncSession,
+    *,
+    owner_ids: set[str] | None = None,
+    bank_ids: set[str] | None = None,
+) -> dict[str, Any]:
+    """Hash chosen bank/question candidates against relational target rows."""
+
+    snapshot = await _build_snapshot(db, owner_ids=owner_ids, bank_ids=bank_ids)
+    source_banks = []
+    target_banks = []
+    for identifier, candidate in sorted(snapshot.banks.items()):
+        source_banks.append({
+            "id": identifier, "ownerId": candidate.owner_id, "name": candidate.name,
+            "subject": candidate.subject, "description": candidate.description,
+            "version": candidate.version, "visibility": candidate.visibility,
+            "revision": candidate.revision,
+        })
+        row = await db.get(QuestionBank, identifier)
+        target_banks.append(None if row is None else {
+            "id": row.id, "ownerId": row.owner_id, "name": row.name,
+            "subject": row.subject, "description": row.description,
+            "version": row.version, "visibility": row.visibility, "revision": row.revision,
+        })
+    source_questions = []
+    target_questions = []
+    for identifier, candidate in sorted(snapshot.questions.items()):
+        source_questions.append({
+            "id": identifier, "bankId": candidate.bank_id,
+            "revision": candidate.revision, "contentHash": candidate.content_hash,
+        })
+        row = await db.get(Question, identifier)
+        target_questions.append(None if row is None else {
+            "id": row.id, "bankId": row.bank_id, "revision": row.revision,
+            "contentHash": canonical_question_hash(question_to_payload(row)),
+        })
+    source_hash = _migration_proof_hash({"banks": source_banks, "questions": source_questions})
+    target_hash = _migration_proof_hash({"banks": target_banks, "questions": target_questions})
+    blockers = {
+        "conflicts": len(snapshot.report.conflicts),
+        "invalidRecords": len(snapshot.report.invalid_records),
+        "nullContentHashes": snapshot.report.null_content_hashes,
+    }
+    return {
+        "sourceHash": source_hash,
+        "targetHash": target_hash,
+        "verificationHash": _migration_proof_hash({"sourceHash": source_hash, "targetHash": target_hash}),
+        "verified": source_hash == target_hash and not any(blockers.values()),
+        **blockers,
+    }
 
 
 async def migrate_runtime_questions(

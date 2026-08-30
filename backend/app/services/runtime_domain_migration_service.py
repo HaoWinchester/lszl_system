@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import unquote
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -649,12 +649,20 @@ async def migrate(
     registry = TARGET_MAPPER_REGISTRY if target_mappers is None else target_mappers
     run = await _require_run(db, run_id)
     run.status = "applying"
+    migration_order = case(
+        (RuntimeMigrationItem.source_key == PUBLISHED_PAPERS_KEY, 0),
+        (RuntimeMigrationItem.source_key == "kg_course_config_drafts_v1", 1),
+        (RuntimeMigrationItem.source_key == "kg_course_config_releases_v1", 2),
+        (RuntimeMigrationItem.source_key == "kg_learning_tasks_v1", 3),
+        (RuntimeMigrationItem.source_key == "kg_course_config_active_release_v1", 4),
+        else_=5,
+    )
     items = list(
         (await db.scalars(
             select(RuntimeMigrationItem)
             .where(RuntimeMigrationItem.run_id == run_id)
             .order_by(
-                (RuntimeMigrationItem.source_key != PUBLISHED_PAPERS_KEY),
+                migration_order,
                 RuntimeMigrationItem.created_at,
                 RuntimeMigrationItem.id,
             )
@@ -694,7 +702,7 @@ async def migrate(
                 select(RuntimeMigrationItem)
                 .where(RuntimeMigrationItem.run_id == run_id)
                 .order_by(
-                    (RuntimeMigrationItem.source_key != PUBLISHED_PAPERS_KEY),
+                    migration_order,
                     RuntimeMigrationItem.created_at,
                     RuntimeMigrationItem.id,
                 )
@@ -881,6 +889,7 @@ async def verify(
     run_id: str,
     *,
     recheck_verified: bool = True,
+    commit: bool = True,
 ) -> dict[str, Any]:
     run = await _require_run(db, run_id)
     items = list(
@@ -981,7 +990,10 @@ async def verify(
         "source_snapshot_payload": (run.report or {}).get("source_snapshot_payload"),
     }
     run.report = report
-    await db.commit()
+    if commit:
+        await db.commit()
+    else:
+        await db.flush()
     return report
 
 

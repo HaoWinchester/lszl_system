@@ -86,6 +86,9 @@ def test_migrate_owner_graph_files_recovers_orphan_content_and_uses_smallest_ord
                 current = await db.get(CurrentFile, owner)
                 assert current is not None
                 assert current.file_id == orphan_id
+                fallback_proof = await verify_all_graph_files(db, owners=[owner])
+                assert fallback_proof["verified"] is True
+                assert fallback_proof["sourceHash"] == fallback_proof["targetHash"]
                 source = await db.get(RuntimeState, owner)
                 assert source.storage == storage
             finally:
@@ -105,10 +108,11 @@ def test_migration_preserves_folder_tag_current_and_is_idempotent() -> None:
     folder_id = f"folder-{suffix}"
     file_id = f"file-{suffix}"
     tag_id = f"tag-{suffix}"
+    second_tag_id = f"tag-second-{suffix}"
     storage = {
         "kg_graph_file_index_v2": json.dumps([{
             "id": file_id, "owner": owner, "name": "带关系图谱", "folderId": folder_id,
-            "tags": ["重点"], "status": "active", "order": 1000,
+            "tags": ["重点", "次要"], "status": "active", "order": 1000,
         }]),
         f"kg_graph_file_content_v2__{owner}__{file_id}": json.dumps({
             "graphData": {"meta": {"title": "带关系图谱"}, "nodes": [], "links": []}
@@ -116,7 +120,10 @@ def test_migration_preserves_folder_tag_current_and_is_idempotent() -> None:
         "kg_graph_folders_v1": json.dumps([{
             "id": folder_id, "owner": owner, "name": "章节一", "status": "active", "order": 1000,
         }]),
-        "kg_graph_file_tags_v2": json.dumps({owner: [{"id": tag_id, "name": "重点", "color": "#ff0000"}]}),
+        "kg_graph_file_tags_v2": json.dumps({owner: [
+            {"id": tag_id, "name": "重点", "color": "#ff0000"},
+            {"id": second_tag_id, "name": "次要", "color": "#00ff00"},
+        ]}),
         "kg_graph_current_file_v2": json.dumps({owner: file_id}),
     }
 
@@ -130,11 +137,23 @@ def test_migration_preserves_folder_tag_current_and_is_idempotent() -> None:
                 report = await migrate_owner_graph_files(db, owner)
                 assert report["files"] == 1
                 assert report["folders"] == 1
-                assert report["tags"] == 1
+                assert report["tags"] == 2
                 assert (await db.get(CurrentFile, owner)).file_id == file_id
                 assert (await db.get(GraphFile, file_id)).folder_id == folder_id
                 assert (await db.get(FileTag, (file_id, tag_id))) is not None
+                assert (await db.get(FileTag, (file_id, second_tag_id))) is not None
                 assert (await db.get(Tag, tag_id)).name == "重点"
+                assert (await verify_all_graph_files(db, owners=[owner]))["verified"] is True
+                await db.execute(
+                    delete(FileTag).where(
+                        FileTag.file_id == file_id,
+                        FileTag.tag_id == second_tag_id,
+                    )
+                )
+                await db.commit()
+                tampered = await verify_all_graph_files(db, owners=[owner])
+                assert tampered["verified"] is False
+                assert tampered["sourceHash"] != tampered["targetHash"]
                 second = await migrate_owner_graph_files(db, owner)
                 assert second["created"] == 0
                 assert second["foldersCreated"] == 0

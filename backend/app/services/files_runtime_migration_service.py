@@ -335,11 +335,12 @@ async def migrate_owner_graph_files(db: AsyncSession, owner: str) -> dict[str, i
             elif source_revision < file.revision:
                 conflicts += 1
         targets[source_id] = file
-        for tag_value in (index.get("tags") if isinstance(index.get("tags"), list) else [])[:1]:
+        seen_tag_ids: set[str] = set()
+        for tag_value in (index.get("tags") if isinstance(index.get("tags"), list) else []):
             tag = tag_map.get(str(tag_value).casefold()) or tag_map.get(str(tag_value))
-            if tag and await db.get(FileTag, (file.id, tag.id)) is None:
-                existing_link = await db.scalar(select(FileTag).where(FileTag.file_id == file.id))
-                if existing_link is None:
+            if tag and tag.id not in seen_tag_ids:
+                seen_tag_ids.add(tag.id)
+                if await db.get(FileTag, (file.id, tag.id)) is None:
                     db.add(FileTag(file_id=file.id, tag_id=tag.id))
 
     current_map = _json(storage.get(CURRENT_KEY), {})
@@ -392,6 +393,206 @@ async def scan_all_graph_files(db: AsyncSession) -> dict:
         "warnings": sum(len(report["warnings"]) for report in reports),
         "reports": reports,
     }
+
+
+def _canonical_hash(value: object) -> str:
+    rendered = json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(rendered).hexdigest()
+
+
+async def _graph_verification_proof(
+    db: AsyncSession, owners: list[str]
+) -> tuple[str, str, str, list[dict[str, str]]]:
+    """Build payload-free aggregate proof over files, folders, tags and current."""
+
+    source_entities: list[dict[str, str]] = []
+    target_entities: list[dict[str, str]] = []
+    failures: list[dict[str, str]] = []
+    for owner in owners:
+        runtime = await db.get(RuntimeState, owner)
+        if runtime is None:
+            failures.append({"owner": owner, "sourceFileId": "", "reason": "runtime-state-missing"})
+            continue
+        storage = dict(runtime.storage or {})
+        indexed, contents, _warnings = _collect_runtime_graphs(owner, storage)
+        source_ids = list(indexed) + [key for key in contents if key not in indexed]
+        migrated = list((await db.scalars(select(GraphFile).where(
+            GraphFile.owner_id == owner,
+            GraphFile.source == "runtime-migration",
+        ))).all())
+        by_source = {row.source_file_id: row for row in migrated if row.source_file_id}
+
+        raw_folders = _json(storage.get(FOLDERS_KEY), [])
+        folder_sources = [
+            row for row in raw_folders
+            if isinstance(row, dict) and str(row.get("owner") or owner) == owner
+        ] if isinstance(raw_folders, list) else []
+        folder_targets = list((await db.scalars(select(Folder).where(Folder.owner_id == owner))).all())
+        used_folder_targets: set[str] = set()
+        folder_source_by_target: dict[str, str] = {}
+        for position, source in enumerate(folder_sources, 1):
+            source_id = str(source.get("id") or "").strip()
+            if not source_id:
+                continue
+            target = next((row for row in folder_targets if row.id == source_id), None)
+            if target is None:
+                deterministic = deterministic_target_id("folder", owner, source_id)
+                candidates = sorted(
+                    (
+                        row for row in folder_targets
+                        if row.id == deterministic
+                        or row.id.startswith(f"{deterministic[:61]}_")
+                    ),
+                    key=lambda row: row.id,
+                )
+                target = next(
+                    (row for row in candidates if row.id not in used_folder_targets),
+                    None,
+                )
+            expected = {
+                "name": str(source.get("name") or "未命名文件夹")[:120],
+                "parentId": str(source.get("parentId") or ""),
+                "restoreParentId": str(source.get("restoreParentId") or ""),
+                "order": int(source.get("order") or position * 1000),
+                "status": _status(source.get("status")),
+            }
+            actual = None
+            if target is not None:
+                used_folder_targets.add(target.id)
+                folder_source_by_target[target.id] = source_id
+                actual = {
+                    "name": target.name,
+                    "parentId": "",  # resolved after the complete source->target map exists
+                    "restoreParentId": "",
+                    "order": target.order_index,
+                    "status": target.status,
+                }
+            source_entities.append({"owner": owner, "kind": "folder", "id": source_id, "hash": _canonical_hash(expected)})
+            target_entities.append({"owner": owner, "kind": "folder", "id": source_id, "hash": _canonical_hash(actual)})
+        # Recompute folder target hashes with semantic source parent ids.
+        folder_target_lookup = {row.id: row for row in folder_targets}
+        for index, proof in enumerate(target_entities):
+            if proof["owner"] != owner or proof["kind"] != "folder":
+                continue
+            target_id = next((key for key, value in folder_source_by_target.items() if value == proof["id"]), "")
+            target = folder_target_lookup.get(target_id)
+            if target is not None:
+                actual = {
+                    "name": target.name,
+                    "parentId": folder_source_by_target.get(target.parent_id or "", ""),
+                    "restoreParentId": folder_source_by_target.get(target.restore_parent_id or "", ""),
+                    "order": target.order_index,
+                    "status": target.status,
+                }
+                target_entities[index] = {**proof, "hash": _canonical_hash(actual)}
+
+        raw_tags = _json(storage.get(TAGS_KEY), {})
+        tag_sources = raw_tags.get(owner, []) if isinstance(raw_tags, dict) else []
+        tag_sources = [row for row in tag_sources if isinstance(row, dict)] if isinstance(tag_sources, list) else []
+        tag_targets = list((await db.scalars(select(Tag).where(Tag.owner_id == owner))).all())
+        tag_source_by_target: dict[str, str] = {}
+        tag_source_aliases: dict[str, str] = {}
+        for source in tag_sources:
+            source_id = str(source.get("id") or source.get("name") or "").strip()
+            name = str(source.get("name") or "").strip()[:40]
+            if not source_id or not name:
+                continue
+            target = next((row for row in tag_targets if row.id == str(source.get("id") or "")), None)
+            target = target or next((row for row in tag_targets if row.name.casefold() == name.casefold()), None)
+            expected = {"name": name, "color": str(source.get("color") or "#64748b")[:16]}
+            actual = {"name": target.name, "color": target.color} if target else None
+            if target is not None:
+                tag_source_by_target[target.id] = source_id
+            tag_source_aliases[source_id.casefold()] = source_id
+            tag_source_aliases[name.casefold()] = source_id
+            source_entities.append({"owner": owner, "kind": "tag", "id": source_id, "hash": _canonical_hash(expected)})
+            target_entities.append({"owner": owner, "kind": "tag", "id": source_id, "hash": _canonical_hash(actual)})
+
+        for position, source_id in enumerate(source_ids, 1):
+            index_row = indexed.get(source_id, {})
+            content = contents.get(source_id, {})
+            raw_graph = content.get("graphData") if isinstance(content, dict) else None
+            title = str(index_row.get("name") or (raw_graph or {}).get("meta", {}).get("title") or "自动恢复图谱").strip()[:200]
+            orphan = source_id not in indexed
+            if orphan:
+                title = f"{title}（自动恢复）"[:200]
+            graph_data = _graph_data(raw_graph, title)
+            source_revision = _positive_revision(content.get("revision"), index_row.get("revision"))
+            expected = {
+                "revision": source_revision,
+                "name": title,
+                "graphHash": _canonical_hash(graph_data),
+                "learningHash": _canonical_hash(content.get("learningState") if isinstance(content.get("learningState"), dict) else {}),
+                "folderId": str(index_row.get("folderId") or ""),
+                "restoreFolderId": str(index_row.get("restoreFolderId") or ""),
+                "favorite": index_row.get("favorite") is True,
+                "order": 0 if orphan else int(index_row.get("order") or position * 1000),
+                "status": _status(index_row.get("status")),
+                "tags": sorted({
+                    tag_source_aliases.get(str(value).casefold(), str(value))
+                    for value in (
+                        index_row.get("tags")
+                        if isinstance(index_row.get("tags"), list)
+                        else []
+                    )
+                }),
+            }
+            target = by_source.get(source_id)
+            target_content = await db.get(FileContent, target.id) if target else None
+            actual = None
+            if target is not None and target_content is not None:
+                links = list((await db.scalars(
+                    select(FileTag).where(FileTag.file_id == target.id)
+                )).all())
+                actual = {
+                    "revision": target.revision,
+                    "name": target.name,
+                    "graphHash": _canonical_hash(target_content.graph_data or {}),
+                    "learningHash": _canonical_hash(target_content.learning_state or {}),
+                    "folderId": folder_source_by_target.get(target.folder_id or "", ""),
+                    "restoreFolderId": folder_source_by_target.get(target.restore_folder_id or "", ""),
+                    "favorite": target.favorite,
+                    "order": target.order_index,
+                    "status": target.status,
+                    "tags": sorted({
+                        tag_source_by_target.get(link.tag_id, link.tag_id)
+                        for link in links
+                    }),
+                }
+            source_entities.append({"owner": owner, "kind": "file", "id": source_id, "hash": _canonical_hash(expected)})
+            target_entities.append({"owner": owner, "kind": "file", "id": source_id, "hash": _canonical_hash(actual)})
+
+        current_map = _json(storage.get(CURRENT_KEY), {})
+        requested_source_id = str(current_map.get(owner) or "") if isinstance(current_map, dict) else ""
+        expected_current_file = by_source.get(requested_source_id)
+        if expected_current_file is None or expected_current_file.status != ACTIVE:
+            active_targets = [
+                row for source_id, row in by_source.items()
+                if source_id in source_ids and row.status == ACTIVE
+            ]
+            expected_current_file = min(
+                active_targets,
+                key=lambda row: (row.order_index, row.created_at, row.id),
+            ) if active_targets else None
+        expected_current = str(expected_current_file.source_file_id or "") if expected_current_file else ""
+        current = await db.get(CurrentFile, owner)
+        actual_current = ""
+        if current and current.file_id:
+            current_file = await db.get(GraphFile, current.file_id)
+            actual_current = str(current_file.source_file_id or "") if current_file else ""
+        source_entities.append({"owner": owner, "kind": "current", "id": owner, "hash": _canonical_hash(expected_current)})
+        target_entities.append({"owner": owner, "kind": "current", "id": owner, "hash": _canonical_hash(actual_current)})
+
+    source_entities.sort(key=lambda row: (row["owner"], row["kind"], row["id"]))
+    target_entities.sort(key=lambda row: (row["owner"], row["kind"], row["id"]))
+    source_hash = _canonical_hash(source_entities)
+    target_hash = _canonical_hash(target_entities)
+    if source_hash != target_hash:
+        failures.append({"owner": "", "sourceFileId": "", "reason": "canonical-proof-mismatch"})
+    verification_hash = _canonical_hash({"sourceHash": source_hash, "targetHash": target_hash})
+    return source_hash, target_hash, verification_hash, failures
 
 
 async def verify_all_graph_files(
@@ -474,7 +675,17 @@ async def verify_all_graph_files(
         expected_current_id = expected_current.id if expected_current else None
         if actual_current_id != expected_current_id:
             failures.append({"owner": owner, "sourceFileId": requested_source_id, "reason": "current-file-mismatch"})
-    return {"owners": len(owners), "verified": not failures, "failures": len(failures), "details": failures}
+    source_hash, target_hash, verification_hash, proof_failures = await _graph_verification_proof(db, owners)
+    failures.extend(proof_failures)
+    return {
+        "owners": len(owners),
+        "verified": not failures,
+        "failures": len(failures),
+        "details": failures,
+        "sourceHash": source_hash,
+        "targetHash": target_hash,
+        "verificationHash": verification_hash,
+    }
 
 
 async def drop_check_all_graph_files(db: AsyncSession) -> dict:

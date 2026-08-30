@@ -16,6 +16,8 @@ from app.services.question_migration_service import (
     migrate_runtime_questions,
     scan_runtime_paper_sources,
     scan_runtime_question_sources,
+    verify_runtime_paper_targets,
+    verify_runtime_question_targets,
 )
 from app.services import teaching_content_revision_service
 from app.services import question_service
@@ -221,6 +223,13 @@ def test_runtime_question_migration_dry_run_apply_and_rerun_are_safe() -> None:
             )
             assert applied.applied is True
             assert applied.conflicts == []
+            proof = await verify_runtime_question_targets(
+                db, owner_ids={owner}, bank_ids=bank_ids
+            )
+            assert proof["verified"] is True
+            assert proof["nullContentHashes"] == 0
+            assert proof["sourceHash"] == proof["targetHash"]
+            assert proof["verificationHash"]
             revision = await teaching_content_revision_service.current(db)
             assert revision["revision"] == revision_before_apply + 1
             assert {
@@ -522,6 +531,12 @@ def test_runtime_paper_migration_preserves_categories_fields_scores_and_order() 
                 paper_ids={paper_id},
             )
             assert applied.applied is True
+            proof = await verify_runtime_paper_targets(
+                db, owner_ids={owner}, paper_ids={paper_id}
+            )
+            assert proof["verified"] is True
+            assert proof["sourceHash"] == proof["targetHash"]
+            assert proof["verificationHash"]
             assert int(
                 (await teaching_content_revision_service.current(db))["revision"]
             ) == revision_before + 1
