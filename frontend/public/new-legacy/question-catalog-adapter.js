@@ -79,7 +79,8 @@
     const page = Math.max(1, Math.trunc(Number(options.page || 1)))
     const pageSize = Math.max(1, Math.min(200, Math.trunc(Number(options.pageSize || 20))))
     const search = String(options.search || '').trim()
-    const cacheKey = JSON.stringify([catalog.contentRevision, id, page, pageSize, search])
+    const questionType = String(options.questionType || '').trim()
+    const cacheKey = JSON.stringify([catalog.contentRevision, id, page, pageSize, search, questionType])
     if (options.forceReload !== true && bankQuestionPageCache.has(cacheKey)) {
       return clone(bankQuestionPageCache.get(cacheKey))
     }
@@ -87,6 +88,7 @@
 
     const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
     if (search) query.set('search', search)
+    if (questionType) query.set('question_type', questionType)
     const task = request(`/question-catalog/banks/${encodeURIComponent(id)}/questions?${query.toString()}`)
       .then(payload => {
         const result = {
