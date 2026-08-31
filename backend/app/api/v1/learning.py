@@ -201,6 +201,18 @@ async def start_practice_session(body: dict, db: DB, user: CurrentUser):
     return {"session": session}
 
 
+@router.post("/learning/practice/sessions/enter")
+async def enter_practice_session(body: dict, db: DB, user: CurrentUser):
+    try:
+        return await practice_session_service.enter_session(
+            db, user.username, user, body
+        )
+    except practice_session_service.PracticeSessionError as error:
+        raise HTTPException(
+            status_code=error.status_code, detail=error.detail()
+        ) from error
+
+
 @router.get("/learning/practice/sessions/active")
 async def active_practice_sessions(
     db: DB,
