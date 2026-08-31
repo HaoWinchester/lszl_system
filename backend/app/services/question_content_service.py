@@ -205,9 +205,12 @@ def normalize_question_payload(payload: dict[str, Any], *, subject: str) -> dict
 
     correct_answer = payload.get("correctAnswer")
     if normalized["type"] == "multiple_choice":
+        correct_option_ids = payload.get("correctOptionIds")
+        if correct_option_ids is None:
+            correct_option_ids = payload.get("correctAnswers")
         answer_source = {
             "options": normalized["options"],
-            "correctOptionIds": payload.get("correctOptionIds"),
+            "correctOptionIds": correct_option_ids,
             "correctAnswer": correct_answer,
         }
         if answer_source["correctOptionIds"] is None and correct_answer is None:
