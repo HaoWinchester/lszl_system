@@ -186,6 +186,49 @@ test('practice entry adapter coalesces lean summaries and does not preload overv
   assert.equal(calls.filter(call => call.url.includes('/papers/')).length, 2)
 })
 
+test('invalidating an in-flight paper summary prevents the stale result from repopulating cache', async () => {
+  const { runInNewContext } = await import('node:vm')
+  const pendingJson = []
+  let fetchCount = 0
+  const window = {
+    location: { pathname: '/new-legacy/practice-mode.html' },
+    addEventListener() {},
+    dispatchEvent() {},
+    KGAuthCore: { currentUser: () => ({ username: 'student-1' }) },
+    fetch: async () => {
+      fetchCount += 1
+      const requestNumber = fetchCount
+      return {
+        ok: true,
+        json: () => new Promise(resolve => pendingJson.push({ requestNumber, resolve })),
+      }
+    },
+  }
+  runInNewContext(
+    source('frontend/scripts/new-legacy-assets/practice-learning-adapter.js'),
+    { window, URLSearchParams, CustomEvent: class CustomEvent {} },
+  )
+  const api = window.KGPracticeLearningApi
+  const stale = api.getPaperProgress('paper-1', 'release-1')
+  await Promise.resolve()
+  api.invalidateEntrySummaries({ paperId: 'paper-1' })
+  const fresh = api.getPaperProgress('paper-1', 'release-1')
+  await Promise.resolve()
+
+  assert.equal(fetchCount, 2, 'invalidation must detach the stale in-flight request')
+  while (pendingJson.length < 2) await new Promise(resolve => setImmediate(resolve))
+  pendingJson.find(item => item.requestNumber === 2).resolve({
+    paperId: 'paper-1', modes: { challenge: { sessionId: 'fresh' }, scholar: null },
+  })
+  assert.equal((await fresh).modes.challenge.sessionId, 'fresh')
+  pendingJson.find(item => item.requestNumber === 1).resolve({
+    paperId: 'paper-1', modes: { challenge: { sessionId: 'stale' }, scholar: null },
+  })
+  assert.equal((await stale).modes.challenge.sessionId, 'stale')
+  assert.equal((await api.getPaperProgress('paper-1', 'release-1')).modes.challenge.sessionId, 'fresh')
+  assert.equal(fetchCount, 2, 'the fresh result must remain cached after the stale request settles')
+})
+
 test('practice mode grades locally and only writes whole-paper payloads on explicit save or submit', () => {
   const practice = source('new-legacy/src/100-practice-mode.js')
   // 统一草稿控制器

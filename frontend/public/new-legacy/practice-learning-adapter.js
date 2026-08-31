@@ -4,6 +4,13 @@
   const API_ROOT = '/api/v1/learning/practice'
   let overview = { mistakes: [], stats: emptyStats(), revengeStats: emptyStats(), revengeCandidates: [], plan: null }
   let loading = null
+  const progressCache = new Map()
+  const progressLoading = new Map()
+  const progressVersions = new Map()
+  let progressEpoch = 0
+  let revengeSummaryCache = null
+  let revengeSummaryLoading = null
+  let revengeSummaryVersion = 0
 
   function text(value) { return String(value == null ? '' : value) }
   function clone(value) { return JSON.parse(JSON.stringify(value)) }
@@ -14,6 +21,7 @@
     try { return global.KGAuthCore?.currentUser?.() || null } catch (error) { return null }
   }
   function authenticated() { return Boolean(currentUser()) }
+  function isPracticeEntryPage() { return /(?:^|\/)practice-mode\.html$/.test(text(global.location?.pathname)) }
   function emit(type, detail) {
     try { global.dispatchEvent(new CustomEvent(type, { detail: clone(detail) })) } catch (error) {}
   }
@@ -53,6 +61,56 @@
     if (loading) return loading
     loading = request('/overview').then(setOverview).finally(() => { loading = null })
     return loading
+  }
+  function invalidateEntrySummaries(scope = {}) {
+    const paperId = text(scope.paperId).trim()
+    if (paperId) {
+      progressCache.delete(paperId)
+      progressLoading.delete(paperId)
+      progressVersions.set(paperId, (progressVersions.get(paperId) || 0) + 1)
+    } else {
+      progressCache.clear()
+      progressLoading.clear()
+      progressEpoch += 1
+    }
+    if (!paperId || scope.revenge === true) {
+      revengeSummaryCache = null
+      revengeSummaryLoading = null
+      revengeSummaryVersion += 1
+    }
+  }
+  async function getPaperProgress(paperId, releaseId) {
+    const key = text(paperId).trim()
+    if (!key) return { paperId: '', modes: { challenge: null, scholar: null } }
+    if (progressCache.has(key)) return clone(progressCache.get(key))
+    if (progressLoading.has(key)) return clone(await progressLoading.get(key))
+    const params = new URLSearchParams()
+    if (releaseId) params.set('releaseId', text(releaseId))
+    const query = params.toString() ? `?${params}` : ''
+    const version = `${progressEpoch}:${progressVersions.get(key) || 0}`
+    const pending = request(`/papers/${encodeURIComponent(paperId)}/progress` + query)
+      .then(payload => {
+        const value = clone(payload || { paperId: key, modes: { challenge: null, scholar: null } })
+        if (version === `${progressEpoch}:${progressVersions.get(key) || 0}`) progressCache.set(key, value)
+        return value
+      })
+      .finally(() => { if (progressLoading.get(key) === pending) progressLoading.delete(key) })
+    progressLoading.set(key, pending)
+    return clone(await pending)
+  }
+  async function getRevengeSummary() {
+    if (revengeSummaryCache) return clone(revengeSummaryCache)
+    if (revengeSummaryLoading) return clone(await revengeSummaryLoading)
+    const version = revengeSummaryVersion
+    const pending = request('/revenge/summary')
+      .then(payload => {
+        const value = clone(payload || { stats: emptyStats(), resumable: null })
+        if (version === revengeSummaryVersion) revengeSummaryCache = value
+        return value
+      })
+      .finally(() => { if (revengeSummaryLoading === pending) revengeSummaryLoading = null })
+    revengeSummaryLoading = pending
+    return clone(await revengeSummaryLoading)
   }
   function snapshot() { return clone(overview) }
   function list(options = {}) {
@@ -111,6 +169,16 @@
     const payload = await request('/sessions/start', { method: 'POST', body: JSON.stringify(input || {}) })
     return clone(payload.session || null)
   }
+  async function enterSession(input) {
+    const payload = await request('/sessions/enter', { method: 'POST', body: JSON.stringify(input || {}) })
+    const session = { ...(payload.session || {}), questions: clone(payload.questions || []) }
+    invalidateEntrySummaries(
+      input?.mode === 'revenge'
+        ? { revenge: true }
+        : { paperId: input?.paperId }
+    )
+    return { resumed: payload.resumed === true, session: clone(session) }
+  }
   async function getActiveSessions(filters = {}) {
     const params = new URLSearchParams()
     if (filters.releaseId) params.set('releaseId', text(filters.releaseId))
@@ -139,13 +207,17 @@
   }
   async function pauseSession(sessionId, input, options = {}) {
     const payload = await request(`/sessions/${encodeURIComponent(sessionId)}/pause`, { method: 'POST', body: JSON.stringify(input || {}), keepalive: options.keepalive === true })
+    invalidateEntrySummaries()
     return clone(payload.session || null)
   }
   async function completeSession(sessionId, input, options = {}) {
-    return clone(await request(`/sessions/${encodeURIComponent(sessionId)}/complete`, { method: 'POST', body: JSON.stringify(input || {}), keepalive: options.keepalive === true }))
+    const payload = await request(`/sessions/${encodeURIComponent(sessionId)}/complete`, { method: 'POST', body: JSON.stringify(input || {}), keepalive: options.keepalive === true })
+    invalidateEntrySummaries()
+    return clone(payload)
   }
   async function abandonSession(sessionId, input, options = {}) {
     const payload = await request(`/sessions/${encodeURIComponent(sessionId)}/abandon`, { method: 'POST', body: JSON.stringify(input || {}), keepalive: options.keepalive === true })
+    invalidateEntrySummaries()
     return clone(payload.session || null)
   }
   async function getReport(sessionId) {
@@ -156,10 +228,15 @@
     refresh, snapshot, list, active, stats, plan, answer, upsertWrong,
     answerRevenge, remediationReviewed, verificationCandidate, verify,
     recordSession, listSessions, clearSessions, startSession, getActiveSessions,
+    getPaperProgress, getRevengeSummary, enterSession, invalidateEntrySummaries,
     getSession, updateState, answerSession, remediationSession, verifySession, pauseSession, completeSession,
     abandonSession, getReport,
   })
   global.KGPracticeLearningApi = api
-  global.addEventListener('kg-auth-session-change', () => { refresh().catch(() => setOverview({})) })
-  if (authenticated()) refresh().catch(() => setOverview({}))
+  global.addEventListener('kg-auth-session-change', () => {
+    invalidateEntrySummaries()
+    if (isPracticeEntryPage()) setOverview({})
+    else refresh().catch(() => setOverview({}))
+  })
+  if (authenticated() && !isPracticeEntryPage()) refresh().catch(() => setOverview({}))
 })(window)

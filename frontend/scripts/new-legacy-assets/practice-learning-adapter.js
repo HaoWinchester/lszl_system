@@ -6,8 +6,11 @@
   let loading = null
   const progressCache = new Map()
   const progressLoading = new Map()
+  const progressVersions = new Map()
+  let progressEpoch = 0
   let revengeSummaryCache = null
   let revengeSummaryLoading = null
+  let revengeSummaryVersion = 0
 
   function text(value) { return String(value == null ? '' : value) }
   function clone(value) { return JSON.parse(JSON.stringify(value)) }
@@ -61,9 +64,20 @@
   }
   function invalidateEntrySummaries(scope = {}) {
     const paperId = text(scope.paperId).trim()
-    if (paperId) progressCache.delete(paperId)
-    else progressCache.clear()
-    if (!paperId || scope.revenge === true) revengeSummaryCache = null
+    if (paperId) {
+      progressCache.delete(paperId)
+      progressLoading.delete(paperId)
+      progressVersions.set(paperId, (progressVersions.get(paperId) || 0) + 1)
+    } else {
+      progressCache.clear()
+      progressLoading.clear()
+      progressEpoch += 1
+    }
+    if (!paperId || scope.revenge === true) {
+      revengeSummaryCache = null
+      revengeSummaryLoading = null
+      revengeSummaryVersion += 1
+    }
   }
   async function getPaperProgress(paperId, releaseId) {
     const key = text(paperId).trim()
@@ -73,25 +87,29 @@
     const params = new URLSearchParams()
     if (releaseId) params.set('releaseId', text(releaseId))
     const query = params.toString() ? `?${params}` : ''
+    const version = `${progressEpoch}:${progressVersions.get(key) || 0}`
     const pending = request(`/papers/${encodeURIComponent(paperId)}/progress` + query)
       .then(payload => {
         const value = clone(payload || { paperId: key, modes: { challenge: null, scholar: null } })
-        progressCache.set(key, value)
+        if (version === `${progressEpoch}:${progressVersions.get(key) || 0}`) progressCache.set(key, value)
         return value
       })
-      .finally(() => { progressLoading.delete(key) })
+      .finally(() => { if (progressLoading.get(key) === pending) progressLoading.delete(key) })
     progressLoading.set(key, pending)
     return clone(await pending)
   }
   async function getRevengeSummary() {
     if (revengeSummaryCache) return clone(revengeSummaryCache)
     if (revengeSummaryLoading) return clone(await revengeSummaryLoading)
-    revengeSummaryLoading = request('/revenge/summary')
+    const version = revengeSummaryVersion
+    const pending = request('/revenge/summary')
       .then(payload => {
-        revengeSummaryCache = clone(payload || { stats: emptyStats(), resumable: null })
-        return revengeSummaryCache
+        const value = clone(payload || { stats: emptyStats(), resumable: null })
+        if (version === revengeSummaryVersion) revengeSummaryCache = value
+        return value
       })
-      .finally(() => { revengeSummaryLoading = null })
+      .finally(() => { if (revengeSummaryLoading === pending) revengeSummaryLoading = null })
+    revengeSummaryLoading = pending
     return clone(await revengeSummaryLoading)
   }
   function snapshot() { return clone(overview) }
