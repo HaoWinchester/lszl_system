@@ -156,6 +156,26 @@ async def practice_overview(db: DB, user: CurrentUser):
     return await learning_service.practice_overview(db, user.username)
 
 
+@router.get("/learning/practice/papers/{paper_id}/progress")
+async def practice_paper_progress(
+    paper_id: str,
+    db: DB,
+    user: CurrentUser,
+    release_id: str | None = Query(None, alias="releaseId"),
+):
+    return await practice_session_service.paper_progress(
+        db,
+        user.username,
+        paper_id,
+        release_id=release_id,
+    )
+
+
+@router.get("/learning/practice/revenge/summary")
+async def practice_revenge_summary(db: DB, user: CurrentUser):
+    return await practice_session_service.revenge_summary(db, user.username)
+
+
 @router.post("/learning/practice/answers")
 async def record_practice_answer(body: dict, db: DB, user: CurrentUser):
     try:

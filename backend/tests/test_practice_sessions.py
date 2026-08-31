@@ -1,6 +1,7 @@
 """Persistent, resumable practice session contracts."""
 
 import asyncio
+import json
 from pathlib import Path
 from uuid import uuid4
 
@@ -692,6 +693,111 @@ def test_active_and_detail_sessions_are_owner_scoped() -> None:
             ).status_code
             == 404
         )
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_practice_paper_progress_is_lightweight_paper_scoped_and_owner_scoped() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as owner_client:
+            assert owner_client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            created = owner_client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "challenge",
+                    "count": 10,
+                    "order": "paper",
+                },
+            )
+            assert created.status_code == 200, created.text
+            session = created.json()["session"]
+
+            response = owner_client.get(
+                f"/api/v1/learning/practice/papers/{ids['paper']}/progress",
+                params={"releaseId": ids["release"]},
+            )
+            assert response.status_code == 200, response.text
+            body = response.json()
+            assert body["paperId"] == ids["paper"]
+            assert body["modes"]["scholar"] is None
+            assert body["modes"]["challenge"] == {
+                "sessionId": session["id"],
+                "status": "active",
+                "releaseId": ids["release"],
+                "answered": 0,
+                "total": 10,
+                "currentIndex": 0,
+                "revision": 1,
+                "lastSavedAt": session["lastSavedAt"],
+            }
+            serialized = json.dumps(body)
+            for forbidden in (
+                "questions",
+                "questionOrder",
+                "answers",
+                "analysis",
+                "reasoningSteps",
+                "runtimeState",
+                "reportSnapshot",
+            ):
+                assert forbidden not in serialized
+
+        with TestClient(app) as other_client:
+            assert other_client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["other_student"], "password": PASSWORD},
+            ).status_code == 200
+            response = other_client.get(
+                f"/api/v1/learning/practice/papers/{ids['paper']}/progress"
+            )
+            assert response.status_code == 200
+            assert response.json()["modes"] == {
+                "challenge": None,
+                "scholar": None,
+            }
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_practice_revenge_summary_omits_mistakes_and_question_snapshots() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            response = client.get(
+                "/api/v1/learning/practice/revenge/summary"
+            )
+            assert response.status_code == 200, response.text
+            body = response.json()
+            assert set(body) == {"stats", "resumable"}
+            assert body["resumable"] is None
+            assert body["stats"] == {
+                "active": 0,
+                "pending": 0,
+                "needsRemediation": 0,
+                "verificationDue": 0,
+                "mastered": 0,
+                "unavailable": 0,
+            }
+            serialized = json.dumps(body)
+            for forbidden in (
+                "mistakes",
+                "revengeCandidates",
+                "questionSnapshot",
+                "questions",
+            ):
+                assert forbidden not in serialized
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
