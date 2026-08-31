@@ -9,7 +9,7 @@ from collections import defaultdict
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
@@ -291,7 +291,6 @@ async def preflight_package(
         global_source[question.id].append(question)
 
     resolved_references: list[dict] = []
-    resolved_question_types: list[str] = []
     for reference in parsed_references:
         bank = resolved_banks.get(reference["sourceBankId"])
         if bank is None:
@@ -341,36 +340,6 @@ async def preflight_package(
                 "sourceQuestionId": reference["sourceQuestionId"],
             }
         )
-        resolved_question_types.append(str(question.type or "single_choice"))
-
-    declared_paper_type = str(paper.get("paperType") or "").strip()
-    if declared_paper_type and declared_paper_type not in {
-        "standard",
-        "multiple_choice",
-    }:
-        errors.append(
-            _finding("error", "PAPER_TYPE_INVALID", "试卷类型不受支持")
-        )
-    if declared_paper_type in {"standard", "multiple_choice"}:
-        paper_type = declared_paper_type
-    elif resolved_question_types and all(
-        value == "multiple_choice" for value in resolved_question_types
-    ):
-        paper_type = "multiple_choice"
-    else:
-        paper_type = "standard"
-    if any(
-        not paper_service.question_matches_paper_type(paper_type, question_type)
-        for question_type in resolved_question_types
-    ):
-        errors.append(
-            _finding(
-                "error",
-                "PAPER_TYPE_QUESTION_MISMATCH",
-                "试卷类型与引用题目类型不一致",
-                paperType=paper_type,
-            )
-        )
 
     existing = await db.get(ExamPaper, paper_id) if paper_id else None
     conflict = None
@@ -404,13 +373,11 @@ async def preflight_package(
             "paperId": paper_id,
             "name": name,
             "subject": subject,
-            "paperType": paper_type,
             "totalCount": paper.get("totalCount"),
             "questionCount": len(raw_references),
             "sourceBankCount": len(source_banks),
         },
         "references": resolved_references,
-        "paperType": paper_type,
         "errors": errors,
         "warnings": warnings,
         "paperConflict": conflict,
@@ -537,7 +504,6 @@ async def import_package(
             if source_paper.get("description") is not None
             else None
         ),
-        "paper_type": preflight["paperType"],
         "category_id": category_id,
         "total_count": len(preflight["references"]),
         "status": "draft",
@@ -570,27 +536,6 @@ async def import_package(
         "published_release_id": None,
     }
     if request.conflict_action == "replace_draft":
-        existing_paper = await db.get(ExamPaper, target_paper_id)
-        if (
-            existing_paper is not None
-            and existing_paper.paper_type != preflight["paperType"]
-            and (
-                int(existing_paper.published_version or 0)
-                or int(
-                    await db.scalar(
-                        select(func.count())
-                        .select_from(PaperQuestion)
-                        .where(PaperQuestion.paper_id == target_paper_id)
-                    )
-                    or 0
-                )
-            )
-        ):
-            raise _error(
-                409,
-                "PAPER_TYPE_LOCKED",
-                "试卷已有题目或发布记录，不能切换类型",
-            )
         updated_id = await paper_service.cas_paper_mutation(
             db,
             actor,

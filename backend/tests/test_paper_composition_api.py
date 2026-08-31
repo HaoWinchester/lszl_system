@@ -173,13 +173,6 @@ def test_composition_preflight_builds_unequal_non_overlapping_variants() -> None
                 json={"username": teacher, "password": PASSWORD},
             )
             assert login.status_code == 200
-            multi_response = client.post(
-                "/api/v1/papers/composition/preflight",
-                json={**request, "paperType": "multiple_choice"},
-            )
-            assert multi_response.status_code == 200, multi_response.text
-            assert multi_response.json()["preflight"]["candidateCount"] == 0
-
             response = client.post(
                 "/api/v1/papers/composition/preflight",
                 json=request,

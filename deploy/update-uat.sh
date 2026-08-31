@@ -14,14 +14,6 @@ HEALTH_URL="http://127.0.0.1:18087/api/v1/health"
 PUBLIC_HEALTH_URL="https://uat.aihuanpu.com/api/v1/health"
 NGINX_CONFIG="$REPO_DIR/deploy/nginx-uat.aihuanpu.com.conf"
 MIN_FREE_GB=5   # 部署前服务器最低剩余磁盘（GB），不足则中止
-REMOTE_STATE_DIR="$REMOTE_DIR/.deploy-state"
-CURRENT_COMMIT="$(git -C "$REPO_DIR" rev-parse HEAD)"
-
-if [ -n "$(git -C "$REPO_DIR" status --porcelain)" ]; then
-  echo "✗ UAT 部署前工作区有未提交修改，请先提交，避免远端差异基线失真" >&2
-  git -C "$REPO_DIR" status --short >&2
-  exit 1
-fi
 
 version_file="$REPO_DIR/new-legacy/VERSION"
 
@@ -50,29 +42,8 @@ if [ "$free_gb" -lt "$MIN_FREE_GB" ]; then
   exit 1
 fi
 
-echo "      识别 UAT 改动范围"
-DEPLOYED_COMMIT="$(ssh "$REMOTE" "cat $REMOTE_STATE_DIR/git-commit 2>/dev/null || true")"
-VALIDATION_PROFILE="full"
-BUILD_CONTENT_PREP="1"
-if [ -n "$DEPLOYED_COMMIT" ] && git -C "$REPO_DIR" cat-file -e "$DEPLOYED_COMMIT^{commit}" 2>/dev/null; then
-  changed_paths="$(mktemp "${TMPDIR:-/tmp}/kg-uat-changes.XXXXXX")"
-  trap 'rm -f "$changed_paths"' EXIT INT TERM
-  {
-    git -C "$REPO_DIR" diff --name-only "$DEPLOYED_COMMIT" --
-    git -C "$REPO_DIR" ls-files --others --exclude-standard
-  } | awk 'NF && !seen[$0]++' > "$changed_paths"
-  VALIDATION_PROFILE="$(node "$REPO_DIR/deploy/uat-change-scope.mjs" --field validationProfile < "$changed_paths")"
-  BUILD_CONTENT_PREP="$(node "$REPO_DIR/deploy/uat-change-scope.mjs" --field buildContentPrep < "$changed_paths")"
-  [ "$BUILD_CONTENT_PREP" = "true" ] && BUILD_CONTENT_PREP="1" || BUILD_CONTENT_PREP="0"
-fi
-echo "      验收级别：$VALIDATION_PROFILE"
-
 echo "[1/9] 本地构建 new-legacy 前端产物"
-if [ "$BUILD_CONTENT_PREP" -eq 1 ]; then
-  build_content_prep
-else
-  echo "      content-prep 未变更，跳过重建"
-fi
+build_content_prep
 cd "$REPO_DIR/frontend"
 node scripts/sync-new-legacy.js
 cd "$REPO_DIR"
@@ -81,20 +52,9 @@ echo "[2/9] 打包并发布 new-legacy release"
 cd "$REPO_DIR/frontend"
 # 若本地已有同版本号但内容不同的 release（开发分支忘记递增 VERSION），自动递增末段重打包。
 # 只有 update 真正成功才允许继续，防止把旧包当新版本发布出去。
-run_release_update() {
-  if [ "$VALIDATION_PROFILE" = "uat-fast" ]; then
-    node scripts/manage-new-legacy.js update ../new-legacy \
-      --validation-profile uat-fast \
-      --uat-base-commit "$DEPLOYED_COMMIT" > /tmp/kg-uat-release.log 2>&1
-  else
-    node scripts/manage-new-legacy.js update ../new-legacy \
-      --validation-profile full > /tmp/kg-uat-release.log 2>&1
-  fi
-}
-
 updated=0
 for _ in 1 2 3; do
-  if run_release_update; then
+  if node scripts/manage-new-legacy.js update ../new-legacy > /tmp/kg-uat-release.log 2>&1; then
     updated=1
     break
   fi
@@ -136,81 +96,29 @@ ssh "$REMOTE" "healthy=0; for attempt in \$(seq 1 40); do if curl -fsS $HEALTH_U
 echo "      HEALTH_OK"
 
 echo "[6/9] 安装 Git 管理的 UAT HTTPS/HTTP2/gzip 配置"
-LOCAL_NGINX_HASH="$(shasum -a 256 "$NGINX_CONFIG" | awk '{print $1}')"
-REMOTE_NGINX_HASH="$(ssh "$REMOTE" "sudo sha256sum /etc/nginx/conf.d/uat.aihuanpu.com.conf 2>/dev/null | awk '{print \$1}'" || true)"
-if [ "$LOCAL_NGINX_HASH" != "$REMOTE_NGINX_HASH" ]; then
-  rsync -az "$NGINX_CONFIG" "$REMOTE:/tmp/nginx-uat.aihuanpu.com.conf"
-  ssh "$REMOTE" "sudo test -s /etc/letsencrypt/live/uat.aihuanpu.com/fullchain.pem \
-    && sudo test -s /etc/letsencrypt/live/uat.aihuanpu.com/privkey.pem \
-    && sudo install -m 0644 /tmp/nginx-uat.aihuanpu.com.conf /etc/nginx/conf.d/uat.aihuanpu.com.conf \
-    && sudo nginx -t \
-    && sudo systemctl reload nginx"
-else
-  echo "      nginx 配置未变更，跳过 reload"
-fi
+rsync -az "$NGINX_CONFIG" "$REMOTE:/tmp/nginx-uat.aihuanpu.com.conf"
+ssh "$REMOTE" "sudo test -s /etc/letsencrypt/live/uat.aihuanpu.com/fullchain.pem \
+  && sudo test -s /etc/letsencrypt/live/uat.aihuanpu.com/privkey.pem \
+  && sudo install -m 0644 /tmp/nginx-uat.aihuanpu.com.conf /etc/nginx/conf.d/uat.aihuanpu.com.conf \
+  && sudo nginx -t \
+  && sudo systemctl reload nginx"
 curl -fsS "$PUBLIC_HEALTH_URL" >/dev/null
 echo "      HTTPS_HEALTH_OK"
 
-echo "[7/9] 核对历史已发布试卷回填状态（远端数据快照 + 回填代码）"
-PLAN_REPORT="/tmp/uat-paper-release-plan.json"
-ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE exec -T backend python -m app.cli.runtime_domain_migration plan \
+echo "[7/9] 回填历史已发布试卷到关系化目录（仅限两个试卷发布键）"
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE exec -T backend python -m app.cli.runtime_domain_migration backfill \
+  --run-id uat-paper-release-backfill-v1 \
   --source-key kg_exam_papers_published_v1 \
   --source-key kg_exam_paper_release_history_v1 \
-  --report-json $PLAN_REPORT"
-SOURCE_SNAPSHOT_HASH="$(ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE exec -T backend python -c \"import json; print(json.load(open('$PLAN_REPORT'))['source_snapshot_hash'])\"")"
-case "$SOURCE_SNAPSHOT_HASH" in
-  *[!0-9a-f]*|'') echo "✗ 无法读取历史试卷数据快照指纹" >&2; exit 1 ;;
-esac
-if [ "${#SOURCE_SNAPSHOT_HASH}" -ne 64 ]; then
-  echo "✗ 历史试卷数据快照指纹长度异常" >&2
-  exit 1
-fi
-BACKFILL_CODE_HASH="$({
-  printf '%s\n' 'uat-paper-release-backfill-v2'
-  for tree in backend/app backend/alembic; do
-    git -C "$REPO_DIR" rev-parse "HEAD:$tree" 2>/dev/null || printf '%s\n' "missing:$tree"
-  done
-} | shasum -a 256 | awk '{print $1}')"
-BACKFILL_FINGERPRINT="$(printf '%s\n%s\n' "$SOURCE_SNAPSHOT_HASH" "$BACKFILL_CODE_HASH" | shasum -a 256 | awk '{print $1}')"
-REMOTE_BACKFILL_FINGERPRINT="$(ssh "$REMOTE" "cat $REMOTE_STATE_DIR/paper-release-backfill-fingerprint 2>/dev/null || true")"
-BACKFILL_TARGET_VERIFIED="0"
-if [ "$BACKFILL_FINGERPRINT" = "$REMOTE_BACKFILL_FINGERPRINT" ]; then
-  if ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE exec -T backend python -m app.cli.runtime_domain_migration verify \
-    --run-id uat-paper-release-backfill-v1 \
-    --report-json /tmp/uat-paper-release-verify.json"; then
-    BACKFILL_TARGET_VERIFIED="1"
-  else
-    echo "      目标表或迁移账本校验失败，强制重新 backfill"
-  fi
-fi
-if [ "$BACKFILL_FINGERPRINT" != "$REMOTE_BACKFILL_FINGERPRINT" ] || [ "$BACKFILL_TARGET_VERIFIED" != "1" ]; then
-  ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE exec -T backend python -m app.cli.runtime_domain_migration backfill \
-    --run-id uat-paper-release-backfill-v1 \
-    --source-key kg_exam_papers_published_v1 \
-    --source-key kg_exam_paper_release_history_v1 \
-    --report-json /tmp/uat-paper-release-backfill.json"
-  ssh "$REMOTE" "mkdir -p $REMOTE_STATE_DIR \
-    && printf '%s\n' '$BACKFILL_FINGERPRINT' > $REMOTE_STATE_DIR/paper-release-backfill-fingerprint.tmp \
-    && mv $REMOTE_STATE_DIR/paper-release-backfill-fingerprint.tmp $REMOTE_STATE_DIR/paper-release-backfill-fingerprint"
-  echo "      PAPER_RELEASE_BACKFILL_OK"
-else
-  echo "      数据快照、回填代码和目标完整性均未变更，跳过 backfill"
-fi
+  --report-json /tmp/uat-paper-release-backfill.json"
+echo "      PAPER_RELEASE_BACKFILL_OK"
 
 echo "[8/9] 清理构建缓存与悬空镜像（仅清理 dangling 资源，不动运行中容器）"
 ssh "$REMOTE" 'docker image prune -f >/dev/null; docker builder prune -f --filter until=168h >/dev/null; true'
 
 echo "[9/9] 磁盘水位与 UAT 版本核对"
 ssh "$REMOTE" 'df -h / | tail -1'
-PUBLIC_VERSION="$(curl -fsS "https://uat.aihuanpu.com/" | sed -n 's/.*data-release="\([^"]*\)".*/\1/p' | head -1)"
-if [ "$PUBLIC_VERSION" != "$VERSION" ]; then
-  echo "✗ UAT 公网版本不匹配：期望 ${VERSION}，实际 ${PUBLIC_VERSION:-未识别}" >&2
-  exit 1
-fi
-ssh "$REMOTE" "mkdir -p $REMOTE_STATE_DIR \
-  && printf '%s\n' '$CURRENT_COMMIT' > $REMOTE_STATE_DIR/git-commit.tmp \
-  && mv $REMOTE_STATE_DIR/git-commit.tmp $REMOTE_STATE_DIR/git-commit"
-echo "      PUBLIC_RELEASE_OK=$PUBLIC_VERSION"
+curl -fsS "https://uat.aihuanpu.com/" | grep -o 'data-release="[^"]*"' | head -1 || true
 
 echo
 echo "✓ UAT 更新完成：https://uat.aihuanpu.com ($VERSION)"

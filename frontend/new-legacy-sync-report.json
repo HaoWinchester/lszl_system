@@ -1,12 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.194",
-  "toVersion": "v9.0-p4.1.195",
+  "fromVersion": "v9.0-p4.1.193",
+  "toVersion": "v9.0-p4.1.193",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []

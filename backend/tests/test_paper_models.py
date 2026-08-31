@@ -1,5 +1,4 @@
 from sqlalchemy import Numeric, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
 
 from app.db.base import Base
 from app.models.paper import (
@@ -7,10 +6,7 @@ from app.models.paper import (
     PaperGenerationBatch,
     PaperImportOperation,
 )
-from app.models.paper_release import PaperRelease
-from app.models.question import ExamPaper, PaperQuestion, Question
-from app.models.training import PracticeVerification
-from app.schemas.question_catalog import QuestionPayload
+from app.models.question import ExamPaper, PaperQuestion
 
 
 def unique_columns(table) -> set[tuple[str, ...]]:
@@ -86,24 +82,3 @@ def test_paper_category_and_batch_links_are_recoverable() -> None:
     assert category_fk.ondelete == "SET NULL"
     assert batch_fk.target_fullname == "paper_generation_batches.id"
     assert batch_fk.ondelete == "SET NULL"
-
-
-def test_multiple_choice_models_store_canonical_arrays_and_paper_type() -> None:
-    assert isinstance(Question.__table__.columns["correct_answer_ids"].type, JSONB)
-    assert "paper_type" in ExamPaper.__table__.columns
-    assert "paper_type" in PaperRelease.__table__.columns
-    assert isinstance(
-        PracticeVerification.__table__.columns["selected_answer_ids"].type,
-        JSONB,
-    )
-
-
-def test_question_payload_exposes_correct_option_ids_alias() -> None:
-    payload = QuestionPayload.model_validate({
-        "id": "question-1",
-        "title": "多选题",
-        "correctOptionIds": ["A", "C"],
-    })
-
-    assert payload.correct_option_ids == ["A", "C"]
-    assert payload.model_dump(by_alias=True)["correctOptionIds"] == ["A", "C"]

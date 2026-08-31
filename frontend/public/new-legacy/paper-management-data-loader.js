@@ -125,9 +125,8 @@
       const page = Math.max(1, Math.trunc(Number(options.page || 1)));
       const pageSize = Math.max(1, Math.min(200, Math.trunc(Number(options.pageSize || 12))));
       const search = text(options.search).trim();
-      const questionType = text(options.questionType || 'standard').trim();
       const generation = ++bankGeneration;
-      const key = JSON.stringify([id, page, pageSize, search, questionType]);
+      const key = JSON.stringify([id, page, pageSize, search]);
       state.selectedBankId = id;
       state.candidatePage = page;
       state.candidatePageSize = pageSize;
@@ -145,7 +144,7 @@
       try {
         const result = options.forceReload !== true && candidatePages.has(key)
           ? clone(candidatePages.get(key))
-          : await catalogApi.loadBankQuestionPage(id, { page, pageSize, search, questionType, forceReload: options.forceReload });
+          : await catalogApi.loadBankQuestionPage(id, { page, pageSize, search, forceReload: options.forceReload });
         if (options.forceReload === true || !candidatePages.has(key)) candidatePages.set(key, clone(result));
         if (generation !== bankGeneration || state.selectedBankId !== id) return clone(result);
         state.candidateQuestions = Array.isArray(result?.questions) ? clone(result.questions) : [];

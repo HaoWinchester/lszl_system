@@ -8,15 +8,9 @@ const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
 const MODULE_PATH = path.join(root, 'src/114-practice-draft-state.js');
-const ANSWER_SET_PATH = path.join(root, 'src/117-question-answer-set.js');
 const context = { window: {}, console };
 context.window.window = context.window;
 vm.createContext(context);
-vm.runInContext(
-  fs.readFileSync(ANSWER_SET_PATH, 'utf8'),
-  context,
-  { filename: 'src/117-question-answer-set.js' },
-);
 vm.runInContext(
   fs.readFileSync(MODULE_PATH, 'utf8'),
   context,
@@ -149,26 +143,6 @@ test('selectionIndex stays stable across reads and later answers', () => {
   // 读两次结果一致（selectionIndex 稳定）
   assert.deepEqual(plain(draft.submission()), plain(draft.submission()))
   assert.equal(draft.answer('q2').selectionIndex, 1)
-})
-
-test('multiple-choice answers use canonical arrays and exact-set grading', () => {
-  const question = {
-    questionId: 'multi-1',
-    question: {
-      type: 'multiple_choice',
-      correctOptionIds: ['A', 'C'],
-      options: [{ id: 'A' }, { id: 'B' }, { id: 'C' }],
-    },
-  }
-  const exact = Core.create({ questions: [question], answers: {} })
-  assert.equal(exact.select('multi-1', ['C', 'A']).answer.correct, true)
-  assert.deepEqual(plain(exact.submission()), {
-    'multi-1': { selectedAnswerIds: ['A', 'C'], selectionIndex: 1 },
-  })
-  for (const selected of [['A'], ['A', 'B', 'C'], ['A', 'B']]) {
-    const draft = Core.create({ questions: [question], answers: {} })
-    assert.equal(draft.select('multi-1', selected).answer.correct, false)
-  }
 })
 
 test('create, select and readers never mutate the provided inputs', () => {

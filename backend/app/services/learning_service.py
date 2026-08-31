@@ -18,7 +18,7 @@ from app.models.training import (
     PracticeVerification,
     TrainingProgress,
 )
-from app.services import question_catalog_service, question_service, practice_experience_service, question_answer_service
+from app.services import question_catalog_service, question_service, practice_experience_service
 
 SESSION_SCHEMA_VERSIONS = {1, 2}
 WORKSPACE_SCHEMA_VERSIONS = set(range(1, 11))
@@ -318,7 +318,6 @@ def _practice_verification_to_dict(verification: PracticeVerification) -> dict:
         "questionId": verification.question_id,
         "bankId": verification.bank_id,
         "selectedAnswer": verification.selected_answer,
-        "selectedAnswerIds": verification.selected_answer_ids or [],
         "correct": verification.correct,
         "createdAt": _iso(verification.created_at),
     }
@@ -523,7 +522,6 @@ async def _record_answer_completion(
     data: dict,
     *,
     selected_answer: str,
-    selected_answer_ids: list[str] | None = None,
     correct: bool,
 ) -> dict:
     """Persist the fact that one option was accepted, independently of mastery."""
@@ -561,7 +559,6 @@ async def _record_answer_completion(
             **answer,
             "selectedAnswer": selected_answer,
             "selectedOptionId": selected_answer,
-            **({"selectedAnswerIds": selected_answer_ids} if selected_answer_ids is not None else {}),
             "submitted": True,
             "isCorrect": correct,
         },
@@ -594,7 +591,6 @@ async def _record_answer_completion(
         "paperId": context["paperId"],
         "releaseId": context["releaseId"],
         "selectedAnswer": selected_answer,
-        **({"selectedAnswerIds": selected_answer_ids} if selected_answer_ids is not None else {}),
         "correct": correct,
         "completedAt": completed_at,
     }
@@ -654,8 +650,6 @@ async def record_practice_answer(
         raise ValueError("bankId 与题目不一致")
     timed_out = data.get("timedOut") is True
     selected_answer = str(data.get("selectedAnswer") or "").strip()
-    snapshot = _question_snapshot(question)
-    multiple = str(question.type or "") == "multiple_choice"
     option_ids = {
         str(option.get("id") or "").strip()
         for option in (question.options or [])
@@ -663,25 +657,12 @@ async def record_practice_answer(
     }
     if timed_out:
         selected_answer = "__timeout__"
-    selected_answer_ids = question_answer_service.normalize_option_ids(
-        data.get("selectedAnswerIds"), [
-            str(option.get("id") or "").strip()
-            for option in (question.options or [])
-            if isinstance(option, dict) and str(option.get("id") or "").strip()
-        ]
-    ) if multiple and not timed_out else []
-    if multiple and not timed_out and not selected_answer_ids:
-        raise ValueError("selectedAnswerIds 不是该题的有效选项集合")
-    if not multiple and not timed_out and (not selected_answer or selected_answer not in option_ids):
+    elif not selected_answer or selected_answer not in option_ids:
         raise ValueError("selectedAnswer 不是该题的有效选项")
     canonical_answer = _canonical_practice_answer(question)
-    grading = question_answer_service.grade_selection(
-        snapshot, selected_answer_ids if multiple else [selected_answer], timed_out=timed_out
-    )
-    if (multiple and len(grading["correctOptionIds"]) < 2) or (not multiple and not canonical_answer):
+    if not canonical_answer:
         raise ValueError("题目尚未配置可判定的正确答案")
-    correct = bool(grading["correct"])
-    stored_selection = selected_answer_ids if multiple else [selected_answer]
+    correct = selected_answer == canonical_answer
     await _practice_write_lock(
         db, owner, f"{release_id}:{question.id}", allow_concurrent=allow_concurrent
     )
@@ -699,7 +680,7 @@ async def record_practice_answer(
     if not record:
         # 只判定：长期错题状态保持原样（锁内的 FOR UPDATE 读取不产生写入）。
         completion = await _record_answer_completion(
-            db, owner, question, data, selected_answer=",".join(stored_selection), selected_answer_ids=selected_answer_ids if multiple else None, correct=correct
+            db, owner, question, data, selected_answer=selected_answer, correct=correct
         )
         return {"correct": correct, "mistake": None, "completion": completion}
     if not correct:
@@ -712,14 +693,18 @@ async def record_practice_answer(
                 source_mode=str(data.get("sourceMode") or "challenge").strip()[:32] or "challenge",
                 language_mode=str(data.get("languageMode") or "zh").strip().lower(),
                 question_snapshot=_question_snapshot(question), knowledge=_practice_knowledge(question),
-                selected_answers=stored_selection, status="pending", wrong_count=1,
+                selected_answers=_latest_actual_wrong_answers(
+                    selected_answer, _question_snapshot(question)
+                ), status="pending", wrong_count=1,
                 first_wrong_at=now, last_wrong_at=now,
             )
             db.add(mistake)
         else:
             mistake.question_snapshot = _question_snapshot(question)
             mistake.knowledge = _practice_knowledge(question)
-            mistake.selected_answers = stored_selection
+            mistake.selected_answers = _latest_actual_wrong_answers(
+                selected_answer, mistake.question_snapshot
+            )
             if mistake.status != "needs_remediation":
                 mistake.status = "pending"
             mistake.wrong_count += 1
@@ -743,10 +728,10 @@ async def record_practice_answer(
                 owner,
                 event_type="PRACTICE_MISTAKE_MASTERED" if next_status == "mastered" else "PRACTICE_MISTAKE_VERIFICATION_SCHEDULED",
                 question_id=question.id,
-                payload={"mistakeId": mistake.id, "releaseId": release_id, **({"selectedAnswerIds": selected_answer_ids} if multiple else {"selectedAnswer": selected_answer}), "status": next_status},
+                payload={"mistakeId": mistake.id, "releaseId": release_id, "selectedAnswer": selected_answer, "status": next_status},
             )
     completion = await _record_answer_completion(
-        db, owner, question, data, selected_answer=",".join(stored_selection), selected_answer_ids=selected_answer_ids if multiple else None, correct=correct
+        db, owner, question, data, selected_answer=selected_answer, correct=correct
     )
     await _append_practice_event(
         db, owner, event_type="PRACTICE_ANSWER_COMPLETED", question_id=question.id,
@@ -1060,7 +1045,6 @@ def build_global_revenge_pool(
         candidate["previousWrongAnswer"] = _latest_previous_wrong_answer(
             group_rows, snapshot
         )
-        candidate["previousWrongAnswerIds"] = list(representative.selected_answers or [])
         candidates.append(candidate)
     return {
         "candidates": candidates,
@@ -1195,25 +1179,12 @@ async def record_revenge_answer(
         for option in snapshot.get("options") or []
         if isinstance(option, dict) and str(option.get("id") or "").strip()
     }
-    multiple = str(snapshot.get("type") or "") == "multiple_choice"
-    selected_answer_ids = question_answer_service.normalize_option_ids(
-        data.get("selectedAnswerIds"), [
-            str(option.get("id") or "").strip()
-            for option in snapshot.get("options") or []
-            if isinstance(option, dict) and str(option.get("id") or "").strip()
-        ]
-    ) if multiple else []
-    if multiple and not selected_answer_ids:
-        raise ValueError("selectedAnswerIds 不是该题的有效选项集合")
-    if not multiple and (not selected_answer or selected_answer not in option_ids):
+    if not selected_answer or selected_answer not in option_ids:
         raise ValueError("selectedAnswer 不是该题的有效选项")
     canonical_answer = canonical_practice_snapshot_answer(snapshot)
-    grading = question_answer_service.grade_selection(
-        snapshot, selected_answer_ids if multiple else [selected_answer]
-    )
-    if (multiple and len(grading["correctOptionIds"]) < 2) or (not multiple and not canonical_answer):
+    if not canonical_answer:
         raise ValueError("错题快照尚未配置可判定的正确答案")
-    correct = bool(grading["correct"])
+    correct = selected_answer == canonical_answer
     now = now_utc()
     mistake.revenge_attempt_count += 1
     mistake.last_revenge_at = now
@@ -1226,7 +1197,9 @@ async def record_revenge_answer(
         mistake.status = "needs_remediation"
         mistake.next_review_at = None
         mistake.mastered_at = None
-        mistake.selected_answers = selected_answer_ids if multiple else _latest_actual_wrong_answers(selected_answer, snapshot)
+        mistake.selected_answers = _latest_actual_wrong_answers(
+            selected_answer, snapshot
+        )
     await _append_practice_event(
         db,
         owner,
@@ -1289,7 +1262,6 @@ async def practice_verification_candidate(
     knowledge = mistake.knowledge or _practice_snapshot_knowledge(mistake.question_snapshot or {})
     taxonomy_id = str(knowledge.get("taxonomyId") or "").strip()
     node_id = str(knowledge.get("nodeId") or "").strip()
-    question_type = str((mistake.question_snapshot or {}).get("type") or "single_choice")
     if not taxonomy_id or not node_id:
         raise ValueError("当前错题尚未配置可用于验证的主要知识点")
     query = (
@@ -1299,7 +1271,6 @@ async def practice_verification_candidate(
             QuestionBank.visibility == "published",
             Question.scope == "public",
             Question.id != mistake.question_id,
-            Question.type == question_type,
             Question.content_metadata["knowledge"]["taxonomyId"].astext == taxonomy_id,
             or_(
                 Question.content_metadata["knowledge"]["primaryNodeId"].astext == node_id,
@@ -1352,30 +1323,22 @@ async def record_practice_verification(
     candidate_question = candidate["question"]
     if question_id != str(candidate_question.get("id") or ""):
         raise ValueError("验证题必须是同一知识点的不同已发布题")
-    multiple = str(candidate_question.get("type") or "") == "multiple_choice"
     selected_answer = str(data.get("selectedAnswer") or "").strip()
-    selected_answer_ids = question_answer_service.normalize_option_ids(
-        data.get("selectedAnswerIds") if multiple else [selected_answer],
-        [
-            str(option.get("id") or "").strip()
-            for option in candidate_question.get("options") or []
-            if isinstance(option, dict) and str(option.get("id") or "").strip()
-        ],
-    )
-    if multiple and not selected_answer_ids:
-        raise ValueError("selectedAnswerIds 不是验证题的有效选项")
-    if not multiple and not selected_answer_ids:
+    option_ids = {
+        str(option.get("id") or "").strip()
+        for option in candidate_question.get("options") or []
+        if isinstance(option, dict) and str(option.get("id") or "").strip()
+    }
+    if not selected_answer or selected_answer not in option_ids:
         raise ValueError("selectedAnswer 不是验证题的有效选项")
-    grading = question_answer_service.grade_selection(candidate_question, selected_answer_ids)
-    correct = bool(grading["correct"])
+    correct = selected_answer == str(candidate_question.get("correctAnswer") or "")
     verification = PracticeVerification(
         id=uid("pv_"),
         mistake_id=mistake.id,
         owner_id=owner,
         question_id=question_id,
         bank_id=str(candidate_question.get("bankId") or "").strip() or None,
-        selected_answer=(",".join(selected_answer_ids) if multiple else selected_answer) or None,
-        selected_answer_ids=selected_answer_ids if multiple else [],
+        selected_answer=selected_answer or None,
         correct=correct,
     )
     db.add(verification)
@@ -1391,12 +1354,7 @@ async def record_practice_verification(
         owner,
         event_type="PRACTICE_REMEDIATION_VERIFIED",
         question_id=question_id,
-        payload={
-            "mistakeId": mistake.id,
-            "correct": correct,
-            "sourceQuestionId": mistake.question_id,
-            **({"selectedAnswerIds": selected_answer_ids} if multiple else {"selectedAnswer": selected_answer}),
-        },
+        payload={"mistakeId": mistake.id, "correct": correct, "sourceQuestionId": mistake.question_id},
     )
     if commit:
         await db.commit()

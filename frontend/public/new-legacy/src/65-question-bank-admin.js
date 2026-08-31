@@ -20,7 +20,6 @@
   const PaperQuotaService=window.KGPaperQuotaService||{};
   const PrincipleRepository=window.KGPrincipleRepository||{};
   const PrincipleBinding=window.KGQuestionPrincipleBinding||{};
-  const AnswerSet=window.KGQuestionAnswerSet||{};
   const PAPER_MODE_IDS=PaperModePolicy.IDS||Object.freeze(['practice_mode','deep_recall','multi_question_canvas']);
   const PAPER_MODE_LABELS=PaperModePolicy.LABELS||Object.freeze({practice_mode:'刷题',deep_recall:'深度回忆',multi_question_canvas:'归纳'});
   const PAPER_MODE_CONFIG_VERSION=Number(PaperModePolicy.CONFIG_VERSION||2);
@@ -377,25 +376,6 @@
     return normalizeQuestion(fallback);
   }
 
-  function multipleChoiceTemplateQuestion(){
-    return normalizeQuestion({
-      ...emptyQuestion('PMP'),
-      id:'question-template-multiple-choice',
-      title:'多选题导入示例',
-      type:'multiple_choice',
-      stem:'以下哪些做法有助于管理项目风险？',
-      options:[
-        {id:'A',text:'识别并登记风险'},
-        {id:'B',text:'忽略低概率风险'},
-        {id:'C',text:'规划并跟踪风险应对'},
-        {id:'D',text:'隐瞒已经发生的问题'}
-      ],
-      correctOptionIds:['A','C'],
-      correctAnswer:'',
-      analysis:'A、C 分别对应风险识别和风险应对管理；B、D 都会削弱风险管理。'
-    });
-  }
-
   function starterBanks(){
     const now = Date.now();
     return [
@@ -566,15 +546,11 @@
     question = question && typeof question === 'object' ? question : {};
     if(Difficulty.migrateQuestion)question=Difficulty.migrateQuestion(question);
     const stemParts = Array.isArray(question.stemParts) ? question.stemParts : [{text:String(question.stem || '')}];
-    const type=String(question.type || 'single_choice');
-    const correct = type==='multiple_choice' ? '' : String(question.correctAnswer || '');
+    const correct = String(question.correctAnswer || '');
     const options = Array.isArray(question.options) ? question.options.map((o,i) => normalizeOption(o,i,correct)) : [];
     const detectedCorrect = options.find(o => o.correct);
-    const correctOptionIds=type==='multiple_choice'
-      ? (AnswerSet.correctIds?.({...question,options}) || options.filter(option=>option.correct).map(option=>option.id))
-      : [];
-    const correctAnswer = type==='multiple_choice' ? '' : String(question.correctAnswer || detectedCorrect?.id || options[0]?.id || '');
-    options.forEach(o => { o.correct = type==='multiple_choice' ? correctOptionIds.includes(o.id) : (o.id === correctAnswer || o.correct && !correctAnswer); });
+    const correctAnswer = String(question.correctAnswer || detectedCorrect?.id || options[0]?.id || '');
+    options.forEach(o => { o.correct = o.id === correctAnswer || o.correct && !correctAnswer; });
     const metadataSource={...(question.metadata&&typeof question.metadata==='object'?question.metadata:{}),principleIds:[...new Set([...(Array.isArray(question.principleIds)?question.principleIds:[]),...(Array.isArray(question.metadata?.principleIds)?question.metadata.principleIds:[])].map(String).filter(Boolean))]};
     const principleBindings=PrincipleBinding.normalize?.(metadataSource,options.map(option=>option.id))||{stemPrincipleIds:metadataSource.principleIds||[],optionPrincipleMap:metadataSource.optionPrincipleMap||{},principleIds:metadataSource.principleIds||[]};
     return {
@@ -582,7 +558,7 @@
       id:String(question.id || ('q-' + Date.now().toString(36) + '-' + index)),
       teacherNumber:String(question.teacherNumber || question.displayNumber || ''),
       title:String(question.title || '未命名题目'),
-      type,
+      type:String(question.type || 'single_choice'),
       subject:String(question.subject || ''),
       difficulty:difficultyValue(question.difficulty),
       domain:String(question.domain || ''),
@@ -592,7 +568,6 @@
       stemParts:stemParts.map(p => ({text:String(p && p.text || ''), ...(p && p.clue ? {clue:String(p.clue)} : {})})),
       options,
       correctAnswer,
-      correctOptionIds,
       analysis:String(question.analysis || ''),
       translations:normalizeTranslations(question),
       metadata:{...metadataSource,...principleBindings,tagPaths:Array.isArray(question.metadata?.tagPaths)?question.metadata.tagPaths.map(item=>item&&typeof item==='object'?{...item,label:canonicalTagName(item.label)}:item):[],translationStatus:String(question.metadata?.translationStatus || (normalizeTranslations(question).en?'bilingual':'zh_only')),knowledge:normalizeQuestionKnowledge(question,String(question.subject||'')),classificationHistory:Array.isArray(question.metadata?.classificationHistory)?question.metadata.classificationHistory.slice(-50):[]},
@@ -692,7 +667,6 @@
       id:String(paper.id || ('paper-' + Date.now().toString(36) + '-' + index)),
       name:String(paper.name || subject + ' 综合训练试卷'),
       subject,
-      paperType:String(paper.paperType||paper.paper_type||'standard')==='multiple_choice'?'multiple_choice':'standard',
       description:String(paper.description || ''),
       accessPolicy:{accessLevel},
       totalCount:Number(paper.totalCount || paper.targetCount || 180),
@@ -733,7 +707,7 @@
   }
   function paperMetadataPayload(paper){
     return {
-      revision:paper.revision,name:paper.name,subject:paper.subject,paperType:paper.paperType,description:paper.description,
+      revision:paper.revision,name:paper.name,subject:paper.subject,description:paper.description,
       categoryId:paper.categoryId||null,totalCount:Math.max(Number(paper.totalCount||0),paper.questions?.length||0),
       quotas:{supplementMode:paper.supplementMode==='principle'?'principle':'domain',domainQuotas:clone(paper.domainQuotas||{}),principleQuotas:clone(paper.principleQuotas||{})},
       accessPolicy:clone(paper.accessPolicy||{}),enabledModes:clone(paper.enabledModes||[]),modeConfigVersion:Number(paper.modeConfigVersion||PAPER_MODE_CONFIG_VERSION),purpose:String(paper.purpose||'learning')
@@ -946,8 +920,7 @@
   function supplementPaperDraft(value,candidateRows=paperCandidates(value?.subject),random=Math.random){
     if(typeof PaperQuotaService.supplement!=='function')throw new Error('试卷配额服务未加载，请刷新页面后重试。');
     const paper=normalizePaper(value),mode=paper.supplementMode==='principle'?'principle':'domain';
-    const wantedType=paper.paperType==='multiple_choice'?'multiple_choice':'standard';
-    const rows=(Array.isArray(candidateRows)?candidateRows:[]).filter(row=>wantedType==='multiple_choice'?row?.question?.type==='multiple_choice':row?.question?.type!=='multiple_choice'),candidateById=new Map();
+    const rows=Array.isArray(candidateRows)?candidateRows:[],candidateById=new Map();
     const candidates=rows.map(row=>{const candidate=paperQuotaCandidate(row);candidateById.set(candidate.id,row);return candidate});
     const response=PaperQuotaService.supplement({
       paperQuestionIds:(paper.questions||[]).map(paperRefKey),
@@ -964,9 +937,9 @@
     const next=normalizePaper({...paper,questions:[...existing,...additions],updatedAt:Date.now()});
     return {paper:next,shortages:response.shortages,assignments:response.assignments,addedQuestionIds:response.addedQuestionIds,unassignedExistingIds:response.unassignedExistingIds};
   }
-  function paperDomainStats(subject,candidateRows=paperCandidates(subject)){
+  function paperDomainStats(subject){
     const stats = new Map();
-    candidateRows.forEach(row => {
+    paperCandidates(subject).forEach(row => {
       const key = row.domain;
       if(!stats.has(key)) stats.set(key, {domain:key, count:0, complete:0});
       const item = stats.get(key);
@@ -1667,7 +1640,6 @@
   let paperCompositionController=null;
   function syncPaperCompositionForm(){
     if(!paperCompositionController)return;
-    paperCompositionController.setPaperType($('qbPaperCompositionType')?.value||'standard');
     paperCompositionController.setBankIds(Array.from(document.querySelectorAll('#qbPaperCompositionBanks [data-paper-composition-bank]:checked')).map(input=>String(input.value||'')));
     for(const code of ['A','B','C'])paperCompositionController.setVariant(code,{enabled:!!$(`qbPaperVariant${code}Enabled`)?.checked,name:$(`qbPaperVariant${code}Name`)?.value||`${code} 卷`,totalCount:Math.max(1,Number($(`qbPaperVariant${code}Count`)?.value||60))});
     paperCompositionController.setHardWeights({people:Math.max(0,Number($('qbPaperPeopleWeight')?.value||0)),process:Math.max(0,Number($('qbPaperProcessWeight')?.value||0)),'business-environment':Math.max(0,Number($('qbPaperBusinessWeight')?.value||0))});
@@ -1832,14 +1804,6 @@
     $('qbClearBankTestRecordsBtn')?.addEventListener('click',()=>{void clearCurrentBankTestRecords()});
     $('qbDeleteBankBtn')?.addEventListener('click', deleteCurrentBank);
     $('qbAddOptionBtn').addEventListener('click', addOption);
-    $('questionTypeInput')?.addEventListener('change', event => {
-      const question=currentQuestion();if(!question)return;
-      const previous=question.type;
-      question.type=String(event.currentTarget.value||'single_choice');
-      if(question.type==='multiple_choice'&&previous!=='multiple_choice')question.correctOptionIds=question.correctAnswer?[question.correctAnswer]:[];
-      if(question.type!=='multiple_choice'&&previous==='multiple_choice')question.correctAnswer=question.correctOptionIds?.[0]||question.options?.[0]?.id||'';
-      renderOptions();
-    });
     $('qbAddSelectedKeywordBtn').addEventListener('click', addSelectedKeyword);
     $('qbAddClueBtn').addEventListener('click', addClue);
     $('qbAddConceptBtn').addEventListener('click', addConcept);
@@ -1864,7 +1828,6 @@
     $('qbAutoQuotaBtn')?.addEventListener('click', autoDistributeQuota);
     $('qbClearQuotaBtn')?.addEventListener('click', clearPaperQuota);
     $('paperSubjectInput')?.addEventListener('change', () => { savePaperForm({silent:true, skipRender:true}); renderPaperManager(); });
-    $('paperTypeInput')?.addEventListener('change', async () => {if(await savePaperForm({silent:true,skipRender:true})){state.paperCandidatePage=1;state.selectedPaperCandidateKeys=new Set();await loadPaperCandidatePage({forceReload:true}).catch(()=>{});renderPaperManager()}});
     document.querySelectorAll('[data-paper-mode]').forEach(input=>input.addEventListener('change',()=>{if(currentPaper())savePaperForm({silent:true})}));
     document.querySelectorAll('[data-paper-supplement-mode]').forEach(input=>input.addEventListener('change',handlePaperSupplementModeChange));
     $('qbTemplateBtn').addEventListener('click', downloadTemplate);
@@ -2573,12 +2536,10 @@
     const wrap = $('qbOptionsEditor');
     if(!q || !wrap) return;
     const bindings=PrincipleBinding.normalize?.(q.metadata||{},(q.options||[]).map(option=>option.id))||q.metadata||{};
-    const multiple=q.type==='multiple_choice';
-    const correctIds=new Set(multiple?(q.correctOptionIds||[]):[q.correctAnswer]);
     wrap.innerHTML = (q.options || []).map((o, i) => `
       <div class="qb-option-row" data-index="${i}" data-option-id="${escapeHTML(o.id)}">
         <label class="radio">
-          <input type="${multiple?'checkbox':'radio'}" name="correctOption" value="${escapeHTML(o.id)}" ${correctIds.has(o.id) ? 'checked' : ''} />
+          <input type="radio" name="correctOption" value="${escapeHTML(o.id)}" ${o.id === q.correctAnswer ? 'checked' : ''} />
           正确
         </label>
         <input class="option-id" value="${escapeHTML(o.id)}" aria-label="选项编号" />
@@ -2593,8 +2554,7 @@
         const row = e.target.closest('[data-index]');
         const index = Number(row.dataset.index);
         q.options.splice(index,1);
-        if(multiple)q.correctOptionIds=(q.correctOptionIds||[]).filter(id=>q.options.some(option=>option.id===id));
-        else if(!q.options.some(o => o.id === q.correctAnswer)) q.correctAnswer = q.options[0]?.id || '';
+        if(!q.options.some(o => o.id === q.correctAnswer)) q.correctAnswer = q.options[0]?.id || '';
         saveBanks(state.banks, {silent:true});
         render();
         toast('已删除选项。');
@@ -3261,7 +3221,6 @@
       subjectSelect.value = paper ? paper.subject : (state.subjectFilter === 'ALL' ? 'PMP' : state.subjectFilter);
     }
     if($('paperNameInput')) $('paperNameInput').value = paper ? paper.name : '';
-    const typeInput=$('paperTypeInput');if(typeInput){typeInput.value=paper?.paperType||'standard';typeInput.disabled=!!paper&&((paper.questions||[]).length>0||Number(paper.publishedVersion||0)>0);typeInput.title=typeInput.disabled?'加入题目或发布后不能更改试卷类型。':''}
     if($('paperTotalInput')) $('paperTotalInput').value = paper ? paper.totalCount || 180 : 180;
     const categorySelect=$('paperCategoryInput');if(categorySelect){categorySelect.innerHTML='<option value="">未分类</option>'+state.paperCategories.map(item=>`<option value="${escapeHTML(item.id)}">${escapeHTML(item.name)}</option>`).join('');categorySelect.value=paper?.categoryId||''}
     if($('paperAccessLevelInput')) $('paperAccessLevelInput').value=paper?.accessPolicy?.accessLevel==='member'?'member':'free';
@@ -3312,7 +3271,6 @@
     if(quotaDraft.errors.length){toast(quotaDraft.errors[0]);return null}
     paper.name = $('paperNameInput')?.value.trim() || paper.name || '未命名试卷';
     paper.subject = $('paperSubjectInput')?.value || paper.subject || 'PMP';
-    paper.paperType = $('paperTypeInput')?.value==='multiple_choice'?'multiple_choice':'standard';
     paper.totalCount = Math.max(1, Number($('paperTotalInput')?.value || paper.totalCount || 180));
     paper.categoryId = $('paperCategoryInput')?.value || '';
     paper.description = $('paperDescriptionInput')?.value.trim() || '';
@@ -3343,7 +3301,6 @@
       id:safeId('paper'),
       name:`${meta.name} 综合训练试卷`,
       subject,
-      paperType:'standard',
       description:`从 ${meta.label} 多个题库/知识领域中抽题组成综合训练。`,
       accessPolicy:{accessLevel:'free'},
       totalCount:180,
@@ -3433,7 +3390,7 @@
     const wrap=$('qbPaperCandidateList');if(!wrap)return;const paper=currentPaper(),subject=$('paperSubjectInput')?.value||paper?.subject||'PMP',bankFilter=$('qbPaperCandidateBankFilter'),banks=state.banks.filter(bank=>bank.subject===subject);
     if(bankFilter){bankFilter.innerHTML='<option value="ALL">全部题库</option>'+banks.map(bank=>`<option value="${escapeHTML(bank.id)}">${escapeHTML(bank.name)}</option>`).join('');if(!banks.some(bank=>bank.id===state.paperCandidateBankId))state.paperCandidateBankId='ALL';bankFilter.value=state.paperCandidateBankId}
     if(!paper){wrap.innerHTML='<div class="qb-empty">请先新建或选择试卷。</div>';return}
-    const keyword=String(state.paperCandidateSearch||'').toLowerCase(),existing=new Set((paper.questions||[]).map(paperRefKey)),wantedType=paper.paperType==='multiple_choice'?'multiple_choice':'standard',rows=paperCandidates(subject).filter(row=>wantedType==='multiple_choice'?row.question.type==='multiple_choice':row.question.type!=='multiple_choice').filter(row=>state.paperCandidateBankId==='ALL'||row.bank.id===state.paperCandidateBankId).filter(row=>!keyword||[row.question.title,stemText(row.question),row.question.domain,row.question.topic,row.question.difficulty,...(row.question.tags||[])].join(' ').toLowerCase().includes(keyword));
+    const keyword=String(state.paperCandidateSearch||'').toLowerCase(),existing=new Set((paper.questions||[]).map(paperRefKey)),rows=paperCandidates(subject).filter(row=>state.paperCandidateBankId==='ALL'||row.bank.id===state.paperCandidateBankId).filter(row=>!keyword||[row.question.title,stemText(row.question),row.question.domain,row.question.topic,row.question.difficulty,...(row.question.tags||[])].join(' ').toLowerCase().includes(keyword));
     const pages=Math.max(1,Math.ceil(rows.length/PAPER_CANDIDATE_PAGE_SIZE));state.paperCandidatePage=Math.min(Math.max(1,state.paperCandidatePage),pages);const start=(state.paperCandidatePage-1)*PAPER_CANDIDATE_PAGE_SIZE,pageRows=rows.slice(start,start+PAPER_CANDIDATE_PAGE_SIZE);state.currentPaperCandidateKeys=pageRows.map(row=>paperRefKey({bankId:row.bank.id,questionId:row.question.id}));
     const selectAll=$('qbSelectPaperCandidatesPage');if(selectAll){selectAll.checked=pageRows.length>0&&pageRows.every(row=>state.selectedPaperCandidateKeys.has(paperRefKey({bankId:row.bank.id,questionId:row.question.id})));selectAll.indeterminate=pageRows.some(row=>state.selectedPaperCandidateKeys.has(paperRefKey({bankId:row.bank.id,questionId:row.question.id})))&&!selectAll.checked}
     const count=$('qbPaperCandidateSelectionCount');if(count)count.textContent=`已选择 ${state.selectedPaperCandidateKeys.size} 道题`;
@@ -3446,7 +3403,7 @@
     const paper=currentPaper(),subject=$('paperSubjectInput')?.value||paper?.subject||'PMP',banks=state.banks.filter(bank=>bank.subject===subject);
     if(!banks.some(bank=>bank.id===state.paperCandidateBankId))state.paperCandidateBankId=banks[0]?.id||'';
     return paperDataLoader.selectBank(state.paperCandidateBankId,{
-      page:state.paperCandidatePage,pageSize:PAPER_CANDIDATE_PAGE_SIZE,search:state.paperCandidateSearch,questionType:paper?.paperType||'standard',forceReload:options.forceReload===true
+      page:state.paperCandidatePage,pageSize:PAPER_CANDIDATE_PAGE_SIZE,search:state.paperCandidateSearch,forceReload:options.forceReload===true
     });
   }
   function renderPaperCandidateList(){
@@ -3456,7 +3413,7 @@
     const search=$('qbPaperCandidateSearch');if(search&&search.value!==state.paperCandidateSearch)search.value=state.paperCandidateSearch;
     if(!paper){wrap.innerHTML='<div class="qb-empty">请先新建或选择试卷。</div>';return}
     if(!state.paperCandidateBankId){wrap.innerHTML='<div class="qb-empty">当前科目暂无题库，请先导入题库数据包。</div>';return}
-    const wantedType=paper.paperType==='multiple_choice'?'multiple_choice':'standard',rows=state.paperCandidateRows.filter(row=>row.bank?.id===state.paperCandidateBankId&&!isQuestionDeleted(row.question)).filter(row=>wantedType==='multiple_choice'?row.question.type==='multiple_choice':row.question.type!=='multiple_choice'),existing=new Set((paper.questions||[]).map(paperRefKey));
+    const rows=state.paperCandidateRows.filter(row=>row.bank?.id===state.paperCandidateBankId&&!isQuestionDeleted(row.question)),existing=new Set((paper.questions||[]).map(paperRefKey));
     const total=state.paperCandidateTotal,pages=Math.max(1,Math.ceil(total/PAPER_CANDIDATE_PAGE_SIZE)),start=(state.paperCandidatePage-1)*PAPER_CANDIDATE_PAGE_SIZE,pageRows=rows;state.currentPaperCandidateKeys=pageRows.map(row=>paperRefKey({bankId:row.bank.id,questionId:row.question.id}));
     const selectAll=$('qbSelectPaperCandidatesPage');if(selectAll){selectAll.checked=pageRows.length>0&&pageRows.every(row=>state.selectedPaperCandidateKeys.has(paperRefKey({bankId:row.bank.id,questionId:row.question.id})));selectAll.indeterminate=pageRows.some(row=>state.selectedPaperCandidateKeys.has(paperRefKey({bankId:row.bank.id,questionId:row.question.id})))&&!selectAll.checked;selectAll.disabled=state.paperCandidateLoading||!pageRows.length}
     const count=$('qbPaperCandidateSelectionCount');if(count)count.textContent=`已选择 ${state.selectedPaperCandidateKeys.size} 道题`;
@@ -3479,9 +3436,8 @@
     if(!paper){paper=await addPaper();}
     paper=readPaperFormInto(clone(paper));if(!paper)return;
     try{await loadPaperQuotaCandidates(paper.subject)}catch(error){return toast(`题库题目加载失败：${error.message||error}`)}
-    const mode=paper.supplementMode==='principle'?'principle':'domain',wantedType=paper.paperType==='multiple_choice'?'multiple_choice':'standard';
-    const candidates=paperCandidates(paper.subject).filter(row=>wantedType==='multiple_choice'?row.question.type==='multiple_choice':row.question.type!=='multiple_choice');
-    const stats=(mode==='principle'?paperPrincipleStats(paper.subject,candidates).map(item=>({bucketId:item.id,count:item.count})):paperDomainStats(paper.subject,candidates).map(item=>({bucketId:item.domain,count:item.count}))).filter(item => item.count > 0);
+    const mode=paper.supplementMode==='principle'?'principle':'domain';
+    const stats=(mode==='principle'?paperPrincipleStats(paper.subject).map(item=>({bucketId:item.id,count:item.count})):paperDomainStats(paper.subject).map(item=>({bucketId:item.domain,count:item.count}))).filter(item => item.count > 0);
     if(!stats.length) return toast('该科目暂无可组卷题目。');
     const total = Math.min(paper.totalCount || 180, stats.reduce((sum,item) => sum + item.count, 0));
     let remain = total;
@@ -3623,14 +3579,14 @@
   }
   function collectOptionsFromDom(){
     const rows = Array.from(document.querySelectorAll('#qbOptionsEditor .qb-option-row'));
-    const correct = new Set(Array.from(document.querySelectorAll('input[name="correctOption"]:checked')).map(input=>String(input.value||'')));
+    const correct = document.querySelector('input[name="correctOption"]:checked')?.value || '';
     return rows.map((row, index) => {
       const id = row.querySelector('.option-id').value.trim() || String.fromCharCode(65 + index);
       return {
         id,
         text:row.querySelector('.option-text').value.trim(),
         trap:row.querySelector('.option-trap').value.trim(),
-        correct:correct.has(id)
+        correct:id === correct
       };
     }).filter(o => o.id || o.text);
   }
@@ -3736,17 +3692,9 @@
     draft.tags = cleanList($('questionTagsInput').value);
     draft.analysis = $('questionAnalysisInput').value.trim();
     draft.options = collectOptionsFromDom().map((o,i) => normalizeOption(o,i,''));
-    const selected=draft.options.filter(option=>option.correct).map(option=>option.id);
-    if(draft.type==='multiple_choice'){
-      draft.correctOptionIds=AnswerSet.normalizeIds?.(selected,draft.options.map(option=>option.id))||selected;
-      draft.correctAnswer='';
-      draft.options.forEach(option=>{option.correct=draft.correctOptionIds.includes(option.id)});
-    }else{
-      const correct=selected[0]||draft.options[0]?.id||'';
-      draft.correctAnswer=correct;
-      draft.correctOptionIds=[];
-      draft.options.forEach(option=>{option.correct=option.id===correct});
-    }
+    const correct = document.querySelector('input[name="correctOption"]:checked')?.value || draft.options.find(o => o.correct)?.id || draft.options[0]?.id || '';
+    draft.correctAnswer = correct;
+    draft.options.forEach(o => { o.correct = o.id === correct; });
     const rawStem = $('questionStemInput').value;
     draft.stemParts = rebuildStemParts(rawStem, stemClues(draft.clues));
     const reasoningSteps = collectReasoningFromDom(q).map(normalizeReasoningStep);
@@ -3772,13 +3720,10 @@
     const collected=collectQuestionDraftFromDom(q,bank);
     if(!collected)return false;
     const {draft,rawStem,reasoningSteps}=collected;
-    const answerErrors=AnswerSet.validate?.(draft)||[];
-    if(answerErrors.length){if(!options.silent)alert(answerErrors.join('\n'));return false}
     const published=!!draft.status?.published;
     const trainingResponse=teacherDomainServices().training?.update?.(draft,{clues:draft.clues||[],concepts:draft.concepts||[],reasoningSteps,metadata:draft.metadata});
     if(trainingResponse?.ok===false)return false;
-    const hasAnswer=draft.type==='multiple_choice'?draft.correctOptionIds.length>=2:!!draft.correctAnswer;
-    draft.status={...(draft.status||{}),contentReady:!!(rawStem.trim()&&draft.options.length>=2&&hasAnswer),published};
+    draft.status={...(draft.status||{}),contentReady:!!(rawStem.trim()&&draft.options.length>=2&&draft.correctAnswer),published};
     const previousBanks=clone(state.banks);
     try{
       const saved=await CatalogEditor.save({...draft,id:q.id,bankId:bank.id,revision:q.revision,creatorId:q.creatorId},{bankId:bank.id,baseRevision:q.revision,creatorId:q.creatorId});
@@ -4563,7 +4508,7 @@
       description:'可复制后修改 subject 为 PMP / CSPM / P2 / ACP / NPDP / PgMP 等。',
       version:'1.0',
       visibility:'template',
-      questions:[demoQuestion(),multipleChoiceTemplateQuestion()]
+      questions:[demoQuestion()]
     });
     downloadJson('项目管理类题库认知标注模板.json', template);
   }

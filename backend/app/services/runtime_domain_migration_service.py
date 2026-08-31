@@ -191,27 +191,6 @@ def _release_canonical(
             "score": score,
             "question": snapshot,
         })
-    declared_paper_type = str(raw.get("paperType") or "").strip()
-    if declared_paper_type and declared_paper_type not in {
-        "standard",
-        "multiple_choice",
-    }:
-        raise ValueError("paper release type is invalid")
-    question_types = [
-        str(item["question"].get("type") or "single_choice")
-        for item in questions
-    ]
-    if declared_paper_type:
-        paper_type = declared_paper_type
-    elif all(value == "multiple_choice" for value in question_types):
-        paper_type = "multiple_choice"
-    else:
-        paper_type = "standard"
-    if any(
-        not paper_service.question_matches_paper_type(paper_type, question_type)
-        for question_type in question_types
-    ):
-        raise ValueError("paper release type does not match its questions")
     status = str(raw.get("status") or "published").strip().lower()
     if source_key == PAPER_RELEASE_HISTORY_KEY and status == "published":
         status = "superseded"
@@ -237,7 +216,6 @@ def _release_canonical(
         "name": str(raw.get("name") or raw.get("title") or "未命名试卷")[:200],
         "subject": str(raw.get("subject") or "PMP")[:32],
         "description": str(raw.get("description") or "") or None,
-        "paperType": paper_type,
         "publisherId": publisher_id,
         "accessLevel": str(access_policy.get("accessLevel") or raw.get("accessLevel") or "free"),
         "enabledModes": enabled_modes,
@@ -291,7 +269,6 @@ async def _paper_release_mapper(db: AsyncSession, item: RuntimeMigrationItem) ->
                 name=source["name"],
                 subject=source["subject"],
                 description=source["description"],
-                paper_type=source["paperType"],
                 publisher_id=source["publisherId"],
                 access_level=source["accessLevel"],
                 enabled_modes=source["enabledModes"],
@@ -808,7 +785,6 @@ async def _read_one_paper_release_canonical(
         "name": release.name,
         "subject": release.subject,
         "description": release.description,
-        "paperType": release.paper_type,
         "publisherId": release.publisher_id,
         "accessLevel": release.access_level,
         "enabledModes": release.enabled_modes or [],

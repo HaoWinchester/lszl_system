@@ -15,7 +15,6 @@ from app.models.user import User
 from app.schemas.question_catalog import QuestionBankImportRequest
 from app.services import (
     question_access_service,
-    question_answer_service,
     question_catalog_service,
     question_content_service,
     teaching_content_revision_service,
@@ -147,17 +146,7 @@ def _question_change_summary(existing: Question, incoming: dict) -> dict:
     # broad metadata object, but only the relevant metadata paths should mark a
     # product-facing category as changed.
     changed = {
-        "content": int(fields_changed((
-            "title",
-            "type",
-            "difficulty",
-            "domain",
-            "topic",
-            "stemParts",
-            "options",
-            "correctAnswer",
-            "correctOptionIds",
-        ))),
+        "content": int(fields_changed(("title", "type", "difficulty", "domain", "topic", "stemParts", "options", "correctAnswer"))),
         "analysis": int(fields_changed(("analysis", "translations"))),
         "keywords": int(fields_changed(("clues", "status")) or metadata_changed(("keywordSystemV2",))),
         "tags": int(fields_changed(("tags",)) or metadata_changed(("tagPaths", "subjectFacets"))),
@@ -205,12 +194,7 @@ def _apply_normalized_question(target: Question, normalized: dict, actor_usernam
     target.tags = normalized["tags"]
     target.stem_parts = normalized["stemParts"]
     target.options = normalized["options"]
-    target.correct_answer_ids = normalized.get("correctOptionIds") or []
-    target.correct_answer = (
-        None
-        if target.type == "multiple_choice"
-        else str(normalized.get("correctAnswer") or "") or None
-    )
+    target.correct_answer = str(normalized.get("correctAnswer") or "") or None
     target.analysis = normalized.get("analysis")
     target.clues = normalized["clues"]
     target.concepts = normalized["concepts"]
@@ -222,12 +206,6 @@ def _apply_normalized_question(target: Question, normalized: dict, actor_usernam
     target.lifecycle = normalized["lifecycle"]
     target.content_hash = question_content_service.canonical_question_hash(normalized)
     target.updated_by = actor_username
-
-
-def _validate_normalized_question(normalized: dict) -> None:
-    issues = question_answer_service.validate_multiple_choice(normalized)
-    if issues:
-        raise _import_validation_error(issues[0]["message"])
 
 
 async def import_question_banks(
@@ -352,7 +330,6 @@ async def import_question_banks(
                         subject=str(bank_values["subject"]),
                     )
                     normalized["scope"] = "internal"
-                    _validate_normalized_question(normalized)
                     current = existing_by_question_source.get(source_question_id)
                     duplicate_signature = question_content_service.duplicate_question_signature(normalized)
                     candidates.append((imported_index, source_question_id, normalized, current, duplicate_signature))
@@ -559,12 +536,7 @@ async def import_question_banks(
                         tags=normalized["tags"],
                         stem_parts=normalized["stemParts"],
                         options=normalized["options"],
-                        correct_answer_ids=normalized.get("correctOptionIds") or [],
-                        correct_answer=(
-                            None
-                            if normalized["type"] == "multiple_choice"
-                            else str(normalized.get("correctAnswer") or "") or None
-                        ),
+                        correct_answer=str(normalized.get("correctAnswer") or "") or None,
                         analysis=normalized.get("analysis"),
                         clues=normalized["clues"],
                         concepts=normalized["concepts"],
@@ -847,7 +819,6 @@ async def create_question(db: AsyncSession, owner: User | str, bank_id: str, dat
         subject=b.subject,
     )
     normalized["scope"] = "internal"
-    _validate_normalized_question(normalized)
     content_hash = question_content_service.canonical_question_hash(normalized)
     q = Question(
         id=question_id,
@@ -868,12 +839,7 @@ async def create_question(db: AsyncSession, owner: User | str, bank_id: str, dat
         tags=normalized["tags"],
         stem_parts=normalized["stemParts"],
         options=normalized["options"],
-        correct_answer_ids=normalized.get("correctOptionIds") or [],
-        correct_answer=(
-            None
-            if normalized["type"] == "multiple_choice"
-            else str(normalized.get("correctAnswer") or "") or None
-        ),
+        correct_answer=str(normalized.get("correctAnswer") or "") or None,
         analysis=normalized.get("analysis"),
         clues=normalized["clues"],
         concepts=normalized["concepts"],
@@ -930,7 +896,6 @@ async def import_questions_into_bank(
             {**raw, "id": question_id, "title": raw.get("title") or f"导入题目 {index + 1}"},
             subject=bank.subject,
         )
-        _validate_normalized_question(normalized)
         signature = question_content_service.duplicate_question_signature(normalized)
         source = "existing" if signature in known_signatures else "batch" if signature in batch_signatures else ""
         if source:
@@ -1002,12 +967,7 @@ async def import_questions_into_bank(
             content_hash=question_content_service.canonical_question_hash(normalized),
             created_by=actor.username, updated_by=actor.username, revision=1,
             tags=normalized["tags"], stem_parts=normalized["stemParts"], options=normalized["options"],
-            correct_answer_ids=normalized.get("correctOptionIds") or [],
-            correct_answer=(
-                None
-                if normalized["type"] == "multiple_choice"
-                else str(normalized.get("correctAnswer") or "") or None
-            ),
+            correct_answer=str(normalized.get("correctAnswer") or "") or None,
             analysis=normalized.get("analysis"), clues=normalized["clues"], concepts=normalized["concepts"],
             reasoning_steps=normalized["reasoningSteps"], status=normalized["status"],
             translations=normalized["translations"], content_metadata=normalized["metadata"],
@@ -1062,7 +1022,6 @@ async def update_question(db: AsyncSession, owner: User | str, question_id: str,
         merged,
         subject=q.subject or "PMP",
     )
-    _validate_normalized_question(normalized)
     q.title = normalized["title"]
     q.type = normalized["type"]
     q.subject = normalized["subject"]
@@ -1074,12 +1033,7 @@ async def update_question(db: AsyncSession, owner: User | str, question_id: str,
     q.tags = normalized["tags"]
     q.stem_parts = normalized["stemParts"]
     q.options = normalized["options"]
-    q.correct_answer_ids = normalized.get("correctOptionIds") or []
-    q.correct_answer = (
-        None
-        if q.type == "multiple_choice"
-        else str(normalized.get("correctAnswer") or "") or None
-    )
+    q.correct_answer = str(normalized.get("correctAnswer") or "") or None
     q.analysis = normalized.get("analysis")
     q.clues = normalized["clues"]
     q.concepts = normalized["concepts"]

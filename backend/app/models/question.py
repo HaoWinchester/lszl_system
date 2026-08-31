@@ -75,7 +75,6 @@ class Question(Base):
     stem_parts: Mapped[list] = mapped_column(JSONB, default=list)  # [{text, clue?}]
     options: Mapped[list] = mapped_column(JSONB, default=list)  # [{id, text, trap, correct}]
     correct_answer: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    correct_answer_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     analysis: Mapped[str | None] = mapped_column(Text, nullable=True)
     clues: Mapped[list] = mapped_column(JSONB, default=list)
     concepts: Mapped[list] = mapped_column(JSONB, default=list)
@@ -93,12 +92,6 @@ class Question(Base):
 
 class ExamPaper(Base):
     __tablename__ = "exam_papers"
-    __table_args__ = (
-        CheckConstraint(
-            "paper_type IN ('standard', 'multiple_choice')",
-            name="ck_exam_papers_paper_type",
-        ),
-    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     owner_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.username"), nullable=False, index=True)
@@ -130,7 +123,6 @@ class ExamPaper(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     subject: Mapped[str] = mapped_column(String(32), default="PMP")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    paper_type: Mapped[str] = mapped_column(String(32), nullable=False, default="standard")
     category_id: Mapped[str | None] = mapped_column(
         String(64),
         ForeignKey("paper_categories.id", ondelete="SET NULL"),

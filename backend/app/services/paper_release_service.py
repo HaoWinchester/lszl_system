@@ -18,7 +18,6 @@ from app.services import (
     paper_service,
     paper_composition_service,
     practice_scoring_service,
-    question_answer_service,
     question_catalog_service,
     subscription_service,
     teaching_content_revision_service,
@@ -58,9 +57,7 @@ def _snapshot_is_learnable(snapshot: dict) -> bool:
         if isinstance(part, dict)
     ) or str(snapshot.get("stem") or "")
     options = snapshot.get("options") or []
-    has_answer = bool(snapshot.get("correctAnswer")) or bool(
-        snapshot.get("correctOptionIds")
-    ) or any(
+    has_answer = bool(snapshot.get("correctAnswer")) or any(
         isinstance(option, dict) and option.get("correct") for option in options
     )
     return bool(stem and len(options) >= 2 and has_answer)
@@ -242,7 +239,6 @@ def release_to_dict(release: PaperRelease, *, content_restricted: bool = False) 
         "title": release.name,
         "subject": release.subject,
         "description": release.description or "",
-        "paperType": release.paper_type,
         "purpose": "learning",
         "publishedBy": release.publisher_id,
         "accessLevel": release.access_level,
@@ -330,23 +326,7 @@ async def publish(
         raise _error(422, "EMPTY_PAPER_RELEASE", "试卷至少需要一道题目")
     frozen_questions = []
     for question, order_index, score in rows:
-        if not paper_service.question_matches_paper_type(
-            paper.paper_type,
-            question.type,
-        ):
-            raise _error(
-                422,
-                "PAPER_TYPE_QUESTION_MISMATCH",
-                "试卷类型与所选题目类型不一致",
-            )
         snapshot = question_catalog_service.question_to_payload(question)
-        issues = question_answer_service.validate_multiple_choice(
-            snapshot,
-            require_analysis=True,
-        )
-        if issues:
-            issue = issues[0]
-            raise _error(422, issue["code"], issue["message"])
         frozen_score = float(score if score is not None else 1)
         snapshot["releaseScore"] = frozen_score
         frozen_questions.append((question, order_index, frozen_score, snapshot))
@@ -374,14 +354,12 @@ async def publish(
         name=paper.name,
         subject=paper.subject,
         description=paper.description,
-        paper_type=paper.paper_type,
         publisher_id=actor.username,
         access_level=access_level,
         enabled_modes=modes,
         allowed_roles=roles,
         release_metadata=metadata,
         source_payload={
-            "paperType": paper.paper_type,
             "questions": [
                 {
                     "bankId": question.bank_id,
@@ -666,22 +644,6 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
     await _repair_release_snapshots(db, canonical)
     for question in canonical["questions"]:
         snapshot = dict(question["question"])
-        if not paper_service.question_matches_paper_type(
-            canonical["paperType"],
-            str(snapshot.get("type") or "single_choice"),
-        ):
-            raise _error(
-                422,
-                "PAPER_TYPE_QUESTION_MISMATCH",
-                "试卷类型与所选题目类型不一致",
-            )
-        issues = question_answer_service.validate_multiple_choice(
-            snapshot,
-            require_analysis=True,
-        )
-        if issues:
-            issue = issues[0]
-            raise _error(422, issue["code"], issue["message"])
         raw_score = question.get("score")
         snapshot["releaseScore"] = float(raw_score if raw_score is not None else 1)
         question["question"] = snapshot
@@ -693,29 +655,6 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
     )
 
     await teaching_content_revision_service.acquire_lock(db)
-    draft = (
-        await db.execute(
-            select(ExamPaper)
-            .where(ExamPaper.id == canonical["paperId"])
-            .with_for_update()
-        )
-    ).scalar_one_or_none()
-    if draft is not None and draft.paper_type != canonical["paperType"]:
-        reference_count = int(
-            await db.scalar(
-                select(func.count())
-                .select_from(PaperQuestion)
-                .where(PaperQuestion.paper_id == draft.id)
-            )
-            or 0
-        )
-        if reference_count or int(draft.published_version or 0):
-            raise _error(
-                409,
-                "PAPER_TYPE_LOCKED",
-                "试卷已有题目或发布记录，不能切换类型",
-            )
-        draft.paper_type = canonical["paperType"]
     release_id = canonical["releaseId"]
     if await db.get(PaperRelease, release_id) is not None:
         raise _error(409, "RELEASE_EXISTS", "该发布版本已存在，请刷新后重试")
@@ -734,7 +673,6 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
         "releaseId": release_id,
         "version": assigned_version,
         "metadata": canonical["metadata"],
-        "paperType": canonical["paperType"],
     })
 
     # 先 supersede 同试卷旧 active 版本，避免触发"每试卷仅一个 active"部分唯一索引
@@ -755,7 +693,6 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
         name=canonical["name"],
         subject=canonical["subject"],
         description=canonical["description"],
-        paper_type=canonical["paperType"],
         publisher_id=actor.username,
         access_level=canonical["accessLevel"],
         enabled_modes=canonical["enabledModes"],
@@ -926,7 +863,6 @@ async def materialize_release_papers(db: AsyncSession, *, dry_run: bool = False)
             name=release.name,
             subject=release.subject or "PMP",
             description=release.description,
-            paper_type=release.paper_type,
             total_count=len(rows),
             quotas={},
             access_policy={

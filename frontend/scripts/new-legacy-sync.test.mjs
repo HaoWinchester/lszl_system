@@ -183,23 +183,19 @@ test('sync copies v8.6.0 and injects the direct runtime without editing upstream
   assert.ok(existsSync(resolve(item.output, 'personal-card-adapter.js')))
 })
 
-test('sync excludes caches and macOS metadata from copied output and source hashes', (t) => {
+test('sync excludes Python and pytest caches from copied output and source hashes', (t) => {
   const item = fixture()
   t.after(() => rmSync(item.root, { recursive: true, force: true }))
   write(resolve(item.upstream, '.pytest_cache/v/cache/nodeids'), '[]')
   write(resolve(item.upstream, 'content-prep-studio/tests/__pycache__/test_build.cpython-311.pyc'), 'cache')
-  write(resolve(item.upstream, '.DS_Store'), 'metadata')
-  write(resolve(item.upstream, 'assets/.DS_Store'), 'metadata')
 
   const result = runSync(item)
 
   assert.equal(result.status, 0, result.stderr)
   assert.equal(existsSync(resolve(item.output, '.pytest_cache')), false)
   assert.equal(existsSync(resolve(item.output, 'content-prep-studio/tests/__pycache__')), false)
-  assert.equal(existsSync(resolve(item.output, '.DS_Store')), false)
-  assert.equal(existsSync(resolve(item.output, 'assets/.DS_Store')), false)
   const sourcePaths = Object.keys(JSON.parse(readFileSync(resolve(item.output, 'manifest.json'), 'utf8')).sourceFiles)
-  assert.equal(sourcePaths.some((path) => path.includes('.pytest_cache') || path.includes('__pycache__') || path.endsWith('.pyc') || path.endsWith('.DS_Store')), false)
+  assert.equal(sourcePaths.some((path) => path.includes('.pytest_cache') || path.includes('__pycache__') || path.endsWith('.pyc')), false)
 })
 
 test('sync loads shared domain and device boundaries before adapters and business scripts', (t) => {

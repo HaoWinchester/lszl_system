@@ -44,7 +44,7 @@ function parseArgs(argv) {
 function isTransientSourceArtifact(path) {
   const normalized = String(path || '').split(sep).join('/')
   const parts = normalized.split('/').filter(Boolean)
-  return parts.some((part) => transientSourceDirectories.has(part)) || normalized.endsWith('.pyc') || normalized.endsWith('.DS_Store')
+  return parts.some((part) => transientSourceDirectories.has(part)) || normalized.endsWith('.pyc')
 }
 
 function walk(root, base = root) {

@@ -23,7 +23,6 @@ class QuestionPayload(BaseModel):
     stem_parts: list[dict[str, Any]] = Field(default_factory=list, alias="stemParts")
     options: list[dict[str, Any]] = Field(default_factory=list)
     correct_answer: Any = Field(default=None, alias="correctAnswer")
-    correct_option_ids: list[str] | None = Field(default=None, alias="correctOptionIds")
     analysis: Any = None
     translations: dict[str, Any] = Field(default_factory=dict)
     clues: list[dict[str, Any]] = Field(default_factory=list)

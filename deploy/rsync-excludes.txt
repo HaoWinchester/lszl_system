@@ -1,5 +1,4 @@
 /.git
-/.deploy-state
 /new-legacy
 /docs
 /frontend/new-legacy-releases

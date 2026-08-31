@@ -219,70 +219,11 @@ def test_content_prep_accepts_multiple_choice_answer_forms(correct_answer: objec
     raw = complete_question()
     raw["type"] = "multiple_choice"
     raw["correctAnswer"] = correct_answer
-    raw["options"].append({"id": "C", "text": "错误选项", "correct": False})
 
     normalized = normalize_question_payload(raw, subject="PMP")
 
-    assert normalized["correctAnswer"] is None
-    assert normalized["correctOptionIds"] == ["A", "B"]
+    assert normalized["correctAnswer"] == "AB"
     assert _validate_question_content(normalized, is_new=True) == []
-
-
-def test_multiple_choice_payload_preserves_canonical_answer_array() -> None:
-    raw = complete_question()
-    raw.update({
-        "type": "multiple_choice",
-        "options": [
-            {"id": "A", "text": "A", "correct": True},
-            {"id": "B", "text": "B", "correct": False},
-            {"id": "C", "text": "C", "correct": True},
-        ],
-        "correctOptionIds": ["C", "A"],
-        "correctAnswer": None,
-    })
-
-    normalized = normalize_question_payload(raw, subject="PMP")
-
-    assert normalized["correctOptionIds"] == ["A", "C"]
-    assert normalized["correctAnswer"] is None
-
-
-def test_multiple_choice_hash_ignores_answer_array_order() -> None:
-    first = complete_question()
-    first.update({
-        "type": "multiple_choice",
-        "options": [
-            {"id": "A", "text": "A"},
-            {"id": "B", "text": "B"},
-            {"id": "C", "text": "C"},
-        ],
-        "correctOptionIds": ["A", "C"],
-        "correctAnswer": None,
-    })
-    reordered = deepcopy(first)
-    reordered["correctOptionIds"] = ["C", "A"]
-
-    assert canonical_question_hash(first) == canonical_question_hash(reordered)
-
-
-def test_multiple_choice_draft_without_analysis_is_not_content_ready() -> None:
-    raw = complete_question()
-    raw.update({
-        "type": "multiple_choice",
-        "options": [
-            {"id": "A", "text": "A"},
-            {"id": "B", "text": "B"},
-            {"id": "C", "text": "C"},
-        ],
-        "correctOptionIds": ["A", "C"],
-        "correctAnswer": None,
-        "analysis": "",
-        "status": {"contentReady": True},
-    })
-
-    normalized = normalize_question_payload(raw, subject="PMP")
-
-    assert normalized["status"]["contentReady"] is False
 
 
 @pytest.mark.parametrize(
@@ -305,11 +246,7 @@ def test_content_prep_rejects_noncanonical_answer_arrays(
     normalized = normalize_question_payload(raw, subject="PMP")
     issues = _validate_question_content(normalized, is_new=True)
 
-    if question_type == "multiple_choice":
-        assert normalized["correctAnswer"] is None
-        assert normalized["correctOptionIds"] == []
-    else:
-        assert normalized["correctAnswer"] == correct_answer
+    assert normalized["correctAnswer"] == correct_answer
     assert [issue.code for issue in issues] == ["CORRECT_ANSWER_MISSING"]
 
 

@@ -22,64 +22,6 @@ PASSWORD = "paper-import-pass"
 FIXTURE = Path(__file__).parent / "fixtures/papers/paper-package-v1.json"
 
 
-def test_import_preflight_enforces_declared_type_and_infers_legacy_multi_type() -> None:
-    suffix = uuid4().hex[:10]
-    teacher = f"paper-import-type-{suffix}"
-    bank_ids = {
-        "fixture-bank-source-a": f"internal-type-bank-a-{suffix}",
-        "fixture-bank-source-b": f"internal-type-bank-b-{suffix}",
-    }
-    question_ids = {
-        "fixture-question-source-1": f"internal-type-question-1-{suffix}",
-        "fixture-question-source-2": f"internal-type-question-2-{suffix}",
-        "fixture-question-source-3": f"internal-type-question-3-{suffix}",
-    }
-    package = json.loads(FIXTURE.read_text(encoding="utf-8"))
-    asyncio.run(seed_import_catalog(teacher, bank_ids, question_ids))
-
-    async def mark_questions_multiple_choice() -> None:
-        async with AsyncSessionLocal() as db:
-            questions = list((await db.scalars(
-                select(Question).where(Question.id.in_(question_ids.values()))
-            )).all())
-            for question in questions:
-                question.type = "multiple_choice"
-            await db.commit()
-
-    try:
-        with TestClient(app) as client:
-            login = client.post(
-                "/api/v1/auth/login",
-                json={"username": teacher, "password": PASSWORD},
-            )
-            assert login.status_code == 200
-
-            declared_multi = json.loads(json.dumps(package))
-            declared_multi["paper"]["paperType"] = "multiple_choice"
-            mismatch = client.post(
-                "/api/v1/papers/import/preflight",
-                json={"fileName": "declared-multi.json", "package": declared_multi},
-            )
-            assert mismatch.status_code == 200, mismatch.text
-            mismatch_result = mismatch.json()["preflight"]
-            assert mismatch_result["valid"] is False
-            assert "PAPER_TYPE_QUESTION_MISMATCH" in {
-                issue["code"] for issue in mismatch_result["errors"]
-            }
-
-            asyncio.run(mark_questions_multiple_choice())
-            inferred = client.post(
-                "/api/v1/papers/import/preflight",
-                json={"fileName": "legacy-multi.json", "package": package},
-            )
-            assert inferred.status_code == 200, inferred.text
-            inferred_result = inferred.json()["preflight"]
-            assert inferred_result["valid"] is True
-            assert inferred_result["summary"]["paperType"] == "multiple_choice"
-    finally:
-        asyncio.run(cleanup_import_catalog(teacher, bank_ids, question_ids))
-
-
 async def seed_import_catalog(
     teacher: str,
     bank_ids: dict[str, str],
@@ -262,7 +204,6 @@ def test_import_preflight_resolves_external_references_without_writes() -> None:
                 "paperId": "fixture-paper-external-04",
                 "name": "PMP 模拟卷 04",
                 "subject": "PMP",
-                "paperType": "standard",
                 "totalCount": 3,
                 "questionCount": 3,
                 "sourceBankCount": 2,

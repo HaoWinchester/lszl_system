@@ -2,12 +2,10 @@
 
 (function(global){
   const clean=value=>String(value??'').trim();
-  const questionType=value=>/多选|multiple[_ -]?choice/i.test(clean(value))?'multiple_choice':'single_choice';
-  const answerIds=value=>[...new Set((clean(value).toUpperCase().match(/[A-H]/g)||[]))];
   const normalizeLine=line=>String(line||'').replace(/\u00a0/g,' ').trim();
   const optionMatch=line=>normalizeLine(line).match(/^\s*(?:[（(]?\s*([A-Ha-h])\s*[）).、:：．.]|([A-Ha-h])\s{1,})(.*)$/);
   const questionHeading=line=>/^\s*(?:第\s*)?\d+\s*(?:题|[、.．:)）])\s*/.test(normalizeLine(line));
-  const answerLine=line=>/^\s*(?:正确答案|参考答案|答案)\s*[：:]?\s*[A-Ha-h](?:\s*[,，、;；\s]\s*[A-Ha-h])*\s*$/i.test(normalizeLine(line));
+  const answerLine=line=>/^\s*(?:正确答案|参考答案|答案)\s*[：:]?\s*([A-Ha-h])\b/i.test(normalizeLine(line));
   const analysisLine=line=>/^\s*(?:答案解析|参考解析|解析|复盘说明)\s*[：:]?/i.test(normalizeLine(line));
   const STRUCTURED_FIELD=/【[^】]+】/;
   const NEXT_QUESTION_LINE=/^[ \t]*[=＝]{3,}[ \t]*下一题[ \t]*[=＝]{3,}[ \t]*$/;
@@ -165,7 +163,7 @@ B
 
   function parseQuestionLegacy(raw){
     const source=String(raw||'').replace(/\r\n?/g,'\n').trim();
-    const result={format:'plain',type:'single_choice',language:'zh_only',subject:'',knowledge:'',stem:'',stemEn:'',options:[],answer:'',correctOptionIds:[],analysis:'',analysisEn:'',keywords:[],tags:[],warnings:[],errors:[],source};
+    const result={format:'plain',language:'zh_only',subject:'',knowledge:'',stem:'',stemEn:'',options:[],answer:'',analysis:'',analysisEn:'',keywords:[],tags:[],warnings:[],errors:[],source};
     if(!source){result.errors.push('请先粘贴题目文本。');return result}
     const lines=source.split('\n');
     const stemLines=[];let currentOption=null;let inAnalysis=false;let answerFound=false;
@@ -175,14 +173,12 @@ B
       const subject=line.match(/^\s*(?:所属科目|科目)\s*[：:]\s*(.+)$/i);
       const knowledge=line.match(/^\s*(?:主要知识点|主知识点|知识点)\s*[：:]\s*(.+)$/i);
       const tags=line.match(/^\s*(?:普通标签|标签)\s*[：:]\s*(.+)$/i);
-      const type=line.match(/^\s*(?:题型|题目类型)\s*[：:]\s*(.+)$/i);
-      const answer=line.match(/^\s*(?:正确答案|参考答案|答案)\s*[：:]?\s*(.+)$/i);
+      const answer=line.match(/^\s*(?:正确答案|参考答案|答案)\s*[：:]?\s*([A-Ha-h])\b/i);
       const analysis=line.match(/^\s*(?:答案解析|参考解析|解析|复盘说明)\s*[：:]?\s*(.*)$/i);
       if(subject){result.subject=clean(subject[1]);return}
       if(knowledge){result.knowledge=clean(knowledge[1]);return}
       if(tags){result.tags=tags[1].split(/[,，;；、]+/).map(clean).filter(Boolean);return}
-      if(type){result.type=questionType(type[1]);return}
-      if(answer){flushOption();result.correctOptionIds=answerIds(answer[1]);result.answer=result.correctOptionIds.join(',');answerFound=true;inAnalysis=false;return}
+      if(answer){flushOption();result.answer=answer[1].toUpperCase();answerFound=true;inAnalysis=false;return}
       if(analysis){flushOption();inAnalysis=true;if(clean(analysis[1]))result.analysis=clean(analysis[1]);return}
       if(inAnalysis){if(line)result.analysis+=(result.analysis?'\n':'')+line;return}
       const match=optionMatch(line);
@@ -192,7 +188,7 @@ B
     });
     flushOption();
     result.stem=stemLines.join('\n').replace(/^\s*(?:第?\s*\d+\s*[题、.．:)）]\s*)/,'').trim();
-    if(!answerFound){const inline=source.match(/(?:正确答案|参考答案|答案)\s*[：:]?\s*([^\n]+)/i);if(inline){result.correctOptionIds=answerIds(inline[1]);result.answer=result.correctOptionIds.join(',')}}
+    if(!answerFound){const inline=source.match(/(?:正确答案|参考答案|答案)\s*[：:]?\s*([A-Ha-h])\b/i);if(inline)result.answer=inline[1].toUpperCase()}
     const seen=new Set();result.options=result.options.filter(option=>{if(!option.id||seen.has(option.id))return false;seen.add(option.id);return true});
     validateQuestion(result);
     return result;
@@ -235,16 +231,14 @@ B
     const enStem=clean(en.stem||section(sections,'题干-english','题干-en'));
     const zhById=new Map((Array.isArray(zh.options)?zh.options:[]).map(item=>[String(item.id||''),clean(item.text)]));
     const enById=new Map((Array.isArray(en.options)?en.options:[]).map(item=>[String(item.id||''),clean(item.text)]));
-    const options=[];for(const id of ['A','B','C','D','E','F','G','H']){const text=zhById.get(id)||section(sections,`${id}-中文`,`${id}-zh`,id);const textEn=enById.get(id)||section(sections,`${id}-english`,`${id}-en`);if(text||textEn)options.push({id,text,textEn})}
-    const type=questionType(section(sections,'题型','题目类型')||activity.type);
-    const correctOptionIds=answerIds(activity.answer?.optionIds||activity.answer?.optionId||section(sections,'答案','正确答案'));
-    const answer=correctOptionIds.join(',');
+    const options=[];for(const id of ['A','B','C','D']){const text=zhById.get(id)||section(sections,`${id}-中文`,`${id}-zh`,id);const textEn=enById.get(id)||section(sections,`${id}-english`,`${id}-en`);if(text||textEn)options.push({id,text,textEn})}
+    const answer=clean(activity.answer?.optionId||section(sections,'答案','正确答案')).toUpperCase().replace(/[^A-D].*$/,'');
     const analysis=clean(activity.explanation?.zh?.detailed||activity.explanation?.zh?.general||section(sections,'解析-中文','解析-zh','解析'));
     const analysisEn=clean(activity.explanation?.en?.detailed||activity.explanation?.en?.general||section(sections,'解析-english','解析-en'));
     const title=section(sections,'题目简称','主题');const titleEn=section(sections,'题目简称-english','主题-english');
     const hasEnglish=Boolean(enStem||analysisEn||options.some(item=>item.textEn));
     const result={
-      format:'structured',type,language:hasEnglish?'bilingual':'zh_only',subject:section(sections,'科目','所属科目'),knowledge:section(sections,'知识点','主要知识点','主知识点'),stem:zhStem,stemEn:enStem,options,answer,correctOptionIds,analysis,analysisEn,title,titleEn,
+      format:'structured',language:hasEnglish?'bilingual':'zh_only',subject:section(sections,'科目','所属科目'),knowledge:section(sections,'知识点','主要知识点','主知识点'),stem:zhStem,stemEn:enStem,options,answer,analysis,analysisEn,title,titleEn,
       topic:section(sections,'主题'),tags:section(sections,'标签','普通标签').split(/[,，;；、]+/).map(clean).filter(Boolean),
       keywords:[],warnings:[],errors:[],source
     };
@@ -262,9 +256,7 @@ B
     if(!result.stem&&!result.stemEn)result.errors.push('未识别到题干。');
     if(!result.stem&&result.stemEn)result.warnings.push('没有中文题干；当前学员端默认中文显示将回退英文。');
     const ids=(result.options||[]).map(item=>item.id).join('');
-    if(result.type==='multiple_choice'){
-      if(result.options.length<3||result.options.length>8)result.errors.push(`当前识别到 ${result.options.length} 个选项；多选题需要 3–8 个选项。`);
-    }else if(result.options.length!==4||ids!=='ABCD')result.errors.push(`当前识别到 ${result.options.length} 个选项（${ids||'无编号'}）；单选题需要 A/B/C/D 共 4 个选项。`);
+    if(result.options.length!==4||ids!=='ABCD')result.errors.push(`当前识别到 ${result.options.length} 个选项（${ids||'无编号'}）；单选题需要 A/B/C/D 共 4 个选项。`);
     if((result.options||[]).some(item=>!clean(item.text)&&!clean(item.textEn)))result.errors.push('存在中英文内容均为空的选项。');
     if(result.stem&&(result.options||[]).some(item=>!clean(item.text)))result.errors.push('中文题目需要完整的 A/B/C/D 中文选项。');
     if(hasEnglish){
@@ -272,12 +264,8 @@ B
       const missing=(result.options||[]).filter(item=>!clean(item.textEn)).map(item=>item.id);
       if(missing.length)result.errors.push(`英文选项缺失：${missing.join('、')}。`);
     }
-    const correctIds=result.correctOptionIds?.length?result.correctOptionIds:answerIds(result.answer);
-    result.correctOptionIds=correctIds;result.answer=correctIds.join(',');
-    if(!correctIds.length)result.errors.push('未识别到正确答案。');
-    else if(correctIds.some(id=>!(result.options||[]).some(item=>item.id===id)))result.errors.push(`答案 ${result.answer} 不在已识别选项中。`);
-    if(result.type==='multiple_choice'&&correctIds.length<2)result.errors.push('多选题至少需要 2 个正确选项。');
-    if(result.type==='multiple_choice'&&correctIds.length>=result.options.length)result.errors.push('多选题至少需要 1 个错误选项。');
+    if(!result.answer)result.errors.push('未识别到正确答案。');
+    else if(!(result.options||[]).some(item=>item.id===result.answer))result.errors.push(`答案 ${result.answer} 不在已识别选项中。`);
     if(!result.analysis)result.warnings.push('未识别到中文解析，可保存后继续补充。');
     if(hasEnglish&&!result.analysisEn)result.warnings.push('未识别到英文解析，可保存后继续补充。');
     result.language=hasEnglish?'bilingual':(result.stem?'zh_only':'en_only');

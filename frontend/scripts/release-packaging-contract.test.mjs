@@ -10,7 +10,6 @@ const repoDir = resolve(frontendDir, '..')
 const source = (path) => readFileSync(resolve(repoDir, path), 'utf8')
 const requiredRsyncExcludes = [
   '/.git',
-  '/.deploy-state',
   '/new-legacy',
   '/docs',
   '/frontend/new-legacy-releases',

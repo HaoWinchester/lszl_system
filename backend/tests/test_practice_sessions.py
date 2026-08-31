@@ -40,7 +40,7 @@ def _practice_fixture_ids() -> dict[str, str]:
 
 
 async def _seed_released_pmp_paper(
-    ids: dict[str, str], *, domains: list[str] | None = None, multiple_choice: bool = False
+    ids: dict[str, str], *, domains: list[str] | None = None
 ) -> None:
     async with AsyncSessionLocal() as db:
         db.add_all(
@@ -89,20 +89,14 @@ async def _seed_released_pmp_paper(
                 source_id=f"source-{question_id}",
                 bank_id=ids["bank"],
                 title=f"PMP 会话题目 {index + 1}",
-                type="multiple_choice" if multiple_choice else "single_choice",
                 subject="PMP",
                 scope="internal",
                 stem_parts=[{"text": f"题干 {index + 1}"}],
-                options=([
-                    {"id": "A", "text": "正确答案 A", "correct": True},
-                    {"id": "B", "text": "干扰项", "correct": False},
-                    {"id": "C", "text": "正确答案 C", "correct": True},
-                ] if multiple_choice else [
+                options=[
                     {"id": "A", "text": "正确答案", "correct": True},
                     {"id": "B", "text": "干扰项", "correct": False},
-                ]),
-                correct_answer=None if multiple_choice else "A",
-                correct_answer_ids=["A", "C"] if multiple_choice else [],
+                ],
+                correct_answer="A",
                 content_metadata={
                     "subjectFacets": [
                         {"dimensionId": "exam-domain", "valueId": domain}
@@ -124,20 +118,14 @@ async def _seed_released_pmp_paper(
                 source_id=f"practice-verification-{ids['release'][-10:]}",
                 bank_id=ids["bank"],
                 title="PMP 会话验证题",
-                type="multiple_choice" if multiple_choice else "single_choice",
                 subject="PMP",
                 scope="public",
                 stem_parts=[{"text": "这是一道同知识点验证题"}],
-                options=([
-                    {"id": "A", "text": "正确答案 A", "correct": True},
-                    {"id": "B", "text": "干扰项", "correct": False},
-                    {"id": "C", "text": "正确答案 C", "correct": True},
-                ] if multiple_choice else [
+                options=[
                     {"id": "A", "text": "正确答案", "correct": True},
                     {"id": "B", "text": "干扰项", "correct": False},
-                ]),
-                correct_answer=None if multiple_choice else "A",
-                correct_answer_ids=["A", "C"] if multiple_choice else [],
+                ],
+                correct_answer="A",
                 content_metadata={
                     "knowledge": {
                         "taxonomyId": "taxonomy-practice-session",
@@ -158,7 +146,6 @@ async def _seed_released_pmp_paper(
                 status="published",
                 name="PMP 会话模拟卷",
                 subject="PMP",
-                paper_type="multiple_choice" if multiple_choice else "standard",
                 publisher_id=ids["teacher"],
                 access_level="free",
                 enabled_modes=["practice_mode"],
@@ -766,48 +753,6 @@ def test_180_question_published_papers_start_save_and_restore_in_all_modes(domai
                 assert restored.json()["session"]["questionOrder"] == session["questionOrder"]
                 assert restored.json()["session"]["stats"]["correct"] == 1
                 assert restored.json()["session"]["answers"][first_id]["selectedAnswer"] == "A"
-    finally:
-        asyncio.run(_cleanup_released_pmp_paper(ids))
-
-
-def test_multiple_choice_session_scores_only_the_exact_option_set() -> None:
-    ids = _practice_fixture_ids()
-    asyncio.run(_seed_released_pmp_paper(ids, domains=["people"], multiple_choice=True))
-    try:
-        with TestClient(app) as client:
-            assert client.post("/api/v1/auth/login", json={
-                "username": ids["student"], "password": PASSWORD,
-            }).status_code == 200
-            for selected, expected in ((["C", "A"], 1), (["A"], 0), (["A", "B", "C"], 0), (["A", "B"], 0)):
-                response = client.post("/api/v1/learning/practice/sessions/start", json={
-                    "paperId": ids["paper"], "releaseId": ids["release"],
-                    "mode": "challenge", "count": 1, "order": "paper",
-                })
-                assert response.status_code == 200, response.text
-                started = response.json()["session"]
-                question_id = started["questionOrder"][0]["questionId"]
-                paused = client.post(
-                    f"/api/v1/learning/practice/sessions/{started['id']}/pause",
-                    json={
-                        "revision": started["revision"],
-                        "answers": {question_id: {"selectedAnswerIds": selected, "selectionIndex": 1}},
-                    },
-                )
-                assert paused.status_code == 200, paused.text
-                session = paused.json()["session"]
-                assert session["stats"]["correct"] == expected
-                assert session["answers"][question_id]["selectedAnswerIds"] == [
-                    option_id for option_id in ("A", "B", "C") if option_id in selected
-                ]
-                completed = client.post(
-                    f"/api/v1/learning/practice/sessions/{started['id']}/complete",
-                    json={
-                        "revision": session["revision"],
-                        "answers": {question_id: {"selectedAnswerIds": selected, "selectionIndex": 1}},
-                    },
-                )
-                assert completed.status_code == 200, completed.text
-                assert completed.json()["session"]["stats"]["correct"] == expected
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))
 

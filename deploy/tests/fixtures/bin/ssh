@@ -1,36 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-if [[ "${UAT_TEST_SCENARIO:-}" == "fast-path" && -n "${UAT_TEST_CALL_LOG:-}" ]]; then
-  echo "ssh $*" >> "$UAT_TEST_CALL_LOG"
-fi
-if [[ "${UAT_TEST_SCENARIO:-}" == "fast-path" && "$*" == *".deploy-state/git-commit"* ]]; then
-  echo "${UAT_TEST_DEPLOYED_COMMIT:?}"
-  exit 0
-fi
-if [[ "${UAT_TEST_SCENARIO:-}" == "fast-path" && "$*" == *"sha256sum /etc/nginx/conf.d/uat.aihuanpu.com.conf"* ]]; then
-  echo "${UAT_TEST_NGINX_HASH:?}"
-  exit 0
-fi
-if [[ "$*" == *"source_snapshot_hash"* ]]; then
-  echo "${UAT_TEST_SOURCE_SNAPSHOT_HASH:-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}"
-  exit 0
-fi
-if [[ "$*" == *"runtime_domain_migration verify"* ]]; then
-  if [[ "${UAT_TEST_FORCE_VERIFY_FAILURE:-0}" == "1" ]]; then
-    exit 1
-  fi
-  exit 0
-fi
-if [[ "${UAT_TEST_SCENARIO:-}" == "fast-path" && "$*" == *"cat "*".deploy-state/paper-release-backfill-fingerprint"* ]]; then
-  if [[ -s "${UAT_TEST_REMOTE_BACKFILL_STATE:?}" ]]; then
-    cat "$UAT_TEST_REMOTE_BACKFILL_STATE"
-  fi
-  exit 0
-fi
-if [[ "${UAT_TEST_SCENARIO:-}" == "fast-path" && "$*" == *"paper-release-backfill-fingerprint.tmp"* ]]; then
-  printf '%s\n' "${UAT_TEST_EXPECTED_BACKFILL_FINGERPRINT:?}" > "${UAT_TEST_REMOTE_BACKFILL_STATE:?}"
-  exit 0
-fi
 if [[ " $* " == *" df -P / "* ]]; then
   echo "10485760"
 fi

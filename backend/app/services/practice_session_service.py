@@ -16,7 +16,7 @@ from app.core.security import now_utc, uid
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.training import LearningEvent, PracticeSession
 from app.models.user import User
-from app.services import learning_service, practice_experience_service, paper_composition_service, paper_release_service, question_answer_service
+from app.services import learning_service, practice_experience_service, paper_composition_service, paper_release_service
 from app.services.practice_scoring_service import (
     DEFAULT_DOMAIN_WEIGHTS,
     DEFAULT_SIMULATION_SCORING,
@@ -245,20 +245,10 @@ async def _validated_draft_answers(
     for question_id, value in raw.items():
         if question_id not in refs or not isinstance(value, dict):
             raise _error(422, "PRACTICE_DRAFT_ANSWER_INVALID", "草稿包含非法题目")
-        row = rows.get(question_id)
-        snapshot = row.snapshot if row is not None and isinstance(row.snapshot, dict) else {}
-        multiple = str(snapshot.get("type") or "") == "multiple_choice"
         selected = str(value.get("selectedAnswer") or "").strip()
-        selected_ids = question_answer_service.normalize_option_ids(
-            value.get("selectedAnswerIds"), [
-                str(option.get("id") or "").strip()
-                for option in snapshot.get("options") or []
-                if isinstance(option, dict) and str(option.get("id") or "").strip()
-            ]
-        ) if multiple else []
         selection_index = value.get("selectionIndex")
         if (
-            (not selected_ids if multiple else not selected)
+            not selected
             or isinstance(selection_index, bool)
             or not isinstance(selection_index, int)
             or selection_index < 1
@@ -275,15 +265,11 @@ async def _validated_draft_answers(
         # 裸 '__timeout__' 不带 timedOut:true 仍被拒绝，防伪造超时。
         timed_out = value.get("timedOut") is True
         allowed_values = {TIMEOUT_ANSWER_PLACEHOLDER} if timed_out else set()
+        row = rows.get(question_id)
         option_ids = (
             _snapshot_option_ids(row.snapshot or {}) if row is not None else set()
         )
-        invalid_selection = (
-            (not selected_ids if not timed_out else selected not in allowed_values)
-            if multiple
-            else selected not in (allowed_values | option_ids)
-        )
-        if invalid_selection or (
+        if selected not in (allowed_values | option_ids) or (
             timed_out and session.mode != "scholar"
         ):
             if timed_out:
@@ -298,11 +284,11 @@ async def _validated_draft_answers(
         # 使旧格式（真实值+timedOut）与新载荷（占位符+timedOut）落库形状一致，
         # 幂等深比较与锁定比较不再出现口径分裂。
         normalized[question_id] = {
-            **({"selectedAnswerIds": selected_ids} if multiple and not timed_out else {"selectedAnswer": (
+            "selectedAnswer": (
                 TIMEOUT_ANSWER_PLACEHOLDER
                 if timed_out
                 else selected
-            )}),
+            ),
             "selectionIndex": selection_index,
             **({"timedOut": True} if timed_out else {}),
         }
@@ -330,14 +316,11 @@ def _draft_stats(
         row = rows.get(question_id)
         snapshot = row.snapshot if row is not None and isinstance(row.snapshot, dict) else {}
         selected = str(answer.get("selectedAnswer") or "")
-        multiple = str(snapshot.get("type") or "") == "multiple_choice"
-        selected_ids = answer.get("selectedAnswerIds") if multiple else []
-        grading = question_answer_service.grade_selection(
-            snapshot,
-            selected_ids if multiple else [selected],
-            timed_out=answer.get("timedOut") is True,
+        is_correct = (
+            bool(str(snapshot.get("correctAnswer") or ""))
+            and not answer.get("timedOut")
+            and selected == str(snapshot.get("correctAnswer") or "")
         )
-        is_correct = bool(grading["correct"])
         answered += 1
         if is_correct:
             correct += 1
@@ -349,7 +332,7 @@ def _draft_stats(
             submission_index = position + 1
         scoring_answers[question_id] = {
             "questionId": question_id,
-            **({"selectedAnswerIds": grading["selectedOptionIds"]} if multiple else {"selectedAnswer": selected}),
+            "selectedAnswer": selected,
             "correct": is_correct,
             "submissionIndex": submission_index,
             "submittedAt": str(answer.get("submittedAt") or ""),
@@ -505,7 +488,6 @@ async def start_session(
                     "previousWrongAnswer": str(
                         candidate.get("previousWrongAnswer") or ""
                     ),
-                    "previousWrongAnswerIds": list(candidate.get("previousWrongAnswerIds") or []),
                     "sourcePaperId": str(candidate.get("paperId") or ""),
                     "sourcePaperName": str(candidate.get("paperName") or ""),
                     "sourceReleaseId": str(candidate.get("releaseId") or ""),
@@ -1077,7 +1059,7 @@ def _revision_conflict(session: PracticeSession) -> PracticeSessionError:
     )
 
 
-_DRAFT_LOCK_FIELDS = ("selectedAnswer", "selectedAnswerIds", "timedOut", "selectionIndex")
+_DRAFT_LOCK_FIELDS = ("selectedAnswer", "timedOut", "selectionIndex")
 
 
 def _assert_existing_selections_unchanged(existing: dict, draft: dict) -> None:
@@ -1377,30 +1359,23 @@ async def _grade_session_selection(
     if timed_out:
         selected = "__timeout__"
     frozen_snapshot = row.snapshot if isinstance(row.snapshot, dict) else {}
-    multiple = str(frozen_snapshot.get("type") or "") == "multiple_choice"
-    selected_ids = draft.get("selectedAnswerIds") if multiple else [selected]
-    selection_grading = question_answer_service.grade_selection(
-        frozen_snapshot, selected_ids, timed_out=timed_out
-    )
     correct_answer = learning_service.canonical_practice_snapshot_answer(
         frozen_snapshot
     )
-    correct_option_ids = selection_grading["correctOptionIds"]
-    selected_option_ids = selection_grading["selectedOptionIds"]
 
     mistake = None
     completion: dict = {}
     try:
         if session.mode == "revenge":
             option_ids = _snapshot_option_ids(frozen_snapshot)
-            if (multiple and len(correct_option_ids) < 2) or (not multiple and (not correct_answer or correct_answer not in option_ids)):
+            if not correct_answer or correct_answer not in option_ids:
                 raise _error(
                     409,
                     "PRACTICE_SNAPSHOT_INVALID",
                     "判题失败：冻结错题快照缺少有效正确答案",
                     questionId=str(ref.get("questionId") or ""),
                 )
-            if (multiple and not selected_option_ids) or (not multiple and selected not in option_ids):
+            if selected not in option_ids:
                 raise _error(
                     422,
                     "PRACTICE_GRADE_FAILED",
@@ -1410,7 +1385,7 @@ async def _grade_session_selection(
                 db,
                 owner,
                 str(ref.get("mistakeId") or ""),
-                ({"selectedAnswerIds": selected_option_ids} if multiple else {"selectedAnswer": selected}),
+                {"selectedAnswer": selected},
                 commit=False,
                 allow_concurrent=True,
                 record=record,
@@ -1420,7 +1395,7 @@ async def _grade_session_selection(
                 ref.get("questionId") or ""
             ):
                 raise _error(404, "PRACTICE_MISTAKE_NOT_FOUND", "错题不存在或无权访问")
-            correct = bool(selection_grading["correct"])
+            correct = selected == correct_answer
         else:
             grading = await learning_service.record_practice_answer(
                 db,
@@ -1431,7 +1406,7 @@ async def _grade_session_selection(
                     "paperId": session.paper_id,
                     "releaseId": session.release_id,
                     "sourceMode": session.mode,
-                    **({"selectedAnswerIds": selected_option_ids} if multiple else {"selectedAnswer": selected}),
+                    "selectedAnswer": selected,
                     "timedOut": timed_out,
                 },
                 current_user=user,
@@ -1456,7 +1431,8 @@ async def _grade_session_selection(
 
     answer = {
         "questionId": ref["questionId"],
-        **({"selectedAnswerIds": selected_option_ids, "correctOptionIds": correct_option_ids} if multiple else {"selectedAnswer": selected, "correctAnswer": correct_answer}),
+        "selectedAnswer": selected,
+        "correctAnswer": correct_answer,
         "correct": correct,
         "submittedAt": completion.get("completedAt") or now_utc().isoformat(),
         "submissionIndex": submission_index,

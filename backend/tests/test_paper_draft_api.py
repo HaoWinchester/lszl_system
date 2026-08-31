@@ -4,7 +4,7 @@ import asyncio
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select
+from sqlalchemy import delete
 
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
@@ -23,117 +23,6 @@ def login(client: TestClient, username: str) -> None:
         json={"username": username, "password": PASSWORD},
     )
     assert response.status_code == 200
-
-
-def test_paper_type_rejects_mixed_questions_and_locks_after_selection() -> None:
-    suffix = uuid4().hex[:10]
-    teacher = f"paper-type-teacher-{suffix}"
-    bank_id = f"paper-type-bank-{suffix}"
-    single_id = f"paper-type-single-{suffix}"
-    multi_id = f"paper-type-multi-{suffix}"
-    paper_id = ""
-
-    async def seed() -> None:
-        async with AsyncSessionLocal() as db:
-            db.add(User(
-                username=teacher,
-                password_hash=hash_password(PASSWORD),
-                role="teacher",
-                status="active",
-            ))
-            await db.flush()
-            db.add(QuestionBank(
-                id=bank_id,
-                owner_id=teacher,
-                name="题型试卷题库",
-                subject="PMP",
-            ))
-            await db.flush()
-            db.add_all([
-                Question(
-                    id=single_id,
-                    bank_id=bank_id,
-                    title="单选题",
-                    type="single_choice",
-                    lifecycle={"status": "active"},
-                ),
-                Question(
-                    id=multi_id,
-                    bank_id=bank_id,
-                    title="多选题",
-                    type="multiple_choice",
-                    options=[{"id": value} for value in "ABC"],
-                    correct_answer_ids=["A", "C"],
-                    analysis="解析",
-                    lifecycle={"status": "active"},
-                ),
-            ])
-            await db.commit()
-
-    async def cleanup() -> None:
-        async with AsyncSessionLocal() as db:
-            paper_ids = list((await db.scalars(
-                select(ExamPaper.id).where(ExamPaper.owner_id == teacher)
-            )).all())
-            if paper_ids:
-                await db.execute(delete(PaperQuestion).where(PaperQuestion.paper_id.in_(paper_ids)))
-                await db.execute(delete(ExamPaper).where(ExamPaper.id.in_(paper_ids)))
-            await db.execute(delete(Question).where(Question.bank_id == bank_id))
-            await db.execute(delete(QuestionBank).where(QuestionBank.id == bank_id))
-            await db.execute(delete(User).where(User.username == teacher))
-            await db.commit()
-
-    def reference(question_id: str) -> dict:
-        return {
-            "bankId": bank_id,
-            "questionId": question_id,
-            "order": 1,
-            "score": 1,
-        }
-
-    asyncio.run(seed())
-    try:
-        with TestClient(app) as client:
-            login(client, teacher)
-            wrong_standard = client.post(
-                "/api/v1/papers",
-                json={"name": "标准卷", "questions": [reference(multi_id)]},
-            )
-            assert wrong_standard.status_code == 422
-            assert wrong_standard.json()["detail"]["code"] == "PAPER_TYPE_QUESTION_MISMATCH"
-
-            wrong_multi = client.post(
-                "/api/v1/papers",
-                json={
-                    "name": "多选卷",
-                    "paperType": "multiple_choice",
-                    "questions": [reference(single_id)],
-                },
-            )
-            assert wrong_multi.status_code == 422
-            assert wrong_multi.json()["detail"]["code"] == "PAPER_TYPE_QUESTION_MISMATCH"
-
-            created = client.post(
-                "/api/v1/papers",
-                json={
-                    "name": "多选卷",
-                    "paperType": "multiple_choice",
-                    "questions": [reference(multi_id)],
-                },
-            )
-            assert created.status_code == 200, created.text
-            paper = created.json()["paper"]
-            paper_id = paper["id"]
-            assert paper["paperType"] == "multiple_choice"
-
-            locked = client.put(
-                f"/api/v1/papers/{paper_id}",
-                json={"revision": 1, "paperType": "standard"},
-            )
-            assert locked.status_code == 409
-            assert locked.json()["detail"]["code"] == "PAPER_TYPE_LOCKED"
-    finally:
-        asyncio.run(cleanup())
 
 
 def test_create_paper_persists_ordered_references_and_denies_students() -> None:

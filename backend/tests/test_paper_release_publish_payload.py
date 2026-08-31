@@ -78,44 +78,6 @@ def test_publish_payload_creates_release_and_withdraw_all(client=None) -> None:
         assert detail.status_code == 404
 
 
-def test_publish_payload_preserves_multiple_choice_paper_type() -> None:
-    with TestClient(app) as client:
-        login(client, "admin")
-        paper = client.post(
-            "/api/v1/papers",
-            json={"name": "待发布空草稿", "subject": "PMP"},
-        ).json()["paper"]
-        paper_id = paper["id"]
-        payload = _payload(paper_id=paper_id)
-        payload["paperType"] = "multiple_choice"
-        question = payload["questionSnapshots"][0]["question"]
-        question.update({
-            "type": "multiple_choice",
-            "options": [
-                {"id": "A", "text": "A"},
-                {"id": "B", "text": "B"},
-                {"id": "C", "text": "C"},
-            ],
-            "correctAnswer": None,
-            "correctOptionIds": ["A", "C"],
-            "analysis": "多选解析",
-        })
-        response = client.post(
-            "/api/v1/paper-releases/publish-payload",
-            json=payload,
-        )
-        assert response.status_code == 200, response.text
-        release = response.json()["release"]
-        assert release["paperType"] == "multiple_choice"
-        questions = client.get(
-            f"/api/v1/paper-releases/{release['releaseId']}/questions?limit=10"
-        ).json()["questions"]
-        assert questions[0]["question"]["correctOptionIds"] == ["A", "C"]
-        managed = client.get(f"/api/v1/papers/{paper_id}").json()["paper"]
-        assert managed["paperType"] == "multiple_choice"
-        client.post(f"/api/v1/paper-releases/papers/{paper_id}/withdraw-all")
-
-
 def test_publish_payload_rejects_unclassified_pmp_practice_questions() -> None:
     with TestClient(app) as client:
         login(client, "admin")

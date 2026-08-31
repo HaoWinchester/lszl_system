@@ -224,13 +224,10 @@ def test_catalog_serializer_normalizes_legacy_string_collections() -> None:
         id="legacy-string-question",
         bank_id="legacy-string-bank",
         title="旧格式题目",
-        type="multiple_choice",
-        options=[{"id": "A"}, {"id": "B"}, {"id": "C"}],
         stem_parts=["旧格式题干"],
         clues=["旧格式线索"],
         concepts=["可持续步调"],
         reasoning_steps=["先判断原则"],
-        correct_answer_ids=["A", "C"],
     )
 
     payload = question_to_payload(question)
@@ -239,7 +236,6 @@ def test_catalog_serializer_normalizes_legacy_string_collections() -> None:
     assert payload["clues"] == [{"text": "旧格式线索"}]
     assert payload["concepts"] == [{"title": "可持续步调"}]
     assert payload["reasoningSteps"] == [{"content": "先判断原则"}]
-    assert payload["correctOptionIds"] == ["A", "C"]
 
 
 def test_teacher_can_manage_another_teachers_bank() -> None:
