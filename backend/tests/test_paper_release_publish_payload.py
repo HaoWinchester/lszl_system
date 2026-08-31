@@ -116,6 +116,36 @@ def test_publish_payload_preserves_multiple_choice_paper_type() -> None:
         client.post(f"/api/v1/paper-releases/papers/{paper_id}/withdraw-all")
 
 
+def test_publish_payload_allows_unclassified_multiple_choice_questions() -> None:
+    with TestClient(app) as client:
+        login(client, "admin")
+        paper_id = f"paper-multi-no-domain-{uuid4().hex[:8]}"
+        payload = _payload(paper_id=paper_id)
+        payload["paperType"] = "multiple_choice"
+        question = payload["questionSnapshots"][0]["question"]
+        question.pop("metadata")
+        question.update({
+            "type": "multiple_choice",
+            "options": [
+                {"id": "A", "text": "A"},
+                {"id": "B", "text": "B"},
+                {"id": "C", "text": "C"},
+            ],
+            "correctAnswer": None,
+            "correctOptionIds": ["A", "C"],
+            "analysis": "多选解析",
+        })
+
+        response = client.post(
+            "/api/v1/paper-releases/publish-payload",
+            json=payload,
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["release"]["paperType"] == "multiple_choice"
+        client.post(f"/api/v1/paper-releases/papers/{paper_id}/withdraw-all")
+
+
 def test_publish_payload_rejects_unclassified_pmp_practice_questions() -> None:
     with TestClient(app) as client:
         login(client, "admin")
