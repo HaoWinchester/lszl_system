@@ -48,9 +48,10 @@ test('revenge card exposes the real pool, independent batch controls and accessi
   assert.match(page, /aria-controls="practiceRevengeRuleTooltip"/)
   assert.match(page, /aria-expanded="false"/)
   assert.match(page, /role="tooltip"/)
-  assert.match(page, /跨试卷、跨版本和历史无版本/)
-  assert.match(page, /相同 question_id 只出一道题/)
-  assert.match(page, /已到期待验证/)
+  assert.match(page, /第一次在复仇模式答对，并且完成交卷/)
+  assert.match(page, /等待约 24 小时/)
+  assert.match(page, /只“保存退出”不算，必须交卷结算/)
+  assert.match(page, /class="practice-revenge-submit-note"/)
 
   assert.match(practice, /KGRevengeEntryPolicy\.derive\(/)
   assert.match(practice, /revengeSelectedCount/)

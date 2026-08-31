@@ -132,7 +132,7 @@
           <aside class="practice-revenge-column">
             <article class="practice-mode-card revenge">
               <span class="practice-mode-icon" data-kg-icon="rotate-ccw" data-kg-icon-size="20" aria-hidden="true"></span>
-              <div><small>REVENGE</small><div class="practice-revenge-title" id="practiceRevengeRuleShell"><h2>复仇模式</h2><button type="button" class="practice-revenge-rule-trigger" id="practiceRevengeRuleTrigger" aria-label="查看复仇模式规则" aria-controls="practiceRevengeRuleTooltip" aria-expanded="false"><span data-kg-icon="circle-help" data-kg-icon-size="16" aria-hidden="true"></span></button><div class="practice-revenge-rule-tooltip" id="practiceRevengeRuleTooltip" role="tooltip" hidden><strong>复仇模式规则</strong><ul><li>按当前账号全局统计，支持跨试卷、跨版本和历史无版本错题。</li><li>相同 question_id 只出一道题，重复历史仍会保留并关联。</li><li>新错题、需补救和已到期待验证的题会进入本次题池。</li><li>优先顺序：需补救 → 新错题 → 已到期待验证。</li><li>10 题以内自动全部进入；超过 10 题可选择本次题量。</li></ul></div></div><p>集中处理真实错题；再次答错先补知识点，再用不同题目验证是否真正掌握。</p></div>
+              <div><small>REVENGE</small><div class="practice-revenge-title" id="practiceRevengeRuleShell"><h2>复仇模式</h2><button type="button" class="practice-revenge-rule-trigger" id="practiceRevengeRuleTrigger" aria-label="查看复仇模式规则" aria-controls="practiceRevengeRuleTooltip" aria-expanded="false"><span data-kg-icon="circle-help" data-kg-icon-size="16" aria-hidden="true"></span></button><div class="practice-revenge-rule-tooltip" id="practiceRevengeRuleTooltip" role="tooltip" hidden><strong>复仇模式规则</strong><ul><li><b>第一次在复仇模式答对，并且完成交卷</b><br>题目会进入“待验证”，暂时移出复仇题池。</li><li><b>等待约 24 小时</b><br>题目会重新进入复仇模式，作为延迟验证题。</li><li><b>再次答对并完成交卷</b><br>题目会变成“已掌握”，不再进入复仇题池。</li><li>只“保存退出”不算，必须交卷结算。</li><li>如果再次答错，需要先看解析、完成补救和验证，然后重新等待验证。</li><li>“已掌握”仍会保留在统计里，并非删除历史记录；以后若又答错，会重新进入错题池。</li></ul></div></div><p>集中处理真实错题；再次答错先补知识点，再用不同题目验证是否真正掌握。</p></div>
               <div class="practice-revenge-total">可复仇 <strong id="practiceRevengeActiveCount">0</strong> 题</div>
               <div class="practice-revenge-stats" aria-label="复仇错题统计"><span>新错题 <strong id="practiceRevengePendingCount">0</strong></span><span>需补救 <strong id="practiceRevengeRemediationCount">0</strong></span><span>待验证 <strong id="practiceRevengeVerificationCount">0</strong></span><span>已掌握 <strong id="practiceRevengeMasteredCount">0</strong></span></div>
               <div class="practice-revenge-count-shell"><span id="practiceRevengeCountSummary">当前暂无可复仇错题</span><fieldset id="practiceRevengeCountOptions" hidden><legend>本次题量</legend><div id="practiceRevengeCountOptionList"></div></fieldset></div>
@@ -162,6 +162,7 @@
           <button type="button" class="practice-answer-sheet-mobile-btn" id="practiceAnswerSheetMobileBtn" aria-controls="practiceAnswerSheetDrawer" aria-expanded="false">答题卡 <span>0/0</span>
           </button>
         </header>
+        <p class="practice-revenge-submit-note">复仇模式须交卷结算：完成作答后，请打开右上角“答题卡”，点击底部“交卷并查看成绩”。</p>
         <div class="practice-time-row" id="practiceTimeRow" hidden>
           <span class="practice-time-icon" data-kg-icon="timer" data-kg-icon-size="18" aria-hidden="true"></span>
           <strong class="practice-time-ms" id="practiceTimerMs">60.0</strong>

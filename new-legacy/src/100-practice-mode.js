@@ -1221,7 +1221,7 @@
       const panel=$('practiceExpPanel');
       if(panel)panel.hidden=!open;
     });
-    global.addEventListener('resize',()=>{if(document.body.dataset.practiceView==='lobby'){positionExperiencePanel();refreshExperiencePanel()}});
+    global.addEventListener('resize',()=>{if(document.body.dataset.practiceView==='lobby'){positionExperiencePanel();const panel=$('practiceExpPanel');if(panel)panel.hidden=global.matchMedia?.('(max-width:1720px)').matches?!document.body.classList.contains('is-exp-panel-open'):false}});
     dom.paperDrawer?.addEventListener('click',event=>{if(event.target===dom.paperDrawer)closePaperDrawer()});
     dom.historyDrawer?.addEventListener('click',event=>{if(event.target===dom.historyDrawer)closeHistoryDrawer()});
     dom.countInputs.forEach(input=>input.addEventListener('change',()=>{if(input.checked){state.selectedCount=Number(input.value);syncCountOptions();syncResumableButtons()}}));

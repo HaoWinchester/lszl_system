@@ -513,7 +513,12 @@ with sync_playwright() as playwright:
     rule_tooltip = page.locator('#practiceRevengeRuleTooltip')
     rule_trigger.hover()
     assert rule_tooltip.is_visible()
-    assert '跨试卷、跨版本和历史无版本' in rule_tooltip.inner_text()
+    rule_text = rule_tooltip.inner_text()
+    assert '第一次在复仇模式答对，并且完成交卷' in rule_text
+    assert '等待约 24 小时' in rule_text
+    assert '再次答对并完成交卷' in rule_text
+    assert '只“保存退出”不算，必须交卷结算。' in rule_text
+    assert '“已掌握”仍会保留在统计里' in rule_text
     page.mouse.move(5, 5)
     page.wait_for_timeout(50)
     assert rule_tooltip.is_hidden()
@@ -532,6 +537,9 @@ with sync_playwright() as playwright:
     page.wait_for_timeout(180)
     assert writes(page)[0] == {"name": "start", "body": {"mode": "revenge", "count": 1, "order": "paper"}}, writes(page)
     assert page.evaluate('KGPracticeMode.snapshot().questionCount') == 1
+    submit_note = page.locator('.practice-revenge-submit-note')
+    assert submit_note.is_visible()
+    assert '右上角“答题卡”' in submit_note.inner_text() and '交卷' in submit_note.inner_text()
     page.locator('#practiceExitBtn').click()
     page.locator('#practiceAbandonBtn').click()
     page.wait_for_timeout(120)
