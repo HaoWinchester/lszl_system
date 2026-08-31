@@ -39,6 +39,7 @@ from app.services import (
     content_reference_service,
     idempotency_service,
     question_access_service,
+    question_answer_service,
     question_catalog_service,
     teaching_content_projection_service,
     teaching_content_revision_service,
@@ -456,26 +457,29 @@ def _validate_question_content(
                 "题目必须包含选项",
             )
         )
+    question_type = str(normalized.get("type") or "single_choice").strip()
+    if question_type == "multiple_choice":
+        for issue in question_answer_service.validate_multiple_choice(normalized):
+            issues.append(
+                _question_issue(
+                    question_id,
+                    issue["field"],
+                    (
+                        "CORRECT_ANSWER_MISSING"
+                        if issue["field"] == "correctOptionIds"
+                        else issue["code"]
+                    ),
+                    issue["message"],
+                )
+            )
+        return issues
+
     correct_answer = normalized.get("correctAnswer")
     correct_answer_text = str(correct_answer or "")
-    question_type = str(normalized.get("type") or "single_choice").strip()
-    selected_option_ids: list[str] = []
-    if correct_answer_text in option_ids:
-        selected_option_ids = [correct_answer_text]
-    elif (
-        question_type == "multiple_choice"
-        and correct_answer_text
-        and all(len(option_id) == 1 for option_id in option_ids)
-        and all(option_id in option_ids for option_id in correct_answer_text)
-    ):
-        selected_option_ids = list(correct_answer_text)
+    selected_option_ids = [correct_answer_text] if correct_answer_text in option_ids else []
     valid_answer = (
         len(selected_option_ids) == len(set(selected_option_ids))
-        and (
-            len(selected_option_ids) >= 2
-            if question_type == "multiple_choice"
-            else len(selected_option_ids) == 1
-        )
+        and len(selected_option_ids) == 1
     )
     if not valid_answer:
         issues.append(
@@ -1027,7 +1031,12 @@ def _assign_question_fields(
     question.tags = normalized.get("tags") or []
     question.stem_parts = normalized.get("stemParts") or []
     question.options = normalized.get("options") or []
-    question.correct_answer = str(normalized.get("correctAnswer") or "")[:20] or None
+    question.correct_answer_ids = normalized.get("correctOptionIds") or []
+    question.correct_answer = (
+        None
+        if question.type == "multiple_choice"
+        else str(normalized.get("correctAnswer") or "")[:20] or None
+    )
     analysis = normalized.get("analysis")
     question.analysis = str(analysis) if analysis is not None else None
     question.translations = normalized.get("translations") or {}

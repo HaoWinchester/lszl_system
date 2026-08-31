@@ -10,9 +10,28 @@ from app.main import app
 from app.models.question import Question, QuestionBank
 from app.models.user import User
 from app.services import teaching_content_revision_service
+from app.services.question_catalog_service import question_to_payload
+from app.services.question_service import _question_change_summary
 
 
 PASSWORD = "question-import-pass"
+
+
+def test_import_summary_counts_multiple_choice_answer_changes_as_content() -> None:
+    current = Question(
+        id="multi-summary-question",
+        bank_id="multi-summary-bank",
+        title="多选题",
+        type="multiple_choice",
+        options=[{"id": "A"}, {"id": "B"}, {"id": "C"}],
+        correct_answer_ids=["A", "C"],
+    )
+    incoming = {
+        **question_to_payload(current),
+        "correctOptionIds": ["A", "B"],
+    }
+
+    assert _question_change_summary(current, incoming)["content"] == 1
 
 
 def _login(client: TestClient, username: str) -> None:
@@ -47,6 +66,74 @@ def _source_bank(source_id: str, question_id: str, *, name: str = "导入题库"
             }
         ],
     }
+
+
+def _multiple_choice_source_bank(
+    source_id: str,
+    question_id: str,
+    *,
+    correct_ids: list[str],
+) -> dict:
+    bank = _source_bank(source_id, question_id)
+    bank["questions"][0].update({
+        "title": "导入的多选题",
+        "type": "multiple_choice",
+        "options": [
+            {"id": "A", "text": "选项 A"},
+            {"id": "B", "text": "选项 B"},
+            {"id": "C", "text": "选项 C"},
+            {"id": "D", "text": "选项 D"},
+        ],
+        "correctOptionIds": correct_ids,
+        "correctAnswer": None,
+        "analysis": "A、C 都正确。",
+    })
+    return bank
+
+
+def test_question_bank_json_import_persists_multiple_choice_answer_array() -> None:
+    suffix = uuid4().hex[:10]
+    usernames = {
+        "manager": f"question-import-multi-{suffix}",
+        "viewer": f"question-import-multi-viewer-{suffix}",
+    }
+    asyncio.run(_seed_users(usernames))
+    try:
+        with TestClient(app) as client:
+            _login(client, usernames["manager"])
+            invalid = client.post(
+                "/api/v1/banks/import",
+                json={
+                    "banks": [
+                        _multiple_choice_source_bank(
+                            "multi-invalid-bank",
+                            "multi-invalid-question",
+                            correct_ids=["A"],
+                        )
+                    ]
+                },
+            )
+            assert invalid.status_code == 422, invalid.text
+            assert invalid.json()["detail"]["code"] == "IMPORT_VALIDATION_FAILED"
+
+            imported = client.post(
+                "/api/v1/banks/import",
+                json={
+                    "banks": [
+                        _multiple_choice_source_bank(
+                            "multi-bank",
+                            "multi-question",
+                            correct_ids=["C", "A"],
+                        )
+                    ]
+                },
+            )
+            assert imported.status_code == 200, imported.text
+            question = imported.json()["banks"][0]["questions"][0]
+            assert question["correctOptionIds"] == ["A", "C"]
+            assert question["correctAnswer"] is None
+    finally:
+        asyncio.run(_cleanup_users(usernames))
 
 
 async def _seed_users(usernames: dict[str, str]) -> None:

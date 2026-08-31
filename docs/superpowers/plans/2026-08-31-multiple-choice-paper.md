@@ -142,6 +142,7 @@ git commit -m "feat: add canonical multiple-choice answers"
 - Modify: `backend/app/services/question_content_service.py`
 - Modify: `backend/app/services/content_prep_service.py`
 - Modify: `backend/app/services/question_catalog_service.py`
+- Modify: `backend/app/services/question_service.py`
 - Modify: `backend/tests/test_question_content_service.py`
 - Modify: `backend/tests/test_question_import.py`
 - Modify: `backend/tests/test_question_catalog.py`
@@ -218,7 +219,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add backend/app/services/question_content_service.py backend/app/services/content_prep_service.py backend/app/services/question_catalog_service.py backend/tests/test_question_content_service.py backend/tests/test_question_import.py backend/tests/test_question_catalog.py
+git add backend/app/services/question_content_service.py backend/app/services/content_prep_service.py backend/app/services/question_catalog_service.py backend/app/services/question_service.py backend/tests/test_question_content_service.py backend/tests/test_question_import.py backend/tests/test_question_catalog.py
 git commit -m "feat: preserve imported multiple-choice answers"
 ```
 
