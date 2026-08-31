@@ -67,6 +67,45 @@ def _create_public_question(*, title: str, taxonomy_id: str, node_id: str) -> di
     return {"bankId": bank_id, "question": published.json()["question"]}
 
 
+def _create_public_multiple_choice(
+    *, title: str, taxonomy_id: str = "taxonomy-pmp", node_id: str = "multiple-choice"
+) -> dict:
+    admin = TestClient(app)
+    _login(admin, "admin", "jbgsnmm~123")
+    bank = admin.post(
+        "/api/v1/banks",
+        json={"name": _name("多选练习题库"), "subject": "PMP", "visibility": "published"},
+    ).json()["bank"]
+    created = admin.post(
+        f"/api/v1/banks/{bank['id']}/questions",
+        json={
+            "title": title,
+            "type": "multiple_choice",
+            "stemParts": [{"text": title}],
+            "options": [
+                {"id": "A", "text": "正确项 A"},
+                {"id": "B", "text": "干扰项 B"},
+                {"id": "C", "text": "正确项 C"},
+                {"id": "D", "text": "干扰项 D"},
+            ],
+            "correctOptionIds": ["A", "C"],
+            "analysis": "A、C 同时成立。",
+            "metadata": {
+                "knowledge": {
+                    "taxonomyId": taxonomy_id,
+                    "primaryNodeId": node_id,
+                    "pathSnapshot": ["多选题", "风险管理"],
+                }
+            },
+        },
+    )
+    assert created.status_code == 200, created.text
+    question = created.json()["question"]
+    published = admin.put(f"/api/v1/questions/{question['id']}", json={"scope": "public"})
+    assert published.status_code == 200, published.text
+    return {"bankId": bank["id"], "question": published.json()["question"]}
+
+
 def _mistake_row(
     *,
     mistake_id: str,
@@ -567,6 +606,80 @@ def test_practice_answer_uses_server_truth_delays_mastery_and_reactivates_mistak
     assert reactivated.json()["mistake"]["status"] == "pending"
     assert reactivated.json()["mistake"]["wrongCount"] == 2
     assert reactivated.json()["mistake"]["masteredAt"] is None
+
+
+def test_multiple_choice_practice_uses_exact_set_scoring() -> None:
+    username = _name("multiple_choice_practice")
+    _create_student(username)
+    source = _create_public_multiple_choice(title="多选精确集合判分")
+    client = TestClient(app)
+    _login(client, username)
+    base = {"questionId": source["question"]["id"], "bankId": source["bankId"]}
+
+    exact = client.post("/api/v1/learning/practice/answers", json={**base, "selectedAnswerIds": ["C", "A"]})
+    assert exact.status_code == 200, exact.text
+    assert exact.json()["correct"] is True
+
+    for selected in (["A"], ["A", "B", "C"], ["A", "D"]):
+        result = client.post("/api/v1/learning/practice/answers", json={**base, "selectedAnswerIds": selected})
+        assert result.status_code == 200, result.text
+        assert result.json()["correct"] is False
+        assert result.json()["mistake"]["selectedAnswers"] == list(selected)
+
+
+def test_multiple_choice_revenge_verification_requires_same_type_and_exact_set() -> None:
+    username = _name("multiple_choice_verification")
+    _create_student(username)
+    source = _create_public_multiple_choice(
+        title="多选复仇原题", taxonomy_id="taxonomy-multi", node_id="risk-node"
+    )
+    verification = _create_public_multiple_choice(
+        title="多选同类验证题", taxonomy_id="taxonomy-multi", node_id="risk-node"
+    )
+    _create_public_question(
+        title="同知识点单选题", taxonomy_id="taxonomy-multi", node_id="risk-node"
+    )
+    client = TestClient(app)
+    _login(client, username)
+    base = {"questionId": source["question"]["id"], "bankId": source["bankId"]}
+
+    wrong = client.post(
+        "/api/v1/learning/practice/answers",
+        json={**base, "selectedAnswerIds": ["A"]},
+    )
+    assert wrong.status_code == 200, wrong.text
+    mistake = wrong.json()["mistake"]
+    revenge_wrong = client.post(
+        f"/api/v1/learning/practice/mistakes/{mistake['id']}/revenge-answer",
+        json={"selectedAnswerIds": ["A", "B", "C"]},
+    )
+    assert revenge_wrong.status_code == 200, revenge_wrong.text
+    reviewed = client.post(
+        f"/api/v1/learning/practice/mistakes/{mistake['id']}/remediation-reviewed"
+    )
+    assert reviewed.status_code == 200, reviewed.text
+
+    candidate = client.get(
+        f"/api/v1/learning/practice/mistakes/{mistake['id']}/verification-candidate"
+    )
+    assert candidate.status_code == 200, candidate.text
+    assert candidate.json()["candidate"]["question"]["id"] == verification["question"]["id"]
+    assert candidate.json()["candidate"]["question"]["type"] == "multiple_choice"
+
+    under_selected = client.post(
+        f"/api/v1/learning/practice/mistakes/{mistake['id']}/verification",
+        json={"questionId": verification["question"]["id"], "selectedAnswerIds": ["A"]},
+    )
+    assert under_selected.status_code == 200, under_selected.text
+    assert under_selected.json()["verification"]["correct"] is False
+
+    exact = client.post(
+        f"/api/v1/learning/practice/mistakes/{mistake['id']}/verification",
+        json={"questionId": verification["question"]["id"], "selectedAnswerIds": ["C", "A"]},
+    )
+    assert exact.status_code == 200, exact.text
+    assert exact.json()["verification"]["correct"] is True
+    assert exact.json()["verification"]["selectedAnswerIds"] == ["A", "C"]
 
 
 def test_practice_answer_validates_options_visibility_and_release_identity() -> None:
