@@ -1,15 +1,16 @@
 """Persistent, resumable practice session contracts."""
 
 import asyncio
+import json
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, event, func, select
 
 from app.core.security import hash_password, now_utc
-from app.db.session import AsyncSessionLocal
+from app.db.session import AsyncSessionLocal, engine
 from app.main import app
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import Question, QuestionBank
@@ -693,6 +694,230 @@ def test_active_and_detail_sessions_are_owner_scoped() -> None:
             == 404
         )
     finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_practice_paper_progress_is_lightweight_paper_scoped_and_owner_scoped() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as owner_client:
+            assert owner_client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            created = owner_client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "challenge",
+                    "count": 10,
+                    "order": "paper",
+                },
+            )
+            assert created.status_code == 200, created.text
+            session = created.json()["session"]
+
+            response = owner_client.get(
+                f"/api/v1/learning/practice/papers/{ids['paper']}/progress",
+                params={"releaseId": ids["release"]},
+            )
+            assert response.status_code == 200, response.text
+            body = response.json()
+            assert body["paperId"] == ids["paper"]
+            assert body["modes"]["scholar"] is None
+            assert body["modes"]["challenge"] == {
+                "sessionId": session["id"],
+                "status": "active",
+                "releaseId": ids["release"],
+                "answered": 0,
+                "total": 10,
+                "currentIndex": 0,
+                "revision": 1,
+                "lastSavedAt": session["lastSavedAt"],
+            }
+            serialized = json.dumps(body)
+            for forbidden in (
+                "questions",
+                "questionOrder",
+                "answers",
+                "analysis",
+                "reasoningSteps",
+                "runtimeState",
+                "reportSnapshot",
+            ):
+                assert forbidden not in serialized
+
+        with TestClient(app) as other_client:
+            assert other_client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["other_student"], "password": PASSWORD},
+            ).status_code == 200
+            response = other_client.get(
+                f"/api/v1/learning/practice/papers/{ids['paper']}/progress"
+            )
+            assert response.status_code == 200
+            assert response.json()["modes"] == {
+                "challenge": None,
+                "scholar": None,
+            }
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_practice_revenge_summary_omits_mistakes_and_question_snapshots() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            response = client.get(
+                "/api/v1/learning/practice/revenge/summary"
+            )
+            assert response.status_code == 200, response.text
+            body = response.json()
+            assert set(body) == {"stats", "resumable"}
+            assert body["resumable"] is None
+            assert body["stats"] == {
+                "active": 0,
+                "pending": 0,
+                "needsRemediation": 0,
+                "verificationDue": 0,
+                "mastered": 0,
+                "unavailable": 0,
+            }
+            serialized = json.dumps(body)
+            for forbidden in (
+                "mistakes",
+                "revengeCandidates",
+                "questionSnapshot",
+                "questions",
+            ):
+                assert forbidden not in serialized
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_enter_practice_session_creates_exact_selected_count() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            response = client.post(
+                "/api/v1/learning/practice/sessions/enter",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "challenge",
+                    "count": 10,
+                    "order": "paper",
+                },
+            )
+            assert response.status_code == 200, response.text
+            body = response.json()
+            assert body["resumed"] is False
+            assert body["session"]["paperId"] == ids["paper"]
+            assert body["session"]["mode"] == "challenge"
+            assert body["session"]["stats"]["total"] == 10
+            assert len(body["questions"]) == 10
+            assert "questions" not in body["session"]
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_enter_practice_session_resumes_original_count_and_order() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            started = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "scholar",
+                    "count": 60,
+                    "order": "paper",
+                },
+            ).json()["session"]
+
+            response = client.post(
+                "/api/v1/learning/practice/sessions/enter",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "scholar",
+                    "count": 10,
+                    "order": "random",
+                },
+            )
+            assert response.status_code == 200, response.text
+            body = response.json()
+            assert body["resumed"] is True
+            assert body["session"]["id"] == started["id"]
+            assert body["session"]["stats"]["total"] == 60
+            assert body["session"]["runtimeState"]["order"] == "paper"
+            assert len(body["questions"]) == 60
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_enter_reads_snapshots_only_for_selected_question_ids() -> None:
+    ids = _practice_fixture_ids()
+    domains = ["people"] * 83 + ["process"] * 92 + ["business-environment"] * 10
+    asyncio.run(_seed_released_pmp_paper(ids, domains=domains))
+    snapshot_select_parameters: list[object] = []
+
+    def capture_snapshot_select(_conn, _cursor, statement, parameters, _context, _many):
+        normalized = " ".join(statement.lower().split())
+        if (
+            normalized.startswith("select")
+            and "paper_release_questions.snapshot" in normalized
+        ):
+            snapshot_select_parameters.append(parameters)
+
+    event.listen(engine.sync_engine, "before_cursor_execute", capture_snapshot_select)
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            response = client.post(
+                "/api/v1/learning/practice/sessions/enter",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "challenge",
+                    "count": 10,
+                    "order": "paper",
+                },
+            )
+            assert response.status_code == 200, response.text
+            assert len(response.json()["questions"]) == 10
+            assert snapshot_select_parameters
+            for parameters in snapshot_select_parameters:
+                values = list(parameters.values()) if isinstance(parameters, dict) else list(parameters)
+                selected_question_ids = [
+                    value
+                    for value in values
+                    if isinstance(value, str) and value.startswith("practice-session-q-")
+                ]
+                assert len(selected_question_ids) == 10
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", capture_snapshot_select)
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
 

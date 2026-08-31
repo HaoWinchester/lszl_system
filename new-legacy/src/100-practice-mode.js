@@ -21,7 +21,7 @@
     feedbackTimer:0,popTimer:0,toastTimer:0,abandonedRecorded:false,catalogAvailable:false,retiredNavigation:null,retiredNoticeShown:false,
     remediationPending:false,verification:null,entryStartingMode:'',revengeRulePinned:false,showPreviousWrong:true,
     session:null,report:null,reviewing:false,answerSheet:null,pendingSelections:{},submitting:false,pendingRequestKey:'',resumeLookupToken:0,
-    draft:null,revengeState:null,saves:null,reconciling:false
+    draft:null,revengeState:null,saves:null,reconciling:false,paperProgress:null,revengeSummary:null
   };
 
   function clone(value){try{return JSON.parse(JSON.stringify(value))}catch(error){return value}}
@@ -260,7 +260,7 @@
   function returnToFrozenReport(){
     state.reviewing=false;document.body.classList.remove('is-practice-review');if(dom.reviewBackBtn)dom.reviewBackBtn.hidden=true;closeAnswerSheetDrawer();setView('result');renderFrozenReport();return true;
   }
-  function getMistakeStats(){try{return practiceApi()?.stats?.()||{active:0,pending:0,needsRemediation:0,mastered:0}}catch(error){return {active:0,pending:0,needsRemediation:0,mastered:0}}}
+  function getMistakeStats(){try{return state.revengeSummary?.stats||practiceApi()?.stats?.()||{active:0,pending:0,needsRemediation:0,mastered:0}}catch(error){return {active:0,pending:0,needsRemediation:0,mastered:0}}}
   function revengePolicy(){
     const stats=getMistakeStats();
     return global.KGRevengeEntryPolicy.derive(stats.active,state.revengeSelectedCount);
@@ -943,28 +943,10 @@
     setView('game');renderQuestion();if(state.mode==='scholar')startTimer({resume:true});
     return true;
   }
-  async function resolvePracticeEntrySession(session,input){
-    const api=practiceApi();
-    if(!session)return api.startSession(input);
-    const previousCount=session.questions?.length||Number(session.stats?.total)||0;
-    // 同卷只允许一份未完成会话；不能忽略新选题量，也不能未经确认放弃旧进度。
-    // 复仇模式实际题量可能受可用错题数限制，保留原有恢复规则。
-    if(input.mode!=='revenge'&&previousCount!==input.count){
-      const message='上次练习共有 '+previousCount+' 题，已答 '+Number(session.stats?.answered||0)+' 题；本次选择了 '+input.count+' 题。是否放弃上次未完成的练习，开始新的 '+input.count+' 题练习？取消将保留上次进度。';
-      if(!global.confirm(message))return null;
-      await api.abandonSession(session.id,{revision:session.revision});
-      return api.startSession(input);
-    }
-    return session;
-  }
   function practiceEntryInput(mode,catalog,count){
     const order=mode==='revenge'?'paper':(dom.orderInputs.find(input=>input.checked)?.value||'paper');
     if(mode==='revenge')return {mode,count:revengePolicy().requestCount,order};
     return {paperId:text(catalog?.paperId||catalog?.id),releaseId:text(catalog?.releaseId),mode,count,order};
-  }
-  function resumableEntry(sessions,mode,paperId){
-    const rows=Array.isArray(sessions)?sessions:[];
-    return mode==='revenge'?rows.find(item=>item.mode==='revenge'):rows.find(item=>text(item.paperId)===paperId&&item.mode===mode);
   }
   async function startPractice(mode){
     const challenge=mode==='challenge';
@@ -983,12 +965,9 @@
     return runClickedRequest({key:'start',button:dom.startButtons.find(item=>item.dataset.practiceStart===String(mode)),title:challenge?'正在准备挑战':'正在进入练习模式',message:'正在读取试题…'},async()=>{
       try{
         const api=practiceApi();
-        if(hasAuthenticatedUser()&&typeof api?.startSession==='function'){
-          const input=practiceEntryInput(mode,catalog,count),paperId=text(input.paperId);
-          const active=await api.getActiveSessions({mode});
-          const resumable=resumableEntry(active,mode,paperId);
-          const session=await resolvePracticeEntrySession(resumable?await api.getSession(resumable.id):null,input);
-          if(!session){restoreFocus=true;return false}
+        if(hasAuthenticatedUser()&&typeof api?.enterSession==='function'){
+          const input=practiceEntryInput(mode,catalog,count),entered=await api.enterSession(input),session=entered?.session;
+          if(!session?.id)throw new Error('进入练习未返回会话');
           state.order=input.order;
           return restoreServerSession(session,mode==='revenge'?null:catalog);
         }
@@ -1018,17 +997,6 @@
         setView('game');renderQuestion();if(state.mode==='scholar')startTimer();return true;
       }catch(error){
         restoreFocus=true;
-        if(hasAuthenticatedUser()&&error?.detail?.code==='RESUMABLE_SESSION_EXISTS'){
-          try{
-            const api=practiceApi(),input=practiceEntryInput(mode,catalog,count),sessionId=text(error.detail.sessionId);
-            const active=sessionId?[]:await api.getActiveSessions({mode});
-            const resumable=sessionId?await api.getSession(sessionId):resumableEntry(active,mode,text(input.paperId));
-            if(resumable){
-              const session=await resolvePracticeEntrySession(resumable,input);
-              return session?restoreServerSession(session,mode==='revenge'?null:catalog):false;
-            }
-          }catch(resumeError){}
-        }
         const errorCode=error?.detail?.code;
         showToast(errorCode==='NO_REVENGE_QUESTIONS'?'当前没有可用的全局复仇错题。':errorCode==='REVENGE_SNAPSHOT_UNAVAILABLE'?'历史错题内容暂不可用，可先使用其他练习模式。':'试题读取失败，请稍后重试。');
         return false;
@@ -1097,15 +1065,23 @@
   }
   async function syncResumableButtons(){
     const release=selectedRelease(),api=practiceApi(),token=++state.resumeLookupToken;
-    if(!hasAuthenticatedUser()||typeof api?.getActiveSessions!=='function')return;
+    if(!hasAuthenticatedUser()||typeof api?.getPaperProgress!=='function'||typeof api?.getRevengeSummary!=='function'){
+      state.paperProgress=null;state.revengeSummary=null;return;
+    }
     try{
-      const paperId=text(release?.paperId||release?.id),releaseKey=text(release?.id),sessions=await api.getActiveSessions({});
+      const paperId=text(release?.paperId||release?.id),releaseKey=text(release?.id),[progress,revenge]=await Promise.all([
+        release?api.getPaperProgress(paperId,text(release?.releaseId||release?.id)):Promise.resolve(null),
+        api.getRevengeSummary()
+      ]);
       if(token!==state.resumeLookupToken||releaseKey!==text(selectedRelease()?.id))return;
-      ['challenge','scholar','revenge'].forEach(mode=>{
-        const button=dom.startButtons.find(item=>item.dataset.practiceStart===mode),session=resumableEntry(sessions,mode,paperId);if(!button||!session)return;
-        const stats=session.stats||{},total=Number(stats.total||session.questions?.length||0);button.disabled=false;
-        button.textContent=mode==='revenge'?'继续上次复仇 '+Number(stats.answered||0)+'/'+total:total!==state.selectedCount?'开始新的 '+state.selectedCount+' 题练习':'继续上次练习 '+Number(stats.answered||0)+'/'+total;
+      state.paperProgress=progress;state.revengeSummary=revenge;
+      syncRevengeStats();syncCountOptions();
+      ['challenge','scholar'].forEach(mode=>{
+        const button=dom.startButtons.find(item=>item.dataset.practiceStart===mode),session=progress?.modes?.[mode];if(!button||!session)return;
+        button.disabled=false;button.textContent='继续上次练习 '+Number(session.answered||0)+'/'+Number(session.total||0);
       });
+      const revengeButton=dom.startButtons.find(item=>item.dataset.practiceStart==='revenge'),revengeSession=revenge?.resumable;
+      if(revengeButton&&revengeSession){revengeButton.disabled=false;revengeButton.textContent='继续上次复仇 '+Number(revengeSession.answered||0)+'/'+Number(revengeSession.total||0)}
     }catch(error){}
   }
   function syncPaperMeta(){

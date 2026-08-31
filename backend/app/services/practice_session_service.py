@@ -181,16 +181,40 @@ def _snapshot_option_ids(snapshot: dict) -> set[str]:
 
 
 async def _release_question_rows(
-    db: AsyncSession, release_id: str
+    db: AsyncSession,
+    release_id: str,
+    *,
+    question_ids: list[str] | None = None,
 ) -> dict[str, PaperReleaseQuestion]:
+    query = select(PaperReleaseQuestion).where(
+        PaperReleaseQuestion.release_id == release_id
+    )
+    if question_ids is not None:
+        if not question_ids:
+            return {}
+        query = query.where(PaperReleaseQuestion.question_id.in_(question_ids))
     rows = (
-        await db.execute(
-            select(PaperReleaseQuestion).where(
-                PaperReleaseQuestion.release_id == release_id
-            )
-        )
+        await db.execute(query)
     ).scalars().all()
     return {row.question_id: row for row in rows}
+
+
+async def _release_question_headers(
+    db: AsyncSession,
+    release_id: str,
+) -> list[Any]:
+    return list(
+        (
+            await db.execute(
+                select(
+                    PaperReleaseQuestion.release_id,
+                    PaperReleaseQuestion.order_index,
+                    PaperReleaseQuestion.bank_id,
+                    PaperReleaseQuestion.question_id,
+                ).where(PaperReleaseQuestion.release_id == release_id)
+            )
+        ).all()
+    )
 
 
 async def _session_question_rows(
@@ -215,7 +239,16 @@ async def _session_question_rows(
         return embedded
     if not session.release_id:
         return {}
-    release_rows = await _release_question_rows(db, session.release_id)
+    question_ids = [
+        str(ref.get("questionId") or "")
+        for ref in refs
+        if isinstance(ref, dict) and str(ref.get("questionId") or "")
+    ]
+    release_rows = await _release_question_rows(
+        db,
+        session.release_id,
+        question_ids=question_ids,
+    )
     return {
         question_id: SessionQuestion(
             question_id=row.question_id,
@@ -416,6 +449,96 @@ async def _session_payload(db: AsyncSession, session: PracticeSession) -> dict:
     }
 
 
+def _progress_summary(row: Any, *, include_release: bool) -> dict:
+    stats = row.stats if isinstance(row.stats, dict) else {}
+    runtime = row.runtime_state if isinstance(row.runtime_state, dict) else {}
+    summary = {
+        "sessionId": row.id,
+        "status": row.status,
+        "answered": max(0, int(stats.get("answered") or 0)),
+        "total": max(0, int(stats.get("total") or 0)),
+        "currentIndex": max(0, int(runtime.get("currentIndex") or 0)),
+        "revision": row.revision,
+    }
+    if include_release:
+        summary["releaseId"] = row.release_id
+        summary["lastSavedAt"] = (
+            row.last_saved_at.isoformat() if row.last_saved_at else None
+        )
+    return summary
+
+
+async def paper_progress(
+    db: AsyncSession,
+    owner: str,
+    paper_id: str,
+    *,
+    release_id: str | None = None,
+) -> dict:
+    # releaseId 只描述当前目录版本；旧 release 的未完成会话仍须显示并恢复。
+    _ = release_id
+    rows = (
+        await db.execute(
+            select(
+                PracticeSession.id,
+                PracticeSession.release_id,
+                PracticeSession.mode,
+                PracticeSession.status,
+                PracticeSession.stats,
+                PracticeSession.runtime_state,
+                PracticeSession.revision,
+                PracticeSession.last_saved_at,
+            )
+            .where(
+                PracticeSession.owner_id == owner,
+                PracticeSession.paper_id == paper_id,
+                PracticeSession.mode.in_(["challenge", "scholar"]),
+                PracticeSession.status.in_(["active", "paused"]),
+            )
+            .order_by(PracticeSession.last_saved_at.desc(), PracticeSession.id)
+        )
+    ).all()
+    latest: dict[str, dict | None] = {"challenge": None, "scholar": None}
+    for row in rows:
+        if latest[row.mode] is None:
+            latest[row.mode] = _progress_summary(row, include_release=True)
+    return {"paperId": paper_id, "modes": latest}
+
+
+async def revenge_summary(db: AsyncSession, owner: str) -> dict:
+    revenge_pool = await learning_service.global_revenge_pool(db, owner)
+    pool_stats = revenge_pool["stats"]
+    row = (
+        await db.execute(
+            select(
+                PracticeSession.id,
+                PracticeSession.status,
+                PracticeSession.stats,
+                PracticeSession.runtime_state,
+                PracticeSession.revision,
+            )
+            .where(
+                PracticeSession.owner_id == owner,
+                PracticeSession.mode == "revenge",
+                PracticeSession.status.in_(["active", "paused"]),
+            )
+            .order_by(PracticeSession.last_saved_at.desc(), PracticeSession.id)
+            .limit(1)
+        )
+    ).one_or_none()
+    return {
+        "stats": {
+            "active": int(pool_stats.get("active") or 0),
+            "pending": int(pool_stats.get("pending") or 0),
+            "needsRemediation": int(pool_stats.get("needsRemediation") or 0),
+            "verificationDue": int(pool_stats.get("verificationDue") or 0),
+            "mastered": int(pool_stats.get("mastered") or 0),
+            "unavailable": int(revenge_pool.get("unavailableCount") or 0),
+        },
+        "resumable": _progress_summary(row, include_release=False) if row else None,
+    }
+
+
 async def start_session(
     db: AsyncSession,
     owner: str,
@@ -539,15 +662,27 @@ async def start_session(
             str(item.get("domain") or "") in weights for item in question_order
         )
     else:
-        rows = list(
-            (
-                await db.execute(
-                    select(PaperReleaseQuestion)
-                    .where(PaperReleaseQuestion.release_id == release_id)
-                    .order_by(PaperReleaseQuestion.order_index)
-                )
-            ).scalars().all()
+        headers = await _release_question_headers(db, release_id)
+        if len(headers) < count:
+            raise _error(
+                422,
+                "PRACTICE_QUESTION_SHORTAGE",
+                "试卷题量不足，无法开始本次练习",
+                available=len(headers),
+                requested=count,
+            )
+        ordered_headers = (
+            sorted(headers, key=lambda row: _stable_random_key(selection_seed, row))
+            if order == "random"
+            else sorted(headers, key=lambda row: row.order_index)
         )
+        selected_ids = [row.question_id for row in ordered_headers[:count]]
+        row_map = await _release_question_rows(
+            db,
+            release_id,
+            question_ids=selected_ids,
+        )
+        rows = [row_map[question_id] for question_id in selected_ids]
         weights, scoring = _release_scoring(release)
         question_order, targets, domain_data_complete = _select_questions(
             rows,
@@ -616,6 +751,80 @@ async def start_session(
         raise
     await db.refresh(session)
     return await _session_payload(db, session)
+
+
+def _entry_response(session: dict, *, resumed: bool) -> dict:
+    questions = list(session.get("questions") or [])
+    entry_session = {
+        key: deepcopy(session.get(key))
+        for key in (
+            "id",
+            "paperId",
+            "releaseId",
+            "mode",
+            "status",
+            "questionOrder",
+            "answers",
+            "runtimeState",
+            "stats",
+            "revision",
+            "startedAt",
+            "lastSavedAt",
+        )
+    }
+    return {
+        "resumed": resumed,
+        "session": entry_session,
+        "questions": questions,
+    }
+
+
+async def enter_session(
+    db: AsyncSession,
+    owner: str,
+    user: User,
+    data: dict,
+) -> dict:
+    mode = str(data.get("mode") or "").strip().lower()
+    paper_id = str(data.get("paperId") or "").strip()
+    if mode not in PRACTICE_SESSION_MODES:
+        raise _error(422, "INVALID_PRACTICE_MODE", "练习模式无效")
+    if mode != "revenge" and not paper_id:
+        raise _error(422, "PRACTICE_RELEASE_REQUIRED", "paperId 和 releaseId 不能为空")
+
+    await db.execute(
+        sql_text("SELECT pg_advisory_xact_lock(hashtext(:owner), hashtext(:scope))"),
+        {
+            "owner": owner,
+            "scope": (
+                "practice-session:global:revenge"
+                if mode == "revenge"
+                else f"practice-session:{paper_id}:{mode}"
+            ),
+        },
+    )
+    existing_query = select(PracticeSession).where(
+        PracticeSession.owner_id == owner,
+        PracticeSession.mode == mode,
+        PracticeSession.status.in_(["active", "paused"]),
+    )
+    if mode != "revenge":
+        existing_query = existing_query.where(PracticeSession.paper_id == paper_id)
+    existing = (
+        await db.execute(
+            existing_query.order_by(
+                PracticeSession.last_saved_at.desc(), PracticeSession.id
+            ).limit(1)
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return _entry_response(
+            await _session_payload(db, existing),
+            resumed=True,
+        )
+
+    created = await start_session(db, owner, user, data)
+    return _entry_response(created, resumed=False)
 
 
 async def get_session(

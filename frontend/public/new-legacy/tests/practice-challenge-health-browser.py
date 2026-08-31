@@ -17,8 +17,8 @@ def body_html() -> tuple[str, str]:
     return match.group(1), re.sub(r"<script[\s\S]*?</script>", "", match.group(2), flags=re.I)
 
 
-# 真实题量选择、180 题的第 3/53/54 次答错、旧血量恢复，以及题量冲突确认。
-# mock 必须尊重 startSession.count，不能用固定题量掩盖选择失效。
+# 真实题量选择、180 题的第 3/53/54 次答错、旧血量恢复，以及旧会话原题量恢复。
+# mock 必须尊重 enterSession.count，不能用固定题量掩盖选择失效。
 
 MOCK_BACKEND = r"""()=>{
   const TOTAL=180;
@@ -49,7 +49,6 @@ MOCK_BACKEND = r"""()=>{
     session.stats=stats(session);
     return clone(session);
   };
-  window.__getActiveSessionsFilter=null;
   window.__seedProgress=({count=TOTAL,wrong=0,correct=0,health=3,mode='challenge'}={})=>{
     const answers={};
     for(let i=0;i<wrong+correct;i++)answers['q'+i]={selectedAnswer:i<wrong?'B':'A',correctAnswer:'A',correct:i>=wrong,selectionIndex:i+1};
@@ -58,12 +57,14 @@ MOCK_BACKEND = r"""()=>{
   window.KGPracticeLearningApi={
     stats:()=>({active:0,pending:0,needsRemediation:0,mastered:0}),active:()=>[],refresh:async()=>({}),
     recordSession:async()=>({}),
-    getActiveSessions:async filters=>{window.__getActiveSessionsFilter=filters;return session&&['active','paused'].includes(session.status)?[clone(session)]:[]},
+    getPaperProgress:async()=>({paperId:'paper-hp',modes:{challenge:session&&session.mode==='challenge'&&['active','paused'].includes(session.status)?{sessionId:session.id,status:session.status,answered:session.stats.answered,total:session.stats.total,revision:session.revision}:null,scholar:session&&session.mode==='scholar'&&['active','paused'].includes(session.status)?{sessionId:session.id,status:session.status,answered:session.stats.answered,total:session.stats.total,revision:session.revision}:null}}),
+    getRevengeSummary:async()=>({stats:{active:0,pending:0,needsRemediation:0,verificationDue:0,mastered:0,unavailable:0},resumable:null}),
     getSession:async id=>session&&session.id===id?clone(session):null,
-    startSession:async input=>{
-      record('startSession');window.__startInput=clone(input);
-      window.__seedSession({id:'ps-'+(++sequence),status:'active',mode:input.mode,questions:refs(input.count),answers:{},runtimeState:{currentIndex:0,order:input.order,streak:0,experience:0,durationMs:0}});
-      return clone(session);
+    enterSession:async input=>{
+      record('enterSession');window.__startInput=clone(input);
+      const resumable=session&&['active','paused'].includes(session.status)&&session.mode===input.mode;
+      if(!resumable)window.__seedSession({id:'ps-'+(++sequence),status:'active',mode:input.mode,questions:refs(input.count),answers:{},runtimeState:{currentIndex:0,order:input.order,streak:0,experience:0,durationMs:0}});
+      return {resumed:!!resumable,session:clone(session)};
     },
     pauseSession:async(id,input)=>{record('pause');Object.assign(session.runtimeState,input.runtimeState||{});Object.assign(session.answers||{},input.answers||{});session.stats=stats(session);session.revision+=1;session.status='paused';return clone(session)},
     completeSession:async(id,input)=>{record('complete');Object.assign(session.runtimeState,input.runtimeState||{});Object.assign(session.answers,input.answers||{});session.stats=stats(session);session.status='completed';session.revision+=1;return {session:clone(session),report:{sessionId:id,resultLabel:'模拟考试结果：FAIL',passed:false,scorePercent:0,passPercent:60,overallBand:'needsImprovement',counts:{total:TOTAL,answered:0,correct:0,wrong:0,unanswered:TOTAL},domainWeights:{},domains:{},wrongQuestionIds:[],durationMs:1000,official:false,disclaimer:'mock'}}},
@@ -146,7 +147,7 @@ with sync_playwright() as playwright:
 
     # 用户复现：全新 180 题，先答对 1 题再答错 4 题；不能自动弹阶段小结。
     start()
-    assert page.evaluate("window.__calls.filter(name=>name==='startSession').length") == 1
+    assert page.evaluate("window.__calls.filter(name=>name==='enterSession').length") == 1
     assert_question_progress(page, 1, 180)
     page.clock.fast_forward(1)
     page.wait_for_timeout(100)
@@ -227,29 +228,17 @@ with sync_playwright() as playwright:
     assert page.locator("#practiceChallengeResult").inner_text() == "挑战失败"
     page.evaluate("window.KGPracticeMode.showLobby()")
 
-    # 选 180 题不能静默恢复旧 10 题；取消必须保留旧会话，确认后才放弃并新建。
+    # 选 180 题但已有 10 题进度时，服务端必须忽略新题量并直接恢复原 10 题。
     page.evaluate("window.__seedProgress({count:10});window.KGPracticeMode.showLobby();window.__calls=[]")
     dialogs = []
-    def cancel_dialog(dialog):
-        dialogs.append(dialog.message)
-        dialog.dismiss()
-    page.on("dialog", cancel_dialog)
+    page.on("dialog", lambda dialog: (dialogs.append(dialog.message), dialog.dismiss()))
     page.locator('[name="practiceCount"][value="180"]').check(force=True)
     page.locator('[data-practice-start="challenge"]').click()
-    page.wait_for_function("!document.querySelector('[data-practice-start=challenge]').disabled")
-    assert dialogs and "10" in dialogs[-1] and "180" in dialogs[-1], dialogs
-    assert page.locator("#practiceLobby").is_visible()
-    assert "abandon" not in page.evaluate("window.__calls")
-    assert "startSession" not in page.evaluate("window.__calls")
-    page.remove_listener("dialog", cancel_dialog)
-    page.once("dialog", lambda dialog: dialog.accept())
-    start()
-    assert page.evaluate("window.__calls") == ["abandon", "startSession"]
-    assert page.evaluate("window.KGPracticeMode.snapshot().questionCount") == 180
-    assert health_count(page) == "54/54"
-    for _ in range(3):
-        answer_wrong(page)
-    assert health_count(page) == "51/54" and fail_hidden(page)
+    page.wait_for_function("document.body.dataset.practiceView === 'game'")
+    assert not dialogs, dialogs
+    assert page.evaluate("window.__calls") == ["enterSession"]
+    assert page.evaluate("window.KGPracticeMode.snapshot().questionCount") == 10
+    assert health_label(page) == "剩余血量 3 / 3"
     abandon()
 
     # 学霸仍使用已保存的血量（有回血/超时规则，不能套用挑战计算）。
@@ -276,33 +265,6 @@ with sync_playwright() as playwright:
     page.locator("#practiceAbandonBtn").click()
     page.wait_for_function("document.body.dataset.practiceView === 'lobby'")
 
-    # 放弃旧练习失败时不新建、不吞掉旧进度；下一次操作可以重试。
-    page.evaluate("""()=>{
-      window.__seedProgress({count:10});window.KGPracticeMode.showLobby();window.__calls=[];
-      window.__originalAbandon=window.KGPracticeLearningApi.abandonSession;
-      window.KGPracticeLearningApi.abandonSession=async()=>{throw new Error('network unavailable')};
-    }""")
-    page.once("dialog", lambda dialog: dialog.accept())
-    page.locator('[data-practice-start="challenge"]').click()
-    page.wait_for_function("!document.querySelector('[data-practice-start=challenge]').disabled")
-    assert page.locator("#practiceLobby").is_visible()
-    assert "startSession" not in page.evaluate("window.__calls")
-    assert "失败" in page.locator("#practiceToast").inner_text()
-    page.evaluate("window.KGPracticeLearningApi.abandonSession=window.__originalAbandon")
-
-    # 并发新建返回 409 时也必须校验题量，不能从错误恢复路径静默进入旧 10 题。
-    page.evaluate("""()=>{
-      const api=window.KGPracticeLearningApi;
-      api.getActiveSessions=async()=>[];
-      api.startSession=async()=>{throw {detail:{code:'RESUMABLE_SESSION_EXISTS',sessionId:window.__seedProgress({count:10}).id}}};
-      window.__calls=[];
-    }""")
-    page.once("dialog", cancel_dialog)
-    page.locator('[data-practice-start="challenge"]').click()
-    page.wait_for_function("!document.querySelector('[data-practice-start=challenge]').disabled")
-    assert len(dialogs) == 2
-    assert page.locator("#practiceLobby").is_visible()
-    assert "abandon" not in page.evaluate("window.__calls")
     assert not errors, errors
-    print("practice-challenge-health-browser-ok: counts, 3/53/54 boundary, resume, save, last question, count mismatch cancel/confirm")
+    print("practice-challenge-health-browser-ok: counts, 3/53/54 boundary, resume, save, last question, original-count resume")
     browser.close()

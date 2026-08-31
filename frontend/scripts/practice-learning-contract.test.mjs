@@ -85,14 +85,19 @@ test('the release synchronizer injects the practice database adapter before the 
 test('practice adapter exposes the complete resumable session lifecycle', () => {
   const adapter = source('frontend/scripts/new-legacy-assets/practice-learning-adapter.js')
   for (const method of [
-    'startSession', 'getActiveSessions', 'getSession', 'updateState',
+    'startSession', 'getActiveSessions', 'getSession', 'getPaperProgress',
+    'getRevengeSummary', 'enterSession', 'updateState',
     'answerSession', 'pauseSession', 'completeSession', 'abandonSession', 'getReport',
   ]) {
     assert.match(adapter, new RegExp(`async function ${method}\\(`), method)
   }
+  assert.match(adapter, /function invalidateEntrySummaries\(/)
   for (const route of [
     "request('/sessions/start'",
     "request('/sessions/active'",
+    "request(`/papers/${encodeURIComponent(paperId)}/progress`",
+    "request('/revenge/summary'",
+    "request('/sessions/enter'",
     "request(`/sessions/${encodeURIComponent(sessionId)}`",
     "request(`/sessions/${encodeURIComponent(sessionId)}/state`",
     "request(`/sessions/${encodeURIComponent(sessionId)}/answers`",
@@ -105,6 +110,123 @@ test('practice adapter exposes the complete resumable session lifecycle', () => 
   assert.match(adapter, /error\.status = response\.status/)
   assert.match(adapter, /error\.detail = payload\?\.detail \|\| payload/)
   assert.match(adapter, /kg:auth-required/)
+})
+
+test('practice entry adapter coalesces lean summaries and does not preload overview', async () => {
+  const { runInNewContext } = await import('node:vm')
+  const calls = []
+  const responses = {
+    progress: {
+      paperId: 'paper-1',
+      modes: { challenge: null, scholar: null },
+    },
+    revenge: {
+      stats: { active: 4, pending: 3, needsRemediation: 1, verificationDue: 0, mastered: 2, unavailable: 0 },
+      resumable: null,
+    },
+    enter: {
+      resumed: false,
+      session: {
+        id: 'ps-1', paperId: 'paper-1', releaseId: 'release-1', mode: 'challenge',
+        status: 'active', questionOrder: [{ questionId: 'q1' }], answers: {},
+        runtimeState: { currentIndex: 0, order: 'paper' }, stats: { total: 1, answered: 0 }, revision: 1,
+      },
+      questions: [{ questionId: 'q1', question: { stem: '题干', options: [{ id: 'A' }, { id: 'B' }] } }],
+    },
+  }
+  const window = {
+    location: { pathname: '/new-legacy/practice-mode.html' },
+    addEventListener() {},
+    dispatchEvent() {},
+    KGAuthCore: { currentUser: () => ({ username: 'student-1' }) },
+    fetch: async (url, options = {}) => {
+      calls.push({ url, options })
+      const body = url.includes('/papers/') ? responses.progress
+        : url.endsWith('/revenge/summary') ? responses.revenge
+          : url.endsWith('/sessions/enter') ? responses.enter
+            : { mistakes: [] }
+      await Promise.resolve()
+      return { ok: true, json: async () => body }
+    },
+  }
+  runInNewContext(
+    source('frontend/scripts/new-legacy-assets/practice-learning-adapter.js'),
+    { window, URLSearchParams, CustomEvent: class CustomEvent {} },
+  )
+  const api = window.KGPracticeLearningApi
+  await Promise.resolve()
+  assert.equal(calls.length, 0, 'entry page must not preload the full overview')
+
+  const [firstProgress, secondProgress, firstRevenge, secondRevenge] = await Promise.all([
+    api.getPaperProgress('paper-1', 'release-1'),
+    api.getPaperProgress('paper-1', 'release-1'),
+    api.getRevengeSummary(),
+    api.getRevengeSummary(),
+  ])
+  assert.deepEqual(JSON.parse(JSON.stringify(firstProgress)), responses.progress)
+  assert.deepEqual(JSON.parse(JSON.stringify(secondProgress)), responses.progress)
+  assert.deepEqual(JSON.parse(JSON.stringify(firstRevenge)), responses.revenge)
+  assert.deepEqual(JSON.parse(JSON.stringify(secondRevenge)), responses.revenge)
+  assert.equal(calls.filter(call => call.url.includes('/papers/')).length, 1)
+  assert.equal(calls.filter(call => call.url.endsWith('/revenge/summary')).length, 1)
+
+  const entered = await api.enterSession({
+    paperId: 'paper-1', releaseId: 'release-1', mode: 'challenge', count: 1, order: 'paper',
+  })
+  assert.equal(entered.resumed, false)
+  assert.equal(entered.session.id, 'ps-1')
+  assert.equal(entered.session.questions.length, 1)
+  assert.equal(calls.filter(call => call.url.endsWith('/sessions/enter')).length, 1)
+  assert.equal(calls.filter(call => call.url.includes('/sessions/active')).length, 0)
+  assert.equal(calls.filter(call => /\/sessions\/ps-1$/.test(call.url)).length, 0)
+  assert.equal(calls.filter(call => call.url.endsWith('/sessions/start')).length, 0)
+
+  api.invalidateEntrySummaries({ paperId: 'paper-1' })
+  await api.getPaperProgress('paper-1', 'release-1')
+  assert.equal(calls.filter(call => call.url.includes('/papers/')).length, 2)
+})
+
+test('invalidating an in-flight paper summary prevents the stale result from repopulating cache', async () => {
+  const { runInNewContext } = await import('node:vm')
+  const pendingJson = []
+  let fetchCount = 0
+  const window = {
+    location: { pathname: '/new-legacy/practice-mode.html' },
+    addEventListener() {},
+    dispatchEvent() {},
+    KGAuthCore: { currentUser: () => ({ username: 'student-1' }) },
+    fetch: async () => {
+      fetchCount += 1
+      const requestNumber = fetchCount
+      return {
+        ok: true,
+        json: () => new Promise(resolve => pendingJson.push({ requestNumber, resolve })),
+      }
+    },
+  }
+  runInNewContext(
+    source('frontend/scripts/new-legacy-assets/practice-learning-adapter.js'),
+    { window, URLSearchParams, CustomEvent: class CustomEvent {} },
+  )
+  const api = window.KGPracticeLearningApi
+  const stale = api.getPaperProgress('paper-1', 'release-1')
+  await Promise.resolve()
+  api.invalidateEntrySummaries({ paperId: 'paper-1' })
+  const fresh = api.getPaperProgress('paper-1', 'release-1')
+  await Promise.resolve()
+
+  assert.equal(fetchCount, 2, 'invalidation must detach the stale in-flight request')
+  while (pendingJson.length < 2) await new Promise(resolve => setImmediate(resolve))
+  pendingJson.find(item => item.requestNumber === 2).resolve({
+    paperId: 'paper-1', modes: { challenge: { sessionId: 'fresh' }, scholar: null },
+  })
+  assert.equal((await fresh).modes.challenge.sessionId, 'fresh')
+  pendingJson.find(item => item.requestNumber === 1).resolve({
+    paperId: 'paper-1', modes: { challenge: { sessionId: 'stale' }, scholar: null },
+  })
+  assert.equal((await stale).modes.challenge.sessionId, 'stale')
+  assert.equal((await api.getPaperProgress('paper-1', 'release-1')).modes.challenge.sessionId, 'fresh')
+  assert.equal(fetchCount, 2, 'the fresh result must remain cached after the stale request settles')
 })
 
 test('practice mode grades locally and only writes whole-paper payloads on explicit save or submit', () => {

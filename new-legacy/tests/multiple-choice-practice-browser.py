@@ -39,10 +39,12 @@ MOCK_BACKEND = r"""()=>{
   window.KGFreeModeLanguage={};
   window.KGPracticeLearningApi={
     stats:()=>({active:0,pending:0,needsRemediation:0,mastered:0}),active:()=>[],refresh:async()=>({}),
-    getActiveSessions:async()=>[],getSession:async()=>null,
-    startSession:async input=>{
+    getPaperProgress:async()=>({paperId:'paper-multi',modes:{challenge:null,scholar:null}}),
+    getRevengeSummary:async()=>({stats:{active:0,pending:0,needsRemediation:0,verificationDue:0,mastered:0,unavailable:0},resumable:null}),
+    getSession:async()=>null,
+    enterSession:async input=>{
       session={id:'ps-multi',paperId:input.paperId,releaseId:input.releaseId,mode:input.mode,status:'active',revision:1,questions:clone(refs),answers:{},runtimeState:{currentIndex:0,order:'paper',health:3,streak:0,experience:0,durationMs:0},stats:{total:2,answered:0,correct:0,wrong:0,unanswered:2,experience:0,durationMs:0}};
-      return clone(session);
+      return {resumed:false,session:clone(session)};
     },
     pauseSession:async()=>clone(session),completeSession:async()=>({session:clone(session),report:{}}),abandonSession:async()=>clone(session),
     listSessions:async()=>[],clearSessions:async()=>{},recordSession:async()=>({}),
