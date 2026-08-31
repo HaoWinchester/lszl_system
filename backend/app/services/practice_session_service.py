@@ -158,11 +158,13 @@ def _select_questions(
 def _question_snapshot_for_session(
     snapshot: dict,
     *,
-    reveal_answer: bool,
+    reveal_explanation: bool,
 ) -> dict:
-    # 本产品不以隐藏答案为防作弊边界：会话载荷固定下发冻结 correctAnswer/analysis/reasoningSteps。
-    _ = reveal_answer
-    return deepcopy(snapshot)
+    payload = deepcopy(snapshot)
+    if not reveal_explanation:
+        for key in ("analysis", "explanation", "reasoningSteps"):
+            payload.pop(key, None)
+    return payload
 
 
 def _public_answer(answer: dict) -> dict:
@@ -403,6 +405,10 @@ def _draft_stats(
 async def _session_payload(db: AsyncSession, session: PracticeSession) -> dict:
     refs = session.question_order if isinstance(session.question_order, list) else []
     row_map = await _session_question_rows(db, session)
+    reveal_explanation = session.status == "completed" or session.mode not in {
+        "challenge",
+        "scholar",
+    }
     questions = []
     answers = session.answers if isinstance(session.answers, dict) else {}
     for ref in refs:
@@ -416,7 +422,7 @@ async def _session_payload(db: AsyncSession, session: PracticeSession) -> dict:
                 **ref,
                 "question": _question_snapshot_for_session(
                     row.snapshot or {},
-                    reveal_answer=True,
+                    reveal_explanation=reveal_explanation,
                 ),
             }
         )
