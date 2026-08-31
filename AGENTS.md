@@ -77,6 +77,11 @@ users / role_themes / system_settings(KV) / user_admin_logs / folders / graph_fi
 
 后端实际 serve 的是 **active release**（`frontend/new-legacy-releases/<version>/site`，由 `current.json` 指定），**不是** sync 产物（`frontend/public/new-legacy/`），**也不是**源（`new-legacy/`）。三者内容可能脱节。以下纪律是用两次生产事故换来的，必须遵守：
 
+### 0. 正式环境发布前必须备份
+- 每次部署正式环境，在任何代码同步、镜像重建、容器重启或数据库迁移之前，必须先备份正式环境当前代码和 PostgreSQL 数据库，并生成记录备份时间、目录、代码包和数据库 dump 路径的 manifest。
+- 必须确认代码归档与数据库 dump 均已成功生成且非空；备份或校验失败时立即中止发布，禁止先上线后补备份。
+- 正式发布结果必须记录本次远端备份目录。不得在发布过程中删除既有正式备份，也不得在日志或交接文档中输出数据库内容、密码或密钥。
+
 ### 1. 发布前硬校验，防内容回退
 - 发布前**必须**核对：`find <待发布 site> -type f | wc -l` 与当前 active release site 文件数对齐；抽查关键页面（如 v9 的 `admin-console.html`）存在。
 - **版本号"最新" ≠ 内容最新**：版本号只是标识，内容取决于 source。源（`new-legacy/`）可能比 active release 旧。
