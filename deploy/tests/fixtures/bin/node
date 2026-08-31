@@ -1,5 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ "${UAT_TEST_SCENARIO:-}" == "fast-path" ]]; then
+  if [[ "${1:-}" == */uat-change-scope.mjs ]]; then
+    exec "${UAT_TEST_REAL_NODE:?}" "$@"
+  fi
+  if [[ "${1:-}" == "scripts/sync-new-legacy.js" ]]; then
+    echo "sync" >> "${UAT_TEST_CALL_LOG:?}"
+    exit 0
+  fi
+  if [[ "${1:-}" == "scripts/manage-new-legacy.js" && "${2:-}" == "update" ]]; then
+    echo "update $*" >> "${UAT_TEST_CALL_LOG:?}"
+    if [[ -n "${UAT_TEST_FAST_CONFLICT_STATE:-}" && ! -e "$UAT_TEST_FAST_CONFLICT_STATE" ]]; then
+      touch "$UAT_TEST_FAST_CONFLICT_STATE"
+      echo "相同版本号"
+      exit 1
+    fi
+    exit 0
+  fi
+  if [[ "${1:-}" == "scripts/manage-new-legacy.js" && "${2:-}" == "promote" ]]; then
+    echo "promote ${3:-}" >> "${UAT_TEST_CALL_LOG:?}"
+    exit 0
+  fi
+  if [[ "${1:-}" == "scripts/prepare-new-legacy-runtime.js" ]]; then
+    echo "runtime" >> "${UAT_TEST_CALL_LOG:?}"
+    exit 0
+  fi
+fi
 if [[ "${UAT_TEST_SCENARIO:-}" == "version-bump" ]]; then
   repo_dir="$(cd .. && pwd)"
   version="$(cat "$repo_dir/new-legacy/VERSION")"
