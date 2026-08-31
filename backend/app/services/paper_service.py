@@ -119,6 +119,7 @@ def serialize_paper(
         "name": paper.name,
         "subject": paper.subject,
         "description": paper.description,
+        "paperType": paper.paper_type,
         "categoryId": paper.category_id,
         "totalCount": paper.total_count,
         "questionCount": question_count,
@@ -279,6 +280,37 @@ async def validate_references(
     return validated
 
 
+def question_matches_paper_type(paper_type: str, question_type: str) -> bool:
+    if paper_type == "multiple_choice":
+        return question_type == "multiple_choice"
+    return question_type != "multiple_choice"
+
+
+def validate_question_types(
+    paper_type: str,
+    validated: list[tuple[PaperReference, Question]],
+) -> None:
+    mismatches = [
+        {
+            "questionId": question.id,
+            "questionType": question.type,
+            "order": reference.order,
+        }
+        for reference, question in validated
+        if not question_matches_paper_type(paper_type, question.type)
+    ]
+    if mismatches:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "PAPER_TYPE_QUESTION_MISMATCH",
+                "message": "试卷类型与所选题目类型不一致",
+                "paperType": paper_type,
+                "issues": mismatches,
+            },
+        )
+
+
 async def _reference_payloads(db: AsyncSession, paper_id: str) -> list[dict]:
     rows = (
         await db.execute(
@@ -313,6 +345,7 @@ async def create_paper(
 ) -> dict:
     await teaching_content_revision_service.acquire_lock(db)
     validated = await validate_references(db, request.questions)
+    validate_question_types(request.paper_type, validated)
     paper = ExamPaper(
         id=uid("p_"),
         owner_id=actor.username,
@@ -322,6 +355,7 @@ async def create_paper(
         name=request.name,
         subject=request.subject,
         description=request.description,
+        paper_type=request.paper_type,
         category_id=request.category_id or None,
         total_count=(
             request.total_count
@@ -395,6 +429,32 @@ async def update_paper(
         values[mapping.get(key, key)] = value
     if "category_id" in values:
         await _require_category(db, values["category_id"])
+    if "paper_type" in values:
+        current = (
+            await db.execute(
+                select(ExamPaper.paper_type, ExamPaper.published_version).where(
+                    ExamPaper.id == paper_id,
+                    ExamPaper.deleted_at.is_(None),
+                )
+            )
+        ).one_or_none()
+        if current is not None and values["paper_type"] != current.paper_type:
+            reference_count = int(
+                await db.scalar(
+                    select(func.count())
+                    .select_from(PaperQuestion)
+                    .where(PaperQuestion.paper_id == paper_id)
+                )
+                or 0
+            )
+            if reference_count or int(current.published_version or 0):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "PAPER_TYPE_LOCKED",
+                        "message": "试卷已有题目或发布记录，不能切换类型",
+                    },
+                )
     if "total_count" in values:
         reference_count = int(
             (
@@ -446,23 +506,24 @@ async def replace_questions(
     request: PaperQuestionReplaceRequest,
 ) -> dict | None:
     await teaching_content_revision_service.acquire_lock(db)
-    validated = await validate_references(db, request.questions)
-    current_total = (
+    current = (
         await db.execute(
-            select(ExamPaper.total_count).where(
+            select(ExamPaper.total_count, ExamPaper.paper_type).where(
                 ExamPaper.id == paper_id,
                 ExamPaper.deleted_at.is_(None),
             )
         )
-    ).scalar_one_or_none()
-    if current_total is None:
+    ).one_or_none()
+    if current is None:
         return None
+    validated = await validate_references(db, request.questions)
+    validate_question_types(current.paper_type, validated)
     updated_id = await cas_paper_mutation(
         db,
         actor,
         paper_id,
         request.revision,
-        {"total_count": max(int(current_total or 0), len(request.questions))},
+        {"total_count": max(int(current.total_count or 0), len(request.questions))},
     )
     if updated_id is None:
         return None

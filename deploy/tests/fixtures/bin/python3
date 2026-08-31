@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "${UAT_TEST_SCENARIO:-}" == "fast-path" && "${1:-}" == */content-prep-studio/build.py ]]; then
+  if [[ -n "${UAT_TEST_FAST_CONFLICT_STATE:-}" ]]; then
+    repo_dir="$(cd "$(dirname "$1")/.." && pwd)"
+    echo "build $(cat "$repo_dir/VERSION")" >> "${UAT_TEST_CALL_LOG:?}"
+  else
+    echo "build unexpected" >> "${UAT_TEST_CALL_LOG:?}"
+  fi
+  exit 0
+fi
+
 if [[ "${UAT_TEST_SCENARIO:-}" == "version-bump" && "${1:-}" == */content-prep-studio/build.py ]]; then
   repo_dir="$(cd "$(dirname "$1")/.." && pwd)"
   echo "build $(cat "$repo_dir/VERSION")" >> "${UAT_TEST_CALL_LOG:?}"

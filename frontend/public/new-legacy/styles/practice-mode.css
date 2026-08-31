@@ -300,6 +300,8 @@ body.practice-mode-page.is-practice-drawer-open{overflow:hidden}
 @media (max-width:760px){.practice-answer-sheet-drawer{justify-content:center;align-items:flex-end}.practice-answer-sheet-drawer .practice-drawer{width:100%;height:min(76vh,640px);border-left:0;border-radius:22px 22px 0 0;animation:practiceAnswerSheetUp .22s cubic-bezier(.2,.8,.2,1)}}
 @keyframes practiceAnswerSheetUp{from{transform:translateY(28px);opacity:.45}to{transform:none;opacity:1}}
 .practice-option.is-pending{border-color:#7c3aed;background:#f5f0ff;box-shadow:0 0 0 2px rgba(124,58,237,.12)}
+.practice-confirm-answer{align-self:flex-end;margin-top:16px;min-width:132px}.practice-confirm-answer:disabled{opacity:.48;cursor:not-allowed}
+.practice-progress{display:grid;gap:5px;min-width:0}.practice-question-progress{color:#667085;font-size:11px;font-weight:850;line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums}.practice-progress-shell{width:100%}body.is-practice-review .practice-progress{display:none!important}
 @media (min-width:1024px){body[data-practice-view="game"] .practice-main{width:min(1240px,calc(100% - 32px))}}
 /* topbar 列布局权威定义：桌面 6 列；<=1023px 退化为答题卡友好的 7 列；gap 同步收紧 */
 @media (max-width:1023px){.practice-game-topbar{grid-template-columns:40px auto minmax(80px,1fr) auto auto auto auto;gap:9px}}

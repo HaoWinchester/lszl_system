@@ -63,6 +63,7 @@ def question_from_snapshot(snapshot: dict) -> Question:
     question.stem_parts = list(snapshot.get("stemParts") or [])
     question.options = list(snapshot.get("options") or [])
     question.correct_answer = snapshot.get("correctAnswer")
+    question.correct_answer_ids = list(snapshot.get("correctOptionIds") or [])
     question.analysis = snapshot.get("analysis")
     question.clues = list(snapshot.get("clues") or [])
     question.concepts = list(snapshot.get("concepts") or [])

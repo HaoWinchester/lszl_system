@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.content_prep import QuestionBankCollaborator
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.user import User
-from app.services import question_access_service
+from app.services import question_access_service, question_answer_service
 
 
 def _iso(value) -> str | None:
@@ -34,7 +34,7 @@ def _legacy_object_list(values, *, text_key: str) -> list[dict]:
 def question_to_payload(question: Question) -> dict:
     """Serialize every canonical question field using the browser contract aliases."""
 
-    return {
+    payload = {
         "id": question.id,
         "sourceId": question.source_id,
         "bankId": question.bank_id,
@@ -68,6 +68,16 @@ def question_to_payload(question: Question) -> dict:
         "createdAt": _iso(question.created_at),
         "updatedAt": _iso(question.updated_at),
     }
+    payload["correctOptionIds"] = (
+        question_answer_service.correct_option_ids({
+            "options": payload["options"],
+            "correctOptionIds": question.correct_answer_ids or None,
+            "correctAnswer": payload["correctAnswer"],
+        })
+        if question.type == "multiple_choice"
+        else []
+    )
+    return payload
 
 
 def bank_to_payload(
@@ -160,9 +170,14 @@ async def list_bank_questions(
     page: int,
     page_size: int,
     search: str | None = None,
+    question_type: Literal["standard", "multiple_choice"] | None = None,
 ) -> tuple[list[dict], int]:
     await question_access_service.require_bank_access(db, user, bank_id, edit=False)
     base = select(Question).where(Question.bank_id == bank_id)
+    if question_type == "multiple_choice":
+        base = base.where(Question.type == "multiple_choice")
+    elif question_type == "standard":
+        base = base.where(Question.type != "multiple_choice")
     keyword = str(search or "").strip()
     if keyword:
         pattern = f"%{keyword}%"

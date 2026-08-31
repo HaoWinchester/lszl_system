@@ -10,13 +10,31 @@ OUTPUT_LOG="$TEST_ROOT/output.log"
 STATE_FILE="$TEST_ROOT/conflict-seen"
 trap 'rm -rf "$TEST_ROOT"' EXIT
 
-mkdir -p "$TEST_REPO/deploy" "$TEST_REPO/frontend" "$TEST_REPO/new-legacy/content-prep-studio"
+mkdir -p \
+  "$TEST_REPO/deploy" \
+  "$TEST_REPO/frontend" \
+  "$TEST_REPO/new-legacy/content-prep-studio" \
+  "$TEST_REPO/backend/app/cli" \
+  "$TEST_REPO/backend/app/services"
 cp "$SOURCE_REPO/deploy/update-uat.sh" "$TEST_REPO/deploy/update-uat.sh"
+cp "$SOURCE_REPO/deploy/nginx-uat.aihuanpu.com.conf" "$TEST_REPO/deploy/nginx-uat.aihuanpu.com.conf"
+cp "$SOURCE_REPO/deploy/rsync-excludes.txt" "$TEST_REPO/deploy/rsync-excludes.txt"
 printf '%s' 'v9.0-p4.1.155' > "$TEST_REPO/new-legacy/VERSION"
-touch "$TEST_REPO/new-legacy/content-prep-studio/build.py" "$CALL_LOG"
+touch \
+  "$TEST_REPO/new-legacy/content-prep-studio/build.py" \
+  "$TEST_REPO/backend/app/cli/runtime_domain_migration.py" \
+  "$TEST_REPO/backend/app/services/runtime_domain_migration_service.py" \
+  "$TEST_REPO/backend/app/services/paper_release_service.py" \
+  "$CALL_LOG"
+git -C "$TEST_REPO" init -q
+git -C "$TEST_REPO" config user.email uat-test@example.com
+git -C "$TEST_REPO" config user.name 'UAT test'
+git -C "$TEST_REPO" add .
+git -C "$TEST_REPO" commit -qm baseline
 
 PATH="$FIXTURE_BIN:$PATH" \
   UAT_TEST_SCENARIO=version-bump \
+  UAT_TEST_PUBLIC_VERSION=v9.0-p4.1.156 \
   UAT_TEST_STATE="$STATE_FILE" \
   UAT_TEST_CALL_LOG="$CALL_LOG" \
   bash "$TEST_REPO/deploy/update-uat.sh" >"$OUTPUT_LOG" 2>&1

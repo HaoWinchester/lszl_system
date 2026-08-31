@@ -6,6 +6,8 @@ import unicodedata
 from copy import deepcopy
 from typing import Any, Literal
 
+from app.services import question_answer_service
+
 
 _INTERNAL_SCOPE_MARKERS = {"internal", "内部使用"}
 _PUBLIC_SCOPE_MARKERS = {"public", "可公开"}
@@ -202,24 +204,42 @@ def normalize_question_payload(payload: dict[str, Any], *, subject: str) -> dict
     normalized["options"] = deepcopy(payload.get("options") or [])
 
     correct_answer = payload.get("correctAnswer")
-    if correct_answer is None:
-        correct_answer = next(
-            (
-                option.get("id")
-                for option in normalized["options"]
-                if isinstance(option, dict) and option.get("correct") is True
-            ),
-            None,
+    if normalized["type"] == "multiple_choice":
+        answer_source = {
+            "options": normalized["options"],
+            "correctOptionIds": payload.get("correctOptionIds"),
+            "correctAnswer": correct_answer,
+        }
+        if answer_source["correctOptionIds"] is None and correct_answer is None:
+            answer_source.pop("correctOptionIds")
+        normalized["correctOptionIds"] = question_answer_service.correct_option_ids(
+            answer_source
         )
-    normalized["correctAnswer"] = _normalize_correct_answer(
-        correct_answer,
-        question_type=normalized["type"],
-        option_ids={
-            str(option.get("id"))
-            for option in normalized["options"]
-            if isinstance(option, dict) and option.get("id")
-        },
-    )
+        normalized["correctAnswer"] = None
+        correct_ids = set(normalized["correctOptionIds"])
+        for option in normalized["options"]:
+            if isinstance(option, dict):
+                option["correct"] = str(option.get("id") or "") in correct_ids
+    else:
+        if correct_answer is None:
+            correct_answer = next(
+                (
+                    option.get("id")
+                    for option in normalized["options"]
+                    if isinstance(option, dict) and option.get("correct") is True
+                ),
+                None,
+            )
+        normalized["correctAnswer"] = _normalize_correct_answer(
+            correct_answer,
+            question_type=normalized["type"],
+            option_ids={
+                str(option.get("id"))
+                for option in normalized["options"]
+                if isinstance(option, dict) and option.get("id")
+            },
+        )
+        normalized["correctOptionIds"] = []
     normalized["analysis"] = deepcopy(payload.get("analysis", payload.get("explanation")))
     normalized["translations"] = deepcopy(payload.get("translations") or {})
     normalized["clues"] = deepcopy(payload.get("clues") or [])
@@ -235,6 +255,11 @@ def normalize_question_payload(payload: dict[str, Any], *, subject: str) -> dict
         },
     )
     normalized["status"] = deepcopy(payload.get("status") or {})
+    if (
+        normalized["type"] == "multiple_choice"
+        and not str(normalized["analysis"] or "").strip()
+    ):
+        normalized["status"]["contentReady"] = False
     normalized["lifecycle"] = deepcopy(payload.get("lifecycle") or {"status": "active"})
     normalized["teacherNumber"] = _optional_text(payload.get("teacherNumber"))
     normalized["explanation"] = deepcopy(payload.get("explanation"))
@@ -301,6 +326,10 @@ def duplicate_question_signature(payload: dict[str, Any]) -> str:
             for option in normalized.get("options") or []
             if isinstance(option, dict)
         ],
-        "correctAnswer": _duplicate_text(normalized.get("correctAnswer")),
+        "answer": (
+            normalized.get("correctOptionIds")
+            if normalized.get("type") == "multiple_choice"
+            else _duplicate_text(normalized.get("correctAnswer"))
+        ),
     }
     return json.dumps(signature, ensure_ascii=False, separators=(",", ":"))

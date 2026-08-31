@@ -151,7 +151,10 @@
         <header class="practice-game-topbar">
           <button type="button" class="practice-exit-btn" id="practiceExitBtn" aria-label="退出本次练习" title="退出"><span data-kg-icon="x" data-kg-icon-size="18" aria-hidden="true"></span></button>
           <button type="button" class="practice-review-back" id="practiceReviewBackBtn" hidden>← 返回成绩单</button>
-          <div class="practice-progress-shell" id="practiceProgressShell" role="progressbar" aria-label="做题进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="practiceProgressBar"></span></div>
+          <div class="practice-progress">
+            <div class="practice-progress-shell" id="practiceProgressShell" role="progressbar" aria-label="做题进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="第 0 / 0 题"><span id="practiceProgressBar"></span></div>
+            <span class="practice-question-progress" id="practiceQuestionProgress" aria-live="polite">第 0 / 0 题</span>
+          </div>
           <div class="practice-health" id="practiceHealth" aria-label="剩余血量"></div>
           <button type="button" class="practice-language-cycle" id="practiceLanguageCycle" title="题目显示语言：中文（点击切换）" aria-label="切换题目显示语言" aria-live="polite">中</button>
           <div class="practice-scholar-stat practice-timer" id="practiceTimer" hidden><strong>60</strong><span>秒</span></div>
@@ -180,6 +183,7 @@
           <div class="practice-question-stem" id="practiceQuestionStem"></div>
           <div class="practice-previous-wrong-answer" id="practicePreviousWrongAnswer" hidden></div>
           <div class="practice-options" id="practiceOptions"></div>
+          <button type="button" class="practice-primary-btn practice-confirm-answer" id="practiceConfirmAnswerBtn" hidden disabled>确认答案</button>
           <div class="practice-explanation" id="practiceExplanationPanel" hidden aria-live="polite">
             <div class="practice-explanation-head" id="practiceExplanationHead">答案与解析</div>
             <div class="practice-explanation-body" id="practiceExplanationBody"></div>
@@ -336,6 +340,7 @@
   <script defer src="src/115-practice-mode-policy.js"></script>
   <script defer src="src/112-practice-answer-sheet.js"></script>
   <script defer src="src/113-practice-result-report.js"></script>
+  <script defer src="src/117-question-answer-set.js"></script>
   <script defer src="src/114-practice-draft-state.js"></script>
   <script defer src="src/116-practice-session-save.js"></script>
   <script defer src="src/118-revenge-entry-policy.js"></script>
