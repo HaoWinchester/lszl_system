@@ -26,8 +26,10 @@ def normalize_option_ids(values: object, option_ids: list[str]) -> list[str]:
 def correct_option_ids(question: dict[str, Any]) -> list[str]:
     option_ids = _option_ids(question)
     explicit = question.get("correctOptionIds")
-    if isinstance(explicit, (list, tuple)):
+    if isinstance(explicit, (list, tuple)) and explicit:
         return normalize_option_ids(explicit, option_ids)
+    if isinstance(explicit, (list, tuple)) and str(question.get("type") or "") == "multiple_choice":
+        return []
 
     legacy = question.get("correctAnswer")
     if isinstance(legacy, (list, tuple)):

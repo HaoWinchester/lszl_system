@@ -170,9 +170,14 @@ async def list_bank_questions(
     page: int,
     page_size: int,
     search: str | None = None,
+    question_type: Literal["standard", "multiple_choice"] | None = None,
 ) -> tuple[list[dict], int]:
     await question_access_service.require_bank_access(db, user, bank_id, edit=False)
     base = select(Question).where(Question.bank_id == bank_id)
+    if question_type == "multiple_choice":
+        base = base.where(Question.type == "multiple_choice")
+    elif question_type == "standard":
+        base = base.where(Question.type != "multiple_choice")
     keyword = str(search or "").strip()
     if keyword:
         pattern = f"%{keyword}%"
