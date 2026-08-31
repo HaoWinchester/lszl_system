@@ -65,8 +65,11 @@ assert(!script.includes('state.sessionWrite'), 'orphaned sessionWrite queue refe
 assert(!script.includes('finishPractice:advanceAfterAnswer'), 'last question must not auto-submit via finish timer choice');
 assert(script.includes('viewAnswers?.()')||script.includes('.viewAnswers()'), 'answer sheet renders from draft viewAnswers');
 
-assert(script.includes('api.startSession('));
-assert(script.includes('api.getActiveSessions('));
+assert(script.includes('api.enterSession('));
+assert(script.includes('api.getPaperProgress('));
+assert(script.includes('api.getRevengeSummary('));
+assert(!script.includes('api.startSession('));
+assert(!script.includes('api.getActiveSessions('));
 assert(script.includes('timedOut:true'));
 assert(script.includes('state.session.runtimeState?.revengeState')||script.includes('state.revengeState'));
 assert(script.includes('KGPracticeAnswerSheet.mount'));
