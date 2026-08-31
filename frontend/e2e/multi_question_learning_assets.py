@@ -409,6 +409,16 @@ def test_workflow(browser, username_a: str, username_b: str, release: dict, ques
                     paperId:row.paperId,releaseId:row.releaseId,totalCount:row.totalCount,
                     enabledModes:row.enabledModes,status:row.status,availability:row.availability
                   })),
+                  repositoryRows: window.KGPublishedPaperRepository?.listCatalogEntries?.({
+                    respectRole:true,mode:'multi_question_canvas'
+                  }),
+                  repositoryInspections: window.KGPaperReleaseApi?.catalog?.().map(row=>
+                    window.KGPublishedPaperRepository?.inspectRelease?.(
+                      {paperId:row.paperId,releaseId:row.releaseId},
+                      {respectRole:true,mode:'multi_question_canvas'}
+                    )
+                  ),
+                  role: window.KGRolePermissions?.currentRole?.(),
                   apiError: String(window.KGPaperReleaseApi?.error?.()||''),
                   questionRows: document.querySelectorAll('#qwQuestionList .qw-question-item').length,
                   paperOptions: [...document.querySelectorAll('#qwPaperSelect option')].map(option=>option.textContent),
