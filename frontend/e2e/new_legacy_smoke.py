@@ -170,6 +170,11 @@ with sync_playwright() as playwright:
             # 就绪为准，不把“网络永远空闲”当作页面可用的先决条件。
             page.goto(BASE + route, wait_until="domcontentloaded")
             page.locator(selector).wait_for(state="visible", timeout=15_000)
+            if route == "/users":
+                # The root renders before the first user-page request settles. Wait for
+                # real list data so the next navigation does not abort that request and
+                # turn an expected page transition into a console-error false positive.
+                page.locator('.um-user-item[data-user="佩奇007"]').wait_for(state="visible", timeout=15_000)
             assert page.locator("iframe").count() == 0, route
             page.wait_for_function(
                 "version => window.__KG_DIRECT_BOOTSTRAP__?.releaseVersion === version",
