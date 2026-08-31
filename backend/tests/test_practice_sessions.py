@@ -413,6 +413,20 @@ async def _set_mistake_status(mistake_id: str, status: str) -> None:
         await db.commit()
 
 
+async def _strip_revenge_previous_answers(session_id: str) -> None:
+    async with AsyncSessionLocal() as db:
+        session = await db.get(PracticeSession, session_id)
+        session.question_order = [
+            {
+                key: value
+                for key, value in ref.items()
+                if key not in {"previousWrongAnswer", "previousWrongAnswerIds"}
+            }
+            for ref in session.question_order
+        ]
+        await db.commit()
+
+
 async def _corrupt_frozen_session_answer(
     session_id: str, question_id: str
 ) -> None:
@@ -1844,6 +1858,41 @@ def test_global_revenge_session_crosses_papers_and_deduplicates_versionless_hist
             assert persisted[mistake_ids["releaseMistake"]].wrong_count == 4
             assert persisted[mistake_ids["secondMistake"]].status == "verification_due"
             assert persisted[mistake_ids["secondMistake"]].revenge_correct_count == 1
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(second_ids))
+        asyncio.run(_cleanup_released_pmp_paper(first_ids))
+
+
+def test_resumed_legacy_revenge_session_backfills_each_latest_wrong_answer() -> None:
+    first_ids = _practice_fixture_ids()
+    second_ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(first_ids, domains=["people"]))
+    asyncio.run(_seed_released_pmp_paper(second_ids, domains=["process"]))
+    asyncio.run(
+        _seed_global_revenge_mistakes(first_ids["student"], first_ids, second_ids)
+    )
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": first_ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            started = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={"mode": "revenge", "count": 10, "order": "paper"},
+            ).json()["session"]
+            asyncio.run(_strip_revenge_previous_answers(started["id"]))
+
+            resumed = client.get(
+                f"/api/v1/learning/practice/sessions/{started['id']}"
+            ).json()["session"]
+
+            assert [
+                item["previousWrongAnswer"] for item in resumed["questionOrder"]
+            ] == ["B", "B"]
+            assert [
+                item["previousWrongAnswerIds"] for item in resumed["questions"]
+            ] == [["B"], ["B"]]
     finally:
         asyncio.run(_cleanup_released_pmp_paper(second_ids))
         asyncio.run(_cleanup_released_pmp_paper(first_ids))

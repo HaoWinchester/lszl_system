@@ -620,21 +620,22 @@ with sync_playwright() as playwright:
     assert previous_wrong_input.is_checked()
     assert previous_wrong_answer.is_visible()
 
-    # ---------- 复仇作答交互：答对停留看解析，手动下一题后再验证答错补救 ----------
-    # mock 复仇题目正确答案 A；答对后超过旧 520ms 延迟仍停留当前题。
+    # 翻到任意复仇题都应显示该题最近一次错选，不能只在第一题出现。
+    page.locator("#practiceNextBtn").click()
+    assert page.evaluate("window.KGPracticeMode.snapshot().index") == 1
+    assert previous_wrong_answer.is_visible()
+    assert "上次选错：B. 错误选项" in previous_wrong_answer.inner_text()
+    page.locator("#practicePrevBtn").click()
+
+    # ---------- 复仇作答交互：答对不弹解析并自动进入下一题，答错才补救 ----------
+    # mock 复仇题目正确答案 A；答对后按原交互自动前进。
     page.evaluate("window.__writes=[]")
     page.locator('[data-option-id="A"]').click()
     page.wait_for_timeout(700)
     assert writes(page) == [], writes(page)
-    assert page.evaluate("window.KGPracticeMode.snapshot().index") == 0
-    assert page.locator("#practiceExplanationPanel").is_visible()
-    assert "回答正确" in page.locator("#practiceExplanationHead").inner_text()
-    assert "第 1 题解析" in page.locator("#practiceExplanationBody").inner_text()
-
-    # 只有点击既有“下一题”按钮后才进入第二题，新题不提前显示解析。
-    page.locator("#practiceNextBtn").click()
     assert page.evaluate("window.KGPracticeMode.snapshot().index") == 1
     assert page.locator("#practiceExplanationPanel").is_hidden()
+    assert previous_wrong_answer.is_visible()
 
     # 结束本轮后重新开始，避免已答对题进入后续验证题夹具。
     page.locator("#practiceExitBtn").click()

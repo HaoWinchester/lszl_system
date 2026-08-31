@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
-from app.models.training import LearningEvent, PracticeSession
+from app.models.training import LearningEvent, PracticeMistake, PracticeSession
 from app.models.user import User
 from app.services import learning_service, practice_experience_service, paper_composition_service, paper_release_service, question_answer_service
 from app.services.practice_scoring_service import (
@@ -405,6 +405,39 @@ def _draft_stats(
 async def _session_payload(db: AsyncSession, session: PracticeSession) -> dict:
     refs = session.question_order if isinstance(session.question_order, list) else []
     row_map = await _session_question_rows(db, session)
+    if session.mode == "revenge":
+        mistake_ids = {
+            str(mistake_id)
+            for ref in refs
+            if isinstance(ref, dict)
+            for mistake_id in (ref.get("mistakeIds") or [ref.get("mistakeId")])
+            if mistake_id
+        }
+        mistakes = (
+            await db.execute(
+                select(PracticeMistake).where(
+                    PracticeMistake.owner_id == session.owner_id,
+                    PracticeMistake.id.in_(mistake_ids),
+                )
+            )
+        ).scalars().all()
+        mistake_map = {row.id: row for row in mistakes}
+        normalized_refs = []
+        for raw_ref in refs:
+            ref = dict(raw_ref)
+            row = row_map.get(str(ref.get("questionId") or ""))
+            group = [
+                mistake_map[mistake_id]
+                for mistake_id in (ref.get("mistakeIds") or [ref.get("mistakeId")])
+                if mistake_id in mistake_map
+            ]
+            previous = learning_service._latest_previous_wrong_answer(
+                group, row.snapshot if row is not None else {}
+            )
+            ref["previousWrongAnswer"] = previous
+            ref["previousWrongAnswerIds"] = [previous] if previous else []
+            normalized_refs.append(ref)
+        refs = normalized_refs
     reveal_explanation = session.status == "completed" or session.mode not in {
         "challenge",
         "scholar",
