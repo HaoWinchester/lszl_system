@@ -69,11 +69,16 @@ def _snapshot_is_learnable(snapshot: dict) -> bool:
 def _validate_practice_domain_inventory(
     *,
     subject: str,
+    paper_type: str,
     modes: list[str],
     snapshots: list[dict],
     metadata: dict,
 ) -> None:
-    if "practice_mode" not in modes or str(subject).strip().upper() != "PMP":
+    if (
+        paper_type == "multiple_choice"
+        or "practice_mode" not in modes
+        or str(subject).strip().upper() != "PMP"
+    ):
         return
     weights = metadata.get("domainWeights") or practice_scoring_service.DEFAULT_DOMAIN_WEIGHTS
     allowed = set(weights)
@@ -352,6 +357,7 @@ async def publish(
         frozen_questions.append((question, order_index, frozen_score, snapshot))
     _validate_practice_domain_inventory(
         subject=paper.subject,
+        paper_type=paper.paper_type,
         modes=modes,
         snapshots=[item[3] for item in frozen_questions],
         metadata=metadata,
@@ -687,6 +693,7 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
         question["question"] = snapshot
     _validate_practice_domain_inventory(
         subject=canonical["subject"],
+        paper_type=canonical["paperType"],
         modes=canonical["enabledModes"],
         snapshots=[question["question"] for question in canonical["questions"]],
         metadata=canonical["metadata"],
