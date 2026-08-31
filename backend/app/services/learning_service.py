@@ -1057,10 +1057,13 @@ def build_global_revenge_pool(
         candidate["questionSnapshot"] = snapshot
         candidate["mistakeId"] = representative.id
         candidate["mistakeIds"] = [row.id for row in group_rows]
-        candidate["previousWrongAnswer"] = _latest_previous_wrong_answer(
+        previous_wrong_answer = _latest_previous_wrong_answer(
             group_rows, snapshot
         )
-        candidate["previousWrongAnswerIds"] = list(representative.selected_answers or [])
+        candidate["previousWrongAnswer"] = previous_wrong_answer
+        candidate["previousWrongAnswerIds"] = (
+            [previous_wrong_answer] if previous_wrong_answer else []
+        )
         candidates.append(candidate)
     return {
         "candidates": candidates,
