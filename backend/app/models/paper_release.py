@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,6 +13,10 @@ class PaperRelease(Base):
     __tablename__ = "paper_releases"
     __table_args__ = (
         UniqueConstraint("paper_id", "version", name="uq_paper_releases_paper_version"),
+        CheckConstraint(
+            "paper_type IN ('standard', 'multiple_choice')",
+            name="ck_paper_releases_paper_type",
+        ),
         Index(
             "uq_paper_releases_one_active",
             "paper_id",
@@ -29,6 +33,7 @@ class PaperRelease(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     subject: Mapped[str] = mapped_column(String(32), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    paper_type: Mapped[str] = mapped_column(String(32), nullable=False, default="standard")
     publisher_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.username"), nullable=False)
     access_level: Mapped[str] = mapped_column(String(16), nullable=False, default="free")
     enabled_modes: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)

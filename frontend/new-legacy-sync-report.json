@@ -1,10 +1,35 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.193",
-  "toVersion": "v9.0-p4.1.193",
+  "toVersion": "v9.0-p4.1.195",
   "changes": {
-    "added": [],
-    "changed": [],
+    "added": [
+      "src/117-question-answer-set.js",
+      "tests/multiple-choice-answer-set.test.js",
+      "tests/multiple-choice-import.test.js",
+      "tests/multiple-choice-paper-ui.test.js",
+      "tests/multiple-choice-practice-browser.py"
+    ],
+    "changed": [
+      "VERSION",
+      "paper-management.html",
+      "practice-mode.html",
+      "question-bank.html",
+      "src/100-practice-mode.js",
+      "src/114-practice-draft-state.js",
+      "src/65-question-bank-admin.js",
+      "src/97-teacher-question-workflow.js",
+      "src/98-teacher-workflow-p2-services.js",
+      "src/teacher/paper-management/paper-composition-controller.js",
+      "styles/practice-mode.css",
+      "tests/learning-entry-answer-feedback-browser.py",
+      "tests/practice-answer-sheet-browser.py",
+      "tests/practice-challenge-health-browser.py",
+      "tests/practice-challenge-loading-browser.py",
+      "tests/practice-draft-state.test.js",
+      "tests/practice-server-answer-browser.py",
+      "tests/v90-p40-practice-mode.test.js"
+    ],
     "removed": []
   },
   "incompatible": []

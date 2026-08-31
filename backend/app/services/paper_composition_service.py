@@ -416,6 +416,11 @@ async def _load_candidates(
         lifecycle = question.lifecycle if isinstance(question.lifecycle, dict) else {}
         if str(lifecycle.get("status") or "").casefold() == "deleted":
             continue
+        if not paper_service.question_matches_paper_type(
+            request.paper_type,
+            question.type,
+        ):
+            continue
         if question_types and str(question.type or "") not in question_types:
             continue
         if difficulties and str(question.difficulty or "") not in difficulties:
@@ -661,6 +666,7 @@ async def create_composition_batch(
             updated_by=actor.username,
             name=variant["name"],
             subject=request.subject,
+            paper_type=request.paper_type,
             total_count=variant["totalCount"],
             status="draft",
             quotas=variant["hardTargets"],

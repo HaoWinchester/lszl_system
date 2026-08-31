@@ -55,9 +55,9 @@ assert(script.includes("saveCoordinator().save('pause'"), 'save-and-exit uses sh
 assert(script.includes("saveCoordinator().save('complete'"), 'completion uses shared coordinator');
 assert(script.includes('markSaved()'), 'successful save/submit clears dirty state');
 assert(script.includes("event.returnValue=''"), 'beforeunload must expose native leave reminder');
-// 复仇验证题派生不承诺"同知识点"
+// 复仇验证优先使用同题型候选；没有候选时安排原题延迟验证。
 assert(!script.includes('同知识点验证题'), 'verification toast must not promise same-knowledge items');
-assert(script.includes('当前没有可用的验证题'), 'neutral verification unavailable toast required');
+assert(script.includes('暂无同题型验证题')&&script.includes('原题延迟验证'), 'same-type fallback and delayed-original notice required');
 // 无死代码：sessionAnswer 孤儿与 sessionWrite 残留必须清除
 assert(!script.includes('function sessionAnswer('), 'unused sessionAnswer helper must be removed');
 assert(!script.includes('state.sessionWrite'), 'orphaned sessionWrite queue references must be removed');

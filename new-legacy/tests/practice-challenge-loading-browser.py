@@ -139,7 +139,7 @@ with sync_playwright() as playwright:
     page.add_script_tag(content=(ROOT / "src/110-learning-loading.js").read_text(encoding="utf-8"))
     # 阶段二走会话 API：需要 session-core / answer-sheet / draft-state 模块
     for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js",
-                   "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/114-practice-draft-state.js"]:
+                   "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/117-question-answer-set.js", "src/114-practice-draft-state.js", "src/118-revenge-entry-policy.js"]:
         page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
     page.add_script_tag(content=(ROOT / "src/100-practice-mode.js").read_text(encoding="utf-8"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
