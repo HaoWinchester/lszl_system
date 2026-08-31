@@ -231,6 +231,8 @@ git commit -m "feat: preserve imported multiple-choice answers"
 - Modify: `backend/app/services/paper_import_service.py`
 - Modify: `backend/app/services/paper_composition_service.py`
 - Modify: `backend/app/services/paper_release_service.py`
+- Modify: `backend/app/services/published_paper_access_service.py`
+- Modify: `backend/app/services/runtime_domain_migration_service.py`
 - Modify: `backend/tests/test_paper_draft_api.py`
 - Modify: `backend/tests/test_paper_import_api.py`
 - Modify: `backend/tests/test_paper_composition_api.py`

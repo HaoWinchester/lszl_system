@@ -22,6 +22,10 @@ class PaperCreateRequest(BaseModel):
     name: str = Field(default="新试卷", min_length=1, max_length=200)
     subject: str = Field(default="PMP", min_length=1, max_length=32)
     description: str | None = None
+    paper_type: Literal["standard", "multiple_choice"] = Field(
+        default="standard",
+        alias="paperType",
+    )
     category_id: str | None = Field(default=None, alias="categoryId", max_length=64)
     total_count: int | None = Field(default=None, alias="totalCount", ge=0, le=10_000)
     quotas: dict[str, Any] = Field(default_factory=dict)
@@ -53,6 +57,10 @@ class PaperUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     subject: str | None = Field(default=None, min_length=1, max_length=32)
     description: str | None = None
+    paper_type: Literal["standard", "multiple_choice"] | None = Field(
+        default=None,
+        alias="paperType",
+    )
     category_id: str | None = Field(default=None, alias="categoryId", max_length=64)
     total_count: int | None = Field(default=None, alias="totalCount", ge=0, le=10_000)
     quotas: dict[str, Any] | None = None
@@ -149,6 +157,10 @@ class PaperCompositionPreflightRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     subject: str = Field(default="PMP", min_length=1, max_length=32)
+    paper_type: Literal["standard", "multiple_choice"] = Field(
+        default="standard",
+        alias="paperType",
+    )
     bank_ids: list[str] = Field(alias="bankIds", min_length=1, max_length=200)
     filters: dict[str, Any] = Field(default_factory=dict)
     variants: list[PaperCompositionVariantRequest] = Field(
