@@ -4,7 +4,12 @@
   "toVersion": "v9.0-p4.1.193",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "practice-mode.html",
+      "src/100-practice-mode.js",
+      "styles/practice-mode.css",
+      "tests/practice-answer-sheet-browser.py"
+    ],
     "removed": []
   },
   "incompatible": []

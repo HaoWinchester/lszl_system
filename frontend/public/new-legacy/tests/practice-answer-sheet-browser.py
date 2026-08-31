@@ -93,6 +93,19 @@ def assert_exit_dialog_geometry(rows):
         assert second["y"] >= first["y"] + first["height"] - 0.5, (first, second)
 
 
+def assert_question_progress(page, current, total):
+    progress = page.locator("#practiceQuestionProgress")
+    assert progress.count() == 1, "topbar must expose the current question position"
+    assert progress.is_visible(), "current question position must stay visible while answering"
+    actual = progress.inner_text()
+    assert actual == f"第 {current} / {total} 题", actual
+    progress_box = progress.bounding_box()
+    topbar_box = page.locator(".practice-game-topbar").bounding_box()
+    assert progress_box and topbar_box
+    assert progress_box["x"] >= topbar_box["x"] - 0.5
+    assert progress_box["x"] + progress_box["width"] <= topbar_box["x"] + topbar_box["width"] + 0.5
+
+
 # ---------------------------------------------------------------------------
 # 全部走同一个 mock 后端：window.__writes 记录所有生命周期写请求。
 # 新契约（本地即时判题）：
@@ -257,6 +270,7 @@ with sync_playwright() as playwright:
     assert page.locator("#practiceGame").is_visible(), page.evaluate("document.body.dataset.practiceView")
     assert page.locator("#practicePreviousWrongToggle").is_hidden()
     assert page.locator("#practicePreviousWrongAnswer").is_hidden()
+    assert_question_progress(page, 1, 10)
 
     # 隐藏的兼容 DOM 也必须遵守模式策略，不能绕过入口提前交卷。
     before_complete = names(page).count('complete')
@@ -307,6 +321,7 @@ with sync_playwright() as playwright:
     page.locator('#practiceAnswerSheet [data-question-id="q4"]').click()
     page.wait_for_timeout(100)
     assert "第 4 道题" in page.locator("#practiceQuestionStem").inner_text()
+    assert_question_progress(page, 4, 10)
     assert_sheet_closed(page)
     assert page.locator("#practiceAnswerSheetMobileBtn").get_attribute("aria-expanded") == "false"
     # 切题后焦点策略：题号点击后焦点自然留在入口按钮（关闭路径不强制，但抽屉必须关）
@@ -431,6 +446,7 @@ with sync_playwright() as playwright:
     )
     page.wait_for_timeout(200)
     assert scholar["mode"] == "scholar", scholar
+    assert_question_progress(page, 1, 10)
     page.wait_for_timeout(450)
     # 学霸计时器到期：本地锁定并记为超时草稿；绝不出现 /answers 写请求
     assert all(write["name"] != "answers" for write in writes(page)), writes(page)
