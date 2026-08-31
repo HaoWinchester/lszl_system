@@ -92,6 +92,18 @@ def fail_hidden(page):
     return page.locator("#practiceFailBackdrop").is_hidden()
 
 
+def assert_question_progress(page, current, total):
+    progress = page.locator("#practiceQuestionProgress")
+    assert progress.count() == 1, "topbar must expose the current question position"
+    assert progress.is_visible(), "current question position must stay visible while answering"
+    actual = progress.inner_text()
+    assert actual == f"第 {current} / {total} 题", {
+        "text": actual,
+        "snapshot": page.evaluate("window.KGPracticeMode.snapshot()"),
+        "nextDisabled": page.locator("#practiceNextBtn").is_disabled(),
+    }
+
+
 with sync_playwright() as playwright:
     candidates = [
         shutil.which("chromium"),
@@ -110,7 +122,7 @@ with sync_playwright() as playwright:
     page.evaluate(MOCK_BACKEND)
     for stylesheet in ["styles/main.css", "styles/practice-mode.css"]:
         page.add_style_tag(content=(ROOT / stylesheet).read_text(encoding="utf-8"))
-    for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/114-practice-draft-state.js", "src/100-practice-mode.js"]:
+    for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/117-question-answer-set.js", "src/114-practice-draft-state.js", "src/118-revenge-entry-policy.js", "src/100-practice-mode.js"]:
         page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(150)
@@ -130,8 +142,13 @@ with sync_playwright() as playwright:
     # 用户复现：全新 180 题，先答对 1 题再答错 4 题；不能自动弹阶段小结。
     start()
     assert page.evaluate("window.__calls.filter(name=>name==='startSession').length") == 1
+    assert_question_progress(page, 1, 180)
+    page.clock.fast_forward(1)
+    page.wait_for_timeout(100)
     page.locator('[data-option-id="A"]').click()
+    assert not errors, errors
     page.clock.fast_forward(600)
+    assert_question_progress(page, 2, 180)
     for wrong in range(1, 5):
         page.locator('[data-option-id="B"]').click()
         page.clock.fast_forward(600)
@@ -235,6 +252,7 @@ with sync_playwright() as playwright:
     page.locator('[data-practice-start="scholar"]').click()
     page.wait_for_function("document.body.dataset.practiceView === 'game'")
     assert health_label(page) == "剩余血量 7 / 18"
+    assert_question_progress(page, 4, 180)
     # 保存响应在途时冻结超时判题，避免请求已捕获草稿后又新增答案。
     page.evaluate("""() => {
       window.__originalPause=KGPracticeLearningApi.pauseSession;

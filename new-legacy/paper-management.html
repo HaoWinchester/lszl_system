@@ -93,6 +93,7 @@
       <div class="qb-grid three pm-paper-fields">
         <label class="qb-field"><span>试卷名称</span><input id="paperNameInput" placeholder="例如：PMP 综合模拟卷 01" /></label>
         <label class="qb-field"><span>科目</span><select id="paperSubjectInput"></select></label>
+        <label class="qb-field"><span>试卷类型</span><select id="paperTypeInput"><option value="standard">普通试卷</option><option value="multiple_choice">多选试卷</option></select><small>加入题目或发布后不可更改。</small></label>
         <label class="qb-field"><span>目标题量</span><input id="paperTotalInput" min="1" max="300" type="number" value="180" /></label>
         <label class="qb-field"><span>所属分类</span><select id="paperCategoryInput"></select></label>
         <label class="qb-field pm-paper-access-field"><span>使用权限</span><select id="paperAccessLevelInput"><option value="free">免费试卷</option><option value="member">VIP 会员专属</option></select><small>VIP 试卷仅对有效会员开放。</small></label>
@@ -226,6 +227,7 @@
       <div class="pm-composition-mode" role="radiogroup" aria-label="组卷方式"><label><input type="radio" name="paperCompositionMode" value="quick" checked />一键组卷</label><label><input type="radio" name="paperCompositionMode" value="custom" />自定义</label></div>
     </header>
     <div class="pm-operation-body">
+      <label class="qb-field"><span>试卷类型</span><select id="qbPaperCompositionType"><option value="standard">普通试卷</option><option value="multiple_choice">多选试卷</option></select></label>
       <section class="pm-composition-section"><h3>候选题库</h3><div class="pm-bank-checklist" id="qbPaperCompositionBanks"><div class="qb-empty">打开窗口后加载当前可用题库。</div></div></section>
       <section class="pm-composition-section"><h3>平行试卷</h3><div class="pm-variant-grid">
         <div class="pm-variant-row"><label><input id="qbPaperVariantAEnabled" type="checkbox" checked />A 卷</label><input id="qbPaperVariantAName" aria-label="A 卷名称" value="PMP 模拟卷 A" /><input id="qbPaperVariantACount" aria-label="A 卷题量" type="number" min="1" max="300" value="60" /></div>
@@ -311,6 +313,7 @@
 <script defer src="src/teacher/teacher-domain-registry.js"></script>
 <script defer src="src/98-teacher-workflow-p2-services.js"></script>
 <script defer src="src/98-question-classification.js"></script>
+<script defer src="src/117-question-answer-set.js"></script>
 <script defer src="src/65-question-bank-admin.js"></script>
 <script defer src="src/admin/module-help-content.js"></script>
 <script defer src="src/admin/module-help-controller.js"></script>
