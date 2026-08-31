@@ -136,6 +136,41 @@ def test_question_bank_json_import_persists_multiple_choice_answer_array() -> No
         asyncio.run(_cleanup_users(usernames))
 
 
+def test_question_bank_json_import_accepts_prepstudio_correct_answers_array() -> None:
+    suffix = uuid4().hex[:10]
+    usernames = {
+        "manager": f"question-import-prepstudio-{suffix}",
+        "viewer": f"question-import-prepstudio-viewer-{suffix}",
+    }
+    source_bank = _multiple_choice_source_bank(
+        "prepstudio-multi-bank",
+        "prepstudio-multi-question",
+        correct_ids=["A", "D"],
+    )
+    question = source_bank["questions"][0]
+    question.pop("correctOptionIds")
+    question["correctAnswers"] = ["A", "D"]
+    question["correctAnswer"] = "A"
+    question["options"][0]["correct"] = True
+    question["options"][3]["correct"] = True
+
+    asyncio.run(_seed_users(usernames))
+    try:
+        with TestClient(app) as client:
+            _login(client, usernames["manager"])
+            imported = client.post(
+                "/api/v1/banks/import",
+                json={"banks": [source_bank]},
+            )
+
+            assert imported.status_code == 200, imported.text
+            saved = imported.json()["banks"][0]["questions"][0]
+            assert saved["correctOptionIds"] == ["A", "D"]
+            assert saved["correctAnswer"] is None
+    finally:
+        asyncio.run(_cleanup_users(usernames))
+
+
 async def _seed_users(usernames: dict[str, str]) -> None:
     password_hash = hash_password(PASSWORD)
     async with AsyncSessionLocal() as db:
