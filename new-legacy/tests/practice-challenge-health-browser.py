@@ -102,6 +102,11 @@ def assert_question_progress(page, current, total):
         "snapshot": page.evaluate("window.KGPracticeMode.snapshot()"),
         "nextDisabled": page.locator("#practiceNextBtn").is_disabled(),
     }
+    progress_box = progress.bounding_box()
+    topbar_box = page.locator(".practice-game-topbar").bounding_box()
+    assert progress_box and topbar_box
+    assert progress_box["x"] >= topbar_box["x"] - 0.5
+    assert progress_box["x"] + progress_box["width"] <= topbar_box["x"] + topbar_box["width"] + 0.5
 
 
 with sync_playwright() as playwright:
@@ -253,6 +258,9 @@ with sync_playwright() as playwright:
     page.wait_for_function("document.body.dataset.practiceView === 'game'")
     assert health_label(page) == "剩余血量 7 / 18"
     assert_question_progress(page, 4, 180)
+    page.set_viewport_size({"width": 390, "height": 844})
+    assert_question_progress(page, 4, 180)
+    page.set_viewport_size({"width": 1440, "height": 960})
     # 保存响应在途时冻结超时判题，避免请求已捕获草稿后又新增答案。
     page.evaluate("""() => {
       window.__originalPause=KGPracticeLearningApi.pauseSession;
