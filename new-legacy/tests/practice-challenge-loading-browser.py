@@ -85,6 +85,8 @@ with sync_playwright() as playwright:
           };
           window.KGPracticeLearningApi={
             stats:()=>({active:0,pending:0,needsRemediation:0,mastered:0}),active:()=>[],refresh:async()=>({}),
+            getPaperProgress:async()=>({paperId:'paper-loading',modes:{challenge:null,scholar:null}}),
+            getRevengeSummary:async()=>({stats:{active:0,pending:0,needsRemediation:0,verificationDue:0,mastered:0,unavailable:0},resumable:null}),
             answer:async()=>({correct:true}),recordSession:async()=>({}),
             getSession:gate('getSession'),
             pauseSession:gate('pause'),
@@ -95,9 +97,8 @@ with sync_playwright() as playwright:
               domains:{people:{weight:50,total:5,answered:5,correct:5,wrong:0,unanswered:0,scorePercent:100,performanceBand:'aboveTarget'},
                        process:{weight:50,total:5,answered:4,correct:3,wrong:1,unanswered:1,scorePercent:75,performanceBand:'target'}},
               wrongQuestionIds:['question-1'],durationMs:60000,official:false,disclaimer:'幻谱模拟判定'}),
-            // 阶段一无 startSession => startPractice 走目录读取路径（KGPublishedPaperRepository），
-            // 目录解析 Promise 由 __challengePending 闸门控制；阶段二再装上 startSession 切到会话路径。
-            getActiveSessions:async filters=>{const s=window.__getActiveSession();return s&&(!filters?.mode||filters.mode===s.mode)?[s]:[]},
+            // 阶段一无 enterSession => startPractice 走目录读取路径（KGPublishedPaperRepository），
+            // 目录解析 Promise 由 __challengePending 闸门控制；阶段二再装上 enterSession 切到会话路径。
             listSessions:async()=>[{paperId:'paper-loading',paperName:'加载测试卷',answered:10,correct:8,endedAt:Date.now(),status:'completed'}],
             clearSessions:async()=>{}
           };
@@ -219,10 +220,14 @@ with sync_playwright() as playwright:
     assert page.locator("#practiceGame").is_visible()
 
     # ---------- 会话内本地交互（作答 / 切题 / 抽屉跳题）零请求零加载框 ----------
-    # 装上 startSession 后 startPractice 优先走会话 API 路径；目录仓储保留以维持大厅试卷数据
+    # 装上 enterSession 后 startPractice 优先走会话 API 路径；目录仓储保留以维持大厅试卷数据
     page.evaluate("""()=>{
       const api=window.KGPracticeLearningApi;
-      api.startSession=async input=>JSON.parse(JSON.stringify(window.__setActiveSession(window.__baseSession())));
+      api.enterSession=async input=>{
+        const existing=window.__getActiveSession();
+        if(!existing)window.__setActiveSession(window.__baseSession({mode:input.mode}));
+        return {resumed:!!existing,session:JSON.parse(JSON.stringify(window.__getActiveSession()))};
+      };
       api.getSession=async id=>JSON.parse(JSON.stringify(window.__getActiveSession()));
       window.__setActiveSession(window.__baseSession());
       window.__lifecycleProbe=[];
@@ -282,7 +287,6 @@ with sync_playwright() as playwright:
     page.evaluate(
         """async()=>{
           const api=window.KGPracticeLearningApi;
-          api.getActiveSessions=async filters=>{const s=window.__getActiveSession();return s&&(!filters?.mode||filters.mode===s.mode)?[s]:[]};
           api.getSession=async id=>JSON.parse(JSON.stringify(window.__getActiveSession()));
           window.__setActiveSession(Object.assign(window.__baseSession(),{status:'paused'}));
           await window.KGPracticeMode.startPractice('challenge');
@@ -388,7 +392,6 @@ with sync_playwright() as playwright:
     # ---------- key=complete：交卷延迟、双击防重入、网络异常恢复、成功出结果页 ----------
     page.evaluate(
         """()=>{
-          window.KGPracticeLearningApi.getActiveSessions=async filters=>{const s=window.__getActiveSession();return s&&(!filters?.mode||filters.mode===s.mode)?[s]:[]};
           window.__setActiveSession(window.__baseSession({mode:'revenge'}));
         }"""
     )

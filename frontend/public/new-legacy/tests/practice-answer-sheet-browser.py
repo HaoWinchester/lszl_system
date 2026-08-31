@@ -159,9 +159,19 @@ with sync_playwright() as playwright:
           window.KGAuthCore={currentUser:()=>({username:'student-1',role:'student'})};
           window.KGPracticeLearningApi={
             stats:()=>JSON.parse(JSON.stringify(window.__revengeStats)),active:()=>[],refresh:async()=>({}),
-            getActiveSessions:async filters=>session&&['active','paused'].includes(session.status)&&(!filters?.mode||filters.mode===session.mode)&&(!filters?.releaseId||filters.releaseId===session.releaseId)?[normalize()]:[],
+            getPaperProgress:async paperId=>{
+              const rows=[...(session&&['active','paused'].includes(session.status)?[normalize()]:[]),...window.__findResumable({})];
+              const summary=mode=>{const value=rows.find(item=>item.mode===mode&&item.paperId===paperId);return value?{sessionId:value.id,status:value.status,answered:value.stats.answered,total:value.stats.total,revision:value.revision}:null};
+              return {paperId,modes:{challenge:summary('challenge'),scholar:summary('scholar')}};
+            },
+            getRevengeSummary:async()=>{const value=[...(session&&['active','paused'].includes(session.status)?[normalize()]:[]),...window.__findResumable({})].find(item=>item.mode==='revenge');return {stats:JSON.parse(JSON.stringify(window.__revengeStats)),resumable:value?{sessionId:value.id,status:value.status,answered:value.stats.answered,total:value.stats.total,revision:value.revision}:null}},
             getSession:async id=>window.__pausedSnapshots[id]?JSON.parse(JSON.stringify(window.__pausedSnapshots[id])):(session?normalize():null),
-            startSession:async input=>{record('start',input);const refs=sessionRefs(input.mode==='revenge'?input.count:10);const total=refs.length;session={id:'ps-'+(++sequence),paperId:input.mode==='revenge'?null:input.paperId,releaseId:input.mode==='revenge'?null:input.releaseId,mode:input.mode,status:'active',revision:1,questions:refs,questionOrder:refs.map(({question,...ref})=>ref),answers:{},runtimeState:{currentIndex:0,order:input.order,health:input.mode==='challenge'?3:3,streak:0,experience:0,durationMs:0},stats:{total,answered:0,correct:0,wrong:0,unanswered:total,experience:0,durationMs:0}};return normalize()},
+            enterSession:async input=>{
+              const rows=[...(session&&['active','paused'].includes(session.status)?[normalize()]:[]),...window.__findResumable({})];
+              const existing=rows.find(item=>item.mode===input.mode&&(input.mode==='revenge'||item.paperId===input.paperId));
+              if(existing){session=JSON.parse(JSON.stringify(existing));return {resumed:true,session:normalize()}}
+              record('start',input);const refs=sessionRefs(input.mode==='revenge'?input.count:10);const total=refs.length;session={id:'ps-'+(++sequence),paperId:input.mode==='revenge'?null:input.paperId,releaseId:input.mode==='revenge'?null:input.releaseId,mode:input.mode,status:'active',revision:1,questions:refs,questionOrder:refs.map(({question,...ref})=>ref),answers:{},runtimeState:{currentIndex:0,order:input.order,health:input.mode==='challenge'?3:3,streak:0,experience:0,durationMs:0},stats:{total,answered:0,correct:0,wrong:0,unanswered:total,experience:0,durationMs:0}};return {resumed:false,session:normalize()}
+            },
             updateState:async(id,input)=>{record('state',input);if(input.revision!==session.revision)throw Object.assign(new Error('stale revision'),{status:409});session.runtimeState={...session.runtimeState,...input.runtimeState};session.revision+=1;return normalize()},
             answerSession:async(id,input)=>{record('answers',input);throw Object.assign(new Error('legacy per-question route must not be called'),{status:500})},
             pauseSession:async(id,input)=>{
@@ -203,7 +213,6 @@ with sync_playwright() as playwright:
           };
           // 旧逐题路由在这个前端里绝不允许被调用
           window.KGPracticeLearningApi.answer=async input=>{record('answers',input);throw new Error('/answers must not be called')};
-          window.__defaultActiveSessions=window.KGPracticeLearningApi.getActiveSessions;
           window.KGPracticeLearningApi.upsertWrong=async input=>{record('upsertWrong',input);throw new Error('/mistakes must not be called during practice')};
           window.KGPracticeLearningApi.answerRevenge=async input=>{record('revengeAnswer',input);throw new Error('revenge answer must stay local until submission')};
           window.__catalog=[{id:'paper-1',paperId:'paper-1',releaseId:'release-1',version:1,name:'PMP 模拟卷',subject:'PMP',status:'published',questionCount:10,totalCount:10,accessPolicy:{accessLevel:'free'}}];
@@ -440,7 +449,6 @@ with sync_playwright() as playwright:
     page.evaluate("window.__writes=[]")
     scholar = page.evaluate(
         """()=>{
-          window.KGPracticeLearningApi.getActiveSessions=async()=>[];
           return window.KGPracticeMode.startPractice('scholar').then(()=>window.KGPracticeMode.snapshot());
         }"""
     )
@@ -475,7 +483,6 @@ with sync_playwright() as playwright:
     # ---------- revenge 入口：题量独立、完整统计、规则浮层 ----------
     page.evaluate("""()=>{
       window.__catalog=[{id:'paper-large',paperId:'paper-large',releaseId:'release-large',version:1,name:'大题量试卷',subject:'PMP',status:'published',questionCount:180,totalCount:180,accessPolicy:{accessLevel:'free'}}];
-      window.KGPracticeLearningApi.getActiveSessions=async()=>[];
       window.__revengeStats={active:1,pending:1,needsRemediation:0,verificationDue:0,mastered:0};
       window.KGPracticeMode.showLobby();
     }""")
@@ -506,7 +513,12 @@ with sync_playwright() as playwright:
     rule_tooltip = page.locator('#practiceRevengeRuleTooltip')
     rule_trigger.hover()
     assert rule_tooltip.is_visible()
-    assert '跨试卷、跨版本和历史无版本' in rule_tooltip.inner_text()
+    rule_text = rule_tooltip.inner_text()
+    assert '第一次在复仇模式答对，并且完成交卷' in rule_text
+    assert '等待约 24 小时' in rule_text
+    assert '再次答对并完成交卷' in rule_text
+    assert '只“保存退出”不算，必须交卷结算。' in rule_text
+    assert '“已掌握”仍会保留在统计里' in rule_text
     page.mouse.move(5, 5)
     page.wait_for_timeout(50)
     assert rule_tooltip.is_hidden()
@@ -525,6 +537,9 @@ with sync_playwright() as playwright:
     page.wait_for_timeout(180)
     assert writes(page)[0] == {"name": "start", "body": {"mode": "revenge", "count": 1, "order": "paper"}}, writes(page)
     assert page.evaluate('KGPracticeMode.snapshot().questionCount') == 1
+    submit_note = page.locator('.practice-revenge-submit-note')
+    assert submit_note.is_visible()
+    assert '右上角“答题卡”' in submit_note.inner_text() and '交卷' in submit_note.inner_text()
     page.locator('#practiceExitBtn').click()
     page.locator('#practiceAbandonBtn').click()
     page.wait_for_timeout(120)
@@ -562,8 +577,8 @@ with sync_playwright() as playwright:
 
     # ---------- revenge：本地推进补救/验证，不调用长期错题写路由 ----------
     page.evaluate("""()=>{
-      window.__workingStartSession=window.KGPracticeLearningApi.startSession;
-      window.KGPracticeLearningApi.startSession=async input=>{
+      window.__workingEnterSession=window.KGPracticeLearningApi.enterSession;
+      window.KGPracticeLearningApi.enterSession=async input=>{
         window.__writes.push({name:'start',body:JSON.parse(JSON.stringify(input))});
         throw Object.assign(new Error('damaged history'),{detail:{code:'REVENGE_SNAPSHOT_UNAVAILABLE',unavailableCount:2}});
       };
@@ -576,7 +591,7 @@ with sync_playwright() as playwright:
     assert not page.locator('[data-practice-start="revenge"]').is_disabled()
     assert page.locator("#practiceLobby").is_visible()
     page.evaluate("""()=>{
-      window.KGPracticeLearningApi.startSession=window.__workingStartSession;
+      window.KGPracticeLearningApi.enterSession=window.__workingEnterSession;
       window.__writes=[];
     }""")
     page.evaluate("window.__writes=[]")
@@ -716,7 +731,6 @@ with sync_playwright() as playwright:
     page.evaluate(
         """()=>{
           window.__catalog=[{id:'paper-2',paperId:'paper-2',releaseId:'release-2',version:1,name:'另一份试卷',subject:'PMP',status:'published',questionCount:10,totalCount:10,accessPolicy:{accessLevel:'free'}}];
-          window.KGPracticeLearningApi.getActiveSessions=async filters=>window.__findResumable(filters);
           window.KGPracticeMode.showLobby();
         }"""
     )
@@ -740,7 +754,6 @@ with sync_playwright() as playwright:
           const api=window.KGPracticeLearningApi;
           window.__catalog=[{id:'paper-1',paperId:'paper-1',releaseId:'release-1',version:1,name:'PMP 模拟卷',subject:'PMP',status:'published',questionCount:10,totalCount:10,accessPolicy:{accessLevel:'free'}}];
           window.KGPracticeMode.showLobby();
-          api.getActiveSessions=async filters=>window.__findResumable(filters).filter(s=>s.mode==='challenge');
           return window.KGPracticeMode.startPractice('challenge').then(()=>window.KGPracticeMode.snapshot());
         }"""
     )

@@ -156,6 +156,26 @@ async def practice_overview(db: DB, user: CurrentUser):
     return await learning_service.practice_overview(db, user.username)
 
 
+@router.get("/learning/practice/papers/{paper_id}/progress")
+async def practice_paper_progress(
+    paper_id: str,
+    db: DB,
+    user: CurrentUser,
+    release_id: str | None = Query(None, alias="releaseId"),
+):
+    return await practice_session_service.paper_progress(
+        db,
+        user.username,
+        paper_id,
+        release_id=release_id,
+    )
+
+
+@router.get("/learning/practice/revenge/summary")
+async def practice_revenge_summary(db: DB, user: CurrentUser):
+    return await practice_session_service.revenge_summary(db, user.username)
+
+
 @router.post("/learning/practice/answers")
 async def record_practice_answer(body: dict, db: DB, user: CurrentUser):
     try:
@@ -179,6 +199,18 @@ async def start_practice_session(body: dict, db: DB, user: CurrentUser):
             status_code=error.status_code, detail=error.detail()
         ) from error
     return {"session": session}
+
+
+@router.post("/learning/practice/sessions/enter")
+async def enter_practice_session(body: dict, db: DB, user: CurrentUser):
+    try:
+        return await practice_session_service.enter_session(
+            db, user.username, user, body
+        )
+    except practice_session_service.PracticeSessionError as error:
+        raise HTTPException(
+            status_code=error.status_code, detail=error.detail()
+        ) from error
 
 
 @router.get("/learning/practice/sessions/active")
