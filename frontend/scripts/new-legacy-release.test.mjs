@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -31,6 +31,19 @@ function runWithValidator(root, validator, sourcePath = source) {
     encoding: 'utf8',
     env: { ...process.env, KG_RELEASE_VALIDATION_SCRIPT: validator },
   })
+}
+
+function runWithValidationProfile(root, validator, profile, sourcePath = source, extraEnv = {}) {
+  const validatorEnvName = `KG_RELEASE_${'VALIDATION_SCRIPT'}`
+  return spawnSync(
+    process.execPath,
+    [command, 'update', sourcePath, '--root', root, '--validation-profile', profile],
+    {
+      cwd: repoDir,
+      encoding: 'utf8',
+      env: { ...process.env, ...extraEnv, [validatorEnvName]: validator },
+    },
+  )
 }
 
 function readJson(path) {
@@ -239,6 +252,159 @@ test('successful validation can emit logs larger than the Node default buffer', 
   const report = readJson(resolve(root, sourceVersion, 'validation.json'))
   assert.equal(report.passed, true)
   assert.equal(report.stdout.length, 40_000)
+})
+
+test('a matching validated release is reused without running the validator twice', () => {
+  const root = makeRoot()
+  const validator = resolve(root, 'count-validation.sh')
+  const calls = resolve(root, 'validation-calls.txt')
+  writeFileSync(
+    validator,
+    '#!/bin/sh\nprintf "%s\\n" "$3" >> "$VALIDATION_CALLS"\n',
+  )
+  chmodSync(validator, 0o755)
+
+  const first = runWithValidationProfile(root, validator, 'full', source, { VALIDATION_CALLS: calls })
+  const second = runWithValidationProfile(root, validator, 'full', source, { VALIDATION_CALLS: calls })
+
+  assert.equal(first.status, 0, first.stderr)
+  assert.equal(second.status, 0, second.stderr)
+  assert.equal(readFileSync(calls, 'utf8'), 'full\n')
+  const report = readJson(resolve(root, sourceVersion, 'validation.json'))
+  assert.equal(report.profile, 'full')
+  assert.match(report.sourceHash, /^[a-f0-9]{64}$/)
+  assert.match(report.adapterHash, /^[a-f0-9]{64}$/)
+  assert.match(report.validatorHash, /^[a-f0-9]{64}$/)
+})
+
+test('uat-fast validation cannot be selected without an authoritative deployed base', () => {
+  const root = makeRoot()
+  const validator = resolve(root, 'never-run-fast-validation.sh')
+  writeFileSync(validator, '#!/bin/sh\nexit 0\n')
+  chmodSync(validator, 0o755)
+
+  const result = runWithValidationProfile(root, validator, 'uat-fast')
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /uat-fast.*UAT 已部署基线/s)
+})
+
+test('uat-fast rejects a caller base that differs from remote UAT state', () => {
+  const root = makeRoot()
+  const validator = resolve(root, 'never-run-mismatched-fast-validation.sh')
+  const fakeBin = resolve(root, 'bin')
+  const fakeSsh = resolve(fakeBin, 'ssh')
+  mkdirSync(fakeBin)
+  writeFileSync(validator, '#!/bin/sh\nexit 0\n')
+  writeFileSync(fakeSsh, `#!/bin/sh\nprintf '%s\\n' '${'f'.repeat(40)}'\n`)
+  chmodSync(validator, 0o755)
+  chmodSync(fakeSsh, 0o755)
+
+  const result = spawnSync(
+    process.execPath,
+    [command, 'update', source, '--root', root, '--validation-profile', 'uat-fast', '--uat-base-commit', 'HEAD'],
+    {
+      cwd: repoDir,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        [`KG_RELEASE_${'VALIDATION_SCRIPT'}`]: validator,
+      },
+    },
+  )
+
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /与远端 UAT 部署状态不一致/)
+})
+
+test('a backend validation-context change invalidates a reusable full report', () => {
+  const root = makeRoot()
+  const validator = resolve(root, 'count-full-validation.sh')
+  const calls = resolve(root, 'full-validation-calls.txt')
+  const contextProbe = resolve(repoDir, 'backend', '.release-validation-context-probe')
+  writeFileSync(
+    validator,
+    '#!/bin/sh\nprintf "full\\n" >> "$VALIDATION_CALLS"\n',
+  )
+  chmodSync(validator, 0o755)
+
+  try {
+    const first = runWithValidationProfile(root, validator, 'full', source, { VALIDATION_CALLS: calls })
+    assert.equal(first.status, 0, first.stderr)
+    writeFileSync(contextProbe, 'backend validation context changed\n')
+    const second = runWithValidationProfile(root, validator, 'full', source, { VALIDATION_CALLS: calls })
+    assert.equal(second.status, 0, second.stderr)
+    assert.equal(readFileSync(calls, 'utf8'), 'full\nfull\n')
+  } finally {
+    rmSync(contextProbe, { force: true })
+  }
+})
+
+test('a root deployment-context change invalidates a reusable full report', () => {
+  const root = makeRoot()
+  const validator = resolve(root, 'count-root-validation.sh')
+  const calls = resolve(root, 'root-validation-calls.txt')
+  const contextProbe = resolve(repoDir, '.release-validation-root-context-probe')
+  writeFileSync(
+    validator,
+    '#!/bin/sh\nprintf "full\\n" >> "$VALIDATION_CALLS"\n',
+  )
+  chmodSync(validator, 0o755)
+
+  try {
+    const first = runWithValidationProfile(root, validator, 'full', source, { VALIDATION_CALLS: calls })
+    assert.equal(first.status, 0, first.stderr)
+    writeFileSync(contextProbe, 'root deployment context changed\n')
+    const second = runWithValidationProfile(root, validator, 'full', source, { VALIDATION_CALLS: calls })
+    assert.equal(second.status, 0, second.stderr)
+    assert.equal(readFileSync(calls, 'utf8'), 'full\nfull\n')
+  } finally {
+    rmSync(contextProbe, { force: true })
+  }
+})
+
+test('changing validator executable mode invalidates the reusable report', () => {
+  const root = makeRoot()
+  const validator = resolve(root, 'mode-sensitive-validation.sh')
+  const calls = resolve(root, 'mode-validation-calls.txt')
+  writeFileSync(validator, '#!/bin/sh\nprintf "full\\n" >> "$VALIDATION_CALLS"\n')
+  chmodSync(validator, 0o755)
+
+  const first = runWithValidationProfile(root, validator, 'full', source, { VALIDATION_CALLS: calls })
+  assert.equal(first.status, 0, first.stderr)
+  chmodSync(validator, 0o644)
+  const second = runWithValidationProfile(root, validator, 'full', source, { VALIDATION_CALLS: calls })
+
+  assert.notEqual(second.status, 0)
+  assert.equal(readFileSync(calls, 'utf8'), 'full\n')
+})
+
+test('changing a dangling symlink target invalidates the reusable report', () => {
+  const root = makeRoot()
+  const validator = resolve(root, 'count-symlink-validation.sh')
+  const calls = resolve(root, 'symlink-validation-calls.txt')
+  const contextProbe = resolve(repoDir, '.release-validation-dangling-probe')
+  writeFileSync(validator, '#!/bin/sh\nprintf "full\\n" >> "$VALIDATION_CALLS"\n')
+  chmodSync(validator, 0o755)
+
+  try {
+    try { unlinkSync(contextProbe) } catch (error) {
+      if (error?.code !== 'ENOENT') throw error
+    }
+    symlinkSync('missing-release-target-a', contextProbe)
+    const first = runWithValidationProfile(root, validator, 'full', source, { VALIDATION_CALLS: calls })
+    assert.equal(first.status, 0, first.stderr)
+    unlinkSync(contextProbe)
+    symlinkSync('missing-release-target-b', contextProbe)
+    const second = runWithValidationProfile(root, validator, 'full', source, { VALIDATION_CALLS: calls })
+    assert.equal(second.status, 0, second.stderr)
+    assert.equal(readFileSync(calls, 'utf8'), 'full\nfull\n')
+  } finally {
+    try { unlinkSync(contextProbe) } catch (error) {
+      if (error?.code !== 'ENOENT') throw error
+    }
+  }
 })
 
 test('failed automatic validation never changes the active release', () => {

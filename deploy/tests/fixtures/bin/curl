@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-echo 'data-release="fixture"'
+echo "data-release=\"${UAT_TEST_PUBLIC_VERSION:-fixture}\""
 exit 0

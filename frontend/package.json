@@ -7,7 +7,8 @@
     "dev": "../scripts/dev.sh",
     "build": "pnpm sync:new-legacy",
     "sync:new-legacy": "node scripts/sync-new-legacy.js && node scripts/export-guided-course.mjs",
-    "test": "node --test scripts/*.test.mjs",
+    "test": "node --test scripts/*.test.mjs && pnpm test:uat-deploy",
+    "test:uat-deploy": "bash ../deploy/tests/update-uat-dirty-tree.test.sh && bash ../deploy/tests/update-uat-fast-path.test.sh && bash ../deploy/tests/update-uat-version-bump.test.sh && bash ../deploy/tests/update-uat-validation.test.sh",
     "test:design": "node --test scripts/design-contract.test.mjs",
     "test:p45-persistence": "node --test scripts/p45-persistence-contract.test.mjs"
   },
