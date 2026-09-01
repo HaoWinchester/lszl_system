@@ -1,11 +1,24 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.203",
-  "toVersion": "v9.0-p4.1.203",
+  "fromVersion": "v9.0-p4.1.201",
+  "toVersion": "v9.0-p4.1.201",
   "changes": {
     "added": [],
     "changed": [],
-    "removed": []
+    "removed": [
+      "src/63-learning-event-repository.js",
+      "src/67-card-contract.js",
+      "src/68-card-context.js",
+      "src/69-card-registry.js",
+      "src/71-card-runtime.js",
+      "src/75-learning-path-edges.js",
+      "src/76-workspace-question-cards.js",
+      "styles/card-runtime.css",
+      "styles/compact-learning-shell.css",
+      "styles/dual-canvas.css",
+      "styles/knowledge-recall-p4526.css",
+      "styles/learning-path-edges.css"
+    ]
   },
   "incompatible": []
 }
