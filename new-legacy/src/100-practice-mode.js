@@ -992,6 +992,7 @@
         state.questions=questions.slice(0,count);state.pendingSelections={};
         state.index=0;state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;state.health=state.maxHealth;state.challengeFailedShown=false;state.streak=0;state.maxStreak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
         createDraft(null);
+        if(state.mode==='challenge'||state.mode==='scholar')showToast('答完全部题目将自动交卷，错题才会记入复仇模式；中途退出不记错题。');
         state.lastSettings={paperId:catalog.id,count,order:state.order,mode:state.mode};
         dom.timer.hidden=true;dom.timeRow.hidden=state.mode!=='scholar';dom.health.hidden=state.mode==='practice';
         setView('game');renderQuestion();if(state.mode==='scholar')startTimer();return true;
