@@ -196,8 +196,9 @@ test('runtime removal contract rejects an unguarded device-preference session wr
 
 test('runtime inventory keeps only backend rollback implementation occurrences', () => {
   const actual = inventory()
-  assert.ok(actual.endpoint.some(item => item.path === 'backend/app/web/routes.py'))
-  assert.ok(actual.runtimeKey.some(item => item.path === 'backend/app/services/runtime_state_service.py'))
+  // 批次2已删除 web 端点与 runtime_state_service：这些位置不得再出现 runtime 痕迹。
+  assert.equal(actual.endpoint.some(item => item.path === 'backend/app/web/routes.py'), false)
+  assert.equal(actual.runtimeKey.some(item => item.path === 'backend/app/services/runtime_state_service.py'), false)
   assert.equal(actual.consumer.some(item => item.path === 'frontend/scripts/new-legacy-assets/server-state-bootstrap.js'), false)
 })
 

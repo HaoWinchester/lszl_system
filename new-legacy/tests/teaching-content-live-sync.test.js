@@ -1,5 +1,9 @@
 'use strict';
 
+// teaching-content-live-sync：只覆盖仍活跃的 teaching-content-sync 广播/轮询
+// 与 question-catalog-adapter 契约。Runtime State（server-state-bootstrap）
+// 已随在线 KV 退役删除（24195fa），相关历史断言一并移除。
+
 const assert = require('assert/strict');
 const fs = require('fs');
 const os = require('os');
@@ -10,7 +14,6 @@ const { spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
 const REPO = path.resolve(ROOT, '..');
 const assetPath = path.join(REPO, 'frontend/scripts/new-legacy-assets/teaching-content-sync.js');
-const bootstrapPath = path.join(REPO, 'frontend/scripts/new-legacy-assets/server-state-bootstrap.js');
 const catalogPath = path.join(REPO, 'frontend/scripts/new-legacy-assets/question-catalog-adapter.js');
 
 assert.ok(fs.existsSync(assetPath), 'teaching-content-sync.js must exist');
@@ -74,66 +77,6 @@ function response(status, payload) {
   return { ok: status >= 200 && status < 300, status, async json() { return payload; } };
 }
 
-function loadServerState({ fetchImpl, contentRevision = 7, role = 'teacher' }) {
-  const listeners = new Map();
-  const events = [];
-  const published = [];
-  let syncListener = null;
-  const browserValues = new Map();
-  const browserStorage = {
-    getItem(key) { return browserValues.has(String(key)) ? browserValues.get(String(key)) : null; },
-    setItem(key, value) { browserValues.set(String(key), String(value)); },
-    removeItem(key) { browserValues.delete(String(key)); },
-    clear() { browserValues.clear(); },
-    key(index) { return Array.from(browserValues.keys())[Number(index)] ?? null; },
-  };
-  const window = {
-    __KG_DIRECT_BOOTSTRAP__: {
-      authenticated: true,
-      authUser: { username: 'test-user', role },
-      readOnly: false,
-      page: 'question-bank.html',
-      namespace: 'questions',
-      revision: 1,
-      contentRevision,
-      storage: {},
-    },
-    crypto: { randomUUID: () => `request-${Math.random()}` },
-    navigator: {},
-    document: { visibilityState: 'visible', addEventListener() {} },
-    localStorage: browserStorage,
-    fetch: fetchImpl,
-    setTimeout,
-    clearTimeout,
-    setInterval,
-    clearInterval,
-    queueMicrotask,
-    addEventListener(type, listener) {
-      const entries = listeners.get(type) || new Set();
-      entries.add(listener);
-      listeners.set(type, entries);
-    },
-    dispatchEvent(event) { events.push(event); },
-    KGTeachingContentSync: {
-      publish(detail) { published.push(detail); },
-      subscribe(listener) { syncListener = listener; return () => { syncListener = null; }; },
-      startPolling(options) { window.pollingOptions = options; },
-      stopPolling() {},
-    },
-  };
-  class CustomEvent {
-    constructor(type, options = {}) { this.type = type; this.detail = options.detail; }
-  }
-  class Blob { constructor(parts) { this.parts = parts; } }
-  const context = vm.createContext({ window, document: window.document, fetch: fetchImpl, CustomEvent, Blob, JSON, Date, Math, Map, Object, Number, Promise, console, setTimeout, clearTimeout, setInterval, clearInterval, queueMicrotask });
-  vm.runInContext(fs.readFileSync(bootstrapPath, 'utf8'), context, { filename: bootstrapPath });
-  return {
-    window, storage: window.KGServerStateStorage, browserStorage, published, events,
-    remote: detail => syncListener?.(detail),
-    pagehide: () => { for (const listener of listeners.get('pagehide') || []) listener({ type: 'pagehide' }); },
-  };
-}
-
 function loadCatalog({ fetchImpl }) {
   let syncListener = null;
   const published = [];
@@ -142,6 +85,15 @@ function loadCatalog({ fetchImpl }) {
     document: { body: { dataset: { questionCatalogMode: 'managed' } } },
     crypto: { randomUUID: () => 'catalog-client' },
     fetch: fetchImpl,
+    // adapter 已走 KGDomainApi：把 fetch 桩适配成 DomainApi.request 契约
+    KGDomainApi: {
+      async request({ method = 'GET', path }) {
+        const res = await fetchImpl(path, { method });
+        const payload = await res.json();
+        if (!res.ok) throw Object.assign(new Error('request failed'), { status: res.status, detail: payload });
+        return payload;
+      },
+    },
     setTimeout,
     clearTimeout,
     dispatchEvent() {},
@@ -283,9 +235,9 @@ async function run() {
     assert.ok(fs.existsSync(path.join(output, 'teaching-content-sync.js')), 'sync asset must be copied to generated pages');
     const questionPage = fs.readFileSync(path.join(output, 'question-bank.html'), 'utf8');
     const syncIndex = questionPage.indexOf('teaching-content-sync.js');
-    const stateIndex = questionPage.indexOf('server-state-bootstrap.js');
     const catalogIndex = questionPage.indexOf('question-catalog-adapter.js');
-    assert.ok(syncIndex >= 0 && syncIndex < stateIndex && stateIndex < catalogIndex, 'sync must load before state and catalog consumers');
+    assert.ok(syncIndex >= 0 && syncIndex < catalogIndex, 'sync must load before catalog consumers');
+    assert.equal(questionPage.includes('server-state-bootstrap.js'), false, 'retired runtime bootstrap must not be injected');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -306,360 +258,6 @@ async function run() {
   await wait(120);
   assert.deepEqual(received, receivedBeforeClose, 'pagehide must unsubscribe and close the BroadcastChannel');
   afterPagehide.dispatch('pagehide');
-
-  const runtimeCalls = [];
-  const runtime = loadServerState({
-    fetchImpl: async (url, options = {}) => {
-      runtimeCalls.push({ url, options });
-      if (options.method === 'GET') return response(200, { storage: {}, revision: 2, contentRevision: 9 });
-      return response(200, { ok: true, revision: 2, contentRevision: 8 });
-    },
-  });
-  runtime.storage.setItem('kg_course_config_drafts_v1', '[]');
-  await runtime.storage.flush();
-  const runtimePayload = JSON.parse(runtimeCalls.find(call => call.options.method === 'PUT').options.body);
-  assert.equal(runtimePayload.contentRevision, 7, 'teaching Runtime State writes must carry the exact bootstrap content revision');
-  assert.equal(typeof runtimePayload.contentRevision, 'number', 'contentRevision must satisfy the backend StrictInt contract');
-  assert.deepEqual(runtime.published.map(item => item.revision), [8], 'a successful teaching Runtime State write must publish its returned revision');
-  const callsBeforeLocalPreference = runtimeCalls.length;
-  runtime.storage.setItem('prep.lastDraftId', 'draft-1');
-  await wait(180);
-  assert.equal(runtime.browserStorage.getItem('prep.lastDraftId'), 'draft-1', 'Prep lastDraftId must stay in browser-only preference storage');
-  assert.equal(runtimeCalls.length, callsBeforeLocalPreference, 'browser-only preferences must not be uploaded to Runtime State');
-
-  const chooserMarker = '{"schemaVersion":1,"consumedDigest":"server-digest","consumedAt":1786424000000}';
-  const refreshCalls = [];
-  const refreshRuntime = loadServerState({
-    fetchImpl: async (url, options = {}) => {
-      refreshCalls.push({ url, options });
-      return response(200, {
-        storage: { kg_learning_entry_chooser_consumed_v1: chooserMarker },
-        revision: 2,
-        contentRevision: 7,
-      });
-    },
-  });
-  assert.equal(typeof refreshRuntime.storage.refresh, 'function', 'server-state storage must expose refresh()');
-  await refreshRuntime.storage.refresh();
-  assert.equal(refreshCalls.length, 1);
-  assert.equal(refreshCalls[0].url, '/api/v1/runtime/state');
-  assert.equal(refreshCalls[0].options.method, 'GET');
-  assert.equal(refreshCalls[0].options.credentials, 'include');
-  assert.equal(refreshRuntime.storage.getItem('kg_learning_entry_chooser_consumed_v1'), chooserMarker);
-
-  let refreshFailureGets = 0;
-  const refreshFailureRuntime = loadServerState({
-    fetchImpl: async (_url, options = {}) => {
-      if (options.method === 'GET') {
-        refreshFailureGets += 1;
-        return response(200, { storage: {}, revision: 2, contentRevision: 7 });
-      }
-      return response(500, { detail: 'save failed' });
-    },
-  });
-  refreshFailureRuntime.storage.setItem('pending-before-refresh', 'must flush first');
-  await assert.rejects(refreshFailureRuntime.storage.refresh(), /保存失败 \(500\)/);
-  assert.equal(refreshFailureGets, 0, 'refresh must not GET after its preceding flush fails');
-  refreshFailureRuntime.pagehide();
-
-  const atomicClaimCalls = [];
-  const atomicMarker = '{"schemaVersion":1,"consumedDigest":"atomic-digest","consumedAt":1786425000000}';
-  const atomicClaimRuntime = loadServerState({
-    fetchImpl: async (url, options = {}) => {
-      atomicClaimCalls.push({ url, options });
-      if (url === '/api/v1/runtime/learning-entry-claim') {
-        return response(200, { claimed: false, key: 'kg_learning_entry_chooser_consumed_v1', value: atomicMarker, revision: 6 });
-      }
-      return response(200, { ok: true, revision: 7, contentRevision: 7 });
-    },
-  });
-  assert.equal(typeof atomicClaimRuntime.storage.claimLearningEntry, 'function');
-  const atomicClaim = await atomicClaimRuntime.storage.claimLearningEntry();
-  assert.equal(atomicClaim.claimed, false);
-  assert.equal(atomicClaimCalls[0].url, '/api/v1/runtime/learning-entry-claim');
-  assert.equal(atomicClaimCalls[0].options.method, 'POST');
-  assert.equal(atomicClaimCalls[0].options.credentials, 'include');
-  assert.equal(atomicClaimRuntime.storage.getItem('kg_learning_entry_chooser_consumed_v1'), atomicMarker);
-  atomicClaimRuntime.storage.setItem('after-atomic-claim', 'saved');
-  await atomicClaimRuntime.storage.flush();
-  const afterAtomicPayload = JSON.parse(atomicClaimCalls.find(call => call.options.method === 'PUT').options.body);
-  assert.equal(afterAtomicPayload.revision, 6, 'atomic claim revision must become the next Runtime State write base');
-
-  runtime.storage.setItem('pending-local-key', 'local draft');
-  await runtime.remote({ revision: 9, source: 'remote' });
-  assert.equal(runtime.storage.getItem('pending-local-key'), 'local draft', 'remote snapshots must reapply pending local mutations');
-  assert.ok(runtime.events.some(event => event.type === 'kg:server-state-reloaded'), 'remote snapshots must announce completion');
-  await wait(150);
-  runtime.storage.setItem('kg_course_config_drafts_v1', '[{"id":"after-remote"}]');
-  await runtime.storage.flush();
-  const afterRemotePayload = JSON.parse(runtimeCalls.filter(call => call.options.method === 'PUT').at(-1).options.body);
-  assert.equal(afterRemotePayload.contentRevision, 9, 'an older personal-write response must not roll back a newer observed teaching revision');
-
-  const studentRuntime = loadServerState({
-    role: 'student',
-    fetchImpl: async () => response(403, { detail: '无权限' }),
-  });
-  assert.equal(studentRuntime.window.pollingOptions, undefined, 'student pages must not poll the manager-only teaching revision endpoint');
-
-  let conflictPuts = 0;
-  let conflictRevision = 10;
-  const conflictRuntime = loadServerState({
-    contentRevision: conflictRevision,
-    fetchImpl: async (_url, options = {}) => {
-      if (options.method === 'GET') {
-        conflictRevision += 1;
-        return response(200, { storage: {}, revision: 1, contentRevision: conflictRevision });
-      }
-      conflictPuts += 1;
-      return response(409, { detail: { currentContentRevision: conflictRevision + 1 } });
-    },
-  });
-  conflictRuntime.storage.setItem('kg_course_config_drafts_v1', '[{"id":"draft"}]');
-  await assert.rejects(conflictRuntime.storage.flush(), /\u6559\u5b66\u5185\u5bb9\u6301\u7eed\u53d8\u5316/);
-  await wait(250);
-  assert.equal(conflictPuts, 2, 'a continuously stale teaching write must stop after one reload retry');
-
-  let interleavedRuntime;
-  let interleavedPuts = 0;
-  let insertedMutation = false;
-  const interleavedRevision = { value: 20 };
-  interleavedRuntime = loadServerState({
-    contentRevision: interleavedRevision.value,
-    fetchImpl: async (_url, options = {}) => {
-      if (options.method === 'GET') {
-        interleavedRevision.value += 1;
-        if (!insertedMutation) {
-          insertedMutation = true;
-          interleavedRuntime.storage.setItem('personal-between-conflicts', 'keep me');
-        }
-        return response(200, { storage: {}, revision: 1, contentRevision: interleavedRevision.value });
-      }
-      interleavedPuts += 1;
-      return response(409, { detail: { currentContentRevision: interleavedRevision.value + 1 } });
-    },
-  });
-  interleavedRuntime.storage.setItem('kg_course_config_drafts_v1', '[{"id":"draft"}]');
-  await assert.rejects(interleavedRuntime.storage.flush(), /教学内容持续变化/);
-  await wait(250);
-  assert.equal(interleavedPuts, 2, 'a local mutation between conflicts must not reset the in-flight retry budget');
-
-  let staleConflictPuts = 0;
-  let staleConflictGets = 0;
-  const staleConflictRuntime = loadServerState({
-    contentRevision: 1,
-    fetchImpl: async (_url, options = {}) => {
-      if (options.method === 'GET') {
-        staleConflictGets += 1;
-        return staleConflictGets === 1
-          ? response(200, { storage: {}, revision: 2, contentRevision: 2 })
-          : response(200, { storage: {}, revision: 1, contentRevision: 1 });
-      }
-      staleConflictPuts += 1;
-      return response(409, { detail: { currentContentRevision: 3 } });
-    },
-  });
-  staleConflictRuntime.storage.setItem('kg_course_config_drafts_v1', '[{"id":"stale-conflict"}]');
-  await assert.rejects(staleConflictRuntime.storage.flush(), /\u6559\u5b66\u5185\u5bb9\u6301\u7eed\u53d8\u5316/);
-  await wait(1000);
-  assert.equal(staleConflictPuts, 2, 'a stale GET after the second 409 must not reset the one-retry budget');
-  assert.equal(staleConflictGets, 1, 'the second 409 must stop before issuing an unnecessary stale reload GET');
-
-  let isolatedConflictPuts = 0;
-  let isolatedConflictGets = 0;
-  const isolatedConflictRuntime = loadServerState({
-    contentRevision: 1,
-    fetchImpl: async (_url, options = {}) => {
-      if (options.method === 'GET') {
-        isolatedConflictGets += 1;
-        if (isolatedConflictGets === 1) return response(200, { storage: {}, revision: 2, contentRevision: 2 });
-        if (isolatedConflictGets === 2) return response(200, { storage: {}, revision: 3, contentRevision: 3 });
-        return response(200, { storage: {}, revision: 2, contentRevision: 2 });
-      }
-      isolatedConflictPuts += 1;
-      if (isolatedConflictPuts === 1) return response(422, { detail: { code: 'ISOLATE_MUTATION' } });
-      return response(409, { detail: { currentContentRevision: 4 } });
-    },
-  });
-  isolatedConflictRuntime.storage.setItem('kg_course_config_drafts_v1', '[{"id":"isolated-conflict"}]');
-  await assert.rejects(isolatedConflictRuntime.storage.flush(), /\u6559\u5b66\u5185\u5bb9\u6301\u7eed\u53d8\u5316/);
-  await wait(1000);
-  assert.equal(isolatedConflictPuts, 3, 'isolated mutation conflicts must also stop after one retry');
-  assert.equal(isolatedConflictGets, 2, 'isolated mutation conflicts must not reload after the retry budget is exhausted');
-
-  let isolatedPutCalls = 0;
-  let isolatedGetCalls = 0;
-  const isolatedPutBodies = [];
-  const isolatedRuntime = loadServerState({
-    contentRevision: 1,
-    fetchImpl: async (_url, options = {}) => {
-      if (options.method === 'GET') {
-        isolatedGetCalls += 1;
-        if (isolatedGetCalls === 1) return response(200, { storage: {}, revision: 2, contentRevision: 2 });
-        return response(200, { storage: {}, revision: 2, contentRevision: 2 });
-      }
-      isolatedPutCalls += 1;
-      isolatedPutBodies.push(JSON.parse(options.body));
-      if (isolatedPutCalls === 1) return response(422, { detail: { code: 'ISOLATE_MUTATION' } });
-      if (isolatedPutCalls === 2) return response(200, { ok: true, revision: 3, contentRevision: 3 });
-      return response(200, { ok: true, revision: 4, contentRevision: 4 });
-    },
-  });
-  isolatedRuntime.storage.setItem('kg_course_config_drafts_v1', '[{"id":"isolated"}]');
-  await isolatedRuntime.storage.flush();
-  assert.equal(
-    isolatedRuntime.storage.getItem('kg_course_config_drafts_v1'),
-    '[{"id":"isolated"}]',
-    'a stale GET after an isolated PUT must not replace the committed local value with an older snapshot',
-  );
-  isolatedRuntime.storage.setItem('kg_course_config_drafts_v1', '[{"id":"next"}]');
-  await isolatedRuntime.storage.flush();
-  assert.equal(
-    isolatedPutBodies.at(-1).contentRevision,
-    3,
-    'a stale GET after an isolated PUT must not roll the exact contentRevision CAS token backward',
-  );
-  assert.equal(isolatedPutBodies.at(-1).revision, 3, 'a stale GET after an isolated PUT must not roll the Runtime State revision backward');
-
-  const runtimeReloads = [];
-  const racingRuntime = loadServerState({
-    contentRevision: 1,
-    fetchImpl: async (_url, options = {}) => {
-      if (options.method === 'GET') return new Promise(resolve => runtimeReloads.push(resolve));
-      return response(200, { ok: true, revision: 1, contentRevision: 1 });
-    },
-  });
-  const runtimeRevisionTwo = racingRuntime.remote({ revision: 2, source: 'remote-2' });
-  await wait(0);
-  const runtimeRevisionThree = racingRuntime.remote({ revision: 3, source: 'remote-3' });
-  await wait(0);
-  assert.equal(runtimeReloads.length, 1, 'remote Runtime State refreshes must serialize while one GET is in flight');
-  runtimeReloads.shift()(response(200, { storage: { shared: 'revision-2' }, revision: 2, contentRevision: 2 }));
-  await wait(0);
-  assert.equal(runtimeReloads.length, 1, 'a queued newer Runtime State revision must GET after the first response');
-  runtimeReloads.shift()(response(200, { storage: { shared: 'revision-3' }, revision: 3, contentRevision: 3 }));
-  await Promise.all([runtimeRevisionTwo, runtimeRevisionThree]);
-  assert.equal(racingRuntime.storage.getItem('shared'), 'revision-3', 'an older Runtime State response must never overwrite a newer remote snapshot');
-
-  let transientRuntimeReads = 0;
-  const transientRuntime = loadServerState({
-    contentRevision: 1,
-    fetchImpl: async (_url, options = {}) => {
-      if (options.method !== 'GET') return response(200, { revision: 1, contentRevision: 1 });
-      transientRuntimeReads += 1;
-      if (transientRuntimeReads === 1) return response(503, { detail: '暂时不可用' });
-      return response(200, { storage: { recovered: 'yes' }, revision: 2, contentRevision: 2 });
-    },
-  });
-  await transientRuntime.remote({ revision: 2, source: 'remote' });
-  assert.equal(transientRuntime.storage.getItem('recovered'), 'yes', 'Runtime State must retry a transient remote reload failure');
-  assert.equal(transientRuntimeReads, 2);
-
-  let extendedRuntimeReads = 0;
-  const extendedRuntime = loadServerState({
-    contentRevision: 1,
-    fetchImpl: async (_url, options = {}) => {
-      if (options.method !== 'GET') return response(200, { revision: 1, contentRevision: 1 });
-      extendedRuntimeReads += 1;
-      if (extendedRuntimeReads <= 3) return response(503, { detail: '暂时不可用' });
-      return response(200, { storage: { recoveredLater: 'yes' }, revision: 2, contentRevision: 2 });
-    },
-  });
-  await extendedRuntime.remote({ revision: 2, source: 'remote' });
-  await wait(400);
-  assert.equal(extendedRuntime.storage.getItem('recoveredLater'), 'yes', 'Runtime State must retain and retry a revision after the short retry budget');
-
-  let staleRuntimeReads = 0;
-  const staleRuntime = loadServerState({
-    contentRevision: 1,
-    fetchImpl: async (_url, options = {}) => {
-      if (options.method !== 'GET') return response(200, { revision: 1, contentRevision: 1 });
-      staleRuntimeReads += 1;
-      if (staleRuntimeReads === 1) return response(200, { storage: { stale: 'replica-lag' }, revision: 1, contentRevision: 1 });
-      return response(200, { storage: { recoveredFromLag: 'yes' }, revision: 2, contentRevision: 2 });
-    },
-  });
-  await staleRuntime.remote({ revision: 2, source: 'remote' });
-  await wait(400);
-  assert.equal(staleRuntime.storage.getItem('recoveredFromLag'), 'yes', 'a successful but stale Runtime State snapshot must keep the target retryable');
-
-  let hiddenRuntimeReads = 0;
-  const hiddenRuntime = loadServerState({
-    contentRevision: 1,
-    fetchImpl: async (_url, options = {}) => {
-      if (options.method !== 'GET') return response(200, { revision: 1, contentRevision: 1 });
-      hiddenRuntimeReads += 1;
-      return response(503, { detail: '页面关闭前失败' });
-    },
-  });
-  const hiddenRuntimeRefresh = hiddenRuntime.remote({ revision: 2, source: 'remote' });
-  await wait(0);
-  hiddenRuntime.pagehide();
-  await hiddenRuntimeRefresh;
-  await wait(200);
-  assert.equal(hiddenRuntimeReads, 1, 'Runtime State pagehide must stop an in-flight retry loop before a second GET');
-
-  let pagehidePuts = 0;
-  const pagehideRuntime = loadServerState({
-    contentRevision: 1,
-    fetchImpl: async (_url, options = {}) => {
-      if (options.method === 'PUT') pagehidePuts += 1;
-      return response(200, { storage: {}, revision: 2, contentRevision: 2 });
-    },
-  });
-  pagehideRuntime.storage.setItem('kg_course_config_drafts_v1', '[{"id":"pagehide"}]');
-  pagehideRuntime.pagehide();
-  await wait(250);
-  assert.equal(pagehidePuts, 0, 'pagehide must cancel pending Runtime State debounce saves');
-
-  let resolvePagehidePut;
-  let inFlightPagehidePuts = 0;
-  let inFlightPagehideGets = 0;
-  const inFlightPagehideRuntime = loadServerState({
-    contentRevision: 1,
-    fetchImpl: async (_url, options = {}) => {
-      if (options.method === 'GET') {
-        inFlightPagehideGets += 1;
-        return response(200, { storage: {}, revision: 2, contentRevision: 2 });
-      }
-      inFlightPagehidePuts += 1;
-      if (inFlightPagehidePuts === 1) return new Promise(resolve => { resolvePagehidePut = resolve; });
-      return response(200, { ok: true, revision: 3, contentRevision: 3 });
-    },
-  });
-  inFlightPagehideRuntime.storage.setItem('kg_course_config_drafts_v1', '[{"id":"in-flight-pagehide"}]');
-  const inFlightPagehideFlush = inFlightPagehideRuntime.storage.flush();
-  await wait(0);
-  inFlightPagehideRuntime.pagehide();
-  resolvePagehidePut(response(409, { detail: { currentContentRevision: 2 } }));
-  await inFlightPagehideFlush;
-  await wait(100);
-  assert.equal(inFlightPagehidePuts, 1, 'pagehide must not start a retry PUT after an in-flight request settles');
-  assert.equal(inFlightPagehideGets, 0, 'pagehide must not reload a conflict after teardown');
-
-  let resolveRemoteBeforePut;
-  let orderedPuts = 0;
-  const orderedRuntime = loadServerState({
-    contentRevision: 1,
-    fetchImpl: async (_url, options = {}) => {
-      if (options.method === 'GET') return new Promise(resolve => { resolveRemoteBeforePut = resolve; });
-      orderedPuts += 1;
-      return response(200, { ok: true, revision: 3, contentRevision: 3 });
-    },
-  });
-  const remoteBeforePut = orderedRuntime.remote({ revision: 2, source: 'remote' });
-  await wait(0);
-  orderedRuntime.storage.setItem('kg_course_config_drafts_v1', '[{"id":"committed-local"}]');
-  const putAfterRemote = orderedRuntime.storage.flush();
-  await wait(0);
-  assert.equal(orderedPuts, 0, 'a local PUT must wait for an older in-flight remote snapshot to apply');
-  resolveRemoteBeforePut(response(200, { storage: { shared: 'old-snapshot' }, revision: 2, contentRevision: 2 }));
-  await Promise.all([remoteBeforePut, putAfterRemote]);
-  assert.equal(orderedPuts, 1);
-  assert.equal(
-    orderedRuntime.storage.getItem('kg_course_config_drafts_v1'),
-    '[{"id":"committed-local"}]',
-    'an old remote snapshot must not erase a local value committed after it',
-  );
 
   let bootstrapRevision = 1;
   const catalogCalls = [];

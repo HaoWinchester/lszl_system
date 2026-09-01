@@ -68,7 +68,7 @@ function session(id = 'server-session-a') {
   return { authenticated: true, loginSessionId: id, user: { username: 'learner' } };
 }
 
-function createTab({ shared, authSession = session(), locksImpl = locks(), BroadcastChannelImpl = FakeBroadcastChannel, storageClaim, storageFlush, storageRefresh } = {}) {
+function createTab({ shared, authSession = session(), locksImpl = locks(), BroadcastChannelImpl = FakeBroadcastChannel } = {}) {
   const listeners = new Map();
   const window = {
     crypto: webcrypto,
@@ -92,9 +92,6 @@ function createTab({ shared, authSession = session(), locksImpl = locks(), Broad
     clearTimeout,
     queueMicrotask,
   };
-  if (storageClaim) window.localStorage.claimLearningEntry = storageClaim;
-  if (storageFlush) window.localStorage.flush = storageFlush;
-  if (storageRefresh) window.localStorage.refresh = storageRefresh;
   shared.attach(window);
   const auth = { async getCurrentSession() { return authSession; } };
   const context = vm.createContext({
@@ -139,122 +136,6 @@ test('lock-backed VM tabs race to one winning claim', async () => {
   assert.equal((await a.init()).shown, false);
 });
 
-test('atomic server claims allow exactly one independent-map tab without Web Locks', async () => {
-  const claimedSessions = new Set();
-  let lockRequests = 0;
-  const forbiddenLocks = { request() { lockRequests += 1; throw new Error('Web Locks must not run'); } };
-  function atomicTab() {
-    return createTab({
-      shared: new SharedStorage(),
-      locksImpl: forbiddenLocks,
-      storageClaim: async () => {
-        const claimed = !claimedSessions.has('server-session-a');
-        claimedSessions.add('server-session-a');
-        return { claimed, key: CONSUMED_KEY, value: 'server-marker', revision: claimedSessions.size };
-      },
-    });
-  }
-  const [first, second] = await Promise.all([atomicTab().init(), atomicTab().init()]);
-  assert.equal(Number(first.shown) + Number(second.shown), 1);
-  assert.equal(lockRequests, 0);
-});
-
-test('atomic server claims allow different login sessions to win independently', async () => {
-  const claimedSessions = new Set();
-  let claimCalls = 0;
-  let lockRequests = 0;
-  function atomicTab(loginSessionId) {
-    return createTab({
-      shared: new SharedStorage(),
-      authSession: session(loginSessionId),
-      locksImpl: { request() { lockRequests += 1; throw new Error('Web Locks must not run'); } },
-      storageClaim: async () => {
-        claimCalls += 1;
-        const claimed = !claimedSessions.has(loginSessionId);
-        claimedSessions.add(loginSessionId);
-        return { claimed, key: CONSUMED_KEY, value: `marker-${loginSessionId}`, revision: claimedSessions.size };
-      },
-    });
-  }
-  assert.equal((await atomicTab('login-a').init()).shown, true);
-  assert.equal((await atomicTab('login-b').init()).shown, true);
-  assert.equal(claimCalls, 2);
-  assert.equal(lockRequests, 0);
-});
-
-test('a false atomic server claim never displays the chooser', async () => {
-  const tab = createTab({
-    shared: new SharedStorage(),
-    storageClaim: async () => false,
-  });
-  assert.equal((await tab.init()).shown, false);
-});
-
-test('a rejected atomic server claim never displays the chooser', async () => {
-  const tab = createTab({
-    shared: new SharedStorage(),
-    storageClaim: async () => { throw new Error('claim unavailable'); },
-  });
-  assert.equal((await tab.init()).shown, false);
-});
-
-test('lock-backed tabs with independent runtime maps refresh from one backend before claiming', async () => {
-  const backend = new Map();
-  const sharedLocks = locks();
-  let refreshes = 0;
-  let flushes = 0;
-  function serverTab() {
-    const local = new SharedStorage();
-    return createTab({
-      shared: local,
-      locksImpl: sharedLocks,
-      storageFlush: async () => {
-        flushes += 1;
-        backend.clear();
-        for (const [key, value] of local.values) backend.set(key, value);
-        return true;
-      },
-      storageRefresh: async () => {
-        refreshes += 1;
-        local.values = new Map(backend);
-        return true;
-      },
-    });
-  }
-  const a = serverTab();
-  const b = serverTab();
-  const [first, second] = await Promise.all([a.init(), b.init()]);
-  assert.equal(Number(first.shown) + Number(second.shown), 1);
-  assert.equal(refreshes, 2);
-  assert.equal(flushes, 1);
-});
-
-test('a false runtime refresh result cannot win or flush a lock-backed claim', async () => {
-  const shared = new SharedStorage();
-  let flushes = 0;
-  const tab = createTab({
-    shared,
-    storageFlush: async () => { flushes += 1; return true; },
-    storageRefresh: async () => false,
-  });
-  assert.equal((await tab.init()).shown, false);
-  assert.equal(flushes, 0);
-  assert.equal(shared.getItem(CONSUMED_KEY), null);
-});
-
-test('a rejected runtime refresh cannot win or flush a lock-backed claim', async () => {
-  const shared = new SharedStorage();
-  let flushes = 0;
-  const tab = createTab({
-    shared,
-    storageFlush: async () => { flushes += 1; return true; },
-    storageRefresh: async () => { throw new Error('runtime refresh failed'); },
-  });
-  assert.equal((await tab.init()).shown, false);
-  assert.equal(flushes, 0);
-  assert.equal(shared.getItem(CONSUMED_KEY), null);
-});
-
 test('a new server-issued login ID is eligible after the prior one was consumed', async () => {
   const shared = new SharedStorage();
   const tab = createTab({ shared });
@@ -284,63 +165,15 @@ test('fallback VM tabs with neither locks nor BroadcastChannel yield after share
   assert.equal(JSON.parse(shared.getItem(CONSUMED_KEY)).consumedDigest, '22b1cd8d13f99dc13e0bb4c7f4d9096424fe72867aeba5039fbc5da40db6e7db');
 });
 
-test('fallback race flushes only the nonce winner and never the losing tab', async () => {
-  const shared = new SharedStorage();
-  let aFlushes = 0;
-  let bFlushes = 0;
-  const a = createTab({ shared, locksImpl: null, BroadcastChannelImpl: null, storageFlush: async () => { aFlushes += 1; } });
-  const b = createTab({ shared, locksImpl: null, BroadcastChannelImpl: null, storageFlush: async () => { bFlushes += 1; } });
-  const [first, second] = await Promise.all([a.init(), b.init()]);
-  assert.equal(Number(first.shown) + Number(second.shown), 1);
-  assert.equal(aFlushes + bFlushes, 1);
-  assert.equal(first.shown ? aFlushes : bFlushes, 1);
-  assert.equal(first.shown ? bFlushes : aFlushes, 0);
-});
-
 test('a missing auth API may claim only from the server bootstrap session field', async () => {
   const shared = new SharedStorage();
   const tab = createTab({ shared });
-  tab.window.__KG_DIRECT_BOOTSTRAP__ = { authUser: { username: 'learner', loginSessionId: 'bootstrap-session-id' } };
+  // b569fa7 起会话由 KGAuthSessionBootstrap 提供
+  tab.window.KGAuthSessionBootstrap = {
+    load: async () => ({ authenticated: true, user: { username: 'learner' }, loginSessionId: 'bootstrap-session-id' }),
+  };
   assert.equal((await tab.window.KGLearningEntryChooser.init({ auth: {}, document: tab.window.document, location: tab.window.location, storage: tab.window.localStorage })).shown, true);
   assert.equal(JSON.parse(shared.getItem(CONSUMED_KEY)).consumedDigest, 'ec484f906c17ed7c7293483a396000f90e00faa3bb1b669d7a03a040418a081f');
-});
-
-test('winning init stays pending until deferred server-state storage flush resolves', async () => {
-  const shared = new SharedStorage();
-  let resolveFlush;
-  let markFlushStarted;
-  let flushCalls = 0;
-  const flushGate = new Promise(resolve => { resolveFlush = resolve; });
-  const flushStarted = new Promise(resolve => { markFlushStarted = resolve; });
-  const tab = createTab({
-    shared,
-    storageFlush() { flushCalls += 1; markFlushStarted(); return flushGate; },
-  });
-  let result = 'pending';
-  const initPromise = tab.init().then(value => { result = value; return value; });
-  const firstOutcome = await Promise.race([flushStarted.then(() => 'flush-started'), initPromise.then(() => 'init-settled')]);
-  assert.equal(firstOutcome, 'flush-started');
-  assert.equal(flushCalls, 1);
-  assert.equal(result, 'pending');
-  resolveFlush(true);
-  assert.equal((await initPromise).shown, true);
-});
-
-test('failed flush rolls back the consumed marker and the same session can claim again', async () => {
-  const shared = new SharedStorage();
-  let flushCalls = 0;
-  const tab = createTab({
-    shared,
-    storageFlush: async () => {
-      flushCalls += 1;
-      if (flushCalls === 1) return false;
-      return true;
-    },
-  });
-  assert.equal((await tab.init()).shown, false);
-  assert.equal(shared.getItem(CONSUMED_KEY), null);
-  assert.equal((await tab.init()).shown, true);
-  assert.equal(flushCalls, 3);
 });
 
 class DomEvent {
@@ -403,7 +236,7 @@ class DomDocument extends DomElement {
   getElementById(id) { return this.querySelector(`#${id}`); }
 }
 
-function createChooserDomTab({ fetchImpl = async () => ({ ok: true, headers: { get: () => 'text/html' } }), injectFetch = true, storageFlush } = {}) {
+function createChooserDomTab({ fetchImpl = async () => ({ ok: true, headers: { get: () => 'text/html' } }), injectFetch = true } = {}) {
   const shared = new SharedStorage();
   const document = new DomDocument();
   const graph = document.createElement('main'); graph.id = 'stage'; graph.setAttribute('tabindex', '-1'); document.body.append(graph);
@@ -417,7 +250,6 @@ function createChooserDomTab({ fetchImpl = async () => ({ ok: true, headers: { g
     removeEventListener(type, listener) { listeners.get(type)?.delete(listener); },
     dispatchEvent(event) { for (const listener of listeners.get(event.type) || []) listener(event); return !event.defaultPrevented; },
   };
-  if (storageFlush) window.localStorage.flush = storageFlush;
   document.defaultView = window;
   const context = vm.createContext({ window, document, location, localStorage: window.localStorage, navigator: window.navigator, crypto: window.crypto, fetch: window.fetch, CustomEvent: DomEvent, setTimeout, clearTimeout, queueMicrotask, Promise, JSON, Date, Math, TextEncoder, Uint8Array, console });
   vm.runInContext(fs.readFileSync(assetPath, 'utf8'), context, { filename: assetPath });
@@ -455,15 +287,6 @@ test('winning claim renders the update-style dismissible four-choice dialog in t
   assert.equal(tab.document.querySelector('[role="dialog"]'), null, 'Escape closes the entry dialog');
   assert.equal(tab.graph.inert, false);
   assert.equal(tab.document.activeElement, tab.graph);
-});
-
-test('failed server-state storage flush neither renders nor reports a winning claim', async () => {
-  const tab = createChooserDomTab({
-    storageFlush: async () => { throw new Error('server persistence failed'); },
-  });
-  const result = await tab.init();
-  assert.equal(result.shown, false);
-  assert.equal(tab.document.querySelector('[role="dialog"]'), null);
 });
 
 test('selection fetches only the fixed same-origin HTML destination before navigating and graph selection restores focus', async () => {
@@ -540,6 +363,11 @@ function directEntryVm(bootstrap) {
   const document = { readyState: 'loading', getElementById() { return null; } };
   const window = {
     __KG_DIRECT_BOOTSTRAP__: bootstrap,
+    // b569fa7 起 direct-entry 经 KGAuthSessionBootstrap 获取会话
+    KGAuthSessionBootstrap: {
+      load: async () => ({ authenticated: Boolean(bootstrap.authUser), user: bootstrap.authUser }),
+      refresh: async () => ({ authenticated: Boolean(bootstrap.authUser), user: bootstrap.authUser }),
+    },
     document,
     location: { search: '', reload() { actions.push('reload'); } },
     KGLearningEntryChooser: { async init() { actions.push('show'); return { shown: true }; } },
@@ -562,22 +390,14 @@ function directEntryVm(bootstrap) {
   };
 }
 
-test('guest index login reloads before authenticated DOMContentLoaded shows the chooser', async () => {
+test('auth session change shows the chooser without reloading (a3dd91f 起 reload 语义已移除)', async () => {
   const guest = directEntryVm({ authenticated: false, username: '', authUser: null });
   await guest.dispatch('kg:auth-session-changed', { authenticated: true, username: 'learner', loginSessionId: 'login-a' });
-  await guest.dispatch('kg-auth-session-change', { username: 'learner', provider: 'remote' });
-  assert.deepEqual(guest.actions, ['reload']);
+  assert.deepEqual(guest.actions, ['show']);
 
   const authenticated = directEntryVm({ authenticated: true, username: 'learner', authUser: { username: 'learner', role: 'student' } });
   await authenticated.dispatch('DOMContentLoaded');
   assert.deepEqual(authenticated.actions, ['show']);
-});
-
-test('a login for a different bootstrap user reloads without pre-showing the chooser', async () => {
-  const page = directEntryVm({ authenticated: true, username: 'teacher', authUser: { username: 'teacher', role: 'teacher' } });
-  await page.dispatch('kg:auth-session-changed', { authenticated: true, username: 'learner', loginSessionId: 'login-a' });
-  await page.dispatch('kg-auth-session-change', { username: 'learner', provider: 'remote' });
-  assert.deepEqual(page.actions, ['reload']);
 });
 
 test('same-user authenticated session rotation may show without reloading', async () => {

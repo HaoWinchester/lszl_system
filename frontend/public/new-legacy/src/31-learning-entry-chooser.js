@@ -71,31 +71,15 @@
   async function rollbackConsumption(storage, digest) {
     if (!consumed(storage, digest)) return;
     try { storage.removeItem(CONSUMED_KEY); } catch (_error) { return; }
-    if (typeof storage.flush !== "function") return;
-    try { await storage.flush(); } catch (_error) {}
   }
   async function consume(storage, digest) {
     if (consumed(storage, digest)) return false;
     if (!writeJSON(storage, CONSUMED_KEY, { schemaVersion: SCHEMA_VERSION, consumedDigest: digest, consumedAt: Date.now() })) return false;
-    if (typeof storage.flush === "function") {
-      try {
-        if (await storage.flush() === false) {
-          await rollbackConsumption(storage, digest);
-          return false;
-        }
-      } catch (_error) {
-        await rollbackConsumption(storage, digest);
-        return false;
-      }
-    }
     notify(digest); return true;
   }
   async function claimWithLocks(storage, lockName, digest) {
     let shown = false;
     await global.navigator.locks.request(lockName, { mode: "exclusive" }, async function () {
-      if (typeof storage.refresh === "function") {
-        try { if (await storage.refresh() === false) return; } catch (_error) { return; }
-      }
       shown = await consume(storage, digest);
     });
     return shown;
@@ -240,13 +224,6 @@
     if (!storage) return { shown: false };
     const loginSessionId = authenticatedSession(await currentServerSession(config.auth || global.KGAuthCore));
     if (!loginSessionId) return { shown: false };
-    if (typeof storage.claimLearningEntry === "function") {
-      let claimResult = false;
-      try { claimResult = await storage.claimLearningEntry(); } catch (_error) { claimResult = false; }
-      const shown = claimResult === true || claimResult?.claimed === true;
-      if (shown) showDialog(config);
-      return { shown };
-    }
     const digest = await sha256(loginSessionId);
     if (!digest || consumed(storage, digest)) return { shown: false };
     const locks = global.navigator && global.navigator.locks;

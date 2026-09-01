@@ -1,16 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.199",
+  "fromVersion": "v9.0-p4.1.201",
   "toVersion": "v9.0-p4.1.201",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "practice-mode.html",
-      "src/100-practice-mode.js",
-      "styles/practice-mode.css",
-      "tests/practice-answer-sheet-browser.py"
+      "src/31-learning-entry-chooser.js",
+      "tests/learning-entry-chooser.test.js",
+      "tests/teaching-content-live-sync.test.js"
     ],
     "removed": []
   },

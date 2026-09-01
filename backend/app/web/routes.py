@@ -6,14 +6,11 @@ from urllib.parse import urlencode
 
 from typing import Annotated
 
-from typing import Literal
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import CurrentUser, get_login_session_id
-from app.core.config import settings
+from app.core.auth import CurrentUser
 from app.core.permissions import can
 from app.db.session import get_db
 from app.web.bootstrap import build_bootstrap, optional_user
@@ -25,8 +22,6 @@ from app.web.releases import (
     preview_release,
     resolve_asset,
 )
-from app.web.schemas import RuntimeStateUpdate
-from app.services import runtime_state_service
 from app.services import user_service
 
 router = APIRouter(include_in_schema=False)
@@ -284,92 +279,6 @@ async def preview_asset(version: str, asset_path: str, request: Request, db: DB)
         )
         return html_response(path, bootstrap)
     return FileResponse(path, headers=_static_headers(request, release))
-
-
-@router.put("/api/v1/runtime/state")
-@router.post("/api/v1/runtime/state")
-async def save_runtime_state(update: RuntimeStateUpdate, user: CurrentUser, db: DB):
-    """Persist legacy Runtime only when rollback sync is explicitly enabled.
-
-    The default retirement drain validates/authenticates the compatibility
-    request, but does not read Runtime, touch its database rows, or mutate
-    shared teaching revisions.
-    """
-    if settings.RUNTIME_SYNC_DISABLED:
-        # 退役 drain：领域 API 已承接全部业务数据，通用 KV 不再落库。固定
-        # 兼容版本避免对 Runtime 状态的读取触发历史迁移/修订副作用。
-        return {
-            "ok": True,
-            "username": user.username,
-            "namespace": update.namespace,
-            "revision": 0,
-            "contentRevision": 0,
-            "requestId": update.requestId,
-        }
-    try:
-        _, revision, content_revision = await runtime_state_service.apply_update(
-            db, user.username, user.role, update
-        )
-    except runtime_state_service.RuntimeStateConflictError as exc:
-        detail: str | dict = str(exc)
-        if exc.current_content_revision is not None:
-            detail = {
-                "code": "CONTENT_REVISION_CONFLICT",
-                "message": str(exc),
-                "currentContentRevision": exc.current_content_revision,
-            }
-        raise HTTPException(status_code=409, detail=detail) from exc
-    except runtime_state_service.RuntimeStateValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except runtime_state_service.RuntimeStatePermissionError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-    return {
-        "ok": True,
-        "username": user.username,
-        "namespace": update.namespace,
-        "revision": revision,
-        "contentRevision": content_revision,
-        "requestId": update.requestId,
-    }
-
-
-@router.get("/api/v1/runtime/state")
-async def read_runtime_state(
-    user: CurrentUser,
-    db: DB,
-    mode: Literal["full", "bootstrap"] | None = None,
-    page: str | None = None,
-):
-    if not settings.RUNTIME_ROLLBACK_READ_ENABLED:
-        raise HTTPException(status_code=410, detail="Runtime state 已退役")
-    if mode is None:
-        mode = "full"
-    storage, revision, content_revision = await runtime_state_service.get_rollback_read_state(
-        db, user.username, user.role, mode=mode, page=page
-    )
-    return {
-        "storage": storage,
-        "revision": revision,
-        "contentRevision": content_revision,
-    }
-
-
-@router.post("/api/v1/runtime/learning-entry-claim")
-async def claim_learning_entry(request: Request, user: CurrentUser, db: DB):
-    if settings.RUNTIME_SYNC_DISABLED:
-        return {"claimed": False, "revision": 0, "retired": True}
-    return await runtime_state_service.claim_learning_entry(
-        db,
-        user.username,
-        get_login_session_id(request),
-    )
-
-
-@router.post("/api/v1/runtime/guided-tour-claim")
-async def claim_guided_tour(user: CurrentUser, db: DB):
-    if settings.RUNTIME_SYNC_DISABLED:
-        return {"claimed": False, "revision": 0, "retired": True}
-    return await runtime_state_service.claim_guided_tour(db, user.username)
 
 
 @router.get("/{asset_path:path}")

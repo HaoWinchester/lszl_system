@@ -7,7 +7,6 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
-from app.core.config import settings
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
 from app.main import app
@@ -30,20 +29,6 @@ TAG_KEY = "kg_question_tag_names_v1"
 ACTIVITY_KEY = "kg_content_activity_overrides_v1"
 RECALL_KEY = "kg_recall_association_library_v1__subject__subject-pmp"
 PROJECTION_KEYS = {"kg_principle_repository_v1", "kg_synthesis_preset_repository_v1"}
-RETIRED_CATALOG_RUNTIME_KEYS = (
-    "kg_content_subjects_v1",
-    "kg_content_taxonomies_v1",
-    "kg_content_activity_overrides_v1",
-    "kg_activity_tags_v1",
-    "kg_activity_collections_v1",
-)
-
-
-@pytest.fixture(autouse=True)
-def legacy_runtime_api_is_explicitly_enabled_for_migration_tests(monkeypatch):
-    """Historical Runtime migration tests opt in; the application default stays retired."""
-    monkeypatch.setattr(settings, "RUNTIME_SYNC_DISABLED", False)
-    monkeypatch.setattr(settings, "RUNTIME_ROLLBACK_READ_ENABLED", True)
 
 
 def test_catalog_snapshot_round_trips_all_five_lifecycle_resources_with_one_revision() -> None:
@@ -213,67 +198,6 @@ def test_catalog_snapshot_round_trips_all_five_lifecycle_resources_with_one_revi
             ).json()
             assert current["contentRevision"] == payload["contentRevision"]
             assert len([row for row in current["activityTags"] if row["id"] == tag_id]) == 1
-    finally:
-        asyncio.run(cleanup())
-
-
-def test_runtime_cannot_mutate_any_retired_catalog_resource_or_bump_content_revision() -> None:
-    previous: dict[str, tuple[str, str] | None] = {}
-
-    async def seed_historical_rows() -> None:
-        async with AsyncSessionLocal() as db:
-            for key in RETIRED_CATALOG_RUNTIME_KEYS:
-                row = await db.get(SharedRuntimeState, key)
-                previous[key] = (row.value, row.updated_by) if row else None
-                if row is None:
-                    db.add(SharedRuntimeState(key=key, value='[{"legacy":true}]', updated_by="pytest"))
-                else:
-                    row.value, row.updated_by = '[{"legacy":true}]', "pytest"
-            await db.commit()
-
-    async def cleanup() -> None:
-        async with AsyncSessionLocal() as db:
-            for key, value in previous.items():
-                row = await db.get(SharedRuntimeState, key)
-                if value is None:
-                    if row is not None:
-                        await db.delete(row)
-                elif row is not None:
-                    row.value, row.updated_by = value
-            await db.commit()
-
-    asyncio.run(seed_historical_rows())
-    try:
-        with TestClient(app) as client:
-            assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "jbgsnmm~123"}).status_code == 200
-            before = client.get("/api/v1/content-prep/shared-content", params={"subjectId": "subject-pmp"}).json()
-            runtime = client.get("/api/v1/runtime/state").json()
-            for key in RETIRED_CATALOG_RUNTIME_KEYS:
-                assert key not in runtime["storage"]
-            mutations = [
-                {"operation": "setItem", "key": key, "value": "[]"}
-                for key in RETIRED_CATALOG_RUNTIME_KEYS
-            ]
-            response = client.put(
-                "/api/v1/runtime/state",
-                json={
-                    "page": "admin-subjects.html",
-                    "namespace": "teaching-catalog",
-                    "operation": "setItem",
-                    "key": RETIRED_CATALOG_RUNTIME_KEYS[0],
-                    "value": "[]",
-                    "storage": {},
-                    "mutations": mutations,
-                    "requestId": f"retired-catalog-{uuid4().hex}",
-                    "revision": runtime["revision"],
-                    "contentRevision": runtime["contentRevision"],
-                },
-            )
-            assert response.status_code == 403, response.text
-            after = client.get("/api/v1/content-prep/shared-content", params={"subjectId": "subject-pmp"}).json()
-            assert after["contentRevision"] == before["contentRevision"]
-            for field in ("subjects", "taxonomies", "activityOverrides", "activityTags", "activityCollections"):
-                assert after[field] == before[field]
     finally:
         asyncio.run(cleanup())
 
