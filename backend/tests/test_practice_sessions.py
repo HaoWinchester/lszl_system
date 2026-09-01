@@ -3503,6 +3503,49 @@ def test_pause_credits_once_and_resumed_completion_only_credits_delta(client, ac
     assert client.get('/api/v1/learning/practice/experience-summary').json()['totalExperience'] == 32
 
 
+def test_abandon_records_mistakes_for_answered_questions(client, active_session, practice_ids):
+    """结束练习时已作答的错题也要记入复仇模式（与交卷同一判分入口）。"""
+
+    sid = active_session['id']
+    ids = [ref['questionId'] for ref in active_session['questions']]
+    wrong_qid, right_qid = ids[0], ids[1]
+    payload = {'revision': active_session['revision'],
+               'answers': {
+                   wrong_qid: {'selectedAnswer': 'B', 'selectionIndex': 1},
+                   right_qid: {'selectedAnswer': 'A', 'selectionIndex': 2},
+               }}
+    saved = client.post(f'/api/v1/learning/practice/sessions/{sid}/abandon', json=payload)
+    assert saved.status_code == 200, saved.text
+
+    async def mistakes() -> dict:
+        async with AsyncSessionLocal() as db:
+            rows = (await db.execute(
+                select(PracticeMistake).where(
+                    PracticeMistake.owner_id == practice_ids['student']
+                )
+            )).scalars().all()
+            return {row.question_id: row for row in rows}
+
+    stored = asyncio.run(mistakes())
+    # 答错的题记入错题库；答对的不记
+    assert wrong_qid in stored
+    assert right_qid not in stored
+    assert stored[wrong_qid].selected_answers == ['B']
+
+    # 幂等：重复 abandon 不重复记账
+    repeat = client.post(f'/api/v1/learning/practice/sessions/{sid}/abandon', json={
+        'revision': saved.json()['session']['revision'],
+        'answers': payload['answers'],
+    })
+    assert repeat.status_code == 200, repeat.text
+    stored_after = asyncio.run(mistakes())
+    assert stored_after[wrong_qid].wrong_count == stored[wrong_qid].wrong_count
+    # 账本已记账：abandon 后不能再交卷重放判题
+    assert client.post(
+        f'/api/v1/learning/practice/sessions/{sid}/complete', json={'revision': 1}
+    ).status_code in {409, 422}
+
+
 def test_abandon_saves_latest_answers_and_credits_without_report(client, active_session):
     sid = active_session['id']
     qid = active_session['questions'][0]['questionId']

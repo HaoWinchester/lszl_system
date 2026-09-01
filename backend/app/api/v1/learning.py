@@ -302,7 +302,7 @@ async def abandon_practice_session(
 ):
     try:
         session = await practice_session_service.abandon_session(
-            db, user.username, session_id, body
+            db, user.username, session_id, body, user=user
         )
     except practice_session_service.PracticeSessionError as error:
         raise HTTPException(

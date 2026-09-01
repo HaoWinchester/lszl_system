@@ -1431,7 +1431,14 @@ async def pause_session(db: AsyncSession, owner: str, session_id: str, data: dic
     return await _session_payload(db, session)
 
 
-async def abandon_session(db: AsyncSession, owner: str, session_id: str, data: dict) -> dict:
+async def abandon_session(
+    db: AsyncSession,
+    owner: str,
+    session_id: str,
+    data: dict,
+    *,
+    user: User | None = None,
+) -> dict:
     requested_revision = _required_revision(data)
     session = await _session_for_update(db, owner, session_id)
     if session.status == "abandoned":
@@ -1445,6 +1452,42 @@ async def abandon_session(db: AsyncSession, owner: str, session_id: str, data: d
     await _apply_saved_draft(db, session, data)
     saved_at = now_utc()
     await _settle_saved_experience(db, session, saved_at)
+    # 结束练习时对已作答题目权威判分并记录错题：与交卷同一判分入口，
+    # 中途退出同样是真实作答，错题应进入复仇模式。只记错题副作用，
+    # 不生成完成报告；任何判分失败按结构化错误整体回滚。
+    if user is not None and session.mode != "revenge":
+        refs = [item for item in session.question_order if isinstance(item, dict)]
+        rows = await _session_question_rows(db, session)
+        already_graded = _already_graded_selections(session.runtime_state or {})
+        answers = dict(session.answers or {})
+        newly_graded: list[str] = []
+        try:
+            for submission_index, ref in enumerate(refs, start=1):
+                question_id = str(ref.get("questionId") or "")
+                selection = answers.get(question_id)
+                if not isinstance(selection, dict) or question_id in already_graded:
+                    continue
+                # 保留草稿锁字段（selectionIndex 等）：幂等重放比对依赖它们，
+                # 判分产物缺这些字段会让重复 abandon 被误判为冲突。
+                graded = await _grade_session_selection(
+                    db, owner, user, session, ref, rows[question_id],
+                    selection, submission_index,
+                )
+                for field in _DRAFT_LOCK_FIELDS:
+                    if field in selection and field not in graded:
+                        graded[field] = selection[field]
+                answers[question_id] = graded
+                newly_graded.append(question_id)
+        except IntegrityError:
+            raise _error(
+                409,
+                "PRACTICE_MISTAKE_ALREADY_RECORDED",
+                "该题错题已记录，请刷新进度后重试",
+            )
+        if newly_graded:
+            session.answers = answers
+            for question_id in newly_graded:
+                _record_runtime_ledger(session, question_id)
     session.status = "abandoned"
     session.abandoned_at = saved_at
     session.last_saved_at = saved_at

@@ -244,7 +244,7 @@
     <div class="practice-exit-backdrop" id="practiceFailBackdrop" hidden>
       <div class="practice-exit-dialog" role="dialog" aria-modal="true" aria-labelledby="practiceFailTitle">
         <h2 id="practiceFailTitle">挑战失败</h2>
-        <p>生命值已归零，本次挑战判定失败。你仍可以继续完成剩余题目，试卷完成情况与学习记录不受影响。答完全部题目才会自动交卷，交卷后错题才会记入复仇模式。</p>
+        <p>生命值已归零，本次挑战判定失败。你仍可以继续完成剩余题目，试卷完成情况与学习记录不受影响。交卷或结束时，已作答题目的错题都会记入复仇模式。</p>
         <div>
           <button type="button" class="practice-secondary-btn" id="practiceFailLobbyBtn">退回大厅</button>
           <button type="button" class="practice-primary-btn" id="practiceFailContinueBtn">继续作答</button>
@@ -307,7 +307,7 @@
   <div class="practice-exit-backdrop" id="practiceExitConfirm" hidden aria-hidden="true">
     <section class="practice-exit-dialog" role="dialog" aria-modal="true" aria-labelledby="practiceExitTitle">
       <h2 id="practiceExitTitle">退出本次练习？</h2>
-      <p id="practiceExitMessage">保存并退出可下次继续；结束本次后无法恢复。两种退出方式都会结算本次已获得的经验。注意：中途退出不判分，本次做错的题不会记入复仇模式。</p>
+      <p id="practiceExitMessage">保存并退出可下次继续；结束本次后无法恢复。两种退出方式都会结算本次已获得的经验，已作答题目的错题也会记入复仇模式。</p>
       <div><button type="button" class="practice-secondary-btn" id="practiceExitCancel">继续做题</button><button type="button" class="practice-primary-btn" id="practiceSaveExitBtn">保存并退出</button><button type="button" class="practice-danger-btn" id="practiceAbandonBtn">结束本次并退出</button><button type="button" id="practiceExitConfirmBtn" hidden>退出练习</button></div>
     </section>
   </div>
