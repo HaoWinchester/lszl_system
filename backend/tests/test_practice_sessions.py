@@ -1863,6 +1863,74 @@ def test_global_revenge_session_crosses_papers_and_deduplicates_versionless_hist
         asyncio.run(_cleanup_released_pmp_paper(first_ids))
 
 
+def test_global_revenge_multiple_choice_returns_all_previous_wrong_ids() -> None:
+    """多选题复仇：上次选错的全部选项都要返回，且按选项顺序排列。"""
+
+    first_ids = _practice_fixture_ids()
+    asyncio.run(
+        _seed_released_pmp_paper(first_ids, domains=["people"], multiple_choice=True)
+    )
+    try:
+        async def seed_multi_choice_mistake() -> str:
+            async with AsyncSessionLocal() as db:
+                question = (
+                    await db.execute(
+                        select(PaperReleaseQuestion).where(
+                            PaperReleaseQuestion.release_id == first_ids["release"]
+                        ).order_by(PaperReleaseQuestion.order_index).limit(1)
+                    )
+                ).scalar_one()
+                snapshot = dict(question.snapshot or {})
+                snapshot["correctAnswer"] = ["A", "C"]
+                now = now_utc()
+                row = PracticeMistake(
+                    id=f"pm-multi-{uuid4().hex[:12]}",
+                    owner_id=first_ids["student"],
+                    question_id=question.question_id,
+                    bank_id=question.bank_id,
+                    paper_id=first_ids["paper"],
+                    release_id=first_ids["release"],
+                    paper_version=1,
+                    paper_name="多选来源试卷",
+                    source_mode="challenge",
+                    language_mode="zh",
+                    question_snapshot=snapshot,
+                    knowledge={},
+                    selected_answers=["B", "C"],
+                    status="pending",
+                    wrong_count=1,
+                    first_wrong_at=now,
+                    last_wrong_at=now,
+                )
+                db.add(row)
+                await db.commit()
+                return question.question_id
+
+        question_id = asyncio.run(seed_multi_choice_mistake())
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": first_ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            response = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={"mode": "revenge", "count": 10, "order": "paper"},
+            )
+
+            assert response.status_code == 200, response.text
+            session = response.json()["session"]
+            row = next(
+                item
+                for item in session["questionOrder"]
+                if item["questionId"] == question_id
+            )
+            # 上次选错 B、C：全部返回并按选项顺序排列；单数兼容字段取最后选错的 C
+            assert row["previousWrongAnswerIds"] == ["B", "C"]
+            assert row["previousWrongAnswer"] == "C"
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(first_ids))
+
+
 def test_resumed_legacy_revenge_session_backfills_each_latest_wrong_answer() -> None:
     first_ids = _practice_fixture_ids()
     second_ids = _practice_fixture_ids()

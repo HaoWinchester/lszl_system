@@ -942,10 +942,14 @@ def _revenge_snapshot_usable(snapshot: dict) -> bool:
     return bool(stem and len(option_ids) >= 2 and correct_answer in option_ids)
 
 
-def _latest_previous_wrong_answer(
+def _latest_previous_wrong_answers(
     rows: list[PracticeMistake], snapshot: dict
-) -> str:
-    """Resolve the newest valid wrong choice across deduplicated mistake rows."""
+) -> tuple[list[str], str]:
+    """Resolve wrong choices from the newest mistake across deduplicated rows.
+
+    多选题上次可能同时选错多个选项：取最新一次错题记录里的全部错误选项，
+    按选项顺序返回；同时给出该次错题中最后选错的选项作为单数兼容值。
+    """
 
     option_ids = {
         str(option.get("id") or "").strip()
@@ -958,12 +962,26 @@ def _latest_previous_wrong_answer(
         value = row.last_wrong_at or row.updated_at or row.created_at
         return value.timestamp() if value else 0.0
 
+    wrong: set[str] = set()
+    last_wrong = ""
     for row in sorted(rows, key=wrong_at, reverse=True):
-        for answer in reversed(row.selected_answers or []):
+        for answer in row.selected_answers or []:
             normalized = str(answer or "").strip()
             if normalized in option_ids and normalized != correct_answer:
-                return normalized
-    return ""
+                wrong.add(normalized)
+                last_wrong = normalized
+        if wrong:
+            return _order_option_ids(snapshot, wrong), last_wrong
+    return [], ""
+
+
+def _order_option_ids(snapshot: dict, ids: set[str]) -> list[str]:
+    ordered = [
+        str(option.get("id") or "").strip()
+        for option in (snapshot or {}).get("options") or []
+        if isinstance(option, dict) and str(option.get("id") or "").strip() in ids
+    ]
+    return ordered
 
 
 def _revenge_status_rank(row: PracticeMistake, now) -> int:
@@ -1062,13 +1080,11 @@ def build_global_revenge_pool(
         candidate["questionSnapshot"] = snapshot
         candidate["mistakeId"] = representative.id
         candidate["mistakeIds"] = [row.id for row in group_rows]
-        previous_wrong_answer = _latest_previous_wrong_answer(
+        previous_wrong_answers, last_wrong = _latest_previous_wrong_answers(
             group_rows, snapshot
         )
-        candidate["previousWrongAnswer"] = previous_wrong_answer
-        candidate["previousWrongAnswerIds"] = (
-            [previous_wrong_answer] if previous_wrong_answer else []
-        )
+        candidate["previousWrongAnswer"] = last_wrong
+        candidate["previousWrongAnswerIds"] = list(previous_wrong_answers)
         candidates.append(candidate)
     return {
         "candidates": candidates,

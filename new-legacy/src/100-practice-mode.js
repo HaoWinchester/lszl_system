@@ -589,8 +589,7 @@
     if(!dom.previousWrongAnswer)return;
     dom.previousWrongAnswer.hidden=!visible;
     if(!visible){dom.previousWrongAnswer.textContent='';return}
-    const view=questionLanguageView(question);
-    dom.previousWrongAnswer.textContent='上次选错：'+options.map(option=>{const display=view?.options?.find(item=>text(item.id)===text(option.id))?.display;return text(option.id)+'. '+(display?languageText(display):option.text)}).join('；');
+    dom.previousWrongAnswer.textContent='上次选错：'+options.map(option=>text(option.id)).join('、');
   }
   function renderQuestion(){
     if(state.mode==='revenge'&&!state.verification?.active&&state.revengeState?.phase==='verification'&&state.revengeState?.verificationQuestion){

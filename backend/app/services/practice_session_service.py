@@ -431,11 +431,11 @@ async def _session_payload(db: AsyncSession, session: PracticeSession) -> dict:
                 for mistake_id in (ref.get("mistakeIds") or [ref.get("mistakeId")])
                 if mistake_id in mistake_map
             ]
-            previous = learning_service._latest_previous_wrong_answer(
+            previous, last_wrong = learning_service._latest_previous_wrong_answers(
                 group, row.snapshot if row is not None else {}
             )
-            ref["previousWrongAnswer"] = previous
-            ref["previousWrongAnswerIds"] = [previous] if previous else []
+            ref["previousWrongAnswer"] = last_wrong
+            ref["previousWrongAnswerIds"] = list(previous)
             normalized_refs.append(ref)
         refs = normalized_refs
     reveal_explanation = session.status == "completed" or session.mode not in {

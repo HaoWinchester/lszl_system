@@ -259,7 +259,9 @@ def test_global_revenge_pool_exposes_the_latest_actual_wrong_option_across_dupli
     pool = learning_service.build_global_revenge_pool([urgent, latest], now=now)
 
     assert pool["candidates"][0]["mistakeId"] == urgent.id
+    # 最新一次错题(latest)里 B、C 都是错误选项；单数兼容字段取最新最后选错的 C
     assert pool["candidates"][0]["previousWrongAnswer"] == "C"
+    assert pool["candidates"][0]["previousWrongAnswerIds"] == ["B", "C"]
 
 
 def test_global_revenge_pool_skips_an_unusable_urgent_copy_when_a_usable_copy_exists() -> None:
