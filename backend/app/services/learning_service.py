@@ -951,11 +951,12 @@ def _snapshot_correct_option_ids(snapshot: dict) -> set[str]:
 def _latest_previous_wrong_answers(
     rows: list[PracticeMistake], snapshot: dict
 ) -> tuple[list[str], str]:
-    """Resolve wrong choices from the most recent attempt only.
+    """Resolve the most recent attempt's selection per question type.
 
-    selected_answers 按写入顺序即作答顺序；历史数据可能累积多次作答。
-    单选一次只选一个：取最后一个有效错选项；多选取最近一条记录里的全部
-    错选项（按选项顺序）。单数兼容字段取按时间最后的错选项。
+    selected_answers 按写入顺序即作答顺序；历史数据可能累积多次作答，
+    只取最新一条记录的最近一次作答。单选一次只选一个：显示最后一个
+    有效错选项；多选：原样显示该次作答勾选的全部选项（按选项顺序），
+    含选对的——用户要的是"我上次选了什么"，与判分对错无关。
     """
 
     option_ids = {
@@ -975,18 +976,24 @@ def _latest_previous_wrong_answers(
         return value.timestamp() if value else 0.0
 
     for row in sorted(rows, key=wrong_at, reverse=True):
-        valid_wrong = [
+        valid = [
             str(answer or "").strip()
             for answer in row.selected_answers or []
             if str(answer or "").strip() in option_ids
-            and str(answer or "").strip() not in correct_ids
         ]
-        if not valid_wrong:
+        if not valid:
             continue
-        last_wrong = valid_wrong[-1]
         if multiple:
-            ordered = _order_option_ids(snapshot, set(valid_wrong))
-            return ordered, last_wrong
+            ordered = _order_option_ids(snapshot, set(valid))
+            return ordered, ordered[-1] if ordered else ""
+        # 单选：历史数据可能累积多次作答，只取最后一个有效错选项
+        last_wrong = valid[-1]
+        if last_wrong in correct_ids:
+            # 尾部恰好是正确项（如重复作答残留），向前找最近的错选项
+            for answer in reversed(valid[:-1]):
+                if answer not in correct_ids:
+                    return [answer], answer
+            return [], ""
         return [last_wrong], last_wrong
     return [], ""
 
