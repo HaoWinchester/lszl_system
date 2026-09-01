@@ -739,7 +739,7 @@
     revealOptionResult(question.type==='multiple_choice'?selection.answer.selectedAnswerIds:selected,questionCorrectIds(question));
     // 挑战/学霸：作答与答题卡回看均不展示解析；
     // 复仇模式保留"答错即见解析与补救"的既有交互。
-    if(shouldShowExplanation())renderPracticeExplanation(question,correct);
+    if(shouldShowExplanation()&&(state.mode!=='revenge'||!correct))renderPracticeExplanation(question,correct);
     renderAnswerSheet();
     // 游戏反馈分支：挑战/学霸用生命与时间驱动，复仇用错题状态推进（全部本地）。
     if(state.mode==='revenge'){
@@ -751,8 +751,9 @@
         renderHealth();return correct;
       }
       state.streak+=1;state.experience+=10+streakBonus(state.streak);
-      showFeedback('复仇成功 · 查看解析后进入下一题','success');
+      showFeedback('复仇成功 · 将安排再次验证','success');
       state.revengeState={phase:'verification_due',mistakeId:question.mistakeId,questionId:question.id};
+      state.feedbackTimer=global.setTimeout(advanceAfterAnswer,FEEDBACK_DELAY);
       renderHealth();return correct;
     }
     if(correct){

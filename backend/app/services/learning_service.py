@@ -924,6 +924,12 @@ def canonical_practice_snapshot_answer(snapshot: dict) -> str:
 def _revenge_snapshot_usable(snapshot: dict) -> bool:
     if not isinstance(snapshot, dict):
         return False
+    stem = str(snapshot.get("stem") or snapshot.get("title") or "").strip()
+    if str(snapshot.get("type") or "single_choice") == "multiple_choice":
+        return bool(
+            stem
+            and not question_answer_service.validate_multiple_choice(snapshot)
+        )
     options = snapshot.get("options")
     if not isinstance(options, list):
         return False
@@ -933,7 +939,6 @@ def _revenge_snapshot_usable(snapshot: dict) -> bool:
         if isinstance(option, dict) and str(option.get("id") or "").strip()
     }
     correct_answer = canonical_practice_snapshot_answer(snapshot)
-    stem = str(snapshot.get("stem") or snapshot.get("title") or "").strip()
     return bool(stem and len(option_ids) >= 2 and correct_answer in option_ids)
 
 
@@ -1057,10 +1062,13 @@ def build_global_revenge_pool(
         candidate["questionSnapshot"] = snapshot
         candidate["mistakeId"] = representative.id
         candidate["mistakeIds"] = [row.id for row in group_rows]
-        candidate["previousWrongAnswer"] = _latest_previous_wrong_answer(
+        previous_wrong_answer = _latest_previous_wrong_answer(
             group_rows, snapshot
         )
-        candidate["previousWrongAnswerIds"] = list(representative.selected_answers or [])
+        candidate["previousWrongAnswer"] = previous_wrong_answer
+        candidate["previousWrongAnswerIds"] = (
+            [previous_wrong_answer] if previous_wrong_answer else []
+        )
         candidates.append(candidate)
     return {
         "candidates": candidates,

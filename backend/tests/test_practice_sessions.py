@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -352,12 +353,12 @@ async def _seed_global_revenge_mistakes(
                 language_mode="zh",
                 question_snapshot=first_question.snapshot,
                 knowledge={},
-                selected_answers=["B"],
+                selected_answers=["B", "B"],
                 status="needs_remediation",
                 wrong_count=2,
                 revenge_wrong_count=1,
                 first_wrong_at=now,
-                last_wrong_at=now,
+                last_wrong_at=now + timedelta(seconds=1),
             ),
             PracticeMistake(
                 id=f"pm-second-{uuid4().hex[:12]}",
@@ -409,6 +410,20 @@ async def _set_mistake_status(mistake_id: str, status: str) -> None:
     async with AsyncSessionLocal() as db:
         mistake = await db.get(PracticeMistake, mistake_id)
         mistake.status = status
+        await db.commit()
+
+
+async def _strip_revenge_previous_answers(session_id: str) -> None:
+    async with AsyncSessionLocal() as db:
+        session = await db.get(PracticeSession, session_id)
+        session.question_order = [
+            {
+                key: value
+                for key, value in ref.items()
+                if key not in {"previousWrongAnswer", "previousWrongAnswerIds"}
+            }
+            for ref in session.question_order
+        ]
         await db.commit()
 
 
@@ -559,7 +574,8 @@ def test_start_session_freezes_42_50_8_order_and_rejects_duplicate_resumable() -
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
 
-def test_session_payload_reveals_frozen_answer_key_for_every_question() -> None:
+@pytest.mark.parametrize("mode", ["challenge", "scholar"])
+def test_competitive_session_hides_explanations_until_completion(mode: str) -> None:
     ids = _practice_fixture_ids()
     asyncio.run(_seed_released_pmp_paper(ids))
     try:
@@ -573,7 +589,7 @@ def test_session_payload_reveals_frozen_answer_key_for_every_question() -> None:
                 json={
                     "paperId": ids["paper"],
                     "releaseId": ids["release"],
-                    "mode": "challenge",
+                    "mode": mode,
                     "count": 10,
                     "order": "paper",
                 },
@@ -582,7 +598,7 @@ def test_session_payload_reveals_frozen_answer_key_for_every_question() -> None:
             for entry in started["questions"]:
                 question = entry["question"]
                 assert question["correctAnswer"] == "A"
-                assert question["analysis"]
+                assert "analysis" not in question
                 assert any(option.get("correct") is True for option in question["options"])
 
             first_id = started["questionOrder"][0]["questionId"]
@@ -597,23 +613,23 @@ def test_session_payload_reveals_frozen_answer_key_for_every_question() -> None:
             first_after = answered["session"]["questions"][0]["question"]
             second_after = answered["session"]["questions"][1]["question"]
             assert first_after["correctAnswer"] == "A"
-            assert first_after["analysis"] == "第 1 题解析"
+            assert "analysis" not in first_after
             assert any(option.get("correct") is True for option in first_after["options"])
             assert second_after["correctAnswer"] == "A"
-            assert second_after["analysis"]
+            assert "analysis" not in second_after
 
-            abandoned = client.post(
-                f"/api/v1/learning/practice/sessions/{started['id']}/abandon",
+            completed = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/complete",
                 json={"revision": answered["session"]["revision"]},
             )
-            assert abandoned.status_code == 200, abandoned.text
-            abandoned_questions = abandoned.json()["session"]["questions"]
-            assert abandoned_questions[0]["question"]["correctAnswer"] == "A"
-            assert abandoned_questions[1]["question"]["correctAnswer"] == "A"
+            assert completed.status_code == 200, completed.text
+            completed_questions = completed.json()["session"]["questions"]
+            assert completed_questions[0]["question"]["analysis"] == "第 1 题解析"
+            assert completed_questions[1]["question"]["analysis"]
             detail = client.get(
                 f"/api/v1/learning/practice/sessions/{started['id']}"
             ).json()["session"]
-            assert detail["questions"][1]["question"]["correctAnswer"] == "A"
+            assert detail["questions"][1]["question"]["analysis"]
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
@@ -1759,6 +1775,8 @@ def test_global_revenge_session_crosses_papers_and_deduplicates_versionless_hist
                 mistake_ids["versionlessMistake"],
                 mistake_ids["releaseMistake"],
             ]
+            assert duplicate["previousWrongAnswer"] == "B"
+            assert duplicate["previousWrongAnswerIds"] == ["B"]
             assert duplicate["sourceReleaseId"] == ""
             assert {
                 row["sourcePaperId"] for row in session["questionOrder"]
@@ -1840,6 +1858,41 @@ def test_global_revenge_session_crosses_papers_and_deduplicates_versionless_hist
             assert persisted[mistake_ids["releaseMistake"]].wrong_count == 4
             assert persisted[mistake_ids["secondMistake"]].status == "verification_due"
             assert persisted[mistake_ids["secondMistake"]].revenge_correct_count == 1
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(second_ids))
+        asyncio.run(_cleanup_released_pmp_paper(first_ids))
+
+
+def test_resumed_legacy_revenge_session_backfills_each_latest_wrong_answer() -> None:
+    first_ids = _practice_fixture_ids()
+    second_ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(first_ids, domains=["people"]))
+    asyncio.run(_seed_released_pmp_paper(second_ids, domains=["process"]))
+    asyncio.run(
+        _seed_global_revenge_mistakes(first_ids["student"], first_ids, second_ids)
+    )
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": first_ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            started = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={"mode": "revenge", "count": 10, "order": "paper"},
+            ).json()["session"]
+            asyncio.run(_strip_revenge_previous_answers(started["id"]))
+
+            resumed = client.get(
+                f"/api/v1/learning/practice/sessions/{started['id']}"
+            ).json()["session"]
+
+            assert [
+                item["previousWrongAnswer"] for item in resumed["questionOrder"]
+            ] == ["B", "B"]
+            assert [
+                item["previousWrongAnswerIds"] for item in resumed["questions"]
+            ] == [["B"], ["B"]]
     finally:
         asyncio.run(_cleanup_released_pmp_paper(second_ids))
         asyncio.run(_cleanup_released_pmp_paper(first_ids))
@@ -2081,7 +2134,7 @@ def active_session(client, practice_ids):
     return started.json()["session"]
 
 
-def test_active_session_reveals_frozen_answer_key_for_client_grading(
+def test_active_session_keeps_answer_key_but_hides_explanation(
     client, active_session
 ):
     session = client.get(
@@ -2089,7 +2142,7 @@ def test_active_session_reveals_frozen_answer_key_for_client_grading(
     ).json()["session"]
     first = session["questions"][0]["question"]
     assert first["correctAnswer"] == "A"
-    assert first["analysis"]
+    assert "analysis" not in first
 
 
 def test_pause_rejects_answer_outside_frozen_question_options(client, active_session):

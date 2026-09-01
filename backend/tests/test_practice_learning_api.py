@@ -314,6 +314,40 @@ def test_global_revenge_pool_normalizes_the_unique_correct_option_from_release_h
     assert pool["candidates"][0]["questionSnapshot"]["correctAnswer"] == "A"
 
 
+def test_global_revenge_pool_includes_multiple_choice_snapshot() -> None:
+    row = _mistake_row(
+        mistake_id="pm_multiple_choice",
+        owner="owner-a",
+        question_id="q-multiple-choice",
+        status="pending",
+    )
+    row.question_snapshot = {
+        "id": row.question_id,
+        "title": "多选复仇题",
+        "stem": "请选择所有正确选项",
+        "type": "multiple_choice",
+        "options": [
+            {"id": "A", "text": "正确项 A"},
+            {"id": "B", "text": "错误项 B"},
+            {"id": "C", "text": "正确项 C"},
+            {"id": "D", "text": "错误项 D"},
+        ],
+        "correctOptionIds": ["A", "C"],
+    }
+    row.selected_answers = ["B", "C"]
+
+    pool = learning_service.build_global_revenge_pool([row], now=now_utc())
+
+    assert pool["unavailableCount"] == 0
+    assert [candidate["questionId"] for candidate in pool["candidates"]] == [
+        row.question_id
+    ]
+    assert pool["candidates"][0]["questionSnapshot"]["correctOptionIds"] == [
+        "A",
+        "C",
+    ]
+
+
 def test_global_revenge_pool_does_not_let_mastered_copy_hide_damaged_active_history() -> None:
     pool = learning_service.build_global_revenge_pool(
         [

@@ -1007,7 +1007,7 @@
         revision:Number(paper.revision),
         accessLevel:paper.accessPolicy?.accessLevel==='member'?'member':'free',
         enabledModes:[...paper.enabledModes],
-        allowedRoles:Array.isArray(paper.allowedRoles)&&paper.allowedRoles.length?[...paper.allowedRoles]:['student','viewer'],
+        allowedRoles:['admin','teacher','student','viewer'],
         metadata:{},
       });
       if(!published)throw new Error('发布服务未返回版本信息。');
