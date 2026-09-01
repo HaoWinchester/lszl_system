@@ -4,10 +4,7 @@
   "toVersion": "v9.0-p4.1.203",
   "changes": {
     "added": [],
-    "changed": [
-      "practice-mode.html",
-      "src/100-practice-mode.js"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
