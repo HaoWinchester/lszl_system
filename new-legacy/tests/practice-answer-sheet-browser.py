@@ -612,7 +612,9 @@ with sync_playwright() as playwright:
     assert previous_wrong_toggle.is_visible()
     assert previous_wrong_input.is_checked()
     assert previous_wrong_answer.is_visible()
-    assert "上次选错：B. 错误选项" in previous_wrong_answer.inner_text()
+    # 上次选错只显示选项 ID，不显示选项内容
+    assert "上次选错：B" in previous_wrong_answer.inner_text()
+    assert "错误选项" not in previous_wrong_answer.inner_text()
     previous_wrong_toggle.click()
     assert not previous_wrong_input.is_checked()
     assert previous_wrong_answer.is_hidden()
@@ -624,7 +626,8 @@ with sync_playwright() as playwright:
     page.locator("#practiceNextBtn").click()
     assert page.evaluate("window.KGPracticeMode.snapshot().index") == 1
     assert previous_wrong_answer.is_visible()
-    assert "上次选错：B. 错误选项" in previous_wrong_answer.inner_text()
+    assert "上次选错：B" in previous_wrong_answer.inner_text()
+    assert "错误选项" not in previous_wrong_answer.inner_text()
     page.locator("#practicePrevBtn").click()
 
     # ---------- 复仇作答交互：答对不弹解析并自动进入下一题，答错才补救 ----------
