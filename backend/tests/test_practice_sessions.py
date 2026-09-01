@@ -1882,6 +1882,11 @@ def test_global_revenge_multiple_choice_returns_all_previous_wrong_ids() -> None
                 ).scalar_one()
                 snapshot = dict(question.snapshot or {})
                 snapshot["correctAnswer"] = ["A", "C"]
+                # 补一个干扰项 D，保证多选错误选项有两个（B、D）
+                snapshot["options"] = [
+                    *snapshot["options"],
+                    {"id": "D", "text": "干扰项 D", "correct": False},
+                ]
                 now = now_utc()
                 row = PracticeMistake(
                     id=f"pm-multi-{uuid4().hex[:12]}",
@@ -1896,7 +1901,7 @@ def test_global_revenge_multiple_choice_returns_all_previous_wrong_ids() -> None
                     language_mode="zh",
                     question_snapshot=snapshot,
                     knowledge={},
-                    selected_answers=["B", "C"],
+                    selected_answers=["B", "D"],
                     status="pending",
                     wrong_count=1,
                     first_wrong_at=now,
@@ -1924,9 +1929,9 @@ def test_global_revenge_multiple_choice_returns_all_previous_wrong_ids() -> None
                 for item in session["questionOrder"]
                 if item["questionId"] == question_id
             )
-            # 上次选错 B、C：全部返回并按选项顺序排列；单数兼容字段取最后选错的 C
-            assert row["previousWrongAnswerIds"] == ["B", "C"]
-            assert row["previousWrongAnswer"] == "C"
+            # 上次选错 B、D（正确项 A、C 未选也算错）：错误选项全部返回，按选项顺序排列
+            assert row["previousWrongAnswerIds"] == ["B", "D"]
+            assert row["previousWrongAnswer"] == "D"
     finally:
         asyncio.run(_cleanup_released_pmp_paper(first_ids))
 

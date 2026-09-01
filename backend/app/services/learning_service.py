@@ -942,13 +942,20 @@ def _revenge_snapshot_usable(snapshot: dict) -> bool:
     return bool(stem and len(option_ids) >= 2 and correct_answer in option_ids)
 
 
+def _snapshot_correct_option_ids(snapshot: dict) -> set[str]:
+    """Resolve the full correct-option set via the canonical MC resolver."""
+
+    return set(question_answer_service.correct_option_ids(snapshot or {}))
+
+
 def _latest_previous_wrong_answers(
     rows: list[PracticeMistake], snapshot: dict
 ) -> tuple[list[str], str]:
-    """Resolve wrong choices from the newest mistake across deduplicated rows.
+    """Resolve wrong choices from the most recent attempt only.
 
-    多选题上次可能同时选错多个选项：取最新一次错题记录里的全部错误选项，
-    按选项顺序返回；同时给出该次错题中最后选错的选项作为单数兼容值。
+    selected_answers 按写入顺序即作答顺序；历史数据可能累积多次作答。
+    单选一次只选一个：取最后一个有效错选项；多选取最近一条记录里的全部
+    错选项（按选项顺序）。单数兼容字段取按时间最后的错选项。
     """
 
     option_ids = {
@@ -956,22 +963,31 @@ def _latest_previous_wrong_answers(
         for option in (snapshot or {}).get("options") or []
         if isinstance(option, dict) and str(option.get("id") or "").strip()
     }
-    correct_answer = canonical_practice_snapshot_answer(snapshot)
+    correct_ids = _snapshot_correct_option_ids(snapshot)
+    # 正确项多于一个必为多选；同时兼容历史快照缺 type 字段的情况
+    multiple = (
+        str((snapshot or {}).get("type") or "") == "multiple_choice"
+        or len(correct_ids) > 1
+    )
 
     def wrong_at(row: PracticeMistake) -> float:
         value = row.last_wrong_at or row.updated_at or row.created_at
         return value.timestamp() if value else 0.0
 
-    wrong: set[str] = set()
-    last_wrong = ""
     for row in sorted(rows, key=wrong_at, reverse=True):
-        for answer in row.selected_answers or []:
-            normalized = str(answer or "").strip()
-            if normalized in option_ids and normalized != correct_answer:
-                wrong.add(normalized)
-                last_wrong = normalized
-        if wrong:
-            return _order_option_ids(snapshot, wrong), last_wrong
+        valid_wrong = [
+            str(answer or "").strip()
+            for answer in row.selected_answers or []
+            if str(answer or "").strip() in option_ids
+            and str(answer or "").strip() not in correct_ids
+        ]
+        if not valid_wrong:
+            continue
+        last_wrong = valid_wrong[-1]
+        if multiple:
+            ordered = _order_option_ids(snapshot, set(valid_wrong))
+            return ordered, last_wrong
+        return [last_wrong], last_wrong
     return [], ""
 
 
