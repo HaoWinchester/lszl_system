@@ -40,6 +40,9 @@ const source = {
     durationMs: 12000,
     languageMode: 'bilingual',
     autoExplain: false,
+    order: 'random',
+    showAnswers: true,
+    markedQuestionIds: ['q1', 'q3'],
     answers: { forged: true },
   },
 };
@@ -65,6 +68,9 @@ assert.deepEqual(
     durationMs: 12000,
     languageMode: 'bilingual',
     autoExplain: false,
+    order: 'random',
+    showAnswers: true,
+    markedQuestionIds: ['q1', 'q3'],
   },
 );
 
