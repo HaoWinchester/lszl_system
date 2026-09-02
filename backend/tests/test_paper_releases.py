@@ -238,6 +238,72 @@ def test_publish_freezes_default_practice_scoring_and_domain_weights() -> None:
         asyncio.run(_cleanup(ids))
 
 
+def test_publish_uses_server_generated_hard_actual_as_domain_weights() -> None:
+    ids = _ids()
+    asyncio.run(_seed(ids))
+
+    async def scenario() -> None:
+        async with AsyncSessionLocal() as db:
+            paper = await db.get(ExamPaper, ids["paper"])
+            paper.generation_config = {
+                "hardQuota": {
+                    "dimensionId": "exam-domain",
+                    "weights": {
+                        "people": 33.33,
+                        "process": 66.67,
+                        "business-environment": 0,
+                    },
+                },
+                "hardActual": {
+                    "people": 2,
+                    "process": 4,
+                    "business-environment": 0,
+                },
+            }
+            questions = list(
+                (
+                    await db.scalars(
+                        select(Question)
+                        .where(Question.bank_id == ids["bank"])
+                        .order_by(Question.id)
+                    )
+                ).all()
+            )
+            for index, question in enumerate(questions):
+                question.content_metadata = {
+                    "subjectFacets": [
+                        {
+                            "dimensionId": "exam-domain",
+                            "valueId": "process" if index < 4 else "people",
+                        }
+                    ]
+                }
+            await db.commit()
+
+            teacher = await db.get(User, ids["teacher"])
+            release = await paper_release_service.publish(
+                db,
+                teacher,
+                ids["paper"],
+                expected_revision=1,
+                access_level="free",
+                enabled_modes=["practice_mode"],
+                allowed_roles=["student"],
+                metadata={},
+            )
+
+            assert release.release_metadata["domainWeights"] == {
+                "people": 2,
+                "process": 4,
+                "business-environment": 0,
+            }
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(_cleanup(ids))
+
+
 def test_multiple_choice_publish_requires_analysis_and_freezes_answer_array() -> None:
     ids = _ids()
     asyncio.run(_seed(ids))
