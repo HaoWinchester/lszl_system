@@ -66,6 +66,36 @@ def _snapshot_is_learnable(snapshot: dict) -> bool:
     return bool(stem and len(options) >= 2 and has_answer)
 
 
+def _generated_domain_weights(
+    paper: ExamPaper,
+    *,
+    question_count: int,
+) -> dict[str, int] | None:
+    """Return trusted actual domain counts frozen by server-side composition."""
+
+    config = paper.generation_config if isinstance(paper.generation_config, dict) else {}
+    hard_quota = config.get("hardQuota")
+    hard_actual = config.get("hardActual")
+    expected_domains = set(practice_scoring_service.DEFAULT_DOMAIN_WEIGHTS)
+    if (
+        not isinstance(hard_quota, dict)
+        or hard_quota.get("dimensionId") != paper_composition_service.EXAM_DOMAIN
+        or not isinstance(hard_actual, dict)
+        or set(hard_actual) != expected_domains
+    ):
+        return None
+    if any(
+        isinstance(value, bool) or not isinstance(value, int) or value < 0
+        for value in hard_actual.values()
+    ):
+        return None
+    normalized = {
+        domain: hard_actual[domain]
+        for domain in practice_scoring_service.DEFAULT_DOMAIN_WEIGHTS
+    }
+    return normalized if sum(normalized.values()) == question_count else None
+
+
 def _validate_practice_domain_inventory(
     *,
     subject: str,
@@ -355,6 +385,12 @@ async def publish(
         frozen_score = float(score if score is not None else 1)
         snapshot["releaseScore"] = frozen_score
         frozen_questions.append((question, order_index, frozen_score, snapshot))
+    generated_weights = _generated_domain_weights(
+        paper,
+        question_count=len(frozen_questions),
+    )
+    if generated_weights is not None:
+        metadata["domainWeights"] = generated_weights
     _validate_practice_domain_inventory(
         subject=paper.subject,
         paper_type=paper.paper_type,
