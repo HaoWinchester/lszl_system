@@ -20,6 +20,7 @@
     let snapshot = null
     let currentId = ''
     let activeFilter = 'all'
+    let markedIds = null
 
     function visibleQuestions() {
       const core = global.KGPracticeSessionCore
@@ -28,9 +29,10 @@
       return questions.filter(question => core?.questionStatus?.(snapshot, question.questionId) === activeFilter)
     }
 
-    function render(session, currentQuestionId, filter) {
+    function render(session, currentQuestionId, filter, markedQuestionIds) {
       snapshot = session || { questions: [], answers: {} }
       currentId = text(currentQuestionId)
+      markedIds = markedQuestionIds && typeof markedQuestionIds.has === 'function' ? markedQuestionIds : null
       if (snapshot.reviewOnly) activeFilter = 'wrong'
       else if (['all', 'unanswered', 'wrong'].includes(filter)) activeFilter = filter
       const core = global.KGPracticeSessionCore
@@ -41,8 +43,9 @@
         const index = (snapshot.questions || []).findIndex(item => text(item?.questionId) === id)
         const status = core?.questionStatus?.(snapshot, id) || 'unanswered'
         const current = id === currentId
-        const label = `第 ${index + 1} 题，${STATUS_LABELS[status] || status}${current ? '，当前题' : ''}`
-        return `<button type="button" class="practice-answer-number is-${escapeHTML(status)}${current ? ' is-current' : ''}" data-question-id="${escapeHTML(id)}" aria-label="${escapeHTML(label)}" aria-current="${current ? 'step' : 'false'}"><span>${index + 1}</span><small>${escapeHTML(STATUS_LABELS[status] || '')}</small></button>`
+        const marked = !!(markedIds && markedIds.has(id))
+        const label = `第 ${index + 1} 题，${STATUS_LABELS[status] || status}${marked ? '，已标记' : ''}${current ? '，当前题' : ''}`
+        return `<button type="button" class="practice-answer-number is-${escapeHTML(status)}${current ? ' is-current' : ''}${marked ? ' is-marked' : ''}" data-question-id="${escapeHTML(id)}" aria-label="${escapeHTML(label)}" aria-current="${current ? 'step' : 'false'}"><span>${index + 1}</span><small>${escapeHTML(STATUS_LABELS[status] || '')}</small></button>`
       }).join('')
       root.innerHTML = `<div class="practice-answer-sheet-head"><div><span>ANSWER SHEET</span><h2>答题概览</h2></div><strong>${stats.answered}/${stats.total}</strong></div>
         <div class="practice-answer-sheet-summary"><span>正确 <b>${stats.correct}</b></span><span>错误 <b>${stats.wrong}</b></span><span>未答 <b>${stats.unanswered}</b></span></div>
@@ -52,7 +55,7 @@
           <button type="button" data-answer-filter="wrong" class="${activeFilter === 'wrong' ? 'is-active' : ''}">错题</button>
         </div>`}
         <div class="practice-answer-number-grid">${numbers || '<p class="practice-answer-filter-empty">该筛选下暂无题目</p>'}</div>
-        <div class="practice-answer-sheet-legend"><span><i class="is-correct"></i>正确</span><span><i class="is-wrong"></i>错误</span><span><i class="is-unanswered"></i>未答</span></div>
+        <div class="practice-answer-sheet-legend"><span><i class="is-correct"></i>正确</span><span><i class="is-wrong"></i>错误</span><span><i class="is-unanswered"></i>未答</span>${markedIds && markedIds.size ? '<span><i class="is-marked"></i>已标记</span>' : ''}</div>
         ${!global.KGPracticeModePolicy.forMode(snapshot.mode,{reviewOnly:snapshot.reviewOnly}).canSubmit || snapshot.status === 'completed' ? '' : '<button type="button" class="practice-answer-submit" data-answer-submit="true">交卷并查看成绩</button>'}`
       return stats
     }

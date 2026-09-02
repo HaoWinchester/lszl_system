@@ -181,6 +181,7 @@
         </div>
 
         <article class="practice-question-card" id="practiceQuestionCard">
+          <button type="button" class="practice-mark-toggle" id="practiceMarkToggle" aria-pressed="false" hidden>标记本题</button>
           <div class="practice-question-stem" id="practiceQuestionStem"></div>
           <div class="practice-previous-wrong-answer" id="practicePreviousWrongAnswer" hidden></div>
           <div class="practice-options" id="practiceOptions"></div>
@@ -194,6 +195,7 @@
           <div class="practice-question-nav" id="practiceQuestionNav" hidden>
             <button type="button" class="practice-nav-btn" id="practicePrevBtn" aria-label="上一题"><span data-kg-icon="chevron-left" data-kg-icon-size="16" aria-hidden="true"></span>上一题</button>
             <label id="practiceExplanationToggle" class="practice-explanation-toggle" hidden><input type="checkbox" id="practiceAutoExplain" checked/><span>显示解析</span></label>
+            <label id="practiceShowAnswersToggle" class="practice-explanation-toggle" hidden><input type="checkbox" id="practiceShowAnswers"/><span>显示答案</span></label>
             <label id="practicePreviousWrongToggle" class="practice-explanation-toggle practice-previous-wrong-toggle" hidden><input type="checkbox" id="practiceShowPreviousWrong" checked/><span>显示上次错选</span></label>
             <span class="practice-question-pos" id="practiceQuestionPos">1 / 10</span>
             <button type="button" class="practice-nav-btn" id="practiceNextBtn" aria-label="下一题">下一题<span data-kg-icon="chevron-right" data-kg-icon-size="16" aria-hidden="true"></span></button>

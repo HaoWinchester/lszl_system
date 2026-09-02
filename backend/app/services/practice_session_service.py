@@ -43,7 +43,12 @@ RUNTIME_FIELDS = RUNTIME_INTEGER_FIELDS | {
     "languageMode",
     "autoExplain",
     "revengeState",
+    "order",
+    "showAnswers",
+    "markedQuestionIds",
 }
+RUNTIME_MARKED_QUESTION_IDS_MAX = 300
+RUNTIME_MARKED_QUESTION_ID_MAX_LENGTH = 128
 
 
 @dataclass(frozen=True)
@@ -1055,6 +1060,30 @@ async def answer_session_question(
     }
 
 
+def _validated_marked_question_ids(value: Any) -> list[str]:
+    # 标记列表：字符串数组、去重保序、限制单元素长度与总量（pagehide 载荷体积）。
+    if not isinstance(value, list) or any(
+        not isinstance(item, str) or not item for item in value
+    ):
+        raise _error(
+            422,
+            "INVALID_RUNTIME_STATE_VALUE",
+            "markedQuestionIds 必须是非空字符串数组",
+            field="markedQuestionIds",
+        )
+    deduped = list(dict.fromkeys(value))
+    if len(deduped) > RUNTIME_MARKED_QUESTION_IDS_MAX or any(
+        len(item) > RUNTIME_MARKED_QUESTION_ID_MAX_LENGTH for item in deduped
+    ):
+        raise _error(
+            422,
+            "INVALID_RUNTIME_STATE_VALUE",
+            "markedQuestionIds 超出长度限制",
+            field="markedQuestionIds",
+        )
+    return deduped
+
+
 def _validated_runtime_state(data: dict, *, question_count: int) -> dict:
     raw = data.get("runtimeState")
     if not isinstance(raw, dict):
@@ -1105,6 +1134,28 @@ def _validated_runtime_state(data: dict, *, question_count: int) -> dict:
                 field="autoExplain",
             )
         state["autoExplain"] = raw["autoExplain"]
+    if "order" in raw:
+        if raw["order"] not in PRACTICE_ORDERS:
+            raise _error(
+                422,
+                "INVALID_RUNTIME_STATE_VALUE",
+                "order 无效",
+                field="order",
+            )
+        state["order"] = raw["order"]
+    if "showAnswers" in raw:
+        if not isinstance(raw["showAnswers"], bool):
+            raise _error(
+                422,
+                "INVALID_RUNTIME_STATE_VALUE",
+                "showAnswers 必须是布尔值",
+                field="showAnswers",
+            )
+        state["showAnswers"] = raw["showAnswers"]
+    if "markedQuestionIds" in raw:
+        state["markedQuestionIds"] = _validated_marked_question_ids(
+            raw["markedQuestionIds"]
+        )
     if "revengeState" in raw:
         revenge_state = raw["revengeState"]
         if not isinstance(revenge_state, dict):

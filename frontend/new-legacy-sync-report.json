@@ -3,8 +3,19 @@
   "fromVersion": "v9.0-p4.1.204",
   "toVersion": "v9.0-p4.1.204",
   "changes": {
-    "added": [],
-    "changed": [],
+    "added": [
+      "tests/practice-mark-show-answers-browser.py",
+      "tests/practice-marked-answer-sheet.test.js",
+      "tests/practice-seeded-shuffle.test.js"
+    ],
+    "changed": [
+      "practice-mode.html",
+      "src/100-practice-mode.js",
+      "src/111-practice-session-core.js",
+      "src/112-practice-answer-sheet.js",
+      "styles/practice-mode.css",
+      "tests/practice-session-core.test.js"
+    ],
     "removed": []
   },
   "incompatible": []
