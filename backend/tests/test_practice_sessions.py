@@ -1360,6 +1360,85 @@ def test_session_runtime_state_is_validated_owner_scoped_and_revisioned() -> Non
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
 
+def test_session_runtime_state_accepts_order_show_answers_and_marked_question_ids() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login",
+                json={"username": ids["student"], "password": PASSWORD},
+            ).status_code == 200
+            started = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "practice",
+                    "count": 60,
+                    "order": "random",
+                },
+            ).json()["session"]
+            runtime_state = {
+                "currentIndex": 3,
+                "durationMs": 5000,
+                "order": "random",
+                "showAnswers": True,
+                "markedQuestionIds": ["q1", "q2", "q1", "q3"],
+            }
+            saved = client.patch(
+                f"/api/v1/learning/practice/sessions/{started['id']}/state",
+                json={"revision": 1, "runtimeState": runtime_state},
+            )
+            assert saved.status_code == 200
+            saved_session = saved.json()["session"]
+            # 去重保序；order/showAnswers 原样落库
+            assert saved_session["runtimeState"]["markedQuestionIds"] == ["q1", "q2", "q3"]
+            assert saved_session["runtimeState"]["order"] == "random"
+            assert saved_session["runtimeState"]["showAnswers"] is True
+
+            # pause → enter resumed 链路字段存活
+            assert client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/pause",
+                json={"revision": 2, "runtimeState": runtime_state},
+            ).status_code == 200
+            entered = client.post(
+                "/api/v1/learning/practice/sessions/enter",
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "practice",
+                    "count": 10,
+                    "order": "paper",
+                },
+            )
+            assert entered.status_code == 200, entered.text
+            body = entered.json()
+            assert body["resumed"] is True
+            assert body["session"]["id"] == started["id"]
+            assert body["session"]["runtimeState"]["order"] == "random"
+            assert body["session"]["runtimeState"]["showAnswers"] is True
+            assert body["session"]["runtimeState"]["markedQuestionIds"] == ["q1", "q2", "q3"]
+
+            for field, value in {
+                "order": "weakest",
+                "showAnswers": 1,
+                "markedQuestionIds": "q1",
+                "markedQuestionIds": [42],
+                "markedQuestionIds": [""],
+                "markedQuestionIds": ["q" * 129],
+                "markedQuestionIds": [f"q{i}" for i in range(301)],
+            }.items():
+                invalid = client.patch(
+                    f"/api/v1/learning/practice/sessions/{started['id']}/state",
+                    json={"revision": 3, "runtimeState": {field: value}},
+                )
+                assert invalid.status_code == 422, (field, value)
+                assert invalid.json()["detail"]["code"] == "INVALID_RUNTIME_STATE_VALUE"
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
 def test_scholar_pause_freezes_time_and_first_write_resumes_without_offline_deduction() -> None:
     ids = _practice_fixture_ids()
     asyncio.run(_seed_released_pmp_paper(ids))

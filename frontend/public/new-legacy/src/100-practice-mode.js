@@ -21,7 +21,8 @@
     feedbackTimer:0,popTimer:0,toastTimer:0,abandonedRecorded:false,catalogAvailable:false,retiredNavigation:null,retiredNoticeShown:false,
     remediationPending:false,verification:null,entryStartingMode:'',revengeRulePinned:false,showPreviousWrong:true,
     session:null,report:null,reviewing:false,answerSheet:null,pendingSelections:{},submitting:false,pendingRequestKey:'',resumeLookupToken:0,
-    draft:null,revengeState:null,saves:null,reconciling:false,paperProgress:null,revengeSummary:null
+    draft:null,revengeState:null,saves:null,reconciling:false,paperProgress:null,revengeSummary:null,
+    markedQuestions:new Set(),showAnswers:false,questionsShuffled:false
   };
 
   function clone(value){try{return JSON.parse(JSON.stringify(value))}catch(error){return value}}
@@ -142,7 +143,7 @@
   }
   function runtimeState(){
     const remainingMs=state.mode==='scholar'?Math.max(0,state.deadline-Date.now()):undefined;
-    const runtime={currentIndex:Math.max(0,state.index),health:Math.max(0,Number(state.health)||0),streak:Math.max(0,Number(state.streak)||0),maxStreak:Math.max(0,Number(state.maxStreak)||0),experience:Math.max(0,Number(state.experience)||0),durationMs:elapsed(),languageMode:languageMode(),autoExplain:autoExplainEnabled()};
+    const runtime={currentIndex:Math.max(0,state.index),health:Math.max(0,Number(state.health)||0),streak:Math.max(0,Number(state.streak)||0),maxStreak:Math.max(0,Number(state.maxStreak)||0),experience:Math.max(0,Number(state.experience)||0),durationMs:elapsed(),languageMode:languageMode(),autoExplain:autoExplainEnabled(),order:text(state.order||'paper'),showAnswers:!!state.showAnswers,markedQuestionIds:[...state.markedQuestions].map(text)};
     if(remainingMs!==undefined)runtime.remainingMs=Math.round(remainingMs);
     if(state.mode==='revenge'&&state.revengeState)runtime.revengeState=clone(state.revengeState);
     return runtime;
@@ -152,12 +153,16 @@
     // 交卷后 / 复盘页才消费服务器冻结结果（state.session.answers 已被完成态覆盖）。
     const draftView=state.reviewing?null:(state.draft?.viewAnswers?.()||null);
     const base=state.session?normalizedSession(state.session):{mode:state.mode,questions:draftQuestions(),answers:{}};
+    if(state.questionsShuffled){
+      // 会话题目被本地确定性洗牌后，答题卡必须跟显示顺序一致，否则题号/跳题错位。
+      base.questions=state.questions.map(question=>({questionId:question.id}));
+    }
     if(draftView&&!state.reviewing)return {...base,answers:draftView,reviewOnly:false};
     return {...base,reviewOnly:state.reviewing};
   }
   function renderAnswerSheet(){
     const session=answerSheetSession(),currentId=state.questions[state.index]?.id||'';
-    const stats=state.answerSheet?.render?.(session,currentId);
+    const stats=state.answerSheet?.render?.(session,currentId,undefined,state.markedQuestions);
     if(dom.answerSheetMobileCount){dom.answerSheetMobileCount.textContent=(stats?.answered||0)+'/'+(stats?.total||state.questions.length||0)}
   }
   function mergeSessionQuestions(){
@@ -297,6 +302,22 @@
   function shuffle(items){
     const list=items.slice();
     for(let index=list.length-1;index>0;index--){const swap=Math.floor(Math.random()*(index+1));[list[index],list[swap]]=[list[swap],list[index]]}
+    return list;
+  }
+  // 确定性洗牌：同一种子恒定同序，用于恢复 random 会话时跨刷新/跨设备稳定重排。
+  function seededShuffle(items,seed){
+    const list=items.slice();
+    // xmur3 字符串哈希 + mulberry32：轻量确定性 PRNG，无依赖
+    let h=1779033703^seed.length;
+    for(let i=0;i<seed.length;i+=1){h=Math.imul(h^seed.charCodeAt(i),3432918353);h=(h<<13)|(h>>>19)}
+    let a=(h^=h>>>16)>>>0;
+    const random=()=>{
+      a=(a+0x6D2B79F5)|0;
+      let t=Math.imul(a^(a>>>15),1|a);
+      t=(t+Math.imul(t^(t>>>7),61|t))^t;
+      return ((t^(t>>>14))>>>0)/4294967296;
+    };
+    for(let index=list.length-1;index>0;index--){const swap=Math.floor(random()*(index+1));[list[index],list[swap]]=[list[swap],list[index]]}
     return list;
   }
   function streakBonus(streak){if(streak>=8)return 10;if(streak>=5)return 5;if(streak>=3)return 2;return 0}
@@ -481,6 +502,7 @@
       try{
         const api=practiceApi(),session=await api.getSession(sessionId),report=await api.getReport(sessionId);
         state.session=normalizedSession(session);state.questions=sessionQuestions(state.session);state.report=clone(report);state.mode=session.mode;state.active=false;state.reviewing=false;state.lastSettings={paperId:session.paperId,count:state.questions.length,order:text(session.runtimeState?.order||'paper'),mode:session.mode};
+        state.markedQuestions=new Set();state.showAnswers=false;state.questionsShuffled=false;
         closeHistoryDrawer();renderFrozenReport();setView('result');return true;
       }catch(error){showToast('成绩报告暂时无法打开，请稍后重试。');return false}
     });
@@ -564,15 +586,39 @@
   function autoExplainEnabled(){
     try{return global.KGActivitySchemaV1?.getPracticeAutoExplain?.()!==false}catch(error){return true}
   }
+  // 显示答案是会话内状态（runtimeState.showAnswers），不是跨卷全局偏好。
+  function showAnswersEnabled(){return state.mode==='practice'&&!state.reviewing&&state.showAnswers===true}
+  function renderQuestionMark(question){
+    const button=$('practiceMarkToggle');if(!button)return;
+    const marked=!!(question&&state.markedQuestions.has(text(question.id)));
+    button.hidden=!(state.active&&question&&!state.reviewing);
+    button.textContent=marked?'取消标记':'标记本题';
+    button.classList.toggle('is-marked',marked);
+    button.setAttribute('aria-pressed',marked?'true':'false');
+  }
+  function toggleQuestionMark(){
+    const question=state.verification?.active?state.verification.question:state.questions[state.index];
+    if(!question||!state.active||state.reviewing)return false;
+    const id=text(question.id);
+    if(state.markedQuestions.has(id))state.markedQuestions.delete(id);else state.markedQuestions.add(id);
+    renderQuestionMark(question);renderAnswerSheet();
+    return true;
+  }
   function questionCorrectIds(question){return question?.type==='multiple_choice'?(question.correctOptionIds||[]):[text(question?.correctAnswer)].filter(Boolean)}
   function answerSelectedIds(answer){return Array.isArray(answer?.selectedAnswerIds)?answer.selectedAnswerIds.map(text):[text(answer?.selectedAnswer)].filter(Boolean)}
-  function renderPracticeExplanation(question,correct){
-    const panel=$('practiceExplanationPanel');if(!panel||!shouldShowExplanation())return;
+  function renderPracticeExplanation(question,correct,neutral=false){
+    const panel=$('practiceExplanationPanel');if(!panel)return;
+    // neutral：显示答案开关下的未答题回放，不适用"回答正确/错误"文案与配色。
+    if(!neutral&&!shouldShowExplanation())return;
     const head=$('practiceExplanationHead'),body=$('practiceExplanationBody');
     const view=questionLanguageView(question);
     const correctText='正确答案：'+questionCorrectIds(question).join('、');
     const explanationMarkup=view?escapeHTML(languageText(view.explanation))+englishLine(view.explanation):escapeHTML(text(question?.raw?.analysis||question?.raw?.explanation||'暂无解析'));
-    if(head){head.textContent=(correct?'回答正确':'回答错误')+' · '+correctText;head.className='practice-explanation-head '+(correct?'is-correct':'is-wrong')}
+    if(head){
+      // 未答题中性回放不带正误配色；已答题保持"回答正确/错误 · 正确答案：XX"。
+      head.textContent=neutral?('正确答案 · '+questionCorrectIds(question).join('、')):((correct?'回答正确':'回答错误')+' · '+correctText);
+      head.className='practice-explanation-head'+(neutral?'':correct?' is-correct':' is-wrong');
+    }
     if(body)body.innerHTML='<p class="practice-answer-line">'+escapeHTML(correctText)+'</p>'+explanationMarkup;
     const actions=$('practiceExplanationActions');
     if(actions)actions.innerHTML='';
@@ -627,7 +673,13 @@
       revealOptionResult(practiceAnswered.selected,questionCorrectIds(question));
       // 已答题按模式策略与普通练习开关展示；未答题不提前显示解析。
       if(shouldShowExplanation())renderPracticeExplanation(question,practiceAnswered.correct);
+    }else if(state.mode==='practice'&&!state.reviewing&&!state.verification?.active&&showAnswersEnabled()){
+      // 显示答案开关：未答题直接回放正确答案与解析（中性文案），锁定作答；关闭开关恢复可答。
+      state.locked=true;lockOptions();
+      revealOptionResult([],questionCorrectIds(question));
+      renderPracticeExplanation(question,null,true);
     }
+    renderQuestionMark(question);
     renderProgress();renderHealth();renderVerificationBanner();
     updateQuestionNav();
     renderAnswerSheet();
@@ -641,6 +693,9 @@
     const toggle=$('practiceExplanationToggle'),input=$('practiceAutoExplain');
     if(toggle)toggle.hidden=state.mode!=='practice'||state.reviewing;
     if(input)input.checked=autoExplainEnabled();
+    const showAnswersToggle=$('practiceShowAnswersToggle'),showAnswersInput=$('practiceShowAnswers');
+    if(showAnswersToggle)showAnswersToggle.hidden=state.mode!=='practice'||state.reviewing;
+    if(showAnswersInput)showAnswersInput.checked=showAnswersEnabled();
     if(dom.previousWrongToggle)dom.previousWrongToggle.hidden=state.mode!=='revenge'||state.reviewing||!!state.verification?.active;
     if(dom.showPreviousWrong)dom.showPreviousWrong.checked=state.showPreviousWrong;
     dom.questionNav.hidden=!navMode;
@@ -906,7 +961,7 @@
     if(!questions.length){showToast('错题内容暂不可用，请稍后刷新重试。');return false}
     const policy=global.KGRevengeEntryPolicy.derive(questions.length,state.revengeSelectedCount),count=policy.requestCount;
     clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);
-    state.mode='revenge';state.showPreviousWrong=true;state.order='weakness_first';state.questions=questions.slice(0,count);state.pendingSelections={};state.index=0;state.health=MAX_HEALTH;state.streak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
+    state.mode='revenge';state.showPreviousWrong=true;state.order='weakness_first';state.questions=questions.slice(0,count);state.pendingSelections={};state.markedQuestions=new Set();state.showAnswers=false;state.questionsShuffled=false;state.index=0;state.health=MAX_HEALTH;state.streak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
     state.lastSettings={paperId:'',count,order:'weakness_first',mode:'revenge'};document.body.dataset.practiceMode='revenge';dom.timer.hidden=true;dom.timeRow.hidden=true;dom.health.hidden=true;
     setView('game');renderQuestion();return true;
   }
@@ -927,7 +982,15 @@
     state.session=normalizedSession(session);state.report=null;state.reviewing=false;state.mode=state.session.mode;state.showPreviousWrong=true;state.questions=sessionQuestions(state.session);
     createDraft(state.session);
     const runtime=state.session.runtimeState||{},stats=state.session.stats||{};
-    state.index=Math.max(0,Math.min(state.questions.length-1,Number(runtime.currentIndex)||0));
+    state.markedQuestions=new Set(Array.isArray(runtime.markedQuestionIds)?runtime.markedQuestionIds.map(text):[]);
+    state.showAnswers=state.mode==='practice'&&runtime.showAnswers===true;
+    // 随机顺序：优先会话冻结的 order；恢复时按 sessionId 确定性洗牌，
+    // 再把保存的 currentIndex 换算到新顺序中同一道题的位置。
+    state.order=['paper','random'].includes(runtime.order)?runtime.order:(state.order||'paper');
+    const savedQuestionId=state.questions[Math.max(0,Math.min(state.questions.length-1,Number(runtime.currentIndex)||0))]?.id;
+    state.questionsShuffled=state.order==='random'&&!!state.session.id;
+    if(state.questionsShuffled)state.questions=seededShuffle(state.questions,state.session.id);
+    state.index=Math.max(0,state.questions.findIndex(question=>question.id===savedQuestionId));
     state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;
     state.health=Number.isInteger(runtime.health)?runtime.health:state.maxHealth;state.streak=Math.max(0,Number(runtime.streak)||0);state.maxStreak=Math.max(0,Number(runtime.maxStreak)||0);state.experience=Math.max(0,Number(runtime.experience??stats.experience)||0);state.correct=Math.max(0,Number(stats.correct)||0);state.answered=Math.max(0,Number(stats.answered)||0);
     // 挑战无回血：生命是题量与已答错题的派生值，不能信任旧版保存的固定 3 点血量。
@@ -937,7 +1000,7 @@
     // 挑战/学霸恢复时血量可能与满血差距很大；顶栏虽然按剩余血量渲染，
     // 但"开始挑战"按钮静默恢复会让人误以为是满血新开局，必须明确告知剩余血量。
     if((state.mode==='challenge'||state.mode==='scholar')&&state.health<state.maxHealth)showToast('已恢复上次进度 · 剩余血量 '+state.health+' / '+state.maxHealth);
-    state.lastSettings={paperId:catalog?.id||state.session.paperId,count:state.questions.length,order:text(runtime.order||state.order||'paper'),mode:state.mode};document.body.dataset.practiceMode=state.mode;
+    state.lastSettings={paperId:catalog?.id||state.session.paperId,count:state.questions.length,order:text(state.order||'paper'),mode:state.mode};document.body.dataset.practiceMode=state.mode;
     if(state.mode==='scholar')state.deadline=Date.now()+Math.max(0,Number(runtime.remainingMs??SCHOLAR_MAX_SECONDS*1000));
     dom.timer.hidden=true;dom.timeRow.hidden=state.mode!=='scholar';dom.health.hidden=!modePolicy().showHealth;
     setView('game');renderQuestion();if(state.mode==='scholar')startTimer({resume:true});
@@ -990,6 +1053,7 @@
         if(state.order==='random')questions=shuffle(questions);
         if(state.retiredNavigation)questions=prioritizeRetiredQuestion(questions,state.retiredNavigation.questionId);
         state.questions=questions.slice(0,count);state.pendingSelections={};
+        state.markedQuestions=new Set();state.showAnswers=false;state.questionsShuffled=false;
         state.index=0;state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;state.health=state.maxHealth;state.challengeFailedShown=false;state.streak=0;state.maxStreak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
         createDraft(null);
         if(state.mode==='challenge'||state.mode==='scholar')showToast('答完全部题目将自动交卷；做错的题（含中途退出时已答的）都会记入复仇模式。');
@@ -1256,6 +1320,9 @@
     // 语言单按钮循环切换：中 → EN → 双 → 中
     const autoExplain=$('practiceAutoExplain');
     autoExplain?.addEventListener('change',()=>{global.KGActivitySchemaV1?.setPracticeAutoExplain?.(autoExplain.checked);renderQuestion()});
+    // 显示答案开关（会话态，随保存落库）；标记按钮只改本地状态与答题卡。
+    $('practiceShowAnswers')?.addEventListener('change',event=>{state.showAnswers=event.target.checked===true;renderQuestion()});
+    $('practiceMarkToggle')?.addEventListener('click',()=>toggleQuestionMark());
     dom.showPreviousWrong?.addEventListener('change',()=>{
       state.showPreviousWrong=dom.showPreviousWrong.checked;
       renderPreviousWrongAnswer(state.verification?.active?state.verification.question:state.questions[state.index]);
