@@ -638,6 +638,11 @@
     window.addEventListener("kg-subscription-change",()=>{if($("userCenterModal")&&$("userCenterModal").classList.contains("show"))fillForm()});
     window.addEventListener("kg-subscription-plan-change",()=>{if($("userCenterModal")&&$("userCenterModal").classList.contains("show"))fillForm()});
     window.addEventListener("kg-wechat-binding-change",()=>{if($("userCenterModal")&&$("userCenterModal").classList.contains("show"))fillForm()});
+    // 远程套餐价格异步到达时重绘已打开的会员权益弹窗：修复首次打开显示内置
+    // 兜底价（￥29）、再次打开才显示后台配置价的竞态（弹窗此前不监听该事件）。
+    window.addEventListener("kg-subscription-plan-change",()=>{
+      if($("userSubscriptionDetailModal")&&$("userSubscriptionDetailModal").classList.contains("show"))renderSubscriptionDetailPlans();
+    });
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);
   else init();

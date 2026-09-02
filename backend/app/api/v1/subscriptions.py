@@ -38,7 +38,11 @@ async def my_subscription(db: DB, user: CurrentUser):
 @router.get("/plans")
 async def plans(db: DB):
     """公开展示数据库中的套餐配置；下单仍要求已登录的学员。"""
-    return {"plans": await system_service.get_subscription_plans(db)}
+    # 套餐价格后台可改，禁止浏览器启发式缓存，防止改价后前端拿到旧价。
+    return JSONResponse(
+        {"plans": await system_service.get_subscription_plans(db)},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.post("/redeem")
