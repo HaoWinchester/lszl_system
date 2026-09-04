@@ -1,5 +1,21 @@
 import { validateSession } from '../../services/auth';
 import { getCurrentUser } from '../../services/session';
+import { listPublishedPapers } from '../../services/papers';
+import {
+  enterSession,
+  getActiveSessions,
+  getExperienceSummary,
+  getOverview,
+  getRevengeSummary,
+} from '../../services/practice';
+import { PaperSummary, PracticeMode, PracticeSession } from '../../types/api';
+
+const modes = [
+  { id: 'normal', title: '普通练习', copy: '边做边理解，提交后看解析', tone: 'green' },
+  { id: 'challenge', title: '挑战模式', copy: '带着时间感完成一组题', tone: 'clay' },
+  { id: 'scholar', title: '学霸模式', copy: '更紧凑的节奏与完整评分', tone: 'gold' },
+  { id: 'revenge', title: '错题复仇', copy: '重做、纠错，再完成一次验证', tone: 'clay' },
+];
 
 function greetingFor(hour: number): string {
   if (hour < 11) return '早上好';
@@ -14,6 +30,12 @@ Page({
     displayName: '同学',
     greeting: '你好',
     todayLabel: '',
+    modes,
+    papers: [] as PaperSummary[],
+    activeSession: null as PracticeSession | null,
+    overview: {},
+    experience: {},
+    revenge: {},
   },
 
   async onLoad() {
@@ -30,9 +52,55 @@ Page({
       wx.reLaunch({ url: '/pages/login/index' });
       return;
     }
+    this.setData({ displayName: user.display_name || user.username });
+    const results = await Promise.allSettled([
+      listPublishedPapers(1, 3),
+      getOverview(),
+      getExperienceSummary(),
+      getRevengeSummary(),
+      getActiveSessions(),
+    ]);
+    const paperResult: any = results[0];
+    const overviewResult: any = results[1];
+    const experienceResult: any = results[2];
+    const revengeResult: any = results[3];
+    const activeResult: any = results[4];
     this.setData({
-      displayName: user.display_name || user.username,
+      papers: paperResult.status === 'fulfilled' ? paperResult.value.items : [],
+      overview: overviewResult.status === 'fulfilled' ? overviewResult.value : {},
+      experience: experienceResult.status === 'fulfilled' ? experienceResult.value : {},
+      revenge: revengeResult.status === 'fulfilled' ? revengeResult.value : {},
+      activeSession: activeResult.status === 'fulfilled' ? activeResult.value[0] || null : null,
       loading: false,
     });
+  },
+
+  async onContinue() {
+    const current = this.data.activeSession;
+    if (!current) return;
+    try {
+      const entered = await enterSession({ sessionId: current.id });
+      wx.navigateTo({ url: `/pages/practice/index?sessionId=${encodeURIComponent(entered.session.id)}` });
+    } catch (error) {
+      wx.showModal({ title: '暂时无法继续', content: error instanceof Error ? error.message : '请稍后重试', showCancel: false });
+    }
+  },
+
+  onBrowsePapers() { wx.navigateTo({ url: '/pages/papers/index?mode=normal' }); },
+
+  onMode(event: any) {
+    const mode = event.currentTarget.dataset.mode as PracticeMode;
+    if (mode === 'revenge') {
+      wx.navigateTo({ url: '/pages/revenge/index' });
+      return;
+    }
+    wx.navigateTo({ url: `/pages/papers/index?mode=${mode}` });
+  },
+
+  onPaper(event: any) {
+    const paper = this.data.papers.find((item: PaperSummary) => item.releaseId === event.currentTarget.dataset.releaseId);
+    if (!paper) return;
+    const params = `paperId=${encodeURIComponent(paper.paperId)}&releaseId=${encodeURIComponent(paper.releaseId)}&title=${encodeURIComponent(paper.title)}&count=${paper.questionCount}&mode=normal`;
+    wx.navigateTo({ url: `/pages/practice-setup/index?${params}` });
   },
 });

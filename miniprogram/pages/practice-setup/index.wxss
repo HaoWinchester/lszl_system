@@ -1,0 +1,24 @@
+.setup-page { padding-bottom: calc(44rpx + env(safe-area-inset-bottom)); }
+.nav-bar { gap: 14rpx; padding-right: 176rpx; }
+.back { display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; border-radius: 50%; background: transparent; }
+.back::after, .choice::after, .line-option::after, .mode-option::after { border: 0; }
+.back-icon { width: 20rpx; height: 20rpx; border-bottom: 3rpx solid var(--ink); border-left: 3rpx solid var(--ink); transform: rotate(45deg); }
+.paper-heading { display: flex; flex-direction: column; padding: 44rpx 0 54rpx; border-bottom: 2rpx solid var(--line); }
+.setup-title { margin-top: 14rpx; color: var(--ink); font-family: "STSong", "Songti SC", serif; font-size: 42rpx; font-weight: 600; line-height: 1.38; }
+.setup-meta { margin-top: 14rpx; color: var(--muted); font-size: 25rpx; }
+.setting-section { padding-top: 48rpx; }
+.setting-label { color: var(--ink); font-size: 29rpx; font-weight: 650; }
+.choice-row { display: flex; flex-wrap: wrap; gap: 18rpx; margin-top: 22rpx; }
+.choice { min-width: 116rpx; min-height: 82rpx; padding: 0 26rpx; border: 2rpx solid var(--line); background: var(--surface); color: var(--muted); font-size: 27rpx; }
+.choice.is-active { border-color: var(--ink); background: var(--green-soft); color: var(--ink); }
+.option-list, .mode-list { margin-top: 16rpx; border-top: 2rpx solid var(--line); }
+.line-option, .mode-option { display: flex; align-items: center; width: 100%; min-height: 122rpx; padding: 20rpx 0; border-bottom: 2rpx solid var(--line); border-radius: 0; background: transparent; text-align: left; }
+.line-option > view:first-child, .mode-text { display: flex; flex: 1; flex-direction: column; }
+.line-title { color: var(--ink); font-size: 29rpx; font-weight: 600; line-height: 1.4; }
+.line-copy { margin-top: 7rpx; color: var(--muted); font-size: 24rpx; line-height: 1.45; }
+.radio { display: flex; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; margin-left: 24rpx; border: 2rpx solid #98a19d; border-radius: 50%; }
+.radio view { width: 20rpx; height: 20rpx; border-radius: 50%; background: var(--ink); }
+.mode-mark { width: 7rpx; height: 64rpx; margin-right: 24rpx; border-radius: 4rpx; background: var(--ink); }
+.mode-mark.clay { background: var(--clay); }
+.mode-mark.gold { background: var(--gold); }
+.start-button { width: 100%; margin-top: 60rpx; }

@@ -1,0 +1,24 @@
+<view class="page-shell papers-page" style="padding-top: {{statusBarHeight}}px">
+  <view class="nav-bar">
+    <button class="back" bindtap="onBack" aria-label="返回"><view class="back-icon"></view></button>
+    <text class="nav-title">试卷库</text>
+  </view>
+
+  <scroll-view class="filters" scroll-x enhanced show-scrollbar="false">
+    <button wx:for="{{subjects}}" wx:key="*this" class="filter {{subject === item ? 'is-active' : ''}}" data-subject="{{item}}" bindtap="onSubject">{{item}}</button>
+  </scroll-view>
+  <view class="access-filters">
+    <button class="access-filter {{access === 'all' ? 'is-active' : ''}}" data-access="all" bindtap="onAccess">全部</button>
+    <button class="access-filter {{access === 'free' ? 'is-active' : ''}}" data-access="free" bindtap="onAccess">免费</button>
+    <button class="access-filter {{access === 'member' ? 'is-active' : ''}}" data-access="member" bindtap="onAccess">会员试卷</button>
+  </view>
+
+  <view wx:if="{{loading}}" class="paper-loading">
+    <view wx:for="{{[1,2,3]}}" wx:key="*this" class="paper-skeleton"><view></view><view></view><view></view></view>
+  </view>
+  <empty-state wx:elif="{{error}}" title="试卷没有载入" body="{{error}}" action-text="重新加载" bind:action="loadPapers" />
+  <empty-state wx:elif="{{filtered.length === 0}}" title="这里还没有试卷" body="换一个科目或访问范围看看。" />
+  <view wx:else class="paper-list">
+    <paper-list-item wx:for="{{filtered}}" wx:key="releaseId" item="{{item}}" bind:select="onSelectPaper" />
+  </view>
+</view>

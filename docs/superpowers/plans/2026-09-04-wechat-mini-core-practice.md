@@ -175,7 +175,7 @@ git commit -m "feat: add mini practice client domain"
 - Consumes: `listPublishedPapers()`, `startSession({paperReleaseId, mode})`.
 - Produces: navigation query `pages/practice/index?sessionId=<encoded id>`.
 
-- [ ] **Step 1: Write the failing page contract**
+- [x] **Step 1: Write the failing page contract**
 
 ```javascript
 test('catalog and setup expose mobile-native empty/loading/error states', () => {
@@ -185,12 +185,12 @@ test('catalog and setup expose mobile-native empty/loading/error states', () => 
 });
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `node --test miniprogram/tests/catalog-pages-contract.test.mjs`
 Expected: FAIL because pages are absent.
 
-- [ ] **Step 3: Implement catalogue, filters, and setup**
+- [x] **Step 3: Implement catalogue, filters, and setup**
 
 On authenticated home load, request the paper catalog, practice overview, experience summary, revenge summary, and active sessions in parallel, while rendering each section independently if one request fails. Create a one-column mobile list with subject chips, free/member access state, paper title, question count, estimated duration, progress, and resume/new action. Setup presents question count, sequential/random order, and the available modes as compact rows, defaults to normal practice, handles `RESUMABLE_SESSION_EXISTS` with explicit continue/abandon choices, and blocks double submission while creating a session.
 
@@ -205,12 +205,12 @@ async start() {
 }
 ```
 
-- [ ] **Step 4: Run page contracts**
+- [x] **Step 4: Run page contracts**
 
 Run: `node --test miniprogram/tests/catalog-pages-contract.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add miniprogram/app.json miniprogram/components miniprogram/pages/home miniprogram/pages/papers miniprogram/pages/practice-setup miniprogram/tests/catalog-pages-contract.test.mjs

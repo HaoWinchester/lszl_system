@@ -1,7 +1,9 @@
 {
   "pages": [
     "pages/home/index",
-    "pages/login/index"
+    "pages/login/index",
+    "pages/papers/index",
+    "pages/practice-setup/index"
   ],
   "window": {
     "navigationStyle": "custom",
