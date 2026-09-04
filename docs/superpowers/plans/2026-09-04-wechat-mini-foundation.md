@@ -43,7 +43,7 @@
 - Produces: `WechatMiniAuthTicket`, `WechatMiniSession`; both use UUID text ids and UTC timestamps.
 - Produces: unique `token_digest`, unique `ticket_digest`, and indexed `username` foreign keys to `users.username`.
 
-- [ ] **Step 1: Write the failing model test**
+- [x] **Step 1: Write the failing model test**
 
 ```python
 from app.models.wechat_mini import WechatMiniAuthTicket, WechatMiniSession
@@ -54,12 +54,12 @@ def test_wechat_mini_auth_tables_are_registered():
     assert WechatMiniSession.__table__.c.token_digest.unique is True
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_wechat_mini_models.py -q`
 Expected: FAIL with `ModuleNotFoundError: app.models.wechat_mini`.
 
-- [ ] **Step 3: Implement the two models and migration**
+- [x] **Step 3: Implement the two models and migration**
 
 ```python
 class WechatMiniSession(Base):
@@ -77,12 +77,12 @@ class WechatMiniSession(Base):
 
 Create the analogous ticket model with `ticket_digest`, `openid`, nullable `unionid`, `created_at`, `expires_at`, and `consumed_at`. Import both in `models/__init__.py`; migration revision is `f4c8b6d9e120`, down revision is `e7b4c2d8a910`.
 
-- [ ] **Step 4: Run migration and model tests**
+- [x] **Step 4: Run migration and model tests**
 
 Run: `cd backend && .venv/bin/alembic upgrade head && .venv/bin/python -m pytest tests/test_wechat_mini_models.py -q`
 Expected: PASS and Alembic reaches `f4c8b6d9e120`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/models backend/alembic/versions backend/tests/test_wechat_mini_models.py
