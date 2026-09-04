@@ -17,7 +17,7 @@ test('catalog exposes loading, error recovery, empty, and access states', () => 
 });
 
 test('setup includes count, order, all supported paper modes, and resume recovery', () => {
-  const page = `${read('pages/practice-setup/index.wxml')}\n${read('pages/practice-setup/index.ts')}`;
+  const page = `${read('pages/practice-setup/index.wxml')}\n${read('pages/practice-setup/index.ts')}\n${read('domain/mode-policy.ts')}`;
   for (const label of ['题量', '顺序出题', '随机出题', '普通练习', '挑战模式', '学霸模式']) {
     assert.match(page, new RegExp(label));
   }

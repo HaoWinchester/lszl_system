@@ -1,12 +1,7 @@
 import { ApiError, messageOf } from '../../services/http';
 import { abandonSession, getSession, startSession } from '../../services/practice';
 import { PracticeMode, PracticeOrder } from '../../types/api';
-
-const modes = [
-  { id: 'normal', title: '普通练习', copy: '提交后即可查看答案与解析', tone: 'green' },
-  { id: 'challenge', title: '挑战模式', copy: '限时完成，交卷后统一查看结果', tone: 'clay' },
-  { id: 'scholar', title: '学霸模式', copy: '更紧凑的时间要求与完整评分', tone: 'gold' },
-];
+import { MODE_CHOICES } from '../../domain/mode-policy';
 
 Page({
   data: {
@@ -19,7 +14,7 @@ Page({
     count: 10,
     order: 'paper' as PracticeOrder,
     mode: 'normal' as PracticeMode,
-    modes,
+    modes: MODE_CHOICES,
     starting: false,
     error: '',
   },

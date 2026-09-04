@@ -40,7 +40,7 @@
 - Produces: `getModePolicy(mode: PracticeMode) -> ModePolicy` with `title`, `showTimer`, `revealAfterAnswer`, `revealAfterComplete`, `allowPause`, and `accent`.
 - Consumes: backend modes `normal`, `challenge`, `scholar`, `revenge` without client-side renaming.
 
-- [ ] **Step 1: Write failing policy tests**
+- [x] **Step 1: Write failing policy tests**
 
 ```javascript
 test('competitive modes never reveal per-question answers', () => {
@@ -52,12 +52,12 @@ test('competitive modes never reveal per-question answers', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `node --test miniprogram/tests/mode-policy.test.mjs`
 Expected: FAIL because the policy module is absent.
 
-- [ ] **Step 3: Implement and consume one policy table**
+- [x] **Step 3: Implement and consume one policy table**
 
 ```typescript
 export const MODE_POLICIES: Record<PracticeMode, ModePolicy> = {
@@ -70,12 +70,12 @@ export const MODE_POLICIES: Record<PracticeMode, ModePolicy> = {
 
 Use a small text timer beside progress, one accent line, and mode-specific copy; do not add badges, streak flames, confetti, or full-width status cards.
 
-- [ ] **Step 4: Run policy and practice contracts**
+- [x] **Step 4: Run policy and practice contracts**
 
 Run: `node --test miniprogram/tests/mode-policy.test.mjs miniprogram/tests/practice-page-contract.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add miniprogram/domain/mode-policy.ts miniprogram/pages/practice miniprogram/pages/practice-setup miniprogram/tests/mode-policy.test.mjs

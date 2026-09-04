@@ -5,8 +5,12 @@
 .exit::after, .sheet-entry::after, .mark-button::after, .previous::after, .submit::after { border: 0; }
 .exit-line { position: absolute; width: 29rpx; height: 3rpx; background: var(--ink); }.exit-line.first { transform: rotate(45deg); }.exit-line.second { transform: rotate(-45deg); }
 .progress-copy { display: flex; flex: 1; align-items: center; justify-content: center; gap: 18rpx; color: var(--muted); font-size: 24rpx; }.progress-copy text:first-child { color: var(--ink); font-weight: 600; }
+.progress-copy .timer { min-width: 76rpx; color: var(--ink); font-variant-numeric: tabular-nums; }
+.progress-copy .timer.urgent { color: var(--clay); font-weight: 650; }
 .sheet-entry { display: grid; grid-template-columns: repeat(2, 12rpx); gap: 7rpx; width: 72rpx; height: 72rpx; border-radius: 50%; background: transparent; }.sheet-entry view { width: 12rpx; height: 12rpx; border: 2rpx solid var(--ink); border-radius: 3rpx; }
 .progress-track { height: 5rpx; overflow: hidden; background: var(--surface-quiet); }.progress-value { height: 100%; background: var(--ink); transition: width .2s ease; }
+.progress-value.clay { background: var(--clay); }
+.progress-value.gold { background: var(--gold); }
 .practice-meta { display: flex; align-items: center; justify-content: space-between; padding-top: 22rpx; }
 .mark-button { min-height: 68rpx; padding: 0 4rpx 0 24rpx; background: transparent; color: var(--muted); font-size: 24rpx; }.mark-button.is-marked { color: var(--clay); }
 .question-loading { padding-top: 62rpx; }.question-loading view { height: 28rpx; margin-bottom: 28rpx; border-radius: 8rpx; background: var(--surface-quiet); }.question-loading view:nth-child(1) { width: 30%; height: 18rpx; }.question-loading view:nth-child(3) { height: 122rpx; }.question-loading view:nth-child(4) { height: 122rpx; }

@@ -33,7 +33,7 @@
     <text class="setting-label">练习方式</text>
     <view class="mode-list">
       <button wx:for="{{modes}}" wx:key="id" class="mode-option {{mode === item.id ? 'is-active' : ''}}" data-mode="{{item.id}}" bindtap="onMode">
-        <view class="mode-mark {{item.tone}}"></view>
+        <view class="mode-mark {{item.accent}}"></view>
         <view class="mode-text"><text class="line-title">{{item.title}}</text><text class="line-copy">{{item.copy}}</text></view>
         <view class="radio"><view wx:if="{{mode === item.id}}"></view></view>
       </button>

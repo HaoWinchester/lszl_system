@@ -1,4 +1,6 @@
 import { clearLocalDraft, loadLocalDraft, saveLocalDraft } from '../../domain/draft-store';
+import { formatTimer, getModePolicy } from '../../domain/mode-policy';
+import type { ModePolicy } from '../../domain/mode-policy';
 import { mergeDraft, moveQuestion, PracticeDraft, toggleAnswer, toggleMarked } from '../../domain/practice-state';
 import { ApiError, messageOf } from '../../services/http';
 import { completeSession, getSession, pauseSession, saveState, submitAnswer } from '../../services/practice';
@@ -21,6 +23,9 @@ function draftFor(session: PracticeSession, username: string, currentIndex: numb
 }
 
 Page({
+  timerId: 0 as any,
+  timerStartedAt: 0,
+  timerDeadline: 0,
   data: {
     statusBarHeight: 24,
     loading: true,
@@ -42,6 +47,9 @@ Page({
     busy: false,
     progressPercent: 0,
     modeTitle: '普通练习',
+    policy: getModePolicy('normal') as ModePolicy,
+    timerLabel: '',
+    timerUrgent: false,
   },
 
   onLoad(query: Record<string, string>) {
@@ -74,10 +82,12 @@ Page({
         markedIds: merged.state.markedQuestionIds,
         submittedById,
         saveState: merged.conflict ? 'conflict' : merged.pendingLocal ? 'local' : 'saved',
-        modeTitle: ({ practice: '普通练习', challenge: '挑战模式', scholar: '学霸模式', revenge: '错题复仇' } as any)[session.mode] || '练习',
+        policy: getModePolicy(session.mode),
+        modeTitle: getModePolicy(session.mode).title,
         loading: false,
       });
       this.refreshCurrent();
+      this.startModeTimer();
     } catch (error) {
       this.setData({ loading: false, error: messageOf(error) });
     }
@@ -92,11 +102,89 @@ Page({
       currentQuestion: entry.question,
       selectedIds: this.data.answers[questionId] || [],
       submitted,
-      showAnalysis: submitted && ['practice', 'revenge'].includes(this.data.session.mode),
+      showAnalysis: submitted && this.data.policy.revealAfterAnswer,
       marked: this.data.markedIds.includes(questionId),
       progressPercent: Math.round(((this.data.currentIndex + 1) / this.data.session.questions.length) * 100),
       sheetItems: this.buildSheetItems(),
     });
+  },
+
+  modeRuntimeState() {
+    const durationMs = this.timerStartedAt
+      ? Math.max(0, Date.now() - this.timerStartedAt)
+      : Number(this.data.session.runtimeState?.durationMs || this.data.session.stats?.durationMs || 0);
+    const runtimeState: Record<string, unknown> = {
+      currentIndex: this.data.currentIndex,
+      markedQuestionIds: this.data.markedIds,
+      durationMs,
+    };
+    if (this.data.policy.timerKind === 'countdown') {
+      runtimeState.remainingMs = Math.max(0, this.timerDeadline - Date.now());
+    }
+    return runtimeState;
+  },
+
+  startModeTimer(resetCountdown = false) {
+    this.stopModeTimer();
+    const policy = this.data.policy;
+    if (!policy.showTimer) return;
+    const priorDuration = Number(this.data.session.runtimeState?.durationMs || this.data.session.stats?.durationMs || 0);
+    this.timerStartedAt = Date.now() - priorDuration;
+    if (policy.timerKind === 'countdown') {
+      const saved = Number(this.data.session.runtimeState?.remainingMs);
+      const remaining = !resetCountdown && Number.isFinite(saved)
+        ? Math.max(0, saved)
+        : Number(policy.initialSeconds || 60) * 1000;
+      this.timerDeadline = Date.now() + remaining;
+    }
+    this.updateModeTimer();
+    this.timerId = setInterval(() => this.updateModeTimer(), 250);
+  },
+
+  stopModeTimer() {
+    if (this.timerId) clearInterval(this.timerId);
+    this.timerId = 0;
+  },
+
+  updateModeTimer() {
+    const policy = this.data.policy;
+    const remaining = policy.timerKind === 'countdown'
+      ? Math.max(0, this.timerDeadline - Date.now())
+      : Math.max(0, Date.now() - this.timerStartedAt);
+    this.setData({ timerLabel: formatTimer(remaining), timerUrgent: policy.timerKind === 'countdown' && remaining <= 10000 });
+    if (policy.timerKind === 'countdown' && remaining <= 0) {
+      this.stopModeTimer();
+      this.submitTimeout();
+    }
+  },
+
+  async submitTimeout() {
+    if (this.data.busy || this.data.submitted) return;
+    const entry = this.data.session.questions[this.data.currentIndex];
+    if (!entry) return;
+    this.setData({ busy: true, saveState: 'saving' });
+    try {
+      const result = await submitAnswer(this.data.session.id, {
+        revision: this.data.session.revision,
+        questionId: entry.questionId,
+        timedOut: true,
+        requestId: `timeout:${this.data.session.id}:${entry.questionId}:${this.data.session.revision}`,
+        runtimeState: this.modeRuntimeState(),
+      });
+      const questions = result.session.questions?.length ? result.session.questions : this.data.session.questions;
+      this.setData({
+        session: { ...result.session, questions },
+        submittedById: { ...this.data.submittedById, [entry.questionId]: true },
+        submitted: true,
+        showAnalysis: false,
+        busy: false,
+        saveState: 'saved',
+      });
+      wx.showToast({ title: '本题超时，已记为未答', icon: 'none' });
+      setTimeout(() => this.onNext(), 450);
+    } catch (error) {
+      await this.handleWriteError(error);
+    }
   },
 
   buildSheetItems() {
@@ -146,7 +234,7 @@ Page({
         session: { ...result.session, questions },
         submittedById,
         submitted: true,
-        showAnalysis: ['practice', 'revenge'].includes(result.session.mode),
+        showAnalysis: this.data.policy.revealAfterAnswer,
         currentQuestion: questions[this.data.currentIndex]?.question || entry.question,
         saveState: 'saved',
         busy: false,
@@ -165,7 +253,7 @@ Page({
       const session = await saveState(this.data.session.id, {
         revision: this.data.session.revision,
         requestId: `state:${this.data.session.id}:${this.data.session.revision}:${this.data.currentIndex}`,
-        runtimeState: { currentIndex: this.data.currentIndex, markedQuestionIds: this.data.markedIds },
+        runtimeState: this.modeRuntimeState(),
       });
       this.setData({ session: { ...session, questions: session.questions.length ? session.questions : this.data.session.questions }, saveState: 'saved' });
       this.saveDraft();
@@ -198,7 +286,14 @@ Page({
     if (this.data.currentIndex + 1 >= this.data.session.questions.length) { this.onComplete(); return; }
     this.goTo(moveQuestion(this.data.currentIndex, this.data.session.questions.length, 1));
   },
-  goTo(index: number) { this.setData({ currentIndex: index, error: '' }); this.refreshCurrent(); this.saveDraft(); this.persistRuntime(); },
+  goTo(index: number) {
+    const changed = index !== this.data.currentIndex;
+    this.setData({ currentIndex: index, error: '' });
+    this.refreshCurrent();
+    if (changed && this.data.policy.timerKind === 'countdown' && !this.data.submitted) this.startModeTimer(true);
+    this.saveDraft();
+    this.persistRuntime();
+  },
   onOpenSheet() { this.setData({ sheetOpen: true, sheetItems: this.buildSheetItems() }); },
   onCloseSheet() { this.setData({ sheetOpen: false }); },
   onSheetSelect(event: any) { this.setData({ sheetOpen: false }); this.goTo(event.detail.index); },
@@ -227,12 +322,27 @@ Page({
       const paused = await pauseSession(this.data.session.id, {
         revision: this.data.session.revision,
         requestId: `pause:${this.data.session.id}:${this.data.session.revision}`,
-        runtimeState: { currentIndex: this.data.currentIndex, markedQuestionIds: this.data.markedIds },
+        runtimeState: this.modeRuntimeState(),
       });
       this.setData({ session: paused, saveState: 'saved' });
     } catch (error) { this.saveDraft(); }
     wx.navigateBack({ delta: 1 });
   },
 
-  onHide() { this.saveDraft(); },
+  onShow() {
+    if (!this.data.loading && this.data.session.id && this.data.policy.showTimer && !this.timerId) this.startModeTimer();
+  },
+  onHide() {
+    this.saveDraft();
+    if (this.data.policy.showTimer) {
+      this.setData({
+        session: {
+          ...this.data.session,
+          runtimeState: { ...this.data.session.runtimeState, ...this.modeRuntimeState() },
+        },
+      });
+    }
+    this.stopModeTimer();
+  },
+  onUnload() { this.stopModeTimer(); },
 });
