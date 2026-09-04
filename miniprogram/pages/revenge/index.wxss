@@ -1,20 +1,20 @@
-.revenge-page { padding-bottom: calc(54rpx + env(safe-area-inset-bottom)); }
-.revenge-nav { gap: 12rpx; padding-right: 0; }
+.revenge-page { padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom)); }
+.revenge-nav { gap: var(--space-2); padding-right: 0; }
 .back { position: relative; display: flex; align-items: center; width: 62rpx; height: 72rpx; background: transparent; }
 .back view { width: 20rpx; height: 20rpx; border-bottom: 3rpx solid var(--ink); border-left: 3rpx solid var(--ink); transform: rotate(45deg); }
-.queue-count { margin-left: auto; color: var(--muted); font-size: 23rpx; }
-.stage-line { display: flex; justify-content: space-between; padding: 34rpx 0 30rpx; border-bottom: 2rpx solid var(--line); }
-.stage-line view { display: flex; align-items: center; gap: 10rpx; color: var(--muted); font-size: 22rpx; }
-.stage-line view text:first-child { display: flex; align-items: center; justify-content: center; width: 34rpx; height: 34rpx; border: 2rpx solid var(--line); border-radius: 50%; font-size: 20rpx; }
+.queue-count { margin-left: auto; color: var(--muted); font-size: var(--font-meta); }
+.stage-line { display: flex; justify-content: space-between; padding: var(--space-4) 0; border-bottom: 2rpx solid var(--line); }
+.stage-line view { display: flex; align-items: center; gap: var(--space-1); color: var(--muted); font-size: var(--font-meta); }
+.stage-line view text:first-child { display: flex; align-items: center; justify-content: center; width: 40rpx; height: 40rpx; border: 2rpx solid var(--line); border-radius: 50%; font-size: var(--font-meta); }
 .stage-line view.active { color: var(--ink); font-weight: 650; }
 .stage-line view.active text:first-child { border-color: var(--clay); background: var(--clay); color: #fffdf7; }
-.revenge-intro { display: flex; flex-direction: column; padding: 48rpx 0 18rpx; }
-.revenge-title { margin-top: 14rpx; color: var(--ink); font-family: "STSong", "Songti SC", serif; font-size: 41rpx; font-weight: 600; line-height: 1.4; }
-.revenge-copy { margin-top: 16rpx; color: var(--muted); font-size: 26rpx; line-height: 1.6; }
-.stage-action { width: 100%; margin-top: 48rpx; min-height: 96rpx; }
-.write-error { display: flex; align-items: center; justify-content: space-between; gap: 22rpx; margin-top: 30rpx; padding-top: 22rpx; border-top: 2rpx solid var(--line); color: var(--danger); font-size: 24rpx; }
+.revenge-intro { display: flex; flex-direction: column; padding: var(--space-5) 0 var(--space-2); }
+.revenge-title { margin-top: var(--space-2); color: var(--ink); font-size: var(--font-display); font-weight: 650; line-height: var(--line-tight); }
+.revenge-copy { margin-top: var(--space-2); color: var(--muted); font-size: var(--font-body); line-height: var(--line-body); }
+.stage-action { width: 100%; margin-top: var(--space-6); min-height: var(--touch-min); }
+.write-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); padding-top: var(--space-3); border-top: 2rpx solid var(--line); color: var(--danger); font-size: var(--font-meta); }
 .write-error text { flex: 1; }
-.write-error button { min-width: 154rpx; min-height: 72rpx; border-bottom: 2rpx solid var(--ink); border-radius: 0; background: transparent; color: var(--ink); font-size: 24rpx; }
-.revenge-loading { padding-top: 54rpx; }
+.write-error button { min-width: 160rpx; min-height: var(--touch-min); border-bottom: 2rpx solid var(--ink); border-radius: 0; background: transparent; color: var(--ink); font-size: var(--font-meta); }
+.revenge-loading { padding-top: var(--space-6); }
 .revenge-loading view { height: 30rpx; margin-bottom: 28rpx; border-radius: 8rpx; background: var(--surface-quiet); }
 .revenge-loading view:nth-child(2) { height: 124rpx; }

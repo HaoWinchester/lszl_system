@@ -61,3 +61,9 @@ test('completion shows answered and unanswered counts before submission', () => 
   assert.match(source, /completeSession/);
   assert.match(source, /requestId/);
 });
+
+test('practice action dock shares the page gutter and touch size', () => {
+  const styles = read('pages/practice/index.wxss');
+  assert.match(styles, /padding:\s*var\(--space-3\) var\(--page-gutter\)/);
+  assert.match(styles, /min-height:\s*var\(--touch-min\)/);
+});

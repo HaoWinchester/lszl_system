@@ -46,3 +46,10 @@ test('result and history routes are declared', () => {
   assert.ok(pages.includes('pages/result/index'));
   assert.ok(pages.includes('pages/history/index'));
 });
+
+test('result typography keeps only one explicit display exception', () => {
+  const styles = read('pages/result/index.wxss');
+  assert.doesNotMatch(styles, /font-family/);
+  assert.match(styles, /\.accuracy-number\s*\{[^}]*font-size:\s*104rpx/s);
+  assert.match(styles, /font-size:\s*var\(--font-display\)/);
+});

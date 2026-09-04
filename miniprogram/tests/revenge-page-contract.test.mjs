@@ -38,3 +38,10 @@ test('revenge route and APIs are wired without a second mistake store', () => {
   }
   assert.doesNotMatch(service, /createMistakeLedger|localMistakeStore/);
 });
+
+test('revenge page uses the shared title and metadata scale', () => {
+  const styles = read('pages/revenge/index.wxss');
+  assert.doesNotMatch(styles, /font-family/);
+  assert.match(styles, /font-size:\s*var\(--font-display\)/);
+  assert.match(styles, /font-size:\s*var\(--font-meta\)/);
+});
