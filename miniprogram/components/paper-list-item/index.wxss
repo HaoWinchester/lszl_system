@@ -1,14 +1,15 @@
 .paper-row {
+  --button-width: 100%;
   display: flex;
   align-items: stretch;
   flex-direction: column;
   width: 100%;
-  min-height: 238rpx;
-  padding: 30rpx 0 32rpx;
-  border-bottom: 2rpx solid #d8d7cc;
+  min-height: 224rpx;
+  padding: var(--space-4) 0;
+  border-bottom: 2rpx solid var(--line);
   border-radius: 0;
   background: transparent;
-  color: #243b35;
+  color: var(--text);
   text-align: left;
 }
 
@@ -20,73 +21,74 @@
   align-items: center;
 }
 
-.paper-meta { gap: 16rpx; }
+.paper-meta { gap: var(--space-2); }
 
 .subject,
 .access {
-  color: #718079;
-  font-size: 23rpx;
-  line-height: 1.4;
+  color: var(--muted);
+  font-size: var(--font-meta);
+  line-height: 1.45;
 }
 
 .access {
-  padding-left: 16rpx;
-  border-left: 2rpx solid #d8d7cc;
+  padding-left: var(--space-2);
+  border-left: 2rpx solid var(--line);
 }
 
-.access.member { color: #a78037; }
+.access.member { color: var(--gold); }
 
 .paper-title {
-  margin-top: 16rpx;
-  color: #173b32;
-  font-size: 33rpx;
+  margin-top: var(--space-2);
+  color: var(--ink);
+  font-size: var(--font-heading);
   font-weight: 650;
-  line-height: 1.4;
+  line-height: var(--line-title);
 }
 
 .paper-copy {
   display: -webkit-box;
   overflow: hidden;
-  margin-top: 10rpx;
-  color: #718079;
-  font-size: 25rpx;
-  line-height: 1.55;
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: var(--font-body);
+  line-height: var(--line-body);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
 .paper-foot {
-  gap: 24rpx;
+  gap: var(--space-3);
   margin-top: auto;
-  padding-top: 22rpx;
-  color: #718079;
-  font-size: 24rpx;
+  padding-top: var(--space-3);
+  color: var(--muted);
+  font-size: var(--font-meta);
 }
 
 .arrow {
   position: relative;
-  width: 34rpx;
-  height: 34rpx;
+  width: 32rpx;
+  height: 32rpx;
   margin-left: auto;
 }
 
 .arrow::after {
   position: absolute;
-  top: 9rpx;
-  right: 5rpx;
+  top: 8rpx;
+  right: 4rpx;
   width: 12rpx;
   height: 12rpx;
-  border-top: 3rpx solid #173b32;
-  border-right: 3rpx solid #173b32;
+  border-top: 3rpx solid var(--ink);
+  border-right: 3rpx solid var(--ink);
   content: "";
   transform: rotate(45deg);
 }
 
 .arrow-line {
   position: absolute;
-  top: 16rpx;
-  right: 6rpx;
-  width: 23rpx;
+  top: 15rpx;
+  right: 5rpx;
+  width: 24rpx;
   height: 3rpx;
-  background: #173b32;
+  background: var(--ink);
 }
+:host { display: block; width: 100%; }

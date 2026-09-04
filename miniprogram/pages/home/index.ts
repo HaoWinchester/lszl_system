@@ -78,7 +78,11 @@ Page({
     const current = this.data.activeSession;
     if (!current) return;
     try {
-      const entered = await enterSession({ sessionId: current.id });
+      const entered = await enterSession({
+        paperId: current.paperId,
+        releaseId: current.releaseId,
+        mode: current.mode,
+      });
       wx.navigateTo({ url: `/pages/practice/index?sessionId=${encodeURIComponent(entered.session.id)}` });
     } catch (error) {
       wx.showModal({ title: '暂时无法继续', content: error instanceof Error ? error.message : '请稍后重试', showCancel: false });

@@ -1,21 +1,21 @@
 .profile-page { padding-bottom: calc(154rpx + env(safe-area-inset-bottom)); }
-.identity { display: flex; flex-direction: column; padding: 64rpx 0 48rpx; border-bottom: 2rpx solid var(--line); }
-.profile-name { margin-top: 13rpx; color: var(--ink); font-family: "STSong", "Songti SC", serif; font-size: 50rpx; font-weight: 600; }
-.profile-username { margin-top: 10rpx; color: var(--muted); font-size: 24rpx; }
+.identity { display: flex; flex-direction: column; padding: var(--space-6) 0 var(--space-5); border-bottom: 2rpx solid var(--line); }
+.profile-name { margin-top: var(--space-2); color: var(--ink); font-size: var(--font-display); font-weight: 650; line-height: var(--line-tight); }
+.profile-username { margin-top: var(--space-1); color: var(--muted); font-size: var(--font-meta); line-height: 1.45; }
 .access-line { display: flex; align-items: center; justify-content: space-between; min-height: 132rpx; border-bottom: 2rpx solid var(--line); }
-.access-line > view:first-child { display: flex; flex-direction: column; padding: 24rpx 28rpx 24rpx 0; }
-.access-line text:first-child { color: var(--ink); font-size: 29rpx; font-weight: 650; }
-.access-line text:last-child { margin-top: 8rpx; color: var(--muted); font-size: 24rpx; line-height: 1.5; }
+.access-copy { display: flex; flex-direction: column; padding: var(--space-3) var(--space-4) var(--space-3) 0; }
+.access-title { color: var(--ink); font-size: var(--font-body); font-weight: 650; }
+.access-description { margin-top: var(--space-1); color: var(--muted); font-size: var(--font-meta); line-height: 1.45; }
 .access-mark { flex: 0 0 17rpx; width: 17rpx; height: 17rpx; border-top: 3rpx solid var(--ink); border-right: 3rpx solid var(--ink); transform: rotate(45deg); }
-.profile-section { padding-top: 52rpx; }
-.learning-facts { display: flex; margin-top: 24rpx; padding: 28rpx 0; border-top: 2rpx solid var(--line); border-bottom: 2rpx solid var(--line); }
-.learning-facts view { display: flex; flex: 1; flex-direction: column; }
-.learning-facts view + view { padding-left: 24rpx; border-left: 2rpx solid var(--line); }
-.learning-facts text:first-child { color: var(--ink); font-size: 34rpx; font-weight: 650; }
-.learning-facts text:last-child { margin-top: 8rpx; color: var(--muted); font-size: 22rpx; }
-.account-section button { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 100rpx; border-bottom: 2rpx solid var(--line); border-radius: 0; background: transparent; color: var(--ink); font-size: 28rpx; text-align: left; }
+.profile-section { padding-top: var(--space-5); }
+.learning-facts { display: flex; margin-top: var(--space-3); padding: var(--space-4) 0; border-top: 2rpx solid var(--line); border-bottom: 2rpx solid var(--line); }
+.learning-fact { display: flex; flex: 1; flex-direction: column; }
+.learning-fact.with-divider { padding-left: var(--space-3); border-left: 2rpx solid var(--line); }
+.learning-value { color: var(--ink); font-size: var(--font-nav); font-weight: 650; }
+.learning-label { margin-top: var(--space-1); color: var(--muted); font-size: var(--font-meta); }
+.account-row, .logout { --button-width: 100%; display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: var(--touch-min); border-bottom: 2rpx solid var(--line); border-radius: 0; background: transparent; color: var(--ink); font-size: var(--font-body); text-align: left; }
 .row-arrow { width: 15rpx; height: 15rpx; margin-right: 5rpx; border-top: 3rpx solid var(--muted); border-right: 3rpx solid var(--muted); transform: rotate(45deg); }
-.account-section .logout { justify-content: flex-start; margin-top: 24rpx; border-bottom: 0; color: var(--clay); }
-.profile-loading { padding-top: 70rpx; }
-.profile-loading view { height: 32rpx; margin-bottom: 30rpx; border-radius: 8rpx; background: var(--surface-quiet); }
-.profile-loading view:first-child { width: 42%; height: 76rpx; }
+.account-section .logout { justify-content: flex-start; margin-top: var(--space-3); border-bottom: 0; color: var(--clay); }
+.profile-loading { padding-top: var(--space-6); }
+.profile-loading-line { height: 32rpx; margin-bottom: var(--space-4); border-radius: 8rpx; background: var(--surface-quiet); }
+.profile-loading-line.is-lead { width: 42%; height: 76rpx; }

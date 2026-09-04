@@ -40,3 +40,16 @@ test('bottom navigation component styles use class selectors only', () => {
   assert.doesNotMatch(styles, /\.bottom-nav button/);
   assert.doesNotMatch(styles, /\.home-icon view/);
 });
+
+test('bottom navigation uses readable shared metadata sizing', () => {
+  const styles = read('components/bottom-nav/index.wxss');
+  assert.match(styles, /font-size:\s*var\(--font-meta\)/);
+  assert.match(styles, /min-height:\s*var\(--touch-min\)/);
+});
+
+test('profile identity and rows share the approved scale', () => {
+  const styles = read('pages/profile/index.wxss');
+  assert.doesNotMatch(styles, /font-family/);
+  assert.match(styles, /font-size:\s*var\(--font-display\)/);
+  assert.match(styles, /min-height:\s*var\(--touch-min\)/);
+});

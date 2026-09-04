@@ -24,7 +24,16 @@ test('question component is accessible, bilingual, image-aware, and touch sized'
   assert.match(wxml, /aria-checked/);
   assert.match(wxml, /stemEn/);
   assert.match(wxml, /previewImage/);
-  assert.match(read('components/question-view/index.wxss'), /min-height:\s*122rpx/);
+  assert.match(read('components/question-view/index.wxss'), /min-height:\s*var\(--option-min\)/);
+});
+
+test('question component uses the shared reading scale', () => {
+  const styles = read('components/question-view/index.wxss');
+  assert.match(styles, /font-size:\s*var\(--font-question\)/);
+  assert.match(styles, /font-size:\s*var\(--font-option\)/);
+  assert.match(styles, /min-height:\s*var\(--option-min\)/);
+  assert.match(styles, /padding:\s*var\(--space-3\)/);
+  assert.match(styles, /\.options\s+\.option\s*\{[^}]*width:\s*100%;[^}]*margin:\s*0;/s);
 });
 
 test('practice components avoid unsupported tag selectors', () => {
@@ -52,4 +61,16 @@ test('completion shows answered and unanswered counts before submission', () => 
   assert.match(source, /已答.*未答/);
   assert.match(source, /completeSession/);
   assert.match(source, /requestId/);
+});
+
+test('practice action dock shares the page gutter and touch size', () => {
+  const styles = read('pages/practice/index.wxss');
+  assert.match(styles, /padding:\s*var\(--space-3\) var\(--page-gutter\)/);
+  assert.match(styles, /min-height:\s*var\(--touch-min\)/);
+});
+
+test('practice header labels stay on one line at phone widths', () => {
+  const styles = read('pages/practice/index.wxss');
+  assert.match(styles, /\.progress-copy\s*\{[^}]*white-space:\s*nowrap;/s);
+  assert.match(styles, /\.progress-mode\s*\{[^}]*flex-shrink:\s*0;/s);
 });

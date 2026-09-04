@@ -402,7 +402,7 @@ Page({
   },
 
   async onExit() {
-    const decision = await wx.showModal({ title: '暂停练习', content: '当前选择会保留在本机，已提交的答案和进度会同步到服务器。', confirmText: '暂停并退出', cancelText: '继续做题' });
+    const decision = await wx.showModal({ title: '暂停练习', content: '当前选择会保留在本机，已提交的答案和进度会同步到服务器。', confirmText: '暂停退出', cancelText: '继续做题' });
     if (!decision.confirm) return;
     try {
       const paused: PracticeSession = await this.syncCoordinator.enqueueWrite({

@@ -23,8 +23,8 @@ test('setup includes count, order, all supported paper modes, and resume recover
   }
   const source = read('pages/practice-setup/index.ts');
   assert.match(source, /RESUMABLE_SESSION_EXISTS/);
-  assert.match(source, /继续上次/);
-  assert.match(source, /放弃后重新开始/);
+  assert.match(source, /confirmText:\s*'继续练习'/);
+  assert.match(source, /cancelText:\s*'重新开始'/);
 });
 
 test('home loads authoritative summaries in parallel and every visible entry has a handler', () => {
@@ -37,6 +37,7 @@ test('home loads authoritative summaries in parallel and every visible entry has
   assert.match(page, /bindtap="onContinue"/);
   assert.match(page, /bindtap="onBrowsePapers"/);
   assert.match(page, /bindtap="onMode"/);
+  assert.match(source, /enterSession\(\{\s*paperId:\s*current\.paperId,\s*releaseId:\s*current\.releaseId,\s*mode:\s*current\.mode,?\s*\}\)/s);
 });
 
 test('new pages are declared and remain one-column mobile layouts', () => {
@@ -44,4 +45,18 @@ test('new pages are declared and remain one-column mobile layouts', () => {
   assert.ok(app.pages.includes('pages/papers/index'));
   assert.ok(app.pages.includes('pages/practice-setup/index'));
   assert.doesNotMatch(`${read('pages/papers/index.wxss')}\n${read('pages/practice-setup/index.wxss')}`, /grid-template-columns\s*:\s*repeat\([2-9]/);
+});
+
+test('catalog and setup controls share touch size and spacing tokens', () => {
+  const styles = `${read('pages/papers/index.wxss')}\n${read('pages/practice-setup/index.wxss')}`;
+  assert.match(styles, /min-height:\s*var\(--touch-min\)/);
+  assert.match(styles, /font-size:\s*var\(--font-body\)/);
+  assert.doesNotMatch(styles, /font-family/);
+});
+
+test('practice count choices remain a three-column mobile row', () => {
+  const setupStyles = read('pages/practice-setup/index.wxss');
+  assert.match(setupStyles, /\.choice\s*\{[^}]*flex:\s*1;/s);
+  assert.match(setupStyles, /\.choice\s*\{[^}]*min-width:\s*0;/s);
+  assert.match(setupStyles, /\.choice\s*\{[^}]*margin:\s*0;/s);
 });

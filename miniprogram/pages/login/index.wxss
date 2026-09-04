@@ -6,52 +6,52 @@
 .intro {
   display: flex;
   flex-direction: column;
-  padding-top: 108rpx;
+  padding-top: var(--space-6);
 }
 
 .headline {
-  margin-top: 18rpx;
+  margin-top: var(--space-2);
   color: var(--ink);
-  font-family: "STSong", "Songti SC", serif;
-  font-size: 52rpx;
-  font-weight: 600;
-  line-height: 1.28;
+  font-size: var(--font-display);
+  font-weight: 650;
+  line-height: var(--line-tight);
 }
 
 .intro-copy {
   max-width: 610rpx;
-  margin-top: 28rpx;
+  margin-top: var(--space-3);
   color: var(--muted);
-  font-size: 28rpx;
-  line-height: 1.7;
+  font-size: var(--font-body);
+  line-height: var(--line-body);
 }
 
 .wechat-button {
-  margin-top: 112rpx;
+  margin-top: var(--space-6);
+  --button-width: 100%;
   width: 100%;
 }
 
 .binding-panel {
   display: flex;
   flex-direction: column;
-  gap: 22rpx;
-  margin-top: 70rpx;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
 }
 
 .binding-tabs {
   display: flex;
-  gap: 34rpx;
-  margin-bottom: 10rpx;
+  gap: var(--space-4);
+  margin-bottom: var(--space-1);
   border-bottom: 2rpx solid var(--line);
 }
 
 .binding-tab {
   position: relative;
-  min-height: 80rpx;
+  min-height: var(--touch-min);
   border-radius: 0;
   background: transparent;
   color: var(--muted);
-  font-size: 28rpx;
+  font-size: var(--font-body);
 }
 
 .binding-tab.is-active {
@@ -70,16 +70,17 @@
 }
 
 .submit-button {
-  margin-top: 12rpx;
+  margin-top: var(--space-2);
+  --button-width: 100%;
   width: 100%;
 }
 
 .legal-row {
   display: flex;
   align-items: flex-start;
-  gap: 18rpx;
+  gap: var(--space-2);
   margin-top: auto;
-  padding: 56rpx 0 8rpx;
+  padding: var(--space-5) 0 var(--space-1);
 }
 
 .check {
@@ -109,8 +110,8 @@
 
 .legal-copy {
   color: var(--muted);
-  font-size: 24rpx;
-  line-height: 1.6;
+  font-size: var(--font-meta);
+  line-height: var(--line-body);
 }
 
 .legal-link {

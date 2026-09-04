@@ -32,7 +32,7 @@
     </view>
     <view wx:if="{{papers.length}}" class="home-papers">
       <button wx:for="{{papers}}" wx:key="releaseId" class="home-paper" data-release-id="{{item.releaseId}}" bindtap="onPaper">
-        <view><text class="home-paper-subject">{{item.subject}}</text><text class="home-paper-title">{{item.title}}</text></view>
+        <view class="home-paper-body"><text class="home-paper-subject">{{item.subject}}</text><text class="home-paper-title">{{item.title}}</text></view>
         <text class="home-paper-count">{{item.questionCount}}题</text>
       </button>
     </view>
