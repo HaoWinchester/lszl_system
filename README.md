@@ -16,9 +16,11 @@
 ## 自动检查
 
 ```bash
-node --test miniprogram/tests/*.test.mjs
+cd miniprogram && npm test
 cd backend && .venv/bin/python -m pytest tests/ -q
 cd frontend && pnpm test
 ```
+
+小程序测试需要 Node.js 22.6 或更高版本；测试脚本已显式开启 TypeScript 类型擦除，Node 22 与 Node 24 均可执行。
 
 自动检查不代替微信开发者工具编译、真机安全区检查和用户 UAT 验收。

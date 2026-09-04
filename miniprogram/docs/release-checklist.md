@@ -45,7 +45,7 @@
 
 | 项目 | 结果 | 证据 |
 |---|---|---|
-| Node 小程序契约 | 通过 | 2026-09-04：`node --test miniprogram/tests/*.test.mjs`，41/41 通过 |
+| Node 小程序契约 | 通过 | 2026-09-04：Node 22.11 与 Node 24.7 分别运行 `cd miniprogram && npm test`，41/41 通过 |
 | FastAPI 后端全量 | 通过 | 2026-09-04：`backend/.venv/bin/python -m pytest backend/tests/ -q`，657/657 通过；1 个依赖库弃用警告 |
 | 网页端契约 | 通过 | 2026-09-04：`cd frontend && pnpm test`；239 项 Node、9 项端到端和 4 项 UAT 部署脚本检查通过 |
 | 微信开发者工具编译 | 未执行 | 当前主机未安装/未暴露开发者工具 |
