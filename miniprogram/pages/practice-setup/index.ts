@@ -69,8 +69,8 @@ Page({
     const decision = await wx.showModal({
       title: '已有未完成练习',
       content: '可以继续上次进度，也可以放弃后重新开始。',
-      confirmText: '继续上次',
-      cancelText: '放弃后重新开始',
+      confirmText: '继续练习',
+      cancelText: '重新开始',
     });
     if (decision.confirm) {
       wx.redirectTo({ url: `/pages/practice/index?sessionId=${encodeURIComponent(sessionId)}` });

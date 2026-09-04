@@ -50,3 +50,4 @@
 }
 
 .empty-action::after { border: 0; }
+:host { display: block; width: 100%; }

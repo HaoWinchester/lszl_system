@@ -21,6 +21,12 @@ button {
   line-height: 1;
 }
 
+button[class] {
+  width: var(--button-width, auto);
+  margin-left: 0;
+  margin-right: 0;
+}
+
 button::after {
   border: 0;
 }

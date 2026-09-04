@@ -74,6 +74,6 @@
 
 .paper-loading { padding-top: var(--space-3); }
 .paper-skeleton { padding: var(--space-5) 0; border-bottom: 2rpx solid var(--line); }
-.paper-skeleton view { width: 100%; height: 24rpx; margin-bottom: var(--space-3); border-radius: 8rpx; background: var(--surface-quiet); }
-.paper-skeleton view:first-child { width: 30%; height: 18rpx; }
-.paper-skeleton view:last-child { width: 55%; margin-bottom: 0; }
+.paper-skeleton-line { width: 100%; height: 24rpx; margin-bottom: var(--space-3); border-radius: 8rpx; background: var(--surface-quiet); }
+.paper-skeleton-line.is-short { width: 30%; height: 18rpx; }
+.paper-skeleton-line.is-medium { width: 55%; margin-bottom: 0; }

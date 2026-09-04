@@ -1,3 +1,4 @@
+:host { display: block; width: 100%; }
 .question { padding: var(--space-5) 0 220rpx; }
 .question-kind { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: var(--font-meta); line-height: 1.45; }
 .question-kind-label { color: var(--clay); font-weight: 600; }
@@ -6,7 +7,7 @@
 .question-images { margin-top: var(--space-3); overflow: hidden; border: 2rpx solid var(--line); border-radius: var(--radius-sm); }
 .question-image { display: block; width: 100%; }
 .options { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-5); }
-.option { display: flex; align-items: center; width: 100%; min-height: var(--option-min); padding: var(--space-3); border: 2rpx solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); text-align: left; }
+.options .option { display: flex; align-items: center; width: 100%; min-height: var(--option-min); margin: 0; padding: var(--space-3); border: 2rpx solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); text-align: left; }
 .option::after { border: 0; }
 .option.is-selected { border-color: var(--ink); background: var(--green-soft); }
 .option.is-locked { opacity: 1; }

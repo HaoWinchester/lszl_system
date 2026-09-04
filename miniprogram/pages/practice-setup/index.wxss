@@ -9,16 +9,16 @@
 .setting-section { padding-top: var(--space-6); }
 .setting-label { color: var(--ink); font-size: var(--font-heading); font-weight: 650; line-height: var(--line-title); }
 .choice-row { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
-.choice { min-width: 120rpx; min-height: var(--touch-min); padding: 0 var(--space-3); border: 2rpx solid var(--line); background: var(--surface); color: var(--muted); font-size: var(--font-body); }
+.choice { flex: 1; min-width: 0; min-height: var(--touch-min); margin: 0; padding: 0 var(--space-2); border: 2rpx solid var(--line); background: var(--surface); color: var(--muted); font-size: var(--font-body); }
 .choice.is-active { border-color: var(--ink); background: var(--green-soft); color: var(--ink); }
 .option-list, .mode-list { margin-top: var(--space-2); border-top: 2rpx solid var(--line); }
-.line-option, .mode-option { display: flex; align-items: center; width: 100%; min-height: var(--option-min); padding: var(--space-3) 0; border-bottom: 2rpx solid var(--line); border-radius: 0; background: transparent; text-align: left; }
-.line-option > view:first-child, .mode-text { display: flex; flex: 1; flex-direction: column; }
+.line-option, .mode-option { --button-width: 100%; display: flex; align-items: center; width: 100%; min-height: var(--option-min); padding: var(--space-3) 0; border-bottom: 2rpx solid var(--line); border-radius: 0; background: transparent; text-align: left; }
+.line-option-copy, .mode-text { display: flex; flex: 1; flex-direction: column; }
 .line-title { color: var(--ink); font-size: var(--font-body); font-weight: 600; line-height: var(--line-title); }
 .line-copy { margin-top: var(--space-1); color: var(--muted); font-size: var(--font-meta); line-height: 1.45; }
 .radio { display: flex; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; margin-left: 24rpx; border: 2rpx solid #98a19d; border-radius: 50%; }
-.radio view { width: 20rpx; height: 20rpx; border-radius: 50%; background: var(--ink); }
+.radio-dot { width: 20rpx; height: 20rpx; border-radius: 50%; background: var(--ink); }
 .mode-mark { width: 8rpx; height: 64rpx; margin-right: var(--space-3); border-radius: 4rpx; background: var(--ink); }
 .mode-mark.clay { background: var(--clay); }
 .mode-mark.gold { background: var(--gold); }
-.start-button { width: 100%; margin-top: var(--space-6); }
+.start-button { --button-width: 100%; width: 100%; margin-top: var(--space-6); }

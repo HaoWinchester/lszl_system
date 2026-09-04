@@ -77,3 +77,38 @@ test('WXML templates avoid unsupported inline collection literals', () => {
     .join('\n');
   assert.doesNotMatch(templates, /wx:for="\{\{\s*\[/);
 });
+
+test('native modal button labels stay within the WeChat four-character limit', () => {
+  const violations = sourceFiles()
+    .filter(path => path.endsWith('.ts'))
+    .flatMap(path => {
+      const source = readFileSync(path, 'utf8');
+      return [...source.matchAll(/(?:confirmText|cancelText)\s*:\s*['`]([^'`]+)['`]/g)]
+        .filter(match => [...match[1]].length > 4)
+        .map(match => `${relative(root, path)}: ${match[1]}`);
+    });
+  assert.deepEqual(violations, []);
+});
+
+test('classed buttons opt out of the native fixed width and declare intentional full widths', () => {
+  const appStyles = read('app.wxss');
+  assert.match(appStyles, /button\[class\]\s*\{[^}]*width:\s*var\(--button-width,\s*auto\);[^}]*margin-left:\s*0;[^}]*margin-right:\s*0;/s);
+
+  const fullWidthRules = [
+    ['pages/home/index.wxss', '.mode-row'],
+    ['pages/home/index.wxss', '.home-paper'],
+    ['pages/practice-setup/index.wxss', '.line-option, .mode-option'],
+    ['pages/practice-setup/index.wxss', '.start-button'],
+    ['pages/profile/index.wxss', '.account-row, .logout'],
+    ['pages/result/index.wxss', '.wrong-row'],
+    ['pages/result/index.wxss', '.next-action'],
+    ['pages/revenge/index.wxss', '.stage-action'],
+    ['components/paper-list-item/index.wxss', '.paper-row'],
+    ['components/answer-sheet/index.wxss', '.complete'],
+  ];
+  for (const [path, selector] of fullWidthRules) {
+    const styles = read(path);
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.match(styles, new RegExp(`${escaped}\\s*\\{[^}]*--button-width:\\s*100%;`, 's'), `${path} ${selector}`);
+  }
+});

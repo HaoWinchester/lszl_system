@@ -4,3 +4,4 @@
 .remediation-key { flex: 0 0 176rpx; color: var(--muted); }
 .remediation-value { color: var(--ink); font-weight: 600; text-align: right; }
 .remediation-copy { display: block; margin-top: var(--space-4); color: #263d36; font-size: var(--font-body); line-height: var(--line-question); }
+:host { display: block; width: 100%; }

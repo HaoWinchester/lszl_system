@@ -13,4 +13,4 @@
 .sheet-number.answered { border-color: #497465; background: var(--green-soft); color: var(--ink); }
 .sheet-number.current { border-color: var(--ink); box-shadow: inset 0 0 0 2rpx var(--ink); }
 .sheet-number.marked::before { position: absolute; top: var(--space-1); right: var(--space-1); width: 8rpx; height: 8rpx; border-radius: 50%; background: var(--clay); content: ""; }
-.complete { width: 100%; min-height: var(--touch-min); margin-top: var(--space-5); border-radius: var(--radius-sm); background: var(--ink); color: #fffdf7; font-size: var(--font-body); font-weight: 650; }
+.complete { --button-width: 100%; width: 100%; min-height: var(--touch-min); margin-top: var(--space-5); border-radius: var(--radius-sm); background: var(--ink); color: #fffdf7; font-size: var(--font-body); font-weight: 650; }

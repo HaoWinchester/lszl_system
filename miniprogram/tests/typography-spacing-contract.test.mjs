@@ -44,3 +44,28 @@ test('global tokens define the approved type and spacing system', () => {
     '--space-6: 48rpx', '--page-gutter: 32rpx', '--option-min: 104rpx',
   ]) assert.match(tokens, new RegExp(declaration.replace(': ', ':\\s*')));
 });
+
+test('page styles use class-based selectors supported by component wxss', () => {
+  const pageAndComponentStyles = wxssFiles()
+    .filter(path => /\/(pages|components)\//.test(path));
+  const unsupported = pageAndComponentStyles.flatMap(path => {
+    const source = readFileSync(path, 'utf8');
+    return source.split('\n').flatMap((line, index) => {
+      const selector = line.split('{', 1)[0];
+      const hasTagDescendant = /(?:^|,)\s*\.[\w-]+(?:\s*>\s*|\s+)(?:view|text|button|image|scroll-view|input)\b/.test(selector);
+      const hasAttributeSelector = /\[[^\]]+\]/.test(selector);
+      return hasTagDescendant || hasAttributeSelector
+        ? [`${relative(root, path)}:${index + 1}`]
+        : [];
+    });
+  });
+
+  assert.deepEqual(unsupported, []);
+});
+
+test('block-level visual components expose a full-width host', () => {
+  for (const component of ['question-view', 'paper-list-item', 'empty-state', 'remediation-note']) {
+    const styles = read(`components/${component}/index.wxss`);
+    assert.match(styles, /:host\s*\{[^}]*display:\s*block;[^}]*width:\s*100%;/s, component);
+  }
+});

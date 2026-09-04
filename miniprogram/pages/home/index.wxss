@@ -36,9 +36,9 @@
 }
 
 .continue-block { padding-bottom: var(--space-5); border-bottom: 2rpx solid var(--line); }
-.continue-button { width: 240rpx; margin-top: var(--space-3); }
+.continue-button { --button-width: 240rpx; width: 240rpx; margin-top: var(--space-3); }
 .mode-section { padding-top: var(--space-5); }
-.mode-row { display: flex; align-items: center; width: 100%; min-height: 126rpx; border-bottom: 2rpx solid var(--line); border-radius: 0; background: transparent; text-align: left; }
+.mode-row { --button-width: 100%; display: flex; align-items: center; width: 100%; min-height: 126rpx; border-bottom: 2rpx solid var(--line); border-radius: 0; background: transparent; text-align: left; }
 .mode-row::after, .all-papers::after, .home-paper::after { border: 0; }
 .mode-line { width: 6rpx; height: 56rpx; margin-right: var(--space-3); border-radius: 3rpx; background: var(--ink); }
 .mode-line.clay { background: var(--clay); }
@@ -50,8 +50,8 @@
 .paper-heading-row { display: flex; align-items: center; justify-content: space-between; margin-top: var(--space-6); }
 .all-papers { min-height: var(--touch-min); padding: 0 var(--space-1); background: transparent; color: var(--ink); font-size: var(--font-meta); text-decoration: underline; text-underline-offset: 5rpx; }
 .home-papers { margin-top: var(--space-1); }
-.home-paper { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 118rpx; border-bottom: 2rpx solid var(--line); border-radius: 0; background: transparent; text-align: left; }
-.home-paper > view { display: flex; flex: 1; flex-direction: column; padding-right: var(--space-3); }
+.home-paper { --button-width: 100%; display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 118rpx; border-bottom: 2rpx solid var(--line); border-radius: 0; background: transparent; text-align: left; }
+.home-paper-body { display: flex; flex: 1; flex-direction: column; padding-right: var(--space-3); }
 .home-paper-subject { color: var(--muted); font-size: var(--font-meta); }
 .home-paper-title { margin-top: var(--space-1); color: var(--ink); font-size: var(--font-body); font-weight: 600; line-height: var(--line-body); }
 .home-paper-count { color: var(--muted); font-size: var(--font-meta); }

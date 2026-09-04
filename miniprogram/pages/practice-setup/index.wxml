@@ -21,10 +21,10 @@
     <text class="setting-label">出题顺序</text>
     <view class="option-list">
       <button class="line-option {{order === 'paper' ? 'is-active' : ''}}" data-order="paper" bindtap="onOrder">
-        <view><text class="line-title">顺序出题</text><text class="line-copy">按照试卷原有顺序练习</text></view><view class="radio"><view wx:if="{{order === 'paper'}}"></view></view>
+        <view class="line-option-copy"><text class="line-title">顺序出题</text><text class="line-copy">按照试卷原有顺序练习</text></view><view class="radio"><view wx:if="{{order === 'paper'}}" class="radio-dot"></view></view>
       </button>
       <button class="line-option {{order === 'random' ? 'is-active' : ''}}" data-order="random" bindtap="onOrder">
-        <view><text class="line-title">随机出题</text><text class="line-copy">每次生成不同题目顺序</text></view><view class="radio"><view wx:if="{{order === 'random'}}"></view></view>
+        <view class="line-option-copy"><text class="line-title">随机出题</text><text class="line-copy">每次生成不同题目顺序</text></view><view class="radio"><view wx:if="{{order === 'random'}}" class="radio-dot"></view></view>
       </button>
     </view>
   </view>
@@ -35,7 +35,7 @@
       <button wx:for="{{modes}}" wx:key="id" class="mode-option {{mode === item.id ? 'is-active' : ''}}" data-mode="{{item.id}}" bindtap="onMode">
         <view class="mode-mark {{item.accent}}"></view>
         <view class="mode-text"><text class="line-title">{{item.title}}</text><text class="line-copy">{{item.copy}}</text></view>
-        <view class="radio"><view wx:if="{{mode === item.id}}"></view></view>
+        <view class="radio"><view wx:if="{{mode === item.id}}" class="radio-dot"></view></view>
       </button>
     </view>
   </view>

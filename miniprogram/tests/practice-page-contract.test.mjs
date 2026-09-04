@@ -33,6 +33,7 @@ test('question component uses the shared reading scale', () => {
   assert.match(styles, /font-size:\s*var\(--font-option\)/);
   assert.match(styles, /min-height:\s*var\(--option-min\)/);
   assert.match(styles, /padding:\s*var\(--space-3\)/);
+  assert.match(styles, /\.options\s+\.option\s*\{[^}]*width:\s*100%;[^}]*margin:\s*0;/s);
 });
 
 test('practice components avoid unsupported tag selectors', () => {
@@ -66,4 +67,10 @@ test('practice action dock shares the page gutter and touch size', () => {
   const styles = read('pages/practice/index.wxss');
   assert.match(styles, /padding:\s*var\(--space-3\) var\(--page-gutter\)/);
   assert.match(styles, /min-height:\s*var\(--touch-min\)/);
+});
+
+test('practice header labels stay on one line at phone widths', () => {
+  const styles = read('pages/practice/index.wxss');
+  assert.match(styles, /\.progress-copy\s*\{[^}]*white-space:\s*nowrap;/s);
+  assert.match(styles, /\.progress-mode\s*\{[^}]*flex-shrink:\s*0;/s);
 });
