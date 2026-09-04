@@ -41,6 +41,14 @@ test('history has loading, error recovery, empty, completed report, and resume p
   assert.match(read('pages/history/index.ts'), /listSessions/);
 });
 
+test('history preserves rendered records during background refreshes', () => {
+  const source = read('pages/history/index.ts');
+  assert.match(source, /pageRefreshMode/);
+  assert.match(source, /lastLoadedAt/);
+  assert.match(source, /silent/);
+  assert.match(source, /mode === 'skip'/);
+});
+
 test('result and history routes are declared', () => {
   const pages = JSON.parse(read('app.json')).pages;
   assert.ok(pages.includes('pages/result/index'));
@@ -59,4 +67,14 @@ test('history removes serif display type and oversized empty spacing', () => {
   assert.doesNotMatch(styles, /font-family/);
   assert.match(styles, /font-size:\s*var\(--font-display\)/);
   assert.doesNotMatch(styles, /padding:\s*58rpx 0 46rpx/);
+});
+
+test('history uses equal filters and normal-flow actions', () => {
+  const page = read('pages/history/index.wxml');
+  const styles = read('pages/history/index.wxss');
+  assert.match(page, /class="history-footer"/);
+  assert.match(styles, /\.history-filter\s*\{[^}]*flex:\s*1;/s);
+  assert.match(styles, /\.history-filter\s*\{[^}]*min-width:\s*0;/s);
+  assert.doesNotMatch(styles, /\.history-action\s*\{[^}]*position:\s*absolute/s);
+  assert.doesNotMatch(styles, /\.history-row\s*\{[^}]*padding:[^;}]*144rpx/s);
 });

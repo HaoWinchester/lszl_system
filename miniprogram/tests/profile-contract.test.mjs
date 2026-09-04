@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -25,24 +25,48 @@ test('profile reads server-owned learning and access state', () => {
   assert.match(source, /clearUserDrafts/);
 });
 
-test('shared bottom navigation connects home, history, and profile', () => {
+test('profile preserves rendered content during background refreshes', () => {
+  const source = read('pages/profile/index.ts');
+  assert.match(source, /pageRefreshMode/);
+  assert.match(source, /lastLoadedAt/);
+  assert.match(source, /silent/);
+  assert.match(source, /mode === 'skip'/);
+});
+
+test('native custom tab bar declares the three persistent primary pages', () => {
   const app = JSON.parse(read('app.json'));
-  assert.ok(app.pages.includes('pages/profile/index'));
-  const nav = read('components/bottom-nav/index.wxml');
-  for (const label of ['首页', '记录', '我的']) assert.match(nav, new RegExp(label));
+  assert.equal(app.tabBar?.custom, true);
+  assert.deepEqual(app.tabBar.list.map(item => item.pagePath), [
+    'pages/home/index',
+    'pages/history/index',
+    'pages/profile/index',
+  ]);
+});
+
+test('custom tab bar switches without relaunching page instances', () => {
+  assert.ok(existsSync(join(root, 'custom-tab-bar/index.ts')));
+  const source = read('custom-tab-bar/index.ts');
+  assert.match(source, /wx\.switchTab/);
+  assert.doesNotMatch(source, /wx\.reLaunch/);
+});
+
+test('primary pages delegate navigation to the native tab bar', () => {
   for (const page of ['home', 'history', 'profile']) {
-    assert.match(read(`pages/${page}/index.wxml`), /bottom-nav/);
+    assert.doesNotMatch(read(`pages/${page}/index.wxml`), /bottom-nav/);
+    assert.match(read(`pages/${page}/index.ts`), /selectPrimaryTab/);
   }
 });
 
-test('bottom navigation component styles use class selectors only', () => {
-  const styles = read('components/bottom-nav/index.wxss');
-  assert.doesNotMatch(styles, /\.bottom-nav button/);
+test('custom tab bar styles use component-safe class selectors', () => {
+  assert.ok(existsSync(join(root, 'custom-tab-bar/index.wxss')));
+  const styles = read('custom-tab-bar/index.wxss');
+  assert.doesNotMatch(styles, /\.tab-bar button/);
   assert.doesNotMatch(styles, /\.home-icon view/);
 });
 
-test('bottom navigation uses readable shared metadata sizing', () => {
-  const styles = read('components/bottom-nav/index.wxss');
+test('custom tab bar keeps readable metadata and touch sizing', () => {
+  assert.ok(existsSync(join(root, 'custom-tab-bar/index.wxss')));
+  const styles = read('custom-tab-bar/index.wxss');
   assert.match(styles, /font-size:\s*var\(--font-meta\)/);
   assert.match(styles, /min-height:\s*var\(--touch-min\)/);
 });
@@ -52,4 +76,20 @@ test('profile identity and rows share the approved scale', () => {
   assert.doesNotMatch(styles, /font-family/);
   assert.match(styles, /font-size:\s*var\(--font-display\)/);
   assert.match(styles, /min-height:\s*var\(--touch-min\)/);
+});
+
+test('profile presents real account information without invented fields', () => {
+  const page = read('pages/profile/index.wxml');
+  for (const label of ['个人信息', '显示名称', '登录账号', '账号身份', '学习权限', '数据同步']) {
+    assert.match(page, new RegExp(label));
+  }
+  assert.match(page, /avatarLetter/);
+  assert.doesNotMatch(page, /手机号|学校|地区|注册时间|编辑资料/);
+});
+
+test('profile information rows share a fixed mobile alignment column', () => {
+  const styles = read('pages/profile/index.wxss');
+  assert.match(styles, /\.info-row\s*\{[^}]*min-height:\s*var\(--touch-min\)/s);
+  assert.match(styles, /\.info-label\s*\{[^}]*flex:\s*0 0 144rpx/s);
+  assert.match(styles, /\.info-value\s*\{[^}]*text-align:\s*right/s);
 });

@@ -1,6 +1,8 @@
 import { messageOf } from '../../services/http';
 import { listSessions } from '../../services/practice';
 import { PracticeHistoryItem } from '../../types/api';
+import { pageRefreshMode } from '../../domain/page-freshness';
+import { selectPrimaryTab } from '../../domain/primary-tabs';
 
 const modeLabels: Record<string, string> = {
   practice: '普通练习', challenge: '挑战模式', scholar: '学霸模式', revenge: '错题复仇',
@@ -33,6 +35,7 @@ Page({
     loading: true,
     error: '',
     filter: 'all',
+    lastLoadedAt: 0,
     items: [] as ReturnType<typeof viewItem>[],
     visibleItems: [] as ReturnType<typeof viewItem>[],
   },
@@ -41,19 +44,34 @@ Page({
     this.setData({ statusBarHeight: wx.getWindowInfo?.().statusBarHeight || 24 });
   },
 
-  onShow() { this.loadHistory(); },
-
-  onPullDownRefresh() {
-    this.loadHistory().finally(() => wx.stopPullDownRefresh());
+  onShow() {
+    selectPrimaryTab(this as any, 1);
+    const mode = pageRefreshMode(this.data.lastLoadedAt);
+    if (mode === 'skip') return;
+    this.loadHistory({ silent: mode === 'silent' });
   },
 
-  async loadHistory() {
-    this.setData({ loading: true, error: '' });
+  onPullDownRefresh() {
+    this.loadHistory({ silent: this.data.lastLoadedAt > 0 }).finally(() => wx.stopPullDownRefresh());
+  },
+
+  async loadHistory(options: { silent?: boolean } = {}) {
+    const silent = options.silent === true && this.data.lastLoadedAt > 0;
+    if (!silent) this.setData({ loading: true, error: '' });
     try {
       const items = (await listSessions()).filter(item => item.sessionId).map(viewItem);
-      this.setData({ items, loading: false });
-      this.applyFilter();
+      const visibleItems = this.data.filter === 'all'
+        ? items
+        : items.filter(item => item.status === this.data.filter);
+      this.setData({
+        items,
+        visibleItems,
+        loading: false,
+        error: '',
+        lastLoadedAt: Date.now(),
+      });
     } catch (error) {
+      if (silent) return;
       this.setData({ loading: false, error: messageOf(error), items: [], visibleItems: [] });
     }
   },

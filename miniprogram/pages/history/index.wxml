@@ -2,22 +2,23 @@
   <view class="nav-bar history-nav"><text class="nav-title">练习记录</text></view>
   <view class="history-heading"><text class="history-title">你做过的题</text><text class="history-copy">记录与网页端同步，未完成的练习可以继续。</text></view>
   <view class="filters">
-    <button class="history-filter {{filter === 'all' ? 'active' : ''}}" data-filter="all" bindtap="onFilter">全部</button>
-    <button class="history-filter {{filter === 'completed' ? 'active' : ''}}" data-filter="completed" bindtap="onFilter">已交卷</button>
-    <button class="history-filter {{filter === 'paused' ? 'active' : ''}}" data-filter="paused" bindtap="onFilter">未完成</button>
+    <button class="history-filter {{filter === 'all' ? 'active' : ''}}" hover-class="history-filter-pressed" data-filter="all" bindtap="onFilter">全部</button>
+    <button class="history-filter {{filter === 'completed' ? 'active' : ''}}" hover-class="history-filter-pressed" data-filter="completed" bindtap="onFilter">已交卷</button>
+    <button class="history-filter {{filter === 'paused' ? 'active' : ''}}" hover-class="history-filter-pressed" data-filter="paused" bindtap="onFilter">未完成</button>
   </view>
 
   <view wx:if="{{loading}}" class="history-loading"><view class="history-loading-line"></view><view class="history-loading-line"></view><view class="history-loading-line"></view></view>
   <empty-state wx:elif="{{error}}" title="记录没有载入" body="{{error}}" action-text="重新加载" bind:action="loadHistory" />
-  <empty-state wx:elif="{{!visibleItems.length}}" title="还没有练习记录" body="完成或暂停一次练习后，会在这里留下记录。" />
+  <empty-state wx:elif="{{!visibleItems.length}}" title="还没有练习记录" body="完成或暂停练习后，记录会保存在这里。" />
   <view wx:else class="history-list">
     <view wx:for="{{visibleItems}}" wx:key="sessionId" class="history-row">
       <view class="history-meta"><text>{{item.dateLabel}}</text><text>{{item.modeLabel}}</text></view>
       <text class="paper-name">{{item.paperName}}</text>
-      <view class="history-result"><text class="history-score">{{item.resultLabel}}</text><text>{{item.statusLabel}}</text></view>
-      <button wx:if="{{item.canReport}}" class="history-action" data-session-id="{{item.sessionId}}" data-kind="report" bindtap="onOpen">查看报告</button>
-      <button wx:elif="{{item.canResume}}" class="history-action" data-session-id="{{item.sessionId}}" data-kind="resume" bindtap="onOpen">继续作答</button>
+      <view class="history-footer">
+        <view class="history-result"><text class="history-score">{{item.resultLabel}}</text><text>{{item.statusLabel}}</text></view>
+        <button wx:if="{{item.canReport}}" class="history-action" data-session-id="{{item.sessionId}}" data-kind="report" bindtap="onOpen">查看报告</button>
+        <button wx:elif="{{item.canResume}}" class="history-action" data-session-id="{{item.sessionId}}" data-kind="resume" bindtap="onOpen">继续作答</button>
+      </view>
     </view>
   </view>
 </view>
-<bottom-nav current="history" />

@@ -6,14 +6,24 @@
 
   <block wx:else>
     <view class="identity">
-      <text class="eyebrow">{{roleLabel}}</text>
-      <text class="profile-name">{{displayName}}</text>
-      <text class="profile-username">{{user.username}}</text>
+      <view class="avatar-mark" aria-hidden="true"><text class="avatar-letter">{{avatarLetter}}</text></view>
+      <view class="identity-copy">
+        <text class="eyebrow">{{roleLabel}}</text>
+        <text class="profile-name">{{displayName}}</text>
+        <text class="profile-username">{{user.username}}</text>
+      </view>
     </view>
 
-    <view class="access-line">
-      <view class="access-copy"><text class="access-title">{{accessTitle}}</text><text class="access-description">{{accessCopy}}</text></view>
-      <view class="access-mark"></view>
+    <view class="profile-section info-section">
+      <text class="section-kicker">个人信息</text>
+      <view class="info-list">
+        <view class="info-row"><text class="info-label">显示名称</text><text class="info-value">{{displayName}}</text></view>
+        <view class="info-row"><text class="info-label">登录账号</text><text class="info-value">{{user.username}}</text></view>
+        <view class="info-row"><text class="info-label">账号身份</text><text class="info-value">{{roleLabel}}</text></view>
+        <view class="info-row"><text class="info-label">学习权限</text><text class="info-value">{{accessTitle}}</text></view>
+        <view class="info-row"><text class="info-label">数据同步</text><text class="info-value sync-value">{{syncLabel}}</text></view>
+      </view>
+      <text class="access-description">{{accessCopy}}</text>
     </view>
 
     <view class="profile-section">
@@ -33,4 +43,3 @@
     </view>
   </block>
 </view>
-<bottom-nav current="profile" />

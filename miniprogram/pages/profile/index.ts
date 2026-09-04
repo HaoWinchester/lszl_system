@@ -5,6 +5,9 @@ import { messageOf } from '../../services/http';
 import { getExperienceSummary, listSessions } from '../../services/practice';
 import { getCurrentUser } from '../../services/session';
 import { getMySubscription } from '../../services/subscription';
+import { pageRefreshMode } from '../../domain/page-freshness';
+import { selectPrimaryTab } from '../../domain/primary-tabs';
+import { avatarLetterOf } from '../../domain/profile-view';
 
 const roleLabels: Record<string, string> = {
   admin: '管理员', teacher: '教师', student: '学员', viewer: '访客',
@@ -26,14 +29,17 @@ Page({
     statusBarHeight: 24,
     loading: true,
     error: '',
+    lastLoadedAt: 0,
     user: {} as any,
     displayName: '同学',
+    avatarLetter: '学',
     roleLabel: '学员',
     totalExperience: 0,
     weekExperience: 0,
     completedCount: 0,
     accessTitle: '基础权限',
     accessCopy: '会员试卷需在网页端开通',
+    syncLabel: '已与网页端同步',
     loggingOut: false,
   },
 
@@ -41,10 +47,16 @@ Page({
     this.setData({ statusBarHeight: wx.getWindowInfo?.().statusBarHeight || 24 });
   },
 
-  onShow() { this.loadProfile(); },
+  onShow() {
+    selectPrimaryTab(this as any, 2);
+    const mode = pageRefreshMode(this.data.lastLoadedAt);
+    if (mode === 'skip') return;
+    this.loadProfile({ silent: mode === 'silent' });
+  },
 
-  async loadProfile() {
-    this.setData({ loading: true, error: '' });
+  async loadProfile(options: { silent?: boolean } = {}) {
+    const silent = options.silent === true && this.data.lastLoadedAt > 0;
+    if (!silent) this.setData({ loading: true, error: '' });
     try {
       const user = await validateSession();
       if (!user) {
@@ -60,9 +72,11 @@ Page({
       const entitled = access.entitlements?.allExamPapers === true;
       const planId = String(access.subscription?.planId || 'free');
       const privileged = ['admin', 'teacher'].includes(user.role);
+      const displayName = user.display_name || user.username;
       this.setData({
         user,
-        displayName: user.display_name || user.username,
+        displayName,
+        avatarLetter: avatarLetterOf(displayName, user.username),
         roleLabel: roleLabels[user.role] || user.role,
         totalExperience: Number(experience.totalExperience || 0),
         weekExperience: Number(experience.weekExperience || 0),
@@ -72,8 +86,11 @@ Page({
           ? `${privileged ? '已开放全部试卷' : '已开放会员试卷'}${dateLabel(access.subscription?.expiresAt) ? ` · ${dateLabel(access.subscription.expiresAt)}` : ''}`
           : '可使用免费试卷；会员权限请在网页端开通',
         loading: false,
+        error: '',
+        lastLoadedAt: Date.now(),
       });
     } catch (error) {
+      if (silent) return;
       this.setData({ loading: false, error: messageOf(error) });
     }
   },
