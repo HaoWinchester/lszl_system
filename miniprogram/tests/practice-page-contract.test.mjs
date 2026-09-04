@@ -24,7 +24,15 @@ test('question component is accessible, bilingual, image-aware, and touch sized'
   assert.match(wxml, /aria-checked/);
   assert.match(wxml, /stemEn/);
   assert.match(wxml, /previewImage/);
-  assert.match(read('components/question-view/index.wxss'), /min-height:\s*122rpx/);
+  assert.match(read('components/question-view/index.wxss'), /min-height:\s*var\(--option-min\)/);
+});
+
+test('question component uses the shared reading scale', () => {
+  const styles = read('components/question-view/index.wxss');
+  assert.match(styles, /font-size:\s*var\(--font-question\)/);
+  assert.match(styles, /font-size:\s*var\(--font-option\)/);
+  assert.match(styles, /min-height:\s*var\(--option-min\)/);
+  assert.match(styles, /padding:\s*var\(--space-3\)/);
 });
 
 test('practice components avoid unsupported tag selectors', () => {
