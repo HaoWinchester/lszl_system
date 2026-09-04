@@ -1,0 +1,21 @@
+<view class="page-shell practice-page" style="padding-top: {{statusBarHeight}}px">
+  <view class="practice-nav">
+    <button class="exit" bindtap="onExit" aria-label="暂停并退出"><view class="exit-line first"></view><view class="exit-line second"></view></button>
+    <view class="progress-copy"><text>{{modeTitle}}</text><text>{{currentIndex + 1}} / {{session.questions.length}}</text></view>
+    <button class="sheet-entry" bindtap="onOpenSheet" aria-label="打开答题卡"><view wx:for="{{[1,2,3,4]}}" wx:key="*this"></view></button>
+  </view>
+  <view class="progress-track"><view class="progress-value" style="width: {{progressPercent}}%"></view></view>
+  <view class="practice-meta"><save-status state="{{saveState}}" /><button class="mark-button {{marked ? 'is-marked' : ''}}" bindtap="onMark">{{marked ? '已标记' : '标记此题'}}</button></view>
+
+  <view wx:if="{{loading}}" class="question-loading"><view></view><view></view><view></view><view></view></view>
+  <empty-state wx:elif="{{error}}" title="题目没有载入" body="{{error}}" action-text="重新加载" bind:action="loadSession" />
+  <question-view wx:else question="{{currentQuestion}}" selected-ids="{{selectedIds}}" submitted="{{submitted}}" show-analysis="{{showAnalysis}}" bind:change="onAnswerChange" />
+
+  <view wx:if="{{!loading && !error}}" class="answer-actions">
+    <button class="previous" disabled="{{currentIndex === 0 || busy}}" bindtap="onPrevious">上一题</button>
+    <button wx:if="{{!submitted}}" class="submit" loading="{{busy}}" disabled="{{busy || selectedIds.length === 0}}" bindtap="submitCurrent">确认答案</button>
+    <button wx:else class="submit" disabled="{{busy}}" bindtap="onNext">{{currentIndex + 1 === session.questions.length ? '检查交卷' : '下一题'}}</button>
+  </view>
+</view>
+
+<answer-sheet open="{{sheetOpen}}" items="{{sheetItems}}" bind:close="onCloseSheet" bind:select="onSheetSelect" bind:complete="onComplete" />

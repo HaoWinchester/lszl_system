@@ -232,7 +232,7 @@ git commit -m "feat: add paper discovery and practice setup"
 - Emits from `question-view`: `change` with `{questionId, selectedOptionIds}`.
 - Emits from `answer-sheet`: `select` with `{index}` and `close`.
 
-- [ ] **Step 1: Write failing answer-screen contracts**
+- [x] **Step 1: Write failing answer-screen contracts**
 
 ```javascript
 test('question screen is native, accessible, and has no answer leakage', () => {
@@ -244,12 +244,12 @@ test('question screen is native, accessible, and has no answer leakage', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `node --test miniprogram/tests/practice-page-contract.test.mjs`
 Expected: FAIL because practice components are absent.
 
-- [ ] **Step 3: Implement mobile answering and resilient saving**
+- [x] **Step 3: Implement mobile answering and resilient saving**
 
 Render one question per screen with a compact top progress bar, bilingual blocks without side-by-side columns, image preview via `wx.previewImage`, option buttons at least 61px high, bookmark, previous/next, and a bottom safe-area action bar. Debounce state persistence by 400ms, show `正在保存/已保存/离线草稿`, and on revision conflict reload server state before offering “使用服务器进度” or “保留本机草稿并重试”.
 
@@ -262,12 +262,12 @@ async persistDraft() {
 }
 ```
 
-- [ ] **Step 4: Run contracts and inspect at 390×844**
+- [x] **Step 4: Run contracts; retain 390×844 Developer Tools inspection in the release gate**
 
 Run: `node --test miniprogram/tests/practice-page-contract.test.mjs miniprogram/tests/practice-domain.test.mjs`
-Expected: PASS. Manual: no horizontal overflow; stem, options, bottom actions, and safe area remain readable.
+Expected: PASS. Automated size and source checks pass; the unavailable WeChat Developer Tools inspection remains in Advanced Delivery Task 5 and is not claimed as completed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add miniprogram/app.json miniprogram/components miniprogram/pages/practice miniprogram/tests/practice-page-contract.test.mjs

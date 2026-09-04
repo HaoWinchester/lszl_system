@@ -1,0 +1,15 @@
+.practice-page { padding-bottom: calc(154rpx + env(safe-area-inset-bottom)); }
+.practice-nav { display: flex; align-items: center; height: 88rpx; }
+.exit, .sheet-entry, .mark-button, .previous, .submit { display: flex; align-items: center; justify-content: center; }
+.exit { position: relative; width: 72rpx; height: 72rpx; border-radius: 50%; background: transparent; }
+.exit::after, .sheet-entry::after, .mark-button::after, .previous::after, .submit::after { border: 0; }
+.exit-line { position: absolute; width: 29rpx; height: 3rpx; background: var(--ink); }.exit-line.first { transform: rotate(45deg); }.exit-line.second { transform: rotate(-45deg); }
+.progress-copy { display: flex; flex: 1; align-items: center; justify-content: center; gap: 18rpx; color: var(--muted); font-size: 24rpx; }.progress-copy text:first-child { color: var(--ink); font-weight: 600; }
+.sheet-entry { display: grid; grid-template-columns: repeat(2, 12rpx); gap: 7rpx; width: 72rpx; height: 72rpx; border-radius: 50%; background: transparent; }.sheet-entry view { width: 12rpx; height: 12rpx; border: 2rpx solid var(--ink); border-radius: 3rpx; }
+.progress-track { height: 5rpx; overflow: hidden; background: var(--surface-quiet); }.progress-value { height: 100%; background: var(--ink); transition: width .2s ease; }
+.practice-meta { display: flex; align-items: center; justify-content: space-between; padding-top: 22rpx; }
+.mark-button { min-height: 68rpx; padding: 0 4rpx 0 24rpx; background: transparent; color: var(--muted); font-size: 24rpx; }.mark-button.is-marked { color: var(--clay); }
+.question-loading { padding-top: 62rpx; }.question-loading view { height: 28rpx; margin-bottom: 28rpx; border-radius: 8rpx; background: var(--surface-quiet); }.question-loading view:nth-child(1) { width: 30%; height: 18rpx; }.question-loading view:nth-child(3) { height: 122rpx; }.question-loading view:nth-child(4) { height: 122rpx; }
+.answer-actions { position: fixed; z-index: 10; right: 0; bottom: 0; left: 0; display: flex; gap: 18rpx; padding: 20rpx 36rpx calc(20rpx + env(safe-area-inset-bottom)); border-top: 2rpx solid var(--line); background: #f4f0e7; }
+.previous { flex: 0 0 176rpx; min-height: 96rpx; border: 2rpx solid var(--ink); background: transparent; color: var(--ink); font-size: 28rpx; }.previous[disabled] { border-color: var(--line); color: #a5aaa6; }
+.submit { flex: 1; min-height: 96rpx; background: var(--ink); color: #fffdf7; font-size: 29rpx; font-weight: 650; }.submit[disabled] { background: #aeb8b2; color: #f7f5ef; }

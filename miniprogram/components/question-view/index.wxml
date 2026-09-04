@@ -1,0 +1,18 @@
+<view class="question">
+  <view class="question-kind"><text>{{displayQuestion.type === 'multiple_choice' ? '多选题' : '单选题'}}</text><text wx:if="{{displayQuestion.type === 'multiple_choice'}}">请选择所有正确选项</text></view>
+  <rich-text class="stem" nodes="{{displayQuestion.stemNodes}}"></rich-text>
+  <text wx:if="{{displayQuestion.stemEn}}" class="stem-en">{{displayQuestion.stemEn}}</text>
+  <view wx:if="{{displayQuestion.images.length}}" class="question-images">
+    <image wx:for="{{displayQuestion.images}}" wx:key="*this" class="question-image" src="{{item}}" mode="widthFix" data-src="{{item}}" bindtap="previewImage" />
+  </view>
+  <view class="options">
+    <button wx:for="{{displayOptions}}" wx:key="id" class="option {{item.selected ? 'is-selected' : ''}} {{submitted ? 'is-locked' : ''}}" data-id="{{item.id}}" disabled="{{submitted}}" bindtap="onChoose" aria-label="选项 {{item.id}} {{item.text}}" aria-checked="{{item.selected}}" role="radio">
+      <view class="option-key">{{item.id}}</view>
+      <view class="option-copy"><text>{{item.text}}</text><text wx:if="{{item.textEn}}" class="option-en">{{item.textEn}}</text></view>
+    </button>
+  </view>
+  <view wx:if="{{showAnalysis && (displayQuestion.analysis || displayQuestion.explanation)}}" class="analysis">
+    <text class="analysis-label">解析</text>
+    <text class="analysis-copy">{{displayQuestion.analysis || displayQuestion.explanation}}</text>
+  </view>
+</view>

@@ -85,12 +85,13 @@ export async function getSession(sessionId: string): Promise<PracticeSession> {
 }
 
 export async function submitAnswer(sessionId: string, input: SessionWriteInput): Promise<any> {
-  return request({
+  const payload: any = await request({
     path: `${ROOT}/sessions/${encodeURIComponent(sessionId)}/answers`,
     method: 'POST',
     data: input,
     idempotencyKey: input.requestId,
   });
+  return { ...payload, session: normalizeSession(payload.session) };
 }
 
 export async function saveState(sessionId: string, input: SessionWriteInput): Promise<PracticeSession> {

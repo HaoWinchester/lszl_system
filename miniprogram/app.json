@@ -3,7 +3,8 @@
     "pages/home/index",
     "pages/login/index",
     "pages/papers/index",
-    "pages/practice-setup/index"
+    "pages/practice-setup/index",
+    "pages/practice/index"
   ],
   "window": {
     "navigationStyle": "custom",

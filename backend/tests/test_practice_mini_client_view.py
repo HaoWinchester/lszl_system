@@ -44,6 +44,27 @@ def test_normal_answer_can_reveal_only_when_route_allows_it() -> None:
     assert revealed is not source
 
 
+def test_normal_answer_reveals_only_the_submitted_question() -> None:
+    source = {
+        "session": {
+            "mode": "practice",
+            "status": "active",
+            "questions": [
+                {"questionId": "q1", "question": {"analysis": "第一题", "correctAnswer": "A"}},
+                {"questionId": "q2", "question": {"analysis": "第二题", "correctAnswer": "B"}},
+            ],
+        },
+        "answer": {"questionId": "q1", "correctAnswer": "A", "correct": True},
+    }
+    result = project_practice_payload(source, transport="bearer", allow_current_reveal=True)
+    assert result["answer"] == source["answer"]
+    assert result["session"]["questions"][0]["question"] == {
+        "analysis": "第一题",
+        "correctAnswer": "A",
+    }
+    assert result["session"]["questions"][1]["question"] == {}
+
+
 def test_completed_session_can_reveal_for_every_mode() -> None:
     source = {
         "session": {"mode": "scholar", "status": "completed"},

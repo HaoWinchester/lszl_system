@@ -54,7 +54,8 @@ export interface PracticeSession {
   currentIndex?: number;
   questions: SessionQuestion[];
   markedQuestionIds?: string[];
-  answers?: Array<Record<string, unknown>>;
+  answers?: Record<string, Record<string, unknown>>;
+  runtimeState?: Record<string, any>;
   stats?: { total?: number; answered?: number; correct?: number; wrong?: number };
   remainingMs?: number;
   updatedAt?: number | string;

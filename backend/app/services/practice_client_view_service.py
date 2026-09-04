@@ -51,6 +51,35 @@ def _strip_hidden(value: Any) -> Any:
     return deepcopy(value)
 
 
+def _reveal_submitted_question(source: dict, projected: dict) -> dict:
+    answer = source.get("answer")
+    if not isinstance(answer, dict):
+        return projected
+    projected["answer"] = deepcopy(answer)
+    question_id = str(answer.get("questionId") or answer.get("question_id") or "")
+    source_session = source.get("session")
+    projected_session = projected.get("session")
+    if not question_id or not isinstance(source_session, dict) or not isinstance(projected_session, dict):
+        return projected
+    source_questions = source_session.get("questions")
+    projected_questions = projected_session.get("questions")
+    if not isinstance(source_questions, list) or not isinstance(projected_questions, list):
+        return projected
+    for source_entry, projected_entry in zip(source_questions, projected_questions):
+        if not isinstance(source_entry, dict) or not isinstance(projected_entry, dict):
+            continue
+        entry_id = str(
+            source_entry.get("questionId")
+            or source_entry.get("question_id")
+            or (source_entry.get("question") or {}).get("id")
+            or ""
+        )
+        if entry_id == question_id and isinstance(source_entry.get("question"), dict):
+            projected_entry["question"] = deepcopy(source_entry["question"])
+            break
+    return projected
+
+
 def project_practice_payload(
     payload: Any,
     *,
@@ -67,6 +96,7 @@ def project_practice_payload(
     mode, status = _session_context(payload)
     if status in COMPLETED_STATUSES:
         return deepcopy(payload)
-    if allow_current_reveal and mode in IMMEDIATE_REVEAL_MODES:
-        return deepcopy(payload)
-    return _strip_hidden(payload)
+    projected = _strip_hidden(payload)
+    if allow_current_reveal and mode in IMMEDIATE_REVEAL_MODES and isinstance(payload, dict):
+        return _reveal_submitted_question(payload, projected)
+    return projected
