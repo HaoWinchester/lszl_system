@@ -1,6 +1,6 @@
 .profile-page { padding-bottom: calc(154rpx + env(safe-area-inset-bottom)); }
 .identity { display: flex; align-items: center; padding: var(--space-6) 0 var(--space-5); border-bottom: 2rpx solid var(--line); }
-.avatar-mark { display: flex; align-items: center; justify-content: center; flex: 0 0 96rpx; width: 96rpx; height: 96rpx; border: 2rpx solid var(--ink); border-radius: 50%; background: var(--green-soft); color: var(--ink); }
+.avatar-mark { display: flex; align-items: center; justify-content: center; flex: 0 0 96rpx; width: 96rpx; height: 96rpx; border: 2rpx solid var(--ink); border-radius: var(--radius-sm); background: var(--green-soft); color: var(--ink); }
 .avatar-letter { font-size: var(--font-question); font-weight: 650; line-height: 1; }
 .identity-copy { display: flex; min-width: 0; margin-left: var(--space-4); flex-direction: column; }
 .profile-name { overflow: hidden; margin-top: var(--space-1); color: var(--ink); font-size: var(--font-display); font-weight: 650; line-height: var(--line-tight); text-overflow: ellipsis; white-space: nowrap; }
@@ -15,7 +15,7 @@
 .learning-facts { display: flex; margin-top: var(--space-3); padding: var(--space-4) 0; border-top: 2rpx solid var(--line); border-bottom: 2rpx solid var(--line); }
 .learning-fact { display: flex; align-items: center; flex: 1; min-width: 0; flex-direction: column; text-align: center; }
 .learning-fact.with-divider { border-left: 2rpx solid var(--line); }
-.learning-value { color: var(--ink); font-size: var(--font-nav); font-weight: 650; }
+.learning-value { color: var(--ink); font-size: var(--font-nav); font-variant-numeric: tabular-nums; font-weight: 650; }
 .learning-label { margin-top: var(--space-1); color: var(--muted); font-size: var(--font-meta); }
 .account-row, .logout { --button-width: 100%; display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: var(--touch-min); border-bottom: 2rpx solid var(--line); border-radius: 0; background: transparent; color: var(--ink); font-size: var(--font-body); text-align: left; }
 .row-arrow { width: 15rpx; height: 15rpx; margin-right: 5rpx; border-top: 3rpx solid var(--muted); border-right: 3rpx solid var(--muted); transform: rotate(45deg); }

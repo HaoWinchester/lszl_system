@@ -1,8 +1,9 @@
 :host { display: block; }
 .tab-bar { position: fixed; z-index: 20; right: 0; bottom: 0; left: 0; display: flex; height: calc(120rpx + env(safe-area-inset-bottom)); padding: var(--space-1) var(--space-6) env(safe-area-inset-bottom); border-top: 2rpx solid var(--line); background: var(--paper, #f4f0e7); }
-.tab-item { --button-width: auto; display: flex; align-items: center; justify-content: center; flex: 1; flex-direction: column; gap: var(--space-1); min-height: var(--touch-min); margin: 0; padding: 0; border-radius: 0; background: transparent; color: #77837e; font-size: var(--font-meta); line-height: 1; }
+.tab-item { --button-width: auto; display: flex; align-items: center; justify-content: center; flex: 1; flex-direction: column; gap: var(--space-1); min-height: var(--touch-min); margin: 0; padding: 0; border-radius: 0; background: transparent; color: #77837e; font-size: var(--font-meta); line-height: 1; transition: color 160ms ease, opacity 160ms ease; }
 .tab-item::after { border: 0; }
 .tab-item.active { color: #173b32; }
+.tab-item-pressed { opacity: .62; }
 .tab-label { line-height: 1; }
 .tab-icon { position: relative; width: 40rpx; height: 40rpx; }
 .home-icon { border-right: 3rpx solid currentColor; border-bottom: 3rpx solid currentColor; border-left: 3rpx solid currentColor; border-radius: 3rpx; transform: translateY(5rpx) rotate(45deg) scale(.72); }

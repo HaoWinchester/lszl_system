@@ -4,8 +4,9 @@
 .history-title { color: var(--ink); font-size: var(--font-display); font-weight: 650; line-height: var(--line-tight); }
 .history-copy { margin-top: var(--space-2); color: var(--muted); font-size: var(--font-body); line-height: var(--line-body); }
 .filters { display: flex; border-bottom: 2rpx solid var(--line); }
-.history-filter { --button-width: 33.333%; position: relative; display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0; min-height: var(--touch-min); padding: 0; border-bottom: 4rpx solid transparent; border-radius: 0; background: transparent; color: var(--muted); font-size: var(--font-body); text-align: center; }
+.history-filter { --button-width: 33.333%; position: relative; display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0; min-height: var(--touch-min); padding: 0; border-bottom: 4rpx solid transparent; border-radius: 0; background: transparent; color: var(--muted); font-size: var(--font-body); text-align: center; transition: color 160ms ease, opacity 160ms ease; }
 .history-filter.active { border-bottom-color: var(--ink); color: var(--ink); font-weight: 600; }
+.history-filter-pressed { opacity: .62; }
 .history-loading { padding-top: var(--space-4); }
 .history-loading-line { height: 136rpx; border-bottom: 2rpx solid var(--line); }
 .history-list { padding-top: var(--space-1); }
