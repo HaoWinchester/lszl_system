@@ -1,5 +1,5 @@
 .home-page {
-  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(154rpx + env(safe-area-inset-bottom));
 }
 
 .welcome {

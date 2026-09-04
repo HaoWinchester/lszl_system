@@ -1,0 +1,36 @@
+<view class="page-shell profile-page" style="padding-top: {{statusBarHeight}}px">
+  <view class="nav-bar"><text class="nav-title">我的</text></view>
+
+  <view wx:if="{{loading}}" class="profile-loading"><view></view><view></view><view></view></view>
+  <empty-state wx:elif="{{error}}" title="账号信息没有载入" body="{{error}}" action-text="重新加载" bind:action="loadProfile" />
+
+  <block wx:else>
+    <view class="identity">
+      <text class="eyebrow">{{roleLabel}}</text>
+      <text class="profile-name">{{displayName}}</text>
+      <text class="profile-username">{{user.username}}</text>
+    </view>
+
+    <view class="access-line">
+      <view><text>{{accessTitle}}</text><text>{{accessCopy}}</text></view>
+      <view class="access-mark"></view>
+    </view>
+
+    <view class="profile-section">
+      <text class="section-kicker">学习数据</text>
+      <view class="learning-facts">
+        <view><text>{{totalExperience}}</text><text>累计经验</text></view>
+        <view><text>{{weekExperience}}</text><text>本周经验</text></view>
+        <view><text>{{completedCount}}</text><text>完成练习</text></view>
+      </view>
+    </view>
+
+    <view class="profile-section account-section">
+      <text class="section-kicker">账号与安全</text>
+      <button data-document="privacy" bindtap="onOpenLegal"><text>隐私政策</text><view class="row-arrow"></view></button>
+      <button data-document="terms" bindtap="onOpenLegal"><text>用户协议</text><view class="row-arrow"></view></button>
+      <button class="logout" loading="{{loggingOut}}" disabled="{{loggingOut}}" bindtap="onLogout">退出登录</button>
+    </view>
+  </block>
+</view>
+<bottom-nav current="profile" />

@@ -16,3 +16,11 @@ export function loadLocalDraft(username: string, sessionId: string): PracticeDra
 export function clearLocalDraft(username: string, sessionId: string): void {
   wx.removeStorageSync(key(username, sessionId));
 }
+
+export function clearUserDrafts(username: string): void {
+  const prefix = `practice-draft:${username}:`;
+  const keys = wx.getStorageInfoSync()?.keys || [];
+  for (const storageKey of keys) {
+    if (String(storageKey).startsWith(prefix)) wx.removeStorageSync(storageKey);
+  }
+}

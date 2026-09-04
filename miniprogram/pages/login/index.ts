@@ -1,5 +1,6 @@
 import { bindExistingAccount, loginWithWechat, registerAccount } from '../../services/auth';
 import { messageOf } from '../../services/http';
+import { showLegalDocument } from '../../domain/legal-copy';
 
 Page({
   data: {
@@ -24,15 +25,7 @@ Page({
   },
 
   onOpenLegal(event: any) {
-    const privacy = event.currentTarget.dataset.document === 'privacy';
-    wx.showModal({
-      title: privacy ? '隐私政策' : '用户协议',
-      content: privacy
-        ? '登录会使用微信身份标识，并同步你在幻谱系统中的学习进度。账号和做题数据由服务器保存。'
-        : '请使用本人账号学习，遵守题库使用规则。提交后生成的成绩、错题与经验会同步到你的账号。',
-      showCancel: false,
-      confirmText: '知道了',
-    });
+    showLegalDocument(event.currentTarget.dataset.document === 'privacy' ? 'privacy' : 'terms');
   },
 
   onModeChange(event: any) {

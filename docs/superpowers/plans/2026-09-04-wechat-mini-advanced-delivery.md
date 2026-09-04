@@ -196,7 +196,7 @@ git commit -m "fix: make mini practice saving resilient"
 - Consumes: current-user/session, experience summary, subscription state, and mini logout endpoints.
 - Produces: explicit logout; legal/privacy links; access-state messaging without payment initiation.
 
-- [ ] **Step 1: Write failing profile contracts**
+- [x] **Step 1: Write failing profile contracts**
 
 ```javascript
 test('profile exposes identity, legal links, and logout without payment', () => {
@@ -206,21 +206,21 @@ test('profile exposes identity, legal links, and logout without payment', () => 
 });
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `node --test miniprogram/tests/profile-contract.test.mjs`
 Expected: FAIL because profile is absent.
 
-- [ ] **Step 3: Implement profile and access messaging**
+- [x] **Step 3: Implement profile and access messaging**
 
 Show username, role, experience/level, completed sessions, and server-returned subscription plan/status. If access is denied, explain that the account must be activated on the web system; do not start WeChat payment. Logout calls the server first, then clears local token/drafts and relaunches login.
 
-- [ ] **Step 4: Run profile and authentication contracts**
+- [x] **Step 4: Run profile and authentication contracts**
 
 Run: `node --test miniprogram/tests/profile-contract.test.mjs miniprogram/tests/foundation-contract.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add miniprogram/app.json miniprogram/app.ts miniprogram/pages/profile miniprogram/services/auth.ts miniprogram/tests/profile-contract.test.mjs

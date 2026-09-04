@@ -27,6 +27,8 @@ function clientMetadata(): Record<string, string> {
 
 function remember(result: SessionResponse): AuthState {
   setSession(result.token, result.user);
+  const app = getApp<any>();
+  if (app?.globalData) app.globalData.authenticated = true;
   return result;
 }
 
@@ -97,5 +99,7 @@ export async function logout(): Promise<void> {
     await request<{ ok: true }>({ path: '/api/v1/auth/mini/logout', method: 'POST' });
   } finally {
     clearSession();
+    const app = getApp<any>();
+    if (app?.globalData) app.globalData.authenticated = false;
   }
 }

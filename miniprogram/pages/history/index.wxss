@@ -1,4 +1,4 @@
-.history-page { padding-bottom: calc(64rpx + env(safe-area-inset-bottom)); }
+.history-page { padding-bottom: calc(154rpx + env(safe-area-inset-bottom)); }
 .history-nav { gap: 12rpx; padding-right: 176rpx; }
 .back { position: relative; display: flex; align-items: center; width: 62rpx; height: 72rpx; background: transparent; }
 .back view { width: 20rpx; height: 20rpx; border-bottom: 3rpx solid var(--ink); border-left: 3rpx solid var(--ink); transform: rotate(45deg); }

@@ -6,6 +6,7 @@ App({
     networkOnline: true,
   },
   onLaunch() {
+    this.globalData.authenticated = Boolean(getSessionToken());
     wx.getNetworkType({
       success: ({ networkType }: { networkType: string }) => {
         this.globalData.networkOnline = networkType !== 'none';
