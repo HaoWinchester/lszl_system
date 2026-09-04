@@ -20,6 +20,7 @@ Page({
     subject: '全部科目',
     access: 'all',
     mode: 'normal' as PracticeMode,
+    skeletonRows: [0, 1, 2],
   },
 
   onLoad(query: Record<string, string>) {

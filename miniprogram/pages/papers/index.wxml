@@ -14,7 +14,7 @@
   </view>
 
   <view wx:if="{{loading}}" class="paper-loading">
-    <view wx:for="{{[1,2,3]}}" wx:key="*this" class="paper-skeleton"><view></view><view></view><view></view></view>
+    <view wx:for="{{skeletonRows}}" wx:key="*this" class="paper-skeleton"><view></view><view></view><view></view></view>
   </view>
   <empty-state wx:elif="{{error}}" title="试卷没有载入" body="{{error}}" action-text="重新加载" bind:action="loadPapers" />
   <empty-state wx:elif="{{filtered.length === 0}}" title="这里还没有试卷" body="换一个科目或访问范围看看。" />

@@ -17,6 +17,15 @@ from app.services import user_service
 from app.services import wechat_mini_service
 
 
+def _authorization_header(request: Request) -> str:
+    """Read Authorization without assuming a fully populated ASGI scope."""
+
+    for raw_name, raw_value in request.scope.get("headers", ()):
+        if raw_name.lower() == b"authorization":
+            return raw_value.decode("latin-1")
+    return ""
+
+
 def establish_authenticated_session(request: Request, username: str) -> str:
     """Replace the signed browser session after a successful authentication."""
 
@@ -46,7 +55,7 @@ async def get_current_user(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
-    authorization = request.headers.get("authorization", "")
+    authorization = _authorization_header(request)
     if authorization.lower().startswith("bearer"):
         raw_token = authorization[6:].strip()
         request.state.auth_transport = "bearer"
@@ -70,7 +79,7 @@ async def get_current_user(
 async def optional_current_user(request: Request, db: AsyncSession) -> User | None:
     """Resolve an active session when present without requiring authentication."""
 
-    authorization = request.headers.get("authorization", "")
+    authorization = _authorization_header(request)
     if authorization.lower().startswith("bearer"):
         raw_token = authorization[6:].strip()
         request.state.auth_transport = "bearer"

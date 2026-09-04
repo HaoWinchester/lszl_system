@@ -55,6 +55,7 @@ Page({
     policy: getModePolicy('normal') as ModePolicy,
     timerLabel: '',
     timerUrgent: false,
+    sheetDots: [0, 1, 2, 3],
   },
 
   onLoad(query: Record<string, string>) {

@@ -10,7 +10,8 @@ const read = path => readFileSync(join(root, path), 'utf8');
 function sourceFiles(directory = root) {
   return readdirSync(directory).flatMap(name => {
     const path = join(directory, name);
-    if (relative(root, path).startsWith('tests')) return [];
+    const localPath = relative(root, path);
+    if (localPath.startsWith('tests') || localPath.startsWith('docs')) return [];
     return statSync(path).isDirectory() ? sourceFiles(path) : [path];
   });
 }
@@ -53,4 +54,12 @@ test('visual foundation avoids AI-like effects and keeps mobile touch sizing', (
   assert.match(styles, /--touch-min:\s*96rpx/);
   assert.match(styles, /--option-min:\s*122rpx/);
   assert.match(styles, /--ink:\s*#173b32/);
+});
+
+test('WXML templates avoid unsupported inline collection literals', () => {
+  const templates = sourceFiles()
+    .filter(path => path.endsWith('.wxml'))
+    .map(path => readFileSync(path, 'utf8'))
+    .join('\n');
+  assert.doesNotMatch(templates, /wx:for="\{\{\s*\[/);
 });
