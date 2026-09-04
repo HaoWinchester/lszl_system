@@ -145,7 +145,7 @@ git commit -m "feat: add wrong-question revenge flow"
 - Produces: `enqueueWrite(job)`, `retryPending()`, `classifyFailure(error)`, and `resolveConflict(serverDraft, localDraft, choice)`.
 - Guarantees: one in-flight write per session, stable idempotency key per logical action, and explicit conflict choice.
 
-- [ ] **Step 1: Write failing sync tests**
+- [x] **Step 1: Write failing sync tests**
 
 ```javascript
 test('a retry keeps the original idempotency key', async () => {
@@ -157,12 +157,12 @@ test('a retry keeps the original idempotency key', async () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `node --test miniprogram/tests/sync-coordinator.test.mjs`
 Expected: FAIL because the coordinator is absent.
 
-- [ ] **Step 3: Implement serialization and user-visible states**
+- [x] **Step 3: Implement serialization and user-visible states**
 
 ```typescript
 export type SyncState = 'idle' | 'saving' | 'saved' | 'offline' | 'conflict';
@@ -171,12 +171,12 @@ export type ConflictChoice = 'server' | 'local';
 
 Network failures retain the queue and local draft; 401 clears the mini session and routes to login; 409/revision errors fetch the authoritative session and display both saved times before applying the user's choice. Page unload attempts one final state save but never blocks navigation indefinitely.
 
-- [ ] **Step 4: Run sync and domain tests**
+- [x] **Step 4: Run sync and domain tests**
 
 Run: `node --test miniprogram/tests/sync-coordinator.test.mjs miniprogram/tests/practice-domain.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add miniprogram/domain/sync-coordinator.ts miniprogram/services/http.ts miniprogram/pages/practice/index.ts miniprogram/pages/revenge/index.ts miniprogram/tests/sync-coordinator.test.mjs

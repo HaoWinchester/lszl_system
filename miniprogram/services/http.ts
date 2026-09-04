@@ -51,6 +51,11 @@ export function request<T>(options: RequestOptions): Promise<T> {
         }
         if (response.statusCode === 401) {
           clearSession();
+          const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+          const currentRoute = String(pages[pages.length - 1]?.route || '');
+          if (currentRoute && currentRoute !== 'pages/login/index') {
+            wx.reLaunch({ url: '/pages/login/index' });
+          }
         }
         const parts = errorParts(response.data);
         reject(new ApiError(parts.message, response.statusCode, parts.code, response.data));

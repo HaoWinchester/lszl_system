@@ -8,7 +8,7 @@
   </view>
 
   <view wx:if="{{loading}}" class="revenge-loading"><view></view><view></view><view></view></view>
-  <empty-state wx:elif="{{error}}" title="错题没有载入" body="{{error}}" action-text="重新加载" bind:action="loadQueue" />
+  <empty-state wx:elif="{{loadError}}" title="错题没有载入" body="{{loadError}}" action-text="重新加载" bind:action="loadQueue" />
   <empty-state wx:elif="{{empty}}" title="暂无待处理错题" body="继续做题后，需要重做和验证的题会出现在这里。" action-text="回到首页" bind:action="onHome" />
 
   <block wx:else>
@@ -21,7 +21,7 @@
     <question-view wx:if="{{stage !== 'remediation'}}" question="{{question}}" selected-ids="{{selectedIds}}" submitted="{{busy}}" show-analysis="{{false}}" bind:change="onAnswerChange" />
     <remediation-note wx:else mistake="{{mistake}}" question="{{question}}" previous-answer="{{previousAnswer}}" />
 
-    <text wx:if="{{error}}" class="error-copy">{{error}}</text>
+    <view wx:if="{{writeError}}" class="write-error"><text>{{writeError}}</text><button bindtap="retryWrites">重试同步</button></view>
     <button wx:if="{{stage === 'answer'}}" class="primary-button stage-action" loading="{{busy}}" disabled="{{busy || !selectedIds.length}}" bindtap="submitOriginal">提交重答</button>
     <button wx:elif="{{stage === 'remediation'}}" class="primary-button stage-action" loading="{{busy}}" disabled="{{busy}}" bindtap="confirmRemediation">我已理解，进入验证</button>
     <button wx:else class="primary-button stage-action" loading="{{busy}}" disabled="{{busy || !selectedIds.length}}" bindtap="submitVerificationAnswer">提交验证</button>

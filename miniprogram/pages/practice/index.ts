@@ -2,6 +2,8 @@ import { clearLocalDraft, loadLocalDraft, saveLocalDraft } from '../../domain/dr
 import { formatTimer, getModePolicy } from '../../domain/mode-policy';
 import type { ModePolicy } from '../../domain/mode-policy';
 import { mergeDraft, moveQuestion, PracticeDraft, toggleAnswer, toggleMarked } from '../../domain/practice-state';
+import { classifyFailure, createSyncCoordinator, resolveConflict } from '../../domain/sync-coordinator';
+import type { SyncJob } from '../../domain/sync-coordinator';
 import { ApiError, messageOf } from '../../services/http';
 import { completeSession, getSession, pauseSession, saveState, submitAnswer } from '../../services/practice';
 import { getCurrentUser } from '../../services/session';
@@ -26,10 +28,13 @@ Page({
   timerId: 0 as any,
   timerStartedAt: 0,
   timerDeadline: 0,
+  syncRevision: 0,
+  syncCoordinator: null as any,
   data: {
     statusBarHeight: 24,
     loading: true,
-    error: '',
+    loadError: '',
+    writeError: '',
     sessionId: '',
     session: { questions: [], revision: 0 } as unknown as PracticeSession,
     currentIndex: 0,
@@ -53,6 +58,7 @@ Page({
   },
 
   onLoad(query: Record<string, string>) {
+    this.syncCoordinator = createSyncCoordinator((job: SyncJob) => this.executeSyncJob(job));
     this.setData({
       statusBarHeight: wx.getWindowInfo?.().statusBarHeight || 24,
       sessionId: decodeURIComponent(query.sessionId || ''),
@@ -61,7 +67,7 @@ Page({
   },
 
   async loadSession() {
-    this.setData({ loading: true, error: '' });
+    this.setData({ loading: true, loadError: '', writeError: '' });
     try {
       const session = await getSession(this.data.sessionId);
       const username = getCurrentUser()?.username || '';
@@ -75,6 +81,7 @@ Page({
       );
       const merged = mergeDraft(serverDraft, loadLocalDraft(username, session.id) || undefined);
       const submittedById = Object.fromEntries(Object.keys(serverAnswers).map(id => [id, true]));
+      this.syncRevision = session.revision;
       this.setData({
         session,
         currentIndex: Math.min(merged.state.currentIndex, Math.max(0, session.questions.length - 1)),
@@ -89,8 +96,21 @@ Page({
       this.refreshCurrent();
       this.startModeTimer();
     } catch (error) {
-      this.setData({ loading: false, error: messageOf(error) });
+      this.setData({ loading: false, loadError: messageOf(error) });
     }
+  },
+
+  async executeSyncJob(job: SyncJob) {
+    const input = { ...job.payload, revision: this.syncRevision, requestId: job.key };
+    let result: any;
+    if (job.action === 'answer') result = await submitAnswer(job.sessionId, input);
+    else if (job.action === 'state') result = await saveState(job.sessionId, input);
+    else if (job.action === 'pause') result = await pauseSession(job.sessionId, input);
+    else if (job.action === 'complete') result = await completeSession(job.sessionId, input);
+    else throw new Error(`不支持的同步操作: ${job.action}`);
+    const session = result?.session || result;
+    if (session?.revision) this.syncRevision = Number(session.revision);
+    return result;
   },
 
   refreshCurrent() {
@@ -164,12 +184,16 @@ Page({
     if (!entry) return;
     this.setData({ busy: true, saveState: 'saving' });
     try {
-      const result = await submitAnswer(this.data.session.id, {
-        revision: this.data.session.revision,
+      const input = {
         questionId: entry.questionId,
         timedOut: true,
-        requestId: `timeout:${this.data.session.id}:${entry.questionId}:${this.data.session.revision}`,
         runtimeState: this.modeRuntimeState(),
+      };
+      const result: any = await this.syncCoordinator.enqueueWrite({
+        sessionId: this.data.session.id,
+        key: `timeout:${this.data.session.id}:${entry.questionId}`,
+        action: 'answer',
+        payload: input,
       });
       const questions = result.session.questions?.length ? result.session.questions : this.data.session.questions;
       this.setData({
@@ -211,23 +235,26 @@ Page({
       event.detail.optionId,
       this.data.currentQuestion.type === 'multiple_choice',
     );
-    this.setData({ answers: { ...this.data.answers, [questionId]: selected }, selectedIds: selected });
+    this.setData({ answers: { ...this.data.answers, [questionId]: selected }, selectedIds: selected, writeError: '' });
     this.saveDraft();
   },
 
   async submitCurrent() {
     if (this.data.busy || !this.data.selectedIds.length) return;
     const entry = this.data.session.questions[this.data.currentIndex];
-    this.setData({ busy: true, saveState: 'saving', error: '' });
+    this.setData({ busy: true, saveState: 'saving', writeError: '' });
     try {
       const input: any = {
-        revision: this.data.session.revision,
         questionId: entry.questionId,
-        requestId: `answer:${this.data.session.id}:${entry.questionId}:${this.data.session.revision}`,
       };
       if (entry.question.type === 'multiple_choice') input.selectedAnswerIds = this.data.selectedIds;
       else input.selectedAnswer = this.data.selectedIds[0];
-      const result = await submitAnswer(this.data.session.id, input);
+      const result: any = await this.syncCoordinator.enqueueWrite({
+        sessionId: this.data.session.id,
+        key: `answer:${this.data.session.id}:${entry.questionId}`,
+        action: 'answer',
+        payload: input,
+      });
       const submittedById = { ...this.data.submittedById, [entry.questionId]: true };
       const questions = result.session.questions?.length ? result.session.questions : this.data.session.questions;
       this.setData({
@@ -250,10 +277,11 @@ Page({
     if (!this.data.session.id) return;
     this.setData({ saveState: 'saving' });
     try {
-      const session = await saveState(this.data.session.id, {
-        revision: this.data.session.revision,
-        requestId: `state:${this.data.session.id}:${this.data.session.revision}:${this.data.currentIndex}`,
-        runtimeState: this.modeRuntimeState(),
+      const session: PracticeSession = await this.syncCoordinator.enqueueWrite({
+        sessionId: this.data.session.id,
+        key: `state:${this.data.session.id}:${this.data.currentIndex}:${[...this.data.markedIds].sort().join(',')}`,
+        action: 'state',
+        payload: { runtimeState: this.modeRuntimeState() },
       });
       this.setData({ session: { ...session, questions: session.questions.length ? session.questions : this.data.session.questions }, saveState: 'saved' });
       this.saveDraft();
@@ -264,13 +292,68 @@ Page({
   },
 
   async handleWriteError(error: unknown) {
-    if (error instanceof ApiError && ['PRACTICE_SESSION_REVISION_CONFLICT', 'REVISION_CONFLICT', 'PRACTICE_REVISION_CONFLICT'].includes(error.code)) {
-      this.setData({ saveState: 'conflict', busy: false });
-      const decision = await wx.showModal({ title: '进度冲突', content: '这份练习已在其他页面更新。是否载入服务器上的最新进度？', confirmText: '载入最新', cancelText: '保留本机' });
-      if (decision.confirm) await this.loadSession();
+    const failure = classifyFailure(error);
+    if (failure === 'auth') {
+      wx.reLaunch({ url: '/pages/login/index' });
       return;
     }
-    this.setData({ saveState: error instanceof ApiError && error.statusCode === 0 ? 'offline' : 'local', error: messageOf(error), busy: false });
+    if (failure === 'conflict' || (error instanceof ApiError && ['PRACTICE_SESSION_REVISION_CONFLICT', 'REVISION_CONFLICT', 'PRACTICE_REVISION_CONFLICT'].includes(error.code))) {
+      this.setData({ saveState: 'conflict', busy: false });
+      try {
+        const latest = await getSession(this.data.session.id);
+        const username = getCurrentUser()?.username || '';
+        const local = loadLocalDraft(username, latest.id) || draftFor(this.data.session, username, this.data.currentIndex, this.data.answers, this.data.markedIds);
+        const serverTime = String((latest as any).lastSavedAt || '刚刚');
+        const localTime = local.savedAt ? new Date(local.savedAt).toLocaleString() : '未记录';
+        const decision = await wx.showModal({
+          title: '进度冲突',
+          content: `服务器：${serverTime}\n本机：${localTime}\n载入服务器进度，或保留本机选择再重试。`,
+          confirmText: '用服务器', cancelText: '保留本机',
+        });
+        if (decision.confirm) {
+          await this.loadSession();
+        } else {
+          const reconciled = resolveConflict(
+            draftFor(latest, username, Number(latest.runtimeState?.currentIndex || 0), answerMap(latest), (latest.runtimeState?.markedQuestionIds || []).map(String)),
+            local,
+            'local',
+          );
+          this.syncRevision = latest.revision;
+          this.setData({
+            session: { ...latest, questions: latest.questions.length ? latest.questions : this.data.session.questions },
+            currentIndex: reconciled.currentIndex,
+            answers: reconciled.answers,
+            markedIds: reconciled.markedQuestionIds,
+            saveState: 'local',
+            writeError: '已保留本机草稿，请点击重试同步。',
+          });
+          this.refreshCurrent();
+        }
+      } catch (loadError) {
+        this.setData({ writeError: messageOf(loadError) });
+      }
+      return;
+    }
+    this.setData({ saveState: failure === 'offline' ? 'offline' : 'local', writeError: messageOf(error), busy: false });
+  },
+
+  async retryWrites() {
+    if (!this.syncCoordinator || !this.syncCoordinator.pendingCount()) {
+      await this.persistRuntime();
+      return;
+    }
+    this.setData({ saveState: 'saving', writeError: '' });
+    try {
+      const results = await this.syncCoordinator.retryPending();
+      const completed = results.find((result: any) => result?.report && result?.session?.status === 'completed') as any;
+      if (completed) {
+        wx.redirectTo({ url: `/pages/result/index?sessionId=${encodeURIComponent(completed.session.id)}` });
+        return;
+      }
+      await this.loadSession();
+    } catch (error) {
+      await this.handleWriteError(error);
+    }
   },
 
   onMark() {
@@ -288,7 +371,7 @@ Page({
   },
   goTo(index: number) {
     const changed = index !== this.data.currentIndex;
-    this.setData({ currentIndex: index, error: '' });
+    this.setData({ currentIndex: index, writeError: '' });
     this.refreshCurrent();
     if (changed && this.data.policy.timerKind === 'countdown' && !this.data.submitted) this.startModeTimer(true);
     this.saveDraft();
@@ -305,9 +388,11 @@ Page({
     if (!decision.confirm) return;
     this.setData({ busy: true });
     try {
-      const result = await completeSession(this.data.session.id, {
-        revision: this.data.session.revision,
-        requestId: `complete:${this.data.session.id}:${this.data.session.revision}`,
+      const result: any = await this.syncCoordinator.enqueueWrite({
+        sessionId: this.data.session.id,
+        key: `complete:${this.data.session.id}`,
+        action: 'complete',
+        payload: { runtimeState: this.modeRuntimeState() },
       });
       const username = getCurrentUser()?.username || '';
       if (username) clearLocalDraft(username, this.data.session.id);
@@ -319,13 +404,20 @@ Page({
     const decision = await wx.showModal({ title: '暂停练习', content: '当前选择会保留在本机，已提交的答案和进度会同步到服务器。', confirmText: '暂停并退出', cancelText: '继续做题' });
     if (!decision.confirm) return;
     try {
-      const paused = await pauseSession(this.data.session.id, {
-        revision: this.data.session.revision,
-        requestId: `pause:${this.data.session.id}:${this.data.session.revision}`,
-        runtimeState: this.modeRuntimeState(),
+      const paused: PracticeSession = await this.syncCoordinator.enqueueWrite({
+        sessionId: this.data.session.id,
+        key: `pause:${this.data.session.id}`,
+        action: 'pause',
+        payload: { runtimeState: this.modeRuntimeState() },
       });
       this.setData({ session: paused, saveState: 'saved' });
-    } catch (error) { this.saveDraft(); }
+      this.saveDraft();
+      this.setData({ saveState: 'saved' });
+    } catch (error) {
+      this.saveDraft();
+      await this.handleWriteError(error);
+      return;
+    }
     wx.navigateBack({ delta: 1 });
   },
 
@@ -334,6 +426,7 @@ Page({
   },
   onHide() {
     this.saveDraft();
+    if (this.data.session.id && !this.data.loading) void this.persistRuntime();
     if (this.data.policy.showTimer) {
       this.setData({
         session: {

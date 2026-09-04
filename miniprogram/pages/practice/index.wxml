@@ -8,10 +8,11 @@
   <view class="practice-meta"><save-status state="{{saveState}}" /><button class="mark-button {{marked ? 'is-marked' : ''}}" bindtap="onMark">{{marked ? '已标记' : '标记此题'}}</button></view>
 
   <view wx:if="{{loading}}" class="question-loading"><view></view><view></view><view></view><view></view></view>
-  <empty-state wx:elif="{{error}}" title="题目没有载入" body="{{error}}" action-text="重新加载" bind:action="loadSession" />
+  <empty-state wx:elif="{{loadError}}" title="题目没有载入" body="{{loadError}}" action-text="重新加载" bind:action="loadSession" />
   <question-view wx:else question="{{currentQuestion}}" selected-ids="{{selectedIds}}" submitted="{{submitted}}" show-analysis="{{showAnalysis}}" bind:change="onAnswerChange" />
 
-  <view wx:if="{{!loading && !error}}" class="answer-actions">
+  <view wx:if="{{writeError && !loading && !loadError}}" class="write-error"><text>{{writeError}}</text><button bindtap="retryWrites">重试同步</button></view>
+  <view wx:if="{{!loading && !loadError}}" class="answer-actions">
     <button class="previous" disabled="{{currentIndex === 0 || busy}}" bindtap="onPrevious">上一题</button>
     <button wx:if="{{!submitted}}" class="submit" loading="{{busy}}" disabled="{{busy || selectedIds.length === 0}}" bindtap="submitCurrent">确认答案</button>
     <button wx:else class="submit" disabled="{{busy}}" bindtap="onNext">{{currentIndex + 1 === session.questions.length ? '检查交卷' : '下一题'}}</button>

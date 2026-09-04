@@ -12,6 +12,9 @@
 .revenge-title { margin-top: 14rpx; color: var(--ink); font-family: "STSong", "Songti SC", serif; font-size: 41rpx; font-weight: 600; line-height: 1.4; }
 .revenge-copy { margin-top: 16rpx; color: var(--muted); font-size: 26rpx; line-height: 1.6; }
 .stage-action { width: 100%; margin-top: 48rpx; min-height: 96rpx; }
+.write-error { display: flex; align-items: center; justify-content: space-between; gap: 22rpx; margin-top: 30rpx; padding-top: 22rpx; border-top: 2rpx solid var(--line); color: var(--danger); font-size: 24rpx; }
+.write-error text { flex: 1; }
+.write-error button { min-width: 154rpx; min-height: 72rpx; border-bottom: 2rpx solid var(--ink); border-radius: 0; background: transparent; color: var(--ink); font-size: 24rpx; }
 .revenge-loading { padding-top: 54rpx; }
 .revenge-loading view { height: 30rpx; margin-bottom: 28rpx; border-radius: 8rpx; background: var(--surface-quiet); }
 .revenge-loading view:nth-child(2) { height: 124rpx; }
