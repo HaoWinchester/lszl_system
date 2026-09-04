@@ -44,6 +44,12 @@ class IssuedMiniSession:
 
 
 @dataclass(frozen=True)
+class ResolvedMiniSession:
+    user: User
+    login_session_id: str
+
+
+@dataclass(frozen=True)
 class MiniLoginOutcome:
     status: Literal["binding_required", "authenticated"]
     binding_ticket: str | None = None
@@ -305,7 +311,7 @@ async def exchange_login_code(
     )
 
 
-async def resolve_session_token(db: AsyncSession, raw_token: str) -> User | None:
+async def resolve_session(db: AsyncSession, raw_token: str) -> ResolvedMiniSession | None:
     if not raw_token:
         return None
     row = (
@@ -324,7 +330,12 @@ async def resolve_session_token(db: AsyncSession, raw_token: str) -> User | None
     user.last_active_at = now_utc()
     await db.commit()
     await db.refresh(user)
-    return user
+    return ResolvedMiniSession(user=user, login_session_id=row.login_session_id)
+
+
+async def resolve_session_token(db: AsyncSession, raw_token: str) -> User | None:
+    resolved = await resolve_session(db, raw_token)
+    return resolved.user if resolved else None
 
 
 async def revoke_session_token(db: AsyncSession, raw_token: str) -> bool:

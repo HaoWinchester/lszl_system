@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser, establish_authenticated_session, get_login_session_id
 from app.core.config import settings
+from app.core.legal import LEGAL_CONSENT_VERSION, accepted_legal_consent
 from app.db.session import get_db
 from app.schemas.auth import AuthenticatedResponse, LoginRequest, RegisterRequest, SelfProfileUpdate
 from app.schemas.user import UserCreate
@@ -49,9 +50,6 @@ SAFE_WECHAT_RETURN_PATHS = {
     "/guided-learning-node.html",
     "/guided-learning-placement-test.html",
 }
-LEGAL_CONSENT_VERSION = "2026-08-13-v1"
-
-
 def _client_info(request: Request) -> tuple[str | None, str | None]:
     ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent")
@@ -81,12 +79,10 @@ def _wechat_redirect(return_path: str, result: str) -> RedirectResponse:
 
 def _accepted_legal_consent(version: str | None) -> str | None:
     """Enforce the current legal documents at the server boundary."""
-    if not settings.LEGAL_CONSENT_REQUIRED:
-        return str(version or "").strip() or None
-    normalized = str(version or "").strip()
-    if normalized != LEGAL_CONSENT_VERSION:
-        raise HTTPException(status_code=400, detail="请先阅读并同意《隐私政策》和《使用条款》")
-    return normalized
+    try:
+        return accepted_legal_consent(version)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/register", response_model=AuthenticatedResponse)

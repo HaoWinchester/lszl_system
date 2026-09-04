@@ -160,7 +160,7 @@ git commit -m "feat: add WeChat mini authentication service"
 - Produces: `request.state.auth_transport` equal to `"bearer"` or `"cookie"` after authentication.
 - Preserves: `CurrentUser = Annotated[User, Depends(get_current_user)]` for all existing routes.
 
-- [ ] **Step 1: Write failing API tests**
+- [x] **Step 1: Write failing API tests**
 
 ```python
 def test_bearer_token_accesses_existing_current_user_route(client, issued_token):
@@ -177,12 +177,12 @@ def test_malformed_bearer_does_not_fall_back_to_cookie(client):
     assert response.status_code == 401
 ```
 
-- [ ] **Step 2: Run the API tests to verify failure**
+- [x] **Step 2: Run the API tests to verify failure**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_wechat_mini_auth_api.py -q`
 Expected: FAIL because routes and Bearer resolution are absent.
 
-- [ ] **Step 3: Add routes and transport-aware authentication**
+- [x] **Step 3: Add routes and transport-aware authentication**
 
 ```python
 authorization = request.headers.get("authorization", "")
@@ -197,12 +197,12 @@ request.state.auth_transport = "cookie"
 
 Map service errors to stable payloads shaped as `{"detail":{"code": str, "message": str}}`; do not expose `openid`, `session_key`, hashes, or secrets in responses or logs.
 
-- [ ] **Step 4: Run auth regressions**
+- [x] **Step 4: Run auth regressions**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_wechat_mini_auth_api.py tests/test_wechat_auth.py tests/test_auth_self_profile.py tests/test_auth_legal_consent.py -q`
 Expected: PASS for new Bearer flow and unchanged browser flows.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/api/v1/wechat_mini_auth.py backend/app/api/v1/router.py backend/app/core/auth.py backend/tests/test_wechat_mini_auth_api.py

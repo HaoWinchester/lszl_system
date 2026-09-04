@@ -19,11 +19,13 @@ from app.api.v1 import (
     system,
     training,
     users,
+    wechat_mini_auth,
 )
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(auth.router)
+api_router.include_router(wechat_mini_auth.router)
 api_router.include_router(users.router)
 api_router.include_router(system.router)
 api_router.include_router(files.router)
