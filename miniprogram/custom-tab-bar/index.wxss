@@ -1,0 +1,15 @@
+:host { display: block; }
+.tab-bar { position: fixed; z-index: 20; right: 0; bottom: 0; left: 0; display: flex; height: calc(120rpx + env(safe-area-inset-bottom)); padding: var(--space-1) var(--space-6) env(safe-area-inset-bottom); border-top: 2rpx solid var(--line); background: var(--paper, #f4f0e7); }
+.tab-item { --button-width: auto; display: flex; align-items: center; justify-content: center; flex: 1; flex-direction: column; gap: var(--space-1); min-height: var(--touch-min); margin: 0; padding: 0; border-radius: 0; background: transparent; color: #77837e; font-size: var(--font-meta); line-height: 1; }
+.tab-item::after { border: 0; }
+.tab-item.active { color: #173b32; }
+.tab-label { line-height: 1; }
+.tab-icon { position: relative; width: 40rpx; height: 40rpx; }
+.home-icon { border-right: 3rpx solid currentColor; border-bottom: 3rpx solid currentColor; border-left: 3rpx solid currentColor; border-radius: 3rpx; transform: translateY(5rpx) rotate(45deg) scale(.72); }
+.home-roof { position: absolute; right: -8rpx; bottom: -8rpx; width: 24rpx; height: 24rpx; border-right: 3rpx solid currentColor; border-bottom: 3rpx solid currentColor; background: var(--paper, #f4f0e7); }
+.history-icon { border: 3rpx solid currentColor; border-radius: 50%; }
+.history-icon::before, .history-icon::after { position: absolute; left: 18rpx; width: 3rpx; border-radius: 2rpx; background: currentColor; content: ''; transform-origin: bottom; }
+.history-icon::before { top: 7rpx; height: 12rpx; }
+.history-icon::after { top: 16rpx; height: 10rpx; transform: rotate(125deg); }
+.profile-icon::before { position: absolute; top: 2rpx; left: 13rpx; width: 14rpx; height: 14rpx; border: 3rpx solid currentColor; border-radius: 50%; content: ''; }
+.profile-icon::after { position: absolute; bottom: 1rpx; left: 5rpx; width: 30rpx; height: 16rpx; border: 3rpx solid currentColor; border-bottom: 0; border-radius: 24rpx 24rpx 0 0; content: ''; }

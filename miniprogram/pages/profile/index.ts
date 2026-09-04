@@ -5,6 +5,7 @@ import { messageOf } from '../../services/http';
 import { getExperienceSummary, listSessions } from '../../services/practice';
 import { getCurrentUser } from '../../services/session';
 import { getMySubscription } from '../../services/subscription';
+import { selectPrimaryTab } from '../../domain/primary-tabs';
 
 const roleLabels: Record<string, string> = {
   admin: '管理员', teacher: '教师', student: '学员', viewer: '访客',
@@ -41,7 +42,10 @@ Page({
     this.setData({ statusBarHeight: wx.getWindowInfo?.().statusBarHeight || 24 });
   },
 
-  onShow() { this.loadProfile(); },
+  onShow() {
+    selectPrimaryTab(this as any, 2);
+    this.loadProfile();
+  },
 
   async loadProfile() {
     this.setData({ loading: true, error: '' });

@@ -1,6 +1,7 @@
 import { messageOf } from '../../services/http';
 import { listSessions } from '../../services/practice';
 import { PracticeHistoryItem } from '../../types/api';
+import { selectPrimaryTab } from '../../domain/primary-tabs';
 
 const modeLabels: Record<string, string> = {
   practice: '普通练习', challenge: '挑战模式', scholar: '学霸模式', revenge: '错题复仇',
@@ -41,7 +42,10 @@ Page({
     this.setData({ statusBarHeight: wx.getWindowInfo?.().statusBarHeight || 24 });
   },
 
-  onShow() { this.loadHistory(); },
+  onShow() {
+    selectPrimaryTab(this as any, 1);
+    this.loadHistory();
+  },
 
   onPullDownRefresh() {
     this.loadHistory().finally(() => wx.stopPullDownRefresh());

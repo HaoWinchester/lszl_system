@@ -15,6 +15,27 @@
     "backgroundColor": "#f4f0e7",
     "backgroundTextStyle": "dark"
   },
+  "tabBar": {
+    "custom": true,
+    "color": "#718079",
+    "selectedColor": "#173b32",
+    "backgroundColor": "#f4f0e7",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/history/index",
+        "text": "记录"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的"
+      }
+    ]
+  },
   "style": "v2",
   "lazyCodeLoading": "requiredComponents",
   "sitemapLocation": "sitemap.json"

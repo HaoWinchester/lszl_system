@@ -10,6 +10,7 @@ import {
   getRevengeSummary,
 } from '../../services/practice';
 import { PaperSummary, PracticeMode, PracticeSession } from '../../types/api';
+import { selectPrimaryTab } from '../../domain/primary-tabs';
 
 const modes = ['normal', 'challenge', 'scholar', 'revenge'].map(id => MODE_POLICIES[id as PracticeMode]);
 
@@ -72,6 +73,10 @@ Page({
       activeSession: activeResult.status === 'fulfilled' ? activeResult.value[0] || null : null,
       loading: false,
     });
+  },
+
+  onShow() {
+    selectPrimaryTab(this as any, 0);
   },
 
   async onContinue() {
