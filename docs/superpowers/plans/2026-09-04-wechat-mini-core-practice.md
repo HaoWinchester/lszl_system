@@ -102,7 +102,7 @@ git commit -m "fix: protect practice answers for mini clients"
 - Produces: `listPublishedPapers()`, `startSession(input)`, `enterSession(id)`, `submitAnswer(id, input)`, `saveState(id, input)`, `pauseSession(id, input)`, `completeSession(id, input)`, `getReport(id)`.
 - Produces: `toggleAnswer(state, optionId)`, `moveQuestion(state, direction)`, `sanitizeRichText(nodes)`, `mergeDraft(server, local) -> {state, conflict}`.
 
-- [ ] **Step 1: Write failing domain tests**
+- [x] **Step 1: Write failing domain tests**
 
 ```javascript
 test('multiple choice toggles without duplicates', () => {
@@ -123,12 +123,12 @@ test('rich text removes event handlers and unsupported nodes', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `node --test miniprogram/tests/practice-domain.test.mjs`
 Expected: FAIL because the domain modules are absent.
 
-- [ ] **Step 3: Implement API mappings and pure state functions**
+- [x] **Step 3: Implement API mappings and pure state functions**
 
 ```typescript
 export interface PracticeDraft {
@@ -148,12 +148,12 @@ export function mergeDraft(server: PracticeDraft, local?: PracticeDraft) {
 
 Normalize API snake/camel variants only once in adapters. Allow only `p`, `br`, `strong`, `em`, `span`, `ul`, `ol`, `li`, and HTTPS `img` rich-text nodes, removing event attributes. Use `wx.setStorageSync('practice-draft:' + username + ':' + sessionId, draft)` and delete the local draft only after the server confirms completion or abandonment.
 
-- [ ] **Step 4: Run domain contracts**
+- [x] **Step 4: Run domain contracts**
 
 Run: `node --test miniprogram/tests/practice-domain.test.mjs miniprogram/tests/foundation-contract.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add miniprogram/types miniprogram/services miniprogram/domain miniprogram/tests/practice-domain.test.mjs
