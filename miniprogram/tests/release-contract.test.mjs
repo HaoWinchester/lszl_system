@@ -30,3 +30,10 @@ test('configuration contains mini-app server keys but no real secrets', () => {
   assert.match(read('config/index.ts'), /uat\.aihuanpu\.com/);
   assert.match(read('config/index.ts'), /lszl\.aihuanpu\.com/);
 });
+
+test('the documented test command supports the UAT Node runtime', () => {
+  const packageJson = JSON.parse(read('package.json'));
+  assert.equal(packageJson.engines.node, '>=22.6.0');
+  assert.match(packageJson.scripts.test, /--experimental-strip-types/);
+  assert.match(readRepo('README.md'), /cd miniprogram && npm test/);
+});
