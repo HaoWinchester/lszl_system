@@ -25,6 +25,12 @@ test('result actions navigate to real learning flows', () => {
   assert.match(source, /getSession/);
 });
 
+test('result empty-domain state uses its own condition instead of an orphan wx:else', () => {
+  const page = read('pages/result/index.wxml');
+  assert.match(page, /<text wx:if="\{\{!domains\.length\}\}" class="section-empty">/);
+  assert.doesNotMatch(page, /<text wx:else class="section-empty">/);
+});
+
 test('history has loading, error recovery, empty, completed report, and resume paths', () => {
   const page = read('pages/history/index.wxml');
   assert.match(page, /wx:if="{{loading}}"/);

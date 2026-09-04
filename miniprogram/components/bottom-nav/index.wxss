@@ -1,10 +1,10 @@
 .bottom-nav { position: fixed; z-index: 20; right: 0; bottom: 0; left: 0; display: flex; height: calc(108rpx + env(safe-area-inset-bottom)); padding: 10rpx 58rpx env(safe-area-inset-bottom); border-top: 2rpx solid #d8d7cc; background: #f4f0e7; }
-.bottom-nav button { display: flex; align-items: center; justify-content: center; flex: 1; flex-direction: column; gap: 6rpx; min-height: 88rpx; background: transparent; color: #87928d; font-size: 20rpx; }
-.bottom-nav button::after { border: 0; }
-.bottom-nav button.active { color: #173b32; }
+.nav-item { display: flex; align-items: center; justify-content: center; flex: 1; flex-direction: column; gap: 6rpx; min-height: 88rpx; background: transparent; color: #87928d; font-size: 20rpx; }
+.nav-item::after { border: 0; }
+.nav-item.active { color: #173b32; }
 .nav-icon { position: relative; width: 38rpx; height: 38rpx; }
 .home-icon { border-right: 3rpx solid currentColor; border-bottom: 3rpx solid currentColor; border-left: 3rpx solid currentColor; border-radius: 3rpx; transform: translateY(5rpx) rotate(45deg) scale(.72); }
-.home-icon view { position: absolute; right: -9rpx; bottom: -9rpx; width: 22rpx; height: 22rpx; border-right: 3rpx solid currentColor; border-bottom: 3rpx solid currentColor; background: #f4f0e7; }
+.home-roof { position: absolute; right: -9rpx; bottom: -9rpx; width: 22rpx; height: 22rpx; border-right: 3rpx solid currentColor; border-bottom: 3rpx solid currentColor; background: #f4f0e7; }
 .history-icon { border: 3rpx solid currentColor; border-radius: 50%; }
 .history-icon::before, .history-icon::after { position: absolute; left: 17rpx; width: 3rpx; border-radius: 2rpx; background: currentColor; content: ''; transform-origin: bottom; }
 .history-icon::before { top: 7rpx; height: 11rpx; }

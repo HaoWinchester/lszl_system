@@ -39,6 +39,13 @@ test('HTTP service attaches the opaque bearer token and handles expiry', () => {
   assert.match(source, /clearSession/);
 });
 
+test('session validation skips the request when no local token exists', () => {
+  const source = read('services/auth.ts');
+  assert.match(source, /getSessionToken/);
+  assert.match(source, /if \(!getSessionToken\(\)\) return null;/);
+  assert.doesNotMatch(source, /getSystemInfoSync/);
+});
+
 test('login requires legal consent and supports existing-account binding', () => {
   const wxml = read('pages/login/index.wxml');
   assert.match(wxml, /微信登录/);

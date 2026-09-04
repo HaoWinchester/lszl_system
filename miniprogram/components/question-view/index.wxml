@@ -1,5 +1,5 @@
 <view class="question">
-  <view class="question-kind"><text>{{displayQuestion.type === 'multiple_choice' ? '多选题' : '单选题'}}</text><text wx:if="{{displayQuestion.type === 'multiple_choice'}}">请选择所有正确选项</text></view>
+  <view class="question-kind"><text class="question-kind-label">{{displayQuestion.type === 'multiple_choice' ? '多选题' : '单选题'}}</text><text wx:if="{{displayQuestion.type === 'multiple_choice'}}">请选择所有正确选项</text></view>
   <rich-text class="stem" nodes="{{displayQuestion.stemNodes}}"></rich-text>
   <text wx:if="{{displayQuestion.stemEn}}" class="stem-en">{{displayQuestion.stemEn}}</text>
   <view wx:if="{{displayQuestion.images.length}}" class="question-images">

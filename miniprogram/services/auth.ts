@@ -1,6 +1,6 @@
 import { LEGAL_CONSENT_VERSION } from '../config/index';
 import { request } from './http';
-import { clearSession, MiniUser, setSession } from './session';
+import { clearSession, getSessionToken, MiniUser, setSession } from './session';
 
 export type AuthState =
   | { status: 'anonymous' }
@@ -16,12 +16,13 @@ interface SessionResponse {
 }
 
 function clientMetadata(): Record<string, string> {
-  const info = wx.getSystemInfoSync();
+  const device = wx.getDeviceInfo();
+  const appInfo = wx.getAppBaseInfo();
   return {
-    platform: String(info.platform || ''),
-    model: String(info.model || ''),
-    system: String(info.system || ''),
-    version: String(info.version || ''),
+    platform: String(device.platform || ''),
+    model: String(device.model || ''),
+    system: String(device.system || ''),
+    version: String(appInfo.version || ''),
   };
 }
 
@@ -86,6 +87,7 @@ export async function registerAccount(
 }
 
 export async function validateSession(): Promise<MiniUser | null> {
+  if (!getSessionToken()) return null;
   try {
     const response = await request<{ user: MiniUser }>({ path: '/api/v1/auth/mini/session' });
     return response.user;

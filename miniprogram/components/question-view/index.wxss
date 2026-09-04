@@ -1,6 +1,6 @@
 .question { padding: 38rpx 0 220rpx; }
 .question-kind { display: flex; align-items: center; justify-content: space-between; color: #718079; font-size: 23rpx; }
-.question-kind text:first-child { color: #a55842; font-weight: 600; }
+.question-kind-label { color: #a55842; font-weight: 600; }
 .stem { display: block; margin-top: 28rpx; color: #173b32; font-size: 35rpx; font-weight: 550; line-height: 1.72; }
 .stem-en { display: block; margin-top: 18rpx; padding-left: 22rpx; border-left: 4rpx solid #d8d7cc; color: #64756e; font-size: 29rpx; line-height: 1.68; }
 .question-images { margin-top: 28rpx; overflow: hidden; border: 2rpx solid #d8d7cc; border-radius: 24rpx; }
