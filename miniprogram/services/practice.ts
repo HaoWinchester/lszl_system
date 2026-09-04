@@ -156,3 +156,40 @@ export async function getReport(sessionId: string): Promise<PracticeReport> {
   });
   return payload.report || {};
 }
+
+export async function submitRevengeAnswer(mistakeId: string, answer: Record<string, unknown>): Promise<any> {
+  const key = String(answer.requestId || `revenge:${mistakeId}`);
+  const payload = await request<{ mistake: any }>({
+    path: `${ROOT}/mistakes/${encodeURIComponent(mistakeId)}/revenge-answer`,
+    method: 'POST',
+    data: answer,
+    idempotencyKey: key,
+  });
+  return payload.mistake;
+}
+
+export async function markRemediationReviewed(mistakeId: string, requestId: string): Promise<any> {
+  const payload = await request<{ mistake: any }>({
+    path: `${ROOT}/mistakes/${encodeURIComponent(mistakeId)}/remediation-reviewed`,
+    method: 'POST',
+    data: {},
+    idempotencyKey: requestId,
+  });
+  return payload.mistake;
+}
+
+export async function getVerificationCandidate(mistakeId: string): Promise<any> {
+  const payload = await request<{ candidate: any }>({
+    path: `${ROOT}/mistakes/${encodeURIComponent(mistakeId)}/verification-candidate`,
+  });
+  return payload.candidate || { available: false };
+}
+
+export async function submitVerification(mistakeId: string, answer: Record<string, unknown>): Promise<any> {
+  return request({
+    path: `${ROOT}/mistakes/${encodeURIComponent(mistakeId)}/verification`,
+    method: 'POST',
+    data: answer,
+    idempotencyKey: String(answer.requestId || `verification:${mistakeId}`),
+  });
+}

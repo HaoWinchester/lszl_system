@@ -1,4 +1,5 @@
 import { validateSession } from '../../services/auth';
+import { MODE_POLICIES } from '../../domain/mode-policy';
 import { getCurrentUser } from '../../services/session';
 import { listPublishedPapers } from '../../services/papers';
 import {
@@ -10,12 +11,7 @@ import {
 } from '../../services/practice';
 import { PaperSummary, PracticeMode, PracticeSession } from '../../types/api';
 
-const modes = [
-  { id: 'normal', title: '普通练习', copy: '边做边理解，提交后看解析', tone: 'green' },
-  { id: 'challenge', title: '挑战模式', copy: '带着时间感完成一组题', tone: 'clay' },
-  { id: 'scholar', title: '学霸模式', copy: '更紧凑的节奏与完整评分', tone: 'gold' },
-  { id: 'revenge', title: '错题复仇', copy: '重做、纠错，再完成一次验证', tone: 'clay' },
-];
+const modes = ['normal', 'challenge', 'scholar', 'revenge'].map(id => MODE_POLICIES[id as PracticeMode]);
 
 function greetingFor(hour: number): string {
   if (hour < 11) return '早上好';
@@ -70,6 +66,9 @@ Page({
       overview: overviewResult.status === 'fulfilled' ? overviewResult.value : {},
       experience: experienceResult.status === 'fulfilled' ? experienceResult.value : {},
       revenge: revengeResult.status === 'fulfilled' ? revengeResult.value : {},
+      modes: modes.map(item => item.id === 'revenge' && revengeResult.status === 'fulfilled' && Number(revengeResult.value?.stats?.active || 0) > 0
+        ? { ...item, copy: `待处理 ${Number(revengeResult.value.stats.active)} 道，重做后完成变式验证` }
+        : item),
       activeSession: activeResult.status === 'fulfilled' ? activeResult.value[0] || null : null,
       loading: false,
     });

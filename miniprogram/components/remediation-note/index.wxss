@@ -1,0 +1,6 @@
+.remediation { margin-top: 42rpx; padding: 8rpx 0 8rpx 28rpx; border-left: 6rpx solid #b96347; }
+.remediation-kicker { color: #b96347; font-size: 23rpx; font-weight: 650; letter-spacing: 2rpx; }
+.answer-line, .knowledge-line { display: flex; justify-content: space-between; gap: 30rpx; margin-top: 24rpx; font-size: 26rpx; }
+.answer-line text:first-child, .knowledge-line text:first-child { flex: 0 0 170rpx; color: #718079; }
+.answer-line text:last-child, .knowledge-line text:last-child { color: #173b32; font-weight: 600; text-align: right; }
+.remediation-copy { display: block; margin-top: 30rpx; color: #263d36; font-size: 28rpx; line-height: 1.75; }

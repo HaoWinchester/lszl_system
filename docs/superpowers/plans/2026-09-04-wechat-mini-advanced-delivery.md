@@ -97,7 +97,7 @@ git commit -m "feat: add restrained advanced practice modes"
 - Produces: `getRevengeSummary()`, `submitRevengeAnswer(mistakeId, answer)`, `markRemediationReviewed(mistakeId)`, `getVerificationCandidate(mistakeId)`, `submitVerification(mistakeId, answer)`.
 - Consumes: existing `/learning/practice/revenge/summary` and mistake routes.
 
-- [ ] **Step 1: Write failing revenge-flow contracts**
+- [x] **Step 1: Write failing revenge-flow contracts**
 
 ```javascript
 test('revenge flow requires remediation before verification', () => {
@@ -108,16 +108,16 @@ test('revenge flow requires remediation before verification', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `node --test miniprogram/tests/revenge-page-contract.test.mjs`
 Expected: FAIL because the page is absent.
 
-- [ ] **Step 3: Implement the three-stage loop**
+- [x] **Step 3: Implement the three-stage loop**
 
 Render `重答原题 → 阅读纠错 → 变式验证` as a quiet three-step text indicator. Require the server-confirmed remediation-reviewed response before requesting the verification candidate, keep each write idempotent, and return to the revenge queue with the refreshed summary after verification.
 
-- [ ] **Step 4: Run frontend and mistake API tests**
+- [x] **Step 4: Run frontend and mistake API tests**
 
 Run: `node --test miniprogram/tests/revenge-page-contract.test.mjs`
 Expected: PASS.
@@ -125,7 +125,7 @@ Expected: PASS.
 Run: `cd backend && .venv/bin/python -m pytest tests/test_practice_sessions.py -q -k 'revenge or remediation or verification'`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add miniprogram/app.json miniprogram/components/remediation-note miniprogram/pages/home miniprogram/pages/result miniprogram/pages/revenge miniprogram/services/practice.ts miniprogram/tests/revenge-page-contract.test.mjs

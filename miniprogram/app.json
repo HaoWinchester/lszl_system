@@ -6,7 +6,8 @@
     "pages/practice-setup/index",
     "pages/practice/index",
     "pages/result/index",
-    "pages/history/index"
+    "pages/history/index",
+    "pages/revenge/index"
   ],
   "window": {
     "navigationStyle": "custom",

@@ -1,0 +1,8 @@
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "empty-state": "/components/empty-state/index",
+    "question-view": "/components/question-view/index",
+    "remediation-note": "/components/remediation-note/index"
+  }
+}
