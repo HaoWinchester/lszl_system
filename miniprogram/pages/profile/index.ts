@@ -7,6 +7,7 @@ import { getCurrentUser } from '../../services/session';
 import { getMySubscription } from '../../services/subscription';
 import { pageRefreshMode } from '../../domain/page-freshness';
 import { selectPrimaryTab } from '../../domain/primary-tabs';
+import { avatarLetterOf } from '../../domain/profile-view';
 
 const roleLabels: Record<string, string> = {
   admin: '管理员', teacher: '教师', student: '学员', viewer: '访客',
@@ -31,12 +32,14 @@ Page({
     lastLoadedAt: 0,
     user: {} as any,
     displayName: '同学',
+    avatarLetter: '学',
     roleLabel: '学员',
     totalExperience: 0,
     weekExperience: 0,
     completedCount: 0,
     accessTitle: '基础权限',
     accessCopy: '会员试卷需在网页端开通',
+    syncLabel: '已与网页端同步',
     loggingOut: false,
   },
 
@@ -69,9 +72,11 @@ Page({
       const entitled = access.entitlements?.allExamPapers === true;
       const planId = String(access.subscription?.planId || 'free');
       const privileged = ['admin', 'teacher'].includes(user.role);
+      const displayName = user.display_name || user.username;
       this.setData({
         user,
-        displayName: user.display_name || user.username,
+        displayName,
+        avatarLetter: avatarLetterOf(displayName, user.username),
         roleLabel: roleLabels[user.role] || user.role,
         totalExperience: Number(experience.totalExperience || 0),
         weekExperience: Number(experience.weekExperience || 0),

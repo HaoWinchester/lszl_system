@@ -77,3 +77,19 @@ test('profile identity and rows share the approved scale', () => {
   assert.match(styles, /font-size:\s*var\(--font-display\)/);
   assert.match(styles, /min-height:\s*var\(--touch-min\)/);
 });
+
+test('profile presents real account information without invented fields', () => {
+  const page = read('pages/profile/index.wxml');
+  for (const label of ['个人信息', '显示名称', '登录账号', '账号身份', '学习权限', '数据同步']) {
+    assert.match(page, new RegExp(label));
+  }
+  assert.match(page, /avatarLetter/);
+  assert.doesNotMatch(page, /手机号|学校|地区|注册时间|编辑资料/);
+});
+
+test('profile information rows share a fixed mobile alignment column', () => {
+  const styles = read('pages/profile/index.wxss');
+  assert.match(styles, /\.info-row\s*\{[^}]*min-height:\s*var\(--touch-min\)/s);
+  assert.match(styles, /\.info-label\s*\{[^}]*flex:\s*0 0 144rpx/s);
+  assert.match(styles, /\.info-value\s*\{[^}]*text-align:\s*right/s);
+});
