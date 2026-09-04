@@ -1,0 +1,65 @@
+<view class="page-shell result-page" style="padding-top: {{statusBarHeight}}px">
+  <view class="nav-bar"><text class="nav-title">练习结果</text></view>
+
+  <view wx:if="{{loading}}" class="result-loading"><view></view><view></view><view></view></view>
+  <view wx:elif="{{error}}" class="result-error">
+    <text class="result-error-title">结果没有载入</text>
+    <text class="result-error-copy">{{error}}</text>
+    <button class="secondary-button" bindtap="loadResult">重新加载</button>
+  </view>
+
+  <block wx:else>
+    <view class="result-heading">
+      <text class="eyebrow">{{report.paperName || '本次练习'}}</text>
+      <text class="result-conclusion">{{conclusion}}</text>
+      <view class="accuracy-line"><text class="accuracy-number">{{accuracy}}</text><text class="accuracy-unit">%</text><text class="accuracy-label">正确率</text></view>
+    </view>
+
+    <view class="result-facts">
+      <view><text>{{score}}%</text><text>得分</text></view>
+      <view><text>{{report.counts.correct || 0}} / {{report.counts.total || 0}}</text><text>答对</text></view>
+      <view><text>{{duration}}</text><text>用时</text></view>
+    </view>
+
+    <view class="result-section">
+      <text class="section-kicker">薄弱知识点</text>
+      <text class="section-intro" wx:if="{{domains.length}}">从得分较低的领域开始复习。</text>
+      <view wx:for="{{domains}}" wx:key="id" class="domain-row {{item.weak ? 'is-weak' : ''}}">
+        <text>{{item.label}}</text><text>{{item.score}}%</text>
+      </view>
+      <text wx:else class="section-empty">本次暂无可用的领域统计。</text>
+    </view>
+
+    <view class="result-section wrong-section">
+      <view class="section-title-row"><text class="section-kicker">错题 {{wrongQuestions.length}}</text><text class="section-aside">点开查看解析</text></view>
+      <button wx:for="{{wrongQuestions}}" wx:key="questionId" class="wrong-row" data-index="{{index}}" bindtap="onReview">
+        <text class="wrong-number">{{item.number}}</text>
+        <text class="wrong-stem">{{item.question.stem}}</text>
+        <text class="wrong-action">查看解析</text>
+      </button>
+      <text wx:if="{{!wrongQuestions.length}}" class="section-empty">没有错题，这次完成得很稳。</text>
+    </view>
+
+    <view class="next-actions">
+      <button wx:if="{{wrongQuestions.length}}" class="primary-button" bindtap="onRevenge">开始错题复仇</button>
+      <button class="secondary-button" bindtap="onRetry">再练一次</button>
+      <button class="quiet-button" bindtap="onHome">回到首页</button>
+    </view>
+  </block>
+</view>
+
+<view wx:if="{{reviewOpen}}" class="review-mask" bindtap="onCloseReview">
+  <view class="review-sheet" catchtap="noop">
+    <view class="review-handle"></view>
+    <view class="review-head"><text>第 {{reviewNumber}} 题</text><button bindtap="onCloseReview">关闭</button></view>
+    <scroll-view scroll-y class="review-scroll">
+      <text class="review-stem">{{reviewQuestion.stem}}</text>
+      <text wx:if="{{reviewQuestion.stemEn}}" class="review-stem-en">{{reviewQuestion.stemEn}}</text>
+      <view class="review-divider"></view>
+      <text class="review-label">正确答案</text>
+      <text class="review-answer">{{reviewAnswer}}</text>
+      <text class="review-label">解析</text>
+      <text class="review-copy">{{reviewQuestion.analysis || reviewQuestion.explanation || '暂无解析'}}</text>
+    </scroll-view>
+  </view>
+</view>

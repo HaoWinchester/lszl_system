@@ -1,0 +1,51 @@
+.empty {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  padding: 104rpx 28rpx;
+  text-align: center;
+}
+
+.empty-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 76rpx;
+  height: 76rpx;
+  border: 2rpx solid #8e9a94;
+  border-radius: 50%;
+}
+
+.empty-mark-line {
+  width: 28rpx;
+  height: 2rpx;
+  background: #8e9a94;
+}
+
+.empty-title {
+  margin-top: 28rpx;
+  color: #173b32;
+  font-size: 32rpx;
+  font-weight: 650;
+}
+
+.empty-copy {
+  max-width: 520rpx;
+  margin-top: 14rpx;
+  color: #718079;
+  font-size: 26rpx;
+  line-height: 1.65;
+}
+
+.empty-action {
+  min-width: 220rpx;
+  min-height: 88rpx;
+  margin-top: 34rpx;
+  border: 2rpx solid #173b32;
+  border-radius: 22rpx;
+  background: transparent;
+  color: #173b32;
+  font-size: 28rpx;
+}
+
+.empty-action::after { border: 0; }

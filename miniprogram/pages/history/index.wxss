@@ -1,0 +1,19 @@
+.history-page { padding-bottom: calc(154rpx + env(safe-area-inset-bottom)); }
+.history-nav { gap: 12rpx; padding-right: 176rpx; }
+.back { position: relative; display: flex; align-items: center; width: 62rpx; height: 72rpx; background: transparent; }
+.back view { width: 20rpx; height: 20rpx; border-bottom: 3rpx solid var(--ink); border-left: 3rpx solid var(--ink); transform: rotate(45deg); }
+.history-heading { display: flex; flex-direction: column; padding: 58rpx 0 46rpx; }
+.history-title { color: var(--ink); font-family: "STSong", "Songti SC", serif; font-size: 46rpx; font-weight: 600; }
+.history-copy { margin-top: 16rpx; color: var(--muted); font-size: 26rpx; line-height: 1.65; }
+.filters { display: flex; gap: 14rpx; padding-bottom: 24rpx; border-bottom: 2rpx solid var(--line); }
+.filters button { min-width: 112rpx; min-height: 72rpx; padding: 0 24rpx; border: 2rpx solid transparent; border-radius: 36rpx; background: transparent; color: var(--muted); font-size: 25rpx; }
+.filters button.active { border-color: var(--ink); color: var(--ink); }
+.history-loading { padding-top: 34rpx; }
+.history-loading view { height: 136rpx; border-bottom: 2rpx solid var(--line); }
+.history-list { padding-top: 8rpx; }
+.history-row { position: relative; display: flex; align-items: flex-start; flex-direction: column; min-height: 208rpx; padding: 30rpx 144rpx 30rpx 0; border-bottom: 2rpx solid var(--line); }
+.history-meta { display: flex; gap: 18rpx; color: var(--muted); font-size: 22rpx; }
+.paper-name { display: -webkit-box; overflow: hidden; margin-top: 12rpx; color: var(--ink); font-size: 29rpx; font-weight: 650; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.history-result { display: flex; gap: 18rpx; margin-top: 14rpx; color: var(--muted); font-size: 24rpx; }
+.history-result text:first-child { color: var(--clay); }
+.history-row > button { position: absolute; right: 0; bottom: 34rpx; min-width: 124rpx; min-height: 72rpx; border-bottom: 2rpx solid var(--ink); border-radius: 0; background: transparent; color: var(--ink); font-size: 24rpx; }

@@ -1,0 +1,8 @@
+<view class="save-status {{state}}" aria-label="{{label}}">
+  <view class="save-dot"></view>
+  <text wx:if="{{state === 'saving'}}">正在保存</text>
+  <text wx:elif="{{state === 'saved'}}">已保存</text>
+  <text wx:elif="{{state === 'offline'}}">离线草稿</text>
+  <text wx:elif="{{state === 'conflict'}}">进度冲突</text>
+  <text wx:else>本地草稿</text>
+</view>

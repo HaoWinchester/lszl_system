@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     WECHAT_ENABLE_OFFICIAL: bool | None = None
     WECHAT_ENABLE_DEMO: bool | None = None
 
+    # 微信小程序凭证与网站开放平台凭证相互独立，仅后端可读。
+    WECHAT_MINI_APP_ID: str = ""
+    WECHAT_MINI_APP_SECRET: str = ""
+    WECHAT_MINI_ENABLE_DEMO: bool | None = None
+    WECHAT_MINI_SESSION_MAX_AGE_SECONDS: int = 60 * 60 * 24 * 30
+    WECHAT_MINI_BINDING_TICKET_MAX_AGE_SECONDS: int = 10 * 60
+
     # 微信 Native 支付凭证仅允许由部署环境和受限文件提供，禁止写入数据库。
     WECHAT_PAY_ENABLE_DEMO: bool | None = None
     WECHAT_PAY_MCH_ID: str = ""

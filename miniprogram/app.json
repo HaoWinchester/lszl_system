@@ -1,0 +1,21 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/login/index",
+    "pages/papers/index",
+    "pages/practice-setup/index",
+    "pages/practice/index",
+    "pages/result/index",
+    "pages/history/index",
+    "pages/revenge/index",
+    "pages/profile/index"
+  ],
+  "window": {
+    "navigationStyle": "custom",
+    "backgroundColor": "#f4f0e7",
+    "backgroundTextStyle": "dark"
+  },
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents",
+  "sitemapLocation": "sitemap.json"
+}

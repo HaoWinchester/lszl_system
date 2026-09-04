@@ -1,0 +1,11 @@
+<view class="bottom-nav">
+  <button class="{{current === 'home' ? 'active' : ''}}" data-target="home" bindtap="navigate" aria-label="首页">
+    <view class="nav-icon home-icon"><view></view></view><text>首页</text>
+  </button>
+  <button class="{{current === 'history' ? 'active' : ''}}" data-target="history" bindtap="navigate" aria-label="记录">
+    <view class="nav-icon history-icon"><view></view></view><text>记录</text>
+  </button>
+  <button class="{{current === 'profile' ? 'active' : ''}}" data-target="profile" bindtap="navigate" aria-label="我的">
+    <view class="nav-icon profile-icon"><view></view></view><text>我的</text>
+  </button>
+</view>

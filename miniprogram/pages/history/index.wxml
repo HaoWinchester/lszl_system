@@ -1,0 +1,23 @@
+<view class="page-shell history-page" style="padding-top: {{statusBarHeight}}px">
+  <view class="nav-bar history-nav"><text class="nav-title">练习记录</text></view>
+  <view class="history-heading"><text class="history-title">你做过的题</text><text class="history-copy">记录与网页端同步，未完成的练习可以继续。</text></view>
+  <view class="filters">
+    <button class="{{filter === 'all' ? 'active' : ''}}" data-filter="all" bindtap="onFilter">全部</button>
+    <button class="{{filter === 'completed' ? 'active' : ''}}" data-filter="completed" bindtap="onFilter">已交卷</button>
+    <button class="{{filter === 'paused' ? 'active' : ''}}" data-filter="paused" bindtap="onFilter">未完成</button>
+  </view>
+
+  <view wx:if="{{loading}}" class="history-loading"><view></view><view></view><view></view></view>
+  <empty-state wx:elif="{{error}}" title="记录没有载入" body="{{error}}" action-text="重新加载" bind:action="loadHistory" />
+  <empty-state wx:elif="{{!visibleItems.length}}" title="还没有练习记录" body="完成或暂停一次练习后，会在这里留下记录。" />
+  <view wx:else class="history-list">
+    <view wx:for="{{visibleItems}}" wx:key="sessionId" class="history-row">
+      <view class="history-meta"><text>{{item.dateLabel}}</text><text>{{item.modeLabel}}</text></view>
+      <text class="paper-name">{{item.paperName}}</text>
+      <view class="history-result"><text>{{item.resultLabel}}</text><text>{{item.statusLabel}}</text></view>
+      <button wx:if="{{item.canReport}}" data-session-id="{{item.sessionId}}" data-kind="report" bindtap="onOpen">查看报告</button>
+      <button wx:elif="{{item.canResume}}" data-session-id="{{item.sessionId}}" data-kind="resume" bindtap="onOpen">继续作答</button>
+    </view>
+  </view>
+</view>
+<bottom-nav current="history" />

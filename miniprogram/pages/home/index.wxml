@@ -1,0 +1,45 @@
+<view class="page-shell home-page" style="padding-top: {{statusBarHeight}}px">
+  <view class="nav-bar"><text class="nav-title">练习</text></view>
+  <view wx:if="{{loading}}" class="loading-state">
+    <view class="loading-line short"></view>
+    <view class="loading-line"></view>
+    <view class="loading-line"></view>
+  </view>
+  <view wx:else>
+    <view class="welcome">
+      <text class="eyebrow">{{todayLabel}}</text>
+      <text class="home-title">{{greeting}}，{{displayName}}</text>
+      <text class="home-copy">学习进度已经与网页端同步。</text>
+    </view>
+    <view class="rule"></view>
+    <view wx:if="{{activeSession}}" class="continue-block">
+      <text class="section-kicker">继续上次</text>
+      <text class="section-title">{{activeSession.paperName || '未完成练习'}}</text>
+      <text class="section-copy">已完成 {{activeSession.stats.answered || 0}} / {{activeSession.stats.total || 0}} 题</text>
+      <button class="secondary-button continue-button" bindtap="onContinue">继续作答</button>
+    </view>
+    <view class="mode-section">
+      <text class="section-kicker">选择练习方式</text>
+      <button wx:for="{{modes}}" wx:key="id" class="mode-row" data-mode="{{item.id}}" bindtap="onMode">
+        <view class="mode-line {{item.accent}}"></view>
+        <view class="mode-body"><text class="mode-title">{{item.title}}</text><text class="mode-copy">{{item.copy}}</text></view>
+        <view class="mode-arrow"></view>
+      </button>
+    </view>
+    <view class="paper-heading-row">
+      <text class="section-kicker">最近试卷</text>
+      <button class="all-papers" bindtap="onBrowsePapers">查看全部</button>
+    </view>
+    <view wx:if="{{papers.length}}" class="home-papers">
+      <button wx:for="{{papers}}" wx:key="releaseId" class="home-paper" data-release-id="{{item.releaseId}}" bindtap="onPaper">
+        <view><text class="home-paper-subject">{{item.subject}}</text><text class="home-paper-title">{{item.title}}</text></view>
+        <text class="home-paper-count">{{item.questionCount}}题</text>
+      </button>
+    </view>
+    <view wx:else class="first-state">
+      <text class="section-title">暂时没有可练习试卷</text>
+      <text class="section-copy">教师发布后会自动出现在这里。</text>
+    </view>
+  </view>
+</view>
+<bottom-nav current="home" />

@@ -53,11 +53,14 @@ from app.models.training import (
     TrainingProgress,
 )
 from app.models.user import User, UserAdminLog
+from app.models.wechat_mini import WechatMiniAuthTicket, WechatMiniSession
 
 __all__ = [
     "User",
     "FeatureUsageEvent",
     "UserAdminLog",
+    "WechatMiniAuthTicket",
+    "WechatMiniSession",
     "RoleTheme",
     "SystemSetting",
     "Folder",

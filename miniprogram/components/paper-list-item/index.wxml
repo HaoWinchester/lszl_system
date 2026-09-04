@@ -1,0 +1,13 @@
+<button class="paper-row" bindtap="onSelect" aria-label="选择试卷 {{item.title}}">
+  <view class="paper-meta">
+    <text class="subject">{{item.subject}}</text>
+    <text class="access {{item.accessLevel === 'member' ? 'member' : ''}}">{{item.accessLevel === 'member' ? '会员试卷' : '免费'}}</text>
+  </view>
+  <text class="paper-title">{{item.title}}</text>
+  <text wx:if="{{item.description}}" class="paper-copy">{{item.description}}</text>
+  <view class="paper-foot">
+    <text>{{item.questionCount}} 题</text>
+    <text wx:if="{{progressText}}">{{progressText}}</text>
+    <view class="arrow"><view class="arrow-line"></view></view>
+  </view>
+</button>

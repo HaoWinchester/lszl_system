@@ -1,0 +1,94 @@
+@import "/styles/tokens.wxss";
+
+page {
+  min-height: 100%;
+  background: var(--paper);
+  color: var(--text);
+  font-family: "PingFang SC", "Noto Sans CJK SC", sans-serif;
+  font-size: 30rpx;
+  line-height: 1.55;
+}
+
+view, text, button, input, image, scroll-view {
+  box-sizing: border-box;
+}
+
+button {
+  margin: 0;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  font-size: 30rpx;
+  line-height: 1;
+}
+
+button::after {
+  border: 0;
+}
+
+.page-shell {
+  min-height: 100vh;
+  padding: 0 var(--page-gutter) calc(48rpx + env(safe-area-inset-bottom));
+}
+
+.nav-bar {
+  display: flex;
+  align-items: center;
+  height: 88rpx;
+  padding-right: 176rpx;
+}
+
+.nav-title {
+  color: var(--ink);
+  font-size: 34rpx;
+  font-weight: 650;
+  letter-spacing: 1rpx;
+}
+
+.eyebrow {
+  color: var(--muted);
+  font-size: 24rpx;
+  letter-spacing: 2rpx;
+}
+
+.primary-button,
+.secondary-button,
+.quiet-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-min);
+  font-weight: 600;
+}
+
+.primary-button {
+  background: var(--ink);
+  color: #fffdf7;
+}
+
+.secondary-button {
+  border: 2rpx solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+}
+
+.quiet-button {
+  background: transparent;
+  color: var(--ink);
+}
+
+.field {
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: 0 28rpx;
+  border: 2rpx solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 30rpx;
+}
+
+.error-copy {
+  margin-top: 20rpx;
+  color: var(--danger);
+  font-size: 26rpx;
+}

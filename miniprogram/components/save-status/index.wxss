@@ -1,0 +1,6 @@
+.save-status { display: flex; align-items: center; gap: 10rpx; color: #718079; font-size: 23rpx; }
+.save-dot { width: 10rpx; height: 10rpx; border-radius: 50%; background: #9da59f; }
+.save-status.saving .save-dot { background: #a78037; }
+.save-status.saved .save-dot { background: #497465; }
+.save-status.offline .save-dot,
+.save-status.conflict .save-dot { background: #a55842; }

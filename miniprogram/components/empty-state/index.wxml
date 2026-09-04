@@ -1,0 +1,6 @@
+<view class="empty">
+  <view class="empty-mark"><view class="empty-mark-line"></view></view>
+  <text class="empty-title">{{title}}</text>
+  <text class="empty-copy">{{body}}</text>
+  <button wx:if="{{actionText}}" class="empty-action" bindtap="onAction">{{actionText}}</button>
+</view>

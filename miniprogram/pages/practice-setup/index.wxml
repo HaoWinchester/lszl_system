@@ -1,0 +1,45 @@
+<view class="page-shell setup-page" style="padding-top: {{statusBarHeight}}px">
+  <view class="nav-bar">
+    <button class="back" bindtap="onBack" aria-label="返回"><view class="back-icon"></view></button>
+    <text class="nav-title">练习设置</text>
+  </view>
+
+  <view class="paper-heading">
+    <text class="eyebrow">本次练习</text>
+    <text class="setup-title">{{title}}</text>
+    <text class="setup-meta">全卷 {{totalCount}} 题</text>
+  </view>
+
+  <view class="setting-section">
+    <text class="setting-label">题量</text>
+    <view class="choice-row">
+      <button wx:for="{{countChoices}}" wx:key="value" class="choice {{count === item.value ? 'is-active' : ''}}" data-value="{{item.value}}" bindtap="onCount">{{item.label}}</button>
+    </view>
+  </view>
+
+  <view class="setting-section">
+    <text class="setting-label">出题顺序</text>
+    <view class="option-list">
+      <button class="line-option {{order === 'paper' ? 'is-active' : ''}}" data-order="paper" bindtap="onOrder">
+        <view><text class="line-title">顺序出题</text><text class="line-copy">按照试卷原有顺序练习</text></view><view class="radio"><view wx:if="{{order === 'paper'}}"></view></view>
+      </button>
+      <button class="line-option {{order === 'random' ? 'is-active' : ''}}" data-order="random" bindtap="onOrder">
+        <view><text class="line-title">随机出题</text><text class="line-copy">每次生成不同题目顺序</text></view><view class="radio"><view wx:if="{{order === 'random'}}"></view></view>
+      </button>
+    </view>
+  </view>
+
+  <view class="setting-section">
+    <text class="setting-label">练习方式</text>
+    <view class="mode-list">
+      <button wx:for="{{modes}}" wx:key="id" class="mode-option {{mode === item.id ? 'is-active' : ''}}" data-mode="{{item.id}}" bindtap="onMode">
+        <view class="mode-mark {{item.accent}}"></view>
+        <view class="mode-text"><text class="line-title">{{item.title}}</text><text class="line-copy">{{item.copy}}</text></view>
+        <view class="radio"><view wx:if="{{mode === item.id}}"></view></view>
+      </button>
+    </view>
+  </view>
+
+  <text wx:if="{{error}}" class="error-copy">{{error}}</text>
+  <button class="primary-button start-button" loading="{{starting}}" disabled="{{starting}}" bindtap="start">开始练习</button>
+</view>

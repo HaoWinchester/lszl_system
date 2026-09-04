@@ -1,0 +1,195 @@
+import { request } from './http';
+import {
+  PracticeMode,
+  PracticeHistoryItem,
+  PracticeReport,
+  PracticeSession,
+  SessionWriteInput,
+  StartSessionInput,
+} from '../types/api';
+import { normalizeQuestion } from '../domain/question';
+
+const ROOT = '/api/v1/learning/practice';
+
+function backendMode(mode: PracticeMode): string {
+  return mode === 'normal' ? 'practice' : mode;
+}
+
+function normalizeSession(rawValue: any): PracticeSession {
+  const raw = rawValue && typeof rawValue === 'object' ? rawValue : {};
+  const questions = Array.isArray(raw.questions) ? raw.questions : [];
+  return {
+    ...raw,
+    id: String(raw.id || ''),
+    mode: String(raw.mode || 'practice'),
+    status: String(raw.status || ''),
+    revision: Number(raw.revision || 0),
+    questions: questions.map((entry: any) => ({
+      ...entry,
+      questionId: String(entry?.questionId || entry?.question?.id || ''),
+      question: normalizeQuestion(entry?.question || entry?.questionSnapshot || {}),
+    })),
+  } as PracticeSession;
+}
+
+export function getOverview(): Promise<Record<string, any>> {
+  return request({ path: `${ROOT}/overview` });
+}
+
+export function getExperienceSummary(): Promise<Record<string, any>> {
+  return request({ path: `${ROOT}/experience-summary` });
+}
+
+export function getRevengeSummary(): Promise<Record<string, any>> {
+  return request({ path: `${ROOT}/revenge/summary` });
+}
+
+export async function getActiveSessions(): Promise<PracticeSession[]> {
+  const payload = await request<{ sessions?: unknown[] }>({ path: `${ROOT}/sessions/active` });
+  return (payload.sessions || []).map(normalizeSession);
+}
+
+export async function listSessions(): Promise<PracticeHistoryItem[]> {
+  const payload = await request<{ sessions?: unknown[] }>({ path: `${ROOT}/sessions` });
+  return (payload.sessions || []).map((value: any) => ({
+    sessionId: String(value?.sessionId || ''),
+    mode: String(value?.mode || 'practice') as PracticeHistoryItem['mode'],
+    paperId: value?.paperId ? String(value.paperId) : undefined,
+    paperName: String(value?.paperName || '未命名练习'),
+    answered: Math.max(0, Number(value?.answered || 0)),
+    correct: Math.max(0, Number(value?.correct || 0)),
+    experience: Math.max(0, Number(value?.experience || 0)),
+    durationMs: Math.max(0, Number(value?.durationMs || 0)),
+    status: String(value?.status || ''),
+    reportAvailable: value?.reportAvailable === true,
+    createdAt: value?.createdAt ? String(value.createdAt) : undefined,
+  }));
+}
+
+export async function startSession(input: StartSessionInput): Promise<PracticeSession> {
+  const payload = await request<{ session: unknown }>({
+    path: `${ROOT}/sessions/start`,
+    method: 'POST',
+    data: { ...input, mode: backendMode(input.mode) },
+  });
+  return normalizeSession(payload.session);
+}
+
+export async function enterSession(input: {
+  sessionId?: string;
+  paperId?: string;
+  releaseId?: string;
+  mode?: PracticeMode;
+}): Promise<{ resumed: boolean; session: PracticeSession }> {
+  const payload = await request<{ resumed?: boolean; session: any; questions?: any[] }>({
+    path: `${ROOT}/sessions/enter`,
+    method: 'POST',
+    data: { ...input, ...(input.mode ? { mode: backendMode(input.mode) } : {}) },
+  });
+  return {
+    resumed: payload.resumed === true,
+    session: normalizeSession({ ...payload.session, questions: payload.questions || payload.session?.questions }),
+  };
+}
+
+export async function getSession(sessionId: string): Promise<PracticeSession> {
+  const payload = await request<{ session: unknown }>({ path: `${ROOT}/sessions/${encodeURIComponent(sessionId)}` });
+  return normalizeSession(payload.session);
+}
+
+export async function submitAnswer(sessionId: string, input: SessionWriteInput): Promise<any> {
+  const payload: any = await request({
+    path: `${ROOT}/sessions/${encodeURIComponent(sessionId)}/answers`,
+    method: 'POST',
+    data: input,
+    idempotencyKey: input.requestId,
+  });
+  return { ...payload, session: normalizeSession(payload.session) };
+}
+
+export async function saveState(sessionId: string, input: SessionWriteInput): Promise<PracticeSession> {
+  const payload = await request<{ session: unknown }>({
+    path: `${ROOT}/sessions/${encodeURIComponent(sessionId)}/state`,
+    method: 'PATCH',
+    data: input,
+    idempotencyKey: input.requestId,
+  });
+  return normalizeSession(payload.session);
+}
+
+export async function pauseSession(sessionId: string, input: SessionWriteInput): Promise<PracticeSession> {
+  const payload = await request<{ session: unknown }>({
+    path: `${ROOT}/sessions/${encodeURIComponent(sessionId)}/pause`,
+    method: 'POST',
+    data: input,
+    idempotencyKey: input.requestId,
+  });
+  return normalizeSession(payload.session);
+}
+
+export async function abandonSession(sessionId: string, input: SessionWriteInput): Promise<PracticeSession> {
+  const payload = await request<{ session: unknown }>({
+    path: `${ROOT}/sessions/${encodeURIComponent(sessionId)}/abandon`,
+    method: 'POST',
+    data: input,
+    idempotencyKey: input.requestId,
+  });
+  return normalizeSession(payload.session);
+}
+
+export async function completeSession(sessionId: string, input: SessionWriteInput): Promise<{
+  session: PracticeSession;
+  report: PracticeReport;
+}> {
+  const payload = await request<{ session: unknown; report: PracticeReport }>({
+    path: `${ROOT}/sessions/${encodeURIComponent(sessionId)}/complete`,
+    method: 'POST',
+    data: input,
+    idempotencyKey: input.requestId,
+  });
+  return { session: normalizeSession(payload.session), report: payload.report || {} };
+}
+
+export async function getReport(sessionId: string): Promise<PracticeReport> {
+  const payload = await request<{ report: PracticeReport }>({
+    path: `${ROOT}/sessions/${encodeURIComponent(sessionId)}/report`,
+  });
+  return payload.report || {};
+}
+
+export async function submitRevengeAnswer(mistakeId: string, answer: Record<string, unknown>): Promise<any> {
+  const key = String(answer.requestId || `revenge:${mistakeId}`);
+  const payload = await request<{ mistake: any }>({
+    path: `${ROOT}/mistakes/${encodeURIComponent(mistakeId)}/revenge-answer`,
+    method: 'POST',
+    data: answer,
+    idempotencyKey: key,
+  });
+  return payload.mistake;
+}
+
+export async function markRemediationReviewed(mistakeId: string, requestId: string): Promise<any> {
+  const payload = await request<{ mistake: any }>({
+    path: `${ROOT}/mistakes/${encodeURIComponent(mistakeId)}/remediation-reviewed`,
+    method: 'POST',
+    data: {},
+    idempotencyKey: requestId,
+  });
+  return payload.mistake;
+}
+
+export async function getVerificationCandidate(mistakeId: string): Promise<any> {
+  const payload = await request<{ candidate: any }>({
+    path: `${ROOT}/mistakes/${encodeURIComponent(mistakeId)}/verification-candidate`,
+  });
+  return payload.candidate || { available: false };
+}
+
+export async function submitVerification(mistakeId: string, answer: Record<string, unknown>): Promise<any> {
+  return request({
+    path: `${ROOT}/mistakes/${encodeURIComponent(mistakeId)}/verification`,
+    method: 'POST',
+    data: answer,
+    idempotencyKey: String(answer.requestId || `verification:${mistakeId}`),
+  });
+}

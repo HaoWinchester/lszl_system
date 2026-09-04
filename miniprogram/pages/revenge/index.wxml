@@ -1,0 +1,29 @@
+<view class="page-shell revenge-page" style="padding-top: {{statusBarHeight}}px">
+  <view class="nav-bar revenge-nav"><button class="back" bindtap="onBack"><view></view></button><text class="nav-title">错题复仇</text><text wx:if="{{queueCount}}" class="queue-count">待处理 {{queueCount}}</text></view>
+
+  <view class="stage-line" wx:if="{{!loading && !empty}}">
+    <view class="{{stage === 'answer' ? 'active' : ''}}"><text>1</text><text>重答原题</text></view>
+    <view class="{{stage === 'remediation' ? 'active' : ''}}"><text>2</text><text>阅读纠错</text></view>
+    <view class="{{stage === 'verification' ? 'active' : ''}}"><text>3</text><text>变式验证</text></view>
+  </view>
+
+  <view wx:if="{{loading}}" class="revenge-loading"><view></view><view></view><view></view></view>
+  <empty-state wx:elif="{{loadError}}" title="错题没有载入" body="{{loadError}}" action-text="重新加载" bind:action="loadQueue" />
+  <empty-state wx:elif="{{empty}}" title="暂无待处理错题" body="继续做题后，需要重做和验证的题会出现在这里。" action-text="回到首页" bind:action="onHome" />
+
+  <block wx:else>
+    <view class="revenge-intro">
+      <text class="eyebrow">{{stage === 'verification' ? '同知识点验证' : candidate.paperName || '历史错题'}}</text>
+      <text class="revenge-title">{{stage === 'answer' ? '先不看答案，再判断一次' : stage === 'remediation' ? '找到上次错在哪里' : '换个问法，看是否真的掌握'}}</text>
+      <text wx:if="{{feedback}}" class="revenge-copy">{{feedback}}</text>
+    </view>
+
+    <question-view wx:if="{{stage !== 'remediation'}}" question="{{question}}" selected-ids="{{selectedIds}}" submitted="{{busy}}" show-analysis="{{false}}" bind:change="onAnswerChange" />
+    <remediation-note wx:else mistake="{{mistake}}" question="{{question}}" previous-answer="{{previousAnswer}}" />
+
+    <view wx:if="{{writeError}}" class="write-error"><text>{{writeError}}</text><button bindtap="retryWrites">重试同步</button></view>
+    <button wx:if="{{stage === 'answer'}}" class="primary-button stage-action" loading="{{busy}}" disabled="{{busy || !selectedIds.length}}" bindtap="submitOriginal">提交重答</button>
+    <button wx:elif="{{stage === 'remediation'}}" class="primary-button stage-action" loading="{{busy}}" disabled="{{busy}}" bindtap="confirmRemediation">我已理解，进入验证</button>
+    <button wx:else class="primary-button stage-action" loading="{{busy}}" disabled="{{busy || !selectedIds.length}}" bindtap="submitVerificationAnswer">提交验证</button>
+  </block>
+</view>
