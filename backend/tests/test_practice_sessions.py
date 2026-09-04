@@ -24,6 +24,7 @@ from app.models.training import (
 from app.models.user import User
 from app.services import question_catalog_service
 from app.services import practice_session_service
+from app.services import wechat_mini_service
 
 
 PASSWORD = "practice-session-pass"
@@ -655,6 +656,50 @@ def test_short_paper_count_is_supported_by_the_session_api() -> None:
             )
             assert response.status_code == 200, response.text
             assert response.json()["session"]["stats"]["total"] == 7
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_mini_bearer_competitive_session_hides_answers_until_completion() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+
+    async def issue_token() -> str:
+        async with AsyncSessionLocal() as db:
+            user = await db.get(User, ids["student"])
+            issued = await wechat_mini_service.issue_session(db, user, {"platform": "test"})
+            return issued.token
+
+    try:
+        headers = {"Authorization": f"Bearer {asyncio.run(issue_token())}"}
+        with TestClient(app) as client:
+            started_response = client.post(
+                "/api/v1/learning/practice/sessions/start",
+                headers=headers,
+                json={
+                    "paperId": ids["paper"],
+                    "releaseId": ids["release"],
+                    "mode": "challenge",
+                    "count": 1,
+                    "order": "paper",
+                },
+            )
+            assert started_response.status_code == 200, started_response.text
+            started = started_response.json()["session"]
+            question = started["questions"][0]["question"]
+            assert "correctAnswer" not in question
+            assert "analysis" not in question
+            assert all("correct" not in option for option in question["options"])
+
+            completed_response = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/complete",
+                headers=headers,
+                json={"revision": started["revision"]},
+            )
+            assert completed_response.status_code == 200, completed_response.text
+            completed_question = completed_response.json()["session"]["questions"][0]["question"]
+            assert completed_question["correctAnswer"] == "A"
+            assert completed_question["analysis"] == "第 1 题解析"
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))
 

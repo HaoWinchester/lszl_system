@@ -41,7 +41,7 @@
 - Produces: `project_practice_payload(payload: Any, *, transport: str, mode: str | None, completed: bool) -> Any`.
 - Rule: Cookie returns the original payload object; Bearer recursively removes `correctAnswer`, `correctOptionIds`, option-level `correct`, and analysis fields until the allowed reveal point.
 
-- [ ] **Step 1: Write failing projection tests**
+- [x] **Step 1: Write failing projection tests**
 
 ```python
 def test_bearer_challenge_payload_has_no_answer_markers():
@@ -54,12 +54,12 @@ def test_cookie_payload_is_unchanged():
     assert project_practice_payload(source, transport="cookie", mode="normal", completed=False) is source
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_practice_mini_client_view.py -q`
 Expected: FAIL because the projection module is absent.
 
-- [ ] **Step 3: Implement recursive projection and apply it to session routes**
+- [x] **Step 3: Implement recursive projection and apply it to session routes**
 
 ```python
 HIDDEN_KEYS = {"correctAnswer", "correct_answer", "correctOptionIds", "correct_answer_ids", "analysis", "explanation"}
@@ -74,12 +74,12 @@ def _strip(value):
 
 Normal mode permits answer/analysis only in the answer-submission response for that question or after completion. Challenge and scholar modes permit them only after session completion. Apply the projection to start, enter, active, answer, complete, report, and detail responses when the authenticated transport is Bearer.
 
-- [ ] **Step 4: Run focused and browser regression tests**
+- [x] **Step 4: Run focused and browser regression tests**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_practice_mini_client_view.py tests/test_practice_sessions.py tests/test_practice_learning_api.py -q`
 Expected: PASS, including explicit Cookie response assertions.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/services/practice_client_view_service.py backend/app/api/v1/learning.py backend/tests/test_practice_mini_client_view.py

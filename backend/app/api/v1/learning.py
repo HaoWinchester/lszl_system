@@ -2,16 +2,32 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser
 from app.db.session import get_db
 from app.schemas.personal_card import PersonalCardCreate, PersonalCardUpdate
 from app.services import learning_service, personal_card_service, practice_session_service
+from app.services.practice_client_view_service import project_practice_payload
 
 router = APIRouter(tags=["learning"])
 DB = Annotated[AsyncSession, Depends(get_db)]
+
+
+def _practice_view(
+    request: Request,
+    payload,
+    *,
+    allow_current_reveal: bool = False,
+    force_completed_reveal: bool = False,
+):
+    return project_practice_payload(
+        payload,
+        transport=str(getattr(request.state, "auth_transport", "cookie")),
+        allow_current_reveal=allow_current_reveal,
+        force_completed_reveal=force_completed_reveal,
+    )
 
 
 @router.get("/learning/personal-cards")
@@ -189,7 +205,7 @@ async def record_practice_answer(body: dict, db: DB, user: CurrentUser):
 
 
 @router.post("/learning/practice/sessions/start")
-async def start_practice_session(body: dict, db: DB, user: CurrentUser):
+async def start_practice_session(body: dict, request: Request, db: DB, user: CurrentUser):
     try:
         session = await practice_session_service.start_session(
             db, user.username, user, body
@@ -198,33 +214,35 @@ async def start_practice_session(body: dict, db: DB, user: CurrentUser):
         raise HTTPException(
             status_code=error.status_code, detail=error.detail()
         ) from error
-    return {"session": session}
+    return _practice_view(request, {"session": session})
 
 
 @router.post("/learning/practice/sessions/enter")
-async def enter_practice_session(body: dict, db: DB, user: CurrentUser):
+async def enter_practice_session(body: dict, request: Request, db: DB, user: CurrentUser):
     try:
-        return await practice_session_service.enter_session(
+        payload = await practice_session_service.enter_session(
             db, user.username, user, body
         )
     except practice_session_service.PracticeSessionError as error:
         raise HTTPException(
             status_code=error.status_code, detail=error.detail()
         ) from error
+    return _practice_view(request, payload)
 
 
 @router.get("/learning/practice/sessions/active")
 async def active_practice_sessions(
+    request: Request,
     db: DB,
     user: CurrentUser,
     release_id: str | None = Query(None, alias="releaseId"),
     mode: str | None = Query(None),
 ):
-    return {
+    return _practice_view(request, {
         "sessions": await practice_session_service.list_active_sessions(
             db, user.username, release_id=release_id, mode=mode
         )
-    }
+    })
 
 
 @router.post("/learning/practice/sessions")
@@ -254,21 +272,22 @@ async def clear_practice_sessions(db: DB, user: CurrentUser):
 
 @router.post("/learning/practice/sessions/{session_id}/answers")
 async def answer_practice_session(
-    session_id: str, body: dict, db: DB, user: CurrentUser
+    session_id: str, body: dict, request: Request, db: DB, user: CurrentUser
 ):
     try:
-        return await practice_session_service.answer_session_question(
+        payload = await practice_session_service.answer_session_question(
             db, user.username, user, session_id, body
         )
     except practice_session_service.PracticeSessionError as error:
         raise HTTPException(
             status_code=error.status_code, detail=error.detail()
         ) from error
+    return _practice_view(request, payload, allow_current_reveal=True)
 
 
 @router.patch("/learning/practice/sessions/{session_id}/state")
 async def update_practice_session_state(
-    session_id: str, body: dict, db: DB, user: CurrentUser
+    session_id: str, body: dict, request: Request, db: DB, user: CurrentUser
 ):
     try:
         session = await practice_session_service.update_runtime_state(
@@ -278,12 +297,12 @@ async def update_practice_session_state(
         raise HTTPException(
             status_code=error.status_code, detail=error.detail()
         ) from error
-    return {"session": session}
+    return _practice_view(request, {"session": session})
 
 
 @router.post("/learning/practice/sessions/{session_id}/pause")
 async def pause_practice_session(
-    session_id: str, body: dict, db: DB, user: CurrentUser
+    session_id: str, body: dict, request: Request, db: DB, user: CurrentUser
 ):
     try:
         session = await practice_session_service.pause_session(
@@ -293,12 +312,12 @@ async def pause_practice_session(
         raise HTTPException(
             status_code=error.status_code, detail=error.detail()
         ) from error
-    return {"session": session}
+    return _practice_view(request, {"session": session})
 
 
 @router.post("/learning/practice/sessions/{session_id}/abandon")
 async def abandon_practice_session(
-    session_id: str, body: dict, db: DB, user: CurrentUser
+    session_id: str, body: dict, request: Request, db: DB, user: CurrentUser
 ):
     try:
         session = await practice_session_service.abandon_session(
@@ -308,12 +327,12 @@ async def abandon_practice_session(
         raise HTTPException(
             status_code=error.status_code, detail=error.detail()
         ) from error
-    return {"session": session}
+    return _practice_view(request, {"session": session})
 
 
 @router.post("/learning/practice/sessions/{session_id}/complete")
 async def complete_practice_session(
-    session_id: str, body: dict, db: DB, user: CurrentUser
+    session_id: str, body: dict, request: Request, db: DB, user: CurrentUser
 ):
     try:
         session, report = await practice_session_service.complete_session(
@@ -323,14 +342,18 @@ async def complete_practice_session(
         raise HTTPException(
             status_code=error.status_code, detail=error.detail()
         ) from error
-    return {"session": session, "report": report}
+    return _practice_view(
+        request,
+        {"session": session, "report": report},
+        force_completed_reveal=True,
+    )
 
 
 @router.post(
     "/learning/practice/sessions/{session_id}/mistakes/{mistake_id}/remediation"
 )
 async def review_session_remediation(
-    session_id: str, mistake_id: str, body: dict, db: DB, user: CurrentUser
+    session_id: str, mistake_id: str, body: dict, request: Request, db: DB, user: CurrentUser
 ):
     try:
         session, mistake, candidate = (
@@ -344,18 +367,18 @@ async def review_session_remediation(
         ) from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-    return {
+    return _practice_view(request, {
         "session": session,
         "mistake": learning_service._practice_mistake_to_dict(mistake),
         "candidate": candidate,
-    }
+    })
 
 
 @router.post(
     "/learning/practice/sessions/{session_id}/mistakes/{mistake_id}/verification"
 )
 async def verify_session_remediation(
-    session_id: str, mistake_id: str, body: dict, db: DB, user: CurrentUser
+    session_id: str, mistake_id: str, body: dict, request: Request, db: DB, user: CurrentUser
 ):
     try:
         session, mistake, verification, answer = (
@@ -369,32 +392,32 @@ async def verify_session_remediation(
         ) from error
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
-    return {
+    return _practice_view(request, {
         "session": session,
         "mistake": learning_service._practice_mistake_to_dict(mistake),
         "verification": learning_service._practice_verification_to_dict(verification),
         "answer": answer,
-    }
+    }, allow_current_reveal=True)
 
 
 @router.get("/learning/practice/sessions/{session_id}/report")
 async def get_practice_session_report(
-    session_id: str, db: DB, user: CurrentUser
+    session_id: str, request: Request, db: DB, user: CurrentUser
 ):
     report = await practice_session_service.get_report(
         db, user.username, session_id
     )
     if report is None:
         raise HTTPException(status_code=404, detail="成绩报告不存在或无权访问")
-    return {"report": report}
+    return _practice_view(request, {"report": report}, force_completed_reveal=True)
 
 
 @router.get("/learning/practice/sessions/{session_id}")
-async def get_practice_session(session_id: str, db: DB, user: CurrentUser):
+async def get_practice_session(session_id: str, request: Request, db: DB, user: CurrentUser):
     session = await practice_session_service.get_session(db, user.username, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="练习会话不存在或无权访问")
-    return {"session": session}
+    return _practice_view(request, {"session": session})
 
 
 @router.post("/learning/practice/mistakes")
