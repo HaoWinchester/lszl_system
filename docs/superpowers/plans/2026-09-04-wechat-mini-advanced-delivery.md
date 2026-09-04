@@ -238,7 +238,7 @@ git commit -m "feat: add mini program learner profile"
 **Interfaces:**
 - Verifies: environment variables, AppID substitution, request-domain allowlist, privacy declarations, account-binding path, all four modes, weak-network recovery, and no answer leakage.
 
-- [ ] **Step 1: Write the failing release contract**
+- [x] **Step 1: Write the failing release contract**
 
 ```javascript
 test('release documentation names every external gate', () => {
@@ -247,16 +247,16 @@ test('release documentation names every external gate', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `node --test miniprogram/tests/release-contract.test.mjs`
 Expected: FAIL because release documentation is absent.
 
-- [ ] **Step 3: Document exact configuration and acceptance cases**
+- [x] **Step 3: Document exact configuration and acceptance cases**
 
 Add non-secret environment keys to `backend/.env.example`; document importing the directory, replacing `touristappid` only in private/local config, setting the HTTPS API base URL, adding it to WeChat request-domain allowlists, and declaring network/account/profile data use. Acceptance cases must cover login/bind/logout, resume, single/multiple choice, bilingual/image, all modes, offline/retry/conflict, answer leakage, subscription denial, and device safe areas.
 
-- [ ] **Step 4: Run complete automated gates**
+- [x] **Step 4: Run complete automated gates**
 
 Run: `node --test miniprogram/tests/*.test.mjs`
 Expected: PASS.
@@ -271,7 +271,9 @@ Expected: PASS because existing browser behavior remains compatible.
 
 Import the project into WeChat Developer Tools, execute the checklist with the configured test AppID, and record exact passes/failures. Then merge the feature branch into `uat`, push with `git -c http.proxy=http://127.0.0.1:7897 push origin uat`, deploy to the UAT environment using the repository's verified deployment procedure, and stop for the user's explicit UAT decision. Do not merge `main`.
 
-- [ ] **Step 6: Commit documentation**
+Automated evidence is recorded. WeChat Developer Tools compilation and device checks remain external gates because this host has neither the tool nor an authorized test AppID.
+
+- [x] **Step 6: Commit documentation**
 
 ```bash
 git add backend/.env.example README.md miniprogram/docs/release-checklist.md miniprogram/tests/release-contract.test.mjs
