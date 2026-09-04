@@ -5,6 +5,7 @@ import { messageOf } from '../../services/http';
 import { getExperienceSummary, listSessions } from '../../services/practice';
 import { getCurrentUser } from '../../services/session';
 import { getMySubscription } from '../../services/subscription';
+import { pageRefreshMode } from '../../domain/page-freshness';
 import { selectPrimaryTab } from '../../domain/primary-tabs';
 
 const roleLabels: Record<string, string> = {
@@ -27,6 +28,7 @@ Page({
     statusBarHeight: 24,
     loading: true,
     error: '',
+    lastLoadedAt: 0,
     user: {} as any,
     displayName: '同学',
     roleLabel: '学员',
@@ -44,11 +46,14 @@ Page({
 
   onShow() {
     selectPrimaryTab(this as any, 2);
-    this.loadProfile();
+    const mode = pageRefreshMode(this.data.lastLoadedAt);
+    if (mode === 'skip') return;
+    this.loadProfile({ silent: mode === 'silent' });
   },
 
-  async loadProfile() {
-    this.setData({ loading: true, error: '' });
+  async loadProfile(options: { silent?: boolean } = {}) {
+    const silent = options.silent === true && this.data.lastLoadedAt > 0;
+    if (!silent) this.setData({ loading: true, error: '' });
     try {
       const user = await validateSession();
       if (!user) {
@@ -76,8 +81,11 @@ Page({
           ? `${privileged ? '已开放全部试卷' : '已开放会员试卷'}${dateLabel(access.subscription?.expiresAt) ? ` · ${dateLabel(access.subscription.expiresAt)}` : ''}`
           : '可使用免费试卷；会员权限请在网页端开通',
         loading: false,
+        error: '',
+        lastLoadedAt: Date.now(),
       });
     } catch (error) {
+      if (silent) return;
       this.setData({ loading: false, error: messageOf(error) });
     }
   },

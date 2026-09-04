@@ -25,6 +25,14 @@ test('profile reads server-owned learning and access state', () => {
   assert.match(source, /clearUserDrafts/);
 });
 
+test('profile preserves rendered content during background refreshes', () => {
+  const source = read('pages/profile/index.ts');
+  assert.match(source, /pageRefreshMode/);
+  assert.match(source, /lastLoadedAt/);
+  assert.match(source, /silent/);
+  assert.match(source, /mode === 'skip'/);
+});
+
 test('native custom tab bar declares the three persistent primary pages', () => {
   const app = JSON.parse(read('app.json'));
   assert.equal(app.tabBar?.custom, true);

@@ -41,6 +41,14 @@ test('history has loading, error recovery, empty, completed report, and resume p
   assert.match(read('pages/history/index.ts'), /listSessions/);
 });
 
+test('history preserves rendered records during background refreshes', () => {
+  const source = read('pages/history/index.ts');
+  assert.match(source, /pageRefreshMode/);
+  assert.match(source, /lastLoadedAt/);
+  assert.match(source, /silent/);
+  assert.match(source, /mode === 'skip'/);
+});
+
 test('result and history routes are declared', () => {
   const pages = JSON.parse(read('app.json')).pages;
   assert.ok(pages.includes('pages/result/index'));

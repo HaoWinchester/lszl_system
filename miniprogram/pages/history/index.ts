@@ -1,6 +1,7 @@
 import { messageOf } from '../../services/http';
 import { listSessions } from '../../services/practice';
 import { PracticeHistoryItem } from '../../types/api';
+import { pageRefreshMode } from '../../domain/page-freshness';
 import { selectPrimaryTab } from '../../domain/primary-tabs';
 
 const modeLabels: Record<string, string> = {
@@ -34,6 +35,7 @@ Page({
     loading: true,
     error: '',
     filter: 'all',
+    lastLoadedAt: 0,
     items: [] as ReturnType<typeof viewItem>[],
     visibleItems: [] as ReturnType<typeof viewItem>[],
   },
@@ -44,20 +46,32 @@ Page({
 
   onShow() {
     selectPrimaryTab(this as any, 1);
-    this.loadHistory();
+    const mode = pageRefreshMode(this.data.lastLoadedAt);
+    if (mode === 'skip') return;
+    this.loadHistory({ silent: mode === 'silent' });
   },
 
   onPullDownRefresh() {
-    this.loadHistory().finally(() => wx.stopPullDownRefresh());
+    this.loadHistory({ silent: this.data.lastLoadedAt > 0 }).finally(() => wx.stopPullDownRefresh());
   },
 
-  async loadHistory() {
-    this.setData({ loading: true, error: '' });
+  async loadHistory(options: { silent?: boolean } = {}) {
+    const silent = options.silent === true && this.data.lastLoadedAt > 0;
+    if (!silent) this.setData({ loading: true, error: '' });
     try {
       const items = (await listSessions()).filter(item => item.sessionId).map(viewItem);
-      this.setData({ items, loading: false });
-      this.applyFilter();
+      const visibleItems = this.data.filter === 'all'
+        ? items
+        : items.filter(item => item.status === this.data.filter);
+      this.setData({
+        items,
+        visibleItems,
+        loading: false,
+        error: '',
+        lastLoadedAt: Date.now(),
+      });
     } catch (error) {
+      if (silent) return;
       this.setData({ loading: false, error: messageOf(error), items: [], visibleItems: [] });
     }
   },
