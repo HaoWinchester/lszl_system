@@ -27,6 +27,13 @@ test('question component is accessible, bilingual, image-aware, and touch sized'
   assert.match(read('components/question-view/index.wxss'), /min-height:\s*122rpx/);
 });
 
+test('practice components avoid unsupported tag selectors', () => {
+  const questionStyles = read('components/question-view/index.wxss');
+  const sheetStyles = read('components/answer-sheet/index.wxss');
+  assert.doesNotMatch(questionStyles, /\.question-kind text/);
+  assert.doesNotMatch(sheetStyles, /\.sheet-head button|\.legend\s*>\s*view/);
+});
+
 test('practice markup never binds hidden scoring facts directly', () => {
   const wxml = `${read('pages/practice/index.wxml')}\n${read('components/question-view/index.wxml')}`;
   assert.doesNotMatch(wxml, /correctAnswer|correctOptionIds|option\.correct/);

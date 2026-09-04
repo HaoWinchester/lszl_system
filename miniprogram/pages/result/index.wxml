@@ -27,7 +27,7 @@
       <view wx:for="{{domains}}" wx:key="id" class="domain-row {{item.weak ? 'is-weak' : ''}}">
         <text>{{item.label}}</text><text>{{item.score}}%</text>
       </view>
-      <text wx:else class="section-empty">本次暂无可用的领域统计。</text>
+      <text wx:if="{{!domains.length}}" class="section-empty">本次暂无可用的领域统计。</text>
     </view>
 
     <view class="result-section wrong-section">

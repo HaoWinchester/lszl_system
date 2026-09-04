@@ -2,10 +2,10 @@
 .sheet { width: 100%; max-height: 76vh; padding: 16rpx 36rpx calc(34rpx + env(safe-area-inset-bottom)); border-radius: 30rpx 30rpx 0 0; background: #f8f5ed; }
 .sheet-handle { width: 66rpx; height: 7rpx; margin: 0 auto 22rpx; border-radius: 4rpx; background: #c4c5bb; }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; color: #173b32; font-size: 34rpx; font-weight: 650; }
-.sheet-head button { min-height: 72rpx; padding: 0 8rpx; background: transparent; color: #718079; font-size: 25rpx; }
-.sheet-head button::after, .sheet-number::after, .complete::after { border: 0; }
+.sheet-close { min-height: 72rpx; padding: 0 8rpx; background: transparent; color: #718079; font-size: 25rpx; }
+.sheet-close::after, .sheet-number::after, .complete::after { border: 0; }
 .legend { display: flex; gap: 28rpx; margin-top: 18rpx; color: #718079; font-size: 22rpx; }
-.legend > view { display: flex; align-items: center; gap: 8rpx; }
+.legend-item { display: flex; align-items: center; gap: 8rpx; }
 .dot { display: inline-block; width: 14rpx; height: 14rpx; border-radius: 50%; background: #d8d7cc; }
 .dot.answered { background: #497465; }.dot.marked { background: #a55842; }.dot.current { border: 2rpx solid #173b32; background: transparent; }
 .sheet-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18rpx; margin-top: 34rpx; overflow-y: auto; }

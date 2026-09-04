@@ -25,6 +25,11 @@ test('revenge uses a quiet three-step learning sequence with real states', () =>
   assert.doesNotMatch(read('pages/revenge/index.wxss'), /gradient|box-shadow|grid-template-columns\s*:\s*repeat\([3-9]/i);
 });
 
+test('remediation component avoids unsupported tag selectors', () => {
+  const styles = read('components/remediation-note/index.wxss');
+  assert.doesNotMatch(styles, /\.(?:answer|knowledge)-line text/);
+});
+
 test('revenge route and APIs are wired without a second mistake store', () => {
   assert.ok(JSON.parse(read('app.json')).pages.includes('pages/revenge/index'));
   const service = read('services/practice.ts');

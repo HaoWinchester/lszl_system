@@ -34,3 +34,9 @@ test('shared bottom navigation connects home, history, and profile', () => {
     assert.match(read(`pages/${page}/index.wxml`), /bottom-nav/);
   }
 });
+
+test('bottom navigation component styles use class selectors only', () => {
+  const styles = read('components/bottom-nav/index.wxss');
+  assert.doesNotMatch(styles, /\.bottom-nav button/);
+  assert.doesNotMatch(styles, /\.home-icon view/);
+});

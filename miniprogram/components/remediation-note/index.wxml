@@ -1,9 +1,9 @@
 <view class="remediation">
   <text class="remediation-kicker">纠错线索</text>
-  <view class="answer-line"><text>你上次选择</text><text>{{previousAnswer || '未记录'}}</text></view>
-  <view class="answer-line"><text>正确答案</text><text>{{answerLabel}}</text></view>
+  <view class="answer-line"><text class="remediation-key">你上次选择</text><text class="remediation-value">{{previousAnswer || '未记录'}}</text></view>
+  <view class="answer-line"><text class="remediation-key">正确答案</text><text class="remediation-value">{{answerLabel}}</text></view>
   <view class="knowledge-line" wx:if="{{mistake.knowledge.title}}">
-    <text>对应知识点</text><text>{{mistake.knowledge.title}}</text>
+    <text class="remediation-key">对应知识点</text><text class="remediation-value">{{mistake.knowledge.title}}</text>
   </view>
   <text class="remediation-copy">{{question.analysis || question.explanation || '重新对照题干条件和每个选项，找出上次判断中遗漏的关键条件。'}}</text>
 </view>
