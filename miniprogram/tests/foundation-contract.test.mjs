@@ -59,8 +59,15 @@ test('visual foundation avoids AI-like effects and keeps mobile touch sizing', (
   const styles = `${read('styles/tokens.wxss')}\n${read('app.wxss')}`;
   assert.doesNotMatch(styles, /linear-gradient|radial-gradient|filter:\s*blur|text-shadow/);
   assert.match(styles, /--touch-min:\s*96rpx/);
-  assert.match(styles, /--option-min:\s*122rpx/);
+  assert.match(styles, /--option-min:\s*104rpx/);
   assert.match(styles, /--ink:\s*#173b32/);
+});
+
+test('entry pages share the approved title and spacing system', () => {
+  const styles = `${read('pages/login/index.wxss')}\n${read('pages/home/index.wxss')}`;
+  assert.doesNotMatch(styles, /font-family/);
+  assert.match(styles, /font-size:\s*var\(--font-display\)/);
+  assert.doesNotMatch(styles, /padding-top:\s*(?:64|88|108|112)rpx/);
 });
 
 test('WXML templates avoid unsupported inline collection literals', () => {

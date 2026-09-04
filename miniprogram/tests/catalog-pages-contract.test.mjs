@@ -45,3 +45,10 @@ test('new pages are declared and remain one-column mobile layouts', () => {
   assert.ok(app.pages.includes('pages/practice-setup/index'));
   assert.doesNotMatch(`${read('pages/papers/index.wxss')}\n${read('pages/practice-setup/index.wxss')}`, /grid-template-columns\s*:\s*repeat\([2-9]/);
 });
+
+test('catalog and setup controls share touch size and spacing tokens', () => {
+  const styles = `${read('pages/papers/index.wxss')}\n${read('pages/practice-setup/index.wxss')}`;
+  assert.match(styles, /min-height:\s*var\(--touch-min\)/);
+  assert.match(styles, /font-size:\s*var\(--font-body\)/);
+  assert.doesNotMatch(styles, /font-family/);
+});
