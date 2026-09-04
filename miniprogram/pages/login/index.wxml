@@ -1,0 +1,33 @@
+<view class="page-shell login-page" style="padding-top: {{statusBarHeight}}px">
+  <view class="nav-bar"><text class="nav-title">幻谱学习</text></view>
+
+  <view class="intro">
+    <text class="eyebrow">随时回到你的学习进度</text>
+    <text class="headline">把一道题，真正弄明白</text>
+    <text class="intro-copy">微信身份只用于登录。绑定已有账号后，网页端的试卷、进度和错题会自动同步。</text>
+  </view>
+
+  <button wx:if="{{stage === 'wechat'}}" class="primary-button wechat-button" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onWechatLogin">微信登录</button>
+
+  <view wx:if="{{stage === 'binding'}}" class="binding-panel">
+    <view class="binding-tabs" role="tablist">
+      <button class="binding-tab {{formMode === 'bind' ? 'is-active' : ''}}" data-mode="bind" bindtap="onModeChange">绑定已有账号</button>
+      <button class="binding-tab {{formMode === 'register' ? 'is-active' : ''}}" data-mode="register" bindtap="onModeChange">创建学习账号</button>
+    </view>
+    <input wx:if="{{formMode === 'register'}}" class="field" placeholder="你的称呼（选填）" value="{{displayName}}" data-field="displayName" bindinput="onInput" />
+    <input class="field" placeholder="用户名" value="{{username}}" data-field="username" bindinput="onInput" />
+    <input class="field" password placeholder="密码" value="{{password}}" data-field="password" bindinput="onInput" />
+    <button class="primary-button submit-button" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmitAccount">{{formMode === 'bind' ? '绑定并继续' : '创建并继续'}}</button>
+    <button class="quiet-button" disabled="{{submitting}}" bindtap="onRestart">重新获取微信身份</button>
+  </view>
+
+  <text wx:if="{{error}}" class="error-copy">{{error}}</text>
+
+  <view class="legal-row" bindtap="onToggleAccepted" aria-label="同意隐私政策与用户协议">
+    <view class="check {{accepted ? 'is-checked' : ''}}"><view wx:if="{{accepted}}" class="check-mark"></view></view>
+    <view class="legal-copy">我已阅读并同意
+      <text class="legal-link" data-document="privacy" catchtap="onOpenLegal">《隐私政策》</text>和
+      <text class="legal-link" data-document="terms" catchtap="onOpenLegal">《用户协议》</text>
+    </view>
+  </view>
+</view>

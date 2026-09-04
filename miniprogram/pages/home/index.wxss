@@ -1,0 +1,66 @@
+.home-page {
+  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+}
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  padding-top: 64rpx;
+}
+
+.home-title {
+  margin-top: 16rpx;
+  color: var(--ink);
+  font-family: "STSong", "Songti SC", serif;
+  font-size: 48rpx;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.home-copy,
+.section-copy {
+  margin-top: 16rpx;
+  color: var(--muted);
+  font-size: 27rpx;
+}
+
+.rule {
+  height: 2rpx;
+  margin: 70rpx 0 54rpx;
+  background: var(--line);
+}
+
+.first-state {
+  display: flex;
+  flex-direction: column;
+}
+
+.section-kicker {
+  color: var(--clay);
+  font-size: 24rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+}
+
+.section-title {
+  margin-top: 14rpx;
+  color: var(--ink);
+  font-size: 36rpx;
+  font-weight: 650;
+}
+
+.loading-state {
+  padding-top: 88rpx;
+}
+
+.loading-line {
+  width: 100%;
+  height: 28rpx;
+  margin-bottom: 30rpx;
+  border-radius: 8rpx;
+  background: var(--surface-quiet);
+}
+
+.loading-line.short {
+  width: 38%;
+}

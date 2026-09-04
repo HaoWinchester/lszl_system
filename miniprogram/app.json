@@ -1,0 +1,14 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/login/index"
+  ],
+  "window": {
+    "navigationStyle": "custom",
+    "backgroundColor": "#f4f0e7",
+    "backgroundTextStyle": "dark"
+  },
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents",
+  "sitemapLocation": "sitemap.json"
+}

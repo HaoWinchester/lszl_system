@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2020",
+    "module": "CommonJS",
+    "lib": ["ES2020"],
+    "typeRoots": ["./types"],
+    "noImplicitAny": true,
+    "noImplicitThis": true
+  },
+  "include": ["**/*.ts", "**/*.d.ts"],
+  "exclude": ["tests"]
+}

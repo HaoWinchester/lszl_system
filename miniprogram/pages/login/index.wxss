@@ -1,0 +1,120 @@
+.login-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  padding-top: 108rpx;
+}
+
+.headline {
+  margin-top: 18rpx;
+  color: var(--ink);
+  font-family: "STSong", "Songti SC", serif;
+  font-size: 52rpx;
+  font-weight: 600;
+  line-height: 1.28;
+}
+
+.intro-copy {
+  max-width: 610rpx;
+  margin-top: 28rpx;
+  color: var(--muted);
+  font-size: 28rpx;
+  line-height: 1.7;
+}
+
+.wechat-button {
+  margin-top: 112rpx;
+  width: 100%;
+}
+
+.binding-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 22rpx;
+  margin-top: 70rpx;
+}
+
+.binding-tabs {
+  display: flex;
+  gap: 34rpx;
+  margin-bottom: 10rpx;
+  border-bottom: 2rpx solid var(--line);
+}
+
+.binding-tab {
+  position: relative;
+  min-height: 80rpx;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 28rpx;
+}
+
+.binding-tab.is-active {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.binding-tab.is-active::before {
+  position: absolute;
+  right: 0;
+  bottom: -2rpx;
+  left: 0;
+  height: 4rpx;
+  background: var(--ink);
+  content: "";
+}
+
+.submit-button {
+  margin-top: 12rpx;
+  width: 100%;
+}
+
+.legal-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 18rpx;
+  margin-top: auto;
+  padding: 56rpx 0 8rpx;
+}
+
+.check {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 40rpx;
+  height: 40rpx;
+  margin-top: 2rpx;
+  border: 2rpx solid #9ba49f;
+  border-radius: 10rpx;
+}
+
+.check.is-checked {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.check-mark {
+  width: 14rpx;
+  height: 8rpx;
+  border-bottom: 3rpx solid #fff;
+  border-left: 3rpx solid #fff;
+  transform: rotate(-45deg) translateY(-2rpx);
+}
+
+.legal-copy {
+  color: var(--muted);
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.legal-link {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 5rpx;
+}

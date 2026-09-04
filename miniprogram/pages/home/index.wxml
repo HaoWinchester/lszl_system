@@ -1,0 +1,21 @@
+<view class="page-shell home-page" style="padding-top: {{statusBarHeight}}px">
+  <view class="nav-bar"><text class="nav-title">练习</text></view>
+  <view wx:if="{{loading}}" class="loading-state">
+    <view class="loading-line short"></view>
+    <view class="loading-line"></view>
+    <view class="loading-line"></view>
+  </view>
+  <view wx:else>
+    <view class="welcome">
+      <text class="eyebrow">{{todayLabel}}</text>
+      <text class="home-title">{{greeting}}，{{displayName}}</text>
+      <text class="home-copy">学习进度已经与网页端同步。</text>
+    </view>
+    <view class="rule"></view>
+    <view class="first-state">
+      <text class="section-kicker">今日练习</text>
+      <text class="section-title">准备好时，从一道题开始</text>
+      <text class="section-copy">题库与练习入口正在读取你的账号权限。</text>
+    </view>
+  </view>
+</view>

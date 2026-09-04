@@ -1,0 +1,18 @@
+page {
+  --paper: #f4f0e7;
+  --surface: #fbf9f3;
+  --surface-quiet: #ece8dc;
+  --ink: #173b32;
+  --text: #243b35;
+  --muted: #718079;
+  --line: #d8d7cc;
+  --green-soft: #dfe9df;
+  --clay: #a55842;
+  --gold: #a78037;
+  --danger: #a3473c;
+  --radius-sm: 22rpx;
+  --radius-md: 28rpx;
+  --touch-min: 96rpx;
+  --option-min: 122rpx;
+  --page-gutter: 36rpx;
+}

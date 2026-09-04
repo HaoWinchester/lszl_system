@@ -1,0 +1,4 @@
+{
+  "desc": "幻谱学习小程序页面索引",
+  "rules": [{ "action": "disallow", "page": "*" }]
+}

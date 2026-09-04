@@ -231,7 +231,7 @@ git commit -m "feat: expose WeChat mini authentication API"
 - Produces: `request<T>(options)`, `getSessionToken()`, `setSessionToken(token)`, `loginWithWechat()`, `bindExistingAccount(credentials)`.
 - Consumes: Task 3 routes and stable error payloads.
 
-- [ ] **Step 1: Write the failing static contract test**
+- [x] **Step 1: Write the failing static contract test**
 
 ```javascript
 test('mini program keeps secrets server-side and declares login/home', () => {
@@ -242,12 +242,12 @@ test('mini program keeps secrets server-side and declares login/home', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify failure**
+- [x] **Step 2: Run it to verify failure**
 
 Run: `node --test miniprogram/tests/foundation-contract.test.mjs`
 Expected: FAIL because `miniprogram/app.json` does not exist.
 
-- [ ] **Step 3: Implement the shell and authentication state machine**
+- [x] **Step 3: Implement the shell and authentication state machine**
 
 ```typescript
 export type AuthState =
@@ -267,12 +267,12 @@ export async function loginWithWechat(): Promise<AuthState> {
 
 Home must show a compact greeting, continue-practice area, mode entry row, and bottom tab bar; login must offer WeChat login first and existing-account binding only after a binding ticket exists. Use `touristappid` in committed project config and ignore `miniprogram/project.private.config.json`.
 
-- [ ] **Step 4: Run contracts and inspect in WeChat Developer Tools**
+- [x] **Step 4: Run contracts; keep Developer Tools inspection in the release gate**
 
 Run: `node --test miniprogram/tests/foundation-contract.test.mjs`
-Expected: PASS. Manual: import `miniprogram/`, compile without WXML/WXSS errors, verify 390×844 layout and 48px minimum controls.
+Expected: PASS. This host does not expose WeChat Developer Tools, so import/compile, 390×844 inspection, and 48px control verification remain explicit items in Advanced Delivery Task 5 rather than being reported as complete here.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .gitignore miniprogram
