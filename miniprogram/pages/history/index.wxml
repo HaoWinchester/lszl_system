@@ -14,9 +14,11 @@
     <view wx:for="{{visibleItems}}" wx:key="sessionId" class="history-row">
       <view class="history-meta"><text>{{item.dateLabel}}</text><text>{{item.modeLabel}}</text></view>
       <text class="paper-name">{{item.paperName}}</text>
-      <view class="history-result"><text class="history-score">{{item.resultLabel}}</text><text>{{item.statusLabel}}</text></view>
-      <button wx:if="{{item.canReport}}" class="history-action" data-session-id="{{item.sessionId}}" data-kind="report" bindtap="onOpen">查看报告</button>
-      <button wx:elif="{{item.canResume}}" class="history-action" data-session-id="{{item.sessionId}}" data-kind="resume" bindtap="onOpen">继续作答</button>
+      <view class="history-footer">
+        <view class="history-result"><text class="history-score">{{item.resultLabel}}</text><text>{{item.statusLabel}}</text></view>
+        <button wx:if="{{item.canReport}}" class="history-action" data-session-id="{{item.sessionId}}" data-kind="report" bindtap="onOpen">查看报告</button>
+        <button wx:elif="{{item.canResume}}" class="history-action" data-session-id="{{item.sessionId}}" data-kind="resume" bindtap="onOpen">继续作答</button>
+      </view>
     </view>
   </view>
 </view>

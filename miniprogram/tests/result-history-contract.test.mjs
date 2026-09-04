@@ -68,3 +68,13 @@ test('history removes serif display type and oversized empty spacing', () => {
   assert.match(styles, /font-size:\s*var\(--font-display\)/);
   assert.doesNotMatch(styles, /padding:\s*58rpx 0 46rpx/);
 });
+
+test('history uses equal filters and normal-flow actions', () => {
+  const page = read('pages/history/index.wxml');
+  const styles = read('pages/history/index.wxss');
+  assert.match(page, /class="history-footer"/);
+  assert.match(styles, /\.history-filter\s*\{[^}]*flex:\s*1;/s);
+  assert.match(styles, /\.history-filter\s*\{[^}]*min-width:\s*0;/s);
+  assert.doesNotMatch(styles, /\.history-action\s*\{[^}]*position:\s*absolute/s);
+  assert.doesNotMatch(styles, /\.history-row\s*\{[^}]*padding:[^;}]*144rpx/s);
+});
