@@ -103,7 +103,7 @@ git commit -m "feat: persist WeChat mini sessions"
 - Produces: `bind_existing_account(db, ticket, username, password, client_meta) -> IssuedMiniSession`.
 - Produces: `resolve_session_token(db, raw_token) -> User | None` and `revoke_session_token(db, raw_token) -> bool`.
 
-- [ ] **Step 1: Write failing service tests**
+- [x] **Step 1: Write failing service tests**
 
 ```python
 async def test_hash_token_never_returns_plaintext():
@@ -118,12 +118,12 @@ async def test_consumed_binding_ticket_cannot_be_reused(db, monkeypatch):
         await bind_existing_account(db, ticket.raw, "学生", "test1234", {})
 ```
 
-- [ ] **Step 2: Run the tests to verify failure**
+- [x] **Step 2: Run the tests to verify failure**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_wechat_mini_service.py -q`
 Expected: FAIL because the service does not exist.
 
-- [ ] **Step 3: Implement exact configuration and lifecycle**
+- [x] **Step 3: Implement exact configuration and lifecycle**
 
 ```python
 WECHAT_MINI_APP_ID: str = ""
@@ -135,12 +135,12 @@ WECHAT_MINI_BINDING_TICKET_MAX_AGE_SECONDS: int = 10 * 60
 
 Use `https://api.weixin.qq.com/sns/jscode2session` with `httpx.AsyncClient`, reject WeChat `errcode`, hash secrets with SHA-256, compare password via the existing user service/security helper, mark tickets consumed in the same transaction that creates a refreshed session row, and return raw secrets only once. Implement account registration through the existing user creation rules, require the active legal-consent version, then bind the ticket's WeChat identity to the new user in the same transaction.
 
-- [ ] **Step 4: Run service tests**
+- [x] **Step 4: Run service tests**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_wechat_mini_service.py -q`
 Expected: PASS for exchange, linked login, binding, expiry, reuse, invalid password, revoke, and inactive-user cases.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/core/config.py backend/app/schemas/wechat_mini.py backend/app/services/wechat_mini_service.py backend/tests/test_wechat_mini_service.py

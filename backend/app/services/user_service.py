@@ -20,14 +20,14 @@ VALID_STATUSES = {"active", "paused", "archived"}
 # ---------- 序列化 ----------
 def wechat_summary(wechat: dict | None) -> dict | None:
     """返回前端需要的绑定状态，不泄露 openid 或 unionid。"""
-    if not wechat or not wechat.get("openid"):
+    if not wechat or not (wechat.get("openid") or wechat.get("miniOpenid")):
         return None
     return {
         "bound": True,
         "nickname": str(wechat.get("nickname") or "微信用户"),
         "avatar": str(wechat.get("avatar") or ""),
-        "boundAt": wechat.get("boundAt"),
-        "lastLoginAt": wechat.get("lastLoginAt"),
+        "boundAt": wechat.get("boundAt") or wechat.get("miniBoundAt"),
+        "lastLoginAt": wechat.get("lastLoginAt") or wechat.get("miniLastLoginAt"),
     }
 
 
