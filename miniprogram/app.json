@@ -4,7 +4,9 @@
     "pages/login/index",
     "pages/papers/index",
     "pages/practice-setup/index",
-    "pages/practice/index"
+    "pages/practice/index",
+    "pages/result/index",
+    "pages/history/index"
   ],
   "window": {
     "navigationStyle": "custom",

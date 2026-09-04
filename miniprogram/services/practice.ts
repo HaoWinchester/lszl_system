@@ -1,6 +1,7 @@
 import { request } from './http';
 import {
   PracticeMode,
+  PracticeHistoryItem,
   PracticeReport,
   PracticeSession,
   SessionWriteInput,
@@ -48,9 +49,21 @@ export async function getActiveSessions(): Promise<PracticeSession[]> {
   return (payload.sessions || []).map(normalizeSession);
 }
 
-export async function listSessions(): Promise<PracticeSession[]> {
+export async function listSessions(): Promise<PracticeHistoryItem[]> {
   const payload = await request<{ sessions?: unknown[] }>({ path: `${ROOT}/sessions` });
-  return (payload.sessions || []).map(normalizeSession);
+  return (payload.sessions || []).map((value: any) => ({
+    sessionId: String(value?.sessionId || ''),
+    mode: String(value?.mode || 'practice') as PracticeHistoryItem['mode'],
+    paperId: value?.paperId ? String(value.paperId) : undefined,
+    paperName: String(value?.paperName || '未命名练习'),
+    answered: Math.max(0, Number(value?.answered || 0)),
+    correct: Math.max(0, Number(value?.correct || 0)),
+    experience: Math.max(0, Number(value?.experience || 0)),
+    durationMs: Math.max(0, Number(value?.durationMs || 0)),
+    status: String(value?.status || ''),
+    reportAvailable: value?.reportAvailable === true,
+    createdAt: value?.createdAt ? String(value.createdAt) : undefined,
+  }));
 }
 
 export async function startSession(input: StartSessionInput): Promise<PracticeSession> {

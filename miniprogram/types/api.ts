@@ -77,11 +77,48 @@ export interface SessionWriteInput {
 
 export interface PracticeReport {
   sessionId?: string;
-  accuracy?: number;
-  score?: number;
+  paperId?: string;
+  releaseId?: string;
+  paperName?: string;
+  mode?: BackendPracticeMode;
+  resultLabel?: string;
+  passed?: boolean;
+  accuracyPercent?: number;
+  scorePercent?: number;
+  rawScore?: number;
+  maxScore?: number;
+  passPercent?: number;
+  overallBand?: string;
+  counts?: {
+    total?: number;
+    answered?: number;
+    correct?: number;
+    wrong?: number;
+    unanswered?: number;
+  };
+  domains?: Record<string, {
+    total?: number;
+    correct?: number;
+    wrong?: number;
+    scorePercent?: number;
+    performanceBand?: string;
+  }>;
+  wrongQuestionIds?: string[];
   durationMs?: number;
-  experience?: number;
-  wrongQuestions?: unknown[];
-  weakDomains?: unknown[];
+  recommendations?: string[];
   [key: string]: unknown;
+}
+
+export interface PracticeHistoryItem {
+  sessionId: string;
+  mode: BackendPracticeMode;
+  paperId?: string;
+  paperName: string;
+  answered: number;
+  correct: number;
+  experience: number;
+  durationMs: number;
+  status: 'completed' | 'paused' | 'abandoned' | string;
+  reportAvailable: boolean;
+  createdAt?: string;
 }

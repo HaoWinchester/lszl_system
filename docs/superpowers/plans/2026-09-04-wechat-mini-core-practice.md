@@ -288,7 +288,7 @@ git commit -m "feat: build native mobile answer flow"
 - Consumes: `completeSession`, `getReport`, existing session list/overview endpoints.
 - Produces: result sections `summary`, `wrongQuestions`, `weakConcepts`, and retry/review navigation.
 
-- [ ] **Step 1: Write failing completion contracts**
+- [x] **Step 1: Write failing completion contracts**
 
 ```javascript
 test('result includes actionable learning feedback', () => {
@@ -297,16 +297,16 @@ test('result includes actionable learning feedback', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `node --test miniprogram/tests/result-history-contract.test.mjs`
 Expected: FAIL because result/history pages are absent.
 
-- [ ] **Step 3: Implement submission confirmation, result, and history**
+- [x] **Step 3: Implement submission confirmation, result, and history**
 
 Before completion show answered/unanswered counts; after confirmation call the existing complete endpoint once with revision and idempotency key. Result uses plain typographic hierarchy instead of dashboard cards, supports reviewing each question, and links wrong questions into the revenge flow. History groups attempts by date and resumes active sessions.
 
-- [ ] **Step 4: Run core frontend and backend gates**
+- [x] **Step 4: Run core frontend and backend gates**
 
 Run: `node --test miniprogram/tests/*.test.mjs`
 Expected: PASS.
@@ -314,7 +314,7 @@ Expected: PASS.
 Run: `cd backend && .venv/bin/python -m pytest tests/test_practice_mini_client_view.py tests/test_practice_sessions.py tests/test_practice_learning_api.py tests/test_paper_releases.py -q`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add miniprogram/app.json miniprogram/pages/home miniprogram/pages/practice miniprogram/pages/result miniprogram/pages/history miniprogram/tests/result-history-contract.test.mjs
