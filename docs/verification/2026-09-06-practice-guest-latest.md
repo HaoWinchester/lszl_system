@@ -16,8 +16,14 @@
 - 游客接口回归额外覆盖仅教师可见、撤回、题目详情与题目列表拒绝匿名访问。
 - agent-browser 使用独立测试数据库逐页点击登录、退出：practice-mode.html / question-workspace.html / knowledge-recall.html / index.html 全部通过。
 - 做题大厅：真实目录、最新标签、三个游客登录入口可见，登录后恢复开始做题入口，退出后仍展示目录；390px 宽度无横向溢出。
-- 发布构建：`node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser`。本地 release 为 v9.0-p4.1.212，候选 985 文件，admin-console.html 存在。远端旧 UAT 为 955 文件，候选未减少内容。
+- 发布构建：`node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser`。本地 release 为 v9.0-p4.1.212，候选 985 文件，admin-console.html 存在。远端旧 UAT 为 955 文件，候选文件总数未减少。
 
 ## 交付状态
 
-待合入 uat 并部署；UAT 业务验收必须由用户本人执行。本次不合入 main。
+已合入并推送 `uat`，功能提交 `558329f`；`main` 保持 `4d14a23`。
+
+执行 `bash deploy/update-uat.sh` 时，在第 0 步磁盘预检中止：远端可用空间 4,092,652 KiB（约 3.90 GiB），最低要求 5 GiB。未进行代码同步、数据库迁移或容器重启。旧 UAT 仍运行原版本。
+
+只读检查 `docker system df`：构建缓存仅约 524 MB，可回收缓存不足以达到门槛；无悬空镜像。未删除有名称的旧镜像、卷、正式备份或其他数据。
+
+部署需要服务器先释放足够空间；用户还需补充第 1 条“不限比例”的具体失败环节。UAT 业务验收尚未进行，不能合入 main。
