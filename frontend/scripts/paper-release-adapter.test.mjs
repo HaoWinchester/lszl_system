@@ -403,3 +403,32 @@ test('generated paper management loads the release adapter before the admin appl
 test('learner pages have no legacy Runtime bootstrap asset', () => {
   assert.equal(existsSync(resolve(frontendRoot, 'scripts/new-legacy-assets/server-state-bootstrap.js')), false)
 })
+
+
+test('guest catalog reloads after both login and logout', async () => {
+  const listeners = new Map()
+  let role = 'guest', requests = 0
+  const context = {
+    console, Promise,
+    CustomEvent: class { constructor(type, init = {}) { this.type = type; this.detail = init.detail } },
+    addEventListener(type, listener) { listeners.set(type, listener) },
+    dispatchEvent(event) { listeners.get(event.type)?.(event) },
+    async fetch() {
+      requests += 1
+      return { ok: true, json: async () => ({ releases: [{ paperId: role, releaseId: role, questionCount: 6 }], total: 1 }) }
+    },
+  }
+  context.window = context
+  attachDomainApi(context)
+  vm.runInNewContext(adapter, context)
+  await context.KGPaperReleaseApi.ready()
+  assert.equal(context.KGPaperReleaseApi.catalog()[0].paperId, 'guest')
+  for (const authenticated of [true, false]) {
+    role = authenticated ? 'student' : 'guest'
+    context.dispatchEvent(new context.CustomEvent('kg:auth-session-changed', { detail: { authenticated } }))
+    assert.equal(context.KGPaperReleaseApi.catalog().length, 0)
+    await context.KGPaperReleaseApi.ready()
+    assert.equal(context.KGPaperReleaseApi.catalog()[0].paperId, role)
+  }
+  assert.equal(requests, 3)
+})

@@ -2,10 +2,10 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import get_current_user, require_permissions
+from app.core.auth import get_current_user, optional_current_user, require_permissions
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.paper_release import PaperReleasePublishRequest, PaperReleaseWithdrawRequest
@@ -85,11 +85,12 @@ async def release_history(
 
 @router.get("/catalog")
 async def release_catalog(
+    request: Request,
     db: DB,
-    user: CurrentUser,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, alias="pageSize", ge=1, le=200),
 ):
+    user = await optional_current_user(request, db)
     return await paper_release_service.catalog(db, user, page=page, page_size=page_size)
 
 

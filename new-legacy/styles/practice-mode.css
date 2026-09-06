@@ -405,3 +405,5 @@ body.practice-mode-page:not([data-practice-view="lobby"]) .practice-exp-fab{disp
 .practice-history-row.is-paper>div:first-child>span{display:block;white-space:normal;line-height:1.5}
 .practice-history-row.is-paper>span{display:block;grid-column:1}
 .practice-history-row.is-paper>.practice-history-actions{grid-column:2;grid-row:1 / span 2;flex-direction:column}
+
+.practice-paper-latest{display:inline-flex;align-items:center;margin-left:8px;padding:2px 7px;border-radius:5px;background:#e4f5eb;color:#17633d;font-size:11px;line-height:1.5;font-weight:700;vertical-align:middle;white-space:nowrap}

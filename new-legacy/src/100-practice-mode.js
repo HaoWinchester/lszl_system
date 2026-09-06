@@ -1014,7 +1014,7 @@
   async function startPractice(mode){
     const challenge=mode==='challenge';
     if(state.entryStartingMode)return false;
-    if(mode==='revenge'&&!hasAuthenticatedUser())return startRevenge();
+    if(!hasAuthenticatedUser()){global.KGSharedAuthDialog?.open?.('登录后即可开始做题，并保存你的学习进度。');return false}
     const catalog=selectedRelease(),count=Number(state.selectedCount);
     if(mode!=='revenge'&&!catalog){syncLobby();return false}
     const access=catalog?paperAccess(catalog):{allowed:true,accessLevel:'free'};
@@ -1122,6 +1122,7 @@
     const revengeEntry=revengePolicy();
     dom.startButtons.forEach(button=>{
       const revenge=button.dataset.practiceStart==='revenge',revengeStats=getMistakeStats(),revengeAvailable=revengeStats.active>0,revengeUnavailable=Number(revengeStats.unavailable||0)>0;
+      if(!hasAuthenticatedUser()){button.disabled=false;button.classList.remove('is-upgrade');button.textContent='登录后'+(revenge?'开始复仇':button.dataset.practiceStart==='challenge'?'开始挑战':'进入学霸模式');return}
       button.disabled=revenge?!revengeAvailable&&!revengeUnavailable:(!release||!firstEnabled);
       button.classList.toggle('is-upgrade',!revenge&&!!release&&!access.allowed);
       button.textContent=revenge?(revengeAvailable?`开始复仇（${revengeEntry.automatic?'全部 ':''}${revengeEntry.requestCount} 题）`:revengeUnavailable?'检查错题内容':'暂无错题'):( !release?(button.dataset.defaultLabel||button.textContent):(!access.allowed?'开通会员':button.dataset.defaultLabel||button.textContent));
@@ -1159,7 +1160,7 @@
   function vipBadge(){return '<span class="practice-vip-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 4.3 4.1L12 4l4.7 6.1L21 6l-2 12H5L3 6Zm4.1 9h9.8l.8-4.8-1.4 1.3L12 6l-4.3 5.5-1.4-1.3.8 4.8Z"/></svg>VIP</span>'}
   function paperCardMarkup(row){
     const access=paperAccess(row),vip=row.accessPolicy?.accessLevel==='member',selected=row.id===state.selectedPaperId,count=Number(row.questionCount||row.totalCount||0);
-    return `<button type="button" class="practice-paper-card ${selected?'is-selected':''} ${!access.allowed?'is-locked':''}" data-paper-id="${escapeHTML(row.id)}" aria-pressed="${selected}">${vip?vipBadge():''}<div class="practice-paper-card-head"><span class="practice-paper-subject">${escapeHTML(row.subject||'综合')}</span>${vip?'':'<span class="practice-paper-free">免费</span>'}</div><h2>${escapeHTML(row.name)}</h2><p>${escapeHTML(row.description||'已发布练习试卷')}</p><div class="practice-paper-footer"><span>${count} 题 · v${Number(row.version||0)}</span><span class="practice-paper-access">${vip?(access.allowed?'VIP 已解锁':'会员专属'):'直接练习'}</span></div></button>`;
+    return `<button type="button" class="practice-paper-card ${selected?'is-selected':''} ${!access.allowed?'is-locked':''}" data-paper-id="${escapeHTML(row.id)}" aria-pressed="${selected}">${vip?vipBadge():''}<div class="practice-paper-card-head"><span class="practice-paper-subject">${escapeHTML(row.subject||'综合')}</span>${vip?'':'<span class="practice-paper-free">免费</span>'}</div><h2>${escapeHTML(row.name)}${global.KGPaperPresentation?.isRecentPublication(row)?'<span class="practice-paper-latest" aria-label="三天内发布的最新试卷">最新</span>':''}</h2><p>${escapeHTML(row.description||'已发布练习试卷')}</p><div class="practice-paper-footer"><span>${count} 题 · v${Number(row.version||0)}</span><span class="practice-paper-access">${vip?(access.allowed?'VIP 已解锁':'会员专属'):'直接练习'}</span></div></button>`;
   }
   function syncSelectedPaperCards(){
     document.querySelectorAll('[data-paper-id]').forEach(button=>{const selected=button.dataset.paperId===state.selectedPaperId;button.classList.toggle('is-selected',selected);button.setAttribute('aria-pressed',String(selected))});
@@ -1201,8 +1202,8 @@
     else if(!releases.some(row=>row.id===state.selectedPaperId))state.selectedPaperId=releases.find(row=>paperAccess(row).allowed)?.id||releases[0]?.id||'';
     if(dom.paperSelect){dom.paperSelect.innerHTML=releases.map(row=>'<option value="'+escapeHTML(row.id)+'">'+escapeHTML(row.name)+'</option>').join('');dom.paperSelect.value=state.selectedPaperId}
     const revengeStats=getMistakeStats(),revengeAvailable=revengeStats.active>0||Number(revengeStats.unavailable||0)>0;
-    dom.empty.hidden=!!releases.length||revengeAvailable;dom.setupCard.hidden=!releases.length;dom.modeGrid.hidden=!releases.length&&!revengeAvailable;
-    const library=dom.paperLibrary?.closest('.practice-library');if(library)library.hidden=!releases.length;
+    dom.empty.hidden=!!releases.length||revengeAvailable;dom.setupCard.hidden=false;dom.modeGrid.hidden=false;
+    const library=dom.paperLibrary?.closest('.practice-library');if(library)library.hidden=false;
     renderPaperLibrary();syncCountOptions();syncPaperMeta();syncRevengeStats();syncResumableButtons();
   }
   function syncRevengeStats(){

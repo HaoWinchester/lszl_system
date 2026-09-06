@@ -341,11 +341,11 @@
 
   global.KGPaperReleaseApi = api;
 
-  // 未登录时静默：请求会 401，目录保持空；登录成功事件后再试
+  // 游客也可读取目录摘要；登录和退出后重新获取当前角色可见目录。
   ready();
   global.addEventListener('kg:auth-session-changed', event => {
-    if (!event?.detail?.authenticated) return;
     invalidate({ keepCatalog: false });
+    announceChange();
     readyPromise = null;
     ready().then(() => announceChange()).catch(() => {});
   });

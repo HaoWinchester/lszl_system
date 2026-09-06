@@ -540,12 +540,22 @@ async def history(
     return {"releases": releases, "page": page, "pageSize": page_size, "total": total}
 
 
-async def catalog(db: AsyncSession, user: User, *, page: int, page_size: int) -> dict:
-    entitled = await entitlement_for_request(db, user)
+def catalog_summary(release: PaperRelease, *, user: User | None, entitled: bool) -> dict:
+    payload = release_to_dict(
+        release, content_restricted=user is None or not can_access_with_entitlement(user, release, entitled)
+    )
+    if user is None:
+        for key in ("publishedBy", "allowedRoles", "metadata"):
+            payload.pop(key, None)
+    return payload
+
+
+async def catalog(db: AsyncSession, user: User | None, *, page: int, page_size: int) -> dict:
+    entitled = await entitlement_for_request(db, user) if user else False
     # allowed_roles 为空数组表示不限制角色（与 can_access_with_entitlement 语义一致）
     role_filter = or_(
         func.jsonb_array_length(PaperRelease.allowed_roles) == 0,
-        PaperRelease.allowed_roles.contains([user.role]),
+        PaperRelease.allowed_roles.contains([user.role if user else "student"]),
     )
     base = select(PaperRelease).where(PaperRelease.status == ACTIVE_STATUS, role_filter)
     total = int(await db.scalar(select(func.count()).select_from(base.subquery())) or 0)
@@ -555,7 +565,7 @@ async def catalog(db: AsyncSession, user: User, *, page: int, page_size: int) ->
     )).scalars().all()
     return {
         "releases": [
-            release_to_dict(item, content_restricted=not can_access_with_entitlement(user, item, entitled))
+            catalog_summary(item, user=user, entitled=entitled)
             for item in releases
         ],
         "page": page,
