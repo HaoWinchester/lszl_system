@@ -46,9 +46,9 @@ def test_publish_payload_creates_release_and_withdraw_all(client=None) -> None:
         assert release["status"] == "published"
         assert release["questionCount"] == 1
         assert release["metadata"]["domainWeights"] == {
-            "people": 42,
-            "process": 50,
-            "business-environment": 8,
+            "people": 0,
+            "process": 1,
+            "business-environment": 0,
         }
         assert release["metadata"]["simulationScoring"]["passPercent"] == 60
         assert release["metadata"]["simulationScoring"]["official"] is False
@@ -156,7 +156,7 @@ def test_publish_payload_rejects_unclassified_pmp_practice_questions() -> None:
         detail = response.json()["detail"]
         assert detail["code"] == "PRACTICE_DOMAIN_PREFLIGHT_FAILED"
         assert detail["invalidQuestionNumbers"] == [1]
-        assert detail["shortages"] == {"process": 1}
+        assert "42%" not in detail["message"]
 
 
 def test_publish_payload_preserves_an_explicit_zero_question_score() -> None:
@@ -311,3 +311,57 @@ def test_experience_summary_week_and_daily() -> None:
         assert len(data["daily"]) == 7
         assert all(set(day) == {"date", "experience"} for day in data["daily"])
         assert data["weekStart"] < data["weekEnd"]
+
+
+@pytest.mark.parametrize("domain", ["people", "process", "business-environment"])
+def test_unrestricted_payload_publishes_and_starts_with_actual_domain_mix(domain):
+    from copy import deepcopy
+    with TestClient(app) as client:
+        login(client)
+        payload = _payload(paper_id=f"unrestricted-{uuid4().hex[:8]}")
+        prototype = payload["questionSnapshots"][0]
+        payload["questions"] = []
+        payload["questionSnapshots"] = []
+        for index in range(20):
+            item = deepcopy(prototype)
+            question_id = f"{payload['paperId']}-q{index}"
+            item["questionId"] = question_id
+            item["question"]["id"] = question_id
+            item["question"]["metadata"]["subjectFacets"][0]["valueId"] = domain
+            payload["questions"].append({"bankId": "b_test", "questionId": question_id, "order": index + 1})
+            payload["questionSnapshots"].append(item)
+        # Browser overrides must not determine the frozen distribution.
+        payload["metadata"] = {"domainWeights": {"people": 42, "process": 50, "business-environment": 8}}
+        response = client.post("/api/v1/paper-releases/publish-payload", json=payload)
+        assert response.status_code == 200, response.text
+        release = response.json()["release"]
+        assert release["metadata"]["domainWeights"] == {
+            value: 20 if value == domain else 0
+            for value in ("people", "process", "business-environment")
+        }
+        for count in (10, 20):
+            started = client.post("/api/v1/learning/practice/sessions/start", json={
+                "paperId": release["paperId"], "releaseId": release["releaseId"],
+                "mode": "challenge", "count": count, "order": "paper",
+            })
+            assert started.status_code == 200, started.text
+            session = started.json()["session"]
+            assert len(session["questions"]) == count
+            assert session["domainWeights"] == {
+                value: 100 if value == domain else 0
+                for value in ("people", "process", "business-environment")
+            }
+            ended = client.post(
+                f"/api/v1/learning/practice/sessions/{session['id']}/abandon",
+                json={"revision": session["revision"]},
+            )
+            assert ended.status_code == 200, ended.text
+
+
+def test_relative_domain_counts_become_report_percentages():
+    from app.models.paper_release import PaperRelease
+    from app.services.practice_session_service import _release_scoring
+    release = PaperRelease(release_metadata={"domainWeights": {"people": 2, "process": 4, "business-environment": 0}})
+    weights, scoring = _release_scoring(release)
+    assert weights == {"people": 33, "process": 67, "business-environment": 0}
+    assert scoring["domainWeights"] == weights
