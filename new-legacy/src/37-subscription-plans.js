@@ -95,11 +95,12 @@
           standardQuestionBank:true,
           allExamPapers:true,
           learningPackageImport:true,
-          learningPackageExport:true
+          learningPackageExport:true,
+          advancedRecall:true
         },
         limits:{
-          dailyTraining:80,
-          recallMaps:20,
+          dailyTraining:-1,
+          recallMaps:-1,
           graphNodes:-1,
           recallNodes:-1,
           importPackages:-1,
