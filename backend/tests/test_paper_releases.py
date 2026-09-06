@@ -1002,3 +1002,47 @@ def test_release_api_rejects_student_publish_and_exposes_lightweight_catalog() -
             assert history[0]["status"] == "withdrawn"
     finally:
         asyncio.run(_cleanup(ids))
+
+
+def test_guest_catalog_shows_student_papers_without_content_or_private_metadata():
+    ids = _ids()
+    asyncio.run(_seed(ids))
+
+    async def publish():
+        async with AsyncSessionLocal() as db:
+            teacher = await db.get(User, ids["teacher"])
+            release = await paper_release_service.publish(
+                db, teacher, ids["paper"], expected_revision=1,
+                access_level="member", enabled_modes=["practice_mode"],
+                allowed_roles=["student"], metadata={"internalNote": "private"},
+            )
+            return release.id
+
+    try:
+        release_id = asyncio.run(publish())
+        with TestClient(app) as client:
+            response = client.get("/api/v1/paper-releases/catalog?pageSize=200")
+            assert response.status_code == 200
+            row = next(row for row in response.json()["releases"] if row["releaseId"] == release_id)
+            assert row["name"] == "冻结试卷"
+            assert row["questionCount"] == 6
+            assert row["contentRestricted"] is True
+            assert row["publishedAt"] > 0
+            assert not {"questions", "questionSnapshots", "metadata", "publishedBy", "allowedRoles"} & row.keys()
+            assert client.get(f"/api/v1/paper-releases/{release_id}").status_code == 401
+            assert client.get(f"/api/v1/paper-releases/{release_id}/questions").status_code == 401
+
+            async def change_visibility(status, roles):
+                async with AsyncSessionLocal() as db:
+                    release = await db.get(PaperRelease, release_id)
+                    release.status = status
+                    release.allowed_roles = roles
+                    await db.commit()
+
+            for status, roles in [("published", ["teacher"]), ("withdrawn", ["student"])]:
+                asyncio.run(change_visibility(status, roles))
+                hidden = client.get("/api/v1/paper-releases/catalog?pageSize=200")
+                assert hidden.status_code == 200
+                assert release_id not in {item["releaseId"] for item in hidden.json()["releases"]}
+    finally:
+        asyncio.run(_cleanup(ids))

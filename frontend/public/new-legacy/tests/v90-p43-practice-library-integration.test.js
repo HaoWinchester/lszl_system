@@ -21,7 +21,8 @@ for (const id of [
 }
 
 for (const script of [
-  'src/59a-paper-learning-modes.js',
+  'src/59c-active-learning-mode-policy.js',
+  'src/paper-presentation.js',
   'src/58-paper-access-service.js',
   'src/59-published-paper-repository.js',
   'src/100-practice-mode.js',
