@@ -267,6 +267,7 @@ body.practice-mode-page.is-practice-drawer-open{overflow:hidden}
 .practice-language-cycle:active{transform:scale(.95)}
 .practice-language-cycle:focus-visible{outline:2px solid #7c3aed;outline-offset:2px}
 /* 复仇模式切题导航（底部） */
+.practice-study-tip{margin:20px 0 0;padding-top:14px;border-top:1px solid #e7ebf1;color:#64748b;font-size:12px;line-height:1.75;overflow-wrap:anywhere}.practice-study-tip strong{margin-right:8px;color:#475569;font-weight:700}
 .practice-question-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:22px;padding-top:16px;border-top:1px solid #eef1f5}
 .practice-nav-btn{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 16px;border:1px solid #d7dde6;border-radius:11px;background:#fff;color:#475569;font-size:13px;font-weight:720;transition:.15s ease}
 .practice-nav-btn:hover:not(:disabled){border-color:#9aa5b5;transform:translateY(-1px)}

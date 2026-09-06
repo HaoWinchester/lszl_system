@@ -801,6 +801,57 @@ with sync_playwright() as playwright:
     prevented_after_complete = page.evaluate("()=>{const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented}")
     assert prevented_after_complete is False
 
+    # 服务端已冻结随机题序：首次从第 1 题开始，跳题与恢复沿用同一序列。
+    for mode in ("challenge", "scholar", "practice"):
+        page.evaluate("KGPracticeMode.showLobby()")
+        page.locator('label:has(input[name="practiceOrder"][value="random"])').click()
+        page.evaluate(
+            """mode=>{
+              const order=[7,2,9,1,8,3,10,4,6,5];
+              const questions=order.map(n=>({questionId:'random-q'+n,orderIndex:n-1,question:{id:'random-q'+n,type:'single_choice',stemParts:[{text:'随机来源题 '+n}],options:[{id:'A',text:'正确',correct:true},{id:'B',text:'错误'}],correctAnswer:'A',analysis:'解析'}}));
+              let current={id:'ps-random-'+mode,paperId:'paper-1',releaseId:'release-1',mode,status:'active',revision:1,questions,answers:{},runtimeState:{currentIndex:0,order:'random'},stats:{total:10,answered:0}};
+              window.__randomSaved=null;
+              KGPracticeLearningApi.enterSession=async()=>({resumed:current.status==='paused',session:JSON.parse(JSON.stringify(current))});
+              KGPracticeLearningApi.pauseSession=async(id,input)=>{
+                window.__randomSaved=JSON.parse(JSON.stringify(input));
+                current={...current,status:'paused',revision:current.revision+1,runtimeState:input.runtimeState,answers:Object.fromEntries(Object.entries(input.answers).map(([id,a])=>[id,{...a,correct:a.selectedAnswer==='A'}]))};
+                return JSON.parse(JSON.stringify(current));
+              };
+            }""", mode,
+        )
+        page.evaluate("mode=>KGPracticeMode.startPractice(mode)", mode)
+        assert_question_progress(page, 1, 10)
+        assert page.locator('#practiceQuestionStem').inner_text() == '随机来源题 7'
+        open_sheet(page)
+        buttons = page.locator('#practiceAnswerSheet [data-question-id]')
+        expected_ids = [f'random-q{n}' for n in [7, 2, 9, 1, 8, 3, 10, 4, 6, 5]]
+        assert buttons.evaluate_all('(rows)=>rows.map(row=>row.dataset.questionId)') == expected_ids
+        assert buttons.locator('span').all_text_contents() == [str(n) for n in range(1, 11)]
+        assert buttons.first.get_attribute('aria-current') == 'step'
+        close_via(page, 'escape')
+        page.locator('[data-option-id="A"]').click()
+        page.wait_for_timeout(650)
+        jump_via_sheet(page, '[data-question-id="random-q4"]')
+        assert_question_progress(page, 8, 10)
+        assert page.locator('#practiceQuestionStem').inner_text() == '随机来源题 4'
+        page.locator('#practiceExitBtn').click()
+        page.locator('#practiceSaveExitBtn').click()
+        page.locator('#practiceLobby').wait_for(state='visible')
+        saved = page.evaluate('window.__randomSaved')
+        assert saved['runtimeState']['currentIndex'] == 7, saved
+        assert saved['runtimeState']['order'] == 'random', saved
+        assert saved['answers']['random-q7']['selectedAnswer'] == 'A', saved
+        # 大厅选择不能改写已保存会话的随机顺序。
+        page.locator('label:has(input[name="practiceOrder"][value="paper"])').click()
+        page.evaluate("mode=>KGPracticeMode.startPractice(mode)", mode)
+        assert_question_progress(page, 8, 10)
+        assert page.locator('#practiceQuestionStem').inner_text() == '随机来源题 4'
+        open_sheet(page)
+        assert buttons.evaluate_all('(rows)=>rows.map(row=>row.dataset.questionId)') == expected_ids
+        assert buttons.nth(7).get_attribute('aria-current') == 'step'
+        assert 'is-correct' in buttons.first.get_attribute('class')
+        close_via(page, 'escape')
+
     assert not errors, errors
     browser.close()
 
