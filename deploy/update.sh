@@ -12,6 +12,7 @@ PROJECT="lszl-kg"
 REMOTE_BACKUP_ROOT="/home/ubuntu/lszl-backups"
 BACKUP_TS="$(date +'%Y%m%d_%H%M%S')"
 REMOTE_BACKUP_DIR="${REMOTE_BACKUP_ROOT}/${BACKUP_TS}"
+ROLLBACK_IMAGE="lszl-kg-backend:rollback-${BACKUP_TS}"
 
 backup_remote_release() {
   ssh "$REMOTE" "install -d -m 700 '${REMOTE_BACKUP_DIR}'"
@@ -34,12 +35,16 @@ backup_remote_release() {
     && docker compose -p ${PROJECT} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} exec -T db pg_restore --list \
       < '${REMOTE_BACKUP_DIR}/db_${BACKUP_TS}.dump' >/dev/null"
 
+  # 给当前运行镜像保留明确标签，防止部署后的 dangling 清理移除回滚镜像。
+  ssh "$REMOTE" "docker tag \$(docker inspect --format '{{.Image}}' lszl-kg-backend-1) '${ROLLBACK_IMAGE}'"
+
   ssh "$REMOTE" "umask 077; cat > '${REMOTE_BACKUP_DIR}/manifest.txt' <<EOF
 project=lszl-kg
 backup_ts=${BACKUP_TS}
 backup_dir=${REMOTE_BACKUP_DIR}
 repo_backup=${REMOTE_BACKUP_DIR}/repo_${BACKUP_TS}.tar.gz
 db_backup=${REMOTE_BACKUP_DIR}/db_${BACKUP_TS}.dump
+rollback_image=${ROLLBACK_IMAGE}
 EOF"
   ssh "$REMOTE" "test -s '${REMOTE_BACKUP_DIR}/manifest.txt'"
   echo "      BACKUP_VERIFIED=${REMOTE_BACKUP_DIR}"
