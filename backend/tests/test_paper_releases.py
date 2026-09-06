@@ -197,7 +197,7 @@ def test_publish_and_withdraw_share_advisory_before_row_lock_order() -> None:
         asyncio.run(_cleanup(ids))
 
 
-def test_publish_freezes_default_practice_scoring_and_domain_weights() -> None:
+def test_publish_freezes_default_scoring_and_actual_domain_weights() -> None:
     ids = _ids()
     asyncio.run(_seed(ids))
 
@@ -216,9 +216,9 @@ def test_publish_freezes_default_practice_scoring_and_domain_weights() -> None:
             )
             assert release.release_metadata["source"] == "teacher-publish"
             assert release.release_metadata["domainWeights"] == {
-                "people": 42,
-                "process": 50,
-                "business-environment": 8,
+                "people": 3,
+                "process": 3,
+                "business-environment": 0,
             }
             assert release.release_metadata["simulationScoring"] == {
                 "version": 1,
@@ -1044,5 +1044,32 @@ def test_guest_catalog_shows_student_papers_without_content_or_private_metadata(
                 hidden = client.get("/api/v1/paper-releases/catalog?pageSize=200")
                 assert hidden.status_code == 200
                 assert release_id not in {item["releaseId"] for item in hidden.json()["releases"]}
+    finally:
+        asyncio.run(_cleanup(ids))
+
+
+@pytest.mark.parametrize("generated", [False, True])
+def test_manual_selected_paper_publishes_current_mix_even_after_generated_edit(generated):
+    ids = _ids()
+    asyncio.run(_seed(ids))
+    async def scenario():
+        async with AsyncSessionLocal() as db:
+            paper = await db.get(ExamPaper, ids["paper"])
+            if generated:
+                paper.generation_config = {
+                    "hardQuota": {"dimensionId": "exam-domain", "weights": {"people": 42, "process": 50, "business-environment": 8}},
+                    "hardActual": {"people": 3, "process": 3, "business-environment": 0},
+                }
+            for question in (await db.scalars(select(Question).where(Question.bank_id == ids["bank"]))).all():
+                question.content_metadata = {"subjectFacets": [{"dimensionId": "exam-domain", "valueId": "people"}]}
+            await db.commit()
+            teacher = await db.get(User, ids["teacher"])
+            release = await paper_release_service.publish(
+                db, teacher, ids["paper"], expected_revision=1, access_level="free",
+                enabled_modes=["practice_mode"], allowed_roles=["student"], metadata={},
+            )
+            assert release.release_metadata["domainWeights"] == {"people": 6, "process": 0, "business-environment": 0}
+    try:
+        asyncio.run(scenario())
     finally:
         asyncio.run(_cleanup(ids))

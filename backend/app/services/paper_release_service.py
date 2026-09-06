@@ -66,37 +66,7 @@ def _snapshot_is_learnable(snapshot: dict) -> bool:
     return bool(stem and len(options) >= 2 and has_answer)
 
 
-def _generated_domain_weights(
-    paper: ExamPaper,
-    *,
-    question_count: int,
-) -> dict[str, int] | None:
-    """Return trusted actual domain counts frozen by server-side composition."""
-
-    config = paper.generation_config if isinstance(paper.generation_config, dict) else {}
-    hard_quota = config.get("hardQuota")
-    hard_actual = config.get("hardActual")
-    expected_domains = set(practice_scoring_service.DEFAULT_DOMAIN_WEIGHTS)
-    if (
-        not isinstance(hard_quota, dict)
-        or hard_quota.get("dimensionId") != paper_composition_service.EXAM_DOMAIN
-        or not isinstance(hard_actual, dict)
-        or set(hard_actual) != expected_domains
-    ):
-        return None
-    if any(
-        isinstance(value, bool) or not isinstance(value, int) or value < 0
-        for value in hard_actual.values()
-    ):
-        return None
-    normalized = {
-        domain: hard_actual[domain]
-        for domain in practice_scoring_service.DEFAULT_DOMAIN_WEIGHTS
-    }
-    return normalized if sum(normalized.values()) == question_count else None
-
-
-def _validate_practice_domain_inventory(
+def _freeze_practice_domain_inventory(
     *,
     subject: str,
     paper_type: str,
@@ -110,9 +80,10 @@ def _validate_practice_domain_inventory(
         or str(subject).strip().upper() != "PMP"
     ):
         return
-    weights = metadata.get("domainWeights") or practice_scoring_service.DEFAULT_DOMAIN_WEIGHTS
-    allowed = set(weights)
-    available = {domain: 0 for domain in weights}
+    # Composition enforces requested quotas; publishing freezes the selected
+    # questions as they are, including unrestricted/manual and edited papers.
+    available = {domain: 0 for domain in practice_scoring_service.DEFAULT_DOMAIN_WEIGHTS}
+    allowed = set(available)
     invalid: list[int] = []
     for index, snapshot in enumerate(snapshots, start=1):
         raw_metadata = snapshot.get("metadata") if isinstance(snapshot.get("metadata"), dict) else {}
@@ -123,24 +94,17 @@ def _validate_practice_domain_inventory(
             invalid.append(index)
         else:
             available[domain] += 1
-    targets = paper_composition_service.allocate_counts(weights, len(snapshots))
-    shortages = {
-        domain: targets[domain] - available[domain]
-        for domain in targets
-        if available[domain] < targets[domain]
-    }
-    if invalid or shortages:
+    if invalid:
         raise HTTPException(
             status_code=422,
             detail={
                 "code": "PRACTICE_DOMAIN_PREFLIGHT_FAILED",
-                "message": "PMP 做题模式发布前需完成 42% / 50% / 8% 领域分类",
-                "domainTargets": targets,
+                "message": "PMP 做题模式发布前需为每道题配置有效的考试领域分类",
                 "available": available,
-                "shortages": shortages,
                 "invalidQuestionNumbers": invalid,
             },
         )
+    metadata["domainWeights"] = available
 
 
 async def _repair_release_snapshots(db: AsyncSession, canonical: dict) -> None:
@@ -385,13 +349,7 @@ async def publish(
         frozen_score = float(score if score is not None else 1)
         snapshot["releaseScore"] = frozen_score
         frozen_questions.append((question, order_index, frozen_score, snapshot))
-    generated_weights = _generated_domain_weights(
-        paper,
-        question_count=len(frozen_questions),
-    )
-    if generated_weights is not None:
-        metadata["domainWeights"] = generated_weights
-    _validate_practice_domain_inventory(
+    _freeze_practice_domain_inventory(
         subject=paper.subject,
         paper_type=paper.paper_type,
         modes=modes,
@@ -737,7 +695,7 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
         raw_score = question.get("score")
         snapshot["releaseScore"] = float(raw_score if raw_score is not None else 1)
         question["question"] = snapshot
-    _validate_practice_domain_inventory(
+    _freeze_practice_domain_inventory(
         subject=canonical["subject"],
         paper_type=canonical["paperType"],
         modes=canonical["enabledModes"],

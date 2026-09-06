@@ -112,8 +112,13 @@ def _release_scoring(release: PaperRelease) -> tuple[dict[str, int], dict]:
         if isinstance(raw_weights, dict)
         else dict(DEFAULT_DOMAIN_WEIGHTS)
     )
-    if any(value <= 0 for value in weights.values()) or sum(weights.values()) != 100:
+    if any(value < 0 for value in weights.values()) or sum(weights.values()) <= 0:
         weights = dict(DEFAULT_DOMAIN_WEIGHTS)
+    else:
+        # Releases may freeze relative question counts, including zero-count
+        # domains. Reports expose percentages, without reverting to PMP quotas.
+        percentages = paper_composition_service.allocate_counts(weights, 100)
+        weights = {domain: percentages.get(domain, 0) for domain in DEFAULT_DOMAIN_WEIGHTS}
     raw_scoring = metadata.get("simulationScoring")
     scoring = deepcopy(raw_scoring) if isinstance(raw_scoring, dict) else deepcopy(DEFAULT_SIMULATION_SCORING)
     scoring["domainWeights"] = weights
