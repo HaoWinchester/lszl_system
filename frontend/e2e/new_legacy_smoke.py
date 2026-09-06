@@ -44,6 +44,7 @@ with sync_playwright() as playwright:
     page_errors: list[str] = []
     http_errors: list[str] = []
     dialog_answers: list[str] = []
+    pending_api_requests: dict = {}
 
     def handle_dialog(dialog: Dialog) -> None:
         if dialog.type == "prompt":
@@ -61,7 +62,32 @@ with sync_playwright() as playwright:
             detail = ""
         http_errors.append(f"{response.status} {response.url} {detail}")
 
+    # 等当前初始化和请求结束后再主动离开页面；保留全部真实错误断言。
+    def wait_for_page_data(target) -> None:
+        if target.url == "about:blank":
+            return
+        target.evaluate("async () => { await window.KGSystemDomain?.ready }")
+        deadline = time.monotonic() + 15
+        settled_since = None
+        while time.monotonic() < deadline:
+            if pending_api_requests.get(target):
+                settled_since = None
+            elif settled_since is None:
+                settled_since = time.monotonic()
+            elif time.monotonic() - settled_since >= 0.1:
+                return
+            target.wait_for_timeout(50)
+        raise AssertionError("页面数据请求未结束，不能开始下一次导航")
+
+    def goto_page(url, **options):
+        wait_for_page_data(page)
+        return page.goto(url, **options)
+
     def bind_page_observers(target) -> None:
+        pending = pending_api_requests.setdefault(target, set())
+        target.on("request", lambda request: pending.add(request) if "/api/v1/" in request.url else None)
+        target.on("requestfinished", lambda request: pending.discard(request))
+        target.on("requestfailed", lambda request: pending.discard(request))
         target.on("dialog", handle_dialog)
         target.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
         target.on("pageerror", lambda error: page_errors.append(error.stack or str(error)) if len(page_errors) < 12 else None)
@@ -71,7 +97,7 @@ with sync_playwright() as playwright:
 
     try:
         print("smoke: guest learning entry lands on practice mode", flush=True)
-        page.goto(BASE + "/learning-path.html", wait_until="networkidle")
+        goto_page(BASE + "/learning-path.html", wait_until="networkidle")
         assert page.url == BASE + "/practice-mode.html"
         page.locator(".practice-app").wait_for(state="visible")
         page.locator("#practiceEmpty").wait_for(state="visible")
@@ -81,7 +107,7 @@ with sync_playwright() as playwright:
         assert page.locator("iframe").count() == 0
 
         print("smoke: original login UI backed by FastAPI session", flush=True)
-        page.goto(BASE + "/login", wait_until="networkidle")
+        goto_page(BASE + "/login", wait_until="networkidle")
         assert "/practice-mode.html?auth=login" in page.url
         page.locator(".practice-app").wait_for(state="visible")
         page.wait_for_function("""() => {
@@ -115,6 +141,7 @@ with sync_playwright() as playwright:
                 practice_runtime_requests.append(f"{request.method} {request.url}")
 
         page.on("request", record_practice_runtime_request)
+        wait_for_page_data(page)
         page.reload(wait_until="networkidle")
         page.wait_for_function("window.__KG_DIRECT_BOOTSTRAP__?.authenticated === true")
         assert "佩奇007" in page.locator("#authStatus").inner_text()
@@ -122,7 +149,7 @@ with sync_playwright() as playwright:
         assert not practice_runtime_requests, practice_runtime_requests
 
         print("smoke: admin page reads and writes real backend users", flush=True)
-        page.goto(BASE + "/users", wait_until="networkidle")
+        goto_page(BASE + "/users", wait_until="networkidle")
         page.locator(".um-app").wait_for(state="visible")
         page.locator("#umListToolsToggle").click()
         for username in ACCOUNTS:
@@ -146,7 +173,7 @@ with sync_playwright() as playwright:
         assert not dialog_answers
 
         print("smoke: retired training alias redirects to practice mode", flush=True)
-        page.goto(BASE + "/training", wait_until="networkidle")
+        goto_page(BASE + "/training", wait_until="networkidle")
         assert page.url.startswith(BASE + "/practice-mode.html")
         assert "retiredMode=single_deep_study" in page.url
         page.locator(".practice-app").wait_for(state="visible", timeout=15_000)
@@ -168,7 +195,7 @@ with sync_playwright() as playwright:
         for route, selector in routes:
             # 教学内容与状态同步会持续轮询；稳定页面以 DOM + 根容器
             # 就绪为准，不把“网络永远空闲”当作页面可用的先决条件。
-            page.goto(BASE + route, wait_until="domcontentloaded")
+            goto_page(BASE + route, wait_until="domcontentloaded")
             page.locator(selector).wait_for(state="visible", timeout=15_000)
             if route == "/users":
                 # The root renders before the first user-page request settles. Wait for
@@ -184,7 +211,7 @@ with sync_playwright() as playwright:
 
         print("smoke: retired guided-learning aliases redirect to practice mode", flush=True)
         for route in ["/learning/placement-test", "/learning/node?node=awareness-keywords"]:
-            page.goto(BASE + route, wait_until="networkidle")
+            goto_page(BASE + route, wait_until="networkidle")
             assert page.url == BASE + "/practice-mode.html"
             page.locator(".practice-app").wait_for(state="visible", timeout=15_000)
             assert page.locator(".gln-main, .glp-main").count() == 0
@@ -219,10 +246,12 @@ with sync_playwright() as playwright:
         previous_page = page
         page = context.new_page()
         bind_page_observers(page)
+        wait_for_page_data(previous_page)
         previous_page.close()
         screenshot = Path("/tmp/new-legacy-direct-settings.png")
-        page.goto(BASE + "/settings", wait_until="domcontentloaded")
+        goto_page(BASE + "/settings", wait_until="domcontentloaded")
         page.locator(".ss-app").wait_for(state="visible", timeout=15_000)
+        wait_for_page_data(page)
         page.screenshot(path=str(screenshot), full_page=False)
         assert screenshot.exists()
 
