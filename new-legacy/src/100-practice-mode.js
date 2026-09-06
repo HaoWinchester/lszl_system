@@ -22,7 +22,7 @@
     remediationPending:false,verification:null,entryStartingMode:'',revengeRulePinned:false,showPreviousWrong:true,
     session:null,report:null,reviewing:false,answerSheet:null,pendingSelections:{},submitting:false,pendingRequestKey:'',resumeLookupToken:0,
     draft:null,revengeState:null,saves:null,reconciling:false,paperProgress:null,revengeSummary:null,
-    markedQuestions:new Set(),showAnswers:false,questionsShuffled:false
+    markedQuestions:new Set(),showAnswers:false
   };
 
   function clone(value){try{return JSON.parse(JSON.stringify(value))}catch(error){return value}}
@@ -153,10 +153,6 @@
     // 交卷后 / 复盘页才消费服务器冻结结果（state.session.answers 已被完成态覆盖）。
     const draftView=state.reviewing?null:(state.draft?.viewAnswers?.()||null);
     const base=state.session?normalizedSession(state.session):{mode:state.mode,questions:draftQuestions(),answers:{}};
-    if(state.questionsShuffled){
-      // 会话题目被本地确定性洗牌后，答题卡必须跟显示顺序一致，否则题号/跳题错位。
-      base.questions=state.questions.map(question=>({questionId:question.id}));
-    }
     if(draftView&&!state.reviewing)return {...base,answers:draftView,reviewOnly:false};
     return {...base,reviewOnly:state.reviewing};
   }
@@ -302,22 +298,6 @@
   function shuffle(items){
     const list=items.slice();
     for(let index=list.length-1;index>0;index--){const swap=Math.floor(Math.random()*(index+1));[list[index],list[swap]]=[list[swap],list[index]]}
-    return list;
-  }
-  // 确定性洗牌：同一种子恒定同序，用于恢复 random 会话时跨刷新/跨设备稳定重排。
-  function seededShuffle(items,seed){
-    const list=items.slice();
-    // xmur3 字符串哈希 + mulberry32：轻量确定性 PRNG，无依赖
-    let h=1779033703^seed.length;
-    for(let i=0;i<seed.length;i+=1){h=Math.imul(h^seed.charCodeAt(i),3432918353);h=(h<<13)|(h>>>19)}
-    let a=(h^=h>>>16)>>>0;
-    const random=()=>{
-      a=(a+0x6D2B79F5)|0;
-      let t=Math.imul(a^(a>>>15),1|a);
-      t=(t+Math.imul(t^(t>>>7),61|t))^t;
-      return ((t^(t>>>14))>>>0)/4294967296;
-    };
-    for(let index=list.length-1;index>0;index--){const swap=Math.floor(random()*(index+1));[list[index],list[swap]]=[list[swap],list[index]]}
     return list;
   }
   function streakBonus(streak){if(streak>=8)return 10;if(streak>=5)return 5;if(streak>=3)return 2;return 0}
@@ -502,7 +482,7 @@
       try{
         const api=practiceApi(),session=await api.getSession(sessionId),report=await api.getReport(sessionId);
         state.session=normalizedSession(session);state.questions=sessionQuestions(state.session);state.report=clone(report);state.mode=session.mode;state.active=false;state.reviewing=false;state.lastSettings={paperId:session.paperId,count:state.questions.length,order:text(session.runtimeState?.order||'paper'),mode:session.mode};
-        state.markedQuestions=new Set();state.showAnswers=false;state.questionsShuffled=false;
+        state.markedQuestions=new Set();state.showAnswers=false;
         closeHistoryDrawer();renderFrozenReport();setView('result');return true;
       }catch(error){showToast('成绩报告暂时无法打开，请稍后重试。');return false}
     });
@@ -961,7 +941,7 @@
     if(!questions.length){showToast('错题内容暂不可用，请稍后刷新重试。');return false}
     const policy=global.KGRevengeEntryPolicy.derive(questions.length,state.revengeSelectedCount),count=policy.requestCount;
     clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);
-    state.mode='revenge';state.showPreviousWrong=true;state.order='weakness_first';state.questions=questions.slice(0,count);state.pendingSelections={};state.markedQuestions=new Set();state.showAnswers=false;state.questionsShuffled=false;state.index=0;state.health=MAX_HEALTH;state.streak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
+    state.mode='revenge';state.showPreviousWrong=true;state.order='weakness_first';state.questions=questions.slice(0,count);state.pendingSelections={};state.markedQuestions=new Set();state.showAnswers=false;state.index=0;state.health=MAX_HEALTH;state.streak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
     state.lastSettings={paperId:'',count,order:'weakness_first',mode:'revenge'};document.body.dataset.practiceMode='revenge';dom.timer.hidden=true;dom.timeRow.hidden=true;dom.health.hidden=true;
     setView('game');renderQuestion();return true;
   }
@@ -984,13 +964,9 @@
     const runtime=state.session.runtimeState||{},stats=state.session.stats||{};
     state.markedQuestions=new Set(Array.isArray(runtime.markedQuestionIds)?runtime.markedQuestionIds.map(text):[]);
     state.showAnswers=state.mode==='practice'&&runtime.showAnswers===true;
-    // 随机顺序：优先会话冻结的 order；恢复时按 sessionId 确定性洗牌，
-    // 再把保存的 currentIndex 换算到新顺序中同一道题的位置。
+    // 服务端已冻结题序；题目、答题卡和 currentIndex 共用该顺序，不能再次洗牌。
     state.order=['paper','random'].includes(runtime.order)?runtime.order:(state.order||'paper');
-    const savedQuestionId=state.questions[Math.max(0,Math.min(state.questions.length-1,Number(runtime.currentIndex)||0))]?.id;
-    state.questionsShuffled=state.order==='random'&&!!state.session.id;
-    if(state.questionsShuffled)state.questions=seededShuffle(state.questions,state.session.id);
-    state.index=Math.max(0,state.questions.findIndex(question=>question.id===savedQuestionId));
+    state.index=Math.max(0,Math.min(state.questions.length-1,Number(runtime.currentIndex)||0));
     state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;
     state.health=Number.isInteger(runtime.health)?runtime.health:state.maxHealth;state.streak=Math.max(0,Number(runtime.streak)||0);state.maxStreak=Math.max(0,Number(runtime.maxStreak)||0);state.experience=Math.max(0,Number(runtime.experience??stats.experience)||0);state.correct=Math.max(0,Number(stats.correct)||0);state.answered=Math.max(0,Number(stats.answered)||0);
     // 挑战无回血：生命是题量与已答错题的派生值，不能信任旧版保存的固定 3 点血量。
@@ -1053,7 +1029,7 @@
         if(state.order==='random')questions=shuffle(questions);
         if(state.retiredNavigation)questions=prioritizeRetiredQuestion(questions,state.retiredNavigation.questionId);
         state.questions=questions.slice(0,count);state.pendingSelections={};
-        state.markedQuestions=new Set();state.showAnswers=false;state.questionsShuffled=false;
+        state.markedQuestions=new Set();state.showAnswers=false;
         state.index=0;state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;state.health=state.maxHealth;state.challengeFailedShown=false;state.streak=0;state.maxStreak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
         createDraft(null);
         if(state.mode==='challenge'||state.mode==='scholar')showToast('答完全部题目将自动交卷；做错的题（含中途退出时已答的）都会记入复仇模式。');
