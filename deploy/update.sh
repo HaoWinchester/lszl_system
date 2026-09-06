@@ -26,6 +26,14 @@ backup_remote_release() {
     pg_dump --format=custom --no-owner --no-acl -U \"\${POSTGRES_USER:-kg}\" -d \"\${POSTGRES_DB:-kg_graph}\"' \
     > '${REMOTE_BACKUP_DIR}/db_${BACKUP_TS}.dump'"
 
+  # 备份文件为空或格式不可读时必须在任何正式同步/重启之前中止。
+  ssh "$REMOTE" "test -s '${REMOTE_BACKUP_DIR}/repo_${BACKUP_TS}.tar.gz' \
+    && tar -tzf '${REMOTE_BACKUP_DIR}/repo_${BACKUP_TS}.tar.gz' >/dev/null \
+    && test -s '${REMOTE_BACKUP_DIR}/db_${BACKUP_TS}.dump' \
+    && cd '${REMOTE_DIR}' \
+    && docker compose -p ${PROJECT} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} exec -T db pg_restore --list \
+      < '${REMOTE_BACKUP_DIR}/db_${BACKUP_TS}.dump' >/dev/null"
+
   ssh "$REMOTE" "umask 077; cat > '${REMOTE_BACKUP_DIR}/manifest.txt' <<EOF
 project=lszl-kg
 backup_ts=${BACKUP_TS}
@@ -33,6 +41,8 @@ backup_dir=${REMOTE_BACKUP_DIR}
 repo_backup=${REMOTE_BACKUP_DIR}/repo_${BACKUP_TS}.tar.gz
 db_backup=${REMOTE_BACKUP_DIR}/db_${BACKUP_TS}.dump
 EOF"
+  ssh "$REMOTE" "test -s '${REMOTE_BACKUP_DIR}/manifest.txt'"
+  echo "      BACKUP_VERIFIED=${REMOTE_BACKUP_DIR}"
 }
 
 echo "[0/5] 发布前备份远端当前代码与数据库"
