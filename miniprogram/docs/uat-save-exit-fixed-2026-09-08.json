@@ -1,0 +1,60 @@
+{
+  "environment": "https://uat.aihuanpu.com",
+  "runtimeCommit": "1c5cf277fb371ee5e1791a05e49a4f7f686e126f",
+  "checkedDate": "2026-09-08",
+  "passed": 3,
+  "results": [
+    {
+      "mode": "normal",
+      "sessionId": "ps_536a49767ad949d2bee18bba091810cd",
+      "checks": [
+        "background save",
+        "pause exit",
+        "multi-select draft",
+        "mark and answer sheet",
+        "second-client resume",
+        "cancel exit",
+        "complete",
+        "lost-response retry",
+        "report and history",
+        "cross-user isolation",
+        "abandon"
+      ]
+    },
+    {
+      "mode": "challenge",
+      "sessionId": "ps_3dbb0198d5c04bfd9b65c410efafdd52",
+      "checks": [
+        "background save",
+        "pause exit",
+        "multi-select draft",
+        "mark and answer sheet",
+        "second-client resume",
+        "cancel exit",
+        "complete",
+        "lost-response retry",
+        "report and history",
+        "cross-user isolation",
+        "abandon"
+      ]
+    },
+    {
+      "mode": "scholar",
+      "sessionId": "ps_bd177e5c965446e0a9675b2802bec452",
+      "checks": [
+        "background save",
+        "pause exit",
+        "multi-select draft",
+        "mark and answer sheet",
+        "second-client resume",
+        "cancel exit",
+        "complete",
+        "lost-response retry",
+        "report and history",
+        "cross-user isolation",
+        "abandon"
+      ]
+    }
+  ],
+  "cleanup": "Test tokens revoked; three test identities archived, records retained"
+}

@@ -1,0 +1,704 @@
+{
+  "checkedAt": "2026-09-08T04:52:30.327Z",
+  "checks": [
+    {
+      "name": "free: identity and membership expiry",
+      "passed": true,
+      "ms": 540
+    },
+    {
+      "name": "free: server receipt events cannot be forged",
+      "passed": true,
+      "ms": 349
+    },
+    {
+      "name": "free: catalog filters and server membership gate",
+      "passed": true,
+      "ms": 1082
+    },
+    {
+      "name": "free: home, history and profile data preparation",
+      "passed": true,
+      "ms": 7207
+    },
+    {
+      "name": "free: refresh failure retains data and recovers",
+      "passed": true,
+      "ms": 1089
+    },
+    {
+      "name": "free: rapid tab re-entry avoids duplicate page fetches",
+      "passed": true,
+      "ms": 338
+    },
+    {
+      "name": "free: authoritative complete, result and PC parity",
+      "passed": true,
+      "ms": 1273
+    },
+    {
+      "name": "free: revenge initial answer and repeated-write safety",
+      "passed": true,
+      "ms": 1120
+    },
+    {
+      "name": "free: resume unfinished remediation",
+      "passed": true,
+      "ms": 568
+    },
+    {
+      "name": "free: remediation without a variant has a usable exit",
+      "passed": true,
+      "ms": 1117
+    },
+    {
+      "name": "free: logout revokes only the current device",
+      "passed": true,
+      "ms": 531
+    },
+    {
+      "name": "member: identity and membership expiry",
+      "passed": true,
+      "ms": 540
+    },
+    {
+      "name": "member: server receipt events cannot be forged",
+      "passed": true,
+      "ms": 417
+    },
+    {
+      "name": "member: catalog filters and server membership gate",
+      "passed": true,
+      "ms": 1155
+    },
+    {
+      "name": "member: home, history and profile data preparation",
+      "passed": true,
+      "ms": 6379
+    },
+    {
+      "name": "member: refresh failure retains data and recovers",
+      "passed": true,
+      "ms": 1097
+    },
+    {
+      "name": "member: rapid tab re-entry avoids duplicate page fetches",
+      "passed": true,
+      "ms": 286
+    },
+    {
+      "name": "member: authoritative complete, result and PC parity",
+      "passed": true,
+      "ms": 1277
+    },
+    {
+      "name": "member: revenge initial answer and repeated-write safety",
+      "passed": true,
+      "ms": 962
+    },
+    {
+      "name": "member: resume unfinished remediation",
+      "passed": true,
+      "ms": 381
+    },
+    {
+      "name": "member: remediation without a variant has a usable exit",
+      "passed": true,
+      "ms": 679
+    },
+    {
+      "name": "member: 180-question limit, large paper save and resume",
+      "passed": true,
+      "ms": 2955
+    },
+    {
+      "name": "member: logout revokes only the current device",
+      "passed": true,
+      "ms": 487
+    },
+    {
+      "name": "expired: identity and membership expiry",
+      "passed": true,
+      "ms": 487
+    },
+    {
+      "name": "expired: server receipt events cannot be forged",
+      "passed": true,
+      "ms": 255
+    },
+    {
+      "name": "expired: catalog filters and server membership gate",
+      "passed": true,
+      "ms": 1210
+    },
+    {
+      "name": "expired: home, history and profile data preparation",
+      "passed": true,
+      "ms": 6510
+    },
+    {
+      "name": "expired: refresh failure retains data and recovers",
+      "passed": true,
+      "ms": 1072
+    },
+    {
+      "name": "expired: rapid tab re-entry avoids duplicate page fetches",
+      "passed": true,
+      "ms": 279
+    },
+    {
+      "name": "expired: authoritative complete, result and PC parity",
+      "passed": true,
+      "ms": 1168
+    },
+    {
+      "name": "expired: revenge initial answer and repeated-write safety",
+      "passed": true,
+      "ms": 921
+    },
+    {
+      "name": "expired: resume unfinished remediation",
+      "passed": true,
+      "ms": 522
+    },
+    {
+      "name": "expired: remediation without a variant has a usable exit",
+      "passed": true,
+      "ms": 1099
+    },
+    {
+      "name": "expired: logout revokes only the current device",
+      "passed": true,
+      "ms": 658
+    }
+  ],
+  "pageTimes": [
+    {
+      "name": "free/membership",
+      "ms": 130
+    },
+    {
+      "name": "free/papers",
+      "ms": 904
+    },
+    {
+      "name": "free/home/first",
+      "ms": 482
+    },
+    {
+      "name": "free/history/first",
+      "ms": 241
+    },
+    {
+      "name": "free/profile/first",
+      "ms": 596
+    },
+    {
+      "name": "free/home/warm",
+      "ms": 434
+    },
+    {
+      "name": "free/history/warm",
+      "ms": 213
+    },
+    {
+      "name": "free/profile/warm",
+      "ms": 580
+    },
+    {
+      "name": "free/home/warm",
+      "ms": 517
+    },
+    {
+      "name": "free/history/warm",
+      "ms": 555
+    },
+    {
+      "name": "free/profile/warm",
+      "ms": 1052
+    },
+    {
+      "name": "free/home/warm",
+      "ms": 434
+    },
+    {
+      "name": "free/history/warm",
+      "ms": 228
+    },
+    {
+      "name": "free/profile/warm",
+      "ms": 546
+    },
+    {
+      "name": "free/home/warm",
+      "ms": 451
+    },
+    {
+      "name": "free/history/warm",
+      "ms": 213
+    },
+    {
+      "name": "free/profile/warm",
+      "ms": 524
+    },
+    {
+      "name": "free/result",
+      "ms": 272
+    },
+    {
+      "name": "member/membership",
+      "ms": 179
+    },
+    {
+      "name": "member/papers",
+      "ms": 757
+    },
+    {
+      "name": "member/home/first",
+      "ms": 462
+    },
+    {
+      "name": "member/history/first",
+      "ms": 224
+    },
+    {
+      "name": "member/profile/first",
+      "ms": 594
+    },
+    {
+      "name": "member/home/warm",
+      "ms": 501
+    },
+    {
+      "name": "member/history/warm",
+      "ms": 217
+    },
+    {
+      "name": "member/profile/warm",
+      "ms": 548
+    },
+    {
+      "name": "member/home/warm",
+      "ms": 485
+    },
+    {
+      "name": "member/history/warm",
+      "ms": 220
+    },
+    {
+      "name": "member/profile/warm",
+      "ms": 556
+    },
+    {
+      "name": "member/home/warm",
+      "ms": 433
+    },
+    {
+      "name": "member/history/warm",
+      "ms": 253
+    },
+    {
+      "name": "member/profile/warm",
+      "ms": 585
+    },
+    {
+      "name": "member/home/warm",
+      "ms": 444
+    },
+    {
+      "name": "member/history/warm",
+      "ms": 221
+    },
+    {
+      "name": "member/profile/warm",
+      "ms": 510
+    },
+    {
+      "name": "member/result",
+      "ms": 246
+    },
+    {
+      "name": "member/full-paper/start",
+      "ms": 577
+    },
+    {
+      "name": "member/full-paper/pause",
+      "ms": 723
+    },
+    {
+      "name": "member/full-paper/resume",
+      "ms": 483
+    },
+    {
+      "name": "expired/membership",
+      "ms": 128
+    },
+    {
+      "name": "expired/papers",
+      "ms": 1017
+    },
+    {
+      "name": "expired/home/first",
+      "ms": 466
+    },
+    {
+      "name": "expired/history/first",
+      "ms": 275
+    },
+    {
+      "name": "expired/profile/first",
+      "ms": 539
+    },
+    {
+      "name": "expired/home/warm",
+      "ms": 437
+    },
+    {
+      "name": "expired/history/warm",
+      "ms": 223
+    },
+    {
+      "name": "expired/profile/warm",
+      "ms": 666
+    },
+    {
+      "name": "expired/home/warm",
+      "ms": 441
+    },
+    {
+      "name": "expired/history/warm",
+      "ms": 212
+    },
+    {
+      "name": "expired/profile/warm",
+      "ms": 511
+    },
+    {
+      "name": "expired/home/warm",
+      "ms": 564
+    },
+    {
+      "name": "expired/history/warm",
+      "ms": 233
+    },
+    {
+      "name": "expired/profile/warm",
+      "ms": 517
+    },
+    {
+      "name": "expired/home/warm",
+      "ms": 469
+    },
+    {
+      "name": "expired/history/warm",
+      "ms": 242
+    },
+    {
+      "name": "expired/profile/warm",
+      "ms": 583
+    },
+    {
+      "name": "expired/result",
+      "ms": 239
+    }
+  ],
+  "latency": [
+    {
+      "path": "GET /api/v1/auth/mini/session",
+      "n": 42,
+      "p50Ms": 133,
+      "p95Ms": 247,
+      "maxMs": 290,
+      "maxBytes": 634
+    },
+    {
+      "path": "GET /api/v1/subscriptions/me",
+      "n": 27,
+      "p50Ms": 381,
+      "p95Ms": 527,
+      "maxMs": 804,
+      "maxBytes": 291
+    },
+    {
+      "path": "GET /api/v1/paper-releases/catalog",
+      "n": 21,
+      "p50Ms": 335,
+      "p95Ms": 1035,
+      "maxMs": 1143,
+      "maxBytes": 17856
+    },
+    {
+      "path": "GET /api/v1/learning/practice/revenge/summary",
+      "n": 24,
+      "p50Ms": 306,
+      "p95Ms": 374,
+      "maxMs": 392,
+      "maxBytes": 121
+    },
+    {
+      "path": "GET /api/v1/learning/practice/sessions/active",
+      "n": 56,
+      "p50Ms": 308,
+      "p95Ms": 531,
+      "maxMs": 803,
+      "maxBytes": 476
+    },
+    {
+      "path": "GET /api/v1/learning/practice/sessions",
+      "n": 40,
+      "p50Ms": 383,
+      "p95Ms": 515,
+      "maxMs": 804,
+      "maxBytes": 610
+    },
+    {
+      "path": "GET /api/v1/learning/practice/experience-summary",
+      "n": 21,
+      "p50Ms": 383,
+      "p95Ms": 450,
+      "maxMs": 805,
+      "maxBytes": 387
+    },
+    {
+      "path": "POST /api/v1/learning/practice/sessions/start",
+      "n": 5,
+      "p50Ms": 214,
+      "p95Ms": 571,
+      "maxMs": 571,
+      "maxBytes": 884171
+    },
+    {
+      "path": "POST /api/v1/learning/practice/sessions/:session/complete",
+      "n": 3,
+      "p50Ms": 341,
+      "p95Ms": 346,
+      "maxMs": 346,
+      "maxBytes": 68172
+    },
+    {
+      "path": "GET /api/v1/learning/practice/sessions/:session/report",
+      "n": 3,
+      "p50Ms": 217,
+      "p95Ms": 235,
+      "maxMs": 235,
+      "maxBytes": 1619
+    },
+    {
+      "path": "GET /api/v1/learning/practice/sessions/:session",
+      "n": 4,
+      "p50Ms": 245,
+      "p95Ms": 480,
+      "maxMs": 480,
+      "maxBytes": 884296
+    },
+    {
+      "path": "GET /api/v1/learning/practice/overview",
+      "n": 9,
+      "p50Ms": 238,
+      "p95Ms": 335,
+      "maxMs": 335,
+      "maxBytes": 40927
+    },
+    {
+      "path": "POST /api/v1/learning/practice/mistakes/:mistake/revenge-answer",
+      "n": 9,
+      "p50Ms": 196,
+      "p95Ms": 239,
+      "maxMs": 239,
+      "maxBytes": 22377
+    },
+    {
+      "path": "GET /api/v1/learning/practice/mistakes/:mistake/remediation",
+      "n": 3,
+      "p50Ms": 186,
+      "p95Ms": 219,
+      "maxMs": 219,
+      "maxBytes": 22377
+    },
+    {
+      "path": "POST /api/v1/learning/practice/mistakes/:mistake/remediation-reviewed",
+      "n": 3,
+      "p50Ms": 343,
+      "p95Ms": 414,
+      "maxMs": 414,
+      "maxBytes": 22407
+    },
+    {
+      "path": "GET /api/v1/learning/practice/mistakes/:mistake/verification-candidate",
+      "n": 6,
+      "p50Ms": 186,
+      "p95Ms": 247,
+      "maxMs": 247,
+      "maxBytes": 140
+    },
+    {
+      "path": "POST /api/v1/auth/mini/logout",
+      "n": 3,
+      "p50Ms": 244,
+      "p95Ms": 253,
+      "maxMs": 253,
+      "maxBytes": 11
+    },
+    {
+      "path": "POST /api/v1/learning/practice/sessions/:session/abandon",
+      "n": 2,
+      "p50Ms": 189,
+      "p95Ms": 608,
+      "maxMs": 608,
+      "maxBytes": 884329
+    },
+    {
+      "path": "POST /api/v1/learning/practice/sessions/:session/pause",
+      "n": 1,
+      "p50Ms": 719,
+      "p95Ms": 719,
+      "maxMs": 719,
+      "maxBytes": 884296
+    }
+  ],
+  "facts": [
+    {
+      "label": "free",
+      "revengeStage": "remediation",
+      "empty": true,
+      "waitingCount": 1
+    },
+    {
+      "label": "member",
+      "revengeStage": "remediation",
+      "empty": true,
+      "waitingCount": 1
+    },
+    {
+      "label": "expired",
+      "revengeStage": "remediation",
+      "empty": true,
+      "waitingCount": 1
+    }
+  ],
+  "failedRequests": [
+    {
+      "path": "/api/v1/learning/events",
+      "method": "POST",
+      "status": 400,
+      "ms": 150.23204099999998,
+      "bytes": 58,
+      "simulated": false
+    },
+    {
+      "path": "/api/v1/learning/events",
+      "method": "POST",
+      "status": 400,
+      "ms": 197.564125,
+      "bytes": 58,
+      "simulated": false
+    },
+    {
+      "path": "/api/v1/learning/practice/sessions/start",
+      "method": "POST",
+      "status": 404,
+      "ms": 162.01783399999977,
+      "bytes": 97,
+      "simulated": false
+    },
+    {
+      "path": "/api/v1/learning/practice/mistakes/:mistake/revenge-answer",
+      "method": "POST",
+      "status": 422,
+      "ms": 195.34937499999978,
+      "bytes": 58,
+      "simulated": false
+    },
+    {
+      "path": "/api/v1/auth/mini/session",
+      "method": "GET",
+      "status": 401,
+      "ms": 99.98504199999843,
+      "bytes": 55,
+      "simulated": false
+    },
+    {
+      "path": "/api/v1/learning/events",
+      "method": "POST",
+      "status": 400,
+      "ms": 174.74933299999975,
+      "bytes": 58,
+      "simulated": false
+    },
+    {
+      "path": "/api/v1/learning/events",
+      "method": "POST",
+      "status": 400,
+      "ms": 242.23500000000058,
+      "bytes": 58,
+      "simulated": false
+    },
+    {
+      "path": "/api/v1/learning/practice/mistakes/:mistake/revenge-answer",
+      "method": "POST",
+      "status": 422,
+      "ms": 135.55754199999865,
+      "bytes": 58,
+      "simulated": false
+    },
+    {
+      "path": "/api/v1/learning/practice/sessions/start",
+      "method": "POST",
+      "status": 422,
+      "ms": 132.3615830000017,
+      "bytes": 95,
+      "simulated": false
+    },
+    {
+      "path": "/api/v1/auth/mini/session",
+      "method": "GET",
+      "status": 401,
+      "ms": 85.40666599999531,
+      "bytes": 55,
+      "simulated": false
+    },
+    {
+      "path": "/api/v1/learning/events",
+      "method": "POST",
+      "status": 400,
+      "ms": 124.9614170000059,
+      "bytes": 58,
+      "simulated": false
+    },
+    {
+      "path": "/api/v1/learning/events",
+      "method": "POST",
+      "status": 400,
+      "ms": 129.40287499999977,
+      "bytes": 58,
+      "simulated": false
+    },
+    {
+      "path": "/api/v1/learning/practice/sessions/start",
+      "method": "POST",
+      "status": 404,
+      "ms": 184.59124999999767,
+      "bytes": 97,
+      "simulated": false
+    },
+    {
+      "path": "/api/v1/learning/practice/mistakes/:mistake/revenge-answer",
+      "method": "POST",
+      "status": 422,
+      "ms": 136.03016699999716,
+      "bytes": 58,
+      "simulated": false
+    },
+    {
+      "path": "/api/v1/auth/mini/session",
+      "method": "GET",
+      "status": 401,
+      "ms": 123.54020899999887,
+      "bytes": 55,
+      "simulated": false
+    }
+  ],
+  "totalRequests": 300,
+  "passed": 34,
+  "failed": 0
+}
